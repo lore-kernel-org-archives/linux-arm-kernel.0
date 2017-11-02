@@ -1,101 +1,204 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 2 Nov 2017 14:56:15 +0800
-Subject: [PATCH V3 00/11] add clock driver for Spreadtrum platforms
-Message-ID: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
+Date: Thu, 2 Nov 2017 14:56:19 +0800
+Subject: [PATCH V3 04/11] clk: sprd: add gate clock support
+In-Reply-To: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
+References: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171102065626.21835-5-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds Spreadtrum clock support together with its binding
-documentation and devicetree data.
+Some clocks on the Spreadtrum's SoCs are just simple gates. Add
+support for those clocks.
 
-Any comments would be greatly appreciated.
-
-Thanks,
-Chunyan
-
-Changes from V2: (http://lkml.iu.edu/hypermail/linux/kernel/1707.1/01504.html)
-* Switch to use regmap to access registers;
-* Splited all clocks into 16 separated nodes, for each belongs to a single address area; 
-* Rearranged the order of clock declaration in sc9860-clk.c, sorted them upon the address area;
-* Added syscon device tree nodes which will be quoted by the node of clocks which are in
-  the same address area with the syscon device;
-* Revised the binding documentation according to the dt modification. 
-
-Changes from V1: (https://lkml.org/lkml/2017/6/17/356)
-* Address Stephen's comments:
-  - Switch to use platform device driver instead of the DT probing mechanism.
-  - Move the common clock macro out from vendor directory, but need to remove those
-    overlap code from other vendors (such as sunxi-ng) once this get merged.
-  - Add support to be built as a module.
-  - Add 'sprd_' prefix for all spin locks used in these drivers.
-  - Mark input parameter of sprd_x with const.
-  - Remove unreasonable dependencies to CONFIG_64BIT.
-  - Add readl() after writing the same register.
-  - Remove CLK_IS_BASIC which is no longer used.
-  - Remove unnecessery CLK_IGNORE_UNUSED when defining a clock.
-  - Change to expose all clock index.
-  - Use clk_ instead of ccu.
-  - Add Kconfig for sprd clocks.
-  - Move the fixed clocks out from the soc node.
-  - Switch to use 64-bit math in pll driver instead of 32-bit math.
-* Revise binding documentation according to dt modification.
-* Rename sc9860.c to sc9860-clk.c
-
-
-Chunyan Zhang (11):
-  drivers: move clock common macros out from vendor directories
-  dt-bindings: Add Spreadtrum clock binding documentation
-  clk: sprd: Add common infrastructure
-  clk: sprd: add gate clock support
-  clk: sprd: add mux clock support
-  clk: sprd: add divider clock support
-  clk: sprd: add composite clock support
-  clk: sprd: add adjustable pll support
-  clk: sprd: add clocks support for SC9860
-  arm64: dts: add syscon for whale2 platform
-  arm64: dts: add clocks for SC9860
-
- Documentation/devicetree/bindings/clock/sprd.txt |   55 +
- arch/arm64/boot/dts/sprd/sc9860.dtsi             |  115 ++
- arch/arm64/boot/dts/sprd/whale2.dtsi             |   48 +-
- drivers/clk/Kconfig                              |    1 +
- drivers/clk/Makefile                             |    1 +
- drivers/clk/clk_common.h                         |   60 +
- drivers/clk/sprd/Kconfig                         |   14 +
- drivers/clk/sprd/Makefile                        |   11 +
- drivers/clk/sprd/common.c                        |  112 ++
- drivers/clk/sprd/common.h                        |   57 +
- drivers/clk/sprd/composite.c                     |   65 +
- drivers/clk/sprd/composite.h                     |   49 +
- drivers/clk/sprd/div.c                           |  100 ++
- drivers/clk/sprd/div.h                           |   79 +
- drivers/clk/sprd/gate.c                          |  106 ++
- drivers/clk/sprd/gate.h                          |   54 +
- drivers/clk/sprd/mux.c                           |   89 +
- drivers/clk/sprd/mux.h                           |   65 +
- drivers/clk/sprd/pll.c                           |  268 +++
- drivers/clk/sprd/pll.h                           |  110 ++
- drivers/clk/sprd/sc9860-clk.c                    | 1987 ++++++++++++++++++++++
- include/dt-bindings/clock/sprd,sc9860-clk.h      |  408 +++++
- 22 files changed, 3852 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/sprd.txt
- create mode 100644 drivers/clk/clk_common.h
- create mode 100644 drivers/clk/sprd/Kconfig
- create mode 100644 drivers/clk/sprd/Makefile
- create mode 100644 drivers/clk/sprd/common.c
- create mode 100644 drivers/clk/sprd/common.h
- create mode 100644 drivers/clk/sprd/composite.c
- create mode 100644 drivers/clk/sprd/composite.h
- create mode 100644 drivers/clk/sprd/div.c
- create mode 100644 drivers/clk/sprd/div.h
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ drivers/clk/sprd/Makefile |   1 +
+ drivers/clk/sprd/gate.c   | 106 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sprd/gate.h   |  54 +++++++++++++++++++++++
+ 3 files changed, 161 insertions(+)
  create mode 100644 drivers/clk/sprd/gate.c
  create mode 100644 drivers/clk/sprd/gate.h
- create mode 100644 drivers/clk/sprd/mux.c
- create mode 100644 drivers/clk/sprd/mux.h
- create mode 100644 drivers/clk/sprd/pll.c
- create mode 100644 drivers/clk/sprd/pll.h
- create mode 100644 drivers/clk/sprd/sc9860-clk.c
- create mode 100644 include/dt-bindings/clock/sprd,sc9860-clk.h
 
+diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
+index 74f4b80..8cd5592 100644
+--- a/drivers/clk/sprd/Makefile
++++ b/drivers/clk/sprd/Makefile
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
+ 
+ clk-sprd-y	+= common.o
++clk-sprd-y	+= gate.o
+diff --git a/drivers/clk/sprd/gate.c b/drivers/clk/sprd/gate.c
+new file mode 100644
+index 0000000..831ef81
+--- /dev/null
++++ b/drivers/clk/sprd/gate.c
+@@ -0,0 +1,106 @@
++/*
++ * Spreadtrum gate clock driver
++ *
++ * Copyright (C) 2017 Spreadtrum, Inc.
++ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#include <linux/clk-provider.h>
++#include <linux/regmap.h>
++
++#include "gate.h"
++
++DEFINE_SPINLOCK(sprd_gate_lock);
++EXPORT_SYMBOL_GPL(sprd_gate_lock);
++
++static void sprd_gate_endisable(const struct sprd_gate *sg, u32 en)
++{
++	const struct sprd_clk_common *common = &sg->common;
++	unsigned long flags = 0;
++	unsigned int reg;
++	int set = sg->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
++
++	set ^= en;
++
++	spin_lock_irqsave(common->lock, flags);
++
++	sprd_regmap_read(common->regmap, common->reg, &reg);
++
++	if (set)
++		reg |= sg->op_bit;
++	else
++		reg &= ~sg->op_bit;
++
++	sprd_regmap_write(common->regmap, common->reg, reg);
++
++	spin_unlock_irqrestore(common->lock, flags);
++}
++
++static void clk_sc_gate_endisable(const struct sprd_gate *sg, u32 en)
++{
++	const struct sprd_clk_common *common = &sg->common;
++	unsigned long flags = 0;
++	int set = sg->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
++	unsigned int offset;
++
++	set ^= en;
++
++	/*
++	 * Each set/clear gate clock has three registers:
++	 * common->reg			- base register
++	 * common->reg + offset		- set register
++	 * common->reg + 2 * offset	- clear register
++	 */
++	offset = set ? sg->sc_offset : sg->sc_offset * 2;
++
++	spin_lock_irqsave(common->lock, flags);
++	sprd_regmap_write(common->regmap, common->reg + offset, sg->op_bit);
++	spin_unlock_irqrestore(common->lock, flags);
++}
++
++static void sprd_gate_disable(struct clk_hw *hw)
++{
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
++
++	if (sg->sc_offset)
++		clk_sc_gate_endisable(sg, 0);
++	else
++		sprd_gate_endisable(sg, 0);
++}
++
++static int sprd_gate_enable(struct clk_hw *hw)
++{
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
++
++	if (sg->sc_offset)
++		clk_sc_gate_endisable(sg, 1);
++	else
++		sprd_gate_endisable(sg, 1);
++
++	return 0;
++}
++
++static int sprd_gate_is_enabled(struct clk_hw *hw)
++{
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
++	struct sprd_clk_common *common = &sg->common;
++	unsigned int reg;
++
++	sprd_regmap_read(common->regmap, common->reg, &reg);
++
++	if (sg->flags & CLK_GATE_SET_TO_DISABLE)
++		reg ^= sg->op_bit;
++
++	reg &= sg->op_bit;
++
++	return reg ? 1 : 0;
++}
++
++const struct clk_ops sprd_gate_ops = {
++	.disable	= sprd_gate_disable,
++	.enable		= sprd_gate_enable,
++	.is_enabled	= sprd_gate_is_enabled,
++};
++EXPORT_SYMBOL_GPL(sprd_gate_ops);
+diff --git a/drivers/clk/sprd/gate.h b/drivers/clk/sprd/gate.h
+new file mode 100644
+index 0000000..5aeb53c
+--- /dev/null
++++ b/drivers/clk/sprd/gate.h
+@@ -0,0 +1,54 @@
++/*
++ * Spreadtrum gate clock driver
++ *
++ * Copyright (C) 2017 Spreadtrum, Inc.
++ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#ifndef _SPRD_GATE_H_
++#define _SPRD_GATE_H_
++
++#include "common.h"
++
++struct sprd_gate {
++	u32			op_bit;
++	u16			flags;
++	u16			sc_offset;
++
++	struct sprd_clk_common	common;
++};
++
++#define SPRD_GATE_CLK(_struct, _name, _parent, _reg, _sc_offset,	\
++		      _op_bit, _flags, _gate_flags)			\
++	struct sprd_gate _struct = {					\
++		.op_bit		= _op_bit,				\
++		.sc_offset	= _sc_offset,				\
++		.flags		= _gate_flags,				\
++		.common	= {						\
++			.regmap		= NULL,				\
++			.reg		= _reg,				\
++			.lock		= &sprd_gate_lock,		\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						      _parent,		\
++						      &sprd_gate_ops,	\
++						      _flags),		\
++		}							\
++	}
++
++static inline struct sprd_gate *hw_to_sprd_gate(const struct clk_hw *hw)
++{
++	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
++
++	return container_of(common, struct sprd_gate, common);
++}
++
++void sprd_gate_helper_disable(struct sprd_clk_common *common, u32 gate);
++int sprd_gate_helper_enable(struct sprd_clk_common *common, u32 gate);
++int sprd_gate_helper_is_enabled(struct sprd_clk_common *common, u32 gate);
++
++extern const struct clk_ops sprd_gate_ops;
++extern spinlock_t sprd_gate_lock;
++
++#endif /* _SPRD_GATE_H_ */
 -- 
 2.7.4
