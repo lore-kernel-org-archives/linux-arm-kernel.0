@@ -1,59 +1,69 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 2 Nov 2017 14:36:23 -0600
-Subject: [PATCH 13/17] coresight etr: Do not clean ETR trace buffer
-In-Reply-To: <20171019171553.24056-14-suzuki.poulose@arm.com>
-References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-14-suzuki.poulose@arm.com>
-Message-ID: <20171102203623.GE23320@xps15>
+From: nleeder@codeaurora.org (Leeder, Neil)
+Date: Thu, 2 Nov 2017 16:38:27 -0400
+Subject: [PATCH 0/2] arm64 SMMUv3 PMU driver with IORT support
+In-Reply-To: <20171031233352.5232hzebwek6avzi@yury-thinkpad>
+References: <1501876754-1064-1-git-send-email-nleeder@codeaurora.org>
+ <20171031233352.5232hzebwek6avzi@yury-thinkpad>
+Message-ID: <5db10f59-e2dc-cb03-0950-58e14eac16e5@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 19, 2017 at 06:15:49PM +0100, Suzuki K Poulose wrote:
-> We zero out the entire trace buffer used for ETR before it
-> is enabled, for helping with debugging. Since we could be
-> restoring a session in perf mode, this could destroy the data.
+Hi Yury,
 
-I'm not sure to follow you with "... restoring a session in perf mode ...". 
-When operating from the perf interface all the memory allocated for a session is
-cleanup after, there is no re-using of memory as in sysFS.
-
-> Get rid of this step, if someone wants to debug, they can always
-> add it as and when needed.
+On 10/31/2017 7:33 PM, Yury Norov wrote:
+> Hi Neil,
 > 
-> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tmc-etr.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
+> On Fri, Aug 04, 2017 at 03:59:12PM -0400, Neil Leeder wrote:
+>> This adds a driver for the SMMUv3 PMU into the perf framework.
+>> It includes an IORT update to support PM Counter Groups.
+>>
+>> IORT has no mechanism for determining device names so PMUs
+>> are named based on their physical address. 
+>>
+>> Tested on Qualcomm QDF2400. perf_fuzzer ran for 4+ hours
+>> with no failures.
+>>
+>> Neil Leeder (2):
+>>   acpi: arm64: add iort support for PMCG
+>>   perf: add arm64 smmuv3 pmu driver
+>>
+>>  drivers/acpi/arm64/iort.c     |  54 +++
+>>  drivers/perf/Kconfig          |   9 +
+>>  drivers/perf/Makefile         |   1 +
+>>  drivers/perf/arm_smmuv3_pmu.c | 823 ++++++++++++++++++++++++++++++++++++++++++
+>>  include/acpi/actbl2.h         |   9 +-
+>>  5 files changed, 895 insertions(+), 1 deletion(-)
+>>  create mode 100644 drivers/perf/arm_smmuv3_pmu.c
 > 
-> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> index 31353fc34b53..849684f85443 100644
-> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
-> @@ -971,8 +971,6 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
->  		return;
->  
->  	drvdata->etr_buf = etr_buf;
-> -	/* Zero out the memory to help with debug */
-> -	memset(etr_buf->vaddr, 0, etr_buf->size);
-
-I agree, this can be costly when dealing with large areas of memory.
-
->  
->  	CS_UNLOCK(drvdata->base);
->  
-> @@ -1267,9 +1265,8 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
->  	if (drvdata->mode == CS_MODE_SYSFS) {
->  		/*
->  		 * The trace run will continue with the same allocated trace
-> -		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
-> -		 * so we don't have to explicitly clear it. Also, since the
-> -		 * tracer is still enabled drvdata::buf can't be NULL.
-> +		 * buffer. Since the tracer is still enabled drvdata::buf can't
-> +		 * be NULL.
->  		 */
->  		tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
->  	} else {
-> -- 
-> 2.13.6
+> I try to run your driver on ThunderX2, but perf list doesn't show new
+> events, and example in description in patch 2 also doesn't work:
+> yury at VAL1-25:~/linux$ tools/perf/perf stat -e smmu_0_ff88840/transaction,filter_enable=1, filter_span=1,filter_stream_id=0x42/ -a pwd
+> event syntax error: '..ter_enable=1,'
+>                                   \___ parser error
+> Run 'perf list' for a list of valid events 
 > 
+>  Usage: perf stat [<options>] [<command>]
+> 
+>     -e, --event <event>   event selector. use 'perf list' to list available events
+> 
+> I run v4.14-rc7 kernel plus this series. The config is attached. I
+> found that platform_match() never return 1 for arm-smmu-pmu and so
+> the driver never probed.
+> 
+> Maybe it's my local configuration issue?
+
+Thanks for testing this driver. As some of the review comments pointed out, there are
+some changes needed which will be addressed in a future patchset. Notably the IORT
+needs updating to handle the two base addresses. The current driver assumes the second
+memory area is adjacent to the first, which may not be the case in all implementations.
+
+In order to make the driver probe correctly, you'll need to update your ACPI tables
+with entries for PMCG, node type 0x5. This ACPI information will include the two base
+addresses. I've heard that the updated spec which will include the second memory
+area will be available soon. At that point I will release another patchset for review.
+
+Neil
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
