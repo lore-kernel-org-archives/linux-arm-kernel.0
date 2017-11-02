@@ -1,75 +1,34 @@
-From: olivier.moysan@st.com (Olivier MOYSAN)
-Date: Thu, 2 Nov 2017 16:38:36 +0000
-Subject: [INTERNAL][PATCH 4/7] ASoC: stm32: sai: fix stop management in isr
-In-Reply-To: <s5hmv4ekjr4.wl-tiwai@suse.de>
-References: <1508418203-16840-1-git-send-email-olivier.moysan@st.com>
- <1508418203-16840-5-git-send-email-olivier.moysan@st.com>
- <s5hmv4ekjr4.wl-tiwai@suse.de>
-Message-ID: <dcb5104f-2d32-f51b-16ba-4cdb9f4c5e59@st.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Thu, 2 Nov 2017 17:47:06 +0100
+Subject: [PATCH] arm: ensure dump_instr() checks addr_limit
+In-Reply-To: <20171102163452.7652-1-mark.rutland@arm.com>
+References: <20171102163452.7652-1-mark.rutland@arm.com>
+Message-ID: <20171102164706.GC5061@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Takashi,
+On Thu, Nov 02, 2017 at 04:34:52PM +0000, Mark Rutland wrote:
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 
-Sorry for late answer. I was OoO.
-Ok, I will add a protection on sai->substream accesses.
+Huh?  What's that doing up here?
 
-Best regards
-Olivier
+> When CONFIG_DEBUG_USER is enabled, it's possible for a user to
+> deliberately trigger dump_instr() with a chosen kernel address.
+> 
+> Let's avoid problems resulting from this by using get_user() rather than
+> __get_user(), ensuring that we don't erroneously access kernel memory.
+> 
+> So that we can use the same code to dump user instructions and kernel
+> instructions, the common dumping code is factored out to __dump_instr(),
+> with the fs manipulated appropriately in dump_instr() around calls to
+> this.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Cc: Russell King <rmk+kernel@armlinux.org.uk>
+> Cc: stable at vger.kernel.org
 
+It's right here...
 
-On 10/26/2017 05:32 PM, Takashi Iwai wrote:
-> On Thu, 19 Oct 2017 15:03:20 +0200,
-> Olivier Moysan wrote:
->>
->> Add check on substream validity.
->>
->> Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
->> ---
->>   sound/soc/stm/stm32_sai_sub.c | 12 ++++++++----
->>   1 file changed, 8 insertions(+), 4 deletions(-)
->>
->> diff --git a/sound/soc/stm/stm32_sai_sub.c b/sound/soc/stm/stm32_sai_sub.c
->> index 2af397d..815ef10 100644
->> --- a/sound/soc/stm/stm32_sai_sub.c
->> +++ b/sound/soc/stm/stm32_sai_sub.c
->> @@ -184,7 +184,6 @@ static bool stm32_sai_sub_writeable_reg(struct device *dev, unsigned int reg)
->>   static irqreturn_t stm32_sai_isr(int irq, void *devid)
->>   {
->>   	struct stm32_sai_sub_data *sai = (struct stm32_sai_sub_data *)devid;
->> -	struct snd_pcm_substream *substream = sai->substream;
->>   	struct platform_device *pdev = sai->pdev;
->>   	unsigned int sr, imr, flags;
->>   	snd_pcm_state_t status = SNDRV_PCM_STATE_RUNNING;
->> @@ -199,6 +198,11 @@ static irqreturn_t stm32_sai_isr(int irq, void *devid)
->>   	regmap_update_bits(sai->regmap, STM_SAI_CLRFR_REGX, SAI_XCLRFR_MASK,
->>   			   SAI_XCLRFR_MASK);
->>   
->> +	if (!sai->substream) {
->> +		dev_err(&pdev->dev, "Device stopped. Spurious IRQ 0x%x\n", sr);
->> +		return IRQ_NONE;
->> +	}
->> +
->>   	if (flags & SAI_XIMR_OVRUDRIE) {
->>   		dev_err(&pdev->dev, "IRQ %s\n",
->>   			STM_SAI_IS_PLAYBACK(sai) ? "underrun" : "overrun");
->> @@ -227,9 +231,9 @@ static irqreturn_t stm32_sai_isr(int irq, void *devid)
->>   	}
->>   
->>   	if (status != SNDRV_PCM_STATE_RUNNING) {
->> -		snd_pcm_stream_lock(substream);
->> -		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
->> -		snd_pcm_stream_unlock(substream);
->> +		snd_pcm_stream_lock(sai->substream);
->> +		snd_pcm_stop(sai->substream, SNDRV_PCM_STATE_XRUN);
->> +		snd_pcm_stream_unlock(sai->substream);
-> 
-> Actually changing to sai->substream opens a race, so this chunk is a
-> bad move, at least.  We have no protection of sai->substream in this
-> context, thus it can hit a NULL dereference...
-> 
-> 
-> thanks,
-> 
-> Takashi
-> 
+confused.
+
+greg k-h
