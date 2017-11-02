@@ -1,128 +1,342 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 2 Nov 2017 00:36:09 -0700
-Subject: [PATCH V2 02/10] clk: reparent orphans after critical clocks
- enabled
-In-Reply-To: <1499946435-7177-3-git-send-email-aisheng.dong@nxp.com>
-References: <1499946435-7177-1-git-send-email-aisheng.dong@nxp.com>
- <1499946435-7177-3-git-send-email-aisheng.dong@nxp.com>
-Message-ID: <20171102073609.GT30645@codeaurora.org>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Thu, 2 Nov 2017 12:58:50 +0530
+Subject: [PATCH v3 3/3] interconnect: Add Qualcomm msm8916 interconnect
+ provider driver
+In-Reply-To: <20170908171830.13813-4-georgi.djakov@linaro.org>
+References: <20170908171830.13813-1-georgi.djakov@linaro.org>
+ <20170908171830.13813-4-georgi.djakov@linaro.org>
+Message-ID: <CAHLCerNO=yznzCdyNt13EYeuSW_b-Rb1dRFnq=MZtXoMLWkkUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/13, Dong Aisheng wrote:
-> The orphan clocks reparent operation should be moved after the critical
-> clocks enabled, otherwise it may get a chance to disable a newly
-> registered critical clock which triggers the following warning.
-> 
-> Assuming we have two clocks: A and B, B is the parent of A.
-> Clock A has flag: CLK_OPS_PARENT_ENABLE
-> Clock B has flag: CLK_IS_CRITICAL
-> 
-> Step 1:
-> Clock A is registered, then it becomes orphan.
-> 
-> Step 2:
-> Clock B is registered. Before clock B reach the critical clock enable
-> operation, orphan A will find the newly registered parent B and do
-> reparent operation, then parent B will be finally disabled in
-> __clk_set_parent_after() due to CLK_OPS_PARENT_ENABLE flag as there's
-> still no users of B which will then trigger the following warning.
-> 
-> [    0.000000] WARNING: CPU: 0 PID: 0 at drivers/clk/clk.c:597 clk_core_disable+0xb4/0xe0
-> [    0.000000] Modules linked in:
-> [    0.000000] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.11.0-rc1-00056-gdff1f66-dirty #1373
-> [    0.000000] Hardware name: Generic DT based system
-> [    0.000000] Backtrace:
-> [    0.000000] [<c010c4bc>] (dump_backtrace) from [<c010c764>] (show_stack+0x18/0x1c)
-> [    0.000000]  r6:600000d3 r5:00000000 r4:c0e26358 r3:00000000
-> [    0.000000] [<c010c74c>] (show_stack) from [<c040599c>] (dump_stack+0xb4/0xe8)
-> [    0.000000] [<c04058e8>] (dump_stack) from [<c0125c94>] (__warn+0xd8/0x104)
-> [    0.000000]  r10:c0c21cd0 r9:c048aa78 r8:00000255 r7:00000009 r6:c0c1cd90 r5:00000000
-> [    0.000000]  r4:00000000 r3:c0e01d34
-> [    0.000000] [<c0125bbc>] (__warn) from [<c0125d74>] (warn_slowpath_null+0x28/0x30)
-> [    0.000000]  r9:00000000 r8:ef00bf80 r7:c165ac4c r6:ef00bf80 r5:ef00bf80 r4:ef00bf80
-> [    0.000000] [<c0125d4c>] (warn_slowpath_null) from [<c048aa78>] (clk_core_disable+0xb4/0xe0)
-> [    0.000000] [<c048a9c4>] (clk_core_disable) from [<c048be88>] (clk_core_disable_lock+0x20/0x2c)
-> [    0.000000]  r4:000000d3 r3:c0e0af00
-> [    0.000000] [<c048be68>] (clk_core_disable_lock) from [<c048c224>] (clk_core_disable_unprepare+0x14/0x28)
-> [    0.000000]  r5:00000000 r4:ef00bf80
-> [    0.000000] [<c048c210>] (clk_core_disable_unprepare) from [<c048c270>] (__clk_set_parent_after+0x38/0x54)
-> [    0.000000]  r4:ef00bd80 r3:000010a0
-> [    0.000000] [<c048c238>] (__clk_set_parent_after) from [<c048daa8>] (clk_register+0x4d0/0x648)
-> [    0.000000]  r6:ef00d500 r5:ef00bf80 r4:ef00bd80 r3:ef00bfd4
-> [    0.000000] [<c048d5d8>] (clk_register) from [<c048dc30>] (clk_hw_register+0x10/0x1c)
-> [    0.000000]  r9:00000000 r8:00000003 r7:00000000 r6:00000824 r5:00000001 r4:ef00d500
-> [    0.000000] [<c048dc20>] (clk_hw_register) from [<c048e698>] (_register_divider+0xcc/0x120)
-> [    0.000000] [<c048e5cc>] (_register_divider) from [<c048e730>] (clk_register_divider+0x44/0x54)
-> [    0.000000]  r10:00000004 r9:00000003 r8:00000001 r7:00000000 r6:00000003 r5:00000001
-> [    0.000000]  r4:f0810030
-> [    0.000000] [<c048e6ec>] (clk_register_divider) from [<c0d3ff58>] (imx7ulp_clocks_init+0x558/0xe98)
-> [    0.000000]  r7:c0e296f8 r6:c165c808 r5:00000000 r4:c165c808
-> [    0.000000] [<c0d3fa00>] (imx7ulp_clocks_init) from [<c0d24db0>] (of_clk_init+0x118/0x1e0)
-> [    0.000000]  r10:00000001 r9:c0e01f68 r8:00000000 r7:c0e01f60 r6:ef7f8974 r5:ef0035c0
-> [    0.000000]  r4:00000006
-> [    0.000000] [<c0d24c98>] (of_clk_init) from [<c0d04a50>] (time_init+0x2c/0x38)
-> [    0.000000]  r10:efffed40 r9:c0d61a48 r8:c0e78000 r7:c0e07900 r6:ffffffff r5:c0e78000
-> [    0.000000]  r4:00000000
-> [    0.000000] [<c0d04a24>] (time_init) from [<c0d00b8c>] (start_kernel+0x218/0x394)
-> [    0.000000] [<c0d00974>] (start_kernel) from [<6000807c>] (0x6000807c)
-> [    0.000000]  r10:00000000 r9:410fc075 r8:6000406a r7:c0e0c930 r6:c0d61a44 r5:c0e07918
-> [    0.000000]  r4:c0e78294
-> [    0.000000] ---[ end trace 0000000000000000 ]---
-
-Please remove timestamps from logs unless they're important.
-
-> 
-> Fixes: fc8726a2c021 ("clk: core: support clocks which requires parents enable (part 2)")
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Michael Turquette <mturquette@baylibre.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Signed-off-by: Dong Aisheng <aisheng.dong@nxp.com>
-> 
+On Fri, Sep 8, 2017 at 10:48 PM, Georgi Djakov <georgi.djakov@linaro.org> wrote:
+> Add driver for the Qualcomm interconnect buses found in msm8916 based
+> platforms. This patch contains only a partial topology to make reviewing
+> easier.
+>
+> Signed-off-by: Georgi Djakov <georgi.djakov@linaro.org>
 > ---
-> ChangeLog:
-> v1->v2:
->  * add more detailed commit messages
+>  drivers/interconnect/Kconfig                     |   5 +
+>  drivers/interconnect/Makefile                    |   1 +
+>  drivers/interconnect/qcom/Kconfig                |  11 +
+>  drivers/interconnect/qcom/Makefile               |   1 +
+>  drivers/interconnect/qcom/interconnect_msm8916.c | 375 +++++++++++++++++++++++
+>  include/linux/interconnect/qcom-msm8916.h        |  92 ++++++
+>  6 files changed, 485 insertions(+)
+>  create mode 100644 drivers/interconnect/qcom/Kconfig
+>  create mode 100644 drivers/interconnect/qcom/Makefile
+>  create mode 100644 drivers/interconnect/qcom/interconnect_msm8916.c
+>  create mode 100644 include/linux/interconnect/qcom-msm8916.h
+>
+> diff --git a/drivers/interconnect/Kconfig b/drivers/interconnect/Kconfig
+> index 1e50e951cdc1..b123a76e2f9d 100644
+> --- a/drivers/interconnect/Kconfig
+> +++ b/drivers/interconnect/Kconfig
+> @@ -8,3 +8,8 @@ menuconfig INTERCONNECT
+>
+>           If unsure, say no.
+>
+> +if INTERCONNECT
+> +
+> +source "drivers/interconnect/qcom/Kconfig"
+> +
+> +endif
+> diff --git a/drivers/interconnect/Makefile b/drivers/interconnect/Makefile
+> index d9da6a6c3560..62a01de24aeb 100644
+> --- a/drivers/interconnect/Makefile
+> +++ b/drivers/interconnect/Makefile
+> @@ -1 +1,2 @@
+>  obj-$(CONFIG_INTERCONNECT)  += interconnect.o
+> +obj-$(CONFIG_INTERCONNECT_QCOM)                += qcom/
+> diff --git a/drivers/interconnect/qcom/Kconfig b/drivers/interconnect/qcom/Kconfig
+> new file mode 100644
+> index 000000000000..86465dc37bd4
+> --- /dev/null
+> +++ b/drivers/interconnect/qcom/Kconfig
+> @@ -0,0 +1,11 @@
+> +config INTERCONNECT_QCOM
+> +       bool "Qualcomm Network-on-Chip interconnect drivers"
+> +       depends on INTERCONNECT
+> +       depends on ARCH_QCOM || COMPILE_TEST
+> +       default y
+> +
+> +config INTERCONNECT_QCOM_MSM8916
+> +       tristate "Qualcomm MSM8916 interconnect driver"
+> +       depends on INTERCONNECT_QCOM
+> +       help
+> +         This is a driver for the Qualcomm Network-on-Chip on msm8916-based platforms.
+> diff --git a/drivers/interconnect/qcom/Makefile b/drivers/interconnect/qcom/Makefile
+> new file mode 100644
+> index 000000000000..0831080e1100
+> --- /dev/null
+> +++ b/drivers/interconnect/qcom/Makefile
+> @@ -0,0 +1 @@
+> +obj-$(CONFIG_INTERCONNECT_QCOM_MSM8916) += interconnect_msm8916.o
+> diff --git a/drivers/interconnect/qcom/interconnect_msm8916.c b/drivers/interconnect/qcom/interconnect_msm8916.c
+> new file mode 100644
+> index 000000000000..9b001e100974
+> --- /dev/null
+> +++ b/drivers/interconnect/qcom/interconnect_msm8916.c
+> @@ -0,0 +1,375 @@
+> +/*
+> + * Copyright (C) 2017 Linaro Ltd
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 and
+> + * only version 2 as published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk.h>
+> +#include <linux/device.h>
+> +#include <linux/io.h>
+> +#include <linux/interconnect-provider.h>
+> +#include <linux/interconnect/qcom-msm8916.h>
+> +#include <linux/module.h>
+> +#include <linux/of_device.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/slab.h>
+> +
+> +#define to_qcom_icp(_icp) \
+> +       container_of(_icp, struct qcom_interconnect_provider, icp)
+> +#define to_qcom_node(_node) \
+> +       container_of(_node, struct qcom_interconnect_node, node)
+> +
+> +enum qcom_bus_type {
+> +       QCOM_BUS_TYPE_NOC = 0,
+> +       QCOM_BUS_TYPE_MEM,
+> +};
+> +
+> +struct qcom_interconnect_provider {
+> +       struct icp              icp;
+> +       void __iomem            *base;
+> +       struct clk              *bus_clk;
+> +       struct clk              *bus_a_clk;
+> +       u32                     base_offset;
+> +       u32                     qos_offset;
+> +       enum qcom_bus_type      type;
+> +};
+> +
+> +struct qcom_interconnect_node {
+> +       struct interconnect_node node;
+> +       unsigned char *name;
+> +       struct interconnect_node *links[8];
 
-Thanks for that. We shouldn't be touching the hardware during clk
-registration though, so something is wrong there. It seems that
-adding the flag to enable clks when touching their registers has
-exposed that we should just be doing the toggle of the bookeeping
-stuff underneath the enable lock here.
+Magic number 8. Replace with 8916_MAX_LINKS or something.
 
-We know that the clk isn't enabled with any sort of prepare_count
-here so we don't need to enable anything to prevent a race. And
-we're holding the prepare mutex so set_rate/set_parent can't race
-here either.
+> +       u16 id;
+> +       u16 num_links;
+> +       u16 port;
+> +       u16 buswidth;
 
-Can you try this patch instead?
+Comment on what a buswidth is just to be clear
 
----8<----
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index c8d83acda006..416d44cc772c 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -2476,14 +2476,17 @@ static int __clk_core_init(struct clk_core *core)
- 	 */
- 	hlist_for_each_entry_safe(orphan, tmp2, &clk_orphan_list, child_node) {
- 		struct clk_core *parent = __clk_init_parent(orphan);
-+		unsigned long flags;
- 
- 		/*
- 		 * we could call __clk_set_parent, but that would result in a
- 		 * redundant call to the .set_rate op, if it exists
- 		 */
- 		if (parent) {
--			__clk_set_parent_before(orphan, parent);
--			__clk_set_parent_after(orphan, parent, NULL);
-+			/* update the clk tree topology */
-+			flags = clk_enable_lock();
-+			clk_reparent(orphan, parent);
-+			clk_enable_unlock(flags);
- 			__clk_recalc_accuracies(orphan);
- 			__clk_recalc_rates(orphan, 0);
- 		}
+> +       u64 rate;
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Comment on units
+
+> +};
+> +
+> +static struct qcom_interconnect_node snoc_int_0;
+> +static struct qcom_interconnect_node snoc_int_1;
+> +static struct qcom_interconnect_node snoc_int_bimc;
+> +static struct qcom_interconnect_node snoc_bimc_0_mas;
+> +static struct qcom_interconnect_node pnoc_snoc_slv;
+> +
+> +static struct qcom_interconnect_node snoc_bimc_0_slv;
+
+IMO, saving an 'a' and 'e' is not worth it for the sake of
+readability. Just use 'slave' and 'master' in the names.
+
+> +static struct qcom_interconnect_node slv_ebi_ch0;
+> +
+> +static struct qcom_interconnect_node pnoc_int_1;
+> +static struct qcom_interconnect_node mas_pnoc_sdcc_1;
+> +static struct qcom_interconnect_node mas_pnoc_sdcc_2;
+> +static struct qcom_interconnect_node pnoc_snoc_mas;
+> +
+> +struct qcom_interconnect_desc {
+> +       struct qcom_interconnect_node **nodes;
+> +       size_t num_nodes;
+> +};
+> +
+> +static struct qcom_interconnect_node snoc_int_0 = {
+> +       .id = 10004,
+> +       .name = "snoc-int-0",
+> +#if 0
+
+Please get rid if these.
+
+> +       .links = { &snoc_pnoc_mas.node },
+> +       .num_links = 1,
+> +#endif
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node snoc_int_1 = {
+> +       .id = 10005,
+> +       .name = "snoc-int-1",
+> +#if 0
+> +       .links = { &slv_apss.node, &slv_cats_0.node, &slv_cats_1.node },
+> +       .num_links = 3,
+> +#endif
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node snoc_int_bimc = {
+> +       .id = 10006,
+> +       .name = "snoc-bimc",
+> +       .links = { &snoc_bimc_0_mas.node },
+> +       .num_links = 1,
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node snoc_bimc_0_mas = {
+> +       .id = 10007,
+> +       .name = "snoc-bimc-0-mas",
+> +       .links = { &snoc_bimc_0_slv.node },
+> +       .num_links = 1,
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node pnoc_snoc_slv = {
+> +       .id = 10011,
+> +       .name = "snoc-pnoc",
+> +       .links = { &snoc_int_0.node, &snoc_int_bimc.node, &snoc_int_1.node },
+> +       .num_links = 3,
+> +       .buswidth = 8,
+> +};
+
+
+Suggest replacing this list of definitions with a macro such as:
+
+#define DEFINE_XCON_NODE(_name, _id, numlinks, buswidth, ...) \
+             static struct qcom_interconnect_node _name;                       \
+             static struct qcom_interconnect_node _name = {                  \
+                   .id = _id,
+                                 \
+                   .name = _name,
+                        \
+                   .buswidth = buswidth,
+                      \
+                   .num_links = numlinks,
+                    \
+                   .links = { __VA_ARGS__ },
+                \
+            };
+
+
+This will reduce these definitions to a series of definitions as
+follows that improves readability.
+
+DEFINE_XCON_NODE(snoc_int_0, 10004, 1, 8, &snoc_pnoc_mas.node)
+DEFINE_XCON_NODE(snoc_int_1, 10005, 3, 8, &snoc_apss.node,
+&slv_cats_0.node, &slv_cats_1.node)
+DEFINE_XCON_NODE(snoc_int_bimc, 10006, 1, 8, &snoc_bimc_0_mas.node)
+
+If fact you could take it one step further and move the definitions
+under the provider definition below directly.
+
+> +static struct qcom_interconnect_node *msm8916_snoc_nodes[] = {
+> +       [SNOC_INT_0] = &snoc_int_0,
+> +       [SNOC_INT_1] = &snoc_int_1,
+> +       [SNOC_INT_BIMC] = &snoc_int_bimc,
+> +       [SNOC_BIMC_0_MAS] = &snoc_bimc_0_mas,
+> +       [PNOC_SNOC_SLV] = &pnoc_snoc_slv,
+> +};
+> +
+> +static struct qcom_interconnect_desc msm8916_snoc = {
+> +       .nodes = msm8916_snoc_nodes,
+> +       .num_nodes = ARRAY_SIZE(msm8916_snoc_nodes),
+> +};
+> +
+> +static struct qcom_interconnect_node snoc_bimc_0_slv = {
+> +       .id = 10025,
+> +       .name = "snoc_bimc_0_slv",
+> +       .links = { &slv_ebi_ch0.node },
+> +       .num_links = 1,
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node slv_ebi_ch0 = {
+> +       .id = 512,
+> +       .name = "slv-ebi-ch0",
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node *msm8916_bimc_nodes[] = {
+> +       [SNOC_BIMC_0_SLV] = &snoc_bimc_0_slv,
+> +       [SLV_EBI_CH0] = &slv_ebi_ch0,
+> +};
+> +
+> +static struct qcom_interconnect_desc msm8916_bimc = {
+> +       .nodes = msm8916_bimc_nodes,
+> +       .num_nodes = ARRAY_SIZE(msm8916_bimc_nodes),
+> +};
+> +
+> +static struct qcom_interconnect_node pnoc_int_1 = {
+> +       .id = 10013,
+> +       .name = "pnoc-int-1",
+> +       .links = { &pnoc_snoc_mas.node },
+> +       .num_links = 1,
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node mas_pnoc_sdcc_1 = {
+> +       .id = 78,
+> +       .name = "mas-pnoc-sdcc-1",
+> +       .links = { &pnoc_int_1.node },
+> +       .num_links = 1,
+> +       .port = 7,
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node mas_pnoc_sdcc_2 = {
+> +       .id = 81,
+> +       .name = "mas-pnoc-sdcc-2",
+> +       .links = { &pnoc_int_1.node },
+> +       .num_links = 1,
+> +       .port = 8,
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node pnoc_snoc_mas = {
+> +       .id = 10010,
+> +       .name = "pnoc-snoc-mas",
+> +       .links = { &pnoc_snoc_slv.node },
+> +       .num_links = 1,
+> +       .buswidth = 8,
+> +};
+> +
+> +static struct qcom_interconnect_node *msm8916_pnoc_nodes[] = {
+> +       [PNOC_INT_1] = &pnoc_int_1,
+> +       [MAS_PNOC_SDCC_1] = &mas_pnoc_sdcc_1,
+> +       [MAS_PNOC_SDCC_2] = &mas_pnoc_sdcc_2,
+> +       [PNOC_SNOC_MAS] = &pnoc_snoc_mas,
+> +};
+
+There are big holes in this node array definition because the index
+values are not contiguous. Are you planning fill these in later for
+each of the providers?
+
+> +static struct qcom_interconnect_desc msm8916_pnoc = {
+> +       .nodes = msm8916_pnoc_nodes,
+> +       .num_nodes = ARRAY_SIZE(msm8916_pnoc_nodes),
+> +};
+> +
+> +static int qcom_interconnect_init(struct interconnect_node *node)
+> +{
+> +       struct qcom_interconnect_node *qn = to_qcom_node(node);
+> +
+> +       /* populate default values */
+> +       if (!qn->buswidth)
+> +               qn->buswidth = 8;
+> +
+> +       /* TODO: init qos and priority */
+> +
+> +       return 0;
