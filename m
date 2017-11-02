@@ -1,57 +1,75 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Thu, 2 Nov 2017 08:58:51 +0800
-Subject: [patch v10 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
- families JTAG master driver
-In-Reply-To: <1509365528-28803-3-git-send-email-oleksandrs@mellanox.com>
-References: <1509365528-28803-3-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <201711020831.fEZEYWBm%fengguang.wu@intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed,  1 Nov 2017 18:03:57 -0700
+Subject: [PATCH 01/12] hwrng: bcm2835-rng: Obtain base register via resource
+In-Reply-To: <20171102010408.27736-1-f.fainelli@gmail.com>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+Message-ID: <20171102010408.27736-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Oleksandr,
+In preparation for consolidating bcm63xx-rng into bcm2835-rng, make sure
+that we obtain the base register via platform_get_resource() since we
+need to support the non-DT enabled MIPS-based BCM63xx DSL SoCs.
 
-I love your patch! Perhaps something to improve:
-
-[auto build test WARNING on linus/master]
-[also build test WARNING on v4.14-rc7]
-[cannot apply to next-20171018]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Oleksandr-Shamray/JTAG-driver-introduction/20171102-045624
-config: m68k-allyesconfig (attached as .config)
-compiler: m68k-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=m68k 
-
-All warnings (new ones prefixed by >>):
-
->> drivers//jtag/jtag-aspeed.c:704:1: warning: initialization from incompatible pointer type
-    };
-    ^
-   drivers//jtag/jtag-aspeed.c:704:1: warning: (near initialization for 'aspeed_jtag_ops.xfer')
-
-vim +704 drivers//jtag/jtag-aspeed.c
-
-   697	
-   698	static const struct jtag_ops aspeed_jtag_ops = {
-   699		.freq_get = aspeed_jtag_freq_get,
-   700		.freq_set = aspeed_jtag_freq_set,
-   701		.status_get = aspeed_jtag_status_get,
-   702		.idle = aspeed_jtag_idle,
-   703		.xfer = aspeed_jtag_xfer
- > 704	};
-   705	
-
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 44335 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171102/e4deb653/attachment-0001.gz>
+ drivers/char/hw_random/bcm2835-rng.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+index 574211a49549..a818418a7e4c 100644
+--- a/drivers/char/hw_random/bcm2835-rng.c
++++ b/drivers/char/hw_random/bcm2835-rng.c
+@@ -81,21 +81,23 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+ 	void (*rng_setup)(void __iomem *base);
+ 	const struct of_device_id *rng_id;
+ 	void __iomem *rng_base;
++	struct resource *r;
+ 	int err;
+ 
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++
+ 	/* map peripheral */
+-	rng_base = of_iomap(np, 0);
+-	if (!rng_base) {
++	rng_base = devm_ioremap_resource(dev, r);
++	if (IS_ERR(rng_base)) {
+ 		dev_err(dev, "failed to remap rng regs");
+-		return -ENODEV;
++		return PTR_ERR(rng_base);
+ 	}
+ 	bcm2835_rng_ops.priv = (unsigned long)rng_base;
+ 
+ 	rng_id = of_match_node(bcm2835_rng_of_match, np);
+-	if (!rng_id) {
+-		iounmap(rng_base);
++	if (!rng_id)
+ 		return -EINVAL;
+-	}
++
+ 	/* Check for rng init function, execute it */
+ 	rng_setup = rng_id->data;
+ 	if (rng_setup)
+@@ -107,10 +109,9 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+ 
+ 	/* register driver */
+ 	err = hwrng_register(&bcm2835_rng_ops);
+-	if (err) {
++	if (err)
+ 		dev_err(dev, "hwrng registration failed\n");
+-		iounmap(rng_base);
+-	} else
++	else
+ 		dev_info(dev, "hwrng registered\n");
+ 
+ 	return err;
+@@ -125,7 +126,6 @@ static int bcm2835_rng_remove(struct platform_device *pdev)
+ 
+ 	/* unregister driver */
+ 	hwrng_unregister(&bcm2835_rng_ops);
+-	iounmap(rng_base);
+ 
+ 	return 0;
+ }
+-- 
+2.9.3
