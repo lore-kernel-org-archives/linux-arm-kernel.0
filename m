@@ -1,83 +1,85 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Thu, 2 Nov 2017 11:49:17 +0000
-Subject: [PATCH] mailbox: add support for doorbell/signal mode controllers
-In-Reply-To: <CABb+yY3Gd3u-_xNPSqJT_+yVHGMs7pgt3Bc4faGvN2KwOsm6_w@mail.gmail.com>
-References: <1509553964-4451-1-git-send-email-sudeep.holla@arm.com>
- <CABb+yY1tcm-68E5oG75hstuMd6AOeb=BB6HeKGnQ1zj4Qya6hg@mail.gmail.com>
- <59a05fcb-ff30-0683-144e-93521a7413f9@arm.com>
- <CABb+yY16-B9vReRjLopV1RsyB8a=c5X9XaomtTj44520XrDdmA@mail.gmail.com>
- <4268c9d9-dc1e-0bd7-3fac-790c2d42b54b@arm.com>
- <CABb+yY3Gd3u-_xNPSqJT_+yVHGMs7pgt3Bc4faGvN2KwOsm6_w@mail.gmail.com>
-Message-ID: <5af1c28f-50db-9f5a-2c60-71cacab4a3ab@arm.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 2 Nov 2017 12:50:43 +0100
+Subject: [PATCH v6 03/12] arm64: dts: mt8173: remove "mediatek, mt8135-mmc"
+ from mmc nodes
+In-Reply-To: <CAPDyKFrRVT8YFXvy3Wuf_jga5oourScOdas34U=YkeLRzHoWMg@mail.gmail.com>
+References: <1508118399-21828-1-git-send-email-chaotian.jing@mediatek.com>
+ <1508118399-21828-4-git-send-email-chaotian.jing@mediatek.com>
+ <CAPDyKFrRVT8YFXvy3Wuf_jga5oourScOdas34U=YkeLRzHoWMg@mail.gmail.com>
+Message-ID: <b24d12e4-251f-6f79-1ed9-5b52f8f39625@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 02/11/17 11:26, Jassi Brar wrote:
-> On Thu, Nov 2, 2017 at 4:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-
-[...]
-
+On 10/25/2017 11:11 PM, Ulf Hansson wrote:
+> On 16 October 2017 at 03:46, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
+>> devicetree bindings has been updated to support multi-platforms,
+>> so that each platform has its owns compatible name.
+>> And, this compatible name may used in driver to distinguish with
+>> other platform.
 >>
->> No that non-zero value is not client specific, it's entirely controller
->> specific.
->>
-> ??
-> For example BCM2835 has such a controller. Have a look at
-> bcm2835_send_data() and let me know what is that controller specific
-> value.
->
-
-You can keep finding one or the other platform that has a deviation.
-Come on there are generic infrastructure support in many subsystem that
-are just used in one or two platforms. I hope you agree for this
-enhancement to the mailbox framework as it's more commonly used mode.
-I am not saying this patch is final, but I just want an agreement to add
-such a support.
-
-[...]
-
->>> 1) Where does the  "whatever_value_to_trigger_signal"  come from?
->>
->> Controller specific.
->>
->>> That has to come from client.
->>
->> No.
->>
-> Again, let me know what does the controller expect 'val' to be
+>> Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
 > 
->   writel(val, MAILBOX_A2B_CMD(chans->idx))
+> Matthias, do you intend to pick this? Else I can do it with your ack...
 > 
 
-It depends on the controller. Whatever value that can generate a signal
-to remote.
+If it's not too late, feel free to take it. Otherwise I will queue it for the
+next merge window:
 
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+
+> Kind regards
+> Uffe
 > 
-> Your entire post is based on your assertion that the controller
-> expects a particular non-zero value to trigger a signal, which is
-> wrong.
-
-Why do you think that ? There are lots of example in the mailbox today.
-Please have a look at few example which don't use data passed from the
-client:
-
-1. pcc_send_data (drivers/mailbox/pcc.c)
-2. sti_mbox_send_data (drivers/mailbox/mailbox-sti.c)
-3. qcom_apcs_ipc_send_data (drivers/mailbox/qcom-apcs-ipc-mailbox.c)
-4. tegra_hsp_doorbell_send_data (drivers/mailbox/tegra-hsp.c)
-
-And SCMI fits the above case.
-
-Also you keep saying I am making this change to get SCMI with ARM MHU.
-Honestly I don't care much about that, I need better support from
-mailbox framework if possible for any platforms running SCMI. So please
-stop assuming my changes are motivated by that. SCMI is designed to
-solve more generic consolidation issues, so I am more focused on that
-than getting it run on some development platform I have with ARM MHU.
-Believe me that's least of my concern.
-
--- 
-Regards,
-Sudeep
+>> ---
+>>  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 12 ++++--------
+>>  1 file changed, 4 insertions(+), 8 deletions(-)
+>>
+>> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> index b99a273..26396ef 100644
+>> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+>> @@ -682,8 +682,7 @@
+>>                 };
+>>
+>>                 mmc0: mmc at 11230000 {
+>> -                       compatible = "mediatek,mt8173-mmc",
+>> -                                    "mediatek,mt8135-mmc";
+>> +                       compatible = "mediatek,mt8173-mmc";
+>>                         reg = <0 0x11230000 0 0x1000>;
+>>                         interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_LOW>;
+>>                         clocks = <&pericfg CLK_PERI_MSDC30_0>,
+>> @@ -693,8 +692,7 @@
+>>                 };
+>>
+>>                 mmc1: mmc at 11240000 {
+>> -                       compatible = "mediatek,mt8173-mmc",
+>> -                                    "mediatek,mt8135-mmc";
+>> +                       compatible = "mediatek,mt8173-mmc";
+>>                         reg = <0 0x11240000 0 0x1000>;
+>>                         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_LOW>;
+>>                         clocks = <&pericfg CLK_PERI_MSDC30_1>,
+>> @@ -704,8 +702,7 @@
+>>                 };
+>>
+>>                 mmc2: mmc at 11250000 {
+>> -                       compatible = "mediatek,mt8173-mmc",
+>> -                                    "mediatek,mt8135-mmc";
+>> +                       compatible = "mediatek,mt8173-mmc";
+>>                         reg = <0 0x11250000 0 0x1000>;
+>>                         interrupts = <GIC_SPI 73 IRQ_TYPE_LEVEL_LOW>;
+>>                         clocks = <&pericfg CLK_PERI_MSDC30_2>,
+>> @@ -715,8 +712,7 @@
+>>                 };
+>>
+>>                 mmc3: mmc at 11260000 {
+>> -                       compatible = "mediatek,mt8173-mmc",
+>> -                                    "mediatek,mt8135-mmc";
+>> +                       compatible = "mediatek,mt8173-mmc";
+>>                         reg = <0 0x11260000 0 0x1000>;
+>>                         interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_LOW>;
+>>                         clocks = <&pericfg CLK_PERI_MSDC30_3>,
+>> --
+>> 1.8.1.1.dirty
+>>
