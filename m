@@ -1,61 +1,57 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed,  1 Nov 2017 18:03:59 -0700
-Subject: [PATCH 03/12] hwrng: bcm2835-rng: Move enabling to hwrng::init
+Date: Wed,  1 Nov 2017 18:04:00 -0700
+Subject: [PATCH 04/12] hwrng: bcm2835-rng: Implementation cleanup callback
 In-Reply-To: <20171102010408.27736-1-f.fainelli@gmail.com>
 References: <20171102010408.27736-1-f.fainelli@gmail.com>
-Message-ID: <20171102010408.27736-4-f.fainelli@gmail.com>
+Message-ID: <20171102010408.27736-5-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We should be moving the enabling of the HWRNG into a hwrng::init
-callback since we can be disabled and enabled every time a different
-hwrng is selected in the system.
+We should be disabling the RNG in a hwrng::cleanup callback if we are
+not longer the system selected RNG, not wait until the device driver is
+removed.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/char/hw_random/bcm2835-rng.c | 16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ drivers/char/hw_random/bcm2835-rng.c | 12 +++++++++---
+ 1 file changed, 9 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
-index 0d72147ab45b..82000a637504 100644
+index 82000a637504..4d0356110b1b 100644
 --- a/drivers/char/hw_random/bcm2835-rng.c
 +++ b/drivers/char/hw_random/bcm2835-rng.c
-@@ -72,6 +72,17 @@ static int bcm2835_rng_read(struct hwrng *rng, void *buf, size_t max,
- 	return num_words * sizeof(u32);
+@@ -83,6 +83,14 @@ static int bcm2835_rng_init(struct hwrng *rng)
+ 	return 0;
  }
  
-+static int bcm2835_rng_init(struct hwrng *rng)
++static void bcm2835_rng_cleanup(struct hwrng *rng)
 +{
 +	struct bcm2835_rng_priv *priv = to_rng_priv(rng);
 +
-+	/* set warm-up count & enable */
-+	__raw_writel(RNG_WARMUP_COUNT, priv->base + RNG_STATUS);
-+	__raw_writel(RNG_RBGEN, priv->base + RNG_CTRL);
-+
-+	return 0;
++	/* disable rng hardware */
++	__raw_writel(0, priv->base + RNG_CTRL);
 +}
 +
  static const struct of_device_id bcm2835_rng_of_match[] = {
  	{ .compatible = "brcm,bcm2835-rng"},
  	{ .compatible = "brcm,bcm-nsp-rng", .data = nsp_rng_init},
-@@ -105,6 +116,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
- 	}
- 
+@@ -118,6 +126,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
  	priv->rng.name = "bcm2835-rng";
-+	priv->rng.init = bcm2835_rng_init;
+ 	priv->rng.init = bcm2835_rng_init;
  	priv->rng.read = bcm2835_rng_read;
++	priv->rng.cleanup = bcm2835_rng_cleanup;
  
  	rng_id = of_match_node(bcm2835_rng_of_match, np);
-@@ -116,10 +128,6 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
- 	if (rng_setup)
- 		rng_setup(priv->base);
+ 	if (!rng_id)
+@@ -142,9 +151,6 @@ static int bcm2835_rng_remove(struct platform_device *pdev)
+ {
+ 	struct bcm2835_rng_priv *priv = platform_get_drvdata(pdev);
  
--	/* set warm-up count & enable */
--	__raw_writel(RNG_WARMUP_COUNT, priv->base + RNG_STATUS);
--	__raw_writel(RNG_RBGEN, priv->base + RNG_CTRL);
+-	/* disable rng hardware */
+-	__raw_writel(0, priv->base + RNG_CTRL);
 -
- 	/* register driver */
- 	err = hwrng_register(&priv->rng);
- 	if (err)
+ 	/* unregister driver */
+ 	hwrng_unregister(&priv->rng);
+ 
 -- 
 2.9.3
