@@ -1,63 +1,55 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 2 Nov 2017 16:43:09 -0700
-Subject: Build failure with verify size in next-20171102
-In-Reply-To: <20171102232038.GA28231@n2100.armlinux.org.uk>
-References: <20171102193027.GB28152@atomide.com>
- <20171102232038.GA28231@n2100.armlinux.org.uk>
-Message-ID: <20171102234309.GE28152@atomide.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 03 Nov 2017 07:53:17 +0800
+Subject: [linux-sunxi] Re: [PATCH] ARM: sun8i: h2+: add support for Banana
+ Pi M2 Zero board
+In-Reply-To: <20171102155003.vp7uve4ypyn4sb6j@flea>
+References: <20171101093814.19177-1-icenowy@aosc.io>
+ <20171102090248.wnvj7dpphn5uqsut@flea>
+ <8327eaeaa12b99f9962a53c9f02ddd6d@aosc.io>
+ <20171102155003.vp7uve4ypyn4sb6j@flea>
+Message-ID: <b548b74e04b29ec8c3cddb7cc42f2b4e@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [171102 23:22]:
-> On Thu, Nov 02, 2017 at 12:30:27PM -0700, Tony Lindgren wrote:
-> > Hi Russeell,
-> > 
-> > I think you're already aware of the build failure caused by commit
-> > 078c0927485e ("ARM: verify size of zImage"), but here's info just
-> > in case.
-> > 
-> > arm-unknown-linux-musleabi-ld.bfd: error: zImage file size is incorrect
-> > make[2]: *** [arch/arm/boot/compressed/Makefile:185: arch/arm/boot/compressed/vmlinux] Error 1
-> > make[1]: *** [arch/arm/boot/Makefile:64: arch/arm/boot/compressed/vmlinux] Error 2
-> > make: *** [arch/arm/Makefile:335: zImage] Error 2
-> > 
-> > Other than that I was surprised that next actually booted for me
-> > after a few week break with Linux next! :)
+? 2017-11-02 23:50?Maxime Ripard ???
+> On Thu, Nov 02, 2017 at 05:07:30PM +0800, Icenowy Zheng wrote:
+>> > > +&mmc0 {
+>> > > +	pinctrl-names = "default";
+>> > > +	pinctrl-0 = <&mmc0_pins_a>;
+>> > > +	vmmc-supply = <&reg_vcc3v3>;
+>> > > +	bus-width = <4>;
+>> > > +	/*
+>> > > +	 * In different revisions the board have different card detect
+>> > > +	 * configuration.
+>> > > +	 */
+>> >
+>> > Which ones?
+>> 
+>> In the sample batch (1.2V fixed voltage) the card detect is normal
+>> (PF6 low as inserted), however in the final batch (1.1V/1.3V
+>> switchable) it's inverted at PF6 (high as inserted).
 > 
-> It would be nice if people can investigate why that happens - I'm
-> completely unable to reproduce it locally, even if I link using 
-> the same vmlinux.lds file and the objects from someone who sees the
-> failure.
+> Then just use the final version's.
 > 
-> There's some binutils version specific stuff that's going on here.
+>> > > +&usbphy {
+>> > > +	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
+>> > > +	/* USB OTG VBUS is directly connected to 5V without any regulators
+>> > > */
+>> >
+>> > So it cannot operate in OTG, but it's host only?
+>> 
+>> It can operate in OTG -- you can power the board via the OTG port,
+>> as the VBUS is not gated from 5V at all, so 5V power at VBUS will
+>> power up the board. Yes, it's a bit unsafe, but the board designer
+>> did it.
 > 
-> What I have in my current for-next, which I'm intending to push,
-> is all the same patches except the patch that introduces the above
-> check is subsituted by a patch that produces an extra _edata_real
-> symbol.  This _should_ match _edata.  So, if you hit this failure,
-> try either my current for-next branch or tomorrow's linux-next, and
-> run arm-linux-nm on arch/arm/boot/compressed/vmlinux and check the
-> addresses given for _edata and _edata_real.
+> What will provide the 5v in the first place then if a USB device is
+> connected to the micro-USB connector?
 
-OK thanks reverting 078c0927485e and applying dad4675388fc ("ARM:
-add debug ".edata_real" symbol") from your for-next branch builds
-and boots for me.
+There're two micro-USB connectors, one is power-only and another is
+OTG. The Vbus of these two connectors are connected together, so
+the external USB device will be powered just by the power input
+from the power-only USB port.
 
-> Theory says they should be identical, but the failure of that assert
-> could only happen if "." inside the output section was different from
-> _edata assigned outside.  _edata_real is now the address of "." inside
-> the output section.
-
-With 078c0927485e reverted and dad4675388fc applied they are
-identical for me:
-
-$ ${armcompiler}nm arch/arm/boot/compressed/vmlinux | grep _edata
-00421960 D _edata
-00421960 D _edata_real
-
-Let me know if you want me to run some test with the failing
-commit also.
-
-Regards,
-
-Tony
+> 
+> Maxime
