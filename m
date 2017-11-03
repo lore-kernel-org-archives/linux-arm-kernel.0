@@ -1,17 +1,50 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 3 Nov 2017 16:31:34 +0100
-Subject: [PATCH] ARM: dts: imx6: RDU2: add i210 node
-In-Reply-To: <20171103095459.29272-1-l.stach@pengutronix.de>
-References: <20171103095459.29272-1-l.stach@pengutronix.de>
-Message-ID: <20171103153134.GR24320@lunn.ch>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Fri, 3 Nov 2017 18:40:47 +0300
+Subject: [PATCH v12 08/11] arm64/kasan: add and use kasan_map_populate()
+In-Reply-To: <a587687a-5d90-c03d-f3d2-1ea9cab1b0c4@oracle.com>
+References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+ <20171013173214.27300-9-pasha.tatashin@oracle.com>
+ <0ae84532-8dcb-10aa-9d69-79d7025b089e@virtuozzo.com>
+ <ad8c5715-dc4f-1fa7-c25b-e08df68643d0@oracle.com>
+ <20171018170651.GG21820@arm.com>
+ <e32c677e-62ac-8977-2f9d-7fe7bda4b547@oracle.com>
+ <f1cb8d18-4d0f-1f88-c3c5-0add8c6c077a@virtuozzo.com>
+ <a587687a-5d90-c03d-f3d2-1ea9cab1b0c4@oracle.com>
+Message-ID: <07ab0b77-0e2a-97b5-73ff-a6598bcb94cd@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 10:54:59AM +0100, Lucas Stach wrote:
-> This is needed for the bootloader to patch in the correct MAC address.
+
+
+On 10/18/2017 08:23 PM, Pavel Tatashin wrote:
+> Hi Andrew and Michal,
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> There are a few changes I need to do to my series:
+> 
+> 1. Replace these two patches:
+> 
+> arm64/kasan: add and use kasan_map_populate()
+> x86/kasan: add and use kasan_map_populate()
+> 
+> With:
+> 
+> x86/mm/kasan: don't use vmemmap_populate() to initialize
+> ?shadow
+> arm64/mm/kasan: don't use vmemmap_populate() to initialize
+> ?shadow
+> 
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Pavel, could you please send the patches? These patches doesn't interfere with rest of the series,
+so I think it should be enough to send just two patches to replace the old ones.
 
-    Andrew
+
+
+
+> 2. Fix a kbuild warning about section mismatch in
+> mm: deferred_init_memmap improvements
+> 
+> How should I proceed to get these replaced in mm-tree? Send three new patches, or send a new series?
+> 
+> Thank you,
+> Pavel
+> 
