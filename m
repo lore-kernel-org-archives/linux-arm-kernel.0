@@ -1,229 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Fri, 3 Nov 2017 14:02:21 +0000
-Subject: [RFC 6/7] arm64: Detect current view of GIC priorities
-In-Reply-To: <1507726862-11944-7-git-send-email-julien.thierry@arm.com>
-References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
- <1507726862-11944-7-git-send-email-julien.thierry@arm.com>
-Message-ID: <d89325a7-3cb0-f4ba-f436-cded350c01f5@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 3 Nov 2017 14:02:41 +0000
+Subject: [PATCH v2] arm64: support __int128 on gcc 5+
+In-Reply-To: <20171103134223.GD13499@arm.com>
+References: <20171102134720.GA17333@arm.com>
+ <20171102174322.21853-1-Jason@zx2c4.com> <20171103134223.GD13499@arm.com>
+Message-ID: <7B289516-DE7F-477F-A81D-6D974F1A0F20@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/17 14:01, Julien Thierry wrote:
-> The values non secure EL1 needs to use for priority registers depends on
-> the value of SCR_EL3.FIQ.
-> 
-> Since we don't have access to SCR_EL3, we fake an interrupt and compare the
-> GIC priority with the one present in the [re]distributor.
-> 
-> Also, add firmware requirements related to SCR_EL3.
-> 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Thomas Gleixner <tglx@linutronix.de>
-> Cc: Jason Cooper <jason@lakedaemon.net>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  Documentation/arm64/booting.txt     |  5 +++
->  arch/arm64/include/asm/arch_gicv3.h |  5 +++
->  arch/arm64/include/asm/irqflags.h   |  6 +++
->  arch/arm64/include/asm/sysreg.h     |  1 +
->  drivers/irqchip/irq-gic-v3.c        | 83 +++++++++++++++++++++++++++++++++++++
->  5 files changed, 100 insertions(+)
-> 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index 8d0df62..e387938 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -188,6 +188,11 @@ Before jumping into the kernel, the following conditions must be met:
->    the kernel image will be entered must be initialised by software at a
->    higher exception level to prevent execution in an UNKNOWN state.
-> 
-> +  - SCR_EL3.FIQ must have the same value across all CPUs the kernel is
-> +    executing on.
-> +  - The value of SCR_EL3.FIQ must be the same as the one present at boot
-> +    time whenever the kernel is executing.
-> +
->    For systems with a GICv3 interrupt controller to be used in v3 mode:
->    - If EL3 is present:
->      ICC_SRE_EL3.Enable (bit 3) must be initialiased to 0b1.
-> diff --git a/arch/arm64/include/asm/arch_gicv3.h b/arch/arm64/include/asm/arch_gicv3.h
-> index b6b430c..90a3dc3 100644
-> --- a/arch/arm64/include/asm/arch_gicv3.h
-> +++ b/arch/arm64/include/asm/arch_gicv3.h
-> @@ -114,6 +114,11 @@ static inline void gic_write_bpr1(u32 val)
->  	write_sysreg_s(val, SYS_ICC_BPR1_EL1);
->  }
-> 
-> +static inline u32 gic_read_rpr(void)
-> +{
-> +	return read_sysreg_s(SYS_ICC_RPR_EL1);
-> +}
-> +
->  #define gic_read_typer(c)		readq_relaxed(c)
->  #define gic_write_irouter(v, c)		writeq_relaxed(v, c)
->  #define gic_read_lpir(c)		readq_relaxed(c)
-> diff --git a/arch/arm64/include/asm/irqflags.h b/arch/arm64/include/asm/irqflags.h
-> index 1c69ebb..4718ca3f 100644
-> --- a/arch/arm64/include/asm/irqflags.h
-> +++ b/arch/arm64/include/asm/irqflags.h
-> @@ -205,6 +205,12 @@ static inline int arch_irqs_disabled_flags(unsigned long flags)
->  		!(ARCH_FLAGS_GET_PMR(flags) & ICC_PMR_EL1_EN_BIT);
->  }
-> 
-> +/* Mask IRQs at CPU level instead of GIC level */
-> +static inline void arch_irqs_daif_disable(void)
 
-nit: I find the naming pretty horrible. No, I don't have a better
-suggestion.
-
-> +{
-> +	asm volatile ("msr daifset, #2" : : : "memory");
-> +}
-> +
->  void maybe_switch_to_sysreg_gic_cpuif(void);
+> On 3 Nov 2017, at 13:42, Will Deacon <will.deacon@arm.com> wrote:
 > 
->  #endif /* CONFIG_IRQFLAGS_GIC_MASKING */
-> diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-> index f707fed..e71bc81 100644
-> --- a/arch/arm64/include/asm/sysreg.h
-> +++ b/arch/arm64/include/asm/sysreg.h
-> @@ -205,6 +205,7 @@
->  #define SYS_ICC_SRE_EL1			sys_reg(3, 0, 12, 12, 5)
->  #define SYS_ICC_IGRPEN0_EL1		sys_reg(3, 0, 12, 12, 6)
->  #define SYS_ICC_IGRPEN1_EL1		sys_reg(3, 0, 12, 12, 7)
-> +#define SYS_ICC_RPR_EL1			sys_reg(3, 0, 12, 11, 3)
-
-We should try and keep the ordering of sysreg consistent, following the
-(Op0, Op1, CRn, CRm, Op2) encoding. And actually, this sysreg has
-already been added (see 43515894c06f8).
-
+> Hi Jason,
 > 
->  #define SYS_CONTEXTIDR_EL1		sys_reg(3, 0, 13, 0, 1)
->  #define SYS_TPIDR_EL1			sys_reg(3, 0, 13, 0, 4)
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index 1cdf495..e0b235f 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -62,6 +62,10 @@ struct gic_chip_data {
->  static struct gic_chip_data gic_data __read_mostly;
->  static struct static_key supports_deactivate = STATIC_KEY_INIT_TRUE;
+> [+Ard]
 > 
-> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-> +DEFINE_STATIC_KEY_FALSE(have_non_secure_prio_view);
-> +#endif
-> +
->  static struct gic_kvm_info gic_v3_kvm_info;
+>> On Thu, Nov 02, 2017 at 06:43:22PM +0100, Jason A. Donenfeld wrote:
+>> Versions of gcc prior to gcc 5 emitted a __multi3 function call when
+>> dealing with TI types, resulting in failures when trying to link to
+>> libgcc, and more generally, bad performance. However, since gcc 5,
+>> the compiler supports actually emitting fast instructions, which means
+>> we can at long last enable this option and receive the speedups.
+>> 
+>> The gcc commit that added proper Aarch64 support is:
+>> https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+>> This commit appears to be part of the gcc 5 release.
+>> 
+>> There are still a few instructions, such as __ashlti3 and __ashrti3,
+>> that require libgcc, which is fine. So, we also link to libgcc for these
+>> functions when needed, which is what several other architectures already
+>> have been doing for a long time.
+>> 
+>> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+>> ---
+>> arch/arm64/Makefile | 4 +++-
+>> 1 file changed, 3 insertions(+), 1 deletion(-)
 > 
->  #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
-> @@ -969,6 +973,81 @@ static int partition_domain_translate(struct irq_domain *d,
->  	.select = gic_irq_domain_select,
->  };
-> 
-> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-> +/*
-> + * The behaviours of RPR and PMR registers differ depending on the value of
-> + * SCR_EL3.FIQ, while the behaviour of priority registers of the distributor
-> + * and redistributors is always the same.
-> + *
-> + * If SCR_EL3.FIQ == 1, the values used for RPR and PMR are the same as the ones
-> + * programmed in the distributor and redistributors registers.
-> + *
-> + * Otherwise, the value presented by RPR as well as the value which will be
-> + * compared against PMR is: (GIC_(R)DIST_PRI[irq] >> 1) | 0x80;
-> + *
-> + * see GICv3/GICv4 Architecture Specification (IHI0069D):
-> + * - section 4.8.1 Non-secure accesses to register fields for Secure interrupt
-> + *   priorities.
-> + * - Figure 4-7 Secure read of the priority field for a Non-secure Group 1
-> + *   interrupt.
-> + */
-> +static void __init gic_detect_prio_view(void)
-> +{
-> +	/*
-> +	 * Randomly picked SGI, must be <= 8 as other SGIs might be
-> +	 * used by the firmware.
-> +	 */
-> +	const u32 fake_irqnr = 7;
-> +	const u32 fake_irqmask = BIT(fake_irqnr);
-> +	void __iomem * const rdist_base = gic_data_rdist_sgi_base();
-> +	unsigned long irq_flags;
-> +	u32 acked_irqnr;
-> +	bool was_enabled;
-> +
-> +	irq_flags = arch_local_save_flags();
-> +
-> +	arch_irqs_daif_disable();
-> +
-> +	was_enabled = !!(readl_relaxed(rdist_base + GICD_ISENABLER) &
-> +			 fake_irqmask);
-> +
-> +	if (!was_enabled)
-> +		writel_relaxed(fake_irqmask, rdist_base + GICD_ISENABLER);
-> +
-> +	/* Need to unmask to acknowledge the IRQ */
-> +	gic_write_pmr(ICC_PMR_EL1_UNMASKED);
-> +	dsb(sy);
-> +
-> +	/* Fake a pending SGI */
-> +	writel_relaxed(fake_irqmask, rdist_base + GICD_ISPENDR);
-> +	dsb(sy);
-> +
-> +	acked_irqnr = gic_read_iar();
-
-Careful, there is no guarantee that you'll immediately get an interrupt
-here. There is a propagation delay, and the only thing the spec says is
-that you'll get something in finite time (give or take a few days).
-
-> +
-> +	if (acked_irqnr == fake_irqnr) {
-> +		if (gic_read_rpr() == gic_get_irq_prio(acked_irqnr, rdist_base))
-> +			static_branch_enable(&have_non_secure_prio_view);
-> +	} else {
-> +		pr_warn("Unexpected IRQ for priority detection: %u\n",
-> +			acked_irqnr);
-> +	}
-> +
-> +	if (acked_irqnr < 1020) {
-> +		gic_write_eoir(acked_irqnr);
-> +		if (static_key_true(&supports_deactivate))
-> +			gic_write_dir(acked_irqnr);
-
-I think we could move this construct to a helper (it is otherwise used
-in the driver).
-
-> +	}
-> +
-> +	/* Restore enabled state */
-> +	if (!was_enabled) {
-> +		writel_relaxed(fake_irqmask, rdist_base + GICD_ICENABLER);
-> +		gic_redist_wait_for_rwp();
-> +	}
-> +
-> +	arch_local_irq_restore(irq_flags);
-> +}
-> +#endif
-> +
->  static int __init gic_init_bases(void __iomem *dist_base,
->  				 struct redist_region *rdist_regs,
->  				 u32 nr_redist_regions,
-> @@ -1025,6 +1104,10 @@ static int __init gic_init_bases(void __iomem *dist_base,
->  	gic_cpu_init();
->  	gic_cpu_pm_init();
-> 
-> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
-> +	gic_detect_prio_view();
-> +#endif
-> +
->  	return 0;
-> 
->  out_free:
-> --
-> 1.9.1
+> We used to link against libgcc way back when, but that dependency was
+> removed in commit d67703a8a69e ("arm64: kill off the libgcc dependency")
+> and I'm really not keen to add it back. I also think that there might
+> be licensing concerns if you link against it and make use of GCC plugins,
+> but IANAL.
 > 
 
-Thanks,
+Is it guaranteed that libgcc doesn?t use neon/vfp? We can?t use it in the kernel otherwise.
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+
+> Shouldn't we just provide our own implementations of __ashlti3 and
+> __ashrti3 instead?
+> 
+> Cheers,
+> 
+> Will
+> 
+>> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+>> index 939b310913cf..70c7c0c1bccb 100644
+>> --- a/arch/arm64/Makefile
+>> +++ b/arch/arm64/Makefile
+>> @@ -53,6 +53,8 @@ KBUILD_AFLAGS    += $(lseinstr) $(brokengasinst)
+>> KBUILD_CFLAGS    += $(call cc-option,-mabi=lp64)
+>> KBUILD_AFLAGS    += $(call cc-option,-mabi=lp64)
+>> 
+>> +KBUILD_CFLAGS    += $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
+>> +
+>> ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+>> KBUILD_CPPFLAGS    += -mbig-endian
+>> CHECKFLAGS    += -D__AARCH64EB__
+>> @@ -108,7 +110,7 @@ core-$(CONFIG_NET) += arch/arm64/net/
+>> core-$(CONFIG_KVM) += arch/arm64/kvm/
+>> core-$(CONFIG_XEN) += arch/arm64/xen/
+>> core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+>> -libs-y        := arch/arm64/lib/ $(libs-y)
+>> +libs-y        := arch/arm64/lib/ $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name) $(libs-y)
+>> core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
+>> 
+>> # Default target when executing plain make
+>> -- 
+>> 2.14.2
+>> 
