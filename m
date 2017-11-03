@@ -1,116 +1,49 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  3 Nov 2017 14:47:40 +0000
-Subject: [PATCH v4 03/20] firmware: arm_scmi: add basic driver infrastructure
- for SCMI
+Date: Fri,  3 Nov 2017 14:47:46 +0000
+Subject: [PATCH v4 09/20] firmware: arm_scmi: add initial support for sensor
+ protocol
 In-Reply-To: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
 References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1509720477-18936-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1509720477-18936-10-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCMI is intended to allow OSPM to manage various functions that are
-provided by the hardware platform it is running on, including power and
-performance functions. SCMI provides two levels of abstraction, protocols
-and transports. Protocols define individual groups of system control and
-management messages. A protocol specification describes the messages
-that it supports. Transports describe the method by which protocol
-messages are communicated between agents and the platform.
+The sensor protocol provides functions to manage platform sensors, and
+provides the commands to describe the protocol version and the various
+attribute flags. It also provides commands to discover various sensors
+implemented and managed by the platform, read any sensor synchronously
+or asynchronously as allowed by the platform, program sensor attributes
+and/or configurations, if applicable.
 
-This patch adds basic infrastructure to manage the message allocation,
-initialisation, packing/unpacking and shared memory management.
+This patch adds support for most of the above features.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- MAINTAINERS                        |   3 +-
- drivers/firmware/Kconfig           |  21 ++
- drivers/firmware/Makefile          |   1 +
- drivers/firmware/arm_scmi/Makefile |   2 +
- drivers/firmware/arm_scmi/common.h |  77 ++++
- drivers/firmware/arm_scmi/driver.c | 708 +++++++++++++++++++++++++++++++++++++
- include/linux/scmi_protocol.h      |  27 ++
- 7 files changed, 838 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/arm_scmi/Makefile
- create mode 100644 drivers/firmware/arm_scmi/common.h
- create mode 100644 drivers/firmware/arm_scmi/driver.c
- create mode 100644 include/linux/scmi_protocol.h
+ drivers/firmware/arm_scmi/Makefile  |   2 +-
+ drivers/firmware/arm_scmi/sensors.c | 302 ++++++++++++++++++++++++++++++++++++
+ include/linux/scmi_protocol.h       |  42 +++++
+ 3 files changed, 345 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/arm_scmi/sensors.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 25fbf29331c0..8ee63627f1ac 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -12957,7 +12957,8 @@ F:	Documentation/devicetree/bindings/arm/arm,sc[mp]i.txt
- F:	drivers/clk/clk-scpi.c
- F:	drivers/cpufreq/scpi-cpufreq.c
- F:	drivers/firmware/arm_scpi.c
--F:	include/linux/scpi_protocol.h
-+F:	drivers/firmware/arm_scmi/
-+F:	include/linux/sc[mp]i_protocol.h
- 
- SYSTEM RESET/SHUTDOWN DRIVERS
- M:	Sebastian Reichel <sre@kernel.org>
-diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
-index 6e4ed5a9c6fd..86ea9d531587 100644
---- a/drivers/firmware/Kconfig
-+++ b/drivers/firmware/Kconfig
-@@ -19,6 +19,27 @@ config ARM_PSCI_CHECKER
- 	  on and off through hotplug, so for now torture tests and PSCI checker
- 	  are mutually exclusive.
- 
-+config ARM_SCMI_PROTOCOL
-+	bool "ARM System Control and Management Interface (SCMI) Message Protocol"
-+	depends on ARM || ARM64 || COMPILE_TEST
-+	depends on MAILBOX
-+	help
-+	  ARM System Control and Management Interface (SCMI) protocol is a
-+	  set of operating system-independent software interfaces that are
-+	  used in system management. SCMI is extensible and currently provides
-+	  interfaces for: Discovery and self-description of the interfaces
-+	  it supports, Power domain management which is the ability to place
-+	  a given device or domain into the various power-saving states that
-+	  it supports, Performance management which is the ability to control
-+	  the performance of a domain that is composed of compute engines
-+	  such as application processors and other accelerators, Clock
-+	  management which is the ability to set and inquire rates on platform
-+	  managed clocks and Sensor management which is the ability to read
-+	  sensor data, and be notified of sensor value.
-+
-+	  This protocol library provides interface for all the client drivers
-+	  making use of the features offered by the SCMI.
-+
- config ARM_SCPI_PROTOCOL
- 	tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
- 	depends on ARM || ARM64 || COMPILE_TEST
-diff --git a/drivers/firmware/Makefile b/drivers/firmware/Makefile
-index a37f12e8d137..91d3ff62c653 100644
---- a/drivers/firmware/Makefile
-+++ b/drivers/firmware/Makefile
-@@ -23,6 +23,7 @@ obj-$(CONFIG_QCOM_SCM_32)	+= qcom_scm-32.o
- CFLAGS_qcom_scm-32.o :=$(call as-instr,.arch armv7-a\n.arch_extension sec,-DREQUIRES_SEC=1) -march=armv7-a
- obj-$(CONFIG_TI_SCI_PROTOCOL)	+= ti_sci.o
- 
-+obj-$(CONFIG_ARM_SCMI_PROTOCOL)	+= arm_scmi/
- obj-y				+= broadcom/
- obj-y				+= meson/
- obj-$(CONFIG_GOOGLE_FIRMWARE)	+= google/
 diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-new file mode 100644
-index 000000000000..b2a24ba2b636
---- /dev/null
+index 420c761ced94..3236890905b9 100644
+--- a/drivers/firmware/arm_scmi/Makefile
 +++ b/drivers/firmware/arm_scmi/Makefile
-@@ -0,0 +1,2 @@
-+obj-y	= scmi-driver.o
-+scmi-driver-y = driver.o
-diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
+@@ -1,4 +1,4 @@
+ obj-y	= scmi-bus.o scmi-driver.o scmi-protocols.o
+ scmi-bus-y = bus.o
+ scmi-driver-y = driver.o
+-scmi-protocols-y = base.o clock.o perf.o power.o
++scmi-protocols-y = base.o clock.o perf.o power.o sensors.o
+diff --git a/drivers/firmware/arm_scmi/sensors.c b/drivers/firmware/arm_scmi/sensors.c
 new file mode 100644
-index 000000000000..cdfc43427c3c
+index 000000000000..aee38d3d1c2d
 --- /dev/null
-+++ b/drivers/firmware/arm_scmi/common.h
-@@ -0,0 +1,77 @@
++++ b/drivers/firmware/arm_scmi/sensors.c
+@@ -0,0 +1,302 @@
 +/*
-+ * System Control and Management Interface (SCMI) Message Protocol
-+ * driver common header file containing some definitions, structures
-+ * and function prototypes used in all the different SCMI protocols.
++ * System Control and Management Interface (SCMI) Sensor Protocol
 + *
 + * Copyright (C) 2017 ARM Ltd.
 + *
@@ -126,810 +59,361 @@ index 000000000000..cdfc43427c3c
 + * You should have received a copy of the GNU General Public License along
 + * with this program. If not, see <http://www.gnu.org/licenses/>.
 + */
-+
-+#include <linux/completion.h>
-+#include <linux/scmi_protocol.h>
-+#include <linux/types.h>
-+
-+/**
-+ * struct scmi_msg_hdr - Message(Tx/Rx) header
-+ *
-+ * @id: The identifier of the command being sent
-+ * @protocol_id: The identifier of the protocol used to send @id command
-+ * @seq: The token to identify the message. when a message/command returns,
-+ *       the platform returns the whole message header unmodified including
-+ *	 the token.
-+ */
-+struct scmi_msg_hdr {
-+	u8 id;
-+	u8 protocol_id;
-+	u16 seq;
-+	u32 status;
-+	bool poll_completion;
-+};
-+
-+/**
-+ * struct scmi_msg - Message(Tx/Rx) structure
-+ *
-+ * @buf: Buffer pointer
-+ * @len: Length of data in the Buffer
-+ */
-+struct scmi_msg {
-+	void *buf;
-+	size_t len;
-+};
-+
-+/**
-+ * struct scmi_xfer - Structure representing a message flow
-+ *
-+ * @hdr: Transmit message header
-+ * @tx: Transmit message
-+ * @rx: Receive message, the buffer should be pre-allocated to store
-+ *	message. If request-ACK protocol is used, we can reuse the same
-+ *	buffer for the rx path as we use for the tx path.
-+ * @done: completion event
-+ */
-+
-+struct scmi_xfer {
-+	void *con_priv;
-+	struct scmi_msg_hdr hdr;
-+	struct scmi_msg tx;
-+	struct scmi_msg rx;
-+	struct completion done;
-+};
-+
-+void scmi_one_xfer_put(const struct scmi_handle *h, struct scmi_xfer *xfer);
-+int scmi_do_xfer(const struct scmi_handle *h, struct scmi_xfer *xfer);
-+int scmi_one_xfer_init(const struct scmi_handle *h, u8 msg_id, u8 prot_id,
-+		       size_t tx_size, size_t rx_size, struct scmi_xfer **p);
-+int scmi_handle_put(const struct scmi_handle *handle);
-+struct scmi_handle *scmi_handle_get(struct device *dev);
-diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-new file mode 100644
-index 000000000000..58d8f88893e6
---- /dev/null
-+++ b/drivers/firmware/arm_scmi/driver.c
-@@ -0,0 +1,708 @@
-+/*
-+ * System Control and Management Interface (SCMI) Message Protocol driver
-+ *
-+ * SCMI Message Protocol is used between the System Control Processor(SCP)
-+ * and the Application Processors(AP). The Message Handling Unit(MHU)
-+ * provides a mechanism for inter-processor communication between SCP's
-+ * Cortex M3 and AP.
-+ *
-+ * SCP offers control and management of the core/cluster power states,
-+ * various power domain DVFS including the core/cluster, certain system
-+ * clocks configuration, thermal sensors and many others.
-+ *
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/bitmap.h>
-+#include <linux/export.h>
-+#include <linux/io.h>
-+#include <linux/kernel.h>
-+#include <linux/mailbox_client.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/semaphore.h>
-+#include <linux/slab.h>
 +
 +#include "common.h"
 +
-+#define MSG_ID_SHIFT		0
-+#define MSG_ID_MASK		0xff
-+#define MSG_TYPE_SHIFT		8
-+#define MSG_TYPE_MASK		0x3
-+#define MSG_PROTOCOL_ID_SHIFT	10
-+#define MSG_PROTOCOL_ID_MASK	0xff
-+#define MSG_TOKEN_ID_SHIFT	18
-+#define MSG_TOKEN_ID_MASK	0x3ff
-+#define MSG_XTRACT_TOKEN(header)	\
-+	(((header) >> MSG_TOKEN_ID_SHIFT) & MSG_TOKEN_ID_MASK)
-+
-+enum scmi_error_codes {
-+	SCMI_SUCCESS = 0,	/* Success */
-+	SCMI_ERR_SUPPORT = -1,	/* Not supported */
-+	SCMI_ERR_PARAMS = -2,	/* Invalid Parameters */
-+	SCMI_ERR_ACCESS = -3,	/* Invalid access/permission denied */
-+	SCMI_ERR_ENTRY = -4,	/* Not found */
-+	SCMI_ERR_RANGE = -5,	/* Value out of range */
-+	SCMI_ERR_BUSY = -6,	/* Device busy */
-+	SCMI_ERR_COMMS = -7,	/* Communication Error */
-+	SCMI_ERR_GENERIC = -8,	/* Generic Error */
-+	SCMI_ERR_HARDWARE = -9,	/* Hardware Error */
-+	SCMI_ERR_PROTOCOL = -10,/* Protocol Error */
-+	SCMI_ERR_MAX
++enum scmi_sensor_protocol_cmd {
++	SENSOR_DESCRIPTION_GET = 0x3,
++	SENSOR_CONFIG_SET = 0x4,
++	SENSOR_TRIP_POINT_SET = 0x5,
++	SENSOR_READING_GET = 0x6,
 +};
 +
-+/* List of all  SCMI devices active in system */
-+static LIST_HEAD(scmi_list);
-+/* Protection for the entire list */
-+static DEFINE_MUTEX(scmi_list_mutex);
-+
-+/**
-+ * struct scmi_xfers_info - Structure to manage transfer information
-+ *
-+ * @sem_xfer_count: Counting Semaphore for managing max simultaneous
-+ *	Messages.
-+ * @xfer_block: Preallocated Message array
-+ * @xfer_alloc_table: Bitmap table for allocated messages.
-+ *	Index of this bitmap table is also used for message
-+ *	sequence identifier.
-+ * @xfer_lock: Protection for message allocation
-+ */
-+struct scmi_xfers_info {
-+	struct semaphore sem_xfer_count;
-+	struct scmi_xfer *xfer_block;
-+	unsigned long *xfer_alloc_table;
-+	/* protect transfer allocation */
-+	spinlock_t xfer_lock;
++struct scmi_msg_resp_sensor_attributes {
++	__le16 num_sensors;
++	    u8 max_requests;
++	    u8 reserved;
++	__le32 reg_addr_low;
++	__le32 reg_addr_high;
++	__le32 reg_size;
 +};
 +
-+/**
-+ * struct scmi_desc - Description of SoC integration
-+ *
-+ * @max_rx_timeout_ms: Timeout for communication with SoC (in Milliseconds)
-+ * @max_msg: Maximum number of messages that can be pending
-+ *	simultaneously in the system
-+ * @max_msg_size: Maximum size of data per message that can be handled.
-+ */
-+struct scmi_desc {
-+	int max_rx_timeout_ms;
-+	int max_msg;
-+	int max_msg_size;
++struct scmi_msg_resp_sensor_description {
++	__le16 num_returned;
++	__le16 num_remaining;
++	struct {
++		__le32 id;
++		__le32 attributes_low;
++#define SUPPORTS_ASYNC_READ(x)	((x) & BIT(31))
++#define NUM_TRIP_POINTS(x)	(((x) >> 4) & 0xff)
++		__le32 attributes_high;
++#define SENSOR_TYPE(x)		((x) & 0xff)
++#define SENSOR_SCALE(x)		(((x) >> 11) & 0x3f)
++#define SENSOR_UPDATE_SCALE(x)	(((x) >> 22) & 0x1f)
++#define SENSOR_UPDATE_BASE(x)	(((x) >> 27) & 0x1f)
++		    u8 name[SCMI_MAX_STR_SIZE];
++	} desc[0];
 +};
 +
-+/**
-+ * struct scmi_info - Structure representing a  SCMI instance
-+ *
-+ * @dev: Device pointer
-+ * @desc: SoC description for this instance
-+ * @handle: Instance of SCMI handle to send to clients
-+ * @cl: Mailbox Client
-+ * @tx_chan: Transmit mailbox channel
-+ * @tx_payload: Transmit mailbox channel payload area
-+ * @minfo: Message info
-+ * @node: list head
-+ * @users: Number of users of this instance
-+ */
-+struct scmi_info {
-+	struct device *dev;
-+	const struct scmi_desc *desc;
-+	struct scmi_handle handle;
-+	struct mbox_client cl;
-+	struct mbox_chan *tx_chan;
-+	void __iomem *tx_payload;
-+	struct scmi_xfers_info minfo;
-+	struct list_head node;
-+	int users;
++struct scmi_msg_set_sensor_config {
++	__le32 id;
++	__le32 event_control;
 +};
 +
-+#define client_to_scmi_info(c)	container_of(c, struct scmi_info, cl)
-+#define handle_to_scmi_info(h)	container_of(h, struct scmi_info, handle)
++struct scmi_msg_set_sensor_trip_point {
++	__le32 id;
++	__le32 event_control;
++#define SENSOR_TP_EVENT_MASK	(0x3)
++#define SENSOR_TP_DISABLED	0x0
++#define SENSOR_TP_POSITIVE	0x1
++#define SENSOR_TP_NEGATIVE	0x2
++#define SENSOR_TP_BOTH		0x3
++#define SENSOR_TP_ID(x)		(((x) & 0xff) << 4)
++	__le32 value_low;
++	__le32 value_high;
++};
 +
-+/*
-+ * SCMI specification requires all parameters, message headers, return
-+ * arguments or any protocol data to be expressed in little endian
-+ * format only.
-+ */
-+struct scmi_shared_mem {
-+	__le32 reserved;
-+	__le32 channel_status;
-+#define SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR	BIT(1)
-+#define SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE	BIT(0)
-+	__le32 reserved1[2];
++struct scmi_msg_sensor_reading_get {
++	__le32 id;
 +	__le32 flags;
-+#define SCMI_SHMEM_FLAG_INTR_ENABLED	BIT(0)
-+	__le32 length;
-+	__le32 msg_header;
-+	u8 msg_payload[0];
++#define SENSOR_READ_ASYNC	BIT(0)
 +};
 +
-+static const int scmi_linux_errmap[] = {
-+	/* better than switch case as long as return value is continuous */
-+	0,			/* SCMI_SUCCESS */
-+	-EOPNOTSUPP,		/* SCMI_ERR_SUPPORT */
-+	-EINVAL,		/* SCMI_ERR_PARAM */
-+	-EACCES,		/* SCMI_ERR_ACCESS */
-+	-ENOENT,		/* SCMI_ERR_ENTRY */
-+	-ERANGE,		/* SCMI_ERR_RANGE */
-+	-EBUSY,			/* SCMI_ERR_BUSY */
-+	-ECOMM,			/* SCMI_ERR_COMMS */
-+	-EIO,			/* SCMI_ERR_GENERIC */
-+	-EREMOTEIO,		/* SCMI_ERR_HARDWARE */
-+	-EPROTO,		/* SCMI_ERR_PROTOCOL */
++struct sensors_info {
++	int num_sensors;
++	int max_requests;
++	u64 reg_addr;
++	u32 reg_size;
++	struct scmi_sensor_info *sensors;
 +};
 +
-+static inline int scmi_to_linux_errno(int errno)
-+{
-+	if (errno < SCMI_SUCCESS && errno > SCMI_ERR_MAX)
-+		return scmi_linux_errmap[-errno];
-+	return -EIO;
-+}
-+
-+/**
-+ * scmi_dump_header_dbg() - Helper to dump a message header.
-+ *
-+ * @dev: Device pointer corresponding to the SCMI entity
-+ * @hdr: pointer to header.
-+ */
-+static inline void scmi_dump_header_dbg(struct device *dev,
-+					struct scmi_msg_hdr *hdr)
-+{
-+	dev_dbg(dev, "Command ID: %x Sequence ID: %x Protocol: %x\n",
-+		hdr->id, hdr->seq, hdr->protocol_id);
-+}
-+
-+static void scmi_fetch_response(struct scmi_xfer *xfer,
-+				struct scmi_shared_mem __iomem *mem)
-+{
-+	xfer->hdr.status = ioread32(mem->msg_payload);
-+	/* Skip the length of header and statues in payload area i.e 8 bytes*/
-+	xfer->rx.len = min_t(size_t, xfer->rx.len, ioread32(&mem->length) - 8);
-+
-+	/* Take a copy to the rx buffer.. */
-+	memcpy_fromio(xfer->rx.buf, mem->msg_payload + 4, xfer->rx.len);
-+}
-+
-+/**
-+ * scmi_rx_callback() - mailbox client callback for receive messages
-+ *
-+ * @cl: client pointer
-+ * @m: mailbox message
-+ *
-+ * Processes one received message to appropriate transfer information and
-+ * signals completion of the transfer.
-+ *
-+ * NOTE: This function will be invoked in IRQ context, hence should be
-+ * as optimal as possible.
-+ */
-+static void scmi_rx_callback(struct mbox_client *cl, void *m)
-+{
-+	u16 xfer_id;
-+	struct scmi_xfer *xfer;
-+	struct scmi_info *info = client_to_scmi_info(cl);
-+	struct scmi_xfers_info *minfo = &info->minfo;
-+	struct device *dev = info->dev;
-+	struct scmi_shared_mem __iomem *mem = info->tx_payload;
-+
-+	xfer_id = MSG_XTRACT_TOKEN(ioread32(&mem->msg_header));
-+
-+	/*
-+	 * Are we even expecting this?
-+	 */
-+	if (!test_bit(xfer_id, minfo->xfer_alloc_table)) {
-+		dev_err(dev, "message for %d is not expected!\n", xfer_id);
-+		return;
-+	}
-+
-+	xfer = &minfo->xfer_block[xfer_id];
-+
-+	scmi_dump_header_dbg(dev, &xfer->hdr);
-+	/* Is the message of valid length? */
-+	if (xfer->rx.len > info->desc->max_msg_size) {
-+		dev_err(dev, "unable to handle %zu xfer(max %d)\n",
-+			xfer->rx.len, info->desc->max_msg_size);
-+		return;
-+	}
-+
-+	scmi_fetch_response(xfer, mem);
-+	complete(&xfer->done);
-+}
-+
-+/**
-+ * pack_scmi_header() - packs and returns 32-bit header
-+ *
-+ * @hdr: pointer to header containing all the information on message id,
-+ *	protocol id and sequence id.
-+ */
-+static inline u32 pack_scmi_header(struct scmi_msg_hdr *hdr)
-+{
-+	return ((hdr->id & MSG_ID_MASK) << MSG_ID_SHIFT) |
-+	   ((hdr->seq & MSG_TOKEN_ID_MASK) << MSG_TOKEN_ID_SHIFT) |
-+	   ((hdr->protocol_id & MSG_PROTOCOL_ID_MASK) << MSG_PROTOCOL_ID_SHIFT);
-+}
-+
-+/**
-+ * scmi_tx_prepare() - mailbox client callback to prepare for the transfer
-+ *
-+ * @cl: client pointer
-+ * @m: mailbox message
-+ *
-+ * This function prepares the shared memory which contains the header and the
-+ * payload.
-+ */
-+static void scmi_tx_prepare(struct mbox_client *cl, void *m)
-+{
-+	struct scmi_xfer *t = m;
-+	struct scmi_info *info = client_to_scmi_info(cl);
-+	struct scmi_shared_mem __iomem *mem = info->tx_payload;
-+
-+	/* Mark channel busy + clear error */
-+	iowrite32(0x0, &mem->channel_status);
-+	iowrite32(t->hdr.poll_completion ? 0 : SCMI_SHMEM_FLAG_INTR_ENABLED,
-+		  &mem->flags);
-+	iowrite32(sizeof(mem->msg_header) + t->tx.len, &mem->length);
-+	iowrite32(pack_scmi_header(&t->hdr), &mem->msg_header);
-+	if (t->tx.buf)
-+		memcpy_toio(mem->msg_payload, t->tx.buf, t->tx.len);
-+}
-+
-+/**
-+ * scmi_one_xfer_get() - Allocate one message
-+ *
-+ * @handle: SCMI entity handle
-+ *
-+ * Helper function which is used by various command functions that are
-+ * exposed to clients of this driver for allocating a message traffic event.
-+ *
-+ * This function can sleep depending on pending requests already in the system
-+ * for the SCMI entity. Further, this also holds a spinlock to maintain
-+ * integrity of internal data structures.
-+ *
-+ * Return: 0 if all went fine, else corresponding error.
-+ */
-+static struct scmi_xfer *scmi_one_xfer_get(const struct scmi_handle *handle)
-+{
-+	u16 xfer_id;
-+	int ret, timeout;
-+	struct scmi_xfer *xfer;
-+	unsigned long flags, bit_pos;
-+	struct scmi_info *info = handle_to_scmi_info(handle);
-+	struct scmi_xfers_info *minfo = &info->minfo;
-+
-+	/*
-+	 * Ensure we have only controlled number of pending messages.
-+	 * Ideally, we might just have to wait a single message, be
-+	 * conservative and wait 5 times that..
-+	 */
-+	timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms) * 5;
-+	ret = down_timeout(&minfo->sem_xfer_count, timeout);
-+	if (ret < 0)
-+		return ERR_PTR(ret);
-+
-+	/* Keep the locked section as small as possible */
-+	spin_lock_irqsave(&minfo->xfer_lock, flags);
-+	bit_pos = find_first_zero_bit(minfo->xfer_alloc_table,
-+				      info->desc->max_msg);
-+	if (bit_pos == info->desc->max_msg) {
-+		spin_unlock_irqrestore(&minfo->xfer_lock, flags);
-+		return ERR_PTR(-ENOMEM);
-+	}
-+	set_bit(bit_pos, minfo->xfer_alloc_table);
-+	spin_unlock_irqrestore(&minfo->xfer_lock, flags);
-+
-+	xfer_id = bit_pos;
-+
-+	xfer = &minfo->xfer_block[xfer_id];
-+	xfer->hdr.seq = xfer_id;
-+	reinit_completion(&xfer->done);
-+
-+	return xfer;
-+}
-+
-+/**
-+ * scmi_one_xfer_put() - Release a message
-+ *
-+ * @minfo: transfer info pointer
-+ * @xfer: message that was reserved by scmi_one_xfer_get
-+ *
-+ * This holds a spinlock to maintain integrity of internal data structures.
-+ */
-+void scmi_one_xfer_put(const struct scmi_handle *handle, struct scmi_xfer *xfer)
-+{
-+	unsigned long flags;
-+	struct scmi_info *info = handle_to_scmi_info(handle);
-+	struct scmi_xfers_info *minfo = &info->minfo;
-+
-+	/*
-+	 * Keep the locked section as small as possible
-+	 * NOTE: we might escape with smp_mb and no lock here..
-+	 * but just be conservative and symmetric.
-+	 */
-+	spin_lock_irqsave(&minfo->xfer_lock, flags);
-+	clear_bit(xfer->hdr.seq, minfo->xfer_alloc_table);
-+	spin_unlock_irqrestore(&minfo->xfer_lock, flags);
-+
-+	/* Increment the count for the next user to get through */
-+	up(&minfo->sem_xfer_count);
-+}
-+
-+/**
-+ * scmi_do_xfer() - Do one transfer
-+ *
-+ * @info: Pointer to SCMI entity information
-+ * @xfer: Transfer to initiate and wait for response
-+ *
-+ * Return: -ETIMEDOUT in case of no response, if transmit error,
-+ *   return corresponding error, else if all goes well,
-+ *   return 0.
-+ */
-+int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
++static int scmi_sensor_attributes_get(const struct scmi_handle *handle,
++				      struct sensors_info *si)
 +{
 +	int ret;
-+	int timeout;
-+	struct scmi_info *info = handle_to_scmi_info(handle);
-+	struct device *dev = info->dev;
++	struct scmi_xfer *t;
++	struct scmi_msg_resp_sensor_attributes *attr;
 +
-+	ret = mbox_send_message(info->tx_chan, xfer);
-+	if (ret < 0) {
-+		dev_dbg(dev, "mbox send fail %d\n", ret);
++	ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
++				 SCMI_PROTOCOL_SENSOR, 0, sizeof(*attr), &t);
++	if (ret)
 +		return ret;
++
++	attr = t->rx.buf;
++
++	ret = scmi_do_xfer(handle, t);
++	if (!ret) {
++		si->num_sensors = le16_to_cpu(attr->num_sensors);
++		si->max_requests = attr->max_requests;
++		si->reg_addr = le32_to_cpu(attr->reg_addr_low) |
++				(u64)le32_to_cpu(attr->reg_addr_high) << 32;
++		si->reg_size = le32_to_cpu(attr->reg_size);
 +	}
 +
-+	/* mbox_send_message returns non-negative value on success, so reset */
-+	ret = 0;
-+
-+	/* And we wait for the response. */
-+	timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms);
-+	if (!wait_for_completion_timeout(&xfer->done, timeout)) {
-+		dev_err(dev, "mbox timed out in resp(caller: %pF)\n",
-+			(void *)_RET_IP_);
-+		ret = -ETIMEDOUT;
-+	} else if (xfer->hdr.status) {
-+		ret = scmi_to_linux_errno(xfer->hdr.status);
-+	}
-+	/*
-+	 * NOTE: we might prefer not to need the mailbox ticker to manage the
-+	 * transfer queueing since the protocol layer queues things by itself.
-+	 * Unfortunately, we have to kick the mailbox framework after we have
-+	 * received our message.
-+	 */
-+	mbox_client_txdone(info->tx_chan, ret);
-+
++	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+/**
-+ * scmi_one_xfer_init() - Allocate and initialise one message
-+ *
-+ * @handle: SCMI entity handle
-+ * @msg_id: Message identifier
-+ * @msg_prot_id: Protocol identifier for the message
-+ * @tx_size: transmit message size
-+ * @rx_size: receive message size
-+ * @p: pointer to the allocated and initialised message
-+ *
-+ * This function allocates the message using @scmi_one_xfer_get and
-+ * initialise the header.
-+ *
-+ * Return: 0 if all went fine with @p pointing to message, else
-+ *	corresponding error.
-+ */
-+int scmi_one_xfer_init(const struct scmi_handle *handle, u8 msg_id, u8 prot_id,
-+		       size_t tx_size, size_t rx_size, struct scmi_xfer **p)
++static int scmi_sensor_description_get(const struct scmi_handle *handle,
++				       struct sensors_info *si)
 +{
-+	int ret;
-+	struct scmi_xfer *xfer;
-+	struct scmi_info *info = handle_to_scmi_info(handle);
-+	struct device *dev = info->dev;
++	int ret, cnt;
++	u32 desc_index = 0;
++	u16 num_returned, num_remaining;
++	struct scmi_xfer *t;
++	struct scmi_msg_resp_sensor_description *buf;
 +
-+	/* Ensure we have sane transfer sizes */
-+	if (rx_size > info->desc->max_msg_size ||
-+	    tx_size > info->desc->max_msg_size)
-+		return -ERANGE;
-+
-+	xfer = scmi_one_xfer_get(handle);
-+	if (IS_ERR(xfer)) {
-+		ret = PTR_ERR(xfer);
-+		dev_err(dev, "failed to get free message slot(%d)\n", ret);
++	ret = scmi_one_xfer_init(handle, SENSOR_DESCRIPTION_GET,
++				 SCMI_PROTOCOL_SENSOR, sizeof(__le32), 0, &t);
++	if (ret)
 +		return ret;
-+	}
 +
-+	xfer->tx.len = tx_size;
-+	xfer->rx.len = rx_size ? : info->desc->max_msg_size;
-+	xfer->hdr.id = msg_id;
-+	xfer->hdr.protocol_id = prot_id;
-+	xfer->hdr.poll_completion = false;
++	buf = t->rx.buf;
 +
-+	*p = xfer;
-+	return 0;
-+}
++	do {
++		/* Set the number of sensors to be skipped/already read */
++		*(__le32 *)t->tx.buf = cpu_to_le32(desc_index);
 +
-+/**
-+ * scmi_handle_get() - Get the  SCMI handle for a device
-+ *
-+ * @dev: pointer to device for which we want SCMI handle
-+ *
-+ * NOTE: The function does not track individual clients of the framework
-+ * and is expected to be maintained by caller of  SCMI protocol library.
-+ * scmi_handle_put must be balanced with successful scmi_handle_get
-+ *
-+ * Return: pointer to handle if successful, NULL on error
-+ */
-+struct scmi_handle *scmi_handle_get(struct device *dev)
-+{
-+	struct list_head *p;
-+	struct scmi_info *info;
-+	struct scmi_handle *handle = NULL;
++		ret = scmi_do_xfer(handle, t);
++		if (ret)
++			break;
 +
-+	mutex_lock(&scmi_list_mutex);
-+	list_for_each(p, &scmi_list) {
-+		info = list_entry(p, struct scmi_info, node);
-+		if (dev->parent == info->dev) {
-+			handle = &info->handle;
-+			info->users++;
++		num_returned = le16_to_cpu(buf->num_returned);
++		num_remaining = le16_to_cpu(buf->num_remaining);
++
++		if (desc_index + num_returned > si->num_sensors) {
++			dev_err(handle->dev, "No. of sensors can't exceed %d",
++				si->num_sensors);
 +			break;
 +		}
-+	}
-+	mutex_unlock(&scmi_list_mutex);
 +
-+	return handle;
-+}
++		for (cnt = 0; cnt < num_returned; cnt++) {
++			u32 attrh;
++			struct scmi_sensor_info *s;
 +
-+/**
-+ * scmi_handle_put() - Release the handle acquired by scmi_handle_get
-+ *
-+ * @handle: handle acquired by scmi_handle_get
-+ *
-+ * NOTE: The function does not track individual clients of the framework
-+ * and is expected to be maintained by caller of  SCMI protocol library.
-+ * scmi_handle_put must be balanced with successful scmi_handle_get
-+ *
-+ * Return: 0 is successfully released
-+ *	if null was passed, it returns -EINVAL;
-+ */
-+int scmi_handle_put(const struct scmi_handle *handle)
-+{
-+	struct scmi_info *info;
++			attrh = le32_to_cpu(buf->desc[cnt].attributes_high);
++			s = &si->sensors[desc_index + cnt];
++			s->id = le32_to_cpu(buf->desc[cnt].id);
++			s->type = SENSOR_TYPE(attrh);
++			memcpy(s->name, buf->desc[cnt].name, SCMI_MAX_STR_SIZE);
++		}
 +
-+	if (!handle)
-+		return -EINVAL;
++		desc_index += num_returned;
++		/*
++		 * check for both returned and remaining to avoid infinite
++		 * loop due to buggy firmware
++		 */
++	} while (num_returned && num_remaining);
 +
-+	info = handle_to_scmi_info(handle);
-+	mutex_lock(&scmi_list_mutex);
-+	if (!WARN_ON(!info->users))
-+		info->users--;
-+	mutex_unlock(&scmi_list_mutex);
-+
-+	return 0;
-+}
-+
-+static const struct scmi_desc scmi_generic_desc = {
-+	.max_rx_timeout_ms = 30,	/* we may increase this if required */
-+	.max_msg = 20,		/* Limited by MBOX_TX_QUEUE_LEN */
-+	.max_msg_size = 128,
-+};
-+
-+/* Each compatible listed below must have descriptor associated with it */
-+static const struct of_device_id scmi_of_match[] = {
-+	{ .compatible = "arm,scmi", .data = &scmi_generic_desc },
-+	{ /* Sentinel */ },
-+};
-+
-+MODULE_DEVICE_TABLE(of, scmi_of_match);
-+
-+static int scmi_xfer_info_init(struct scmi_info *sinfo)
-+{
-+	int i;
-+	struct scmi_xfer *xfer;
-+	struct device *dev = sinfo->dev;
-+	const struct scmi_desc *desc = sinfo->desc;
-+	struct scmi_xfers_info *info = &sinfo->minfo;
-+
-+	/* Pre-allocated messages, no more than what hdr.seq can support */
-+	if (WARN_ON(desc->max_msg >= (MSG_TOKEN_ID_MASK + 1))) {
-+		dev_err(dev, "Maximum message of %d exceeds supported %d\n",
-+			desc->max_msg, MSG_TOKEN_ID_MASK + 1);
-+		return -EINVAL;
-+	}
-+
-+	info->xfer_block = devm_kcalloc(dev, desc->max_msg,
-+					sizeof(*info->xfer_block), GFP_KERNEL);
-+	if (!info->xfer_block)
-+		return -ENOMEM;
-+
-+	info->xfer_alloc_table = devm_kcalloc(dev, BITS_TO_LONGS(desc->max_msg),
-+					      sizeof(long), GFP_KERNEL);
-+	if (!info->xfer_alloc_table)
-+		return -ENOMEM;
-+
-+	bitmap_zero(info->xfer_alloc_table, desc->max_msg);
-+
-+	/* Pre-initialize the buffer pointer to pre-allocated buffers */
-+	for (i = 0, xfer = info->xfer_block; i < desc->max_msg; i++, xfer++) {
-+		xfer->rx.buf = devm_kcalloc(dev, sizeof(u8), desc->max_msg_size,
-+					    GFP_KERNEL);
-+		if (!xfer->rx.buf)
-+			return -ENOMEM;
-+
-+		xfer->tx.buf = xfer->rx.buf;
-+		init_completion(&xfer->done);
-+	}
-+
-+	spin_lock_init(&info->xfer_lock);
-+
-+	sema_init(&info->sem_xfer_count, desc->max_msg);
-+
-+	return 0;
-+}
-+
-+static int scmi_mailbox_check(struct device_node *np)
-+{
-+	struct of_phandle_args arg;
-+
-+	return of_parse_phandle_with_args(np, "mboxes", "#mbox-cells", 0, &arg);
-+}
-+
-+static int scmi_mbox_free_channel(struct scmi_info *info)
-+{
-+	if (!IS_ERR_OR_NULL(info->tx_chan)) {
-+		mbox_free_channel(info->tx_chan);
-+		info->tx_chan = NULL;
-+	}
-+
-+	return 0;
-+}
-+
-+static int scmi_remove(struct platform_device *pdev)
-+{
-+	int ret = 0;
-+	struct scmi_info *info = platform_get_drvdata(pdev);
-+
-+	mutex_lock(&scmi_list_mutex);
-+	if (info->users)
-+		ret = -EBUSY;
-+	else
-+		list_del(&info->node);
-+	mutex_unlock(&scmi_list_mutex);
-+
-+	if (!ret)
-+		/* Safe to free channels since no more users */
-+		return scmi_mbox_free_channel(info);
-+
++	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+static inline int scmi_mbox_chan_setup(struct scmi_info *info)
++static int
++scmi_sensor_configuration_set(const struct scmi_handle *handle, u32 sensor_id)
 +{
 +	int ret;
-+	struct resource res;
-+	resource_size_t size;
-+	struct device *dev = info->dev;
-+	struct device_node *shmem, *np = dev->of_node;
-+	struct mbox_client *cl;
++	u32 evt_cntl = BIT(0);
++	struct scmi_xfer *t;
++	struct scmi_msg_set_sensor_config *cfg;
 +
-+	cl = &info->cl;
-+	cl->dev = dev;
-+	cl->rx_callback = scmi_rx_callback;
-+	cl->tx_prepare = scmi_tx_prepare;
-+	cl->tx_block = false;
-+	cl->knows_txdone = true;
-+
-+	shmem = of_parse_phandle(np, "shmem", 0);
-+	ret = of_address_to_resource(shmem, 0, &res);
-+	of_node_put(shmem);
-+	if (ret) {
-+		dev_err(dev, "failed to get SCMI Tx payload mem resource\n");
++	ret = scmi_one_xfer_init(handle, SENSOR_CONFIG_SET,
++				 SCMI_PROTOCOL_SENSOR, sizeof(*cfg), 0, &t);
++	if (ret)
 +		return ret;
-+	}
 +
-+	size = resource_size(&res);
-+	info->tx_payload = devm_ioremap(dev, res.start, size);
-+	if (!info->tx_payload) {
-+		dev_err(dev, "failed to ioremap SCMI Tx payload\n");
-+		return -EADDRNOTAVAIL;
-+	}
++	cfg = t->tx.buf;
++	cfg->id = cpu_to_le32(sensor_id);
++	cfg->event_control = cpu_to_le32(evt_cntl);
 +
-+	/* Transmit channel is first entry i.e. index 0 */
-+	info->tx_chan = mbox_request_channel(cl, 0);
-+	if (IS_ERR(info->tx_chan)) {
-+		ret = PTR_ERR(info->tx_chan);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(dev, "failed to request SCMI Tx mailbox\n");
-+		return ret;
-+	}
++	ret = scmi_do_xfer(handle, t);
 +
-+	return 0;
++	scmi_one_xfer_put(handle, t);
++	return ret;
 +}
 +
-+static int scmi_probe(struct platform_device *pdev)
++static int scmi_sensor_trip_point_set(const struct scmi_handle *handle,
++				      u32 sensor_id, u8 trip_id, u64 trip_value)
 +{
 +	int ret;
-+	struct scmi_handle *handle;
-+	const struct scmi_desc *desc;
-+	struct scmi_info *info;
-+	struct device *dev = &pdev->dev;
-+	struct device_node *np = dev->of_node;
++	u32 evt_cntl = SENSOR_TP_BOTH;
++	struct scmi_xfer *t;
++	struct scmi_msg_set_sensor_trip_point *trip;
 +
-+	/* Only mailbox method supported, check for the presence of one */
-+	if (scmi_mailbox_check(np)) {
-+		dev_err(dev, "no mailbox found in %pOF\n", np);
-+		return -EINVAL;
++	ret = scmi_one_xfer_init(handle, SENSOR_TRIP_POINT_SET,
++				 SCMI_PROTOCOL_SENSOR, sizeof(*trip), 0, &t);
++	if (ret)
++		return ret;
++
++	trip = t->tx.buf;
++	trip->id = cpu_to_le32(sensor_id);
++	trip->event_control = cpu_to_le32(evt_cntl | SENSOR_TP_ID(trip_id));
++	trip->value_low = cpu_to_le32(trip_value & 0xffffffff);
++	trip->value_high = cpu_to_le32(trip_value >> 32);
++
++	ret = scmi_do_xfer(handle, t);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++static int scmi_sensor_reading_get(const struct scmi_handle *handle,
++				   u32 sensor_id, bool async, u64 *value)
++{
++	int ret;
++	struct scmi_xfer *t;
++	struct scmi_msg_sensor_reading_get *sensor;
++
++	ret = scmi_one_xfer_init(handle, SENSOR_READING_GET,
++				 SCMI_PROTOCOL_SENSOR, sizeof(*sensor),
++				 sizeof(u64), &t);
++	if (ret)
++		return ret;
++
++	sensor = t->tx.buf;
++	sensor->id = cpu_to_le32(sensor_id);
++	sensor->flags = cpu_to_le32(async ? SENSOR_READ_ASYNC : 0);
++
++	ret = scmi_do_xfer(handle, t);
++	if (!ret) {
++		__le32 *pval = t->rx.buf;
++
++		*value = le32_to_cpu(*pval);
++		*value |= (u64)le32_to_cpu(*(pval + 1)) << 32;
 +	}
 +
-+	desc = of_match_device(scmi_of_match, dev)->data;
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
 +
-+	info = devm_kzalloc(dev, sizeof(*info), GFP_KERNEL);
-+	if (!info)
++static const struct scmi_sensor_info *
++scmi_sensor_info_get(const struct scmi_handle *handle, u32 sensor_id)
++{
++	struct sensors_info *si = handle->sensor_priv;
++
++	return si->sensors + sensor_id;
++}
++
++static int scmi_sensor_count_get(const struct scmi_handle *handle)
++{
++	struct sensors_info *si = handle->sensor_priv;
++
++	return si->num_sensors;
++}
++
++static struct scmi_sensor_ops sensor_ops = {
++	.count_get = scmi_sensor_count_get,
++	.info_get = scmi_sensor_info_get,
++	.configuration_set = scmi_sensor_configuration_set,
++	.trip_point_set = scmi_sensor_trip_point_set,
++	.reading_get = scmi_sensor_reading_get,
++};
++
++static int scmi_sensors_protocol_init(struct scmi_handle *handle)
++{
++	u32 version;
++	struct sensors_info *sinfo;
++
++	scmi_version_get(handle, SCMI_PROTOCOL_SENSOR, &version);
++
++	dev_dbg(handle->dev, "Sensor Version %d.%d\n",
++		PROTOCOL_REV_MAJOR(version), PROTOCOL_REV_MINOR(version));
++
++	sinfo = devm_kzalloc(handle->dev, sizeof(*sinfo), GFP_KERNEL);
++	if (!sinfo)
 +		return -ENOMEM;
 +
-+	info->dev = dev;
-+	info->desc = desc;
-+	INIT_LIST_HEAD(&info->node);
++	scmi_sensor_attributes_get(handle, sinfo);
 +
-+	ret = scmi_xfer_info_init(info);
-+	if (ret)
-+		return ret;
++	sinfo->sensors = devm_kcalloc(handle->dev, sinfo->num_sensors,
++				      sizeof(*sinfo->sensors), GFP_KERNEL);
++	if (!sinfo->sensors)
++		return -ENOMEM;
 +
-+	platform_set_drvdata(pdev, info);
++	scmi_sensor_description_get(handle, sinfo);
 +
-+	handle = &info->handle;
-+	handle->dev = info->dev;
-+
-+	ret = scmi_mbox_chan_setup(info);
-+	if (ret)
-+		return ret;
-+
-+	mutex_lock(&scmi_list_mutex);
-+	list_add_tail(&info->node, &scmi_list);
-+	mutex_unlock(&scmi_list_mutex);
++	handle->sensor_ops = &sensor_ops;
++	handle->sensor_priv = sinfo;
 +
 +	return 0;
 +}
 +
-+static struct platform_driver scmi_driver = {
-+	.driver = {
-+		   .name = "arm-scmi",
-+		   .of_match_table = scmi_of_match,
-+		   },
-+	.probe = scmi_probe,
-+	.remove = scmi_remove,
++static int __init scmi_sensors_init(void)
++{
++	return scmi_protocol_register(SCMI_PROTOCOL_SENSOR,
++				      &scmi_sensors_protocol_init);
++}
++subsys_initcall(scmi_sensors_init);
+diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
+index 95a645f9039d..70e2993f6d48 100644
+--- a/include/linux/scmi_protocol.h
++++ b/include/linux/scmi_protocol.h
+@@ -138,6 +138,45 @@ struct scmi_power_ops {
+ 	int (*state_notify_enable)(const struct scmi_handle *, u32, bool);
+ };
+ 
++struct scmi_sensor_info {
++	u32 id;
++	u8 type;
++	char name[SCMI_MAX_STR_SIZE];
 +};
 +
-+module_platform_driver(scmi_driver);
-+
-+MODULE_ALIAS("platform: arm-scmi");
-+MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-+MODULE_DESCRIPTION("ARM SCMI protocol driver");
-+MODULE_LICENSE("GPL v2");
-diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-new file mode 100644
-index 000000000000..854ed2479993
---- /dev/null
-+++ b/include/linux/scmi_protocol.h
-@@ -0,0 +1,27 @@
 +/*
-+ * SCMI Message Protocol driver header
-+ *
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
++ * Partial list from Distributed Management Task Force (DMTF) specification:
++ * DSP0249 (Platform Level Data Model specification)
 + */
-+#include <linux/types.h>
++enum scmi_sensor_class {
++	NONE = 0x0,
++	TEMPERATURE_C = 0x2,
++	VOLTAGE = 0x5,
++	CURRENT = 0x6,
++	POWER = 0x7,
++	ENERGY = 0x8,
++};
 +
 +/**
-+ * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
++ * struct scmi_sensor_ops - represents the various operations provided
++ *	by SCMI Sensor Protocol
 + *
-+ * @dev: pointer to the SCMI device
++ * @count_get: get the count of sensors provided by SCMI
++ * @info_get: get the information of the specified sensor
++ * @configuration_set: control notifications on cross-over events for
++ *	the trip-points
++ * @trip_point_set: selects and configures a trip-point of interest
++ * @reading_get: gets the current value of the sensor
 + */
-+struct scmi_handle {
-+	struct device *dev;
++struct scmi_sensor_ops {
++	int (*count_get)(const struct scmi_handle *);
++	const struct scmi_sensor_info *(*info_get)(const struct scmi_handle *,
++						   u32);
++	int (*configuration_set)(const struct scmi_handle *, u32);
++	int (*trip_point_set)(const struct scmi_handle *, u32, u8, u64);
++	int (*reading_get)(const struct scmi_handle *, u32, bool, u64 *);
 +};
++
+ /**
+  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
+  *
+@@ -146,6 +185,7 @@ struct scmi_power_ops {
+  * @power_ops: pointer to set of power protocol operations
+  * @perf_ops: pointer to set of performance protocol operations
+  * @clk_ops: pointer to set of clock protocol operations
++ * @sensor_ops: pointer to set of sensor protocol operations
+  */
+ struct scmi_handle {
+ 	struct device *dev;
+@@ -153,10 +193,12 @@ struct scmi_handle {
+ 	struct scmi_perf_ops *perf_ops;
+ 	struct scmi_clk_ops *clk_ops;
+ 	struct scmi_power_ops *power_ops;
++	struct scmi_sensor_ops *sensor_ops;
+ 	/* for protocol internal use */
+ 	void *perf_priv;
+ 	void *clk_priv;
+ 	void *power_priv;
++	void *sensor_priv;
+ };
+ 
+ enum scmi_std_protocol {
 -- 
 2.7.4
