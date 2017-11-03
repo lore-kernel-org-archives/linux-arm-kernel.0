@@ -1,52 +1,38 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Fri,  3 Nov 2017 10:11:45 -0700
-Subject: [PATCH 01/15] kbuild: add ld-name macro and support for GNU gold
+Date: Fri,  3 Nov 2017 10:11:54 -0700
+Subject: [PATCH 09/15] arm64: keep .altinstructions and .altinstr_replacement
 In-Reply-To: <20171103171203.107569-1-samitolvanen@google.com>
 References: <20171103171203.107569-1-samitolvanen@google.com>
-Message-ID: <20171103171203.107569-2-samitolvanen@google.com>
+Message-ID: <20171103171203.107569-11-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GNU gold may require different flags than GNU ld. Add a macro for
-detecting the linker and conditionally add gold specific flags from
-LDFLAGS_GOLD.
+Make sure the linker doesn't remove .altinstructions or
+.altinstr_replacement when CONFIG_LD_DEAD_CODE_DATA_ELIMINATION is
+enabled.
 
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
- Makefile               | 5 +++++
- scripts/Kbuild.include | 4 ++++
- 2 files changed, 9 insertions(+)
+ arch/arm64/kernel/vmlinux.lds.S | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Makefile b/Makefile
-index 3a8868ee967e..59980d5a03d0 100644
---- a/Makefile
-+++ b/Makefile
-@@ -826,6 +826,11 @@ include scripts/Makefile.kasan
- include scripts/Makefile.extrawarn
- include scripts/Makefile.ubsan
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 7da3e5c366a0..15479995869c 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -138,11 +138,11 @@ SECTIONS
+ 	. = ALIGN(4);
+ 	.altinstructions : {
+ 		__alt_instructions = .;
+-		*(.altinstructions)
++		KEEP(*(.altinstructions))
+ 		__alt_instructions_end = .;
+ 	}
+ 	.altinstr_replacement : {
+-		*(.altinstr_replacement)
++		KEEP(*(.altinstr_replacement))
+ 	}
  
-+# Add any flags specific to ld.gold
-+ifeq ($(ld-name),gold)
-+LDFLAGS		+= $(LDFLAGS_GOLD)
-+endif
-+
- # Add any arch overrides and user supplied CPPFLAGS, AFLAGS and CFLAGS as the
- # last assignments
- KBUILD_CPPFLAGS += $(ARCH_CPPFLAGS) $(KCPPFLAGS)
-diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
-index 9ffd3dda3889..584d6cecd7c0 100644
---- a/scripts/Kbuild.include
-+++ b/scripts/Kbuild.include
-@@ -172,6 +172,10 @@ ld-option = $(call try-run,\
- # Important: no spaces around options
- ar-option = $(call try-run, $(AR) rc$(1) "$$TMP",$(1),$(2))
- 
-+# ld-name
-+# Expands to either bfd or gold
-+ld-name = $(shell $(LD) -v 2>&1 | grep -q "GNU gold" && echo gold || echo bfd)
-+
- # ld-version
- # Note this is mainly for HJ Lu's 3 number binutil versions
- ld-version = $(shell $(LD) --version | $(srctree)/scripts/ld-version.sh)
+ 	. = ALIGN(PAGE_SIZE);
 -- 
 2.15.0.403.gc27cc4dac6-goog
