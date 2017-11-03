@@ -1,73 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Nov 2017 13:42:24 +0000
-Subject: [PATCH v2] arm64: support __int128 on gcc 5+
-In-Reply-To: <20171102174322.21853-1-Jason@zx2c4.com>
-References: <20171102134720.GA17333@arm.com>
- <20171102174322.21853-1-Jason@zx2c4.com>
-Message-ID: <20171103134223.GD13499@arm.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 3 Nov 2017 08:54:57 -0500
+Subject: Performance issues writing to PCIe in a Zynq
+In-Reply-To: <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>
+References: <1509636637116.27702@axon.tv>
+ <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>
+Message-ID: <20171103135457.GA8457@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jason,
+On Fri, Nov 03, 2017 at 09:12:04AM +0100, Michal Simek wrote:
+> On 2.11.2017 16:30, Ruben Guerra Marin wrote:
+> > 
+> > I have the a Zynq board running petalinux, and it is connected
+> > through PCIe to a Virtex Ultrascale board. I configured the
+> > Ultrascale for Tandem PCIe, which the second stage bitstream is
+> > being programmed from the Zynq board (I crossed compiled the mcap
+> > application that Xilinx provides).
+> > 
+> > This works perfectly, but takes around ~12 seconds to program the
+> > second stage bitstream (compressed is ~12 MB), which is quite
+> > slow. We also tried debugging the mcap application and pciutils.
+> > We found out the operation that takes long to execute: In
+> > pciutils, the instruction to actually call the write to the driver
+> > (pwrite) takes approximately 6uS, so if you add up this for 12 MB
+> > then you can see why it takes so long. Why is this so slow? Is
+> > this maybe a problem with the driver?
+> > 
+> > For testing, I added an ILA to the AXI bus in between the Zynq GP1
+> > and the PCIe IP control registers port. I triggered halfway the
+> > programming of the bitstream using the mcap program provided by
+> > Xilinx. I can see that it is writing to address x358, which
+> > according to the *datasheet*
+> > (https://www.xilinx.com/Attachment/Xilinx_Answer_64761__UltraScale_Devices.pdf)
+> > is the Write Data Register, which is correct (and again, I know
+> > the whole bitstream gets programmed correctly).
+> > 
+> > But what I also see is that a "awvalid" being asserted to the next
+> > one it takes 245 cycles, and I can imagine this is why it takes 12
+> > seconds to program a 12MB bitstream.
 
-[+Ard]
+How long do you expect this to take?  What are the corresponding times
+on other hardware or other OSes?
 
-On Thu, Nov 02, 2017 at 06:43:22PM +0100, Jason A. Donenfeld wrote:
-> Versions of gcc prior to gcc 5 emitted a __multi3 function call when
-> dealing with TI types, resulting in failures when trying to link to
-> libgcc, and more generally, bad performance. However, since gcc 5,
-> the compiler supports actually emitting fast instructions, which means
-> we can at long last enable this option and receive the speedups.
-> 
-> The gcc commit that added proper Aarch64 support is:
-> https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
-> This commit appears to be part of the gcc 5 release.
-> 
-> There are still a few instructions, such as __ashlti3 and __ashrti3,
-> that require libgcc, which is fine. So, we also link to libgcc for these
-> functions when needed, which is what several other architectures already
-> have been doing for a long time.
-> 
-> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
-> ---
->  arch/arm64/Makefile | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+It sounds like this programming is done via config accesses, which are
+definitely not a fast path, so I don't know if 12s is unreasonably
+slow or not.  The largest config write is 4 bytes, which means 12MB
+requires 3M writes, and if each takes 6us, that's 18s total.
 
-We used to link against libgcc way back when, but that dependency was
-removed in commit d67703a8a69e ("arm64: kill off the libgcc dependency")
-and I'm really not keen to add it back. I also think that there might
-be licensing concerns if you link against it and make use of GCC plugins,
-but IANAL.
+Most platforms serialize config accesses with a lock, which also slows
+things down.  It looks like your hardware might support ECAM, which
+means you might be able to remove the locking overhead by using
+lockless config (see CONFIG_PCI_LOCKLESS_CONFIG).  This is a new
+feature currently only used by x86, and it's currently a system-wide
+compile-time switch, so it would require some work for you to use it.
 
-Shouldn't we just provide our own implementations of __ashlti3 and
-__ashrti3 instead?
+The high bandwidth way to do this would be use a BAR and do PCI memory
+writes instead of PCI config writes.  Obviously the adapter determines
+whether this is possible.
 
-Cheers,
-
-Will
-
-> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-> index 939b310913cf..70c7c0c1bccb 100644
-> --- a/arch/arm64/Makefile
-> +++ b/arch/arm64/Makefile
-> @@ -53,6 +53,8 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
->  KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
->  KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
->  
-> +KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-> +
->  ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
->  KBUILD_CPPFLAGS	+= -mbig-endian
->  CHECKFLAGS	+= -D__AARCH64EB__
-> @@ -108,7 +110,7 @@ core-$(CONFIG_NET) += arch/arm64/net/
->  core-$(CONFIG_KVM) += arch/arm64/kvm/
->  core-$(CONFIG_XEN) += arch/arm64/xen/
->  core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
-> -libs-y		:= arch/arm64/lib/ $(libs-y)
-> +libs-y		:= arch/arm64/lib/ $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name) $(libs-y)
->  core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
->  
->  # Default target when executing plain make
-> -- 
-> 2.14.2
-> 
+Bjorn
