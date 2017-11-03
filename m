@@ -1,36 +1,39 @@
-From: xiaowei.bao@nxp.com (Bao Xiaowei)
-Date: Fri, 3 Nov 2017 17:31:15 +0800
-Subject: [PATCH 3/3] ARMv8: pcie: make the DWC EP driver support for layerscape
-In-Reply-To: <20171103093115.14915-1-xiaowei.bao@nxp.com>
-References: <20171103093115.14915-1-xiaowei.bao@nxp.com>
-Message-ID: <20171103093115.14915-4-xiaowei.bao@nxp.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Fri,  3 Nov 2017 10:54:59 +0100
+Subject: [PATCH] ARM: dts: imx6: RDU2: add i210 node
+Message-ID: <20171103095459.29272-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Layerscape pcie controllers support RC or EP mode, Add the EP mode
-support in Kconfig, the driver will support both RC and EP mode, and
-the driver is able to judge the pcie controllers work on RC or EP mode.
+This is needed for the bootloader to patch in the correct MAC address.
 
-Signed-off-by: Bao Xiaowei <xiaowei.bao@nxp.com>
-Acked-by: Minghuan Lian <minghuan.Lian@nxp.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- v2:
- - no change
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
- drivers/pci/dwc/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/pci/dwc/Kconfig b/drivers/pci/dwc/Kconfig
-index 22ec82fcdea2..b5f507795779 100644
---- a/drivers/pci/dwc/Kconfig
-+++ b/drivers/pci/dwc/Kconfig
-@@ -108,6 +108,7 @@ config PCI_LAYERSCAPE
- 	depends on PCI_MSI_IRQ_DOMAIN
- 	select MFD_SYSCON
- 	select PCIE_DW_HOST
-+	select PCIE_DW_EP
- 	help
- 	  Say Y here if you want PCIe controller support on Layerscape SoCs.
+diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+index f939cf67c08f..4455a13f5d66 100644
+--- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+@@ -580,6 +580,18 @@
+ 	pinctrl-0 = <&pinctrl_pcie>;
+ 	reset-gpio = <&gpio7 12 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
++
++	host at 0 {
++		reg = <0 0 0 0 0>;
++		device_type = "pci";
++
++		#address-cells = <3>;
++		#size-cells = <2>;
++
++		i210: i210 at 0 {
++			reg = <0 0 0 0 0>;
++		};
++	};
+ };
  
+ &usdhc2 {
 -- 
-2.14.1
+2.11.0
