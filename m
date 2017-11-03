@@ -1,47 +1,104 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 3 Nov 2017 16:26:39 +0200
-Subject: [PATCH 5/7] ARM: AM33xx: CM: add support for getting physical address
- for a register
-In-Reply-To: <1509719201-32700-1-git-send-email-t-kristo@ti.com>
-References: <1509719201-32700-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1509719201-32700-6-git-send-email-t-kristo@ti.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri,  3 Nov 2017 14:47:47 +0000
+Subject: [PATCH v4 10/20] firmware: arm_scmi: probe and initialise all the
+ supported protocols
+In-Reply-To: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
+References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1509720477-18936-11-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Needed for mapping the hwmods towards their corresponding clkctrl
-providers and clocks.
+Now that we have basic support for all the protocols in the
+specification, let's probe them individually and initialise them.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- arch/arm/mach-omap2/cm33xx.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/firmware/arm_scmi/driver.c | 51 +++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 50 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-omap2/cm33xx.c b/arch/arm/mach-omap2/cm33xx.c
-index a9e08d8..cf75bbe 100644
---- a/arch/arm/mach-omap2/cm33xx.c
-+++ b/arch/arm/mach-omap2/cm33xx.c
-@@ -333,6 +333,11 @@ static int am33xx_clkdm_clk_disable(struct clockdomain *clkdm)
+diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+index 20d083be474c..11c18ac9816f 100644
+--- a/drivers/firmware/arm_scmi/driver.c
++++ b/drivers/firmware/arm_scmi/driver.c
+@@ -494,6 +494,21 @@ void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
+ 	info->protocols_imp = prot_imp;
+ }
+ 
++static bool
++scmi_is_protocol_implemented(const struct scmi_handle *handle, u8 prot_id)
++{
++	int i;
++	struct scmi_info *info = handle_to_scmi_info(handle);
++
++	if (!info->protocols_imp)
++		return false;
++
++	for (i = 0; i < MAX_PROTOCOLS_IMP; i++)
++		if (info->protocols_imp[i] == prot_id)
++			return true;
++	return false;
++}
++
+ /**
+  * scmi_handle_get() - Get the  SCMI handle for a device
+  *
+@@ -691,6 +706,23 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
  	return 0;
  }
  
-+static u32 am33xx_cm_xlate_clkctrl(u8 part, u16 inst, u16 offset)
++static inline void
++scmi_create_protocol_device(struct device_node *np, struct scmi_info *info,
++			    int prot_id)
 +{
-+	return cm_base.pa + inst + offset;
++	struct scmi_device *sdev;
++
++	sdev = scmi_device_create(np, info->dev, prot_id);
++	if (!sdev) {
++		dev_err(info->dev, "failed to create %d protocol device\n",
++			prot_id);
++		return;
++	}
++
++	/* setup handle now as the transport is ready */
++	scmi_set_handle(sdev);
 +}
 +
- struct clkdm_ops am33xx_clkdm_operations = {
- 	.clkdm_sleep		= am33xx_clkdm_sleep,
- 	.clkdm_wakeup		= am33xx_clkdm_wakeup,
-@@ -347,6 +352,7 @@ struct clkdm_ops am33xx_clkdm_operations = {
- 	.wait_module_idle	= &am33xx_cm_wait_module_idle,
- 	.module_enable		= &am33xx_cm_module_enable,
- 	.module_disable		= &am33xx_cm_module_disable,
-+	.xlate_clkctrl		= &am33xx_cm_xlate_clkctrl,
- };
+ static int scmi_probe(struct platform_device *pdev)
+ {
+ 	int ret;
+@@ -698,7 +730,7 @@ static int scmi_probe(struct platform_device *pdev)
+ 	const struct scmi_desc *desc;
+ 	struct scmi_info *info;
+ 	struct device *dev = &pdev->dev;
+-	struct device_node *np = dev->of_node;
++	struct device_node *child, *np = dev->of_node;
  
- int __init am33xx_cm_init(const struct omap_prcm_init_data *data)
+ 	/* Only mailbox method supported, check for the presence of one */
+ 	if (scmi_mailbox_check(np)) {
+@@ -741,6 +773,23 @@ static int scmi_probe(struct platform_device *pdev)
+ 	list_add_tail(&info->node, &scmi_list);
+ 	mutex_unlock(&scmi_list_mutex);
+ 
++	for_each_available_child_of_node(np, child) {
++		u32 prot_id;
++
++		if (of_property_read_u32(child, "reg", &prot_id))
++			continue;
++
++		prot_id &= MSG_PROTOCOL_ID_MASK;
++
++		if (!scmi_is_protocol_implemented(handle, prot_id)) {
++			dev_err(dev, "SCMI protocol %d not implemented\n",
++				prot_id);
++			continue;
++		}
++
++		scmi_create_protocol_device(child, info, prot_id);
++	}
++
+ 	return 0;
+ }
+ 
 -- 
-1.9.1
-
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+2.7.4
