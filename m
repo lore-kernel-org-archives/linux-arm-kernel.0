@@ -1,44 +1,34 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Fri,  3 Nov 2017 10:11:52 -0700
-Subject: [PATCH 07/15] arm64: use -mno-implicit-float instead of
- -mgeneral-regs-only
+Date: Fri,  3 Nov 2017 10:11:51 -0700
+Subject: [PATCH 06/15] efi/libstub: disable LTO
 In-Reply-To: <20171103171203.107569-1-samitolvanen@google.com>
 References: <20171103171203.107569-1-samitolvanen@google.com>
-Message-ID: <20171103171203.107569-9-samitolvanen@google.com>
+Message-ID: <20171103171203.107569-8-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Hackmann <ghackmann@google.com>
+With CONFIG_CLANG_LTO, we produce LLVM IR instead of object files. Since LTO
+is not really needed here and the Makefile assumes we produce an object file,
+disable LTO for libstub.
 
-LLVM bug 30792 causes clang's AArch64 backend to crash compiling
-arch/arm64/crypto/aes-ce-cipher.c.  Replacing -mgeneral-regs-only with
--mno-implicit-float is the suggested workaround.
-
-Signed-off-by: Greg Hackmann <ghackmann@google.com>
-Cc: Matthias Kaehlcke <mka@chromium.org>
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
- arch/arm64/Makefile | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ drivers/firmware/efi/libstub/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..eb6f3c9ec6cb 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -45,7 +45,13 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
-   endif
- endif
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 2371a92808be..5146eee677ce 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+ 				   -D__NO_FORTIFY \
+ 				   $(call cc-option,-ffreestanding) \
+-				   $(call cc-option,-fno-stack-protector)
++				   $(call cc-option,-fno-stack-protector) \
++				   $(DISABLE_LTO)
  
--KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
-+ifeq ($(cc-name),clang)
-+# This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792.
-+KBUILD_CFLAGS	+= -mno-implicit-float
-+else
-+KBUILD_CFLAGS	+= -mgeneral-regs-only
-+endif
-+KBUILD_CFLAGS	+= $(lseinstr) $(brokengasinst)
- KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
- KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
- KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+ GCOV_PROFILE			:= n
+ KASAN_SANITIZE			:= n
 -- 
 2.15.0.403.gc27cc4dac6-goog
