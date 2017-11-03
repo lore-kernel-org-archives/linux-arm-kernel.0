@@ -1,77 +1,32 @@
 From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Fri,  3 Nov 2017 22:58:55 +0300
-Subject: [PATCH 2/2] arm64: dts: orange-pi-zero-plus2: enable AP6212a WiFi/BT
- combo
+Date: Fri,  3 Nov 2017 22:58:54 +0300
+Subject: [PATCH 1/2] arm64: dts: orange-pi-zero-plus2: fix sdcard detect
 In-Reply-To: <20171103195855.15283-1-geomatsi@gmail.com>
 References: <20171103195855.15283-1-geomatsi@gmail.com>
-Message-ID: <20171103195855.15283-3-geomatsi@gmail.com>
+Message-ID: <20171103195855.15283-2-geomatsi@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable AP6212a WiFi/BT combo chip on orange-pi-zero-plus2 board:
-- WiFi SDIO interface is connected to MMC1
-- WiFi REG_ON pin connected to gpio PA9: attach to mmc-pwrseq
-- WiFi HOST_WAKE pin connected to gpio PL7
-- BT is connected to UART1
+The sdcard detect pin on orange-pi-zero-plus2 is pulled up.
+Fix cd-gpio description to enable sdcard detect.
 
 Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
 ---
- .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 32 ++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
+ arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-index a42fd79a62a3..d415b7b67cce 100644
+index b6b7a561df8c..a42fd79a62a3 100644
 --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
 +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-@@ -64,6 +64,13 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-max-microvolt = <3300000>;
- 	};
-+
-+	wifi_pwrseq: wifi_pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		reset-gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
-+		post-power-on-delay-ms = <200>;
-+	};
- };
- 
- &mmc0 {
-@@ -75,6 +82,25 @@
+@@ -71,7 +71,7 @@
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+ 	vmmc-supply = <&reg_vcc3v3>;
+ 	bus-width = <4>;
+-	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
  	status = "okay";
  };
  
-+&mmc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc1_pins_a>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	vqmmc-supply = <&reg_vcc3v3>;
-+	mmc-pwrseq = <&wifi_pwrseq>;
-+	bus-width = <4>;
-+	non-removable;
-+	status = "okay";
-+
-+	brcmf: wifi at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&r_pio>;
-+		interrupts = <0 7 IRQ_TYPE_LEVEL_LOW>;	/* PL7 */
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_8bit_pins>;
-@@ -90,3 +116,9 @@
- 	pinctrl-0 = <&uart0_pins_a>;
- 	status = "okay";
- };
-+
-+&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
-+	status = "okay";
-+};
 -- 
 2.11.0
