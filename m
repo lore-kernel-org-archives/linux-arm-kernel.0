@@ -1,40 +1,30 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Fri, 3 Nov 2017 11:20:11 -0700
-Subject: [PATCH 07/15] arm64: use -mno-implicit-float instead of
- -mgeneral-regs-only
-In-Reply-To: <20171103180257.e52r2qdeeg4m4l5p@lakrids.cambridge.arm.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Fri, 3 Nov 2017 11:22:06 -0700
+Subject: [PATCH 00/15] Add support for clang LTO
+In-Reply-To: <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
 References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103171203.107569-9-samitolvanen@google.com>
- <20171103180257.e52r2qdeeg4m4l5p@lakrids.cambridge.arm.com>
-Message-ID: <CAKwvOdna0oZGj6QySaALEJ_y1s5QW-mBLMsxoJs4T-qLzeFnFA@mail.gmail.com>
+ <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
+Message-ID: <20171103182206.GA117212@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 3, 2017 at 11:02 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> Ah, so I guess this is what I was hitting when testing with clang 5.0.0.
+On Fri, Nov 03, 2017 at 05:51:56PM +0000, Mark Rutland wrote:
+> Which tree are you testing with?
 
-Exactly.
+I've tested that this builds on top of Linus' current tree.
 
-> I was under the impression that this series was jsut enablnig LTO
-> support, not clang support generally.
+> I had to create an aarch64-linux-gnu-clang wrapper, too. I'm not sure if
+> there's build system help to avoid needing that?
 
-Clang is supported at least for the arm64*/x86-64 configs that we've
-gotten around to testing.
+This appears to depend on how your toolchain was built as Nick mentioned in
+an earlier message. I compiled clang from the unified LLVM git repo using
+this configuration:
 
-* minus this one last compiler bug (but maybe "last" is optimistic).
+  $ make -G Ninja ../llvm-project/llvm \
+	-DCMAKE_BUILD_TYPE=Release \
+	-DENABLE_PIC=1 \
+	-DLLVM_BINUTILS_INCDIR=/path/to/binutils-2.27/include \
+	-DLLVM_TARGETS_TO_BUILD="X86;AArch64" && \
+    ninja
 
-> It would be much nicer if we could depend on a fixed clang to start
-> with...
-
-I agree, which is why I'm on the fence with this patch.  With a newer
-version of Clang, it's not needed.
-
-There are some kbuild macros for certain versions of GCC, maybe
-something like that can be used to conditionally swap these flags if
-using an older version of Clang?
-
->> +# This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792.
->> +KBUILD_CFLAGS        += -mno-implicit-float
->> +else
->> +KBUILD_CFLAGS        += -mgeneral-regs-only
->> +endif
+Sami
