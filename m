@@ -1,65 +1,89 @@
-From: tpiepho@impinj.com (Trent Piepho)
-Date: Fri, 3 Nov 2017 17:53:59 +0000
-Subject: [PATCH v2 1/4] spi: imx: GPIO based chip selects should not be
- required
-In-Reply-To: <20171102151439.6dpfud7a5vtc27dy@sirena.co.uk>
-References: <20171027010841.28624-1-tpiepho@impinj.com>
- <20171027010841.28624-2-tpiepho@impinj.com>
- <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
- <1509469061.5473.16.camel@impinj.com>
- <20171102151439.6dpfud7a5vtc27dy@sirena.co.uk>
-Message-ID: <1509731639.5473.60.camel@impinj.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Nov 2017 17:51:56 +0000
+Subject: [PATCH 00/15] Add support for clang LTO
+In-Reply-To: <20171103171203.107569-1-samitolvanen@google.com>
+References: <20171103171203.107569-1-samitolvanen@google.com>
+Message-ID: <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-11-02 at 15:14 +0000, Mark Brown wrote:
-> On Tue, Oct 31, 2017 at 04:57:42PM +0000, Trent Piepho wrote:
-> > On Tue, 2017-10-31 at 11:19 +0000, Mark Brown wrote:
-> > > Do the native chip selects actually work usefully on this hardware?
-> > > There used to be problems with it wanting to do things like bounce the
-> > > chip select on every word which made it extremely difficult to use with
-> > > Linux.
-> > Still are annoying, but on the device we have connected to it, it ends
-> > up working as desired.
-> > I've not thoroughly investigated this hardware to find the details. 
-> > IIRC, the designware SPI on Altera SoCFPGA had the same issue, but it
-> > was a flaw in the driver and I was able to fix it.  I've come to expect
-> > it, as every new SPI master I use doesn't work properly in some
-> > different way.
+Hi,
+
+On Fri, Nov 03, 2017 at 10:11:44AM -0700, Sami Tolvanen wrote:
+> This series adds build system support for compiling the kernel with clang
+> Link Time Optimization (LTO), using GNU gold with the LLVMgold plug-in
+> for linking. Some background for clang's LTO support is available here:
 > 
-> It's one of the reasons why I'm suspicous of making the GPIO optional,
-> lots of chips use GPIO chipselects because a lot of the breakage is
-> confined to chip select handling and I remember the i.MX as being
-> especially far from useful.
+>   https://llvm.org/docs/LinkTimeOptimization.html
+> 
+> With -flto, clang produces LLVM bitcode instead of object files, and
+> the compilation to native code happens at link time. In addition, clang
+> cannot use an external assembler for inline assembly when LTO is enabled,
+> which causes further compatibility issues.
+> 
+> The patches in this series remove intermediate linking steps when LTO is
+> used, postpone processing done on object files until after the LTO link
+> step, add workarounds for GNU gold incompatibilities, and address inline
+> assembly incompatibilities for arm64.
+> 
+> These changes allow arm64 defconfig to be compiled with LTO, but other
+> architectures are not enabled until compatibility issues have been
+> addressed. In particular, x86 inline assembly doesn't currently compile
+> with clang's integrated assembler due to this LLVM bug:
+> 
+>   https://bugs.llvm.org/show_bug.cgi?id=24487
+> 
+> Due to recent bug fixes in the toolchain, it's recommended to use clang
+> 5.0 or later, and GNU gold from binutils 2.27 or later
 
-Just to be clear, one doesn't need to use GPIOs with the driver as is. 
-But the bindings to do that are non-standard and these patches make the
-driver follow the standard. (and don't break anyone).
+Which tree are you testing with?
 
-It's unfortunate that this, and in my experience every, SPI master
-doesn't always (or ever) generate the waveforms it should according to
-the Linux API.  But I don't think not following the specification for
-the device tree bindings is a mitigation of this.  If anything, it just
-creates more problems.
+I had a go building the arm64 for/next/core branch defconfig using clang
+5.0.0 from llvm.org, with the Linaro 17.05 toolchain's binutils
+(2.27.0.20161019), and I hit what appears to be a compiler bug quite
+quickly.
 
-As someone who has done bringup a more than a few devices, I know what
-I want the hardware to do, and I know the proper bindings to do that. 
-But someone comes back and says they don't work and now I need to dig
-into the driver source and figure out what its particular flavor of
-non-standard behavior is.  I don't think that helped me any.  It didn't
-tell what the hardware/driver's quirks are w.r.t. ability to follow the
-Linux SPI API either.
+I had to create an aarch64-linux-gnu-clang wrapper, too. I'm not sure if
+there's build system help to avoid needing that?
 
-This also happens after the hardware is designed and built, so it's a
-little late to choose another pin.
+----
+[mark at lakrids:~/src/linux]% uselinaro 17.05 usellvm 5.0.0 make CROSS_COMPILE=aarch64-linux-gnu- CC=clang  ARCH=arm64 
+Segmentation fault
+arch/arm64/Makefile:27: ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum
+arch/arm64/Makefile:48: Detected assembler with broken .inst; disassembly will be unreliable
+  CHK     include/config/kernel.release
+  CHK     include/generated/uapi/linux/version.h
+  CHK     include/generated/utsrelease.h
+  CHK     include/generated/bounds.h
+  CHK     include/generated/timeconst.h
+  CHK     include/generated/asm-offsets.h
+  CALL    scripts/checksyscalls.sh
+  CHK     scripts/mod/devicetable-offsets.h
+  CHK     include/generated/compile.h
+  CC      arch/arm64/crypto/aes-ce-cipher.o
+fatal error: error in backend: Do not know how to split the result of this operator!
 
-If the goal is to document the hardware quirks, then shouldn't this be
-done through documentation?  A note or pointer in the kconfig,
-something in the source, a better description in Documention/
-somewhere, etc.  That would have a better chance of being seen before
-hardware is designed, and would explain the issue too, instead of just
-appearing as another quirk in device tree bindings.
+clang-5.0: error: clang frontend command failed with exit code 70 (use -v to see invocation)
+clang version 5.0.0 (tags/RELEASE_500/final)
+Target: aarch64--linux-gnu
+Thread model: posix
+InstalledDir: /mnt/data/opt/toolchain/llvm/5.0.0/bin
+clang-5.0: note: diagnostic msg: PLEASE submit a bug report to http://llvm.org/bugs/ and include the crash backtrace, preprocessed source, and associated run script.
+clang-5.0: note: diagnostic msg: 
+********************
 
-Also consider there is a lot of re-implemented code in each driver
-relating to device tree parsing and also GPIO CS.  Non-standard
-behavior in a driver doesn't help any refactoring effort.
+PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT:
+Preprocessed source(s) and associated run script(s) are located at:
+clang-5.0: note: diagnostic msg: /tmp/aes-ce-cipher-7850ed.c
+clang-5.0: note: diagnostic msg: /tmp/aes-ce-cipher-7850ed.sh
+clang-5.0: note: diagnostic msg: 
+
+********************
+scripts/Makefile.build:313: recipe for target 'arch/arm64/crypto/aes-ce-cipher.o' failed
+make[1]: *** [arch/arm64/crypto/aes-ce-cipher.o] Error 70
+Makefile:1019: recipe for target 'arch/arm64/crypto' failed
+make: *** [arch/arm64/crypto] Error 2
+----
+
+Thanks,
+Mark.
