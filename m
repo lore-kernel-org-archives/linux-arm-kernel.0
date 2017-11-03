@@ -1,49 +1,71 @@
 From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  3 Nov 2017 17:51:03 +0000
-Subject: [PATCH v10 6/8] arm_pmu: Use of_cpu_node_to_id helper
+Date: Fri,  3 Nov 2017 17:51:01 +0000
+Subject: [PATCH v10 4/8] irqchip: gic-v3: Use of_cpu_node_to_id helper
 In-Reply-To: <20171103175105.23546-1-suzuki.poulose@arm.com>
 References: <20171103175105.23546-1-suzuki.poulose@arm.com>
-Message-ID: <20171103175105.23546-7-suzuki.poulose@arm.com>
+Message-ID: <20171103175105.23546-5-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new generic helper, of_cpu_node_to_id(), to map a
-a phandle to the logical CPU number while parsing the
-PMU irq affinity.
+Use the new generic helper of_cpu_node_to_id() instead
+of using our own version to map a device node to logical CPU
+number.
 
-Cc: Will Deacon <will.deacon@arm.com>
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- drivers/perf/arm_pmu_platform.c | 15 +++------------
- 1 file changed, 3 insertions(+), 12 deletions(-)
+Changes since V3:
+ - Reflect the change in the helper name and return value.
+---
+ drivers/irqchip/irq-gic-v3.c | 29 ++---------------------------
+ 1 file changed, 2 insertions(+), 27 deletions(-)
 
-diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-index 4eafa7a42e52..a96884e37eaf 100644
---- a/drivers/perf/arm_pmu_platform.c
-+++ b/drivers/perf/arm_pmu_platform.c
-@@ -81,19 +81,10 @@ static int pmu_parse_irq_affinity(struct device_node *node, int i)
- 		return -EINVAL;
- 	}
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index b5df99c6f680..04cecab71597 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1038,31 +1038,6 @@ static int __init gic_validate_dist_version(void __iomem *dist_base)
+ 	return 0;
+ }
  
--	/* Now look up the logical CPU number */
--	for_each_possible_cpu(cpu) {
--		struct device_node *cpu_dn;
+-static int get_cpu_number(struct device_node *dn)
+-{
+-	const __be32 *cell;
+-	u64 hwid;
+-	int cpu;
 -
--		cpu_dn = of_cpu_device_node_get(cpu);
--		of_node_put(cpu_dn);
+-	cell = of_get_property(dn, "reg", NULL);
+-	if (!cell)
+-		return -1;
 -
--		if (dn == cpu_dn)
--			break;
--	}
+-	hwid = of_read_number(cell, of_n_addr_cells(dn));
 -
--	if (cpu >= nr_cpu_ids) {
-+	cpu = of_cpu_node_to_id(dn);
-+	if (cpu < 0) {
- 		pr_warn("failed to find logical CPU for %s\n", dn->name);
-+		cpu = nr_cpu_ids;
- 	}
+-	/*
+-	 * Non affinity bits must be set to 0 in the DT
+-	 */
+-	if (hwid & ~MPIDR_HWID_BITMASK)
+-		return -1;
+-
+-	for_each_possible_cpu(cpu)
+-		if (cpu_logical_map(cpu) == hwid)
+-			return cpu;
+-
+-	return -1;
+-}
+-
+ /* Create all possible partitions at boot time */
+ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+ {
+@@ -1113,8 +1088,8 @@ static void __init gic_populate_ppi_partitions(struct device_node *gic_node)
+ 			if (WARN_ON(!cpu_node))
+ 				continue;
  
- 	of_node_put(dn);
+-			cpu = get_cpu_number(cpu_node);
+-			if (WARN_ON(cpu == -1))
++			cpu = of_cpu_node_to_id(cpu_node);
++			if (WARN_ON(cpu < 0))
+ 				continue;
+ 
+ 			pr_cont("%pOF[%d] ", cpu_node, cpu);
 -- 
 2.13.6
