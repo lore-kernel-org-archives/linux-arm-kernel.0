@@ -1,31 +1,44 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Fri,  3 Nov 2017 10:11:49 -0700
-Subject: [PATCH 05/15] scripts/mod: disable LTO for empty.c
+Date: Fri,  3 Nov 2017 10:11:53 -0700
+Subject: [PATCH 08/15] arm64: don't pass -maarch64linux to GNU gold
 In-Reply-To: <20171103171203.107569-1-samitolvanen@google.com>
 References: <20171103171203.107569-1-samitolvanen@google.com>
-Message-ID: <20171103171203.107569-6-samitolvanen@google.com>
+Message-ID: <20171103171203.107569-10-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With CONFIG_CLANG_LTO, clang generates LLVM IR instead of ELF object
-files. As empty.o is used for probing target properties, disable LTO
-for it to produce an object file instead.
+This change fixes the following error message when linking with GNU
+gold:
+
+  ld.gold: error: unrecognized emulation aarch64linux
 
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
- scripts/mod/Makefile | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/Makefile | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/scripts/mod/Makefile b/scripts/mod/Makefile
-index 42c5d50f2bcc..e014b2fdd069 100644
---- a/scripts/mod/Makefile
-+++ b/scripts/mod/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- OBJECT_FILES_NON_STANDARD := y
-+CFLAGS_empty.o += $(DISABLE_LTO)
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index eb6f3c9ec6cb..c16bd1ab37f8 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -64,14 +64,18 @@ KBUILD_CPPFLAGS	+= -mbig-endian
+ CHECKFLAGS	+= -D__AARCH64EB__
+ AS		+= -EB
+ LD		+= -EB
++ifneq ($(ld-name),gold)
+ LDFLAGS		+= -maarch64linuxb
++endif
+ UTS_MACHINE	:= aarch64_be
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ CHECKFLAGS	+= -D__AARCH64EL__
+ AS		+= -EL
+ LD		+= -EL
++ifneq ($(ld-name),gold)
+ LDFLAGS		+= -maarch64linux
++endif
+ UTS_MACHINE	:= aarch64
+ endif
  
- hostprogs-y	:= modpost mk_elfconfig
- always		:= $(hostprogs-y) empty.o
 -- 
 2.15.0.403.gc27cc4dac6-goog
