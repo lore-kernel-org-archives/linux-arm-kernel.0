@@ -1,128 +1,51 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Fri,  3 Nov 2017 15:18:58 +0100
-Subject: [PATCH v3] arm64: support __int128 on gcc 5+
-In-Reply-To: <CAHmME9oXG1AgkJM-Ya6Jns+Y6HadwGxQ+NqmF0ed=p8Zg8fiVg@mail.gmail.com>
-References: <CAHmME9oXG1AgkJM-Ya6Jns+Y6HadwGxQ+NqmF0ed=p8Zg8fiVg@mail.gmail.com>
-Message-ID: <20171103141858.13149-1-Jason@zx2c4.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 3 Nov 2017 22:22:31 +0800
+Subject: [PATCH 0/3] crypto: marvell - Remove the old CESA driver
+In-Reply-To: <20171011131619.30196-1-boris.brezillon@free-electrons.com>
+References: <20171011131619.30196-1-boris.brezillon@free-electrons.com>
+Message-ID: <20171103142231.GD9011@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Versions of gcc prior to gcc 5 emitted a __multi3 function call when
-dealing with TI types, resulting in failures when trying to link to
-libgcc, and more generally, bad performance. However, since gcc 5,
-the compiler supports actually emitting fast instructions, which means
-we can at long last enable this option and receive the speedups.
+On Wed, Oct 11, 2017 at 03:16:16PM +0200, Boris Brezillon wrote:
+> Hello,
+> 
+> It's been several releases since we added a new driver to support the
+> CESA IP (the new driver was introduced in 4.2). It seems most major
+> bugs have been discovered and fixed and now is probably a good time to
+> kill the old driver and force remaining users to switch to the new one.
+> 
+> This series first add a platform_device_id table to the marvell CESA
+> driver so that it can work on non-DT platforms. Then we patch all
+> defconfigs to select the new driver instead of the old. And finally we
+> remove the old driver.
+> These patches have to be applied in this order to make things
+> bisectable, so, if this series is accepted it will have to go through
+> a single tree (either ARM or crypto).
+> 
+> Regards,
+> 
+> Boris
+> 
+> Boris Brezillon (3):
+>   crypto: marvell - Add a platform_device_id table
+>   ARM: configs: Stop selecting the old CESA driver
+>   crypto: marvell - Remove the old mv_cesa driver
+> 
+>  arch/arm/configs/dove_defconfig     |    2 +-
+>  arch/arm/configs/multi_v5_defconfig |    2 +-
+>  arch/arm/configs/orion5x_defconfig  |    2 +-
+>  drivers/crypto/Kconfig              |   22 +-
+>  drivers/crypto/Makefile             |    1 -
+>  drivers/crypto/marvell/cesa.c       |   13 +-
+>  drivers/crypto/mv_cesa.c            | 1216 -----------------------------------
+>  drivers/crypto/mv_cesa.h            |  150 -----
+>  8 files changed, 12 insertions(+), 1396 deletions(-)
+>  delete mode 100644 drivers/crypto/mv_cesa.c
+>  delete mode 100644 drivers/crypto/mv_cesa.h
 
-The gcc commit that added proper Aarch64 support is:
-https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
-This commit appears to be part of the gcc 5 release.
-
-There are still a few instructions, __ashlti3 and __ashrti3, which
-require libgcc, which is fine. Rather than linking to libgcc, we
-simply provide them ourselves, since they're not that complicated.
-
-Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
----
-Changes v2->v3:
-  - We now just provide trivial implementations for the missing
-    functions, rather than linking to libgcc.
-
- arch/arm64/Makefile      |  2 ++
- arch/arm64/lib/Makefile  |  2 +-
- arch/arm64/lib/tishift.S | 59 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 62 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/lib/tishift.S
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..1f8a0fec6998 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -53,6 +53,8 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
- KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
- KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
- 
-+KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-+
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index a0abc142c92b..55bdb01f1ea6 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -2,7 +2,7 @@ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
--		   strchr.o strrchr.o
-+		   strchr.o strrchr.o tishift.o
- 
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
-diff --git a/arch/arm64/lib/tishift.S b/arch/arm64/lib/tishift.S
-new file mode 100644
-index 000000000000..47b6f7ee2b11
---- /dev/null
-+++ b/arch/arm64/lib/tishift.S
-@@ -0,0 +1,59 @@
-+/*
-+ * Copyright (C) 2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Resreved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+ENTRY(__ashlti3)
-+	cbz	x2, 1f
-+	mov	x3, #64
-+	sub	x3, x3, x2
-+	cmp	x3, #0
-+	b.le	2f
-+	lsl	x1, x1, x2
-+	lsr	x3, x0, x3
-+	lsl	x2, x0, x2
-+	orr	x1, x1, x3
-+	mov	x0, x2
-+1:
-+	ret
-+2:
-+	neg	w1, w3
-+	mov	x2, #0
-+	lsl	x1, x0, x1
-+	mov	x0, x2
-+	ret
-+ENDPROC(__ashlti3)
-+
-+ENTRY(__ashrti3)
-+	cbz	x2, 3f
-+	mov	x3, #64
-+	sub	x3, x3, x2
-+	cmp	x3, #0
-+	b.le	4f
-+	lsr	x0, x0, x2
-+	lsl	x3, x1, x3
-+	asr	x2, x1, x2
-+	orr	x0, x0, x3
-+	mov	x1, x2
-+3:
-+	ret
-+4:
-+	neg	w0, w3
-+	asr	x2, x1, #63
-+	asr	x0, x1, x0
-+	mov	x1, x2
-+	ret
-+ENDPROC(__ashrti3)
+All applied.  Thanks.
 -- 
-2.14.2
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
