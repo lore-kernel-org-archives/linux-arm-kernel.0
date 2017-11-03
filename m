@@ -1,131 +1,74 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Nov 2017 09:12:14 +0000
-Subject: Build failure with verify size in next-20171102
-In-Reply-To: <CAKv+Gu_E66aC7iLcqtszpx2yYSC1eskQ3JAm4QXAPhTPBw7nhQ@mail.gmail.com>
-References: <20171102193027.GB28152@atomide.com>
- <20171102232038.GA28231@n2100.armlinux.org.uk>
- <20171102234309.GE28152@atomide.com>
- <20171103000437.GB28231@n2100.armlinux.org.uk>
- <20171103001437.GC28231@n2100.armlinux.org.uk>
- <CAKv+Gu_E66aC7iLcqtszpx2yYSC1eskQ3JAm4QXAPhTPBw7nhQ@mail.gmail.com>
-Message-ID: <20171103091213.GD28231@n2100.armlinux.org.uk>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 3 Nov 2017 09:25:07 +0000
+Subject: [PATCH 1/2] arm64: Fix static use of function graph
+In-Reply-To: <20171102101831.GU9463@n2100.armlinux.org.uk>
+References: <1509546824-46165-1-git-send-email-julien.thierry@arm.com>
+ <1509546824-46165-2-git-send-email-julien.thierry@arm.com>
+ <20171102044306.GL10563@linaro.org>
+ <20171102101831.GU9463@n2100.armlinux.org.uk>
+Message-ID: <46841fbe-a8d6-53cc-3cfb-e4cd10f630c3@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 08:22:51AM +0000, Ard Biesheuvel wrote:
-> On 3 November 2017 at 00:14, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Fri, Nov 03, 2017 at 12:04:37AM +0000, Russell King - ARM Linux wrote:
-> >> On Thu, Nov 02, 2017 at 04:43:09PM -0700, Tony Lindgren wrote:
-> >> > * Russell King - ARM Linux <linux@armlinux.org.uk> [171102 23:22]:
-> >> > > On Thu, Nov 02, 2017 at 12:30:27PM -0700, Tony Lindgren wrote:
-> >> > > > Hi Russeell,
-> >> > > >
-> >> > > > I think you're already aware of the build failure caused by commit
-> >> > > > 078c0927485e ("ARM: verify size of zImage"), but here's info just
-> >> > > > in case.
-> >> > > >
-> >> > > > arm-unknown-linux-musleabi-ld.bfd: error: zImage file size is incorrect
-> >> > > > make[2]: *** [arch/arm/boot/compressed/Makefile:185: arch/arm/boot/compressed/vmlinux] Error 1
-> >> > > > make[1]: *** [arch/arm/boot/Makefile:64: arch/arm/boot/compressed/vmlinux] Error 2
-> >> > > > make: *** [arch/arm/Makefile:335: zImage] Error 2
-> >> > > >
-> >> > > > Other than that I was surprised that next actually booted for me
-> >> > > > after a few week break with Linux next! :)
-> >> > >
-> >> > > It would be nice if people can investigate why that happens - I'm
-> >> > > completely unable to reproduce it locally, even if I link using
-> >> > > the same vmlinux.lds file and the objects from someone who sees the
-> >> > > failure.
-> >> > >
-> >> > > There's some binutils version specific stuff that's going on here.
-> >> > >
-> >> > > What I have in my current for-next, which I'm intending to push,
-> >> > > is all the same patches except the patch that introduces the above
-> >> > > check is subsituted by a patch that produces an extra _edata_real
-> >> > > symbol.  This _should_ match _edata.  So, if you hit this failure,
-> >> > > try either my current for-next branch or tomorrow's linux-next, and
-> >> > > run arm-linux-nm on arch/arm/boot/compressed/vmlinux and check the
-> >> > > addresses given for _edata and _edata_real.
-> >> >
-> >> > OK thanks reverting 078c0927485e and applying dad4675388fc ("ARM:
-> >> > add debug ".edata_real" symbol") from your for-next branch builds
-> >> > and boots for me.
-> >> >
-> >> > > Theory says they should be identical, but the failure of that assert
-> >> > > could only happen if "." inside the output section was different from
-> >> > > _edata assigned outside.  _edata_real is now the address of "." inside
-> >> > > the output section.
-> >> >
-> >> > With 078c0927485e reverted and dad4675388fc applied they are
-> >> > identical for me:
-> >> >
-> >> > $ ${armcompiler}nm arch/arm/boot/compressed/vmlinux | grep _edata
-> >> > 00421960 D _edata
-> >> > 00421960 D _edata_real
-> >> >
-> >> > Let me know if you want me to run some test with the failing
-> >> > commit also.
-> >>
-> >> So:
-> >>
-> >>   .image_end (NOLOAD) : {
-> >>      ASSERT(. == _edata, "...");
-> >>   }
-> >>
-> >> fails, because . != _edata, but:
-> >>
-> >>   .image_end (NOLOAD) : {
-> >>      _edata_real = .;
-> >>   }
-> >>
-> >> produces an image where _edata_real == _edata.
-> >>
-> >> That's completely insane and illogical.  *Shrug*.  God knows what's
-> >> going on there.
-> >
-> > Reading through the "ld" documentation for ".":
-> >
-> >      Note: '.' actually refers to the byte offset from the start of the
-> >   current containing object.  Normally this is the 'SECTIONS' statement,
-> >   whose start address is 0, hence '.' can be used as an absolute address.
-> >   If '.' is used inside a section description however, it refers to the
-> >   byte offset from the start of that section, not an absolute address.
-> >
-> > If that _were_ true, then _edata_real should be zero, because it's
-> > used inside a section description and it should be the "byte offset
-> > from the start of that section, not an absolute address".  It isn't.
-> > So, this documentation is blatently wrong and misleading.  In fact,
-> > we use this fact that "." refers to the virtual address in the generic
-> > parts of the linker script.
-> >
-> > I don't think we can trust anything the ld documentation says about "."
-> > and by extension, I don't think we can trust ld's behaviour in how "."
-> > behaves.
-> >
-> > Quite where we go from here, I've no idea, because I don't see how we
-> > can trust the linker's behaviour with linker scripts.
-> >
-> 
-> Could we try moving the ASSERT after the section, and using
-> 
-> ASSERT(ADDR(.image_end) == _edata, "...");
-> 
-> instead?
+Hi,
 
-You want to trust what value ADDR(.image_end) comes out with when we
-know that the linker already elides empty output sections?
+On 02/11/17 10:18, Russell King - ARM Linux wrote:
+> On Thu, Nov 02, 2017 at 01:43:07PM +0900, AKASHI Takahiro wrote:
+>> On Wed, Nov 01, 2017 at 02:33:43PM +0000, Julien Thierry wrote:
+>>> Function graph does not work currently when CONFIG_DYNAMIC_TRACE is not
+>>> set. This is because ftrace_function_trace is not always set to ftrace_stub
+>>> when function_graph is in use.
+>>>
+>>> Do not skip checking of graph tracer functions when ftrace_function_trace
+>>> is set.
+>>>
+>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>> Cc: Will Deacon <will.deacon@arm.com>
+>>> Cc: Mark Rutland <mark.rutland@arm.com>
+>>> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>
+>> Reviewed-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>>
+>> I think that arm has the same issue, hoping the following patch
+>> will fix it:
 
-Only if someone reads the linker's code and confirm that it will work,
-and gets assurances from the binutils people that they will maintain
-the behaviour into the future.
+Thanks for noticing this and for the patch. I'll re-spin a version for 
+this series and include your patch.
 
-I'm not inclined to trust anything that the linker appears to do,
-whether or not the documentation says anything about it.  As I've
-said above, the entire thing is a complete mess of untrustworthy
-documentation and behaviour.
+>> ===
+>> >From e25bcf50d1acde698285a0c64f72d97f8b17e3fb Mon Sep 17 00:00:00 2001
+>> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> Date: Thu, 2 Nov 2017 11:35:04 +0900
+>> Subject: [PATCH] arm: ftrace: function_graph with DYNAMIC_FTRACE
+>>
+>> ---
+>>   arch/arm/kernel/entry-ftrace.S | 12 +++++-------
+>>   1 file changed, 5 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
+>> index efcd9f25a14b..ef94c73ad996 100644
+>> --- a/arch/arm/kernel/entry-ftrace.S
+>> +++ b/arch/arm/kernel/entry-ftrace.S
+>> @@ -68,8 +68,12 @@
+>>   	ldr	r2, [r0]
+>>   	adr	r0, .Lftrace_stub
+>>   	cmp	r0, r2
+>> -	bne	1f
+>> +	beq	1f
+>>   
+>> + 	mcount_get_lr	r1			@ lr of instrumented func
+>> +	mcount_adjust_addr	r0, lr		@ instrumented function
+>> +	blx	r2
+> 
+> NAK.  Not all CPUs support "blx".  I don't see why you'd make this
+> gratuitous change when just moving code around.  Please separate
+> your changes in future.
+> 
+
+I'll change the blx back to the badr + mov instructions in the new version.
+
+Thanks,
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Julien Thierry
