@@ -1,110 +1,52 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 3 Nov 2017 10:02:44 +0000
-Subject: [PATCH 07/17] coresight: tmc etr: Add transparent buffer
- management
-In-Reply-To: <20171102174812.GA23320@xps15>
+Date: Fri, 3 Nov 2017 10:03:59 +0000
+Subject: [PATCH 10/17] coresight: etr: Track if the device is coherent
+In-Reply-To: <20171102194022.GC23320@xps15>
 References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-8-suzuki.poulose@arm.com>
- <20171102174812.GA23320@xps15>
-Message-ID: <cc094fc0-3d48-c17f-9afc-25b0a1186dd0@arm.com>
+ <20171019171553.24056-11-suzuki.poulose@arm.com>
+ <20171102194022.GC23320@xps15>
+Message-ID: <50c2ab4c-7cb9-4f48-d058-9a44c28a81e9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/17 17:48, Mathieu Poirier wrote:
-> On Thu, Oct 19, 2017 at 06:15:43PM +0100, Suzuki K Poulose wrote:
->> At the moment we always use contiguous memory for TMC ETR tracing
->> when used from sysfs. The size of the buffer is fixed at boot time
->> and can only be changed by modifiying the DT. With the introduction
->> of SG support we could support really large buffers in that mode.
->> This patch abstracts the buffer used for ETR to switch between a
->> contiguous buffer or a SG table depending on the availability of
->> the memory.
->>
->> This also enables the sysfs mode to use the ETR in SG mode depending
->> on configured the trace buffer size. Also, since ETR will use the
->> new infrastructure to manage the buffer, we can get rid of some
->> of the members in the tmc_drvdata and clean up the fields a bit.
+On 02/11/17 19:40, Mathieu Poirier wrote:
+> On Thu, Oct 19, 2017 at 06:15:46PM +0100, Suzuki K Poulose wrote:
+>> Track if the ETR is dma-coherent or not. This will be useful
+>> in deciding if we should use software buffering for perf.
 >>
 >> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
 >> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 >> ---
->>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 433 +++++++++++++++++++-----
->>   drivers/hwtracing/coresight/coresight-tmc.h     |  60 +++-
->>   2 files changed, 403 insertions(+), 90 deletions(-)
+>>   drivers/hwtracing/coresight/coresight-tmc.c | 5 ++++-
+>>   drivers/hwtracing/coresight/coresight-tmc.h | 1 +
+>>   2 files changed, 5 insertions(+), 1 deletion(-)
 >>
-> 
-> [..]
->   
+>> diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
+>> index 4939333cc6c7..5a8c41130f96 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tmc.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tmc.c
+>> @@ -347,6 +347,9 @@ static int tmc_etr_setup_caps(struct tmc_drvdata *drvdata,
+>>   	if (!(devid & TMC_DEVID_NOSCAT))
+>>   		tmc_etr_set_cap(drvdata, TMC_ETR_SG);
+>>   
+>> +	if (device_get_dma_attr(drvdata->dev) == DEV_DMA_COHERENT)
+>> +		tmc_etr_set_cap(drvdata, TMC_ETR_COHERENT);
 >> +
->> +static void tmc_etr_sync_sg_buf(struct etr_buf *etr_buf, u64 rrp, u64 rwp)
-
->> +	w_offset = tmc_sg_get_data_page_offset(table, rwp);
->> +	if (w_offset < 0) {
->> +		dev_warn(table->dev, "Unable to map RWP %llx to offset\n",
->> +				rwp);
+>>   	/* Check if the AXI address width is available */
+>>   	if (devid & TMC_DEVID_AXIAW_VALID)
+>>   		dma_mask = ((devid >> TMC_DEVID_AXIAW_SHIFT) &
+>> @@ -397,7 +400,7 @@ static int tmc_probe(struct amba_device *adev, const struct amba_id *id)
+>>   	if (!drvdata)
+>>   		goto out;
+>>   
+>> -	drvdata->dev = &adev->dev;
+>> +	drvdata->dev = dev;
 > 
->                  dev_warn(table->dev,
->                           "Unable to map RWP %llx to offset\n", rwq);
-> 
-> It looks a little better and we respect indentation rules.  Same for r_offset.
-> 
-
->> +static inline int tmc_etr_mode_alloc_buf(int mode,
->> +				  struct tmc_drvdata *drvdata,
->> +				  struct etr_buf *etr_buf, int node,
->> +				  void **pages)
-> 
-> static inline int
-> tmc_etr_mode_alloc_buf(int mode,
->                         struct tmc_drvdata *drvdata,
->                         struct etr_buf *etr_buf, int node,
->                         void **pages)
-
->> + * tmc_alloc_etr_buf: Allocate a buffer use by ETR.
->> + * @drvdata	: ETR device details.
->> + * @size	: size of the requested buffer.
->> + * @flags	: Required properties of the type of buffer.
->> + * @node	: Node for memory allocations.
->> + * @pages	: An optional list of pages.
->> + */
->> +static struct etr_buf *tmc_alloc_etr_buf(struct tmc_drvdata *drvdata,
->> +					  ssize_t size, int flags,
->> +					  int node, void **pages)
-> 
-> Please fix indentation.  Also @flags isn't used.
+> What is that one for?
 > 
 
-Yep, flags is only used later and can move it to the patch where we use it.
-
->> +{
->> +	int rc = -ENOMEM;
->> +	bool has_etr_sg, has_iommu;
->> +	struct etr_buf *etr_buf;
->> +
->> +	has_etr_sg = tmc_etr_has_cap(drvdata, TMC_ETR_SG);
->> +	has_iommu = iommu_get_domain_for_dev(drvdata->dev);
->> +
->> +	etr_buf = kzalloc(sizeof(*etr_buf), GFP_KERNEL);
->> +	if (!etr_buf)
->> +		return ERR_PTR(-ENOMEM);
->> +
->> +	etr_buf->size = size;
->> +
->> +	/*
->> +	 * If we have to use an existing list of pages, we cannot reliably
->> +	 * use a contiguous DMA memory (even if we have an IOMMU). Otherwise,
->> +	 * we use the contiguous DMA memory if :
->> +	 *  a) The ETR cannot use Scatter-Gather.
->> +	 *  b) if not a, we have an IOMMU backup
-> 
-> Please rework the above sentence.
-
-How about :
-	   b) if (a) is not true and we have an IOMMU connected to the ETR.
-
-I will address the other comments on indentation.
-
-Thanks for the detailed look
+Oops, that was a minor cleanup and need not be part of this patch. I will leave things
+as it is. It is not worth a separate patch.
 
 Cheers
 Suzuki
