@@ -1,52 +1,75 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Nov 2017 18:49:12 +0000
-Subject: [PATCH 00/15] Add support for clang LTO
-In-Reply-To: <CAKwvOdnf4VS=3rQz2KUX68XLw2Dpv6oQp8EqDCDMXcKCmb3M8A@mail.gmail.com>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
- <CAKwvOdkTSXuxiFVUPXmefnDM6uV3BLDEJ+suO0BgfZxC6+Srbw@mail.gmail.com>
- <20171103182901.eajkzkef3to4p6rf@lakrids.cambridge.arm.com>
- <CAKwvOdnf4VS=3rQz2KUX68XLw2Dpv6oQp8EqDCDMXcKCmb3M8A@mail.gmail.com>
-Message-ID: <20171103184912.n4hoehrqqmf3ui44@lakrids.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 03 Nov 2017 18:50:58 +0000
+Subject: Applied "spi: s3c64xx: remove redundant pointer sci" to the spi tree
+In-Reply-To: <20171103133525.8173-1-colin.king@canonical.com>
+Message-ID: <E1eAh3S-0005u1-W6@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 11:36:33AM -0700, Nick Desaulniers wrote:
-> On Fri, Nov 3, 2017 at 11:29 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Fri, Nov 03, 2017 at 11:07:04AM -0700, Nick Desaulniers wrote:
-> >> On Fri, Nov 3, 2017 at 10:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > I had to create an aarch64-linux-gnu-clang wrapper, too. I'm not sure if
-> >> > there's build system help to avoid needing that?
-> >>
-> >> Gah!  So a BIG difference with Clang vs GCC for cross compiling is
-> >> that Clang by default ships with all backends enabled, and uses a
-> >> `-target <triple>` CFLAG to determine the arch to cross compile for,
-> >> while GCC is configured at compile time to support one back end, IIUC.
-> >
-> > Yup.
-> >
-> > I initally tried passing CC=clang\ --target=aarch64-linux-gnu
-> >
-> > ... but since that conflicts with CROSS_COMPILE, you then have to
-> > override AS, LD, OBJCOPY, etc, separately too.
-> 
-> make CC=clang CROSS_COMPILE=aarch64-linux-gnu-
-> 
-> I think you may need a trailing hyphen on your target as it gets
-> prefixed onto as and ld:
-> 
-> Makefile:
-> 
->  348 # Make variables (CC, etc...)
->  349 AS    = $(CROSS_COMPILE)as
->  350 LD    = $(CROSS_COMPILE)ld
+The patch
 
-I thought CC=clang CROSS_COMPILE=foo- would result in foo-clang, but
-evidently this is not the case.
+   spi: s3c64xx: remove redundant pointer sci
 
-I must've meseed up something else; sorry for the noise.
+has been applied to the spi tree at
 
-Thanks for correcting me; now I can go delete my wrapper. :)
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
 Thanks,
-Mark.
+Mark
+
+>From 4132b8b9107badf75bf30c8b4b3ac2cebd03389d Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Fri, 3 Nov 2017 13:35:25 +0000
+Subject: [PATCH] spi: s3c64xx: remove redundant pointer sci
+
+The pointer sci is assigned but never read, hence it is redundant
+and can be removed. Cleans up clang warning:
+
+drivers/spi/spi-s3c64xx.c:791:2: warning: Value stored to 'sci' is
+never read
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-s3c64xx.c | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index b392cca8fa4f..de7df20f8712 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -752,7 +752,6 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ {
+ 	struct s3c64xx_spi_csinfo *cs = spi->controller_data;
+ 	struct s3c64xx_spi_driver_data *sdd;
+-	struct s3c64xx_spi_info *sci;
+ 	int err;
+ 
+ 	sdd = spi_master_get_devdata(spi->master);
+@@ -788,8 +787,6 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 		spi_set_ctldata(spi, cs);
+ 	}
+ 
+-	sci = sdd->cntrlr_info;
+-
+ 	pm_runtime_get_sync(&sdd->pdev->dev);
+ 
+ 	/* Check if we can provide the requested rate */
+-- 
+2.15.0
