@@ -1,68 +1,37 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri,  3 Nov 2017 11:44:18 +0000
-Subject: [PATCH v2 3/3] perf: Fix ftrace builtin when kernel doesn't have
- function_graph
-In-Reply-To: <1509709458-44541-1-git-send-email-julien.thierry@arm.com>
-References: <1509709458-44541-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1509709458-44541-4-git-send-email-julien.thierry@arm.com>
+From: suzuki.poulose@arm.com (Suzuki K Poulose)
+Date: Fri,  3 Nov 2017 11:45:18 +0000
+Subject: [PATCH 2/2] arm-ccn: perf: Prevent module unload while PMU is in use
+In-Reply-To: <20171103114518.5311-1-suzuki.poulose@arm.com>
+References: <20171103114518.5311-1-suzuki.poulose@arm.com>
+Message-ID: <20171103114518.5311-2-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When linux is built without support for function graph tracer, the ftrace
-builtin of perf will fail when trying to reset max_graph_depth because the
-file does not exist. This prevents the use of function tracer from perf.
+When the PMU driver is built as a module, the perf expects the
+pmu->module to be valid, so that the driver is prevented from
+being unloaded while it is in use. Fix the CCN pmu driver to
+fill in this field.
 
-Only try to write the file max_graph_depth file when it exists.
-
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Fixes: commit a33b0daab73a0 ("bus: ARM CCN PMU driver")
+Cc: Pawel Moll <pawel.moll@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: linux-kernel at vger.kernel.org
+Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
 ---
- tools/perf/builtin-ftrace.c | 14 +++++++++++++-
- 1 file changed, 13 insertions(+), 1 deletion(-)
+ drivers/bus/arm-ccn.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/tools/perf/builtin-ftrace.c b/tools/perf/builtin-ftrace.c
-index 25a42ac..1abc066 100644
---- a/tools/perf/builtin-ftrace.c
-+++ b/tools/perf/builtin-ftrace.c
-@@ -14,6 +14,7 @@
- #include <signal.h>
- #include <fcntl.h>
- #include <poll.h>
-+#include <sys/stat.h>
-
- #include "debug.h"
- #include <subcmd/parse-options.h>
-@@ -116,6 +117,13 @@ static int append_tracing_file(const char *name, const char *val)
- static int reset_tracing_cpu(void);
- static void reset_tracing_filters(void);
-
-+static inline bool tracing_file_accessible(const char *name)
-+{
-+	struct stat s;
-+
-+	return stat(get_tracing_file(name), &s) == 0;
-+}
-+
- static int reset_tracing_files(struct perf_ftrace *ftrace __maybe_unused)
- {
- 	if (write_tracing_file("tracing_on", "0") < 0)
-@@ -130,8 +138,12 @@ static int reset_tracing_files(struct perf_ftrace *ftrace __maybe_unused)
- 	if (reset_tracing_cpu() < 0)
- 		return -1;
-
--	if (write_tracing_file("max_graph_depth", "0") < 0)
-+	if (!tracing_file_accessible("max_graph_depth")) {
-+		if (!strcmp(ftrace->tracer, "function_graph"))
-+			return -1;
-+	} else if (write_tracing_file("max_graph_depth", "0") < 0) {
- 		return -1;
-+	}
-
- 	reset_tracing_filters();
- 	return 0;
---
-1.9.1
+diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
+index e8c6946fed9d..3063f5312397 100644
+--- a/drivers/bus/arm-ccn.c
++++ b/drivers/bus/arm-ccn.c
+@@ -1276,6 +1276,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
+ 
+ 	/* Perf driver registration */
+ 	ccn->dt.pmu = (struct pmu) {
++		.module = THIS_MODULE,
+ 		.attr_groups = arm_ccn_pmu_attr_groups,
+ 		.task_ctx_nr = perf_invalid_context,
+ 		.event_init = arm_ccn_pmu_event_init,
+-- 
+2.13.6
