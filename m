@@ -1,62 +1,142 @@
 From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Thu, 2 Nov 2017 18:23:54 -0600
-Subject: [PATCH 1/2] media: s5p-mfc: check for firmware allocation before
- requesting firmware
-In-Reply-To: <5bbc048a-4b68-de23-373d-eb8a12c5b736@samsung.com>
+Date: Thu, 2 Nov 2017 18:27:17 -0600
+Subject: [PATCH 2/2] media: s5p-mfc: fix lock confection -
+ request_firmware() once and keep state
+In-Reply-To: <c1704d1b-95e8-e6a2-9086-3079f78daa00@samsung.com>
 References: <cover.1507325072.git.shuahkh@osg.samsung.com>
- <CGME20171006213015epcas3p2c0d4741e06b2d8c25583fb656b7f5532@epcas3p2.samsung.com>
- <e7c1ad0167ca363cc783be11871a04957127a3fa.1507325072.git.shuahkh@osg.samsung.com>
- <5bbc048a-4b68-de23-373d-eb8a12c5b736@samsung.com>
-Message-ID: <9b86cd70-9063-bf45-6851-73c2f982de5b@osg.samsung.com>
+ <CGME20171006213016epcas3p20e34abea60ca43f7c3f79a68fc7a38d7@epcas3p2.samsung.com>
+ <fab205fc9ba1bc00e5dda4db6d426fde69116c37.1507325072.git.shuahkh@osg.samsung.com>
+ <c1704d1b-95e8-e6a2-9086-3079f78daa00@samsung.com>
+Message-ID: <93d0668e-1fa6-ac2b-d998-9e0317469dd1@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2017 02:12 AM, Andrzej Hajda wrote:
-> Hi Shuah,
-> 
+On 11/02/2017 02:31 AM, Andrzej Hajda wrote:
 > On 06.10.2017 23:30, Shuah Khan wrote:
->> Check if firmware is allocated before requesting firmware instead of
->> requesting firmware only to release it if firmware is not allocated.
+>> Driver calls request_firmware() whenever the device is opened for the
+>> first time. As the device gets opened and closed, dev->num_inst == 1
+>> is true several times. This is not necessary since the firmware is saved
+>> in the fw_buf. s5p_mfc_load_firmware() copies the buffer returned by
+>> the request_firmware() to dev->fw_buf.
+>>
+>> fw_buf sticks around until it gets released from s5p_mfc_remove(), hence
+>> there is no need to keep requesting firmware and copying it to fw_buf.
+>>
+>> This might have been overlooked when changes are made to free fw_buf from
+>> the device release interface s5p_mfc_release().
+>>
+>> Fix s5p_mfc_load_firmware() to call request_firmware() once and keep state.
+>> Change _probe() to load firmware once fw_buf has been allocated.
+>>
+>> s5p_mfc_open() and it continues to call s5p_mfc_load_firmware() and init
+>> hardware which is the step where firmware is written to the device.
+>>
+>> This addresses the mfc_mutex contention due to repeated request_firmware()
+>> calls from open() in the following circular locking warning:
+>>
+>> [  552.194115] qtdemux0:sink/2710 is trying to acquire lock:
+>> [  552.199488]  (&dev->mfc_mutex){+.+.}, at: [<bf145544>] s5p_mfc_mmap+0x28/0xd4 [s5p_mfc]
+>> [  552.207459]
+>>                but task is already holding lock:
+>> [  552.213264]  (&mm->mmap_sem){++++}, at: [<c01df2e4>] vm_mmap_pgoff+0x44/0xb8
+>> [  552.220284]
+>>                which lock already depends on the new lock.
+>>
+>> [  552.228429]
+>>                the existing dependency chain (in reverse order) is:
+>> [  552.235881]
+>>                -> #2 (&mm->mmap_sem){++++}:
+>> [  552.241259]        __might_fault+0x80/0xb0
+>> [  552.245331]        filldir64+0xc0/0x2f8
+>> [  552.249144]        call_filldir+0xb0/0x14c
+>> [  552.253214]        ext4_readdir+0x768/0x90c
+>> [  552.257374]        iterate_dir+0x74/0x168
+>> [  552.261360]        SyS_getdents64+0x7c/0x1a0
+>> [  552.265608]        ret_fast_syscall+0x0/0x28
+>> [  552.269850]
+>>                -> #1 (&type->i_mutex_dir_key#2){++++}:
+>> [  552.276180]        down_read+0x48/0x90
+>> [  552.279904]        lookup_slow+0x74/0x178
+>> [  552.283889]        walk_component+0x1a4/0x2e4
+>> [  552.288222]        link_path_walk+0x174/0x4a0
+>> [  552.292555]        path_openat+0x68/0x944
+>> [  552.296541]        do_filp_open+0x60/0xc4
+>> [  552.300528]        file_open_name+0xe4/0x114
+>> [  552.304772]        filp_open+0x28/0x48
+>> [  552.308499]        kernel_read_file_from_path+0x30/0x78
+>> [  552.313700]        _request_firmware+0x3ec/0x78c
+>> [  552.318291]        request_firmware+0x3c/0x54
+>> [  552.322642]        s5p_mfc_load_firmware+0x54/0x150 [s5p_mfc]
+>> [  552.328358]        s5p_mfc_open+0x4e4/0x550 [s5p_mfc]
+>> [  552.333394]        v4l2_open+0xa0/0x104 [videodev]
+>> [  552.338137]        chrdev_open+0xa4/0x18c
+>> [  552.342121]        do_dentry_open+0x208/0x310
+>> [  552.346454]        path_openat+0x28c/0x944
+>> [  552.350526]        do_filp_open+0x60/0xc4
+>> [  552.354512]        do_sys_open+0x118/0x1c8
+>> [  552.358586]        ret_fast_syscall+0x0/0x28
+>> [  552.362830]
+>>                -> #0 (&dev->mfc_mutex){+.+.}:
+>>                -> #0 (&dev->mfc_mutex){+.+.}:
+>> [  552.368379]        lock_acquire+0x6c/0x88
+>> [  552.372364]        __mutex_lock+0x68/0xa34
+>> [  552.376437]        mutex_lock_interruptible_nested+0x1c/0x24
+>> [  552.382086]        s5p_mfc_mmap+0x28/0xd4 [s5p_mfc]
+>> [  552.386939]        v4l2_mmap+0x54/0x88 [videodev]
+>> [  552.391601]        mmap_region+0x3a8/0x638
+>> [  552.395673]        do_mmap+0x330/0x3a4
+>> [  552.399400]        vm_mmap_pgoff+0x90/0xb8
+>> [  552.403472]        SyS_mmap_pgoff+0x90/0xc0
+>> [  552.407632]        ret_fast_syscall+0x0/0x28
+>> [  552.411876]
+>>                other info that might help us debug this:
+>>
+>> [  552.419848] Chain exists of:
+>>                  &dev->mfc_mutex --> &type->i_mutex_dir_key#2 --> &mm->mmap_sem
+>>
+>> [  552.431200]  Possible unsafe locking scenario:
+>>
+>> [  552.437092]        CPU0                    CPU1
+>> [  552.441598]        ----                    ----
+>> [  552.446104]   lock(&mm->mmap_sem);
+>> [  552.449484]                                lock(&type->i_mutex_dir_key#2);
+>> [  552.456329]                                lock(&mm->mmap_sem);
+>> [  552.462222]   lock(&dev->mfc_mutex);
+>> [  552.465775]
+>>                 *** DEADLOCK ***
+> 
+> I am not 100% but it looks like false positive. Could you describe
+> scenario when it deadlocks?
+> 
 >>
 >> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
 >> ---
->>  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c | 10 +++++-----
->>  1 file changed, 5 insertions(+), 5 deletions(-)
+>>  drivers/media/platform/s5p-mfc/s5p_mfc.c        | 4 ++++
+>>  drivers/media/platform/s5p-mfc/s5p_mfc_common.h | 3 +++
+>>  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c   | 5 +++++
+>>  3 files changed, 12 insertions(+)
 >>
->> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
->> index 69ef9c2..f064a0d1 100644
->> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
->> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
->> @@ -55,6 +55,11 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
->>  	 * into kernel. */
->>  	mfc_debug_enter();
->>  
->> +	if (!dev->fw_buf.virt) {
->> +		mfc_err("MFC firmware is not allocated\n");
->> +		return -EINVAL;
->> +	}
->> +
->>  	for (i = MFC_FW_MAX_VERSIONS - 1; i >= 0; i--) {
->>  		if (!dev->variant->fw_name[i])
->>  			continue;
->> @@ -75,11 +80,6 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
->>  		release_firmware(fw_blob);
->>  		return -ENOMEM;
+>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc.c b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> index 1afde50..4c253fb 100644
+>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc.c
+>> @@ -1315,6 +1315,10 @@ static int s5p_mfc_probe(struct platform_device *pdev)
+>>  		goto err_dma;
 >>  	}
->> -	if (!dev->fw_buf.virt) {
->> -		mfc_err("MFC firmware is not allocated\n");
->> -		release_firmware(fw_blob);
->> -		return -EINVAL;
->> -	}
+>>  
+>> +	ret = s5p_mfc_load_firmware(dev);
+>> +	if (ret)
+>> +		mfc_err("Failed to load FW - try loading from open()\n");
+>> +
 > 
-> Is there any scenario in which dev->fw_buf.virt is null and
-> s5p_mfc_load_firmware is called?
-> I suspect this check is not necessary at all.
-> 
+> What is the point of adding it? It will produce error log in case
+> filesystem is not yet mounted, and as I remember it was the reason to
+> put fw load to open callback.
 
-I don't believe so. Allocation is done in s5p_mfc_configure_dma_memory()
-code path and if that fails it bails out of _probe. I can remove the check
-all together.
+"What is the point of adding it" does it mean the error message or the
+attempt to load the firmware. Would it be okay to just try to load and
+not print error if it fails? If it works at this stage, _open() doesn't
+have to take time hit trying to load it.
 
 thanks,
 -- Shuah
