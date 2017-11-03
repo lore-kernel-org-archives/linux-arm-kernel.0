@@ -1,60 +1,68 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri,  3 Nov 2017 11:44:17 +0000
-Subject: [PATCH v2 2/3] arm: ftrace: function_graph with DYNAMIC_FTRACE
+Date: Fri,  3 Nov 2017 11:44:18 +0000
+Subject: [PATCH v2 3/3] perf: Fix ftrace builtin when kernel doesn't have
+ function_graph
 In-Reply-To: <1509709458-44541-1-git-send-email-julien.thierry@arm.com>
 References: <1509709458-44541-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <1509709458-44541-3-git-send-email-julien.thierry@arm.com>
+Message-ID: <1509709458-44541-4-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function graph does not work currently when CONFIG_DYNAMIC_TRACE is not
-set. This is because ftrace_function_trace is not always set to ftrace_stub
-when function_graph is in use.
+When linux is built without support for function graph tracer, the ftrace
+builtin of perf will fail when trying to reset max_graph_depth because the
+file does not exist. This prevents the use of function tracer from perf.
 
-Do not skip checking of graph tracer functions when ftrace_function_trace
-is set.
+Only try to write the file max_graph_depth file when it exists.
 
-Suggested-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Ingo Molnar <mingo@redhat.com>
+Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm/kernel/entry-ftrace.S | 14 +++++++-------
- 1 file changed, 7 insertions(+), 7 deletions(-)
+ tools/perf/builtin-ftrace.c | 14 +++++++++++++-
+ 1 file changed, 13 insertions(+), 1 deletion(-)
 
-Takahiro's patch was not signed-off, let me know if I need to change the
-Suggested-by into a Signed-off-by.
+diff --git a/tools/perf/builtin-ftrace.c b/tools/perf/builtin-ftrace.c
+index 25a42ac..1abc066 100644
+--- a/tools/perf/builtin-ftrace.c
++++ b/tools/perf/builtin-ftrace.c
+@@ -14,6 +14,7 @@
+ #include <signal.h>
+ #include <fcntl.h>
+ #include <poll.h>
++#include <sys/stat.h>
 
-diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
-index efcd9f2..e3555f8 100644
---- a/arch/arm/kernel/entry-ftrace.S
-+++ b/arch/arm/kernel/entry-ftrace.S
-@@ -68,7 +68,13 @@
- 	ldr	r2, [r0]
- 	adr	r0, .Lftrace_stub
- 	cmp	r0, r2
--	bne	1f
-+	beq	1f
+ #include "debug.h"
+ #include <subcmd/parse-options.h>
+@@ -116,6 +117,13 @@ static int append_tracing_file(const char *name, const char *val)
+ static int reset_tracing_cpu(void);
+ static void reset_tracing_filters(void);
+
++static inline bool tracing_file_accessible(const char *name)
++{
++	struct stat s;
 +
-+	mcount_get_lr	r1			@ lr of instrumented func
-+	mcount_adjust_addr	r0, lr		@ instrumented function
-+	badr	lr, 1f
-+	mov	pc, r2
-+1:
++	return stat(get_tracing_file(name), &s) == 0;
++}
++
+ static int reset_tracing_files(struct perf_ftrace *ftrace __maybe_unused)
+ {
+ 	if (write_tracing_file("tracing_on", "0") < 0)
+@@ -130,8 +138,12 @@ static int reset_tracing_files(struct perf_ftrace *ftrace __maybe_unused)
+ 	if (reset_tracing_cpu() < 0)
+ 		return -1;
 
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	ldr     r1, =ftrace_graph_return
-@@ -84,12 +90,6 @@
- #endif
+-	if (write_tracing_file("max_graph_depth", "0") < 0)
++	if (!tracing_file_accessible("max_graph_depth")) {
++		if (!strcmp(ftrace->tracer, "function_graph"))
++			return -1;
++	} else if (write_tracing_file("max_graph_depth", "0") < 0) {
+ 		return -1;
++	}
 
- 	mcount_exit
--
--1: 	mcount_get_lr	r1			@ lr of instrumented func
--	mcount_adjust_addr	r0, lr		@ instrumented function
--	badr	lr, 2f
--	mov	pc, r2
--2:	mcount_exit
- .endm
-
- #ifdef CONFIG_DYNAMIC_FTRACE_WITH_REGS
+ 	reset_tracing_filters();
+ 	return 0;
 --
 1.9.1
