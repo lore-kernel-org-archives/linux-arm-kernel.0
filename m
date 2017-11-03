@@ -1,33 +1,33 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Fri,  3 Nov 2017 10:12:02 -0700
-Subject: [PATCH 14/15] arm64: crypto: disable LTO for aes-ce-cipher.c
-In-Reply-To: <20171103171203.107569-1-samitolvanen@google.com>
-References: <20171103171203.107569-1-samitolvanen@google.com>
-Message-ID: <20171103171203.107569-19-samitolvanen@google.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Nov 2017 17:18:01 +0000
+Subject: [PATCH v16 12/13] arm, tile: turn off timer tick for
+ oneshot_stopped state
+In-Reply-To: <1509728692-10460-13-git-send-email-cmetcalf@mellanox.com>
+References: <1509728692-10460-1-git-send-email-cmetcalf@mellanox.com>
+ <1509728692-10460-13-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20171103171801.xzxyypt3axyawu7l@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_CLANG_LTO requires the use of clang's integrated assembler, which
-doesn't understand the inline assembly in aes-ce-cipher.c. Disable LTO for
-the file to work around the issue.
+Hi Chris,
 
-Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
----
- arch/arm64/crypto/Makefile | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+On Fri, Nov 03, 2017 at 01:04:51PM -0400, Chris Metcalf wrote:
+> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+> index fd4b7f684bd0..61ea7f907c56 100644
+> --- a/drivers/clocksource/arm_arch_timer.c
+> +++ b/drivers/clocksource/arm_arch_timer.c
+> @@ -722,6 +722,8 @@ static void __arch_timer_setup(unsigned type,
+>  		}
+>  	}
+>  
+> +	clk->set_state_oneshot_stopped = clk->set_state_shutdown;
 
-diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-index b5edc5918c28..0edaef43a1d4 100644
---- a/arch/arm64/crypto/Makefile
-+++ b/arch/arm64/crypto/Makefile
-@@ -24,7 +24,7 @@ obj-$(CONFIG_CRYPTO_CRC32_ARM64_CE) += crc32-ce.o
- crc32-ce-y:= crc32-ce-core.o crc32-ce-glue.o
- 
- obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
--CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
-+CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto $(DISABLE_LTO)
- 
- obj-$(CONFIG_CRYPTO_AES_ARM64_CE_CCM) += aes-ce-ccm.o
- aes-ce-ccm-y := aes-ce-ccm-glue.o aes-ce-ccm-core.o
--- 
-2.15.0.403.gc27cc4dac6-goog
+AFAICT, we've set up this callback since commit:
+
+  cf8c5009ee37d25c ("clockevents/drivers/arm_arch_timer: Implement ->set_state_oneshot_stopped()")
+
+... so I don't beleive this is necessary, and I think this change can be
+dropped.
+
+Thanks,
+Mark.
