@@ -1,26 +1,35 @@
 From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 3 Nov 2017 16:26:34 +0200
-Subject: [PATCH 0/7] ARM: OMAP2+: clkctrl fixes/enhancements for omaps
-Message-ID: <1509719201-32700-1-git-send-email-t-kristo@ti.com>
+Date: Fri, 3 Nov 2017 16:26:40 +0200
+Subject: [PATCH 6/7] ARM: OMAP2+: hwmod: calculate physical register address
+ on am33xx
+In-Reply-To: <1509719201-32700-1-git-send-email-t-kristo@ti.com>
+References: <1509719201-32700-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1509719201-32700-7-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add support for the address translation logic for am33xx. Needed for
+mapping hwmods towards their corresponding clkctrl providers and clocks.
 
-This series adds some fixes/enhancements for the clkctrl support on
-omap family SoCs. Required to properly support clkctrl clocks on
-am3,am4,am5,omap4,omap5,dra7. Targeted for 4.16 seeing we are pretty
-late on 4.14-rc cycle.
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-This series can be merged independently from the other serieses
-(driver part support code, DTS data.) Boot tested against 4.14-rc1
-on the boards I have access to.
-
-Series has been pushed here:
-Tree: https://github.com/t-kristo/linux-pm.git
-Branch: 4.14-rc1-clkctrl-mach-omap2
-
--Tero
+diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
+index bb7c745..ca5ca76 100644
+--- a/arch/arm/mach-omap2/omap_hwmod.c
++++ b/arch/arm/mach-omap2/omap_hwmod.c
+@@ -3840,6 +3840,7 @@ void __init omap_hwmod_init(void)
+ 		soc_ops.is_hardreset_asserted = _omap4_is_hardreset_asserted;
+ 		soc_ops.init_clkdm = _init_clkdm;
+ 		soc_ops.disable_direct_prcm = _omap4_disable_direct_prcm;
++		soc_ops.xlate_clkctrl = _omap4_xlate_clkctrl;
+ 	} else {
+ 		WARN(1, "omap_hwmod: unknown SoC type\n");
+ 	}
+-- 
+1.9.1
 
 --
 Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
