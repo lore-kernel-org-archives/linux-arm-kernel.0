@@ -1,42 +1,26 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 3 Nov 2017 22:25:29 +0800
-Subject: [PATCH v10 00/20] simplify crypto wait for async op
-In-Reply-To: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
-References: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
-Message-ID: <20171103142528.GL9011@gondor.apana.org.au>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 3 Nov 2017 16:26:34 +0200
+Subject: [PATCH 0/7] ARM: OMAP2+: clkctrl fixes/enhancements for omaps
+Message-ID: <1509719201-32700-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 18, 2017 at 08:00:32AM +0100, Gilad Ben-Yossef wrote:
-> Many users of kernel async. crypto services have a pattern of
-> starting an async. crypto op and than using a completion
-> to wait for it to end.
-> 
-> This patch set simplifies this common use case in two ways:
-> 
-> First, by separating the return codes of the case where a
-> request is queued to a backlog due to the provider being
-> busy (-EBUSY) from the case the request has failed due
-> to the provider being busy and backlogging is not enabled
-> (-ENOSPC).
-> 
-> Next, this change is than built on to create a generic API
-> to wait for a async. crypto operation to complete.
-> 
-> The end result is a smaller code base and an API that is
-> easier to use and more difficult to get wrong.
-> 
-> The patch set was boot tested on x86_64 and arm64 which
-> at the very least tests the crypto users via testmgr and
-> tcrypt but I do note that I do not have access to some
-> of the HW whose drivers are modified nor do I claim I was
-> able to test all of the corner cases.
-> 
-> The patch set is based upon linux-next release tagged
-> next-20171017.
+Hi,
 
-All applied.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+This series adds some fixes/enhancements for the clkctrl support on
+omap family SoCs. Required to properly support clkctrl clocks on
+am3,am4,am5,omap4,omap5,dra7. Targeted for 4.16 seeing we are pretty
+late on 4.14-rc cycle.
+
+This series can be merged independently from the other serieses
+(driver part support code, DTS data.) Boot tested against 4.14-rc1
+on the boards I have access to.
+
+Series has been pushed here:
+Tree: https://github.com/t-kristo/linux-pm.git
+Branch: 4.14-rc1-clkctrl-mach-omap2
+
+-Tero
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
