@@ -1,101 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 3 Nov 2017 09:05:18 -0700
-Subject: SDP4430 nightly regression (was: Re: [GIT PULL] two omap
- regression fixes)
-In-Reply-To: <20171103104316.GE28231@n2100.armlinux.org.uk>
-References: <pull-1509652473-291160@atomide.com>
- <20171103104316.GE28231@n2100.armlinux.org.uk>
-Message-ID: <20171103160518.GG28152@atomide.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 03 Nov 2017 16:14:04 +0000
+Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before entering
+ the guest
+In-Reply-To: <20171103124904.GC14144@cbox>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171019145807.23251-21-james.morse@arm.com> <20171031062315.GY2166@lvm>
+ <59F861EE.4010505@arm.com> <20171101045550.GB11166@lvm>
+ <59FB0D0C.1010208@arm.com> <20171103124904.GC14144@cbox>
+Message-ID: <59FC95CC.3090706@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Russell King - ARM Linux <linux@armlinux.org.uk> [171103 10:45]:
-> I don't know if this is covered in your pull request, but since 31st
-> October, the SDP4430 no longer recovers from a hibernation attempt.
-> (as found by my nightly tests).
+Hi Christoffer,
 
-No I was not aware of any -rc series regressions, thanks for letting
-me know.
+On 03/11/17 12:49, Christoffer Dall wrote:
+> Does a non-secure esb() cause the error to be delivered to firmware on
+> the secure side if anything is pending?
 
-> 4.14-rc6+ plus my tree plus arm-soc/for-next branch worked fine:
-> 
-> root at omap-4430sdp:~# if [ -f /sys/power/disk ]; then echo reboot > /sys/power/disk; echo disk > /sys/power/state; fi
-> PM: hibernation entry
-> PM: Syncing filesystems ...
-> PM: done.
-> Freezing user space processes ... (elapsed 0.022 seconds) done.
-> OOM killer disabled.
-> PM: Basic memory bitmaps created
-> PM: Preallocating image memory... done (allocated 13293 pages)
-> PM: Allocated 53172 kbytes in 0.17 seconds (312.77 MB/s)
-> Freezing remaining freezable tasks ... (elapsed 0.016 seconds) done.
-> Suspending console(s) (use no_console_suspend to debug)
-> omap_hwmod: gpio2: _wait_target_disable failed
-> Disabling non-boot CPUs ...
-> PM: Creating hibernation image:
-> PM: Need to copy 13028 pages
-> PM: Normal pages needed: 9836 + 1024, available pages: 53639
-> PM: Hibernation image created (13028 pages copied)
-> Enabling non-boot CPUs ...
-> CPU1 is up
-> PM: Cannot find swap device, try swapon -a.
-> PM: Cannot get swap writer
-> PM: Basic memory bitmaps freed
-> OOM killer enabled.
-> Restarting tasks ... done.
-> PM: hibernation exit
-> root at omap-4430sdp:~#
-> 
-> The above is an example of success - it's intentional that there's no
-> swap, which prevents the system entering hibernation.  The purpose of
-> this test is to exercise the PM and CPU hotplug paths.
-> 
-> 4.14-rc7+ plus my tree plus arm-soc/for-next now fails:
-> 
-> root at omap-4430sdp:~# if [ -f /sys/power/disk ]; then echo reboot > /sys/power/disk; echo disk > /sys/power/state; fi
-> PM: hibernation entry
-> PM: Syncing filesystems ...
-> PM: done.
-> Freezing user space processes ... (elapsed 0.022 seconds) done.
-> OOM killer disabled.
-> PM: Basic memory bitmaps created
-> PM: Preallocating image memory... done (allocated 13200 pages)
-> PM: Allocated 52800 kbytes in 0.17 seconds (310.58 MB/s)
-> Freezing remaining freezable tasks ... (elapsed 0.015 seconds) done.
-> Suspending console(s) (use no_console_suspend to debug)
-> 
-> From what I can see, there's no change in arm-soc/for-next across that
-> period - the same SHA1 hash was merged for the build tree update
-> on the 27th October as was used on the 30th October.
-> 
-> There's no change (apart from the SHA hashes, the diff between them is
-> empty) in the branch I merged between those two dates either for my
-> tree.  The SHA hash change was due to squashing some MPS3 changes to
-> fix a build error for the recently added mps3 build target in the
-> builder.
-> 
-> The material difference is Linus' tip, which changed from f34157878d3b
-> ("Merge tag 'nfs-for-4.14-4' of git://git.linux-nfs.org/projects/trondmy/linux-nfs")
-> to 0b07194bb55e ("Linux 4.14-rc7").
-> 
-> In the diffstat between the two build trees (post merge), I don't see
-> anything in arch/arm that could account for it.  I do see some power
-> changes:
-> 
->  drivers/base/power/domain_governor.c               |  53 +--
->  drivers/base/power/qos.c                           |   2 +-
->  drivers/base/power/runtime.c                       |   2 +-
->  drivers/base/power/sysfs.c                         |  25 +-
-> 
-> but nothing in tty or serial.  These power changes look like QoS
-> changes, which probably aren't related.
-> 
-> Just to make sure, I've diffed the build tree SHAs and the change in
-> Linus' tip, and the two diffs match apart from a couple of SHA blob
-> hashes on a couple of files (EFI stub and MAINTAINERS).
+Yes, the ESB-instruction causes 'synchronisable' errors to become pending as an
+SError. They then follow the normal SError rules.
 
-Initiating git bisect sequence.
 
-Regards,
+> I'm not sure I fully understand the interaction between issuing an
+> esb() in non-secure and firmware handling a RAS error; I thought there
+> would be none, and that this was only for kernel-first ?
 
-Tony
+To implement firmware-first, EL3 has to set SCR_EL3.EA to route external-aborts
+and physical SError to EL3. So an ESB-instruction, even in a guest, may cause an
+SError to be taken to EL3 for firmware-first handling.
+
+This is why RAS is causing so much noise for KVM, any notification could also
+interrupt a guest, so firmware has to emulate an exception taken to EL2
+correctly and KVM will have to plumb the notification across to the host APEI code.
+
+
+Thanks,
+
+James
