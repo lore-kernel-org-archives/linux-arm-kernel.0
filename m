@@ -1,34 +1,45 @@
-From: mylene.josserand@free-electrons.com (=?UTF-8?q?Myl=C3=A8ne=20Josserand?=)
-Date: Fri,  3 Nov 2017 11:57:47 +0100
-Subject: [PATCH] clk: sunxi-ng: a83t: Fix i2c buses bits
-Message-ID: <20171103105747.26335-1-mylene.josserand@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Nov 2017 11:16:10 +0000
+Subject: [PATCH v9 1/8] perf: Export perf_event_update_userpage
+In-Reply-To: <20171031172318.11823-2-suzuki.poulose@arm.com>
+References: <20171031172318.11823-1-suzuki.poulose@arm.com>
+ <20171031172318.11823-2-suzuki.poulose@arm.com>
+Message-ID: <20171103111610.zksofse7w55qu34u@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-i2c1 and i2c2 bits for CCU are not bit 0 but bit 1 and bit 2.
-Because of that, the i2c0 (bit 0) was not correctly configured.
-Fixed the correct bits for i2c1 and i2c2.
+[+ Ingo]
 
-Signed-off-by: Myl?ne Josserand <mylene.josserand@free-electrons.com>
----
- drivers/clk/sunxi-ng/ccu-sun8i-a83t.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On Tue, Oct 31, 2017 at 05:23:11PM +0000, Suzuki K Poulose wrote:
+> Export perf_event_update_userpage() so that PMU driver using them,
+> can be built as modules.
 
-diff --git a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
-index e43acebdfbcd..f8203115a6bc 100644
---- a/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
-+++ b/drivers/clk/sunxi-ng/ccu-sun8i-a83t.c
-@@ -354,9 +354,9 @@ static SUNXI_CCU_GATE(bus_tdm_clk,	"bus-tdm",	"apb1",
- static SUNXI_CCU_GATE(bus_i2c0_clk,	"bus-i2c0",	"apb2",
- 		      0x06c, BIT(0), 0);
- static SUNXI_CCU_GATE(bus_i2c1_clk,	"bus-i2c1",	"apb2",
--		      0x06c, BIT(0), 0);
-+		      0x06c, BIT(1), 0);
- static SUNXI_CCU_GATE(bus_i2c2_clk,	"bus-i2c2",	"apb2",
--		      0x06c, BIT(0), 0);
-+		      0x06c, BIT(2), 0);
- static SUNXI_CCU_GATE(bus_uart0_clk,	"bus-uart0",	"apb2",
- 		      0x06c, BIT(16), 0);
- static SUNXI_CCU_GATE(bus_uart1_clk,	"bus-uart1",	"apb2",
--- 
-2.11.0
+Peter, Ingo, are you happy with this?
+
+It would be useful if we could take this via the arm64 tree with the
+rest of the series.
+
+Thanks,
+Mark.
+
+> Cc: Peter Zilstra <peterz@infradead.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  kernel/events/core.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/kernel/events/core.c b/kernel/events/core.c
+> index 9d93db81fa36..550015829db8 100644
+> --- a/kernel/events/core.c
+> +++ b/kernel/events/core.c
+> @@ -4982,6 +4982,7 @@ void perf_event_update_userpage(struct perf_event *event)
+>  unlock:
+>  	rcu_read_unlock();
+>  }
+> +EXPORT_SYMBOL_GPL(perf_event_update_userpage);
+>  
+>  static int perf_mmap_fault(struct vm_fault *vmf)
+>  {
+> -- 
+> 2.13.6
+> 
