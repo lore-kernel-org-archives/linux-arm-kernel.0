@@ -1,56 +1,54 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Nov 2017 18:29:01 +0000
-Subject: [PATCH 00/15] Add support for clang LTO
-In-Reply-To: <CAKwvOdkTSXuxiFVUPXmefnDM6uV3BLDEJ+suO0BgfZxC6+Srbw@mail.gmail.com>
+Date: Fri, 3 Nov 2017 18:31:56 +0000
+Subject: [PATCH 07/15] arm64: use -mno-implicit-float instead of
+ -mgeneral-regs-only
+In-Reply-To: <20171103171203.107569-9-samitolvanen@google.com>
 References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
- <CAKwvOdkTSXuxiFVUPXmefnDM6uV3BLDEJ+suO0BgfZxC6+Srbw@mail.gmail.com>
-Message-ID: <20171103182901.eajkzkef3to4p6rf@lakrids.cambridge.arm.com>
+ <20171103171203.107569-9-samitolvanen@google.com>
+Message-ID: <20171103183156.ando3jj5pl2hfk5j@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 11:07:04AM -0700, Nick Desaulniers wrote:
-> On Fri, Nov 3, 2017 at 10:51 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > I had to create an aarch64-linux-gnu-clang wrapper, too. I'm not sure if
-> > there's build system help to avoid needing that?
+On Fri, Nov 03, 2017 at 10:11:52AM -0700, Sami Tolvanen wrote:
+> From: Greg Hackmann <ghackmann@google.com>
 > 
-> Gah!  So a BIG difference with Clang vs GCC for cross compiling is
-> that Clang by default ships with all backends enabled, and uses a
-> `-target <triple>` CFLAG to determine the arch to cross compile for,
-> while GCC is configured at compile time to support one back end, IIUC.
-
-Yup.
-
-I initally tried passing CC=clang\ --target=aarch64-linux-gnu
-
-... but since that conflicts with CROSS_COMPILE, you then have to
-override AS, LD, OBJCOPY, etc, separately too.
-
-This is a little less than ideal. :/
-
-> Clang _can_ be built with all other back ends disabled but one, but I
-> have a problem with this approach:  distributions of Clang are rarely
-> configured this way (all backends enabled by default), and it seems we
-> just found this past week that Clang if configured with just one
-> backend, it will silently ignore -target flags for other backends and
-> generate code for the configured backend (this led to:
-> https://lkml.org/lkml/2017/11/2/892).  I consider this a bug in Clang,
-> so I just filed: https://bugs.llvm.org/show_bug.cgi?id=35196
-
-Ouch. Thanks for attacking that.
-
-> >   CC      arch/arm64/crypto/aes-ce-cipher.o
-> > fatal error: error in backend: Do not know how to split the result of this operator!
+> LLVM bug 30792 causes clang's AArch64 backend to crash compiling
+> arch/arm64/crypto/aes-ce-cipher.c.  Replacing -mgeneral-regs-only with
+> -mno-implicit-float is the suggested workaround.
 > 
-> Yep, we've seen this.  It was the FINAL bug in Clang for compiling the
-> kernel for arm64.  It was recently fixed upstream in llvm by
-> gbiv at google.com, but so recent that you'll need to either compiler
-> Clang from source from ToT or work around it like we have in Android
-> with:
-> https://android.googlesource.com/kernel/msm/+/9093342a0186dad05095b70f1806938310ace6e7
+> Signed-off-by: Greg Hackmann <ghackmann@google.com>
+> Cc: Matthias Kaehlcke <mka@chromium.org>
+> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 
-Sure. I can live with patch 7 for now, assuming there's nothing else
-lurking in the shadows.
+Just to check, what happens if you pass both to clang?
+
+If it works when you pass both...
+
+> -KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
+> +ifeq ($(cc-name),clang)
+> +# This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792.
+> +KBUILD_CFLAGS	+= -mno-implicit-float
+> +else
+> +KBUILD_CFLAGS	+= -mgeneral-regs-only
+> +endif
+
+... then this can be reduced to:
+
+# This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792
+KBUILD_CFLAGS		+= $(call cc-option, -mno-implicit-float)
 
 Thanks,
 Mark.
+
+> +KBUILD_CFLAGS	+= $(lseinstr) $(brokengasinst)
+>  KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+>  KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
+>  KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+> -- 
+> 2.15.0.403.gc27cc4dac6-goog
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
