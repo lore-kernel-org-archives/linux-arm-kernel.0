@@ -1,116 +1,38 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 3 Nov 2017 13:49:04 +0100
-Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before
- entering the guest
-In-Reply-To: <59FB0D0C.1010208@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-21-james.morse@arm.com>
- <20171031062315.GY2166@lvm> <59F861EE.4010505@arm.com>
- <20171101045550.GB11166@lvm> <59FB0D0C.1010208@arm.com>
-Message-ID: <20171103124904.GC14144@cbox>
+From: elder@ieee.org (Alex Elder)
+Date: Fri, 3 Nov 2017 08:09:10 -0500
+Subject: [PATCH v3 2/3] usb: phy: remove phy-msm-usb.c
+In-Reply-To: <20171103000257.GG12812@usblab-sd-06.qualcomm.com>
+References: <20171031131131.8099-1-elder@linaro.org>
+ <20171031131131.8099-3-elder@linaro.org>
+ <20171103000257.GG12812@usblab-sd-06.qualcomm.com>
+Message-ID: <5210a424-a4bb-b42f-1f17-074d2b4d58a7@ieee.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 12:18:20PM +0000, James Morse wrote:
-> Hi Christoffer,
+On 11/02/2017 07:02 PM, Jack Pham wrote:
+> Hi Alex,
 > 
-> On 01/11/17 04:55, Christoffer Dall wrote:
-> > On Tue, Oct 31, 2017 at 11:43:42AM +0000, James Morse wrote:
-> >> On 31/10/17 06:23, Christoffer Dall wrote:
-> >>> On Thu, Oct 19, 2017 at 03:58:06PM +0100, James Morse wrote:
-> >>>> On VHE systems KVM masks SError before switching the VBAR value. Any
-> >>>> host RAS error that the CPU knew about before world-switch may become
-> >>>> pending as an SError during world-switch, and only be taken once we enter
-> >>>> the guest.
-> >>>>
-> >>>> Until KVM can take RAS SErrors during world switch, add an ESB to
-> >>>> force any RAS errors to be synchronised and taken on the host before
-> >>>> we enter world switch.
-> >>>>
-> >>>> RAS errors that become pending during world switch are still taken
-> >>>> once we enter the guest.
-> >>
-> >>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >>>> index cf5d78ba14b5..5dc6f2877762 100644
-> >>>> --- a/arch/arm64/include/asm/kvm_host.h
-> >>>> +++ b/arch/arm64/include/asm/kvm_host.h
-> >>>> @@ -392,6 +392,7 @@ static inline void __cpu_init_stage2(void)
-> >>>>  
-> >>>>  static inline void kvm_arm_vhe_guest_enter(void)
-> >>>>  {
-> >>>> +	esb();
-> >>
-> >>> I don't fully appreciate what the point of this is?
-> >>>
-> >>> As I understand it, our fundamental goal here is to try to distinguish
-> >>> between errors happening on the host or in the guest.
-> >>
-> >> Not just host/guest, but also those we can and can't handle.
-> >>
-> >> KVM can't currently take an SError during world switch, so a RAS error that the
-> >> CPU was hoping to defer may spread from the host into KVM's
-> >> no-SError:world-switch code. If this happens it will (almost certainly) have to
-> >> be re-classified as uncontainable.
-> >>
-> >> There is also a firmware-first angle here: NOTIFY_SEI can't be delivered if the
-> >> normal world has SError masked, so any error that spreads past this point
-> >> becomes a reboot-by-firmware instead of an OS notification and almost-helpful
-> >> error message.
-> >>
-> >>
-> >>> If that's correct, then why don't we do it at the last possible moment
-> >>> when we still have a scratch register left, in the world switch code
-> >>> itself, and in the case abort the guest entry and report back a "host
-> >>> SError" return code.
-> >>
-> >> We have IESB to run the error-barrier as we enter the guest. This would make any
-> >> host error pending as an SError, and we would exit the guest immediately. But if
-> >> there was an RAS error during world switch, by this point its likely to be
-> >> classified as uncontainable.
-> >>
-> >> This esb() is trying to keep this window of code as small as possible, to just
-> >> errors that occur during world switch.
-> >>
-> >> With your vcpu load/save this window becomes a lot smaller, it may be possible
-> >> to get a VHE-host's arch-code SError handler to take errors from EL2, in which
-> >> case this barrier can disappear.
-> >> (note to self: guest may still own the debug hardware)
-> >>
-> > 
-> > ok, thanks for your detailed explanation.  I didn't consider that the
-> > classification of a RAS error as containable vs. non-containable
-> > depended on where we take the exception.
+> On Tue, Oct 31, 2017 at 08:11:30AM -0500, Alex Elder wrote:
+>> No Qualcomm SoC requires the "phy-msm-usb.c" USB phy driver support
+>> any more, so remove the code.
+>>
+>> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+>> Signed-off-by: Alex Elder <elder@linaro.org>
+>> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+>> Acked-by: Andy Gross <andy.gross@linaro.org>
+>> ---
+> <snip>
 > 
-> Will makes the point over on patch 11 that until we have different handling for
-> these different classifications of error, there isn't much point doing this now.
-> (i.e. we treat an error generated here, or when we enter the guest in the same way).
+>> -#include <linux/usb/msm_hsusb_hw.h>
 > 
-> I was trying to keep my eye on what we need for kernel-first support, so we
-> don't have to change the code twice, we just expand the error handling to do better.
+> This file and ehci-msm.c were the last consumers of this header, so it
+> too can now be deleted. Has your series been picked up yet? If so I or
+> someone can send a follow-up patch.
 
-I figured as much...
+Thanks for pointing that out!  I'll post a new patch now
+to remove it.
 
+					-Alex
 > 
-> I'll drop this patch for now, it will come back if/when we get kernel-first
-> support for RAS.
-
-Either way is fine from my point of view.
+> Jack
 > 
-> 
-> What about firmware-first? Firmware can always take these errors when the normal
-> world is running. Dropping the barrier means its up to the CPU when any error
-> gets reported, if firmware has to use NOTIFY_SEI it will have to do a reboot if
-> the error occurs during world-switch (as SError is masked). If an error spreads
-> over this boundary, that's just tough-luck, the kernel would have panic'd anyway.
-> 
-> 
-
-Does a non-secure esb() cause the error to be delivered to firmware on
-the secure side if anything is pending?
-
-I'm not sure I fully understand the interaction between issuing an
-esb() in non-secure and firmware handling a RAS error; I thought there
-would be none, and that this was only for kernel-first ?
-
-Thanks,
--Christoffer
