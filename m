@@ -1,27 +1,47 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Fri, 3 Nov 2017 13:18:23 -0700
-Subject: [PATCH 07/15] arm64: use -mno-implicit-float instead of
- -mgeneral-regs-only
-In-Reply-To: <CAGXu5jLAb+Jj7x8p0mizewoOHuQVqup9DxHkvgqkQFeB5cJo9w@mail.gmail.com>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103171203.107569-9-samitolvanen@google.com>
- <20171103183156.ando3jj5pl2hfk5j@lakrids.cambridge.arm.com>
- <20171103185222.k3c5kjo5m7dqieyg@lakrids.cambridge.arm.com>
- <CAGXu5jLAb+Jj7x8p0mizewoOHuQVqup9DxHkvgqkQFeB5cJo9w@mail.gmail.com>
-Message-ID: <20171103201823.GB137924@samitolvanen.mtv.corp.google.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Fri, 03 Nov 2017 13:18:28 -0700
+Subject: [PATCH 12/12] hwrng: bcm63xx-rng: Remove since bcm2835-rng takes
+ over
+In-Reply-To: <20171102010408.27736-13-f.fainelli@gmail.com>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+ <20171102010408.27736-13-f.fainelli@gmail.com>
+Message-ID: <877ev7ru97.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 12:06:15PM -0700, Kees Cook wrote:
-> Should a clang version test be included, since we know at least 5.0 is
-> need (with this fix)? There are distros with much earlier versions of
-> clang, for example...
+Florian Fainelli <f.fainelli@gmail.com> writes:
 
-Greg knows better, but I remember him mentioning that upstream clang
-doesn't generate any worse code with -mno-implicit-float, so there should
-be no harm in using this workaround with all versions.
+> bcm2835-rng is now capable of supporting the BCM63xx hardware, so remove
+> the driver which duplicates the same functionality.
+>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  drivers/char/hw_random/Kconfig       |  13 ---
+>  drivers/char/hw_random/Makefile      |   1 -
+>  drivers/char/hw_random/bcm63xx-rng.c | 154 -----------------------------------
+>  3 files changed, 168 deletions(-)
+>  delete mode 100644 drivers/char/hw_random/bcm63xx-rng.c
+>
 
-This might change in future, of course, so I don't have objections to
-adding a check for clang version < 6.0 here.
+> diff --git a/drivers/char/hw_random/bcm63xx-rng.c b/drivers/char/hw_random/bcm63xx-rng.c
+> deleted file mode 100644
+> index 5132c9cde50d..000000000000
+> --- a/drivers/char/hw_random/bcm63xx-rng.c
+> +++ /dev/null
 
-Sami
+> -static int bcm63xx_rng_data_present(struct hwrng *rng, int wait)
+> -{
+> -	struct bcm63xx_rng_priv *priv = to_rng_priv(rng);
+> -
+> -	return __raw_readl(priv->regs + RNG_STAT) & RNG_AVAIL_MASK;
+> -}
+
+It looks like this method isn't in the 2835 implementation.  Should it
+get ported over?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171103/869b7075/attachment.sig>
