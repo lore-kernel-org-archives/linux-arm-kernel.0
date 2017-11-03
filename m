@@ -1,49 +1,52 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  3 Nov 2017 14:47:46 +0000
-Subject: [PATCH v4 09/20] firmware: arm_scmi: add initial support for sensor
- protocol
+Date: Fri,  3 Nov 2017 14:47:41 +0000
+Subject: [PATCH v4 04/20] firmware: arm_scmi: add common infrastructure and
+ support for base protocol
 In-Reply-To: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
 References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1509720477-18936-10-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1509720477-18936-5-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The sensor protocol provides functions to manage platform sensors, and
-provides the commands to describe the protocol version and the various
-attribute flags. It also provides commands to discover various sensors
-implemented and managed by the platform, read any sensor synchronously
-or asynchronously as allowed by the platform, program sensor attributes
-and/or configurations, if applicable.
+The base protocol describes the properties of the implementation and
+provide generic error management. The base protocol provides commands
+to describe protocol version, discover implementation specific
+attributes and vendor/sub-vendor identification, list of protocols
+implemented and the various agents are in the system including OSPM
+and the platform. It also supports registering for notifications of
+platform errors.
 
-This patch adds support for most of the above features.
+This protocol is mandatory. This patch adds support for the same along
+with some basic infrastructure to add support for other protocols.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scmi/Makefile  |   2 +-
- drivers/firmware/arm_scmi/sensors.c | 302 ++++++++++++++++++++++++++++++++++++
- include/linux/scmi_protocol.h       |  42 +++++
- 3 files changed, 345 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/arm_scmi/sensors.c
+ drivers/firmware/arm_scmi/Makefile |   3 +-
+ drivers/firmware/arm_scmi/base.c   | 293 +++++++++++++++++++++++++++++++++++++
+ drivers/firmware/arm_scmi/common.h |  37 +++++
+ drivers/firmware/arm_scmi/driver.c |  53 +++++++
+ include/linux/scmi_protocol.h      |  37 +++++
+ 5 files changed, 422 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/firmware/arm_scmi/base.c
 
 diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-index 420c761ced94..3236890905b9 100644
+index b2a24ba2b636..5d9c7ef35f0f 100644
 --- a/drivers/firmware/arm_scmi/Makefile
 +++ b/drivers/firmware/arm_scmi/Makefile
-@@ -1,4 +1,4 @@
- obj-y	= scmi-bus.o scmi-driver.o scmi-protocols.o
- scmi-bus-y = bus.o
+@@ -1,2 +1,3 @@
+-obj-y	= scmi-driver.o
++obj-y	= scmi-driver.o scmi-protocols.o
  scmi-driver-y = driver.o
--scmi-protocols-y = base.o clock.o perf.o power.o
-+scmi-protocols-y = base.o clock.o perf.o power.o sensors.o
-diff --git a/drivers/firmware/arm_scmi/sensors.c b/drivers/firmware/arm_scmi/sensors.c
++scmi-protocols-y = base.o
+diff --git a/drivers/firmware/arm_scmi/base.c b/drivers/firmware/arm_scmi/base.c
 new file mode 100644
-index 000000000000..aee38d3d1c2d
+index 000000000000..2b5fbb724899
 --- /dev/null
-+++ b/drivers/firmware/arm_scmi/sensors.c
-@@ -0,0 +1,302 @@
++++ b/drivers/firmware/arm_scmi/base.c
+@@ -0,0 +1,293 @@
 +/*
-+ * System Control and Management Interface (SCMI) Sensor Protocol
++ * System Control and Management Interface (SCMI) Base Protocol
 + *
 + * Copyright (C) 2017 ARM Ltd.
 + *
@@ -62,169 +65,230 @@ index 000000000000..aee38d3d1c2d
 +
 +#include "common.h"
 +
-+enum scmi_sensor_protocol_cmd {
-+	SENSOR_DESCRIPTION_GET = 0x3,
-+	SENSOR_CONFIG_SET = 0x4,
-+	SENSOR_TRIP_POINT_SET = 0x5,
-+	SENSOR_READING_GET = 0x6,
++enum scmi_base_protocol_cmd {
++	BASE_DISCOVER_VENDOR = 0x3,
++	BASE_DISCOVER_SUB_VENDOR = 0x4,
++	BASE_DISCOVER_IMPLEMENT_VERSION = 0x5,
++	BASE_DISCOVER_LIST_PROTOCOLS = 0x6,
++	BASE_DISCOVER_AGENT = 0x7,
++	BASE_NOTIFY_ERRORS = 0x8,
 +};
 +
-+struct scmi_msg_resp_sensor_attributes {
-+	__le16 num_sensors;
-+	    u8 max_requests;
-+	    u8 reserved;
-+	__le32 reg_addr_low;
-+	__le32 reg_addr_high;
-+	__le32 reg_size;
++struct scmi_msg_resp_base_attributes {
++	    u8 num_protocols;
++	    u8 num_agents;
++	__le16 reserved;
 +};
 +
-+struct scmi_msg_resp_sensor_description {
-+	__le16 num_returned;
-+	__le16 num_remaining;
-+	struct {
-+		__le32 id;
-+		__le32 attributes_low;
-+#define SUPPORTS_ASYNC_READ(x)	((x) & BIT(31))
-+#define NUM_TRIP_POINTS(x)	(((x) >> 4) & 0xff)
-+		__le32 attributes_high;
-+#define SENSOR_TYPE(x)		((x) & 0xff)
-+#define SENSOR_SCALE(x)		(((x) >> 11) & 0x3f)
-+#define SENSOR_UPDATE_SCALE(x)	(((x) >> 22) & 0x1f)
-+#define SENSOR_UPDATE_BASE(x)	(((x) >> 27) & 0x1f)
-+		    u8 name[SCMI_MAX_STR_SIZE];
-+	} desc[0];
-+};
-+
-+struct scmi_msg_set_sensor_config {
-+	__le32 id;
-+	__le32 event_control;
-+};
-+
-+struct scmi_msg_set_sensor_trip_point {
-+	__le32 id;
-+	__le32 event_control;
-+#define SENSOR_TP_EVENT_MASK	(0x3)
-+#define SENSOR_TP_DISABLED	0x0
-+#define SENSOR_TP_POSITIVE	0x1
-+#define SENSOR_TP_NEGATIVE	0x2
-+#define SENSOR_TP_BOTH		0x3
-+#define SENSOR_TP_ID(x)		(((x) & 0xff) << 4)
-+	__le32 value_low;
-+	__le32 value_high;
-+};
-+
-+struct scmi_msg_sensor_reading_get {
-+	__le32 id;
-+	__le32 flags;
-+#define SENSOR_READ_ASYNC	BIT(0)
-+};
-+
-+struct sensors_info {
-+	int num_sensors;
-+	int max_requests;
-+	u64 reg_addr;
-+	u32 reg_size;
-+	struct scmi_sensor_info *sensors;
-+};
-+
-+static int scmi_sensor_attributes_get(const struct scmi_handle *handle,
-+				      struct sensors_info *si)
++/**
++ * scmi_base_attributes_get() - gets the implementation details
++ *	that are associated with the base protocol.
++ *
++ * @handle - SCMI entity handle
++ *
++ * Return: 0 on success, else appropriate SCMI error.
++ */
++static int scmi_base_attributes_get(const struct scmi_handle *handle)
 +{
 +	int ret;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_resp_sensor_attributes *attr;
++	struct scmi_msg_resp_base_attributes *attr_info;
++	struct scmi_revision_info *rev = handle->version;
 +
 +	ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
-+				 SCMI_PROTOCOL_SENSOR, 0, sizeof(*attr), &t);
++				 SCMI_PROTOCOL_BASE, 0, sizeof(*attr_info), &t);
 +	if (ret)
 +		return ret;
 +
-+	attr = t->rx.buf;
-+
 +	ret = scmi_do_xfer(handle, t);
 +	if (!ret) {
-+		si->num_sensors = le16_to_cpu(attr->num_sensors);
-+		si->max_requests = attr->max_requests;
-+		si->reg_addr = le32_to_cpu(attr->reg_addr_low) |
-+				(u64)le32_to_cpu(attr->reg_addr_high) << 32;
-+		si->reg_size = le32_to_cpu(attr->reg_size);
++		attr_info = t->rx.buf;
++		rev->num_protocols = attr_info->num_protocols;
++		rev->num_agents = attr_info->num_agents;
 +	}
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+static int scmi_sensor_description_get(const struct scmi_handle *handle,
-+				       struct sensors_info *si)
++/**
++ * scmi_base_vendor_id_get() - gets vendor/subvendor identifier ASCII string.
++ *
++ * @handle - SCMI entity handle
++ * @sub_vendor - specify true if sub-vendor ID is needed
++ *
++ * Return: 0 on success, else appropriate SCMI error.
++ */
++static int
++scmi_base_vendor_id_get(const struct scmi_handle *handle, bool sub_vendor)
 +{
-+	int ret, cnt;
-+	u32 desc_index = 0;
-+	u16 num_returned, num_remaining;
++	u8 cmd;
++	int ret, size;
++	char *vendor_id;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_resp_sensor_description *buf;
++	struct scmi_revision_info *rev = handle->version;
 +
-+	ret = scmi_one_xfer_init(handle, SENSOR_DESCRIPTION_GET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(__le32), 0, &t);
++	if (sub_vendor) {
++		cmd = BASE_DISCOVER_SUB_VENDOR;
++		vendor_id = rev->sub_vendor_id;
++		size = ARRAY_SIZE(rev->sub_vendor_id);
++	} else {
++		cmd = BASE_DISCOVER_VENDOR;
++		vendor_id = rev->vendor_id;
++		size = ARRAY_SIZE(rev->vendor_id);
++	}
++
++	ret = scmi_one_xfer_init(handle, cmd, SCMI_PROTOCOL_BASE, 0, size, &t);
 +	if (ret)
 +		return ret;
 +
-+	buf = t->rx.buf;
++	ret = scmi_do_xfer(handle, t);
++	if (!ret)
++		memcpy(vendor_id, t->rx.buf, size);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++/**
++ * scmi_base_implementation_version_get() - gets a vendor-specific
++ *	implementation 32-bit version. The format of the version number is
++ *	vendor-specific
++ *
++ * @handle - SCMI entity handle
++ *
++ * Return: 0 on success, else appropriate SCMI error.
++ */
++static int
++scmi_base_implementation_version_get(const struct scmi_handle *handle)
++{
++	int ret;
++	__le32 *impl_ver;
++	struct scmi_xfer *t;
++	struct scmi_revision_info *rev = handle->version;
++
++	ret = scmi_one_xfer_init(handle, BASE_DISCOVER_IMPLEMENT_VERSION,
++				 SCMI_PROTOCOL_BASE, 0, sizeof(*impl_ver), &t);
++	if (ret)
++		return ret;
++
++	ret = scmi_do_xfer(handle, t);
++	if (!ret) {
++		impl_ver = t->rx.buf;
++		rev->impl_ver = le32_to_cpu(*impl_ver);
++	}
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++/**
++ * scmi_base_implementation_list_get() - gets the list of protocols it is
++ *	OSPM is allowed to access
++ *
++ * @handle - SCMI entity handle
++ * @protocols_imp - pointer to hold the list of protocol identifiers
++ *
++ * Return: 0 on success, else appropriate SCMI error.
++ */
++static int scmi_base_implementation_list_get(const struct scmi_handle *handle,
++					     u8 *protocols_imp)
++{
++	u8 *list;
++	int ret, loop;
++	struct scmi_xfer *t;
++	__le32 *num_skip, *num_ret;
++	u32 tot_num_ret = 0, loop_num_ret;
++	struct device *dev = handle->dev;
++
++	ret = scmi_one_xfer_init(handle, BASE_DISCOVER_LIST_PROTOCOLS,
++				 SCMI_PROTOCOL_BASE, sizeof(*num_skip), 0, &t);
++	if (ret)
++		return ret;
++
++	num_skip = t->tx.buf;
++	num_ret = t->rx.buf;
++	list = t->rx.buf + sizeof(*num_ret);
 +
 +	do {
-+		/* Set the number of sensors to be skipped/already read */
-+		*(__le32 *)t->tx.buf = cpu_to_le32(desc_index);
++		/* Set the number of protocols to be skipped/already read */
++		*num_skip = cpu_to_le32(tot_num_ret);
 +
 +		ret = scmi_do_xfer(handle, t);
 +		if (ret)
 +			break;
 +
-+		num_returned = le16_to_cpu(buf->num_returned);
-+		num_remaining = le16_to_cpu(buf->num_remaining);
-+
-+		if (desc_index + num_returned > si->num_sensors) {
-+			dev_err(handle->dev, "No. of sensors can't exceed %d",
-+				si->num_sensors);
++		loop_num_ret = le32_to_cpu(*num_ret);
++		if (tot_num_ret + loop_num_ret > MAX_PROTOCOLS_IMP) {
++			dev_err(dev, "No. of Protocol > MAX_PROTOCOLS_IMP");
 +			break;
 +		}
 +
-+		for (cnt = 0; cnt < num_returned; cnt++) {
-+			u32 attrh;
-+			struct scmi_sensor_info *s;
++		for (loop = 0; loop < loop_num_ret; loop++)
++			protocols_imp[tot_num_ret + loop] = *(list + loop);
 +
-+			attrh = le32_to_cpu(buf->desc[cnt].attributes_high);
-+			s = &si->sensors[desc_index + cnt];
-+			s->id = le32_to_cpu(buf->desc[cnt].id);
-+			s->type = SENSOR_TYPE(attrh);
-+			memcpy(s->name, buf->desc[cnt].name, SCMI_MAX_STR_SIZE);
-+		}
-+
-+		desc_index += num_returned;
-+		/*
-+		 * check for both returned and remaining to avoid infinite
-+		 * loop due to buggy firmware
-+		 */
-+	} while (num_returned && num_remaining);
++		tot_num_ret += loop_num_ret;
++	} while (loop_num_ret);
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
++/**
++ * scmi_base_discover_agent_get() - discover the name of an agent
++ *
++ * @handle - SCMI entity handle
++ * @id - Agent identifier
++ * @name - Agent identifier ASCII string
++ *
++ * An agent id of 0 is reserved to identify the platform itself.
++ * Generally operating system is represented as "OSPM"
++ *
++ * Return: 0 on success, else appropriate SCMI error.
++ */
++static int scmi_base_discover_agent_get(const struct scmi_handle *handle,
++					int id, char *name)
++{
++	int ret;
++	struct scmi_xfer *t;
++
++	ret = scmi_one_xfer_init(handle, BASE_DISCOVER_AGENT,
++				 SCMI_PROTOCOL_BASE, sizeof(__le32),
++				 SCMI_MAX_STR_SIZE, &t);
++	if (ret)
++		return ret;
++
++	*(__le32 *)t->tx.buf = cpu_to_le32(id);
++
++	ret = scmi_do_xfer(handle, t);
++	if (!ret)
++		memcpy(name, t->rx.buf, SCMI_MAX_STR_SIZE);
++
++	scmi_one_xfer_put(handle, t);
++	return ret;
++}
++
++/**
++ * scmi_base_error_notifications_enable() - register/unregister for
++ *	notifications of errors in the platform
++ *
++ * @handle - SCMI entity handle
++ * @enable - Enable/Disable the notification
++ *
++ * Return: 0 on success, else appropriate SCMI error.
++ */
 +static int
-+scmi_sensor_configuration_set(const struct scmi_handle *handle, u32 sensor_id)
++scmi_base_error_notifications_enable(const struct scmi_handle *handle, bool en)
 +{
 +	int ret;
-+	u32 evt_cntl = BIT(0);
 +	struct scmi_xfer *t;
-+	struct scmi_msg_set_sensor_config *cfg;
 +
-+	ret = scmi_one_xfer_init(handle, SENSOR_CONFIG_SET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(*cfg), 0, &t);
++	ret = scmi_one_xfer_init(handle, BASE_NOTIFY_ERRORS, SCMI_PROTOCOL_BASE,
++				 sizeof(__le32), 0, &t);
 +	if (ret)
 +		return ret;
 +
-+	cfg = t->tx.buf;
-+	cfg->id = cpu_to_le32(sensor_id);
-+	cfg->event_control = cpu_to_le32(evt_cntl);
++	*(__le32 *)t->tx.buf = cpu_to_le32(en & BIT(0));
 +
 +	ret = scmi_do_xfer(handle, t);
 +
@@ -232,188 +296,253 @@ index 000000000000..aee38d3d1c2d
 +	return ret;
 +}
 +
-+static int scmi_sensor_trip_point_set(const struct scmi_handle *handle,
-+				      u32 sensor_id, u8 trip_id, u64 trip_value)
++int scmi_base_protocol_init(struct scmi_handle *h)
 +{
-+	int ret;
-+	u32 evt_cntl = SENSOR_TP_BOTH;
-+	struct scmi_xfer *t;
-+	struct scmi_msg_set_sensor_trip_point *trip;
++	int id, ret;
++	u8 *prot_imp;
++	u32 version;
++	char name[SCMI_MAX_STR_SIZE];
++	const struct scmi_handle *handle = h;
++	struct device *dev = handle->dev;
++	struct scmi_revision_info *rev = handle->version;
 +
-+	ret = scmi_one_xfer_init(handle, SENSOR_TRIP_POINT_SET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(*trip), 0, &t);
++	ret = scmi_version_get(handle, SCMI_PROTOCOL_BASE, &version);
 +	if (ret)
 +		return ret;
 +
-+	trip = t->tx.buf;
-+	trip->id = cpu_to_le32(sensor_id);
-+	trip->event_control = cpu_to_le32(evt_cntl | SENSOR_TP_ID(trip_id));
-+	trip->value_low = cpu_to_le32(trip_value & 0xffffffff);
-+	trip->value_high = cpu_to_le32(trip_value >> 32);
++	prot_imp = devm_kcalloc(dev, MAX_PROTOCOLS_IMP, sizeof(u8), GFP_KERNEL);
++	if (!prot_imp)
++		return -ENOMEM;
 +
-+	ret = scmi_do_xfer(handle, t);
++	rev->major_ver = PROTOCOL_REV_MAJOR(version),
++	rev->minor_ver = PROTOCOL_REV_MINOR(version);
 +
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
++	scmi_base_attributes_get(handle);
++	scmi_base_vendor_id_get(handle, false);
++	scmi_base_vendor_id_get(handle, true);
++	scmi_base_implementation_version_get(handle);
++	scmi_base_implementation_list_get(handle, prot_imp);
++	scmi_base_error_notifications_enable(handle, true);
++	scmi_setup_protocol_implemented(handle, prot_imp);
++
++	dev_info(dev, "SCMI Protocol v%d.%d '%s:%s' Firmware version 0x%x\n",
++		 rev->major_ver, rev->minor_ver, rev->vendor_id,
++		 rev->sub_vendor_id, rev->impl_ver);
++	dev_dbg(dev, "Found %d protocol(s) %d agent(s)\n", rev->num_protocols,
++		rev->num_agents);
++
++	for (id = 0; id < rev->num_agents; id++) {
++		scmi_base_discover_agent_get(handle, id, name);
++		dev_dbg(dev, "Agent %d: %s\n", id, name);
++	}
++
++	return 0;
 +}
+diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
+index cdfc43427c3c..bc767f4997e0 100644
+--- a/drivers/firmware/arm_scmi/common.h
++++ b/drivers/firmware/arm_scmi/common.h
+@@ -19,9 +19,41 @@
+  */
+ 
+ #include <linux/completion.h>
++#include <linux/device.h>
++#include <linux/errno.h>
++#include <linux/kernel.h>
+ #include <linux/scmi_protocol.h>
+ #include <linux/types.h>
+ 
++#define PROTOCOL_REV_MINOR_BITS	16
++#define PROTOCOL_REV_MINOR_MASK	((1U << PROTOCOL_REV_MINOR_BITS) - 1)
++#define PROTOCOL_REV_MAJOR(x)	((x) >> PROTOCOL_REV_MINOR_BITS)
++#define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
++#define MAX_PROTOCOLS_IMP	16
 +
-+static int scmi_sensor_reading_get(const struct scmi_handle *handle,
-+				   u32 sensor_id, bool async, u64 *value)
++enum scmi_common_cmd {
++	PROTOCOL_VERSION = 0x0,
++	PROTOCOL_ATTRIBUTES = 0x1,
++	PROTOCOL_MESSAGE_ATTRIBUTES = 0x2,
++};
++
++/**
++ * struct scmi_msg_resp_prot_version - Response for a message
++ *
++ * @major_version: Major version of the ABI that firmware supports
++ * @minor_version: Minor version of the ABI that firmware supports
++ *
++ * In general, ABI version changes follow the rule that minor version increments
++ * are backward compatible. Major revision changes in ABI may not be
++ * backward compatible.
++ *
++ * Response to a generic message with message type SCMI_MSG_VERSION
++ */
++struct scmi_msg_resp_prot_version {
++	__le16 minor_version;
++	__le16 major_version;
++};
++
+ /**
+  * struct scmi_msg_hdr - Message(Tx/Rx) header
+  *
+@@ -75,3 +107,8 @@ int scmi_one_xfer_init(const struct scmi_handle *h, u8 msg_id, u8 prot_id,
+ 		       size_t tx_size, size_t rx_size, struct scmi_xfer **p);
+ int scmi_handle_put(const struct scmi_handle *handle);
+ struct scmi_handle *scmi_handle_get(struct device *dev);
++int scmi_version_get(const struct scmi_handle *h, u8 protocol, u32 *version);
++void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
++				     u8 *prot_imp);
++
++int scmi_base_protocol_init(struct scmi_handle *h);
+diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+index 58d8f88893e6..20d083be474c 100644
+--- a/drivers/firmware/arm_scmi/driver.c
++++ b/drivers/firmware/arm_scmi/driver.c
+@@ -108,21 +108,27 @@ struct scmi_desc {
+  * @dev: Device pointer
+  * @desc: SoC description for this instance
+  * @handle: Instance of SCMI handle to send to clients
++ * @version: SCMI revision information containing protocol version,
++ *	implementation version and (sub-)vendor identification.
+  * @cl: Mailbox Client
+  * @tx_chan: Transmit mailbox channel
+  * @tx_payload: Transmit mailbox channel payload area
+  * @minfo: Message info
++ * @protocols_imp: list of protocols implemented, currently maximum of
++ *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
+  * @node: list head
+  * @users: Number of users of this instance
+  */
+ struct scmi_info {
+ 	struct device *dev;
+ 	const struct scmi_desc *desc;
++	struct scmi_revision_info version;
+ 	struct scmi_handle handle;
+ 	struct mbox_client cl;
+ 	struct mbox_chan *tx_chan;
+ 	void __iomem *tx_payload;
+ 	struct scmi_xfers_info minfo;
++	u8 *protocols_imp;
+ 	struct list_head node;
+ 	int users;
+ };
+@@ -450,6 +456,45 @@ int scmi_one_xfer_init(const struct scmi_handle *handle, u8 msg_id, u8 prot_id,
+ }
+ 
+ /**
++ * scmi_version_get() - command to get the revision of the SCMI entity
++ *
++ * @handle: Handle to SCMI entity information
++ *
++ * Updates the SCMI information in the internal data structure.
++ *
++ * Return: 0 if all went fine, else return appropriate error.
++ */
++int scmi_version_get(const struct scmi_handle *handle, u8 protocol,
++		     u32 *version)
 +{
 +	int ret;
++	__le32 *rev_info;
 +	struct scmi_xfer *t;
-+	struct scmi_msg_sensor_reading_get *sensor;
 +
-+	ret = scmi_one_xfer_init(handle, SENSOR_READING_GET,
-+				 SCMI_PROTOCOL_SENSOR, sizeof(*sensor),
-+				 sizeof(u64), &t);
++	ret = scmi_one_xfer_init(handle, PROTOCOL_VERSION, protocol, 0,
++				 sizeof(*version), &t);
 +	if (ret)
 +		return ret;
-+
-+	sensor = t->tx.buf;
-+	sensor->id = cpu_to_le32(sensor_id);
-+	sensor->flags = cpu_to_le32(async ? SENSOR_READ_ASYNC : 0);
 +
 +	ret = scmi_do_xfer(handle, t);
 +	if (!ret) {
-+		__le32 *pval = t->rx.buf;
-+
-+		*value = le32_to_cpu(*pval);
-+		*value |= (u64)le32_to_cpu(*(pval + 1)) << 32;
++		rev_info = t->rx.buf;
++		*version = le32_to_cpu(*rev_info);
 +	}
 +
 +	scmi_one_xfer_put(handle, t);
 +	return ret;
 +}
 +
-+static const struct scmi_sensor_info *
-+scmi_sensor_info_get(const struct scmi_handle *handle, u32 sensor_id)
++void scmi_setup_protocol_implemented(const struct scmi_handle *handle,
++				     u8 *prot_imp)
 +{
-+	struct sensors_info *si = handle->sensor_priv;
++	struct scmi_info *info = handle_to_scmi_info(handle);
 +
-+	return si->sensors + sensor_id;
++	info->protocols_imp = prot_imp;
 +}
-+
-+static int scmi_sensor_count_get(const struct scmi_handle *handle)
-+{
-+	struct sensors_info *si = handle->sensor_priv;
-+
-+	return si->num_sensors;
-+}
-+
-+static struct scmi_sensor_ops sensor_ops = {
-+	.count_get = scmi_sensor_count_get,
-+	.info_get = scmi_sensor_info_get,
-+	.configuration_set = scmi_sensor_configuration_set,
-+	.trip_point_set = scmi_sensor_trip_point_set,
-+	.reading_get = scmi_sensor_reading_get,
-+};
-+
-+static int scmi_sensors_protocol_init(struct scmi_handle *handle)
-+{
-+	u32 version;
-+	struct sensors_info *sinfo;
-+
-+	scmi_version_get(handle, SCMI_PROTOCOL_SENSOR, &version);
-+
-+	dev_dbg(handle->dev, "Sensor Version %d.%d\n",
-+		PROTOCOL_REV_MAJOR(version), PROTOCOL_REV_MINOR(version));
-+
-+	sinfo = devm_kzalloc(handle->dev, sizeof(*sinfo), GFP_KERNEL);
-+	if (!sinfo)
-+		return -ENOMEM;
-+
-+	scmi_sensor_attributes_get(handle, sinfo);
-+
-+	sinfo->sensors = devm_kcalloc(handle->dev, sinfo->num_sensors,
-+				      sizeof(*sinfo->sensors), GFP_KERNEL);
-+	if (!sinfo->sensors)
-+		return -ENOMEM;
-+
-+	scmi_sensor_description_get(handle, sinfo);
-+
-+	handle->sensor_ops = &sensor_ops;
-+	handle->sensor_priv = sinfo;
-+
-+	return 0;
-+}
-+
-+static int __init scmi_sensors_init(void)
-+{
-+	return scmi_protocol_register(SCMI_PROTOCOL_SENSOR,
-+				      &scmi_sensors_protocol_init);
-+}
-+subsys_initcall(scmi_sensors_init);
-diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-index 95a645f9039d..70e2993f6d48 100644
---- a/include/linux/scmi_protocol.h
-+++ b/include/linux/scmi_protocol.h
-@@ -138,6 +138,45 @@ struct scmi_power_ops {
- 	int (*state_notify_enable)(const struct scmi_handle *, u32, bool);
- };
- 
-+struct scmi_sensor_info {
-+	u32 id;
-+	u8 type;
-+	char name[SCMI_MAX_STR_SIZE];
-+};
-+
-+/*
-+ * Partial list from Distributed Management Task Force (DMTF) specification:
-+ * DSP0249 (Platform Level Data Model specification)
-+ */
-+enum scmi_sensor_class {
-+	NONE = 0x0,
-+	TEMPERATURE_C = 0x2,
-+	VOLTAGE = 0x5,
-+	CURRENT = 0x6,
-+	POWER = 0x7,
-+	ENERGY = 0x8,
-+};
 +
 +/**
-+ * struct scmi_sensor_ops - represents the various operations provided
-+ *	by SCMI Sensor Protocol
+  * scmi_handle_get() - Get the  SCMI handle for a device
+  *
+  * @dev: pointer to device for which we want SCMI handle
+@@ -679,11 +724,19 @@ static int scmi_probe(struct platform_device *pdev)
+ 
+ 	handle = &info->handle;
+ 	handle->dev = info->dev;
++	handle->version = &info->version;
+ 
+ 	ret = scmi_mbox_chan_setup(info);
+ 	if (ret)
+ 		return ret;
+ 
++	ret = scmi_base_protocol_init(handle);
++	if (ret) {
++		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
++		scmi_mbox_free_channel(info);
++		return ret;
++	}
++
+ 	mutex_lock(&scmi_list_mutex);
+ 	list_add_tail(&info->node, &scmi_list);
+ 	mutex_unlock(&scmi_list_mutex);
+diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
+index 854ed2479993..664da3d763f2 100644
+--- a/include/linux/scmi_protocol.h
++++ b/include/linux/scmi_protocol.h
+@@ -17,11 +17,48 @@
+  */
+ #include <linux/types.h>
+ 
++#define SCMI_MAX_STR_SIZE	16
++
++/**
++ * struct scmi_revision_info - version information structure
 + *
-+ * @count_get: get the count of sensors provided by SCMI
-+ * @info_get: get the information of the specified sensor
-+ * @configuration_set: control notifications on cross-over events for
-+ *	the trip-points
-+ * @trip_point_set: selects and configures a trip-point of interest
-+ * @reading_get: gets the current value of the sensor
++ * @major_ver: Major ABI version. Change here implies risk of backward
++ *	compatibility break.
++ * @minor_ver: Minor ABI version. Change here implies new feature addition,
++ *	or compatible change in ABI.
++ * @num_protocols: Number of protocols that are implemented, excluding the
++ *	base protocol.
++ * @num_agents: Number of agents in the system.
++ * @impl_ver: A vendor-specific implementation version.
++ * @vendor_id: A vendor identifier(Null terminated ASCII string)
++ * @sub_vendor_id: A sub-vendor identifier(Null terminated ASCII string)
 + */
-+struct scmi_sensor_ops {
-+	int (*count_get)(const struct scmi_handle *);
-+	const struct scmi_sensor_info *(*info_get)(const struct scmi_handle *,
-+						   u32);
-+	int (*configuration_set)(const struct scmi_handle *, u32);
-+	int (*trip_point_set)(const struct scmi_handle *, u32, u8, u64);
-+	int (*reading_get)(const struct scmi_handle *, u32, bool, u64 *);
++struct scmi_revision_info {
++	u16 major_ver;
++	u16 minor_ver;
++	u8 num_protocols;
++	u8 num_agents;
++	u32 impl_ver;
++	char vendor_id[SCMI_MAX_STR_SIZE];
++	char sub_vendor_id[SCMI_MAX_STR_SIZE];
 +};
 +
  /**
   * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
   *
-@@ -146,6 +185,7 @@ struct scmi_power_ops {
-  * @power_ops: pointer to set of power protocol operations
-  * @perf_ops: pointer to set of performance protocol operations
-  * @clk_ops: pointer to set of clock protocol operations
-+ * @sensor_ops: pointer to set of sensor protocol operations
+  * @dev: pointer to the SCMI device
++ * @version: pointer to the structure containing SCMI version information
   */
  struct scmi_handle {
  	struct device *dev;
-@@ -153,10 +193,12 @@ struct scmi_handle {
- 	struct scmi_perf_ops *perf_ops;
- 	struct scmi_clk_ops *clk_ops;
- 	struct scmi_power_ops *power_ops;
-+	struct scmi_sensor_ops *sensor_ops;
- 	/* for protocol internal use */
- 	void *perf_priv;
- 	void *clk_priv;
- 	void *power_priv;
-+	void *sensor_priv;
++	struct scmi_revision_info *version;
++};
++
++enum scmi_std_protocol {
++	SCMI_PROTOCOL_BASE = 0x10,
++	SCMI_PROTOCOL_POWER = 0x11,
++	SCMI_PROTOCOL_SYSTEM = 0x12,
++	SCMI_PROTOCOL_PERF = 0x13,
++	SCMI_PROTOCOL_CLOCK = 0x14,
++	SCMI_PROTOCOL_SENSOR = 0x15,
  };
- 
- enum scmi_std_protocol {
 -- 
 2.7.4
