@@ -1,50 +1,43 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Fri, 3 Nov 2017 18:40:47 +0300
-Subject: [PATCH v12 08/11] arm64/kasan: add and use kasan_map_populate()
-In-Reply-To: <a587687a-5d90-c03d-f3d2-1ea9cab1b0c4@oracle.com>
-References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
- <20171013173214.27300-9-pasha.tatashin@oracle.com>
- <0ae84532-8dcb-10aa-9d69-79d7025b089e@virtuozzo.com>
- <ad8c5715-dc4f-1fa7-c25b-e08df68643d0@oracle.com>
- <20171018170651.GG21820@arm.com>
- <e32c677e-62ac-8977-2f9d-7fe7bda4b547@oracle.com>
- <f1cb8d18-4d0f-1f88-c3c5-0add8c6c077a@virtuozzo.com>
- <a587687a-5d90-c03d-f3d2-1ea9cab1b0c4@oracle.com>
-Message-ID: <07ab0b77-0e2a-97b5-73ff-a6598bcb94cd@virtuozzo.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Fri, 3 Nov 2017 15:38:08 +0000
+Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20171103151711.GA22453@kroah.com>
+References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
+ <20170831160430.GB11200@kroah.com> <20171103151711.GA22453@kroah.com>
+Message-ID: <59FC8D60.6030708@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Greg,
 
+On 11/03/2017 05:17 PM, Greg KH wrote:
+> On Thu, Aug 31, 2017 at 06:04:30PM +0200, Greg KH wrote:
+>> On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
+>>> From: Stuart Yoder <stuart.yoder@nxp.com>
+>>>
+>>> Move the source files out of staging into their final locations:
+>>>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+>>>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+>>>    -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+>>>    -README.txt, providing and overview of DPAA goes to
+>>>     Documentation/dpaa2/overview.txt
+>>>
+>>> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+>>> Update dpaa2_eth and dpio staging drivers.
+>>>
+>>> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> This is going to have to wait until I get a chunk of time to do the
+>> review.  Probably after 4.13-final is out.
+>
+> Ok, review comments as I go through the code:
 
-On 10/18/2017 08:23 PM, Pavel Tatashin wrote:
-> Hi Andrew and Michal,
-> 
-> There are a few changes I need to do to my series:
-> 
-> 1. Replace these two patches:
-> 
-> arm64/kasan: add and use kasan_map_populate()
-> x86/kasan: add and use kasan_map_populate()
-> 
-> With:
-> 
-> x86/mm/kasan: don't use vmemmap_populate() to initialize
-> ?shadow
-> arm64/mm/kasan: don't use vmemmap_populate() to initialize
-> ?shadow
-> 
+Thanks a lot for taking the time. I'll take care of the comments next week.
 
-Pavel, could you please send the patches? These patches doesn't interfere with rest of the series,
-so I think it should be enough to send just two patches to replace the old ones.
-
-
-
-
-> 2. Fix a kbuild warning about section mismatch in
-> mm: deferred_init_memmap improvements
-> 
-> How should I proceed to get these replaced in mm-tree? Send three new patches, or send a new series?
-> 
-> Thank you,
-> Pavel
-> 
+---
+Best Regards, Laurentiu
