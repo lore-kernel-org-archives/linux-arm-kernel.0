@@ -1,28 +1,59 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Fri, 3 Nov 2017 06:28:26 -0700
-Subject: [PATCH v2] ata: fixes kernel crash while tracing
- ata_eh_link_autopsy event
-In-Reply-To: <1509620467-6679-1-git-send-email-rsahu@apm.com>
-References: <1509620467-6679-1-git-send-email-rsahu@apm.com>
-Message-ID: <20171103132826.GR3252168@devbig577.frc2.facebook.com>
+From: smueller@chronox.de (Stephan Mueller)
+Date: Fri, 03 Nov 2017 14:34:44 +0100
+Subject: [PATCH] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <20171103132016.GB8330@gondor.apana.org.au>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <5260911.ZuXsrgFD2R@positron.chronox.de>
+ <20171103132016.GB8330@gondor.apana.org.au>
+Message-ID: <1516308.8nf3SO2l11@tauon.chronox.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 04:31:07PM +0530, Rameshwar Prasad Sahu wrote:
-> When tracing ata link error event, the kernel crashes when the disk is
-> removed due to NULL pointer access by trace_ata_eh_link_autopsy API.
-> This occurs as the dev is NULL when the disk disappeared. This patch
-> fixes this crash by calling trace_ata_eh_link_autopsy only if "dev"
-> is not NULL.
+Am Freitag, 3. November 2017, 14:20:16 CET schrieb Herbert Xu:
+
+Hi Herbert,
+
+> On Sun, Oct 29, 2017 at 09:39:30PM +0100, Stephan M?ller wrote:
+> > Am Mittwoch, 25. Oktober 2017, 17:26:31 CET schrieb Romain Izard:
+> > 
+> > Hi Romain,
+> > 
+> > the patch below should cover the issue you see. Would you mind testing it?
+> > 
+> > Thanks
+> > Stephan
+> > 
+> > ---8<---
+> > 
+> > The code paths protected by the socket-lock do not use or modify the
+> > socket in a non-atomic fashion. The actions pertaining the socket do not
+> > even need to be handled as an atomic operation. Thus, the socket-lock
+> > can be safely ignored.
 > 
-> v2 changes:
->  Removed direct passing "link" pointer instead of "dev" in trace API.
+> Are you sure about that? In particular is the callback function still
+> sane without the socket lock if a concurrent recvmsg/sendmsg call is
+> made?
+
+resultlen receives its data from the async_request -> no socket
+
+af_alg_free_areq_sgls(areq) does not require a socket, but it uses the socket 
+to find the data structures -> I do not see that the socket is operated on 
+though. The socket will always be alive as the sk_refcnt is not yet 
+decremented by __sock_put.
+
+sock_kfree_s uses an atomic operation
+
+__sock_put uses an atomic operation
+
+iocb->ki_complete does not use the socket
+
+Where would you think that the lock is needed?
 > 
-> Signed-off-by: Rameshwar Prasad Sahu <rsahu@apm.com>
+> Your fixes header is wrong too as the locks weren't introduced in that
+> commit, they just got moved around.
 
-Applied to libata/for-4.15.
+Neither the skcipher_async_cb nor aead_async_cb up to and including 4.13 
+contain any lock.
 
-Thanks.
-
--- 
-tejun
+Ciao
+Stephan
