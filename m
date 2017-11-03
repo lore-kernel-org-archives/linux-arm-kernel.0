@@ -1,59 +1,43 @@
-From: smueller@chronox.de (Stephan Mueller)
-Date: Fri, 03 Nov 2017 14:34:44 +0100
-Subject: [PATCH] crypto: AF_ALG - remove locking in async callback
-In-Reply-To: <20171103132016.GB8330@gondor.apana.org.au>
-References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
- <5260911.ZuXsrgFD2R@positron.chronox.de>
- <20171103132016.GB8330@gondor.apana.org.au>
-Message-ID: <1516308.8nf3SO2l11@tauon.chronox.de>
+From: colin.king@canonical.com (Colin King)
+Date: Fri,  3 Nov 2017 13:35:25 +0000
+Subject: [PATCH] spi: s3c64xx: remove redundant pointer sci
+Message-ID: <20171103133525.8173-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 3. November 2017, 14:20:16 CET schrieb Herbert Xu:
+From: Colin Ian King <colin.king@canonical.com>
 
-Hi Herbert,
+The pointer sci is assigned but never read, hence it is redundant
+and can be removed. Cleans up clang warning:
 
-> On Sun, Oct 29, 2017 at 09:39:30PM +0100, Stephan M?ller wrote:
-> > Am Mittwoch, 25. Oktober 2017, 17:26:31 CET schrieb Romain Izard:
-> > 
-> > Hi Romain,
-> > 
-> > the patch below should cover the issue you see. Would you mind testing it?
-> > 
-> > Thanks
-> > Stephan
-> > 
-> > ---8<---
-> > 
-> > The code paths protected by the socket-lock do not use or modify the
-> > socket in a non-atomic fashion. The actions pertaining the socket do not
-> > even need to be handled as an atomic operation. Thus, the socket-lock
-> > can be safely ignored.
-> 
-> Are you sure about that? In particular is the callback function still
-> sane without the socket lock if a concurrent recvmsg/sendmsg call is
-> made?
+drivers/spi/spi-s3c64xx.c:791:2: warning: Value stored to 'sci' is
+never read
 
-resultlen receives its data from the async_request -> no socket
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/spi/spi-s3c64xx.c | 3 ---
+ 1 file changed, 3 deletions(-)
 
-af_alg_free_areq_sgls(areq) does not require a socket, but it uses the socket 
-to find the data structures -> I do not see that the socket is operated on 
-though. The socket will always be alive as the sk_refcnt is not yet 
-decremented by __sock_put.
-
-sock_kfree_s uses an atomic operation
-
-__sock_put uses an atomic operation
-
-iocb->ki_complete does not use the socket
-
-Where would you think that the lock is needed?
-> 
-> Your fixes header is wrong too as the locks weren't introduced in that
-> commit, they just got moved around.
-
-Neither the skcipher_async_cb nor aead_async_cb up to and including 4.13 
-contain any lock.
-
-Ciao
-Stephan
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index b392cca8fa4f..de7df20f8712 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -752,7 +752,6 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ {
+ 	struct s3c64xx_spi_csinfo *cs = spi->controller_data;
+ 	struct s3c64xx_spi_driver_data *sdd;
+-	struct s3c64xx_spi_info *sci;
+ 	int err;
+ 
+ 	sdd = spi_master_get_devdata(spi->master);
+@@ -788,8 +787,6 @@ static int s3c64xx_spi_setup(struct spi_device *spi)
+ 		spi_set_ctldata(spi, cs);
+ 	}
+ 
+-	sci = sdd->cntrlr_info;
+-
+ 	pm_runtime_get_sync(&sdd->pdev->dev);
+ 
+ 	/* Check if we can provide the requested rate */
+-- 
+2.14.1
