@@ -1,74 +1,143 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 3 Nov 2017 09:25:07 +0000
-Subject: [PATCH 1/2] arm64: Fix static use of function graph
-In-Reply-To: <20171102101831.GU9463@n2100.armlinux.org.uk>
-References: <1509546824-46165-1-git-send-email-julien.thierry@arm.com>
- <1509546824-46165-2-git-send-email-julien.thierry@arm.com>
- <20171102044306.GL10563@linaro.org>
- <20171102101831.GU9463@n2100.armlinux.org.uk>
-Message-ID: <46841fbe-a8d6-53cc-3cfb-e4cd10f630c3@arm.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Fri, 3 Nov 2017 09:37:02 +0000
+Subject: [RFCv2 PATCH 14/36] iommu/arm-smmu-v3: Add support for Substream
+ IDs
+In-Reply-To: <37a82eaa-dc9d-af98-6cb8-941ca925b838@huawei.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-15-jean-philippe.brucker@arm.com>
+ <5FC3163CFD30C246ABAA99954A238FA838454887@FRAEML521-MBX.china.huawei.com>
+ <20171102155152.GA11899@e106794-lin.localdomain>
+ <5FC3163CFD30C246ABAA99954A238FA838454A9B@FRAEML521-MBX.china.huawei.com>
+ <37a82eaa-dc9d-af98-6cb8-941ca925b838@huawei.com>
+Message-ID: <0d607058-9dd7-6564-316d-ebada8bff960@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 02/11/17 10:18, Russell King - ARM Linux wrote:
-> On Thu, Nov 02, 2017 at 01:43:07PM +0900, AKASHI Takahiro wrote:
->> On Wed, Nov 01, 2017 at 02:33:43PM +0000, Julien Thierry wrote:
->>> Function graph does not work currently when CONFIG_DYNAMIC_TRACE is not
->>> set. This is because ftrace_function_trace is not always set to ftrace_stub
->>> when function_graph is in use.
->>>
->>> Do not skip checking of graph tracer functions when ftrace_function_trace
->>> is set.
->>>
->>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
->>> Cc: Catalin Marinas <catalin.marinas@arm.com>
->>> Cc: Will Deacon <will.deacon@arm.com>
->>> Cc: Mark Rutland <mark.rutland@arm.com>
->>> Cc: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>
->> Reviewed-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>
->> I think that arm has the same issue, hoping the following patch
->> will fix it:
-
-Thanks for noticing this and for the patch. I'll re-spin a version for 
-this series and include your patch.
-
->> ===
->> >From e25bcf50d1acde698285a0c64f72d97f8b17e3fb Mon Sep 17 00:00:00 2001
->> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> Date: Thu, 2 Nov 2017 11:35:04 +0900
->> Subject: [PATCH] arm: ftrace: function_graph with DYNAMIC_FTRACE
->>
->> ---
->>   arch/arm/kernel/entry-ftrace.S | 12 +++++-------
->>   1 file changed, 5 insertions(+), 7 deletions(-)
->>
->> diff --git a/arch/arm/kernel/entry-ftrace.S b/arch/arm/kernel/entry-ftrace.S
->> index efcd9f25a14b..ef94c73ad996 100644
->> --- a/arch/arm/kernel/entry-ftrace.S
->> +++ b/arch/arm/kernel/entry-ftrace.S
->> @@ -68,8 +68,12 @@
->>   	ldr	r2, [r0]
->>   	adr	r0, .Lftrace_stub
->>   	cmp	r0, r2
->> -	bne	1f
->> +	beq	1f
->>   
->> + 	mcount_get_lr	r1			@ lr of instrumented func
->> +	mcount_adjust_addr	r0, lr		@ instrumented function
->> +	blx	r2
+On 03/11/17 05:45, Yisheng Xie wrote:
+> Hi Jean,
 > 
-> NAK.  Not all CPUs support "blx".  I don't see why you'd make this
-> gratuitous change when just moving code around.  Please separate
-> your changes in future.
+> On 2017/11/3 1:02, Shameerali Kolothum Thodi wrote:
+>>
+>>
+>>> -----Original Message-----
+>>> From: Jean-Philippe Brucker [mailto:Jean-Philippe.Brucker at arm.com]
+>>> Sent: Thursday, November 02, 2017 3:52 PM
+>>> To: Shameerali Kolothum Thodi <shameerali.kolothum.thodi@huawei.com>
+>>> Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org; linux-
+>>> acpi at vger.kernel.org; devicetree at vger.kernel.org; iommu at lists.linux-
+>>> foundation.org; Mark Rutland <Mark.Rutland@arm.com>; xieyisheng (A)
+>>> <xieyisheng1@huawei.com>; Gabriele Paoloni
+>>> <gabriele.paoloni@huawei.com>; Catalin Marinas
+>>> <Catalin.Marinas@arm.com>; Will Deacon <Will.Deacon@arm.com>;
+>>> okaya at codeaurora.org; yi.l.liu at intel.com; Lorenzo Pieralisi
+>>> <Lorenzo.Pieralisi@arm.com>; ashok.raj at intel.com; tn at semihalf.com;
+>>> joro at 8bytes.org; rfranz at cavium.com; lenb at kernel.org;
+>>> jacob.jun.pan at linux.intel.com; alex.williamson at redhat.com;
+>>> robh+dt at kernel.org; Leizhen (ThunderTown) <thunder.leizhen@huawei.com>;
+>>> bhelgaas at google.com; dwmw2 at infradead.org; liubo (CU)
+>>> <liubo95@huawei.com>; rjw at rjwysocki.net; robdclark at gmail.com;
+>>> hanjun.guo at linaro.org; Sudeep Holla <Sudeep.Holla@arm.com>; Robin
+>>> Murphy <Robin.Murphy@arm.com>; nwatters at codeaurora.org; Linuxarm
+>>> <linuxarm@huawei.com>
+>>> Subject: Re: [RFCv2 PATCH 14/36] iommu/arm-smmu-v3: Add support for
+>>> Substream IDs
+>>>
+>>> Hi Shameer,
+>>>
+>>> On Thu, Nov 02, 2017 at 12:49:32PM +0000, Shameerali Kolothum Thodi wrote:
+>>>> We had a go with this series on HiSIlicon D05 platform which doesn't have
+>>>> support for ssids/ATS/PRI, to make sure it generally works.
+>>>>
+>>>> But observed the below crash on boot,
+>>>>
+>>>> [   16.009084] WARNING: CPU: 59 PID: 391 at mm/page_alloc.c:3883
+>>> __alloc_pages_nodemask+0x19c/0xc48
+>>>> [   16.026797] Modules linked in:
+>>>> [   16.032944] CPU: 59 PID: 391 Comm: kworker/59:1 Not tainted 4.14.0-rc1-
+>>> 159539-ge42aca3 #236
+>>>> [...]
+>>>> [   16.068206] Workqueue: events deferred_probe_work_func
+>>>> [   16.078557] task: ffff8017d38a0000 task.stack: ffff00000b198000
+>>>> [   16.090486] PC is at __alloc_pages_nodemask+0x19c/0xc48
+>>>> [   16.101013] LR is at __alloc_pages_nodemask+0xe0/0xc48
+>>>> [   16.469220] [<ffff000008186b94>] __alloc_pages_nodemask+0x19c/0xc48
+>>>> [   16.481854] [<ffff0000081d65b0>] alloc_pages_current+0x80/0xcc
+>>>> [   16.493607] [<ffff000008182be8>] __get_free_pages+0xc/0x38
+>>>> [   16.504661] [<ffff0000083c4d58>] swiotlb_alloc_coherent+0x64/0x190
+>>>> [   16.517117] [<ffff00000809824c>] __dma_alloc+0x110/0x204
+>>>> [   16.527820] [<ffff00000858e850>] dmam_alloc_coherent+0x88/0xf0
+>>>> [   16.539575] [<ffff000008568884>]
+>>> arm_smmu_domain_finalise_s1+0x60/0x248
+>>>> [   16.552909] [<ffff00000856c104>] arm_smmu_attach_dev+0x264/0x300
+>>>> [   16.565013] [<ffff00000855d40c>] __iommu_attach_device+0x48/0x5c
+>>>> [   16.577117] [<ffff00000855e698>] iommu_group_add_device+0x144/0x3a4
+>>>> [   16.589746] [<ffff00000855ed18>] iommu_group_get_for_dev+0x70/0xf8
+>>>> [   16.602201] [<ffff00000856a314>] arm_smmu_add_device+0x1a4/0x418
+>>>> [   16.614308] [<ffff00000849dfcc>] iort_iommu_configure+0xf0/0x16c
+>>>> [   16.626416] [<ffff000008468c50>] acpi_dma_configure+0x30/0x70
+>>>> [   16.637994] [<ffff00000858f00c>] dma_configure+0xa8/0xd4
+>>>> [   16.648695] [<ffff00000857706c>] driver_probe_device+0x1a4/0x2dc
+>>>> [   16.673081] [<ffff0000085752c8>] bus_for_each_drv+0x54/0x94
+>>>> [   16.684307] [<ffff000008576db0>] __device_attach+0xc4/0x12c
+>>>> [   16.695533] [<ffff000008577350>] device_initial_probe+0x10/0x18
+>>>> [   16.707462] [<ffff0000085762b4>] bus_probe_device+0x90/0x98
+>>>>
+>>>> After a bit of debug it looks like on platforms where ssid is not supported,
+>>>> s1_cfg.num_contexts is set to zero and it eventually results in this crash
+>>>> in,
+>>>> arm_smmu_domain_finalise_s1() -->arm_smmu_alloc_cd_tables()-->
+>>>> arm_smmu_alloc_cd_leaf_table() as num_leaf_entries is zero.
+>>>>
+>>>> With the below fix, it works on D05 now,
+>>>>
+>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>>>> index 8ad90e2..51f5821 100644
+>>>> --- a/drivers/iommu/arm-smmu-v3.c
+>>>> +++ b/drivers/iommu/arm-smmu-v3.c
+>>>> @@ -2433,7 +2433,10 @@ static int arm_smmu_domain_finalise(struct
+>>> iommu_domain *domain,
+>>>>                         domain->min_pasid = 1;
+>>>>                         domain->max_pasid = master->num_ssids - 1;
+>>>>                         smmu_domain->s1_cfg.num_contexts = master->num_ssids;
+>>>> +               } else {
+>>>> +                       smmu_domain->s1_cfg.num_contexts = 1;
+>>>>                 }
+>>>> +
+>>>>                 smmu_domain->s1_cfg.can_stall = master->ste.can_stall;
+>>>>                 break;
+>>>>         case ARM_SMMU_DOMAIN_NESTED:
+>>>>
+>>>>
+>>>> I am not sure this is right place do this. Please take a look.
+>>>
+>>> Thanks for testing the series and reporting the bug. I added the
+>>> following patch to branch svm/current, does it work for you?
+>>
+>> Yes, it does.
+>>
+>> Thanks,
+>> Shameer
+>>  
+>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>>> index 42c8378624ed..edda466adc81 100644
+>>> --- a/drivers/iommu/arm-smmu-v3.c
+>>> +++ b/drivers/iommu/arm-smmu-v3.c
+>>> @@ -3169,9 +3169,7 @@ static int arm_smmu_add_device(struct device *dev)
+>>>                 }
+>>>         }
+>>>
+>>> -       if (smmu->ssid_bits)
+>>> -               master->num_ssids = 1 << min(smmu->ssid_bits,
+>>> -                                            fwspec->num_pasid_bits);
+>>> +       master->num_ssids = 1 << min(smmu->ssid_bits, fwspec-
+>>>> num_pasid_bits);
 > 
+> If fwspec->num_pasid_bits = 0, then master have _one_ num_ssids ?
 
-I'll change the blx back to the badr + mov instructions in the new version.
+Yes, the context table allocator always needs to allocate at least one
+entry, even if the master or SMMU doesn't support SSID. I think an earlier
+version called this field "num_contexts", maybe we should got back to that
+name for clarity?
 
 Thanks,
-
--- 
-Julien Thierry
+Jean
