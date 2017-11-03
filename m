@@ -1,57 +1,47 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Fri, 3 Nov 2017 22:28:13 +0100
-Subject: device tree bindings for lp5523 leds on N950?
-In-Reply-To: <20170822102214.pmag4k2dxz4fdvq5@earth>
-References: <20170814133816.GA24493@amd>
- <20170815131518.jt4xff6qv4whebul@earth>
- <20170822102214.pmag4k2dxz4fdvq5@earth>
-Message-ID: <20171103212812.GA15026@amd>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 3 Nov 2017 14:58:32 -0700
+Subject: [PATCH 12/12] hwrng: bcm63xx-rng: Remove since bcm2835-rng takes
+ over
+In-Reply-To: <877ev7ru97.fsf@anholt.net>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+ <20171102010408.27736-13-f.fainelli@gmail.com> <877ev7ru97.fsf@anholt.net>
+Message-ID: <cd6ab76c-1e33-6a3b-efce-e661c647c4db@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-> On Tue, Aug 15, 2017 at 09:15:28AM -0400, Sebastian Reichel wrote:
-> > Hi Pavel,
-> > 
-> > On Mon, Aug 14, 2017 at 03:38:16PM +0200, Pavel Machek wrote:
-> > > I'm (still) trying to debug "N950 not booting" situation. I'm stuck
-> > > with black screen, so I thought it would be cool to use RGB led for
-> > > debugging...
-> > > 
-> > > Unfortunately, I don't see required dts bindings in the mainline.
-> > > 
-> > > Does anyone have that working?
-> > 
-> > I have some N950 DTS patches lying around, I think RGB led was one
-> > of them. I'm currently in Canda for a company event without my N950,
-> > but I should be able to send something tested before the weekend.
+On 11/03/2017 01:18 PM, Eric Anholt wrote:
+> Florian Fainelli <f.fainelli@gmail.com> writes:
 > 
-> Below is a DTS snippet for N950, that has been tested by me
-> on top of 4.13-rc6. The left and right keyboard LEDs are
-> also debug LEDs for cpu idle modes, so they will be lit
-> without being enabled in lp5523. The status LED of N950 is
-> not RGB, but just white. Also you need this to get the driver
-> loading. Otherwise detection after reset fails even after
-> quite increases waiting times. Looks like the lp5523 reset
-> (which is not properly Ack'd by the device) breaks the omap-i2c
-> state horribly.
+>> bcm2835-rng is now capable of supporting the BCM63xx hardware, so remove
+>> the driver which duplicates the same functionality.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  drivers/char/hw_random/Kconfig       |  13 ---
+>>  drivers/char/hw_random/Makefile      |   1 -
+>>  drivers/char/hw_random/bcm63xx-rng.c | 154 -----------------------------------
+>>  3 files changed, 168 deletions(-)
+>>  delete mode 100644 drivers/char/hw_random/bcm63xx-rng.c
+>>
+> 
+>> diff --git a/drivers/char/hw_random/bcm63xx-rng.c b/drivers/char/hw_random/bcm63xx-rng.c
+>> deleted file mode 100644
+>> index 5132c9cde50d..000000000000
+>> --- a/drivers/char/hw_random/bcm63xx-rng.c
+>> +++ /dev/null
+> 
+>> -static int bcm63xx_rng_data_present(struct hwrng *rng, int wait)
+>> -{
+>> -	struct bcm63xx_rng_priv *priv = to_rng_priv(rng);
+>> -
+>> -	return __raw_readl(priv->regs + RNG_STAT) & RNG_AVAIL_MASK;
+>> -}
+> 
+> It looks like this method isn't in the 2835 implementation.  Should it
+> get ported over?
 
-Thanks a lot, LED now works. It took me a while, but I now have n950
-usable with nfsroot. (For a while, anyway.)
-
-N9 is usable too. Hardware is similar enough than it could be possible
-to debug without serial cable.
-
-Best regards,
-									Pavel
+The read method already has something similar in that it busy loops
+until it gets some random words available, which is why I did not port
+it over.
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171103/76e0020c/attachment.sig>
+Florian
