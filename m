@@ -1,35 +1,29 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 3 Nov 2017 22:28:29 +0800
-Subject: [PATCH 0/2] Fixes for the Atmel AES crypto module
-In-Reply-To: <20171031152524.25216-1-romain.izard.pro@gmail.com>
-References: <20171031152524.25216-1-romain.izard.pro@gmail.com>
-Message-ID: <20171103142829.GT9011@gondor.apana.org.au>
+Date: Fri, 3 Nov 2017 22:27:41 +0800
+Subject: [PATCH] drivers/crypto: Convert timers to use timer_setup()
+In-Reply-To: <20171025101842.GA145495@beast>
+References: <20171025101842.GA145495@beast>
+Message-ID: <20171103142741.GQ9011@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 04:25:22PM +0100, Romain Izard wrote:
-> After encountering an issue with cts(cbc(aes)) in the Atmel AES module,
-> I have used tcrypt and libkcapi's test suite to validate my fix. This led
-> me to observe some other issues.
+On Wed, Oct 25, 2017 at 03:18:42AM -0700, Kees Cook wrote:
+> In preparation for unconditionally passing the struct timer_list pointer to
+> all timer callbacks, switch to using the new timer_setup() and from_timer()
+> to pass the timer pointer explicitly.
 > 
-> This series includes the IV issue correction for the Atmel AES crypto
-> engine, as well as a secondary issue observed when running
-> 'insmod tcrypt.ko mode=10' and 'insmod tcrypt.ko mode=152' on a SAMA5D2
-> board.
-> 
-> The libkcapi test suite still reports some problems, for example when the
-> input data is too large to fit into an intermediate buffer in unaligned
-> cases. And it seems that with the v4.14 updates, new asynchronous tests
-> are enabled and report new issues.
-> 
-> Romain Izard (2):
->   crypto: atmel-aes - properly set IV after {en,de}crypt
->   crypto: atmel-aes - Reset the controller before each use
-> 
->  drivers/crypto/atmel-aes.c | 50 ++++++++++++++++++++++++++++++++++++----------
->  1 file changed, 40 insertions(+), 10 deletions(-)
+> Cc: Herbert Xu <herbert@gondor.apana.org.au>
+> Cc: Jesper Nilsson <jesper.nilsson@axis.com>
+> Cc: Lars Persson <lars.persson@axis.com>
+> Cc: Niklas Cassel <niklas.cassel@axis.com>
+> Cc: "David S. Miller" <davem@davemloft.net>
+> Cc: Jamie Iles <jamie@jamieiles.com>
+> Cc: linux-arm-kernel at axis.com
+> Cc: linux-crypto at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Kees Cook <keescook@chromium.org>
 
-All applied.  Thanks.
+Patch applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
