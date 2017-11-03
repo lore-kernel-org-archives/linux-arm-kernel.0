@@ -1,37 +1,44 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  3 Nov 2017 14:47:54 +0000
-Subject: [PATCH v4 17/20] hwmon: (core) Add hwmon_max to hwmon_sensor_types
- enumeration
-In-Reply-To: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
-References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1509720477-18936-18-git-send-email-sudeep.holla@arm.com>
+From: pasha.tatashin@oracle.com (Pavel Tatashin)
+Date: Fri, 3 Nov 2017 11:50:53 -0400
+Subject: [PATCH v12 08/11] arm64/kasan: add and use kasan_map_populate()
+In-Reply-To: <07ab0b77-0e2a-97b5-73ff-a6598bcb94cd@virtuozzo.com>
+References: <20171013173214.27300-1-pasha.tatashin@oracle.com>
+ <20171013173214.27300-9-pasha.tatashin@oracle.com>
+ <0ae84532-8dcb-10aa-9d69-79d7025b089e@virtuozzo.com>
+ <ad8c5715-dc4f-1fa7-c25b-e08df68643d0@oracle.com>
+ <20171018170651.GG21820@arm.com>
+ <e32c677e-62ac-8977-2f9d-7fe7bda4b547@oracle.com>
+ <f1cb8d18-4d0f-1f88-c3c5-0add8c6c077a@virtuozzo.com>
+ <a587687a-5d90-c03d-f3d2-1ea9cab1b0c4@oracle.com>
+ <07ab0b77-0e2a-97b5-73ff-a6598bcb94cd@virtuozzo.com>
+Message-ID: <7f4e35ba-2448-16ba-63e1-229eb30b068b@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's useful to know the maximum types of sensor supported by hwmon
-framework. It can be used to allocate some data structures when sorting
-the monitors based on their type.
+>> 1. Replace these two patches:
+>>
+>> arm64/kasan: add and use kasan_map_populate()
+>> x86/kasan: add and use kasan_map_populate()
+>>
+>> With:
+>>
+>> x86/mm/kasan: don't use vmemmap_populate() to initialize
+>>  ?shadow
+>> arm64/mm/kasan: don't use vmemmap_populate() to initialize
+>>  ?shadow
+>>
+> 
+> Pavel, could you please send the patches? These patches doesn't interfere with rest of the series,
+> so I think it should be enough to send just two patches to replace the old ones.
+> 
 
-This will be used by scmi hwmon support.
+Hi Andrey,
 
-Cc: linux-hwmon at vger.kernel.org
-Acked-by: Guenter Roeck <linux@roeck-us.net>
-Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
----
- include/linux/hwmon.h | 1 +
- 1 file changed, 1 insertion(+)
+I asked Michal and Andrew how to proceed but never received a reply from 
+them. The patches independent from the deferred page init series as long 
+as they come before the series.
 
-diff --git a/include/linux/hwmon.h b/include/linux/hwmon.h
-index ceb751987c40..e5fd2707b6df 100644
---- a/include/linux/hwmon.h
-+++ b/include/linux/hwmon.h
-@@ -29,6 +29,7 @@ enum hwmon_sensor_types {
- 	hwmon_humidity,
- 	hwmon_fan,
- 	hwmon_pwm,
-+	hwmon_max,
- };
- 
- enum hwmon_chip_attributes {
--- 
-2.7.4
+Anyway, I will post these two patches to the mailing list soon. But, not 
+really sure if they will be taken into mm-tree.
+
+Pavel
