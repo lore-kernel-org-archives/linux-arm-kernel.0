@@ -1,359 +1,204 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  3 Nov 2017 14:47:56 +0000
-Subject: [PATCH v4 19/20] cpufreq: add support for CPU DVFS based on SCMI
- message protocol
+Date: Fri,  3 Nov 2017 14:47:52 +0000
+Subject: [PATCH v4 15/20] firmware: arm_scmi: add device power domain support
+ using genpd
 In-Reply-To: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
 References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1509720477-18936-20-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1509720477-18936-16-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On some ARM based systems, a separate Cortex-M based System Control
-Processor(SCP) provides the overall power, clock, reset and system
-control including CPU DVFS. SCMI Message Protocol is used to
-communicate with the SCP.
+This patch hooks up the support for device power domain provided by
+SCMI using the Linux generic power domain infrastructure.
 
-This patch adds a cpufreq driver for such systems using SCMI interface
-to drive CPU DVFS.
-
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
-Cc: linux-pm at vger.kernel.org
+Cc: Kevin Hilman <khilman@baylibre.com>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- MAINTAINERS                    |   2 +-
- drivers/cpufreq/Kconfig.arm    |  11 ++
- drivers/cpufreq/Makefile       |   1 +
- drivers/cpufreq/scmi-cpufreq.c | 274 +++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 287 insertions(+), 1 deletion(-)
- create mode 100644 drivers/cpufreq/scmi-cpufreq.c
+ drivers/firmware/Kconfig                   |  13 +++
+ drivers/firmware/arm_scmi/Makefile         |   1 +
+ drivers/firmware/arm_scmi/scmi_pm_domain.c | 140 +++++++++++++++++++++++++++++
+ 3 files changed, 154 insertions(+)
+ create mode 100644 drivers/firmware/arm_scmi/scmi_pm_domain.c
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 1f9004d68ad4..f0a4251461a7 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -12955,7 +12955,7 @@ L:	linux-arm-kernel at lists.infradead.org
- S:	Maintained
- F:	Documentation/devicetree/bindings/arm/arm,sc[mp]i.txt
- F:	drivers/clk/clk-sc[mp]i.c
--F:	drivers/cpufreq/scpi-cpufreq.c
-+F:	drivers/cpufreq/sc[mp]i-cpufreq.c
- F:	drivers/firmware/arm_scpi.c
- F:	drivers/firmware/arm_scmi/
- F:	include/linux/sc[mp]i_protocol.h
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index bdce4488ded1..e21f84cbd9b4 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -205,6 +205,17 @@ config ARM_SA1100_CPUFREQ
- config ARM_SA1110_CPUFREQ
- 	bool
+diff --git a/drivers/firmware/Kconfig b/drivers/firmware/Kconfig
+index 86ea9d531587..86d2901ad87a 100644
+--- a/drivers/firmware/Kconfig
++++ b/drivers/firmware/Kconfig
+@@ -40,6 +40,19 @@ config ARM_SCMI_PROTOCOL
+ 	  This protocol library provides interface for all the client drivers
+ 	  making use of the features offered by the SCMI.
  
-+config ARM_SCMI_CPUFREQ
-+	tristate "SCMI based CPUfreq driver"
-+	depends on ARM_SCMI_PROTOCOL || COMPILE_TEST
-+	select PM_OPP
++config ARM_SCMI_POWER_DOMAIN
++	tristate "SCMI power domain driver"
++	depends on ARM_SCMI_PROTOCOL || (COMPILE_TEST && OF)
++	default y
++	select PM_GENERIC_DOMAINS if PM
 +	help
-+	  This adds the CPUfreq driver support for ARM platforms using SCMI
-+	  protocol for CPU power management.
++	  This enables support for the SCMI power domains which can be
++	  enabled or disabled via the SCP firmware
 +
-+	  This driver uses SCMI Message Protocol driver to interact with the
-+	  firmware providing the CPU DVFS functionality.
++	  This driver can also be built as a module.  If so, the module
++	  will be called scmi_pm_domain. Note this may needed early in boot
++	  before rootfs may be available.
 +
- config ARM_SCPI_CPUFREQ
-         tristate "SCPI based CPUfreq driver"
- 	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
-diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-index c7af9b2a255e..1206207f9b62 100644
---- a/drivers/cpufreq/Makefile
-+++ b/drivers/cpufreq/Makefile
-@@ -71,6 +71,7 @@ obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
- obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
- obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
- obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
-+obj-$(CONFIG_ARM_SCMI_CPUFREQ)		+= scmi-cpufreq.o
- obj-$(CONFIG_ARM_SCPI_CPUFREQ)		+= scpi-cpufreq.o
- obj-$(CONFIG_ARM_SPEAR_CPUFREQ)		+= spear-cpufreq.o
- obj-$(CONFIG_ARM_STI_CPUFREQ)		+= sti-cpufreq.o
-diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
+ config ARM_SCPI_PROTOCOL
+ 	tristate "ARM System Control and Power Interface (SCPI) Message Protocol"
+ 	depends on ARM || ARM64 || COMPILE_TEST
+diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
+index 3236890905b9..99e36c580fbc 100644
+--- a/drivers/firmware/arm_scmi/Makefile
++++ b/drivers/firmware/arm_scmi/Makefile
+@@ -2,3 +2,4 @@ obj-y	= scmi-bus.o scmi-driver.o scmi-protocols.o
+ scmi-bus-y = bus.o
+ scmi-driver-y = driver.o
+ scmi-protocols-y = base.o clock.o perf.o power.o sensors.o
++obj-$(CONFIG_ARM_SCMI_POWER_DOMAIN) += scmi_pm_domain.o
+diff --git a/drivers/firmware/arm_scmi/scmi_pm_domain.c b/drivers/firmware/arm_scmi/scmi_pm_domain.c
 new file mode 100644
-index 000000000000..b1057a13e6a7
+index 000000000000..d8c9aa6960cf
 --- /dev/null
-+++ b/drivers/cpufreq/scmi-cpufreq.c
-@@ -0,0 +1,274 @@
++++ b/drivers/firmware/arm_scmi/scmi_pm_domain.c
+@@ -0,0 +1,140 @@
 +/*
-+ * System Control and Power Interface (SCMI) based CPUFreq Interface driver
++ * SCMI Generic power domain support.
 + *
 + * Copyright (C) 2017 ARM Ltd.
-+ * Sudeep Holla <sudeep.holla@arm.com>
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
 + *
-+ * This program is distributed "as is" WITHOUT ANY WARRANTY of any
-+ * kind, whether express or implied; without even the implied warranty
-+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along
++ * with this program. If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
-+
-+#include <linux/cpu.h>
-+#include <linux/cpufreq.h>
-+#include <linux/cpumask.h>
-+#include <linux/cpu_cooling.h>
-+#include <linux/export.h>
++#include <linux/err.h>
++#include <linux/io.h>
 +#include <linux/module.h>
-+#include <linux/pm_opp.h>
-+#include <linux/slab.h>
++#include <linux/pm_domain.h>
 +#include <linux/scmi_protocol.h>
-+#include <linux/types.h>
 +
-+struct scmi_data {
-+	int domain_id;
-+	struct device *cpu_dev;
-+	struct thermal_cooling_device *cdev;
++struct scmi_pm_domain {
++	struct generic_pm_domain genpd;
++	const struct scmi_handle *handle;
++	const char *name;
++	u32 domain;
 +};
 +
-+static const struct scmi_handle *handle;
++#define to_scmi_pd(gpd) container_of(gpd, struct scmi_pm_domain, genpd)
 +
-+unsigned int scmi_cpufreq_get_rate(unsigned int cpu)
-+{
-+	struct cpufreq_policy *policy = cpufreq_cpu_get_raw(cpu);
-+	struct scmi_perf_ops *perf_ops = handle->perf_ops;
-+	struct scmi_data *priv = policy->driver_data;
-+	unsigned long rate;
-+	int ret;
-+
-+	ret = perf_ops->freq_get(handle, priv->domain_id, &rate, false);
-+	if (ret)
-+		return 0;
-+	return rate / 1000;
-+}
-+
-+/*
-+ * perf_ops->freq_set is not a synchronous, the actual OPP change will
-+ * happen asynchronously and can get notified if the events are
-+ * subscribed for by the SCMI firmware
-+ */
-+static int
-+scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
-+{
-+	struct scmi_data *priv = policy->driver_data;
-+	struct scmi_perf_ops *perf_ops = handle->perf_ops;
-+	u64 freq = policy->freq_table[index].frequency * 1000;
-+
-+	return perf_ops->freq_set(handle, priv->domain_id, freq, false);
-+}
-+
-+static int
-+scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
-+{
-+	int cpu, domain, tdomain;
-+	struct device *tcpu_dev;
-+
-+	domain = handle->perf_ops->device_domain_id(cpu_dev);
-+	if (domain < 0)
-+		return domain;
-+
-+	for_each_possible_cpu(cpu) {
-+		if (cpu == cpu_dev->id)
-+			continue;
-+
-+		tcpu_dev = get_cpu_device(cpu);
-+		if (!tcpu_dev)
-+			continue;
-+
-+		tdomain = handle->perf_ops->device_domain_id(tcpu_dev);
-+		if (tdomain == domain)
-+			cpumask_set_cpu(cpu, cpumask);
-+	}
-+
-+	return 0;
-+}
-+
-+static int scmi_cpufreq_init(struct cpufreq_policy *policy)
++static int scmi_pd_power(struct generic_pm_domain *domain, bool power_on)
 +{
 +	int ret;
-+	unsigned int latency;
-+	struct device *cpu_dev;
-+	struct scmi_data *priv;
-+	struct cpufreq_frequency_table *freq_table;
++	u32 state, ret_state;
++	struct scmi_pm_domain *pd = to_scmi_pd(domain);
++	const struct scmi_power_ops *ops = pd->handle->power_ops;
 +
-+	cpu_dev = get_cpu_device(policy->cpu);
-+	if (!cpu_dev) {
-+		pr_err("failed to get cpu%d device\n", policy->cpu);
-+		return -ENODEV;
-+	}
++	if (power_on)
++		state = SCMI_POWER_STATE_GENERIC_ON;
++	else
++		state = SCMI_POWER_STATE_GENERIC_OFF;
 +
-+	ret = handle->perf_ops->add_opps_to_device(handle, cpu_dev);
-+	if (ret) {
-+		dev_warn(cpu_dev, "failed to add opps to the device\n");
-+		return ret;
-+	}
-+
-+	ret = scmi_get_sharing_cpus(cpu_dev, policy->cpus);
-+	if (ret) {
-+		dev_warn(cpu_dev, "failed to get sharing cpumask\n");
-+		return ret;
-+	}
-+
-+	ret = dev_pm_opp_set_sharing_cpus(cpu_dev, policy->cpus);
-+	if (ret) {
-+		dev_err(cpu_dev, "%s: failed to mark OPPs as shared: %d\n",
-+			__func__, ret);
-+		return ret;
-+	}
-+
-+	/*
-+	 * We need OPP table to function and since OPPs are added by the
-+	 * platform, let's wait for the same.
-+	 */
-+	ret = dev_pm_opp_get_opp_count(cpu_dev);
-+	if (ret <= 0) {
-+		dev_dbg(cpu_dev, "OPP table is not ready, deferring probe\n");
-+		ret = -EPROBE_DEFER;
-+		goto out_free_opp;
-+	}
-+
-+	priv = kzalloc(sizeof(*priv), GFP_KERNEL);
-+	if (!priv) {
-+		ret = -ENOMEM;
-+		goto out_free_opp;
-+	}
-+
-+	ret = dev_pm_opp_init_cpufreq_table(cpu_dev, &freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "failed to init cpufreq table: %d\n", ret);
-+		goto out_free_priv;
-+	}
-+
-+	priv->cpu_dev = cpu_dev;
-+	priv->domain_id = handle->perf_ops->device_domain_id(cpu_dev);
-+
-+	policy->driver_data = priv;
-+
-+	ret = cpufreq_table_validate_and_show(policy, freq_table);
-+	if (ret) {
-+		dev_err(cpu_dev, "%s: invalid frequency table: %d\n", __func__,
-+			ret);
-+		goto out_free_cpufreq_table;
-+	}
-+
-+	/* SCMI allows DVFS request for any domain from any CPU */
-+	policy->dvfs_possible_from_any_cpu = true;
-+
-+	latency = handle->perf_ops->get_transition_latency(handle, cpu_dev);
-+	if (!latency)
-+		latency = CPUFREQ_ETERNAL;
-+
-+	policy->cpuinfo.transition_latency = latency;
-+
-+	return 0;
-+
-+out_free_cpufreq_table:
-+	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
-+out_free_priv:
-+	kfree(priv);
-+out_free_opp:
-+	dev_pm_opp_cpumask_remove_table(policy->cpus);
++	ret = ops->state_set(pd->handle, pd->domain, state);
++	if (!ret)
++		ret = ops->state_get(pd->handle, pd->domain, &ret_state);
++	if (!ret && state != ret_state)
++		return -EIO;
 +
 +	return ret;
 +}
 +
-+static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
++static int scmi_pd_power_on(struct generic_pm_domain *domain)
 +{
-+	struct scmi_data *priv = policy->driver_data;
-+
-+	cpufreq_cooling_unregister(priv->cdev);
-+	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
-+	kfree(priv);
-+	dev_pm_opp_cpumask_remove_table(policy->related_cpus);
-+
-+	return 0;
++	return scmi_pd_power(domain, true);
 +}
 +
-+static void scmi_cpufreq_ready(struct cpufreq_policy *policy)
++static int scmi_pd_power_off(struct generic_pm_domain *domain)
 +{
-+	struct scmi_data *priv = policy->driver_data;
-+	struct device_node *np = of_node_get(priv->cpu_dev->of_node);
++	return scmi_pd_power(domain, false);
++}
 +
-+	if (WARN_ON(!np))
-+		return;
++static int scmi_pm_domain_probe(struct scmi_device *sdev)
++{
++	int num_domains, i;
++	struct device *dev = &sdev->dev;
++	struct device_node *np = dev->of_node;
++	struct scmi_pm_domain *scmi_pd;
++	struct genpd_onecell_data *scmi_pd_data;
++	struct generic_pm_domain **domains;
++	const struct scmi_handle *handle = sdev->handle;
 +
-+	if (of_find_property(np, "#cooling-cells", NULL)) {
-+		u32 pcoeff = 0;
++	if (!handle || !handle->power_ops)
++		return -ENODEV;
 +
-+		of_property_read_u32(np, "dynamic-power-coefficient",
-+				     &pcoeff);
++	num_domains = handle->power_ops->num_domains_get(handle);
++	if (num_domains < 0) {
++		dev_err(dev, "number of domains not found\n");
++		return num_domains;
++	}
 +
-+		priv->cdev = of_cpufreq_power_cooling_register(np, policy,
-+							       pcoeff, NULL);
-+		if (IS_ERR(priv->cdev)) {
-+			dev_err(priv->cpu_dev,
-+				"running cpufreq without cooling device: %ld\n",
-+				PTR_ERR(priv->cdev));
++	scmi_pd = devm_kcalloc(dev, num_domains, sizeof(*scmi_pd), GFP_KERNEL);
++	if (!scmi_pd)
++		return -ENOMEM;
 +
-+			priv->cdev = NULL;
++	scmi_pd_data = devm_kzalloc(dev, sizeof(*scmi_pd_data), GFP_KERNEL);
++	if (!scmi_pd_data)
++		return -ENOMEM;
++
++	domains = devm_kcalloc(dev, num_domains, sizeof(*domains), GFP_KERNEL);
++	if (!domains)
++		return -ENOMEM;
++
++	for (i = 0; i < num_domains; i++, scmi_pd++) {
++		u32 state;
++
++		domains[i] = &scmi_pd->genpd;
++
++		scmi_pd->domain = i;
++		scmi_pd->handle = handle;
++		scmi_pd->name = handle->power_ops->name_get(handle, i);
++		scmi_pd->genpd.name = scmi_pd->name;
++		scmi_pd->genpd.power_off = scmi_pd_power_off;
++		scmi_pd->genpd.power_on = scmi_pd_power_on;
++
++		if (handle->power_ops->state_get(handle, i, &state)) {
++			dev_dbg(dev, "failed to get state for domain %d\n", i);
++			continue;
 +		}
++
++		pm_genpd_init(&scmi_pd->genpd, NULL,
++			      state == SCMI_POWER_STATE_GENERIC_OFF);
 +	}
 +
-+	of_node_put(np);
-+}
++	scmi_pd_data->domains = domains;
++	scmi_pd_data->num_domains = num_domains;
 +
-+static struct cpufreq_driver scmi_cpufreq_driver = {
-+	.name	= "scmi",
-+	.flags	= CPUFREQ_STICKY | CPUFREQ_HAVE_GOVERNOR_PER_POLICY |
-+		  CPUFREQ_NEED_INITIAL_FREQ_CHECK,
-+	.verify	= cpufreq_generic_frequency_table_verify,
-+	.attr	= cpufreq_generic_attr,
-+	.target_index	= scmi_cpufreq_set_target,
-+	.get	= scmi_cpufreq_get_rate,
-+	.init	= scmi_cpufreq_init,
-+	.exit	= scmi_cpufreq_exit,
-+	.ready	= scmi_cpufreq_ready,
-+};
++	of_genpd_add_provider_onecell(np, scmi_pd_data);
 +
-+static int scmi_cpufreq_probe(struct scmi_device *sdev)
-+{
-+	int ret;
-+
-+	handle = sdev->handle;
-+
-+	if (!handle || !handle->perf_ops)
-+		return -ENODEV;
-+
-+	ret = cpufreq_register_driver(&scmi_cpufreq_driver);
-+	if (ret) {
-+		dev_err(&sdev->dev, "%s: registering cpufreq failed, err: %d\n",
-+			__func__, ret);
-+	}
-+
-+	return ret;
-+}
-+
-+static void scmi_cpufreq_remove(struct scmi_device *sdev)
-+{
-+	cpufreq_unregister_driver(&scmi_cpufreq_driver);
++	return 0;
 +}
 +
 +static const struct scmi_device_id scmi_id_table[] = {
-+	{ SCMI_PROTOCOL_PERF },
++	{ SCMI_PROTOCOL_POWER },
 +	{ },
 +};
 +MODULE_DEVICE_TABLE(scmi, scmi_id_table);
 +
-+static struct scmi_driver scmi_cpufreq_drv = {
-+	.name		= "scmi-cpufreq",
-+	.probe		= scmi_cpufreq_probe,
-+	.remove		= scmi_cpufreq_remove,
-+	.id_table	= scmi_id_table,
++static struct scmi_driver scmi_power_domain_driver = {
++	.name = "scmi-power-domain",
++	.probe = scmi_pm_domain_probe,
++	.id_table = scmi_id_table,
 +};
-+module_scmi_driver(scmi_cpufreq_drv);
++module_scmi_driver(scmi_power_domain_driver);
 +
 +MODULE_AUTHOR("Sudeep Holla <sudeep.holla@arm.com>");
-+MODULE_DESCRIPTION("ARM SCMI CPUFreq interface driver");
++MODULE_DESCRIPTION("ARM SCMI power domain driver");
 +MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
