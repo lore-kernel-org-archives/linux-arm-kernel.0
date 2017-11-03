@@ -1,55 +1,33 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Fri, 3 Nov 2017 07:54:18 +0800
-Subject: [PATCH] usb: mtu3: fix dma_addr_t printk output again
-In-Reply-To: <20171102143027.775184-1-arnd@arndb.de>
-References: <20171102143027.775184-1-arnd@arndb.de>
-Message-ID: <1509666858.17567.144.camel@mhfsdcap03>
+From: jackp@codeaurora.org (Jack Pham)
+Date: Thu, 2 Nov 2017 17:02:58 -0700
+Subject: [PATCH v3 2/3] usb: phy: remove phy-msm-usb.c
+In-Reply-To: <20171031131131.8099-3-elder@linaro.org>
+References: <20171031131131.8099-1-elder@linaro.org>
+ <20171031131131.8099-3-elder@linaro.org>
+Message-ID: <20171103000257.GG12812@usblab-sd-06.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
-On Thu, 2017-11-02 at 15:30 +0100, Arnd Bergmann wrote:
-> The support for 36-bit addresses originally came with an incorrect
-> printk format for dma addresses. Felipe changed the format string it
-> while applying, but the result was still incorrect, since we now have
-> to pass a pointer to the address instead of the integer value:
+Hi Alex,
+
+On Tue, Oct 31, 2017 at 08:11:30AM -0500, Alex Elder wrote:
+> No Qualcomm SoC requires the "phy-msm-usb.c" USB phy driver support
+> any more, so remove the code.
 > 
-> drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_tx_gpd':
-> drivers/usb/mtu3/mtu3_qmu.c:261:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
-> drivers/usb/mtu3/mtu3_qmu.c: In function 'mtu3_prepare_rx_gpd':
-> drivers/usb/mtu3/mtu3_qmu.c:300:25: error: format '%p' expects argument of type 'void *', but argument 7 has type 'dma_addr_t {aka unsigned int}' [-Werror=format=]
-> 
-> This fixes the printk argument accordingly.
-> 
-> Fixes: 1a46dfea0841 ("usb: mtu3: support 36-bit DMA address")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Alex Elder <elder@linaro.org>
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> Acked-by: Andy Gross <andy.gross@linaro.org>
 > ---
->  drivers/usb/mtu3/mtu3_qmu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/usb/mtu3/mtu3_qmu.c b/drivers/usb/mtu3/mtu3_qmu.c
-> index 42145a3f1422..0b4b412b1d0d 100644
-> --- a/drivers/usb/mtu3/mtu3_qmu.c
-> +++ b/drivers/usb/mtu3/mtu3_qmu.c
-> @@ -259,7 +259,7 @@ static int mtu3_prepare_tx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
->  	enq = advance_enq_gpd(ring);
->  	enq_dma = gpd_virt_to_dma(ring, enq);
->  	dev_dbg(mep->mtu->dev, "TX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
-> -		mep->epnum, gpd, enq, enq_dma);
-> +		mep->epnum, gpd, enq, &enq_dma);
->  
->  	enq->flag &= ~GPD_FLAGS_HWO;
->  	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
-> @@ -298,7 +298,7 @@ static int mtu3_prepare_rx_gpd(struct mtu3_ep *mep, struct mtu3_request *mreq)
->  	enq = advance_enq_gpd(ring);
->  	enq_dma = gpd_virt_to_dma(ring, enq);
->  	dev_dbg(mep->mtu->dev, "RX-EP%d queue gpd=%p, enq=%p, qdma=%pad\n",
-> -		mep->epnum, gpd, enq, enq_dma);
-> +		mep->epnum, gpd, enq, &enq_dma);
->  
->  	enq->flag &= ~GPD_FLAGS_HWO;
->  	gpd->next_gpd = cpu_to_le32(lower_32_bits(enq_dma));
+<snip>
 
-Thanks.
+> -#include <linux/usb/msm_hsusb_hw.h>
 
-Acked-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+This file and ehci-msm.c were the last consumers of this header, so it
+too can now be deleted. Has your series been picked up yet? If so I or
+someone can send a follow-up patch.
+
+Jack
+-- 
+The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
