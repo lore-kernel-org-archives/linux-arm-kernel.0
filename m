@@ -1,646 +1,238 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  3 Nov 2017 14:47:43 +0000
-Subject: [PATCH v4 06/20] firmware: arm_scmi: add initial support for
- performance protocol
+Date: Fri,  3 Nov 2017 14:47:50 +0000
+Subject: [PATCH v4 13/20] firmware: arm_scmi: refactor in preparation to
+ support per-protocol channels
 In-Reply-To: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
 References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1509720477-18936-7-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1509720477-18936-14-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The performance protocol is intended for the performance management of
-group(s) of device(s) that run in the same performance domain. It
-includes even the CPUs. A performance domain is defined by a set of
-devices that always have to run at the same performance level.
-For example, a set of CPUs that share a voltage domain, and have a
-common frequency control, is said to be in the same performance domain.
+In order to support per-protocol channels if available, we need to
+factor out all the mailbox channel information(Tx/Rx payload and
+channel handle) out of the main SCMI instance information structure.
 
-The commands in this protocol provide functionality to describe the
-protocol version, describe various attribute flags, set and get the
-performance level of a domain. It also supports discovery of the list
-of performance levels supported by a performance domain, and the
-properties of each performance level.
-
-This patch adds basic support for the performance protocol.
+This patch refactors the existing channel information into a separate
+chan_info structure.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scmi/Makefile |   2 +-
- drivers/firmware/arm_scmi/common.h |   1 +
- drivers/firmware/arm_scmi/perf.c   | 527 +++++++++++++++++++++++++++++++++++++
- include/linux/scmi_protocol.h      |  34 +++
- 4 files changed, 563 insertions(+), 1 deletion(-)
- create mode 100644 drivers/firmware/arm_scmi/perf.c
+ drivers/firmware/arm_scmi/driver.c | 86 ++++++++++++++++++++++++--------------
+ 1 file changed, 54 insertions(+), 32 deletions(-)
 
-diff --git a/drivers/firmware/arm_scmi/Makefile b/drivers/firmware/arm_scmi/Makefile
-index 5f4ec2613db6..687cbbfb3af6 100644
---- a/drivers/firmware/arm_scmi/Makefile
-+++ b/drivers/firmware/arm_scmi/Makefile
-@@ -1,4 +1,4 @@
- obj-y	= scmi-bus.o scmi-driver.o scmi-protocols.o
- scmi-bus-y = bus.o
- scmi-driver-y = driver.o
--scmi-protocols-y = base.o
-+scmi-protocols-y = base.o perf.o
-diff --git a/drivers/firmware/arm_scmi/common.h b/drivers/firmware/arm_scmi/common.h
-index f1eeacaef57b..b045a3f268e7 100644
---- a/drivers/firmware/arm_scmi/common.h
-+++ b/drivers/firmware/arm_scmi/common.h
-@@ -30,6 +30,7 @@
- #define PROTOCOL_REV_MAJOR(x)	((x) >> PROTOCOL_REV_MINOR_BITS)
- #define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
- #define MAX_PROTOCOLS_IMP	16
-+#define MAX_OPPS		16
- 
- enum scmi_common_cmd {
- 	PROTOCOL_VERSION = 0x0,
-diff --git a/drivers/firmware/arm_scmi/perf.c b/drivers/firmware/arm_scmi/perf.c
-new file mode 100644
-index 000000000000..a1f5cf136748
---- /dev/null
-+++ b/drivers/firmware/arm_scmi/perf.c
-@@ -0,0 +1,527 @@
-+/*
-+ * System Control and Management Interface (SCMI) Performance Protocol
-+ *
-+ * Copyright (C) 2017 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along
-+ * with this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/of.h>
-+#include <linux/platform_device.h>
-+#include <linux/pm_opp.h>
-+#include <linux/sort.h>
-+
-+#include "common.h"
-+
-+enum scmi_performance_protocol_cmd {
-+	PERF_DOMAIN_ATTRIBUTES = 0x3,
-+	PERF_DESCRIBE_LEVELS = 0x4,
-+	PERF_LIMITS_SET = 0x5,
-+	PERF_LIMITS_GET = 0x6,
-+	PERF_LEVEL_SET = 0x7,
-+	PERF_LEVEL_GET = 0x8,
-+	PERF_NOTIFY_LIMITS = 0x9,
-+	PERF_NOTIFY_LEVEL = 0xa,
-+};
-+
-+struct scmi_opp {
-+	u32 perf;
-+	u32 power;
-+	u32 trans_latency_us;
-+};
-+
-+struct scmi_msg_resp_perf_attributes {
-+	__le16 num_domains;
-+	__le16 flags;
-+#define POWER_SCALE_IN_MILLIWATT(x)	((x) & BIT(0))
-+	__le32 stats_addr_low;
-+	__le32 stats_addr_high;
-+	__le32 stats_size;
-+};
-+
-+struct scmi_msg_resp_perf_domain_attributes {
-+	__le32 flags;
-+#define SUPPORTS_SET_LIMITS(x)		((x) & BIT(31))
-+#define SUPPORTS_SET_PERF_LVL(x)	((x) & BIT(30))
-+#define SUPPORTS_PERF_LIMIT_NOTIFY(x)	((x) & BIT(29))
-+#define SUPPORTS_PERF_LEVEL_NOTIFY(x)	((x) & BIT(28))
-+	__le32 rate_limit_us;
-+	__le32 sustained_freq_khz;
-+	__le32 sustained_perf_level;
-+	    u8 name[SCMI_MAX_STR_SIZE];
-+};
-+
-+struct scmi_msg_perf_describe_levels {
-+	__le32 domain;
-+	__le32 level_index;
-+};
-+
-+struct scmi_perf_set_limits {
-+	__le32 domain;
-+	__le32 max_level;
-+	__le32 min_level;
-+};
-+
-+struct scmi_perf_get_limits {
-+	__le32 max_level;
-+	__le32 min_level;
-+};
-+
-+struct scmi_perf_set_level {
-+	__le32 domain;
-+	__le32 level;
-+};
-+
-+struct scmi_perf_notify_level_or_limits {
-+	__le32 domain;
-+	__le32 notify_enable;
-+};
-+
-+struct scmi_msg_resp_perf_describe_levels {
-+	__le16 num_returned;
-+	__le16 num_remaining;
-+	struct {
-+		__le32 perf_val;
-+		__le32 power;
-+		__le16 transition_latency_us;
-+		__le16 reserved;
-+	} opp[0];
-+};
-+
-+struct perf_dom_info {
-+	bool set_limits;
-+	bool set_perf;
-+	bool perf_limit_notify;
-+	bool perf_level_notify;
-+	u32 opp_count;
-+	u32 sustained_freq_khz;
-+	u32 sustained_perf_level;
-+	u32 mult_factor;
-+	char name[SCMI_MAX_STR_SIZE];
-+	struct scmi_opp opp[MAX_OPPS];
-+};
-+
-+struct scmi_perf_info {
-+	int num_domains;
-+	bool power_scale_mw;
-+	u64 stats_addr;
-+	u32 stats_size;
-+	struct perf_dom_info *dom_info;
-+};
-+
-+static int scmi_perf_attributes_get(const struct scmi_handle *handle,
-+				    struct scmi_perf_info *pi)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_msg_resp_perf_attributes *attr;
-+
-+	ret = scmi_one_xfer_init(handle, PROTOCOL_ATTRIBUTES,
-+				 SCMI_PROTOCOL_PERF, 0, sizeof(*attr), &t);
-+	if (ret)
-+		return ret;
-+
-+	attr = t->rx.buf;
-+
-+	ret = scmi_do_xfer(handle, t);
-+	if (!ret) {
-+		u16 flags = le16_to_cpu(attr->flags);
-+
-+		pi->num_domains = le16_to_cpu(attr->num_domains);
-+		pi->power_scale_mw = POWER_SCALE_IN_MILLIWATT(flags);
-+		pi->stats_addr = le32_to_cpu(attr->stats_addr_low) |
-+				(u64)le32_to_cpu(attr->stats_addr_high) << 32;
-+		pi->stats_size = le32_to_cpu(attr->stats_size);
-+	}
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int
-+scmi_perf_domain_attributes_get(const struct scmi_handle *handle, u32 domain,
-+				struct perf_dom_info *dom_info)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_msg_resp_perf_domain_attributes *attr;
-+
-+	ret = scmi_one_xfer_init(handle, PERF_DOMAIN_ATTRIBUTES,
-+				 SCMI_PROTOCOL_PERF, sizeof(domain),
-+				 sizeof(*attr), &t);
-+	if (ret)
-+		return ret;
-+
-+	*(__le32 *)t->tx.buf = cpu_to_le32(domain);
-+	attr = t->rx.buf;
-+
-+	ret = scmi_do_xfer(handle, t);
-+	if (!ret) {
-+		u32 flags = le32_to_cpu(attr->flags);
-+
-+		dom_info->set_limits = SUPPORTS_SET_LIMITS(flags);
-+		dom_info->set_perf = SUPPORTS_SET_PERF_LVL(flags);
-+		dom_info->perf_limit_notify = SUPPORTS_PERF_LIMIT_NOTIFY(flags);
-+		dom_info->perf_level_notify = SUPPORTS_PERF_LEVEL_NOTIFY(flags);
-+		dom_info->sustained_freq_khz =
-+					le32_to_cpu(attr->sustained_freq_khz);
-+		dom_info->sustained_perf_level =
-+					le32_to_cpu(attr->sustained_perf_level);
-+		dom_info->mult_factor =	(dom_info->sustained_freq_khz * 1000) /
-+					dom_info->sustained_perf_level;
-+		memcpy(dom_info->name, attr->name, SCMI_MAX_STR_SIZE);
-+	}
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int opp_cmp_func(const void *opp1, const void *opp2)
-+{
-+	const struct scmi_opp *t1 = opp1, *t2 = opp2;
-+
-+	return t1->perf - t2->perf;
-+}
-+
-+static int
-+scmi_perf_describe_levels_get(const struct scmi_handle *handle, u32 domain,
-+			      struct perf_dom_info *perf_dom)
-+{
-+	int ret, cnt;
-+	u32 tot_opp_cnt = 0;
-+	u16 num_returned, num_remaining;
-+	struct scmi_xfer *t;
-+	struct scmi_opp *opp;
-+	struct scmi_msg_perf_describe_levels *dom_info;
-+	struct scmi_msg_resp_perf_describe_levels *level_info;
-+
-+	ret = scmi_one_xfer_init(handle, PERF_DESCRIBE_LEVELS,
-+				 SCMI_PROTOCOL_PERF, sizeof(*dom_info), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	dom_info = t->tx.buf;
-+	level_info = t->rx.buf;
-+
-+	do {
-+		dom_info->domain = cpu_to_le32(domain);
-+		/* Set the number of OPPs to be skipped/already read */
-+		dom_info->level_index = cpu_to_le32(tot_opp_cnt);
-+
-+		ret = scmi_do_xfer(handle, t);
-+		if (ret)
-+			break;
-+
-+		num_returned = le16_to_cpu(level_info->num_returned);
-+		num_remaining = le16_to_cpu(level_info->num_remaining);
-+		if (tot_opp_cnt + num_returned > MAX_OPPS) {
-+			dev_err(handle->dev, "No. of OPPs exceeded MAX_OPPS");
-+			break;
-+		}
-+
-+		opp = &perf_dom->opp[tot_opp_cnt];
-+		for (cnt = 0; cnt < num_returned; cnt++, opp++) {
-+			opp->perf = le32_to_cpu(level_info->opp[cnt].perf_val);
-+			opp->power = le32_to_cpu(level_info->opp[cnt].power);
-+			opp->trans_latency_us = le16_to_cpu(
-+				level_info->opp[cnt].transition_latency_us);
-+
-+			dev_dbg(handle->dev, "Level %d Power %d Latency %dus\n",
-+				opp->perf, opp->power, opp->trans_latency_us);
-+		}
-+
-+		tot_opp_cnt += num_returned;
-+		/*
-+		 * check for both returned and remaining to avoid infinite
-+		 * loop due to buggy firmware
-+		 */
-+	} while (num_returned && num_remaining);
-+
-+	perf_dom->opp_count = tot_opp_cnt;
-+	scmi_one_xfer_put(handle, t);
-+
-+	sort(perf_dom->opp, tot_opp_cnt, sizeof(*opp), opp_cmp_func, NULL);
-+	return ret;
-+}
-+
-+static int scmi_perf_limits_set(const struct scmi_handle *handle, u32 domain,
-+				u32 max_perf, u32 min_perf)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_perf_set_limits *limits;
-+
-+	ret = scmi_one_xfer_init(handle, PERF_LIMITS_SET, SCMI_PROTOCOL_PERF,
-+				 sizeof(*limits), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	limits = t->tx.buf;
-+	limits->domain = cpu_to_le32(domain);
-+	limits->max_level = cpu_to_le32(max_perf);
-+	limits->min_level = cpu_to_le32(min_perf);
-+
-+	ret = scmi_do_xfer(handle, t);
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int scmi_perf_limits_get(const struct scmi_handle *handle, u32 domain,
-+				u32 *max_perf, u32 *min_perf)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_perf_get_limits *limits;
-+
-+	ret = scmi_one_xfer_init(handle, PERF_LIMITS_GET, SCMI_PROTOCOL_PERF,
-+				 sizeof(__le32), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	*(__le32 *)t->tx.buf = cpu_to_le32(domain);
-+
-+	ret = scmi_do_xfer(handle, t);
-+	if (!ret) {
-+		limits = t->rx.buf;
-+
-+		*max_perf = le32_to_cpu(limits->max_level);
-+		*min_perf = le32_to_cpu(limits->min_level);
-+	}
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int
-+scmi_perf_level_set(const struct scmi_handle *handle, u32 domain, u32 level)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_perf_set_level *lvl;
-+
-+	ret = scmi_one_xfer_init(handle, PERF_LEVEL_SET, SCMI_PROTOCOL_PERF,
-+				 sizeof(*lvl), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	lvl = t->tx.buf;
-+	lvl->domain = cpu_to_le32(domain);
-+	lvl->level = cpu_to_le32(level);
-+
-+	ret = scmi_do_xfer(handle, t);
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int
-+scmi_perf_level_get(const struct scmi_handle *handle, u32 domain, u32 *level)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+
-+	ret = scmi_one_xfer_init(handle, PERF_LEVEL_GET, SCMI_PROTOCOL_PERF,
-+				 sizeof(u32), sizeof(u32), &t);
-+	if (ret)
-+		return ret;
-+
-+	*(__le32 *)t->tx.buf = cpu_to_le32(domain);
-+
-+	ret = scmi_do_xfer(handle, t);
-+	if (!ret)
-+		*level = le32_to_cpu(*(__le32 *)t->rx.buf);
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int __scmi_perf_notify_enable(const struct scmi_handle *handle, u32 cmd,
-+				     u32 domain, bool enable)
-+{
-+	int ret;
-+	struct scmi_xfer *t;
-+	struct scmi_perf_notify_level_or_limits *notify;
-+
-+	ret = scmi_one_xfer_init(handle, cmd, SCMI_PROTOCOL_PERF,
-+				 sizeof(*notify), 0, &t);
-+	if (ret)
-+		return ret;
-+
-+	notify = t->tx.buf;
-+	notify->domain = cpu_to_le32(domain);
-+	notify->notify_enable = cpu_to_le32(enable & BIT(0));
-+
-+	ret = scmi_do_xfer(handle, t);
-+
-+	scmi_one_xfer_put(handle, t);
-+	return ret;
-+}
-+
-+static int scmi_perf_limits_notify_enable(const struct scmi_handle *handle,
-+					  u32 domain, bool enable)
-+{
-+	return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LIMITS,
-+					 domain, enable);
-+}
-+
-+static int scmi_perf_level_notify_enable(const struct scmi_handle *handle,
-+					 u32 domain, bool enable)
-+{
-+	return __scmi_perf_notify_enable(handle, PERF_NOTIFY_LEVEL,
-+					 domain, enable);
-+}
-+
-+/* Device specific ops */
-+static int scmi_dev_domain_id(struct device *dev)
-+{
-+	struct of_phandle_args clkspec;
-+
-+	if (of_parse_phandle_with_args(dev->of_node, "clocks", "#clock-cells",
-+				       0, &clkspec))
-+		return -EINVAL;
-+
-+	return clkspec.args[0];
-+}
-+
-+static int scmi_dvfs_add_opps_to_device(const struct scmi_handle *handle,
-+					struct device *dev)
-+{
-+	int idx, ret, domain;
-+	unsigned long freq;
-+	struct scmi_opp *opp;
-+	struct perf_dom_info *dom;
-+	struct scmi_perf_info *pi = handle->perf_priv;
-+
-+	domain = scmi_dev_domain_id(dev);
-+	if (domain < 0)
-+		return domain;
-+
-+	dom = pi->dom_info + domain;
-+	if (!dom)
-+		return -EIO;
-+
-+	for (opp = dom->opp, idx = 0; idx < dom->opp_count; idx++, opp++) {
-+		freq = opp->perf * dom->mult_factor;
-+
-+		ret = dev_pm_opp_add(dev, freq, 0);
-+		if (ret) {
-+			dev_warn(dev, "failed to add opp %luHz\n", freq);
-+
-+			while (idx-- > 0) {
-+				freq = (--opp)->perf * dom->mult_factor;
-+				dev_pm_opp_remove(dev, freq);
-+			}
-+			return ret;
-+		}
-+	}
-+	return 0;
-+}
-+
-+static int scmi_dvfs_get_transition_latency(const struct scmi_handle *handle,
-+					    struct device *dev)
-+{
-+	struct perf_dom_info *dom;
-+	struct scmi_perf_info *pi = handle->perf_priv;
-+	int domain = scmi_dev_domain_id(dev);
-+
-+	if (domain < 0)
-+		return domain;
-+
-+	dom = pi->dom_info + domain;
-+	if (!dom)
-+		return -EIO;
-+
-+	/* uS to nS */
-+	return dom->opp[dom->opp_count - 1].trans_latency_us * 1000;
-+}
-+
-+static int scmi_dvfs_freq_set(const struct scmi_handle *handle, u32 domain,
-+			      unsigned long freq)
-+{
-+	struct scmi_perf_info *pi = handle->perf_priv;
-+	struct perf_dom_info *dom = pi->dom_info + domain;
-+
-+	return scmi_perf_level_set(handle, domain, freq / dom->mult_factor);
-+}
-+
-+static int scmi_dvfs_freq_get(const struct scmi_handle *handle, u32 domain,
-+			      unsigned long *freq)
-+{
-+	int ret;
-+	u32 level;
-+	struct scmi_perf_info *pi = handle->perf_priv;
-+	struct perf_dom_info *dom = pi->dom_info + domain;
-+
-+	ret = scmi_perf_level_get(handle, domain, &level);
-+	if (!ret)
-+		*freq = level * dom->mult_factor;
-+
-+	return ret;
-+}
-+
-+static struct scmi_perf_ops perf_ops = {
-+	.limits_set = scmi_perf_limits_set,
-+	.limits_get = scmi_perf_limits_get,
-+	.level_set = scmi_perf_level_set,
-+	.level_get = scmi_perf_level_get,
-+	.limits_notify_enable = scmi_perf_limits_notify_enable,
-+	.level_notify_enable = scmi_perf_level_notify_enable,
-+	.device_domain_id = scmi_dev_domain_id,
-+	.get_transition_latency = scmi_dvfs_get_transition_latency,
-+	.add_opps_to_device = scmi_dvfs_add_opps_to_device,
-+	.freq_set = scmi_dvfs_freq_set,
-+	.freq_get = scmi_dvfs_freq_get,
-+};
-+
-+static int scmi_perf_protocol_init(struct scmi_handle *handle)
-+{
-+	int domain;
-+	u32 version;
-+	struct scmi_perf_info *pinfo;
-+
-+	scmi_version_get(handle, SCMI_PROTOCOL_PERF, &version);
-+
-+	dev_dbg(handle->dev, "Performance Version %d.%d\n",
-+		PROTOCOL_REV_MAJOR(version), PROTOCOL_REV_MINOR(version));
-+
-+	pinfo = devm_kzalloc(handle->dev, sizeof(*pinfo), GFP_KERNEL);
-+	if (!pinfo)
-+		return -ENOMEM;
-+
-+	scmi_perf_attributes_get(handle, pinfo);
-+
-+	pinfo->dom_info = devm_kcalloc(handle->dev, pinfo->num_domains,
-+				       sizeof(*pinfo->dom_info), GFP_KERNEL);
-+	if (!pinfo->dom_info)
-+		return -ENOMEM;
-+
-+	for (domain = 0; domain < pinfo->num_domains; domain++) {
-+		struct perf_dom_info *dom = pinfo->dom_info + domain;
-+
-+		scmi_perf_domain_attributes_get(handle, domain, dom);
-+		scmi_perf_describe_levels_get(handle, domain, dom);
-+	}
-+
-+	handle->perf_ops = &perf_ops;
-+	handle->perf_priv = pinfo;
-+
-+	return 0;
-+}
-+
-+static int __init scmi_perf_init(void)
-+{
-+	return scmi_protocol_register(SCMI_PROTOCOL_PERF,
-+				      &scmi_perf_protocol_init);
-+}
-+subsys_initcall(scmi_perf_init);
-diff --git a/include/linux/scmi_protocol.h b/include/linux/scmi_protocol.h
-index 7b72c75cb560..8fa189ca0fed 100644
---- a/include/linux/scmi_protocol.h
-+++ b/include/linux/scmi_protocol.h
-@@ -44,15 +44,49 @@ struct scmi_revision_info {
- 	char sub_vendor_id[SCMI_MAX_STR_SIZE];
+diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
+index 0c9dda72f10c..24acb421208c 100644
+--- a/drivers/firmware/arm_scmi/driver.c
++++ b/drivers/firmware/arm_scmi/driver.c
+@@ -105,6 +105,22 @@ struct scmi_desc {
  };
  
-+struct scmi_handle;
+ /**
++ * struct scmi_chan_info - Structure representing a SCMI channel informfation
++ *
++ * @cl: Mailbox Client
++ * @chan: Transmit/Receive mailbox channel
++ * @payload: Transmit/Receive mailbox channel payload area
++ * @dev: Reference to device in the SCMI hierarchy corresponding to this
++ *	 channel
++ */
++struct scmi_chan_info {
++	struct mbox_client cl;
++	struct mbox_chan *chan;
++	void __iomem *payload;
++	struct device *dev;
++};
 +
 +/**
-+ * struct scmi_perf_ops - represents the various operations provided
-+ *	by SCMI Performance Protocol
-+ *
-+ * @limits_set: sets limits on the performance level of a domain
-+ * @limits_get: gets limits on the performance level of a domain
-+ * @level_set: sets the performance level of a domain
-+ * @level_get: gets the performance level of a domain
-+ * @limits_notify_enable: requests notifications from the platform for changes
-+ *	in the allowed maximum and minimum performance levels
-+ * @level_notify_enable: requests notifications from the platform when the
-+ *	performance level for a domain changes in value
-+ */
-+struct scmi_perf_ops {
-+	int (*limits_set)(const struct scmi_handle *, u32, u32, u32);
-+	int (*limits_get)(const struct scmi_handle *, u32, u32 *, u32 *);
-+	int (*level_set)(const struct scmi_handle *, u32, u32);
-+	int (*level_get)(const struct scmi_handle *, u32, u32 *);
-+	int (*limits_notify_enable)(const struct scmi_handle *, u32, bool);
-+	int (*level_notify_enable)(const struct scmi_handle *, u32, bool);
-+	int (*device_domain_id)(struct device *);
-+	int (*get_transition_latency)(const struct scmi_handle *,
-+				      struct device *);
-+	int (*add_opps_to_device)(const struct scmi_handle *, struct device *);
-+	int (*freq_set)(const struct scmi_handle *, u32, unsigned long);
-+	int (*freq_get)(const struct scmi_handle *, u32, unsigned long *);
-+};
-+
- /**
-  * struct scmi_handle - Handle returned to ARM SCMI clients for usage.
+  * struct scmi_info - Structure representing a  SCMI instance
   *
-  * @dev: pointer to the SCMI device
-  * @version: pointer to the structure containing SCMI version information
-+ * @perf_ops: pointer to set of performance protocol operations
-  */
- struct scmi_handle {
- 	struct device *dev;
- 	struct scmi_revision_info *version;
-+	struct scmi_perf_ops *perf_ops;
-+	/* for protocol internal use */
-+	void *perf_priv;
+  * @dev: Device pointer
+@@ -112,10 +128,8 @@ struct scmi_desc {
+  * @handle: Instance of SCMI handle to send to clients
+  * @version: SCMI revision information containing protocol version,
+  *	implementation version and (sub-)vendor identification.
+- * @cl: Mailbox Client
+- * @tx_chan: Transmit mailbox channel
+- * @tx_payload: Transmit mailbox channel payload area
+  * @minfo: Message info
++ * @tx_cinfo: Reference to SCMI channel information
+  * @protocols_imp: list of protocols implemented, currently maximum of
+  *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
+  * @node: list head
+@@ -126,16 +140,14 @@ struct scmi_info {
+ 	const struct scmi_desc *desc;
+ 	struct scmi_revision_info version;
+ 	struct scmi_handle handle;
+-	struct mbox_client cl;
+-	struct mbox_chan *tx_chan;
+-	void __iomem *tx_payload;
+ 	struct scmi_xfers_info minfo;
++	struct scmi_chan_info *tx_cinfo;
+ 	u8 *protocols_imp;
+ 	struct list_head node;
+ 	int users;
  };
  
- enum scmi_std_protocol {
+-#define client_to_scmi_info(c)	container_of(c, struct scmi_info, cl)
++#define client_to_scmi_chan_info(c) container_of(c, struct scmi_chan_info, cl)
+ #define handle_to_scmi_info(h)	container_of(h, struct scmi_info, handle)
+ 
+ /*
+@@ -218,10 +230,11 @@ static void scmi_rx_callback(struct mbox_client *cl, void *m)
+ {
+ 	u16 xfer_id;
+ 	struct scmi_xfer *xfer;
+-	struct scmi_info *info = client_to_scmi_info(cl);
++	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
++	struct device *dev = cinfo->dev;
++	struct scmi_info *info = dev_get_drvdata(dev);
+ 	struct scmi_xfers_info *minfo = &info->minfo;
+-	struct device *dev = info->dev;
+-	struct scmi_shared_mem __iomem *mem = info->tx_payload;
++	struct scmi_shared_mem __iomem *mem = cinfo->payload;
+ 
+ 	xfer_id = MSG_XTRACT_TOKEN(ioread32(&mem->msg_header));
+ 
+@@ -272,8 +285,8 @@ static inline u32 pack_scmi_header(struct scmi_msg_hdr *hdr)
+ static void scmi_tx_prepare(struct mbox_client *cl, void *m)
+ {
+ 	struct scmi_xfer *t = m;
+-	struct scmi_info *info = client_to_scmi_info(cl);
+-	struct scmi_shared_mem __iomem *mem = info->tx_payload;
++	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
++	struct scmi_shared_mem __iomem *mem = cinfo->payload;
+ 
+ 	/* Mark channel busy + clear error */
+ 	iowrite32(0x0, &mem->channel_status);
+@@ -366,15 +379,15 @@ void scmi_one_xfer_put(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ }
+ 
+ static bool
+-scmi_xfer_poll_done(const struct scmi_info *info, struct scmi_xfer *xfer)
++scmi_xfer_poll_done(const struct scmi_chan_info *cinfo, struct scmi_xfer *xfer)
+ {
+-	struct scmi_shared_mem *mem = info->tx_payload;
+-	u16 xfer_id = MSG_XTRACT_TOKEN(le32_to_cpu(mem->msg_header));
++	struct scmi_shared_mem __iomem *mem = cinfo->payload;
++	u16 xfer_id = MSG_XTRACT_TOKEN(ioread32(&mem->msg_header));
+ 
+ 	if (xfer->hdr.seq != xfer_id)
+ 		return false;
+ 
+-	return le32_to_cpu(mem->channel_status) &
++	return ioread32(&mem->channel_status) &
+ 		(SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR |
+ 		SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE);
+ }
+@@ -396,8 +409,9 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 	int timeout;
+ 	struct scmi_info *info = handle_to_scmi_info(handle);
+ 	struct device *dev = info->dev;
++	struct scmi_chan_info *cinfo = info->tx_cinfo;
+ 
+-	ret = mbox_send_message(info->tx_chan, xfer);
++	ret = mbox_send_message(cinfo->chan, xfer);
+ 	if (ret < 0) {
+ 		dev_dbg(dev, "mbox send fail %d\n", ret);
+ 		return ret;
+@@ -413,11 +427,11 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 		do {
+ 			udelay(5);
+ 			cur = ktime_get();
+-		} while (!scmi_xfer_poll_done(info, xfer) &&
++		} while (!scmi_xfer_poll_done(cinfo, xfer) &&
+ 			 ktime_before(cur, stop));
+ 
+ 		if (ktime_before(cur, stop))
+-			scmi_fetch_response(xfer, info->tx_payload);
++			scmi_fetch_response(xfer, cinfo->payload);
+ 		else
+ 			ret = -ETIMEDOUT;
+ 	} else {
+@@ -437,7 +451,7 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 	 * Unfortunately, we have to kick the mailbox framework after we have
+ 	 * received our message.
+ 	 */
+-	mbox_client_txdone(info->tx_chan, ret);
++	mbox_client_txdone(cinfo->chan, ret);
+ 
+ 	return ret;
+ }
+@@ -667,11 +681,11 @@ static int scmi_mailbox_check(struct device_node *np)
+ 	return of_parse_phandle_with_args(np, "mboxes", "#mbox-cells", 0, &arg);
+ }
+ 
+-static int scmi_mbox_free_channel(struct scmi_info *info)
++static int scmi_mbox_free_channel(struct scmi_chan_info *cinfo)
+ {
+-	if (!IS_ERR_OR_NULL(info->tx_chan)) {
+-		mbox_free_channel(info->tx_chan);
+-		info->tx_chan = NULL;
++	if (!IS_ERR_OR_NULL(cinfo->chan)) {
++		mbox_free_channel(cinfo->chan);
++		cinfo->chan = NULL;
+ 	}
+ 
+ 	return 0;
+@@ -691,7 +705,7 @@ static int scmi_remove(struct platform_device *pdev)
+ 
+ 	if (!ret)
+ 		/* Safe to free channels since no more users */
+-		return scmi_mbox_free_channel(info);
++		return scmi_mbox_free_channel(info->tx_cinfo);
+ 
+ 	return ret;
+ }
+@@ -703,9 +717,17 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
+ 	resource_size_t size;
+ 	struct device *dev = info->dev;
+ 	struct device_node *shmem, *np = dev->of_node;
++	struct scmi_chan_info *cinfo;
+ 	struct mbox_client *cl;
+ 
+-	cl = &info->cl;
++	cinfo = devm_kzalloc(info->dev, sizeof(*cinfo), GFP_KERNEL);
++	if (!cinfo)
++		return -ENOMEM;
++
++	info->tx_cinfo = cinfo;
++	cinfo->dev = dev;
++
++	cl = &cinfo->cl;
+ 	cl->dev = dev;
+ 	cl->rx_callback = scmi_rx_callback;
+ 	cl->tx_prepare = scmi_tx_prepare;
+@@ -721,16 +743,16 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
+ 	}
+ 
+ 	size = resource_size(&res);
+-	info->tx_payload = devm_ioremap(dev, res.start, size);
+-	if (!info->tx_payload) {
++	cinfo->payload = devm_ioremap(info->dev, res.start, size);
++	if (!cinfo->payload) {
+ 		dev_err(dev, "failed to ioremap SCMI Tx payload\n");
+ 		return -EADDRNOTAVAIL;
+ 	}
+ 
+ 	/* Transmit channel is first entry i.e. index 0 */
+-	info->tx_chan = mbox_request_channel(cl, 0);
+-	if (IS_ERR(info->tx_chan)) {
+-		ret = PTR_ERR(info->tx_chan);
++	cinfo->chan = mbox_request_channel(cl, 0);
++	if (IS_ERR(cinfo->chan)) {
++		ret = PTR_ERR(cinfo->chan);
+ 		if (ret != -EPROBE_DEFER)
+ 			dev_err(dev, "failed to request SCMI Tx mailbox\n");
+ 		return ret;
+@@ -798,7 +820,7 @@ static int scmi_probe(struct platform_device *pdev)
+ 	ret = scmi_base_protocol_init(handle);
+ 	if (ret) {
+ 		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
+-		scmi_mbox_free_channel(info);
++		scmi_mbox_free_channel(info->tx_cinfo);
+ 		return ret;
+ 	}
+ 
 -- 
 2.7.4
