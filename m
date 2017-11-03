@@ -1,33 +1,83 @@
-From: jackp@codeaurora.org (Jack Pham)
-Date: Thu, 2 Nov 2017 17:02:58 -0700
-Subject: [PATCH v3 2/3] usb: phy: remove phy-msm-usb.c
-In-Reply-To: <20171031131131.8099-3-elder@linaro.org>
-References: <20171031131131.8099-1-elder@linaro.org>
- <20171031131131.8099-3-elder@linaro.org>
-Message-ID: <20171103000257.GG12812@usblab-sd-06.qualcomm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Nov 2017 00:04:37 +0000
+Subject: Build failure with verify size in next-20171102
+In-Reply-To: <20171102234309.GE28152@atomide.com>
+References: <20171102193027.GB28152@atomide.com>
+ <20171102232038.GA28231@n2100.armlinux.org.uk>
+ <20171102234309.GE28152@atomide.com>
+Message-ID: <20171103000437.GB28231@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
-
-On Tue, Oct 31, 2017 at 08:11:30AM -0500, Alex Elder wrote:
-> No Qualcomm SoC requires the "phy-msm-usb.c" USB phy driver support
-> any more, so remove the code.
+On Thu, Nov 02, 2017 at 04:43:09PM -0700, Tony Lindgren wrote:
+> * Russell King - ARM Linux <linux@armlinux.org.uk> [171102 23:22]:
+> > On Thu, Nov 02, 2017 at 12:30:27PM -0700, Tony Lindgren wrote:
+> > > Hi Russeell,
+> > > 
+> > > I think you're already aware of the build failure caused by commit
+> > > 078c0927485e ("ARM: verify size of zImage"), but here's info just
+> > > in case.
+> > > 
+> > > arm-unknown-linux-musleabi-ld.bfd: error: zImage file size is incorrect
+> > > make[2]: *** [arch/arm/boot/compressed/Makefile:185: arch/arm/boot/compressed/vmlinux] Error 1
+> > > make[1]: *** [arch/arm/boot/Makefile:64: arch/arm/boot/compressed/vmlinux] Error 2
+> > > make: *** [arch/arm/Makefile:335: zImage] Error 2
+> > > 
+> > > Other than that I was surprised that next actually booted for me
+> > > after a few week break with Linux next! :)
+> > 
+> > It would be nice if people can investigate why that happens - I'm
+> > completely unable to reproduce it locally, even if I link using 
+> > the same vmlinux.lds file and the objects from someone who sees the
+> > failure.
+> > 
+> > There's some binutils version specific stuff that's going on here.
+> > 
+> > What I have in my current for-next, which I'm intending to push,
+> > is all the same patches except the patch that introduces the above
+> > check is subsituted by a patch that produces an extra _edata_real
+> > symbol.  This _should_ match _edata.  So, if you hit this failure,
+> > try either my current for-next branch or tomorrow's linux-next, and
+> > run arm-linux-nm on arch/arm/boot/compressed/vmlinux and check the
+> > addresses given for _edata and _edata_real.
 > 
-> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: Alex Elder <elder@linaro.org>
-> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> Acked-by: Andy Gross <andy.gross@linaro.org>
-> ---
-<snip>
+> OK thanks reverting 078c0927485e and applying dad4675388fc ("ARM:
+> add debug ".edata_real" symbol") from your for-next branch builds
+> and boots for me.
+> 
+> > Theory says they should be identical, but the failure of that assert
+> > could only happen if "." inside the output section was different from
+> > _edata assigned outside.  _edata_real is now the address of "." inside
+> > the output section.
+> 
+> With 078c0927485e reverted and dad4675388fc applied they are
+> identical for me:
+> 
+> $ ${armcompiler}nm arch/arm/boot/compressed/vmlinux | grep _edata
+> 00421960 D _edata
+> 00421960 D _edata_real
+> 
+> Let me know if you want me to run some test with the failing
+> commit also.
 
-> -#include <linux/usb/msm_hsusb_hw.h>
+So:
 
-This file and ehci-msm.c were the last consumers of this header, so it
-too can now be deleted. Has your series been picked up yet? If so I or
-someone can send a follow-up patch.
+  .image_end (NOLOAD) : {
+     ASSERT(. == _edata, "...");
+  }
 
-Jack
+fails, because . != _edata, but:
+
+  .image_end (NOLOAD) : {
+     _edata_real = .;
+  }
+
+produces an image where _edata_real == _edata.
+
+That's completely insane and illogical.  *Shrug*.  God knows what's
+going on there.
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
