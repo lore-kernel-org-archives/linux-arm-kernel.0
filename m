@@ -1,44 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 3 Nov 2017 20:10:50 +0000
-Subject: [PATCH 14/15] arm64: crypto: disable LTO for aes-ce-cipher.c
-In-Reply-To: <20171103171203.107569-19-samitolvanen@google.com>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103171203.107569-19-samitolvanen@google.com>
-Message-ID: <CAKv+Gu9VBt0raWQ3RZV165Dpnw4aZTF9VN9pBhDwpHNBXdc83Q@mail.gmail.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 3 Nov 2017 20:11:50 +0000
+Subject: [PATCH v2 1/4] spi: imx: GPIO based chip selects should not be
+ required
+In-Reply-To: <1509739759.5473.93.camel@impinj.com>
+References: <20171027010841.28624-1-tpiepho@impinj.com>
+ <20171027010841.28624-2-tpiepho@impinj.com>
+ <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
+ <1509469061.5473.16.camel@impinj.com>
+ <20171102151439.6dpfud7a5vtc27dy@sirena.co.uk>
+ <1509731639.5473.60.camel@impinj.com>
+ <20171103183700.spnqbagr4q7fth4k@sirena.co.uk>
+ <1509736735.5473.87.camel@impinj.com>
+ <20171103193649.jcoiy3raefikko2h@sirena.co.uk>
+ <1509739759.5473.93.camel@impinj.com>
+Message-ID: <20171103201150.7lt2bc6co7angy5w@sirena.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 November 2017 at 17:12, Sami Tolvanen <samitolvanen@google.com> wrote:
-> CONFIG_CLANG_LTO requires the use of clang's integrated assembler, which
-> doesn't understand the inline assembly in aes-ce-cipher.c. Disable LTO for
-> the file to work around the issue.
->
-> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+On Fri, Nov 03, 2017 at 08:09:19PM +0000, Trent Piepho wrote:
+> On Fri, 2017-11-03 at 19:36 +0000, Mark Brown wrote:
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Is there any documentation of the bindings for this driver at all?  I
+> > wasn't able to find it.
 
-> ---
->  arch/arm64/crypto/Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-> index b5edc5918c28..0edaef43a1d4 100644
-> --- a/arch/arm64/crypto/Makefile
-> +++ b/arch/arm64/crypto/Makefile
-> @@ -24,7 +24,7 @@ obj-$(CONFIG_CRYPTO_CRC32_ARM64_CE) += crc32-ce.o
->  crc32-ce-y:= crc32-ce-core.o crc32-ce-glue.o
->
->  obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
-> -CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
-> +CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto $(DISABLE_LTO)
->
->  obj-$(CONFIG_CRYPTO_AES_ARM64_CE_CCM) += aes-ce-ccm.o
->  aes-ce-ccm-y := aes-ce-ccm-glue.o aes-ce-ccm-core.o
-> --
-> 2.15.0.403.gc27cc4dac6-goog
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
+
+Ah, good - for some reason I'd thought that was a different IP block
+(SPI controllers are like serial ports, endless room for innovation!).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171103/89aabf5a/attachment.sig>
