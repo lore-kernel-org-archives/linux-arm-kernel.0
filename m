@@ -1,111 +1,44 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 03 Nov 2017 17:19:40 +0000
-Subject: [PATCH v4 09/21] KVM: arm/arm64: mask/unmask daif around VHE
- guests
-In-Reply-To: <20171103124502.GB14144@cbox>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-10-james.morse@arm.com> <20171030074019.GS2166@lvm>
- <59FB0C24.7080503@arm.com> <20171103124502.GB14144@cbox>
-Message-ID: <59FCA52C.1070406@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Nov 2017 17:23:16 +0000
+Subject: [PATCH v16 10/13] arch/arm: enable task isolation functionality
+In-Reply-To: <1509728692-10460-11-git-send-email-cmetcalf@mellanox.com>
+References: <1509728692-10460-1-git-send-email-cmetcalf@mellanox.com>
+ <1509728692-10460-11-git-send-email-cmetcalf@mellanox.com>
+Message-ID: <20171103172316.GP9463@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
-
-On 03/11/17 12:45, Christoffer Dall wrote:
-> On Thu, Nov 02, 2017 at 12:14:28PM +0000, James Morse wrote:
->> On 30/10/17 07:40, Christoffer Dall wrote:
->>> On Thu, Oct 19, 2017 at 03:57:55PM +0100, James Morse wrote:
->>>> Non-VHE systems take an exception to EL2 in order to world-switch into the
->>>> guest. When returning from the guest KVM implicitly restores the DAIF
->>>> flags when it returns to the kernel at EL1.
->>>>
->>>> With VHE none of this exception-level jumping happens, so KVMs
->>>> world-switch code is exposed to the host kernel's DAIF values, and KVM
->>>> spills the guest-exit DAIF values back into the host kernel.
->>>> On entry to a guest we have Debug and SError exceptions unmasked, KVM
->>>> has switched VBAR but isn't prepared to handle these. On guest exit
->>>> Debug exceptions are left disabled once we return to the host and will
->>>> stay this way until we enter user space.
-
-
->>>> Give me a kick if you want this reworked as a fix (which will then
->>>> conflict with this series), or a backportable version.
->>>
->>> I don't know of any real-world issues where some more graceful handling
->>> of SErrors would make sense on older kernels, so I'm fine with just
->>> merging this together with this series.
->>
->> What about debug?
-
-> Are we unmasking debug exceptions as we should with this patch?
-
-With this patch, yes, it directly restores the DAIF flags the arch code wants
-for irq-masked process-context. Debug is re-enabled.
-
-
-> If so, I suppose that could be required for something like kgdb or when
-> running KVM as a guest hypervisor (nested).
+On Fri, Nov 03, 2017 at 01:04:49PM -0400, Chris Metcalf wrote:
+> From: Francis Giraldeau <francis.giraldeau@gmail.com>
 > 
-> In that case, we should probably provide a backport for stable, if we
-> think people are going to be running older kernels on VHE systems, which
-> they probably are.
-
-Okay, I will produce a backport once this gets merged.
-
-
->>> On guest exit Debug exceptions are left disabled once we return to the host
->>> and will stay this way until we enter user space.
-
-> [The indentation seems to indicate I wrote this, but I don't think I
-> did.  I'm confused.]
-
-I quoted it from the commit message, but evidently not from this depth-of-reply.
-Sorry for the confusion.
-
-
->> Today VHE:KVM causes the kernel to run with SError unmasked and debug disabled
->> until the next return to user-space, whereas previously the kernel expected
->> SError to be masked and debug enabled.
->>
->>
->> (Reposting just the SError rework without this patch changes the kernel to
->> expect SError to be unmasked, which isn't making this any worse.)
-
-> I'm sorry, I don't understand this discussion.  What is today, and what
-
-English has failed me. I'll try again:
-
-v4.14-rc7 with VHE causes the kernel to run after guest-exit with SError
-unmasked and debug disabled until the next return to user-space.
-
-The arch code expects SError masked and debug enabled.
-
-In your kgdb example, if we switch-to a new task instead of returning to user
-space, it won't hit any break/watchpoints.
-
-
-> is previously, and are you suggesting we drop this patch, or that the
-> rest of this series is somehow going to be applied without this patch?
-
-I reposted just the SError rework, patches 1-10 without this patch.
-
-If merged, this would change the arch code to expect SError to be unmasked from
-process context, leaving just the debug disabled after VHE guest-exit.
-
-I was (hurriedly) trying to work out if reposting the SError-rework without this
-patch made the situation worse.
-
-
-Sorry for the confusion!
-
-James
-
-
-
-> Reset: I think this patch is fine in the context of this series..  I now
-> have no idea what we need to do in terms of older kernels.
+> This patch is a port of the task isolation functionality to the arm 32-bit
+> architecture. The task isolation needs an additional thread flag that
+> requires to change the entry assembly code to accept a bitfield larger than
+> one byte.  The constants _TIF_SYSCALL_WORK and _TIF_WORK_MASK are now
+> defined in the literal pool. The rest of the patch is straightforward and
+> reflects what is done on other architectures.
 > 
-> Thanks,
-> -Christoffer
-> 
+> To avoid problems with the tst instruction in the v7m build, we renumber
+> TIF_SECCOMP to bit 8 and let TIF_TASK_ISOLATION use bit 7.
+
+After a bit of digging (which could've been saved if our patch format
+contained information about what kernel version this patch was
+generated against) it turns out that this patch will not apply since
+commit 73ac5d6a2b6ac ("arm/syscalls: Check address limit on user-mode
+return") has been applied, which means the TIF numbers have changed
+as well as the assembly code that your patch touches.
+
+My guess is that this patch was generated from a 4.13 kernel, so
+misses the 4.14-rc1 changes.  Since we're potentially about to start
+the merge window for 4.15 this weekend, the timing of this doesn't
+work well either.
+
+Once 4.15-rc1 has been published, please rebase against that version
+and resend.
+
+Thanks.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
