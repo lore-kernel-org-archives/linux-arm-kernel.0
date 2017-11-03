@@ -1,73 +1,195 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Fri, 3 Nov 2017 09:37:18 +0800
-Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
-In-Reply-To: <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
-References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
- <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
- <1509423579.10793.10.camel@mtkswgap22>
- <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
- <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
-Message-ID: <1509673038.19220.19.camel@mtkswgap22>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Thu,  2 Nov 2017 22:27:44 -0500
+Subject: [PATCH 3/3] arm64: Add software workaround for Falkor erratum 1041
+In-Reply-To: <1509679664-3749-1-git-send-email-shankerd@codeaurora.org>
+References: <1509679664-3749-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <1509679664-3749-4-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The ARM architecture defines the memory locations that are permitted
+to be accessed as the result of a speculative instruction fetch from
+an exception level for which all stages of translation are disabled.
+Specifically, the core is permitted to speculatively fetch from the
+4KB region containing the current program counter and next 4KB.
 
-On Thu, 2017-11-02 at 17:05 +0100, Arnd Bergmann wrote:
-> On Thu, Nov 2, 2017 at 12:47 PM, Matthias Brugger
-> <matthias.bgg@gmail.com> wrote:
-> > Hi Arnd,
-> >
-> > On 10/31/2017 05:19 AM, Ryder Lee wrote:
-> >> Hi Arnd,
-> >>
-> >> We have 3 root ports in MT7623, but this is a bug in this chip where the
-> >> HW designers wired the IRQs in a nonstandard way. We've tried to
-> >> statically assign the bus portion of the address part in the parent
-> >> interrupt-map before, but this approach cannot handle the case - if we
-> >> attach the device in random order.
-> >>
-> >
-> > Ryder, please don't top post :)
+When translation is changed from enabled to disabled for the running
+exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
+Falkor core may errantly speculatively access memory locations outside
+of the 4KB region permitted by the architecture. The errant memory
+access may lead to one of the following unexpected behaviors.
 
-Oh. My bad!
+1) A System Error Interrupt (SEI) being raised by the Falkor core due
+   to the errant memory access attempting to access a region of memory
+   that is protected by a slave-side memory protection unit.
+2) Unpredictable device behavior due to a speculative read from device
+   memory. This behavior may only occur if the instruction cache is
+   disabled prior to or coincident with translation being changed from
+   enabled to disabled.
 
-> >> Thanks.
-> >>
-> >> On Mon, 2017-10-30 at 13:42 +0100, Arnd Bergmann wrote:
-> >>> On Mon, Oct 23, 2017 at 12:06 AM, Matthias Brugger
-> >>> <matthias.bgg@gmail.com> wrote:
-> >>>>
-> >>>> ----------------------------------------------------------------
-> >>>> - mt76233 add PCIe node
-> >>>
-> >>> Could you clarify what the subnodes in the PCI node are for? It seems odd
-> >>> to have "interrupt-map" properties in both the pcie controller and its child
-> >>> nodes, and I want to ensure this is following the standard PCIe binding before
-> >>> I pull it.
-> >>>
-> >
-> > Arnd, I didn't found the pull request in your next/dt branch.
-> > Is there more clarification needed from our side?
-> 
-> I'm still unsure about it., this looks like exactly the thing that the top-level
-> interrupt-map is supposed to handle fine.
-> 
-> Can you send a pull request for the series without the pci child nodes for the
-> moment while we figure out what the exact problem is? We can take
-> whatever fix we come up with during the v4.15 -rc cycle then.
-> 
-> I would assume that either the parent interrupt-map is wrong, or something
-> broke the parser, but that it's not actually something that's wrong in the
-> hardware design in a way that we can't already handle in a standard way.
-> 
-> Ryder, can you be more specific how the interrupts are wired up?
-> Is there one IRQ per slot that is connected to all of IntA/IntB/IntC/IntD
-> and gets propagated through the bridges like that, or is it something else?
+To avoid the errant behavior, software must execute an ISB immediately
+prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
 
-Yes, that's what I mean - we only have one IRQ which is connected to all
-INTx for each slot, and I'm not sure if there is any better way to solve
-this problem. 
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+ Documentation/arm64/silicon-errata.txt |  1 +
+ arch/arm64/Kconfig                     | 10 ++++++++++
+ arch/arm64/include/asm/assembler.h     | 17 +++++++++++++++++
+ arch/arm64/include/asm/cpucaps.h       |  3 ++-
+ arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
+ arch/arm64/kernel/efi-entry.S          |  4 ++--
+ arch/arm64/kernel/head.S               |  4 ++--
+ 7 files changed, 50 insertions(+), 5 deletions(-)
 
->      Arnd
-> 
+diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
+index 66e8ce1..704770c0 100644
+--- a/Documentation/arm64/silicon-errata.txt
++++ b/Documentation/arm64/silicon-errata.txt
+@@ -74,3 +74,4 @@ stable kernels.
+ | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
+ | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
+ | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
++| Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6..7e933fb 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -539,6 +539,16 @@ config QCOM_QDF2400_ERRATUM_0065
+ 
+ 	  If unsure, say Y.
+ 
++config QCOM_FALKOR_ERRATUM_1041
++	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
++	default y
++	help
++	  Falkor CPU may speculatively fetch instructions from an improper
++	  memory location when MMU translation is changed from SCTLR_ELn[M]=1
++	  to SCTLR_ELn[M]=0. Prefix an ISB instruction to fix the problem.
++
++	  If unsure, say Y.
++
+ endmenu
+ 
+ 
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index b6dfb4f..4c91efb 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -30,6 +30,7 @@
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
++#include <asm/alternative.h>
+ 
+ /*
+  * Enable and disable interrupts.
+@@ -514,6 +515,22 @@
+  *   reg: the value to be written.
+  */
+ 	.macro	write_sctlr, eln, reg
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
++alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1041
++	tbnz    \reg, #0, 8000f          // enable MMU?
++	isb
++8000:
++alternative_else_nop_endif
++#endif
++	msr	sctlr_\eln, \reg
++	.endm
++
++	.macro	early_write_sctlr, eln, reg
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
++	tbnz    \reg, #0, 8000f          // enable MMU?
++	isb
++8000:
++#endif
+ 	msr	sctlr_\eln, \reg
+ 	.endm
+ 
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 8da6216..7f7a59d 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -40,7 +40,8 @@
+ #define ARM64_WORKAROUND_858921			19
+ #define ARM64_WORKAROUND_CAVIUM_30115		20
+ #define ARM64_HAS_DCPOP				21
++#define ARM64_WORKAROUND_QCOM_FALKOR_E1041	22
+ 
+-#define ARM64_NCAPS				22
++#define ARM64_NCAPS				23
+ 
+ #endif /* __ASM_CPUCAPS_H */
+diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
+index 0e27f86..27f9a45 100644
+--- a/arch/arm64/kernel/cpu_errata.c
++++ b/arch/arm64/kernel/cpu_errata.c
+@@ -179,6 +179,22 @@ static int cpu_enable_trap_ctr_access(void *__unused)
+ 			   MIDR_CPU_VAR_REV(0, 0)),
+ 	},
+ #endif
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
++	{
++		.desc = "Qualcomm Technologies Falkor erratum 1041",
++		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
++		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
++			MIDR_CPU_VAR_REV(0, 0),
++			MIDR_CPU_VAR_REV(0, 0)),
++	},
++	{
++		.desc = "Qualcomm Technologies Falkor erratum 1041",
++		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
++		MIDR_RANGE(MIDR_QCOM_FALKOR,
++			MIDR_CPU_VAR_REV(0, 1),
++			MIDR_CPU_VAR_REV(0, 2)),
++	},
++#endif
+ #ifdef CONFIG_ARM64_ERRATUM_858921
+ 	{
+ 	/* Cortex-A73 all versions */
+diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
+index acae627..c31be1b 100644
+--- a/arch/arm64/kernel/efi-entry.S
++++ b/arch/arm64/kernel/efi-entry.S
+@@ -96,14 +96,14 @@ ENTRY(entry)
+ 	read_sctlr el2, x0
+ 	bic	x0, x0, #1 << 0	// clear SCTLR.M
+ 	bic	x0, x0, #1 << 2	// clear SCTLR.C
+-	write_sctlr el2, x0
++	early_write_sctlr el2, x0
+ 	isb
+ 	b	2f
+ 1:
+ 	read_sctlr el1, x0
+ 	bic	x0, x0, #1 << 0	// clear SCTLR.M
+ 	bic	x0, x0, #1 << 2	// clear SCTLR.C
+-	write_sctlr el1, x0
++	early_write_sctlr el1, x0
+ 	isb
+ 2:
+ 	/* Jump to kernel entry point */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index b8d5b73..9512ce7 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -511,7 +511,7 @@ install_el2_stub:
+ 	mov	x0, #0x0800			// Set/clear RES{1,0} bits
+ CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
+ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
+-	write_sctlr el1, x0
++	early_write_sctlr el1, x0
+ 
+ 	/* Coprocessor traps. */
+ 	mov	x0, #0x33ff
+@@ -732,7 +732,7 @@ __primary_switch:
+ 	 * to take into account by discarding the current kernel mapping and
+ 	 * creating a new one.
+ 	 */
+-	write_sctlr el1, x20			// disable the MMU
++	early_write_sctlr el1, x20		// disable the MMU
+ 	isb
+ 	bl	__create_page_tables		// recreate kernel mapping
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
