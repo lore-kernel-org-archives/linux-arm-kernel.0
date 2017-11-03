@@ -1,48 +1,39 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 3 Nov 2017 22:22:31 +0800
-Subject: [PATCH 0/3] crypto: marvell - Remove the old CESA driver
-In-Reply-To: <20171011131619.30196-1-boris.brezillon@free-electrons.com>
-References: <20171011131619.30196-1-boris.brezillon@free-electrons.com>
-Message-ID: <20171103142231.GD9011@gondor.apana.org.au>
+Date: Fri, 3 Nov 2017 22:25:29 +0800
+Subject: [PATCH v10 00/20] simplify crypto wait for async op
+In-Reply-To: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
+References: <1508310057-25369-1-git-send-email-gilad@benyossef.com>
+Message-ID: <20171103142528.GL9011@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 11, 2017 at 03:16:16PM +0200, Boris Brezillon wrote:
-> Hello,
+On Wed, Oct 18, 2017 at 08:00:32AM +0100, Gilad Ben-Yossef wrote:
+> Many users of kernel async. crypto services have a pattern of
+> starting an async. crypto op and than using a completion
+> to wait for it to end.
 > 
-> It's been several releases since we added a new driver to support the
-> CESA IP (the new driver was introduced in 4.2). It seems most major
-> bugs have been discovered and fixed and now is probably a good time to
-> kill the old driver and force remaining users to switch to the new one.
+> This patch set simplifies this common use case in two ways:
 > 
-> This series first add a platform_device_id table to the marvell CESA
-> driver so that it can work on non-DT platforms. Then we patch all
-> defconfigs to select the new driver instead of the old. And finally we
-> remove the old driver.
-> These patches have to be applied in this order to make things
-> bisectable, so, if this series is accepted it will have to go through
-> a single tree (either ARM or crypto).
+> First, by separating the return codes of the case where a
+> request is queued to a backlog due to the provider being
+> busy (-EBUSY) from the case the request has failed due
+> to the provider being busy and backlogging is not enabled
+> (-ENOSPC).
 > 
-> Regards,
+> Next, this change is than built on to create a generic API
+> to wait for a async. crypto operation to complete.
 > 
-> Boris
+> The end result is a smaller code base and an API that is
+> easier to use and more difficult to get wrong.
 > 
-> Boris Brezillon (3):
->   crypto: marvell - Add a platform_device_id table
->   ARM: configs: Stop selecting the old CESA driver
->   crypto: marvell - Remove the old mv_cesa driver
+> The patch set was boot tested on x86_64 and arm64 which
+> at the very least tests the crypto users via testmgr and
+> tcrypt but I do note that I do not have access to some
+> of the HW whose drivers are modified nor do I claim I was
+> able to test all of the corner cases.
 > 
->  arch/arm/configs/dove_defconfig     |    2 +-
->  arch/arm/configs/multi_v5_defconfig |    2 +-
->  arch/arm/configs/orion5x_defconfig  |    2 +-
->  drivers/crypto/Kconfig              |   22 +-
->  drivers/crypto/Makefile             |    1 -
->  drivers/crypto/marvell/cesa.c       |   13 +-
->  drivers/crypto/mv_cesa.c            | 1216 -----------------------------------
->  drivers/crypto/mv_cesa.h            |  150 -----
->  8 files changed, 12 insertions(+), 1396 deletions(-)
->  delete mode 100644 drivers/crypto/mv_cesa.c
->  delete mode 100644 drivers/crypto/mv_cesa.h
+> The patch set is based upon linux-next release tagged
+> next-20171017.
 
 All applied.  Thanks.
 -- 
