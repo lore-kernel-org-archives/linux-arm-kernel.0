@@ -1,107 +1,62 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 3 Nov 2017 00:14:37 +0000
-Subject: Build failure with verify size in next-20171102
-In-Reply-To: <20171103000437.GB28231@n2100.armlinux.org.uk>
-References: <20171102193027.GB28152@atomide.com>
- <20171102232038.GA28231@n2100.armlinux.org.uk>
- <20171102234309.GE28152@atomide.com>
- <20171103000437.GB28231@n2100.armlinux.org.uk>
-Message-ID: <20171103001437.GC28231@n2100.armlinux.org.uk>
+From: shuahkh@osg.samsung.com (Shuah Khan)
+Date: Thu, 2 Nov 2017 18:23:54 -0600
+Subject: [PATCH 1/2] media: s5p-mfc: check for firmware allocation before
+ requesting firmware
+In-Reply-To: <5bbc048a-4b68-de23-373d-eb8a12c5b736@samsung.com>
+References: <cover.1507325072.git.shuahkh@osg.samsung.com>
+ <CGME20171006213015epcas3p2c0d4741e06b2d8c25583fb656b7f5532@epcas3p2.samsung.com>
+ <e7c1ad0167ca363cc783be11871a04957127a3fa.1507325072.git.shuahkh@osg.samsung.com>
+ <5bbc048a-4b68-de23-373d-eb8a12c5b736@samsung.com>
+Message-ID: <9b86cd70-9063-bf45-6851-73c2f982de5b@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 12:04:37AM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 02, 2017 at 04:43:09PM -0700, Tony Lindgren wrote:
-> > * Russell King - ARM Linux <linux@armlinux.org.uk> [171102 23:22]:
-> > > On Thu, Nov 02, 2017 at 12:30:27PM -0700, Tony Lindgren wrote:
-> > > > Hi Russeell,
-> > > > 
-> > > > I think you're already aware of the build failure caused by commit
-> > > > 078c0927485e ("ARM: verify size of zImage"), but here's info just
-> > > > in case.
-> > > > 
-> > > > arm-unknown-linux-musleabi-ld.bfd: error: zImage file size is incorrect
-> > > > make[2]: *** [arch/arm/boot/compressed/Makefile:185: arch/arm/boot/compressed/vmlinux] Error 1
-> > > > make[1]: *** [arch/arm/boot/Makefile:64: arch/arm/boot/compressed/vmlinux] Error 2
-> > > > make: *** [arch/arm/Makefile:335: zImage] Error 2
-> > > > 
-> > > > Other than that I was surprised that next actually booted for me
-> > > > after a few week break with Linux next! :)
-> > > 
-> > > It would be nice if people can investigate why that happens - I'm
-> > > completely unable to reproduce it locally, even if I link using 
-> > > the same vmlinux.lds file and the objects from someone who sees the
-> > > failure.
-> > > 
-> > > There's some binutils version specific stuff that's going on here.
-> > > 
-> > > What I have in my current for-next, which I'm intending to push,
-> > > is all the same patches except the patch that introduces the above
-> > > check is subsituted by a patch that produces an extra _edata_real
-> > > symbol.  This _should_ match _edata.  So, if you hit this failure,
-> > > try either my current for-next branch or tomorrow's linux-next, and
-> > > run arm-linux-nm on arch/arm/boot/compressed/vmlinux and check the
-> > > addresses given for _edata and _edata_real.
-> > 
-> > OK thanks reverting 078c0927485e and applying dad4675388fc ("ARM:
-> > add debug ".edata_real" symbol") from your for-next branch builds
-> > and boots for me.
-> > 
-> > > Theory says they should be identical, but the failure of that assert
-> > > could only happen if "." inside the output section was different from
-> > > _edata assigned outside.  _edata_real is now the address of "." inside
-> > > the output section.
-> > 
-> > With 078c0927485e reverted and dad4675388fc applied they are
-> > identical for me:
-> > 
-> > $ ${armcompiler}nm arch/arm/boot/compressed/vmlinux | grep _edata
-> > 00421960 D _edata
-> > 00421960 D _edata_real
-> > 
-> > Let me know if you want me to run some test with the failing
-> > commit also.
+On 11/02/2017 02:12 AM, Andrzej Hajda wrote:
+> Hi Shuah,
 > 
-> So:
+> On 06.10.2017 23:30, Shuah Khan wrote:
+>> Check if firmware is allocated before requesting firmware instead of
+>> requesting firmware only to release it if firmware is not allocated.
+>>
+>> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
+>> ---
+>>  drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c | 10 +++++-----
+>>  1 file changed, 5 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+>> index 69ef9c2..f064a0d1 100644
+>> --- a/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+>> +++ b/drivers/media/platform/s5p-mfc/s5p_mfc_ctrl.c
+>> @@ -55,6 +55,11 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
+>>  	 * into kernel. */
+>>  	mfc_debug_enter();
+>>  
+>> +	if (!dev->fw_buf.virt) {
+>> +		mfc_err("MFC firmware is not allocated\n");
+>> +		return -EINVAL;
+>> +	}
+>> +
+>>  	for (i = MFC_FW_MAX_VERSIONS - 1; i >= 0; i--) {
+>>  		if (!dev->variant->fw_name[i])
+>>  			continue;
+>> @@ -75,11 +80,6 @@ int s5p_mfc_load_firmware(struct s5p_mfc_dev *dev)
+>>  		release_firmware(fw_blob);
+>>  		return -ENOMEM;
+>>  	}
+>> -	if (!dev->fw_buf.virt) {
+>> -		mfc_err("MFC firmware is not allocated\n");
+>> -		release_firmware(fw_blob);
+>> -		return -EINVAL;
+>> -	}
 > 
->   .image_end (NOLOAD) : {
->      ASSERT(. == _edata, "...");
->   }
+> Is there any scenario in which dev->fw_buf.virt is null and
+> s5p_mfc_load_firmware is called?
+> I suspect this check is not necessary at all.
 > 
-> fails, because . != _edata, but:
-> 
->   .image_end (NOLOAD) : {
->      _edata_real = .;
->   }
-> 
-> produces an image where _edata_real == _edata.
-> 
-> That's completely insane and illogical.  *Shrug*.  God knows what's
-> going on there.
 
-Reading through the "ld" documentation for ".":
+I don't believe so. Allocation is done in s5p_mfc_configure_dma_memory()
+code path and if that fails it bails out of _probe. I can remove the check
+all together.
 
-     Note: '.' actually refers to the byte offset from the start of the
-  current containing object.  Normally this is the 'SECTIONS' statement,
-  whose start address is 0, hence '.' can be used as an absolute address.
-  If '.' is used inside a section description however, it refers to the
-  byte offset from the start of that section, not an absolute address.
-
-If that _were_ true, then _edata_real should be zero, because it's
-used inside a section description and it should be the "byte offset
-from the start of that section, not an absolute address".  It isn't.
-So, this documentation is blatently wrong and misleading.  In fact,
-we use this fact that "." refers to the virtual address in the generic
-parts of the linker script.
-
-I don't think we can trust anything the ld documentation says about "."
-and by extension, I don't think we can trust ld's behaviour in how "."
-behaves.
-
-Quite where we go from here, I've no idea, because I don't see how we
-can trust the linker's behaviour with linker scripts.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+thanks,
+-- Shuah
