@@ -1,70 +1,127 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Fri, 3 Nov 2017 10:10:30 +0000
-Subject: [PATCH 13/17] coresight etr: Do not clean ETR trace buffer
-In-Reply-To: <20171102203623.GE23320@xps15>
-References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-14-suzuki.poulose@arm.com>
- <20171102203623.GE23320@xps15>
-Message-ID: <c7a89f16-3974-69aa-505f-a3395d0579e6@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 3 Nov 2017 10:43:16 +0000
+Subject: SDP4430 nightly regression (was: Re: [GIT PULL] two omap regression
+ fixes)
+In-Reply-To: <pull-1509652473-291160@atomide.com>
+References: <pull-1509652473-291160@atomide.com>
+Message-ID: <20171103104316.GE28231@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/17 20:36, Mathieu Poirier wrote:
-> On Thu, Oct 19, 2017 at 06:15:49PM +0100, Suzuki K Poulose wrote:
->> We zero out the entire trace buffer used for ETR before it
->> is enabled, for helping with debugging. Since we could be
->> restoring a session in perf mode, this could destroy the data.
+On Thu, Nov 02, 2017 at 12:55:33PM -0700, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
 > 
-> I'm not sure to follow you with "... restoring a session in perf mode ...".
-> When operating from the perf interface all the memory allocated for a session is
-> cleanup after, there is no re-using of memory as in sysFS.
+> The following changes since commit 4afa616ce937f88d9a69a71b8c561551596a81e3:
+> 
+>   ARM: dts: am43xx-epos-evm: Remove extra CPSW EMAC entry (2017-09-19 10:59:26 -0700)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.14/fixes-rc7-signed
+> 
+> for you to fetch changes up to 6301d58477bc11116c78c9542871f27ae374278d:
+> 
+>   ARM: OMAP2/3: CM: fix cm_split_idlest functionality (2017-10-30 09:14:55 -0700)
+> 
+> ----------------------------------------------------------------
+> Two regression fixes for omap3 to fix mmc3 issues noticed on nokia n9.
+> 
+> These have been broken for a few months and we don't have the LCD yet
+> functional on n9. So these can wait for the merge window if considered
+> too late for the -rc cycle at this point.
+> 
+> ----------------------------------------------------------------
+> Tero Kristo (2):
+>       ARM: OMAP3: hwmod_data: add missing module_offs for MMC3
+>       ARM: OMAP2/3: CM: fix cm_split_idlest functionality
+> 
+>  arch/arm/mach-omap2/cm_common.c            | 6 +++++-
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c | 1 +
+>  arch/arm/mach-omap2/prcm-common.h          | 1 +
+>  3 files changed, 7 insertions(+), 1 deletion(-)
 
-We could directly use the perf ring buffer for the ETR. In that case, the perf
-ring buffer could contain trace data collected from the previous "schedule"
-which the userspace hasn't collected yet. So, doing a memset here would
-destroy that data.
+I don't know if this is covered in your pull request, but since 31st
+October, the SDP4430 no longer recovers from a hibernation attempt.
+(as found by my nightly tests).
 
-Cheers
-Suzuki
+4.14-rc6+ plus my tree plus arm-soc/for-next branch worked fine:
 
-> 
->> Get rid of this step, if someone wants to debug, they can always
->> add it as and when needed.
->>
->> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
->> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
->> ---
->>   drivers/hwtracing/coresight/coresight-tmc-etr.c | 7 ++-----
->>   1 file changed, 2 insertions(+), 5 deletions(-)
->>
->> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etr.c b/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> index 31353fc34b53..849684f85443 100644
->> --- a/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> +++ b/drivers/hwtracing/coresight/coresight-tmc-etr.c
->> @@ -971,8 +971,6 @@ static void tmc_etr_enable_hw(struct tmc_drvdata *drvdata,
->>   		return;
->>   
->>   	drvdata->etr_buf = etr_buf;
->> -	/* Zero out the memory to help with debug */
->> -	memset(etr_buf->vaddr, 0, etr_buf->size);
-> 
-> I agree, this can be costly when dealing with large areas of memory.
-> 
->>   
->>   	CS_UNLOCK(drvdata->base);
->>   
->> @@ -1267,9 +1265,8 @@ int tmc_read_unprepare_etr(struct tmc_drvdata *drvdata)
->>   	if (drvdata->mode == CS_MODE_SYSFS) {
->>   		/*
->>   		 * The trace run will continue with the same allocated trace
->> -		 * buffer. The trace buffer is cleared in tmc_etr_enable_hw(),
->> -		 * so we don't have to explicitly clear it. Also, since the
->> -		 * tracer is still enabled drvdata::buf can't be NULL.
->> +		 * buffer. Since the tracer is still enabled drvdata::buf can't
->> +		 * be NULL.
->>   		 */
->>   		tmc_etr_enable_hw(drvdata, drvdata->sysfs_buf);
->>   	} else {
->> -- 
->> 2.13.6
->>
+root at omap-4430sdp:~# if [ -f /sys/power/disk ]; then echo reboot > /sys/power/disk; echo disk > /sys/power/state; fi
+PM: hibernation entry
+PM: Syncing filesystems ...
+PM: done.
+Freezing user space processes ... (elapsed 0.022 seconds) done.
+OOM killer disabled.
+PM: Basic memory bitmaps created
+PM: Preallocating image memory... done (allocated 13293 pages)
+PM: Allocated 53172 kbytes in 0.17 seconds (312.77 MB/s)
+Freezing remaining freezable tasks ... (elapsed 0.016 seconds) done.
+Suspending console(s) (use no_console_suspend to debug)
+omap_hwmod: gpio2: _wait_target_disable failed
+Disabling non-boot CPUs ...
+PM: Creating hibernation image:
+PM: Need to copy 13028 pages
+PM: Normal pages needed: 9836 + 1024, available pages: 53639
+PM: Hibernation image created (13028 pages copied)
+Enabling non-boot CPUs ...
+CPU1 is up
+PM: Cannot find swap device, try swapon -a.
+PM: Cannot get swap writer
+PM: Basic memory bitmaps freed
+OOM killer enabled.
+Restarting tasks ... done.
+PM: hibernation exit
+root at omap-4430sdp:~#
+
+The above is an example of success - it's intentional that there's no
+swap, which prevents the system entering hibernation.  The purpose of
+this test is to exercise the PM and CPU hotplug paths.
+
+4.14-rc7+ plus my tree plus arm-soc/for-next now fails:
+
+root at omap-4430sdp:~# if [ -f /sys/power/disk ]; then echo reboot > /sys/power/disk; echo disk > /sys/power/state; fi
+PM: hibernation entry
+PM: Syncing filesystems ...
+PM: done.
+Freezing user space processes ... (elapsed 0.022 seconds) done.
+OOM killer disabled.
+PM: Basic memory bitmaps created
+PM: Preallocating image memory... done (allocated 13200 pages)
+PM: Allocated 52800 kbytes in 0.17 seconds (310.58 MB/s)
+Freezing remaining freezable tasks ... (elapsed 0.015 seconds) done.
+Suspending console(s) (use no_console_suspend to debug)
+
+>From what I can see, there's no change in arm-soc/for-next across that
+period - the same SHA1 hash was merged for the build tree update
+on the 27th October as was used on the 30th October.
+
+There's no change (apart from the SHA hashes, the diff between them is
+empty) in the branch I merged between those two dates either for my
+tree.  The SHA hash change was due to squashing some MPS3 changes to
+fix a build error for the recently added mps3 build target in the
+builder.
+
+The material difference is Linus' tip, which changed from f34157878d3b
+("Merge tag 'nfs-for-4.14-4' of git://git.linux-nfs.org/projects/trondmy/linux-nfs")
+to 0b07194bb55e ("Linux 4.14-rc7").
+
+In the diffstat between the two build trees (post merge), I don't see
+anything in arch/arm that could account for it.  I do see some power
+changes:
+
+ drivers/base/power/domain_governor.c               |  53 +--
+ drivers/base/power/qos.c                           |   2 +-
+ drivers/base/power/runtime.c                       |   2 +-
+ drivers/base/power/sysfs.c                         |  25 +-
+
+but nothing in tty or serial.  These power changes look like QoS
+changes, which probably aren't related.
+
+Just to make sure, I've diffed the build tree SHAs and the change in
+Linus' tip, and the two diffs match apart from a couple of SHA blob
+hashes on a couple of files (EFI stub and MAINTAINERS).
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
