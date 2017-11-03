@@ -1,37 +1,103 @@
-From: suzuki.poulose@arm.com (Suzuki K Poulose)
-Date: Fri,  3 Nov 2017 11:45:18 +0000
-Subject: [PATCH 2/2] arm-ccn: perf: Prevent module unload while PMU is in use
-In-Reply-To: <20171103114518.5311-1-suzuki.poulose@arm.com>
-References: <20171103114518.5311-1-suzuki.poulose@arm.com>
-Message-ID: <20171103114518.5311-2-suzuki.poulose@arm.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 3 Nov 2017 11:50:56 +0000
+Subject: [RFC 0/7] arm64: provide pseudo NMI with GICv3
+In-Reply-To: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <06cbf39f-dec0-41fa-329d-33e65d244144@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the PMU driver is built as a module, the perf expects the
-pmu->module to be valid, so that the driver is prevented from
-being unloaded while it is in use. Fix the CCN pmu driver to
-fill in this field.
+Gentle ping on this series.
 
-Fixes: commit a33b0daab73a0 ("bus: ARM CCN PMU driver")
-Cc: Pawel Moll <pawel.moll@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/arm-ccn.c | 1 +
- 1 file changed, 1 insertion(+)
+On 11/10/17 14:00, Julien Thierry wrote:
+> Hi,
+> 
+> This series is a continuation of the work started by Daniel [1]. The goal is
+> to use GICv3 interrupt priorities to simulate an NMI.
+> 
+> To achieve this, set two priorities, one for standard interrupts and
+> another, higher priority, for NMIs. Whenever we want to disable interrupts,
+> we mask the standard priority instead so NMIs can still be raised. Some
+> corner cases though still require to actually mask all interrupts
+> effectively disabling the NMI.
+> 
+> Of course, using priority masking instead of PSR.I comes at some cost. On
+> hackbench, I notice a ~6% drop of performance. However, on a kernel build,
+> I do not see significant differences.
+> 
+> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
+> for now. I don't think there is any reason LPIs should be allowed to be set
+> as NMI as they do not have an active state.
+> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
+> 
+> Requirements to use this:
+> - Have GICv3
+> - SCR_EL3.FIQ is set to 1 when linux runs
+> - Select Kernel Feature -> Use ICC system registers for IRQ masking
+> 
+>  From my testing with the perf interrupt, there doesn't seem to be any major
+> issue left (but if you find some, do tell!).
+> 
+> * Patches 1 and 5 are minor utility changes.
+> * Patches 2 and 3 allows to detect and enable the use of GICv3 system
+>    registers during boot time.
+> * Patch 4 introduces the masking of IRQs using priorities replacing irq
+>    disabling.
+> * Patch 6 add detection of the view linux has on GICv3 priorities, without
+>    this we cannot easily mask specific priorities in an accurate manner
+> * Patch 7 adds the support for NMIs
+> 
+> 
+> [1] http://www.spinics.net/lists/arm-kernel/msg525077.html
+> 
+> Thanks,
+> 
+> Julien Thierry
+> 
+> 
+> Daniel Thompson (4):
+>    arm64: irqflags: Reorder the fiq & async macros
+>    arm64: cpufeature: Allow early detect of specific features
+>    arm64: alternative: Apply alternatives early in boot process
+>    arm64: irqflags: Use ICC sysregs to implement IRQ masking
+> 
+> Julien Thierry (3):
+>    irqchip/gic: Add functions to access irq priorities
+>    arm64: Detect current view of GIC priorities
+>    arm64: Add support for pseudo-NMIs
+> 
+>   Documentation/arm64/booting.txt        |   5 +
+>   arch/arm64/Kconfig                     |  15 ++
+>   arch/arm64/include/asm/alternative.h   |   1 +
+>   arch/arm64/include/asm/arch_gicv3.h    |  24 +++
+>   arch/arm64/include/asm/assembler.h     |  33 +++-
+>   arch/arm64/include/asm/efi.h           |   5 +
+>   arch/arm64/include/asm/irqflags.h      | 143 +++++++++++++++-
+>   arch/arm64/include/asm/kvm_host.h      |  40 +++++
+>   arch/arm64/include/asm/processor.h     |   4 +
+>   arch/arm64/include/asm/ptrace.h        |  14 +-
+>   arch/arm64/include/asm/sysreg.h        |   1 +
+>   arch/arm64/kernel/alternative.c        |  39 ++++-
+>   arch/arm64/kernel/asm-offsets.c        |   1 +
+>   arch/arm64/kernel/cpufeature.c         |  67 +++++---
+>   arch/arm64/kernel/entry.S              | 132 ++++++++++++--
+>   arch/arm64/kernel/head.S               |  38 +++++
+>   arch/arm64/kernel/process.c            |   6 +
+>   arch/arm64/kernel/smp.c                |  14 ++
+>   arch/arm64/mm/proc.S                   |  23 +++
+>   drivers/irqchip/irq-gic-common.c       |  10 ++
+>   drivers/irqchip/irq-gic-common.h       |   2 +
+>   drivers/irqchip/irq-gic-v3-its.c       |   2 +-
+>   drivers/irqchip/irq-gic-v3.c           | 304 +++++++++++++++++++++++++++++----
+>   include/linux/interrupt.h              |   1 +
+>   include/linux/irqchip/arm-gic-common.h |   6 +
+>   include/linux/irqchip/arm-gic.h        |   5 -
+>   26 files changed, 845 insertions(+), 90 deletions(-)
+> 
+> --
+> 1.9.1
+> 
 
-diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-index e8c6946fed9d..3063f5312397 100644
---- a/drivers/bus/arm-ccn.c
-+++ b/drivers/bus/arm-ccn.c
-@@ -1276,6 +1276,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
- 
- 	/* Perf driver registration */
- 	ccn->dt.pmu = (struct pmu) {
-+		.module = THIS_MODULE,
- 		.attr_groups = arm_ccn_pmu_attr_groups,
- 		.task_ctx_nr = perf_invalid_context,
- 		.event_init = arm_ccn_pmu_event_init,
 -- 
-2.13.6
+Julien Thierry
