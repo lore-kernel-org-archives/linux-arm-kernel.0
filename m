@@ -1,59 +1,34 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Fri,  3 Nov 2017 10:11:46 -0700
-Subject: [PATCH 02/15] kbuild: fix LD_DEAD_CODE_DATA_ELIMINATION with GNU gold
+Date: Fri,  3 Nov 2017 10:11:50 -0700
+Subject: [PATCH 06/15] efi/libstub: disable clang LTO
 In-Reply-To: <20171103171203.107569-1-samitolvanen@google.com>
 References: <20171103171203.107569-1-samitolvanen@google.com>
-Message-ID: <20171103171203.107569-3-samitolvanen@google.com>
+Message-ID: <20171103171203.107569-7-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't remove .head.text or .exitcall.exit when linking with --gc-sections,
-and include .init.text.* in .init.text and .init.rodata.* in .init.rodata.
+With CONFIG_CLANG_LTO, we produce LLVM IR instead of object files. Since LTO
+is not really needed here and the Makefile assumes we produce an object file,
+disable LTO for libstub.
 
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
- include/asm-generic/vmlinux.lds.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/firmware/efi/libstub/Makefile | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index 8acfc1e099e1..d0070985c191 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -511,7 +511,7 @@
- 		VMLINUX_SYMBOL(__softirqentry_text_end) = .;
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index 2371a92808be..5146eee677ce 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -20,7 +20,8 @@ cflags-$(CONFIG_EFI_ARMSTUB)	+= -I$(srctree)/scripts/dtc/libfdt
+ KBUILD_CFLAGS			:= $(cflags-y) -DDISABLE_BRANCH_PROFILING \
+ 				   -D__NO_FORTIFY \
+ 				   $(call cc-option,-ffreestanding) \
+-				   $(call cc-option,-fno-stack-protector)
++				   $(call cc-option,-fno-stack-protector) \
++				   $(DISABLE_LTO)
  
- /* Section used for early init (in .S files) */
--#define HEAD_TEXT  *(.head.text)
-+#define HEAD_TEXT  KEEP(*(.head.text))
- 
- #define HEAD_TEXT_SECTION							\
- 	.head.text : AT(ADDR(.head.text) - LOAD_OFFSET) {		\
-@@ -556,7 +556,7 @@
- 	MEM_DISCARD(init.data)						\
- 	KERNEL_CTORS()							\
- 	MCOUNT_REC()							\
--	*(.init.rodata)							\
-+	*(.init.rodata .init.rodata.*)					\
- 	FTRACE_EVENTS()							\
- 	TRACE_SYSCALLS()						\
- 	KPROBE_BLACKLIST()						\
-@@ -575,7 +575,7 @@
- 	EARLYCON_TABLE()
- 
- #define INIT_TEXT							\
--	*(.init.text)							\
-+	*(.init.text .init.text.*)					\
- 	*(.text.startup)						\
- 	MEM_DISCARD(init.text)
- 
-@@ -592,7 +592,7 @@
- 	MEM_DISCARD(exit.text)
- 
- #define EXIT_CALL							\
--	*(.exitcall.exit)
-+	KEEP(*(.exitcall.exit))
- 
- /*
-  * bss (Block Started by Symbol) - uninitialized data
+ GCOV_PROFILE			:= n
+ KASAN_SANITIZE			:= n
 -- 
 2.15.0.403.gc27cc4dac6-goog
