@@ -1,34 +1,112 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Fri, 3 Nov 2017 09:12:04 +0100
-Subject: Performance issues writing to PCIe in a Zynq
-In-Reply-To: <1509636637116.27702@axon.tv>
-References: <1509636637116.27702@axon.tv>
-Message-ID: <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 3 Nov 2017 08:22:51 +0000
+Subject: Build failure with verify size in next-20171102
+In-Reply-To: <20171103001437.GC28231@n2100.armlinux.org.uk>
+References: <20171102193027.GB28152@atomide.com>
+ <20171102232038.GA28231@n2100.armlinux.org.uk>
+ <20171102234309.GE28152@atomide.com>
+ <20171103000437.GB28231@n2100.armlinux.org.uk>
+ <20171103001437.GC28231@n2100.armlinux.org.uk>
+Message-ID: <CAKv+Gu_E66aC7iLcqtszpx2yYSC1eskQ3JAm4QXAPhTPBw7nhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 3 November 2017 at 00:14, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Fri, Nov 03, 2017 at 12:04:37AM +0000, Russell King - ARM Linux wrote:
+>> On Thu, Nov 02, 2017 at 04:43:09PM -0700, Tony Lindgren wrote:
+>> > * Russell King - ARM Linux <linux@armlinux.org.uk> [171102 23:22]:
+>> > > On Thu, Nov 02, 2017 at 12:30:27PM -0700, Tony Lindgren wrote:
+>> > > > Hi Russeell,
+>> > > >
+>> > > > I think you're already aware of the build failure caused by commit
+>> > > > 078c0927485e ("ARM: verify size of zImage"), but here's info just
+>> > > > in case.
+>> > > >
+>> > > > arm-unknown-linux-musleabi-ld.bfd: error: zImage file size is incorrect
+>> > > > make[2]: *** [arch/arm/boot/compressed/Makefile:185: arch/arm/boot/compressed/vmlinux] Error 1
+>> > > > make[1]: *** [arch/arm/boot/Makefile:64: arch/arm/boot/compressed/vmlinux] Error 2
+>> > > > make: *** [arch/arm/Makefile:335: zImage] Error 2
+>> > > >
+>> > > > Other than that I was surprised that next actually booted for me
+>> > > > after a few week break with Linux next! :)
+>> > >
+>> > > It would be nice if people can investigate why that happens - I'm
+>> > > completely unable to reproduce it locally, even if I link using
+>> > > the same vmlinux.lds file and the objects from someone who sees the
+>> > > failure.
+>> > >
+>> > > There's some binutils version specific stuff that's going on here.
+>> > >
+>> > > What I have in my current for-next, which I'm intending to push,
+>> > > is all the same patches except the patch that introduces the above
+>> > > check is subsituted by a patch that produces an extra _edata_real
+>> > > symbol.  This _should_ match _edata.  So, if you hit this failure,
+>> > > try either my current for-next branch or tomorrow's linux-next, and
+>> > > run arm-linux-nm on arch/arm/boot/compressed/vmlinux and check the
+>> > > addresses given for _edata and _edata_real.
+>> >
+>> > OK thanks reverting 078c0927485e and applying dad4675388fc ("ARM:
+>> > add debug ".edata_real" symbol") from your for-next branch builds
+>> > and boots for me.
+>> >
+>> > > Theory says they should be identical, but the failure of that assert
+>> > > could only happen if "." inside the output section was different from
+>> > > _edata assigned outside.  _edata_real is now the address of "." inside
+>> > > the output section.
+>> >
+>> > With 078c0927485e reverted and dad4675388fc applied they are
+>> > identical for me:
+>> >
+>> > $ ${armcompiler}nm arch/arm/boot/compressed/vmlinux | grep _edata
+>> > 00421960 D _edata
+>> > 00421960 D _edata_real
+>> >
+>> > Let me know if you want me to run some test with the failing
+>> > commit also.
+>>
+>> So:
+>>
+>>   .image_end (NOLOAD) : {
+>>      ASSERT(. == _edata, "...");
+>>   }
+>>
+>> fails, because . != _edata, but:
+>>
+>>   .image_end (NOLOAD) : {
+>>      _edata_real = .;
+>>   }
+>>
+>> produces an image where _edata_real == _edata.
+>>
+>> That's completely insane and illogical.  *Shrug*.  God knows what's
+>> going on there.
+>
+> Reading through the "ld" documentation for ".":
+>
+>      Note: '.' actually refers to the byte offset from the start of the
+>   current containing object.  Normally this is the 'SECTIONS' statement,
+>   whose start address is 0, hence '.' can be used as an absolute address.
+>   If '.' is used inside a section description however, it refers to the
+>   byte offset from the start of that section, not an absolute address.
+>
+> If that _were_ true, then _edata_real should be zero, because it's
+> used inside a section description and it should be the "byte offset
+> from the start of that section, not an absolute address".  It isn't.
+> So, this documentation is blatently wrong and misleading.  In fact,
+> we use this fact that "." refers to the virtual address in the generic
+> parts of the linker script.
+>
+> I don't think we can trust anything the ld documentation says about "."
+> and by extension, I don't think we can trust ld's behaviour in how "."
+> behaves.
+>
+> Quite where we go from here, I've no idea, because I don't see how we
+> can trust the linker's behaviour with linker scripts.
+>
 
-On 2.11.2017 16:30, Ruben Guerra Marin wrote:
-> Hi,
-> 
-> 
-> I have the a Zynq board running petalinux, and it is connected through PCIe to a Virtex Ultrascale board. I configured the Ultrascale for Tandem PCIe, which the second stage bitstream is being programmed from the Zynq board (I crossed compiled the mcap application that Xilinx provides).
-> 
-> 
-> 
-> This works perfectly, but takes around ~12 seconds to program the second stage bitstream (compressed is ~12 MB), which is quite slow. We also tried debugging the mcap application and pciutils. We found out the operation that takes long to execute: In pciutils, the instruction to actually call the write to the driver (pwrite) takes approximately 6uS, so if you add up this for 12 MB then you can see why it takes so long. Why is this so slow? Is this maybe a problem with the driver?
-> 
-> 
-> For testing, I added an ILA to the AXI bus in between the Zynq GP1 and the PCIe IP control registers port. I triggered halfway the programming of the bitstream using the mcap program provided by Xilinx. I can see that it is writing to address x358, which according to the *datasheet* (https://www.xilinx.com/Attachment/Xilinx_Answer_64761__UltraScale_Devices.pdf) is the Write Data Register, which is correct (and again, I know the whole bitstream gets programmed correctly).
-> 
-> 
-> 
-> But what I also see is that a "awvalid" being asserted to the next one it takes 245 cycles, and I can imagine this is why it takes 12 seconds to program a 12MB bitstream.
-> 
-> ?
+Could we try moving the ASSERT after the section, and using
 
-Bharat: Can you please take a look at this?
+ASSERT(ADDR(.image_end) == _edata, "...");
 
-Thanks,
-Michal
+instead?
