@@ -1,51 +1,73 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 3 Nov 2017 13:41:54 +0000
-Subject: [PATCH 00/23] KAISER: unmap most of the kernel from userspace
- page tables
-In-Reply-To: <816a3491-3c2c-ec0a-810f-b593c25968f2@linux.intel.com>
-References: <20171031223146.6B47C861@viggo.jf.intel.com>
- <20171102190106.GC22263@arm.com>
- <816a3491-3c2c-ec0a-810f-b593c25968f2@linux.intel.com>
-Message-ID: <20171103134154.GB13499@arm.com>
+Date: Fri, 3 Nov 2017 13:42:24 +0000
+Subject: [PATCH v2] arm64: support __int128 on gcc 5+
+In-Reply-To: <20171102174322.21853-1-Jason@zx2c4.com>
+References: <20171102134720.GA17333@arm.com>
+ <20171102174322.21853-1-Jason@zx2c4.com>
+Message-ID: <20171103134223.GD13499@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 12:38:05PM -0700, Dave Hansen wrote:
-> On 11/02/2017 12:01 PM, Will Deacon wrote:
-> > On Tue, Oct 31, 2017 at 03:31:46PM -0700, Dave Hansen wrote:
-> >> KAISER makes it harder to defeat KASLR, but makes syscalls and
-> >> interrupts slower.  These patches are based on work from a team at
-> >> Graz University of Technology posted here[1].  The major addition is
-> >> support for Intel PCIDs which builds on top of Andy Lutomorski's PCID
-> >> work merged for 4.14.  PCIDs make KAISER's overhead very reasonable
-> >> for a wide variety of use cases.
-> > I just wanted to say that I've got a version of this up and running for
-> > arm64. I'm still ironing out a few small details, but I hope to post it
-> > after the merge window. We always use ASIDs, and the perf impact looks
-> > like it aligns roughly with your findings for a PCID-enabled x86 system.
+Hi Jason,
+
+[+Ard]
+
+On Thu, Nov 02, 2017 at 06:43:22PM +0100, Jason A. Donenfeld wrote:
+> Versions of gcc prior to gcc 5 emitted a __multi3 function call when
+> dealing with TI types, resulting in failures when trying to link to
+> libgcc, and more generally, bad performance. However, since gcc 5,
+> the compiler supports actually emitting fast instructions, which means
+> we can at long last enable this option and receive the speedups.
 > 
-> Welcome to the party!
+> The gcc commit that added proper Aarch64 support is:
+> https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+> This commit appears to be part of the gcc 5 release.
 > 
-> I don't know if you've found anything different, but there been woefully
-> little code that's really cross-architecture.  The kernel task
-> stack-mapping stuff _was_, but it's going away.  The per-cpu-user-mapped
-> section stuff might be common, I guess.
+> There are still a few instructions, such as __ashlti3 and __ashrti3,
+> that require libgcc, which is fine. So, we also link to libgcc for these
+> functions when needed, which is what several other architectures already
+> have been doing for a long time.
+> 
+> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+> ---
+>  arch/arm64/Makefile | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
 
-I currently don't have anything mapped other than the trampoline page, so
-I haven't had to do per-cpu stuff (yet). This will interfere with perf
-tracing using SPE, but if that's the only thing that needs it then it's
-a hard sell, I think.
+We used to link against libgcc way back when, but that dependency was
+removed in commit d67703a8a69e ("arm64: kill off the libgcc dependency")
+and I'm really not keen to add it back. I also think that there might
+be licensing concerns if you link against it and make use of GCC plugins,
+but IANAL.
 
-> Is there any other common infrastructure that we can or should be sharing?
+Shouldn't we just provide our own implementations of __ashlti3 and
+__ashrti3 instead?
 
-I really can't see anything. My changes are broadly divided into:
-
-  * Page table setup
-  * Exception entry/exit via trampoline
-  * User access (e.g. get_user)
-  * TLB invalidation
-  * Context switch (backend of switch_mm)
-
-which is all deeply arch-specific.
+Cheers,
 
 Will
+
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index 939b310913cf..70c7c0c1bccb 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -53,6 +53,8 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
+>  KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
+>  KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
+>  
+> +KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
+> +
+>  ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
+>  KBUILD_CPPFLAGS	+= -mbig-endian
+>  CHECKFLAGS	+= -D__AARCH64EB__
+> @@ -108,7 +110,7 @@ core-$(CONFIG_NET) += arch/arm64/net/
+>  core-$(CONFIG_KVM) += arch/arm64/kvm/
+>  core-$(CONFIG_XEN) += arch/arm64/xen/
+>  core-$(CONFIG_CRYPTO) += arch/arm64/crypto/
+> -libs-y		:= arch/arm64/lib/ $(libs-y)
+> +libs-y		:= arch/arm64/lib/ $(shell $(CC) $(KBUILD_CFLAGS) -print-libgcc-file-name) $(libs-y)
+>  core-$(CONFIG_EFI_STUB) += $(objtree)/drivers/firmware/efi/libstub/lib.a
+>  
+>  # Default target when executing plain make
+> -- 
+> 2.14.2
+> 
