@@ -1,238 +1,104 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri,  3 Nov 2017 14:47:50 +0000
-Subject: [PATCH v4 13/20] firmware: arm_scmi: refactor in preparation to
- support per-protocol channels
+Date: Fri,  3 Nov 2017 14:47:48 +0000
+Subject: [PATCH v4 11/20] firmware: arm_scmi: add support for polling based
+ SCMI transfers
 In-Reply-To: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
 References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
-Message-ID: <1509720477-18936-14-git-send-email-sudeep.holla@arm.com>
+Message-ID: <1509720477-18936-12-git-send-email-sudeep.holla@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support per-protocol channels if available, we need to
-factor out all the mailbox channel information(Tx/Rx payload and
-channel handle) out of the main SCMI instance information structure.
+It would be useful to have options to perform some SCMI transfers
+atomically by polling for the completion flag instead of interrupt
+driven. The SCMI specification has option to disable the interrupt and
+poll for the completion flag in the shared memory.
 
-This patch refactors the existing channel information into a separate
-chan_info structure.
+This patch adds support for polling based SCMI transfers using that
+option. This might be used for uninterrupted/atomic DVFS operations
+from the scheduler context.
 
 Cc: Arnd Bergmann <arnd@arndb.de>
 Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 ---
- drivers/firmware/arm_scmi/driver.c | 86 ++++++++++++++++++++++++--------------
- 1 file changed, 54 insertions(+), 32 deletions(-)
+ drivers/firmware/arm_scmi/driver.c | 49 +++++++++++++++++++++++++++++++-------
+ 1 file changed, 41 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/firmware/arm_scmi/driver.c b/drivers/firmware/arm_scmi/driver.c
-index 0c9dda72f10c..24acb421208c 100644
+index 11c18ac9816f..0c9dda72f10c 100644
 --- a/drivers/firmware/arm_scmi/driver.c
 +++ b/drivers/firmware/arm_scmi/driver.c
-@@ -105,6 +105,22 @@ struct scmi_desc {
- };
+@@ -26,9 +26,11 @@
+  */
  
+ #include <linux/bitmap.h>
++#include <linux/delay.h>
+ #include <linux/export.h>
+ #include <linux/io.h>
+ #include <linux/kernel.h>
++#include <linux/ktime.h>
+ #include <linux/mailbox_client.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
+@@ -363,6 +365,21 @@ void scmi_one_xfer_put(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 	up(&minfo->sem_xfer_count);
+ }
+ 
++static bool
++scmi_xfer_poll_done(const struct scmi_info *info, struct scmi_xfer *xfer)
++{
++	struct scmi_shared_mem *mem = info->tx_payload;
++	u16 xfer_id = MSG_XTRACT_TOKEN(le32_to_cpu(mem->msg_header));
++
++	if (xfer->hdr.seq != xfer_id)
++		return false;
++
++	return le32_to_cpu(mem->channel_status) &
++		(SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR |
++		SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE);
++}
++
++#define SCMI_MAX_POLLING_TIMEOUT_NS	(100 * NSEC_PER_USEC)
  /**
-+ * struct scmi_chan_info - Structure representing a SCMI channel informfation
-+ *
-+ * @cl: Mailbox Client
-+ * @chan: Transmit/Receive mailbox channel
-+ * @payload: Transmit/Receive mailbox channel payload area
-+ * @dev: Reference to device in the SCMI hierarchy corresponding to this
-+ *	 channel
-+ */
-+struct scmi_chan_info {
-+	struct mbox_client cl;
-+	struct mbox_chan *chan;
-+	void __iomem *payload;
-+	struct device *dev;
-+};
-+
-+/**
-  * struct scmi_info - Structure representing a  SCMI instance
+  * scmi_do_xfer() - Do one transfer
   *
-  * @dev: Device pointer
-@@ -112,10 +128,8 @@ struct scmi_desc {
-  * @handle: Instance of SCMI handle to send to clients
-  * @version: SCMI revision information containing protocol version,
-  *	implementation version and (sub-)vendor identification.
-- * @cl: Mailbox Client
-- * @tx_chan: Transmit mailbox channel
-- * @tx_payload: Transmit mailbox channel payload area
-  * @minfo: Message info
-+ * @tx_cinfo: Reference to SCMI channel information
-  * @protocols_imp: list of protocols implemented, currently maximum of
-  *	MAX_PROTOCOLS_IMP elements allocated by the base protocol
-  * @node: list head
-@@ -126,16 +140,14 @@ struct scmi_info {
- 	const struct scmi_desc *desc;
- 	struct scmi_revision_info version;
- 	struct scmi_handle handle;
--	struct mbox_client cl;
--	struct mbox_chan *tx_chan;
--	void __iomem *tx_payload;
- 	struct scmi_xfers_info minfo;
-+	struct scmi_chan_info *tx_cinfo;
- 	u8 *protocols_imp;
- 	struct list_head node;
- 	int users;
- };
+@@ -389,14 +406,30 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+ 	/* mbox_send_message returns non-negative value on success, so reset */
+ 	ret = 0;
  
--#define client_to_scmi_info(c)	container_of(c, struct scmi_info, cl)
-+#define client_to_scmi_chan_info(c) container_of(c, struct scmi_chan_info, cl)
- #define handle_to_scmi_info(h)	container_of(h, struct scmi_info, handle)
- 
- /*
-@@ -218,10 +230,11 @@ static void scmi_rx_callback(struct mbox_client *cl, void *m)
- {
- 	u16 xfer_id;
- 	struct scmi_xfer *xfer;
--	struct scmi_info *info = client_to_scmi_info(cl);
-+	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
-+	struct device *dev = cinfo->dev;
-+	struct scmi_info *info = dev_get_drvdata(dev);
- 	struct scmi_xfers_info *minfo = &info->minfo;
--	struct device *dev = info->dev;
--	struct scmi_shared_mem __iomem *mem = info->tx_payload;
-+	struct scmi_shared_mem __iomem *mem = cinfo->payload;
- 
- 	xfer_id = MSG_XTRACT_TOKEN(ioread32(&mem->msg_header));
- 
-@@ -272,8 +285,8 @@ static inline u32 pack_scmi_header(struct scmi_msg_hdr *hdr)
- static void scmi_tx_prepare(struct mbox_client *cl, void *m)
- {
- 	struct scmi_xfer *t = m;
--	struct scmi_info *info = client_to_scmi_info(cl);
--	struct scmi_shared_mem __iomem *mem = info->tx_payload;
-+	struct scmi_chan_info *cinfo = client_to_scmi_chan_info(cl);
-+	struct scmi_shared_mem __iomem *mem = cinfo->payload;
- 
- 	/* Mark channel busy + clear error */
- 	iowrite32(0x0, &mem->channel_status);
-@@ -366,15 +379,15 @@ void scmi_one_xfer_put(const struct scmi_handle *handle, struct scmi_xfer *xfer)
- }
- 
- static bool
--scmi_xfer_poll_done(const struct scmi_info *info, struct scmi_xfer *xfer)
-+scmi_xfer_poll_done(const struct scmi_chan_info *cinfo, struct scmi_xfer *xfer)
- {
--	struct scmi_shared_mem *mem = info->tx_payload;
--	u16 xfer_id = MSG_XTRACT_TOKEN(le32_to_cpu(mem->msg_header));
-+	struct scmi_shared_mem __iomem *mem = cinfo->payload;
-+	u16 xfer_id = MSG_XTRACT_TOKEN(ioread32(&mem->msg_header));
- 
- 	if (xfer->hdr.seq != xfer_id)
- 		return false;
- 
--	return le32_to_cpu(mem->channel_status) &
-+	return ioread32(&mem->channel_status) &
- 		(SCMI_SHMEM_CHAN_STAT_CHANNEL_ERROR |
- 		SCMI_SHMEM_CHAN_STAT_CHANNEL_FREE);
- }
-@@ -396,8 +409,9 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
- 	int timeout;
- 	struct scmi_info *info = handle_to_scmi_info(handle);
- 	struct device *dev = info->dev;
-+	struct scmi_chan_info *cinfo = info->tx_cinfo;
- 
--	ret = mbox_send_message(info->tx_chan, xfer);
-+	ret = mbox_send_message(cinfo->chan, xfer);
- 	if (ret < 0) {
- 		dev_dbg(dev, "mbox send fail %d\n", ret);
- 		return ret;
-@@ -413,11 +427,11 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
- 		do {
- 			udelay(5);
- 			cur = ktime_get();
--		} while (!scmi_xfer_poll_done(info, xfer) &&
-+		} while (!scmi_xfer_poll_done(cinfo, xfer) &&
- 			 ktime_before(cur, stop));
- 
- 		if (ktime_before(cur, stop))
--			scmi_fetch_response(xfer, info->tx_payload);
-+			scmi_fetch_response(xfer, cinfo->payload);
- 		else
- 			ret = -ETIMEDOUT;
- 	} else {
-@@ -437,7 +451,7 @@ int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
- 	 * Unfortunately, we have to kick the mailbox framework after we have
- 	 * received our message.
- 	 */
--	mbox_client_txdone(info->tx_chan, ret);
-+	mbox_client_txdone(cinfo->chan, ret);
- 
- 	return ret;
- }
-@@ -667,11 +681,11 @@ static int scmi_mailbox_check(struct device_node *np)
- 	return of_parse_phandle_with_args(np, "mboxes", "#mbox-cells", 0, &arg);
- }
- 
--static int scmi_mbox_free_channel(struct scmi_info *info)
-+static int scmi_mbox_free_channel(struct scmi_chan_info *cinfo)
- {
--	if (!IS_ERR_OR_NULL(info->tx_chan)) {
--		mbox_free_channel(info->tx_chan);
--		info->tx_chan = NULL;
-+	if (!IS_ERR_OR_NULL(cinfo->chan)) {
-+		mbox_free_channel(cinfo->chan);
-+		cinfo->chan = NULL;
- 	}
- 
- 	return 0;
-@@ -691,7 +705,7 @@ static int scmi_remove(struct platform_device *pdev)
- 
- 	if (!ret)
- 		/* Safe to free channels since no more users */
--		return scmi_mbox_free_channel(info);
-+		return scmi_mbox_free_channel(info->tx_cinfo);
- 
- 	return ret;
- }
-@@ -703,9 +717,17 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
- 	resource_size_t size;
- 	struct device *dev = info->dev;
- 	struct device_node *shmem, *np = dev->of_node;
-+	struct scmi_chan_info *cinfo;
- 	struct mbox_client *cl;
- 
--	cl = &info->cl;
-+	cinfo = devm_kzalloc(info->dev, sizeof(*cinfo), GFP_KERNEL);
-+	if (!cinfo)
-+		return -ENOMEM;
+-	/* And we wait for the response. */
+-	timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms);
+-	if (!wait_for_completion_timeout(&xfer->done, timeout)) {
+-		dev_err(dev, "mbox timed out in resp(caller: %pF)\n",
+-			(void *)_RET_IP_);
+-		ret = -ETIMEDOUT;
+-	} else if (xfer->hdr.status) {
+-		ret = scmi_to_linux_errno(xfer->hdr.status);
++	if (xfer->hdr.poll_completion) {
++		ktime_t stop, cur;
 +
-+	info->tx_cinfo = cinfo;
-+	cinfo->dev = dev;
++		stop = ktime_add_ns(ktime_get(), SCMI_MAX_POLLING_TIMEOUT_NS);
++		do {
++			udelay(5);
++			cur = ktime_get();
++		} while (!scmi_xfer_poll_done(info, xfer) &&
++			 ktime_before(cur, stop));
 +
-+	cl = &cinfo->cl;
- 	cl->dev = dev;
- 	cl->rx_callback = scmi_rx_callback;
- 	cl->tx_prepare = scmi_tx_prepare;
-@@ -721,16 +743,16 @@ static inline int scmi_mbox_chan_setup(struct scmi_info *info)
++		if (ktime_before(cur, stop))
++			scmi_fetch_response(xfer, info->tx_payload);
++		else
++			ret = -ETIMEDOUT;
++	} else {
++		/* And we wait for the response. */
++		timeout = msecs_to_jiffies(info->desc->max_rx_timeout_ms);
++		if (!wait_for_completion_timeout(&xfer->done, timeout)) {
++			dev_err(dev, "mbox timed out in resp(caller: %pF)\n",
++				(void *)_RET_IP_);
++			ret = -ETIMEDOUT;
++		} else if (xfer->hdr.status) {
++			ret = scmi_to_linux_errno(xfer->hdr.status);
++		}
  	}
- 
- 	size = resource_size(&res);
--	info->tx_payload = devm_ioremap(dev, res.start, size);
--	if (!info->tx_payload) {
-+	cinfo->payload = devm_ioremap(info->dev, res.start, size);
-+	if (!cinfo->payload) {
- 		dev_err(dev, "failed to ioremap SCMI Tx payload\n");
- 		return -EADDRNOTAVAIL;
- 	}
- 
- 	/* Transmit channel is first entry i.e. index 0 */
--	info->tx_chan = mbox_request_channel(cl, 0);
--	if (IS_ERR(info->tx_chan)) {
--		ret = PTR_ERR(info->tx_chan);
-+	cinfo->chan = mbox_request_channel(cl, 0);
-+	if (IS_ERR(cinfo->chan)) {
-+		ret = PTR_ERR(cinfo->chan);
- 		if (ret != -EPROBE_DEFER)
- 			dev_err(dev, "failed to request SCMI Tx mailbox\n");
- 		return ret;
-@@ -798,7 +820,7 @@ static int scmi_probe(struct platform_device *pdev)
- 	ret = scmi_base_protocol_init(handle);
- 	if (ret) {
- 		dev_err(dev, "unable to communicate with SCMI(%d)\n", ret);
--		scmi_mbox_free_channel(info);
-+		scmi_mbox_free_channel(info->tx_cinfo);
- 		return ret;
- 	}
- 
+ 	/*
+ 	 * NOTE: we might prefer not to need the mailbox ticker to manage the
 -- 
 2.7.4
