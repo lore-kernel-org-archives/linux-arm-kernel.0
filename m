@@ -1,94 +1,228 @@
-From: ryder.lee@mediatek.com (Ryder Lee)
-Date: Fri, 3 Nov 2017 19:52:47 +0800
-Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
-In-Reply-To: <CAK8P3a1doHCH4ucC1AUR5HiH5qvMXeoqsav-9dsvhM2KPh3FNw@mail.gmail.com>
-References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
- <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
- <1509423579.10793.10.camel@mtkswgap22>
- <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
- <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
- <1509673038.19220.19.camel@mtkswgap22>
- <CAK8P3a1doHCH4ucC1AUR5HiH5qvMXeoqsav-9dsvhM2KPh3FNw@mail.gmail.com>
-Message-ID: <1509709967.15691.25.camel@mtkswgap22>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Fri, 3 Nov 2017 11:57:07 +0000
+Subject: [RFC 4/7] arm64: irqflags: Use ICC sysregs to implement IRQ
+ masking
+In-Reply-To: <20171017091242.GA7810@lvm>
+References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
+ <1507726862-11944-5-git-send-email-julien.thierry@arm.com>
+ <20171016211857.GQ1845@lvm> <86952124-b669-2e97-76fe-2aa30d5735e1@arm.com>
+ <20171017091242.GA7810@lvm>
+Message-ID: <d76eb408-4150-0c51-5791-1298ff151f96@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-11-03 at 10:40 +0100, Arnd Bergmann wrote:
-> On Fri, Nov 3, 2017 at 2:37 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
-> >> Ryder, can you be more specific how the interrupts are wired up?
-> >> Is there one IRQ per slot that is connected to all of IntA/IntB/IntC/IntD
-> >> and gets propagated through the bridges like that, or is it something else?
-> >
-> > Yes, that's what I mean - we only have one IRQ which is connected to all
-> > INTx for each slot, and I'm not sure if there is any better way to solve
-> > this problem.
-> 
-> Ok. Your parent interrupt-map seems entirely reasonable for that case as far
-> as I can tell (maybe someone else can find a problem):
-> 
-> +               interrupt-map-mask = <0xf800 0 0 0>;
-> +               interrupt-map = <0x0000 0 0 0 &sysirq GIC_SPI 193
-> IRQ_TYPE_LEVEL_LOW>,
-> +                               <0x0800 0 0 0 &sysirq GIC_SPI 194
-> IRQ_TYPE_LEVEL_LOW>,
-> +                               <0x1000 0 0 0 &sysirq GIC_SPI 195
-> IRQ_TYPE_LEVEL_LOW>;
-> 
-> However, I can't find any other example of a machine using
-> interrupt-map-mask = <0xf800 0 0 0>; in the kernel tree, so it's possible
-> that we have a parser bug. We do have other boards that list all four
-> interrupts for each slot, and that seems to work fine. Can you try this
-> map in the parent while leaving out the chilren?
-> 
->                interrupt-map-mask = <0xf800 0 0 7>;
->                interrupt-map = <0x0000 0 0 1 &sysirq GIC_SPI 193
-> IRQ_TYPE_LEVEL_LOW>,
->                                         <0x0000 0 0 2 &sysirq GIC_SPI
-> 193 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x0000 0 0 3 &sysirq GIC_SPI
-> 193 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x0000 0 0 4 &sysirq GIC_SPI
-> 193 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x0800 0 0 1 &sysirq GIC_SPI
-> 194 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x0800 0 0 2 &sysirq GIC_SPI
-> 194 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x0800 0 0 3 &sysirq GIC_SPI
-> 194 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x0800 0 0 4 &sysirq GIC_SPI
-> 194 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x1000 0 0 1 &sysirq GIC_SPI
-> 195 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x1000 0 0 2 &sysirq GIC_SPI
-> 195 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x1000 0 0 3 &sysirq GIC_SPI
-> 195 IRQ_TYPE_LEVEL_LOW>,
->                                         <0x1000 0 0 4 &sysirq GIC_SPI
-> 195 IRQ_TYPE_LEVEL_LOW>;
-> 
-> This should have the exact same effect as what you have in your tree,
-> but if that works,
-> we can merge that version and try to figure out why the kernel thinks
-> they are different.
 
-I've tried this approach by using the 4-ports network card and got the
-result:
-pcieport 0000:00:01.0: assign IRQ: got 220
-pcieport 0000:00:01.0: assigning IRQ 220
-pcieport 0000:00:01.0: enabling device (0140 -> 0142)
-pcieport 0000:00:01.0: enabling bus mastering
-pcieport 0000:00:01.0: Signaling PME with IRQ 220
-....
-igb 0000:01:00.0: assign IRQ: got 221
-igb 0000:01:00.0: assigning IRQ 221
-igb 0000:01:00.1: assign IRQ: got 221
-igb 0000:01:00.1: assigning IRQ 221
-igb 0000:01:00.2: assign IRQ: got 221
-igb 0000:01:00.2: assigning IRQ 221
-igb 0000:01:00.3: assign IRQ: got 221
-igb 0000:01:00.3: assigning IRQ 221
 
-I think slot 1 should share its IRQ (220) with every device in the
-hierarchy below this root port.
+On 17/10/17 10:12, Christoffer Dall wrote:
+> On Tue, Oct 17, 2017 at 09:36:51AM +0100, Julien Thierry wrote:
+>>
+>>
+>> On 16/10/17 22:18, Christoffer Dall wrote:
+>>> On Wed, Oct 11, 2017 at 02:00:59PM +0100, Julien Thierry wrote:
+>>>> From: Daniel Thompson <daniel.thompson@linaro.org>
+>>>>
+>>>> Currently irqflags is implemented using the PSR's I bit. It is possible
+>>>> to implement irqflags by using the co-processor interface to the GIC.
+>>>> Using the co-processor interface makes it feasible to simulate NMIs
+>>>> using GIC interrupt prioritization.
+>>>>
+>>>> This patch changes the irqflags macros to modify, save and restore
+>>>> ICC_PMR_EL1. This has a substantial knock on effect for the rest of
+>>>> the kernel. There are four reasons for this:
+>>>>
+>>>> 1. The state of the PMR becomes part of the interrupt context and must be
+>>>>     saved and restored during exceptions. It is saved on the stack as part
+>>>>     of the saved context when an interrupt/exception is taken.
+>>>>
+>>>> 2. The hardware automatically masks the I bit (at boot, during traps, etc).
+>>>>     When the I bit is set by hardware we must add code to switch from I
+>>>>     bit masking and PMR masking:
+>>>>         - For IRQs, this is done after the interrupt has been acknowledged
+>>>>         	 avoiding the need to unmask.
+>>>>         - For other exceptions, this is done right after saving the context.
+>>>>
+>>>> 3. Some instructions, such as wfi, require that the PMR not be used
+>>>>     for interrupt masking. Before calling these instructions we must
+>>>>     switch from PMR masking to I bit masking.
+>>>>     This is also the case when KVM runs a guest, if the CPU receives
+>>>>     an interrupt from the host, interrupts must not be masked in PMR
+>>>>     otherwise the GIC will not signal it to the CPU.
+>>>>
+>>>> 4. We use the alternatives system to allow a single kernel to boot and
+>>>>     be switched to the alternative masking approach at runtime.
+>>>>
+>>>> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+>>>> [julien.thierry at arm.com: changes reflected in commit,
+>>>> 			 message, fixes, renaming]
+>>>> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+>>>> Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>>> Cc: Will Deacon <will.deacon@arm.com>
+>>>> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+>>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> ---
+>>>
+>>> I just gave a quick look to the KVM part here but didn't get into
+>>> whether this rather invasive change is warranted or not (it's definitely
+>>> entertaining though).
+>>>
+>>
+>> I appreciate you looking into this, it wasn't very clear to me how to deal
+>> with that for KVM.
+>>
+>>> [...]
+>>>
+>>>
+>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>>> index e923b58..070e8a5 100644
+>>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>>> @@ -38,6 +38,10 @@
+>>>>   #include <kvm/arm_arch_timer.h>
+>>>>   #include <kvm/arm_pmu.h>
+>>>>
+>>>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>>>> +#include <asm/arch_gicv3.h>
+>>>> +#endif
+>>>> +
+>>>>   #define KVM_MAX_VCPUS VGIC_V3_MAX_CPUS
+>>>>
+>>>>   #define KVM_VCPU_MAX_FEATURES 4
+>>>> @@ -332,7 +336,30 @@ int kvm_unmap_hva_range(struct kvm *kvm,
+>>>>   void kvm_arm_resume_guest(struct kvm *kvm);
+>>>>
+>>>>   u64 __kvm_call_hyp(void *hypfn, ...);
+>>>> +
+>>>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>>>> +/*
+>>>> + * If we use PMR to disable interrupts, interrupts happening while the
+>>>
+>>> I would describe this as 'masking' interrupts, as opposed to 'disabling'
+>>> interrupts, in general, and probably we can be more precise by
+>>> categorizing interrupts as 'normal' vs. 'priority (NMIs)' or something
+>>> like that.
+>>>
+>>
+>> Right, I'll do that.
+>>
+>>>> + * guest is executing will not be signaled to the host by the GIC  (and
+>>>
+>>> signaled to the CPU.  (Whether this then causes an exception to EL2
+>>> depends on the HCR_EL2.IMO flag and what KVM does with that exception).
+>>>
+>>
+>> True, I'll fix that.
+>>
+>>>> + * any call to a waiting kvm_kick_many_cpus will likely cause a
+>>>> + * deadlock).
+>>>
+>>> This kick thing is an unccessary specific example to bring out here, I
+>>> don't think it adds to the general understanding.
+>>>
+>>
+>> Yes, makes sense.
+>>
+>>>> + * We need to switch back to using PSR.I.
+>>>> + */
+>>>> +#define kvm_call_hyp(f, ...)						\
+>>>> +	({								\
+>>>> +		u64 res;						\
+>>>> +		unsigned long flags;					\
+>>>> +									\
+>>>> +		flags = arch_local_irq_save();				\
+>>>> +		gic_end_pmr_masking();					\
+>>>> +		res = __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__);	\
+>>>> +		gic_start_pmr_masking();				\
+>>>> +		arch_local_irq_restore(flags);				\
+>>>> +		res;							\
+>>>
+>>> This is in the critical path, so ideally this could instead be done
+>>> inside the function, because the trap will set PSTATE.I already, so it
+>>> should be possible to reduce this to a set of save/clear/restore
+>>> operations after __kvm_call_hyp.
+>>
+>> Hmmm, you are talking about the function called by __kvm_call_hyp, right?
+>>
+>> But this means we'll need to add the save/clear/restore to each function
+>> that can be called by __kvm_call_hyp, no?
+> 
+> No, you only need to do this in the case where you run the guedt,
+> __kvm_vcpu_run, because all the other callers don't need to be able to
+> take interrupts as they are under control of the host.
+> 
+>>
+>> Also in the VHE case we don't have the trap setting the PSTATE.I (the code
+>> calling kvm_call_hyp disables interrupts before entering the guest, but now
+>> the function disabling interrupts is just masking them with PMR).
+>>
+> 
+> Yes, for VHE you'd have to do something more.  One option would be to
+> disable interrupts using PSTATE.I in kvm_arch_vcpu_ioctl_run() for VHE,
+> another option is to simply mask interrupts in the PSTATE only for VHE
+> in __kvm_vcpu_run.
+> 
 
-Ryder.
+I agree this should work, but I wonder whether it is worth splitting the 
+different places we have to deal with that.
+
+Do you think there is good performance improvement to be had here?
+
+Marc, what's your opinion on saving/restoring the PMR state in the hyp 
+run code, relying on the I bit being always set before hand by hvc or 
+explicitly when in VHE?
+
+>>>
+>>>> +	})
+>>>> +#else
+>>>>   #define kvm_call_hyp(f, ...) __kvm_call_hyp(kvm_ksym_ref(f), ##__VA_ARGS__)
+>>>> +#endif
+>>>>
+>>>>   void force_vm_exit(const cpumask_t *mask);
+>>>>   void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
+>>>> @@ -349,6 +376,9 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>>>>   				       unsigned long hyp_stack_ptr,
+>>>>   				       unsigned long vector_ptr)
+>>>>   {
+>>>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>>>> +	unsigned long flags;
+>>>> +#endif
+>>>>   	/*
+>>>>   	 * Call initialization code, and switch to the full blown HYP code.
+>>>>   	 * If the cpucaps haven't been finalized yet, something has gone very
+>>>> @@ -356,7 +386,17 @@ static inline void __cpu_init_hyp_mode(phys_addr_t pgd_ptr,
+>>>>   	 * cpus_have_const_cap() wrapper.
+>>>>   	 */
+>>>>   	BUG_ON(!static_branch_likely(&arm64_const_caps_ready));
+>>>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>>>> +	flags = arch_local_irq_save();
+>>>> +	gic_end_pmr_masking();
+>>>> +#endif
+>>>> +
+>>>>   	__kvm_call_hyp((void *)pgd_ptr, hyp_stack_ptr, vector_ptr);
+>>>> +
+>>>> +#ifdef CONFIG_USE_ICC_SYSREGS_FOR_IRQFLAGS
+>>>> +	gic_start_pmr_masking();
+>>>> +	arch_local_irq_restore(flags);
+>>>> +#endif
+>>>
+>>> I don't think you need any of this, because I don't think you'd ever
+>>> need to handle interrupts while initializing hyp mode.
+>>>
+>>
+>> I was more worried about getting an "NMI" during the EL2 initialisation
+>> rather than missing the masked interrupts. Do you know whether this might be
+>> an issue here or not?
+>>
+> 
+> For non-VHE it won't be an issue, because making a hyp call will mask
+> interrupts using PSTATE.I, and for VHE we don't do any work here, so
+> it's not an issue there either.
+> 
+
+Noted, I'll get rid of that part.
+
+Thanks,
+
+-- 
+Julien Thierry
