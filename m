@@ -1,39 +1,26 @@
-From: james.morse@arm.com (James Morse)
-Date: Fri, 03 Nov 2017 16:14:04 +0000
-Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before entering
- the guest
-In-Reply-To: <20171103124904.GC14144@cbox>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-21-james.morse@arm.com> <20171031062315.GY2166@lvm>
- <59F861EE.4010505@arm.com> <20171101045550.GB11166@lvm>
- <59FB0D0C.1010208@arm.com> <20171103124904.GC14144@cbox>
-Message-ID: <59FC95CC.3090706@arm.com>
+From: s.nawrocki@samsung.com (Sylwester Nawrocki)
+Date: Fri, 03 Nov 2017 17:43:12 +0100
+Subject: [PATCH 0/2] ARM: dts: exynos: Updates for Odroid HDMI audio
+References: <CGME20171103164358epcas2p1556289ae7a9f2e29da932fc24651d592@epcas2p1.samsung.com>
+Message-ID: <20171103164314.14919-1-s.nawrocki@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+These patches are intended for v4.16-rc1 as they depend on the
+HDMI codec patch which is going to be merged in coming merge
+window.
 
-On 03/11/17 12:49, Christoffer Dall wrote:
-> Does a non-secure esb() cause the error to be delivered to firmware on
-> the secure side if anything is pending?
+Sylwester Nawrocki (2):
+  ARM: dts: exynos: Switch to dedicated Odroid-XU3 sound card binding
+  ARM: dts: exynos: Add sound support for Odroid XU4
 
-Yes, the ESB-instruction causes 'synchronisable' errors to become pending as an
-SError. They then follow the normal SError rules.
+ arch/arm/boot/dts/exynos4.dtsi                    |  1 +
+ arch/arm/boot/dts/exynos5420.dtsi                 |  1 +
+ arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi | 64 ++++++++++++++--------
+ arch/arm/boot/dts/exynos5422-odroidxu4-audio.dtsi | 67 +++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5422-odroidxu4.dts        |  1 +
+ 5 files changed, 111 insertions(+), 23 deletions(-)
+ create mode 100644 arch/arm/boot/dts/exynos5422-odroidxu4-audio.dtsi
 
-
-> I'm not sure I fully understand the interaction between issuing an
-> esb() in non-secure and firmware handling a RAS error; I thought there
-> would be none, and that this was only for kernel-first ?
-
-To implement firmware-first, EL3 has to set SCR_EL3.EA to route external-aborts
-and physical SError to EL3. So an ESB-instruction, even in a guest, may cause an
-SError to be taken to EL3 for firmware-first handling.
-
-This is why RAS is causing so much noise for KVM, any notification could also
-interrupt a guest, so firmware has to emulate an exception taken to EL2
-correctly and KVM will have to plumb the notification across to the host APEI code.
-
-
-Thanks,
-
-James
+--
+2.14.2
