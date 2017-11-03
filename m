@@ -1,33 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Nov 2017 17:18:01 +0000
-Subject: [PATCH v16 12/13] arm, tile: turn off timer tick for
- oneshot_stopped state
-In-Reply-To: <1509728692-10460-13-git-send-email-cmetcalf@mellanox.com>
-References: <1509728692-10460-1-git-send-email-cmetcalf@mellanox.com>
- <1509728692-10460-13-git-send-email-cmetcalf@mellanox.com>
-Message-ID: <20171103171801.xzxyypt3axyawu7l@lakrids.cambridge.arm.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Fri,  3 Nov 2017 10:12:03 -0700
+Subject: [PATCH 15/15] arm64: select ARCH_SUPPORTS_CLANG_LTO
+In-Reply-To: <20171103171203.107569-1-samitolvanen@google.com>
+References: <20171103171203.107569-1-samitolvanen@google.com>
+Message-ID: <20171103171203.107569-20-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chris,
+Allow CONFIG_CLANG_LTO to be enabled for the architecture.
 
-On Fri, Nov 03, 2017 at 01:04:51PM -0400, Chris Metcalf wrote:
-> diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-> index fd4b7f684bd0..61ea7f907c56 100644
-> --- a/drivers/clocksource/arm_arch_timer.c
-> +++ b/drivers/clocksource/arm_arch_timer.c
-> @@ -722,6 +722,8 @@ static void __arch_timer_setup(unsigned type,
->  		}
->  	}
->  
-> +	clk->set_state_oneshot_stopped = clk->set_state_shutdown;
+Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-AFAICT, we've set up this callback since commit:
-
-  cf8c5009ee37d25c ("clockevents/drivers/arm_arch_timer: Implement ->set_state_oneshot_stopped()")
-
-... so I don't beleive this is necessary, and I think this change can be
-dropped.
-
-Thanks,
-Mark.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a301fdc90319..6ae31f0c58ee 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -23,6 +23,7 @@ config ARM64
+ 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+ 	select ARCH_HAVE_NMI_SAFE_CMPXCHG if ACPI_APEI_SEA
+ 	select ARCH_USE_CMPXCHG_LOCKREF
++	select ARCH_SUPPORTS_CLANG_LTO
+ 	select ARCH_SUPPORTS_MEMORY_FAILURE
+ 	select ARCH_SUPPORTS_ATOMIC_RMW
+ 	select ARCH_SUPPORTS_NUMA_BALANCING
+-- 
+2.15.0.403.gc27cc4dac6-goog
