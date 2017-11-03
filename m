@@ -1,17 +1,16 @@
-From: mka@chromium.org (Matthias Kaehlcke)
-Date: Fri, 3 Nov 2017 11:07:39 -0700
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 3 Nov 2017 18:09:13 +0000
 Subject: [PATCH 00/15] Add support for clang LTO
 In-Reply-To: <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
 References: <20171103171203.107569-1-samitolvanen@google.com>
  <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
-Message-ID: <20171103180739.GG96615@google.com>
+Message-ID: <20171103180913.whp2tdjjvs32f4lz@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-El Fri, Nov 03, 2017 at 05:51:56PM +0000 Mark Rutland ha dit:
-
+On Fri, Nov 03, 2017 at 05:51:56PM +0000, Mark Rutland wrote:
+> Hi,
+> 
 > On Fri, Nov 03, 2017 at 10:11:44AM -0700, Sami Tolvanen wrote:
 > > This series adds build system support for compiling the kernel with clang
 > > Link Time Optimization (LTO), using GNU gold with the LLVMgold plug-in
@@ -40,67 +39,17 @@ El Fri, Nov 03, 2017 at 05:51:56PM +0000 Mark Rutland ha dit:
 > > 5.0 or later, and GNU gold from binutils 2.27 or later
 > 
 > Which tree are you testing with?
-
-In general upstream should be a good starting point.
-
+> 
 > I had a go building the arm64 for/next/core branch defconfig using clang
 > 5.0.0 from llvm.org, with the Linaro 17.05 toolchain's binutils
 > (2.27.0.20161019), and I hit what appears to be a compiler bug quite
 > quickly.
-> 
-> I had to create an aarch64-linux-gnu-clang wrapper, too. I'm not sure if
-> there's build system help to avoid needing that?
-> 
-> ----
-> [mark at lakrids:~/src/linux]% uselinaro 17.05 usellvm 5.0.0 make CROSS_COMPILE=aarch64-linux-gnu- CC=clang  ARCH=arm64 
-> Segmentation fault
-> arch/arm64/Makefile:27: ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum
-> arch/arm64/Makefile:48: Detected assembler with broken .inst;
-> disassembly will be unreliable
 
-This should be fixed by https://patchwork.kernel.org/patch/10039329/
-and https://patchwork.kernel.org/patch/10030583/
+So as per my reply to patch 7, it looks like this series addresses this
+case.
 
-Unfortunately we didn't encounter these earlier, in Chrome OS this
-was/is hidden by invoking an architecture aware wrapper instead of
-bare clang :(
+What's the minimum set of patches necessary to work with clang (ignoring
+LTO)?
 
->   CHK     include/config/kernel.release
->   CHK     include/generated/uapi/linux/version.h
->   CHK     include/generated/utsrelease.h
->   CHK     include/generated/bounds.h
->   CHK     include/generated/timeconst.h
->   CHK     include/generated/asm-offsets.h
->   CALL    scripts/checksyscalls.sh
->   CHK     scripts/mod/devicetable-offsets.h
->   CHK     include/generated/compile.h
->   CC      arch/arm64/crypto/aes-ce-cipher.o
-> fatal error: error in backend: Do not know how to split the result of this operator!
-> 
-> clang-5.0: error: clang frontend command failed with exit code 70 (use -v to see invocation)
-> clang version 5.0.0 (tags/RELEASE_500/final)
-> Target: aarch64--linux-gnu
-> Thread model: posix
-> InstalledDir: /mnt/data/opt/toolchain/llvm/5.0.0/bin
-> clang-5.0: note: diagnostic msg: PLEASE submit a bug report to http://llvm.org/bugs/ and include the crash backtrace, preprocessed source, and associated run script.
-> clang-5.0: note: diagnostic msg: 
-> ********************
-> 
-> PLEASE ATTACH THE FOLLOWING FILES TO THE BUG REPORT:
-> Preprocessed source(s) and associated run script(s) are located at:
-> clang-5.0: note: diagnostic msg: /tmp/aes-ce-cipher-7850ed.c
-> clang-5.0: note: diagnostic msg: /tmp/aes-ce-cipher-7850ed.sh
-> clang-5.0: note: diagnostic msg: 
-> 
-> ********************
-> scripts/Makefile.build:313: recipe for target 'arch/arm64/crypto/aes-ce-cipher.o' failed
-> make[1]: *** [arch/arm64/crypto/aes-ce-cipher.o] Error 70
-> Makefile:1019: recipe for target 'arch/arm64/crypto' failed
-> make: *** [arch/arm64/crypto] Error 2
-
-This is fixed in newer clang versions, otherwise you need
-
-[PATCH 07/15] arm64: use -mno-implicit-float instead of
--mgeneral-regs-only
-
-of this series.
+Thanks,
+Mark.
