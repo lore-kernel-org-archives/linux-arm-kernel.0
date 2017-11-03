@@ -1,48 +1,82 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 3 Nov 2017 12:32:42 +0000
-Subject: [PATCH 2/2] arm-ccn: perf: Prevent module unload while PMU is in
- use
-In-Reply-To: <20171103114518.5311-2-suzuki.poulose@arm.com>
-References: <20171103114518.5311-1-suzuki.poulose@arm.com>
- <20171103114518.5311-2-suzuki.poulose@arm.com>
-Message-ID: <20171103123241.yb736dvn22jalgbb@lakrids.cambridge.arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 3 Nov 2017 13:45:02 +0100
+Subject: [PATCH v4 09/21] KVM: arm/arm64: mask/unmask daif around VHE
+ guests
+In-Reply-To: <59FB0C24.7080503@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <20171019145807.23251-10-james.morse@arm.com>
+ <20171030074019.GS2166@lvm> <59FB0C24.7080503@arm.com>
+Message-ID: <20171103124502.GB14144@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 11:45:18AM +0000, Suzuki K Poulose wrote:
-> When the PMU driver is built as a module, the perf expects the
-> pmu->module to be valid, so that the driver is prevented from
-> being unloaded while it is in use. Fix the CCN pmu driver to
-> fill in this field.
+On Thu, Nov 02, 2017 at 12:14:28PM +0000, James Morse wrote:
+> Hi Christoffer,
 > 
-> Fixes: commit a33b0daab73a0 ("bus: ARM CCN PMU driver")
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
-
-With Will's nit on the Fixes tag cleaned up:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
-> ---
->  drivers/bus/arm-ccn.c | 1 +
->  1 file changed, 1 insertion(+)
+> On 30/10/17 07:40, Christoffer Dall wrote:
+> > On Thu, Oct 19, 2017 at 03:57:55PM +0100, James Morse wrote:
+> >> Non-VHE systems take an exception to EL2 in order to world-switch into the
+> >> guest. When returning from the guest KVM implicitly restores the DAIF
+> >> flags when it returns to the kernel at EL1.
+> >>
+> >> With VHE none of this exception-level jumping happens, so KVMs
+> >> world-switch code is exposed to the host kernel's DAIF values, and KVM
+> >> spills the guest-exit DAIF values back into the host kernel.
+> >> On entry to a guest we have Debug and SError exceptions unmasked, KVM
+> >> has switched VBAR but isn't prepared to handle these. On guest exit
+> >> Debug exceptions are left disabled once we return to the host and will
+> >> stay this way until we enter user space.
+> >>
+> >> Add a helper to mask/unmask DAIF around VHE guests. The unmask can only
+> >> happen after the hosts VBAR value has been synchronised by the isb in
+> >> __vhe_hyp_call (via kvm_call_hyp()). Masking could be as late as
+> >> setting KVMs VBAR value, but is kept here for symmetry.
 > 
-> diff --git a/drivers/bus/arm-ccn.c b/drivers/bus/arm-ccn.c
-> index e8c6946fed9d..3063f5312397 100644
-> --- a/drivers/bus/arm-ccn.c
-> +++ b/drivers/bus/arm-ccn.c
-> @@ -1276,6 +1276,7 @@ static int arm_ccn_pmu_init(struct arm_ccn *ccn)
->  
->  	/* Perf driver registration */
->  	ccn->dt.pmu = (struct pmu) {
-> +		.module = THIS_MODULE,
->  		.attr_groups = arm_ccn_pmu_attr_groups,
->  		.task_ctx_nr = perf_invalid_context,
->  		.event_init = arm_ccn_pmu_event_init,
-> -- 
-> 2.13.6
+> > Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 > 
+> Thanks!
+> 
+> 
+> >> ---
+> >> Give me a kick if you want this reworked as a fix (which will then
+> >> conflict with this series), or a backportable version.
+> > 
+> > I don't know of any real-world issues where some more graceful handling
+> > of SErrors would make sense on older kernels, so I'm fine with just
+> > merging this together with this series.
+> 
+> What about debug?
+
+Are we unmasking debug exceptions as we should with this patch?
+
+If so, I suppose that could be required for something like kgdb or when
+running KVM as a guest hypervisor (nested).
+
+In that case, we should probably provide a backport for stable, if we
+think people are going to be running older kernels on VHE systems, which
+they probably are.
+
+> > On guest exit Debug exceptions are left disabled once we return to the host
+> > and will stay this way until we enter user space.
+
+[The indentation seems to indicate I wrote this, but I don't think I
+did.  I'm confused.]
+
+> 
+> Today VHE:KVM causes the kernel to run with SError unmasked and debug disabled
+> until the next return to user-space, whereas previously the kernel expected
+> SError to be masked and debug enabled.
+> 
+> 
+> (Reposting just the SError rework without this patch changes the kernel to
+> expect SError to be unmasked, which isn't making this any worse.)
+> 
+I'm sorry, I don't understand this discussion.  What is today, and what
+is previously, and are you suggesting we drop this patch, or that the
+rest of this series is somehow going to be applied without this patch?
+
+Reset: I think this patch is fine in the context of this series..  I now
+have no idea what we need to do in terms of older kernels.
+
+Thanks,
+-Christoffer
