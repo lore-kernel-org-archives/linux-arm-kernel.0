@@ -1,103 +1,94 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri, 3 Nov 2017 11:50:56 +0000
-Subject: [RFC 0/7] arm64: provide pseudo NMI with GICv3
-In-Reply-To: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
-References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <06cbf39f-dec0-41fa-329d-33e65d244144@arm.com>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Fri, 3 Nov 2017 19:52:47 +0800
+Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
+In-Reply-To: <CAK8P3a1doHCH4ucC1AUR5HiH5qvMXeoqsav-9dsvhM2KPh3FNw@mail.gmail.com>
+References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
+ <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+ <1509423579.10793.10.camel@mtkswgap22>
+ <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
+ <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
+ <1509673038.19220.19.camel@mtkswgap22>
+ <CAK8P3a1doHCH4ucC1AUR5HiH5qvMXeoqsav-9dsvhM2KPh3FNw@mail.gmail.com>
+Message-ID: <1509709967.15691.25.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Gentle ping on this series.
+On Fri, 2017-11-03 at 10:40 +0100, Arnd Bergmann wrote:
+> On Fri, Nov 3, 2017 at 2:37 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> >> Ryder, can you be more specific how the interrupts are wired up?
+> >> Is there one IRQ per slot that is connected to all of IntA/IntB/IntC/IntD
+> >> and gets propagated through the bridges like that, or is it something else?
+> >
+> > Yes, that's what I mean - we only have one IRQ which is connected to all
+> > INTx for each slot, and I'm not sure if there is any better way to solve
+> > this problem.
+> 
+> Ok. Your parent interrupt-map seems entirely reasonable for that case as far
+> as I can tell (maybe someone else can find a problem):
+> 
+> +               interrupt-map-mask = <0xf800 0 0 0>;
+> +               interrupt-map = <0x0000 0 0 0 &sysirq GIC_SPI 193
+> IRQ_TYPE_LEVEL_LOW>,
+> +                               <0x0800 0 0 0 &sysirq GIC_SPI 194
+> IRQ_TYPE_LEVEL_LOW>,
+> +                               <0x1000 0 0 0 &sysirq GIC_SPI 195
+> IRQ_TYPE_LEVEL_LOW>;
+> 
+> However, I can't find any other example of a machine using
+> interrupt-map-mask = <0xf800 0 0 0>; in the kernel tree, so it's possible
+> that we have a parser bug. We do have other boards that list all four
+> interrupts for each slot, and that seems to work fine. Can you try this
+> map in the parent while leaving out the chilren?
+> 
+>                interrupt-map-mask = <0xf800 0 0 7>;
+>                interrupt-map = <0x0000 0 0 1 &sysirq GIC_SPI 193
+> IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x0000 0 0 2 &sysirq GIC_SPI
+> 193 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x0000 0 0 3 &sysirq GIC_SPI
+> 193 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x0000 0 0 4 &sysirq GIC_SPI
+> 193 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x0800 0 0 1 &sysirq GIC_SPI
+> 194 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x0800 0 0 2 &sysirq GIC_SPI
+> 194 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x0800 0 0 3 &sysirq GIC_SPI
+> 194 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x0800 0 0 4 &sysirq GIC_SPI
+> 194 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x1000 0 0 1 &sysirq GIC_SPI
+> 195 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x1000 0 0 2 &sysirq GIC_SPI
+> 195 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x1000 0 0 3 &sysirq GIC_SPI
+> 195 IRQ_TYPE_LEVEL_LOW>,
+>                                         <0x1000 0 0 4 &sysirq GIC_SPI
+> 195 IRQ_TYPE_LEVEL_LOW>;
+> 
+> This should have the exact same effect as what you have in your tree,
+> but if that works,
+> we can merge that version and try to figure out why the kernel thinks
+> they are different.
 
-On 11/10/17 14:00, Julien Thierry wrote:
-> Hi,
-> 
-> This series is a continuation of the work started by Daniel [1]. The goal is
-> to use GICv3 interrupt priorities to simulate an NMI.
-> 
-> To achieve this, set two priorities, one for standard interrupts and
-> another, higher priority, for NMIs. Whenever we want to disable interrupts,
-> we mask the standard priority instead so NMIs can still be raised. Some
-> corner cases though still require to actually mask all interrupts
-> effectively disabling the NMI.
-> 
-> Of course, using priority masking instead of PSR.I comes at some cost. On
-> hackbench, I notice a ~6% drop of performance. However, on a kernel build,
-> I do not see significant differences.
-> 
-> Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
-> hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
-> for now. I don't think there is any reason LPIs should be allowed to be set
-> as NMI as they do not have an active state.
-> When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
-> 
-> Requirements to use this:
-> - Have GICv3
-> - SCR_EL3.FIQ is set to 1 when linux runs
-> - Select Kernel Feature -> Use ICC system registers for IRQ masking
-> 
->  From my testing with the perf interrupt, there doesn't seem to be any major
-> issue left (but if you find some, do tell!).
-> 
-> * Patches 1 and 5 are minor utility changes.
-> * Patches 2 and 3 allows to detect and enable the use of GICv3 system
->    registers during boot time.
-> * Patch 4 introduces the masking of IRQs using priorities replacing irq
->    disabling.
-> * Patch 6 add detection of the view linux has on GICv3 priorities, without
->    this we cannot easily mask specific priorities in an accurate manner
-> * Patch 7 adds the support for NMIs
-> 
-> 
-> [1] http://www.spinics.net/lists/arm-kernel/msg525077.html
-> 
-> Thanks,
-> 
-> Julien Thierry
-> 
-> 
-> Daniel Thompson (4):
->    arm64: irqflags: Reorder the fiq & async macros
->    arm64: cpufeature: Allow early detect of specific features
->    arm64: alternative: Apply alternatives early in boot process
->    arm64: irqflags: Use ICC sysregs to implement IRQ masking
-> 
-> Julien Thierry (3):
->    irqchip/gic: Add functions to access irq priorities
->    arm64: Detect current view of GIC priorities
->    arm64: Add support for pseudo-NMIs
-> 
->   Documentation/arm64/booting.txt        |   5 +
->   arch/arm64/Kconfig                     |  15 ++
->   arch/arm64/include/asm/alternative.h   |   1 +
->   arch/arm64/include/asm/arch_gicv3.h    |  24 +++
->   arch/arm64/include/asm/assembler.h     |  33 +++-
->   arch/arm64/include/asm/efi.h           |   5 +
->   arch/arm64/include/asm/irqflags.h      | 143 +++++++++++++++-
->   arch/arm64/include/asm/kvm_host.h      |  40 +++++
->   arch/arm64/include/asm/processor.h     |   4 +
->   arch/arm64/include/asm/ptrace.h        |  14 +-
->   arch/arm64/include/asm/sysreg.h        |   1 +
->   arch/arm64/kernel/alternative.c        |  39 ++++-
->   arch/arm64/kernel/asm-offsets.c        |   1 +
->   arch/arm64/kernel/cpufeature.c         |  67 +++++---
->   arch/arm64/kernel/entry.S              | 132 ++++++++++++--
->   arch/arm64/kernel/head.S               |  38 +++++
->   arch/arm64/kernel/process.c            |   6 +
->   arch/arm64/kernel/smp.c                |  14 ++
->   arch/arm64/mm/proc.S                   |  23 +++
->   drivers/irqchip/irq-gic-common.c       |  10 ++
->   drivers/irqchip/irq-gic-common.h       |   2 +
->   drivers/irqchip/irq-gic-v3-its.c       |   2 +-
->   drivers/irqchip/irq-gic-v3.c           | 304 +++++++++++++++++++++++++++++----
->   include/linux/interrupt.h              |   1 +
->   include/linux/irqchip/arm-gic-common.h |   6 +
->   include/linux/irqchip/arm-gic.h        |   5 -
->   26 files changed, 845 insertions(+), 90 deletions(-)
-> 
-> --
-> 1.9.1
-> 
+I've tried this approach by using the 4-ports network card and got the
+result:
+pcieport 0000:00:01.0: assign IRQ: got 220
+pcieport 0000:00:01.0: assigning IRQ 220
+pcieport 0000:00:01.0: enabling device (0140 -> 0142)
+pcieport 0000:00:01.0: enabling bus mastering
+pcieport 0000:00:01.0: Signaling PME with IRQ 220
+....
+igb 0000:01:00.0: assign IRQ: got 221
+igb 0000:01:00.0: assigning IRQ 221
+igb 0000:01:00.1: assign IRQ: got 221
+igb 0000:01:00.1: assigning IRQ 221
+igb 0000:01:00.2: assign IRQ: got 221
+igb 0000:01:00.2: assigning IRQ 221
+igb 0000:01:00.3: assign IRQ: got 221
+igb 0000:01:00.3: assigning IRQ 221
 
--- 
-Julien Thierry
+I think slot 1 should share its IRQ (220) with every device in the
+hierarchy below this root port.
+
+Ryder.
