@@ -1,37 +1,38 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Fri, 3 Nov 2017 11:15:55 -0700
-Subject: [PATCH 13/15] arm64: fix mrs_s/msr_s macros for clang LTO
-In-Reply-To: <20171103180620.47yrko7apk52imri@lakrids.cambridge.arm.com>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103171203.107569-18-samitolvanen@google.com>
- <CAKwvOd=mG-X1DpUk+6hNXkoE-5hLGHe654ZKGEv=Dx1mnVJt5w@mail.gmail.com>
- <20171103180620.47yrko7apk52imri@lakrids.cambridge.arm.com>
-Message-ID: <CAKwvOd=zNQqyta42hm86rXquCd67OoO=azT7NWMF94=6xVS_4g@mail.gmail.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Sat, 4 Nov 2017 02:17:03 +0800
+Subject: [PATCH] clk: meson: gxbb: fix wrong clock for SARADC
+Message-ID: <20171103181703.30434-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 3, 2017 at 11:06 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Fri, Nov 03, 2017 at 10:53:08AM -0700, Nick Desaulniers wrote:
->> These mrs_s and msr_s macros in particular were preventing us from
->> linking arm64 with Clang's integrated assembler, regardless of LTO.
->> Those macros ran into: https://bugs.llvm.org/show_bug.cgi?id=19749.
->> So while I appreciate how clever they are, they prevent us from
->> assembling with Clang so I would like to see them go.
->
-> They're necessary to work with some currently-supported toolchains
-> (which don't support the s*_*_c*_c*_* syntax), so they're not going to
-> go completely.
->
-> If you could suggest something that clang might prefer, which doesn't
-> adversely affect GCC, I'm all ears.
+According to the datasheet, the clock gate bit for
+SARADC is bit[22] in Meson-GXBB/GXL series.
 
-I wasn't clear in my point; I recognize what they do and agree that
-they are needed.
+Change-Id: Ic4fa58276d2a9ea273eef0a08541fc213ac5ac89
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ drivers/clk/meson/gxbb.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-More specifically, my problem is the use of .macro assembly
-directives, since Clang "considers it a feature" not to let you invoke
-a .macro defined in one inline asm block from another asm inline
-block.
-
-So I would like to see *the use of .macro in separate inline asm
-blocks within mrs_s and msr_s c-preprocessor macros go.*
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index b2d1e8ed7152..4f5b535fcd12 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -1139,7 +1139,6 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
+ static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
+ static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
+ static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
+-static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
+ static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
+ static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
+ static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
+@@ -1149,6 +1148,7 @@ static MESON_GATE(gxbb_async_fifo, HHI_GCLK_MPEG0, 16);
+ static MESON_GATE(gxbb_sdio, HHI_GCLK_MPEG0, 17);
+ static MESON_GATE(gxbb_abuf, HHI_GCLK_MPEG0, 18);
+ static MESON_GATE(gxbb_hiu_iface, HHI_GCLK_MPEG0, 19);
++static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 22);
+ static MESON_GATE(gxbb_assist_misc, HHI_GCLK_MPEG0, 23);
+ static MESON_GATE(gxbb_emmc_a, HHI_GCLK_MPEG0, 24);
+ static MESON_GATE(gxbb_emmc_b, HHI_GCLK_MPEG0, 25);
+-- 
+2.14.1
