@@ -1,43 +1,105 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Fri, 3 Nov 2017 15:38:08 +0000
-Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20171103151711.GA22453@kroah.com>
-References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
- <20170831160430.GB11200@kroah.com> <20171103151711.GA22453@kroah.com>
-Message-ID: <59FC8D60.6030708@nxp.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri,  3 Nov 2017 16:43:24 +0100
+Subject: [PATCH] soc: amlogic: meson-gx-pwrc-vpu: fix power-off when powered
+ by bootloader
+Message-ID: <1509723804-21114-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+In the case the VPU power domain has been powered on by the bootloader
+and no driver are attached to this power domain, the genpd will power it
+off after a certain amount of time, but the clocks hasn't been enabled
+by the kernel itself and the power-off will trigger some faults.
+This patch enable the clocks to have a coherent state for an eventual
+poweroff and switches to the pm_domain_always_on_gov governor.
 
-On 11/03/2017 05:17 PM, Greg KH wrote:
-> On Thu, Aug 31, 2017 at 06:04:30PM +0200, Greg KH wrote:
->> On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
->>> From: Stuart Yoder <stuart.yoder@nxp.com>
->>>
->>> Move the source files out of staging into their final locations:
->>>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->>>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
->>>    -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
->>>    -README.txt, providing and overview of DPAA goes to
->>>     Documentation/dpaa2/overview.txt
->>>
->>> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
->>> Update dpaa2_eth and dpio staging drivers.
->>>
->>> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
->>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>
->> This is going to have to wait until I get a chunk of time to do the
->> review.  Probably after 4.13-final is out.
->
-> Ok, review comments as I go through the code:
-
-Thanks a lot for taking the time. I'll take care of the comments next week.
-
+Fixes: 75fcb5ca4b46 ("soc: amlogic: add Meson GX VPU Domains driver")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
-Best Regards, Laurentiu
+ drivers/soc/amlogic/meson-gx-pwrc-vpu.c | 29 +++++++++++++++++++----------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/soc/amlogic/meson-gx-pwrc-vpu.c b/drivers/soc/amlogic/meson-gx-pwrc-vpu.c
+index bf5190b..2bdeebc 100644
+--- a/drivers/soc/amlogic/meson-gx-pwrc-vpu.c
++++ b/drivers/soc/amlogic/meson-gx-pwrc-vpu.c
+@@ -34,7 +34,6 @@ struct meson_gx_pwrc_vpu {
+ 	struct reset_control *rstc;
+ 	struct clk *vpu_clk;
+ 	struct clk *vapb_clk;
+-	bool powered;
+ };
+ 
+ static inline
+@@ -78,8 +77,6 @@ static int meson_gx_pwrc_vpu_power_off(struct generic_pm_domain *genpd)
+ 	clk_disable_unprepare(pd->vpu_clk);
+ 	clk_disable_unprepare(pd->vapb_clk);
+ 
+-	pd->powered = false;
+-
+ 	return 0;
+ }
+ 
+@@ -91,7 +88,11 @@ static int meson_gx_pwrc_vpu_setup_clk(struct meson_gx_pwrc_vpu *pd)
+ 	if (ret)
+ 		return ret;
+ 
+-	return clk_prepare_enable(pd->vapb_clk);
++	ret = clk_prepare_enable(pd->vapb_clk);
++	if (ret)
++		clk_disable_unprepare(pd->vpu_clk);
++
++	return ret;
+ }
+ 
+ static int meson_gx_pwrc_vpu_power_on(struct generic_pm_domain *genpd)
+@@ -139,8 +140,6 @@ static int meson_gx_pwrc_vpu_power_on(struct generic_pm_domain *genpd)
+ 	if (ret)
+ 		return ret;
+ 
+-	pd->powered = true;
+-
+ 	return 0;
+ }
+ 
+@@ -167,6 +166,8 @@ static int meson_gx_pwrc_vpu_probe(struct platform_device *pdev)
+ 	struct reset_control *rstc;
+ 	struct clk *vpu_clk;
+ 	struct clk *vapb_clk;
++	bool powered_off;
++	int ret;
+ 
+ 	regmap_ao = syscon_node_to_regmap(of_get_parent(pdev->dev.of_node));
+ 	if (IS_ERR(regmap_ao)) {
+@@ -205,8 +206,17 @@ static int meson_gx_pwrc_vpu_probe(struct platform_device *pdev)
+ 	vpu_hdmi_pd.vpu_clk = vpu_clk;
+ 	vpu_hdmi_pd.vapb_clk = vapb_clk;
+ 
+-	pm_genpd_init(&vpu_hdmi_pd.genpd, &simple_qos_governor,
+-		      meson_gx_pwrc_vpu_get_power(&vpu_hdmi_pd));
++	powered_off = meson_gx_pwrc_vpu_get_power(&vpu_hdmi_pd);
++
++	/* If already powered, sync the clock states */
++	if (!powered_off) {
++		ret = meson_gx_pwrc_vpu_setup_clk(&vpu_hdmi_pd);
++		if (ret)
++			return ret;
++	}
++
++	pm_genpd_init(&vpu_hdmi_pd.genpd, &pm_domain_always_on_gov,
++		      powered_off);
+ 
+ 	return of_genpd_add_provider_simple(pdev->dev.of_node,
+ 					    &vpu_hdmi_pd.genpd);
+@@ -214,8 +224,7 @@ static int meson_gx_pwrc_vpu_probe(struct platform_device *pdev)
+ 
+ static void meson_gx_pwrc_vpu_shutdown(struct platform_device *pdev)
+ {
+-	if (vpu_hdmi_pd.powered)
+-		meson_gx_pwrc_vpu_power_off(&vpu_hdmi_pd.genpd);
++	meson_gx_pwrc_vpu_power_off(&vpu_hdmi_pd.genpd);
+ }
+ 
+ static const struct of_device_id meson_gx_pwrc_vpu_match_table[] = {
+-- 
+2.7.4
