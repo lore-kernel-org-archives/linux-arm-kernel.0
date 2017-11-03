@@ -1,39 +1,60 @@
 From: julien.thierry@arm.com (Julien Thierry)
-Date: Fri,  3 Nov 2017 11:44:15 +0000
-Subject: [PATCH v2 0/3] Ftrace fixes
-Message-ID: <1509709458-44541-1-git-send-email-julien.thierry@arm.com>
+Date: Fri,  3 Nov 2017 11:44:16 +0000
+Subject: [PATCH v2 1/3] arm64: Fix static use of function graph
+In-Reply-To: <1509709458-44541-1-git-send-email-julien.thierry@arm.com>
+References: <1509709458-44541-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1509709458-44541-2-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Function graph does not work currently when CONFIG_DYNAMIC_TRACE is not
+set. This is because ftrace_function_trace is not always set to ftrace_stub
+when function_graph is in use.
 
->From what Steve Rostedt said, we shouldn't rely on ftrace_trace_function
-not being ftrace_stub when using the function graph tracer. As x86 does,
-always check whether function graph tracing is requested in static tracing.
+Do not skip checking of graph tracer functions when ftrace_function_trace
+is set.
 
-While testing that I didn't break things, I discovered that the perf ftrace
-builtin doesn't handle kernels built without function graph tracer
-(regardless of whether tracing is dynamic or not).
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Steven Rostedt (VMware) <rostedt@goodmis.org>
+Reviewed-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-First and second patches fixe the ftrace issue for arm64 and arm
-respectively.
-Third patch fixes the perf front-end.
-
-Changes since v1:
-* Added fix for arm suggested by Akashi Takahiro
-* Reset graph depth file when it exists
-
-Cheers,
-
-Julien Thierry (3):
-  arm64: Fix static use of function graph
-  arm: ftrace: function_graph with DYNAMIC_FTRACE
-  perf: Fix ftrace builtin when kernel doesn't have function_graph
-
- arch/arm/kernel/entry-ftrace.S   | 14 +++++++-------
+---
  arch/arm64/kernel/entry-ftrace.S | 12 +++---------
- tools/perf/builtin-ftrace.c      | 14 +++++++++++++-
- 3 files changed, 23 insertions(+), 17 deletions(-)
+ 1 file changed, 3 insertions(+), 9 deletions(-)
 
+diff --git a/arch/arm64/kernel/entry-ftrace.S b/arch/arm64/kernel/entry-ftrace.S
+index e1be42e..1175f58 100644
+--- a/arch/arm64/kernel/entry-ftrace.S
++++ b/arch/arm64/kernel/entry-ftrace.S
+@@ -108,13 +108,8 @@ ENTRY(_mcount)
+ 	mcount_get_lr	x1		//       function's lr (= parent's pc)
+ 	blr	x2			//   (*ftrace_trace_function)(pc, lr);
+
+-#ifndef CONFIG_FUNCTION_GRAPH_TRACER
+-skip_ftrace_call:			//   return;
+-	mcount_exit			// }
+-#else
+-	mcount_exit			//   return;
+-					// }
+-skip_ftrace_call:
++skip_ftrace_call:			// }
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	ldr_l	x2, ftrace_graph_return
+ 	cmp	x0, x2			//   if ((ftrace_graph_return
+ 	b.ne	ftrace_graph_caller	//        != ftrace_stub)
+@@ -123,9 +118,8 @@ skip_ftrace_call:
+ 	adr_l	x0, ftrace_graph_entry_stub //     != ftrace_graph_entry_stub))
+ 	cmp	x0, x2
+ 	b.ne	ftrace_graph_caller	//     ftrace_graph_caller();
+-
+-	mcount_exit
+ #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
++	mcount_exit
+ ENDPROC(_mcount)
+
+ #else /* CONFIG_DYNAMIC_FTRACE */
 --
 1.9.1
