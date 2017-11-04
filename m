@@ -1,104 +1,91 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 4 Nov 2017 19:27:58 +0100 (CET)
-Subject: [PATCH 11/12] hwrng: bcm2835-rng: Enable BCM2835 RNG to work on
- BCM63xx platforms
-In-Reply-To: <20171102010408.27736-12-f.fainelli@gmail.com>
-References: <20171102010408.27736-1-f.fainelli@gmail.com>
- <20171102010408.27736-12-f.fainelli@gmail.com>
-Message-ID: <1831955836.132229.1509820078271@email.1und1.de>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 5 Nov 2017 02:49:27 +0800
+Subject: [PATCH v1 3/3] KVM: arm64: add ESB in exception handler entry
+ and exit.
+In-Reply-To: <1509563697-6359-4-git-send-email-gengdongjiu@huawei.com>
+References: <1509563697-6359-4-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <201711050220.e6qabuar%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian
+Hi Dongjiu,
 
-> Florian Fainelli <f.fainelli@gmail.com> hat am 2. November 2017 um 02:04 geschrieben:
-> 
-> 
-> We have now incorporated all necessary functionality for the BCM63xx
-> platforms to successfully migrate over bcm2835-rng, so add the final
-> bits: Kconfig selection and proper platform_device device type matching
-> to keep the same platform device name for registration to work.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  drivers/char/hw_random/Kconfig       |  7 ++++---
->  drivers/char/hw_random/bcm2835-rng.c | 11 ++++++++++-
->  2 files changed, 14 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> index 95a031e9eced..d0689cc8c7fc 100644
-> --- a/drivers/char/hw_random/Kconfig
-> +++ b/drivers/char/hw_random/Kconfig
-> @@ -87,12 +87,13 @@ config HW_RANDOM_BCM63XX
->  	  If unusure, say Y.
->  
->  config HW_RANDOM_BCM2835
-> -	tristate "Broadcom BCM2835 Random Number Generator support"
-> -	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X
-> +	tristate "Broadcom BCM2835/BCM63xx Random Number Generator support"
-> +	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X || \
-> +		   ARCH_BCM_63XX || BCM63XX || BMIPS_GENERIC
->  	default HW_RANDOM
->  	---help---
->  	  This driver provides kernel-side support for the Random Number
-> -	  Generator hardware found on the Broadcom BCM2835 SoCs.
-> +	  Generator hardware found on the Broadcom BCM2835 and BCM63xx SoCs.
->  
->  	  To compile this driver as a module, choose M here: the
->  	  module will be called bcm2835-rng
-> diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
-> index 650e0033c273..d9ffe14f312b 100644
-> --- a/drivers/char/hw_random/bcm2835-rng.c
-> +++ b/drivers/char/hw_random/bcm2835-rng.c
-> @@ -131,6 +131,7 @@ static const struct of_device_id bcm2835_rng_of_match[] = {
->  	{ .compatible = "brcm,bcm2835-rng"},
->  	{ .compatible = "brcm,bcm-nsp-rng", .data = &nsp_rng_of_data },
->  	{ .compatible = "brcm,bcm5301x-rng", .data = &nsp_rng_of_data },
-> +	{ .compatible = "brcm,bcm6368-rng"},
->  	{},
->  };
->  
-> @@ -164,7 +165,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
->  	if (IS_ERR(priv->clk))
->  		priv->clk = NULL;
->  
-> -	priv->rng.name = "bcm2835-rng";
-> +	priv->rng.name = pdev->id_entry->name;
+Thank you for the patch! Yet something to improve:
 
-this change breaks registration on bcm2835, because the name is NULL.
+[auto build test ERROR on arm64/for-next/core]
+[also build test ERROR on v4.14-rc7 next-20171103]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Regards
-Stefan
+url:    https://github.com/0day-ci/linux/commits/Dongjiu-Geng/arm64-add-a-macro-for-SError-synchronization/20171104-224216
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git for-next/core
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
->  	priv->rng.init = bcm2835_rng_init;
->  	priv->rng.read = bcm2835_rng_read;
->  	priv->rng.cleanup = bcm2835_rng_cleanup;
-> @@ -190,12 +191,20 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
->  
->  MODULE_DEVICE_TABLE(of, bcm2835_rng_of_match);
->  
-> +static struct platform_device_id bcm2835_rng_devtype[] = {
-> +	{ .name = "bcm2835-rng" },
-> +	{ .name = "bcm63xx-rng" },
-> +	{ /* sentinel */ }
-> +};
-> +MODULE_DEVICE_TABLE(platform, bcm2835_rng_devtype);
-> +
->  static struct platform_driver bcm2835_rng_driver = {
->  	.driver = {
->  		.name = "bcm2835-rng",
->  		.of_match_table = bcm2835_rng_of_match,
->  	},
->  	.probe		= bcm2835_rng_probe,
-> +	.id_table	= bcm2835_rng_devtype,
->  };
->  module_platform_driver(bcm2835_rng_driver);
->  
-> -- 
-> 2.9.3
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+All errors (new ones prefixed by >>):
+
+   arch/arm64/kvm/hyp/entry.S: Assembler messages:
+>> arch/arm64/kvm/hyp/entry.S:88: Error: selected processor does not support `esb'
+--
+   arch/arm64/kvm/hyp/hyp-entry.S: Assembler messages:
+>> arch/arm64/kvm/hyp/hyp-entry.S:57: Error: selected processor does not support `esb'
+
+vim +88 arch/arm64/kvm/hyp/entry.S
+
+    51	
+    52	/*
+    53	 * u64 __guest_enter(struct kvm_vcpu *vcpu,
+    54	 *		     struct kvm_cpu_context *host_ctxt);
+    55	 */
+    56	ENTRY(__guest_enter)
+    57		// x0: vcpu
+    58		// x1: host context
+    59		// x2-x17: clobbered by macros
+    60		// x18: guest context
+    61	
+    62		// Store the host regs
+    63		save_callee_saved_regs x1
+    64	
+    65		// Store the host_ctxt for use at exit time
+    66		str	x1, [sp, #-16]!
+    67	
+    68		add	x18, x0, #VCPU_CONTEXT
+    69	
+    70		// Restore guest regs x0-x17
+    71		ldp	x0, x1,   [x18, #CPU_XREG_OFFSET(0)]
+    72		ldp	x2, x3,   [x18, #CPU_XREG_OFFSET(2)]
+    73		ldp	x4, x5,   [x18, #CPU_XREG_OFFSET(4)]
+    74		ldp	x6, x7,   [x18, #CPU_XREG_OFFSET(6)]
+    75		ldp	x8, x9,   [x18, #CPU_XREG_OFFSET(8)]
+    76		ldp	x10, x11, [x18, #CPU_XREG_OFFSET(10)]
+    77		ldp	x12, x13, [x18, #CPU_XREG_OFFSET(12)]
+    78		ldp	x14, x15, [x18, #CPU_XREG_OFFSET(14)]
+    79		ldp	x16, x17, [x18, #CPU_XREG_OFFSET(16)]
+    80	
+    81		// Restore guest regs x19-x29, lr
+    82		restore_callee_saved_regs x18
+    83	
+    84		// Restore guest reg x18
+    85		ldr	x18,      [x18, #CPU_XREG_OFFSET(18)]
+    86	
+    87		// synchronize host pending asynchronous error
+  > 88		error_synchronize
+    89		// Do not touch any register after this!
+    90		eret
+    91	ENDPROC(__guest_enter)
+    92	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 57567 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171105/387d324b/attachment-0001.gz>
