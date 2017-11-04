@@ -1,115 +1,88 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 4 Nov 2017 15:11:29 +0530
-Subject: [PATCH 3/3] Documentation: add Actions S900 clock bindings
-In-Reply-To: <5c55d704-6414-13d7-1311-64b425d4404a@suse.de>
+Date: Sat, 4 Nov 2017 15:20:37 +0530
+Subject: [PATCH 1/3] arm64: dts: actions: add s900 clock controller nodes
+In-Reply-To: <a8bd3b8b-190a-6dbf-6976-207baca3030b@suse.de>
 References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <1509479663-8985-4-git-send-email-manivannan.sadhasivam@linaro.org>
- <5c55d704-6414-13d7-1311-64b425d4404a@suse.de>
-Message-ID: <20171104094129.GB18680@linaro.org>
+ <1509479663-8985-2-git-send-email-manivannan.sadhasivam@linaro.org>
+ <a8bd3b8b-190a-6dbf-6976-207baca3030b@suse.de>
+Message-ID: <20171104095037.GC18680@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Andreas,
-On Sat, Nov 04, 2017 at 04:55:04PM +0800, Andreas F?rber wrote:
+On Sat, Nov 04, 2017 at 04:43:31PM +0800, Andreas F?rber wrote:
 > Am 01.11.2017 um 03:54 schrieb Manivannan Sadhasivam:
-> > This patch adds clock bindings for Actions Semi S900 SoC.
+> > This patch adds clock controller nodes for Actions Semi s900 SoC
 > 
-> "This patch"
->
-Ack. 
+> Please avoid "This patch". Once applied, it's a commit. :)
+> 
+Ack.
 > > 
 > > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > > ---
-> >  .../bindings/clock/actions,s900-clock.txt          | 47 ++++++++++++++++++++++
-> >  1 file changed, 47 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/clock/actions,s900-clock.txt
+> >  arch/arm64/boot/dts/actions/s900.dtsi | 19 +++++++++++++++++++
+> >  1 file changed, 19 insertions(+)
 > > 
-> > diff --git a/Documentation/devicetree/bindings/clock/actions,s900-clock.txt b/Documentation/devicetree/bindings/clock/actions,s900-clock.txt
-> > new file mode 100644
-> > index 0000000..951d6ad
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/clock/actions,s900-clock.txt
-> > @@ -0,0 +1,47 @@
-> > +* Actions s900 Clock Controller
+> > diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
+> > index 11406f6..c099ef1 100644
+> > --- a/arch/arm64/boot/dts/actions/s900.dtsi
+> > +++ b/arch/arm64/boot/dts/actions/s900.dtsi
+> > @@ -5,6 +5,7 @@
+> >   */
+> >  
+> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> > +#include <dt-bindings/clock/actions,s900-clock.h>
 > 
-> Please consistently spell it S900 here and below - it looks especially
-> odd when you upper-case all other words.
-> 
-Ack.
-> > +
-> > +The Actions s900 clock controller generates and supplies clock to various
-> > +controllers within the SoC. The clock binding described here is applicable to
-> > +s900 SoC.
-> > +
-> > +Required Properties:
-> > +
-> > +- compatible: should be "actions,s900-clock"
-> 
-> What about "actions,s900-cmu" as in Clock Management Unit? (manual
-> version 1.0 section 1.5, page 6)
-> 
-"cmu" makes sense, will change it.
-> > +- reg: physical base address of the controller and length of memory mapped
-> > +  region.
-> > +- #clock-cells: should be 1.
-> > +
-> > +Each clock is assigned an identifier and client nodes can use this identifier
-> 
-> ", and"?
+> Alphabetical order please.
 > 
 Ack.
-> > +to specify the clock which they consume.
+> >  
+> >  / {
+> >  	compatible = "actions,s900";
+> > @@ -88,6 +89,24 @@
+> >  		#clock-cells = <0>;
+> >  	};
+> >  
+> > +	losc: losc {
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <32768>;
+> > +		#clock-cells = <0>;
+> > +	};
 > > +
-> > +All available clocks are defined as preprocessor macros in
-> > +dt-bindings/clock/actions,s900-clock.h header and can be used in device
-> > +tree sources.
+> > +	diff_24M: diff_24M {
 > 
-> As Rob pointed out, missing here.
+> No underscore in node names please - maybe diff-24M or simpler diff24M?
+> Please double-check that name - is it from manual or from schematics?
 > 
-Will add this header to dt-bindings patch in next revision.
+Actually, this name comes from vendor driver and they have used "24M_diff".
+As per DT conventions I renamed it to "diff_24M".
+
+But I'm not clear about that clock. As I said in my reply to Rob's review
+there isn't much documentation also. So, I guess we can name it as diff24M
+for now.
+> > +		compatible = "fixed-clock";
+> > +		clock-frequency = <24000000>;
+> > +		#clock-cells = <0>;
+> > +	};
 > > +
-> > +External clocks:
-> > +
-> > +The hosc clock used as input for the plls is generated outside the SoC. It is
-> > +expected that it is defined using standard clock bindings as "hosc".
-> > +
-> > +Actions s900 Clock Controller also require two more clocks:
-> > + - "losc" - internal low frequency oscillator
-> > + - "diff_24M" - internal differential 24MHz clock
-> > +
-> > +Example: Clock controller node:
-> > +
-> > +        clock: clock-controller at e0160000 {
+> > +	clock: clock-controller at e0160000 {
 > > +		compatible = "actions,s900-clock";
 > > +		reg = <0 0xe0160000 0 0x1000>;
 > > +		#clock-cells = <1>;
 > > +	};
 > 
-> Spaces vs. tab indentation.
+> This node belongs into the soc node below, ordered by unit address.
+> And maybe there's a better label than "clock"? "clkc" or some official
+> name from the manual?
 > 
-Ack.
-> Regarding the question in the dts patch, I think cmu would be a better
-> label here and there.
-> 
-Yeah. Will use cmu.
-> > +
-> > +Example: UART controller node that consumes clock generated by the clock
-> > +controller:
-> > +
-> > +	serial5: uart at e012a000 {
-> > +		compatible = "actions,s900-uart", "actions,owl-uart";
-> > +		reg = <0x0 0xe012a000 0x0 0x2000>;
-> > +		interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-> > +		clocks = <&clock CLK_UART5>;
-> > +		clock-names = "uart";
-> 
-> Better not use a clock name here that is not defined in the uart binding.
-> 
-Agree.
+Will use "cmu".
 
 Thanks,
 Mani
-> > +	};
+> > +
+> >  	soc {
+> >  		compatible = "simple-bus";
+> >  		#address-cells = <2>;
 > 
 > Regards,
 > Andreas
