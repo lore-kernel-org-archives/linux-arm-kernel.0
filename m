@@ -1,123 +1,49 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 4 Nov 2017 16:36:30 +0800
-Subject: [PATCH 2/3] clk: owl: add clock driver for Actions S900 SoC
-In-Reply-To: <1509479663-8985-3-git-send-email-manivannan.sadhasivam@linaro.org>
-References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <1509479663-8985-3-git-send-email-manivannan.sadhasivam@linaro.org>
-Message-ID: <7c87aee4-dde4-ab3d-06b0-75f3686ab5dd@suse.de>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Sat, 4 Nov 2017 16:41:47 +0800
+Subject: [PATCH] clk: meson: gxbb: fix wrong clock for SARADC
+In-Reply-To: <20171103181703.30434-1-yixun.lan@amlogic.com>
+References: <20171103181703.30434-1-yixun.lan@amlogic.com>
+Message-ID: <e8a5faa9-d3ca-e03e-3589-2685d6ada30a@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mani,
 
-Still on travels, but some quick comments:
 
-Please compare the CC list from my patch series - you seem to be missing
-some Actions Semi people.
-
-Am 01.11.2017 um 03:54 schrieb Manivannan Sadhasivam:
-> This patch adds clock driver for Actions Semi OWL
-> series S900 SoC.
+On 11/04/17 02:17, Yixun Lan wrote:
+> According to the datasheet, the clock gate bit for
+> SARADC is bit[22] in Meson-GXBB/GXL series.
 > 
-> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> Change-Id: Ic4fa58276d2a9ea273eef0a08541fc213ac5ac89
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > ---
->  MAINTAINERS                                    |   5 +
->  drivers/clk/Makefile                           |   1 +
->  drivers/clk/owl/Makefile                       |   2 +
->  drivers/clk/owl/clk-factor.c                   | 270 ++++++++++++
->  drivers/clk/owl/clk-pll.c                      | 346 +++++++++++++++
->  drivers/clk/owl/clk-s900.c                     | 587 +++++++++++++++++++++++++
->  drivers/clk/owl/clk.c                          | 318 ++++++++++++++
->  drivers/clk/owl/clk.h                          | 301 +++++++++++++
-
-Taking into account previous arm/DT side comments I received, we should
-use clk/actions/ rather than clk/owl/. We can still use owl- or -owl
-inside actions/ if necessary.
-
->  include/dt-bindings/clock/actions,s900-clock.h | 141 ++++++
->  9 files changed, 1971 insertions(+)
->  create mode 100644 drivers/clk/owl/Makefile
->  create mode 100644 drivers/clk/owl/clk-factor.c
->  create mode 100644 drivers/clk/owl/clk-pll.c
->  create mode 100644 drivers/clk/owl/clk-s900.c
->  create mode 100644 drivers/clk/owl/clk.c
->  create mode 100644 drivers/clk/owl/clk.h
->  create mode 100644 include/dt-bindings/clock/actions,s900-clock.h
+>  drivers/clk/meson/gxbb.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 2d3d750..beae8aa 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1098,6 +1098,11 @@ F:	arch/arm/mach-*/
->  F:	arch/arm/plat-*/
->  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
->  
-> +ARM/ACTIONS SEMI SoC CLOCK SUPPORT
-> +L:	Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
+> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+> index b2d1e8ed7152..4f5b535fcd12 100644
+> --- a/drivers/clk/meson/gxbb.c
+> +++ b/drivers/clk/meson/gxbb.c
+> @@ -1139,7 +1139,6 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
+>  static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
+>  static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
+>  static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
+> -static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
+>  static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
+>  static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
+>  static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
+> @@ -1149,6 +1148,7 @@ static MESON_GATE(gxbb_async_fifo, HHI_GCLK_MPEG0, 16);
+>  static MESON_GATE(gxbb_sdio, HHI_GCLK_MPEG0, 17);
+>  static MESON_GATE(gxbb_abuf, HHI_GCLK_MPEG0, 18);
+>  static MESON_GATE(gxbb_hiu_iface, HHI_GCLK_MPEG0, 19);
+> +static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 22);
+>  static MESON_GATE(gxbb_assist_misc, HHI_GCLK_MPEG0, 23);
+>  static MESON_GATE(gxbb_emmc_a, HHI_GCLK_MPEG0, 24);
+>  static MESON_GATE(gxbb_emmc_b, HHI_GCLK_MPEG0, 25);
+> 
+Hi Neil
+ I assume you will take this via the clk-meson tree..
+could you amend the commit msg and drop the 'Change-Id'?
+(for other parts, please feel free to adjust if you see fit)
+ thanks
 
-You're not a mailing list. If you want to be the maintainer (M:), fine
-with me, but I'd like to be CC'ed please - either via R: here or by
-extending the section below.
-
-> +S:	Maintained
-> +F:	drivers/clk/owl/
-
-This is lacking the binding.
-
-> +
->  ARM/ACTIONS SEMI ARCHITECTURE
->  M:	Andreas F?rber <afaerber@suse.de>
->  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
-> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> index c99f363..821c1e1 100644
-> --- a/drivers/clk/Makefile
-> +++ b/drivers/clk/Makefile
-> @@ -75,6 +75,7 @@ endif
->  obj-y					+= mvebu/
->  obj-$(CONFIG_ARCH_MXS)			+= mxs/
->  obj-$(CONFIG_COMMON_CLK_NXP)		+= nxp/
-> +obj-$(CONFIG_ARCH_ACTIONS)		+= owl/
->  obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
->  obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
->  obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
-> diff --git a/drivers/clk/owl/Makefile b/drivers/clk/owl/Makefile
-> new file mode 100644
-> index 0000000..dbba0af
-> --- /dev/null
-> +++ b/drivers/clk/owl/Makefile
-> @@ -0,0 +1,2 @@
-> +obj-y				+= clk.o clk-pll.o clk-factor.o
-> +obj-$(CONFIG_ARCH_ACTIONS)	+= clk-s900.o
-
-$(CONFIG_ARCH_ACTIONS) is superfluous here.
-
-> diff --git a/drivers/clk/owl/clk-factor.c b/drivers/clk/owl/clk-factor.c
-> new file mode 100644
-> index 0000000..6429acd
-> --- /dev/null
-> +++ b/drivers/clk/owl/clk-factor.c
-> @@ -0,0 +1,270 @@
-> +/*
-> + * Copyright (c) 2014 Actions Semi Inc.
-> + * David Liu <liuwei@actions-semi.com>
-> + *
-> + * Copyright (c) 2017 Linaro Ltd.
-> + * Author: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> + *
-> + * This program is free software: you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License v2 as published by
-> + * the Free Software Foundation.
-
-I had found that S500 code was licensed under GPLv2+ but some S900 parts
-were GPLv2 only. I personally have a bias towards GPLv2+ - any chance we
-can use that here?
-
-Implementation not yet reviewed.
-
-Regards,
-Andreas
-
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Yixun
