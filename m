@@ -1,22 +1,26 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 4 Nov 2017 12:39:57 +0100
-Subject: [PATCH v2 3/3] tty: serial: imx: remove imx_disable_rx_int
-In-Reply-To: <20171020212021.13065-3-troy.kisky@boundarydevices.com>
-References: <20171020212021.13065-1-troy.kisky@boundarydevices.com>
- <20171020212021.13065-3-troy.kisky@boundarydevices.com>
-Message-ID: <20171104113957.GA10523@kroah.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Sat, 4 Nov 2017 17:21:11 +0530
+Subject: [PATCH v4 03/20] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <1509720477-18936-4-git-send-email-sudeep.holla@arm.com>
+References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
+ <1509720477-18936-4-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CABb+yY0KR7rzUSqrG7vPJDZONK3rXtk03WX2eTGAdmkpvTUEbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 20, 2017 at 02:20:21PM -0700, Troy Kisky wrote:
-> Since imx_disable_rx_int is only called by imx_startup,
-> let's integrate it into that function.
-> 
-> Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
-> ---
-> v2: new patch
-> ---
->  drivers/tty/serial/imx.c | 39 ++++++++++-----------------------------
->  1 file changed, 10 insertions(+), 29 deletions(-)
+On Fri, Nov 3, 2017 at 8:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Does not apply :(
+.....
+
+> +int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+> +{
+> +       int ret;
+> +       int timeout;
+> +       struct scmi_info *info = handle_to_scmi_info(handle);
+> +       struct device *dev = info->dev;
+> +
+> +       ret = mbox_send_message(info->tx_chan, xfer);
+>                                                                           ^^^^^^^^
+The call still remains unchanged and broken.
+https://lkml.org/lkml/2017/7/24/502
