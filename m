@@ -1,42 +1,65 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 04 Nov 2017 21:23:06 +0100
-Subject: [GIT PULL 2/2] Rockchip dts64 updates for 4.15 part2
-In-Reply-To: <3824439.LIeQpy2inU@phil>
-References: <3824439.LIeQpy2inU@phil>
-Message-ID: <1575518.sQZnmpGzTX@phil>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Sat, 4 Nov 2017 22:08:04 +0100
+Subject: [PATCH] usb: gadget: bcm63xx_udc: Use common error handling code in
+ bcm63xx_udc_probe()
+Message-ID: <73cacf30-3380-0a77-559c-1ad824fb88eb@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit d85438991874205467f9739d5f3ee771245b4754:
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Sat, 4 Nov 2017 22:02:46 +0100
 
-  arm64: dts: rockchip: enable cec pin for rk3399 firefly (2017-10-15 14:11:32 +0200)
+Add a jump target so that a specific error message is stored only once
+at the end of this function implementation.
+Replace two calls of the function "dev_err" by goto statements.
 
-are available in the git repository at:
+This issue was detected by using the Coccinelle software.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.15-rockchip-dts64-2
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/usb/gadget/udc/bcm63xx_udc.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-for you to fetch changes up to 6f8c539313d884f4715b328e1ce4a3987649b97e:
-
-  arm64: dts: rockchip: add efuse for RK3368 SoCs (2017-10-24 15:25:27 +0200)
-
-----------------------------------------------------------------
-Support for the RGA (raster graphics accelerator) on rk3399
-and efuses on rk3368.
-
-----------------------------------------------------------------
-Heiko Stuebner (2):
-      clk: rockchip: add more rk3188 graphics clock ids
-      Merge branch 'v4.15-shared/clkids' into v4.15-armsoc/dts64
-
-Jacob Chen (1):
-      arm64: dts: rockchip: add RGA device node for RK3399
-
-Romain Perier (2):
-      clk: rockchip: add clock id for PCLK_EFUSE256 of RK3368 SoCs
-      arm64: dts: rockchip: add efuse for RK3368 SoCs
-
- arch/arm64/boot/dts/rockchip/rk3368.dtsi      | 16 ++++++++++++++++
- arch/arm64/boot/dts/rockchip/rk3399.dtsi      | 11 +++++++++++
- include/dt-bindings/clock/rk3188-cru-common.h |  9 +++++++--
- include/dt-bindings/clock/rk3368-cru.h        |  1 +
- 4 files changed, 35 insertions(+), 2 deletions(-)
+diff --git a/drivers/usb/gadget/udc/bcm63xx_udc.c b/drivers/usb/gadget/udc/bcm63xx_udc.c
+index f78503203f42..e3caae9c1ea9 100644
+--- a/drivers/usb/gadget/udc/bcm63xx_udc.c
++++ b/drivers/usb/gadget/udc/bcm63xx_udc.c
+@@ -2389,10 +2389,8 @@ static int bcm63xx_udc_probe(struct platform_device *pdev)
+ 		goto out_uninit;
+ 	}
+ 	if (devm_request_irq(dev, irq, &bcm63xx_udc_ctrl_isr, 0,
+-			     dev_name(dev), udc) < 0) {
+-		dev_err(dev, "error requesting IRQ #%d\n", irq);
+-		goto out_uninit;
+-	}
++			     dev_name(dev), udc) < 0)
++		goto report_request_failure;
+ 
+ 	/* IRQ resources #1-6: data interrupts for IUDMA channels 0-5 */
+ 	for (i = 0; i < BCM63XX_NUM_IUDMA; i++) {
+@@ -2402,10 +2400,8 @@ static int bcm63xx_udc_probe(struct platform_device *pdev)
+ 			goto out_uninit;
+ 		}
+ 		if (devm_request_irq(dev, irq, &bcm63xx_udc_data_isr, 0,
+-				     dev_name(dev), &udc->iudma[i]) < 0) {
+-			dev_err(dev, "error requesting IRQ #%d\n", irq);
+-			goto out_uninit;
+-		}
++				     dev_name(dev), &udc->iudma[i]) < 0)
++			goto report_request_failure;
+ 	}
+ 
+ 	bcm63xx_udc_init_debugfs(udc);
+@@ -2417,6 +2413,10 @@ static int bcm63xx_udc_probe(struct platform_device *pdev)
+ out_uninit:
+ 	bcm63xx_uninit_udc_hw(udc);
+ 	return rc;
++
++report_request_failure:
++	dev_err(dev, "error requesting IRQ #%d\n", irq);
++	goto out_uninit;
+ }
+ 
+ /**
+-- 
+2.15.0
