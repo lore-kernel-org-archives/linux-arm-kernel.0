@@ -1,57 +1,48 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sat, 4 Nov 2017 17:30:36 +0800
-Subject: [PATCH 2/3] clk: owl: add clock driver for Actions S900 SoC
-In-Reply-To: <20171104091949.GB14705@linaro.org>
-References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <1509479663-8985-3-git-send-email-manivannan.sadhasivam@linaro.org>
- <7c87aee4-dde4-ab3d-06b0-75f3686ab5dd@suse.de>
- <20171104091949.GB14705@linaro.org>
-Message-ID: <25a2e233-f565-8baa-17e2-9c867bbbe9d0@suse.de>
+Date: Sat, 4 Nov 2017 17:34:36 +0800
+Subject: [GIT PULL] ARM: actions: dt64 for v4.14
+In-Reply-To: <CAOesGMgJH_LEjOr_JAj+J9LRr-dYHy2zS2PAAJM96+hece=HUw@mail.gmail.com>
+References: <20170905223252.9478-1-afaerber@suse.de>
+ <20170905223252.9478-2-afaerber@suse.de>
+ <CAOesGMgJH_LEjOr_JAj+J9LRr-dYHy2zS2PAAJM96+hece=HUw@mail.gmail.com>
+Message-ID: <7368054b-8a2f-7f42-08fb-4fb58cd1c725@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Olof,
 
-Am 04.11.2017 um 17:19 schrieb Manivannan Sadhasivam:
->>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
->>> index c99f363..821c1e1 100644
->>> --- a/drivers/clk/Makefile
->>> +++ b/drivers/clk/Makefile
->>> @@ -75,6 +75,7 @@ endif
->>>  obj-y					+= mvebu/
->>>  obj-$(CONFIG_ARCH_MXS)			+= mxs/
->>>  obj-$(CONFIG_COMMON_CLK_NXP)		+= nxp/
->>> +obj-$(CONFIG_ARCH_ACTIONS)		+= owl/
->>>  obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
->>>  obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
->>>  obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
->>> diff --git a/drivers/clk/owl/Makefile b/drivers/clk/owl/Makefile
->>> new file mode 100644
->>> index 0000000..dbba0af
->>> --- /dev/null
->>> +++ b/drivers/clk/owl/Makefile
->>> @@ -0,0 +1,2 @@
->>> +obj-y				+= clk.o clk-pll.o clk-factor.o
->>> +obj-$(CONFIG_ARCH_ACTIONS)	+= clk-s900.o
+Am 16.09.2017 um 05:58 schrieb Olof Johansson:
+> On Tue, Sep 5, 2017 at 3:32 PM, Andreas F?rber <afaerber@suse.de> wrote:
+>> Hi Olof and Arnd,
 >>
->> $(CONFIG_ARCH_ACTIONS) is superfluous here.
+>> Here's a (late) dt64 pull for Actions Semi.
+>> This clock node is needed to make use of the new full serial driver.
 >>
-> Okay. Since, we haven't added ARCH_ACTIONS to defconfig yet I intentionally
-> made this conditional compilation.
+>> Regards,
+>> Andreas
+>>
+>> The following changes since commit 5771a8c08880cdca3bfb4a3fc6d309d6bba20877:
+>>
+>>   Linux v4.13-rc1 (2017-07-15 15:22:10 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-dt-for-4.14
+>>
+>> for you to fetch changes up to f0e12dd55384d5ef53c6e15673d39133dfca5f0a:
+>>
+>>   arm64: dts: actions: s900-bubblegum-96: Add fake uart5 clock (2017-09-06 00:14:38 +0200)
 > 
-> Would like a suggestion from you on this!
+> Merged into next/late. Thanks!
 
-My point was that the ../Makefile already uses $(CONFIG_ARCH_ACTIONS),
-so $(CONFIG_ARCH_ACTIONS) can never be n here.
+Hmm, this has still not shown up in linux.git and disappeared in
+linux-next.git - did this get lost? Do I need to resubmit this for 4.15?
 
-Instead you should probably either use $(CONFIG_ARM64) or better some
-new Kconfig option (CONFIG_CLK_OWL_S900?), so that we don't
-unnecessarily compile S900 on 32-bit arm and S500 on arm64.
+Same issue with 32-bit dt pull.
 
-Another point: What about S700? Does it need to duplicate clk-s900.c or
-can we share any code between the two?
+Holding back three 4.15 pulls due to this.
 
-Cheers,
+Regards,
 Andreas
 
 -- 
