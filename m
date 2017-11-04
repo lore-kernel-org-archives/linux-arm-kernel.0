@@ -1,59 +1,40 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 4 Nov 2017 15:34:04 +0530
-Subject: [PATCH 0/3] Add clock driver for Actions S900 SoC
-In-Reply-To: <62797b3b-a622-48a1-9dc5-3cc2b5c7afd3@suse.de>
-References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <62797b3b-a622-48a1-9dc5-3cc2b5c7afd3@suse.de>
-Message-ID: <20171104100404.GA23738@linaro.org>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sat,  4 Nov 2017 19:09:38 +0800
+Subject: [GIT PULL] arm: actions: dt64 for v4.15
+In-Reply-To: <20171104110938.9019-1-afaerber@suse.de>
+References: <20171104110938.9019-1-afaerber@suse.de>
+Message-ID: <20171104110938.9019-3-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 04, 2017 at 05:05:31PM +0800, Andreas F?rber wrote:
-> Hi Mani,
-> 
-> Am 01.11.2017 um 03:54 schrieb Manivannan Sadhasivam:
-> > This series adds clock driver for Actions Semi OWL series
-> > S900 SoC with relevant clock bindings and device tree data.
-> > 
-> > This series also addresses the review comments from previous
-> > submission happened last year.
-> > 
-> > https://patchwork.kernel.org/patch/9254471/
-> 
-> Interesting - I had searched for any S500/S900 patches before starting
-> to work on this but came up empty on LAKML.
->
-Even I'm also not able to find the patch submission in LKML. But found that
-in patchwork. 
-> It seems you missed at least one review comment from 2016 about the
-> example indentation, so please double-check for anything Stephen already
-> pointed out.
-> 
-Agree. Will incorporate in next revision. Can't blame checkpatch for this ;-)
-> > Driver has been validated on Bubblegum-96 board.
-> > 
-> > Thanks,
-> > Mani
-> > 
-> > Manivannan Sadhasivam (3):
-> >   arm64: dts: actions: add s900 clock controller nodes
-> >   clk: owl: add clock driver for Actions S900 SoC
-> >   Documentation: add Actions S900 clock bindings
-> 
-> Please reverse the patch order.
-> 
-Ack.
-> Have you checked S500 code whether the S900 vs. common split is correct?
-> 
-Will look at both S500 and S700.
-> Many thanks for your work on this,
-> 
-I should thank you for getting the SoC support in :-)
+Hi Olof and Arnd,
 
--Mani
-> Andreas
-> 
-> -- 
-> SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-> GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-> HRB 21284 (AG N?rnberg)
+Here's a (late) dt64 pull for Actions Semi.
+This clock node is needed to make use of the full serial driver merged in 4.14.
+
+Regards,
+Andreas
+
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-dt-for-4.15
+
+for you to fetch changes up to 965f94c77552d80f824229a6a68f7ca92a59e5ff:
+
+  arm64: dts: actions: s900-bubblegum-96: Add fake uart5 clock (2017-11-04 18:21:10 +0800)
+
+----------------------------------------------------------------
+Actions Semi ARM64 based SoC DT for v4.15
+
+This updates the Bubblegum-96 DT with a clock node for the debug UART.
+
+----------------------------------------------------------------
+Andreas F?rber (1):
+      arm64: dts: actions: s900-bubblegum-96: Add fake uart5 clock
+
+ arch/arm64/boot/dts/actions/s900-bubblegum-96.dts | 7 +++++++
+ 1 file changed, 7 insertions(+)
