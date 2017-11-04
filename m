@@ -1,37 +1,57 @@
-From: gregkh@linuxfoundation.org (Greg KH)
-Date: Sat, 4 Nov 2017 12:36:32 +0100
-Subject: [patch v11 1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <1509724449-26221-2-git-send-email-oleksandrs@mellanox.com>
-References: <1509724449-26221-1-git-send-email-oleksandrs@mellanox.com>
- <1509724449-26221-2-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <20171104113632.GC24583@kroah.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Sat,  4 Nov 2017 19:39:08 +0800
+Subject: [GIT PULL] ARM: realtek: dt64 for v4.15
+Message-ID: <20171104113908.9748-1-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 05:54:06PM +0200, Oleksandr Shamray wrote:
-> diff --git a/include/uapi/linux/jtag.h b/include/uapi/linux/jtag.h
-> new file mode 100644
-> index 0000000..0b25a83
-> --- /dev/null
-> +++ b/include/uapi/linux/jtag.h
-> @@ -0,0 +1,117 @@
-> +/*
-> + * JTAG class driver
-> + *
-> + * Copyright (c) 2017 Mellanox Technologies. All rights reserved.
-> + * Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
-> + *
-> + * Released under the GPLv2/BSD.
-> + * SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
+Hi Arnd and Olof,
 
-Minor nit, this should go on the first line of the .h file now, to match
-the rest of the kernel (just happened, not your fault.)
+Here's a (late) dt64 pull for Realtek.
+Contains two new board DTs and a generalization of the SoC DT.
 
-Also, uapi files are not just GPLv2, they have the userspace exception,
-so this should just be:
-	SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
-no need to add any BSD stuff to it at all.
+Regards,
+Andreas
 
-thanks,
+The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
-greg k-h
+  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-realtek.git tags/realtek-arm64-dt-for-4.15
+
+for you to fetch changes up to a9ce6f854581aa7c39fd94f965658aa4e7ff7892:
+
+  arm64: dts: realtek: Add MeLE V9 (2017-10-26 16:24:38 +0900)
+
+----------------------------------------------------------------
+Realtek ARM64 based SoC DT for v4.15
+
+This refactors the RTD1295 DT, preparing for (but not yet adding)
+RTD1293 and RTD1296. Superfluous reg property entries are dropped.
+DTs for PROBOX2 AVA and MeLE V9 TV boxes are added.
+
+----------------------------------------------------------------
+Andreas F?rber (8):
+      arm64: dts: realtek: Clean up RTD1295 UART reg property
+      dt-bindings: Add vendor prefix for ProBox2
+      dt-bindings: arm: realtek: Add ProBox2 AVA
+      arm64: dts: realtek: Add ProBox2 Ava
+      arm64: dts: realtek: Factor out common RTD129x parts
+      dt-bindings: Add vendor prefix for MeLE
+      dt-bindings: arm: realtek: Document MeLE V9
+      arm64: dts: realtek: Add MeLE V9
+
+ Documentation/devicetree/bindings/arm/realtek.txt  |  2 +
+ .../devicetree/bindings/vendor-prefixes.txt        |  2 +
+ arch/arm64/boot/dts/realtek/Makefile               |  2 +
+ arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts    | 31 ++++++++++
+ .../arm64/boot/dts/realtek/rtd1295-probox2-ava.dts | 31 ++++++++++
+ arch/arm64/boot/dts/realtek/rtd1295-zidoo-x9s.dts  |  6 --
+ arch/arm64/boot/dts/realtek/rtd1295.dtsi           | 62 ++-----------------
+ arch/arm64/boot/dts/realtek/rtd129x.dtsi           | 72 ++++++++++++++++++++++
+ 8 files changed, 144 insertions(+), 64 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-mele-v9.dts
+ create mode 100644 arch/arm64/boot/dts/realtek/rtd1295-probox2-ava.dts
+ create mode 100644 arch/arm64/boot/dts/realtek/rtd129x.dtsi
