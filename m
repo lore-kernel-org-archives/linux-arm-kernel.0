@@ -1,54 +1,61 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Sat, 4 Nov 2017 19:22:06 +0300
-Subject: [PATCH 1/2] arm64: dts: orange-pi-zero-plus2: fix sdcard detect
-In-Reply-To: <CAMty3ZCxXUaBf3t=3d7D+RU6rp83oJw8BHADU3TYDeM4Vx_k-w@mail.gmail.com>
-References: <20171103195855.15283-1-geomatsi@gmail.com>
- <20171103195855.15283-2-geomatsi@gmail.com>
- <CAMty3ZCs8kq1vUGLOi0ZghY7n0iXgUQ1E=ngBO6Y4wm7wMLF7Q@mail.gmail.com>
- <20171104154221.ao7kkcwqhnja3cxe@speedy.hunter>
- <CAMty3ZCxXUaBf3t=3d7D+RU6rp83oJw8BHADU3TYDeM4Vx_k-w@mail.gmail.com>
-Message-ID: <20171104162206.gowih7h7og3fk7rk@speedy.hunter>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Sat, 04 Nov 2017 17:40:30 +0100
+Subject: [PATCH] clk: meson: gxbb: fix wrong clock for SARADC
+In-Reply-To: <e8a5faa9-d3ca-e03e-3589-2685d6ada30a@amlogic.com>
+References: <20171103181703.30434-1-yixun.lan@amlogic.com>
+ <e8a5faa9-d3ca-e03e-3589-2685d6ada30a@amlogic.com>
+Message-ID: <59FDED7E.8030100@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > The sdcard detect pin on orange-pi-zero-plus2 is pulled up.
-> > > Fix cd-gpio description to enable sdcard detect.
-> > >
-> > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
-> > > ---
-> > >  arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts | 2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > > index b6b7a561df8c..a42fd79a62a3 100644
-> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > > @@ -71,7 +71,7 @@
-> > >         pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-> > >         vmmc-supply = <&reg_vcc3v3>;
-> > >         bus-width = <4>;
-> > > -       cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-> > > +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
-> >
-> > Was able to detect and do mount with existing dts
-> 
-> Did you try to boot from sdcard ? I am not able to boot my board from
-> sd-card without this change. As I mentioned earlier in my email
-> to buildroot mailing list, with mmc debug enabled I see that mmc
-> tries to init sd-card when I remove it from the slot.
-> 
-> Maybe there is a minor differences between h/w versions or batches ?
-> What is you board version ? I tested on board v1.0.
-> 
-> 
-> I'm using same v1.0
+Hi Yixun,
 
-Ok, lets skip this patch for now.
+Le 04/11/2017 09:41, Yixun Lan a ?crit :
+> 
+> 
+> On 11/04/17 02:17, Yixun Lan wrote:
+>> According to the datasheet, the clock gate bit for
+>> SARADC is bit[22] in Meson-GXBB/GXL series.
+>>
+>> Change-Id: Ic4fa58276d2a9ea273eef0a08541fc213ac5ac89
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  drivers/clk/meson/gxbb.c | 2 +-
+>>  1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+>> index b2d1e8ed7152..4f5b535fcd12 100644
+>> --- a/drivers/clk/meson/gxbb.c
+>> +++ b/drivers/clk/meson/gxbb.c
+>> @@ -1139,7 +1139,6 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
+>>  static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
+>>  static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
+>>  static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
+>> -static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
+>>  static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
+>>  static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
+>>  static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
+>> @@ -1149,6 +1148,7 @@ static MESON_GATE(gxbb_async_fifo, HHI_GCLK_MPEG0, 16);
+>>  static MESON_GATE(gxbb_sdio, HHI_GCLK_MPEG0, 17);
+>>  static MESON_GATE(gxbb_abuf, HHI_GCLK_MPEG0, 18);
+>>  static MESON_GATE(gxbb_hiu_iface, HHI_GCLK_MPEG0, 19);
+>> +static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 22);
+>>  static MESON_GATE(gxbb_assist_misc, HHI_GCLK_MPEG0, 23);
+>>  static MESON_GATE(gxbb_emmc_a, HHI_GCLK_MPEG0, 24);
+>>  static MESON_GATE(gxbb_emmc_b, HHI_GCLK_MPEG0, 25);
+>>
+> Hi Neil
+>  I assume you will take this via the clk-meson tree..
+> could you amend the commit msg and drop the 'Change-Id'?
+> (for other parts, please feel free to adjust if you see fit)
+>  thanks
 
-I will double check v1.0 schematics and my board behavior.
-Though I see that mmc0 dts fragment in u-boot for this board
-also differs from the current kernel one: it uses 'cd-inverted' property.
+Yes, I will push it as a fix.
 
-Regards,
-Sergey
+Can you check if the saradc driver is still functional when applied ?
+
+Neil
+
+> 
+> Yixun
+> 
