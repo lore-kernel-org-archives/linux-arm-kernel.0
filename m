@@ -1,99 +1,51 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Sat,  4 Nov 2017 13:31:21 +0900
-Subject: [PATCH -next 2/2] arm: kprobes: Remove jprobe test case
-In-Reply-To: <150976982219.2012.12861503668350308669.stgit@devbox>
-References: <150976982219.2012.12861503668350308669.stgit@devbox>
-Message-ID: <150976988105.2012.13618117383683725047.stgit@devbox>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sat, 4 Nov 2017 09:26:19 +0100
+Subject: [GIT PULL] ARM: SoC fixes for 4.14
+Message-ID: <CAK8P3a0Eb_LWvBtcM-wKCOSGEFk4d9Xp+Sufe67vqrYAJMmjhg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove jprobe test case because jprobe is deprecated
-feature. We must not use it.
+The following changes since commit 0b07194bb55ed836c2cc7c22e866b87a14681984:
 
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
----
- arch/arm/probes/kprobes/test-core.c |   57 -----------------------------------
- 1 file changed, 57 deletions(-)
+  Linux 4.14-rc7 (2017-10-29 13:58:38 -0700)
 
-diff --git a/arch/arm/probes/kprobes/test-core.c b/arch/arm/probes/kprobes/test-core.c
-index 9c3ceba69015..9ed0129bed3c 100644
---- a/arch/arm/probes/kprobes/test-core.c
-+++ b/arch/arm/probes/kprobes/test-core.c
-@@ -227,7 +227,6 @@ static bool test_regs_ok;
- static int test_func_instance;
- static int pre_handler_called;
- static int post_handler_called;
--static int jprobe_func_called;
- static int kretprobe_handler_called;
- static int tests_failed;
- 
-@@ -370,50 +369,6 @@ static int test_kprobe(long (*func)(long, long))
- 	return 0;
- }
- 
--static void __kprobes jprobe_func(long r0, long r1)
--{
--	jprobe_func_called = test_func_instance;
--	if (r0 == FUNC_ARG1 && r1 == FUNC_ARG2)
--		test_regs_ok = true;
--	jprobe_return();
--}
--
--static struct jprobe the_jprobe = {
--	.entry		= jprobe_func,
--};
--
--static int test_jprobe(long (*func)(long, long))
--{
--	int ret;
--
--	the_jprobe.kp.addr = (kprobe_opcode_t *)func;
--	ret = register_jprobe(&the_jprobe);
--	if (ret < 0) {
--		pr_err("FAIL: register_jprobe failed with %d\n", ret);
--		return ret;
--	}
--
--	ret = call_test_func(func, true);
--
--	unregister_jprobe(&the_jprobe);
--	the_jprobe.kp.flags = 0; /* Clear disable flag to allow reuse */
--
--	if (!ret)
--		return -EINVAL;
--	if (jprobe_func_called != test_func_instance) {
--		pr_err("FAIL: jprobe handler function not called\n");
--		return -EINVAL;
--	}
--	if (!call_test_func(func, false))
--		return -EINVAL;
--	if (jprobe_func_called == test_func_instance) {
--		pr_err("FAIL: probe called after unregistering\n");
--		return -EINVAL;
--	}
--
--	return 0;
--}
--
- static int __kprobes
- kretprobe_handler(struct kretprobe_instance *ri, struct pt_regs *regs)
- {
-@@ -468,18 +423,6 @@ static int run_api_tests(long (*func)(long, long))
- 	if (ret < 0)
- 		return ret;
- 
--	pr_info("    jprobe\n");
--	ret = test_jprobe(func);
--#if defined(CONFIG_THUMB2_KERNEL) && !defined(MODULE)
--	if (ret == -EINVAL) {
--		pr_err("FAIL: Known longtime bug with jprobe on Thumb kernels\n");
--		tests_failed = ret;
--		ret = 0;
--	}
--#endif
--	if (ret < 0)
--		return ret;
--
- 	pr_info("    kretprobe\n");
- 	ret = test_kretprobe(func);
- 	if (ret < 0)
+are available in the git repository at:
+
+  ssh://git at gitolite.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+tags/armsoc-fixes
+
+for you to fetch changes up to da984d754069818090511fc3b36ea2f9a0b538b5:
+
+  Merge tag 'mvebu-fixes-4.14-3' of
+git://git.infradead.org/linux-mvebu into fixes (2017-10-30 15:55:12
++0100)
+
+----------------------------------------------------------------
+ARM: SoC fixes for 4.14
+
+Only two patches came in over the last two weeks: Uniphier USB support
+needs additional clocks enabled (on both 32-bit and 64-bit ARM), and
+a Marvell MVEBU stability issue has been fixed.
+
+----------------------------------------------------------------
+Arnd Bergmann (2):
+      Merge tag 'uniphier-fixes-v4.14' of
+git://git.kernel.org/.../masahiroy/linux-uniphier into fixes
+      Merge tag 'mvebu-fixes-4.14-3' of
+git://git.infradead.org/linux-mvebu into fixes
+
+Masahiro Yamada (2):
+      ARM: dts: uniphier: add STDMAC clock to EHCI nodes
+      arm64: dts: uniphier: add STDMAC clock to EHCI nodes
+
+Yan Markman (1):
+      ARM: dts: mvebu: pl310-cache disable double-linefill
+
+ arch/arm/boot/dts/armada-375.dtsi                | 4 ++--
+ arch/arm/boot/dts/armada-38x.dtsi                | 4 ++--
+ arch/arm/boot/dts/armada-39x.dtsi                | 4 ++--
+ arch/arm/boot/dts/uniphier-ld4.dtsi              | 9 ++++++---
+ arch/arm/boot/dts/uniphier-pro4.dtsi             | 6 ++++--
+ arch/arm/boot/dts/uniphier-sld8.dtsi             | 9 ++++++---
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi | 9 ++++++---
+ 7 files changed, 28 insertions(+), 17 deletions(-)
