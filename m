@@ -1,65 +1,56 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 4 Nov 2017 15:24:00 +0530
-Subject: [PATCH 2/3] clk: owl: add clock driver for Actions S900 SoC
-In-Reply-To: <25a2e233-f565-8baa-17e2-9c867bbbe9d0@suse.de>
+Date: Sat, 4 Nov 2017 15:34:04 +0530
+Subject: [PATCH 0/3] Add clock driver for Actions S900 SoC
+In-Reply-To: <62797b3b-a622-48a1-9dc5-3cc2b5c7afd3@suse.de>
 References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <1509479663-8985-3-git-send-email-manivannan.sadhasivam@linaro.org>
- <7c87aee4-dde4-ab3d-06b0-75f3686ab5dd@suse.de>
- <20171104091949.GB14705@linaro.org>
- <25a2e233-f565-8baa-17e2-9c867bbbe9d0@suse.de>
-Message-ID: <20171104095400.GD18680@linaro.org>
+ <62797b3b-a622-48a1-9dc5-3cc2b5c7afd3@suse.de>
+Message-ID: <20171104100404.GA23738@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 04, 2017 at 05:30:36PM +0800, Andreas F?rber wrote:
-> Hi,
+On Sat, Nov 04, 2017 at 05:05:31PM +0800, Andreas F?rber wrote:
+> Hi Mani,
 > 
-> Am 04.11.2017 um 17:19 schrieb Manivannan Sadhasivam:
-> >>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-> >>> index c99f363..821c1e1 100644
-> >>> --- a/drivers/clk/Makefile
-> >>> +++ b/drivers/clk/Makefile
-> >>> @@ -75,6 +75,7 @@ endif
-> >>>  obj-y					+= mvebu/
-> >>>  obj-$(CONFIG_ARCH_MXS)			+= mxs/
-> >>>  obj-$(CONFIG_COMMON_CLK_NXP)		+= nxp/
-> >>> +obj-$(CONFIG_ARCH_ACTIONS)		+= owl/
-> >>>  obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
-> >>>  obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
-> >>>  obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
-> >>> diff --git a/drivers/clk/owl/Makefile b/drivers/clk/owl/Makefile
-> >>> new file mode 100644
-> >>> index 0000000..dbba0af
-> >>> --- /dev/null
-> >>> +++ b/drivers/clk/owl/Makefile
-> >>> @@ -0,0 +1,2 @@
-> >>> +obj-y				+= clk.o clk-pll.o clk-factor.o
-> >>> +obj-$(CONFIG_ARCH_ACTIONS)	+= clk-s900.o
-> >>
-> >> $(CONFIG_ARCH_ACTIONS) is superfluous here.
-> >>
-> > Okay. Since, we haven't added ARCH_ACTIONS to defconfig yet I intentionally
-> > made this conditional compilation.
+> Am 01.11.2017 um 03:54 schrieb Manivannan Sadhasivam:
+> > This series adds clock driver for Actions Semi OWL series
+> > S900 SoC with relevant clock bindings and device tree data.
 > > 
-> > Would like a suggestion from you on this!
+> > This series also addresses the review comments from previous
+> > submission happened last year.
+> > 
+> > https://patchwork.kernel.org/patch/9254471/
 > 
-> My point was that the ../Makefile already uses $(CONFIG_ARCH_ACTIONS),
-> so $(CONFIG_ARCH_ACTIONS) can never be n here.
+> Interesting - I had searched for any S500/S900 patches before starting
+> to work on this but came up empty on LAKML.
 >
-Ah. Missed that :-) 
-> Instead you should probably either use $(CONFIG_ARM64) or better some
-> new Kconfig option (CONFIG_CLK_OWL_S900?), so that we don't
-> unnecessarily compile S900 on 32-bit arm and S500 on arm64.
+Even I'm also not able to find the patch submission in LKML. But found that
+in patchwork. 
+> It seems you missed at least one review comment from 2016 about the
+> example indentation, so please double-check for anything Stephen already
+> pointed out.
 > 
-CONFIG_CLK_OWL_S900 seems to be beter
-> Another point: What about S700? Does it need to duplicate clk-s900.c or
-> can we share any code between the two?
+Agree. Will incorporate in next revision. Can't blame checkpatch for this ;-)
+> > Driver has been validated on Bubblegum-96 board.
+> > 
+> > Thanks,
+> > Mani
+> > 
+> > Manivannan Sadhasivam (3):
+> >   arm64: dts: actions: add s900 clock controller nodes
+> >   clk: owl: add clock driver for Actions S900 SoC
+> >   Documentation: add Actions S900 clock bindings
 > 
-Haven't looked at that yet. Will let you know.
+> Please reverse the patch order.
+> 
+Ack.
+> Have you checked S500 code whether the S900 vs. common split is correct?
+> 
+Will look at both S500 and S700.
+> Many thanks for your work on this,
+> 
+I should thank you for getting the SoC support in :-)
 
-Thanks,
-Mani
-> Cheers,
+-Mani
 > Andreas
 > 
 > -- 
