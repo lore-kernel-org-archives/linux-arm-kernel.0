@@ -1,49 +1,78 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Sat, 4 Nov 2017 16:41:47 +0800
-Subject: [PATCH] clk: meson: gxbb: fix wrong clock for SARADC
-In-Reply-To: <20171103181703.30434-1-yixun.lan@amlogic.com>
-References: <20171103181703.30434-1-yixun.lan@amlogic.com>
-Message-ID: <e8a5faa9-d3ca-e03e-3589-2685d6ada30a@amlogic.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Sat, 4 Nov 2017 16:43:31 +0800
+Subject: [PATCH 1/3] arm64: dts: actions: add s900 clock controller nodes
+In-Reply-To: <1509479663-8985-2-git-send-email-manivannan.sadhasivam@linaro.org>
+References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
+ <1509479663-8985-2-git-send-email-manivannan.sadhasivam@linaro.org>
+Message-ID: <a8bd3b8b-190a-6dbf-6976-207baca3030b@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Am 01.11.2017 um 03:54 schrieb Manivannan Sadhasivam:
+> This patch adds clock controller nodes for Actions Semi s900 SoC
 
+Please avoid "This patch". Once applied, it's a commit. :)
 
-On 11/04/17 02:17, Yixun Lan wrote:
-> According to the datasheet, the clock gate bit for
-> SARADC is bit[22] in Meson-GXBB/GXL series.
 > 
-> Change-Id: Ic4fa58276d2a9ea273eef0a08541fc213ac5ac89
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
 > ---
->  drivers/clk/meson/gxbb.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  arch/arm64/boot/dts/actions/s900.dtsi | 19 +++++++++++++++++++
+>  1 file changed, 19 insertions(+)
 > 
-> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-> index b2d1e8ed7152..4f5b535fcd12 100644
-> --- a/drivers/clk/meson/gxbb.c
-> +++ b/drivers/clk/meson/gxbb.c
-> @@ -1139,7 +1139,6 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
->  static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
->  static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
->  static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
-> -static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
->  static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
->  static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
->  static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
-> @@ -1149,6 +1148,7 @@ static MESON_GATE(gxbb_async_fifo, HHI_GCLK_MPEG0, 16);
->  static MESON_GATE(gxbb_sdio, HHI_GCLK_MPEG0, 17);
->  static MESON_GATE(gxbb_abuf, HHI_GCLK_MPEG0, 18);
->  static MESON_GATE(gxbb_hiu_iface, HHI_GCLK_MPEG0, 19);
-> +static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 22);
->  static MESON_GATE(gxbb_assist_misc, HHI_GCLK_MPEG0, 23);
->  static MESON_GATE(gxbb_emmc_a, HHI_GCLK_MPEG0, 24);
->  static MESON_GATE(gxbb_emmc_b, HHI_GCLK_MPEG0, 25);
-> 
-Hi Neil
- I assume you will take this via the clk-meson tree..
-could you amend the commit msg and drop the 'Change-Id'?
-(for other parts, please feel free to adjust if you see fit)
- thanks
+> diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
+> index 11406f6..c099ef1 100644
+> --- a/arch/arm64/boot/dts/actions/s900.dtsi
+> +++ b/arch/arm64/boot/dts/actions/s900.dtsi
+> @@ -5,6 +5,7 @@
+>   */
+>  
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/actions,s900-clock.h>
 
-Yixun
+Alphabetical order please.
+
+>  
+>  / {
+>  	compatible = "actions,s900";
+> @@ -88,6 +89,24 @@
+>  		#clock-cells = <0>;
+>  	};
+>  
+> +	losc: losc {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <32768>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	diff_24M: diff_24M {
+
+No underscore in node names please - maybe diff-24M or simpler diff24M?
+Please double-check that name - is it from manual or from schematics?
+
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <24000000>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	clock: clock-controller at e0160000 {
+> +		compatible = "actions,s900-clock";
+> +		reg = <0 0xe0160000 0 0x1000>;
+> +		#clock-cells = <1>;
+> +	};
+
+This node belongs into the soc node below, ordered by unit address.
+And maybe there's a better label than "clock"? "clkc" or some official
+name from the manual?
+
+> +
+>  	soc {
+>  		compatible = "simple-bus";
+>  		#address-cells = <2>;
+
+Regards,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
