@@ -1,27 +1,27 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Sat, 4 Nov 2017 02:13:04 +0000
-Subject: [PATCH 00/15] Add support for clang LTO
-In-Reply-To: <20171103195647.GA137924@samitolvanen.mtv.corp.google.com>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
- <20171103180913.whp2tdjjvs32f4lz@lakrids.cambridge.arm.com>
- <CAKwvOd=5CCMAA9n7=ocPO5UYmCmkNs8GLYrxXVZVZEeYCyisyA@mail.gmail.com>
- <20171103192634.u25go4tu7lgzl6ja@lakrids.cambridge.arm.com>
- <20171103195647.GA137924@samitolvanen.mtv.corp.google.com>
-Message-ID: <20171104021303.bexhsxpg5tjerhu7@salmiak>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Sat,  4 Nov 2017 13:30:22 +0900
+Subject: [PATCH -next 0/2] arm: kprobes: Remove jprobe test case
+Message-ID: <150976982219.2012.12861503668350308669.stgit@devbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 12:56:47PM -0700, Sami Tolvanen wrote:
-> On Fri, Nov 03, 2017 at 07:26:35PM +0000, Mark Rutland wrote:
-> > I guess that in Google you haven't tested on a platform with EL2
-> > available?
-> 
-> Correct. I'll look into this and include a fix in v2. Does this work on a
-> clang build without LTO?
+Hi,
 
-I saw this on v4.14-rc7, with patch 7 (-mno-implicit-float), but no other
-patches from this series (i.e. no LTO).
+This series fixes a typo and remove jprobe test case
+because jprobe is deprecated feature. The typo is
+related to jprobe so need to be fixed in this series.
 
-Thanks,
-Mark.
+Thank you,
+
+---
+
+Masami Hiramatsu (2):
+      arm: kprobes: Fix kretprobe test to check correct counter
+      arm: kprobes: Remove jprobe test case
+
+
+ arch/arm/probes/kprobes/test-core.c |   59 +----------------------------------
+ 1 file changed, 1 insertion(+), 58 deletions(-)
+
+--
+Masami Hiramatsu (Linaro) <mhiramat@kernel.org>
