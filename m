@@ -1,16 +1,17 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat,  4 Nov 2017 19:09:38 +0800
-Subject: [GIT PULL] arm: actions: dt64 for v4.15
+Date: Sat,  4 Nov 2017 19:09:37 +0800
+Subject: [GIT PULL] arm: actions: dt for v4.15
 In-Reply-To: <20171104110938.9019-1-afaerber@suse.de>
 References: <20171104110938.9019-1-afaerber@suse.de>
-Message-ID: <20171104110938.9019-3-afaerber@suse.de>
+Message-ID: <20171104110938.9019-2-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Olof and Arnd,
 
-Here's a (late) dt64 pull for Actions Semi.
+Here's a (late) dt pull for Actions Semi.
 This clock node is needed to make use of the full serial driver merged in 4.14.
+CubieBoard6 is new for 4.15.
 
 Regards,
 Andreas
@@ -21,20 +22,30 @@ The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm64-dt-for-4.15
+  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm-dt-for-4.15
 
-for you to fetch changes up to 965f94c77552d80f824229a6a68f7ca92a59e5ff:
+for you to fetch changes up to 7f6a78fe34f041da317e46813254abab776d46f7:
 
-  arm64: dts: actions: s900-bubblegum-96: Add fake uart5 clock (2017-11-04 18:21:10 +0800)
-
-----------------------------------------------------------------
-Actions Semi ARM64 based SoC DT for v4.15
-
-This updates the Bubblegum-96 DT with a clock node for the debug UART.
+  ARM: dts: owl-s500: Add CubieBoard6 (2017-11-04 18:12:45 +0800)
 
 ----------------------------------------------------------------
-Andreas F?rber (1):
-      arm64: dts: actions: s900-bubblegum-96: Add fake uart5 clock
+Actions Semi ARM based SoC DT for v4.15
 
- arch/arm64/boot/dts/actions/s900-bubblegum-96.dts | 7 +++++++
- 1 file changed, 7 insertions(+)
+This updates the Guitar board DT with a clock node for the debug UART
+and adds a new DT for the CubieBoard6.
+It also updates the S500 DT with CPU power domains.
+
+----------------------------------------------------------------
+Andreas F?rber (4):
+      ARM: dts: owl-s500: Set power domains for CPU2 and CPU3
+      ARM: dts: owl-s500-guitar-bb-rev-b: Add fake uart3 clock
+      dt-bindings: arm: actions: Add CubieBoard6
+      ARM: dts: owl-s500: Add CubieBoard6
+
+ Documentation/devicetree/bindings/arm/actions.txt |  1 +
+ arch/arm/boot/dts/Makefile                        |  1 +
+ arch/arm/boot/dts/owl-s500-cubieboard6.dts        | 44 +++++++++++++++++++++++
+ arch/arm/boot/dts/owl-s500-guitar-bb-rev-b.dts    |  7 ++++
+ arch/arm/boot/dts/owl-s500.dtsi                   |  3 ++
+ 5 files changed, 56 insertions(+)
+ create mode 100644 arch/arm/boot/dts/owl-s500-cubieboard6.dts
