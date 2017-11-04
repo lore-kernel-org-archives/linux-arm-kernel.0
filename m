@@ -1,90 +1,65 @@
 From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Sat, 4 Nov 2017 15:20:37 +0530
-Subject: [PATCH 1/3] arm64: dts: actions: add s900 clock controller nodes
-In-Reply-To: <a8bd3b8b-190a-6dbf-6976-207baca3030b@suse.de>
+Date: Sat, 4 Nov 2017 15:24:00 +0530
+Subject: [PATCH 2/3] clk: owl: add clock driver for Actions S900 SoC
+In-Reply-To: <25a2e233-f565-8baa-17e2-9c867bbbe9d0@suse.de>
 References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <1509479663-8985-2-git-send-email-manivannan.sadhasivam@linaro.org>
- <a8bd3b8b-190a-6dbf-6976-207baca3030b@suse.de>
-Message-ID: <20171104095037.GC18680@linaro.org>
+ <1509479663-8985-3-git-send-email-manivannan.sadhasivam@linaro.org>
+ <7c87aee4-dde4-ab3d-06b0-75f3686ab5dd@suse.de>
+ <20171104091949.GB14705@linaro.org>
+ <25a2e233-f565-8baa-17e2-9c867bbbe9d0@suse.de>
+Message-ID: <20171104095400.GD18680@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andreas,
-On Sat, Nov 04, 2017 at 04:43:31PM +0800, Andreas F?rber wrote:
-> Am 01.11.2017 um 03:54 schrieb Manivannan Sadhasivam:
-> > This patch adds clock controller nodes for Actions Semi s900 SoC
+On Sat, Nov 04, 2017 at 05:30:36PM +0800, Andreas F?rber wrote:
+> Hi,
 > 
-> Please avoid "This patch". Once applied, it's a commit. :)
-> 
-Ack.
+> Am 04.11.2017 um 17:19 schrieb Manivannan Sadhasivam:
+> >>> diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+> >>> index c99f363..821c1e1 100644
+> >>> --- a/drivers/clk/Makefile
+> >>> +++ b/drivers/clk/Makefile
+> >>> @@ -75,6 +75,7 @@ endif
+> >>>  obj-y					+= mvebu/
+> >>>  obj-$(CONFIG_ARCH_MXS)			+= mxs/
+> >>>  obj-$(CONFIG_COMMON_CLK_NXP)		+= nxp/
+> >>> +obj-$(CONFIG_ARCH_ACTIONS)		+= owl/
+> >>>  obj-$(CONFIG_MACH_PISTACHIO)		+= pistachio/
+> >>>  obj-$(CONFIG_COMMON_CLK_PXA)		+= pxa/
+> >>>  obj-$(CONFIG_COMMON_CLK_QCOM)		+= qcom/
+> >>> diff --git a/drivers/clk/owl/Makefile b/drivers/clk/owl/Makefile
+> >>> new file mode 100644
+> >>> index 0000000..dbba0af
+> >>> --- /dev/null
+> >>> +++ b/drivers/clk/owl/Makefile
+> >>> @@ -0,0 +1,2 @@
+> >>> +obj-y				+= clk.o clk-pll.o clk-factor.o
+> >>> +obj-$(CONFIG_ARCH_ACTIONS)	+= clk-s900.o
+> >>
+> >> $(CONFIG_ARCH_ACTIONS) is superfluous here.
+> >>
+> > Okay. Since, we haven't added ARCH_ACTIONS to defconfig yet I intentionally
+> > made this conditional compilation.
 > > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  arch/arm64/boot/dts/actions/s900.dtsi | 19 +++++++++++++++++++
-> >  1 file changed, 19 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/actions/s900.dtsi b/arch/arm64/boot/dts/actions/s900.dtsi
-> > index 11406f6..c099ef1 100644
-> > --- a/arch/arm64/boot/dts/actions/s900.dtsi
-> > +++ b/arch/arm64/boot/dts/actions/s900.dtsi
-> > @@ -5,6 +5,7 @@
-> >   */
-> >  
-> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> > +#include <dt-bindings/clock/actions,s900-clock.h>
+> > Would like a suggestion from you on this!
 > 
-> Alphabetical order please.
+> My point was that the ../Makefile already uses $(CONFIG_ARCH_ACTIONS),
+> so $(CONFIG_ARCH_ACTIONS) can never be n here.
+>
+Ah. Missed that :-) 
+> Instead you should probably either use $(CONFIG_ARM64) or better some
+> new Kconfig option (CONFIG_CLK_OWL_S900?), so that we don't
+> unnecessarily compile S900 on 32-bit arm and S500 on arm64.
 > 
-Ack.
-> >  
-> >  / {
-> >  	compatible = "actions,s900";
-> > @@ -88,6 +89,24 @@
-> >  		#clock-cells = <0>;
-> >  	};
-> >  
-> > +	losc: losc {
-> > +		compatible = "fixed-clock";
-> > +		clock-frequency = <32768>;
-> > +		#clock-cells = <0>;
-> > +	};
-> > +
-> > +	diff_24M: diff_24M {
+CONFIG_CLK_OWL_S900 seems to be beter
+> Another point: What about S700? Does it need to duplicate clk-s900.c or
+> can we share any code between the two?
 > 
-> No underscore in node names please - maybe diff-24M or simpler diff24M?
-> Please double-check that name - is it from manual or from schematics?
-> 
-Actually, this name comes from vendor driver and they have used "24M_diff".
-As per DT conventions I renamed it to "diff_24M".
-
-But I'm not clear about that clock. As I said in my reply to Rob's review
-there isn't much documentation also. So, I guess we can name it as diff24M
-for now.
-> > +		compatible = "fixed-clock";
-> > +		clock-frequency = <24000000>;
-> > +		#clock-cells = <0>;
-> > +	};
-> > +
-> > +	clock: clock-controller at e0160000 {
-> > +		compatible = "actions,s900-clock";
-> > +		reg = <0 0xe0160000 0 0x1000>;
-> > +		#clock-cells = <1>;
-> > +	};
-> 
-> This node belongs into the soc node below, ordered by unit address.
-> And maybe there's a better label than "clock"? "clkc" or some official
-> name from the manual?
-> 
-Will use "cmu".
+Haven't looked at that yet. Will let you know.
 
 Thanks,
 Mani
-> > +
-> >  	soc {
-> >  		compatible = "simple-bus";
-> >  		#address-cells = <2>;
-> 
-> Regards,
+> Cheers,
 > Andreas
 > 
 > -- 
