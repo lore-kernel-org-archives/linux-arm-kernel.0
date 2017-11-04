@@ -1,42 +1,37 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Sat,  4 Nov 2017 19:09:36 +0800
-Subject: [GIT PULL] arm: actions: soc for v4.15
-Message-ID: <20171104110938.9019-1-afaerber@suse.de>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Sat, 4 Nov 2017 12:36:32 +0100
+Subject: [patch v11 1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <1509724449-26221-2-git-send-email-oleksandrs@mellanox.com>
+References: <1509724449-26221-1-git-send-email-oleksandrs@mellanox.com>
+ <1509724449-26221-2-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <20171104113632.GC24583@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd and Olof,
+On Fri, Nov 03, 2017 at 05:54:06PM +0200, Oleksandr Shamray wrote:
+> diff --git a/include/uapi/linux/jtag.h b/include/uapi/linux/jtag.h
+> new file mode 100644
+> index 0000000..0b25a83
+> --- /dev/null
+> +++ b/include/uapi/linux/jtag.h
+> @@ -0,0 +1,117 @@
+> +/*
+> + * JTAG class driver
+> + *
+> + * Copyright (c) 2017 Mellanox Technologies. All rights reserved.
+> + * Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
+> + *
+> + * Released under the GPLv2/BSD.
+> + * SPDX-License-Identifier: GPL-2.0 OR BSD-3-Clause
 
-Here's a (late) soc pull for Actions Semi.
-These are pretty much non-functional cleanups.
+Minor nit, this should go on the first line of the .h file now, to match
+the rest of the kernel (just happened, not your fault.)
 
-Regards,
-Andreas
+Also, uapi files are not just GPLv2, they have the userspace exception,
+so this should just be:
+	SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+no need to add any BSD stuff to it at all.
 
-The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+thanks,
 
-  Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git tags/actions-arm-soc-for-4.15
-
-for you to fetch changes up to 6c2eb3e76fb84e2eb46d484f71fab469c0d9532c:
-
-  ARM: owl: smp: Drop owl_secondary_boot() (2017-09-20 16:49:27 +0200)
-
-----------------------------------------------------------------
-Actions Semi Arm SoC for v4.15
-
-This cleans up the S500 SMP code.
-
-----------------------------------------------------------------
-Andreas F?rber (2):
-      ARM: owl: smp: Use __pa_symbol()
-      ARM: owl: smp: Drop owl_secondary_boot()
-
- arch/arm/mach-actions/Makefile  |  4 +---
- arch/arm/mach-actions/headsmp.S | 52 -----------------------------------------
- arch/arm/mach-actions/platsmp.c |  2 +-
- 3 files changed, 2 insertions(+), 56 deletions(-)
- delete mode 100644 arch/arm/mach-actions/headsmp.S
+greg k-h
