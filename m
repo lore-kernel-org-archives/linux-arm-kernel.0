@@ -1,41 +1,26 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sun, 5 Nov 2017 15:59:11 +0800
-Subject: [PATCH V3 09/11] clk: sprd: add clocks support for SC9860
-In-Reply-To: <20171102065626.21835-10-chunyan.zhang@spreadtrum.com>
-References: <20171102065626.21835-10-chunyan.zhang@spreadtrum.com>
-Message-ID: <201711051514.YPFNxHpn%fengguang.wu@intel.com>
+From: sam@ravnborg.org (Sam Ravnborg)
+Date: Sun, 5 Nov 2017 09:39:28 +0100
+Subject: [PATCH 2/2] kbuild: handle dtb-y and CONFIG_OF_ALL_DTBS natively
+ in Makefile.lib
+In-Reply-To: <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
+ <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20171105083928.GA28930@ravnborg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chunyan,
+Hi Masahiro
 
-Thank you for the patch! Yet something to improve:
+Nice cleanup - looks good.
 
-[auto build test ERROR on clk/clk-next]
-[also build test ERROR on v4.14-rc7 next-20171103]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+> --- a/arch/mips/boot/dts/brcm/Makefile
+> +++ b/arch/mips/boot/dts/brcm/Makefile
+> @@ -37,5 +37,3 @@ obj-y				+= $(patsubst %.dtb, %.dtb.o, $(dtb-y))
+>  
+>  # Force kbuild to make empty built-in.o if necessary
+>  obj-				+= dummy.o
 
-url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/add-clock-driver-for-Spreadtrum-platforms/20171105-035536
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
-config: arm64-allmodconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+I noticed a few of these dummy.o in the patched files.
+Looks like another candidate for cleaning up - in a separate patch.
 
-All errors (new ones prefixed by >>):
-
->> ERROR: "sprd_clk_regmap_init" [drivers/clk/sprd/sc9860-clk.ko] undefined!
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 57588 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171105/85c43202/attachment-0001.gz>
+	Sam
