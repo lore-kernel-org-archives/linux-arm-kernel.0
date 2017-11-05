@@ -1,30 +1,37 @@
-From: ileixe@gmail.com (Yang Yooseok)
-Date: Sun,  5 Nov 2017 22:16:55 +0900
-Subject: [PATCH] ARM: topology: Fix minor typo in comment
-Message-ID: <20171105131655.2046-1-ileixe@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Sun, 5 Nov 2017 14:49:51 +0100
+Subject: [PATCH 2/2] kbuild: handle dtb-y and CONFIG_OF_ALL_DTBS natively
+ in Makefile.lib
+In-Reply-To: <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
+ <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK8P3a17uK02gvY=iQhnGq7OooV4JzxLpAV5V5eES3bEutm6aA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The middle efficiency should be an average of two efficiency values, so
-the fomula in comment is modified.
+On Sun, Nov 5, 2017 at 6:30 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> If CONFIG_OF_ALL_DTBS is enabled, "make ARCH=arm64 dtbs" compiles each
+> DTB twice; one from arch/arm64/boot/dts/*/Makefile and the other from
+> the dtb-$(CONFIG_OF_ALL_DTBS) line in arch/arm64/boot/dts/Makefile.
+> It could be a race problem when building DTBS in parallel.
+>
+> Another minor issue is CONFIG_OF_ALL_DTBS covers only *.dts in vendor
+> sub-directories, so this broke when Broadcom added one more hierarchy
+> in arch/arm64/boot/dts/broadcom/<soc>/.
+>
+> One idea to fix the issues in a clean way is to move DTB handling
+> to Kbuild core scripts.  Makefile.dtbinst already recognizes dtb-y
+> natively, so it should not hurt to do so.
+>
+> Add $(dtb-y) to extra-y, and $(dtb-) as well if CONFIG_OF_ALL_DTBS is
+> enabled.  All clutter things in Makefiles go away.
+>
+> As a bonus clean-up, I also removed dts-dirs.  Just use subdir-y
+> directly to traverse sub-directories.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Signed-off-by: Yang Yooseok <ileixe@gmail.com>
----
- arch/arm/kernel/topology.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Nice, that's much better than the hack I had.
 
-diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
-index 24ac3cab411d..d8a4619c86b8 100644
---- a/arch/arm/kernel/topology.c
-+++ b/arch/arm/kernel/topology.c
-@@ -77,7 +77,7 @@ static bool cap_from_dt = true;
- /*
-  * Iterate all CPUs' descriptor in DT and compute the efficiency
-  * (as per table_efficiency). Also calculate a middle efficiency
-- * as close as possible to  (max{eff_i} - min{eff_i}) / 2
-+ * as close as possible to  (max{eff_i} + min{eff_i}) / 2
-  * This is later used to scale the cpu_capacity field such that an
-  * 'average' CPU is of middle capacity. Also see the comments near
-  * table_efficiency[] and update_cpu_capacity().
--- 
-2.13.1
+Acked-by: Arnd Bergmann <arnd@arndb.de>
