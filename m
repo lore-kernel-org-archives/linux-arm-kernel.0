@@ -1,220 +1,54 @@
-From: saeedb@amazon.com (BSHARA, Said)
-Date: Sun, 5 Nov 2017 12:29:06 +0000
-Subject: [PATCH net-next 4/8] net: ethernet: add the Alpine Ethernet driver
-In-Reply-To: <723d35ce-aaa2-9011-19d6-99e77eed846f@gmail.com>
-References: <20170203181216.30214-1-antoine.tenart@free-electrons.com>
- <20170203181216.30214-5-antoine.tenart@free-electrons.com>
- <20170203205823.GA22572@lunn.ch> <1503841641816.62526@amazon.com>
- <20170828180932.GG10418@lunn.ch>
- <8023db8c8218450fb6c97049db054989@EX13D13UWA001.ant.amazon.com>
- <723d35ce-aaa2-9011-19d6-99e77eed846f@gmail.com>
-Message-ID: <1509884946.21689.10.camel@amazon.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 5 Nov 2017 13:54:19 +0100
+Subject: [PATCH v2 2/2] dt-bindings: i2c: Update documentation for
+ "mv78230-a0-i2c"
+In-Reply-To: <20171005232953.gsxs6ecp6kopolf2@rob-hp-laptop>
+References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
+ <20170928213605.22874-3-kalyan.kinthada@alliedtelesis.co.nz>
+ <87k20dmxw0.fsf@free-electrons.com>
+ <20171005110820.phcjh7dmygi43dhq@ninjato>
+ <20171005232953.gsxs6ecp6kopolf2@rob-hp-laptop>
+Message-ID: <20171105125419.p2ce2yl4nfi6lfcl@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-11-02 at 11:19 -0700, Florian Fainelli wrote:
-> On 11/02/2017 09:05 AM, Chocron, Jonathan wrote:
+On Thu, Oct 05, 2017 at 06:29:53PM -0500, Rob Herring wrote:
+> On Thu, Oct 05, 2017 at 01:08:20PM +0200, Wolfram Sang wrote:
+> > On Mon, Oct 02, 2017 at 04:23:43PM +0200, Gregory CLEMENT wrote:
+> > > Hi Wolfram,
+> > >  
+> > >  On ven., sept. 29 2017, Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz> wrote:
+> > > 
+> > > > This commit modifies the documentation for
+> > > > "marvell,mv78230-a0-i2c" compatible string.
+> > > >
+> > > > The "marvell,mv78230-a0-i2c" compatible string enables the workaround
+> > > > for an i2c repeated start timing violation, but unlike
+> > > > "marvell,mv78230-i2c" it disables the i2c offload support. This is
+> > > > applicable to a number of SoCs such as early revisions of the Armada XP
+> > > > and the Armada 38x.
+> > > >
+> > > > Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
+> > > 
+> > > 
+> > > I applied the dt fix on my mvebu/fixes branch. Do you want to apply this
+> > > one on your branch, or do you prefer I take it. In this case an acked-by
+> > > would be nice.
 > > 
-> > ?-----Original Message-----
-> > > 
-> > > From: Andrew Lunn [mailto:andrew at lunn.ch]
-> > > Sent: Monday, August 28, 2017 9:10 PM
-> > > To: Chocron, Jonathan <jonnyc@amazon.com>
-> > > Cc: Antoine Tenart <antoine.tenart@free-electrons.com>;
-> > > netdev at vger.kernel.org; davem at davemloft.net; linux-arm-
-> > > kernel at lists.infradead.org; thomas.petazzoni at free-electrons.com;
-> > > arnd at arndb.de
-> > > Subject: Re: [PATCH net-next 4/8] net: ethernet: add the Alpine
-> > > Ethernet
-> > > driver
-> > > 
-> > > On Sun, Aug 27, 2017 at 01:47:19PM +0000, Chocron, Jonathan
-> > > wrote:
-> > > > 
-> > > > This is a fixed version of my previous response (using proper
-> > > > indentation
-> > > and leaving only the specific questions responded to).
-> > > 
-> > > Wow, this is old.??3 Feb 2017. I had to go dig into the archive
-> > > to refresh my
-> > > memory.
-> > > 
-> > > > 
-> > > > > 
-> > > > > > 
-> > > > > > +/* MDIO */
-> > > > > > +#define AL_ETH_MDIO_C45_DEV_MASK?????0x1f0000
-> > > > > > +#define AL_ETH_MDIO_C45_DEV_SHIFT????16
-> > > > > > +#define AL_ETH_MDIO_C45_REG_MASK?????0xffff
-> > > > > > +
-> > > > > > +static int al_mdio_read(struct mii_bus *bp, int mii_id,
-> > > > > > int reg)
-> > > > > > +{
-> > > > > > +?????struct al_eth_adapter *adapter = bp->priv;
-> > > > > > +?????u16 value = 0;
-> > > > > > +?????int rc;
-> > > > > > +?????int timeout = MDIO_TIMEOUT_MSEC;
-> > > > > > +
-> > > > > > +?????while (timeout > 0) {
-> > > > > > +?????????????if (reg & MII_ADDR_C45) {
-> > > > > > +?????????????????????netdev_dbg(adapter->netdev, "[c45]:
-> > > > > > dev %x reg %x val
-> > > %x\n",
-> > > > 
-> > > > > 
-> > > > > > 
-> > > > > > +????????????????????????????????((reg &
-> > > > > > AL_ETH_MDIO_C45_DEV_MASK) >>
-> > > AL_ETH_MDIO_C45_DEV_SHIFT),
-> > > > 
-> > > > > 
-> > > > > > 
-> > > > > > +????????????????????????????????(reg &
-> > > > > > AL_ETH_MDIO_C45_REG_MASK), value);
-> > > > > > +?????????????????????rc = al_eth_mdio_read(&adapter-
-> > > > > > >hw_adapter, adapter-
-> > > > phy_addr,
-> > > > > 
-> > > > > > 
-> > > > > > +?????????????????????????????((reg &
-> > > > > > AL_ETH_MDIO_C45_DEV_MASK) >>
-> > > AL_ETH_MDIO_C45_DEV_SHIFT),
-> > > > 
-> > > > > 
-> > > > > > 
-> > > > > > +?????????????????????????????(reg &
-> > > > > > AL_ETH_MDIO_C45_REG_MASK), &value);
-> > > > > > +?????????????} else {
-> > > > > > +?????????????????????rc = al_eth_mdio_read(&adapter-
-> > > > > > >hw_adapter, adapter-
-> > > > phy_addr,
-> > > > > 
-> > > > > > 
-> > > > > > +???????????????????????????????????????????MDIO_DEVAD_NONE
-> > > > > > , reg, &value);
-> > > > > > +?????????????}
-> > > > > > +
-> > > > > > +?????????????if (rc == 0)
-> > > > > > +?????????????????????return value;
-> > > > > > +
-> > > > > > +?????????????netdev_dbg(adapter->netdev,
-> > > > > > +????????????????????????"mdio read failed. try again in 10
-> > > > > > + msec\n");
-> > > > > > +
-> > > > > > +?????????????timeout -= 10;
-> > > > > > +?????????????msleep(10);
-> > > > > > +?????}
-> > > > > This is rather unusual, retrying MDIO operations. Are you
-> > > > > working
-> > > > > around a hardware bug? I suspect this also opens up race
-> > > > > conditions,
-> > > > > in particular with PHY interrupts, which can be clear on
-> > > > > read.
-> > > > The MDIO bus is shared between the ethernet units. There is a
-> > > > HW lock
-> > > > used to arbitrate between different interfaces trying to access
-> > > > the
-> > > > bus, therefore there is a retry loop. The reg isn't accessed
-> > > > before
-> > > > obtaining the lock, so there shouldn't be any clear on read
-> > > > issues.
-> > > > 
-> > > > > 
-> > > > > > 
-> > > > > > +/* al_eth_mdiobus_setup - initialize mdiobus and register
-> > > > > > to
-> > > > > > +kernel */ static int al_eth_mdiobus_setup(struct
-> > > > > > al_eth_adapter
-> > > > > > +*adapter) {
-> > > > > > +?????struct phy_device *phydev;
-> > > > > > +?????int i;
-> > > > > > +?????int ret = 0;
-> > > > > > +
-> > > > > > +?????adapter->mdio_bus = mdiobus_alloc();
-> > > > > > +?????if (!adapter->mdio_bus)
-> > > > > > +?????????????return -ENOMEM;
-> > > > > > +
-> > > > > > +?????adapter->mdio_bus->name?????= "al mdio bus";
-> > > > > > +?????snprintf(adapter->mdio_bus->id, MII_BUS_ID_SIZE,
-> > > > > > "%x",
-> > > > > > +??????????????(adapter->pdev->bus->number << 8) | adapter-
-> > > > > > >pdev-
-> > > > devfn);
-> > > > > 
-> > > > > > 
-> > > > > > +?????adapter->mdio_bus->priv?????= adapter;
-> > > > > > +?????adapter->mdio_bus->parent???= &adapter->pdev->dev;
-> > > > > > +?????adapter->mdio_bus->read?????= &al_mdio_read;
-> > > > > > +?????adapter->mdio_bus->write????= &al_mdio_write;
-> > > > > > +?????adapter->mdio_bus->phy_mask = ~BIT(adapter-
-> > > > > > >phy_addr);
-> > > > > Why do this?
-> > > > Since the MDIO bus is shared, we want each interface to probe
-> > > > only for the
-> > > PHY associated with it.
-> > > 
-> > > So i think this is the core of the problem. You have one physical
-> > > MDIO bus,
-> > > yet you register it twice with the MDIO framework.
-> > > 
-> > > How about you only register it once? A lot of the complexity then
-> > > goes away.
-> > > The mutex in the mdio core per bus means you don't need your
-> > > hardware
-> > > locking. All that code goes away. All the retry code goes away.
-> > > Life is simple.
-> > > 
-> > > 	Andrew
-> > We indeed have one physical MDIO bus, but have multiple masters on
-> > it,
-> > each "behind" a different internal PCIe device. Since the accesses
-> > to the bus
-> > are done "indirectly" through each master, we can't register the
-> > bus only once.
-> How do your multiple masters get arbitrated on the unique MDIO bus?
-> Is
-> there hardware automatically doing that, or do you have to semaphore
-> those accesses at the software level?
-hardware level.
+> > I'd prefer to take it. What I'd really like to see here is an ack from
+> > Rob because of the previous discussion of an earlier revision of this
+> > patch.
 > 
-> > 
-> > Think of the scenario that we register it in the driver context of
-> > PCIe device A,
-> > and then the driver is unbound from just this device. Device B
-> > won't be able
-> > to access the bus since it was registered with callbacks that use a
-> > PCIe BAR of
-> > device A, which is no longer valid.
-> You can have one single physical MDIO bus that you register once
-> throughout the SoC's power on lifecycle, and then you can create
-> "virtual" MDIO bus instances which map 1:1 with the PCIe
-> device/function
-> and are nested from that single MDIO bus, this also gives you
-> serialization of accesses and arbitration for free.
-the problem is that physical MDIO controller actually belongs to one of
-the pcie devices and it's not independent interface, as the registers
-address belongs to that pcie device, also, a reset to that pcie device
-will reset the "shared" mdio controller.
-> 
-> > 
-> > 
-> > Is it possible to register the mdio_bus struct as a global instance
-> > at driver load,
-> > and someway pass the offset to the specific device's MDIO master,
-> > as part of
-> > each read/write transaction towards the MDIO bus?
-> You can register how many instances of the MDIO bus you want in a
-> system, it can be a singleton for the purpose of supporting your
-> specific hardware, or you can build a layer on top like I just
-> suggested
-> above.
-> 
-> > 
-> > Or perhaps you have another suggestion which takes into account the
-> > issues I've described?
-> Considering that binding to a MDIO bus is done by MDIO bus name
-> (bus->id) and/or Device Tree parent/child hierarchy, if there is only
-> one, just have all instances reference the same MDIO bus when they
-> want
-> to bind to their devices (pure mdio_device, or phy_device) on that
-> MDIO bus.
+> I'm confused how mv78230 relates to Armada XP or 38x... I don't really 
+> want to know either. If normal compatible string conventions were 
+> followed then I wouldn't have to.
+
+Is this a NAK or "annoyed, but don't really care"? ;)
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171105/e334224e/attachment.sig>
