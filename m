@@ -1,21 +1,34 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 5 Nov 2017 16:24:04 +0100
-Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-c: Fix the I2C EEPROM address
-In-Reply-To: <1509884312-4499-1-git-send-email-festevam@gmail.com>
-References: <1509884312-4499-1-git-send-email-festevam@gmail.com>
-Message-ID: <20171105152404.GZ24320@lunn.ch>
+From: mylene.josserand@free-electrons.com (Mylene JOSSERAND)
+Date: Sun, 5 Nov 2017 17:37:26 +0100
+Subject: [PATCH] clk: sunxi-ng: a83t: Fix i2c buses bits
+In-Reply-To: <20171103151100.GR11011@codeaurora.org>
+References: <20171103105747.26335-1-mylene.josserand@free-electrons.com>
+ <20171103151100.GR11011@codeaurora.org>
+Message-ID: <20171105173726.7be83f08@dell-desktop.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 05, 2017 at 10:18:32AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> at24mac602 should be at the I2C address 0x50, so that it matches the
-> 'reg' property.
-> 
-> Fixes: d4cd158176c3 ("ARM: dts: vf610-zii-dev: Add .dts file for rev. C")
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Hello,
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Le Fri, 3 Nov 2017 08:11:00 -0700,
+Stephen Boyd <sboyd@codeaurora.org> a ?crit :
 
-    Andrew
+> On 11/03, Myl?ne Josserand wrote:
+> > i2c1 and i2c2 bits for CCU are not bit 0 but bit 1 and bit 2.
+> > Because of that, the i2c0 (bit 0) was not correctly configured.
+> > Fixed the correct bits for i2c1 and i2c2.
+> > 
+> > Signed-off-by: Myl?ne Josserand
+> > <mylene.josserand@free-electrons.com> ---  
+> 
+> Please add a Fixes tag.
+> 
+
+Sure, I will resend the patch with a Fixes tag.
+
+Thank you,
+
+-- 
+Myl?ne Josserand, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
