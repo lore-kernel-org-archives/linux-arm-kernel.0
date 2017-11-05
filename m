@@ -1,55 +1,61 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sun, 5 Nov 2017 23:11:38 +0900
-Subject: [PATCH 1/2] MIPS: dts: remove bogus bcm96358nb4ser.dtb from dtb-y
- entry
-In-Reply-To: <1509859853-27473-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK7LNAQfK_BWQcVW-ScrpAwNAHav3MrrzV-tjn_YUjsuvd7U5A@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 5 Nov 2017 16:02:37 +0100
+Subject: [PATCH v4] tty: serial: meson: allow baud-rates lower than 9600
+In-Reply-To: <20171105141206.GA31306@kroah.com>
+References: <bb0a70cc-6cc1-46d2-aa04-046a37c9f516@myway.de>
+ <20171105141206.GA31306@kroah.com>
+Message-ID: <CAFBinCAVvJ8BS3FiEUYs+6ChVg0=yi5KnNvTM=cLt7g86GXGRQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+CC Ralf Baechle <ralf@linux-mips.org>
-+CC linux-mips at linux-mips.org
-+CC Kevin Cernekee <cernekee@gmail.com>
-+CC Florian Fainelli <f.fainelli@gmail.com>
+Hi Thomas,
 
+thank you for this patch!
 
-I missed to CC MIPS maintainers.
-
-
-2017-11-05 14:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> arch/mips/boot/dts/brcm/bcm96358nb4ser.dts does not exist, so
-> we cannot build bcm96358nb4ser.dtb .
+On Sun, Nov 5, 2017 at 3:12 PM, Greg Kroah-Hartman
+<gregkh@linuxfoundation.org> wrote:
+> On Sun, Nov 05, 2017 at 05:29:30AM +0100, Thomas Rohloff wrote:
+>> Devices like DCF77 receivers need the baud-rate to be as low as 50.
+>>
+>> I have tested this on a Meson GXL device with uart_A.
+>>
+>> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+>> Cc: Jiri Slaby <jslaby@suse.com>
+>> Cc: Carlo Caione <carlo@caione.org>
+>> Cc: Kevin Hilman <khilman@baylibre.com>
+>> Cc: linux-amlogic at lists.infradead.org
+>> Cc: linux-arm-kernel at lists.infradead.org
+>> Cc: linux-kernel at vger.kernel.org
+>> Signed-off-by: Thomas Rohloff <v10lator@myway.de>
+>> ---
+>> drivers/tty/serial/meson_uart.c | 2 +-
+>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/tty/serial/meson_uart.c
+>> b/drivers/tty/serial/meson_uart.c
+>> index 07c0f98be3ac..e281ce5d101d 100644
+>> --- a/drivers/tty/serial/meson_uart.c
+>> +++ b/drivers/tty/serial/meson_uart.c
+>> @@ -362,7 +362,7 @@ static void meson_uart_set_termios(struct uart_port
+>> *port,
 >
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
+> This is line-wrapped and can not be applied :(
 >
->  arch/mips/boot/dts/brcm/Makefile | 1 -
->  1 file changed, 1 deletion(-)
+> It's your email client, look at this setting:
+>         Content-Type: text/plain; charset=utf-8; format=flowed
 >
-> diff --git a/arch/mips/boot/dts/brcm/Makefile b/arch/mips/boot/dts/brcm/Makefile
-> index 69a69d1..ad76130 100644
-> --- a/arch/mips/boot/dts/brcm/Makefile
-> +++ b/arch/mips/boot/dts/brcm/Makefile
-> @@ -22,7 +22,6 @@ dtb-$(CONFIG_DT_NONE) += \
->         bcm63268-comtrend-vr-3032u.dtb \
->         bcm93384wvg.dtb \
->         bcm93384wvg_viper.dtb \
-> -       bcm96358nb4ser.dtb \
->         bcm96368mvwg.dtb \
->         bcm9ejtagprb.dtb \
->         bcm97125cbmb.dtb \
-> --
-> 2.7.4
+> format=flowed does not work for kernel patches, it corruptes and edits
+> them as it thinks this is just a conversation, not a machine-readable
+> format.
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 5th try?  :)
+if you send a 5th version, please also include Neil's "Reviewed-by"
+just below your Signed-off-by:
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+
+you can do this by running git commit --amend - this lets you edit the
+existing commit message so you can append that
 
 
-
--- 
-Best Regards
-Masahiro Yamada
+Regards,
+Martin
