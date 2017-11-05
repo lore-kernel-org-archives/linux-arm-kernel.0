@@ -1,27 +1,41 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 5 Nov 2017 08:21:41 +0100
-Subject: [PATCH v3] tty: serial: meson: allow baud-rates lower than 9600
-In-Reply-To: <bef0434b-fa23-464e-8c6c-d1f7dc678767@myway.de>
-References: <19343ad6-75de-4059-825a-98ed40ecf423@myway.de>
- <20171104131352.GA9271@kroah.com>
- <bef0434b-fa23-464e-8c6c-d1f7dc678767@myway.de>
-Message-ID: <20171105072141.GC28366@kroah.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 5 Nov 2017 15:59:11 +0800
+Subject: [PATCH V3 09/11] clk: sprd: add clocks support for SC9860
+In-Reply-To: <20171102065626.21835-10-chunyan.zhang@spreadtrum.com>
+References: <20171102065626.21835-10-chunyan.zhang@spreadtrum.com>
+Message-ID: <201711051514.YPFNxHpn%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 05, 2017 at 05:26:59AM +0100, V10lator wrote:
-> Am Samstag, 4. November 2017 14:13:52 CET schrieb Greg Kroah-Hartman:
-> > What changed from v2?
-> 
-> Nothing. I just re-based the patch on a fresh git clone as you couldn't
-> merge v2.
+Hi Chunyan,
 
-Then you need to say so somewhere otherwise I, and everyone else, has no
-idea what changed.
+Thank you for the patch! Yet something to improve:
 
-Remember, I get thousands of patches a week to review, and have the
-short-term memory of a squirrel :(
+[auto build test ERROR on clk/clk-next]
+[also build test ERROR on v4.14-rc7 next-20171103]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-thanks,
+url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/add-clock-driver-for-Spreadtrum-platforms/20171105-035536
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm64-allmodconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 6.1.1-9) 6.1.1 20160705
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-greg k-h
+All errors (new ones prefixed by >>):
+
+>> ERROR: "sprd_clk_regmap_init" [drivers/clk/sprd/sc9860-clk.ko] undefined!
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 57588 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171105/85c43202/attachment-0001.gz>
