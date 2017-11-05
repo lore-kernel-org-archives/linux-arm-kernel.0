@@ -1,48 +1,59 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Sun, 5 Nov 2017 15:12:06 +0100
-Subject: [PATCH v4] tty: serial: meson: allow baud-rates lower than 9600
-In-Reply-To: <bb0a70cc-6cc1-46d2-aa04-046a37c9f516@myway.de>
-References: <bb0a70cc-6cc1-46d2-aa04-046a37c9f516@myway.de>
-Message-ID: <20171105141206.GA31306@kroah.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun,  5 Nov 2017 15:12:24 +0100
+Subject: [PATCH 0/2] ARM: pxa: move pxa-i2c.h to platform_data
+Message-ID: <20171105141226.13624-1-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 05, 2017 at 05:29:30AM +0100, Thomas Rohloff wrote:
-> Devices like DCF77 receivers need the baud-rate to be as low as 50.
-> 
-> I have tested this on a Meson GXL device with uart_A.
-> 
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Cc: Jiri Slaby <jslaby@suse.com>
-> Cc: Carlo Caione <carlo@caione.org>
-> Cc: Kevin Hilman <khilman@baylibre.com>
-> Cc: linux-amlogic at lists.infradead.org
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
-> Signed-off-by: Thomas Rohloff <v10lator@myway.de>
-> ---
-> drivers/tty/serial/meson_uart.c | 2 +-
-> 1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/meson_uart.c
-> b/drivers/tty/serial/meson_uart.c
-> index 07c0f98be3ac..e281ce5d101d 100644
-> --- a/drivers/tty/serial/meson_uart.c
-> +++ b/drivers/tty/serial/meson_uart.c
-> @@ -362,7 +362,7 @@ static void meson_uart_set_termios(struct uart_port
-> *port,
+As discussed previously, we move the declarations now to devices.h and the
+platform_data to the platform_data directory. Only build tested, but buildbot
+is happy.
 
-This is line-wrapped and can not be applied :(
+Wolfram Sang (2):
+  ARM: pxa: move declarations to proper place
+  ARM: pxa: move header file out of I2C realm
 
-It's your email client, look at this setting:
-	Content-Type: text/plain; charset=utf-8; format=flowed
+ arch/arm/mach-mmp/mmp2.h                                 |  2 +-
+ arch/arm/mach-mmp/pxa168.h                               |  2 +-
+ arch/arm/mach-mmp/pxa910.h                               |  2 +-
+ arch/arm/mach-pxa/balloon3.c                             |  2 +-
+ arch/arm/mach-pxa/cm-x300.c                              |  2 +-
+ arch/arm/mach-pxa/colibri-evalboard.c                    |  2 +-
+ arch/arm/mach-pxa/colibri-pxa270-income.c                |  2 +-
+ arch/arm/mach-pxa/corgi.c                                |  2 +-
+ arch/arm/mach-pxa/csb726.c                               |  2 +-
+ arch/arm/mach-pxa/devices.c                              |  2 +-
+ arch/arm/mach-pxa/devices.h                              |  9 +++++++++
+ arch/arm/mach-pxa/em-x270.c                              |  2 +-
+ arch/arm/mach-pxa/ezx.c                                  |  2 +-
+ arch/arm/mach-pxa/hx4700.c                               |  2 +-
+ arch/arm/mach-pxa/littleton.c                            |  2 +-
+ arch/arm/mach-pxa/magician.c                             |  2 +-
+ arch/arm/mach-pxa/mainstone.c                            |  2 +-
+ arch/arm/mach-pxa/mioa701.c                              |  2 +-
+ arch/arm/mach-pxa/mxm8x10.c                              |  2 +-
+ arch/arm/mach-pxa/palm27x.c                              |  2 +-
+ arch/arm/mach-pxa/pcm990-baseboard.c                     |  2 +-
+ arch/arm/mach-pxa/poodle.c                               |  2 +-
+ arch/arm/mach-pxa/pxa27x.c                               |  2 +-
+ arch/arm/mach-pxa/pxa3xx.c                               |  2 +-
+ arch/arm/mach-pxa/raumfeld.c                             |  2 +-
+ arch/arm/mach-pxa/saar.c                                 |  2 +-
+ arch/arm/mach-pxa/spitz.c                                |  2 +-
+ arch/arm/mach-pxa/stargate2.c                            |  2 +-
+ arch/arm/mach-pxa/tosa.c                                 |  2 +-
+ arch/arm/mach-pxa/trizeps4.c                             |  2 +-
+ arch/arm/mach-pxa/viper.c                                |  2 +-
+ arch/arm/mach-pxa/vpac270.c                              |  2 +-
+ arch/arm/mach-pxa/xcep.c                                 |  2 +-
+ arch/arm/mach-pxa/z2.c                                   |  2 +-
+ arch/arm/mach-pxa/zeus.c                                 |  3 ++-
+ arch/arm/mach-pxa/zylonite_pxa300.c                      |  2 +-
+ drivers/i2c/busses/i2c-pxa-pci.c                         |  2 +-
+ drivers/i2c/busses/i2c-pxa.c                             |  2 +-
+ include/linux/{i2c/pxa-i2c.h => platform_data/i2c-pxa.h} | 11 -----------
+ 39 files changed, 47 insertions(+), 48 deletions(-)
+ rename include/linux/{i2c/pxa-i2c.h => platform_data/i2c-pxa.h} (90%)
 
-format=flowed does not work for kernel patches, it corruptes and edits
-them as it thinks this is just a conversation, not a machine-readable
-format.
-
-5th try?  :)
-
-thanks,
-
-greg k-h
+-- 
+2.11.0
