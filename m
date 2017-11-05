@@ -1,26 +1,33 @@
-From: sam@ravnborg.org (Sam Ravnborg)
-Date: Sun, 5 Nov 2017 09:39:28 +0100
-Subject: [PATCH 2/2] kbuild: handle dtb-y and CONFIG_OF_ALL_DTBS natively
- in Makefile.lib
-In-Reply-To: <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20171105083928.GA28930@ravnborg.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun,  5 Nov 2017 10:18:32 -0200
+Subject: [PATCH] ARM: dts: vf610-zii-dev-rev-c: Fix the I2C EEPROM address
+Message-ID: <1509884312-4499-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Nice cleanup - looks good.
+at24mac602 should be at the I2C address 0x50, so that it matches the
+'reg' property.
 
-> --- a/arch/mips/boot/dts/brcm/Makefile
-> +++ b/arch/mips/boot/dts/brcm/Makefile
-> @@ -37,5 +37,3 @@ obj-y				+= $(patsubst %.dtb, %.dtb.o, $(dtb-y))
->  
->  # Force kbuild to make empty built-in.o if necessary
->  obj-				+= dummy.o
+Fixes: d4cd158176c3 ("ARM: dts: vf610-zii-dev: Add .dts file for rev. C")
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/vf610-zii-dev-rev-c.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I noticed a few of these dummy.o in the patched files.
-Looks like another candidate for cleaning up - in a separate patch.
-
-	Sam
+diff --git a/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts b/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts
+index 02a6227..fbb3758 100644
+--- a/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts
++++ b/arch/arm/boot/dts/vf610-zii-dev-rev-c.dts
+@@ -359,7 +359,7 @@
+ };
+ 
+ &i2c1 {
+-	at24mac602 at 0 {
++	at24mac602 at 50 {
+ 		compatible = "atmel,24c02";
+ 		reg = <0x50>;
+ 		read-only;
+-- 
+2.7.4
