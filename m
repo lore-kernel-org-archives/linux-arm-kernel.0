@@ -1,54 +1,30 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun, 5 Nov 2017 13:54:19 +0100
-Subject: [PATCH v2 2/2] dt-bindings: i2c: Update documentation for
- "mv78230-a0-i2c"
-In-Reply-To: <20171005232953.gsxs6ecp6kopolf2@rob-hp-laptop>
-References: <20170928213605.22874-1-kalyan.kinthada@alliedtelesis.co.nz>
- <20170928213605.22874-3-kalyan.kinthada@alliedtelesis.co.nz>
- <87k20dmxw0.fsf@free-electrons.com>
- <20171005110820.phcjh7dmygi43dhq@ninjato>
- <20171005232953.gsxs6ecp6kopolf2@rob-hp-laptop>
-Message-ID: <20171105125419.p2ce2yl4nfi6lfcl@ninjato>
+From: ileixe@gmail.com (Yang Yooseok)
+Date: Sun,  5 Nov 2017 22:16:55 +0900
+Subject: [PATCH] ARM: topology: Fix minor typo in comment
+Message-ID: <20171105131655.2046-1-ileixe@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 06:29:53PM -0500, Rob Herring wrote:
-> On Thu, Oct 05, 2017 at 01:08:20PM +0200, Wolfram Sang wrote:
-> > On Mon, Oct 02, 2017 at 04:23:43PM +0200, Gregory CLEMENT wrote:
-> > > Hi Wolfram,
-> > >  
-> > >  On ven., sept. 29 2017, Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz> wrote:
-> > > 
-> > > > This commit modifies the documentation for
-> > > > "marvell,mv78230-a0-i2c" compatible string.
-> > > >
-> > > > The "marvell,mv78230-a0-i2c" compatible string enables the workaround
-> > > > for an i2c repeated start timing violation, but unlike
-> > > > "marvell,mv78230-i2c" it disables the i2c offload support. This is
-> > > > applicable to a number of SoCs such as early revisions of the Armada XP
-> > > > and the Armada 38x.
-> > > >
-> > > > Signed-off-by: Kalyan Kinthada <kalyan.kinthada@alliedtelesis.co.nz>
-> > > 
-> > > 
-> > > I applied the dt fix on my mvebu/fixes branch. Do you want to apply this
-> > > one on your branch, or do you prefer I take it. In this case an acked-by
-> > > would be nice.
-> > 
-> > I'd prefer to take it. What I'd really like to see here is an ack from
-> > Rob because of the previous discussion of an earlier revision of this
-> > patch.
-> 
-> I'm confused how mv78230 relates to Armada XP or 38x... I don't really 
-> want to know either. If normal compatible string conventions were 
-> followed then I wouldn't have to.
+The middle efficiency should be an average of two efficiency values, so
+the fomula in comment is modified.
 
-Is this a NAK or "annoyed, but don't really care"? ;)
+Signed-off-by: Yang Yooseok <ileixe@gmail.com>
+---
+ arch/arm/kernel/topology.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171105/e334224e/attachment.sig>
+diff --git a/arch/arm/kernel/topology.c b/arch/arm/kernel/topology.c
+index 24ac3cab411d..d8a4619c86b8 100644
+--- a/arch/arm/kernel/topology.c
++++ b/arch/arm/kernel/topology.c
+@@ -77,7 +77,7 @@ static bool cap_from_dt = true;
+ /*
+  * Iterate all CPUs' descriptor in DT and compute the efficiency
+  * (as per table_efficiency). Also calculate a middle efficiency
+- * as close as possible to  (max{eff_i} - min{eff_i}) / 2
++ * as close as possible to  (max{eff_i} + min{eff_i}) / 2
+  * This is later used to scale the cpu_capacity field such that an
+  * 'average' CPU is of middle capacity. Also see the comments near
+  * table_efficiency[] and update_cpu_capacity().
+-- 
+2.13.1
