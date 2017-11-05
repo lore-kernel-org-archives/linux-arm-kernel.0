@@ -1,7 +1,7 @@
 From: v10lator@myway.de (Thomas Rohloff)
-Date: Sun,  5 Nov 2017 20:35:14 +0100
-Subject: [PATCH] tty: serial: meson: allow baud-rates lower than 9600
-Message-ID: <20171105193514.7833-1-v10lator@myway.de>
+Date: Sun,  5 Nov 2017 20:36:30 +0100
+Subject: [PATCH v5] tty: serial: meson: allow baud-rates lower than 9600
+Message-ID: <20171105193630.8596-1-v10lator@myway.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
