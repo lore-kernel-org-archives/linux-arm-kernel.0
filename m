@@ -1,40 +1,33 @@
-From: v10lator@myway.de (Thomas Rohloff)
-Date: Sun, 05 Nov 2017 05:29:30 +0100
-Subject: [PATCH v4] tty: serial: meson: allow baud-rates lower than 9600
-Message-ID: <bb0a70cc-6cc1-46d2-aa04-046a37c9f516@myway.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Sun,  5 Nov 2017 14:30:52 +0900
+Subject: [PATCH 1/2] MIPS: dts: remove bogus bcm96358nb4ser.dtb from dtb-y
+ entry
+In-Reply-To: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1509859853-27473-2-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Devices like DCF77 receivers need the baud-rate to be as low as 50.
+arch/mips/boot/dts/brcm/bcm96358nb4ser.dts does not exist, so
+we cannot build bcm96358nb4ser.dtb .
 
-I have tested this on a Meson GXL device with uart_A.
-
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Thomas Rohloff <v10lator@myway.de>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- drivers/tty/serial/meson_uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/tty/serial/meson_uart.c 
-b/drivers/tty/serial/meson_uart.c
-index 07c0f98be3ac..e281ce5d101d 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -362,7 +362,7 @@ static void meson_uart_set_termios(struct uart_port 
-*port,
- 
- 	writel(val, port->membase + AML_UART_CONTROL);
- 
--	baud = uart_get_baud_rate(port, termios, old, 9600, 4000000);
-+	baud = uart_get_baud_rate(port, termios, old, 50, 4000000);
- 	meson_uart_change_speed(port, baud);
- 
- 	port->read_status_mask = AML_UART_TX_FIFO_WERR;
+ arch/mips/boot/dts/brcm/Makefile | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/arch/mips/boot/dts/brcm/Makefile b/arch/mips/boot/dts/brcm/Makefile
+index 69a69d1..ad76130 100644
+--- a/arch/mips/boot/dts/brcm/Makefile
++++ b/arch/mips/boot/dts/brcm/Makefile
+@@ -22,7 +22,6 @@ dtb-$(CONFIG_DT_NONE) += \
+ 	bcm63268-comtrend-vr-3032u.dtb \
+ 	bcm93384wvg.dtb \
+ 	bcm93384wvg_viper.dtb \
+-	bcm96358nb4ser.dtb \
+ 	bcm96368mvwg.dtb \
+ 	bcm9ejtagprb.dtb \
+ 	bcm97125cbmb.dtb \
 -- 
-2.13.6
+2.7.4
