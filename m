@@ -1,39 +1,28 @@
-From: v10lator@myway.de (Thomas Rohloff)
-Date: Sun,  5 Nov 2017 20:36:30 +0100
-Subject: [PATCH v5] tty: serial: meson: allow baud-rates lower than 9600
-Message-ID: <20171105193630.8596-1-v10lator@myway.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 5 Nov 2017 23:08:45 +0100
+Subject: [PATCH 0/2] ARM: pxa: move pxa-i2c.h to platform_data
+In-Reply-To: <20171105141226.13624-1-wsa@the-dreams.de>
+References: <20171105141226.13624-1-wsa@the-dreams.de>
+Message-ID: <20171105220845.edwugarkt2te7ak4@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Devices like DCF77 receivers need the baud-rate to be as low as 50.
 
-I have tested this on a Meson GXL device with uart_A.
+> As discussed previously, we move the declarations now to devices.h and the
+> platform_data to the platform_data directory. Only build tested, but buildbot
+> is happy.
 
-Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-Cc: Jiri Slaby <jslaby@suse.com>
-Cc: Carlo Caione <carlo@caione.org>
-Cc: Kevin Hilman <khilman@baylibre.com>
-Cc: linux-amlogic at lists.infradead.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-kernel at vger.kernel.org
-Signed-off-by: Thomas Rohloff <v10lator@myway.de>
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
----
- drivers/tty/serial/meson_uart.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Well, after the initial success message, it looks Buildbot is not happy,
+after all. It found 3 more boards which needed to include "devices.h". I
+did some own scanning and pushed out an improved patchset. I will wait
+a bit longer for reports this time, too.
 
-diff --git a/drivers/tty/serial/meson_uart.c b/drivers/tty/serial/meson_uart.c
-index 07c0f98be3ac..e281ce5d101d 100644
---- a/drivers/tty/serial/meson_uart.c
-+++ b/drivers/tty/serial/meson_uart.c
-@@ -362,7 +362,7 @@ static void meson_uart_set_termios(struct uart_port *port,
- 
- 	writel(val, port->membase + AML_UART_CONTROL);
- 
--	baud = uart_get_baud_rate(port, termios, old, 9600, 4000000);
-+	baud = uart_get_baud_rate(port, termios, old, 50, 4000000);
- 	meson_uart_change_speed(port, baud);
- 
- 	port->read_status_mask = AML_UART_TX_FIFO_WERR;
--- 
-2.13.6
+But this series should still give you an idea about the approach.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171105/49bde2d9/attachment.sig>
