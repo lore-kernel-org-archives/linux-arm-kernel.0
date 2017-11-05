@@ -1,59 +1,71 @@
 From: wsa@the-dreams.de (Wolfram Sang)
-Date: Sun,  5 Nov 2017 15:12:24 +0100
-Subject: [PATCH 0/2] ARM: pxa: move pxa-i2c.h to platform_data
-Message-ID: <20171105141226.13624-1-wsa@the-dreams.de>
+Date: Sun,  5 Nov 2017 15:12:25 +0100
+Subject: [PATCH 1/2] ARM: pxa: move declarations to proper place
+In-Reply-To: <20171105141226.13624-1-wsa@the-dreams.de>
+References: <20171105141226.13624-1-wsa@the-dreams.de>
+Message-ID: <20171105141226.13624-2-wsa@the-dreams.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As discussed previously, we move the declarations now to devices.h and the
-platform_data to the platform_data directory. Only build tested, but buildbot
-is happy.
+Platform data is not the right place for such declarations, use
+devices.h in the mach-directory where the rest is located. Note that the
+board file for Zeus needed an additional include for this to work.
 
-Wolfram Sang (2):
-  ARM: pxa: move declarations to proper place
-  ARM: pxa: move header file out of I2C realm
+Signed-off-by: Wolfram Sang <wsa@the-dreams.de>
+---
+ arch/arm/mach-pxa/devices.h |  9 +++++++++
+ arch/arm/mach-pxa/zeus.c    |  1 +
+ include/linux/i2c/pxa-i2c.h | 11 -----------
+ 3 files changed, 10 insertions(+), 11 deletions(-)
 
- arch/arm/mach-mmp/mmp2.h                                 |  2 +-
- arch/arm/mach-mmp/pxa168.h                               |  2 +-
- arch/arm/mach-mmp/pxa910.h                               |  2 +-
- arch/arm/mach-pxa/balloon3.c                             |  2 +-
- arch/arm/mach-pxa/cm-x300.c                              |  2 +-
- arch/arm/mach-pxa/colibri-evalboard.c                    |  2 +-
- arch/arm/mach-pxa/colibri-pxa270-income.c                |  2 +-
- arch/arm/mach-pxa/corgi.c                                |  2 +-
- arch/arm/mach-pxa/csb726.c                               |  2 +-
- arch/arm/mach-pxa/devices.c                              |  2 +-
- arch/arm/mach-pxa/devices.h                              |  9 +++++++++
- arch/arm/mach-pxa/em-x270.c                              |  2 +-
- arch/arm/mach-pxa/ezx.c                                  |  2 +-
- arch/arm/mach-pxa/hx4700.c                               |  2 +-
- arch/arm/mach-pxa/littleton.c                            |  2 +-
- arch/arm/mach-pxa/magician.c                             |  2 +-
- arch/arm/mach-pxa/mainstone.c                            |  2 +-
- arch/arm/mach-pxa/mioa701.c                              |  2 +-
- arch/arm/mach-pxa/mxm8x10.c                              |  2 +-
- arch/arm/mach-pxa/palm27x.c                              |  2 +-
- arch/arm/mach-pxa/pcm990-baseboard.c                     |  2 +-
- arch/arm/mach-pxa/poodle.c                               |  2 +-
- arch/arm/mach-pxa/pxa27x.c                               |  2 +-
- arch/arm/mach-pxa/pxa3xx.c                               |  2 +-
- arch/arm/mach-pxa/raumfeld.c                             |  2 +-
- arch/arm/mach-pxa/saar.c                                 |  2 +-
- arch/arm/mach-pxa/spitz.c                                |  2 +-
- arch/arm/mach-pxa/stargate2.c                            |  2 +-
- arch/arm/mach-pxa/tosa.c                                 |  2 +-
- arch/arm/mach-pxa/trizeps4.c                             |  2 +-
- arch/arm/mach-pxa/viper.c                                |  2 +-
- arch/arm/mach-pxa/vpac270.c                              |  2 +-
- arch/arm/mach-pxa/xcep.c                                 |  2 +-
- arch/arm/mach-pxa/z2.c                                   |  2 +-
- arch/arm/mach-pxa/zeus.c                                 |  3 ++-
- arch/arm/mach-pxa/zylonite_pxa300.c                      |  2 +-
- drivers/i2c/busses/i2c-pxa-pci.c                         |  2 +-
- drivers/i2c/busses/i2c-pxa.c                             |  2 +-
- include/linux/{i2c/pxa-i2c.h => platform_data/i2c-pxa.h} | 11 -----------
- 39 files changed, 47 insertions(+), 48 deletions(-)
- rename include/linux/{i2c/pxa-i2c.h => platform_data/i2c-pxa.h} (90%)
-
+diff --git a/arch/arm/mach-pxa/devices.h b/arch/arm/mach-pxa/devices.h
+index 04580c407276cd..dfd0d121fc1799 100644
+--- a/arch/arm/mach-pxa/devices.h
++++ b/arch/arm/mach-pxa/devices.h
+@@ -55,3 +55,12 @@ extern struct platform_device pxa93x_device_gpio;
+ 
+ void __init pxa_register_device(struct platform_device *dev, void *data);
+ void __init pxa2xx_set_dmac_info(int nb_channels, int nb_requestors);
++
++struct i2c_pxa_platform_data;
++extern void pxa_set_i2c_info(struct i2c_pxa_platform_data *info);
++#ifdef CONFIG_PXA27x
++extern void pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info);
++#endif
++#ifdef CONFIG_PXA3xx
++extern void pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info);
++#endif
+diff --git a/arch/arm/mach-pxa/zeus.c b/arch/arm/mach-pxa/zeus.c
+index ecbcaee5a2d5f8..8b16ba46c8c3bf 100644
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -40,6 +40,7 @@
+ #include <asm/mach/map.h>
+ 
+ #include "pxa27x.h"
++#include "devices.h"
+ #include <mach/regs-uart.h>
+ #include <linux/platform_data/usb-ohci-pxa27x.h>
+ #include <linux/platform_data/mmc-pxamci.h>
+diff --git a/include/linux/i2c/pxa-i2c.h b/include/linux/i2c/pxa-i2c.h
+index 53aab243cbd834..5236f216dfaefd 100644
+--- a/include/linux/i2c/pxa-i2c.h
++++ b/include/linux/i2c/pxa-i2c.h
+@@ -71,15 +71,4 @@ struct i2c_pxa_platform_data {
+ 	unsigned char		master_code;
+ 	unsigned long		rate;
+ };
+-
+-extern void pxa_set_i2c_info(struct i2c_pxa_platform_data *info);
+-
+-#ifdef CONFIG_PXA27x
+-extern void pxa27x_set_i2c_power_info(struct i2c_pxa_platform_data *info);
+-#endif
+-
+-#ifdef CONFIG_PXA3xx
+-extern void pxa3xx_set_i2c_power_info(struct i2c_pxa_platform_data *info);
+-#endif
+-
+ #endif
 -- 
 2.11.0
