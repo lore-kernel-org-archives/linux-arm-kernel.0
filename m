@@ -1,240 +1,178 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sat, 4 Nov 2017 16:43:25 -0500
-Subject: [PATCH 3/3] arm64: Add software workaround for Falkor erratum 1041
-In-Reply-To: <1f4a523c-608b-b46b-527a-bc1e02e7db5e@arm.com>
-References: <1509679664-3749-1-git-send-email-shankerd@codeaurora.org>
- <1509679664-3749-4-git-send-email-shankerd@codeaurora.org>
- <1f4a523c-608b-b46b-527a-bc1e02e7db5e@arm.com>
-Message-ID: <2ef66b5c-d1b7-a5fc-a19d-88dddff95bad@codeaurora.org>
+From: ryder.lee@mediatek.com (Ryder Lee)
+Date: Sun, 5 Nov 2017 09:41:52 +0800
+Subject: [GIT PULL] Mediatek: 32-bit DT update for v4.15
+In-Reply-To: <CAK8P3a1oP98K3mzK3MfFvJ27y5fgYsTnOdPpjukQGXOLAQYhyA@mail.gmail.com>
+References: <c7145c00-b2b9-780c-0bfd-15f7d8a08dd6@gmail.com>
+ <CAK8P3a3NWwoe0mX45WrFONyiHt9eWTTMziEc+rjqSfr5QZv8xQ@mail.gmail.com>
+ <1509423579.10793.10.camel@mtkswgap22>
+ <e8fdd9a9-ce13-8804-aea0-46becc6f9730@gmail.com>
+ <CAK8P3a0+9fChSbObS9boR8okHtO8u8_hr2Te+RjfRD0T54QYWQ@mail.gmail.com>
+ <1509673038.19220.19.camel@mtkswgap22>
+ <CAK8P3a1doHCH4ucC1AUR5HiH5qvMXeoqsav-9dsvhM2KPh3FNw@mail.gmail.com>
+ <1509709967.15691.25.camel@mtkswgap22>
+ <CAK8P3a1oP98K3mzK3MfFvJ27y5fgYsTnOdPpjukQGXOLAQYhyA@mail.gmail.com>
+Message-ID: <1509846112.26038.22.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin, Thanks for your review comments. 
-
-On 11/03/2017 10:11 AM, Robin Murphy wrote:
-> On 03/11/17 03:27, Shanker Donthineni wrote:
->> The ARM architecture defines the memory locations that are permitted
->> to be accessed as the result of a speculative instruction fetch from
->> an exception level for which all stages of translation are disabled.
->> Specifically, the core is permitted to speculatively fetch from the
->> 4KB region containing the current program counter and next 4KB.
->>
->> When translation is changed from enabled to disabled for the running
->> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
->> Falkor core may errantly speculatively access memory locations outside
->> of the 4KB region permitted by the architecture. The errant memory
->> access may lead to one of the following unexpected behaviors.
->>
->> 1) A System Error Interrupt (SEI) being raised by the Falkor core due
->>    to the errant memory access attempting to access a region of memory
->>    that is protected by a slave-side memory protection unit.
->> 2) Unpredictable device behavior due to a speculative read from device
->>    memory. This behavior may only occur if the instruction cache is
->>    disabled prior to or coincident with translation being changed from
->>    enabled to disabled.
->>
->> To avoid the errant behavior, software must execute an ISB immediately
->> prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
->>
->> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->> ---
->>  Documentation/arm64/silicon-errata.txt |  1 +
->>  arch/arm64/Kconfig                     | 10 ++++++++++
->>  arch/arm64/include/asm/assembler.h     | 17 +++++++++++++++++
->>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->>  arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
->>  arch/arm64/kernel/efi-entry.S          |  4 ++--
->>  arch/arm64/kernel/head.S               |  4 ++--
->>  7 files changed, 50 insertions(+), 5 deletions(-)
->>
->> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
->> index 66e8ce1..704770c0 100644
->> --- a/Documentation/arm64/silicon-errata.txt
->> +++ b/Documentation/arm64/silicon-errata.txt
->> @@ -74,3 +74,4 @@ stable kernels.
->>  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
->>  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
->>  | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
->> +| Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
->> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->> index 0df64a6..7e933fb 100644
->> --- a/arch/arm64/Kconfig
->> +++ b/arch/arm64/Kconfig
->> @@ -539,6 +539,16 @@ config QCOM_QDF2400_ERRATUM_0065
->>  
->>  	  If unsure, say Y.
->>  
->> +config QCOM_FALKOR_ERRATUM_1041
->> +	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
->> +	default y
->> +	help
->> +	  Falkor CPU may speculatively fetch instructions from an improper
->> +	  memory location when MMU translation is changed from SCTLR_ELn[M]=1
->> +	  to SCTLR_ELn[M]=0. Prefix an ISB instruction to fix the problem.
->> +
->> +	  If unsure, say Y.
->> +
->>  endmenu
->>  
->>  
->> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->> index b6dfb4f..4c91efb 100644
->> --- a/arch/arm64/include/asm/assembler.h
->> +++ b/arch/arm64/include/asm/assembler.h
->> @@ -30,6 +30,7 @@
->>  #include <asm/pgtable-hwdef.h>
->>  #include <asm/ptrace.h>
->>  #include <asm/thread_info.h>
->> +#include <asm/alternative.h>
->>  
->>  /*
->>   * Enable and disable interrupts.
->> @@ -514,6 +515,22 @@
->>   *   reg: the value to be written.
->>   */
->>  	.macro	write_sctlr, eln, reg
->> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
->> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1041
->> +	tbnz    \reg, #0, 8000f          // enable MMU?
+On Fri, 2017-11-03 at 16:21 +0100, Arnd Bergmann wrote:
+> On Fri, Nov 3, 2017 at 12:52 PM, Ryder Lee <ryder.lee@mediatek.com> wrote:
+> > On Fri, 2017-11-03 at 10:40 +0100, Arnd Bergmann wrote:
+> >> On Fri, Nov 3, 2017 at 2:37 AM, Ryder Lee <ryder.lee@mediatek.com> wrote:
 > 
-> Do we really need the branch here? It's not like enabling the MMU is
-> something we do on the syscall fastpath, and I can't imagine an extra
-> ISB hurts much (and is probably comparable to a mispredicted branch
-
-I don't have any strong opinion on whether to use an ISB conditionally
-or unconditionally. Yes, the current kernel code is not touching
-SCTLR_ELn register on the system call fast path. I would like to keep
-it as a conditional ISB in case if the future kernel accesses the
-SCTLR_ELn on the fast path. An extra ISB should not hurt a lot but I
-believe it has more overhead than the TBZ+branch mis-prediction on Falkor
-CPU. This patch has been tested on the real hardware to fix the problem.
-
-I'm open to change to an unconditional ISB if it's the better fix.
-
-> anyway). In fact, is there any noticeable hit on other
-> microarchitectures if we save the alternative bother and just do it
-> unconditionally always?
+> >> This should have the exact same effect as what you have in your tree,
+> >> but if that works,
+> >> we can merge that version and try to figure out why the kernel thinks
+> >> they are different.
+> >
+> > I've tried this approach by using the 4-ports network card and got the
+> > result:
+> > pcieport 0000:00:01.0: assign IRQ: got 220
+> > pcieport 0000:00:01.0: assigning IRQ 220
+> > pcieport 0000:00:01.0: enabling device (0140 -> 0142)
+> > pcieport 0000:00:01.0: enabling bus mastering
+> > pcieport 0000:00:01.0: Signaling PME with IRQ 220
+> > ....
+> > igb 0000:01:00.0: assign IRQ: got 221
+> > igb 0000:01:00.0: assigning IRQ 221
+> > igb 0000:01:00.1: assign IRQ: got 221
+> > igb 0000:01:00.1: assigning IRQ 221
+> > igb 0000:01:00.2: assign IRQ: got 221
+> > igb 0000:01:00.2: assigning IRQ 221
+> > igb 0000:01:00.3: assign IRQ: got 221
+> > igb 0000:01:00.3: assigning IRQ 221
+> >
+> > I think slot 1 should share its IRQ (220) with every device in the
+> > hierarchy below this root port.
+> 
+> Agreed, that is what I expected, too. I've looked at the of_pci_irq.c
+> in more detail but couldn't come up with what happened. Can you
+> try running with this patch or something like that to figure out where
+> it takes the wrong turn?
+> 
+> https://pastebin.com/MrMzwcmw
 > 
 
-I can't comment on the performance impacts of other CPUs since I don't
-have access to their development platforms. I'll prefer alternatives
-just to avoid the unnecessary overhead on future Qualcomm Datacenter
-server CPUs and regression on other CPUs because of inserting an ISB
-prior to SCTLR_ELn register update. Let's see what rest of the ARM 
-maintainers think about always using an ISB instead of alternatives.
+[    4.466527] pcieport 0000:00:01.0: swizzle found slot 1 pin 1
+[    4.472252] pcieport 0000:00:01.0: direct parse found irq
+3747445820:3747445848
+[    4.479515] pcieport 0000:00:01.0: parse pin 1
+[    4.483920] null ppdev, node dfff3744, pin 1
+[    4.488151] null ppdev, parse node dfff3744 pin 1
+[    4.492825] of_irq_parse_raw:  /pcie-controller at 1a140000:00000001
+[    4.498885] OF: of_irq_parse_raw: ipar=/pcie-controller at 1a140000,
+size=1
+[    4.505530] OF:  -> addrsize=3
+[    4.508569] OF:  -> match=0 (imaplen=92)
+[    4.512481] OF:  -> newintsize=3, newaddrsize=0
+[    4.516969] OF:  -> imaplen=88
+[    4.520007] OF:  -> match=0 (imaplen=84)
+[    4.523899] OF:  -> newintsize=3, newaddrsize=0
+[    4.528400] OF:  -> imaplen=80
+[    4.531425] OF:  -> match=0 (imaplen=76)
+[    4.535317] OF:  -> newintsize=3, newaddrsize=0
+[    4.539817] OF:  -> imaplen=72
+[    4.542842] OF:  -> match=0 (imaplen=68)
+[    4.546734] OF:  -> newintsize=3, newaddrsize=0
+[    4.551234] OF:  -> imaplen=64
+[    4.554259] OF:  -> match=1 (imaplen=60)
+[    4.558151] OF:  -> newintsize=3, newaddrsize=0
+[    4.562651] OF:  -> imaplen=56
+[    4.565676] OF:  -> new parent: /interrupt-controller at 10200100
+[    4.571469] OF:  -> got it !
+[    4.574322] null ppdev, parse node dfff3744 irq 0:194
+[    4.579413] pcieport 0000:00:01.0: assign IRQ: got 220
 
-> Robin.
-> 
->> +	isb
->> +8000:
->> +alternative_else_nop_endif
->> +#endif
->> +	msr	sctlr_\eln, \reg
->> +	.endm
->> +
->> +	.macro	early_write_sctlr, eln, reg
->> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
->> +	tbnz    \reg, #0, 8000f          // enable MMU?
->> +	isb
->> +8000:
->> +#endif
->>  	msr	sctlr_\eln, \reg
->>  	.endm
->>  
->> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
->> index 8da6216..7f7a59d 100644
->> --- a/arch/arm64/include/asm/cpucaps.h
->> +++ b/arch/arm64/include/asm/cpucaps.h
->> @@ -40,7 +40,8 @@
->>  #define ARM64_WORKAROUND_858921			19
->>  #define ARM64_WORKAROUND_CAVIUM_30115		20
->>  #define ARM64_HAS_DCPOP				21
->> +#define ARM64_WORKAROUND_QCOM_FALKOR_E1041	22
->>  
->> -#define ARM64_NCAPS				22
->> +#define ARM64_NCAPS				23
->>  
->>  #endif /* __ASM_CPUCAPS_H */
->> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
->> index 0e27f86..27f9a45 100644
->> --- a/arch/arm64/kernel/cpu_errata.c
->> +++ b/arch/arm64/kernel/cpu_errata.c
->> @@ -179,6 +179,22 @@ static int cpu_enable_trap_ctr_access(void *__unused)
->>  			   MIDR_CPU_VAR_REV(0, 0)),
->>  	},
->>  #endif
->> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
->> +	{
->> +		.desc = "Qualcomm Technologies Falkor erratum 1041",
->> +		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
->> +		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
->> +			MIDR_CPU_VAR_REV(0, 0),
->> +			MIDR_CPU_VAR_REV(0, 0)),
->> +	},
->> +	{
->> +		.desc = "Qualcomm Technologies Falkor erratum 1041",
->> +		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
->> +		MIDR_RANGE(MIDR_QCOM_FALKOR,
->> +			MIDR_CPU_VAR_REV(0, 1),
->> +			MIDR_CPU_VAR_REV(0, 2)),
->> +	},
->> +#endif
->>  #ifdef CONFIG_ARM64_ERRATUM_858921
->>  	{
->>  	/* Cortex-A73 all versions */
->> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
->> index acae627..c31be1b 100644
->> --- a/arch/arm64/kernel/efi-entry.S
->> +++ b/arch/arm64/kernel/efi-entry.S
->> @@ -96,14 +96,14 @@ ENTRY(entry)
->>  	read_sctlr el2, x0
->>  	bic	x0, x0, #1 << 0	// clear SCTLR.M
->>  	bic	x0, x0, #1 << 2	// clear SCTLR.C
->> -	write_sctlr el2, x0
->> +	early_write_sctlr el2, x0
->>  	isb
->>  	b	2f
->>  1:
->>  	read_sctlr el1, x0
->>  	bic	x0, x0, #1 << 0	// clear SCTLR.M
->>  	bic	x0, x0, #1 << 2	// clear SCTLR.C
->> -	write_sctlr el1, x0
->> +	early_write_sctlr el1, x0
->>  	isb
->>  2:
->>  	/* Jump to kernel entry point */
->> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
->> index b8d5b73..9512ce7 100644
->> --- a/arch/arm64/kernel/head.S
->> +++ b/arch/arm64/kernel/head.S
->> @@ -511,7 +511,7 @@ install_el2_stub:
->>  	mov	x0, #0x0800			// Set/clear RES{1,0} bits
->>  CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
->>  CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->> -	write_sctlr el1, x0
->> +	early_write_sctlr el1, x0
->>  
->>  	/* Coprocessor traps. */
->>  	mov	x0, #0x33ff
->> @@ -732,7 +732,7 @@ __primary_switch:
->>  	 * to take into account by discarding the current kernel mapping and
->>  	 * creating a new one.
->>  	 */
->> -	write_sctlr el1, x20			// disable the MMU
->> +	early_write_sctlr el1, x20		// disable the MMU
->>  	isb
->>  	bl	__create_page_tables		// recreate kernel mapping
->>  
->>
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+[    4.613400] igb 0000:01:00.0: swizzle pin 1
+[    4.617551] pcieport 0000:00:01.0: swizzle found slot 1 pin 1
+[    4.623276] igb 0000:01:00.0: parse pin 1
+[    4.627251] pcieport 0000:00:01.0: node dfff3e6c pin 1
+[    4.632359] pcieport 0000:00:01.0: parse node dfff3e6c pin 1
+[    4.637970]
+of_irq_parse_raw:  /pcie-controller at 1a140000/pcie at 1,0:00000001
+[    4.644807] OF: of_irq_parse_raw: ipar=/pcie-controller at 1a140000,
+size=1
+[    4.651463] OF:  -> addrsize=3
+[    4.654491] OF:  -> match=1 (imaplen=92)
+[    4.658404] OF:  -> newintsize=3, newaddrsize=0
+[    4.662893] OF:  -> imaplen=88
+[    4.665917] OF:  -> new parent: /interrupt-controller at 10200100
+[    4.671711] OF:  -> got it !
+[    4.674567] pcieport 0000:00:01.0: parse node dfff3e6c irq 0:193
+[    4.680596] igb 0000:01:00.0: assign IRQ: got 221
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+[    4.806020] igb 0000:01:00.1: swizzle pin 2
+[    4.810201] pcieport 0000:00:01.0: swizzle found slot 1 pin 2
+[    4.815902] igb 0000:01:00.1: parse pin 2
+[    4.819891] pcieport 0000:00:01.0: node dfff3e6c pin 2
+[    4.824987] pcieport 0000:00:01.0: parse node dfff3e6c pin 2
+[    4.830609]
+of_irq_parse_raw:  /pcie-controller at 1a140000/pcie at 1,0:00000002
+[    4.837437] OF: of_irq_parse_raw: ipar=/pcie-controller at 1a140000,
+size=1
+[    4.844093] OF:  -> addrsize=3
+[    4.847121] OF:  -> match=0 (imaplen=92)
+[    4.851042] OF:  -> newintsize=3, newaddrsize=0
+[    4.855532] OF:  -> imaplen=88
+[    4.858570] OF:  -> match=1 (imaplen=84)
+[    4.862463] OF:  -> newintsize=3, newaddrsize=0
+[    4.866952] OF:  -> imaplen=80
+[    4.869988] OF:  -> new parent: /interrupt-controller at 10200100
+[    4.875769] OF:  -> got it !
+[    4.878637] pcieport 0000:00:01.0: parse node dfff3e6c irq 0:193
+[    4.884601] igb 0000:01:00.1: assign IRQ: got 221
+
+
+But if I add "interrupt-map properties" in both the pcie controller and
+its child node:
+
+[    4.466979] pcieport 0000:00:01.0: swizzle found slot 1 pin 1
+[    4.472705] pcieport 0000:00:01.0: direct parse found irq
+3747437628:3747437656
+[    4.479969] pcieport 0000:00:01.0: parse pin 1
+[    4.484372] null ppdev, node dfff3570, pin 1
+[    4.488603] null ppdev, parse node dfff3570 pin 1
+[    4.493278] of_irq_parse_raw:  /pcie-controller at 1a140000:00000001
+[    4.499338] OF: of_irq_parse_raw: ipar=/pcie-controller at 1a140000,
+size=1
+[    4.505983] OF:  -> addrsize=3
+[    4.509023] OF:  -> match=0 (imaplen=20)
+[    4.512935] OF:  -> newintsize=3, newaddrsize=0
+[    4.517424] OF:  -> imaplen=16
+[    4.520464] OF:  -> match=1 (imaplen=12)
+[    4.524356] OF:  -> newintsize=3, newaddrsize=0
+[    4.528857] OF:  -> imaplen=8
+[    4.531797] OF:  -> new parent: /interrupt-controller at 10200100
+[    4.537578] OF:  -> got it !
+[    4.540442] null ppdev, parse node dfff3570 irq 0:194
+[    4.545534] pcieport 0000:00:01.0: assign IRQ: got 220
+
+[    4.579510] igb 0000:01:00.0: swizzle pin 1
+[    4.583660] pcieport 0000:00:01.0: swizzle found slot 1 pin 1
+[    4.589384] igb 0000:01:00.0: parse pin 1
+[    4.593359] pcieport 0000:00:01.0: node dfff3d34 pin 1
+[    4.598453] pcieport 0000:00:01.0: parse node dfff3d34 pin 1
+[    4.604080]
+of_irq_parse_raw:  /pcie-controller at 1a140000/pcie at 1,0:00000001
+[    4.610918] OF: of_irq_parse_raw:
+ipar=/pcie-controller at 1a140000/pcie at 1,0, size=1
+[    4.618337] OF:  -> addrsize=3
+[    4.621377] OF:  -> match=1 (imaplen=4)
+[    4.625193] OF:  -> newintsize=3, newaddrsize=0
+[    4.629695] OF:  -> imaplen=0
+[    4.632633] OF:  -> new parent: /interrupt-controller at 10200100
+[    4.638414] OF:  -> got it !
+[    4.641282] pcieport 0000:00:01.0: parse node dfff3d34 irq 0:194
+[    4.647242] igb 0000:01:00.0: assign IRQ: got 220
+
+[    4.772710] igb 0000:01:00.1: swizzle pin 2
+[    4.776860] pcieport 0000:00:01.0: swizzle found slot 1 pin 2
+[    4.782583] igb 0000:01:00.1: parse pin 2
+[    4.786559] pcieport 0000:00:01.0: node dfff3d34 pin 2
+[    4.791668] pcieport 0000:00:01.0: parse node dfff3d34 pin 2
+[    4.834485] pcieport 0000:00:01.0: parse node dfff3d34 irq 0:194
+[    4.840460] igb 0000:01:00.1: assign IRQ: got 220
+
+I'm trying to understand what happened in the walking function.
+
+Ryder
