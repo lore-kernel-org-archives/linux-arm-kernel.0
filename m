@@ -1,37 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sun, 5 Nov 2017 14:49:51 +0100
-Subject: [PATCH 2/2] kbuild: handle dtb-y and CONFIG_OF_ALL_DTBS natively
- in Makefile.lib
-In-Reply-To: <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAK8P3a17uK02gvY=iQhnGq7OooV4JzxLpAV5V5eES3bEutm6aA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Sun, 5 Nov 2017 15:12:06 +0100
+Subject: [PATCH v4] tty: serial: meson: allow baud-rates lower than 9600
+In-Reply-To: <bb0a70cc-6cc1-46d2-aa04-046a37c9f516@myway.de>
+References: <bb0a70cc-6cc1-46d2-aa04-046a37c9f516@myway.de>
+Message-ID: <20171105141206.GA31306@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 5, 2017 at 6:30 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> If CONFIG_OF_ALL_DTBS is enabled, "make ARCH=arm64 dtbs" compiles each
-> DTB twice; one from arch/arm64/boot/dts/*/Makefile and the other from
-> the dtb-$(CONFIG_OF_ALL_DTBS) line in arch/arm64/boot/dts/Makefile.
-> It could be a race problem when building DTBS in parallel.
->
-> Another minor issue is CONFIG_OF_ALL_DTBS covers only *.dts in vendor
-> sub-directories, so this broke when Broadcom added one more hierarchy
-> in arch/arm64/boot/dts/broadcom/<soc>/.
->
-> One idea to fix the issues in a clean way is to move DTB handling
-> to Kbuild core scripts.  Makefile.dtbinst already recognizes dtb-y
-> natively, so it should not hurt to do so.
->
-> Add $(dtb-y) to extra-y, and $(dtb-) as well if CONFIG_OF_ALL_DTBS is
-> enabled.  All clutter things in Makefiles go away.
->
-> As a bonus clean-up, I also removed dts-dirs.  Just use subdir-y
-> directly to traverse sub-directories.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On Sun, Nov 05, 2017 at 05:29:30AM +0100, Thomas Rohloff wrote:
+> Devices like DCF77 receivers need the baud-rate to be as low as 50.
+> 
+> I have tested this on a Meson GXL device with uart_A.
+> 
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Cc: Jiri Slaby <jslaby@suse.com>
+> Cc: Carlo Caione <carlo@caione.org>
+> Cc: Kevin Hilman <khilman@baylibre.com>
+> Cc: linux-amlogic at lists.infradead.org
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
+> Signed-off-by: Thomas Rohloff <v10lator@myway.de>
+> ---
+> drivers/tty/serial/meson_uart.c | 2 +-
+> 1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/meson_uart.c
+> b/drivers/tty/serial/meson_uart.c
+> index 07c0f98be3ac..e281ce5d101d 100644
+> --- a/drivers/tty/serial/meson_uart.c
+> +++ b/drivers/tty/serial/meson_uart.c
+> @@ -362,7 +362,7 @@ static void meson_uart_set_termios(struct uart_port
+> *port,
 
-Nice, that's much better than the hack I had.
+This is line-wrapped and can not be applied :(
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+It's your email client, look at this setting:
+	Content-Type: text/plain; charset=utf-8; format=flowed
+
+format=flowed does not work for kernel patches, it corruptes and edits
+them as it thinks this is just a conversation, not a machine-readable
+format.
+
+5th try?  :)
+
+thanks,
+
+greg k-h
