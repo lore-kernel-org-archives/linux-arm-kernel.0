@@ -1,101 +1,214 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 6 Nov 2017 09:01:31 +0000
-Subject: [PATCH v9 0/5] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <CAKTKpr4j2TuNGd0KO1MbCFXrWBmv0Ci37oa19rOQU=_W94GW1w@mail.gmail.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <CAKTKpr4j2TuNGd0KO1MbCFXrWBmv0Ci37oa19rOQU=_W94GW1w@mail.gmail.com>
-Message-ID: <4dd0e0dd-3565-98b9-ca50-0ee441b1955c@huawei.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 6 Nov 2017 14:34:52 +0530
+Subject: [PATCH 3/4] iommu/arm-smmu-v3: Use NUMA memory allocations for
+ stream tables and comamnd queues
+In-Reply-To: <c14854ea-2f58-2d30-1b6c-153a7f3e24a6@arm.com>
+References: <20170921085922.11659-1-ganapatrao.kulkarni@cavium.com>
+ <20170921085922.11659-4-ganapatrao.kulkarni@cavium.com>
+ <db28d6ff-77e5-ed59-c1b8-57c917564a68@arm.com>
+ <CAKTKpr508ArR1RUSY8HnaOkp==zPZ2=P_6gcXOAfi9hJq6XcqA@mail.gmail.com>
+ <c14854ea-2f58-2d30-1b6c-153a7f3e24a6@arm.com>
+Message-ID: <CAKTKpr7OEDC+Yn=qnK3j50ddrexjyYkYhzoMe1-_G342z1=1Kg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/10/2017 18:49, Ganapatrao Kulkarni wrote:
-> Hi Arnaldo, Will,
+On Wed, Oct 18, 2017 at 7:06 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 04/10/17 14:53, Ganapatrao Kulkarni wrote:
+>> Hi Robin,
+>>
+>>
+>> On Thu, Sep 21, 2017 at 5:28 PM, Robin Murphy <robin.murphy@arm.com> wrote:
+>>> [+Christoph and Marek]
+>>>
+>>> On 21/09/17 09:59, Ganapatrao Kulkarni wrote:
+>>>> Introduce smmu_alloc_coherent and smmu_free_coherent functions to
+>>>> allocate/free dma coherent memory from NUMA node associated with SMMU.
+>>>> Replace all calls of dmam_alloc_coherent with smmu_alloc_coherent
+>>>> for SMMU stream tables and command queues.
+>>>
+>>> This doesn't work - not only do you lose the 'managed' aspect and risk
+>>> leaking various tables on probe failure or device removal, but more
+>>> importantly, unless you add DMA syncs around all the CPU accesses to the
+>>> tables, you lose the critical 'coherent' aspect, and that's a horribly
+>>> invasive change that I really don't want to make.
+>>
+>> this implementation is similar to function used to allocate memory for
+>> translation tables.
 >
-> can this be queued to next?
+> The concept is similar, yes, and would work if implemented *correctly*
+> with the aforementioned comprehensive and hugely invasive changes. The
+> implementation as presented in this patch, however, is incomplete and
+> badly broken.
+>
+> By way of comparison, the io-pgtable implementations contain all the
+> necessary dma_sync_* calls, never relied on devres, and only have one
+> DMA direction to worry about (hint: the queues don't all work
+> identically). There are also a couple of practical reasons for using
+> streaming mappings with the DMA == phys restriction there - tracking
+> both the CPU and DMA addresses for each table would significantly
+> increase the memory overhead, and using the cacheable linear map address
+> in all cases sidesteps any potential problems with the atomic PTE
+> updates. Neither of those concerns apply to the SMMUv3 data structures,
+> which are textbook coherent DMA allocations (being tied to the lifetime
+> of the device, rather than transient).
+>
+>> why do you see it affects to stream tables and not to page tables.
+>> at runtime, both tables are accessed by SMMU only.
+>>
+>> As said in cover letter, having stream table from respective NUMA node
+>> is yielding
+>> around 30% performance!
+>> please suggest, if there is any better way to address this issue?
+>
+> I fully agree that NUMA-aware allocations are a worthwhile thing that we
+> want. I just don't like the idea of going around individual drivers
+> replacing coherent API usage with bodged-up streaming mappings - I
+> really think it's worth making the effort to to tackle it once, in the
+> proper place, in a way that benefits all users together.
+>
+> Robin.
+>
+>>>
+>>> Christoph, Marek; how reasonable do you think it is to expect
+>>> dma_alloc_coherent() to be inherently NUMA-aware on NUMA-capable
+>>> systems? SWIOTLB looks fairly straightforward to fix up (for the simple
+>>> allocation case; I'm not sure it's even worth it for bounce-buffering),
+>>> but the likes of CMA might be a little trickier...
+
+IIUC, having DMA allocation per node may become issue for 32 bit PCI
+devices connected on NODE 1 on IOMMU less platforms.
+most of the platforms may have NODE 1 RAM located beyond 4GB and
+having DMA allocation beyond 32bit for NODE1(and above) devices may
+make 32 bit pci devices not usable.
+
+DMA/IOMMU experts, please advise?
+
+>>>
+>>> Robin.
+>>>
+>>>> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+>>>> ---
+>>>>  drivers/iommu/arm-smmu-v3.c | 57 ++++++++++++++++++++++++++++++++++++++++-----
+>>>>  1 file changed, 51 insertions(+), 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+>>>> index e67ba6c..bc4ba1f 100644
+>>>> --- a/drivers/iommu/arm-smmu-v3.c
+>>>> +++ b/drivers/iommu/arm-smmu-v3.c
+>>>> @@ -1158,6 +1158,50 @@ static void arm_smmu_init_bypass_stes(u64 *strtab, unsigned int nent)
+>>>>       }
+>>>>  }
+>>>>
+>>>> +static void *smmu_alloc_coherent(struct arm_smmu_device *smmu, size_t size,
+>>>> +             dma_addr_t *dma_handle, gfp_t gfp)
+>>>> +{
+>>>> +     struct device *dev = smmu->dev;
+>>>> +     void *pages;
+>>>> +     dma_addr_t dma;
+>>>> +     int numa_node = dev_to_node(dev);
+>>>> +
+>>>> +     pages = alloc_pages_exact_nid(numa_node, size, gfp | __GFP_ZERO);
+>>>> +     if (!pages)
+>>>> +             return NULL;
+>>>> +
+>>>> +     if (!(smmu->features & ARM_SMMU_FEAT_COHERENCY)) {
+>>>> +             dma = dma_map_single(dev, pages, size, DMA_TO_DEVICE);
+>>>> +             if (dma_mapping_error(dev, dma))
+>>>> +                     goto out_free;
+>>>> +             /*
+>>>> +              * We depend on the SMMU being able to work with any physical
+>>>> +              * address directly, so if the DMA layer suggests otherwise by
+>>>> +              * translating or truncating them, that bodes very badly...
+>>>> +              */
+>>>> +             if (dma != virt_to_phys(pages))
+>>>> +                     goto out_unmap;
+>>>> +     }
+>>>> +
+>>>> +     *dma_handle = (dma_addr_t)virt_to_phys(pages);
+>>>> +     return pages;
+>>>> +
+>>>> +out_unmap:
+>>>> +     dev_err(dev, "Cannot accommodate DMA translation for IOMMU page tables\n");
+>>>> +     dma_unmap_single(dev, dma, size, DMA_TO_DEVICE);
+>>>> +out_free:
+>>>> +     free_pages_exact(pages, size);
+>>>> +     return NULL;
+>>>> +}
+>>>> +
+>>>> +static void smmu_free_coherent(struct arm_smmu_device *smmu, size_t size,
+>>>> +             void *pages, dma_addr_t dma_handle)
+>>>> +{
+>>>> +     if (!(smmu->features & ARM_SMMU_FEAT_COHERENCY))
+>>>> +             dma_unmap_single(smmu->dev, dma_handle, size, DMA_TO_DEVICE);
+>>>> +     free_pages_exact(pages, size);
+>>>> +}
+>>>> +
+>>>>  static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
+>>>>  {
+>>>>       size_t size;
+>>>> @@ -1172,7 +1216,7 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
+>>>>       strtab = &cfg->strtab[(sid >> STRTAB_SPLIT) * STRTAB_L1_DESC_DWORDS];
+>>>>
+>>>>       desc->span = STRTAB_SPLIT + 1;
+>>>> -     desc->l2ptr = dmam_alloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
+>>>> +     desc->l2ptr = smmu_alloc_coherent(smmu, size, &desc->l2ptr_dma,
+>>>>                                         GFP_KERNEL | __GFP_ZERO);
+>>>>       if (!desc->l2ptr) {
+>>>>               dev_err(smmu->dev,
+>>>> @@ -1487,7 +1531,7 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+>>>>               struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
+>>>>
+>>>>               if (cfg->cdptr) {
+>>>> -                     dmam_free_coherent(smmu_domain->smmu->dev,
+>>>> +                     smmu_free_coherent(smmu,
+>>>>                                          CTXDESC_CD_DWORDS << 3,
+>>>>                                          cfg->cdptr,
+>>>>                                          cfg->cdptr_dma);
+>>>> @@ -1515,7 +1559,7 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
+>>>>       if (asid < 0)
+>>>>               return asid;
+>>>>
+>>>> -     cfg->cdptr = dmam_alloc_coherent(smmu->dev, CTXDESC_CD_DWORDS << 3,
+>>>> +     cfg->cdptr = smmu_alloc_coherent(smmu, CTXDESC_CD_DWORDS << 3,
+>>>>                                        &cfg->cdptr_dma,
+>>>>                                        GFP_KERNEL | __GFP_ZERO);
+>>>>       if (!cfg->cdptr) {
+>>>> @@ -1984,7 +2028,7 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+>>>>  {
+>>>>       size_t qsz = ((1 << q->max_n_shift) * dwords) << 3;
+>>>>
+>>>> -     q->base = dmam_alloc_coherent(smmu->dev, qsz, &q->base_dma, GFP_KERNEL);
+>>>> +     q->base = smmu_alloc_coherent(smmu, qsz, &q->base_dma, GFP_KERNEL);
+>>>>       if (!q->base) {
+>>>>               dev_err(smmu->dev, "failed to allocate queue (0x%zx bytes)\n",
+>>>>                       qsz);
+>>>> @@ -2069,7 +2113,7 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+>>>>                        size, smmu->sid_bits);
+>>>>
+>>>>       l1size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
+>>>> -     strtab = dmam_alloc_coherent(smmu->dev, l1size, &cfg->strtab_dma,
+>>>> +     strtab = smmu_alloc_coherent(smmu, l1size, &cfg->strtab_dma,
+>>>>                                    GFP_KERNEL | __GFP_ZERO);
+>>>>       if (!strtab) {
+>>>>               dev_err(smmu->dev,
+>>>> @@ -2097,8 +2141,9 @@ static int arm_smmu_init_strtab_linear(struct arm_smmu_device *smmu)
+>>>>       u32 size;
+>>>>       struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+>>>>
+>>>> +
+>>>>       size = (1 << smmu->sid_bits) * (STRTAB_STE_DWORDS << 3);
+>>>> -     strtab = dmam_alloc_coherent(smmu->dev, size, &cfg->strtab_dma,
+>>>> +     strtab = smmu_alloc_coherent(smmu, size, &cfg->strtab_dma,
+>>>>                                    GFP_KERNEL | __GFP_ZERO);
+>>>>       if (!strtab) {
+>>>>               dev_err(smmu->dev,
+>>>>
+>>>
+>>
+>> thanks
+>> Ganapat
+>>
 >
 
-Is there any update on the status of this patchset? From searching the 
-acme git, I can only assume that it has not been merged. So we'll have 
-to work on top of this out-of-tree series.
-
-John
-
-> On Tue, Oct 17, 2017 at 12:02 AM, Ganapatrao Kulkarni
-> <ganapatrao.kulkarni@cavium.com> wrote:
->> Extending json/jevent framework for parsing arm64 event files.
->> Adding jevents for ThunderX2 implementation defined PMU events.
->>
->> v9:
->>    - Rebased to [3] and resolved conficts in PATCH 1/5 and reworked PATCH 3/5.
->>    - Added PATCH 5 to fix segmentation fault in perf_pmu__find_map
->>
->> [3] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
->>
->> v8:
->>    - Rename thunderx2 directory to cavium
->>
->> v7:
->>    - Addressed some more comments from Will Deacon.
->>
->> v6 : Addressed comments [1] [2]
->>
->> [1] https://patchwork.kernel.org/patch/9903099/
->> [2] https://patchwork.kernel.org/patch/9853899/
->>
->> v5:
->>    - Addressed comments from Arnaldo.
->>    - Rebased to 4.13-rc5
->>
->> v4:
->>    - Rebased to 4.13-rc1
->>
->> v3:
->>    - Addressed comments from Will Deacon and Jayachandran C.
->>    - Rebased to 4.12-rc1
->>
->> v2:
->>    - Updated as per Mark Rutland's suggestions.
->>    - Added provision for get_cpuid_str to get cpu id string
->>      from associated cpus of pmu core device.
->>
->> v1: Initial patchset.
->>
->>
->> Ganapatrao Kulkarni (5):
->>   perf utils: passing pmu as a parameter to function get_cpuid_str
->>   perf tools arm64: Add support for get_cpuid_str function.
->>   perf utils: use pmu->is_uncore to detect PMU CORE/UNCORE devices
->>   perf vendor events arm64: Add ThunderX2 implementation defined pmu
->>     core events
->>   perf utils: add check for valid cpuid in function perf_pmu__find_map
->>
->>  tools/perf/arch/arm64/util/Build                   |  1 +
->>  tools/perf/arch/arm64/util/header.c                | 65 ++++++++++++++++++++++
->>  tools/perf/arch/powerpc/util/header.c              |  2 +-
->>  tools/perf/arch/x86/util/header.c                  |  2 +-
->>  .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 +++++++++++++++++++++
->>  tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 +++++
->>  tools/perf/util/header.h                           |  3 +-
->>  tools/perf/util/metricgroup.c                      |  4 +-
->>  tools/perf/util/pmu.c                              | 39 ++++++++-----
->>  tools/perf/util/pmu.h                              |  2 +-
->>  10 files changed, 174 insertions(+), 21 deletions(-)
->>  create mode 100644 tools/perf/arch/arm64/util/header.c
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
->>
->> --
->> 2.9.4
->>
->
-> thanks
-> Ganapat
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> .
->
+thanks
+Ganapat
