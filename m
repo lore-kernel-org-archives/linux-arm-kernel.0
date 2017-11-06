@@ -1,40 +1,22 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 6 Nov 2017 17:09:29 -0500
-Subject: [PATCH 2/3] dmaengine: qcom_hidma: add support for the new
- revision
-In-Reply-To: <0b24eb03-1f0e-ec65-b12b-65036ef7addc@codeaurora.org>
-References: <1509989180-22617-1-git-send-email-okaya@codeaurora.org>
- <1509989180-22617-2-git-send-email-okaya@codeaurora.org>
- <428c7106-8ebe-0c12-4576-1cfac422923e@arm.com>
- <0b24eb03-1f0e-ec65-b12b-65036ef7addc@codeaurora.org>
-Message-ID: <1733d997-6f3a-459a-b14f-b29823c3a8af@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 6 Nov 2017 16:13:37 -0600
+Subject: [PATCH 1/3] dt-bindings: clk: Hi3660: Document stub clock
+In-Reply-To: <1509693907-90682-2-git-send-email-zhongkaihua@huawei.com>
+References: <1509693907-90682-1-git-send-email-zhongkaihua@huawei.com>
+ <1509693907-90682-2-git-send-email-zhongkaihua@huawei.com>
+Message-ID: <20171106221337.grwywvxzes7jcgob@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/2017 1:15 PM, Sinan Kaya wrote:
-> On 11/6/2017 1:03 PM, Robin Murphy wrote:
->>>  #ifdef CONFIG_ACPI
->>>  		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
->>> +		if (ret)
->>> +			ret = strcmp(acpi_device_hid(adev), "QCOM8063");
->> This string-juggling looks to have already hit the point at which it
->> doesn't scale well - it would be a lot nicer to make use of
->> of_device_get_match_data() and the ACPI equivalent to abstract the
->> version-specific data appropriately.
+On Fri, Nov 03, 2017 at 03:25:05PM +0800, Kaihua Zhong wrote:
+> From: Leo Yan <leo.yan@linaro.org>
 > 
-> Sure, let me do some research.
+> Document the DT binding for stub clock which is used for CPU,
+> GPU and DDR frequency scaling.
 > 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  Documentation/devicetree/bindings/clock/hi3660-clock.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-I just wanted to double check here. 
-
-This is what I can do:
-1. Maintain different match tables for different driver capabilities.
-2. Instead of doing open-coded strcmp, I can do match against different tables
-using acpi_match_device/of_match_device.
-
-Hope this works for you.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Acked-by: Rob Herring <robh@kernel.org>
