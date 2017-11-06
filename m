@@ -1,39 +1,111 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 6 Nov 2017 19:17:13 +0000
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
-Message-ID: <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 6 Nov 2017 13:17:49 -0600
+Subject: [PATCH 2/2] PCI: mvebu: Check DRAM window size
+In-Reply-To: <20171005211650.GZ25517@bhelgaas-glaptop.roam.corp.google.com>
+References: <20170828152517.24506-1-jlu@pengutronix.de>
+ <20170828152517.24506-3-jlu@pengutronix.de>
+ <20170925235658.GK15970@bhelgaas-glaptop.roam.corp.google.com>
+ <20171005211650.GZ25517@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171106191749.GC31930@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 06, 2017 at 04:30:41AM -0800, kernelci.org bot wrote:
+On Thu, Oct 05, 2017 at 04:16:50PM -0500, Bjorn Helgaas wrote:
+> On Mon, Sep 25, 2017 at 06:56:58PM -0500, Bjorn Helgaas wrote:
+> > On Mon, Aug 28, 2017 at 05:25:17PM +0200, Jan Luebbe wrote:
+> > > The sum of the DRAM windows may exceed 4GB (at least on Armada XP).
+> > > Return an error in that case.
+> > > 
+> > > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+> > 
+> > Looking for an ack from Thomas or Jason before applying this...
+> 
+> Ping, I think I'm stil waiting for an ack for this.  Or did I miss it?
 
-> Full Boot Summary:
-https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20171106/
-> Full Build Summary: https://kernelci.org/build/next/branch/master/kernel/next-20171106/
+I'm dropping this.  Please repost it with the appropriate acks if it's
+still needed.
 
-Since Friday -next has been failing to boot tegra124-nyan-big in
-kernelci with all configs:
-
-> arm:
-
->     multi_v7_defconfig:
->         tegra124-nyan-big:
->             lab-collabora: failing since 2 days (last pass: next-20171102 - first fail: next-20171103)
-
-It's fine in mainline, see: 
-
-    https://kernelci.org/boot/id/5a0030c959b514aad21cdd1a/
-
-for boot log, history and comparisons with other trees.  Looks like
-output started grinding to a halt at the point where it starts
-requesting firmware but ICBW.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171106/bf1ae8aa/attachment.sig>
+> > > ---
+> > >  drivers/pci/host/pci-mvebu.c | 27 ++++++++++++++++++++++-----
+> > >  1 file changed, 22 insertions(+), 5 deletions(-)
+> > > 
+> > > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
+> > > index f353a6eb2f01..5d74af81d104 100644
+> > > --- a/drivers/pci/host/pci-mvebu.c
+> > > +++ b/drivers/pci/host/pci-mvebu.c
+> > > @@ -206,10 +206,10 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
+> > >   * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
+> > >   * WIN[0-3] -> DRAM bank[0-3]
+> > >   */
+> > > -static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+> > > +static int mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+> > >  {
+> > >  	const struct mbus_dram_target_info *dram;
+> > > -	u32 size;
+> > > +	u64 size;
+> > >  	int i;
+> > >  
+> > >  	dram = mv_mbus_dram_info();
+> > > @@ -252,19 +252,32 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
+> > >  	if ((size & (size - 1)) != 0)
+> > >  		size = 1 << fls(size);
+> > >  
+> > > +	if (size > 0x100000000) {
+> > > +		dev_err(&port->pcie->pdev->dev,
+> > > +			"Could not configure DRAM window (too large): 0x%llx\n",
+> > > +			size);
+> > > +
+> > > +		return -EINVAL;
+> > > +	}
+> > > +
+> > >  	/* Setup BAR[1] to all DRAM banks. */
+> > >  	mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
+> > >  	mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
+> > >  	mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
+> > >  		     PCIE_BAR_CTRL_OFF(1));
+> > > +
+> > > +	return 0;
+> > >  }
+> > >  
+> > > -static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+> > > +static int mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+> > >  {
+> > >  	u32 cmd, mask;
+> > > +	int ret;
+> > >  
+> > >  	/* Point PCIe unit MBUS decode windows to DRAM space. */
+> > > -	mvebu_pcie_setup_wins(port);
+> > > +	ret = mvebu_pcie_setup_wins(port);
+> > > +	if (ret)
+> > > +		return ret;
+> > >  
+> > >  	/* Master + slave enable. */
+> > >  	cmd = mvebu_readl(port, PCIE_CMD_OFF);
+> > > @@ -277,6 +290,8 @@ static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
+> > >  	mask = mvebu_readl(port, PCIE_MASK_OFF);
+> > >  	mask |= PCIE_MASK_ENABLE_INTS;
+> > >  	mvebu_writel(port, mask, PCIE_MASK_OFF);
+> > > +
+> > > +	return 0;
+> > >  }
+> > >  
+> > >  static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
+> > > @@ -882,7 +897,9 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
+> > >  
+> > >  		if (!port->base)
+> > >  			continue;
+> > > -		mvebu_pcie_setup_hw(port);
+> > > +		err = mvebu_pcie_setup_hw(port);
+> > > +		if (err)
+> > > +			return 0;
+> > >  	}
+> > >  
+> > >  	return 1;
+> > > -- 
+> > > 2.11.0
+> > > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
