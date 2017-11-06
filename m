@@ -1,43 +1,39 @@
-From: manivannan.sadhasivam@linaro.org (Manivannan Sadhasivam)
-Date: Fri, 3 Nov 2017 00:11:23 +0530
-Subject: [PATCH 2/3] clk: owl: add clock driver for Actions S900 SoC
-In-Reply-To: <20171102000246.rcermsfe7rycrmk3@rob-hp-laptop>
-References: <1509479663-8985-1-git-send-email-manivannan.sadhasivam@linaro.org>
- <1509479663-8985-3-git-send-email-manivannan.sadhasivam@linaro.org>
- <20171102000246.rcermsfe7rycrmk3@rob-hp-laptop>
-Message-ID: <20171102184123.GA15014@linaro.org>
+From: hjp@liab.dk (Henrik Juul Pedersen)
+Date: Mon, 6 Nov 2017 15:12:31 +0100
+Subject: Possible bug in Armada-37xx pincontroller
+Message-ID: <CABQZ+_Qy1ghA3_zMTHGjbfhwmfRNGaGRxUfsgUmayeOKxpEJvQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 07:02:46PM -0500, Rob Herring wrote:
-> On Wed, Nov 01, 2017 at 01:24:22AM +0530, Manivannan Sadhasivam wrote:
-> > This patch adds clock driver for Actions Semi OWL
-> > series S900 SoC.
-> > 
-> > Signed-off-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
-> > ---
-> >  MAINTAINERS                                    |   5 +
-> >  drivers/clk/Makefile                           |   1 +
-> >  drivers/clk/owl/Makefile                       |   2 +
-> >  drivers/clk/owl/clk-factor.c                   | 270 ++++++++++++
-> >  drivers/clk/owl/clk-pll.c                      | 346 +++++++++++++++
-> >  drivers/clk/owl/clk-s900.c                     | 587 +++++++++++++++++++++++++
-> >  drivers/clk/owl/clk.c                          | 318 ++++++++++++++
-> >  drivers/clk/owl/clk.h                          | 301 +++++++++++++
-> 
-> >  include/dt-bindings/clock/actions,s900-clock.h | 141 ++++++
-> 
-> This belongs in the DT binding patch.
->
-Ack. Will add it in next revision.
+Hi,
 
-Thanks,
-Mani 
-> >  9 files changed, 1971 insertions(+)
-> >  create mode 100644 drivers/clk/owl/Makefile
-> >  create mode 100644 drivers/clk/owl/clk-factor.c
-> >  create mode 100644 drivers/clk/owl/clk-pll.c
-> >  create mode 100644 drivers/clk/owl/clk-s900.c
-> >  create mode 100644 drivers/clk/owl/clk.c
-> >  create mode 100644 drivers/clk/owl/clk.h
-> >  create mode 100644 include/dt-bindings/clock/actions,s900-clock.h
+After some review of a current Armada 37xx design, we stumbled upon
+some pin numbering, which seems doubly-defined, and doesn't seem to
+follow the documentation available to us.
+
+We haven't gotten our hardware yet, so we haven't been able to test
+it, but the following patch is as we believe it should be defined.
+
+Best regards,
+Henrik Juul Pedersen
+LIAB ApS
+
+---
+
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 71b944748304..e223fac20993 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -157,8 +157,8 @@ static struct armada_37xx_pin_group
+armada_37xx_nb_groups[] = {
+        PIN_GRP_GPIO("pwm1", 12, 1, BIT(4), "pwm"),
+        PIN_GRP_GPIO("pwm2", 13, 1, BIT(5), "pwm"),
+        PIN_GRP_GPIO("pwm3", 14, 1, BIT(6), "pwm"),
+-       PIN_GRP_GPIO("pmic1", 17, 1, BIT(7), "pmic"),
+-       PIN_GRP_GPIO("pmic0", 16, 1, BIT(8), "pmic"),
++       PIN_GRP_GPIO("pmic1", 7, 1, BIT(7), "pmic"),
++       PIN_GRP_GPIO("pmic0", 6, 1, BIT(8), "pmic"),
+        PIN_GRP_GPIO("i2c2", 2, 2, BIT(9), "i2c"),
+        PIN_GRP_GPIO("i2c1", 0, 2, BIT(10), "i2c"),
+        PIN_GRP_GPIO("spi_cs1", 17, 1, BIT(12), "spi"),
