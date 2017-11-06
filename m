@@ -1,28 +1,56 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 6 Nov 2017 13:15:43 -0500
-Subject: [PATCH 2/3] dmaengine: qcom_hidma: add support for the new
- revision
-In-Reply-To: <428c7106-8ebe-0c12-4576-1cfac422923e@arm.com>
-References: <1509989180-22617-1-git-send-email-okaya@codeaurora.org>
- <1509989180-22617-2-git-send-email-okaya@codeaurora.org>
- <428c7106-8ebe-0c12-4576-1cfac422923e@arm.com>
-Message-ID: <0b24eb03-1f0e-ec65-b12b-65036ef7addc@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  6 Nov 2017 18:34:36 +0000
+Subject: [PATCH v2 1/2] dt-bindings: add description of Socionext EXIU
+ interrupt controller
+Message-ID: <20171106183437.18214-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/6/2017 1:03 PM, Robin Murphy wrote:
->>  #ifdef CONFIG_ACPI
->>  		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
->> +		if (ret)
->> +			ret = strcmp(acpi_device_hid(adev), "QCOM8063");
-> This string-juggling looks to have already hit the point at which it
-> doesn't scale well - it would be a lot nicer to make use of
-> of_device_get_match_data() and the ACPI equivalent to abstract the
-> version-specific data appropriately.
+Add a description of the External Interrupt Unit (EXIU) interrupt
+controller as found on the Socionext SynQuacer SoC.
 
-Sure, let me do some research.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ Documentation/devicetree/bindings/interrupt-controller/socionext,synquacer-exiu.txt | 32 ++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/socionext,synquacer-exiu.txt b/Documentation/devicetree/bindings/interrupt-controller/socionext,synquacer-exiu.txt
+new file mode 100644
+index 000000000000..dc3778b6fbee
+--- /dev/null
++++ b/Documentation/devicetree/bindings/interrupt-controller/socionext,synquacer-exiu.txt
+@@ -0,0 +1,32 @@
++Socionext SynQuacer External Interrupt Unit (EXIU)
++
++The Socionext Synquacer SoC has an external interrupt unit (EXIU)
++that forwards a block of 32 configurable input lines to 32 adjacent
++level-high type GICv3 SPIs.
++
++Required properties:
++
++- compatible           : Should be "socionext,synquacer-exiu".
++- reg                  : Specifies base physical address and size of the
++                         control registers.
++- interrupt-controller : Identifies the node as an interrupt controller.
++- #interrupt-cells     : Specifies the number of cells needed to encode an
++                         interrupt source. The value must be 3.
++- interrupt-parent     : phandle of the GIC these interrupts are routed to.
++- socionext,spi-base   : The SPI number of the first SPI of the 32 adjacent
++                         ones the EXIU forwards its interrups to.
++
++Notes:
++
++- Only SPIs can use the EXIU as an interrupt parent.
++
++Example:
++
++	exiu: exiu at 510c0000 {
++		compatible = "socionext,synquacer-exiu";
++		reg = <0x0 0x510c0000 0x0 0x20>;
++		interrupt-controller;
++		interrupt-parent = <&gic>;
++		#interrupt-cells = <3>;
++		socionext,spi-base = <112>;
++	};
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
