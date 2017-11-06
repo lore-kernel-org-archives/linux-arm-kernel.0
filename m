@@ -1,42 +1,66 @@
-From: smueller@chronox.de (Stephan Mueller)
-Date: Mon, 06 Nov 2017 17:06:09 +0100
-Subject: [PATCH] crypto: AF_ALG - remove locking in async callback
-In-Reply-To: <20171103132016.GB8330@gondor.apana.org.au>
-References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
- <5260911.ZuXsrgFD2R@positron.chronox.de>
- <20171103132016.GB8330@gondor.apana.org.au>
-Message-ID: <1977235.9AvJZzduGj@tauon.chronox.de>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 06 Nov 2017 17:09:07 +0100
+Subject: [PATCH] pinctrl: Fix armada-37xx pmic pin group numbering
+In-Reply-To: <CABQZ+_QYDE9k31ywvHqSEsNPjsnGQHMd0oCyErKFAT1PpETkEg@mail.gmail.com>
+ (Henrik Juul Pedersen's message of "Mon, 6 Nov 2017 17:02:58 +0100")
+References: <CABQZ+_QYDE9k31ywvHqSEsNPjsnGQHMd0oCyErKFAT1PpETkEg@mail.gmail.com>
+Message-ID: <87shdr75jw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 3. November 2017, 14:20:16 CET schrieb Herbert Xu:
+Hi Henrik,
+ 
+ On lun., nov. 06 2017, Henrik Juul Pedersen <hjp@liab.dk> wrote:
 
-Hi Herbert,
+> Fix pin numbering in Marvell ARMADA 37xx pincontroller.
+>
+> The pmic0 and pmic1 pin groups start on pins 6 and 7 respectively.
+>
+> Signed-off-by: Henrik Juul Pedersen <hjp@liab.dk>
 
-> > 
-> > The code paths protected by the socket-lock do not use or modify the
-> > socket in a non-atomic fashion. The actions pertaining the socket do not
-> > even need to be handled as an atomic operation. Thus, the socket-lock
-> > can be safely ignored.
-> 
-> Are you sure about that? In particular is the callback function still
-> sane without the socket lock if a concurrent recvmsg/sendmsg call is
-> made?
+Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 
-I reviewed the code again and I cannot find a reason for keeping the lock. All 
-we need to ensure is that the socket exists. This is ensured with the refcount 
-of the socket released by __sock_put().
+when applying the patch, we should also add:
 
-Would you mind helping me where you think the lock is needed.
-> 
-> Your fixes header is wrong too as the locks weren't introduced in that
-> commit, they just got moved around.
+Fixes: 87466ccd9401 ("pinctrl: armada-37xx: Add pin controller support
+for Armada 37xx")
+Cc: <stable@vger.kernel.org>
 
-Correct, the initial introduction was in 
-e870456d8e7c8d57c059ea479b5aadbb55ff4c3a (algif_skcipher) and 
-d887c52d6ae43aeebd249b5f2f1333e60236aa60 (algif_aead)
+Thanks,
 
-Thanks a lot.
+Gregory
 
-Ciao
-Stephan
+> ---
+>  drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> index 71b94474..e223fac2 100644
+> --- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> +++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+> @@ -157,8 +157,8 @@ static struct armada_37xx_pin_group
+> armada_37xx_nb_groups[] = {
+>   PIN_GRP_GPIO("pwm1", 12, 1, BIT(4), "pwm"),
+>   PIN_GRP_GPIO("pwm2", 13, 1, BIT(5), "pwm"),
+>   PIN_GRP_GPIO("pwm3", 14, 1, BIT(6), "pwm"),
+> - PIN_GRP_GPIO("pmic1", 17, 1, BIT(7), "pmic"),
+> - PIN_GRP_GPIO("pmic0", 16, 1, BIT(8), "pmic"),
+> + PIN_GRP_GPIO("pmic1", 7, 1, BIT(7), "pmic"),
+> + PIN_GRP_GPIO("pmic0", 6, 1, BIT(8), "pmic"),
+>   PIN_GRP_GPIO("i2c2", 2, 2, BIT(9), "i2c"),
+>   PIN_GRP_GPIO("i2c1", 0, 2, BIT(10), "i2c"),
+>   PIN_GRP_GPIO("spi_cs1", 17, 1, BIT(12), "spi"),
+> -- 
+> 2.14.1
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
