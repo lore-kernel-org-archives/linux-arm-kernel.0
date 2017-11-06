@@ -1,51 +1,45 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Mon, 6 Nov 2017 19:13:06 +0300
-Subject: [PATCH 1/2] arm64: dts: orange-pi-zero-plus2: fix sdcard detect
-In-Reply-To: <20171106122633.5mnqfh6xhmmxr45s@flea>
-References: <20171103195855.15283-1-geomatsi@gmail.com>
- <20171103195855.15283-2-geomatsi@gmail.com>
- <CAMty3ZCs8kq1vUGLOi0ZghY7n0iXgUQ1E=ngBO6Y4wm7wMLF7Q@mail.gmail.com>
- <20171104154221.ao7kkcwqhnja3cxe@speedy.hunter>
- <20171106122633.5mnqfh6xhmmxr45s@flea>
-Message-ID: <20171106161306.tq6yeq6bq36ridj3@speedy.hunter>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 6 Nov 2017 16:14:59 +0000
+Subject: [PATCH v4] arm64: support __int128 on gcc 5+
+In-Reply-To: <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
+References: <20171103141858.13149-1-Jason@zx2c4.com>
+ <20171106093151.8312-1-Jason@zx2c4.com>
+ <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
+Message-ID: <20171106161459.bm4b2c7ahljluuda@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
-
-> > > > The sdcard detect pin on orange-pi-zero-plus2 is pulled up.
-> > > > Fix cd-gpio description to enable sdcard detect.
-> > > >
-> > > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
-> > > > ---
-> > > >  arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts | 2 +-
-> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > > >
-> > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > > > index b6b7a561df8c..a42fd79a62a3 100644
-> > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
-> > > > @@ -71,7 +71,7 @@
-> > > >         pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-> > > >         vmmc-supply = <&reg_vcc3v3>;
-> > > >         bus-width = <4>;
-> > > > -       cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
-> > > > +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
-> > > 
-> > > Was able to detect and do mount with existing dts
+On Mon, Nov 06, 2017 at 03:59:18PM +0000, Catalin Marinas wrote:
+> On Mon, Nov 06, 2017 at 10:31:51AM +0100, Jason A. Donenfeld wrote:
+> > Versions of gcc prior to gcc 5 emitted a __multi3 function call when
+> > dealing with TI types, resulting in failures when trying to link to
+> > libgcc, and more generally, bad performance. However, since gcc 5,
+> > the compiler supports actually emitting fast instructions, which means
+> > we can at long last enable this option and receive the speedups.
 > > 
-> > Did you try to boot from sdcard ? I am not able to boot my board from
-> > sd-card without this change. As I mentioned earlier in my email
-> > to buildroot mailing list, with mmc debug enabled I see that mmc
-> > tries to init sd-card when I remove it from the slot.
+> > The gcc commit that added proper Aarch64 support is:
+> > https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+> > This commit appears to be part of the gcc 5 release.
 > > 
-> > Maybe there is a minor differences between h/w versions or batches ?
-> > What is you board version ? I tested on board v1.0.
+> > There are still a few instructions, __ashlti3 and __ashrti3, which
+> > require libgcc, which is fine. Rather than linking to libgcc, we
+> > simply provide them ourselves, since they're not that complicated.
+> > 
+> > Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
 > 
-> Looking at the schematics, it definitely looks like it's active low.
+> According to Arnd, linux-next (with this patch included) fails to build
+> with gcc-7 (config: https://pastebin.com/raw/sgvPe96e).
 
-Is it ok to merge it then ? Or using 'cd-inverted' property
-is the preferable option ?
+Actually, it fails with gcc-6 as well (gcc (Debian 6.3.0-18) 6.3.0
+20170516) with this error:
 
-Regards,
-Sergey
+kernel/sched/fair.o: In function `__calc_delta':
+fair.c:(.text+0x84c): undefined reference to `__lshrti3'
+kernel/time/timekeeping.o: In function `timekeeping_resume':
+timekeeping.c:(.text+0x2cac): undefined reference to `__lshrti3'
+
+So I'm for reverting the commit and we should allow more randconfig
+tests for the 4.16 merging window.
+
+-- 
+Catalin
