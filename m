@@ -1,97 +1,102 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 6 Nov 2017 14:20:08 +0000
-Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20171103151711.GA22453@kroah.com>
-References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
- <20170831160430.GB11200@kroah.com> <20171103151711.GA22453@kroah.com>
-Message-ID: <5A006F97.1080409@nxp.com>
+From: oleksandrs@mellanox.com (Oleksandr Shamray)
+Date: Mon, 6 Nov 2017 14:28:08 +0000
+Subject: [v11,1/4] drivers: jtag: Add JTAG core driver
+In-Reply-To: <8760aoz78q.fsf@bilbrey.org>
+References: <1509724449-26221-2-git-send-email-oleksandrs@mellanox.com>
+ <8760aoz78q.fsf@bilbrey.org>
+Message-ID: <DB6PR0501MB2197286DFD9801F6C78D638DB1500@DB6PR0501MB2197.eurprd05.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, 
+Thanks for review>
 
+> -----Original Message-----
+> From: Chip Bilbrey [mailto:chip at bilbrey.org]
+> Sent: Monday, November 6, 2017 12:33 AM
+> To: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; linux-
+> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; openbmc at lists.ozlabs.org; joel at jms.id.au;
+> jiri at resnulli.us; tklauser at distanz.ch; linux-serial at vger.kernel.org;
+> mec at shout.net; Vadim Pasternak <vadimp@mellanox.com>; system-sw-low-
+> level <system-sw-low-level@mellanox.com>; robh+dt at kernel.org; openocd-
+> devel-owner at lists.sourceforge.net; linux-api at vger.kernel.org;
+> davem at davemloft.net; mchehab at kernel.org; Jiri Pirko <jiri@mellanox.com>
+> Subject: Re: [v11,1/4] drivers: jtag: Add JTAG core driver
+> 
+> 
+> Oleksandr Shamray writes:
+> > diff --git a/include/uapi/linux/jtag.h b/include/uapi/linux/jtag.h new
+> > file mode 100644 index 0000000..0b25a83
+> > --- /dev/null
+> > +++ b/include/uapi/linux/jtag.h
+> > [...]
+> > +/**
+> > + * enum jtag_xfer_mode:
+> > + *
+> > + * @JTAG_XFER_HW_MODE: hardware mode transfer
+> > + * @JTAG_XFER_SW_MODE: software mode transfer  */ enum
+> jtag_xfer_mode
+> > +{
+> > +	JTAG_XFER_HW_MODE,
+> > +	JTAG_XFER_SW_MODE,
+> > +};
+> 
+> Is this essentially selecting between bit-bang mode or not?  Is there a generally
+> applicable reason to select SW mode over HW (or vice versa)?
+> This sounds like it's tied to device-specific capability which shouldn't be exposed
+> in a generic user API.
 
-On 11/03/2017 05:17 PM, Greg KH wrote:
-> On Thu, Aug 31, 2017 at 06:04:30PM +0200, Greg KH wrote:
->> On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
->>> From: Stuart Yoder <stuart.yoder@nxp.com>
->>>
->>> Move the source files out of staging into their final locations:
->>>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->>>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
->>>    -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
->>>    -README.txt, providing and overview of DPAA goes to
->>>     Documentation/dpaa2/overview.txt
->>>
->>> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
->>> Update dpaa2_eth and dpio staging drivers.
->>>
->>> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
->>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>
->> This is going to have to wait until I get a chunk of time to do the
->> review.  Probably after 4.13-final is out.
->
-> Ok, review comments as I go through the code:
-> 	mc-sys.c             323 EXPORT_SYMBOL(mc_send_command);
->
-> should be EXPORT_SYMBOL_GPL(fsl_mc_send_command); to match up with your
-> other exports and global namespace, right?
+It is a mode of working some JTAG master devices. F.e Aspeed JTAG core can work in fully automatic mode when all StateMachine 
+transitions and pin control done by hardware and in the more simpler mode when JTAG pin control does by the user (like bit-bang). 
 
-Right. There's an inconsistent mixture of EXPORT_SYMBOL() and 
-EXPORT_SYMBOL_GPL() usage. I'll change them all to EXPORT_SYMBOL_GPL().
+It HW defined feature and can be applied not in all cases. 
 
-> You export a lot of dpcon_* symbols that no one uses, please do not do
-> that.  Verify that all of them are actually used right now, if not,
-> remove them.  If you think you are going to use them in the future,
-> wonderful, add them in then.
+Seems it can be deleted from xfer option and controlled by separate like IOCTL_SET_PARAM command.
+> 
+> > +/**
+> > + * struct jtag_xfer - jtag xfer:
+> > + *
+> > + * @mode: access mode
+> > + * @type: transfer type
+> > + * @direction: xfer direction
+> > + * @length: xfer bits len
+> > + * @tdio : xfer data array
+> > + * @endir: xfer end state
+> > + *
+> > + * Structure represents interface to Aspeed JTAG device for jtag sdr
+> > +xfer
+> > + * execution.
+> 
+> Probably should remove the reference to Aspeed here.
 
-Actually, most of the dpcon_* APIs are used in the ethernet driver here: 
-drivers/staging/fsl-dpaa2/ethernet. I think i saw only a couple of 
-functions that are not used so I'll drop those.
+Thanks, will remove it.
 
-> Same for your dpaa2_* exported symbols, most are not used from what I
-> can see.
+> 
+> > +/* ioctl interface */
+> > +#define __JTAG_IOCTL_MAGIC	0xb2
+> > +
+> > +#define JTAG_IOCRUNTEST	_IOW(__JTAG_IOCTL_MAGIC, 0,\
+> > +			     struct jtag_run_test_idle)
+> > +#define JTAG_SIOCFREQ	_IOW(__JTAG_IOCTL_MAGIC, 1, unsigned int)
+> > +#define JTAG_GIOCFREQ	_IOR(__JTAG_IOCTL_MAGIC, 2, unsigned int)
+> > +#define JTAG_IOCXFER	_IOWR(__JTAG_IOCTL_MAGIC, 3, struct
+> jtag_xfer)
+> > +#define JTAG_GIOCSTATUS _IOWR(__JTAG_IOCTL_MAGIC, 4, enum
+> > +jtag_endstate)
+> 
+> I notice the single-open()-per-device lock was dropped by request in an earlier
+> revision of your patches, but multiple processes trying to drive a single JTAG
+> master could wreak serious havoc if transactions get interleaved. Would
+> something like an added JTAG_LOCKCHAIN/UNLOCKCHAIN
+> ioctl() for exclusive client access be reasonable to prevent this?
 
-I'll check these too and drop the unused ones.
+Yes, it dropped by recommendation of Greg KH <gregkh@linuxfoundation.org>. 
+Uer app should care about it.
 
-> struct dpaa2_io {
->          atomic_t refs;
->
-> That's a kref, please use it instead of trying to roll your own.
->
-> And even for this, your locking is not correct (i.e. you do not have
-> any), that needs to be fixed so that teardown works correctly.
+> 
+> -Chip
 
-I think we can drop this refcount altogether as it's not used. Roy, any 
-comment on this?
-
-> You have a lot of WARN_ON() calls, that's going to be ignored and should
-> all not be needed now that the code is debugged and working properly.
-> Please remove them, or turn them into dev_err() calls with a real if ()
-> check instead.
-
-Right, there are quite of few (100+) WARN_ON()s. I'll go through them 
-and clean them up ... most of them seem paranoid checks anyway.
-
-> You are checking "strings" for the type of device in a lot of places,
-> like this:
-> 	        if (strcmp(obj_desc->type, "dprc") == 0) {
-> why are you not just using the built-in driver model .type field and
-> comparing that to the different type structures?  It's much easier, and
-> you don't have to again, "roll your own".  See the USB or Greybus code
-> for examples of busses that have different "types" of devices on them at
-> the same time.
->
-
-I had a quick look over greybus and noticed the device types declared in 
-drivers/staging/greybus/greybus.h plus some helper macros to check the 
-device type. I'll give this a go, though i might return with some 
-questions (e.g. I don't yet understand what device_type::release op is 
-used for).
-
----
-Thanks & Best Regards, Laurentiu
+Thanks for review.
+Oleksandr.
