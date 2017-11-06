@@ -1,65 +1,78 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 6 Nov 2017 20:00:49 +0900
-Subject: [PATCH 1/2] MIPS: dts: remove bogus bcm96358nb4ser.dtb from dtb-y
- entry
-In-Reply-To: <20171106095139.GG15260@jhogan-linux>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-2-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNAQfK_BWQcVW-ScrpAwNAHav3MrrzV-tjn_YUjsuvd7U5A@mail.gmail.com>
- <20171106095139.GG15260@jhogan-linux>
-Message-ID: <CAK7LNAQ_bugEP8hHKmCif5QCz2=Pw_GpXzYz4zJeXO0HXaT_ag@mail.gmail.com>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Mon, 6 Nov 2017 14:25:10 +0300
+Subject: [PATCH 1/2] arm64: dts: orange-pi-zero-plus2: fix sdcard detect
+In-Reply-To: <CAMty3ZBi1pscPLQyc4S075pvzyh-2wsSPnqqEuQgDFQ_c5oyFg@mail.gmail.com>
+References: <20171103195855.15283-1-geomatsi@gmail.com>
+ <20171103195855.15283-2-geomatsi@gmail.com>
+ <CAMty3ZCs8kq1vUGLOi0ZghY7n0iXgUQ1E=ngBO6Y4wm7wMLF7Q@mail.gmail.com>
+ <20171104154221.ao7kkcwqhnja3cxe@speedy.hunter>
+ <CAMty3ZCxXUaBf3t=3d7D+RU6rp83oJw8BHADU3TYDeM4Vx_k-w@mail.gmail.com>
+ <20171104162206.gowih7h7og3fk7rk@speedy.hunter>
+ <CAMty3ZBi1pscPLQyc4S075pvzyh-2wsSPnqqEuQgDFQ_c5oyFg@mail.gmail.com>
+Message-ID: <20171106112510.nqp3gwdz37wqhksa@speedy.hunter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-11-06 19:41 GMT+09:00 James Hogan <jhogan@kernel.org>:
-> Hi,
->
-> On Sun, Nov 05, 2017 at 11:11:38PM +0900, Masahiro Yamada wrote:
->> +CC Ralf Baechle <ralf@linux-mips.org>
->> +CC linux-mips at linux-mips.org
->> +CC Kevin Cernekee <cernekee@gmail.com>
->> +CC Florian Fainelli <f.fainelli@gmail.com>
->>
->>
->> I missed to CC MIPS maintainers.
->
-> Yes, please resend the patch so it lands in patchwork.linux-mips.org.
+On Mon, Nov 06, 2017 at 03:58:15PM +0530, Jagan Teki wrote:
+> On Sat, Nov 4, 2017 at 9:52 PM, Sergey Matyukevich <geomatsi@gmail.com> wrote:
+> >> > > The sdcard detect pin on orange-pi-zero-plus2 is pulled up.
+> >> > > Fix cd-gpio description to enable sdcard detect.
+> >> > >
+> >> > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> >> > > ---
+> >> > >  arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts | 2 +-
+> >> > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >> > >
+> >> > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> >> b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> >> > > index b6b7a561df8c..a42fd79a62a3 100644
+> >> > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> >> > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> >> > > @@ -71,7 +71,7 @@
+> >> > >         pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> >> > >         vmmc-supply = <&reg_vcc3v3>;
+> >> > >         bus-width = <4>;
+> >> > > -       cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+> >> > > +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+> >> >
+> >> > Was able to detect and do mount with existing dts
+> >>
+> >> Did you try to boot from sdcard ? I am not able to boot my board from
+> >> sd-card without this change. As I mentioned earlier in my email
+> >> to buildroot mailing list, with mmc debug enabled I see that mmc
+> >> tries to init sd-card when I remove it from the slot.
+> >>
+> >> Maybe there is a minor differences between h/w versions or batches ?
+> >> What is you board version ? I tested on board v1.0.
+> >>
+> >>
+> >> I'm using same v1.0
+> >
+> > Ok, lets skip this patch for now.
+> >
+> > I will double check v1.0 schematics and my board behavior.
+> > Though I see that mmc0 dts fragment in u-boot for this board
+> > also differs from the current kernel one: it uses 'cd-inverted' property.
+> 
+> Can you shared the hang log.. look like I've seen boot issue with
+> Latest Linux and U-Boot.
+> 
+> [    1.348668] ALSA device list:
+> [    1.351649]   No soundcards found.
+> [    1.355388] Waiting for root device /dev/mmcblk0p2...
+> [    1.371117] mmc1: new high speed MMC card at address 0001
+> [    1.376947] mmcblk1: mmc1:0001 8WPD3R 7.28 GiB
+> [    1.381623] mmcblk1boot0: mmc1:0001 8WPD3R partition 1 4.00 MiB
+> [    1.387682] mmcblk1boot1: mmc1:0001 8WPD3R partition 2 4.00 MiB
+> [    1.395036]  mmcblk1: p1 p2 p3 < p5 p6 p7 p8 p9 p10 p11 p12 p13 p14
+> p15 p16 p17 >
+> [    1.402542] mmcblk1: p1 size 6873088 extends beyond EOD, truncated
 
+My log is exactly the same. The kernel detects mmcblk1 (emmmc) but can not
+detect mmcblk0 (sd-card). As a result, it waits according to 'rootwait' option
+in kernel command line. With this patch applied sd-card is properly detected
+and boot succeeds. As I mentioned in the commit message, this behavior corresponds
+to what I see in board schematics.
 
-This is a part of clean-up series of DT building.
-
-I want Acked-by from MIPS maintainers
-so that the whole series can go to a different tree.
-(DT or Kbuild).
-
-
-Sam addressed more clean-up candidates in MIPS Makefiles
-https://patchwork.kernel.org/patch/10041879/
-
-So, I will probably end up with touching those Makefiles more.
-
-All patches must go to the same tree.
-
-
->> 2017-11-05 14:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->> > arch/mips/boot/dts/brcm/bcm96358nb4ser.dts does not exist, so
->> > we cannot build bcm96358nb4ser.dtb .
->
-> This appears to be due to the file being renamed in commit 695835511f96
-> ("MIPS: BMIPS: rename bcm96358nb4ser to bcm6358-neufbox4-sercom").
-> Please can you update the commit message when you resend to mention the
-> cause of the problem.
->
-> You could also add the following if you like while you're at it:
->
-> Fixes: 695835511f96 ("MIPS: BMIPS: rename bcm96358nb4ser to bcm6358-neufbox4-sercom")
-> Cc: <stable@vger.kernel.org> # 4.9+
->
-
-
-Will do.  Thanks!
-
-
--- 
-Best Regards
-Masahiro Yamada
+Regards,
+Sergey
