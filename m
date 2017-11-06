@@ -1,37 +1,44 @@
 From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 6 Nov 2017 13:06:34 -0700
-Subject: [PATCH 0/4] ipmmu-vmsa cleanup
-In-Reply-To: <cover.1507918320.git.robin.murphy@arm.com>
-References: <cover.1507918320.git.robin.murphy@arm.com>
-Message-ID: <20171106130634.4a42e18a@t450s.home>
+Date: Mon, 6 Nov 2017 13:09:46 -0700
+Subject: [PATCH] iommu/mediatek: Fix driver name
+In-Reply-To: <20171030113755.32408-1-matthias.bgg@gmail.com>
+References: <20171030113755.32408-1-matthias.bgg@gmail.com>
+Message-ID: <20171106130946.46a05132@t450s.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Oct 2017 19:23:38 +0100
-Robin Murphy <robin.murphy@arm.com> wrote:
+On Mon, 30 Oct 2017 12:37:55 +0100
+Matthias Brugger <matthias.bgg@gmail.com> wrote:
 
-> Arnd reports a build warning[1] thanks to me missing ipmmu-vmsa's second
-> set of ops when converting io-pgtable-arm users to the new iommu_iotlb_*
-> callbacks. Rather than just treat the symptom with a point fix, this
-> seemed like a good excuse to clean up the messy #ifdeffery and
-> duplication in the driver that led to the oversight in the first place.
+> There exist two Mediatek iommu drivers for the two different
+> generations of the device. But both drivers have the same name
+> "mtk-iommu". This breaks the registration of the second driver:
 > 
-> Build-tested successfully for arm64, ARM, and ARM + CONFIG_IOMMU_DMA.
+> Error: Driver 'mtk-iommu' is already registered, aborting...
 > 
-> Robin.
+> Fix this by changing the name for first generation to
+> "mtk-iommu-v1".
 > 
-> [1]:https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1510423.html
+> Fixes: b17336c55d89 ("iommu/mediatek: add support for mtk iommu generation one HW")
+> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> ---
+>  drivers/iommu/mtk_iommu_v1.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> Robin Murphy (4):
->   iommu/ipmmu-vmsa: Unify domain alloc/free
->   iommu/ipmmu-vmsa: Simplify group allocation
->   iommu/ipmmu-vmsa: Clean up struct ipmmu_vmsa_iommu_priv
->   iommu/ipmmu-vmsa: Unify ipmmu_ops
-> 
->  drivers/iommu/ipmmu-vmsa.c | 251 ++++++++++++++-------------------------------
->  1 file changed, 78 insertions(+), 173 deletions(-)
-> 
+> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
+> index bc1efbfb9ddf..542930cd183d 100644
+> --- a/drivers/iommu/mtk_iommu_v1.c
+> +++ b/drivers/iommu/mtk_iommu_v1.c
+> @@ -708,7 +708,7 @@ static struct platform_driver mtk_iommu_driver = {
+>  	.probe	= mtk_iommu_probe,
+>  	.remove	= mtk_iommu_remove,
+>  	.driver	= {
+> -		.name = "mtk-iommu",
+> +		.name = "mtk-iommu-v1",
+>  		.of_match_table = mtk_iommu_of_ids,
+>  		.pm = &mtk_iommu_pm_ops,
+>  	}
 
-Applied to iommu/ipmmu-vmsa for v4.15.  Thanks,
+Applied to iommu/updates for v4.15.  Thanks,
 
 Alex
