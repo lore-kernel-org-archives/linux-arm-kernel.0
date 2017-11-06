@@ -1,47 +1,38 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 6 Nov 2017 18:03:30 +0100
-Subject: [PATCH v3 0/9] irqchip: stm32: add stm32h7 support
-Message-ID: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
+Date: Mon, 6 Nov 2017 18:03:33 +0100
+Subject: [PATCH v3 3/9] dt-bindings: interrupt-controllers: add compatible
+ string for stm32h7
+In-Reply-To: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
+References: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1509987819-29599-4-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-This series adds:
--Management of multi-bank of external interrupts
-stm32h7 has up to 96 inputs (3 banks of  32 inputs).
--Fix initial value after cold/hot boot (wakeup issue).
+This patch updates stm32-exti documentation with stm32h7-exti
+compatible string.
 
-Changes v3:
--remove chip.name and handler, already done by
-irq_alloc_domain_generic_chips
--add Rob ack in dt-bindings commit
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/interrupt-controller/st,stm32-exti.txt        | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Changes v2:
--Remove irq_mask and adds const on struct stm32_exti_bank
--Add wrapper functions pending and ack
--Replace BITS_PER_LONG by IRQS_PER_BANK
--Fill commit message on
-"ARM: dts: stm32: add support of exti on stm32h743"
--Add system config bank for stm32h7
-
-Ludovic Barre (9):
-  irqchip: stm32: select GENERIC_IRQ_CHIP
-  irqchip: stm32: add multi-bank management
-  dt-bindings: interrupt-controllers: add compatible string for stm32h7
-  irqchip: stm32: add stm32h7 support
-  irqchip: stm32: fix initial values
-  irqchip: stm32: move the wakeup on interrupt mask
-  ARM: dts: stm32: add exti support for stm32h743
-  ARM: dts: stm32: add system config bank node for stm32h743
-  ARM: dts: stm32: add support of exti on stm32h743 pinctrl
-
- .../interrupt-controller/st,stm32-exti.txt         |   4 +-
- arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  24 +++
- arch/arm/boot/dts/stm32h743.dtsi                   |  13 ++
- drivers/irqchip/Kconfig                            |   1 +
- drivers/irqchip/irq-stm32-exti.c                   | 206 ++++++++++++++++-----
- 5 files changed, 198 insertions(+), 50 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+index 6e7703d..edf03f0 100644
+--- a/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
++++ b/Documentation/devicetree/bindings/interrupt-controller/st,stm32-exti.txt
+@@ -2,7 +2,9 @@ STM32 External Interrupt Controller
+ 
+ Required properties:
+ 
+-- compatible: Should be "st,stm32-exti"
++- compatible: Should be:
++    "st,stm32-exti"
++    "st,stm32h7-exti"
+ - reg: Specifies base physical address and size of the registers
+ - interrupt-controller: Indentifies the node as an interrupt controller
+ - #interrupt-cells: Specifies the number of cells to encode an interrupt
 -- 
 2.7.4
