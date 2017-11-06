@@ -1,111 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 6 Nov 2017 13:17:49 -0600
-Subject: [PATCH 2/2] PCI: mvebu: Check DRAM window size
-In-Reply-To: <20171005211650.GZ25517@bhelgaas-glaptop.roam.corp.google.com>
-References: <20170828152517.24506-1-jlu@pengutronix.de>
- <20170828152517.24506-3-jlu@pengutronix.de>
- <20170925235658.GK15970@bhelgaas-glaptop.roam.corp.google.com>
- <20171005211650.GZ25517@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171106191749.GC31930@bhelgaas-glaptop.roam.corp.google.com>
+From: tpiepho@impinj.com (Trent Piepho)
+Date: Mon, 6 Nov 2017 19:20:41 +0000
+Subject: [PATCH v2 1/4] spi: imx: GPIO based chip selects should not be
+ required
+In-Reply-To: <20171106073246.efcz7r2vnymz3me7@pengutronix.de>
+References: <20171027010841.28624-1-tpiepho@impinj.com>
+ <20171027010841.28624-2-tpiepho@impinj.com>
+ <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
+ <1509469061.5473.16.camel@impinj.com>
+ <20171102151439.6dpfud7a5vtc27dy@sirena.co.uk>
+ <1509731639.5473.60.camel@impinj.com>
+ <20171103183700.spnqbagr4q7fth4k@sirena.co.uk>
+ <1509736735.5473.87.camel@impinj.com>
+ <20171106073246.efcz7r2vnymz3me7@pengutronix.de>
+Message-ID: <1509996041.5473.103.camel@impinj.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 05, 2017 at 04:16:50PM -0500, Bjorn Helgaas wrote:
-> On Mon, Sep 25, 2017 at 06:56:58PM -0500, Bjorn Helgaas wrote:
-> > On Mon, Aug 28, 2017 at 05:25:17PM +0200, Jan Luebbe wrote:
-> > > The sum of the DRAM windows may exceed 4GB (at least on Armada XP).
-> > > Return an error in that case.
-> > > 
-> > > Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+On Mon, 2017-11-06 at 08:32 +0100, Sascha Hauer wrote:
+> On Fri, Nov 03, 2017 at 07:18:56PM +0000, Trent Piepho wrote:
 > > 
-> > Looking for an ack from Thomas or Jason before applying this...
+> > Comments in the driver indicate that some SoCs do not allow GPIO usage
+> > on all chip select pins.
 > 
-> Ping, I think I'm stil waiting for an ack for this.  Or did I miss it?
+> Which comments do you mean? I remember there were comments, but I can't
+> find any in the driver.
 
-I'm dropping this.  Please repost it with the appropriate acks if it's
-still needed.
+It's in arch/arm/plat-mxc/include/mach/spi.h.
 
-> > > ---
-> > >  drivers/pci/host/pci-mvebu.c | 27 ++++++++++++++++++++++-----
-> > >  1 file changed, 22 insertions(+), 5 deletions(-)
-> > > 
-> > > diff --git a/drivers/pci/host/pci-mvebu.c b/drivers/pci/host/pci-mvebu.c
-> > > index f353a6eb2f01..5d74af81d104 100644
-> > > --- a/drivers/pci/host/pci-mvebu.c
-> > > +++ b/drivers/pci/host/pci-mvebu.c
-> > > @@ -206,10 +206,10 @@ static void mvebu_pcie_set_local_dev_nr(struct mvebu_pcie_port *port, int nr)
-> > >   * BAR[0,2] -> disabled, BAR[1] -> covers all DRAM banks
-> > >   * WIN[0-3] -> DRAM bank[0-3]
-> > >   */
-> > > -static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-> > > +static int mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-> > >  {
-> > >  	const struct mbus_dram_target_info *dram;
-> > > -	u32 size;
-> > > +	u64 size;
-> > >  	int i;
-> > >  
-> > >  	dram = mv_mbus_dram_info();
-> > > @@ -252,19 +252,32 @@ static void mvebu_pcie_setup_wins(struct mvebu_pcie_port *port)
-> > >  	if ((size & (size - 1)) != 0)
-> > >  		size = 1 << fls(size);
-> > >  
-> > > +	if (size > 0x100000000) {
-> > > +		dev_err(&port->pcie->pdev->dev,
-> > > +			"Could not configure DRAM window (too large): 0x%llx\n",
-> > > +			size);
-> > > +
-> > > +		return -EINVAL;
-> > > +	}
-> > > +
-> > >  	/* Setup BAR[1] to all DRAM banks. */
-> > >  	mvebu_writel(port, dram->cs[0].base, PCIE_BAR_LO_OFF(1));
-> > >  	mvebu_writel(port, 0, PCIE_BAR_HI_OFF(1));
-> > >  	mvebu_writel(port, ((size - 1) & 0xffff0000) | 1,
-> > >  		     PCIE_BAR_CTRL_OFF(1));
-> > > +
-> > > +	return 0;
-> > >  }
-> > >  
-> > > -static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-> > > +static int mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-> > >  {
-> > >  	u32 cmd, mask;
-> > > +	int ret;
-> > >  
-> > >  	/* Point PCIe unit MBUS decode windows to DRAM space. */
-> > > -	mvebu_pcie_setup_wins(port);
-> > > +	ret = mvebu_pcie_setup_wins(port);
-> > > +	if (ret)
-> > > +		return ret;
-> > >  
-> > >  	/* Master + slave enable. */
-> > >  	cmd = mvebu_readl(port, PCIE_CMD_OFF);
-> > > @@ -277,6 +290,8 @@ static void mvebu_pcie_setup_hw(struct mvebu_pcie_port *port)
-> > >  	mask = mvebu_readl(port, PCIE_MASK_OFF);
-> > >  	mask |= PCIE_MASK_ENABLE_INTS;
-> > >  	mvebu_writel(port, mask, PCIE_MASK_OFF);
-> > > +
-> > > +	return 0;
-> > >  }
-> > >  
-> > >  static int mvebu_pcie_hw_rd_conf(struct mvebu_pcie_port *port,
-> > > @@ -882,7 +897,9 @@ static int mvebu_pcie_setup(int nr, struct pci_sys_data *sys)
-> > >  
-> > >  		if (!port->base)
-> > >  			continue;
-> > > -		mvebu_pcie_setup_hw(port);
-> > > +		err = mvebu_pcie_setup_hw(port);
-> > > +		if (err)
-> > > +			return 0;
-> > >  	}
-> > >  
-> > >  	return 1;
-> > > -- 
-> > > 2.11.0
-> > > 
-> > 
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> The only SoC which has dedicated SPI CS pins which can't be configured
+> as GPIOs is the i.MX31. Unless you have an i.MX31 you shouldn't be
+> forced to use native chip selects.
+
+Indeed I'm not forced to, but native is more efficient and faster, and
+since I'm lucky enough that they work for me, I'd like to be able to
+use them.  And I can already, but the DT bindings are non-standard and
+I don't see any value in that. DT bindings are complex enough without
+drivers adding quirks. And my experience was no one connected the non-
+standard bindings with native CS not working well.  I think explicit
+documentation will be more effective at that.
