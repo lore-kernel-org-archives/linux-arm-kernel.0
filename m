@@ -1,65 +1,50 @@
-From: olivier.moysan@st.com (Olivier Moysan)
-Date: Mon, 6 Nov 2017 16:18:53 +0100
-Subject: [PATCH 2/2] ASoC: stm32: spdifrx: fix control DMA error management
-In-Reply-To: <1509981533-28622-1-git-send-email-olivier.moysan@st.com>
-References: <1509981533-28622-1-git-send-email-olivier.moysan@st.com>
-Message-ID: <1509981533-28622-3-git-send-email-olivier.moysan@st.com>
+From: seanpaul@chromium.org (Sean Paul)
+Date: Mon, 6 Nov 2017 10:36:32 -0500
+Subject: [PATCH] drm/rockchip: add CONFIG_OF dependency for lvds
+In-Reply-To: <20171106135852.1355487-1-arnd@arndb.de>
+References: <20171106135852.1355487-1-arnd@arndb.de>
+Message-ID: <20171106153632.nl5av3wnoq632f3o@art_vandelay>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix DMA channel request error handling.
+On Mon, Nov 06, 2017 at 02:58:43PM +0100, Arnd Bergmann wrote:
+> Build-testing on randconfig kernels revealed a dependency in the
+> newly added lvds sub-driver:
+> 
+> drivers/gpu/drm/rockchip/rockchip_lvds.c: In function 'rockchip_lvds_bind':
+> drivers/gpu/drm/rockchip/rockchip_lvds.c:380:24: error: 'struct drm_bridge' has no member named 'of_node'
+>    remote = lvds->bridge->of_node;
+> 
+> We could work around that in the code, adding a Kconfig dependency
+> seems easier.
+> 
+> Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
----
- sound/soc/stm/stm32_spdifrx.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
+Thanks for the patch Arnd, I've pushed to drm-misc-next-fixes.
 
-diff --git a/sound/soc/stm/stm32_spdifrx.c b/sound/soc/stm/stm32_spdifrx.c
-index d7dbe84..b9bdefc 100644
---- a/sound/soc/stm/stm32_spdifrx.c
-+++ b/sound/soc/stm/stm32_spdifrx.c
-@@ -392,6 +392,12 @@ static int stm32_spdifrx_dma_ctrl_register(struct device *dev,
- {
- 	int ret;
- 
-+	spdifrx->ctrl_chan = dma_request_chan(dev, "rx-ctrl");
-+	if (IS_ERR(spdifrx->ctrl_chan)) {
-+		dev_err(dev, "dma_request_slave_channel failed\n");
-+		return PTR_ERR(spdifrx->ctrl_chan);
-+	}
-+
- 	spdifrx->dmab = devm_kzalloc(dev, sizeof(struct snd_dma_buffer),
- 				     GFP_KERNEL);
- 	if (!spdifrx->dmab)
-@@ -406,12 +412,6 @@ static int stm32_spdifrx_dma_ctrl_register(struct device *dev,
- 		return ret;
- 	}
- 
--	spdifrx->ctrl_chan = dma_request_chan(dev, "rx-ctrl");
--	if (!spdifrx->ctrl_chan) {
--		dev_err(dev, "dma_request_slave_channel failed\n");
--		return -EINVAL;
--	}
--
- 	spdifrx->slave_config.direction = DMA_DEV_TO_MEM;
- 	spdifrx->slave_config.src_addr = (dma_addr_t)(spdifrx->phys_addr +
- 					 STM32_SPDIFRX_CSR);
-@@ -423,7 +423,6 @@ static int stm32_spdifrx_dma_ctrl_register(struct device *dev,
- 				     &spdifrx->slave_config);
- 	if (ret < 0) {
- 		dev_err(dev, "dmaengine_slave_config returned error %d\n", ret);
--		dma_release_channel(spdifrx->ctrl_chan);
- 		spdifrx->ctrl_chan = NULL;
- 	}
- 
-@@ -962,7 +961,7 @@ static int stm32_spdifrx_probe(struct platform_device *pdev)
- 	return 0;
- 
- error:
--	if (spdifrx->ctrl_chan)
-+	if (!IS_ERR(spdifrx->ctrl_chan))
- 		dma_release_channel(spdifrx->ctrl_chan);
- 	if (spdifrx->dmab)
- 		snd_dma_free_pages(spdifrx->dmab);
+Sean
+
+> ---
+>  drivers/gpu/drm/rockchip/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+> index 3c70c6224bd2..0ccc76217ee4 100644
+> --- a/drivers/gpu/drm/rockchip/Kconfig
+> +++ b/drivers/gpu/drm/rockchip/Kconfig
+> @@ -60,7 +60,7 @@ config ROCKCHIP_INNO_HDMI
+>  config ROCKCHIP_LVDS
+>  	bool "Rockchip LVDS support"
+>  	depends on DRM_ROCKCHIP
+> -	depends on PINCTRL
+> +	depends on PINCTRL && OF
+>  	help
+>  	  Choose this option to enable support for Rockchip LVDS controllers.
+>  	  Rockchip rk3288 SoC has LVDS TX Controller can be used, and it
+> -- 
+> 2.9.0
+> 
+
 -- 
-1.9.1
+Sean Paul, Software Engineer, Google / Chromium OS
