@@ -1,63 +1,52 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon,  6 Nov 2017 12:26:19 -0500
-Subject: [PATCH 3/3] dmaengine: qcom_hidma: add identity register support
+Date: Mon,  6 Nov 2017 12:26:18 -0500
+Subject: [PATCH 2/3] dmaengine: qcom_hidma: add support for the new revision
 In-Reply-To: <1509989180-22617-1-git-send-email-okaya@codeaurora.org>
 References: <1509989180-22617-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1509989180-22617-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1509989180-22617-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The location for destination event channel register has been relocated from
-offset 0x28 to 0x40. Update the code accordingly.
+Add support for probing the newer HW.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma.c | 26 +++++++++++++++++++++++++-
- 1 file changed, 25 insertions(+), 1 deletion(-)
+ drivers/dma/qcom/hidma.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 29d6aaa..50640c9 100644
+index e366985..29d6aaa 100644
 --- a/drivers/dma/qcom/hidma.c
 +++ b/drivers/dma/qcom/hidma.c
-@@ -761,6 +761,27 @@ static bool hidma_msi_capable(struct device *dev)
- 	return ret == 0;
- }
+@@ -749,9 +749,13 @@ static bool hidma_msi_capable(struct device *dev)
+ 			return false;
  
-+static bool hidma_identity_capable(struct device *dev)
-+{
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+	const char *of_compat;
-+	int ret = -EINVAL;
-+
-+	if (!adev || acpi_disabled) {
-+		ret = device_property_read_string(dev, "compatible",
-+						  &of_compat);
+ 		ret = strcmp(of_compat, "qcom,hidma-1.1");
 +		if (ret)
-+			return false;
-+
-+		ret = strcmp(of_compat, "qcom,hidma-1.2");
-+	} else {
-+#ifdef CONFIG_ACPI
-+		ret = strcmp(acpi_device_hid(adev), "QCOM8063");
-+#endif
-+	}
-+	return ret == 0;
-+}
-+
- static int hidma_probe(struct platform_device *pdev)
- {
- 	struct hidma_dev *dmadev;
-@@ -852,7 +873,10 @@ static int hidma_probe(struct platform_device *pdev)
- 	if (!dmadev->nr_descriptors)
- 		dmadev->nr_descriptors = HIDMA_NR_DEFAULT_DESC;
- 
--	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
-+	if (hidma_identity_capable(&pdev->dev))
-+		dmadev->chidx = readl(dmadev->dev_trca + 0x40);
-+	else
-+		dmadev->chidx = readl(dmadev->dev_trca + 0x28);
- 
- 	/* Set DMA mask to 64 bits. */
- 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
++			ret = strcmp(of_compat, "qcom,hidma-1.2");
+ 	} else {
+ #ifdef CONFIG_ACPI
+ 		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
++		if (ret)
++			ret = strcmp(acpi_device_hid(adev), "QCOM8063");
+ #endif
+ 	}
+ 	return ret == 0;
+@@ -954,6 +958,7 @@ static int hidma_remove(struct platform_device *pdev)
+ static const struct acpi_device_id hidma_acpi_ids[] = {
+ 	{"QCOM8061"},
+ 	{"QCOM8062"},
++	{"QCOM8063"},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
+@@ -962,6 +967,7 @@ static int hidma_remove(struct platform_device *pdev)
+ static const struct of_device_id hidma_match[] = {
+ 	{.compatible = "qcom,hidma-1.0",},
+ 	{.compatible = "qcom,hidma-1.1",},
++	{.compatible = "qcom,hidma-1.2",},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, hidma_match);
 -- 
 1.9.1
