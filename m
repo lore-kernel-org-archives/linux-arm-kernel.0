@@ -1,18 +1,111 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 06 Nov 2017 10:45:51 +0100
-Subject: [PATCH] clk: meson: gxbb: fix wrong clock for SARADC/SANA
-In-Reply-To: <9b1f5cb5-9029-8865-a867-54d819b42e1a@amlogic.com>
-References: <20171106075212.14275-1-yixun.lan@amlogic.com>
- <1509959454.1328.8.camel@baylibre.com>
- <9b1f5cb5-9029-8865-a867-54d819b42e1a@amlogic.com>
-Message-ID: <1509961551.1328.13.camel@baylibre.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Mon,  6 Nov 2017 10:44:53 +0100
+Subject: [PATCH 4.4 18/40] ARM: pxa: Dont rely on public mmc header to include
+ leds.h
+In-Reply-To: <20171106094501.346859822@linuxfoundation.org>
+References: <20171106094501.346859822@linuxfoundation.org>
+Message-ID: <20171106094502.077515519@linuxfoundation.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-11-06 at 17:38 +0800, Yixun Lan wrote:
-> > * Is it an error in the published datasheets ?
-> 
-> then, I think the published datasheet need to be updated.
+4.4-stable review patch.  If anyone has any objections, please let me know.
 
-This needs to be clearly explained in your patch description/comment, or maybe
-directly in the code.
+------------------
+
+From: Ulf Hansson <ulf.hansson@linaro.org>
+
+
+[ Upstream commit 40d727a2defa176b78159d445bcf7afcc2ed9021 ]
+
+Some of the pxa platforms, balloon3, colibri-pxa270-income, corgi,
+trizeps4, vpac270, zeus and zylonite depends on leds.h. Explicitly include
+it instead of relying on the public mmc header host.h.
+
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Sasha Levin <alexander.levin@verizon.com>
+Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+---
+ arch/arm/mach-pxa/balloon3.c              |    1 +
+ arch/arm/mach-pxa/colibri-pxa270-income.c |    1 +
+ arch/arm/mach-pxa/corgi.c                 |    1 +
+ arch/arm/mach-pxa/trizeps4.c              |    1 +
+ arch/arm/mach-pxa/vpac270.c               |    1 +
+ arch/arm/mach-pxa/zeus.c                  |    1 +
+ arch/arm/mach-pxa/zylonite.c              |    1 +
+ 7 files changed, 7 insertions(+)
+
+--- a/arch/arm/mach-pxa/balloon3.c
++++ b/arch/arm/mach-pxa/balloon3.c
+@@ -17,6 +17,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/sched.h>
+ #include <linux/bitops.h>
+ #include <linux/fb.h>
+--- a/arch/arm/mach-pxa/colibri-pxa270-income.c
++++ b/arch/arm/mach-pxa/colibri-pxa270-income.c
+@@ -17,6 +17,7 @@
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/ioport.h>
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -18,6 +18,7 @@
+ #include <linux/major.h>
+ #include <linux/fs.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/pm.h>
+--- a/arch/arm/mach-pxa/trizeps4.c
++++ b/arch/arm/mach-pxa/trizeps4.c
+@@ -16,6 +16,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/export.h>
+ #include <linux/sched.h>
+ #include <linux/bitops.h>
+--- a/arch/arm/mach-pxa/vpac270.c
++++ b/arch/arm/mach-pxa/vpac270.c
+@@ -15,6 +15,7 @@
+ #include <linux/irq.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
++#include <linux/leds.h>
+ #include <linux/gpio.h>
+ #include <linux/usb/gpio_vbus.h>
+ #include <linux/mtd/mtd.h>
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -13,6 +13,7 @@
+ 
+ #include <linux/cpufreq.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/irq.h>
+ #include <linux/pm.h>
+ #include <linux/gpio.h>
+--- a/arch/arm/mach-pxa/zylonite.c
++++ b/arch/arm/mach-pxa/zylonite.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
