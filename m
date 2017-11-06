@@ -1,41 +1,48 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 06 Nov 2017 18:43:38 +0000
-Subject: [RFC/RFT PATCH 0/6] Switch GHES ioremap_page_range() to use fixmap
-In-Reply-To: <1509559730.30483.19.camel@hpe.com>
-References: <20171031153832.17746-1-james.morse@arm.com>	
- <59F9E119.6040700@arm.com> <20171101153043.xgzepqbxsblmppp5@pd.tnic>
- <1509559730.30483.19.camel@hpe.com>
-Message-ID: <5A00AD5A.1070601@arm.com>
+Date: Mon,  6 Nov 2017 18:44:23 +0000
+Subject: [PATCH 0/4] Switch GHES ioremap_page_range() to use fixmap
+Message-ID: <20171106184427.31905-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/17 18:20, Kani, Toshimitsu wrote:
-> On Wed, 2017-11-01 at 16:30 +0100, Borislav Petkov wrote:
->> On Wed, Nov 01, 2017 at 02:58:33PM +0000, James Morse wrote:
->>> Does anyone have an x86 machine that does firmware-first using NOTIFY_NMI?
+GHES is doing ioremap_page_range() in both NMI and irq context, neither
+are safe as it may sleep to allocate intermediate levels of page table.
 
->> AFAIK, the only one who has access to a reportedly somewhat working GHES
->> implementation is Toshi. CCed.
-> 
-> Thanks for the heads-up.  My x86 system only supports GHES with SCI
-> error sources.  It uses MCE for synchronous error events.
-> 
-> So, for x86 SCI error sources:
-> 
-> Tested-by: Toshi Kani <toshi.kani@hpe.com>
+Replace the NMI/irq GHES_IOREMAP_PAGES to use a fixmap entry each.
 
-Thanks Toshi!
+After this nothing uses ghes_ioremap_area or arch_apei_flush_tlb_one(),
+rip them out.
 
+This hasn't been tested on a system with x86's NOTIFY_NMI. Any more
+more testing would be welcome. These patches are (still) based on rc7.
 
-> nit: I think ghes_ioremap_pfn_[nmi|irq] should be renamed since they no
-> longer use ioremap. 
+Changes since RFC:
+ * Added #ifdefs around the entries in fixmap.h
+ * Added a paragraph about HAVE_ACPI_APEI to the commit message
+ * Merged the first three patches for improved history
 
-I thought that would be too noisy...
-
-I have some more rework to do in here before we can merge the other arm64 RAS
-stuff, I can take that into account then.
+I've tried to be clear with who-acked-what when merging the patches.
+For reference, the arch-acks are here:
+https://lkml.org/lkml/2017/11/2/254
+https://lkml.org/lkml/2017/10/31/780
 
 
 Thanks,
 
-James
+James Morse (4):
+  ACPI / APEI:  Replace ioremap_page_range() with fixmap
+  ACPI / APEI: Remove ghes_ioremap_area
+  arm64: mm: Remove arch_apei_flush_tlb_one()
+  ACPI / APEI: Remove arch_apei_flush_tlb_one()
+
+ arch/arm64/include/asm/acpi.h   | 12 ------
+ arch/arm64/include/asm/fixmap.h |  7 ++++
+ arch/arm64/mm/mmu.c             |  4 ++
+ arch/x86/include/asm/fixmap.h   |  6 +++
+ arch/x86/kernel/acpi/apei.c     |  5 ---
+ drivers/acpi/apei/ghes.c        | 84 +++++++++--------------------------------
+ include/acpi/apei.h             |  1 -
+ 7 files changed, 34 insertions(+), 85 deletions(-)
+
+-- 
+2.15.0.rc2
