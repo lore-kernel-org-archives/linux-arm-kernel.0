@@ -1,202 +1,282 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon,  6 Nov 2017 13:03:50 -0800
-Subject: [PATCH v5 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
-Message-ID: <20171106210401.95320-1-salyzyn@android.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 6 Nov 2017 14:10:41 -0700
+Subject: [PATCH 16/17] coresight: perf: Remove reset_buffer call back for
+ sinks
+In-Reply-To: <20171019171553.24056-17-suzuki.poulose@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+ <20171019171553.24056-17-suzuki.poulose@arm.com>
+Message-ID: <20171106211041.GB12148@xps15>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take an effort to recode the arm64 vdso code from assembler to C
-previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-it for use in both arm and arm64, overlapping any optimizations
-for each architecture. But instead of landing it in arm64, land the
-result into lib/vdso and unify both implementations to simplify
-future maintenance.
+On Thu, Oct 19, 2017 at 06:15:52PM +0100, Suzuki K Poulose wrote:
+> Right now we issue an update_buffer() and reset_buffer() call backs
+> in succession when we stop tracing an event. The update_buffer is
+> supposed to check the status of the buffer and make sure the ring buffer
+> is updated with the trace data. And we store information about the
+> size of the data collected only to be consumed by the reset_buffer
+> callback which always follows the update_buffer. This patch gets
+> rid of the reset_buffer callback altogether and performs the actions
+> in update_buffer, making it return the size collected.
+> 
+> This removes some not-so pretty hack (storing the new head in the
+> size field for snapshot mode) and cleans it up a little bit.
 
-Add a case for CLOCK_BOOTTIME as it is popular for measuring
-relative time on systems expected to suspend() or hibernate().
+The idea in splitting the update and reset operation was to seamlessly support
+sinks that generate an interrupt when their buffer gets full.  Those are coming
+and when we do need to support them we'll find ourselves splitting the update
+and reset operation again.   
 
-Android uses CLOCK_BOOTTIME for all relative time measurements
-and timeouts. Switching to vdso reduced CPU utilization and improves
-accuracy. There is also a desire by some partners to switch all
-logging over to CLOCK_BOOTTIME, and thus this operation alone would
-contribute to a near percentile CPU load.
+See comment below.
 
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-Cc: Andrew Pinski <apinski@cavium.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
+> 
+> Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-etb10.c    | 56 +++++------------------
+>  drivers/hwtracing/coresight/coresight-etm-perf.c |  9 +---
+>  drivers/hwtracing/coresight/coresight-tmc-etf.c  | 58 +++++-------------------
+>  include/linux/coresight.h                        |  5 +-
+>  4 files changed, 26 insertions(+), 102 deletions(-)
+> 
+> diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
+> index 757f556975f7..75c5699000b0 100644
+> --- a/drivers/hwtracing/coresight/coresight-etb10.c
+> +++ b/drivers/hwtracing/coresight/coresight-etb10.c
+> @@ -323,37 +323,7 @@ static int etb_set_buffer(struct coresight_device *csdev,
+>  	return ret;
+>  }
+>  
+> -static unsigned long etb_reset_buffer(struct coresight_device *csdev,
+> -				      struct perf_output_handle *handle,
+> -				      void *sink_config)
+> -{
+> -	unsigned long size = 0;
+> -	struct cs_buffers *buf = sink_config;
+> -
+> -	if (buf) {
+> -		/*
+> -		 * In snapshot mode ->data_size holds the new address of the
+> -		 * ring buffer's head.  The size itself is the whole address
+> -		 * range since we want the latest information.
+> -		 */
+> -		if (buf->snapshot)
+> -			handle->head = local_xchg(&buf->data_size,
+> -						  buf->nr_pages << PAGE_SHIFT);
+> -
+> -		/*
+> -		 * Tell the tracer PMU how much we got in this run and if
+> -		 * something went wrong along the way.  Nobody else can use
+> -		 * this cs_buffers instance until we are done.  As such
+> -		 * resetting parameters here and squaring off with the ring
+> -		 * buffer API in the tracer PMU is fine.
+> -		 */
+> -		size = local_xchg(&buf->data_size, 0);
+> -	}
+> -
+> -	return size;
+> -}
+> -
+> -static void etb_update_buffer(struct coresight_device *csdev,
+> +static unsigned long etb_update_buffer(struct coresight_device *csdev,
+>  			      struct perf_output_handle *handle,
+>  			      void *sink_config)
+>  {
+> @@ -362,13 +332,13 @@ static void etb_update_buffer(struct coresight_device *csdev,
+>  	u8 *buf_ptr;
+>  	const u32 *barrier;
+>  	u32 read_ptr, write_ptr, capacity;
+> -	u32 status, read_data, to_read;
+> -	unsigned long offset;
+> +	u32 status, read_data;
+> +	unsigned long offset, to_read;
+>  	struct cs_buffers *buf = sink_config;
+>  	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+>  	if (!buf)
+> -		return;
+> +		return 0;
+>  
+>  	capacity = drvdata->buffer_depth * ETB_FRAME_SIZE_WORDS;
+>  
+> @@ -473,18 +443,17 @@ static void etb_update_buffer(struct coresight_device *csdev,
+>  	writel_relaxed(0x0, drvdata->base + ETB_RAM_WRITE_POINTER);
+>  
+>  	/*
+> -	 * In snapshot mode all we have to do is communicate to
+> -	 * perf_aux_output_end() the address of the current head.  In full
+> -	 * trace mode the same function expects a size to move rb->aux_head
+> -	 * forward.
+> +	 * In snapshot mode we have to update the handle->head to point
+> +	 * to the new location.
+>  	 */
+> -	if (buf->snapshot)
+> -		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
+> -	else
+> -		local_add(to_read, &buf->data_size);
+> -
+> +	if (buf->snapshot) {
+> +		handle->head = (cur * PAGE_SIZE) + offset;
+> +		to_read = buf->nr_pages << PAGE_SHIFT;
+> +	}
+>  	etb_enable_hw(drvdata);
+>  	CS_LOCK(drvdata->base);
+> +
+> +	return to_read;
+>  }
+>  
+>  static const struct coresight_ops_sink etb_sink_ops = {
+> @@ -493,7 +462,6 @@ static const struct coresight_ops_sink etb_sink_ops = {
+>  	.alloc_buffer	= etb_alloc_buffer,
+>  	.free_buffer	= etb_free_buffer,
+>  	.set_buffer	= etb_set_buffer,
+> -	.reset_buffer	= etb_reset_buffer,
+>  	.update_buffer	= etb_update_buffer,
+>  };
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight-etm-perf.c b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> index 8a0ad77574e7..e5f9567c87c4 100644
+> --- a/drivers/hwtracing/coresight/coresight-etm-perf.c
+> +++ b/drivers/hwtracing/coresight/coresight-etm-perf.c
+> @@ -342,15 +342,8 @@ static void etm_event_stop(struct perf_event *event, int mode)
+>  		if (!sink_ops(sink)->update_buffer)
+>  			return;
+>  
+> -		sink_ops(sink)->update_buffer(sink, handle,
+> +		size = sink_ops(sink)->update_buffer(sink, handle,
+>  					      event_data->snk_config);
+> -
+> -		if (!sink_ops(sink)->reset_buffer)
+> -			return;
+> -
+> -		size = sink_ops(sink)->reset_buffer(sink, handle,
+> -						    event_data->snk_config);
 
-v2:
-- rebased and changed from 3/3 to 10/10, fortified commit message.
+For the current sink we support, i.e those that don't generate interrupts when
+their buffer is full, I'm in agreement with your work.  I suggest you don't
+touch the current implementation of etm_event_stop() and move everything you've
+done to the reset operation.  The end result is the same and we don't have to
+rework (again) etm_event_stop() when we need to support IPs that do send
+interrupts.
 
-v3:
-- move arch/arm/vdso/vgettimeofday.c to lib/vdso/vgettimeofday.c.
-
-v4:
-- update commit message to reflect specific, and overall reasoning
-  of patch series.
-- drop forced inline operations.
-- switch typeof() with __kernel_time_t.
-
-v5:
-- added comment about open coded timepsec_add_ns() for clarity.
-
----
- arch/arm/include/asm/vdso_datapage.h   |  1 +
- arch/arm/kernel/vdso.c                 |  1 +
- arch/arm64/include/asm/vdso_datapage.h |  1 +
- arch/arm64/kernel/vdso.c               |  1 +
- lib/vdso/vgettimeofday.c               | 55 ++++++++++++++++++++++++++++++++++
- 5 files changed, 59 insertions(+)
-
-diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
-index 1c6e6a5d5d9d..1adfb2daac3a 100644
---- a/arch/arm/include/asm/vdso_datapage.h
-+++ b/arch/arm/include/asm/vdso_datapage.h
-@@ -64,6 +64,7 @@ struct vdso_data {
- 	u32 tz_minuteswest;	/* timezone info for gettimeofday(2) */
- 	u32 tz_dsttime;
- 
-+	u64 btm_nsec;		/* monotonic to boot time */
- 	/* Raw clocksource multipler */
- 	u32 cs_raw_mult;
- 	/* Raw time */
-diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
-index a80c58805699..d3ec878c5809 100644
---- a/arch/arm/kernel/vdso.c
-+++ b/arch/arm/kernel/vdso.c
-@@ -347,6 +347,7 @@ void update_vsyscall(struct timekeeper *tk)
- 		/* tkr_mono.shift == tkr_raw.shift */
- 		vdso_data->cs_shift		= tk->tkr_mono.shift;
- 		vdso_data->cs_mask		= tk->tkr_mono.mask;
-+		vdso_data->btm_nsec		= ktime_to_ns(tk->offs_boot);
- 	}
- 
- 	vdso_write_end(vdso_data);
-diff --git a/arch/arm64/include/asm/vdso_datapage.h b/arch/arm64/include/asm/vdso_datapage.h
-index 95f4a7abab80..e4fa5e054708 100644
---- a/arch/arm64/include/asm/vdso_datapage.h
-+++ b/arch/arm64/include/asm/vdso_datapage.h
-@@ -45,6 +45,7 @@ struct vdso_data {
- 	__u64 xtime_coarse_nsec;
- 	__u64 wtm_clock_sec;	/* Wall to monotonic time */
- 	vdso_wtm_clock_nsec_t wtm_clock_nsec;
-+	__u64 btm_nsec;		/* monotonic to boot time */
- 	__u32 tb_seq_count;	/* Timebase sequence counter */
- 	/* cs_* members must be adjacent and in this order (ldp accesses) */
- 	__u32 cs_mono_mult;	/* NTP-adjusted clocksource multiplier */
-diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
-index 59f150c25889..0710edd8bedc 100644
---- a/arch/arm64/kernel/vdso.c
-+++ b/arch/arm64/kernel/vdso.c
-@@ -243,6 +243,7 @@ void update_vsyscall(struct timekeeper *tk)
- 		vdso_data->cs_raw_mult		= tk->tkr_raw.mult;
- 		/* tkr_mono.shift == tkr_raw.shift */
- 		vdso_data->cs_shift		= tk->tkr_mono.shift;
-+		vdso_data->btm_nsec		= ktime_to_ns(tk->offs_boot);
- 	}
- 
- 	smp_wmb();
-diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
-index 33c5917fe9f8..d64f60010bb2 100644
---- a/lib/vdso/vgettimeofday.c
-+++ b/lib/vdso/vgettimeofday.c
-@@ -247,6 +247,50 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- 	return 0;
- }
- 
-+static notrace int do_boottime(const struct vdso_data *vd, struct timespec *ts)
-+{
-+	u32 seq, mult, shift;
-+	u64 nsec, cycle_last, wtm_nsec;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
-+	u64 mask;
-+#endif
-+	__kernel_time_t sec;
-+
-+	do {
-+		seq = vdso_read_begin(vd);
-+
-+		if (vd->use_syscall)
-+			return -1;
-+
-+		cycle_last = vd->cs_cycle_last;
-+
-+		mult = vd->cs_mono_mult;
-+		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
-+		mask = vd->cs_mask;
-+#endif
-+
-+		sec = vd->xtime_clock_sec;
-+		nsec = vd->xtime_clock_snsec;
-+
-+		sec += vd->wtm_clock_sec;
-+		wtm_nsec = vd->wtm_clock_nsec + vd->btm_nsec;
-+
-+	} while (unlikely(vdso_read_retry(vd, seq)));
-+
-+	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
-+	nsec >>= shift;
-+	nsec += wtm_nsec;
-+
-+	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
-+	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
-+	ts->tv_nsec = nsec;
-+
-+	return 0;
-+}
-+
- #else /* ARCH_PROVIDES_TIMER */
- 
- static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
-@@ -265,6 +309,12 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- 	return -1;
- }
- 
-+static notrace int do_boottime(const struct vdso_data *vd,
-+			       struct timespec *ts)
-+{
-+	return -1;
-+}
-+
- #endif /* ARCH_PROVIDES_TIMER */
- 
- notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
-@@ -290,6 +340,10 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
- 		if (do_monotonic_raw(vd, ts))
- 			goto fallback;
- 		break;
-+	case CLOCK_BOOTTIME:
-+		if (do_boottime(vd, ts))
-+			goto fallback;
-+		break;
- 	default:
- 		goto fallback;
- 	}
-@@ -326,6 +380,7 @@ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
- 	long nsec;
- 
- 	if (clock == CLOCK_REALTIME ||
-+	    clock == CLOCK_BOOTTIME ||
- 	    clock == CLOCK_MONOTONIC ||
- 	    clock == CLOCK_MONOTONIC_RAW)
- 		nsec = MONOTONIC_RES_NSEC;
--- 
-2.15.0.403.gc27cc4dac6-goog
+> -
+>  		perf_aux_output_end(handle, size);
+>  	}
+>  
+> diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> index aa4e8f03ef49..073198e7b46e 100644
+> --- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> +++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
+> @@ -358,36 +358,7 @@ static int tmc_set_etf_buffer(struct coresight_device *csdev,
+>  	return ret;
+>  }
+>  
+> -static unsigned long tmc_reset_etf_buffer(struct coresight_device *csdev,
+> -					  struct perf_output_handle *handle,
+> -					  void *sink_config)
+> -{
+> -	long size = 0;
+> -	struct cs_buffers *buf = sink_config;
+> -
+> -	if (buf) {
+> -		/*
+> -		 * In snapshot mode ->data_size holds the new address of the
+> -		 * ring buffer's head.  The size itself is the whole address
+> -		 * range since we want the latest information.
+> -		 */
+> -		if (buf->snapshot)
+> -			handle->head = local_xchg(&buf->data_size,
+> -						  buf->nr_pages << PAGE_SHIFT);
+> -		/*
+> -		 * Tell the tracer PMU how much we got in this run and if
+> -		 * something went wrong along the way.  Nobody else can use
+> -		 * this cs_buffers instance until we are done.  As such
+> -		 * resetting parameters here and squaring off with the ring
+> -		 * buffer API in the tracer PMU is fine.
+> -		 */
+> -		size = local_xchg(&buf->data_size, 0);
+> -	}
+> -
+> -	return size;
+> -}
+> -
+> -static void tmc_update_etf_buffer(struct coresight_device *csdev,
+> +static unsigned long tmc_update_etf_buffer(struct coresight_device *csdev,
+>  				  struct perf_output_handle *handle,
+>  				  void *sink_config)
+>  {
+> @@ -396,17 +367,17 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+>  	const u32 *barrier;
+>  	u32 *buf_ptr;
+>  	u64 read_ptr, write_ptr;
+> -	u32 status, to_read;
+> -	unsigned long offset;
+> +	u32 status;
+> +	unsigned long offset, to_read;
+>  	struct cs_buffers *buf = sink_config;
+>  	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
+>  
+>  	if (!buf)
+> -		return;
+> +		return 0;
+>  
+>  	/* This shouldn't happen */
+>  	if (WARN_ON_ONCE(drvdata->mode != CS_MODE_PERF))
+> -		return;
+> +		return 0;
+>  
+>  	CS_UNLOCK(drvdata->base);
+>  
+> @@ -495,18 +466,14 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
+>  		}
+>  	}
+>  
+> -	/*
+> -	 * In snapshot mode all we have to do is communicate to
+> -	 * perf_aux_output_end() the address of the current head.  In full
+> -	 * trace mode the same function expects a size to move rb->aux_head
+> -	 * forward.
+> -	 */
+> -	if (buf->snapshot)
+> -		local_set(&buf->data_size, (cur * PAGE_SIZE) + offset);
+> -	else
+> -		local_add(to_read, &buf->data_size);
+> -
+> +	/* In snapshot mode we have to update the head */
+> +	if (buf->snapshot) {
+> +		handle->head = (cur * PAGE_SIZE) + offset;
+> +		to_read = buf->nr_pages << PAGE_SHIFT;
+> +	}
+>  	CS_LOCK(drvdata->base);
+> +
+> +	return to_read;
+>  }
+>  
+>  static const struct coresight_ops_sink tmc_etf_sink_ops = {
+> @@ -515,7 +482,6 @@ static const struct coresight_ops_sink tmc_etf_sink_ops = {
+>  	.alloc_buffer	= tmc_alloc_etf_buffer,
+>  	.free_buffer	= tmc_free_etf_buffer,
+>  	.set_buffer	= tmc_set_etf_buffer,
+> -	.reset_buffer	= tmc_reset_etf_buffer,
+>  	.update_buffer	= tmc_update_etf_buffer,
+>  };
+>  
+> diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+> index d950dad5056a..5c9e5fe2bf32 100644
+> --- a/include/linux/coresight.h
+> +++ b/include/linux/coresight.h
+> @@ -199,10 +199,7 @@ struct coresight_ops_sink {
+>  	int (*set_buffer)(struct coresight_device *csdev,
+>  			  struct perf_output_handle *handle,
+>  			  void *sink_config);
+> -	unsigned long (*reset_buffer)(struct coresight_device *csdev,
+> -				      struct perf_output_handle *handle,
+> -				      void *sink_config);
+> -	void (*update_buffer)(struct coresight_device *csdev,
+> +	unsigned long (*update_buffer)(struct coresight_device *csdev,
+>  			      struct perf_output_handle *handle,
+>  			      void *sink_config);
+>  };
+> -- 
+> 2.13.6
+> 
