@@ -1,54 +1,58 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 6 Nov 2017 15:32:04 +0800
-Subject: [PATCH 2/2] arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
-Message-ID: <20171106073204.14548-1-yixun.lan@amlogic.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 6 Nov 2017 08:32:46 +0100
+Subject: [PATCH v2 1/4] spi: imx: GPIO based chip selects should not be
+ required
+In-Reply-To: <1509736735.5473.87.camel@impinj.com>
+References: <20171027010841.28624-1-tpiepho@impinj.com>
+ <20171027010841.28624-2-tpiepho@impinj.com>
+ <20171031111919.gocl7wwrhkwnxrya@sirena.co.uk>
+ <1509469061.5473.16.camel@impinj.com>
+ <20171102151439.6dpfud7a5vtc27dy@sirena.co.uk>
+ <1509731639.5473.60.camel@impinj.com>
+ <20171103183700.spnqbagr4q7fth4k@sirena.co.uk>
+ <1509736735.5473.87.camel@impinj.com>
+Message-ID: <20171106073246.efcz7r2vnymz3me7@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Qiufang Dai <qiufang.dai@amlogic.com>
+On Fri, Nov 03, 2017 at 07:18:56PM +0000, Trent Piepho wrote:
+> On Fri, 2017-11-03 at 18:37 +0000, Mark Brown wrote:
+> > On Fri, Nov 03, 2017 at 05:53:59PM +0000, Trent Piepho wrote:
+> > 
+> > > Just to be clear, one doesn't need to use GPIOs with the driver as is. 
+> > > But the bindings to do that are non-standard and these patches make the
+> > > driver follow the standard. (and don't break anyone).
+> > 
+> > If there are non-standard bindings then mark them as deprecated.  I
+> > can't immediately find *any* binding documentation for this controller.
+> > The last commit looks like it was more attempting to work round broken
+> > board bindings and do something sensible than add a new binding, at
+> > least that's what I remember my sense of it being.
+> 
+> The non-standard part is needing to add cs-gpios = <0> to get a native
+> chip select when that is documented as being optional.  It doesn't
+> follow the spec.  It doesn't match other drivers (and dw-spi is equally
+> as broken in the same manner, probably others too) that do follow the
+> spec.
+> 
+> > If the hardware is as broken as these controllers always were in the
+> > past and there are workarounds which work in all practical situations
+> > (AFAIK all the relevant SoCs permit GPIO usage on the chip select pins)
+> 
+> Comments in the driver indicate that some SoCs do not allow GPIO usage
+> on all chip select pins.
 
-Try to add Hiubus DT info, and also enable clock DT info
-for the Amlogic's Meson-AXG SoC.
+Which comments do you mean? I remember there were comments, but I can't
+find any in the driver.
 
-Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+The only SoC which has dedicated SPI CS pins which can't be configured
+as GPIOs is the i.MX31. Unless you have an i.MX31 you shouldn't be
+forced to use native chip selects.
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 003832890d2b..4a07fc7daa99 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -7,6 +7,8 @@
- #include <dt-bindings/gpio/gpio.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/axg-clkc.h>
-+#include <dt-bindings/clock/gxbb-aoclkc.h>
- 
- / {
- 	compatible = "amlogic,meson-axg";
-@@ -148,6 +150,20 @@
- 			#address-cells = <0>;
- 		};
- 
-+		hiubus: hiubus at ff63c000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff63c000 0x0 0x1c00>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
-+
-+			clkc: clock-controller at 0 {
-+				compatible = "amlogic,axg-clkc";
-+				#clock-cells = <1>;
-+				reg = <0x0 0x0 0x0 0x320>;
-+			};
-+		};
-+
- 		mailbox: mailbox at ff63dc00 {
- 			compatible = "amlogic,meson-gx-mhu", "amlogic,meson-gxbb-mhu";
- 			reg = <0 0xff63dc00 0 0x400>;
+Sascha
+
 -- 
-2.14.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
