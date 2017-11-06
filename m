@@ -1,29 +1,51 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Mon, 06 Nov 2017 18:09:41 +0200
-Subject: [PATCH v5 4/7] i2c: designware: add i2c gpio recovery option
-In-Reply-To: <1509590430-11968-5-git-send-email-preid@electromag.com.au>
-References: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
- <1509590430-11968-5-git-send-email-preid@electromag.com.au>
-Message-ID: <1509984581.25007.47.camel@linux.intel.com>
+From: geomatsi@gmail.com (Sergey Matyukevich)
+Date: Mon, 6 Nov 2017 19:13:06 +0300
+Subject: [PATCH 1/2] arm64: dts: orange-pi-zero-plus2: fix sdcard detect
+In-Reply-To: <20171106122633.5mnqfh6xhmmxr45s@flea>
+References: <20171103195855.15283-1-geomatsi@gmail.com>
+ <20171103195855.15283-2-geomatsi@gmail.com>
+ <CAMty3ZCs8kq1vUGLOi0ZghY7n0iXgUQ1E=ngBO6Y4wm7wMLF7Q@mail.gmail.com>
+ <20171104154221.ao7kkcwqhnja3cxe@speedy.hunter>
+ <20171106122633.5mnqfh6xhmmxr45s@flea>
+Message-ID: <20171106161306.tq6yeq6bq36ridj3@speedy.hunter>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-11-02 at 10:40 +0800, Phil Reid wrote:
-> From: Tim Sander <tim@krieglstein.org>
+Hello Maxime,
+
+> > > > The sdcard detect pin on orange-pi-zero-plus2 is pulled up.
+> > > > Fix cd-gpio description to enable sdcard detect.
+> > > >
+> > > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+> > > > ---
+> > > >  arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts | 2 +-
+> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > > >
+> > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> > > > index b6b7a561df8c..a42fd79a62a3 100644
+> > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+> > > > @@ -71,7 +71,7 @@
+> > > >         pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> > > >         vmmc-supply = <&reg_vcc3v3>;
+> > > >         bus-width = <4>;
+> > > > -       cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+> > > > +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+> > > 
+> > > Was able to detect and do mount with existing dts
+> > 
+> > Did you try to boot from sdcard ? I am not able to boot my board from
+> > sd-card without this change. As I mentioned earlier in my email
+> > to buildroot mailing list, with mmc debug enabled I see that mmc
+> > tries to init sd-card when I remove it from the slot.
+> > 
+> > Maybe there is a minor differences between h/w versions or batches ?
+> > What is you board version ? I tested on board v1.0.
 > 
-> This patch contains much input from Phil Reid and has been tested
-> on Intel/Altera Cyclone V SOC Hardware with Altera GPIO's for the
-> SCL and SDA GPIO's.
-> 
-> Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
-> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> Looking at the schematics, it definitely looks like it's active low.
 
-Shame on me, I totally forgot one important comment on all this.
+Is it ok to merge it then ? Or using 'cd-inverted' property
+is the preferable option ?
 
-How do we switch pinctrl back to the native function? Is it guaranteed
-by pinctrl framework and all underneath drivers?
-
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Regards,
+Sergey
