@@ -1,40 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon,  6 Nov 2017 14:34:01 +0100
-Subject: [PATCH] [fixup timers-conversion] ARM: footbridge: add missing
- semicolon
-Message-ID: <20171106133410.467203-1-arnd@arndb.de>
+Date: Mon,  6 Nov 2017 14:58:43 +0100
+Subject: [PATCH] drm/rockchip: add CONFIG_OF dependency for lvds
+Message-ID: <20171106135852.1355487-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer_setup() conversion included a small typo that breaks the
-build:
+Build-testing on randconfig kernels revealed a dependency in the
+newly added lvds sub-driver:
 
-arch/arm/mach-footbridge/dc21285.c: In function 'dc21285_enable_error':
-arch/arm/mach-footbridge/dc21285.c:145:2: error: expected ';' before 'else'
-  else if (timer == &perr_timer)
+drivers/gpu/drm/rockchip/rockchip_lvds.c: In function 'rockchip_lvds_bind':
+drivers/gpu/drm/rockchip/rockchip_lvds.c:380:24: error: 'struct drm_bridge' has no member named 'of_node'
+   remote = lvds->bridge->of_node;
 
-Fixes: b7bea32f0cc4 ("ARM: footbridge: Convert timers to use timer_setup()")
-Cc: Thomas Gleixner <tglx@linutronix.de>
+We could work around that in the code, adding a Kconfig dependency
+seems easier.
+
+Fixes: 34cc0aa25456 ("drm/rockchip: Add support for Rockchip Soc LVDS")
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-The broken patch is currently in -tip and came in through timers-conversion-next3.
-Please apply this one on top, or fold it into the original patch if possible
----
- arch/arm/mach-footbridge/dc21285.c | 2 +-
+ drivers/gpu/drm/rockchip/Kconfig | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
-index 8407e4a07c77..e7b350f18f5f 100644
---- a/arch/arm/mach-footbridge/dc21285.c
-+++ b/arch/arm/mach-footbridge/dc21285.c
-@@ -141,7 +141,7 @@ static void dc21285_enable_error(struct timer_list *timer)
- 	del_timer(timer);
- 
- 	if (timer == &serr_timer)
--		enable_irq(IRQ_PCI_SERR)
-+		enable_irq(IRQ_PCI_SERR);
- 	else if (timer == &perr_timer)
- 		enable_irq(IRQ_PCI_PERR);
- }
+diff --git a/drivers/gpu/drm/rockchip/Kconfig b/drivers/gpu/drm/rockchip/Kconfig
+index 3c70c6224bd2..0ccc76217ee4 100644
+--- a/drivers/gpu/drm/rockchip/Kconfig
++++ b/drivers/gpu/drm/rockchip/Kconfig
+@@ -60,7 +60,7 @@ config ROCKCHIP_INNO_HDMI
+ config ROCKCHIP_LVDS
+ 	bool "Rockchip LVDS support"
+ 	depends on DRM_ROCKCHIP
+-	depends on PINCTRL
++	depends on PINCTRL && OF
+ 	help
+ 	  Choose this option to enable support for Rockchip LVDS controllers.
+ 	  Rockchip rk3288 SoC has LVDS TX Controller can be used, and it
 -- 
 2.9.0
