@@ -1,44 +1,121 @@
-From: alex.williamson@redhat.com (Alex Williamson)
-Date: Mon, 6 Nov 2017 13:09:46 -0700
-Subject: [PATCH] iommu/mediatek: Fix driver name
-In-Reply-To: <20171030113755.32408-1-matthias.bgg@gmail.com>
-References: <20171030113755.32408-1-matthias.bgg@gmail.com>
-Message-ID: <20171106130946.46a05132@t450s.home>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 6 Nov 2017 12:16:02 -0800
+Subject: [PATCH 11/12] hwrng: bcm2835-rng: Enable BCM2835 RNG to work on
+ BCM63xx platforms
+In-Reply-To: <1831955836.132229.1509820078271@email.1und1.de>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+ <20171102010408.27736-12-f.fainelli@gmail.com>
+ <1831955836.132229.1509820078271@email.1und1.de>
+Message-ID: <2538f1bb-e0f8-c336-d82a-0cb2f19b0ead@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 30 Oct 2017 12:37:55 +0100
-Matthias Brugger <matthias.bgg@gmail.com> wrote:
+On 11/04/2017 11:27 AM, Stefan Wahren wrote:
+> Hi Florian
+> 
+>> Florian Fainelli <f.fainelli@gmail.com> hat am 2. November 2017 um 02:04 geschrieben:
+>>
+>>
+>> We have now incorporated all necessary functionality for the BCM63xx
+>> platforms to successfully migrate over bcm2835-rng, so add the final
+>> bits: Kconfig selection and proper platform_device device type matching
+>> to keep the same platform device name for registration to work.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+>> ---
+>>  drivers/char/hw_random/Kconfig       |  7 ++++---
+>>  drivers/char/hw_random/bcm2835-rng.c | 11 ++++++++++-
+>>  2 files changed, 14 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+>> index 95a031e9eced..d0689cc8c7fc 100644
+>> --- a/drivers/char/hw_random/Kconfig
+>> +++ b/drivers/char/hw_random/Kconfig
+>> @@ -87,12 +87,13 @@ config HW_RANDOM_BCM63XX
+>>  	  If unusure, say Y.
+>>  
+>>  config HW_RANDOM_BCM2835
+>> -	tristate "Broadcom BCM2835 Random Number Generator support"
+>> -	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X
+>> +	tristate "Broadcom BCM2835/BCM63xx Random Number Generator support"
+>> +	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X || \
+>> +		   ARCH_BCM_63XX || BCM63XX || BMIPS_GENERIC
+>>  	default HW_RANDOM
+>>  	---help---
+>>  	  This driver provides kernel-side support for the Random Number
+>> -	  Generator hardware found on the Broadcom BCM2835 SoCs.
+>> +	  Generator hardware found on the Broadcom BCM2835 and BCM63xx SoCs.
+>>  
+>>  	  To compile this driver as a module, choose M here: the
+>>  	  module will be called bcm2835-rng
+>> diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+>> index 650e0033c273..d9ffe14f312b 100644
+>> --- a/drivers/char/hw_random/bcm2835-rng.c
+>> +++ b/drivers/char/hw_random/bcm2835-rng.c
+>> @@ -131,6 +131,7 @@ static const struct of_device_id bcm2835_rng_of_match[] = {
+>>  	{ .compatible = "brcm,bcm2835-rng"},
+>>  	{ .compatible = "brcm,bcm-nsp-rng", .data = &nsp_rng_of_data },
+>>  	{ .compatible = "brcm,bcm5301x-rng", .data = &nsp_rng_of_data },
+>> +	{ .compatible = "brcm,bcm6368-rng"},
+>>  	{},
+>>  };
+>>  
+>> @@ -164,7 +165,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+>>  	if (IS_ERR(priv->clk))
+>>  		priv->clk = NULL;
+>>  
+>> -	priv->rng.name = "bcm2835-rng";
+>> +	priv->rng.name = pdev->id_entry->name;
+> 
+> this change breaks registration on bcm2835, because the name is NULL.
 
-> There exist two Mediatek iommu drivers for the two different
-> generations of the device. But both drivers have the same name
-> "mtk-iommu". This breaks the registration of the second driver:
-> 
-> Error: Driver 'mtk-iommu' is already registered, aborting...
-> 
-> Fix this by changing the name for first generation to
-> "mtk-iommu-v1".
-> 
-> Fixes: b17336c55d89 ("iommu/mediatek: add support for mtk iommu generation one HW")
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
-> ---
->  drivers/iommu/mtk_iommu_v1.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iommu/mtk_iommu_v1.c b/drivers/iommu/mtk_iommu_v1.c
-> index bc1efbfb9ddf..542930cd183d 100644
-> --- a/drivers/iommu/mtk_iommu_v1.c
-> +++ b/drivers/iommu/mtk_iommu_v1.c
-> @@ -708,7 +708,7 @@ static struct platform_driver mtk_iommu_driver = {
->  	.probe	= mtk_iommu_probe,
->  	.remove	= mtk_iommu_remove,
->  	.driver	= {
-> -		.name = "mtk-iommu",
-> +		.name = "mtk-iommu-v1",
->  		.of_match_table = mtk_iommu_of_ids,
->  		.pm = &mtk_iommu_pm_ops,
->  	}
+OH right, I will fix that in v2, I am assuming that if you did something
+like this, things still work correctly for you on 2835:
 
-Applied to iommu/updates for v4.15.  Thanks,
+if (!priv->id_entry->name)
+	priv->rng.name = "bcm2835-rng";
+else
+	priv->rng.name = priv->id_entry->name;
 
-Alex
+?
+
+> 
+> Regards
+> Stefan
+> 
+>>  	priv->rng.init = bcm2835_rng_init;
+>>  	priv->rng.read = bcm2835_rng_read;
+>>  	priv->rng.cleanup = bcm2835_rng_cleanup;
+>> @@ -190,12 +191,20 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+>>  
+>>  MODULE_DEVICE_TABLE(of, bcm2835_rng_of_match);
+>>  
+>> +static struct platform_device_id bcm2835_rng_devtype[] = {
+>> +	{ .name = "bcm2835-rng" },
+>> +	{ .name = "bcm63xx-rng" },
+>> +	{ /* sentinel */ }
+>> +};
+>> +MODULE_DEVICE_TABLE(platform, bcm2835_rng_devtype);
+>> +
+>>  static struct platform_driver bcm2835_rng_driver = {
+>>  	.driver = {
+>>  		.name = "bcm2835-rng",
+>>  		.of_match_table = bcm2835_rng_of_match,
+>>  	},
+>>  	.probe		= bcm2835_rng_probe,
+>> +	.id_table	= bcm2835_rng_devtype,
+>>  };
+>>  module_platform_driver(bcm2835_rng_driver);
+>>  
+>> -- 
+>> 2.9.3
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+
+-- 
+Florian
