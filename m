@@ -1,45 +1,25 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 6 Nov 2017 13:45:25 +0100
-Subject: [PATCH v4 20/21] KVM: arm64: Take any host SError before
- entering the guest
-In-Reply-To: <59FC95CC.3090706@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <20171019145807.23251-21-james.morse@arm.com>
- <20171031062315.GY2166@lvm> <59F861EE.4010505@arm.com>
- <20171101045550.GB11166@lvm> <59FB0D0C.1010208@arm.com>
- <20171103124904.GC14144@cbox> <59FC95CC.3090706@arm.com>
-Message-ID: <20171106124525.GE14144@cbox>
+From: bhumirks@gmail.com (Bhumika Goyal)
+Date: Mon,  6 Nov 2017 14:15:38 +0100
+Subject: [PATCH 0/2] ARM: OMAP2+: CM: make some structures,
+ function arguments and pointers as const
+Message-ID: <1509974140-10860-1-git-send-email-bhumirks@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 04:14:04PM +0000, James Morse wrote:
-> Hi Christoffer,
-> 
-> On 03/11/17 12:49, Christoffer Dall wrote:
-> > Does a non-secure esb() cause the error to be delivered to firmware on
-> > the secure side if anything is pending?
-> 
-> Yes, the ESB-instruction causes 'synchronisable' errors to become pending as an
-> SError. They then follow the normal SError rules.
-> 
-> 
-> > I'm not sure I fully understand the interaction between issuing an
-> > esb() in non-secure and firmware handling a RAS error; I thought there
-> > would be none, and that this was only for kernel-first ?
-> 
-> To implement firmware-first, EL3 has to set SCR_EL3.EA to route external-aborts
-> and physical SError to EL3. So an ESB-instruction, even in a guest, may cause an
-> SError to be taken to EL3 for firmware-first handling.
-> 
-> This is why RAS is causing so much noise for KVM, any notification could also
-> interrupt a guest, so firmware has to emulate an exception taken to EL2
-> correctly and KVM will have to plumb the notification across to the host APEI code.
-> 
-> 
+Make some pointers and function arguments as const. After this change,
+make the structures of type cm_ll_data as const.
 
-I see, but since the end result is that either we panic or firmware
-reboots the machine, we don't care and can leave this patch out for now.
-Makes sense.
+Bhumika Goyal (2):
+  ARM: OMAP2+: CM: make some pointers and function arguments as const
+  ARM: OMAP2+: CM: make cm_ll_data structures as const
 
-Thanks for the explanation!
--Christoffer
+ arch/arm/mach-omap2/cm.h         | 4 ++--
+ arch/arm/mach-omap2/cm2xxx.c     | 2 +-
+ arch/arm/mach-omap2/cm33xx.c     | 2 +-
+ arch/arm/mach-omap2/cm3xxx.c     | 2 +-
+ arch/arm/mach-omap2/cm_common.c  | 6 +++---
+ arch/arm/mach-omap2/cminst44xx.c | 2 +-
+ 6 files changed, 9 insertions(+), 9 deletions(-)
+
+-- 
+1.9.1
