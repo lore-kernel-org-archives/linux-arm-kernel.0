@@ -1,72 +1,161 @@
-From: bhumirks@gmail.com (Bhumika Goyal)
-Date: Mon,  6 Nov 2017 14:15:39 +0100
-Subject: [PATCH 1/2] ARM: OMAP2+: CM: make some pointers and function
- arguments as const
-In-Reply-To: <1509974140-10860-1-git-send-email-bhumirks@gmail.com>
-References: <1509974140-10860-1-git-send-email-bhumirks@gmail.com>
-Message-ID: <1509974140-10860-2-git-send-email-bhumirks@gmail.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Mon, 6 Nov 2017 14:24:48 +0100
+Subject: [RFC 05/12] dt-bindings: mtd: add Marvell NAND controller
+ documentation
+In-Reply-To: <20171024190433.r5xy25eqdesz7jjs@rob-hp-laptop>
+References: <20171018143629.29302-1-miquel.raynal@free-electrons.com>
+ <20171018143629.29302-6-miquel.raynal@free-electrons.com>
+ <20171024190433.r5xy25eqdesz7jjs@rob-hp-laptop>
+Message-ID: <20171106142448.40ca5033@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the pointer cm_ll_data of type cm_ll_data as const as it does not
-modify the fields of the structure it points too.
-After this change, make the argument of cm_register function as const as
-it is used to initialise cm_ll_data or used inside an if condition.
-Make the pointer argument of cm_unregister function as const as it is only
-used inside an if condition.
-Add const to the function prototypes too.
+Hi Rob,
 
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
----
- arch/arm/mach-omap2/cm.h        | 4 ++--
- arch/arm/mach-omap2/cm_common.c | 6 +++---
- 2 files changed, 5 insertions(+), 5 deletions(-)
+> > +Required properties:
+> > +C'est faux, t'en a rajout? un y a pas longtps :).
+> > +Je conseille de mettre ?a sous forme de liste, genre  
+> 
+> Humm.
 
-diff --git a/arch/arm/mach-omap2/cm.h b/arch/arm/mach-omap2/cm.h
-index e833984..7b66e17 100644
---- a/arch/arm/mach-omap2/cm.h
-+++ b/arch/arm/mach-omap2/cm.h
-@@ -72,8 +72,8 @@ int omap_cm_wait_module_idle(u8 part, s16 prcm_mod, u16 idlest_reg,
- 			     u8 idlest_shift);
- int omap_cm_module_enable(u8 mode, u8 part, u16 inst, u16 clkctrl_offs);
- int omap_cm_module_disable(u8 part, u16 inst, u16 clkctrl_offs);
--extern int cm_register(struct cm_ll_data *cld);
--extern int cm_unregister(struct cm_ll_data *cld);
-+extern int cm_register(const struct cm_ll_data *cld);
-+extern int cm_unregister(const struct cm_ll_data *cld);
- int omap_cm_init(void);
- int omap2_cm_base_init(void);
- 
-diff --git a/arch/arm/mach-omap2/cm_common.c b/arch/arm/mach-omap2/cm_common.c
-index 83c6fa7..adf8858 100644
---- a/arch/arm/mach-omap2/cm_common.c
-+++ b/arch/arm/mach-omap2/cm_common.c
-@@ -29,7 +29,7 @@
-  * common CM functions
-  */
- static struct cm_ll_data null_cm_ll_data;
--static struct cm_ll_data *cm_ll_data = &null_cm_ll_data;
-+static const struct cm_ll_data *cm_ll_data = &null_cm_ll_data;
- 
- /* cm_base: base virtual address of the CM IP block */
- struct omap_domain_base cm_base;
-@@ -189,7 +189,7 @@ int omap_cm_module_disable(u8 part, u16 inst, u16 clkctrl_offs)
-  * is NULL, or -EEXIST if cm_register() has already been called
-  * without an intervening cm_unregister().
-  */
--int cm_register(struct cm_ll_data *cld)
-+int cm_register(const struct cm_ll_data *cld)
- {
- 	if (!cld)
- 		return -EINVAL;
-@@ -213,7 +213,7 @@ int cm_register(struct cm_ll_data *cld)
-  * -EINVAL if @cld is NULL or if @cld does not match the struct
-  * cm_ll_data * previously registered by cm_register().
-  */
--int cm_unregister(struct cm_ll_data *cld)
-+int cm_unregister(const struct cm_ll_data *cld)
- {
- 	if (!cld || cm_ll_data != cld)
- 		return -EINVAL;
--- 
-1.9.1
+Oops!
+
+> 
+> > +
+> > +- compatible: can be one of the following:
+> > +    * "marvell,armada-8k-nand-controller"
+> > +    * "marvell,armada370-nand-controller"
+> > +    * "marvell,pxa3xx-nand-controller"
+> > +    * "marvell,armada-8k-nand" (deprecated)
+> > +    * "marvell,armada370-nand" (deprecated)
+> > +    * "marvell,pxa3xx-nand" (deprecated)
+> > +- reg: shall contain registers location and length for data and
+> > reg.  
+> 
+> 2 regions?
+
+Just one, rephrased.
+
+> 
+> > +- #address-cells: shall be set to 1. Encode the nand CS.
+> > +- #size-cells: shall be set to 0.
+> > +- interrupts: shall define the nand controller interrupt.
+> > +- clocks: shall reference nand controller clocks.  
+> 
+> How many clocks?
+
+Only one too: "reference the NAND controller clock".
+
+> 
+> > +- marvell,system-controller: Set to retrieve the syscon node that
+> > handles
+> > +  NAND controller related registers (only required with the
+> > +  "marvell,armada-8k-nand[-controller]" compatibles).
+> > +
+> > +Optional properties:
+> > +- dmas: shall reference DMA channel associated to the NAND
+> > controller. +- dma-names: shall be "rxtx".
+> > +
+> > +Optional children nodes:
+> > +Children nodes represent the available NAND chips.
+> > +
+> > +Required properties:
+> > +- reg: shall contain the native Chip Select ids (0-3)
+> > +- marvell,rb: shall contain the native Ready/Busy ids (0-1)
+> > +
+> > +Optional properties:
+> > +- marvell,nand-keep-config: orders the driver not to take the
+> > timings
+> > +  from the core and leaving them completely untouched. Bootloader
+> > +  timings will then be used.
+> > +- marvell,nand-enable-arbiter: only useful for PXA platforms, will
+> > +  enable bus arbiter between NFC and DFI bus (must be enabled for
+> > +  NFC operation)  
+> 
+> Why do you need this if it must be enabled?
+
+That is right, there is no more need for it, also removed it from the
+driver, just knowing the board with the compatible string is enough.
+
+> 
+> > +- nand-on-flash-bbt: speed up the boot process by not discovering
+> > all
+> > +  the bad blocks at each boot and reading directly an on flash
+> > table. +- nand-ecc-mode: one of the supported ECC modes ("none",
+> > "soft",
+> > +  "hw"). If not specified, hardware ECC will be used.
+> > +- nand-ecc-algo: algorithm to use if previous choice was "soft"
+> > +  ("hamming" or "bch). This property may be added for hardware ECC
+> > for
+> > +  clarification but will be ignored by the driver because ECC mode
+> > is
+> > +  chosen depending on the page size and the strength required by
+> > the
+> > +  NAND chip. This value may be overwritten with the
+> > nand-ecc-strength
+> > +  property.
+> > +- nand-ecc-strength: desired ECC strength.
+> > +- nand-ecc-step-size: indication on the ECC step size. This has no
+> > +  effect and will be ignored by the driver when using hardware
+> > +  ECC. Because Marvell's NAND flash controller does use fixed
+> > strength
+> > +  (1-bit for Hamming, 16-bit for BCH), the step size will shrink or
+> > +  grown in order to fit the required strength and the value
+> > +  updated. Step sizes are not completely random for all and follow
+> > +  certain patterns described in AN-379, "Marvell SoC NFC ECC".  
+> 
+> For standard properties, just reference nand.txt and add any 
+> constraints. Don't define what the property is again.
+
+Ok.
+
+> 
+> > +
+> > +See Documentation/devicetree/bindings/mtd/nand.txt for more
+> > details on +generic bindings.
+> > +
+> > +
+> > +Example:
+> > +nand_controller: nand-controller at d0000 {
+> > +	compatible = "marvell,armada370-nand-controller";
+> > +	reg = <0xd0000 0x54>;
+> > +	#address-cells = <1>;
+> > +	#size-cells = <0>;
+> > +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
+> > +	clocks = <&coredivclk 0>;
+> > +	status = "okay";  
+> 
+> Don't show status in examples.
+
+Ok.
+
+> 
+> > +
+> > +	nand at 0 {
+> > +		reg = <0>;
+> > +		marvell,rb = <0>;
+> > +		nand-ecc-mode = "hw";
+> > +		marvell,nand-keep-config;
+> > +		marvell,nand-enable-arbiter;
+> > +		nand-on-flash-bbt;
+> > +		nand-ecc-strength = <4>;
+> > +		nand-ecc-step-size = <512>;
+> > +
+> > +		partitions {
+> > +			compatible = "fixed-partitions";
+> > +			#address-cells = <1>;
+> > +			#size-cells = <1>;
+> > +
+> > +			partition at 0 {
+> > +				label = "Rootfs";
+> > +				reg = <0x00000000 0x40000000>;
+> > +			};
+> > +		};
+> > +	};
+> > +};
+> > -- 
+> > 2.11.0
+> >   
+
+Thanks for the review,
+Miqu?l
