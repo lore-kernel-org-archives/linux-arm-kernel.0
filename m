@@ -1,31 +1,35 @@
 From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon,  6 Nov 2017 12:38:12 +0530
-Subject: [PATCH v2 0/4] arm64: defconfig: enable additional led triggers
-Message-ID: <cover.1509951550.git.amit.kucheria@linaro.org>
+Date: Mon,  6 Nov 2017 12:38:13 +0530
+Subject: [PATCH v2 1/4] arm64: defconfig: enable new trigger modes for leds
+In-Reply-To: <cover.1509951550.git.amit.kucheria@linaro.org>
+References: <cover.1509951550.git.amit.kucheria@linaro.org>
+Message-ID: <266d889176a4f39617abbfb08177d4cbed89cdf2.1509951550.git.amit.kucheria@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset enables the kernel panic and disk-activity trigger for LEDs
-and then enables the panic trigger for three 96Boards - DB410c, Hikey and
-Hikey960.
+Most development boards and devices have one or more LEDs. It is useful
+during debugging if they can be wired to show different behaviours such as
+disk or cpu activity or a load-average dependent heartbeat. Enable panic
+and disk activity triggers so they can be tied to LED activity during
+debugging as well.
 
-DB410c and Hikey panic behaviour has been tested by triggering a panic
-through /proc/sysrq-trigger, while Hikey960 is only compile-tested.
+Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
+---
+ arch/arm64/configs/defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-
-Amit Kucheria (4):
-  arm64: defconfig: enable new trigger modes for leds
-  arm64: dts: qcom: apq8016-sbc: Allow USR4 LED to notify kernel panic
-  arm64: dts: hisilicon: hi6220-hikey: Allow USR1 LED to notify kernel
-    panic
-  arm64: dts: hisilicon: hi3660-hikey960: Allow USR4 LED to notify
-    kernel panic
-
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 1 +
- arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts    | 1 +
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi         | 1 +
- arch/arm64/configs/defconfig                      | 2 ++
- 4 files changed, 5 insertions(+)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 34480e9..4ed357f 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -460,6 +460,8 @@ CONFIG_LEDS_SYSCON=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
++CONFIG_LEDS_TRIGGER_PANIC=y
++CONFIG_LEDS_TRIGGER_DISK=y
+ CONFIG_EDAC=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_DRV_MAX77686=y
 -- 
 2.7.4
