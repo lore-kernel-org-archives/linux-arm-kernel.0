@@ -1,47 +1,78 @@
 From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 6 Nov 2017 18:03:36 +0100
-Subject: [PATCH v3 6/9] irqchip: stm32: move the wakeup on interrupt mask
+Date: Mon, 6 Nov 2017 18:03:34 +0100
+Subject: [PATCH v3 4/9] irqchip: stm32: add stm32h7 support
 In-Reply-To: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
 References: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <1509987819-29599-7-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1509987819-29599-5-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ludovic Barre <ludovic.barre@st.com>
 
-Move irq_set_wake on interrupt mask, needed to wake up from
-low power mode as the event mask is not able to do so.
+stm32h7 has up to 96 inputs
+(3 banks of 32 inputs max).
 
 Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
 ---
- drivers/irqchip/irq-stm32-exti.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/irqchip/irq-stm32-exti.c | 42 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
 diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
-index 477d0fa..31ab0de 100644
+index ef37870..8f409a9 100644
 --- a/drivers/irqchip/irq-stm32-exti.c
 +++ b/drivers/irqchip/irq-stm32-exti.c
-@@ -156,16 +156,16 @@ static int stm32_irq_set_wake(struct irq_data *data, unsigned int on)
- 	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(data);
+@@ -38,6 +38,39 @@ static const struct stm32_exti_bank *stm32f4xx_exti_banks[] = {
+ 	&stm32f4xx_exti_b1,
+ };
+ 
++static const struct stm32_exti_bank stm32h7xx_exti_b1 = {
++	.imr_ofst	= 0x80,
++	.emr_ofst	= 0x84,
++	.rtsr_ofst	= 0x00,
++	.ftsr_ofst	= 0x04,
++	.swier_ofst	= 0x08,
++	.pr_ofst	= 0x88,
++};
++
++static const struct stm32_exti_bank stm32h7xx_exti_b2 = {
++	.imr_ofst	= 0x90,
++	.emr_ofst	= 0x94,
++	.rtsr_ofst	= 0x20,
++	.ftsr_ofst	= 0x24,
++	.swier_ofst	= 0x28,
++	.pr_ofst	= 0x98,
++};
++
++static const struct stm32_exti_bank stm32h7xx_exti_b3 = {
++	.imr_ofst	= 0xA0,
++	.emr_ofst	= 0xA4,
++	.rtsr_ofst	= 0x40,
++	.ftsr_ofst	= 0x44,
++	.swier_ofst	= 0x48,
++	.pr_ofst	= 0xA8,
++};
++
++static const struct stm32_exti_bank *stm32h7xx_exti_banks[] = {
++	&stm32h7xx_exti_b1,
++	&stm32h7xx_exti_b2,
++	&stm32h7xx_exti_b3,
++};
++
+ static unsigned long stm32_exti_pending(struct irq_chip_generic *gc)
+ {
  	const struct stm32_exti_bank *stm32_bank = gc->private;
- 	int pin = data->hwirq % IRQS_PER_BANK;
--	u32 emr;
-+	u32 imr;
+@@ -256,3 +289,12 @@ static int __init stm32f4_exti_of_init(struct device_node *np,
+ }
  
- 	irq_gc_lock(gc);
- 
--	emr = irq_reg_readl(gc, stm32_bank->emr_ofst);
-+	imr = irq_reg_readl(gc, stm32_bank->imr_ofst);
- 	if (on)
--		emr |= BIT(pin);
-+		imr |= BIT(pin);
- 	else
--		emr &= ~BIT(pin);
--	irq_reg_writel(gc, emr, stm32_bank->emr_ofst);
-+		imr &= ~BIT(pin);
-+	irq_reg_writel(gc, imr, stm32_bank->imr_ofst);
- 
- 	irq_gc_unlock(gc);
- 
+ IRQCHIP_DECLARE(stm32f4_exti, "st,stm32-exti", stm32f4_exti_of_init);
++
++static int __init stm32h7_exti_of_init(struct device_node *np,
++				       struct device_node *parent)
++{
++	return stm32_exti_init(stm32h7xx_exti_banks,
++			ARRAY_SIZE(stm32h7xx_exti_banks), np);
++}
++
++IRQCHIP_DECLARE(stm32h7_exti, "st,stm32h7-exti", stm32h7_exti_of_init);
 -- 
 2.7.4
