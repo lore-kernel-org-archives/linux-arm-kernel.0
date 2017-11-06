@@ -1,7 +1,7 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon,  6 Nov 2017 13:02:47 -0800
-Subject: [PATCH v5 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
-Message-ID: <20171106210250.95116-1-salyzyn@android.com>
+Date: Mon,  6 Nov 2017 13:02:19 -0800
+Subject: [PATCH v5 06/12] arm: vdso: add support for clock_getres
+Message-ID: <20171106210227.95012-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,8 +12,8 @@ for each architecture. But instead of landing it in arm64, land the
 result into lib/vdso and unify both implementations to simplify
 future maintenance.
 
-Add ARCH_CLOCK_FIXED_MASK as an efficiency since arm64 has no
-purpose for cs_mask vdso_data variable.
+Add clock_getres vdso support to match up with existing support in
+the arm64's vdso.
 
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
 Cc: James Morse <james.morse@arm.com>
@@ -34,85 +34,98 @@ Cc: Thomas Gleixner <tglx@linutronix.de>
 Cc: linux-kernel at vger.kernel.org
 Cc: linux-arm-kernel at lists.infradead.org
 
+v2:
+- split first CL into 7 of 7 pieces
+
 v4:
-- New in series, split off from earlier.
+- update commit message to reflect overall reasoning.
+- replace typeof() with long for nsec
+- replace clock_id with clock to match usage elsewhere.
 
 v5:
-- rebase
+- add linux/hrtimer.h to compiler.h to supply for LOW_RES_NSEC and
+  MONOTONIC_RES_NSEC.
 
 ---
- arch/arm/vdso/vgettimeofday.c | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/kernel/vdso.c        |  1 +
+ arch/arm/vdso/compiler.h      |  1 +
+ arch/arm/vdso/vdso.lds.S      |  1 +
+ arch/arm/vdso/vgettimeofday.c | 23 +++++++++++++++++++++++
+ 4 files changed, 26 insertions(+)
 
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index b7c93fce2f59..a80c58805699 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -189,6 +189,7 @@ static void __init patch_vdso(void *ehdr)
+ 	if (!cntvct_ok) {
+ 		vdso_nullpatch_one(&einfo, "__vdso_gettimeofday");
+ 		vdso_nullpatch_one(&einfo, "__vdso_clock_gettime");
++		vdso_nullpatch_one(&einfo, "__vdso_clock_getres");
+ 	}
+ }
+ 
+diff --git a/arch/arm/vdso/compiler.h b/arch/arm/vdso/compiler.h
+index 3edddb705a1b..c7751019246a 100644
+--- a/arch/arm/vdso/compiler.h
++++ b/arch/arm/vdso/compiler.h
+@@ -27,6 +27,7 @@
+ #include <asm/processor.h>	/* for cpu_relax()			*/
+ #include <asm/unistd.h>
+ #include <linux/compiler.h>
++#include <linux/hrtimer.h>	/* for LOW_RES_NSEC and MONOTONIC_RES_NSEC */
+ #include <linux/time.h>		/* for NSEC_PER_SEC			*/
+ 
+ #ifndef CONFIG_AEABI
+diff --git a/arch/arm/vdso/vdso.lds.S b/arch/arm/vdso/vdso.lds.S
+index 89ca89f12d23..1d81e8c3acf6 100644
+--- a/arch/arm/vdso/vdso.lds.S
++++ b/arch/arm/vdso/vdso.lds.S
+@@ -82,6 +82,7 @@ VERSION
+ 	global:
+ 		__vdso_clock_gettime;
+ 		__vdso_gettimeofday;
++		__vdso_clock_getres;
+ 	local: *;
+ 	};
+ }
 diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
-index a354586f8a65..3005479efbe8 100644
+index a2c4db83edc4..a354586f8a65 100644
 --- a/arch/arm/vdso/vgettimeofday.c
 +++ b/arch/arm/vdso/vgettimeofday.c
-@@ -128,7 +128,11 @@ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
+@@ -32,6 +32,7 @@
+ 
+ DEFINE_FALLBACK(gettimeofday, struct timeval *, tv, struct timezone *, tz)
+ DEFINE_FALLBACK(clock_gettime, clockid_t, clock, struct timespec *, ts)
++DEFINE_FALLBACK(clock_getres, clockid_t, clock, struct timespec *, ts)
+ 
+ static notrace u32 vdso_read_begin(const struct vdso_data *vd)
  {
- 	u32 seq, mult, shift;
- 	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
- 	u64 mask;
-+#endif
- 	vdso_xtime_clock_sec_t sec;
+@@ -301,3 +302,25 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
  
- 	do {
-@@ -141,7 +145,9 @@ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
- 
- 		mult = vd->cs_mono_mult;
- 		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
- 		mask = vd->cs_mask;
-+#endif
- 
- 		sec = vd->xtime_clock_sec;
- 		nsec = vd->xtime_clock_snsec;
-@@ -161,7 +167,11 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- {
- 	u32 seq, mult, shift;
- 	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
- 	u64 mask;
-+#endif
- 	vdso_wtm_clock_nsec_t wtm_nsec;
- 	__kernel_time_t sec;
- 
-@@ -175,7 +185,9 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
- 
- 		mult = vd->cs_mono_mult;
- 		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
- 		mask = vd->cs_mask;
-+#endif
- 
- 		sec = vd->xtime_clock_sec;
- 		nsec = vd->xtime_clock_snsec;
-@@ -200,7 +212,11 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- {
- 	u32 seq, mult, shift;
- 	u64 nsec, cycle_last;
-+#ifdef ARCH_CLOCK_FIXED_MASK
-+	static const u64 mask = ARCH_CLOCK_FIXED_MASK;
-+#else
- 	u64 mask;
-+#endif
- 	vdso_raw_time_sec_t sec;
- 
- 	do {
-@@ -213,7 +229,9 @@ static notrace int do_monotonic_raw(const struct vdso_data *vd,
- 
- 		mult = vd->cs_raw_mult;
- 		shift = vd->cs_shift;
-+#ifndef ARCH_CLOCK_FIXED_MASK
- 		mask = vd->cs_mask;
-+#endif
- 
- 		sec = vd->raw_time_sec;
- 		nsec = vd->raw_time_nsec;
+ 	return 0;
+ }
++
++int __vdso_clock_getres(clockid_t clock, struct timespec *res)
++{
++	long nsec;
++
++	if (clock == CLOCK_REALTIME ||
++	    clock == CLOCK_MONOTONIC ||
++	    clock == CLOCK_MONOTONIC_RAW)
++		nsec = MONOTONIC_RES_NSEC;
++	else if (clock == CLOCK_REALTIME_COARSE ||
++		 clock == CLOCK_MONOTONIC_COARSE)
++		nsec = LOW_RES_NSEC;
++	else
++		return clock_getres_fallback(clock, res);
++
++	if (likely(res != NULL)) {
++		res->tv_sec = 0;
++		res->tv_nsec = nsec;
++	}
++
++	return 0;
++}
 -- 
 2.15.0.403.gc27cc4dac6-goog
