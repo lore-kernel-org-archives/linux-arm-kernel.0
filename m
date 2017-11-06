@@ -1,97 +1,80 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 6 Nov 2017 11:35:49 -0600
-Subject: Performance issues writing to PCIe in a Zynq
-In-Reply-To: <1509958288489.45871@axon.tv>
-References: <1509636637116.27702@axon.tv>
- <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>
- <20171103135457.GA8457@bhelgaas-glaptop.roam.corp.google.com>
- <1509958288489.45871@axon.tv>
-Message-ID: <20171106173549.GB31930@bhelgaas-glaptop.roam.corp.google.com>
+From: digetx@gmail.com (Dmitry Osipenko)
+Date: Mon, 6 Nov 2017 20:44:59 +0300
+Subject: Tegra baseline test results for v4.14-rc8
+In-Reply-To: <8bed4ae2-db37-5bf9-5099-e8b241ad4b1b@nvidia.com>
+References: <8bed4ae2-db37-5bf9-5099-e8b241ad4b1b@nvidia.com>
+Message-ID: <7d041081-f60b-2eb3-f7e2-fa7d469f50f6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 06, 2017 at 08:51:28AM +0000, Ruben Guerra Marin wrote:
-> Hi, according to Xilinx, from a computer host it happens in a
-> second, while for us in the Zynq (ARM) takes way more than that as
-> explained before. And indeed the programming is done via config
-> accesses, and can't happen otherwise as this is the way Xilinx
-> created its FPGA IP (Intellectual Property) cores. Still if I do a
-> baremetal test (so no Linux) and write from the ARMs to the FPGA via
-> those registers, it takes only 17 cycles instead of the Linux
-> implementation which takes 250 cycles. 
-
-Which PCI host bridge driver are you using?
-
-If you're using drivers/pci/host/pcie-xilinx.c, it uses
-pci_generic_config_write(), which doesn't contain anything that looks
-obviously expensive (except for the __iowmb() inside writeq(), and
-it's hard to do much about that).
-
-There is the pci_lock that's acquired in pci_bus_read_config_dword()
-(see drivers/pci/access.c).  As I mentioned before, it looks like
-xilinx could probably use the CONFIG_PCI_LOCKLESS_CONFIG strategy to
-get rid of that lock.  Not sure how much that would buy you since
-there's probably no contention, but you could experiment with it.
-
-It sounds like you have some user-level code involved, too; I don't
-know anything about what that code might be doing.
-
-Can you do any profiling to figure out where the time is going?
-
-> From: Bjorn Helgaas <helgaas@kernel.org>
-> Sent: Friday, November 3, 2017 2:54 PM
-> To: Michal Simek
-> Cc: Ruben Guerra Marin; bhelgaas at google.com; soren.brinkmann at xilinx.com; bharat.kumar.gogada at xilinx.com; linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: Performance issues writing to PCIe in a Zynq
+On 06.11.2017 15:36, Jon Hunter wrote:
+> Here are some basic Tegra test results for Linux v4.14-rc8.
+> Logs and other details at:
 > 
-> On Fri, Nov 03, 2017 at 09:12:04AM +0100, Michal Simek wrote:
-> > On 2.11.2017 16:30, Ruben Guerra Marin wrote:
-> > >
-> > > I have the a Zynq board running petalinux, and it is connected
-> > > through PCIe to a Virtex Ultrascale board. I configured the
-> > > Ultrascale for Tandem PCIe, which the second stage bitstream is
-> > > being programmed from the Zynq board (I crossed compiled the mcap
-> > > application that Xilinx provides).
-> > >
-> > > This works perfectly, but takes around ~12 seconds to program the
-> > > second stage bitstream (compressed is ~12 MB), which is quite
-> > > slow. We also tried debugging the mcap application and pciutils.
-> > > We found out the operation that takes long to execute: In
-> > > pciutils, the instruction to actually call the write to the driver
-> > > (pwrite) takes approximately 6uS, so if you add up this for 12 MB
-> > > then you can see why it takes so long. Why is this so slow? Is
-> > > this maybe a problem with the driver?
-> > >
-> > > For testing, I added an ILA to the AXI bus in between the Zynq GP1
-> > > and the PCIe IP control registers port. I triggered halfway the
-> > > programming of the bitstream using the mcap program provided by
-> > > Xilinx. I can see that it is writing to address x358, which
-> > > according to the *datasheet*
-> > > (https://www.xilinx.com/Attachment/Xilinx_Answer_64761__UltraScale_Devices.pdf)
-> > > is the Write Data Register, which is correct (and again, I know
-> > > the whole bitstream gets programmed correctly).
-> > >
-> > > But what I also see is that a "awvalid" being asserted to the next
-> > > one it takes 245 cycles, and I can imagine this is why it takes 12
-> > > seconds to program a 12MB bitstream.
+>     https://nvtb.github.io//linux/test_v4.14-rc8/20171105133104/
 > 
-> How long do you expect this to take?  What are the corresponding times
-> on other hardware or other OSes?
+
+The "timeout waiting for phy to stabilize" still persists on Trimslice and I've
+seen it occasionally after the "Fix phy suspend for UDC" patch been applied, but
+not on every boot as before the patch. It looks to me that increasing timeout
+value completely fixes it, maybe you could check if increasing timeout helps on
+Trimslice?
+
 > 
-> It sounds like this programming is done via config accesses, which are
-> definitely not a fast path, so I don't know if 12s is unreasonably
-> slow or not.  The largest config write is 4 bytes, which means 12MB
-> requires 3M writes, and if each takes 6us, that's 18s total.
+> Test summary
+> ------------
 > 
-> Most platforms serialize config accesses with a lock, which also slows
-> things down.  It looks like your hardware might support ECAM, which
-> means you might be able to remove the locking overhead by using
-> lockless config (see     CONFIG_    PCI_LOCKLESS_CONFIG).  This is a new
-> feature currently only used by x86, and it's currently a system-wide
-> compile-time switch, so it would require some work for you to use it.
+> Build: zImage:
+>     Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
 > 
-> The high bandwidth way to do this would be use a BAR and do PCI memory
-> writes instead of PCI config writes.  Obviously the adapter determines
-> whether this is possible.
+> Build: Image:
+>     Pass: ( 1/ 1): defconfig
 > 
-> Bjorn
+> Boot to userspace: defconfig:
+>     Pass: ( 4/ 4): qemu-vexpress64, tegra132-norrin,
+> 		   tegra210-p2371-0000, tegra210-smaug
+> 
+> Boot to userspace: multi_v7_defconfig:
+>     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> 
+> Boot to userspace: tegra_defconfig:
+>     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> 
+> PM: System suspend: multi_v7_defconfig:
+>     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> 
+> PM: System suspend: tegra_defconfig:
+>     Pass: ( 5/ 5): tegra114-dalmore-a04, tegra124-jetson-tk1,
+> 		   tegra124-nyan-big, tegra20-trimslice, tegra30-beaver
+> 
+> 
+> vmlinux object size
+> (delta in bytes from test_v4.14-rc7 (0b07194bb55ed836c2cc7c22e866b87a14681984)):
+>    text     data      bss    total  kernel
+>    -328     +376        0      +48  defconfig
+>   +6652      +64        0    +6716  multi_v7_defconfig
+>   +6852    +4096        0   +10948  tegra_defconfig
+> 
+> 
+> Boot-time memory difference
+> (delta in bytes from test_v4.14-rc7 (0b07194bb55ed836c2cc7c22e866b87a14681984))
+>     avail    rsrvd     high    freed                board              kconfig                  dtb
+>         .        .        .        .      qemu-vexpress64            defconfig           __internal
+>         .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+>         .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+>         .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+>         .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+>         .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+>         .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+>         .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+>         .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+>         .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+>         .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+>         .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+>         .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+>         .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+> --
+> nvpublic
