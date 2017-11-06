@@ -1,33 +1,33 @@
-From: amit.kucheria@linaro.org (Amit Kucheria)
-Date: Mon,  6 Nov 2017 12:38:16 +0530
-Subject: [PATCH v2 4/4] arm64: dts: hisilicon: hi3660-hikey960: Allow USR4 LED
- to notify kernel panic
-In-Reply-To: <cover.1509951550.git.amit.kucheria@linaro.org>
-References: <cover.1509951550.git.amit.kucheria@linaro.org>
-Message-ID: <ff7260c53afbe5d1c8d7f6bdf1d297fec2750d8d.1509951550.git.amit.kucheria@linaro.org>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 6 Nov 2017 15:31:34 +0800
+Subject: [PATCH 0/2] add clk controller driver for Meson-AXG SoC
+Message-ID: <20171106073134.13830-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Blink the LED on a kernel panic.
+patch 1: add driver for the clk controller which found in Meson AXG
 
-Signed-off-by: Amit Kucheria <amit.kucheria@linaro.org>
-Acked-by: Guodong Xu <guodong.xu@linaro.org>
-Tested-by: Manivannan Sadhasivam <manivannan.sadhasivam@linaro.org>
----
- arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts | 1 +
- 1 file changed, 1 insertion(+)
+  Note, we deliberately create a seperate source file for the Meson AXG
+series, instead of sharing code with previous GXBB/GXL - the file axg.c
+It would help us maintaining the code more easily.
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-index e9f87cb..1cf77ee 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660-hikey960.dts
-@@ -109,6 +109,7 @@
- 			label = "user_led4";
- 			/* gpio_190_user_led4 */
- 			gpios = <&gpio23 6 0>;
-+			panic-indicator;
- 			linux,default-trigger = "cpu0";
- 		};
- 
+patch 2: describe the DT info for Meson AXG
+
+Qiufang Dai (2):
+  clk: meson-axg: add clock controller drivers
+  arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
+
+ arch/arm64/Kconfig.platforms               |   1 +
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi |  16 +
+ drivers/clk/meson/Kconfig                  |   8 +
+ drivers/clk/meson/Makefile                 |   1 +
+ drivers/clk/meson/axg.c                    | 948 +++++++++++++++++++++++++++++
+ drivers/clk/meson/axg.h                    | 127 ++++
+ include/dt-bindings/clock/axg-clkc.h       |  72 +++
+ 7 files changed, 1173 insertions(+)
+ create mode 100644 drivers/clk/meson/axg.c
+ create mode 100644 drivers/clk/meson/axg.h
+ create mode 100644 include/dt-bindings/clock/axg-clkc.h
+
 -- 
-2.7.4
+2.14.1
