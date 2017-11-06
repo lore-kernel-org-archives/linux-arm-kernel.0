@@ -1,51 +1,74 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 6 Nov 2017 09:40:43 +0100
-Subject: [PATCH v2 00/10] Allwinner H3/H5/A64(DE2) SimpleFB support
-In-Reply-To: <20171102154447.b5qo3rvu5djxupay@flea>
-References: <20171027150658.18509-1-icenowy@aosc.io>
- <9bca10cc95d04f87a1122bc582402310@aosc.io>
- <20171102154447.b5qo3rvu5djxupay@flea>
-Message-ID: <20171106084043.2vv56w2dmrutz4gn@phenom.ffwll.local>
+From: ruben.guerra.marin@axon.tv (Ruben Guerra Marin)
+Date: Mon, 6 Nov 2017 08:51:28 +0000
+Subject: Performance issues writing to PCIe in a Zynq
+In-Reply-To: <20171103135457.GA8457@bhelgaas-glaptop.roam.corp.google.com>
+References: <1509636637116.27702@axon.tv>
+ <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>,
+ <20171103135457.GA8457@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <1509958288489.45871@axon.tv>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 04:44:47PM +0100, Maxime Ripard wrote:
-> On Thu, Nov 02, 2017 at 04:51:29PM +0800, Icenowy Zheng wrote:
-> > ? 2017-10-27 23:06?Icenowy Zheng ???
-> > > This patchset adds support for the SimpleFB on Allwinner SoCs with
-> > > "Display Engine 2.0".
-> > > 
-> > > PATCH 1 to PATCH 3 are DE2 CCU fixes for H3/H5 SoCs.
-> > > 
-> > > PATCH 4 adds the pipeline strings for DE2 SimpleFB.
-> > > 
-> > > PATCH 5 to 7 adds necessary device tree nodes (DE2 CCU and SimpleFB)
-> > > for H3/H5 SoCs.
-> > > 
-> > > PATCH 8 to 10 are for Allwinner A64 SoC to enable SimpleFB.
-> > > 
-> > > Icenowy Zheng (10):
-> > >   dt-bindings: fix the binding of Allwinner DE2 CCU of A83T and H3
-> > >   clk: sunxi-ng: add support for Allwinner H3 DE2 CCU
-> > >   clk: sunxi-ng: fix the A64/H5 clock description of DE2 CCU
-> > >   dt-bindings: simplefb-sunxi: add pipelines for DE2
-> > >   ARM: sun8i: h3/h5: add DE2 CCU device node for H3
-> > >   arm64: allwinner: h5: add compatible string for DE2 CCU
-> > >   ARM: sunxi: h3/h5: add simplefb nodes
-> > >   dt-bindings: add binding for A64 DE2 CCU SRAM
-> > >   arm64: allwinner: a64: add DE2 CCU for A64 SoC
-> > >   arm64: allwinner: a64: add simplefb for A64 SoC
-> > 
-> > Maxime, could you review and, if possible, apply the H3/5
-> > part of this patchset?
-> 
-> This came a bit late, we're too close from the merge window
-> now. Please resend them after -rc1 is out.
+Hi, according to Xilinx, from a computer host it happens in a second, while for us in the Zynq (ARM) takes way more than that as explained before. And indeed the programming is done via config accesses, and can't happen otherwise as this is the way Xilinx created its FPGA IP (Intellectual Property) cores. Still if I do a baremetal test (so no Linux) and write from the ARMs to the FPGA via those registers, it takes only 17 cycles instead of the Linux implementation which takes 250 cycles. 
 
-Just dropping here that drm-misc is open all the time, making for a much
-better process for contributors :-)
--Daniel
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Ruben Guerra Marin
+ruben.guerra.marin at axon.tv
+
+________________________________________
+From: Bjorn Helgaas <helgaas@kernel.org>
+Sent: Friday, November 3, 2017 2:54 PM
+To: Michal Simek
+Cc: Ruben Guerra Marin; bhelgaas at google.com; soren.brinkmann at xilinx.com; bharat.kumar.gogada at xilinx.com; linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
+Subject: Re: Performance issues writing to PCIe in a Zynq
+
+On Fri, Nov 03, 2017 at 09:12:04AM +0100, Michal Simek wrote:
+> On 2.11.2017 16:30, Ruben Guerra Marin wrote:
+> >
+> > I have the a Zynq board running petalinux, and it is connected
+> > through PCIe to a Virtex Ultrascale board. I configured the
+> > Ultrascale for Tandem PCIe, which the second stage bitstream is
+> > being programmed from the Zynq board (I crossed compiled the mcap
+> > application that Xilinx provides).
+> >
+> > This works perfectly, but takes around ~12 seconds to program the
+> > second stage bitstream (compressed is ~12 MB), which is quite
+> > slow. We also tried debugging the mcap application and pciutils.
+> > We found out the operation that takes long to execute: In
+> > pciutils, the instruction to actually call the write to the driver
+> > (pwrite) takes approximately 6uS, so if you add up this for 12 MB
+> > then you can see why it takes so long. Why is this so slow? Is
+> > this maybe a problem with the driver?
+> >
+> > For testing, I added an ILA to the AXI bus in between the Zynq GP1
+> > and the PCIe IP control registers port. I triggered halfway the
+> > programming of the bitstream using the mcap program provided by
+> > Xilinx. I can see that it is writing to address x358, which
+> > according to the *datasheet*
+> > (https://www.xilinx.com/Attachment/Xilinx_Answer_64761__UltraScale_Devices.pdf)
+> > is the Write Data Register, which is correct (and again, I know
+> > the whole bitstream gets programmed correctly).
+> >
+> > But what I also see is that a "awvalid" being asserted to the next
+> > one it takes 245 cycles, and I can imagine this is why it takes 12
+> > seconds to program a 12MB bitstream.
+
+How long do you expect this to take?  What are the corresponding times
+on other hardware or other OSes?
+
+It sounds like this programming is done via config accesses, which are
+definitely not a fast path, so I don't know if 12s is unreasonably
+slow or not.  The largest config write is 4 bytes, which means 12MB
+requires 3M writes, and if each takes 6us, that's 18s total.
+
+Most platforms serialize config accesses with a lock, which also slows
+things down.  It looks like your hardware might support ECAM, which
+means you might be able to remove the locking overhead by using
+lockless config (see     CONFIG_    PCI_LOCKLESS_CONFIG).  This is a new
+feature currently only used by x86, and it's currently a system-wide
+compile-time switch, so it would require some work for you to use it.
+
+The high bandwidth way to do this would be use a BAR and do PCI memory
+writes instead of PCI config writes.  Obviously the adapter determines
+whether this is possible.
+
+Bjorn
