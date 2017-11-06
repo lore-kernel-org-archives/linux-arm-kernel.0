@@ -1,34 +1,62 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 6 Nov 2017 18:58:43 +0100
-Subject: [PATCH 04/37] KVM: arm/arm64: Get rid of vcpu->arch.irq_lines
-In-Reply-To: <20171012104141.26902-5-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-5-christoffer.dall@linaro.org>
-Message-ID: <20171106175843.oahi24paaiwqzkgn@kamzik.brq.redhat.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 6 Nov 2017 18:03:16 +0000
+Subject: [PATCH 2/3] dmaengine: qcom_hidma: add support for the new
+ revision
+In-Reply-To: <1509989180-22617-2-git-send-email-okaya@codeaurora.org>
+References: <1509989180-22617-1-git-send-email-okaya@codeaurora.org>
+ <1509989180-22617-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <428c7106-8ebe-0c12-4576-1cfac422923e@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:08PM +0200, Christoffer Dall wrote:
-> We currently have a separate read-modify-write of the HCR_EL2 on entry
-> to the guest for the sole purpose of setting the VF and VI bits, if set.
-> Since this is most rarely the case (only when using userspace IRQ chip
-> and interrupts are in flight), let's get rid of this operation and
-> instead modify the bits in the vcpu->arch.hcr[_el2] directly when
-> needed.
+On 06/11/17 17:26, Sinan Kaya wrote:
+> Add support for probing the newer HW.
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  arch/arm/include/asm/kvm_emulate.h   |  9 ++-------
->  arch/arm/include/asm/kvm_host.h      |  3 ---
->  arch/arm/kvm/emulate.c               |  2 +-
->  arch/arm/kvm/hyp/switch.c            |  2 +-
->  arch/arm64/include/asm/kvm_emulate.h |  9 ++-------
->  arch/arm64/include/asm/kvm_host.h    |  3 ---
->  arch/arm64/kvm/hyp/switch.c          |  6 ------
->  arch/arm64/kvm/inject_fault.c        |  2 +-
->  virt/kvm/arm/arm.c                   | 11 ++++++-----
->  virt/kvm/arm/mmu.c                   |  6 +++---
->  10 files changed, 16 insertions(+), 37 deletions(-)
->
+>  drivers/dma/qcom/hidma.c | 6 ++++++
+>  1 file changed, 6 insertions(+)
+> 
+> diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+> index e366985..29d6aaa 100644
+> --- a/drivers/dma/qcom/hidma.c
+> +++ b/drivers/dma/qcom/hidma.c
+> @@ -749,9 +749,13 @@ static bool hidma_msi_capable(struct device *dev)
+>  			return false;
+>  
+>  		ret = strcmp(of_compat, "qcom,hidma-1.1");
+> +		if (ret)
+> +			ret = strcmp(of_compat, "qcom,hidma-1.2");
+>  	} else {
+>  #ifdef CONFIG_ACPI
+>  		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
+> +		if (ret)
+> +			ret = strcmp(acpi_device_hid(adev), "QCOM8063");
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+This string-juggling looks to have already hit the point at which it
+doesn't scale well - it would be a lot nicer to make use of
+of_device_get_match_data() and the ACPI equivalent to abstract the
+version-specific data appropriately.
+
+Robin.
+
+>  #endif
+>  	}
+>  	return ret == 0;
+> @@ -954,6 +958,7 @@ static int hidma_remove(struct platform_device *pdev)
+>  static const struct acpi_device_id hidma_acpi_ids[] = {
+>  	{"QCOM8061"},
+>  	{"QCOM8062"},
+> +	{"QCOM8063"},
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
+> @@ -962,6 +967,7 @@ static int hidma_remove(struct platform_device *pdev)
+>  static const struct of_device_id hidma_match[] = {
+>  	{.compatible = "qcom,hidma-1.0",},
+>  	{.compatible = "qcom,hidma-1.1",},
+> +	{.compatible = "qcom,hidma-1.2",},
+>  	{},
+>  };
+>  MODULE_DEVICE_TABLE(of, hidma_match);
+> 
