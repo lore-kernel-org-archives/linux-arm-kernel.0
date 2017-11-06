@@ -1,161 +1,40 @@
-From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
-Date: Mon, 6 Nov 2017 14:24:48 +0100
-Subject: [RFC 05/12] dt-bindings: mtd: add Marvell NAND controller
- documentation
-In-Reply-To: <20171024190433.r5xy25eqdesz7jjs@rob-hp-laptop>
-References: <20171018143629.29302-1-miquel.raynal@free-electrons.com>
- <20171018143629.29302-6-miquel.raynal@free-electrons.com>
- <20171024190433.r5xy25eqdesz7jjs@rob-hp-laptop>
-Message-ID: <20171106142448.40ca5033@xps13>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon,  6 Nov 2017 14:34:01 +0100
+Subject: [PATCH] [fixup timers-conversion] ARM: footbridge: add missing
+ semicolon
+Message-ID: <20171106133410.467203-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+The timer_setup() conversion included a small typo that breaks the
+build:
 
-> > +Required properties:
-> > +C'est faux, t'en a rajout? un y a pas longtps :).
-> > +Je conseille de mettre ?a sous forme de liste, genre  
-> 
-> Humm.
+arch/arm/mach-footbridge/dc21285.c: In function 'dc21285_enable_error':
+arch/arm/mach-footbridge/dc21285.c:145:2: error: expected ';' before 'else'
+  else if (timer == &perr_timer)
 
-Oops!
+Fixes: b7bea32f0cc4 ("ARM: footbridge: Convert timers to use timer_setup()")
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+The broken patch is currently in -tip and came in through timers-conversion-next3.
+Please apply this one on top, or fold it into the original patch if possible
+---
+ arch/arm/mach-footbridge/dc21285.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> 
-> > +
-> > +- compatible: can be one of the following:
-> > +    * "marvell,armada-8k-nand-controller"
-> > +    * "marvell,armada370-nand-controller"
-> > +    * "marvell,pxa3xx-nand-controller"
-> > +    * "marvell,armada-8k-nand" (deprecated)
-> > +    * "marvell,armada370-nand" (deprecated)
-> > +    * "marvell,pxa3xx-nand" (deprecated)
-> > +- reg: shall contain registers location and length for data and
-> > reg.  
-> 
-> 2 regions?
-
-Just one, rephrased.
-
-> 
-> > +- #address-cells: shall be set to 1. Encode the nand CS.
-> > +- #size-cells: shall be set to 0.
-> > +- interrupts: shall define the nand controller interrupt.
-> > +- clocks: shall reference nand controller clocks.  
-> 
-> How many clocks?
-
-Only one too: "reference the NAND controller clock".
-
-> 
-> > +- marvell,system-controller: Set to retrieve the syscon node that
-> > handles
-> > +  NAND controller related registers (only required with the
-> > +  "marvell,armada-8k-nand[-controller]" compatibles).
-> > +
-> > +Optional properties:
-> > +- dmas: shall reference DMA channel associated to the NAND
-> > controller. +- dma-names: shall be "rxtx".
-> > +
-> > +Optional children nodes:
-> > +Children nodes represent the available NAND chips.
-> > +
-> > +Required properties:
-> > +- reg: shall contain the native Chip Select ids (0-3)
-> > +- marvell,rb: shall contain the native Ready/Busy ids (0-1)
-> > +
-> > +Optional properties:
-> > +- marvell,nand-keep-config: orders the driver not to take the
-> > timings
-> > +  from the core and leaving them completely untouched. Bootloader
-> > +  timings will then be used.
-> > +- marvell,nand-enable-arbiter: only useful for PXA platforms, will
-> > +  enable bus arbiter between NFC and DFI bus (must be enabled for
-> > +  NFC operation)  
-> 
-> Why do you need this if it must be enabled?
-
-That is right, there is no more need for it, also removed it from the
-driver, just knowing the board with the compatible string is enough.
-
-> 
-> > +- nand-on-flash-bbt: speed up the boot process by not discovering
-> > all
-> > +  the bad blocks at each boot and reading directly an on flash
-> > table. +- nand-ecc-mode: one of the supported ECC modes ("none",
-> > "soft",
-> > +  "hw"). If not specified, hardware ECC will be used.
-> > +- nand-ecc-algo: algorithm to use if previous choice was "soft"
-> > +  ("hamming" or "bch). This property may be added for hardware ECC
-> > for
-> > +  clarification but will be ignored by the driver because ECC mode
-> > is
-> > +  chosen depending on the page size and the strength required by
-> > the
-> > +  NAND chip. This value may be overwritten with the
-> > nand-ecc-strength
-> > +  property.
-> > +- nand-ecc-strength: desired ECC strength.
-> > +- nand-ecc-step-size: indication on the ECC step size. This has no
-> > +  effect and will be ignored by the driver when using hardware
-> > +  ECC. Because Marvell's NAND flash controller does use fixed
-> > strength
-> > +  (1-bit for Hamming, 16-bit for BCH), the step size will shrink or
-> > +  grown in order to fit the required strength and the value
-> > +  updated. Step sizes are not completely random for all and follow
-> > +  certain patterns described in AN-379, "Marvell SoC NFC ECC".  
-> 
-> For standard properties, just reference nand.txt and add any 
-> constraints. Don't define what the property is again.
-
-Ok.
-
-> 
-> > +
-> > +See Documentation/devicetree/bindings/mtd/nand.txt for more
-> > details on +generic bindings.
-> > +
-> > +
-> > +Example:
-> > +nand_controller: nand-controller at d0000 {
-> > +	compatible = "marvell,armada370-nand-controller";
-> > +	reg = <0xd0000 0x54>;
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-> > +	clocks = <&coredivclk 0>;
-> > +	status = "okay";  
-> 
-> Don't show status in examples.
-
-Ok.
-
-> 
-> > +
-> > +	nand at 0 {
-> > +		reg = <0>;
-> > +		marvell,rb = <0>;
-> > +		nand-ecc-mode = "hw";
-> > +		marvell,nand-keep-config;
-> > +		marvell,nand-enable-arbiter;
-> > +		nand-on-flash-bbt;
-> > +		nand-ecc-strength = <4>;
-> > +		nand-ecc-step-size = <512>;
-> > +
-> > +		partitions {
-> > +			compatible = "fixed-partitions";
-> > +			#address-cells = <1>;
-> > +			#size-cells = <1>;
-> > +
-> > +			partition at 0 {
-> > +				label = "Rootfs";
-> > +				reg = <0x00000000 0x40000000>;
-> > +			};
-> > +		};
-> > +	};
-> > +};
-> > -- 
-> > 2.11.0
-> >   
-
-Thanks for the review,
-Miqu?l
+diff --git a/arch/arm/mach-footbridge/dc21285.c b/arch/arm/mach-footbridge/dc21285.c
+index 8407e4a07c77..e7b350f18f5f 100644
+--- a/arch/arm/mach-footbridge/dc21285.c
++++ b/arch/arm/mach-footbridge/dc21285.c
+@@ -141,7 +141,7 @@ static void dc21285_enable_error(struct timer_list *timer)
+ 	del_timer(timer);
+ 
+ 	if (timer == &serr_timer)
+-		enable_irq(IRQ_PCI_SERR)
++		enable_irq(IRQ_PCI_SERR);
+ 	else if (timer == &perr_timer)
+ 		enable_irq(IRQ_PCI_PERR);
+ }
+-- 
+2.9.0
