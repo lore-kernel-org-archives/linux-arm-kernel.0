@@ -1,96 +1,222 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Nov 2017 11:15:19 -0600
-Subject: [PATCH V3 02/11] dt-bindings: Add Spreadtrum clock binding
- documentation
-In-Reply-To: <20171102065626.21835-3-chunyan.zhang@spreadtrum.com>
-References: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
- <20171102065626.21835-3-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171106171519.xomnca72adqtzm2n@rob-hp-laptop>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 6 Nov 2017 18:22:51 +0100
+Subject: [PATCH 01/37] KVM: arm64: Avoid storing the vcpu pointer on the
+ stack
+In-Reply-To: <20171012104141.26902-2-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-2-christoffer.dall@linaro.org>
+Message-ID: <20171106172251.vi7jlsyqhjcnq35w@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 02:56:17PM +0800, Chunyan Zhang wrote:
-> Introduce a new binding with its documentation for Spreadtrum clock
-> sub-framework.
+On Thu, Oct 12, 2017 at 12:41:05PM +0200, Christoffer Dall wrote:
+> We already have the percpu area for the host cpu state, which points to
+> the VCPU, so there's no need to store the VCPU pointer on the stack on
+> every context switch.  We can be a little more clever and just use
+> tpidr_el2 for the percpu offset and load the VCPU pointer from the host
+> context.
 > 
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+> This requires us to have a scratch register though, so we take the
+> chance to rearrange some of the el1_sync code to only look at the
+> vttbr_el2 to determine if this is a trap from the guest or an HVC from
+> the host.  We do add an extra check to call the panic code if the kernel
+> is configured with debugging enabled and we saw a trap from the host
+> which wasn't an HVC, indicating that we left some EL2 trap configured by
+> mistake.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  Documentation/devicetree/bindings/clock/sprd.txt | 55 ++++++++++++++++++++++++
->  1 file changed, 55 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/sprd.txt
+>  arch/arm64/include/asm/kvm_asm.h | 20 ++++++++++++++++++++
+>  arch/arm64/kernel/asm-offsets.c  |  1 +
+>  arch/arm64/kvm/hyp/entry.S       |  5 +----
+>  arch/arm64/kvm/hyp/hyp-entry.S   | 39 ++++++++++++++++++---------------------
+>  arch/arm64/kvm/hyp/switch.c      |  2 +-
+>  5 files changed, 41 insertions(+), 26 deletions(-)
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sprd.txt b/Documentation/devicetree/bindings/clock/sprd.txt
-> new file mode 100644
-> index 0000000..5c09529
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/sprd.txt
-> @@ -0,0 +1,55 @@
-> +Spreadtrum Clock Binding
-> +------------------------
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index ab4d0a9..7e48a39 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -70,4 +70,24 @@ extern u32 __init_stage2_translation(void);
+>  
+>  #endif
+>  
+> +#ifdef __ASSEMBLY__
+> +.macro get_host_ctxt reg, tmp
+> +	/*
+> +	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+> +	 * not be accessible by this address from EL2, hyp_panic() converts
+> +	 * it with kern_hyp_va() before use.
+> +	 */
+> +	ldr	\reg, =kvm_host_cpu_state
+> +	mrs	\tmp, tpidr_el2
+> +	add	\reg, \reg, \tmp
+> +	kern_hyp_va \reg
+> +.endm
 > +
-> +Required properties:
-> +- compatible: should contain the following compatible strings:
-> +	- "sprd,sc9860-pmu-gate"
-> +	- "sprd,sc9860-pll"
-> +	- "sprd,sc9860-ap-clk"
-> +	- "sprd,sc9860-aon-prediv"
-> +	- "sprd,sc9860-apahb-gate"
-> +	- "sprd,sc9860-aon-gate"
-> +	- "sprd,sc9860-aonsecure-clk"
-> +	- "sprd,sc9860-agcp-gate"
-> +	- "sprd,sc9860-gpu-clk"
-> +	- "sprd,sc9860-vsp-clk"
-> +	- "sprd,sc9860-vsp-gate"
-> +	- "sprd,sc9860-cam-clk"
-> +	- "sprd,sc9860-cam-gate"
-> +	- "sprd,sc9860-disp-clk"
-> +	- "sprd,sc9860-disp-gate"
-> +	- "sprd,sc9860-apapb-gate"
-> +
-> +- #clock-cells: must be 1
-> +
-> +- clocks : shall be the input parent clock(s) phandle for the clock.
+> +.macro get_vcpu vcpu, ctxt
+> +	ldr	\vcpu, [\ctxt, #HOST_CONTEXT_VCPU]
+> +	kern_hyp_va	\vcpu
+> +.endm
 
-You need to document how many clocks for each block.
+To avoid the need for the pattern
+
+  get_host_ctxt x0, x1
+  get_vcpu      x1, x0
+
+everywhere this macro is used, how about defining it as
+
+ .macro get_vcpu vcpu, tmp
+     get_host_ctxt \tmp, \vcpu    
+     ldr     \vcpu, [\tmp, #HOST_CONTEXT_VCPU]
+     kern_hyp_va     \vcpu
+ .endm
+
+which also has the side-effect of tmp being ctxt after the call.
 
 > +
-> +Optional properties:
+> +#endif
 > +
-> +- reg:	Contain the registers base address and length. It must be configured only if no 'sprd,syscon' under the node.
-> +
-> +- sprd,syscon: phandle to the syscon which is in the same address area with the clock.
-> +
-> +Example:
-> +
-> +	pmu_gate: pmu-gate {
-> +		compatible = "sprd,sc9860-pmu-gate";
-> +		sprd,syscon = <&pmu_apb>;
+>  #endif /* __ARM_KVM_ASM_H__ */
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 71bf088..612021d 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -135,6 +135,7 @@ int main(void)
+>    DEFINE(CPU_FP_REGS,		offsetof(struct kvm_regs, fp_regs));
+>    DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
+>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
+> +  DEFINE(HOST_CONTEXT_VCPU,	offsetof(struct kvm_cpu_context, __hyp_running_vcpu));
+>  #endif
+>  #ifdef CONFIG_CPU_PM
+>    DEFINE(CPU_SUSPEND_SZ,	sizeof(struct cpu_suspend_ctx));
+> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+> index 9a8ab5d..76cd48f 100644
+> --- a/arch/arm64/kvm/hyp/entry.S
+> +++ b/arch/arm64/kvm/hyp/entry.S
+> @@ -62,9 +62,6 @@ ENTRY(__guest_enter)
+>  	// Store the host regs
+>  	save_callee_saved_regs x1
+>  
+> -	// Store host_ctxt and vcpu for use at exit time
+> -	stp	x1, x0, [sp, #-16]!
+> -
+>  	add	x18, x0, #VCPU_CONTEXT
+>  
+>  	// Restore guest regs x0-x17
+> @@ -119,7 +116,7 @@ ENTRY(__guest_exit)
+>  	save_callee_saved_regs x1
+>  
+>  	// Restore the host_ctxt from the stack
+> -	ldr	x2, [sp], #16
+> +	get_host_ctxt	x2, x3
+>  
+>  	// Now restore the host regs
+>  	restore_callee_saved_regs x2
+> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+> index e4f37b9..2950f26 100644
+> --- a/arch/arm64/kvm/hyp/hyp-entry.S
+> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
+> @@ -56,19 +56,16 @@ ENDPROC(__vhe_hyp_call)
+>  el1_sync:				// Guest trapped into EL2
+>  	stp	x0, x1, [sp, #-16]!
+>  
+> -alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+> -	mrs	x1, esr_el2
+> -alternative_else
+> -	mrs	x1, esr_el1
+> -alternative_endif
+> -	lsr	x0, x1, #ESR_ELx_EC_SHIFT
+> -
+> -	cmp	x0, #ESR_ELx_EC_HVC64
+> -	b.ne	el1_trap
+> -
+>  	mrs	x1, vttbr_el2		// If vttbr is valid, the 64bit guest
+>  	cbnz	x1, el1_trap		// called HVC
+>  
+> +#ifdef CONFIG_DEBUG
+> +	mrs	x0, esr_el2
+> +	lsr	x0, x0, #ESR_ELx_EC_SHIFT
+> +	cmp     x0, #ESR_ELx_EC_HVC64
+> +	b.ne    __hyp_panic
+> +#endif
 
-Ideally, the pmu-gate node would be a child of pmu_apb and use the reg 
-property if clock registers are a contiguous range. Then you don't need 
-this phandle.
+The dropping of the "alternative_if_not ARM64_HAS_VIRT_HOST_EXTN" stuff
+isn't called out in the commit message, but it looks like it was just 
+a cleanup of code that was never necessary, as esr_el2 aliases esr_el1.
+Is that correct?
 
-> +		clocks = <&ext_26m>;
-> +		#clock-cells = <1>;
-> +	};
 > +
-> +	pll: pll {
-> +		compatible = "sprd,sc9860-pll";
-> +		sprd,syscon = <&ana_apb>;
-
-Same here.
-
-> +		clocks = <&pmu_gate 0>;
-> +		#clock-cells = <1>;
-> +	};
+>  	/* Here, we're pretty sure the host called HVC. */
+>  	ldp	x0, x1, [sp], #16
+>  
+> @@ -101,10 +98,15 @@ alternative_endif
+>  	eret
+>  
+>  el1_trap:
+> +	get_host_ctxt	x0, x1
+> +	get_vcpu	x1, x0
 > +
-> +	ap_clk: clock-controller at 20000000 {
-> +		compatible = "sprd,sc9860-ap-clk";
-> +		reg = <0 0x20000000 0 0x400>;
-> +		clocks = <&ext_26m>, <&pll 0>,
-> +			 <&pmu_gate 0>;
-> +		#clock-cells = <1>;
-> +	};
+> +	mrs		x0, esr_el2
+> +	lsr		x0, x0, #ESR_ELx_EC_SHIFT
+>  	/*
+>  	 * x0: ESR_EC
+> +	 * x1: vcpu pointer
+>  	 */
+> -	ldr	x1, [sp, #16 + 8]	// vcpu stored by __guest_enter
+>  
+>  	/*
+>  	 * We trap the first access to the FP/SIMD to save the host context
+> @@ -122,13 +124,15 @@ alternative_else_nop_endif
+>  
+>  el1_irq:
+>  	stp     x0, x1, [sp, #-16]!
+> -	ldr	x1, [sp, #16 + 8]
+> +	get_host_ctxt	x0, x1
+> +	get_vcpu	x1, x0
+>  	mov	x0, #ARM_EXCEPTION_IRQ
+>  	b	__guest_exit
+>  
+>  el1_error:
+>  	stp     x0, x1, [sp, #-16]!
+> -	ldr	x1, [sp, #16 + 8]
+> +	get_host_ctxt	x0, x1
+> +	get_vcpu	x1, x0
+>  	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+>  	b	__guest_exit
+>  
+> @@ -164,14 +168,7 @@ ENTRY(__hyp_do_panic)
+>  ENDPROC(__hyp_do_panic)
+>  
+>  ENTRY(__hyp_panic)
+> -	/*
+> -	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+> -	 * not be accessible by this address from EL2, hyp_panic() converts
+> -	 * it with kern_hyp_va() before use.
+> -	 */
+> -	ldr	x0, =kvm_host_cpu_state
+> -	mrs	x1, tpidr_el2
+> -	add	x0, x0, x1
+> +	get_host_ctxt x0, x1
+>  	b	hyp_panic
+>  ENDPROC(__hyp_panic)
+>  
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 69ef24a..a0123ad 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -435,7 +435,7 @@ void __hyp_text __noreturn hyp_panic(struct kvm_cpu_context *__host_ctxt)
+>  	if (read_sysreg(vttbr_el2)) {
+>  		struct kvm_cpu_context *host_ctxt;
+>  
+> -		host_ctxt = kern_hyp_va(__host_ctxt);
+> +		host_ctxt = __host_ctxt;
+>  		vcpu = host_ctxt->__hyp_running_vcpu;
+>  		__timer_disable_traps(vcpu);
+>  		__deactivate_traps(vcpu);
 > -- 
-> 2.7.4
-> 
+> 2.9.0
+>
+
+Thanks,
+drew
