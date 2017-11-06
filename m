@@ -1,35 +1,74 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 6 Nov 2017 16:18:22 -0600
-Subject: [PATCH v4 02/20] dt-bindings: arm: add support for ARM System
- Control and Management Interface(SCMI) protocol
-In-Reply-To: <1509720477-18936-3-git-send-email-sudeep.holla@arm.com>
-References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
- <1509720477-18936-3-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20171106221822.b6ejvckapvprfsmh@rob-hp-laptop>
+From: rfranz@cavium.com (Roy Franz)
+Date: Mon, 6 Nov 2017 14:29:02 -0800
+Subject: [PATCH v2] mtd: slram: use memremap() instead of ioremap()
+In-Reply-To: <20171019225549.11422-1-roy.franz@cavium.com>
+References: <20171019225549.11422-1-roy.franz@cavium.com>
+Message-ID: <CAKWsp+zhqHZaUjbzeutxqE81f5orOLMd6uNVoYifjeYibhAD5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 02:47:39PM +0000, Sudeep Holla wrote:
-> This patch adds devicetree binding for System Control and Management
-> Interface (SCMI) Message Protocol used between the Application Cores(AP)
-> and the System Control Processor(SCP). The MHU peripheral provides a
-> mechanism for inter-processor communication between SCP's M3 processor
-> and AP.
-> 
-> SCP offers control and management of the core/cluster power states,
-> various power domain DVFS including the core/cluster, certain system
-> clocks configuration, thermal sensors and many others.
-> 
-> SCMI protocol is developed as better replacement to the existing SCPI
-> which is not flexible and easily extensible.
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  Documentation/devicetree/bindings/arm/arm,scmi.txt | 179 +++++++++++++++++++++
->  MAINTAINERS                                        |   4 +-
->  2 files changed, 181 insertions(+), 2 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/arm/arm,scmi.txt
+ping - is this suitable for 4.15?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Thanks,
+Roy
+
+
+On Thu, Oct 19, 2017 at 3:55 PM, Roy Franz <rfranz@cavium.com> wrote:
+> Convert slram to use memremap() to map the memory it uses to back an MTD
+> device, as this is the proper interface for mapping memory. This change
+> enables normal memory to be used to back an MTD device on arm64, as arm64
+> prevents ioremap() being used on normal memory.
+>
+> Signed-off-by: Roy Franz <roy.franz@cavium.com>
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Tested-by: David Daney <david.daney@cavium.com>
+> ---
+> Tested on arm64 simulation, using simulator to preload filesystem image into RAM,
+> and also tested on x86_64 using video card memory.  This is useful for speeding
+> up booting on (very slow) emulation environments by avoiding any processing of
+> an initramfs.
+> David Daney tested on MIPS64.
+>
+> v2: Fix typo in subject line, s/mdt/mtd/
+>     added acked-by/tested-by
+>
+>  drivers/mtd/devices/slram.c | 9 +++++----
+>  1 file changed, 5 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/mtd/devices/slram.c b/drivers/mtd/devices/slram.c
+> index 8087c36dc693..0ec85f316d24 100644
+> --- a/drivers/mtd/devices/slram.c
+> +++ b/drivers/mtd/devices/slram.c
+> @@ -163,8 +163,9 @@ static int register_device(char *name, unsigned long start, unsigned long length
+>         }
+>
+>         if (!(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start =
+> -                               ioremap(start, length))) {
+> -               E("slram: ioremap failed\n");
+> +               memremap(start, length,
+> +                        MEMREMAP_WB | MEMREMAP_WT | MEMREMAP_WC))) {
+> +               E("slram: memremap failed\n");
+>                 return -EIO;
+>         }
+>         ((slram_priv_t *)(*curmtd)->mtdinfo->priv)->end =
+> @@ -186,7 +187,7 @@ static int register_device(char *name, unsigned long start, unsigned long length
+>
+>         if (mtd_device_register((*curmtd)->mtdinfo, NULL, 0))   {
+>                 E("slram: Failed to register new device\n");
+> -               iounmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
+> +               memunmap(((slram_priv_t *)(*curmtd)->mtdinfo->priv)->start);
+>                 kfree((*curmtd)->mtdinfo->priv);
+>                 kfree((*curmtd)->mtdinfo);
+>                 return(-EAGAIN);
+> @@ -206,7 +207,7 @@ static void unregister_devices(void)
+>         while (slram_mtdlist) {
+>                 nextitem = slram_mtdlist->next;
+>                 mtd_device_unregister(slram_mtdlist->mtdinfo);
+> -               iounmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
+> +               memunmap(((slram_priv_t *)slram_mtdlist->mtdinfo->priv)->start);
+>                 kfree(slram_mtdlist->mtdinfo->priv);
+>                 kfree(slram_mtdlist->mtdinfo);
+>                 kfree(slram_mtdlist);
+> --
+> 2.11.0
+>
