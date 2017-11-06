@@ -1,39 +1,39 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon, 06 Nov 2017 18:41:58 +0000
-Subject: [RFC/RFT PATCH 3/6] ACPI / APEI: Replace ioremap_page_range()
- with fixmap
-In-Reply-To: <459a2731-b7eb-5836-93fd-57b7feaa5e40@huawei.com>
-References: <20171031153832.17746-1-james.morse@arm.com>
- <20171031153832.17746-4-james.morse@arm.com>
- <3b796e66-1618-0a6e-e57e-99323514b84d@huawei.com> <59F9E0DF.20006@arm.com>
- <459a2731-b7eb-5836-93fd-57b7feaa5e40@huawei.com>
-Message-ID: <5A00ACF6.2010200@arm.com>
+Date: Mon, 06 Nov 2017 18:43:38 +0000
+Subject: [RFC/RFT PATCH 0/6] Switch GHES ioremap_page_range() to use fixmap
+In-Reply-To: <1509559730.30483.19.camel@hpe.com>
+References: <20171031153832.17746-1-james.morse@arm.com>	
+ <59F9E119.6040700@arm.com> <20171101153043.xgzepqbxsblmppp5@pd.tnic>
+ <1509559730.30483.19.camel@hpe.com>
+Message-ID: <5A00AD5A.1070601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu
+On 01/11/17 18:20, Kani, Toshimitsu wrote:
+> On Wed, 2017-11-01 at 16:30 +0100, Borislav Petkov wrote:
+>> On Wed, Nov 01, 2017 at 02:58:33PM +0000, James Morse wrote:
+>>> Does anyone have an x86 machine that does firmware-first using NOTIFY_NMI?
 
-On 02/11/17 12:01, gengdongjiu wrote:
-> James Morse wrote:
->> Can I take that as a 'Tested-by:'?
->>
->> These tags also let us record who has a system that can test changes to this driver.
+>> AFAIK, the only one who has access to a reportedly somewhat working GHES
+>> implementation is Toshi. CCed.
 > 
-> sure.
-> Thanks for the fixing.
-> Qiang Zheng who is my colleague have tested it.
+> Thanks for the heads-up.  My x86 system only supports GHES with SCI
+> error sources.  It uses MCE for synchronous error events.
 > 
-> CC  Qiang.
+> So, for x86 SCI error sources:
 > 
-> Tested-by:  Qiang Zheng <zhengqiang10@huawei.com>
+> Tested-by: Toshi Kani <toshi.kani@hpe.com>
 
-I can't do anything with this unless Qiang posts it. (I'll add to the CC list in
-the next version)
+Thanks Toshi!
 
->From Documentation/process/5.Posting.rst:
-> Be careful in the addition of tags to your patches: only Cc: is appropriate
-> for addition without the explicit permission of the person named.
 
+> nit: I think ghes_ioremap_pfn_[nmi|irq] should be renamed since they no
+> longer use ioremap. 
+
+I thought that would be too noisy...
+
+I have some more rework to do in here before we can merge the other arm64 RAS
+stuff, I can take that into account then.
 
 
 Thanks,
