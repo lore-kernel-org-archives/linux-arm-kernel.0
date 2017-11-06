@@ -1,128 +1,72 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Mon,  6 Nov 2017 10:31:51 +0100
-Subject: [PATCH v4] arm64: support __int128 on gcc 5+
-In-Reply-To: <20171103141858.13149-1-Jason@zx2c4.com>
-References: <20171103141858.13149-1-Jason@zx2c4.com>
-Message-ID: <20171106093151.8312-1-Jason@zx2c4.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 6 Nov 2017 17:31:56 +0800
+Subject: [PATCH] clk: meson: gxbb: fix wrong clock for SARADC/SANA
+In-Reply-To: <889b8fd5-31e4-1371-6121-0f1aec6fa777@baylibre.com>
+References: <20171106075212.14275-1-yixun.lan@amlogic.com>
+ <889b8fd5-31e4-1371-6121-0f1aec6fa777@baylibre.com>
+Message-ID: <c773682c-6045-a476-e0c8-04347624c4e3@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Versions of gcc prior to gcc 5 emitted a __multi3 function call when
-dealing with TI types, resulting in failures when trying to link to
-libgcc, and more generally, bad performance. However, since gcc 5,
-the compiler supports actually emitting fast instructions, which means
-we can at long last enable this option and receive the speedups.
+Hi Neil:
 
-The gcc commit that added proper Aarch64 support is:
-https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
-This commit appears to be part of the gcc 5 release.
 
-There are still a few instructions, __ashlti3 and __ashrti3, which
-require libgcc, which is fine. Rather than linking to libgcc, we
-simply provide them ourselves, since they're not that complicated.
+On 11/06/17 16:57, Neil Armstrong wrote:
+> On 06/11/2017 08:52, Yixun Lan wrote:
+>> According to the datasheet, in Meson-GXBB/GXL series,
+>> The clock gate bit for SARADC is HHI_GCLK_MPEG2 bit[22],
+>> while clock gate bit for SANA is HHI_GCLK_MPEG0 bit[10].
+>>
+>> Test passed at gxl_skt dev board.
+>>
+>> Tested-by: Xingyu Chen <xingyu.chen@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>>
+>> ---
+>> I think this error was introduced by a copy & paste from meson8 code?
+>> and we didn't notice them due to the SANA clock is also enabled by
+>> DTS (so SAR_ADC works fine)?
+>> ---
+>>  drivers/clk/meson/gxbb.c | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+>> index b2d1e8ed7152..92168348ffa6 100644
+>> --- a/drivers/clk/meson/gxbb.c
+>> +++ b/drivers/clk/meson/gxbb.c
+>> @@ -1139,7 +1139,7 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
+>>  static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
+>>  static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
+>>  static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
+>> -static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
+>> +static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG0, 10);
+>>  static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
+>>  static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
+>>  static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
+>> @@ -1190,7 +1190,7 @@ static MESON_GATE(gxbb_usb0_ddr_bridge, HHI_GCLK_MPEG2, 9);
+>>  static MESON_GATE(gxbb_mmc_pclk, HHI_GCLK_MPEG2, 11);
+>>  static MESON_GATE(gxbb_dvin, HHI_GCLK_MPEG2, 12);
+>>  static MESON_GATE(gxbb_uart2, HHI_GCLK_MPEG2, 15);
+>> -static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG2, 22);
+>> +static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG2, 22);
+>>  static MESON_GATE(gxbb_vpu_intr, HHI_GCLK_MPEG2, 25);
+>>  static MESON_GATE(gxbb_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
+>>  static MESON_GATE(gxbb_clk81_a53, HHI_GCLK_MPEG2, 29);
+>>
+> 
+> Hi Yixun,
+> 
+> Can you precise how it affects the saradc driver ? from the DT and clk PoV ?
+>
+the saradc module doesn't require sana clock (it's irrelvevant), we will
+send a patchset v3 to address this.
 
-Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
----
-Changes v3->v4:
-  - Typo in comment
-  - Relabel second function
+> Also, can you add a Fixes: tag on the patch ?
+> 
+sure, I can do this.
 
- arch/arm64/Makefile      |  2 ++
- arch/arm64/lib/Makefile  |  2 +-
- arch/arm64/lib/tishift.S | 59 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 62 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/lib/tishift.S
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..1f8a0fec6998 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -53,6 +53,8 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
- KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
- KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
- 
-+KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-+
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index a0abc142c92b..55bdb01f1ea6 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -2,7 +2,7 @@ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
--		   strchr.o strrchr.o
-+		   strchr.o strrchr.o tishift.o
- 
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
-diff --git a/arch/arm64/lib/tishift.S b/arch/arm64/lib/tishift.S
-new file mode 100644
-index 000000000000..bffe03c478a5
---- /dev/null
-+++ b/arch/arm64/lib/tishift.S
-@@ -0,0 +1,59 @@
-+/*
-+ * Copyright (C) 2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+ENTRY(__ashlti3)
-+	cbz	x2, 1f
-+	mov	x3, #64
-+	sub	x3, x3, x2
-+	cmp	x3, #0
-+	b.le	2f
-+	lsl	x1, x1, x2
-+	lsr	x3, x0, x3
-+	lsl	x2, x0, x2
-+	orr	x1, x1, x3
-+	mov	x0, x2
-+1:
-+	ret
-+2:
-+	neg	w1, w3
-+	mov	x2, #0
-+	lsl	x1, x0, x1
-+	mov	x0, x2
-+	ret
-+ENDPROC(__ashlti3)
-+
-+ENTRY(__ashrti3)
-+	cbz	x2, 1f
-+	mov	x3, #64
-+	sub	x3, x3, x2
-+	cmp	x3, #0
-+	b.le	2f
-+	lsr	x0, x0, x2
-+	lsl	x3, x1, x3
-+	asr	x2, x1, x2
-+	orr	x0, x0, x3
-+	mov	x1, x2
-+1:
-+	ret
-+2:
-+	neg	w0, w3
-+	asr	x2, x1, #63
-+	asr	x0, x1, x0
-+	mov	x1, x2
-+	ret
-+ENDPROC(__ashrti3)
--- 
-2.15.0
+> Thanks,
+> Neil
+> 
+> .
+> 
