@@ -1,93 +1,62 @@
 From: james.morse@arm.com (James Morse)
-Date: Mon,  6 Nov 2017 18:44:25 +0000
-Subject: [PATCH 2/4] ACPI / APEI: Remove ghes_ioremap_area
+Date: Mon,  6 Nov 2017 18:44:26 +0000
+Subject: [PATCH 3/4] arm64: mm: Remove arch_apei_flush_tlb_one()
 In-Reply-To: <20171106184427.31905-1-james.morse@arm.com>
 References: <20171106184427.31905-1-james.morse@arm.com>
-Message-ID: <20171106184427.31905-3-james.morse@arm.com>
+Message-ID: <20171106184427.31905-4-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that nothing is using the ghes_ioremap_area pages, rip them out.
+Nothing calls arch_apei_flush_tlb_one() anymore, instead relying on
+__set_fixmap() to do the invalidation. Remove it.
+
+Move the IPI-considered-harmful comment to __set_fixmap().
 
 Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Borislav Petkov <bp@suse.de>
+Acked-by: Will Deacon <will.deacon@arm.com>
 Tested-by: Tyler Baicar <tbaicar@codeaurora.org>
 ---
- drivers/acpi/apei/ghes.c | 39 ++-------------------------------------
- 1 file changed, 2 insertions(+), 37 deletions(-)
+ arch/arm64/include/asm/acpi.h | 12 ------------
+ arch/arm64/mm/mmu.c           |  4 ++++
+ 2 files changed, 4 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index f3269816b997..1a4f16b10052 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -114,19 +114,7 @@ static DEFINE_MUTEX(ghes_list_mutex);
-  * from BIOS to Linux can be determined only in NMI, IRQ or timer
-  * handler, but general ioremap can not be used in atomic context, so
-  * the fixmap is used instead.
-- */
--
--/*
-- * Two virtual pages are used, one for IRQ/PROCESS context, the other for
-- * NMI context (optionally).
-- */
--#define GHES_IOREMAP_PAGES           2
--#define GHES_IOREMAP_IRQ_PAGE(base)	(base)
--#define GHES_IOREMAP_NMI_PAGE(base)	((base) + PAGE_SIZE)
--
--/* virtual memory area for atomic ioremap */
--static struct vm_struct *ghes_ioremap_area;
--/*
-+ *
-  * These 2 spinlocks are used to prevent the fixmap entries from being used
-  * simultaneously.
+diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+index 59cca1d6ec54..32f465a80e4e 100644
+--- a/arch/arm64/include/asm/acpi.h
++++ b/arch/arm64/include/asm/acpi.h
+@@ -126,18 +126,6 @@ static inline const char *acpi_get_enable_method(int cpu)
   */
-@@ -141,23 +129,6 @@ static atomic_t ghes_estatus_cache_alloced;
- 
- static int ghes_panic_timeout __read_mostly = 30;
- 
--static int ghes_ioremap_init(void)
+ #define acpi_disable_cmcff 1
+ pgprot_t arch_apei_get_mem_attribute(phys_addr_t addr);
+-
+-/*
+- * Despite its name, this function must still broadcast the TLB
+- * invalidation in order to ensure other CPUs don't end up with junk
+- * entries as a result of speculation. Unusually, its also called in
+- * IRQ context (ghes_iounmap_irq) so if we ever need to use IPIs for
+- * TLB broadcasting, then we're in trouble here.
+- */
+-static inline void arch_apei_flush_tlb_one(unsigned long addr)
 -{
--	ghes_ioremap_area = __get_vm_area(PAGE_SIZE * GHES_IOREMAP_PAGES,
--		VM_IOREMAP, VMALLOC_START, VMALLOC_END);
--	if (!ghes_ioremap_area) {
--		pr_err(GHES_PFX "Failed to allocate virtual memory area for atomic ioremap.\n");
--		return -ENOMEM;
--	}
--
--	return 0;
+-	flush_tlb_kernel_range(addr, addr + PAGE_SIZE);
 -}
--
--static void ghes_ioremap_exit(void)
--{
--	free_vm_area(ghes_ioremap_area);
--}
--
- static void __iomem *ghes_ioremap_pfn_nmi(u64 pfn)
- {
- 	phys_addr_t paddr;
-@@ -1270,13 +1241,9 @@ static int __init ghes_init(void)
+ #endif /* CONFIG_ACPI_APEI */
  
- 	ghes_nmi_init_cxt();
- 
--	rc = ghes_ioremap_init();
--	if (rc)
--		goto err;
--
- 	rc = ghes_estatus_pool_init();
- 	if (rc)
--		goto err_ioremap_exit;
-+		goto err;
- 
- 	rc = ghes_estatus_pool_expand(GHES_ESTATUS_CACHE_AVG_SIZE *
- 				      GHES_ESTATUS_CACHE_ALLOCED_MAX);
-@@ -1300,8 +1267,6 @@ static int __init ghes_init(void)
- 	return 0;
- err_pool_exit:
- 	ghes_estatus_pool_exit();
--err_ioremap_exit:
--	ghes_ioremap_exit();
- err:
- 	return rc;
+ #ifdef CONFIG_ACPI_NUMA
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f1eb15e0e864..267d2b79d52d 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -778,6 +778,10 @@ void __init early_fixmap_init(void)
+ 	}
  }
+ 
++/*
++ * Unusually, this is also called in IRQ context (ghes_iounmap_irq) so if we
++ * ever need to use IPIs for TLB broadcasting, then we're in trouble here.
++ */
+ void __set_fixmap(enum fixed_addresses idx,
+ 			       phys_addr_t phys, pgprot_t flags)
+ {
 -- 
 2.15.0.rc2
