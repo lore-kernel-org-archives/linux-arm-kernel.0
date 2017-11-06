@@ -1,159 +1,23 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Mon,  6 Nov 2017 13:04:09 -0800
-Subject: [PATCH v5 12/12] lib: vdso: do not expose gettimeofday,
- if no arch supported timer
-Message-ID: <20171106210413.95388-1-salyzyn@android.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 6 Nov 2017 15:38:26 -0600
+Subject: [PATCH 10/12] dt-bindings: rng: Incorporate brcm,bcm6368.txt
+ binding
+In-Reply-To: <20171102010408.27736-11-f.fainelli@gmail.com>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+ <20171102010408.27736-11-f.fainelli@gmail.com>
+Message-ID: <20171106213826.vetpedvdiwwmo4hs@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take an effort to recode the arm64 vdso code from assembler to C
-previously submitted by Andrew Pinski <apinski@cavium.com>, rework
-it for use in both arm and arm64, overlapping any optimizations
-for each architecture. But instead of landing it in arm64, land the
-result into lib/vdso and unify both implementations to simplify
-future maintenance.
+On Wed, Nov 01, 2017 at 06:04:06PM -0700, Florian Fainelli wrote:
+> Since the same block is used on BCM2835 and BCM6368, merge the bindings
+> and remove the brcm,bcm6368.txt binding document.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> ---
+>  .../devicetree/bindings/rng/brcm,bcm2835.txt       | 22 +++++++++++++++++++---
+>  .../devicetree/bindings/rng/brcm,bcm6368.txt       | 17 -----------------
+>  2 files changed, 19 insertions(+), 20 deletions(-)
+>  delete mode 100644 Documentation/devicetree/bindings/rng/brcm,bcm6368.txt
 
-If ARCH_PROVIDES_TIMER is not defined, do not expose gettimeofday.
-libc will default directly to syscall.  Also ifdef clock_gettime
-switch cases and stubs if not supported and other unused components.
-
-Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Andy Lutomirski <luto@amacapital.net>
-Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Laura Abbott <labbott@redhat.com>
-Cc: Kees Cook <keescook@chromium.org>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Andy Gross <andy.gross@linaro.org>
-Cc: Kevin Brodsky <kevin.brodsky@arm.com>
-Cc: Andrew Pinski <apinski@cavium.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-
-v3:
-- do not expose gettimeofday if arch does not support user space timer.
-
-v4:
-- update commit message to reflect overall reasoning of patch series.
-
-v5:
-- rebase
-
----
- lib/vdso/vgettimeofday.c | 52 +++++++++++++++++++-----------------------------
- 1 file changed, 20 insertions(+), 32 deletions(-)
-
-diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
-index d64f60010bb2..079955162be8 100644
---- a/lib/vdso/vgettimeofday.c
-+++ b/lib/vdso/vgettimeofday.c
-@@ -30,7 +30,9 @@
- #include "compiler.h"
- #include "datapage.h"
- 
-+#ifdef ARCH_PROVIDES_TIMER
- DEFINE_FALLBACK(gettimeofday, struct timeval *, tv, struct timezone *, tz)
-+#endif
- DEFINE_FALLBACK(clock_gettime, clockid_t, clock, struct timespec *, ts)
- DEFINE_FALLBACK(clock_getres, clockid_t, clock, struct timespec *, ts)
- 
-@@ -291,30 +293,6 @@ static notrace int do_boottime(const struct vdso_data *vd, struct timespec *ts)
- 	return 0;
- }
- 
--#else /* ARCH_PROVIDES_TIMER */
--
--static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
--{
--	return -1;
--}
--
--static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
--{
--	return -1;
--}
--
--static notrace int do_monotonic_raw(const struct vdso_data *vd,
--				    struct timespec *ts)
--{
--	return -1;
--}
--
--static notrace int do_boottime(const struct vdso_data *vd,
--			       struct timespec *ts)
--{
--	return -1;
--}
--
- #endif /* ARCH_PROVIDES_TIMER */
- 
- notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
-@@ -328,6 +306,7 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
- 	case CLOCK_MONOTONIC_COARSE:
- 		do_monotonic_coarse(vd, ts);
- 		break;
-+#ifdef ARCH_PROVIDES_TIMER
- 	case CLOCK_REALTIME:
- 		if (do_realtime(vd, ts))
- 			goto fallback;
-@@ -344,6 +323,7 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
- 		if (do_boottime(vd, ts))
- 			goto fallback;
- 		break;
-+#endif
- 	default:
- 		goto fallback;
- 	}
-@@ -353,6 +333,7 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
- 	return clock_gettime_fallback(clock, ts);
- }
- 
-+#ifdef ARCH_PROVIDES_TIMER
- notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
- {
- 	const struct vdso_data *vd = __get_datapage();
-@@ -374,21 +355,28 @@ notrace int __vdso_gettimeofday(struct timeval *tv, struct timezone *tz)
- 
- 	return 0;
- }
-+#endif
- 
- int __vdso_clock_getres(clockid_t clock, struct timespec *res)
- {
- 	long nsec;
- 
--	if (clock == CLOCK_REALTIME ||
--	    clock == CLOCK_BOOTTIME ||
--	    clock == CLOCK_MONOTONIC ||
--	    clock == CLOCK_MONOTONIC_RAW)
--		nsec = MONOTONIC_RES_NSEC;
--	else if (clock == CLOCK_REALTIME_COARSE ||
--		 clock == CLOCK_MONOTONIC_COARSE)
-+	switch (clock) {
-+	case CLOCK_REALTIME_COARSE:
-+	case CLOCK_MONOTONIC_COARSE:
- 		nsec = LOW_RES_NSEC;
--	else
-+		break;
-+#ifdef ARCH_PROVIDES_TIMER
-+	case CLOCK_REALTIME:
-+	case CLOCK_MONOTONIC:
-+	case CLOCK_MONOTONIC_RAW:
-+	case CLOCK_BOOTTIME:
-+		nsec = MONOTONIC_RES_NSEC;
-+		break;
-+#endif
-+	default:
- 		return clock_getres_fallback(clock, res);
-+	}
- 
- 	if (likely(res != NULL)) {
- 		res->tv_sec = 0;
--- 
-2.15.0.403.gc27cc4dac6-goog
+Acked-by: Rob Herring <robh@kernel.org>
