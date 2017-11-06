@@ -1,37 +1,35 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 6 Nov 2017 15:59:18 +0000
-Subject: [PATCH v4] arm64: support __int128 on gcc 5+
-In-Reply-To: <20171106093151.8312-1-Jason@zx2c4.com>
-References: <20171103141858.13149-1-Jason@zx2c4.com>
- <20171106093151.8312-1-Jason@zx2c4.com>
-Message-ID: <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
+From: hjp@liab.dk (Henrik Juul Pedersen)
+Date: Mon, 6 Nov 2017 17:02:58 +0100
+Subject: [PATCH] pinctrl: Fix armada-37xx pmic pin group numbering
+Message-ID: <CABQZ+_QYDE9k31ywvHqSEsNPjsnGQHMd0oCyErKFAT1PpETkEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 06, 2017 at 10:31:51AM +0100, Jason A. Donenfeld wrote:
-> Versions of gcc prior to gcc 5 emitted a __multi3 function call when
-> dealing with TI types, resulting in failures when trying to link to
-> libgcc, and more generally, bad performance. However, since gcc 5,
-> the compiler supports actually emitting fast instructions, which means
-> we can at long last enable this option and receive the speedups.
-> 
-> The gcc commit that added proper Aarch64 support is:
-> https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
-> This commit appears to be part of the gcc 5 release.
-> 
-> There are still a few instructions, __ashlti3 and __ashrti3, which
-> require libgcc, which is fine. Rather than linking to libgcc, we
-> simply provide them ourselves, since they're not that complicated.
-> 
-> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+Fix pin numbering in Marvell ARMADA 37xx pincontroller.
 
-According to Arnd, linux-next (with this patch included) fails to build
-with gcc-7 (config: https://pastebin.com/raw/sgvPe96e).
+The pmic0 and pmic1 pin groups start on pins 6 and 7 respectively.
 
-Will is managing the upcoming merging window for arm64 but is travelling
-this week. I'll wait for couple of days, he'll probably catch up with
-emails but my suggestion is that we revert the patch and push it back
-again into -next after the 4.15 merging window.
+Signed-off-by: Henrik Juul Pedersen <hjp@liab.dk>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 71b94474..e223fac2 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -157,8 +157,8 @@ static struct armada_37xx_pin_group
+armada_37xx_nb_groups[] = {
+  PIN_GRP_GPIO("pwm1", 12, 1, BIT(4), "pwm"),
+  PIN_GRP_GPIO("pwm2", 13, 1, BIT(5), "pwm"),
+  PIN_GRP_GPIO("pwm3", 14, 1, BIT(6), "pwm"),
+- PIN_GRP_GPIO("pmic1", 17, 1, BIT(7), "pmic"),
+- PIN_GRP_GPIO("pmic0", 16, 1, BIT(8), "pmic"),
++ PIN_GRP_GPIO("pmic1", 7, 1, BIT(7), "pmic"),
++ PIN_GRP_GPIO("pmic0", 6, 1, BIT(8), "pmic"),
+  PIN_GRP_GPIO("i2c2", 2, 2, BIT(9), "i2c"),
+  PIN_GRP_GPIO("i2c1", 0, 2, BIT(10), "i2c"),
+  PIN_GRP_GPIO("spi_cs1", 17, 1, BIT(12), "spi"),
 -- 
-Catalin
+2.14.1
