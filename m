@@ -1,50 +1,132 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Mon,  6 Nov 2017 10:12:49 +0100
-Subject: [PATCH 4.13 36/36] irqchip/irq-mvebu-gicp: Add missing spin_lock init
-In-Reply-To: <20171106085047.005824077@linuxfoundation.org>
-References: <20171106085047.005824077@linuxfoundation.org>
-Message-ID: <20171106085048.658146684@linuxfoundation.org>
+From: gregkh@linuxfoundation.org (gregkh at linuxfoundation.org)
+Date: Mon, 06 Nov 2017 10:25:03 +0100
+Subject: Patch "ARM: pxa: Don't rely on public mmc header to include leds.h"
+ has been added to the 4.4-stable tree
+Message-ID: <1509960303239170@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-4.13-stable review patch.  If anyone has any objections, please let me know.
 
-------------------
+This is a note to let you know that I've just added the patch titled
 
-From: Antoine Tenart <antoine.tenart@free-electrons.com>
+    ARM: pxa: Don't rely on public mmc header to include leds.h
 
-commit c9bb86338a6bb91e4d32db04feb6b8d423e04d06 upstream.
+to the 4.4-stable tree which can be found at:
+    http://www.kernel.org/git/?p=linux/kernel/git/stable/stable-queue.git;a=summary
 
-A spin lock is used in the irq-mvebu-gicp driver, but it is never
-initialized. This patch adds the missing spin_lock_init() call in the
-driver's probe function.
+The filename of the patch is:
+     arm-pxa-don-t-rely-on-public-mmc-header-to-include-leds.h.patch
+and it can be found in the queue-4.4 subdirectory.
 
-Fixes: a68a63cb4dfc ("irqchip/irq-mvebu-gicp: Add new driver for Marvell GICP")
-Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Reviewed-by: gregory.clement at free-electrons.com
-Acked-by: marc.zyngier at arm.com
-Cc: thomas.petazzoni at free-electrons.com
-Cc: andrew at lunn.ch
-Cc: jason at lakedaemon.net
-Cc: nadavh at marvell.com
-Cc: miquel.raynal at free-electrons.com
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: sebastian.hesselbarth at gmail.com
-Link: https://lkml.kernel.org/r/20171025072326.21030-1-antoine.tenart at free-electrons.com
+If you, or anyone else, feels it should not be added to the stable tree,
+please let <stable@vger.kernel.org> know about it.
+
+
+>From foo at baz Mon Nov  6 10:22:56 CET 2017
+From: Ulf Hansson <ulf.hansson@linaro.org>
+Date: Sat, 7 Oct 2017 22:37:44 +0000
+Subject: ARM: pxa: Don't rely on public mmc header to include leds.h
+
+From: Ulf Hansson <ulf.hansson@linaro.org>
+
+
+[ Upstream commit 40d727a2defa176b78159d445bcf7afcc2ed9021 ]
+
+Some of the pxa platforms, balloon3, colibri-pxa270-income, corgi,
+trizeps4, vpac270, zeus and zylonite depends on leds.h. Explicitly include
+it instead of relying on the public mmc header host.h.
+
+Cc: Daniel Mack <daniel@zonque.org>
+Cc: Haojian Zhuang <haojian.zhuang@gmail.com>
+Cc: Robert Jarzmik <robert.jarzmik@free.fr>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Signed-off-by: Ulf Hansson <ulf.hansson@linaro.org>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+Signed-off-by: Sasha Levin <alexander.levin@verizon.com>
 Signed-off-by: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-
 ---
- drivers/irqchip/irq-mvebu-gicp.c |    1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/mach-pxa/balloon3.c              |    1 +
+ arch/arm/mach-pxa/colibri-pxa270-income.c |    1 +
+ arch/arm/mach-pxa/corgi.c                 |    1 +
+ arch/arm/mach-pxa/trizeps4.c              |    1 +
+ arch/arm/mach-pxa/vpac270.c               |    1 +
+ arch/arm/mach-pxa/zeus.c                  |    1 +
+ arch/arm/mach-pxa/zylonite.c              |    1 +
+ 7 files changed, 7 insertions(+)
 
---- a/drivers/irqchip/irq-mvebu-gicp.c
-+++ b/drivers/irqchip/irq-mvebu-gicp.c
-@@ -194,6 +194,7 @@ static int mvebu_gicp_probe(struct platf
- 		return -ENOMEM;
+--- a/arch/arm/mach-pxa/balloon3.c
++++ b/arch/arm/mach-pxa/balloon3.c
+@@ -17,6 +17,7 @@
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/sched.h>
+ #include <linux/bitops.h>
+ #include <linux/fb.h>
+--- a/arch/arm/mach-pxa/colibri-pxa270-income.c
++++ b/arch/arm/mach-pxa/colibri-pxa270-income.c
+@@ -17,6 +17,7 @@
+ #include <linux/gpio.h>
+ #include <linux/init.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/ioport.h>
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+--- a/arch/arm/mach-pxa/corgi.c
++++ b/arch/arm/mach-pxa/corgi.c
+@@ -18,6 +18,7 @@
+ #include <linux/major.h>
+ #include <linux/fs.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/mmc/host.h>
+ #include <linux/mtd/physmap.h>
+ #include <linux/pm.h>
+--- a/arch/arm/mach-pxa/trizeps4.c
++++ b/arch/arm/mach-pxa/trizeps4.c
+@@ -16,6 +16,7 @@
+ #include <linux/kernel.h>
+ #include <linux/platform_device.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/export.h>
+ #include <linux/sched.h>
+ #include <linux/bitops.h>
+--- a/arch/arm/mach-pxa/vpac270.c
++++ b/arch/arm/mach-pxa/vpac270.c
+@@ -15,6 +15,7 @@
+ #include <linux/irq.h>
+ #include <linux/gpio_keys.h>
+ #include <linux/input.h>
++#include <linux/leds.h>
+ #include <linux/gpio.h>
+ #include <linux/usb/gpio_vbus.h>
+ #include <linux/mtd/mtd.h>
+--- a/arch/arm/mach-pxa/zeus.c
++++ b/arch/arm/mach-pxa/zeus.c
+@@ -13,6 +13,7 @@
  
- 	gicp->dev = &pdev->dev;
-+	spin_lock_init(&gicp->spi_lock);
- 
- 	gicp->res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	if (!gicp->res)
+ #include <linux/cpufreq.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/irq.h>
+ #include <linux/pm.h>
+ #include <linux/gpio.h>
+--- a/arch/arm/mach-pxa/zylonite.c
++++ b/arch/arm/mach-pxa/zylonite.c
+@@ -16,6 +16,7 @@
+ #include <linux/module.h>
+ #include <linux/kernel.h>
+ #include <linux/interrupt.h>
++#include <linux/leds.h>
+ #include <linux/init.h>
+ #include <linux/platform_device.h>
+ #include <linux/gpio.h>
+
+
+Patches currently in stable-queue which might be from ulf.hansson at linaro.org are
+
+queue-4.4/mmc-s3cmci-include-linux-interrupt.h-for-tasklet_struct.patch
+queue-4.4/arm-pxa-don-t-rely-on-public-mmc-header-to-include-leds.h.patch
