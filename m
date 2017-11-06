@@ -1,31 +1,46 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Mon, 6 Nov 2017 23:39:06 +0100
-Subject: AXP803 I2C support / AXP devicetree-bindings
-Message-ID: <CAFBinCAm8pA-dh3+T4Ui+DvLv5C17Zup-FN8pvi0cUa5PgwJJw@mail.gmail.com>
+From: lionel.debieve@st.com (lionel.debieve at st.com)
+Date: Mon, 6 Nov 2017 23:41:52 +0100
+Subject: [PATCH v2 1/1] crypto: stm32/hash - Fix return issue on update
+Message-ID: <1510008112-1573-1-git-send-email-lionel.debieve@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+From: Lionel Debieve <lionel.debieve@st.com>
 
-recently I discovered that there are some X-Powers AXP chips that
-support both, Allwinner's own "RSB" as well as the I2C ("TWSI" in the
-datasheet) busses.
+When data append reached the threshold for processing,
+we must inform that processing is on going to wait before
+managing the next request.
 
-one chip that supports both interfaces is the AXP803
-the datasheet is linked in the public PINE64 wiki: [1] (direct link: [0])
+Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
+---
+ drivers/crypto/stm32/stm32-hash.c | 8 +-------
+ 1 file changed, 1 insertion(+), 7 deletions(-)
 
-currently the "x-powers,axp803" binding is "RSB" bus specific as it's
-currently only listed in drivers/mfd/axp20x-rsb.c
-
-was there a discussion about supporting both, the "RSB" and I2C bus
-for one chip (for example the AXP803) in the past (I couldn't find
-anything online)?
-what about the device-tree bindings in this case?
-
-
-Regards
-Martin
-
-
-[0] http://files.pine64.org/doc/datasheet/pine64/AXP803_Datasheet_V1.0.pdf
-[1] http://wiki.pine64.org/index.php/PINE_A64_Main_Page#Datasheets_for_Components_and_Peripherals
+diff --git a/drivers/crypto/stm32/stm32-hash.c b/drivers/crypto/stm32/stm32-hash.c
+index c462be7..4ca4a26 100644
+--- a/drivers/crypto/stm32/stm32-hash.c
++++ b/drivers/crypto/stm32/stm32-hash.c
+@@ -895,7 +895,6 @@ static int stm32_hash_enqueue(struct ahash_request *req, unsigned int op)
+ static int stm32_hash_update(struct ahash_request *req)
+ {
+ 	struct stm32_hash_request_ctx *rctx = ahash_request_ctx(req);
+-	int ret;
+ 
+ 	if (!req->nbytes || !(rctx->flags & HASH_FLAGS_CPU))
+ 		return 0;
+@@ -909,12 +908,7 @@ static int stm32_hash_update(struct ahash_request *req)
+ 		return 0;
+ 	}
+ 
+-	ret = stm32_hash_enqueue(req, HASH_OP_UPDATE);
+-
+-	if (rctx->flags & HASH_FLAGS_FINUP)
+-		return ret;
+-
+-	return 0;
++	return stm32_hash_enqueue(req, HASH_OP_UPDATE);
+ }
+ 
+ static int stm32_hash_final(struct ahash_request *req)
+-- 
+2.7.4
