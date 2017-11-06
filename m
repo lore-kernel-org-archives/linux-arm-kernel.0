@@ -1,32 +1,88 @@
-From: manu@freebsd.org (Emmanuel Vadot)
-Date: Mon,  6 Nov 2017 21:51:39 +0100
-Subject: [PATCH] ARM: dts: sunxi: Add codec for A13 Olinuxino
-Message-ID: <20171106205139.82751-1-manu@freebsd.org>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Mon,  6 Nov 2017 13:00:31 -0800
+Subject: [PATCH v5 00/12] arm+arm64: vdso unification to lib/vdso/
+Message-ID: <20171106210048.94494-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A13 Olinuxino have an headphone jack and audio is supported
-so enable it.
+Take an effort to recode the arm64 vdso code from assembler to C
+previously submitted by Andrew Pinski <apinski@cavium.com>, rework
+it for use in both arm and arm64, overlapping any optimizations
+for each architecture. But instead of landing it in arm64, land the
+result into lib/vdso and unify both implementations to simplify
+future maintenance. This will act as the basis for implementing
+arm64 vdso32 in the future.
 
-Signed-off-by: Emmanuel Vadot <manu@freebsd.org>
----
- arch/arm/boot/dts/sun5i-a13-olinuxino.dts | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-index 38072c7e10e2..4b9af423c6d5 100644
---- a/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-+++ b/arch/arm/boot/dts/sun5i-a13-olinuxino.dts
-@@ -114,6 +114,10 @@
- 	status = "okay";
- };
- 
-+&codec {
-+	status = "okay";
-+};
-+
- &ehci0 {
- 	status = "okay";
- };
--- 
-2.14.1
+apinski at cavium.com made the following claims in the original patch:
+
+This allows the compiler to optimize the divide by 1000 and remove
+the other divides.
+
+On ThunderX, gettimeofday improves by 32%.  On ThunderX 2,
+gettimeofday improves by 18%.
+
+Note I noticed a bug in the old implementation of __kernel_clock_getres;
+it was checking only the lower 32bits of the pointer; this would work
+for most cases but could fail in a few.
+
+
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+
+v2:
+- split first CL into 7 pieces, there were cosmetic adjustments.
+- make sure profiling is turned off.
+- kept quiet_cmd_vdsoas.
+
+v3:
+- changed are a result of private email review comments
+- rebase
+- move arch/arm/vdso/vgettimeofday.c to lib/vdso/vgettimeofday.c
+- adjust vgettimeofday.c to be a better global candidate, switch to using
+  ARCH_PROVIDES_TIMER and __arch_counter_get() as more generic.
+- do not expose gettimeofday if arch does not support user space timer
+
+v4:
+- update commit messages to reflect reasoning here.
+- switch to arch_vdso_read_counter as common API.
+- split out ARCH_CLOCK_FIXED_MASK.
+- Use GENMASK_ULL macro for ARCH_CLOCK_FIXED_MASK.
+- dropping forced inline patch and side effects.
+- replace all typeof()s with the appropriate types
+  vdso_wtm_clock_nsec_t, vdso_xtime_clock_sec, vdso_raw_time_sec_t,
+  long (tv_nsec) and __kernel_time_t (tv_sec).
+- clock_getres implementation, use clock instead of clock_id to
+  match usage elsewhere and remove an inconsistency.
+- simplify arm64 implementation of arch_vdso_read_counter,
+  use read_sysreg.
+
+v5:
+- fixes and changes inspired by compiling with clang.  Makefile and
+  portability issues identified.  clang build produced a bad arm64
+  vdso binary until proper compile flags were provided.
+- arm compile issue, replace erroneous tk->raw_time.shift with
+  tk->tkr_raw.shift.
+- changes inspired by compat architectural portability, minimize
+  include files in vgettimeofday.c that notoriously include
+  unnecessary architectural cruft and defer them to vdso compiler.h.
+  Problematic direct and indirectly included files are
+  asm/arch_timer.h, asm/processor.h, asm/sysreg.h, linux/jiffies.h,
+  linux/hrtimer.h and linux/time.h.
+- do not use timespec_add_ns as not accessible via uapi/linux/time.h.
+- strip out unused definitions in asm-offsets.c.
