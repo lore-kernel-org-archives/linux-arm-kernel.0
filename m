@@ -1,45 +1,37 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Mon, 6 Nov 2017 16:57:12 +0100
-Subject: [PATCH 2/2] crypto: atmel-aes - Reset the controller before each
- use
-In-Reply-To: <ff2356ef-2c11-18e5-6da2-654b1d77280c@microchip.com>
-References: <20171031152524.25216-1-romain.izard.pro@gmail.com>
- <20171031152524.25216-3-romain.izard.pro@gmail.com>
- <ff2356ef-2c11-18e5-6da2-654b1d77280c@microchip.com>
-Message-ID: <CAGkQfmNFZcfeTVPOhQEwqXjaUPVu1se+j-x_kbrB29ag_4OU9A@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 6 Nov 2017 15:59:18 +0000
+Subject: [PATCH v4] arm64: support __int128 on gcc 5+
+In-Reply-To: <20171106093151.8312-1-Jason@zx2c4.com>
+References: <20171103141858.13149-1-Jason@zx2c4.com>
+ <20171106093151.8312-1-Jason@zx2c4.com>
+Message-ID: <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-11-06 16:45 GMT+01:00 Tudor Ambarus <tudor.ambarus@microchip.com>:
-> Hi, Romain,
->
-> On 10/31/2017 05:25 PM, Romain Izard wrote:
->>
->> When using the rfc4543(gcm(aes))) mode, the registers of the hardware
->> engine are not empty after use. If the engine is not reset before its
->> next use, the following results will be invalid.
->>
->> Always reset the hardware engine.
->
->
-> Thanks for the fix! I could reproduce the issue only when running
-> rfc4543(gcm(aes))) and then, immediately after, ecb(aes).
->
-> Have you encountered this bug with other combination of algorithms?
->
-> I'm trying to isolate the bug so that we can have a more fine-grained
-> fix.
+On Mon, Nov 06, 2017 at 10:31:51AM +0100, Jason A. Donenfeld wrote:
+> Versions of gcc prior to gcc 5 emitted a __multi3 function call when
+> dealing with TI types, resulting in failures when trying to link to
+> libgcc, and more generally, bad performance. However, since gcc 5,
+> the compiler supports actually emitting fast instructions, which means
+> we can at long last enable this option and receive the speedups.
+> 
+> The gcc commit that added proper Aarch64 support is:
+> https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+> This commit appears to be part of the gcc 5 release.
+> 
+> There are still a few instructions, __ashlti3 and __ashrti3, which
+> require libgcc, which is fine. Rather than linking to libgcc, we
+> simply provide them ourselves, since they're not that complicated.
+> 
+> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
 
-I just ran the tcrypt tests because they were failing on the
-cts(cbc(aes)) transform and I observed this issue when the ecb
-test failed only on the second run.
+According to Arnd, linux-next (with this patch included) fails to build
+with gcc-7 (config: https://pastebin.com/raw/sgvPe96e).
 
-For me, the issue looks like the rfc4543 mode does not read
-all the registers from the AES engine, and the following operation
-fails because the registers are reused directly in the ECB mode.
-
-As the ECB mode is a rare case where we do not use an IV, this
-may be the reason why other modes do not display the issue.
+Will is managing the upcoming merging window for arm64 but is travelling
+this week. I'll wait for couple of days, he'll probably catch up with
+emails but my suggestion is that we revert the patch and push it back
+again into -next after the 4.15 merging window.
 
 -- 
-Romain Izard
+Catalin
