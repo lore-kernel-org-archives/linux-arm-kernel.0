@@ -1,51 +1,40 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 6 Nov 2017 18:25:01 -0600
-Subject: [PATCH v10 2/9] PCI: remove unused __weak attribute in
- pci_register_io_range()
-In-Reply-To: <1509120687-7352-3-git-send-email-gabriele.paoloni@huawei.com>
-References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
- <1509120687-7352-3-git-send-email-gabriele.paoloni@huawei.com>
-Message-ID: <20171107002501.GD9538@bhelgaas-glaptop.roam.corp.google.com>
+From: preid@electromag.com.au (Phil Reid)
+Date: Tue, 7 Nov 2017 09:02:50 +0800
+Subject: [PATCH v5 4/7] i2c: designware: add i2c gpio recovery option
+In-Reply-To: <1509984581.25007.47.camel@linux.intel.com>
+References: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
+ <1509590430-11968-5-git-send-email-preid@electromag.com.au>
+ <1509984581.25007.47.camel@linux.intel.com>
+Message-ID: <a0265848-2496-d347-a40f-ce83e7dfd945@electromag.com.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 27, 2017 at 05:11:20PM +0100, Gabriele Paoloni wrote:
-> From: gabriele paoloni <gabriele.paoloni@huawei.com>
+On 7/11/2017 00:09, Andy Shevchenko wrote:
+> On Thu, 2017-11-02 at 10:40 +0800, Phil Reid wrote:
+>> From: Tim Sander <tim@krieglstein.org>
+>>
+>> This patch contains much input from Phil Reid and has been tested
+>> on Intel/Altera Cyclone V SOC Hardware with Altera GPIO's for the
+>> SCL and SDA GPIO's.
+>>
+>> Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
+>> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
 > 
-> Currently pci_register_io_range() has only one definition;
-> therefore there is no use of the __weak attribute.
+> Shame on me, I totally forgot one important comment on all this.
 > 
-> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> Acked-by: Bjorn Helgaas <helgaas@kernel.org>
+> How do we switch pinctrl back to the native function? Is it guaranteed
+> by pinctrl framework and all underneath drivers?
+> 
+> 
+G'day Andy,
 
-Also, I normally use this (Google address instead of kernel.org):
+That is a good question. I don't have an understanding of how the pinctrl
+framework works with respect to requesting gpios.
+My device (Intel / Altera Cyclone V SOC) doesn't have a pinctrl for the i2c / gpio mux as
+yet. It's all setup by the bootloader and they don't expect you to change it.
+I'm using two separate GPIO's "wired" to the i2c bus via the SOC FPGA for the recovery.
+Tim was doing the same.
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-
-(Also affects your other PCI patches.)
-
-> ---
->  drivers/pci/pci.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index af0cc34..eee967c 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -3270,7 +3270,7 @@ static DEFINE_SPINLOCK(io_range_lock);
->   * Record the PCI IO range (expressed as CPU physical address + size).
->   * Return a negative value if an error has occured, zero otherwise
->   */
-> -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> +int pci_register_io_range(phys_addr_t addr, resource_size_t size)
->  {
->  	int err = 0;
->  
-> -- 
-> 2.7.4
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-- 
+Regards
+Phil Reid
