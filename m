@@ -1,19 +1,20 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Nov 2017 11:20:11 +0100
-Subject: [PATCH 3/4] arm64: dts: renesas: r8a77970: Connect Ethernet-AVB
- to IPMMU-RT
-In-Reply-To: <20171101103504.7658-4-horms+renesas@verge.net.au>
+Date: Tue, 7 Nov 2017 11:20:44 +0100
+Subject: [PATCH 4/4] arm64: dts: renesas: r8a77970: Enable IPMMU-DS1, RT
+ and MM
+In-Reply-To: <20171101103504.7658-5-horms+renesas@verge.net.au>
 References: <20171101103504.7658-1-horms+renesas@verge.net.au>
- <20171101103504.7658-4-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdW_MGuDB37U2i2GHVDYG7QZCc8u_WeCfY_DUc9uPEuKwA@mail.gmail.com>
+ <20171101103504.7658-5-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVN1S-jVVDoo7EBxaNg1tDSCtqpmHbwqVgyfRb748fvJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 1, 2017 at 11:35 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Add IPMMU-RT to the Ethernet-AVB device node.
+> Enable the r8a77970 device nodes for IPMMU-DS1, IPMMU-RT
+> and the shared IPMMU-MM device.
 >
-> Based on work by Magnus Damm for the r8a7795.
+> Based on work for the r8a7796 by Magnus Damm.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
