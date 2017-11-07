@@ -1,29 +1,82 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Tue, 7 Nov 2017 19:24:38 +0300
-Subject: [PATCH v2 2/2] arm64/mm/kasan: don't use vmemmap_populate() to
- initialize shadow
-In-Reply-To: <20171106183516.6644-3-pasha.tatashin@oracle.com>
-References: <20171106183516.6644-1-pasha.tatashin@oracle.com>
- <20171106183516.6644-3-pasha.tatashin@oracle.com>
-Message-ID: <a1f63638-7edd-a498-d89f-67dea59a247a@virtuozzo.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 7 Nov 2017 17:25:28 +0100
+Subject: [PATCH 16/37] KVM: arm64: Remove noop calls to timer
+ save/restore from VHE switch
+In-Reply-To: <20171012104141.26902-17-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-17-christoffer.dall@linaro.org>
+Message-ID: <20171107162528.q3rdlih5fpn7fnhd@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2017 09:35 PM, Pavel Tatashin wrote:
-> From: Will Deacon <will.deacon@arm.com>
+On Thu, Oct 12, 2017 at 12:41:20PM +0200, Christoffer Dall wrote:
+> The VHE switch function calls __timer_enable_traps and
+> __timer_disable_traps which don't do anything on VHE systems.
+> Therefore, simply remove these calls from the VHE switch function and
+> make the functions non-conditional as they are now only called from the
+> non-VHE switch path.
 > 
-> The kasan shadow is currently mapped using vmemmap_populate() since that
-> provides a semi-convenient way to map pages into init_top_pgt. However,
-> since that no longer zeroes the mapped pages, it is not suitable for kasan,
-> which requires zeroed shadow memory.
-> 
-> Add kasan_populate_shadow() interface and use it instead of
-> vmemmap_populate(). Besides, this allows us to take advantage of gigantic
-> pages and use them to populate the shadow, which should save us some memory
-> wasted on page tables and reduce TLB pressure.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
+>  arch/arm64/kvm/hyp/switch.c |  2 --
+>  virt/kvm/arm/hyp/timer-sr.c | 10 ++--------
+>  2 files changed, 2 insertions(+), 10 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 2cedf12..b98b73b 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -336,7 +336,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  	__activate_vm(vcpu);
+>  
+>  	__vgic_restore_state(vcpu);
+> -	__timer_enable_traps(vcpu);
+>  
+>  	/*
+>  	 * We must restore the 32-bit state before the sysregs, thanks
+> @@ -356,7 +355,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  
+>  	__sysreg_save_guest_state(guest_ctxt);
+>  	__sysreg32_save_state(vcpu);
+> -	__timer_disable_traps(vcpu);
+>  	__vgic_save_state(vcpu);
+>  
+>  	__deactivate_traps(vcpu);
+> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+> index f398616..82c217e 100644
+> --- a/virt/kvm/arm/hyp/timer-sr.c
+> +++ b/virt/kvm/arm/hyp/timer-sr.c
+> @@ -53,16 +53,10 @@ void __hyp_text disable_el1_phys_timer_access(void)
+>  
+>  void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
+>  {
+> -	/*
+> -	 * We don't need to do this for VHE since the host kernel runs in EL2
+> -	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
+> -	 */
 
-Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com> 
+I was about to suggest that we should move this comment, instead of remove
+it, but it seems misleading anyway. We do call
+enable/disable_el1_phys_timer_access on VHE, but at VCPU load/put time
+instead of VM enter/exit time. So I guess removing it is best.
+
+> -	if (!has_vhe())
+> -		enable_el1_phys_timer_access();
+> +	enable_el1_phys_timer_access();
+>  }
+>  
+>  void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
+>  {
+> -	if (!has_vhe())
+> -		disable_el1_phys_timer_access();
+> +	disable_el1_phys_timer_access();
+>  }
+> -- 
+> 2.9.0
+> 
+
+Should we just call enable/disable_el1_phys_timer_access directly from
+__kvm_vcpu_run for non-VHE and drop this extra function level?
+
+Thanks,
+drew
