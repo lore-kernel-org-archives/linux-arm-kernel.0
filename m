@@ -1,71 +1,120 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Nov 2017 16:24:32 +0100
-Subject: [PATCH v5 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4
- from being saved
-In-Reply-To: <20171027142855.21584-24-marc.zyngier@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-24-marc.zyngier@arm.com>
-Message-ID: <1f75a11a-41c3-71b8-6abf-4aa2962e348e@redhat.com>
+From: peda@axentia.se (Peter Rosin)
+Date: Tue, 7 Nov 2017 16:25:05 +0100
+Subject: [PATCH] ARM: sa1100: simpad: Correct I2C GPIO offsets
+In-Reply-To: <20171107151703.3847-1-linus.walleij@linaro.org>
+References: <20171107151703.3847-1-linus.walleij@linaro.org>
+Message-ID: <eee254f2-6c34-0cc3-85e6-a3b70100021c@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-Hi Marc,
-On 27/10/2017 16:28, Marc Zyngier wrote:
-> The GICv4 architecture doesn't make it easy for save/restore to
-> work, as it doesn't give any guarantee that the pending state
-> is written into the pending table.
-
-I don't understand where does the limitation exactly come from. Can't we
-use the GICR_VPENDBASER table data?
-
-Thanks
-
-Eric
+On 2017-11-07 16:17, Linus Walleij wrote:
+> Arnd reported the following build bug bug:
 > 
-> So let's not take any chance, and let's return an error if
-> we encounter any LPI that has the HW bit set. In order for
-> userspace to distinguish this error from other failure modes,
-> use -EACCES as an error code.
+> In file included from arch/arm/mach-sa1100/simpad.c:20:0:
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:1118:18: error: large
+> integer implicitly truncated to unsigned type [-Werror=overflow]
+>                       (0x00000001 << (Nb))
+>                       ^
+> include/linux/gpio/machine.h:56:16: note: in definition of macro
+> 'GPIO_LOOKUP_IDX'
+> .chip_hwnum = _chip_hwnum,
+>               ^~~~~~~~~~~
+> arch/arm/mach-sa1100/include/mach/SA-1100.h:1140:21: note: in
+> expansion of macro 'GPIO_GPIO'
+>                     ^~~~~~~~~
+> arch/arm/mach-sa1100/simpad.c:331:27: note: in expansion of
+> macro 'GPIO_GPIO21'
+>   GPIO_LOOKUP_IDX("gpio", GPIO_GPIO21, NULL, 0,
 > 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> This is what happened:
+> 
+> commit b2e63555592f81331c8da3afaa607d8cf83e8138
+> "i2c: gpio: Convert to use descriptors"
+> commit 4d0ce62c0a02e41a65cfdcfe277f5be430edc371
+> "i2c: gpio: Augment all boardfiles to use open drain"
+> together uncovered an old bug in the Simpad board
+> file: as theGPIO_LOOKUP_IDX() encodes GPIO offsets
+> on gpiochips in an u16 (see <linux/gpio/machine.h>)
+> these GPIO "numbers" does not fit, since in
+> arch/arm/mach-sa1100/include/mach/SA-1100.h it is
+> defined as:
+
+I suspect that you had a line here that started with a hashmark
+(#) and that the whole line got eaten by some git tool during
+a rebase or something. Don't ever start lines with # in the git
+commit message. It will simply disappear somewhere at some point.
+
+Cheers,
+peda
+
+> This is however provably wrong, since the i2c-gpio
+> driver uses proper GPIO numbers, albeit earlier from
+> the global number space, whereas this GPIO_GPIO21
+> is the local line offset in the GPIO register, which
+> is used in other code but certainly not in the
+> gpiolib GPIO driver in drivers/gpio/gpio-sa1100.c, which
+> has code like this:
+> 
+> static void sa1100_gpio_set(struct gpio_chip *chip,
+>                             unsigned offset, int value)
+> {
+>     int reg = value ? R_GPSR : R_GPCR;
+> 
+>     writel_relaxed(BIT(offset),
+>         sa1100_gpio_chip(chip)->membase + reg);
+> }
+> 
+> So far everything however compiled fine as an unsigned
+> int was used to pass the GPIO numbers in
+> struct i2c_gpio_platform_data. We can trace the actual error
+> back to
+> 
+> commit dbd406f9d0a1d33a1303eb75cbe3f9435513d339
+> "ARM: 7025/1: simpad: add GPIO based device definitions."
+> This added the i2c_gpio with the wrong offsets.
+> 
+> This commit was before the SA1100 was converted to use
+> the gpiolib, but as can be seen from the contemporary
+> gpio.c in mach-sa1100, it was already using:
+> 
+> static int sa1100_gpio_get(struct gpio_chip *chip,
+>                            unsigned offset)
+> {
+>         return GPLR & GPIO_GPIO(offset);
+> }
+> 
+> And GPIO_GPIO() is essentially the BIT() macro.
+> 
+> Cc: Wolfram Sang <w.sang@pengutronix.de>
+> Cc: Jochen Friedrich <jochen@scram.de>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: Russell King <linux@arm.linux.org.uk>
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  Documentation/virtual/kvm/devices/arm-vgic-its.txt | 2 ++
->  virt/kvm/arm/vgic/vgic-its.c                       | 9 +++++++++
->  2 files changed, 11 insertions(+)
+> Wolfram: this is in the i2c GPIO refactoring in your tree,
+> please apply it directly as a fix for v4.15 if there are
+> no protests.
+> Jochen: did this ever work? I suspect the patch was simply
+> developed on top of a different kernel.
+> ---
+>  arch/arm/mach-sa1100/simpad.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> index eb06beb75960..1eec7bcb2d52 100644
-> --- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> +++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-> @@ -60,6 +60,8 @@ Groups:
->      -EINVAL: Inconsistent restored data
->      -EFAULT: Invalid guest ram access
->      -EBUSY:  One or more VCPUS are running
-> +    -EACCES: The virtual ITS is backed by a physical GICv4 ITS, and the
-> +    	     state is not available
->  
->    KVM_DEV_ARM_VGIC_GRP_ITS_REGS
->    Attributes:
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index eb72eb027060..2710834d0920 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -1989,6 +1989,15 @@ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
->  	list_for_each_entry(ite, &device->itt_head, ite_list) {
->  		gpa_t gpa = base + ite->event_id * ite_esz;
->  
-> +		/*
-> +		 * If an LPI carries the HW bit, this means that this
-> +		 * interrupt is controlled by GICv4, and we do not
-> +		 * have direct access to that state. Let's simply fail
-> +		 * the save operation...
-> +		 */
-> +		if (ite->irq->hw)
-> +			return -EACCES;
-> +
->  		ret = vgic_its_save_ite(its, device, ite, gpa, ite_esz);
->  		if (ret)
->  			return ret;
+> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
+> index 9db483a42826..7d4feb8a49ac 100644
+> --- a/arch/arm/mach-sa1100/simpad.c
+> +++ b/arch/arm/mach-sa1100/simpad.c
+> @@ -328,9 +328,9 @@ static struct platform_device simpad_gpio_leds = {
+>  static struct gpiod_lookup_table simpad_i2c_gpiod_table = {
+>  	.dev_id = "i2c-gpio",
+>  	.table = {
+> -		GPIO_LOOKUP_IDX("gpio", GPIO_GPIO21, NULL, 0,
+> +		GPIO_LOOKUP_IDX("gpio", 21, NULL, 0,
+>  				GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+> -		GPIO_LOOKUP_IDX("gpio", GPIO_GPIO25, NULL, 1,
+> +		GPIO_LOOKUP_IDX("gpio", 25, NULL, 1,
+>  				GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
+>  	},
+>  };
 > 
