@@ -1,64 +1,29 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 7 Nov 2017 17:14:50 +0100
-Subject: [PATCH 15/37] KVM: arm64: Don't deactivate VM on VHE systems
-In-Reply-To: <20171012104141.26902-16-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-16-christoffer.dall@linaro.org>
-Message-ID: <20171107161450.akn7yspt4ebxynjy@kamzik.brq.redhat.com>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Tue, 7 Nov 2017 19:24:38 +0300
+Subject: [PATCH v2 2/2] arm64/mm/kasan: don't use vmemmap_populate() to
+ initialize shadow
+In-Reply-To: <20171106183516.6644-3-pasha.tatashin@oracle.com>
+References: <20171106183516.6644-1-pasha.tatashin@oracle.com>
+ <20171106183516.6644-3-pasha.tatashin@oracle.com>
+Message-ID: <a1f63638-7edd-a498-d89f-67dea59a247a@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:19PM +0200, Christoffer Dall wrote:
-> There is no need to reset the VTTBR to zero when exiting the guest on
-> VHE systems.  VHE systems don't use stage 2 translations for the EL2&0
-> translation regime used by the host.
+On 11/06/2017 09:35 PM, Pavel Tatashin wrote:
+> From: Will Deacon <will.deacon@arm.com>
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> The kasan shadow is currently mapped using vmemmap_populate() since that
+> provides a semi-convenient way to map pages into init_top_pgt. However,
+> since that no longer zeroes the mapped pages, it is not suitable for kasan,
+> which requires zeroed shadow memory.
+> 
+> Add kasan_populate_shadow() interface and use it instead of
+> vmemmap_populate(). Besides, this allows us to take advantage of gigantic
+> pages and use them to populate the shadow, which should save us some memory
+> wasted on page tables and reduce TLB pressure.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: Pavel Tatashin <pasha.tatashin@oracle.com>
 > ---
->  arch/arm64/kvm/hyp/switch.c | 5 ++---
->  1 file changed, 2 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index b72dc66..2cedf12 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -136,13 +136,13 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
->  	write_sysreg(0, pmuserenr_el0);
->  }
->  
-> -static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
-> +static inline void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
->  {
->  	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
 
-Hmm, should we change __activate_vm to take a kvm pointer instead of a
-vcpu, and then call the function from the VHE kvm_vcpu_run normally, but
-from the non-VHE kvm_vcpu_run with kern_hyp_va(vcpu->kvm)? I only ask,
-because it appears to be the last kern_hyp_va() that VHE code would still
-invoke, at least considering the code in arch/arm64/kvm/hyp/switch.c
-
->  	write_sysreg(kvm->arch.vttbr, vttbr_el2);
->  }
->  
-> -static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-> +static inline void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
-
-Adding these 'inline' attributes is unrelated to this patch, and probably
-unnecessary, as the compiler probably knew to do so anyway, but whatever.
-
->  {
->  	write_sysreg(0, vttbr_el2);
->  }
-> @@ -360,7 +360,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  	__vgic_save_state(vcpu);
->  
->  	__deactivate_traps(vcpu);
-> -	__deactivate_vm(vcpu);
->  
->  	__sysreg_restore_host_state(host_ctxt);
->  
-> -- 
-> 2.9.0
-> 
-
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Acked-by: Andrey Ryabinin <aryabinin@virtuozzo.com> 
