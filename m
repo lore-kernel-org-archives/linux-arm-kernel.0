@@ -1,108 +1,68 @@
-From: shuahkh@osg.samsung.com (Shuah Khan)
-Date: Tue, 7 Nov 2017 09:53:43 -0700
-Subject: [PATCH v2 1/2] media: exynos-gsc: fix lockdep warning
-In-Reply-To: <5362d81f-80c1-e806-51c2-a818a941518a@xs4all.nl>
-References: <cover.1507935819.git.shuahkh@osg.samsung.com>
- <f1de8d306e45127bdcb53b4ee53a7d5dc3c5c95b.1507935819.git.shuahkh@osg.samsung.com>
- <5362d81f-80c1-e806-51c2-a818a941518a@xs4all.nl>
-Message-ID: <16599447-c4ee-1400-edae-6c3160a162e5@osg.samsung.com>
+From: jagan@amarulasolutions.com (Jagan Teki)
+Date: Tue, 7 Nov 2017 22:47:49 +0530
+Subject: [PATCH 1/2] arm64: dts: orange-pi-zero-plus2: fix sdcard detect
+In-Reply-To: <CAMty3ZCYQx0MfiJnOZPtO4nSAtOrGicOzw_x_AznTiEW8h2sLg@mail.gmail.com>
+References: <20171103195855.15283-1-geomatsi@gmail.com>
+ <20171103195855.15283-2-geomatsi@gmail.com>
+ <CAMty3ZCs8kq1vUGLOi0ZghY7n0iXgUQ1E=ngBO6Y4wm7wMLF7Q@mail.gmail.com>
+ <20171104154221.ao7kkcwqhnja3cxe@speedy.hunter>
+ <20171106122633.5mnqfh6xhmmxr45s@flea>
+ <20171106161306.tq6yeq6bq36ridj3@speedy.hunter>
+ <CAMty3ZCYQx0MfiJnOZPtO4nSAtOrGicOzw_x_AznTiEW8h2sLg@mail.gmail.com>
+Message-ID: <CAMty3ZANhL7cHqYw4VY2Sj_JUZGyqFZ+7pLssc1tniN3BdupOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/16/2017 09:18 AM, Hans Verkuil wrote:
-> On 10/16/2017 05:16 PM, Shuah Khan wrote:
->> The driver mmap functions shouldn't take lock when calling vb2_mmap().
->> Fix it to not take the lock.
+On Tue, Nov 7, 2017 at 1:12 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+> On Mon, Nov 6, 2017 at 9:43 PM, Sergey Matyukevich <geomatsi@gmail.com> wrote:
+>> Hello Maxime,
 >>
->> Reference: commit log for f035eb4e976ef5a059e30bc91cfd310ff030a7d3
->> and e752577ed7bf55c81e10343fced8b378cda2b63b
+>>> > > > The sdcard detect pin on orange-pi-zero-plus2 is pulled up.
+>>> > > > Fix cd-gpio description to enable sdcard detect.
+>>> > > >
+>>> > > > Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+>>> > > > ---
+>>> > > >  arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts | 2 +-
+>>> > > >  1 file changed, 1 insertion(+), 1 deletion(-)
+>>> > > >
+>>> > > > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+>>> > > > index b6b7a561df8c..a42fd79a62a3 100644
+>>> > > > --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+>>> > > > +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+>>> > > > @@ -71,7 +71,7 @@
+>>> > > >         pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+>>> > > >         vmmc-supply = <&reg_vcc3v3>;
+>>> > > >         bus-width = <4>;
+>>> > > > -       cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
+>>> > > > +       cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>;
+>>> > >
+>>> > > Was able to detect and do mount with existing dts
+>>> >
+>>> > Did you try to boot from sdcard ? I am not able to boot my board from
+>>> > sd-card without this change. As I mentioned earlier in my email
+>>> > to buildroot mailing list, with mmc debug enabled I see that mmc
+>>> > tries to init sd-card when I remove it from the slot.
+>>> >
+>>> > Maybe there is a minor differences between h/w versions or batches ?
+>>> > What is you board version ? I tested on board v1.0.
+>>>
+>>> Looking at the schematics, it definitely looks like it's active low.
 >>
->> The following lockdep warning is fixed with this change.
->>
->> [ 1990.972058] ======================================================
->> [ 1990.978172] WARNING: possible circular locking dependency detected
->> [ 1990.984327] 4.14.0-rc2-00002-gfab205f-dirty #4 Not tainted
->> [ 1990.989783] ------------------------------------------------------
->> [ 1990.995937] qtdemux0:sink/2765 is trying to acquire lock:
->> [ 1991.001309]  (&gsc->lock){+.+.}, at: [<bf1729f0>] gsc_m2m_mmap+0x24/0x5c [exynos_gsc]
->> [ 1991.009108]
->>                but task is already holding lock:
->> [ 1991.014913]  (&mm->mmap_sem){++++}, at: [<c01df2e4>] vm_mmap_pgoff+0x44/0xb8
->> [ 1991.021932]
->>                which lock already depends on the new lock.
->>
->> [ 1991.030078]
->>                the existing dependency chain (in reverse order) is:
->> [ 1991.037530]
->>                -> #1 (&mm->mmap_sem){++++}:
->> [ 1991.042913]        __might_fault+0x80/0xb0
->> [ 1991.047096]        video_usercopy+0x1cc/0x510 [videodev]
->> [ 1991.052297]        v4l2_ioctl+0xa4/0xdc [videodev]
->> [ 1991.057036]        do_vfs_ioctl+0xa0/0xa18
->> [ 1991.061102]        SyS_ioctl+0x34/0x5c
->> [ 1991.064834]        ret_fast_syscall+0x0/0x28
->> [ 1991.069072]
->>                -> #0 (&gsc->lock){+.+.}:
->> [ 1991.074193]        lock_acquire+0x6c/0x88
->> [ 1991.078179]        __mutex_lock+0x68/0xa34
->> [ 1991.082247]        mutex_lock_interruptible_nested+0x1c/0x24
->> [ 1991.087888]        gsc_m2m_mmap+0x24/0x5c [exynos_gsc]
->> [ 1991.093029]        v4l2_mmap+0x54/0x88 [videodev]
->> [ 1991.097673]        mmap_region+0x3a8/0x638
->> [ 1991.101743]        do_mmap+0x330/0x3a4
->> [ 1991.105470]        vm_mmap_pgoff+0x90/0xb8
->> [ 1991.109542]        SyS_mmap_pgoff+0x90/0xc0
->> [ 1991.113702]        ret_fast_syscall+0x0/0x28
->> [ 1991.117945]
->>                other info that might help us debug this:
->>
->> [ 1991.125918]  Possible unsafe locking scenario:
->>
->> [ 1991.131810]        CPU0                    CPU1
->> [ 1991.136315]        ----                    ----
->> [ 1991.140821]   lock(&mm->mmap_sem);
->> [ 1991.144201]                                lock(&gsc->lock);
->> [ 1991.149833]                                lock(&mm->mmap_sem);
->> [ 1991.155725]   lock(&gsc->lock);
->> [ 1991.158845]
->>                 *** DEADLOCK ***
->>
->> [ 1991.164740] 1 lock held by qtdemux0:sink/2765:
->> [ 1991.169157]  #0:  (&mm->mmap_sem){++++}, at: [<c01df2e4>] vm_mmap_pgoff+0x44/0xb8
->> [ 1991.176609]
->>                stack backtrace:
->> [ 1991.180946] CPU: 2 PID: 2765 Comm: qtdemux0:sink Not tainted 4.14.0-rc2-00002-gfab205f-dirty #4
->> [ 1991.189608] Hardware name: SAMSUNG EXYNOS (Flattened Device Tree)
->> [ 1991.195686] [<c01102c8>] (unwind_backtrace) from [<c010cabc>] (show_stack+0x10/0x14)
->> [ 1991.203393] [<c010cabc>] (show_stack) from [<c08543a4>] (dump_stack+0x98/0xc4)
->> [ 1991.210586] [<c08543a4>] (dump_stack) from [<c016b2fc>] (print_circular_bug+0x254/0x410)
->> [ 1991.218644] [<c016b2fc>] (print_circular_bug) from [<c016c580>] (check_prev_add+0x468/0x938)
->> [ 1991.227049] [<c016c580>] (check_prev_add) from [<c016f4dc>] (__lock_acquire+0x1314/0x14fc)
->> [ 1991.235281] [<c016f4dc>] (__lock_acquire) from [<c016fefc>] (lock_acquire+0x6c/0x88)
->> [ 1991.242993] [<c016fefc>] (lock_acquire) from [<c0869fb4>] (__mutex_lock+0x68/0xa34)
->> [ 1991.250620] [<c0869fb4>] (__mutex_lock) from [<c086aa08>] (mutex_lock_interruptible_nested+0x1c/0x24)
->> [ 1991.259812] [<c086aa08>] (mutex_lock_interruptible_nested) from [<bf1729f0>] (gsc_m2m_mmap+0x24/0x5c [exynos_gsc])
->> [ 1991.270159] [<bf1729f0>] (gsc_m2m_mmap [exynos_gsc]) from [<bf037120>] (v4l2_mmap+0x54/0x88 [videodev])
->> [ 1991.279510] [<bf037120>] (v4l2_mmap [videodev]) from [<c01f4798>] (mmap_region+0x3a8/0x638)
->> [ 1991.287792] [<c01f4798>] (mmap_region) from [<c01f4d58>] (do_mmap+0x330/0x3a4)
->> [ 1991.294986] [<c01f4d58>] (do_mmap) from [<c01df330>] (vm_mmap_pgoff+0x90/0xb8)
->> [ 1991.302178] [<c01df330>] (vm_mmap_pgoff) from [<c01f28cc>] (SyS_mmap_pgoff+0x90/0xc0)
->> [ 1991.309977] [<c01f28cc>] (SyS_mmap_pgoff) from [<c0108820>] (ret_fast_syscall+0x0/0x28)
->>
->> Signed-off-by: Shuah Khan <shuahkh@osg.samsung.com>
->> Suggested-by: Hans Verkuil <hansverk@cisco.com>
->> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> 
-> Acked-by: Hans Verkuil <hansverk@cisco.com>
-> 
-> Regards,
-> 
-> 	Hans
+>> Is it ok to merge it then ? Or using 'cd-inverted' property
+>> is the preferable option ?
+>
+> W/o any change mainline works unstable for me, it wasn't booting
+> at-all[1] did you find the same?
+>
+> Even tried with active LOW and cd-inverted.
+>
+> [1] https://paste.ubuntu.com/25909064/
 
-Hi Mauro,
+Look like something broken for H5 and A64 between v4.14-rc8 to latest
 
-Are you planning to take this in for 4.15-rc1? This patch is applicable
-to stable as well.
-
-thanks,
--- Shuah
+thanks!
+-- 
+Jagan Teki
+Senior Linux Kernel Engineer | Amarula Solutions
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
