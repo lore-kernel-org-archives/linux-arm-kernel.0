@@ -1,33 +1,51 @@
-From: zyw@rock-chips.com (Chris Zhong)
-Date: Tue,  7 Nov 2017 10:49:19 +0800
-Subject: [PATCH] ARM: dts: add phy-reset property for rk3066a-rayeager emac
-Message-ID: <1510022959-19440-1-git-send-email-zyw@rock-chips.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 7 Nov 2017 11:13:23 +0800
+Subject: AXP803 I2C support / AXP devicetree-bindings
+In-Reply-To: <CAFBinCAm8pA-dh3+T4Ui+DvLv5C17Zup-FN8pvi0cUa5PgwJJw@mail.gmail.com>
+References: <CAFBinCAm8pA-dh3+T4Ui+DvLv5C17Zup-FN8pvi0cUa5PgwJJw@mail.gmail.com>
+Message-ID: <CAGb2v642n4puXqKOjG0QxhFgFFW2nJKrpU4KV2ZRPNb6_zF4pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ethernet phy of rk3066a-rayeager has a reset pin, it controlled by
-GPIO1_D6, this pin should be pull down then pull up to reset the phy.
-Add a phy-reset property in emac, make the phy can be reset when emac
-power on.
+On Tue, Nov 7, 2017 at 6:39 AM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> Hello,
+>
+> recently I discovered that there are some X-Powers AXP chips that
+> support both, Allwinner's own "RSB" as well as the I2C ("TWSI" in the
+> datasheet) busses.
+>
+> one chip that supports both interfaces is the AXP803
+> the datasheet is linked in the public PINE64 wiki: [1] (direct link: [0])
 
-Signed-off-by: Chris Zhong <zyw@rock-chips.com>
----
+All the RSB based PMICs support both modes. They start in I2C mode
+when cold booted.
 
- arch/arm/boot/dts/rk3066a-rayeager.dts | 2 ++
- 1 file changed, 2 insertions(+)
+>
+> currently the "x-powers,axp803" binding is "RSB" bus specific as it's
+> currently only listed in drivers/mfd/axp20x-rsb.c
+>
+> was there a discussion about supporting both, the "RSB" and I2C bus
+> for one chip (for example the AXP803) in the past (I couldn't find
+> anything online)?
 
-diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
-index 570157f..6064a0a 100644
---- a/arch/arm/boot/dts/rk3066a-rayeager.dts
-+++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
-@@ -173,6 +173,8 @@
- 	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
- 	phy = <&phy0>;
- 	phy-supply = <&vcc_rmii>;
-+	phy-reset-gpios = <&gpio1 RK_PD6 GPIO_ACTIVE_LOW>; /* PHY_RST */
-+	phy-reset-duration = <10>; /* millisecond */
- 	status = "okay";
- 
- 	phy0: ethernet-phy at 0 {
--- 
-2.7.4
+No. None of the boards actually use I2C instead of RSB. RSB mode is
+initialized by the boot loader. There is no easy way for the kernel to
+switch it back.
+
+> what about the device-tree bindings in this case?
+
+We can deal with it if someone actually comes up with a practical
+case needing it. Otherwise things go untested, which is not what
+we want.
+
+ChenYu
+
+>
+>
+> Regards
+> Martin
+>
+>
+> [0] http://files.pine64.org/doc/datasheet/pine64/AXP803_Datasheet_V1.0.pdf
+> [1] http://wiki.pine64.org/index.php/PINE_A64_Main_Page#Datasheets_for_Components_and_Peripherals
