@@ -1,46 +1,43 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 7 Nov 2017 16:34:04 +0000
-Subject: [PATCH v5 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4
- from being saved
-In-Reply-To: <77d479e5-98f9-9081-a3a6-87bef1009775@redhat.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-24-marc.zyngier@arm.com>
- <1f75a11a-41c3-71b8-6abf-4aa2962e348e@redhat.com>
- <9c1e1c92-e0fa-737f-63ab-a335b93af6da@arm.com>
- <77d479e5-98f9-9081-a3a6-87bef1009775@redhat.com>
-Message-ID: <33f4de5f-004e-6b92-d4f6-651e536dc697@arm.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Tue, 7 Nov 2017 17:38:55 +0100
+Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
+In-Reply-To: <20171107130331.4wut5g6znzakkg4z@flea>
+References: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20171107130331.4wut5g6znzakkg4z@flea>
+Message-ID: <65694f1d-e1cb-08e0-0883-f0087f5e09f5@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/17 16:12, Auger Eric wrote:
-> Hi Marc,
-> 
-> On 07/11/2017 16:38, Marc Zyngier wrote:
->> On 07/11/17 15:24, Auger Eric wrote:
->>> Hi Marc,
->>>
->>> Hi Marc,
->>> On 27/10/2017 16:28, Marc Zyngier wrote:
->>>> The GICv4 architecture doesn't make it easy for save/restore to
->>>> work, as it doesn't give any guarantee that the pending state
->>>> is written into the pending table.
->>>
->>> I don't understand where does the limitation exactly come from. Can't we
->>> use the GICR_VPENDBASER table data?
->> You can't. None of the tables that are written by either the ITS or the
->> redistributors are architected. All you know is that there is one bit
->> per vLPI, but that's it (you don't even know which one is which).
-> Oh I thought the redistributor config and pending tables were fully
-> specified (6.1.2 and 6.1.3 of the spec), except the 1kB of the pending
-> table.
+Board could be any with A20,
+for example Olinuxino A20.
+Or our Q027, S027 boards, but final dts still are not complete.
 
-The property table is definitely architected. It is a lot less clear for
-the pending table. The main issue is that you cannot really know when
-the various bits have actually been flushed all the way from the
-redistributor caches to memory to be introspected. Yes, it sucks.
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Giulio Benetti
+R&D Manager &
+Advanced Research
+
+MICRONOVA SRL
+Sede: Via A. Niedda 3 - 35010 Vigonza (PD)
+Tel. 049/8931563 - Fax 049/8931346
+Cod.Fiscale - P.IVA 02663420285
+Capitale Sociale ? 26.000 i.v.
+Iscritta al Reg. Imprese di Padova N. 02663420285
+Numero R.E.A. 258642
+
+Il 07/11/2017 14:03, Maxime Ripard ha scritto:
+> On Tue, Nov 07, 2017 at 01:49:59PM +0100, Giulio Benetti wrote:
+>> On sun7i-a20-* there's no way to enable PA00--PA27 as RGB888 LCD0 pins.
+>>
+>> Add lcd_rgb888_pins in sun7i-a20.dtsi.
+>>
+>> It can be used on sun7i-a20-olinuxino-lime.dts.
+>> This patch gives possibility to set parallel lcd pins for RGB888.
+>> To be used with tcon0 in your <target>.dts
+> 
+> My question was on which board do you want to use it right now. If the
+> answer is none, then we won't merge that patch, we have too many
+> pinctrl already to not add the unused ones.
+> 
+> Maxime
+> 
