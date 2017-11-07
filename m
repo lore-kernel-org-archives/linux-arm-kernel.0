@@ -1,67 +1,83 @@
-From: balbi@kernel.org (Felipe Balbi)
-Date: Tue, 07 Nov 2017 10:24:56 +0200
-Subject: [PATCH v2 3/3] usb: dwc3: Enable USB 3.0 phy driver
-In-Reply-To: <20171107072055.26945-3-ran.wang_1@nxp.com>
-References: <20171107072055.26945-1-ran.wang_1@nxp.com>
- <20171107072055.26945-3-ran.wang_1@nxp.com>
-Message-ID: <87k1z2sdgn.fsf@linux.intel.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Tue, 7 Nov 2017 10:49:41 +0200
+Subject: [PATCH v2 1/5] dt-bindings: iio: at91-sama5d2_adc: add optional
+ dma property
+In-Reply-To: <CAL_JsqLPMeF9EtcCO3eZn+7DbyAQcxzNYEpAiFvQoe1=ytpELQ@mail.gmail.com>
+References: <1507703732-29175-1-git-send-email-eugen.hristev@microchip.com>
+ <1507703732-29175-2-git-send-email-eugen.hristev@microchip.com>
+ <20171013215142.vlfhzzzetmc7resq@rob-hp-laptop>
+ <20171019111417.7rzdnkvtukzzhl2u@piout.net>
+ <CAL_JsqLPMeF9EtcCO3eZn+7DbyAQcxzNYEpAiFvQoe1=ytpELQ@mail.gmail.com>
+Message-ID: <5f171202-6a6a-2055-cb5c-c0c687f60f86@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi,
 
-Ran Wang <ran.wang_1@nxp.com> writes:
-> Adds entry point at dwc3 core init function to enable
-> USB 3.0 PHY driver.
->
-> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> ---
-> Change in v2:
-> 	- New file
->
->  drivers/usb/dwc3/core.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
->
-> diff --git a/drivers/usb/dwc3/core.c b/drivers/usb/dwc3/core.c
-> index 03474d3575ab..a9df03c64a7b 100644
-> --- a/drivers/usb/dwc3/core.c
-> +++ b/drivers/usb/dwc3/core.c
-> @@ -746,6 +746,8 @@ static int dwc3_core_init(struct dwc3 *dwc)
->  {
->  	u32			reg;
->  	int			ret;
-> +	int			retval;
-> +	struct phy *phy;
->  
->  	if (!dwc3_core_is_valid(dwc)) {
->  		dev_err(dwc->dev, "this is not a DesignWare USB3 DRD Core\n");
-> @@ -770,6 +772,19 @@ static int dwc3_core_init(struct dwc3 *dwc)
->  	if (ret)
->  		goto err0;
->  
-> +	phy = phy_get(dwc->dev, "usb-phy");
-> +	if (IS_ERR(phy)) {
-> +		retval = PTR_ERR(phy);
-> +		if (retval == -EPROBE_DEFER)
-> +			dev_dbg(dwc->dev, "usb-phy no found\n");
-> +	} else {
-> +		retval = phy_init(phy);
-> +		if (retval) {
-> +			phy_put(phy);
-> +		    dev_dbg(dwc->dev, "phy_init() error!\n");
-> +		}
-> +	}
-> +
+On 20.10.2017 00:58, Rob Herring wrote:
+> On Thu, Oct 19, 2017 at 6:14 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+>> On 13/10/2017 at 16:51:42 -0500, Rob Herring wrote:
+>>> On Wed, Oct 11, 2017 at 09:35:28AM +0300, Eugen Hristev wrote:
+>>>> Added property for DMA configuration of the device.
+>>>>
+>>>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>>>> ---
+>>>>   Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt | 7 +++++++
+>>>>   1 file changed, 7 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+>>>> index 552e7a8..5f94d479 100644
+>>>> --- a/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+>>>> +++ b/Documentation/devicetree/bindings/iio/adc/at91-sama5d2_adc.txt
+>>>> @@ -17,6 +17,11 @@ Required properties:
+>>>>     This property uses the IRQ edge types values: IRQ_TYPE_EDGE_RISING ,
+>>>>     IRQ_TYPE_EDGE_FALLING or IRQ_TYPE_EDGE_BOTH
+>>>>
+>>>> +Optional properties:
+>>>> +  - dmas: Phandle to dma channel for the ADC.
+>>>> +  See ../../dma/dma.txt for details.
+>>>> +  - dma-names: Must be "rx" when dmas property is being used.
+>>>
+>>> -names is pointless when there is only one.
+>>>
+>>
+>> You didn't reply to the question I had previously about that: What if at
+>> some point, we have multiple dmas in the same binding?
+> 
+> Then add dma-names at that point and rx has to be first. If you know
+> there's other channels, then add them now. Don't evolve the bindings
+> needlessly based on what a driver supports.
+> 
+> Would another channel make sense here? Maybe multi-channel rx in which
+> case your naming wouldn't be setup for that. But "tx" on an ADC?
+> 
+> Rob
 
-what???? We already do this. See dwc3_core_get_phy().
+Hello Rob,
 
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/b998e37c/attachment.sig>
+I can keep only "dmas" and remove "dma-names", but then, the API used by
+the drivers that request channels requires a name parameter
+(dma_request_slave_channel), and it will look always inside the
+"dma-names" property to match the name and find the proper channel, and
+it will fail in this case.
+
+Looking in the general dma binding (dma.txt) I can see that both
+properties are marked as required for a client driver, so that's why
+I added both.
+
+I can either keep dma-names; or try to find the channel properties by
+looking directly into the OF node and create the dma_chan struct inside
+my driver (maybe call some xlate function for the DMA controller), but
+still need to get the DT property. A complicated option would be to
+actually create an API inside the dmaengine to find a channel without
+name.
+
+Which approach you think it's best to pursue ?
+
+Thanks,
+Eugen
+
+
+
+> 
