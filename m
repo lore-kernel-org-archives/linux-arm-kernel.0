@@ -1,24 +1,19 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Nov 2017 11:08:16 +0100
-Subject: [PATCH v4 15/15] arm64: dts: renesas: r8a7795-es1: Enable
- IPMMU-MP1
-In-Reply-To: <20171101103452.7491-16-horms+renesas@verge.net.au>
-References: <20171101103452.7491-1-horms+renesas@verge.net.au>
- <20171101103452.7491-16-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdX5hUzb1UZL6QxhaaHh-Og_7UxCcJ7CjnV87qf7=wvFaQ@mail.gmail.com>
+Date: Tue, 7 Nov 2017 11:09:41 +0100
+Subject: [PATCH 0/4] arm64: dts: renesas: r8a7796: IPMMU upstream
+ integration
+In-Reply-To: <20171101103504.7658-1-horms+renesas@verge.net.au>
+References: <20171101103504.7658-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWSuk+rD16Ym19kMCYXb8n2YaGwSzAnZmfH_u8z_pTFcw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 1, 2017 at 11:34 AM, Simon Horman
+On Wed, Nov 1, 2017 at 11:35 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> From: Magnus Damm <damm+renesas@opensource.se>
->
-> Enable the r8a7795 ES1.x device node for IPMMU-MP1.
->
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> This series adds DT nodes for IPMMU instances on r8a77970 together with
+> connections to r8a77970 on-chip devices: SYS-DMAC and Ethernet-AVB.
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Subject s/7796/77970/.
 
 Gr{oetje,eeting}s,
 
