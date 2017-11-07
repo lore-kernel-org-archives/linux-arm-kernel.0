@@ -1,40 +1,66 @@
-From: preid@electromag.com.au (Phil Reid)
-Date: Tue, 7 Nov 2017 09:02:50 +0800
-Subject: [PATCH v5 4/7] i2c: designware: add i2c gpio recovery option
-In-Reply-To: <1509984581.25007.47.camel@linux.intel.com>
-References: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
- <1509590430-11968-5-git-send-email-preid@electromag.com.au>
- <1509984581.25007.47.camel@linux.intel.com>
-Message-ID: <a0265848-2496-d347-a40f-ce83e7dfd945@electromag.com.au>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 7 Nov 2017 01:19:03 +0000
+Subject: Page fault while link_path_walk for path_len > 4060 bytes
+In-Reply-To: <20171104001757.GM21978@ZenIV.linux.org.uk>
+References: <08e7e3332dc86c535dd2961ac1cde0b5@codeaurora.org>
+ <54083a824d6705a93d972ca5ef3a7b35@codeaurora.org>
+ <3958983ccec4aca494bf72c397f34bfa@codeaurora.org>
+ <953068e79da559bfd4f13e46e31c5a4e@codeaurora.org>
+ <20170822125747.GB28024@arm.com>
+ <b13b3a27e92c5413d168ad775163ea91@codeaurora.org>
+ <20170912202615.GA9432@arm.com>
+ <20171104001757.GM21978@ZenIV.linux.org.uk>
+Message-ID: <20171107011902.GB13514@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7/11/2017 00:09, Andy Shevchenko wrote:
-> On Thu, 2017-11-02 at 10:40 +0800, Phil Reid wrote:
->> From: Tim Sander <tim@krieglstein.org>
->>
->> This patch contains much input from Phil Reid and has been tested
->> on Intel/Altera Cyclone V SOC Hardware with Altera GPIO's for the
->> SCL and SDA GPIO's.
->>
->> Acked-by: Jarkko Nikula <jarkko.nikula@linux.intel.com>
->> Reviewed-by: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+On Sat, Nov 04, 2017 at 12:17:57AM +0000, Al Viro wrote:
+> [looking through the old mail]
 > 
-> Shame on me, I totally forgot one important comment on all this.
+> On Tue, Sep 12, 2017 at 09:26:16PM +0100, Will Deacon wrote:
+> > > -    { do_page_fault,    SIGSEGV, SEGV_MAPERR,    "level 3 translation
+> > > fault"    },
+> > > +    { do_translation_fault,    SIGSEGV, SEGV_MAPERR,    "level 3
+> > > translation fault"    },
+> > > we will try with above changes and get back to you.
+> > 
+> > Did you test with this change?
 > 
-> How do we switch pinctrl back to the native function? Is it guaranteed
-> by pinctrl framework and all underneath drivers?
-> 
-> 
-G'day Andy,
+> FWIW, while that went in as commit 760bfb47c36a ("arm64: fault: Route pte
+> translation faults via do_translation_fault"), I wonder if the same issue
+> exists on arm.  It looks like the pagefault handler there is fairly
+> similar to arm64 one and the same shortcut is present there.
 
-That is a good question. I don't have an understanding of how the pinctrl
-framework works with respect to requesting gpios.
-My device (Intel / Altera Cyclone V SOC) doesn't have a pinctrl for the i2c / gpio mux as
-yet. It's all setup by the bootloader and they don't expect you to change it.
-I'm using two separate GPIO's "wired" to the i2c bus via the SOC FPGA for the recovery.
-Tim was doing the same.
+So we never actually nailed this one down on arm64 (the problem mysteriously
+disappeared iirc, and I failed to reproduce it on my systems) but I fixed it
+anyway because it looked at least theoretically possible. In that case, yes,
+I think ARM needs the same sort of fixes for both 2 and 3 level tables where
+the handler branch directly to do_page_fault.
 
--- 
-Regards
-Phil Reid
+> The more I'm looking at that, the more it looks like we *really* need
+> a comment in all instances of load_unaligned_zeropad() warning about
+> that pitfall.  Something like
+> /*
+>  * Load an unaligned word from kernel space.
+>  *
+>  * In the (very unlikely) case of the word being a page-crosser
+>  * and the next page not being mapped, take the exception and
+>  * return zeroes in the non-existing part.
+>  *
+>  * NOTE: this relies upon the pagefault handler *NOT* blocking
+>  * in such situation (fault in kernel mode on kernel address with
+>  * exception fixup present).  Verify that for your architecture
+>  * before using an equivalent of this approach.  Note that
+>  * you can't count upon faulthandler_disabled() saving you;
+>  * this function can be called e.g. under a spinlock on non-preempt
+>  * kernels without pagefault_disable() done by caller.
+>  */
+> perhaps.  That property holds on x86, ppc and (now) arm64, but as
+> arm64 case shows, it might not be true for other architectures.
+> As the matter of fact, e.g. sparc64 (which will not use that
+> thing for obvious reasons anyway) it is *not* true, etc.
+
+I wonder if there's any mileage in a test module for this? That code rarely
+(if ever) gets run in practice.
+
+Will
