@@ -1,47 +1,34 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 7 Nov 2017 10:12:59 +0000
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
- <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
-Message-ID: <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 7 Nov 2017 11:13:36 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77995: Add IPMMU device nodes
+In-Reply-To: <20171101103508.7721-2-horms+renesas@verge.net.au>
+References: <20171101103508.7721-1-horms+renesas@verge.net.au>
+ <20171101103508.7721-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVS_5_iouNei_HvgUtWTVS_NuLcbpua_K_VUQqr7Pt_QA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Nov 1, 2017 at 11:35 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Add r8a77995 IPMMU nodes and keep all disabled by default.
+>
+> Based on work for the r8a7795 and r8a7796 by Magnus Damm
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-On 06/11/17 19:17, Mark Brown wrote:
-> On Mon, Nov 06, 2017 at 04:30:41AM -0800, kernelci.org bot wrote:
-> 
->> Full Boot Summary:
-> https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20171106/
->> Full Build Summary: https://kernelci.org/build/next/branch/master/kernel/next-20171106/
-> 
-> Since Friday -next has been failing to boot tegra124-nyan-big in
-> kernelci with all configs:
-> 
->> arm:
-> 
->>     multi_v7_defconfig:
->>         tegra124-nyan-big:
->>             lab-collabora: failing since 2 days (last pass: next-20171102 - first fail: next-20171103)
-> 
-> It's fine in mainline, see: 
-> 
->     https://kernelci.org/boot/id/5a0030c959b514aad21cdd1a/
-> 
-> for boot log, history and comparisons with other trees.  Looks like
-> output started grinding to a halt at the point where it starts
-> requesting firmware but ICBW.
+My comment for r8a7795.dtsi about IPMMU-* comments is applicable here, too.
+My comment about power-domains properties probably isn't, as R-Car D3
+doesn't have I/O power domains, which table 16.2 doesn't take into account.
 
-Thanks for the report. I have been looking into a failure on nyan-big
-[0], but this one looks like a new failure. I will take a look.
+Gr{oetje,eeting}s,
 
-Cheers
-Jon
+                        Geert
 
-[0] https://lkml.org/lkml/2017/9/19/306
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
--- 
-nvpublic
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
