@@ -1,49 +1,29 @@
-From: michael@amarulasolutions.com (Michael Nazzareno Trimarchi)
-Date: Tue, 7 Nov 2017 21:04:19 +0100
-Subject: Battery charging, battery status on Nokia N9, N950
-In-Reply-To: <20171107195912.GA3274@amd>
-References: <20171103210349.GA14071@amd> <20171107195020.GA19508@amd>
- <20171107195912.GA3274@amd>
-Message-ID: <CAOf5uwnoUkZG6KUzhn2u8vdcd5_+nmUQpXwE1zjNwiakN+Mscg@mail.gmail.com>
+From: otavio.salvador@ossystems.com.br (Otavio Salvador)
+Date: Tue, 7 Nov 2017 18:05:01 -0200
+Subject: [PATCH] ARM: dts: imx7d-pico-pi: Separate into cpu and baseboard
+ dts
+In-Reply-To: <1510079483-24012-1-git-send-email-vanessa.maegima@nxp.com>
+References: <1510079483-24012-1-git-send-email-vanessa.maegima@nxp.com>
+Message-ID: <CAP9ODKrNzLkOt76=b58S3TioXBk1FrS4XpPkPQCN48mcAP-GVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel
-
-On Tue, Nov 7, 2017 at 8:59 PM, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
+On Tue, Nov 7, 2017 at 4:31 PM, Vanessa Maegima <vanessa.maegima@nxp.com> wrote:
+> Separate the old imx7d-pico into cpu (imx7d-pico.dtsi) and baseboard
+> (imx7d-pico-pi.dts) dts so the same cpu dtsi can be used in different
+> baseboards variants.
 >
->>
->> > I'm fighting with battery status & battery charging on Nokia
->> > N9/N950. https://elinux.org/N950 contains enough info to get battery
->> > status (and below is first attempt at kernel implementation), but I'm
->> > not sure what needs to be done to charge the battery (or at least
->> > power phone from USB).
->>
->> Nemo recovery system (2824336 Jul 25  2016 zImage-moslo) seems to
->> either charge phone from USB or at power it from USB.
->>
->> But 4.13 does not; it seems there are two separate issue.
->>
->> First, something needs to be done to enable system power from the
->> USB. I'm not sure what that one would be :-(. Then, it should be
->> possible to ask bq24153 to charge the battery.
->
-> If someone has schematics or pointer to them.. for N9 or N950, that
-> would be useful :-).
->
+> Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
 
-You can dump pinctrl and configuration and check if some gpio are
-used.  From reference schematic of this charger you have OTG and
-CD. Those pins can be just used to enable/disable and boost charging.
-You should dig a bit in sysfs to figure it out ;)
+Thanks for looking at this Vanessa, one question though is if it is
+allowed to just drop the old dtb file or we need to keep it for
+backward compatibility?
 
-Michael
+Honestly, it was not available for a long time so I would personally
+be fine with just renaming it but I don't know about the police on
+this.
 
-
-> Thanks,
->                                                                         Pavel
->
-> --
-> (english) http://www.livejournal.com/~pavelmachek
-> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-- 
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://code.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
