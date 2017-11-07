@@ -1,94 +1,36 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 7 Nov 2017 13:49:26 +0800
-Subject: [PATCH v3 4/4] ARM64: dts: meson: drop "sana" clock from SARADC
-In-Reply-To: <20171107053728.32169-2-yixun.lan@amlogic.com>
-References: <20171107053728.32169-1-yixun.lan@amlogic.com>
- <20171107053728.32169-2-yixun.lan@amlogic.com>
-Message-ID: <1042f0e2-1a13-af57-5057-6f97ff4c4aa2@amlogic.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 7 Nov 2017 11:45:40 +0530
+Subject: [PATCH v4 19/20] cpufreq: add support for CPU DVFS based on SCMI
+ message protocol
+In-Reply-To: <1509720477-18936-20-git-send-email-sudeep.holla@arm.com>
+References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
+ <1509720477-18936-20-git-send-email-sudeep.holla@arm.com>
+Message-ID: <20171107061540.GB3297@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On 11/07/17 13:37, Yixun Lan wrote:
-> From: Xingyu Chen <xingyu.chen@amlogic.com>
+On 03-11-17, 14:47, Sudeep Holla wrote:
+> On some ARM based systems, a separate Cortex-M based System Control
+> Processor(SCP) provides the overall power, clock, reset and system
+> control including CPU DVFS. SCMI Message Protocol is used to
+> communicate with the SCP.
 > 
-> The SAR ADC modules doesn't require The "sana" clock.
+> This patch adds a cpufreq driver for such systems using SCMI interface
+> to drive CPU DVFS.
 > 
-> Singed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+> Cc: linux-pm at vger.kernel.org
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 > ---
->  arch/arm/boot/dts/meson8.dtsi               | 5 ++---
->  arch/arm/boot/dts/meson8b.dtsi              | 5 ++---
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 3 +--
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 3 +--
->  4 files changed, 6 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
-> index b98d44fde6b6..f93d6cf6e094 100644
-> --- a/arch/arm/boot/dts/meson8.dtsi
-> +++ b/arch/arm/boot/dts/meson8.dtsi
-> @@ -289,9 +289,8 @@
->  &saradc {
->  	compatible = "amlogic,meson8-saradc", "amlogic,meson-saradc";
->  	clocks = <&clkc CLKID_XTAL>,
-> -		<&clkc CLKID_SAR_ADC>,
-> -		<&clkc CLKID_SANA>;
-> -	clock-names = "clkin", "core", "sana";
-> +		<&clkc CLKID_SAR_ADC>;
-> +	clock-names = "clkin", "core";
->  };
->  
->  &spifc {
-> diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-> index bc278da7df0d..4aa444284f0c 100644
-> --- a/arch/arm/boot/dts/meson8b.dtsi
-> +++ b/arch/arm/boot/dts/meson8b.dtsi
-> @@ -185,9 +185,8 @@
->  &saradc {
->  	compatible = "amlogic,meson8b-saradc", "amlogic,meson-saradc";
->  	clocks = <&clkc CLKID_XTAL>,
-> -		<&clkc CLKID_SAR_ADC>,
-> -		<&clkc CLKID_SANA>;
-> -	clock-names = "clkin", "core", "sana";
-> +		<&clkc CLKID_SAR_ADC>;
-> +	clock-names = "clkin", "core";
->  };
->  
->  &uart_AO {
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index af834cdbba79..b77f2593cdc3 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -686,10 +686,9 @@
->  	compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
->  	clocks = <&xtal>,
->  		 <&clkc CLKID_SAR_ADC>,
-> -		 <&clkc CLKID_SANA>,
->  		 <&clkc CLKID_SAR_ADC_CLK>,
->  		 <&clkc CLKID_SAR_ADC_SEL>;
-> -	clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
-> +	clock-names = "clkin", "core", "adc_clk", "adc_sel";
->  };
->  
->  &sd_emmc_a {
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index d8dd3298b15c..07805a3b4db0 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -628,10 +628,9 @@
->  	compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
->  	clocks = <&xtal>,
->  		 <&clkc CLKID_SAR_ADC>,
-> -		 <&clkc CLKID_SANA>,
->  		 <&clkc CLKID_SAR_ADC_CLK>,
->  		 <&clkc CLKID_SAR_ADC_SEL>;
-> -	clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
-> +	clock-names = "clkin", "core", "adc_clk", "adc_sel";
->  };
->  
->  &sd_emmc_a {
-> 
+>  MAINTAINERS                    |   2 +-
+>  drivers/cpufreq/Kconfig.arm    |  11 ++
+>  drivers/cpufreq/Makefile       |   1 +
+>  drivers/cpufreq/scmi-cpufreq.c | 274 +++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 287 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/cpufreq/scmi-cpufreq.c
 
-sorry, please drop this particular 'patch [4/4]', I've actually send it
-twice, others are good.
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+
+-- 
+viresh
