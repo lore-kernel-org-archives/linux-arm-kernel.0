@@ -1,160 +1,97 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue,  7 Nov 2017 17:07:35 -0600
-Subject: [PATCH 3/4] [v6] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
-References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1510096056-13765-4-git-send-email-timur@codeaurora.org>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 8 Nov 2017 00:27:13 +0100 (CET)
+Subject: [PATCH 11/12] hwrng: bcm2835-rng: Enable BCM2835 RNG to work on
+ BCM63xx platforms
+In-Reply-To: <345702666.5362.1510037144469@email.1und1.de>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+ <20171102010408.27736-12-f.fainelli@gmail.com>
+ <1831955836.132229.1509820078271@email.1und1.de>
+ <2538f1bb-e0f8-c336-d82a-0cb2f19b0ead@gmail.com>
+ <345702666.5362.1510037144469@email.1und1.de>
+Message-ID: <1627253231.37578.1510097233943@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pinctrl-msm only accepts an array of GPIOs from 0 to n-1, and it expects
-each group to support have only one pin (npins == 1).
 
-We can support "sparse" GPIO maps if we allow for some groups to have zero
-pins (npins == 0).  These pins are "hidden" from the rest of the driver
-and gpiolib.
+> Stefan Wahren <stefan.wahren@i2se.com> hat am 7. November 2017 um 07:45 geschrieben:
+> 
+> 
+> > Florian Fainelli <f.fainelli@gmail.com> hat am 6. November 2017 um 21:16 geschrieben:
+> > 
+> > 
+> > On 11/04/2017 11:27 AM, Stefan Wahren wrote:
+> > > Hi Florian
+> > > 
+> > >> Florian Fainelli <f.fainelli@gmail.com> hat am 2. November 2017 um 02:04 geschrieben:
+> > >>
+> > >>
+> > >> We have now incorporated all necessary functionality for the BCM63xx
+> > >> platforms to successfully migrate over bcm2835-rng, so add the final
+> > >> bits: Kconfig selection and proper platform_device device type matching
+> > >> to keep the same platform device name for registration to work.
+> > >>
+> > >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> > >> ---
+> > >>  drivers/char/hw_random/Kconfig       |  7 ++++---
+> > >>  drivers/char/hw_random/bcm2835-rng.c | 11 ++++++++++-
+> > >>  2 files changed, 14 insertions(+), 4 deletions(-)
+> > >>
+> > >> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+> > >> index 95a031e9eced..d0689cc8c7fc 100644
+> > >> --- a/drivers/char/hw_random/Kconfig
+> > >> +++ b/drivers/char/hw_random/Kconfig
+> > >> @@ -87,12 +87,13 @@ config HW_RANDOM_BCM63XX
+> > >>  	  If unusure, say Y.
+> > >>  
+> > >>  config HW_RANDOM_BCM2835
+> > >> -	tristate "Broadcom BCM2835 Random Number Generator support"
+> > >> -	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X
+> > >> +	tristate "Broadcom BCM2835/BCM63xx Random Number Generator support"
+> > >> +	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X || \
+> > >> +		   ARCH_BCM_63XX || BCM63XX || BMIPS_GENERIC
+> > >>  	default HW_RANDOM
+> > >>  	---help---
+> > >>  	  This driver provides kernel-side support for the Random Number
+> > >> -	  Generator hardware found on the Broadcom BCM2835 SoCs.
+> > >> +	  Generator hardware found on the Broadcom BCM2835 and BCM63xx SoCs.
+> > >>  
+> > >>  	  To compile this driver as a module, choose M here: the
+> > >>  	  module will be called bcm2835-rng
+> > >> diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+> > >> index 650e0033c273..d9ffe14f312b 100644
+> > >> --- a/drivers/char/hw_random/bcm2835-rng.c
+> > >> +++ b/drivers/char/hw_random/bcm2835-rng.c
+> > >> @@ -131,6 +131,7 @@ static const struct of_device_id bcm2835_rng_of_match[] = {
+> > >>  	{ .compatible = "brcm,bcm2835-rng"},
+> > >>  	{ .compatible = "brcm,bcm-nsp-rng", .data = &nsp_rng_of_data },
+> > >>  	{ .compatible = "brcm,bcm5301x-rng", .data = &nsp_rng_of_data },
+> > >> +	{ .compatible = "brcm,bcm6368-rng"},
+> > >>  	{},
+> > >>  };
+> > >>  
+> > >> @@ -164,7 +165,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+> > >>  	if (IS_ERR(priv->clk))
+> > >>  		priv->clk = NULL;
+> > >>  
+> > >> -	priv->rng.name = "bcm2835-rng";
+> > >> +	priv->rng.name = pdev->id_entry->name;
+> > > 
+> > > this change breaks registration on bcm2835, because the name is NULL.
+> > 
+> > OH right, I will fix that in v2, I am assuming that if you did something
+> > like this, things still work correctly for you on 2835:
+> > 
+> > if (!priv->id_entry->name)
+> > 	priv->rng.name = "bcm2835-rng";
+> > else
+> > 	priv->rng.name = priv->id_entry->name;
+> > 
+> > ?
+> 
+> I think that should work, but i'm not really happy about it. I prefer a more general solution. Looking at the other rng drivers shows the following pattern:
+> 
+> priv->rng.name = pdev->name;
+> 
+> I need to verify this on bcm2835.
 
-A new boolean 'sparse' indicates whether the GPIO map is sparse.  If any
-GPIO has an 'npins' value of 0, then 'sparse' must be set to True.
-
-Most access to unavailable GPIOs can be blocked via the gpio_chip.request
-function.  The one exception is when gpiochip_add_data() scans all of
-the GPIOs without "requesting" them.  To cover this case,
-msm_gpio_get_direction() separately checks if the GPIO is available.
-
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- drivers/pinctrl/qcom/pinctrl-msm.c | 48 +++++++++++++++++++++++++++++++++-----
- drivers/pinctrl/qcom/pinctrl-msm.h |  2 ++
- 2 files changed, 44 insertions(+), 6 deletions(-)
-
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
-index ff491da64dab..66c68a314ca9 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.c
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.c
-@@ -507,6 +507,11 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
- 	};
- 
- 	g = &pctrl->soc->groups[offset];
-+
-+	/* If the GPIO group has no pins, then don't show it. */
-+	if (!g->npins)
-+		return;
-+
- 	ctl_reg = readl(pctrl->regs + g->ctl_reg);
- 
- 	is_out = !!(ctl_reg & BIT(g->oe_bit));
-@@ -516,7 +521,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
- 
- 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
- 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
--	seq_printf(s, " %s", pulls[pull]);
-+	seq_printf(s, " %s\n", pulls[pull]);
- }
- 
- static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
-@@ -524,23 +529,36 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
- 	unsigned gpio = chip->base;
- 	unsigned i;
- 
--	for (i = 0; i < chip->ngpio; i++, gpio++) {
-+	for (i = 0; i < chip->ngpio; i++, gpio++)
- 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
--		seq_puts(s, "\n");
--	}
- }
- 
- #else
- #define msm_gpio_dbg_show NULL
- #endif
- 
-+/*
-+ * If the requested GPIO has no pins, then treat it as unavailable.
-+ * Otherwise, call the standard request function.
-+ */
-+static int msm_gpio_request(struct gpio_chip *chip, unsigned int offset)
-+{
-+	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
-+	const struct msm_pingroup *g = &pctrl->soc->groups[offset];
-+
-+	if (!g->npins)
-+		return -ENODEV;
-+
-+	return gpiochip_generic_request(chip, offset);
-+}
-+
- static const struct gpio_chip msm_gpio_template = {
- 	.direction_input  = msm_gpio_direction_input,
- 	.direction_output = msm_gpio_direction_output,
- 	.get_direction    = msm_gpio_get_direction,
- 	.get              = msm_gpio_get,
- 	.set              = msm_gpio_set,
--	.request          = gpiochip_generic_request,
-+	.request          = msm_gpio_request,
- 	.free             = gpiochip_generic_free,
- 	.dbg_show         = msm_gpio_dbg_show,
- };
-@@ -813,6 +831,8 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
- 	struct gpio_chip *chip;
- 	int ret;
- 	unsigned ngpio = pctrl->soc->ngpios;
-+	const struct msm_pingroup *groups = pctrl->soc->groups;
-+	unsigned int i;
- 
- 	if (WARN_ON(ngpio > MAX_NR_GPIO))
- 		return -EINVAL;
-@@ -825,13 +845,29 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
- 	chip->owner = THIS_MODULE;
- 	chip->of_node = pctrl->dev->of_node;
- 
-+	/* If the GPIO map is sparse, then we need to disable specific IRQs */
-+	if (pctrl->soc->sparse) {
-+		chip->irq_need_valid_mask = true;
-+		chip->line_need_valid_mask = true;
-+	}
-+
- 	ret = gpiochip_add_data(&pctrl->chip, pctrl);
- 	if (ret) {
- 		dev_err(pctrl->dev, "Failed register gpiochip\n");
- 		return ret;
- 	}
- 
--	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
-+	if (chip->line_need_valid_mask) {
-+		for (i = 0; i < ngpio; i++)
-+			if (!groups[i].npins) {
-+				clear_bit(i, pctrl->chip.irq_valid_mask);
-+				clear_bit(i, pctrl->chip.line_valid_mask);
-+			}
-+	}
-+
-+	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev),
-+				     0, 0, ngpio);
-+
- 	if (ret) {
- 		dev_err(pctrl->dev, "Failed to add pin range\n");
- 		gpiochip_remove(&pctrl->chip);
-diff --git a/drivers/pinctrl/qcom/pinctrl-msm.h b/drivers/pinctrl/qcom/pinctrl-msm.h
-index 9b9feea540ff..70762bcb84cb 100644
---- a/drivers/pinctrl/qcom/pinctrl-msm.h
-+++ b/drivers/pinctrl/qcom/pinctrl-msm.h
-@@ -107,6 +107,7 @@ struct msm_pingroup {
-  * @ngroups:	    The numbmer of entries in @groups.
-  * @ngpio:	    The number of pingroups the driver should expose as GPIOs.
-  * @pull_no_keeper: The SoC does not support keeper bias.
-+ * @sparse:         The GPIO map is sparse (some GPIOs have npins == 0)
-  */
- struct msm_pinctrl_soc_data {
- 	const struct pinctrl_pin_desc *pins;
-@@ -117,6 +118,7 @@ struct msm_pinctrl_soc_data {
- 	unsigned ngroups;
- 	unsigned ngpios;
- 	bool pull_no_keeper;
-+	bool sparse;
- };
- 
- int msm_pinctrl_probe(struct platform_device *pdev,
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Okay pdev->name works for bcm2835
