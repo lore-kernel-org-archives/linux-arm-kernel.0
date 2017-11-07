@@ -1,32 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Nov 2017 14:02:13 +0100
-Subject: [PATCH 1/1] add mali r6p2 dt node
-In-Reply-To: <1510059543-7064-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1510059543-7064-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <20171107130213.g73f6oemzdkulgek@flea>
+Date: Tue, 7 Nov 2017 14:03:31 +0100
+Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
+In-Reply-To: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20171107130331.4wut5g6znzakkg4z@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 01:59:03PM +0100, Giulio Benetti wrote:
-> It seems there is not mali node in sun7i-a20.dtsi
+On Tue, Nov 07, 2017 at 01:49:59PM +0100, Giulio Benetti wrote:
+> On sun7i-a20-* there's no way to enable PA00--PA27 as RGB888 LCD0 pins.
 > 
-> Add mali node to sun7i-a20.dtsi
+> Add lcd_rgb888_pins in sun7i-a20.dtsi.
 > 
-> This patch adds device tree mali node compatible with r6p2 utgard kernel driver 
-> provided by ARM and patched by maxime ripard on his github.
-> 
-> It can be easily used in target.dts with:
-> 
-> &mali {
-> 	status = "okay";
-> }
-> 
-> then loading mali.ko in user space.
+> It can be used on sun7i-a20-olinuxino-lime.dts.
+> This patch gives possibility to set parallel lcd pins for RGB888.
+> To be used with tcon0 in your <target>.dts
 
-Can you please stop sending the same patch over and over again without
-making any changes?
+My question was on which board do you want to use it right now. If the
+answer is none, then we won't merge that patch, we have too many
+pinctrl already to not add the unused ones.
 
-Thanks,
 Maxime
 
 -- 
@@ -39,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 801 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/69d494e8/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/4befc79b/attachment.sig>
