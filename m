@@ -1,47 +1,56 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:52 +0100
-Subject: [PULL 19/26] arm/arm64: KVM: Load the timer state when enabling the
- timer
+Date: Tue,  7 Nov 2017 11:47:59 +0100
+Subject: [PULL 26/26] KVM: arm/arm64: fix the incompatible matching for
+ external abort
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-20-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-27-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After being lazy with saving/restoring the timer state, we defer that
-work to vcpu_load and vcpu_put, which ensure that the timer state is
-loaded on the hardware timers whenever the VCPU runs.
+From: Dongjiu Geng <gengdongjiu@huawei.com>
 
-Unfortunately, we are failing to do that the first time vcpu_load()
-runs, because the timer has not yet been enabled at that time.  As long
-as the initialized timer state matches what happens to be in the
-hardware (a disabled timer, because we never leave the timer screaming),
-this does not show up as a problem, but is nevertheless incorrect.
+kvm_vcpu_dabt_isextabt() tries to match a full fault syndrome, but
+calls kvm_vcpu_trap_get_fault_type() that only returns the fault class,
+thus reducing the scope of the check. This doesn't cause any observable
+bug yet as we end-up matching a closely related syndrome for which we
+return the same value.
 
-The solution is simple; disable preemption while setting the timer to be
-enabled, and call the timer load function when first enabling the timer.
+Using kvm_vcpu_trap_get_fault() instead fixes it for good.
 
+Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/include/asm/kvm_emulate.h   | 2 +-
+ arch/arm64/include/asm/kvm_emulate.h | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 2035cf251701..4db54ff08d9e 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -861,7 +861,11 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return ret;
+diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+index dcae3970148d..3d22eb87f919 100644
+--- a/arch/arm/include/asm/kvm_emulate.h
++++ b/arch/arm/include/asm/kvm_emulate.h
+@@ -233,7 +233,7 @@ static inline u8 kvm_vcpu_trap_get_fault_type(struct kvm_vcpu *vcpu)
  
- no_vgic:
-+	preempt_disable();
- 	timer->enabled = 1;
-+	kvm_timer_vcpu_load_vgic(vcpu);
-+	preempt_enable();
-+
- 	return 0;
- }
+ static inline bool kvm_vcpu_dabt_isextabt(struct kvm_vcpu *vcpu)
+ {
+-	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
++	switch (kvm_vcpu_trap_get_fault(vcpu)) {
+ 	case FSC_SEA:
+ 	case FSC_SEA_TTW0:
+ 	case FSC_SEA_TTW1:
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index bf61da0ef82b..5f28dfa14cee 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -240,7 +240,7 @@ static inline u8 kvm_vcpu_trap_get_fault_type(const struct kvm_vcpu *vcpu)
  
+ static inline bool kvm_vcpu_dabt_isextabt(const struct kvm_vcpu *vcpu)
+ {
+-	switch (kvm_vcpu_trap_get_fault_type(vcpu)) {
++	switch (kvm_vcpu_trap_get_fault(vcpu)) {
+ 	case FSC_SEA:
+ 	case FSC_SEA_TTW0:
+ 	case FSC_SEA_TTW1:
 -- 
 2.14.2
