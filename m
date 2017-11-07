@@ -1,86 +1,52 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 7 Nov 2017 14:33:14 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20171026141627.GD21504@atomide.com>
-References: <20170925080806.GA9837@js1304-P5Q-DELUXE>
- <20170925145437.GG4394@atomide.com>
- <20171018082927.GB27595@js1304-P5Q-DELUXE>
- <20171019183033.GH4394@atomide.com>
- <20171020015542.GA10438@js1304-P5Q-DELUXE>
- <20171020173146.GN4394@atomide.com>
- <20171023045342.GA23082@js1304-P5Q-DELUXE>
- <20171025173137.GQ4394@atomide.com>
- <20171026044829.GB11791@js1304-P5Q-DELUXE>
- <20171026141627.GD21504@atomide.com>
-Message-ID: <20171107053313.GA12447@js1304-P5Q-DELUXE>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 7 Nov 2017 13:36:46 +0800
+Subject: [PATCH v3 0/4] fix the clock setting for SAR ADC
+Message-ID: <20171107053646.31087-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+patch [1/4]:
+  Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
+the published datasheet also has wrong description about this.
 
-Sorry for dealy. I was on vacation during last week.
+patch [2-4/4]:
+  Drop the "sana" clock from SAR ADC module,
 
-On Thu, Oct 26, 2017 at 07:16:27AM -0700, Tony Lindgren wrote:
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171025 21:45]:
-> > On Wed, Oct 25, 2017 at 10:31:38AM -0700, Tony Lindgren wrote:
-> > > Great, this branch boots on n900! Early parts of the dmesg attached
-> > > below.
-> > 
-> > Sound good. Perhaps, problem is due to the cache management. With my
-> > patchset, direct mapping for CMA area is cleared in
-> > dma_contiguous_remap() if CONFIG_HIGHMEM. I guess that proper cache
-> > operation is required there.
-> > 
-> > Could you test my newly updated branch again? I re-enable
-> > dma_contiguous_remap() to clear direct mapping for CMA area and add
-> > proper(?) cache operation although I'm not the expert on that area.
-> > 
-> > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
-> 
-> Yeah that one boots too, dmesg below. I wonder why flushing the range
-> with dmac_flush_range() and outer_flush_range() no longer seems enough
-> though?
+  From the hardware perspective, the SAR ADC module doesn't
+require "sana" clock to wrok. This should apply to all SoC,
+including meson6,8, GXBB, GXL..
 
-I don't know the reason. AFAIK, it should be enough to flush cpu cache
-before clearing page table entry, however, it doesn't work for n900.
+Note: the whole patchset series has been tested at GXL-P212 board,
+we haven't got any meson6,8 board to test, so I would appreciate
+if someone (Martin?) could help to confirm it works there.
+ 
+Changes since v2 at [2] :
+  - explicitly point out 'sana' clock is not required for saradc, and drop them
+  - update comments, as the published datasheet is wrong
+ 
+Changes since v1 at [1] :
+  - correct SAR ADC/SANA clock gate bit
 
-flush_cache_all() has not only d-cache flushing but also i-cache
-flushing. So, I'd like to test effect of i-cache flushing.
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005221.html
+[2] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005242.html
 
-Could you test follwing updated branch?
 
-https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+Xingyu Chen (3):
+  iio: adc: meson-saradc: remove irrelevant clock "sana"
+  dt-bindings: iio: adc: update the doc for SAR ADC
+  ARM64: dts: meson: drop "sana" clock from SAR ADC
 
-It has three relevant commits on top and enables CMA memory use.
+Yixun Lan (1):
+  clk: meson: gxbb: fix wrong clock for SARADC/SANA
 
-"arm/dma: remove i-cache flush"
-"arm/dma: flush i-cache and d-cache separately"
-"arm/dma: call flush_cache_all() and don't do outer cache operation"
+ .../bindings/iio/adc/amlogic,meson-saradc.txt        |  1 -
+ arch/arm/boot/dts/meson8.dtsi                        |  5 ++---
+ arch/arm/boot/dts/meson8b.dtsi                       |  5 ++---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          |  3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi           |  3 +--
+ drivers/clk/meson/gxbb.c                             |  4 ++--
+ drivers/iio/adc/meson_saradc.c                       | 20 --------------------
+ 7 files changed, 8 insertions(+), 33 deletions(-)
 
-I think that flush_cache_all() here looks fine because size of CMA
-area is usually large enough to use flush_cache_all() but
-understanding root cause would be important so I ask this test. If u
-don't mind, please test each commit with reverting one by one and let
-me know the result of each test.
-
-> Reverting the arch/arm/mm/dma-mapping.c changes in your patch
-> "arm/dma: re-enable to remap the CMA area and flush cache before
-> remapping" also boots, but produces the following build warnings:
-> 
-> arch/arm/mm/dma-mapping.c: In function 'dma_contiguous_remap':
-> arch/arm/mm/dma-mapping.c:503:20: warning: passing argument 1 of
-> 'cpu_cache.dma_flush_range' makes pointer from integer without a
-> cast [-Wint-conversion]
-> dmac_flush_range(map.virtual, map.virtual + map.length);
->                     ^~~
-> arch/arm/mm/dma-mapping.c:503:20: note: expected 'const void *' but
-> argument is of type 'long unsigned int'
-> arch/arm/mm/dma-mapping.c:503:33: warning: passing argument 2 of
-> 'cpu_cache.dma_flush_range' makes pointer from integer without a
-> cast [-Wint-conversion]
-> dmac_flush_range(map.virtual, map.virtual + map.length);
-
-Thanks for info.
-I think that incorrect type would not be related to this problem.
-
-Thanks.
+-- 
+2.14.1
