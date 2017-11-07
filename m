@@ -1,48 +1,38 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 7 Nov 2017 22:12:23 +0800
-Subject: [PATCH v4 1/4] clk: meson: gxbb: fix wrong clock for SARADC/SANA
-Message-ID: <20171107141223.1507-1-yixun.lan@amlogic.com>
+From: fabio.estevam@nxp.com (Fabio Estevam)
+Date: Tue, 7 Nov 2017 12:29:31 -0200
+Subject: [PATCH] ARM: dts: imx6qdl-wandboard-revd1: Make EDID functional
+Message-ID: <1510064971-18755-1-git-send-email-fabio.estevam@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the datasheet, in Meson-GXBB/GXL series,
-The clock gate bit for SARADC is HHI_GCLK_MPEG2 bit[22],
-while clock gate bit for SANA is HHI_GCLK_MPEG0 bit[10].
+There are 0 ohm resistors that allow selecting the EDID I2C port to
+be I2C1 or I2C2.
 
-Test passed at gxl-s905x-p212 board.
+On revd1 the 0 ohm resistors are populated in such a way that the I2C2
+is used as DDC I2C bus, so fix it accordingly. 
 
-The following published datasheets are wrong and should be updated
-[1] GXBB v1.1.4
-[2] GXL v0.3_20170314
-
-Fixes: 738f66d3211d ("clk: gxbb: add AmLogic GXBB clk controller driver")
-Tested-by: Xingyu Chen <xingyu.chen@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- drivers/clk/meson/gxbb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index b2d1e8ed7152..92168348ffa6 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -1139,7 +1139,7 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
- static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
- static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
- static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
--static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
-+static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG0, 10);
- static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
- static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
- static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
-@@ -1190,7 +1190,7 @@ static MESON_GATE(gxbb_usb0_ddr_bridge, HHI_GCLK_MPEG2, 9);
- static MESON_GATE(gxbb_mmc_pclk, HHI_GCLK_MPEG2, 11);
- static MESON_GATE(gxbb_dvin, HHI_GCLK_MPEG2, 12);
- static MESON_GATE(gxbb_uart2, HHI_GCLK_MPEG2, 15);
--static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG2, 22);
-+static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG2, 22);
- static MESON_GATE(gxbb_vpu_intr, HHI_GCLK_MPEG2, 25);
- static MESON_GATE(gxbb_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
- static MESON_GATE(gxbb_clk81_a53, HHI_GCLK_MPEG2, 29);
+diff --git a/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
+index 6d8d9ca..3a8a495 100644
+--- a/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
+@@ -21,6 +21,11 @@
+ 	};
+ };
+ 
++&hdmi {
++	ddc-i2c-bus = <&i2c2>;
++	status = "okay";
++};
++
+ &i2c3 {
+ 	clock-frequency = <100000>;
+ 	pinctrl-names = "default";
 -- 
-2.14.1
+2.7.4
