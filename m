@@ -1,103 +1,134 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:35 +0100
-Subject: [PULL 02/26] arm64: Use physical counter for in-kernel reads when
- booted in EL2
+Date: Tue,  7 Nov 2017 11:47:39 +0100
+Subject: [PULL 06/26] KVM: arm/arm64: Make timer_arm and timer_disarm helpers
+ more generic
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-3-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-7-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-Using the physical counter allows KVM to retain the offset between the
-virtual and physical counter as long as it is actively running a VCPU.
+We are about to add an additional soft timer to the arch timer state for
+a VCPU and would like to be able to reuse the functions to program and
+cancel a timer, so we make them slightly more generic and rename to make
+it more clear that these functions work on soft timers and not the
+hardware resource that this code is managing.
 
-As soon as a VCPU is released, another thread is scheduled or we start
-running userspace applications, we reset the offset to 0, so that
-userspace accessing the virtual timer can still read the virtual counter
-and get the same view of time as the kernel.
+The armed flag on the timer state is only used to assert a condition,
+and we don't rely on this assertion in any meaningful way, so we can
+simply get rid of this flack and slightly reduce complexity.
 
-This opens up potential improvements for KVM performance, but we have to
-make a few adjustments to preserve system consistency.
-
-Currently get_cycles() is hardwired to arch_counter_get_cntvct() on
-arm64, but as we move to using the physical timer for the in-kernel
-time-keeping on systems that boot in EL2, we should use the same counter
-for get_cycles() as for other in-kernel timekeeping operations.
-
-Similarly, implementations of arch_timer_set_next_event_phys() is
-modified to use the counter specific to the timer being programmed.
-
-VHE kernels or kernels continuing to use the virtual timer are
-unaffected.
-
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Catalin Marinas <catalin.marinas@arm.com>
 Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
 ---
- arch/arm64/include/asm/timex.h       |  2 +-
- drivers/clocksource/arm_arch_timer.c | 12 ++++++++----
- 2 files changed, 9 insertions(+), 5 deletions(-)
+ include/kvm/arm_arch_timer.h |  3 ---
+ virt/kvm/arm/arch_timer.c    | 33 +++++++++++----------------------
+ 2 files changed, 11 insertions(+), 25 deletions(-)
 
-diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
-index 81a076eb37fa..9ad60bae5c8d 100644
---- a/arch/arm64/include/asm/timex.h
-+++ b/arch/arm64/include/asm/timex.h
-@@ -22,7 +22,7 @@
-  * Use the current timer as a cycle counter since this is what we use for
-  * the delay loop.
-  */
--#define get_cycles()	arch_counter_get_cntvct()
-+#define get_cycles()	arch_timer_read_counter()
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index f0053f884b4a..d0beae98f755 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -48,9 +48,6 @@ struct arch_timer_cpu {
+ 	/* Work queued with the above timer expires */
+ 	struct work_struct		expired;
  
- #include <asm-generic/timex.h>
- 
-diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
-index ff8f8a177156..061476e92db7 100644
---- a/drivers/clocksource/arm_arch_timer.c
-+++ b/drivers/clocksource/arm_arch_timer.c
-@@ -158,6 +158,7 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
-  * if we don't have the cp15 accessors we won't have a problem.
-  */
- u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
-+EXPORT_SYMBOL_GPL(arch_timer_read_counter);
- 
- static u64 arch_counter_read(struct clocksource *cs)
- {
-@@ -329,16 +330,19 @@ static void erratum_set_next_event_tval_generic(const int access, unsigned long
- 						struct clock_event_device *clk)
- {
- 	unsigned long ctrl;
--	u64 cval = evt + arch_counter_get_cntvct();
-+	u64 cval;
- 
- 	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
- 	ctrl |= ARCH_TIMER_CTRL_ENABLE;
- 	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
- 
--	if (access == ARCH_TIMER_PHYS_ACCESS)
-+	if (access == ARCH_TIMER_PHYS_ACCESS) {
-+		cval = evt + arch_counter_get_cntpct();
- 		write_sysreg(cval, cntp_cval_el0);
--	else
-+	} else {
-+		cval = evt + arch_counter_get_cntvct();
- 		write_sysreg(cval, cntv_cval_el0);
-+	}
- 
- 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+-	/* Background timer active */
+-	bool				armed;
+-
+ 	/* Is the timer enabled */
+ 	bool			enabled;
+ };
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 8e89d63005c7..223230191195 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -56,26 +56,16 @@ u64 kvm_phys_timer_read(void)
+ 	return timecounter->cc->read(timecounter->cc);
  }
-@@ -913,7 +917,7 @@ static void __init arch_counter_register(unsigned type)
  
- 	/* Register the CP15 based counter if we have one */
- 	if (type & ARCH_TIMER_TYPE_CP15) {
--		if (IS_ENABLED(CONFIG_ARM64) ||
-+		if ((IS_ENABLED(CONFIG_ARM64) && !is_hyp_mode_available()) ||
- 		    arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
- 			arch_timer_read_counter = arch_counter_get_cntvct;
- 		else
+-static bool timer_is_armed(struct arch_timer_cpu *timer)
++static void soft_timer_start(struct hrtimer *hrt, u64 ns)
+ {
+-	return timer->armed;
+-}
+-
+-/* timer_arm: as in "arm the timer", not as in ARM the company */
+-static void timer_arm(struct arch_timer_cpu *timer, u64 ns)
+-{
+-	timer->armed = true;
+-	hrtimer_start(&timer->timer, ktime_add_ns(ktime_get(), ns),
++	hrtimer_start(hrt, ktime_add_ns(ktime_get(), ns),
+ 		      HRTIMER_MODE_ABS);
+ }
+ 
+-static void timer_disarm(struct arch_timer_cpu *timer)
++static void soft_timer_cancel(struct hrtimer *hrt, struct work_struct *work)
+ {
+-	if (timer_is_armed(timer)) {
+-		hrtimer_cancel(&timer->timer);
+-		cancel_work_sync(&timer->expired);
+-		timer->armed = false;
+-	}
++	hrtimer_cancel(hrt);
++	cancel_work_sync(work);
+ }
+ 
+ static irqreturn_t kvm_arch_timer_handler(int irq, void *dev_id)
+@@ -271,7 +261,7 @@ static void kvm_timer_emulate(struct kvm_vcpu *vcpu,
+ 		return;
+ 
+ 	/*  The timer has not yet expired, schedule a background timer */
+-	timer_arm(timer, kvm_timer_compute_delta(timer_ctx));
++	soft_timer_start(&timer->timer, kvm_timer_compute_delta(timer_ctx));
+ }
+ 
+ /*
+@@ -285,8 +275,6 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
+ 
+-	BUG_ON(timer_is_armed(timer));
+-
+ 	/*
+ 	 * No need to schedule a background timer if any guest timer has
+ 	 * already expired, because kvm_vcpu_block will return before putting
+@@ -306,13 +294,14 @@ void kvm_timer_schedule(struct kvm_vcpu *vcpu)
+ 	 * The guest timers have not yet expired, schedule a background timer.
+ 	 * Set the earliest expiration time among the guest timers.
+ 	 */
+-	timer_arm(timer, kvm_timer_earliest_exp(vcpu));
++	soft_timer_start(&timer->timer, kvm_timer_earliest_exp(vcpu));
+ }
+ 
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+-	timer_disarm(timer);
++
++	soft_timer_cancel(&timer->timer, &timer->expired);
+ }
+ 
+ static void kvm_timer_flush_hwstate_vgic(struct kvm_vcpu *vcpu)
+@@ -448,7 +437,7 @@ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
+ 	 * This is to cancel the background timer for the physical timer
+ 	 * emulation if it is set.
+ 	 */
+-	timer_disarm(timer);
++	soft_timer_cancel(&timer->timer, &timer->expired);
+ 
+ 	/*
+ 	 * The guest could have modified the timer registers or the timer
+@@ -615,7 +604,7 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+ 
+-	timer_disarm(timer);
++	soft_timer_cancel(&timer->timer, &timer->expired);
+ 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
+ }
+ 
 -- 
 2.14.2
