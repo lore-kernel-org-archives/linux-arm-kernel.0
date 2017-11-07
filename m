@@ -1,49 +1,67 @@
-From: colin.king@canonical.com (Colin King)
-Date: Tue,  7 Nov 2017 14:39:14 +0000
-Subject: [PATCH][V2] usb: gadget: pxa27x: Remove redundant assignment to
- is_short and dev
-Message-ID: <20171107143914.5748-1-colin.king@canonical.com>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Tue, 7 Nov 2017 14:40:46 +0000
+Subject: [PATCH v5 2/2] crypto: stm32 - Support for STM32 CRYP crypto
+ module
+In-Reply-To: <20171022072659.GB8489@Red>
+References: <1508425830-13565-1-git-send-email-fabien.dessenne@st.com>
+ <1508425830-13565-3-git-send-email-fabien.dessenne@st.com>
+ <20171022072659.GB8489@Red>
+Message-ID: <d924a278-90d0-969e-f1ae-a12f92e8972d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
 
-Variable is_short is set to zero but this value is never read as it is
-overwritten with a new value later on, hence it is a redundant
-assignment and can be removed.  Pointer dev is assigned a value that
-is not read and it is updated a few statements later, this too is
-redundant and can be removed. Cleans up clan warnings:
 
-drivers/usb/gadget/udc/pxa27x_udc.c:986:3: warning: Value stored
-to 'is_short' is never read
-drivers/usb/gadget/udc/pxa27x_udc.c:1141:2: warning: Value stored
-to 'dev' is never read
+On 22/10/17 09:26, Corentin Labbe wrote:
+> On Thu, Oct 19, 2017 at 05:10:30PM +0200, Fabien Dessenne wrote:
+>> This module registers block cipher algorithms that make use of the
+>> STMicroelectronics STM32 crypto "CRYP1" hardware.
+>> The following algorithms are supported:
+>> - aes: ecb, cbc, ctr
+>> - des: ecb, cbc
+>> - tdes: ecb, cbc
+>>
+>> Signed-off-by: Fabien Dessenne <fabien.dessenne@st.com>
+>> ---
+>>   drivers/crypto/stm32/Kconfig      |    9 +
+>>   drivers/crypto/stm32/Makefile     |    3 +-
+>>   drivers/crypto/stm32/stm32-cryp.c | 1172 +++++++++++++++++++++++++++++++++++++
+>>   3 files changed, 1183 insertions(+), 1 deletion(-)
+>>   create mode 100644 drivers/crypto/stm32/stm32-cryp.c
+>>
+>> diff --git a/drivers/crypto/stm32/Kconfig b/drivers/crypto/stm32/Kconfig
+>> +static void stm32_cryp_irq_write_block(struct stm32_cryp *cryp)
+>> +{
+>> +	unsigned int i, j;
+>> +	u32 *src;
+>> +	u8 d8[4];
+>> +
+>> +	src = sg_virt(cryp->in_sg) + _walked_in;
+>> +
+>> +	for (i = 0; i < cryp->hw_blocksize / sizeof(u32); i++) {
+>> +		if (likely(cryp->total_in >= sizeof(u32))) {
+>> +			/* Write a full u32 */
+>> +			stm32_cryp_write(cryp, CRYP_DIN, *src);
+> Hello
+>
+> Try also to test your driver with userspace via AF_ALG (libkcapi is a good start).
+> It should probably crash here.
+> I have do the same on my first sunxi-ss driver and you should use kmap().
+>
+> Regards
+Hi Corentin,
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- drivers/usb/gadget/udc/pxa27x_udc.c | 3 ---
- 1 file changed, 3 deletions(-)
+Thank you for suggesting to test from userspace through the AF_ALG 
+socket with libkcapi.
+This increases my test coverage.
 
-diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
-index 14606f340325..d88e56cce56d 100644
---- a/drivers/usb/gadget/udc/pxa27x_udc.c
-+++ b/drivers/usb/gadget/udc/pxa27x_udc.c
-@@ -984,8 +984,6 @@ static int write_fifo(struct pxa_ep *ep, struct pxa27x_request *req)
- 
- 	max = ep->fifo_size;
- 	do {
--		is_short = 0;
--
- 		udccsr = udc_ep_readl(ep, UDCCSR);
- 		if (udccsr & UDCCSR_PC) {
- 			ep_vdbg(ep, "Clearing Transmit Complete, udccsr=%x\n",
-@@ -1139,7 +1137,6 @@ static int pxa_ep_queue(struct usb_ep *_ep, struct usb_request *_req,
- 	if (unlikely(!_ep))
- 		return -EINVAL;
- 
--	dev = udc_usb_ep->dev;
- 	ep = udc_usb_ep->pxa_ep;
- 	if (unlikely(!ep))
- 		return -EINVAL;
--- 
-2.14.1
+I ran the miscellaneous tests (kcapi-enc-test(large).sh + test.sh) and 
+could not observe any crash.
+Note that I had already fixed some 'memory crashes' while testing with 
+testmgr / tcrypt while testing from the kernel.
+
+So it looks like the proposed implementation is fine.
+
+BR
+
+Fabien
