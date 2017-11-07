@@ -1,40 +1,54 @@
-From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
-Date: Tue, 7 Nov 2017 22:36:00 +0100
-Subject: [PATCH v4 0/4] fix the clock setting for SAR ADC
-In-Reply-To: <20171107140942.29243-1-yixun.lan@amlogic.com>
-References: <20171107140942.29243-1-yixun.lan@amlogic.com>
-Message-ID: <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Nov 2017 22:38:03 +0100
+Subject: [PATCH v5 18/26] KVM: arm/arm64: GICv4: Use pending_last as a
+ scheduling hint
+In-Reply-To: <20171027142855.21584-19-marc.zyngier@arm.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-19-marc.zyngier@arm.com>
+Message-ID: <f95fdd7d-28ce-407b-209c-0930e3bf05e8@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yixun,
+Hi,
 
-On Tue, Nov 7, 2017 at 3:09 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
-> patch [1/4]:
->   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
-> the published datasheets[4] also has wrong description about this.
->   This patch should be explicitly merged *before* other patches.
->
-> patch [2-4/4]:
->   Drop the "sana" clock from SAR ADC module,
-I agree with Jerome that patch 2/4 should be applied last.
-when I wrote the driver I couldn't get it to work on my GXBB board
-(which unfortunately has died since then) because the clocks were
-disabled (they weren't enabled by the bootloader). people who are
-using an old .dtb would get the same problem again until the clock
-driver is merged
+On 27/10/2017 16:28, Marc Zyngier wrote:
+> When a vPE exits, the pending_last flag is set when there are
+> pending VLPIs stored in the pending table. Similarily, we set
+> this flag when a doorbell interrupt fires, as it indicates the
+> same condition.
+This is actually done in the next patch.
 
->   From the hardware perspective, the SAR ADC module doesn't
-> require "sana" clock to wrok. This should apply to all SoC,
-> including meson6,8, GXBB, GXL..
-thank you for clarifying this!
-
-> Note: the whole patchset series has been tested at GXL-P212 board,
-> we haven't got any meson6,8 board to test, so I would appreciate
-> if someone (Martin?) could help to confirm it works there.
-I can test this on a Meson8b and a Meson8m2 board on the weekend -
-I'll let you know about the results
+Besides:
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
 
-Regards
-Martin
+Thanks
+
+Eric
+
+
+> 
+> Let's update kvm_vgic_vcpu_pending_irq() to account for that
+> flag as well, making a vcpu runnable when set.
+> 
+> Acked-by: Christoffer Dall <cdall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index 9d557efd1f7d..0691a2250949 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -769,6 +769,9 @@ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu)
+>  	if (!vcpu->kvm->arch.vgic.enabled)
+>  		return false;
+>  
+> +	if (vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last)
+> +		return true;
+> +
+>  	spin_lock(&vgic_cpu->ap_list_lock);
+>  
+>  	list_for_each_entry(irq, &vgic_cpu->ap_list_head, ap_list) {
+> 
