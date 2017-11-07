@@ -1,28 +1,41 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 7 Nov 2017 16:59:47 +0100
-Subject: [PATCH] ARM: dts: add phy-reset property for rk3066a-rayeager emac
-In-Reply-To: <e6f2393e-cb3b-9006-d0f5-6b30fd2a5192@mentor.com>
-References: <1510022959-19440-1-git-send-email-zyw@rock-chips.com>
- <e6f2393e-cb3b-9006-d0f5-6b30fd2a5192@mentor.com>
-Message-ID: <20171107155947.GC18410@lunn.ch>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 7 Nov 2017 17:07:26 +0100
+Subject: [PATCH 14/37] KVM: arm64: Remove kern_hyp_va() use in VHE switch
+ function
+In-Reply-To: <20171012104141.26902-15-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-15-christoffer.dall@linaro.org>
+Message-ID: <20171107160726.4fuw67qfzemm24es@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> As a side question, which is mainly addressed to Sergei and Roger,
-> I don't quite understand why PHY properties were initially added to
-> MAC/MDIO bus device tree nodes, in my opinion they must be moved under
-> PHY device tree nodes.
+On Thu, Oct 12, 2017 at 12:41:18PM +0200, Christoffer Dall wrote:
+> VHE kernels run completely in EL2 and therefore don't have a notion of
+> kernel and hyp addresses, they are all just kernel addresses.  Therefore
+> don't call kern_hyp_va() in the VHE switch function.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 4 +---
+>  1 file changed, 1 insertion(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 8a0f38f..b72dc66 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -326,9 +326,7 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  	struct kvm_cpu_context *guest_ctxt;
+>  	u64 exit_code;
+>  
+> -	vcpu = kern_hyp_va(vcpu);
+> -
+> -	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> +	host_ctxt = vcpu->arch.host_cpu_context;
+>  	host_ctxt->__hyp_running_vcpu = vcpu;
+>  	guest_ctxt = &vcpu->arch.ctxt;
+>  
+> -- 
+> 2.9.0
+>
 
-If you look at the implementation, they are not actually PHY
-properties. They are MDIO properties. It is the MDIO driver using them
-to perform an 'MDIO bus reset'. The property names are wrong.
-
-The device tree structure could be better. It mixes the MAC and the
-MDIO properties in the same node. It would of been better to have
-separate nodes. 
-
-The MDIO core now has equivalent functionality. So yes, it would be
-better to use the generic MDIO properties, not these driver
-properties.
-
-	 Andrew
+Reviewed-by: Andrew Jones <drjones@redhat.com>
