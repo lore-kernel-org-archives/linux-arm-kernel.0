@@ -1,118 +1,90 @@
 From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Nov 2017 22:43:14 +0100
-Subject: [PATCH v5 19/26] KVM: arm/arm64: GICv4: Add doorbell interrupt
- handling
-In-Reply-To: <20171027142855.21584-20-marc.zyngier@arm.com>
+Date: Tue, 7 Nov 2017 22:45:58 +0100
+Subject: [PATCH v5 20/26] KVM: arm/arm64: GICv4: Use the doorbell
+ interrupt as an unblocking source
+In-Reply-To: <20171027142855.21584-21-marc.zyngier@arm.com>
 References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-20-marc.zyngier@arm.com>
-Message-ID: <3b39afd2-f035-a138-2a3b-10ac10b55c22@redhat.com>
+ <20171027142855.21584-21-marc.zyngier@arm.com>
+Message-ID: <badc7dbf-bbfa-cf50-ea45-52e5e1eb8f9f@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
 On 27/10/2017 16:28, Marc Zyngier wrote:
-> When a vPE is not running, a VLPI being made pending results in a
-> doorbell interrupt being delivered. Let's handle this interrupt
-> and update the pending_last flag that indicates that VLPIs are
-> pending. The corresponding vcpu is also kicked into action.
+> The doorbell interrupt is only useful if the vcpu is blocked on WFI.
+> In all other cases, recieving a doorbell interrupt is just a waste
+> of cycles.
 > 
-> Special care is taken to prevent the doorbell from being enabled
-> at request time (this is controlled separately), and to make
-> the disabling on the interrupt non-lazy.
+> So let's only enable the doorbell if a vcpu is getting blocked,
+> and disable it when it is unblocked. This is very similar to
+> what we're doing for the background timer.
 > 
-> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Reviewed-by: Christoffer Dall <cdall@linaro.org>
 > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 
-Thanks
-
 Eric
 > ---
->  virt/kvm/arm/vgic/vgic-v4.c | 48 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 48 insertions(+)
+>  include/kvm/arm_vgic.h      |  3 +++
+>  virt/kvm/arm/arm.c          |  2 ++
+>  virt/kvm/arm/vgic/vgic-v4.c | 18 ++++++++++++++++++
+>  3 files changed, 23 insertions(+)
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-> index 01a2889b7b7c..ea898af1a7a9 100644
-> --- a/virt/kvm/arm/vgic/vgic-v4.c
-> +++ b/virt/kvm/arm/vgic/vgic-v4.c
-> @@ -16,12 +16,24 @@
->   */
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index 2f750c770bf2..8c896540a72c 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -381,4 +381,7 @@ int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
+>  int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
+>  				 struct kvm_kernel_irq_routing_entry *irq_entry);
 >  
->  #include <linux/interrupt.h>
-> +#include <linux/irq.h>
->  #include <linux/irqdomain.h>
->  #include <linux/kvm_host.h>
->  #include <linux/irqchip/arm-gic-v3.h>
->  
->  #include "vgic.h"
->  
-> +static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
-> +{
-> +	struct kvm_vcpu *vcpu = info;
+> +void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu);
+> +void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu);
 > +
-> +	vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
-> +	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
-> +	kvm_vcpu_kick(vcpu);
-> +
-> +	return IRQ_HANDLED;
-> +}
-> +
->  /**
->   * vgic_v4_init - Initialize the GICv4 data structures
->   * @kvm:	Pointer to the VM being initialized
-> @@ -61,6 +73,33 @@ int vgic_v4_init(struct kvm *kvm)
->  		return ret;
->  	}
->  
-> +	kvm_for_each_vcpu(i, vcpu, kvm) {
-> +		int irq = dist->its_vm.vpes[i]->irq;
-> +
-> +		/*
-> +		 * Don't automatically enable the doorbell, as we're
-> +		 * flipping it back and forth when the vcpu gets
-> +		 * blocked. Also disable the lazy disabling, as the
-> +		 * doorbell could kick us out of the guest too
-> +		 * early...
-> +		 */
-> +		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
-> +		ret = request_irq(irq, vgic_v4_doorbell_handler,
-> +				  0, "vcpu", vcpu);
-> +		if (ret) {
-> +			kvm_err("failed to allocate vcpu IRQ%d\n", irq);
-> +			/*
-> +			 * Trick: adjust the number of vpes so we know
-> +			 * how many to nuke on teardown...
-> +			 */
-> +			dist->its_vm.nr_vpes = i;
-> +			break;
-> +		}
-> +	}
-> +
-> +	if (ret)
-> +		vgic_v4_teardown(kvm);
-> +
->  	return ret;
+>  #endif /* __KVM_ARM_VGIC_H */
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 8388c1cc23f6..092a4ec03e57 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -316,11 +316,13 @@ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+>  void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+>  {
+>  	kvm_timer_schedule(vcpu);
+> +	kvm_vgic_v4_enable_doorbell(vcpu);
 >  }
 >  
-> @@ -73,10 +112,19 @@ int vgic_v4_init(struct kvm *kvm)
->  void vgic_v4_teardown(struct kvm *kvm)
+>  void kvm_arch_vcpu_unblocking(struct kvm_vcpu *vcpu)
 >  {
->  	struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
-> +	int i;
+>  	kvm_timer_unschedule(vcpu);
+> +	kvm_vgic_v4_disable_doorbell(vcpu);
+>  }
 >  
->  	if (!its_vm->vpes)
->  		return;
->  
-> +	for (i = 0; i < its_vm->nr_vpes; i++) {
-> +		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
-> +		int irq = its_vm->vpes[i]->irq;
+>  int kvm_arch_vcpu_init(struct kvm_vcpu *vcpu)
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> index ea898af1a7a9..1a2f2fcdfa67 100644
+> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -237,3 +237,21 @@ int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int virq,
+>  	mutex_unlock(&its->its_lock);
+>  	return ret;
+>  }
 > +
-> +		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
-> +		free_irq(irq, vcpu);
+> +void kvm_vgic_v4_enable_doorbell(struct kvm_vcpu *vcpu)
+> +{
+> +	if (vgic_supports_direct_msis(vcpu->kvm)) {
+> +		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
+> +		if (irq)
+> +			enable_irq(irq);
 > +	}
+> +}
 > +
->  	its_free_vcpu_irqs(its_vm);
->  	kfree(its_vm->vpes);
->  	its_vm->nr_vpes = 0;
+> +void kvm_vgic_v4_disable_doorbell(struct kvm_vcpu *vcpu)
+> +{
+> +	if (vgic_supports_direct_msis(vcpu->kvm)) {
+> +		int irq = vcpu->arch.vgic_cpu.vgic_v3.its_vpe.irq;
+> +		if (irq)
+> +			disable_irq(irq);
+> +	}
+> +}
 > 
