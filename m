@@ -1,78 +1,45 @@
 From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 7 Nov 2017 10:36:47 +0000
-Subject: [PATCH 06/17] coresight: tmc: Make ETR SG table circular
-In-Reply-To: <20171106190712.GA12148@xps15>
+Date: Tue, 7 Nov 2017 10:37:22 +0000
+Subject: [PATCH 13/17] coresight etr: Do not clean ETR trace buffer
+In-Reply-To: <CANLsYkyEVqZ+Nc-RwWpNJ7TpxTdDFHF05-JsSSG65JYZhnoc6Q@mail.gmail.com>
 References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-7-suzuki.poulose@arm.com>
- <20171106190712.GA12148@xps15>
-Message-ID: <978c66da-1897-191d-7c2d-49b21c9c0a39@arm.com>
+ <20171019171553.24056-14-suzuki.poulose@arm.com>
+ <20171102203623.GE23320@xps15> <c7a89f16-3974-69aa-505f-a3395d0579e6@arm.com>
+ <CANLsYkyEVqZ+Nc-RwWpNJ7TpxTdDFHF05-JsSSG65JYZhnoc6Q@mail.gmail.com>
+Message-ID: <6897a1ae-eede-6f78-1d2f-4dfb26679162@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/11/17 19:07, Mathieu Poirier wrote:
-> On Thu, Oct 19, 2017 at 06:15:42PM +0100, Suzuki K Poulose wrote:
-
-...
-
->> +/*
->> + * tmc_etr_sg_offset_to_table_index : Translate a given data @offset
->> + * to the index of the page table "entry". Data pointers always have
->> + * a fixed location, with ETR_SG_PTRS_PER_PAGE - 1 entries in an
->> + * ETR_SG_PAGE and 1 link entry per (ETR_SG_PTRS_PER_PAGE -1) entries.
->> + */
->> +static inline u32
->> +tmc_etr_sg_offset_to_table_index(u64 offset)
->> +{
->> +	u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
->> +
->> +	return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
->> +}
+On 03/11/17 20:17, Mathieu Poirier wrote:
+> On 3 November 2017 at 04:10, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+>> On 02/11/17 20:36, Mathieu Poirier wrote:
+>>>
+>>> On Thu, Oct 19, 2017 at 06:15:49PM +0100, Suzuki K Poulose wrote:
+>>>>
+>>>> We zero out the entire trace buffer used for ETR before it
+>>>> is enabled, for helping with debugging. Since we could be
+>>>> restoring a session in perf mode, this could destroy the data.
+>>>
+>>>
+>>> I'm not sure to follow you with "... restoring a session in perf mode
+>>> ...".
+>>> When operating from the perf interface all the memory allocated for a
+>>> session is
+>>> cleanup after, there is no re-using of memory as in sysFS.
+>>
+>>
+>> We could directly use the perf ring buffer for the ETR. In that case, the
+>> perf
+>> ring buffer could contain trace data collected from the previous "schedule"
+>> which the userspace hasn't collected yet. So, doing a memset here would
+>> destroy that data.
 > 
-> This function is the source of a bizarre linking error when compiling [14/17] on
-> armv7 as pasted here:
-> 
->    UPD     include/generated/compile.h
->    CC      init/version.o
->    AR      init/built-in.o
->    AR      built-in.o
->    LD      vmlinux.o
->    MODPOST vmlinux.o
-> drivers/hwtracing/coresight/coresight-tmc-etr.o: In function
-> `tmc_etr_sg_offset_to_table_index':
-> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:553:
-> undefined reference to `__aeabi_uldivmod'
-> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:551:
-> undefined reference to `__aeabi_uldivmod'
-> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:553:
-> undefined reference to `__aeabi_uldivmod'
-> drivers/hwtracing/coresight/coresight-tmc-etr.o: In function
-> `tmc_etr_sg_table_rotate':
-> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:609:
-> undefined reference to `__aeabi_uldivmod'
-> 
-> Please see if you can reproduce on your side.
+> I originally thought your comment was about re-using the memory from a
+> previous trace session, hence the confusion.  Please rework your
+> changelog to include this clarification as I am sure other people can
+> be mislead.
 
-Uh ! I had gcc-7, which didn't complain about it. But if switch to 4.9, it does.
-It looks like division of 64bit entity on arm32 is triggering it. We don't need
-this to be u64 above, as it is the page_idx and could simply switch to "unsigned long"
-rather than explicitly using div64 helpers.
+Sure, will do.
 
-The following change fixes the issue for me. Please could you check if it solves the problem
-for you ?
-
-
-@@ -551,7 +553,7 @@ static void tmc_etr_sg_table_populate(struct etr_sg_table *etr_table)
-  static inline u32
-  tmc_etr_sg_offset_to_table_index(u64 offset)
-  {
--       u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
-+       unsigned long sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
-  
-         return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
-  }
-
-
-
-Thanks for the testing !
-
+Thanks
 Suzuki
