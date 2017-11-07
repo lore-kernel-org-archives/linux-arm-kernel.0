@@ -1,82 +1,54 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 7 Nov 2017 17:25:28 +0100
-Subject: [PATCH 16/37] KVM: arm64: Remove noop calls to timer
- save/restore from VHE switch
-In-Reply-To: <20171012104141.26902-17-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-17-christoffer.dall@linaro.org>
-Message-ID: <20171107162528.q3rdlih5fpn7fnhd@kamzik.brq.redhat.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed,  8 Nov 2017 01:31:45 +0900
+Subject: [PATCH 0/2] kbuild: remove all "obj- := dummy.o" tricks
+Message-ID: <1510072307-16819-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:20PM +0200, Christoffer Dall wrote:
-> The VHE switch function calls __timer_enable_traps and
-> __timer_disable_traps which don't do anything on VHE systems.
-> Therefore, simply remove these calls from the VHE switch function and
-> make the functions non-conditional as they are now only called from the
-> non-VHE switch path.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/hyp/switch.c |  2 --
->  virt/kvm/arm/hyp/timer-sr.c | 10 ++--------
->  2 files changed, 2 insertions(+), 10 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 2cedf12..b98b73b 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -336,7 +336,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  	__activate_vm(vcpu);
->  
->  	__vgic_restore_state(vcpu);
-> -	__timer_enable_traps(vcpu);
->  
->  	/*
->  	 * We must restore the 32-bit state before the sysregs, thanks
-> @@ -356,7 +355,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  
->  	__sysreg_save_guest_state(guest_ctxt);
->  	__sysreg32_save_state(vcpu);
-> -	__timer_disable_traps(vcpu);
->  	__vgic_save_state(vcpu);
->  
->  	__deactivate_traps(vcpu);
-> diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-> index f398616..82c217e 100644
-> --- a/virt/kvm/arm/hyp/timer-sr.c
-> +++ b/virt/kvm/arm/hyp/timer-sr.c
-> @@ -53,16 +53,10 @@ void __hyp_text disable_el1_phys_timer_access(void)
->  
->  void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
->  {
-> -	/*
-> -	 * We don't need to do this for VHE since the host kernel runs in EL2
-> -	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
-> -	 */
 
-I was about to suggest that we should move this comment, instead of remove
-it, but it seems misleading anyway. We do call
-enable/disable_el1_phys_timer_access on VHE, but at VCPU load/put time
-instead of VM enter/exit time. So I guess removing it is best.
+This clean-up was prompted by Sam
+when I refactored DT building:
+https://patchwork.kernel.org/patch/10041881/
 
-> -	if (!has_vhe())
-> -		enable_el1_phys_timer_access();
-> +	enable_el1_phys_timer_access();
->  }
->  
->  void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
->  {
-> -	if (!has_vhe())
-> -		disable_el1_phys_timer_access();
-> +	disable_el1_phys_timer_access();
->  }
-> -- 
-> 2.9.0
-> 
+If you want to test this series,
+apply the following 3 patches:
+https://patchwork.kernel.org/patch/10037891/
+https://patchwork.kernel.org/patch/10041877/
+https://patchwork.kernel.org/patch/10041881/
 
-Should we just call enable/disable_el1_phys_timer_access directly from
-__kvm_vcpu_run for non-VHE and drop this extra function level?
+I CCed DT forks to informs them of conflicts
+with those patches Rob Herring offered to apply.
+I doubt if he wants to review this series...
 
-Thanks,
-drew
+
+
+Masahiro Yamada (2):
+  kbuild: create built-in.o automatically if parent directory wants it
+  kbuild: remove all dummy assignments to obj-
+
+ Makefile                                  | 2 +-
+ arch/arm/mach-uniphier/Makefile           | 1 -
+ arch/mips/boot/dts/brcm/Makefile          | 3 ---
+ arch/mips/boot/dts/cavium-octeon/Makefile | 3 ---
+ arch/mips/boot/dts/img/Makefile           | 3 ---
+ arch/mips/boot/dts/ingenic/Makefile       | 3 ---
+ arch/mips/boot/dts/lantiq/Makefile        | 3 ---
+ arch/mips/boot/dts/mti/Makefile           | 3 ---
+ arch/mips/boot/dts/netlogic/Makefile      | 3 ---
+ arch/mips/boot/dts/ni/Makefile            | 3 ---
+ arch/mips/boot/dts/pic32/Makefile         | 3 ---
+ arch/mips/boot/dts/qca/Makefile           | 3 ---
+ arch/mips/boot/dts/ralink/Makefile        | 3 ---
+ arch/mips/boot/dts/xilfpga/Makefile       | 3 ---
+ firmware/Makefile                         | 3 ---
+ samples/bpf/Makefile                      | 3 ---
+ samples/hidraw/Makefile                   | 3 ---
+ samples/seccomp/Makefile                  | 3 ---
+ samples/sockmap/Makefile                  | 3 ---
+ samples/statx/Makefile                    | 3 ---
+ samples/uhid/Makefile                     | 3 ---
+ scripts/Makefile.build                    | 4 ++--
+ 22 files changed, 3 insertions(+), 61 deletions(-)
+
+-- 
+2.7.4
