@@ -1,38 +1,36 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Tue, 7 Nov 2017 12:29:31 -0200
-Subject: [PATCH] ARM: dts: imx6qdl-wandboard-revd1: Make EDID functional
-Message-ID: <1510064971-18755-1-git-send-email-fabio.estevam@nxp.com>
+From: colin.king@canonical.com (Colin King)
+Date: Tue,  7 Nov 2017 14:31:25 +0000
+Subject: [PATCH] usb: gadget: pxa27x: Remove redundant assignment to is_short
+Message-ID: <20171107143125.5548-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are 0 ohm resistors that allow selecting the EDID I2C port to
-be I2C1 or I2C2.
+From: Colin Ian King <colin.king@canonical.com>
 
-On revd1 the 0 ohm resistors are populated in such a way that the I2C2
-is used as DDC I2C bus, so fix it accordingly. 
+Variable is set to zero but this value is never read as it is
+overwritten with a new value later on, hence it is a redundant
+assignment and can be removed. Cleans up clang warning:
 
-Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+drivers/usb/gadget/udc/pxa27x_udc.c:1141:2: warning: Value stored
+to 'dev' is never read
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
 ---
- arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/usb/gadget/udc/pxa27x_udc.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi b/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
-index 6d8d9ca..3a8a495 100644
---- a/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-wandboard-revd1.dtsi
-@@ -21,6 +21,11 @@
- 	};
- };
+diff --git a/drivers/usb/gadget/udc/pxa27x_udc.c b/drivers/usb/gadget/udc/pxa27x_udc.c
+index 14606f340325..e3d362cc47db 100644
+--- a/drivers/usb/gadget/udc/pxa27x_udc.c
++++ b/drivers/usb/gadget/udc/pxa27x_udc.c
+@@ -984,8 +984,6 @@ static int write_fifo(struct pxa_ep *ep, struct pxa27x_request *req)
  
-+&hdmi {
-+	ddc-i2c-bus = <&i2c2>;
-+	status = "okay";
-+};
-+
- &i2c3 {
- 	clock-frequency = <100000>;
- 	pinctrl-names = "default";
+ 	max = ep->fifo_size;
+ 	do {
+-		is_short = 0;
+-
+ 		udccsr = udc_ep_readl(ep, UDCCSR);
+ 		if (udccsr & UDCCSR_PC) {
+ 			ep_vdbg(ep, "Clearing Transmit Complete, udccsr=%x\n",
 -- 
-2.7.4
+2.14.1
