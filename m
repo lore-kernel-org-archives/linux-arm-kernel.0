@@ -1,61 +1,69 @@
-From: jon.mason@broadcom.com (Jon Mason)
-Date: Tue, 7 Nov 2017 17:45:46 -0500
-Subject: [PATCH 1/2] ARM: dts: NSP: Disable AHCI controller for HR NSP
- boards
-In-Reply-To: <20171107222812.17267-2-f.fainelli@gmail.com>
-References: <20171107222812.17267-1-f.fainelli@gmail.com>
- <20171107222812.17267-2-f.fainelli@gmail.com>
-Message-ID: <CAC3K-4qZBJc9vRr2z3Fhx78feRdVASYFHZgayV=gG1jZ0dApVg@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue,  7 Nov 2017 17:07:33 -0600
+Subject: [PATCH 1/4] [v2] Revert "gpio: set up initial state from
+ .get_direction()"
+In-Reply-To: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+Message-ID: <1510096056-13765-2-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 7, 2017 at 5:28 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> The AHCI controller is currently enabled for all of these boards:
-> bcm958623hr and bcm958625hr would result in a hard hang on boot that we
-> cannot get rid of. Since this does not appear to have an easy and simple
-> fix, just disable the AHCI controller for now until this gets resolved.
->
-> Fixes: 70725d6e97ac ("ARM: dts: NSP: Enable SATA on bcm958625hr")
-> Fixes: d454c3762437 ("ARM: dts: NSP: Add new DT file for bcm958623hr")
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+This reverts commit 72d3200061776264941be1b5a9bb8e926b3b30a5.
 
-Acked-by: Jon Mason <jon.mason@broadcom.com>
+We cannot blindly query the direction of all GPIOs when the pins are
+first registered.  The get_direction callback normally triggers a
+read/write to hardware, but we shouldn't be touching the hardware for
+an individual GPIO until after it's been properly claimed.
 
-> ---
->  arch/arm/boot/dts/bcm958623hr.dts | 4 ----
->  arch/arm/boot/dts/bcm958625hr.dts | 4 ----
->  2 files changed, 8 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/bcm958623hr.dts b/arch/arm/boot/dts/bcm958623hr.dts
-> index 3bc50849d013..b8bde13de90a 100644
-> --- a/arch/arm/boot/dts/bcm958623hr.dts
-> +++ b/arch/arm/boot/dts/bcm958623hr.dts
-> @@ -141,10 +141,6 @@
->         status = "okay";
->  };
->
-> -&sata {
-> -       status = "okay";
-> -};
-> -
->  &qspi {
->         bspi-sel = <0>;
->         flash: m25p80 at 0 {
-> diff --git a/arch/arm/boot/dts/bcm958625hr.dts b/arch/arm/boot/dts/bcm958625hr.dts
-> index d94d14b3c745..6a44b8021702 100644
-> --- a/arch/arm/boot/dts/bcm958625hr.dts
-> +++ b/arch/arm/boot/dts/bcm958625hr.dts
-> @@ -177,10 +177,6 @@
->         status = "okay";
->  };
->
-> -&sata {
-> -       status = "okay";
-> -};
-> -
->  &srab {
->         compatible = "brcm,bcm58625-srab", "brcm,nsp-srab";
->         status = "okay";
-> --
-> 2.9.3
->
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/gpio/gpiolib.c | 31 +++++++------------------------
+ 1 file changed, 7 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+index eb80dac4e26a..60553af4c004 100644
+--- a/drivers/gpio/gpiolib.c
++++ b/drivers/gpio/gpiolib.c
+@@ -1221,31 +1221,14 @@ int gpiochip_add_data(struct gpio_chip *chip, void *data)
+ 		struct gpio_desc *desc = &gdev->descs[i];
+ 
+ 		desc->gdev = gdev;
+-		/*
+-		 * REVISIT: most hardware initializes GPIOs as inputs
+-		 * (often with pullups enabled) so power usage is
+-		 * minimized. Linux code should set the gpio direction
+-		 * first thing; but until it does, and in case
+-		 * chip->get_direction is not set, we may expose the
+-		 * wrong direction in sysfs.
+-		 */
+-
+-		if (chip->get_direction) {
+-			/*
+-			 * If we have .get_direction, set up the initial
+-			 * direction flag from the hardware.
+-			 */
+-			int dir = chip->get_direction(chip, i);
+ 
+-			if (!dir)
+-				set_bit(FLAG_IS_OUT, &desc->flags);
+-		} else if (!chip->direction_input) {
+-			/*
+-			 * If the chip lacks the .direction_input callback
+-			 * we logically assume all lines are outputs.
+-			 */
+-			set_bit(FLAG_IS_OUT, &desc->flags);
+-		}
++		/* REVISIT: most hardware initializes GPIOs as inputs (often
++		 * with pullups enabled) so power usage is minimized. Linux
++		 * code should set the gpio direction first thing; but until
++		 * it does, and in case chip->get_direction is not set, we may
++		 * expose the wrong direction in sysfs.
++		 */
++		desc->flags = !chip->direction_input ? (1 << FLAG_IS_OUT) : 0;
+ 	}
+ 
+ #ifdef CONFIG_PINCTRL
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
