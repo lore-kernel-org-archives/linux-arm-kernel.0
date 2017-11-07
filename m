@@ -1,82 +1,76 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:56 +0100
-Subject: [PULL 23/26] KVM: arm/arm64: Document KVM_DEV_ARM_ITS_CTRL_RESET
+Date: Tue,  7 Nov 2017 11:47:48 +0100
+Subject: [PULL 15/26] KVM: arm/arm64: Move phys_timer_emulate function
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-24-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-16-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+From: Christoffer Dall <cdall@linaro.org>
 
-At the moment, the in-kernel emulated ITS is not properly reset.
-On guest restart/reset some registers keep their old values and
-internal structures like device, ITE, and collection lists are not
-freed.
+We are about to call phys_timer_emulate() from kvm_timer_update_state()
+and modify phys_timer_emulate() at the same time.  Moving the function
+and modifying it in a single patch makes the diff hard to read, so do
+this separately first.
 
-This may lead to various bugs. Among them, we can have incorrect state
-backup or failure when saving the ITS state at early guest boot stage.
+No functional change.
 
-This patch documents a new attribute, KVM_DEV_ARM_ITS_CTRL_RESET in
-the KVM_DEV_ARM_VGIC_GRP_CTRL group.
-
-Upon this action, we can reset registers and especially those
-pointing to tables previously allocated by the guest and free
-the internal data structures storing the list of devices, collections
-and lpis.
-
-The usual approach for device reset of having userspace write
-the reset values of the registers to the kernel via the register
-read/write APIs doesn't work for the ITS because it has some
-internal state (caches) which is not exposed as registers,
-and there is no register interface for "drop cached data without
-writing it back to RAM". So we need a KVM API which mimics the
-hardware's reset line, to provide the equivalent behaviour to
-a "pull the power cord out of the back of the machine" reset.
-
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Reported-by: wanghaibin <wanghaibin.wang@huawei.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- Documentation/virtual/kvm/devices/arm-vgic-its.txt | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+ virt/kvm/arm/arch_timer.c | 32 ++++++++++++++++----------------
+ 1 file changed, 16 insertions(+), 16 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-index eb06beb75960..8d5830eab26a 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-@@ -33,6 +33,10 @@ Groups:
-       request the initialization of the ITS, no additional parameter in
-       kvm_device_attr.addr.
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index d1a6fb12121f..7f4f12d48a1a 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -255,6 +255,22 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 	}
+ }
  
-+    KVM_DEV_ARM_ITS_CTRL_RESET
-+      reset the ITS, no additional parameter in kvm_device_attr.addr.
-+      See "ITS Reset State" section.
++/* Schedule the background timer for the emulated timer. */
++static void phys_timer_emulate(struct kvm_vcpu *vcpu,
++			      struct arch_timer_context *timer_ctx)
++{
++	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 +
-     KVM_DEV_ARM_ITS_SAVE_TABLES
-       save the ITS table data into guest RAM, at the location provisioned
-       by the guest in corresponding registers/table entries.
-@@ -157,3 +161,19 @@ Then vcpus can be started.
-  - pINTID is the physical LPI ID; if zero, it means the entry is not valid
-    and other fields are not meaningful.
-  - ICID is the collection ID
++	if (kvm_timer_should_fire(timer_ctx))
++		return;
 +
-+ ITS Reset State:
-+ ----------------
++	if (!kvm_timer_irq_can_fire(timer_ctx))
++		return;
 +
-+RESET returns the ITS to the same state that it was when first created and
-+initialized. When the RESET command returns, the following things are
-+guaranteed:
++	/*  The timer has not yet expired, schedule a background timer */
++	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
++}
 +
-+- The ITS is not enabled and quiescent
-+  GITS_CTLR.Enabled = 0 .Quiescent=1
-+- There is no internally cached state
-+- No collection or device table are used
-+  GITS_BASER<n>.Valid = 0
-+- GITS_CBASER = 0, GITS_CREADR = 0, GITS_CWRITER = 0
-+- The ABI version is unchanged and remains the one set when the ITS
-+  device was first created.
+ /*
+  * Check if there was a change in the timer state (should we raise or lower
+  * the line level to the GIC).
+@@ -281,22 +297,6 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
+ 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
+ }
+ 
+-/* Schedule the background timer for the emulated timer. */
+-static void phys_timer_emulate(struct kvm_vcpu *vcpu,
+-			      struct arch_timer_context *timer_ctx)
+-{
+-	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+-
+-	if (kvm_timer_should_fire(timer_ctx))
+-		return;
+-
+-	if (!kvm_timer_irq_can_fire(timer_ctx))
+-		return;
+-
+-	/*  The timer has not yet expired, schedule a background timer */
+-	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
+-}
+-
+ static void vtimer_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
 -- 
 2.14.2
