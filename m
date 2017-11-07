@@ -1,45 +1,52 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 6 Nov 2017 18:11:13 -0600
-Subject: [PATCH] PCI: turn off PCIe services during shutdown
-In-Reply-To: <1508958063-6947-1-git-send-email-okaya@codeaurora.org>
-References: <1508958063-6947-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171107001113.GA9538@bhelgaas-glaptop.roam.corp.google.com>
+Date: Mon, 6 Nov 2017 18:21:20 -0600
+Subject: [PATCH v10 9/9] MANTAINERS: Add maintainer for HiSilicon LPC
+ driver
+In-Reply-To: <1509120687-7352-10-git-send-email-gabriele.paoloni@huawei.com>
+References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1509120687-7352-10-git-send-email-gabriele.paoloni@huawei.com>
+Message-ID: <20171107002120.GB9538@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 03:01:02PM -0400, Sinan Kaya wrote:
-> Some of the PCIe services such as AER are being left enabled during
-> shutdown. This might cause spurious AER errors while SOC is being
-> powered down.
-> 
-> Let's clean up the PCIe services gracefully during shutdown to clear
-> these false positives.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+s/MANTAINERS/MAINTAINERS/
 
-Applied to pci/portdrv for v4.15, thanks!
-
+On Fri, Oct 27, 2017 at 05:11:27PM +0100, Gabriele Paoloni wrote:
+> Added maintainer for drivers/bus/hisi_lpc.c
+> 
+> Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
 > ---
->  drivers/pci/pcie/portdrv_pci.c | 1 +
->  1 file changed, 1 insertion(+)
+>  MAINTAINERS | 7 +++++++
+>  1 file changed, 7 insertions(+)
 > 
-> diff --git a/drivers/pci/pcie/portdrv_pci.c b/drivers/pci/pcie/portdrv_pci.c
-> index 083276e..b350d12 100644
-> --- a/drivers/pci/pcie/portdrv_pci.c
-> +++ b/drivers/pci/pcie/portdrv_pci.c
-> @@ -246,6 +246,7 @@ static void pcie_portdrv_err_resume(struct pci_dev *dev)
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index f66488d..b49d4c0 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -6130,6 +6130,13 @@ F:	include/uapi/linux/if_hippi.h
+>  F:	net/802/hippi.c
+>  F:	drivers/net/hippi/
 >  
->  	.probe		= pcie_portdrv_probe,
->  	.remove		= pcie_portdrv_remove,
-> +	.shutdown	= pcie_portdrv_remove,
->  
->  	.err_handler	= &pcie_portdrv_err_handler,
->  
+> +HISILICON LPC BUS DRIVER
+> +L:	linuxarm at huawei.com
+> +W:	http://www.hisilicon.com
+> +S:	Maintained
+> +F:	drivers/bus/hisi_lpc.c
+> +F:	Documentation/devicetree/bindings/arm/hisilicon/hisilicon-low-pin-count.txt
+
+Does this really count as a "maintainer" since it's only a mailing
+list, not a real person?  I personally prefer a specific person
+because there's no accountability with a mailing list.
+
+> +
+>  HISILICON NETWORK SUBSYSTEM DRIVER
+>  M:	Yisen Zhuang <yisen.zhuang@huawei.com>
+>  M:	Salil Mehta <salil.mehta@huawei.com>
 > -- 
-> 1.9.1
+> 2.7.4
 > 
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
