@@ -1,42 +1,24 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Nov 2017 11:17:39 +0100
-Subject: [PATCH 1/4] arm64: dts: renesas: r8a77970: Add IPMMU device nodes
-In-Reply-To: <20171101103504.7658-2-horms+renesas@verge.net.au>
+Date: Tue, 7 Nov 2017 11:19:42 +0100
+Subject: [PATCH 2/4] arm64: dts: renesas: r8a77970: Tie SYS-DMAC to
+ IPMMU-DS1
+In-Reply-To: <20171101103504.7658-3-horms+renesas@verge.net.au>
 References: <20171101103504.7658-1-horms+renesas@verge.net.au>
- <20171101103504.7658-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXT=kMQXahCo0TC-BLyO8f_ONn-JPjnaqWjE4UhtXbn_g@mail.gmail.com>
+ <20171101103504.7658-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdU19MGhi8NCpM=8W4zVJga2kO3Vv8syvFeEjjPn09NjZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 1, 2017 at 11:35 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
-> Add r8a77970 IPMMU nodes and keep all disabled by default.
+> Hook up r8a77970 DMAC nodes to the IPMMU. In particular
+> SYS-DMAC1 and SYS-DMAC2 get tied to IPMMU-DS1.
 >
-> Based on work for the r8a7796 by Magnus Damm
+> Based on work for the r8a7796 by Magnus Damm.
 >
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-With the compatible value for ipmmu_ds1 fixed:
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-My comments for r8a7795.dtsi about IPMMU-* comments and power-domains
-properties are applicable here, too.
-
-> --- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-
-[...]
-
-> +               ipmmu_ds1: mmu at e7740000 {
-> +                       compatible = "renesas,ipmmu-r8a7796";
-
-"renesas,ipmmu-r8a77970"
-
-> +                       reg = <0 0xe7740000 0 0x1000>; /* IPMMU-DS1 */
-> +                       renesas,ipmmu-main = <&ipmmu_mm 1>;
-> +                       #iommu-cells = <1>;
-> +                       status = "disabled";
-> +               };
 
 Gr{oetje,eeting}s,
 
