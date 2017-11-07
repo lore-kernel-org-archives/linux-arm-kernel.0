@@ -1,78 +1,100 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Tue, 07 Nov 2017 12:03:17 +0100
-Subject: [PATCH v3 0/4] fix the clock setting for SAR ADC
-In-Reply-To: <20171107053646.31087-1-yixun.lan@amlogic.com>
-References: <20171107053646.31087-1-yixun.lan@amlogic.com>
-Message-ID: <1510052597.1328.69.camel@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Nov 2017 12:05:39 +0100
+Subject: [PATCH 1/1] add mali r6p2 dt node
+In-Reply-To: <1510049010-5758-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1510049010-5758-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20171107110539.3wrm6uu6ohh6dnuy@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-11-07 at 13:36 +0800, Yixun Lan wrote:
-> patch [1/4]:
->   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
-> the published datasheet also has wrong description about this.
-> 
-> patch [2-4/4]:
->   Drop the "sana" clock from SAR ADC module,
-> 
->   From the hardware perspective, the SAR ADC module doesn't
-> require "sana" clock to wrok. This should apply to all SoC,
-> including meson6,8, GXBB, GXL..
-> 
-> Note: the whole patchset series has been tested at GXL-P212 board,
-> we haven't got any meson6,8 board to test, so I would appreciate
-> if someone (Martin?) could help to confirm it works there.
->  
-> Changes since v2 at [2] :
->   - explicitly point out 'sana' clock is not required for saradc, and drop
-> them
->   - update comments, as the published datasheet is wrong
->  
-> Changes since v1 at [1] :
->   - correct SAR ADC/SANA clock gate bit
-> 
-> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005221.ht
-> ml
-> [2] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005242.ht
-> ml
-> 
+Hi,
 
-Those patches should go through different trees. To avoid causing a (temporary)
-regression, the clk patch absolutely needs to be merged before any other patches
-is merged.
-
-I can take the clk patch as a fix for v4.15. It's too late for v4.14 but it's
-not big deal, I suppose the long term kernel will pick it up later on.
-
-Once the sana clock is indeed *the* sana clock, which of IIO or DT patch is
-merged first does not matter, the sana clock is optional.
-
-BTW, the cover letter and the IIO patch are missing the IIO maintainer and
-mailing list. According to MAINTAINERS, you are missing:
-
-* Jonathan Cameron <jic23@kernel.org>
-* linux-iio at vger.kernel.org
-
-Please resend with the warning note above (so other maintainers are aware of
-dependency), the correction applied to patch 1 commit log and the missing
-recipients.
-
+On Tue, Nov 07, 2017 at 11:03:30AM +0100, Giulio Benetti wrote:
+> This patch adds device tree mali node compatible with r6p2 utgard kernel driver 
+> provided by ARM and patched by maxime ripard on his github.
 > 
-> Xingyu Chen (3):
->   iio: adc: meson-saradc: remove irrelevant clock "sana"
->   dt-bindings: iio: adc: update the doc for SAR ADC
->   ARM64: dts: meson: drop "sana" clock from SAR ADC
+> It can be easily used in target.dts with:
 > 
-> Yixun Lan (1):
->   clk: meson: gxbb: fix wrong clock for SARADC/SANA
+> &mali {
+> 	status = "okay";
+> }
 > 
->  .../bindings/iio/adc/amlogic,meson-saradc.txt        |  1 -
->  arch/arm/boot/dts/meson8.dtsi                        |  5 ++---
->  arch/arm/boot/dts/meson8b.dtsi                       |  5 ++---
->  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          |  3 +--
->  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi           |  3 +--
->  drivers/clk/meson/gxbb.c                             |  4 ++--
->  drivers/iio/adc/meson_saradc.c                       | 20 -----------------
+> then loading mali.ko in user space.
+> 
+> Best regards
+> Giulio Benetti
+> Micronova srl
+
+Again, you should have a proper commit log here.
+
+Moreover, the DT binding itself doesn't have a dependency on the mali
+driver version. This is just a description of the hardware so you
+shouldn't mention it.
+
+And there's no need for the status = "okay" in the board DTS, since
+you don't disable it in your patch.
+
+> Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 > ---
->  7 files changed, 8 insertions(+), 33 deletions(-)
+>  arch/arm/boot/dts/sun7i-a20.dtsi | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
 > 
+> diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+> index 228c368..e402596 100644
+> --- a/arch/arm/boot/dts/sun7i-a20.dtsi
+> +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+> @@ -1216,6 +1216,33 @@
+>  			#size-cells = <0>;
+>  		};
+>  
+> +		mali: gpu at 1c40000 {
+> +			compatible = "allwinner,sun8i-a23-mali",
+
+This doesn't make any sense. The A23 went out later, and...
+
+> +				     "allwinner,sun7i-a20-mali", "arm,mali-400";
+
+You're actually using the proper compatible already.
+
+> +			reg = <0x01c40000 0x10000>;
+> +			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
+> +				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
+> +			interrupt-names = "gp",
+> +					  "gpmmu",
+> +					  "pp0",
+> +					  "ppmmu0",
+> +					  "pp1",
+> +					  "ppmmu1",
+> +					  "pmu";
+> +			clocks = <&ccu CLK_AHB_GPU>, <&ccu CLK_GPU>;
+> +			clock-names = "bus", "core";
+> +			resets = <&ccu RST_GPU>;
+> +			#cooling-cells = <2>;
+
+This isn't needed unless you're using thermal throttling, but in this
+case you would also need to add the OPPs.
+
+> +
+> +			assigned-clocks = <&ccu CLK_GPU>;
+> +			assigned-clock-rates = <381000000>;
+
+And this should be in the driver instead.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/f8c0bcd9/attachment-0001.sig>
