@@ -1,53 +1,61 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Nov 2017 21:15:29 +0100
-Subject: [PATCH v5 11/26] KVM: arm/arm64: GICv4: Handle INT command
- applied to a VLPI
-In-Reply-To: <20171027142855.21584-12-marc.zyngier@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-12-marc.zyngier@arm.com>
-Message-ID: <6e12eac9-7b75-2c2c-0c79-d17a3c0d65eb@redhat.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 7 Nov 2017 21:16:51 +0100
+Subject: Battery charging, battery status on Nokia N9, N950
+In-Reply-To: <CAOf5uwnoUkZG6KUzhn2u8vdcd5_+nmUQpXwE1zjNwiakN+Mscg@mail.gmail.com>
+References: <20171103210349.GA14071@amd> <20171107195020.GA19508@amd>
+ <20171107195912.GA3274@amd>
+ <CAOf5uwnoUkZG6KUzhn2u8vdcd5_+nmUQpXwE1zjNwiakN+Mscg@mail.gmail.com>
+Message-ID: <20171107201651.GB2572@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
-
-On 27/10/2017 16:28, Marc Zyngier wrote:
-> If the guest issues an INT command targetting a VLPI, let's
-> call into the irq_set_irqchip_state() helper to make it pending
-> on the physical side.
+On Tue 2017-11-07 21:04:19, Michael Nazzareno Trimarchi wrote:
+> Hi Pavel
 > 
-> This works just as well if userspace decides to inject an interrupt
-> using the normal userspace API...
-There is also another path:
-KVM_SIGNAL_MSI ioctl / kvm_send_userspace_msi / kvm_set_msi /
-vgic_its_inject_msi / vgic_its_trigger_msi
-
-I wonder whether we shouldn't prevent the userspace from messing up with
-the host irq pending state?
-
-Thanks
-
-Eric
+> On Tue, Nov 7, 2017 at 8:59 PM, Pavel Machek <pavel@ucw.cz> wrote:
+> > Hi!
+> >
+> >>
+> >> > I'm fighting with battery status & battery charging on Nokia
+> >> > N9/N950. https://elinux.org/N950 contains enough info to get battery
+> >> > status (and below is first attempt at kernel implementation), but I'm
+> >> > not sure what needs to be done to charge the battery (or at least
+> >> > power phone from USB).
+> >>
+> >> Nemo recovery system (2824336 Jul 25  2016 zImage-moslo) seems to
+> >> either charge phone from USB or at power it from USB.
+> >>
+> >> But 4.13 does not; it seems there are two separate issue.
+> >>
+> >> First, something needs to be done to enable system power from the
+> >> USB. I'm not sure what that one would be :-(. Then, it should be
+> >> possible to ask bq24153 to charge the battery.
+> >
+> > If someone has schematics or pointer to them.. for N9 or N950, that
+> > would be useful :-).
+> >
 > 
-> Acked-by: Christoffer Dall <cdall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 89768d2b6a91..b2a678d131d0 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -578,6 +578,10 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
->  	if (err)
->  		return err;
->  
-> +	if (irq->hw)
-> +		return irq_set_irqchip_state(irq->host_irq,
-> +					     IRQCHIP_STATE_PENDING, true);
-> +
->  	spin_lock(&irq->irq_lock);
->  	irq->pending_latch = true;
->  	vgic_queue_irq_unlock(kvm, irq);
-> 
+> You can dump pinctrl and configuration and check if some gpio are
+> used.  From reference schematic of this charger you have OTG and
+> CD. Those pins can be just used to enable/disable and boost charging.
+> You should dig a bit in sysfs to figure it out ;)
+
+I tried to search old board file from working version -- seemed better
+than randomly toggling stuff in /sys. But I could not find anything
+suspicious.
+
+If someone has the schematics, that would be useful.
+
+Best regards,
+									Pavel
+
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/b8c1c535/attachment.sig>
