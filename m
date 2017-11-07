@@ -1,62 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 7 Nov 2017 11:23:09 +0000
-Subject: [PATCH v3 0/9] irqchip: stm32: add stm32h7 support
-In-Reply-To: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
-References: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
-Message-ID: <04d9d728-7f9f-6bc0-bb57-c7bb49817872@arm.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Tue, 7 Nov 2017 10:50:35 +0000
+Subject: [PATCH v10 2/9] PCI: remove unused __weak attribute in
+ pci_register_io_range()
+In-Reply-To: <20171107002325.GC9538@bhelgaas-glaptop.roam.corp.google.com>
+References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1509120687-7352-3-git-send-email-gabriele.paoloni@huawei.com>
+ <20171107002325.GC9538@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40CC3351@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
 
-On 06/11/17 17:03, Ludovic Barre wrote:
-> From: Ludovic Barre <ludovic.barre@st.com>
-> 
-> This series adds:
-> -Management of multi-bank of external interrupts
-> stm32h7 has up to 96 inputs (3 banks of  32 inputs).
-> -Fix initial value after cold/hot boot (wakeup issue).
-> 
-> Changes v3:
-> -remove chip.name and handler, already done by
-> irq_alloc_domain_generic_chips
-> -add Rob ack in dt-bindings commit
-> 
-> Changes v2:
-> -Remove irq_mask and adds const on struct stm32_exti_bank
-> -Add wrapper functions pending and ack
-> -Replace BITS_PER_LONG by IRQS_PER_BANK
-> -Fill commit message on
-> "ARM: dts: stm32: add support of exti on stm32h743"
-> -Add system config bank for stm32h7
-> 
-> Ludovic Barre (9):
->   irqchip: stm32: select GENERIC_IRQ_CHIP
->   irqchip: stm32: add multi-bank management
->   dt-bindings: interrupt-controllers: add compatible string for stm32h7
->   irqchip: stm32: add stm32h7 support
->   irqchip: stm32: fix initial values
->   irqchip: stm32: move the wakeup on interrupt mask
->   ARM: dts: stm32: add exti support for stm32h743
->   ARM: dts: stm32: add system config bank node for stm32h743
->   ARM: dts: stm32: add support of exti on stm32h743 pinctrl
-> 
->  .../interrupt-controller/st,stm32-exti.txt         |   4 +-
->  arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  24 +++
->  arch/arm/boot/dts/stm32h743.dtsi                   |  13 ++
->  drivers/irqchip/Kconfig                            |   1 +
->  drivers/irqchip/irq-stm32-exti.c                   | 206 ++++++++++++++++-----
->  5 files changed, 198 insertions(+), 50 deletions(-)
-> 
 
-I'm happy to take the first 6 patches through the irqchip tree. How
-about the last 3? I'd rather see them routed via armsoc if there is any
-risk of merge conflicts.
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: 07 November 2017 00:23
+> To: Gabriele Paoloni
+> Cc: catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
+> frowand.list at gmail.com; bhelgaas at google.com; rafael at kernel.org;
+> arnd at arndb.de; linux-arm-kernel at lists.infradead.org;
+> lorenzo.pieralisi at arm.com; mark.rutland at arm.com; brian.starkey at arm.com;
+> olof at lixom.net; benh at kernel.crashing.org; linux-kernel at vger.kernel.org;
+> linux-acpi at vger.kernel.org; Linuxarm; linux-pci at vger.kernel.org;
+> minyard at acm.org; John Garry; xuwei (O)
+> Subject: Re: [PATCH v10 2/9] PCI: remove unused __weak attribute in
+> pci_register_io_range()
+> 
+> > PCI: remove unused __weak attribute in pci_register_io_range()
+> 
+> Please capitalize to follow drivers/pci convention, e.g.,
+> 
+>   PCI: Remove __weak attribute from pci_register_io_range()
+> 
+> (Also do the same for the other PCI patches.)
 
-How do you want to proceed?
+Agreed, many thanks
 
-Thanks,
+Gab
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> On Fri, Oct 27, 2017 at 05:11:20PM +0100, Gabriele Paoloni wrote:
+> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> >
+> > Currently pci_register_io_range() has only one definition;
+> > therefore there is no use of the __weak attribute.
+> >
+> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> > Acked-by: Bjorn Helgaas <helgaas@kernel.org>
+> > ---
+> >  drivers/pci/pci.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> > index af0cc34..eee967c 100644
+> > --- a/drivers/pci/pci.c
+> > +++ b/drivers/pci/pci.c
+> > @@ -3270,7 +3270,7 @@ static DEFINE_SPINLOCK(io_range_lock);
+> >   * Record the PCI IO range (expressed as CPU physical address +
+> size).
+> >   * Return a negative value if an error has occured, zero otherwise
+> >   */
+> > -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t
+> size)
+> > +int pci_register_io_range(phys_addr_t addr, resource_size_t size)
+> >  {
+> >  	int err = 0;
+> >
+> > --
+> > 2.7.4
+> >
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-acpi"
+> in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
