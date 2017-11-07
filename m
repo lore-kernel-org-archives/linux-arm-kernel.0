@@ -1,41 +1,93 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:36 +0100
-Subject: [PULL 03/26] KVM: arm/arm64: Guard kvm_vgic_map_is_active against
- !vgic_initialized
+Date: Tue,  7 Nov 2017 11:47:41 +0100
+Subject: [PULL 08/26] KVM: arm/arm64: Move timer/vgic flush/sync under
+ disabled irq
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-4-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-9-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-If the vgic is not initialized, don't try to grab its spinlocks or
-traverse its data structures.
+As we are about to play tricks with the timer to be more lazy in saving
+and restoring state, we need to move the timer sync and flush functions
+under a disabled irq section and since we have to flush the vgic state
+after the timer and PMU state, we do the whole flush/sync sequence with
+disabled irqs.
 
-This is important because we soon have to start considering the active
-state of a virtual interrupts when doing vcpu_load, which may happen
-early on before the vgic is initialized.
+The only downside is a slightly longer delay before being able to
+process hardware interrupts and run softirqs.
 
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic.c | 3 +++
- 1 file changed, 3 insertions(+)
+ virt/kvm/arm/arm.c | 26 +++++++++++++-------------
+ 1 file changed, 13 insertions(+), 13 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index fed717e07938..e1f7dbcfece0 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -777,6 +777,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
- 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
- 	bool map_is_active;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index b9f68e4add71..27db222a0c8d 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -654,11 +654,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
  
-+	if (!vgic_initialized(vcpu->kvm))
-+		return false;
+ 		kvm_pmu_flush_hwstate(vcpu);
+ 
++		local_irq_disable();
 +
- 	spin_lock(&irq->irq_lock);
- 	map_is_active = irq->hw && irq->active;
- 	spin_unlock(&irq->irq_lock);
+ 		kvm_timer_flush_hwstate(vcpu);
+ 		kvm_vgic_flush_hwstate(vcpu);
+ 
+-		local_irq_disable();
+-
+ 		/*
+ 		 * If we have a singal pending, or need to notify a userspace
+ 		 * irqchip about timer or PMU level changes, then we exit (and
+@@ -683,10 +683,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
+ 		    kvm_request_pending(vcpu)) {
+ 			vcpu->mode = OUTSIDE_GUEST_MODE;
+-			local_irq_enable();
+ 			kvm_pmu_sync_hwstate(vcpu);
+ 			kvm_timer_sync_hwstate(vcpu);
+ 			kvm_vgic_sync_hwstate(vcpu);
++			local_irq_enable();
+ 			preempt_enable();
+ 			continue;
+ 		}
+@@ -709,6 +709,16 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 
+ 		kvm_arm_clear_debug(vcpu);
+ 
++		/*
++		 * We must sync the PMU and timer state before the vgic state so
++		 * that the vgic can properly sample the updated state of the
++		 * interrupt line.
++		 */
++		kvm_pmu_sync_hwstate(vcpu);
++		kvm_timer_sync_hwstate(vcpu);
++
++		kvm_vgic_sync_hwstate(vcpu);
++
+ 		/*
+ 		 * We may have taken a host interrupt in HYP mode (ie
+ 		 * while executing the guest). This interrupt is still
+@@ -732,16 +742,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		guest_exit();
+ 		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+ 
+-		/*
+-		 * We must sync the PMU and timer state before the vgic state so
+-		 * that the vgic can properly sample the updated state of the
+-		 * interrupt line.
+-		 */
+-		kvm_pmu_sync_hwstate(vcpu);
+-		kvm_timer_sync_hwstate(vcpu);
+-
+-		kvm_vgic_sync_hwstate(vcpu);
+-
+ 		preempt_enable();
+ 
+ 		ret = handle_exit(vcpu, run, ret);
 -- 
 2.14.2
