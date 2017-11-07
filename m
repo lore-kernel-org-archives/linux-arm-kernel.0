@@ -1,36 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Nov 2017 16:18:30 +0100
-Subject: [GIT PULL] Allwinner DT changes for 4.15, step 2
-In-Reply-To: <20171106092623.tqvmvqhpopyu2mri@flea>
-References: <20171106092623.tqvmvqhpopyu2mri@flea>
-Message-ID: <CAK8P3a3dL2_oWiBi4p4CnAOa8F7ijcrKje1fRq84j7pWJpqECA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 7 Nov 2017 07:48:42 -0800
+Subject: n900 in next-20170901
+In-Reply-To: <20171107053313.GA12447@js1304-P5Q-DELUXE>
+References: <20170925145437.GG4394@atomide.com>
+ <20171018082927.GB27595@js1304-P5Q-DELUXE>
+ <20171019183033.GH4394@atomide.com>
+ <20171020015542.GA10438@js1304-P5Q-DELUXE>
+ <20171020173146.GN4394@atomide.com>
+ <20171023045342.GA23082@js1304-P5Q-DELUXE>
+ <20171025173137.GQ4394@atomide.com>
+ <20171026044829.GB11791@js1304-P5Q-DELUXE>
+ <20171026141627.GD21504@atomide.com>
+ <20171107053313.GA12447@js1304-P5Q-DELUXE>
+Message-ID: <20171107154842.GP28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 6, 2017 at 10:26 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
->
-> Here are a few commits that would be great to get in 4.15, given how
-> long they've been hanging around.
->
-> The first and most important one is the reintroduction of the EMAC DT
-> changes after they've been reverted at the last minute in 4.13.
->
-> There's a arm64 patch that crept in because the H5 and H3 share a
-> common DTSI that is located in arch/arm, and merging that patch
-> through the arm64 PR, especially given the pull requests that have
-> already been sent, would just have generated too many conflicts.
-That's all good, in particular as I've been pulling both arm32 and
-arm64 changes into a shared next/dt branch. Please keep sending
-them separately when you can, we'll just merge them as needed.
+Hi,
 
-One small request: the text you wrote above makes a better changelog
-text than what you had in the signed tag, so I ended up using your
-longer description in the merge commit. Try to describe the changes
-like that in the future too, giving a little more background in what you
-see as important, instead of just listing lots of small items that
-we can see from the list of commits.
+* Joonsoo Kim <iamjoonsoo.kim@lge.com> [171107 05:30]:
+> Could you test follwing updated branch?
+> 
+> https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+> 
+> It has three relevant commits on top and enables CMA memory use.
 
-Thanks,
+Okie dokie.
 
-      Arnd
+> "arm/dma: remove i-cache flush"
+
+Your branch at the above commit is not booting on n900.
+
+> "arm/dma: flush i-cache and d-cache separately"
+
+Not booting at this commit either.
+
+> "arm/dma: call flush_cache_all() and don't do outer cache operation"
+
+Not booting at this commit either.
+
+Earlier commit f14f3479c0d7 ("arm/dma: re-enable to remap the CMA
+area and flush cache before remapping") in you branch boots.
+
+Then the following commit d6512d6d0171 ("Revert "arm/mm: disable
+atomic_pool"") won't boot.
+
+Also your tree at commit 6d0525cef962 ("arm/dma: remove i-cache
+flush") with only commit d6512d6d0171 ("Revert "arm/mm: disable
+atomic_pool"") reverted boots on n900.
+
+So it seems the issue is currently at the atomic_pool_init()
+related code?
+
+Regards,
+
+Tony
