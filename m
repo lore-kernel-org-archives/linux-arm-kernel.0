@@ -1,45 +1,65 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 7 Nov 2017 10:37:22 +0000
-Subject: [PATCH 13/17] coresight etr: Do not clean ETR trace buffer
-In-Reply-To: <CANLsYkyEVqZ+Nc-RwWpNJ7TpxTdDFHF05-JsSSG65JYZhnoc6Q@mail.gmail.com>
-References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-14-suzuki.poulose@arm.com>
- <20171102203623.GE23320@xps15> <c7a89f16-3974-69aa-505f-a3395d0579e6@arm.com>
- <CANLsYkyEVqZ+Nc-RwWpNJ7TpxTdDFHF05-JsSSG65JYZhnoc6Q@mail.gmail.com>
-Message-ID: <6897a1ae-eede-6f78-1d2f-4dfb26679162@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 07 Nov 2017 11:38:59 +0100
+Subject: [PATCH v3 1/4] clk: meson: gxbb: fix wrong clock for SARADC/SANA
+In-Reply-To: <20171107054142.7935-1-yixun.lan@amlogic.com>
+References: <20171107054142.7935-1-yixun.lan@amlogic.com>
+Message-ID: <1510051139.1328.52.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/11/17 20:17, Mathieu Poirier wrote:
-> On 3 November 2017 at 04:10, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
->> On 02/11/17 20:36, Mathieu Poirier wrote:
->>>
->>> On Thu, Oct 19, 2017 at 06:15:49PM +0100, Suzuki K Poulose wrote:
->>>>
->>>> We zero out the entire trace buffer used for ETR before it
->>>> is enabled, for helping with debugging. Since we could be
->>>> restoring a session in perf mode, this could destroy the data.
->>>
->>>
->>> I'm not sure to follow you with "... restoring a session in perf mode
->>> ...".
->>> When operating from the perf interface all the memory allocated for a
->>> session is
->>> cleanup after, there is no re-using of memory as in sysFS.
->>
->>
->> We could directly use the perf ring buffer for the ETR. In that case, the
->> perf
->> ring buffer could contain trace data collected from the previous "schedule"
->> which the userspace hasn't collected yet. So, doing a memset here would
->> destroy that data.
+On Tue, 2017-11-07 at 13:41 +0800, Yixun Lan wrote:
+> According to the datasheet, in Meson-GXBB/GXL series,
+> The clock gate bit for SARADC is HHI_GCLK_MPEG2 bit[22],
+> while clock gate bit for SANA is HHI_GCLK_MPEG0 bit[10].
 > 
-> I originally thought your comment was about re-using the memory from a
-> previous trace session, hence the confusion.  Please rework your
-> changelog to include this clarification as I am sure other people can
-> be mislead.
+> Test passed at gxl-s905x-p212 board.
+> 
+> The following published datasheets are wrong and should be updated
+> [1] GXBB v1.1.4, page 57
+> http://dn.odroid.com/S905/DataSheet/S905_Public_Datasheet_V1.1.4.pdf
+> [2] GXL v0.3_20170314, page
+> http://www.mediafire.com/file/5bpt054va5ut7v9/S905X_Datasheet_V0.3_20170314pub
+> licversion-Wesion.pdf
 
-Sure, will do.
+You may mention those links in the cover letter, since mediafire links are
+unlikely to last, better no mentioning them here. The version is enough.
 
-Thanks
-Suzuki
+> 
+> Fixes: 7ba64d82b358 ("gxbb: clk: Adjust MESON_GATE macro to be shared..")
+
+The commit where the issue is introduced is actually
+Fixes: 738f66d3211d ("clk: gxbb: add AmLogic GXBB clk controller driver") 
+
+Yes there has been a rework afterward, but the problem you are fixing originate
+from that commit.
+
+
+> Tested-by: Xingyu Chen <xingyu.chen@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  drivers/clk/meson/gxbb.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+> index b2d1e8ed7152..92168348ffa6 100644
+> --- a/drivers/clk/meson/gxbb.c
+> +++ b/drivers/clk/meson/gxbb.c
+> @@ -1139,7 +1139,7 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
+>  static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
+>  static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
+>  static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
+> -static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
+> +static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG0, 10);
+>  static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
+>  static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
+>  static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
+> @@ -1190,7 +1190,7 @@ static MESON_GATE(gxbb_usb0_ddr_bridge, HHI_GCLK_MPEG2,
+> 9);
+>  static MESON_GATE(gxbb_mmc_pclk, HHI_GCLK_MPEG2, 11);
+>  static MESON_GATE(gxbb_dvin, HHI_GCLK_MPEG2, 12);
+>  static MESON_GATE(gxbb_uart2, HHI_GCLK_MPEG2, 15);
+> -static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG2, 22);
+> +static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG2, 22);
+>  static MESON_GATE(gxbb_vpu_intr, HHI_GCLK_MPEG2, 25);
+>  static MESON_GATE(gxbb_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
+>  static MESON_GATE(gxbb_clk81_a53, HHI_GCLK_MPEG2, 29);
