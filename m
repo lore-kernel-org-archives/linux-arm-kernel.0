@@ -1,137 +1,60 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 7 Nov 2017 07:45:44 +0100 (CET)
-Subject: [PATCH 11/12] hwrng: bcm2835-rng: Enable BCM2835 RNG to work on
- BCM63xx platforms
-In-Reply-To: <2538f1bb-e0f8-c336-d82a-0cb2f19b0ead@gmail.com>
-References: <20171102010408.27736-1-f.fainelli@gmail.com>
- <20171102010408.27736-12-f.fainelli@gmail.com>
- <1831955836.132229.1509820078271@email.1und1.de>
- <2538f1bb-e0f8-c336-d82a-0cb2f19b0ead@gmail.com>
-Message-ID: <345702666.5362.1510037144469@email.1und1.de>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 7 Nov 2017 07:58:15 +0100
+Subject: [PATCH v4 2/3] spi: imx: Don't require platform data chipselect
+ array
+In-Reply-To: <20171106194618.9421-3-tpiepho@impinj.com>
+References: <20171106194618.9421-1-tpiepho@impinj.com>
+ <20171106194618.9421-3-tpiepho@impinj.com>
+Message-ID: <78f09b72-2c11-8008-79ea-af194decc2d2@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Florian Fainelli <f.fainelli@gmail.com> hat am 6. November 2017 um 21:16 geschrieben:
+On 06.11.2017 20:46, Trent Piepho wrote:
+> If the array is not present, assume all chip selects are native.  This
+> is the standard behavior for SPI masters configured via the device
+> tree and the behavior of this driver as well when it is configured via
+> device tree.
 > 
+> This reduces platform data vs DT differences and allows most of the
+> platform data based boards to remove their chip select arrays.
 > 
-> On 11/04/2017 11:27 AM, Stefan Wahren wrote:
-> > Hi Florian
-> > 
-> >> Florian Fainelli <f.fainelli@gmail.com> hat am 2. November 2017 um 02:04 geschrieben:
-> >>
-> >>
-> >> We have now incorporated all necessary functionality for the BCM63xx
-> >> platforms to successfully migrate over bcm2835-rng, so add the final
-> >> bits: Kconfig selection and proper platform_device device type matching
-> >> to keep the same platform device name for registration to work.
-> >>
-> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> >> ---
-> >>  drivers/char/hw_random/Kconfig       |  7 ++++---
-> >>  drivers/char/hw_random/bcm2835-rng.c | 11 ++++++++++-
-> >>  2 files changed, 14 insertions(+), 4 deletions(-)
-> >>
-> >> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
-> >> index 95a031e9eced..d0689cc8c7fc 100644
-> >> --- a/drivers/char/hw_random/Kconfig
-> >> +++ b/drivers/char/hw_random/Kconfig
-> >> @@ -87,12 +87,13 @@ config HW_RANDOM_BCM63XX
-> >>  	  If unusure, say Y.
-> >>  
-> >>  config HW_RANDOM_BCM2835
-> >> -	tristate "Broadcom BCM2835 Random Number Generator support"
-> >> -	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X
-> >> +	tristate "Broadcom BCM2835/BCM63xx Random Number Generator support"
-> >> +	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X || \
-> >> +		   ARCH_BCM_63XX || BCM63XX || BMIPS_GENERIC
-> >>  	default HW_RANDOM
-> >>  	---help---
-> >>  	  This driver provides kernel-side support for the Random Number
-> >> -	  Generator hardware found on the Broadcom BCM2835 SoCs.
-> >> +	  Generator hardware found on the Broadcom BCM2835 and BCM63xx SoCs.
-> >>  
-> >>  	  To compile this driver as a module, choose M here: the
-> >>  	  module will be called bcm2835-rng
-> >> diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
-> >> index 650e0033c273..d9ffe14f312b 100644
-> >> --- a/drivers/char/hw_random/bcm2835-rng.c
-> >> +++ b/drivers/char/hw_random/bcm2835-rng.c
-> >> @@ -131,6 +131,7 @@ static const struct of_device_id bcm2835_rng_of_match[] = {
-> >>  	{ .compatible = "brcm,bcm2835-rng"},
-> >>  	{ .compatible = "brcm,bcm-nsp-rng", .data = &nsp_rng_of_data },
-> >>  	{ .compatible = "brcm,bcm5301x-rng", .data = &nsp_rng_of_data },
-> >> +	{ .compatible = "brcm,bcm6368-rng"},
-> >>  	{},
-> >>  };
-> >>  
-> >> @@ -164,7 +165,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
-> >>  	if (IS_ERR(priv->clk))
-> >>  		priv->clk = NULL;
-> >>  
-> >> -	priv->rng.name = "bcm2835-rng";
-> >> +	priv->rng.name = pdev->id_entry->name;
-> > 
-> > this change breaks registration on bcm2835, because the name is NULL.
-> 
-> OH right, I will fix that in v2, I am assuming that if you did something
-> like this, things still work correctly for you on 2835:
-> 
-> if (!priv->id_entry->name)
-> 	priv->rng.name = "bcm2835-rng";
-> else
-> 	priv->rng.name = priv->id_entry->name;
-> 
-> ?
+> CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Sascha Hauer <kernel@pengutronix.de>
+> CC: Fabio Estevam <fabio.estevam@nxp.com>
+> CC: Mark Brown <broonie@kernel.org>
+> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
 
-I think that should work, but i'm not really happy about it. I prefer a more general solution. Looking at the other rng drivers shows the following pattern:
+Reviewed-by: Oleksij Rempel <o.rempel@pengutronix.de>
 
-priv->rng.name = pdev->name;
-
-I need to verify this on bcm2835.
-
+> ---
+>  drivers/spi/spi-imx.c | 16 +++++++++-------
+>  1 file changed, 9 insertions(+), 7 deletions(-)
 > 
-> > 
-> > Regards
-> > Stefan
-> > 
-> >>  	priv->rng.init = bcm2835_rng_init;
-> >>  	priv->rng.read = bcm2835_rng_read;
-> >>  	priv->rng.cleanup = bcm2835_rng_cleanup;
-> >> @@ -190,12 +191,20 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
-> >>  
-> >>  MODULE_DEVICE_TABLE(of, bcm2835_rng_of_match);
-> >>  
-> >> +static struct platform_device_id bcm2835_rng_devtype[] = {
-> >> +	{ .name = "bcm2835-rng" },
-> >> +	{ .name = "bcm63xx-rng" },
-> >> +	{ /* sentinel */ }
-> >> +};
-> >> +MODULE_DEVICE_TABLE(platform, bcm2835_rng_devtype);
-> >> +
-> >>  static struct platform_driver bcm2835_rng_driver = {
-> >>  	.driver = {
-> >>  		.name = "bcm2835-rng",
-> >>  		.of_match_table = bcm2835_rng_of_match,
-> >>  	},
-> >>  	.probe		= bcm2835_rng_probe,
-> >> +	.id_table	= bcm2835_rng_devtype,
-> >>  };
-> >>  module_platform_driver(bcm2835_rng_driver);
-> >>  
-> >> -- 
-> >> 2.9.3
-> >>
-> >>
-> >> _______________________________________________
-> >> linux-arm-kernel mailing list
-> >> linux-arm-kernel at lists.infradead.org
-> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index ad54f8258513..5caa6c9524fa 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -1526,13 +1526,15 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  	/* Get number of chip selects, either platform data or OF */
+>  	if (mxc_platform_info) {
+>  		master->num_chipselect = mxc_platform_info->num_chipselect;
+> -		master->cs_gpios = devm_kzalloc(&master->dev,
+> -			sizeof(int) * master->num_chipselect, GFP_KERNEL);
+> -		if (!master->cs_gpios)
+> -			return -ENOMEM;
+> -
+> -		for (i = 0; i < master->num_chipselect; i++)
+> -			master->cs_gpios[i] = mxc_platform_info->chipselect[i];
+> +		if (mxc_platform_info->chipselect) {
+> +			master->cs_gpios = devm_kzalloc(&master->dev,
+> +				sizeof(int) * master->num_chipselect, GFP_KERNEL);
+> +			if (!master->cs_gpios)
+> +				return -ENOMEM;
+> +
+> +			for (i = 0; i < master->num_chipselect; i++)
+> +				master->cs_gpios[i] = mxc_platform_info->chipselect[i];
+> +		}
+>  	} else {
+>  		u32 num_cs;
+>  
 > 
-> 
-> -- 
-> Florian
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
