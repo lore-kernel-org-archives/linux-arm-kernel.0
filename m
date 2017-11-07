@@ -1,63 +1,74 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 7 Nov 2017 11:45:01 +0100
-Subject: [PATCH 05/37] KVM: Record the executing ioctl number on the vcpu
- struct
-In-Reply-To: <20171012104141.26902-6-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-6-christoffer.dall@linaro.org>
-Message-ID: <20171107104501.74enxcrv762jui4i@kamzik.brq.redhat.com>
+From: tklauser@distanz.ch (Tobias Klauser)
+Date: Tue, 7 Nov 2017 11:36:13 +0100
+Subject: [patch v11 4/4] Documentation: jtag: Add ABI documentation
+In-Reply-To: <1509724449-26221-5-git-send-email-oleksandrs@mellanox.com>
+References: <1509724449-26221-1-git-send-email-oleksandrs@mellanox.com>
+ <1509724449-26221-5-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <20171107103613.GJ1370@distanz.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:09PM +0200, Christoffer Dall wrote:
-> Some architectures may decide to do different things during
-> kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
-> arm64 is about to do significant work in vcpu load/put when running a
-> vcpu, but not when doing things like KVM_SET_ONE_REG or
-> KVM_SET_MP_STATE.
+On 2017-11-03 at 16:54:09 +0100, Oleksandr Shamray <oleksandrs@mellanox.com> wrote:
+> Added document that describe the ABI for JTAG class drivrer
 > 
-> Therefore, store the ioctl number that we are executing on the VCPU
-> during the first vcpu_load() which succeeds in getting the vcpu->mutex
-> and set the ioctl number to 0 when exiting kvm_vcpu_ioctl() after
-> successfully loading the vcpu.
-> 
-> Cc: Paolo Bonzini <pbonzini@redhat.com>
-> Cc: Radim Kr?m?? <rkrcmar@redhat.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/x86/kvm/vmx.c       | 2 +-
->  arch/x86/kvm/x86.c       | 8 ++++----
->  include/linux/kvm_host.h | 3 ++-
->  virt/kvm/kvm_main.c      | 6 ++++--
->  4 files changed, 11 insertions(+), 8 deletions(-)
->
+> v10->v11
+> v9->v10
+> Fixes added by Oleksandr:
+> - change jtag-cdev to jtag-dev in documentation
+> - update Kernel Version and Date in jtag-dev documentation;
+> v8->v9
+> v7->v8
+> v6->v7
+> Comments pointed by Pavel Machek <pavel@ucw.cz>
+> - Added jtag-cdev documentation to Documentation/ABI/testing folder
+> ---
+>  Documentation/ABI/testing/jatg-dev |   27 +++++++++++++++++++++++++++
+>  1 files changed, 27 insertions(+), 0 deletions(-)
+>  create mode 100644 Documentation/ABI/testing/jatg-dev
+> 
+> diff --git a/Documentation/ABI/testing/jatg-dev b/Documentation/ABI/testing/jatg-dev
+> new file mode 100644
+> index 0000000..803dbab
+> --- /dev/null
+> +++ b/Documentation/ABI/testing/jatg-dev
 
-I wonder if enough other architectures would be able to benefit from this
-for most/all of their non-RUN VCPU ioctls. If so, then maybe we should
-consider doing something like
+Typo in the file name: s/jatg-dev/jtag-dev/
 
- int __vcpu_load(struct kvm_vcpu *vcpu)
- {
-    int cpu;
+> @@ -0,0 +1,27 @@
+> +What:		/dev/jtag[0-9]+
+> +Date:		October 2017
+> +KernelVersion:	4.15
+> +Contact:	oleksandrs at mellanox.com
+> +Description:
+> +		The misc device files /dev/jtag* are the interface
+> +		between JTAG master interfase and userspace.
 
-    cpu = get_cpu();
-    preempt_notifier_register(&vcpu->preempt_notifier);
-    kvm_arch_vcpu_load(vcpu, cpu);
-    put_cpu();
-    return 0;
- }
- int vcpu_load(struct kvm_vcpu *vcpu)
- {
-    if (mutex_lock_killable(&vcpu->mutex))
-        return -EINTR;
-    return __vcpu_load(vcpu);
- }
+Typo: s/interfase/interface/
 
-and the equivalent for vcpu_put.
-
-Then just take the lock in kvm_vcpu_ioctl and leave it to the
-kvm_arch_vcpu_ioctl_* functions to call __vcpu_load/__vcpu_put
-if necessary.
-
-Thanks,
-drew
+> +
+> +		The ioctl(2)-based ABI is defined and documented in
+> +		[include/uapi]<linux/jtag.h>.
+> +
+> +		The following file operations are supported:
+> +
+> +		open(2)
+> +		The argument flag currently support only one access
+> +		mode O_RDWR.
+> +
+> +		ioctl(2)
+> +		Initiate various actions.
+> +		See the inline documentation in [include/uapi]<linux/jtag.h>
+> +		for descriptions of all ioctls.
+> +
+> +		close(2)
+> +		Stops and free up the I/O contexts that was associated
+> +		with the file descriptor.
+> +
+> +Users:		TBD
+> \ No newline at end of file
+> -- 
+> 1.7.1
+> 
