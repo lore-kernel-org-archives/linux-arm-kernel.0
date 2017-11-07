@@ -1,470 +1,111 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:58 +0100
-Subject: [PULL 25/26] KVM: arm/arm64: Unify 32bit fault injection
+Date: Tue,  7 Nov 2017 11:47:51 +0100
+Subject: [PULL 18/26] KVM: arm/arm64: Rework kvm_timer_should_fire
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-26-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-19-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+From: Christoffer Dall <cdall@linaro.org>
 
-Both arm and arm64 implementations are capable of injecting
-faults, and yet have completely divergent implementations,
-leading to different bugs and reduced maintainability.
+kvm_timer_should_fire() can be called in two different situations from
+the kvm_vcpu_block().
 
-Let's elect the arm64 version as the canonical one
-and move it into aarch32.c, which is common to both
-architectures.
+The first case is before calling kvm_timer_schedule(), used for wait
+polling, and in this case the VCPU thread is running and the timer state
+is loaded onto the hardware so all we have to do is check if the virtual
+interrupt lines are asserted, becasue the timer interrupt handler
+functions will raise those lines as appropriate.
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+The second case is inside the wait loop of kvm_vcpu_block(), where we
+have already called kvm_timer_schedule() and therefore the hardware will
+be disabled and the software view of the timer state is up to date
+(timer->loaded is false), and so we can simply check if the timer should
+fire by looking at the software state.
+
+Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_emulate.h   |  36 ++++++++-
- arch/arm/kvm/emulate.c               | 139 -----------------------------------
- arch/arm64/include/asm/kvm_emulate.h |   3 +
- arch/arm64/kvm/inject_fault.c        |  74 +------------------
- virt/kvm/arm/aarch32.c               |  97 ++++++++++++++++++++++--
- 5 files changed, 131 insertions(+), 218 deletions(-)
+ include/kvm/arm_arch_timer.h |  3 ++-
+ virt/kvm/arm/arch_timer.c    | 22 +++++++++++++++++++++-
+ virt/kvm/arm/arm.c           |  3 +--
+ 3 files changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index 98089ffd91bb..dcae3970148d 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -25,7 +25,22 @@
- #include <asm/kvm_arm.h>
- #include <asm/cputype.h>
+diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+index 2352f3a4e88b..01ee473517e2 100644
+--- a/include/kvm/arm_arch_timer.h
++++ b/include/kvm/arm_arch_timer.h
+@@ -78,7 +78,8 @@ int kvm_arm_timer_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
+ int kvm_arm_timer_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
+ int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
  
-+/* arm64 compatibility macros */
-+#define COMPAT_PSR_MODE_ABT	ABT_MODE
-+#define COMPAT_PSR_MODE_UND	UND_MODE
-+#define COMPAT_PSR_T_BIT	PSR_T_BIT
-+#define COMPAT_PSR_I_BIT	PSR_I_BIT
-+#define COMPAT_PSR_A_BIT	PSR_A_BIT
-+#define COMPAT_PSR_E_BIT	PSR_E_BIT
-+#define COMPAT_PSR_IT_MASK	PSR_IT_MASK
+-bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
++bool kvm_timer_is_pending(struct kvm_vcpu *vcpu);
 +
- unsigned long *vcpu_reg(struct kvm_vcpu *vcpu, u8 reg_num);
-+
-+static inline unsigned long *vcpu_reg32(struct kvm_vcpu *vcpu, u8 reg_num)
-+{
-+	return vcpu_reg(vcpu, reg_num);
-+}
-+
- unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu);
+ void kvm_timer_schedule(struct kvm_vcpu *vcpu);
+ void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
  
- static inline unsigned long vcpu_get_reg(struct kvm_vcpu *vcpu,
-@@ -42,10 +57,25 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 53d9bd4a734f..2035cf251701 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -49,6 +49,7 @@ static const struct kvm_irq_level default_vtimer_irq = {
+ static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx);
+ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 				 struct arch_timer_context *timer_ctx);
++static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
  
- bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
- void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
--void kvm_inject_undefined(struct kvm_vcpu *vcpu);
-+void kvm_inject_undef32(struct kvm_vcpu *vcpu);
-+void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
-+void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_vabt(struct kvm_vcpu *vcpu);
--void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
--void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
-+
-+static inline void kvm_inject_undefined(struct kvm_vcpu *vcpu)
-+{
-+	kvm_inject_undef32(vcpu);
-+}
-+
-+static inline void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
-+{
-+	kvm_inject_dabt32(vcpu, addr);
-+}
-+
-+static inline void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
-+{
-+	kvm_inject_pabt32(vcpu, addr);
-+}
- 
- static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
+ u64 kvm_phys_timer_read(void)
  {
-diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
-index 0064b86a2c87..cdff963f133a 100644
---- a/arch/arm/kvm/emulate.c
-+++ b/arch/arm/kvm/emulate.c
-@@ -165,145 +165,6 @@ unsigned long *vcpu_spsr(struct kvm_vcpu *vcpu)
-  * Inject exceptions into the guest
-  */
- 
--static u32 exc_vector_base(struct kvm_vcpu *vcpu)
--{
--	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
--	u32 vbar = vcpu_cp15(vcpu, c12_VBAR);
--
--	if (sctlr & SCTLR_V)
--		return 0xffff0000;
--	else /* always have security exceptions */
--		return vbar;
--}
--
--/*
-- * Switch to an exception mode, updating both CPSR and SPSR. Follow
-- * the logic described in AArch32.EnterMode() from the ARMv8 ARM.
-- */
--static void kvm_update_psr(struct kvm_vcpu *vcpu, unsigned long mode)
--{
--	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
--
--	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | mode;
--
--	switch (mode) {
--	case FIQ_MODE:
--		*vcpu_cpsr(vcpu) |= PSR_F_BIT;
--		/* Fall through */
--	case ABT_MODE:
--	case IRQ_MODE:
--		*vcpu_cpsr(vcpu) |= PSR_A_BIT;
--		/* Fall through */
--	default:
--		*vcpu_cpsr(vcpu) |= PSR_I_BIT;
--	}
--
--	*vcpu_cpsr(vcpu) &= ~(PSR_IT_MASK | PSR_J_BIT | PSR_E_BIT | PSR_T_BIT);
--
--	if (sctlr & SCTLR_TE)
--		*vcpu_cpsr(vcpu) |= PSR_T_BIT;
--	if (sctlr & SCTLR_EE)
--		*vcpu_cpsr(vcpu) |= PSR_E_BIT;
--
--	/* Note: These now point to the mode banked copies */
--	*vcpu_spsr(vcpu) = cpsr;
--}
--
--/**
-- * kvm_inject_undefined - inject an undefined exception into the guest
-- * @vcpu: The VCPU to receive the undefined exception
-- *
-- * It is assumed that this code is called from the VCPU thread and that the
-- * VCPU therefore is not currently executing guest code.
-- *
-- * Modelled after TakeUndefInstrException() pseudocode.
-- */
--void kvm_inject_undefined(struct kvm_vcpu *vcpu)
--{
--	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	bool is_thumb = (cpsr & PSR_T_BIT);
--	u32 vect_offset = 4;
--	u32 return_offset = (is_thumb) ? 2 : 4;
--
--	kvm_update_psr(vcpu, UND_MODE);
--	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) - return_offset;
--
--	/* Branch to exception vector */
--	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
--}
--
--/*
-- * Modelled after TakeDataAbortException() and TakePrefetchAbortException
-- * pseudocode.
-- */
--static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
--{
--	unsigned long cpsr = *vcpu_cpsr(vcpu);
--	bool is_thumb = (cpsr & PSR_T_BIT);
--	u32 vect_offset;
--	u32 return_offset = (is_thumb) ? 4 : 0;
--	bool is_lpae;
--
--	kvm_update_psr(vcpu, ABT_MODE);
--	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
--
--	if (is_pabt)
--		vect_offset = 12;
--	else
--		vect_offset = 16;
--
--	/* Branch to exception vector */
--	*vcpu_pc(vcpu) = exc_vector_base(vcpu) + vect_offset;
--
--	if (is_pabt) {
--		/* Set IFAR and IFSR */
--		vcpu_cp15(vcpu, c6_IFAR) = addr;
--		is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
--		/* Always give debug fault for now - should give guest a clue */
--		if (is_lpae)
--			vcpu_cp15(vcpu, c5_IFSR) = 1 << 9 | 0x22;
--		else
--			vcpu_cp15(vcpu, c5_IFSR) = 2;
--	} else { /* !iabt */
--		/* Set DFAR and DFSR */
--		vcpu_cp15(vcpu, c6_DFAR) = addr;
--		is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
--		/* Always give debug fault for now - should give guest a clue */
--		if (is_lpae)
--			vcpu_cp15(vcpu, c5_DFSR) = 1 << 9 | 0x22;
--		else
--			vcpu_cp15(vcpu, c5_DFSR) = 2;
--	}
--
--}
--
--/**
-- * kvm_inject_dabt - inject a data abort into the guest
-- * @vcpu: The VCPU to receive the undefined exception
-- * @addr: The address to report in the DFAR
-- *
-- * It is assumed that this code is called from the VCPU thread and that the
-- * VCPU therefore is not currently executing guest code.
-- */
--void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
--{
--	inject_abt(vcpu, false, addr);
--}
--
--/**
-- * kvm_inject_pabt - inject a prefetch abort into the guest
-- * @vcpu: The VCPU to receive the undefined exception
-- * @addr: The address to report in the DFAR
-- *
-- * It is assumed that this code is called from the VCPU thread and that the
-- * VCPU therefore is not currently executing guest code.
-- */
--void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
--{
--	inject_abt(vcpu, true, addr);
--}
--
- /**
-  * kvm_inject_vabt - inject an async abort / SError into the guest
-  * @vcpu: The VCPU to receive the exception
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index e5df3fce0008..bf61da0ef82b 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -41,6 +41,9 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu);
- void kvm_inject_vabt(struct kvm_vcpu *vcpu);
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr);
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr);
-+void kvm_inject_undef32(struct kvm_vcpu *vcpu);
-+void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr);
-+void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr);
- 
- static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- {
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index da6a8cfa54a0..8ecbcb40e317 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -33,74 +33,6 @@
- #define LOWER_EL_AArch64_VECTOR		0x400
- #define LOWER_EL_AArch32_VECTOR		0x600
- 
--static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
--{
--	unsigned long cpsr;
--	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
--	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
--	u32 return_offset = (is_thumb) ? 4 : 0;
--	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
--
--	cpsr = mode | COMPAT_PSR_I_BIT;
--
--	if (sctlr & (1 << 30))
--		cpsr |= COMPAT_PSR_T_BIT;
--	if (sctlr & (1 << 25))
--		cpsr |= COMPAT_PSR_E_BIT;
--
--	*vcpu_cpsr(vcpu) = cpsr;
--
--	/* Note: These now point to the banked copies */
--	*vcpu_spsr(vcpu) = new_spsr_value;
--	*vcpu_reg32(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
--
--	/* Branch to exception vector */
--	if (sctlr & (1 << 13))
--		vect_offset += 0xffff0000;
--	else /* always have security exceptions */
--		vect_offset += vcpu_cp15(vcpu, c12_VBAR);
--
--	*vcpu_pc(vcpu) = vect_offset;
--}
--
--static void inject_undef32(struct kvm_vcpu *vcpu)
--{
--	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
--}
--
--/*
-- * Modelled after TakeDataAbortException() and TakePrefetchAbortException
-- * pseudocode.
-- */
--static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
--			 unsigned long addr)
--{
--	u32 vect_offset;
--	u32 *far, *fsr;
--	bool is_lpae;
--
--	if (is_pabt) {
--		vect_offset = 12;
--		far = &vcpu_cp15(vcpu, c6_IFAR);
--		fsr = &vcpu_cp15(vcpu, c5_IFSR);
--	} else { /* !iabt */
--		vect_offset = 16;
--		far = &vcpu_cp15(vcpu, c6_DFAR);
--		fsr = &vcpu_cp15(vcpu, c5_DFSR);
--	}
--
--	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
--
--	*far = addr;
--
--	/* Give the guest an IMPLEMENTATION DEFINED exception */
--	is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
--	if (is_lpae)
--		*fsr = 1 << 9 | 0x34;
--	else
--		*fsr = 0x14;
--}
--
- enum exception_type {
- 	except_type_sync	= 0,
- 	except_type_irq		= 0x80,
-@@ -197,7 +129,7 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
- void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
- 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
--		inject_abt32(vcpu, false, addr);
-+		kvm_inject_dabt32(vcpu, addr);
- 	else
- 		inject_abt64(vcpu, false, addr);
+@@ -226,7 +227,7 @@ static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
+ 	return HRTIMER_NORESTART;
  }
-@@ -213,7 +145,7 @@ void kvm_inject_dabt(struct kvm_vcpu *vcpu, unsigned long addr)
- void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
- {
- 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
--		inject_abt32(vcpu, true, addr);
-+		kvm_inject_pabt32(vcpu, addr);
- 	else
- 		inject_abt64(vcpu, true, addr);
- }
-@@ -227,7 +159,7 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
- void kvm_inject_undefined(struct kvm_vcpu *vcpu)
- {
- 	if (!(vcpu->arch.hcr_el2 & HCR_RW))
--		inject_undef32(vcpu);
-+		kvm_inject_undef32(vcpu);
- 	else
- 		inject_undef64(vcpu);
- }
-diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
-index 79c7c357804b..8bc479fa37e6 100644
---- a/virt/kvm/arm/aarch32.c
-+++ b/virt/kvm/arm/aarch32.c
-@@ -25,11 +25,6 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
  
--#ifndef CONFIG_ARM64
--#define COMPAT_PSR_T_BIT	PSR_T_BIT
--#define COMPAT_PSR_IT_MASK	PSR_IT_MASK
--#endif
--
+-bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
++static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+ {
+ 	u64 cval, now;
+ 
+@@ -239,6 +240,25 @@ bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
+ 	return cval <= now;
+ }
+ 
++bool kvm_timer_is_pending(struct kvm_vcpu *vcpu)
++{
++	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
++	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
++
++	if (vtimer->irq.level || ptimer->irq.level)
++		return true;
++
++	/*
++	 * When this is called from withing the wait loop of kvm_vcpu_block(),
++	 * the software view of the timer state is up to date (timer->loaded
++	 * is false), and so we can simply check if the timer should fire now.
++	 */
++	if (!vtimer->loaded && kvm_timer_should_fire(vtimer))
++		return true;
++
++	return kvm_timer_should_fire(ptimer);
++}
++
  /*
-  * stolen from arch/arm/kernel/opcodes.c
-  *
-@@ -150,3 +145,95 @@ void __hyp_text kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr)
- 		*vcpu_pc(vcpu) += 4;
- 	kvm_adjust_itstate(vcpu);
+  * Reflect the timer output level into the kvm_run structure
+  */
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 14c50d142c67..bc126fb99a3d 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -307,8 +307,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
+ 
+ int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
+ {
+-	return kvm_timer_should_fire(vcpu_vtimer(vcpu)) ||
+-	       kvm_timer_should_fire(vcpu_ptimer(vcpu));
++	return kvm_timer_is_pending(vcpu);
  }
-+
-+/*
-+ * Table taken from ARMv8 ARM DDI0487B-B, table G1-10.
-+ */
-+static const u8 return_offsets[8][2] = {
-+	[0] = { 0, 0 },		/* Reset, unused */
-+	[1] = { 4, 2 },		/* Undefined */
-+	[2] = { 0, 0 },		/* SVC, unused */
-+	[3] = { 4, 4 },		/* Prefetch abort */
-+	[4] = { 8, 8 },		/* Data abort */
-+	[5] = { 0, 0 },		/* HVC, unused */
-+	[6] = { 4, 4 },		/* IRQ, unused */
-+	[7] = { 4, 4 },		/* FIQ, unused */
-+};
-+
-+static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
-+{
-+	unsigned long cpsr;
-+	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
-+	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
-+	u32 return_offset = return_offsets[vect_offset >> 2][is_thumb];
-+	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
-+
-+	cpsr = mode | COMPAT_PSR_I_BIT;
-+
-+	if (sctlr & (1 << 30))
-+		cpsr |= COMPAT_PSR_T_BIT;
-+	if (sctlr & (1 << 25))
-+		cpsr |= COMPAT_PSR_E_BIT;
-+
-+	*vcpu_cpsr(vcpu) = cpsr;
-+
-+	/* Note: These now point to the banked copies */
-+	*vcpu_spsr(vcpu) = new_spsr_value;
-+	*vcpu_reg32(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
-+
-+	/* Branch to exception vector */
-+	if (sctlr & (1 << 13))
-+		vect_offset += 0xffff0000;
-+	else /* always have security exceptions */
-+		vect_offset += vcpu_cp15(vcpu, c12_VBAR);
-+
-+	*vcpu_pc(vcpu) = vect_offset;
-+}
-+
-+void kvm_inject_undef32(struct kvm_vcpu *vcpu)
-+{
-+	prepare_fault32(vcpu, COMPAT_PSR_MODE_UND, 4);
-+}
-+
-+/*
-+ * Modelled after TakeDataAbortException() and TakePrefetchAbortException
-+ * pseudocode.
-+ */
-+static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
-+			 unsigned long addr)
-+{
-+	u32 vect_offset;
-+	u32 *far, *fsr;
-+	bool is_lpae;
-+
-+	if (is_pabt) {
-+		vect_offset = 12;
-+		far = &vcpu_cp15(vcpu, c6_IFAR);
-+		fsr = &vcpu_cp15(vcpu, c5_IFSR);
-+	} else { /* !iabt */
-+		vect_offset = 16;
-+		far = &vcpu_cp15(vcpu, c6_DFAR);
-+		fsr = &vcpu_cp15(vcpu, c5_DFSR);
-+	}
-+
-+	prepare_fault32(vcpu, COMPAT_PSR_MODE_ABT | COMPAT_PSR_A_BIT, vect_offset);
-+
-+	*far = addr;
-+
-+	/* Give the guest an IMPLEMENTATION DEFINED exception */
-+	is_lpae = (vcpu_cp15(vcpu, c2_TTBCR) >> 31);
-+	if (is_lpae)
-+		*fsr = 1 << 9 | 0x34;
-+	else
-+		*fsr = 0x14;
-+}
-+
-+void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr)
-+{
-+	inject_abt32(vcpu, false, addr);
-+}
-+
-+void kvm_inject_pabt32(struct kvm_vcpu *vcpu, unsigned long addr)
-+{
-+	inject_abt32(vcpu, true, addr);
-+}
+ 
+ void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
 -- 
 2.14.2
