@@ -1,77 +1,36 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 7 Nov 2017 10:50:00 +0000
-Subject: [PATCH v10 2/9] PCI: remove unused __weak attribute in
- pci_register_io_range()
-In-Reply-To: <20171107002501.GD9538@bhelgaas-glaptop.roam.corp.google.com>
-References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
- <1509120687-7352-3-git-send-email-gabriele.paoloni@huawei.com>
- <20171107002501.GD9538@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40CC332E@FRAEML521-MBX.china.huawei.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 7 Nov 2017 11:30:00 +0000
+Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
+ untried/unknown (next-20171106)
+In-Reply-To: <20171107021724.GB23638@arm.com>
+References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
+ <20171106184753.xyj7xmlrzbfgovqz@sirena.co.uk>
+ <20171107021724.GB23638@arm.com>
+Message-ID: <20171107113000.y6bwknno56pdc62j@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 07, 2017 at 02:17:25AM +0000, Will Deacon wrote:
+> On Mon, Nov 06, 2017 at 06:47:53PM +0000, Mark Brown wrote:
+> > On Mon, Nov 06, 2017 at 04:30:41AM -0800, kernelci.org bot wrote:
 
+> > There's several arm64 boots failing in -next at the minute, including
+> > qemu - the last success seems to have been 20171017 which isn't terribly
+> > helpful, obviously -next was spotty in October:
 
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: 07 November 2017 00:25
-> To: Gabriele Paoloni
-> Cc: catalin.marinas at arm.com; will.deacon at arm.com; robh+dt at kernel.org;
-> frowand.list at gmail.com; bhelgaas at google.com; rafael at kernel.org;
-> arnd at arndb.de; linux-arm-kernel at lists.infradead.org;
-> lorenzo.pieralisi at arm.com; mark.rutland at arm.com; brian.starkey at arm.com;
-> olof at lixom.net; benh at kernel.crashing.org; linux-kernel at vger.kernel.org;
-> linux-acpi at vger.kernel.org; Linuxarm; linux-pci at vger.kernel.org;
-> minyard at acm.org; John Garry; xuwei (O)
-> Subject: Re: [PATCH v10 2/9] PCI: remove unused __weak attribute in
-> pci_register_io_range()
-> 
-> On Fri, Oct 27, 2017 at 05:11:20PM +0100, Gabriele Paoloni wrote:
-> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
-> >
-> > Currently pci_register_io_range() has only one definition;
-> > therefore there is no use of the __weak attribute.
-> >
-> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-> > Acked-by: Bjorn Helgaas <helgaas@kernel.org>
-> 
-> Also, I normally use this (Google address instead of kernel.org):
-> 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> (Also affects your other PCI patches.)
+> There is a known boot failure due to 83e3c48729d9:
 
-Ok no probs, we'll change all the Acked-by in the next patchset
+> http://lkml.kernel.org/r/20171102141210.gu4cwpoq2e6o7liu at black.fi.intel.com
 
-Many Thanks
-Gab 
+> There's a patch there which appears to fix the problem, but it's not yet
+> in next (and it needs to go via -mm).
 
-> 
-> > ---
-> >  drivers/pci/pci.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> > index af0cc34..eee967c 100644
-> > --- a/drivers/pci/pci.c
-> > +++ b/drivers/pci/pci.c
-> > @@ -3270,7 +3270,7 @@ static DEFINE_SPINLOCK(io_range_lock);
-> >   * Record the PCI IO range (expressed as CPU physical address +
-> size).
-> >   * Return a negative value if an error has occured, zero otherwise
-> >   */
-> > -int __weak pci_register_io_range(phys_addr_t addr, resource_size_t
-> size)
-> > +int pci_register_io_range(phys_addr_t addr, resource_size_t size)
-> >  {
-> >  	int err = 0;
-> >
-> > --
-> > 2.7.4
-> >
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-acpi"
-> in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Ugh, right.  It'd be good to get this in soon as it's making the boot
+reports very hard to use and obscuring any other arm64 boot failures.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/dec1f6eb/attachment.sig>
