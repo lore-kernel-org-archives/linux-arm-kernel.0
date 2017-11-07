@@ -1,38 +1,45 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 7 Nov 2017 12:19:13 +0000
-Subject: Performance issues writing to PCIe in a Zynq
-In-Reply-To: <1510045454475.74232@axon.tv>
-References: <1509636637116.27702@axon.tv>
- <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>
- <20171103135457.GA8457@bhelgaas-glaptop.roam.corp.google.com>
- <1509958288489.45871@axon.tv>,
- <20171106173549.GB31930@bhelgaas-glaptop.roam.corp.google.com>
- <1510045454475.74232@axon.tv>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD00B3AB2@AcuExch.aculab.com>
+From: giulio.benetti@micronovasrl.com (Giulio Benetti)
+Date: Tue,  7 Nov 2017 13:49:59 +0100
+Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
+Message-ID: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ruben Guerra Marin
-> Sent: 07 November 2017 09:04
-> > Which PCI host bridge driver are you using?
-> Indeed I am using drivers/pci/host/pcie-xilinx.c
-> 
-> > Can you do any profiling to figure out where the time is going?
-> So I did some profiling on the mcap application, and traced the bottleneck in a write call to
-> pciutils. I added some debug to pciutils and could trace it that the bottleneck is in a function
-> called pwrite, which pretty much does this:
-> 
-> syscall(SYS_pwrite, fd, buf, size, where);
-> 
-> until now this is the last part I could trace it to.
+On sun7i-a20-* there's no way to enable PA00--PA27 as RGB888 LCD0 pins.
 
-Are you doing one pwrite() for each 32-bit word?
-If you are trying to write a large fpga image you'll need to use
-a single system call.
-I'd suspect that needs a special driver....
+Add lcd_rgb888_pins in sun7i-a20.dtsi.
 
-I'd also check that the driver size isn't doing single word copy_from_user().
-That can be completely horrid in recent kernels because of userspace copy
-hardening.
+It can be used on sun7i-a20-olinuxino-lime.dts.
+This patch gives possibility to set parallel lcd pins for RGB888.
+To be used with tcon0 in your <target>.dts
 
-	David
+Best regards
+Giulio Benetti
+Micronova srl
+
+Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
+---
+ arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
+index 228c368..b85a917 100644
+--- a/arch/arm/boot/dts/sun7i-a20.dtsi
++++ b/arch/arm/boot/dts/sun7i-a20.dtsi
+@@ -921,6 +921,14 @@
+ 				pins = "PI20", "PI21";
+ 				function = "uart7";
+ 			};
++
++			lcd_rgb888_pins: lcd-rgb888 {
++				pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", 
++					"PD8", "PD9", "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
++					"PD16", "PD17", "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
++					"PD24", "PD25", "PD26", "PD27";
++				function = "lcd0";
++			};
+ 		};
+ 
+ 		timer at 1c20c00 {
+-- 
+2.7.4
