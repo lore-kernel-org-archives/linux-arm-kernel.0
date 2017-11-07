@@ -1,52 +1,44 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Nov 2017 16:11:52 +0100
-Subject: [GIT PULL v2] Mediatek: 32-bit DTS updates for v4.15
-In-Reply-To: <6fcfb359-6486-3051-1d6a-1eb18e6f0bc4@gmail.com>
-References: <8a52a27e-f930-e873-6803-233dfa48b087@gmail.com>
- <6fcfb359-6486-3051-1d6a-1eb18e6f0bc4@gmail.com>
-Message-ID: <CAK8P3a1jP+pWsm06+jNJwQsVDRBx+9zNuxD4Rb8obcFCTPxqhQ@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 07 Nov 2017 16:14:47 +0100
+Subject: [GIT PULL] ARM: mvebu: dt64 for v4.15 (#2)
+Message-ID: <87a7zy6ryw.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 7, 2017 at 3:14 PM, Matthias Brugger <matthias.bgg@gmail.com> wrote:
-> On 11/02/2017 07:52 PM, Matthias Brugger wrote:
->> are available in the git repository at:
->>
->>   https://github.com/mbgg/linux-mediatek.git tags/v4.14-next-dts32-2
->>
->> for you to fetch changes up to eb54a522f164f89587381d665307d53acf75f114:
->>
->>   arm: dts: mt7623: remove unused compatible string for pio node (2017-11-02
->> 19:43:20 +0100)
->>
->> ----------------------------------------------------------------
->> - mt7623 update nodes to binding description
->> - mt2701 add display pwn nodes
->> - mt2701 update audio node description
->>
->> ----------------------------------------------------------------
->> Ryder Lee (4):
->>       arm: dts: mediatek: update audio node for mt2701 and mt7623
->>       arm: dts: mt7623: update crypto node
->>       arm: dts: mt7623: update usb related nodes
->>       arm: dts: mt7623: remove unused compatible string for pio node
->>
->> Weiqing Kong (2):
->>       arm: dts: mt2701: add pwm backlight device node
->>       arm: dts: mt2701: enable display pwm backlight
->>
->>  arch/arm/boot/dts/mt2701-evb.dts | 23 +++++++++++++++++++++++
->>  arch/arm/boot/dts/mt2701.dtsi    | 13 ++++++++++++-
->>  arch/arm/boot/dts/mt7623.dtsi    | 30 +++++++++++++++++-------------
->>  3 files changed, 52 insertions(+), 14 deletions(-)
->>
->
-> I don't see this commits in your repository. Did you forgot to merge them?
->
+Hi,
 
-It was still on my todo list, but I should not have waited that long. Thanks
-for the reminder.
+Here is the second pull request for dt64 for mvebu for v4.15.
 
-Pulled into next/dt now.
+These last pull request appears only now because the uart driver was
+just merged a couple of days ago.
 
-      Arnd
+Gregory
+
+The following changes since commit c4e3bf290c3089502ee33e25795075b86fe9a449:
+
+  arm64: dts: marvell: 7040-db: Add the carrier detect pin for SD card on CP (2017-10-12 15:53:47 +0200)
+
+are available in the git repository at:
+
+  git://git.infradead.org/linux-mvebu.git tags/mvebu-dt64-4.15-2
+
+for you to fetch changes up to c3c08c5d32d819a73f75a76b315e229a2081680a:
+
+  arm64: dts: marvell: armada-3720-espressobin: fill UART nodes (2017-10-30 15:56:34 +0100)
+
+----------------------------------------------------------------
+mvebu dt64 for 4.15 (part 2)
+
+Add the extended UART support on Armada 3700
+
+----------------------------------------------------------------
+Miquel Raynal (4):
+      arm64: dts: marvell: armada-37xx: add UART clock
+      arm64: dts: marvell: armada-37xx: add second UART port
+      arm64: dts: marvell: armada-3720-db: enable second UART port
+      arm64: dts: marvell: armada-3720-espressobin: fill UART nodes
+
+ arch/arm64/boot/dts/marvell/armada-3720-db.dts        |  9 ++++++++-
+ .../boot/dts/marvell/armada-3720-espressobin.dts      | 12 ++++++++++++
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi          | 19 ++++++++++++++++++-
+ 3 files changed, 38 insertions(+), 2 deletions(-)
