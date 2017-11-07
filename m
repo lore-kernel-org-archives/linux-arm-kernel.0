@@ -1,72 +1,261 @@
-From: ludovic.barre@st.com (Ludovic BARRE)
-Date: Tue, 7 Nov 2017 14:06:44 +0100
-Subject: [PATCH v3 0/9] irqchip: stm32: add stm32h7 support
-In-Reply-To: <04d9d728-7f9f-6bc0-bb57-c7bb49817872@arm.com>
-References: <1509987819-29599-1-git-send-email-ludovic.Barre@st.com>
- <04d9d728-7f9f-6bc0-bb57-c7bb49817872@arm.com>
-Message-ID: <2f41fc16-6ed2-2d44-52e9-5461c86baf75@st.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Nov 2017 14:08:23 +0100
+Subject: [PATCH v5 09/26] KVM: arm/arm64: GICv4: Add init/teardown of the
+ per-VM vPE irq domain
+In-Reply-To: <20171027142855.21584-10-marc.zyngier@arm.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-10-marc.zyngier@arm.com>
+Message-ID: <4a41a67d-a04b-b3ca-a5e8-c582e27c17d1@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi Marc
+Hi Marc,
 
-normally, Alex take the last 3 ("ARM: dts")
-commits in his branch, and will send in his pull request
-Alex you confirm?
+On 27/10/2017 16:28, Marc Zyngier wrote:
+> In order to control the GICv4 view of virtual CPUs, we rely
+> on an irqdomain allocated for that purpose. Let's add a couple
+> of helpers to that effect.
+> 
+> At the same time, the vgic data structures gain new fields to
+> track all this... erm... wonderful stuff.
+> 
+> The way we hook into the vgic init is slightly convoluted. We
+> need the vgic to be initialized (in order to guarantee that
+> the number of vcpus is now fixed), and we must have a vITS
+> (otherwise this is all very pointless). So we end-up calling
+> the init from both vgic_init and vgic_its_create.
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  arch/arm/kvm/Makefile         |  1 +
+>  arch/arm64/kvm/Makefile       |  1 +
+>  include/kvm/arm_vgic.h        | 19 ++++++++++
+>  virt/kvm/arm/vgic/vgic-init.c |  9 +++++
+>  virt/kvm/arm/vgic/vgic-its.c  |  8 +++++
+>  virt/kvm/arm/vgic/vgic-v4.c   | 83 +++++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/vgic/vgic.h      |  2 ++
+>  7 files changed, 123 insertions(+)
+>  create mode 100644 virt/kvm/arm/vgic/vgic-v4.c
+> 
+> diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
+> index d9beee652d36..0a1dd2cdb928 100644
+> --- a/arch/arm/kvm/Makefile
+> +++ b/arch/arm/kvm/Makefile
+> @@ -31,6 +31,7 @@ obj-y += $(KVM)/arm/vgic/vgic-init.o
+>  obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
+>  obj-y += $(KVM)/arm/vgic/vgic-v2.o
+>  obj-y += $(KVM)/arm/vgic/vgic-v3.o
+> +obj-y += $(KVM)/arm/vgic/vgic-v4.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
+> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+> index 5d9810086c25..c30fd388ef80 100644
+> --- a/arch/arm64/kvm/Makefile
+> +++ b/arch/arm64/kvm/Makefile
+> @@ -26,6 +26,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
+> +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v4.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
+>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
+> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> index ba9fb450aa1b..7eeb6c2a2f9c 100644
+> --- a/include/kvm/arm_vgic.h
+> +++ b/include/kvm/arm_vgic.h
+> @@ -26,6 +26,8 @@
+>  #include <linux/list.h>
+>  #include <linux/jump_label.h>
+>  
+> +#include <linux/irqchip/arm-gic-v4.h>
+> +
+>  #define VGIC_V3_MAX_CPUS	255
+>  #define VGIC_V2_MAX_CPUS	8
+>  #define VGIC_NR_IRQS_LEGACY     256
+> @@ -236,6 +238,15 @@ struct vgic_dist {
+>  
+>  	/* used by vgic-debug */
+>  	struct vgic_state_iter *iter;
+> +
+> +	/*
+> +	 * GICv4 ITS per-VM data, containing the IRQ domain, the VPE
+> +	 * array, the property table pointer as well as allocation
+> +	 * data. This essentially ties the Linux IRQ core and ITS
+> +	 * together, and avoids leaking KVM's data structures anywhere
+> +	 * else.
+> +	 */
+> +	struct its_vm		its_vm;
+>  };
+>  
+>  struct vgic_v2_cpu_if {
+> @@ -254,6 +265,14 @@ struct vgic_v3_cpu_if {
+>  	u32		vgic_ap0r[4];
+>  	u32		vgic_ap1r[4];
+>  	u64		vgic_lr[VGIC_V3_MAX_LRS];
+> +
+> +	/*
+> +	 * GICv4 ITS per-VPE data, containing the doorbell IRQ, the
+> +	 * pending table pointer, the its_vm pointer and a few other
+> +	 * HW specific things. As for the its_vm structure, this is
+> +	 * linking the Linux IRQ subsystem and the ITS together.
+> +	 */
+> +	struct its_vpe	its_vpe;
+>  };
+>  
+>  struct vgic_cpu {
+> diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> index 5801261f3add..40be908da238 100644
+> --- a/virt/kvm/arm/vgic/vgic-init.c
+> +++ b/virt/kvm/arm/vgic/vgic-init.c
+> @@ -285,6 +285,12 @@ int vgic_init(struct kvm *kvm)
+>  	if (ret)
+>  		goto out;
+>  
+> +	if (vgic_supports_direct_msis(kvm)) {
+> +		ret = vgic_v4_init(kvm);
+> +		if (ret)
+> +			goto out;
+> +	}
+> +
+>  	kvm_for_each_vcpu(i, vcpu, kvm)
+>  		kvm_vgic_vcpu_enable(vcpu);
+>  
+> @@ -320,6 +326,9 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
+>  
+>  	kfree(dist->spis);
+>  	dist->nr_spis = 0;
+> +
+> +	if (vgic_supports_direct_msis(kvm))
+> +		vgic_v4_teardown(kvm);
+>  }
+>  
+>  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 8ee03f1e89fc..89768d2b6a91 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -1603,6 +1603,14 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
+>  	if (!its)
+>  		return -ENOMEM;
+>  
+> +	if (vgic_initialized(dev->kvm)) {
+Don't we need to test vgic_supports_direct_msis() on this path too?
 
-BR
-Ludo
+Thanks
 
-On 11/07/2017 12:23 PM, Marc Zyngier wrote:
-> Hi Ludovic,
-> 
-> On 06/11/17 17:03, Ludovic Barre wrote:
->> From: Ludovic Barre <ludovic.barre@st.com>
->>
->> This series adds:
->> -Management of multi-bank of external interrupts
->> stm32h7 has up to 96 inputs (3 banks of  32 inputs).
->> -Fix initial value after cold/hot boot (wakeup issue).
->>
->> Changes v3:
->> -remove chip.name and handler, already done by
->> irq_alloc_domain_generic_chips
->> -add Rob ack in dt-bindings commit
->>
->> Changes v2:
->> -Remove irq_mask and adds const on struct stm32_exti_bank
->> -Add wrapper functions pending and ack
->> -Replace BITS_PER_LONG by IRQS_PER_BANK
->> -Fill commit message on
->> "ARM: dts: stm32: add support of exti on stm32h743"
->> -Add system config bank for stm32h7
->>
->> Ludovic Barre (9):
->>    irqchip: stm32: select GENERIC_IRQ_CHIP
->>    irqchip: stm32: add multi-bank management
->>    dt-bindings: interrupt-controllers: add compatible string for stm32h7
->>    irqchip: stm32: add stm32h7 support
->>    irqchip: stm32: fix initial values
->>    irqchip: stm32: move the wakeup on interrupt mask
->>    ARM: dts: stm32: add exti support for stm32h743
->>    ARM: dts: stm32: add system config bank node for stm32h743
->>    ARM: dts: stm32: add support of exti on stm32h743 pinctrl
->>
->>   .../interrupt-controller/st,stm32-exti.txt         |   4 +-
->>   arch/arm/boot/dts/stm32h743-pinctrl.dtsi           |  24 +++
->>   arch/arm/boot/dts/stm32h743.dtsi                   |  13 ++
->>   drivers/irqchip/Kconfig                            |   1 +
->>   drivers/irqchip/irq-stm32-exti.c                   | 206 ++++++++++++++++-----
->>   5 files changed, 198 insertions(+), 50 deletions(-)
->>
-> 
-> I'm happy to take the first 6 patches through the irqchip tree. How
-> about the last 3? I'd rather see them routed via armsoc if there is any
-> risk of merge conflicts.
-> 
-> How do you want to proceed?
-> 
-> Thanks,
-> 
-> 	M.
+Eric
+> +		int ret = vgic_v4_init(dev->kvm);
+> +		if (ret) {
+> +			kfree(its);
+> +			return ret;
+> +		}
+> +	}
+> +	
+>  	mutex_init(&its->its_lock);
+>  	mutex_init(&its->cmd_lock);
+>  
+> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> new file mode 100644
+> index 000000000000..c794f0cef09e
+> --- /dev/null
+> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> @@ -0,0 +1,83 @@
+> +/*
+> + * Copyright (C) 2017 ARM Ltd.
+> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +
+> +#include <linux/interrupt.h>
+> +#include <linux/irqdomain.h>
+> +#include <linux/kvm_host.h>
+> +
+> +#include "vgic.h"
+> +
+> +/**
+> + * vgic_v4_init - Initialize the GICv4 data structures
+> + * @kvm:	Pointer to the VM being initialized
+> + *
+> + * We may be called each time a vITS is created, or when the
+> + * vgic is initialized. This relies on kvm->lock to be
+> + * held. In both cases, the number of vcpus should now be
+> + * fixed.
+> + */
+> +int vgic_v4_init(struct kvm *kvm)
+> +{
+> +	struct vgic_dist *dist = &kvm->arch.vgic;
+> +	struct kvm_vcpu *vcpu;
+> +	int i, nr_vcpus, ret;
+> +
+> +	if (dist->its_vm.vpes)
+> +		return 0;
+> +
+> +	nr_vcpus = atomic_read(&kvm->online_vcpus);
+> +
+> +	dist->its_vm.vpes = kzalloc(sizeof(*dist->its_vm.vpes) * nr_vcpus,
+> +				    GFP_KERNEL);
+> +	if (!dist->its_vm.vpes)
+> +		return -ENOMEM;
+> +
+> +	dist->its_vm.nr_vpes = nr_vcpus;
+> +
+> +	kvm_for_each_vcpu(i, vcpu, kvm)
+> +		dist->its_vm.vpes[i] = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
+> +
+> +	ret = its_alloc_vcpu_irqs(&dist->its_vm);
+> +	if (ret < 0) {
+> +		kvm_err("VPE IRQ allocation failure\n");
+> +		kfree(dist->its_vm.vpes);
+> +		dist->its_vm.nr_vpes = 0;
+> +		dist->its_vm.vpes = NULL;
+> +		return ret;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +/**
+> + * vgic_v4_teardown - Free the GICv4 data structures
+> + * @kvm:	Pointer to the VM being destroyed
+> + *
+> + * Relies on kvm->lock to be held.
+> + */
+> +void vgic_v4_teardown(struct kvm *kvm)
+> +{
+> +	struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
+> +
+> +	if (!its_vm->vpes)
+> +		return;
+> +
+> +	its_free_vcpu_irqs(its_vm);
+> +	kfree(its_vm->vpes);
+> +	its_vm->nr_vpes = 0;
+> +	its_vm->vpes = NULL;
+> +}
+> diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
+> index e67ccb6a6250..c4105f613f57 100644
+> --- a/virt/kvm/arm/vgic/vgic.h
+> +++ b/virt/kvm/arm/vgic/vgic.h
+> @@ -241,5 +241,7 @@ int vgic_its_resolve_lpi(struct kvm *kvm, struct vgic_its *its,
+>  struct vgic_its *vgic_msi_to_its(struct kvm *kvm, struct kvm_msi *msi);
+>  
+>  bool vgic_supports_direct_msis(struct kvm *kvm);
+> +int vgic_v4_init(struct kvm *kvm);
+> +void vgic_v4_teardown(struct kvm *kvm);
+>  
+>  #endif
 > 
