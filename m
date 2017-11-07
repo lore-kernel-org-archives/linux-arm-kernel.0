@@ -1,73 +1,52 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue,  7 Nov 2017 15:10:44 +0000
-Subject: [PATCH 3/8] ARM: dts: r8a7745: Add CAN[01] SoC support
+Date: Tue,  7 Nov 2017 15:10:46 +0000
+Subject: [PATCH 5/8] ARM: dts: iwg22d-sodimm-dbhd-ca: Add can1 support to HDMI
+ DB
 In-Reply-To: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1510067449-17017-4-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1510067449-17017-6-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the definitions for can0 and can1 to the SoC .dtsi.
+CAN1 interface is exposed via connector J1 found on the HDMI daughter
+board. This patch enables can1 DT node from within the daughter board
+specific device tree.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 2b32638..529e8c6 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -1065,6 +1065,34 @@
- 				#phy-cells = <1>;
- 			};
- 		};
-+
-+		can0: can at e6e80000 {
-+			compatible = "renesas,can-r8a7745",
-+				     "renesas,rcar-gen2-can";
-+			reg = <0 0xe6e80000 0 0x1000>;
-+			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 916>,
-+				 <&cpg CPG_CORE R8A7745_CLK_RCAN>,
-+				 <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 916>;
-+			status = "disabled";
-+		};
-+
-+		can1: can at e6e88000 {
-+			compatible = "renesas,can-r8a7745",
-+				     "renesas,rcar-gen2-can";
-+			reg = <0 0xe6e88000 0 0x1000>;
-+			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 915>,
-+				 <&cpg CPG_CORE R8A7745_CLK_RCAN>,
-+				 <&can_clk>;
-+			clock-names = "clkp1", "clkp2", "can_clk";
-+			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
-+			resets = <&cpg 915>;
-+			status = "disabled";
-+		};
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
+index a8a4ec8..d34de82 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
+@@ -54,6 +54,13 @@
  	};
+ };
  
- 	/* External root clock */
-@@ -1082,6 +1110,14 @@
- 		clock-frequency = <48000000>;
- 	};
++&can1 {
++	pinctrl-0 = <&can1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
+ &hscif2 {
+ 	pinctrl-0 = <&hscif2_pins>;
+ 	pinctrl-names = "default";
+@@ -105,6 +112,11 @@
+ };
  
-+	/* External CAN clock */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		/* This value must be overridden by the board. */
-+		clock-frequency = <0>;
+ &pfc {
++	can1_pins: can1 {
++		groups = "can1_data_b";
++		function = "can1";
 +	};
 +
- 	/* External SCIF clock */
- 	scif_clk: scif {
- 		compatible = "fixed-clock";
+ 	du0_pins: du0 {
+ 		groups = "du0_rgb888", "du0_sync", "du0_disp", "du0_clk0_out";
+ 		function = "du0";
 -- 
 2.7.4
