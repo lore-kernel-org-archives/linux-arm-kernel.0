@@ -1,51 +1,36 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue,  7 Nov 2017 15:10:49 +0000
-Subject: [PATCH 8/8] ARM: dts: iwg20d-q7-dbcm-ca: Add can1 support to camera DB
-In-Reply-To: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1510067449-17017-9-git-send-email-fabrizio.castro@bp.renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 7 Nov 2017 16:18:30 +0100
+Subject: [GIT PULL] Allwinner DT changes for 4.15, step 2
+In-Reply-To: <20171106092623.tqvmvqhpopyu2mri@flea>
+References: <20171106092623.tqvmvqhpopyu2mri@flea>
+Message-ID: <CAK8P3a3dL2_oWiBi4p4CnAOa8F7ijcrKje1fRq84j7pWJpqECA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CAN1 interface is exposed via connector J3 found on the camera daughter
-board. This patch enables can1 DT node from within the daughter board
-specific dtsi.
+On Mon, Nov 6, 2017 at 10:26 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+>
+> Here are a few commits that would be great to get in 4.15, given how
+> long they've been hanging around.
+>
+> The first and most important one is the reintroduction of the EMAC DT
+> changes after they've been reverted at the last minute in 4.13.
+>
+> There's a arm64 patch that crept in because the H5 and H3 share a
+> common DTSI that is located in arch/arm, and merging that patch
+> through the arm64 PR, especially given the pull requests that have
+> already been sent, would just have generated too many conflicts.
+That's all good, in particular as I've been pulling both arm32 and
+arm64 changes into a shared next/dt branch. Please keep sending
+them separately when you can, we'll just merge them as needed.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
----
- arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+One small request: the text you wrote above makes a better changelog
+text than what you had in the signed tag, so I ended up using your
+longer description in the merge commit. Try to describe the changes
+like that in the future too, giving a little more background in what you
+see as important, instead of just listing lots of small items that
+we can see from the list of commits.
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-index 4db18f2..476273b 100644
---- a/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-+++ b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-@@ -32,6 +32,13 @@
- 	};
- };
- 
-+&can1 {
-+	pinctrl-0 = <&can1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
- &du {
- 	pinctrl-0 = <&du_pins>;
- 	pinctrl-names = "default";
-@@ -94,6 +101,11 @@
- };
- 
- &pfc {
-+	can1_pins: can1 {
-+		groups = "can1_data_d";
-+		function = "can1";
-+	};
-+
- 	du_pins: du {
- 		groups = "du_rgb888", "du_sync", "du_oddf", "du_clk_out_0";
- 		function = "du";
--- 
-2.7.4
+Thanks,
+
+      Arnd
