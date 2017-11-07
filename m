@@ -1,120 +1,167 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Tue, 7 Nov 2017 16:25:05 +0100
-Subject: [PATCH] ARM: sa1100: simpad: Correct I2C GPIO offsets
-In-Reply-To: <20171107151703.3847-1-linus.walleij@linaro.org>
-References: <20171107151703.3847-1-linus.walleij@linaro.org>
-Message-ID: <eee254f2-6c34-0cc3-85e6-a3b70100021c@axentia.se>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 7 Nov 2017 16:25:29 +0100
+Subject: [PATCH 13/37] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
+In-Reply-To: <20171012104141.26902-14-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-14-christoffer.dall@linaro.org>
+Message-ID: <20171107152529.taszxq37f35yw3ga@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-11-07 16:17, Linus Walleij wrote:
-> Arnd reported the following build bug bug:
+On Thu, Oct 12, 2017 at 12:41:17PM +0200, Christoffer Dall wrote:
+> So far this is just a copy of the legacy non-VHE switch function, where
+> we only change the existing calls to has_vhe() in both the original and
+> new functions.
 > 
-> In file included from arch/arm/mach-sa1100/simpad.c:20:0:
-> arch/arm/mach-sa1100/include/mach/SA-1100.h:1118:18: error: large
-> integer implicitly truncated to unsigned type [-Werror=overflow]
->                       (0x00000001 << (Nb))
->                       ^
-> include/linux/gpio/machine.h:56:16: note: in definition of macro
-> 'GPIO_LOOKUP_IDX'
-> .chip_hwnum = _chip_hwnum,
->               ^~~~~~~~~~~
-> arch/arm/mach-sa1100/include/mach/SA-1100.h:1140:21: note: in
-> expansion of macro 'GPIO_GPIO'
->                     ^~~~~~~~~
-> arch/arm/mach-sa1100/simpad.c:331:27: note: in expansion of
-> macro 'GPIO_GPIO21'
->   GPIO_LOOKUP_IDX("gpio", GPIO_GPIO21, NULL, 0,
-> 
-> This is what happened:
-> 
-> commit b2e63555592f81331c8da3afaa607d8cf83e8138
-> "i2c: gpio: Convert to use descriptors"
-> commit 4d0ce62c0a02e41a65cfdcfe277f5be430edc371
-> "i2c: gpio: Augment all boardfiles to use open drain"
-> together uncovered an old bug in the Simpad board
-> file: as theGPIO_LOOKUP_IDX() encodes GPIO offsets
-> on gpiochips in an u16 (see <linux/gpio/machine.h>)
-> these GPIO "numbers" does not fit, since in
-> arch/arm/mach-sa1100/include/mach/SA-1100.h it is
-> defined as:
-
-I suspect that you had a line here that started with a hashmark
-(#) and that the whole line got eaten by some git tool during
-a rebase or something. Don't ever start lines with # in the git
-commit message. It will simply disappear somewhere at some point.
-
-Cheers,
-peda
-
-> This is however provably wrong, since the i2c-gpio
-> driver uses proper GPIO numbers, albeit earlier from
-> the global number space, whereas this GPIO_GPIO21
-> is the local line offset in the GPIO register, which
-> is used in other code but certainly not in the
-> gpiolib GPIO driver in drivers/gpio/gpio-sa1100.c, which
-> has code like this:
-> 
-> static void sa1100_gpio_set(struct gpio_chip *chip,
->                             unsigned offset, int value)
-> {
->     int reg = value ? R_GPSR : R_GPCR;
-> 
->     writel_relaxed(BIT(offset),
->         sa1100_gpio_chip(chip)->membase + reg);
-> }
-> 
-> So far everything however compiled fine as an unsigned
-> int was used to pass the GPIO numbers in
-> struct i2c_gpio_platform_data. We can trace the actual error
-> back to
-> 
-> commit dbd406f9d0a1d33a1303eb75cbe3f9435513d339
-> "ARM: 7025/1: simpad: add GPIO based device definitions."
-> This added the i2c_gpio with the wrong offsets.
-> 
-> This commit was before the SA1100 was converted to use
-> the gpiolib, but as can be seen from the contemporary
-> gpio.c in mach-sa1100, it was already using:
-> 
-> static int sa1100_gpio_get(struct gpio_chip *chip,
->                            unsigned offset)
-> {
->         return GPLR & GPIO_GPIO(offset);
-> }
-> 
-> And GPIO_GPIO() is essentially the BIT() macro.
-> 
-> Cc: Wolfram Sang <w.sang@pengutronix.de>
-> Cc: Jochen Friedrich <jochen@scram.de>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: Russell King <linux@arm.linux.org.uk>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
-> Wolfram: this is in the i2c GPIO refactoring in your tree,
-> please apply it directly as a fix for v4.15 if there are
-> no protests.
-> Jochen: did this ever work? I suspect the patch was simply
-> developed on top of a different kernel.
-> ---
->  arch/arm/mach-sa1100/simpad.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+>  arch/arm/include/asm/kvm_asm.h   |  4 +++
+>  arch/arm64/include/asm/kvm_asm.h |  2 ++
+>  arch/arm64/kvm/hyp/switch.c      | 57 ++++++++++++++++++++++++++++++++++++++++
+>  virt/kvm/arm/arm.c               |  5 +++-
+>  4 files changed, 67 insertions(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
-> index 9db483a42826..7d4feb8a49ac 100644
-> --- a/arch/arm/mach-sa1100/simpad.c
-> +++ b/arch/arm/mach-sa1100/simpad.c
-> @@ -328,9 +328,9 @@ static struct platform_device simpad_gpio_leds = {
->  static struct gpiod_lookup_table simpad_i2c_gpiod_table = {
->  	.dev_id = "i2c-gpio",
->  	.table = {
-> -		GPIO_LOOKUP_IDX("gpio", GPIO_GPIO21, NULL, 0,
-> +		GPIO_LOOKUP_IDX("gpio", 21, NULL, 0,
->  				GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
-> -		GPIO_LOOKUP_IDX("gpio", GPIO_GPIO25, NULL, 1,
-> +		GPIO_LOOKUP_IDX("gpio", 25, NULL, 1,
->  				GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
->  	},
->  };
+> diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
+> index 36dd296..1a7bc5f 100644
+> --- a/arch/arm/include/asm/kvm_asm.h
+> +++ b/arch/arm/include/asm/kvm_asm.h
+> @@ -70,8 +70,12 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
+>  
+>  extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
+>  
+> +/* no VHE on 32-bit :( */
+> +static inline int kvm_vcpu_run(struct kvm_vcpu *vcpu) { return 0; }
+> +
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  
+> +
+
+stray new blank line
+
+>  extern void __init_stage2_translation(void);
+>  
+>  extern u64 __vgic_v3_get_ich_vtr_el2(void);
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 7e48a39..2eb5b23 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -57,6 +57,8 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
+>  
+>  extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
+>  
+> +extern int kvm_vcpu_run(struct kvm_vcpu *vcpu);
+> +
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  
+>  extern u64 __vgic_v3_get_ich_vtr_el2(void);
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index ed30af5..8a0f38f 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -319,6 +319,63 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
+>  	return false;
+>  }
+>  
+> +/* Switch to the guest for VHE systems running in EL2 */
+> +int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> +{
+> +	struct kvm_cpu_context *host_ctxt;
+> +	struct kvm_cpu_context *guest_ctxt;
+> +	u64 exit_code;
+> +
+> +	vcpu = kern_hyp_va(vcpu);
+> +
+> +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> +	host_ctxt->__hyp_running_vcpu = vcpu;
+> +	guest_ctxt = &vcpu->arch.ctxt;
+> +
+> +	__sysreg_save_host_state(host_ctxt);
+> +
+> +	__activate_traps(vcpu);
+> +	__activate_vm(vcpu);
+> +
+> +	__vgic_restore_state(vcpu);
+> +	__timer_enable_traps(vcpu);
+> +
+> +	/*
+> +	 * We must restore the 32-bit state before the sysregs, thanks
+> +	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
+> +	 */
+> +	__sysreg32_restore_state(vcpu);
+> +	__sysreg_restore_guest_state(guest_ctxt);
+> +	__debug_switch_to_guest(vcpu);
+> +
+> +	/* Jump in the fire! */
+> +again:
+> +	exit_code = __guest_enter(vcpu, host_ctxt);
+> +	/* And we're baaack! */
+> +
+> +	if (fixup_guest_exit(vcpu, &exit_code))
+> +		goto again;
+> +
+> +	__sysreg_save_guest_state(guest_ctxt);
+> +	__sysreg32_save_state(vcpu);
+> +	__timer_disable_traps(vcpu);
+> +	__vgic_save_state(vcpu);
+> +
+> +	__deactivate_traps(vcpu);
+> +	__deactivate_vm(vcpu);
+> +
+> +	__sysreg_restore_host_state(host_ctxt);
+> +
+> +	/*
+> +	 * This must come after restoring the host sysregs, since a non-VHE
+> +	 * system may enable SPE here and make use of the TTBRs.
+> +	 */
+> +	__debug_switch_to_host(vcpu);
+> +
+> +	return exit_code;
+> +}
+> +
+> +/* Switch to the guest for legacy non-VHE systems */
+>  int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  {
+>  	struct kvm_cpu_context *host_ctxt;
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index cf121b2..b11647a 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -706,7 +706,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+>  		trace_kvm_entry(*vcpu_pc(vcpu));
+>  		guest_enter_irqoff();
+>  
+> -		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+> +		if (has_vhe())
+> +			ret = kvm_vcpu_run(vcpu);
+> +		else
+> +			ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
+
+So kvm_vcpu_run() is going to be VHE only, but the only way for people
+stepping through the code to know that is by seeing this callsite or by
+reading the comment above it. Everywhere else we make it much more clear
+with the _vhe and _nvhe suffixes. I wonder if we should keep that pattern
+by adding
+
+ static int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ {
+    if (has_vhe())
+        ret = kvm_vcpu_run_vhe(vcpu);
+    else
+        ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
+ }
+
+to virt/kvm/arm/arm.c and then calling that from here.
+
+I'm afraid the __ prefix is too ambiguous in the kernel to interpret
+__foo() as the hyp mode non-VHE version of foo(), the hyp mode VHE
+version.
+
+Thanks,
+drew
+
+>  
+>  		vcpu->mode = OUTSIDE_GUEST_MODE;
+>  		vcpu->stat.exits++;
+> -- 
+> 2.9.0
 > 
