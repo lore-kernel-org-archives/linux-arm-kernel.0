@@ -1,55 +1,44 @@
 From: pprakash@codeaurora.org (Prashanth Prakash)
-Date: Tue,  7 Nov 2017 10:35:33 -0700
-Subject: [PATCH 2/2] ARM64 / cpuidle: Use new cpuidle macro for entering
- retention state
-In-Reply-To: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
-References: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
-Message-ID: <1510076133-18139-3-git-send-email-pprakash@codeaurora.org>
+Date: Tue,  7 Nov 2017 10:35:31 -0700
+Subject: [PATCH 0/2] Avoid calling cpu_pm functions for retention idle states
+Message-ID: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU_PM_CPU_IDLE_ENTER_RETENTION skips calling cpu_pm_enter() and
-cpu_pm_exit(). By not calling cpu_pm functions in idle entry/exit
-paths we can reduce the latency involved in entering and exiting
-the low power idle state.
+CPU_PM_CPU_IDLE_ENTER() treats all idle states whose idx != 0 as a
+state that loses some context, but we can have deeper idle states that
+doesn't lose any software context. If a CPU is entering such a low power
+idle state where it retains the context, then there is no need to call
+cpu_pm_enter()/cpu_pm_exit().
 
-On ARM64 based Qualcomm server platform we measured below overhead
+Add a new macro(CPU_PM_CPU_IDLE_ENTER_RETENTION) to be used by cpuidle
+drivers when they are entering retention state. By not calling cpu_pm_enter
+and cpu_pm_exit we reduce the latency involved in entering and exiting
+the retention states.
+
+On ARM64 based Qualcomm server platform we measured below overhead for
 for calling cpu_pm_enter and cpu_pm_exit for retention states.
 
 workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
-	Average overhead of cpu_pm_enter - 1.2us
-	Average overhead of cpu_pm_exit  - 3.1us
+Overhead of cpu_pm_enter - 1.2us(Average), 6.5us(Max)
+Overhead of cpu_pm_exit  - 3.1us(Average), 11.1us(Max)
 
-Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
----
- arch/arm64/kernel/cpuidle.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+Listed below are 5 functions that were notified on ENTER/EXIT on the
+test platform:
+      gic_cpu_pm_notifier
+      arch_timer_cpu_pm_notify
+      cpu_pm_pmu_notify
+      hyp_init_cpu_pm_notifier
+      fpsimd_cpu_pm_notifier
 
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index fd69108..f2d1381 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -47,6 +47,8 @@ int arm_cpuidle_suspend(int index)
- 
- #include <acpi/processor.h>
- 
-+#define ARM64_LPI_IS_RETENTION_STATE(arch_flags) (!(arch_flags))
-+
- int acpi_processor_ffh_lpi_probe(unsigned int cpu)
- {
- 	return arm_cpuidle_init(cpu);
-@@ -54,6 +56,10 @@ int acpi_processor_ffh_lpi_probe(unsigned int cpu)
- 
- int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)
- {
--	return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, lpi->index);
-+	if (ARM64_LPI_IS_RETENTION_STATE(lpi->arch_flags))
-+		return CPU_PM_CPU_IDLE_ENTER_RETENTION(arm_cpuidle_suspend,
-+						lpi->index);
-+	else
-+		return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, lpi->index);
- }
- #endif
+Prashanth Prakash (2):
+  cpuidle: Add new macro to enter a retention idle state
+  ARM64 / cpuidle: Use new cpuidle macro for entering retention state
+
+ arch/arm64/kernel/cpuidle.c |  8 +++++++-
+ include/linux/cpuidle.h     | 38 +++++++++++++++++++++++---------------
+ 2 files changed, 30 insertions(+), 16 deletions(-)
+
 -- 
 Qualcomm Datacenter Technologies on behalf of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the
