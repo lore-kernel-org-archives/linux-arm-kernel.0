@@ -1,29 +1,26 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 7 Nov 2017 16:26:53 +0100
-Subject: [GIT PULL 2/2] Rockchip dts64 updates for 4.15 part2
-In-Reply-To: <1575518.sQZnmpGzTX@phil>
-References: <3824439.LIeQpy2inU@phil> <1575518.sQZnmpGzTX@phil>
-Message-ID: <CAK8P3a3JctnMhN7VyxqAYwtXLR2DJT+FDNpcyic-QaPn7Yw7wg@mail.gmail.com>
+Date: Tue, 7 Nov 2017 16:30:32 +0100
+Subject: [PATCH] ARM: multi_v7_defconfig: Select RPMSG_VIRTIO as module
+In-Reply-To: <20171103051442.GO28761@minitux>
+References: <1507222198-5052-1-git-send-email-anup@brainfault.org>
+ <20171103051442.GO28761@minitux>
+Message-ID: <CAK8P3a3L2NPvcARy1+6pqbeVo=GAnTvx1F7TfgPQ5TwMwRu0-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 4, 2017 at 9:23 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> The following changes since commit d85438991874205467f9739d5f3ee771245b4754:
+On Fri, Nov 3, 2017 at 6:14 AM, Bjorn Andersson
+<bjorn.andersson@linaro.org> wrote:
+> On Thu 05 Oct 09:49 PDT 2017, Anup Patel wrote:
 >
->   arm64: dts: rockchip: enable cec pin for rk3399 firefly (2017-10-15 14:11:32 +0200)
+>> The RPMSG_VIRTIO is now user selectable option so we explicitly
+>> select it in multi_v7_defconfig. Till now RPMSG_VIRTIO was
+>> selected by ST_REMOTEPROC=m in multi_v7_defconfig.
+>>
 >
-> are available in the git repository at:
+> Acked-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 >
->   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.15-rockchip-dts64-2
->
-> for you to fetch changes up to 6f8c539313d884f4715b328e1ce4a3987649b97e:
->
->   arm64: dts: rockchip: add efuse for RK3368 SoCs (2017-10-24 15:25:27 +0200)
->
-> ----------------------------------------------------------------
-> Support for the RGA (raster graphics accelerator) on rk3399
-> and efuses on rk3368.
+>> Signed-off-by: Anup Patel <anup@brainfault.org>
 
-Pulled into next/dt, thanks!
+Applied, thanks!
 
-      Arnd
+     Arnd
