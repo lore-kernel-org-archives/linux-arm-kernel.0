@@ -1,10 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Nov 2017 10:54:17 +0100
-Subject: [PATCH 1/7] arm64: dts: renesas: r8a7796: Add IPMMU device nodes
-In-Reply-To: <20171101103458.7582-2-horms+renesas@verge.net.au>
+Date: Tue, 7 Nov 2017 11:00:51 +0100
+Subject: [PATCH 2/7] arm64: dts: renesas: r8a7796: Tie SYS-DMAC to
+ IPMMU-DS0/1
+In-Reply-To: <20171101103458.7582-3-horms+renesas@verge.net.au>
 References: <20171101103458.7582-1-horms+renesas@verge.net.au>
- <20171101103458.7582-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWdPmU=16B8BbfTD316MWOGVVhb4-vcg7yr-JBLKDwjdg@mail.gmail.com>
+ <20171101103458.7582-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXoMgeyB-dnSgNB88aC5h2g+OzcHPALXavtQAPhuZmv-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,16 +13,13 @@ On Wed, Nov 1, 2017 at 11:34 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > From: Magnus Damm <damm+renesas@opensource.se>
 >
-> Add r8a7796 IPMMU nodes and keep all disabled by default.
+> Hook up r8a7796 DMAC nodes to the IPMMUs. In particular SYS-DMAC0
+> gets tied to IPMMU-DS0, and SYS-DMAC1 and SYS-DMAC2 get tied to IPMMU-DS1.
 >
 > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> [simon: update names]
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-My comments for r8a7795.dtsi about IPMMU-* comments and power-domains
-properties are applicable here, too.
 
 Gr{oetje,eeting}s,
 
