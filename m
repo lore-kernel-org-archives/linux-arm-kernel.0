@@ -1,11 +1,11 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Nov 2017 11:07:59 +0100
-Subject: [PATCH v4 14/15] arm64: dts: renesas: r8a7795: Enable IPMMU-VI,
- VP, DS0, DS1 and MM
-In-Reply-To: <20171101103452.7491-15-horms+renesas@verge.net.au>
+Date: Tue, 7 Nov 2017 11:08:16 +0100
+Subject: [PATCH v4 15/15] arm64: dts: renesas: r8a7795-es1: Enable
+ IPMMU-MP1
+In-Reply-To: <20171101103452.7491-16-horms+renesas@verge.net.au>
 References: <20171101103452.7491-1-horms+renesas@verge.net.au>
- <20171101103452.7491-15-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdV80LSM6YhRfbvsXQiSbDe6zqGqV51fdyeTFAmDDH06Jw@mail.gmail.com>
+ <20171101103452.7491-16-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdX5hUzb1UZL6QxhaaHh-Og_7UxCcJ7CjnV87qf7=wvFaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,11 +13,7 @@ On Wed, Nov 1, 2017 at 11:34 AM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > From: Magnus Damm <damm+renesas@opensource.se>
 >
-> Enable the r8a7795 device nodes for IPMMU-VI, IPMMU-VP, IPMMU-DS0,
-
-VI0, VP0
-
-> IPMMU-DS1 and the shared IPMMU-MM device.
+> Enable the r8a7795 ES1.x device node for IPMMU-MP1.
 >
 > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
