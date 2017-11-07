@@ -1,69 +1,66 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 7 Nov 2017 22:38:57 +0200
-Subject: [PATCH 1/3] Documentation: dt: memory: ti-emif: add edac support
- under emif
-In-Reply-To: <1510087139-21885-1-git-send-email-t-kristo@ti.com>
-References: <1510087139-21885-1-git-send-email-t-kristo@ti.com>
-Message-ID: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Nov 2017 22:01:41 +0100
+Subject: [PATCH v5 13/26] KVM: arm/arm64: GICv4: Propagate affinity
+ changes to the physical ITS
+In-Reply-To: <20171027142855.21584-14-marc.zyngier@arm.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-14-marc.zyngier@arm.com>
+Message-ID: <52c64fa1-f662-2703-53c5-d2024ef12254@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Certain revisions of the TI EMIF IP contain ECC support in them. Reflect
-this in the DT binding.
+Hi Marc,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Cc: Santosh Shilimkar <ssantosh@kernel.org>
-Cc: Rob Herring <robh+dt@kernel.org>
----
- .../devicetree/bindings/memory-controllers/ti/emif.txt   | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+On 27/10/2017 16:28, Marc Zyngier wrote:
+> When the guest issues an affinity change, we need to tell the physical
+> ITS that we're now targetting a new vcpu.  This is done by extracting
+> the current mapping, updating the target, and reapplying the mapping.
+> 
+> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 16 +++++++++++++++-
+>  1 file changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index c9b1c0967426..42ffb9084bb7 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -337,11 +337,25 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+>  
+>  static int update_affinity(struct vgic_irq *irq, struct kvm_vcpu *vcpu)
+>  {
+> +	int ret = 0;
+> +
+>  	spin_lock(&irq->irq_lock);
+>  	irq->target_vcpu = vcpu;
+>  	spin_unlock(&irq->irq_lock);
+>  
+> -	return 0;
+> +	if (irq->hw) {
+> +		struct its_vlpi_map map;
+> +
+> +		ret = its_get_vlpi(irq->host_irq, &map);
+> +		if (ret)
+> +			return ret;
+> +
+> +		map.vpe = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
+> +
+> +		ret = its_map_vlpi(irq->host_irq, &map);
+Do we check somewhere the virtual LPI ID does not exceed the capacity of
+the VPT. I fail to find that in the irq-gic-v3-its.c driver.
 
-diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-index 0db6047..f56a347 100644
---- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-+++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
-@@ -3,12 +3,16 @@
- EMIF - External Memory Interface - is an SDRAM controller used in
- TI SoCs. EMIF supports, based on the IP revision, one or more of
- DDR2/DDR3/LPDDR2 protocols. This binding describes a given instance
--of the EMIF IP and memory parts attached to it.
-+of the EMIF IP and memory parts attached to it. Certain revisions
-+of the EMIF IP controller also contain optional ECC support, which
-+corrects one bit errors and detects two bit errors.
- 
- Required properties:
- - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
-   is the IP revision of the specific EMIF instance.
- 		  For am437x should be ti,emif-am4372.
-+		  For dra7xx should be ti,emif-dra7xx.
-+		  For k2x family, should be ti,emif-keystone.
- 
- - phy-type	: <u32> indicating the DDR phy type. Following are the
-   allowed values
-@@ -42,6 +46,10 @@ Optional properties:
- - hw-caps-temp-alert	: Have this property if the controller
-   has capability for generating SDRAM temperature alerts
- 
-+- interrupts		: A list of interrupt specifiers for memory
-+  controller interrupts, if available. Required for EMIF instances
-+  that support ECC.
-+
- Example:
- 
- emif1: emif at 0x4c000000 {
-@@ -54,3 +62,9 @@ emif1: emif at 0x4c000000 {
- 	hw-caps-ll-interface;
- 	hw-caps-temp-alert;
- };
-+
-+emif1: emif at 4c000000 {
-+	compatible = "ti,emif-dra7";
-+	reg = <0x4c000000 0x200>;
-+	interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
-+};
--- 
-1.9.1
+Also in case the hw part fails, should we still have the irq->target_cpu
+set to the new value. In other words shouldn't we first do the hw block
+and upon success set the target_vcpu?
 
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Thanks
+
+Eric
+> +	}
+> +
+> +	return ret;
+>  }
+>  
+>  /*
+> 
