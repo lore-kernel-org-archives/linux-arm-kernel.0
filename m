@@ -1,125 +1,252 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Tue, 7 Nov 2017 15:01:09 +0800
-Subject: [PATCH V3 02/11] dt-bindings: Add Spreadtrum clock binding
- documentation
-In-Reply-To: <20171106171519.xomnca72adqtzm2n@rob-hp-laptop>
-References: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
- <20171102065626.21835-3-chunyan.zhang@spreadtrum.com>
- <20171106171519.xomnca72adqtzm2n@rob-hp-laptop>
-Message-ID: <CAAfSe-s=uF6j2T2cePbAT3q4BxY6RcvktwZVs+PjnkQYozvrWQ@mail.gmail.com>
+From: o.rempel@pengutronix.de (Oleksij Rempel)
+Date: Tue, 7 Nov 2017 08:03:07 +0100
+Subject: [PATCH v4 3/3] ARM: imx: Update spi_imx platform data to reflect
+ current state
+In-Reply-To: <20171106194618.9421-4-tpiepho@impinj.com>
+References: <20171106194618.9421-1-tpiepho@impinj.com>
+ <20171106194618.9421-4-tpiepho@impinj.com>
+Message-ID: <bec3983e-2f93-0e7f-730e-1d1f311de914@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
 
-On 7 November 2017 at 01:15, Rob Herring <robh@kernel.org> wrote:
-> On Thu, Nov 02, 2017 at 02:56:17PM +0800, Chunyan Zhang wrote:
->> Introduce a new binding with its documentation for Spreadtrum clock
->> sub-framework.
->>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> ---
->>  Documentation/devicetree/bindings/clock/sprd.txt | 55 ++++++++++++++++++++++++
->>  1 file changed, 55 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/clock/sprd.txt
->>
->> diff --git a/Documentation/devicetree/bindings/clock/sprd.txt b/Documentation/devicetree/bindings/clock/sprd.txt
->> new file mode 100644
->> index 0000000..5c09529
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/clock/sprd.txt
->> @@ -0,0 +1,55 @@
->> +Spreadtrum Clock Binding
->> +------------------------
->> +
->> +Required properties:
->> +- compatible: should contain the following compatible strings:
->> +     - "sprd,sc9860-pmu-gate"
->> +     - "sprd,sc9860-pll"
->> +     - "sprd,sc9860-ap-clk"
->> +     - "sprd,sc9860-aon-prediv"
->> +     - "sprd,sc9860-apahb-gate"
->> +     - "sprd,sc9860-aon-gate"
->> +     - "sprd,sc9860-aonsecure-clk"
->> +     - "sprd,sc9860-agcp-gate"
->> +     - "sprd,sc9860-gpu-clk"
->> +     - "sprd,sc9860-vsp-clk"
->> +     - "sprd,sc9860-vsp-gate"
->> +     - "sprd,sc9860-cam-clk"
->> +     - "sprd,sc9860-cam-gate"
->> +     - "sprd,sc9860-disp-clk"
->> +     - "sprd,sc9860-disp-gate"
->> +     - "sprd,sc9860-apapb-gate"
->> +
->> +- #clock-cells: must be 1
->> +
->> +- clocks : shall be the input parent clock(s) phandle for the clock.
->
-> You need to document how many clocks for each block.
 
-It depends, "clocks" property here just simply shows which clock group
-the clock's parents are in.
-The detailed dependency relationship (i.e. how many parents and which
-are the parents) are implemented in driver code.
+On 06.11.2017 20:46, Trent Piepho wrote:
+> The docs for the spi_imx platform data still refer to a -32 offset used to
+> specify a native chip select.  This was removed in commit 602c8f4485cd
+> ("spi: imx: fix use of native chip-selects with devicetree") and no
+> longer works as documented.  Update documentation.
+> 
+> The macro MXC_SPI_CS() is no longer is needed.
+> 
+> If a board uses all native chip selects, then it's not necessary to
+> specify a chip select array at all, as all native is the default (this is
+> how device-tree configured SPI masters work too).  Most of the spi-imx
+> platform data users have their chip select arrays removed by this patch.
+> 
+> This patch also fixes a bug in mx31moboard introduced in the '602 commit.
+> When that board was updated in commit 901f26bce64a ("ARM: imx: set
+> correct chip_select in platform setup") to reflect the SPI change, only
+> SPI bus 2 was updated and SPI bus 1 was left with non-sequential chip
+> selects.  The mc13783 spi device on bus 1 had its chip select updated as
+> if it were on bus 2.
+> 
+> CC: Shawn Guo <shawnguo@kernel.org>
+> CC: Sascha Hauer <kernel@pengutronix.de>
+> CC: Fabio Estevam <fabio.estevam@nxp.com>
+> Acked-by: Greg Ungerer <gerg@linux-m68k.org>
+> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
 
-Ok, I should address more, will do in the next version.
+Reviewed-by: Oleksij Rempel <o.rempel@pengutronix.de>
 
->
->> +
->> +Optional properties:
->> +
->> +- reg:       Contain the registers base address and length. It must be configured only if no 'sprd,syscon' under the node.
->> +
->> +- sprd,syscon: phandle to the syscon which is in the same address area with the clock.
->> +
->> +Example:
->> +
->> +     pmu_gate: pmu-gate {
->> +             compatible = "sprd,sc9860-pmu-gate";
->> +             sprd,syscon = <&pmu_apb>;
->
-> Ideally, the pmu-gate node would be a child of pmu_apb and use the reg
-> property if clock registers are a contiguous range. Then you don't need
-> this phandle.
-
-The pmu-gate is actually a clock independent from the 'pmu_apb' syscon
-device, using a reference to syscon node instead of a reg property is
-just to avoid mapping the same address areas repeatedly.  Spreadtrum's
-clock h/w design is a little complicated, after discussing with Arnd
-and Stephen, I then chose to implement in this way.
-
-I guess the name of 'pmu_apb' might be confused, it's actually not a
-bus, but a global address area stored a lot of registers shared by a
-few devices including some clocks.  I think I'd better use another
-name instead of pmu_apb :)
-
-Please let me know if I'm missing something here.
-
-Thanks,
-Chunyan
-
->
->> +             clocks = <&ext_26m>;
->> +             #clock-cells = <1>;
->> +     };
->> +
->> +     pll: pll {
->> +             compatible = "sprd,sc9860-pll";
->> +             sprd,syscon = <&ana_apb>;
->
-> Same here.
->
->> +             clocks = <&pmu_gate 0>;
->> +             #clock-cells = <1>;
->> +     };
->> +
->> +     ap_clk: clock-controller at 20000000 {
->> +             compatible = "sprd,sc9860-ap-clk";
->> +             reg = <0 0x20000000 0 0x400>;
->> +             clocks = <&ext_26m>, <&pll 0>,
->> +                      <&pmu_gate 0>;
->> +             #clock-cells = <1>;
->> +     };
->> --
->> 2.7.4
->>
+> ---
+>  arch/arm/mach-imx/mach-mx31_3ds.c     | 18 ++----------------
+>  arch/arm/mach-imx/mach-mx31lilly.c    | 12 ++----------
+>  arch/arm/mach-imx/mach-mx31lite.c     | 16 ++--------------
+>  arch/arm/mach-imx/mach-mx31moboard.c  | 17 +++--------------
+>  arch/arm/mach-imx/mach-pcm037_eet.c   |  5 +----
+>  include/linux/platform_data/spi-imx.h | 29 +++++++++++++++++------------
+>  6 files changed, 27 insertions(+), 70 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mach-mx31_3ds.c b/arch/arm/mach-imx/mach-mx31_3ds.c
+> index 68c3f0799d5b..9d87f1dcf7bb 100644
+> --- a/arch/arm/mach-imx/mach-mx31_3ds.c
+> +++ b/arch/arm/mach-imx/mach-mx31_3ds.c
+> @@ -374,26 +374,12 @@ static struct imx_ssi_platform_data mx31_3ds_ssi_pdata = {
+>  };
+>  
+>  /* SPI */
+> -static int spi0_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master spi0_pdata __initconst = {
+> -	.chipselect	= spi0_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi0_internal_chipselect),
+> -};
+> -
+> -static int spi1_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static const struct spi_imx_master spi1_pdata __initconst = {
+> -	.chipselect	= spi1_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi1_internal_chipselect),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static struct spi_board_info mx31_3ds_spi_devs[] __initdata = {
+> diff --git a/arch/arm/mach-imx/mach-mx31lilly.c b/arch/arm/mach-imx/mach-mx31lilly.c
+> index 6fd463642954..8bf52819d4d9 100644
+> --- a/arch/arm/mach-imx/mach-mx31lilly.c
+> +++ b/arch/arm/mach-imx/mach-mx31lilly.c
+> @@ -226,20 +226,12 @@ static void __init lilly1131_usb_init(void)
+>  
+>  /* SPI */
+>  
+> -static int spi_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master spi0_pdata __initconst = {
+> -	.chipselect = spi_internal_chipselect,
+> -	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+> +	.num_chipselect = 3,
+>  };
+>  
+>  static const struct spi_imx_master spi1_pdata __initconst = {
+> -	.chipselect = spi_internal_chipselect,
+> -	.num_chipselect = ARRAY_SIZE(spi_internal_chipselect),
+> +	.num_chipselect = 3,
+>  };
+>  
+>  static struct mc13xxx_platform_data mc13783_pdata __initdata = {
+> diff --git a/arch/arm/mach-imx/mach-mx31lite.c b/arch/arm/mach-imx/mach-mx31lite.c
+> index f033a57d5694..fcbaf0070ccf 100644
+> --- a/arch/arm/mach-imx/mach-mx31lite.c
+> +++ b/arch/arm/mach-imx/mach-mx31lite.c
+> @@ -83,15 +83,8 @@ static const struct imxuart_platform_data uart_pdata __initconst = {
+>  };
+>  
+>  /* SPI */
+> -static int spi0_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(1),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master spi0_pdata __initconst = {
+> -	.chipselect	= spi0_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi0_internal_chipselect),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static const struct mxc_nand_platform_data
+> @@ -133,13 +126,8 @@ static struct platform_device smsc911x_device = {
+>   * The MC13783 is the only hard-wired SPI device on the module.
+>   */
+>  
+> -static int spi1_internal_chipselect[] = {
+> -	MXC_SPI_CS(0),
+> -};
+> -
+>  static const struct spi_imx_master spi1_pdata __initconst = {
+> -	.chipselect	= spi1_internal_chipselect,
+> -	.num_chipselect	= ARRAY_SIZE(spi1_internal_chipselect),
+> +	.num_chipselect	= 1,
+>  };
+>  
+>  static struct mc13xxx_platform_data mc13783_pdata __initdata = {
+> diff --git a/arch/arm/mach-imx/mach-mx31moboard.c b/arch/arm/mach-imx/mach-mx31moboard.c
+> index 7716f83aecdd..643a3d749703 100644
+> --- a/arch/arm/mach-imx/mach-mx31moboard.c
+> +++ b/arch/arm/mach-imx/mach-mx31moboard.c
+> @@ -152,14 +152,8 @@ static const struct imxi2c_platform_data moboard_i2c1_data __initconst = {
+>  	.bitrate = 100000,
+>  };
+>  
+> -static int moboard_spi1_cs[] = {
+> -	MXC_SPI_CS(0),
+> -	MXC_SPI_CS(2),
+> -};
+> -
+>  static const struct spi_imx_master moboard_spi1_pdata __initconst = {
+> -	.chipselect	= moboard_spi1_cs,
+> -	.num_chipselect	= ARRAY_SIZE(moboard_spi1_cs),
+> +	.num_chipselect	= 3,
+>  };
+>  
+>  static struct regulator_consumer_supply sdhc_consumers[] = {
+> @@ -296,19 +290,14 @@ static struct spi_board_info moboard_spi_board_info[] __initdata = {
+>  		/* irq number is run-time assigned */
+>  		.max_speed_hz = 300000,
+>  		.bus_num = 1,
+> -		.chip_select = 1,
+> +		.chip_select = 0,
+>  		.platform_data = &moboard_pmic,
+>  		.mode = SPI_CS_HIGH,
+>  	},
+>  };
+>  
+> -static int moboard_spi2_cs[] = {
+> -	MXC_SPI_CS(0), MXC_SPI_CS(1),
+> -};
+> -
+>  static const struct spi_imx_master moboard_spi2_pdata __initconst = {
+> -	.chipselect	= moboard_spi2_cs,
+> -	.num_chipselect	= ARRAY_SIZE(moboard_spi2_cs),
+> +	.num_chipselect	= 2,
+>  };
+>  
+>  #define SDHC1_CD IOMUX_TO_GPIO(MX31_PIN_ATA_CS0)
+> diff --git a/arch/arm/mach-imx/mach-pcm037_eet.c b/arch/arm/mach-imx/mach-pcm037_eet.c
+> index 95bd97710494..15bc956d466b 100644
+> --- a/arch/arm/mach-imx/mach-pcm037_eet.c
+> +++ b/arch/arm/mach-imx/mach-pcm037_eet.c
+> @@ -56,11 +56,8 @@ static struct spi_board_info pcm037_spi_dev[] = {
+>  };
+>  
+>  /* Platform Data for MXC CSPI */
+> -static int pcm037_spi1_cs[] = { MXC_SPI_CS(0), MXC_SPI_CS(1), };
+> -
+>  static const struct spi_imx_master pcm037_spi1_pdata __initconst = {
+> -	.chipselect = pcm037_spi1_cs,
+> -	.num_chipselect = ARRAY_SIZE(pcm037_spi1_cs),
+> +	.num_chipselect = 2,
+>  };
+>  
+>  /* GPIO-keys input device */
+> diff --git a/include/linux/platform_data/spi-imx.h b/include/linux/platform_data/spi-imx.h
+> index 08be445e8eb8..9b2ed66ef7a2 100644
+> --- a/include/linux/platform_data/spi-imx.h
+> +++ b/include/linux/platform_data/spi-imx.h
+> @@ -4,24 +4,29 @@
+>  
+>  /*
+>   * struct spi_imx_master - device.platform_data for SPI controller devices.
+> - * @chipselect: Array of chipselects for this master. Numbers >= 0 mean gpio
+> - *              pins, numbers < 0 mean internal CSPI chipselects according
+> - *              to MXC_SPI_CS(). Normally you want to use gpio based chip
+> - *              selects as the CSPI module tries to be intelligent about
+> - *              when to assert the chipselect: The CSPI module deasserts the
+> - *              chipselect once it runs out of input data. The other problem
+> - *              is that it is not possible to mix between high active and low
+> - *              active chipselects on one single bus using the internal
+> - *              chipselects. Unfortunately Freescale decided to put some
+> + * @chipselect: Array of chipselects for this master or NULL.  Numbers >= 0
+> + *              mean GPIO pins, -ENOENT means internal CSPI chipselect
+> + *              matching the position in the array.  E.g., if chipselect[1] =
+> + *              -ENOENT then a SPI slave using chip select 1 will use the
+> + *              native SS1 line of the CSPI.  Omitting the array will use
+> + *              all native chip selects.
+> +
+> + *              Normally you want to use gpio based chip selects as the CSPI
+> + *              module tries to be intelligent about when to assert the
+> + *              chipselect:  The CSPI module deasserts the chipselect once it
+> + *              runs out of input data.  The other problem is that it is not
+> + *              possible to mix between high active and low active chipselects
+> + *              on one single bus using the internal chipselects.
+> + *              Unfortunately, on some SoCs, Freescale decided to put some
+>   *              chipselects on dedicated pins which are not usable as gpios,
+>   *              so we have to support the internal chipselects.
+> - * @num_chipselect: ARRAY_SIZE(chipselect)
+> + *
+> + * @num_chipselect: If @chipselect is specified, ARRAY_SIZE(chipselect),
+> + *                  otherwise the number of native chip selects.
+>   */
+>  struct spi_imx_master {
+>  	int	*chipselect;
+>  	int	num_chipselect;
+>  };
+>  
+> -#define MXC_SPI_CS(no)	((no) - 32)
+> -
+>  #endif /* __MACH_SPI_H_*/
+> 
