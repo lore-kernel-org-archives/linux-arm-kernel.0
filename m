@@ -1,79 +1,119 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 07 Nov 2017 11:27:21 +0000
-Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
-Message-ID: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 7 Nov 2017 11:56:06 +0100
+Subject: [PATCH 07/37] KVM: arm/arm64: Add kvm_vcpu_load_sysregs and
+ kvm_vcpu_put_sysregs
+In-Reply-To: <20171012104141.26902-8-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-8-christoffer.dall@linaro.org>
+Message-ID: <20171107105606.rrcvdc3vue7fezsj@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Parsing the EDID for HDMI and audio information in the get_modes()
-callback is incorrect - this only parses the EDID read from the
-connector, not any override or firmware provided EDID.
+On Thu, Oct 12, 2017 at 12:41:11PM +0200, Christoffer Dall wrote:
+> As we are about to move a buch of save/restore logic for VHE kernels to
+> the load and put functions, we need some infrastructure to do this.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  3 +++
+>  arch/arm64/include/asm/kvm_host.h |  3 +++
+>  arch/arm64/kvm/hyp/sysreg-sr.c    | 27 +++++++++++++++++++++++++++
+>  virt/kvm/arm/arm.c                |  2 ++
+>  4 files changed, 35 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 1100170..13f8165 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -290,4 +290,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
+>  
+> +static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 27305e7..7d3bfa7 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -383,4 +383,7 @@ static inline void __cpu_init_stage2(void)
+>  		  "PARange is %d bits, unsupported configuration!", parange);
+>  }
+>  
+> +void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
+> +void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HOST_H__ */
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index c54cc2a..b7438c8 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -183,3 +183,30 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+>  	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+>  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
+>  }
+> +
+> +/**
+> + * kvm_vcpu_load_sysregs - Load guest system register to physical CPU
 
-The correct place to parse the EDID for these parameters is the
-fill_modes() callback, after we've called the helper.  Move the parsing
-there.  This caused problems for Lu?s Mendes.
+system registers to the physical CPU
 
-Cc: <stable@vger.kernel.org>
-Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
- 1 file changed, 24 insertions(+), 4 deletions(-)
+> + *
+> + * @vcpu: The VCPU pointer
+> + *
+> + * If the kernel runs in EL2 then load the system register state for the VCPU
+> + * for EL1 onto the physical CPU so that we can go back and foward between the
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index 9fe407f49986..2516a1c18a10 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -1905,10 +1905,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
- 		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
- 			edid->width_cm, edid->height_cm);
- 
--		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
--		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
- 		drm_mode_connector_update_edid_property(connector, edid);
--		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
- 		ret = drm_add_edid_modes(connector, edid);
- 		/* Store the ELD */
- 		drm_edid_to_eld(connector, edid);
-@@ -1920,6 +1917,29 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
- 	return ret;
- }
- 
-+static int dw_hdmi_connector_fill_modes(struct drm_connector *connector,
-+					uint32_t maxX, uint32_t maxY)
-+{
-+	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-+					    connector);
-+	int ret;
-+
-+	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
-+
-+	if (connector->edid_blob_ptr) {
-+		struct edid *edid = (void *)connector->edid_blob_ptr->data;
-+
-+		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
-+		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
-+		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
-+	} else {
-+		hdmi->sink_is_hdmi = false;
-+		hdmi->sink_has_audio = false;
-+	}
-+
-+	return ret;
-+}
-+
- static void dw_hdmi_connector_force(struct drm_connector *connector)
- {
- 	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-@@ -1933,7 +1953,7 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
- }
- 
- static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
--	.fill_modes = drm_helper_probe_single_connector_modes,
-+	.fill_modes = dw_hdmi_connector_fill_modes,
- 	.detect = dw_hdmi_connector_detect,
- 	.destroy = drm_connector_cleanup,
- 	.force = dw_hdmi_connector_force,
--- 
-2.7.4
+/foward/forth/
+
+> + * VM and the hypervisor without switching all this state around.
+> + */
+> +void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+> +{
+> +}
+> +
+> +/**
+> + * kvm_vcpu_put_sysregs - Restore host system register state to physical CPU
+
+system registers to the physical CPU
+
+> + *
+> + * @vcpu: The VCPU pointer
+> + *
+> + * If the kernel runs in EL2 and the physical register state belongs to the
+> + * VCPU, then restore the system register state for the host for EL1 onto the
+> + * physical CPU so that we can run userspace and other threads on this
+> + * physical CPU.
+> + */
+> +void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+> +{
+> +}
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index d495453..cf121b2 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -358,6 +358,7 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
+>  	kvm_arm_set_running_vcpu(vcpu);
+>  	kvm_vgic_load(vcpu);
+>  	kvm_timer_vcpu_load(vcpu);
+> +	kvm_vcpu_load_sysregs(vcpu);
+>  }
+>  
+>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+> @@ -365,6 +366,7 @@ void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+>  	if (vcpu->ioctl != KVM_RUN)
+>  		return;
+>  
+> +	kvm_vcpu_put_sysregs(vcpu);
+>  	kvm_timer_vcpu_put(vcpu);
+>  	kvm_vgic_put(vcpu);
+>  
+> -- 
+> 2.9.0
+> 
+
+I'm not sure this needs to be a separate patch, but it was a nice relaxing
+review :-)
+
+Reviewed-by: Andrew Jones <drjones@redhat.com>
