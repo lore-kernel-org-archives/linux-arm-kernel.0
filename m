@@ -1,32 +1,60 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 7 Nov 2017 15:54:27 +0800
-Subject: [PATCH 1/3] dt-bindings: clk: Hi3660: Document stub clock
-In-Reply-To: <20171106221337.grwywvxzes7jcgob@rob-hp-laptop>
-References: <1509693907-90682-1-git-send-email-zhongkaihua@huawei.com>
- <1509693907-90682-2-git-send-email-zhongkaihua@huawei.com>
- <20171106221337.grwywvxzes7jcgob@rob-hp-laptop>
-Message-ID: <20171107075427.GC23571@leoy-linaro>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Tue, 7 Nov 2017 09:20:33 +0100
+Subject: [RESEND PATCH v5 08/16] ARM: dts: socfpga: Add generic compatible
+ string for I2C EEPROM
+In-Reply-To: <20170615185418.13980-9-javier@dowhile0.org>
+References: <20170615185418.13980-1-javier@dowhile0.org>
+ <20170615185418.13980-9-javier@dowhile0.org>
+Message-ID: <CABxcv=mQ_QjXiL0iBEZ=V9finCVywj6sSnbR+5Cb0kJrw12cow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 06, 2017 at 04:13:37PM -0600, Rob Herring wrote:
-> On Fri, Nov 03, 2017 at 03:25:05PM +0800, Kaihua Zhong wrote:
-> > From: Leo Yan <leo.yan@linaro.org>
-> > 
-> > Document the DT binding for stub clock which is used for CPU,
-> > GPU and DDR frequency scaling.
-> > 
-> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > ---
-> >  Documentation/devicetree/bindings/clock/hi3660-clock.txt | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
+Hello Dinh,
 
-Thanks, Rob.
+On Thu, Jun 15, 2017 at 8:54 PM, Javier Martinez Canillas
+<javier@dowhile0.org> wrote:
+> The at24 driver allows to register I2C EEPROM chips using different vendor
+> and devices, but the I2C subsystem does not take the vendor into account
+> when matching using the I2C table since it only has device entries.
+>
+> But when matching using an OF table, both the vendor and device has to be
+> taken into account so the driver defines only a set of compatible strings
+> using the "atmel" vendor as a generic fallback for compatible I2C devices.
+>
+> So add this generic fallback to the device node compatible string to make
+> the device to match the driver using the OF device ID table.
+>
+> Signed-off-by: Javier Martinez Canillas <javier@dowhile0.org>
+>
+> ---
+>
+> Changes in v5: None
+> Changes in v4:
+> - Only use the atmel manufacturer in the compatible string instead of
+>   keeping the deprecated ones (Rob Herring).
+>
+> Changes in v3: None
+> Changes in v2: None
+>
+>  arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+> index 893198049397..4bb2791ab04a 100644
+> --- a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+> +++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
+> @@ -294,7 +294,7 @@
+>         clock-frequency = <100000>;
+>
+>         at24 at 50 {
+> -               compatible = "at24,24c02";
+> +               compatible = "atmel,24c02";
+>                 pagesize = <8>;
+>                 reg = <0x50>;
+>         };
+> --
 
-And will refactor the dt binding header in next version with other
-comments.
+Any comments about this patch?
 
-Thanks,
-Leo Yan
+Best regards,
+Javier
