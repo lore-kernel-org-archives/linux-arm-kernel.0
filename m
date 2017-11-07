@@ -1,149 +1,21 @@
 From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue,  7 Nov 2017 08:58:18 +0900
-Subject: [PATCH v5] arm64: support __int128 on gcc 5+
+Date: Tue, 7 Nov 2017 09:01:34 +0900
+Subject: [PATCH v4] arm64: support __int128 on gcc 5+
 In-Reply-To: <CAKv+Gu94w3f0n4qDeR3uC5nVaKwjTUYf8W4cs5L3nE1HxoDG9Q@mail.gmail.com>
-References: <CAKv+Gu94w3f0n4qDeR3uC5nVaKwjTUYf8W4cs5L3nE1HxoDG9Q@mail.gmail.com>
-Message-ID: <20171106235818.30182-1-Jason@zx2c4.com>
+References: <20171103141858.13149-1-Jason@zx2c4.com>
+ <20171106093151.8312-1-Jason@zx2c4.com>
+ <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
+ <20171106161459.bm4b2c7ahljluuda@armageddon.cambridge.arm.com>
+ <CAHmME9p+ef-+fmdiO15LU7X3Sr-CDyngpPwKZN2FqOQmZNjLtg@mail.gmail.com>
+ <CAKv+Gu94w3f0n4qDeR3uC5nVaKwjTUYf8W4cs5L3nE1HxoDG9Q@mail.gmail.com>
+Message-ID: <CAHmME9o7_g=_yofAMBaABrPzbVrKryv9ucb=MhAB6CGC6g=4tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Versions of gcc prior to gcc 5 emitted a __multi3 function call when
-dealing with TI types, resulting in failures when trying to link to
-libgcc, and more generally, bad performance. However, since gcc 5,
-the compiler supports actually emitting fast instructions, which means
-we can at long last enable this option and receive the speedups.
+On Tue, Nov 7, 2017 at 1:55 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+> It appears your v4 adds __ashlti3() and __ashrti3, whereas the error
+> is about __lshrti3() being undefined.
 
-The gcc commit that added proper Aarch64 support is:
-https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
-This commit appears to be part of the gcc 5 release.
-
-There are still a few instructions, __ashlti3, __ashrti3, and __lshrti3
-which require libgcc, which is fine. Rather than linking to libgcc, we
-simply provide them ourselves, since they're not that complicated.
-
-Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
----
-Changes v4->v5:
-   - Add implementation of __lshrti3. (Note that __lshlti3 is not
-     a function.)
-
- arch/arm64/Makefile      |  2 ++
- arch/arm64/lib/Makefile  |  2 +-
- arch/arm64/lib/tishift.S | 80 ++++++++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 83 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/lib/tishift.S
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..1f8a0fec6998 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -53,6 +53,8 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
- KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
- KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
- 
-+KBUILD_CFLAGS	+= $(call cc-ifversion, -ge, 0500, -DCONFIG_ARCH_SUPPORTS_INT128)
-+
- ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
- KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
-diff --git a/arch/arm64/lib/Makefile b/arch/arm64/lib/Makefile
-index 9a8cb96555d6..4e696f96451f 100644
---- a/arch/arm64/lib/Makefile
-+++ b/arch/arm64/lib/Makefile
-@@ -3,7 +3,7 @@ lib-y		:= bitops.o clear_user.o delay.o copy_from_user.o	\
- 		   copy_to_user.o copy_in_user.o copy_page.o		\
- 		   clear_page.o memchr.o memcpy.o memmove.o memset.o	\
- 		   memcmp.o strcmp.o strncmp.o strlen.o strnlen.o	\
--		   strchr.o strrchr.o
-+		   strchr.o strrchr.o tishift.o
- 
- # Tell the compiler to treat all general purpose registers (with the
- # exception of the IP registers, which are already handled by the caller
-diff --git a/arch/arm64/lib/tishift.S b/arch/arm64/lib/tishift.S
-new file mode 100644
-index 000000000000..d3db9b2cd479
---- /dev/null
-+++ b/arch/arm64/lib/tishift.S
-@@ -0,0 +1,80 @@
-+/*
-+ * Copyright (C) 2017 Jason A. Donenfeld <Jason@zx2c4.com>. All Rights Reserved.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/linkage.h>
-+
-+ENTRY(__ashlti3)
-+	cbz	x2, 1f
-+	mov	x3, #64
-+	sub	x3, x3, x2
-+	cmp	x3, #0
-+	b.le	2f
-+	lsl	x1, x1, x2
-+	lsr	x3, x0, x3
-+	lsl	x2, x0, x2
-+	orr	x1, x1, x3
-+	mov	x0, x2
-+1:
-+	ret
-+2:
-+	neg	w1, w3
-+	mov	x2, #0
-+	lsl	x1, x0, x1
-+	mov	x0, x2
-+	ret
-+ENDPROC(__ashlti3)
-+
-+ENTRY(__ashrti3)
-+	cbz	x2, 1f
-+	mov	x3, #64
-+	sub	x3, x3, x2
-+	cmp	x3, #0
-+	b.le	2f
-+	lsr	x0, x0, x2
-+	lsl	x3, x1, x3
-+	asr	x2, x1, x2
-+	orr	x0, x0, x3
-+	mov	x1, x2
-+1:
-+	ret
-+2:
-+	neg	w0, w3
-+	asr	x2, x1, #63
-+	asr	x0, x1, x0
-+	mov	x1, x2
-+	ret
-+ENDPROC(__ashrti3)
-+
-+ENTRY(__lshrti3)
-+	cbz	x2, 1f
-+	mov	x3, #64
-+	sub	x3, x3, x2
-+	cmp	x3, #0
-+	b.le	2f
-+	lsr	x0, x0, x2
-+	lsl	x3, x1, x3
-+	lsr	x2, x1, x2
-+	orr	x0, x0, x3
-+	mov	x1, x2
-+1:
-+	ret
-+2:
-+	neg	w0, w3
-+	mov	x2, #0
-+	lsr	x0, x1, x0
-+	mov	x1, x2
-+	ret
-+ENDPROC(__lshrti3)
--- 
-2.15.0
+Whoopsie. v5 adds the final missing function. Looks like it now
+compiles for -next with the config you provided me.
