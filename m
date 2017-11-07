@@ -1,45 +1,67 @@
 From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Tue,  7 Nov 2017 13:49:59 +0100
-Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
-Message-ID: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
+Date: Tue,  7 Nov 2017 13:59:03 +0100
+Subject: [PATCH 1/1] add mali r6p2 dt node
+Message-ID: <1510059543-7064-1-git-send-email-giulio.benetti@micronovasrl.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On sun7i-a20-* there's no way to enable PA00--PA27 as RGB888 LCD0 pins.
+It seems there is not mali node in sun7i-a20.dtsi
 
-Add lcd_rgb888_pins in sun7i-a20.dtsi.
+Add mali node to sun7i-a20.dtsi
 
-It can be used on sun7i-a20-olinuxino-lime.dts.
-This patch gives possibility to set parallel lcd pins for RGB888.
-To be used with tcon0 in your <target>.dts
+This patch adds device tree mali node compatible with r6p2 utgard kernel driver 
+provided by ARM and patched by maxime ripard on his github.
 
-Best regards
-Giulio Benetti
-Micronova srl
+It can be easily used in target.dts with:
+
+&mali {
+	status = "okay";
+}
+
+then loading mali.ko in user space.
 
 Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
 ---
- arch/arm/boot/dts/sun7i-a20.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/sun7i-a20.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 228c368..b85a917 100644
+index 228c368..e402596 100644
 --- a/arch/arm/boot/dts/sun7i-a20.dtsi
 +++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -921,6 +921,14 @@
- 				pins = "PI20", "PI21";
- 				function = "uart7";
- 			};
-+
-+			lcd_rgb888_pins: lcd-rgb888 {
-+				pins = "PD0", "PD1", "PD2", "PD3", "PD4", "PD5", "PD6", "PD7", 
-+					"PD8", "PD9", "PD10", "PD11", "PD12", "PD13", "PD14", "PD15",
-+					"PD16", "PD17", "PD18", "PD19", "PD20", "PD21", "PD22", "PD23",
-+					"PD24", "PD25", "PD26", "PD27";
-+				function = "lcd0";
-+			};
+@@ -1216,6 +1216,33 @@
+ 			#size-cells = <0>;
  		};
  
- 		timer at 1c20c00 {
++		mali: gpu at 1c40000 {
++			compatible = "allwinner,sun8i-a23-mali",
++				     "allwinner,sun7i-a20-mali", "arm,mali-400";
++			reg = <0x01c40000 0x10000>;
++			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "gp",
++					  "gpmmu",
++					  "pp0",
++					  "ppmmu0",
++					  "pp1",
++					  "ppmmu1",
++					  "pmu";
++			clocks = <&ccu CLK_AHB_GPU>, <&ccu CLK_GPU>;
++			clock-names = "bus", "core";
++			resets = <&ccu RST_GPU>;
++			#cooling-cells = <2>;
++
++			assigned-clocks = <&ccu CLK_GPU>;
++			assigned-clock-rates = <381000000>;
++		};
++
+ 		gmac: ethernet at 1c50000 {
+ 			compatible = "allwinner,sun7i-a20-gmac";
+ 			reg = <0x01c50000 0x10000>;
 -- 
 2.7.4
