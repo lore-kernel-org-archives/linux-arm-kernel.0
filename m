@@ -1,111 +1,81 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:51 +0100
-Subject: [PULL 18/26] KVM: arm/arm64: Rework kvm_timer_should_fire
+Date: Tue,  7 Nov 2017 11:47:55 +0100
+Subject: [PULL 22/26] KVM: arm/arm64: vgic-its: Free caches when GITS_BASER
+ Valid bit is cleared
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-19-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-23-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <cdall@linaro.org>
+From: Eric Auger <eric.auger@redhat.com>
 
-kvm_timer_should_fire() can be called in two different situations from
-the kvm_vcpu_block().
+When the GITS_BASER<n>.Valid gets cleared, the data structures in
+guest RAM are not valid anymore. The device, collection
+and LPI lists stored in the in-kernel ITS represent the same
+information in some form of cache. So let's void the cache.
 
-The first case is before calling kvm_timer_schedule(), used for wait
-polling, and in this case the VCPU thread is running and the timer state
-is loaded onto the hardware so all we have to do is check if the virtual
-interrupt lines are asserted, becasue the timer interrupt handler
-functions will raise those lines as appropriate.
-
-The second case is inside the wait loop of kvm_vcpu_block(), where we
-have already called kvm_timer_schedule() and therefore the hardware will
-be disabled and the software view of the timer state is up to date
-(timer->loaded is false), and so we can simply check if the timer should
-fire by looking at the software state.
-
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_arch_timer.h |  3 ++-
- virt/kvm/arm/arch_timer.c    | 22 +++++++++++++++++++++-
- virt/kvm/arm/arm.c           |  3 +--
- 3 files changed, 24 insertions(+), 4 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 22 ++++++++++++++++++----
+ 1 file changed, 18 insertions(+), 4 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 2352f3a4e88b..01ee473517e2 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -78,7 +78,8 @@ int kvm_arm_timer_set_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
- int kvm_arm_timer_get_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
- int kvm_arm_timer_has_attr(struct kvm_vcpu *vcpu, struct kvm_device_attr *attr);
- 
--bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
-+bool kvm_timer_is_pending(struct kvm_vcpu *vcpu);
-+
- void kvm_timer_schedule(struct kvm_vcpu *vcpu);
- void kvm_timer_unschedule(struct kvm_vcpu *vcpu);
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 53d9bd4a734f..2035cf251701 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -49,6 +49,7 @@ static const struct kvm_irq_level default_vtimer_irq = {
- static bool kvm_timer_irq_can_fire(struct arch_timer_context *timer_ctx);
- static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- 				 struct arch_timer_context *timer_ctx);
-+static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
- 
- u64 kvm_phys_timer_read(void)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index d46256c07ba5..1732e08a4375 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -1431,7 +1431,7 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+ 				      unsigned long val)
  {
-@@ -226,7 +227,7 @@ static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
- 	return HRTIMER_NORESTART;
+ 	const struct vgic_its_abi *abi = vgic_its_get_abi(its);
+-	u64 entry_size, device_type;
++	u64 entry_size, table_type;
+ 	u64 reg, *regptr, clearbits = 0;
+ 
+ 	/* When GITS_CTLR.Enable is 1, we ignore write accesses. */
+@@ -1442,12 +1442,12 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+ 	case 0:
+ 		regptr = &its->baser_device_table;
+ 		entry_size = abi->dte_esz;
+-		device_type = GITS_BASER_TYPE_DEVICE;
++		table_type = GITS_BASER_TYPE_DEVICE;
+ 		break;
+ 	case 1:
+ 		regptr = &its->baser_coll_table;
+ 		entry_size = abi->cte_esz;
+-		device_type = GITS_BASER_TYPE_COLLECTION;
++		table_type = GITS_BASER_TYPE_COLLECTION;
+ 		clearbits = GITS_BASER_INDIRECT;
+ 		break;
+ 	default:
+@@ -1459,10 +1459,24 @@ static void vgic_mmio_write_its_baser(struct kvm *kvm,
+ 	reg &= ~clearbits;
+ 
+ 	reg |= (entry_size - 1) << GITS_BASER_ENTRY_SIZE_SHIFT;
+-	reg |= device_type << GITS_BASER_TYPE_SHIFT;
++	reg |= table_type << GITS_BASER_TYPE_SHIFT;
+ 	reg = vgic_sanitise_its_baser(reg);
+ 
+ 	*regptr = reg;
++
++	if (!(reg & GITS_BASER_VALID)) {
++		/* Take the its_lock to prevent a race with a save/restore */
++		mutex_lock(&its->its_lock);
++		switch (table_type) {
++		case GITS_BASER_TYPE_DEVICE:
++			vgic_its_free_device_list(kvm, its);
++			break;
++		case GITS_BASER_TYPE_COLLECTION:
++			vgic_its_free_collection_list(kvm, its);
++			break;
++		}
++		mutex_unlock(&its->its_lock);
++	}
  }
  
--bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
-+static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
- {
- 	u64 cval, now;
- 
-@@ -239,6 +240,25 @@ bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx)
- 	return cval <= now;
- }
- 
-+bool kvm_timer_is_pending(struct kvm_vcpu *vcpu)
-+{
-+	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
-+
-+	if (vtimer->irq.level || ptimer->irq.level)
-+		return true;
-+
-+	/*
-+	 * When this is called from withing the wait loop of kvm_vcpu_block(),
-+	 * the software view of the timer state is up to date (timer->loaded
-+	 * is false), and so we can simply check if the timer should fire now.
-+	 */
-+	if (!vtimer->loaded && kvm_timer_should_fire(vtimer))
-+		return true;
-+
-+	return kvm_timer_should_fire(ptimer);
-+}
-+
- /*
-  * Reflect the timer output level into the kvm_run structure
-  */
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 14c50d142c67..bc126fb99a3d 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -307,8 +307,7 @@ void kvm_arch_vcpu_destroy(struct kvm_vcpu *vcpu)
- 
- int kvm_cpu_has_pending_timer(struct kvm_vcpu *vcpu)
- {
--	return kvm_timer_should_fire(vcpu_vtimer(vcpu)) ||
--	       kvm_timer_should_fire(vcpu_ptimer(vcpu));
-+	return kvm_timer_is_pending(vcpu);
- }
- 
- void kvm_arch_vcpu_blocking(struct kvm_vcpu *vcpu)
+ static unsigned long vgic_mmio_read_its_ctlr(struct kvm *vcpu,
 -- 
 2.14.2
