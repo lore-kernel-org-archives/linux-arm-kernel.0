@@ -1,45 +1,40 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Nov 2017 22:28:36 +0100
-Subject: [PATCH v5 16/26] KVM: arm/arm64: GICv4: Propagate property
- updates to VLPIs
-In-Reply-To: <20171027142855.21584-17-marc.zyngier@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-17-marc.zyngier@arm.com>
-Message-ID: <6763d90f-93bf-ddbb-d456-5979b8870aa2@redhat.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Tue, 7 Nov 2017 22:36:00 +0100
+Subject: [PATCH v4 0/4] fix the clock setting for SAR ADC
+In-Reply-To: <20171107140942.29243-1-yixun.lan@amlogic.com>
+References: <20171107140942.29243-1-yixun.lan@amlogic.com>
+Message-ID: <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Yixun,
 
-On 27/10/2017 16:28, Marc Zyngier wrote:
-> Upon updating a property, we propagate it all the way to the physical
-> ITS, and ask for an INV command to be executed there.
-> 
-> Acked-by: Christoffer Dall <cdall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index 0b7e648e7a0c..2e77c7c83942 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -296,6 +296,9 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
->  		spin_unlock(&irq->irq_lock);
->  	}
->  
-> +	if (irq->hw)
-> +		return its_prop_update_vlpi(irq->host_irq, prop, true);
-> +
->  	return 0;
->  }
-I am confused by the vgic_queue_irq_unlock() on the "hw" path. Why is it
-needed in hw mode?
+On Tue, Nov 7, 2017 at 3:09 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+> patch [1/4]:
+>   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
+> the published datasheets[4] also has wrong description about this.
+>   This patch should be explicitly merged *before* other patches.
+>
+> patch [2-4/4]:
+>   Drop the "sana" clock from SAR ADC module,
+I agree with Jerome that patch 2/4 should be applied last.
+when I wrote the driver I couldn't get it to work on my GXBB board
+(which unfortunately has died since then) because the clocks were
+disabled (they weren't enabled by the bootloader). people who are
+using an old .dtb would get the same problem again until the clock
+driver is merged
 
-Thanks
+>   From the hardware perspective, the SAR ADC module doesn't
+> require "sana" clock to wrok. This should apply to all SoC,
+> including meson6,8, GXBB, GXL..
+thank you for clarifying this!
 
-Eric
+> Note: the whole patchset series has been tested at GXL-P212 board,
+> we haven't got any meson6,8 board to test, so I would appreciate
+> if someone (Martin?) could help to confirm it works there.
+I can test this on a Meson8b and a Meson8m2 board on the weekend -
+I'll let you know about the results
 
->  
-> 
+
+Regards
+Martin
