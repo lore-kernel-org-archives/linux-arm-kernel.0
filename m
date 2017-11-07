@@ -1,52 +1,50 @@
 From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Tue,  7 Nov 2017 15:10:46 +0000
-Subject: [PATCH 5/8] ARM: dts: iwg22d-sodimm-dbhd-ca: Add can1 support to HDMI
- DB
+Date: Tue,  7 Nov 2017 15:10:45 +0000
+Subject: [PATCH 4/8] ARM: dts: iwg22d-sodimm: Add can0 support to carrier board
 In-Reply-To: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
 References: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <1510067449-17017-6-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <1510067449-17017-5-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CAN1 interface is exposed via connector J1 found on the HDMI daughter
-board. This patch enables can1 DT node from within the daughter board
-specific device tree.
+This patch enables CAN0 interface exposed through connector J15 on the
+carrier board.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 ---
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts | 12 ++++++++++++
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
-index a8a4ec8..d34de82 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
-+++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
-@@ -54,6 +54,13 @@
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+index 80c82aa..39ce7e7 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+@@ -59,6 +59,13 @@
  	};
  };
  
-+&can1 {
-+	pinctrl-0 = <&can1_pins>;
++&can0 {
++	pinctrl-0 = <&can0_pins>;
 +	pinctrl-names = "default";
 +
 +	status = "okay";
 +};
 +
- &hscif2 {
- 	pinctrl-0 = <&hscif2_pins>;
+ &hscif1 {
+ 	pinctrl-0 = <&hscif1_pins>;
  	pinctrl-names = "default";
-@@ -105,6 +112,11 @@
- };
+@@ -85,6 +92,11 @@
+ 		function = "avb";
+ 	};
  
- &pfc {
-+	can1_pins: can1 {
-+		groups = "can1_data_b";
-+		function = "can1";
++	can0_pins: can0 {
++		groups = "can0_data";
++		function = "can0";
 +	};
 +
- 	du0_pins: du0 {
- 		groups = "du0_rgb888", "du0_sync", "du0_disp", "du0_clk0_out";
- 		function = "du0";
+ 	hscif1_pins: hscif1 {
+ 		groups = "hscif1_data", "hscif1_ctrl";
+ 		function = "hscif1";
 -- 
 2.7.4
