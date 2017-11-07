@@ -1,50 +1,82 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 7 Nov 2017 13:41:42 +0800
-Subject: [PATCH v3 1/4] clk: meson: gxbb: fix wrong clock for SARADC/SANA
-Message-ID: <20171107054142.7935-1-yixun.lan@amlogic.com>
+Date: Tue, 7 Nov 2017 13:44:38 +0800
+Subject: [PATCH] clk: meson: gxbb: fix wrong clock for SARADC/SANA
+In-Reply-To: <CAFBinCD4XTcunKx+heiRzW+g1b_sDL7wV5oMqPsE3ESP6Cf4_A@mail.gmail.com>
+References: <20171106075212.14275-1-yixun.lan@amlogic.com>
+ <889b8fd5-31e4-1371-6121-0f1aec6fa777@baylibre.com>
+ <c773682c-6045-a476-e0c8-04347624c4e3@amlogic.com>
+ <CAFBinCD4XTcunKx+heiRzW+g1b_sDL7wV5oMqPsE3ESP6Cf4_A@mail.gmail.com>
+Message-ID: <bb13a301-1f91-a37a-26ad-7dcc190a2b84@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-According to the datasheet, in Meson-GXBB/GXL series,
-The clock gate bit for SARADC is HHI_GCLK_MPEG2 bit[22],
-while clock gate bit for SANA is HHI_GCLK_MPEG0 bit[10].
+Hi Martin
 
-Test passed at gxl-s905x-p212 board.
-
-The following published datasheets are wrong and should be updated
-[1] GXBB v1.1.4, page 57
-http://dn.odroid.com/S905/DataSheet/S905_Public_Datasheet_V1.1.4.pdf
-[2] GXL v0.3_20170314, page
-http://www.mediafire.com/file/5bpt054va5ut7v9/S905X_Datasheet_V0.3_20170314publicversion-Wesion.pdf
-
-Fixes: 7ba64d82b358 ("gxbb: clk: Adjust MESON_GATE macro to be shared..")
-Tested-by: Xingyu Chen <xingyu.chen@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- drivers/clk/meson/gxbb.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
-index b2d1e8ed7152..92168348ffa6 100644
---- a/drivers/clk/meson/gxbb.c
-+++ b/drivers/clk/meson/gxbb.c
-@@ -1139,7 +1139,7 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
- static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
- static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
- static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
--static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
-+static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG0, 10);
- static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
- static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
- static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
-@@ -1190,7 +1190,7 @@ static MESON_GATE(gxbb_usb0_ddr_bridge, HHI_GCLK_MPEG2, 9);
- static MESON_GATE(gxbb_mmc_pclk, HHI_GCLK_MPEG2, 11);
- static MESON_GATE(gxbb_dvin, HHI_GCLK_MPEG2, 12);
- static MESON_GATE(gxbb_uart2, HHI_GCLK_MPEG2, 15);
--static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG2, 22);
-+static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG2, 22);
- static MESON_GATE(gxbb_vpu_intr, HHI_GCLK_MPEG2, 25);
- static MESON_GATE(gxbb_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
- static MESON_GATE(gxbb_clk81_a53, HHI_GCLK_MPEG2, 29);
--- 
-2.14.1
+On 11/07/17 06:03, Martin Blumenstingl wrote:
+> Hi Yixun,
+> 
+> On Mon, Nov 6, 2017 at 10:31 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+>> Hi Neil:
+>>
+>>
+>> On 11/06/17 16:57, Neil Armstrong wrote:
+>>> On 06/11/2017 08:52, Yixun Lan wrote:
+>>>> According to the datasheet, in Meson-GXBB/GXL series,
+>>>> The clock gate bit for SARADC is HHI_GCLK_MPEG2 bit[22],
+>>>> while clock gate bit for SANA is HHI_GCLK_MPEG0 bit[10].
+>>>>
+>>>> Test passed at gxl_skt dev board.
+>>>>
+>>>> Tested-by: Xingyu Chen <xingyu.chen@amlogic.com>
+>>>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>>>>
+>>>> ---
+>>>> I think this error was introduced by a copy & paste from meson8 code?
+>>>> and we didn't notice them due to the SANA clock is also enabled by
+>>>> DTS (so SAR_ADC works fine)?
+>>>> ---
+>>>>  drivers/clk/meson/gxbb.c | 4 ++--
+>>>>  1 file changed, 2 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+>>>> index b2d1e8ed7152..92168348ffa6 100644
+>>>> --- a/drivers/clk/meson/gxbb.c
+>>>> +++ b/drivers/clk/meson/gxbb.c
+>>>> @@ -1139,7 +1139,7 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
+>>>>  static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
+>>>>  static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
+>>>>  static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
+>>>> -static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
+>>>> +static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG0, 10);
+>>>>  static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
+>>>>  static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
+>>>>  static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
+>>>> @@ -1190,7 +1190,7 @@ static MESON_GATE(gxbb_usb0_ddr_bridge, HHI_GCLK_MPEG2, 9);
+>>>>  static MESON_GATE(gxbb_mmc_pclk, HHI_GCLK_MPEG2, 11);
+>>>>  static MESON_GATE(gxbb_dvin, HHI_GCLK_MPEG2, 12);
+>>>>  static MESON_GATE(gxbb_uart2, HHI_GCLK_MPEG2, 15);
+>>>> -static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG2, 22);
+>>>> +static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG2, 22);
+>>>>  static MESON_GATE(gxbb_vpu_intr, HHI_GCLK_MPEG2, 25);
+>>>>  static MESON_GATE(gxbb_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
+>>>>  static MESON_GATE(gxbb_clk81_a53, HHI_GCLK_MPEG2, 29);
+>>>>
+>>>
+>>> Hi Yixun,
+>>>
+>>> Can you precise how it affects the saradc driver ? from the DT and clk PoV ?
+>>>
+>> the saradc module doesn't require sana clock (it's irrelvevant), we will
+>> send a patchset v3 to address this.
+> is the SANA clock irrelevant for the SAR ADC on all SoCs (even
+> Meson8/Meson8b/Meson8m2) or just on the GX SoCs?
+> also, do you know what "SANA" stands for?
+> 
+> 
+> Regards
+> Martin
+> 
+> .
+> 
+the sana clock irrelevant for all SoCs (including meson8/8b/8m2)
+SANA  stands for Stream Analyzer
