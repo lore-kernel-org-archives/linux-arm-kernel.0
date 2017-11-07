@@ -1,65 +1,53 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Tue,  7 Nov 2017 21:13:25 +0100
-Subject: [PATCH 1/2] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
-Message-ID: <20171107201326.17401-1-clabbe.montjoie@gmail.com>
+From: eric.auger@redhat.com (Auger Eric)
+Date: Tue, 7 Nov 2017 21:15:29 +0100
+Subject: [PATCH v5 11/26] KVM: arm/arm64: GICv4: Handle INT command
+ applied to a VLPI
+In-Reply-To: <20171027142855.21584-12-marc.zyngier@arm.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-12-marc.zyngier@arm.com>
+Message-ID: <6e12eac9-7b75-2c2c-0c79-d17a3c0d65eb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
+Hi Marc,
 
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a83t.dtsi | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+On 27/10/2017 16:28, Marc Zyngier wrote:
+> If the guest issues an INT command targetting a VLPI, let's
+> call into the irq_set_irqchip_state() helper to make it pending
+> on the physical side.
+> 
+> This works just as well if userspace decides to inject an interrupt
+> using the normal userspace API...
+There is also another path:
+KVM_SIGNAL_MSI ioctl / kvm_send_userspace_msi / kvm_set_msi /
+vgic_its_inject_msi / vgic_its_trigger_msi
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 19acae1b4089..68e5135410ec 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -336,6 +336,14 @@
- 			#interrupt-cells = <3>;
- 			#gpio-cells = <3>;
- 
-+			emac_rgmii_pins: emac-rgmii-pins {
-+				pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-+				       "PD11", "PD12", "PD13", "PD14", "PD18",
-+				       "PD19", "PD21", "PD22", "PD23";
-+				function = "gmac";
-+				drive-strength = <40>;
-+			};
-+
- 			mmc0_pins: mmc0-pins {
- 				pins = "PF0", "PF1", "PF2",
- 				       "PF3", "PF4", "PF5";
-@@ -440,6 +448,27 @@
- 			status = "disabled";
- 		};
- 
-+		emac: ethernet at 1c30000 {
-+			compatible = "allwinner,sun8i-a83t-emac";
-+			syscon = <&syscon>;
-+			reg = <0x01c30000 0x104>;
-+			interrupts = <GIC_SPI 82 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "macirq";
-+			resets = <&ccu 13>;
-+			reset-names = "stmmaceth";
-+			clocks = <&ccu 27>;
-+			clock-names = "stmmaceth";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			mdio: mdio {
-+				compatible = "snps,dwmac-mdio";
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+			};
-+		};
-+
- 		gic: interrupt-controller at 1c81000 {
- 			compatible = "arm,cortex-a7-gic", "arm,cortex-a15-gic";
- 			reg = <0x01c81000 0x1000>,
--- 
-2.13.6
+I wonder whether we shouldn't prevent the userspace from messing up with
+the host irq pending state?
+
+Thanks
+
+Eric
+> 
+> Acked-by: Christoffer Dall <cdall@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+> index 89768d2b6a91..b2a678d131d0 100644
+> --- a/virt/kvm/arm/vgic/vgic-its.c
+> +++ b/virt/kvm/arm/vgic/vgic-its.c
+> @@ -578,6 +578,10 @@ static int vgic_its_trigger_msi(struct kvm *kvm, struct vgic_its *its,
+>  	if (err)
+>  		return err;
+>  
+> +	if (irq->hw)
+> +		return irq_set_irqchip_state(irq->host_irq,
+> +					     IRQCHIP_STATE_PENDING, true);
+> +
+>  	spin_lock(&irq->irq_lock);
+>  	irq->pending_latch = true;
+>  	vgic_queue_irq_unlock(kvm, irq);
+> 
