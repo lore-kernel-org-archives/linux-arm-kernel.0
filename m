@@ -1,7 +1,9 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 7 Nov 2017 13:37:27 +0800
-Subject: [PATCH v3 4/4] ARM64: dts: meson: drop "sana" clock from SAR ADC
-Message-ID: <20171107053728.32169-1-yixun.lan@amlogic.com>
+Date: Tue, 7 Nov 2017 13:37:28 +0800
+Subject: [PATCH v3 4/4] ARM64: dts: meson: drop "sana" clock from SARADC
+In-Reply-To: <20171107053728.32169-1-yixun.lan@amlogic.com>
+References: <20171107053728.32169-1-yixun.lan@amlogic.com>
+Message-ID: <20171107053728.32169-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
