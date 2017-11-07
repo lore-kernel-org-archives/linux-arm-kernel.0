@@ -1,54 +1,74 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 7 Nov 2017 12:09:27 +0100
-Subject: [PATCH] ARM: dts: iwg20d-q7: Add support for ttySC3
-In-Reply-To: <TY1PR06MB0895D27B9C7F2D3B3113654EC0460@TY1PR06MB0895.apcprd06.prod.outlook.com>
-References: <1507539981-4193-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <CAMuHMdUprE7QuXF_sX47JyrvuZXhXnQFufy4OHeJ5ExwwoogKw@mail.gmail.com>
- <TY1PR06MB0895D27B9C7F2D3B3113654EC0460@TY1PR06MB0895.apcprd06.prod.outlook.com>
-Message-ID: <CAMuHMdXPSUmNiFF7gmkWng5OA_U4DUF+4uohjkjvuMPwgffj-g@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 7 Nov 2017 12:10:00 +0100
+Subject: [PATCH 07/37] KVM: arm/arm64: Add kvm_vcpu_load_sysregs and
+ kvm_vcpu_put_sysregs
+In-Reply-To: <20171012104141.26902-8-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-8-christoffer.dall@linaro.org>
+Message-ID: <20171107111000.uwpiofgbchm3s5gn@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabrizio,
+On Thu, Oct 12, 2017 at 12:41:11PM +0200, Christoffer Dall wrote:
+> As we are about to move a buch of save/restore logic for VHE kernels to
+> the load and put functions, we need some infrastructure to do this.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_host.h   |  3 +++
+>  arch/arm64/include/asm/kvm_host.h |  3 +++
+>  arch/arm64/kvm/hyp/sysreg-sr.c    | 27 +++++++++++++++++++++++++++
+>  virt/kvm/arm/arm.c                |  2 ++
+>  4 files changed, 35 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 1100170..13f8165 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -290,4 +290,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+>  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+>  			       struct kvm_device_attr *attr);
+>  
+> +static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
+> +static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
+> +
+>  #endif /* __ARM_KVM_HOST_H__ */
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 27305e7..7d3bfa7 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -383,4 +383,7 @@ static inline void __cpu_init_stage2(void)
+>  		  "PARange is %d bits, unsupported configuration!", parange);
+>  }
+>  
+> +void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
+> +void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
+> +
+>  #endif /* __ARM64_KVM_HOST_H__ */
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index c54cc2a..b7438c8 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -183,3 +183,30 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+>  	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+>  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
+>  }
+> +
+> +/**
+> + * kvm_vcpu_load_sysregs - Load guest system register to physical CPU
+> + *
+> + * @vcpu: The VCPU pointer
+> + *
+> + * If the kernel runs in EL2 then load the system register state for the VCPU
+> + * for EL1 onto the physical CPU so that we can go back and foward between the
+> + * VM and the hypervisor without switching all this state around.
 
-On Mon, Oct 23, 2017 at 3:25 PM, Fabrizio Castro
-<fabrizio.castro@bp.renesas.com> wrote:
->> > > --- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
->> > > +++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
->> > > @@ -11,6 +11,7 @@
->> > >  / {
->> > >         aliases {
->> > >                 serial0 = &scif0;
->> > > +               serial3 = &scifb1;
->> >
->> > Given this port is not labeled "serial3", but called "data uart", you may want
->> > to add a comment to avoid confusion:
->>
->> It's a little bit confusing, isn't it? The lines related to such interface are named as UART0_x on the carrier board schematic, the section
->> of the schematic that contains the header is named "data uart header", and the board documentation names it explicitly as "UART 3 -
->> /dev/ttySC3 (SCIFB1)".
+Actually, on second thought, I'm a bit confused by this comment. Maybe
+it'll be clearer after the code that goes here will be added, but, ATM,
+I'm not sure why we want to specifically load EL1 VCPU state here. Will
+that always be the case, even with nested? Also, I'm not sure what
+alternative loading scheme we're avoiding in order to ensure the state
+isn't "switched around", which I don't really understand either.
 
-And you cannot use "serial0" (to match "UART0"), as that's already in use
-for the SOM...
-
->> I don't think there is anything we can do to make this easier for the user really, is there? :D
->> If we decide to add a comment to serial 3, I guess we need to be consistent and add comments for the other serial interfaces too.
->> If you still prefer having a comment there I'll send a v2 and patch(es) for adding comments to the other interfaces, just let me know.
->
-> Any thoughts about this?
-
-Making life easier for the user is good.
-Consistency is also good.
-
-I have no strong feelings about this, so do as you please...
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+drew
