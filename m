@@ -1,47 +1,38 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 07 Nov 2017 12:03:59 +0000
-Subject: [PATCH] arm64: Make ARMV8_DEPRECATED depend on SYSCTL
-In-Reply-To: <1509991631-7938-1-git-send-email-Dave.Martin@arm.com> (Dave
- Martin's message of "Mon, 6 Nov 2017 18:07:11 +0000")
-References: <1509991631-7938-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87y3nicn2o.fsf@e105922-lin.cambridge.arm.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 7 Nov 2017 12:19:13 +0000
+Subject: Performance issues writing to PCIe in a Zynq
+In-Reply-To: <1510045454475.74232@axon.tv>
+References: <1509636637116.27702@axon.tv>
+ <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>
+ <20171103135457.GA8457@bhelgaas-glaptop.roam.corp.google.com>
+ <1509958288489.45871@axon.tv>,
+ <20171106173549.GB31930@bhelgaas-glaptop.roam.corp.google.com>
+ <1510045454475.74232@axon.tv>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6DD00B3AB2@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin <Dave.Martin@arm.com> writes:
+From: Ruben Guerra Marin
+> Sent: 07 November 2017 09:04
+> > Which PCI host bridge driver are you using?
+> Indeed I am using drivers/pci/host/pcie-xilinx.c
+> 
+> > Can you do any profiling to figure out where the time is going?
+> So I did some profiling on the mcap application, and traced the bottleneck in a write call to
+> pciutils. I added some debug to pciutils and could trace it that the bottleneck is in a function
+> called pwrite, which pretty much does this:
+> 
+> syscall(SYS_pwrite, fd, buf, size, where);
+> 
+> until now this is the last part I could trace it to.
 
-> If CONFIG_SYSCTL=n and CONFIG_ARMV8_DEPRECATED=y, the deprecated
-> instruction emulation code currently leaks some memory at boot
-> time, and won't have any runtime control interface.  This does
-> not feel like useful or intended behaviour...
->
-> This patch adds a dependency on CONFIG_SYSCTL, so that such a
-> kernel can't be built in the first place.
->
-> It's probably not worth adding the error-handling / cleanup code
-> that would be needed to deal with this otherwise: people who
-> desperately need the emulation can still enable SYSCTL.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/Kconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 1046074..df296b7 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -807,6 +807,7 @@ config FORCE_MAX_ZONEORDER
->  menuconfig ARMV8_DEPRECATED
->  	bool "Emulate deprecated/obsolete ARMv8 instructions"
->  	depends on COMPAT
-> +	depends on SYSCTL
->  	help
->  	  Legacy software support may require certain instructions
->  	  that have been deprecated or obsoleted in the architecture.
+Are you doing one pwrite() for each 32-bit word?
+If you are trying to write a large fpga image you'll need to use
+a single system call.
+I'd suspect that needs a special driver....
 
-Adding the dependency makes sense.
+I'd also check that the driver size isn't doing single word copy_from_user().
+That can be completely horrid in recent kernels because of userspace copy
+hardening.
 
-Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
-Thanks!
+	David
