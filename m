@@ -1,145 +1,84 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 7 Nov 2017 14:58:28 +0100
-Subject: [PATCH v1 2/2] drm/stm: ltdc: add a 2nd endpoint
-In-Reply-To: <1509018489-19641-3-git-send-email-philippe.cornu@st.com>
-References: <1509018489-19641-1-git-send-email-philippe.cornu@st.com>
- <1509018489-19641-3-git-send-email-philippe.cornu@st.com>
-Message-ID: <CA+M3ks6T5zcHr3uoyRCdg69LS5be-Erc20YHX7_e645WkmvTmg@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Tue, 7 Nov 2017 15:09:19 +0100
+Subject: [PATCH 09/37] KVM: arm64: Move debug dirty flag calculation out
+ of world switch
+In-Reply-To: <20171012104141.26902-10-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-10-christoffer.dall@linaro.org>
+Message-ID: <20171107140919.p6act55ubmzlv66b@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-10-26 13:48 GMT+02:00 Philippe Cornu <philippe.cornu@st.com>:
-> ltdc can have up to 2 endpoints:
->  - dpi external gpios: for rgb panels or external bridge ICs.
->  - dpi internal ios: connected internally to dsi.
->
-> Note: Refer to the reference manual to know if the dsi is
-> present on your device.
-
-Applied on drm-misc-next
-Thanks
-
-Benjamin
-
-> Signed-off-by: Philippe Cornu <philippe.cornu@st.com>
+On Thu, Oct 12, 2017 at 12:41:13PM +0200, Christoffer Dall wrote:
+> There is no need to figure out inside the world-switch if we should
+> save/restore the debug registers or not, we can might as well do that in
+> the higher level debug setup code, making it easier to optimize down the
+> line.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
->  drivers/gpu/drm/stm/ltdc.c | 64 ++++++++++++++++++++++++++++++++--------------
->  1 file changed, 45 insertions(+), 19 deletions(-)
->
-> diff --git a/drivers/gpu/drm/stm/ltdc.c b/drivers/gpu/drm/stm/ltdc.c
-> index d5c8a42..38a6739 100644
-> --- a/drivers/gpu/drm/stm/ltdc.c
-> +++ b/drivers/gpu/drm/stm/ltdc.c
-> @@ -33,6 +33,8 @@
->
->  #define MAX_IRQ 4
->
-> +#define MAX_ENDPOINTS 2
+>  arch/arm64/kvm/debug.c        | 9 +++++++++
+>  arch/arm64/kvm/hyp/debug-sr.c | 6 ------
+>  2 files changed, 9 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index dbadfaf..62550de19 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -193,6 +193,15 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+>  	if (trap_debug)
+>  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
+>  
+> +	/*
+> +	 * If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
+> +	 * a full save/restore cycle.
+
+The commit message implies testing KVM_ARM64_DEBUG_DIRTY, but it only
+tests KDE and MDE.
+
+> +	 */
+> +	if ((vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_KDE) ||
+> +	    (vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_MDE))
+
+nit: could also write as
+
+ if (vcpu_sys_reg(vcpu, MDSCR_EL1) & (DBG_MDSCR_KDE | DBG_MDSCR_MDE))
+
+> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
 > +
->  #define HWVER_10200 0x010200
->  #define HWVER_10300 0x010300
->  #define HWVER_20101 0x020101
-> @@ -886,18 +888,33 @@ int ltdc_load(struct drm_device *ddev)
->         struct ltdc_device *ldev = ddev->dev_private;
->         struct device *dev = ddev->dev;
->         struct device_node *np = dev->of_node;
-> -       struct drm_bridge *bridge;
-> -       struct drm_panel *panel;
-> +       struct drm_bridge *bridge[MAX_ENDPOINTS] = {NULL};
-> +       struct drm_panel *panel[MAX_ENDPOINTS] = {NULL};
->         struct drm_crtc *crtc;
->         struct reset_control *rstc;
->         struct resource *res;
-> -       int irq, ret, i;
-> +       int irq, ret, i, endpoint_not_ready = -ENODEV;
->
->         DRM_DEBUG_DRIVER("\n");
->
-> -       ret = drm_of_find_panel_or_bridge(np, 0, 0, &panel, &bridge);
-> -       if (ret)
-> -               return ret;
-> +       /* Get endpoints if any */
-> +       for (i = 0; i < MAX_ENDPOINTS; i++) {
-> +               ret = drm_of_find_panel_or_bridge(np, 0, i, &panel[i],
-> +                                                 &bridge[i]);
+
+It looks like there's only one flag for debug_flags - this dirty flag,
+which I guess is also used to trigger trapping. So maybe this could be a
+second flag of a "lazy state" field, as I suggested earlier?
+
 > +
-> +               /*
-> +                * If at least one endpoint is ready, continue probing,
-> +                * else if at least one endpoint is -EPROBE_DEFER and
-> +                * there is no previous ready endpoints, defer probing.
-> +                */
-> +               if (!ret)
-> +                       endpoint_not_ready = 0;
-> +               else if (ret == -EPROBE_DEFER && endpoint_not_ready)
-> +                       endpoint_not_ready = -EPROBE_DEFER;
-> +       }
-> +
-> +       if (endpoint_not_ready)
-> +               return endpoint_not_ready;
->
->         rstc = devm_reset_control_get_exclusive(dev, NULL);
->
-> @@ -958,19 +975,25 @@ int ltdc_load(struct drm_device *ddev)
->
->         DRM_INFO("ltdc hw version 0x%08x - ready\n", ldev->caps.hw_version);
->
-> -       if (panel) {
-> -               bridge = drm_panel_bridge_add(panel, DRM_MODE_CONNECTOR_DPI);
-> -               if (IS_ERR(bridge)) {
-> -                       DRM_ERROR("Failed to create panel-bridge\n");
-> -                       ret = PTR_ERR(bridge);
-> -                       goto err;
-> +       /* Add endpoints panels or bridges if any */
-> +       for (i = 0; i < MAX_ENDPOINTS; i++) {
-> +               if (panel[i]) {
-> +                       bridge[i] = drm_panel_bridge_add(panel[i],
-> +                                                       DRM_MODE_CONNECTOR_DPI);
-> +                       if (IS_ERR(bridge[i])) {
-> +                               DRM_ERROR("panel-bridge endpoint %d\n", i);
-> +                               ret = PTR_ERR(bridge[i]);
-> +                               goto err;
-> +                       }
->                 }
-> -       }
->
-> -       ret = ltdc_encoder_init(ddev, bridge);
-> -       if (ret) {
-> -               DRM_ERROR("Failed to init encoder\n");
-> -               goto err;
-> +               if (bridge[i]) {
-> +                       ret = ltdc_encoder_init(ddev, bridge[i]);
-> +                       if (ret) {
-> +                               DRM_ERROR("init encoder endpoint %d\n", i);
-> +                               goto err;
-> +                       }
-> +               }
->         }
->
->         crtc = devm_kzalloc(dev, sizeof(*crtc), GFP_KERNEL);
-> @@ -998,7 +1021,8 @@ int ltdc_load(struct drm_device *ddev)
->         return 0;
->
->  err:
-> -       drm_panel_bridge_remove(bridge);
-> +       for (i = 0; i < MAX_ENDPOINTS; i++)
-> +               drm_panel_bridge_remove(bridge[i]);
->
->         clk_disable_unprepare(ldev->pixel_clk);
->
-> @@ -1008,10 +1032,12 @@ int ltdc_load(struct drm_device *ddev)
->  void ltdc_unload(struct drm_device *ddev)
->  {
->         struct ltdc_device *ldev = ddev->dev_private;
-> +       int i;
->
->         DRM_DEBUG_DRIVER("\n");
->
-> -       drm_of_panel_bridge_remove(ddev->dev->of_node, 0, 0);
-> +       for (i = 0; i < MAX_ENDPOINTS; i++)
-> +               drm_of_panel_bridge_remove(ddev->dev->of_node, 0, i);
->
->         clk_disable_unprepare(ldev->pixel_clk);
+>  	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
+>  	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_sys_reg(vcpu, MDSCR_EL1));
 >  }
-> --
-> 1.9.1
+> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> index f5154ed..0fc0758 100644
+> --- a/arch/arm64/kvm/hyp/debug-sr.c
+> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> @@ -172,12 +172,6 @@ void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
+>  
+>  void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+>  {
+> -	/* If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
+> -	 * a full save/restore cycle. */
+> -	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
+> -	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_MDE))
+> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+> -
+>  	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+>  			   kern_hyp_va(vcpu->arch.host_cpu_context));
+>  	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
+> -- 
+> 2.9.0
 >
+
+Also, while grepping, I noticed __debug_cond_restore_host_state() unsets
+KVM_ARM64_DEBUG_DIRTY on that condition that it's set. A micro
+optimization could be to do it unconditionally, removing the branch.
+
+Thanks,
+drew
