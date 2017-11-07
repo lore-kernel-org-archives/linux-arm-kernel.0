@@ -1,37 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  7 Nov 2017 15:12:36 +0100
-Subject: [PATCH] pinctrl: samsung/s3c24xx: add CONFIG_OF dependency
-Message-ID: <20171107141244.3377780-1-arnd@arndb.de>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 7 Nov 2017 15:14:31 +0100
+Subject: [GIT PULL v2] Mediatek: 32-bit DTS updates for v4.15
+In-Reply-To: <8a52a27e-f930-e873-6803-233dfa48b087@gmail.com>
+References: <8a52a27e-f930-e873-6803-233dfa48b087@gmail.com>
+Message-ID: <6fcfb359-6486-3051-1d6a-1eb18e6f0bc4@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver fails to build without CONFIG_OF:
+Hi Arnd,
 
-drivers/pinctrl/samsung/pinctrl-samsung.c: In function 'samsung_gpiolib_register':
-drivers/pinctrl/samsung/pinctrl-samsung.c:936:5: error: 'struct gpio_chip' has no member named 'of_node'
+On 11/02/2017 07:52 PM, Matthias Brugger wrote:
+> Hi Arnd and Olof,
+> 
+> Please pull the following commits. This is version 2 of the pull request. I
+> dropped the PCI nodes addition as it needs more clarification.
+> 
+> Thanks
+> Matthias
+> 
+> ---
+> 
+> The following changes since commit 2bd6bf03f4c1c59381d62c61d03f6cc3fe71f66e:
+> 
+>   Linux 4.14-rc1 (2017-09-16 15:47:51 -0700)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.14-next-dts32-2
+> 
+> for you to fetch changes up to eb54a522f164f89587381d665307d53acf75f114:
+> 
+>   arm: dts: mt7623: remove unused compatible string for pio node (2017-11-02
+> 19:43:20 +0100)
+> 
+> ----------------------------------------------------------------
+> - mt7623 update nodes to binding description
+> - mt2701 add display pwn nodes
+> - mt2701 update audio node description
+> 
+> ----------------------------------------------------------------
+> Ryder Lee (4):
+>       arm: dts: mediatek: update audio node for mt2701 and mt7623
+>       arm: dts: mt7623: update crypto node
+>       arm: dts: mt7623: update usb related nodes
+>       arm: dts: mt7623: remove unused compatible string for pio node
+> 
+> Weiqing Kong (2):
+>       arm: dts: mt2701: add pwm backlight device node
+>       arm: dts: mt2701: enable display pwm backlight
+> 
+>  arch/arm/boot/dts/mt2701-evb.dts | 23 +++++++++++++++++++++++
+>  arch/arm/boot/dts/mt2701.dtsi    | 13 ++++++++++++-
+>  arch/arm/boot/dts/mt7623.dtsi    | 30 +++++++++++++++++-------------
+>  3 files changed, 52 insertions(+), 14 deletions(-)
+> 
 
-This configuration is now possible since we can now select the
-PINCTRL subsystem on S3C24xx machines other than the device tree
-based ones.
+I don't see this commits in your repository. Did you forgot to merge them?
 
-Fixes: d219b924611a ("pinctrl: change Kconfig PINCTRL variable to a menuconfig")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- drivers/pinctrl/samsung/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/samsung/Kconfig b/drivers/pinctrl/samsung/Kconfig
-index 0357f9701eb9..ecfb90059eeb 100644
---- a/drivers/pinctrl/samsung/Kconfig
-+++ b/drivers/pinctrl/samsung/Kconfig
-@@ -29,7 +29,7 @@ config PINCTRL_EXYNOS5440
- 
- config PINCTRL_S3C24XX
- 	bool "Samsung S3C24XX SoC pinctrl driver"
--	depends on ARCH_S3C24XX
-+	depends on ARCH_S3C24XX && OF
- 	select PINCTRL_SAMSUNG
- 
- config PINCTRL_S3C64XX
--- 
-2.9.0
+Best regards,
+Matthias
