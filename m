@@ -1,63 +1,79 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:53 +0100
-Subject: [PULL 20/26] KVM: arm/arm64: vgic-its: Remove kvm_its_unmap_device
-In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
-References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-21-christoffer.dall@linaro.org>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 07 Nov 2017 11:27:21 +0000
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+Message-ID: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Eric Auger <eric.auger@redhat.com>
+Parsing the EDID for HDMI and audio information in the get_modes()
+callback is incorrect - this only parses the EDID read from the
+connector, not any override or firmware provided EDID.
 
-Let's remove kvm_its_unmap_device and use kvm_its_free_device
-as both functions are identical.
+The correct place to parse the EDID for these parameters is the
+fill_modes() callback, after we've called the helper.  Move the parsing
+there.  This caused problems for Lu?s Mendes.
 
-Signed-off-by: Eric Auger <eric.auger@redhat.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: <stable@vger.kernel.org>
+Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 14 ++------------
- 1 file changed, 2 insertions(+), 12 deletions(-)
+ drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
+ 1 file changed, 24 insertions(+), 4 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 9f5e34767628..75c18183eee3 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -897,7 +897,7 @@ static int vgic_its_cmd_handle_mapi(struct kvm *kvm, struct vgic_its *its,
+diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+index 9fe407f49986..2516a1c18a10 100644
+--- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
++++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+@@ -1905,10 +1905,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+ 		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
+ 			edid->width_cm, edid->height_cm);
+ 
+-		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+-		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+ 		drm_mode_connector_update_edid_property(connector, edid);
+-		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+ 		ret = drm_add_edid_modes(connector, edid);
+ 		/* Store the ELD */
+ 		drm_edid_to_eld(connector, edid);
+@@ -1920,6 +1917,29 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+ 	return ret;
  }
  
- /* Requires the its_lock to be held. */
--static void vgic_its_unmap_device(struct kvm *kvm, struct its_device *device)
-+static void vgic_its_free_device(struct kvm *kvm, struct its_device *device)
++static int dw_hdmi_connector_fill_modes(struct drm_connector *connector,
++					uint32_t maxX, uint32_t maxY)
++{
++	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
++					    connector);
++	int ret;
++
++	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
++
++	if (connector->edid_blob_ptr) {
++		struct edid *edid = (void *)connector->edid_blob_ptr->data;
++
++		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
++		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
++		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
++	} else {
++		hdmi->sink_is_hdmi = false;
++		hdmi->sink_has_audio = false;
++	}
++
++	return ret;
++}
++
+ static void dw_hdmi_connector_force(struct drm_connector *connector)
  {
- 	struct its_ite *ite, *temp;
- 
-@@ -960,7 +960,7 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
- 	 * by removing the mapping and re-establishing it.
- 	 */
- 	if (device)
--		vgic_its_unmap_device(kvm, device);
-+		vgic_its_free_device(kvm, device);
- 
- 	/*
- 	 * The spec does not say whether unmapping a not-mapped device
-@@ -1615,16 +1615,6 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 	return vgic_its_set_abi(its, NR_ITS_ABIS - 1);
+ 	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+@@ -1933,7 +1953,7 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
  }
  
--static void vgic_its_free_device(struct kvm *kvm, struct its_device *dev)
--{
--	struct its_ite *ite, *tmp;
--
--	list_for_each_entry_safe(ite, tmp, &dev->itt_head, ite_list)
--		its_free_ite(kvm, ite);
--	list_del(&dev->dev_list);
--	kfree(dev);
--}
--
- static void vgic_its_destroy(struct kvm_device *kvm_dev)
- {
- 	struct kvm *kvm = kvm_dev->kvm;
+ static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
+-	.fill_modes = drm_helper_probe_single_connector_modes,
++	.fill_modes = dw_hdmi_connector_fill_modes,
+ 	.detect = dw_hdmi_connector_detect,
+ 	.destroy = drm_connector_cleanup,
+ 	.force = dw_hdmi_connector_force,
 -- 
-2.14.2
+2.7.4
