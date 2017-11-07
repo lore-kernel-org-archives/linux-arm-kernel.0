@@ -1,172 +1,82 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:49 +0100
-Subject: [PULL 16/26] KVM: arm/arm64: Avoid phys timer emulation in vcpu
- entry/exit
+Date: Tue,  7 Nov 2017 11:47:56 +0100
+Subject: [PULL 23/26] KVM: arm/arm64: Document KVM_DEV_ARM_ITS_CTRL_RESET
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-17-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-24-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <cdall@linaro.org>
+From: Eric Auger <eric.auger@redhat.com>
 
-There is no need to schedule and cancel a hrtimer when entering and
-exiting the guest, because we know when the physical timer is going to
-fire when the guest programs it, and we can simply program the hrtimer
-at that point.
+At the moment, the in-kernel emulated ITS is not properly reset.
+On guest restart/reset some registers keep their old values and
+internal structures like device, ITE, and collection lists are not
+freed.
 
-Now when the register modifications from the guest go through the
-kvm_arm_timer_set/get_reg functions, which always call
-kvm_timer_update_state(), we can simply consider the timer state in this
-function and schedule and cancel the timers as needed.
+This may lead to various bugs. Among them, we can have incorrect state
+backup or failure when saving the ITS state at early guest boot stage.
 
-This avoids looking at the physical timer emulation state when entering
-and exiting the VCPU, allowing for faster servicing of the VM when
-needed.
+This patch documents a new attribute, KVM_DEV_ARM_ITS_CTRL_RESET in
+the KVM_DEV_ARM_VGIC_GRP_CTRL group.
 
-Signed-off-by: Christoffer Dall <cdall@linaro.org>
+Upon this action, we can reset registers and especially those
+pointing to tables previously allocated by the guest and free
+the internal data structures storing the list of devices, collections
+and lpis.
+
+The usual approach for device reset of having userspace write
+the reset values of the registers to the kernel via the register
+read/write APIs doesn't work for the ITS because it has some
+internal state (caches) which is not exposed as registers,
+and there is no register interface for "drop cached data without
+writing it back to RAM". So we need a KVM API which mimics the
+hardware's reset line, to provide the equivalent behaviour to
+a "pull the power cord out of the back of the machine" reset.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Reported-by: wanghaibin <wanghaibin.wang@huawei.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 75 ++++++++++++++++++++++++++++++++---------------
- 1 file changed, 51 insertions(+), 24 deletions(-)
+ Documentation/virtual/kvm/devices/arm-vgic-its.txt | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 7f4f12d48a1a..20e56c420632 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -202,7 +202,27 @@ static enum hrtimer_restart kvm_bg_timer_expire(struct hrtimer *hrt)
+diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+index eb06beb75960..8d5830eab26a 100644
+--- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
++++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
+@@ -33,6 +33,10 @@ Groups:
+       request the initialization of the ITS, no additional parameter in
+       kvm_device_attr.addr.
  
- static enum hrtimer_restart kvm_phys_timer_expire(struct hrtimer *hrt)
- {
--	WARN(1, "Timer only used to ensure guest exit - unexpected event.");
-+	struct arch_timer_context *ptimer;
-+	struct arch_timer_cpu *timer;
-+	struct kvm_vcpu *vcpu;
-+	u64 ns;
++    KVM_DEV_ARM_ITS_CTRL_RESET
++      reset the ITS, no additional parameter in kvm_device_attr.addr.
++      See "ITS Reset State" section.
 +
-+	timer = container_of(hrt, struct arch_timer_cpu, phys_timer);
-+	vcpu = container_of(timer, struct kvm_vcpu, arch.timer_cpu);
-+	ptimer = vcpu_ptimer(vcpu);
+     KVM_DEV_ARM_ITS_SAVE_TABLES
+       save the ITS table data into guest RAM, at the location provisioned
+       by the guest in corresponding registers/table entries.
+@@ -157,3 +161,19 @@ Then vcpus can be started.
+  - pINTID is the physical LPI ID; if zero, it means the entry is not valid
+    and other fields are not meaningful.
+  - ICID is the collection ID
 +
-+	/*
-+	 * Check that the timer has really expired from the guest's
-+	 * PoV (NTP on the host may have forced it to expire
-+	 * early). If not ready, schedule for a later time.
-+	 */
-+	ns = kvm_timer_compute_delta(ptimer);
-+	if (unlikely(ns)) {
-+		hrtimer_forward_now(hrt, ns_to_ktime(ns));
-+		return HRTIMER_RESTART;
-+	}
++ ITS Reset State:
++ ----------------
 +
-+	kvm_timer_update_irq(vcpu, true, ptimer);
- 	return HRTIMER_NORESTART;
- }
- 
-@@ -256,24 +276,28 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
- }
- 
- /* Schedule the background timer for the emulated timer. */
--static void phys_timer_emulate(struct kvm_vcpu *vcpu,
--			      struct arch_timer_context *timer_ctx)
-+static void phys_timer_emulate(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-+	struct arch_timer_context *ptimer = vcpu_ptimer(vcpu);
- 
--	if (kvm_timer_should_fire(timer_ctx))
--		return;
--
--	if (!kvm_timer_irq_can_fire(timer_ctx))
-+	/*
-+	 * If the timer can fire now we have just raised the IRQ line and we
-+	 * don't need to have a soft timer scheduled for the future.  If the
-+	 * timer cannot fire at all, then we also don't need a soft timer.
-+	 */
-+	if (kvm_timer_should_fire(ptimer) || !kvm_timer_irq_can_fire(ptimer)) {
-+		soft_timer_cancel(&timer->phys_timer, NULL);
- 		return;
-+	}
- 
--	/*  The timer has not yet expired, schedule a background timer */
--	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(timer_ctx));
-+	soft_timer_start(&timer->phys_timer, kvm_timer_compute_delta(ptimer));
- }
- 
- /*
-- * Check if there was a change in the timer state (should we raise or lower
-- * the line level to the GIC).
-+ * Check if there was a change in the timer state, so that we should either
-+ * raise or lower the line level to the GIC or schedule a background timer to
-+ * emulate the physical timer.
-  */
- static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- {
-@@ -295,6 +319,8 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 
- 	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
- 		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
++RESET returns the ITS to the same state that it was when first created and
++initialized. When the RESET command returns, the following things are
++guaranteed:
 +
-+	phys_timer_emulate(vcpu);
- }
- 
- static void vtimer_save_state(struct kvm_vcpu *vcpu)
-@@ -441,6 +467,9 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
- 
- 	if (has_vhe())
- 		disable_el1_phys_timer_access();
-+
-+	/* Set the background timer for the physical timer emulation. */
-+	phys_timer_emulate(vcpu);
- }
- 
- bool kvm_timer_should_notify_user(struct kvm_vcpu *vcpu)
-@@ -476,12 +505,6 @@ void kvm_timer_flush_hwstate(struct kvm_vcpu *vcpu)
- 
- 	if (unlikely(!timer->enabled))
- 		return;
--
--	if (kvm_timer_should_fire(ptimer) != ptimer->irq.level)
--		kvm_timer_update_irq(vcpu, !ptimer->irq.level, ptimer);
--
--	/* Set the background timer for the physical timer emulation. */
--	phys_timer_emulate(vcpu, vcpu_ptimer(vcpu));
- }
- 
- void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
-@@ -496,6 +519,17 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 
- 	vtimer_save_state(vcpu);
- 
-+	/*
-+	 * Cancel the physical timer emulation, because the only case where we
-+	 * need it after a vcpu_put is in the context of a sleeping VCPU, and
-+	 * in that case we already factor in the deadline for the physical
-+	 * timer when scheduling the bg_timer.
-+	 *
-+	 * In any case, we re-schedule the hrtimer for the physical timer when
-+	 * coming back to the VCPU thread in kvm_timer_vcpu_load().
-+	 */
-+	soft_timer_cancel(&timer->phys_timer, NULL);
-+
- 	/*
- 	 * The kernel may decide to run userspace after calling vcpu_put, so
- 	 * we reset cntvoff to 0 to ensure a consistent read between user
-@@ -538,15 +572,8 @@ static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
-  */
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- {
--	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 
--	/*
--	 * This is to cancel the background timer for the physical timer
--	 * emulation if it is set.
--	 */
--	soft_timer_cancel(&timer->phys_timer, NULL);
--
- 	/*
- 	 * If we entered the guest with the vtimer output asserted we have to
- 	 * check if the guest has modified the timer so that we should lower
++- The ITS is not enabled and quiescent
++  GITS_CTLR.Enabled = 0 .Quiescent=1
++- There is no internally cached state
++- No collection or device table are used
++  GITS_BASER<n>.Valid = 0
++- GITS_CBASER = 0, GITS_CREADR = 0, GITS_CWRITER = 0
++- The ABI version is unchanged and remains the one set when the ITS
++  device was first created.
 -- 
 2.14.2
