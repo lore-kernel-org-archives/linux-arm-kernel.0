@@ -1,84 +1,71 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 7 Nov 2017 15:09:19 +0100
-Subject: [PATCH 09/37] KVM: arm64: Move debug dirty flag calculation out
- of world switch
-In-Reply-To: <20171012104141.26902-10-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-10-christoffer.dall@linaro.org>
-Message-ID: <20171107140919.p6act55ubmzlv66b@kamzik.brq.redhat.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 7 Nov 2017 22:09:42 +0800
+Subject: [PATCH v4 0/4] fix the clock setting for SAR ADC
+Message-ID: <20171107140942.29243-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:13PM +0200, Christoffer Dall wrote:
-> There is no need to figure out inside the world-switch if we should
-> save/restore the debug registers or not, we can might as well do that in
-> the higher level debug setup code, making it easier to optimize down the
-> line.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/debug.c        | 9 +++++++++
->  arch/arm64/kvm/hyp/debug-sr.c | 6 ------
->  2 files changed, 9 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-> index dbadfaf..62550de19 100644
-> --- a/arch/arm64/kvm/debug.c
-> +++ b/arch/arm64/kvm/debug.c
-> @@ -193,6 +193,15 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
->  	if (trap_debug)
->  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
->  
-> +	/*
-> +	 * If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
-> +	 * a full save/restore cycle.
+patch [1/4]:
+  Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
+the published datasheets[4] also has wrong description about this.
+  This patch should be explicitly merged *before* other patches.
 
-The commit message implies testing KVM_ARM64_DEBUG_DIRTY, but it only
-tests KDE and MDE.
+patch [2-4/4]:
+  Drop the "sana" clock from SAR ADC module,
 
-> +	 */
-> +	if ((vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_KDE) ||
-> +	    (vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_MDE))
+  From the hardware perspective, the SAR ADC module doesn't
+require "sana" clock to wrok. This should apply to all SoC,
+including meson6,8, GXBB, GXL..
 
-nit: could also write as
+Note: the whole patchset series has been tested at GXL-P212 board,
+we haven't got any meson6,8 board to test, so I would appreciate
+if someone (Martin?) could help to confirm it works there.
 
- if (vcpu_sys_reg(vcpu, MDSCR_EL1) & (DBG_MDSCR_KDE | DBG_MDSCR_MDE))
+Changes since v3 at [3] :
+  - fix the missing iio maintainers for patch[2/4]
+  - add warning about the dependency, the patch[1/4] should go first
+  - update comments
 
-> +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> +
+Changes since v2 at [2] :
+  - explicitly point out 'sana' clock is not required for saradc, and drop them
+  - update comments, as the published datasheet is wrong
+ 
+Changes since v1 at [1] :
+  - correct SAR ADC/SANA clock gate bit
 
-It looks like there's only one flag for debug_flags - this dirty flag,
-which I guess is also used to trigger trapping. So maybe this could be a
-second flag of a "lazy state" field, as I suggested earlier?
+[1] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005221.html
 
-> +
->  	trace_kvm_arm_set_dreg32("MDCR_EL2", vcpu->arch.mdcr_el2);
->  	trace_kvm_arm_set_dreg32("MDSCR_EL1", vcpu_sys_reg(vcpu, MDSCR_EL1));
->  }
-> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> index f5154ed..0fc0758 100644
-> --- a/arch/arm64/kvm/hyp/debug-sr.c
-> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> @@ -172,12 +172,6 @@ void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
->  
->  void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
->  {
-> -	/* If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
-> -	 * a full save/restore cycle. */
-> -	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
-> -	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_MDE))
-> -		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
-> -
->  	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
->  			   kern_hyp_va(vcpu->arch.host_cpu_context));
->  	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
-> -- 
-> 2.9.0
->
+[2] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005242.html
 
-Also, while grepping, I noticed __debug_cond_restore_host_state() unsets
-KVM_ARM64_DEBUG_DIRTY on that condition that it's set. A micro
-optimization could be to do it unconditionally, removing the branch.
+[3] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005252.html
+    http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005257.html
+    http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005253.html
+    http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005254.html
+    http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005255.html
 
-Thanks,
-drew
+
+[4] GXBB v1.1.4, page 57
+      http://dn.odroid.com/S905/DataSheet/S905_Public_Datasheet_V1.1.4.pdf
+    GXL v0.3_20170314
+      http://www.mediafire.com/file/5bpt054va5ut7v9/S905X_Datasheet_V0.3_20170314publicversion-Wesion.pdf
+
+
+Xingyu Chen (3):
+  iio: adc: meson-saradc: remove irrelevant clock "sana"
+  dt-bindings: iio: adc: update the doc for SAR ADC
+  ARM64: dts: meson: drop "sana" clock from SAR ADC
+
+Yixun Lan (1):
+  clk: meson: gxbb: fix wrong clock for SARADC/SANA
+
+ .../bindings/iio/adc/amlogic,meson-saradc.txt        |  1 -
+ arch/arm/boot/dts/meson8.dtsi                        |  5 ++---
+ arch/arm/boot/dts/meson8b.dtsi                       |  5 ++---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          |  3 +--
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi           |  3 +--
+ drivers/clk/meson/gxbb.c                             |  4 ++--
+ drivers/iio/adc/meson_saradc.c                       | 20 --------------------
+ 7 files changed, 8 insertions(+), 33 deletions(-)
+
+-- 
+2.14.1
