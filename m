@@ -1,11 +1,11 @@
 From: eric.auger@redhat.com (Auger Eric)
-Date: Tue, 7 Nov 2017 14:08:23 +0100
+Date: Tue, 7 Nov 2017 14:09:51 +0100
 Subject: [PATCH v5 09/26] KVM: arm/arm64: GICv4: Add init/teardown of the
  per-VM vPE irq domain
 In-Reply-To: <20171027142855.21584-10-marc.zyngier@arm.com>
 References: <20171027142855.21584-1-marc.zyngier@arm.com>
  <20171027142855.21584-10-marc.zyngier@arm.com>
-Message-ID: <4a41a67d-a04b-b3ca-a5e8-c582e27c17d1@redhat.com>
+Message-ID: <29cf6620-5dd4-2f8f-790a-8b77092ef39d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -142,12 +142,10 @@ On 27/10/2017 16:28, Marc Zyngier wrote:
 >  		return -ENOMEM;
 >  
 > +	if (vgic_initialized(dev->kvm)) {
-Don't we need to test vgic_supports_direct_msis() on this path too?
-
-Thanks
-
-Eric
 > +		int ret = vgic_v4_init(dev->kvm);
+
+If you respin I forgot 2 nits below:
+nit: line to be added
 > +		if (ret) {
 > +			kfree(its);
 > +			return ret;
@@ -223,6 +221,11 @@ Eric
 > +		dist->its_vm.nr_vpes = 0;
 > +		dist->its_vm.vpes = NULL;
 > +		return ret;
+nit: not requested
+
+Thanks
+
+Eric
 > +	}
 > +
 > +	return ret;
