@@ -1,85 +1,31 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 7 Nov 2017 11:49:33 +0530
-Subject: [PATCH v4 20/20] cpufreq: scmi: add support for fast frequency
- switching
-In-Reply-To: <1509720477-18936-21-git-send-email-sudeep.holla@arm.com>
-References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
- <1509720477-18936-21-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20171107061933.GC3297@vireshk-i7>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 7 Nov 2017 14:32:12 +0800
+Subject: [PATCH] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <4677171.2qOLUIFS1s@positron.chronox.de>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <1977235.9AvJZzduGj@tauon.chronox.de>
+ <20171107052235.GA20803@gondor.apana.org.au>
+ <4677171.2qOLUIFS1s@positron.chronox.de>
+Message-ID: <20171107063212.GA25491@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03-11-17, 14:47, Sudeep Holla wrote:
-> The cpufreq core provides option for drivers to implement fast_switch
-> callback which is invoked for frequency switching from interrupt context.
+On Tue, Nov 07, 2017 at 07:19:32AM +0100, Stephan M?ller wrote:
 > 
-> This patch adds support for fast_switch callback in SCMI cpufreq driver
-> by making use of polling based SCMI transfer. It also sets the flag
-> fast_switch_possible.
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: linux-pm at vger.kernel.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> ---
->  drivers/cpufreq/scmi-cpufreq.c | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/scmi-cpufreq.c b/drivers/cpufreq/scmi-cpufreq.c
-> index b1057a13e6a7..91df5013f7b2 100644
-> --- a/drivers/cpufreq/scmi-cpufreq.c
-> +++ b/drivers/cpufreq/scmi-cpufreq.c
-> @@ -64,6 +64,19 @@ scmi_cpufreq_set_target(struct cpufreq_policy *policy, unsigned int index)
->  	return perf_ops->freq_set(handle, priv->domain_id, freq, false);
->  }
->  
-> +static unsigned int scmi_cpufreq_fast_switch(struct cpufreq_policy *policy,
-> +					     unsigned int target_freq)
-> +{
-> +	struct scmi_data *priv = policy->driver_data;
-> +	struct scmi_perf_ops *perf_ops = handle->perf_ops;
-> +
-> +	if (!perf_ops->freq_set(handle, priv->domain_id,
-> +				target_freq * 1000, true))
-> +		return target_freq;
-> +
-> +	return 0;
-> +}
-> +
->  static int
->  scmi_get_sharing_cpus(struct device *cpu_dev, struct cpumask *cpumask)
->  {
-> @@ -167,6 +180,7 @@ static int scmi_cpufreq_init(struct cpufreq_policy *policy)
->  
->  	policy->cpuinfo.transition_latency = latency;
->  
-> +	policy->fast_switch_possible = true;
->  	return 0;
->  
->  out_free_cpufreq_table:
-> @@ -183,6 +197,7 @@ static int scmi_cpufreq_exit(struct cpufreq_policy *policy)
->  {
->  	struct scmi_data *priv = policy->driver_data;
->  
-> +	policy->fast_switch_possible = false;
+> Where I am not fully sure is whether af_alg_async_cb is called in any case. 
+> I.e. when we invoke an AIO operation with a cipher that completes 
+> synchronously (e.g. AES-NI), is this callback triggered?
 
-You don't need this.
+It's the same with any other callback in the crypto API.  The
+completion function is called if the return value is EINPROGRESS
+or EBUSY.
 
->  	cpufreq_cooling_unregister(priv->cdev);
->  	dev_pm_opp_free_cpufreq_table(priv->cpu_dev, &policy->freq_table);
->  	kfree(priv);
-> @@ -226,6 +241,7 @@ static struct cpufreq_driver scmi_cpufreq_driver = {
->  	.verify	= cpufreq_generic_frequency_table_verify,
->  	.attr	= cpufreq_generic_attr,
->  	.target_index	= scmi_cpufreq_set_target,
-> +	.fast_switch	= scmi_cpufreq_fast_switch,
->  	.get	= scmi_cpufreq_get_rate,
->  	.init	= scmi_cpufreq_init,
->  	.exit	= scmi_cpufreq_exit,
+In fact the algif_aead/algif_skcipher code already frees the SG lists
+and areq on a sync return.  So perhaps you can merge this with the
+completion function.
 
-Apart from that.
-
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
-
+Cheers,
 -- 
-viresh
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
