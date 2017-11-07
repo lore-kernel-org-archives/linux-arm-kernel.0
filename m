@@ -1,106 +1,48 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 7 Nov 2017 15:22:29 +0100
-Subject: [PATCH 10/37] KVM: arm64: Slightly improve debug save/restore
- functions
-In-Reply-To: <20171012104141.26902-11-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-11-christoffer.dall@linaro.org>
-Message-ID: <20171107142229.6aoijhbzgvkvnjt2@kamzik.brq.redhat.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 7 Nov 2017 22:12:23 +0800
+Subject: [PATCH v4 1/4] clk: meson: gxbb: fix wrong clock for SARADC/SANA
+Message-ID: <20171107141223.1507-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:14PM +0200, Christoffer Dall wrote:
-> The debug save/restore functions can be improved by using the has_vhe()
-> static key instead of the instruction alternative.  Using the static key
-> uses the same paradigm as we're going to use elsewhere, it makes the
-> code more readable, and it generates slightly better code (no
-> stack setups and function calls unless necessary).
-> 
-> We also use a static key on the restore path, because it will be
-> marginally faster than loading a value from memory.
-> 
-> Finally, we don't have to conditionally clear the debug dirty flag if
-> it's set, we can just clear it.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/arm64/kvm/hyp/debug-sr.c | 22 +++++++++-------------
->  1 file changed, 9 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> index 0fc0758..a2291b6 100644
-> --- a/arch/arm64/kvm/hyp/debug-sr.c
-> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> @@ -75,11 +75,6 @@
->  
->  #define psb_csync()		asm volatile("hint #17")
->  
-> -static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
-> -{
-> -	/* The vcpu can run. but it can't hide. */
-> -}
-> -
->  static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
->  {
->  	u64 reg;
-> @@ -109,10 +104,6 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
->  	dsb(nsh);
->  }
->  
-> -static hyp_alternate_select(__debug_save_spe,
-> -			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> -
->  static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
->  {
->  	if (!pmscr_el1)
-> @@ -174,17 +165,22 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
->  {
->  	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
->  			   kern_hyp_va(vcpu->arch.host_cpu_context));
-> -	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
-> +
-> +	/* Non-VHE: Disable and flush SPE data generation
-> +	 * VHE: The vcpu can run. but it can't hide. */
+According to the datasheet, in Meson-GXBB/GXL series,
+The clock gate bit for SARADC is HHI_GCLK_MPEG2 bit[22],
+while clock gate bit for SANA is HHI_GCLK_MPEG0 bit[10].
 
-Not the standard comment format.
-s/./,/
+Test passed at gxl-s905x-p212 board.
 
-I'm glad you kept the funny comment :-)
+The following published datasheets are wrong and should be updated
+[1] GXBB v1.1.4
+[2] GXL v0.3_20170314
 
+Fixes: 738f66d3211d ("clk: gxbb: add AmLogic GXBB clk controller driver")
+Tested-by: Xingyu Chen <xingyu.chen@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ drivers/clk/meson/gxbb.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> +	if (!has_vhe())
-> +		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
->  }
->  
->  void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
->  {
-> -	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
-> +	if (!has_vhe())
-> +		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
-> +
->  	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
->  			      kern_hyp_va(vcpu->arch.host_cpu_context));
->  
-> -	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
-> -		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
-> +	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
-
-Guess I should have read ahead before commenting on this in the last
-patch :-)
-
->  }
->  
->  u32 __hyp_text __kvm_get_mdcr_el2(void)
-> -- 
-> 2.9.0
->
-
-Do we still need to pass vcpu->arch.host_debug_state.pmscr_el1 as a
-parameter to __debug_save_spe_nvhe and __debug_restore_spe? Or can
-we just pass the vcpu and remove the "if (!pmscr_el1) return" in
-__debug_restore_spe? Should __debug_restore_spe be renamed to have
-a _nvhe for consistency?
-
-Thanks,
-drew
+diff --git a/drivers/clk/meson/gxbb.c b/drivers/clk/meson/gxbb.c
+index b2d1e8ed7152..92168348ffa6 100644
+--- a/drivers/clk/meson/gxbb.c
++++ b/drivers/clk/meson/gxbb.c
+@@ -1139,7 +1139,7 @@ static MESON_GATE(gxbb_pl301, HHI_GCLK_MPEG0, 6);
+ static MESON_GATE(gxbb_periphs, HHI_GCLK_MPEG0, 7);
+ static MESON_GATE(gxbb_spicc, HHI_GCLK_MPEG0, 8);
+ static MESON_GATE(gxbb_i2c, HHI_GCLK_MPEG0, 9);
+-static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG0, 10);
++static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG0, 10);
+ static MESON_GATE(gxbb_smart_card, HHI_GCLK_MPEG0, 11);
+ static MESON_GATE(gxbb_rng0, HHI_GCLK_MPEG0, 12);
+ static MESON_GATE(gxbb_uart0, HHI_GCLK_MPEG0, 13);
+@@ -1190,7 +1190,7 @@ static MESON_GATE(gxbb_usb0_ddr_bridge, HHI_GCLK_MPEG2, 9);
+ static MESON_GATE(gxbb_mmc_pclk, HHI_GCLK_MPEG2, 11);
+ static MESON_GATE(gxbb_dvin, HHI_GCLK_MPEG2, 12);
+ static MESON_GATE(gxbb_uart2, HHI_GCLK_MPEG2, 15);
+-static MESON_GATE(gxbb_sana, HHI_GCLK_MPEG2, 22);
++static MESON_GATE(gxbb_sar_adc, HHI_GCLK_MPEG2, 22);
+ static MESON_GATE(gxbb_vpu_intr, HHI_GCLK_MPEG2, 25);
+ static MESON_GATE(gxbb_sec_ahb_ahb3_bridge, HHI_GCLK_MPEG2, 26);
+ static MESON_GATE(gxbb_clk81_a53, HHI_GCLK_MPEG2, 29);
+-- 
+2.14.1
