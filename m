@@ -1,24 +1,59 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Tue, 7 Nov 2017 21:36:21 +0100
-Subject: [PATCH v2] ARM: sa1100: simpad: Correct I2C GPIO offsets
-In-Reply-To: <20171107201857.5752-1-linus.walleij@linaro.org>
-References: <20171107201857.5752-1-linus.walleij@linaro.org>
-Message-ID: <20171107203621.53uxggqcd4rzbfjw@ninjato>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 7 Nov 2017 22:38:59 +0200
+Subject: [PATCH 3/3] ARM: dts: Keystone: add ECC error handler support
+In-Reply-To: <1510087139-21885-1-git-send-email-t-kristo@ti.com>
+References: <1510087139-21885-1-git-send-email-t-kristo@ti.com>
+Message-ID: <1510087139-21885-4-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Murali Karicheri <m-karicheri2@ti.com>
 
-> Wolfram: this is in the i2c GPIO refactoring in your tree,
-> please apply it directly as a fix for v4.15 if there are
-> no protests.
+Add emif node for keystone2 devices, which is used for ECC support.
 
-OK, noted that this is for v4.15. Since it touches arch/arm, some ack
-from an arm-maintainer would be good to have...
+Signed-off-by: Murali Karicheri <m-karicheri2@ti.com>
+[t-kristo at ti.com: made emif enabled by default for all keystone2 devices]
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+Cc: Santosh Shilimkar <ssantosh@kernel.org>
+---
+ arch/arm/boot/dts/keystone-k2g.dtsi | 6 ++++++
+ arch/arm/boot/dts/keystone.dtsi     | 6 ++++++
+ 2 files changed, 12 insertions(+)
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/eff8f0f7/attachment.sig>
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index 826b286..33e12c1 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -343,5 +343,11 @@
+ 			clock-names = "fck", "mmchsdb_fck";
+ 			status = "disabled";
+ 		};
++
++		emif: emif at 21010000 {
++			compatible = "ti,emif-keystone";
++			reg = <0x21010000 0x200>;
++			interrupts = <GIC_SPI 123 IRQ_TYPE_EDGE_RISING>;
++		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/keystone.dtsi b/arch/arm/boot/dts/keystone.dtsi
+index 8dd74f4..5f4e38f 100644
+--- a/arch/arm/boot/dts/keystone.dtsi
++++ b/arch/arm/boot/dts/keystone.dtsi
+@@ -340,5 +340,11 @@
+ 					<GIC_SPI 29 IRQ_TYPE_EDGE_RISING>;
+ 			};
+ 		};
++
++		emif: emif at 21010000 {
++			compatible = "ti,emif-keystone";
++			reg = <0x21010000 0x200>;
++			interrupts = <GIC_SPI 448 IRQ_TYPE_EDGE_RISING>;
++		};
+ 	};
+ };
+-- 
+1.9.1
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
