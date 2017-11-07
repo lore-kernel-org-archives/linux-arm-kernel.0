@@ -1,93 +1,103 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue,  7 Nov 2017 11:47:41 +0100
-Subject: [PULL 08/26] KVM: arm/arm64: Move timer/vgic flush/sync under
- disabled irq
+Date: Tue,  7 Nov 2017 11:47:35 +0100
+Subject: [PULL 02/26] arm64: Use physical counter for in-kernel reads when
+ booted in EL2
 In-Reply-To: <20171107104800.30021-1-christoffer.dall@linaro.org>
 References: <20171107104800.30021-1-christoffer.dall@linaro.org>
-Message-ID: <20171107104800.30021-9-christoffer.dall@linaro.org>
+Message-ID: <20171107104800.30021-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Christoffer Dall <cdall@linaro.org>
 
-As we are about to play tricks with the timer to be more lazy in saving
-and restoring state, we need to move the timer sync and flush functions
-under a disabled irq section and since we have to flush the vgic state
-after the timer and PMU state, we do the whole flush/sync sequence with
-disabled irqs.
+Using the physical counter allows KVM to retain the offset between the
+virtual and physical counter as long as it is actively running a VCPU.
 
-The only downside is a slightly longer delay before being able to
-process hardware interrupts and run softirqs.
+As soon as a VCPU is released, another thread is scheduled or we start
+running userspace applications, we reset the offset to 0, so that
+userspace accessing the virtual timer can still read the virtual counter
+and get the same view of time as the kernel.
 
+This opens up potential improvements for KVM performance, but we have to
+make a few adjustments to preserve system consistency.
+
+Currently get_cycles() is hardwired to arch_counter_get_cntvct() on
+arm64, but as we move to using the physical timer for the in-kernel
+time-keeping on systems that boot in EL2, we should use the same counter
+for get_cycles() as for other in-kernel timekeeping operations.
+
+Similarly, implementations of arch_timer_set_next_event_phys() is
+modified to use the counter specific to the timer being programmed.
+
+VHE kernels or kernels continuing to use the virtual timer are
+unaffected.
+
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Catalin Marinas <catalin.marinas@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/arm.c | 26 +++++++++++++-------------
- 1 file changed, 13 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/timex.h       |  2 +-
+ drivers/clocksource/arm_arch_timer.c | 12 ++++++++----
+ 2 files changed, 9 insertions(+), 5 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index b9f68e4add71..27db222a0c8d 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -654,11 +654,11 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+diff --git a/arch/arm64/include/asm/timex.h b/arch/arm64/include/asm/timex.h
+index 81a076eb37fa..9ad60bae5c8d 100644
+--- a/arch/arm64/include/asm/timex.h
++++ b/arch/arm64/include/asm/timex.h
+@@ -22,7 +22,7 @@
+  * Use the current timer as a cycle counter since this is what we use for
+  * the delay loop.
+  */
+-#define get_cycles()	arch_counter_get_cntvct()
++#define get_cycles()	arch_timer_read_counter()
  
- 		kvm_pmu_flush_hwstate(vcpu);
+ #include <asm-generic/timex.h>
  
-+		local_irq_disable();
-+
- 		kvm_timer_flush_hwstate(vcpu);
- 		kvm_vgic_flush_hwstate(vcpu);
+diff --git a/drivers/clocksource/arm_arch_timer.c b/drivers/clocksource/arm_arch_timer.c
+index ff8f8a177156..061476e92db7 100644
+--- a/drivers/clocksource/arm_arch_timer.c
++++ b/drivers/clocksource/arm_arch_timer.c
+@@ -158,6 +158,7 @@ u32 arch_timer_reg_read(int access, enum arch_timer_reg reg,
+  * if we don't have the cp15 accessors we won't have a problem.
+  */
+ u64 (*arch_timer_read_counter)(void) = arch_counter_get_cntvct;
++EXPORT_SYMBOL_GPL(arch_timer_read_counter);
  
--		local_irq_disable();
--
- 		/*
- 		 * If we have a singal pending, or need to notify a userspace
- 		 * irqchip about timer or PMU level changes, then we exit (and
-@@ -683,10 +683,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		if (ret <= 0 || need_new_vmid_gen(vcpu->kvm) ||
- 		    kvm_request_pending(vcpu)) {
- 			vcpu->mode = OUTSIDE_GUEST_MODE;
--			local_irq_enable();
- 			kvm_pmu_sync_hwstate(vcpu);
- 			kvm_timer_sync_hwstate(vcpu);
- 			kvm_vgic_sync_hwstate(vcpu);
-+			local_irq_enable();
- 			preempt_enable();
- 			continue;
- 		}
-@@ -709,6 +709,16 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ static u64 arch_counter_read(struct clocksource *cs)
+ {
+@@ -329,16 +330,19 @@ static void erratum_set_next_event_tval_generic(const int access, unsigned long
+ 						struct clock_event_device *clk)
+ {
+ 	unsigned long ctrl;
+-	u64 cval = evt + arch_counter_get_cntvct();
++	u64 cval;
  
- 		kvm_arm_clear_debug(vcpu);
+ 	ctrl = arch_timer_reg_read(access, ARCH_TIMER_REG_CTRL, clk);
+ 	ctrl |= ARCH_TIMER_CTRL_ENABLE;
+ 	ctrl &= ~ARCH_TIMER_CTRL_IT_MASK;
  
-+		/*
-+		 * We must sync the PMU and timer state before the vgic state so
-+		 * that the vgic can properly sample the updated state of the
-+		 * interrupt line.
-+		 */
-+		kvm_pmu_sync_hwstate(vcpu);
-+		kvm_timer_sync_hwstate(vcpu);
-+
-+		kvm_vgic_sync_hwstate(vcpu);
-+
- 		/*
- 		 * We may have taken a host interrupt in HYP mode (ie
- 		 * while executing the guest). This interrupt is still
-@@ -732,16 +742,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		guest_exit();
- 		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
+-	if (access == ARCH_TIMER_PHYS_ACCESS)
++	if (access == ARCH_TIMER_PHYS_ACCESS) {
++		cval = evt + arch_counter_get_cntpct();
+ 		write_sysreg(cval, cntp_cval_el0);
+-	else
++	} else {
++		cval = evt + arch_counter_get_cntvct();
+ 		write_sysreg(cval, cntv_cval_el0);
++	}
  
--		/*
--		 * We must sync the PMU and timer state before the vgic state so
--		 * that the vgic can properly sample the updated state of the
--		 * interrupt line.
--		 */
--		kvm_pmu_sync_hwstate(vcpu);
--		kvm_timer_sync_hwstate(vcpu);
--
--		kvm_vgic_sync_hwstate(vcpu);
--
- 		preempt_enable();
+ 	arch_timer_reg_write(access, ARCH_TIMER_REG_CTRL, ctrl, clk);
+ }
+@@ -913,7 +917,7 @@ static void __init arch_counter_register(unsigned type)
  
- 		ret = handle_exit(vcpu, run, ret);
+ 	/* Register the CP15 based counter if we have one */
+ 	if (type & ARCH_TIMER_TYPE_CP15) {
+-		if (IS_ENABLED(CONFIG_ARM64) ||
++		if ((IS_ENABLED(CONFIG_ARM64) && !is_hyp_mode_available()) ||
+ 		    arch_timer_uses_ppi == ARCH_TIMER_VIRT_PPI)
+ 			arch_timer_read_counter = arch_counter_get_cntvct;
+ 		else
 -- 
 2.14.2
