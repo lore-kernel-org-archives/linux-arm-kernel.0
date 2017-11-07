@@ -1,126 +1,137 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Tue, 7 Nov 2017 07:45:22 +0100
-Subject: [PATCH v4 1/3] spi: imx: GPIO chip select DT property should not
- be required
-In-Reply-To: <20171106194618.9421-2-tpiepho@impinj.com>
-References: <20171106194618.9421-1-tpiepho@impinj.com>
- <20171106194618.9421-2-tpiepho@impinj.com>
-Message-ID: <354ae9de-d3b4-72b9-f39c-0cde89052303@pengutronix.de>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Tue, 7 Nov 2017 07:45:44 +0100 (CET)
+Subject: [PATCH 11/12] hwrng: bcm2835-rng: Enable BCM2835 RNG to work on
+ BCM63xx platforms
+In-Reply-To: <2538f1bb-e0f8-c336-d82a-0cb2f19b0ead@gmail.com>
+References: <20171102010408.27736-1-f.fainelli@gmail.com>
+ <20171102010408.27736-12-f.fainelli@gmail.com>
+ <1831955836.132229.1509820078271@email.1und1.de>
+ <2538f1bb-e0f8-c336-d82a-0cb2f19b0ead@gmail.com>
+Message-ID: <345702666.5362.1510037144469@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 06.11.2017 20:46, Trent Piepho wrote:
-> The driver will fail to load if the device tree property for gpio chip
-> selects is not specified.  Change the driver to make the property optional.
-> Also have the driver respect the "num-cs" property in the standard way.
+> Florian Fainelli <f.fainelli@gmail.com> hat am 6. November 2017 um 21:16 geschrieben:
 > 
-> This way one can use the native CS lines using standard bindings instead of
-> being forced to specify a gpio-cs of <0>.
 > 
-> Since native CS do not work in a commonly useful manner with this
-> hardware/driver, note in the documention that most users probably should
-> use GPIO based CS lines rather than native.
+> On 11/04/2017 11:27 AM, Stefan Wahren wrote:
+> > Hi Florian
+> > 
+> >> Florian Fainelli <f.fainelli@gmail.com> hat am 2. November 2017 um 02:04 geschrieben:
+> >>
+> >>
+> >> We have now incorporated all necessary functionality for the BCM63xx
+> >> platforms to successfully migrate over bcm2835-rng, so add the final
+> >> bits: Kconfig selection and proper platform_device device type matching
+> >> to keep the same platform device name for registration to work.
+> >>
+> >> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+> >> ---
+> >>  drivers/char/hw_random/Kconfig       |  7 ++++---
+> >>  drivers/char/hw_random/bcm2835-rng.c | 11 ++++++++++-
+> >>  2 files changed, 14 insertions(+), 4 deletions(-)
+> >>
+> >> diff --git a/drivers/char/hw_random/Kconfig b/drivers/char/hw_random/Kconfig
+> >> index 95a031e9eced..d0689cc8c7fc 100644
+> >> --- a/drivers/char/hw_random/Kconfig
+> >> +++ b/drivers/char/hw_random/Kconfig
+> >> @@ -87,12 +87,13 @@ config HW_RANDOM_BCM63XX
+> >>  	  If unusure, say Y.
+> >>  
+> >>  config HW_RANDOM_BCM2835
+> >> -	tristate "Broadcom BCM2835 Random Number Generator support"
+> >> -	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X
+> >> +	tristate "Broadcom BCM2835/BCM63xx Random Number Generator support"
+> >> +	depends on ARCH_BCM2835 || ARCH_BCM_NSP || ARCH_BCM_5301X || \
+> >> +		   ARCH_BCM_63XX || BCM63XX || BMIPS_GENERIC
+> >>  	default HW_RANDOM
+> >>  	---help---
+> >>  	  This driver provides kernel-side support for the Random Number
+> >> -	  Generator hardware found on the Broadcom BCM2835 SoCs.
+> >> +	  Generator hardware found on the Broadcom BCM2835 and BCM63xx SoCs.
+> >>  
+> >>  	  To compile this driver as a module, choose M here: the
+> >>  	  module will be called bcm2835-rng
+> >> diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+> >> index 650e0033c273..d9ffe14f312b 100644
+> >> --- a/drivers/char/hw_random/bcm2835-rng.c
+> >> +++ b/drivers/char/hw_random/bcm2835-rng.c
+> >> @@ -131,6 +131,7 @@ static const struct of_device_id bcm2835_rng_of_match[] = {
+> >>  	{ .compatible = "brcm,bcm2835-rng"},
+> >>  	{ .compatible = "brcm,bcm-nsp-rng", .data = &nsp_rng_of_data },
+> >>  	{ .compatible = "brcm,bcm5301x-rng", .data = &nsp_rng_of_data },
+> >> +	{ .compatible = "brcm,bcm6368-rng"},
+> >>  	{},
+> >>  };
+> >>  
+> >> @@ -164,7 +165,7 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+> >>  	if (IS_ERR(priv->clk))
+> >>  		priv->clk = NULL;
+> >>  
+> >> -	priv->rng.name = "bcm2835-rng";
+> >> +	priv->rng.name = pdev->id_entry->name;
+> > 
+> > this change breaks registration on bcm2835, because the name is NULL.
 > 
-> CC: Mark Brown <broonie@kernel.org>
-> CC: Shawn Guo <shawnguo@kernel.org>
-> CC: Sascha Hauer <kernel@pengutronix.de>
-> CC: Fabio Estevam <fabio.estevam@nxp.com>
-> CC: Oleksij Rempel <o.rempel@pengutronix.de>
-> Signed-off-by: Trent Piepho <tpiepho@impinj.com>
-
-
-Reviewed-by: Oleksij Rempel <o.rempel@pengutronix.de>
-
-
-> ---
->  Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt | 18 ++++++++++++------
->  drivers/spi/spi-imx.c                                  | 18 ++++++++++--------
->  2 files changed, 22 insertions(+), 14 deletions(-)
+> OH right, I will fix that in v2, I am assuming that if you did something
+> like this, things still work correctly for you on 2835:
 > 
-> diff --git a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> index 5bf13960f7f4..e3c48b20b1a6 100644
-> --- a/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> +++ b/Documentation/devicetree/bindings/spi/fsl-imx-cspi.txt
-> @@ -12,24 +12,30 @@ Required properties:
->    - "fsl,imx53-ecspi" for SPI compatible with the one integrated on i.MX53 and later Soc
->  - reg : Offset and length of the register set for the device
->  - interrupts : Should contain CSPI/eCSPI interrupt
-> -- cs-gpios : Specifies the gpio pins to be used for chipselects.
->  - clocks : Clock specifiers for both ipg and per clocks.
->  - clock-names : Clock names should include both "ipg" and "per"
->  See the clock consumer binding,
->  	Documentation/devicetree/bindings/clock/clock-bindings.txt
-> -- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
-> -		Documentation/devicetree/bindings/dma/dma.txt
-> -- dma-names: DMA request names should include "tx" and "rx" if present.
->  
-> -Obsolete properties:
-> -- fsl,spi-num-chipselects : Contains the number of the chipselect
-> +Recommended properties:
-> +- cs-gpios : GPIOs to use as chip selects, see spi-bus.txt.  While the native chip
-> +select lines can be used, they appear to always generate a pulse between each
-> +word of a transfer.  Most use cases will require GPIO based chip selects to
-> +generate a valid transaction.
->  
->  Optional properties:
-> +- num-cs :  Number of total chip selects, see spi-bus.txt.
-> +- dmas: DMA specifiers for tx and rx dma. See the DMA client binding,
-> +Documentation/devicetree/bindings/dma/dma.txt.
-> +- dma-names: DMA request names, if present, should include "tx" and "rx".
->  - fsl,spi-rdy-drctl: Integer, representing the value of DRCTL, the register
->  controlling the SPI_READY handling. Note that to enable the DRCTL consideration,
->  the SPI_READY mode-flag needs to be set too.
->  Valid values are: 0 (disabled), 1 (edge-triggered burst) and 2 (level-triggered burst).
->  
-> +Obsolete properties:
-> +- fsl,spi-num-chipselects : Contains the number of the chipselect
-> +
->  Example:
->  
->  ecspi at 70010000 {
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 301cdb721bad..ad54f8258513 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -1523,6 +1523,7 @@ static int spi_imx_probe(struct platform_device *pdev)
->  
->  	spi_imx->devtype_data = devtype_data;
->  
-> +	/* Get number of chip selects, either platform data or OF */
->  	if (mxc_platform_info) {
->  		master->num_chipselect = mxc_platform_info->num_chipselect;
->  		master->cs_gpios = devm_kzalloc(&master->dev,
-> @@ -1532,7 +1533,13 @@ static int spi_imx_probe(struct platform_device *pdev)
->  
->  		for (i = 0; i < master->num_chipselect; i++)
->  			master->cs_gpios[i] = mxc_platform_info->chipselect[i];
-> - 	}
-> +	} else {
-> +		u32 num_cs;
-> +
-> +		if (!of_property_read_u32(np, "num-cs", &num_cs))
-> +			master->num_chipselect = num_cs;
-> +		/* If not preset, default value of 1 is used */
-> +	}
->  
->  	spi_imx->bitbang.chipselect = spi_imx_chipselect;
->  	spi_imx->bitbang.setup_transfer = spi_imx_setupxfer;
-> @@ -1619,13 +1626,8 @@ static int spi_imx_probe(struct platform_device *pdev)
->  		goto out_clk_put;
->  	}
->  
-> -	if (!spi_imx->slave_mode) {
-> -		if (!master->cs_gpios) {
-> -			dev_err(&pdev->dev, "No CS GPIOs available\n");
-> -			ret = -EINVAL;
-> -			goto out_clk_put;
-> -		}
-> -
-> +	/* Request GPIO CS lines, if any */
-> +	if (!spi_imx->slave_mode && master->cs_gpios) {
->  		for (i = 0; i < master->num_chipselect; i++) {
->  			if (!gpio_is_valid(master->cs_gpios[i]))
->  				continue;
+> if (!priv->id_entry->name)
+> 	priv->rng.name = "bcm2835-rng";
+> else
+> 	priv->rng.name = priv->id_entry->name;
 > 
+> ?
+
+I think that should work, but i'm not really happy about it. I prefer a more general solution. Looking at the other rng drivers shows the following pattern:
+
+priv->rng.name = pdev->name;
+
+I need to verify this on bcm2835.
+
+> 
+> > 
+> > Regards
+> > Stefan
+> > 
+> >>  	priv->rng.init = bcm2835_rng_init;
+> >>  	priv->rng.read = bcm2835_rng_read;
+> >>  	priv->rng.cleanup = bcm2835_rng_cleanup;
+> >> @@ -190,12 +191,20 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+> >>  
+> >>  MODULE_DEVICE_TABLE(of, bcm2835_rng_of_match);
+> >>  
+> >> +static struct platform_device_id bcm2835_rng_devtype[] = {
+> >> +	{ .name = "bcm2835-rng" },
+> >> +	{ .name = "bcm63xx-rng" },
+> >> +	{ /* sentinel */ }
+> >> +};
+> >> +MODULE_DEVICE_TABLE(platform, bcm2835_rng_devtype);
+> >> +
+> >>  static struct platform_driver bcm2835_rng_driver = {
+> >>  	.driver = {
+> >>  		.name = "bcm2835-rng",
+> >>  		.of_match_table = bcm2835_rng_of_match,
+> >>  	},
+> >>  	.probe		= bcm2835_rng_probe,
+> >> +	.id_table	= bcm2835_rng_devtype,
+> >>  };
+> >>  module_platform_driver(bcm2835_rng_driver);
+> >>  
+> >> -- 
+> >> 2.9.3
+> >>
+> >>
+> >> _______________________________________________
+> >> linux-arm-kernel mailing list
+> >> linux-arm-kernel at lists.infradead.org
+> >> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+> 
+> -- 
+> Florian
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
