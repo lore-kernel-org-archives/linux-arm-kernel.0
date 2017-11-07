@@ -1,21 +1,45 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Tue, 7 Nov 2017 09:01:34 +0900
-Subject: [PATCH v4] arm64: support __int128 on gcc 5+
-In-Reply-To: <CAKv+Gu94w3f0n4qDeR3uC5nVaKwjTUYf8W4cs5L3nE1HxoDG9Q@mail.gmail.com>
-References: <20171103141858.13149-1-Jason@zx2c4.com>
- <20171106093151.8312-1-Jason@zx2c4.com>
- <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
- <20171106161459.bm4b2c7ahljluuda@armageddon.cambridge.arm.com>
- <CAHmME9p+ef-+fmdiO15LU7X3Sr-CDyngpPwKZN2FqOQmZNjLtg@mail.gmail.com>
- <CAKv+Gu94w3f0n4qDeR3uC5nVaKwjTUYf8W4cs5L3nE1HxoDG9Q@mail.gmail.com>
-Message-ID: <CAHmME9o7_g=_yofAMBaABrPzbVrKryv9ucb=MhAB6CGC6g=4tA@mail.gmail.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 6 Nov 2017 18:11:13 -0600
+Subject: [PATCH] PCI: turn off PCIe services during shutdown
+In-Reply-To: <1508958063-6947-1-git-send-email-okaya@codeaurora.org>
+References: <1508958063-6947-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <20171107001113.GA9538@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 7, 2017 at 1:55 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
-> It appears your v4 adds __ashlti3() and __ashrti3, whereas the error
-> is about __lshrti3() being undefined.
+On Wed, Oct 25, 2017 at 03:01:02PM -0400, Sinan Kaya wrote:
+> Some of the PCIe services such as AER are being left enabled during
+> shutdown. This might cause spurious AER errors while SOC is being
+> powered down.
+> 
+> Let's clean up the PCIe services gracefully during shutdown to clear
+> these false positives.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-Whoopsie. v5 adds the final missing function. Looks like it now
-compiles for -next with the config you provided me.
+Applied to pci/portdrv for v4.15, thanks!
+
+> ---
+>  drivers/pci/pcie/portdrv_pci.c | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/pci/pcie/portdrv_pci.c b/drivers/pci/pcie/portdrv_pci.c
+> index 083276e..b350d12 100644
+> --- a/drivers/pci/pcie/portdrv_pci.c
+> +++ b/drivers/pci/pcie/portdrv_pci.c
+> @@ -246,6 +246,7 @@ static void pcie_portdrv_err_resume(struct pci_dev *dev)
+>  
+>  	.probe		= pcie_portdrv_probe,
+>  	.remove		= pcie_portdrv_remove,
+> +	.shutdown	= pcie_portdrv_remove,
+>  
+>  	.err_handler	= &pcie_portdrv_err_handler,
+>  
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
