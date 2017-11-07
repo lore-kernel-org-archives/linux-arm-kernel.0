@@ -1,37 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 7 Nov 2017 12:01:15 +0100
-Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
-In-Reply-To: <1510050759-6110-1-git-send-email-giulio.benetti@micronovasrl.com>
-References: <1510050759-6110-1-git-send-email-giulio.benetti@micronovasrl.com>
-Message-ID: <20171107110115.dkzzcaiokhocc2qu@flea>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Tue, 07 Nov 2017 12:03:17 +0100
+Subject: [PATCH v3 0/4] fix the clock setting for SAR ADC
+In-Reply-To: <20171107053646.31087-1-yixun.lan@amlogic.com>
+References: <20171107053646.31087-1-yixun.lan@amlogic.com>
+Message-ID: <1510052597.1328.69.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 07, 2017 at 11:32:39AM +0100, Giulio Benetti wrote:
-> This patch gives possibility to set parallel lcd pins for RGB888.
-> To be used with tcon0 in your <target>.dts
+On Tue, 2017-11-07 at 13:36 +0800, Yixun Lan wrote:
+> patch [1/4]:
+>   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
+> the published datasheet also has wrong description about this.
 > 
-> Best regards
-> Giulio Benetti
-> Micronova srl
+> patch [2-4/4]:
+>   Drop the "sana" clock from SAR ADC module,
+> 
+>   From the hardware perspective, the SAR ADC module doesn't
+> require "sana" clock to wrok. This should apply to all SoC,
+> including meson6,8, GXBB, GXL..
+> 
+> Note: the whole patchset series has been tested at GXL-P212 board,
+> we haven't got any meson6,8 board to test, so I would appreciate
+> if someone (Martin?) could help to confirm it works there.
+>  
+> Changes since v2 at [2] :
+>   - explicitly point out 'sana' clock is not required for saradc, and drop
+> them
+>   - update comments, as the published datasheet is wrong
+>  
+> Changes since v1 at [1] :
+>   - correct SAR ADC/SANA clock gate bit
+> 
+> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005221.ht
+> ml
+> [2] http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005242.ht
+> ml
+> 
 
-This isn't a cover letter, but a commit log. You should document why
-and how you did that change, nothing else.
+Those patches should go through different trees. To avoid causing a (temporary)
+regression, the clk patch absolutely needs to be merged before any other patches
+is merged.
 
-On what board is this supposed to be used?
+I can take the clk patch as a fix for v4.15. It's too late for v4.14 but it's
+not big deal, I suppose the long term kernel will pick it up later on.
 
-Maxime
+Once the sana clock is indeed *the* sana clock, which of IIO or DT patch is
+merged first does not matter, the sana clock is optional.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/ca02cc10/attachment.sig>
+BTW, the cover letter and the IIO patch are missing the IIO maintainer and
+mailing list. According to MAINTAINERS, you are missing:
+
+* Jonathan Cameron <jic23@kernel.org>
+* linux-iio at vger.kernel.org
+
+Please resend with the warning note above (so other maintainers are aware of
+dependency), the correction applied to patch 1 commit log and the missing
+recipients.
+
+> 
+> Xingyu Chen (3):
+>   iio: adc: meson-saradc: remove irrelevant clock "sana"
+>   dt-bindings: iio: adc: update the doc for SAR ADC
+>   ARM64: dts: meson: drop "sana" clock from SAR ADC
+> 
+> Yixun Lan (1):
+>   clk: meson: gxbb: fix wrong clock for SARADC/SANA
+> 
+>  .../bindings/iio/adc/amlogic,meson-saradc.txt        |  1 -
+>  arch/arm/boot/dts/meson8.dtsi                        |  5 ++---
+>  arch/arm/boot/dts/meson8b.dtsi                       |  5 ++---
+>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi          |  3 +--
+>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi           |  3 +--
+>  drivers/clk/meson/gxbb.c                             |  4 ++--
+>  drivers/iio/adc/meson_saradc.c                       | 20 -----------------
+> ---
+>  7 files changed, 8 insertions(+), 33 deletions(-)
+> 
