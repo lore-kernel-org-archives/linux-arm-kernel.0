@@ -1,116 +1,159 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Tue,  7 Nov 2017 17:07:34 -0600
-Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
+Date: Tue,  7 Nov 2017 17:07:35 -0600
+Subject: [PATCH 3/4] [v6] pinctrl: qcom: disable GPIO groups with no pins
 In-Reply-To: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
 References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
-Message-ID: <1510096056-13765-3-git-send-email-timur@codeaurora.org>
+Message-ID: <1510096056-13765-4-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for specifying that some GPIOs within a range are unavailable.
-Some systems have a sparse list of GPIOs, where a range of GPIOs is
-specified (usually 0 to n-1), but some subset within that range is
-absent or unavailable for whatever reason.
+pinctrl-msm only accepts an array of GPIOs from 0 to n-1, and it expects
+each group to support have only one pin (npins == 1).
 
-To support this, allow drivers to specify a bitmask of GPIOs that
-are present or absent.  Gpiolib will then block access to those that
-are absent.
+We can support "sparse" GPIO maps if we allow for some groups to have zero
+pins (npins == 0).  These pins are "hidden" from the rest of the driver
+and gpiolib.
+
+A new boolean 'sparse' indicates whether the GPIO map is sparse.  If any
+GPIO has an 'npins' value of 0, then 'sparse' must be set to True.
+
+Most access to unavailable GPIOs can be blocked via the gpio_chip.request
+function.  The one exception is when gpiochip_add_data() scans all of
+the GPIOs without "requesting" them.  To cover this case,
+msm_gpio_get_direction() separately checks if the GPIO is available.
 
 Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
- drivers/gpio/gpiolib.c      | 43 +++++++++++++++++++++++++++++++++++--------
- include/linux/gpio/driver.h |  2 ++
- 2 files changed, 37 insertions(+), 8 deletions(-)
+ drivers/pinctrl/qcom/pinctrl-msm.c | 48 +++++++++++++++++++++++++++++++++-----
+ drivers/pinctrl/qcom/pinctrl-msm.h |  2 ++
+ 2 files changed, 44 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-index 60553af4c004..c32387936cdd 100644
---- a/drivers/gpio/gpiolib.c
-+++ b/drivers/gpio/gpiolib.c
-@@ -1481,22 +1481,36 @@ static struct gpio_chip *find_chip_by_name(const char *name)
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.c b/drivers/pinctrl/qcom/pinctrl-msm.c
+index ff491da64dab..66c68a314ca9 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.c
++++ b/drivers/pinctrl/qcom/pinctrl-msm.c
+@@ -507,6 +507,11 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 	};
  
- static int gpiochip_irqchip_init_valid_mask(struct gpio_chip *gpiochip)
- {
--	if (!gpiochip->irq_need_valid_mask)
--		return 0;
-+	if (gpiochip->irq_need_valid_mask) {
-+		gpiochip->irq_valid_mask =
-+			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
-+				sizeof(long), GFP_KERNEL);
-+		if (!gpiochip->irq_valid_mask)
-+			return -ENOMEM;
- 
--	gpiochip->irq_valid_mask = kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
--					   sizeof(long), GFP_KERNEL);
--	if (!gpiochip->irq_valid_mask)
--		return -ENOMEM;
-+		/* Assume by default all GPIOs are valid */
-+		bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
-+	}
- 
--	/* Assume by default all GPIOs are valid */
--	bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
-+	if (gpiochip->line_need_valid_mask) {
-+		gpiochip->line_valid_mask =
-+			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
-+				sizeof(long), GFP_KERNEL);
-+		if (!gpiochip->line_valid_mask)
-+			return -ENOMEM;
+ 	g = &pctrl->soc->groups[offset];
 +
-+		/* Assume by default all GPIOs are valid */
-+		bitmap_fill(gpiochip->line_valid_mask, gpiochip->ngpio);
-+	}
++	/* If the GPIO group has no pins, then don't show it. */
++	if (!g->npins)
++		return;
++
+ 	ctl_reg = readl(pctrl->regs + g->ctl_reg);
  
- 	return 0;
+ 	is_out = !!(ctl_reg & BIT(g->oe_bit));
+@@ -516,7 +521,7 @@ static void msm_gpio_dbg_show_one(struct seq_file *s,
+ 
+ 	seq_printf(s, " %-8s: %-3s %d", g->name, is_out ? "out" : "in", func);
+ 	seq_printf(s, " %dmA", msm_regval_to_drive(drive));
+-	seq_printf(s, " %s", pulls[pull]);
++	seq_printf(s, " %s\n", pulls[pull]);
  }
  
- static void gpiochip_irqchip_free_valid_mask(struct gpio_chip *gpiochip)
- {
-+	kfree(gpiochip->line_valid_mask);
-+	gpiochip->line_valid_mask = NULL;
-+
- 	kfree(gpiochip->irq_valid_mask);
- 	gpiochip->irq_valid_mask = NULL;
- }
-@@ -1510,6 +1524,15 @@ static bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
- 	return test_bit(offset, gpiochip->irq_valid_mask);
+ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+@@ -524,23 +529,36 @@ static void msm_gpio_dbg_show(struct seq_file *s, struct gpio_chip *chip)
+ 	unsigned gpio = chip->base;
+ 	unsigned i;
+ 
+-	for (i = 0; i < chip->ngpio; i++, gpio++) {
++	for (i = 0; i < chip->ngpio; i++, gpio++)
+ 		msm_gpio_dbg_show_one(s, NULL, chip, i, gpio);
+-		seq_puts(s, "\n");
+-	}
  }
  
-+static bool gpiochip_irqchip_line_valid(const struct gpio_chip *gpiochip,
-+					unsigned int offset)
-+{
-+	/* No mask means all valid */
-+	if (likely(!gpiochip->line_valid_mask))
-+		return true;
-+	return test_bit(offset, gpiochip->line_valid_mask);
-+}
-+
- /**
-  * gpiochip_set_cascaded_irqchip() - connects a cascaded irqchip to a gpiochip
-  * @gpiochip: the gpiochip to set the irqchip chain to
-@@ -3320,6 +3343,10 @@ struct gpio_desc *__must_check gpiod_get_index(struct device *dev,
- 		return desc;
- 	}
- 
-+	/* Make sure the GPIO is valid before we request it. */
-+	if (!gpiochip_irqchip_line_valid(desc->gdev->chip, idx))
-+		return ERR_PTR(-EACCES);
-+
- 	status = gpiod_request(desc, con_id);
- 	if (status < 0)
- 		return ERR_PTR(status);
-diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
-index 424e5139ff10..853828ccabc8 100644
---- a/include/linux/gpio/driver.h
-+++ b/include/linux/gpio/driver.h
-@@ -173,6 +173,8 @@ struct gpio_chip {
- 	bool			irq_nested;
- 	bool			irq_need_valid_mask;
- 	unsigned long		*irq_valid_mask;
-+	bool			line_need_valid_mask;
-+	unsigned long		*line_valid_mask;
- 	struct lock_class_key	*lock_key;
+ #else
+ #define msm_gpio_dbg_show NULL
  #endif
  
++/*
++ * If the requested GPIO has no pins, then treat it as unavailable.
++ * Otherwise, call the standard request function.
++ */
++static int msm_gpio_request(struct gpio_chip *chip, unsigned int offset)
++{
++	struct msm_pinctrl *pctrl = gpiochip_get_data(chip);
++	const struct msm_pingroup *g = &pctrl->soc->groups[offset];
++
++	if (!g->npins)
++		return -ENODEV;
++
++	return gpiochip_generic_request(chip, offset);
++}
++
+ static const struct gpio_chip msm_gpio_template = {
+ 	.direction_input  = msm_gpio_direction_input,
+ 	.direction_output = msm_gpio_direction_output,
+ 	.get_direction    = msm_gpio_get_direction,
+ 	.get              = msm_gpio_get,
+ 	.set              = msm_gpio_set,
+-	.request          = gpiochip_generic_request,
++	.request          = msm_gpio_request,
+ 	.free             = gpiochip_generic_free,
+ 	.dbg_show         = msm_gpio_dbg_show,
+ };
+@@ -813,6 +831,8 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+ 	struct gpio_chip *chip;
+ 	int ret;
+ 	unsigned ngpio = pctrl->soc->ngpios;
++	const struct msm_pingroup *groups = pctrl->soc->groups;
++	unsigned int i;
+ 
+ 	if (WARN_ON(ngpio > MAX_NR_GPIO))
+ 		return -EINVAL;
+@@ -825,13 +845,29 @@ static int msm_gpio_init(struct msm_pinctrl *pctrl)
+ 	chip->owner = THIS_MODULE;
+ 	chip->of_node = pctrl->dev->of_node;
+ 
++	/* If the GPIO map is sparse, then we need to disable specific IRQs */
++	if (pctrl->soc->sparse) {
++		chip->irq_need_valid_mask = true;
++		chip->line_need_valid_mask = true;
++	}
++
+ 	ret = gpiochip_add_data(&pctrl->chip, pctrl);
+ 	if (ret) {
+ 		dev_err(pctrl->dev, "Failed register gpiochip\n");
+ 		return ret;
+ 	}
+ 
+-	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev), 0, 0, chip->ngpio);
++	if (chip->line_need_valid_mask) {
++		for (i = 0; i < ngpio; i++)
++			if (!groups[i].npins) {
++				clear_bit(i, pctrl->chip.irq_valid_mask);
++				clear_bit(i, pctrl->chip.line_valid_mask);
++			}
++	}
++
++	ret = gpiochip_add_pin_range(&pctrl->chip, dev_name(pctrl->dev),
++				     0, 0, ngpio);
++
+ 	if (ret) {
+ 		dev_err(pctrl->dev, "Failed to add pin range\n");
+ 		gpiochip_remove(&pctrl->chip);
+diff --git a/drivers/pinctrl/qcom/pinctrl-msm.h b/drivers/pinctrl/qcom/pinctrl-msm.h
+index 9b9feea540ff..70762bcb84cb 100644
+--- a/drivers/pinctrl/qcom/pinctrl-msm.h
++++ b/drivers/pinctrl/qcom/pinctrl-msm.h
+@@ -107,6 +107,7 @@ struct msm_pingroup {
+  * @ngroups:	    The numbmer of entries in @groups.
+  * @ngpio:	    The number of pingroups the driver should expose as GPIOs.
+  * @pull_no_keeper: The SoC does not support keeper bias.
++ * @sparse:         The GPIO map is sparse (some GPIOs have npins == 0)
+  */
+ struct msm_pinctrl_soc_data {
+ 	const struct pinctrl_pin_desc *pins;
+@@ -117,6 +118,7 @@ struct msm_pinctrl_soc_data {
+ 	unsigned ngroups;
+ 	unsigned ngpios;
+ 	bool pull_no_keeper;
++	bool sparse;
+ };
+ 
+ int msm_pinctrl_probe(struct platform_device *pdev,
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
 Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
