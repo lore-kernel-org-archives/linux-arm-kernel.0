@@ -1,67 +1,42 @@
-From: giulio.benetti@micronovasrl.com (Giulio Benetti)
-Date: Tue,  7 Nov 2017 13:59:03 +0100
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 7 Nov 2017 14:02:13 +0100
 Subject: [PATCH 1/1] add mali r6p2 dt node
-Message-ID: <1510059543-7064-1-git-send-email-giulio.benetti@micronovasrl.com>
+In-Reply-To: <1510059543-7064-1-git-send-email-giulio.benetti@micronovasrl.com>
+References: <1510059543-7064-1-git-send-email-giulio.benetti@micronovasrl.com>
+Message-ID: <20171107130213.g73f6oemzdkulgek@flea>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems there is not mali node in sun7i-a20.dtsi
+On Tue, Nov 07, 2017 at 01:59:03PM +0100, Giulio Benetti wrote:
+> It seems there is not mali node in sun7i-a20.dtsi
+> 
+> Add mali node to sun7i-a20.dtsi
+> 
+> This patch adds device tree mali node compatible with r6p2 utgard kernel driver 
+> provided by ARM and patched by maxime ripard on his github.
+> 
+> It can be easily used in target.dts with:
+> 
+> &mali {
+> 	status = "okay";
+> }
+> 
+> then loading mali.ko in user space.
 
-Add mali node to sun7i-a20.dtsi
+Can you please stop sending the same patch over and over again without
+making any changes?
 
-This patch adds device tree mali node compatible with r6p2 utgard kernel driver 
-provided by ARM and patched by maxime ripard on his github.
+Thanks,
+Maxime
 
-It can be easily used in target.dts with:
-
-&mali {
-	status = "okay";
-}
-
-then loading mali.ko in user space.
-
-Signed-off-by: Giulio Benetti <giulio.benetti@micronovasrl.com>
----
- arch/arm/boot/dts/sun7i-a20.dtsi | 27 +++++++++++++++++++++++++++
- 1 file changed, 27 insertions(+)
-
-diff --git a/arch/arm/boot/dts/sun7i-a20.dtsi b/arch/arm/boot/dts/sun7i-a20.dtsi
-index 228c368..e402596 100644
---- a/arch/arm/boot/dts/sun7i-a20.dtsi
-+++ b/arch/arm/boot/dts/sun7i-a20.dtsi
-@@ -1216,6 +1216,33 @@
- 			#size-cells = <0>;
- 		};
- 
-+		mali: gpu at 1c40000 {
-+			compatible = "allwinner,sun8i-a23-mali",
-+				     "allwinner,sun7i-a20-mali", "arm,mali-400";
-+			reg = <0x01c40000 0x10000>;
-+			interrupts = <GIC_SPI 69 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 70 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>,
-+				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "gp",
-+					  "gpmmu",
-+					  "pp0",
-+					  "ppmmu0",
-+					  "pp1",
-+					  "ppmmu1",
-+					  "pmu";
-+			clocks = <&ccu CLK_AHB_GPU>, <&ccu CLK_GPU>;
-+			clock-names = "bus", "core";
-+			resets = <&ccu RST_GPU>;
-+			#cooling-cells = <2>;
-+
-+			assigned-clocks = <&ccu CLK_GPU>;
-+			assigned-clock-rates = <381000000>;
-+		};
-+
- 		gmac: ethernet at 1c50000 {
- 			compatible = "allwinner,sun7i-a20-gmac";
- 			reg = <0x01c50000 0x10000>;
 -- 
-2.7.4
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/69d494e8/attachment.sig>
