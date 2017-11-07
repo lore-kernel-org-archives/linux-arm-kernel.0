@@ -1,73 +1,39 @@
-From: ddaney@caviumnetworks.com (David Daney)
-Date: Tue, 7 Nov 2017 11:49:23 -0800
-Subject: [PATCH net-next 1/2] net: add support for Cavium PTP coprocessor
-In-Reply-To: <20171107190704.15458-2-aleksey.makarov@cavium.com>
-References: <20171107190704.15458-1-aleksey.makarov@cavium.com>
- <20171107190704.15458-2-aleksey.makarov@cavium.com>
-Message-ID: <1d765627-edb1-cc0f-65bc-cf061687a8c6@caviumnetworks.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 7 Nov 2017 20:50:20 +0100
+Subject: Battery charging, battery status on Nokia N9, N950
+In-Reply-To: <20171103210349.GA14071@amd>
+References: <20171103210349.GA14071@amd>
+Message-ID: <20171107195020.GA19508@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2017 11:07 AM, Aleksey Makarov wrote:
-> From: Radoslaw Biernacki <rad@semihalf.com>
-> 
-> This patch adds support for the Precision Time Protocol
-> Clocks and Timestamping hardware found on Cavium ThunderX
-> processors.
-> 
-> Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@cavium.com>
-> ---
->   drivers/net/ethernet/cavium/Kconfig             |  13 +
->   drivers/net/ethernet/cavium/Makefile            |   1 +
->   drivers/net/ethernet/cavium/common/Makefile     |   1 +
->   drivers/net/ethernet/cavium/common/cavium_ptp.c | 353 ++++++++++++++++++++++++
->   drivers/net/ethernet/cavium/common/cavium_ptp.h |  78 ++++++
->   5 files changed, 446 insertions(+)
->   create mode 100644 drivers/net/ethernet/cavium/common/Makefile
->   create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.c
->   create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.h
-> 
-[...]
-> +
-> +/* The Cavium PTP can *only* be found in SoCs containing the ThunderX
-> + * ARM64 CPU implementation.  All accesses to the device registers on this
-> + * platform are implicitly strongly ordered with respect to memory
-> + * accesses.
+Hi!
 
-I believe that is not correct.  I/O register accesses are implicitly 
-ordered with respect to other I/O register accesses.  However, with 
-respect to memory accesses, no ordering is imposed.  Therefore, one must 
-be very careful not to introduce subtile memory ordering bugs with these 
-things when using the unordered versions.
+> I'm fighting with battery status & battery charging on Nokia
+> N9/N950. https://elinux.org/N950 contains enough info to get battery
+> status (and below is first attempt at kernel implementation), but I'm
+> not sure what needs to be done to charge the battery (or at least
+> power phone from USB).
 
-> + * So writeq_relaxed() and readq_relaxed() are safe to use with
-> + * no memory barriers in this driver.  The readq()/writeq() functions add
-> + * explicit ordering operation which in this case are redundant, and only
-> + * add overhead.
+Nemo recovery system (2824336 Jul 25  2016 zImage-moslo) seems to
+either charge phone from USB or at power it from USB.
 
+But 4.13 does not; it seems there are two separate issue.
 
-Also it should be noted that on production silicon, the performance 
-difference between the "relaxed" variant and the normal variant of 
-read*/write* is often negligible.
+First, something needs to be done to enable system power from the
+USB. I'm not sure what that one would be :-(. Then, it should be
+possible to ask bq24153 to charge the battery.
 
-
-> + */
-> +
-> +static u64 cavium_ptp_reg_read(struct cavium_ptp *clock, u64 offset)
-> +{
-> +	return readq_relaxed(clock->reg_base + offset);
-> +}
-> +
-> +static void cavium_ptp_reg_write(struct cavium_ptp *clock, u64 offset, u64 val)
-> +{
-> +	writeq_relaxed(val, clock->reg_base + offset);
-> +}
-> +
-
-Are the PTP register access really so much in the hot path that using 
-the relaxed variants can be measured here?  If not, would it make the 
-driver look cleaner to remove these and just use readq/writeq calls 
-directly  in the body of the driver?
-
-David.
+Best regards,
+							Pavel
+							
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171107/be8b935e/attachment.sig>
