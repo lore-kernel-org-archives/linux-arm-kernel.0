@@ -1,118 +1,195 @@
-From: ruben.guerra.marin@axon.tv (Ruben Guerra Marin)
-Date: Tue, 7 Nov 2017 09:04:14 +0000
-Subject: Performance issues writing to PCIe in a Zynq
-In-Reply-To: <20171106173549.GB31930@bhelgaas-glaptop.roam.corp.google.com>
-References: <1509636637116.27702@axon.tv>
- <eca01e58-3da1-d5c4-00f7-71dd6a926870@xilinx.com>
- <20171103135457.GA8457@bhelgaas-glaptop.roam.corp.google.com>
- <1509958288489.45871@axon.tv>,
- <20171106173549.GB31930@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1510045454475.74232@axon.tv>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Tue, 07 Nov 2017 10:05:48 +0100
+Subject: [PATCH v2] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <20171107063212.GA25491@gondor.apana.org.au>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <4677171.2qOLUIFS1s@positron.chronox.de>
+ <20171107063212.GA25491@gondor.apana.org.au>
+Message-ID: <2510520.gYBNS8MAsP@positron.chronox.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Which PCI host bridge driver are you using?
-Indeed I am using drivers/pci/host/pcie-xilinx.c
+The code paths protected by the socket-lock do not use or modify the
+socket in a non-atomic fashion. The actions pertaining the socket do not
+even need to be handled as an atomic operation. Thus, the socket-lock
+can be safely ignored.
 
-> Can you do any profiling to figure out where the time is going?
-So I did some profiling on the mcap application, and traced the bottleneck in a write call to pciutils. I added some debug to pciutils and could trace it that the bottleneck is in a function called pwrite, which pretty much does this:
+This fixes a bug regarding scheduling in atomic as the callback function
+may be invoked in interrupt context.
 
-syscall(SYS_pwrite, fd, buf, size, where);
+In addition, the sock_hold is moved before the AIO encrypt/decrypt
+operation to ensure that the socket is always present. This avoids a
+tiny race window where the socket is unprotected and yet used by the AIO
+operation.
 
-until now this is the last part I could trace it to.
+Finally, the release of resources for a crypto operation is moved into a
+common function of af_alg_free_resources.
 
-Ruben Guerra Marin
-ruben.guerra.marin at axon.tv
+Fixes: e870456d8e7c8 ("crypto: algif_skcipher - overhaul memory management")
+Fixes: d887c52d6ae43 ("crypto: algif_aead - overhaul memory management")
+Reported-by: Romain Izard <romain.izard.pro@gmail.com>
+Signed-off-by: Stephan Mueller <smueller@chronox.de>
+---
+ crypto/af_alg.c         | 21 ++++++++++++++-------
+ crypto/algif_aead.c     | 23 ++++++++++++-----------
+ crypto/algif_skcipher.c | 23 ++++++++++++-----------
+ include/crypto/if_alg.h |  1 +
+ 4 files changed, 39 insertions(+), 29 deletions(-)
 
-________________________________________
-From: Bjorn Helgaas <helgaas@kernel.org>
-Sent: Monday, November 6, 2017 6:35 PM
-To: Ruben Guerra Marin
-Cc: Michal Simek; bhelgaas at google.com; soren.brinkmann at xilinx.com; bharat.kumar.gogada at xilinx.com; linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-Subject: Re: Performance issues writing to PCIe in a Zynq
-
-On Mon, Nov 06, 2017 at 08:51:28AM +0000, Ruben Guerra Marin wrote:
-> Hi, according to Xilinx, from a computer host it happens in a
-> second, while for us in the Zynq (ARM) takes way more than that as
-> explained before. And indeed the programming is done via config
-> accesses, and can't happen otherwise as this is the way Xilinx
-> created its FPGA IP (Intellectual Property) cores. Still if I do a
-> baremetal test (so no Linux) and write from the ARMs to the FPGA via
-> those registers, it takes only 17 cycles instead of the Linux
-> implementation which takes 250 cycles.
-
-Which PCI host bridge driver are you using?
-
-If you're using drivers/pci/host/pcie-xilinx.c, it uses
-pci_generic_config_write(), which doesn't contain anything that looks
-obviously expensive (except for the __iowmb() inside writeq(), and
-it's hard to do much about that).
-
-There is the pci_lock that's acquired in pci_bus_read_config_dword()
-(see drivers/pci/access.c).  As I mentioned before, it looks like
-xilinx could probably use the CONFIG_PCI_LOCKLESS_CONFIG strategy to
-get rid of that lock.  Not sure how much that would buy you since
-there's probably no contention, but you could experiment with it.
-
-It sounds like you have some user-level code involved, too; I don't
-know anything about what that code might be doing.
-
-Can you do any profiling to figure out where the time is going?
-
-> From: Bjorn Helgaas <helgaas@kernel.org>
-> Sent: Friday, November 3, 2017 2:54 PM
-> To: Michal Simek
-> Cc: Ruben Guerra Marin; bhelgaas at google.com; soren.brinkmann at xilinx.com; bharat.kumar.gogada at xilinx.com; linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Subject: Re: Performance issues writing to PCIe in a Zynq
->
-> On Fri, Nov 03, 2017 at 09:12:04AM +0100, Michal Simek wrote:
-> > On 2.11.2017 16:30, Ruben Guerra Marin wrote:
-> > >
-> > > I have the a Zynq board running petalinux, and it is connected
-> > > through PCIe to a Virtex Ultrascale board. I configured the
-> > > Ultrascale for Tandem PCIe, which the second stage bitstream is
-> > > being programmed from the Zynq board (I crossed compiled the mcap
-> > > application that Xilinx provides).
-> > >
-> > > This works perfectly, but takes around ~12 seconds to program the
-> > > second stage bitstream (compressed is ~12 MB), which is quite
-> > > slow. We also tried debugging the mcap application and pciutils.
-> > > We found out the operation that takes long to execute: In
-> > > pciutils, the instruction to actually call the write to the driver
-> > > (pwrite) takes approximately 6uS, so if you add up this for 12 MB
-> > > then you can see why it takes so long. Why is this so slow? Is
-> > > this maybe a problem with the driver?
-> > >
-> > > For testing, I added an ILA to the AXI bus in between the Zynq GP1
-> > > and the PCIe IP control registers port. I triggered halfway the
-> > > programming of the bitstream using the mcap program provided by
-> > > Xilinx. I can see that it is writing to address x358, which
-> > > according to the *datasheet*
-> > > (https://www.xilinx.com/Attachment/Xilinx_Answer_64761__UltraScale_Devices.pdf)
-> > > is the Write Data Register, which is correct (and again, I know
-> > > the whole bitstream gets programmed correctly).
-> > >
-> > > But what I also see is that a "awvalid" being asserted to the next
-> > > one it takes 245 cycles, and I can imagine this is why it takes 12
-> > > seconds to program a 12MB bitstream.
->
-> How long do you expect this to take?  What are the corresponding times
-> on other hardware or other OSes?
->
-> It sounds like this programming is done via config accesses, which are
-> definitely not a fast path, so I don't know if 12s is unreasonably
-> slow or not.  The largest config write is 4 bytes, which means 12MB
-> requires 3M writes, and if each takes 6us, that's 18s total.
->
-> Most platforms serialize config accesses with a lock, which also slows
-> things down.  It looks like your hardware might support ECAM, which
-> means you might be able to remove the locking overhead by using
-> lockless config (see     CONFIG_    PCI_LOCKLESS_CONFIG).  This is a new
-> feature currently only used by x86, and it's currently a system-wide
-> compile-time switch, so it would require some work for you to use it.
->
-> The high bandwidth way to do this would be use a BAR and do PCI memory
-> writes instead of PCI config writes.  Obviously the adapter determines
-> whether this is possible.
->
-> Bjorn
+diff --git a/crypto/af_alg.c b/crypto/af_alg.c
+index 85cea9de324a..358749c38894 100644
+--- a/crypto/af_alg.c
++++ b/crypto/af_alg.c
+@@ -1021,6 +1021,18 @@ ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
+ EXPORT_SYMBOL_GPL(af_alg_sendpage);
+ 
+ /**
++ * af_alg_free_resources - release resources required for crypto request
++ */
++void af_alg_free_resources(struct af_alg_async_req *areq)
++{
++	struct sock *sk = areq->sk;
++
++	af_alg_free_areq_sgls(areq);
++	sock_kfree_s(sk, areq, areq->areqlen);
++}
++EXPORT_SYMBOL_GPL(af_alg_free_resources);
++
++/**
+  * af_alg_async_cb - AIO callback handler
+  *
+  * This handler cleans up the struct af_alg_async_req upon completion of the
+@@ -1036,18 +1048,13 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
+ 	struct kiocb *iocb = areq->iocb;
+ 	unsigned int resultlen;
+ 
+-	lock_sock(sk);
+-
+ 	/* Buffer size written by crypto operation. */
+ 	resultlen = areq->outlen;
+ 
+-	af_alg_free_areq_sgls(areq);
+-	sock_kfree_s(sk, areq, areq->areqlen);
+-	__sock_put(sk);
++	af_alg_free_resources(areq);
++	sock_put(sk);
+ 
+ 	iocb->ki_complete(iocb, err ? err : resultlen, 0);
+-
+-	release_sock(sk);
+ }
+ EXPORT_SYMBOL_GPL(af_alg_async_cb);
+ 
+diff --git a/crypto/algif_aead.c b/crypto/algif_aead.c
+index aacae0837aff..6cdd4fb08335 100644
+--- a/crypto/algif_aead.c
++++ b/crypto/algif_aead.c
+@@ -268,12 +268,23 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
+ 
+ 	if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
+ 		/* AIO operation */
++		sock_hold(sk);
+ 		areq->iocb = msg->msg_iocb;
+ 		aead_request_set_callback(&areq->cra_u.aead_req,
+ 					  CRYPTO_TFM_REQ_MAY_BACKLOG,
+ 					  af_alg_async_cb, areq);
+ 		err = ctx->enc ? crypto_aead_encrypt(&areq->cra_u.aead_req) :
+ 				 crypto_aead_decrypt(&areq->cra_u.aead_req);
++
++		/* AIO operation in progress */
++		if (err == -EINPROGRESS) {
++			/* Remember output size that will be generated. */
++			areq->outlen = outlen;
++
++			return -EIOCBQUEUED;
++		}
++
++		sock_put(sk);
+ 	} else {
+ 		/* Synchronous operation */
+ 		aead_request_set_callback(&areq->cra_u.aead_req,
+@@ -285,19 +296,9 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
+ 				&ctx->wait);
+ 	}
+ 
+-	/* AIO operation in progress */
+-	if (err == -EINPROGRESS) {
+-		sock_hold(sk);
+-
+-		/* Remember output size that will be generated. */
+-		areq->outlen = outlen;
+-
+-		return -EIOCBQUEUED;
+-	}
+ 
+ free:
+-	af_alg_free_areq_sgls(areq);
+-	sock_kfree_s(sk, areq, areq->areqlen);
++	af_alg_free_resources(areq);
+ 
+ 	return err ? err : outlen;
+ }
+diff --git a/crypto/algif_skcipher.c b/crypto/algif_skcipher.c
+index 9954b078f0b9..0e0dd44f0545 100644
+--- a/crypto/algif_skcipher.c
++++ b/crypto/algif_skcipher.c
+@@ -117,6 +117,7 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+ 
+ 	if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
+ 		/* AIO operation */
++		sock_hold(sk);
+ 		areq->iocb = msg->msg_iocb;
+ 		skcipher_request_set_callback(&areq->cra_u.skcipher_req,
+ 					      CRYPTO_TFM_REQ_MAY_SLEEP,
+@@ -124,6 +125,16 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+ 		err = ctx->enc ?
+ 			crypto_skcipher_encrypt(&areq->cra_u.skcipher_req) :
+ 			crypto_skcipher_decrypt(&areq->cra_u.skcipher_req);
++
++		/* AIO operation in progress */
++		if (err == -EINPROGRESS) {
++			/* Remember output size that will be generated. */
++			areq->outlen = len;
++
++			return -EIOCBQUEUED;
++		}
++
++		sock_put(sk);
+ 	} else {
+ 		/* Synchronous operation */
+ 		skcipher_request_set_callback(&areq->cra_u.skcipher_req,
+@@ -136,19 +147,9 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+ 						 &ctx->wait);
+ 	}
+ 
+-	/* AIO operation in progress */
+-	if (err == -EINPROGRESS) {
+-		sock_hold(sk);
+-
+-		/* Remember output size that will be generated. */
+-		areq->outlen = len;
+-
+-		return -EIOCBQUEUED;
+-	}
+ 
+ free:
+-	af_alg_free_areq_sgls(areq);
+-	sock_kfree_s(sk, areq, areq->areqlen);
++	af_alg_free_resources(areq);
+ 
+ 	return err ? err : len;
+ }
+diff --git a/include/crypto/if_alg.h b/include/crypto/if_alg.h
+index 6abf0a3604dc..38d9c5861ed8 100644
+--- a/include/crypto/if_alg.h
++++ b/include/crypto/if_alg.h
+@@ -242,6 +242,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
+ 		   unsigned int ivsize);
+ ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
+ 			int offset, size_t size, int flags);
++void af_alg_free_resources(struct af_alg_async_req *areq);
+ void af_alg_async_cb(struct crypto_async_request *_req, int err);
+ unsigned int af_alg_poll(struct file *file, struct socket *sock,
+ 			 poll_table *wait);
+-- 
+2.13.6
