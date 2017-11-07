@@ -1,27 +1,43 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 7 Nov 2017 01:23:55 +0000
-Subject: [PATCH v9 0/5] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
-Message-ID: <20171107012355.GC13514@arm.com>
+Date: Tue, 7 Nov 2017 02:13:16 +0000
+Subject: [PATCH v4] arm64: support __int128 on gcc 5+
+In-Reply-To: <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
+References: <20171103141858.13149-1-Jason@zx2c4.com>
+ <20171106093151.8312-1-Jason@zx2c4.com>
+ <20171106155917.glgjgipppzsdpp6h@armageddon.cambridge.arm.com>
+Message-ID: <20171107021316.GA23638@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaldo,
-
-On Tue, Oct 17, 2017 at 12:02:17AM +0530, Ganapatrao Kulkarni wrote:
-> Extending json/jevent framework for parsing arm64 event files.
-> Adding jevents for ThunderX2 implementation defined PMU events.
+On Mon, Nov 06, 2017 at 03:59:18PM +0000, Catalin Marinas wrote:
+> On Mon, Nov 06, 2017 at 10:31:51AM +0100, Jason A. Donenfeld wrote:
+> > Versions of gcc prior to gcc 5 emitted a __multi3 function call when
+> > dealing with TI types, resulting in failures when trying to link to
+> > libgcc, and more generally, bad performance. However, since gcc 5,
+> > the compiler supports actually emitting fast instructions, which means
+> > we can at long last enable this option and receive the speedups.
+> > 
+> > The gcc commit that added proper Aarch64 support is:
+> > https://gcc.gnu.org/git/?p=gcc.git;a=commitdiff;h=d1ae7bb994f49316f6f63e6173f2931e837a351d
+> > This commit appears to be part of the gcc 5 release.
+> > 
+> > There are still a few instructions, __ashlti3 and __ashrti3, which
+> > require libgcc, which is fine. Rather than linking to libgcc, we
+> > simply provide them ourselves, since they're not that complicated.
+> > 
+> > Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
 > 
-> v9:
->    - Rebased to [3] and resolved conficts in PATCH 1/5 and reworked PATCH 3/5.
->    - Added PATCH 5 to fix segmentation fault in perf_pmu__find_map
+> According to Arnd, linux-next (with this patch included) fails to build
+> with gcc-7 (config: https://pastebin.com/raw/sgvPe96e).
 > 
-> [3] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
+> Will is managing the upcoming merging window for arm64 but is travelling
+> this week. I'll wait for couple of days, he'll probably catch up with
+> emails but my suggestion is that we revert the patch and push it back
+> again into -next after the 4.15 merging window.
 
-I'm happy with this version of the series (it's all Acked now), so would you
-be able to pick it up for mainline, please?
+So I pushed a fixup patch on top of for-next/core, but I suggest we
+temporarily revert the- DCONFIG_ARCH_SUPPORTS_INT128 option if any other
+issues crop up.
 
 Cheers,
 
