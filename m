@@ -1,109 +1,45 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Wed, 8 Nov 2017 17:58:27 +0530
-Subject: [PATCH v2 6/7] pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer
- pdata ops
-In-Reply-To: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
-References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1510144108-29563-7-git-send-email-j-keerthy@ti.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed,  8 Nov 2017 13:47:49 +0100
+Subject: [PATCH 0/3] tee: asynchronous supplicant requests
+Message-ID: <1510145272-14842-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+Hi,
 
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
+Currently all tee supplicant communication is synchronous. This isn't very
+limiting if the supplicant only is accessing system local resources like
+storage. With network access via the supplicant it becomes a larger
+problem.
 
-No code changes in this v2 version. Only enhanced patch
-statistics for renames.
+This patch set enables asynchronous communication with the supplicant by
+introducing meta parameters in the user space API. The meta parameters can
+be used to tag requests with an id that can be matched against an
+asynchronous response as is done here in the OP-TEE driver. 
 
- drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
- 1 file changed, 22 insertions(+), 17 deletions(-)
+Asynchronous supplicant communication is needed by OP-TEE to implement
+GlobalPlatforms TEE Sockets API Specification v1.0.1. The specification is
+available at https://www.globalplatform.org/specificationsdevice.asp.
 
-diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-index 5ad42f3..3b27aff 100644
---- a/drivers/pwm/pwm-omap-dmtimer.c
-+++ b/drivers/pwm/pwm-omap-dmtimer.c
-@@ -23,6 +23,7 @@
- #include <linux/mutex.h>
- #include <linux/of.h>
- #include <linux/of_platform.h>
-+#include <linux/platform_data/dmtimer-omap.h>
- #include <linux/platform_data/pwm_omap_dmtimer.h>
- #include <linux/platform_device.h>
- #include <linux/pm_runtime.h>
-@@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
- 	struct pwm_chip chip;
- 	struct mutex mutex;
- 	pwm_omap_dmtimer *dm_timer;
--	struct pwm_omap_dmtimer_pdata *pdata;
-+	struct omap_dm_timer_ops *pdata;
- 	struct platform_device *dm_timer_pdev;
- };
- 
-@@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- {
- 	struct device_node *np = pdev->dev.of_node;
- 	struct device_node *timer;
-+	struct platform_device *timer_pdev;
- 	struct pwm_omap_dmtimer_chip *omap;
--	struct pwm_omap_dmtimer_pdata *pdata;
-+	struct dmtimer_platform_data *timer_pdata;
-+	struct omap_dm_timer_ops *pdata;
- 	pwm_omap_dmtimer *dm_timer;
- 	u32 v;
- 	int status;
- 
--	pdata = dev_get_platdata(&pdev->dev);
--	if (!pdata) {
--		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
-+	timer = of_parse_phandle(np, "ti,timers", 0);
-+	if (!timer)
-+		return -ENODEV;
-+
-+	timer_pdev = of_find_device_by_node(timer);
-+	if (!timer_pdev) {
-+		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
-+		return -ENODEV;
-+	}
-+
-+	timer_pdata = dev_get_platdata(&timer_pdev->dev);
-+	if (!timer_pdata) {
-+		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
- 		return -EINVAL;
- 	}
- 
--	if (!pdata->request_by_node ||
-+	pdata = timer_pdata->timer_ops;
-+
-+	if (!pdata || !pdata->request_by_node ||
- 	    !pdata->free ||
- 	    !pdata->enable ||
- 	    !pdata->disable ||
-@@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	timer = of_parse_phandle(np, "ti,timers", 0);
--	if (!timer)
--		return -ENODEV;
--
- 	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
- 		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
- 		return -ENODEV;
-@@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
- 
- 	omap->pdata = pdata;
- 	omap->dm_timer = dm_timer;
--
--	omap->dm_timer_pdev = of_find_device_by_node(timer);
--	if (!omap->dm_timer_pdev) {
--		dev_err(&pdev->dev, "Unable to find timer pdev\n");
--		omap->pdata->free(dm_timer);
--		return -EINVAL;
--	}
-+	omap->dm_timer_pdev = timer_pdev;
- 
- 	/*
- 	 * Ensure that the timer is stopped before we allow PWM core to call
+This change is backwards compatible allowing older supplicants to work with
+newer kernels and vice versa.
+
+Thanks,
+Jens
+
+Jens Wiklander (3):
+  tee: add tee_param_is_memref() for driver use
+  tee: add TEE_IOCTL_PARAM_ATTR_META
+  optee: support asynchronous supplicant requests
+
+ drivers/tee/optee/core.c          |  11 +-
+ drivers/tee/optee/optee_private.h |  43 ++---
+ drivers/tee/optee/rpc.c           |   4 +-
+ drivers/tee/optee/supp.c          | 375 ++++++++++++++++++++++++--------------
+ drivers/tee/tee_core.c            |  32 ++--
+ include/linux/tee_drv.h           |  12 ++
+ include/uapi/linux/tee.h          |   7 +
+ 7 files changed, 295 insertions(+), 189 deletions(-)
+
 -- 
-1.9.1
+2.7.4
