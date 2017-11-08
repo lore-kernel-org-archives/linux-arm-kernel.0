@@ -1,60 +1,54 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 8 Nov 2017 09:46:29 +0100
-Subject: [PATCH v5 22/26] KVM: arm/arm64: GICv4: Enable virtual cpuif if
- VLPIs can be delivered
-In-Reply-To: <20171027142855.21584-23-marc.zyngier@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-23-marc.zyngier@arm.com>
-Message-ID: <7eb443d1-b247-943b-36e6-a478b7a9d78f@redhat.com>
+From: xuyiping@hisilicon.com (Xu YiPing)
+Date: Wed, 8 Nov 2017 16:59:38 +0800
+Subject: [PATCH] arm64: dts: hi3660: improve pmu description
+Message-ID: <1510131578-84235-1-git-send-email-xuyiping@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-On 27/10/2017 16:28, Marc Zyngier wrote:
-> In order for VLPIs to be delivered to the guest, we must make
-> sure that the 
-virtual
-cpuif is always enabled, irrespective of the
-> presence of virtual interrupt in the LRs.
-> 
-> Acked-by: Christoffer Dall <cdall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
+cortex a73 pmu is supported, use it instead of armpmu-v3
 
-Thanks
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 22 +++++++++++++---------
+ 1 file changed, 13 insertions(+), 9 deletions(-)
 
-Eric
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index 13ae69f..f638897 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -203,21 +203,25 @@
+ 					 IRQ_TYPE_LEVEL_HIGH)>;
+ 	};
 
-> ---
->  virt/kvm/arm/hyp/vgic-v3-sr.c | 9 ++++++---
->  1 file changed, 6 insertions(+), 3 deletions(-)
-> 
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 91728faa13fd..f5c3d6d7019e 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -258,7 +258,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
->  		}
->  	} else {
-> -		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-> +		    cpu_if->its_vpe.its_vm)
->  			write_gicreg(0, ICH_HCR_EL2);
->  
->  		cpu_if->vgic_elrsr = 0xffff;
-> @@ -337,9 +338,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
->  		/*
->  		 * If we need to trap system registers, we must write
->  		 * ICH_HCR_EL2 anyway, even if no interrupts are being
-> -		 * injected,
-> +		 * injected. Same thing if GICv4 is used, as VLPI
-> +		 * delivery is gated by ICH_HCR_EL2.En.
->  		 */
-> -		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
-> +		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
-> +		    cpu_if->its_vpe.its_vm)
->  			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
->  	}
->  
-> 
+-	pmu {
+-		compatible = "arm,armv8-pmuv3";
++	pmu_a53 {
++		compatible = "arm,cortex-a53-pmu";
+ 		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+-			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++			     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+ 		interrupt-affinity = <&cpu0>,
+ 				     <&cpu1>,
+ 				     <&cpu2>,
+-				     <&cpu3>,
+-				     <&cpu4>,
++				     <&cpu3>;
++	};
++
++	pmu_a73 {
++		compatible = "arm,cortex-a73-pmu";
++		interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
++			     <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu4>,
+ 				     <&cpu5>,
+ 				     <&cpu6>,
+ 				     <&cpu7>;
+--
+2.7.4
