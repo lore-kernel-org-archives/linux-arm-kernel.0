@@ -1,29 +1,77 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 08 Nov 2017 01:24:47 +0100
-Subject: [PATCH v4 20/20] cpufreq: scmi: add support for fast frequency
- switching
-In-Reply-To: <1509720477-18936-21-git-send-email-sudeep.holla@arm.com>
-References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
- <1509720477-18936-21-git-send-email-sudeep.holla@arm.com>
-Message-ID: <4588325.776kYim3Ci@aspire.rjw.lan>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 7 Nov 2017 18:38:56 -0600
+Subject: [PATCH 2/4] pinctrl: Add skew-delay pin config and bindings
+In-Reply-To: <CACRpkdZcB9ghYYFSQdTqpuN29DZZeY_AKimQ62-5W7+Mymm1HQ@mail.gmail.com>
+References: <20171028133719.27528-1-linus.walleij@linaro.org>
+ <20171028133719.27528-2-linus.walleij@linaro.org>
+ <20171101212659.be4phj2wha66x63d@rob-hp-laptop>
+ <CACRpkdZcB9ghYYFSQdTqpuN29DZZeY_AKimQ62-5W7+Mymm1HQ@mail.gmail.com>
+Message-ID: <CAL_Jsq+DStFnj_oDtuVza1Owv1xpMJtxgf=FzTSJS67CqhP2AA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 3, 2017 3:47:57 PM CET Sudeep Holla wrote:
-> The cpufreq core provides option for drivers to implement fast_switch
-> callback which is invoked for frequency switching from interrupt context.
-> 
-> This patch adds support for fast_switch callback in SCMI cpufreq driver
-> by making use of polling based SCMI transfer. It also sets the flag
-> fast_switch_possible.
-> 
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> Cc: linux-pm at vger.kernel.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+On Thu, Nov 2, 2017 at 9:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Wed, Nov 1, 2017 at 10:26 PM, Rob Herring <robh@kernel.org> wrote:
+>> On Sat, Oct 28, 2017 at 03:37:17PM +0200, Linus Walleij wrote:
+>>> Some pin controllers (such as the Gemini) can control the
+>>> expected clock skew and output delay on certain pins with a
+>>> sub-nanosecond granularity. This is typically done by shunting
+>>> in a number of double inverters in front of or behind the pin.
+>>> Make it possible to configure this with a generic binding.
+>>>
+>>> Cc: devicetree at vger.kernel.org
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>>  Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 4 ++++
+>>>  drivers/pinctrl/pinconf-generic.c                              | 2 ++
+>>>  include/linux/pinctrl/pinconf-generic.h                        | 5 +++++
+>>>  3 files changed, 11 insertions(+)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>>> index 4483cc31e531..ad9bbbba36e9 100644
+>>> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>>> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>>> @@ -271,6 +271,10 @@ output-high              - set the pin to output mode with high level
+>>>  sleep-hardware-state - indicate this is sleep related state which will be programmed
+>>>                         into the registers for the sleep state.
+>>>  slew-rate            - set the slew rate
+>>> +skew-delay           - this affects the expected clock skew on input pins
+>>> +                       and the delay before latching a value to an output
+>>> +                       pin. Typically indicates how many double-inverters are
+>>> +                       used to delay the signal.
+>>
+>> Units?
+>
+> Number of double-inverters I guess, just as it says.
+>
+> skew-delay = <1>; // number of inverter pairs
+>
+> Like with other bindings of this type they are custom.
+>
+> The Gemini datasheet says "every unit represents about 0.2 ns".
+>
+> So if you set it to 1, that means (as far as I can guess) this
+> is shunted in:
+>
+>    |\    |\
+> --+ >o--+ >o---
+>    |/    |/
+>
+> The signal will take ~0.2 ns to propagate through this.
+> For 2, there will be four inverters etc.
+>
+> It is dependent of production technology, and I do not know
+> if everyone is using something like double-inverters.
+>
+> We could try to define a value in picoseconds instead so I
+> would need to set this to 200 in that case if you think that is better:
+>
+> skew-delay = <200>; // picoseconds
+>
+> I think it would be kludgy since with increasing clock speeds
+> maybe picoseconds would be too big even. Nanoseconds is
+> apparently already a to coarse unit.
 
-I'm assuming that this material will go in along with the rest of the series
-through a different tree.
+Okay, it is fine.
 
-Thanks,
-Rafael
+Acked-by: Rob Herring <robh@kernel.org>
