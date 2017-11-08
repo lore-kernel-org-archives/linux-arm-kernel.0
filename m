@@ -1,34 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 8 Nov 2017 11:56:23 +0100
-Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
-In-Reply-To: <65694f1d-e1cb-08e0-0883-f0087f5e09f5@micronovasrl.com>
-References: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20171107130331.4wut5g6znzakkg4z@flea>
- <65694f1d-e1cb-08e0-0883-f0087f5e09f5@micronovasrl.com>
-Message-ID: <20171108105623.zzabmqd3a3sehg2k@flea.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 8 Nov 2017 12:05:48 +0100
+Subject: [PATCH v4 20/20] cpufreq: scmi: add support for fast frequency
+ switching
+In-Reply-To: <3f79f75f-1b6a-3f7b-b0c0-f970f0fb6c12@arm.com>
+References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
+ <1509720477-18936-21-git-send-email-sudeep.holla@arm.com>
+ <4588325.776kYim3Ci@aspire.rjw.lan>
+ <3f79f75f-1b6a-3f7b-b0c0-f970f0fb6c12@arm.com>
+Message-ID: <CAK8P3a03wGUQ+wMsRctuqhN20iBrgLTZOnFqN1k3gCXnwaBtDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 8, 2017 at 11:42 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>
+>
+> On 08/11/17 00:24, Rafael J. Wysocki wrote:
+>> On Friday, November 3, 2017 3:47:57 PM CET Sudeep Holla wrote:
+>>> The cpufreq core provides option for drivers to implement fast_switch
+>>> callback which is invoked for frequency switching from interrupt context.
+>>>
+>>> This patch adds support for fast_switch callback in SCMI cpufreq driver
+>>> by making use of polling based SCMI transfer. It also sets the flag
+>>> fast_switch_possible.
+>>>
+>>> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+>>> Cc: Viresh Kumar <viresh.kumar@linaro.org>
+>>> Cc: linux-pm at vger.kernel.org
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>
+>> I'm assuming that this material will go in along with the rest of the series
+>> through a different tree.
+>>
+>
+> Indeed, I will ask ARM-SoC guys to take it via their tree when ready. I
+> assume you are fine with that, please provide ack if that's still the case.
 
-On Tue, Nov 07, 2017 at 05:38:55PM +0100, Giulio Benetti wrote:
-> Board could be any with A20,
-> for example Olinuxino A20.
-> Or our Q027, S027 boards, but final dts still are not complete.
+Yes, that makes sense.
 
-Therefore no upstream boards are using it right now, so we'll merge it
-when that will be the case.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171108/b475d01a/attachment.sig>
+      Arnd
