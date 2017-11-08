@@ -1,88 +1,74 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 8 Nov 2017 14:48:02 +0800
-Subject: [PATCH 4/4] ARM64: dts: meson-axg: add pinctrl DT info for Meson-AXG
- SoC
-Message-ID: <20171108064802.1707-1-yixun.lan@amlogic.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed, 8 Nov 2017 16:46:45 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20171107154842.GP28152@atomide.com>
+References: <20171018082927.GB27595@js1304-P5Q-DELUXE>
+ <20171019183033.GH4394@atomide.com>
+ <20171020015542.GA10438@js1304-P5Q-DELUXE>
+ <20171020173146.GN4394@atomide.com>
+ <20171023045342.GA23082@js1304-P5Q-DELUXE>
+ <20171025173137.GQ4394@atomide.com>
+ <20171026044829.GB11791@js1304-P5Q-DELUXE>
+ <20171026141627.GD21504@atomide.com>
+ <20171107053313.GA12447@js1304-P5Q-DELUXE>
+ <20171107154842.GP28152@atomide.com>
+Message-ID: <20171108074645.GA18747@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Xingyu Chen <xingyu.chen@amlogic.com>
+On Tue, Nov 07, 2017 at 07:48:42AM -0800, Tony Lindgren wrote:
+> Hi,
+> 
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171107 05:30]:
+> > Could you test follwing updated branch?
+> > 
+> > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+> > 
+> > It has three relevant commits on top and enables CMA memory use.
+> 
+> Okie dokie.
+> 
+> > "arm/dma: remove i-cache flush"
+> 
+> Your branch at the above commit is not booting on n900.
+> 
+> > "arm/dma: flush i-cache and d-cache separately"
+> 
+> Not booting at this commit either.
+> 
+> > "arm/dma: call flush_cache_all() and don't do outer cache operation"
+> 
+> Not booting at this commit either.
+> 
+> Earlier commit f14f3479c0d7 ("arm/dma: re-enable to remap the CMA
+> area and flush cache before remapping") in you branch boots.
+> 
+> Then the following commit d6512d6d0171 ("Revert "arm/mm: disable
+> atomic_pool"") won't boot.
+> 
+> Also your tree at commit 6d0525cef962 ("arm/dma: remove i-cache
+> flush") with only commit d6512d6d0171 ("Revert "arm/mm: disable
+> atomic_pool"") reverted boots on n900.
 
-Add new pinctrl DT info for the Amlogic's Meson-AXG SoC.
+Thanks a lot!
 
-Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 43 ++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
+> So it seems the issue is currently at the atomic_pool_init()
+> related code?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 4a07fc7daa99..771a1c46b8a8 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -9,6 +9,7 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/axg-clkc.h>
- #include <dt-bindings/clock/gxbb-aoclkc.h>
-+#include <dt-bindings/gpio/meson-axg-gpio.h>
- 
- / {
- 	compatible = "amlogic,meson-axg";
-@@ -173,6 +174,32 @@
- 			#mbox-cells = <1>;
- 		};
- 
-+		periphs: periphs at ff634000 {
-+			compatible = "simple-bus";
-+			reg = <0x0 0xff634000 0x0 0x2000>;
-+			#address-cells = <2>;
-+			#size-cells = <2>;
-+			ranges = <0x0 0x0 0x0 0xff634000 0x0 0x2000>;
-+
-+			pinctrl_periphs: pinctrl at 480 {
-+				compatible = "amlogic,meson-axg-periphs-pinctrl";
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				ranges;
-+
-+				gpio: bank at 480 {
-+					reg = <0x0 0x00480 0x0 0x40>,
-+						<0x0 0x004e8 0x0 0x14>,
-+						<0x0 0x00520 0x0 0x14>,
-+						<0x0 0x00430 0x0 0x3c>;
-+					reg-names = "mux", "pull", "pull-enable", "gpio";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					gpio-ranges = <&pinctrl_periphs 0 0 86>;
-+				};
-+			};
-+		};
-+
- 		sram: sram at fffc0000 {
- 			compatible = "amlogic,meson-axg-sram", "mmio-sram";
- 			reg = <0x0 0xfffc0000 0x0 0x20000>;
-@@ -197,6 +224,22 @@
- 			#address-cells = <2>;
- 			#size-cells = <2>;
- 			ranges = <0x0 0x0 0x0 0xff800000 0x0 0x100000>;
-+			pinctrl_aobus: pinctrl at 14 {
-+				compatible = "amlogic,meson-axg-aobus-pinctrl";
-+				#address-cells = <2>;
-+				#size-cells = <2>;
-+				ranges;
-+
-+				gpio_ao: bank at 14 {
-+					reg = <0x0 0x00014 0x0 0x8>,
-+						<0x0 0x0002c 0x0 0x4>,
-+						<0x0 0x00024 0x0 0x8>;
-+					reg-names = "mux", "pull", "gpio";
-+					gpio-controller;
-+					#gpio-cells = <2>;
-+					gpio-ranges = <&pinctrl_aobus 0 0 15>;
-+				};
-+			};
- 
- 			uart_AO: serial at 3000 {
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
--- 
-2.14.1
+Yes, your test showed it although I can't find any clue in
+atomic_pool_init().
+
+Could you test updated branch?
+
+https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+
+There are two relevant commits.
+
+arm/dma: stop dma allocation before __dma_alloc_remap()
+arm/dma: disable atomic pool after dma allocation
+
+atomic pool initialization will be done partially to check
+exact point of failure. These are brain-dead commits however I have no
+idea what's going on here until now. :/
+
+Thanks.
