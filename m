@@ -1,44 +1,37 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Wed, 8 Nov 2017 13:14:41 +0530
-Subject: [PATCH] arm64: dts: msm8916: Add missing #phy-cells
-In-Reply-To: <20171108034501.2994-1-bjorn.andersson@linaro.org>
-References: <20171108034501.2994-1-bjorn.andersson@linaro.org>
-Message-ID: <f66341bb-2dff-7b21-3a78-5c9ec1c3a719@codeaurora.org>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Wed,  8 Nov 2017 13:16:40 +0530
+Subject: [PATCH v2 0/3] Add driver for Broadcom Cygnus USB phy controller
+Message-ID: <1510127203-5815-1-git-send-email-raveendra.padasalagi@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add driver for Broadcom's USB phy controller's used in Cygnus family
+of SoC and it's based on 4.14-rc3 tag.
 
+The patch set can be fetched from iproc-cyg-usb-v2 branch of
+https://github.com/Broadcom/arm64-linux.git
 
-On 11/08/2017 09:15 AM, Bjorn Andersson wrote:
-> Add a missing #phy-cells to the dsi-phy, to silence dtc warning.
-> 
+Changes since v1:
+  - Added "dt-bindings: phy:" subject prefix in dt bindings patch
+  - Renamed phy node name from "phy" to "usb-phy"
+  - Added BIT() macro definitions for some of the register bit access
+  - Added .owner in phy_ops structure.
+  - Added cygnus_phy_shutdown_all() to keep probe() clean.
+  - Used devm_extcon_register_notifier() instead of extcon_register_notifier()
 
-Reviewed-by: Archit Taneja <architt@codeaurora.org>
+Raveendra Padasalagi (3):
+  dt-bindings: phy: Add Cygnus usb phy binding
+  drivers: phy: broadcom: Add driver for Cygnus USB phy controller
+  ARM: dts: Add dt node for Broadcom Cygnus USB phy
 
-Thanks,
-Archit
-
-> Cc: Archit Taneja <architt@codeaurora.org>
-> Fixes: 305410ffd1b2 ("arm64: dts: msm8916: Add display support")
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
-> ---
->   arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
->   1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index 6b2127a6ced1..09ac5c43807e 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -906,6 +906,7 @@
->   					    "dsi_phy_regulator";
->   
->   				#clock-cells = <1>;
-> +				#phy-cells = <0>;
->   
->   				clocks = <&gcc GCC_MDSS_AHB_CLK>;
->   				clock-names = "iface_clk";
-> 
+ .../bindings/phy/brcm,cygnus-usb-phy.txt           | 106 ++++
+ arch/arm/boot/dts/bcm-cygnus.dtsi                  |  35 ++
+ drivers/phy/broadcom/Kconfig                       |  14 +
+ drivers/phy/broadcom/Makefile                      |   1 +
+ drivers/phy/broadcom/phy-bcm-cygnus-usb.c          | 690 +++++++++++++++++++++
+ 5 files changed, 846 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+ create mode 100644 drivers/phy/broadcom/phy-bcm-cygnus-usb.c
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
