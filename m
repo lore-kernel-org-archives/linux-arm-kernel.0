@@ -1,76 +1,93 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 8 Nov 2017 15:19:36 +0000
-Subject: [PATCH v5 26/26] KVM: arm/arm64: GICv4: Theory of operations
-In-Reply-To: <98265bff-57ca-a31e-f41c-75b41a4e34f7@redhat.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-27-marc.zyngier@arm.com>
- <98265bff-57ca-a31e-f41c-75b41a4e34f7@redhat.com>
-Message-ID: <39032d1d-3371-1751-6981-f30811db19a8@arm.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Wed, 8 Nov 2017 15:19:43 +0000
+Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
+ untried/unknown (next-20171106)
+In-Reply-To: <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
+References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
+ <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
+ <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
+ <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
+ <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
+Message-ID: <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/17 09:13, Auger Eric wrote:
-> Hi Marc,
-> 
-> On 27/10/2017 16:28, Marc Zyngier wrote:
->> Yet another braindump so I can free some cells...
+On 07/11/17 11:43, Guillaume Tucker wrote:
+> On 07/11/17 10:55, Mark Brown wrote:
+>> On Tue, Nov 07, 2017 at 10:12:59AM +0000, Jon Hunter wrote:
+>>> On 06/11/17 19:17, Mark Brown wrote:
 >>
->> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-v4.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 67 insertions(+)
+>>>>>     multi_v7_defconfig:
+>>>>>         tegra124-nyan-big:
+>>>>>             lab-collabora: failing since 2 days (last pass: next-20171102 - first fail: next-20171103)
 >>
->> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
->> index d10e18eabd3b..e367d65a0ebe 100644
->> --- a/virt/kvm/arm/vgic/vgic-v4.c
->> +++ b/virt/kvm/arm/vgic/vgic-v4.c
->> @@ -23,6 +23,73 @@
->>  
->>  #include "vgic.h"
->>  
->> +/*
->> + * How KVM uses GICv4 (insert rude comments here):
->> + *
->> + * The vgic-v4 layer acts as a bridge between several entities:
->> + * - The GICv4 ITS representation offered by the ITS driver
->> + * - VFIO, which is in charge of the PCI endpoint
->> + * - The virtual ITS, which is the only thing the guest sees
->> + *
->> + * The configuration of VLPIs is triggered by a callback from VFIO,
->> + * instructing KVM that a PCI device has been configured to deliver
->> + * MSIs to a vITS.
-> We actually have a negotiation protocol between VFIO PCI (irq bypass
-> producer) and KVM irqfd (IRQ bypass consumer). When both recognize they
-> are tied together, handling an MSI tunneling, they initiate the
-> forwarding setup.
->> + *
->> + * kvm_vgic_v4_set_forwarding() is thus called with the routing entry,
->> + * and this is used to find the corresponding vITS data structures
->> + * (ITS instance, device, event and irq) using a process that is
->> + * extremely similar to the injection of an MSI.
-> 
-> Is it correct to say we replace the following injection chain:
-> 
-> pEventID|										
-> (pITS)	|-> pLPIID -> VFIO PCI IRQ handler -> KVM irqfd ...
-> pDevID	|
-> 
-> 		vEventID|
-> ... inject	(vITS)	| -> vLPIID
-> 		vDevID	|
-> 
-> by
-> 
-> pEventID|
-> (pITS)	| -> vLPIID
-> pDevID	|
+>>> Thanks for the report. I have been looking into a failure on nyan-big
+>>> [0], but this one looks like a new failure. I will take a look.
+>>
+>> Guillaume Tucker has been bisecting this with the shiny new bisection
+>> code he's testing, he was saying on IRC he thinks he's found the
+>> offending commit:
+>>
+>>    https://people.collabora.com/~gtucker/tmp/bisect-tegra-4.14.rc8-next-20171106.txt
+>>
+>> (not CCing Johannes yet)
+>
+> Please take this with a pinch of salt, I'm now running some extra
+> boot tests to prove it.  If you look at this log, all the boots
+> passed which is a bit suspicious.  I did build and boot the
+> revision it found with multi_v7_defconfig on tegra124 and it
+> passed, so it looks like this commit may not have anything to do
+> with the boot failure.  The automated bisection is still experimental.
+>
+> Passing LAVA boot test with this revision:
+>
+>   https://lava.collabora.co.uk/scheduler/job/976375
+>
+> I've started a slightly different bisection job now on
+> next-20171107 and the common ancestor between next and mainline,
+> results can take a few hours to come back.
 
-That's indeed a pretty accurate description of what happens, with a side
-messaging (doorbells).
+After a few more automated bisection attempts and a bug fix in
+LAVA, I've now found at least one potentially breaking commit:
 
-Thanks,
+   commit d89e2378a97fafdc74cbf997e7c88af75b81610a
+   Author: Robin Murphy <robin.murphy@arm.com>
+   Date:   Thu Oct 12 16:56:14 2017 +0100
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+       drivers: flag buses which demand DMA configuration
+
+
+I've run some boot tests manually with this revision and then
+also after reverting it in-place, these respectively failed and
+passed:
+
+   * d89e2378, failed:
+     https://lava.collabora.co.uk/scheduler/job/978968
+
+   * d89e2378 reverted, passed:
+     https://lava.collabora.co.uk/scheduler/job/978969
+
+
+I then went on and tried the same but on top of next-20171108 and
+found that they both failed
+
+   * next-20171108, failed:
+     https://lava.collabora.co.uk/scheduler/job/979063
+
+   * next-20171108 with d89e2378 reverted, failed as well:
+     https://lava.collabora.co.uk/scheduler/job/979167
+
+
+So this shows there is almost certainly another offending commit
+in -next.  The errors in both cases are not quite the same, the
+last one is triggered by a BUG whereas the first one is a NULL
+pointer (I haven't looked any further).  Also I don't think
+there's any fix for d89e2378a97fafdc74cbf997e7c88af75b81610a
+which is currently still in next.
+
+Note: This happens to be a very good example of running a
+kernelci.org bisection on a real issue, it's quite a bit of a
+pipe cleaner.  I'll now see if there's a way to bisect what looks
+like another breaking change in-between.
+
+Guillaume
