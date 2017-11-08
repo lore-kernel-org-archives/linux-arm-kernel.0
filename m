@@ -1,5 +1,5 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Nov 2017 12:05:48 +0100
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 8 Nov 2017 12:21:16 +0100
 Subject: [PATCH v4 20/20] cpufreq: scmi: add support for fast frequency
  switching
 In-Reply-To: <3f79f75f-1b6a-3f7b-b0c0-f970f0fb6c12@arm.com>
@@ -7,7 +7,7 @@ References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
  <1509720477-18936-21-git-send-email-sudeep.holla@arm.com>
  <4588325.776kYim3Ci@aspire.rjw.lan>
  <3f79f75f-1b6a-3f7b-b0c0-f970f0fb6c12@arm.com>
-Message-ID: <CAK8P3a03wGUQ+wMsRctuqhN20iBrgLTZOnFqN1k3gCXnwaBtDA@mail.gmail.com>
+Message-ID: <CAJZ5v0hAiJBrdXNn2Gf_aC4z-UmBg8t4fTNRbWTPsvk+kFtABA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,6 +35,8 @@ On Wed, Nov 8, 2017 at 11:42 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 > Indeed, I will ask ARM-SoC guys to take it via their tree when ready. I
 > assume you are fine with that, please provide ack if that's still the case.
 
-Yes, that makes sense.
+OK
 
-      Arnd
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+
+as long as the changes are fine by Viresh.
