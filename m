@@ -1,64 +1,44 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 8 Nov 2017 10:51:35 -0600
-Subject: [PATCH 1/2] MIPS: dts: remove bogus bcm96358nb4ser.dtb from dtb-y
- entry
-In-Reply-To: <CAK7LNAQ_bugEP8hHKmCif5QCz2=Pw_GpXzYz4zJeXO0HXaT_ag@mail.gmail.com>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-2-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNAQfK_BWQcVW-ScrpAwNAHav3MrrzV-tjn_YUjsuvd7U5A@mail.gmail.com>
- <20171106095139.GG15260@jhogan-linux>
- <CAK7LNAQ_bugEP8hHKmCif5QCz2=Pw_GpXzYz4zJeXO0HXaT_ag@mail.gmail.com>
-Message-ID: <CAL_JsqJ8taCKnr_79UumiH2GFYq-fMzzkYm2iYevTOgUUWuzvg@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 8 Nov 2017 11:58:42 -0500
+Subject: [PATCH V2 2/3] dmaengine: qcom_hidma: add support for the new
+ revision
+In-Reply-To: <e673a03d-1707-fe4a-7f5d-df1466981893@codeaurora.org>
+References: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
+ <1510158582-5343-2-git-send-email-okaya@codeaurora.org>
+ <e673a03d-1707-fe4a-7f5d-df1466981893@codeaurora.org>
+Message-ID: <c55ecc2c-332c-e9e6-c74c-3c67fd2ab89a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 6, 2017 at 5:00 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2017-11-06 19:41 GMT+09:00 James Hogan <jhogan@kernel.org>:
->> Hi,
->>
->> On Sun, Nov 05, 2017 at 11:11:38PM +0900, Masahiro Yamada wrote:
->>> +CC Ralf Baechle <ralf@linux-mips.org>
->>> +CC linux-mips at linux-mips.org
->>> +CC Kevin Cernekee <cernekee@gmail.com>
->>> +CC Florian Fainelli <f.fainelli@gmail.com>
->>>
->>>
->>> I missed to CC MIPS maintainers.
->>
->> Yes, please resend the patch so it lands in patchwork.linux-mips.org.
->
->
-> This is a part of clean-up series of DT building.
->
-> I want Acked-by from MIPS maintainers
-> so that the whole series can go to a different tree.
-> (DT or Kbuild).
->
->
-> Sam addressed more clean-up candidates in MIPS Makefiles
-> https://patchwork.kernel.org/patch/10041879/
->
-> So, I will probably end up with touching those Makefiles more.
->
-> All patches must go to the same tree.
->
->
->>> 2017-11-05 14:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->>> > arch/mips/boot/dts/brcm/bcm96358nb4ser.dts does not exist, so
->>> > we cannot build bcm96358nb4ser.dtb .
->>
->> This appears to be due to the file being renamed in commit 695835511f96
->> ("MIPS: BMIPS: rename bcm96358nb4ser to bcm6358-neufbox4-sercom").
->> Please can you update the commit message when you resend to mention the
->> cause of the problem.
->>
->> You could also add the following if you like while you're at it:
->>
->> Fixes: 695835511f96 ("MIPS: BMIPS: rename bcm96358nb4ser to bcm6358-neufbox4-sercom")
->> Cc: <stable@vger.kernel.org> # 4.9+
+On 11/8/2017 11:49 AM, Timur Tabi wrote:
+> On 11/08/2017 10:29 AM, Sinan Kaya wrote:
+>> +#define HIDMA_MAX_DEV_MATCH 10
+>> +
+>> +struct hidma_cap {
+>> +??? const struct of_device_id of[HIDMA_MAX_DEV_MATCH];
+>> +??? const struct acpi_device_id acpi[HIDMA_MAX_DEV_MATCH];
+>> +};
+> 
+> This seems wrong.? You're defining an array of size 10, but it only has three elements.? And the third element is a sentinel, which is typically used to avoid specifying the size of the array.
+> 
 
-I think this one can be applied independently and we'd want it to if
-we tag for stable. So I think it can go thru the MIPS tree.
+It is true that I define an array of size 10. It is just some arbitrary number
+with forward thinking. I don't really have to use it to the maximum today as long
+as I satisfy the calling conventions.
 
-Rob
+What is important is that the of_device_match() and acpi_device_match() functions
+will stop searching only if they find an empty element. The {} element.
+
+That's the calling semantics of of_device_match() and acpi_device_match().
+
+Besides, C compiler also won't let me put two arrays together like this.
+
+struct my_struct {
+	struct some_struct array1[]
+	struct some_struct array2[]
+}
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
