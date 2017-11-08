@@ -1,73 +1,84 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 8 Nov 2017 10:35:14 +0100
-Subject: [PATCH v5 23/26] KVM: arm/arm64: GICv4: Prevent a VM using GICv4
- from being saved
-In-Reply-To: <32f1d6ae-4ab5-25e4-587d-9a51fccb955f@redhat.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-24-marc.zyngier@arm.com>
- <1f75a11a-41c3-71b8-6abf-4aa2962e348e@redhat.com>
- <9c1e1c92-e0fa-737f-63ab-a335b93af6da@arm.com>
- <77d479e5-98f9-9081-a3a6-87bef1009775@redhat.com>
- <33f4de5f-004e-6b92-d4f6-651e536dc697@arm.com>
- <32f1d6ae-4ab5-25e4-587d-9a51fccb955f@redhat.com>
-Message-ID: <c5640b41-62fd-0f16-1907-bc053f649ea5@redhat.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Wed, 8 Nov 2017 17:49:55 +0800
+Subject: [PATCH] ARM: dts: add phy-reset property for rk3066a-rayeager emac
+In-Reply-To: <ac15ef59-3b5e-1752-09db-0a773615f44c@gmail.com>
+References: <1510022959-19440-1-git-send-email-zyw@rock-chips.com>
+ <e6f2393e-cb3b-9006-d0f5-6b30fd2a5192@mentor.com>
+ <e08d8ea2-40c5-a5b3-e570-44c90388fcdd@rock-chips.com>
+ <ac15ef59-3b5e-1752-09db-0a773615f44c@gmail.com>
+Message-ID: <464f7b9f-1c07-286e-1b7f-bdef0332b4c9@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Florian Fainelli
 
-On 07/11/2017 23:24, Auger Eric wrote:
-> Hi
-> 
-> On 07/11/2017 17:34, Marc Zyngier wrote:
->> On 07/11/17 16:12, Auger Eric wrote:
->>> Hi Marc,
->>>
->>> On 07/11/2017 16:38, Marc Zyngier wrote:
->>>> On 07/11/17 15:24, Auger Eric wrote:
->>>>> Hi Marc,
->>>>>
->>>>> Hi Marc,
->>>>> On 27/10/2017 16:28, Marc Zyngier wrote:
->>>>>> The GICv4 architecture doesn't make it easy for save/restore to
->>>>>> work, as it doesn't give any guarantee that the pending state
->>>>>> is written into the pending table.
->>>>>
->>>>> I don't understand where does the limitation exactly come from. Can't we
->>>>> use the GICR_VPENDBASER table data?
->>>> You can't. None of the tables that are written by either the ITS or the
->>>> redistributors are architected. All you know is that there is one bit
->>>> per vLPI, but that's it (you don't even know which one is which).
->>> Oh I thought the redistributor config and pending tables were fully
->>> specified (6.1.2 and 6.1.3 of the spec), except the 1kB of the pending
->>> table.
+
+On 2017?11?08? 02:26, Florian Fainelli wrote:
+> On 11/07/2017 01:51 AM, Chris Zhong wrote:
 >>
->> The property table is definitely architected. It is a lot less clear for
->> the pending table. The main issue is that you cannot really know when
->> the various bits have actually been flushed all the way from the
->> redistributor caches to memory to be introspected. Yes, it sucks.
-> Oh OK the INV only guarantees the caches are consistent with the LPI
-> config table. Maybe you could clarify the commit message with those details.
-> 
-> So
-> Reviewed-by: Eric Auger <eric.auger@redhat.com>
-
-Reading the spec further, looks setting the Valid bit of GICR_VPENDBASER
-is supposed  to force the redistributor to retrieve pending interrupts
-from the the VCPU I/F and ensure the VPT in memory is correct.
-
-Anyway that's not a big deal at the moment as you pointed out...
+>> On 2017?11?07? 15:54, Vladimir Zapolskiy wrote:
+>>> Hello Chris,
+>>>
+>>> On 11/07/2017 04:49 AM, Chris Zhong wrote:
+>>>> The ethernet phy of rk3066a-rayeager has a reset pin, it controlled by
+>>>> GPIO1_D6, this pin should be pull down then pull up to reset the phy.
+>>>> Add a phy-reset property in emac, make the phy can be reset when emac
+>>>> power on.
+>>> for PHY reset there are properties 'reset-gpios' and 'reset-delay-us',
+>>> please reference to Documentation/devicetree/bindings/net/mdio.txt
+>>>
+>>> Can you try to reuse them instead of adding new custom properties?
+>> This phy-reset is from Documentation/devicetree/bindings/net/arc_emac.txt.
+>> And copy from arch/arm/boot/dts/rk3036-kylin.dts.
+>> Can we just use these properties, they are not new.
+> Because it already exists does not mean it's correct, in fact, it is not
+> at all because it places the reset property for a PHY into the MAC node,
+> which is just not what this is, what we should be using instead is the
+> following patch series:
+>
+> http://patchwork.ozlabs.org/project/netdev/list/?series=9267
+>
+> http://patchwork.ozlabs.org/patch/828499/
+> http://patchwork.ozlabs.org/patch/828505/
+> http://patchwork.ozlabs.org/patch/828501/
+> http://patchwork.ozlabs.org/patch/828502/
+Okay, this series works for me, and I will push a new version patch 
+following it,
+with a reset-gpios property under phy node.
+And hope this series can be applied soon.
 
 Thanks
+Chris Zhong
 
-Eric
-> 
-> Thanks
-> 
-> Eric
-> 
->>
->> Thanks,
->>
->> 	M.
->>
+
+>>> As a side question, which is mainly addressed to Sergei and Roger,
+>>> I don't quite understand why PHY properties were initially added to
+>>> MAC/MDIO bus device tree nodes, in my opinion they must be moved under
+>>> PHY device tree nodes.
+>>>
+>>> -- 
+>>> With best wishes,
+>>> Vladimir
+>>>
+>>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>>> ---
+>>>>
+>>>>    arch/arm/boot/dts/rk3066a-rayeager.dts | 2 ++
+>>>>    1 file changed, 2 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>> b/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>> index 570157f..6064a0a 100644
+>>>> --- a/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>> +++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>> @@ -173,6 +173,8 @@
+>>>>        pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
+>>>>        phy = <&phy0>;
+>>>>        phy-supply = <&vcc_rmii>;
+>>>> +    phy-reset-gpios = <&gpio1 RK_PD6 GPIO_ACTIVE_LOW>; /* PHY_RST */
+>>>> +    phy-reset-duration = <10>; /* millisecond */
+>>>>        status = "okay";
+>>>>          phy0: ethernet-phy at 0 {
+>>>>
+>>>
+>
