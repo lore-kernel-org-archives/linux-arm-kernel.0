@@ -1,51 +1,34 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 8 Nov 2017 11:55:23 +0100
-Subject: [PATCH v2] ARM: sa1100: simpad: Correct I2C GPIO offsets
-In-Reply-To: <CAK8P3a0_kB8NBifbutqyvY_FYHnZTpwK-m0KZV3swpMa4fxjrA@mail.gmail.com>
-References: <20171107201857.5752-1-linus.walleij@linaro.org>
- <CAK8P3a0_kB8NBifbutqyvY_FYHnZTpwK-m0KZV3swpMa4fxjrA@mail.gmail.com>
-Message-ID: <CAK8P3a35EyYU+B8bDXDjveMx7U5pVWuYAqgkwzYgRwi7A0qxfw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 8 Nov 2017 11:56:23 +0100
+Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
+In-Reply-To: <65694f1d-e1cb-08e0-0883-f0087f5e09f5@micronovasrl.com>
+References: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20171107130331.4wut5g6znzakkg4z@flea>
+ <65694f1d-e1cb-08e0-0883-f0087f5e09f5@micronovasrl.com>
+Message-ID: <20171108105623.zzabmqd3a3sehg2k@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 8, 2017 at 11:54 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Tue, Nov 7, 2017 at 9:18 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
->
->> diff --git a/arch/arm/mach-sa1100/simpad.c b/arch/arm/mach-sa1100/simpad.c
->> index 9db483a42826..7d4feb8a49ac 100644
->> --- a/arch/arm/mach-sa1100/simpad.c
->> +++ b/arch/arm/mach-sa1100/simpad.c
->> @@ -328,9 +328,9 @@ static struct platform_device simpad_gpio_leds = {
->>  static struct gpiod_lookup_table simpad_i2c_gpiod_table = {
->>         .dev_id = "i2c-gpio",
->>         .table = {
->> -               GPIO_LOOKUP_IDX("gpio", GPIO_GPIO21, NULL, 0,
->> +               GPIO_LOOKUP_IDX("gpio", 21, NULL, 0,
->>                                 GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
->> -               GPIO_LOOKUP_IDX("gpio", GPIO_GPIO25, NULL, 1,
->> +               GPIO_LOOKUP_IDX("gpio", 25, NULL, 1,
->>                                 GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN),
->>         },
->>  };
->
-> This looks like it's probably correct, but now I'm puzzled by another line in
-> the same file:
->
-> static struct gpio_keys_button simpad_button_table[] = {
->         { KEY_POWER, IRQ_GPIO_POWER_BUTTON, 1, "power button" },
-> };
->
-> Here we pass a gpio number as well, but we use the macro for the IRQ
-> number that is apparently 32 higher than the gpio number. This came from the
-> same commit that introduced the GPIO_GPIO21 reference, so it may well
-> be broken, too.
->
-> I'm fine with your version getting merged as it certainly can't make things
-> worse, it fixes the build warning, and it probably fixes one thing that is
-> wrong today
+Hi,
 
-I also meant to say
+On Tue, Nov 07, 2017 at 05:38:55PM +0100, Giulio Benetti wrote:
+> Board could be any with A20,
+> for example Olinuxino A20.
+> Or our Q027, S027 boards, but final dts still are not complete.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Therefore no upstream boards are using it right now, so we'll merge it
+when that will be the case.
 
-for this patch going through the i2c tree.
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171108/b475d01a/attachment.sig>
