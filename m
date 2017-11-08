@@ -1,77 +1,55 @@
-From: aleksey.makarov@cavium.com (Aleksey Makarov)
-Date: Wed, 8 Nov 2017 15:14:30 +0300
-Subject: [PATCH net-next 1/2] net: add support for Cavium PTP coprocessor
-In-Reply-To: <1d765627-edb1-cc0f-65bc-cf061687a8c6@caviumnetworks.com>
-References: <20171107190704.15458-1-aleksey.makarov@cavium.com>
- <20171107190704.15458-2-aleksey.makarov@cavium.com>
- <1d765627-edb1-cc0f-65bc-cf061687a8c6@caviumnetworks.com>
-Message-ID: <13187c17-6a73-f916-f919-2386b55ce047@cavium.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Wed, 8 Nov 2017 17:58:21 +0530
+Subject: [PATCH v2 0/7] omap: dmtimer: Move driver out of plat-omap
+Message-ID: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The series moves dmtimer out of plat-omap to drivers/clocksource.
+The series also does a bunch of changes to pwm-omap-dmtimer code
+to adapt to the driver migration and clean up plat specific
+pdata-quirks and use the dmtimer platform data.
 
+Boot tested on DRA7-EVM and AM437X-GP-EVM.
 
-On 11/07/2017 10:49 PM, David Daney wrote:
-> On 11/07/2017 11:07 AM, Aleksey Makarov wrote:
->> From: Radoslaw Biernacki <rad@semihalf.com>
->>
->> This patch adds support for the Precision Time Protocol
->> Clocks and Timestamping hardware found on Cavium ThunderX
->> processors.
->>
->> Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@cavium.com>
->> ---
->> ? drivers/net/ethernet/cavium/Kconfig???????????? |? 13 +
->> ? drivers/net/ethernet/cavium/Makefile??????????? |?? 1 +
->> ? drivers/net/ethernet/cavium/common/Makefile???? |?? 1 +
->> ? drivers/net/ethernet/cavium/common/cavium_ptp.c | 353 ++++++++++++++++++++++++
->> ? drivers/net/ethernet/cavium/common/cavium_ptp.h |? 78 ++++++
->> ? 5 files changed, 446 insertions(+)
->> ? create mode 100644 drivers/net/ethernet/cavium/common/Makefile
->> ? create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.c
->> ? create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.h
->>
-> [...]
->> +
->> +/* The Cavium PTP can *only* be found in SoCs containing the ThunderX
->> + * ARM64 CPU implementation.? All accesses to the device registers on this
->> + * platform are implicitly strongly ordered with respect to memory
->> + * accesses.
-> 
-> I believe that is not correct.  I/O register accesses are implicitly
-> ordered with respect to other I/O register accesses.  However, with
-> respect to memory accesses, no ordering is imposed.  Therefore, one
-> must be very careful not to introduce subtile memory ordering bugs
-> with these things when using the unordered versions.
+More testing would be of great help. 
 
-I will fix it in the next version.
+No code changes in this v2 version. Only enhanced patch
+statistics for renames.
+ 
+Keerthy (7):
+  clocksource: dmtimer: Remove all the exports
+  arm: omap: Move dmtimer.h out of plat-omap
+  arm: OMAP: Move dmtimer driver out of plat-omap to drivers under
+    clocksource
+  dmtimer: Add timer ops to the platform data structure
+  clocksource: dmtimer: Populate the timer ops to the pdata
+  pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer pdata ops
+  arm: omap: pdata-quirks: Remove unused timer pdata
 
-Thank you
-Aleksey Makarov
+ arch/arm/mach-omap1/pm.c                           |  2 +-
+ arch/arm/mach-omap1/timer.c                        |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +-
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  2 +-
+ arch/arm/mach-omap2/pdata-quirks.c                 | 32 -------------
+ arch/arm/mach-omap2/timer.c                        |  2 +-
+ arch/arm/plat-omap/Kconfig                         |  6 ---
+ arch/arm/plat-omap/Makefile                        |  1 -
+ drivers/clocksource/Kconfig                        |  6 +++
+ drivers/clocksource/Makefile                       |  1 +
+ .../plat-omap => drivers/clocksource}/dmtimer.c    | 54 +++++++++++-----------
+ drivers/pwm/pwm-omap-dmtimer.c                     | 39 +++++++++-------
+ .../include/plat => include/clocksource}/dmtimer.h |  0
+ include/linux/platform_data/dmtimer-omap.h         | 38 +++++++++++++++
+ 20 files changed, 104 insertions(+), 95 deletions(-)
+ rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (95%)
+ rename {arch/arm/plat-omap/include/plat => include/clocksource}/dmtimer.h (100%)
 
->> + * So writeq_relaxed() and readq_relaxed() are safe to use with
->> + * no memory barriers in this driver.? The readq()/writeq() functions add
->> + * explicit ordering operation which in this case are redundant, and only
->> + * add overhead.
-> 
-> 
-> Also it should be noted that on production silicon, the performance difference between the "relaxed" variant and the normal variant of read*/write* is often negligible.
-> 
-> 
->> + */
->> +
->> +static u64 cavium_ptp_reg_read(struct cavium_ptp *clock, u64 offset)
->> +{
->> +??? return readq_relaxed(clock->reg_base + offset);
->> +}
->> +
->> +static void cavium_ptp_reg_write(struct cavium_ptp *clock, u64 offset, u64 val)
->> +{
->> +??? writeq_relaxed(val, clock->reg_base + offset);
->> +}
->> +
-> 
-> Are the PTP register access really so much in the hot path that using the relaxed variants can be measured here?? If not, would it make the driver look cleaner to remove these and just use readq/writeq calls directly? in the body of the driver?
-> 
-> David.
+-- 
+1.9.1
