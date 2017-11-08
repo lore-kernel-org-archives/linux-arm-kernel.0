@@ -1,86 +1,34 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 08 Nov 2017 23:47:47 +0100
-Subject: [PATCH 1/2] cpuidle: Add new macro to enter a retention idle state
-In-Reply-To: <1510076133-18139-2-git-send-email-pprakash@codeaurora.org>
-References: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
- <1510076133-18139-2-git-send-email-pprakash@codeaurora.org>
-Message-ID: <6518212.kvKYyx3eLf@aspire.rjw.lan>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Nov 2017 14:57:12 -0800
+Subject: [PATCH v2 0/7] omap: dmtimer: Move driver out of plat-omap
+In-Reply-To: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
+References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20171108225712.GX28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 7, 2017 6:35:32 PM CET Prashanth Prakash wrote:
-> If a CPU is entering a low power idle state where it doesn't lose any
-> context, then there is no need to call cpu_pm_enter()/cpu_pm_exit().
-> Add a new macro(CPU_PM_CPU_IDLE_ENTER_RETENTION) to be used by cpuidle
-> drivers when they are entering retention state. By not calling
-> cpu_pm_enter and cpu_pm_exit we reduce the latency involved in
-> entering and exiting the retention idle states.
+* Keerthy <j-keerthy@ti.com> [171108 04:30]:
+> The series moves dmtimer out of plat-omap to drivers/clocksource.
+> The series also does a bunch of changes to pwm-omap-dmtimer code
+> to adapt to the driver migration and clean up plat specific
+> pdata-quirks and use the dmtimer platform data.
 > 
-> On ARM64 based Qualcomm Server Platform we measured below overhead for
-> for calling cpu_pm_enter and cpu_pm_exit for retention states.
+> Boot tested on DRA7-EVM and AM437X-GP-EVM.
 > 
-> workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
->         Average overhead of cpu_pm_enter - 1.2us
->         Average overhead of cpu_pm_exit  - 3.1us
+> More testing would be of great help. 
 > 
-> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
-> ---
->  include/linux/cpuidle.h | 38 +++++++++++++++++++++++---------------
->  1 file changed, 23 insertions(+), 15 deletions(-)
-> 
-> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-> index 8f7788d..54cbd9d 100644
-> --- a/include/linux/cpuidle.h
-> +++ b/include/linux/cpuidle.h
-> @@ -258,21 +258,29 @@ static inline int cpuidle_register_governor(struct cpuidle_governor *gov)
->  #endif
->  
->  #define CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx)	\
-> -({								\
-> -	int __ret;						\
-> -								\
-> -	if (!idx) {						\
-> -		cpu_do_idle();					\
-> -		return idx;					\
-> -	}							\
-> -								\
-> -	__ret = cpu_pm_enter();					\
-> -	if (!__ret) {						\
-> -		__ret = low_level_idle_enter(idx);		\
-> -		cpu_pm_exit();					\
-> -	}							\
-> -								\
-> -	__ret ? -1 : idx;					\
-> +	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 0)
-> +
-> +#define CPU_PM_CPU_IDLE_ENTER_RETENTION(low_level_idle_enter, idx)	\
-> +	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 1)
-> +
-> +#define __CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, is_retention) \
-> +({									\
-> +	int __ret = 0;							\
-> +									\
-> +	if (!idx) {							\
-> +		cpu_do_idle();						\
-> +		return idx;						\
-> +	}								\
-> +									\
-> +	if (!is_retention)						\
-> +		__ret =  cpu_pm_enter();				\
-> +	if (!__ret) {							\
-> +		__ret = low_level_idle_enter(idx);			\
-> +		if (!is_retention)					\
-> +			cpu_pm_exit();					\
-> +	}								\
-> +									\
-> +	__ret ? -1 : idx;						\
->  })
->  
->  #endif /* _LINUX_CPUIDLE_H */
-> 
+> No code changes in this v2 version. Only enhanced patch
+> statistics for renames.
 
-The ordering of the macros seems kind of backwards.  The inner-most
-ones usually go first (which is more natural for a human reader too).
+OK Cool.
 
-Thanks,
-Rafael
+Thierry, can you please take a look at the driver code and see if
+you want other clean-ups done before moving this to drivers?
+
+For merging, I can set up an immutable branch for this against
+v4.15-rc1 when it's out and no more comments. That way we both
+can then merge it in as needed.
+
+Regards,
+
+Tony
