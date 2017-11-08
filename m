@@ -1,35 +1,37 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 08 Nov 2017 15:11:26 +0000
-Subject: [PATCH 15/13] firmware: arm_sdei: move the frozen flag under
- the spinlock
-In-Reply-To: <20171101155941.19432-1-james.morse@arm.com>
-References: <20171017174432.1684-1-james.morse@arm.com>
- <20171101155941.19432-1-james.morse@arm.com>
-Message-ID: <5A031E9E.2090809@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 8 Nov 2017 15:14:39 +0000
+Subject: [PATCH v5 25/26] KVM: arm/arm64: GICv4: Enable VLPI support
+In-Reply-To: <2d20a22e-214d-3835-7f61-29fc5e88413a@redhat.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-26-marc.zyngier@arm.com>
+ <2d20a22e-214d-3835-7f61-29fc5e88413a@redhat.com>
+Message-ID: <ba1b912b-e15b-1c76-f8e7-b9f7c5d6dc38@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/11/17 15:59, James Morse wrote:
-> dpm_suspend() calls the freeze/thaw callbacks for hibernate before
-> disable_non_bootcpus() takes down secondaries.
+On 08/11/17 08:44, Auger Eric wrote:
+> Hi Marc,
 > 
-> This leads to a fun race where the freeze/thaw callbacks reset the
-> SDEI interface (as we may be restoring a kernel with a different
-> layout due to KASLR), then the cpu-hotplug callbacks come in to
-> save the current state, which has already been reset.
+> On 27/10/2017 16:28, Marc Zyngier wrote:
+>> All it takes is the has_v4 flag to be set in gic_kvm_info
+>> as well as "kvm-arm.vgic_v4_enable=1" being passed on the
+>> command line for GICv4 to be enabled in KVM.
 > 
-> We solve this with a 'frozen' flag that stops the hotplug callback
-> from overwriting the saved values.
-> 
-> This patch moves the flag under the 'events' spinlock we take
-> in the hotplug callbacks, to avoid depending on cpu-hotplug's
-> mechanics to ensure the callback sees the correct value.
+> What did you motivate your choice of having an enable option instead of
+> a disable option?
 
-Scratch this. All this has really done is moved the race around. Will had a much
-better suggestion that makes it look like all the CPUs are down. That makes
-hotplug and power-management behave the same.
+Currently, SW MSI injection works really well. It's been validated,
+plenty of people are using it. On the other hand, GICv4 is new and
+probably buggy. I only know of 2 other people having tried it. I'm also
+not sure it gives the best possible performance in the general use case
+(oversubscribed host with freely migrating vcpus).
 
+Given that, I'm not keen on making it the default. But if you can report
+that it is better and more reliable than SW injection, I'll switch the
+default the other way around! ;-)
 
 Thanks,
 
-James
+	M.
+-- 
+Jazz is not dead. It just smells funny...
