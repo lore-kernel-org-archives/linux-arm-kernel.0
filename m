@@ -1,820 +1,126 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Wed, 8 Nov 2017 21:47:09 +0530
-Subject: [PATCH v2 2/3] drivers: phy: broadcom: Add driver for Cygnus USB
- phy controller
-In-Reply-To: <5A02DE4A.8030408@samsung.com>
-References: <1510127203-5815-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1510127203-5815-3-git-send-email-raveendra.padasalagi@broadcom.com>
- <CGME20171108075237epcas4p1ff44128cefdf883b180fa1d0e673be24@epcas4p1.samsung.com>
- <CAAFb_vrE=hg2aRvyAv=KCQaoVYqi0EszQ3NsmmRX+xKypVmiUg@mail.gmail.com>
- <5A02DE4A.8030408@samsung.com>
-Message-ID: <CAAFb_vr1g84hhSGuvQZ1TrRe=u6-WCc47LE8kpN3HQYpNGBA1w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Nov 2017 00:22:23 +0800
+Subject: [PATCH 2/3] ASoC: sun8i-codec: Set the BCLK divider
+In-Reply-To: <20171108154710.16407-3-maxime.ripard@free-electrons.com>
+References: <20171108154710.16407-1-maxime.ripard@free-electrons.com>
+ <20171108154710.16407-3-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v64taPeDRQUhh9pZMQ=UdNsZE9xSfiDF2pVRs1wvz8pubw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 8, 2017 at 11:47 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> While the current code was reporting to be able to work in master mode, it
+> failed to do so because the BCLK divider wasn't programmed, meaning that
+> the BCLK would run at the PLL's frequency no matter the sample rate.
+>
+> It was obviously a bit too fast.
+>
+> Add support to retrieve the divider to use, and set it. Since our PLL is
+> not always able to generate a perfect multiple of the sample rate, we'll
+> have to choose the closest divider that matches our setup.
+>
+> Fixes: 36c684936fae ("ASoC: Add sun8i digital audio codec")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  sound/soc/sunxi/sun8i-codec.c | 53 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 53 insertions(+)
+>
+> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+> index 038107baf414..522546e6b153 100644
+> --- a/sound/soc/sunxi/sun8i-codec.c
+> +++ b/sound/soc/sunxi/sun8i-codec.c
+> @@ -73,6 +73,7 @@
+>  #define SUN8I_SYS_SR_CTRL_AIF2_FS_MASK         GENMASK(11, 8)
+>  #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK  GENMASK(5, 4)
+>  #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK  GENMASK(8, 6)
+> +#define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK  GENMASK(12, 9)
+>
+>  struct sun8i_codec {
+>         struct device   *dev;
+> @@ -226,12 +227,57 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+>         return 0;
+>  }
+>
+> +struct sun8i_codec_clk_div {
+> +       u8      div;
+> +       u8      val;
+> +};
+> +
+> +static const struct sun8i_codec_clk_div sun8i_codec_bclk_div[] = {
+> +       { .div = 1,     .val = 0 },
+> +       { .div = 2,     .val = 1 },
+> +       { .div = 4,     .val = 2 },
+> +       { .div = 6,     .val = 3 },
+> +       { .div = 8,     .val = 4 },
+> +       { .div = 12,    .val = 5 },
+> +       { .div = 16,    .val = 6 },
+> +       { .div = 24,    .val = 7 },
+> +       { .div = 32,    .val = 8 },
+> +       { .div = 48,    .val = 9 },
+> +       { .div = 64,    .val = 10 },
+> +       { .div = 96,    .val = 11 },
+> +       { .div = 128,   .val = 12 },
+> +       { .div = 192,   .val = 13 },
+> +};
+> +
+> +static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
+> +                                  unsigned int rate,
+> +                                  unsigned int word_size)
+> +{
+> +       unsigned long clk_rate = clk_get_rate(scodec->clk_module);
+> +       unsigned int div = clk_rate / rate / word_size / 2;
+> +       unsigned int best_val = 0, best_diff = ~0;
+> +       int i;
+> +
+> +       for (i = 0; i < ARRAY_SIZE(sun8i_codec_bclk_div); i++) {
+> +               const struct sun8i_codec_clk_div *bdiv = &sun8i_codec_bclk_div[i];
+> +               unsigned int diff = abs(bdiv->div - div);
+> +
+> +               if (diff < best_diff) {
+> +                       best_diff = diff;
+> +                       best_val = bdiv->val;
+> +               }
+> +       }
+> +
+> +       return best_val;
+> +}
+> +
+>  static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+>                                  struct snd_pcm_hw_params *params,
+>                                  struct snd_soc_dai *dai)
+>  {
+>         struct sun8i_codec *scodec = snd_soc_codec_get_drvdata(dai->codec);
+>         int sample_rate;
+> +       u8 bclk_div;
+>
+>         /*
+>          * The CPU DAI handles only a sample of 16 bits. Configure the
+> @@ -241,6 +287,13 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+>                            SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK,
+>                            SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16);
 
-On Wed, Nov 8, 2017 at 4:06 PM, Chanwoo Choi <cw00.choi@samsung.com> wrote:
-> Hi,
->
-> On 2017? 11? 08? 16:52, Raveendra Padasalagi wrote:
->> Hi,
->>
->> Adding Chanwoo Choi to review extcon API's.
->>
->> -Raveendra
->> On Wed, Nov 8, 2017 at 1:16 PM, Raveendra Padasalagi
->> <raveendra.padasalagi@broadcom.com> wrote:
->>> Add driver for Broadcom's USB phy controller's used in Cygnus
->>> familyof SoC. Cygnus has three USB phy controller's, port 0,
->>> port 1 provides USB host functionality and port 2 can be configured
->>> for host/device role.
->>>
->>> Configuration of host/device role for port 2 is achieved based on
->>> the extcon events, the driver registers to extcon framework to get
->>> appropriate connect events for Host/Device cables connect/disconnect
->>> states based on VBUS and ID interrupts.
->>>
->>> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
->>> ---
->>>  drivers/phy/broadcom/Kconfig              |  14 +
->>>  drivers/phy/broadcom/Makefile             |   1 +
->>>  drivers/phy/broadcom/phy-bcm-cygnus-usb.c | 690 ++++++++++++++++++++++++++++++
->>>  3 files changed, 705 insertions(+)
->>>  create mode 100644 drivers/phy/broadcom/phy-bcm-cygnus-usb.c
->>>
->>> diff --git a/drivers/phy/broadcom/Kconfig b/drivers/phy/broadcom/Kconfig
->>> index 64fc59c..3179daf 100644
->>> --- a/drivers/phy/broadcom/Kconfig
->>> +++ b/drivers/phy/broadcom/Kconfig
->>> @@ -1,6 +1,20 @@
->>>  #
->>>  # Phy drivers for Broadcom platforms
->>>  #
->>> +config PHY_BCM_CYGNUS_USB
->>> +       tristate "Broadcom Cygnus USB PHY support"
->>> +       depends on OF
->>> +       depends on ARCH_BCM_CYGNUS || COMPILE_TEST
->>> +       select GENERIC_PHY
->>> +       select EXTCON_USB_GPIO
->
-> As I commented on v1 patch, it is not proper to select the specific
-> device driver. Instead, you should select the framework as following:
->
->         select EXTCON
->
-> And if you want to enable the specific device driver,
-> you need to add the configuration to the config file
-> (such as arch/arm64/configs/*defconfig).
->
-Ok, Got confused with the suggestion on previous patch.
-Without selecting EXTCON_USB_GPIO, "linux,usb-gpio" driver was not
-getting enabled in the build.
+This looks like it's using 16 bit words regardless of the settings in params.
 
-It's clear now, I will keep "select EXTCON"  in this Kconfig and send
-another patch to enable
-EXTCON_USB_GPIO in required defconfig.
-
->>> +       default ARCH_BCM_CYGNUS
->>> +       help
->>> +         Enable this to support three USB PHY's present in Broadcom's
->>> +         Cygnus chip.
->>> +
->>> +         The phys are capable of supporting host mode on all ports and
->>> +         device mode for port 2.
->>> +
->>>  config PHY_CYGNUS_PCIE
->>>         tristate "Broadcom Cygnus PCIe PHY driver"
->>>         depends on OF && (ARCH_BCM_CYGNUS || COMPILE_TEST)
->>> diff --git a/drivers/phy/broadcom/Makefile b/drivers/phy/broadcom/Makefile
->>> index 4eb82ec..3dec23c 100644
->>> --- a/drivers/phy/broadcom/Makefile
->>> +++ b/drivers/phy/broadcom/Makefile
->>> @@ -1,4 +1,5 @@
->>>  obj-$(CONFIG_PHY_CYGNUS_PCIE)          += phy-bcm-cygnus-pcie.o
->>> +obj-$(CONFIG_PHY_BCM_CYGNUS_USB)       += phy-bcm-cygnus-usb.o
->>>  obj-$(CONFIG_BCM_KONA_USB2_PHY)                += phy-bcm-kona-usb2.o
->>>  obj-$(CONFIG_PHY_BCM_NS_USB2)          += phy-bcm-ns-usb2.o
->>>  obj-$(CONFIG_PHY_BCM_NS_USB3)          += phy-bcm-ns-usb3.o
->>> diff --git a/drivers/phy/broadcom/phy-bcm-cygnus-usb.c b/drivers/phy/broadcom/phy-bcm-cygnus-usb.c
->>> new file mode 100644
->>> index 0000000..cf957d4
->>> --- /dev/null
->>> +++ b/drivers/phy/broadcom/phy-bcm-cygnus-usb.c
->>> @@ -0,0 +1,690 @@
->>> +/*
->>> + * Copyright 2017 Broadcom
->>> + *
->>> + * This program is free software; you can redistribute it and/or modify
->>> + * it under the terms of the GNU General Public License, version 2, as
->>> + * published by the Free Software Foundation (the "GPL").
->>> + *
->>> + * This program is distributed in the hope that it will be useful, but
->>> + * WITHOUT ANY WARRANTY; without even the implied warranty of
->>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
->>> + * General Public License version 2 (GPLv2) for more details.
->>> + *
->>> + * You should have received a copy of the GNU General Public License
->>> + * version 2 (GPLv2) along with this source code.
->>> + */
->>> +
->>> +#include <linux/module.h>
->>> +#include <linux/platform_device.h>
->>> +#include <linux/io.h>
->>> +#include <linux/of.h>
->>> +#include <linux/of_address.h>
->>> +#include <linux/phy/phy.h>
->>> +#include <linux/delay.h>
->>> +#include <linux/regulator/consumer.h>
->>> +#include <linux/extcon.h>
->>> +#include <linux/gpio.h>
->>> +#include <linux/gpio/consumer.h>
->>> +#include <linux/interrupt.h>
->>> +
->>> +/* CDRU Block Register Offsets and bit definitions */
->>> +#define CDRU_USBPHY_CLK_RST_SEL_OFFSET                 0x0
->>> +#define CDRU_USBPHY2_HOST_DEV_SEL_OFFSET               0x4
->>> +#define CDRU_USB_DEV_SUSPEND_RESUME_CTRL_OFFSET                0x5C
->>> +#define CDRU_USBPHY_P0_STATUS_OFFSET                   0x1C
->>> +#define CDRU_USBPHY_P1_STATUS_OFFSET                   0x34
->>> +#define CDRU_USBPHY_P2_STATUS_OFFSET                   0x4C
->>> +
->>> +#define CDRU_USBPHY_USBPHY_ILDO_ON_FLAG                        BIT(1)
->>> +#define CDRU_USBPHY_USBPHY_PLL_LOCK                    BIT(0)
->>> +#define CDRU_USB_DEV_SUSPEND_RESUME_CTRL_DISABLE       BIT(0)
->>> +
->>> +/* CRMU Block Register Offsets and bit definitions */
->>> +#define CRMU_USB_PHY_AON_CTRL_OFFSET                   0x0
->>> +#define CRMU_USBPHY_P0_AFE_CORERDY_VDDC                        BIT(1)
->>> +#define CRMU_USBPHY_P0_RESETB                          BIT(2)
->>> +#define CRMU_USBPHY_P1_AFE_CORERDY_VDDC                        BIT(9)
->>> +#define CRMU_USBPHY_P1_RESETB                          BIT(10)
->>> +#define CRMU_USBPHY_P2_AFE_CORERDY_VDDC                        BIT(17)
->>> +#define CRMU_USBPHY_P2_RESETB                          BIT(18)
->>> +
->>> +/* USB2 IDM Block register Offset and bit definitions */
->>> +#define USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET          0x0408
->>> +#define USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE      BIT(0)
->>> +#define SUSPEND_OVERRIDE_0                             BIT(13)
->>> +#define SUSPEND_OVERRIDE_0_POS                         13
->>> +#define SUSPEND_OVERRIDE_1                             BIT(14)
->>> +#define SUSPEND_OVERRIDE_1_POS                         14
->>> +#define SUSPEND_OVERRIDE_2                             BIT(15)
->>> +#define SUSPEND_OVERRIDE_2_POS                         15
->>> +
->>> +#define USB2_IDM_IDM_RESET_CONTROL_OFFSET              0x0800
->>> +#define USB2_IDM_IDM_RESET_CONTROL__RESET              BIT(0)
->>> +#define USB2D_IDM_IDM_IO_SS_CLEAR_NAK_NEMPTY_EN_I      BIT(24)
->>> +
->>> +#define PHY2_DEV_HOST_CTRL_SEL_DEVICE                  0
->>> +#define PHY2_DEV_HOST_CTRL_SEL_HOST                    1
->>> +#define PHY2_DEV_HOST_CTRL_SEL_IDLE                    2
->>> +
->>> +#define PLL_LOCK_RETRY_COUNT                           1000
->>> +#define MAX_REGULATOR_NAME_LEN                         25
->>> +#define DUAL_ROLE_PHY                                  2
->>> +
->>> +#define USBPHY_WQ_DELAY_MS             msecs_to_jiffies(500)
->>> +#define USB2_SEL_DEVICE                        0
->>> +#define USB2_SEL_HOST                  1
->>> +#define USB2_SEL_IDLE                  2
->>> +#define USB_CONNECTED                  1
->>> +#define USB_DISCONNECTED               0
->>> +#define MAX_NUM_PHYS                   3
->>> +
->>> +static const int status_reg[] = {CDRU_USBPHY_P0_STATUS_OFFSET,
->>> +                               CDRU_USBPHY_P1_STATUS_OFFSET,
->>> +                               CDRU_USBPHY_P2_STATUS_OFFSET};
->>> +
->>> +struct cygnus_phy_instance;
->>> +
->>> +struct cygnus_phy_driver {
->>> +       void __iomem *cdru_usbphy_regs;
->>> +       void __iomem *crmu_usbphy_aon_ctrl_regs;
->>> +       void __iomem *usb2h_idm_regs;
->>> +       void __iomem *usb2d_idm_regs;
->>> +       int num_phys;
->>> +       bool idm_host_enabled;
->>> +       struct cygnus_phy_instance *instances;
->>> +       int phyto_src_clk;
->>> +       struct platform_device *pdev;
->>> +};
->>> +
->>> +struct cygnus_phy_instance {
->>> +       struct cygnus_phy_driver *driver;
->>> +       struct phy *generic_phy;
->>> +       int port;
->>> +       int new_state;          /* 1 - Host, 0 - device, 2 - idle*/
->>> +       bool power;             /* 1 - powered_on 0 - powered off */
->>> +       struct regulator *vbus_supply;
->>> +       spinlock_t lock;
->>> +       struct extcon_dev *edev;
->>> +       struct notifier_block   device_nb;
->>> +       struct notifier_block   host_nb;
->>> +};
->>> +
->>> +static inline int phy_pll_lock_stat(u32 usb_reg, int bit_mask,
->>> +                                   struct cygnus_phy_driver *phy_driver)
->>> +{
->>> +       /* Wait for the PLL lock status */
->>> +       int retry = PLL_LOCK_RETRY_COUNT;
->>> +       u32 reg_val;
->>> +
->>> +       do {
->>> +               udelay(1);
->>> +               reg_val = readl(phy_driver->cdru_usbphy_regs +
->>> +                               usb_reg);
->>> +               if (reg_val & bit_mask)
->>> +                       return 0;
->>> +       } while (--retry > 0);
->>> +
->>> +       return -EBUSY;
->>> +}
->>> +
->>> +static struct phy *cygnus_phy_xlate(struct device *dev,
->>> +                                   struct of_phandle_args *args)
->>> +{
->>> +       struct cygnus_phy_driver *phy_driver = dev_get_drvdata(dev);
->>> +       struct cygnus_phy_instance *instance_ptr;
->>> +
->>> +       if (!phy_driver)
->>> +               return ERR_PTR(-EINVAL);
->>> +
->>> +       if (WARN_ON(args->args[0] >= phy_driver->num_phys))
->>> +               return ERR_PTR(-ENODEV);
->>> +
->>> +       if (WARN_ON(args->args_count < 1))
->>> +               return ERR_PTR(-EINVAL);
->>> +
->>> +       instance_ptr = &phy_driver->instances[args->args[0]];
->>> +       if (instance_ptr->port > phy_driver->phyto_src_clk)
->>> +               phy_driver->phyto_src_clk = instance_ptr->port;
->>> +
->>> +       if (instance_ptr->port == DUAL_ROLE_PHY)
->>> +               goto ret_p2;
->>> +       phy_driver->instances[instance_ptr->port].new_state =
->>> +                                               PHY2_DEV_HOST_CTRL_SEL_HOST;
->>> +
->>> +ret_p2:
->>> +       return phy_driver->instances[instance_ptr->port].generic_phy;
->>> +}
->>> +
->>> +static void cygnus_usbp2_dev_clock_init(struct phy *generic_phy, bool enable)
->>> +{
->>> +       u32 reg_val;
->>> +       struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>> +       struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>> +
->>> +       reg_val = readl(phy_driver->usb2d_idm_regs +
->>> +                       USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +
->>> +       if (enable)
->>> +               reg_val |= USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>> +       else
->>> +               reg_val &= ~USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>> +
->>> +       writel(reg_val, phy_driver->usb2d_idm_regs +
->>> +               USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +
->>> +       reg_val = readl(phy_driver->usb2d_idm_regs +
->>> +                       USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>> +
->>> +       if (enable)
->>> +               reg_val &= ~USB2_IDM_IDM_RESET_CONTROL__RESET;
->>> +       else
->>> +               reg_val |= USB2_IDM_IDM_RESET_CONTROL__RESET;
->>> +
->>> +       writel(reg_val, phy_driver->usb2d_idm_regs +
->>> +               USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>> +}
->>> +
->>> +static void cygnus_phy_clk_reset_src_switch(struct phy *generic_phy,
->>> +                                           u32 src_phy)
->>> +{
->>> +       u32 reg_val;
->>> +       struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>> +       struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>> +
->>> +       writel(src_phy, phy_driver->cdru_usbphy_regs +
->>> +               CDRU_USBPHY_CLK_RST_SEL_OFFSET);
->>> +
->>> +       /* Force the clock/reset source phy to not suspend */
->>> +       reg_val = readl(phy_driver->usb2h_idm_regs +
->>> +                       USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +       reg_val &= ~(SUSPEND_OVERRIDE_0 | SUSPEND_OVERRIDE_1 |
->>> +                       SUSPEND_OVERRIDE_2);
->>> +
->>> +       reg_val |= BIT(SUSPEND_OVERRIDE_0_POS + src_phy);
->>> +
->>> +       writel(reg_val, phy_driver->usb2h_idm_regs +
->>> +               USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +}
->>> +
->>> +static void cygnus_phy_dual_role_init(struct cygnus_phy_instance *instance_ptr)
->>> +{
->>> +       u32 reg_val;
->>> +       struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>> +
->>> +       if (instance_ptr->new_state == PHY2_DEV_HOST_CTRL_SEL_HOST) {
->>> +               writel(PHY2_DEV_HOST_CTRL_SEL_HOST,
->>> +                       phy_driver->cdru_usbphy_regs +
->>> +                       CDRU_USBPHY2_HOST_DEV_SEL_OFFSET);
->>> +               return;
->>> +       }
->>> +
->>> +       /*
->>> +        * Disable suspend/resume signals to device controller
->>> +        * when a port is in device mode
->>> +        */
->>> +       writel(PHY2_DEV_HOST_CTRL_SEL_DEVICE,
->>> +               phy_driver->cdru_usbphy_regs +
->>> +               CDRU_USBPHY2_HOST_DEV_SEL_OFFSET);
->>> +       reg_val = readl(phy_driver->cdru_usbphy_regs +
->>> +                       CDRU_USB_DEV_SUSPEND_RESUME_CTRL_OFFSET);
->>> +       reg_val |= CDRU_USB_DEV_SUSPEND_RESUME_CTRL_DISABLE;
->>> +       writel(reg_val, phy_driver->cdru_usbphy_regs +
->>> +                       CDRU_USB_DEV_SUSPEND_RESUME_CTRL_OFFSET);
->>> +}
->>> +
->>> +static int cygnus_phy_init(struct phy *generic_phy)
->>> +{
->>> +       struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>> +
->>> +       if (instance_ptr->port == DUAL_ROLE_PHY)
->>> +               cygnus_phy_dual_role_init(instance_ptr);
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static int cygnus_phy_shutdown(struct phy *generic_phy)
->>> +{
->>> +       u32 reg_val;
->>> +       int i, ret;
->>> +       unsigned long flags;
->>> +       bool power_off_flag = true;
->>> +       struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>> +       struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>> +
->>> +       if (instance_ptr->vbus_supply) {
->>> +               ret = regulator_disable(instance_ptr->vbus_supply);
->>> +               if (ret) {
->>> +                       dev_err(&generic_phy->dev,
->>> +                                       "Failed to disable regulator\n");
->>> +                       return ret;
->>> +               }
->>> +       }
->>> +
->>> +       spin_lock_irqsave(&instance_ptr->lock, flags);
->>> +
->>> +       /* power down the phy */
->>> +       reg_val = readl(phy_driver->crmu_usbphy_aon_ctrl_regs +
->>> +                       CRMU_USB_PHY_AON_CTRL_OFFSET);
->>> +       if (instance_ptr->port == 0) {
->>> +               reg_val &= ~CRMU_USBPHY_P0_AFE_CORERDY_VDDC;
->>> +               reg_val &= ~CRMU_USBPHY_P0_RESETB;
->>> +       } else if (instance_ptr->port == 1) {
->>> +               reg_val &= ~CRMU_USBPHY_P1_AFE_CORERDY_VDDC;
->>> +               reg_val &= ~CRMU_USBPHY_P1_RESETB;
->>> +       } else if (instance_ptr->port == 2) {
->>> +               reg_val &= ~CRMU_USBPHY_P2_AFE_CORERDY_VDDC;
->>> +               reg_val &= ~CRMU_USBPHY_P2_RESETB;
->>> +       }
->>> +       writel(reg_val, phy_driver->crmu_usbphy_aon_ctrl_regs +
->>> +               CRMU_USB_PHY_AON_CTRL_OFFSET);
->>> +
->>> +       instance_ptr->power = false;
->>> +
->>> +       /* Determine whether all the phy's are powered off */
->>> +       for (i = 0; i < phy_driver->num_phys; i++) {
->>> +               if (phy_driver->instances[i].power == true) {
->>> +                       power_off_flag = false;
->>> +                       break;
->>> +               }
->>> +       }
->>> +
->>> +       /* Disable clock to USB device and keep the USB device in reset */
->>> +       if (instance_ptr->port == DUAL_ROLE_PHY)
->>> +               cygnus_usbp2_dev_clock_init(instance_ptr->generic_phy,
->>> +                                           false);
->>> +
->>> +       /*
->>> +        * Put the host controller into reset state and
->>> +        * disable clock if all the phy's are powered off
->>> +        */
->>> +       if (power_off_flag) {
->>> +               reg_val = readl(phy_driver->usb2h_idm_regs +
->>> +                       USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +               reg_val &= ~USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>> +               writel(reg_val, phy_driver->usb2h_idm_regs +
->>> +                               USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +
->>> +               reg_val = readl(phy_driver->usb2h_idm_regs +
->>> +                                USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>> +               reg_val |= USB2_IDM_IDM_RESET_CONTROL__RESET;
->>> +               writel(reg_val, phy_driver->usb2h_idm_regs +
->>> +                               USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>> +               phy_driver->idm_host_enabled = false;
->>> +       }
->>> +       spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>> +       return 0;
->>> +}
->>> +
->>> +static int cygnus_phy_poweron(struct phy *generic_phy)
->>> +{
->>> +       int ret;
->>> +       unsigned long flags;
->>> +       u32 reg_val;
->>> +       struct cygnus_phy_instance *instance_ptr = phy_get_drvdata(generic_phy);
->>> +       struct cygnus_phy_driver *phy_driver = instance_ptr->driver;
->>> +       u32 extcon_event = instance_ptr->new_state;
->>> +
->>> +       /*
->>> +        * Switch on the regulator only if in HOST mode
->>> +        */
->>> +       if (instance_ptr->vbus_supply) {
->>> +               ret = regulator_enable(instance_ptr->vbus_supply);
->>> +               if (ret) {
->>> +                       dev_err(&generic_phy->dev,
->>> +                               "Failed to enable regulator\n");
->>> +                       goto err_shutdown;
->>> +               }
->>> +       }
->>> +
->>> +       spin_lock_irqsave(&instance_ptr->lock, flags);
->>> +       /* Bring the AFE block out of reset to start powering up the PHY */
->>> +       reg_val = readl(phy_driver->crmu_usbphy_aon_ctrl_regs +
->>> +                       CRMU_USB_PHY_AON_CTRL_OFFSET);
->>> +       if (instance_ptr->port == 0)
->>> +               reg_val |= CRMU_USBPHY_P0_AFE_CORERDY_VDDC;
->>> +       else if (instance_ptr->port == 1)
->>> +               reg_val |= CRMU_USBPHY_P1_AFE_CORERDY_VDDC;
->>> +       else if (instance_ptr->port == 2)
->>> +               reg_val |= CRMU_USBPHY_P2_AFE_CORERDY_VDDC;
->>> +       writel(reg_val, phy_driver->crmu_usbphy_aon_ctrl_regs +
->>> +               CRMU_USB_PHY_AON_CTRL_OFFSET);
->>> +
->>> +       /* Check for power on and PLL lock */
->>> +       ret = phy_pll_lock_stat(status_reg[instance_ptr->port],
->>> +                               CDRU_USBPHY_USBPHY_ILDO_ON_FLAG, phy_driver);
->>> +       if (ret < 0) {
->>> +               dev_err(&generic_phy->dev,
->>> +                       "Timed out waiting for USBPHY_ILDO_ON_FLAG on port %d",
->>> +                       instance_ptr->port);
->>> +               spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>> +               goto err_shutdown;
->>> +       }
->>> +       ret = phy_pll_lock_stat(status_reg[instance_ptr->port],
->>> +                               CDRU_USBPHY_USBPHY_PLL_LOCK, phy_driver);
->>> +       if (ret < 0) {
->>> +               dev_err(&generic_phy->dev,
->>> +                       "Timed out waiting for USBPHY_PLL_LOCK on port %d",
->>> +                       instance_ptr->port);
->>> +               spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>> +               goto err_shutdown;
->>> +       }
->>> +
->>> +       instance_ptr->power = true;
->>> +
->>> +       /* Enable clock to USB device and take the USB device out of reset */
->>> +       if (instance_ptr->port == DUAL_ROLE_PHY)
->>> +               cygnus_usbp2_dev_clock_init(instance_ptr->generic_phy, true);
->>> +
->>> +       /* Set clock source provider to be the last powered on phy */
->>> +       if (instance_ptr->port == phy_driver->phyto_src_clk)
->>> +               cygnus_phy_clk_reset_src_switch(generic_phy,
->>> +                               instance_ptr->port);
->>> +
->>> +       if (phy_driver->idm_host_enabled != true &&
->>> +               extcon_event == PHY2_DEV_HOST_CTRL_SEL_HOST) {
->>> +               /* Enable clock to USB host and take the host out of reset */
->>> +               reg_val = readl(phy_driver->usb2h_idm_regs +
->>> +                               USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +               reg_val |= USB2_IDM_IDM_IO_CONTROL_DIRECT_CLK_ENABLE;
->>> +               writel(reg_val, phy_driver->usb2h_idm_regs +
->>> +                               USB2_IDM_IDM_IO_CONTROL_DIRECT_OFFSET);
->>> +
->>> +               reg_val = readl(phy_driver->usb2h_idm_regs +
->>> +                               USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>> +               reg_val &= ~USB2_IDM_IDM_RESET_CONTROL__RESET;
->>> +               writel(reg_val, phy_driver->usb2h_idm_regs +
->>> +                                USB2_IDM_IDM_RESET_CONTROL_OFFSET);
->>> +               phy_driver->idm_host_enabled = true;
->>> +       }
->>> +       spin_unlock_irqrestore(&instance_ptr->lock, flags);
->>> +
->>> +       return 0;
->>> +err_shutdown:
->>> +       cygnus_phy_shutdown(generic_phy);
->>> +       return ret;
->>> +}
->>> +
->>> +static int usbd_connect_notify(struct notifier_block *self,
->>> +                              unsigned long event, void *ptr)
->>> +{
->>> +       struct cygnus_phy_instance *instance_ptr = container_of(self,
->>> +                                       struct cygnus_phy_instance, device_nb);
->>> +
->>> +       if (event) {
->>> +               instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_DEVICE;
->>> +               cygnus_phy_dual_role_init(instance_ptr);
->>> +       }
 >
-> As I commented on v1 patch, this callback function considers the attached state.
-> Is it right that you don't consider the detached state?
+> +       bclk_div = sun8i_codec_get_bclk_div(scodec, params_rate(params),
+> +                                           params_width(params));
 
-I am aware of this, I don't need to handle detached state. Interested in only
-device cable connect state as I have to change the role of the PHY only on
-attach state. On detach phy is assumed to continue in the previous mode.
+But here you pass params_width(params). Seems a bit error prone.
 
->>> +
->>> +       return NOTIFY_OK;
->>> +}
->>> +
->>> +static int usbh_connect_notify(struct notifier_block *self,
->>> +                              unsigned long event, void *ptr)
->>> +{
->>> +       struct cygnus_phy_instance *instance_ptr = container_of(self,
->>> +                                       struct cygnus_phy_instance, host_nb);
->>> +       if (event) {
->>> +               instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_HOST;
->>> +               cygnus_phy_dual_role_init(instance_ptr);
->>> +       }
->
-> ditto.
+Otherwise,
 
-I am aware of this, I don't need to handle detached state. Interested in only
-host cable connect state as explained above.
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
->>> +
->>> +       return NOTIFY_OK;
->>> +}
->>> +
->>> +static int cygnus_register_extcon_notifiers(
->>> +                               struct cygnus_phy_instance *instance_ptr)
->>> +{
->>> +       int ret = 0;
->>> +       struct device *dev = &instance_ptr->generic_phy->dev;
->>> +
->>> +       if (of_property_read_bool(dev->of_node, "extcon")) {
->>> +               instance_ptr->edev = extcon_get_edev_by_phandle(dev, 0);
->>> +               if (IS_ERR(instance_ptr->edev)) {
->>> +                       if (PTR_ERR(instance_ptr->edev) == -EPROBE_DEFER)
->>> +                               return -EPROBE_DEFER;
->>> +                       ret = PTR_ERR(instance_ptr->edev);
->>> +                       goto err;
->>> +               }
->>> +
->>> +               instance_ptr->device_nb.notifier_call = usbd_connect_notify;
->>> +               ret = devm_extcon_register_notifier(dev,
->>> +                                               instance_ptr->edev,
->>> +                                               EXTCON_USB,
->>> +                                               &instance_ptr->device_nb);
->>> +               if (ret < 0) {
->>> +                       dev_err(dev, "Can't register extcon notifier\n");
->>> +                       goto err;
->>> +               }
->>> +
->>> +               if (extcon_get_state(instance_ptr->edev, EXTCON_USB) == true) {
->>> +                       instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_DEVICE;
->>> +                       cygnus_phy_dual_role_init(instance_ptr);
->>> +               }
->>> +
->>> +               instance_ptr->host_nb.notifier_call = usbh_connect_notify;
->>> +               ret = devm_extcon_register_notifier(dev,
->>> +                                               instance_ptr->edev,
->>> +                                               EXTCON_USB_HOST,
->>> +                                               &instance_ptr->host_nb);
->>> +               if (ret < 0) {
->>> +                       dev_err(dev, "Can't register extcon notifier\n");
->>> +                       goto err;
->>> +               }
->>> +
->>> +               if (extcon_get_state(instance_ptr->edev, EXTCON_USB_HOST)
->>> +                                       == true) {
->>> +                       instance_ptr->new_state = PHY2_DEV_HOST_CTRL_SEL_HOST;
->>> +                       cygnus_phy_dual_role_init(instance_ptr);
->>> +               }
->>> +       } else {
->>> +               dev_err(dev, "Extcon device handle not found\n");
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       return 0;
->>> +err:
->>> +       return ret;
->>> +}
->>> +
->>> +static const struct phy_ops ops = {
->>> +       .init           = cygnus_phy_init,
->>> +       .power_on       = cygnus_phy_poweron,
->>> +       .power_off      = cygnus_phy_shutdown,
->>> +       .owner = THIS_MODULE,
->>> +};
->>> +
->>> +static void cygnus_phy_shutdown_all(struct cygnus_phy_driver *phy_driver)
->>> +{
->>> +       u32 reg_val;
->>> +
->>> +       /*
->>> +        * Shutdown all ports. They can be powered up as
->>> +        * required
->>> +        */
->>> +       reg_val = readl(phy_driver->crmu_usbphy_aon_ctrl_regs +
->>> +                       CRMU_USB_PHY_AON_CTRL_OFFSET);
->>> +       reg_val &= ~CRMU_USBPHY_P0_AFE_CORERDY_VDDC;
->>> +       reg_val &= ~CRMU_USBPHY_P0_RESETB;
->>> +       reg_val &= ~CRMU_USBPHY_P1_AFE_CORERDY_VDDC;
->>> +       reg_val &= ~CRMU_USBPHY_P1_RESETB;
->>> +       reg_val &= ~CRMU_USBPHY_P2_AFE_CORERDY_VDDC;
->>> +       reg_val &= ~CRMU_USBPHY_P2_RESETB;
->>> +       writel(reg_val, phy_driver->crmu_usbphy_aon_ctrl_regs +
->>> +               CRMU_USB_PHY_AON_CTRL_OFFSET);
->>> +}
->>> +
->>> +static int cygnus_phy_instance_create(struct cygnus_phy_driver *phy_driver)
->>> +{
->>> +       struct device_node *child;
->>> +       char *vbus_name;
->>> +       struct platform_device *pdev = phy_driver->pdev;
->>> +       struct device *dev = &pdev->dev;
->>> +       struct device_node *node = dev->of_node;
->>> +       struct cygnus_phy_instance *instance_ptr;
->>> +       unsigned int id, ret;
->>> +
->>> +       for_each_available_child_of_node(node, child) {
->>> +               if (of_property_read_u32(child, "reg", &id)) {
->>> +                       dev_err(dev, "missing reg property for %s\n",
->>> +                               child->name);
->>> +                       ret = -EINVAL;
->>> +                       goto put_child;
->>> +               }
->>> +
->>> +               if (id >= MAX_NUM_PHYS) {
->>> +                       dev_err(dev, "invalid PHY id: %u\n", id);
->>> +                       ret = -EINVAL;
->>> +                       goto put_child;
->>> +               }
->>> +
->>> +               instance_ptr = &phy_driver->instances[id];
->>> +               instance_ptr->driver = phy_driver;
->>> +               instance_ptr->port = id;
->>> +               spin_lock_init(&instance_ptr->lock);
->>> +
->>> +               if (instance_ptr->generic_phy) {
->>> +                       dev_err(dev, "duplicated PHY id: %u\n", id);
->>> +                       ret = -EINVAL;
->>> +                       goto put_child;
->>> +               }
->>> +
->>> +               instance_ptr->generic_phy =
->>> +                               devm_phy_create(dev, child, &ops);
->>> +               if (IS_ERR(instance_ptr->generic_phy)) {
->>> +                       dev_err(dev, "Failed to create usb phy %d", id);
->>> +                       ret = PTR_ERR(instance_ptr->generic_phy);
->>> +                       goto put_child;
->>> +               }
->>> +
->>> +               vbus_name = devm_kzalloc(&instance_ptr->generic_phy->dev,
->>> +                                       MAX_REGULATOR_NAME_LEN,
->>> +                                       GFP_KERNEL);
->>> +               if (!vbus_name) {
->>> +                       ret = -ENOMEM;
->>> +                       goto put_child;
->>> +               }
->>> +
->>> +               /* regulator use is optional */
->>> +               sprintf(vbus_name, "vbus-p%d", id);
->>> +               instance_ptr->vbus_supply =
->>> +                       devm_regulator_get(&instance_ptr->generic_phy->dev,
->>> +                                       vbus_name);
->>> +               if (IS_ERR(instance_ptr->vbus_supply))
->>> +                       instance_ptr->vbus_supply = NULL;
->>> +               devm_kfree(&instance_ptr->generic_phy->dev, vbus_name);
->>> +               phy_set_drvdata(instance_ptr->generic_phy, instance_ptr);
->>> +       }
->>> +
->>> +       return 0;
->>> +
->>> +put_child:
->>> +       of_node_put(child);
->>> +       return ret;
->>> +}
->>> +
->>> +static int cygnus_phy_probe(struct platform_device *pdev)
->>> +{
->>> +       struct resource *res;
->>> +       struct cygnus_phy_driver *phy_driver;
->>> +       struct phy_provider *phy_provider;
->>> +       int i, ret;
->>> +       u32 reg_val;
->>> +       struct device *dev = &pdev->dev;
->>> +       struct device_node *node = dev->of_node;
->>> +
->>> +       /* allocate memory for each phy instance */
->>> +       phy_driver = devm_kzalloc(dev, sizeof(struct cygnus_phy_driver),
->>> +                                 GFP_KERNEL);
->>> +       if (!phy_driver)
->>> +               return -ENOMEM;
->>> +
->>> +       phy_driver->num_phys = of_get_child_count(node);
->>> +
->>> +       if (phy_driver->num_phys == 0) {
->>> +               dev_err(dev, "PHY no child node\n");
->>> +               return -ENODEV;
->>> +       }
->>> +
->>> +       phy_driver->instances = devm_kzalloc(dev, phy_driver->num_phys *
->>> +                                            sizeof(struct cygnus_phy_instance),
->>> +                                            GFP_KERNEL);
->>> +       if (!phy_driver->instances)
->>> +               return -ENOMEM;
->>> +
->>> +       phy_driver->pdev = pdev;
->>> +       platform_set_drvdata(pdev, phy_driver);
->>> +
->>> +       ret = cygnus_phy_instance_create(phy_driver);
->>> +       if (ret)
->>> +               return ret;
->>> +
->>> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->>> +                                          "crmu-usbphy-aon-ctrl");
->>> +       phy_driver->crmu_usbphy_aon_ctrl_regs = devm_ioremap_resource(dev, res);
->>> +       if (IS_ERR(phy_driver->crmu_usbphy_aon_ctrl_regs))
->>> +               return PTR_ERR(phy_driver->crmu_usbphy_aon_ctrl_regs);
->>> +
->>> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM,
->>> +                                          "cdru-usbphy");
->>> +       phy_driver->cdru_usbphy_regs = devm_ioremap_resource(dev, res);
->>> +       if (IS_ERR(phy_driver->cdru_usbphy_regs))
->>> +               return PTR_ERR(phy_driver->cdru_usbphy_regs);
->>> +
->>> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb2h-idm");
->>> +       phy_driver->usb2h_idm_regs = devm_ioremap_resource(dev, res);
->>> +       if (IS_ERR(phy_driver->usb2h_idm_regs))
->>> +               return PTR_ERR(phy_driver->usb2h_idm_regs);
->>> +
->>> +       res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "usb2d-idm");
->>> +       phy_driver->usb2d_idm_regs = devm_ioremap_resource(dev, res);
->>> +       if (IS_ERR(phy_driver->usb2d_idm_regs))
->>> +               return PTR_ERR(phy_driver->usb2d_idm_regs);
->>> +
->>> +       reg_val = readl(phy_driver->usb2d_idm_regs);
->>> +       writel((reg_val | USB2D_IDM_IDM_IO_SS_CLEAR_NAK_NEMPTY_EN_I),
->>> +                  phy_driver->usb2d_idm_regs);
->>> +       phy_driver->idm_host_enabled = false;
->>> +
->>> +       /* Shutdown all ports. They can be powered up as required */
->>> +       cygnus_phy_shutdown_all(phy_driver);
->>> +
->>> +       phy_provider = devm_of_phy_provider_register(dev, cygnus_phy_xlate);
->>> +       if (IS_ERR(phy_provider)) {
->>> +               dev_err(dev, "Failed to register as phy provider\n");
->>> +               ret = PTR_ERR(phy_provider);
->>> +               return ret;
->>> +       }
->>> +
->>> +       for (i = 0; i < phy_driver->num_phys; i++) {
->>> +               if (phy_driver->instances[i].port == DUAL_ROLE_PHY) {
->>> +                       ret = cygnus_register_extcon_notifiers(
->>> +                               &phy_driver->instances[DUAL_ROLE_PHY]);
->>> +                       if (ret) {
->>> +                               dev_err(dev, "Failed to register notifier\n");
->>> +                               return ret;
->>> +                       }
->>> +               }
->>> +       }
->>> +
->>> +       return 0;
->>> +}
->>> +
->>> +static const struct of_device_id cygnus_phy_dt_ids[] = {
->>> +       { .compatible = "brcm,cygnus-usb-phy", },
->>> +       { }
->>> +};
->>> +MODULE_DEVICE_TABLE(of, cygnus_phy_dt_ids);
->>> +
->>> +static struct platform_driver cygnus_phy_driver = {
->>> +       .probe = cygnus_phy_probe,
->>> +       .driver = {
->>> +               .name = "bcm-cygnus-usbphy",
->>> +               .of_match_table = of_match_ptr(cygnus_phy_dt_ids),
->>> +       },
->>> +};
->>> +module_platform_driver(cygnus_phy_driver);
->>> +
->>> +MODULE_ALIAS("platform:bcm-cygnus-usbphy");
->>> +MODULE_AUTHOR("Raveendra Padasalagi <Raveendra.padasalagi@broadcom.com");
->>> +MODULE_DESCRIPTION("Broadcom Cygnus USB PHY driver");
->>> +MODULE_LICENSE("GPL v2");
->>> --
->>> 1.9.1
->>>
->>
->>
->>
->
->
+> +
+> +       regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
+> +                          SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
+> +                          bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
+> +
+>         regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
+>                            SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
+>                            SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
 > --
-> Best Regards,
-> Chanwoo Choi
-> Samsung Electronics
+> 2.14.3
+>
