@@ -1,74 +1,44 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Wed, 8 Nov 2017 16:46:45 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20171107154842.GP28152@atomide.com>
-References: <20171018082927.GB27595@js1304-P5Q-DELUXE>
- <20171019183033.GH4394@atomide.com>
- <20171020015542.GA10438@js1304-P5Q-DELUXE>
- <20171020173146.GN4394@atomide.com>
- <20171023045342.GA23082@js1304-P5Q-DELUXE>
- <20171025173137.GQ4394@atomide.com>
- <20171026044829.GB11791@js1304-P5Q-DELUXE>
- <20171026141627.GD21504@atomide.com>
- <20171107053313.GA12447@js1304-P5Q-DELUXE>
- <20171107154842.GP28152@atomide.com>
-Message-ID: <20171108074645.GA18747@js1304-P5Q-DELUXE>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Wed, 8 Nov 2017 13:14:41 +0530
+Subject: [PATCH] arm64: dts: msm8916: Add missing #phy-cells
+In-Reply-To: <20171108034501.2994-1-bjorn.andersson@linaro.org>
+References: <20171108034501.2994-1-bjorn.andersson@linaro.org>
+Message-ID: <f66341bb-2dff-7b21-3a78-5c9ec1c3a719@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 07:48:42AM -0800, Tony Lindgren wrote:
-> Hi,
-> 
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171107 05:30]:
-> > Could you test follwing updated branch?
-> > 
-> > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
-> > 
-> > It has three relevant commits on top and enables CMA memory use.
-> 
-> Okie dokie.
-> 
-> > "arm/dma: remove i-cache flush"
-> 
-> Your branch at the above commit is not booting on n900.
-> 
-> > "arm/dma: flush i-cache and d-cache separately"
-> 
-> Not booting at this commit either.
-> 
-> > "arm/dma: call flush_cache_all() and don't do outer cache operation"
-> 
-> Not booting at this commit either.
-> 
-> Earlier commit f14f3479c0d7 ("arm/dma: re-enable to remap the CMA
-> area and flush cache before remapping") in you branch boots.
-> 
-> Then the following commit d6512d6d0171 ("Revert "arm/mm: disable
-> atomic_pool"") won't boot.
-> 
-> Also your tree at commit 6d0525cef962 ("arm/dma: remove i-cache
-> flush") with only commit d6512d6d0171 ("Revert "arm/mm: disable
-> atomic_pool"") reverted boots on n900.
 
-Thanks a lot!
 
-> So it seems the issue is currently at the atomic_pool_init()
-> related code?
+On 11/08/2017 09:15 AM, Bjorn Andersson wrote:
+> Add a missing #phy-cells to the dsi-phy, to silence dtc warning.
+> 
 
-Yes, your test showed it although I can't find any clue in
-atomic_pool_init().
+Reviewed-by: Archit Taneja <architt@codeaurora.org>
 
-Could you test updated branch?
+Thanks,
+Archit
 
-https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+> Cc: Archit Taneja <architt@codeaurora.org>
+> Fixes: 305410ffd1b2 ("arm64: dts: msm8916: Add display support")
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+> ---
+>   arch/arm64/boot/dts/qcom/msm8916.dtsi | 1 +
+>   1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> index 6b2127a6ced1..09ac5c43807e 100644
+> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+> @@ -906,6 +906,7 @@
+>   					    "dsi_phy_regulator";
+>   
+>   				#clock-cells = <1>;
+> +				#phy-cells = <0>;
+>   
+>   				clocks = <&gcc GCC_MDSS_AHB_CLK>;
+>   				clock-names = "iface_clk";
+> 
 
-There are two relevant commits.
-
-arm/dma: stop dma allocation before __dma_alloc_remap()
-arm/dma: disable atomic pool after dma allocation
-
-atomic pool initialization will be done partially to check
-exact point of failure. These are brain-dead commits however I have no
-idea what's going on here until now. :/
-
-Thanks.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
