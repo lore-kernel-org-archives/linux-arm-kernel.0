@@ -1,65 +1,59 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Wed,  8 Nov 2017 13:16:43 +0530
-Subject: [PATCH v2 3/3] ARM: dts: Add dt node for Broadcom Cygnus USB phy
-In-Reply-To: <1510127203-5815-1-git-send-email-raveendra.padasalagi@broadcom.com>
-References: <1510127203-5815-1-git-send-email-raveendra.padasalagi@broadcom.com>
-Message-ID: <1510127203-5815-4-git-send-email-raveendra.padasalagi@broadcom.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 8 Nov 2017 08:48:58 +0100
+Subject: [PATCH 1/2] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
+In-Reply-To: <CAGb2v64zkEoy=_9D7g+GC5ZxYg_zuaTo3LL1e=4RXLnL0VDWaA@mail.gmail.com>
+References: <20171107201326.17401-1-clabbe.montjoie@gmail.com>
+ <CAGb2v64zkEoy=_9D7g+GC5ZxYg_zuaTo3LL1e=4RXLnL0VDWaA@mail.gmail.com>
+Message-ID: <20171108074858.ompog5in7xi776d6@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT node for Broadcom's USB phy controller's used
-in Cygnus family of SoC.
+On Wed, Nov 08, 2017 at 02:27:21PM +0800, Chen-Yu Tsai wrote:
+> On Wed, Nov 8, 2017 at 4:13 AM, Corentin Labbe
+> <clabbe.montjoie@gmail.com> wrote:
+> > The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
+> > This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
+> 
+> The subject should say "add .... device node", not driver.
+> 
+> >
+> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > ---
+> >  arch/arm/boot/dts/sun8i-a83t.dtsi | 29 +++++++++++++++++++++++++++++
+> >  1 file changed, 29 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> > index 19acae1b4089..68e5135410ec 100644
+> > --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
+> > +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+> > @@ -336,6 +336,14 @@
+> >                         #interrupt-cells = <3>;
+> >                         #gpio-cells = <3>;
+> >
+> > +                       emac_rgmii_pins: emac-rgmii-pins {
+> > +                               pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
+> > +                                      "PD11", "PD12", "PD13", "PD14", "PD18",
+> > +                                      "PD19", "PD21", "PD22", "PD23";
+> > +                               function = "gmac";
+> > +                               drive-strength = <40>;
+> > +                       };
+> > +
+> 
+> You should mention this change in your commit log.
 
-Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
----
- arch/arm/boot/dts/bcm-cygnus.dtsi | 35 +++++++++++++++++++++++++++++++++++
- 1 file changed, 35 insertions(+)
+And add a comment about why that drive strength is needed.
 
-diff --git a/arch/arm/boot/dts/bcm-cygnus.dtsi b/arch/arm/boot/dts/bcm-cygnus.dtsi
-index 7c957ea..c7b39dd 100644
---- a/arch/arm/boot/dts/bcm-cygnus.dtsi
-+++ b/arch/arm/boot/dts/bcm-cygnus.dtsi
-@@ -96,6 +96,41 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 
-+		extcon_usb: extcon_usb {
-+			compatible = "linux,extcon-usb-gpio";
-+			vbus-gpio = <&gpio_asiu 121 0>;
-+			id-gpio = <&gpio_asiu 122 0>;
-+			status = "okay";
-+		};
-+
-+		usbphy: usb-phy at 0301c028 {
-+			compatible = "brcm,cygnus-usb-phy";
-+			reg = <0x0301c028 0x4>,
-+			      <0x0301d1b4 0x5c>,
-+			      <0x18115000 0xa00>,
-+			      <0x18111000 0xa00>;
-+			reg-names = "crmu-usbphy-aon-ctrl", "cdru-usbphy",
-+				    "usb2h-idm", "usb2d-idm";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			usbphy0: usb-phy at 0 {
-+				#phy-cells = <1>;
-+				reg = <0>;
-+			};
-+
-+			usbphy1: usb-phy at 1 {
-+				#phy-cells = <1>;
-+				reg = <1>;
-+			};
-+
-+			usbphy2: usb-phy at 2 {
-+				#phy-cells = <1>;
-+				reg = <2>;
-+				extcon = <&extcon_usb>;
-+			};
-+		};
-+
- 		otp: otp at 0301c800 {
- 			compatible = "brcm,ocotp";
- 			reg = <0x0301c800 0x2c>;
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171108/98b3fb88/attachment.sig>
