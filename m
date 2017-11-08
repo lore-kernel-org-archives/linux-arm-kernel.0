@@ -1,138 +1,615 @@
 From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed,  8 Nov 2017 13:47:51 +0100
-Subject: [PATCH 2/3] tee: add TEE_IOCTL_PARAM_ATTR_META
+Date: Wed,  8 Nov 2017 13:47:52 +0100
+Subject: [PATCH 3/3] optee: support asynchronous supplicant requests
 In-Reply-To: <1510145272-14842-1-git-send-email-jens.wiklander@linaro.org>
 References: <1510145272-14842-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1510145272-14842-3-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1510145272-14842-4-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds TEE_IOCTL_PARAM_ATTR_META which can be used to indicate meta
-parameters when communicating with user space. These meta parameters can
-be used by supplicant support multiple parallel requests at a time.
+Adds support for asynchronous supplicant requests, meaning that the
+supplicant can process several requests in parallel or block in a
+request for some time.
 
-Reviewed-by: Etienne Carriere <etienne.carriere@linaro.org>
+Acked-by: Etienne Carriere <etienne.carriere@linaro.org>
+Tested-by: Etienne Carriere <etienne.carriere@linaro.org> (b2260 pager=y/n)
 Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 ---
- drivers/tee/optee/supp.c | 25 +++++++++++++++++++++++++
- drivers/tee/tee_core.c   | 16 ++++++++++------
- include/uapi/linux/tee.h |  7 +++++++
- 3 files changed, 42 insertions(+), 6 deletions(-)
+ drivers/tee/optee/core.c          |  11 +-
+ drivers/tee/optee/optee_private.h |  43 ++---
+ drivers/tee/optee/rpc.c           |   4 +-
+ drivers/tee/optee/supp.c          | 358 +++++++++++++++++++++++---------------
+ 4 files changed, 243 insertions(+), 173 deletions(-)
 
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 7952357df9c8..b7492da92567 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -187,12 +187,12 @@ static int optee_open(struct tee_context *ctx)
+ 	if (teedev == optee->supp_teedev) {
+ 		bool busy = true;
+ 
+-		mutex_lock(&optee->supp.ctx_mutex);
++		mutex_lock(&optee->supp.mutex);
+ 		if (!optee->supp.ctx) {
+ 			busy = false;
+ 			optee->supp.ctx = ctx;
+ 		}
+-		mutex_unlock(&optee->supp.ctx_mutex);
++		mutex_unlock(&optee->supp.mutex);
+ 		if (busy) {
+ 			kfree(ctxdata);
+ 			return -EBUSY;
+@@ -252,11 +252,8 @@ static void optee_release(struct tee_context *ctx)
+ 
+ 	ctx->data = NULL;
+ 
+-	if (teedev == optee->supp_teedev) {
+-		mutex_lock(&optee->supp.ctx_mutex);
+-		optee->supp.ctx = NULL;
+-		mutex_unlock(&optee->supp.ctx_mutex);
+-	}
++	if (teedev == optee->supp_teedev)
++		optee_supp_release(&optee->supp);
+ }
+ 
+ static const struct tee_driver_ops optee_ops = {
+diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
+index c374cd594314..3e7da187acbe 100644
+--- a/drivers/tee/optee/optee_private.h
++++ b/drivers/tee/optee/optee_private.h
+@@ -53,36 +53,24 @@ struct optee_wait_queue {
+  * @ctx			the context of current connected supplicant.
+  *			if !NULL the supplicant device is available for use,
+  *			else busy
+- * @ctx_mutex:		held while accessing @ctx
+- * @func:		supplicant function id to call
+- * @ret:		call return value
+- * @num_params:		number of elements in @param
+- * @param:		parameters for @func
+- * @req_posted:		if true, a request has been posted to the supplicant
+- * @supp_next_send:	if true, next step is for supplicant to send response
+- * @thrd_mutex:		held by the thread doing a request to supplicant
+- * @supp_mutex:		held by supplicant while operating on this struct
+- * @data_to_supp:	supplicant is waiting on this for next request
+- * @data_from_supp:	requesting thread is waiting on this to get the result
++ * @mutex:		held while accessing content of this struct
++ * @req_id:		current request id if supplicant is doing synchronous
++ *			communication, else -1
++ * @reqs:		queued request not yet retrieved by supplicant
++ * @idr:		IDR holding all requests currently being processed
++ *			by supplicant
++ * @reqs_c:		completion used by supplicant when waiting for a
++ *			request to be queued.
+  */
+ struct optee_supp {
++	/* Serializes access to this struct */
++	struct mutex mutex;
+ 	struct tee_context *ctx;
+-	/* Serializes access of ctx */
+-	struct mutex ctx_mutex;
+-
+-	u32 func;
+-	u32 ret;
+-	size_t num_params;
+-	struct tee_param *param;
+-
+-	bool req_posted;
+-	bool supp_next_send;
+-	/* Serializes access to this struct for requesting thread */
+-	struct mutex thrd_mutex;
+-	/* Serializes access to this struct for supplicant threads */
+-	struct mutex supp_mutex;
+-	struct completion data_to_supp;
+-	struct completion data_from_supp;
++
++	int req_id;
++	struct list_head reqs;
++	struct idr idr;
++	struct completion reqs_c;
+ };
+ 
+ /**
+@@ -142,6 +130,7 @@ int optee_supp_read(struct tee_context *ctx, void __user *buf, size_t len);
+ int optee_supp_write(struct tee_context *ctx, void __user *buf, size_t len);
+ void optee_supp_init(struct optee_supp *supp);
+ void optee_supp_uninit(struct optee_supp *supp);
++void optee_supp_release(struct optee_supp *supp);
+ 
+ int optee_supp_recv(struct tee_context *ctx, u32 *func, u32 *num_params,
+ 		    struct tee_param *param);
+diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
+index cef417f4f4d2..c6df4317ca9f 100644
+--- a/drivers/tee/optee/rpc.c
++++ b/drivers/tee/optee/rpc.c
+@@ -192,10 +192,10 @@ static struct tee_shm *cmd_alloc_suppl(struct tee_context *ctx, size_t sz)
+ 	if (ret)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	mutex_lock(&optee->supp.ctx_mutex);
++	mutex_lock(&optee->supp.mutex);
+ 	/* Increases count as secure world doesn't have a reference */
+ 	shm = tee_shm_get_from_id(optee->supp.ctx, param.u.value.c);
+-	mutex_unlock(&optee->supp.ctx_mutex);
++	mutex_unlock(&optee->supp.mutex);
+ 	return shm;
+ }
+ 
 diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
-index b4ea0678a436..56aa8b929b8c 100644
+index 56aa8b929b8c..df35fc01fd3e 100644
 --- a/drivers/tee/optee/supp.c
 +++ b/drivers/tee/optee/supp.c
-@@ -119,6 +119,27 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
+@@ -16,21 +16,61 @@
+ #include <linux/uaccess.h>
+ #include "optee_private.h"
+ 
++struct optee_supp_req {
++	struct list_head link;
++
++	bool busy;
++	u32 func;
++	u32 ret;
++	size_t num_params;
++	struct tee_param *param;
++
++	struct completion c;
++};
++
+ void optee_supp_init(struct optee_supp *supp)
+ {
+ 	memset(supp, 0, sizeof(*supp));
+-	mutex_init(&supp->ctx_mutex);
+-	mutex_init(&supp->thrd_mutex);
+-	mutex_init(&supp->supp_mutex);
+-	init_completion(&supp->data_to_supp);
+-	init_completion(&supp->data_from_supp);
++	mutex_init(&supp->mutex);
++	init_completion(&supp->reqs_c);
++	idr_init(&supp->idr);
++	INIT_LIST_HEAD(&supp->reqs);
++	supp->req_id = -1;
+ }
+ 
+ void optee_supp_uninit(struct optee_supp *supp)
+ {
+-	mutex_destroy(&supp->ctx_mutex);
+-	mutex_destroy(&supp->thrd_mutex);
+-	mutex_destroy(&supp->supp_mutex);
++	mutex_destroy(&supp->mutex);
++	idr_destroy(&supp->idr);
++}
++
++void optee_supp_release(struct optee_supp *supp)
++{
++	int id;
++	struct optee_supp_req *req;
++	struct optee_supp_req *req_tmp;
++
++	mutex_lock(&supp->mutex);
++
++	/* Abort all request retrieved by supplicant */
++	idr_for_each_entry(&supp->idr, req, id) {
++		req->busy = false;
++		idr_remove(&supp->idr, id);
++		req->ret = TEEC_ERROR_COMMUNICATION;
++		complete(&req->c);
++	}
++
++	/* Abort all queued requests */
++	list_for_each_entry_safe(req, req_tmp, &supp->reqs, link) {
++		list_del(&req->link);
++		req->ret = TEEC_ERROR_COMMUNICATION;
++		complete(&req->c);
++	}
++
++	supp->ctx = NULL;
++	supp->req_id = -1;
++
++	mutex_unlock(&supp->mutex);
+ }
+ 
+ /**
+@@ -44,53 +84,42 @@ void optee_supp_uninit(struct optee_supp *supp)
+  */
+ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
+ 			struct tee_param *param)
++
+ {
+-	bool interruptable;
+ 	struct optee *optee = tee_get_drvdata(ctx->teedev);
+ 	struct optee_supp *supp = &optee->supp;
++	struct optee_supp_req *req = kzalloc(sizeof(*req), GFP_KERNEL);
++	bool interruptable;
+ 	u32 ret;
+ 
+-	/*
+-	 * Other threads blocks here until we've copied our answer from
+-	 * supplicant.
+-	 */
+-	while (mutex_lock_interruptible(&supp->thrd_mutex)) {
+-		/* See comment below on when the RPC can be interrupted. */
+-		mutex_lock(&supp->ctx_mutex);
+-		interruptable = !supp->ctx;
+-		mutex_unlock(&supp->ctx_mutex);
+-		if (interruptable)
+-			return TEEC_ERROR_COMMUNICATION;
+-	}
++	if (!req)
++		return TEEC_ERROR_OUT_OF_MEMORY;
+ 
+-	/*
+-	 * We have exclusive access now since the supplicant at this
+-	 * point is either doing a
+-	 * wait_for_completion_interruptible(&supp->data_to_supp) or is in
+-	 * userspace still about to do the ioctl() to enter
+-	 * optee_supp_recv() below.
+-	 */
++	init_completion(&req->c);
++	req->func = func;
++	req->num_params = num_params;
++	req->param = param;
+ 
+-	supp->func = func;
+-	supp->num_params = num_params;
+-	supp->param = param;
+-	supp->req_posted = true;
++	/* Insert the request in the request list */
++	mutex_lock(&supp->mutex);
++	list_add_tail(&req->link, &supp->reqs);
++	mutex_unlock(&supp->mutex);
+ 
+-	/* Let supplicant get the data */
+-	complete(&supp->data_to_supp);
++	/* Tell an eventual waiter there's a new request */
++	complete(&supp->reqs_c);
+ 
+ 	/*
+ 	 * Wait for supplicant to process and return result, once we've
+-	 * returned from wait_for_completion(data_from_supp) we have
++	 * returned from wait_for_completion(&req->c) successfully we have
+ 	 * exclusive access again.
+ 	 */
+-	while (wait_for_completion_interruptible(&supp->data_from_supp)) {
+-		mutex_lock(&supp->ctx_mutex);
++	while (wait_for_completion_interruptible(&req->c)) {
++		mutex_lock(&supp->mutex);
+ 		interruptable = !supp->ctx;
+ 		if (interruptable) {
+ 			/*
+ 			 * There's no supplicant available and since the
+-			 * supp->ctx_mutex currently is held none can
++			 * supp->mutex currently is held none can
+ 			 * become available until the mutex released
+ 			 * again.
+ 			 *
+@@ -101,28 +130,65 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
+ 			 * will serve all requests in a timely manner and
+ 			 * interrupting then wouldn't make sense.
+ 			 */
+-			supp->ret = TEEC_ERROR_COMMUNICATION;
+-			init_completion(&supp->data_to_supp);
++			interruptable = !req->busy;
++			if (!req->busy)
++				list_del(&req->link);
+ 		}
+-		mutex_unlock(&supp->ctx_mutex);
+-		if (interruptable)
++		mutex_unlock(&supp->mutex);
++
++		if (interruptable) {
++			req->ret = TEEC_ERROR_COMMUNICATION;
+ 			break;
++		}
+ 	}
+ 
+-	ret = supp->ret;
+-	supp->param = NULL;
+-	supp->req_posted = false;
+-
+-	/* We're done, let someone else talk to the supplicant now. */
+-	mutex_unlock(&supp->thrd_mutex);
++	ret = req->ret;
++	kfree(req);
+ 
  	return ret;
  }
  
-+static int supp_check_recv_params(size_t num_params, struct tee_param *params)
+-static int supp_check_recv_params(size_t num_params, struct tee_param *params)
++static struct optee_supp_req  *supp_pop_entry(struct optee_supp *supp,
++					      int num_params, int *id)
 +{
-+	size_t n;
++	struct optee_supp_req *req;
 +
-+	/*
-+	 * If there's memrefs we need to decrease those as they where
-+	 * increased earlier and we'll even refuse to accept any below.
-+	 */
-+	for (n = 0; n < num_params; n++)
-+		if (tee_param_is_memref(params + n) && params[n].u.memref.shm)
-+			tee_shm_put(params[n].u.memref.shm);
++	if (supp->req_id != -1) {
++		/*
++		 * Supplicant should not mix synchronous and asnynchronous
++		 * requests.
++		 */
++		return ERR_PTR(-EINVAL);
++	}
 +
-+	/*
-+	 * We only expect parameters as TEE_IOCTL_PARAM_ATTR_TYPE_NONE (0).
-+	 */
-+	for (n = 0; n < num_params; n++)
-+		if (params[n].attr)
-+			return -EINVAL;
++	if (list_empty(&supp->reqs))
++		return NULL;
++
++	req = list_first_entry(&supp->reqs, struct optee_supp_req, link);
++
++	if (num_params < req->num_params) {
++		/* Not enough room for parameters */
++		return ERR_PTR(-EINVAL);
++	}
++
++	*id = idr_alloc(&supp->idr, req, 1, 0, GFP_KERNEL);
++	if (*id < 0)
++		return ERR_PTR(-ENOMEM);
++
++	list_del(&req->link);
++	req->busy = true;
++
++	return req;
++}
++
++static int supp_check_recv_params(size_t num_params, struct tee_param *params,
++				  size_t *num_meta)
+ {
+ 	size_t n;
+ 
++	if (!num_params)
++		return -EINVAL;
++
+ 	/*
+ 	 * If there's memrefs we need to decrease those as they where
+ 	 * increased earlier and we'll even refuse to accept any below.
+@@ -132,11 +198,20 @@ static int supp_check_recv_params(size_t num_params, struct tee_param *params)
+ 			tee_shm_put(params[n].u.memref.shm);
+ 
+ 	/*
+-	 * We only expect parameters as TEE_IOCTL_PARAM_ATTR_TYPE_NONE (0).
++	 * We only expect parameters as TEE_IOCTL_PARAM_ATTR_TYPE_NONE with
++	 * or without the TEE_IOCTL_PARAM_ATTR_META bit set.
+ 	 */
+ 	for (n = 0; n < num_params; n++)
+-		if (params[n].attr)
++		if (params[n].attr &&
++		    params[n].attr != TEE_IOCTL_PARAM_ATTR_META)
+ 			return -EINVAL;
++
++	/* At most we'll need one meta parameter so no need to check for more */
++	if (params->attr == TEE_IOCTL_PARAM_ATTR_META)
++		*num_meta = 1;
++	else
++		*num_meta = 0;
++
+ 	return 0;
+ }
+ 
+@@ -156,69 +231,99 @@ int optee_supp_recv(struct tee_context *ctx, u32 *func, u32 *num_params,
+ 	struct tee_device *teedev = ctx->teedev;
+ 	struct optee *optee = tee_get_drvdata(teedev);
+ 	struct optee_supp *supp = &optee->supp;
++	struct optee_supp_req *req = NULL;
++	int id;
++	size_t num_meta;
+ 	int rc;
+ 
+-	rc = supp_check_recv_params(*num_params, param);
++	rc = supp_check_recv_params(*num_params, param, &num_meta);
+ 	if (rc)
+ 		return rc;
+ 
+-	/*
+-	 * In case two threads in one supplicant is calling this function
+-	 * simultaneously we need to protect the data with a mutex which
+-	 * we'll release before returning.
+-	 */
+-	mutex_lock(&supp->supp_mutex);
++	while (true) {
++		mutex_lock(&supp->mutex);
++		req = supp_pop_entry(supp, *num_params - num_meta, &id);
++		mutex_unlock(&supp->mutex);
++
++		if (req) {
++			if (IS_ERR(req))
++				return PTR_ERR(req);
++			break;
++		}
+ 
+-	if (supp->supp_next_send) {
+ 		/*
+-		 * optee_supp_recv() has been called again without
+-		 * a optee_supp_send() in between. Supplicant has
+-		 * probably been restarted before it was able to
+-		 * write back last result. Abort last request and
+-		 * wait for a new.
++		 * If we didn't get a request we'll block in
++		 * wait_for_completion() to avoid needless spinning.
++		 *
++		 * This is where supplicant will be hanging most of
++		 * the time, let's make this interruptable so we
++		 * can easily restart supplicant if needed.
+ 		 */
+-		if (supp->req_posted) {
+-			supp->ret = TEEC_ERROR_COMMUNICATION;
+-			supp->supp_next_send = false;
+-			complete(&supp->data_from_supp);
+-		}
++		if (wait_for_completion_interruptible(&supp->reqs_c))
++			return -ERESTARTSYS;
+ 	}
+ 
+-	/*
+-	 * This is where supplicant will be hanging most of the
+-	 * time, let's make this interruptable so we can easily
+-	 * restart supplicant if needed.
+-	 */
+-	if (wait_for_completion_interruptible(&supp->data_to_supp)) {
+-		rc = -ERESTARTSYS;
+-		goto out;
++	if (num_meta) {
++		/*
++		 * tee-supplicant support meta parameters -> requsts can be
++		 * processed asynchronously.
++		 */
++		param->attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT |
++			      TEE_IOCTL_PARAM_ATTR_META;
++		param->u.value.a = id;
++		param->u.value.b = 0;
++		param->u.value.c = 0;
++	} else {
++		mutex_lock(&supp->mutex);
++		supp->req_id = id;
++		mutex_unlock(&supp->mutex);
+ 	}
+ 
+-	/* We have exlusive access to the data */
++	*func = req->func;
++	*num_params = req->num_params + num_meta;
++	memcpy(param + num_meta, req->param,
++	       sizeof(struct tee_param) * req->num_params);
+ 
+-	if (*num_params < supp->num_params) {
+-		/*
+-		 * Not enough room for parameters, tell supplicant
+-		 * it failed and abort last request.
+-		 */
+-		supp->ret = TEEC_ERROR_COMMUNICATION;
+-		rc = -EINVAL;
+-		complete(&supp->data_from_supp);
+-		goto out;
 +	return 0;
 +}
 +
++static struct optee_supp_req *supp_pop_req(struct optee_supp *supp,
++					   size_t num_params,
++					   struct tee_param *param,
++					   size_t *num_meta)
++{
++	struct optee_supp_req *req;
++	int id;
++	size_t nm;
++	const u32 attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT |
++			 TEE_IOCTL_PARAM_ATTR_META;
++
++	if (!num_params)
++		return ERR_PTR(-EINVAL);
++
++	if (supp->req_id == -1) {
++		if (param->attr != attr)
++			return ERR_PTR(-EINVAL);
++		id = param->u.value.a;
++		nm = 1;
++	} else {
++		id = supp->req_id;
++		nm = 0;
+ 	}
+ 
+-	*func = supp->func;
+-	*num_params = supp->num_params;
+-	memcpy(param, supp->param,
+-	       sizeof(struct tee_param) * supp->num_params);
++	req = idr_find(&supp->idr, id);
++	if (!req)
++		return ERR_PTR(-ENOENT);
++
++	if ((num_params - nm) != req->num_params)
++		return ERR_PTR(-EINVAL);
+ 
+-	/* Allow optee_supp_send() below to do its work */
+-	supp->supp_next_send = true;
++	req->busy = false;
++	idr_remove(&supp->idr, id);
++	supp->req_id = -1;
++	*num_meta = nm;
+ 
+-	rc = 0;
+-out:
+-	mutex_unlock(&supp->supp_mutex);
+-	return rc;
++	return req;
+ }
+ 
  /**
-  * optee_supp_recv() - receive request for supplicant
-  * @ctx:	context receiving the request
-@@ -137,6 +158,10 @@ int optee_supp_recv(struct tee_context *ctx, u32 *func, u32 *num_params,
+@@ -236,63 +341,42 @@ int optee_supp_send(struct tee_context *ctx, u32 ret, u32 num_params,
+ 	struct tee_device *teedev = ctx->teedev;
+ 	struct optee *optee = tee_get_drvdata(teedev);
  	struct optee_supp *supp = &optee->supp;
- 	int rc;
++	struct optee_supp_req *req;
+ 	size_t n;
+-	int rc = 0;
++	size_t num_meta;
  
-+	rc = supp_check_recv_params(*num_params, param);
-+	if (rc)
-+		return rc;
-+
- 	/*
- 	 * In case two threads in one supplicant is calling this function
- 	 * simultaneously we need to protect the data with a mutex which
-diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
-index c78104589e42..4d0ce606f0fc 100644
---- a/drivers/tee/tee_core.c
-+++ b/drivers/tee/tee_core.c
-@@ -152,11 +152,11 @@ static int params_from_user(struct tee_context *ctx, struct tee_param *params,
- 			return -EFAULT;
+-	/*
+-	 * We still have exclusive access to the data since that's how we
+-	 * left it when returning from optee_supp_read().
+-	 */
++	mutex_lock(&supp->mutex);
++	req = supp_pop_req(supp, num_params, param, &num_meta);
++	mutex_unlock(&supp->mutex);
  
- 		/* All unused attribute bits has to be zero */
--		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_TYPE_MASK)
-+		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_MASK)
- 			return -EINVAL;
+-	/* See comment on mutex in optee_supp_read() above */
+-	mutex_lock(&supp->supp_mutex);
+-
+-	if (!supp->supp_next_send) {
+-		/*
+-		 * Something strange is going on, supplicant shouldn't
+-		 * enter optee_supp_send() in this state
+-		 */
+-		rc = -ENOENT;
+-		goto out;
+-	}
+-
+-	if (num_params != supp->num_params) {
+-		/*
+-		 * Something is wrong, let supplicant restart. Next call to
+-		 * optee_supp_recv() will give an error to the requesting
+-		 * thread and release it.
+-		 */
+-		rc = -EINVAL;
+-		goto out;
++	if (IS_ERR(req)) {
++		/* Something is wrong, let supplicant restart. */
++		return PTR_ERR(req);
+ 	}
  
- 		params[n].attr = ip.attr;
--		switch (ip.attr) {
-+		switch (ip.attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
- 		case TEE_IOCTL_PARAM_ATTR_TYPE_NONE:
- 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
- 			break;
-@@ -394,8 +394,8 @@ static int params_to_supp(struct tee_context *ctx,
- 		struct tee_ioctl_param ip;
- 		struct tee_param *p = params + n;
+ 	/* Update out and in/out parameters */
+-	for (n = 0; n < num_params; n++) {
+-		struct tee_param *p = supp->param + n;
++	for (n = 0; n < req->num_params; n++) {
++		struct tee_param *p = req->param + n;
  
--		ip.attr = p->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK;
 -		switch (p->attr) {
-+		ip.attr = p->attr;
 +		switch (p->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
- 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT:
- 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
- 			ip.a = p->u.value.a;
-@@ -459,6 +459,10 @@ static int tee_ioctl_supp_recv(struct tee_context *ctx,
- 	if (!params)
- 		return -ENOMEM;
- 
-+	rc = params_from_user(ctx, params, num_params, uarg->params);
-+	if (rc)
-+		goto out;
-+
- 	rc = ctx->teedev->desc->ops->supp_recv(ctx, &func, &num_params, params);
- 	if (rc)
- 		goto out;
-@@ -488,11 +492,11 @@ static int params_from_supp(struct tee_param *params, size_t num_params,
- 			return -EFAULT;
- 
- 		/* All unused attribute bits has to be zero */
--		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_TYPE_MASK)
-+		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_MASK)
- 			return -EINVAL;
- 
- 		p->attr = ip.attr;
--		switch (ip.attr) {
-+		switch (ip.attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
  		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
  		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
- 			/* Only out and in/out values can be updated */
-diff --git a/include/uapi/linux/tee.h b/include/uapi/linux/tee.h
-index 688782e90140..267c12e7fd79 100644
---- a/include/uapi/linux/tee.h
-+++ b/include/uapi/linux/tee.h
-@@ -154,6 +154,13 @@ struct tee_ioctl_buf_data {
-  */
- #define TEE_IOCTL_PARAM_ATTR_TYPE_MASK		0xff
+-			p->u.value.a = param[n].u.value.a;
+-			p->u.value.b = param[n].u.value.b;
+-			p->u.value.c = param[n].u.value.c;
++			p->u.value.a = param[n + num_meta].u.value.a;
++			p->u.value.b = param[n + num_meta].u.value.b;
++			p->u.value.c = param[n + num_meta].u.value.c;
+ 			break;
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
+-			p->u.memref.size = param[n].u.memref.size;
++			p->u.memref.size = param[n + num_meta].u.memref.size;
+ 			break;
+ 		default:
+ 			break;
+ 		}
+ 	}
+-	supp->ret = ret;
+-
+-	/* Allow optee_supp_recv() above to do its work */
+-	supp->supp_next_send = false;
++	req->ret = ret;
  
-+/* Meta parameter carrying extra information about the message. */
-+#define TEE_IOCTL_PARAM_ATTR_META		0x100
+ 	/* Let the requesting thread continue */
+-	complete(&supp->data_from_supp);
+-out:
+-	mutex_unlock(&supp->supp_mutex);
+-	return rc;
++	complete(&req->c);
 +
-+/* Mask of all known attr bits */
-+#define TEE_IOCTL_PARAM_ATTR_MASK \
-+	(TEE_IOCTL_PARAM_ATTR_TYPE_MASK | TEE_IOCTL_PARAM_ATTR_META)
-+
- /*
-  * Matches TEEC_LOGIN_* in GP TEE Client API
-  * Are only defined for GP compliant TEEs
++	return 0;
+ }
 -- 
 2.7.4
