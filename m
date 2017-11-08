@@ -1,53 +1,42 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Wed, 8 Nov 2017 20:30:51 +0100
-Subject: [PATCH 1/2] ARM: sun8i: a83t: add dwmac-sun8i ethernet driver
-In-Reply-To: <20171108074858.ompog5in7xi776d6@flea.lan>
-References: <20171107201326.17401-1-clabbe.montjoie@gmail.com>
- <CAGb2v64zkEoy=_9D7g+GC5ZxYg_zuaTo3LL1e=4RXLnL0VDWaA@mail.gmail.com>
- <20171108074858.ompog5in7xi776d6@flea.lan>
-Message-ID: <20171108193051.GB26904@Red>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 08 Nov 2017 12:41:41 -0800
+Subject: [PATCH v2 06/12] hwrng: bcm2835-rng: Rework interrupt masking
+In-Reply-To: <1086045224.63286.1510166797078@email.1und1.de>
+References: <20171108004449.32730-1-f.fainelli@gmail.com>
+ <20171108004449.32730-7-f.fainelli@gmail.com>
+ <1086045224.63286.1510166797078@email.1und1.de>
+Message-ID: <87efp8bj0a.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 08, 2017 at 08:48:58AM +0100, Maxime Ripard wrote:
-> On Wed, Nov 08, 2017 at 02:27:21PM +0800, Chen-Yu Tsai wrote:
-> > On Wed, Nov 8, 2017 at 4:13 AM, Corentin Labbe
-> > <clabbe.montjoie@gmail.com> wrote:
-> > > The dwmac-sun8i is an ethernet MAC hardware that support 10/100/1000 speed.
-> > > This patch enable the dwmac-sun8i on the Allwinner a83t SoC Device-tree.
-> > 
-> > The subject should say "add .... device node", not driver.
-> > 
-> > >
-> > > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > > ---
-> > >  arch/arm/boot/dts/sun8i-a83t.dtsi | 29 +++++++++++++++++++++++++++++
-> > >  1 file changed, 29 insertions(+)
-> > >
-> > > diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > > index 19acae1b4089..68e5135410ec 100644
-> > > --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > > +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> > > @@ -336,6 +336,14 @@
-> > >                         #interrupt-cells = <3>;
-> > >                         #gpio-cells = <3>;
-> > >
-> > > +                       emac_rgmii_pins: emac-rgmii-pins {
-> > > +                               pins = "PD2", "PD3", "PD4", "PD5", "PD6", "PD7",
-> > > +                                      "PD11", "PD12", "PD13", "PD14", "PD18",
-> > > +                                      "PD19", "PD21", "PD22", "PD23";
-> > > +                               function = "gmac";
-> > > +                               drive-strength = <40>;
-> > > +                       };
-> > > +
-> > 
-> > You should mention this change in your commit log.
-> 
-> And add a comment about why that drive strength is needed.
-> 
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-OK I will do it
+> Hi Florian,
+>
+>> Florian Fainelli <f.fainelli@gmail.com> hat am 8. November 2017 um 01:44 geschrieben:
+>> 
+>> 
+>> The interrupt masking done for Northstart Plus and Northstar (BCM5301X)
+>> is moved from being a function pointer mapped to of_device_id::data into
+>> a proper part of the hwrng::init callback. While at it, we also make the
+>> of_data be a proper structure indicating the platform specifics, since
+>> the day we need to add a second type of platform information, we would
+>> have to do that anyway.
+>
+> in the lack of proper documentation for bcm2835 rng, is it possible
+> that we should mask the interrupts for bcm2835 as well?
 
-Thanks
-Regards
+I don't have the RTL nearby and the RNG block doesn't have the usual
+#defines for power-on-reset values, so I'm not sure.  I don't see any
+use of the RNG by the firmware that should impact Linux -- a driver
+exists and it uses IRQs, but it shouldn't have been active, and even if
+it was then its teardown process masks the interrupt off again.
+
+However, masking it off ourselves should be harmless at worst.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171108/9fa89f7f/attachment.sig>
