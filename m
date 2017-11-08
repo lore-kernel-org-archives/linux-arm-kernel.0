@@ -1,68 +1,27 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Wed, 08 Nov 2017 16:37:51 +0000
-Subject: [PATCH v5 12/30] arm64/sve: Low-level CPU setup
-In-Reply-To: <1509465082-30427-13-git-send-email-Dave.Martin@arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-13-git-send-email-Dave.Martin@arm.com>
-Message-ID: <87efp8rajk.fsf@linaro.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Nov 2017 08:42:21 -0800
+Subject: [PATCH v2 2/7] arm: omap: Move dmtimer.h out of plat-omap
+In-Reply-To: <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
+References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
+ <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
+Message-ID: <20171108164221.GV28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+* Keerthy <j-keerthy@ti.com> [171108 12:31]:
+> The header file is currently under plat-omap directory
+> under arch/omap. Move this out to an accessible place.
+> 
+> No Code changes done to the header file.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Some of the dmtimer functions are in this header to optimize the
+size of the system timer code. Can you please check if some of them
+can be left out of dmtimer.h and be made private to mach-omap1/timer.c
+and mach-omap2/timer.c?
 
-> To enable the kernel to use SVE, SVE traps from EL1 to EL2 must be
-> disabled.  To take maximum advantage of the hardware, the full
-> available vector length also needs to be enabled for EL1 by
-> programming ZCR_EL2.LEN.  (The kernel will program ZCR_EL1.LEN as
-> required, but this cannot override the limit set by ZCR_EL2.)
->
-> This patch makes the appropriate changes to the EL2 early setup
-> code.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
->
-> ---
->
-> **Dropped at v3** Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-> (Due to significant changes to the logic.)
+Again, we don't want driver code to start mis-using these as that's
+immediately going to be big mess out of control.
 
-Have it back:
+Regards,
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
-> ---
->  arch/arm64/kernel/head.S | 13 ++++++++++++-
->  1 file changed, 12 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index cfa90a4..67e86a0 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -524,8 +524,19 @@ CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
->  	mov	x0, #0x33ff
->  	msr	cptr_el2, x0			// Disable copro. traps to EL2
->
-> +	/* SVE register access */
-> +	mrs	x1, id_aa64pfr0_el1
-> +	ubfx	x1, x1, #ID_AA64PFR0_SVE_SHIFT, #4
-> +	cbz	x1, 7f
-> +
-> +	bic	x0, x0, #CPTR_EL2_TZ		// Also disable SVE traps
-> +	msr	cptr_el2, x0			// Disable copro. traps to EL2
-> +	isb
-> +	mov	x1, #ZCR_ELx_LEN_MASK		// SVE: Enable full vector
-> +	msr_s	SYS_ZCR_EL2, x1			// length for EL1.
-> +
->  	/* Hypervisor stub */
-> -	adr_l	x0, __hyp_stub_vectors
-> +7:	adr_l	x0, __hyp_stub_vectors
->  	msr	vbar_el2, x0
->
->  	/* spsr */
-
-
---
-Alex Benn?e
+Tony
