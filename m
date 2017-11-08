@@ -1,219 +1,97 @@
-From: manoj.iyer@canonical.com (Manoj Iyer)
-Date: Wed, 8 Nov 2017 13:05:55 -0600 (CST)
-Subject: [3/3] arm64: Add software workaround for Falkor erratum 1041
-In-Reply-To: <1509679664-3749-4-git-send-email-shankerd@codeaurora.org>
-References: <1509679664-3749-4-git-send-email-shankerd@codeaurora.org>
-Message-ID: <alpine.DEB.2.20.1711081305310.26324@lazy>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Wed, 8 Nov 2017 20:19:57 +0100 (CET)
+Subject: [PATCH v2 07/12] hwrng: bcm2835-rng: Manage an optional clock
+In-Reply-To: <20171108004449.32730-8-f.fainelli@gmail.com>
+References: <20171108004449.32730-1-f.fainelli@gmail.com>
+ <20171108004449.32730-8-f.fainelli@gmail.com>
+Message-ID: <1065382783.63901.1510168797132@email.1und1.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2 Nov 2017, Shanker Donthineni wrote:
+Hi Florian,
 
-> The ARM architecture defines the memory locations that are permitted
-> to be accessed as the result of a speculative instruction fetch from
-> an exception level for which all stages of translation are disabled.
-> Specifically, the core is permitted to speculatively fetch from the
-> 4KB region containing the current program counter and next 4KB.
->
-> When translation is changed from enabled to disabled for the running
-> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
-> Falkor core may errantly speculatively access memory locations outside
-> of the 4KB region permitted by the architecture. The errant memory
-> access may lead to one of the following unexpected behaviors.
->
-> 1) A System Error Interrupt (SEI) being raised by the Falkor core due
->   to the errant memory access attempting to access a region of memory
->   that is protected by a slave-side memory protection unit.
-> 2) Unpredictable device behavior due to a speculative read from device
->   memory. This behavior may only occur if the instruction cache is
->   disabled prior to or coincident with translation being changed from
->   enabled to disabled.
->
-> To avoid the errant behavior, software must execute an ISB immediately
-> prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
->
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> Florian Fainelli <f.fainelli@gmail.com> hat am 8. November 2017 um 01:44 geschrieben:
+> 
+> 
+> One of the last steps before bcm63xx-rng can be eliminated is to manage
+> a clock during hwrng::init and hwrng::cleanup, so fetch it in the probe
+> function, and manage it during these two steps when valid.
+> 
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > ---
-> Documentation/arm64/silicon-errata.txt |  1 +
-> arch/arm64/Kconfig                     | 10 ++++++++++
-> arch/arm64/include/asm/assembler.h     | 17 +++++++++++++++++
-> arch/arm64/include/asm/cpucaps.h       |  3 ++-
-> arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
-> arch/arm64/kernel/efi-entry.S          |  4 ++--
-> arch/arm64/kernel/head.S               |  4 ++--
-> 7 files changed, 50 insertions(+), 5 deletions(-)
->
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 66e8ce1..704770c0 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -74,3 +74,4 @@ stable kernels.
-> | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
-> | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
-> | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
-> +| Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0df64a6..7e933fb 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -539,6 +539,16 @@ config QCOM_QDF2400_ERRATUM_0065
->
-> 	  If unsure, say Y.
->
-> +config QCOM_FALKOR_ERRATUM_1041
-> +	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
-> +	default y
-> +	help
-> +	  Falkor CPU may speculatively fetch instructions from an improper
-> +	  memory location when MMU translation is changed from SCTLR_ELn[M]=1
-> +	  to SCTLR_ELn[M]=0. Prefix an ISB instruction to fix the problem.
+>  drivers/char/hw_random/bcm2835-rng.c | 17 ++++++++++++++++-
+>  1 file changed, 16 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+> index ed20e0b6b7ae..99b56fd5482c 100644
+> --- a/drivers/char/hw_random/bcm2835-rng.c
+> +++ b/drivers/char/hw_random/bcm2835-rng.c
+> @@ -15,6 +15,7 @@
+>  #include <linux/of_platform.h>
+>  #include <linux/platform_device.h>
+>  #include <linux/printk.h>
+> +#include <linux/clk.h>
+>  
+>  #define RNG_CTRL	0x0
+>  #define RNG_STATUS	0x4
+> @@ -33,6 +34,7 @@ struct bcm2835_rng_priv {
+>  	struct hwrng rng;
+>  	void __iomem *base;
+>  	bool mask_interrupts;
+> +	struct clk *clk;
+>  };
+>  
+>  static inline struct bcm2835_rng_priv *to_rng_priv(struct hwrng *rng)
+> @@ -66,8 +68,15 @@ static int bcm2835_rng_read(struct hwrng *rng, void *buf, size_t max,
+>  static int bcm2835_rng_init(struct hwrng *rng)
+>  {
+>  	struct bcm2835_rng_priv *priv = to_rng_priv(rng);
+> +	int ret = 0;
+>  	u32 val;
+>  
+> +	if (!IS_ERR(priv->clk)) {
+> +		ret = clk_prepare_enable(priv->clk);
+> +		if (ret)
+> +			return ret;
+> +	}
 > +
-> +	  If unsure, say Y.
+
+the clocks are optional to the binding, but not for the proper function of all RNG. So shouldn't we catch the case that we cannot get the clock during probe, but the clock is required for a specific SoC?
+
+>  	if (priv->mask_interrupts) {
+>  		/* mask the interrupt */
+>  		val = readl(priv->base + RNG_INT_MASK);
+> @@ -79,7 +88,7 @@ static int bcm2835_rng_init(struct hwrng *rng)
+>  	__raw_writel(RNG_WARMUP_COUNT, priv->base + RNG_STATUS);
+>  	__raw_writel(RNG_RBGEN, priv->base + RNG_CTRL);
+>  
+> -	return 0;
+> +	return ret;
+>  }
+>  
+>  static void bcm2835_rng_cleanup(struct hwrng *rng)
+> @@ -88,6 +97,9 @@ static void bcm2835_rng_cleanup(struct hwrng *rng)
+>  
+>  	/* disable rng hardware */
+>  	__raw_writel(0, priv->base + RNG_CTRL);
 > +
-> endmenu
->
->
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index b6dfb4f..4c91efb 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -30,6 +30,7 @@
-> #include <asm/pgtable-hwdef.h>
-> #include <asm/ptrace.h>
-> #include <asm/thread_info.h>
-> +#include <asm/alternative.h>
->
-> /*
->  * Enable and disable interrupts.
-> @@ -514,6 +515,22 @@
->  *   reg: the value to be written.
->  */
-> 	.macro	write_sctlr, eln, reg
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
-> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1041
-> +	tbnz    \reg, #0, 8000f          // enable MMU?
-> +	isb
-> +8000:
-> +alternative_else_nop_endif
-> +#endif
-> +	msr	sctlr_\eln, \reg
-> +	.endm
+> +	if (!IS_ERR(priv->clk))
+> +		clk_disable_unprepare(priv->clk);
+>  }
+>  
+>  struct bcm2835_rng_of_data {
+> @@ -130,6 +142,9 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+>  		return PTR_ERR(priv->base);
+>  	}
+>  
+> +	/* Clock is optional on most platforms */
+> +	priv->clk = devm_clk_get(dev, NULL);
 > +
-> +	.macro	early_write_sctlr, eln, reg
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
-> +	tbnz    \reg, #0, 8000f          // enable MMU?
-> +	isb
-> +8000:
-> +#endif
-> 	msr	sctlr_\eln, \reg
-> 	.endm
->
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index 8da6216..7f7a59d 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -40,7 +40,8 @@
-> #define ARM64_WORKAROUND_858921			19
-> #define ARM64_WORKAROUND_CAVIUM_30115		20
-> #define ARM64_HAS_DCPOP				21
-> +#define ARM64_WORKAROUND_QCOM_FALKOR_E1041	22
->
-> -#define ARM64_NCAPS				22
-> +#define ARM64_NCAPS				23
->
-> #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 0e27f86..27f9a45 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -179,6 +179,22 @@ static int cpu_enable_trap_ctr_access(void *__unused)
-> 			   MIDR_CPU_VAR_REV(0, 0)),
-> 	},
-> #endif
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1041
-> +	{
-> +		.desc = "Qualcomm Technologies Falkor erratum 1041",
-> +		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-> +		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
-> +			MIDR_CPU_VAR_REV(0, 0),
-> +			MIDR_CPU_VAR_REV(0, 0)),
-> +	},
-> +	{
-> +		.desc = "Qualcomm Technologies Falkor erratum 1041",
-> +		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-> +		MIDR_RANGE(MIDR_QCOM_FALKOR,
-> +			MIDR_CPU_VAR_REV(0, 1),
-> +			MIDR_CPU_VAR_REV(0, 2)),
-> +	},
-> +#endif
-> #ifdef CONFIG_ARM64_ERRATUM_858921
-> 	{
-> 	/* Cortex-A73 all versions */
-> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-> index acae627..c31be1b 100644
-> --- a/arch/arm64/kernel/efi-entry.S
-> +++ b/arch/arm64/kernel/efi-entry.S
-> @@ -96,14 +96,14 @@ ENTRY(entry)
-> 	read_sctlr el2, x0
-> 	bic	x0, x0, #1 << 0	// clear SCTLR.M
-> 	bic	x0, x0, #1 << 2	// clear SCTLR.C
-> -	write_sctlr el2, x0
-> +	early_write_sctlr el2, x0
-> 	isb
-> 	b	2f
-> 1:
-> 	read_sctlr el1, x0
-> 	bic	x0, x0, #1 << 0	// clear SCTLR.M
-> 	bic	x0, x0, #1 << 2	// clear SCTLR.C
-> -	write_sctlr el1, x0
-> +	early_write_sctlr el1, x0
-> 	isb
-> 2:
-> 	/* Jump to kernel entry point */
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index b8d5b73..9512ce7 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -511,7 +511,7 @@ install_el2_stub:
-> 	mov	x0, #0x0800			// Set/clear RES{1,0} bits
-> CPU_BE(	movk	x0, #0x33d0, lsl #16	)	// Set EE and E0E on BE systems
-> CPU_LE(	movk	x0, #0x30d0, lsl #16	)	// Clear EE and E0E on LE systems
-> -	write_sctlr el1, x0
-> +	early_write_sctlr el1, x0
->
-> 	/* Coprocessor traps. */
-> 	mov	x0, #0x33ff
-> @@ -732,7 +732,7 @@ __primary_switch:
-> 	 * to take into account by discarding the current kernel mapping and
-> 	 * creating a new one.
-> 	 */
-> -	write_sctlr el1, x20			// disable the MMU
-> +	early_write_sctlr el1, x20		// disable the MMU
-> 	isb
-> 	bl	__create_page_tables		// recreate kernel mapping
->
->
 
-I applied the 3 patches to Ubuntu 4.13.0-16-generic (Artful) kernel and
-ran stress-ng cpu tests on QDF2400 server as follows:
+At least EPROBE_DEFER should be handled here:
 
-sudo ./stress-ng --pathological -v --cpu 100 --cpu-load 80 --cpu-method
-all --cpu-online 500 --matrix  100 --matrix-method  all --matrix-size 8192
---vm 10 --vm-hang 10 --vm-method  all --switch 100 --numa 100
-
-Where stress-ng would spawn N workers and test cpu offline/online, perform
-matrix operations, do rapid context switchs, and anonymous mmaps. Although
-I was not able to reproduce the erratum on the stock 4.13 kernel using the
-same test case, the patched kernel did not seem to introduce any
-regressions either. I ran the stress-ng tests for over 8hrs found the
-system to be stable.
-
-Tested-by: Manoj Iyer <manoj.iyer@canonical.com>
+if (IS_ERR(priv->clk) && PTR_ERR(priv->clk) == -EPROBE_DEFER)
+	return -EPROBE_DEFER;
 
 Regards
---
-============================
-Manoj Iyer
-Ubuntu/Canonical
-ARM Servers - Cloud
-============================
+Stefan
