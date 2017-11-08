@@ -1,77 +1,75 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 7 Nov 2017 18:38:56 -0600
-Subject: [PATCH 2/4] pinctrl: Add skew-delay pin config and bindings
-In-Reply-To: <CACRpkdZcB9ghYYFSQdTqpuN29DZZeY_AKimQ62-5W7+Mymm1HQ@mail.gmail.com>
-References: <20171028133719.27528-1-linus.walleij@linaro.org>
- <20171028133719.27528-2-linus.walleij@linaro.org>
- <20171101212659.be4phj2wha66x63d@rob-hp-laptop>
- <CACRpkdZcB9ghYYFSQdTqpuN29DZZeY_AKimQ62-5W7+Mymm1HQ@mail.gmail.com>
-Message-ID: <CAL_Jsq+DStFnj_oDtuVza1Owv1xpMJtxgf=FzTSJS67CqhP2AA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Tue,  7 Nov 2017 16:44:38 -0800
+Subject: [PATCH v2 01/12] hwrng: bcm2835-rng: Obtain base register via resource
+In-Reply-To: <20171108004449.32730-1-f.fainelli@gmail.com>
+References: <20171108004449.32730-1-f.fainelli@gmail.com>
+Message-ID: <20171108004449.32730-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 2, 2017 at 9:32 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Wed, Nov 1, 2017 at 10:26 PM, Rob Herring <robh@kernel.org> wrote:
->> On Sat, Oct 28, 2017 at 03:37:17PM +0200, Linus Walleij wrote:
->>> Some pin controllers (such as the Gemini) can control the
->>> expected clock skew and output delay on certain pins with a
->>> sub-nanosecond granularity. This is typically done by shunting
->>> in a number of double inverters in front of or behind the pin.
->>> Make it possible to configure this with a generic binding.
->>>
->>> Cc: devicetree at vger.kernel.org
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>>  Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt | 4 ++++
->>>  drivers/pinctrl/pinconf-generic.c                              | 2 ++
->>>  include/linux/pinctrl/pinconf-generic.h                        | 5 +++++
->>>  3 files changed, 11 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>> index 4483cc31e531..ad9bbbba36e9 100644
->>> --- a/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>> +++ b/Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>> @@ -271,6 +271,10 @@ output-high              - set the pin to output mode with high level
->>>  sleep-hardware-state - indicate this is sleep related state which will be programmed
->>>                         into the registers for the sleep state.
->>>  slew-rate            - set the slew rate
->>> +skew-delay           - this affects the expected clock skew on input pins
->>> +                       and the delay before latching a value to an output
->>> +                       pin. Typically indicates how many double-inverters are
->>> +                       used to delay the signal.
->>
->> Units?
->
-> Number of double-inverters I guess, just as it says.
->
-> skew-delay = <1>; // number of inverter pairs
->
-> Like with other bindings of this type they are custom.
->
-> The Gemini datasheet says "every unit represents about 0.2 ns".
->
-> So if you set it to 1, that means (as far as I can guess) this
-> is shunted in:
->
->    |\    |\
-> --+ >o--+ >o---
->    |/    |/
->
-> The signal will take ~0.2 ns to propagate through this.
-> For 2, there will be four inverters etc.
->
-> It is dependent of production technology, and I do not know
-> if everyone is using something like double-inverters.
->
-> We could try to define a value in picoseconds instead so I
-> would need to set this to 200 in that case if you think that is better:
->
-> skew-delay = <200>; // picoseconds
->
-> I think it would be kludgy since with increasing clock speeds
-> maybe picoseconds would be too big even. Nanoseconds is
-> apparently already a to coarse unit.
+In preparation for consolidating bcm63xx-rng into bcm2835-rng, make sure
+that we obtain the base register via platform_get_resource() since we
+need to support the non-DT enabled MIPS-based BCM63xx DSL SoCs.
 
-Okay, it is fine.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ drivers/char/hw_random/bcm2835-rng.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
-Acked-by: Rob Herring <robh@kernel.org>
+diff --git a/drivers/char/hw_random/bcm2835-rng.c b/drivers/char/hw_random/bcm2835-rng.c
+index 574211a49549..a818418a7e4c 100644
+--- a/drivers/char/hw_random/bcm2835-rng.c
++++ b/drivers/char/hw_random/bcm2835-rng.c
+@@ -81,21 +81,23 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+ 	void (*rng_setup)(void __iomem *base);
+ 	const struct of_device_id *rng_id;
+ 	void __iomem *rng_base;
++	struct resource *r;
+ 	int err;
+ 
++	r = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++
+ 	/* map peripheral */
+-	rng_base = of_iomap(np, 0);
+-	if (!rng_base) {
++	rng_base = devm_ioremap_resource(dev, r);
++	if (IS_ERR(rng_base)) {
+ 		dev_err(dev, "failed to remap rng regs");
+-		return -ENODEV;
++		return PTR_ERR(rng_base);
+ 	}
+ 	bcm2835_rng_ops.priv = (unsigned long)rng_base;
+ 
+ 	rng_id = of_match_node(bcm2835_rng_of_match, np);
+-	if (!rng_id) {
+-		iounmap(rng_base);
++	if (!rng_id)
+ 		return -EINVAL;
+-	}
++
+ 	/* Check for rng init function, execute it */
+ 	rng_setup = rng_id->data;
+ 	if (rng_setup)
+@@ -107,10 +109,9 @@ static int bcm2835_rng_probe(struct platform_device *pdev)
+ 
+ 	/* register driver */
+ 	err = hwrng_register(&bcm2835_rng_ops);
+-	if (err) {
++	if (err)
+ 		dev_err(dev, "hwrng registration failed\n");
+-		iounmap(rng_base);
+-	} else
++	else
+ 		dev_info(dev, "hwrng registered\n");
+ 
+ 	return err;
+@@ -125,7 +126,6 @@ static int bcm2835_rng_remove(struct platform_device *pdev)
+ 
+ 	/* unregister driver */
+ 	hwrng_unregister(&bcm2835_rng_ops);
+-	iounmap(rng_base);
+ 
+ 	return 0;
+ }
+-- 
+2.9.3
