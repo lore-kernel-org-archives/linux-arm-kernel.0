@@ -1,44 +1,58 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Wed, 8 Nov 2017 11:23:08 -0600
-Subject: [PATCH 2/2] kbuild: handle dtb-y and CONFIG_OF_ALL_DTBS natively
- in Makefile.lib
-In-Reply-To: <CAK8P3a17uK02gvY=iQhnGq7OooV4JzxLpAV5V5eES3bEutm6aA@mail.gmail.com>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
- <CAK8P3a17uK02gvY=iQhnGq7OooV4JzxLpAV5V5eES3bEutm6aA@mail.gmail.com>
-Message-ID: <CAL_Jsq+3oZyz23MeocEZTvh8CbdHJuudcSbWnZbuuM=kLebQEg@mail.gmail.com>
+From: cphealy@gmail.com (Chris Healy)
+Date: Wed, 8 Nov 2017 09:30:44 -0800
+Subject: [PATCH] ARM: dts: imx: rdu1: cosmetic changes to the audio nodes
+In-Reply-To: <20171108171300.15068-1-l.stach@pengutronix.de>
+References: <20171108171300.15068-1-l.stach@pengutronix.de>
+Message-ID: <CAFXsbZqYhC7R3M6W8sATJuhHbABYvVY6NbzYkodL1Jb6p6AUUA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 5, 2017 at 7:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Sun, Nov 5, 2017 at 6:30 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> If CONFIG_OF_ALL_DTBS is enabled, "make ARCH=arm64 dtbs" compiles each
->> DTB twice; one from arch/arm64/boot/dts/*/Makefile and the other from
->> the dtb-$(CONFIG_OF_ALL_DTBS) line in arch/arm64/boot/dts/Makefile.
->> It could be a race problem when building DTBS in parallel.
->>
->> Another minor issue is CONFIG_OF_ALL_DTBS covers only *.dts in vendor
->> sub-directories, so this broke when Broadcom added one more hierarchy
->> in arch/arm64/boot/dts/broadcom/<soc>/.
->>
->> One idea to fix the issues in a clean way is to move DTB handling
->> to Kbuild core scripts.  Makefile.dtbinst already recognizes dtb-y
->> natively, so it should not hurt to do so.
->>
->> Add $(dtb-y) to extra-y, and $(dtb-) as well if CONFIG_OF_ALL_DTBS is
->> enabled.  All clutter things in Makefiles go away.
->>
->> As a bonus clean-up, I also removed dts-dirs.  Just use subdir-y
->> directly to traverse sub-directories.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
-> Nice, that's much better than the hack I had.
->
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Chris Healy <cphealy@gmail.com>
 
-I applied this, but it has a few conflicts with SPDX tags from Greg
-and some board additions in arm-soc. Please take a look.
-
-Rob
+On Wed, Nov 8, 2017 at 9:13 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> This renames the audio device to "Front" in order to match the RDU2
+> naming, which makes it easier for a unified userspace to deal with
+> both boards.
+>
+> Also rename the phandle for the headphone amplifier to more closely
+> resemble the RDU2 DTS.
+>
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx51-zii-rdu1.dts | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> index 2628dbe4174b..31c35919c580 100644
+> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> @@ -243,7 +243,7 @@
+>
+>         sound {
+>                 compatible = "simple-audio-card";
+> -               simple-audio-card,name = "RDU1 audio";
+> +               simple-audio-card,name = "Front";
+>                 simple-audio-card,format = "i2s";
+>                 simple-audio-card,bitclock-master = <&sound_codec>;
+>                 simple-audio-card,frame-master = <&sound_codec>;
+> @@ -252,7 +252,7 @@
+>                 simple-audio-card,routing =
+>                         "Headphone Jack", "HPLEFT",
+>                         "Headphone Jack", "HPRIGHT";
+> -               simple-audio-card,aux-devs = <&tpa6130a2>;
+> +               simple-audio-card,aux-devs = <&hpa1>;
+>
+>                 sound_cpu: simple-audio-card,cpu {
+>                         sound-dai = <&ssi2>;
+> @@ -480,7 +480,7 @@
+>                 reg = <0x50>;
+>         };
+>
+> -       tpa6130a2: amp at 60 {
+> +       hpa1: amp at 60 {
+>                 compatible = "ti,tpa6130a2";
+>                 reg = <0x60>;
+>                 pinctrl-names = "default";
+> --
+> 2.11.0
+>
