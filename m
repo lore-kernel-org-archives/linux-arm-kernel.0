@@ -1,49 +1,77 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 9 Nov 2017 00:25:22 +0800
-Subject: [PATCH 3/3] ASoC: sun8i-codec: Fix left and right channels
- inversion
-In-Reply-To: <20171108154710.16407-4-maxime.ripard@free-electrons.com>
-References: <20171108154710.16407-1-maxime.ripard@free-electrons.com>
- <20171108154710.16407-4-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v678wHyfCm1HzdmGT8f7qcv7VGkAZprMuK5rwqfT7BTvQw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed,  8 Nov 2017 11:29:42 -0500
+Subject: [PATCH V2 3/3] dmaengine: qcom_hidma: add identity register support
+In-Reply-To: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
+References: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1510158582-5343-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 8, 2017 at 11:47 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Since its introduction, the codec had an inversion of the left and right
-> channels. It turned out to be pretty simple as it appears that the codec
-> doesn't have the same polarity on the LRCK signal than the I2S block.
->
-> Fix this by inverting our bit value for the LRCK inversion.
->
-> Fixes: 36c684936fae ("ASoC: Add sun8i digital audio codec")
-> Cc: <stable@vger.kernel.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The location for destination event channel register has been relocated from
+offset 0x28 to 0x40. Update the code accordingly.
 
-I suggest adding a comment in case anyone stumbles across it.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/dma/qcom/hidma.c | 33 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 32 insertions(+), 1 deletion(-)
 
-Otherwise,
-
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-
-> ---
->  sound/soc/sunxi/sun8i-codec.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-> index 522546e6b153..c8dcb1502d74 100644
-> --- a/sound/soc/sunxi/sun8i-codec.c
-> +++ b/sound/soc/sunxi/sun8i-codec.c
-> @@ -200,7 +200,7 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
->                            value << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_INV);
->         regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
->                            BIT(SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV),
-> -                          value << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV);
-> +                          !value << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV);
->
->         /* DAI format */
->         switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
-> --
-> 2.14.3
->
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index 4ef7d6f..e8b7be0 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -126,6 +126,18 @@ struct hidma_cap {
+ 	}
+ };
+ 
++static struct hidma_cap hidma_identity_cap = {
++	.of = {
++		{.compatible = "qcom,hidma-1.2",},
++		{},
++	},
++
++	.acpi = {
++		{"QCOM8063"},
++		{},
++	}
++};
++
+ /* process completed descriptors */
+ static void hidma_process_completed(struct hidma_chan *mchan)
+ {
+@@ -772,6 +784,22 @@ static bool hidma_msi_capable(struct device *dev)
+ 	return ret;
+ }
+ 
++static bool hidma_identity_capable(struct device *dev)
++{
++	struct acpi_device *adev = ACPI_COMPANION(dev);
++	int ret;
++
++	if (!adev || acpi_disabled)
++		ret = of_match_device(hidma_identity_cap.of, dev) != NULL;
++	else {
++#ifdef CONFIG_ACPI
++		ret = acpi_match_device(hidma_identity_cap.acpi, dev) != NULL;
++#endif
++	}
++
++	return ret;
++}
++
+ static int hidma_probe(struct platform_device *pdev)
+ {
+ 	struct hidma_dev *dmadev;
+@@ -863,7 +891,10 @@ static int hidma_probe(struct platform_device *pdev)
+ 	if (!dmadev->nr_descriptors)
+ 		dmadev->nr_descriptors = HIDMA_NR_DEFAULT_DESC;
+ 
+-	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
++	if (hidma_identity_capable(&pdev->dev))
++		dmadev->chidx = readl(dmadev->dev_trca + 0x40);
++	else
++		dmadev->chidx = readl(dmadev->dev_trca + 0x28);
+ 
+ 	/* Set DMA mask to 64 bits. */
+ 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+-- 
+1.9.1
