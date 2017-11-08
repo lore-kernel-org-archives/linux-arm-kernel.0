@@ -1,124 +1,169 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 8 Nov 2017 10:13:16 +0100
-Subject: [PATCH v5 26/26] KVM: arm/arm64: GICv4: Theory of operations
-In-Reply-To: <20171027142855.21584-27-marc.zyngier@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-27-marc.zyngier@arm.com>
-Message-ID: <98265bff-57ca-a31e-f41c-75b41a4e34f7@redhat.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 8 Nov 2017 12:25:55 +0300
+Subject: [PATCH 13/15] arm64: fix mrs_s/msr_s macros for clang LTO
+In-Reply-To: <20171103171203.107569-18-samitolvanen@google.com>
+References: <20171103171203.107569-1-samitolvanen@google.com>
+ <20171103171203.107569-18-samitolvanen@google.com>
+Message-ID: <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+Hi Sami,
 
-On 27/10/2017 16:28, Marc Zyngier wrote:
-> Yet another braindump so I can free some cells...
+(CC Andi Kleen, Alex Matveev, Maxim Kuvyrkov)
+
+On Fri, Nov 03, 2017 at 10:12:01AM -0700, Sami Tolvanen wrote:
+> Clang's integrated assembler does not allow assembly macros defined
+> in one inline asm block using the .macro directive to be used across
+> separate asm blocks. LLVM developers consider this a feature and not a
+> bug, recommending code refactoring:
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  virt/kvm/arm/vgic/vgic-v4.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 67 insertions(+)
+>   https://bugs.llvm.org/show_bug.cgi?id=19749
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-> index d10e18eabd3b..e367d65a0ebe 100644
-> --- a/virt/kvm/arm/vgic/vgic-v4.c
-> +++ b/virt/kvm/arm/vgic/vgic-v4.c
-> @@ -23,6 +23,73 @@
->  
->  #include "vgic.h"
->  
-> +/*
-> + * How KVM uses GICv4 (insert rude comments here):
-> + *
-> + * The vgic-v4 layer acts as a bridge between several entities:
-> + * - The GICv4 ITS representation offered by the ITS driver
-> + * - VFIO, which is in charge of the PCI endpoint
-> + * - The virtual ITS, which is the only thing the guest sees
-> + *
-> + * The configuration of VLPIs is triggered by a callback from VFIO,
-> + * instructing KVM that a PCI device has been configured to deliver
-> + * MSIs to a vITS.
-We actually have a negotiation protocol between VFIO PCI (irq bypass
-producer) and KVM irqfd (IRQ bypass consumer). When both recognize they
-are tied together, handling an MSI tunneling, they initiate the
-forwarding setup.
-> + *
-> + * kvm_vgic_v4_set_forwarding() is thus called with the routing entry,
-> + * and this is used to find the corresponding vITS data structures
-> + * (ITS instance, device, event and irq) using a process that is
-> + * extremely similar to the injection of an MSI.
+> As binutils doesn't allow macros to be redefined, this change adds C
+> preprocessor macros that define the assembly macros globally for binutils
+> and locally for clang's integrated assembler.
 
-Is it correct to say we replace the following injection chain:
+This macros are also the problem for gcc and ld.bfd if we try to
+enable LTO.
 
-pEventID|										
-(pITS)	|-> pLPIID -> VFIO PCI IRQ handler -> KVM irqfd ...
-pDevID	|
+The patch below uses trick with undefining mrs_s/msr_s immediately
+after use to solve the problem. It works for both gcc and clang.
 
-		vEventID|
-... inject	(vITS)	| -> vLPIID
-		vDevID	|
+There's the series from Andi Kleen that enables LTO for Linux on x86:
+https://lwn.net/Articles/512548/
+https://github.com/andikleen/linux-misc/tree/lto-411-1
 
-by
+It has solved many problems you also try to solve, and some patches
+are looking very similar. 
 
-pEventID|
-(pITS)	| -> vLPIID
-pDevID	|
+At now we have different patchsets for gcc and clang, and it would be
+better to have them together. One thing I'm worried is that you introduce
+CONFIG_CLANG_LTO and use it for all cases, including that where more
+generic CONFIG_LTO should be used.
 
-Thanks
+I think we'd also discuss it here.
+________
 
-Eric
-> + *
-> + * At this stage, we can link the guest's view of an LPI (uniquely
-> + * identified by the routing entry) and the host irq, using the GICv4
-> + * driver mapping operation. Should the mapping succeed, we've then
-> + * successfully upgraded the guest's LPI to a VLPI. We can then start
-> + * with updating GICv4's view of the property table and generating an
-> + * INValidation in order to kickstart the delivery of this VLPI to the
-> + * guest directly, without software intervention. Well, almost.
-> + *
-> + * When the PCI endpoint is deconfigured, this operation is reversed
-> + * with VFIO calling kvm_vgic_v4_unset_forwarding().
-> + *
-> + * Once the VLPI has been mapped, it needs to follow any change the
-> + * guest performs on its LPI through the vITS. For that, a number of
-> + * command handlers have hooks to communicate these changes to the HW:
-> + * - Any invalidation triggers a call to its_prop_update_vlpi()
-> + * - The INT command results in a irq_set_irqchip_state(), which
-> + *   generates an INT on the corresponding VLPI.
-> + * - The CLEAR command results in a irq_set_irqchip_state(), which
-> + *   generates an CLEAR on the corresponding VLPI.
-> + * - DISCARD translates into an unmap, similar to a call to
-> + *   kvm_vgic_v4_unset_forwarding().
-> + * - MOVI is translated by an update of the existing mapping, changing
-> + *   the target vcpu, resulting in a VMOVI being generated.
-> + * - MOVALL is translated by a string of mapping updates (similar to
-> + *   the handling of MOVI). MOVALL is horrible.
-> + *
-> + * Note that a DISCARD/MAPTI sequence emitted from the guest without
-> + * reprogramming the PCI endpoint after MAPTI does not result in a
-> + * VLPI being mapped, as there is no callback from VFIO (the guest
-> + * will get the interrupt via the normal SW injection). Fixing this is
-> + * not trivial, and requires some horrible messing with the VFIO
-> + * internals. Not fun. Don't do that.
-> + *
-> + * Then there is the scheduling. Each time a vcpu is about to run on a
-> + * physical CPU, KVM must tell the corresponding redistributor about
-> + * it. And if we've migrated our vcpu from one CPU to another, we must
-> + * tell the ITS (so that the messages reach the right redistributor).
-> + * This is done in two steps: first issue a irq_set_affinity() on the
-> + * irq corresponding to the vcpu, then call its_schedule_vpe(). You
-> + * must be in a non-preemptible context. On exit, another call to
-> + * its_schedule_vpe() tells the redistributor that we're done with the
-> + * vcpu.
-> + *
-> + * Finally, the doorbell handling: Each vcpu is allocated an interrupt
-> + * which will fire each time a VLPI is made pending whilst the vcpu is
-> + * not running. Each time the vcpu gets blocked, the doorbell
-> + * interrupt gets enabled. When the vcpu is unblocked (for whatever
-> + * reason), the doorbell interrupt is disabled.
-> + */
-> +
->  #define DB_IRQ_FLAGS	(IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY | IRQ_NO_BALANCING)
->  
->  static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
-> 
+>From c939344c726e8ae6b28012ad2807c63b54175e40 Mon Sep 17 00:00:00 2001
+From: Alex Matveev <alxmtvv@gmail.com>
+Date: Tue, 7 Nov 2017 01:06:33 +0000
+Subject: [PATCH] arm64: make mrs_s and msr_s macros work with LTO
+
+Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
+in-place and workaround gcc and clang limitations on redefining macros
+across different assembler blocks.
+
+Signed-off-by: Alex Matveev <alxmtvv@gmail.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+---
+ arch/arm64/include/asm/kvm_hyp.h |  8 ++++--
+ arch/arm64/include/asm/sysreg.h  | 55 +++++++++++++++++++++++++++-------------
+ 2 files changed, 43 insertions(+), 20 deletions(-)
+
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 4572a9b560fa..20bfb8e676e0 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -29,7 +29,9 @@
+ 	({								\
+ 		u64 reg;						\
+ 		asm volatile(ALTERNATIVE("mrs %0, " __stringify(r##nvh),\
+-					 "mrs_s %0, " __stringify(r##vh),\
++					 DEFINE_MRS_S			\
++					 "mrs_s %0, " __stringify(r##vh) "\n"\
++					 UNDEFINE_MRS_S,		\
+ 					 ARM64_HAS_VIRT_HOST_EXTN)	\
+ 			     : "=r" (reg));				\
+ 		reg;							\
+@@ -39,7 +41,9 @@
+ 	do {								\
+ 		u64 __val = (u64)(v);					\
+ 		asm volatile(ALTERNATIVE("msr " __stringify(r##nvh) ", %x0",\
+-					 "msr_s " __stringify(r##vh) ", %x0",\
++					 DEFINE_MSR_S			\
++					 "msr_s " __stringify(r##vh) ", %x0\n"\
++					 UNDEFINE_MSR_S,		\
+ 					 ARM64_HAS_VIRT_HOST_EXTN)	\
+ 					 : : "rZ" (__val));		\
+ 	} while (0)
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index f707fed5886f..a69b0ca9a3b4 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -463,20 +463,39 @@
+ 
+ #include <linux/types.h>
+ 
+-asm(
+-"	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
+-"	.equ	.L__reg_num_x\\num, \\num\n"
+-"	.endr\n"
++#define __DEFINE_MRS_MSR_S_REGNUM				\
++"	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n" \
++"	.equ	.L__reg_num_x\\num, \\num\n"			\
++"	.endr\n"						\
+ "	.equ	.L__reg_num_xzr, 31\n"
+-"\n"
+-"	.macro	mrs_s, rt, sreg\n"
+-	__emit_inst(0xd5200000|(\\sreg)|(.L__reg_num_\\rt))
++
++#define DEFINE_MRS_S						\
++	__DEFINE_MRS_MSR_S_REGNUM				\
++"	.macro	mrs_s, rt, sreg\n"				\
++	__emit_inst(0xd5200000|(\\sreg)|(.L__reg_num_\\rt))	\
+ "	.endm\n"
+-"\n"
+-"	.macro	msr_s, sreg, rt\n"
+-	__emit_inst(0xd5000000|(\\sreg)|(.L__reg_num_\\rt))
++
++#define DEFINE_MSR_S						\
++	__DEFINE_MRS_MSR_S_REGNUM				\
++"	.macro	msr_s, sreg, rt\n"				\
++	__emit_inst(0xd5000000|(\\sreg)|(.L__reg_num_\\rt))	\
+ "	.endm\n"
+-);
++
++#define UNDEFINE_MRS_S						\
++"	.purgem	mrs_s\n"
++
++#define UNDEFINE_MSR_S						\
++"	.purgem	msr_s\n"
++
++#define __mrs_s(r, v)						\
++	DEFINE_MRS_S						\
++"	mrs_s %0, " __stringify(r) "\n"				\
++	UNDEFINE_MRS_S : "=r" (v)
++
++#define __msr_s(r, v)						\
++	DEFINE_MSR_S						\
++"	msr_s " __stringify(r) ", %x0\n"			\
++	UNDEFINE_MSR_S : : "rZ" (v)
+ 
+ /*
+  * Unlike read_cpuid, calls to read_sysreg are never expected to be
+@@ -502,15 +521,15 @@ asm(
+  * For registers without architectural names, or simply unsupported by
+  * GAS.
+  */
+-#define read_sysreg_s(r) ({						\
+-	u64 __val;							\
+-	asm volatile("mrs_s %0, " __stringify(r) : "=r" (__val));	\
+-	__val;								\
++#define read_sysreg_s(r) ({					\
++	u64 __val;						\
++	asm volatile(__mrs_s(r, __val));			\
++	__val;							\
+ })
+ 
+-#define write_sysreg_s(v, r) do {					\
+-	u64 __val = (u64)(v);						\
+-	asm volatile("msr_s " __stringify(r) ", %x0" : : "rZ" (__val));	\
++#define write_sysreg_s(v, r) do {				\
++	u64 __val = (u64)(v);					\
++	asm volatile(__msr_s(r, __val));			\
+ } while (0)
+ 
+ static inline void config_sctlr_el1(u32 clear, u32 set)
+-- 
+2.11.0
