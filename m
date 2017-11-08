@@ -1,71 +1,77 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 8 Nov 2017 12:05:21 +0000
-Subject: [PATCH v5 13/26] KVM: arm/arm64: GICv4: Propagate affinity
- changes to the physical ITS
-In-Reply-To: <52c64fa1-f662-2703-53c5-d2024ef12254@redhat.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-14-marc.zyngier@arm.com>
- <52c64fa1-f662-2703-53c5-d2024ef12254@redhat.com>
-Message-ID: <cc8aac2e-3b13-b6e4-97de-ecf16bbf6283@arm.com>
+From: aleksey.makarov@cavium.com (Aleksey Makarov)
+Date: Wed, 8 Nov 2017 15:14:30 +0300
+Subject: [PATCH net-next 1/2] net: add support for Cavium PTP coprocessor
+In-Reply-To: <1d765627-edb1-cc0f-65bc-cf061687a8c6@caviumnetworks.com>
+References: <20171107190704.15458-1-aleksey.makarov@cavium.com>
+ <20171107190704.15458-2-aleksey.makarov@cavium.com>
+ <1d765627-edb1-cc0f-65bc-cf061687a8c6@caviumnetworks.com>
+Message-ID: <13187c17-6a73-f916-f919-2386b55ce047@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/17 21:01, Auger Eric wrote:
-> Hi Marc,
-> 
-> On 27/10/2017 16:28, Marc Zyngier wrote:
->> When the guest issues an affinity change, we need to tell the physical
->> ITS that we're now targetting a new vcpu.  This is done by extracting
->> the current mapping, updating the target, and reapplying the mapping.
+
+
+On 11/07/2017 10:49 PM, David Daney wrote:
+> On 11/07/2017 11:07 AM, Aleksey Makarov wrote:
+>> From: Radoslaw Biernacki <rad@semihalf.com>
 >>
->> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> This patch adds support for the Precision Time Protocol
+>> Clocks and Timestamping hardware found on Cavium ThunderX
+>> processors.
+>>
+>> Signed-off-by: Radoslaw Biernacki <rad@semihalf.com>
+>> Signed-off-by: Aleksey Makarov <aleksey.makarov@cavium.com>
 >> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 16 +++++++++++++++-
->>  1 file changed, 15 insertions(+), 1 deletion(-)
+>> ? drivers/net/ethernet/cavium/Kconfig???????????? |? 13 +
+>> ? drivers/net/ethernet/cavium/Makefile??????????? |?? 1 +
+>> ? drivers/net/ethernet/cavium/common/Makefile???? |?? 1 +
+>> ? drivers/net/ethernet/cavium/common/cavium_ptp.c | 353 ++++++++++++++++++++++++
+>> ? drivers/net/ethernet/cavium/common/cavium_ptp.h |? 78 ++++++
+>> ? 5 files changed, 446 insertions(+)
+>> ? create mode 100644 drivers/net/ethernet/cavium/common/Makefile
+>> ? create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.c
+>> ? create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.h
 >>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index c9b1c0967426..42ffb9084bb7 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -337,11 +337,25 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
->>  
->>  static int update_affinity(struct vgic_irq *irq, struct kvm_vcpu *vcpu)
->>  {
->> +	int ret = 0;
+> [...]
 >> +
->>  	spin_lock(&irq->irq_lock);
->>  	irq->target_vcpu = vcpu;
->>  	spin_unlock(&irq->irq_lock);
->>  
->> -	return 0;
->> +	if (irq->hw) {
->> +		struct its_vlpi_map map;
+>> +/* The Cavium PTP can *only* be found in SoCs containing the ThunderX
+>> + * ARM64 CPU implementation.? All accesses to the device registers on this
+>> + * platform are implicitly strongly ordered with respect to memory
+>> + * accesses.
+> 
+> I believe that is not correct.  I/O register accesses are implicitly
+> ordered with respect to other I/O register accesses.  However, with
+> respect to memory accesses, no ordering is imposed.  Therefore, one
+> must be very careful not to introduce subtile memory ordering bugs
+> with these things when using the unordered versions.
+
+I will fix it in the next version.
+
+Thank you
+Aleksey Makarov
+
+>> + * So writeq_relaxed() and readq_relaxed() are safe to use with
+>> + * no memory barriers in this driver.? The readq()/writeq() functions add
+>> + * explicit ordering operation which in this case are redundant, and only
+>> + * add overhead.
+> 
+> 
+> Also it should be noted that on production silicon, the performance difference between the "relaxed" variant and the normal variant of read*/write* is often negligible.
+> 
+> 
+>> + */
 >> +
->> +		ret = its_get_vlpi(irq->host_irq, &map);
->> +		if (ret)
->> +			return ret;
+>> +static u64 cavium_ptp_reg_read(struct cavium_ptp *clock, u64 offset)
+>> +{
+>> +??? return readq_relaxed(clock->reg_base + offset);
+>> +}
 >> +
->> +		map.vpe = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
+>> +static void cavium_ptp_reg_write(struct cavium_ptp *clock, u64 offset, u64 val)
+>> +{
+>> +??? writeq_relaxed(val, clock->reg_base + offset);
+>> +}
 >> +
->> +		ret = its_map_vlpi(irq->host_irq, &map);
-> Do we check somewhere the virtual LPI ID does not exceed the capacity of
-> the VPT. I fail to find that in the irq-gic-v3-its.c driver.
-
-The worse case is that we end-up with a VMAPVI that silently fails, and
-the guest doesn't gets its interrupts. The real issue here is that we
-don't expose the size of the VPT allocation to the guest. I'll see how
-to address this.
-
-> Also in case the hw part fails, should we still have the irq->target_cpu
-> set to the new value. In other words shouldn't we first do the hw block
-> and upon success set the target_vcpu?
-
-Sure. But given that we'll never use target_vcpu for anything either (we
-keep the vlpi mapped), I'm not sure what this gets us...
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+> 
+> Are the PTP register access really so much in the hot path that using the relaxed variants can be measured here?? If not, would it make the driver look cleaner to remove these and just use readq/writeq calls directly? in the body of the driver?
+> 
+> David.
