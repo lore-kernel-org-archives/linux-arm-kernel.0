@@ -1,38 +1,38 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 8 Nov 2017 18:14:11 +0000
-Subject: [PATCH 1/2] cpuidle: Add new macro to enter a retention idle state
-In-Reply-To: <3aa849d6-d456-670b-2c77-a26fa7d597af@codeaurora.org>
-References: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
- <1510076133-18139-2-git-send-email-pprakash@codeaurora.org>
- <c60a1552-e722-f548-45d4-1529e129c231@arm.com>
- <3aa849d6-d456-670b-2c77-a26fa7d597af@codeaurora.org>
-Message-ID: <a3b485e4-fa22-98e4-2b9b-dcb604c89bc2@arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed,  8 Nov 2017 19:22:25 +0100
+Subject: [PATCH] ARM: dts: imx6: RDU2: add alias for RTC
+Message-ID: <20171108182225.18226-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This makes sure that the battery backed RTC is always the
+primary one, regardless of the driver probe ordering.
 
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-On 08/11/17 17:15, Prakash, Prashanth wrote:
-> Hi Sudeep,
-> 
-> On 11/8/2017 7:38 AM, Sudeep Holla wrote:
-
->> I am fine with this change as initial step. But I am wondering if we
->> will have a retention state which loses partial state ?
->>
->> The specification has flags to specify that difference but will we see
->> that in reality is a different question. If we see such hardware, then
->> we may need to revert this and handle in the callbacks as we can't skip
->> cpu_pm notifier callbacks all together right ?
-> I agree. This is a initial and quick first step and will help only fully retention states.
-> 
-> If there are devices with partial retention states and necessary support in cpu
-> PM framework we can revert this and handle it in more generic way.
-> 
-
-Sounds good. Just wanted to be aware of that fact. Hope we don't get
-such crazy hardware(but you never know).
-
+diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+index ea9d3c1199e9..289224b863fa 100644
+--- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+@@ -49,6 +49,7 @@
+ 
+ 	aliases {
+ 		mdio-gpio0 = &mdio1;
++		rtc0 = &ds1341;
+ 	};
+ 
+ 	mdio1: mdio {
+@@ -501,7 +502,7 @@
+ 		reg = <0x54>;
+ 	};
+ 
+-	rtc at 68 {
++	ds1341: rtc at 68 {
+ 		compatible = "dallas,ds1341";
+ 		reg = <0x68>;
+ 	};
 -- 
-Regards,
-Sudeep
+2.11.0
