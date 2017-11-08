@@ -1,27 +1,99 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 8 Nov 2017 11:51:20 -0600
-Subject: [PATCH V2 2/3] dmaengine: qcom_hidma: add support for the new
- revision
-In-Reply-To: <76b030eb-232f-e075-f5e8-09731a5b6670@codeaurora.org>
-References: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
- <1510158582-5343-2-git-send-email-okaya@codeaurora.org>
- <e673a03d-1707-fe4a-7f5d-df1466981893@codeaurora.org>
- <c55ecc2c-332c-e9e6-c74c-3c67fd2ab89a@codeaurora.org>
- <fe23cb49-d617-fd79-8fb6-08d45fc88bce@codeaurora.org>
- <76b030eb-232f-e075-f5e8-09731a5b6670@codeaurora.org>
-Message-ID: <3b65f19a-a94d-9fbd-81a4-84400bf30e01@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed,  8 Nov 2017 18:01:40 +0000
+Subject: [RFC PATCH] phy: don't disable and re-enable interrupts in oneshot
+ threaded handler
+Message-ID: <20171108180140.3817-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/08/2017 11:37 AM, Sinan Kaya wrote:
-> I think we are talking styles here.
+The PHY interrupt handling code registers its interrupt as a oneshot
+threaded interrupt, which guarantees that the interrupt will be masked
+throughout both the primary and secondary handling stages.
 
-I don't think my suggestions are stylistic.  Your version wastes space.
+However, the handling code still disables the interrupt by calling
+disable_irq(), and re-enables it by calling enable_irq() after having
+acked the interrupt in the PHY hardware.
 
-However, if you really insist on your approach, that's fine with me. 
-I'm not the maintainer.
+This causes problems with hierarchical irqchip implementations built
+on top of the GIC, because the core threaded interrupt code will only
+EOI the interrupt if it is still masked after the secondary handler
+completes. If this is not the case, the EOI is not emitted, and the
+interrupt remains active, blocking further interrupts from the same
+source. Disabling and enabling the interrupt will result in the secondary
+handler completing with the interrupt unmasked, resulting in the above
+behavior.
 
+So remove the disable_irq/enable_irq, and rely on the fact that the
+interrupt remains masked already.
+
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ drivers/net/phy/phy.c | 20 ++++----------------
+ 1 file changed, 4 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/net/phy/phy.c b/drivers/net/phy/phy.c
+index d0626bf5c540..ce8bba0c1072 100644
+--- a/drivers/net/phy/phy.c
++++ b/drivers/net/phy/phy.c
+@@ -774,8 +774,8 @@ static void phy_error(struct phy_device *phydev)
+  * @irq: interrupt line
+  * @phy_dat: phy_device pointer
+  *
+- * Description: When a PHY interrupt occurs, the handler disables
+- * interrupts, and uses phy_change to handle the interrupt.
++ * Description: When a PHY interrupt occurs, the handler invokes
++ *              phy_change to handle the interrupt.
+  */
+ static irqreturn_t phy_interrupt(int irq, void *phy_dat)
+ {
+@@ -784,9 +784,6 @@ static irqreturn_t phy_interrupt(int irq, void *phy_dat)
+ 	if (PHY_HALTED == phydev->state)
+ 		return IRQ_NONE;		/* It can't be ours.  */
+ 
+-	disable_irq_nosync(irq);
+-	atomic_inc(&phydev->irq_disable);
+-
+ 	phy_change(phydev);
+ 
+ 	return IRQ_HANDLED;
+@@ -891,10 +888,10 @@ void phy_change(struct phy_device *phydev)
+ 	if (phy_interrupt_is_valid(phydev)) {
+ 		if (phydev->drv->did_interrupt &&
+ 		    !phydev->drv->did_interrupt(phydev))
+-			goto ignore;
++			return;
+ 
+ 		if (phy_disable_interrupts(phydev))
+-			goto phy_err;
++			goto irq_enable_err;
+ 	}
+ 
+ 	mutex_lock(&phydev->lock);
+@@ -903,9 +900,6 @@ void phy_change(struct phy_device *phydev)
+ 	mutex_unlock(&phydev->lock);
+ 
+ 	if (phy_interrupt_is_valid(phydev)) {
+-		atomic_dec(&phydev->irq_disable);
+-		enable_irq(phydev->irq);
+-
+ 		/* Reenable interrupts */
+ 		if (PHY_HALTED != phydev->state &&
+ 		    phy_config_interrupt(phydev, PHY_INTERRUPT_ENABLED))
+@@ -916,15 +910,9 @@ void phy_change(struct phy_device *phydev)
+ 	phy_trigger_machine(phydev, true);
+ 	return;
+ 
+-ignore:
+-	atomic_dec(&phydev->irq_disable);
+-	enable_irq(phydev->irq);
+-	return;
+-
+ irq_enable_err:
+ 	disable_irq(phydev->irq);
+ 	atomic_inc(&phydev->irq_disable);
+-phy_err:
+ 	phy_error(phydev);
+ }
+ 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.11.0
