@@ -1,63 +1,71 @@
-From: simon@lineageos.org (Simon Shields)
-Date: Thu, 9 Nov 2017 00:23:04 +1100
-Subject: [PATCH v2] arm/dts/trats2: add bcm4334 device node
-Message-ID: <20171108132258.GA15728@lineageos.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 8 Nov 2017 22:24:19 +0900
+Subject: [PATCH] clk: uniphier: fix parent of miodmac clock data
+In-Reply-To: <1508374366-27171-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1508374366-27171-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAK7LNARdcAvoNoe56fGvsmsWP=nZhQWtkDaxv=6r8h8T=FzNxw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the bcm4334 to power on and enables
-wifi functionality on trats2.
+Hi Stephen,
 
-Signed-off-by: Simon Shields <simon@lineageos.org>
----
- arch/arm/boot/dts/exynos4412-trats2.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+Could you pick this up, please?
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 2da6ced64ee0..2560e8a348ff 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -240,6 +240,13 @@
- 
- 	};
- 
-+	wlan_pwrseq: sdhci3-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpj0 0 GPIO_ACTIVE_LOW>;
-+		clocks = <&max77686 MAX77686_CLK_PMIC>;
-+		clock-names = "ext_clock";
-+	};
-+
- 	sound {
- 		compatible = "samsung,trats2-audio";
- 		samsung,i2s-controller = <&i2s0>;
-@@ -1238,6 +1245,27 @@
- 	status = "okay";
- };
- 
-+&sdhci_3 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	non-removable;
-+	bus-width = <4>;
-+
-+	mmc-pwrseq = <&wlan_pwrseq>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
-+	vmmc-supply = <&ldo21_reg>;
-+	status = "okay";
-+
-+	brcmf: brcmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&gpx2>;
-+		interrupts = <5 0>;
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &serial_0 {
- 	status = "okay";
- };
+You sent a pull request last week.
+So, queuing this for -next is fine for me.
+
+
+
+2017-10-19 9:52 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> The "miodmac" is not a child of "stdmac".  They are independent
+> from each other.  Fix it.
+>
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+>
+>  drivers/clk/uniphier/clk-uniphier-mio.c | 7 +++----
+>  1 file changed, 3 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/clk/uniphier/clk-uniphier-mio.c b/drivers/clk/uniphier/clk-uniphier-mio.c
+> index 16e4d30..badc478 100644
+> --- a/drivers/clk/uniphier/clk-uniphier-mio.c
+> +++ b/drivers/clk/uniphier/clk-uniphier-mio.c
+> @@ -13,6 +13,8 @@
+>   * GNU General Public License for more details.
+>   */
+>
+> +#include <linux/stddef.h>
+> +
+>  #include "clk-uniphier.h"
+>
+>  #define UNIPHIER_MIO_CLK_SD_FIXED                                      \
+> @@ -73,15 +75,12 @@
+>  #define UNIPHIER_MIO_CLK_USB2_PHY(idx, ch)                             \
+>         UNIPHIER_CLK_GATE("usb2" #ch "-phy", (idx), "usb2", 0x20 + 0x200 * (ch), 29)
+>
+> -#define UNIPHIER_MIO_CLK_DMAC(idx)                                     \
+> -       UNIPHIER_CLK_GATE("miodmac", (idx), "stdmac", 0x20, 25)
+> -
+>  const struct uniphier_clk_data uniphier_ld4_mio_clk_data[] = {
+>         UNIPHIER_MIO_CLK_SD_FIXED,
+>         UNIPHIER_MIO_CLK_SD(0, 0),
+>         UNIPHIER_MIO_CLK_SD(1, 1),
+>         UNIPHIER_MIO_CLK_SD(2, 2),
+> -       UNIPHIER_MIO_CLK_DMAC(7),
+> +       UNIPHIER_CLK_GATE("miodmac", 7, NULL, 0x20, 25),
+>         UNIPHIER_MIO_CLK_USB2(8, 0),
+>         UNIPHIER_MIO_CLK_USB2(9, 1),
+>         UNIPHIER_MIO_CLK_USB2(10, 2),
+> --
+> 2.7.4
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-clk" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
 -- 
-2.15.0
+Best Regards
+Masahiro Yamada
