@@ -1,62 +1,135 @@
-From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
-Date: Wed, 08 Nov 2017 11:29:14 +0200
-Subject: [PATCH v5 4/7] i2c: designware: add i2c gpio recovery option
-In-Reply-To: <2970055.FM06l9ul3d@dabox>
-References: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
- <1509984581.25007.47.camel@linux.intel.com>
- <a0265848-2496-d347-a40f-ce83e7dfd945@electromag.com.au>
- <2970055.FM06l9ul3d@dabox>
-Message-ID: <1510133354.25007.97.camel@linux.intel.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Wed, 8 Nov 2017 10:32:30 +0100
+Subject: [PATCH 17/37] KVM: arm64: Move userspace system registers into
+ separate function
+In-Reply-To: <20171012104141.26902-18-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-18-christoffer.dall@linaro.org>
+Message-ID: <20171108093230.kusus6zsrf5jbkr6@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-11-08 at 09:29 +0100, Tim Sander wrote:
-
-> > > How do we switch pinctrl back to the native function? Is it
-> > > guaranteed
-> > > by pinctrl framework and all underneath drivers?
-> > That is a good question. I don't have an understanding of how the
-> > pinctrl
-> > framework works with respect to requesting gpios.
-> > My device (Intel / Altera Cyclone V SOC) doesn't have a pinctrl for
-> > the i2c
-> > / gpio mux as yet.
+On Thu, Oct 12, 2017 at 12:41:21PM +0200, Christoffer Dall wrote:
+> There's a semantic difference between the EL1 registers that control
+> operation of a kernel running in EL1 and EL1 registers that only control
+> userspace execution in EL0.  Since we can defer saving/restoring the
+> latter, move them into their own function.
 > 
-> According to the documentation from Intel/Altera it is not allowed to
-> change 
-> the pinmux while running.
-
-The driver is used on many platforms and requesting GPIO function while
-running _is_ a pinmux change.
-
->  My guess is that they are using a shift chain, so 
-> the output values of all pins in the chain are not stable. I think
-> they have 
-> been lazy and just used the io config for fpgas with an jtag
-> controller and 
-> connected the shift chain for pinconfig to this controller. So
-> unfortunatly it 
-> is not possible to switch single pins on the run without interfering
-> with 
-> other pins.
-
-...for this certain SoC.
-
-> > It's all setup by the bootloader and they don't expect
-> > you to change it. I'm using two separate GPIO's "wired" to the i2c
-> > bus via
-> > the SOC FPGA for the recovery. Tim was doing the same.
+> We also take this chance to rename the function saving/restoring the
+> remaining system register to make it clear this function deals with
+> the EL1 system registers.
 > 
-> Yes, i think thats the only way. But it is annoying that the i2c
-> controllers 
-> of 201x have no way to recover from such bus errors >:-(.
+> No functional change.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/hyp/sysreg-sr.c | 34 +++++++++++++++++++++++-----------
+>  1 file changed, 23 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> index c4a3714..193c2b0 100644
+> --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> @@ -34,14 +34,18 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+>  
+>  static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
+>  {
+> +	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+> +	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
 
-Yep, it's pity, and we need to cope somehow with it.
+Maybe a comment stating that sp_el0 is here, instead of down in user
+state, because arm64 Linux chooses to use it for the 'current' pointer.
+At least that's why I think it's been promoted to common state, but maybe
+there was a different reason I missed.
 
-So, my understanding of the current case is that either this change goes in only for certain SoC(s), or waiting until there is a guarantee from pinctrl subsystem to return function to native back when recovery finished.
+> +}
+> +
+> +static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
+> +{
+>  	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
+>  	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
+>  	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
+> -	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
+> -	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
+>  }
+>  
+> -static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+> +static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
+>  	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
+> @@ -70,31 +74,37 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
+>  }
+>  
+>  static hyp_alternate_select(__sysreg_call_save_host_state,
+> -			    __sysreg_save_state, __sysreg_do_nothing,
+> +			    __sysreg_save_el1_state, __sysreg_do_nothing,
+>  			    ARM64_HAS_VIRT_HOST_EXTN);
+>  
+>  void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_call_save_host_state()(ctxt);
+>  	__sysreg_save_common_state(ctxt);
+> +	__sysreg_save_user_state(ctxt);
+>  }
+>  
+>  void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
+>  {
+> -	__sysreg_save_state(ctxt);
+> +	__sysreg_save_el1_state(ctxt);
+>  	__sysreg_save_common_state(ctxt);
+> +	__sysreg_save_user_state(ctxt);
+>  }
+>  
+>  static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
+>  {
+> -	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
+> -	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
+> -	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
+>  	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
+>  	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
+>  }
+>  
+> -static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+> +static void __hyp_text __sysreg_restore_user_state(struct kvm_cpu_context *ctxt)
+> +{
+> +	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
+> +	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  	tpidr_el0);
+> +	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], 	tpidrro_el0);
+> +}
+> +
+> +static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
+>  	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
+> @@ -123,19 +133,21 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
+>  }
+>  
+>  static hyp_alternate_select(__sysreg_call_restore_host_state,
+> -			    __sysreg_restore_state, __sysreg_do_nothing,
+> +			    __sysreg_restore_el1_state, __sysreg_do_nothing,
+>  			    ARM64_HAS_VIRT_HOST_EXTN);
+>  
+>  void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
+>  {
+>  	__sysreg_call_restore_host_state()(ctxt);
+>  	__sysreg_restore_common_state(ctxt);
+> +	__sysreg_restore_user_state(ctxt);
+>  }
+>  
+>  void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
+>  {
+> -	__sysreg_restore_state(ctxt);
+> +	__sysreg_restore_el1_state(ctxt);
+>  	__sysreg_restore_common_state(ctxt);
+> +	__sysreg_restore_user_state(ctxt);
+>  }
+>  
+>  static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
+> -- 
+> 2.9.0
+>
 
-My personal vote is for latter.
-
--- 
-Andy Shevchenko <andriy.shevchenko@linux.intel.com>
-Intel Finland Oy
+Otherwise
+ 
+Reviewed-by: Andrew Jones <drjones@redhat.com>
