@@ -1,103 +1,43 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed,  8 Nov 2017 11:29:41 -0500
-Subject: [PATCH V2 2/3] dmaengine: qcom_hidma: add support for the new revision
-In-Reply-To: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
-References: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1510158582-5343-2-git-send-email-okaya@codeaurora.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 8 Nov 2017 16:33:41 +0000
+Subject: [PATCH v4 03/20] firmware: arm_scmi: add basic driver
+ infrastructure for SCMI
+In-Reply-To: <CABb+yY0KR7rzUSqrG7vPJDZONK3rXtk03WX2eTGAdmkpvTUEbw@mail.gmail.com>
+References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
+ <1509720477-18936-4-git-send-email-sudeep.holla@arm.com>
+ <CABb+yY0KR7rzUSqrG7vPJDZONK3rXtk03WX2eTGAdmkpvTUEbw@mail.gmail.com>
+Message-ID: <d51a66a0-9272-ff93-ff99-28d0928950a8@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for probing the newer HW and also organize MSI capable hardware
-into an array for maintenance reasons.
+Hi Jassi,
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma.c | 41 +++++++++++++++++++++++++++++------------
- 1 file changed, 29 insertions(+), 12 deletions(-)
+On 04/11/17 11:51, Jassi Brar wrote:
+> On Fri, Nov 3, 2017 at 8:17 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> 
+> .....
+> 
+>> +int scmi_do_xfer(const struct scmi_handle *handle, struct scmi_xfer *xfer)
+>> +{
+>> +       int ret;
+>> +       int timeout;
+>> +       struct scmi_info *info = handle_to_scmi_info(handle);
+>> +       struct device *dev = info->dev;
+>> +
+>> +       ret = mbox_send_message(info->tx_chan, xfer);
+>>                                                                           ^^^^^^^^
+> The call still remains unchanged and broken.
+> https://lkml.org/lkml/2017/7/24/502
+> 
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index e366985..4ef7d6f 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -50,6 +50,7 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/of_dma.h>
-+#include <linux/of_device.h>
- #include <linux/property.h>
- #include <linux/delay.h>
- #include <linux/acpi.h>
-@@ -104,6 +105,26 @@ static void hidma_free(struct hidma_dev *dmadev)
- module_param(nr_desc_prm, uint, 0644);
- MODULE_PARM_DESC(nr_desc_prm, "number of descriptors (default: 0)");
- 
-+#define HIDMA_MAX_DEV_MATCH 10
-+
-+struct hidma_cap {
-+	const struct of_device_id of[HIDMA_MAX_DEV_MATCH];
-+	const struct acpi_device_id acpi[HIDMA_MAX_DEV_MATCH];
-+};
-+
-+static struct hidma_cap hidma_msi_cap = {
-+	.of = {
-+		{.compatible = "qcom,hidma-1.1",},
-+		{.compatible = "qcom,hidma-1.2",},
-+		{},
-+	},
-+
-+	.acpi = {
-+		{"QCOM8062"},
-+		{"QCOM8063"},
-+		{},
-+	}
-+};
- 
- /* process completed descriptors */
- static void hidma_process_completed(struct hidma_chan *mchan)
-@@ -739,22 +760,16 @@ static int hidma_request_msi(struct hidma_dev *dmadev,
- static bool hidma_msi_capable(struct device *dev)
- {
- 	struct acpi_device *adev = ACPI_COMPANION(dev);
--	const char *of_compat;
--	int ret = -EINVAL;
--
--	if (!adev || acpi_disabled) {
--		ret = device_property_read_string(dev, "compatible",
--						  &of_compat);
--		if (ret)
--			return false;
-+	int ret;
- 
--		ret = strcmp(of_compat, "qcom,hidma-1.1");
--	} else {
-+	if (!adev || acpi_disabled)
-+		ret = of_match_device(hidma_msi_cap.of, dev) != NULL;
-+	else {
- #ifdef CONFIG_ACPI
--		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
-+		ret = acpi_match_device(hidma_msi_cap.acpi, dev) != NULL;
- #endif
- 	}
--	return ret == 0;
-+	return ret;
- }
- 
- static int hidma_probe(struct platform_device *pdev)
-@@ -954,6 +969,7 @@ static int hidma_remove(struct platform_device *pdev)
- static const struct acpi_device_id hidma_acpi_ids[] = {
- 	{"QCOM8061"},
- 	{"QCOM8062"},
-+	{"QCOM8063"},
- 	{},
- };
- MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
-@@ -962,6 +978,7 @@ static int hidma_remove(struct platform_device *pdev)
- static const struct of_device_id hidma_match[] = {
- 	{.compatible = "qcom,hidma-1.0",},
- 	{.compatible = "qcom,hidma-1.1",},
-+	{.compatible = "qcom,hidma-1.2",},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, hidma_match);
+Yes, since you are in favor of abstraction on top of mailbox while Arnd,
+Bjorn, and me prefer to deal with that in mailbox framework itself, I
+thought I will keep that discussion separate and get the remaining parts
+of SCMI reviewed.
+
+I have not forgotten about it, just trying to keep it separate. Sorry, I
+could have been more specific.
+
 -- 
-1.9.1
+Regards,
+Sudeep
