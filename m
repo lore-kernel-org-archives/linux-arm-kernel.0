@@ -1,33 +1,63 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 8 Nov 2017 14:53:23 +0200
-Subject: [PATCH] ARM: dts: dra7: Add missing hdmi audio DMA channel information
-Message-ID: <20171108125323.7070-1-peter.ujfalusi@ti.com>
+From: simon@lineageos.org (Simon Shields)
+Date: Thu, 9 Nov 2017 00:01:32 +1100
+Subject: [PATCH] arm/dts/trats2: add bcm4334 device node
+Message-ID: <20171108130126.GA8455@lineageos.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The audio DMA request for hdmi is crossbar 76 and we use sDMA
-to handle the data transfer.
+This patch allows the bcm4334 to power on and enables
+wifi functionality on trats2.
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Simon Shields <simon@lineageos.org>
 ---
- arch/arm/boot/dts/dra7.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm/boot/dts/exynos4412-trats2.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index ac9216293b7c..a61802b0c4b9 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1907,6 +1907,8 @@
- 				ti,hwmods = "dss_hdmi";
- 				clocks = <&dss_48mhz_clk>, <&dss_hdmi_clk>;
- 				clock-names = "fck", "sys_clk";
-+				dmas = <&sdma_xbar 76>;
-+				dma-names = "audio_tx";
- 			};
- 		};
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 2da6ced64ee0..c34982739d8d 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -240,6 +240,13 @@
  
+ 	};
+ 
++	wlan_pwrseq: sdhci3-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpj0 0 GPIO_ACTIVE_LOW>;
++		clocks = <&max77686 MAX77686_CLK_PMIC>;
++		clock-names = "ext_clock";
++	};
++
+ 	sound {
+ 		compatible = "samsung,trats2-audio";
+ 		samsung,i2s-controller = <&i2s0>;
+@@ -1238,6 +1245,27 @@
+ 	status = "okay";
+ };
+ 
++&sdhci_3 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	broken-cd;
++	bus-width = <4>;
++
++	mmc-pwrseq = <&wlan_pwrseq>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
++	vmmc-supply = <&ldo21_reg>;
++	status = "okay";
++
++	brcmf: brcmf at 1 {
++		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&gpx2>;
++		interrupts = <5 0>;
++		interrupt-names = "host-wake";
++	};
++};
++
+ &serial_0 {
+ 	status = "okay";
+ };
 -- 
-Peter
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+2.15.0
