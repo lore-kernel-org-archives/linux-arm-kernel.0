@@ -1,80 +1,138 @@
 From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed,  8 Nov 2017 13:47:50 +0100
-Subject: [PATCH 1/3] tee: add tee_param_is_memref() for driver use
+Date: Wed,  8 Nov 2017 13:47:51 +0100
+Subject: [PATCH 2/3] tee: add TEE_IOCTL_PARAM_ATTR_META
 In-Reply-To: <1510145272-14842-1-git-send-email-jens.wiklander@linaro.org>
 References: <1510145272-14842-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1510145272-14842-2-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1510145272-14842-3-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
+
+Adds TEE_IOCTL_PARAM_ATTR_META which can be used to indicate meta
+parameters when communicating with user space. These meta parameters can
+be used by supplicant support multiple parallel requests at a time.
 
 Reviewed-by: Etienne Carriere <etienne.carriere@linaro.org>
 Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 ---
- drivers/tee/tee_core.c  | 16 ++--------------
- include/linux/tee_drv.h | 12 ++++++++++++
- 2 files changed, 14 insertions(+), 14 deletions(-)
+ drivers/tee/optee/supp.c | 25 +++++++++++++++++++++++++
+ drivers/tee/tee_core.c   | 16 ++++++++++------
+ include/uapi/linux/tee.h |  7 +++++++
+ 3 files changed, 42 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
-index 58a5009eacc3..c78104589e42 100644
---- a/drivers/tee/tee_core.c
-+++ b/drivers/tee/tee_core.c
-@@ -221,18 +221,6 @@ static int params_to_user(struct tee_ioctl_param __user *uparams,
- 	return 0;
+diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
+index b4ea0678a436..56aa8b929b8c 100644
+--- a/drivers/tee/optee/supp.c
++++ b/drivers/tee/optee/supp.c
+@@ -119,6 +119,27 @@ u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
+ 	return ret;
  }
  
--static bool param_is_memref(struct tee_param *param)
--{
--	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
--	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
--	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
--	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
--		return true;
--	default:
--		return false;
--	}
--}
--
- static int tee_ioctl_open_session(struct tee_context *ctx,
- 				  struct tee_ioctl_buf_data __user *ubuf)
- {
-@@ -296,7 +284,7 @@ static int tee_ioctl_open_session(struct tee_context *ctx,
- 	if (params) {
- 		/* Decrease ref count for all valid shared memory pointers */
- 		for (n = 0; n < arg.num_params; n++)
--			if (param_is_memref(params + n) &&
-+			if (tee_param_is_memref(params + n) &&
- 			    params[n].u.memref.shm)
- 				tee_shm_put(params[n].u.memref.shm);
- 		kfree(params);
-@@ -358,7 +346,7 @@ static int tee_ioctl_invoke(struct tee_context *ctx,
- 	if (params) {
- 		/* Decrease ref count for all valid shared memory pointers */
- 		for (n = 0; n < arg.num_params; n++)
--			if (param_is_memref(params + n) &&
-+			if (tee_param_is_memref(params + n) &&
- 			    params[n].u.memref.shm)
- 				tee_shm_put(params[n].u.memref.shm);
- 		kfree(params);
-diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-index cb889afe576b..f4a0ac05ebb4 100644
---- a/include/linux/tee_drv.h
-+++ b/include/linux/tee_drv.h
-@@ -275,4 +275,16 @@ int tee_shm_get_id(struct tee_shm *shm);
-  */
- struct tee_shm *tee_shm_get_from_id(struct tee_context *ctx, int id);
- 
-+static inline bool tee_param_is_memref(struct tee_param *param)
++static int supp_check_recv_params(size_t num_params, struct tee_param *params)
 +{
-+	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
-+	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
-+	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
-+	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
-+		return true;
-+	default:
-+		return false;
-+	}
++	size_t n;
++
++	/*
++	 * If there's memrefs we need to decrease those as they where
++	 * increased earlier and we'll even refuse to accept any below.
++	 */
++	for (n = 0; n < num_params; n++)
++		if (tee_param_is_memref(params + n) && params[n].u.memref.shm)
++			tee_shm_put(params[n].u.memref.shm);
++
++	/*
++	 * We only expect parameters as TEE_IOCTL_PARAM_ATTR_TYPE_NONE (0).
++	 */
++	for (n = 0; n < num_params; n++)
++		if (params[n].attr)
++			return -EINVAL;
++	return 0;
 +}
 +
- #endif /*__TEE_DRV_H*/
+ /**
+  * optee_supp_recv() - receive request for supplicant
+  * @ctx:	context receiving the request
+@@ -137,6 +158,10 @@ int optee_supp_recv(struct tee_context *ctx, u32 *func, u32 *num_params,
+ 	struct optee_supp *supp = &optee->supp;
+ 	int rc;
+ 
++	rc = supp_check_recv_params(*num_params, param);
++	if (rc)
++		return rc;
++
+ 	/*
+ 	 * In case two threads in one supplicant is calling this function
+ 	 * simultaneously we need to protect the data with a mutex which
+diff --git a/drivers/tee/tee_core.c b/drivers/tee/tee_core.c
+index c78104589e42..4d0ce606f0fc 100644
+--- a/drivers/tee/tee_core.c
++++ b/drivers/tee/tee_core.c
+@@ -152,11 +152,11 @@ static int params_from_user(struct tee_context *ctx, struct tee_param *params,
+ 			return -EFAULT;
+ 
+ 		/* All unused attribute bits has to be zero */
+-		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_TYPE_MASK)
++		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_MASK)
+ 			return -EINVAL;
+ 
+ 		params[n].attr = ip.attr;
+-		switch (ip.attr) {
++		switch (ip.attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_NONE:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
+ 			break;
+@@ -394,8 +394,8 @@ static int params_to_supp(struct tee_context *ctx,
+ 		struct tee_ioctl_param ip;
+ 		struct tee_param *p = params + n;
+ 
+-		ip.attr = p->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK;
+-		switch (p->attr) {
++		ip.attr = p->attr;
++		switch (p->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
+ 			ip.a = p->u.value.a;
+@@ -459,6 +459,10 @@ static int tee_ioctl_supp_recv(struct tee_context *ctx,
+ 	if (!params)
+ 		return -ENOMEM;
+ 
++	rc = params_from_user(ctx, params, num_params, uarg->params);
++	if (rc)
++		goto out;
++
+ 	rc = ctx->teedev->desc->ops->supp_recv(ctx, &func, &num_params, params);
+ 	if (rc)
+ 		goto out;
+@@ -488,11 +492,11 @@ static int params_from_supp(struct tee_param *params, size_t num_params,
+ 			return -EFAULT;
+ 
+ 		/* All unused attribute bits has to be zero */
+-		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_TYPE_MASK)
++		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_MASK)
+ 			return -EINVAL;
+ 
+ 		p->attr = ip.attr;
+-		switch (ip.attr) {
++		switch (ip.attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
+ 			/* Only out and in/out values can be updated */
+diff --git a/include/uapi/linux/tee.h b/include/uapi/linux/tee.h
+index 688782e90140..267c12e7fd79 100644
+--- a/include/uapi/linux/tee.h
++++ b/include/uapi/linux/tee.h
+@@ -154,6 +154,13 @@ struct tee_ioctl_buf_data {
+  */
+ #define TEE_IOCTL_PARAM_ATTR_TYPE_MASK		0xff
+ 
++/* Meta parameter carrying extra information about the message. */
++#define TEE_IOCTL_PARAM_ATTR_META		0x100
++
++/* Mask of all known attr bits */
++#define TEE_IOCTL_PARAM_ATTR_MASK \
++	(TEE_IOCTL_PARAM_ATTR_TYPE_MASK | TEE_IOCTL_PARAM_ATTR_META)
++
+ /*
+  * Matches TEEC_LOGIN_* in GP TEE Client API
+  * Are only defined for GP compliant TEEs
 -- 
 2.7.4
