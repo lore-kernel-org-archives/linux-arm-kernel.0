@@ -1,183 +1,78 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed,  8 Nov 2017 16:06:24 +0000
-Subject: [PATCH v4 15/13] firmware: arm_sdei: be more robust against
- cpu-hotplug
-In-Reply-To: <5A031E9E.2090809@arm.com>
-References: <5A031E9E.2090809@arm.com>
-Message-ID: <20171108160624.10355-1-james.morse@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 08 Nov 2017 16:08:07 +0000
+Subject: Applied "ASoC: stm32: spdifrx: fix 16 bits capture" to the asoc tree
+In-Reply-To: <1509981533-28622-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <E1eCStb-0002F5-Ck@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-dpm_suspend() calls the freeze/thaw callbacks for hibernate before
-disable_non_bootcpus() takes down secondaries.
+The patch
 
-This leads to a fun race where the freeze/thaw callbacks reset the
-SDEI interface (as we may be restoring a kernel with a different
-layout due to KASLR), then the cpu-hotplug callbacks come in to
-save the current state, which has already been reset.
+   ASoC: stm32: spdifrx: fix 16 bits capture
 
-I tried to solve this with a 'frozen' flag that stops the hotplug
-callback from overwriting the saved values. Instead this just
-moves the race around and makes it even harder to think about.
+has been applied to the asoc tree at
 
-Instead, make it look like the secondaries have gone offline.
-Call cpuhp_remove_state() in the freeze callback, this will call the
-teardown hook on all online CPUs, then remove the state. This saves
-all private events and makes future CPU up/down events invisible.
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Change sdei_event_unregister_all()/sdei_reregister_events() to
-only save/restore shared events, which are all that is left. With
-this we can remove the frozen flag. We can remove the device
-suspend/resume calls too as cpuhotplug's teardown call has masked
-the CPUs.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-All that is left is the reboot notifier, (which was abusing the
-frozen flag). Call cpuhp_remove_state() to make it look like
-secondary CPUs have gone offline.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Suggested-by: Will Deacon <will.deacon@arm.com>
-Signed-off-by: James Morse <james.morse@arm.com>
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 9036e4acc81700a51e5f42820ba4570bea9b6f48 Mon Sep 17 00:00:00 2001
+From: olivier moysan <olivier.moysan@st.com>
+Date: Mon, 6 Nov 2017 16:18:52 +0100
+Subject: [PATCH] ASoC: stm32: spdifrx: fix 16 bits capture
+
+Change DMA bus width to manage properly 16 bits packed format.
+
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- drivers/firmware/arm_sdei.c | 60 +++++++++++++++++++++++----------------------
- 1 file changed, 31 insertions(+), 29 deletions(-)
+ sound/soc/stm/stm32_spdifrx.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
-index 65a8f122f545..d50634a25954 100644
---- a/drivers/firmware/arm_sdei.c
-+++ b/drivers/firmware/arm_sdei.c
-@@ -86,9 +86,6 @@ struct sdei_event {
- static LIST_HEAD(sdei_events);
- static DEFINE_SPINLOCK(sdei_events_lock);
+diff --git a/sound/soc/stm/stm32_spdifrx.c b/sound/soc/stm/stm32_spdifrx.c
+index 84cc5678beba..d7dbe84d5eeb 100644
+--- a/sound/soc/stm/stm32_spdifrx.c
++++ b/sound/soc/stm/stm32_spdifrx.c
+@@ -750,17 +750,21 @@ static int stm32_spdifrx_hw_params(struct snd_pcm_substream *substream,
+ 	switch (data_size) {
+ 	case 16:
+ 		fmt = SPDIFRX_DRFMT_PACKED;
+-		spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
+ 		break;
+ 	case 32:
+ 		fmt = SPDIFRX_DRFMT_LEFT;
+-		spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 		break;
+ 	default:
+ 		dev_err(&spdifrx->pdev->dev, "Unexpected data format\n");
+ 		return -EINVAL;
+ 	}
  
--/* When frozen, cpu-hotplug notifiers shouldn't unregister/re-register events */
--static bool frozen;
--
- static DEFINE_PER_CPU(u64, sdei_running_event) = -1;
++	/*
++	 * Set buswidth to 4 bytes for all data formats.
++	 * Packed format: transfer 2 x 2 bytes samples
++	 * Left format: transfer 1 x 3 bytes samples + 1 dummy byte
++	 */
++	spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 	snd_soc_dai_init_dma_data(cpu_dai, NULL, &spdifrx->dma_params);
  
- /* Private events are registered/enabled via IPI passing one of these */
-@@ -625,15 +622,18 @@ EXPORT_SYMBOL(sdei_event_unregister);
- 
- /*
-  * unregister events, but don't destroy them as they are re-registered by
-- * sdei_reregister_events().
-+ * sdei_reregister_shared().
-  */
--static int sdei_event_unregister_all(void)
-+static int sdei_unregister_shared(void)
- {
- 	int err = 0;
- 	struct sdei_event *event;
- 
- 	spin_lock(&sdei_events_lock);
- 	list_for_each_entry(event, &sdei_events, list) {
-+		if (event->type != SDEI_EVENT_TYPE_SHARED)
-+			continue;
-+
- 		err = _sdei_event_unregister(event);
- 		if (err)
- 			break;
-@@ -841,13 +841,16 @@ static int sdei_reregister_event(struct sdei_event *event)
- 	return err;
- }
- 
--static int sdei_reregister_events(void)
-+static int sdei_reregister_shared(void)
- {
- 	int err = 0;
- 	struct sdei_event *event;
- 
- 	spin_lock(&sdei_events_lock);
- 	list_for_each_entry(event, &sdei_events, list) {
-+		if (event->type != SDEI_EVENT_TYPE_SHARED)
-+			continue;
-+
- 		err = sdei_reregister_event(event);
- 		if (err)
- 			break;
-@@ -862,11 +865,6 @@ static int sdei_cpuhp_down(unsigned int cpu)
- 	struct sdei_event *event;
- 	struct sdei_crosscall_args arg;
- 
--	if (frozen) {
--		/* All events unregistered  */
--		return sdei_mask_local_cpu();
--	}
--
- 	/* un-register private events */
- 	spin_lock(&sdei_events_lock);
- 	list_for_each_entry(event, &sdei_events, list) {
-@@ -890,11 +888,6 @@ static int sdei_cpuhp_up(unsigned int cpu)
- 	struct sdei_event *event;
- 	struct sdei_crosscall_args arg;
- 
--	if (frozen) {
--		/* Events will be re-registered when we thaw. */
--		return sdei_unmask_local_cpu();
--	}
--
- 	/* re-register/enable private events */
- 	spin_lock(&sdei_events_lock);
- 	list_for_each_entry(event, &sdei_events, list) {
-@@ -1004,22 +997,33 @@ static int sdei_device_freeze(struct device *dev)
- {
- 	int err;
- 
--	frozen = true;
--	err = sdei_event_unregister_all();
-+	/* save and unregister private events */
-+	cpuhp_remove_state(CPUHP_AP_ARM_SDEI_STARTING);
-+
-+	err = sdei_unregister_shared();
- 	if (err)
- 		return err;
- 
--	return sdei_device_suspend(dev);
-+	return 0;
- }
- 
- static int sdei_device_thaw(struct device *dev)
- {
- 	int err;
- 
--	sdei_device_resume(dev);
-+	/* re-register shared events */
-+	err = sdei_reregister_shared();
-+	if (err) {
-+		pr_warn("Failed to re-register shared events...\n");
-+		sdei_mark_interface_broken();
-+		return err;
-+	}
-+
-+	err = cpuhp_setup_state(CPUHP_AP_ARM_SDEI_STARTING, "SDEI",
-+				&sdei_cpuhp_up, &sdei_cpuhp_down);
-+	if (err)
-+		pr_warn("Failed to re-register CPU hotplug notifier...\n");
- 
--	err = sdei_reregister_events();
--	frozen = false;
- 	return err;
- }
- 
-@@ -1048,15 +1052,13 @@ static const struct dev_pm_ops sdei_pm_ops = {
- static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
- 				void *data)
- {
--	on_each_cpu(&_ipi_mask_cpu, NULL, true);
--
--	sdei_platform_reset();
--
- 	/*
--	 * There is now no point trying to unregister private events if we go on
--	 * to take CPUs offline.
-+	 * We are going to reset the interface, after this there is no point
-+	 * doing work when we take CPUs offline.
- 	 */
--	frozen = true;
-+	cpuhp_remove_state(CPUHP_AP_ARM_SDEI_STARTING);
-+
-+	sdei_platform_reset();
- 
- 	return NOTIFY_OK;
- }
+ 	return regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
 -- 
 2.15.0
