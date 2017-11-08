@@ -1,80 +1,82 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Wed, 8 Nov 2017 16:42:48 +0000
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
- <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
- <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
- <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
- <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
- <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
- <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
-Message-ID: <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 8 Nov 2017 10:46:10 -0600
+Subject: [PATCH v2] kbuild: clean up *.dtb and *.dtb.S patterns from
+ top-level Makefile
+In-Reply-To: <1509591085-23940-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1509591085-23940-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CAL_JsqKLbDWcwcgotnQAO2FeFp55SZRd0z9r2Dr0ZsK0LKZMLw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 08/11/17 15:57, Jon Hunter wrote:
+On Wed, Nov 1, 2017 at 9:51 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> We need to add "clean-files" in Makfiles to clean up DT blobs, but we
+> often miss to do so.
 >
-> On 08/11/17 15:19, Guillaume Tucker wrote:
+> Since there are no source files that end with .dtb or .dtb.S, so we
+> can clean-up those files from the top-level Makefile.
 >
-> ...
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 >
->> After a few more automated bisection attempts and a bug fix in
->> LAVA, I've now found at least one potentially breaking commit:
->>
->>   commit d89e2378a97fafdc74cbf997e7c88af75b81610a
->>   Author: Robin Murphy <robin.murphy@arm.com>
->>   Date:   Thu Oct 12 16:56:14 2017 +0100
->>
->>       drivers: flag buses which demand DMA configuration
->>
->>
->> I've run some boot tests manually with this revision and then
->> also after reverting it in-place, these respectively failed and
->> passed:
->>
->>   * d89e2378, failed:
->>     https://lava.collabora.co.uk/scheduler/job/978968
->>
->>   * d89e2378 reverted, passed:
->>     https://lava.collabora.co.uk/scheduler/job/978969
->>
->>
->> I then went on and tried the same but on top of next-20171108 and
->> found that they both failed
->>
->>   * next-20171108, failed:
->>     https://lava.collabora.co.uk/scheduler/job/979063
->>
->>   * next-20171108 with d89e2378 reverted, failed as well:
->>     https://lava.collabora.co.uk/scheduler/job/979167
->>
->>
->> So this shows there is almost certainly another offending commit
->> in -next.  The errors in both cases are not quite the same, the
->> last one is triggered by a BUG whereas the first one is a NULL
->> pointer (I haven't looked any further).  Also I don't think
->> there's any fix for d89e2378a97fafdc74cbf997e7c88af75b81610a
->> which is currently still in next.
+> Changes in v2:
+>   - Remove clean-files
+
+Applied this and the 2 prerequisite patches.
+
 >
-> This crash is a known issue [0] and we have been discussing this. Can
-> you try applying [1]?
-
-So with next-20171108 + d89e2378a9 reverted + [1] applied:
-
-   https://lava.collabora.co.uk/scheduler/job/979173
-
-No visible kernel crash in the log but it hangs.
-
-
-I also tried next-20171108 + [1] applied only:
-
-   https://lava.collabora.co.uk/scheduler/job/979179
-
-which also appears to hang.
-
-Guillaume
-
-> [0] https://lkml.org/lkml/2017/9/19/306
-> [1] https://patchwork.kernel.org/patch/9974835/
+>  Documentation/kbuild/makefiles.txt               | 1 -
+>  Makefile                                         | 2 +-
+>  arch/arc/boot/dts/Makefile                       | 1 -
+>  arch/arm/boot/dts/Makefile                       | 1 -
+>  arch/arm64/boot/dts/actions/Makefile             | 1 -
+>  arch/arm64/boot/dts/al/Makefile                  | 1 -
+>  arch/arm64/boot/dts/allwinner/Makefile           | 1 -
+>  arch/arm64/boot/dts/altera/Makefile              | 1 -
+>  arch/arm64/boot/dts/amd/Makefile                 | 1 -
+>  arch/arm64/boot/dts/amlogic/Makefile             | 1 -
+>  arch/arm64/boot/dts/apm/Makefile                 | 1 -
+>  arch/arm64/boot/dts/arm/Makefile                 | 1 -
+>  arch/arm64/boot/dts/broadcom/Makefile            | 1 -
+>  arch/arm64/boot/dts/broadcom/northstar2/Makefile | 1 -
+>  arch/arm64/boot/dts/broadcom/stingray/Makefile   | 1 -
+>  arch/arm64/boot/dts/cavium/Makefile              | 1 -
+>  arch/arm64/boot/dts/exynos/Makefile              | 1 -
+>  arch/arm64/boot/dts/freescale/Makefile           | 1 -
+>  arch/arm64/boot/dts/hisilicon/Makefile           | 1 -
+>  arch/arm64/boot/dts/lg/Makefile                  | 1 -
+>  arch/arm64/boot/dts/marvell/Makefile             | 1 -
+>  arch/arm64/boot/dts/mediatek/Makefile            | 1 -
+>  arch/arm64/boot/dts/nvidia/Makefile              | 1 -
+>  arch/arm64/boot/dts/qcom/Makefile                | 1 -
+>  arch/arm64/boot/dts/realtek/Makefile             | 1 -
+>  arch/arm64/boot/dts/renesas/Makefile             | 1 -
+>  arch/arm64/boot/dts/rockchip/Makefile            | 1 -
+>  arch/arm64/boot/dts/socionext/Makefile           | 1 -
+>  arch/arm64/boot/dts/sprd/Makefile                | 1 -
+>  arch/arm64/boot/dts/xilinx/Makefile              | 1 -
+>  arch/arm64/boot/dts/zte/Makefile                 | 1 -
+>  arch/c6x/boot/dts/Makefile                       | 2 --
+>  arch/cris/boot/dts/Makefile                      | 2 --
+>  arch/h8300/boot/dts/Makefile                     | 1 -
+>  arch/metag/boot/dts/Makefile                     | 1 -
+>  arch/microblaze/boot/Makefile                    | 2 +-
+>  arch/mips/boot/dts/Makefile                      | 1 -
+>  arch/mips/boot/dts/brcm/Makefile                 | 1 -
+>  arch/mips/boot/dts/cavium-octeon/Makefile        | 1 -
+>  arch/mips/boot/dts/img/Makefile                  | 1 -
+>  arch/mips/boot/dts/ingenic/Makefile              | 1 -
+>  arch/mips/boot/dts/lantiq/Makefile               | 1 -
+>  arch/mips/boot/dts/mti/Makefile                  | 1 -
+>  arch/mips/boot/dts/netlogic/Makefile             | 1 -
+>  arch/mips/boot/dts/ni/Makefile                   | 1 -
+>  arch/mips/boot/dts/pic32/Makefile                | 1 -
+>  arch/mips/boot/dts/qca/Makefile                  | 1 -
+>  arch/mips/boot/dts/ralink/Makefile               | 1 -
+>  arch/mips/boot/dts/xilfpga/Makefile              | 1 -
+>  arch/nios2/boot/Makefile                         | 2 --
+>  arch/openrisc/boot/dts/Makefile                  | 2 --
+>  arch/powerpc/boot/Makefile                       | 2 +-
+>  arch/sh/boot/dts/Makefile                        | 2 --
+>  arch/xtensa/boot/dts/Makefile                    | 2 --
+>  54 files changed, 3 insertions(+), 60 deletions(-)
