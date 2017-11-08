@@ -1,59 +1,49 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 8 Nov 2017 15:01:46 +0000
-Subject: [PATCH 2/2] ARM64 / cpuidle: Use new cpuidle macro for entering
- retention state
-In-Reply-To: <16086b6c-6f34-35e8-bc19-705380e5b767@arm.com>
-References: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
- <1510076133-18139-3-git-send-email-pprakash@codeaurora.org>
- <16086b6c-6f34-35e8-bc19-705380e5b767@arm.com>
-Message-ID: <6ae11aa5-34c3-5b28-d058-080f7e753190@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 8 Nov 2017 15:08:36 +0000
+Subject: [PATCH v5 16/26] KVM: arm/arm64: GICv4: Propagate property
+ updates to VLPIs
+In-Reply-To: <6763d90f-93bf-ddbb-d456-5979b8870aa2@redhat.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-17-marc.zyngier@arm.com>
+ <6763d90f-93bf-ddbb-d456-5979b8870aa2@redhat.com>
+Message-ID: <49bff080-0908-cc7a-7036-543f963180a5@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 08/11/17 14:27, Sudeep Holla wrote:
+On 07/11/17 21:28, Auger Eric wrote:
+> Hi Marc,
 > 
-> 
-> On 07/11/17 17:35, Prashanth Prakash wrote:
->> CPU_PM_CPU_IDLE_ENTER_RETENTION skips calling cpu_pm_enter() and
->> cpu_pm_exit(). By not calling cpu_pm functions in idle entry/exit
->> paths we can reduce the latency involved in entering and exiting
->> the low power idle state.
+> On 27/10/2017 16:28, Marc Zyngier wrote:
+>> Upon updating a property, we propagate it all the way to the physical
+>> ITS, and ask for an INV command to be executed there.
 >>
->> On ARM64 based Qualcomm server platform we measured below overhead
->> for calling cpu_pm_enter and cpu_pm_exit for retention states.
->>
->> workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
->> 	Average overhead of cpu_pm_enter - 1.2us
->> 	Average overhead of cpu_pm_exit  - 3.1us
->>
->> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+>> Acked-by: Christoffer Dall <cdall@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->>  arch/arm64/kernel/cpuidle.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>  virt/kvm/arm/vgic/vgic-its.c | 3 +++
+>>  1 file changed, 3 insertions(+)
 >>
->> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
->> index fd69108..f2d1381 100644
->> --- a/arch/arm64/kernel/cpuidle.c
->> +++ b/arch/arm64/kernel/cpuidle.c
->> @@ -47,6 +47,8 @@ int arm_cpuidle_suspend(int index)
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 0b7e648e7a0c..2e77c7c83942 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -296,6 +296,9 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
+>>  		spin_unlock(&irq->irq_lock);
+>>  	}
 >>  
->>  #include <acpi/processor.h>
->>  
->> +#define ARM64_LPI_IS_RETENTION_STATE(arch_flags) (!(arch_flags))
+>> +	if (irq->hw)
+>> +		return its_prop_update_vlpi(irq->host_irq, prop, true);
 >> +
-> 
-> Ideally we could cater both ACPI LPI and DT using PSCI parameters. No ?
-> Just thinking it out loud as I see no reason to restrict this just to
-> ACPI LPIs.
-> 
+>>  	return 0;
+>>  }
+> I am confused by the vgic_queue_irq_unlock() on the "hw" path. Why is it
+> needed in hw mode?
 
-Just to add, after chatting with Lorenzo, I see PSCI covers only core
-states but that then leads to my question in the other patch: do we need
-partial state save/restore ever ? If not, then we can still use PSCI
-flag in both DT and ACPI.
+It's not. I guess we could bypass this altogether and take a short cut
+after having updated the priority and enabled fields.
 
+Thanks,
+
+	M.
 -- 
-Regards,
-Sudeep
+Jazz is not dead. It just smells funny...
