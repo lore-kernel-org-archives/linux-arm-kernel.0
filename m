@@ -1,78 +1,65 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 08 Nov 2017 16:08:07 +0000
-Subject: Applied "ASoC: stm32: spdifrx: fix 16 bits capture" to the asoc tree
-In-Reply-To: <1509981533-28622-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1eCStb-0002F5-Ck@debutante>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 8 Nov 2017 16:11:32 +0000
+Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
+In-Reply-To: <87vaimql46.fsf@linaro.org>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
+ <87vaimql46.fsf@linaro.org>
+Message-ID: <20171108161116.GA20202@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Tue, Nov 07, 2017 at 01:22:33PM +0000, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > This patch implements support for saving and restoring the SVE
+> > registers around signals.
+> >
+> > A fixed-size header struct sve_context is always included in the
+> > signal frame encoding the thread's vector length at the time of
+> > signal delivery, optionally followed by a variable-layout structure
+> > encoding the SVE registers.
+> >
+> > Because of the need to preserve backwards compatibility, the FPSIMD
+> > view of the SVE registers is always dumped as a struct
+> > fpsimd_context in the usual way, in addition to any sve_context.
+> >
+> > The SVE vector registers are dumped in full, including bits 127:0
+> > of each register which alias the corresponding FPSIMD vector
+> > registers in the hardware.  To avoid any ambiguity about which
+> > alias to restore during sigreturn, the kernel always restores bits
+> > 127:0 of each SVE vector register from the fpsimd_context in the
+> > signal frame (which must be present): userspace needs to take this
+> > into account if it wants to modify the SVE vector register contents
+> > on return from a signal.
+> >
+> > FPSR and FPCR, which are used by both FPSIMD and SVE, are not
+> > included in sve_context because they are always present in
+> > fpsimd_context anyway.
+> >
+> > For signal delivery, a new helper
+> > fpsimd_signal_preserve_current_state() is added to update _both_
+> > the FPSIMD and SVE views in the task struct, to make it easier to
+> > populate this information into the signal frame.  Because of the
+> > redundancy between the two views of the state, only one is updated
+> > otherwise.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> 
+> After adding SVE support for RISU I was able to confirm consistent
+> signal delivery with a decent context over multiple runs and after
+> hacking echo "32" > /proc/sys/abi/sve_default_vector_length to change
+> the default length the tests would fail (as expected).
+> 
+> Tested-by: Alex Benn?e <alex.bennee@linaro.org>
 
-   ASoC: stm32: spdifrx: fix 16 bits capture
+Good to have confirmation of this, thanks
 
-has been applied to the asoc tree at
+[...]
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 9036e4acc81700a51e5f42820ba4570bea9b6f48 Mon Sep 17 00:00:00 2001
-From: olivier moysan <olivier.moysan@st.com>
-Date: Mon, 6 Nov 2017 16:18:52 +0100
-Subject: [PATCH] ASoC: stm32: spdifrx: fix 16 bits capture
-
-Change DMA bus width to manage properly 16 bits packed format.
-
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/stm/stm32_spdifrx.c | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
-
-diff --git a/sound/soc/stm/stm32_spdifrx.c b/sound/soc/stm/stm32_spdifrx.c
-index 84cc5678beba..d7dbe84d5eeb 100644
---- a/sound/soc/stm/stm32_spdifrx.c
-+++ b/sound/soc/stm/stm32_spdifrx.c
-@@ -750,17 +750,21 @@ static int stm32_spdifrx_hw_params(struct snd_pcm_substream *substream,
- 	switch (data_size) {
- 	case 16:
- 		fmt = SPDIFRX_DRFMT_PACKED;
--		spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_2_BYTES;
- 		break;
- 	case 32:
- 		fmt = SPDIFRX_DRFMT_LEFT;
--		spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
- 		break;
- 	default:
- 		dev_err(&spdifrx->pdev->dev, "Unexpected data format\n");
- 		return -EINVAL;
- 	}
- 
-+	/*
-+	 * Set buswidth to 4 bytes for all data formats.
-+	 * Packed format: transfer 2 x 2 bytes samples
-+	 * Left format: transfer 1 x 3 bytes samples + 1 dummy byte
-+	 */
-+	spdifrx->dma_params.addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
- 	snd_soc_dai_init_dma_data(cpu_dai, NULL, &spdifrx->dma_params);
- 
- 	return regmap_update_bits(spdifrx->regmap, STM32_SPDIFRX_CR,
--- 
-2.15.0
+Cheers
+---Dave
