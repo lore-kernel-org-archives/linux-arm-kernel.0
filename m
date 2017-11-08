@@ -1,77 +1,33 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed,  8 Nov 2017 11:29:42 -0500
-Subject: [PATCH V2 3/3] dmaengine: qcom_hidma: add identity register support
-In-Reply-To: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
-References: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1510158582-5343-3-git-send-email-okaya@codeaurora.org>
+Date: Wed,  8 Nov 2017 11:29:40 -0500
+Subject: [PATCH V2 1/3] Documentation: DT: qcom_hidma: bump HW revision for
+ the bugfixed HW
+Message-ID: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The location for destination event channel register has been relocated from
-offset 0x28 to 0x40. Update the code accordingly.
+A new version of the HIDMA IP has been released with bug fixes. Bumping the
+hardware version to differentiate from others.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma.c | 33 ++++++++++++++++++++++++++++++++-
- 1 file changed, 32 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index 4ef7d6f..e8b7be0 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -126,6 +126,18 @@ struct hidma_cap {
- 	}
- };
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+index 55492c2..5d93d6d 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -47,8 +47,8 @@ When the OS is not in control of the management interface (i.e. it's a guest),
+ the channel nodes appear on their own, not under a management node.
  
-+static struct hidma_cap hidma_identity_cap = {
-+	.of = {
-+		{.compatible = "qcom,hidma-1.2",},
-+		{},
-+	},
-+
-+	.acpi = {
-+		{"QCOM8063"},
-+		{},
-+	}
-+};
-+
- /* process completed descriptors */
- static void hidma_process_completed(struct hidma_chan *mchan)
- {
-@@ -772,6 +784,22 @@ static bool hidma_msi_capable(struct device *dev)
- 	return ret;
- }
- 
-+static bool hidma_identity_capable(struct device *dev)
-+{
-+	struct acpi_device *adev = ACPI_COMPANION(dev);
-+	int ret;
-+
-+	if (!adev || acpi_disabled)
-+		ret = of_match_device(hidma_identity_cap.of, dev) != NULL;
-+	else {
-+#ifdef CONFIG_ACPI
-+		ret = acpi_match_device(hidma_identity_cap.acpi, dev) != NULL;
-+#endif
-+	}
-+
-+	return ret;
-+}
-+
- static int hidma_probe(struct platform_device *pdev)
- {
- 	struct hidma_dev *dmadev;
-@@ -863,7 +891,10 @@ static int hidma_probe(struct platform_device *pdev)
- 	if (!dmadev->nr_descriptors)
- 		dmadev->nr_descriptors = HIDMA_NR_DEFAULT_DESC;
- 
--	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
-+	if (hidma_identity_capable(&pdev->dev))
-+		dmadev->chidx = readl(dmadev->dev_trca + 0x40);
-+	else
-+		dmadev->chidx = readl(dmadev->dev_trca + 0x28);
- 
- 	/* Set DMA mask to 64 bits. */
- 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+ Required properties:
+-- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
+-for MSI capable HW.
++- compatible: must contain "qcom,hidma-1.0" for initial HW or
++  "qcom,hidma-1.1"/"qcom,hidma-1.2" for MSI capable HW.
+ - reg: Addresses for the transfer and event channel
+ - interrupts: Should contain the event interrupt
+ - desc-count: Number of asynchronous requests this channel can handle
 -- 
 1.9.1
