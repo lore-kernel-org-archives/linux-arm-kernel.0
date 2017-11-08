@@ -1,112 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed,  8 Nov 2017 16:47:09 +0100
-Subject: [PATCH 2/3] ASoC: sun8i-codec: Set the BCLK divider
-In-Reply-To: <20171108154710.16407-1-maxime.ripard@free-electrons.com>
-References: <20171108154710.16407-1-maxime.ripard@free-electrons.com>
-Message-ID: <20171108154710.16407-3-maxime.ripard@free-electrons.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 8 Nov 2017 09:55:18 -0600
+Subject: [PATCH] arm64: dts: hi3660: improve pmu description
+In-Reply-To: <1510131578-84235-1-git-send-email-xuyiping@hisilicon.com>
+References: <1510131578-84235-1-git-send-email-xuyiping@hisilicon.com>
+Message-ID: <CAL_JsqKFMSvRCB48X4eiPpi5nAL4WGGVGh8GRJpp_JMNdALjbw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-While the current code was reporting to be able to work in master mode, it
-failed to do so because the BCLK divider wasn't programmed, meaning that
-the BCLK would run at the PLL's frequency no matter the sample rate.
+On Wed, Nov 8, 2017 at 2:59 AM, Xu YiPing <xuyiping@hisilicon.com> wrote:
+> cortex a73 pmu is supported, use it instead of armpmu-v3
 
-It was obviously a bit too fast.
+The subject is misleading and you need a better commit message. Why is
+this change needed? You are going from 1 to 2 devices.
 
-Add support to retrieve the divider to use, and set it. Since our PLL is
-not always able to generate a perfect multiple of the sample rate, we'll
-have to choose the closest divider that matches our setup.
+Missing your S-o-B, too.
 
-Fixes: 36c684936fae ("ASoC: Add sun8i digital audio codec")
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- sound/soc/sunxi/sun8i-codec.c | 53 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 53 insertions(+)
+> ---
+>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> index 13ae69f..f638897 100644
+> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+> @@ -203,21 +203,25 @@
+>                                          IRQ_TYPE_LEVEL_HIGH)>;
+>         };
+>
+> -       pmu {
+> -               compatible = "arm,armv8-pmuv3";
+> +       pmu_a53 {
 
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index 038107baf414..522546e6b153 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -73,6 +73,7 @@
- #define SUN8I_SYS_SR_CTRL_AIF2_FS_MASK		GENMASK(11, 8)
- #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK	GENMASK(5, 4)
- #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK	GENMASK(8, 6)
-+#define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK	GENMASK(12, 9)
- 
- struct sun8i_codec {
- 	struct device	*dev;
-@@ -226,12 +227,57 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- 	return 0;
- }
- 
-+struct sun8i_codec_clk_div {
-+	u8	div;
-+	u8	val;
-+};
-+
-+static const struct sun8i_codec_clk_div sun8i_codec_bclk_div[] = {
-+	{ .div = 1,	.val = 0 },
-+	{ .div = 2,	.val = 1 },
-+	{ .div = 4,	.val = 2 },
-+	{ .div = 6,	.val = 3 },
-+	{ .div = 8,	.val = 4 },
-+	{ .div = 12,	.val = 5 },
-+	{ .div = 16,	.val = 6 },
-+	{ .div = 24,	.val = 7 },
-+	{ .div = 32,	.val = 8 },
-+	{ .div = 48,	.val = 9 },
-+	{ .div = 64,	.val = 10 },
-+	{ .div = 96,	.val = 11 },
-+	{ .div = 128,	.val = 12 },
-+	{ .div = 192,	.val = 13 },
-+};
-+
-+static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
-+				   unsigned int rate,
-+				   unsigned int word_size)
-+{
-+	unsigned long clk_rate = clk_get_rate(scodec->clk_module);
-+	unsigned int div = clk_rate / rate / word_size / 2;
-+	unsigned int best_val = 0, best_diff = ~0;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(sun8i_codec_bclk_div); i++) {
-+		const struct sun8i_codec_clk_div *bdiv = &sun8i_codec_bclk_div[i];
-+		unsigned int diff = abs(bdiv->div - div);
-+
-+		if (diff < best_diff) {
-+			best_diff = diff;
-+			best_val = bdiv->val;
-+		}
-+	}
-+
-+	return best_val;
-+}
-+
- static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
- 				 struct snd_pcm_hw_params *params,
- 				 struct snd_soc_dai *dai)
- {
- 	struct sun8i_codec *scodec = snd_soc_codec_get_drvdata(dai->codec);
- 	int sample_rate;
-+	u8 bclk_div;
- 
- 	/*
- 	 * The CPU DAI handles only a sample of 16 bits. Configure the
-@@ -241,6 +287,13 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16);
- 
-+	bclk_div = sun8i_codec_get_bclk_div(scodec, params_rate(params),
-+					    params_width(params));
-+
-+	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
-+			   SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
-+			   bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
-+
- 	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
--- 
-2.14.3
+Don't use '_' in node names. Building with W=2 will tell you this.
+
+> +               compatible = "arm,cortex-a53-pmu";
+>                 interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
+>                              <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
+>                              <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+> -                            <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
+> -                            <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
+> -                            <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+> -                            <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+> -                            <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+> +                            <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+>                 interrupt-affinity = <&cpu0>,
+>                                      <&cpu1>,
+>                                      <&cpu2>,
+> -                                    <&cpu3>,
+> -                                    <&cpu4>,
+> +                                    <&cpu3>;
+> +       };
+> +
+> +       pmu_a73 {
+> +               compatible = "arm,cortex-a73-pmu";
+> +               interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+> +                            <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+> +               interrupt-affinity = <&cpu4>,
+>                                      <&cpu5>,
+>                                      <&cpu6>,
+>                                      <&cpu7>;
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
