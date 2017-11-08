@@ -1,45 +1,37 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed,  8 Nov 2017 13:47:49 +0100
-Subject: [PATCH 0/3] tee: asynchronous supplicant requests
-Message-ID: <1510145272-14842-1-git-send-email-jens.wiklander@linaro.org>
+From: colin.king@canonical.com (Colin King)
+Date: Wed,  8 Nov 2017 12:47:55 +0000
+Subject: [PATCH] usb: gadget: udc-xilinx: remove redundant pointer udc
+Message-ID: <20171108124755.24947-1-colin.king@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Colin Ian King <colin.king@canonical.com>
 
-Currently all tee supplicant communication is synchronous. This isn't very
-limiting if the supplicant only is accessing system local resources like
-storage. With network access via the supplicant it becomes a larger
-problem.
+Pointer udc is assigned but never read, hence it is redundant and
+can be removed. Cleans up clang warning:
 
-This patch set enables asynchronous communication with the supplicant by
-introducing meta parameters in the user space API. The meta parameters can
-be used to tag requests with an id that can be matched against an
-asynchronous response as is done here in the OP-TEE driver. 
+drivers/usb/gadget/udc/udc-xilinx.c:974:2: warning: Value stored
+to 'udc' is never read
 
-Asynchronous supplicant communication is needed by OP-TEE to implement
-GlobalPlatforms TEE Sockets API Specification v1.0.1. The specification is
-available at https://www.globalplatform.org/specificationsdevice.asp.
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+---
+ drivers/usb/gadget/udc/udc-xilinx.c | 2 --
+ 1 file changed, 2 deletions(-)
 
-This change is backwards compatible allowing older supplicants to work with
-newer kernels and vice versa.
-
-Thanks,
-Jens
-
-Jens Wiklander (3):
-  tee: add tee_param_is_memref() for driver use
-  tee: add TEE_IOCTL_PARAM_ATTR_META
-  optee: support asynchronous supplicant requests
-
- drivers/tee/optee/core.c          |  11 +-
- drivers/tee/optee/optee_private.h |  43 ++---
- drivers/tee/optee/rpc.c           |   4 +-
- drivers/tee/optee/supp.c          | 375 ++++++++++++++++++++++++--------------
- drivers/tee/tee_core.c            |  32 ++--
- include/linux/tee_drv.h           |  12 ++
- include/uapi/linux/tee.h          |   7 +
- 7 files changed, 295 insertions(+), 189 deletions(-)
-
+diff --git a/drivers/usb/gadget/udc/udc-xilinx.c b/drivers/usb/gadget/udc/udc-xilinx.c
+index 7da2b9ce8cb3..6407e433bc78 100644
+--- a/drivers/usb/gadget/udc/udc-xilinx.c
++++ b/drivers/usb/gadget/udc/udc-xilinx.c
+@@ -963,10 +963,8 @@ static struct usb_request *xudc_ep_alloc_request(struct usb_ep *_ep,
+ 						 gfp_t gfp_flags)
+ {
+ 	struct xusb_ep *ep = to_xusb_ep(_ep);
+-	struct xusb_udc *udc;
+ 	struct xusb_req *req;
+ 
+-	udc = ep->udc;
+ 	req = kzalloc(sizeof(*req), gfp_flags);
+ 	if (!req)
+ 		return NULL;
 -- 
-2.7.4
+2.14.1
