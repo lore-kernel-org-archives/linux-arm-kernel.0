@@ -1,63 +1,33 @@
-From: simon@lineageos.org (Simon Shields)
-Date: Thu, 9 Nov 2017 00:01:32 +1100
-Subject: [PATCH] arm/dts/trats2: add bcm4334 device node
-Message-ID: <20171108130126.GA8455@lineageos.org>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed,  8 Nov 2017 14:07:52 +0100
+Subject: [PATCH] optee: fix invalid of_node_put() in optee_driver_init()
+Message-ID: <1510146472-24069-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch allows the bcm4334 to power on and enables
-wifi functionality on trats2.
+The first node supplied to of_find_matching_node() has its reference
+counter decreased as part of call to that function. In optee_driver_init()
+after calling of_find_matching_node() it's invalid to call of_node_put() on
+the supplied node again.
 
-Signed-off-by: Simon Shields <simon@lineageos.org>
+So remove the invalid call to of_node_put().
+
+Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 ---
- arch/arm/boot/dts/exynos4412-trats2.dts | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
+ drivers/tee/optee/core.c | 1 -
+ 1 file changed, 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-index 2da6ced64ee0..c34982739d8d 100644
---- a/arch/arm/boot/dts/exynos4412-trats2.dts
-+++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-@@ -240,6 +240,13 @@
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 58169e519422..18c8c0a50d37 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -589,7 +589,6 @@ static int __init optee_driver_init(void)
+ 		return -ENODEV;
  
- 	};
+ 	np = of_find_matching_node(fw_np, optee_match);
+-	of_node_put(fw_np);
+ 	if (!np)
+ 		return -ENODEV;
  
-+	wlan_pwrseq: sdhci3-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		reset-gpios = <&gpj0 0 GPIO_ACTIVE_LOW>;
-+		clocks = <&max77686 MAX77686_CLK_PMIC>;
-+		clock-names = "ext_clock";
-+	};
-+
- 	sound {
- 		compatible = "samsung,trats2-audio";
- 		samsung,i2s-controller = <&i2s0>;
-@@ -1238,6 +1245,27 @@
- 	status = "okay";
- };
- 
-+&sdhci_3 {
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	broken-cd;
-+	bus-width = <4>;
-+
-+	mmc-pwrseq = <&wlan_pwrseq>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
-+	vmmc-supply = <&ldo21_reg>;
-+	status = "okay";
-+
-+	brcmf: brcmf at 1 {
-+		reg = <1>;
-+		compatible = "brcm,bcm4329-fmac";
-+		interrupt-parent = <&gpx2>;
-+		interrupts = <5 0>;
-+		interrupt-names = "host-wake";
-+	};
-+};
-+
- &serial_0 {
- 	status = "okay";
- };
 -- 
-2.15.0
+2.7.4
