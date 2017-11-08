@@ -1,30 +1,86 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 8 Nov 2017 22:38:10 +0000
-Subject: [PATCH] Kernel debugging: omap: print warning if CONFIG_DEBUG_LL
- is enabled
-In-Reply-To: <20171108223604.GG28231@n2100.armlinux.org.uk>
-References: <b80b85cd6f26d02d698463b3dd5e9783081aa780.1510176592.git.hns@goldelico.com>
- <20171108222755.GW28152@atomide.com>
- <20171108223604.GG28231@n2100.armlinux.org.uk>
-Message-ID: <20171108223810.GH28231@n2100.armlinux.org.uk>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 08 Nov 2017 23:47:47 +0100
+Subject: [PATCH 1/2] cpuidle: Add new macro to enter a retention idle state
+In-Reply-To: <1510076133-18139-2-git-send-email-pprakash@codeaurora.org>
+References: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
+ <1510076133-18139-2-git-send-email-pprakash@codeaurora.org>
+Message-ID: <6518212.kvKYyx3eLf@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 08, 2017 at 10:36:04PM +0000, Russell King - ARM Linux wrote:
-> We don't need a compiler warning there, we probably need better help
-> text against DEBUG_LL and against EARLY_PRINTK.
+On Tuesday, November 7, 2017 6:35:32 PM CET Prashanth Prakash wrote:
+> If a CPU is entering a low power idle state where it doesn't lose any
+> context, then there is no need to call cpu_pm_enter()/cpu_pm_exit().
+> Add a new macro(CPU_PM_CPU_IDLE_ENTER_RETENTION) to be used by cpuidle
+> drivers when they are entering retention state. By not calling
+> cpu_pm_enter and cpu_pm_exit we reduce the latency involved in
+> entering and exiting the retention idle states.
+> 
+> On ARM64 based Qualcomm Server Platform we measured below overhead for
+> for calling cpu_pm_enter and cpu_pm_exit for retention states.
+> 
+> workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
+>         Average overhead of cpu_pm_enter - 1.2us
+>         Average overhead of cpu_pm_exit  - 3.1us
+> 
+> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+> ---
+>  include/linux/cpuidle.h | 38 +++++++++++++++++++++++---------------
+>  1 file changed, 23 insertions(+), 15 deletions(-)
+> 
+> diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
+> index 8f7788d..54cbd9d 100644
+> --- a/include/linux/cpuidle.h
+> +++ b/include/linux/cpuidle.h
+> @@ -258,21 +258,29 @@ static inline int cpuidle_register_governor(struct cpuidle_governor *gov)
+>  #endif
+>  
+>  #define CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx)	\
+> -({								\
+> -	int __ret;						\
+> -								\
+> -	if (!idx) {						\
+> -		cpu_do_idle();					\
+> -		return idx;					\
+> -	}							\
+> -								\
+> -	__ret = cpu_pm_enter();					\
+> -	if (!__ret) {						\
+> -		__ret = low_level_idle_enter(idx);		\
+> -		cpu_pm_exit();					\
+> -	}							\
+> -								\
+> -	__ret ? -1 : idx;					\
+> +	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 0)
+> +
+> +#define CPU_PM_CPU_IDLE_ENTER_RETENTION(low_level_idle_enter, idx)	\
+> +	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 1)
+> +
+> +#define __CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, is_retention) \
+> +({									\
+> +	int __ret = 0;							\
+> +									\
+> +	if (!idx) {							\
+> +		cpu_do_idle();						\
+> +		return idx;						\
+> +	}								\
+> +									\
+> +	if (!is_retention)						\
+> +		__ret =  cpu_pm_enter();				\
+> +	if (!__ret) {							\
+> +		__ret = low_level_idle_enter(idx);			\
+> +		if (!is_retention)					\
+> +			cpu_pm_exit();					\
+> +	}								\
+> +									\
+> +	__ret ? -1 : idx;						\
+>  })
+>  
+>  #endif /* _LINUX_CPUIDLE_H */
+> 
 
-Actually, this is already clearly stated against DEBUG_LL:
+The ordering of the macros seems kind of backwards.  The inner-most
+ones usually go first (which is more natural for a human reader too).
 
-          Note that selecting this option will limit the kernel to a single
-          UART definition, as specified below. Attempting to boot the kernel
-          image on a different platform *will not work*, so this option should
-          not be enabled for kernels that are intended to be portable.
-
-and since EARLY_PRINTK depends on DEBUG_LL... I guess people don't
-read help texts anymore.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks,
+Rafael
