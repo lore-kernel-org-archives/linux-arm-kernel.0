@@ -1,27 +1,80 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 8 Nov 2017 08:42:21 -0800
-Subject: [PATCH v2 2/7] arm: omap: Move dmtimer.h out of plat-omap
-In-Reply-To: <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
-References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
- <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
-Message-ID: <20171108164221.GV28152@atomide.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Wed, 8 Nov 2017 16:42:48 +0000
+Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
+ untried/unknown (next-20171106)
+In-Reply-To: <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
+References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
+ <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
+ <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
+ <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
+ <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
+ <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
+ <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
+Message-ID: <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [171108 12:31]:
-> The header file is currently under plat-omap directory
-> under arch/omap. Move this out to an accessible place.
-> 
-> No Code changes done to the header file.
+On 08/11/17 15:57, Jon Hunter wrote:
+>
+> On 08/11/17 15:19, Guillaume Tucker wrote:
+>
+> ...
+>
+>> After a few more automated bisection attempts and a bug fix in
+>> LAVA, I've now found at least one potentially breaking commit:
+>>
+>>   commit d89e2378a97fafdc74cbf997e7c88af75b81610a
+>>   Author: Robin Murphy <robin.murphy@arm.com>
+>>   Date:   Thu Oct 12 16:56:14 2017 +0100
+>>
+>>       drivers: flag buses which demand DMA configuration
+>>
+>>
+>> I've run some boot tests manually with this revision and then
+>> also after reverting it in-place, these respectively failed and
+>> passed:
+>>
+>>   * d89e2378, failed:
+>>     https://lava.collabora.co.uk/scheduler/job/978968
+>>
+>>   * d89e2378 reverted, passed:
+>>     https://lava.collabora.co.uk/scheduler/job/978969
+>>
+>>
+>> I then went on and tried the same but on top of next-20171108 and
+>> found that they both failed
+>>
+>>   * next-20171108, failed:
+>>     https://lava.collabora.co.uk/scheduler/job/979063
+>>
+>>   * next-20171108 with d89e2378 reverted, failed as well:
+>>     https://lava.collabora.co.uk/scheduler/job/979167
+>>
+>>
+>> So this shows there is almost certainly another offending commit
+>> in -next.  The errors in both cases are not quite the same, the
+>> last one is triggered by a BUG whereas the first one is a NULL
+>> pointer (I haven't looked any further).  Also I don't think
+>> there's any fix for d89e2378a97fafdc74cbf997e7c88af75b81610a
+>> which is currently still in next.
+>
+> This crash is a known issue [0] and we have been discussing this. Can
+> you try applying [1]?
 
-Some of the dmtimer functions are in this header to optimize the
-size of the system timer code. Can you please check if some of them
-can be left out of dmtimer.h and be made private to mach-omap1/timer.c
-and mach-omap2/timer.c?
+So with next-20171108 + d89e2378a9 reverted + [1] applied:
 
-Again, we don't want driver code to start mis-using these as that's
-immediately going to be big mess out of control.
+   https://lava.collabora.co.uk/scheduler/job/979173
 
-Regards,
+No visible kernel crash in the log but it hangs.
 
-Tony
+
+I also tried next-20171108 + [1] applied only:
+
+   https://lava.collabora.co.uk/scheduler/job/979179
+
+which also appears to hang.
+
+Guillaume
+
+> [0] https://lkml.org/lkml/2017/9/19/306
+> [1] https://patchwork.kernel.org/patch/9974835/
