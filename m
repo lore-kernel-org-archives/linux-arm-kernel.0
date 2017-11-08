@@ -1,63 +1,49 @@
-From: eric.auger@redhat.com (Auger Eric)
-Date: Wed, 8 Nov 2017 15:14:03 +0100
-Subject: [PATCH v5 12/26] KVM: arm/arm64: GICv4: Unmap VLPI when freeing
- an LPI
-In-Reply-To: <aa3f7570-d200-d138-2a45-798d9d051274@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-13-marc.zyngier@arm.com>
- <052a6676-c15a-6d91-da1e-660312c29f1b@redhat.com>
- <aa3f7570-d200-d138-2a45-798d9d051274@arm.com>
-Message-ID: <1da6c685-28f0-ae5c-b47c-738730d2faa9@redhat.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Wed, 8 Nov 2017 14:27:28 +0000
+Subject: [PATCH 2/2] ARM64 / cpuidle: Use new cpuidle macro for entering
+ retention state
+In-Reply-To: <1510076133-18139-3-git-send-email-pprakash@codeaurora.org>
+References: <1510076133-18139-1-git-send-email-pprakash@codeaurora.org>
+ <1510076133-18139-3-git-send-email-pprakash@codeaurora.org>
+Message-ID: <16086b6c-6f34-35e8-bc19-705380e5b767@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-On 08/11/2017 12:52, Marc Zyngier wrote:
-> On 07/11/17 20:28, Auger Eric wrote:
->> Hi Marc,
->>
->> On 27/10/2017 16:28, Marc Zyngier wrote:
->>> When freeing an LPI (on a DISCARD command, for example), we need
->>> to unmap the VLPI down to the physical ITS level.
->>>
->>> Acked-by: Christoffer Dall <cdall@linaro.org>
->>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>> ---
->>>  virt/kvm/arm/vgic/vgic-its.c | 6 +++++-
->>>  1 file changed, 5 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->>> index b2a678d131d0..c9b1c0967426 100644
->>> --- a/virt/kvm/arm/vgic/vgic-its.c
->>> +++ b/virt/kvm/arm/vgic/vgic-its.c
->>> @@ -628,8 +628,12 @@ static void its_free_ite(struct kvm *kvm, struct its_ite *ite)
->>>  	list_del(&ite->ite_list);
->>>  
->>>  	/* This put matches the get in vgic_add_lpi. */
->>> -	if (ite->irq)
->>> +	if (ite->irq) {
->>> +		if (ite->irq->hw)
->>> +			WARN_ON(its_unmap_vlpi(ite->irq->host_irq));
->>> +
->>>  		vgic_put_irq(kvm, ite->irq);
->> You could have put the its_unmap_vlpi() directly in vgic_put_irq which
->> is meant to decr the ref/release the LPI irq.
-> 
-> Do you see this as an issue?
 
-not really. I just thought it would be nicer in vgic_put_irq but that's
-a detail.
+On 07/11/17 17:35, Prashanth Prakash wrote:
+> CPU_PM_CPU_IDLE_ENTER_RETENTION skips calling cpu_pm_enter() and
+> cpu_pm_exit(). By not calling cpu_pm functions in idle entry/exit
+> paths we can reduce the latency involved in entering and exiting
+> the low power idle state.
+> 
+> On ARM64 based Qualcomm server platform we measured below overhead
+> for calling cpu_pm_enter and cpu_pm_exit for retention states.
+> 
+> workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
+> 	Average overhead of cpu_pm_enter - 1.2us
+> 	Average overhead of cpu_pm_exit  - 3.1us
+> 
+> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+> ---
+>  arch/arm64/kernel/cpuidle.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
+> index fd69108..f2d1381 100644
+> --- a/arch/arm64/kernel/cpuidle.c
+> +++ b/arch/arm64/kernel/cpuidle.c
+> @@ -47,6 +47,8 @@ int arm_cpuidle_suspend(int index)
+>  
+>  #include <acpi/processor.h>
+>  
+> +#define ARM64_LPI_IS_RETENTION_STATE(arch_flags) (!(arch_flags))
+> +
 
-Thanks
+Ideally we could cater both ACPI LPI and DT using PSCI parameters. No ?
+Just thinking it out loud as I see no reason to restrict this just to
+ACPI LPIs.
 
-Eric
-> 
-> I'm trying hard to keep the GICv4 changes local to the ITS code, and not
-> spread it everywhere in the vgic, but I'll happily change it if you spot
-> something that seems wrong.
-> 
-> Thanks,
-> 
-> 	M.
-> 
+-- 
+Regards,
+Sudeep
