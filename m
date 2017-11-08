@@ -1,98 +1,49 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 08 Nov 2017 16:08:04 +0000
-Subject: Applied "ASoC: stm32: spdifrx: fix control DMA error management" to
- the asoc tree
-In-Reply-To: <1509981533-28622-3-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1eCStY-0002Do-DQ@debutante>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 9 Nov 2017 00:25:22 +0800
+Subject: [PATCH 3/3] ASoC: sun8i-codec: Fix left and right channels
+ inversion
+In-Reply-To: <20171108154710.16407-4-maxime.ripard@free-electrons.com>
+References: <20171108154710.16407-1-maxime.ripard@free-electrons.com>
+ <20171108154710.16407-4-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v678wHyfCm1HzdmGT8f7qcv7VGkAZprMuK5rwqfT7BTvQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Wed, Nov 8, 2017 at 11:47 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Since its introduction, the codec had an inversion of the left and right
+> channels. It turned out to be pretty simple as it appears that the codec
+> doesn't have the same polarity on the LRCK signal than the I2S block.
+>
+> Fix this by inverting our bit value for the LRCK inversion.
+>
+> Fixes: 36c684936fae ("ASoC: Add sun8i digital audio codec")
+> Cc: <stable@vger.kernel.org>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-   ASoC: stm32: spdifrx: fix control DMA error management
+I suggest adding a comment in case anyone stumbles across it.
 
-has been applied to the asoc tree at
+Otherwise,
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 98c8dc2fd59fdad77d26d7b0d7007776c5fbec16 Mon Sep 17 00:00:00 2001
-From: olivier moysan <olivier.moysan@st.com>
-Date: Mon, 6 Nov 2017 16:18:53 +0100
-Subject: [PATCH] ASoC: stm32: spdifrx: fix control DMA error management
-
-Fix DMA channel request error handling.
-
-Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/stm/stm32_spdifrx.c | 15 +++++++--------
- 1 file changed, 7 insertions(+), 8 deletions(-)
-
-diff --git a/sound/soc/stm/stm32_spdifrx.c b/sound/soc/stm/stm32_spdifrx.c
-index d7dbe84d5eeb..b9bdefcd3e10 100644
---- a/sound/soc/stm/stm32_spdifrx.c
-+++ b/sound/soc/stm/stm32_spdifrx.c
-@@ -392,6 +392,12 @@ static int stm32_spdifrx_dma_ctrl_register(struct device *dev,
- {
- 	int ret;
- 
-+	spdifrx->ctrl_chan = dma_request_chan(dev, "rx-ctrl");
-+	if (IS_ERR(spdifrx->ctrl_chan)) {
-+		dev_err(dev, "dma_request_slave_channel failed\n");
-+		return PTR_ERR(spdifrx->ctrl_chan);
-+	}
-+
- 	spdifrx->dmab = devm_kzalloc(dev, sizeof(struct snd_dma_buffer),
- 				     GFP_KERNEL);
- 	if (!spdifrx->dmab)
-@@ -406,12 +412,6 @@ static int stm32_spdifrx_dma_ctrl_register(struct device *dev,
- 		return ret;
- 	}
- 
--	spdifrx->ctrl_chan = dma_request_chan(dev, "rx-ctrl");
--	if (!spdifrx->ctrl_chan) {
--		dev_err(dev, "dma_request_slave_channel failed\n");
--		return -EINVAL;
--	}
--
- 	spdifrx->slave_config.direction = DMA_DEV_TO_MEM;
- 	spdifrx->slave_config.src_addr = (dma_addr_t)(spdifrx->phys_addr +
- 					 STM32_SPDIFRX_CSR);
-@@ -423,7 +423,6 @@ static int stm32_spdifrx_dma_ctrl_register(struct device *dev,
- 				     &spdifrx->slave_config);
- 	if (ret < 0) {
- 		dev_err(dev, "dmaengine_slave_config returned error %d\n", ret);
--		dma_release_channel(spdifrx->ctrl_chan);
- 		spdifrx->ctrl_chan = NULL;
- 	}
- 
-@@ -962,7 +961,7 @@ static int stm32_spdifrx_probe(struct platform_device *pdev)
- 	return 0;
- 
- error:
--	if (spdifrx->ctrl_chan)
-+	if (!IS_ERR(spdifrx->ctrl_chan))
- 		dma_release_channel(spdifrx->ctrl_chan);
- 	if (spdifrx->dmab)
- 		snd_dma_free_pages(spdifrx->dmab);
--- 
-2.15.0
+> ---
+>  sound/soc/sunxi/sun8i-codec.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+> index 522546e6b153..c8dcb1502d74 100644
+> --- a/sound/soc/sunxi/sun8i-codec.c
+> +++ b/sound/soc/sunxi/sun8i-codec.c
+> @@ -200,7 +200,7 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+>                            value << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_INV);
+>         regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
+>                            BIT(SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV),
+> -                          value << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV);
+> +                          !value << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV);
+>
+>         /* DAI format */
+>         switch (fmt & SND_SOC_DAIFMT_FORMAT_MASK) {
+> --
+> 2.14.3
+>
