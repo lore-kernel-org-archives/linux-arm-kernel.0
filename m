@@ -1,68 +1,183 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 8 Nov 2017 15:57:48 +0000
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
- <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
- <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
- <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
- <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
- <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
-Message-ID: <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
+From: james.morse@arm.com (James Morse)
+Date: Wed,  8 Nov 2017 16:06:24 +0000
+Subject: [PATCH v4 15/13] firmware: arm_sdei: be more robust against
+ cpu-hotplug
+In-Reply-To: <5A031E9E.2090809@arm.com>
+References: <5A031E9E.2090809@arm.com>
+Message-ID: <20171108160624.10355-1-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+dpm_suspend() calls the freeze/thaw callbacks for hibernate before
+disable_non_bootcpus() takes down secondaries.
 
-On 08/11/17 15:19, Guillaume Tucker wrote:
+This leads to a fun race where the freeze/thaw callbacks reset the
+SDEI interface (as we may be restoring a kernel with a different
+layout due to KASLR), then the cpu-hotplug callbacks come in to
+save the current state, which has already been reset.
 
-...
+I tried to solve this with a 'frozen' flag that stops the hotplug
+callback from overwriting the saved values. Instead this just
+moves the race around and makes it even harder to think about.
 
-> After a few more automated bisection attempts and a bug fix in
-> LAVA, I've now found at least one potentially breaking commit:
-> 
-> ? commit d89e2378a97fafdc74cbf997e7c88af75b81610a
-> ? Author: Robin Murphy <robin.murphy@arm.com>
-> ? Date:?? Thu Oct 12 16:56:14 2017 +0100
-> 
-> ????? drivers: flag buses which demand DMA configuration
-> 
-> 
-> I've run some boot tests manually with this revision and then
-> also after reverting it in-place, these respectively failed and
-> passed:
-> 
-> ? * d89e2378, failed:
-> ??? https://lava.collabora.co.uk/scheduler/job/978968
-> 
-> ? * d89e2378 reverted, passed:
-> ??? https://lava.collabora.co.uk/scheduler/job/978969
-> 
-> 
-> I then went on and tried the same but on top of next-20171108 and
-> found that they both failed
-> 
-> ? * next-20171108, failed:
-> ??? https://lava.collabora.co.uk/scheduler/job/979063
-> 
-> ? * next-20171108 with d89e2378 reverted, failed as well:
-> ??? https://lava.collabora.co.uk/scheduler/job/979167
-> 
-> 
-> So this shows there is almost certainly another offending commit
-> in -next.? The errors in both cases are not quite the same, the
-> last one is triggered by a BUG whereas the first one is a NULL
-> pointer (I haven't looked any further).? Also I don't think
-> there's any fix for d89e2378a97fafdc74cbf997e7c88af75b81610a
-> which is currently still in next.
+Instead, make it look like the secondaries have gone offline.
+Call cpuhp_remove_state() in the freeze callback, this will call the
+teardown hook on all online CPUs, then remove the state. This saves
+all private events and makes future CPU up/down events invisible.
 
-This crash is a known issue [0] and we have been discussing this. Can
-you try applying [1]?
+Change sdei_event_unregister_all()/sdei_reregister_events() to
+only save/restore shared events, which are all that is left. With
+this we can remove the frozen flag. We can remove the device
+suspend/resume calls too as cpuhotplug's teardown call has masked
+the CPUs.
 
-Cheers
-Jon
+All that is left is the reboot notifier, (which was abusing the
+frozen flag). Call cpuhp_remove_state() to make it look like
+secondary CPUs have gone offline.
 
-[0] https://lkml.org/lkml/2017/9/19/306
-[1] https://patchwork.kernel.org/patch/9974835/
+Suggested-by: Will Deacon <will.deacon@arm.com>
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ drivers/firmware/arm_sdei.c | 60 +++++++++++++++++++++++----------------------
+ 1 file changed, 31 insertions(+), 29 deletions(-)
+
+diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+index 65a8f122f545..d50634a25954 100644
+--- a/drivers/firmware/arm_sdei.c
++++ b/drivers/firmware/arm_sdei.c
+@@ -86,9 +86,6 @@ struct sdei_event {
+ static LIST_HEAD(sdei_events);
+ static DEFINE_SPINLOCK(sdei_events_lock);
+ 
+-/* When frozen, cpu-hotplug notifiers shouldn't unregister/re-register events */
+-static bool frozen;
+-
+ static DEFINE_PER_CPU(u64, sdei_running_event) = -1;
+ 
+ /* Private events are registered/enabled via IPI passing one of these */
+@@ -625,15 +622,18 @@ EXPORT_SYMBOL(sdei_event_unregister);
+ 
+ /*
+  * unregister events, but don't destroy them as they are re-registered by
+- * sdei_reregister_events().
++ * sdei_reregister_shared().
+  */
+-static int sdei_event_unregister_all(void)
++static int sdei_unregister_shared(void)
+ {
+ 	int err = 0;
+ 	struct sdei_event *event;
+ 
+ 	spin_lock(&sdei_events_lock);
+ 	list_for_each_entry(event, &sdei_events, list) {
++		if (event->type != SDEI_EVENT_TYPE_SHARED)
++			continue;
++
+ 		err = _sdei_event_unregister(event);
+ 		if (err)
+ 			break;
+@@ -841,13 +841,16 @@ static int sdei_reregister_event(struct sdei_event *event)
+ 	return err;
+ }
+ 
+-static int sdei_reregister_events(void)
++static int sdei_reregister_shared(void)
+ {
+ 	int err = 0;
+ 	struct sdei_event *event;
+ 
+ 	spin_lock(&sdei_events_lock);
+ 	list_for_each_entry(event, &sdei_events, list) {
++		if (event->type != SDEI_EVENT_TYPE_SHARED)
++			continue;
++
+ 		err = sdei_reregister_event(event);
+ 		if (err)
+ 			break;
+@@ -862,11 +865,6 @@ static int sdei_cpuhp_down(unsigned int cpu)
+ 	struct sdei_event *event;
+ 	struct sdei_crosscall_args arg;
+ 
+-	if (frozen) {
+-		/* All events unregistered  */
+-		return sdei_mask_local_cpu();
+-	}
+-
+ 	/* un-register private events */
+ 	spin_lock(&sdei_events_lock);
+ 	list_for_each_entry(event, &sdei_events, list) {
+@@ -890,11 +888,6 @@ static int sdei_cpuhp_up(unsigned int cpu)
+ 	struct sdei_event *event;
+ 	struct sdei_crosscall_args arg;
+ 
+-	if (frozen) {
+-		/* Events will be re-registered when we thaw. */
+-		return sdei_unmask_local_cpu();
+-	}
+-
+ 	/* re-register/enable private events */
+ 	spin_lock(&sdei_events_lock);
+ 	list_for_each_entry(event, &sdei_events, list) {
+@@ -1004,22 +997,33 @@ static int sdei_device_freeze(struct device *dev)
+ {
+ 	int err;
+ 
+-	frozen = true;
+-	err = sdei_event_unregister_all();
++	/* save and unregister private events */
++	cpuhp_remove_state(CPUHP_AP_ARM_SDEI_STARTING);
++
++	err = sdei_unregister_shared();
+ 	if (err)
+ 		return err;
+ 
+-	return sdei_device_suspend(dev);
++	return 0;
+ }
+ 
+ static int sdei_device_thaw(struct device *dev)
+ {
+ 	int err;
+ 
+-	sdei_device_resume(dev);
++	/* re-register shared events */
++	err = sdei_reregister_shared();
++	if (err) {
++		pr_warn("Failed to re-register shared events...\n");
++		sdei_mark_interface_broken();
++		return err;
++	}
++
++	err = cpuhp_setup_state(CPUHP_AP_ARM_SDEI_STARTING, "SDEI",
++				&sdei_cpuhp_up, &sdei_cpuhp_down);
++	if (err)
++		pr_warn("Failed to re-register CPU hotplug notifier...\n");
+ 
+-	err = sdei_reregister_events();
+-	frozen = false;
+ 	return err;
+ }
+ 
+@@ -1048,15 +1052,13 @@ static const struct dev_pm_ops sdei_pm_ops = {
+ static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
+ 				void *data)
+ {
+-	on_each_cpu(&_ipi_mask_cpu, NULL, true);
+-
+-	sdei_platform_reset();
+-
+ 	/*
+-	 * There is now no point trying to unregister private events if we go on
+-	 * to take CPUs offline.
++	 * We are going to reset the interface, after this there is no point
++	 * doing work when we take CPUs offline.
+ 	 */
+-	frozen = true;
++	cpuhp_remove_state(CPUHP_AP_ARM_SDEI_STARTING);
++
++	sdei_platform_reset();
+ 
+ 	return NOTIFY_OK;
+ }
 -- 
-nvpublic
+2.15.0
