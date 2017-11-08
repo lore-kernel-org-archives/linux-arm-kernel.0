@@ -1,82 +1,149 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 8 Nov 2017 10:46:10 -0600
-Subject: [PATCH v2] kbuild: clean up *.dtb and *.dtb.S patterns from
- top-level Makefile
-In-Reply-To: <1509591085-23940-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1509591085-23940-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CAL_JsqKLbDWcwcgotnQAO2FeFp55SZRd0z9r2Dr0ZsK0LKZMLw@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 8 Nov 2017 16:47:25 +0000
+Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
+ untried/unknown (next-20171106)
+In-Reply-To: <cdac9d47-42ce-b5c2-b325-68726d194888@kapsi.fi>
+References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
+ <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
+ <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
+ <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
+ <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
+ <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
+ <7ce29bba-485c-b063-961a-3a745718357f@arm.com>
+ <cdac9d47-42ce-b5c2-b325-68726d194888@kapsi.fi>
+Message-ID: <20462478-b50f-abd1-05b0-26a2fda3a2ad@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 1, 2017 at 9:51 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> We need to add "clean-files" in Makfiles to clean up DT blobs, but we
-> often miss to do so.
->
-> Since there are no source files that end with .dtb or .dtb.S, so we
-> can clean-up those files from the top-level Makefile.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
->
-> Changes in v2:
->   - Remove clean-files
+On 08/11/17 16:23, Mikko Perttunen wrote:
+> On 08.11.2017 17:55, Robin Murphy wrote:
+>>
+>>
+>> On 08/11/17 15:19, Guillaume Tucker wrote:
+>>> On 07/11/17 11:43, Guillaume Tucker wrote:
+>>>> On 07/11/17 10:55, Mark Brown wrote:
+>>>>> On Tue, Nov 07, 2017 at 10:12:59AM +0000, Jon Hunter wrote:
+>>>>>> On 06/11/17 19:17, Mark Brown wrote:
+>>>>>
+>>>>>>>> ??? multi_v7_defconfig:
+>>>>>>>> ??????? tegra124-nyan-big:
+>>>>>>>> ??????????? lab-collabora: failing since 2 days (last pass:
+>>>>>>>> next-20171102 - first fail: next-20171103)
+>>>>>
+>>>>>> Thanks for the report. I have been looking into a failure on nyan-big
+>>>>>> [0], but this one looks like a new failure. I will take a look.
+>>>>>
+>>>>> Guillaume Tucker has been bisecting this with the shiny new bisection
+>>>>> code he's testing, he was saying on IRC he thinks he's found the
+>>>>> offending commit:
+>>>>>
+>>>>>
+>>>>> https://people.collabora.com/~gtucker/tmp/bisect-tegra-4.14.rc8-next-20171106.txt 
+>>>>>
+>>>>>
+>>>>>
+>>>>> (not CCing Johannes yet)
+>>>>
+>>>> Please take this with a pinch of salt, I'm now running some extra
+>>>> boot tests to prove it.? If you look at this log, all the boots
+>>>> passed which is a bit suspicious.? I did build and boot the
+>>>> revision it found with multi_v7_defconfig on tegra124 and it
+>>>> passed, so it looks like this commit may not have anything to do
+>>>> with the boot failure.? The automated bisection is still experimental.
+>>>>
+>>>> Passing LAVA boot test with this revision:
+>>>>
+>>>> ? https://lava.collabora.co.uk/scheduler/job/976375
+>>>>
+>>>> I've started a slightly different bisection job now on
+>>>> next-20171107 and the common ancestor between next and mainline,
+>>>> results can take a few hours to come back.
+>>>
+>>> After a few more automated bisection attempts and a bug fix in
+>>> LAVA, I've now found at least one potentially breaking commit:
+>>>
+>>> ?? commit d89e2378a97fafdc74cbf997e7c88af75b81610a
+>>> ?? Author: Robin Murphy <robin.murphy@arm.com>
+>>> ?? Date:?? Thu Oct 12 16:56:14 2017 +0100
+>>>
+>>> ?????? drivers: flag buses which demand DMA configuration
+>>>
+>>>
+>>> I've run some boot tests manually with this revision and then
+>>> also after reverting it in-place, these respectively failed and
+>>> passed:
+>>>
+>>> ?? * d89e2378, failed:
+>>> ???? https://lava.collabora.co.uk/scheduler/job/978968
+>>>
+>>> ?? * d89e2378 reverted, passed:
+>>> ???? https://lava.collabora.co.uk/scheduler/job/978969
+>>>
+>>>
+>>> I then went on and tried the same but on top of next-20171108 and
+>>> found that they both failed
+>>>
+>>> ?? * next-20171108, failed:
+>>> ???? https://lava.collabora.co.uk/scheduler/job/979063
+>>>
+>>> ?? * next-20171108 with d89e2378 reverted, failed as well:
+>>> ???? https://lava.collabora.co.uk/scheduler/job/979167
+>>>
+>>>
+>>> So this shows there is almost certainly another offending commit
+>>> in -next.? The errors in both cases are not quite the same, the
+>>> last one is triggered by a BUG whereas the first one is a NULL
+>>> pointer (I haven't looked any further).? Also I don't think
+>>> there's any fix for d89e2378a97fafdc74cbf997e7c88af75b81610a
+>>> which is currently still in next.
+>>
+>> The fix was actually posted before said commit was even written:
+>>
+>> https://patchwork.kernel.org/patch/9967847/
+>>
+>> What is currently queued in the DMA tree fell out of the discussion on
+>> patch 2 of that series, but I kind of assumed the host1x folks would
+>> still take patch 1; I guess that hasn't happened.
+> 
+> I am seeing this patch in linux-next, though:
 
-Applied this and the 2 prerequisite patches.
+Phew, great! Perhaps I should have actually looked :)
 
->
->  Documentation/kbuild/makefiles.txt               | 1 -
->  Makefile                                         | 2 +-
->  arch/arc/boot/dts/Makefile                       | 1 -
->  arch/arm/boot/dts/Makefile                       | 1 -
->  arch/arm64/boot/dts/actions/Makefile             | 1 -
->  arch/arm64/boot/dts/al/Makefile                  | 1 -
->  arch/arm64/boot/dts/allwinner/Makefile           | 1 -
->  arch/arm64/boot/dts/altera/Makefile              | 1 -
->  arch/arm64/boot/dts/amd/Makefile                 | 1 -
->  arch/arm64/boot/dts/amlogic/Makefile             | 1 -
->  arch/arm64/boot/dts/apm/Makefile                 | 1 -
->  arch/arm64/boot/dts/arm/Makefile                 | 1 -
->  arch/arm64/boot/dts/broadcom/Makefile            | 1 -
->  arch/arm64/boot/dts/broadcom/northstar2/Makefile | 1 -
->  arch/arm64/boot/dts/broadcom/stingray/Makefile   | 1 -
->  arch/arm64/boot/dts/cavium/Makefile              | 1 -
->  arch/arm64/boot/dts/exynos/Makefile              | 1 -
->  arch/arm64/boot/dts/freescale/Makefile           | 1 -
->  arch/arm64/boot/dts/hisilicon/Makefile           | 1 -
->  arch/arm64/boot/dts/lg/Makefile                  | 1 -
->  arch/arm64/boot/dts/marvell/Makefile             | 1 -
->  arch/arm64/boot/dts/mediatek/Makefile            | 1 -
->  arch/arm64/boot/dts/nvidia/Makefile              | 1 -
->  arch/arm64/boot/dts/qcom/Makefile                | 1 -
->  arch/arm64/boot/dts/realtek/Makefile             | 1 -
->  arch/arm64/boot/dts/renesas/Makefile             | 1 -
->  arch/arm64/boot/dts/rockchip/Makefile            | 1 -
->  arch/arm64/boot/dts/socionext/Makefile           | 1 -
->  arch/arm64/boot/dts/sprd/Makefile                | 1 -
->  arch/arm64/boot/dts/xilinx/Makefile              | 1 -
->  arch/arm64/boot/dts/zte/Makefile                 | 1 -
->  arch/c6x/boot/dts/Makefile                       | 2 --
->  arch/cris/boot/dts/Makefile                      | 2 --
->  arch/h8300/boot/dts/Makefile                     | 1 -
->  arch/metag/boot/dts/Makefile                     | 1 -
->  arch/microblaze/boot/Makefile                    | 2 +-
->  arch/mips/boot/dts/Makefile                      | 1 -
->  arch/mips/boot/dts/brcm/Makefile                 | 1 -
->  arch/mips/boot/dts/cavium-octeon/Makefile        | 1 -
->  arch/mips/boot/dts/img/Makefile                  | 1 -
->  arch/mips/boot/dts/ingenic/Makefile              | 1 -
->  arch/mips/boot/dts/lantiq/Makefile               | 1 -
->  arch/mips/boot/dts/mti/Makefile                  | 1 -
->  arch/mips/boot/dts/netlogic/Makefile             | 1 -
->  arch/mips/boot/dts/ni/Makefile                   | 1 -
->  arch/mips/boot/dts/pic32/Makefile                | 1 -
->  arch/mips/boot/dts/qca/Makefile                  | 1 -
->  arch/mips/boot/dts/ralink/Makefile               | 1 -
->  arch/mips/boot/dts/xilfpga/Makefile              | 1 -
->  arch/nios2/boot/Makefile                         | 2 --
->  arch/openrisc/boot/dts/Makefile                  | 2 --
->  arch/powerpc/boot/Makefile                       | 2 +-
->  arch/sh/boot/dts/Makefile                        | 2 --
->  arch/xtensa/boot/dts/Makefile                    | 2 --
->  54 files changed, 3 insertions(+), 60 deletions(-)
+So for this case it seems it's only the DRM tree being merged into -next 
+after the DMA mapping tree which is hurting Guillaume's bisection. 
+That's unfortunate, but it least it's not an a complete showstopper.
+
+Robin.
+
+> commit 2fb0dceb69ce957f01bdb6fddf7baf4c4b9cbc0d
+> Author:???? Mikko Perttunen <mperttunen@nvidia.com>
+> AuthorDate: Sun Sep 24 12:04:53 2017 +0300
+> Commit:???? Thierry Reding <treding@nvidia.com>
+> CommitDate: Fri Oct 20 14:19:51 2017 +0200
+> 
+>  ??? gpu: host1x: Call of_dma_configure() after setting bus
+> 
+>  ??? of_dma_configure() now checks the device's bus before configuring 
+> it, so
+>  ??? we need to set the device's bus before calling.
+> 
+>  ??? Signed-off-by: Mikko Perttunen <mperttunen@nvidia.com>
+>  ??? Signed-off-by: Thierry Reding <treding@nvidia.com>
+> 
+> 
+> Mikko
+> 
+>>
+>> Robin.
+>>
+>>>
+>>> Note: This happens to be a very good example of running a
+>>> kernelci.org bisection on a real issue, it's quite a bit of a
+>>> pipe cleaner.? I'll now see if there's a way to bisect what looks
+>>> like another breaking change in-between.
+>>>
+>>> Guillaume
+>> -- 
+>> To unsubscribe from this list: send the line "unsubscribe linux-tegra" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at? http://vger.kernel.org/majordomo-info.html
