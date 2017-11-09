@@ -1,57 +1,62 @@
-From: james.morse@arm.com (James Morse)
-Date: Thu, 09 Nov 2017 18:14:56 +0000
-Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
- support
-In-Reply-To: <20171019145807.23251-1-james.morse@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
-Message-ID: <5A049B20.6000501@arm.com>
+From: luis.p.mendes@gmail.com (=?UTF-8?B?THXDrXMgTWVuZGVz?=)
+Date: Thu, 9 Nov 2017 18:45:30 +0000
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+In-Reply-To: <20171109162853.GD12318@n2100.armlinux.org.uk>
+References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+ <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+ <20171109093122.GA12318@n2100.armlinux.org.uk> <87inejaiij.fsf@intel.com>
+ <CAEzXK1qHEcB6f_uGPJk9RxSd+tP5rNuiutBN1FAkEv-nU1k5Ug@mail.gmail.com>
+ <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
+ <87efp7abwi.fsf@intel.com>
+ <CAEzXK1odLNgPTG_cAEqg8d2r_WbnqnVcCvAYQCHkRr4DgAHvhQ@mail.gmail.com>
+ <878tffa434.fsf@intel.com> <20171109162853.GD12318@n2100.armlinux.org.uk>
+Message-ID: <CAEzXK1qWdgUGaqfeJ8O=Jr6=Cj9Atpz2UAx_D6RrM5VNW-_h3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi guys,
+I've verified that dw_hdmi tracks when there is a monitor connected or
+not and reacts to it, there are logs that are generated when the
+TV/Monitor goes into standby and this is true even if DDC cannot be
+read.
+My original problem is that if the EDID data cannot be read then
+dw_hdmi will enter DVI mode confiuration, with which I cannot get
+sound, other than that the driver works properly.
 
-On 19/10/17 15:57, James Morse wrote:
-> Known issues:
-[...]
->  * KVM-Migration: VDISR_EL2 is exposed to userspace as DISR_EL1, but how should
->    HCR_EL2.VSE or VSESR_EL2 be migrated when the guest has an SError pending but
->    hasn't taken it yet...?
-
-I've been trying to work out how this pending-SError-migration could work.
-
-If HCR_EL2.VSE is set then the guest will take a virtual SError when it next
-unmasks SError. Today this doesn't get migrated, but only KVM sets this bit as
-an attempt to kill the guest.
-
-This will be more of a problem with GengDongjiu's SError CAP for triggering
-guest SError from user-space, which will also allow the VSESR_EL2 to be
-specified. (this register becomes the guest ESR_EL1 when the virtual SError is
-taken and is used to emulate firmware-first's NOTIFY_SEI and eventually
-kernel-first RAS). These errors are likely to be handled by the guest.
-
-
-We don't want to expose VSESR_EL2 to user-space, and for migration it isn't
-enough as a value of '0' doesn't tell us if HCR_EL2.VSE is set.
-
-To get out of this corner: why not declare pending-SError-migration an invalid
-thing to do?
-
-We can give Qemu a way to query if a virtual SError is (still) pending. Qemu
-would need to check this on each vcpu after migration, just before it throws the
-switch and the guest runs on the new host. This way the VSESR_EL2 value doesn't
-need migrating at all.
-
-In the ideal world, Qemu could re-inject the last SError it triggered if there
-is still one pending when it migrates... but because KVM injects errors too, it
-would need to block migration until this flag is cleared.
-KVM can promise this doesn't change unless you run the vcpu, so provided the
-vcpu actually takes the SError at some point this thing can still be migrated.
-
-This does make the VSE machinery hidden unmigratable state in KVM, which is nasty.
-
-Can anyone suggest a better way?
-
-
-Thanks,
-
-James
+On Thu, Nov 9, 2017 at 4:28 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Nov 09, 2017 at 05:01:35PM +0200, Jani Nikula wrote:
+>> On Thu, 09 Nov 2017, Lu?s Mendes <luis.p.mendes@gmail.com> wrote:
+>> > Hi Jani,
+>> >
+>> > I tried:
+>> > git clone git://people.freedesktop.org/~airlied/linux -b drm-next
+>> > --depth=1 --single-branch
+>> >
+>> > I got this:
+>> > EDID isn't loaded from file
+>> >
+>> > # cat /proc/cmdline
+>> > console=ttymxc0,115200 root=/dev/sda2 rw video=HDMI-A-1:1920x1080M at 60
+>> > drm.edid_firmware=edid/ktc_edid.bin dw_hdmi.dyndbg=+pfl cma=128M
+>>
+>> Please try adding D at the end of your video= parameter to force
+>> connector on. Otherwise it'll do a ddc probe which apparently fails with
+>> your display.
+>
+> I do hope you're not converting dw-hdmi to use DDC probing and having it
+> ignore the hotplug signal.  dw-hdmi has to work with AV setups, which
+> include an AV receiver, and that includes the AV receiver modifying the
+> HDMI data when:
+>
+> (a) the TV is turned off or on.
+> (b) the AV receiver is placed into or out of standby
+>
+> and it informs sources by pulsing the HDMI HPD signal, as per the HDMI
+> specification.  Proving the presence of DDC as a means of detection
+> won't pick up on these changes, and will cause a regression in the
+> driver.
+>
+> --
+> RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+> According to speedtest.net: 8.21Mbps down 510kbps up
