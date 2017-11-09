@@ -1,63 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 9 Nov 2017 14:48:10 +0000
-Subject: [PATCH] arm64/debug: don't duplicate filenames.
-In-Reply-To: <20171109144136.n4iser235446sv3x@cedar>
-References: <20171109121440.6872-1-jamie.iles@oracle.com>
- <20171109123503.GB22781@e103592.cambridge.arm.com>
- <20171109130851.ozarqoy4u3uag5so@cedar>
- <20171109143121.GC22781@e103592.cambridge.arm.com>
- <20171109144136.n4iser235446sv3x@cedar>
-Message-ID: <20171109144809.GD22781@e103592.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Nov 2017 06:52:23 -0800
+Subject: [PATCH v2 2/7] arm: omap: Move dmtimer.h out of plat-omap
+In-Reply-To: <008c2d8b-6f76-882d-fc70-8fd4204c49d5@ti.com>
+References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
+ <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
+ <20171108164221.GV28152@atomide.com>
+ <6ca9c73a-95a1-2466-151e-cdba64c3c478@ti.com>
+ <008c2d8b-6f76-882d-fc70-8fd4204c49d5@ti.com>
+Message-ID: <20171109145223.GB28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 02:41:36PM +0000, Jamie Iles wrote:
-> On Thu, Nov 09, 2017 at 02:31:22PM +0000, Dave Martin wrote:
-> > On Thu, Nov 09, 2017 at 01:08:51PM +0000, Jamie Iles wrote:
-> > > Hi Dave,
-> > > 
-> > > On Thu, Nov 09, 2017 at 12:35:04PM +0000, Dave Martin wrote:
-
-[...]
-
-> > > > Or is the linker not removing duplicates that some from the same source
-> > > > file?
-> > > 
-> > > In my testing, yes, the linker is merging them.
+* Keerthy <j-keerthy@ti.com> [171109 08:09]:
+> 
+> 
+> On Thursday 09 November 2017 09:55 AM, Keerthy wrote:
 > > 
-> > So, playing devil's advocate here, what is this fixing?
-> 
-> It's caused some confusion looking at object files, it's certainly not a 
-> critical bug!
-> 
-> > It doesn't really matter where in the toolchain the duplicates get
-> > removed, just that it happens somewhere...
 > > 
-> > It looks like ld -r doesn't do the deduplication, so there may be a fair
-> > amount of duplicates before the final linux of vmlinux -- which I guess
-> > could be an issue if BUG() is used in macros that get expanded all over
-> > the place.
+> > On Wednesday 08 November 2017 10:12 PM, Tony Lindgren wrote:
+> >> * Keerthy <j-keerthy@ti.com> [171108 12:31]:
+> >>> The header file is currently under plat-omap directory
+> >>> under arch/omap. Move this out to an accessible place.
+> >>>
+> >>> No Code changes done to the header file.
+> >>
+> >> Some of the dmtimer functions are in this header to optimize the
+> >> size of the system timer code. Can you please check if some of them
+> >> can be left out of dmtimer.h and be made private to mach-omap1/timer.c
+> >> and mach-omap2/timer.c?
+> > 
+> > Okay. I will try to clean that as well.
 > 
-> Ah, interesting.  Testing with a loadable module, this means that there 
-> are duplicates in modules.  With mainline:
+> Tony,
 > 
->   strings ./fs/ext4/ext4.ko | grep -c "inode\.c"
->   61
+> Only function that i could push out of dmtimer.h was
+> __omap_dm_timer_override_errata
 > 
-> and with my patch:
-> 
->   strings ./fs/ext4/ext4.ko | grep -c "inode\.c"
->   4
-> 
-> Thanks,
-> 
-> Jamie
+> which is being currently called by mach-omap2/timer.c alone.
 
-That's a more convincing argument...  I had forgotten that modules
-weren't fully linked.
+Hmm OK thanks for checking.
 
-So this does look like a good idea.  I have some comments, but I'll
-reply to the original patch (where there is code).
+> Rest all are used both my dmtimer.c as well as mach-omap2/timer.c.
+> Here is the list:
+> 
+> __omap_dm_timer_read
+> __omap_dm_timer_write
+> __omap_dm_timer_init_regs
+> __omap_dm_timer_enable_posted
+> __omap_dm_timer_stop
+> __omap_dm_timer_load_start
+> __omap_dm_timer_int_enable
+> __omap_dm_timer_read_counter
+> __omap_dm_timer_write_status
+> 
+> Any preferences on moving them to dmtimer.c or leaving them in header file?
 
-Cheers
----Dave
+How about we make the system timer functions and these header
+functions private to the dmtimer.c. Then we can have the SoC specific
+system timer functions be selected based on comaptible value like
+drivers typically do :)
+
+I think only the SoC specific init code should be left in
+arch/arm/mach-omap[12]/timer.c.
+
+Regards,
+
+Tony
