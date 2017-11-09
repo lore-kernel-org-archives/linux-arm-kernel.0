@@ -1,25 +1,122 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Thu, 9 Nov 2017 08:45:42 -0800
-Subject: [PATCH 13/15] arm64: fix mrs_s/msr_s macros for clang LTO
-In-Reply-To: <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103171203.107569-18-samitolvanen@google.com>
- <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
-Message-ID: <20171109164542.GB10540@samitolvanen.mtv.corp.google.com>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 9 Nov 2017 08:49:41 -0800
+Subject: [PATCH 1/4] arm64: dts: qcom: pm8916: fix wcd_codec indentation
+In-Reply-To: <20171101175335.22123-2-damien.riegel@savoirfairelinux.com>
+References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
+ <20171101175335.22123-2-damien.riegel@savoirfairelinux.com>
+Message-ID: <20171109164941.GZ28761@minitux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 08, 2017 at 12:25:55PM +0300, Yury Norov wrote:
-> The patch below uses trick with undefining mrs_s/msr_s immediately
-> after use to solve the problem. It works for both gcc and clang.
+On Wed 01 Nov 10:53 PDT 2017, Damien Riegel wrote:
 
-Great, looks good to me! I tested the patch with LTO and clang's integrated
-assembler seems to be happy with it.
+> Indentation did not respect kernel standards, so fix that for the usual
+> indent with tabs, align with spaces. While at it, remove some empty
+> lines before and after the closing parenthesis of this block.
+> 
+> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
 
-> It has solved many problems you also try to solve, and some patches
-> are looking very similar.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 
-I haven't had a closer look at the gcc LTO patches yet, but I am definitely
-all for using common code where possible.
+Regards,
+Bjorn
 
-Sami 
+> ---
+>  arch/arm64/boot/dts/qcom/pm8916.dtsi | 82 ++++++++++++++++++------------------
+>  1 file changed, 40 insertions(+), 42 deletions(-)
+> 
+> diff --git a/arch/arm64/boot/dts/qcom/pm8916.dtsi b/arch/arm64/boot/dts/qcom/pm8916.dtsi
+> index 53deebf9f515..d19f4cb9a5f3 100644
+> --- a/arch/arm64/boot/dts/qcom/pm8916.dtsi
+> +++ b/arch/arm64/boot/dts/qcom/pm8916.dtsi
+> @@ -96,47 +96,45 @@
+>  		#address-cells = <1>;
+>  		#size-cells = <0>;
+>  
+> -                wcd_codec: codec at f000 {
+> -                       compatible = "qcom,pm8916-wcd-analog-codec";
+> -	               reg = <0xf000 0x200>;
+> -	               reg-names = "pmic-codec-core";
+> -	               clocks = <&gcc GCC_CODEC_DIGCODEC_CLK>;
+> -	               clock-names = "mclk";
+> -	               interrupt-parent = <&spmi_bus>;
+> -	               interrupts = <0x1 0xf0 0x0 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf0 0x1 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf0 0x2 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf0 0x3 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf0 0x4 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf0 0x5 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf0 0x6 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf0 0x7 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf1 0x0 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf1 0x1 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf1 0x2 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf1 0x3 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf1 0x4 IRQ_TYPE_NONE>,
+> -	                            <0x1 0xf1 0x5 IRQ_TYPE_NONE>;
+> -	               interrupt-names = "cdc_spk_cnp_int",
+> -	                                 "cdc_spk_clip_int",
+> -	                                 "cdc_spk_ocp_int",
+> -	                                 "mbhc_ins_rem_det1",
+> -	                                 "mbhc_but_rel_det",
+> -	                                 "mbhc_but_press_det",
+> -	                                 "mbhc_ins_rem_det",
+> -	                                 "mbhc_switch_int",
+> -	                                 "cdc_ear_ocp_int",
+> -	                                 "cdc_hphr_ocp_int",
+> -	                                 "cdc_hphl_ocp_det",
+> -	                                 "cdc_ear_cnp_int",
+> -	                                 "cdc_hphr_cnp_int",
+> -	                                 "cdc_hphl_cnp_int";
+> -	               vdd-cdc-io-supply = <&pm8916_l5>;
+> -	               vdd-cdc-tx-rx-cx-supply = <&pm8916_l5>;
+> -	               vdd-micbias-supply = <&pm8916_l13>;
+> -	               #sound-dai-cells = <1>;
+> -
+> -                };
+> -
+> +		wcd_codec: codec at f000 {
+> +			compatible = "qcom,pm8916-wcd-analog-codec";
+> +			reg = <0xf000 0x200>;
+> +			reg-names = "pmic-codec-core";
+> +			clocks = <&gcc GCC_CODEC_DIGCODEC_CLK>;
+> +			clock-names = "mclk";
+> +			interrupt-parent = <&spmi_bus>;
+> +			interrupts = <0x1 0xf0 0x0 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf0 0x1 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf0 0x2 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf0 0x3 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf0 0x4 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf0 0x5 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf0 0x6 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf0 0x7 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf1 0x0 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf1 0x1 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf1 0x2 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf1 0x3 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf1 0x4 IRQ_TYPE_NONE>,
+> +				     <0x1 0xf1 0x5 IRQ_TYPE_NONE>;
+> +			interrupt-names = "cdc_spk_cnp_int",
+> +					  "cdc_spk_clip_int",
+> +					  "cdc_spk_ocp_int",
+> +					  "mbhc_ins_rem_det1",
+> +					  "mbhc_but_rel_det",
+> +					  "mbhc_but_press_det",
+> +					  "mbhc_ins_rem_det",
+> +					  "mbhc_switch_int",
+> +					  "cdc_ear_ocp_int",
+> +					  "cdc_hphr_ocp_int",
+> +					  "cdc_hphl_ocp_det",
+> +					  "cdc_ear_cnp_int",
+> +					  "cdc_hphr_cnp_int",
+> +					  "cdc_hphl_cnp_int";
+> +			vdd-cdc-io-supply = <&pm8916_l5>;
+> +			vdd-cdc-tx-rx-cx-supply = <&pm8916_l5>;
+> +			vdd-micbias-supply = <&pm8916_l13>;
+> +			#sound-dai-cells = <1>;
+> +		};
+>  	};
+>  };
+> -- 
+> 2.15.0
+> 
