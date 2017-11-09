@@ -1,49 +1,39 @@
 From: philip@cog.systems (Philip Derrin)
-Date: Thu,  9 Nov 2017 11:41:43 +1100
-Subject: [PATCH 1/2] ARM: mm: make STRICT_KERNEL_RWX effective for LPAE
-In-Reply-To: <20171109004144.2246-1-philip@cog.systems>
-References: <20171109004144.2246-1-philip@cog.systems>
-Message-ID: <20171109004144.2246-2-philip@cog.systems>
+Date: Thu,  9 Nov 2017 11:41:42 +1100
+Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
+Message-ID: <20171109004144.2246-1-philip@cog.systems>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, for ARM kernels with CONFIG_ARM_LPAE and
-CONFIG_STRICT_KERNEL_RWX enabled, the 2MiB pages mapping the
-kernel code and rodata are writable. They are marked read-only in
-a software bit (L_PMD_SECT_RDONLY) but the hardware read-only bit
-is not set (PMD_SECT_AP2).
+Hi,
 
-For user mappings, the logic that propagates the software bit
-to the hardware bit is in set_pmd_at(); but for the kernel,
-section_update() writes the PMDs directly, skipping this logic.
+This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
+when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
+mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
+merged in 3.19.
 
-The fix is to set PMD_SECT_AP2 for read-only sections in
-section_update(), at the same time as L_PMD_SECT_RDONLY.
+The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
+mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
+implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
+sections to be read-only"), and another that moved the LPAE read-only bit into
+a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
+logic for LPAE").
 
-Fixes: 1e3479225acb ("ARM: 8275/1: mm: fix PMD_SECT_RDONLY undeclared compile error")
-Signed-off-by: Philip Derrin <philip@cog.systems>
-Reported-by: Neil Dick <neil@cog.systems>
-Tested-by: Neil Dick <neil@cog.systems>
-Tested-by: Laura Abbott <labbott@redhat.com>
-Cc: stable at vger.kernel.org
----
+The incorrect mappings were not apparent in the debugfs kernel_page_tables
+dump because that was checking only the software RO bit, not the hardware RO
+bit.
+
+Regards,
+Philip
+
+
+Philip Derrin (2):
+  ARM: mm: make STRICT_KERNEL_RWX effective for LPAE
+  ARM: mm: dump: check hardware RO bit for LPAE
+
+ arch/arm/mm/dump.c | 4 ++--
  arch/arm/mm/init.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index ad80548325fe..0f6d1537f330 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -639,8 +639,8 @@ static struct section_perm ro_perms[] = {
- 		.start  = (unsigned long)_stext,
- 		.end    = (unsigned long)__init_begin,
- #ifdef CONFIG_ARM_LPAE
--		.mask   = ~L_PMD_SECT_RDONLY,
--		.prot   = L_PMD_SECT_RDONLY,
-+		.mask   = ~(L_PMD_SECT_RDONLY | PMD_SECT_AP2),
-+		.prot   = L_PMD_SECT_RDONLY | PMD_SECT_AP2,
- #else
- 		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
- 		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
 -- 
 2.15.0
