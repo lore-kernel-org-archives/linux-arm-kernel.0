@@ -1,37 +1,102 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Nov 2017 16:26:35 +0000
-Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
-In-Reply-To: <87efp7abwi.fsf@intel.com>
-References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
- <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
- <20171109093122.GA12318@n2100.armlinux.org.uk>
- <87inejaiij.fsf@intel.com>
- <CAEzXK1qHEcB6f_uGPJk9RxSd+tP5rNuiutBN1FAkEv-nU1k5Ug@mail.gmail.com>
- <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
- <87efp7abwi.fsf@intel.com>
-Message-ID: <20171109162634.GC12318@n2100.armlinux.org.uk>
+From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
+Date: Thu, 9 Nov 2017 17:27:42 +0100
+Subject: [PATCH v2 4/7] dmtimer: Add timer ops to the platform data
+ structure
+In-Reply-To: <1510144108-29563-5-git-send-email-j-keerthy@ti.com>
+References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
+ <1510144108-29563-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <20171109162742.mrdvh5cvom577whh@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 02:12:45PM +0200, Jani Nikula wrote:
-> And as I said elsewhere in the thread, Russell's patch may be relevant
-> for current Linus' master and stable. We just need to reconciliate how
-> the two things should work together in drm-next and v4.15 and on.
+Hi,
 
-Exactly, the patch is intended for current kernels.  The hint is that
-(a) it's a bug fix, (b) it says "fix" in the title, and (c) it has the
-stable attributation which says "apply me to previous kernels".
+On Wed, Nov 08, 2017 at 05:58:25PM +0530, Keerthy wrote:
+> Add timer ops to the platform data structure
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+> 
+> No code changes in this v2 version. Only enhanced patch
+> statistics for renames.
 
-Daniel's response effectively says "no, we're not going to accept the
-patch, work on a fix with some development code."
+I think the solution to provide private functions is not very nice,
+but it improves the current situation and does not touch any ABI (so
+can easily be changed later on), so:
 
-So, unless someone wants to tell me that it's acceptable to develop bug
-fixes against Linus' tree _for_ Linus' tree and accept this patch, or
-show some other solution that can be applied to Linus' current tree and
-backported to stable trees, I'm just not going to bother in future -
-someone else can end up doing the work.
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+-- Sebastian
+
+>  include/linux/platform_data/dmtimer-omap.h | 38 ++++++++++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+> 
+> diff --git a/include/linux/platform_data/dmtimer-omap.h b/include/linux/platform_data/dmtimer-omap.h
+> index a19b78d..a3e1794 100644
+> --- a/include/linux/platform_data/dmtimer-omap.h
+> +++ b/include/linux/platform_data/dmtimer-omap.h
+> @@ -20,12 +20,50 @@
+>  #ifndef __PLATFORM_DATA_DMTIMER_OMAP_H__
+>  #define __PLATFORM_DATA_DMTIMER_OMAP_H__
+>  
+> +struct omap_dm_timer_ops {
+> +	struct omap_dm_timer *(*request_by_node)(struct device_node *np);
+> +	struct omap_dm_timer *(*request_specific)(int timer_id);
+> +	struct omap_dm_timer *(*request)(void);
+> +
+> +	int	(*free)(struct omap_dm_timer *timer);
+> +
+> +	void	(*enable)(struct omap_dm_timer *timer);
+> +	void	(*disable)(struct omap_dm_timer *timer);
+> +
+> +	int	(*get_irq)(struct omap_dm_timer *timer);
+> +	int	(*set_int_enable)(struct omap_dm_timer *timer,
+> +				  unsigned int value);
+> +	int	(*set_int_disable)(struct omap_dm_timer *timer, u32 mask);
+> +
+> +	struct clk *(*get_fclk)(struct omap_dm_timer *timer);
+> +
+> +	int	(*start)(struct omap_dm_timer *timer);
+> +	int	(*stop)(struct omap_dm_timer *timer);
+> +	int	(*set_source)(struct omap_dm_timer *timer, int source);
+> +
+> +	int	(*set_load)(struct omap_dm_timer *timer, int autoreload,
+> +			    unsigned int value);
+> +	int	(*set_match)(struct omap_dm_timer *timer, int enable,
+> +			     unsigned int match);
+> +	int	(*set_pwm)(struct omap_dm_timer *timer, int def_on,
+> +			   int toggle, int trigger);
+> +	int	(*set_prescaler)(struct omap_dm_timer *timer, int prescaler);
+> +
+> +	unsigned int (*read_counter)(struct omap_dm_timer *timer);
+> +	int	(*write_counter)(struct omap_dm_timer *timer,
+> +				 unsigned int value);
+> +	unsigned int (*read_status)(struct omap_dm_timer *timer);
+> +	int	(*write_status)(struct omap_dm_timer *timer,
+> +				unsigned int value);
+> +};
+> +
+>  struct dmtimer_platform_data {
+>  	/* set_timer_src - Only used for OMAP1 devices */
+>  	int (*set_timer_src)(struct platform_device *pdev, int source);
+>  	u32 timer_capability;
+>  	u32 timer_errata;
+>  	int (*get_context_loss_count)(struct device *);
+> +	struct omap_dm_timer_ops *timer_ops;
+>  };
+>  
+>  #endif /* __PLATFORM_DATA_DMTIMER_OMAP_H__ */
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/bed1490d/attachment-0001.sig>
