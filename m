@@ -1,55 +1,45 @@
-From: poza@codeaurora.org (Pawandeep Oza)
-Date: Fri, 10 Nov 2017 02:16:39 +0530
-Subject: [PATCH 4/4] PCI/AER: Dont do recovery when DPC is enabled
-In-Reply-To: <1510260399-14886-1-git-send-email-poza@codeaurora.org>
-References: <1510260399-14886-1-git-send-email-poza@codeaurora.org>
-Message-ID: <1510260399-14886-5-git-send-email-poza@codeaurora.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Thu,  9 Nov 2017 15:03:03 -0600
+Subject: [PATCH v4 1/9] ACPICA: Add additional PPTT flags for cache properties
+In-Reply-To: <20171109210311.25655-1-jeremy.linton@arm.com>
+References: <20171109210311.25655-1-jeremy.linton@arm.com>
+Message-ID: <20171109210311.25655-2-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Oza Pawandeep <poza@codeaurora.org>
+The PPTT table has a number of flags that can be set
+to describe whether the cache is I/D/U and the allocation
+and write policies. Add these flags.
 
-PCI Express Base Specification, Rev. 4.0 Version 0.9
-6.2.10: Downstream Port Containment (DPC)
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ include/acpi/actbl1.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-DPC is an optional normative feature of a Downstream Port. DPC halts PCI
-Express traffic below a Downstream Port after an unmasked uncorrectable
-error is detected at or below the Port, avoiding the potential spread of
-any data corruption, and permitting error recovery if supported by
-software
-
-Triggering DPC disables its Link by directing the LTSSM to the Disabled
-state. Once the LTSSM reaches the Disabled state, it remains in that
-state until the DPC Trigger Status bit is Cleared
-
-So when DPC service is active and registered to port driver, AER should
-not attempt to recover, since DPC will be removing downstream devices.
-
-Signed-off-by: Oza Pawandeep <poza@codeaurora.org>
-
-diff --git a/drivers/pci/pcie/aer/aerdrv_core.c b/drivers/pci/pcie/aer/aerdrv_core.c
-index 7448052..8d48d5c 100644
---- a/drivers/pci/pcie/aer/aerdrv_core.c
-+++ b/drivers/pci/pcie/aer/aerdrv_core.c
-@@ -495,6 +495,18 @@ static void do_recovery(struct pci_dev *dev, int severity)
- 	pci_ers_result_t status, result = PCI_ERS_RESULT_RECOVERED;
- 	enum pci_channel_state state;
+diff --git a/include/acpi/actbl1.h b/include/acpi/actbl1.h
+index 6b8714a428b6..71f874e2790d 100644
+--- a/include/acpi/actbl1.h
++++ b/include/acpi/actbl1.h
+@@ -1346,6 +1346,20 @@ struct acpi_pptt_cache {
+ #define ACPI_PPTT_MASK_CACHE_TYPE           (0x0C)	/* Cache type */
+ #define ACPI_PPTT_MASK_WRITE_POLICY         (0x10)	/* Write policy */
  
-+	/*
-+	 * If DPC is enabled, there is no need to attempt recovery.
-+	 * Since DPC disables its Link by directing the LTSSM to
-+	 * the Disabled state.
-+	 * DPC driver will take care of the recovery, there is no need
-+	 * for AER driver to race.
-+	 */
-+	if (pcie_port_query_service(dev, PCIE_PORT_SERVICE_DPC)) {
-+		dev_info(&dev->dev, "AER: Device recovery to be done by DPC\n");
-+		return;
-+	}
++/* Attributes describing cache */
++#define ACPI_PPTT_CACHE_READ_ALLOCATE	    (0x0)   /* Cache line is allocated on read */
++#define ACPI_PPTT_CACHE_WRITE_ALLOCATE	    (0x01)  /* Cache line is allocated on write */
++#define ACPI_PPTT_CACHE_RW_ALLOCATE	    (0x02)  /* Cache line is allocated on read and write */
++#define ACPI_PPTT_CACHE_RW_ALLOCATE_ALT	    (0x03)  /* Alternate representation of above */
 +
- 	if (severity == AER_FATAL)
- 		state = pci_channel_io_frozen;
- 	else
++#define ACPI_PPTT_CACHE_TYPE_DATA	    (0x0)   /* Data cache */
++#define ACPI_PPTT_CACHE_TYPE_INSTR	    (1<<2)  /* Instruction cache */
++#define ACPI_PPTT_CACHE_TYPE_UNIFIED	    (2<<2)  /* Unified I & D cache */
++#define ACPI_PPTT_CACHE_TYPE_UNIFIED_ALT    (3<<2)  /* Alternate representation of above */
++
++#define ACPI_PPTT_CACHE_POLICY_WB	    (0x0)   /* Cache is write back */
++#define ACPI_PPTT_CACHE_POLICY_WT	    (1<<4)  /* Cache is write through */
++
+ /* 2: ID Structure */
+ 
+ struct acpi_pptt_id {
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.,
-a Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.13.5
