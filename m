@@ -1,48 +1,64 @@
-From: maxim.kuvyrkov@linaro.org (Maxim Kuvyrkov)
-Date: Thu, 9 Nov 2017 07:48:06 +0300
-Subject: [PATCH 13/15] arm64: fix mrs_s/msr_s macros for clang LTO
-In-Reply-To: <20171109000222.GC8522@tassilo.jf.intel.com>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103171203.107569-18-samitolvanen@google.com>
- <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
- <20171109000222.GC8522@tassilo.jf.intel.com>
-Message-ID: <DAE9979D-29B4-4BD3-99E5-0E8273A7F8E0@linaro.org>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 9 Nov 2017 06:44:49 +0100
+Subject: [PATCH] Kernel debugging: omap: print warning if CONFIG_DEBUG_LL
+ is enabled
+In-Reply-To: <20171108223810.GH28231@n2100.armlinux.org.uk>
+References: <b80b85cd6f26d02d698463b3dd5e9783081aa780.1510176592.git.hns@goldelico.com>
+ <20171108222755.GW28152@atomide.com>
+ <20171108223604.GG28231@n2100.armlinux.org.uk>
+ <20171108223810.GH28231@n2100.armlinux.org.uk>
+Message-ID: <E542DC13-D6C4-4C84-8521-8CE468BD0AFE@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Nov 9, 2017, at 3:02 AM, Andi Kleen <ak@linux.intel.com> wrote:
+Hi Russel,
+
+> Am 08.11.2017 um 23:38 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
 > 
->> There's the series from Andi Kleen that enables LTO for Linux on x86:
->> https://lwn.net/Articles/512548/
->> https://github.com/andikleen/linux-misc/tree/lto-411-1
->> 
->> It has solved many problems you also try to solve, and some patches
->> are looking very similar. 
->> 
->> At now we have different patchsets for gcc and clang, and it would be
->> better to have them together. One thing I'm worried is that you introduce
->> CONFIG_CLANG_LTO and use it for all cases, including that where more
->> generic CONFIG_LTO should be used.
+> On Wed, Nov 08, 2017 at 10:36:04PM +0000, Russell King - ARM Linux wrote:
+>> We don't need a compiler warning there, we probably need better help
+>> text against DEBUG_LL and against EARLY_PRINTK.
 > 
-> Yes would be good to merge the two. I've been looking at updating
-> my old one.
+> Actually, this is already clearly stated against DEBUG_LL:
 > 
-> I don't cover any ARM code, but lots of generic code. My patches
-> also worked on MIPS at least.
+>          Note that selecting this option will limit the kernel to a single
+>          UART definition, as specified below. Attempting to boot the kernel
+>          image on a different platform *will not work*, so this option should
+>          not be enabled for kernels that are intended to be portable.
 > 
-> There's also older patches to enable single-pass-linking for kallsyms,
-> which is extremly useful for LTO build performance.
+> and since EARLY_PRINTK depends on DEBUG_LL... I guess people don't
+> read help texts anymore.
 
-[Yury, thanks for the CC:]
+Yes, we read, but we face a situation where it doesn't help that it is a
+well known problem *for you* or anyone else and that it is described in the help.
 
-Chiming in from the toolchain side, Linaro's Toolchain team will try to help with any GCC or Clang issues that are exposed by building kernel with LTO on arm64 / arm.
+We simply had a private defconfig for years and someone enabled DEBUG_LL some
+years ago and it worked.
 
-Regarding CONFIG_* options, I would expect most of the configuration changes to be equally valid for both GCC's and Clang's LTO support.  Sami, I don't think it's fair to ask you to support both Clang and GCC in your patchset, but, where changes are obviously toolchain-agnostic, could you use CONFIG_LTO?  And use CONFIG_LTO_CLANG for Clang-specific parts?
+Then we upgrade the kernel for every -rc and it continued to work well. Then,
+recently when doing just one update the compiled kernel failed to boot. Nobody
+did change and look at the defconfig and its help. We just merged the latest
+patches from linus/master.
 
-This way we will be able to avoid most of the refactoring when adding support for GCC's LTO.
+Do you expect anybody to remember after 3 years of *not* changing DEBUG_LL what
+was written in a help message? Or to understand that DEBUG_LL has anything to
+do with the mysteriously appearing boot problem? Which can't easily be debugged
+since there are no messages despite playing with EARLY_PRINTK/EARLYCON?
 
-Thank you,
+It took me several hours of git bisect to find out the problematic commits
+and needed help by the author to relate it to DEBUG_LL in the defconfig.
 
---
-Maxim Kuvyrkov
-www.linaro.org
+So we are coming from the other end with much less knowledge than you have.
+Linux has grown to be a beast that only a handful of people fully understand.
+And this patch is to help those poor production kernel maintainers like me
+who don't...
+
+A technically different solution would be to automatically disable DEBUG_LL
+if it is not compatible with some other setting.
+
+BTW it appears that there was similar code elsewhere long time ago:
+
+http://elixir.free-electrons.com/linux/v3.1.10/source/arch/arm/plat-mxc/include/mach/debug-macro.S
+
+BR and thanks,
+Nikolaus Schaller
