@@ -1,64 +1,123 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu, 9 Nov 2017 06:44:49 +0100
-Subject: [PATCH] Kernel debugging: omap: print warning if CONFIG_DEBUG_LL
- is enabled
-In-Reply-To: <20171108223810.GH28231@n2100.armlinux.org.uk>
-References: <b80b85cd6f26d02d698463b3dd5e9783081aa780.1510176592.git.hns@goldelico.com>
- <20171108222755.GW28152@atomide.com>
- <20171108223604.GG28231@n2100.armlinux.org.uk>
- <20171108223810.GH28231@n2100.armlinux.org.uk>
-Message-ID: <E542DC13-D6C4-4C84-8521-8CE468BD0AFE@goldelico.com>
+Date: Thu, 9 Nov 2017 07:05:15 +0100
+Subject: [PATCH 1/4] omapdrm: fix compatible string for td028ttec1
+In-Reply-To: <2790033.EQlQQc1BPI@avalon>
+References: <cover.1510175371.git.hns@goldelico.com>
+ <8678120467a1d0e67d4d882b3f01d58867586653.1510175371.git.hns@goldelico.com>
+ <2790033.EQlQQc1BPI@avalon>
+Message-ID: <C999B55A-771D-44AF-8072-2F30FE6B54B7@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russel,
+Hi Laurent,
 
-> Am 08.11.2017 um 23:38 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
+> Am 09.11.2017 um 04:33 schrieb Laurent Pinchart <laurent.pinchart@ideasonboard.com>:
 > 
-> On Wed, Nov 08, 2017 at 10:36:04PM +0000, Russell King - ARM Linux wrote:
->> We don't need a compiler warning there, we probably need better help
->> text against DEBUG_LL and against EARLY_PRINTK.
+> Hi Nikolaus,
 > 
-> Actually, this is already clearly stated against DEBUG_LL:
+> Thank you for the patch.
 > 
->          Note that selecting this option will limit the kernel to a single
->          UART definition, as specified below. Attempting to boot the kernel
->          image on a different platform *will not work*, so this option should
->          not be enabled for kernels that are intended to be portable.
+> On Wednesday, 8 November 2017 23:09:29 EET H. Nikolaus Schaller wrote:
+>> The vendor name was "toppoly" but other panels and the vendor list
+>> have defined it as "tpo". So let's fix it in driver and bindings.
+>> 
+>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+>> ---
+>> .../display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt} | 4 ++--
+>> drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c           | 4 ++--
+>> drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c  | 4 ++--
+>> 3 files changed, 6 insertions(+), 6 deletions(-)
+>> rename
+>> Documentation/devicetree/bindings/display/panel/{toppoly,td028ttec1.txt =>
+>> tpo,td028ttec1.txt} (84%)
+>> 
+>> diff --git
+>> a/Documentation/devicetree/bindings/display/panel/toppoly,td028ttec1.txt
+>> b/Documentation/devicetree/bindings/display/panel/tpo,td028ttec1.txt
+>> similarity index 84%
+>> rename from
+>> Documentation/devicetree/bindings/display/panel/toppoly,td028ttec1.txt
+>> rename to
+>> Documentation/devicetree/bindings/display/panel/tpo,td028ttec1.txt index
+>> 7175dc3740ac..ed34253d9fb1 100644
+>> --- a/Documentation/devicetree/bindings/display/panel/toppoly,td028ttec1.txt
+>> +++ b/Documentation/devicetree/bindings/display/panel/tpo,td028ttec1.txt @@
+>> -2,7 +2,7 @@ Toppoly TD028TTEC1 Panel
+>> ========================
+>> 
+>> Required properties:
+>> -- compatible: "toppoly,td028ttec1"
+>> +- compatible: "tpo,td028ttec1"
+>> 
+>> Optional properties:
+>> - label: a symbolic name for the panel
+>> @@ -14,7 +14,7 @@ Example
+>> -------
+>> 
+>> lcd-panel: td028ttec1 at 0 {
+>> -	compatible = "toppoly,td028ttec1";
+>> +	compatible = "tpo,td028ttec1";
+>> 	reg = <0>;
+>> 	spi-max-frequency = <100000>;
+>> 	spi-cpol;
+>> diff --git a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+>> b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c index
+>> 0a38a0e8c925..2dab491478c2 100644
+>> --- a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+>> +++ b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+>> @@ -452,7 +452,7 @@ static int td028ttec1_panel_remove(struct spi_device
+>> *spi) }
+>> 
+>> static const struct of_device_id td028ttec1_of_match[] = {
+>> -	{ .compatible = "omapdss,toppoly,td028ttec1", },
+>> +	{ .compatible = "omapdss,tpo,td028ttec1", },
 > 
-> and since EARLY_PRINTK depends on DEBUG_LL... I guess people don't
-> read help texts anymore.
+> Doesn't this break backward compatibility with existing DT ?
 
-Yes, we read, but we face a situation where it doesn't help that it is a
-well known problem *for you* or anyone else and that it is described in the help.
+Yes, it does. But I am only aware of the GTA04 which uses it and
+there is a separate fix).
 
-We simply had a private defconfig for years and someone enabled DEBUG_LL some
-years ago and it worked.
-
-Then we upgrade the kernel for every -rc and it continued to work well. Then,
-recently when doing just one update the compiled kernel failed to boot. Nobody
-did change and look at the defconfig and its help. We just merged the latest
-patches from linus/master.
-
-Do you expect anybody to remember after 3 years of *not* changing DEBUG_LL what
-was written in a help message? Or to understand that DEBUG_LL has anything to
-do with the mysteriously appearing boot problem? Which can't easily be debugged
-since there are no messages despite playing with EARLY_PRINTK/EARLYCON?
-
-It took me several hours of git bisect to find out the problematic commits
-and needed help by the author to relate it to DEBUG_LL in the defconfig.
-
-So we are coming from the other end with much less knowledge than you have.
-Linux has grown to be a beast that only a handful of people fully understand.
-And this patch is to help those poor production kernel maintainers like me
-who don't...
-
-A technically different solution would be to automatically disable DEBUG_LL
-if it is not compatible with some other setting.
-
-BTW it appears that there was similar code elsewhere long time ago:
-
-http://elixir.free-electrons.com/linux/v3.1.10/source/arch/arm/plat-mxc/include/mach/debug-macro.S
-
-BR and thanks,
-Nikolaus Schaller
+> 
+>> 	{},
+>> };
+>> 
+>> @@ -471,7 +471,7 @@ static struct spi_driver td028ttec1_spi_driver = {
+>> 
+>> module_spi_driver(td028ttec1_spi_driver);
+>> 
+>> -MODULE_ALIAS("spi:toppoly,td028ttec1");
+>> +MODULE_ALIAS("spi:tpo,td028ttec1");
+>> MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
+>> MODULE_DESCRIPTION("Toppoly TD028TTEC1 panel driver");
+>> MODULE_LICENSE("GPL");
+>> diff --git
+>> a/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
+>> b/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c index
+>> 57e9e146ff74..39e1754746d2 100644
+>> --- a/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
+>> +++ b/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
+>> @@ -455,7 +455,7 @@ static int td028ttec1_panel_remove(struct spi_device
+>> *spi) }
+>> 
+>> static const struct of_device_id td028ttec1_of_match[] = {
+>> -	{ .compatible = "omapdss,toppoly,td028ttec1", },
+>> +	{ .compatible = "omapdss,tpo,td028ttec1", },
+>> 	{},
+>> };
+>> 
+>> @@ -474,7 +474,7 @@ static struct spi_driver td028ttec1_spi_driver = {
+>> 
+>> module_spi_driver(td028ttec1_spi_driver);
+>> 
+>> -MODULE_ALIAS("spi:toppoly,td028ttec1");
+>> +MODULE_ALIAS("spi:tpo,td028ttec1");
+>> MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
+>> MODULE_DESCRIPTION("Toppoly TD028TTEC1 panel driver");
+>> MODULE_LICENSE("GPL");
+> 
+> 
+> -- 
+> Regards,
+> 
+> Laurent Pinchart
+> 
