@@ -1,81 +1,82 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Thu, 9 Nov 2017 09:00:16 -0800
-Subject: [PATCH 4/4] arm64: dts: qcom: msm8916: add bindings for i2c1,
- i2c3, i2c5
-In-Reply-To: <20171101175335.22123-5-damien.riegel@savoirfairelinux.com>
-References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
- <20171101175335.22123-5-damien.riegel@savoirfairelinux.com>
-Message-ID: <20171109170016.GC28761@minitux>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Thu,  9 Nov 2017 17:00:19 +0000
+Subject: [PATCH v2 1/3] kvm: arm debug: introduce helper for single-step
+In-Reply-To: <20171109170021.2984-1-alex.bennee@linaro.org>
+References: <20171109170021.2984-1-alex.bennee@linaro.org>
+Message-ID: <20171109170021.2984-2-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 01 Nov 10:53 PDT 2017, Damien Riegel wrote:
+After emulating instructions we may want return to user-space to
+handle a single-step. If single-step is enabled the helper set the run
+structure for return and returns true.
 
-I think it's better to use the word "nodes" (add nodes...)
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> ---
->  arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 72 ++++++++++++++++++++++++++++++
->  arch/arm64/boot/dts/qcom/msm8916.dtsi      | 45 +++++++++++++++++++
->  2 files changed, 117 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> index c67ad8ed8b60..1cec5b30ed6e 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> @@ -270,6 +270,30 @@
->  		};
->  	};
->  
-> +	i2c1_default: i2c1_default {
-> +		pinmux {
-> +			function = "blsp_i2c1";
-> +			pins = "gpio2", "gpio3";
-> +		};
-> +		pinconf {
-> +			pins = "gpio2", "gpio3";
-> +			drive-strength = <16>;
-> +			bias-disable;
-> +		};
+---
+v2
+  - kvm_arm_maybe_return_debug -> kvm_arm_handle_step_debug
+  - return bool, true if return to userspace is required
+---
+ arch/arm/include/asm/kvm_host.h   |  2 ++
+ arch/arm64/include/asm/kvm_host.h |  1 +
+ arch/arm64/kvm/debug.c            | 22 ++++++++++++++++++++++
+ 3 files changed, 25 insertions(+)
 
-pinconf is typically board specific, so please leave these out from the
-base dtsi.
-
-> diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> index de25bd6070f5..bdc4cb6f66d4 100644
-> --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> @@ -455,6 +455,21 @@
->  			status = "disabled";
->  		};
->  
-> +		blsp_i2c1: i2c at 78b5000 {
-> +			compatible = "qcom,i2c-qup-v2.2.1";
-> +			reg = <0x078b5000 0x600>;
-
-Size is 0x500.
-
-> +			interrupts = <GIC_SPI 95 0>;
-> +			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-> +				 <&gcc GCC_BLSP1_QUP1_I2C_APPS_CLK>;
-> +			clock-names = "iface", "core";
-> +			pinctrl-names = "default", "sleep";
-> +			pinctrl-0 = <&i2c1_default>;
-> +			pinctrl-1 = <&i2c1_sleep>;
-
-Please omit the pinctrl-* properties from the base dtsi (when it's not
-hard coded things for the platform).
-
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +		};
-> +
->  		blsp_i2c2: i2c at 78b6000 {
->  			compatible = "qcom,i2c-qup-v2.2.1";
->  			reg = <0x078b6000 0x600>;
-
-Otherwise this looks good!
-
-Regards,
-Bjorn
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 4a879f6ff13b..a2e881d6108e 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
+ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
++static inline bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu,
++					     struct kvm_run *run) {}
+ 
+ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+ 			       struct kvm_device_attr *attr);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index e923b58606e2..bbfd6a2adb2b 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
+ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
++bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+ 			       struct kvm_device_attr *attr);
+ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index dbadfaf850a7..95afd22a4634 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -221,3 +221,25 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+ 		}
+ 	}
+ }
++
++
++/*
++ * When KVM has successfully emulated the instruction we might want to
++ * return to user space with a KVM_EXIT_DEBUG. We can only do this
++ * once the emulation is complete though so for userspace emulations
++ * we have to wait until we have re-entered KVM before calling this
++ * helper.
++ *
++ * Return true (and set exit_reason) to return to userspace or false
++ * if no further action required.
++ */
++
++bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
++		run->exit_reason = KVM_EXIT_DEBUG;
++		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
++		return true;
++	}
++	return false;
++}
+-- 
+2.14.2
