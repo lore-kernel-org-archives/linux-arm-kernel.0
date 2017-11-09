@@ -1,41 +1,113 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Nov 2017 09:37:34 +0000
-Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
-In-Reply-To: <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
-References: <20171109004144.2246-1-philip@cog.systems>
- <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
-Message-ID: <20171109093734.GB12318@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu,  9 Nov 2017 10:39:24 +0100
+Subject: [PATCH v2] ASoC: sun8i-codec: Set the BCLK divider
+Message-ID: <20171109093924.12803-1-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 08, 2017 at 05:23:43PM -0800, Kees Cook wrote:
-> On Wed, Nov 8, 2017 at 4:41 PM, Philip Derrin <philip@cog.systems> wrote:
-> > Hi,
-> >
-> > This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
-> > when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
-> > mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
-> > merged in 3.19.
-> >
-> > The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
-> > mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
-> > implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
-> > sections to be read-only"), and another that moved the LPAE read-only bit into
-> > a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
-> > logic for LPAE").
-> >
-> > The incorrect mappings were not apparent in the debugfs kernel_page_tables
-> > dump because that was checking only the software RO bit, not the hardware RO
-> > bit.
-> 
-> Thanks for catching this! Please consider both patches:
-> 
-> Reviewed-by: Kees Cook <keescook@chromium.org>
+While the current code was reporting to be able to work in master mode, it
+failed to do so because the BCLK divider wasn't programmed, meaning that
+the BCLK would run at the PLL's frequency no matter the sample rate.
 
-Where are these patches, and why weren't they copied to the arm kernel
-list?
+It was obviously a bit too fast.
 
+Add support to retrieve the divider to use, and set it. Since our PLL is
+not always able to generate a perfect multiple of the sample rate, we'll
+have to choose the closest divider that matches our setup.
+
+Fixes: 36c684936fae ("ASoC: Add sun8i digital audio codec")
+Cc: <stable@vger.kernel.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+---
+Changes from v1:
+  - Hardcoded the bit width to remain consistent with the rest of the driver
+---
+ sound/soc/sunxi/sun8i-codec.c | 51 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index c2ceca485d6a..7a312168f864 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -73,6 +73,7 @@
+ #define SUN8I_SYS_SR_CTRL_AIF2_FS_MASK		GENMASK(11, 8)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK	GENMASK(5, 4)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK	GENMASK(8, 6)
++#define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK	GENMASK(12, 9)
+ 
+ struct sun8i_codec {
+ 	struct device	*dev;
+@@ -226,12 +227,57 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+ 	return 0;
+ }
+ 
++struct sun8i_codec_clk_div {
++	u8	div;
++	u8	val;
++};
++
++static const struct sun8i_codec_clk_div sun8i_codec_bclk_div[] = {
++	{ .div = 1,	.val = 0 },
++	{ .div = 2,	.val = 1 },
++	{ .div = 4,	.val = 2 },
++	{ .div = 6,	.val = 3 },
++	{ .div = 8,	.val = 4 },
++	{ .div = 12,	.val = 5 },
++	{ .div = 16,	.val = 6 },
++	{ .div = 24,	.val = 7 },
++	{ .div = 32,	.val = 8 },
++	{ .div = 48,	.val = 9 },
++	{ .div = 64,	.val = 10 },
++	{ .div = 96,	.val = 11 },
++	{ .div = 128,	.val = 12 },
++	{ .div = 192,	.val = 13 },
++};
++
++static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
++				   unsigned int rate,
++				   unsigned int word_size)
++{
++	unsigned long clk_rate = clk_get_rate(scodec->clk_module);
++	unsigned int div = clk_rate / rate / word_size / 2;
++	unsigned int best_val = 0, best_diff = ~0;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(sun8i_codec_bclk_div); i++) {
++		const struct sun8i_codec_clk_div *bdiv = &sun8i_codec_bclk_div[i];
++		unsigned int diff = abs(bdiv->div - div);
++
++		if (diff < best_diff) {
++			best_diff = diff;
++			best_val = bdiv->val;
++		}
++	}
++
++	return best_val;
++}
++
+ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 				 struct snd_pcm_hw_params *params,
+ 				 struct snd_soc_dai *dai)
+ {
+ 	struct sun8i_codec *scodec = snd_soc_codec_get_drvdata(dai->codec);
+ 	int sample_rate;
++	u8 bclk_div;
+ 
+ 	/*
+ 	 * The CPU DAI handles only a sample of 16 bits. Configure the
+@@ -241,6 +287,11 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16);
+ 
++	bclk_div = sun8i_codec_get_bclk_div(scodec, params_rate(params), 16);
++	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
++			   SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
++			   bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
++
+ 	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.14.3
