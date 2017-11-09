@@ -1,56 +1,89 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Thu, 9 Nov 2017 11:49:20 +0200
-Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
-In-Reply-To: <20171109093734.GB12318@n2100.armlinux.org.uk>
-References: <20171109004144.2246-1-philip@cog.systems>
- <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
- <20171109093734.GB12318@n2100.armlinux.org.uk>
-Message-ID: <20171109094920.2xpyhtrwj5kjb2qz@tarshish>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Thu, 9 Nov 2017 09:55:36 +0000
+Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
+ untried/unknown (next-20171106)
+In-Reply-To: <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
+References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
+ <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
+ <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
+ <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
+ <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
+ <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
+ <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
+ <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
+Message-ID: <7cdfa633-d9c6-881a-ae5f-f94f7e6413ee@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
 
-On Thu, Nov 09, 2017 at 09:37:34AM +0000, Russell King - ARM Linux wrote:
-> On Wed, Nov 08, 2017 at 05:23:43PM -0800, Kees Cook wrote:
-> > On Wed, Nov 8, 2017 at 4:41 PM, Philip Derrin <philip@cog.systems> wrote:
-> > > Hi,
-> > >
-> > > This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
-> > > when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
-> > > mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
-> > > merged in 3.19.
-> > >
-> > > The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
-> > > mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
-> > > implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
-> > > sections to be read-only"), and another that moved the LPAE read-only bit into
-> > > a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
-> > > logic for LPAE").
-> > >
-> > > The incorrect mappings were not apparent in the debugfs kernel_page_tables
-> > > dump because that was checking only the software RO bit, not the hardware RO
-> > > bit.
-> > 
-> > Thanks for catching this! Please consider both patches:
-> > 
-> > Reviewed-by: Kees Cook <keescook@chromium.org>
+On 08/11/17 16:42, Guillaume Tucker wrote:
+> On 08/11/17 15:57, Jon Hunter wrote:
+>>
+>> On 08/11/17 15:19, Guillaume Tucker wrote:
+>>
+>> ...
+>>
+>>> After a few more automated bisection attempts and a bug fix in
+>>> LAVA, I've now found at least one potentially breaking commit:
+>>>
+>>> ? commit d89e2378a97fafdc74cbf997e7c88af75b81610a
+>>> ? Author: Robin Murphy <robin.murphy@arm.com>
+>>> ? Date:?? Thu Oct 12 16:56:14 2017 +0100
+>>>
+>>> ????? drivers: flag buses which demand DMA configuration
+>>>
+>>>
+>>> I've run some boot tests manually with this revision and then
+>>> also after reverting it in-place, these respectively failed and
+>>> passed:
+>>>
+>>> ? * d89e2378, failed:
+>>> ??? https://lava.collabora.co.uk/scheduler/job/978968
+>>>
+>>> ? * d89e2378 reverted, passed:
+>>> ??? https://lava.collabora.co.uk/scheduler/job/978969
+>>>
+>>>
+>>> I then went on and tried the same but on top of next-20171108 and
+>>> found that they both failed
+>>>
+>>> ? * next-20171108, failed:
+>>> ??? https://lava.collabora.co.uk/scheduler/job/979063
+>>>
+>>> ? * next-20171108 with d89e2378 reverted, failed as well:
+>>> ??? https://lava.collabora.co.uk/scheduler/job/979167
+>>>
+>>>
+>>> So this shows there is almost certainly another offending commit
+>>> in -next.? The errors in both cases are not quite the same, the
+>>> last one is triggered by a BUG whereas the first one is a NULL
+>>> pointer (I haven't looked any further).? Also I don't think
+>>> there's any fix for d89e2378a97fafdc74cbf997e7c88af75b81610a
+>>> which is currently still in next.
+>>
+>> This crash is a known issue [0] and we have been discussing this. Can
+>> you try applying [1]?
 > 
-> Where are these patches, and why weren't they copied to the arm kernel
-> list?
+> So with next-20171108 + d89e2378a9 reverted + [1] applied:
+> 
+> ? https://lava.collabora.co.uk/scheduler/job/979173
+> 
+> No visible kernel crash in the log but it hangs.
+> 
+> 
+> I also tried next-20171108 + [1] applied only:
+> 
+> ? https://lava.collabora.co.uk/scheduler/job/979179
+> 
+> which also appears to hang.
 
-I got the patches from the list.
+Thanks for the update. I am wondering if it is one of the kernel modules
+that is getting loaded because booting multi_v7_defconfig and loading no
+modules does not hang for me. I will take a look but I might not get to
+it until next week.
 
-  Cover:
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/541532.html
-  1/2:
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/541531.html
-  2/2:
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/541533.html
-
-baruch
+Cheers
+Jon
 
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+nvpublic
