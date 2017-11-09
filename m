@@ -1,75 +1,55 @@
 From: poza@codeaurora.org (Pawandeep Oza)
-Date: Fri, 10 Nov 2017 02:16:38 +0530
-Subject: [PATCH 3/4] PCI/portdrv: Implement interface to query the registered
- service
+Date: Fri, 10 Nov 2017 02:16:39 +0530
+Subject: [PATCH 4/4] PCI/AER: Dont do recovery when DPC is enabled
 In-Reply-To: <1510260399-14886-1-git-send-email-poza@codeaurora.org>
 References: <1510260399-14886-1-git-send-email-poza@codeaurora.org>
-Message-ID: <1510260399-14886-4-git-send-email-poza@codeaurora.org>
+Message-ID: <1510260399-14886-5-git-send-email-poza@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Oza Pawandeep <poza@codeaurora.org>
 
-This patch implements query service interface. So that, any port service
-driver can query to know, if the service is active or not.
+PCI Express Base Specification, Rev. 4.0 Version 0.9
+6.2.10: Downstream Port Containment (DPC)
 
-When multiple service drivers try to take actions, these service drivers
-could race or could have conflict of interest.
+DPC is an optional normative feature of a Downstream Port. DPC halts PCI
+Express traffic below a Downstream Port after an unmasked uncorrectable
+error is detected at or below the Port, avoiding the potential spread of
+any data corruption, and permitting error recovery if supported by
+software
 
-For e.g. when DPC is enabled, AER should not attempt recovery.
+Triggering DPC disables its Link by directing the LTSSM to the Disabled
+state. Once the LTSSM reaches the Disabled state, it remains in that
+state until the DPC Trigger Status bit is Cleared
 
-The interface walks up the parent till root bridge, and if any of the
-downstream port has DPC service active, it stops there, since DPC will be
-removing all the devices beneath.
+So when DPC service is active and registered to port driver, AER should
+not attempt to recover, since DPC will be removing downstream devices.
 
 Signed-off-by: Oza Pawandeep <poza@codeaurora.org>
 
-diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
-index 6bfe986..63fa57a 100644
---- a/drivers/pci/pcie/portdrv_core.c
-+++ b/drivers/pci/pcie/portdrv_core.c
-@@ -490,6 +490,30 @@ static int pcie_port_remove_service(struct device *dev)
- }
+diff --git a/drivers/pci/pcie/aer/aerdrv_core.c b/drivers/pci/pcie/aer/aerdrv_core.c
+index 7448052..8d48d5c 100644
+--- a/drivers/pci/pcie/aer/aerdrv_core.c
++++ b/drivers/pci/pcie/aer/aerdrv_core.c
+@@ -495,6 +495,18 @@ static void do_recovery(struct pci_dev *dev, int severity)
+ 	pci_ers_result_t status, result = PCI_ERS_RESULT_RECOVERED;
+ 	enum pci_channel_state state;
  
- /**
-+ * pcie_port_service_query - query if particula port service is enabled.
-+ * dev: pcie device
-+ * @port service: PCI express port service
-+ */
-+int pcie_port_query_service(struct pci_dev *dev, u32 port_service)
-+{
-+	struct pcie_device *pdev;
-+	struct pci_dev *parent, *this = dev;
++	/*
++	 * If DPC is enabled, there is no need to attempt recovery.
++	 * Since DPC disables its Link by directing the LTSSM to
++	 * the Disabled state.
++	 * DPC driver will take care of the recovery, there is no need
++	 * for AER driver to race.
++	 */
++	if (pcie_port_query_service(dev, PCIE_PORT_SERVICE_DPC)) {
++		dev_info(&dev->dev, "AER: Device recovery to be done by DPC\n");
++		return;
++	}
 +
-+	do {
-+		list_for_each_entry(pdev, &this->service_list, slist) {
-+			if (pdev->service == port_service)
-+				return 1;
-+		}
-+		parent = pci_upstream_bridge(this);
-+		this = parent;
-+	} while (parent && pci_is_pcie(parent));
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL(pcie_port_query_service);
-+
-+
-+/**
-  * pcie_port_shutdown_service - shut down given PCI Express port service
-  * @dev: PCI Express port service device to handle
-  *
-diff --git a/include/linux/pcieport_if.h b/include/linux/pcieport_if.h
-index 9d05621..bb8febb 100644
---- a/include/linux/pcieport_if.h
-+++ b/include/linux/pcieport_if.h
-@@ -68,5 +68,5 @@ struct pcie_port_service_driver {
- 
- int pcie_port_service_register(struct pcie_port_service_driver *new);
- void pcie_port_service_unregister(struct pcie_port_service_driver *new);
--
-+int pcie_port_query_service(struct pci_dev *dev, u32 port_service);
- #endif /* _PCIEPORT_IF_H_ */
+ 	if (severity == AER_FATAL)
+ 		state = pci_channel_io_frozen;
+ 	else
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.,
 a Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
