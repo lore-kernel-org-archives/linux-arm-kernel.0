@@ -1,112 +1,99 @@
-From: hzpeterchen@gmail.com (Peter Chen)
-Date: Thu, 9 Nov 2017 17:42:19 +0800
-Subject: [PATCH RFC] usb: chipidea: imx: make over-current polarity
- configurable for i.MX25
-In-Reply-To: <20171024085729.3712-1-u.kleine-koenig@pengutronix.de>
-References: <20171024085729.3712-1-u.kleine-koenig@pengutronix.de>
-Message-ID: <20171109094219.GB6787@b29397-desktop>
+From: jani.nikula@linux.intel.com (Jani Nikula)
+Date: Thu, 09 Nov 2017 11:49:56 +0200
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+In-Reply-To: <20171109093122.GA12318@n2100.armlinux.org.uk>
+References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+ <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+ <20171109093122.GA12318@n2100.armlinux.org.uk>
+Message-ID: <87inejaiij.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 10:57:29AM +0200, Uwe Kleine-K?nig wrote:
-> In commit 9dba516ed282 ("usb: chipidea: imx: set over current polarity
-> per dts setting") i.MX6 and i.MX7 learned the dt property
-> "over-current-active-high". The difference compared to i.MX25 is that on
-> the latter the default in hardware and the driver is already
-> active-high. For that reason the over-current-active-high property is
-> added to the imx25 template to keep the default behaviour.
-> 
-> The obvious downside is that device trees that were compiled before this
-> change don't have that property and so when run with a kernel including
-> this change suddenly use active low logic. This could only be
-> circumvented with another property "over-current-active-low" and
-> different default handling for imx6/7 vs imx25 if none (or both) of the
-> properties are present. For simplicity I stick to the easier and better
-> understandable alternative at the cost of dt incompatibility.
+On Thu, 09 Nov 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> On Thu, Nov 09, 2017 at 09:23:18AM +0100, Daniel Vetter wrote:
+>> On Tue, Nov 07, 2017 at 11:27:21AM +0000, Russell King wrote:
+>> > Parsing the EDID for HDMI and audio information in the get_modes()
+>> > callback is incorrect - this only parses the EDID read from the
+>> > connector, not any override or firmware provided EDID.
+>> > 
+>> > The correct place to parse the EDID for these parameters is the
+>> > fill_modes() callback, after we've called the helper.  Move the parsing
+>> > there.  This caused problems for Lu?s Mendes.
+>> > 
+>> > Cc: <stable@vger.kernel.org>
+>> > Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+>> > Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+>> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+>> > ---
+>> >  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
+>> >  1 file changed, 24 insertions(+), 4 deletions(-)
+>> > 
+>> > diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> > index 9fe407f49986..2516a1c18a10 100644
+>> > --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> > +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> > @@ -1905,10 +1905,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>> >  		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
+>> >  			edid->width_cm, edid->height_cm);
+>> >  
+>> > -		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+>> > -		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+>> >  		drm_mode_connector_update_edid_property(connector, edid);
+>> > -		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+>> >  		ret = drm_add_edid_modes(connector, edid);
+>> >  		/* Store the ELD */
+>> >  		drm_edid_to_eld(connector, edid);
+>> > @@ -1920,6 +1917,29 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>> >  	return ret;
+>> >  }
+>> >  
+>> > +static int dw_hdmi_connector_fill_modes(struct drm_connector *connector,
+>> > +					uint32_t maxX, uint32_t maxY)
+>> > +{
+>> > +	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+>> > +					    connector);
+>> > +	int ret;
+>> > +
+>> > +	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
+>> > +
+>> > +	if (connector->edid_blob_ptr) {
+>> > +		struct edid *edid = (void *)connector->edid_blob_ptr->data;
+>> > +
+>> > +		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+>> > +		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+>> > +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+>> > +	} else {
+>> > +		hdmi->sink_is_hdmi = false;
+>> > +		hdmi->sink_has_audio = false;
+>> > +	}
+>> > +
+>> > +	return ret;
+>> > +}
+>> > +
+>> >  static void dw_hdmi_connector_force(struct drm_connector *connector)
+>> >  {
+>> >  	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+>> > @@ -1933,7 +1953,7 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
+>> >  }
+>> >  
+>> >  static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
+>> > -	.fill_modes = drm_helper_probe_single_connector_modes,
+>> > +	.fill_modes = dw_hdmi_connector_fill_modes,
+>> 
+>> Papering over helper functions shouldn't be necessary, except the helper
+>> functions not handling the override edid is a known issue. Jani Nikula is
+>> working on a proper fix, please coordinate with him.
+>
+> So, what you're basically saying is that fixing real bugs that affect
+> users is not something that DRM people want.  That's fine, I'll ignore
+> people who come to me for help with DRM bugs in future then because
+> it's obviously a dead loss.
 
-Sorry to reply late, in order to keep compatibility, my suggestion is
-add another property "over-current-active-low" and change imx25 related
-code accordingly.
+We may already have fixed the bug in drm-next at the proper
+layer. Please see my other mail.
 
-Peter
-> 
-> Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
-> ---
-> Hello,
-> 
-> is it ok to break compatibility here?
-> 
-> Best regards
-> Uwe
-> 
->  arch/arm/boot/dts/imx25.dtsi       |  2 ++
->  drivers/usb/chipidea/usbmisc_imx.c | 15 +++++++++++++--
->  2 files changed, 15 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-> index 09ce8b81fafa..bb0054603846 100644
-> --- a/arch/arm/boot/dts/imx25.dtsi
-> +++ b/arch/arm/boot/dts/imx25.dtsi
-> @@ -565,6 +565,7 @@
->  				fsl,usbphy = <&usbphy0>;
->  				phy_type = "utmi";
->  				dr_mode = "otg";
-> +				over-current-active-high;
->  				status = "disabled";
->  			};
->  
-> @@ -576,6 +577,7 @@
->  				clock-names = "ipg", "ahb", "per";
->  				fsl,usbmisc = <&usbmisc 1>;
->  				fsl,usbphy = <&usbphy1>;
-> +				over-current-active-high;
->  				status = "disabled";
->  			};
->  
-> diff --git a/drivers/usb/chipidea/usbmisc_imx.c b/drivers/usb/chipidea/usbmisc_imx.c
-> index 9f4a0185dd60..6f3d0341357c 100644
-> --- a/drivers/usb/chipidea/usbmisc_imx.c
-> +++ b/drivers/usb/chipidea/usbmisc_imx.c
-> @@ -125,16 +125,27 @@ static int usbmisc_imx25_init(struct imx_usbmisc_data *data)
->  		val = readl(usbmisc->base);
->  		val &= ~(MX25_OTG_SIC_MASK | MX25_OTG_PP_BIT);
->  		val |= (MX25_EHCI_INTERFACE_DIFF_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_OTG_SIC_SHIFT;
-> -		val |= (MX25_OTG_PM_BIT | MX25_OTG_OCPOL_BIT);
-> +		val |= MX25_OTG_PM_BIT;
-> +
-> +		if (data->oc_polarity)
-> +			val |= MX25_OTG_OCPOL_BIT;
-> +		else
-> +			val &= ~MX25_OTG_OCPOL_BIT;
-> +
->  		writel(val, usbmisc->base);
->  		break;
->  	case 1:
->  		val = readl(usbmisc->base);
->  		val &= ~(MX25_H1_SIC_MASK | MX25_H1_PP_BIT |  MX25_H1_IPPUE_UP_BIT);
->  		val |= (MX25_EHCI_INTERFACE_SINGLE_UNI & MX25_EHCI_INTERFACE_MASK) << MX25_H1_SIC_SHIFT;
-> -		val |= (MX25_H1_PM_BIT | MX25_H1_OCPOL_BIT | MX25_H1_TLL_BIT |
-> +		val |= (MX25_H1_PM_BIT | MX25_H1_TLL_BIT |
->  			MX25_H1_USBTE_BIT | MX25_H1_IPPUE_DOWN_BIT);
->  
-> +		if (data->oc_polarity)
-> +			val |= MX25_H1_OCPOL_BIT;
-> +		else
-> +			val &= ~MX25_H1_OCPOL_BIT;
-> +
->  		writel(val, usbmisc->base);
->  
->  		break;
-> -- 
-> 2.11.0
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+BR,
+Jani.
 
 -- 
-
-Best Regards,
-Peter Chen
+Jani Nikula, Intel Open Source Technology Center
