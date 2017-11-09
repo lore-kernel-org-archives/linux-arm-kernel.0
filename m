@@ -1,91 +1,55 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 9 Nov 2017 09:11:41 +0900
-Subject: [PATCH 1/2] MIPS: dts: remove bogus bcm96358nb4ser.dtb from dtb-y
- entry
-In-Reply-To: <CAL_JsqJ8taCKnr_79UumiH2GFYq-fMzzkYm2iYevTOgUUWuzvg@mail.gmail.com>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-2-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNAQfK_BWQcVW-ScrpAwNAHav3MrrzV-tjn_YUjsuvd7U5A@mail.gmail.com>
- <20171106095139.GG15260@jhogan-linux>
- <CAK7LNAQ_bugEP8hHKmCif5QCz2=Pw_GpXzYz4zJeXO0HXaT_ag@mail.gmail.com>
- <CAL_JsqJ8taCKnr_79UumiH2GFYq-fMzzkYm2iYevTOgUUWuzvg@mail.gmail.com>
-Message-ID: <CAK7LNATZ9O4cCpxLrG3MJoKYF+RnURkY4-tY2MdiZb90eGPtQg@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Thu, 9 Nov 2017 09:36:39 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20171109001113.GZ28152@atomide.com>
+References: <20171023045342.GA23082@js1304-P5Q-DELUXE>
+ <20171025173137.GQ4394@atomide.com>
+ <20171026044829.GB11791@js1304-P5Q-DELUXE>
+ <20171026141627.GD21504@atomide.com>
+ <20171107053313.GA12447@js1304-P5Q-DELUXE>
+ <20171107154842.GP28152@atomide.com>
+ <20171108074645.GA18747@js1304-P5Q-DELUXE>
+ <20171108163413.GU28152@atomide.com>
+ <20171109000801.GA23982@js1304-P5Q-DELUXE>
+ <20171109001113.GZ28152@atomide.com>
+Message-ID: <20171109003639.GB23982@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-11-09 1:51 GMT+09:00 Rob Herring <robh+dt@kernel.org>:
-> On Mon, Nov 6, 2017 at 5:00 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> 2017-11-06 19:41 GMT+09:00 James Hogan <jhogan@kernel.org>:
->>> Hi,
->>>
->>> On Sun, Nov 05, 2017 at 11:11:38PM +0900, Masahiro Yamada wrote:
->>>> +CC Ralf Baechle <ralf@linux-mips.org>
->>>> +CC linux-mips at linux-mips.org
->>>> +CC Kevin Cernekee <cernekee@gmail.com>
->>>> +CC Florian Fainelli <f.fainelli@gmail.com>
->>>>
->>>>
->>>> I missed to CC MIPS maintainers.
->>>
->>> Yes, please resend the patch so it lands in patchwork.linux-mips.org.
->>
->>
->> This is a part of clean-up series of DT building.
->>
->> I want Acked-by from MIPS maintainers
->> so that the whole series can go to a different tree.
->> (DT or Kbuild).
->>
->>
->> Sam addressed more clean-up candidates in MIPS Makefiles
->> https://patchwork.kernel.org/patch/10041879/
->>
->> So, I will probably end up with touching those Makefiles more.
->>
->> All patches must go to the same tree.
->>
->>
->>>> 2017-11-05 14:30 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
->>>> > arch/mips/boot/dts/brcm/bcm96358nb4ser.dts does not exist, so
->>>> > we cannot build bcm96358nb4ser.dtb .
->>>
->>> This appears to be due to the file being renamed in commit 695835511f96
->>> ("MIPS: BMIPS: rename bcm96358nb4ser to bcm6358-neufbox4-sercom").
->>> Please can you update the commit message when you resend to mention the
->>> cause of the problem.
->>>
->>> You could also add the following if you like while you're at it:
->>>
->>> Fixes: 695835511f96 ("MIPS: BMIPS: rename bcm96358nb4ser to bcm6358-neufbox4-sercom")
->>> Cc: <stable@vger.kernel.org> # 4.9+
->
-> I think this one can be applied independently and we'd want it to if
-> we tag for stable. So I think it can go thru the MIPS tree.
->
+On Wed, Nov 08, 2017 at 04:11:13PM -0800, Tony Lindgren wrote:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171109 00:05]:
+> > On Wed, Nov 08, 2017 at 08:34:13AM -0800, Tony Lindgren wrote:
+> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171108 07:43]:
+> > > > On Tue, Nov 07, 2017 at 07:48:42AM -0800, Tony Lindgren wrote:
+> > > > > So it seems the issue is currently at the atomic_pool_init()
+> > > > > related code?
+> > > > 
+> > > > Yes, your test showed it although I can't find any clue in
+> > > > atomic_pool_init().
+> > > > 
+> > > > Could you test updated branch?
+> > > > 
+> > > > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+> > > > 
+> > > > There are two relevant commits.
+> > > > 
+> > > > arm/dma: stop dma allocation before __dma_alloc_remap()
+> > > > arm/dma: disable atomic pool after dma allocation
+> > > > 
+> > > > atomic pool initialization will be done partially to check
+> > > > exact point of failure. These are brain-dead commits however I have no
+> > > > idea what's going on here until now. :/
+> > > 
+> > > OK that booted, dmesg output below. Hopefully that provides
+> > > you with some more clues.
+> > 
+> > Thanks!
+> > 
+> > Could you let me know which one is booted? Both of them? or just top
+> > commit ("arm/dma: stop dma allocation before __dma_alloc_remap()")?
+> 
+> Oh OK. Only the top commit boots.
 
+Okay! I will try to analyze!
 
-As I said to MIPS folks, this patch must go before 2/2.
-
-You picked up only 2/2, so your dt/kbuild branch is broken.
-
-
-make ARCH=mips allyesconfig
-&& make ARCH=mips CROSS_COMPILE=mips-linux- dtbs
-
-
-will produce the following error.
-
-
-make[2]: *** No rule to make target
-'arch/mips/boot/dts/brcm/bcm96358nb4ser.dtb', needed by '__build'.
-Stop.
-scripts/Makefile.build:570: recipe for target 'arch/mips/boot/dts/brcm' failed
-make[1]: *** [arch/mips/boot/dts/brcm] Error 2
-arch/mips/Makefile:413: recipe for target 'dtbs' failed
-make: *** [dtbs] Error 2
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks.
