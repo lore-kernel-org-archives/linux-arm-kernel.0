@@ -1,143 +1,230 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 09 Nov 2017 17:44:33 +0000
-Subject: Applied "ASoC: sun8i-codec: Set the BCLK divider" to the asoc tree
-In-Reply-To: <20171109093924.12803-1-maxime.ripard@free-electrons.com>
-Message-ID: <E1eCqsT-0006kU-9P@debutante>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 9 Nov 2017 17:56:39 +0000
+Subject: [PATCH v5 13/30] arm64/sve: Core task context handling
+In-Reply-To: <878tffqsnb.fsf@linaro.org>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-14-git-send-email-Dave.Martin@arm.com>
+ <878tffqsnb.fsf@linaro.org>
+Message-ID: <20171109175638.GF22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Thu, Nov 09, 2017 at 05:16:40PM +0000, Alex Benn?e wrote:
+> 
+> Dave Martin <Dave.Martin@arm.com> writes:
+> 
+> > This patch adds the core support for switching and managing the SVE
+> > architectural state of user tasks.
+> >
+> > Calls to the existing FPSIMD low-level save/restore functions are
+> > factored out as new functions task_fpsimd_{save,load}(), since SVE
+> > now dynamically may or may not need to be handled at these points
+> > depending on the kernel configuration, hardware features discovered
+> > at boot, and the runtime state of the task.  To make these
+> > decisions as fast as possible, const cpucaps are used where
+> > feasible, via the system_supports_sve() helper.
+> >
+> > The SVE registers are only tracked for threads that have explicitly
+> > used SVE, indicated by the new thread flag TIF_SVE.  Otherwise, the
+> > FPSIMD view of the architectural state is stored in
+> > thread.fpsimd_state as usual.
+> >
+> > When in use, the SVE registers are not stored directly in
+> > thread_struct due to their potentially large and variable size.
+> > Because the task_struct slab allocator must be configured very
+> > early during kernel boot, it is also tricky to configure it
+> > correctly to match the maximum vector length provided by the
+> > hardware, since this depends on examining secondary CPUs as well as
+> > the primary.  Instead, a pointer sve_state in thread_struct points
+> > to a dynamically allocated buffer containing the SVE register data,
+> > and code is added to allocate and free this buffer at appropriate
+> > times.
+> >
+> > TIF_SVE is set when taking an SVE access trap from userspace, if
+> > suitable hardware support has been detected.  This enables SVE for
+> > the thread: a subsequent return to userspace will disable the trap
+> > accordingly.  If such a trap is taken without sufficient system-
+> > wide hardware support, SIGILL is sent to the thread instead as if
+> > an undefined instruction had been executed: this may happen if
+> > userspace tries to use SVE in a system where not all CPUs support
+> > it for example.
+> >
+> > The kernel will clear TIF_SVE and disable SVE for the thread
+> > whenever an explicit syscall is made by userspace.  For backwards
+> > compatibility reasons and conformance with the spirit of the base
+> > AArch64 procedure call standard, the subset of the SVE register
+> > state that aliases the FPSIMD registers is still preserved across a
+> > syscall even if this happens.  The remainder of the SVE register
+> > state logically becomes zero at syscall entry, though the actual
+> > zeroing work is currently deferred until the thread next tries to
+> > use SVE, causing another trap to the kernel.  This implementation
+> > is suboptimal: in the future, the fastpath case may be optimised
+> > to zero the registers in-place and leave SVE enabled for the task,
+> > where beneficial.
+> >
+> > TIF_SVE is also cleared in the following slowpath cases, which are
+> > taken as reasonable hints that the task may no longer use SVE:
+> >  * exec
+> >  * fork and clone
+> >
+> > Code is added to sync data between thread.fpsimd_state and
+> > thread.sve_state whenever enabling/disabling SVE, in a manner
+> > consistent with the SVE architectural programmer's model.
+> >
+> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Alex Benn?e <alex.bennee@linaro.org>
+> >
+> > ---
+> >
+> > Kept Catalin's Reviewed-by, since this is a trivial change.
+> >
+> > Changes since v4
+> > ----------------
+> >
+> > Miscellaneous:
+> >
+> >  * Mark do_sve_acc() as asmlinkage.
+> >
+> >    (Semantic correctness only; no functional impact.)
 
-   ASoC: sun8i-codec: Set the BCLK divider
+[...]
 
-has been applied to the asoc tree at
+> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> > index f5e851e..56e848f 100644
+> > --- a/arch/arm64/kernel/entry.S
+> > +++ b/arch/arm64/kernel/entry.S
+> > @@ -607,6 +607,8 @@ el0_sync:
+> >  	b.eq	el0_ia
+> >  	cmp	x24, #ESR_ELx_EC_FP_ASIMD	// FP/ASIMD access
+> >  	b.eq	el0_fpsimd_acc
+> > +	cmp	x24, #ESR_ELx_EC_SVE		// SVE access
+> > +	b.eq	el0_sve_acc
+> 
+> I'm guessing there is a point that this long chain of cmp instructions
+> is better handled with a jump table? One for the maintainer though I
+> guess?
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
+Probably it would be worth refactoring this at some point.
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+There's a tradeoff between the length of this list the extra D-cache
+and/or branch miss(es) that might result from using a table.
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
+The optimimum approach would be microarchitecture dependent, but I
+suspect a good compromise would be to profile this, pick the few most
+common / most latency sensitive exception types and keep those as
+compare-and-branch, deferring the remainder to a table lookup.
 
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
+I had a vague plan to take a look at it, but for this series is
+was very much in "nice-to-have" territory.
 
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
+> >  	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
+> >  	b.eq	el0_fpsimd_exc
+> >  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
+> > @@ -658,6 +660,7 @@ el0_svc_compat:
+> >  	/*
+> >  	 * AArch32 syscall handling
+> >  	 */
+> > +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
+> >  	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
+> >  	mov	wscno, w7			// syscall number in w7 (r7)
+> >  	mov     wsc_nr, #__NR_compat_syscalls
 
-Thanks,
-Mark
+[...]
 
->From 316b7758c998fb13371d14bb6c9e45ab129c19a7 Mon Sep 17 00:00:00 2001
-From: Maxime Ripard <maxime.ripard@free-electrons.com>
-Date: Thu, 9 Nov 2017 10:39:24 +0100
-Subject: [PATCH] ASoC: sun8i-codec: Set the BCLK divider
+> > @@ -835,16 +848,36 @@ ENDPROC(ret_to_user)
+> >   */
+> >  	.align	6
+> >  el0_svc:
+> > +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
+> >  	adrp	stbl, sys_call_table		// load syscall table pointer
+> >  	mov	wscno, w8			// syscall number in w8
+> >  	mov	wsc_nr, #__NR_syscalls
+> > +
+> > +#ifndef CONFIG_ARM64_SVE
+> > +	b	el0_svc_naked
+> 
+> Hmm we've hoisted the ldr x16, [tsk, #TSK_TI_FLAGS] out of el0_svc_naked
+> but we'll still be testing the bit when CONFIG_ARM64_SVE isn't enabled?
 
-While the current code was reporting to be able to work in master mode, it
-failed to do so because the BCLK divider wasn't programmed, meaning that
-the BCLK would run at the PLL's frequency no matter the sample rate.
+Where?  In this patch it's #ifdef'd out.  In "Detect SVE and activate
+runtime support" this is converted to an asm alternative, so this should
+reduce to a statically predictable branch when CONFIG_ARM64_SVE=y but
+SVE support is not detected.
 
-It was obviously a bit too fast.
+> I'm not clear why you couldn't keep that where it was?
 
-Add support to retrieve the divider to use, and set it. Since our PLL is
-not always able to generate a perfect multiple of the sample rate, we'll
-have to choose the closest divider that matches our setup.
+Catalin wasn't keen on the duplication of work reading and writing the
+thread flags, so I moved it to the common path.
 
-Fixes: 36c684936fae ("ASoC: Add sun8i digital audio codec")
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
-Cc: <stable@vger.kernel.org>
----
- sound/soc/sunxi/sun8i-codec.c | 51 +++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
+> 
+> > +#else
+> > +	tbz	x16, #TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
+> > +	bic	x16, x16, #_TIF_SVE		// discard SVE state
+> > +	str	x16, [tsk, #TSK_TI_FLAGS]
+> > +
+> > +	/*
+> > +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
+> > +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
+> > +	 * happens if a context switch or kernel_neon_begin() or context
+> > +	 * modification (sigreturn, ptrace) intervenes.
+> > +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case:
+> > +	 */
+> > +	mrs	x9, cpacr_el1
+> > +	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
+> > +	msr	cpacr_el1, x9			// synchronised by eret to el0
+> > +#endif /* CONFIG_ARM64_SVE */
+> > +
+> >  el0_svc_naked:					// compat entry point
+> >  	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
+> >  	enable_dbg_and_irq
+> >  	ct_user_exit 1
+> >
+> > -	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
+> > -	tst	x16, #_TIF_SYSCALL_WORK
+> > +	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
+> >  	b.ne	__sys_trace
+> >  	cmp     wscno, wsc_nr			// check upper syscall limit
+> >  	b.hs	ni_sys
 
-diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index 038107baf414..50a9e077f01b 100644
---- a/sound/soc/sunxi/sun8i-codec.c
-+++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -73,6 +73,7 @@
- #define SUN8I_SYS_SR_CTRL_AIF2_FS_MASK		GENMASK(11, 8)
- #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK	GENMASK(5, 4)
- #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK	GENMASK(8, 6)
-+#define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK	GENMASK(12, 9)
- 
- struct sun8i_codec {
- 	struct device	*dev;
-@@ -226,12 +227,57 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- 	return 0;
- }
- 
-+struct sun8i_codec_clk_div {
-+	u8	div;
-+	u8	val;
-+};
-+
-+static const struct sun8i_codec_clk_div sun8i_codec_bclk_div[] = {
-+	{ .div = 1,	.val = 0 },
-+	{ .div = 2,	.val = 1 },
-+	{ .div = 4,	.val = 2 },
-+	{ .div = 6,	.val = 3 },
-+	{ .div = 8,	.val = 4 },
-+	{ .div = 12,	.val = 5 },
-+	{ .div = 16,	.val = 6 },
-+	{ .div = 24,	.val = 7 },
-+	{ .div = 32,	.val = 8 },
-+	{ .div = 48,	.val = 9 },
-+	{ .div = 64,	.val = 10 },
-+	{ .div = 96,	.val = 11 },
-+	{ .div = 128,	.val = 12 },
-+	{ .div = 192,	.val = 13 },
-+};
-+
-+static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
-+				   unsigned int rate,
-+				   unsigned int word_size)
-+{
-+	unsigned long clk_rate = clk_get_rate(scodec->clk_module);
-+	unsigned int div = clk_rate / rate / word_size / 2;
-+	unsigned int best_val = 0, best_diff = ~0;
-+	int i;
-+
-+	for (i = 0; i < ARRAY_SIZE(sun8i_codec_bclk_div); i++) {
-+		const struct sun8i_codec_clk_div *bdiv = &sun8i_codec_bclk_div[i];
-+		unsigned int diff = abs(bdiv->div - div);
-+
-+		if (diff < best_diff) {
-+			best_diff = diff;
-+			best_val = bdiv->val;
-+		}
-+	}
-+
-+	return best_val;
-+}
-+
- static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
- 				 struct snd_pcm_hw_params *params,
- 				 struct snd_soc_dai *dai)
- {
- 	struct sun8i_codec *scodec = snd_soc_codec_get_drvdata(dai->codec);
- 	int sample_rate;
-+	u8 bclk_div;
- 
- 	/*
- 	 * The CPU DAI handles only a sample of 16 bits. Configure the
-@@ -241,6 +287,11 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16);
- 
-+	bclk_div = sun8i_codec_get_bclk_div(scodec, params_rate(params), 16);
-+	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
-+			   SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
-+			   bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
-+
- 	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
- 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
--- 
-2.15.0
+[...]
+
+> > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
+> > index 18c0290..9d3c7f0 100644
+> > --- a/arch/arm64/kernel/traps.c
+> > +++ b/arch/arm64/kernel/traps.c
+> > @@ -310,8 +310,8 @@ static int call_undef_hook(struct pt_regs *regs)
+> >  	return fn ? fn(regs, instr) : 1;
+> >  }
+> >
+> > -static void force_signal_inject(int signal, int code, struct pt_regs *regs,
+> > -				unsigned long address)
+> > +void force_signal_inject(int signal, int code, struct pt_regs *regs,
+> > +			 unsigned long address)
+> >  {
+> >  	siginfo_t info;
+> >  	void __user *pc = (void __user *)instruction_pointer(regs);
+> > @@ -325,7 +325,7 @@ static void force_signal_inject(int signal, int code, struct pt_regs *regs,
+> >  		desc = "illegal memory access";
+> >  		break;
+> >  	default:
+> > -		desc = "bad mode";
+> > +		desc = "unknown or unrecoverable error";
+> >  		break;
+> >  	}
+> 
+> Is this a separate trivial clean-up patch? It seems like you should
+> handle SIGKILL explicitly?
+
+I considered it part of this patch, since this function is not currently
+used elsewhere.
+
+I only expect this path to be followed as a catch-all for BUG() like
+conditions that can be contained by killing the user task.  Printing
+out a super-descriptive message didn't seem appropriate, but "bad mode"
+is especially opaque.  I think that was a paste from arch/arm -- AArch64
+doesn't have "modes" as such.
+
+Cheers
+---Dave
