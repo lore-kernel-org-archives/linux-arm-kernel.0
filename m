@@ -1,197 +1,68 @@
-From: manoj.iyer@canonical.com (Manoj Iyer)
-Date: Thu, 9 Nov 2017 10:58:29 -0600 (CST)
-Subject: [3/3] arm64: Add software workaround for Falkor erratum 1041
-In-Reply-To: <alpine.DEB.2.20.1711091010570.15101@lazy>
-References: <1509679664-3749-4-git-send-email-shankerd@codeaurora.org>
- <alpine.DEB.2.20.1711081305310.26324@lazy> <5A04369A.2020405@arm.com>
- <alpine.DEB.2.20.1711090949110.15101@lazy>
- <alpine.DEB.2.20.1711091010570.15101@lazy>
-Message-ID: <alpine.DEB.2.20.1711091041180.15101@lazy>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Nov 2017 16:58:40 +0000
+Subject: [PATCH] Kernel debugging: omap: print warning if CONFIG_DEBUG_LL
+ is enabled
+In-Reply-To: <E542DC13-D6C4-4C84-8521-8CE468BD0AFE@goldelico.com>
+References: <b80b85cd6f26d02d698463b3dd5e9783081aa780.1510176592.git.hns@goldelico.com>
+ <20171108222755.GW28152@atomide.com>
+ <20171108223604.GG28231@n2100.armlinux.org.uk>
+ <20171108223810.GH28231@n2100.armlinux.org.uk>
+ <E542DC13-D6C4-4C84-8521-8CE468BD0AFE@goldelico.com>
+Message-ID: <20171109165840.GI28231@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 09, 2017 at 06:44:49AM +0100, H. Nikolaus Schaller wrote:
+> Hi Russel,
 
-James,
+Nikolus,
 
-Looks like my VM test raised a false alarm. I retested stock Artful 4.13 
-kernel (No erratum 1041 patches applied).
+> > Am 08.11.2017 um 23:38 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
+> > 
+> > On Wed, Nov 08, 2017 at 10:36:04PM +0000, Russell King - ARM Linux wrote:
+> >> We don't need a compiler warning there, we probably need better help
+> >> text against DEBUG_LL and against EARLY_PRINTK.
+> > 
+> > Actually, this is already clearly stated against DEBUG_LL:
+> > 
+> >          Note that selecting this option will limit the kernel to a single
+> >          UART definition, as specified below. Attempting to boot the kernel
+> >          image on a different platform *will not work*, so this option should
+> >          not be enabled for kernels that are intended to be portable.
+> > 
+> > and since EARLY_PRINTK depends on DEBUG_LL... I guess people don't
+> > read help texts anymore.
+> 
+> Yes, we read, but we face a situation where it doesn't help that it is a
+> well known problem *for you* or anyone else and that it is described in
+> the help.
 
-Host: Ubuntu Artful 4.13 kernel with *no* erratum 1041 patches applied.
-Guest: Ubuntu Zesty (4.10) kernel.
+Personally, I'd like early_printk not to be re-using this, but others
+disagree.  It's all about knowledge and compromise.
 
-- Created 20 VMs one at a time
+What we don't want is more warnings in the kernel - it's already
+hard enough for people to spot the "bad" warnings that they need to
+fix to have a working system (such as wrong printf specifiers) that
+(a) they're not going to spot this #warning and (b) it's just going
+to be more noise for those who do try to spot the warnings.
 
-In a loop:
-- Stop (virsh destroy) 20 VMs one at a time
-- Start (virsh start) 20 VMs one at a time.
+> Do you expect anybody to remember after 3 years of *not* changing DEBUG_LL
+> what was written in a help message? Or to understand that DEBUG_LL has
+> anything to do with the mysteriously appearing boot problem? Which can't
+> easily be debugged since there are no messages despite playing with
+> EARLY_PRINTK/EARLYCON?
 
-And, I am able to reproduce the system reset issue I previously reported. 
-I think the problem I reported with VMs might have nothing to do with the 
-erratum 1041 patches, and probably needs to be root caused seperately.
+Do you expect people to read the build log of their kernel and spot
+the additional warning?  You might be on the ball enough to do that,
+but not everyone does, or is.  Not everyone logs the output of the
+kernel build so they can review it later.  I suspect that many just
+set the build going in a terminal, walk away and come back sometime
+later when they think it's done.  (This view is based upon the number
+of warnings that I've seen crop up that are for things that are real
+bugs that others have introduced - had the warnings been spotted, it
+would've triggered a "oh, that's not right" moment.)
 
-With stock 4.13 kernel (no erratum 1041 patches applied):
-
-awrep6 login: [  461.881379] ACPI CPPC: PCC check channel failed. Status=0
-[  462.051194] ACPI CPPC: PCC check channel failed. Status=0
-[  462.223137] ACPI CPPC: PCC check channel failed. Status=0
-[  462.633790] ACPI CPPC: PCC check channel failed. Status=0
-[  463.231971] ACPI CPPC: PCC check channel failed. Status=0
-[  463.403163] ACPI CPPC: PCC check channel failed. Status=0
-[  463.822936] ACPI CPPC: PCC check channel failed. Status=0
-[  463.995222] ACPI CPPC: PCC check channel failed. Status=0
-[  464.130962] ACPI CPPC: PCC check channel failed. Status=0
-[  464.258973] ACPI CPPC: PCC check channel failed. Status=0
-[  465.283028] ACPI CPPC: PCC check channel failed. Status=0
-
-
-SYS_DBG: Running SDI image (immediate mode)
-SYS_DBG: Ram Dump Init
-SYS_DBG: Failed to init SD card
-SYS_DBG: Resetting system!
-
-
-On Thu, 9 Nov 2017, Manoj Iyer wrote:
-
->
->
->
-> On Thu, 9 Nov 2017, Manoj Iyer wrote:
->
->> 
->> James,
->> 
->> (sorry for top-posting)
->> 
->> Applied patch 3 patches to Ubuntu Artful Kernel ( 4.13.0-16-generic )
->> 
->> - Start 20 VMs one at a time
->> 
->> In a loop:
->> - Stop (virsh destroy) 20 VMs one at a time
->> - Start (virsh start) 20 VMs one at a time.
->
-> Fixing some confusion I might have introduced in my prev email.
->
-> - Applied all 3 patches to Ubuntu Artful Kernel ( 4.13.0-16-generic )
->
-> - Created 20 VMs one at a time
->
-> In a loop:
-> - Stop (virsh destroy) 20 VMs one at a time
-> - Start (virsh start) 20 VMs one at a time.
->
->> 
->> The system reset's itself after starting the last VM on the 1st loop 
->> displaying the following:
->> 
->> awrep6 login: [ 603.349141] ACPI CPPC: PCC check channel failed. Status=0
->> [ 603.765101] ACPI CPPC: PCC check channel failed. Status=0
->> [ 603.937389] ACPI CPPC: PCC check channel failed. Status=0
->> [ 608.285495] ACPI CPPC: PCC check channel failed. Status=0
->> [ 608.289481] ACPI CPPC: PCC check channel failed. Status=0
->> 
->> SYS_DBG: Running SDI image (immediate mode)
->> SYS_DBG: Ram Dump Init
->> SYS_DBG: Failed to init SD card
->> SYS_DBG: Resetting system!
->> 
->> Followed by the following messages on system reboot:
->> [ 6.616891] BERT: Error records from previous boot:
->> [ 6.621655] [Hardware Error]: event severity: fatal
->> [ 6.626516] [Hardware Error]: imprecise tstamp: 0000-00-00 00:00:00
->> [ 6.632851] [Hardware Error]: Error 0, type: fatal
->> [ 6.637713] [Hardware Error]: section type: unknown, 
->> d2e2621c-f936-468d-0d84-15a4ed015c8b
->> [ 6.646045] [Hardware Error]: section length: 0x238
->> [ 6.651082] [Hardware Error]: 00000000: 72724502 5220726f 6f736165 6e55206e 
->> .Error Reason Un
->> [ 6.659761] [Hardware Error]: 00000010: 776f6e6b 0000006e 00000000 00000000 
->> known...........
->> [ 6.668442] [Hardware Error]: 00000020: 00000000 00000000 00000000 00000000 
->> ................
->> [ 6.677122] [Hardware Error]: 00000030: 00000000 00000000 00000000 00000000 
->> ................
->> 
->> 
->> On Thu, 9 Nov 2017, James Morse wrote:
->> 
->>> Hi Manoj,
->>> 
->>> On 08/11/17 19:05, Manoj Iyer wrote:
->>>> On Thu, 2 Nov 2017, Shanker Donthineni wrote:
->>>>> The ARM architecture defines the memory locations that are permitted
->>>>> to be accessed as the result of a speculative instruction fetch from
->>>>> an exception level for which all stages of translation are disabled.
->>>>> Specifically, the core is permitted to speculatively fetch from the
->>>>> 4KB region containing the current program counter and next 4KB.
->>>>> 
->>>>> When translation is changed from enabled to disabled for the running
->>>>> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
->>>>> Falkor core may errantly speculatively access memory locations outside
->>>>> of the 4KB region permitted by the architecture. The errant memory
->>>>> access may lead to one of the following unexpected behaviors.
->>> 
->>>> I applied the 3 patches to Ubuntu 4.13.0-16-generic (Artful) kernel and
->>>> ran stress-ng cpu tests on QDF2400 server
->>> 
->>> [...]
->>> 
->>>> Where stress-ng would spawn N workers and test cpu offline/online, 
->>>> perform
->>>> matrix operations, do rapid context switchs, and anonymous mmaps. 
->>>> Although
->>>> I was not able to reproduce the erratum on the stock 4.13 kernel using 
->>>> the
->>>> same test case, the patched kernel did not seem to introduce any
->>>> regressions either. I ran the stress-ng tests for over 8hrs found the
->>>> system to be stable.
->>> 
->>> 
->>> Could you throw kexec and KVM into the mix? This issue only shows up when 
->>> we
->>> disable the MMU, which we almost never do.
->>> 
->>> For CPU offline/online we make the PSCI 'offline' call with the MMU 
->>> enabled.
->>> When the CPU comes back firmware has reset the EL2/EL1 SCTLR from a higher
->>> exception level, so it won't hit this issue.
->>> 
->>> One place we do this is kexec, where we drop into purgatory with the MMU 
->>> disabled.
->>> 
->>> The other is KVM unloading itself to return to the hyp stub. You can 
->>> stress this
->>> by starting and stopping a VM. When the number of VMs reaches 0 KVM should
->>> unload via 'kvm_arch_hardware_disable()'.
->>> 
->>> 
->>> Thanks,
->>> 
->>> James
->>> 
->>> 
->> 
->> --
->> ============================
->> Manoj Iyer
->> Ubuntu/Canonical
->> ARM Servers - Cloud
->> ============================
->> 
->> 
->
-> --
-> ============================
-> Manoj Iyer
-> Ubuntu/Canonical
-> ARM Servers - Cloud
-> ============================
->
->
-
---
-============================
-Manoj Iyer
-Ubuntu/Canonical
-ARM Servers - Cloud
-============================
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
