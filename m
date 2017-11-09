@@ -1,93 +1,81 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu,  9 Nov 2017 16:26:11 -0600
-Subject: [PATCH 3/6] arm: dts: marvell: Add missing #phy-cells to usb-nop-xceiv
+Date: Thu,  9 Nov 2017 16:26:14 -0600
+Subject: [PATCH 6/6] arm: dts: am33xx: Add missing #phy-cells to ti,
+ am335x-usb-phy
 In-Reply-To: <20171109222614.5719-1-robh@kernel.org>
 References: <20171109222614.5719-1-robh@kernel.org>
-Message-ID: <20171109222614.5719-3-robh@kernel.org>
+Message-ID: <20171109222614.5719-6-robh@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"usb-nop-xceiv" is using the phy binding, but is missing #phy-cells
-property. This is probably because the binding was the precursor to the phy
-binding.
-
-Fixes the following warning in Marvell dts files:
+"ti,am335x-usb-phy" is using the phy binding, but is missing #phy-cells
+property. Fixes the following warning in TI dts files:
 
 Warning (phys_property): Missing property '#phy-cells' in node ...
 
 Signed-off-by: Rob Herring <robh@kernel.org>
-Cc: Jason Cooper <jason@lakedaemon.net>
-Cc: Andrew Lunn <andrew@lunn.ch>
-Cc: Gregory Clement <gregory.clement@free-electrons.com>
-Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Cc: "Beno?t Cousson" <bcousson@baylibre.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Cc: linux-omap at vger.kernel.org
 ---
-Please apply to Marvell tree.
+Please apply to TI tree.
 
- arch/arm/boot/dts/armada-385-db-ap.dts          | 1 +
- arch/arm/boot/dts/armada-385-linksys.dtsi       | 1 +
- arch/arm/boot/dts/armada-385-synology-ds116.dts | 2 ++
- arch/arm/boot/dts/armada-388-gp.dts             | 2 ++
- 4 files changed, 6 insertions(+)
+ Documentation/devicetree/bindings/usb/am33xx-usb.txt | 2 ++
+ arch/arm/boot/dts/am33xx.dtsi                        | 2 ++
+ arch/arm/boot/dts/dm814x.dtsi                        | 1 +
+ 3 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/boot/dts/armada-385-db-ap.dts b/arch/arm/boot/dts/armada-385-db-ap.dts
-index 25d2d720dc0e..678aa023335d 100644
---- a/arch/arm/boot/dts/armada-385-db-ap.dts
-+++ b/arch/arm/boot/dts/armada-385-db-ap.dts
-@@ -236,6 +236,7 @@
- 	usb3_phy: usb3_phy {
- 		compatible = "usb-nop-xceiv";
- 		vcc-supply = <&reg_xhci0_vbus>;
+diff --git a/Documentation/devicetree/bindings/usb/am33xx-usb.txt b/Documentation/devicetree/bindings/usb/am33xx-usb.txt
+index 7a33f22c815a..7a198a30408a 100644
+--- a/Documentation/devicetree/bindings/usb/am33xx-usb.txt
++++ b/Documentation/devicetree/bindings/usb/am33xx-usb.txt
+@@ -95,6 +95,7 @@ usb: usb at 47400000 {
+ 		reg = <0x47401300 0x100>;
+ 		reg-names = "phy";
+ 		ti,ctrl_mod = <&ctrl_mod>;
 +		#phy-cells = <0>;
  	};
  
- 	reg_xhci0_vbus: xhci0-vbus {
-diff --git a/arch/arm/boot/dts/armada-385-linksys.dtsi b/arch/arm/boot/dts/armada-385-linksys.dtsi
-index e1f355ffc8f7..434dc9aaa5e4 100644
---- a/arch/arm/boot/dts/armada-385-linksys.dtsi
-+++ b/arch/arm/boot/dts/armada-385-linksys.dtsi
-@@ -66,6 +66,7 @@
- 	usb3_1_phy: usb3_1-phy {
- 		compatible = "usb-nop-xceiv";
- 		vcc-supply = <&usb3_1_vbus>;
+ 	usb0: usb at 47401000 {
+@@ -141,6 +142,7 @@ usb: usb at 47400000 {
+ 		reg = <0x47401b00 0x100>;
+ 		reg-names = "phy";
+ 		ti,ctrl_mod = <&ctrl_mod>;
 +		#phy-cells = <0>;
  	};
  
- 	usb3_1_vbus: usb3_1-vbus {
-diff --git a/arch/arm/boot/dts/armada-385-synology-ds116.dts b/arch/arm/boot/dts/armada-385-synology-ds116.dts
-index 31510eb56f10..55a3c4870b8c 100644
---- a/arch/arm/boot/dts/armada-385-synology-ds116.dts
-+++ b/arch/arm/boot/dts/armada-385-synology-ds116.dts
-@@ -191,11 +191,13 @@
- 	usb3_0_phy: usb3_0_phy {
- 		compatible = "usb-nop-xceiv";
- 		vcc-supply = <&reg_usb3_0_vbus>;
-+		#phy-cells = <0>;
- 	};
+ 	usb1: usb at 47401800 {
+diff --git a/arch/arm/boot/dts/am33xx.dtsi b/arch/arm/boot/dts/am33xx.dtsi
+index 7d7ca054c557..a39465a67ca2 100644
+--- a/arch/arm/boot/dts/am33xx.dtsi
++++ b/arch/arm/boot/dts/am33xx.dtsi
+@@ -626,6 +626,7 @@
+ 				reg-names = "phy";
+ 				status = "disabled";
+ 				ti,ctrl_mod = <&usb_ctrl_mod>;
++				#phy-cells = <0>;
+ 			};
  
- 	usb3_1_phy: usb3_1_phy {
- 		compatible = "usb-nop-xceiv";
- 		vcc-supply = <&reg_usb3_1_vbus>;
-+		#phy-cells = <0>;
- 	};
+ 			usb0: usb at 47401000 {
+@@ -674,6 +675,7 @@
+ 				reg-names = "phy";
+ 				status = "disabled";
+ 				ti,ctrl_mod = <&usb_ctrl_mod>;
++				#phy-cells = <0>;
+ 			};
  
- 	reg_usb3_0_vbus: usb3-vbus0 {
-diff --git a/arch/arm/boot/dts/armada-388-gp.dts b/arch/arm/boot/dts/armada-388-gp.dts
-index f503955dbd3b..51b4ee6df130 100644
---- a/arch/arm/boot/dts/armada-388-gp.dts
-+++ b/arch/arm/boot/dts/armada-388-gp.dts
-@@ -276,11 +276,13 @@
- 	usb2_1_phy: usb2_1_phy {
- 		compatible = "usb-nop-xceiv";
- 		vcc-supply = <&reg_usb2_1_vbus>;
-+		#phy-cells = <0>;
- 	};
+ 			usb1: usb at 47401800 {
+diff --git a/arch/arm/boot/dts/dm814x.dtsi b/arch/arm/boot/dts/dm814x.dtsi
+index 9708157f5daf..b7a11c1168d1 100644
+--- a/arch/arm/boot/dts/dm814x.dtsi
++++ b/arch/arm/boot/dts/dm814x.dtsi
+@@ -75,6 +75,7 @@
+ 				reg = <0x47401300 0x100>;
+ 				reg-names = "phy";
+ 				ti,ctrl_mod = <&usb_ctrl_mod>;
++				#phy-cells = <0>;
+ 			};
  
- 	usb3_phy: usb3_phy {
- 		compatible = "usb-nop-xceiv";
- 		vcc-supply = <&reg_usb3_vbus>;
-+		#phy-cells = <0>;
- 	};
- 
- 	reg_usb3_vbus: usb3-vbus {
+ 			usb0: usb at 47401000 {
 -- 
 2.14.1
