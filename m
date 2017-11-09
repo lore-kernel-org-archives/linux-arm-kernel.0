@@ -1,141 +1,68 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Thu, 9 Nov 2017 11:12:27 +0100
-Subject: [PATCH v4 05/12] IIO: ADC: add sigma delta modulator support
+Date: Thu, 9 Nov 2017 11:12:32 +0100
+Subject: [PATCH v4 10/12] IIO: consumer: allow to set buffer sizes
 In-Reply-To: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1510222354-15290-6-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1510222354-15290-11-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add generic driver to support sigma delta modulators.
+Add iio consumer API to set buffer size and watermark according
+to sysfs API.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 ---
- drivers/iio/adc/Kconfig            | 12 ++++++
- drivers/iio/adc/Makefile           |  1 +
- drivers/iio/adc/sd_adc_modulator.c | 82 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 95 insertions(+)
- create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+V3 -> V4 changes:
+ - Set only the Watermark not the buffer lenght
+ - Rename functions to replace "params" with "watermark"
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 5762565..c5db62f 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -626,6 +626,18 @@ config SPEAR_ADC
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called spear_adc.
+ drivers/iio/buffer/industrialio-buffer-cb.c | 11 +++++++++++
+ include/linux/iio/consumer.h                | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
+index 4847534..ea63c83 100644
+--- a/drivers/iio/buffer/industrialio-buffer-cb.c
++++ b/drivers/iio/buffer/industrialio-buffer-cb.c
+@@ -104,6 +104,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
  
-+config SD_ADC_MODULATOR
-+	tristate "Generic sigma delta modulator"
-+	depends on OF
-+	select IIO_BUFFER
-+	select IIO_TRIGGERED_BUFFER
-+	help
-+	  Select this option to enables sigma delta modulator. This driver can
-+	  support generic sigma delta modulators.
-+
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called sd_adc_modulator.
-+
- config STM32_ADC_CORE
- 	tristate "STMicroelectronics STM32 adc core"
- 	depends on ARCH_STM32 || COMPILE_TEST
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index 9874e05..d800325 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -81,3 +81,4 @@ obj-$(CONFIG_VF610_ADC) += vf610_adc.o
- obj-$(CONFIG_VIPERBOARD_ADC) += viperboard_adc.o
- xilinx-xadc-y := xilinx-xadc-core.o xilinx-xadc-events.o
- obj-$(CONFIG_XILINX_XADC) += xilinx-xadc.o
-+obj-$(CONFIG_SD_ADC_MODULATOR) += sd_adc_modulator.o
-diff --git a/drivers/iio/adc/sd_adc_modulator.c b/drivers/iio/adc/sd_adc_modulator.c
-new file mode 100644
-index 0000000..ff2504a
---- /dev/null
-+++ b/drivers/iio/adc/sd_adc_modulator.c
-@@ -0,0 +1,82 @@
-+/*
-+ * Generic sigma delta modulator driver
-+ *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author: Arnaud Pouliquen <arnaud.pouliquen@st.com>.
-+ *
-+ * License type: GPLv2
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-+ * or FITNESS FOR A PARTICULAR PURPOSE.
-+ * See the GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/iio/iio.h>
-+#include <linux/iio/triggered_buffer.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+
-+static const struct iio_info iio_sd_mod_iio_info;
-+
-+static const struct iio_chan_spec iio_sd_mod_ch = {
-+	.type = IIO_VOLTAGE,
-+	.indexed = 1,
-+	.scan_index = 0,
-+	.scan_type = {
-+		.sign = 'u',
-+		.realbits = 1,
-+		.shift = 0,
-+	},
-+};
-+
-+static int iio_sd_mod_probe(struct platform_device *pdev)
++int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buff,
++					size_t watermark)
 +{
-+	struct device *dev = &pdev->dev;
-+	struct iio_dev *iio;
++	if (!watermark)
++		return -EINVAL;
++	cb_buff->buffer.watermark = watermark;
 +
-+	iio = devm_iio_device_alloc(dev, 0);
-+	if (!iio)
-+		return -ENOMEM;
-+
-+	iio->dev.parent = dev;
-+	iio->dev.of_node = dev->of_node;
-+	iio->name = dev_name(dev);
-+	iio->info = &iio_sd_mod_iio_info;
-+	iio->modes = INDIO_BUFFER_HARDWARE;
-+
-+	iio->num_channels = 1;
-+	iio->channels = &iio_sd_mod_ch;
-+
-+	platform_set_drvdata(pdev, iio);
-+
-+	return devm_iio_device_register(&pdev->dev, iio);
++	return 0;
 +}
++EXPORT_SYMBOL_GPL(iio_channel_cb_set_buffer_watermark);
 +
-+static const struct of_device_id sd_adc_of_match[] = {
-+	{ .compatible = "sd-modulator" },
-+	{ .compatible = "ads1201" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sd_adc_of_match);
+ int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
+ {
+ 	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
+diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+index 5e347a9..0d94557 100644
+--- a/include/linux/iio/consumer.h
++++ b/include/linux/iio/consumer.h
+@@ -134,6 +134,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ 						       void *private),
+ 					     void *private);
+ /**
++ * iio_channel_cb_set_buffer_watermark() - set the buffer watermark.
++ * @cb_buffer:		The callback buffer from whom we want the channel
++ *			information.
++ * @watermark: buffer watermark in bytes.
++ *
++ * This function allows to configure the buffer watermark.
++ */
++int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buffer,
++					size_t watermark);
 +
-+static struct platform_driver iio_sd_mod_adc = {
-+	.driver = {
-+		.name = "iio_sd_adc_mod",
-+		.of_match_table = of_match_ptr(sd_adc_of_match),
-+	},
-+	.probe = iio_sd_mod_probe,
-+};
-+
-+module_platform_driver(iio_sd_mod_adc);
-+
-+MODULE_DESCRIPTION("Basic sigma delta modulator");
-+MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
-+MODULE_LICENSE("GPL v2");
++/**
+  * iio_channel_release_all_cb() - release and unregister the callback.
+  * @cb_buffer:		The callback buffer that was allocated.
+  */
 -- 
 2.7.4
