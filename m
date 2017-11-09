@@ -1,33 +1,54 @@
-From: ak@linux.intel.com (Andi Kleen)
-Date: Wed, 8 Nov 2017 16:02:22 -0800
-Subject: [PATCH 13/15] arm64: fix mrs_s/msr_s macros for clang LTO
-In-Reply-To: <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
-References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103171203.107569-18-samitolvanen@google.com>
- <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
-Message-ID: <20171109000222.GC8522@tassilo.jf.intel.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 8 Nov 2017 16:11:13 -0800
+Subject: n900 in next-20170901
+In-Reply-To: <20171109000801.GA23982@js1304-P5Q-DELUXE>
+References: <20171020173146.GN4394@atomide.com>
+ <20171023045342.GA23082@js1304-P5Q-DELUXE>
+ <20171025173137.GQ4394@atomide.com>
+ <20171026044829.GB11791@js1304-P5Q-DELUXE>
+ <20171026141627.GD21504@atomide.com>
+ <20171107053313.GA12447@js1304-P5Q-DELUXE>
+ <20171107154842.GP28152@atomide.com>
+ <20171108074645.GA18747@js1304-P5Q-DELUXE>
+ <20171108163413.GU28152@atomide.com>
+ <20171109000801.GA23982@js1304-P5Q-DELUXE>
+Message-ID: <20171109001113.GZ28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> There's the series from Andi Kleen that enables LTO for Linux on x86:
-> https://lwn.net/Articles/512548/
-> https://github.com/andikleen/linux-misc/tree/lto-411-1
+* Joonsoo Kim <iamjoonsoo.kim@lge.com> [171109 00:05]:
+> On Wed, Nov 08, 2017 at 08:34:13AM -0800, Tony Lindgren wrote:
+> > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171108 07:43]:
+> > > On Tue, Nov 07, 2017 at 07:48:42AM -0800, Tony Lindgren wrote:
+> > > > So it seems the issue is currently at the atomic_pool_init()
+> > > > related code?
+> > > 
+> > > Yes, your test showed it although I can't find any clue in
+> > > atomic_pool_init().
+> > > 
+> > > Could you test updated branch?
+> > > 
+> > > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
+> > > 
+> > > There are two relevant commits.
+> > > 
+> > > arm/dma: stop dma allocation before __dma_alloc_remap()
+> > > arm/dma: disable atomic pool after dma allocation
+> > > 
+> > > atomic pool initialization will be done partially to check
+> > > exact point of failure. These are brain-dead commits however I have no
+> > > idea what's going on here until now. :/
+> > 
+> > OK that booted, dmesg output below. Hopefully that provides
+> > you with some more clues.
 > 
-> It has solved many problems you also try to solve, and some patches
-> are looking very similar. 
+> Thanks!
 > 
-> At now we have different patchsets for gcc and clang, and it would be
-> better to have them together. One thing I'm worried is that you introduce
-> CONFIG_CLANG_LTO and use it for all cases, including that where more
-> generic CONFIG_LTO should be used.
+> Could you let me know which one is booted? Both of them? or just top
+> commit ("arm/dma: stop dma allocation before __dma_alloc_remap()")?
 
-Yes would be good to merge the two. I've been looking at updating
-my old one.
+Oh OK. Only the top commit boots.
 
-I don't cover any ARM code, but lots of generic code. My patches
-also worked on MIPS at least.
+Regards,
 
-There's also older patches to enable single-pass-linking for kallsyms,
-which is extremly useful for LTO build performance.
-
--Andi
+Tony
