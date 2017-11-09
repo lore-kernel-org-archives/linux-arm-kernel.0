@@ -1,40 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Nov 2017 13:15:28 +0100
-Subject: [linux-sunxi] Re: [PATCH v2 00/10] Allwinner H3/H5/A64(DE2)
- SimpleFB support
-In-Reply-To: <CAP03XerMhdOYL08ED7=rt99BZ=RpXLhz_EySUhrJ4HbjYTX93g@mail.gmail.com>
-References: <20171027150658.18509-1-icenowy@aosc.io>
- <9bca10cc95d04f87a1122bc582402310@aosc.io>
- <20171102154447.b5qo3rvu5djxupay@flea>
- <20171106084043.2vv56w2dmrutz4gn@phenom.ffwll.local>
- <CAP03XerMhdOYL08ED7=rt99BZ=RpXLhz_EySUhrJ4HbjYTX93g@mail.gmail.com>
-Message-ID: <20171109121528.zqilrabirceyaj5h@flea.lan>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 9 Nov 2017 12:16:20 +0000
+Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
+In-Reply-To: <BLUPR0201MB150538FDD455F6042803B54FA5560@BLUPR0201MB1505.namprd02.prod.outlook.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-2-jean-philippe.brucker@arm.com>
+ <BLUPR0201MB150538FDD455F6042803B54FA5560@BLUPR0201MB1505.namprd02.prod.outlook.com>
+Message-ID: <16b6ba80-b15b-b278-0d06-350ae0201e82@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 11:17:03AM +0000, Chris Obbard wrote:
-> Hi Everyone,
-> 
-> What's the status of HDMI/SimpleFB driver for H5?
-> 
-> I don't see anything related to HDMI in linux-next dts files:
-> 
-> arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-pc2.dts? (example board)
-> arch/arm64/boot/dts/allwinner/sun50i-h5.dtsi
-> arch/arm/boot/dts/sunxi-h3-h5.dtsi
+Hi Bharat,
 
-It will be part of 4.16 and are not in linux-next (yet).
+On 11/08/2017 05:50 PM, Bharat Kumar Gogada wrote:
+> Hi Jean,
+> 
+> +static struct iommu_process *
+> +iommu_process_alloc(struct iommu_domain *domain, struct task_struct
+> +*task) {
+> +       int err;
+> +       int pasid;
+> +       struct iommu_process *process;
+> +
+> +       if (WARN_ON(!domain->ops->process_alloc ||
+> !domain->ops->process_free))
+> +               return ERR_PTR(-ENODEV);
+> +
+> +       process = domain->ops->process_alloc(task);
+> +       if (IS_ERR(process))
+> +               return process;
+> +       if (!process)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       process->pid            = get_task_pid(task, PIDTYPE_PID);
+> +       process->release        = domain->ops->process_free;
+> +       INIT_LIST_HEAD(&process->domains);
+> +       kref_init(&process->kref);
+> +
+> +       if (!process->pid) {
+> +               err = -EINVAL;
+> +               goto err_free_process;
+> +       }
+> +
+> +       idr_preload(GFP_KERNEL);
+> +       spin_lock(&iommu_process_lock);
+> +       pasid = idr_alloc_cyclic(&iommu_process_idr, process,
+> domain->min_pasid,
+> +                                domain->max_pasid + 1, GFP_ATOMIC);
+> If EP supports only one pasid; domain->min_pasid=1 and domain->max_pasid=0.
+> When idr_alloc_cyclic is called it invokes idr_get_free_cmn function
+> where we have following condition. (Based on kernel 4.14-rc6)
+>         if (!radix_tree_tagged(root, IDR_FREE))
+>                 start = max(start, maxindex + 1);
+>               if (start > max)
+>                 return ERR_PTR(-ENOSPC);
+> Here max is being assigned zero by the time this function is invoked,
+> this value is based on domain->max_pasid.
+> This condition fails and ENOSPC is returned.
+>        
+> In this case even though hardware supports PASID, BIND flow fails.
 
-Maxime
+It should fail, since we're reserving PASID 0 for non-PASID transactions
+with S1DSS=0b10. In addition, the SMMUv3 specification does not allow
+using PASID with a single entry. See the description of S1CDMax in 5.2
+Stream Table Entry:
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/fe25db37/attachment-0001.sig>
+"when this field is 0, the substreams of the STE are disabled and one CD
+is available. (The minimum useful number of substreams is 2.) Any
+transaction with a SubstreamID will be terminated with an abort and a
+C_BAD_SUBSTREAMID event recorded."
+
+> Any reason why pasid allocation moved to idr allocations rather than
+> bitmap allocations as in v1 patches ?
+
+Yes, idr provides a convenient way to quickly retrieve the context
+associated with a PASID, when handling a fault. v1 had the allocation in a
+bitmap and storing in a rb-tree. By using an idr we combine both and rely
+on a well-tested infrastructure.
+
+Note that in the future we might need to go back to handcrafting the PASID
+allocation, but it will probably still be based on idr.
+
+Thanks,
+Jean
