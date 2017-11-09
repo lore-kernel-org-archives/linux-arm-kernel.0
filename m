@@ -1,36 +1,84 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Thu, 09 Nov 2017 14:12:45 +0200
-Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
-In-Reply-To: <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
-References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
- <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
- <20171109093122.GA12318@n2100.armlinux.org.uk> <87inejaiij.fsf@intel.com>
- <CAEzXK1qHEcB6f_uGPJk9RxSd+tP5rNuiutBN1FAkEv-nU1k5Ug@mail.gmail.com>
- <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
-Message-ID: <87efp7abwi.fsf@intel.com>
+From: jphilippe.brucker@gmail.com (Jean-Philippe Brucker)
+Date: Thu, 9 Nov 2017 12:13:13 +0000
+Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
+In-Reply-To: <BLUPR0201MB150538FDD455F6042803B54FA5560@BLUPR0201MB1505.namprd02.prod.outlook.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-2-jean-philippe.brucker@arm.com>
+ <BLUPR0201MB150538FDD455F6042803B54FA5560@BLUPR0201MB1505.namprd02.prod.outlook.com>
+Message-ID: <67e7ad60-3f71-26d8-6ff6-59c95275f0e3@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 09 Nov 2017, Lu?s Mendes <luis.p.mendes@gmail.com> wrote:
-> I've just applied the referred individual patch to kernel-4.14-rc5 and
-> the EDID isn't loaded. dw-hdmi gets no firmware at all.
+Hi Bharat,
 
-Sorry, I didn't mean you could just cherry-pick that one commit and make
-it work. There were a number of preparatory patches before that, and I
-think some cleanups on top.
+On 11/08/2017 05:50 PM, Bharat Kumar Gogada wrote:
+> Hi Jean,
+> 
+> +static struct iommu_process *
+> +iommu_process_alloc(struct iommu_domain *domain, struct task_struct
+> +*task) {
+> +       int err;
+> +       int pasid;
+> +       struct iommu_process *process;
+> +
+> +       if (WARN_ON(!domain->ops->process_alloc ||
+> !domain->ops->process_free))
+> +               return ERR_PTR(-ENODEV);
+> +
+> +       process = domain->ops->process_alloc(task);
+> +       if (IS_ERR(process))
+> +               return process;
+> +       if (!process)
+> +               return ERR_PTR(-ENOMEM);
+> +
+> +       process->pid            = get_task_pid(task, PIDTYPE_PID);
+> +       process->release        = domain->ops->process_free;
+> +       INIT_LIST_HEAD(&process->domains);
+> +       kref_init(&process->kref);
+> +
+> +       if (!process->pid) {
+> +               err = -EINVAL;
+> +               goto err_free_process;
+> +       }
+> +
+> +       idr_preload(GFP_KERNEL);
+> +       spin_lock(&iommu_process_lock);
+> +       pasid = idr_alloc_cyclic(&iommu_process_idr, process,
+> domain->min_pasid,
+> +                                domain->max_pasid + 1, GFP_ATOMIC);
+> If EP supports only one pasid; domain->min_pasid=1 and domain->max_pasid=0.
+> When idr_alloc_cyclic is called it invokes idr_get_free_cmn function
+> where we have following condition. (Based on kernel 4.14-rc6)
+>         if (!radix_tree_tagged(root, IDR_FREE))
+>                 start = max(start, maxindex + 1);
+>               if (start > max)
+>                 return ERR_PTR(-ENOSPC);
+> Here max is being assigned zero by the time this function is invoked,
+> this value is based on domain->max_pasid.
+> This condition fails and ENOSPC is returned.
+>        
+> In this case even though hardware supports PASID, BIND flow fails.
 
-Please try drm-next to make sure you have it all.
+It should fail, since we're reserving PASID 0 for non-PASID transactions
+with S1DSS=0b10. In addition, the SMMUv3 specification does not allow
+using PASID with a single entry. See the description of S1CDMax in 5.2
+Stream Table Entry:
 
-We didn't intend for the commits to be backported, instead we very much
-wanted them to get a gradually increasing amount of exposure first to
-make sure we don't break stuff.
+"when this field is 0, the substreams of the STE are disabled and one CD
+is available. (The minimum useful number of substreams is 2.) Any
+transaction with a SubstreamID will be terminated with an abort and a
+C_BAD_SUBSTREAMID event recorded."
 
-And as I said elsewhere in the thread, Russell's patch may be relevant
-for current Linus' master and stable. We just need to reconciliate how
-the two things should work together in drm-next and v4.15 and on.
+> Any reason why pasid allocation moved to idr allocations rather than
+> bitmap allocations as in v1 patches ?
 
-BR,
-Jani.
+Yes, idr provides a convenient way to quickly retrieve the context
+associated with a PASID, when handling a fault. v1 had the allocation in a
+bitmap and storing in a rb-tree. By using an idr we combine both and rely
+on a well-tested infrastructure.
 
--- 
-Jani Nikula, Intel Open Source Technology Center
+Note that in the future we might need to go back to handcrafting the PASID
+allocation, but it will probably still be based on idr.
+
+Thanks,
+Jean
