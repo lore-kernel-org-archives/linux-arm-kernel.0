@@ -1,91 +1,39 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Nov 2017 09:31:22 +0000
-Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
-In-Reply-To: <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
-References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
- <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
-Message-ID: <20171109093122.GA12318@n2100.armlinux.org.uk>
+Date: Thu, 9 Nov 2017 09:37:34 +0000
+Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
+In-Reply-To: <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
+References: <20171109004144.2246-1-philip@cog.systems>
+ <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
+Message-ID: <20171109093734.GB12318@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 09:23:18AM +0100, Daniel Vetter wrote:
-> On Tue, Nov 07, 2017 at 11:27:21AM +0000, Russell King wrote:
-> > Parsing the EDID for HDMI and audio information in the get_modes()
-> > callback is incorrect - this only parses the EDID read from the
-> > connector, not any override or firmware provided EDID.
-> > 
-> > The correct place to parse the EDID for these parameters is the
-> > fill_modes() callback, after we've called the helper.  Move the parsing
-> > there.  This caused problems for Lu?s Mendes.
-> > 
-> > Cc: <stable@vger.kernel.org>
-> > Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-> > Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> > ---
-> >  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
-> >  1 file changed, 24 insertions(+), 4 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > index 9fe407f49986..2516a1c18a10 100644
-> > --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> > @@ -1905,10 +1905,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
-> >  		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
-> >  			edid->width_cm, edid->height_cm);
-> >  
-> > -		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
-> > -		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
-> >  		drm_mode_connector_update_edid_property(connector, edid);
-> > -		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
-> >  		ret = drm_add_edid_modes(connector, edid);
-> >  		/* Store the ELD */
-> >  		drm_edid_to_eld(connector, edid);
-> > @@ -1920,6 +1917,29 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
-> >  	return ret;
-> >  }
-> >  
-> > +static int dw_hdmi_connector_fill_modes(struct drm_connector *connector,
-> > +					uint32_t maxX, uint32_t maxY)
-> > +{
-> > +	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-> > +					    connector);
-> > +	int ret;
-> > +
-> > +	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
-> > +
-> > +	if (connector->edid_blob_ptr) {
-> > +		struct edid *edid = (void *)connector->edid_blob_ptr->data;
-> > +
-> > +		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
-> > +		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
-> > +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
-> > +	} else {
-> > +		hdmi->sink_is_hdmi = false;
-> > +		hdmi->sink_has_audio = false;
-> > +	}
-> > +
-> > +	return ret;
-> > +}
-> > +
-> >  static void dw_hdmi_connector_force(struct drm_connector *connector)
-> >  {
-> >  	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-> > @@ -1933,7 +1953,7 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
-> >  }
-> >  
-> >  static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
-> > -	.fill_modes = drm_helper_probe_single_connector_modes,
-> > +	.fill_modes = dw_hdmi_connector_fill_modes,
+On Wed, Nov 08, 2017 at 05:23:43PM -0800, Kees Cook wrote:
+> On Wed, Nov 8, 2017 at 4:41 PM, Philip Derrin <philip@cog.systems> wrote:
+> > Hi,
+> >
+> > This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
+> > when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
+> > mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
+> > merged in 3.19.
+> >
+> > The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
+> > mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
+> > implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
+> > sections to be read-only"), and another that moved the LPAE read-only bit into
+> > a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
+> > logic for LPAE").
+> >
+> > The incorrect mappings were not apparent in the debugfs kernel_page_tables
+> > dump because that was checking only the software RO bit, not the hardware RO
+> > bit.
 > 
-> Papering over helper functions shouldn't be necessary, except the helper
-> functions not handling the override edid is a known issue. Jani Nikula is
-> working on a proper fix, please coordinate with him.
+> Thanks for catching this! Please consider both patches:
+> 
+> Reviewed-by: Kees Cook <keescook@chromium.org>
 
-So, what you're basically saying is that fixing real bugs that affect
-users is not something that DRM people want.  That's fine, I'll ignore
-people who come to me for help with DRM bugs in future then because
-it's obviously a dead loss.
+Where are these patches, and why weren't they copied to the arm kernel
+list?
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
