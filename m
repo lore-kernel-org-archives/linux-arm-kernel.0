@@ -1,49 +1,68 @@
-From: james.hogan@mips.com (James Hogan)
-Date: Thu, 9 Nov 2017 08:06:02 +0000
-Subject: [PATCH 1/2] MIPS: dts: remove bogus bcm96358nb4ser.dtb from
- dtb-y entry
-In-Reply-To: <CAK7LNAQ_bugEP8hHKmCif5QCz2=Pw_GpXzYz4zJeXO0HXaT_ag@mail.gmail.com>
-References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
- <1509859853-27473-2-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNAQfK_BWQcVW-ScrpAwNAHav3MrrzV-tjn_YUjsuvd7U5A@mail.gmail.com>
- <20171106095139.GG15260@jhogan-linux>
- <CAK7LNAQ_bugEP8hHKmCif5QCz2=Pw_GpXzYz4zJeXO0HXaT_ag@mail.gmail.com>
-Message-ID: <20171109080601.GS15260@jhogan-linux>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 9 Nov 2017 13:36:48 +0530
+Subject: [PATCH v2 2/7] arm: omap: Move dmtimer.h out of plat-omap
+In-Reply-To: <6ca9c73a-95a1-2466-151e-cdba64c3c478@ti.com>
+References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
+ <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
+ <20171108164221.GV28152@atomide.com>
+ <6ca9c73a-95a1-2466-151e-cdba64c3c478@ti.com>
+Message-ID: <008c2d8b-6f76-882d-fc70-8fd4204c49d5@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 06, 2017 at 08:00:49PM +0900, Masahiro Yamada wrote:
-> 2017-11-06 19:41 GMT+09:00 James Hogan <jhogan@kernel.org>:
-> > Hi,
-> >
-> > On Sun, Nov 05, 2017 at 11:11:38PM +0900, Masahiro Yamada wrote:
-> >> +CC Ralf Baechle <ralf@linux-mips.org>
-> >> +CC linux-mips at linux-mips.org
-> >> +CC Kevin Cernekee <cernekee@gmail.com>
-> >> +CC Florian Fainelli <f.fainelli@gmail.com>
-> >>
-> >>
-> >> I missed to CC MIPS maintainers.
-> >
-> > Yes, please resend the patch so it lands in patchwork.linux-mips.org.
+
+
+On Thursday 09 November 2017 09:55 AM, Keerthy wrote:
 > 
 > 
-> This is a part of clean-up series of DT building.
+> On Wednesday 08 November 2017 10:12 PM, Tony Lindgren wrote:
+>> * Keerthy <j-keerthy@ti.com> [171108 12:31]:
+>>> The header file is currently under plat-omap directory
+>>> under arch/omap. Move this out to an accessible place.
+>>>
+>>> No Code changes done to the header file.
+>>
+>> Some of the dmtimer functions are in this header to optimize the
+>> size of the system timer code. Can you please check if some of them
+>> can be left out of dmtimer.h and be made private to mach-omap1/timer.c
+>> and mach-omap2/timer.c?
 > 
-> I want Acked-by from MIPS maintainers
-> so that the whole series can go to a different tree.
-> (DT or Kbuild).
+> Okay. I will try to clean that as well.
 
-Well FWIW, as acting MIPS maintainer right now:
+Tony,
 
-Acked-by: James Hogan <jhogan@kernel.org>
+Only function that i could push out of dmtimer.h was
+__omap_dm_timer_override_errata
 
-Cheers
-James
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/e05c7ad1/attachment.sig>
+which is being currently called by mach-omap2/timer.c alone.
+
+Rest all are used both my dmtimer.c as well as mach-omap2/timer.c.
+Here is the list:
+
+__omap_dm_timer_read
+__omap_dm_timer_write
+__omap_dm_timer_init_regs
+__omap_dm_timer_enable_posted
+__omap_dm_timer_stop
+__omap_dm_timer_load_start
+__omap_dm_timer_int_enable
+__omap_dm_timer_read_counter
+__omap_dm_timer_write_status
+
+Any preferences on moving them to dmtimer.c or leaving them in header file?
+
+Regards,
+Keerthy
+
+> 
+>>
+>> Again, we don't want driver code to start mis-using these as that's
+>> immediately going to be big mess out of control.
+> 
+> Sure.
+> 
+>>
+>> Regards,
+>>
+>> Tony
+>>
