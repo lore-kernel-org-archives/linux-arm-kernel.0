@@ -1,111 +1,97 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Thu, 9 Nov 2017 17:17:12 +0100
-Subject: [PATCH v2 3/7] arm: OMAP: Move dmtimer driver out of plat-omap
- to drivers under clocksource
-In-Reply-To: <1510144108-29563-4-git-send-email-j-keerthy@ti.com>
-References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
- <1510144108-29563-4-git-send-email-j-keerthy@ti.com>
-Message-ID: <20171109161712.4upyx7sypfdctuop@earth>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 9 Nov 2017 09:19:15 -0700
+Subject: [PATCH 06/17] coresight: tmc: Make ETR SG table circular
+In-Reply-To: <978c66da-1897-191d-7c2d-49b21c9c0a39@arm.com>
+References: <20171019171553.24056-1-suzuki.poulose@arm.com>
+ <20171019171553.24056-7-suzuki.poulose@arm.com> <20171106190712.GA12148@xps15>
+ <978c66da-1897-191d-7c2d-49b21c9c0a39@arm.com>
+Message-ID: <CANLsYkx_rzVRE_=Z+S8HOL=doRurN3YYcOvoi=mEAZszThRWjQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 7 November 2017 at 03:36, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
+> On 06/11/17 19:07, Mathieu Poirier wrote:
+>>
+>> On Thu, Oct 19, 2017 at 06:15:42PM +0100, Suzuki K Poulose wrote:
+>
+>
+> ...
+>
+>>> +/*
+>>> + * tmc_etr_sg_offset_to_table_index : Translate a given data @offset
+>>> + * to the index of the page table "entry". Data pointers always have
+>>> + * a fixed location, with ETR_SG_PTRS_PER_PAGE - 1 entries in an
+>>> + * ETR_SG_PAGE and 1 link entry per (ETR_SG_PTRS_PER_PAGE -1) entries.
+>>> + */
+>>> +static inline u32
+>>> +tmc_etr_sg_offset_to_table_index(u64 offset)
+>>> +{
+>>> +       u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
+>>> +
+>>> +       return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
+>>> +}
+>>
+>>
+>> This function is the source of a bizarre linking error when compiling
+>> [14/17] on
+>> armv7 as pasted here:
+>>
+>>    UPD     include/generated/compile.h
+>>    CC      init/version.o
+>>    AR      init/built-in.o
+>>    AR      built-in.o
+>>    LD      vmlinux.o
+>>    MODPOST vmlinux.o
+>> drivers/hwtracing/coresight/coresight-tmc-etr.o: In function
+>> `tmc_etr_sg_offset_to_table_index':
+>>
+>> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:553:
+>> undefined reference to `__aeabi_uldivmod'
+>>
+>> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:551:
+>> undefined reference to `__aeabi_uldivmod'
+>>
+>> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:553:
+>> undefined reference to `__aeabi_uldivmod'
+>> drivers/hwtracing/coresight/coresight-tmc-etr.o: In function
+>> `tmc_etr_sg_table_rotate':
+>>
+>> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:609:
+>> undefined reference to `__aeabi_uldivmod'
+>>
+>> Please see if you can reproduce on your side.
+>
+>
+> Uh ! I had gcc-7, which didn't complain about it. But if switch to 4.9, it
+> does.
+> It looks like division of 64bit entity on arm32 is triggering it. We don't
+> need
+> this to be u64 above, as it is the page_idx and could simply switch to
+> "unsigned long"
+> rather than explicitly using div64 helpers.
+>
+> The following change fixes the issue for me. Please could you check if it
+> solves the problem
+> for you ?
 
-On Wed, Nov 08, 2017 at 05:58:24PM +0530, Keerthy wrote:
-> Move the dmtimer driver out of plat-omap to clocksource.
-> So that non-omap devices also could use this.
-> 
-> No Code changes done to the driver file.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-> 
-> No code changes in this v2 version. Only enhanced patch
-> statistics for renames.
+Unfortunately it doesn't.
 
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+Mathieu
 
--- Sebastian
-
->  arch/arm/plat-omap/Kconfig                            | 6 ------
->  arch/arm/plat-omap/Makefile                           | 1 -
->  drivers/clocksource/Kconfig                           | 6 ++++++
->  drivers/clocksource/Makefile                          | 1 +
->  {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c | 0
->  5 files changed, 7 insertions(+), 7 deletions(-)
->  rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (100%)
-> 
-> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
-> index 3e27bff..4b92ac5 100644
-> --- a/arch/arm/plat-omap/Kconfig
-> +++ b/arch/arm/plat-omap/Kconfig
-> @@ -105,12 +105,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
->  	help
->  	  PPA routine service ID for setting L2 auxiliary control register.
->  
-> -config OMAP_DM_TIMER
-> -	bool "Use dual-mode timer"
-> -	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
-> -	help
-> -	 Select this option if you want to use OMAP Dual-Mode timers.
-> -
->  config OMAP_SERIAL_WAKE
->  	bool "Enable wake-up events for serial ports"
->  	depends on ARCH_OMAP1 && OMAP_MUX
-> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
-> index 47e1867..7215ada 100644
-> --- a/arch/arm/plat-omap/Makefile
-> +++ b/arch/arm/plat-omap/Makefile
-> @@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
->  
->  # omap_device support (OMAP2+ only at the moment)
->  
-> -obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
->  obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index c729a88..4da66cf 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -46,6 +46,12 @@ config DIGICOLOR_TIMER
->  	help
->  	  Enables the support for the digicolor timer driver.
->  
-> +config OMAP_DM_TIMER
-> +	bool "Use dual-mode timer"
-> +	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
-> +	help
-> +	 Select this option if you want to use Dual-Mode timers.
-> +
->  config DW_APB_TIMER
->  	bool "DW APB timer driver" if COMPILE_TEST
->  	help
-> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
-> index dbc1ad1..a8e51e6 100644
-> --- a/drivers/clocksource/Makefile
-> +++ b/drivers/clocksource/Makefile
-> @@ -15,6 +15,7 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
->  obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
->  obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
->  obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
-> +obj-$(CONFIG_OMAP_DM_TIMER)	+= dmtimer.o
->  obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
->  obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
->  obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
-> diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/dmtimer.c
-> similarity index 100%
-> rename from arch/arm/plat-omap/dmtimer.c
-> rename to drivers/clocksource/dmtimer.c
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/1b998f1b/attachment.sig>
+>
+>
+> @@ -551,7 +553,7 @@ static void tmc_etr_sg_table_populate(struct
+> etr_sg_table *etr_table)
+>  static inline u32
+>  tmc_etr_sg_offset_to_table_index(u64 offset)
+>  {
+> -       u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
+> +       unsigned long sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
+>          return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
+>  }
+>
+>
+>
+> Thanks for the testing !
+>
+> Suzuki
