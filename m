@@ -1,29 +1,39 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Thu, 9 Nov 2017 09:23:18 +0100
+From: jani.nikula@linux.intel.com (Jani Nikula)
+Date: Thu, 09 Nov 2017 10:27:02 +0200
 Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
 In-Reply-To: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
 References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
-Message-ID: <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+Message-ID: <87tvy3amcp.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 11:27:21AM +0000, Russell King wrote:
+On Tue, 07 Nov 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
 > Parsing the EDID for HDMI and audio information in the get_modes()
 > callback is incorrect - this only parses the EDID read from the
 > connector, not any override or firmware provided EDID.
-> 
+>
 > The correct place to parse the EDID for these parameters is the
 > fill_modes() callback, after we've called the helper.  Move the parsing
 > there.  This caused problems for Lu?s Mendes.
-> 
+>
 > Cc: <stable@vger.kernel.org>
 > Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
 > Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
 > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+
+Is this still needed after 53fd40a90f3c ("drm: handle override and
+firmware EDID at drm_do_get_edid() level") that is headed for v4.15? I'm
+thinking this might be applicable only for current Linus master and
+stable.
+
+BR,
+Jani.
+
+
 > ---
 >  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
 >  1 file changed, 24 insertions(+), 4 deletions(-)
-> 
+>
 > diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
 > index 9fe407f49986..2516a1c18a10 100644
 > --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
@@ -75,24 +85,9 @@ On Tue, Nov 07, 2017 at 11:27:21AM +0000, Russell King wrote:
 >  static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
 > -	.fill_modes = drm_helper_probe_single_connector_modes,
 > +	.fill_modes = dw_hdmi_connector_fill_modes,
-
-Papering over helper functions shouldn't be necessary, except the helper
-functions not handling the override edid is a known issue. Jani Nikula is
-working on a proper fix, please coordinate with him.
--Daniel
-
 >  	.detect = dw_hdmi_connector_detect,
 >  	.destroy = drm_connector_cleanup,
 >  	.force = dw_hdmi_connector_force,
-> -- 
-> 2.7.4
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Jani Nikula, Intel Open Source Technology Center
