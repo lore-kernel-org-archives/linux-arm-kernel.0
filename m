@@ -1,36 +1,56 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 08 Nov 2017 16:50:55 -0800
-Subject: [PATCH] soc: amlogic: meson-gx-pwrc-vpu: fix power-off when
- powered by bootloader
-In-Reply-To: <1509723804-21114-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Fri, 3 Nov 2017 16:43:24 +0100")
-References: <1509723804-21114-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7hshdoi8b4.fsf@baylibre.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 8 Nov 2017 17:23:43 -0800
+Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
+In-Reply-To: <20171109004144.2246-1-philip@cog.systems>
+References: <20171109004144.2246-1-philip@cog.systems>
+Message-ID: <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
-
-Neil Armstrong <narmstrong@baylibre.com> writes:
-
-> In the case the VPU power domain has been powered on by the bootloader
-> and no driver are attached to this power domain, the genpd will power it
-> off after a certain amount of time, but the clocks hasn't been enabled
-> by the kernel itself and the power-off will trigger some faults.
-> This patch enable the clocks to have a coherent state for an eventual
-> poweroff and switches to the pm_domain_always_on_gov governor.
+On Wed, Nov 8, 2017 at 4:41 PM, Philip Derrin <philip@cog.systems> wrote:
+> Hi,
 >
-> Fixes: 75fcb5ca4b46 ("soc: amlogic: add Meson GX VPU Domains driver")
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
+> when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
+> mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
+> merged in 3.19.
+>
+> The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
+> mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
+> implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
+> sections to be read-only"), and another that moved the LPAE read-only bit into
+> a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
+> logic for LPAE").
+>
+> The incorrect mappings were not apparent in the debugfs kernel_page_tables
+> dump because that was checking only the software RO bit, not the hardware RO
+> bit.
 
-Tested-by: Kevin Hilman <khilman@baylibre.com>
+Thanks for catching this! Please consider both patches:
 
-This fixes a patch that's currently in arm-soc next/drivers (or
-amlogic/drivers-2 to be precise.)
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-If it's not too late, please feel free to apply directly.  If not, I
-will queue up for v4.15-rc fixes cycle.
+-Kees
 
-Thanks,
+>
+> Regards,
+> Philip
+>
+>
+> Philip Derrin (2):
+>   ARM: mm: make STRICT_KERNEL_RWX effective for LPAE
+>   ARM: mm: dump: check hardware RO bit for LPAE
+>
+>  arch/arm/mm/dump.c | 4 ++--
+>  arch/arm/mm/init.c | 4 ++--
+>  2 files changed, 4 insertions(+), 4 deletions(-)
+>
+> --
+> 2.15.0
+>
 
-Kevin
+
+
+-- 
+Kees Cook
+Pixel Security
