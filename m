@@ -1,66 +1,89 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 9 Nov 2017 21:45:07 +0000
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <bfed6e80-44a7-6e96-c6a6-bc9793a1937a@collabora.com>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
- <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
- <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
- <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
- <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
- <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
- <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
- <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
- <7cdfa633-d9c6-881a-ae5f-f94f7e6413ee@nvidia.com>
- <5f064e65-ee29-179b-8102-984d12d24d9d@collabora.com>
- <15792a16-6b57-a6ad-92dc-0ffaba0354db@nvidia.com>
- <1eb4e14f-4728-d4f7-95a6-0a6308760d7a@collabora.com>
- <CAK8P3a3iiSgutnHFU7PoLGQyObgyAreQOOtrDhjijoMU5wZ1Eg@mail.gmail.com>
- <18ef379f-0c23-0cbf-4228-30d5c46c690f@nvidia.com>
- <bfed6e80-44a7-6e96-c6a6-bc9793a1937a@collabora.com>
-Message-ID: <2038e32a-de4a-a683-462e-555e991a2111@nvidia.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 9 Nov 2017 22:45:40 +0100
+Subject: [PATCH] Add support for bq27521 battery monitor
+In-Reply-To: <20171109212945.2sgu56zkse7nbzo3@pali>
+References: <20171109210615.GA27638@amd> <20171109212945.2sgu56zkse7nbzo3@pali>
+Message-ID: <20171109214540.GB23376@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 09/11/17 19:03, Guillaume Tucker wrote:
-...
-
-> Alright, so here's all the results I got all based on
-> next-20171109 and running on tegra124-nyan-big:
+On Thu 2017-11-09 22:29:45, Pali Roh?r wrote:
+> On Thursday 09 November 2017 22:06:15 Pavel Machek wrote:
+> > diff --git a/drivers/power/supply/bq27xxx_battery.c b/drivers/power/supply/bq27xxx_battery.c
+> > index ed44439..ee2851a 100644
+> > --- a/drivers/power/supply/bq27xxx_battery.c
+> > +++ b/drivers/power/supply/bq27xxx_battery.c
+> > @@ -381,6 +381,30 @@ static u8 bq27xxx_regs[][BQ27XXX_REG_MAX] = {
+> >  		[BQ27XXX_REG_AP] = INVALID_REG_ADDR,
+> >  		BQ27XXX_DM_REG_ROWS,
+> >  	},
+> > +	[BQ27521] = {				/* FIXME */
+> > +		[BQ27XXX_REG_CTRL] = 0x02,
+> > +		[BQ27XXX_REG_TEMP] = 0x0a,
+> > +		[BQ27XXX_REG_INT_TEMP] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_VOLT] = 0x0c,
+> > +		[BQ27XXX_REG_AI] = 0x0e,
+> > +		[BQ27XXX_REG_FLAGS] = 0x08,
+> > +		[BQ27XXX_REG_TTE] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_TTF] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_TTES] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_TTECP] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_NAC] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_FCC] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_CYCT] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_AE] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_SOC] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_DCAP] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_REG_AP] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_DM_CTRL] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_DM_CLASS] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_DM_BLOCK] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_DM_DATA] = INVALID_REG_ADDR,
+> > +		[BQ27XXX_DM_CKSUM] = INVALID_REG_ADDR,
+> > +	},
+> >  	[BQ27530] = {
+> >  		[BQ27XXX_REG_CTRL] = 0x00,
+> >  		[BQ27XXX_REG_TEMP] = 0x06,
 > 
-> ? * plain multi_v7_defconfig, passes:
-> ??? https://lava.collabora.co.uk/scheduler/job/981295
-> 
-> ? * CONFIG_MODULES disabled, fails:
-> ??? https://lava.collabora.co.uk/scheduler/job/981342
-> 
-> ? * CONFIG_MODULES and CONFIG_DRM_NOUVEAU disabled, also fails:
-> ??? https://lava.collabora.co.uk/scheduler/job/981343
+> Hi! IIRC those registers are valid only for sn27521 chip in revision 14
+> (or new). For older revision is used different register map. And
+> detection of chip revision is somehow possible via some registers.
 
-This is the crash in the EC driver that I mentioned before. You need to
-add the fix for the EC driver to avoid this BUG_ON.
+Yes, I know.. I even had this, but as I can't test it, and early N950
+samples should be very very rare, I'd prefer the patch as is.
 
-I was able to bisect this manually dancing around the various bugs and
-it points to this commit ...
-
-commit 7313cfa4f6e30384fa04083698d1e865cf812a6a
-Author: Ben Skeggs <bskeggs@redhat.com>
-Date:   Wed Nov 1 03:56:19 2017 +1000
-
-    drm/nouveau/bar: move bar1 initialisation into its own function
-
-
-Unfortunately, I cannot revert cleanly on top of next-20171109 and so I
-cannot confirm.
-
-Ben, we are seeing a hang on Tegra when booting with CONFIG_DRM_NOUVEAU
-enabled. Apart from the above bisect result, I don't have much else to
-go on at the moment. Let me know if you have any thoughts or anything to
-test.
-
-Cheers
-Jon
+@@ -1905,6 +1940,23 @@ int bq27xxx_battery_setup(struct bq27xxx_device_info *di)
+ 
+ 	dev_info(di->dev, "support ver. %s enabled\n", DRIVER_VERSION);
+ 
++	if (di->chip == BQ27521) {
++		int val;
++		val = di->bus.read(di, 0x32, false);
++		if (val == 0x2100) {
++			printk("rev. 13 chip detected; add support\n");
++			/* https://elinux.org/N950 has details */
++			return PTR_ERR(ENODEV);
++		}
++
++		val = di->bus.read(di, 0x34, false);
++		if ((val & 0xff00) != 0x2100) {
++			printk("rev. 14 chip not detected?!\n");
++			return PTR_ERR(EINVAL);
++		}
++		printk("verified chip rev. 14\n");
++	}
++
+ 	bq27xxx_battery_settings(di);
+ 	bq27xxx_battery_update(di);
+ 
 
 -- 
-nvpublic
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/c8612126/attachment.sig>
