@@ -1,15 +1,14 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Thu, 09 Nov 2017 17:44:14 +0000
-Subject: Applied "ASoC: sun8i-codec: Add a comment on the LRCK inversion" to
- the asoc tree
-In-Reply-To: <20171109094046.13483-1-maxime.ripard@free-electrons.com>
-Message-ID: <E1eCqsA-0006j3-Fj@debutante>
+Date: Thu, 09 Nov 2017 17:44:33 +0000
+Subject: Applied "ASoC: sun8i-codec: Set the BCLK divider" to the asoc tree
+In-Reply-To: <20171109093924.12803-1-maxime.ripard@free-electrons.com>
+Message-ID: <E1eCqsT-0006kU-9P@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: sun8i-codec: Add a comment on the LRCK inversion
+   ASoC: sun8i-codec: Set the BCLK divider
 
 has been applied to the asoc tree at
 
@@ -34,43 +33,111 @@ to this mail.
 Thanks,
 Mark
 
->From e7b8a6d3efa8316dfe786e9cd559c62e9152337c Mon Sep 17 00:00:00 2001
+>From 316b7758c998fb13371d14bb6c9e45ab129c19a7 Mon Sep 17 00:00:00 2001
 From: Maxime Ripard <maxime.ripard@free-electrons.com>
-Date: Thu, 9 Nov 2017 10:40:46 +0100
-Subject: [PATCH] ASoC: sun8i-codec: Add a comment on the LRCK inversion
+Date: Thu, 9 Nov 2017 10:39:24 +0100
+Subject: [PATCH] ASoC: sun8i-codec: Set the BCLK divider
 
-The current code might be a bit intriguing without having experienced the
-issue before, and might come up as a mistake.
+While the current code was reporting to be able to work in master mode, it
+failed to do so because the BCLK divider wasn't programmed, meaning that
+the BCLK would run at the PLL's frequency no matter the sample rate.
 
-Make explicit what's going on by adding a comment.
+It was obviously a bit too fast.
 
+Add support to retrieve the divider to use, and set it. Since our PLL is
+not always able to generate a perfect multiple of the sample rate, we'll
+have to choose the closest divider that matches our setup.
+
+Fixes: 36c684936fae ("ASoC: Add sun8i digital audio codec")
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
+Cc: <stable@vger.kernel.org>
 ---
- sound/soc/sunxi/sun8i-codec.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ sound/soc/sunxi/sun8i-codec.c | 51 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
 
 diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-index c2ceca485d6a..b3329692e3dc 100644
+index 038107baf414..50a9e077f01b 100644
 --- a/sound/soc/sunxi/sun8i-codec.c
 +++ b/sound/soc/sunxi/sun8i-codec.c
-@@ -197,6 +197,17 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
- 	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
- 			   BIT(SUN8I_AIF1CLK_CTRL_AIF1_BCLK_INV),
- 			   value << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_INV);
+@@ -73,6 +73,7 @@
+ #define SUN8I_SYS_SR_CTRL_AIF2_FS_MASK		GENMASK(11, 8)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK	GENMASK(5, 4)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK	GENMASK(8, 6)
++#define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK	GENMASK(12, 9)
+ 
+ struct sun8i_codec {
+ 	struct device	*dev;
+@@ -226,12 +227,57 @@ static int sun8i_set_fmt(struct snd_soc_dai *dai, unsigned int fmt)
+ 	return 0;
+ }
+ 
++struct sun8i_codec_clk_div {
++	u8	div;
++	u8	val;
++};
 +
-+	/*
-+	 * It appears that the DAI and the codec don't share the same
-+	 * polarity for the LRCK signal when they mean 'normal' and
-+	 * 'inverted' in the datasheet.
-+	 *
-+	 * Since the DAI here is our regular i2s driver that have been
-+	 * tested with way more codecs than just this one, it means
-+	 * that the codec probably gets it backward, and we have to
-+	 * invert the value here.
-+	 */
++static const struct sun8i_codec_clk_div sun8i_codec_bclk_div[] = {
++	{ .div = 1,	.val = 0 },
++	{ .div = 2,	.val = 1 },
++	{ .div = 4,	.val = 2 },
++	{ .div = 6,	.val = 3 },
++	{ .div = 8,	.val = 4 },
++	{ .div = 12,	.val = 5 },
++	{ .div = 16,	.val = 6 },
++	{ .div = 24,	.val = 7 },
++	{ .div = 32,	.val = 8 },
++	{ .div = 48,	.val = 9 },
++	{ .div = 64,	.val = 10 },
++	{ .div = 96,	.val = 11 },
++	{ .div = 128,	.val = 12 },
++	{ .div = 192,	.val = 13 },
++};
++
++static u8 sun8i_codec_get_bclk_div(struct sun8i_codec *scodec,
++				   unsigned int rate,
++				   unsigned int word_size)
++{
++	unsigned long clk_rate = clk_get_rate(scodec->clk_module);
++	unsigned int div = clk_rate / rate / word_size / 2;
++	unsigned int best_val = 0, best_diff = ~0;
++	int i;
++
++	for (i = 0; i < ARRAY_SIZE(sun8i_codec_bclk_div); i++) {
++		const struct sun8i_codec_clk_div *bdiv = &sun8i_codec_bclk_div[i];
++		unsigned int diff = abs(bdiv->div - div);
++
++		if (diff < best_diff) {
++			best_diff = diff;
++			best_val = bdiv->val;
++		}
++	}
++
++	return best_val;
++}
++
+ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 				 struct snd_pcm_hw_params *params,
+ 				 struct snd_soc_dai *dai)
+ {
+ 	struct sun8i_codec *scodec = snd_soc_codec_get_drvdata(dai->codec);
+ 	int sample_rate;
++	u8 bclk_div;
+ 
+ 	/*
+ 	 * The CPU DAI handles only a sample of 16 bits. Configure the
+@@ -241,6 +287,11 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_MASK,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16);
+ 
++	bclk_div = sun8i_codec_get_bclk_div(scodec, params_rate(params), 16);
++	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
++			   SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK,
++			   bclk_div << SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV);
++
  	regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
- 			   BIT(SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV),
- 			   !value << SUN8I_AIF1CLK_CTRL_AIF1_LRCK_INV);
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
+ 			   SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
 -- 
 2.15.0
