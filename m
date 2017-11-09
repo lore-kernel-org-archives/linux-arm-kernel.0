@@ -1,41 +1,76 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Thu, 9 Nov 2017 11:29:40 +0000
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <5f064e65-ee29-179b-8102-984d12d24d9d@collabora.com>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
- <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
- <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
- <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
- <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
- <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
- <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
- <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
- <7cdfa633-d9c6-881a-ae5f-f94f7e6413ee@nvidia.com>
- <5f064e65-ee29-179b-8102-984d12d24d9d@collabora.com>
-Message-ID: <15792a16-6b57-a6ad-92dc-0ffaba0354db@nvidia.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 9 Nov 2017 17:12:58 +0530
+Subject: [PATCH] ARM: dts: keystone-k2l: Add the second gpio bank node
+Message-ID: <1510227778-20491-1-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In case of k2l there are 2 more banks with 16 pins each.
+Adding the node as the da-vinci driver now supports multiple
+banks.
 
-On 09/11/17 10:43, Guillaume Tucker wrote:
+Signed-off-by: Keerthy <j-keerthy@ti.com>
+---
 
-...
+This is based on linux-next branch. Boot tested on keystone-k2l-evm.
 
-> I actually built these kernel revisions with module support
-> disabled to speed up the builds, and no modules are being
-> downloaded in the LAVA job.
-> 
-> If you have a public URL with your known working kernel zImage
-> and dtb, let me know so I could re-run the same test LAVA boot
-> test to see if I get the same results as you (i.e. no hang).
+ arch/arm/boot/dts/keystone-k2l.dtsi | 44 +++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
-I don't have a public URL for the zImage but I can definitely email it
-to you. By the way, when booting I am setting 'init=/bin/bash' so no
-start-up scripts are running.
-
-Cheers
-Jon
-
+diff --git a/arch/arm/boot/dts/keystone-k2l.dtsi b/arch/arm/boot/dts/keystone-k2l.dtsi
+index 4370e65..cc77113 100644
+--- a/arch/arm/boot/dts/keystone-k2l.dtsi
++++ b/arch/arm/boot/dts/keystone-k2l.dtsi
+@@ -63,6 +63,50 @@
+ 			interrupts = <GIC_SPI 435 IRQ_TYPE_EDGE_RISING>;
+ 		};
+ 
++		gpio1: gpio at 2348000 {
++			compatible = "ti,keystone-gpio";
++			reg = <0x02348000 0x100>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			/* HW Interrupts mapped to GPIO pins */
++			interrupts = <GIC_SPI 152 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 153 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 154 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 155 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 156 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 157 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 158 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 159 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 160 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 161 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 162 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 163 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 164 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 165 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 166 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 167 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 168 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 169 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 170 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 171 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 172 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 173 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 174 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 175 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 176 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 401 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 402 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 403 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 404 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 405 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 406 IRQ_TYPE_EDGE_RISING>,
++					<GIC_SPI 407 IRQ_TYPE_EDGE_RISING>;
++			clocks = <&clkgpio>;
++			clock-names = "gpio";
++			ti,ngpio = <32>;
++			ti,davinci-gpio-unbanked = <32>;
++		};
++
+ 		k2l_pmx: pinmux at 2620690 {
+ 			compatible = "pinctrl-single";
+ 			reg = <0x02620690 0xc>;
 -- 
-nvpublic
+1.9.1
