@@ -1,56 +1,39 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 8 Nov 2017 17:23:43 -0800
-Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
-In-Reply-To: <20171109004144.2246-1-philip@cog.systems>
-References: <20171109004144.2246-1-philip@cog.systems>
-Message-ID: <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
+From: brouer@redhat.com (Jesper Dangaard Brouer)
+Date: Thu, 9 Nov 2017 02:38:06 +0100
+Subject: [PATCH v4 1/1] xdp: Sample xdp program implementing ip forward
+In-Reply-To: <20171108.104024.315386187840767748.davem@davemloft.net>
+References: <1509852150-1466-1-git-send-email-christina.jacob.koikara@gmail.com>
+ <1509852150-1466-2-git-send-email-christina.jacob.koikara@gmail.com>
+ <20171108.104024.315386187840767748.davem@davemloft.net>
+Message-ID: <20171109023806.36b38f0c@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 8, 2017 at 4:41 PM, Philip Derrin <philip@cog.systems> wrote:
-> Hi,
->
-> This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
-> when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
-> mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
-> merged in 3.19.
->
-> The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
-> mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
-> implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
-> sections to be read-only"), and another that moved the LPAE read-only bit into
-> a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
-> logic for LPAE").
->
-> The incorrect mappings were not apparent in the debugfs kernel_page_tables
-> dump because that was checking only the software RO bit, not the hardware RO
-> bit.
+On Wed, 08 Nov 2017 10:40:24 +0900 (KST)
+David Miller <davem@davemloft.net> wrote:
 
-Thanks for catching this! Please consider both patches:
+> From: Christina Jacob <christina.jacob.koikara@gmail.com>
+> Date: Sun,  5 Nov 2017 08:52:30 +0530
+> 
+> > From: Christina Jacob <Christina.Jacob@cavium.com>
+> > 
+> > Implements port to port forwarding with route table and arp table
+> > lookup for ipv4 packets using bpf_redirect helper function and
+> > lpm_trie  map.
+> > 
+> > Signed-off-by: Christina Jacob <Christina.Jacob@cavium.com>  
+> 
+> Applied to net-next, thank you.
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+I've not had time to proper test (and review) this V4 patch, but I
+guess I'll have to do so when I get home from Seoul...
 
--Kees
-
->
-> Regards,
-> Philip
->
->
-> Philip Derrin (2):
->   ARM: mm: make STRICT_KERNEL_RWX effective for LPAE
->   ARM: mm: dump: check hardware RO bit for LPAE
->
->  arch/arm/mm/dump.c | 4 ++--
->  arch/arm/mm/init.c | 4 ++--
->  2 files changed, 4 insertions(+), 4 deletions(-)
->
-> --
-> 2.15.0
->
-
-
+I especially want to measure the effect of using bpf_redirect_map().
+To Christina: what performance improvement did you see on your
+board/arch when switching from bpf_redirect() to bpf_redirect_map()?
 
 -- 
-Kees Cook
-Pixel Security
+Best regards,
+  Jesper Dangaard Brouer
+  MSc.CS, Principal Kernel Engineer at Red Hat
+  LinkedIn: http://www.linkedin.com/in/brouer
