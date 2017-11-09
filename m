@@ -1,37 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Nov 2017 11:42:46 +0100
-Subject: [PATCH] soc: amlogic: meson-gx-pwrc-vpu: fix power-off when
- powered by bootloader
-In-Reply-To: <7hshdoi8b4.fsf@baylibre.com>
-References: <1509723804-21114-1-git-send-email-narmstrong@baylibre.com>
- <7hshdoi8b4.fsf@baylibre.com>
-Message-ID: <CAK8P3a2eYi0bajPmmfjOJWOE76_-A-oDLOKObWyijY_95FEXqw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 9 Nov 2017 19:54:40 +0900
+Subject: [PATCH 00/15] Add support for clang LTO
+In-Reply-To: <20171104021303.bexhsxpg5tjerhu7@salmiak>
+References: <20171103171203.107569-1-samitolvanen@google.com>
+ <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
+ <20171103180913.whp2tdjjvs32f4lz@lakrids.cambridge.arm.com>
+ <CAKwvOd=5CCMAA9n7=ocPO5UYmCmkNs8GLYrxXVZVZEeYCyisyA@mail.gmail.com>
+ <20171103192634.u25go4tu7lgzl6ja@lakrids.cambridge.arm.com>
+ <20171103195647.GA137924@samitolvanen.mtv.corp.google.com>
+ <20171104021303.bexhsxpg5tjerhu7@salmiak>
+Message-ID: <20171109105439.GA27630@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 9, 2017 at 1:50 AM, Kevin Hilman <khilman@baylibre.com> wrote:
-> Arnd, Olof,
->
-> Neil Armstrong <narmstrong@baylibre.com> writes:
->
->> In the case the VPU power domain has been powered on by the bootloader
->> and no driver are attached to this power domain, the genpd will power it
->> off after a certain amount of time, but the clocks hasn't been enabled
->> by the kernel itself and the power-off will trigger some faults.
->> This patch enable the clocks to have a coherent state for an eventual
->> poweroff and switches to the pm_domain_always_on_gov governor.
->>
->> Fixes: 75fcb5ca4b46 ("soc: amlogic: add Meson GX VPU Domains driver")
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->
-> Tested-by: Kevin Hilman <khilman@baylibre.com>
->
-> This fixes a patch that's currently in arm-soc next/drivers (or
-> amlogic/drivers-2 to be precise.)
->
-> If it's not too late, please feel free to apply directly.  If not, I
-> will queue up for v4.15-rc fixes cycle.
+On Sat, Nov 04, 2017 at 02:13:04AM +0000, Mark Rutland wrote:
+> On Fri, Nov 03, 2017 at 12:56:47PM -0700, Sami Tolvanen wrote:
+> > On Fri, Nov 03, 2017 at 07:26:35PM +0000, Mark Rutland wrote:
+> > > I guess that in Google you haven't tested on a platform with EL2
+> > > available?
+> > 
+> > Correct. I'll look into this and include a fix in v2. Does this work on a
+> > clang build without LTO?
+> 
+> I saw this on v4.14-rc7, with patch 7 (-mno-implicit-float), but no other
+> patches from this series (i.e. no LTO).
 
-Applied to next/drivers, thanks!
 
-      Arnd
+Add -fno-jump-tables to ccflags-y of arch/arm64/kvm/hyp/Makefile.
+Without this option, clang generates a branch instruction (br x11)
+to an absolute (EL1) virtual address.
+
+-Takahiro AKASHI
+
+> Thanks,
+> Mark.
