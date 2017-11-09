@@ -1,121 +1,141 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Thu, 9 Nov 2017 11:12:25 +0100
-Subject: [PATCH v4 03/12] IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+Date: Thu, 9 Nov 2017 11:12:27 +0100
+Subject: [PATCH v4 05/12] IIO: ADC: add sigma delta modulator support
 In-Reply-To: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1510222354-15290-4-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1510222354-15290-6-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devm_iio_hw_consumer_alloc function that calls iio_hw_consumer_free
-when the device is unbound from the bus.
+Add generic driver to support sigma delta modulators.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 ---
- drivers/iio/buffer/industrialio-hw-consumer.c | 70 ++++++++++++++++++++++++++-
- include/linux/iio/hw-consumer.h               |  2 +
- 2 files changed, 70 insertions(+), 2 deletions(-)
+ drivers/iio/adc/Kconfig            | 12 ++++++
+ drivers/iio/adc/Makefile           |  1 +
+ drivers/iio/adc/sd_adc_modulator.c | 82 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 95 insertions(+)
+ create mode 100644 drivers/iio/adc/sd_adc_modulator.c
 
-diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
-index 7d4d800..e980a79 100644
---- a/drivers/iio/buffer/industrialio-hw-consumer.c
-+++ b/drivers/iio/buffer/industrialio-hw-consumer.c
-@@ -129,15 +129,81 @@ EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
-  */
- void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
- {
--	struct hw_consumer_buffer *buf;
-+	struct hw_consumer_buffer *buf, *n;
+diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
+index 5762565..c5db62f 100644
+--- a/drivers/iio/adc/Kconfig
++++ b/drivers/iio/adc/Kconfig
+@@ -626,6 +626,18 @@ config SPEAR_ADC
+ 	  To compile this driver as a module, choose M here: the
+ 	  module will be called spear_adc.
  
- 	iio_channel_release_all(hwc->channels);
--	list_for_each_entry(buf, &hwc->buffers, head)
-+	list_for_each_entry_safe(buf, n, &hwc->buffers, head)
- 		iio_buffer_put(&buf->buffer);
- 	kfree(hwc);
- }
- EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
- 
-+static void devm_iio_hw_consumer_release(struct device *dev, void *res)
-+{
-+	iio_hw_consumer_free(*(struct iio_hw_consumer **)res);
-+}
++config SD_ADC_MODULATOR
++	tristate "Generic sigma delta modulator"
++	depends on OF
++	select IIO_BUFFER
++	select IIO_TRIGGERED_BUFFER
++	help
++	  Select this option to enables sigma delta modulator. This driver can
++	  support generic sigma delta modulators.
 +
-+static int devm_iio_hw_consumer_match(struct device *dev, void *res, void *data)
-+{
-+	struct iio_hw_consumer **r = res;
++	  This driver can also be built as a module.  If so, the module
++	  will be called sd_adc_modulator.
 +
-+	if (!r || !*r) {
-+		WARN_ON(!r || !*r);
-+		return 0;
-+	}
-+	return *r == data;
-+}
-+
-+/**
-+ * devm_iio_hw_consumer_alloc - Resource-managed iio_hw_consumer_alloc()
-+ * @dev: Pointer to consumer device.
+ config STM32_ADC_CORE
+ 	tristate "STMicroelectronics STM32 adc core"
+ 	depends on ARCH_STM32 || COMPILE_TEST
+diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
+index 9874e05..d800325 100644
+--- a/drivers/iio/adc/Makefile
++++ b/drivers/iio/adc/Makefile
+@@ -81,3 +81,4 @@ obj-$(CONFIG_VF610_ADC) += vf610_adc.o
+ obj-$(CONFIG_VIPERBOARD_ADC) += viperboard_adc.o
+ xilinx-xadc-y := xilinx-xadc-core.o xilinx-xadc-events.o
+ obj-$(CONFIG_XILINX_XADC) += xilinx-xadc.o
++obj-$(CONFIG_SD_ADC_MODULATOR) += sd_adc_modulator.o
+diff --git a/drivers/iio/adc/sd_adc_modulator.c b/drivers/iio/adc/sd_adc_modulator.c
+new file mode 100644
+index 0000000..ff2504a
+--- /dev/null
++++ b/drivers/iio/adc/sd_adc_modulator.c
+@@ -0,0 +1,82 @@
++/*
++ * Generic sigma delta modulator driver
 + *
-+ * Managed iio_hw_consumer_alloc. iio_hw_consumer allocated with this function
-+ * is automatically freed on driver detach.
++ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
++ * Author: Arnaud Pouliquen <arnaud.pouliquen@st.com>.
 + *
-+ * If an iio_hw_consumer allocated with this function needs to be freed
-+ * separately, devm_iio_hw_consumer_free() must be used.
++ * License type: GPLv2
 + *
-+ * returns pointer to allocated iio_hw_consumer on success, NULL on failure.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but
++ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
++ * or FITNESS FOR A PARTICULAR PURPOSE.
++ * See the GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program. If not, see <http://www.gnu.org/licenses/>.
 + */
-+struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev)
++
++#include <linux/iio/iio.h>
++#include <linux/iio/triggered_buffer.h>
++#include <linux/module.h>
++#include <linux/of_device.h>
++
++static const struct iio_info iio_sd_mod_iio_info;
++
++static const struct iio_chan_spec iio_sd_mod_ch = {
++	.type = IIO_VOLTAGE,
++	.indexed = 1,
++	.scan_index = 0,
++	.scan_type = {
++		.sign = 'u',
++		.realbits = 1,
++		.shift = 0,
++	},
++};
++
++static int iio_sd_mod_probe(struct platform_device *pdev)
 +{
-+	struct iio_hw_consumer **ptr, *iio_hwc;
++	struct device *dev = &pdev->dev;
++	struct iio_dev *iio;
 +
-+	ptr = devres_alloc(devm_iio_hw_consumer_release, sizeof(*ptr),
-+			   GFP_KERNEL);
-+	if (!ptr)
-+		return NULL;
++	iio = devm_iio_device_alloc(dev, 0);
++	if (!iio)
++		return -ENOMEM;
 +
-+	iio_hwc = iio_hw_consumer_alloc(dev);
-+	if (IS_ERR(iio_hwc)) {
-+		devres_free(ptr);
-+	} else {
-+		*ptr = iio_hwc;
-+		devres_add(dev, ptr);
-+	}
++	iio->dev.parent = dev;
++	iio->dev.of_node = dev->of_node;
++	iio->name = dev_name(dev);
++	iio->info = &iio_sd_mod_iio_info;
++	iio->modes = INDIO_BUFFER_HARDWARE;
 +
-+	return iio_hwc;
++	iio->num_channels = 1;
++	iio->channels = &iio_sd_mod_ch;
++
++	platform_set_drvdata(pdev, iio);
++
++	return devm_iio_device_register(&pdev->dev, iio);
 +}
-+EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_alloc);
 +
-+/**
-+ * devm_iio_hw_consumer_free - Resource-managed iio_hw_consumer_free()
-+ * @dev: Pointer to consumer device.
-+ * @hwc: iio_hw_consumer to free.
-+ *
-+ * Free iio_hw_consumer allocated with devm_iio_hw_consumer_alloc().
-+ */
-+void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc)
-+{
-+	int rc;
++static const struct of_device_id sd_adc_of_match[] = {
++	{ .compatible = "sd-modulator" },
++	{ .compatible = "ads1201" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, sd_adc_of_match);
 +
-+	rc = devres_release(dev, devm_iio_hw_consumer_release,
-+			    devm_iio_hw_consumer_match, hwc);
-+	WARN_ON(rc);
-+}
-+EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_free);
++static struct platform_driver iio_sd_mod_adc = {
++	.driver = {
++		.name = "iio_sd_adc_mod",
++		.of_match_table = of_match_ptr(sd_adc_of_match),
++	},
++	.probe = iio_sd_mod_probe,
++};
 +
- /**
-  * iio_hw_consumer_enable() - Enable IIO hardware consumer
-  * @hwc: iio_hw_consumer to enable.
-diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
-index f16791b..90ecfce 100644
---- a/include/linux/iio/hw-consumer.h
-+++ b/include/linux/iio/hw-consumer.h
-@@ -14,6 +14,8 @@ struct iio_hw_consumer;
- 
- struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
- void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
-+struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev);
-+void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc);
- int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
- void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
- 
++module_platform_driver(iio_sd_mod_adc);
++
++MODULE_DESCRIPTION("Basic sigma delta modulator");
++MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
++MODULE_LICENSE("GPL v2");
 -- 
 2.7.4
