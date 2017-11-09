@@ -1,38 +1,93 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 9 Nov 2017 10:07:06 +0100
-Subject: [PATCH v10 1/8] perf: Export perf_event_update_userpage
-In-Reply-To: <20171103175105.23546-2-suzuki.poulose@arm.com>
-References: <20171103175105.23546-1-suzuki.poulose@arm.com>
- <20171103175105.23546-2-suzuki.poulose@arm.com>
-Message-ID: <20171109090706.oangi7qebju5mvmu@hirez.programming.kicks-ass.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Nov 2017 09:31:22 +0000
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+In-Reply-To: <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+ <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+Message-ID: <20171109093122.GA12318@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 05:50:58PM +0000, Suzuki K Poulose wrote:
-> Export perf_event_update_userpage() so that PMU driver using them,
-> can be built as modules.
+On Thu, Nov 09, 2017 at 09:23:18AM +0100, Daniel Vetter wrote:
+> On Tue, Nov 07, 2017 at 11:27:21AM +0000, Russell King wrote:
+> > Parsing the EDID for HDMI and audio information in the get_modes()
+> > callback is incorrect - this only parses the EDID read from the
+> > connector, not any override or firmware provided EDID.
+> > 
+> > The correct place to parse the EDID for these parameters is the
+> > fill_modes() callback, after we've called the helper.  Move the parsing
+> > there.  This caused problems for Lu?s Mendes.
+> > 
+> > Cc: <stable@vger.kernel.org>
+> > Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+> > Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+> > Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> > ---
+> >  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
+> >  1 file changed, 24 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > index 9fe407f49986..2516a1c18a10 100644
+> > --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> > @@ -1905,10 +1905,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+> >  		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
+> >  			edid->width_cm, edid->height_cm);
+> >  
+> > -		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+> > -		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+> >  		drm_mode_connector_update_edid_property(connector, edid);
+> > -		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+> >  		ret = drm_add_edid_modes(connector, edid);
+> >  		/* Store the ELD */
+> >  		drm_edid_to_eld(connector, edid);
+> > @@ -1920,6 +1917,29 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+> >  	return ret;
+> >  }
+> >  
+> > +static int dw_hdmi_connector_fill_modes(struct drm_connector *connector,
+> > +					uint32_t maxX, uint32_t maxY)
+> > +{
+> > +	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+> > +					    connector);
+> > +	int ret;
+> > +
+> > +	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
+> > +
+> > +	if (connector->edid_blob_ptr) {
+> > +		struct edid *edid = (void *)connector->edid_blob_ptr->data;
+> > +
+> > +		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+> > +		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+> > +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+> > +	} else {
+> > +		hdmi->sink_is_hdmi = false;
+> > +		hdmi->sink_has_audio = false;
+> > +	}
+> > +
+> > +	return ret;
+> > +}
+> > +
+> >  static void dw_hdmi_connector_force(struct drm_connector *connector)
+> >  {
+> >  	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+> > @@ -1933,7 +1953,7 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
+> >  }
+> >  
+> >  static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
+> > -	.fill_modes = drm_helper_probe_single_connector_modes,
+> > +	.fill_modes = dw_hdmi_connector_fill_modes,
 > 
-> Cc: Peter Zilstra <peterz@infradead.org>
-> Signed-off-by: Suzuki K Poulose <suzuki.poulose@arm.com>
+> Papering over helper functions shouldn't be necessary, except the helper
+> functions not handling the override edid is a known issue. Jani Nikula is
+> working on a proper fix, please coordinate with him.
 
-Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
+So, what you're basically saying is that fixing real bugs that affect
+users is not something that DRM people want.  That's fine, I'll ignore
+people who come to me for help with DRM bugs in future then because
+it's obviously a dead loss.
 
-> ---
->  kernel/events/core.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/kernel/events/core.c b/kernel/events/core.c
-> index 9d93db81fa36..550015829db8 100644
-> --- a/kernel/events/core.c
-> +++ b/kernel/events/core.c
-> @@ -4982,6 +4982,7 @@ void perf_event_update_userpage(struct perf_event *event)
->  unlock:
->  	rcu_read_unlock();
->  }
-> +EXPORT_SYMBOL_GPL(perf_event_update_userpage);
->  
->  static int perf_mmap_fault(struct vm_fault *vmf)
->  {
-> -- 
-> 2.13.6
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
