@@ -1,33 +1,53 @@
 From: poza@codeaurora.org (Pawandeep Oza)
-Date: Fri, 10 Nov 2017 02:16:35 +0530
-Subject: [PATCH 0/4] PCI: query active service list
-Message-ID: <1510260399-14886-1-git-send-email-poza@codeaurora.org>
+Date: Fri, 10 Nov 2017 02:16:37 +0530
+Subject: [PATCH 2/4] PCI/portdrv: Add/Remove port services to the list
+In-Reply-To: <1510260399-14886-1-git-send-email-poza@codeaurora.org>
+References: <1510260399-14886-1-git-send-email-poza@codeaurora.org>
+Message-ID: <1510260399-14886-3-git-send-email-poza@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The list of patches provides querying facility to all services drivers.
-They can query any other service, to see if it is active/registered.
+From: Oza Pawandeep <poza@codeaurora.org>
 
-This is useful when multiple service drivers do not want to race for 
-actions based on service interrupt trigger.
+This patch adds and removes the port service to the service list.
 
-for e.g. if both AER and DPC are triggering, AER should not race since
-DPC is going to bring down the link and all the devices beneath, and 
-goint to recover HW.
+Signed-off-by: Oza Pawandeep <poza@codeaurora.org>
 
-Oza Pawandeep (4):
-  PCI: Add port service list node for pci_dev.
-  PCI/portdrv: Add/Remove port services to the list
-  PCI/portdrv: Implement interface to query the registered service
-  PCI/AER: Dont do recovery when DPC is enabled
-
- drivers/pci/pcie/aer/aerdrv_core.c | 12 ++++++++++++
- drivers/pci/pcie/portdrv_core.c    | 29 +++++++++++++++++++++++++++++
- drivers/pci/probe.c                |  1 +
- include/linux/pci.h                |  2 ++
- include/linux/pcieport_if.h        |  3 ++-
- 5 files changed, 46 insertions(+), 1 deletion(-)
-
+diff --git a/drivers/pci/pcie/portdrv_core.c b/drivers/pci/pcie/portdrv_core.c
+index a592103..6bfe986 100644
+--- a/drivers/pci/pcie/portdrv_core.c
++++ b/drivers/pci/pcie/portdrv_core.c
+@@ -454,6 +454,8 @@ static int pcie_port_probe_service(struct device *dev)
+ 	if (status)
+ 		return status;
+ 
++	list_add_tail(&pciedev->slist, &pciedev->port->service_list);
++
+ 	get_device(dev);
+ 	return 0;
+ }
+@@ -477,6 +479,9 @@ static int pcie_port_remove_service(struct device *dev)
+ 
+ 	pciedev = to_pcie_device(dev);
+ 	driver = to_service_driver(dev->driver);
++
++	list_del(&pciedev->slist);
++
+ 	if (driver && driver->remove) {
+ 		driver->remove(pciedev);
+ 		put_device(dev);
+diff --git a/include/linux/pcieport_if.h b/include/linux/pcieport_if.h
+index b69769d..9d05621 100644
+--- a/include/linux/pcieport_if.h
++++ b/include/linux/pcieport_if.h
+@@ -31,6 +31,7 @@ struct pcie_device {
+ 	u32		service;    /* Port service this device represents */
+ 	void		*priv_data; /* Service Private Data */
+ 	struct device	device;     /* Generic Device Interface */
++	struct list_head slist;     /* List of services */
+ };
+ #define to_pcie_device(d) container_of(d, struct pcie_device, device)
+ 
 -- 
 Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.,
 a Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
