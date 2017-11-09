@@ -1,71 +1,98 @@
-From: rogerq@ti.com (Roger Quadros)
-Date: Thu, 9 Nov 2017 10:20:57 +0200
-Subject: [PATCH] ARM: dts: add phy-reset property for rk3066a-rayeager emac
-In-Reply-To: <e6f2393e-cb3b-9006-d0f5-6b30fd2a5192@mentor.com>
-References: <1510022959-19440-1-git-send-email-zyw@rock-chips.com>
- <e6f2393e-cb3b-9006-d0f5-6b30fd2a5192@mentor.com>
-Message-ID: <94e38995-e050-db91-0702-bf889e4ff397@ti.com>
+From: daniel@ffwll.ch (Daniel Vetter)
+Date: Thu, 9 Nov 2017 09:23:18 +0100
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+In-Reply-To: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+Message-ID: <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, Nov 07, 2017 at 11:27:21AM +0000, Russell King wrote:
+> Parsing the EDID for HDMI and audio information in the get_modes()
+> callback is incorrect - this only parses the EDID read from the
+> connector, not any override or firmware provided EDID.
+> 
+> The correct place to parse the EDID for these parameters is the
+> fill_modes() callback, after we've called the helper.  Move the parsing
+> there.  This caused problems for Lu?s Mendes.
+> 
+> Cc: <stable@vger.kernel.org>
+> Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+> Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+>  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
+>  1 file changed, 24 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index 9fe407f49986..2516a1c18a10 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -1905,10 +1905,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>  		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
+>  			edid->width_cm, edid->height_cm);
+>  
+> -		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+> -		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+>  		drm_mode_connector_update_edid_property(connector, edid);
+> -		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+>  		ret = drm_add_edid_modes(connector, edid);
+>  		/* Store the ELD */
+>  		drm_edid_to_eld(connector, edid);
+> @@ -1920,6 +1917,29 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
+>  	return ret;
+>  }
+>  
+> +static int dw_hdmi_connector_fill_modes(struct drm_connector *connector,
+> +					uint32_t maxX, uint32_t maxY)
+> +{
+> +	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+> +					    connector);
+> +	int ret;
+> +
+> +	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
+> +
+> +	if (connector->edid_blob_ptr) {
+> +		struct edid *edid = (void *)connector->edid_blob_ptr->data;
+> +
+> +		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
+> +		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
+> +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
+> +	} else {
+> +		hdmi->sink_is_hdmi = false;
+> +		hdmi->sink_has_audio = false;
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+>  static void dw_hdmi_connector_force(struct drm_connector *connector)
+>  {
+>  	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
+> @@ -1933,7 +1953,7 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
+>  }
+>  
+>  static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
+> -	.fill_modes = drm_helper_probe_single_connector_modes,
+> +	.fill_modes = dw_hdmi_connector_fill_modes,
 
-On 07/11/17 09:54, Vladimir Zapolskiy wrote:
-> Hello Chris,
-> 
-> On 11/07/2017 04:49 AM, Chris Zhong wrote:
->> The ethernet phy of rk3066a-rayeager has a reset pin, it controlled by
->> GPIO1_D6, this pin should be pull down then pull up to reset the phy.
->> Add a phy-reset property in emac, make the phy can be reset when emac
->> power on.
-> 
-> for PHY reset there are properties 'reset-gpios' and 'reset-delay-us',
-> please reference to Documentation/devicetree/bindings/net/mdio.txt
-> 
-> Can you try to reuse them instead of adding new custom properties?
-> 
-> As a side question, which is mainly addressed to Sergei and Roger,
-> I don't quite understand why PHY properties were initially added to
-> MAC/MDIO bus device tree nodes, in my opinion they must be moved under
-> PHY device tree nodes.
+Papering over helper functions shouldn't be necessary, except the helper
+functions not handling the override edid is a known issue. Jani Nikula is
+working on a proper fix, please coordinate with him.
+-Daniel
 
-The PHY reset *has* to be performed at the MDIO bus driver level so that they
-can be pin-strap configured correctly and be detected during MDIO bus scan.
-
-- We have boards where PHYs won't be detected if RESET is not done before the scan. (due to invalid h/w pin-strapping config)
-- We have boards where a single GPIO line controls reset of all PHYs on the bus.
-
-Due to these reasons the RESET control lies with the MDIO bus driver.
-
+>  	.detect = dw_hdmi_connector_detect,
+>  	.destroy = drm_connector_cleanup,
+>  	.force = dw_hdmi_connector_force,
+> -- 
+> 2.7.4
 > 
-> --
-> With best wishes,
-> Vladimir
-> 
->>
->> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
->> ---
->>
->>  arch/arm/boot/dts/rk3066a-rayeager.dts | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts b/arch/arm/boot/dts/rk3066a-rayeager.dts
->> index 570157f..6064a0a 100644
->> --- a/arch/arm/boot/dts/rk3066a-rayeager.dts
->> +++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
->> @@ -173,6 +173,8 @@
->>  	pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
->>  	phy = <&phy0>;
->>  	phy-supply = <&vcc_rmii>;
->> +	phy-reset-gpios = <&gpio1 RK_PD6 GPIO_ACTIVE_LOW>; /* PHY_RST */
->> +	phy-reset-duration = <10>; /* millisecond */
->>  	status = "okay";
->>  
->>  	phy0: ethernet-phy at 0 {
->>
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
 
 -- 
-cheers,
--roger
-
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Daniel Vetter
+Software Engineer, Intel Corporation
+http://blog.ffwll.ch
