@@ -1,100 +1,102 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Thu, 9 Nov 2017 12:14:56 -0500
-Subject: [PATCH 4/4] arm64: dts: qcom: msm8916: add bindings for i2c1,
- i2c3, i2c5
-In-Reply-To: <20171109170016.GC28761@minitux>
-References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
- <20171101175335.22123-5-damien.riegel@savoirfairelinux.com>
- <20171109170016.GC28761@minitux>
-Message-ID: <20171109171456.6t3nhig6t4bnkc77@workotop.localdomain>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 9 Nov 2017 18:16:29 +0100
+Subject: [PATCH] Kernel debugging: omap: print warning if CONFIG_DEBUG_LL
+ is enabled
+In-Reply-To: <20171109165840.GI28231@n2100.armlinux.org.uk>
+References: <b80b85cd6f26d02d698463b3dd5e9783081aa780.1510176592.git.hns@goldelico.com>
+ <20171108222755.GW28152@atomide.com>
+ <20171108223604.GG28231@n2100.armlinux.org.uk>
+ <20171108223810.GH28231@n2100.armlinux.org.uk>
+ <E542DC13-D6C4-4C84-8521-8CE468BD0AFE@goldelico.com>
+ <20171109165840.GI28231@n2100.armlinux.org.uk>
+Message-ID: <450E9318-EB71-4635-A137-82DF78206D24@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Hi Russel,
 
-
-On Thu, Nov 09, 2017 at 09:00:16AM -0800, Bjorn Andersson wrote:
-> On Wed 01 Nov 10:53 PDT 2017, Damien Riegel wrote:
+> Am 09.11.2017 um 17:58 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
 > 
-> I think it's better to use the word "nodes" (add nodes...)
+> On Thu, Nov 09, 2017 at 06:44:49AM +0100, H. Nikolaus Schaller wrote:
+>> Hi Russel,
+> 
+> Nikolus,
+> 
+>>> Am 08.11.2017 um 23:38 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
+>>> 
+>>> On Wed, Nov 08, 2017 at 10:36:04PM +0000, Russell King - ARM Linux wrote:
+>>>> We don't need a compiler warning there, we probably need better help
+>>>> text against DEBUG_LL and against EARLY_PRINTK.
+>>> 
+>>> Actually, this is already clearly stated against DEBUG_LL:
+>>> 
+>>>         Note that selecting this option will limit the kernel to a single
+>>>         UART definition, as specified below. Attempting to boot the kernel
+>>>         image on a different platform *will not work*, so this option should
+>>>         not be enabled for kernels that are intended to be portable.
+>>> 
+>>> and since EARLY_PRINTK depends on DEBUG_LL... I guess people don't
+>>> read help texts anymore.
+>> 
+>> Yes, we read, but we face a situation where it doesn't help that it is a
+>> well known problem *for you* or anyone else and that it is described in
+>> the help.
+> 
+> Personally, I'd like early_printk not to be re-using this, but others
+> disagree.  It's all about knowledge and compromise.
 
-Will reword that.
+Sure, we have to make a lot of compromises...
 
 > 
-> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> > ---
-> >  arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 72 ++++++++++++++++++++++++++++++
-> >  arch/arm64/boot/dts/qcom/msm8916.dtsi      | 45 +++++++++++++++++++
-> >  2 files changed, 117 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> > index c67ad8ed8b60..1cec5b30ed6e 100644
-> > --- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> > @@ -270,6 +270,30 @@
-> >  		};
-> >  	};
-> >  
-> > +	i2c1_default: i2c1_default {
-> > +		pinmux {
-> > +			function = "blsp_i2c1";
-> > +			pins = "gpio2", "gpio3";
-> > +		};
-> > +		pinconf {
-> > +			pins = "gpio2", "gpio3";
-> > +			drive-strength = <16>;
-> > +			bias-disable;
-> > +		};
+> What we don't want is more warnings in the kernel - it's already
+> hard enough for people to spot the "bad" warnings that they need to
+> fix to have a working system (such as wrong printf specifiers) that
+> (a) they're not going to spot this #warning and (b) it's just going
+> to be more noise for those who do try to spot the warnings.
+
 > 
-> pinconf is typically board specific, so please leave these out from the
-> base dtsi.
-
-I don't mind dropping that, but pinconf for i2c{2,4,6} is already in
-msm8916-pins.dtsi, so we should either drop them all, or add pinconf for
-i2c{1,3,5} for consistency. And if I read the pinctrl driver correctly,
-I2C cannot be routed to other pins, the only properties that users may
-want to modify are drive-strength and bias. Let me know which option you
-prefer.
-
-
-> > diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > index de25bd6070f5..bdc4cb6f66d4 100644
-> > --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-> > @@ -455,6 +455,21 @@
-> >  			status = "disabled";
-> >  		};
-> >  
-> > +		blsp_i2c1: i2c at 78b5000 {
-> > +			compatible = "qcom,i2c-qup-v2.2.1";
-> > +			reg = <0x078b5000 0x600>;
+>> Do you expect anybody to remember after 3 years of *not* changing DEBUG_LL
+>> what was written in a help message? Or to understand that DEBUG_LL has
+>> anything to do with the mysteriously appearing boot problem? Which can't
+>> easily be debugged since there are no messages despite playing with
+>> EARLY_PRINTK/EARLYCON?
 > 
-> Size is 0x500.
+> Do you expect people to read the build log of their kernel and spot
+> the additional warning?
 
-Will update that (and will also do that for patch 3)
+I am doing it and I rarely see warnings by the compiler. Maybe sometimes
+during the -rc phase but not in stable.
 
-> > +			interrupts = <GIC_SPI 95 0>;
-> > +			clocks = <&gcc GCC_BLSP1_AHB_CLK>,
-> > +				 <&gcc GCC_BLSP1_QUP1_I2C_APPS_CLK>;
-> > +			clock-names = "iface", "core";
-> > +			pinctrl-names = "default", "sleep";
-> > +			pinctrl-0 = <&i2c1_default>;
-> > +			pinctrl-1 = <&i2c1_sleep>;
-> 
-> Please omit the pinctrl-* properties from the base dtsi (when it's not
-> hard coded things for the platform).
-> 
-> > +			#address-cells = <1>;
-> > +			#size-cells = <0>;
-> > +			status = "disabled";
-> > +		};
-> > +
-> >  		blsp_i2c2: i2c at 78b6000 {
-> >  			compatible = "qcom,i2c-qup-v2.2.1";
-> >  			reg = <0x078b6000 0x600>;
-> 
-> Otherwise this looks good!
+>  You might be on the ball enough to do that,
+> but not everyone does, or is.  Not everyone logs the output of the
+> kernel build so they can review it later.  I suspect that many just
+> set the build going in a terminal, walk away and come back sometime
+> later when they think it's done.
 
-Thank you for the review,
--- 
-Damien
+In this case they would have a good trigger and reason to look into the
+build log: the kernel they just built isn't booting and doesn't tell
+anything. Then I guess for many of us the next logical step would be to
+look trough the build log (but not through a defconfig that wasn't touched
+for ages).
+
+Well, I have to admit that if someone doesn't try a clean build, it
+will not see it again if the initial log wasn't captured somewhere...
+
+So it should more be an #error than a #warning. Then people must notice.
+But I don't know if there are situations where this would be too strict.
+
+And in this special case someone may even have the idea to enable DEBUG_LL
+to get better error reporting - but find it is already enabled. Not knowing
+that this is the reason of the problem. This is what IMHO makes this case
+very special.
+
+Or the other option would be to automatically disable DEBUG_LL if it
+conflicts. Then, there is no need for a warning that could be ignored.
+
+>  (This view is based upon the number
+> of warnings that I've seen crop up that are for things that are real
+> bugs that others have introduced - had the warnings been spotted, it
+> would've triggered a "oh, that's not right" moment.)
+
+BR and thanks,
+Nikolaus
