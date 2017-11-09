@@ -1,29 +1,25 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Thu, 9 Nov 2017 08:31:44 -0800
-Subject: [PATCH 00/15] Add support for clang LTO
-In-Reply-To: <20171109105439.GA27630@linaro.org>
+Date: Thu, 9 Nov 2017 08:45:42 -0800
+Subject: [PATCH 13/15] arm64: fix mrs_s/msr_s macros for clang LTO
+In-Reply-To: <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
 References: <20171103171203.107569-1-samitolvanen@google.com>
- <20171103175156.f44o7kuxgzym3pbt@lakrids.cambridge.arm.com>
- <20171103180913.whp2tdjjvs32f4lz@lakrids.cambridge.arm.com>
- <CAKwvOd=5CCMAA9n7=ocPO5UYmCmkNs8GLYrxXVZVZEeYCyisyA@mail.gmail.com>
- <20171103192634.u25go4tu7lgzl6ja@lakrids.cambridge.arm.com>
- <20171103195647.GA137924@samitolvanen.mtv.corp.google.com>
- <20171104021303.bexhsxpg5tjerhu7@salmiak>
- <20171109105439.GA27630@linaro.org>
-Message-ID: <20171109163144.GA10540@samitolvanen.mtv.corp.google.com>
+ <20171103171203.107569-18-samitolvanen@google.com>
+ <20171108092555.ta4mkqolunyw6mdr@yury-thinkpad>
+Message-ID: <20171109164542.GB10540@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 07:54:40PM +0900, AKASHI Takahiro wrote:
-> Add -fno-jump-tables to ccflags-y of arch/arm64/kvm/hyp/Makefile.
-> Without this option, clang generates a branch instruction (br x11)
-> to an absolute (EL1) virtual address.
+On Wed, Nov 08, 2017 at 12:25:55PM +0300, Yury Norov wrote:
+> The patch below uses trick with undefining mrs_s/msr_s immediately
+> after use to solve the problem. It works for both gcc and clang.
 
-Yes, the behavior changed in LLVM r308050, which is part of the 5.0
-release, but not in the latest Android clang prebuilts. Before this
-change, no branches were generated in __init_stage2_translation.
+Great, looks good to me! I tested the patch with LTO and clang's integrated
+assembler seems to be happy with it.
 
-Using -mllvm -jump-threading-threshold=0 also appears to solve this
-problem.
+> It has solved many problems you also try to solve, and some patches
+> are looking very similar.
 
-Sami
+I haven't had a closer look at the gcc LTO patches yet, but I am definitely
+all for using common code where possible.
+
+Sami 
