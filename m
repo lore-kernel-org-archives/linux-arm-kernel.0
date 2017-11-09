@@ -1,193 +1,66 @@
-From: aleksey.makarov@cavium.com (Aleksey Makarov)
-Date: Thu,  9 Nov 2017 14:58:57 +0300
-Subject: [PATCH net-next] net: thunderx: fix double free error
-Message-ID: <20171109115859.23838-1-aleksey.makarov@cavium.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 9 Nov 2017 12:08:59 +0000
+Subject: [RFCv2 PATCH 21/36] iommu/arm-smmu-v3: Implement process
+ operations
+In-Reply-To: <084b1848-0939-5e73-3890-3aab8dc4bc70@huawei.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-22-jean-philippe.brucker@arm.com>
+ <084b1848-0939-5e73-3890-3aab8dc4bc70@huawei.com>
+Message-ID: <812aa54c-1cda-d4a4-640f-4aa2d8eb81fa@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch fixes an error in memory allocation/freeing in
-ThunderX PF driver.
+Hi,
 
-I moved the allocation to the probe() function and made it managed.
+On 09/11/17 03:32, Yisheng Xie wrote:
+> Hi Jean,
+> 
+> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+>> Hook process operations to support PASID and page table sharing with the
+>> SMMUv3:
+>>
+>> +
+>> +static void arm_smmu_process_exit(struct iommu_domain *domain,
+>> +				  struct iommu_process *process)
+>> +{
+>> +	struct arm_smmu_master_data *master;
+>> +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
+>> +
+>> +	if (!domain->process_exit)
+>> +		return;
+> 
+> If domain do not set process_exit handler, just return? smmu do not
+> need invalid ATC, clear cd entry, etc.? Maybe you should check when
+> call domain->process_exit?
 
->From the Colin's email:
+Indeed, that doesn't make sense. I'll move the check below.
 
-While running static analysis on linux-next with CoverityScan I found 3
-double free errors in the Cavium thunder driver.
+Thanks,
+Jean
 
-The issue occurs on the err_disable_device: label of function nic_probe
-when nic_free_lmacmem(nic) is called and a double free occurs on
-nic->duplex, nic->link and nic->speed.  This occurs when nic_init_hw()
-fails:
-
-        /* Initialize hardware */
-        err = nic_init_hw(nic);
-        if (err)
-                goto err_release_regions;
-
-nic_init_hw() calls nic_get_hw_info() and this calls nic_free_lmacmem()
-if any of the allocations fail. This free'ing occurs again by the call
-to nic_free_lmacmem() on the err_release_regions exit path in nic_probe().
-
-Reported-by: Colin Ian King <colin.king@canonical.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic_main.c | 82 ++++++++++----------------
- 1 file changed, 30 insertions(+), 52 deletions(-)
-
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index c12ab7f1adb9..26309e209217 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -361,17 +361,8 @@ static void nic_set_lmac_vf_mapping(struct nicpf *nic)
- 	}
- }
- 
--static void nic_free_lmacmem(struct nicpf *nic)
-+static void nic_get_hw_info(struct nicpf *nic)
- {
--	kfree(nic->vf_lmac_map);
--	kfree(nic->link);
--	kfree(nic->duplex);
--	kfree(nic->speed);
--}
--
--static int nic_get_hw_info(struct nicpf *nic)
--{
--	u8 max_lmac;
- 	u16 sdevid;
- 	struct hw_info *hw = nic->hw;
- 
-@@ -419,41 +410,16 @@ static int nic_get_hw_info(struct nicpf *nic)
- 		break;
- 	}
- 	hw->tl4_cnt = MAX_QUEUES_PER_QSET * pci_sriov_get_totalvfs(nic->pdev);
--
--	/* Allocate memory for LMAC tracking elements */
--	max_lmac = hw->bgx_cnt * MAX_LMAC_PER_BGX;
--	nic->vf_lmac_map = kmalloc_array(max_lmac, sizeof(u8), GFP_KERNEL);
--	if (!nic->vf_lmac_map)
--		goto error;
--	nic->link = kmalloc_array(max_lmac, sizeof(u8), GFP_KERNEL);
--	if (!nic->link)
--		goto error;
--	nic->duplex = kmalloc_array(max_lmac, sizeof(u8), GFP_KERNEL);
--	if (!nic->duplex)
--		goto error;
--	nic->speed = kmalloc_array(max_lmac, sizeof(u32), GFP_KERNEL);
--	if (!nic->speed)
--		goto error;
--	return 0;
--
--error:
--	nic_free_lmacmem(nic);
--	return -ENOMEM;
- }
- 
- #define BGX0_BLOCK 8
- #define BGX1_BLOCK 9
- 
--static int nic_init_hw(struct nicpf *nic)
-+static void nic_init_hw(struct nicpf *nic)
- {
--	int i, err;
-+	int i;
- 	u64 cqm_cfg;
- 
--	/* Get HW capability info */
--	err = nic_get_hw_info(nic);
--	if (err)
--		return err;
--
- 	/* Enable NIC HW block */
- 	nic_reg_write(nic, NIC_PF_CFG, 0x3);
- 
-@@ -507,8 +473,6 @@ static int nic_init_hw(struct nicpf *nic)
- 	cqm_cfg = nic_reg_read(nic, NIC_PF_CQM_CFG);
- 	if (cqm_cfg < NICPF_CQM_MIN_DROP_LEVEL)
- 		nic_reg_write(nic, NIC_PF_CQM_CFG, NICPF_CQM_MIN_DROP_LEVEL);
--
--	return 0;
- }
- 
- /* Channel parse index configuration */
-@@ -1325,6 +1289,7 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- {
- 	struct device *dev = &pdev->dev;
- 	struct nicpf *nic;
-+	u8     max_lmac;
- 	int    err;
- 
- 	BUILD_BUG_ON(sizeof(union nic_mbx) > 16);
-@@ -1334,10 +1299,8 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 		return -ENOMEM;
- 
- 	nic->hw = devm_kzalloc(dev, sizeof(struct hw_info), GFP_KERNEL);
--	if (!nic->hw) {
--		devm_kfree(dev, nic);
-+	if (!nic->hw)
- 		return -ENOMEM;
--	}
- 
- 	pci_set_drvdata(pdev, nic);
- 
-@@ -1378,11 +1341,33 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- 
- 	nic->node = nic_get_node_id(pdev);
- 
--	/* Initialize hardware */
--	err = nic_init_hw(nic);
--	if (err)
-+	/* Get HW capability info */
-+	nic_get_hw_info(nic);
-+
-+	/* Allocate memory for LMAC tracking elements */
-+	err = -ENOMEM;
-+	max_lmac = nic->hw->bgx_cnt * MAX_LMAC_PER_BGX;
-+
-+	nic->vf_lmac_map = devm_kmalloc_array(dev, max_lmac, sizeof(u8),
-+					      GFP_KERNEL);
-+	if (!nic->vf_lmac_map)
-+		goto err_release_regions;
-+
-+	nic->link = devm_kmalloc_array(dev, max_lmac, sizeof(u8), GFP_KERNEL);
-+	if (!nic->link)
- 		goto err_release_regions;
- 
-+	nic->duplex = devm_kmalloc_array(dev, max_lmac, sizeof(u8), GFP_KERNEL);
-+	if (!nic->duplex)
-+		goto err_release_regions;
-+
-+	nic->speed = devm_kmalloc_array(dev, max_lmac, sizeof(u32), GFP_KERNEL);
-+	if (!nic->speed)
-+		goto err_release_regions;
-+
-+	/* Initialize hardware */
-+	nic_init_hw(nic);
-+
- 	nic_set_lmac_vf_mapping(nic);
- 
- 	/* Register interrupts */
-@@ -1416,9 +1401,6 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
- err_release_regions:
- 	pci_release_regions(pdev);
- err_disable_device:
--	nic_free_lmacmem(nic);
--	devm_kfree(dev, nic->hw);
--	devm_kfree(dev, nic);
- 	pci_disable_device(pdev);
- 	pci_set_drvdata(pdev, NULL);
- 	return err;
-@@ -1440,10 +1422,6 @@ static void nic_remove(struct pci_dev *pdev)
- 	nic_unregister_interrupts(nic);
- 	pci_release_regions(pdev);
- 
--	nic_free_lmacmem(nic);
--	devm_kfree(&pdev->dev, nic->hw);
--	devm_kfree(&pdev->dev, nic);
--
- 	pci_disable_device(pdev);
- 	pci_set_drvdata(pdev, NULL);
- }
--- 
-2.15.0
+>> +
+>> +	spin_lock(&smmu_domain->devices_lock);
+>> +	list_for_each_entry(master, &smmu_domain->devices, list) {
+>> +		if (!master->processes)
+>> +			continue;
+>> +
+>> +		master->processes--;
+> Add
+> 		if (domain->process_exit)
+> here?
+>> +		domain->process_exit(domain, master->dev, process->pasid,
+>> +				     domain->process_exit_token);
+>> +
+>> +		/* TODO: inval ATC */
+>> +	}
+>> +	spin_unlock(&smmu_domain->devices_lock);
+>> +
+>> +	arm_smmu_write_ctx_desc(smmu_domain, process->pasid, NULL);
+>> +
+>> +	/* TODO: Invalidate all mappings if not DVM */
+>> +}
+>> +
+> Thanks
+> Yisheng Xie
+> 
+> 
