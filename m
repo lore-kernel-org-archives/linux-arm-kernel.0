@@ -1,73 +1,48 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 9 Nov 2017 15:01:23 +0000
-Subject: [PATCH] arm64/debug: don't duplicate filenames.
-In-Reply-To: <20171109121440.6872-1-jamie.iles@oracle.com>
-References: <20171109121440.6872-1-jamie.iles@oracle.com>
-Message-ID: <20171109150123.GE22781@e103592.cambridge.arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Nov 2017 07:08:54 -0800
+Subject: n900 in next-20170901
+In-Reply-To: <20171109035031.GA24383@js1304-P5Q-DELUXE>
+References: <20171026044829.GB11791@js1304-P5Q-DELUXE>
+ <20171026141627.GD21504@atomide.com>
+ <20171107053313.GA12447@js1304-P5Q-DELUXE>
+ <20171107154842.GP28152@atomide.com>
+ <20171108074645.GA18747@js1304-P5Q-DELUXE>
+ <20171108163413.GU28152@atomide.com>
+ <20171109000801.GA23982@js1304-P5Q-DELUXE>
+ <20171109001113.GZ28152@atomide.com>
+ <20171109003639.GB23982@js1304-P5Q-DELUXE>
+ <20171109035031.GA24383@js1304-P5Q-DELUXE>
+Message-ID: <20171109150854.GC28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 12:14:40PM +0000, Jamie Iles wrote:
-> Rather than explicitly pushing the filename into .rodata.str, use a
-> compiler generated string literal and use the address of that as an
-> input constraint to the inline assembly.  This allows the compiler to
-> emit only one version of the string without relying on the linker to
-> deduplicate.
+* Joonsoo Kim <iamjoonsoo.kim@lge.com> [171109 03:47]:
+> Could you test following two commits on my updated branch?
 > 
-> Cc: Dave P Martin <Dave.Martin@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Signed-off-by: Jamie Iles <jamie.iles@oracle.com>
-> ---
->  arch/arm64/include/asm/bug.h | 12 +++++-------
->  1 file changed, 5 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/bug.h b/arch/arm64/include/asm/bug.h
-> index a02a57186f56..a7b05625ef63 100644
-> --- a/arch/arm64/include/asm/bug.h
-> +++ b/arch/arm64/include/asm/bug.h
-> @@ -23,12 +23,8 @@
->  #ifdef CONFIG_DEBUG_BUGVERBOSE
->  #define _BUGVERBOSE_LOCATION(file, line) __BUGVERBOSE_LOCATION(file, line)
->  #define __BUGVERBOSE_LOCATION(file, line)				\
-> -		".pushsection .rodata.str,\"aMS\", at progbits,1\n"	\
-> -	"2:	.string \"" file "\"\n\t"				\
-> -		".popsection\n\t"					\
-> -									\
-> -		".long 2b - 0b\n\t"					\
-> -		".short " #line "\n\t"
-> +		".long %[file] - 0b\n\t"				\
-> +		".short %[line]\n\t"
->  #else
->  #define _BUGVERBOSE_LOCATION(file, line)
->  #endif
-> @@ -50,7 +46,9 @@ _BUGVERBOSE_LOCATION(__FILE__, __LINE__)		\
->  #define __BUG_FLAGS(flags)				\
->  	asm volatile (					\
->  		__BUG_ENTRY(flags)			\
-> -		"brk %[imm]" :: [imm] "i" (BUG_BRK_IMM)	\
-> +		"brk %[imm]" :: [imm] "i" (BUG_BRK_IMM),\
-> +			        [line] "i" (__LINE__),  \
-> +			        [file] "i" (__FILE__)   \
+> "arm/dma: vmalloc area allocation"
 
-Please remove the extra level of macro nesting.  It's only there to
-ensure that __LINE__ is fully expanded before stringifying it with
-#line.  Your version doesn't rely on stringification, so this shouldn't
-be needed any more.
+Won't boot at this commit:
 
-Also, I'm not 100% sure that "i" is the right constraint to use, but
-I can't come up with a better answer.
+[    6.747283] save_secure_sram() returns 0000ff02
+[    6.751983] save_secure_sram()'s param: 0: 0x4
+[    6.756561] save_secure_sram()'s param: 1: 0x8e700000
+[    6.761749] save_secure_sram()'s param: 2: 0x0
+[    6.766326] save_secure_sram()'s param: 3: 0x1
+[    6.770904] save_secure_sram()'s param: 4: 0x1
 
+> "arm/dma: defer atomic pool initialization"
 
-You should check to see whether anything else in the kernel is using a
-similar technique.
+Boots at this commit.
 
-A quick grep for 'section.*MS' suggests that arm, arm64, s390 and
-are all doing something similar.  It would be good to fix all of them
-if they're affected.
+> I suspect that changed virtual address of the sram due to early
+> __dma_alloc_remap() call causes the problem and above two commits test
+> this theory.
 
-firmware/Makefile also has an instance, though it may not matter as
-much.  I've not spent the time to figure out what it's doing.
+Hmm OK. Does your first patch above now have the initcall issue too?
+It boots if I make that also subsys_initcall and then I get:
 
-Cheers
----Dave
+[    2.078094] vmalloc_pool_init: DMA: get vmalloc area: d0010000
+
+Regards,
+
+Tony
