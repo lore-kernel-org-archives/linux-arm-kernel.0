@@ -1,101 +1,53 @@
-From: sebastian.reichel@collabora.co.uk (Sebastian Reichel)
-Date: Thu, 9 Nov 2017 17:29:02 +0100
-Subject: [PATCH v2 7/7] arm: omap: pdata-quirks: Remove unused timer pdata
-In-Reply-To: <1510144108-29563-8-git-send-email-j-keerthy@ti.com>
-References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
- <1510144108-29563-8-git-send-email-j-keerthy@ti.com>
-Message-ID: <20171109162902.gmqcznrvegvkwrrz@earth>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 9 Nov 2017 16:28:53 +0000
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+In-Reply-To: <878tffa434.fsf@intel.com>
+References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+ <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+ <20171109093122.GA12318@n2100.armlinux.org.uk>
+ <87inejaiij.fsf@intel.com>
+ <CAEzXK1qHEcB6f_uGPJk9RxSd+tP5rNuiutBN1FAkEv-nU1k5Ug@mail.gmail.com>
+ <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
+ <87efp7abwi.fsf@intel.com>
+ <CAEzXK1odLNgPTG_cAEqg8d2r_WbnqnVcCvAYQCHkRr4DgAHvhQ@mail.gmail.com>
+ <878tffa434.fsf@intel.com>
+Message-ID: <20171109162853.GD12318@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Nov 08, 2017 at 05:58:28PM +0530, Keerthy wrote:
-> Remove unused timer pdata.
+On Thu, Nov 09, 2017 at 05:01:35PM +0200, Jani Nikula wrote:
+> On Thu, 09 Nov 2017, Lu?s Mendes <luis.p.mendes@gmail.com> wrote:
+> > Hi Jani,
+> >
+> > I tried:
+> > git clone git://people.freedesktop.org/~airlied/linux -b drm-next
+> > --depth=1 --single-branch
+> >
+> > I got this:
+> > EDID isn't loaded from file
+> >
+> > # cat /proc/cmdline
+> > console=ttymxc0,115200 root=/dev/sda2 rw video=HDMI-A-1:1920x1080M at 60
+> > drm.edid_firmware=edid/ktc_edid.bin dw_hdmi.dyndbg=+pfl cma=128M
 > 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
-> ---
-> 
-> No code changes in this v2 version. Only enhanced patch
-> statistics for renames.
+> Please try adding D at the end of your video= parameter to force
+> connector on. Otherwise it'll do a ddc probe which apparently fails with
+> your display.
 
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+I do hope you're not converting dw-hdmi to use DDC probing and having it
+ignore the hotplug signal.  dw-hdmi has to work with AV setups, which
+include an AV receiver, and that includes the AV receiver modifying the
+HDMI data when:
 
--- Sebastian
+(a) the TV is turned off or on.
+(b) the AV receiver is placed into or out of standby
 
->  arch/arm/mach-omap2/pdata-quirks.c | 32 --------------------------------
->  1 file changed, 32 deletions(-)
-> 
-> diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-> index ad9df86..e7d7fc7 100644
-> --- a/arch/arm/mach-omap2/pdata-quirks.c
-> +++ b/arch/arm/mach-omap2/pdata-quirks.c
-> @@ -24,10 +24,8 @@
->  #include <linux/platform_data/hsmmc-omap.h>
->  #include <linux/platform_data/iommu-omap.h>
->  #include <linux/platform_data/wkup_m3.h>
-> -#include <linux/platform_data/pwm_omap_dmtimer.h>
->  #include <linux/platform_data/media/ir-rx51.h>
->  #include <linux/platform_data/asoc-ti-mcbsp.h>
-> -#include <clocksource/dmtimer.h>
->  
->  #include "common.h"
->  #include "common-board-devices.h"
-> @@ -477,33 +475,6 @@ void omap_auxdata_legacy_init(struct device *dev)
->  	dev->platform_data = &twl_gpio_auxdata;
->  }
->  
-> -/* Dual mode timer PWM callbacks platdata */
-> -#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-> -static struct pwm_omap_dmtimer_pdata pwm_dmtimer_pdata = {
-> -	.request_by_node = omap_dm_timer_request_by_node,
-> -	.request_specific = omap_dm_timer_request_specific,
-> -	.request = omap_dm_timer_request,
-> -	.set_source = omap_dm_timer_set_source,
-> -	.get_irq = omap_dm_timer_get_irq,
-> -	.set_int_enable = omap_dm_timer_set_int_enable,
-> -	.set_int_disable = omap_dm_timer_set_int_disable,
-> -	.free = omap_dm_timer_free,
-> -	.enable = omap_dm_timer_enable,
-> -	.disable = omap_dm_timer_disable,
-> -	.get_fclk = omap_dm_timer_get_fclk,
-> -	.start = omap_dm_timer_start,
-> -	.stop = omap_dm_timer_stop,
-> -	.set_load = omap_dm_timer_set_load,
-> -	.set_match = omap_dm_timer_set_match,
-> -	.set_pwm = omap_dm_timer_set_pwm,
-> -	.set_prescaler = omap_dm_timer_set_prescaler,
-> -	.read_counter = omap_dm_timer_read_counter,
-> -	.write_counter = omap_dm_timer_write_counter,
-> -	.read_status = omap_dm_timer_read_status,
-> -	.write_status = omap_dm_timer_write_status,
-> -};
-> -#endif
-> -
->  static struct ir_rx51_platform_data __maybe_unused rx51_ir_data = {
->  	.set_max_mpu_wakeup_lat = omap_pm_set_max_mpu_wakeup_lat,
->  };
-> @@ -572,9 +543,6 @@ static void __init omap3_mcbsp_init(void) {}
->  	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
->  		       &wkup_m3_data),
->  #endif
-> -#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-> -	OF_DEV_AUXDATA("ti,omap-dmtimer-pwm", 0, NULL, &pwm_dmtimer_pdata),
-> -#endif
->  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
->  	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
->  		       &omap4_iommu_pdata),
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/71320ddc/attachment.sig>
+and it informs sources by pulsing the HDMI HPD signal, as per the HDMI
+specification.  Proving the presence of DDC as a means of detection
+won't pick up on these changes, and will cause a regression in the
+driver.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
