@@ -1,56 +1,49 @@
-From: pprakash@codeaurora.org (Prashanth Prakash)
-Date: Wed,  8 Nov 2017 17:38:42 -0700
-Subject: [PATCH v2 2/2] ARM64 / cpuidle: Use new cpuidle macro for entering
- retention state
-In-Reply-To: <1510187922-8218-1-git-send-email-pprakash@codeaurora.org>
-References: <1510187922-8218-1-git-send-email-pprakash@codeaurora.org>
-Message-ID: <1510187922-8218-3-git-send-email-pprakash@codeaurora.org>
+From: philip@cog.systems (Philip Derrin)
+Date: Thu,  9 Nov 2017 11:41:43 +1100
+Subject: [PATCH 1/2] ARM: mm: make STRICT_KERNEL_RWX effective for LPAE
+In-Reply-To: <20171109004144.2246-1-philip@cog.systems>
+References: <20171109004144.2246-1-philip@cog.systems>
+Message-ID: <20171109004144.2246-2-philip@cog.systems>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPU_PM_CPU_IDLE_ENTER_RETENTION skips calling cpu_pm_enter() and
-cpu_pm_exit(). By not calling cpu_pm functions in idle entry/exit
-paths we can reduce the latency involved in entering and exiting
-the low power idle state.
+Currently, for ARM kernels with CONFIG_ARM_LPAE and
+CONFIG_STRICT_KERNEL_RWX enabled, the 2MiB pages mapping the
+kernel code and rodata are writable. They are marked read-only in
+a software bit (L_PMD_SECT_RDONLY) but the hardware read-only bit
+is not set (PMD_SECT_AP2).
 
-On ARM64 based Qualcomm server platform we measured below overhead
-for calling cpu_pm_enter and cpu_pm_exit for retention states.
+For user mappings, the logic that propagates the software bit
+to the hardware bit is in set_pmd_at(); but for the kernel,
+section_update() writes the PMDs directly, skipping this logic.
 
-workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
-	Average overhead of cpu_pm_enter - 1.2us
-	Average overhead of cpu_pm_exit  - 3.1us
+The fix is to set PMD_SECT_AP2 for read-only sections in
+section_update(), at the same time as L_PMD_SECT_RDONLY.
 
-Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
+Fixes: 1e3479225acb ("ARM: 8275/1: mm: fix PMD_SECT_RDONLY undeclared compile error")
+Signed-off-by: Philip Derrin <philip@cog.systems>
+Reported-by: Neil Dick <neil@cog.systems>
+Tested-by: Neil Dick <neil@cog.systems>
+Tested-by: Laura Abbott <labbott@redhat.com>
+Cc: stable at vger.kernel.org
 ---
- arch/arm64/kernel/cpuidle.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/mm/init.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
-index fd69108..f2d1381 100644
---- a/arch/arm64/kernel/cpuidle.c
-+++ b/arch/arm64/kernel/cpuidle.c
-@@ -47,6 +47,8 @@ int arm_cpuidle_suspend(int index)
- 
- #include <acpi/processor.h>
- 
-+#define ARM64_LPI_IS_RETENTION_STATE(arch_flags) (!(arch_flags))
-+
- int acpi_processor_ffh_lpi_probe(unsigned int cpu)
- {
- 	return arm_cpuidle_init(cpu);
-@@ -54,6 +56,10 @@ int acpi_processor_ffh_lpi_probe(unsigned int cpu)
- 
- int acpi_processor_ffh_lpi_enter(struct acpi_lpi_state *lpi)
- {
--	return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, lpi->index);
-+	if (ARM64_LPI_IS_RETENTION_STATE(lpi->arch_flags))
-+		return CPU_PM_CPU_IDLE_ENTER_RETENTION(arm_cpuidle_suspend,
-+						lpi->index);
-+	else
-+		return CPU_PM_CPU_IDLE_ENTER(arm_cpuidle_suspend, lpi->index);
- }
- #endif
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index ad80548325fe..0f6d1537f330 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -639,8 +639,8 @@ static struct section_perm ro_perms[] = {
+ 		.start  = (unsigned long)_stext,
+ 		.end    = (unsigned long)__init_begin,
+ #ifdef CONFIG_ARM_LPAE
+-		.mask   = ~L_PMD_SECT_RDONLY,
+-		.prot   = L_PMD_SECT_RDONLY,
++		.mask   = ~(L_PMD_SECT_RDONLY | PMD_SECT_AP2),
++		.prot   = L_PMD_SECT_RDONLY | PMD_SECT_AP2,
+ #else
+ 		.mask   = ~(PMD_SECT_APX | PMD_SECT_AP_WRITE),
+ 		.prot   = PMD_SECT_APX | PMD_SECT_AP_WRITE,
 -- 
-Qualcomm Datacenter Technologies on behalf of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.15.0
