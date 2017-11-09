@@ -1,59 +1,173 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 9 Nov 2017 23:13:26 +0000
-Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
-In-Reply-To: <20171109094920.2xpyhtrwj5kjb2qz@tarshish>
-References: <20171109004144.2246-1-philip@cog.systems>
- <CAGXu5jKBipDwQLz=ez8-SCW4=QNw8hNi+e4NYzQhbfEFACggcQ@mail.gmail.com>
- <20171109093734.GB12318@n2100.armlinux.org.uk>
- <20171109094920.2xpyhtrwj5kjb2qz@tarshish>
-Message-ID: <20171109231326.GF12318@n2100.armlinux.org.uk>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Thu,  9 Nov 2017 15:39:50 -0800
+Subject: [PATCH v6 05/12] arm: vdso: Add support for CLOCK_MONOTONIC_RAW
+Message-ID: <20171109234010.31286-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 11:49:20AM +0200, Baruch Siach wrote:
-> Hi Russell,
-> 
-> On Thu, Nov 09, 2017 at 09:37:34AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Nov 08, 2017 at 05:23:43PM -0800, Kees Cook wrote:
-> > > On Wed, Nov 8, 2017 at 4:41 PM, Philip Derrin <philip@cog.systems> wrote:
-> > > > Hi,
-> > > >
-> > > > This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
-> > > > when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
-> > > > mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
-> > > > merged in 3.19.
-> > > >
-> > > > The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
-> > > > mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
-> > > > implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
-> > > > sections to be read-only"), and another that moved the LPAE read-only bit into
-> > > > a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
-> > > > logic for LPAE").
-> > > >
-> > > > The incorrect mappings were not apparent in the debugfs kernel_page_tables
-> > > > dump because that was checking only the software RO bit, not the hardware RO
-> > > > bit.
-> > > 
-> > > Thanks for catching this! Please consider both patches:
-> > > 
-> > > Reviewed-by: Kees Cook <keescook@chromium.org>
-> > 
-> > Where are these patches, and why weren't they copied to the arm kernel
-> > list?
-> 
-> I got the patches from the list.
-> 
->   Cover:
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/541532.html
->   1/2:
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/541531.html
->   2/2:
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/541533.html
+Take an effort to recode the arm64 vdso code from assembler to C
+previously submitted by Andrew Pinski <apinski@cavium.com>, rework
+it for use in both arm and arm64, overlapping any optimizations
+for each architecture. But instead of landing it in arm64, land the
+result into lib/vdso and unify both implementations to simplify
+future maintenance.
 
-Ah, dspam decided they were spam, so they ended up in one of my junk
-mailboxes.
+Add a case for CLOCK_MONOTONIC_RAW to match up with support that
+is available in arm64's vdso.
 
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
+
+v2:
+- split first CL into 6 of 7 pieces
+
+v4:
+- Move out ARCH_CLOCK_FIXED_MASK to later adjustment.
+- update commit message to reflect overall reasoning.
+- replace typeof() with type vdso_raw_time_sec_t.
+
+v5:
+- replace erroneous tk->raw_time.shift with tk->tkr_raw.shift
+
+v6:
+- fixup raw_time_sec and raw_time_nsec in vdso.c
+
+---
+ arch/arm/include/asm/vdso_datapage.h | 11 +++++++++
+ arch/arm/kernel/vdso.c               |  3 +++
+ arch/arm/vdso/vgettimeofday.c        | 44 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 58 insertions(+)
+
+diff --git a/arch/arm/include/asm/vdso_datapage.h b/arch/arm/include/asm/vdso_datapage.h
+index 8dd7303db4ec..1c6e6a5d5d9d 100644
+--- a/arch/arm/include/asm/vdso_datapage.h
++++ b/arch/arm/include/asm/vdso_datapage.h
+@@ -34,6 +34,11 @@ typedef u32 vdso_wtm_clock_nsec_t;
+ typedef u32 vdso_xtime_clock_sec_t;
+ #endif
+ 
++#ifndef _VDSO_RAW_TIME_SEC_T
++#define _VDSO_RAW_TIME_SEC_T
++typedef u32 vdso_raw_time_sec_t;
++#endif
++
+ /* Try to be cache-friendly on systems that don't implement the
+  * generic timer: fit the unconditionally updated fields in the first
+  * 32 bytes.
+@@ -58,6 +63,12 @@ struct vdso_data {
+ 	u64 xtime_clock_snsec;	/* CLOCK_REALTIME sub-ns base */
+ 	u32 tz_minuteswest;	/* timezone info for gettimeofday(2) */
+ 	u32 tz_dsttime;
++
++	/* Raw clocksource multipler */
++	u32 cs_raw_mult;
++	/* Raw time */
++	vdso_raw_time_sec_t raw_time_sec;
++	u32 raw_time_nsec;
+ };
+ 
+ union vdso_data_store {
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index aed84b659cc5..898420579ae9 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -335,9 +335,12 @@ void update_vsyscall(struct timekeeper *tk)
+ 
+ 	if (!vdso_data->use_syscall) {
+ 		vdso_data->cs_cycle_last	= tk->tkr_mono.cycle_last;
++		vdso_data->raw_time_sec		= tk->raw_sec;
++		vdso_data->raw_time_nsec	= tk->tkr_raw.xtime_nsec;
+ 		vdso_data->xtime_clock_sec	= tk->xtime_sec;
+ 		vdso_data->xtime_clock_snsec	= tk->tkr_mono.xtime_nsec;
+ 		vdso_data->cs_mono_mult		= tk->tkr_mono.mult;
++		vdso_data->cs_raw_mult		= tk->tkr_raw.mult;
+ 		/* tkr_mono.shift == tkr_raw.shift */
+ 		vdso_data->cs_shift		= tk->tkr_mono.shift;
+ 		vdso_data->cs_mask		= tk->tkr_mono.mask;
+diff --git a/arch/arm/vdso/vgettimeofday.c b/arch/arm/vdso/vgettimeofday.c
+index 59893fca03b3..a2c4db83edc4 100644
+--- a/arch/arm/vdso/vgettimeofday.c
++++ b/arch/arm/vdso/vgettimeofday.c
+@@ -194,6 +194,40 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
+ 	return 0;
+ }
+ 
++static notrace int do_monotonic_raw(const struct vdso_data *vd,
++				    struct timespec *ts)
++{
++	u32 seq, mult, shift;
++	u64 nsec, cycle_last;
++	u64 mask;
++	vdso_raw_time_sec_t sec;
++
++	do {
++		seq = vdso_read_begin(vd);
++
++		if (vd->use_syscall)
++			return -1;
++
++		cycle_last = vd->cs_cycle_last;
++
++		mult = vd->cs_raw_mult;
++		shift = vd->cs_shift;
++		mask = vd->cs_mask;
++
++		sec = vd->raw_time_sec;
++		nsec = vd->raw_time_nsec;
++
++	} while (unlikely(vdso_read_retry(vd, seq)));
++
++	nsec += get_clock_shifted_nsec(cycle_last, mult, mask);
++	nsec >>= shift;
++	/* open coding timespec_add_ns to save a ts->tv_nsec = 0 */
++	ts->tv_sec = sec + __iter_div_u64_rem(nsec, NSEC_PER_SEC, &nsec);
++	ts->tv_nsec = nsec;
++
++	return 0;
++}
++
+ #else /* CONFIG_ARM_ARCH_TIMER */
+ 
+ static notrace int do_realtime(const struct vdso_data *vd, struct timespec *ts)
+@@ -206,6 +240,12 @@ static notrace int do_monotonic(const struct vdso_data *vd, struct timespec *ts)
+ 	return -1;
+ }
+ 
++static notrace int do_monotonic_raw(const struct vdso_data *vd,
++				    struct timespec *ts)
++{
++	return -1;
++}
++
+ #endif /* CONFIG_ARM_ARCH_TIMER */
+ 
+ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
+@@ -227,6 +267,10 @@ notrace int __vdso_clock_gettime(clockid_t clock, struct timespec *ts)
+ 		if (do_monotonic(vd, ts))
+ 			goto fallback;
+ 		break;
++	case CLOCK_MONOTONIC_RAW:
++		if (do_monotonic_raw(vd, ts))
++			goto fallback;
++		break;
+ 	default:
+ 		goto fallback;
+ 	}
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.15.0.448.gf294e3d99a-goog
