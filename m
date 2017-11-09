@@ -1,243 +1,213 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Thu, 09 Nov 2017 18:06:18 +0000
-Subject: [PATCH v5 13/30] arm64/sve: Core task context handling
-In-Reply-To: <20171109175638.GF22781@e103592.cambridge.arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-14-git-send-email-Dave.Martin@arm.com>
- <878tffqsnb.fsf@linaro.org>
- <20171109175638.GF22781@e103592.cambridge.arm.com>
-Message-ID: <877euzqqcl.fsf@linaro.org>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 9 Nov 2017 19:12:54 +0100
+Subject: [PATCH] Kernel debugging: omap: print warning if CONFIG_DEBUG_LL
+ is enabled
+In-Reply-To: <20171109173533.GJ28231@n2100.armlinux.org.uk>
+References: <b80b85cd6f26d02d698463b3dd5e9783081aa780.1510176592.git.hns@goldelico.com>
+ <20171108222755.GW28152@atomide.com>
+ <20171108223604.GG28231@n2100.armlinux.org.uk>
+ <20171108223810.GH28231@n2100.armlinux.org.uk>
+ <E542DC13-D6C4-4C84-8521-8CE468BD0AFE@goldelico.com>
+ <20171109165840.GI28231@n2100.armlinux.org.uk>
+ <450E9318-EB71-4635-A137-82DF78206D24@goldelico.com>
+ <20171109173533.GJ28231@n2100.armlinux.org.uk>
+Message-ID: <ECA76857-CF1A-4419-9301-1F3AB4730FA5@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Russell,
 
-Dave Martin <Dave.Martin@arm.com> writes:
+> Am 09.11.2017 um 18:35 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
+> 
+> Hi Nikkylos,
+> 
+> On Thu, Nov 09, 2017 at 06:16:29PM +0100, H. Nikolaus Schaller wrote:
+>> Hi Russel,
+>> 
+>>> Am 09.11.2017 um 17:58 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
+>>> 
+>>> On Thu, Nov 09, 2017 at 06:44:49AM +0100, H. Nikolaus Schaller wrote:
+>>>> Hi Russel,
+>>> 
+>>> Nikolus,
+>>> 
+>>>>> Am 08.11.2017 um 23:38 schrieb Russell King - ARM Linux <linux@armlinux.org.uk>:
+>>>>> 
+>>>>> On Wed, Nov 08, 2017 at 10:36:04PM +0000, Russell King - ARM Linux wrote:
+>>>>>> We don't need a compiler warning there, we probably need better help
+>>>>>> text against DEBUG_LL and against EARLY_PRINTK.
+>>>>> 
+>>>>> Actually, this is already clearly stated against DEBUG_LL:
+>>>>> 
+>>>>>        Note that selecting this option will limit the kernel to a single
+>>>>>        UART definition, as specified below. Attempting to boot the kernel
+>>>>>        image on a different platform *will not work*, so this option should
+>>>>>        not be enabled for kernels that are intended to be portable.
+>>>>> 
+>>>>> and since EARLY_PRINTK depends on DEBUG_LL... I guess people don't
+>>>>> read help texts anymore.
+>>>> 
+>>>> Yes, we read, but we face a situation where it doesn't help that it is a
+>>>> well known problem *for you* or anyone else and that it is described in
+>>>> the help.
+>>> 
+>>> Personally, I'd like early_printk not to be re-using this, but others
+>>> disagree.  It's all about knowledge and compromise.
+>> 
+>> Sure, we have to make a lot of compromises...
+>> 
+>>> 
+>>> What we don't want is more warnings in the kernel - it's already
+>>> hard enough for people to spot the "bad" warnings that they need to
+>>> fix to have a working system (such as wrong printf specifiers) that
+>>> (a) they're not going to spot this #warning and (b) it's just going
+>>> to be more noise for those who do try to spot the warnings.
+>> 
+>>> 
+>>>> Do you expect anybody to remember after 3 years of *not* changing DEBUG_LL
+>>>> what was written in a help message? Or to understand that DEBUG_LL has
+>>>> anything to do with the mysteriously appearing boot problem? Which can't
+>>>> easily be debugged since there are no messages despite playing with
+>>>> EARLY_PRINTK/EARLYCON?
+>>> 
+>>> Do you expect people to read the build log of their kernel and spot
+>>> the additional warning?
+>> 
+>> I am doing it and I rarely see warnings by the compiler. Maybe sometimes
+>> during the -rc phase but not in stable.
+> 
+> The warnings you see are compiler specific, and I hardly ever see builds
+> that are fully clean.
 
-> On Thu, Nov 09, 2017 at 05:16:40PM +0000, Alex Benn?e wrote:
->>
->> Dave Martin <Dave.Martin@arm.com> writes:
->>
->> > This patch adds the core support for switching and managing the SVE
->> > architectural state of user tasks.
->> >
->> > Calls to the existing FPSIMD low-level save/restore functions are
->> > factored out as new functions task_fpsimd_{save,load}(), since SVE
->> > now dynamically may or may not need to be handled at these points
->> > depending on the kernel configuration, hardware features discovered
->> > at boot, and the runtime state of the task.  To make these
->> > decisions as fast as possible, const cpucaps are used where
->> > feasible, via the system_supports_sve() helper.
->> >
->> > The SVE registers are only tracked for threads that have explicitly
->> > used SVE, indicated by the new thread flag TIF_SVE.  Otherwise, the
->> > FPSIMD view of the architectural state is stored in
->> > thread.fpsimd_state as usual.
->> >
->> > When in use, the SVE registers are not stored directly in
->> > thread_struct due to their potentially large and variable size.
->> > Because the task_struct slab allocator must be configured very
->> > early during kernel boot, it is also tricky to configure it
->> > correctly to match the maximum vector length provided by the
->> > hardware, since this depends on examining secondary CPUs as well as
->> > the primary.  Instead, a pointer sve_state in thread_struct points
->> > to a dynamically allocated buffer containing the SVE register data,
->> > and code is added to allocate and free this buffer at appropriate
->> > times.
->> >
->> > TIF_SVE is set when taking an SVE access trap from userspace, if
->> > suitable hardware support has been detected.  This enables SVE for
->> > the thread: a subsequent return to userspace will disable the trap
->> > accordingly.  If such a trap is taken without sufficient system-
->> > wide hardware support, SIGILL is sent to the thread instead as if
->> > an undefined instruction had been executed: this may happen if
->> > userspace tries to use SVE in a system where not all CPUs support
->> > it for example.
->> >
->> > The kernel will clear TIF_SVE and disable SVE for the thread
->> > whenever an explicit syscall is made by userspace.  For backwards
->> > compatibility reasons and conformance with the spirit of the base
->> > AArch64 procedure call standard, the subset of the SVE register
->> > state that aliases the FPSIMD registers is still preserved across a
->> > syscall even if this happens.  The remainder of the SVE register
->> > state logically becomes zero at syscall entry, though the actual
->> > zeroing work is currently deferred until the thread next tries to
->> > use SVE, causing another trap to the kernel.  This implementation
->> > is suboptimal: in the future, the fastpath case may be optimised
->> > to zero the registers in-place and leave SVE enabled for the task,
->> > where beneficial.
->> >
->> > TIF_SVE is also cleared in the following slowpath cases, which are
->> > taken as reasonable hints that the task may no longer use SVE:
->> >  * exec
->> >  * fork and clone
->> >
->> > Code is added to sync data between thread.fpsimd_state and
->> > thread.sve_state whenever enabling/disabling SVE, in a manner
->> > consistent with the SVE architectural programmer's model.
->> >
->> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
->> > Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
->> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> > Cc: Alex Benn?e <alex.bennee@linaro.org>
->> >
->> > ---
->> >
->> > Kept Catalin's Reviewed-by, since this is a trivial change.
->> >
->> > Changes since v4
->> > ----------------
->> >
->> > Miscellaneous:
->> >
->> >  * Mark do_sve_acc() as asmlinkage.
->> >
->> >    (Semantic correctness only; no functional impact.)
->
-> [...]
->
->> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
->> > index f5e851e..56e848f 100644
->> > --- a/arch/arm64/kernel/entry.S
->> > +++ b/arch/arm64/kernel/entry.S
->> > @@ -607,6 +607,8 @@ el0_sync:
->> >  	b.eq	el0_ia
->> >  	cmp	x24, #ESR_ELx_EC_FP_ASIMD	// FP/ASIMD access
->> >  	b.eq	el0_fpsimd_acc
->> > +	cmp	x24, #ESR_ELx_EC_SVE		// SVE access
->> > +	b.eq	el0_sve_acc
->>
->> I'm guessing there is a point that this long chain of cmp instructions
->> is better handled with a jump table? One for the maintainer though I
->> guess?
->
-> Probably it would be worth refactoring this at some point.
->
-> There's a tradeoff between the length of this list the extra D-cache
-> and/or branch miss(es) that might result from using a table.
->
-> The optimimum approach would be microarchitecture dependent, but I
-> suspect a good compromise would be to profile this, pick the few most
-> common / most latency sensitive exception types and keep those as
-> compare-and-branch, deferring the remainder to a table lookup.
->
-> I had a vague plan to take a look at it, but for this series is
-> was very much in "nice-to-have" territory.
->
->> >  	cmp	x24, #ESR_ELx_EC_FP_EXC64	// FP/ASIMD exception
->> >  	b.eq	el0_fpsimd_exc
->> >  	cmp	x24, #ESR_ELx_EC_SYS64		// configurable trap
->> > @@ -658,6 +660,7 @@ el0_svc_compat:
->> >  	/*
->> >  	 * AArch32 syscall handling
->> >  	 */
->> > +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
->> >  	adrp	stbl, compat_sys_call_table	// load compat syscall table pointer
->> >  	mov	wscno, w7			// syscall number in w7 (r7)
->> >  	mov     wsc_nr, #__NR_compat_syscalls
->
-> [...]
->
->> > @@ -835,16 +848,36 @@ ENDPROC(ret_to_user)
->> >   */
->> >  	.align	6
->> >  el0_svc:
->> > +	ldr	x16, [tsk, #TSK_TI_FLAGS]	// load thread flags
->> >  	adrp	stbl, sys_call_table		// load syscall table pointer
->> >  	mov	wscno, w8			// syscall number in w8
->> >  	mov	wsc_nr, #__NR_syscalls
->> > +
->> > +#ifndef CONFIG_ARM64_SVE
->> > +	b	el0_svc_naked
->>
->> Hmm we've hoisted the ldr x16, [tsk, #TSK_TI_FLAGS] out of el0_svc_naked
->> but we'll still be testing the bit when CONFIG_ARM64_SVE isn't enabled?
->
-> Where?  In this patch it's #ifdef'd out.  In "Detect SVE and activate
-> runtime support" this is converted to an asm alternative, so this should
-> reduce to a statically predictable branch when CONFIG_ARM64_SVE=y but
-> SVE support is not detected.
->
->> I'm not clear why you couldn't keep that where it was?
->
-> Catalin wasn't keen on the duplication of work reading and writing the
-> thread flags, so I moved it to the common path.
+I can just contribute my experience that mine are usually.
 
-Ahh sorry, I see it now.
+> 
+>>> You might be on the ball enough to do that,
+>>> but not everyone does, or is.  Not everyone logs the output of the
+>>> kernel build so they can review it later.  I suspect that many just
+>>> set the build going in a terminal, walk away and come back sometime
+>>> later when they think it's done.
+>> 
+>> In this case they would have a good trigger and reason to look into the
+>> build log: the kernel they just built isn't booting and doesn't tell
+>> anything. Then I guess for many of us the next logical step would be to
+>> look trough the build log (but not through a defconfig that wasn't touched
+>> for ages).
+>> 
+>> Well, I have to admit that if someone doesn't try a clean build, it
+>> will not see it again if the initial log wasn't captured somewhere...
+>> 
+>> So it should more be an #error than a #warning. Then people must notice.
+>> But I don't know if there are situations where this would be too strict.
+> 
+> There are - it's perfectly valid to have your kernel, but with DEBUG_LL
+> enabled and configured correctly so it outputs to a real UART on your
+> platform.  As I've explained already, DEBUG_LL exists as a way of last
+> resort to solve the "it doesn't boot" problem, because it gives a
+> way for the early assembler to be instrumented and debugged before
+> anything else is up, through the kernel boot sequence and into the C
+> code.
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+Indeed - except that DEBUG_LL can be the reason for the "it doesn't boot"
+which I assume nobody expects. t would be like placing a voltmeter somewhere
+and you have power outage.
 
->
->>
->> > +#else
->> > +	tbz	x16, #TIF_SVE, el0_svc_naked	// Skip unless TIF_SVE set:
->> > +	bic	x16, x16, #_TIF_SVE		// discard SVE state
->> > +	str	x16, [tsk, #TSK_TI_FLAGS]
->> > +
->> > +	/*
->> > +	 * task_fpsimd_load() won't be called to update CPACR_EL1 in
->> > +	 * ret_to_user unless TIF_FOREIGN_FPSTATE is still set, which only
->> > +	 * happens if a context switch or kernel_neon_begin() or context
->> > +	 * modification (sigreturn, ptrace) intervenes.
->> > +	 * So, ensure that CPACR_EL1 is already correct for the fast-path case:
->> > +	 */
->> > +	mrs	x9, cpacr_el1
->> > +	bic	x9, x9, #CPACR_EL1_ZEN_EL0EN	// disable SVE for el0
->> > +	msr	cpacr_el1, x9			// synchronised by eret to el0
->> > +#endif /* CONFIG_ARM64_SVE */
->> > +
->> >  el0_svc_naked:					// compat entry point
->> >  	stp	x0, xscno, [sp, #S_ORIG_X0]	// save the original x0 and syscall number
->> >  	enable_dbg_and_irq
->> >  	ct_user_exit 1
->> >
->> > -	ldr	x16, [tsk, #TSK_TI_FLAGS]	// check for syscall hooks
->> > -	tst	x16, #_TIF_SYSCALL_WORK
->> > +	tst	x16, #_TIF_SYSCALL_WORK		// check for syscall hooks
->> >  	b.ne	__sys_trace
->> >  	cmp     wscno, wsc_nr			// check upper syscall limit
->> >  	b.hs	ni_sys
->
-> [...]
->
->> > diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
->> > index 18c0290..9d3c7f0 100644
->> > --- a/arch/arm64/kernel/traps.c
->> > +++ b/arch/arm64/kernel/traps.c
->> > @@ -310,8 +310,8 @@ static int call_undef_hook(struct pt_regs *regs)
->> >  	return fn ? fn(regs, instr) : 1;
->> >  }
->> >
->> > -static void force_signal_inject(int signal, int code, struct pt_regs *regs,
->> > -				unsigned long address)
->> > +void force_signal_inject(int signal, int code, struct pt_regs *regs,
->> > +			 unsigned long address)
->> >  {
->> >  	siginfo_t info;
->> >  	void __user *pc = (void __user *)instruction_pointer(regs);
->> > @@ -325,7 +325,7 @@ static void force_signal_inject(int signal, int code, struct pt_regs *regs,
->> >  		desc = "illegal memory access";
->> >  		break;
->> >  	default:
->> > -		desc = "bad mode";
->> > +		desc = "unknown or unrecoverable error";
->> >  		break;
->> >  	}
->>
->> Is this a separate trivial clean-up patch? It seems like you should
->> handle SIGKILL explicitly?
->
-> I considered it part of this patch, since this function is not currently
-> used elsewhere.
->
-> I only expect this path to be followed as a catch-all for BUG() like
-> conditions that can be contained by killing the user task.  Printing
-> out a super-descriptive message didn't seem appropriate, but "bad mode"
-> is especially opaque.  I think that was a paste from arch/arm -- AArch64
-> doesn't have "modes" as such.
->
-> Cheers
-> ---Dave
+> 
+> That is its primary purpose.  Adding a #error or #warning is going to
+> turn people who most need the infrastructure to solve the "it silently
+> doesn't boot" away.
 
+This confirms my assumption that a #warning seems more appropriate than
+an #error. You can ignore it if you know what you are doing.
 
---
-Alex Benn?e
+> 
+> Unfortunately, DEBUG_LL is one of those things that is platform specific,
+> it has to be to guarantee output, so situations such as missing DT can
+> still produce output.  Unfortunately, it got used for early_printk
+> because it was easier to add early_printk rather than telling people
+> to add a printascii() call in kernel/printk/printk.c (which is what I
+> used to tell people, and what I _still_ do today.)
+
+Yes, I have used printascii() in early days of board bringup (especially
+with broken u-boot setup)...
+
+> 
+> DEBUG_LL has always been intended for this purpose, and it's under the
+> "debugging" menus, because it's really not meant to be enabled for
+> production.  If you have folk who have enabled DEBUG_LL in your
+> configurations, and then left it enabled beyond this level of debugging,
+> I have to question the competence of that.
+
+It is not a matter of competence but experience. Simply assume that someone
+with only a little experience did enable it (or even copied from some
+nowadays unknown source) some years ago for some good reason (in the
+view of the team experience back then) and nobody questioned this decision
+afterwards.
+
+And suddenly the system fails completely.
+
+It is the same mental principle how severe bugs (and security issues) stay
+for years and are suddenly found to the surprise of everybody.
+
+> DEBUG_LL may be an extreme example of a config option that can land
+> your kernel in a non-bootable situation, but there are plenty of other
+> configuration options that will severely degrade the performance of
+> your kernel.  Should we go around adding #warning's for those as well?
+
+No. If just performance is going down, you can still boot and see messages
+and debug other (e.g. driver) issues.
+
+And have all debugging tools around. But you can't play around to debug
+a non-booting kernel (except through JTAG).
+
+> 
+> I know that the kernel configuration is hard - and it's hard because
+> it's large, but it is worth reviewing the options that you have in
+> your config from time to time, especially the debug options,
+
+We did that from time to time - but I admit it is not done in a systematic
+and well documented way. Something to think about and maybe automate...
+
+sed "s/\(.*DEBUG.*\)=y/# \1 is not set/g" <debug_defconfig >defconfig
+
+> and
+> question whether the debug options that are enabled are appropriate
+> for the phase of development.
+> 
+> So, if you're doing new development, you should have all the options
+> that add extra checks enabled (such as lockdep, hang checks, etc).
+> If you're moving towards the end of the development phase, and you
+> care about performance, then you need to start turning these options
+> off, because many of them will slow the kernel down.
+> 
+> The configuration of debug options is not something that should be
+> static.
+> 
+> I suspect that you probably have a lot of debug options enabled in your
+> kernel that affect it's performance... maybe you're due to review them
+> as a whole?
+
+It would not solve the problem. Just assume we have two configs - one with
+debug disabled and one with debug enabled. Now we come to 4.14-rc1 where
+the code change happened. We will not immediately notice, but as soon as we
+build with the debug defconfig (for debugging something else), we can't
+even boot.
+
+So instead of fixing an important and urgent issue, we have to make the
+debug kernel boot again...
+
+While this might hint at a config problem, we still do not know which one.
+And we look for and find DEBUG_LL enabled which we think is (still) right.
+
+And it wasn't completely wrong before the patches for OMAP were integrated.
+
+While my proposed patch would immediately tell - without runtime performance
+influence. And in the non-debug config nobody would even see the #warning
+because DEBUG_LL is disabled.
+
+But it is up to you to accept or reject this idea - we for our team have
+solved it for us. We simply want to save others from making the same
+bad experience again. If this is not welcome, it has to be accepted.
+
+BR and thanks,
+Nikolaus
