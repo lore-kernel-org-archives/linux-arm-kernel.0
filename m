@@ -1,97 +1,39 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Thu, 9 Nov 2017 09:19:15 -0700
-Subject: [PATCH 06/17] coresight: tmc: Make ETR SG table circular
-In-Reply-To: <978c66da-1897-191d-7c2d-49b21c9c0a39@arm.com>
-References: <20171019171553.24056-1-suzuki.poulose@arm.com>
- <20171019171553.24056-7-suzuki.poulose@arm.com> <20171106190712.GA12148@xps15>
- <978c66da-1897-191d-7c2d-49b21c9c0a39@arm.com>
-Message-ID: <CANLsYkx_rzVRE_=Z+S8HOL=doRurN3YYcOvoi=mEAZszThRWjQ@mail.gmail.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 9 Nov 2017 16:18:15 +0000
+Subject: [PATCH v10 0/9] LPC: legacy ISA I/O support
+In-Reply-To: <CALdTtnsCXp9kone=VECSyPOi6kuYML8eU-TKHM+_ekhVoGSTYA@mail.gmail.com>
+References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
+ <CALdTtnsCXp9kone=VECSyPOi6kuYML8eU-TKHM+_ekhVoGSTYA@mail.gmail.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40CC85DB@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 November 2017 at 03:36, Suzuki K Poulose <Suzuki.Poulose@arm.com> wrote:
-> On 06/11/17 19:07, Mathieu Poirier wrote:
->>
->> On Thu, Oct 19, 2017 at 06:15:42PM +0100, Suzuki K Poulose wrote:
->
->
-> ...
->
->>> +/*
->>> + * tmc_etr_sg_offset_to_table_index : Translate a given data @offset
->>> + * to the index of the page table "entry". Data pointers always have
->>> + * a fixed location, with ETR_SG_PTRS_PER_PAGE - 1 entries in an
->>> + * ETR_SG_PAGE and 1 link entry per (ETR_SG_PTRS_PER_PAGE -1) entries.
->>> + */
->>> +static inline u32
->>> +tmc_etr_sg_offset_to_table_index(u64 offset)
->>> +{
->>> +       u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
->>> +
->>> +       return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
->>> +}
->>
->>
->> This function is the source of a bizarre linking error when compiling
->> [14/17] on
->> armv7 as pasted here:
->>
->>    UPD     include/generated/compile.h
->>    CC      init/version.o
->>    AR      init/built-in.o
->>    AR      built-in.o
->>    LD      vmlinux.o
->>    MODPOST vmlinux.o
->> drivers/hwtracing/coresight/coresight-tmc-etr.o: In function
->> `tmc_etr_sg_offset_to_table_index':
->>
->> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:553:
->> undefined reference to `__aeabi_uldivmod'
->>
->> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:551:
->> undefined reference to `__aeabi_uldivmod'
->>
->> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:553:
->> undefined reference to `__aeabi_uldivmod'
->> drivers/hwtracing/coresight/coresight-tmc-etr.o: In function
->> `tmc_etr_sg_table_rotate':
->>
->> /home/mpoirier/work/linaro/coresight/kernel-maint/drivers/hwtracing/coresight/coresight-tmc-etr.c:609:
->> undefined reference to `__aeabi_uldivmod'
->>
->> Please see if you can reproduce on your side.
->
->
-> Uh ! I had gcc-7, which didn't complain about it. But if switch to 4.9, it
-> does.
-> It looks like division of 64bit entity on arm32 is triggering it. We don't
-> need
-> this to be u64 above, as it is the page_idx and could simply switch to
-> "unsigned long"
-> rather than explicitly using div64 helpers.
->
-> The following change fixes the issue for me. Please could you check if it
-> solves the problem
-> for you ?
+Hi Dann
 
-Unfortunately it doesn't.
+> -----Original Message-----
+> From: dann frazier [mailto:dann.frazier at canonical.com]
+> Sent: 09 November 2017 16:16
+> To: Gabriele Paoloni
+> Cc: Catalin Marinas; Will Deacon; Rob Herring; Frank Rowand; Bjorn
+> Helgaas; rafael at kernel.org; Arnd Bergmann; linux-arm-kernel;
+> lorenzo.pieralisi at arm.com; Mark Rutland; Brian Starkey; olof at lixom.net;
+> benh at kernel.crashing.org; linux-kernel at vger.kernel.org; linux-
+> acpi at vger.kernel.org; Linuxarm; linux-pci at vger.kernel.org; Corey
+> Minyard; John Garry; xuwei (O)
+> Subject: Re: [PATCH v10 0/9] LPC: legacy ISA I/O support
+> 
+> On Fri, Oct 27, 2017 at 10:11 AM, Gabriele Paoloni
+> <gabriele.paoloni@huawei.com> wrote:
+> > From: gabriele paoloni <gabriele.paoloni@huawei.com>
+> >
+> > This patchset supports the IPMI-bt device attached to the Low-Pin-
+> Count
+> > interface implemented on Hisilicon Hip06/Hip07 SoC.
+> 
+> fwiw, I tested this on one of our D05 boards and verified that the
+> IPMI SI worked fine.
+> 
+> Tested-by: dann frazier <dann.frazier@canonical.com>
 
-Mathieu
-
->
->
-> @@ -551,7 +553,7 @@ static void tmc_etr_sg_table_populate(struct
-> etr_sg_table *etr_table)
->  static inline u32
->  tmc_etr_sg_offset_to_table_index(u64 offset)
->  {
-> -       u64 sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
-> +       unsigned long sgpage_idx = offset >> ETR_SG_PAGE_SHIFT;
->          return sgpage_idx + sgpage_idx / (ETR_SG_PTRS_PER_PAGE - 1);
->  }
->
->
->
-> Thanks for the testing !
->
-> Suzuki
+Many thanks for this
+Gab
