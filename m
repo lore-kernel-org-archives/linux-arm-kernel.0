@@ -1,66 +1,38 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Thu, 9 Nov 2017 12:50:31 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20171109003639.GB23982@js1304-P5Q-DELUXE>
-References: <20171025173137.GQ4394@atomide.com>
- <20171026044829.GB11791@js1304-P5Q-DELUXE>
- <20171026141627.GD21504@atomide.com>
- <20171107053313.GA12447@js1304-P5Q-DELUXE>
- <20171107154842.GP28152@atomide.com>
- <20171108074645.GA18747@js1304-P5Q-DELUXE>
- <20171108163413.GU28152@atomide.com>
- <20171109000801.GA23982@js1304-P5Q-DELUXE>
- <20171109001113.GZ28152@atomide.com>
- <20171109003639.GB23982@js1304-P5Q-DELUXE>
-Message-ID: <20171109035031.GA24383@js1304-P5Q-DELUXE>
+From: j-keerthy@ti.com (Keerthy)
+Date: Thu, 9 Nov 2017 09:55:25 +0530
+Subject: [PATCH v2 2/7] arm: omap: Move dmtimer.h out of plat-omap
+In-Reply-To: <20171108164221.GV28152@atomide.com>
+References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
+ <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
+ <20171108164221.GV28152@atomide.com>
+Message-ID: <6ca9c73a-95a1-2466-151e-cdba64c3c478@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 09:36:39AM +0900, Joonsoo Kim wrote:
-> On Wed, Nov 08, 2017 at 04:11:13PM -0800, Tony Lindgren wrote:
-> > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171109 00:05]:
-> > > On Wed, Nov 08, 2017 at 08:34:13AM -0800, Tony Lindgren wrote:
-> > > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171108 07:43]:
-> > > > > On Tue, Nov 07, 2017 at 07:48:42AM -0800, Tony Lindgren wrote:
-> > > > > > So it seems the issue is currently at the atomic_pool_init()
-> > > > > > related code?
-> > > > > 
-> > > > > Yes, your test showed it although I can't find any clue in
-> > > > > atomic_pool_init().
-> > > > > 
-> > > > > Could you test updated branch?
-> > > > > 
-> > > > > https://github.com/JoonsooKim/linux/tree/cma-debug4-next-20180901
-> > > > > 
-> > > > > There are two relevant commits.
-> > > > > 
-> > > > > arm/dma: stop dma allocation before __dma_alloc_remap()
-> > > > > arm/dma: disable atomic pool after dma allocation
-> > > > > 
-> > > > > atomic pool initialization will be done partially to check
-> > > > > exact point of failure. These are brain-dead commits however I have no
-> > > > > idea what's going on here until now. :/
-> > > > 
-> > > > OK that booted, dmesg output below. Hopefully that provides
-> > > > you with some more clues.
-> > > 
-> > > Thanks!
-> > > 
-> > > Could you let me know which one is booted? Both of them? or just top
-> > > commit ("arm/dma: stop dma allocation before __dma_alloc_remap()")?
-> > 
-> > Oh OK. Only the top commit boots.
+
+
+On Wednesday 08 November 2017 10:12 PM, Tony Lindgren wrote:
+> * Keerthy <j-keerthy@ti.com> [171108 12:31]:
+>> The header file is currently under plat-omap directory
+>> under arch/omap. Move this out to an accessible place.
+>>
+>> No Code changes done to the header file.
 > 
-> Okay! I will try to analyze!
+> Some of the dmtimer functions are in this header to optimize the
+> size of the system timer code. Can you please check if some of them
+> can be left out of dmtimer.h and be made private to mach-omap1/timer.c
+> and mach-omap2/timer.c?
+
+Okay. I will try to clean that as well.
+
 > 
+> Again, we don't want driver code to start mis-using these as that's
+> immediately going to be big mess out of control.
 
-Could you test following two commits on my updated branch?
+Sure.
 
-"arm/dma: vmalloc area allocation"
-"arm/dma: defer atomic pool initialization"
-
-I suspect that changed virtual address of the sram due to early
-__dma_alloc_remap() call causes the problem and above two commits test
-this theory.
-
-Thanks.
+> 
+> Regards,
+> 
+> Tony
+> 
