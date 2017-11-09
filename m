@@ -1,106 +1,100 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Thu, 9 Nov 2017 19:03:14 +0000
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <18ef379f-0c23-0cbf-4228-30d5c46c690f@nvidia.com>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
- <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
- <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
- <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
- <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
- <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
- <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
- <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
- <7cdfa633-d9c6-881a-ae5f-f94f7e6413ee@nvidia.com>
- <5f064e65-ee29-179b-8102-984d12d24d9d@collabora.com>
- <15792a16-6b57-a6ad-92dc-0ffaba0354db@nvidia.com>
- <1eb4e14f-4728-d4f7-95a6-0a6308760d7a@collabora.com>
- <CAK8P3a3iiSgutnHFU7PoLGQyObgyAreQOOtrDhjijoMU5wZ1Eg@mail.gmail.com>
- <18ef379f-0c23-0cbf-4228-30d5c46c690f@nvidia.com>
-Message-ID: <bfed6e80-44a7-6e96-c6a6-bc9793a1937a@collabora.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 9 Nov 2017 14:34:38 -0600
+Subject: [PATCH 2/2] kbuild: handle dtb-y and CONFIG_OF_ALL_DTBS natively
+ in Makefile.lib
+In-Reply-To: <CAK7LNAT-3yBTFqnFECbGzSHRUiaG38b0BG3_3ouRAZRTF+iiDQ@mail.gmail.com>
+References: <1509859853-27473-1-git-send-email-yamada.masahiro@socionext.com>
+ <1509859853-27473-3-git-send-email-yamada.masahiro@socionext.com>
+ <CAAG0J98rRS+Sw8k_87gmTqYdNWByk=9zWVbWnC348vd63H4N9w@mail.gmail.com>
+ <CAAG0J99envT6gtM6tHdTvetrHr0itX1dexkuWSU=u1c5UTLE1A@mail.gmail.com>
+ <CAK7LNAT-3yBTFqnFECbGzSHRUiaG38b0BG3_3ouRAZRTF+iiDQ@mail.gmail.com>
+Message-ID: <CAL_JsqLJZ3D8MXooiS+RFC1jJTCf7L6epwXUgovMAtH5Logwqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 09/11/17 15:23, Jon Hunter wrote:
+On Thu, Nov 9, 2017 at 6:23 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Hi James,
 >
-> On 09/11/17 13:17, Arnd Bergmann wrote:
->> On Thu, Nov 9, 2017 at 1:51 PM, Guillaume Tucker
->> <guillaume.tucker@collabora.com> wrote:
->>> On 09/11/17 11:29, Jon Hunter wrote:
->>>>
->>>>
->>>> On 09/11/17 10:43, Guillaume Tucker wrote:
->>>>
->>>> ...
->>>>
->>>>> I actually built these kernel revisions with module support
->>>>> disabled to speed up the builds, and no modules are being
->>>>> downloaded in the LAVA job.
->>>>>
->>>>> If you have a public URL with your known working kernel zImage
->>>>> and dtb, let me know so I could re-run the same test LAVA boot
->>>>> test to see if I get the same results as you (i.e. no hang).
->>>>
->>>>
->>>> I don't have a public URL for the zImage but I can definitely email it
->>>> to you. By the way, when booting I am setting 'init=/bin/bash' so no
->>>> start-up scripts are running.
->>>
->>>
->>> Thanks, I tried your binary and it booted fine.  I built
->>> next-20171109 again with and without loadable module support
->>> enabled and it fails with it disabled but passes with it
->>> enabled (even without actually loading any modules):
->>>
->>>   * with CONFIG_MODULES disabled (fails):
->>>     https://lava.collabora.co.uk/scheduler/job/981215
->>>
->>>   * with plain multi_v7_defconfig and no modules loaded (passes):
->>>     https://lava.collabora.co.uk/scheduler/job/981217
->>>
->>>
->>> So I guess this means disabling loadable modules support has some
->>> interesting side-effects that cause the kernel to crash.  I think
->>> the kci builds all leave modules enabled with multi_v7_defconfig,
->>> so the failing boots must be due to something else.  Taking
->>> another look at the failing kci boots now...
->>
->> The one thing that comes to mind that happened recently with
->> modules is
->>
->> 371435f78e9e ("kernel debug: support resetting WARN_ONCE for all architectures")
->>
->> Can you try reverting this? It's probably something else, but I'd like
->> to rule it out.
 >
-> I have been able to reproduce the problem by disabling support for
-> loadable modules on both Tegra124 Nyan-Big and Jetson TK1. Disabling
-> DRM_NOUVEAU appears to avoid the problem.
+> 2017-11-09 21:19 GMT+09:00 James Hogan <james@albanarts.com>:
+>> (resend using a working From address)
+>>
+>> <yamada.masahiro@socionext.com> wrote:
+>>> If CONFIG_OF_ALL_DTBS is enabled, "make ARCH=arm64 dtbs" compiles each
+>>> DTB twice; one from arch/arm64/boot/dts/*/Makefile and the other from
+>>> the dtb-$(CONFIG_OF_ALL_DTBS) line in arch/arm64/boot/dts/Makefile.
+>>> It could be a race problem when building DTBS in parallel.
+>>>
+>>> Another minor issue is CONFIG_OF_ALL_DTBS covers only *.dts in vendor
+>>> sub-directories, so this broke when Broadcom added one more hierarchy
+>>> in arch/arm64/boot/dts/broadcom/<soc>/.
+>>>
+>>> One idea to fix the issues in a clean way is to move DTB handling
+>>> to Kbuild core scripts.  Makefile.dtbinst already recognizes dtb-y
+>>> natively, so it should not hurt to do so.
+>>>
+>>> Add $(dtb-y) to extra-y, and $(dtb-) as well if CONFIG_OF_ALL_DTBS is
+>>> enabled.  All clutter things in Makefiles go away.
+>>>
+>>> As a bonus clean-up, I also removed dts-dirs.  Just use subdir-y
+>>> directly to traverse sub-directories.
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>
+>>  ...
+>>
+>>> diff --git a/arch/mips/boot/dts/Makefile b/arch/mips/boot/dts/Makefile
+>>> index 7891ffa..b2b0d88 100644
+>>> --- a/arch/mips/boot/dts/Makefile
+>>> +++ b/arch/mips/boot/dts/Makefile
+>>> @@ -1,20 +1,14 @@
+>>> -dts-dirs       += brcm
+>>> -dts-dirs       += cavium-octeon
+>>> -dts-dirs       += img
+>>> -dts-dirs       += ingenic
+>>> -dts-dirs       += lantiq
+>>> -dts-dirs       += mti
+>>> -dts-dirs       += netlogic
+>>> -dts-dirs       += ni
+>>> -dts-dirs       += pic32
+>>> -dts-dirs       += qca
+>>> -dts-dirs       += ralink
+>>> -dts-dirs       += xilfpga
+>>> +subdir-y       += brcm
+>>> +subdir-y       += cavium-octeon
+>>> +subdir-y       += img
+>>> +subdir-y       += ingenic
+>>> +subdir-y       += lantiq
+>>> +subdir-y       += mti
+>>> +subdir-y       += netlogic
+>>> +subdir-y       += ni
+>>> +subdir-y       += pic32
+>>> +subdir-y       += qca
+>>> +subdir-y       += ralink
+>>> +subdir-y       += xilfpga
+>>>
+>>> -obj-y          := $(addsuffix /, $(dts-dirs))
+>>> -
+>>> -dtstree                := $(srctree)/$(src)
+>>> -dtb-$(CONFIG_OF_ALL_DTBS) := $(patsubst $(dtstree)/%.dts,%.dtb, $(foreach d,$(dts-dirs), $(wildcard $(dtstree)/$(d)/*.dts)))
+>>> -
+>>> -always         := $(dtb-y)
+>>> -subdir-y       := $(dts-dirs)
+>>> +obj-$(BUILTIN_DTB)     := $(addsuffix /, $(subdir-y))
+>>
+>> I wonder if that should be CONFIG_BUILTIN_DTB?
+>>
+>> This is causing failures in linux-next with MIPS
+>> cavium_octeon_defconfig like below, and changing this line to
+>> CONFIG_BUILTIN_DTB seems to fix it.
 >
-> Guillaume can you try the same?
+> Good catch!
+>
+>
+> Rob,
+> Can you fix it to CONFIG_BUILTIN_DTB?
 
-Alright, so here's all the results I got all based on
-next-20171109 and running on tegra124-nyan-big:
+Fixed.
 
-   * plain multi_v7_defconfig, passes:
-     https://lava.collabora.co.uk/scheduler/job/981295
-
-   * CONFIG_MODULES disabled, fails:
-     https://lava.collabora.co.uk/scheduler/job/981342
-
-   * CONFIG_MODULES and CONFIG_DRM_NOUVEAU disabled, also fails:
-     https://lava.collabora.co.uk/scheduler/job/981343
-
-   * CONFIG_MODULES disabled and 371435f78 [0] reverted, also fails:
-     https://lava.collabora.co.uk/scheduler/job/981353
-
-
-What I could try to run next is a bisection with CONFIG_MODULES
-disabled between when the DRM branch got merged (so the first
-crash should be fixed) and next-20171109.
-
-
-Guillaume
-
-[0] "kernel debug: support resetting WARN_ONCE for all architectures"
-https://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git/commit/?id=371435f78e9e26519763411c2cd20975d2293efe
+Rob
