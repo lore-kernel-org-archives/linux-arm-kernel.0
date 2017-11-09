@@ -1,69 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 9 Nov 2017 14:40:32 +0100
-Subject: [PATCH 1/1] add mali r6p2 dt node
-In-Reply-To: <49715d2b-97f5-7e21-7072-8e050d471a9f@micronovasrl.com>
-References: <1510049010-5758-1-git-send-email-giulio.benetti@micronovasrl.com>
- <20171107110539.3wrm6uu6ohh6dnuy@flea>
- <49715d2b-97f5-7e21-7072-8e050d471a9f@micronovasrl.com>
-Message-ID: <20171109134032.rwhhf6pvcr6xrgol@flea.lan>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 9 Nov 2017 13:45:02 +0000
+Subject: next/master boot: 264 boots: 62 failed, 199 passed with 3
+ conflicts (next-20171109)
+In-Reply-To: <5a0446a2.85a8500a.55819.1c58@mx.google.com>
+References: <5a0446a2.85a8500a.55819.1c58@mx.google.com>
+Message-ID: <20171109134502.wyxxcstplybe4ed4@sirena.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 06:55:22PM +0100, Giulio Benetti wrote:
-> Hi,
-> 
-> Il 07/11/2017 12:05, Maxime Ripard ha scritto:
-> > Hi,
-> > 
-> > On Tue, Nov 07, 2017 at 11:03:30AM +0100, Giulio Benetti wrote:
-> > > This patch adds device tree mali node compatible with r6p2 utgard kernel driver
-> > > provided by ARM and patched by maxime ripard on his github.
-> > > 
-> > > It can be easily used in target.dts with:
-> > > 
-> > > &mali {
-> > > 	status = "okay";
-> > > }
-> > > 
-> > > then loading mali.ko in user space.
-> > > 
-> > > Best regards
-> > > Giulio Benetti
-> > > Micronova srl
-> > 
-> > Again, you should have a proper commit log here.
-> 
-> As log could it be:
-> It seems there is not mali node in sun7i-a20.dtsi    << This is "Why"
-> 
-> Add mali node to sun7i-a20.dtsi                << This is "How"
-> 
-> Or can you point me to some example?
-> I've tried to check lot of other patches,
-> but really I can't understand which is the right way.
+On Thu, Nov 09, 2017 at 04:14:26AM -0800, kernelci.org bot wrote:
 
-Not having your signature would be a good start, and describing the
-changes would be great as well. You can comment on which Mali chip it
-is for example, which variant, whether the BSP uses thermal throttling
-or not, and if so why did you leave it out, which frequency it's
-running at, etc.
+Today's -next fails to boot a bcm2836-rpi-2-b on any config in kernelci,
+it was working yesterday:
 
-> Now, to avoid any possible other mistake,
-> do I have to resubmit patch corrected answering to this thread,
-> when you give me the ok?
+>     bcm2835_defconfig:
+>         bcm2836-rpi-2-b:
+>             lab-collabora: new failure (last pass: next-20171107)
 
-Please resend it yes.
+The boot log looks like something went badly wrong with USB:
 
-Maxime
+[    1.643488] dwc2 3f980000.usb: DWC OTG Controller
+[    1.648225] dwc2 3f980000.usb: new USB bus registered, assigned bus number 1
+[    1.655328] dwc2 3f980000.usb: irq 39, io mem 0x3f980000
+[    1.661495] hub 1-0:1.0: USB hub found
+[    1.665301] hub 1-0:1.0: 1 port detected
+[    1.669239] hub 1-0:1.0: config failed, can't get hub status (err 2)
+[    1.676763] hub 1-0:1.0: activate --> -22
+[    1.680806] hub 1-0:1.0: activate --> -22
+[    1.684855] hub 1-0:1.0: activate --> -22
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+and so on until the tester gets bored.  There's nothing obvious changed
+in arch/arm or drivers/usb though.
+
+More info and full log here:
+
+   https://kernelci.org/boot/id/5a04231159b514cb291cdd1a/
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 801 bytes
+Size: 488 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/2432e33d/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/9596ee7b/attachment-0001.sig>
