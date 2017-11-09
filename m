@@ -1,66 +1,36 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 9 Nov 2017 12:08:59 +0000
-Subject: [RFCv2 PATCH 21/36] iommu/arm-smmu-v3: Implement process
- operations
-In-Reply-To: <084b1848-0939-5e73-3890-3aab8dc4bc70@huawei.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-22-jean-philippe.brucker@arm.com>
- <084b1848-0939-5e73-3890-3aab8dc4bc70@huawei.com>
-Message-ID: <812aa54c-1cda-d4a4-640f-4aa2d8eb81fa@arm.com>
+From: jani.nikula@linux.intel.com (Jani Nikula)
+Date: Thu, 09 Nov 2017 14:12:45 +0200
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+In-Reply-To: <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
+References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+ <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+ <20171109093122.GA12318@n2100.armlinux.org.uk> <87inejaiij.fsf@intel.com>
+ <CAEzXK1qHEcB6f_uGPJk9RxSd+tP5rNuiutBN1FAkEv-nU1k5Ug@mail.gmail.com>
+ <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
+Message-ID: <87efp7abwi.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 09 Nov 2017, Lu?s Mendes <luis.p.mendes@gmail.com> wrote:
+> I've just applied the referred individual patch to kernel-4.14-rc5 and
+> the EDID isn't loaded. dw-hdmi gets no firmware at all.
 
-On 09/11/17 03:32, Yisheng Xie wrote:
-> Hi Jean,
-> 
-> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
->> Hook process operations to support PASID and page table sharing with the
->> SMMUv3:
->>
->> +
->> +static void arm_smmu_process_exit(struct iommu_domain *domain,
->> +				  struct iommu_process *process)
->> +{
->> +	struct arm_smmu_master_data *master;
->> +	struct arm_smmu_domain *smmu_domain = to_smmu_domain(domain);
->> +
->> +	if (!domain->process_exit)
->> +		return;
-> 
-> If domain do not set process_exit handler, just return? smmu do not
-> need invalid ATC, clear cd entry, etc.? Maybe you should check when
-> call domain->process_exit?
+Sorry, I didn't mean you could just cherry-pick that one commit and make
+it work. There were a number of preparatory patches before that, and I
+think some cleanups on top.
 
-Indeed, that doesn't make sense. I'll move the check below.
+Please try drm-next to make sure you have it all.
 
-Thanks,
-Jean
+We didn't intend for the commits to be backported, instead we very much
+wanted them to get a gradually increasing amount of exposure first to
+make sure we don't break stuff.
 
->> +
->> +	spin_lock(&smmu_domain->devices_lock);
->> +	list_for_each_entry(master, &smmu_domain->devices, list) {
->> +		if (!master->processes)
->> +			continue;
->> +
->> +		master->processes--;
-> Add
-> 		if (domain->process_exit)
-> here?
->> +		domain->process_exit(domain, master->dev, process->pasid,
->> +				     domain->process_exit_token);
->> +
->> +		/* TODO: inval ATC */
->> +	}
->> +	spin_unlock(&smmu_domain->devices_lock);
->> +
->> +	arm_smmu_write_ctx_desc(smmu_domain, process->pasid, NULL);
->> +
->> +	/* TODO: Invalidate all mappings if not DVM */
->> +}
->> +
-> Thanks
-> Yisheng Xie
-> 
-> 
+And as I said elsewhere in the thread, Russell's patch may be relevant
+for current Linus' master and stable. We just need to reconciliate how
+the two things should work together in drm-next and v4.15 and on.
+
+BR,
+Jani.
+
+-- 
+Jani Nikula, Intel Open Source Technology Center
