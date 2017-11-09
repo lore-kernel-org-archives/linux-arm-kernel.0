@@ -1,71 +1,69 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 9 Nov 2017 14:17:00 +0100
-Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
- untried/unknown (next-20171106)
-In-Reply-To: <1eb4e14f-4728-d4f7-95a6-0a6308760d7a@collabora.com>
-References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
- <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
- <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
- <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
- <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
- <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
- <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
- <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
- <7cdfa633-d9c6-881a-ae5f-f94f7e6413ee@nvidia.com>
- <5f064e65-ee29-179b-8102-984d12d24d9d@collabora.com>
- <15792a16-6b57-a6ad-92dc-0ffaba0354db@nvidia.com>
- <1eb4e14f-4728-d4f7-95a6-0a6308760d7a@collabora.com>
-Message-ID: <CAK8P3a3iiSgutnHFU7PoLGQyObgyAreQOOtrDhjijoMU5wZ1Eg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 9 Nov 2017 14:40:32 +0100
+Subject: [PATCH 1/1] add mali r6p2 dt node
+In-Reply-To: <49715d2b-97f5-7e21-7072-8e050d471a9f@micronovasrl.com>
+References: <1510049010-5758-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20171107110539.3wrm6uu6ohh6dnuy@flea>
+ <49715d2b-97f5-7e21-7072-8e050d471a9f@micronovasrl.com>
+Message-ID: <20171109134032.rwhhf6pvcr6xrgol@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 9, 2017 at 1:51 PM, Guillaume Tucker
-<guillaume.tucker@collabora.com> wrote:
-> On 09/11/17 11:29, Jon Hunter wrote:
->>
->>
->> On 09/11/17 10:43, Guillaume Tucker wrote:
->>
->> ...
->>
->>> I actually built these kernel revisions with module support
->>> disabled to speed up the builds, and no modules are being
->>> downloaded in the LAVA job.
->>>
->>> If you have a public URL with your known working kernel zImage
->>> and dtb, let me know so I could re-run the same test LAVA boot
->>> test to see if I get the same results as you (i.e. no hang).
->>
->>
->> I don't have a public URL for the zImage but I can definitely email it
->> to you. By the way, when booting I am setting 'init=/bin/bash' so no
->> start-up scripts are running.
->
->
-> Thanks, I tried your binary and it booted fine.  I built
-> next-20171109 again with and without loadable module support
-> enabled and it fails with it disabled but passes with it
-> enabled (even without actually loading any modules):
->
->   * with CONFIG_MODULES disabled (fails):
->     https://lava.collabora.co.uk/scheduler/job/981215
->
->   * with plain multi_v7_defconfig and no modules loaded (passes):
->     https://lava.collabora.co.uk/scheduler/job/981217
->
->
-> So I guess this means disabling loadable modules support has some
-> interesting side-effects that cause the kernel to crash.  I think
-> the kci builds all leave modules enabled with multi_v7_defconfig,
-> so the failing boots must be due to something else.  Taking
-> another look at the failing kci boots now...
+On Tue, Nov 07, 2017 at 06:55:22PM +0100, Giulio Benetti wrote:
+> Hi,
+> 
+> Il 07/11/2017 12:05, Maxime Ripard ha scritto:
+> > Hi,
+> > 
+> > On Tue, Nov 07, 2017 at 11:03:30AM +0100, Giulio Benetti wrote:
+> > > This patch adds device tree mali node compatible with r6p2 utgard kernel driver
+> > > provided by ARM and patched by maxime ripard on his github.
+> > > 
+> > > It can be easily used in target.dts with:
+> > > 
+> > > &mali {
+> > > 	status = "okay";
+> > > }
+> > > 
+> > > then loading mali.ko in user space.
+> > > 
+> > > Best regards
+> > > Giulio Benetti
+> > > Micronova srl
+> > 
+> > Again, you should have a proper commit log here.
+> 
+> As log could it be:
+> It seems there is not mali node in sun7i-a20.dtsi    << This is "Why"
+> 
+> Add mali node to sun7i-a20.dtsi                << This is "How"
+> 
+> Or can you point me to some example?
+> I've tried to check lot of other patches,
+> but really I can't understand which is the right way.
 
-The one thing that comes to mind that happened recently with
-modules is
+Not having your signature would be a good start, and describing the
+changes would be great as well. You can comment on which Mali chip it
+is for example, which variant, whether the BSP uses thermal throttling
+or not, and if so why did you leave it out, which frequency it's
+running at, etc.
 
-371435f78e9e ("kernel debug: support resetting WARN_ONCE for all architectures")
+> Now, to avoid any possible other mistake,
+> do I have to resubmit patch corrected answering to this thread,
+> when you give me the ok?
 
-Can you try reverting this? It's probably something else, but I'd like
-to rule it out.
+Please resend it yes.
 
-      Arnd
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171109/2432e33d/attachment.sig>
