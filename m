@@ -1,30 +1,75 @@
-From: P.Bruenn@beckhoff.com (=?iso-8859-1?Q?Patrick_Br=FCnn?=)
-Date: Thu, 9 Nov 2017 09:59:02 +0000
-Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <20171109030327.anzo47xayxckn47r@piout.net>
-References: <D24E577EA1E37B4788A3BFBC418F14A70760C04A@wetsrvex01.loepfe.com>
- <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
- <20171109030327.anzo47xayxckn47r@piout.net>
-Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB52290E@NT-Mail07.beckhoff.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 9 Nov 2017 10:05:14 +0000
+Subject: [PATCH v10 6/9] LPC: Support the LPC host on Hip06/Hip07 with
+ DT bindings
+In-Reply-To: <20171109004604.vkrpyrxbogx7r4td@xps13.dannf>
+References: <1509120687-7352-1-git-send-email-gabriele.paoloni@huawei.com>
+ <1509120687-7352-7-git-send-email-gabriele.paoloni@huawei.com>
+ <20171109004604.vkrpyrxbogx7r4td@xps13.dannf>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E40CC7ED0@FRAEML521-MBX.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
->From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
->Sent: Donnerstag, 9. November 2017 04:03
->
->hwclock times out because the alarm is not working properly. Can you
->check whether rtctest is working?
->
-You mean "tools/testing/selftests/timers/rtctest", right?
+Hi Dann
 
-I just run it and it's stuck at "Counting 5 update (1/sec) interrupts from reading /dev/rtc0:"
+[...]
 
-Kernel log shows a new message for each try I restart rtctest.
-[ 1032.349562] imxdi_rtc 53fa4000.srtc: Write-wait timeout val = 0x5a042418 reg = 0x00000008"
+> > +
+> > +#define START_WORK		0x01
+> 
+> Any reason not to put this in the LPC_ namespace as well?
 
+No, not really. We'll make it consistent in the next patchset 
 
-Regards, Patrick
+> 
+> > +/* The minimal nanosecond interval for each query on LPC cycle
+> status. */
 
-Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
-Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
+[...]
+
+> > + * hisilpc_target_in - trigger a series of lpc cycles to read
+> required data
+> > + *		       from target peripheral.
+> > + * @pdev: pointer to hisi lpc device
+> 
+> It's now lpcdev
+> 
+
+Thanks, we'll change it.
+
+> > + * @para: some parameters used to control the lpc I/O operations
+
+[...]
+
+> > + * @pio: the target I/O port address.
+> 
+> @outval & @pio are in the opposite order of the actual function
+
+Thanks, we'll change it.
+
+> 
+
+[...]
+
+> > +		lpcdev->io_host->devpara = NULL;
+> > +		dev_err(dev, "OF: scan hisilpc children got failed(%d)\n",
+> > +			ret);
+> 
+> nit: Maybe "OF: scanning hisilpc children failed(%d)" ?
+> 
+
+Yes, thanks we'll change it.
+
+> > +		return ret;
+> > +	}
+> > +
+> > +	dev_info(dev, "hslpc end probing. range[%pa - sz:%pa]\n",
+> > +		&lpcdev->io_host->io_start,
+> > +		&lpcdev->io_host->size);
+> > +
+> > +	return ret;
+> > +}
+> 
+> 
+>  -dann
