@@ -1,93 +1,98 @@
-From: jani.nikula@linux.intel.com (Jani Nikula)
-Date: Thu, 09 Nov 2017 10:27:02 +0200
-Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
-In-Reply-To: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
-References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
-Message-ID: <87tvy3amcp.fsf@intel.com>
+From: rogerq@ti.com (Roger Quadros)
+Date: Thu, 9 Nov 2017 10:28:03 +0200
+Subject: [PATCH] ARM: dts: add phy-reset property for rk3066a-rayeager emac
+In-Reply-To: <464f7b9f-1c07-286e-1b7f-bdef0332b4c9@rock-chips.com>
+References: <1510022959-19440-1-git-send-email-zyw@rock-chips.com>
+ <e6f2393e-cb3b-9006-d0f5-6b30fd2a5192@mentor.com>
+ <e08d8ea2-40c5-a5b3-e570-44c90388fcdd@rock-chips.com>
+ <ac15ef59-3b5e-1752-09db-0a773615f44c@gmail.com>
+ <464f7b9f-1c07-286e-1b7f-bdef0332b4c9@rock-chips.com>
+Message-ID: <a6b2354c-324f-3d22-39d4-8cdc2e8ba97a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 07 Nov 2017, Russell King <rmk+kernel@armlinux.org.uk> wrote:
-> Parsing the EDID for HDMI and audio information in the get_modes()
-> callback is incorrect - this only parses the EDID read from the
-> connector, not any override or firmware provided EDID.
->
-> The correct place to parse the EDID for these parameters is the
-> fill_modes() callback, after we've called the helper.  Move the parsing
-> there.  This caused problems for Lu?s Mendes.
->
-> Cc: <stable@vger.kernel.org>
-> Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-> Tested-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+On 08/11/17 11:49, Chris Zhong wrote:
+> Hi Florian Fainelli
+> 
+> 
+> On 2017?11?08? 02:26, Florian Fainelli wrote:
+>> On 11/07/2017 01:51 AM, Chris Zhong wrote:
+>>>
+>>> On 2017?11?07? 15:54, Vladimir Zapolskiy wrote:
+>>>> Hello Chris,
+>>>>
+>>>> On 11/07/2017 04:49 AM, Chris Zhong wrote:
+>>>>> The ethernet phy of rk3066a-rayeager has a reset pin, it controlled by
+>>>>> GPIO1_D6, this pin should be pull down then pull up to reset the phy.
+>>>>> Add a phy-reset property in emac, make the phy can be reset when emac
+>>>>> power on.
+>>>> for PHY reset there are properties 'reset-gpios' and 'reset-delay-us',
+>>>> please reference to Documentation/devicetree/bindings/net/mdio.txt
+>>>>
+>>>> Can you try to reuse them instead of adding new custom properties?
+>>> This phy-reset is from Documentation/devicetree/bindings/net/arc_emac.txt.
+>>> And copy from arch/arm/boot/dts/rk3036-kylin.dts.
+>>> Can we just use these properties, they are not new.
+>> Because it already exists does not mean it's correct, in fact, it is not
+>> at all because it places the reset property for a PHY into the MAC node,
+>> which is just not what this is, what we should be using instead is the
+>> following patch series:
+>>
+>> http://patchwork.ozlabs.org/project/netdev/list/?series=9267
+>>
+>> http://patchwork.ozlabs.org/patch/828499/
+>> http://patchwork.ozlabs.org/patch/828505/
+>> http://patchwork.ozlabs.org/patch/828501/
+>> http://patchwork.ozlabs.org/patch/828502/
+> Okay, this series works for me, and I will push a new version patch following it,
+> with a reset-gpios property under phy node.
+> And hope this series can be applied soon.
+> 
 
-Is this still needed after 53fd40a90f3c ("drm: handle override and
-firmware EDID at drm_do_get_edid() level") that is headed for v4.15? I'm
-thinking this might be applicable only for current Linus master and
-stable.
+If 'reset-gpios' and 'reset-delay-us' as per [1] works for you
+then why not use that?
 
-BR,
-Jani.
+[1] Documentation/devicetree/bindings/net/mdio.txt
 
-
-> ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 28 ++++++++++++++++++++++++----
->  1 file changed, 24 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index 9fe407f49986..2516a1c18a10 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -1905,10 +1905,7 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
->  		dev_dbg(hdmi->dev, "got edid: width[%d] x height[%d]\n",
->  			edid->width_cm, edid->height_cm);
->  
-> -		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
-> -		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
->  		drm_mode_connector_update_edid_property(connector, edid);
-> -		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
->  		ret = drm_add_edid_modes(connector, edid);
->  		/* Store the ELD */
->  		drm_edid_to_eld(connector, edid);
-> @@ -1920,6 +1917,29 @@ static int dw_hdmi_connector_get_modes(struct drm_connector *connector)
->  	return ret;
->  }
->  
-> +static int dw_hdmi_connector_fill_modes(struct drm_connector *connector,
-> +					uint32_t maxX, uint32_t maxY)
-> +{
-> +	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-> +					    connector);
-> +	int ret;
-> +
-> +	ret = drm_helper_probe_single_connector_modes(connector, maxX, maxY);
-> +
-> +	if (connector->edid_blob_ptr) {
-> +		struct edid *edid = (void *)connector->edid_blob_ptr->data;
-> +
-> +		hdmi->sink_is_hdmi = drm_detect_hdmi_monitor(edid);
-> +		hdmi->sink_has_audio = drm_detect_monitor_audio(edid);
-> +		cec_notifier_set_phys_addr_from_edid(hdmi->cec_notifier, edid);
-> +	} else {
-> +		hdmi->sink_is_hdmi = false;
-> +		hdmi->sink_has_audio = false;
-> +	}
-> +
-> +	return ret;
-> +}
-> +
->  static void dw_hdmi_connector_force(struct drm_connector *connector)
->  {
->  	struct dw_hdmi *hdmi = container_of(connector, struct dw_hdmi,
-> @@ -1933,7 +1953,7 @@ static void dw_hdmi_connector_force(struct drm_connector *connector)
->  }
->  
->  static const struct drm_connector_funcs dw_hdmi_connector_funcs = {
-> -	.fill_modes = drm_helper_probe_single_connector_modes,
-> +	.fill_modes = dw_hdmi_connector_fill_modes,
->  	.detect = dw_hdmi_connector_detect,
->  	.destroy = drm_connector_cleanup,
->  	.force = dw_hdmi_connector_force,
+> Thanks
+> Chris Zhong
+> 
+> 
+>>>> As a side question, which is mainly addressed to Sergei and Roger,
+>>>> I don't quite understand why PHY properties were initially added to
+>>>> MAC/MDIO bus device tree nodes, in my opinion they must be moved under
+>>>> PHY device tree nodes.
+>>>>
+>>>> --?
+>>>> With best wishes,
+>>>> Vladimir
+>>>>
+>>>>> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>>>>> ---
+>>>>>
+>>>>> ?? arch/arm/boot/dts/rk3066a-rayeager.dts | 2 ++
+>>>>> ?? 1 file changed, 2 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>>> b/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>>> index 570157f..6064a0a 100644
+>>>>> --- a/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>>> +++ b/arch/arm/boot/dts/rk3066a-rayeager.dts
+>>>>> @@ -173,6 +173,8 @@
+>>>>> ?????? pinctrl-0 = <&emac_xfer>, <&emac_mdio>, <&rmii_rst>;
+>>>>> ?????? phy = <&phy0>;
+>>>>> ?????? phy-supply = <&vcc_rmii>;
+>>>>> +??? phy-reset-gpios = <&gpio1 RK_PD6 GPIO_ACTIVE_LOW>; /* PHY_RST */
+>>>>> +??? phy-reset-duration = <10>; /* millisecond */
+>>>>> ?????? status = "okay";
+>>>>> ???????? phy0: ethernet-phy at 0 {
+>>>>>
+>>>>
+>>
+> 
 
 -- 
-Jani Nikula, Intel Open Source Technology Center
+cheers,
+-roger
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
