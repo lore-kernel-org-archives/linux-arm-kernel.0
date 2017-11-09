@@ -1,68 +1,80 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 9 Nov 2017 13:36:48 +0530
-Subject: [PATCH v2 2/7] arm: omap: Move dmtimer.h out of plat-omap
-In-Reply-To: <6ca9c73a-95a1-2466-151e-cdba64c3c478@ti.com>
-References: <1510144108-29563-1-git-send-email-j-keerthy@ti.com>
- <1510144108-29563-3-git-send-email-j-keerthy@ti.com>
- <20171108164221.GV28152@atomide.com>
- <6ca9c73a-95a1-2466-151e-cdba64c3c478@ti.com>
-Message-ID: <008c2d8b-6f76-882d-fc70-8fd4204c49d5@ti.com>
+From: xuyiping@hisilicon.com (YiPing Xu)
+Date: Thu, 9 Nov 2017 16:17:15 +0800
+Subject: [PATCH] arm64: dts: hi3660: improve pmu description
+In-Reply-To: <CAL_JsqKFMSvRCB48X4eiPpi5nAL4WGGVGh8GRJpp_JMNdALjbw@mail.gmail.com>
+References: <1510131578-84235-1-git-send-email-xuyiping@hisilicon.com>
+ <CAL_JsqKFMSvRCB48X4eiPpi5nAL4WGGVGh8GRJpp_JMNdALjbw@mail.gmail.com>
+Message-ID: <6b698589-3847-020e-563d-b7807ddb50d4@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On Thursday 09 November 2017 09:55 AM, Keerthy wrote:
-> 
-> 
-> On Wednesday 08 November 2017 10:12 PM, Tony Lindgren wrote:
->> * Keerthy <j-keerthy@ti.com> [171108 12:31]:
->>> The header file is currently under plat-omap directory
->>> under arch/omap. Move this out to an accessible place.
->>>
->>> No Code changes done to the header file.
+On 2017/11/8 23:55, Rob Herring wrote:
+> On Wed, Nov 8, 2017 at 2:59 AM, Xu YiPing <xuyiping@hisilicon.com> wrote:
+>> cortex a73 pmu is supported, use it instead of armpmu-v3
+>
+> The subject is misleading and you need a better commit message. Why is
+> this change needed? You are going from 1 to 2 devices.
+>
+> Missing your S-o-B, too.
+>
+>> ---
+>>  arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 22 +++++++++++++---------
+>>  1 file changed, 13 insertions(+), 9 deletions(-)
 >>
->> Some of the dmtimer functions are in this header to optimize the
->> size of the system timer code. Can you please check if some of them
->> can be left out of dmtimer.h and be made private to mach-omap1/timer.c
->> and mach-omap2/timer.c?
-> 
-> Okay. I will try to clean that as well.
-
-Tony,
-
-Only function that i could push out of dmtimer.h was
-__omap_dm_timer_override_errata
-
-which is being currently called by mach-omap2/timer.c alone.
-
-Rest all are used both my dmtimer.c as well as mach-omap2/timer.c.
-Here is the list:
-
-__omap_dm_timer_read
-__omap_dm_timer_write
-__omap_dm_timer_init_regs
-__omap_dm_timer_enable_posted
-__omap_dm_timer_stop
-__omap_dm_timer_load_start
-__omap_dm_timer_int_enable
-__omap_dm_timer_read_counter
-__omap_dm_timer_write_status
-
-Any preferences on moving them to dmtimer.c or leaving them in header file?
-
-Regards,
-Keerthy
-
-> 
+>> diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> index 13ae69f..f638897 100644
+>> --- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> +++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+>> @@ -203,21 +203,25 @@
+>>                                          IRQ_TYPE_LEVEL_HIGH)>;
+>>         };
 >>
->> Again, we don't want driver code to start mis-using these as that's
->> immediately going to be big mess out of control.
-> 
-> Sure.
-> 
+>> -       pmu {
+>> -               compatible = "arm,armv8-pmuv3";
+>> +       pmu_a53 {
+>
+> Don't use '_' in node names. Building with W=2 will tell you this.
+
+OK, i'll modify it
+>
+>> +               compatible = "arm,cortex-a53-pmu";
+>>                 interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>,
+>>                              <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>,
+>>                              <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
+>> -                            <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
+>> -                            <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
+>> -                            <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+>> -                            <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+>> -                            <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+>> +                            <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>;
+>>                 interrupt-affinity = <&cpu0>,
+>>                                      <&cpu1>,
+>>                                      <&cpu2>,
+>> -                                    <&cpu3>,
+>> -                                    <&cpu4>,
+>> +                                    <&cpu3>;
+>> +       };
+>> +
+>> +       pmu_a73 {
+>> +               compatible = "arm,cortex-a73-pmu";
+>> +               interrupts = <GIC_SPI 2 IRQ_TYPE_LEVEL_HIGH>,
+>> +                            <GIC_SPI 3 IRQ_TYPE_LEVEL_HIGH>,
+>> +                            <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
+>> +                            <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>;
+>> +               interrupt-affinity = <&cpu4>,
+>>                                      <&cpu5>,
+>>                                      <&cpu6>,
+>>                                      <&cpu7>;
+>> --
+>> 2.7.4
 >>
->> Regards,
 >>
->> Tony
->>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>
+> .
+>
