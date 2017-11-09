@@ -1,7 +1,7 @@
 From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Thu, 9 Nov 2017 13:21:43 +1100
+Date: Thu, 9 Nov 2017 13:26:32 +1100
 Subject: linux-next: manual merge of the devicetree tree with the arm-soc tree
-Message-ID: <20171109132143.3e59879d@canb.auug.org.au>
+Message-ID: <20171109132632.480f1050@canb.auug.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,11 +9,11 @@ Hi Rob,
 
 Today's linux-next merge of the devicetree tree got a conflict in:
 
-  arch/arm64/boot/dts/allwinner/Makefile
+  arch/arm64/boot/dts/amlogic/Makefile
 
 between commit:
 
-  d7341305863b ("arm64: allwinner: h5: add NanoPi NEO Plus2 DT support")
+  593d311d9f17 ("ARM64: dts: meson-gxm: Add Vega S96 board")
 
 from the arm-soc tree and commit:
 
@@ -32,15 +32,15 @@ complex conflicts.
 Cheers,
 Stephen Rothwell
 
-diff --cc arch/arm64/boot/dts/allwinner/Makefile
-index 16fa7b9839e6,4dab590d24a5..000000000000
---- a/arch/arm64/boot/dts/allwinner/Makefile
-+++ b/arch/arm64/boot/dts/allwinner/Makefile
-@@@ -9,8 -8,3 +9,4 @@@ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-o
-  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-prime.dtb
-  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-orangepi-zero-plus2.dtb
-  dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo2.dtb
- +dtb-$(CONFIG_ARCH_SUNXI) += sun50i-h5-nanopi-neo-plus2.dtb
+diff --cc arch/arm64/boot/dts/amlogic/Makefile
+index b503e9b00cd3,4eb8f829472e..000000000000
+--- a/arch/arm64/boot/dts/amlogic/Makefile
++++ b/arch/arm64/boot/dts/amlogic/Makefile
+@@@ -22,8 -19,3 +22,4 @@@ dtb-$(CONFIG_ARCH_MESON) += meson-gxm-n
+  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q200.dtb
+  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-q201.dtb
+  dtb-$(CONFIG_ARCH_MESON) += meson-gxm-rbox-pro.dtb
+ +dtb-$(CONFIG_ARCH_MESON) += meson-gxm-vega-s96.dtb
 - 
 - always		:= $(dtb-y)
 - subdir-y	:= $(dts-dirs)
