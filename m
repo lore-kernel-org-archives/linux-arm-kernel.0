@@ -1,57 +1,63 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu,  9 Nov 2017 09:29:50 +0100
-Subject: [PATCH v2 2/2] ARM: sun8i: bananapi-m3: Enable dwmac-sun8i
-In-Reply-To: <20171109082950.21124-1-clabbe.montjoie@gmail.com>
-References: <20171109082950.21124-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171109082950.21124-3-clabbe.montjoie@gmail.com>
+From: simon@lineageos.org (Simon Shields)
+Date: Thu, 9 Nov 2017 19:37:03 +1100
+Subject: [PATCH v3] arm/dts/trats2: add bcm4334 device node
+Message-ID: <20171109083657.GA27597@lineageos.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dwmac-sun8i hardware is present on the bananapi m3
-It uses an external PHY rtl8211e via RGMII.
+This patch allows the bcm4334 to power on and enables
+wifi functionality on trats2.
 
-This patch create the needed emac and phy nodes.
-
-Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Signed-off-by: Simon Shields <simon@lineageos.org>
 ---
- arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 18 ++++++++++++++++++
- 1 file changed, 18 insertions(+)
+ arch/arm/boot/dts/exynos4412-trats2.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-index c606af3dbfed..45bdd5c17829 100644
---- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-@@ -52,6 +52,7 @@
- 	compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
+diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+index 2da6ced64ee0..f34fdc9c57ad 100644
+--- a/arch/arm/boot/dts/exynos4412-trats2.dts
++++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+@@ -240,6 +240,13 @@
  
- 	aliases {
-+		ethernet0 = &emac;
- 		serial0 = &uart0;
  	};
  
-@@ -88,6 +89,23 @@
- 	/* TODO GL830 USB-to-SATA bridge downstream w/ GPIO power controls */
++	wlan_pwrseq: sdhci3-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpj0 0 GPIO_ACTIVE_LOW>;
++		clocks = <&max77686 MAX77686_CLK_PMIC>;
++		clock-names = "ext_clock";
++	};
++
+ 	sound {
+ 		compatible = "samsung,trats2-audio";
+ 		samsung,i2s-controller = <&i2s0>;
+@@ -1238,6 +1245,27 @@
+ 	status = "okay";
  };
  
-+&emac {
++&sdhci_3 {
++	#address-cells = <1>;
++	#size-cells = <0>;
++	non-removable;
++	bus-width = <4>;
++
++	mmc-pwrseq = <&wlan_pwrseq>;
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	allwinner,rx-delay-ps = <700>;
-+	allwinner,tx-delay-ps = <700>;
-+
++	pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
++	vmmc-supply = <&ldo21_reg>;
 +	status = "okay";
-+};
 +
-+&mdio {
-+	ext_rgmii_phy: ethernet-phy at 1 {
++	brcmf: brcmf at 1 {
 +		reg = <1>;
++		compatible = "brcm,bcm4329-fmac";
++		interrupt-parent = <&gpx2>;
++		interrupts = <5 IRQ_TYPE_NONE>;
++		interrupt-names = "host-wake";
 +	};
 +};
 +
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
+ &serial_0 {
+ 	status = "okay";
+ };
 -- 
-2.13.6
+2.15.0
