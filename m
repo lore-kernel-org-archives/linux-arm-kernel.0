@@ -1,150 +1,177 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sat, 11 Nov 2017 03:54:06 +0800
-Subject: [PATCH v8 3/7] acpi: apei: Add SEI notification type support for ARMv8
+Date: Sat, 11 Nov 2017 03:54:09 +0800
+Subject: [PATCH v8 6/7] arm64: kvm: Set Virtual SError Exception Syndrome for
+ guest
 In-Reply-To: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
 References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1510343650-23659-4-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1510343650-23659-7-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.2 requires implementation of the RAS extension, in
-this extension it adds SEI(SError Interrupt) notification
-type, this patch adds new GHES error source SEI handling
-functions. This error source parsing and handling method
-is similar with the SEA.
+RAS Extension add a VSESR_EL2 register which can provides
+the syndrome value reported to software on taking a virtual
+SError interrupt exception. This patch supports to specify
+this Syndrome.
 
-Expose API ghes_notify_sei() to external users. External
-modules can call this exposed API to parse APEI table and
-handle the SEI notification.
+In the RAS Extensions we can not set all-zero syndrome value
+for SError, which means 'RAS error: Uncategorized' instead of
+'no valid ISS'. So set it to IMPLEMENTATION DEFINED syndrome
+by default.
+
+We also need to support userspace to specify a valid syndrome
+value, Because in some case, the recovery is driven by userspace.
+This patch can support that userspace can specify it.
+
+In the guest/host world switch, restore this value to VSESR_EL2
+only when HCR_EL2.VSE is set. This value no need to be saved
+because it is stale vale when guest exit.
 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
+Signed-off-by: Quanming Wu <wuquanming@huawei.com>
+[Set an impdef ESR for Virtual-SError]
+Signed-off-by: James Morse <james.morse@arm.com>
 ---
- drivers/acpi/apei/Kconfig | 15 ++++++++++++++
- drivers/acpi/apei/ghes.c  | 53 +++++++++++++++++++++++++++++++++++++++++++++++
- include/acpi/ghes.h       |  1 +
- 3 files changed, 69 insertions(+)
+ arch/arm64/include/asm/kvm_emulate.h | 10 ++++++++++
+ arch/arm64/include/asm/kvm_host.h    |  1 +
+ arch/arm64/include/asm/sysreg.h      |  3 +++
+ arch/arm64/kvm/guest.c               | 11 ++++++++++-
+ arch/arm64/kvm/hyp/switch.c          | 16 ++++++++++++++++
+ arch/arm64/kvm/inject_fault.c        | 13 ++++++++++++-
+ 6 files changed, 52 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/acpi/apei/Kconfig b/drivers/acpi/apei/Kconfig
-index 52ae543..ff4afc3 100644
---- a/drivers/acpi/apei/Kconfig
-+++ b/drivers/acpi/apei/Kconfig
-@@ -55,6 +55,21 @@ config ACPI_APEI_SEA
- 	  option allows the OS to look for such hardware error record, and
- 	  take appropriate action.
+diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+index 555b28b..73c84d0 100644
+--- a/arch/arm64/include/asm/kvm_emulate.h
++++ b/arch/arm64/include/asm/kvm_emulate.h
+@@ -155,6 +155,16 @@ static inline u32 kvm_vcpu_get_hsr(const struct kvm_vcpu *vcpu)
+ 	return vcpu->arch.fault.esr_el2;
+ }
  
-+config ACPI_APEI_SEI
-+	bool "APEI SError(System Error) Interrupt logging/recovering support"
-+	depends on ARM64 && ACPI_APEI_GHES
-+	default y
-+	help
-+	  This option should be enabled if the system supports
-+	  firmware first handling of SEI (SError interrupt).
++static inline u32 kvm_vcpu_get_vsesr(const struct kvm_vcpu *vcpu)
++{
++	return vcpu->arch.fault.vsesr_el2;
++}
 +
-+	  SEI happens with asynchronous external abort for errors on device
-+	  memory reads on ARMv8 systems. If a system supports firmware first
-+	  handling of SEI, the platform analyzes and handles hardware error
-+	  notifications from SEI, and it may then form a hardware error record for
-+	  the OS to parse and handle. This option allows the OS to look for
-+	  such hardware error record, and take appropriate action.
++static inline void kvm_vcpu_set_vsesr(struct kvm_vcpu *vcpu, unsigned long val)
++{
++	vcpu->arch.fault.vsesr_el2 = val;
++}
 +
- config ACPI_APEI_MEMORY_FAILURE
- 	bool "APEI memory error recovering support"
- 	depends on ACPI_APEI && MEMORY_FAILURE
-diff --git a/drivers/acpi/apei/ghes.c b/drivers/acpi/apei/ghes.c
-index 6a3f824..67cd3a7 100644
---- a/drivers/acpi/apei/ghes.c
-+++ b/drivers/acpi/apei/ghes.c
-@@ -855,6 +855,46 @@ static inline void ghes_sea_add(struct ghes *ghes) { }
- static inline void ghes_sea_remove(struct ghes *ghes) { }
- #endif /* CONFIG_ACPI_APEI_SEA */
+ static inline int kvm_vcpu_get_condition(const struct kvm_vcpu *vcpu)
+ {
+ 	u32 esr = kvm_vcpu_get_hsr(vcpu);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 769cc58..53d1d81 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -88,6 +88,7 @@ struct kvm_vcpu_fault_info {
+ 	u32 esr_el2;		/* Hyp Syndrom Register */
+ 	u64 far_el2;		/* Hyp Fault Address Register */
+ 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
++	u32 vsesr_el2;          /* Virtual SError Exception Syndrome Register */
+ };
  
-+#ifdef CONFIG_ACPI_APEI_SEI
-+static LIST_HEAD(ghes_sei);
-+
-+/*
-+ * Return 0 only if one of the SEI error sources successfully reported an error
-+ * record sent from the firmware.
-+ */
-+int ghes_notify_sei(void)
-+{
-+	struct ghes *ghes;
-+	int ret = -ENOENT;
-+
-+	rcu_read_lock();
-+	list_for_each_entry_rcu(ghes, &ghes_sei, list) {
-+		if (!ghes_proc(ghes))
-+			ret = 0;
-+	}
-+	rcu_read_unlock();
-+	return ret;
-+}
-+
-+static void ghes_sei_add(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_add_rcu(&ghes->list, &ghes_sei);
-+	mutex_unlock(&ghes_list_mutex);
-+}
-+
-+static void ghes_sei_remove(struct ghes *ghes)
-+{
-+	mutex_lock(&ghes_list_mutex);
-+	list_del_rcu(&ghes->list);
-+	mutex_unlock(&ghes_list_mutex);
-+	synchronize_rcu();
-+}
-+#else /* CONFIG_ACPI_APEI_SEI */
-+static inline void ghes_sei_add(struct ghes *ghes) { }
-+static inline void ghes_sei_remove(struct ghes *ghes) { }
-+#endif /* CONFIG_ACPI_APEI_SEI */
-+
- #ifdef CONFIG_HAVE_ACPI_APEI_NMI
  /*
-  * printk is not safe in NMI context.  So in NMI handler, we allocate
-@@ -1086,6 +1126,13 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 			goto err;
- 		}
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		if (!IS_ENABLED(CONFIG_ACPI_APEI_SEI)) {
-+			pr_warn(GHES_PFX "Generic hardware error source: %d notified via SEI is not supported!\n",
-+				generic->header.source_id);
-+		goto err;
-+	}
-+	break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		if (!IS_ENABLED(CONFIG_HAVE_ACPI_APEI_NMI)) {
- 			pr_warn(GHES_PFX "Generic hardware error source: %d notified via NMI interrupt is not supported!\n",
-@@ -1158,6 +1205,9 @@ static int ghes_probe(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_add(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_add(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_add(ghes);
- 		break;
-@@ -1211,6 +1261,9 @@ static int ghes_remove(struct platform_device *ghes_dev)
- 	case ACPI_HEST_NOTIFY_SEA:
- 		ghes_sea_remove(ghes);
- 		break;
-+	case ACPI_HEST_NOTIFY_SEI:
-+		ghes_sei_remove(ghes);
-+		break;
- 	case ACPI_HEST_NOTIFY_NMI:
- 		ghes_nmi_remove(ghes);
- 		break;
-diff --git a/include/acpi/ghes.h b/include/acpi/ghes.h
-index 8feb0c8..9ba59e2 100644
---- a/include/acpi/ghes.h
-+++ b/include/acpi/ghes.h
-@@ -120,5 +120,6 @@ static inline void *acpi_hest_get_next(struct acpi_hest_generic_data *gdata)
- 	     section = acpi_hest_get_next(section))
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index 47b967d..3b035cc 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -86,6 +86,9 @@
+ #define REG_PSTATE_PAN_IMM		sys_reg(0, 0, 4, 0, 4)
+ #define REG_PSTATE_UAO_IMM		sys_reg(0, 0, 4, 0, 3)
  
- int ghes_notify_sea(void);
-+int ghes_notify_sei(void);
++/* virtual SError exception syndrome register */
++#define REG_VSESR_EL2                  sys_reg(3, 4, 5, 2, 3)
++
+ #define SET_PSTATE_PAN(x) __emit_inst(0xd5000000 | REG_PSTATE_PAN_IMM |	\
+ 				      (!!x)<<8 | 0x1f)
+ #define SET_PSTATE_UAO(x) __emit_inst(0xd5000000 | REG_PSTATE_UAO_IMM |	\
+diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
+index 738ae90..ffad42b 100644
+--- a/arch/arm64/kvm/guest.c
++++ b/arch/arm64/kvm/guest.c
+@@ -279,7 +279,16 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
  
- #endif /* GHES_H */
+ int kvm_arm_set_sei_esr(struct kvm_vcpu *vcpu, u32 *syndrome)
+ {
+-	return -EINVAL;
++	u64 reg = *syndrome;
++
++	/* inject virtual system Error or asynchronous abort */
++	kvm_inject_vabt(vcpu);
++
++	if (reg)
++		/* set vsesr_el2[24:0] with value that user space specified */
++		kvm_vcpu_set_vsesr(vcpu, reg & ESR_ELx_ISS_MASK);
++
++	return 0;
+ }
+ 
+ int __attribute_const__ kvm_target_cpu(void)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index c6f17c7..06a71d2 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -67,6 +67,14 @@ static hyp_alternate_select(__activate_traps_arch,
+ 			    __activate_traps_nvhe, __activate_traps_vhe,
+ 			    ARM64_HAS_VIRT_HOST_EXTN);
+ 
++static void __hyp_text __sysreg_set_vsesr(struct kvm_vcpu *vcpu, u64 value)
++{
++	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN) &&
++			       (value & HCR_VSE))
++		write_sysreg_s(kvm_vcpu_get_vsesr(vcpu), REG_VSESR_EL2);
++}
++
++
+ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+@@ -86,6 +94,14 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
+ 		isb();
+ 	}
+ 	write_sysreg(val, hcr_el2);
++
++	/*
++	 * If the virtual SError interrupt is taken to EL1 using AArch64,
++	 * then VSESR_EL2 provides the syndrome value reported in ISS field
++	 * of ESR_EL1.
++	 */
++	__sysreg_set_vsesr(vcpu, val);
++
+ 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+ 	write_sysreg(1 << 15, hstr_el2);
+ 	/*
+diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+index 3556715..fb94b5e 100644
+--- a/arch/arm64/kvm/inject_fault.c
++++ b/arch/arm64/kvm/inject_fault.c
+@@ -246,14 +246,25 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+ 		inject_undef64(vcpu);
+ }
+ 
++static void pend_guest_serror(struct kvm_vcpu *vcpu, u64 esr)
++{
++	kvm_vcpu_set_vsesr(vcpu, esr);
++	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
++}
++
+ /**
+  * kvm_inject_vabt - inject an async abort / SError into the guest
+  * @vcpu: The VCPU to receive the exception
+  *
+  * It is assumed that this code is called from the VCPU thread and that the
+  * VCPU therefore is not currently executing guest code.
++ *
++ * Systems with the RAS Extensions specify an imp-def ESR (ISV/IDS = 1) with
++ * the remaining ISS all-zeros so that this error is not interpreted as an
++ * uncatagorized RAS error. Without the RAS Extensions we can't specify an ESR
++ * value, so the CPU generates an imp-def value.
+  */
+ void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+ {
+-	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
++	pend_guest_serror(vcpu, ESR_ELx_ISV);
+ }
 -- 
 1.9.1
