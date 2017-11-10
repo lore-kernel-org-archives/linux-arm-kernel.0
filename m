@@ -1,40 +1,59 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Fri, 10 Nov 2017 14:41:38 +0100
-Subject: [PATCH 1/2] rtc: at91rm9200: stop calculating yday in
- at91_rtc_readalarm
-In-Reply-To: <20171110085931.32347-1-alexandre.belloni@free-electrons.com>
-References: <20171110085931.32347-1-alexandre.belloni@free-electrons.com>
-Message-ID: <a00561dd-fb84-55d4-c819-12dd9d2bace7@microchip.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Fri, 10 Nov 2017 09:03:18 -0500
+Subject: [PATCH V2 2/3] dmaengine: qcom_hidma: add support for the new
+ revision
+In-Reply-To: <e781fe6c-a4ad-4a96-c705-dfcd9a8d10b0@arm.com>
+References: <1510158582-5343-1-git-send-email-okaya@codeaurora.org>
+ <1510158582-5343-2-git-send-email-okaya@codeaurora.org>
+ <e781fe6c-a4ad-4a96-c705-dfcd9a8d10b0@arm.com>
+Message-ID: <3ca59a37-e8f8-a2cf-fa3a-f4ee6d544dcd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11/2017 at 09:59, Alexandre Belloni wrote:
-> Calculating yday in the read_alarm callback is useless as this value is
-> never used later. Also, it was buggy anyway because at the time this is
-> done, tm_year is always 0 as the alarm register doesn't hold the year.
-> 
-> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
++linux-acpi, +Rafael for context
 
-Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
+On 11/8/2017 12:51 PM, Robin Murphy wrote:
+> Apologies if I wasn't very clear, but what I meant to imply by dropping the of_device_get_match_data() hint was to follow one of the common patterns where you either just have some version token:
+> 
+> ????enum foo_ver {
+> ??????? FOO_V1,
+> ??????? ...
+> ????}
+> 
+> ????struct acpi_device_id foo_acpi_ids[] = {
+> ??????? { "_FOO0001", FOO_V1 },
+> ??????? ...
+> ????}
+> 
+> ????struct of_device_id foo_of_match[] = {
+> ??????? { .compatible = "foo,v1", .data = (void *)FOO_V1 },
+> ??????? ...
+> ????}
+> 
+> ????int foo_probe(struct device *dev) {
+> ??????? ...
+> ??????? foodev->version = (enum foo_ver)
+> ??????????????? of_device_get_match_data(&dev->of_node)
+> ??????? ...
+> ????}
+> 
+> ????int foo_reset(struct foodev *foodev) {
+> ??????? if (foodev->version == FOO_V1)
+> ??????????? writel(0, foodev->base + 0x20);
+> ??????? else
+> ??????????? writel(0, foodev->base + 0x30);
+> ????}
 
-> ---
->  drivers/rtc/rtc-at91rm9200.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/drivers/rtc/rtc-at91rm9200.c b/drivers/rtc/rtc-at91rm9200.c
-> index e221b78b6f10..e84f5ec4faf6 100644
-> --- a/drivers/rtc/rtc-at91rm9200.c
-> +++ b/drivers/rtc/rtc-at91rm9200.c
-> @@ -208,7 +208,6 @@ static int at91_rtc_readalarm(struct device *dev, struct rtc_wkalrm *alrm)
->  	struct rtc_time *tm = &alrm->time;
->  
->  	at91_rtc_decodetime(AT91_RTC_TIMALR, AT91_RTC_CALALR, tm);
-> -	tm->tm_yday = rtc_year_days(tm->tm_mday, tm->tm_mon, tm->tm_year);
->  	tm->tm_year = at91_alarm_year - 1900;
->  
->  	alrm->enabled = (at91_rtc_read_imr() & AT91_RTC_ALARM)
-> 
+I did post v3 with this approach. However, I could not really find a ACPI function that
+returns the driver data very similar to of_device_get_match_data(). The only thing
+that is closer is acpi_match_device().
+
+I introduced this new function as part of the v3 series. 
+
+Let me know if I'm missing something.
 
 
 -- 
-Nicolas Ferre
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
