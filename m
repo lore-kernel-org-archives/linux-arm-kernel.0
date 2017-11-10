@@ -1,44 +1,35 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 10 Nov 2017 07:37:34 -0800
-Subject: n900 in next-20170901
-In-Reply-To: <20171110064623.GA32442@js1304-P5Q-DELUXE>
-References: <20171109000801.GA23982@js1304-P5Q-DELUXE>
- <20171109001113.GZ28152@atomide.com>
- <20171109003639.GB23982@js1304-P5Q-DELUXE>
- <20171109035031.GA24383@js1304-P5Q-DELUXE>
- <20171109150854.GC28152@atomide.com>
- <20171110001315.GA29669@js1304-P5Q-DELUXE>
- <20171110032610.GJ28152@atomide.com>
- <20171110061917.GK28152@atomide.com>
- <20171110062340.GL28152@atomide.com>
- <20171110064623.GA32442@js1304-P5Q-DELUXE>
-Message-ID: <20171110153734.GP28152@atomide.com>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Fri, 10 Nov 2017 18:12:09 +0200
+Subject: [PATCH v5 4/7] i2c: designware: add i2c gpio recovery option
+In-Reply-To: <7abe16b1-4bfd-4427-8783-b3733ed9f06c@electromag.com.au>
+References: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
+ <1509984581.25007.47.camel@linux.intel.com>
+ <a0265848-2496-d347-a40f-ce83e7dfd945@electromag.com.au>
+ <2970055.FM06l9ul3d@dabox> <1510133354.25007.97.camel@linux.intel.com>
+ <7abe16b1-4bfd-4427-8783-b3733ed9f06c@electromag.com.au>
+Message-ID: <1510330329.25007.133.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Joonsoo Kim <iamjoonsoo.kim@lge.com> [171110 06:43]:
-> On Thu, Nov 09, 2017 at 10:23:40PM -0800, Tony Lindgren wrote:
-> > * Tony Lindgren <tony@atomide.com> [171109 22:19]:
-> > > * Tony Lindgren <tony@atomide.com> [171110 03:28]:
-> > > > Then I'll follow up on cleaning up save_secure_ram_context later.
-> > > 
-> > > Here's a better version, the static mapping did not get used.. It
-> > > just moved the area so it happened to work. It needs to be set
-> > > up as MT_MEMORY_RWX_NONCACHED instead.
-> > 
-> 
-> I see a better version now. Hmm... I guess that it also has the
-> problem that I mentioned on first version.
-> 
-> > And FYI, here's what I currently have for the follow-up patch,
-> > but that can wait a bit.
-> 
-> Okay. So, this patch should be applied on the top of above better version?
+On Fri, 2017-11-10 at 14:55 +0800, Phil Reid wrote:
+> On 8/11/2017 17:29, Andy Shevchenko wrote:
+> > On Wed, 2017-11-08 at 09:29 +0100, Tim Sander wrote:
 
-Yeah, but we may actually want to combine both patches into a
-single patch to avoid the save_secure_ram_context 0xffff translation
-limit, see my comments in the first version.
+> I'm not sure my change set will affect anything..
+> Current drivers using the gpio functions are requesting the gpio using
+> the old interface.
+> If releasing the gpio doesn't restore the original functionality than
+> nothing changes with this series.
+> 
+> For the designware driver, the recovery code wont be called unless the
+> gpio's are specified via the device tree.
+> So the pinmux config shouldn't get changed.
+> 
+> It'd be nice to have the code in mainline even if most soc's can't use
+> it as yet.
 
-Regards,
+I'm fine as long as it doesn't break existing users of DW I2C.
 
-Tony
+-- 
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
