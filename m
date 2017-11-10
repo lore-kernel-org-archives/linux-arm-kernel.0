@@ -1,27 +1,22 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 10 Nov 2017 22:36:25 +1100
-Subject: [PATCH 0/2] hwrng: iproc-rng200: Add support for BCM7278
-In-Reply-To: <20171101232006.3943-1-f.fainelli@gmail.com>
-References: <20171101232006.3943-1-f.fainelli@gmail.com>
-Message-ID: <20171110113625.GA26163@gondor.apana.org.au>
+Date: Fri, 10 Nov 2017 22:37:20 +1100
+Subject: [PATCH v2 1/1] crypto: stm32/hash - Fix return issue on update
+In-Reply-To: <1510008112-1573-1-git-send-email-lionel.debieve@st.com>
+References: <1510008112-1573-1-git-send-email-lionel.debieve@st.com>
+Message-ID: <20171110113720.GC26163@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 04:20:04PM -0700, Florian Fainelli wrote:
-> Hi,
+On Mon, Nov 06, 2017 at 11:41:52PM +0100, lionel.debieve at st.com wrote:
+> From: Lionel Debieve <lionel.debieve@st.com>
 > 
-> This patch series adds support for the RNG200 block found on the BCM7278 SoC.
-> This requires us to update the compatible string (and associated binding
-> document) as well as the Kconfig option to make that driver selectable with
-> ARCH_BRCMSTB gating the enabling of such SoCs.
+> When data append reached the threshold for processing,
+> we must inform that processing is on going to wait before
+> managing the next request.
 > 
-> Thank you
-> 
-> Florian Fainelli (2):
->   dt-bindings: rng: Document BCM7278 RNG200 compatible
->   hwrng: iproc-rng200: Add support for BCM7278
+> Signed-off-by: Lionel Debieve <lionel.debieve@st.com>
 
-All applied.  Thanks.
+Patch applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
