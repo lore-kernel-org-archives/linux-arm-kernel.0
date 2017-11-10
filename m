@@ -1,179 +1,51 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 10 Nov 2017 10:41:34 +0100
-Subject: [PATCH v5 10/26] KVM: arm/arm64: GICv4: Wire mapping/unmapping of
- VLPIs in VFIO irq bypass
-In-Reply-To: <b9a0e890-f92c-b174-0959-5f14fd3ac726@arm.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-11-marc.zyngier@arm.com>
- <1b60525f-5bb3-d19b-78df-fdfa5f48dc30@redhat.com>
- <0331ecc1-d4d6-420f-1ce8-7be1f386cdff@arm.com>
- <20171110082846.GH14144@cbox> <b9a0e890-f92c-b174-0959-5f14fd3ac726@arm.com>
-Message-ID: <CAMJs5B_Jb_FE3OWpM1Yg1GGu0rq02RzsW70ie9ZUhzTek__RZQ@mail.gmail.com>
+From: jani.nikula@linux.intel.com (Jani Nikula)
+Date: Fri, 10 Nov 2017 11:45:27 +0200
+Subject: [PATCH] drm/bridge: dw-hdmi: fix EDID parsing
+In-Reply-To: <20171109162634.GC12318@n2100.armlinux.org.uk>
+References: <E1eC22L-0003sN-Dw@rmk-PC.armlinux.org.uk>
+ <20171109082317.predibr5vv2d33i2@phenom.ffwll.local>
+ <20171109093122.GA12318@n2100.armlinux.org.uk> <87inejaiij.fsf@intel.com>
+ <CAEzXK1qHEcB6f_uGPJk9RxSd+tP5rNuiutBN1FAkEv-nU1k5Ug@mail.gmail.com>
+ <CAEzXK1qx=frs=Py3FhUK2vCfEp3Uzt2Nt=hKyxOnaP-nj4z8HA@mail.gmail.com>
+ <87efp7abwi.fsf@intel.com> <20171109162634.GC12318@n2100.armlinux.org.uk>
+Message-ID: <87zi7u8o20.fsf@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 10:05 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 10/11/17 08:28, Christoffer Dall wrote:
->> Hi Eric and Marc,
->>
->> On Tue, Nov 07, 2017 at 02:42:44PM +0000, Marc Zyngier wrote:
->>> Hi Eric,
->>>
->>> On 07/11/17 13:06, Auger Eric wrote:
->>>> Hi Marc,
->>>>
->>>> On 27/10/2017 16:28, Marc Zyngier wrote:
->>>>> Let's use the irq bypass mechanism introduced for platform device
->>>>> interrupts
->>>> nit: I would remove "introduced for platform device interrupts"
->>>> as this is not upstream yet. x86 posted interrupts also use it.
->>>>
->>>>>
->>>>  and establish our LPI->VLPI mapping.
->>
->> I have tweaked the commit message.
->>
->>>>>
->>>>> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
->>>>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->>>>> ---
->>>>>  include/kvm/arm_vgic.h      |   8 ++++
->>>>>  virt/kvm/arm/arm.c          |   6 ++-
->>>>>  virt/kvm/arm/vgic/vgic-v4.c | 108 ++++++++++++++++++++++++++++++++++++++++++++
->>>>>  3 files changed, 120 insertions(+), 2 deletions(-)
->>>>>
->>>>> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
->>>>> index 7eeb6c2a2f9c..2f750c770bf2 100644
->>>>> --- a/include/kvm/arm_vgic.h
->>>>> +++ b/include/kvm/arm_vgic.h
->>>>> @@ -373,4 +373,12 @@ int kvm_vgic_setup_default_irq_routing(struct kvm *kvm);
->>>>>
->>>>>  int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner);
->>>>>
->>>>> +struct kvm_kernel_irq_routing_entry;
->>>>> +
->>>>> +int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
->>>>> +                         struct kvm_kernel_irq_routing_entry *irq_entry);
->>>>> +
->>>>> +int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
->>>>> +                           struct kvm_kernel_irq_routing_entry *irq_entry);
->>>>> +
->>>>>  #endif /* __KVM_ARM_VGIC_H */
->>>>> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
->>>>> index 5d5218ecd547..8388c1cc23f6 100644
->>>>> --- a/virt/kvm/arm/arm.c
->>>>> +++ b/virt/kvm/arm/arm.c
->>>>> @@ -1462,7 +1462,8 @@ int kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *cons,
->>>>>    struct kvm_kernel_irqfd *irqfd =
->>>>>            container_of(cons, struct kvm_kernel_irqfd, consumer);
->>>>>
->>>>> -  return 0;
->>>>> +  return kvm_vgic_v4_set_forwarding(irqfd->kvm, prod->irq,
->>>>> +                                    &irqfd->irq_entry);
->>>>>  }
->>>>>  void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
->>>>>                                  struct irq_bypass_producer *prod)
->>>>> @@ -1470,7 +1471,8 @@ void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
->>>>>    struct kvm_kernel_irqfd *irqfd =
->>>>>            container_of(cons, struct kvm_kernel_irqfd, consumer);
->>>>>
->>>>> -  return;
->>>>> +  kvm_vgic_v4_unset_forwarding(irqfd->kvm, prod->irq,
->>>>> +                               &irqfd->irq_entry);
->>>>>  }
->>>>>
->>>>>  void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *cons)
->>>>> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
->>>>> index c794f0cef09e..01a2889b7b7c 100644
->>>>> --- a/virt/kvm/arm/vgic/vgic-v4.c
->>>>> +++ b/virt/kvm/arm/vgic/vgic-v4.c
->>>>> @@ -18,6 +18,7 @@
->>>>>  #include <linux/interrupt.h>
->>>>>  #include <linux/irqdomain.h>
->>>>>  #include <linux/kvm_host.h>
->>>>> +#include <linux/irqchip/arm-gic-v3.h>
->>>>>
->>>>>  #include "vgic.h"
->>>>>
->>>>> @@ -81,3 +82,110 @@ void vgic_v4_teardown(struct kvm *kvm)
->>>>>    its_vm->nr_vpes = 0;
->>>>>    its_vm->vpes = NULL;
->>>>>  }
->>>>> +
->>>>> +static struct vgic_its *vgic_get_its(struct kvm *kvm,
->>>>> +                               struct kvm_kernel_irq_routing_entry *irq_entry)
->>>>> +{
->>>>> +  struct kvm_msi msi  = (struct kvm_msi) {
->>>>> +          .address_lo     = irq_entry->msi.address_lo,
->>>>> +          .address_hi     = irq_entry->msi.address_hi,
->>>>> +          .data           = irq_entry->msi.data,
->>>>> +          .flags          = irq_entry->msi.flags,
->>>>> +          .devid          = irq_entry->msi.devid,
->>>>> +  };
->>>>> +
->>>>> +  /*
->>>>> +   * Get a reference on the LPI. If NULL, this is not a valid
->>>>> +   * translation for any of our vITSs.
->>>>> +   */
->>>> I don't understand the relevance of the above comment.
->>>
->>> Hmmm. The first part looks like an outdated leftover, as the ITS is not
->>> refcounted, and we don't deal with LPIs here.
->>>
->>
->> I simply removed this comment.
->>
->> [...]
->>
->> I think the only thing left to fix on this patch is the IRQ_DISABLE_LAZY
->> thing on its_map_vlpi() failures, which Marc can fix post -rc1.
+On Thu, 09 Nov 2017, Russell King - ARM Linux <linux@armlinux.org.uk> wrote:
+> On Thu, Nov 09, 2017 at 02:12:45PM +0200, Jani Nikula wrote:
+>> And as I said elsewhere in the thread, Russell's patch may be relevant
+>> for current Linus' master and stable. We just need to reconciliate how
+>> the two things should work together in drm-next and v4.15 and on.
 >
-> Here's what I've queued on the irqchip side:
+> Exactly, the patch is intended for current kernels.  The hint is that
+> (a) it's a bug fix, (b) it says "fix" in the title, and (c) it has the
+> stable attributation which says "apply me to previous kernels".
 >
-> From 9c0733704b99c89773416af3a412332b0e8bd2a4 Mon Sep 17 00:00:00 2001
-> From: Marc Zyngier <marc.zyngier@arm.com>
-> Date: Fri, 10 Nov 2017 09:00:41 +0000
-> Subject: [PATCH] irqchip/gic-v4: Clear IRQ_DISABLE_UNLAZY again if mapping
->  fails
->
-> Should the call to irq_set_vcpu_affinity() fail at map time,
-> we should restore the normal lazy-disable behaviour instead
-> of staying with the eager disable that GICv4 requires.
->
-> Reported-by: Eric Auger <eric.auger@redhat.com>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  drivers/irqchip/irq-gic-v4.c | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/irqchip/irq-gic-v4.c b/drivers/irqchip/irq-gic-v4.c
-> index cd0bcc3b7e33..dba9d67cb9c1 100644
-> --- a/drivers/irqchip/irq-gic-v4.c
-> +++ b/drivers/irqchip/irq-gic-v4.c
-> @@ -177,6 +177,7 @@ int its_map_vlpi(int irq, struct its_vlpi_map *map)
->                         .map      = map,
->                 },
->         };
-> +       int ret;
->
->         /*
->          * The host will never see that interrupt firing again, so it
-> @@ -184,7 +185,11 @@ int its_map_vlpi(int irq, struct its_vlpi_map *map)
->          */
->         irq_set_status_flags(irq, IRQ_DISABLE_UNLAZY);
->
-> -       return irq_set_vcpu_affinity(irq, &info);
-> +       ret = irq_set_vcpu_affinity(irq, &info);
-> +       if (ret)
-> +               irq_clear_status_flags(irq, IRQ_DISABLE_UNLAZY);
-> +
-> +       return ret;
->  }
->
->  int its_get_vlpi(int irq, struct its_vlpi_map *map)
-> --
-> 2.14.2
->
->
+> Daniel's response effectively says "no, we're not going to accept the
+> patch, work on a fix with some development code."
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Please don't turn a technical discussion into an unnecessary
+altercation. Focusing on finding the best solution instead would be much
+appreciated.
+
+> So, unless someone wants to tell me that it's acceptable to develop bug
+> fixes against Linus' tree _for_ Linus' tree and accept this patch, or
+> show some other solution that can be applied to Linus' current tree and
+> backported to stable trees, I'm just not going to bother in future -
+> someone else can end up doing the work.
+
+I also don't want non-regression fixes merged to Linus' tree if they're
+known to regress much wider impact work queued to Linus' tree for the
+next merge window. And it's not just some development code, it's been in
+drm-next and linux-next for more than 1? months now. So I want to figure
+this out first.
+
+Lu?s, can you try try drm-next *with* Russell's patch, please?
+
+
+BR,
+Jani.
+
+-- 
+Jani Nikula, Intel Open Source Technology Center
