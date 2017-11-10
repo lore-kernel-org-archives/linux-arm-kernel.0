@@ -1,58 +1,138 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 10 Nov 2017 17:26:56 +0000
-Subject: [PATCH] arm64: cpu_errata: Add Kryo to Falkor 1003 errata
-In-Reply-To: <20171108190029.19835-1-sboyd@codeaurora.org>
-References: <20171108190029.19835-1-sboyd@codeaurora.org>
-Message-ID: <20171110172656.zvnpfjkky7rqumyf@armageddon.cambridge.arm.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Fri, 10 Nov 2017 12:44:24 -0500
+Subject: [PATCH] dmaengine: dmatest: move callback wait queue to thread context
+Message-ID: <1510335864-25997-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 08, 2017 at 11:00:29AM -0800, Stephen Boyd wrote:
-> The Kryo CPUs are also affected by the Falkor 1003 errata, so
-> we need to do the same workaround on Kryo CPUs. The MIDR is
-> slightly more complicated here, where the PART number is not
-> always the same when looking at all the bits from 15 to 4. Drop
-> the lower 8 bits and just look at the top 4 to see if it's '2'
-> and then consider those as Kryo CPUs. This covers all the
-> combinations without having to list them all out.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
-> 
-> We may need to introduce another Kconfig option to block software PAN
-> from being enabled when this errata is enabled (and then have software PAN
-> depend on this new config being false).
+Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+introduced a bug (that is in fact documented by the patch commit text)
+that leaves behind a dangling pointer. Since the done_wait structure is
+allocated on the stack, future invocations to the DMATEST can produce
+undesirable results (e.g., corrupted spinlocks).
 
-It depends on whether you'd want to use SW PAN together with these CPUs.
->From a defconfig + single Image perspective, SW PAN is disabled but it
-would be nice to allow single Image with both E1003 and SW PAN configs
-enabled (though SW PAN wouldn't be used at run-time).
+Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
+out") attempted to WARN the user that the stack was likely corrupted but
+did not fix the actual issue.
 
-As a quick hack, something like below but we may want to add a separate
-cap bit as a minor optimisation (not sure it makes a difference).
-Untested:
+This patch fixes the issue by pushing the wait queue and callback
+structs into the the thread structure. If a failure occurs due to time,
+dmaengine_terminate_all will force the callback to safely call
+wake_up_all() without possibility of using a freed pointer.
 
-------------------8<--------------------------
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index ac67cfc2585a..8d2ddaef70a2 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -268,7 +268,8 @@ static inline bool system_supports_fpsimd(void)
- static inline bool system_uses_ttbr0_pan(void)
- {
- 	return IS_ENABLED(CONFIG_ARM64_SW_TTBR0_PAN) &&
--		!cpus_have_const_cap(ARM64_HAS_PAN);
-+		!cpus_have_const_cap(ARM64_HAS_PAN) &&
-+		!cpus_have_const_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003);
+Cc: stable at vger.kernel.org
+Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
+Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
+Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+ drivers/dma/dmatest.c | 37 ++++++++++++++++---------------------
+ 1 file changed, 16 insertions(+), 21 deletions(-)
+
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index 47edc7f..2573b6c 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -155,6 +155,12 @@ struct dmatest_params {
+ #define PATTERN_COUNT_MASK	0x1f
+ #define PATTERN_MEMSET_IDX	0x01
+ 
++/* poor man's completion - we want to use wait_event_freezable() on it */
++struct dmatest_done {
++	bool			done;
++	wait_queue_head_t	*wait;
++};
++
+ struct dmatest_thread {
+ 	struct list_head	node;
+ 	struct dmatest_info	*info;
+@@ -165,6 +171,8 @@ struct dmatest_thread {
+ 	u8			**dsts;
+ 	u8			**udsts;
+ 	enum dma_transaction_type type;
++	wait_queue_head_t done_wait;
++	struct dmatest_done test_done;
+ 	bool			done;
+ };
+ 
+@@ -342,11 +350,6 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
+ 	return error_count;
  }
  
-------------------8<--------------------------
-
-> Otherwise, I can take a look at updating the software PAN implementation
-> to handle this errata, but that is probably a dead-end?
-
-It will probably be more intrusive and would also make SW PAN a lot
-slower. I don't think it's worth it.
-
+-/* poor man's completion - we want to use wait_event_freezable() on it */
+-struct dmatest_done {
+-	bool			done;
+-	wait_queue_head_t	*wait;
+-};
+ 
+ static void dmatest_callback(void *arg)
+ {
+@@ -424,9 +427,8 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
+  */
+ static int dmatest_func(void *data)
+ {
+-	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(done_wait);
+ 	struct dmatest_thread	*thread = data;
+-	struct dmatest_done	done = { .wait = &done_wait };
++	struct dmatest_done	*done = &thread->test_done;
+ 	struct dmatest_info	*info;
+ 	struct dmatest_params	*params;
+ 	struct dma_chan		*chan;
+@@ -673,9 +675,9 @@ static int dmatest_func(void *data)
+ 			continue;
+ 		}
+ 
+-		done.done = false;
++		done->done = false;
+ 		tx->callback = dmatest_callback;
+-		tx->callback_param = &done;
++		tx->callback_param = done;
+ 		cookie = tx->tx_submit(tx);
+ 
+ 		if (dma_submit_error(cookie)) {
+@@ -688,21 +690,12 @@ static int dmatest_func(void *data)
+ 		}
+ 		dma_async_issue_pending(chan);
+ 
+-		wait_event_freezable_timeout(done_wait, done.done,
++		wait_event_freezable_timeout(thread->done_wait, done->done,
+ 					     msecs_to_jiffies(params->timeout));
+ 
+ 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+ 
+-		if (!done.done) {
+-			/*
+-			 * We're leaving the timed out dma operation with
+-			 * dangling pointer to done_wait.  To make this
+-			 * correct, we'll need to allocate wait_done for
+-			 * each test iteration and perform "who's gonna
+-			 * free it this time?" dancing.  For now, just
+-			 * leave it dangling.
+-			 */
+-			WARN(1, "dmatest: Kernel stack may be corrupted!!\n");
++		if (!done->done) {
+ 			dmaengine_unmap_put(um);
+ 			result("test timed out", total_tests, src_off, dst_off,
+ 			       len, 0);
+@@ -789,7 +782,7 @@ static int dmatest_func(void *data)
+ 		dmatest_KBs(runtime, total_len), ret);
+ 
+ 	/* terminate all transfers on specified channels */
+-	if (ret)
++	if (ret || failed_tests)
+ 		dmaengine_terminate_all(chan);
+ 
+ 	thread->done = true;
+@@ -849,6 +842,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
+ 		thread->info = info;
+ 		thread->chan = dtc->chan;
+ 		thread->type = type;
++		thread->test_done.wait = &thread->done_wait;
++		init_waitqueue_head(&thread->done_wait);
+ 		smp_wmb();
+ 		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
+ 				dma_chan_name(chan), op, i);
 -- 
-Catalin
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
