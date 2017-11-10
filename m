@@ -1,57 +1,39 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 10 Nov 2017 16:56:52 +0530
-Subject: [PATCH] ARM: AM33xx: PRM: Remove am33xx_pwrdm_read_prev_pwrst function
-Message-ID: <1510313212-29660-1-git-send-email-j-keerthy@ti.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 10 Nov 2017 22:10:58 +1100
+Subject: [PATCH v2] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <2510520.gYBNS8MAsP@positron.chronox.de>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <4677171.2qOLUIFS1s@positron.chronox.de>
+ <20171107063212.GA25491@gondor.apana.org.au>
+ <2510520.gYBNS8MAsP@positron.chronox.de>
+Message-ID: <20171110111058.GA25914@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Referring TRM Am335X series:
-http://www.ti.com/lit/ug/spruh73p/spruh73p.pdf
+On Tue, Nov 07, 2017 at 10:05:48AM +0100, Stephan M?ller wrote:
+>  
+>  	if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
+>  		/* AIO operation */
+> +		sock_hold(sk);
+>  		areq->iocb = msg->msg_iocb;
+>  		aead_request_set_callback(&areq->cra_u.aead_req,
+>  					  CRYPTO_TFM_REQ_MAY_BACKLOG,
+>  					  af_alg_async_cb, areq);
+>  		err = ctx->enc ? crypto_aead_encrypt(&areq->cra_u.aead_req) :
+>  				 crypto_aead_decrypt(&areq->cra_u.aead_req);
+> +
+> +		/* AIO operation in progress */
+> +		if (err == -EINPROGRESS) {
+> +			/* Remember output size that will be generated. */
+> +			areq->outlen = outlen;
+> +
+> +			return -EIOCBQUEUED;
+> +		}
 
-The LastPowerStateEntered bitfield is present only for PM_CEFUSE
-domain. This is not present in any of the other power domains. Hence
-remove the generic am33xx_pwrdm_read_prev_pwrst hook which wrongly
-reads the reserved bit fields for all the other power domains.
+Since we're allowing backlogs, what about EBUSY?
 
-Reading the reserved bits leads to wrongly interpreting the low
-power transitions for various power domains that do not have the
-LastPowerStateEntered field. The pm debug counters values are wrong
-currently as we are incrementing them based on the reserved bits.
-
-Signed-off-by: Keerthy <j-keerthy@ti.com>
----
- arch/arm/mach-omap2/prm33xx.c | 12 ------------
- 1 file changed, 12 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/prm33xx.c b/arch/arm/mach-omap2/prm33xx.c
-index bc5df8d..dfca8d9 100644
---- a/arch/arm/mach-omap2/prm33xx.c
-+++ b/arch/arm/mach-omap2/prm33xx.c
-@@ -176,17 +176,6 @@ static int am33xx_pwrdm_read_pwrst(struct powerdomain *pwrdm)
- 	return v;
- }
- 
--static int am33xx_pwrdm_read_prev_pwrst(struct powerdomain *pwrdm)
--{
--	u32 v;
--
--	v = am33xx_prm_read_reg(pwrdm->prcm_offs, pwrdm->pwrstst_offs);
--	v &= AM33XX_LASTPOWERSTATEENTERED_MASK;
--	v >>= AM33XX_LASTPOWERSTATEENTERED_SHIFT;
--
--	return v;
--}
--
- static int am33xx_pwrdm_set_lowpwrstchange(struct powerdomain *pwrdm)
- {
- 	am33xx_prm_rmw_reg_bits(AM33XX_LOWPOWERSTATECHANGE_MASK,
-@@ -386,7 +375,6 @@ struct pwrdm_ops am33xx_pwrdm_operations = {
- 	.pwrdm_set_next_pwrst		= am33xx_pwrdm_set_next_pwrst,
- 	.pwrdm_read_next_pwrst		= am33xx_pwrdm_read_next_pwrst,
- 	.pwrdm_read_pwrst		= am33xx_pwrdm_read_pwrst,
--	.pwrdm_read_prev_pwrst		= am33xx_pwrdm_read_prev_pwrst,
- 	.pwrdm_set_logic_retst		= am33xx_pwrdm_set_logic_retst,
- 	.pwrdm_read_logic_pwrst		= am33xx_pwrdm_read_logic_pwrst,
- 	.pwrdm_read_logic_retst		= am33xx_pwrdm_read_logic_retst,
+Cheers,
 -- 
-1.9.1
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
