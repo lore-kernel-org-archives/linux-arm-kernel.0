@@ -1,53 +1,140 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Nov 2017 14:26:05 +0100
-Subject: [PATCH v2 0/7] arm64: dts: renesas: r8a7796: IPMMU upstream
- integration
-Message-ID: <20171110132612.1589-1-horms+renesas@verge.net.au>
+Date: Fri, 10 Nov 2017 14:26:06 +0100
+Subject: [PATCH v2 1/7] arm64: dts: renesas: r8a7796: Add IPMMU device nodes
+In-Reply-To: <20171110132612.1589-1-horms+renesas@verge.net.au>
+References: <20171110132612.1589-1-horms+renesas@verge.net.au>
+Message-ID: <20171110132612.1589-2-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds DT nodes for IPMMU instances on r8a7796 together with
-connections to various r8a7796 on-chip devices such as Audio-DMAC, SYS-DMAC,
-Ethernet-AVB and a bunch of multimedia devices that make use of FCP.
+From: Magnus Damm <damm+renesas@opensource.se>
 
-With these patches applied a white list enabled IPMMU driver may be used
-to check silicon revision and then enable IPMMU in the known working cases.
+Add r8a7796 IPMMU nodes and keep all disabled by default.
 
-The recommended test stack for this patchset is a merge of
-* The iommu/next branch of the vfio tree
-* renesas-devel-20171110-v4.14-rc8 tag of the renesas tree
-
-With the following applied:
- [PATCH v4 0/3] iommu/ipmmu-vmsa: r8a7796 support V4
-
-The final patch in the series enable IPMMU support for all IPMMU
-instances on r8a7796 that are used by IPMMU devices listed above.
-
-The DT binding for r8a7796 have been acked (as part of the r8a7796 series
-noted above) but have not yet been merged.
-
-Changes since V1:
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+v2 [Simon Horman]
 * Drop mostly redundant comments from nodes
 * Add power domains
 
-Based on work by Magnus Damm.
+v4 [Simon Horman]
+* Update node names as per recent datasheet naming
 
-Based on renesas-devel-20171110-v4.14-rc8
+v0 [Magnus Damm]
+---
+ arch/arm64/boot/dts/renesas/r8a7796.dtsi | 99 ++++++++++++++++++++++++++++++++
+ 1 file changed, 99 insertions(+)
 
-Magnus Damm (3):
-  arm64: dts: renesas: r8a7796: Add IPMMU device nodes
-  arm64: dts: renesas: r8a7796: Tie SYS-DMAC to IPMMU-DS0/1
-  arm64: dts: renesas: r8a7796: Enable IPMMU-DS0, DS1, MP, VI0, VC0 and
-    MM
-
-Simon Horman (4):
-  arm64: dts: renesas: r8a7796: Tie Audio-DMAC to IPMMU-MP
-  arm64: dts: renesas: r8a7796: Point FDP1 via FCPF to IPMMU-VI0
-  arm64: dts: renesas: r8a7796: Point VSPI via FCPVI to IPMMU-VC0
-  arm64: dts: renesas: r8a7796: Connect Ethernet-AVB to IPMMU-DS0
-
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 138 +++++++++++++++++++++++++++++++
- 1 file changed, 138 insertions(+)
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+index 8c94a313d9e1..cb66b722ceb9 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
+@@ -357,6 +357,105 @@
+ 					     <&a53_3>;
+ 		};
+ 
++		ipmmu_vi0: mmu at febd0000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xfebd0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 9>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_vc0: mmu at fe6b0000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xfe6b0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 8>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_pv0: mmu at fd800000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xfd800000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 5>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_pv1: mmu at fd950000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xfd950000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 6>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ir: mmu at ff8b0000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xff8b0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 3>;
++			power-domains = <&sysc R8A7796_PD_A3IR>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_hc: mmu at e6570000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xe6570000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 2>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_rt: mmu at ffc80000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xffc80000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 7>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_mp: mmu at ec670000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xec670000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 4>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ds0: mmu at e6740000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xe6740000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 0>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ds1: mmu at e7740000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xe7740000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 1>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_mm: mmu at e67b0000 {
++			compatible = "renesas,ipmmu-r8a7796";
++			reg = <0 0xe67b0000 0 0x1000>;
++			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>;
++			power-domains = <&sysc R8A7796_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
+ 		cpg: clock-controller at e6150000 {
+ 			compatible = "renesas,r8a7796-cpg-mssr";
+ 			reg = <0 0xe6150000 0 0x1000>;
 -- 
 2.11.0
