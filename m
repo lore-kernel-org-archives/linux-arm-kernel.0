@@ -1,92 +1,195 @@
-From: eballetbo@gmail.com (Enric Balletbo Serra)
-Date: Fri, 10 Nov 2017 13:15:30 +0100
-Subject: [PATCH v6 00/10] rockchip: kevin: Enable edp display
-In-Reply-To: <20171101193307.4pnn6u5keo7o5yut@art_vandelay>
-References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
- <2449324.8EdsLz1NaV@phil> <59F7FE17.80405@rock-chips.com>
- <20171101193307.4pnn6u5keo7o5yut@art_vandelay>
-Message-ID: <CAFqH_501Zvpw+dthWg5Pze5R=T6grVHqz6isy5u+a8R3D7vr1g@mail.gmail.com>
+From: smueller@chronox.de (Stephan =?ISO-8859-1?Q?M=FCller?=)
+Date: Fri, 10 Nov 2017 13:20:55 +0100
+Subject: [PATCH v3] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <20171110111058.GA25914@gondor.apana.org.au>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <2510520.gYBNS8MAsP@positron.chronox.de>
+ <20171110111058.GA25914@gondor.apana.org.au>
+Message-ID: <1966139.WIlnTlQG5u@positron.chronox.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
+The code paths protected by the socket-lock do not use or modify the
+socket in a non-atomic fashion. The actions pertaining the socket do not
+even need to be handled as an atomic operation. Thus, the socket-lock
+can be safely ignored.
 
-2017-11-01 20:33 GMT+01:00 Sean Paul <seanpaul@chromium.org>:
-> On Tue, Oct 31, 2017 at 12:37:43PM +0800, JeffyChen wrote:
->> Hi Heiko,
->>
->> On 10/31/2017 07:01 AM, Heiko Stuebner wrote:
->> > As I was just looking at the edp dts change in patch1 again, does this
->> > series also contain a fix for the issue below [0] ?
->> >
->> > I'm still seeing this on 4.14-rc6 with the most recent drm tree merged in.
->> >
->> i saw that too, it should due to our psr code...i think Zain has solved
->> these in chromeos kernel, i will ask Zain if he have time to upstream them,
->> or maybe i'll try to upstream them.
->
-> You need the patchset where I've refactored the psr locking/workers. I have a
-> version of it based on Heiko's tree at
-> https://cgit.freedesktop.org/~seanpaul/dogwood/log/?h=rk3399-display
->
-> With this kernel, the backlight comes on, but I don't have anything on the
-> display (which is why I didn't post it). I'll try putting this set on top and
-> see what happens.
->
+This fixes a bug regarding scheduling in atomic as the callback function
+may be invoked in interrupt context.
 
-There is a patch in the ML sent by Emil [1], similar to the Sean
-patch, that solves the issue.
+In addition, the sock_hold is moved before the AIO encrypt/decrypt
+operation to ensure that the socket is always present. This avoids a
+tiny race window where the socket is unprotected and yet used by the AIO
+operation.
 
-And I can confirm that the Jeffy's patches + Emil patch makes the
-display work on kevin or current rc8
+Finally, the release of resources for a crypto operation is moved into a
+common function of af_alg_free_resources.
 
-[1] https://patchwork.kernel.org/patch/9985237/
+Fixes: e870456d8e7c8 ("crypto: algif_skcipher - overhaul memory management")
+Fixes: d887c52d6ae43 ("crypto: algif_aead - overhaul memory management")
+Reported-by: Romain Izard <romain.izard.pro@gmail.com>
+Signed-off-by: Stephan Mueller <smueller@chronox.de>
+---
+ crypto/af_alg.c         | 21 ++++++++++++++-------
+ crypto/algif_aead.c     | 23 ++++++++++++-----------
+ crypto/algif_skcipher.c | 23 ++++++++++++-----------
+ include/crypto/if_alg.h |  1 +
+ 4 files changed, 39 insertions(+), 29 deletions(-)
 
-Enric
-
-> Sean
->
->> >
->> > Heiko
->> >
->> > [0]
->> >
->> > [   27.960120] BUG: scheduling while atomic: kworker/1:1/68/0x00000002
->> > [   27.974429] Modules linked in: rockchipdrm dw_hdmi analogix_dp drm_kms_helper panel_simple crc32_ce drm crct10dif_ce rockchip_saradc pwm_bl pwm_cros_ec rockchip_thermal ip_tables x_tabl
->> > es ipv6 smsc95xx smsc75xx ax88179_178a asix usbnet phy_rockchip_pcie pcie_rockchip
->> > [   28.008769] CPU: 1 PID: 68 Comm: kworker/1:1 Tainted: G        W       4.14.0-rc7-03201-g12490811b353 #559
->> > [   28.008774] Hardware name: Google Kevin (DT)
->> > [   28.008825] Workqueue: events analogix_dp_psr_work [rockchipdrm]
->> > [   28.008828] Call trace:
->> > [   28.008838] [<ffff000008088d60>] dump_backtrace+0x0/0x378
->> > [   28.008842] [<ffff0000080890ec>] show_stack+0x14/0x20
->> > [   28.008847] [<ffff0000089b04d8>] dump_stack+0x9c/0xbc
->> > [   28.008852] [<ffff0000080ec4b4>] __schedule_bug+0x4c/0x70
->> > [   28.008856] [<ffff0000089c4828>] __schedule+0x558/0x5e8
->> > [   28.008859] [<ffff0000089c48f0>] schedule+0x38/0xa0
->> > [   28.008864] [<ffff0000089c8194>] schedule_hrtimeout_range_clock+0x84/0xe8
->> > [   28.008867] [<ffff0000089c8208>] schedule_hrtimeout_range+0x10/0x18
->> > [   28.008870] [<ffff0000089c7c74>] usleep_range+0x64/0x78
->> > [   28.008882] [<ffff000000ef56e4>] analogix_dp_transfer+0x16c/0xa88 [analogix_dp]
->> > [   28.008891] [<ffff000000ef2190>] analogix_dpaux_transfer+0x10/0x18 [analogix_dp]
->> > [   28.008950] [<ffff000000ddbb1c>] drm_dp_dpcd_access+0x4c/0xf8 [drm_kms_helper]
->> > [   28.008994] [<ffff000000ddbbe4>] drm_dp_dpcd_write+0x1c/0x28 [drm_kms_helper]
->> > [   28.009002] [<ffff000000ef2130>] analogix_dp_disable_psr+0x60/0xb0 [analogix_dp]
->> > [   28.009036] [<ffff000000f8398c>] analogix_dp_psr_work+0x4c/0xc0 [rockchipdrm]
->> > [   28.009040] [<ffff0000080dff44>] process_one_work+0x1d4/0x348
->> > [   28.009043] [<ffff0000080e0100>] worker_thread+0x48/0x470
->> > [   28.009048] [<ffff0000080e63d4>] kthread+0x12c/0x130
->> > [   28.009052] [<ffff000008084b88>] ret_from_fork+0x10/0x18
->> >
->> >
->> >
->> >
->>
->>
->
-> --
-> Sean Paul, Software Engineer, Google / Chromium OS
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+diff --git a/crypto/af_alg.c b/crypto/af_alg.c
+index 85cea9de324a..358749c38894 100644
+--- a/crypto/af_alg.c
++++ b/crypto/af_alg.c
+@@ -1021,6 +1021,18 @@ ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
+ EXPORT_SYMBOL_GPL(af_alg_sendpage);
+ 
+ /**
++ * af_alg_free_resources - release resources required for crypto request
++ */
++void af_alg_free_resources(struct af_alg_async_req *areq)
++{
++	struct sock *sk = areq->sk;
++
++	af_alg_free_areq_sgls(areq);
++	sock_kfree_s(sk, areq, areq->areqlen);
++}
++EXPORT_SYMBOL_GPL(af_alg_free_resources);
++
++/**
+  * af_alg_async_cb - AIO callback handler
+  *
+  * This handler cleans up the struct af_alg_async_req upon completion of the
+@@ -1036,18 +1048,13 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
+ 	struct kiocb *iocb = areq->iocb;
+ 	unsigned int resultlen;
+ 
+-	lock_sock(sk);
+-
+ 	/* Buffer size written by crypto operation. */
+ 	resultlen = areq->outlen;
+ 
+-	af_alg_free_areq_sgls(areq);
+-	sock_kfree_s(sk, areq, areq->areqlen);
+-	__sock_put(sk);
++	af_alg_free_resources(areq);
++	sock_put(sk);
+ 
+ 	iocb->ki_complete(iocb, err ? err : resultlen, 0);
+-
+-	release_sock(sk);
+ }
+ EXPORT_SYMBOL_GPL(af_alg_async_cb);
+ 
+diff --git a/crypto/algif_aead.c b/crypto/algif_aead.c
+index aacae0837aff..db9378a45296 100644
+--- a/crypto/algif_aead.c
++++ b/crypto/algif_aead.c
+@@ -268,12 +268,23 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
+ 
+ 	if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
+ 		/* AIO operation */
++		sock_hold(sk);
+ 		areq->iocb = msg->msg_iocb;
+ 		aead_request_set_callback(&areq->cra_u.aead_req,
+ 					  CRYPTO_TFM_REQ_MAY_BACKLOG,
+ 					  af_alg_async_cb, areq);
+ 		err = ctx->enc ? crypto_aead_encrypt(&areq->cra_u.aead_req) :
+ 				 crypto_aead_decrypt(&areq->cra_u.aead_req);
++
++		/* AIO operation in progress */
++		if (err == -EINPROGRESS || err == -EBUSY) {
++			/* Remember output size that will be generated. */
++			areq->outlen = outlen;
++
++			return -EIOCBQUEUED;
++		}
++
++		sock_put(sk);
+ 	} else {
+ 		/* Synchronous operation */
+ 		aead_request_set_callback(&areq->cra_u.aead_req,
+@@ -285,19 +296,9 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
+ 				&ctx->wait);
+ 	}
+ 
+-	/* AIO operation in progress */
+-	if (err == -EINPROGRESS) {
+-		sock_hold(sk);
+-
+-		/* Remember output size that will be generated. */
+-		areq->outlen = outlen;
+-
+-		return -EIOCBQUEUED;
+-	}
+ 
+ free:
+-	af_alg_free_areq_sgls(areq);
+-	sock_kfree_s(sk, areq, areq->areqlen);
++	af_alg_free_resources(areq);
+ 
+ 	return err ? err : outlen;
+ }
+diff --git a/crypto/algif_skcipher.c b/crypto/algif_skcipher.c
+index 9954b078f0b9..30cff827dd8f 100644
+--- a/crypto/algif_skcipher.c
++++ b/crypto/algif_skcipher.c
+@@ -117,6 +117,7 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+ 
+ 	if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
+ 		/* AIO operation */
++		sock_hold(sk);
+ 		areq->iocb = msg->msg_iocb;
+ 		skcipher_request_set_callback(&areq->cra_u.skcipher_req,
+ 					      CRYPTO_TFM_REQ_MAY_SLEEP,
+@@ -124,6 +125,16 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+ 		err = ctx->enc ?
+ 			crypto_skcipher_encrypt(&areq->cra_u.skcipher_req) :
+ 			crypto_skcipher_decrypt(&areq->cra_u.skcipher_req);
++
++		/* AIO operation in progress */
++		if (err == -EINPROGRESS || err == -EBUSY) {
++			/* Remember output size that will be generated. */
++			areq->outlen = len;
++
++			return -EIOCBQUEUED;
++		}
++
++		sock_put(sk);
+ 	} else {
+ 		/* Synchronous operation */
+ 		skcipher_request_set_callback(&areq->cra_u.skcipher_req,
+@@ -136,19 +147,9 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+ 						 &ctx->wait);
+ 	}
+ 
+-	/* AIO operation in progress */
+-	if (err == -EINPROGRESS) {
+-		sock_hold(sk);
+-
+-		/* Remember output size that will be generated. */
+-		areq->outlen = len;
+-
+-		return -EIOCBQUEUED;
+-	}
+ 
+ free:
+-	af_alg_free_areq_sgls(areq);
+-	sock_kfree_s(sk, areq, areq->areqlen);
++	af_alg_free_resources(areq);
+ 
+ 	return err ? err : len;
+ }
+diff --git a/include/crypto/if_alg.h b/include/crypto/if_alg.h
+index 6abf0a3604dc..38d9c5861ed8 100644
+--- a/include/crypto/if_alg.h
++++ b/include/crypto/if_alg.h
+@@ -242,6 +242,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
+ 		   unsigned int ivsize);
+ ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
+ 			int offset, size_t size, int flags);
++void af_alg_free_resources(struct af_alg_async_req *areq);
+ void af_alg_async_cb(struct crypto_async_request *_req, int err);
+ unsigned int af_alg_poll(struct file *file, struct socket *sock,
+ 			 poll_table *wait);
+-- 
+2.13.6
