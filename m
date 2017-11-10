@@ -1,123 +1,200 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Fri, 10 Nov 2017 15:37:28 +0900
-Subject: n900 in next-20170901
-In-Reply-To: <20171110032610.GJ28152@atomide.com>
-References: <20171107154842.GP28152@atomide.com>
- <20171108074645.GA18747@js1304-P5Q-DELUXE>
- <20171108163413.GU28152@atomide.com>
- <20171109000801.GA23982@js1304-P5Q-DELUXE>
- <20171109001113.GZ28152@atomide.com>
- <20171109003639.GB23982@js1304-P5Q-DELUXE>
- <20171109035031.GA24383@js1304-P5Q-DELUXE>
- <20171109150854.GC28152@atomide.com>
- <20171110001315.GA29669@js1304-P5Q-DELUXE>
- <20171110032610.GJ28152@atomide.com>
-Message-ID: <20171110063727.GA32073@js1304-P5Q-DELUXE>
+From: kishon@ti.com (Kishon Vijay Abraham I)
+Date: Fri, 10 Nov 2017 12:01:58 +0530
+Subject: [PATCHv4 2/3] ARMv8: layerscape: add the pcie ep function support
+In-Reply-To: <20171110034847.17891-3-xiaowei.bao@nxp.com>
+References: <20171110034847.17891-1-xiaowei.bao@nxp.com>
+ <20171110034847.17891-3-xiaowei.bao@nxp.com>
+Message-ID: <d02ec499-5de5-11fe-9d95-591513037d49@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 07:26:10PM -0800, Tony Lindgren wrote:
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171110 00:10]:
-> > On Thu, Nov 09, 2017 at 07:08:54AM -0800, Tony Lindgren wrote:
-> > > Hmm OK. Does your first patch above now have the initcall issue too?
-> > > It boots if I make that also subsys_initcall and then I get:
-> > 
-> > > [    2.078094] vmalloc_pool_init: DMA: get vmalloc area: d0010000
-> > 
-> > Yes, first patch has the initcall issue and it's intentional in order
-> > to check the theory. I checked following log for this.
-> > 
-> > - Boot failure
-> > SRAM_ADDR: omap_map_sram: P: 0x40208000 - 0x4020f000
-> > SRAM_ADDR: omap_map_sram: V: 0xd0050000 - 0xd0057000
-> > 
-> > - Boot success
-> > SRAM_ADDR: omap_map_sram: P: 0x40208000 - 0x4020f000
-> > SRAM_ADDR: omap_map_sram: V: 0xd0008000 - 0xd000f000
-> > 
-> > When failure, virtual address for sram is higher than normal one due
-> > to vmalloc area allocation in __dma_alloc_remap(). If it is deferred,
-> > virtual address is the same with success case and then the system work.
-> > 
-> > So, my next theory is that there is n900 specific assumption that sram
-> > should have that address. Could you check if any working tree for n900
-> > which doesn't have my CMA series work or not with adding
-> > "arm/dma: vmalloc area allocation"?
-> 
-> Oh I see, sorry I was not following you earlier. So you mean that
-> by adding the vmalloc_pool_init() initcall the va mapping for SRAM
-> changes.
+Hi,
 
-Exactly.
-
+On Friday 10 November 2017 09:18 AM, Bao Xiaowei wrote:
+> Add the pcie controller ep function support of layerscape base on
+> pcie ep framework.
 > 
-> And yes, save_secure_ram_context seems to be doing some sketchy
-> virt to phys calculation with sram_phy_addr_mask. Here's a small
-> patch to fix that for your CMA series, maybe you can merge it
-> with your series to avoid breaking booting for git bisect.
-> 
-> Then I'll follow up on cleaning up save_secure_ram_context later.
-
-Thanks for the patch. However, the patch should be modified. See below.
-
-> Regards,
-> 
-> Tony
-> 
-> 8< -------------------------
-> >From tony Mon Sep 17 00:00:00 2001
-> From: Tony Lindgren <tony@atomide.com>
-> Date: Thu, 9 Nov 2017 17:05:34 -0800
-> Subject: [PATCH] ARM: OMAP2+: Add static SRAM mapping for
->  save_secure_ram_context
-> 
-> With the CMA changes from Joonsoo Kim <iamjoonsoo.kim@lge.com>, it
-> was noticed that n900 stopped booting. After investigating it turned
-> out that n900 save_secure_ram_context does some whacky virtual to
-> physical address translation for the SRAM data address.
-> 
-> Let's fix this for CMA changes by adding a static mapping for SRAM
-> on omap3. Then we can follow up with a patch to clean up the address
-> translation in save_secure_ram_context later on.
-> 
-> Debugged-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Bao Xiaowei <xiaowei.bao@nxp.com>
 > ---
->  arch/arm/mach-omap2/io.c    | 6 ++++++
->  arch/arm/mach-omap2/iomap.h | 4 ++++
->  2 files changed, 10 insertions(+)
+>  v2:
+>  - fix the ioremap function used but no ioumap issue
+>  - optimize the code structure
+>  - add code comments
+>  v3:
+>  - fix the msi outband window request failed issue
+>  v4:
+>  - optimize the code, adjust the format
 > 
-> diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
-> --- a/arch/arm/mach-omap2/io.c
-> +++ b/arch/arm/mach-omap2/io.c
-> @@ -139,6 +139,12 @@ static struct map_desc omap243x_io_desc[] __initdata = {
->  
->  #ifdef	CONFIG_ARCH_OMAP3
->  static struct map_desc omap34xx_io_desc[] __initdata = {
-> +	{
-> +		.virtual	= OMAP34XX_SRAM_VIRT,
-> +		.pfn		= __phys_to_pfn(OMAP34XX_SRAM_PHYS),
-> +		.length		= OMAP34XX_SRAM_SIZE,
-> +		.type		= MT_DEVICE
-> +	},
->  	{
->  		.virtual	= L3_34XX_VIRT,
->  		.pfn		= __phys_to_pfn(L3_34XX_PHYS),
-> diff --git a/arch/arm/mach-omap2/iomap.h b/arch/arm/mach-omap2/iomap.h
-> --- a/arch/arm/mach-omap2/iomap.h
-> +++ b/arch/arm/mach-omap2/iomap.h
-> @@ -123,6 +123,10 @@
->   * VPOM3430 was not working for Int controller
->   */
->  
-> +#define OMAP34XX_SRAM_PHYS	0x40200000
-> +#define OMAP34XX_SRAM_VIRT	0xd0010000
-> +#define OMAP34XX_SRAM_SIZE	0x10000
+>  drivers/pci/dwc/pci-layerscape.c | 120 ++++++++++++++++++++++++++++++++++++---
+>  1 file changed, 113 insertions(+), 7 deletions(-)
 
-For my testing environment, vmalloc address space is started at
-roughly 0xe0000000 so 0xd0010000 would not be valid. And, PHYS
-can be different according to the system type. Maybe either
-OMAP3_SRAM_PUB_PA or OMAP3_SRAM_PA. It seems that SIZE and TYPE should
-be considered, too. My understanding is correct?
+$subject should begin with
+PCI: layerscape:
+> 
+> diff --git a/drivers/pci/dwc/pci-layerscape.c b/drivers/pci/dwc/pci-layerscape.c
+> index 87fa486bee2c..6f3e434599e0 100644
+> --- a/drivers/pci/dwc/pci-layerscape.c
+> +++ b/drivers/pci/dwc/pci-layerscape.c
+> @@ -34,7 +34,12 @@
+>  /* PEX Internal Configuration Registers */
+>  #define PCIE_STRFMR1		0x71c /* Symbol Timer & Filter Mask Register1 */
+>  
+> +#define PCIE_DBI2_BASE		0x1000	/* DBI2 base address*/
 
-Thanks.
+The base address should come from dt.
+> +#define PCIE_MSI_MSG_DATA_OFF	0x5c	/* MSI Data register address*/
+> +#define PCIE_MSI_OB_SIZE	4096
+> +#define PCIE_MSI_ADDR_OFFSET	(1024 * 1024)
+>  #define PCIE_IATU_NUM		6
+> +#define PCIE_EP_ADDR_SPACE_SIZE 0x100000000
+>  
+>  struct ls_pcie_drvdata {
+>  	u32 lut_offset;
+> @@ -44,12 +49,20 @@ struct ls_pcie_drvdata {
+>  	const struct dw_pcie_ops *dw_pcie_ops;
+>  };
+>  
+> +struct ls_pcie_ep {
+> +	dma_addr_t msi_phys_addr;
+> +	void __iomem *msi_virt_addr;
+> +	u64 msi_msg_addr;
+> +	u16 msi_msg_data;
+> +};
+> +
+>  struct ls_pcie {
+>  	struct dw_pcie *pci;
+>  	void __iomem *lut;
+>  	struct regmap *scfg;
+>  	const struct ls_pcie_drvdata *drvdata;
+>  	int index;
+> +	struct ls_pcie_ep *pcie_ep;
+>  };
+>  
+>  #define to_ls_pcie(x)	dev_get_drvdata((x)->dev)
+> @@ -263,6 +276,99 @@ static const struct of_device_id ls_pcie_of_match[] = {
+>  	{ },
+>  };
+>  
+> +static void ls_pcie_raise_msi_irq(struct ls_pcie_ep *pcie_ep)
+> +{
+> +	iowrite32(pcie_ep->msi_msg_data, pcie_ep->msi_virt_addr);
+> +}
+> +
+> +static int ls_pcie_raise_irq(struct dw_pcie_ep *ep,
+> +		enum pci_epc_irq_type type, u8 interrupt_num)
+> +{
+> +	struct dw_pcie *pci = to_dw_pcie_from_ep(ep);
+> +	struct ls_pcie *pcie = to_ls_pcie(pci);
+> +	struct ls_pcie_ep *pcie_ep = pcie->pcie_ep;
+> +	u32 free_win;
+> +
+> +	/* get the msi message address and msi message data */
+> +	pcie_ep->msi_msg_addr = ioread32(pci->dbi_base + MSI_MESSAGE_ADDR_L32) |
+> +		(((u64)ioread32(pci->dbi_base + MSI_MESSAGE_ADDR_U32)) << 32);
+> +	pcie_ep->msi_msg_data = ioread16(pci->dbi_base + PCIE_MSI_MSG_DATA_OFF);
+> +
+> +	/* request and config the outband window for msi */
+> +	free_win = find_first_zero_bit(&ep->ob_window_map,
+> +					sizeof(ep->ob_window_map));
+> +	if (free_win >= ep->num_ob_windows) {
+> +		dev_err(pci->dev, "no free outbound window\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	dw_pcie_prog_outbound_atu(pci, free_win, PCIE_ATU_TYPE_MEM,
+> +					pcie_ep->msi_phys_addr,
+> +					pcie_ep->msi_msg_addr,
+> +					PCIE_MSI_OB_SIZE);
+> +
+> +	set_bit(free_win, &ep->ob_window_map);
+
+This custom logic is not required. You can use [1] instead
+
+[1] -> https://lkml.org/lkml/2017/11/3/318
+> +
+> +	/* generate the msi interrupt */
+> +	ls_pcie_raise_msi_irq(pcie_ep);
+> +
+> +	/* release the outband window of msi */
+> +	dw_pcie_disable_atu(pci, free_win, DW_PCIE_REGION_OUTBOUND);
+> +	clear_bit(free_win, &ep->ob_window_map);
+> +
+> +	return 0;
+> +}
+> +
+> +static struct dw_pcie_ep_ops pcie_ep_ops = {
+> +	.raise_irq = ls_pcie_raise_irq,
+> +};
+> +
+> +static int __init ls_add_pcie_ep(struct ls_pcie *pcie,
+> +					struct platform_device *pdev)
+> +{
+> +	struct dw_pcie *pci = pcie->pci;
+> +	struct device *dev = pci->dev;
+> +	struct dw_pcie_ep *ep;
+> +	struct ls_pcie_ep *pcie_ep;
+> +	struct resource *cfg_res;
+> +	int ret;
+> +
+> +	ep = &pci->ep;
+> +	ep->ops = &pcie_ep_ops;
+> +
+> +	pcie_ep = devm_kzalloc(dev, sizeof(*pcie_ep), GFP_KERNEL);
+> +	if (!pcie_ep)
+> +		return -ENOMEM;
+> +
+> +	pcie->pcie_ep = pcie_ep;
+> +
+> +	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+> +	if (cfg_res) {
+> +		ep->phys_base = cfg_res->start;
+> +		ep->addr_size = PCIE_EP_ADDR_SPACE_SIZE;
+> +	} else {
+> +		dev_err(dev, "missing *config* space\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	pcie_ep->msi_phys_addr = ep->phys_base + PCIE_MSI_ADDR_OFFSET;
+> +
+> +	pcie_ep->msi_virt_addr = ioremap(pcie_ep->msi_phys_addr,
+> +						PCIE_MSI_OB_SIZE);
+> +	if (!pcie_ep->msi_virt_addr) {
+> +		dev_err(dev, "failed to map MSI outbound region\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	ret = dw_pcie_ep_init(ep);
+> +	if (ret) {
+> +		dev_err(dev, "failed to initialize endpoint\n");
+> +		return ret;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int __init ls_add_pcie_port(struct ls_pcie *pcie)
+>  {
+>  	struct dw_pcie *pci = pcie->pci;
+> @@ -309,18 +415,18 @@ static int __init ls_pcie_probe(struct platform_device *pdev)
+>  	if (IS_ERR(pci->dbi_base))
+>  		return PTR_ERR(pci->dbi_base);
+>  
+> -	pcie->lut = pci->dbi_base + pcie->drvdata->lut_offset;
+> +	pci->dbi_base2 = pci->dbi_base + PCIE_DBI2_BASE;
+>  
+> -	if (!ls_pcie_is_bridge(pcie))
+> -		return -ENODEV;
+> +	pcie->lut = pci->dbi_base + pcie->drvdata->lut_offset;
+>  
+>  	platform_set_drvdata(pdev, pcie);
+>  
+> -	ret = ls_add_pcie_port(pcie);
+> -	if (ret < 0)
+> -		return ret;
+> +	if (!ls_pcie_is_bridge(pcie))
+> +		ret = ls_add_pcie_ep(pcie, pdev);
+
+HOST or EP mode should be obtained directly from dt.
+
+Thanks
+Kishon
