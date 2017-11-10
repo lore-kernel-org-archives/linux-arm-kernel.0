@@ -1,42 +1,41 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Fri, 10 Nov 2017 14:36:00 +0800
-Subject: [PATCH V4 05/12] clk: sprd: add mux clock support
+Date: Fri, 10 Nov 2017 14:36:01 +0800
+Subject: [PATCH V4 06/12] clk: sprd: add divider clock support
 In-Reply-To: <20171110063607.3250-1-chunyan.zhang@spreadtrum.com>
 References: <20171110063607.3250-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171110063607.3250-6-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171110063607.3250-7-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds clock multiplexor support for Spreadtrum platforms,
-the mux clocks also can be found in sprd composite clocks, so
-provides two helpers that can be reused later on.
+This is a feature that can also be found in sprd composite clocks,
+provide a bunch of helpers that can be reused in that.
 
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- drivers/clk/sprd/Makefile |  1 +
- drivers/clk/sprd/mux.c    | 86 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sprd/mux.h    | 78 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 165 insertions(+)
- create mode 100644 drivers/clk/sprd/mux.c
- create mode 100644 drivers/clk/sprd/mux.h
+ drivers/clk/sprd/Makefile |   1 +
+ drivers/clk/sprd/div.c    | 100 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sprd/div.h    |  79 ++++++++++++++++++++++++++++++++++++
+ 3 files changed, 180 insertions(+)
+ create mode 100644 drivers/clk/sprd/div.c
+ create mode 100644 drivers/clk/sprd/div.h
 
 diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-index 8cd5592..cee36b5 100644
+index cee36b5..80e6039 100644
 --- a/drivers/clk/sprd/Makefile
 +++ b/drivers/clk/sprd/Makefile
-@@ -2,3 +2,4 @@ obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
- 
+@@ -3,3 +3,4 @@ obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
  clk-sprd-y	+= common.o
  clk-sprd-y	+= gate.o
-+clk-sprd-y	+= mux.o
-diff --git a/drivers/clk/sprd/mux.c b/drivers/clk/sprd/mux.c
+ clk-sprd-y	+= mux.o
++clk-sprd-y	+= div.o
+diff --git a/drivers/clk/sprd/div.c b/drivers/clk/sprd/div.c
 new file mode 100644
-index 0000000..dacb5b4
+index 0000000..3e08dcd
 --- /dev/null
-+++ b/drivers/clk/sprd/mux.c
-@@ -0,0 +1,86 @@
++++ b/drivers/clk/sprd/div.c
+@@ -0,0 +1,100 @@
 +/*
-+ * Spreadtrum multiplexer clock driver
++ * Spreadtrum divider clock driver
 + *
 + * Copyright (C) 2017 Spreadtrum, Inc.
 + * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
@@ -44,91 +43,105 @@ index 0000000..dacb5b4
 + * SPDX-License-Identifier: GPL-2.0
 + */
 +
-+#include <linux/clk.h>
 +#include <linux/clk-provider.h>
-+#include <linux/regmap.h>
 +
-+#include "mux.h"
++#include "div.h"
 +
-+DEFINE_SPINLOCK(sprd_mux_lock);
-+EXPORT_SYMBOL_GPL(sprd_mux_lock);
++DEFINE_SPINLOCK(sprd_div_lock);
++EXPORT_SYMBOL_GPL(sprd_div_lock);
 +
-+u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
-+			      const struct sprd_mux_ssel *mux)
++long sprd_div_helper_round_rate(struct sprd_clk_common *common,
++				const struct sprd_div_internal *div,
++				unsigned long rate,
++				unsigned long *parent_rate)
 +{
++	return divider_round_rate(&common->hw, rate, parent_rate,
++				  NULL, div->width, 0);
++}
++EXPORT_SYMBOL_GPL(sprd_div_helper_round_rate);
++
++static long sprd_div_round_rate(struct clk_hw *hw, unsigned long rate,
++				unsigned long *parent_rate)
++{
++	struct sprd_div *cd = hw_to_sprd_div(hw);
++
++	return sprd_div_helper_round_rate(&cd->common, &cd->div,
++					  rate, parent_rate);
++}
++
++unsigned long sprd_div_helper_recalc_rate(struct sprd_clk_common *common,
++					  const struct sprd_div_internal *div,
++					  unsigned long parent_rate)
++{
++	unsigned long val;
 +	unsigned int reg;
-+	u8 parent;
-+	int num_parents;
-+	int i;
 +
 +	sprd_regmap_read(common->regmap, common->reg, &reg);
-+	parent = reg >> mux->shift;
-+	parent &= (1 << mux->width) - 1;
++	val = reg >> div->shift;
++	val &= (1 << div->width) - 1;
 +
-+	if (!mux->table)
-+		return parent;
-+
-+	num_parents = clk_hw_get_num_parents(&common->hw);
-+
-+	for (i = 0; i < num_parents - 1; i++)
-+		if (parent >= mux->table[i] && parent < mux->table[i + 1])
-+			return i;
-+
-+	return num_parents - 1;
++	return divider_recalc_rate(&common->hw, parent_rate, val, NULL, 0);
 +}
-+EXPORT_SYMBOL_GPL(sprd_mux_helper_get_parent);
++EXPORT_SYMBOL_GPL(sprd_div_helper_recalc_rate);
 +
-+static u8 sprd_mux_get_parent(struct clk_hw *hw)
++static unsigned long sprd_div_recalc_rate(struct clk_hw *hw,
++					  unsigned long parent_rate)
 +{
-+	struct sprd_mux *cm = hw_to_sprd_mux(hw);
++	struct sprd_div *cd = hw_to_sprd_div(hw);
 +
-+	return sprd_mux_helper_get_parent(&cm->common, &cm->mux);
++	return sprd_div_helper_recalc_rate(&cd->common, &cd->div, parent_rate);
 +}
 +
-+int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
-+			       const struct sprd_mux_ssel *mux,
-+			       u8 index)
++int sprd_div_helper_set_rate(const struct sprd_clk_common *common,
++			     const struct sprd_div_internal *div,
++			     unsigned long rate,
++			     unsigned long parent_rate)
 +{
-+	unsigned long flags = 0;
++	unsigned long flags;
++	unsigned long val;
 +	unsigned int reg;
 +
-+	if (mux->table)
-+		index = mux->table[index];
++	val = divider_get_val(rate, parent_rate, NULL,
++			      div->width, 0);
 +
 +	spin_lock_irqsave(common->lock, flags);
 +
 +	sprd_regmap_read(common->regmap, common->reg, &reg);
-+	reg &= ~GENMASK(mux->width + mux->shift - 1, mux->shift);
++	reg &= ~GENMASK(div->width + div->shift - 1, div->shift);
++
 +	sprd_regmap_write(common->regmap, common->reg,
-+			  reg | (index << mux->shift));
++			  reg | (val << div->shift));
 +
 +	spin_unlock_irqrestore(common->lock, flags);
 +
 +	return 0;
-+}
-+EXPORT_SYMBOL_GPL(sprd_mux_helper_set_parent);
 +
-+static int sprd_mux_set_parent(struct clk_hw *hw, u8 index)
++}
++EXPORT_SYMBOL_GPL(sprd_div_helper_set_rate);
++
++static int sprd_div_set_rate(struct clk_hw *hw, unsigned long rate,
++			     unsigned long parent_rate)
 +{
-+	struct sprd_mux *cm = hw_to_sprd_mux(hw);
++	struct sprd_div *cd = hw_to_sprd_div(hw);
 +
-+	return sprd_mux_helper_set_parent(&cm->common, &cm->mux, index);
++	return sprd_div_helper_set_rate(&cd->common, &cd->div,
++					rate, parent_rate);
 +}
 +
-+const struct clk_ops sprd_mux_ops = {
-+	.get_parent = sprd_mux_get_parent,
-+	.set_parent = sprd_mux_set_parent,
-+	.determine_rate = __clk_mux_determine_rate,
++const struct clk_ops sprd_div_ops = {
++	.recalc_rate = sprd_div_recalc_rate,
++	.round_rate = sprd_div_round_rate,
++	.set_rate = sprd_div_set_rate,
 +};
-+EXPORT_SYMBOL_GPL(sprd_mux_ops);
-diff --git a/drivers/clk/sprd/mux.h b/drivers/clk/sprd/mux.h
++EXPORT_SYMBOL_GPL(sprd_div_ops);
+diff --git a/drivers/clk/sprd/div.h b/drivers/clk/sprd/div.h
 new file mode 100644
-index 0000000..72a3f78
+index 0000000..fa47773
 --- /dev/null
-+++ b/drivers/clk/sprd/mux.h
-@@ -0,0 +1,78 @@
++++ b/drivers/clk/sprd/div.h
+@@ -0,0 +1,79 @@
 +/*
-+ * Spreadtrum multiplexer clock driver
++ * Spreadtrum divider clock driver
 + *
 + * Copyright (C) 2017 Spreadtrum, Inc.
 + * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
@@ -136,74 +149,75 @@ index 0000000..72a3f78
 + * SPDX-License-Identifier: GPL-2.0
 + */
 +
-+#ifndef _SPRD_MUX_H_
-+#define _SPRD_MUX_H_
++#ifndef _SPRD_DIV_H_
++#define _SPRD_DIV_H_
 +
 +#include "common.h"
 +
 +/**
-+ * struct sprd_mux_ssel - Mux clock's source select bits in its register
++ * struct sprd_div_internal - Internal divider description
 + * @shift: Bit offset of the divider in its register
 + * @width: Width of the divider field in its register
-+ * @table: For some mux clocks, not all sources are used on some special
-+ *	   chips, this matches the value of mux clock's register and the
-+ *	   sources which are used for this mux clock
++ *
++ * That structure represents a single divider, and is meant to be
++ * embedded in other structures representing the various clock
++ * classes.
 + */
-+struct sprd_mux_ssel {
-+	u8		shift;
-+	u8		width;
-+	const u8	*table;
++struct sprd_div_internal {
++	u8	shift;
++	u8	width;
 +};
 +
-+struct sprd_mux {
-+	struct sprd_mux_ssel mux;
++#define _SPRD_DIV_CLK(_shift, _width)	\
++	{				\
++		.shift	= _shift,	\
++		.width	= _width,	\
++	}
++
++struct sprd_div {
++	struct sprd_div_internal	div;
 +	struct sprd_clk_common	common;
 +};
 +
-+#define _SPRD_MUX_CLK(_shift, _width, _table)		\
-+	{						\
-+		.shift	= _shift,			\
-+		.width	= _width,			\
-+		.table	= _table,			\
-+	}
-+
-+#define SPRD_MUX_CLK_TABLE(_struct, _name, _parents, _table,		\
-+				     _reg, _shift, _width,		\
-+				     _flags)				\
-+	struct sprd_mux _struct = {					\
-+		.mux	= _SPRD_MUX_CLK(_shift, _width, _table),	\
++#define SPRD_DIV_CLK(_struct, _name, _parent, _reg,			\
++			_shift, _width, _flags)				\
++	struct sprd_div _struct = {					\
++		.div	= _SPRD_DIV_CLK(_shift, _width),		\
 +		.common	= {						\
 +			.regmap		= NULL,				\
 +			.reg		= _reg,				\
-+			.lock		= &sprd_mux_lock,		\
-+			.hw.init = CLK_HW_INIT_PARENTS(_name,		\
-+						       _parents,	\
-+						       &sprd_mux_ops,	\
-+						       _flags),		\
++			.lock		= &sprd_div_lock,		\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						      _parent,		\
++						      &sprd_div_ops,	\
++						      _flags),		\
 +		}							\
 +	}
 +
-+#define SPRD_MUX_CLK(_struct, _name, _parents, _reg,		\
-+		     _shift, _width, _flags)			\
-+	SPRD_MUX_CLK_TABLE(_struct, _name, _parents, NULL,	\
-+			   _reg, _shift, _width, _flags)
-+
-+static inline struct sprd_mux *hw_to_sprd_mux(const struct clk_hw *hw)
++static inline struct sprd_div *hw_to_sprd_div(const struct clk_hw *hw)
 +{
 +	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
 +
-+	return container_of(common, struct sprd_mux, common);
++	return container_of(common, struct sprd_div, common);
 +}
 +
-+extern const struct clk_ops sprd_mux_ops;
-+extern spinlock_t sprd_mux_lock;
++long sprd_div_helper_round_rate(struct sprd_clk_common *common,
++				const struct sprd_div_internal *div,
++				unsigned long rate,
++				unsigned long *parent_rate);
 +
-+u8 sprd_mux_helper_get_parent(const struct sprd_clk_common *common,
-+			      const struct sprd_mux_ssel *mux);
-+int sprd_mux_helper_set_parent(const struct sprd_clk_common *common,
-+			       const struct sprd_mux_ssel *mux,
-+			       u8 index);
++unsigned long sprd_div_helper_recalc_rate(struct sprd_clk_common *common,
++					  const struct sprd_div_internal *div,
++					  unsigned long parent_rate);
 +
-+#endif /* _SPRD_MUX_H_ */
++int sprd_div_helper_set_rate(const struct sprd_clk_common *common,
++			     const struct sprd_div_internal *div,
++			     unsigned long rate,
++			     unsigned long parent_rate);
++
++extern const struct clk_ops sprd_div_ops;
++extern spinlock_t sprd_div_lock;
++
++#endif /* _SPRD_DIV_H_ */
 -- 
 2.7.4
