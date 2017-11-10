@@ -1,16 +1,16 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Nov 2017 14:25:26 +0100
-Subject: [PATCH v5 09/15] arm64: dts: renesas: r8a7795: Point VSPBC/VSPBD via
- FCPVB to IPMMU-VP0/1
+Date: Fri, 10 Nov 2017 14:25:27 +0100
+Subject: [PATCH v5 10/15] arm64: dts: renesas: r8a7795: Point VSPI via FCPVI
+ to IPMMU-VP0/1
 In-Reply-To: <20171110132532.1202-1-horms+renesas@verge.net.au>
 References: <20171110132532.1202-1-horms+renesas@verge.net.au>
-Message-ID: <20171110132532.1202-10-horms+renesas@verge.net.au>
+Message-ID: <20171110132532.1202-11-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Hook up the FCPVB devices to allow use of VSPBC/VSPBD with
+Hook up the FCPVI devices to allow use of VSPI with
 IPMMU-VP0 and IPMMU-VP1.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
@@ -21,46 +21,49 @@ v5 [Simon Horman]
 * Added reviewed by tag from Geert Uytterhoeven
 
 v4 [Simon Horman]
-* Use IPMMU-VP1 for FCPVP1 on ES2.0
+* broke out of larger patch
+* Use IPMMU-VP1 for FCPVI1 on ES2.0
+
+v1 - v3 [Magnus Damm]
 ---
  arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 4 ++++
  arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 2 ++
  2 files changed, 6 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-index 736281335653..3d50627c0670 100644
+index 3d50627c0670..b2d2f04c5e1c 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-@@ -151,6 +151,10 @@
- 	       <&ipmmu_mp1 30>, <&ipmmu_mp1 31>;
- };
- 
-+&fcpvb1 {
-+	iommus = <&ipmmu_vp0 7>;
-+};
-+
- &fcpf1 {
+@@ -159,6 +159,10 @@
  	iommus = <&ipmmu_vp0 1>;
  };
+ 
++&fcpvi1 {
++	iommus = <&ipmmu_vp0 9>;
++};
++
+ &fcpvd2 {
+ 	iommus = <&ipmmu_vi0 10>;
+ };
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 1202b84104a0..cf9708ac46eb 100644
+index cf9708ac46eb..851324eac5ed 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -2062,6 +2062,7 @@
- 			clocks = <&cpg CPG_MOD 606>;
+@@ -2120,6 +2120,7 @@
+ 			clocks = <&cpg CPG_MOD 611>;
  			power-domains = <&sysc R8A7795_PD_A3VP>;
- 			resets = <&cpg 606>;
-+			iommus = <&ipmmu_vp1 7>;
+ 			resets = <&cpg 611>;
++			iommus = <&ipmmu_vp0 8>;
  		};
  
- 		fcpf0: fcp at fe950000 {
-@@ -2099,6 +2100,7 @@
- 			clocks = <&cpg CPG_MOD 607>;
+ 		vspi1: vsp at fe9b0000 {
+@@ -2139,6 +2140,7 @@
+ 			clocks = <&cpg CPG_MOD 610>;
  			power-domains = <&sysc R8A7795_PD_A3VP>;
- 			resets = <&cpg 607>;
-+			iommus = <&ipmmu_vp0 5>;
+ 			resets = <&cpg 610>;
++			iommus = <&ipmmu_vp1 9>;
  		};
  
- 		vspi0: vsp at fe9a0000 {
+ 		vspd0: vsp at fea20000 {
 -- 
 2.11.0
