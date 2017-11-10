@@ -1,40 +1,62 @@
-From: yangbo.lu@nxp.com (Yangbo Lu)
-Date: Fri, 10 Nov 2017 09:58:47 +0800
-Subject: [PATCH] arm: dts: ls1021a: fix the value of TMR_FIPER1
-Message-ID: <20171110015847.29635-1-yangbo.lu@nxp.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu,  9 Nov 2017 21:32:55 -0500
+Subject: [PATCH V3 4/4] dmaengine: qcom_hidma: add identity register support
+In-Reply-To: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
+References: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1510281175-27173-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The timer fixed interval period pulse generator register
-is used to generate periodic pulses. The down count
-register loads the value programmed in the fixed period
-interval (FIPER). At every tick of the timer accumulator
-overflow, the counter decrements by the value of
-TMR_CTRL[TCLK_PERIOD]. It generates a pulse when the down
-counter value reaches zero. It reloads the down counter
-in the cycle following a pulse. To use the TMR_FIPER1
-register to generate a 1 PPS event, the value
-(10^9 nanoseconds) - TCLK_PERIOD should be programmed.
-It should be 999999995 not 999999990 since TCLK_PERIOD
-is 5.
+The location for destination event channel register has been relocated from
+offset 0x28 to 0x40. Update the code accordingly.
 
-Signed-off-by: Yangbo Lu <yangbo.lu@nxp.com>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/arm/boot/dts/ls1021a.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/dma/qcom/hidma.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 9319e1f0f1d8..10e536f338f7 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -575,7 +575,7 @@
- 			fsl,tclk-period = <5>;
- 			fsl,tmr-prsc    = <2>;
- 			fsl,tmr-add     = <0xaaaaaaab>;
--			fsl,tmr-fiper1  = <999999990>;
-+			fsl,tmr-fiper1  = <999999995>;
- 			fsl,tmr-fiper2  = <99990>;
- 			fsl,max-adj     = <499999999>;
- 		};
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index d9d8071..a3a6032 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -107,6 +107,7 @@ static void hidma_free(struct hidma_dev *dmadev)
+ 
+ enum hidma_cap {
+ 	HIDMA_MSI_CAP = 1,
++	HIDMA_IDENTITY_CAP,
+ };
+ 
+ /* process completed descriptors */
+@@ -843,7 +844,10 @@ static int hidma_probe(struct platform_device *pdev)
+ 	if (!dmadev->nr_descriptors)
+ 		dmadev->nr_descriptors = HIDMA_NR_DEFAULT_DESC;
+ 
+-	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
++	if (hidma_test_capability(&pdev->dev, HIDMA_IDENTITY_CAP))
++		dmadev->chidx = readl(dmadev->dev_trca + 0x40);
++	else
++		dmadev->chidx = readl(dmadev->dev_trca + 0x28);
+ 
+ 	/* Set DMA mask to 64 bits. */
+ 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+@@ -949,7 +953,7 @@ static int hidma_remove(struct platform_device *pdev)
+ static const struct acpi_device_id hidma_acpi_ids[] = {
+ 	{"QCOM8061"},
+ 	{"QCOM8062", HIDMA_MSI_CAP},
+-	{"QCOM8063", HIDMA_MSI_CAP},
++	{"QCOM8063", (HIDMA_MSI_CAP | HIDMA_IDENTITY_CAP)},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
+@@ -958,7 +962,8 @@ static int hidma_remove(struct platform_device *pdev)
+ static const struct of_device_id hidma_match[] = {
+ 	{.compatible = "qcom,hidma-1.0",},
+ 	{.compatible = "qcom,hidma-1.1", .data = (void *)(HIDMA_MSI_CAP),},
+-	{.compatible = "qcom,hidma-1.2", .data = (void *)(HIDMA_MSI_CAP),},
++	{.compatible = "qcom,hidma-1.2",
++	 .data = (void *)(HIDMA_MSI_CAP | HIDMA_IDENTITY_CAP),},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, hidma_match);
 -- 
-2.14.1
+1.9.1
