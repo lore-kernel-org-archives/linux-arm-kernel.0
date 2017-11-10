@@ -1,41 +1,48 @@
 From: jlu@pengutronix.de (Jan Luebbe)
-Date: Fri, 10 Nov 2017 10:03:05 +0100
-Subject: [PATCH v3 4/7] ARM: l2x0: support parity-enable/disable on aurora
+Date: Fri, 10 Nov 2017 10:03:03 +0100
+Subject: [PATCH v3 2/7] ARM: aurora-l2: add prefix to MAX_RANGE_SIZE
 In-Reply-To: <20171110090308.21562-1-jlu@pengutronix.de>
 References: <20171110090308.21562-1-jlu@pengutronix.de>
-Message-ID: <20171110090308.21562-5-jlu@pengutronix.de>
+Message-ID: <20171110090308.21562-3-jlu@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Packham <chris.packham@alliedtelesis.co.nz>
+The macro name is too generic, so add a AURORA_ prefix.
 
-The aurora cache on the Marvell Armada-XP SoC supports the same tag
-parity features as the other l2x0 cache implementations.
-
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-[jlu at pengutronix.de: use aurora specific define AURORA_ACR_PARITY_EN]
 Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
+Reviewed-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- arch/arm/mm/cache-l2x0.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/include/asm/hardware/cache-aurora-l2.h | 2 +-
+ arch/arm/mm/cache-l2x0.c                        | 4 ++--
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
+diff --git a/arch/arm/include/asm/hardware/cache-aurora-l2.h b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+index c86124769831..dc5c479ec4c3 100644
+--- a/arch/arm/include/asm/hardware/cache-aurora-l2.h
++++ b/arch/arm/include/asm/hardware/cache-aurora-l2.h
+@@ -41,7 +41,7 @@
+ #define AURORA_ACR_FORCE_WRITE_THRO_POLICY	\
+ 	(2 << AURORA_ACR_FORCE_WRITE_POLICY_OFFSET)
+ 
+-#define MAX_RANGE_SIZE		1024
++#define AURORA_MAX_RANGE_SIZE	1024
+ 
+ #define AURORA_WAY_SIZE_SHIFT	2
+ 
 diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 7d2d2a3c67d0..b70bee74750d 100644
+index a00d6f7fd34c..7d2d2a3c67d0 100644
 --- a/arch/arm/mm/cache-l2x0.c
 +++ b/arch/arm/mm/cache-l2x0.c
-@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
- 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
- 	}
+@@ -1364,8 +1364,8 @@ static unsigned long aurora_range_end(unsigned long start, unsigned long end)
+ 	 * since cache range operations stall the CPU pipeline
+ 	 * until completion.
+ 	 */
+-	if (end > start + MAX_RANGE_SIZE)
+-		end = start + MAX_RANGE_SIZE;
++	if (end > start + AURORA_MAX_RANGE_SIZE)
++		end = start + AURORA_MAX_RANGE_SIZE;
  
-+	if (of_property_read_bool(np, "arm,parity-enable")) {
-+		mask |= AURORA_ACR_PARITY_EN;
-+		val |= AURORA_ACR_PARITY_EN;
-+	} else if (of_property_read_bool(np, "arm,parity-disable")) {
-+		mask |= AURORA_ACR_PARITY_EN;
-+	}
-+
- 	*aux_val &= ~mask;
- 	*aux_val |= val;
- 	*aux_mask &= ~mask;
+ 	/*
+ 	 * Cache range operations can't straddle a page boundary.
 -- 
 2.11.0
