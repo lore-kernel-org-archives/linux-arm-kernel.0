@@ -1,54 +1,120 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Fri, 10 Nov 2017 06:50:15 +0100
-Subject: [PATCH v2 2/2] ARM: sun8i: bananapi-m3: Enable dwmac-sun8i
-In-Reply-To: <CAGb2v6670K24MTQ8NWGDF8e2iXB+Okghp51kMD7rADgviQ65fg@mail.gmail.com>
-References: <20171109082950.21124-1-clabbe.montjoie@gmail.com>
- <20171109082950.21124-3-clabbe.montjoie@gmail.com>
- <CAGb2v6670K24MTQ8NWGDF8e2iXB+Okghp51kMD7rADgviQ65fg@mail.gmail.com>
-Message-ID: <20171110055015.GA11040@Red>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 9 Nov 2017 22:19:17 -0800
+Subject: n900 in next-20170901
+In-Reply-To: <20171110032610.GJ28152@atomide.com>
+References: <20171107154842.GP28152@atomide.com>
+ <20171108074645.GA18747@js1304-P5Q-DELUXE>
+ <20171108163413.GU28152@atomide.com>
+ <20171109000801.GA23982@js1304-P5Q-DELUXE>
+ <20171109001113.GZ28152@atomide.com>
+ <20171109003639.GB23982@js1304-P5Q-DELUXE>
+ <20171109035031.GA24383@js1304-P5Q-DELUXE>
+ <20171109150854.GC28152@atomide.com>
+ <20171110001315.GA29669@js1304-P5Q-DELUXE>
+ <20171110032610.GJ28152@atomide.com>
+Message-ID: <20171110061917.GK28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 11:48:11AM +0800, Chen-Yu Tsai wrote:
-> On Thu, Nov 9, 2017 at 4:29 PM, Corentin Labbe
-> <clabbe.montjoie@gmail.com> wrote:
-> > The dwmac-sun8i hardware is present on the bananapi m3
-> > It uses an external PHY rtl8211e via RGMII.
-> >
-> > This patch create the needed emac and phy nodes.
-> >
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >  arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts | 18 ++++++++++++++++++
-> >  1 file changed, 18 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-> > index c606af3dbfed..45bdd5c17829 100644
-> > --- a/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-> > +++ b/arch/arm/boot/dts/sun8i-a83t-bananapi-m3.dts
-> > @@ -52,6 +52,7 @@
-> >         compatible = "sinovoip,bpi-m3", "allwinner,sun8i-a83t";
-> >
-> >         aliases {
-> > +               ethernet0 = &emac;
-> >                 serial0 = &uart0;
-> >         };
-> >
-> > @@ -88,6 +89,23 @@
-> >         /* TODO GL830 USB-to-SATA bridge downstream w/ GPIO power controls */
-> >  };
-> >
-> > +&emac {
-> > +       pinctrl-names = "default";
-> > +       pinctrl-0 = <&emac_rgmii_pins>;
-> > +       phy-handle = <&ext_rgmii_phy>;
-> > +       phy-mode = "rgmii";
+* Tony Lindgren <tony@atomide.com> [171110 03:28]:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171110 00:10]:
+> > On Thu, Nov 09, 2017 at 07:08:54AM -0800, Tony Lindgren wrote:
+> > > Hmm OK. Does your first patch above now have the initcall issue too?
+> > > It boots if I make that also subsys_initcall and then I get:
+> > 
+> > > [    2.078094] vmalloc_pool_init: DMA: get vmalloc area: d0010000
+> > 
+> > Yes, first patch has the initcall issue and it's intentional in order
+> > to check the theory. I checked following log for this.
+> > 
+> > - Boot failure
+> > SRAM_ADDR: omap_map_sram: P: 0x40208000 - 0x4020f000
+> > SRAM_ADDR: omap_map_sram: V: 0xd0050000 - 0xd0057000
+> > 
+> > - Boot success
+> > SRAM_ADDR: omap_map_sram: P: 0x40208000 - 0x4020f000
+> > SRAM_ADDR: omap_map_sram: V: 0xd0008000 - 0xd000f000
+> > 
+> > When failure, virtual address for sram is higher than normal one due
+> > to vmalloc area allocation in __dma_alloc_remap(). If it is deferred,
+> > virtual address is the same with success case and then the system work.
+> > 
+> > So, my next theory is that there is n900 specific assumption that sram
+> > should have that address. Could you check if any working tree for n900
+> > which doesn't have my CMA series work or not with adding
+> > "arm/dma: vmalloc area allocation"?
 > 
-> Schematics say PHY is power by DC1SW from the PMIC.
-> Not sure why you don't need that. Have you tested your patch?
+> Oh I see, sorry I was not following you earlier. So you mean that
+> by adding the vmalloc_pool_init() initcall the va mapping for SRAM
+> changes.
+> 
+> And yes, save_secure_ram_context seems to be doing some sketchy
+> virt to phys calculation with sram_phy_addr_mask. Here's a small
+> patch to fix that for your CMA series, maybe you can merge it
+> with your series to avoid breaking booting for git bisect.
+> 
+> Then I'll follow up on cleaning up save_secure_ram_context later.
 
-Tested on 4.14.0-rc5-next-20171018+ 
-I will try to check which uboot is used, perhaps it's an old uboot with some PMIC hack.
+Here's a better version, the static mapping did not get used.. It
+just moved the area so it happened to work. It needs to be set
+up as MT_MEMORY_RWX_NONCACHED instead.
 
-Thanks
-Regards
+Regards,
+
+Tony
+
+8< -------------------
+>From tony Mon Sep 17 00:00:00 2001
+From: Tony Lindgren <tony@atomide.com>
+Date: Thu, 9 Nov 2017 17:05:34 -0800
+Subject: [PATCH] ARM: OMAP2+: Add static SRAM mapping for
+ save_secure_ram_context
+
+With the CMA changes from Joonsoo Kim <iamjoonsoo.kim@lge.com>, it
+was noticed that n900 stopped booting. After investigating it turned
+out that n900 save_secure_ram_context does some whacky virtual to
+physical address translation for the SRAM data address.
+
+Let's fix this for CMA changes by adding a static mapping for SRAM
+on omap3. Then we can follow up with a patch to clean up the address
+translation in save_secure_ram_context later on.
+
+Debugged-by: Joonsoo Kim <iamjoonsoo.kim@lge.com>
+Signed-off-by: Tony Lindgren <tony@atomide.com>
+---
+ arch/arm/mach-omap2/io.c    | 6 ++++++
+ arch/arm/mach-omap2/iomap.h | 4 ++++
+ 2 files changed, 10 insertions(+)
+
+diff --git a/arch/arm/mach-omap2/io.c b/arch/arm/mach-omap2/io.c
+--- a/arch/arm/mach-omap2/io.c
++++ b/arch/arm/mach-omap2/io.c
+@@ -139,6 +139,12 @@ static struct map_desc omap243x_io_desc[] __initdata = {
+ 
+ #ifdef	CONFIG_ARCH_OMAP3
+ static struct map_desc omap34xx_io_desc[] __initdata = {
++	{
++		.virtual	= OMAP34XX_SRAM_VIRT,
++		.pfn		= __phys_to_pfn(OMAP34XX_SRAM_PHYS),
++		.length		= OMAP34XX_SRAM_SIZE,
++		.type		= MT_MEMORY_RWX_NONCACHED
++	},
+ 	{
+ 		.virtual	= L3_34XX_VIRT,
+ 		.pfn		= __phys_to_pfn(L3_34XX_PHYS),
+diff --git a/arch/arm/mach-omap2/iomap.h b/arch/arm/mach-omap2/iomap.h
+--- a/arch/arm/mach-omap2/iomap.h
++++ b/arch/arm/mach-omap2/iomap.h
+@@ -123,6 +123,10 @@
+  * VPOM3430 was not working for Int controller
+  */
+ 
++#define OMAP34XX_SRAM_PHYS	0x40200000
++#define OMAP34XX_SRAM_VIRT	0xd0010000
++#define OMAP34XX_SRAM_SIZE	0x10000
++
+ #define L4_PER_34XX_PHYS	L4_PER_34XX_BASE
+ 						/* 0x49000000 --> 0xfb000000 */
+ #define L4_PER_34XX_VIRT	(L4_PER_34XX_PHYS + OMAP2_L4_IO_OFFSET)
+-- 
+2.15.0
