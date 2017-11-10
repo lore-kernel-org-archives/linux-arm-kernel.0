@@ -1,31 +1,33 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Fri, 10 Nov 2017 16:46:50 +0800
-Subject: [PATCH 2/3] reset: meson-axg: add compatible string for Meson-AXG SoC
-In-Reply-To: <20171110084650.31325-1-yixun.lan@amlogic.com>
-References: <20171110084650.31325-1-yixun.lan@amlogic.com>
-Message-ID: <20171110084650.31325-2-yixun.lan@amlogic.com>
+Date: Fri, 10 Nov 2017 16:46:59 +0800
+Subject: [PATCH 3/3] arm64: dts: meson-axg: add new reset DT node
+Message-ID: <20171110084659.31641-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Try to add compatible string explictly to support new Meson-AXG SoC.
+Add reset DT node for Amlogic's Meson-AXG SoC.
 
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- drivers/reset/reset-meson.c | 2 ++
- 1 file changed, 2 insertions(+)
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
-index c419a3753d00..93cbee1ae8ef 100644
---- a/drivers/reset/reset-meson.c
-+++ b/drivers/reset/reset-meson.c
-@@ -139,6 +139,8 @@ static const struct of_device_id meson_reset_dt_ids[] = {
- 	   .data = &meson_reset_meson8_ops, },
- 	 { .compatible = "amlogic,meson-gxbb-reset",
- 	   .data = &meson_reset_gx_ops, },
-+	 { .compatible = "amlogic,meson-axg-reset",
-+	   .data = &meson_reset_gx_ops, },
- 	 { /* sentinel */ },
- };
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index e0fb860e12c5..65945c6c8b65 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -123,6 +123,12 @@
+ 			#size-cells = <2>;
+ 			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
  
++			reset: reset-controller at 1004 {
++				compatible = "amlogic,meson-axg-reset";
++				reg = <0x0 0x01004 0x0 0x9c>;
++				#reset-cells = <1>;
++			};
++
+ 			uart_A: serial at 24000 {
+ 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
+ 				reg = <0x0 0x24000 0x0 0x14>;
 -- 
 2.14.1
