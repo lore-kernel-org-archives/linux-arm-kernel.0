@@ -1,167 +1,84 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Fri, 10 Nov 2017 14:36:07 +0800
-Subject: [PATCH V4 12/12] arm64: dts: add clocks for SC9860
+Date: Fri, 10 Nov 2017 14:36:06 +0800
+Subject: [PATCH V4 11/12] arm64: dts: add syscon for whale2 platform
 In-Reply-To: <20171110063607.3250-1-chunyan.zhang@spreadtrum.com>
 References: <20171110063607.3250-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171110063607.3250-13-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171110063607.3250-12-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks on SC9860 are in the same address area with syscon devices,
-those are what have a property of 'sprd,syscon' which would refer to
-syscon devices, others would have a reg property indicated their address
-ranges.
+Some clocks on SC9860 are in the same address area with syscon
+devices, the proper syscon node will be quoted under the
+definitions of those clocks in DT.
 
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- arch/arm64/boot/dts/sprd/sc9860.dtsi | 115 +++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/sprd/whale2.dtsi |   2 +-
- 2 files changed, 116 insertions(+), 1 deletion(-)
+ arch/arm64/boot/dts/sprd/whale2.dtsi | 46 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-index 7b7d8ce..bf03da4 100644
---- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-@@ -7,6 +7,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/sprd,sc9860-clk.h>
- #include "whale2.dtsi"
- 
- / {
-@@ -183,6 +184,120 @@
- 	};
- 
- 	soc {
-+		pmu_gate: pmu-gate {
-+			compatible = "sprd,sc9860-pmu-gate";
-+			sprd,syscon = <&pmu_regs>; /* 0x402b0000 */
-+			clocks = <&ext_26m>;
-+			#clock-cells = <1>;
-+		};
-+
-+		pll: pll {
-+			compatible = "sprd,sc9860-pll";
-+			sprd,syscon = <&ana_regs>; /* 0x40400000 */
-+			clocks = <&pmu_gate 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		ap_clk: clock-controller at 20000000 {
-+			compatible = "sprd,sc9860-ap-clk";
-+			reg = <0 0x20000000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>,
-+				 <&pmu_gate 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		aon_prediv: aon-prediv {
-+			compatible = "sprd,sc9860-aon-prediv";
-+			reg = <0 0x402d0000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>,
-+				 <&pmu_gate 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		apahb_gate: apahb-gate {
-+			compatible = "sprd,sc9860-apahb-gate";
-+			sprd,syscon = <&ap_ahb_regs>; /* 0x20210000 */
-+			clocks = <&aon_prediv 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		aon_gate: aon-gate {
-+			compatible = "sprd,sc9860-aon-gate";
-+			sprd,syscon = <&aon_regs>; /* 0x402e0000 */
-+			clocks = <&aon_prediv 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		aonsecure_clk: clock-controller at 40880000 {
-+			compatible = "sprd,sc9860-aonsecure-clk";
-+			reg = <0 0x40880000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		agcp_gate: agcp-gate {
-+			compatible = "sprd,sc9860-agcp-gate";
-+			sprd,syscon = <&agcp_regs>; /* 0x415e0000 */
-+			clocks = <&aon_prediv 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		gpu_clk: clock-controller at 60200000 {
-+			compatible = "sprd,sc9860-gpu-clk";
-+			reg = <0 0x60200000 0 0x400>;
-+			clocks = <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		vsp_clk: clock-controller at 61000000 {
-+			compatible = "sprd,sc9860-vsp-clk";
-+			reg = <0 0x61000000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		vsp_gate: vsp-gate {
-+			compatible = "sprd,sc9860-vsp-gate";
-+			sprd,syscon = <&vsp_regs>; /* 0x61100000 */
-+			clocks = <&vsp_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		cam_clk: clock-controller at 62000000 {
-+			compatible = "sprd,sc9860-cam-clk";
-+			reg = <0 0x62000000 0 0x4000>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		cam_gate: cam-gate {
-+			compatible = "sprd,sc9860-cam-gate";
-+			sprd,syscon = <&cam_regs>; /* 0x62100000 */
-+			clocks = <&cam_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		disp_clk: clock-controller at 63000000 {
-+			compatible = "sprd,sc9860-disp-clk";
-+			reg = <0 0x63000000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		disp_gate: disp-gate {
-+			compatible = "sprd,sc9860-disp-gate";
-+			sprd,syscon = <&disp_regs>; /* 0x63100000 */
-+			clocks = <&disp_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		apapb_gate: apapb-gate {
-+			compatible = "sprd,sc9860-apapb-gate";
-+			sprd,syscon = <&ap_apb_regs>; /* 0x70b00000 */
-+			clocks = <&ap_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
- 		funnel at 10001000 { /* SoC Funnel */
- 			compatible = "arm,coresight-funnel", "arm,primecell";
- 			reg = <0 0x10001000 0 0x1000>;
 diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index 6ea3a75..eb004bb 100644
+index 7c217c5..6ea3a75 100644
 --- a/arch/arm64/boot/dts/sprd/whale2.dtsi
 +++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -110,6 +110,6 @@
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <26000000>;
--		clock-output-names = "ext_26m";
-+		clock-output-names = "ext-26m";
+@@ -17,6 +17,51 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		ap_ahb_regs: syscon at 20210000 {
++			compatible = "syscon";
++			reg = <0 0x20210000 0 0x10000>;
++		};
++
++		pmu_regs: syscon at 402b0000 {
++			compatible = "syscon";
++			reg = <0 0x402b0000 0 0x10000>;
++		};
++
++		aon_regs: syscon at 402e0000 {
++			compatible = "syscon";
++			reg = <0 0x402e0000 0 0x10000>;
++		};
++
++		ana_regs: syscon at 40400000 {
++			compatible = "syscon";
++			reg = <0 0x40400000 0 0x10000>;
++		};
++
++		agcp_regs: syscon at 415e0000 {
++			compatible = "syscon";
++			reg = <0 0x415e0000 0 0x1000000>;
++		};
++
++		vsp_regs: syscon at 61100000 {
++			compatible = "syscon";
++			reg = <0 0x61100000 0 0x10000>;
++		};
++
++		cam_regs: syscon at 62100000 {
++			compatible = "syscon";
++			reg = <0 0x62100000 0 0x10000>;
++		};
++
++		disp_regs: syscon at 63100000 {
++			compatible = "syscon";
++			reg = <0 0x63100000 0 0x10000>;
++		};
++
++		ap_apb_regs: syscon at 70b00000 {
++			compatible = "syscon";
++			reg = <0 0x70b00000 0 0x40000>;
++		};
++
+ 		ap-apb {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -59,7 +104,6 @@
+ 				status = "disabled";
+ 			};
+ 		};
+-
  	};
- };
+ 
+ 	ext_26m: ext-26m {
 -- 
 2.7.4
