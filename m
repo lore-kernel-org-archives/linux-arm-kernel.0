@@ -1,21 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Fri, 10 Nov 2017 02:03:18 +0100
-Subject: [PATCH] ARM: dts: vf610-zii-dev-c: Fix switch EEPROM size
-In-Reply-To: <CAOMZO5DvJAAh_eNnHF4sOjPuzqkKxkenuSDzG7ppaEMh7puFBQ@mail.gmail.com>
-References: <1510271336-30769-1-git-send-email-andrew@lunn.ch>
- <CAOMZO5DvJAAh_eNnHF4sOjPuzqkKxkenuSDzG7ppaEMh7puFBQ@mail.gmail.com>
-Message-ID: <20171110010318.GA32303@lunn.ch>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 10 Nov 2017 09:05:59 +0800
+Subject: [PATCH 1/1] add rgb888 pins to a20 to enable parallel rgb LCD
+In-Reply-To: <20171108105623.zzabmqd3a3sehg2k@flea.lan>
+References: <1510058999-6778-1-git-send-email-giulio.benetti@micronovasrl.com>
+ <20171107130331.4wut5g6znzakkg4z@flea>
+ <65694f1d-e1cb-08e0-0883-f0087f5e09f5@micronovasrl.com>
+ <20171108105623.zzabmqd3a3sehg2k@flea.lan>
+Message-ID: <a57155315f2d5791b629e03240265e2e@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio
-
-> vf610-zii-dev-rev-b.dts also uses 512.
+? 2017-11-08 18:56?Maxime Ripard ???
+> Hi,
 > 
-> Should it be also changed or is it correct for the rev-b?
+> On Tue, Nov 07, 2017 at 05:38:55PM +0100, Giulio Benetti wrote:
+>> Board could be any with A20,
+>> for example Olinuxino A20.
+>> Or our Q027, S027 boards, but final dts still are not complete.
+> 
+> Therefore no upstream boards are using it right now, so we'll merge it
+> when that will be the case.
 
-Rev-B is correct. Rev-C has a newer generation of Ethernet switch,
-which has a little microcontroller in it. That microcontroller gets
-its code from the EEPROM. So a bigger EEPROM is required.
+I think the LCD connector on Banana Pi's uses parallel interface,
+although the LCD should be an external DT overlay.
 
-    Andrew
+> 
+> Maxime
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
