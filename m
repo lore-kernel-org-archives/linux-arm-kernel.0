@@ -1,30 +1,37 @@
 From: robh@kernel.org (Rob Herring)
-Date: Fri, 10 Nov 2017 15:05:51 -0600
-Subject: [PATCH v4 06/12] IIO: add DT bindings for stm32 DFSDM filter
-In-Reply-To: <1510222354-15290-7-git-send-email-arnaud.pouliquen@st.com>
-References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
- <1510222354-15290-7-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20171110210551.dpt3x2rsqnsk3yzi@rob-hp-laptop>
+Date: Fri, 10 Nov 2017 15:10:24 -0600
+Subject: [PATCH V3 09/11] clk: sprd: add clocks support for SC9860
+In-Reply-To: <CAAfSe-tadvpgJ0OC00Ccc+y+84t90dArfAu9ASOG77Hnw9Z=RA@mail.gmail.com>
+References: <20171102065626.21835-1-chunyan.zhang@spreadtrum.com>
+ <20171102065626.21835-10-chunyan.zhang@spreadtrum.com>
+ <20171106214335.qvuvcwahemnpwftt@rob-hp-laptop>
+ <CAAfSe-tadvpgJ0OC00Ccc+y+84t90dArfAu9ASOG77Hnw9Z=RA@mail.gmail.com>
+Message-ID: <CAL_Jsq+3wuzCPh1Pkbq79t9zkef-Gvg9AW4pgrKvwOuRJJyn1Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 11:12:28AM +0100, Arnaud Pouliquen wrote:
-> Add bindings that describes STM32 Digital Filter for Sigma Delta
-> Modulators. DFSDM allows to connect sigma delta
-> modulators.
-> 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-> ---
-> V3->V4 changes:
->    V3 Acked-by Rob Herring but add some minor changes:
-> 	- rename compatibility to st,stm32h7-dfsdm
-> 	- update example to align with last clock patches upstreamed
-> 	- replace pdm by dmic in example
-> 
->  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 124 +++++++++++++++++++++
->  1 file changed, 124 insertions(+)
->  .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        | 127 +++++++++++++++++++++
->  1 file changed, 127 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+On Thu, Nov 9, 2017 at 2:18 AM, Chunyan Zhang <zhang.lyra@gmail.com> wrote:
+> Hi Rob and Stephen,
+>
+> On 7 November 2017 at 05:43, Rob Herring <robh@kernel.org> wrote:
+>> On Thu, Nov 02, 2017 at 02:56:24PM +0800, Chunyan Zhang wrote:
+>>> This patch added the list of clocks for Spreadtrum's SC9860 SoC,
+>>> together with clock initialization code.
+>>>
+>>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>>> ---
+>>>  drivers/clk/sprd/Kconfig                    |   10 +
+>>>  drivers/clk/sprd/Makefile                   |    3 +
+>>>  drivers/clk/sprd/sc9860-clk.c               | 1987 +++++++++++++++++++++++++++
+>>>  include/dt-bindings/clock/sprd,sc9860-clk.h |  408 ++++++
+>>
+>> This belongs in the binding doc patch.
+>
+> I noticed that this kind of files were submitted in driver patch
+> before when adding a new driver, how about I just put it into a single
+> patch in the next version?
 
-Acked-by: Rob Herring <robh@kernel.org>
+It's been done all ways, but the correct way is as I told you. Binding
+doc and header in one, driver in another patch.
+
+Rob
