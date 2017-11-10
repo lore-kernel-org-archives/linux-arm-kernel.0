@@ -1,35 +1,79 @@
-From: vanessa.maegima@nxp.com (Vanessa Maegima)
-Date: Fri, 10 Nov 2017 12:38:57 +0000
-Subject: [PATCH] ARM: dts: imx7d-pico-pi: Separate into cpu and baseboard
- dts
-In-Reply-To: <CAP9ODKrNzLkOt76=b58S3TioXBk1FrS4XpPkPQCN48mcAP-GVQ@mail.gmail.com>
-References: <1510079483-24012-1-git-send-email-vanessa.maegima@nxp.com>
- <CAP9ODKrNzLkOt76=b58S3TioXBk1FrS4XpPkPQCN48mcAP-GVQ@mail.gmail.com>
-Message-ID: <1510317495.12715.2.camel@nxp.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 10 Nov 2017 14:25:17 +0100
+Subject: [PATCH v5 00/15] arm64: dts: renesas: r8a7795: IPMMU upstream
+ integration
+Message-ID: <20171110132532.1202-1-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Ter, 2017-11-07 at 18:05 -0200, Otavio Salvador wrote:
-> On Tue, Nov 7, 2017 at 4:31 PM, Vanessa Maegima <vanessa.maegima@nxp.
-> com> wrote:
-> > 
-> > Separate the old imx7d-pico into cpu (imx7d-pico.dtsi) and
-> > baseboard
-> > (imx7d-pico-pi.dts) dts so the same cpu dtsi can be used in
-> > different
-> > baseboards variants.
-> > 
-> > Signed-off-by: Vanessa Maegima <vanessa.maegima@nxp.com>
-> Thanks for looking at this Vanessa, one question though is if it is
-> allowed to just drop the old dtb file or we need to keep it for
-> backward compatibility?
-> 
-> Honestly, it was not available for a long time so I would personally
-> be fine with just renaming it but I don't know about the police on
-> this.
-> 
+This series adds DT nodes for IPMMU instances on r8a7795 together with
+connections to various r8a7795 on-chip devices such as Audio-DMAC, SYS-DMAC,
+Ethernet-AVB, SATA and a bunch of multimedia devices that make use of FCP.
 
-I do not know this either, but I agree with you, just renaming it seems
-ok for me.
+With these patches applied a white list enabled IPMMU driver may be used
+to check silicon revision and then enable IPMMU in the known working cases.
 
-Vanessa
+The recommended test stack for this patchset is a merge of
+* The iommu/next branch of the vfio tree
+* renesas-devel-20171110-v4.14-rc8 tag of the renesas tree
+
+The final two patches in the series enable IPMMU support for all IPMMU
+instances on r8a7795 that are used by IPMMU devices listed above with one
+exception.  The exception is the SATA device connected to IPMMU-HC which
+still is disabled pending IPMMU USB integration support. I expect IPMMU USB
+integration to be handled as a second step once this series is agreed on.
+
+The DT binding for r8a7795 has since long been included in mainline and
+this series implements support following such format:
+
+d4e42e7 iommu/ipmmu-vmsa: Add r8a7795 DT binding
+
+Changes since V4:
+ - Correct ES1.x override for ipmmu_vc0
+ - Add ES1.x override for ipmmu_vc1
+ - Drop mostly redundant comments from nodes
+ - Add power domains
+
+Changes since V3:
+ - Rework to support ES2.0
+ - Other minor changes as noted in per-patch changelogs
+
+Changes since V2:
+ - Added the iommus property before power domains - thanks Geert!
+ - Added reviewed-by to patch 2 and 3 from Laurent - thanks!
+ - Re-added Ethernet and FCPVD patches (They were present in V1 but not V2)
+ - Added remaining FCP devices such as FCPF, FCPVB and FCPVI
+ - Added SATA device
+ - Added final patch to enable various IPMMU devices in the DTS file
+
+Since the DT binding has been merged quite some time ago and the interface
+seems stable enough I see no reason not to queue these up for upstream merge.
+
+This is a minor rework of work by Magnus Damm.
+
+Based on renesas-devel-20171110-v4.14-rc8
+
+Magnus Damm (15):
+  arm64: dts: renesas: r8a7795: Add IPMMU device nodes
+  arm64: dts: renesas: r8a7795-es1: Add IPMMU device nodes
+  arm64: dts: renesas: r8a7795: Tie SYS-DMAC to IPMMU-DS0/1
+  arm64: dts: renesas: r8a7795: Tie Audio-DMAC to IPMMU-MP0/1
+  arm64: dts: renesas: r8a7795: Point DU/VSPD via FCPVD to IPMMU-VI0/1
+  arm64: dts: renesas: r8a7795-es1: Point DU/VSPD via FCPVD to IPMMU-VI0
+  arm64: dts: renesas: r8a7795: Point FDP1 via FCPF to IPMMU-VP0/1
+  arm64: dts: renesas: r8a7795-es1: Point FDP1 via FCPF to IPMMU-VP0
+  arm64: dts: renesas: r8a7795: Point VSPBC/VSPBD via FCPVB to
+    IPMMU-VP0/1
+  arm64: dts: renesas: r8a7795: Point VSPI via FCPVI to IPMMU-VP0/1
+  arm64: dts: renesas: r8a7795-es1: Point VSPI via FCPVI to IPMMU-VP
+  arm64: dts: renesas: r8a7795: Connect Ethernet-AVB to IPMMU-DS0
+  arm64: dts: renesas: r8a7795: Connect SATA to IPMMU-HC
+  arm64: dts: renesas: r8a7795: Enable IPMMU-VI0, VP1, DS0, DS1 and MM
+  arm64: dts: renesas: r8a7795-es1: Enable IPMMU-MP1
+
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi |  81 ++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 191 +++++++++++++++++++++++++++
+ 2 files changed, 272 insertions(+)
+
+-- 
+2.11.0
