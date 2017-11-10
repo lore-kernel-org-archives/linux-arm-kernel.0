@@ -1,397 +1,129 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 10 Nov 2017 10:25:37 +0200
-Subject: [PATCHv2 2/3] EDAC: ti: add support for TI keystone and DRA7xx EDAC
-In-Reply-To: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
-References: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
-Message-ID: <1510302337-31663-1-git-send-email-t-kristo@ti.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 10 Nov 2017 09:28:46 +0100
+Subject: [PATCH v5 10/26] KVM: arm/arm64: GICv4: Wire mapping/unmapping
+ of VLPIs in VFIO irq bypass
+In-Reply-To: <0331ecc1-d4d6-420f-1ce8-7be1f386cdff@arm.com>
+References: <20171027142855.21584-1-marc.zyngier@arm.com>
+ <20171027142855.21584-11-marc.zyngier@arm.com>
+ <1b60525f-5bb3-d19b-78df-fdfa5f48dc30@redhat.com>
+ <0331ecc1-d4d6-420f-1ce8-7be1f386cdff@arm.com>
+Message-ID: <20171110082846.GH14144@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-TI Keystone and DRA7xx SoCs have support for EDAC on DDR3 memory that can
-correct one bit errors and detect two bit errors. Add EDAC driver for this
-feature which plugs into the generic kernel EDAC framework.
+Hi Eric and Marc,
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
-v2:
- * fixed checkpatch errors
- * improved error cleanup for failed probe
- * converted to use edac_printk
- * added MAINTAINERS entry
- * dropped mutex and used atomic counter for ID
- * ... and some minor cosmetic changes
+On Tue, Nov 07, 2017 at 02:42:44PM +0000, Marc Zyngier wrote:
+> Hi Eric,
+> 
+> On 07/11/17 13:06, Auger Eric wrote:
+> > Hi Marc,
+> > 
+> > On 27/10/2017 16:28, Marc Zyngier wrote:
+> >> Let's use the irq bypass mechanism introduced for platform device
+> >> interrupts
+> > nit: I would remove "introduced for platform device interrupts"
+> > as this is not upstream yet. x86 posted interrupts also use it.
+> > 
+> >>
+> >  and establish our LPI->VLPI mapping.
 
- MAINTAINERS            |   6 +
- drivers/edac/Kconfig   |   7 ++
- drivers/edac/Makefile  |   1 +
- drivers/edac/ti_edac.c | 314 +++++++++++++++++++++++++++++++++++++++++++++++++
- 4 files changed, 328 insertions(+)
- create mode 100644 drivers/edac/ti_edac.c
+I have tweaked the commit message.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 2281af4..c46ed26 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -5028,6 +5028,12 @@ L:	linux-edac at vger.kernel.org
- S:	Maintained
- F:	drivers/edac/skx_edac.c
- 
-+EDAC-TI
-+M:	Tero Kristo <t-kristo@ti.com>
-+L:	linux-edac at vger.kernel.org
-+S:	Maintained
-+F:	drivers/edac/ti_edac.c
-+
- EDIROL UA-101/UA-1000 DRIVER
- M:	Clemens Ladisch <clemens@ladisch.de>
- L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
-diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
-index 96afb2a..3c40170 100644
---- a/drivers/edac/Kconfig
-+++ b/drivers/edac/Kconfig
-@@ -457,4 +457,11 @@ config EDAC_XGENE
- 	  Support for error detection and correction on the
- 	  APM X-Gene family of SOCs.
- 
-+config EDAC_TI
-+	tristate "Texas Instruments DDR3 ECC Controller"
-+	depends on ARCH_KEYSTONE || SOC_DRA7XX
-+	help
-+	  Support for error detection and correction on the
-+          TI SoCs.
-+
- endif # EDAC
-diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
-index 0fd9ffa..b54912e 100644
---- a/drivers/edac/Makefile
-+++ b/drivers/edac/Makefile
-@@ -78,3 +78,4 @@ obj-$(CONFIG_EDAC_THUNDERX)		+= thunderx_edac.o
- obj-$(CONFIG_EDAC_ALTERA)		+= altera_edac.o
- obj-$(CONFIG_EDAC_SYNOPSYS)		+= synopsys_edac.o
- obj-$(CONFIG_EDAC_XGENE)		+= xgene_edac.o
-+obj-$(CONFIG_EDAC_TI)			+= ti_edac.o
-diff --git a/drivers/edac/ti_edac.c b/drivers/edac/ti_edac.c
-new file mode 100644
-index 0000000..c147853
---- /dev/null
-+++ b/drivers/edac/ti_edac.c
-@@ -0,0 +1,314 @@
-+/*
-+ * Copyright (C) 2017 Texas Instruments Incorporated - http://www.ti.com/
-+ *
-+ * Texas Instruments DDR3 ECC error correction and detection driver
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/init.h>
-+#include <linux/edac.h>
-+#include <linux/io.h>
-+#include <linux/interrupt.h>
-+#include <linux/of_address.h>
-+#include <linux/of_device.h>
-+#include <linux/module.h>
-+
-+#include "edac_module.h"
-+
-+/* EMIF controller registers */
-+#define EMIF_SDRAM_CONFIG		0x008
-+#define EMIF_IRQ_STATUS			0x0ac
-+#define EMIF_IRQ_ENABLE_SET		0x0b4
-+#define EMIF_ECC_CTRL			0x110
-+#define EMIF_1B_ECC_ERR_CNT		0x130
-+#define EMIF_1B_ECC_ERR_THRSH		0x134
-+#define EMIF_1B_ECC_ERR_ADDR_LOG	0x13c
-+#define EMIF_2B_ECC_ERR_ADDR_LOG	0x140
-+
-+/* Bit definitions for EMIF_SDRAM_CONFIG */
-+#define SDRAM_TYPE_SHIFT		29
-+#define SDRAM_TYPE_MASK			GENMASK(31, 29)
-+#define SDRAM_TYPE_DDR3			(3 << SDRAM_TYPE_SHIFT)
-+#define SDRAM_TYPE_DDR2			(2 << SDRAM_TYPE_SHIFT)
-+#define SDRAM_NARROW_MODE_MASK		GENMASK(15, 14)
-+#define SDRAM_K2_NARROW_MODE_SHIFT	12
-+#define SDRAM_K2_NARROW_MODE_MASK	GENMASK(13, 12)
-+#define SDRAM_ROWSIZE_SHIFT		7
-+#define SDRAM_ROWSIZE_MASK		GENMASK(9, 7)
-+#define SDRAM_IBANK_SHIFT		4
-+#define SDRAM_IBANK_MASK		GENMASK(6, 4)
-+#define SDRAM_K2_IBANK_SHIFT		5
-+#define SDRAM_K2_IBANK_MASK		GENMASK(6, 5)
-+#define SDRAM_K2_EBANK_SHIFT		3
-+#define SDRAM_K2_EBANK_MASK		BIT(SDRAM_K2_EBANK_SHIFT)
-+#define SDRAM_PAGESIZE_SHIFT		0
-+#define SDRAM_PAGESIZE_MASK		GENMASK(2, 0)
-+#define SDRAM_K2_PAGESIZE_SHIFT		0
-+#define SDRAM_K2_PAGESIZE_MASK		GENMASK(1, 0)
-+
-+#define EMIF_1B_ECC_ERR_THRSH_SHIFT	24
-+
-+/* IRQ bit definitions */
-+#define EMIF_1B_ECC_ERR			BIT(5)
-+#define EMIF_2B_ECC_ERR			BIT(4)
-+#define EMIF_WR_ECC_ERR			BIT(3)
-+#define EMIF_SYS_ERR			BIT(0)
-+/* Bit 31 enables ECC and 28 enables RMW */
-+#define ECC_ENABLED			(BIT(31) | BIT(28))
-+
-+#define EDAC_MOD_NAME			"ti-emif-edac"
-+
-+enum {
-+	EMIF_TYPE_DRA7,
-+	EMIF_TYPE_K2
-+};
-+
-+struct ti_edac {
-+	void __iomem *reg;
-+};
-+
-+static atomic_t edac_id = ATOMIC_INIT(0);
-+
-+static u32 ti_edac_readl(struct ti_edac *edac, u16 offset)
-+{
-+	return readl_relaxed(edac->reg + offset);
-+}
-+
-+static void ti_edac_writel(struct ti_edac *edac, u32 val, u16 offset)
-+{
-+	writel_relaxed(val, edac->reg + offset);
-+}
-+
-+static irqreturn_t ti_edac_isr(int irq, void *data)
-+{
-+	struct mem_ctl_info *mci = data;
-+	struct ti_edac *edac = mci->pvt_info;
-+	u32 irq_status;
-+	u32 err_addr;
-+	int err_count;
-+
-+	irq_status = ti_edac_readl(edac, EMIF_IRQ_STATUS);
-+
-+	if (irq_status & EMIF_1B_ECC_ERR) {
-+		err_addr = ti_edac_readl(edac, EMIF_1B_ECC_ERR_ADDR_LOG);
-+		err_count = ti_edac_readl(edac, EMIF_1B_ECC_ERR_CNT);
-+		ti_edac_writel(edac, err_count, EMIF_1B_ECC_ERR_CNT);
-+		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci, err_count,
-+				     err_addr >> PAGE_SHIFT,
-+				     err_addr & ~PAGE_MASK, -1, 0, 0, 0,
-+				     mci->ctl_name, "1B");
-+	}
-+
-+	if (irq_status & EMIF_2B_ECC_ERR) {
-+		err_addr = ti_edac_readl(edac, EMIF_2B_ECC_ERR_ADDR_LOG);
-+		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci, 1,
-+				     err_addr >> PAGE_SHIFT,
-+				     err_addr & ~PAGE_MASK, -1, 0, 0, 0,
-+				     mci->ctl_name, "2B");
-+	}
-+
-+	if (irq_status & EMIF_WR_ECC_ERR)
-+		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci, 1,
-+				     0, 0, -1, 0, 0, 0,
-+				     mci->ctl_name, "WR");
-+
-+	ti_edac_writel(edac, irq_status, EMIF_IRQ_STATUS);
-+
-+	return IRQ_HANDLED;
-+}
-+
-+static void ti_edac_setup_dimm(struct mem_ctl_info *mci, u32 type)
-+{
-+	struct dimm_info *dimm;
-+	struct ti_edac *edac = mci->pvt_info;
-+	int bits;
-+	u32 val;
-+	u32 memsize;
-+
-+	dimm = EDAC_DIMM_PTR(mci->layers, mci->dimms, mci->n_layers, 0, 0, 0);
-+
-+	val = ti_edac_readl(edac, EMIF_SDRAM_CONFIG);
-+
-+	if (type == EMIF_TYPE_DRA7) {
-+		bits = ((val & SDRAM_PAGESIZE_MASK) >> SDRAM_PAGESIZE_SHIFT) + 8;
-+		bits += ((val & SDRAM_ROWSIZE_MASK) >> SDRAM_ROWSIZE_SHIFT) + 9;
-+		bits += (val & SDRAM_IBANK_MASK) >> SDRAM_IBANK_SHIFT;
-+
-+		if (val & SDRAM_NARROW_MODE_MASK) {
-+			bits++;
-+			dimm->dtype = DEV_X16;
-+		} else {
-+			bits += 2;
-+			dimm->dtype = DEV_X32;
-+		}
-+	} else {
-+		bits = 16;
-+		bits += ((val & SDRAM_K2_PAGESIZE_MASK) >>
-+			SDRAM_K2_PAGESIZE_SHIFT) + 8;
-+		bits += (val & SDRAM_K2_IBANK_MASK) >> SDRAM_K2_IBANK_SHIFT;
-+		bits += (val & SDRAM_K2_EBANK_MASK) >> SDRAM_K2_EBANK_SHIFT;
-+
-+		val = (val & SDRAM_K2_NARROW_MODE_MASK) >>
-+			SDRAM_K2_NARROW_MODE_SHIFT;
-+		switch (val) {
-+		case 0:
-+			bits += 3;
-+			dimm->dtype = DEV_X64;
-+			break;
-+		case 1:
-+			bits += 2;
-+			dimm->dtype = DEV_X32;
-+			break;
-+		case 2:
-+			bits++;
-+			dimm->dtype = DEV_X16;
-+			break;
-+		}
-+	}
-+
-+	memsize = 1 << bits;
-+
-+	dimm->nr_pages = memsize >> PAGE_SHIFT;
-+	dimm->grain = 4;
-+	if ((val & SDRAM_TYPE_MASK) == SDRAM_TYPE_DDR2)
-+		dimm->mtype = MEM_DDR2;
-+	else
-+		dimm->mtype = MEM_DDR3;
-+
-+	val = ti_edac_readl(edac, EMIF_ECC_CTRL);
-+	if (val & ECC_ENABLED)
-+		dimm->edac_mode = EDAC_SECDED;
-+	else
-+		dimm->edac_mode = EDAC_NONE;
-+}
-+
-+static const struct of_device_id ti_edac_of_match[] = {
-+	{ .compatible = "ti,emif-keystone", .data = (void *)EMIF_TYPE_K2 },
-+	{ .compatible = "ti,emif-dra7xx", .data = (void *)EMIF_TYPE_DRA7 },
-+	{},
-+};
-+
-+static int ti_edac_probe(struct platform_device *pdev)
-+{
-+	int error_irq = 0, ret = -ENODEV;
-+	struct device *dev = &pdev->dev;
-+	struct resource *res;
-+	void __iomem *reg;
-+	struct mem_ctl_info *mci;
-+	struct edac_mc_layer layers[1];
-+	const struct of_device_id *id;
-+	struct ti_edac *edac;
-+	int my_id;
-+
-+	id = of_match_device(ti_edac_of_match, &pdev->dev);
-+	if (!id)
-+		return -ENODEV;
-+
-+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	reg = devm_ioremap_resource(dev, res);
-+	if (IS_ERR(reg)) {
-+		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-+			    "EMIF controller regs not defined\n");
-+		return PTR_ERR(reg);
-+	}
-+
-+	layers[0].type = EDAC_MC_LAYER_ALL_MEM;
-+	layers[0].size = 1;
-+
-+	/* Allocate ID number for our EMIF controller */
-+	my_id = atomic_inc_return(&edac_id) - 1;
-+
-+	mci = edac_mc_alloc(my_id, 1, layers, sizeof(*edac));
-+	if (!mci)
-+		return -ENOMEM;
-+
-+	mci->pdev = &pdev->dev;
-+	edac = mci->pvt_info;
-+	edac->reg = reg;
-+	platform_set_drvdata(pdev, mci);
-+
-+	mci->mtype_cap = MEM_FLAG_DDR3 | MEM_FLAG_DDR2;
-+	mci->edac_ctl_cap = EDAC_FLAG_SECDED | EDAC_FLAG_NONE;
-+	mci->mod_name = EDAC_MOD_NAME;
-+	mci->ctl_name = id->compatible;
-+	mci->dev_name = dev_name(&pdev->dev);
-+
-+	/* Setup memory layout */
-+	ti_edac_setup_dimm(mci, (u32)(id->data));
-+
-+	ret = edac_mc_add_mc(mci);
-+	if (ret) {
-+		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-+			    "Failed to register mci: %d.\n", ret);
-+		goto err;
-+	}
-+
-+	/* add EMIF ECC error handler */
-+	error_irq = platform_get_irq(pdev, 0);
-+	if (!error_irq) {
-+		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-+			    "EMIF irq number not defined.\n");
-+		goto err2;
-+	}
-+
-+	ret = devm_request_irq(dev, error_irq, ti_edac_isr, 0,
-+			       "emif-edac-irq", mci);
-+	if (ret) {
-+		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-+			    "request_irq fail for EMIF EDAC irq\n");
-+		goto err2;
-+	}
-+
-+	/* Generate an interrupt with each 1b error */
-+	ti_edac_writel(edac, 1 << EMIF_1B_ECC_ERR_THRSH_SHIFT,
-+		       EMIF_1B_ECC_ERR_THRSH);
-+
-+	/* Enable interrupts */
-+	ti_edac_writel(edac,
-+		       EMIF_1B_ECC_ERR | EMIF_2B_ECC_ERR | EMIF_WR_ECC_ERR,
-+		       EMIF_IRQ_ENABLE_SET);
-+
-+	return 0;
-+
-+err2:
-+	edac_mc_del_mc(&pdev->dev);
-+err:
-+	edac_mc_free(mci);
-+	return ret;
-+}
-+
-+static int ti_edac_remove(struct platform_device *pdev)
-+{
-+	struct mem_ctl_info *mci = platform_get_drvdata(pdev);
-+
-+	edac_mc_del_mc(&pdev->dev);
-+	edac_mc_free(mci);
-+
-+	return 0;
-+}
-+
-+static struct platform_driver ti_edac_driver = {
-+	.probe = ti_edac_probe,
-+	.remove = ti_edac_remove,
-+	.driver = {
-+		   .name = EDAC_MOD_NAME,
-+		   .of_match_table = ti_edac_of_match,
-+	},
-+};
-+
-+module_platform_driver(ti_edac_driver);
-+
-+MODULE_AUTHOR("Texas Instruments Inc.");
-+MODULE_DESCRIPTION("EDAC Driver for Texas Instruments DDR3 MC");
-+MODULE_LICENSE("GPL v2");
--- 
-1.9.1
+> >>
+> >> Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> >> ---
+> >>  include/kvm/arm_vgic.h      |   8 ++++
+> >>  virt/kvm/arm/arm.c          |   6 ++-
+> >>  virt/kvm/arm/vgic/vgic-v4.c | 108 ++++++++++++++++++++++++++++++++++++++++++++
+> >>  3 files changed, 120 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+> >> index 7eeb6c2a2f9c..2f750c770bf2 100644
+> >> --- a/include/kvm/arm_vgic.h
+> >> +++ b/include/kvm/arm_vgic.h
+> >> @@ -373,4 +373,12 @@ int kvm_vgic_setup_default_irq_routing(struct kvm *kvm);
+> >>  
+> >>  int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner);
+> >>  
+> >> +struct kvm_kernel_irq_routing_entry;
+> >> +
+> >> +int kvm_vgic_v4_set_forwarding(struct kvm *kvm, int irq,
+> >> +			       struct kvm_kernel_irq_routing_entry *irq_entry);
+> >> +
+> >> +int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int irq,
+> >> +				 struct kvm_kernel_irq_routing_entry *irq_entry);
+> >> +
+> >>  #endif /* __KVM_ARM_VGIC_H */
+> >> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> >> index 5d5218ecd547..8388c1cc23f6 100644
+> >> --- a/virt/kvm/arm/arm.c
+> >> +++ b/virt/kvm/arm/arm.c
+> >> @@ -1462,7 +1462,8 @@ int kvm_arch_irq_bypass_add_producer(struct irq_bypass_consumer *cons,
+> >>  	struct kvm_kernel_irqfd *irqfd =
+> >>  		container_of(cons, struct kvm_kernel_irqfd, consumer);
+> >>  
+> >> -	return 0;
+> >> +	return kvm_vgic_v4_set_forwarding(irqfd->kvm, prod->irq,
+> >> +					  &irqfd->irq_entry);
+> >>  }
+> >>  void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
+> >>  				      struct irq_bypass_producer *prod)
+> >> @@ -1470,7 +1471,8 @@ void kvm_arch_irq_bypass_del_producer(struct irq_bypass_consumer *cons,
+> >>  	struct kvm_kernel_irqfd *irqfd =
+> >>  		container_of(cons, struct kvm_kernel_irqfd, consumer);
+> >>  
+> >> -	return;
+> >> +	kvm_vgic_v4_unset_forwarding(irqfd->kvm, prod->irq,
+> >> +				     &irqfd->irq_entry);
+> >>  }
+> >>  
+> >>  void kvm_arch_irq_bypass_stop(struct irq_bypass_consumer *cons)
+> >> diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+> >> index c794f0cef09e..01a2889b7b7c 100644
+> >> --- a/virt/kvm/arm/vgic/vgic-v4.c
+> >> +++ b/virt/kvm/arm/vgic/vgic-v4.c
+> >> @@ -18,6 +18,7 @@
+> >>  #include <linux/interrupt.h>
+> >>  #include <linux/irqdomain.h>
+> >>  #include <linux/kvm_host.h>
+> >> +#include <linux/irqchip/arm-gic-v3.h>
+> >>  
+> >>  #include "vgic.h"
+> >>  
+> >> @@ -81,3 +82,110 @@ void vgic_v4_teardown(struct kvm *kvm)
+> >>  	its_vm->nr_vpes = 0;
+> >>  	its_vm->vpes = NULL;
+> >>  }
+> >> +
+> >> +static struct vgic_its *vgic_get_its(struct kvm *kvm,
+> >> +				     struct kvm_kernel_irq_routing_entry *irq_entry)
+> >> +{
+> >> +	struct kvm_msi msi  = (struct kvm_msi) {
+> >> +		.address_lo	= irq_entry->msi.address_lo,
+> >> +		.address_hi	= irq_entry->msi.address_hi,
+> >> +		.data		= irq_entry->msi.data,
+> >> +		.flags		= irq_entry->msi.flags,
+> >> +		.devid		= irq_entry->msi.devid,
+> >> +	};
+> >> +
+> >> +	/*
+> >> +	 * Get a reference on the LPI. If NULL, this is not a valid
+> >> +	 * translation for any of our vITSs.
+> >> +	 */
+> > I don't understand the relevance of the above comment.
+> 
+> Hmmm. The first part looks like an outdated leftover, as the ITS is not
+> refcounted, and we don't deal with LPIs here.
+> 
 
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+I simply removed this comment.
+
+[...]
+
+I think the only thing left to fix on this patch is the IRQ_DISABLE_LAZY
+thing on its_map_vlpi() failures, which Marc can fix post -rc1.
+
+Thanks,
+-Christoffer
