@@ -1,221 +1,397 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 10 Nov 2017 09:20:43 +0100
-Subject: [PATCH v5 09/26] KVM: arm/arm64: GICv4: Add init/teardown of the
- per-VM vPE irq domain
-In-Reply-To: <4a41a67d-a04b-b3ca-a5e8-c582e27c17d1@redhat.com>
-References: <20171027142855.21584-1-marc.zyngier@arm.com>
- <20171027142855.21584-10-marc.zyngier@arm.com>
- <4a41a67d-a04b-b3ca-a5e8-c582e27c17d1@redhat.com>
-Message-ID: <20171110082043.GG14144@cbox>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Fri, 10 Nov 2017 10:25:37 +0200
+Subject: [PATCHv2 2/3] EDAC: ti: add support for TI keystone and DRA7xx EDAC
+In-Reply-To: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
+References: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
+Message-ID: <1510302337-31663-1-git-send-email-t-kristo@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 02:08:23PM +0100, Auger Eric wrote:
-> Hi Marc,
-> 
-> On 27/10/2017 16:28, Marc Zyngier wrote:
-> > In order to control the GICv4 view of virtual CPUs, we rely
-> > on an irqdomain allocated for that purpose. Let's add a couple
-> > of helpers to that effect.
-> > 
-> > At the same time, the vgic data structures gain new fields to
-> > track all this... erm... wonderful stuff.
-> > 
-> > The way we hook into the vgic init is slightly convoluted. We
-> > need the vgic to be initialized (in order to guarantee that
-> > the number of vcpus is now fixed), and we must have a vITS
-> > (otherwise this is all very pointless). So we end-up calling
-> > the init from both vgic_init and vgic_its_create.
-> > 
-> > Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  arch/arm/kvm/Makefile         |  1 +
-> >  arch/arm64/kvm/Makefile       |  1 +
-> >  include/kvm/arm_vgic.h        | 19 ++++++++++
-> >  virt/kvm/arm/vgic/vgic-init.c |  9 +++++
-> >  virt/kvm/arm/vgic/vgic-its.c  |  8 +++++
-> >  virt/kvm/arm/vgic/vgic-v4.c   | 83 +++++++++++++++++++++++++++++++++++++++++++
-> >  virt/kvm/arm/vgic/vgic.h      |  2 ++
-> >  7 files changed, 123 insertions(+)
-> >  create mode 100644 virt/kvm/arm/vgic/vgic-v4.c
-> > 
-> > diff --git a/arch/arm/kvm/Makefile b/arch/arm/kvm/Makefile
-> > index d9beee652d36..0a1dd2cdb928 100644
-> > --- a/arch/arm/kvm/Makefile
-> > +++ b/arch/arm/kvm/Makefile
-> > @@ -31,6 +31,7 @@ obj-y += $(KVM)/arm/vgic/vgic-init.o
-> >  obj-y += $(KVM)/arm/vgic/vgic-irqfd.o
-> >  obj-y += $(KVM)/arm/vgic/vgic-v2.o
-> >  obj-y += $(KVM)/arm/vgic/vgic-v3.o
-> > +obj-y += $(KVM)/arm/vgic/vgic-v4.o
-> >  obj-y += $(KVM)/arm/vgic/vgic-mmio.o
-> >  obj-y += $(KVM)/arm/vgic/vgic-mmio-v2.o
-> >  obj-y += $(KVM)/arm/vgic/vgic-mmio-v3.o
-> > diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> > index 5d9810086c25..c30fd388ef80 100644
-> > --- a/arch/arm64/kvm/Makefile
-> > +++ b/arch/arm64/kvm/Makefile
-> > @@ -26,6 +26,7 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-init.o
-> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-irqfd.o
-> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v2.o
-> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v3.o
-> > +kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-v4.o
-> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio.o
-> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v2.o
-> >  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic/vgic-mmio-v3.o
-> > diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> > index ba9fb450aa1b..7eeb6c2a2f9c 100644
-> > --- a/include/kvm/arm_vgic.h
-> > +++ b/include/kvm/arm_vgic.h
-> > @@ -26,6 +26,8 @@
-> >  #include <linux/list.h>
-> >  #include <linux/jump_label.h>
-> >  
-> > +#include <linux/irqchip/arm-gic-v4.h>
-> > +
-> >  #define VGIC_V3_MAX_CPUS	255
-> >  #define VGIC_V2_MAX_CPUS	8
-> >  #define VGIC_NR_IRQS_LEGACY     256
-> > @@ -236,6 +238,15 @@ struct vgic_dist {
-> >  
-> >  	/* used by vgic-debug */
-> >  	struct vgic_state_iter *iter;
-> > +
-> > +	/*
-> > +	 * GICv4 ITS per-VM data, containing the IRQ domain, the VPE
-> > +	 * array, the property table pointer as well as allocation
-> > +	 * data. This essentially ties the Linux IRQ core and ITS
-> > +	 * together, and avoids leaking KVM's data structures anywhere
-> > +	 * else.
-> > +	 */
-> > +	struct its_vm		its_vm;
-> >  };
-> >  
-> >  struct vgic_v2_cpu_if {
-> > @@ -254,6 +265,14 @@ struct vgic_v3_cpu_if {
-> >  	u32		vgic_ap0r[4];
-> >  	u32		vgic_ap1r[4];
-> >  	u64		vgic_lr[VGIC_V3_MAX_LRS];
-> > +
-> > +	/*
-> > +	 * GICv4 ITS per-VPE data, containing the doorbell IRQ, the
-> > +	 * pending table pointer, the its_vm pointer and a few other
-> > +	 * HW specific things. As for the its_vm structure, this is
-> > +	 * linking the Linux IRQ subsystem and the ITS together.
-> > +	 */
-> > +	struct its_vpe	its_vpe;
-> >  };
-> >  
-> >  struct vgic_cpu {
-> > diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-> > index 5801261f3add..40be908da238 100644
-> > --- a/virt/kvm/arm/vgic/vgic-init.c
-> > +++ b/virt/kvm/arm/vgic/vgic-init.c
-> > @@ -285,6 +285,12 @@ int vgic_init(struct kvm *kvm)
-> >  	if (ret)
-> >  		goto out;
-> >  
-> > +	if (vgic_supports_direct_msis(kvm)) {
-> > +		ret = vgic_v4_init(kvm);
-> > +		if (ret)
-> > +			goto out;
-> > +	}
-> > +
-> >  	kvm_for_each_vcpu(i, vcpu, kvm)
-> >  		kvm_vgic_vcpu_enable(vcpu);
-> >  
-> > @@ -320,6 +326,9 @@ static void kvm_vgic_dist_destroy(struct kvm *kvm)
-> >  
-> >  	kfree(dist->spis);
-> >  	dist->nr_spis = 0;
-> > +
-> > +	if (vgic_supports_direct_msis(kvm))
-> > +		vgic_v4_teardown(kvm);
-> >  }
-> >  
-> >  void kvm_vgic_vcpu_destroy(struct kvm_vcpu *vcpu)
-> > diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> > index 8ee03f1e89fc..89768d2b6a91 100644
-> > --- a/virt/kvm/arm/vgic/vgic-its.c
-> > +++ b/virt/kvm/arm/vgic/vgic-its.c
-> > @@ -1603,6 +1603,14 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
-> >  	if (!its)
-> >  		return -ENOMEM;
-> >  
-> > +	if (vgic_initialized(dev->kvm)) {
-> Don't we need to test vgic_supports_direct_msis() on this path too?
-> 
+TI Keystone and DRA7xx SoCs have support for EDAC on DDR3 memory that can
+correct one bit errors and detect two bit errors. Add EDAC driver for this
+feature which plugs into the generic kernel EDAC framework.
 
-Seems to me that we should, otherwise creating an ITS after the VGIC has
-been initialized would fail on non-GICv4 compatible systems, right?
+Signed-off-by: Tero Kristo <t-kristo@ti.com>
+---
+v2:
+ * fixed checkpatch errors
+ * improved error cleanup for failed probe
+ * converted to use edac_printk
+ * added MAINTAINERS entry
+ * dropped mutex and used atomic counter for ID
+ * ... and some minor cosmetic changes
 
-How about this patch as a follow-up to the series:
+ MAINTAINERS            |   6 +
+ drivers/edac/Kconfig   |   7 ++
+ drivers/edac/Makefile  |   1 +
+ drivers/edac/ti_edac.c | 314 +++++++++++++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 328 insertions(+)
+ create mode 100644 drivers/edac/ti_edac.c
 
-commit 48ec1662d0f10d6468907cdc7e12c46ca1ef497c (HEAD -> next-gicv4)
-Author: Christoffer Dall <christoffer.dall@linaro.org>
-Date:   Fri Nov 10 09:16:23 2017 +0100
-
-    KVM: arm/arm64: Fix GICv4 ITS initialization issues
-    
-    We should only try to initialize GICv4 data structures on a GICv4
-    capable system.  Move the vgic_supports_direct_msis() check inito
-    vgic_v4_init() so that any KVM VGIC initialization path does not fail
-    on non-GICv4 systems.
-    
-    Also be slightly more strict in the checking of the return value in
-    vgic_its_create, and only error out on negative return values from the
-    vgic_v4_init() function.  This is important because the kvm device code
-    only treats negative values as errors and only cleans up in this case.
-    Errornously treating a positive return value as an error from the
-    vgic_v4_init() function can lead to NULL pointer dereferences, as has
-    recently been observed.
-    
-    Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 40be908da238..62310122ee78 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -285,11 +285,9 @@ int vgic_init(struct kvm *kvm)
- 	if (ret)
- 		goto out;
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 2281af4..c46ed26 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -5028,6 +5028,12 @@ L:	linux-edac at vger.kernel.org
+ S:	Maintained
+ F:	drivers/edac/skx_edac.c
  
--	if (vgic_supports_direct_msis(kvm)) {
--		ret = vgic_v4_init(kvm);
--		if (ret)
--			goto out;
--	}
-+	ret = vgic_v4_init(kvm);
-+	if (ret)
-+		goto out;
- 
- 	kvm_for_each_vcpu(i, vcpu, kvm)
- 		kvm_vgic_vcpu_enable(vcpu);
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index b8c1b724ba3e..c93ecd4a903b 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1673,7 +1673,7 @@ static int vgic_its_create(struct kvm_device *dev, u32 type)
- 
- 	if (vgic_initialized(dev->kvm)) {
- 		int ret = vgic_v4_init(dev->kvm);
--		if (ret) {
-+		if (ret < 0) {
- 			kfree(its);
- 			return ret;
- 		}
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index e367d65a0ebe..bb7e31fcee35 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -118,6 +118,9 @@ int vgic_v4_init(struct kvm *kvm)
- 	struct kvm_vcpu *vcpu;
- 	int i, nr_vcpus, ret;
- 
-+	if (!vgic_supports_direct_msis(kvm))
-+		return 0; /* Nothing to see here... move along. */
++EDAC-TI
++M:	Tero Kristo <t-kristo@ti.com>
++L:	linux-edac at vger.kernel.org
++S:	Maintained
++F:	drivers/edac/ti_edac.c
 +
- 	if (dist->its_vm.vpes)
- 		return 0;
+ EDIROL UA-101/UA-1000 DRIVER
+ M:	Clemens Ladisch <clemens@ladisch.de>
+ L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
+diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+index 96afb2a..3c40170 100644
+--- a/drivers/edac/Kconfig
++++ b/drivers/edac/Kconfig
+@@ -457,4 +457,11 @@ config EDAC_XGENE
+ 	  Support for error detection and correction on the
+ 	  APM X-Gene family of SOCs.
  
++config EDAC_TI
++	tristate "Texas Instruments DDR3 ECC Controller"
++	depends on ARCH_KEYSTONE || SOC_DRA7XX
++	help
++	  Support for error detection and correction on the
++          TI SoCs.
++
+ endif # EDAC
+diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
+index 0fd9ffa..b54912e 100644
+--- a/drivers/edac/Makefile
++++ b/drivers/edac/Makefile
+@@ -78,3 +78,4 @@ obj-$(CONFIG_EDAC_THUNDERX)		+= thunderx_edac.o
+ obj-$(CONFIG_EDAC_ALTERA)		+= altera_edac.o
+ obj-$(CONFIG_EDAC_SYNOPSYS)		+= synopsys_edac.o
+ obj-$(CONFIG_EDAC_XGENE)		+= xgene_edac.o
++obj-$(CONFIG_EDAC_TI)			+= ti_edac.o
+diff --git a/drivers/edac/ti_edac.c b/drivers/edac/ti_edac.c
+new file mode 100644
+index 0000000..c147853
+--- /dev/null
++++ b/drivers/edac/ti_edac.c
+@@ -0,0 +1,314 @@
++/*
++ * Copyright (C) 2017 Texas Instruments Incorporated - http://www.ti.com/
++ *
++ * Texas Instruments DDR3 ECC error correction and detection driver
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/init.h>
++#include <linux/edac.h>
++#include <linux/io.h>
++#include <linux/interrupt.h>
++#include <linux/of_address.h>
++#include <linux/of_device.h>
++#include <linux/module.h>
++
++#include "edac_module.h"
++
++/* EMIF controller registers */
++#define EMIF_SDRAM_CONFIG		0x008
++#define EMIF_IRQ_STATUS			0x0ac
++#define EMIF_IRQ_ENABLE_SET		0x0b4
++#define EMIF_ECC_CTRL			0x110
++#define EMIF_1B_ECC_ERR_CNT		0x130
++#define EMIF_1B_ECC_ERR_THRSH		0x134
++#define EMIF_1B_ECC_ERR_ADDR_LOG	0x13c
++#define EMIF_2B_ECC_ERR_ADDR_LOG	0x140
++
++/* Bit definitions for EMIF_SDRAM_CONFIG */
++#define SDRAM_TYPE_SHIFT		29
++#define SDRAM_TYPE_MASK			GENMASK(31, 29)
++#define SDRAM_TYPE_DDR3			(3 << SDRAM_TYPE_SHIFT)
++#define SDRAM_TYPE_DDR2			(2 << SDRAM_TYPE_SHIFT)
++#define SDRAM_NARROW_MODE_MASK		GENMASK(15, 14)
++#define SDRAM_K2_NARROW_MODE_SHIFT	12
++#define SDRAM_K2_NARROW_MODE_MASK	GENMASK(13, 12)
++#define SDRAM_ROWSIZE_SHIFT		7
++#define SDRAM_ROWSIZE_MASK		GENMASK(9, 7)
++#define SDRAM_IBANK_SHIFT		4
++#define SDRAM_IBANK_MASK		GENMASK(6, 4)
++#define SDRAM_K2_IBANK_SHIFT		5
++#define SDRAM_K2_IBANK_MASK		GENMASK(6, 5)
++#define SDRAM_K2_EBANK_SHIFT		3
++#define SDRAM_K2_EBANK_MASK		BIT(SDRAM_K2_EBANK_SHIFT)
++#define SDRAM_PAGESIZE_SHIFT		0
++#define SDRAM_PAGESIZE_MASK		GENMASK(2, 0)
++#define SDRAM_K2_PAGESIZE_SHIFT		0
++#define SDRAM_K2_PAGESIZE_MASK		GENMASK(1, 0)
++
++#define EMIF_1B_ECC_ERR_THRSH_SHIFT	24
++
++/* IRQ bit definitions */
++#define EMIF_1B_ECC_ERR			BIT(5)
++#define EMIF_2B_ECC_ERR			BIT(4)
++#define EMIF_WR_ECC_ERR			BIT(3)
++#define EMIF_SYS_ERR			BIT(0)
++/* Bit 31 enables ECC and 28 enables RMW */
++#define ECC_ENABLED			(BIT(31) | BIT(28))
++
++#define EDAC_MOD_NAME			"ti-emif-edac"
++
++enum {
++	EMIF_TYPE_DRA7,
++	EMIF_TYPE_K2
++};
++
++struct ti_edac {
++	void __iomem *reg;
++};
++
++static atomic_t edac_id = ATOMIC_INIT(0);
++
++static u32 ti_edac_readl(struct ti_edac *edac, u16 offset)
++{
++	return readl_relaxed(edac->reg + offset);
++}
++
++static void ti_edac_writel(struct ti_edac *edac, u32 val, u16 offset)
++{
++	writel_relaxed(val, edac->reg + offset);
++}
++
++static irqreturn_t ti_edac_isr(int irq, void *data)
++{
++	struct mem_ctl_info *mci = data;
++	struct ti_edac *edac = mci->pvt_info;
++	u32 irq_status;
++	u32 err_addr;
++	int err_count;
++
++	irq_status = ti_edac_readl(edac, EMIF_IRQ_STATUS);
++
++	if (irq_status & EMIF_1B_ECC_ERR) {
++		err_addr = ti_edac_readl(edac, EMIF_1B_ECC_ERR_ADDR_LOG);
++		err_count = ti_edac_readl(edac, EMIF_1B_ECC_ERR_CNT);
++		ti_edac_writel(edac, err_count, EMIF_1B_ECC_ERR_CNT);
++		edac_mc_handle_error(HW_EVENT_ERR_CORRECTED, mci, err_count,
++				     err_addr >> PAGE_SHIFT,
++				     err_addr & ~PAGE_MASK, -1, 0, 0, 0,
++				     mci->ctl_name, "1B");
++	}
++
++	if (irq_status & EMIF_2B_ECC_ERR) {
++		err_addr = ti_edac_readl(edac, EMIF_2B_ECC_ERR_ADDR_LOG);
++		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci, 1,
++				     err_addr >> PAGE_SHIFT,
++				     err_addr & ~PAGE_MASK, -1, 0, 0, 0,
++				     mci->ctl_name, "2B");
++	}
++
++	if (irq_status & EMIF_WR_ECC_ERR)
++		edac_mc_handle_error(HW_EVENT_ERR_UNCORRECTED, mci, 1,
++				     0, 0, -1, 0, 0, 0,
++				     mci->ctl_name, "WR");
++
++	ti_edac_writel(edac, irq_status, EMIF_IRQ_STATUS);
++
++	return IRQ_HANDLED;
++}
++
++static void ti_edac_setup_dimm(struct mem_ctl_info *mci, u32 type)
++{
++	struct dimm_info *dimm;
++	struct ti_edac *edac = mci->pvt_info;
++	int bits;
++	u32 val;
++	u32 memsize;
++
++	dimm = EDAC_DIMM_PTR(mci->layers, mci->dimms, mci->n_layers, 0, 0, 0);
++
++	val = ti_edac_readl(edac, EMIF_SDRAM_CONFIG);
++
++	if (type == EMIF_TYPE_DRA7) {
++		bits = ((val & SDRAM_PAGESIZE_MASK) >> SDRAM_PAGESIZE_SHIFT) + 8;
++		bits += ((val & SDRAM_ROWSIZE_MASK) >> SDRAM_ROWSIZE_SHIFT) + 9;
++		bits += (val & SDRAM_IBANK_MASK) >> SDRAM_IBANK_SHIFT;
++
++		if (val & SDRAM_NARROW_MODE_MASK) {
++			bits++;
++			dimm->dtype = DEV_X16;
++		} else {
++			bits += 2;
++			dimm->dtype = DEV_X32;
++		}
++	} else {
++		bits = 16;
++		bits += ((val & SDRAM_K2_PAGESIZE_MASK) >>
++			SDRAM_K2_PAGESIZE_SHIFT) + 8;
++		bits += (val & SDRAM_K2_IBANK_MASK) >> SDRAM_K2_IBANK_SHIFT;
++		bits += (val & SDRAM_K2_EBANK_MASK) >> SDRAM_K2_EBANK_SHIFT;
++
++		val = (val & SDRAM_K2_NARROW_MODE_MASK) >>
++			SDRAM_K2_NARROW_MODE_SHIFT;
++		switch (val) {
++		case 0:
++			bits += 3;
++			dimm->dtype = DEV_X64;
++			break;
++		case 1:
++			bits += 2;
++			dimm->dtype = DEV_X32;
++			break;
++		case 2:
++			bits++;
++			dimm->dtype = DEV_X16;
++			break;
++		}
++	}
++
++	memsize = 1 << bits;
++
++	dimm->nr_pages = memsize >> PAGE_SHIFT;
++	dimm->grain = 4;
++	if ((val & SDRAM_TYPE_MASK) == SDRAM_TYPE_DDR2)
++		dimm->mtype = MEM_DDR2;
++	else
++		dimm->mtype = MEM_DDR3;
++
++	val = ti_edac_readl(edac, EMIF_ECC_CTRL);
++	if (val & ECC_ENABLED)
++		dimm->edac_mode = EDAC_SECDED;
++	else
++		dimm->edac_mode = EDAC_NONE;
++}
++
++static const struct of_device_id ti_edac_of_match[] = {
++	{ .compatible = "ti,emif-keystone", .data = (void *)EMIF_TYPE_K2 },
++	{ .compatible = "ti,emif-dra7xx", .data = (void *)EMIF_TYPE_DRA7 },
++	{},
++};
++
++static int ti_edac_probe(struct platform_device *pdev)
++{
++	int error_irq = 0, ret = -ENODEV;
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	void __iomem *reg;
++	struct mem_ctl_info *mci;
++	struct edac_mc_layer layers[1];
++	const struct of_device_id *id;
++	struct ti_edac *edac;
++	int my_id;
++
++	id = of_match_device(ti_edac_of_match, &pdev->dev);
++	if (!id)
++		return -ENODEV;
++
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	reg = devm_ioremap_resource(dev, res);
++	if (IS_ERR(reg)) {
++		edac_printk(KERN_ERR, EDAC_MOD_NAME,
++			    "EMIF controller regs not defined\n");
++		return PTR_ERR(reg);
++	}
++
++	layers[0].type = EDAC_MC_LAYER_ALL_MEM;
++	layers[0].size = 1;
++
++	/* Allocate ID number for our EMIF controller */
++	my_id = atomic_inc_return(&edac_id) - 1;
++
++	mci = edac_mc_alloc(my_id, 1, layers, sizeof(*edac));
++	if (!mci)
++		return -ENOMEM;
++
++	mci->pdev = &pdev->dev;
++	edac = mci->pvt_info;
++	edac->reg = reg;
++	platform_set_drvdata(pdev, mci);
++
++	mci->mtype_cap = MEM_FLAG_DDR3 | MEM_FLAG_DDR2;
++	mci->edac_ctl_cap = EDAC_FLAG_SECDED | EDAC_FLAG_NONE;
++	mci->mod_name = EDAC_MOD_NAME;
++	mci->ctl_name = id->compatible;
++	mci->dev_name = dev_name(&pdev->dev);
++
++	/* Setup memory layout */
++	ti_edac_setup_dimm(mci, (u32)(id->data));
++
++	ret = edac_mc_add_mc(mci);
++	if (ret) {
++		edac_printk(KERN_ERR, EDAC_MOD_NAME,
++			    "Failed to register mci: %d.\n", ret);
++		goto err;
++	}
++
++	/* add EMIF ECC error handler */
++	error_irq = platform_get_irq(pdev, 0);
++	if (!error_irq) {
++		edac_printk(KERN_ERR, EDAC_MOD_NAME,
++			    "EMIF irq number not defined.\n");
++		goto err2;
++	}
++
++	ret = devm_request_irq(dev, error_irq, ti_edac_isr, 0,
++			       "emif-edac-irq", mci);
++	if (ret) {
++		edac_printk(KERN_ERR, EDAC_MOD_NAME,
++			    "request_irq fail for EMIF EDAC irq\n");
++		goto err2;
++	}
++
++	/* Generate an interrupt with each 1b error */
++	ti_edac_writel(edac, 1 << EMIF_1B_ECC_ERR_THRSH_SHIFT,
++		       EMIF_1B_ECC_ERR_THRSH);
++
++	/* Enable interrupts */
++	ti_edac_writel(edac,
++		       EMIF_1B_ECC_ERR | EMIF_2B_ECC_ERR | EMIF_WR_ECC_ERR,
++		       EMIF_IRQ_ENABLE_SET);
++
++	return 0;
++
++err2:
++	edac_mc_del_mc(&pdev->dev);
++err:
++	edac_mc_free(mci);
++	return ret;
++}
++
++static int ti_edac_remove(struct platform_device *pdev)
++{
++	struct mem_ctl_info *mci = platform_get_drvdata(pdev);
++
++	edac_mc_del_mc(&pdev->dev);
++	edac_mc_free(mci);
++
++	return 0;
++}
++
++static struct platform_driver ti_edac_driver = {
++	.probe = ti_edac_probe,
++	.remove = ti_edac_remove,
++	.driver = {
++		   .name = EDAC_MOD_NAME,
++		   .of_match_table = ti_edac_of_match,
++	},
++};
++
++module_platform_driver(ti_edac_driver);
++
++MODULE_AUTHOR("Texas Instruments Inc.");
++MODULE_DESCRIPTION("EDAC Driver for Texas Instruments DDR3 MC");
++MODULE_LICENSE("GPL v2");
+-- 
+1.9.1
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
