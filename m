@@ -1,62 +1,205 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 10 Nov 2017 16:39:22 +0000
-Subject: [PATCH v5 2/2] memory: ti-emif-sram: introduce relocatable
- suspend/resume handlers
-In-Reply-To: <19256977-40e1-a972-4de8-838a8da863cc@oracle.com>
-References: <20171013205915.9652-1-d-gerlach@ti.com>
- <20171013205915.9652-3-d-gerlach@ti.com>
- <19256977-40e1-a972-4de8-838a8da863cc@oracle.com>
-Message-ID: <20171110163922.GK28231@n2100.armlinux.org.uk>
+From: romain.izard.pro@gmail.com (Romain Izard)
+Date: Fri, 10 Nov 2017 17:50:48 +0100
+Subject: [PATCH v3] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <1966139.WIlnTlQG5u@positron.chronox.de>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <2510520.gYBNS8MAsP@positron.chronox.de>
+ <20171110111058.GA25914@gondor.apana.org.au>
+ <1966139.WIlnTlQG5u@positron.chronox.de>
+Message-ID: <CAGkQfmNtmSPM+gKXY_5Y-BsU3UA_CmdvXLu5SKVXiKHgLx=w6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 16, 2017 at 08:31:59AM -0700, Santosh Shilimkar wrote:
-> Hi Russell,
-> 
-> On 10/13/2017 1:59 PM, Dave Gerlach wrote:
-> >Certain SoCs like Texas Instruments AM335x and AM437x require parts
-> >of the EMIF PM code to run late in the suspend sequence from SRAM,
-> >such as saving and restoring the EMIF context and placing the memory
-> >into self-refresh.
-> >
-> >One requirement for these SoCs to suspend and enter its lowest power
-> >mode, called DeepSleep0, is that the PER power domain must be shut off.
-> >Because the EMIF (DDR Controller) resides within this power domain, it
-> >will lose context during a suspend operation, so we must save it so we
-> >can restore once we resume. However, we cannot execute this code from
-> >external memory, as it is not available at this point, so the code must
-> >be executed late in the suspend path from SRAM.
-> >
-> >This patch introduces a ti-emif-sram driver that includes several
-> >functions written in ARM ASM that are relocatable so the PM SRAM
-> >code can use them. It also allocates a region of writable SRAM to
-> >be used by the code running in the executable region of SRAM to save
-> >and restore the EMIF context. It can export a table containing the
-> >absolute addresses of the available PM functions so that other SRAM
-> >code can branch to them. This code is required for suspend/resume on
-> >AM335x and AM437x to work.
-> >
-> >In addition to this, to be able to share data structures between C and
-> >the ti-emif-sram-pm assembly code, we can automatically generate all of
-> >the C struct member offsets and sizes as macros by processing
-> >emif-asm-offsets.c into assembly code and then extracting the relevant
-> >data as is done for the generated platform asm-offsets.h files.
-> >
-> >Signed-off-by: Dave Gerlach <d-gerlach@ti.com>
-> >---
-> >v4->v5:
-> >* Simplify Makefile to generate include/generated/ti-emif-asm-offsets.h
-> >
-> If you are happy with this version from Dave, can I get your ack please?
-> I can add this to the driver-soc then.
+2017-11-10 13:20 GMT+01:00 Stephan M?ller <smueller@chronox.de>:
+> The code paths protected by the socket-lock do not use or modify the
+> socket in a non-atomic fashion. The actions pertaining the socket do not
+> even need to be handled as an atomic operation. Thus, the socket-lock
+> can be safely ignored.
+>
+> This fixes a bug regarding scheduling in atomic as the callback function
+> may be invoked in interrupt context.
+>
+> In addition, the sock_hold is moved before the AIO encrypt/decrypt
+> operation to ensure that the socket is always present. This avoids a
+> tiny race window where the socket is unprotected and yet used by the AIO
+> operation.
+>
+> Finally, the release of resources for a crypto operation is moved into a
+> common function of af_alg_free_resources.
+>
+> Fixes: e870456d8e7c8 ("crypto: algif_skcipher - overhaul memory management")
+> Fixes: d887c52d6ae43 ("crypto: algif_aead - overhaul memory management")
+> Reported-by: Romain Izard <romain.izard.pro@gmail.com>
+> Signed-off-by: Stephan Mueller <smueller@chronox.de>
 
-Does it need my ack anymore?  It doesn't touch anything in arch/arm.
-If you still want it, then... notwithstanding the loss of type checking
-that fncpy() gave and the new sram stuff messes up...
+Tested-by: Romain Izard <romain.izard.pro@gmail.com>
 
-Acked-by: Russell King <rmk+kernel@armlinux.org.uk>
+On 4.14-rc8, with some fuzzing when applying the patch.
+The deterministic crash is not reproduced.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> ---
+>  crypto/af_alg.c         | 21 ++++++++++++++-------
+>  crypto/algif_aead.c     | 23 ++++++++++++-----------
+>  crypto/algif_skcipher.c | 23 ++++++++++++-----------
+>  include/crypto/if_alg.h |  1 +
+>  4 files changed, 39 insertions(+), 29 deletions(-)
+>
+> diff --git a/crypto/af_alg.c b/crypto/af_alg.c
+> index 85cea9de324a..358749c38894 100644
+> --- a/crypto/af_alg.c
+> +++ b/crypto/af_alg.c
+> @@ -1021,6 +1021,18 @@ ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
+>  EXPORT_SYMBOL_GPL(af_alg_sendpage);
+>
+>  /**
+> + * af_alg_free_resources - release resources required for crypto request
+> + */
+> +void af_alg_free_resources(struct af_alg_async_req *areq)
+> +{
+> +       struct sock *sk = areq->sk;
+> +
+> +       af_alg_free_areq_sgls(areq);
+> +       sock_kfree_s(sk, areq, areq->areqlen);
+> +}
+> +EXPORT_SYMBOL_GPL(af_alg_free_resources);
+> +
+> +/**
+>   * af_alg_async_cb - AIO callback handler
+>   *
+>   * This handler cleans up the struct af_alg_async_req upon completion of the
+> @@ -1036,18 +1048,13 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
+>         struct kiocb *iocb = areq->iocb;
+>         unsigned int resultlen;
+>
+> -       lock_sock(sk);
+> -
+>         /* Buffer size written by crypto operation. */
+>         resultlen = areq->outlen;
+>
+> -       af_alg_free_areq_sgls(areq);
+> -       sock_kfree_s(sk, areq, areq->areqlen);
+> -       __sock_put(sk);
+> +       af_alg_free_resources(areq);
+> +       sock_put(sk);
+>
+>         iocb->ki_complete(iocb, err ? err : resultlen, 0);
+> -
+> -       release_sock(sk);
+>  }
+>  EXPORT_SYMBOL_GPL(af_alg_async_cb);
+>
+> diff --git a/crypto/algif_aead.c b/crypto/algif_aead.c
+> index aacae0837aff..db9378a45296 100644
+> --- a/crypto/algif_aead.c
+> +++ b/crypto/algif_aead.c
+> @@ -268,12 +268,23 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
+>
+>         if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
+>                 /* AIO operation */
+> +               sock_hold(sk);
+>                 areq->iocb = msg->msg_iocb;
+>                 aead_request_set_callback(&areq->cra_u.aead_req,
+>                                           CRYPTO_TFM_REQ_MAY_BACKLOG,
+>                                           af_alg_async_cb, areq);
+>                 err = ctx->enc ? crypto_aead_encrypt(&areq->cra_u.aead_req) :
+>                                  crypto_aead_decrypt(&areq->cra_u.aead_req);
+> +
+> +               /* AIO operation in progress */
+> +               if (err == -EINPROGRESS || err == -EBUSY) {
+> +                       /* Remember output size that will be generated. */
+> +                       areq->outlen = outlen;
+> +
+> +                       return -EIOCBQUEUED;
+> +               }
+> +
+> +               sock_put(sk);
+>         } else {
+>                 /* Synchronous operation */
+>                 aead_request_set_callback(&areq->cra_u.aead_req,
+> @@ -285,19 +296,9 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
+>                                 &ctx->wait);
+>         }
+>
+> -       /* AIO operation in progress */
+> -       if (err == -EINPROGRESS) {
+> -               sock_hold(sk);
+> -
+> -               /* Remember output size that will be generated. */
+> -               areq->outlen = outlen;
+> -
+> -               return -EIOCBQUEUED;
+> -       }
+>
+>  free:
+> -       af_alg_free_areq_sgls(areq);
+> -       sock_kfree_s(sk, areq, areq->areqlen);
+> +       af_alg_free_resources(areq);
+>
+>         return err ? err : outlen;
+>  }
+> diff --git a/crypto/algif_skcipher.c b/crypto/algif_skcipher.c
+> index 9954b078f0b9..30cff827dd8f 100644
+> --- a/crypto/algif_skcipher.c
+> +++ b/crypto/algif_skcipher.c
+> @@ -117,6 +117,7 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+>
+>         if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
+>                 /* AIO operation */
+> +               sock_hold(sk);
+>                 areq->iocb = msg->msg_iocb;
+>                 skcipher_request_set_callback(&areq->cra_u.skcipher_req,
+>                                               CRYPTO_TFM_REQ_MAY_SLEEP,
+> @@ -124,6 +125,16 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+>                 err = ctx->enc ?
+>                         crypto_skcipher_encrypt(&areq->cra_u.skcipher_req) :
+>                         crypto_skcipher_decrypt(&areq->cra_u.skcipher_req);
+> +
+> +               /* AIO operation in progress */
+> +               if (err == -EINPROGRESS || err == -EBUSY) {
+> +                       /* Remember output size that will be generated. */
+> +                       areq->outlen = len;
+> +
+> +                       return -EIOCBQUEUED;
+> +               }
+> +
+> +               sock_put(sk);
+>         } else {
+>                 /* Synchronous operation */
+>                 skcipher_request_set_callback(&areq->cra_u.skcipher_req,
+> @@ -136,19 +147,9 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
+>                                                  &ctx->wait);
+>         }
+>
+> -       /* AIO operation in progress */
+> -       if (err == -EINPROGRESS) {
+> -               sock_hold(sk);
+> -
+> -               /* Remember output size that will be generated. */
+> -               areq->outlen = len;
+> -
+> -               return -EIOCBQUEUED;
+> -       }
+>
+>  free:
+> -       af_alg_free_areq_sgls(areq);
+> -       sock_kfree_s(sk, areq, areq->areqlen);
+> +       af_alg_free_resources(areq);
+>
+>         return err ? err : len;
+>  }
+> diff --git a/include/crypto/if_alg.h b/include/crypto/if_alg.h
+> index 6abf0a3604dc..38d9c5861ed8 100644
+> --- a/include/crypto/if_alg.h
+> +++ b/include/crypto/if_alg.h
+> @@ -242,6 +242,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
+>                    unsigned int ivsize);
+>  ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
+>                         int offset, size_t size, int flags);
+> +void af_alg_free_resources(struct af_alg_async_req *areq);
+>  void af_alg_async_cb(struct crypto_async_request *_req, int err);
+>  unsigned int af_alg_poll(struct file *file, struct socket *sock,
+>                          poll_table *wait);
+> --
+> 2.13.6
+>
+>
