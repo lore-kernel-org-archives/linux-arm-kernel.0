@@ -1,218 +1,114 @@
-From: manoj.iyer@canonical.com (Manoj Iyer)
-Date: Fri, 10 Nov 2017 11:49:22 -0600 (CST)
-Subject: [3/3] arm64: Add software workaround for Falkor erratum 1041
-In-Reply-To: <alpine.DEB.2.20.1711091041180.15101@lazy>
-References: <1509679664-3749-4-git-send-email-shankerd@codeaurora.org>
- <alpine.DEB.2.20.1711081305310.26324@lazy> <5A04369A.2020405@arm.com>
- <alpine.DEB.2.20.1711090949110.15101@lazy>
- <alpine.DEB.2.20.1711091010570.15101@lazy>
- <alpine.DEB.2.20.1711091041180.15101@lazy>
-Message-ID: <alpine.DEB.2.20.1711101146400.4353@lazy>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Fri, 10 Nov 2017 10:24:53 -0800
+Subject: [PATCH] lib: vdso: add support for time
+Message-ID: <20171110182513.44671-1-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Nov 2017, Manoj Iyer wrote:
+Add time() vdso support to match up with existing support in the x86's
+vdso.  Currently benefitting arm and arm64 which uses the common
+vgettimeofday.c implementation.  On arm provides about a ~14 fold
+improvement in speed over the straight syscall, and about a ~5 fold
+improvement in speed over an alternate library implementation that
+relies on the vdso call to gettimeofday to fulfill the request.
 
->
-> James,
->
-> Looks like my VM test raised a false alarm. I retested stock Artful 4.13 
-> kernel (No erratum 1041 patches applied).
->
+We can provide __vdso_time even if we can not provide a speed
+enhanced __vdso_gettimeofday (arm, virtual counters).
 
-James, an update on the crash (false alarm). We suspect this is a firmware 
-crash due to a possible fw bug. Once this is addressed I will be able to 
-send you the test results you requested on VM start/stop with the erratum 
-1041 patches applied.
+Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Russell King <linux@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Andy Lutomirski <luto@amacapital.net>
+Cc: Dmitry Safonov <dsafonov@virtuozzo.com>
+Cc: John Stultz <john.stultz@linaro.org>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Laura Abbott <labbott@redhat.com>
+Cc: Kees Cook <keescook@chromium.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Andy Gross <andy.gross@linaro.org>
+Cc: Kevin Brodsky <kevin.brodsky@arm.com>
+Cc: Andrew Pinski <apinski@cavium.com>
+Cc: Thomas Gleixner <tglx@linutronix.de>
+Cc: linux-kernel at vger.kernel.org
+Cc: linux-arm-kernel at lists.infradead.org
 
+NB: to be applied _after_
+ [PATCH v5 10/12] arm64: vdso: replace gettimeofday.S with global vgettimeofday.C
 
-> Host: Ubuntu Artful 4.13 kernel with *no* erratum 1041 patches applied.
-> Guest: Ubuntu Zesty (4.10) kernel.
->
-> - Created 20 VMs one at a time
->
-> In a loop:
-> - Stop (virsh destroy) 20 VMs one at a time
-> - Start (virsh start) 20 VMs one at a time.
->
-> And, I am able to reproduce the system reset issue I previously reported. I 
-> think the problem I reported with VMs might have nothing to do with the 
-> erratum 1041 patches, and probably needs to be root caused seperately.
->
-> With stock 4.13 kernel (no erratum 1041 patches applied):
->
-> awrep6 login: [  461.881379] ACPI CPPC: PCC check channel failed. Status=0
-> [  462.051194] ACPI CPPC: PCC check channel failed. Status=0
-> [  462.223137] ACPI CPPC: PCC check channel failed. Status=0
-> [  462.633790] ACPI CPPC: PCC check channel failed. Status=0
-> [  463.231971] ACPI CPPC: PCC check channel failed. Status=0
-> [  463.403163] ACPI CPPC: PCC check channel failed. Status=0
-> [  463.822936] ACPI CPPC: PCC check channel failed. Status=0
-> [  463.995222] ACPI CPPC: PCC check channel failed. Status=0
-> [  464.130962] ACPI CPPC: PCC check channel failed. Status=0
-> [  464.258973] ACPI CPPC: PCC check channel failed. Status=0
-> [  465.283028] ACPI CPPC: PCC check channel failed. Status=0
->
->
-> SYS_DBG: Running SDI image (immediate mode)
-> SYS_DBG: Ram Dump Init
-> SYS_DBG: Failed to init SD card
-> SYS_DBG: Resetting system!
->
->
-> On Thu, 9 Nov 2017, Manoj Iyer wrote:
->
->> 
->> 
->> 
->> On Thu, 9 Nov 2017, Manoj Iyer wrote:
->> 
->>> 
->>> James,
->>> 
->>> (sorry for top-posting)
->>> 
->>> Applied patch 3 patches to Ubuntu Artful Kernel ( 4.13.0-16-generic )
->>> 
->>> - Start 20 VMs one at a time
->>> 
->>> In a loop:
->>> - Stop (virsh destroy) 20 VMs one at a time
->>> - Start (virsh start) 20 VMs one at a time.
->> 
->> Fixing some confusion I might have introduced in my prev email.
->> 
->> - Applied all 3 patches to Ubuntu Artful Kernel ( 4.13.0-16-generic )
->> 
->> - Created 20 VMs one at a time
->> 
->> In a loop:
->> - Stop (virsh destroy) 20 VMs one at a time
->> - Start (virsh start) 20 VMs one at a time.
->> 
->>> 
->>> The system reset's itself after starting the last VM on the 1st loop 
->>> displaying the following:
->>> 
->>> awrep6 login: [ 603.349141] ACPI CPPC: PCC check channel failed. Status=0
->>> [ 603.765101] ACPI CPPC: PCC check channel failed. Status=0
->>> [ 603.937389] ACPI CPPC: PCC check channel failed. Status=0
->>> [ 608.285495] ACPI CPPC: PCC check channel failed. Status=0
->>> [ 608.289481] ACPI CPPC: PCC check channel failed. Status=0
->>> 
->>> SYS_DBG: Running SDI image (immediate mode)
->>> SYS_DBG: Ram Dump Init
->>> SYS_DBG: Failed to init SD card
->>> SYS_DBG: Resetting system!
->>> 
->>> Followed by the following messages on system reboot:
->>> [ 6.616891] BERT: Error records from previous boot:
->>> [ 6.621655] [Hardware Error]: event severity: fatal
->>> [ 6.626516] [Hardware Error]: imprecise tstamp: 0000-00-00 00:00:00
->>> [ 6.632851] [Hardware Error]: Error 0, type: fatal
->>> [ 6.637713] [Hardware Error]: section type: unknown, 
->>> d2e2621c-f936-468d-0d84-15a4ed015c8b
->>> [ 6.646045] [Hardware Error]: section length: 0x238
->>> [ 6.651082] [Hardware Error]: 00000000: 72724502 5220726f 6f736165 
->>> 6e55206e .Error Reason Un
->>> [ 6.659761] [Hardware Error]: 00000010: 776f6e6b 0000006e 00000000 
->>> 00000000 known...........
->>> [ 6.668442] [Hardware Error]: 00000020: 00000000 00000000 00000000 
->>> 00000000 ................
->>> [ 6.677122] [Hardware Error]: 00000030: 00000000 00000000 00000000 
->>> 00000000 ................
->>> 
->>> 
->>> On Thu, 9 Nov 2017, James Morse wrote:
->>> 
->>>> Hi Manoj,
->>>> 
->>>> On 08/11/17 19:05, Manoj Iyer wrote:
->>>>> On Thu, 2 Nov 2017, Shanker Donthineni wrote:
->>>>>> The ARM architecture defines the memory locations that are permitted
->>>>>> to be accessed as the result of a speculative instruction fetch from
->>>>>> an exception level for which all stages of translation are disabled.
->>>>>> Specifically, the core is permitted to speculatively fetch from the
->>>>>> 4KB region containing the current program counter and next 4KB.
->>>>>> 
->>>>>> When translation is changed from enabled to disabled for the running
->>>>>> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
->>>>>> Falkor core may errantly speculatively access memory locations outside
->>>>>> of the 4KB region permitted by the architecture. The errant memory
->>>>>> access may lead to one of the following unexpected behaviors.
->>>> 
->>>>> I applied the 3 patches to Ubuntu 4.13.0-16-generic (Artful) kernel and
->>>>> ran stress-ng cpu tests on QDF2400 server
->>>> 
->>>> [...]
->>>> 
->>>>> Where stress-ng would spawn N workers and test cpu offline/online, 
->>>>> perform
->>>>> matrix operations, do rapid context switchs, and anonymous mmaps. 
->>>>> Although
->>>>> I was not able to reproduce the erratum on the stock 4.13 kernel using 
->>>>> the
->>>>> same test case, the patched kernel did not seem to introduce any
->>>>> regressions either. I ran the stress-ng tests for over 8hrs found the
->>>>> system to be stable.
->>>> 
->>>> 
->>>> Could you throw kexec and KVM into the mix? This issue only shows up when 
->>>> we
->>>> disable the MMU, which we almost never do.
->>>> 
->>>> For CPU offline/online we make the PSCI 'offline' call with the MMU 
->>>> enabled.
->>>> When the CPU comes back firmware has reset the EL2/EL1 SCTLR from a 
->>>> higher
->>>> exception level, so it won't hit this issue.
->>>> 
->>>> One place we do this is kexec, where we drop into purgatory with the MMU 
->>>> disabled.
->>>> 
->>>> The other is KVM unloading itself to return to the hyp stub. You can 
->>>> stress this
->>>> by starting and stopping a VM. When the number of VMs reaches 0 KVM 
->>>> should
->>>> unload via 'kvm_arch_hardware_disable()'.
->>>> 
->>>> 
->>>> Thanks,
->>>> 
->>>> James
->>>> 
->>>> 
->>> 
->>> --
->>> ============================
->>> Manoj Iyer
->>> Ubuntu/Canonical
->>> ARM Servers - Cloud
->>> ============================
->>> 
->>> 
->> 
->> --
->> ============================
->> Manoj Iyer
->> Ubuntu/Canonical
->> ARM Servers - Cloud
->> ============================
->> 
->> 
->
-> --
-> ============================
-> Manoj Iyer
-> Ubuntu/Canonical
-> ARM Servers - Cloud
-> ============================
->
->
+---
+ arch/arm/kernel/vdso.c            |  1 +
+ arch/arm/vdso/vdso.lds.S          |  1 +
+ arch/arm64/kernel/vdso/compiler.h |  1 +
+ arch/arm64/kernel/vdso/vdso.lds.S |  1 +
+ lib/vdso/vgettimeofday.c          | 10 ++++++++++
+ 5 files changed, 14 insertions(+)
 
---
-============================
-Manoj Iyer
-Ubuntu/Canonical
-ARM Servers - Cloud
-============================
+diff --git a/arch/arm/kernel/vdso.c b/arch/arm/kernel/vdso.c
+index da52aade40a3..b8ae87b4d526 100644
+--- a/arch/arm/kernel/vdso.c
++++ b/arch/arm/kernel/vdso.c
+@@ -190,6 +190,7 @@ static void __init patch_vdso(void *ehdr)
+ 		vdso_nullpatch_one(&einfo, "__vdso_gettimeofday");
+ 		vdso_nullpatch_one(&einfo, "__vdso_clock_gettime");
+ 		vdso_nullpatch_one(&einfo, "__vdso_clock_getres");
++		/* do not zero out __vdso_time, no cntvct_ok dependency */
+ 	}
+ }
+ 
+diff --git a/arch/arm/vdso/vdso.lds.S b/arch/arm/vdso/vdso.lds.S
+index 1d81e8c3acf6..1eb577091d1f 100644
+--- a/arch/arm/vdso/vdso.lds.S
++++ b/arch/arm/vdso/vdso.lds.S
+@@ -83,6 +83,7 @@ VERSION
+ 		__vdso_clock_gettime;
+ 		__vdso_gettimeofday;
+ 		__vdso_clock_getres;
++		__vdso_time;
+ 	local: *;
+ 	};
+ }
+diff --git a/arch/arm64/kernel/vdso/compiler.h b/arch/arm64/kernel/vdso/compiler.h
+index 921a7191b497..fb27545640f2 100644
+--- a/arch/arm64/kernel/vdso/compiler.h
++++ b/arch/arm64/kernel/vdso/compiler.h
+@@ -65,5 +65,6 @@ static __always_inline notrace u64 arch_vdso_read_counter(void)
+ #define __vdso_clock_gettime __kernel_clock_gettime
+ #define __vdso_gettimeofday __kernel_gettimeofday
+ #define __vdso_clock_getres __kernel_clock_getres
++#define __vdso_time __kernel_time
+ 
+ #endif /* __VDSO_COMPILER_H */
+diff --git a/arch/arm64/kernel/vdso/vdso.lds.S b/arch/arm64/kernel/vdso/vdso.lds.S
+index beca249bc2f3..9de0ffc369c5 100644
+--- a/arch/arm64/kernel/vdso/vdso.lds.S
++++ b/arch/arm64/kernel/vdso/vdso.lds.S
+@@ -88,6 +88,7 @@ VERSION
+ 		__kernel_gettimeofday;
+ 		__kernel_clock_gettime;
+ 		__kernel_clock_getres;
++		__kernel_time;
+ 	local: *;
+ 	};
+ }
+diff --git a/lib/vdso/vgettimeofday.c b/lib/vdso/vgettimeofday.c
+index 079955162be8..d8d675d46749 100644
+--- a/lib/vdso/vgettimeofday.c
++++ b/lib/vdso/vgettimeofday.c
+@@ -385,3 +385,13 @@ int __vdso_clock_getres(clockid_t clock, struct timespec *res)
+ 
+ 	return 0;
+ }
++
++notrace time_t __vdso_time(time_t *t)
++{
++	const struct vdso_data *vd = __get_datapage();
++	time_t result = READ_ONCE(vd->xtime_coarse_sec);
++
++	if (t)
++		*t = result;
++	return result;
++}
+-- 
+2.15.0.448.gf294e3d99a-goog
