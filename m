@@ -1,104 +1,68 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  9 Nov 2017 21:32:54 -0500
-Subject: [PATCH V3 3/4] dmaengine: qcom_hidma: add support for the new revision
+Date: Thu,  9 Nov 2017 21:32:53 -0500
+Subject: [PATCH V3 2/4] ACPI / bus: introduce acpi_device_get_match_data()
+ function
 In-Reply-To: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
 References: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1510281175-27173-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1510281175-27173-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for probing the newer HW and also organize MSI capable hardware
-into an array for maintenance reasons.
+OF has of_device_get_match_data() function to extract driver specific data
+structure. Add a similar function for ACPI.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/qcom/hidma.c | 35 ++++++++++++++++-------------------
- 1 file changed, 16 insertions(+), 19 deletions(-)
+ drivers/acpi/bus.c   | 12 ++++++++++++
+ include/linux/acpi.h |  6 ++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index e366985..d9d8071 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -50,6 +50,7 @@
- #include <linux/slab.h>
- #include <linux/spinlock.h>
- #include <linux/of_dma.h>
-+#include <linux/of_device.h>
- #include <linux/property.h>
- #include <linux/delay.h>
- #include <linux/acpi.h>
-@@ -104,6 +105,9 @@ static void hidma_free(struct hidma_dev *dmadev)
- module_param(nr_desc_prm, uint, 0644);
- MODULE_PARM_DESC(nr_desc_prm, "number of descriptors (default: 0)");
- 
-+enum hidma_cap {
-+	HIDMA_MSI_CAP = 1,
-+};
- 
- /* process completed descriptors */
- static void hidma_process_completed(struct hidma_chan *mchan)
-@@ -736,25 +740,17 @@ static int hidma_request_msi(struct hidma_dev *dmadev,
- #endif
+diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+index 4d0979e..da29c10 100644
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -785,6 +785,18 @@ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
  }
+ EXPORT_SYMBOL_GPL(acpi_match_device);
  
--static bool hidma_msi_capable(struct device *dev)
-+static bool hidma_test_capability(struct device *dev, enum hidma_cap test_cap)
++void *acpi_device_get_match_data(const struct device *dev)
++{
++	const struct acpi_device_id *match;
++
++	match = acpi_match_device(dev->driver->acpi_match_table, dev);
++	if (!match)
++		return NULL;
++
++	return (void *)match->driver_data;
++}
++EXPORT_SYMBOL_GPL(acpi_device_get_match_data);
++
+ int acpi_match_device_ids(struct acpi_device *device,
+ 			  const struct acpi_device_id *ids)
  {
- 	struct acpi_device *adev = ACPI_COMPANION(dev);
--	const char *of_compat;
--	int ret = -EINVAL;
-+	enum hidma_cap cap;
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 502af53..62c85a5 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -584,6 +584,7 @@ extern int acpi_nvs_for_each_region(int (*func)(__u64, __u64, void *),
+ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
+ 					       const struct device *dev);
  
--	if (!adev || acpi_disabled) {
--		ret = device_property_read_string(dev, "compatible",
--						  &of_compat);
--		if (ret)
--			return false;
-+	if (!adev || acpi_disabled)
-+		cap = (enum hidma_cap) of_device_get_match_data(dev);
-+	else
-+		cap = (enum hidma_cap) acpi_device_get_match_data(dev);
- 
--		ret = strcmp(of_compat, "qcom,hidma-1.1");
--	} else {
--#ifdef CONFIG_ACPI
--		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
--#endif
--	}
--	return ret == 0;
-+	return cap ? ((cap & test_cap) > 0) : 0;
++void *acpi_device_get_match_data(const struct device *dev);
+ extern bool acpi_driver_match_device(struct device *dev,
+ 				     const struct device_driver *drv);
+ int acpi_device_uevent_modalias(struct device *, struct kobj_uevent_env *);
+@@ -755,6 +756,11 @@ static inline const struct acpi_device_id *acpi_match_device(
+ 	return NULL;
  }
  
- static int hidma_probe(struct platform_device *pdev)
-@@ -834,8 +830,7 @@ static int hidma_probe(struct platform_device *pdev)
- 	 * Determine the MSI capability of the platform. Old HW doesn't
- 	 * support MSI.
- 	 */
--	msi = hidma_msi_capable(&pdev->dev);
--
-+	msi = hidma_test_capability(&pdev->dev, HIDMA_MSI_CAP);
- 	device_property_read_u32(&pdev->dev, "desc-count",
- 				 &dmadev->nr_descriptors);
- 
-@@ -953,7 +948,8 @@ static int hidma_remove(struct platform_device *pdev)
- #if IS_ENABLED(CONFIG_ACPI)
- static const struct acpi_device_id hidma_acpi_ids[] = {
- 	{"QCOM8061"},
--	{"QCOM8062"},
-+	{"QCOM8062", HIDMA_MSI_CAP},
-+	{"QCOM8063", HIDMA_MSI_CAP},
- 	{},
- };
- MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
-@@ -961,7 +957,8 @@ static int hidma_remove(struct platform_device *pdev)
- 
- static const struct of_device_id hidma_match[] = {
- 	{.compatible = "qcom,hidma-1.0",},
--	{.compatible = "qcom,hidma-1.1",},
-+	{.compatible = "qcom,hidma-1.1", .data = (void *)(HIDMA_MSI_CAP),},
-+	{.compatible = "qcom,hidma-1.2", .data = (void *)(HIDMA_MSI_CAP),},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, hidma_match);
++static inline void *acpi_device_get_match_data(const struct device *dev)
++{
++	return NULL;
++}
++
+ static inline bool acpi_driver_match_device(struct device *dev,
+ 					    const struct device_driver *drv)
+ {
 -- 
 1.9.1
