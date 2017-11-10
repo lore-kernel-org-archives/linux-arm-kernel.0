@@ -1,185 +1,92 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Fri, 10 Nov 2017 17:41:56 +0530
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
- regions being no longer mapped as NOMAP
-In-Reply-To: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
-References: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
-Message-ID: <CACi5LpNV_E9pvhTwLcy6vtEj9qbL1ZEHe-5sv=iiW0k9JxPD1Q@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Fri, 10 Nov 2017 13:15:30 +0100
+Subject: [PATCH v6 00/10] rockchip: kevin: Enable edp display
+In-Reply-To: <20171101193307.4pnn6u5keo7o5yut@art_vandelay>
+References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
+ <2449324.8EdsLz1NaV@phil> <59F7FE17.80405@rock-chips.com>
+ <20171101193307.4pnn6u5keo7o5yut@art_vandelay>
+Message-ID: <CAFqH_501Zvpw+dthWg5Pze5R=T6grVHqz6isy5u+a8R3D7vr1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Resent with Akashi's correct email address.
+Dear all,
 
-On Fri, Nov 10, 2017 at 5:39 PM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
-> Hi Ard, Akashi
+2017-11-01 20:33 GMT+01:00 Sean Paul <seanpaul@chromium.org>:
+> On Tue, Oct 31, 2017 at 12:37:43PM +0800, JeffyChen wrote:
+>> Hi Heiko,
+>>
+>> On 10/31/2017 07:01 AM, Heiko Stuebner wrote:
+>> > As I was just looking at the edp dts change in patch1 again, does this
+>> > series also contain a fix for the issue below [0] ?
+>> >
+>> > I'm still seeing this on 4.14-rc6 with the most recent drm tree merged in.
+>> >
+>> i saw that too, it should due to our psr code...i think Zain has solved
+>> these in chromeos kernel, i will ask Zain if he have time to upstream them,
+>> or maybe i'll try to upstream them.
 >
-> I have met an issue on an arm64 board using the latest master branch from Linus.
+> You need the patchset where I've refactored the psr locking/workers. I have a
+> version of it based on Heiko's tree at
+> https://cgit.freedesktop.org/~seanpaul/dogwood/log/?h=rk3399-display
 >
-> I think I have a dirty hack to avoid the issue, but would want more
-> opinions from you as it might break crashkernel dump on other arm64
-> machines.
+> With this kernel, the backlight comes on, but I don't have anything on the
+> display (which is why I didn't post it). I'll try putting this set on top and
+> see what happens.
 >
-> 1. This arm64 machine supports acpi only boot mode (i.e. acpi=force is
-> always set in bootargs)
+
+There is a patch in the ML sent by Emil [1], similar to the Sean
+patch, that solves the issue.
+
+And I can confirm that the Jeffy's patches + Emil patch makes the
+display work on kevin or current rc8
+
+[1] https://patchwork.kernel.org/patch/9985237/
+
+Enric
+
+> Sean
 >
-> 2. Since f56ab9a5b73ca2aee777ccdf2d355ae2dd31db5a (efi/arm: Don't mark
-> ACPI reclaim memory as MEMBLOCK_NOMAP), Ard rightly added a chunk
-> which marks the 'EFI_ACPI_RECLAIM_MEMORY' regions as useable memory
-> (by setting the EFI_MEMORY_WB flag for such efi memory descriptors
-> thus marking them as System RAM).
+>> >
+>> > Heiko
+>> >
+>> > [0]
+>> >
+>> > [   27.960120] BUG: scheduling while atomic: kworker/1:1/68/0x00000002
+>> > [   27.974429] Modules linked in: rockchipdrm dw_hdmi analogix_dp drm_kms_helper panel_simple crc32_ce drm crct10dif_ce rockchip_saradc pwm_bl pwm_cros_ec rockchip_thermal ip_tables x_tabl
+>> > es ipv6 smsc95xx smsc75xx ax88179_178a asix usbnet phy_rockchip_pcie pcie_rockchip
+>> > [   28.008769] CPU: 1 PID: 68 Comm: kworker/1:1 Tainted: G        W       4.14.0-rc7-03201-g12490811b353 #559
+>> > [   28.008774] Hardware name: Google Kevin (DT)
+>> > [   28.008825] Workqueue: events analogix_dp_psr_work [rockchipdrm]
+>> > [   28.008828] Call trace:
+>> > [   28.008838] [<ffff000008088d60>] dump_backtrace+0x0/0x378
+>> > [   28.008842] [<ffff0000080890ec>] show_stack+0x14/0x20
+>> > [   28.008847] [<ffff0000089b04d8>] dump_stack+0x9c/0xbc
+>> > [   28.008852] [<ffff0000080ec4b4>] __schedule_bug+0x4c/0x70
+>> > [   28.008856] [<ffff0000089c4828>] __schedule+0x558/0x5e8
+>> > [   28.008859] [<ffff0000089c48f0>] schedule+0x38/0xa0
+>> > [   28.008864] [<ffff0000089c8194>] schedule_hrtimeout_range_clock+0x84/0xe8
+>> > [   28.008867] [<ffff0000089c8208>] schedule_hrtimeout_range+0x10/0x18
+>> > [   28.008870] [<ffff0000089c7c74>] usleep_range+0x64/0x78
+>> > [   28.008882] [<ffff000000ef56e4>] analogix_dp_transfer+0x16c/0xa88 [analogix_dp]
+>> > [   28.008891] [<ffff000000ef2190>] analogix_dpaux_transfer+0x10/0x18 [analogix_dp]
+>> > [   28.008950] [<ffff000000ddbb1c>] drm_dp_dpcd_access+0x4c/0xf8 [drm_kms_helper]
+>> > [   28.008994] [<ffff000000ddbbe4>] drm_dp_dpcd_write+0x1c/0x28 [drm_kms_helper]
+>> > [   28.009002] [<ffff000000ef2130>] analogix_dp_disable_psr+0x60/0xb0 [analogix_dp]
+>> > [   28.009036] [<ffff000000f8398c>] analogix_dp_psr_work+0x4c/0xc0 [rockchipdrm]
+>> > [   28.009040] [<ffff0000080dff44>] process_one_work+0x1d4/0x348
+>> > [   28.009043] [<ffff0000080e0100>] worker_thread+0x48/0x470
+>> > [   28.009048] [<ffff0000080e63d4>] kthread+0x12c/0x130
+>> > [   28.009052] [<ffff000008084b88>] ret_from_fork+0x10/0x18
+>> >
+>> >
+>> >
+>> >
+>>
+>>
 >
-> 3. However this causes crashkernel booting on ACPI only machines to fail:
->
-> [    0.039205] ACPI: Core revision 20170728
-> pud=000000002e7d0003, *pmd=000000002e7c0003, *pte=00e8000039710707
-> [    0.095098] Internal error: Oops: 96000021 [#1] SMP
-> [    0.100022] Modules linked in:
-> [    0.103102] CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.14.0-rc6 #1
-> [    0.109432] task: ffff000008d05180 task.stack: ffff000008cc0000
-> [    0.115414] PC is at acpi_ns_lookup+0x25c/0x3c0
-> [    0.119987] LR is at acpi_ds_load1_begin_op+0xa4/0x294
-> [    0.125175] pc : [<ffff0000084a6764>] lr : [<ffff00000849b4f8>]
-> pstate: 60000045
-> [    0.132647] sp : ffff000008ccfb40
-> [    0.135989] x29: ffff000008ccfb40 x28: ffff000008a9f2a4
-> [    0.141354] x27: ffff0000088be820 x26: 0000000000000000
-> [    0.146718] x25: 000000000000001b x24: 0000000000000001
-> [    0.152083] x23: 0000000000000001 x22: ffff000009710027
-> [    0.157447] x21: ffff000008ccfc50 x20: 0000000000000001
-> [    0.162812] x19: 000000000000001b x18: 0000000000000005
-> [    0.168176] x17: 0000000000000000 x16: 0000000000000000
-> [    0.173541] x15: 0000000000000000 x14: 000000000000038e
-> [    0.178905] x13: ffffffff00000000 x12: ffffffffffffffff
-> [    0.184270] x11: 0000000000000006 x10: 00000000ffffff76
-> [    0.189634] x9 : 000000000000005f x8 : ffff8000126d0140
-> [    0.194998] x7 : 0000000000000000 x6 : ffff000008ccfc50
-> [    0.200362] x5 : ffff80000fe62c00 x4 : 0000000000000001
-> [    0.205727] x3 : ffff000008ccfbe0 x2 : ffff0000095e3980
-> [    0.211091] x1 : ffff000009710027 x0 : 0000000000000000
-> [    0.216456] Process swapper/0 (pid: 0, stack limit = 0xffff000008cc0000)
-> [    0.223224] Call trace:
-> [    0.225688] Exception stack(0xffff000008ccfa00 to 0xffff000008ccfb40)
-> [    0.232194] fa00: 0000000000000000 ffff000009710027
-> ffff0000095e3980 ffff000008ccfbe0
-> [    0.240106] fa20: 0000000000000001 ffff80000fe62c00
-> ffff000008ccfc50 0000000000000000
-> [    0.248018] fa40: ffff8000126d0140 000000000000005f
-> 00000000ffffff76 0000000000000006
-> [    0.255931] fa60: ffffffffffffffff ffffffff00000000
-> 000000000000038e 0000000000000000
-> [    0.263843] fa80: 0000000000000000 0000000000000000
-> 0000000000000005 000000000000001b
-> [    0.271754] faa0: 0000000000000001 ffff000008ccfc50
-> ffff000009710027 0000000000000001
-> [    0.279667] fac0: 0000000000000001 000000000000001b
-> 0000000000000000 ffff0000088be820
-> [    0.287579] fae0: ffff000008a9f2a4 ffff000008ccfb40
-> ffff00000849b4f8 ffff000008ccfb40
-> [    0.295491] fb00: ffff0000084a6764 0000000060000045
-> ffff000008ccfb40 ffff000008260a18
-> [    0.303403] fb20: ffffffffffffffff ffff0000087f3fb0
-> ffff000008ccfb40 ffff0000084a6764
-> [    0.311316] [<ffff0000084a6764>] acpi_ns_lookup+0x25c/0x3c0
-> [    0.316943] [<ffff00000849b4f8>] acpi_ds_load1_begin_op+0xa4/0x294
-> [    0.323186] [<ffff0000084ad4ac>] acpi_ps_build_named_op+0xc4/0x198
-> [    0.329428] [<ffff0000084ad6cc>] acpi_ps_create_op+0x14c/0x270
-> [    0.335319] [<ffff0000084acfa8>] acpi_ps_parse_loop+0x188/0x5c8
-> [    0.341298] [<ffff0000084ae048>] acpi_ps_parse_aml+0xb0/0x2b8
-> [    0.347101] [<ffff0000084a8e10>] acpi_ns_one_complete_parse+0x144/0x184
-> [    0.353783] [<ffff0000084a8e98>] acpi_ns_parse_table+0x48/0x68
-> [    0.359675] [<ffff0000084a82cc>] acpi_ns_load_table+0x4c/0xdc
-> [    0.365479] [<ffff0000084b32f8>] acpi_tb_load_namespace+0xe4/0x264
-> [    0.371723] [<ffff000008baf9b4>] acpi_load_tables+0x48/0xc0
-> [    0.377350] [<ffff000008badc20>] acpi_early_init+0x9c/0xd0
-> [    0.382891] [<ffff000008b70d50>] start_kernel+0x3b4/0x43c
-> [    0.388343] Code: b9008fb9 2a000318 36380054 32190318 (b94002c0)
-> [    0.394500] ---[ end trace c46ed37f9651c58e ]---
-> [    0.399160] Kernel panic - not syncing: Fatal exception
-> [    0.404437] Rebooting in 10 seconds..
->
-> 4. On the primary kernel boot, I notice with efi=debug that while the
-> ACPI regions are properly recognized as Reclaim regions:
->
-> ...
-> [    0.000000] efi:   0x000039710000-0x00003975ffff [ACPI Reclaim
-> Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]
-> [    0.000000] efi:   0x000039770000-0x0000397affff [ACPI Reclaim
-> Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]
-> ...
-> [    0.000000] efi:   0x0000398a0000-0x0000398bffff [ACPI Reclaim
-> Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]
->
-> And appear correctly as early memory node ranges:
->
-> [    0.000000] Early memory node ranges
-> ...
-> [    0.000000]   node   0: [mem 0x00000000396c0000-0x000000003975ffff]
-> [    0.000000]   node   0: [mem 0x0000000039760000-0x000000003976ffff]
-> [    0.000000]   node   0: [mem 0x0000000039770000-0x00000000397affff]
-> [    0.000000]   node   0: [mem 0x00000000397b0000-0x000000003989ffff]
-> [    0.000000]   node   0: [mem 0x00000000398a0000-0x00000000398bffff]
->
-> 5. However when the crashkernel is boot'ed I see that although the
-> same regions are recognized as Reclaim regions they do not appear in
-> the "Early Memory node range" entries:
->
-> [  141.348355] Starting crashdump kernel...
-> [  141.352269] Bye!
-> ...
-> [    0.000000] efi:   0x000039710000-0x00003975ffff [ACPI Reclaim
-> Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]
-> [    0.000000] efi:   0x000039770000-0x0000397affff [ACPI Reclaim
-> Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]
-> ...
-> [    0.000000] efi:   0x0000398a0000-0x0000398bffff [ACPI Reclaim
-> Memory|   |  |  |  |  |  |  |   |WB|WT|WC|UC]
->
-> ...
-> [    0.000000] Early memory node ranges
-> [    0.000000]   node   0: [mem 0x000000000e800000-0x000000002e7fffff]
-> [    0.000000]   node   0: [mem 0x0000000039620000-0x00000000396bffff]
-> [    0.000000]   node   0: [mem 0x0000000039760000-0x000000003976ffff]
-> [    0.000000]   node   0: [mem 0x00000000397b0000-0x000000003989ffff]
-> [    0.000000]   node   0: [mem 0x00000000398c0000-0x0000000039d3ffff]
-> [    0.000000]   node   0: [mem 0x000000003ed30000-0x000000003ed5ffff]
->
-> ( ^^^ No entry for ACPI Reclaim Memory regions)
->
-> 6a. Also I see that during the primary kernel boot:
->
-> 'acpi_os_ioremap' calls 'ioremap_cache' for the ACPI Reclaim Memory regions.
->
-> 6b. But during the crashkernel boot, ''acpi_os_ioremap' calls
-> 'ioremap' for the ACPI Reclaim Memory regions and not the _cache
-> variant.
->
-> 7. I think this is because of how the memblock regions are mapped in
-> 'arch/arm64/mm/mmu.c':
->
-> I am not quite sure if I fully understand the trick we have presently
-> inside '__init map_mem(pgd_t *pgd)', but reading the comment below:
->
->     /*
->      * Take care not to create a writable alias for the
->      * read-only text and rodata sections of the kernel image.
->      * So temporarily mark them as NOMAP to skip mappings in
->      * the following for-loop
->      */
->
-> I think we are marking only the kernel text and crashkernel regions
-> with NO_CONT_MAPPINGS or NO_CONT_MAPPINGS and NO_BLOCK_MAPPINGS
->
-> 8. Also, I think now the crashkernel handling changed by
-> e7cd190385d17790cc3eb3821b1094b00aacf325 (arm64: mark reserved
-> memblock regions explicitly in iomem), needs to be changed to handle
-> the change added by Ard to fix this issue on ACPI only machines.
->
-> I have a dirty hack in place, but I would like to have your opinions
-> about what can be a more concrete fix to this issue (as we mark these
-> regions as System RAM now rather than NOMAP) and I don't have a DTB
-> based machine to test on currently.
->
-> Please share your views.
->
-> Regards,
-> Bhupesh
+> --
+> Sean Paul, Software Engineer, Google / Chromium OS
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/dri-devel
