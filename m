@@ -1,16 +1,17 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 10 Nov 2017 14:25:25 +0100
-Subject: [PATCH v5 08/15] arm64: dts: renesas: r8a7795-es1: Point FDP1 via
- FCPF to IPMMU-VP0
+Date: Fri, 10 Nov 2017 14:25:23 +0100
+Subject: [PATCH v5 06/15] arm64: dts: renesas: r8a7795-es1: Point DU/VSPD via
+ FCPVD to IPMMU-VI0
 In-Reply-To: <20171110132532.1202-1-horms+renesas@verge.net.au>
 References: <20171110132532.1202-1-horms+renesas@verge.net.au>
-Message-ID: <20171110132532.1202-9-horms+renesas@verge.net.au>
+Message-ID: <20171110132532.1202-7-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Hook up the FCPF devices to allow use of FDP1 with IPMMU-VP0.
+Hook up the FCPVD devices to allow use of the VSP and DU
+together with IPMMU-VI0.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
@@ -20,7 +21,7 @@ v5 [Simon Horman]
 * Added reviewed by tag from Geert Uytterhoeven
 
 v4 [Simon Horman]
-* broke out of larger patch
+* broke out of a larger patch
 
 v1 - v3 [Magnus Damm]
 ---
@@ -28,16 +29,16 @@ v1 - v3 [Magnus Damm]
  1 file changed, 1 insertion(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-index 6b4dfa42f5b2..736281335653 100644
+index 71499d193ddb..1eafa5382e86 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-@@ -56,6 +56,7 @@
- 		clocks = <&cpg CPG_MOD 613>;
- 		power-domains = <&sysc R8A7795_PD_A3VP>;
- 		resets = <&cpg 613>;
-+		iommus = <&ipmmu_vp0 2>;
+@@ -94,6 +94,7 @@
+ 		clocks = <&cpg CPG_MOD 600>;
+ 		power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
+ 		resets = <&cpg 600>;
++		iommus = <&ipmmu_vi0 11>;
  	};
  
- 	vspi2: vsp at fe9c0000 {
+ 	fdp1 at fe948000 {
 -- 
 2.11.0
