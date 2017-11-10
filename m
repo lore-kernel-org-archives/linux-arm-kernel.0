@@ -1,28 +1,28 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 10 Nov 2017 12:36:24 +0100
-Subject: [PATCH 1/7] arm64: dts: renesas: r8a7796: Add IPMMU device nodes
-In-Reply-To: <CAMuHMdWdPmU=16B8BbfTD316MWOGVVhb4-vcg7yr-JBLKDwjdg@mail.gmail.com>
-References: <20171101103458.7582-1-horms+renesas@verge.net.au>
- <20171101103458.7582-2-horms+renesas@verge.net.au>
- <CAMuHMdWdPmU=16B8BbfTD316MWOGVVhb4-vcg7yr-JBLKDwjdg@mail.gmail.com>
-Message-ID: <20171110113623.6jjl6jvnnzu4y5pi@verge.net.au>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Fri, 10 Nov 2017 22:36:25 +1100
+Subject: [PATCH 0/2] hwrng: iproc-rng200: Add support for BCM7278
+In-Reply-To: <20171101232006.3943-1-f.fainelli@gmail.com>
+References: <20171101232006.3943-1-f.fainelli@gmail.com>
+Message-ID: <20171110113625.GA26163@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 10:54:17AM +0100, Geert Uytterhoeven wrote:
-> On Wed, Nov 1, 2017 at 11:34 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > From: Magnus Damm <damm+renesas@opensource.se>
-> >
-> > Add r8a7796 IPMMU nodes and keep all disabled by default.
-> >
-> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> > [simon: update names]
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+On Wed, Nov 01, 2017 at 04:20:04PM -0700, Florian Fainelli wrote:
+> Hi,
 > 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> This patch series adds support for the RNG200 block found on the BCM7278 SoC.
+> This requires us to update the compatible string (and associated binding
+> document) as well as the Kconfig option to make that driver selectable with
+> ARCH_BRCMSTB gating the enabling of such SoCs.
 > 
-> My comments for r8a7795.dtsi about IPMMU-* comments and power-domains
-> properties are applicable here, too.
+> Thank you
+> 
+> Florian Fainelli (2):
+>   dt-bindings: rng: Document BCM7278 RNG200 compatible
+>   hwrng: iproc-rng200: Add support for BCM7278
 
-Thanks, will fix.
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
