@@ -1,73 +1,31 @@
-From: preid@electromag.com.au (Phil Reid)
-Date: Fri, 10 Nov 2017 14:55:22 +0800
-Subject: [PATCH v5 4/7] i2c: designware: add i2c gpio recovery option
-In-Reply-To: <1510133354.25007.97.camel@linux.intel.com>
-References: <1509590430-11968-1-git-send-email-preid@electromag.com.au>
- <1509984581.25007.47.camel@linux.intel.com>
- <a0265848-2496-d347-a40f-ce83e7dfd945@electromag.com.au>
- <2970055.FM06l9ul3d@dabox> <1510133354.25007.97.camel@linux.intel.com>
-Message-ID: <7abe16b1-4bfd-4427-8783-b3733ed9f06c@electromag.com.au>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Fri, 10 Nov 2017 07:47:17 +0000
+Subject: [PATCH] fixup! kvm: arm debug: introduce helper for single-step
+In-Reply-To: <20171109170021.2984-2-alex.bennee@linaro.org>
+References: <20171109170021.2984-2-alex.bennee@linaro.org>
+Message-ID: <20171110074717.30134-1-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 8/11/2017 17:29, Andy Shevchenko wrote:
-> On Wed, 2017-11-08 at 09:29 +0100, Tim Sander wrote:
-> 
->>>> How do we switch pinctrl back to the native function? Is it
->>>> guaranteed
->>>> by pinctrl framework and all underneath drivers?
->>> That is a good question. I don't have an understanding of how the
->>> pinctrl
->>> framework works with respect to requesting gpios.
->>> My device (Intel / Altera Cyclone V SOC) doesn't have a pinctrl for
->>> the i2c
->>> / gpio mux as yet.
->>
->> According to the documentation from Intel/Altera it is not allowed to
->> change
->> the pinmux while running.
-> 
-> The driver is used on many platforms and requesting GPIO function while
-> running _is_ a pinmux change. >
->>   My guess is that they are using a shift chain, so
->> the output values of all pins in the chain are not stable. I think
->> they have
->> been lazy and just used the io config for fpgas with an jtag
->> controller and
->> connected the shift chain for pinconfig to this controller. So
->> unfortunatly it
->> is not possible to switch single pins on the run without interfering
->> with
->> other pins.
-> 
-> ...for this certain SoC.
-> 
->>> It's all setup by the bootloader and they don't expect
->>> you to change it. I'm using two separate GPIO's "wired" to the i2c
->>> bus via
->>> the SOC FPGA for the recovery. Tim was doing the same.
->>
->> Yes, i think thats the only way. But it is annoying that the i2c
->> controllers
->> of 201x have no way to recover from such bus errors >:-(.
-> 
-> Yep, it's pity, and we need to cope somehow with it.
-> 
-> So, my understanding of the current case is that either this change goes in only for certain SoC(s), or waiting until there is a guarantee from pinctrl subsystem to return function to native back when recovery finished.
-> 
-> My personal vote is for latter.
-> 
+---
+ arch/arm/include/asm/kvm_host.h | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-I'm not sure my change set will affect anything..
-Current drivers using the gpio functions are requesting the gpio using the old interface.
-If releasing the gpio doesn't restore the original functionality than nothing changes with this series.
-
-For the designware driver, the recovery code wont be called unless the gpio's are specified via the device tree.
-So the pinmux config shouldn't get changed.
-
-It'd be nice to have the code in mainline even if most soc's can't use it as yet.
-
-
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index a2e881d6108e..26a1ea6c6542 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -286,7 +286,10 @@ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+ static inline bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu,
+-					     struct kvm_run *run) {}
++					     struct kvm_run *run)
++{
++	return false;
++}
+ 
+ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+ 			       struct kvm_device_attr *attr);
 -- 
-Regards
-Phil Reid
+2.14.2
