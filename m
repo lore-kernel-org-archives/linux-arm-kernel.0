@@ -1,205 +1,75 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri, 10 Nov 2017 17:50:48 +0100
-Subject: [PATCH v3] crypto: AF_ALG - remove locking in async callback
-In-Reply-To: <1966139.WIlnTlQG5u@positron.chronox.de>
-References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
- <2510520.gYBNS8MAsP@positron.chronox.de>
- <20171110111058.GA25914@gondor.apana.org.au>
- <1966139.WIlnTlQG5u@positron.chronox.de>
-Message-ID: <CAGkQfmNtmSPM+gKXY_5Y-BsU3UA_CmdvXLu5SKVXiKHgLx=w6A@mail.gmail.com>
+From: robert.moore@intel.com (Moore, Robert)
+Date: Fri, 10 Nov 2017 17:13:19 +0000
+Subject: [PATCH v4 1/9] ACPICA: Add additional PPTT flags for cache
+ properties
+In-Reply-To: <20171109210311.25655-2-jeremy.linton@arm.com>
+References: <20171109210311.25655-1-jeremy.linton@arm.com>
+ <20171109210311.25655-2-jeremy.linton@arm.com>
+Message-ID: <94F2FBAB4432B54E8AACC7DFDE6C92E37E618DB4@ORSMSX110.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-11-10 13:20 GMT+01:00 Stephan M?ller <smueller@chronox.de>:
-> The code paths protected by the socket-lock do not use or modify the
-> socket in a non-atomic fashion. The actions pertaining the socket do not
-> even need to be handled as an atomic operation. Thus, the socket-lock
-> can be safely ignored.
->
-> This fixes a bug regarding scheduling in atomic as the callback function
-> may be invoked in interrupt context.
->
-> In addition, the sock_hold is moved before the AIO encrypt/decrypt
-> operation to ensure that the socket is always present. This avoids a
-> tiny race window where the socket is unprotected and yet used by the AIO
-> operation.
->
-> Finally, the release of resources for a crypto operation is moved into a
-> common function of af_alg_free_resources.
->
-> Fixes: e870456d8e7c8 ("crypto: algif_skcipher - overhaul memory management")
-> Fixes: d887c52d6ae43 ("crypto: algif_aead - overhaul memory management")
-> Reported-by: Romain Izard <romain.izard.pro@gmail.com>
-> Signed-off-by: Stephan Mueller <smueller@chronox.de>
+Included in ACPICA version 20171110
 
-Tested-by: Romain Izard <romain.izard.pro@gmail.com>
 
-On 4.14-rc8, with some fuzzing when applying the patch.
-The deterministic crash is not reproduced.
-
+> -----Original Message-----
+> From: Jeremy Linton [mailto:jeremy.linton at arm.com]
+> Sent: Thursday, November 9, 2017 1:03 PM
+> To: linux-acpi at vger.kernel.org
+> Cc: linux-arm-kernel at lists.infradead.org; sudeep.holla at arm.com;
+> hanjun.guo at linaro.org; lorenzo.pieralisi at arm.com; rjw at rjwysocki.net;
+> will.deacon at arm.com; catalin.marinas at arm.com;
+> gregkh at linuxfoundation.org; viresh.kumar at linaro.org;
+> mark.rutland at arm.com; linux-kernel at vger.kernel.org; linux-
+> pm at vger.kernel.org; jhugo at codeaurora.org; wangxiongfeng2 at huawei.com;
+> Jonathan.Zhang at cavium.com; ahs3 at redhat.com;
+> Jayachandran.Nair at cavium.com; austinwc at codeaurora.org; lenb at kernel.org;
+> Moore, Robert <robert.moore@intel.com>; Zheng, Lv <lv.zheng@intel.com>;
+> devel at acpica.org; Jeremy Linton <jeremy.linton@arm.com>
+> Subject: [PATCH v4 1/9] ACPICA: Add additional PPTT flags for cache
+> properties
+> 
+> The PPTT table has a number of flags that can be set to describe whether
+> the cache is I/D/U and the allocation and write policies. Add these
+> flags.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 > ---
->  crypto/af_alg.c         | 21 ++++++++++++++-------
->  crypto/algif_aead.c     | 23 ++++++++++++-----------
->  crypto/algif_skcipher.c | 23 ++++++++++++-----------
->  include/crypto/if_alg.h |  1 +
->  4 files changed, 39 insertions(+), 29 deletions(-)
->
-> diff --git a/crypto/af_alg.c b/crypto/af_alg.c
-> index 85cea9de324a..358749c38894 100644
-> --- a/crypto/af_alg.c
-> +++ b/crypto/af_alg.c
-> @@ -1021,6 +1021,18 @@ ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
->  EXPORT_SYMBOL_GPL(af_alg_sendpage);
->
->  /**
-> + * af_alg_free_resources - release resources required for crypto request
-> + */
-> +void af_alg_free_resources(struct af_alg_async_req *areq)
-> +{
-> +       struct sock *sk = areq->sk;
+>  include/acpi/actbl1.h | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/include/acpi/actbl1.h b/include/acpi/actbl1.h index
+> 6b8714a428b6..71f874e2790d 100644
+> --- a/include/acpi/actbl1.h
+> +++ b/include/acpi/actbl1.h
+> @@ -1346,6 +1346,20 @@ struct acpi_pptt_cache {
+>  #define ACPI_PPTT_MASK_CACHE_TYPE           (0x0C)	/* Cache type */
+>  #define ACPI_PPTT_MASK_WRITE_POLICY         (0x10)	/* Write policy */
+> 
+> +/* Attributes describing cache */
+> +#define ACPI_PPTT_CACHE_READ_ALLOCATE	    (0x0)   /* Cache line is
+> allocated on read */
+> +#define ACPI_PPTT_CACHE_WRITE_ALLOCATE	    (0x01)  /* Cache line is
+> allocated on write */
+> +#define ACPI_PPTT_CACHE_RW_ALLOCATE	    (0x02)  /* Cache line is
+> allocated on read and write */
+> +#define ACPI_PPTT_CACHE_RW_ALLOCATE_ALT	    (0x03)  /* Alternate
+> representation of above */
 > +
-> +       af_alg_free_areq_sgls(areq);
-> +       sock_kfree_s(sk, areq, areq->areqlen);
-> +}
-> +EXPORT_SYMBOL_GPL(af_alg_free_resources);
+> +#define ACPI_PPTT_CACHE_TYPE_DATA	    (0x0)   /* Data cache */
+> +#define ACPI_PPTT_CACHE_TYPE_INSTR	    (1<<2)  /* Instruction cache */
+> +#define ACPI_PPTT_CACHE_TYPE_UNIFIED	    (2<<2)  /* Unified I & D cache
+> */
+> +#define ACPI_PPTT_CACHE_TYPE_UNIFIED_ALT    (3<<2)  /* Alternate
+> representation of above */
 > +
-> +/**
->   * af_alg_async_cb - AIO callback handler
->   *
->   * This handler cleans up the struct af_alg_async_req upon completion of the
-> @@ -1036,18 +1048,13 @@ void af_alg_async_cb(struct crypto_async_request *_req, int err)
->         struct kiocb *iocb = areq->iocb;
->         unsigned int resultlen;
->
-> -       lock_sock(sk);
-> -
->         /* Buffer size written by crypto operation. */
->         resultlen = areq->outlen;
->
-> -       af_alg_free_areq_sgls(areq);
-> -       sock_kfree_s(sk, areq, areq->areqlen);
-> -       __sock_put(sk);
-> +       af_alg_free_resources(areq);
-> +       sock_put(sk);
->
->         iocb->ki_complete(iocb, err ? err : resultlen, 0);
-> -
-> -       release_sock(sk);
->  }
->  EXPORT_SYMBOL_GPL(af_alg_async_cb);
->
-> diff --git a/crypto/algif_aead.c b/crypto/algif_aead.c
-> index aacae0837aff..db9378a45296 100644
-> --- a/crypto/algif_aead.c
-> +++ b/crypto/algif_aead.c
-> @@ -268,12 +268,23 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
->
->         if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
->                 /* AIO operation */
-> +               sock_hold(sk);
->                 areq->iocb = msg->msg_iocb;
->                 aead_request_set_callback(&areq->cra_u.aead_req,
->                                           CRYPTO_TFM_REQ_MAY_BACKLOG,
->                                           af_alg_async_cb, areq);
->                 err = ctx->enc ? crypto_aead_encrypt(&areq->cra_u.aead_req) :
->                                  crypto_aead_decrypt(&areq->cra_u.aead_req);
+> +#define ACPI_PPTT_CACHE_POLICY_WB	    (0x0)   /* Cache is write back
+> */
+> +#define ACPI_PPTT_CACHE_POLICY_WT	    (1<<4)  /* Cache is write
+> through */
 > +
-> +               /* AIO operation in progress */
-> +               if (err == -EINPROGRESS || err == -EBUSY) {
-> +                       /* Remember output size that will be generated. */
-> +                       areq->outlen = outlen;
-> +
-> +                       return -EIOCBQUEUED;
-> +               }
-> +
-> +               sock_put(sk);
->         } else {
->                 /* Synchronous operation */
->                 aead_request_set_callback(&areq->cra_u.aead_req,
-> @@ -285,19 +296,9 @@ static int _aead_recvmsg(struct socket *sock, struct msghdr *msg,
->                                 &ctx->wait);
->         }
->
-> -       /* AIO operation in progress */
-> -       if (err == -EINPROGRESS) {
-> -               sock_hold(sk);
-> -
-> -               /* Remember output size that will be generated. */
-> -               areq->outlen = outlen;
-> -
-> -               return -EIOCBQUEUED;
-> -       }
->
->  free:
-> -       af_alg_free_areq_sgls(areq);
-> -       sock_kfree_s(sk, areq, areq->areqlen);
-> +       af_alg_free_resources(areq);
->
->         return err ? err : outlen;
->  }
-> diff --git a/crypto/algif_skcipher.c b/crypto/algif_skcipher.c
-> index 9954b078f0b9..30cff827dd8f 100644
-> --- a/crypto/algif_skcipher.c
-> +++ b/crypto/algif_skcipher.c
-> @@ -117,6 +117,7 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
->
->         if (msg->msg_iocb && !is_sync_kiocb(msg->msg_iocb)) {
->                 /* AIO operation */
-> +               sock_hold(sk);
->                 areq->iocb = msg->msg_iocb;
->                 skcipher_request_set_callback(&areq->cra_u.skcipher_req,
->                                               CRYPTO_TFM_REQ_MAY_SLEEP,
-> @@ -124,6 +125,16 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
->                 err = ctx->enc ?
->                         crypto_skcipher_encrypt(&areq->cra_u.skcipher_req) :
->                         crypto_skcipher_decrypt(&areq->cra_u.skcipher_req);
-> +
-> +               /* AIO operation in progress */
-> +               if (err == -EINPROGRESS || err == -EBUSY) {
-> +                       /* Remember output size that will be generated. */
-> +                       areq->outlen = len;
-> +
-> +                       return -EIOCBQUEUED;
-> +               }
-> +
-> +               sock_put(sk);
->         } else {
->                 /* Synchronous operation */
->                 skcipher_request_set_callback(&areq->cra_u.skcipher_req,
-> @@ -136,19 +147,9 @@ static int _skcipher_recvmsg(struct socket *sock, struct msghdr *msg,
->                                                  &ctx->wait);
->         }
->
-> -       /* AIO operation in progress */
-> -       if (err == -EINPROGRESS) {
-> -               sock_hold(sk);
-> -
-> -               /* Remember output size that will be generated. */
-> -               areq->outlen = len;
-> -
-> -               return -EIOCBQUEUED;
-> -       }
->
->  free:
-> -       af_alg_free_areq_sgls(areq);
-> -       sock_kfree_s(sk, areq, areq->areqlen);
-> +       af_alg_free_resources(areq);
->
->         return err ? err : len;
->  }
-> diff --git a/include/crypto/if_alg.h b/include/crypto/if_alg.h
-> index 6abf0a3604dc..38d9c5861ed8 100644
-> --- a/include/crypto/if_alg.h
-> +++ b/include/crypto/if_alg.h
-> @@ -242,6 +242,7 @@ int af_alg_sendmsg(struct socket *sock, struct msghdr *msg, size_t size,
->                    unsigned int ivsize);
->  ssize_t af_alg_sendpage(struct socket *sock, struct page *page,
->                         int offset, size_t size, int flags);
-> +void af_alg_free_resources(struct af_alg_async_req *areq);
->  void af_alg_async_cb(struct crypto_async_request *_req, int err);
->  unsigned int af_alg_poll(struct file *file, struct socket *sock,
->                          poll_table *wait);
+>  /* 2: ID Structure */
+> 
+>  struct acpi_pptt_id {
 > --
-> 2.13.6
->
->
+> 2.13.5
