@@ -1,138 +1,77 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Fri, 10 Nov 2017 12:44:24 -0500
-Subject: [PATCH] dmaengine: dmatest: move callback wait queue to thread context
-Message-ID: <1510335864-25997-1-git-send-email-awallis@codeaurora.org>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 10 Nov 2017 18:48:03 +0100
+Subject: [PATCH v4] ARM: dts: exynos: add bcm4334 device node to trats2
+In-Reply-To: <20171109100645.GA32635@lineageos.org>
+References: <20171109100645.GA32635@lineageos.org>
+Message-ID: <20171110174803.umsgcs45pmjhplgk@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
-introduced a bug (that is in fact documented by the patch commit text)
-that leaves behind a dangling pointer. Since the done_wait structure is
-allocated on the stack, future invocations to the DMATEST can produce
-undesirable results (e.g., corrupted spinlocks).
+On Thu, Nov 09, 2017 at 09:06:45PM +1100, Simon Shields wrote:
+> This patch allows the bcm4334 to power on and enables
+> wifi functionality on trats2.
+> 
+> Signed-off-by: Simon Shields <simon@lineageos.org>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index bceb919ac637..1bf1943ba7a1 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -241,6 +241,13 @@
+>  
+>  	};
+>  
+> +	wlan_pwrseq: sdhci3-pwrseq {
+> +		compatible = "mmc-pwrseq-simple";
+> +		reset-gpios = <&gpj0 0 GPIO_ACTIVE_LOW>;
+> +		clocks = <&max77686 MAX77686_CLK_PMIC>;
+> +		clock-names = "ext_clock";
+> +	};
+> +
+>  	sound {
+>  		compatible = "samsung,trats2-audio";
+>  		samsung,i2s-controller = <&i2s0>;
+> @@ -1239,6 +1246,27 @@
+>  	status = "okay";
+>  };
+>  
+> +&sdhci_3 {
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	non-removable;
+> +	bus-width = <4>;
+> +
+> +	mmc-pwrseq = <&wlan_pwrseq>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&sd3_clk &sd3_cmd &sd3_bus4>;
+> +	vmmc-supply = <&ldo21_reg>;
 
-Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
-out") attempted to WARN the user that the stack was likely corrupted but
-did not fix the actual issue.
+How did you get LDO21 here? It does not look correct.
 
-This patch fixes the issue by pushing the wait queue and callback
-structs into the the thread structure. If a failure occurs due to time,
-dmaengine_terminate_all will force the callback to safely call
-wake_up_all() without possibility of using a freed pointer.
+> +	status = "okay";
+> +
+> +	brcmf: brcmf at 1 {
 
-Cc: stable at vger.kernel.org
-Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
-Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
-Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
- drivers/dma/dmatest.c | 37 ++++++++++++++++---------------------
- 1 file changed, 16 insertions(+), 21 deletions(-)
+The node name should be generic class of device, thus maybe "wifi"?
+Label can stay although I see it is not used now.
 
-diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
-index 47edc7f..2573b6c 100644
---- a/drivers/dma/dmatest.c
-+++ b/drivers/dma/dmatest.c
-@@ -155,6 +155,12 @@ struct dmatest_params {
- #define PATTERN_COUNT_MASK	0x1f
- #define PATTERN_MEMSET_IDX	0x01
- 
-+/* poor man's completion - we want to use wait_event_freezable() on it */
-+struct dmatest_done {
-+	bool			done;
-+	wait_queue_head_t	*wait;
-+};
-+
- struct dmatest_thread {
- 	struct list_head	node;
- 	struct dmatest_info	*info;
-@@ -165,6 +171,8 @@ struct dmatest_thread {
- 	u8			**dsts;
- 	u8			**udsts;
- 	enum dma_transaction_type type;
-+	wait_queue_head_t done_wait;
-+	struct dmatest_done test_done;
- 	bool			done;
- };
- 
-@@ -342,11 +350,6 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
- 	return error_count;
- }
- 
--/* poor man's completion - we want to use wait_event_freezable() on it */
--struct dmatest_done {
--	bool			done;
--	wait_queue_head_t	*wait;
--};
- 
- static void dmatest_callback(void *arg)
- {
-@@ -424,9 +427,8 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
-  */
- static int dmatest_func(void *data)
- {
--	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(done_wait);
- 	struct dmatest_thread	*thread = data;
--	struct dmatest_done	done = { .wait = &done_wait };
-+	struct dmatest_done	*done = &thread->test_done;
- 	struct dmatest_info	*info;
- 	struct dmatest_params	*params;
- 	struct dma_chan		*chan;
-@@ -673,9 +675,9 @@ static int dmatest_func(void *data)
- 			continue;
- 		}
- 
--		done.done = false;
-+		done->done = false;
- 		tx->callback = dmatest_callback;
--		tx->callback_param = &done;
-+		tx->callback_param = done;
- 		cookie = tx->tx_submit(tx);
- 
- 		if (dma_submit_error(cookie)) {
-@@ -688,21 +690,12 @@ static int dmatest_func(void *data)
- 		}
- 		dma_async_issue_pending(chan);
- 
--		wait_event_freezable_timeout(done_wait, done.done,
-+		wait_event_freezable_timeout(thread->done_wait, done->done,
- 					     msecs_to_jiffies(params->timeout));
- 
- 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
- 
--		if (!done.done) {
--			/*
--			 * We're leaving the timed out dma operation with
--			 * dangling pointer to done_wait.  To make this
--			 * correct, we'll need to allocate wait_done for
--			 * each test iteration and perform "who's gonna
--			 * free it this time?" dancing.  For now, just
--			 * leave it dangling.
--			 */
--			WARN(1, "dmatest: Kernel stack may be corrupted!!\n");
-+		if (!done->done) {
- 			dmaengine_unmap_put(um);
- 			result("test timed out", total_tests, src_off, dst_off,
- 			       len, 0);
-@@ -789,7 +782,7 @@ static int dmatest_func(void *data)
- 		dmatest_KBs(runtime, total_len), ret);
- 
- 	/* terminate all transfers on specified channels */
--	if (ret)
-+	if (ret || failed_tests)
- 		dmaengine_terminate_all(chan);
- 
- 	thread->done = true;
-@@ -849,6 +842,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
- 		thread->info = info;
- 		thread->chan = dtc->chan;
- 		thread->type = type;
-+		thread->test_done.wait = &thread->done_wait;
-+		init_waitqueue_head(&thread->done_wait);
- 		smp_wmb();
- 		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
- 				dma_chan_name(chan), op, i);
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Best regards,
+Krzysztof
+
+> +		reg = <1>;
+> +		compatible = "brcm,bcm4329-fmac";
+> +		interrupt-parent = <&gpx2>;
+> +		interrupts = <5 IRQ_TYPE_NONE>;
+> +		interrupt-names = "host-wake";
+> +	};
+> +};
+> +
+>  &serial_0 {
+>  	status = "okay";
+>  };
+> -- 
+> 2.15.0
+> 
