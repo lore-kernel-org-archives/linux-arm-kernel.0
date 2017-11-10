@@ -1,35 +1,58 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 10 Nov 2017 10:26:50 +0100
-Subject: [PATCH 2/3] soc: renesas: Identify R-Car M3-W ES1.1
-In-Reply-To: <20171101084237.atr25lujcqctwhjj@verge.net.au>
-References: <1509384599-28953-1-git-send-email-geert+renesas@glider.be>
- <1509384599-28953-3-git-send-email-geert+renesas@glider.be>
- <20171101084237.atr25lujcqctwhjj@verge.net.au>
-Message-ID: <20171110092649.6m4ltkoq7z53apvx@verge.net.au>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Fri, 10 Nov 2017 17:26:54 +0800
+Subject: [PATCH] arm64: allwinner: a64: add Ethernet PHY regulator for several
+ boards
+Message-ID: <20171110092654.10746-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 01, 2017 at 09:42:38AM +0100, Simon Horman wrote:
-> On Mon, Oct 30, 2017 at 06:29:58PM +0100, Geert Uytterhoeven wrote:
-> > The Product Register of R-Car M3-W ES1.1 incorrectly identifies the SoC
-> > revision as ES2.0.  Add a workaround to fix this.
-> > 
-> > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> > ---
-> > Is it already known how future revisions will be identified?
-> 
-> I'd like there to be some sort of conclusion to that discussion before
-> applying that patch (I seem to recall we discussed it some time ago
-> but I don't recall the outcome). The reason that I am being cautious here
-> is that it potentially has implications for old-kernel/new-SoC compatibility
-> which may be hard to fix later.
-> 
-> I am happy to apply the other patches in the series if you think that is
-> worthwhile.
+On several A64 boards the Ethernet PHY is powered by the DC1SW regulator
+on the AXP803 PMIC.
 
-After some discussion off-list I am now satisfied that the approach you
-have taken - to special case as identifying ES1.1 as what would otherwise
-be identified ES2.0 - is not likely to cause problems with future SoC
-releases.
+Add phy-handle property to these boards' emac node.
 
-I have applied this patch for v4.16.
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts     | 1 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts           | 1 +
+ arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 1 +
+ 3 files changed, 3 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 45bdbfb96126..4a8d3f83a36e 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -75,6 +75,7 @@
+ 	pinctrl-0 = <&rgmii_pins>;
+ 	phy-mode = "rgmii";
+ 	phy-handle = <&ext_rgmii_phy>;
++	phy-supply = <&reg_dc1sw>;
+ 	status = "okay";
+ };
+ 
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 806442d3e846..604cdaedac38 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -77,6 +77,7 @@
+ 	pinctrl-0 = <&rmii_pins>;
+ 	phy-mode = "rmii";
+ 	phy-handle = <&ext_rmii_phy1>;
++	phy-supply = <&reg_dc1sw>;
+ 	status = "okay";
+ 
+ };
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+index 0eb2acedf8c3..a053a6ac5267 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+@@ -82,6 +82,7 @@
+ 	pinctrl-0 = <&rgmii_pins>;
+ 	phy-mode = "rgmii";
+ 	phy-handle = <&ext_rgmii_phy>;
++	phy-supply = <&reg_dc1sw>;
+ 	status = "okay";
+ };
+ 
+-- 
+2.14.2
