@@ -1,56 +1,98 @@
-From: jlu@pengutronix.de (Jan Luebbe)
-Date: Fri, 10 Nov 2017 10:03:06 +0100
-Subject: [PATCH v3 5/7] ARM: l2x0: add marvell,ecc-enable property for aurora
-In-Reply-To: <20171110090308.21562-1-jlu@pengutronix.de>
-References: <20171110090308.21562-1-jlu@pengutronix.de>
-Message-ID: <20171110090308.21562-6-jlu@pengutronix.de>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Fri, 10 Nov 2017 09:18:55 +0000
+Subject: next/master boot: 273 boots: 63 failed, 209 passed with 1
+ untried/unknown (next-20171106)
+In-Reply-To: <5505affd-58a5-857f-051d-5b93257e175d@redhat.com>
+References: <5a0055f1.85a8500a.98d54.a4e4@mx.google.com>
+ <20171106191713.d7jqg2b6zqchythw@sirena.co.uk>
+ <d8e21d87-776b-beff-62af-34e5ad1febc3@nvidia.com>
+ <20171107105501.7x74gdqzhr7uulp2@sirena.org.uk>
+ <a384e96c-27c7-782b-75b9-7525714f5831@collabora.com>
+ <613bcd63-a215-acbe-9150-c1495f7604f6@collabora.com>
+ <5740b853-4898-2ebc-f67d-0808d1b44c36@nvidia.com>
+ <ab2ee0a8-6584-7436-ca1b-4f1b521279b0@collabora.com>
+ <7cdfa633-d9c6-881a-ae5f-f94f7e6413ee@nvidia.com>
+ <5f064e65-ee29-179b-8102-984d12d24d9d@collabora.com>
+ <15792a16-6b57-a6ad-92dc-0ffaba0354db@nvidia.com>
+ <1eb4e14f-4728-d4f7-95a6-0a6308760d7a@collabora.com>
+ <CAK8P3a3iiSgutnHFU7PoLGQyObgyAreQOOtrDhjijoMU5wZ1Eg@mail.gmail.com>
+ <18ef379f-0c23-0cbf-4228-30d5c46c690f@nvidia.com>
+ <bfed6e80-44a7-6e96-c6a6-bc9793a1937a@collabora.com>
+ <2038e32a-de4a-a683-462e-555e991a2111@nvidia.com>
+ <64b117d3-b2ad-037a-b034-78ef1510fbb4@nvidia.com>
+ <5505affd-58a5-857f-051d-5b93257e175d@redhat.com>
+Message-ID: <1040af29-4d15-4e8a-29ab-40952523535c@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chris Packham <chris.packham@alliedtelesis.co.nz>
 
-The aurora cache on the Marvell Armada-XP SoC supports ECC protection
-for the L2 data arrays. Add a "marvell,ecc-enable" device tree property
-which can be used to enable this.
+On 09/11/17 22:57, Ben Skeggs wrote:
+> On 11/10/2017 08:54 AM, Jon Hunter wrote:
+>>
+>> On 09/11/17 21:45, Jon Hunter wrote:
+>>>
+>>> On 09/11/17 19:03, Guillaume Tucker wrote:
+>>> ...
+>>>
+>>>> Alright, so here's all the results I got all based on
+>>>> next-20171109 and running on tegra124-nyan-big:
+>>>>
+>>>> ? * plain multi_v7_defconfig, passes:
+>>>> ??? https://lava.collabora.co.uk/scheduler/job/981295
+>>>>
+>>>> ? * CONFIG_MODULES disabled, fails:
+>>>> ??? https://lava.collabora.co.uk/scheduler/job/981342
+>>>>
+>>>> ? * CONFIG_MODULES and CONFIG_DRM_NOUVEAU disabled, also fails:
+>>>> ??? https://lava.collabora.co.uk/scheduler/job/981343
+>>>
+>>> This is the crash in the EC driver that I mentioned before. You need to
+>>> add the fix for the EC driver to avoid this BUG_ON.
+>>>
+>>> I was able to bisect this manually dancing around the various bugs and
+>>> it points to this commit ...
+>>>
+>>> commit 7313cfa4f6e30384fa04083698d1e865cf812a6a
+>>> Author: Ben Skeggs <bskeggs@redhat.com>
+>>> Date:   Wed Nov 1 03:56:19 2017 +1000
+>>>
+>>>     drm/nouveau/bar: move bar1 initialisation into its own function
+>>>
+>>>
+>>> Unfortunately, I cannot revert cleanly on top of next-20171109 and so I
+>>> cannot confirm.
+>>>
+>>> Ben, we are seeing a hang on Tegra when booting with CONFIG_DRM_NOUVEAU
+>>> enabled. Apart from the above bisect result, I don't have much else to
+>>> go on at the moment. Let me know if you have any thoughts or anything to
+>>> test.
+>>
+>> Here is part of the crash dump I see ...
+> 
+> Hey,
+> 
+> Oops, I went to great care to make that series bisectable, but
+> apparently this slipped through the cracks.
+> 
+> 48fe02478a0ddb89930f3595f8217fa2dfd98796 should fix that crash.
 
-Signed-off-by: Chris Packham <chris.packham@alliedtelesis.co.nz>
-[jlu at pengutronix.de: use aurora specific define AURORA_ACR_ECC_EN]
-Signed-off-by: Jan Luebbe <jlu@pengutronix.de>
----
- Documentation/devicetree/bindings/arm/l2c2x0.txt | 2 ++
- arch/arm/mm/cache-l2x0.c                         | 7 +++++++
- 2 files changed, 9 insertions(+)
+Thanks Ben. However, looking at next-20171109 this one is already in.
+So maybe the bisect is still not getting me to the current issue. When
+booting next-20171109 the last thing I see is ...
 
-diff --git a/Documentation/devicetree/bindings/arm/l2c2x0.txt b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-index fbe6cb21f4cf..15a84f0ba9f1 100644
---- a/Documentation/devicetree/bindings/arm/l2c2x0.txt
-+++ b/Documentation/devicetree/bindings/arm/l2c2x0.txt
-@@ -76,6 +76,8 @@ Optional properties:
-   specified to indicate that such transforms are precluded.
- - arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
- - arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
-+- marvell,ecc-enable : enable ECC protection on the L2 cache
-+- marvell,ecc-disable : disable ECC protection on the L2 cache
- - arm,outer-sync-disable : disable the outer sync operation on the L2 cache.
-   Some core tiles, especially ARM PB11MPCore have a faulty L220 cache that
-   will randomly hang unless outer sync operations are disabled.
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index b70bee74750d..644f786e4fa9 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -1505,6 +1505,13 @@ static void __init aurora_of_parse(const struct device_node *np,
- 		mask |= AURORA_ACR_FORCE_WRITE_POLICY_MASK;
- 	}
- 
-+	if (of_property_read_bool(np, "marvell,ecc-enable")) {
-+		mask |= AURORA_ACR_ECC_EN;
-+		val |= AURORA_ACR_ECC_EN;
-+	} else if (of_property_read_bool(np, "marvell,ecc-disable")) {
-+		mask |= AURORA_ACR_ECC_EN;
-+	}
-+
- 	if (of_property_read_bool(np, "arm,parity-enable")) {
- 		mask |= AURORA_ACR_PARITY_EN;
- 		val |= AURORA_ACR_PARITY_EN;
+[    2.228178] nouveau 57000000.gpu: NVIDIA GK20A (0ea000a1)
+[    2.233634] nouveau 57000000.gpu: imem: using IOMMU
+[    2.238572] nouveau 57000000.gpu: Direct firmware load for nvidia/gk20a/fecs_inst.bin failed with error -2
+[    2.248295] nouveau 57000000.gpu: Direct firmware load for nouveau/nvea_fuc409c failed with error -2
+[    2.257479] nouveau 57000000.gpu: Direct firmware load for nouveau/fuc409c failed with error -2
+[    2.266189] nouveau 57000000.gpu: gr: failed to load fuc409c
+
+So no crash. I did see the crash after the bisect, but not in top of
+tree. It appears to hang after the nouveau probe fails. Any thoughts
+on how to debug further?
+
+Cheers
+Jon
+
 -- 
-2.11.0
+nvpublic
