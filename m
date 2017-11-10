@@ -1,283 +1,150 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Fri, 10 Nov 2017 10:27:36 +0000
-Subject: [PATCH v5 16/30] arm64/sve: Backend logic for setting the vector
- length
-In-Reply-To: <1509465082-30427-17-git-send-email-Dave.Martin@arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-17-git-send-email-Dave.Martin@arm.com>
-Message-ID: <8760aiqvhj.fsf@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Fri, 10 Nov 2017 11:39:37 +0100
+Subject: [PATCH v4.14] Add support for bq27521 battery monitor
+In-Reply-To: <20171109210615.GA27638@amd>
+References: <20171109210615.GA27638@amd>
+Message-ID: <20171110103937.GA29900@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ 
+This adds basic support for BQ27521 battery monitor, used in Nokia N9
+and N950. In particular, battery voltage is important to be able to
+tell when the battery is almost empty. Emptying battery on N950 is
+pretty painful, as flasher needs to be used to recover phone in such case.
 
-Dave Martin <Dave.Martin@arm.com> writes:
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-> This patch implements the core logic for changing a task's vector
-> length on request from userspace.  This will be used by the ptrace
-> and prctl frontends that are implemented in later patches.
->
-> The SVE architecture permits, but does not require, implementations
-> to support vector lengths that are not a power of two.  To handle
-> this, logic is added to check a requested vector length against a
-> possibly sparse bitmap of available vector lengths at runtime, so
-> that the best supported value can be chosen.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
+diff --git a/drivers/power/supply/bq27xxx_battery.c b/drivers/power/supply/bq27xxx_battery.c
+index 51f0961..f684288 100644
+--- a/drivers/power/supply/bq27xxx_battery.c
++++ b/drivers/power/supply/bq27xxx_battery.c
+@@ -323,6 +323,30 @@ static u8
+ 		[BQ27XXX_REG_AP] = INVALID_REG_ADDR,
+ 		BQ27XXX_DM_REG_ROWS,
+ 	},
++	bq27521_regs[BQ27XXX_REG_MAX] = {
++		[BQ27XXX_REG_CTRL] = 0x02,
++		[BQ27XXX_REG_TEMP] = 0x0a,
++		[BQ27XXX_REG_INT_TEMP] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_VOLT] = 0x0c,
++		[BQ27XXX_REG_AI] = 0x0e,
++		[BQ27XXX_REG_FLAGS] = 0x08,
++		[BQ27XXX_REG_TTE] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_TTF] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_TTES] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_TTECP] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_NAC] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_FCC] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_CYCT] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_AE] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_SOC] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_DCAP] = INVALID_REG_ADDR,
++		[BQ27XXX_REG_AP] = INVALID_REG_ADDR,
++		[BQ27XXX_DM_CTRL] = INVALID_REG_ADDR,
++		[BQ27XXX_DM_CLASS] = INVALID_REG_ADDR,
++		[BQ27XXX_DM_BLOCK] = INVALID_REG_ADDR,
++		[BQ27XXX_DM_DATA] = INVALID_REG_ADDR,
++		[BQ27XXX_DM_CKSUM] = INVALID_REG_ADDR,
++	},
+ 	bq27530_regs[BQ27XXX_REG_MAX] = {
+ 		[BQ27XXX_REG_CTRL] = 0x00,
+ 		[BQ27XXX_REG_TEMP] = 0x06,
+@@ -557,6 +581,15 @@ static enum power_supply_property bq27520g4_props[] = {
+ 	POWER_SUPPLY_PROP_MANUFACTURER,
+ };
+ 
++static enum power_supply_property bq27521_props[] = {
++	POWER_SUPPLY_PROP_STATUS,
++	POWER_SUPPLY_PROP_PRESENT,
++	POWER_SUPPLY_PROP_VOLTAGE_NOW,
++	POWER_SUPPLY_PROP_CURRENT_NOW,
++	POWER_SUPPLY_PROP_TEMP,
++	POWER_SUPPLY_PROP_TECHNOLOGY,
++};
++
+ static enum power_supply_property bq27530_props[] = {
+ 	POWER_SUPPLY_PROP_STATUS,
+ 	POWER_SUPPLY_PROP_PRESENT,
+@@ -671,6 +704,7 @@ static struct bq27xxx_dm_reg bq27500_dm_regs[] = {
+ #define bq27520g2_dm_regs 0
+ #define bq27520g3_dm_regs 0
+ #define bq27520g4_dm_regs 0
++#define bq27521_dm_regs 0
+ #define bq27530_dm_regs 0
+ #define bq27531_dm_regs 0
+ #define bq27541_dm_regs 0
+@@ -717,8 +751,8 @@ static struct bq27xxx_dm_reg bq27621_dm_regs[] = {
+ #endif
+ 
+ #define BQ27XXX_O_ZERO	0x00000001
+-#define BQ27XXX_O_OTDC	0x00000002
+-#define BQ27XXX_O_UTOT  0x00000004
++#define BQ27XXX_O_OTDC	0x00000002 /* has OTC/OTD overtemperature flags */
++#define BQ27XXX_O_UTOT  0x00000004 /* has OT overtemperature flag */
+ #define BQ27XXX_O_CFGUP	0x00000008
+ #define BQ27XXX_O_RAM	0x00000010
+ 
+@@ -751,6 +785,7 @@ static struct {
+ 	[BQ27520G2] = BQ27XXX_DATA(bq27520g2, 0         , BQ27XXX_O_OTDC),
+ 	[BQ27520G3] = BQ27XXX_DATA(bq27520g3, 0         , BQ27XXX_O_OTDC),
+ 	[BQ27520G4] = BQ27XXX_DATA(bq27520g4, 0         , BQ27XXX_O_OTDC),
++	[BQ27521]   = BQ27XXX_DATA(bq27521,   0         , 0),
+ 	[BQ27530]   = BQ27XXX_DATA(bq27530,   0         , BQ27XXX_O_UTOT),
+ 	[BQ27531]   = BQ27XXX_DATA(bq27531,   0         , BQ27XXX_O_UTOT),
+ 	[BQ27541]   = BQ27XXX_DATA(bq27541,   0         , BQ27XXX_O_OTDC),
+diff --git a/drivers/power/supply/bq27xxx_battery_i2c.c b/drivers/power/supply/bq27xxx_battery_i2c.c
+index 0b11ed4..6b25e5f 100644
+--- a/drivers/power/supply/bq27xxx_battery_i2c.c
++++ b/drivers/power/supply/bq27xxx_battery_i2c.c
+@@ -239,6 +239,7 @@ static const struct i2c_device_id bq27xxx_i2c_id_table[] = {
+ 	{ "bq27520g2", BQ27520G2 },
+ 	{ "bq27520g3", BQ27520G3 },
+ 	{ "bq27520g4", BQ27520G4 },
++	{ "bq27521", BQ27521 },
+ 	{ "bq27530", BQ27530 },
+ 	{ "bq27531", BQ27531 },
+ 	{ "bq27541", BQ27541 },
+@@ -269,6 +270,7 @@ static const struct of_device_id bq27xxx_battery_i2c_of_match_table[] = {
+ 	{ .compatible = "ti,bq27520g2" },
+ 	{ .compatible = "ti,bq27520g3" },
+ 	{ .compatible = "ti,bq27520g4" },
++	{ .compatible = "ti,bq27521" },
+ 	{ .compatible = "ti,bq27530" },
+ 	{ .compatible = "ti,bq27531" },
+ 	{ .compatible = "ti,bq27541" },
+diff --git a/include/linux/mfd/twl.h b/include/linux/mfd/twl.h
+index 9ad7828..6547d30 100644
+--- a/include/linux/mfd/twl.h
++++ b/include/linux/mfd/twl.h
+@@ -70,6 +70,7 @@ enum twl4030_module_ids {
+ 	TWL4030_MODULE_INT,
+ 
+ 	TWL5031_MODULE_ACCESSORY,
++	TWL5031_MODULE_BCC,
+ 	TWL5031_MODULE_INTERRUPTS,
+ 
+ 	TWL4030_MODULE_LAST,
+diff --git a/include/linux/power/bq27xxx_battery.h b/include/linux/power/bq27xxx_battery.h
+index 43194e0..d8d127a 100644
+--- a/include/linux/power/bq27xxx_battery.h
++++ b/include/linux/power/bq27xxx_battery.h
+@@ -15,6 +15,7 @@ enum bq27xxx_chip {
+ 	BQ27520G2, /* bq27520G2 */
+ 	BQ27520G3, /* bq27520G3 */
+ 	BQ27520G4, /* bq27520G4 */
++	BQ27521, /* bq27521 */	
+ 	BQ27530, /* bq27530, bq27531 */
+ 	BQ27531,
+ 	BQ27541, /* bq27541, bq27542, bq27546, bq27742 */
 
-Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
-
-> ---
->  arch/arm64/include/asm/fpsimd.h |   8 +++
->  arch/arm64/kernel/fpsimd.c      | 137 +++++++++++++++++++++++++++++++++++++++-
->  include/uapi/linux/prctl.h      |   5 ++
->  3 files changed, 149 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/fpsimd.h b/arch/arm64/include/asm/fpsimd.h
-> index 9bbd74c..86f550c 100644
-> --- a/arch/arm64/include/asm/fpsimd.h
-> +++ b/arch/arm64/include/asm/fpsimd.h
-> @@ -20,6 +20,7 @@
->
->  #ifndef __ASSEMBLY__
->
-> +#include <linux/cache.h>
->  #include <linux/stddef.h>
->
->  /*
-> @@ -70,17 +71,24 @@ extern void fpsimd_update_current_state(struct fpsimd_state *state);
->
->  extern void fpsimd_flush_task_state(struct task_struct *target);
->
-> +/* Maximum VL that SVE VL-agnostic software can transparently support */
-> +#define SVE_VL_ARCH_MAX 0x100
-> +
->  extern void sve_save_state(void *state, u32 *pfpsr);
->  extern void sve_load_state(void const *state, u32 const *pfpsr,
->  			   unsigned long vq_minus_1);
->  extern unsigned int sve_get_vl(void);
->
-> +extern int __ro_after_init sve_max_vl;
-> +
->  #ifdef CONFIG_ARM64_SVE
->
->  extern size_t sve_state_size(struct task_struct const *task);
->
->  extern void sve_alloc(struct task_struct *task);
->  extern void fpsimd_release_task(struct task_struct *task);
-> +extern int sve_set_vector_length(struct task_struct *task,
-> +				 unsigned long vl, unsigned long flags);
->
->  #else /* ! CONFIG_ARM64_SVE */
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index e0b5ef5..1ceb069 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -17,8 +17,10 @@
->   * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->   */
->
-> +#include <linux/bitmap.h>
->  #include <linux/bottom_half.h>
->  #include <linux/bug.h>
-> +#include <linux/cache.h>
->  #include <linux/compat.h>
->  #include <linux/cpu.h>
->  #include <linux/cpu_pm.h>
-> @@ -28,6 +30,7 @@
->  #include <linux/init.h>
->  #include <linux/percpu.h>
->  #include <linux/preempt.h>
-> +#include <linux/prctl.h>
->  #include <linux/ptrace.h>
->  #include <linux/sched/signal.h>
->  #include <linux/signal.h>
-> @@ -113,6 +116,20 @@ static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
->  /* Default VL for tasks that don't set it explicitly: */
->  static int sve_default_vl = SVE_VL_MIN;
->
-> +#ifdef CONFIG_ARM64_SVE
-> +
-> +/* Maximum supported vector length across all CPUs (initially poisoned) */
-> +int __ro_after_init sve_max_vl = -1;
-> +/* Set of available vector lengths, as vq_to_bit(vq): */
-> +static DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> +
-> +#else /* ! CONFIG_ARM64_SVE */
-> +
-> +/* Dummy declaration for code that will be optimised out: */
-> +extern DECLARE_BITMAP(sve_vq_map, SVE_VQ_MAX);
-> +
-> +#endif /* ! CONFIG_ARM64_SVE */
-> +
->  /*
->   * Call __sve_free() directly only if you know task can't be scheduled
->   * or preempted.
-> @@ -270,6 +287,50 @@ static void task_fpsimd_save(void)
->  	}
->  }
->
-> +/*
-> + * Helpers to translate bit indices in sve_vq_map to VQ values (and
-> + * vice versa).  This allows find_next_bit() to be used to find the
-> + * _maximum_ VQ not exceeding a certain value.
-> + */
-> +
-> +static unsigned int vq_to_bit(unsigned int vq)
-> +{
-> +	return SVE_VQ_MAX - vq;
-> +}
-> +
-> +static unsigned int bit_to_vq(unsigned int bit)
-> +{
-> +	if (WARN_ON(bit >= SVE_VQ_MAX))
-> +		bit = SVE_VQ_MAX - 1;
-> +
-> +	return SVE_VQ_MAX - bit;
-> +}
-> +
-> +/*
-> + * All vector length selection from userspace comes through here.
-> + * We're on a slow path, so some sanity-checks are included.
-> + * If things go wrong there's a bug somewhere, but try to fall back to a
-> + * safe choice.
-> + */
-> +static unsigned int find_supported_vector_length(unsigned int vl)
-> +{
-> +	int bit;
-> +	int max_vl = sve_max_vl;
-> +
-> +	if (WARN_ON(!sve_vl_valid(vl)))
-> +		vl = SVE_VL_MIN;
-> +
-> +	if (WARN_ON(!sve_vl_valid(max_vl)))
-> +		max_vl = SVE_VL_MIN;
-> +
-> +	if (vl > max_vl)
-> +		vl = max_vl;
-> +
-> +	bit = find_next_bit(sve_vq_map, SVE_VQ_MAX,
-> +			    vq_to_bit(sve_vq_from_vl(vl)));
-> +	return sve_vl_from_vq(bit_to_vq(bit));
-> +}
-> +
->  #define ZREG(sve_state, vq, n) ((char *)(sve_state) +		\
->  	(SVE_SIG_ZREG_OFFSET(vq, n) - SVE_SIG_REGS_OFFSET))
->
-> @@ -364,6 +425,76 @@ void sve_alloc(struct task_struct *task)
->  	BUG_ON(!task->thread.sve_state);
->  }
->
-> +int sve_set_vector_length(struct task_struct *task,
-> +			  unsigned long vl, unsigned long flags)
-> +{
-> +	if (flags & ~(unsigned long)(PR_SVE_VL_INHERIT |
-> +				     PR_SVE_SET_VL_ONEXEC))
-> +		return -EINVAL;
-> +
-> +	if (!sve_vl_valid(vl))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Clamp to the maximum vector length that VL-agnostic SVE code can
-> +	 * work with.  A flag may be assigned in the future to allow setting
-> +	 * of larger vector lengths without confusing older software.
-> +	 */
-> +	if (vl > SVE_VL_ARCH_MAX)
-> +		vl = SVE_VL_ARCH_MAX;
-> +
-> +	vl = find_supported_vector_length(vl);
-> +
-> +	if (flags & (PR_SVE_VL_INHERIT |
-> +		     PR_SVE_SET_VL_ONEXEC))
-> +		task->thread.sve_vl_onexec = vl;
-> +	else
-> +		/* Reset VL to system default on next exec: */
-> +		task->thread.sve_vl_onexec = 0;
-> +
-> +	/* Only actually set the VL if not deferred: */
-> +	if (flags & PR_SVE_SET_VL_ONEXEC)
-> +		goto out;
-> +
-> +	if (vl == task->thread.sve_vl)
-> +		goto out;
-> +
-> +	/*
-> +	 * To ensure the FPSIMD bits of the SVE vector registers are preserved,
-> +	 * write any live register state back to task_struct, and convert to a
-> +	 * non-SVE thread.
-> +	 */
-> +	if (task == current) {
-> +		local_bh_disable();
-> +
-> +		task_fpsimd_save();
-> +		set_thread_flag(TIF_FOREIGN_FPSTATE);
-> +	}
-> +
-> +	fpsimd_flush_task_state(task);
-> +	if (test_and_clear_tsk_thread_flag(task, TIF_SVE))
-> +		sve_to_fpsimd(task);
-> +
-> +	if (task == current)
-> +		local_bh_enable();
-> +
-> +	/*
-> +	 * Force reallocation of task SVE state to the correct size
-> +	 * on next use:
-> +	 */
-> +	sve_free(task);
-> +
-> +	task->thread.sve_vl = vl;
-> +
-> +out:
-> +	if (flags & PR_SVE_VL_INHERIT)
-> +		set_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
-> +	else
-> +		clear_tsk_thread_flag(task, TIF_SVE_VL_INHERIT);
-> +
-> +	return 0;
-> +}
-> +
->  /*
->   * Called from the put_task_struct() path, which cannot get here
->   * unless dead_task is really dead and not schedulable.
-> @@ -480,7 +611,7 @@ void fpsimd_thread_switch(struct task_struct *next)
->
->  void fpsimd_flush_thread(void)
->  {
-> -	int vl;
-> +	int vl, supported_vl;
->
->  	if (!system_supports_fpsimd())
->  		return;
-> @@ -508,6 +639,10 @@ void fpsimd_flush_thread(void)
->  		if (WARN_ON(!sve_vl_valid(vl)))
->  			vl = SVE_VL_MIN;
->
-> +		supported_vl = find_supported_vector_length(vl);
-> +		if (WARN_ON(supported_vl != vl))
-> +			vl = supported_vl;
-> +
->  		current->thread.sve_vl = vl;
->
->  		/*
-> diff --git a/include/uapi/linux/prctl.h b/include/uapi/linux/prctl.h
-> index a8d0759..1b64901 100644
-> --- a/include/uapi/linux/prctl.h
-> +++ b/include/uapi/linux/prctl.h
-> @@ -197,4 +197,9 @@ struct prctl_mm_map {
->  # define PR_CAP_AMBIENT_LOWER		3
->  # define PR_CAP_AMBIENT_CLEAR_ALL	4
->
-> +/* arm64 Scalable Vector Extension controls */
-> +# define PR_SVE_SET_VL_ONEXEC		(1 << 18) /* defer effect until exec */
-> +# define PR_SVE_VL_LEN_MASK		0xffff
-> +# define PR_SVE_VL_INHERIT		(1 << 17) /* inherit across exec */
-> +
->  #endif /* _LINUX_PRCTL_H */
-
-
---
-Alex Benn?e
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171110/17a1b5fa/attachment.sig>
