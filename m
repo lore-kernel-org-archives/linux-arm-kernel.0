@@ -1,107 +1,221 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Sat, 11 Nov 2017 03:54:07 +0800
-Subject: [PATCH v8 4/7] KVM: arm64: Trap RAS error registers and set HCR_EL2's
- TERR & TEA
+Date: Sat, 11 Nov 2017 03:54:10 +0800
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by categorization
 In-Reply-To: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
 References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
-Message-ID: <1510343650-23659-5-git-send-email-gengdongjiu@huawei.com>
+Message-ID: <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8.2 adds a new bit HCR_EL2.TEA which routes synchronous external
-aborts to EL2, and adds a trap control bit HCR_EL2.TERR which traps
-all Non-secure EL1&0 error record accesses to EL2.
+If it is not RAS SError, directly inject virtual SError,
+which will keep the old way. If it is RAS SError, firstly
+let host ACPI module to handle it. For the ACPI handling,
+if the error address is invalid, APEI driver will not
+identify the address to hwpoison memory and can not notify
+guest to do the recovery. In order to safe, KVM continues
+categorizing errors and handle it separately.
 
-This patch enables the two bits for the guest OS, guaranteeing that
-KVM takes external aborts and traps attempts to access the physical
-error registers.
-
-ERRIDR_EL1 advertises the number of error records, we return
-zero meaning we can treat all the other registers as RAZ/WI too.
+If the RAS error is not propagated, let host user space to
+handle it. The reason is that sometimes we can only kill the
+guest effected application instead of panic whose guest OS.
+Host user space specifies a valid ESR and inject virtual
+SError, guest can just kill the current application if the
+non-consumed error coming from guest application.
 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
-[removed specific emulation, use trap_raz_wi() directly for everything,
- rephrased parts of the commit message]
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Quanming Wu <wuquanming@huawei.com>
 ---
- arch/arm64/include/asm/kvm_arm.h     |  2 ++
- arch/arm64/include/asm/kvm_emulate.h |  7 +++++++
- arch/arm64/include/asm/sysreg.h      | 10 ++++++++++
- arch/arm64/kvm/sys_regs.c            | 10 ++++++++++
- 4 files changed, 29 insertions(+)
+ arch/arm64/include/asm/esr.h         | 15 ++++++++
+ arch/arm64/include/asm/kvm_asm.h     |  3 ++
+ arch/arm64/include/asm/system_misc.h |  1 +
+ arch/arm64/kvm/handle_exit.c         | 67 +++++++++++++++++++++++++++++++++---
+ arch/arm64/mm/fault.c                | 16 +++++++++
+ 5 files changed, 98 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 61d694c..1188272 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -23,6 +23,8 @@
- #include <asm/types.h>
+diff --git a/arch/arm64/include/asm/esr.h b/arch/arm64/include/asm/esr.h
+index 66ed8b6..aca7eee 100644
+--- a/arch/arm64/include/asm/esr.h
++++ b/arch/arm64/include/asm/esr.h
+@@ -102,6 +102,7 @@
+ #define ESR_ELx_FSC_ACCESS	(0x08)
+ #define ESR_ELx_FSC_FAULT	(0x04)
+ #define ESR_ELx_FSC_PERM	(0x0C)
++#define ESR_ELx_FSC_SERROR	(0x11)
  
- /* Hyp Configuration Register (HCR) bits */
-+#define HCR_TEA		(UL(1) << 37)
-+#define HCR_TERR	(UL(1) << 36)
- #define HCR_E2H		(UL(1) << 34)
- #define HCR_ID		(UL(1) << 33)
- #define HCR_CD		(UL(1) << 32)
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index e5df3fc..555b28b 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -47,6 +47,13 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- 	vcpu->arch.hcr_el2 = HCR_GUEST_FLAGS;
- 	if (is_kernel_in_hyp_mode())
- 		vcpu->arch.hcr_el2 |= HCR_E2H;
-+	if (cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
-+		/* route synchronous external abort exceptions to EL2 */
-+		vcpu->arch.hcr_el2 |= HCR_TEA;
-+		/* trap error record accesses */
-+		vcpu->arch.hcr_el2 |= HCR_TERR;
+ /* ISS field definitions for Data Aborts */
+ #define ESR_ELx_ISV_SHIFT	(24)
+@@ -119,6 +120,20 @@
+ #define ESR_ELx_CM_SHIFT	(8)
+ #define ESR_ELx_CM 		(UL(1) << ESR_ELx_CM_SHIFT)
+ 
++/* ISS field definitions for SError interrupt */
++#define ESR_ELx_AET_SHIFT	(10)
++#define ESR_ELx_AET		(UL(0x7) << ESR_ELx_AET_SHIFT)
++/* Uncontainable error */
++#define ESR_ELx_AET_UC		(UL(0) << ESR_ELx_AET_SHIFT)
++/* Unrecoverable error */
++#define ESR_ELx_AET_UEU		(UL(1) << ESR_ELx_AET_SHIFT)
++/* Restartable error */
++#define ESR_ELx_AET_UEO		(UL(2) << ESR_ELx_AET_SHIFT)
++/* Recoverable error */
++#define ESR_ELx_AET_UER		(UL(3) << ESR_ELx_AET_SHIFT)
++/* Corrected */
++#define ESR_ELx_AET_CE		(UL(6) << ESR_ELx_AET_SHIFT)
++
+ /* ISS field definitions for exceptions taken in to Hyp */
+ #define ESR_ELx_CV		(UL(1) << 24)
+ #define ESR_ELx_COND_SHIFT	(20)
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 26a64d0..884f723 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -27,6 +27,9 @@
+ #define ARM_EXCEPTION_IRQ	  0
+ #define ARM_EXCEPTION_EL1_SERROR  1
+ #define ARM_EXCEPTION_TRAP	  2
++/* Error code for SError Interrupt (SEI) exception */
++#define KVM_SEI_SEV_RECOVERABLE	  1
++
+ /* The hyp-stub will return this for any kvm_call_hyp() call */
+ #define ARM_EXCEPTION_HYP_GONE	  HVC_STUB_ERR
+ 
+diff --git a/arch/arm64/include/asm/system_misc.h b/arch/arm64/include/asm/system_misc.h
+index 07aa8e3..9ee13ad 100644
+--- a/arch/arm64/include/asm/system_misc.h
++++ b/arch/arm64/include/asm/system_misc.h
+@@ -57,6 +57,7 @@ void hook_debug_fault_code(int nr, int (*fn)(unsigned long, unsigned int,
+ })
+ 
+ int handle_guest_sea(phys_addr_t addr, unsigned int esr);
++int handle_guest_sei(void);
+ 
+ #endif	/* __ASSEMBLY__ */
+ 
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 7debb74..1afdc87 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
++#include <asm/system_misc.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -178,6 +179,66 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ 	return arm_exit_handlers[hsr_ec];
+ }
+ 
++/**
++ * kvm_handle_guest_sei - handles SError interrupt or asynchronous aborts
++ * @vcpu:	the VCPU pointer
++ *
++ * For RAS SError interrupt, firstly let host kernel handle it.
++ * If the AET is [ESR_ELx_AET_UER], then let user space handle it,
++ */
++static int kvm_handle_guest_sei(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	unsigned int esr = kvm_vcpu_get_hsr(vcpu);
++	bool impdef_syndrome =  esr & ESR_ELx_ISV;	/* aka IDS */
++	unsigned int aet = esr & ESR_ELx_AET;
++
++	/*
++	 * This is not RAS SError
++	 */
++	if (!cpus_have_const_cap(ARM64_HAS_RAS_EXTN)) {
++		kvm_inject_vabt(vcpu);
++		return 1;
 +	}
 +
- 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
- 		vcpu->arch.hcr_el2 &= ~HCR_RW;
++	/* The host kernel may handle this abort. */
++	handle_guest_sei();
++
++	/*
++	 * In below two conditions, it will directly inject the
++	 * virtual SError:
++	 * 1. The Syndrome is IMPLEMENTATION DEFINED
++	 * 2. It is Uncategorized SEI
++	 */
++	if (impdef_syndrome ||
++		((esr & ESR_ELx_FSC) != ESR_ELx_FSC_SERROR)) {
++		kvm_inject_vabt(vcpu);
++		return 1;
++	}
++
++	switch (aet) {
++	case ESR_ELx_AET_CE:	/* corrected error */
++	case ESR_ELx_AET_UEO:	/* restartable error, not yet consumed */
++		return 1;	/* continue processing the guest exit */
++	case ESR_ELx_AET_UER:	/* The error has not been propagated */
++		/*
++		 * Userspace only handle the guest SError Interrupt(SEI) if the
++		 * error has not been propagated
++		 */
++		run->exit_reason = KVM_EXIT_EXCEPTION;
++		run->ex.exception = ESR_ELx_EC_SERROR;
++		run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
++		return 0;
++	default:
++		/*
++		 * Until now, the CPU supports RAS and SEI is fatal, or host
++		 * does not support to handle the SError.
++		 */
++		panic("This Asynchronous SError interrupt is dangerous, panic");
++	}
++
++	return 0;
++}
++
+ /*
+  * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
+  * proper exit to userspace.
+@@ -201,8 +262,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 			*vcpu_pc(vcpu) -= adj;
+ 		}
+ 
+-		kvm_inject_vabt(vcpu);
+-		return 1;
++		return kvm_handle_guest_sei(vcpu, run);
+ 	}
+ 
+ 	exception_index = ARM_EXCEPTION_CODE(exception_index);
+@@ -211,8 +271,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 	case ARM_EXCEPTION_IRQ:
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+-		kvm_inject_vabt(vcpu);
+-		return 1;
++		return kvm_handle_guest_sei(vcpu, run);
+ 	case ARM_EXCEPTION_TRAP:
+ 		/*
+ 		 * See ARM ARM B1.14.1: "Hyp traps on instructions
+diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+index b64958b..8560672 100644
+--- a/arch/arm64/mm/fault.c
++++ b/arch/arm64/mm/fault.c
+@@ -728,6 +728,22 @@ int handle_guest_sea(phys_addr_t addr, unsigned int esr)
  }
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index 64e2a80..47b967d 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -169,6 +169,16 @@
- #define SYS_AFSR0_EL1			sys_reg(3, 0, 5, 1, 0)
- #define SYS_AFSR1_EL1			sys_reg(3, 0, 5, 1, 1)
- #define SYS_ESR_EL1			sys_reg(3, 0, 5, 2, 0)
-+
-+#define SYS_ERRIDR_EL1			sys_reg(3, 0, 5, 3, 0)
-+#define SYS_ERRSELR_EL1			sys_reg(3, 0, 5, 3, 1)
-+#define SYS_ERXFR_EL1			sys_reg(3, 0, 5, 4, 0)
-+#define SYS_ERXCTLR_EL1			sys_reg(3, 0, 5, 4, 1)
-+#define SYS_ERXSTATUS_EL1		sys_reg(3, 0, 5, 4, 2)
-+#define SYS_ERXADDR_EL1			sys_reg(3, 0, 5, 4, 3)
-+#define SYS_ERXMISC0_EL1		sys_reg(3, 0, 5, 5, 0)
-+#define SYS_ERXMISC1_EL1		sys_reg(3, 0, 5, 5, 1)
-+
- #define SYS_FAR_EL1			sys_reg(3, 0, 6, 0, 0)
- #define SYS_PAR_EL1			sys_reg(3, 0, 7, 4, 0)
  
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 2e070d3..2b1fafa 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -953,6 +953,16 @@ static bool access_cntp_cval(struct kvm_vcpu *vcpu,
- 	{ SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
- 	{ SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
- 	{ SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
+ /*
++ * Handle SError interrupt that occurred in guest OS.
++ *
++ * The return value will be zero if the SEI was successfully handled
++ * and non-zero if handling is failed.
++ */
++int handle_guest_sei(void)
++{
++	int ret = -ENOENT;
 +
-+	{ SYS_DESC(SYS_ERRIDR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERRSELR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXFR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXCTLR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXSTATUS_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXADDR_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXMISC0_EL1), trap_raz_wi },
-+	{ SYS_DESC(SYS_ERXMISC1_EL1), trap_raz_wi },
++	if (IS_ENABLED(CONFIG_ACPI_APEI_SEI))
++		ret = ghes_notify_sei();
 +
- 	{ SYS_DESC(SYS_FAR_EL1), access_vm_reg, reset_unknown, FAR_EL1 },
- 	{ SYS_DESC(SYS_PAR_EL1), NULL, reset_unknown, PAR_EL1 },
- 
++	return ret;
++}
++
++/*
+  * Dispatch a data abort to the relevant handler.
+  */
+ asmlinkage void __exception do_mem_abort(unsigned long addr, unsigned int esr,
 -- 
 1.9.1
