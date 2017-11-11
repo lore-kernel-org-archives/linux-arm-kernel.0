@@ -1,121 +1,191 @@
-From: bp@alien8.de (Borislav Petkov)
-Date: Sat, 11 Nov 2017 11:46:50 +0100
-Subject: [PATCHv2 2/3] EDAC: ti: add support for TI keystone and DRA7xx
- EDAC
-In-Reply-To: <1510302337-31663-1-git-send-email-t-kristo@ti.com>
-References: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
- <1510302337-31663-1-git-send-email-t-kristo@ti.com>
-Message-ID: <20171111104650.ypcfvo4lzfvn5jzv@pd.tnic>
+From: christopher.spinrath@rwth-aachen.de (Christopher Spinrath)
+Date: Sat, 11 Nov 2017 15:24:47 +0100
+Subject: [PATCH] ARM: dts: imx6: Remove unneeded address-cells/size-cells
+In-Reply-To: <1510348378-18150-1-git-send-email-festevam@gmail.com>
+References: <1510348378-18150-1-git-send-email-festevam@gmail.com>
+Message-ID: <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 10:25:37AM +0200, Tero Kristo wrote:
-> TI Keystone and DRA7xx SoCs have support for EDAC on DDR3 memory that can
-> correct one bit errors and detect two bit errors. Add EDAC driver for this
-> feature which plugs into the generic kernel EDAC framework.
+Hi Fabio,
 
-...
+(I'm sorry if I've missed some recipients or broke the email thread but
+I got Fabio's email from the infradead archive.)
 
-> +static int ti_edac_probe(struct platform_device *pdev)
-> +{
-> +	int error_irq = 0, ret = -ENODEV;
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	void __iomem *reg;
-> +	struct mem_ctl_info *mci;
-> +	struct edac_mc_layer layers[1];
-> +	const struct of_device_id *id;
-> +	struct ti_edac *edac;
-> +	int my_id;
-> +
-> +	id = of_match_device(ti_edac_of_match, &pdev->dev);
-> +	if (!id)
-> +		return -ENODEV;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	reg = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(reg)) {
-> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-> +			    "EMIF controller regs not defined\n");
-> +		return PTR_ERR(reg);
-> +	}
-> +
-> +	layers[0].type = EDAC_MC_LAYER_ALL_MEM;
-> +	layers[0].size = 1;
-> +
-> +	/* Allocate ID number for our EMIF controller */
-> +	my_id = atomic_inc_return(&edac_id) - 1;
+On 11/10/2017 10:12 PM, festevam at gmail.com (Fabio Estevam) wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> According to Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt:
+> 
+> "- #address-cells, #size-cells : Must be present if the device has
+> sub-nodes representing partitions."
+> 
+> Remove the occurrences of #address-cells/size-cells where no sub-nodes
+> representing partitions are present.
 
-You can do ATOMIC_INIT(-1) and then you don't need that silly - 1.
+This results in a regression for those devices where U-Boot is supposed
+to inject the partition sub-nodes. For example, this is the case for
+cm-fx6 module based devices like the Utilite Pro.
 
-But there's something else wrong with this ID generation:
+Linux fails to parse the partitions and reports:
+[    9.330881] spi0.0: error parsing ofpart partition
+/soc/aips-bus at 2000000/spba-bus at 2000000/ecspi at 2008000/m25p80 at 0/partition at 0
+(/soc/aips-bus at 2000000/spba-bus at 2000000/ecspi at 2008000/m25p80 at 0)
+[    9.330887] mtd: failed to find partitions; one or more parsers
+reports errors (-22)
 
-> +
-> +	mci = edac_mc_alloc(my_id, 1, layers, sizeof(*edac));
-> +	if (!mci)
-> +		return -ENOMEM;
+Also, the documentation does not forbid the #address-cells/size-cells if
+no partitions are present.
 
-<--- if you return here due to error, the next one which succeeds will
-get the next number and you'd have a hole in the numbering and wonder
-where did instance 0 go.
+So, please, drop this patch (or exclude at least the cm-fx6 related change).
 
-So I'm wondering if instead you could derive the ID from some controller
-registers which are specific to the instance. Or some hardware detail
-which is instance-specific.
+Thanks!
+Christopher
 
-In my driver, for example, the 0th instance has PCI device functions
-00:18.x which is node 0, then node 1 has 00:19.x and so on, and this is
-a stable numbering. If you could do that for your hw you'll be able to
-pinpoint which instance and which DIMMs we're talking about reliably.
-
-> +
-> +	mci->pdev = &pdev->dev;
-> +	edac = mci->pvt_info;
-> +	edac->reg = reg;
-> +	platform_set_drvdata(pdev, mci);
-> +
-> +	mci->mtype_cap = MEM_FLAG_DDR3 | MEM_FLAG_DDR2;
-> +	mci->edac_ctl_cap = EDAC_FLAG_SECDED | EDAC_FLAG_NONE;
-> +	mci->mod_name = EDAC_MOD_NAME;
-> +	mci->ctl_name = id->compatible;
-> +	mci->dev_name = dev_name(&pdev->dev);
-> +
-> +	/* Setup memory layout */
-> +	ti_edac_setup_dimm(mci, (u32)(id->data));
-> +
-> +	ret = edac_mc_add_mc(mci);
-
-Do that...
-
-> +	if (ret) {
-> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-> +			    "Failed to register mci: %d.\n", ret);
-> +		goto err;
-> +	}
-> +
-> +	/* add EMIF ECC error handler */
-> +	error_irq = platform_get_irq(pdev, 0);
-> +	if (!error_irq) {
-> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-> +			    "EMIF irq number not defined.\n");
-> +		goto err2;
-> +	}
-> +
-> +	ret = devm_request_irq(dev, error_irq, ti_edac_isr, 0,
-> +			       "emif-edac-irq", mci);
-> +	if (ret) {
-> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-> +			    "request_irq fail for EMIF EDAC irq\n");
-> +		goto err2;
-> +	}
-
-... here, after you've requested IRQs successfully and you can save
-yourself the err2 error path.
-
-Thx.
-
--- 
-Regards/Gruss,
-    Boris.
-
-Good mailing practices for 400: avoid top-posting and trim the reply.
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> ---
+>  arch/arm/boot/dts/imx6q-cm-fx6.dts           | 2 --
+>  arch/arm/boot/dts/imx6q-mccmon6.dts          | 2 --
+>  arch/arm/boot/dts/imx6qdl-aristainetos.dtsi  | 2 --
+>  arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi | 2 --
+>  arch/arm/boot/dts/imx6qdl-sabreauto.dtsi     | 2 --
+>  arch/arm/boot/dts/imx6qdl-sabresd.dtsi       | 2 --
+>  arch/arm/boot/dts/imx6sl-evk.dts             | 2 --
+>  arch/arm/boot/dts/imx6sx-sdb-reva.dts        | 4 ----
+>  arch/arm/boot/dts/imx6sx-sdb.dts             | 4 ----
+>  9 files changed, 22 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-cm-fx6.dts b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> index bc7587c..5df84e2 100644
+> --- a/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> +++ b/arch/arm/boot/dts/imx6q-cm-fx6.dts
+> @@ -194,8 +194,6 @@
+>  	status = "okay";
+>  
+>  	m25p80 at 0 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "st,m25p", "jedec,spi-nor";
+>  		spi-max-frequency = <20000000>;
+>  		reg = <0>;
+> diff --git a/arch/arm/boot/dts/imx6q-mccmon6.dts b/arch/arm/boot/dts/imx6q-mccmon6.dts
+> index cab36f4..9636e15 100644
+> --- a/arch/arm/boot/dts/imx6q-mccmon6.dts
+> +++ b/arch/arm/boot/dts/imx6q-mccmon6.dts
+> @@ -90,8 +90,6 @@
+>  	status = "okay";
+>  
+>  	s25sl032p: flash at 0 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "jedec,spi-nor";
+>  		spi-max-frequency = <40000000>;
+>  		reg = <0>;
+> diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
+> index 7d64075..d8f578c 100644
+> --- a/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
+> @@ -106,8 +106,6 @@
+>  	status = "okay";
+>  
+>  	flash: m25p80 at 0 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "micron,n25q128a11", "jedec,spi-nor";
+>  		spi-max-frequency = <20000000>;
+>  		reg = <0>;
+> diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+> index 1b18728..5875252 100644
+> --- a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+> @@ -136,8 +136,6 @@
+>  	status = "okay";
+>  
+>  	flash: m25p80 at 1 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "micron,n25q128a11", "jedec,spi-nor";
+>  		spi-max-frequency = <20000000>;
+>  		reg = <1>;
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> index 4fa2fac..828a9a5 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
+> @@ -200,8 +200,6 @@
+>  	status = "disabled"; /* pin conflict with WEIM NOR */
+>  
+>  	flash: m25p80 at 0 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "st,m25p32", "jedec,spi-nor";
+>  		spi-max-frequency = <20000000>;
+>  		reg = <0>;
+> diff --git a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> index 0a50705..acb0292 100644
+> --- a/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-sabresd.dtsi
+> @@ -196,8 +196,6 @@
+>  	status = "okay";
+>  
+>  	flash: m25p80 at 0 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "st,m25p32", "jedec,spi-nor";
+>  		spi-max-frequency = <20000000>;
+>  		reg = <0>;
+> diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+> index 60600b4..03a2240 100644
+> --- a/arch/arm/boot/dts/imx6sl-evk.dts
+> +++ b/arch/arm/boot/dts/imx6sl-evk.dts
+> @@ -123,8 +123,6 @@
+>  	status = "okay";
+>  
+>  	flash: m25p80 at 0 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "st,m25p32", "jedec,spi-nor";
+>  		spi-max-frequency = <20000000>;
+>  		reg = <0>;
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb-reva.dts b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+> index e3533e7..ebbed57 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sdb-reva.dts
+> @@ -127,16 +127,12 @@
+>  
+>  	flash0: s25fl128s at 0 {
+>  		reg = <0>;
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+>  		spi-max-frequency = <66000000>;
+>  	};
+>  
+>  	flash1: s25fl128s at 1 {
+>  		reg = <1>;
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "spansion,s25fl128s", "jedec,spi-nor";
+>  		spi-max-frequency = <66000000>;
+>  	};
+> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dts b/arch/arm/boot/dts/imx6sx-sdb.dts
+> index 6dd9beb..4b7481a 100644
+> --- a/arch/arm/boot/dts/imx6sx-sdb.dts
+> +++ b/arch/arm/boot/dts/imx6sx-sdb.dts
+> @@ -113,16 +113,12 @@
+>  	status = "okay";
+>  
+>  	flash0: n25q256a at 0 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "micron,n25q256a", "jedec,spi-nor";
+>  		spi-max-frequency = <29000000>;
+>  		reg = <0>;
+>  	};
+>  
+>  	flash1: n25q256a at 1 {
+> -		#address-cells = <1>;
+> -		#size-cells = <1>;
+>  		compatible = "micron,n25q256a", "jedec,spi-nor";
+>  		spi-max-frequency = <29000000>;
+>  		reg = <1>;
+> 
