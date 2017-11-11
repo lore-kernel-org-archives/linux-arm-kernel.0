@@ -1,81 +1,40 @@
-From: bjorn.andersson@linaro.org (Bjorn Andersson)
-Date: Fri, 10 Nov 2017 23:56:12 -0800
-Subject: [PATCH 4/4] arm64: dts: qcom: msm8916: add bindings for i2c1,
- i2c3, i2c5
-In-Reply-To: <20171109171456.6t3nhig6t4bnkc77@workotop.localdomain>
-References: <20171101175335.22123-1-damien.riegel@savoirfairelinux.com>
- <20171101175335.22123-5-damien.riegel@savoirfairelinux.com>
- <20171109170016.GC28761@minitux>
- <20171109171456.6t3nhig6t4bnkc77@workotop.localdomain>
-Message-ID: <20171111075612.GA1236@tuxbook>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 11 Nov 2017 19:23:07 +0900 (KST)
+Subject: [PATCH net-next] net: thunderx: fix double free error
+In-Reply-To: <20171109115859.23838-1-aleksey.makarov@cavium.com>
+References: <20171109115859.23838-1-aleksey.makarov@cavium.com>
+Message-ID: <20171111.192307.246949830866393163.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 09 Nov 09:14 PST 2017, Damien Riegel wrote:
+From: Aleksey Makarov <aleksey.makarov@cavium.com>
+Date: Thu,  9 Nov 2017 14:58:57 +0300
 
-> Hi Bjorn,
+> This patch fixes an error in memory allocation/freeing in
+> ThunderX PF driver.
 > 
+> I moved the allocation to the probe() function and made it managed.
 > 
-> On Thu, Nov 09, 2017 at 09:00:16AM -0800, Bjorn Andersson wrote:
-> > On Wed 01 Nov 10:53 PDT 2017, Damien Riegel wrote:
-> > 
-> > I think it's better to use the word "nodes" (add nodes...)
+> From the Colin's email:
 > 
-> Will reword that.
+> While running static analysis on linux-next with CoverityScan I found 3
+> double free errors in the Cavium thunder driver.
 > 
-> > 
-> > > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> > > ---
-> > >  arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 72 ++++++++++++++++++++++++++++++
-> > >  arch/arm64/boot/dts/qcom/msm8916.dtsi      | 45 +++++++++++++++++++
-> > >  2 files changed, 117 insertions(+)
-> > > 
-> > > diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> > > index c67ad8ed8b60..1cec5b30ed6e 100644
-> > > --- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> > > +++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-> > > @@ -270,6 +270,30 @@
-> > >  		};
-> > >  	};
-> > >  
-> > > +	i2c1_default: i2c1_default {
-> > > +		pinmux {
-> > > +			function = "blsp_i2c1";
-> > > +			pins = "gpio2", "gpio3";
-> > > +		};
-> > > +		pinconf {
-> > > +			pins = "gpio2", "gpio3";
-> > > +			drive-strength = <16>;
-> > > +			bias-disable;
-> > > +		};
-> > 
-> > pinconf is typically board specific, so please leave these out from the
-> > base dtsi.
+> The issue occurs on the err_disable_device: label of function nic_probe
+> when nic_free_lmacmem(nic) is called and a double free occurs on
+> nic->duplex, nic->link and nic->speed.  This occurs when nic_init_hw()
+> fails:
 > 
-> I don't mind dropping that, but pinconf for i2c{2,4,6} is already in
-> msm8916-pins.dtsi, so we should either drop them all, or add pinconf for
-> i2c{1,3,5} for consistency.
-
-You're right, this needs to be consistent. So I would like us to update
-the existing nodes,
-
-> And if I read the pinctrl driver correctly,
-> I2C cannot be routed to other pins, the only properties that users may
-> want to modify are drive-strength and bias. Let me know which option you
-> prefer.
+>         /* Initialize hardware */
+>         err = nic_init_hw(nic);
+>         if (err)
+>                 goto err_release_regions;
 > 
+> nic_init_hw() calls nic_get_hw_info() and this calls nic_free_lmacmem()
+> if any of the allocations fail. This free'ing occurs again by the call
+> to nic_free_lmacmem() on the err_release_regions exit path in nic_probe().
+> 
+> Reported-by: Colin Ian King <colin.king@canonical.com>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@cavium.com>
 
-I discussed the matter with my colleagues and we concluded that we want
-to keep the muxing in the platform.dtsi and move the specification of
-the electrical properties (pinconf) to the board.dts(i).
-
-We did discuss having some "default values" in the platform file, but
-pushing these down to the board file gives an indication to others that
-these values are board specific.
-
-
-PS. If you're willing to provide a patch for the existing nodes I would
-be happy to review this as well!
-
-Regards,
-Bjorn
+Applied, thank you.
