@@ -1,51 +1,55 @@
-From: khoroshilov@ispras.ru (Alexey Khoroshilov)
-Date: Sat, 11 Nov 2017 00:55:32 +0300
-Subject: [PATCH] phy: rockchip-inno-usb2: fix error handling in
- rockchip_usb2phy_probe()
-Message-ID: <1510350932-3461-1-git-send-email-khoroshilov@ispras.ru>
+From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
+Date: Sat, 11 Nov 2017 00:37:37 +0000
+Subject: [PATCH v4 0/4] fix the clock setting for SAR ADC
+In-Reply-To: <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
+References: <20171107140942.29243-1-yixun.lan@amlogic.com>
+ <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
+Message-ID: <20171111003737.000038f0@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-rockchip_usb2phy_probe() does not disable clock in case of failure in
-devm_of_phy_provider_register() and it ignores if clk_prepare_enable() fails.
+On Tue, 7 Nov 2017 22:36:00 +0100
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
 
-Found by Linux Driver Verification project (linuxtesting.org).
+> Hi Yixun,
+> 
+> On Tue, Nov 7, 2017 at 3:09 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+> > patch [1/4]:
+> >   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
+> > the published datasheets[4] also has wrong description about this.
+> >   This patch should be explicitly merged *before* other patches.
+> >
+> > patch [2-4/4]:
+> >   Drop the "sana" clock from SAR ADC module,  
+> I agree with Jerome that patch 2/4 should be applied last.
 
-Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
----
- drivers/phy/rockchip/phy-rockchip-inno-usb2.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+Let me know when I should take this.
 
-diff --git a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-index ee7ce5ee53f9..ada1ff33cad3 100644
---- a/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-+++ b/drivers/phy/rockchip/phy-rockchip-inno-usb2.c
-@@ -1150,7 +1150,12 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
- 
- 	rphy->clk = of_clk_get_by_name(np, "phyclk");
- 	if (!IS_ERR(rphy->clk)) {
--		clk_prepare_enable(rphy->clk);
-+		ret = clk_prepare_enable(rphy->clk);
-+		if (ret) {
-+			dev_info(&pdev->dev, "failed to prepare phyclk\n");
-+			clk_put(rphy->clk);
-+			rphy->clk = NULL;
-+		}
- 	} else {
- 		dev_info(&pdev->dev, "no phyclk specified\n");
- 		rphy->clk = NULL;
-@@ -1202,7 +1207,11 @@ static int rockchip_usb2phy_probe(struct platform_device *pdev)
- 	}
- 
- 	provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
--	return PTR_ERR_OR_ZERO(provider);
-+	if (IS_ERR(provider)) {
-+		ret = PTR_ERR(provider);
-+		goto disable_clks;
-+	}
-+	return 0;
- 
- put_child:
- 	of_node_put(child_np);
--- 
-2.7.4
+Thanks,
+
+Jonathan
+
+> when I wrote the driver I couldn't get it to work on my GXBB board
+> (which unfortunately has died since then) because the clocks were
+> disabled (they weren't enabled by the bootloader). people who are
+> using an old .dtb would get the same problem again until the clock
+> driver is merged
+> 
+> >   From the hardware perspective, the SAR ADC module doesn't
+> > require "sana" clock to wrok. This should apply to all SoC,
+> > including meson6,8, GXBB, GXL..  
+> thank you for clarifying this!
+> 
+> > Note: the whole patchset series has been tested at GXL-P212 board,
+> > we haven't got any meson6,8 board to test, so I would appreciate
+> > if someone (Martin?) could help to confirm it works there.  
+> I can test this on a Meson8b and a Meson8m2 board on the weekend -
+> I'll let you know about the results
+> 
+> 
+> Regards
+> Martin
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
