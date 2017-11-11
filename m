@@ -1,55 +1,29 @@
-From: Jonathan.Cameron@huawei.com (Jonathan Cameron)
-Date: Sat, 11 Nov 2017 00:37:37 +0000
-Subject: [PATCH v4 0/4] fix the clock setting for SAR ADC
-In-Reply-To: <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
-References: <20171107140942.29243-1-yixun.lan@amlogic.com>
- <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
-Message-ID: <20171111003737.000038f0@huawei.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 10 Nov 2017 18:44:51 -0800
+Subject: [PATCH] clk: hi3660: fix incorrect uart3 clock freqency
+In-Reply-To: <20170807145156.7880-1-guodong.xu@linaro.org>
+References: <20170807145156.7880-1-guodong.xu@linaro.org>
+Message-ID: <20171111024451.GD22441@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 7 Nov 2017 22:36:00 +0100
-Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
-
-> Hi Yixun,
+On 08/07, Guodong Xu wrote:
+> From: Zhong Kaihua <zhongkaihua@huawei.com>
 > 
-> On Tue, Nov 7, 2017 at 3:09 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
-> > patch [1/4]:
-> >   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
-> > the published datasheets[4] also has wrong description about this.
-> >   This patch should be explicitly merged *before* other patches.
-> >
-> > patch [2-4/4]:
-> >   Drop the "sana" clock from SAR ADC module,  
-> I agree with Jerome that patch 2/4 should be applied last.
-
-Let me know when I should take this.
-
-Thanks,
-
-Jonathan
-
-> when I wrote the driver I couldn't get it to work on my GXBB board
-> (which unfortunately has died since then) because the clocks were
-> disabled (they weren't enabled by the bootloader). people who are
-> using an old .dtb would get the same problem again until the clock
-> driver is merged
+> UART3 clock rate is doubled in previous commit.
 > 
-> >   From the hardware perspective, the SAR ADC module doesn't
-> > require "sana" clock to wrok. This should apply to all SoC,
-> > including meson6,8, GXBB, GXL..  
-> thank you for clarifying this!
+> This error is not detected until recently a mezzanine board which makes
+> real use of uart3 port (through LS connector of 96boards) was setup
+> and tested on hi3660-hikey960 board.
 > 
-> > Note: the whole patchset series has been tested at GXL-P212 board,
-> > we haven't got any meson6,8 board to test, so I would appreciate
-> > if someone (Martin?) could help to confirm it works there.  
-> I can test this on a Meson8b and a Meson8m2 board on the weekend -
-> I'll let you know about the results
+> This patch changes clock source rate of clk_factor_uart3 to 100000000.
 > 
-> 
-> Regards
-> Martin
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
+> Signed-off-by: Guodong Xu <guodong.xu@linaro.org>
+> ---
+
+Applied to clk-next
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
