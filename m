@@ -1,70 +1,51 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sun, 12 Nov 2017 14:13:49 +0000
-Subject: spi->irq == 0 on module reload of driver using IRQF_TRIGGER_LOW
-In-Reply-To: <21FDD1B8-E8F6-4DCE-9D30-D82B713B0008@martin.sperl.org>
-References: <21FDD1B8-E8F6-4DCE-9D30-D82B713B0008@martin.sperl.org>
-Message-ID: <20171112141349.6b4b3852@why.wild-wind.fr.eu.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 12 Nov 2017 15:29:18 +0100
+Subject: [PATCH] omap3-n900: enable autofocus
+In-Reply-To: <20171112112528.GA21009@amd>
+References: <20171112112528.GA21009@amd>
+Message-ID: <20171112142918.rqxd2uk7ljyhpctt@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 12 Nov 2017 13:32:44 +0100
-<kernel@martin.sperl.org> wrote:
+Hi,
 
-Martin,
+On Sun, Nov 12, 2017 at 12:25:29PM +0100, Pavel Machek wrote:
+> 
+> Connect auto-focus coil to the camera sensor, so that it can be used
+> by camera applications.
+> 
+> Signed-off-by: Pavel Machek <pavel@ucw.cz>
 
-> Hi!
-> 
-> During the development of a new spi driver on a raspberry pi CM1
-> I have seen an issue with the following code triggering strange behavior:
-> 
-> 	ret = request_threaded_irq(spi->irq, NULL,
-> 				   mcp2517fd_can_ist,
-> 				   IRQF_ONESHOT | IRQF_TRIGGER_LOW,
-> 				   DEVICE_NAME, priv);
-> 
-> This works fine the first time the module is loaded (spi->irq is not 0),
-> but as soon as the module gets removed and reinstalled spi->irq is 0 
-> and I get the message in dmesg:
-> [ 1282.311991] irq: type mismatch, failed to map hwirq-16 for /soc/gpio at 7e200000!
-> 
-> This does not happen when using the IRQF_TRIGGER_FALLING flag.
-> 
-> in spi_drv_probe spi core does sets spi->dev to 0 in case 
-> of_irq_get returns < 0;
-> 
-> The specific code that triggers this message and return 0 is 
-> irq_create_fwspec_mapping.
-> 
-> After implementing: https://www.spinics.net/lists/arm-kernel/msg528469.html
-> and also checking for spi->irq == 0, I get:
-> 
-> [   87.867456] irq: type mismatch (2/8), failed to map hwirq-16 for /soc/gpio at 7e200000!
+I think you should replace auto-focus with lens-focus. This is not
+automatic. Otherwise:
 
-Well, you have the answer here: The interrupt has been configured with
-a falling edge trigger, while you're requesting a level low. Obviously,
-something is changing it.
+Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 
-It would be interesting to see both the driver code and the DT file
-where the interrupt is described...
+-- Sebastian
 
-> [   87.867512] mcp2517fd spi0.0: no valid irq line defined: irq = 0
+> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
+> index 669c51c..59cc743 100644
+> --- a/arch/arm/boot/dts/omap3-n900.dts
+> +++ b/arch/arm/boot/dts/omap3-n900.dts
+> @@ -778,6 +778,8 @@
+>  
+>  		reset-gpio = <&gpio4 6 GPIO_ACTIVE_HIGH>; /* 102 */
+>  
+> +		lens-focus = <&ad5820>;
+> +
+>  		port {
+>  			csi_cam1: endpoint {
+>  				bus-type = <3>; /* CCP2 */
 > 
-> The test for irq == 0 is the first thing that happens in the 
-> spi.driver.probe code of the module.
-> 
-> So to me it looks as if something deeper down the stack during
-> initialization.
-> 
-> As if the irq-type is not cleaned up during release of the irq on module
-> unload - which I can confirm calls free_irq(spi->irq, priv).
+> -- 
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
 
-I don't really understand this remark. The trigger type is a property
-of the generating device, so "cleaning up" doesn't make much sense
-(even if you;re not using the interrupt anymore, the device is still
-there).
 
-Thanks,
-
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171112/8566b3fa/attachment.sig>
