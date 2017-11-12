@@ -1,33 +1,43 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Sun, 12 Nov 2017 19:19:30 +0100
-Subject: spi->irq == 0 on module reload of driver using IRQF_TRIGGER_LOW
-In-Reply-To: <20171112154101.483d21d2@why.wild-wind.fr.eu.org>
-References: <21FDD1B8-E8F6-4DCE-9D30-D82B713B0008@martin.sperl.org>
- <20171112141349.6b4b3852@why.wild-wind.fr.eu.org>
- <CD4EBEF8-DDFD-40C3-A03E-7EC964B32357@martin.sperl.org>
- <20171112154101.483d21d2@why.wild-wind.fr.eu.org>
-Message-ID: <20171112181930.GG30830@lunn.ch>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Sun, 12 Nov 2017 19:34:12 +0100
+Subject: [PATCH] nvmem: meson-mx-efuse: fix reading from an offset other than 0
+Message-ID: <20171112183412.12806-1-martin.blumenstingl@googlemail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +&spi {
-> > +            status = "okay";
-> > +
-> > +            can0: mcp2517fd at 0 {
-> > +                reg = <0>;
-> > +                compatible = "microchip,mcp2517fd";
-> > +                pinctrl-names = "default";
-> > +                pinctrl-0 = <&can0_pins>;
-> > +                spi-max-frequency = <12500000>;
-> > +                interrupt-parent = <&gpio>;
-> > +                interrupts = <16 0x2>;
-> 
-> This indicates a falling edge. No wonder the kernel is confused (I
-> don't know why this isn't enforced the first time though, probably an
-> issue in the GPIO irqchip driver...). Replacing this 2 with a 8 should
-> allow you to make some progress.
+meson_mx_efuse_read calculates the address internal to the eFuse based
+on the offset and the word size. This works fine with any given offset.
+However, the offset is also included when writing to the output buffer.
+This means that reading 4 bytes at offset 500 tries to write beyond the
+array allocated by the nvmem core as it wants to write the 4 bytes to
+"buffer address + offset (500)".
+This issue did not show up in the previous tests since no driver uses
+any value from the eFuse yet and reading the eFuse via sysfs simply
+reads the whole eFuse, starting at offset 0.
 
-And using IRQ_TYPE_LEVEL_LOW, from interrupt-controller/irq.h would
-make it readable.
+Fix this by only including the offset in the internal address
+calculation.
 
-     Andrew
+Fixes: 8caef1fa9176 ("nvmem: add a driver for the Amlogic Meson6/Meson8/Meson8b SoCs")
+Signed-off-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+---
+ drivers/nvmem/meson-mx-efuse.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/nvmem/meson-mx-efuse.c b/drivers/nvmem/meson-mx-efuse.c
+index a346b4923550..41d3a3c1104e 100644
+--- a/drivers/nvmem/meson-mx-efuse.c
++++ b/drivers/nvmem/meson-mx-efuse.c
+@@ -156,8 +156,8 @@ static int meson_mx_efuse_read(void *context, unsigned int offset,
+ 				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE,
+ 				 MESON_MX_EFUSE_CNTL1_AUTO_RD_ENABLE);
+ 
+-	for (i = offset; i < offset + bytes; i += efuse->config.word_size) {
+-		addr = i / efuse->config.word_size;
++	for (i = 0; i < bytes; i += efuse->config.word_size) {
++		addr = (offset + i) / efuse->config.word_size;
+ 
+ 		err = meson_mx_efuse_read_addr(efuse, addr, &tmp);
+ 		if (err)
+-- 
+2.15.0
