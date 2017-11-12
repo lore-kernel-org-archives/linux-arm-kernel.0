@@ -1,54 +1,113 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Sun, 12 Nov 2017 13:32:44 +0100
-Subject: spi->irq == 0 on module reload of driver using IRQF_TRIGGER_LOW
-Message-ID: <21FDD1B8-E8F6-4DCE-9D30-D82B713B0008@martin.sperl.org>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Sun, 12 Nov 2017 20:41:29 +0800
+Subject: [PATCH] ARM: dts: sun8i: add support for Orange Pi R1
+Message-ID: <20171112124129.15844-1-icenowy@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Orange Pi R1 is a board design based on Orange Pi Zero, with XR819 Wi-Fi
+chip replaced by RTL8189ETV Wi-Fi module and the USB Type-A jack
+replaced by an onboard USB RTL8152B USB-Ethernet adapter.
 
-During the development of a new spi driver on a raspberry pi CM1
-I have seen an issue with the following code triggering strange behavior:
+Add support for it.
 
-	ret = request_threaded_irq(spi->irq, NULL,
-				   mcp2517fd_can_ist,
-				   IRQF_ONESHOT | IRQF_TRIGGER_LOW,
-				   DEVICE_NAME, priv);
+Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+---
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts | 73 +++++++++++++++++++++++++
+ 2 files changed, 74 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
 
-This works fine the first time the module is loaded (spi->irq is not 0),
-but as soon as the module gets removed and reinstalled spi->irq is 0 
-and I get the message in dmesg:
-[ 1282.311991] irq: type mismatch, failed to map hwirq-16 for /soc/gpio at 7e200000!
-
-This does not happen when using the IRQF_TRIGGER_FALLING flag.
-
-in spi_drv_probe spi core does sets spi->dev to 0 in case 
-of_irq_get returns < 0;
-
-The specific code that triggers this message and return 0 is 
-irq_create_fwspec_mapping.
-
-After implementing: https://www.spinics.net/lists/arm-kernel/msg528469.html
-and also checking for spi->irq == 0, I get:
-
-[   87.867456] irq: type mismatch (2/8), failed to map hwirq-16 for /soc/gpio at 7e200000!
-[   87.867512] mcp2517fd spi0.0: no valid irq line defined: irq = 0
-
-The test for irq == 0 is the first thing that happens in the 
-spi.driver.probe code of the module.
-
-So to me it looks as if something deeper down the stack during
-initialization.
-
-As if the irq-type is not cleaned up during release of the irq on module
-unload - which I can confirm calls free_irq(spi->irq, priv).
-
-After modprobe the module the first time the following entry in
-/proc/interrupts shows:
- 88:          0  pinctrl-bcm2835  16 Level     mcp2517fd
-
-Any ideas why this happens and what can done about it?
-
-Thanks, Martin
-
-P.s: This issue shows on 4.14.0-rc8, but also on the downstream 4.9.57.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9caf21..3c139c63098f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -949,6 +949,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a83t-bananapi-m3.dtb \
+ 	sun8i-a83t-cubietruck-plus.dtb \
+ 	sun8i-a83t-tbs-a711.dtb \
++	sun8i-h2-plus-orangepi-r1.dtb \
+ 	sun8i-h2-plus-orangepi-zero.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
+ 	sun8i-h3-beelink-x2.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
+new file mode 100644
+index 000000000000..32a6d312422e
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h2-plus-orangepi-r1.dts
+@@ -0,0 +1,73 @@
++/*
++ * Copyright (C) 2017 Icenowy Zheng <icenowy@aosc.xyz>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/* Orange Pi R1 is based on Orange Pi Zero design */
++#include "sun8i-h2-plus-orangepi-zero.dts"
++
++/ {
++	model = "Xunlong Orange Pi R1";
++	compatible = "xunlong,orangepi-r1", "allwinner,sun8i-h2-plus";
++
++	/delete-node/ reg_vcc_wifi;
++
++	aliases {
++		ethernet1 = &rtl8189etv;
++	};
++};
++
++&ohci1 {
++	/*
++	 * RTL8152B USB-Ethernet adapter is connected to USB1,
++	 * and it's a USB 2.0 device. So the OHCI1 controller
++	 * can be left disabled.
++	 */
++	status = "disabled";
++};
++
++&mmc1 {
++	vmmc-supply = <&reg_vcc3v3>;
++	vqmmc-supply = <&reg_vcc3v3>;
++
++	rtl8189etv: sdio_wifi at 1 {
++		reg = <1>;
++	};
++};
+-- 
+2.14.2
