@@ -1,70 +1,54 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Sat, 11 Nov 2017 16:03:50 +0100
-Subject: [linux-sunxi] [PATCH] arm64: allwinner: a64: add Ethernet PHY
- regulator for several boards
-In-Reply-To: <20171110092654.10746-1-icenowy@aosc.io>
-References: <20171110092654.10746-1-icenowy@aosc.io>
-Message-ID: <20171111150350.GA20609@Red>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sun, 12 Nov 2017 01:14:12 +0100
+Subject: [PATCH V3 2/4] ACPI / bus: introduce acpi_device_get_match_data()
+ function
+In-Reply-To: <31ef1ea5-ddb6-1a24-980b-7986627cfeca@codeaurora.org>
+References: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
+ <1510281175-27173-2-git-send-email-okaya@codeaurora.org>
+ <31ef1ea5-ddb6-1a24-980b-7986627cfeca@codeaurora.org>
+Message-ID: <1605519.pfaIp4IsxJ@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 05:26:54PM +0800, Icenowy Zheng wrote:
-> On several A64 boards the Ethernet PHY is powered by the DC1SW regulator
-> on the AXP803 PMIC.
-> 
-> Add phy-handle property to these boards' emac node.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+On Friday, November 10, 2017 3:35:41 AM CET Sinan Kaya wrote:
+> +linux-acpi at vger.kernel.org, +Rafael
 
-Acked-by: Corentin LABBE <clabbe.montjoie@gmail.com>
-Tested-by: Corentin LABBE <clabbe.montjoie@gmail.com>
-Tested-on: sun50i-a64-pine64
-Tested-on: sun50i-a64-bananapi-m64
+Thanks!
 
-Thanks
-Regards
+> On 11/9/2017 9:32 PM, Sinan Kaya wrote:
+> > OF has of_device_get_match_data() function to extract driver specific data
+> > structure. Add a similar function for ACPI.
+> > 
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> > ---
+> >  drivers/acpi/bus.c   | 12 ++++++++++++
+> >  include/linux/acpi.h |  6 ++++++
+> >  2 files changed, 18 insertions(+)
+> > 
+> > diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+> > index 4d0979e..da29c10 100644
+> > --- a/drivers/acpi/bus.c
+> > +++ b/drivers/acpi/bus.c
+> > @@ -785,6 +785,18 @@ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
+> >  }
+> >  EXPORT_SYMBOL_GPL(acpi_match_device);
+> >  
+> > +void *acpi_device_get_match_data(const struct device *dev)
+> > +{
+> > +	const struct acpi_device_id *match;
+> > +
+> > +	match = acpi_match_device(dev->driver->acpi_match_table, dev);
+> > +	if (!match)
+> > +		return NULL;
+> > +
+> > +	return (void *)match->driver_data;
+> > +}
+> > +EXPORT_SYMBOL_GPL(acpi_device_get_match_data);
 
-> ---
->  arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts     | 1 +
->  arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts           | 1 +
->  arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts | 1 +
->  3 files changed, 3 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-> index 45bdbfb96126..4a8d3f83a36e 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-> @@ -75,6 +75,7 @@
->  	pinctrl-0 = <&rgmii_pins>;
->  	phy-mode = "rgmii";
->  	phy-handle = <&ext_rgmii_phy>;
-> +	phy-supply = <&reg_dc1sw>;
->  	status = "okay";
->  };
->  
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> index 806442d3e846..604cdaedac38 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
-> @@ -77,6 +77,7 @@
->  	pinctrl-0 = <&rmii_pins>;
->  	phy-mode = "rmii";
->  	phy-handle = <&ext_rmii_phy1>;
-> +	phy-supply = <&reg_dc1sw>;
->  	status = "okay";
->  
->  };
-> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> index 0eb2acedf8c3..a053a6ac5267 100644
-> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-> @@ -82,6 +82,7 @@
->  	pinctrl-0 = <&rgmii_pins>;
->  	phy-mode = "rgmii";
->  	phy-handle = <&ext_rgmii_phy>;
-> +	phy-supply = <&reg_dc1sw>;
->  	status = "okay";
->  };
->  
-> -- 
-> 2.14.2
+While I understand that the name follows the OF convention, I have some
+doubts on whether it is the best one.
+
+Apart from this the change is fine by me.
+
+Thanks,
+Rafael
