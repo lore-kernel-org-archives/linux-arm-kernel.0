@@ -1,34 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 12 Nov 2017 10:14:23 -0200
-Subject: [PATCH] ARM: dts: imx6: Remove unneeded address-cells/size-cells
-In-Reply-To: <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
-References: <1510348378-18150-1-git-send-email-festevam@gmail.com>
- <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
-Message-ID: <CAOMZO5CEVdWgKRQT8-42GOEyFgB8cvCtJZK780BK1t3zHkX62w@mail.gmail.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Sun, 12 Nov 2017 13:32:44 +0100
+Subject: spi->irq == 0 on module reload of driver using IRQF_TRIGGER_LOW
+Message-ID: <21FDD1B8-E8F6-4DCE-9D30-D82B713B0008@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
+Hi!
 
-On Sat, Nov 11, 2017 at 12:24 PM, Christopher Spinrath
-<christopher.spinrath@rwth-aachen.de> wrote:
+During the development of a new spi driver on a raspberry pi CM1
+I have seen an issue with the following code triggering strange behavior:
 
-> This results in a regression for those devices where U-Boot is supposed
-> to inject the partition sub-nodes. For example, this is the case for
-> cm-fx6 module based devices like the Utilite Pro.
->
-> Linux fails to parse the partitions and reports:
-> [    9.330881] spi0.0: error parsing ofpart partition
-> /soc/aips-bus at 2000000/spba-bus at 2000000/ecspi at 2008000/m25p80 at 0/partition at 0
-> (/soc/aips-bus at 2000000/spba-bus at 2000000/ecspi at 2008000/m25p80 at 0)
-> [    9.330887] mtd: failed to find partitions; one or more parsers
-> reports errors (-22)
->
-> Also, the documentation does not forbid the #address-cells/size-cells if
-> no partitions are present.
->
-> So, please, drop this patch (or exclude at least the cm-fx6 related change).
+	ret = request_threaded_irq(spi->irq, NULL,
+				   mcp2517fd_can_ist,
+				   IRQF_ONESHOT | IRQF_TRIGGER_LOW,
+				   DEVICE_NAME, priv);
 
-Good point! I will resend the patch and will only change the NXP boards.
+This works fine the first time the module is loaded (spi->irq is not 0),
+but as soon as the module gets removed and reinstalled spi->irq is 0 
+and I get the message in dmesg:
+[ 1282.311991] irq: type mismatch, failed to map hwirq-16 for /soc/gpio at 7e200000!
 
-Thanks
+This does not happen when using the IRQF_TRIGGER_FALLING flag.
+
+in spi_drv_probe spi core does sets spi->dev to 0 in case 
+of_irq_get returns < 0;
+
+The specific code that triggers this message and return 0 is 
+irq_create_fwspec_mapping.
+
+After implementing: https://www.spinics.net/lists/arm-kernel/msg528469.html
+and also checking for spi->irq == 0, I get:
+
+[   87.867456] irq: type mismatch (2/8), failed to map hwirq-16 for /soc/gpio at 7e200000!
+[   87.867512] mcp2517fd spi0.0: no valid irq line defined: irq = 0
+
+The test for irq == 0 is the first thing that happens in the 
+spi.driver.probe code of the module.
+
+So to me it looks as if something deeper down the stack during
+initialization.
+
+As if the irq-type is not cleaned up during release of the irq on module
+unload - which I can confirm calls free_irq(spi->irq, priv).
+
+After modprobe the module the first time the following entry in
+/proc/interrupts shows:
+ 88:          0  pinctrl-bcm2835  16 Level     mcp2517fd
+
+Any ideas why this happens and what can done about it?
+
+Thanks, Martin
+
+P.s: This issue shows on 4.14.0-rc8, but also on the downstream 4.9.57.
