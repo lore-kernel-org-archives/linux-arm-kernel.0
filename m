@@ -1,36 +1,34 @@
-From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
-Date: Sun, 12 Nov 2017 13:07:15 +0100
-Subject: [PATCH] omap3-n900: enable autofocus
-In-Reply-To: <20171112112528.GA21009@amd>
-References: <20171112112528.GA21009@amd>
-Message-ID: <20171112120715.lyiwwvqileospbqv@pali>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sun, 12 Nov 2017 10:14:23 -0200
+Subject: [PATCH] ARM: dts: imx6: Remove unneeded address-cells/size-cells
+In-Reply-To: <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
+References: <1510348378-18150-1-git-send-email-festevam@gmail.com>
+ <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
+Message-ID: <CAOMZO5CEVdWgKRQT8-42GOEyFgB8cvCtJZK780BK1t3zHkX62w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 12 November 2017 12:25:29 Pavel Machek wrote:
-> 
-> Connect auto-focus coil to the camera sensor, so that it can be used
-> by camera applications.
-> 
-> Signed-off-by: Pavel Machek <pavel@ucw.cz>
+Hi Christopher,
 
-Acked-by: Pali Roh?r <pali.rohar@gmail.com>
+On Sat, Nov 11, 2017 at 12:24 PM, Christopher Spinrath
+<christopher.spinrath@rwth-aachen.de> wrote:
 
-> diff --git a/arch/arm/boot/dts/omap3-n900.dts b/arch/arm/boot/dts/omap3-n900.dts
-> index 669c51c..59cc743 100644
-> --- a/arch/arm/boot/dts/omap3-n900.dts
-> +++ b/arch/arm/boot/dts/omap3-n900.dts
-> @@ -778,6 +778,8 @@
->  
->  		reset-gpio = <&gpio4 6 GPIO_ACTIVE_HIGH>; /* 102 */
->  
-> +		lens-focus = <&ad5820>;
-> +
->  		port {
->  			csi_cam1: endpoint {
->  				bus-type = <3>; /* CCP2 */
-> 
+> This results in a regression for those devices where U-Boot is supposed
+> to inject the partition sub-nodes. For example, this is the case for
+> cm-fx6 module based devices like the Utilite Pro.
+>
+> Linux fails to parse the partitions and reports:
+> [    9.330881] spi0.0: error parsing ofpart partition
+> /soc/aips-bus at 2000000/spba-bus at 2000000/ecspi at 2008000/m25p80 at 0/partition at 0
+> (/soc/aips-bus at 2000000/spba-bus at 2000000/ecspi at 2008000/m25p80 at 0)
+> [    9.330887] mtd: failed to find partitions; one or more parsers
+> reports errors (-22)
+>
+> Also, the documentation does not forbid the #address-cells/size-cells if
+> no partitions are present.
+>
+> So, please, drop this patch (or exclude at least the cm-fx6 related change).
 
--- 
-Pali Roh?r
-pali.rohar at gmail.com
+Good point! I will resend the patch and will only change the NXP boards.
+
+Thanks
