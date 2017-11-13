@@ -1,100 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Nov 2017 10:17:50 +0100
-Subject: [PULL 25/27] KVM: arm/arm64: GICv4: Theory of operations
-In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
-References: <20171113091752.10663-1-christoffer.dall@linaro.org>
-Message-ID: <20171113091752.10663-26-christoffer.dall@linaro.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 13 Nov 2017 09:35:57 +0000
+Subject: spi->irq == 0 on module reload of driver using IRQF_TRIGGER_LOW
+In-Reply-To: <6CD8E928-2143-4295-A5B3-4B95026E7261@martin.sperl.org>
+ (kernel@martin.sperl.org's message of "Sun, 12 Nov 2017 17:49:39
+ +0100")
+References: <21FDD1B8-E8F6-4DCE-9D30-D82B713B0008@martin.sperl.org>
+ <20171112141349.6b4b3852@why.wild-wind.fr.eu.org>
+ <CD4EBEF8-DDFD-40C3-A03E-7EC964B32357@martin.sperl.org>
+ <20171112154101.483d21d2@why.wild-wind.fr.eu.org>
+ <6CD8E928-2143-4295-A5B3-4B95026E7261@martin.sperl.org>
+Message-ID: <87k1yuttaa.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
+On Sun, Nov 12 2017 at  5:49:39 pm GMT, <kernel@martin.sperl.org> wrote:
+>> On 12.11.2017, at 16:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>> +
+>>> +            can0: mcp2517fd at 0 {
+>>> +                reg = <0>;
+>>> +                compatible = "microchip,mcp2517fd";
+>>> +                pinctrl-names = "default";
+>>> +                pinctrl-0 = <&can0_pins>;
+>>> +                spi-max-frequency = <12500000>;
+>>> +                interrupt-parent = <&gpio>;
+>>> +                interrupts = <16 0x2>;
+>> 
+>> This indicates a falling edge. No wonder the kernel is confused (I
+>> don't know why this isn't enforced the first time though, probably an
+>> issue in the GPIO irqchip driver...). Replacing this 2 with a 8 should
+>> allow you to make some progress.
+>
+> Thanks for the clarification - with that change it works!
+>
+> For a better understanding:
+> Isn?t the interrupt type to use more of a driver decision than a
+> HW implementation detail that needs to get defined in the device tree?
 
-Yet another braindump so I can free some cells...
+Absolutely *not*. The signalling of an interrupt is completely HW
+dependent, and the driver *must* use abide by the HW rule. That's
+because edge and level interrupts signal entirely different things:
 
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-v4.c | 67 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 67 insertions(+)
+- An edge interrupt signals a an event. Something has happened, and many
+  of these events can be signalled independently without the CPU doing
+  anything.
 
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index bf874dd01fc0..915d09dc2638 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -23,6 +23,73 @@
- 
- #include "vgic.h"
- 
-+/*
-+ * How KVM uses GICv4 (insert rude comments here):
-+ *
-+ * The vgic-v4 layer acts as a bridge between several entities:
-+ * - The GICv4 ITS representation offered by the ITS driver
-+ * - VFIO, which is in charge of the PCI endpoint
-+ * - The virtual ITS, which is the only thing the guest sees
-+ *
-+ * The configuration of VLPIs is triggered by a callback from VFIO,
-+ * instructing KVM that a PCI device has been configured to deliver
-+ * MSIs to a vITS.
-+ *
-+ * kvm_vgic_v4_set_forwarding() is thus called with the routing entry,
-+ * and this is used to find the corresponding vITS data structures
-+ * (ITS instance, device, event and irq) using a process that is
-+ * extremely similar to the injection of an MSI.
-+ *
-+ * At this stage, we can link the guest's view of an LPI (uniquely
-+ * identified by the routing entry) and the host irq, using the GICv4
-+ * driver mapping operation. Should the mapping succeed, we've then
-+ * successfully upgraded the guest's LPI to a VLPI. We can then start
-+ * with updating GICv4's view of the property table and generating an
-+ * INValidation in order to kickstart the delivery of this VLPI to the
-+ * guest directly, without software intervention. Well, almost.
-+ *
-+ * When the PCI endpoint is deconfigured, this operation is reversed
-+ * with VFIO calling kvm_vgic_v4_unset_forwarding().
-+ *
-+ * Once the VLPI has been mapped, it needs to follow any change the
-+ * guest performs on its LPI through the vITS. For that, a number of
-+ * command handlers have hooks to communicate these changes to the HW:
-+ * - Any invalidation triggers a call to its_prop_update_vlpi()
-+ * - The INT command results in a irq_set_irqchip_state(), which
-+ *   generates an INT on the corresponding VLPI.
-+ * - The CLEAR command results in a irq_set_irqchip_state(), which
-+ *   generates an CLEAR on the corresponding VLPI.
-+ * - DISCARD translates into an unmap, similar to a call to
-+ *   kvm_vgic_v4_unset_forwarding().
-+ * - MOVI is translated by an update of the existing mapping, changing
-+ *   the target vcpu, resulting in a VMOVI being generated.
-+ * - MOVALL is translated by a string of mapping updates (similar to
-+ *   the handling of MOVI). MOVALL is horrible.
-+ *
-+ * Note that a DISCARD/MAPTI sequence emitted from the guest without
-+ * reprogramming the PCI endpoint after MAPTI does not result in a
-+ * VLPI being mapped, as there is no callback from VFIO (the guest
-+ * will get the interrupt via the normal SW injection). Fixing this is
-+ * not trivial, and requires some horrible messing with the VFIO
-+ * internals. Not fun. Don't do that.
-+ *
-+ * Then there is the scheduling. Each time a vcpu is about to run on a
-+ * physical CPU, KVM must tell the corresponding redistributor about
-+ * it. And if we've migrated our vcpu from one CPU to another, we must
-+ * tell the ITS (so that the messages reach the right redistributor).
-+ * This is done in two steps: first issue a irq_set_affinity() on the
-+ * irq corresponding to the vcpu, then call its_schedule_vpe(). You
-+ * must be in a non-preemptible context. On exit, another call to
-+ * its_schedule_vpe() tells the redistributor that we're done with the
-+ * vcpu.
-+ *
-+ * Finally, the doorbell handling: Each vcpu is allocated an interrupt
-+ * which will fire each time a VLPI is made pending whilst the vcpu is
-+ * not running. Each time the vcpu gets blocked, the doorbell
-+ * interrupt gets enabled. When the vcpu is unblocked (for whatever
-+ * reason), the doorbell interrupt is disabled.
-+ */
-+
- #define DB_IRQ_FLAGS	(IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY | IRQ_NO_BALANCING)
- 
- static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+- A level interrupt indicates a change of state, and this state persist
+  until the CPU has services the interrupt.
+
+That's the difference between receiving a SMS each time you pay
+something your bank card, and receiving a phone call from your bank
+because your account is overdrawn.
+
+> In my case I probably could write some more code that would allow edge
+> interrupts to work (without race-conditions on spi transfers - probably
+> by using spi_async to reenable interrupts on the HW device), but it
+> would not be as straight-forward and a bit more complex.
+
+And more or less wrong, given that the spec sheet calls out "active low"
+interrupts.
+
+> Summary: Essentially the driver has to match the interrupt type -
+> otherwise it will fail (on second initialization).
+
+And even that is not quite right. The driver should fail straight
+away. on the first request. I don't have the HW to track it down, but
+I'd appreciate it if you could have a look and enlighten me.
+
+Thanks,
+
+	M.
 -- 
-2.14.2
+Jazz is not dead, it just smell funny.
