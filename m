@@ -1,209 +1,144 @@
-From: andrew@aj.id.au (Andrew Jeffery)
-Date: Mon, 13 Nov 2017 15:34:14 +1030
-Subject: [PATCH v5 3/5] clk: aspeed: Add platform driver and register PLLs
-In-Reply-To: <20171030060250.701-4-joel@jms.id.au>
-References: <20171030060250.701-1-joel@jms.id.au>
- <20171030060250.701-4-joel@jms.id.au>
-Message-ID: <1510549454.4287.68.camel@aj.id.au>
+From: shile.zhang@nokia-sbell.com (Zhang, Shile (NSB - CN/Hangzhou))
+Date: Mon, 13 Nov 2017 05:32:26 +0000
+Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb
+ mappings
+In-Reply-To: <1509700757-34420-1-git-send-email-shile.zhang@nokia-sbell.com>
+References: <1509700757-34420-1-git-send-email-shile.zhang@nokia-sbell.com>
+Message-ID: <VI1PR0701MB2846C892037A515D0B3F4EF8A12B0@VI1PR0701MB2846.eurprd07.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-10-30 at 16:32 +1030, Joel Stanley wrote:
-> This registers a platform driver to set up all of the non-core
-> clocks.
-> 
-> The clocks that have configurable rates are now registered.
-> 
-> Signed-off-by: Joel Stanley <joel@jms.id.au>
+Hi, Russell,
 
-Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
+Have you any time to check this patch?
+I found this issue/missing in my works, the application cannot mmap big hugepage (about 360MB) due to no more contiguous vm from the default "TASK_UNMMAPPED_AREA" by legacy bottom-up.
+We need this patch to fix this issue.
 
-> --
-> v5:
->  - Remove eclk configuration. We do not have enough information to
->  correctly implement the mux and divisor, so it will have to be
->  implemented in the future
-> v4:
->  - Add eclk div table to fix ast2500 calculation
->  - Add defines to document the BIT() macros
->  - Pass dev where we can when registering clocks
->  - Check for errors when registering clk_hws
-> v3:
->  - Fix bclk and eclk calculation
->  - Separate out ast2400 and ast25000 for pll calculation
-> ---
->  drivers/clk/clk-aspeed.c | 130
-> +++++++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 130 insertions(+)
-> 
-> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
-> index a8da411326e9..8bf3f3767560 100644
-> --- a/drivers/clk/clk-aspeed.c
-> +++ b/drivers/clk/clk-aspeed.c
-> @@ -14,6 +14,8 @@
->  #include <linux/clk-provider.h>
->  #include <linux/mfd/syscon.h>
->  #include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
->  #include <linux/regmap.h>
->  #include <linux/slab.h>
->  #include <linux/spinlock.h>
-> @@ -114,6 +116,18 @@ static const struct aspeed_gate_data
-> aspeed_gates[] = {
->  	[ASPEED_CLK_GATE_LHCCLK] =	{ 28, -1, "lhclk-gate",	
-> 	"lhclk", 0 }, /* LPC master/LPC+ */
->  };
->  
-> +static const struct clk_div_table ast2500_mac_div_table[] = {
-> +	{ 0x0, 4 }, /* Yep, really. Aspeed confirmed this is correct
-> */
-> +	{ 0x1, 4 },
-> +	{ 0x2, 6 },
-> +	{ 0x3, 8 },
-> +	{ 0x4, 10 },
-> +	{ 0x5, 12 },
-> +	{ 0x6, 14 },
-> +	{ 0x7, 16 },
-> +	{ 0 }
-> +};
-> +
->  static const struct clk_div_table ast2400_div_table[] = {
->  	{ 0x0, 2 },
->  	{ 0x1, 4 },
-> @@ -179,6 +193,122 @@ static struct clk_hw
-> *aspeed_ast2500_calc_pll(const char *name, u32 val)
->  			mult, div);
->  }
->  
-> +struct aspeed_clk_soc_data {
-> +	const struct clk_div_table *div_table;
-> +	const struct clk_div_table *mac_div_table;
-> +	struct clk_hw *(*calc_pll)(const char *name, u32 val);
-> +};
-> +
-> +static const struct aspeed_clk_soc_data ast2500_data = {
-> +	.div_table = ast2500_div_table,
-> +	.mac_div_table = ast2500_mac_div_table,
-> +	.calc_pll = aspeed_ast2500_calc_pll,
-> +};
-> +
-> +static const struct aspeed_clk_soc_data ast2400_data = {
-> +	.div_table = ast2400_div_table,
-> +	.mac_div_table = ast2400_div_table,
-> +	.calc_pll = aspeed_ast2400_calc_pll,
-> +};
-> +
-> +static int aspeed_clk_probe(struct platform_device *pdev)
-> +{
-> +	const struct aspeed_clk_soc_data *soc_data;
-> +	struct device *dev = &pdev->dev;
-> +	struct regmap *map;
-> +	struct clk_hw *hw;
-> +	u32 val, rate;
-> +
-> +	map = syscon_node_to_regmap(dev->of_node);
-> +	if (IS_ERR(map)) {
-> +		dev_err(dev, "no syscon regmap\n");
-> +		return PTR_ERR(map);
-> +	}
-> +
-> +	/* SoC generations share common layouts but have different
-> divisors */
-> +	soc_data = of_device_get_match_data(dev);
-> +	if (!soc_data) {
-> +		dev_err(dev, "no match data for platform\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* UART clock div13 setting */
-> +	regmap_read(map, ASPEED_MISC_CTRL, &val);
-> +	if (val & UART_DIV13_EN)
-> +		rate = 24000000 / 13;
-> +	else
-> +		rate = 24000000;
-> +	/* TODO: Find the parent data for the uart clock */
-> +	hw = clk_hw_register_fixed_rate(dev, "uart", NULL, 0, rate);
-> +	if (IS_ERR(hw))
-> +		return PTR_ERR(hw);
-> +	aspeed_clk_data->hws[ASPEED_CLK_UART] = hw;
-> +
-> +	/*
-> +	 * Memory controller (M-PLL) PLL. This clock is configured
-> by the
-> +	 * bootloader, and is exposed to Linux as a read-only clock
-> rate.
-> +	 */
-> +	regmap_read(map, ASPEED_MPLL_PARAM, &val);
-> +	hw = soc_data->calc_pll("mpll", val);
-> +	if (IS_ERR(hw))
-> +		return PTR_ERR(hw);
-> +	aspeed_clk_data->hws[ASPEED_CLK_MPLL] =	hw;
-> +
-> +	/* SD/SDIO clock divider (TODO: There's a gate too) */
-> +	hw = clk_hw_register_divider_table(dev, "sdio", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 12, 3, 0,
-> +			soc_data->div_table,
-> +			&aspeed_clk_lock);
-> +	if (IS_ERR(hw))
-> +		return PTR_ERR(hw);
-> +	aspeed_clk_data->hws[ASPEED_CLK_SDIO] = hw;
-> +
-> +	/* MAC AHB bus clock divider */
-> +	hw = clk_hw_register_divider_table(dev, "mac", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 16, 3, 0,
-> +			soc_data->mac_div_table,
-> +			&aspeed_clk_lock);
-> +	if (IS_ERR(hw))
-> +		return PTR_ERR(hw);
-> +	aspeed_clk_data->hws[ASPEED_CLK_MAC] = hw;
-> +
-> +	/* LPC Host (LHCLK) clock divider */
-> +	hw = clk_hw_register_divider_table(dev, "lhclk", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION, 20, 3, 0,
-> +			soc_data->div_table,
-> +			&aspeed_clk_lock);
-> +	if (IS_ERR(hw))
-> +		return PTR_ERR(hw);
-> +	aspeed_clk_data->hws[ASPEED_CLK_LHCLK] = hw;
-> +
-> +	/* P-Bus (BCLK) clock divider */
-> +	hw = clk_hw_register_divider_table(dev, "bclk", "hpll", 0,
-> +			scu_base + ASPEED_CLK_SELECTION_2, 0, 2, 0,
-> +			soc_data->div_table,
-> +			&aspeed_clk_lock);
-> +	if (IS_ERR(hw))
-> +		return PTR_ERR(hw);
-> +	aspeed_clk_data->hws[ASPEED_CLK_BCLK] = hw;
-> +
-> +	return 0;
-> +};
-> +
-> +static const struct of_device_id aspeed_clk_dt_ids[] = {
-> +	{ .compatible = "aspeed,ast2400-scu", .data = &ast2400_data
-> },
-> +	{ .compatible = "aspeed,ast2500-scu", .data = &ast2500_data
-> },
-> +	{ }
-> +};
-> +
-> +static struct platform_driver aspeed_clk_driver = {
-> +	.probe  = aspeed_clk_probe,
-> +	.driver = {
-> +		.name = "aspeed-clk",
-> +		.of_match_table = aspeed_clk_dt_ids,
-> +		.suppress_bind_attrs = true,
-> +	},
-> +};
-> +builtin_platform_driver(aspeed_clk_driver);
-> +
->  static void __init aspeed_ast2400_cc(struct regmap *map)
->  {
->  	struct clk_hw *hw;
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171113/56840941/attachment.sig>
+Could you please help check this patch?
+
+Thanks!
+
+BR, Shile
+
+-----Original Message-----
+From: Shile Zhang [mailto:shile.zhang at nokia-sbell.com] 
+Sent: Friday, November 03, 2017 5:19 PM
+To: Russell King <linux@armlinux.org.uk>
+Cc: linux-kernel at vger.kernel.org; Zhang, Shile (NSB - CN/Hangzhou) <shile.zhang@nokia-sbell.com>
+Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb mappings
+
+merge from arch/x86
+
+Signed-off-by: Shile Zhang <shile.zhang@nokia-sbell.com>
+---
+ arch/arm/include/asm/page.h |  1 +
+ arch/arm/mm/hugetlbpage.c   | 85 +++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+)
+
+diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
+index 4355f0e..994630f 100644
+--- a/arch/arm/include/asm/page.h
++++ b/arch/arm/include/asm/page.h
+@@ -144,6 +144,7 @@ extern void copy_page(void *to, const void *from);
+ 
+ #ifdef CONFIG_KUSER_HELPERS
+ #define __HAVE_ARCH_GATE_AREA 1
++#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
+ #endif
+ 
+ #ifdef CONFIG_ARM_LPAE
+diff --git a/arch/arm/mm/hugetlbpage.c b/arch/arm/mm/hugetlbpage.c
+index fcafb52..46ed0c8 100644
+--- a/arch/arm/mm/hugetlbpage.c
++++ b/arch/arm/mm/hugetlbpage.c
+@@ -45,3 +45,88 @@ int pmd_huge(pmd_t pmd)
+ {
+ 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
+ }
++
++#ifdef CONFIG_HUGETLB_PAGE
++static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *file,
++		unsigned long addr, unsigned long len,
++		unsigned long pgoff, unsigned long flags)
++{
++	struct hstate *h = hstate_file(file);
++	struct vm_unmapped_area_info info;
++
++	info.flags = 0;
++	info.length = len;
++	info.low_limit = current->mm->mmap_legacy_base;
++	info.high_limit = TASK_SIZE;
++	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
++	info.align_offset = 0;
++	return vm_unmapped_area(&info);
++}
++
++static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
++		unsigned long addr0, unsigned long len,
++		unsigned long pgoff, unsigned long flags)
++{
++	struct hstate *h = hstate_file(file);
++	struct vm_unmapped_area_info info;
++	unsigned long addr;
++
++	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
++	info.length = len;
++	info.low_limit = PAGE_SIZE;
++	info.high_limit = current->mm->mmap_base;
++	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
++	info.align_offset = 0;
++	addr = vm_unmapped_area(&info);
++
++	/*
++	 * A failed mmap() very likely causes application failure,
++	 * so fall back to the bottom-up function here. This scenario
++	 * can happen with large stack limits and large mmap()
++	 * allocations.
++	 */
++	if (addr & ~PAGE_MASK) {
++		VM_BUG_ON(addr != -ENOMEM);
++		info.flags = 0;
++		info.low_limit = TASK_UNMAPPED_BASE;
++		info.high_limit = TASK_SIZE;
++		addr = vm_unmapped_area(&info);
++	}
++
++	return addr;
++}
++
++unsigned long
++hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
++		unsigned long len, unsigned long pgoff, unsigned long flags)
++{
++	struct hstate *h = hstate_file(file);
++	struct mm_struct *mm = current->mm;
++	struct vm_area_struct *vma;
++
++	if (len & ~huge_page_mask(h))
++		return -EINVAL;
++	if (len > TASK_SIZE)
++		return -ENOMEM;
++
++	if (flags & MAP_FIXED) {
++		if (prepare_hugepage_range(file, addr, len))
++			return -EINVAL;
++		return addr;
++	}
++
++	if (addr) {
++		addr = ALIGN(addr, huge_page_size(h));
++		vma = find_vma(mm, addr);
++		if (TASK_SIZE - len >= addr &&
++		    (!vma || addr + len <= vma->vm_start))
++			return addr;
++	}
++	if (mm->get_unmapped_area == arch_get_unmapped_area)
++		return hugetlb_get_unmapped_area_bottomup(file, addr, len,
++				pgoff, flags);
++	else
++		return hugetlb_get_unmapped_area_topdown(file, addr, len,
++				pgoff, flags);
++}
++#endif /* CONFIG_HUGETLB_PAGE */
+-- 
+2.6.2
