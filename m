@@ -1,26 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 13 Nov 2017 08:53:03 +0100
-Subject: [PATCH 0/3] Add R8A77970/Eagle PFC support
-In-Reply-To: <20171110200218.747996672@cogentembedded.com>
-References: <20171110200218.747996672@cogentembedded.com>
-Message-ID: <20171113075303.zmkmq6bt3lfuttwu@verge.net.au>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 13 Nov 2017 08:55:53 +0100
+Subject: [PATCH] ARM: dts: imx6: Remove unneeded address-cells/size-cells
+In-Reply-To: <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
+References: <1510348378-18150-1-git-send-email-festevam@gmail.com>
+ <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
+Message-ID: <20171113075553.vseyq3swmzwja3ld@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 11:02:18PM +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> Here's the set of 3 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-20171110-v4.14-rc8' tag.  We're adding the R8A77970 PFC node
-> and then describing the pins for SCIF0 and EtherAVB devices declared earlier.
-> These patches depend on the R8A77970 PFC suport in order to work properly.
-> 
-> [1/3] arm64: dts: renesas: r8a77970: add PFC support
-> [2/3] arm64: dts: renesas: eagle: add SCIF0 pins
-> [3/3] arm64: dts: renesas: eagle: add EtherAVB pins
+Hello,
 
-Hi Sergei,
+On Sat, Nov 11, 2017 at 03:24:47PM +0100, Christopher Spinrath wrote:
+> (I'm sorry if I've missed some recipients or broke the email thread but
+> I got Fabio's email from the infradead archive.)
+> 
+> On 11/10/2017 10:12 PM, festevam at gmail.com (Fabio Estevam) wrote:
+> > From: Fabio Estevam <fabio.estevam@nxp.com>
+> > 
+> > According to Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt:
+> > 
+> > "- #address-cells, #size-cells : Must be present if the device has
+> > sub-nodes representing partitions."
+> > 
+> > Remove the occurrences of #address-cells/size-cells where no sub-nodes
+> > representing partitions are present.
+> 
+> This results in a regression for those devices where U-Boot is supposed
+> to inject the partition sub-nodes. For example, this is the case for
+> cm-fx6 module based devices like the Utilite Pro.
 
-I have marked these patches as deferred pending acceptance of the PFC
-driver. Please repost or otherwise ping me once that dependency has been
-accepted.
+sounds like an U-Boot bug that it inserts partition nodes, but doesn't
+ensure matching #address-cells/size-cells are specified.
+
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
