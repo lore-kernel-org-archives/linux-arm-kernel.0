@@ -1,42 +1,49 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 13 Nov 2017 12:33:31 +0100
-Subject: [PATCH v2 1/2] ARM: dts: exynos: Switch to dedicated Odroid-XU3
- sound card binding
-In-Reply-To: <6ffab0bd-abc7-be8a-38f0-695269271427@samsung.com>
-References: <20171103165446.15438-1-s.nawrocki@samsung.com>
- <CGME20171103165539epcas1p48cc87811574dace9dfe91d8e9ec6f7ca@epcas1p4.samsung.com>
- <20171103165446.15438-2-s.nawrocki@samsung.com>
- <20171110171417.qbnn7gsihor2fwng@kozik-lap>
- <6ffab0bd-abc7-be8a-38f0-695269271427@samsung.com>
-Message-ID: <CAJKOXPdzv-or772AkwN9WXhoFHg38ws1y98O8y86hmywj++VWQ@mail.gmail.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Mon, 13 Nov 2017 22:34:50 +1100
+Subject: linux-next: Tree for Nov 7
+In-Reply-To: <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
+References: <20171107162217.382cd754@canb.auug.org.au>
+ <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
+ <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
+ <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
+ <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
+ <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
+ <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
+Message-ID: <87lgjawgx1.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 13, 2017 at 12:30 PM, Sylwester Nawrocki
-<s.nawrocki@samsung.com> wrote:
-> On 11/10/2017 06:14 PM, Krzysztof Kozlowski wrote:
->> On Fri, Nov 03, 2017 at 05:54:45PM +0100, Sylwester Nawrocki wrote:
->>> The new sound card DT binding is used for Odroid XU3 in order
->>> to properly support the HDMI audio path.
->>> Clocks configuration is changed so the I2S controller is now the bit
->>> and the frame clock master with EPLL as the root clock source.
->>
->> Patch looks good but I do not understand this last sentence. What did
->> you want to say?
->
-> Which part is hard to understand exactly? Perhaps this is clearer?
->
-> "Clocks configuration is changed so the I2S controller is now the bit
-> clock and the frame clock master.  The EPLL output clock is now the
-> audio root clock adjusted to each audio sample rate."
->
-> Previously the CODEC's internal PLL was used for generating the I2S
-> bit and frame clocks accorrding to each audio sample rate.
+Hi Michal,
 
-Ahhh, makes sense, the previous "is not the bit and..." mislead me. I
-thought it's a typo, you wanted to use "but" and something is missing.
-The extended description is I think better, so I'll use it in commit
-msg when applying.
+Michal Hocko <mhocko@kernel.org> writes:
+> On Mon 13-11-17 10:20:06, Michal Hocko wrote:
+>> [Cc arm and ppc maintainers]
+>
+> Hmm, it turned out to be a problem on other architectures as well.
+> CCing more maintainers. For your reference, we are talking about
+> http://lkml.kernel.org/r/20171023082608.6167-1-mhocko at kernel.org
+> which has broken architectures which do apply aligning on the mmap
+> address hint without MAP_FIXED applied. See below my proposed way
+> around this issue because I belive that the above patch is quite
+> valuable on its own to be dropped for all archs.
 
-Best regards,
-Krzysztof
+I don't really like your solution sorry :)  The fact that you've had to
+patch seven arches seems like a red flag.
+
+I think this is a generic problem with MAP_FIXED, which I've heard
+userspace folks complain about in the past.
+
+Currently MAP_FIXED does two things:
+  1. makes addr not a hint but the required address
+  2. blasts any existing mapping
+
+You want 1) but not 2).
+
+So the right solution IMHO would be to add a new mmap flag to request
+that behaviour, ie. a fixed address but iff there is nothing already
+mapped there.
+
+I don't know the mm code well enough to know if that's hard for some
+reason, but it *seems* like it should be doable.
+
+cheers
