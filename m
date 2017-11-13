@@ -1,99 +1,74 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 13 Nov 2017 17:25:51 +0100
-Subject: [PATCH 22/37] KVM: arm64: Change 32-bit handling of VM system
- registers
-In-Reply-To: <20171012104141.26902-23-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-23-christoffer.dall@linaro.org>
-Message-ID: <20171113162551.i6xnmohnzs6lpf3w@hawk.localdomain>
+From: khalid.aziz@oracle.com (Khalid Aziz)
+Date: Mon, 13 Nov 2017 09:35:22 -0700
+Subject: linux-next: Tree for Nov 7
+In-Reply-To: <20171113160637.jhekbdyfpccme3be@dhcp22.suse.cz>
+References: <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
+ <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
+ <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
+ <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
+ <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
+ <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
+ <87lgjawgx1.fsf@concordia.ellerman.id.au>
+ <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
+ <20171113151641.yfqrecpcxllpn5mq@dhcp22.suse.cz>
+ <20171113154939.6ui2fmpokpm7g4oj@dhcp22.suse.cz>
+ <20171113160637.jhekbdyfpccme3be@dhcp22.suse.cz>
+Message-ID: <c52fa249-9583-18a2-cbac-28abfb23d5a5@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:26PM +0200, Christoffer Dall wrote:
-> We currently handle 32-bit accesses to trapped VM system registers using
-> the 32-bit index into the coproc array on the vcpu structure, which is a
-> union of the coprog array and the sysreg array.
-
-coproc
-
-> 
-> Since all the 32-bit coproc indicies are created to correspond to the
-> architectural mapping between 64-bit system registers and 32-bit
-> coprocessor registers, and because the AArch64 system registers are the
-> double in size of the AArch32 coprocessor registers, we can always find
-> the system register entry that we must update by dividing the 32-bit
-> coproc index by 2.
-> 
-> This is going to make our lives much easier when we have to start
-> accessing system registers that uses deferred save/restore and might
-
-use
-
-> have to be read directly from the physical CPU.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+On 11/13/2017 09:06 AM, Michal Hocko wrote:
+> OK, so this one should take care of the backward compatibility while
+> still not touching the arch code
 > ---
->  arch/arm64/include/asm/kvm_host.h |  8 --------
->  arch/arm64/kvm/sys_regs.c         | 20 +++++++++++++++-----
->  2 files changed, 15 insertions(+), 13 deletions(-)
+> commit 39ff9bf8597e79a032da0954aea1f0d77d137765
+> Author: Michal Hocko <mhocko@suse.com>
+> Date:   Mon Nov 13 17:06:24 2017 +0100
 > 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 5e09eb9..9f5761f 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -289,14 +289,6 @@ struct kvm_vcpu_arch {
->  #define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
->  #define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
->  
-> -#ifdef CONFIG_CPU_BIG_ENDIAN
-> -#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r))
-> -#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r) + 1)
-> -#else
-> -#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r) + 1)
-> -#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r))
-> -#endif
-> -
->  struct kvm_vm_stat {
->  	ulong remote_tlb_flush;
->  };
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index bb0e41b..dbe35fd 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -120,16 +120,26 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
->  			  const struct sys_reg_desc *r)
->  {
->  	bool was_enabled = vcpu_has_cache_enabled(vcpu);
-> +	u64 val;
-> +	int reg = r->reg;
->  
->  	BUG_ON(!p->is_write);
->  
-> -	if (!p->is_aarch32) {
-> -		vcpu_sys_reg(vcpu, r->reg) = p->regval;
-> +	/* See the 32bit mapping in kvm_host.h */
-> +	if (p->is_aarch32)
-> +		reg = r->reg / 2;
+>      mm: introduce MAP_FIXED_SAFE
+>      
+>      MAP_FIXED is used quite often but it is inherently dangerous because it
+>      unmaps an existing mapping covered by the requested range. While this
+>      might be might be really desidered behavior in many cases there are
+>      others which would rather see a failure than a silent memory corruption.
+>      Introduce a new MAP_FIXED_SAFE flag for mmap to achive this behavior.
+>      It is a MAP_FIXED extension with a single exception that it fails with
+>      ENOMEM if the requested address is already covered by an existing
+>      mapping. We still do rely on get_unmaped_area to handle all the arch
+>      specific MAP_FIXED treatment and check for a conflicting vma after it
+>      returns.
+>      
+>      Signed-off-by: Michal Hocko <mhocko@suse.com>
+> 
+> ...... deleted .......
+> diff --git a/mm/mmap.c b/mm/mmap.c
+> index 680506faceae..aad8d37f0205 100644
+> --- a/mm/mmap.c
+> +++ b/mm/mmap.c
+> @@ -1358,6 +1358,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
+>   	if (mm->map_count > sysctl_max_map_count)
+>   		return -ENOMEM;
+>   
+> +	/* force arch specific MAP_FIXED handling in get_unmapped_area */
+> +	if (flags & MAP_FIXED_SAFE)
+> +		flags |= MAP_FIXED;
 > +
-> +	if (!p->is_aarch32 || !p->is_32bit) {
-> +		val = p->regval;
->  	} else {
-> -		if (!p->is_32bit)
-> -			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
-> -		vcpu_cp15_64_low(vcpu, r->reg) = lower_32_bits(p->regval);
-> +		val = vcpu_sys_reg(vcpu, reg);
-> +		if (r->reg % 2)
-> +			val = (p->regval << 32) | (u64)lower_32_bits(val);
-> +		else
-> +			val = ((u64)upper_32_bits(val) << 32) |
-> +				(u64)lower_32_bits(p->regval);
->  	}
-> +	vcpu_sys_reg(vcpu, reg) = val;
->  
->  	kvm_toggle_cache(vcpu, was_enabled);
->  	return true;
-> -- 
-> 2.9.0
->
+>   	/* Obtain the address to map to. we verify (or select) it and ensure
+>   	 * that it represents a valid section of the address space.
+>   	 */
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+Do you need to move this code above:
+
+         if (!(flags & MAP_FIXED))
+                 addr = round_hint_to_min(addr);
+
+         /* Careful about overflows.. */
+         len = PAGE_ALIGN(len);
+         if (!len)
+                 return -ENOMEM;
+
+Not doing that might mean the hint address will end up being rounded for 
+MAP_FIXED_SAFE which would change the behavior from MAP_FIXED.
+
+--
+Khalid
