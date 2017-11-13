@@ -1,64 +1,54 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Nov 2017 10:17:47 +0100
-Subject: [PULL 22/27] KVM: arm/arm64: GICv4: Prevent a VM using GICv4 from
- being saved
+Date: Mon, 13 Nov 2017 10:17:46 +0100
+Subject: [PULL 21/27] KVM: arm/arm64: GICv4: Enable virtual cpuif if VLPIs can
+ be delivered
 In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
 References: <20171113091752.10663-1-christoffer.dall@linaro.org>
-Message-ID: <20171113091752.10663-23-christoffer.dall@linaro.org>
+Message-ID: <20171113091752.10663-22-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-The GICv4 architecture doesn't make it easy for save/restore to
-work, as it doesn't give any guarantee that the pending state
-is written into the pending table.
+In order for VLPIs to be delivered to the guest, we must make sure that
+the virtual cpuif is always enabled, irrespective of the presence of
+virtual interrupt in the LRs.
 
-So let's not take any chance, and let's return an error if
-we encounter any LPI that has the HW bit set. In order for
-userspace to distinguish this error from other failure modes,
-use -EACCES as an error code.
-
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- Documentation/virtual/kvm/devices/arm-vgic-its.txt | 2 ++
- virt/kvm/arm/vgic/vgic-its.c                       | 9 +++++++++
- 2 files changed, 11 insertions(+)
+ virt/kvm/arm/hyp/vgic-v3-sr.c | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/virtual/kvm/devices/arm-vgic-its.txt b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-index 8d5830eab26a..4f0c9fc40365 100644
---- a/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-+++ b/Documentation/virtual/kvm/devices/arm-vgic-its.txt
-@@ -64,6 +64,8 @@ Groups:
-     -EINVAL: Inconsistent restored data
-     -EFAULT: Invalid guest ram access
-     -EBUSY:  One or more VCPUS are running
-+    -EACCES: The virtual ITS is backed by a physical GICv4 ITS, and the
-+	     state is not available
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 91728faa13fd..f5c3d6d7019e 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -258,7 +258,8 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
+ 		}
+ 	} else {
+-		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
++		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
++		    cpu_if->its_vpe.its_vm)
+ 			write_gicreg(0, ICH_HCR_EL2);
  
-   KVM_DEV_ARM_VGIC_GRP_ITS_REGS
-   Attributes:
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index bf571f6d2b32..b8c1b724ba3e 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1995,6 +1995,15 @@ static int vgic_its_save_itt(struct vgic_its *its, struct its_device *device)
- 	list_for_each_entry(ite, &device->itt_head, ite_list) {
- 		gpa_t gpa = base + ite->event_id * ite_esz;
+ 		cpu_if->vgic_elrsr = 0xffff;
+@@ -337,9 +338,11 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		/*
+ 		 * If we need to trap system registers, we must write
+ 		 * ICH_HCR_EL2 anyway, even if no interrupts are being
+-		 * injected,
++		 * injected. Same thing if GICv4 is used, as VLPI
++		 * delivery is gated by ICH_HCR_EL2.En.
+ 		 */
+-		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
++		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
++		    cpu_if->its_vpe.its_vm)
+ 			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+ 	}
  
-+		/*
-+		 * If an LPI carries the HW bit, this means that this
-+		 * interrupt is controlled by GICv4, and we do not
-+		 * have direct access to that state. Let's simply fail
-+		 * the save operation...
-+		 */
-+		if (ite->irq->hw)
-+			return -EACCES;
-+
- 		ret = vgic_its_save_ite(its, device, ite, gpa, ite_esz);
- 		if (ret)
- 			return ret;
 -- 
 2.14.2
