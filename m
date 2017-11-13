@@ -1,54 +1,66 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 13 Nov 2017 15:52:27 -0500
-Subject: [3/4] PCI/portdrv: Implement interface to query the registered
- service
-In-Reply-To: <1510260399-14886-4-git-send-email-poza@codeaurora.org>
-References: <1510260399-14886-4-git-send-email-poza@codeaurora.org>
-Message-ID: <73379e2c-b0c3-885c-bb5d-b981863b6042@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 13 Nov 2017 13:15:30 -0800
+Subject: n900 in next-20170901
+In-Reply-To: <20171110153620.GO28152@atomide.com>
+References: <20171108163413.GU28152@atomide.com>
+ <20171109000801.GA23982@js1304-P5Q-DELUXE>
+ <20171109001113.GZ28152@atomide.com>
+ <20171109003639.GB23982@js1304-P5Q-DELUXE>
+ <20171109035031.GA24383@js1304-P5Q-DELUXE>
+ <20171109150854.GC28152@atomide.com>
+ <20171110001315.GA29669@js1304-P5Q-DELUXE>
+ <20171110032610.GJ28152@atomide.com>
+ <20171110063727.GA32073@js1304-P5Q-DELUXE>
+ <20171110153620.GO28152@atomide.com>
+Message-ID: <20171113211530.GY28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some nits only.
+* Tony Lindgren <tony@atomide.com> [171110 07:36]:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171110 06:34]:
+> > On Thu, Nov 09, 2017 at 07:26:10PM -0800, Tony Lindgren wrote:
+> > > +#define OMAP34XX_SRAM_PHYS	0x40200000
+> > > +#define OMAP34XX_SRAM_VIRT	0xd0010000
+> > > +#define OMAP34XX_SRAM_SIZE	0x10000
+> > 
+> > For my testing environment, vmalloc address space is started at
+> > roughly 0xe0000000 so 0xd0010000 would not be valid.
+> 
+> Well we can map it anywhere we want, got any preferences?
 
->  /**
-> + * pcie_port_service_query - query if particula port service is enabled.
-> + * dev: pcie device
-> + * @port service: PCI express port service
-> + */
-> +int pcie_port_query_service(struct pci_dev *dev, u32 port_service)
-> +{
-> +	struct pcie_device *pdev;
-> +	struct pci_dev *parent, *this = dev;
-> +
-> +	do {
+Hmm and I'm also wondering what you do to make vmalloc space to
+start at 0xe0000000 instead of 0xd0000000?
 
-While I understand the motivation why this function is searching for DPC capable
-parent until the root port, the name of the function does not represent this. 
+The reason I'm asking is because I think we can just move all of
+save_secure_ram_context to run from DDR instead of SRAM. But I'd
+rather do a minimal patch first that fixes your series and then we
+can test the further changes with more time.
 
-It might make sense to split this into two where the first function just queries
-the capabilities of the immediate device (the list_for_each_section).
+After moving save_secure_ram_context to DDR, we can call
+save_secure_ram_context directly with something like:
 
-> +		list_for_each_entry(pdev, &this->service_list, slist) {
-> +			if (pdev->service == port_service)
-> +				return 1;
-> +		}
+	args_pa = __pa(omap3_secure_ram_storage);
+	offset = (unsigned long)omap3_secure_ram_storage - args_pa;
+	ret = save_secure_ram_context(args_pa, offset);
 
-Another function to query all parents until you reach the root port.
+> Just that the current save_secure_ram_context uses "high_mask"
+> of 0xffff to translate the address. To make this more flexible,
+> we need the save_secure_ram_context changes too. So we might
+> want to do the static mapping and save_secure_ram_context changes
+> as a single patch.
+> 
+> > And, PHYS can be different according to the system type. Maybe either
+> > OMAP3_SRAM_PUB_PA or OMAP3_SRAM_PA. It seems that SIZE and TYPE should
+> > be considered, too. My understanding is correct?
+> 
+> We can have a static map for the whole SRAM area, see function
+> __arm_ioremap_pfn_caller() for the comment "Try to reuse one of the
+> static mapping whenever possible". So the different public SRAM start
+> addresses and sizes don't matter there.
 
-> +		parent = pci_upstream_bridge(this);
-> +		this = parent;
-> +	} while (parent && pci_is_pcie(parent));
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL(pcie_port_query_service);
-> +
+And then if save_secure_ram_contet runs in DDR, no static map is
+needed.
 
+Regards,
 
-
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Tony
