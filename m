@@ -1,66 +1,19 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 13 Nov 2017 13:15:30 -0800
-Subject: n900 in next-20170901
-In-Reply-To: <20171110153620.GO28152@atomide.com>
-References: <20171108163413.GU28152@atomide.com>
- <20171109000801.GA23982@js1304-P5Q-DELUXE>
- <20171109001113.GZ28152@atomide.com>
- <20171109003639.GB23982@js1304-P5Q-DELUXE>
- <20171109035031.GA24383@js1304-P5Q-DELUXE>
- <20171109150854.GC28152@atomide.com>
- <20171110001315.GA29669@js1304-P5Q-DELUXE>
- <20171110032610.GJ28152@atomide.com>
- <20171110063727.GA32073@js1304-P5Q-DELUXE>
- <20171110153620.GO28152@atomide.com>
-Message-ID: <20171113211530.GY28152@atomide.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 14 Nov 2017 00:23:19 +0300
+Subject: [PATCH 0/2] Add R8A77970/Eagle GPIO support
+Message-ID: <20171113212319.775334314@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tony Lindgren <tony@atomide.com> [171110 07:36]:
-> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171110 06:34]:
-> > On Thu, Nov 09, 2017 at 07:26:10PM -0800, Tony Lindgren wrote:
-> > > +#define OMAP34XX_SRAM_PHYS	0x40200000
-> > > +#define OMAP34XX_SRAM_VIRT	0xd0010000
-> > > +#define OMAP34XX_SRAM_SIZE	0x10000
-> > 
-> > For my testing environment, vmalloc address space is started at
-> > roughly 0xe0000000 so 0xd0010000 would not be valid.
-> 
-> Well we can map it anywhere we want, got any preferences?
+Hello!
 
-Hmm and I'm also wondering what you do to make vmalloc space to
-start at 0xe0000000 instead of 0xd0000000?
+Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+'renesas-devel-20171113-v4.14' tag. We're adding the R8A77970 GPIO nodes
+and then describing the PHY IRQ for EtherAVB  device declared earlier.
+These patches depend on the R8A77970/Eagle PFC suport patchset in order
+to apply/compile.
 
-The reason I'm asking is because I think we can just move all of
-save_secure_ram_context to run from DDR instead of SRAM. But I'd
-rather do a minimal patch first that fixes your series and then we
-can test the further changes with more time.
+[1/2] arm64: dts: renesas: r8a77970: add GPIO support
+[2/2] arm64: dts: renesas: eagle: specify EtherAVB PHY IRQ
 
-After moving save_secure_ram_context to DDR, we can call
-save_secure_ram_context directly with something like:
-
-	args_pa = __pa(omap3_secure_ram_storage);
-	offset = (unsigned long)omap3_secure_ram_storage - args_pa;
-	ret = save_secure_ram_context(args_pa, offset);
-
-> Just that the current save_secure_ram_context uses "high_mask"
-> of 0xffff to translate the address. To make this more flexible,
-> we need the save_secure_ram_context changes too. So we might
-> want to do the static mapping and save_secure_ram_context changes
-> as a single patch.
-> 
-> > And, PHYS can be different according to the system type. Maybe either
-> > OMAP3_SRAM_PUB_PA or OMAP3_SRAM_PA. It seems that SIZE and TYPE should
-> > be considered, too. My understanding is correct?
-> 
-> We can have a static map for the whole SRAM area, see function
-> __arm_ioremap_pfn_caller() for the comment "Try to reuse one of the
-> static mapping whenever possible". So the different public SRAM start
-> addresses and sizes don't matter there.
-
-And then if save_secure_ram_contet runs in DDR, no static map is
-needed.
-
-Regards,
-
-Tony
+WBR, Sergei
