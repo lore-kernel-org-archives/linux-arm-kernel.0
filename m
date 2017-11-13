@@ -1,77 +1,113 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Nov 2017 10:17:39 +0100
-Subject: [PULL 14/27] KVM: arm/arm64: GICv4: Handle MOVALL applied to a vPE
+Date: Mon, 13 Nov 2017 10:17:43 +0100
+Subject: [PULL 18/27] KVM: arm/arm64: GICv4: Add doorbell interrupt handling
 In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
 References: <20171113091752.10663-1-christoffer.dall@linaro.org>
-Message-ID: <20171113091752.10663-15-christoffer.dall@linaro.org>
+Message-ID: <20171113091752.10663-19-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-The current implementation of MOVALL doesn't allow us to call
-into the core ITS code as we hold a number of spinlocks.
+When a vPE is not running, a VLPI being made pending results in a
+doorbell interrupt being delivered. Let's handle this interrupt
+and update the pending_last flag that indicates that VLPIs are
+pending. The corresponding vcpu is also kicked into action.
 
-Let's try a method used in other parts of the code, were we copy
-the intids of the candicate interrupts, and then do whatever
-we need to do with them outside of the critical section.
-
-This allows us to move the interrupts one by one, at the expense
-of a bit of CPU time. Who cares? MOVALL is such a stupid command
-anyway...
+Special care is taken to prevent the doorbell from being enabled
+at request time (this is controlled separately), and to make
+the disabling on the interrupt non-lazy.
 
 Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 19 ++++++++++---------
- 1 file changed, 10 insertions(+), 9 deletions(-)
+ virt/kvm/arm/vgic/vgic-v4.c | 48 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 48 insertions(+)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 15e79285380d..78d11aed1e17 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -1169,11 +1169,12 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
- 				      u64 *its_cmd)
- {
--	struct vgic_dist *dist = &kvm->arch.vgic;
- 	u32 target1_addr = its_cmd_get_target_addr(its_cmd);
- 	u32 target2_addr = its_cmd_mask_field(its_cmd, 3, 16, 32);
- 	struct kvm_vcpu *vcpu1, *vcpu2;
- 	struct vgic_irq *irq;
-+	u32 *intids;
-+	int irq_count, i;
+diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+index 2edfe23c8238..796e00c77903 100644
+--- a/virt/kvm/arm/vgic/vgic-v4.c
++++ b/virt/kvm/arm/vgic/vgic-v4.c
+@@ -16,12 +16,24 @@
+  */
  
- 	if (target1_addr >= atomic_read(&kvm->online_vcpus) ||
- 	    target2_addr >= atomic_read(&kvm->online_vcpus))
-@@ -1185,19 +1186,19 @@ static int vgic_its_cmd_handle_movall(struct kvm *kvm, struct vgic_its *its,
- 	vcpu1 = kvm_get_vcpu(kvm, target1_addr);
- 	vcpu2 = kvm_get_vcpu(kvm, target2_addr);
+ #include <linux/interrupt.h>
++#include <linux/irq.h>
+ #include <linux/irqdomain.h>
+ #include <linux/kvm_host.h>
+ #include <linux/irqchip/arm-gic-v3.h>
  
--	spin_lock(&dist->lpi_list_lock);
-+	irq_count = vgic_copy_lpi_list(vcpu1, &intids);
-+	if (irq_count < 0)
-+		return irq_count;
+ #include "vgic.h"
  
--	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
--		spin_lock(&irq->irq_lock);
-+	for (i = 0; i < irq_count; i++) {
-+		irq = vgic_get_irq(kvm, NULL, intids[i]);
- 
--		if (irq->target_vcpu == vcpu1)
--			irq->target_vcpu = vcpu2;
-+		update_affinity(irq, vcpu2);
- 
--		spin_unlock(&irq->irq_lock);
-+		vgic_put_irq(kvm, irq);
++static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
++{
++	struct kvm_vcpu *vcpu = info;
++
++	vcpu->arch.vgic_cpu.vgic_v3.its_vpe.pending_last = true;
++	kvm_make_request(KVM_REQ_IRQ_PENDING, vcpu);
++	kvm_vcpu_kick(vcpu);
++
++	return IRQ_HANDLED;
++}
++
+ /**
+  * vgic_v4_init - Initialize the GICv4 data structures
+  * @kvm:	Pointer to the VM being initialized
+@@ -61,6 +73,33 @@ int vgic_v4_init(struct kvm *kvm)
+ 		return ret;
  	}
  
--	spin_unlock(&dist->lpi_list_lock);
--
-+	kfree(intids);
- 	return 0;
++	kvm_for_each_vcpu(i, vcpu, kvm) {
++		int irq = dist->its_vm.vpes[i]->irq;
++
++		/*
++		 * Don't automatically enable the doorbell, as we're
++		 * flipping it back and forth when the vcpu gets
++		 * blocked. Also disable the lazy disabling, as the
++		 * doorbell could kick us out of the guest too
++		 * early...
++		 */
++		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
++		ret = request_irq(irq, vgic_v4_doorbell_handler,
++				  0, "vcpu", vcpu);
++		if (ret) {
++			kvm_err("failed to allocate vcpu IRQ%d\n", irq);
++			/*
++			 * Trick: adjust the number of vpes so we know
++			 * how many to nuke on teardown...
++			 */
++			dist->its_vm.nr_vpes = i;
++			break;
++		}
++	}
++
++	if (ret)
++		vgic_v4_teardown(kvm);
++
+ 	return ret;
  }
  
+@@ -73,10 +112,19 @@ int vgic_v4_init(struct kvm *kvm)
+ void vgic_v4_teardown(struct kvm *kvm)
+ {
+ 	struct its_vm *its_vm = &kvm->arch.vgic.its_vm;
++	int i;
+ 
+ 	if (!its_vm->vpes)
+ 		return;
+ 
++	for (i = 0; i < its_vm->nr_vpes; i++) {
++		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
++		int irq = its_vm->vpes[i]->irq;
++
++		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
++		free_irq(irq, vcpu);
++	}
++
+ 	its_free_vcpu_irqs(its_vm);
+ 	kfree(its_vm->vpes);
+ 	its_vm->nr_vpes = 0;
 -- 
 2.14.2
