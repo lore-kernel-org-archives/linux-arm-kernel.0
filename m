@@ -1,54 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 13 Nov 2017 14:39:44 +0000
-Subject: [PATCH 1/3] irqchip/mips-gic: pr_err() strings should end with
- newlines
-In-Reply-To: <500e0c48a5e46003d33b31a257806a4991c0ff9d.1510580710.git.arvind.yadav.cs@gmail.com>
-References: <cover.1510580710.git.arvind.yadav.cs@gmail.com>
- <500e0c48a5e46003d33b31a257806a4991c0ff9d.1510580710.git.arvind.yadav.cs@gmail.com>
-Message-ID: <6c243286-203e-3d05-feb9-7a81a0eb624a@arm.com>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Mon, 13 Nov 2017 15:39:35 +0100
+Subject: [PATCH] arm: dts: ls1021a: add "fsl,
+ ls1021a-esdhc" compatible string to esdhc node
+Message-ID: <1510583976-6661-1-git-send-email-rasmus.villemoes@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/17 13:53, Arvind Yadav wrote:
-> pr_err() messages should end with a new-line to avoid other messages
-> being concatenated.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/irqchip/irq-mips-gic.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-mips-gic.c b/drivers/irqchip/irq-mips-gic.c
-> index c90976d..e87d33b 100644
-> --- a/drivers/irqchip/irq-mips-gic.c
-> +++ b/drivers/irqchip/irq-mips-gic.c
-> @@ -737,7 +737,7 @@ static int __init gic_of_init(struct device_node *node,
->  					       gic_shared_intrs, 0,
->  					       &gic_irq_domain_ops, NULL);
->  	if (!gic_irq_domain) {
-> -		pr_err("Failed to add GIC IRQ domain");
-> +		pr_err("Failed to add GIC IRQ domain\n");
->  		return -ENXIO;
->  	}
->  
-> @@ -746,7 +746,7 @@ static int __init gic_of_init(struct device_node *node,
->  						  GIC_NUM_LOCAL_INTRS + gic_shared_intrs,
->  						  node, &gic_ipi_domain_ops, NULL);
->  	if (!gic_ipi_domain) {
-> -		pr_err("Failed to add GIC IPI domain");
-> +		pr_err("Failed to add GIC IPI domain\n");
->  		return -ENXIO;
->  	}
->  
-> 
+Commit a22950c888e3 (mmc: sdhci-of-esdhc: add quirk
+SDHCI_QUIRK_BROKEN_TIMEOUT_VAL for ls1021a) added logic to the driver to
+enable the broken timeout val quirk for ls1021a, but did not add the
+corresponding compatible string to the device tree, so it didn't really
+have any effect. Fix that.
 
-This patch doesn't apply to the current state of the irqchip tree, nor
-of tip/irq/core. Please verify that it applies and resubmit if required.
+Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've applied patches 2 and 3.
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 3ff2b8a9f01a..9cdec545decc 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -162,7 +162,7 @@
+ 		};
+ 
+ 		esdhc: esdhc at 1560000 {
+-			compatible = "fsl,esdhc";
++			compatible = "fsl,ls1021a-esdhc", "fsl,esdhc";
+ 			reg = <0x0 0x1560000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+ 			clock-frequency = <0>;
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
