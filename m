@@ -1,46 +1,99 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 13 Nov 2017 17:15:22 +0100
-Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <3BB206AB2B1BD448954845CE6FF69A8E01CB52290E@NT-Mail07.beckhoff.com>
-References: <D24E577EA1E37B4788A3BFBC418F14A70760C04A@wetsrvex01.loepfe.com>
- <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
- <20171109030327.anzo47xayxckn47r@piout.net>
- <3BB206AB2B1BD448954845CE6FF69A8E01CB52290E@NT-Mail07.beckhoff.com>
-Message-ID: <20171113161522.2kq7un7gl5vg4qlq@piout.net>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 13 Nov 2017 17:25:51 +0100
+Subject: [PATCH 22/37] KVM: arm64: Change 32-bit handling of VM system
+ registers
+In-Reply-To: <20171012104141.26902-23-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-23-christoffer.dall@linaro.org>
+Message-ID: <20171113162551.i6xnmohnzs6lpf3w@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Cc Fabio
+On Thu, Oct 12, 2017 at 12:41:26PM +0200, Christoffer Dall wrote:
+> We currently handle 32-bit accesses to trapped VM system registers using
+> the 32-bit index into the coproc array on the vcpu structure, which is a
+> union of the coprog array and the sysreg array.
 
-On 09/11/2017 at 09:59:02 +0000, Patrick Br?nn wrote:
+coproc
+
 > 
-> >From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
-> >Sent: Donnerstag, 9. November 2017 04:03
-> >
-> >hwclock times out because the alarm is not working properly. Can you
-> >check whether rtctest is working?
-> >
-> You mean "tools/testing/selftests/timers/rtctest", right?
+> Since all the 32-bit coproc indicies are created to correspond to the
+> architectural mapping between 64-bit system registers and 32-bit
+> coprocessor registers, and because the AArch64 system registers are the
+> double in size of the AArch32 coprocessor registers, we can always find
+> the system register entry that we must update by dividing the 32-bit
+> coproc index by 2.
 > 
-> I just run it and it's stuck at "Counting 5 update (1/sec) interrupts from reading /dev/rtc0:"
+> This is going to make our lives much easier when we have to start
+> accessing system registers that uses deferred save/restore and might
+
+use
+
+> have to be read directly from the physical CPU.
 > 
-
-So alarms or interrupts definitively don't work.
-
-> Kernel log shows a new message for each try I restart rtctest.
-> [ 1032.349562] imxdi_rtc 53fa4000.srtc: Write-wait timeout val = 0x5a042418 reg = 0x00000008"
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/include/asm/kvm_host.h |  8 --------
+>  arch/arm64/kvm/sys_regs.c         | 20 +++++++++++++++-----
+>  2 files changed, 15 insertions(+), 13 deletions(-)
 > 
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index 5e09eb9..9f5761f 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -289,14 +289,6 @@ struct kvm_vcpu_arch {
+>  #define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
+>  #define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
+>  
+> -#ifdef CONFIG_CPU_BIG_ENDIAN
+> -#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r))
+> -#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r) + 1)
+> -#else
+> -#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r) + 1)
+> -#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r))
+> -#endif
+> -
+>  struct kvm_vm_stat {
+>  	ulong remote_tlb_flush;
+>  };
+> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+> index bb0e41b..dbe35fd 100644
+> --- a/arch/arm64/kvm/sys_regs.c
+> +++ b/arch/arm64/kvm/sys_regs.c
+> @@ -120,16 +120,26 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+>  			  const struct sys_reg_desc *r)
+>  {
+>  	bool was_enabled = vcpu_has_cache_enabled(vcpu);
+> +	u64 val;
+> +	int reg = r->reg;
+>  
+>  	BUG_ON(!p->is_write);
+>  
+> -	if (!p->is_aarch32) {
+> -		vcpu_sys_reg(vcpu, r->reg) = p->regval;
+> +	/* See the 32bit mapping in kvm_host.h */
+> +	if (p->is_aarch32)
+> +		reg = r->reg / 2;
+> +
+> +	if (!p->is_aarch32 || !p->is_32bit) {
+> +		val = p->regval;
+>  	} else {
+> -		if (!p->is_32bit)
+> -			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
+> -		vcpu_cp15_64_low(vcpu, r->reg) = lower_32_bits(p->regval);
+> +		val = vcpu_sys_reg(vcpu, reg);
+> +		if (r->reg % 2)
+> +			val = (p->regval << 32) | (u64)lower_32_bits(val);
+> +		else
+> +			val = ((u64)upper_32_bits(val) << 32) |
+> +				(u64)lower_32_bits(p->regval);
+>  	}
+> +	vcpu_sys_reg(vcpu, reg) = val;
+>  
+>  	kvm_toggle_cache(vcpu, was_enabled);
+>  	return true;
+> -- 
+> 2.9.0
+>
 
-That would explain it because failing to write DCAMR means that the
-alarm is not set to the proper value.
-
-But that doesn't explain all the spurious interrupts you are seeing.
-
-Fabio, is there any recent change in the platform code that would make
-reading/writing the rtc register fail?
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Reviewed-by: Andrew Jones <drjones@redhat.com>
