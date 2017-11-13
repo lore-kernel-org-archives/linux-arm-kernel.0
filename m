@@ -1,52 +1,136 @@
-From: bhsharma@redhat.com (Bhupesh Sharma)
-Date: Mon, 13 Nov 2017 14:19:54 +0530
-Subject: [PATCH] kdump: print a message in case crashkernel size parsing
- resulted in zero bytes
-In-Reply-To: <20171113054311.GA4971@dhcp-128-65.nay.redhat.com>
-References: <20171113054311.GA4971@dhcp-128-65.nay.redhat.com>
-Message-ID: <a8a5d2ae-579e-262c-4231-49ab967b0108@redhat.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Mon, 13 Nov 2017 11:03:04 +0200
+Subject: [PATCHv2 2/3] EDAC: ti: add support for TI keystone and DRA7xx
+ EDAC
+In-Reply-To: <20171111104650.ypcfvo4lzfvn5jzv@pd.tnic>
+References: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
+ <1510302337-31663-1-git-send-email-t-kristo@ti.com>
+ <20171111104650.ypcfvo4lzfvn5jzv@pd.tnic>
+Message-ID: <d944de66-9d18-6b3a-fe6f-8222c5f7992d@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+On 11/11/17 12:46, Borislav Petkov wrote:
+> On Fri, Nov 10, 2017 at 10:25:37AM +0200, Tero Kristo wrote:
+>> TI Keystone and DRA7xx SoCs have support for EDAC on DDR3 memory that can
+>> correct one bit errors and detect two bit errors. Add EDAC driver for this
+>> feature which plugs into the generic kernel EDAC framework.
+> 
+> ...
+> 
+>> +static int ti_edac_probe(struct platform_device *pdev)
+>> +{
+>> +	int error_irq = 0, ret = -ENODEV;
+>> +	struct device *dev = &pdev->dev;
+>> +	struct resource *res;
+>> +	void __iomem *reg;
+>> +	struct mem_ctl_info *mci;
+>> +	struct edac_mc_layer layers[1];
+>> +	const struct of_device_id *id;
+>> +	struct ti_edac *edac;
+>> +	int my_id;
+>> +
+>> +	id = of_match_device(ti_edac_of_match, &pdev->dev);
+>> +	if (!id)
+>> +		return -ENODEV;
+>> +
+>> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+>> +	reg = devm_ioremap_resource(dev, res);
+>> +	if (IS_ERR(reg)) {
+>> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
+>> +			    "EMIF controller regs not defined\n");
+>> +		return PTR_ERR(reg);
+>> +	}
+>> +
+>> +	layers[0].type = EDAC_MC_LAYER_ALL_MEM;
+>> +	layers[0].size = 1;
+>> +
+>> +	/* Allocate ID number for our EMIF controller */
+>> +	my_id = atomic_inc_return(&edac_id) - 1;
+> 
+> You can do ATOMIC_INIT(-1) and then you don't need that silly - 1.
+> 
+> But there's something else wrong with this ID generation:
+> 
+>> +
+>> +	mci = edac_mc_alloc(my_id, 1, layers, sizeof(*edac));
+>> +	if (!mci)
+>> +		return -ENOMEM;
+> 
+> <--- if you return here due to error, the next one which succeeds will
+> get the next number and you'd have a hole in the numbering and wonder
+> where did instance 0 go.
 
-Cc: arm kernel mailing list for wider distribution
+Yeah, that definitely can happen.
 
-On 11/13/2017 11:13 AM, Dave Young wrote:
-> In parse_crashkernel_mem, it silently return in case we get zero
-> bytes in the parsing function.  It is useful for debugging for
-> adding a warning message especially sometimes kernel can not boot
-> up correctly.
->
-> Signed-off-by: Dave Young <dyoung@redhat.com>
-> ---
->  kernel/crash_core.c |    3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
->
-> --- linux-x86.orig/kernel/crash_core.c
-> +++ linux-x86/kernel/crash_core.c
-> @@ -108,7 +108,8 @@ static int __init parse_crashkernel_mem(
->                  return -EINVAL;
->              }
->          }
-> -    }
-> +    } else
-> +        pr_warn("crashkernel size resulted in zero bytes\n");
->
->      return 0;
->  }
->
-This is a useful change as finding this debug message in the boot logs allows better debug of crashkernel related issues.
+> 
+> So I'm wondering if instead you could derive the ID from some controller
+> registers which are specific to the instance. Or some hardware detail
+> which is instance-specific.
+> 
+> In my driver, for example, the 0th instance has PCI device functions
+> 00:18.x which is node 0, then node 1 has 00:19.x and so on, and this is
+> a stable numbering. If you could do that for your hw you'll be able to
+> pinpoint which instance and which DIMMs we're talking about reliably.
 
-However I have one minor point:
+The only reliable way to determine the instance is to sort them by 
+physical address space they occupy. This will require me to lookup all 
+nodes that have same compatible string, and check their regs. This 
+should probably be okay seeing we have only two EMIF instances at most.
 
-- The comment above 'parse_crashkernel_mem' currently mentions:
-  * The function returns 0 on success and -EINVAL on failure.
-  */
+I'll check how to do this most reliably.
 
-- I am wondering if we hit the WARNING case where the crashkernel size resulted in 0 bytes, then should we still be returning 0 from this function. Or, should this be replaced with 'return -EINVAL'.
 
-- If not, can we atleast update the comment above this function to better document the return values and where having a 'return 0' should be ok, even if crashkernel size resulted in 0 bytes.
+> 
+>> +
+>> +	mci->pdev = &pdev->dev;
+>> +	edac = mci->pvt_info;
+>> +	edac->reg = reg;
+>> +	platform_set_drvdata(pdev, mci);
+>> +
+>> +	mci->mtype_cap = MEM_FLAG_DDR3 | MEM_FLAG_DDR2;
+>> +	mci->edac_ctl_cap = EDAC_FLAG_SECDED | EDAC_FLAG_NONE;
+>> +	mci->mod_name = EDAC_MOD_NAME;
+>> +	mci->ctl_name = id->compatible;
+>> +	mci->dev_name = dev_name(&pdev->dev);
+>> +
+>> +	/* Setup memory layout */
+>> +	ti_edac_setup_dimm(mci, (u32)(id->data));
+>> +
+>> +	ret = edac_mc_add_mc(mci);
+> 
+> Do that...
+> 
+>> +	if (ret) {
+>> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
+>> +			    "Failed to register mci: %d.\n", ret);
+>> +		goto err;
+>> +	}
+>> +
+>> +	/* add EMIF ECC error handler */
+>> +	error_irq = platform_get_irq(pdev, 0);
+>> +	if (!error_irq) {
+>> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
+>> +			    "EMIF irq number not defined.\n");
+>> +		goto err2;
+>> +	}
+>> +
+>> +	ret = devm_request_irq(dev, error_irq, ti_edac_isr, 0,
+>> +			       "emif-edac-irq", mci);
+>> +	if (ret) {
+>> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
+>> +			    "request_irq fail for EMIF EDAC irq\n");
+>> +		goto err2;
+>> +	}
+> 
+> ... here, after you've requested IRQs successfully and you can save
+> yourself the err2 error path.
 
-Regards,
-Bhupesh
+Ok.
+
+> 
+> Thx.
+> 
+
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
