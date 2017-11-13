@@ -1,96 +1,68 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 13 Nov 2017 16:31:42 +0100
-Subject: linux-next: Tree for Nov 7
-In-Reply-To: <20171113150908.GL12318@n2100.armlinux.org.uk>
-References: <20171107162217.382cd754@canb.auug.org.au>
- <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
- <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
- <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
- <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
- <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
- <20171113141140.cns5fxt5jg4zdedb@dhcp22.suse.cz>
- <20171113150908.GL12318@n2100.armlinux.org.uk>
-Message-ID: <20171113153142.aoznpjivgjjihlef@dhcp22.suse.cz>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Mon, 13 Nov 2017 16:40:36 +0100
+Subject: [PATCH 3/5] dt-bindings: arm: Document Socionext MB86S71 and
+ Fujitsu F-Cue
+In-Reply-To: <CAKv+Gu_Wkdd3EdOjKJYZN5Ypjodpu5kFU=Ubg9H5e6ER3zq8Mg@mail.gmail.com>
+References: <20170625170020.11791-1-afaerber@suse.de>
+ <20170625170020.11791-4-afaerber@suse.de>
+ <20170628164605.2gnvrv4g7jluzyrm@rob-hp-laptop>
+ <CAK7LNATqjOMUajUCYVq=L6wWVTUEc1M7Po+KQ3M3Z=A7+FHX5w@mail.gmail.com>
+ <51221840-b08e-45f1-5601-937fb15f3947@suse.de>
+ <CAK7LNASYvdWq5rV6q5Xf4Zqjso3H+XQY9Z6byJgcgfN7wT6fog@mail.gmail.com>
+ <a39e3d09-4182-ee54-c855-3817498b306a@suse.de>
+ <CAKv+Gu8fkOhQCx-BsyTkottkk63dohzSqa8RhAgTDcMVcmFbxQ@mail.gmail.com>
+ <3327258c-b222-248b-9550-7620a57328f5@suse.de>
+ <CAKv+Gu98dns-VoWF6xc0h_2R7SjcA3+85KVhLyLDgOBenhXJRQ@mail.gmail.com>
+ <4d589d7a-2035-085e-17c4-1b88785b59f9@suse.de>
+ <CAKv+Gu-m-KYnsgyFBUuez3gRhwPF=_sD4fGpE6BDugzW9NUnsA@mail.gmail.com>
+ <c3c5b129-cd30-335d-80fd-05e9e4756121@suse.de>
+ <CAKv+Gu_Wkdd3EdOjKJYZN5Ypjodpu5kFU=Ubg9H5e6ER3zq8Mg@mail.gmail.com>
+Message-ID: <4c5fdcbd-057f-12a2-55f4-ff5f85b80f64@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 13-11-17 15:09:09, Russell King - ARM Linux wrote:
-> On Mon, Nov 13, 2017 at 03:11:40PM +0100, Michal Hocko wrote:
-> > On Mon 13-11-17 10:20:06, Michal Hocko wrote:
-> > > [Cc arm and ppc maintainers]
-> > > 
-> > > Thanks a lot for testing!
-> > > 
-> > > On Sun 12-11-17 11:38:02, Joel Stanley wrote:
-> > > > On Fri, Nov 10, 2017 at 11:00 PM, Michal Hocko <mhocko@kernel.org> wrote:
-> > > > > Hi Joel,
-> > > > >
-> > > > > On Wed 08-11-17 15:20:50, Michal Hocko wrote:
-> > > > > [...]
-> > > > >> > There are a lot of messages on the way up that look like this:
-> > > > >> >
-> > > > >> > [    2.527460] Uhuuh, elf segement at 000d9000 requested but the
-> > > > >> > memory is mapped already
-> > > > >> > [    2.540160] Uhuuh, elf segement at 000d9000 requested but the
-> > > > >> > memory is mapped already
-> > > > >> > [    2.546153] Uhuuh, elf segement at 000d9000 requested but the
-> > > > >> > memory is mapped already
-> > > > >> >
-> > > > >> > And then trying to run userspace looks like this:
-> > > > >>
-> > > > >> Could you please run with debugging patch posted
-> > > > >> http://lkml.kernel.org/r/20171107102854.vylrtaodla63kc57 at dhcp22.suse.cz
-> > > > >
-> > > > > Did you have chance to test with this debugging patch, please?
-> > > > 
-> > > > Lots of this:
-> > > > 
-> > > > [    1.177266] Uhuuh, elf segement at 000d9000 requested but the  memory is mapped already, got 000dd000
-> > > > [    1.177555] Clashing vma [dd000, de000] flags:100873 name:(null)
-> > > 
-> > > This smells like the problem I've expected that mmap with hint doesn't
-> > > respect the hint even though there is no clashing mapping. The above
-> > > basically says that we didn't map at 0xd9000 but it has placed it at
-> > > 0xdd000. The nearest (clashing) vma is at 0xdd000 so this is our new
-> > > mapping. find_vma returns the closest vma (with addr < vm_end) for the
-> > > given address 0xd9000 so this address cannot be mapped by any other vma.
-> > > 
-> > > Now that I am looking at arm's arch_get_unmapped_area it does perform
-> > > aligning for shared vmas.
-> > 
-> > Sorry for confusion here. These are not shared mappings as pointed out
-> > by Russell in a private email. I got confused by the above flags which I
-> > have misinterpreted as bit 0 set => MAP_SHARED. These are vm_flags
-> > obviously so the bit 0 is VM_READ. Sorry about the confusion. The real
-> > reason we are doing the alignment is that we do a file mapping
-> > 	/*
-> > 	 * We only need to do colour alignment if either the I or D
-> > 	 * caches alias.
-> > 	 */
-> > 	if (aliasing)
-> > 		do_align = filp || (flags & MAP_SHARED);
-> > 
-> > I am not really familiar with this architecture to understand why do we
-> > need aliasing for file mappings, though.
+Am 06.11.2017 um 12:28 schrieb Ard Biesheuvel:
+> On 6 November 2017 at 06:58, Andreas F?rber <afaerber@suse.de> wrote:
+>> Am 05.11.2017 um 04:39 schrieb Ard Biesheuvel:
+> [...]
+>>>
+>>> Again, I am not the one who is ranting here. You hit a nerve by
+>>> accusing me of 'rebelling against linux.git' while this is quite the
+>>> opposite of what I am doing.
+>>
+>> Actually you did confirm that point by starting an argument about not
+>> needing a central repository and you not liking Linux as the location.
+>> That was exactly what I meant with my original comment.
+>>
+>> Adding Actions Semi was somewhat easy as a new vendor and now - roughly
+>> a year after the board went to market - there's Linaro contributions
+>> from Mani that I'm thankful for.
+>>
+>> Whereas patches keep falling into a dark hole when there's already other
+>> work for a certain vendor, such as Marvell and now Socionext, with no
+>> one feeling responsible for either taking them or saying, "hey, we're
+>> not going to submit any conflicting DT bindings for SynQuacer because we
+>> use ACPI, so please go ahead with proposal X, thanks for your efforts".
+>>
+>> Don't complain about me ranting if you belittle my volunteer work that I
+>> believe Linaro and its partners should've done in the first place: If I
+>> can get an initial mainline PoC done as an individual on a few
+>> evenings/weekends, then the same should be super-easy for an
+>> organization with lots of engineers and paying member companies.
 > 
-> I think it's there so that flush_dcache_page() works - possibly
-> get_user_pages() being used on a private mapping of page cache pages,
-> but that's guessing.
+> The only person doing the ranting, rebelling and belittling in this
+> thread is you. I have never commented on the nature of your work, let
+> alone belittle it.
 
-I fail to see how the mixure of MAP_FIXED and regular mapping of the
-same file work then, but as I've said I really do not understand this
-code.
+You have stated your opinion that Device Trees don't belong in a central
+repository and that Linux was the wrong place for them. My contributions
+to Linux have been mainly such Device Trees and bindings, such as this
+patch series here. Quod erat demonstrandum.
 
-> I'm afraid I don't remember all the details, this is code from around
-> 15 years ago, and I'd be very nervous about changing it now without
-> fully understanding the issues.
+Regards,
+Andreas
 
-Ohh, absolutely! I didn't dare to touch this code and that's why I took
-the easy way and simply opt-out from the harding for all those archs
-that are basically sharing this pattern. But after a closer look it
-seems that we can really introduce MAP_FIXED_SAFE that would keep the
-arch mmap code intact yet we would get the hardening for all archs.
-It would allow also allow a safer MAP_FIXED semantic for userspace.
 -- 
-Michal Hocko
-SUSE Labs
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
