@@ -1,60 +1,27 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Mon, 13 Nov 2017 11:04:01 +0000
-Subject: [PATCH v2 3/3] kvm: arm64: handle single-step of userspace mmio
- instructions
-In-Reply-To: <20171109170021.2984-4-alex.bennee@linaro.org>
-References: <20171109170021.2984-1-alex.bennee@linaro.org>
- <20171109170021.2984-4-alex.bennee@linaro.org>
-Message-ID: <b3f76167-50e4-5f25-9ec2-16f07de0fd32@arm.com>
+From: bharatku@xilinx.com (Bharat Kumar Gogada)
+Date: Mon, 13 Nov 2017 11:06:51 +0000
+Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
+In-Reply-To: <16b6ba80-b15b-b278-0d06-350ae0201e82@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-2-jean-philippe.brucker@arm.com>
+ <BLUPR0201MB150538FDD455F6042803B54FA5560@BLUPR0201MB1505.namprd02.prod.outlook.com>
+ <16b6ba80-b15b-b278-0d06-350ae0201e82@arm.com>
+Message-ID: <SN1PR0201MB1518765CCEDD9B75119D6C63A52B0@SN1PR0201MB1518.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+>        
+> In this case even though hardware supports PASID, BIND flow fails.
 
-On 09/11/17 17:00, Alex Benn?e wrote:
-> The system state of KVM when using userspace emulation is not complete
-> until we return into KVM_RUN. To handle mmio related updates we wait
-> until they have been committed and then schedule our KVM_EXIT_DEBUG.
-> 
-> The kvm_arm_handle_step_debug() helper tells us if we need to return
-> and sets up the exit_reason for us.
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> 
-> ---
-> v2
->    - call helper directly from kvm_arch_vcpu_ioctl_run
-> ---
->   virt/kvm/arm/arm.c | 3 +++
->   1 file changed, 3 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 95cba0799828..2991adfaca9d 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -625,6 +625,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->   		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
->   		if (ret)
->   			return ret;
-> +		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
-> +			return 1;
-> +
+It should fail, since we're reserving PASID 0 for non-PASID transactions with S1DSS=0b10. In addition, the SMMUv3 specification does not allow using PASID with a single entry. See the description of S1CDMax in 5.2 Stream Table Entry:
 
-In the previous patch, kvm_arch_vcpu_ioctl_run return 0 when telling 
-userspace about a debug exception. Shouldn't this branch return 0 
-instead of 1?
+"when this field is 0, the substreams of the STE are disabled and one CD is available. (The minimum useful number of substreams is 2.) Any transaction with a SubstreamID will be terminated with an abort and a C_BAD_SUBSTREAMID event recorded."
 
-Returning on non-zero for kvm_handle_mmio_return is done because it 
-means there was an error. This is not the case for 
-kvm_arm_handle_step_debug.
+> Any reason why pasid allocation moved to idr allocations rather than 
+> bitmap allocations as in v1 patches ?
 
-The description in the comment of kvm_arch_vcpu_ioctl_run is not very 
-clear whether non-zero result should be used for errors or if only the 
-negative values are treated as such, and positive values seems to be 
-generally used to keep the vcpu going. So, I thought it might make sense 
-to always return the same value upon debug exceptions.
+Yes, idr provides a convenient way to quickly retrieve the context associated with a PASID, when handling a fault. v1 had the allocation in a bitmap and storing in a rb-tree. By using an idr we combine both and rely on a well-tested infrastructure.
 
-Cheers,
+Note that in the future we might need to go back to handcrafting the PASID allocation, but it will probably still be based on idr.
 
--- 
-Julien Thierry
+Thanks for the clarification, Jean. 
