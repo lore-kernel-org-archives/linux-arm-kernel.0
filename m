@@ -1,157 +1,268 @@
-From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
-Date: Mon, 13 Nov 2017 09:53:45 +0530
-Subject: [PATCH v2 1/3] dt-bindings: phy: Add Cygnus usb phy binding
-In-Reply-To: <20171110214439.rlt5de2c6e6k246d@rob-hp-laptop>
-References: <1510127203-5815-1-git-send-email-raveendra.padasalagi@broadcom.com>
- <1510127203-5815-2-git-send-email-raveendra.padasalagi@broadcom.com>
- <20171110214439.rlt5de2c6e6k246d@rob-hp-laptop>
-Message-ID: <CAAFb_vqKLOixSROUvkRFR=hwOqQvnVyV4mu37=MrEBo-pZaF5w@mail.gmail.com>
+From: andrew@aj.id.au (Andrew Jeffery)
+Date: Mon, 13 Nov 2017 15:33:31 +1030
+Subject: [PATCH v5 2/5] clk: aspeed: Register core clocks
+In-Reply-To: <20171030060250.701-3-joel@jms.id.au>
+References: <20171030060250.701-1-joel@jms.id.au>
+ <20171030060250.701-3-joel@jms.id.au>
+Message-ID: <1510549411.4287.67.camel@aj.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 2017-10-30 at 16:32 +1030, Joel Stanley wrote:
+> This registers the core clocks; those which are required to calculate
+> the rate of the timer peripheral so the system can load a clocksource
+> driver.
+> 
+> Signed-off-by: Joel Stanley <joel@jms.id.au>
+> 
+> ---
+> v5:
+>   - Add Andrew's Reviewed-by
 
-On Sat, Nov 11, 2017 at 3:14 AM, Rob Herring <robh@kernel.org> wrote:
-> On Wed, Nov 08, 2017 at 01:16:41PM +0530, Raveendra Padasalagi wrote:
->> Add devicetree binding document for broadcom's
->> Cygnus SoC specific usb phy controller driver.
->>
->> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
->> ---
->>  .../bindings/phy/brcm,cygnus-usb-phy.txt           | 106 +++++++++++++++++++++
->>  1 file changed, 106 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
->>
->> diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
->> new file mode 100644
->> index 0000000..bbc4b94
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
->> @@ -0,0 +1,106 @@
->> +BROADCOM CYGNUS USB PHY
->> +
->> +Required Properties:
->> +- compatible:  brcm,cygnus-usb-phy
->> +- reg : the register start address and length for
->> +        crmu_usbphy_aon_ctrl,
->> +        cdru usb phy control,
->> +        usb host idm registers,
->> +        usb device idm registers.
->> +- reg-names: a list of the names corresponding to the previous register ranges
->> +  Should contain
->> +        "crmu-usbphy-aon-ctrl",
->> +        "cdru-usbphy",
->> +        "usb2h-idm",
->> +        "usb2d-idm".
->> +- address-cells: should be 1
->> +- size-cells: should be 0
->> +
->> +Sub-nodes:
->> +  Each port's PHY should be represented as a sub-node.
->> +
->> +Sub-nodes required properties:
->> +- reg: the PHY number
->> +- #phy-cells must be 1
->> +  The node that uses the phy must provide 1 integer argument specifying
->> +  port number.
->> +
->> +Optional Properties:
->> +- vbus-p#-supply : The regulator for vbus out control for the host
->
-> Is this a literal # or something else?
+Not quite it seems!
 
-Yes, this is a literal. It's assumed # will replace numeric 0-2 for
-each of the ports.
-In the example it's not shown as the regulators specified in vbus-p#-supply
-are board specific.
+Reviewed-by: Andrew Jeffery <andrew@aj.id.au>
 
->> +  functionality enabled ports.
->> +- vbus-gpios: vbus gpio binding
->> +  This is mandatory for port 2, as port 2 is used as dual role phy.
->> +  Based on the vbus and id values device or host role is determined
->> +  for phy 2.
->
-> These optional properties don't match with the example.
-vbus-gpios is placed by mistake here in the documentation,
-this is no more required. I will remove it in the next version of the patch.
-
->> +
->> +- extcon: extcon phandle
->> +  This is mandatory for port 2,  as port 2 is used as dual role phy.
->> +  extcon should be phandle to external usb gpio module which provide
->> +  device or host role notifications based on the ID and VBUS gpio's state.
->> +
->> +
->> +Refer to phy/phy-bindings.txt for the generic PHY binding properties
->> +
->> +NOTE: port 0 and port 1 are host only and port 2 is dual role port.
->> +
->> +Example of phy :
->> +     usbphy: usb-phy at 0301c028 {
->> +             compatible = "brcm,cygnus-usb-phy";
->> +             reg = <0x0301c028 0x4>,
->> +                   <0x0301d1b4 0x5c>,
->> +                   <0x18115000 0xa00>,
->> +                   <0x18111000 0xa00>;
->> +             reg-names = "crmu-usbphy-aon-ctrl", "cdru-usbphy",
->> +                         "usb2h-idm", "usb2d-idm";
->> +             #address-cells = <1>;
->> +             #size-cells = <0>;
->> +
->> +             usbphy0: usb-phy at 0 {
->> +                     reg = <0>;
->> +                     #phy-cells = <1>;
->> +             };
->> +
->> +             usbphy1: usb-phy at 1 {
->> +                     reg = <1>;
->> +                     #phy-cells = <1>;
->> +             };
->> +
->> +             usbphy2: usb-phy at 2 {
->> +                     reg = <2>;
->> +                     #phy-cells = <1>;
->> +                     extcon = <&extcon_usb>;
->> +             };
->> +     };
->> +
->> +     extcon_usb: extcon_usb {
->> +             compatible = "linux,extcon-usb-gpio";
->> +             vbus-gpio = <&gpio_asiu 121 0>;
->> +             id-gpio = <&gpio_asiu 122 0>;
->> +             status = "okay";
->> +     };
->> +
->> +
->> +Example of node using the phy:
->> +
->> +     /* This nodes declares all three ports, port 0
->> +     and port 1 are host and port 2 is device or host */
->> +
->> +     ehci0: usb at 18048000 {
->> +             compatible = "generic-ehci";
->> +             reg = <0x18048000 0x100>;
->> +             interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>;
->> +             phys = <&usbphy0 0 &usbphy1 1 &usbphy2 2>;
->> +             phy-names = "usbp0","usbp1","usbp2";
->> +             status = "okay";
->
-> Don't show status in examples.
-
-Ok, Thanks. I will update it in the next version of the patch.
-
->> +     };
->> +
->> +     /* This node declares port 2 phy
->> +     and configures it for device */
->> +
->> +     usbd_udc_dwc1: usb at 1804c000 {
->> +             compatible = "iproc-udc";
->> +             reg = <0x1804c000 0x2000>;
->> +             interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
->> +             phys = <&usbphy2 2>;
->> +             phy-names = "usbdrd";
->> +     };
->> --
->> 1.9.1
->>
+> v4:
+>   - Add defines to document the BIT() macros
+> v3:
+>   - Fix ast2400 ahb calculation
+>   - Remove incorrect 'this is wrong' comment
+>   - Separate out clkin calc to be per platform
+>   - Support 48MHz clkin on ast2400
+> ---
+>  drivers/clk/clk-aspeed.c | 177
+> +++++++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 177 insertions(+)
+> 
+> diff --git a/drivers/clk/clk-aspeed.c b/drivers/clk/clk-aspeed.c
+> index 388a98f4ca41..a8da411326e9 100644
+> --- a/drivers/clk/clk-aspeed.c
+> +++ b/drivers/clk/clk-aspeed.c
+> @@ -20,7 +20,23 @@
+>  
+>  #include <dt-bindings/clock/aspeed-clock.h>
+>  
+> +#define ASPEED_RESET_CTRL	0x04
+> +#define ASPEED_CLK_SELECTION	0x08
+> +#define ASPEED_CLK_STOP_CTRL	0x0c
+> +#define ASPEED_MPLL_PARAM	0x20
+> +#define ASPEED_HPLL_PARAM	0x24
+> +#define  AST2500_HPLL_BYPASS_EN	BIT(20)
+> +#define  AST2400_HPLL_STRAPPED	BIT(18)
+> +#define  AST2400_HPLL_BYPASS_EN	BIT(17)
+> +#define ASPEED_MISC_CTRL	0x2c
+> +#define  UART_DIV13_EN		BIT(12)
+>  #define ASPEED_STRAP		0x70
+> +#define  CLKIN_25MHZ_EN		BIT(23)
+> +#define  AST2400_CLK_SOURCE_SEL	BIT(18)
+> +#define ASPEED_CLK_SELECTION_2	0xd8
+> +
+> +/* Globally visible clocks */
+> +static DEFINE_SPINLOCK(aspeed_clk_lock);
+>  
+>  /* Keeps track of all clocks */
+>  static struct clk_hw_onecell_data *aspeed_clk_data;
+> @@ -98,6 +114,160 @@ static const struct aspeed_gate_data
+> aspeed_gates[] = {
+>  	[ASPEED_CLK_GATE_LHCCLK] =	{ 28, -1, "lhclk-gate",	
+> 	"lhclk", 0 }, /* LPC master/LPC+ */
+>  };
+>  
+> +static const struct clk_div_table ast2400_div_table[] = {
+> +	{ 0x0, 2 },
+> +	{ 0x1, 4 },
+> +	{ 0x2, 6 },
+> +	{ 0x3, 8 },
+> +	{ 0x4, 10 },
+> +	{ 0x5, 12 },
+> +	{ 0x6, 14 },
+> +	{ 0x7, 16 },
+> +	{ 0 }
+> +};
+> +
+> +static const struct clk_div_table ast2500_div_table[] = {
+> +	{ 0x0, 4 },
+> +	{ 0x1, 8 },
+> +	{ 0x2, 12 },
+> +	{ 0x3, 16 },
+> +	{ 0x4, 20 },
+> +	{ 0x5, 24 },
+> +	{ 0x6, 28 },
+> +	{ 0x7, 32 },
+> +	{ 0 }
+> +};
+> +
+> +static struct clk_hw *aspeed_ast2400_calc_pll(const char *name, u32
+> val)
+> +{
+> +	unsigned int mult, div;
+> +
+> +	if (val & AST2400_HPLL_BYPASS_EN) {
+> +		/* Pass through mode */
+> +		mult = div = 1;
+> +	} else {
+> +		/* F = 24Mhz * (2-OD) * [(N + 2) / (D + 1)] */
+> +		u32 n = (val >> 5) & 0x3f;
+> +		u32 od = (val >> 4) & 0x1;
+> +		u32 d = val & 0xf;
+> +
+> +		mult = (2 - od) * (n + 2);
+> +		div = d + 1;
+> +	}
+> +	return clk_hw_register_fixed_factor(NULL, name, "clkin", 0,
+> +			mult, div);
+> +};
+> +
+> +static struct clk_hw *aspeed_ast2500_calc_pll(const char *name, u32
+> val)
+> +{
+> +	unsigned int mult, div;
+> +
+> +	if (val & AST2500_HPLL_BYPASS_EN) {
+> +		/* Pass through mode */
+> +		mult = div = 1;
+> +	} else {
+> +		/* F = clkin * [(M+1) / (N+1)] / (P + 1) */
+> +		u32 p = (val >> 13) & 0x3f;
+> +		u32 m = (val >> 5) & 0xff;
+> +		u32 n = val & 0x1f;
+> +
+> +		mult = (m + 1) / (n + 1);
+> +		div = p + 1;
+> +	}
+> +
+> +	return clk_hw_register_fixed_factor(NULL, name, "clkin", 0,
+> +			mult, div);
+> +}
+> +
+> +static void __init aspeed_ast2400_cc(struct regmap *map)
+> +{
+> +	struct clk_hw *hw;
+> +	u32 val, freq, div;
+> +
+> +	/*
+> +	 * CLKIN is the crystal oscillator, 24, 48 or 25MHz selected
+> by
+> +	 * strapping
+> +	 */
+> +	regmap_read(map, ASPEED_STRAP, &val);
+> +	if (val & CLKIN_25MHZ_EN)
+> +		freq = 25000000;
+> +	else if (val & AST2400_CLK_SOURCE_SEL)
+> +		freq = 48000000;
+> +	else
+> +		freq = 24000000;
+> +	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0,
+> freq);
+> +	pr_debug("clkin @%u MHz\n", freq / 1000000);
+> +
+> +	/*
+> +	 * High-speed PLL clock derived from the crystal. This the
+> CPU clock,
+> +	 * and we assume that it is enabled
+> +	 */
+> +	regmap_read(map, ASPEED_HPLL_PARAM, &val);
+> +	WARN(val & AST2400_HPLL_STRAPPED, "hpll is strapped not
+> configured");
+> +	aspeed_clk_data->hws[ASPEED_CLK_HPLL] =
+> aspeed_ast2400_calc_pll("hpll", val);
+> +
+> +	/*
+> +	 * Strap bits 11:10 define the CPU/AHB clock frequency ratio
+> (aka HCLK)
+> +	 *   00: Select CPU:AHB = 1:1
+> +	 *   01: Select CPU:AHB = 2:1
+> +	 *   10: Select CPU:AHB = 4:1
+> +	 *   11: Select CPU:AHB = 3:1
+> +	 */
+> +	regmap_read(map, ASPEED_STRAP, &val);
+> +	val = (val >> 10) & 0x3;
+> +	div = val + 1;
+> +	if (div == 3)
+> +		div = 4;
+> +	else if (div == 4)
+> +		div = 3;
+> +	hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1,
+> div);
+> +	aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
+> +
+> +	/* APB clock clock selection register SCU08 (aka PCLK) */
+> +	hw = clk_hw_register_divider_table(NULL, "apb", "hpll", 0,
+> +			scu_base + ASPEED_CLK_SELECTION, 23, 3, 0,
+> +			ast2400_div_table,
+> +			&aspeed_clk_lock);
+> +	aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
+> +}
+> +
+> +static void __init aspeed_ast2500_cc(struct regmap *map)
+> +{
+> +	struct clk_hw *hw;
+> +	u32 val, freq, div;
+> +
+> +	/* CLKIN is the crystal oscillator, 24 or 25MHz selected by
+> strapping */
+> +	regmap_read(map, ASPEED_STRAP, &val);
+> +	if (val & CLKIN_25MHZ_EN)
+> +		freq = 25000000;
+> +	else
+> +		freq = 24000000;
+> +	hw = clk_hw_register_fixed_rate(NULL, "clkin", NULL, 0,
+> freq);
+> +	pr_debug("clkin @%u MHz\n", freq / 1000000);
+> +
+> +	/*
+> +	 * High-speed PLL clock derived from the crystal. This the
+> CPU clock,
+> +	 * and we assume that it is enabled
+> +	 */
+> +	regmap_read(map, ASPEED_HPLL_PARAM, &val);
+> +	aspeed_clk_data->hws[ASPEED_CLK_HPLL] =
+> aspeed_ast2500_calc_pll("hpll", val);
+> +
+> +	/* Strap bits 11:9 define the AXI/AHB clock frequency ratio
+> (aka HCLK)*/
+> +	regmap_read(map, ASPEED_STRAP, &val);
+> +	val = (val >> 9) & 0x7;
+> +	WARN(val == 0, "strapping is zero: cannot determine ahb
+> clock");
+> +	div = 2 * (val + 1);
+> +	hw = clk_hw_register_fixed_factor(NULL, "ahb", "hpll", 0, 1,
+> div);
+> +	aspeed_clk_data->hws[ASPEED_CLK_AHB] = hw;
+> +
+> +	/* APB clock clock selection register SCU08 (aka PCLK) */
+> +	regmap_read(map, ASPEED_CLK_SELECTION, &val);
+> +	val = (val >> 23) & 0x7;
+> +	div = 4 * (val + 1);
+> +	hw = clk_hw_register_fixed_factor(NULL, "apb", "hpll", 0, 1,
+> div);
+> +	aspeed_clk_data->hws[ASPEED_CLK_APB] = hw;
+> +};
+> +
+>  static void __init aspeed_cc_init(struct device_node *np)
+>  {
+>  	struct regmap *map;
+> @@ -139,6 +309,13 @@ static void __init aspeed_cc_init(struct
+> device_node *np)
+>  		return;
+>  	}
+>  
+> +	if (of_device_is_compatible(np, "aspeed,ast2400-scu"))
+> +		aspeed_ast2400_cc(map);
+> +	else if (of_device_is_compatible(np, "aspeed,ast2500-scu"))
+> +		aspeed_ast2500_cc(map);
+> +	else
+> +		pr_err("unknown platform, failed to add clocks\n");
+> +
+>  	aspeed_clk_data->num = ASPEED_NUM_CLKS;
+>  	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
+> aspeed_clk_data);
+>  	if (ret)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: This is a digitally signed message part
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171113/7e53c922/attachment-0001.sig>
