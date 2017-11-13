@@ -1,108 +1,74 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 13 Nov 2017 16:01:55 +0800
-Subject: [PATCH] ARM64: dts: meson-axg: add ethernet mac controller
-Message-ID: <20171113080155.2463-1-yixun.lan@amlogic.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 13 Nov 2017 09:20:59 +0100
+Subject: [linux-sunxi] Re: [PATCH] ARM: sun8i: h2+: add support for
+ Banana Pi M2 Zero board
+In-Reply-To: <b548b74e04b29ec8c3cddb7cc42f2b4e@aosc.io>
+References: <20171101093814.19177-1-icenowy@aosc.io>
+ <20171102090248.wnvj7dpphn5uqsut@flea>
+ <8327eaeaa12b99f9962a53c9f02ddd6d@aosc.io>
+ <20171102155003.vp7uve4ypyn4sb6j@flea>
+ <b548b74e04b29ec8c3cddb7cc42f2b4e@aosc.io>
+Message-ID: <20171113082059.cxi7diuy6dvremlo@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT info for the stmmac ethernet MAC which found in
-the Amlogic's Meson-AXG SoC, also describe the ethernet
-pinctrl & clock information here.
+Hi,
 
-This is tested in the S400 dev board which use a RTL8211F PHY,
-and the pins connect to the 'eth_rgmii_y_pins' group.
+On Fri, Nov 03, 2017 at 07:53:17AM +0800, Icenowy Zheng wrote:
+> ? 2017-11-02 23:50?Maxime Ripard ???
+> > On Thu, Nov 02, 2017 at 05:07:30PM +0800, Icenowy Zheng wrote:
+> > > > > +&mmc0 {
+> > > > > +	pinctrl-names = "default";
+> > > > > +	pinctrl-0 = <&mmc0_pins_a>;
+> > > > > +	vmmc-supply = <&reg_vcc3v3>;
+> > > > > +	bus-width = <4>;
+> > > > > +	/*
+> > > > > +	 * In different revisions the board have different card detect
+> > > > > +	 * configuration.
+> > > > > +	 */
+> > > >
+> > > > Which ones?
+> > > 
+> > > In the sample batch (1.2V fixed voltage) the card detect is normal
+> > > (PF6 low as inserted), however in the final batch (1.1V/1.3V
+> > > switchable) it's inverted at PF6 (high as inserted).
+> > 
+> > Then just use the final version's.
+> > 
+> > > > > +&usbphy {
+> > > > > +	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
+> > > > > +	/* USB OTG VBUS is directly connected to 5V without any regulators
+> > > > > */
+> > > >
+> > > > So it cannot operate in OTG, but it's host only?
+> > > 
+> > > It can operate in OTG -- you can power the board via the OTG port,
+> > > as the VBUS is not gated from 5V at all, so 5V power at VBUS will
+> > > power up the board. Yes, it's a bit unsafe, but the board designer
+> > > did it.
+> > 
+> > What will provide the 5v in the first place then if a USB device is
+> > connected to the micro-USB connector?
+> 
+> There're two micro-USB connectors, one is power-only and another is
+> OTG. The Vbus of these two connectors are connected together, so
+> the external USB device will be powered just by the power input
+> from the power-only USB port.
 
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  7 ++++
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 53 ++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+)
+Can you put that in the comment?
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-index 9eb6aaee155d..7b39a9fe2b0f 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-@@ -21,3 +21,10 @@
- 	status = "okay";
- };
- 
-+&ethmac {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+
-+	pinctrl-0 = <&eth_rgmii_y_pins>;
-+	pinctrl-names = "default";
-+};
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 65945c6c8b65..57faaa9d8013 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -157,6 +157,19 @@
- 			#address-cells = <0>;
- 		};
- 
-+		ethmac: ethernet at ff3f0000 {
-+			compatible = "amlogic,meson-axg-dwmac", "amlogic,meson-gxbb-dwmac", "snps,dwmac";
-+			reg = <0x0 0xff3f0000 0x0 0x10000
-+				0x0 0xff634540 0x0 0x8>;
-+			interrupts = <GIC_SPI 8 IRQ_TYPE_EDGE_RISING>;
-+			interrupt-names = "macirq";
-+			status = "disabled";
-+			clocks = <&clkc CLKID_ETH>,
-+				 <&clkc CLKID_FCLK_DIV2>,
-+				 <&clkc CLKID_MPLL2>;
-+			clock-names = "stmmaceth", "clkin0", "clkin1";
-+		};
-+
- 		hiubus: hiubus at ff63c000 {
- 			compatible = "simple-bus";
- 			reg = <0x0 0xff63c000 0x0 0x1c00>;
-@@ -203,6 +216,46 @@
- 					#gpio-cells = <2>;
- 					gpio-ranges = <&pinctrl_periphs 0 0 86>;
- 				};
-+
-+				eth_rgmii_x_pins: eth-x-rgmii {
-+					mux {
-+						groups = "eth_mdio_x",
-+						       "eth_mdc_x",
-+						       "eth_rgmii_rx_clk_x",
-+						       "eth_rx_dv_x",
-+						       "eth_rxd0_x",
-+						       "eth_rxd1_x",
-+						       "eth_rxd2_rgmii",
-+						       "eth_rxd3_rgmii",
-+						       "eth_rgmii_tx_clk",
-+						       "eth_txen_x",
-+						       "eth_txd0_x",
-+						       "eth_txd1_x",
-+						       "eth_txd2_rgmii",
-+						       "eth_txd3_rgmii";
-+						function = "eth";
-+					};
-+				};
-+
-+				eth_rgmii_y_pins: eth-y-rgmii {
-+					mux {
-+						groups = "eth_mdio_y",
-+						       "eth_mdc_y",
-+						       "eth_rgmii_rx_clk_y",
-+						       "eth_rx_dv_y",
-+						       "eth_rxd0_y",
-+						       "eth_rxd1_y",
-+						       "eth_rxd2_rgmii",
-+						       "eth_rxd3_rgmii",
-+						       "eth_rgmii_tx_clk",
-+						       "eth_txen_y",
-+						       "eth_txd0_y",
-+						       "eth_txd1_y",
-+						       "eth_txd2_rgmii",
-+						       "eth_txd3_rgmii";
-+						function = "eth";
-+					};
-+				};
- 			};
- 		};
- 
+Thanks.
+
+Maxime
+
 -- 
-2.14.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171113/84de0ec9/attachment.sig>
