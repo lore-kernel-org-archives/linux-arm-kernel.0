@@ -1,54 +1,96 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Mon, 13 Nov 2017 17:34:57 +0000
-Subject: [RFC 3/7] arm64: alternative: Apply alternatives early in boot
- process
-In-Reply-To: <1507726862-11944-4-git-send-email-julien.thierry@arm.com>
-References: <1507726862-11944-1-git-send-email-julien.thierry@arm.com>
- <1507726862-11944-4-git-send-email-julien.thierry@arm.com>
-Message-ID: <fe6eb133-c8ef-a519-5c6a-82a35f958cc7@arm.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Mon, 13 Nov 2017 18:35:52 +0100
+Subject: RCU stall with high number of KVM vcpus
+In-Reply-To: <2832f775-3cbe-d984-fe4f-e018642b6f1d@arm.com>
+References: <20171113131000.GA10546@hc>
+ <2832f775-3cbe-d984-fe4f-e018642b6f1d@arm.com>
+Message-ID: <20171113173552.GA13282@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/17 14:00, Julien Thierry wrote:
-> From: Daniel Thompson <daniel.thompson@linaro.org>
+On Mon, Nov 13, 2017 at 01:47:38PM +0000, Marc Zyngier wrote:
+> On 13/11/17 13:10, Jan Glauber wrote:
+> > I'm seeing RCU stalls in the host with 4.14 when I run KVM on ARM64 (ThunderX2) with a high
+> > number of vcpus (60). I only use one guest that does kernel compiles in
 > 
-> Currently alternatives are applied very late in the boot process (and
-> a long time after we enable scheduling). Some alternative sequences,
-> such as those that alter the way CPU context is stored, must be applied
-> much earlier in the boot sequence.
+> Is that only reproducible on 4.14? With or without VHE? Can you
+> reproduce this on another implementation (such as ThunderX-1)?
+
+I've reproduced it on a distro 4.13 and several vanilla 4.14 rc's and
+tip/locking. VHE is enabled. I've not yet tried to reproduce it with
+older kernels or ThunderX-1. I can check if it happens also on ThunderX-1.
+
+> > a loop. After some hours (less likely the more debugging options are
+> > enabled, more likely with more vcpus) RCU stalls are happening in both host & guest.
+> > 
+> > Both host & guest recover after some time, until the issue is triggered
+> > again. 
+> > 
+> > Stack traces in the guest are next to useless, everything is messed up
+> > there. The host seems to stave on kvm->mmu_lock spin lock, the lock_stat
 > 
-> Introduce apply_alternatives_early() to allow some alternatives to be
-> applied immediately after we detect the CPU features of the boot CPU.
+> Please elaborate. Messed in what way? Corrupted? The guest crashing? Or
+> is that a tooling issue?
+
+Every vcpu that oopses prints one line in parallel, so I get blocks like:
+[58880.179814] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.179834] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.179847] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.179873] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.179893] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.179911] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.179917] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.180288] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.180303] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.180336] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.180363] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.180384] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.180415] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+[58880.180461] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+
+I can send the full log if you want to have a look.
+
+> > numbers don't look good, see waittime-max:
+> > 
+> > -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+> >                               class name    con-bounces    contentions   waittime-min   waittime-max waittime-total   waittime-avg    acq-bounces   acquisitions   holdtime-min   holdtime-max holdtime-total   holdtime-avg
+> > -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+> > 
+> >                 &(&kvm->mmu_lock)->rlock:      99346764       99406604           0.14  1321260806.59 710654434972.0        7148.97      154228320      225122857           0.13   917688890.60  3705916481.39          16.46
+> >                 ------------------------
+> >                 &(&kvm->mmu_lock)->rlock       99365598          [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
+> >                 &(&kvm->mmu_lock)->rlock          25164          [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
+> >                 &(&kvm->mmu_lock)->rlock          14934          [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
+> >                 &(&kvm->mmu_lock)->rlock            908          [<ffff00000810a1f0>] __cond_resched_lock+0x68/0xb8
+> >                 ------------------------
+> >                 &(&kvm->mmu_lock)->rlock              3          [<ffff0000080b34c8>] stage2_flush_vm+0x60/0xd8
+> >                 &(&kvm->mmu_lock)->rlock       99186296          [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
+> >                 &(&kvm->mmu_lock)->rlock         179238          [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
+> >                 &(&kvm->mmu_lock)->rlock          19181          [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
+> > 
+> > .............................................................................................................................................................................................................................
+> [slots of stuff]
 > 
-> Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->   arch/arm64/include/asm/alternative.h |  1 +
->   arch/arm64/kernel/alternative.c      | 39 +++++++++++++++++++++++++++++++++---
->   arch/arm64/kernel/smp.c              |  6 ++++++
->   3 files changed, 43 insertions(+), 3 deletions(-)
+> Well, the mmu_lock is clearly contended. Is the box in a state where you
+> are swapping? There seem to be as many faults as contentions, which is a
+> bit surprising...
+
+I don't think it is swapping but need to double check.
+
+> Also, we recently moved arm64 to qrwlocks, which may have an impact.
+> Care to give this[1] a go and report the result?
+
+Sure, I that was my first suspision but I can reproduce the issue with
+and without the qrwlock patches, so these are not to blame. Also, the
+starving lock is a spinlock and not a qrwlock. So maybe the spinlocks
+have fairness issues too?
+
+--Jan
+
+> Thanks,
 > 
-
-
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 9f7195a..84c6983 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -455,6 +455,12 @@ void __init smp_prepare_boot_cpu(void)
->   	 * cpuinfo_store_boot_cpu() above.
->   	 */
->   	update_cpu_errata_workarounds();
-> +	/*
-> +	 * We now know enough about the boot CPU to apply the
-> +	 * alternatives that cannot wait until interrupt handling
-> +	 * and/or scheduling is enabled.
-> +	 */
-> +	apply_alternatives_early();
->   }
-
-What happens if a secondary CPU, activated at boot doesn't have the "early"
-capabilities ?
-
-Suzuki
+> 	M.
+> 
+> [1]: https://lkml.org/lkml/2017/10/12/266
+> -- 
+> Jazz is not dead. It just smells funny...
