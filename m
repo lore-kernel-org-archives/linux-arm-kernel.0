@@ -1,42 +1,70 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Nov 2017 10:17:52 +0100
-Subject: [PULL 27/27] KVM: arm/arm64: Don't queue VLPIs on INV/INVALL
+Date: Mon, 13 Nov 2017 10:17:48 +0100
+Subject: [PULL 23/27] KVM: arm/arm64: GICv4: Prevent userspace from changing
+ doorbell affinity
 In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
 References: <20171113091752.10663-1-christoffer.dall@linaro.org>
-Message-ID: <20171113091752.10663-28-christoffer.dall@linaro.org>
+Message-ID: <20171113091752.10663-24-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since VLPIs are injected directly by the hardware there's no need to
-mark these as pending in software and queue them on the AP list.
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+We so far allocate the doorbell interrupts without taking any
+special measure regarding the affinity of these interrupts. We
+simply move them around as required when the vcpu gets scheduled
+on a different CPU.
+
+But that's counting without userspace (and the evil irqbalance) that
+can try and move the VPE interrupt around, causing the ITS code
+to emit VMOVP commands and remap the doorbell to another redistributor.
+Worse, this can happen while the vcpu is running, causing all kind
+of trouble if the VPE is already resident, and we end-up in UNPRED
+territory.
+
+So let's take a definitive action and prevent userspace from messing
+with us. This is just a matter of adding IRQ_NO_BALANCING to the
+set of flags we already have, letting the kernel in sole control
+of the affinity.
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ virt/kvm/arm/vgic/vgic-v4.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index c93ecd4a903b..a3754ec719c4 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -292,11 +292,14 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 		irq->priority = LPI_PROP_PRIORITY(prop);
- 		irq->enabled = LPI_PROP_ENABLE_BIT(prop);
+diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
+index c9cec01008c2..bf874dd01fc0 100644
+--- a/virt/kvm/arm/vgic/vgic-v4.c
++++ b/virt/kvm/arm/vgic/vgic-v4.c
+@@ -23,6 +23,8 @@
  
--		vgic_queue_irq_unlock(kvm, irq, flags);
--	} else {
--		spin_unlock_irqrestore(&irq->irq_lock, flags);
-+		if (!irq->hw) {
-+			vgic_queue_irq_unlock(kvm, irq, flags);
-+			return 0;
-+		}
- 	}
+ #include "vgic.h"
  
-+	spin_unlock_irqrestore(&irq->irq_lock, flags);
++#define DB_IRQ_FLAGS	(IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY | IRQ_NO_BALANCING)
 +
- 	if (irq->hw)
- 		return its_prop_update_vlpi(irq->host_irq, prop, needs_inv);
+ static irqreturn_t vgic_v4_doorbell_handler(int irq, void *info)
+ {
+ 	struct kvm_vcpu *vcpu = info;
+@@ -83,7 +85,7 @@ int vgic_v4_init(struct kvm *kvm)
+ 		 * doorbell could kick us out of the guest too
+ 		 * early...
+ 		 */
+-		irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
++		irq_set_status_flags(irq, DB_IRQ_FLAGS);
+ 		ret = request_irq(irq, vgic_v4_doorbell_handler,
+ 				  0, "vcpu", vcpu);
+ 		if (ret) {
+@@ -121,7 +123,7 @@ void vgic_v4_teardown(struct kvm *kvm)
+ 		struct kvm_vcpu *vcpu = kvm_get_vcpu(kvm, i);
+ 		int irq = its_vm->vpes[i]->irq;
+ 
+-		irq_clear_status_flags(irq, IRQ_NOAUTOEN | IRQ_DISABLE_UNLAZY);
++		irq_clear_status_flags(irq, DB_IRQ_FLAGS);
+ 		free_irq(irq, vcpu);
+ 	}
  
 -- 
 2.14.2
