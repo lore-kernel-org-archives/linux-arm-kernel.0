@@ -1,162 +1,117 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 13 Nov 2017 17:06:37 +0100
-Subject: linux-next: Tree for Nov 7
-In-Reply-To: <20171113154939.6ui2fmpokpm7g4oj@dhcp22.suse.cz>
-References: <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
- <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
- <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
- <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
- <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
- <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
- <87lgjawgx1.fsf@concordia.ellerman.id.au>
- <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
- <20171113151641.yfqrecpcxllpn5mq@dhcp22.suse.cz>
- <20171113154939.6ui2fmpokpm7g4oj@dhcp22.suse.cz>
-Message-ID: <20171113160637.jhekbdyfpccme3be@dhcp22.suse.cz>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 13 Nov 2017 17:14:45 +0100
+Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
+ support
+In-Reply-To: <20171113112946.GK14144@cbox>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <5A049B20.6000501@arm.com> <20171113112946.GK14144@cbox>
+Message-ID: <20171113161445.xfqyuntza76ckdmq@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Sorry for spamming, this one is the last attempt hopefully]
-
-On Mon 13-11-17 16:49:39, Michal Hocko wrote:
-> On Mon 13-11-17 16:16:41, Michal Hocko wrote:
-> > On Mon 13-11-17 13:00:57, Michal Hocko wrote:
-> > [...]
-> > > Yes, I have mentioned that in the previous email but the amount of code
-> > > would be even larger. Basically every arch which reimplements
-> > > arch_get_unmapped_area would have to special case new MAP_FIXED flag to
-> > > do vma lookup.
+On Mon, Nov 13, 2017 at 12:29:46PM +0100, Christoffer Dall wrote:
+> On Thu, Nov 09, 2017 at 06:14:56PM +0000, James Morse wrote:
+> > Hi guys,
 > > 
-> > It turned out that this might be much more easier than I thought after
-> > all. It seems we can really handle that in the common code. This would
-> > mean that we are exposing a new functionality to the userspace though.
-> > Myabe this would be useful on its own though. Just a quick draft (not
-> > even compile tested) whether this makes sense in general. I would be
-> > worried about unexpected behavior when somebody set other bit without a
-> > good reason and we might fail with ENOMEM for such a call now.
+> > On 19/10/17 15:57, James Morse wrote:
+> > > Known issues:
+> > [...]
+> > >  * KVM-Migration: VDISR_EL2 is exposed to userspace as DISR_EL1, but how should
+> > >    HCR_EL2.VSE or VSESR_EL2 be migrated when the guest has an SError pending but
+> > >    hasn't taken it yet...?
+> > 
+> > I've been trying to work out how this pending-SError-migration could work.
+> > 
+> > If HCR_EL2.VSE is set then the guest will take a virtual SError when it next
+> > unmasks SError. Today this doesn't get migrated, but only KVM sets this bit as
+> > an attempt to kill the guest.
+> > 
+> > This will be more of a problem with GengDongjiu's SError CAP for triggering
+> > guest SError from user-space, which will also allow the VSESR_EL2 to be
+> > specified. (this register becomes the guest ESR_EL1 when the virtual SError is
+> > taken and is used to emulate firmware-first's NOTIFY_SEI and eventually
+> > kernel-first RAS). These errors are likely to be handled by the guest.
+> > 
+> > 
+> > We don't want to expose VSESR_EL2 to user-space, and for migration it isn't
+> > enough as a value of '0' doesn't tell us if HCR_EL2.VSE is set.
+> > 
+> > To get out of this corner: why not declare pending-SError-migration an invalid
+> > thing to do?
 > 
-> Hmm, the bigger problem would be the backward compatibility actually. We
-> would get silent corruptions which is exactly what the flag is trying
-> fix. mmap flags handling really sucks. So I guess we would have to make
-> the flag internal only :/
+> To answer that question we'd have to know if that is generally a valid
+> thing to require.  How will higher level tools in the stack deal with
+> this (e.g. libvirt, and OpenStack).  Is it really valid to tell them
+> "nope, can't migrate right now".  I'm thinking if you have a failing
+> host and want to signal some error to the guest, that's probably a
+> really good time to migrate your mission-critical VM away to a different
+> host, and being told, "sorry, cannot do this" would be painful.  I'm
+> cc'ing Drew for his insight into libvirt and how this is done on x86,
+> but I'm not really crazy about this idea.
 
-OK, so this one should take care of the backward compatibility while
-still not touching the arch code
----
-commit 39ff9bf8597e79a032da0954aea1f0d77d137765
-Author: Michal Hocko <mhocko@suse.com>
-Date:   Mon Nov 13 17:06:24 2017 +0100
+Without actually confirming, I'm pretty sure it's handled with a best
+effort to cancel the migration, continuing/restoring execution on the
+source host (or there may be other policies that could be set as well).
+Naturally, if the source host is going down and the migration is
+cancelled, then the VM goes down too...
 
-    mm: introduce MAP_FIXED_SAFE
-    
-    MAP_FIXED is used quite often but it is inherently dangerous because it
-    unmaps an existing mapping covered by the requested range. While this
-    might be might be really desidered behavior in many cases there are
-    others which would rather see a failure than a silent memory corruption.
-    Introduce a new MAP_FIXED_SAFE flag for mmap to achive this behavior.
-    It is a MAP_FIXED extension with a single exception that it fails with
-    ENOMEM if the requested address is already covered by an existing
-    mapping. We still do rely on get_unmaped_area to handle all the arch
-    specific MAP_FIXED treatment and check for a conflicting vma after it
-    returns.
-    
-    Signed-off-by: Michal Hocko <mhocko@suse.com>
+Anyway, I don't think we would generally want to introduce guest
+controlled migration blockers. IIUC, this migration blocker would remain
+until the guest handled the SError, which it may never unmask.
 
-diff --git a/arch/alpha/include/uapi/asm/mman.h b/arch/alpha/include/uapi/asm/mman.h
-index 3b26cc62dadb..767bcb8a4c28 100644
---- a/arch/alpha/include/uapi/asm/mman.h
-+++ b/arch/alpha/include/uapi/asm/mman.h
-@@ -31,6 +31,8 @@
- #define MAP_STACK	0x80000		/* give out an address that is best suited for process/thread stacks */
- #define MAP_HUGETLB	0x100000	/* create a huge page mapping */
- 
-+#define MAP_FIXED_SAFE 0x2000000	/* MAP_FIXED which doesn't unmap underlying mapping */
-+
- #define MS_ASYNC	1		/* sync memory asynchronously */
- #define MS_SYNC		2		/* synchronous memory sync */
- #define MS_INVALIDATE	4		/* invalidate the caches */
-diff --git a/arch/mips/include/uapi/asm/mman.h b/arch/mips/include/uapi/asm/mman.h
-index da3216007fe0..c2311eb7219b 100644
---- a/arch/mips/include/uapi/asm/mman.h
-+++ b/arch/mips/include/uapi/asm/mman.h
-@@ -49,6 +49,8 @@
- #define MAP_STACK	0x40000		/* give out an address that is best suited for process/thread stacks */
- #define MAP_HUGETLB	0x80000		/* create a huge page mapping */
- 
-+#define MAP_FIXED_SAFE 0x2000000	/* MAP_FIXED which doesn't unmap underlying mapping */
-+
- /*
-  * Flags for msync
-  */
-diff --git a/arch/parisc/include/uapi/asm/mman.h b/arch/parisc/include/uapi/asm/mman.h
-index cc9ba1d34779..b06fd830bc6f 100644
---- a/arch/parisc/include/uapi/asm/mman.h
-+++ b/arch/parisc/include/uapi/asm/mman.h
-@@ -25,6 +25,8 @@
- #define MAP_STACK	0x40000		/* give out an address that is best suited for process/thread stacks */
- #define MAP_HUGETLB	0x80000		/* create a huge page mapping */
- 
-+#define MAP_FIXED_SAFE 0x2000000	/* MAP_FIXED which doesn't unmap underlying mapping */
-+
- #define MS_SYNC		1		/* synchronous memory sync */
- #define MS_ASYNC	2		/* sync memory asynchronously */
- #define MS_INVALIDATE	4		/* invalidate the caches */
-diff --git a/arch/xtensa/include/uapi/asm/mman.h b/arch/xtensa/include/uapi/asm/mman.h
-index b15b278aa314..f4b291bca764 100644
---- a/arch/xtensa/include/uapi/asm/mman.h
-+++ b/arch/xtensa/include/uapi/asm/mman.h
-@@ -62,6 +62,8 @@
- # define MAP_UNINITIALIZED 0x0		/* Don't support this flag */
- #endif
- 
-+#define MAP_FIXED_SAFE 0x2000000	/* MAP_FIXED which doesn't unmap underlying mapping */
-+
- /*
-  * Flags for msync
-  */
-diff --git a/include/uapi/asm-generic/mman-common.h b/include/uapi/asm-generic/mman-common.h
-index 203268f9231e..03c518777f83 100644
---- a/include/uapi/asm-generic/mman-common.h
-+++ b/include/uapi/asm-generic/mman-common.h
-@@ -25,6 +25,8 @@
- # define MAP_UNINITIALIZED 0x0		/* Don't support this flag */
- #endif
- 
-+#define MAP_FIXED_SAFE 0x2000000	/* MAP_FIXED which doesn't unmap underlying mapping */
-+
- /*
-  * Flags for mlock
-  */
-diff --git a/mm/mmap.c b/mm/mmap.c
-index 680506faceae..aad8d37f0205 100644
---- a/mm/mmap.c
-+++ b/mm/mmap.c
-@@ -1358,6 +1358,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
- 	if (mm->map_count > sysctl_max_map_count)
- 		return -ENOMEM;
- 
-+	/* force arch specific MAP_FIXED handling in get_unmapped_area */
-+	if (flags & MAP_FIXED_SAFE)
-+		flags |= MAP_FIXED;
-+
- 	/* Obtain the address to map to. we verify (or select) it and ensure
- 	 * that it represents a valid section of the address space.
- 	 */
-@@ -1365,6 +1369,13 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
- 	if (offset_in_page(addr))
- 		return addr;
- 
-+	if (flags & MAP_FIXED_SAFE) {
-+		struct vm_area_struct *vma = find_vma(mm, addr);
-+
-+		if (vma && vma->vm_start <= addr)
-+			return -ENOMEM;
-+	}
-+
- 	if (prot == PROT_EXEC) {
- 		pkey = execute_only_pkey(mm);
- 		if (pkey < 0)
+> 
+> > 
+> > We can give Qemu a way to query if a virtual SError is (still) pending. Qemu
+> > would need to check this on each vcpu after migration, just before it throws the
+> > switch and the guest runs on the new host. This way the VSESR_EL2 value doesn't
+> > need migrating at all.
+> > 
+> > In the ideal world, Qemu could re-inject the last SError it triggered if there
+> > is still one pending when it migrates... but because KVM injects errors too, it
+> > would need to block migration until this flag is cleared.
+> 
+> I don't understand your conclusion here.
+> 
+> If QEMU can query the virtual SError pending state, it can also inject
+> that before running the VM after a restore, and we should have preserved
+> the same state.
+> 
+> > KVM can promise this doesn't change unless you run the vcpu, so provided the
+> > vcpu actually takes the SError at some point this thing can still be migrated.
+> > 
+> > This does make the VSE machinery hidden unmigratable state in KVM, which is nasty.
+> 
+> Yes, nasty.
+> 
+> > 
+> > Can anyone suggest a better way?
+> > 
+> 
+> I'm thinking this is analogous to migrating a VM that uses an irqchip in
+> userspace and has set the IRQ or FIQ lines using KVM_IRQ_LINE.  My
+> feeling is that this is also not supported today.
 
--- 
-Michal Hocko
-SUSE Labs
+Luckily userspace irqchip is mostly a debug feature, or just to support
+oddball hardware. Or at least that's the way I see its usecases...
+
+> 
+> My suggestion would be to add some set of VCPU exception state,
+> potentially as flags, which can be migrated along with the VM, or at
+> least used by userspace to query the state of the VM, if there exists a
+> reliable mechanism to restore the state again without any side effects.
+> 
+> I think we have to comb through Documentation/virtual/kvm/api.txt to see
+> if we can reuse anything, and if not, add something.  We could also
+
+Maybe KVM_GET/SET_VCPU_EVENTS? Looks like the doc mistakenly states it's
+a VM ioctl, but it's a VCPU ioctl.
+
+> consider adding something to Documentation/virtual/kvm/devices/vcpu.txt,
+> where I think we have a large number space to use from.
+> 
+> Hope this helps?
+> 
+> -Christoffer
+
+Thanks,
+drew
