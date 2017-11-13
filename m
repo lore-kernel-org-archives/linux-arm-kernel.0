@@ -1,27 +1,94 @@
-From: bharatku@xilinx.com (Bharat Kumar Gogada)
-Date: Mon, 13 Nov 2017 11:06:51 +0000
-Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
-In-Reply-To: <16b6ba80-b15b-b278-0d06-350ae0201e82@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-2-jean-philippe.brucker@arm.com>
- <BLUPR0201MB150538FDD455F6042803B54FA5560@BLUPR0201MB1505.namprd02.prod.outlook.com>
- <16b6ba80-b15b-b278-0d06-350ae0201e82@arm.com>
-Message-ID: <SN1PR0201MB1518765CCEDD9B75119D6C63A52B0@SN1PR0201MB1518.namprd02.prod.outlook.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Nov 2017 12:29:46 +0100
+Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
+ support
+In-Reply-To: <5A049B20.6000501@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <5A049B20.6000501@arm.com>
+Message-ID: <20171113112946.GK14144@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->        
-> In this case even though hardware supports PASID, BIND flow fails.
+On Thu, Nov 09, 2017 at 06:14:56PM +0000, James Morse wrote:
+> Hi guys,
+> 
+> On 19/10/17 15:57, James Morse wrote:
+> > Known issues:
+> [...]
+> >  * KVM-Migration: VDISR_EL2 is exposed to userspace as DISR_EL1, but how should
+> >    HCR_EL2.VSE or VSESR_EL2 be migrated when the guest has an SError pending but
+> >    hasn't taken it yet...?
+> 
+> I've been trying to work out how this pending-SError-migration could work.
+> 
+> If HCR_EL2.VSE is set then the guest will take a virtual SError when it next
+> unmasks SError. Today this doesn't get migrated, but only KVM sets this bit as
+> an attempt to kill the guest.
+> 
+> This will be more of a problem with GengDongjiu's SError CAP for triggering
+> guest SError from user-space, which will also allow the VSESR_EL2 to be
+> specified. (this register becomes the guest ESR_EL1 when the virtual SError is
+> taken and is used to emulate firmware-first's NOTIFY_SEI and eventually
+> kernel-first RAS). These errors are likely to be handled by the guest.
+> 
+> 
+> We don't want to expose VSESR_EL2 to user-space, and for migration it isn't
+> enough as a value of '0' doesn't tell us if HCR_EL2.VSE is set.
+> 
+> To get out of this corner: why not declare pending-SError-migration an invalid
+> thing to do?
 
-It should fail, since we're reserving PASID 0 for non-PASID transactions with S1DSS=0b10. In addition, the SMMUv3 specification does not allow using PASID with a single entry. See the description of S1CDMax in 5.2 Stream Table Entry:
+To answer that question we'd have to know if that is generally a valid
+thing to require.  How will higher level tools in the stack deal with
+this (e.g. libvirt, and OpenStack).  Is it really valid to tell them
+"nope, can't migrate right now".  I'm thinking if you have a failing
+host and want to signal some error to the guest, that's probably a
+really good time to migrate your mission-critical VM away to a different
+host, and being told, "sorry, cannot do this" would be painful.  I'm
+cc'ing Drew for his insight into libvirt and how this is done on x86,
+but I'm not really crazy about this idea.
 
-"when this field is 0, the substreams of the STE are disabled and one CD is available. (The minimum useful number of substreams is 2.) Any transaction with a SubstreamID will be terminated with an abort and a C_BAD_SUBSTREAMID event recorded."
+> 
+> We can give Qemu a way to query if a virtual SError is (still) pending. Qemu
+> would need to check this on each vcpu after migration, just before it throws the
+> switch and the guest runs on the new host. This way the VSESR_EL2 value doesn't
+> need migrating at all.
+> 
+> In the ideal world, Qemu could re-inject the last SError it triggered if there
+> is still one pending when it migrates... but because KVM injects errors too, it
+> would need to block migration until this flag is cleared.
 
-> Any reason why pasid allocation moved to idr allocations rather than 
-> bitmap allocations as in v1 patches ?
+I don't understand your conclusion here.
 
-Yes, idr provides a convenient way to quickly retrieve the context associated with a PASID, when handling a fault. v1 had the allocation in a bitmap and storing in a rb-tree. By using an idr we combine both and rely on a well-tested infrastructure.
+If QEMU can query the virtual SError pending state, it can also inject
+that before running the VM after a restore, and we should have preserved
+the same state.
 
-Note that in the future we might need to go back to handcrafting the PASID allocation, but it will probably still be based on idr.
+> KVM can promise this doesn't change unless you run the vcpu, so provided the
+> vcpu actually takes the SError at some point this thing can still be migrated.
+> 
+> This does make the VSE machinery hidden unmigratable state in KVM, which is nasty.
 
-Thanks for the clarification, Jean. 
+Yes, nasty.
+
+> 
+> Can anyone suggest a better way?
+> 
+
+I'm thinking this is analogous to migrating a VM that uses an irqchip in
+userspace and has set the IRQ or FIQ lines using KVM_IRQ_LINE.  My
+feeling is that this is also not supported today.
+
+My suggestion would be to add some set of VCPU exception state,
+potentially as flags, which can be migrated along with the VM, or at
+least used by userspace to query the state of the VM, if there exists a
+reliable mechanism to restore the state again without any side effects.
+
+I think we have to comb through Documentation/virtual/kvm/api.txt to see
+if we can reuse anything, and if not, add something.  We could also
+consider adding something to Documentation/virtual/kvm/devices/vcpu.txt,
+where I think we have a large number space to use from.
+
+Hope this helps?
+
+-Christoffer
