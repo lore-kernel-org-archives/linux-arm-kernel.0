@@ -1,32 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Nov 2017 10:22:36 +0100
-Subject: [PATCH] ARM: dts: sun8i: add support for Orange Pi R1
-In-Reply-To: <20171112124129.15844-1-icenowy@aosc.io>
-References: <20171112124129.15844-1-icenowy@aosc.io>
-Message-ID: <20171113092236.p4ssxmj7ybn52jxy@flea.lan>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Nov 2017 10:17:49 +0100
+Subject: [PULL 24/27] KVM: arm/arm64: GICv4: Enable VLPI support
+In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
+References: <20171113091752.10663-1-christoffer.dall@linaro.org>
+Message-ID: <20171113091752.10663-25-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 12, 2017 at 08:41:29PM +0800, Icenowy Zheng wrote:
-> Orange Pi R1 is a board design based on Orange Pi Zero, with XR819 Wi-Fi
-> chip replaced by RTL8189ETV Wi-Fi module and the USB Type-A jack
-> replaced by an onboard USB RTL8152B USB-Ethernet adapter.
-> 
-> Add support for it.
-> 
-> Signed-off-by: Icenowy Zheng <icenowy@aosc.io>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-Queued for 416, thanks!
-Maxime
+All it takes is the has_v4 flag to be set in gic_kvm_info
+as well as "kvm-arm.vgic_v4_enable=1" being passed on the
+command line for GICv4 to be enabled in KVM.
 
+Acked-by: Christoffer Dall <cdall@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ Documentation/admin-guide/kernel-parameters.txt |  4 ++++
+ virt/kvm/arm/vgic/vgic-v3.c                     | 14 ++++++++++++++
+ 2 files changed, 18 insertions(+)
+
+diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
+index 3daa0a590236..6f897a4c8281 100644
+--- a/Documentation/admin-guide/kernel-parameters.txt
++++ b/Documentation/admin-guide/kernel-parameters.txt
+@@ -1881,6 +1881,10 @@
+ 			[KVM,ARM] Trap guest accesses to GICv3 common
+ 			system registers
+ 
++	kvm-arm.vgic_v4_enable=
++			[KVM,ARM] Allow use of GICv4 for direct injection of
++			LPIs.
++
+ 	kvm-intel.ept=	[KVM,Intel] Disable extended page tables
+ 			(virtualized MMU) support on capable Intel chips.
+ 			Default is 1 (enabled)
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 863351c090d8..2f05f732d3fd 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -24,6 +24,7 @@
+ static bool group0_trap;
+ static bool group1_trap;
+ static bool common_trap;
++static bool gicv4_enable;
+ 
+ void vgic_v3_set_underflow(struct kvm_vcpu *vcpu)
+ {
+@@ -461,6 +462,12 @@ static int __init early_common_trap_cfg(char *buf)
+ }
+ early_param("kvm-arm.vgic_v3_common_trap", early_common_trap_cfg);
+ 
++static int __init early_gicv4_enable(char *buf)
++{
++	return strtobool(buf, &gicv4_enable);
++}
++early_param("kvm-arm.vgic_v4_enable", early_gicv4_enable);
++
+ /**
+  * vgic_v3_probe - probe for a GICv3 compatible interrupt controller in DT
+  * @node:	pointer to the DT node
+@@ -480,6 +487,13 @@ int vgic_v3_probe(const struct gic_kvm_info *info)
+ 	kvm_vgic_global_state.can_emulate_gicv2 = false;
+ 	kvm_vgic_global_state.ich_vtr_el2 = ich_vtr_el2;
+ 
++	/* GICv4 support? */
++	if (info->has_v4) {
++		kvm_vgic_global_state.has_gicv4 = gicv4_enable;
++		kvm_info("GICv4 support %sabled\n",
++			 gicv4_enable ? "en" : "dis");
++	}
++
+ 	if (!info->vcpu.start) {
+ 		kvm_info("GICv3: no GICV resource entry\n");
+ 		kvm_vgic_global_state.vcpu_base = 0;
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171113/93f05e61/attachment.sig>
+2.14.2
