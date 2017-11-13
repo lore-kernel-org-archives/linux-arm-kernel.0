@@ -1,91 +1,93 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Nov 2017 10:17:41 +0100
-Subject: [PULL 16/27] KVM: arm/arm64: GICv4: Handle INVALL applied to a vPE
-In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
-References: <20171113091752.10663-1-christoffer.dall@linaro.org>
-Message-ID: <20171113091752.10663-17-christoffer.dall@linaro.org>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Mon, 13 Nov 2017 09:32:27 +0000
+Subject: [PATCH v2 1/3] kvm: arm debug: introduce helper for single-step
+In-Reply-To: <20171109170021.2984-2-alex.bennee@linaro.org>
+References: <20171109170021.2984-1-alex.bennee@linaro.org>
+ <20171109170021.2984-2-alex.bennee@linaro.org>
+Message-ID: <883136c1-1a22-6b19-e019-cd666ed53444@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marc Zyngier <marc.zyngier@arm.com>
 
-There is no need to perform an INV for each interrupt when updating
-multiple interrupts.  Instead, we can rely on the final VINVALL that
-gets sent to the ITS to do the work for all of them.
 
-Acked-by: Christoffer Dall <cdall@linaro.org>
-Reviewed-by: Eric Auger <eric.auger@redhat.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/vgic/vgic-its.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+On 09/11/17 17:00, Alex Benn?e wrote:
+> After emulating instructions we may want return to user-space to
+> handle a single-step. If single-step is enabled the helper set the run
+> structure for return and returns true.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index 4768a0e21cc5..bf571f6d2b32 100644
---- a/virt/kvm/arm/vgic/vgic-its.c
-+++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -38,7 +38,7 @@ static int vgic_its_save_tables_v0(struct vgic_its *its);
- static int vgic_its_restore_tables_v0(struct vgic_its *its);
- static int vgic_its_commit_v0(struct vgic_its *its);
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu);
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv);
- 
- /*
-  * Creates a new (reference to a) struct vgic_irq for a given LPI.
-@@ -106,7 +106,7 @@ static struct vgic_irq *vgic_add_lpi(struct kvm *kvm, u32 intid,
- 	 * However we only have those structs for mapped IRQs, so we read in
- 	 * the respective config data from memory here upon mapping the LPI.
- 	 */
--	ret = update_lpi_config(kvm, irq, NULL);
-+	ret = update_lpi_config(kvm, irq, NULL, false);
- 	if (ret)
- 		return ERR_PTR(ret);
- 
-@@ -273,7 +273,7 @@ static struct its_collection *find_collection(struct vgic_its *its, int coll_id)
-  * VCPU. Unconditionally applies if filter_vcpu is NULL.
-  */
- static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
--			     struct kvm_vcpu *filter_vcpu)
-+			     struct kvm_vcpu *filter_vcpu, bool needs_inv)
- {
- 	u64 propbase = GICR_PROPBASER_ADDRESS(kvm->arch.vgic.propbaser);
- 	u8 prop;
-@@ -298,7 +298,7 @@ static int update_lpi_config(struct kvm *kvm, struct vgic_irq *irq,
- 	}
- 
- 	if (irq->hw)
--		return its_prop_update_vlpi(irq->host_irq, prop, true);
-+		return its_prop_update_vlpi(irq->host_irq, prop, needs_inv);
- 
- 	return 0;
- }
-@@ -1117,7 +1117,7 @@ static int vgic_its_cmd_handle_inv(struct kvm *kvm, struct vgic_its *its,
- 	if (!ite)
- 		return E_ITS_INV_UNMAPPED_INTERRUPT;
- 
--	return update_lpi_config(kvm, ite->irq, NULL);
-+	return update_lpi_config(kvm, ite->irq, NULL, true);
- }
- 
- /*
-@@ -1152,12 +1152,15 @@ static int vgic_its_cmd_handle_invall(struct kvm *kvm, struct vgic_its *its,
- 		irq = vgic_get_irq(kvm, NULL, intids[i]);
- 		if (!irq)
- 			continue;
--		update_lpi_config(kvm, irq, vcpu);
-+		update_lpi_config(kvm, irq, vcpu, false);
- 		vgic_put_irq(kvm, irq);
- 	}
- 
- 	kfree(intids);
- 
-+	if (vcpu->arch.vgic_cpu.vgic_v3.its_vpe.its_vm)
-+		its_invall_vpe(&vcpu->arch.vgic_cpu.vgic_v3.its_vpe);
-+
- 	return 0;
- }
- 
+With the fixup:
+
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+
+> 
+> ---
+> v2
+>    - kvm_arm_maybe_return_debug -> kvm_arm_handle_step_debug
+>    - return bool, true if return to userspace is required
+> ---
+>   arch/arm/include/asm/kvm_host.h   |  2 ++
+>   arch/arm64/include/asm/kvm_host.h |  1 +
+>   arch/arm64/kvm/debug.c            | 22 ++++++++++++++++++++++
+>   3 files changed, 25 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> index 4a879f6ff13b..a2e881d6108e 100644
+> --- a/arch/arm/include/asm/kvm_host.h
+> +++ b/arch/arm/include/asm/kvm_host.h
+> @@ -285,6 +285,8 @@ static inline void kvm_arm_init_debug(void) {}
+>   static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+>   static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+>   static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
+> +static inline bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu,
+> +					     struct kvm_run *run) {}
+>   
+>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>   			       struct kvm_device_attr *attr);
+> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> index e923b58606e2..bbfd6a2adb2b 100644
+> --- a/arch/arm64/include/asm/kvm_host.h
+> +++ b/arch/arm64/include/asm/kvm_host.h
+> @@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
+>   void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+>   void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+>   void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
+> +bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
+>   int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+>   			       struct kvm_device_attr *attr);
+>   int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+> diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> index dbadfaf850a7..95afd22a4634 100644
+> --- a/arch/arm64/kvm/debug.c
+> +++ b/arch/arm64/kvm/debug.c
+> @@ -221,3 +221,25 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+>   		}
+>   	}
+>   }
+> +
+> +
+> +/*
+> + * When KVM has successfully emulated the instruction we might want to
+> + * return to user space with a KVM_EXIT_DEBUG. We can only do this
+> + * once the emulation is complete though so for userspace emulations
+> + * we have to wait until we have re-entered KVM before calling this
+> + * helper.
+> + *
+> + * Return true (and set exit_reason) to return to userspace or false
+> + * if no further action required.
+> + */
+> +
+> +bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
+> +{
+> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+> +		run->exit_reason = KVM_EXIT_DEBUG;
+> +		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
+> +		return true;
+> +	}
+> +	return false;
+> +}
+> 
+
 -- 
-2.14.2
+Julien Thierry
