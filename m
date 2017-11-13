@@ -1,34 +1,39 @@
-From: mark.yao@rock-chips.com (Mark Yao)
-Date: Mon, 13 Nov 2017 18:15:31 +0800
-Subject: [PATCH] MAINTAINERS: change maintainer for Rockchip drm drivers
-Message-ID: <1510568131-28838-1-git-send-email-mark.yao@rock-chips.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 13 Nov 2017 11:29:40 +0100
+Subject: [PATCH] omap3-n900: enable autofocus
+In-Reply-To: <20171112142918.rqxd2uk7ljyhpctt@earth>
+References: <20171112112528.GA21009@amd>
+ <20171112142918.rqxd2uk7ljyhpctt@earth>
+Message-ID: <20171113102940.GC31566@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For personal reasons, Mark Yao will leave rockchip,
-can not continue maintain drm/rockchip, Sandy Huang
-will take over the drm/rockchip.
+On Sun 2017-11-12 15:29:18, Sebastian Reichel wrote:
+> Hi,
+> 
+> On Sun, Nov 12, 2017 at 12:25:29PM +0100, Pavel Machek wrote:
+> > 
+> > Connect auto-focus coil to the camera sensor, so that it can be used
+> > by camera applications.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> 
+> I think you should replace auto-focus with lens-focus. This is not
+> automatic. Otherwise:
 
-Cc: Sandy Huang <hjc@rock-chips.com>
-Cc: Heiko Stuebner <heiko@sntech.de>
+You are right... althrough the lens is really meant for auto-focus.
 
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
----
- MAINTAINERS | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Anyway, I can send the updated patch if neccessary.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 0d77f22..31bf080 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4627,7 +4627,7 @@ F:	Documentation/devicetree/bindings/display/bridge/renesas,dw-hdmi.txt
- F:	Documentation/devicetree/bindings/display/renesas,du.txt
- 
- DRM DRIVERS FOR ROCKCHIP
--M:	Mark Yao <mark.yao@rock-chips.com>
-+M:	Sandy Huang <hjc@rock-chips.com>
- L:	dri-devel at lists.freedesktop.org
- S:	Maintained
- F:	drivers/gpu/drm/rockchip/
+Best regards,
+								Pavel 
 -- 
-2.7.4
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171113/202e3be5/attachment.sig>
