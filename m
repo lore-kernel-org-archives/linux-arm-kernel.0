@@ -1,47 +1,39 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 14 Nov 2017 00:34:20 +0100
-Subject: [PATCH v2 1/8] dt-bindings: arm: actions: Add S700 and CubieBoard7
+Date: Tue, 14 Nov 2017 00:34:27 +0100
+Subject: [PATCH v2 8/8] arm64: dts: actions: Add S700 SPS node
 In-Reply-To: <20171113233427.5386-1-afaerber@suse.de>
 References: <20171113233427.5386-1-afaerber@suse.de>
-Message-ID: <20171113233427.5386-2-afaerber@suse.de>
+Message-ID: <20171113233427.5386-9-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the Actions Semi S700 SoC and the Cubietech CubieBoard7.
+Add a node to the S700 Device Tree for the Smart Power System (SPS).
 
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- v1 -> v2: Unchanged
+ v2: New
  
- Documentation/devicetree/bindings/arm/actions.txt | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ To be squashed into 5/8 if binding gets acked.
+ 
+ arch/arm64/boot/dts/actions/s700.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/actions.txt b/Documentation/devicetree/bindings/arm/actions.txt
-index ced764a8549e..544a8855fad5 100644
---- a/Documentation/devicetree/bindings/arm/actions.txt
-+++ b/Documentation/devicetree/bindings/arm/actions.txt
-@@ -25,6 +25,21 @@ Root node property compatible must contain, depending on board:
-  - LeMaker Guitar Base Board rev. B: "lemaker,guitar-bb-rev-b", "lemaker,guitar"
+diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
+index b54df405aaeb..6a39968b209f 100644
+--- a/arch/arm64/boot/dts/actions/s700.dtsi
++++ b/arch/arm64/boot/dts/actions/s700.dtsi
+@@ -154,6 +154,12 @@
+ 			status = "disabled";
+ 		};
  
- 
-+S700 SoC
-+========
++		sps: power-controller at e01b0100 {
++			compatible = "actions,s700-sps";
++			reg = <0x0 0xe01b0100 0x0 0x100>;
++			#power-domain-cells = <1>;
++		};
 +
-+Required root node properties:
-+
-+- compatible :  must contain "actions,s700"
-+
-+
-+Boards:
-+
-+Root node property compatible must contain, depending on board:
-+
-+ - Cubietech CubieBoard7: "cubietech,cubieboard7"
-+
-+
- S900 SoC
- ========
- 
+ 		timer: timer at e024c000 {
+ 			compatible = "actions,s700-timer";
+ 			reg = <0x0 0xe024c000 0x0 0x4000>;
 -- 
 2.13.6
