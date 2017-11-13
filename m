@@ -1,34 +1,85 @@
-From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
-Date: Mon, 13 Nov 2017 15:39:35 +0100
-Subject: [PATCH] arm: dts: ls1021a: add "fsl,
- ls1021a-esdhc" compatible string to esdhc node
-Message-ID: <1510583976-6661-1-git-send-email-rasmus.villemoes@prevas.dk>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 13 Nov 2017 15:09:09 +0000
+Subject: linux-next: Tree for Nov 7
+In-Reply-To: <20171113141140.cns5fxt5jg4zdedb@dhcp22.suse.cz>
+References: <20171107162217.382cd754@canb.auug.org.au>
+ <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
+ <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
+ <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
+ <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
+ <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
+ <20171113141140.cns5fxt5jg4zdedb@dhcp22.suse.cz>
+Message-ID: <20171113150908.GL12318@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit a22950c888e3 (mmc: sdhci-of-esdhc: add quirk
-SDHCI_QUIRK_BROKEN_TIMEOUT_VAL for ls1021a) added logic to the driver to
-enable the broken timeout val quirk for ls1021a, but did not add the
-corresponding compatible string to the device tree, so it didn't really
-have any effect. Fix that.
+On Mon, Nov 13, 2017 at 03:11:40PM +0100, Michal Hocko wrote:
+> On Mon 13-11-17 10:20:06, Michal Hocko wrote:
+> > [Cc arm and ppc maintainers]
+> > 
+> > Thanks a lot for testing!
+> > 
+> > On Sun 12-11-17 11:38:02, Joel Stanley wrote:
+> > > On Fri, Nov 10, 2017 at 11:00 PM, Michal Hocko <mhocko@kernel.org> wrote:
+> > > > Hi Joel,
+> > > >
+> > > > On Wed 08-11-17 15:20:50, Michal Hocko wrote:
+> > > > [...]
+> > > >> > There are a lot of messages on the way up that look like this:
+> > > >> >
+> > > >> > [    2.527460] Uhuuh, elf segement at 000d9000 requested but the
+> > > >> > memory is mapped already
+> > > >> > [    2.540160] Uhuuh, elf segement at 000d9000 requested but the
+> > > >> > memory is mapped already
+> > > >> > [    2.546153] Uhuuh, elf segement at 000d9000 requested but the
+> > > >> > memory is mapped already
+> > > >> >
+> > > >> > And then trying to run userspace looks like this:
+> > > >>
+> > > >> Could you please run with debugging patch posted
+> > > >> http://lkml.kernel.org/r/20171107102854.vylrtaodla63kc57 at dhcp22.suse.cz
+> > > >
+> > > > Did you have chance to test with this debugging patch, please?
+> > > 
+> > > Lots of this:
+> > > 
+> > > [    1.177266] Uhuuh, elf segement at 000d9000 requested but the  memory is mapped already, got 000dd000
+> > > [    1.177555] Clashing vma [dd000, de000] flags:100873 name:(null)
+> > 
+> > This smells like the problem I've expected that mmap with hint doesn't
+> > respect the hint even though there is no clashing mapping. The above
+> > basically says that we didn't map at 0xd9000 but it has placed it at
+> > 0xdd000. The nearest (clashing) vma is at 0xdd000 so this is our new
+> > mapping. find_vma returns the closest vma (with addr < vm_end) for the
+> > given address 0xd9000 so this address cannot be mapped by any other vma.
+> > 
+> > Now that I am looking at arm's arch_get_unmapped_area it does perform
+> > aligning for shared vmas.
+> 
+> Sorry for confusion here. These are not shared mappings as pointed out
+> by Russell in a private email. I got confused by the above flags which I
+> have misinterpreted as bit 0 set => MAP_SHARED. These are vm_flags
+> obviously so the bit 0 is VM_READ. Sorry about the confusion. The real
+> reason we are doing the alignment is that we do a file mapping
+> 	/*
+> 	 * We only need to do colour alignment if either the I or D
+> 	 * caches alias.
+> 	 */
+> 	if (aliasing)
+> 		do_align = filp || (flags & MAP_SHARED);
+> 
+> I am not really familiar with this architecture to understand why do we
+> need aliasing for file mappings, though.
 
-Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
----
- arch/arm/boot/dts/ls1021a.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+I think it's there so that flush_dcache_page() works - possibly
+get_user_pages() being used on a private mapping of page cache pages,
+but that's guessing.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 3ff2b8a9f01a..9cdec545decc 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -162,7 +162,7 @@
- 		};
- 
- 		esdhc: esdhc at 1560000 {
--			compatible = "fsl,esdhc";
-+			compatible = "fsl,ls1021a-esdhc", "fsl,esdhc";
- 			reg = <0x0 0x1560000 0x0 0x10000>;
- 			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
- 			clock-frequency = <0>;
+I'm afraid I don't remember all the details, this is code from around
+15 years ago, and I'd be very nervous about changing it now without
+fully understanding the issues.
+
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
