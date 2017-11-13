@@ -1,51 +1,59 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 13 Nov 2017 16:40:58 -0600
-Subject: [PATCH v1 3/3] PCI: xilinx: Rename xilinx_pcie_link_is_up() to
- xilinx_pcie_link_up()
-In-Reply-To: <20171113224001.29024.87126.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20171113224001.29024.87126.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171113224058.29024.51914.stgit@bhelgaas-glaptop.roam.corp.google.com>
+From: poza@codeaurora.org (poza at codeaurora.org)
+Date: Tue, 14 Nov 2017 04:56:30 +0530
+Subject: [3/4] PCI/portdrv: Implement interface to query the registered
+ service
+In-Reply-To: <73379e2c-b0c3-885c-bb5d-b981863b6042@codeaurora.org>
+References: <1510260399-14886-4-git-send-email-poza@codeaurora.org>
+ <73379e2c-b0c3-885c-bb5d-b981863b6042@codeaurora.org>
+Message-ID: <b98f5b7e1b64f9d5ce1ff7e52fa0887d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bjorn Helgaas <bhelgaas@google.com>
+On 2017-11-14 02:22, Sinan Kaya wrote:
+> Some nits only.
+> 
+>>  /**
+>> + * pcie_port_service_query - query if particula port service is 
+>> enabled.
+>> + * dev: pcie device
+>> + * @port service: PCI express port service
+>> + */
+>> +int pcie_port_query_service(struct pci_dev *dev, u32 port_service)
+>> +{
+>> +	struct pcie_device *pdev;
+>> +	struct pci_dev *parent, *this = dev;
+>> +
+>> +	do {
+> 
+> While I understand the motivation why this function is searching for 
+> DPC capable
+> parent until the root port, the name of the function does not represent 
+> this.
+> 
 
-Rename xilinx_pcie_link_is_up() to xilinx_pcie_link_up() to follow the
-convention of other drivers.  No functional change intended.
+Will change it to more relevant one.
 
-Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
----
- drivers/pci/host/pcie-xilinx.c |    6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+> It might make sense to split this into two where the first function 
+> just queries
+> the capabilities of the immediate device (the list_for_each_section).
+> 
+>> +		list_for_each_entry(pdev, &this->service_list, slist) {
+>> +			if (pdev->service == port_service)
+>> +				return 1;
+>> +		}
+> 
+> Another function to query all parents until you reach the root port.
+> 
+>> +		parent = pci_upstream_bridge(this);
+>> +		this = parent;
+>> +	} while (parent && pci_is_pcie(parent));
+>> +
+>> +	return 0;
+>> +}
+>> +EXPORT_SYMBOL(pcie_port_query_service);
+>> +
 
-diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-index 94e13cb8608f..7b5325990f5e 100644
---- a/drivers/pci/host/pcie-xilinx.c
-+++ b/drivers/pci/host/pcie-xilinx.c
-@@ -129,7 +129,7 @@ static inline void pcie_write(struct xilinx_pcie_port *port, u32 val, u32 reg)
- 	writel(val, port->reg_base + reg);
- }
- 
--static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie_port *port)
-+static inline bool xilinx_pcie_link_up(struct xilinx_pcie_port *port)
- {
- 	return (pcie_read(port, XILINX_PCIE_REG_PSCR) &
- 		XILINX_PCIE_REG_PSCR_LNKUP) ? 1 : 0;
-@@ -165,7 +165,7 @@ static bool xilinx_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
- 
- 	/* Check if link is up when trying to access downstream ports */
- 	if (bus->number != port->root_busno)
--		if (!xilinx_pcie_link_is_up(port))
-+		if (!xilinx_pcie_link_up(port))
- 			return false;
- 
- 	/* Only one device down on each root port */
-@@ -541,7 +541,7 @@ static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
- {
- 	struct device *dev = port->dev;
- 
--	if (xilinx_pcie_link_is_up(port))
-+	if (xilinx_pcie_link_up(port))
- 		dev_info(dev, "PCIe Link is UP\n");
- 	else
- 		dev_info(dev, "PCIe Link is DOWN\n");
+yes that makes sense; will split the function as you are suggesting.
+
+Regards,
+Oza.
