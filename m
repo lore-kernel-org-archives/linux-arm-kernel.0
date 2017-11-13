@@ -1,60 +1,51 @@
 From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 13 Nov 2017 16:40:51 -0600
-Subject: [PATCH v1 2/3] PCI: altera: Rename altera_pcie_link_is_up() to
- altera_pcie_link_up()
+Date: Mon, 13 Nov 2017 16:40:58 -0600
+Subject: [PATCH v1 3/3] PCI: xilinx: Rename xilinx_pcie_link_is_up() to
+ xilinx_pcie_link_up()
 In-Reply-To: <20171113224001.29024.87126.stgit@bhelgaas-glaptop.roam.corp.google.com>
 References: <20171113224001.29024.87126.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <20171113224051.29024.76516.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <20171113224058.29024.51914.stgit@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Bjorn Helgaas <bhelgaas@google.com>
 
-Rename altera_pcie_link_is_up() to altera_pcie_link_up() to follow the
+Rename xilinx_pcie_link_is_up() to xilinx_pcie_link_up() to follow the
 convention of other drivers.  No functional change intended.
 
 Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
 ---
- drivers/pci/host/pcie-altera.c |    8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ drivers/pci/host/pcie-xilinx.c |    6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-altera.c
-index b468b8cccf8d..5cc4f594d79a 100644
---- a/drivers/pci/host/pcie-altera.c
-+++ b/drivers/pci/host/pcie-altera.c
-@@ -105,7 +105,7 @@ static inline u32 cra_readl(struct altera_pcie *pcie, const u32 reg)
- 	return readl_relaxed(pcie->cra_base + reg);
+diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+index 94e13cb8608f..7b5325990f5e 100644
+--- a/drivers/pci/host/pcie-xilinx.c
++++ b/drivers/pci/host/pcie-xilinx.c
+@@ -129,7 +129,7 @@ static inline void pcie_write(struct xilinx_pcie_port *port, u32 val, u32 reg)
+ 	writel(val, port->reg_base + reg);
  }
  
--static bool altera_pcie_link_is_up(struct altera_pcie *pcie)
-+static bool altera_pcie_link_up(struct altera_pcie *pcie)
+-static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie_port *port)
++static inline bool xilinx_pcie_link_up(struct xilinx_pcie_port *port)
  {
- 	return !!((cra_readl(pcie, RP_LTSSM) & RP_LTSSM_MASK) == LTSSM_L0);
- }
-@@ -142,7 +142,7 @@ static bool altera_pcie_valid_device(struct altera_pcie *pcie,
- {
- 	/* If there is no link, then there is no device */
- 	if (bus->number != pcie->root_bus_nr) {
--		if (!altera_pcie_link_is_up(pcie))
-+		if (!altera_pcie_link_up(pcie))
+ 	return (pcie_read(port, XILINX_PCIE_REG_PSCR) &
+ 		XILINX_PCIE_REG_PSCR_LNKUP) ? 1 : 0;
+@@ -165,7 +165,7 @@ static bool xilinx_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
+ 
+ 	/* Check if link is up when trying to access downstream ports */
+ 	if (bus->number != port->root_busno)
+-		if (!xilinx_pcie_link_is_up(port))
++		if (!xilinx_pcie_link_up(port))
  			return false;
- 	}
  
-@@ -412,7 +412,7 @@ static void altera_wait_link_retrain(struct altera_pcie *pcie)
- 	/* Wait for link is up */
- 	start_jiffies = jiffies;
- 	for (;;) {
--		if (altera_pcie_link_is_up(pcie))
-+		if (altera_pcie_link_up(pcie))
- 			break;
- 
- 		if (time_after(jiffies, start_jiffies + LINK_UP_TIMEOUT)) {
-@@ -427,7 +427,7 @@ static void altera_pcie_retrain(struct altera_pcie *pcie)
+ 	/* Only one device down on each root port */
+@@ -541,7 +541,7 @@ static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
  {
- 	u16 linkcap, linkstat, linkctl;
+ 	struct device *dev = port->dev;
  
--	if (!altera_pcie_link_is_up(pcie))
-+	if (!altera_pcie_link_up(pcie))
- 		return;
- 
- 	/*
+-	if (xilinx_pcie_link_is_up(port))
++	if (xilinx_pcie_link_up(port))
+ 		dev_info(dev, "PCIe Link is UP\n");
+ 	else
+ 		dev_info(dev, "PCIe Link is DOWN\n");
