@@ -1,74 +1,52 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Nov 2017 09:20:59 +0100
-Subject: [linux-sunxi] Re: [PATCH] ARM: sun8i: h2+: add support for
- Banana Pi M2 Zero board
-In-Reply-To: <b548b74e04b29ec8c3cddb7cc42f2b4e@aosc.io>
-References: <20171101093814.19177-1-icenowy@aosc.io>
- <20171102090248.wnvj7dpphn5uqsut@flea>
- <8327eaeaa12b99f9962a53c9f02ddd6d@aosc.io>
- <20171102155003.vp7uve4ypyn4sb6j@flea>
- <b548b74e04b29ec8c3cddb7cc42f2b4e@aosc.io>
-Message-ID: <20171113082059.cxi7diuy6dvremlo@flea.lan>
+From: yong.deng@magewell.com (Yong)
+Date: Mon, 13 Nov 2017 16:30:29 +0800
+Subject: [linux-sunxi] [PATCH v3 3/3] media: MAINTAINERS: add entries
+ for Allwinner V3s CSI
+In-Reply-To: <1510558631-45511-1-git-send-email-yong.deng@magewell.com>
+References: <1510558631-45511-1-git-send-email-yong.deng@magewell.com>
+Message-ID: <20171113163029.d0563943558192e36af7c9b0@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, 13 Nov 2017 15:37:11 +0800
+Yong Deng <yong.deng@magewell.com> wrote:
 
-On Fri, Nov 03, 2017 at 07:53:17AM +0800, Icenowy Zheng wrote:
-> ? 2017-11-02 23:50?Maxime Ripard ???
-> > On Thu, Nov 02, 2017 at 05:07:30PM +0800, Icenowy Zheng wrote:
-> > > > > +&mmc0 {
-> > > > > +	pinctrl-names = "default";
-> > > > > +	pinctrl-0 = <&mmc0_pins_a>;
-> > > > > +	vmmc-supply = <&reg_vcc3v3>;
-> > > > > +	bus-width = <4>;
-> > > > > +	/*
-> > > > > +	 * In different revisions the board have different card detect
-> > > > > +	 * configuration.
-> > > > > +	 */
-> > > >
-> > > > Which ones?
-> > > 
-> > > In the sample batch (1.2V fixed voltage) the card detect is normal
-> > > (PF6 low as inserted), however in the final batch (1.1V/1.3V
-> > > switchable) it's inverted at PF6 (high as inserted).
-> > 
-> > Then just use the final version's.
-> > 
-> > > > > +&usbphy {
-> > > > > +	usb0_id_det-gpios = <&r_pio 0 6 GPIO_ACTIVE_HIGH>; /* PL6 */
-> > > > > +	/* USB OTG VBUS is directly connected to 5V without any regulators
-> > > > > */
-> > > >
-> > > > So it cannot operate in OTG, but it's host only?
-> > > 
-> > > It can operate in OTG -- you can power the board via the OTG port,
-> > > as the VBUS is not gated from 5V at all, so 5V power at VBUS will
-> > > power up the board. Yes, it's a bit unsafe, but the board designer
-> > > did it.
-> > 
-> > What will provide the 5v in the first place then if a USB device is
-> > connected to the micro-USB connector?
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> ---
+>  MAINTAINERS | 8 ++++++++
+>  1 file changed, 8 insertions(+)
 > 
-> There're two micro-USB connectors, one is power-only and another is
-> OTG. The Vbus of these two connectors are connected together, so
-> the external USB device will be powered just by the power input
-> from the power-only USB port.
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index adbf693..1ba7782 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -3744,6 +3744,14 @@ M:	Jaya Kumar <jayakumar.alsa@gmail.com>
+>  S:	Maintained
+>  F:	sound/pci/cs5535audio/
+>  
+> +CSI DRIVERS FOR ALLWINNER V3s
+> +M:	Yong Deng <yong.deng@magewell.com>
+> +L:	linux-media at vger.kernel.org
+> +T:	git git://linuxtv.org/media_tree.git
+> +S:	Maintained
+> +F:	drivers/media/platform/sun6i-csi/
 
-Can you put that in the comment?
+Sorry, the path has been changed to drivers/media/platform/sunxi/sun6i-csi/.
+I will fix it.
 
-Thanks.
+> +F:	Documentation/devicetree/bindings/media/sun6i-csi.txt
+> +
+>  CW1200 WLAN driver
+>  M:	Solomon Peachy <pizza@shaftnet.org>
+>  S:	Maintained
+> -- 
+> 1.8.3.1
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
 
-Maxime
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171113/84de0ec9/attachment.sig>
+Thanks,
+Yong
