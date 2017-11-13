@@ -1,57 +1,54 @@
-From: geomatsi@gmail.com (Sergey Matyukevich)
-Date: Mon, 13 Nov 2017 22:24:11 +0300
-Subject: [PATCH 1/2] arm64: dts: orange-pi-zero-plus2: fix sdcard detect
-In-Reply-To: <CAMty3ZB3aXCsd9VkibjxPdA=BXvXr3nMbGJJvtZN_z2SGVUAXA@mail.gmail.com>
-References: <20171103195855.15283-1-geomatsi@gmail.com>
- <20171103195855.15283-2-geomatsi@gmail.com>
- <CAMty3ZCs8kq1vUGLOi0ZghY7n0iXgUQ1E=ngBO6Y4wm7wMLF7Q@mail.gmail.com>
- <20171104154221.ao7kkcwqhnja3cxe@speedy.hunter>
- <20171106122633.5mnqfh6xhmmxr45s@flea>
- <20171106161306.tq6yeq6bq36ridj3@speedy.hunter>
- <CAMty3ZCYQx0MfiJnOZPtO4nSAtOrGicOzw_x_AznTiEW8h2sLg@mail.gmail.com>
- <CAMty3ZANhL7cHqYw4VY2Sj_JUZGyqFZ+7pLssc1tniN3BdupOA@mail.gmail.com>
- <20171107201245.gptgfli54o6eqmrj@speedy.hunter>
- <CAMty3ZB3aXCsd9VkibjxPdA=BXvXr3nMbGJJvtZN_z2SGVUAXA@mail.gmail.com>
-Message-ID: <20171113192411.kmohcthzickk4n5v@speedy.hunter>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 13 Nov 2017 15:52:27 -0500
+Subject: [3/4] PCI/portdrv: Implement interface to query the registered
+ service
+In-Reply-To: <1510260399-14886-4-git-send-email-poza@codeaurora.org>
+References: <1510260399-14886-4-git-send-email-poza@codeaurora.org>
+Message-ID: <73379e2c-b0c3-885c-bb5d-b981863b6042@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Maxime,
+Some nits only.
 
-On Wed, Nov 08, 2017 at 04:55:32PM +0530, Jagan Teki wrote:
-> On Wed, Nov 8, 2017 at 1:42 AM, Sergey Matyukevich <geomatsi@gmail.com> wrote:
-> > Hi,
-> >
-> >> >>> > Did you try to boot from sdcard ? I am not able to boot my board from
-> >> >>> > sd-card without this change. As I mentioned earlier in my email
-> >> >>> > to buildroot mailing list, with mmc debug enabled I see that mmc
-> >> >>> > tries to init sd-card when I remove it from the slot.
-> >> >>> >
-> >> >>> > Maybe there is a minor differences between h/w versions or batches ?
-> >> >>> > What is you board version ? I tested on board v1.0.
-> >> >>>
-> >> >>> Looking at the schematics, it definitely looks like it's active low.
-> >> >>
-> >> >> Is it ok to merge it then ? Or using 'cd-inverted' property
-> >> >> is the preferable option ?
-> >> >
-> >> > W/o any change mainline works unstable for me, it wasn't booting
-> >> > at-all[1] did you find the same?
-> >> >
-> >> > Even tried with active LOW and cd-inverted.
-> >> >
-> >> > [1] https://paste.ubuntu.com/25909064/
-> >>
-> >> Look like something broken for H5 and A64 between v4.14-rc8 to latest
-> >
-> > Both 4.13.7 and 4.14-rc8 (synched today) kernels worked fine for me.
-> > DTS behavior is all the same:
-> 
-> I've tried fresh sync [2] but still see the issue, can you check the
-> Image size of log(suspecting on that area)
+>  /**
+> + * pcie_port_service_query - query if particula port service is enabled.
+> + * dev: pcie device
+> + * @port service: PCI express port service
+> + */
+> +int pcie_port_query_service(struct pci_dev *dev, u32 port_service)
+> +{
+> +	struct pcie_device *pdev;
+> +	struct pci_dev *parent, *this = dev;
+> +
+> +	do {
 
-Do you plan to accept this patch as well ? Or you would prefer to wait
-for the confirmation from Jagan as well ?
+While I understand the motivation why this function is searching for DPC capable
+parent until the root port, the name of the function does not represent this. 
 
-Regards,
-Sergey
+It might make sense to split this into two where the first function just queries
+the capabilities of the immediate device (the list_for_each_section).
+
+> +		list_for_each_entry(pdev, &this->service_list, slist) {
+> +			if (pdev->service == port_service)
+> +				return 1;
+> +		}
+
+Another function to query all parents until you reach the root port.
+
+> +		parent = pci_upstream_bridge(this);
+> +		this = parent;
+> +	} while (parent && pci_is_pcie(parent));
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL(pcie_port_query_service);
+> +
+
+
+
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
