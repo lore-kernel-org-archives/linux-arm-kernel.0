@@ -1,144 +1,115 @@
-From: shile.zhang@nokia-sbell.com (Zhang, Shile (NSB - CN/Hangzhou))
-Date: Mon, 13 Nov 2017 05:32:26 +0000
-Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb
- mappings
-In-Reply-To: <1509700757-34420-1-git-send-email-shile.zhang@nokia-sbell.com>
-References: <1509700757-34420-1-git-send-email-shile.zhang@nokia-sbell.com>
-Message-ID: <VI1PR0701MB2846C892037A515D0B3F4EF8A12B0@VI1PR0701MB2846.eurprd07.prod.outlook.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 13 Nov 2017 15:38:57 +0800
+Subject: [PATCH v4 4/4] ARM64: dts: meson: drop "sana" clock from SAR ADC
+In-Reply-To: <CAFBinCAEgCzZQQN4V8bJMpkNJ9AJLDLWC2DSEkz7N7m60p=QDg@mail.gmail.com>
+References: <20171107141027.30717-1-yixun.lan@amlogic.com>
+ <CAFBinCAEgCzZQQN4V8bJMpkNJ9AJLDLWC2DSEkz7N7m60p=QDg@mail.gmail.com>
+Message-ID: <1f191946-7cd2-04c9-7b1f-f5e790b6ddc7@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russell,
+Hi Kevin & others
 
-Have you any time to check this patch?
-I found this issue/missing in my works, the application cannot mmap big hugepage (about 360MB) due to no more contiguous vm from the default "TASK_UNMMAPPED_AREA" by legacy bottom-up.
-We need this patch to fix this issue.
+  I'd like to just re-send the patch [4/4] (while leave others[1-3/4]
+unchanged), to have separated DT patch the for 32bit / 64bit platform.
+  is this ok for you?
 
-Could you please help check this patch?
 
-Thanks!
+On 11/12/17 09:33, Martin Blumenstingl wrote:
+> Hi Yixun,
+> 
+> On Tue, Nov 7, 2017 at 3:10 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+>> From: Xingyu Chen <xingyu.chen@amlogic.com>
+>>
+>> The SAR ADC modules doesn't require The "sana" clock.
+>>
+>> Singed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  arch/arm/boot/dts/meson8.dtsi               | 5 ++---
+>>  arch/arm/boot/dts/meson8b.dtsi              | 5 ++---
+> these two should go into a separate patch (with "ARM: dts: ..."
+> prefix) - the ARM maintainers want separate pull requests for the
+> 32-bit and 64-bit .dts changes, so patches should also follow that
+> schema
+> 
+> with that fixed, you can add my ACK on both (32-bit and 64-bit) .dts patches:
+> Acked-by: Martin Blumenstingl<martin.blumenstingl@googlemail.com>
+> 
 
-BR, Shile
+thanks, I will send separate patch for this, and I will add your 'Acked-by'
 
------Original Message-----
-From: Shile Zhang [mailto:shile.zhang at nokia-sbell.com] 
-Sent: Friday, November 03, 2017 5:19 PM
-To: Russell King <linux@armlinux.org.uk>
-Cc: linux-kernel at vger.kernel.org; Zhang, Shile (NSB - CN/Hangzhou) <shile.zhang@nokia-sbell.com>
-Subject: [PATCH] mm/hugetlb: Implement ASLR and topdown for hugetlb mappings
-
-merge from arch/x86
-
-Signed-off-by: Shile Zhang <shile.zhang@nokia-sbell.com>
----
- arch/arm/include/asm/page.h |  1 +
- arch/arm/mm/hugetlbpage.c   | 85 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 86 insertions(+)
-
-diff --git a/arch/arm/include/asm/page.h b/arch/arm/include/asm/page.h
-index 4355f0e..994630f 100644
---- a/arch/arm/include/asm/page.h
-+++ b/arch/arm/include/asm/page.h
-@@ -144,6 +144,7 @@ extern void copy_page(void *to, const void *from);
- 
- #ifdef CONFIG_KUSER_HELPERS
- #define __HAVE_ARCH_GATE_AREA 1
-+#define HAVE_ARCH_HUGETLB_UNMAPPED_AREA
- #endif
- 
- #ifdef CONFIG_ARM_LPAE
-diff --git a/arch/arm/mm/hugetlbpage.c b/arch/arm/mm/hugetlbpage.c
-index fcafb52..46ed0c8 100644
---- a/arch/arm/mm/hugetlbpage.c
-+++ b/arch/arm/mm/hugetlbpage.c
-@@ -45,3 +45,88 @@ int pmd_huge(pmd_t pmd)
- {
- 	return pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT);
- }
-+
-+#ifdef CONFIG_HUGETLB_PAGE
-+static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *file,
-+		unsigned long addr, unsigned long len,
-+		unsigned long pgoff, unsigned long flags)
-+{
-+	struct hstate *h = hstate_file(file);
-+	struct vm_unmapped_area_info info;
-+
-+	info.flags = 0;
-+	info.length = len;
-+	info.low_limit = current->mm->mmap_legacy_base;
-+	info.high_limit = TASK_SIZE;
-+	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
-+	info.align_offset = 0;
-+	return vm_unmapped_area(&info);
-+}
-+
-+static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
-+		unsigned long addr0, unsigned long len,
-+		unsigned long pgoff, unsigned long flags)
-+{
-+	struct hstate *h = hstate_file(file);
-+	struct vm_unmapped_area_info info;
-+	unsigned long addr;
-+
-+	info.flags = VM_UNMAPPED_AREA_TOPDOWN;
-+	info.length = len;
-+	info.low_limit = PAGE_SIZE;
-+	info.high_limit = current->mm->mmap_base;
-+	info.align_mask = PAGE_MASK & ~huge_page_mask(h);
-+	info.align_offset = 0;
-+	addr = vm_unmapped_area(&info);
-+
-+	/*
-+	 * A failed mmap() very likely causes application failure,
-+	 * so fall back to the bottom-up function here. This scenario
-+	 * can happen with large stack limits and large mmap()
-+	 * allocations.
-+	 */
-+	if (addr & ~PAGE_MASK) {
-+		VM_BUG_ON(addr != -ENOMEM);
-+		info.flags = 0;
-+		info.low_limit = TASK_UNMAPPED_BASE;
-+		info.high_limit = TASK_SIZE;
-+		addr = vm_unmapped_area(&info);
-+	}
-+
-+	return addr;
-+}
-+
-+unsigned long
-+hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
-+		unsigned long len, unsigned long pgoff, unsigned long flags)
-+{
-+	struct hstate *h = hstate_file(file);
-+	struct mm_struct *mm = current->mm;
-+	struct vm_area_struct *vma;
-+
-+	if (len & ~huge_page_mask(h))
-+		return -EINVAL;
-+	if (len > TASK_SIZE)
-+		return -ENOMEM;
-+
-+	if (flags & MAP_FIXED) {
-+		if (prepare_hugepage_range(file, addr, len))
-+			return -EINVAL;
-+		return addr;
-+	}
-+
-+	if (addr) {
-+		addr = ALIGN(addr, huge_page_size(h));
-+		vma = find_vma(mm, addr);
-+		if (TASK_SIZE - len >= addr &&
-+		    (!vma || addr + len <= vma->vm_start))
-+			return addr;
-+	}
-+	if (mm->get_unmapped_area == arch_get_unmapped_area)
-+		return hugetlb_get_unmapped_area_bottomup(file, addr, len,
-+				pgoff, flags);
-+	else
-+		return hugetlb_get_unmapped_area_topdown(file, addr, len,
-+				pgoff, flags);
-+}
-+#endif /* CONFIG_HUGETLB_PAGE */
--- 
-2.6.2
+>>  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 3 +--
+>>  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 3 +--
+>>  4 files changed, 6 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/arch/arm/boot/dts/meson8.dtsi b/arch/arm/boot/dts/meson8.dtsi
+>> index b98d44fde6b6..f93d6cf6e094 100644
+>> --- a/arch/arm/boot/dts/meson8.dtsi
+>> +++ b/arch/arm/boot/dts/meson8.dtsi
+>> @@ -289,9 +289,8 @@
+>>  &saradc {
+>>         compatible = "amlogic,meson8-saradc", "amlogic,meson-saradc";
+>>         clocks = <&clkc CLKID_XTAL>,
+>> -               <&clkc CLKID_SAR_ADC>,
+>> -               <&clkc CLKID_SANA>;
+>> -       clock-names = "clkin", "core", "sana";
+>> +               <&clkc CLKID_SAR_ADC>;
+>> +       clock-names = "clkin", "core";
+>>  };
+>>
+>>  &spifc {
+>> diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+>> index bc278da7df0d..4aa444284f0c 100644
+>> --- a/arch/arm/boot/dts/meson8b.dtsi
+>> +++ b/arch/arm/boot/dts/meson8b.dtsi
+>> @@ -185,9 +185,8 @@
+>>  &saradc {
+>>         compatible = "amlogic,meson8b-saradc", "amlogic,meson-saradc";
+>>         clocks = <&clkc CLKID_XTAL>,
+>> -               <&clkc CLKID_SAR_ADC>,
+>> -               <&clkc CLKID_SANA>;
+>> -       clock-names = "clkin", "core", "sana";
+>> +               <&clkc CLKID_SAR_ADC>;
+>> +       clock-names = "clkin", "core";
+>>  };
+>>
+>>  &uart_AO {
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>> index af834cdbba79..b77f2593cdc3 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+>> @@ -686,10 +686,9 @@
+>>         compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
+>>         clocks = <&xtal>,
+>>                  <&clkc CLKID_SAR_ADC>,
+>> -                <&clkc CLKID_SANA>,
+>>                  <&clkc CLKID_SAR_ADC_CLK>,
+>>                  <&clkc CLKID_SAR_ADC_SEL>;
+>> -       clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
+>> +       clock-names = "clkin", "core", "adc_clk", "adc_sel";
+>>  };
+>>
+>>  &sd_emmc_a {
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+>> index d8dd3298b15c..07805a3b4db0 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+>> @@ -628,10 +628,9 @@
+>>         compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
+>>         clocks = <&xtal>,
+>>                  <&clkc CLKID_SAR_ADC>,
+>> -                <&clkc CLKID_SANA>,
+>>                  <&clkc CLKID_SAR_ADC_CLK>,
+>>                  <&clkc CLKID_SAR_ADC_SEL>;
+>> -       clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
+>> +       clock-names = "clkin", "core", "adc_clk", "adc_sel";
+>>  };
+>>
+>>  &sd_emmc_a {
+>> --
+>> 2.14.1
+>>
+> 
+> .
+> 
