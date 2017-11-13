@@ -1,108 +1,157 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameerali Kolothum Thodi)
-Date: Mon, 13 Nov 2017 18:13:08 +0000
-Subject: RCU stall with high number of KVM vcpus
-In-Reply-To: <20171113173552.GA13282@hc>
-References: <20171113131000.GA10546@hc>
- <2832f775-3cbe-d984-fe4f-e018642b6f1d@arm.com> <20171113173552.GA13282@hc>
-Message-ID: <5FC3163CFD30C246ABAA99954A238FA83845C7B4@FRAEML521-MBX.china.huawei.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Mon, 13 Nov 2017 19:25:32 +0100
+Subject: spi->irq == 0 on module reload of driver using IRQF_TRIGGER_LOW
+In-Reply-To: <87k1yuttaa.fsf@on-the-bus.cambridge.arm.com>
+References: <21FDD1B8-E8F6-4DCE-9D30-D82B713B0008@martin.sperl.org>
+ <20171112141349.6b4b3852@why.wild-wind.fr.eu.org>
+ <CD4EBEF8-DDFD-40C3-A03E-7EC964B32357@martin.sperl.org>
+ <20171112154101.483d21d2@why.wild-wind.fr.eu.org>
+ <6CD8E928-2143-4295-A5B3-4B95026E7261@martin.sperl.org>
+ <87k1yuttaa.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <75149D40-6A6E-4EC9-8D13-49FF2ED92597@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+> On 13.11.2017, at 10:35, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> 
+> On Sun, Nov 12 2017 at  5:49:39 pm GMT, <kernel@martin.sperl.org> wrote:
+>>> On 12.11.2017, at 16:41, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>>>> +
+>>>> +            can0: mcp2517fd at 0 {
+>>>> +                reg = <0>;
+>>>> +                compatible = "microchip,mcp2517fd";
+>>>> +                pinctrl-names = "default";
+>>>> +                pinctrl-0 = <&can0_pins>;
+>>>> +                spi-max-frequency = <12500000>;
+>>>> +                interrupt-parent = <&gpio>;
+>>>> +                interrupts = <16 0x2>;
+>>> 
+>>> This indicates a falling edge. No wonder the kernel is confused (I
+>>> don't know why this isn't enforced the first time though, probably an
+>>> issue in the GPIO irqchip driver...). Replacing this 2 with a 8 should
+>>> allow you to make some progress.
+>> 
+>> Thanks for the clarification - with that change it works!
+>> 
+>> For a better understanding:
+>> Isn?t the interrupt type to use more of a driver decision than a
+>> HW implementation detail that needs to get defined in the device tree?
+> 
+> Absolutely *not*. The signalling of an interrupt is completely HW
+> dependent, and the driver *must* use abide by the HW rule. That's
+> because edge and level interrupts signal entirely different things:
+> 
+> - An edge interrupt signals a an event. Something has happened, and many
+>  of these events can be signalled independently without the CPU doing
+>  anything.
+> 
+> - A level interrupt indicates a change of state, and this state persist
+>  until the CPU has services the interrupt.
+> 
+> That's the difference between receiving a SMS each time you pay
+> something your bank card, and receiving a phone call from your bank
+> because your account is overdrawn.
 
-> -----Original Message-----
-> From: linux-arm-kernel [mailto:linux-arm-kernel-bounces at lists.infradead.org]
-> On Behalf Of Jan Glauber
-> Sent: Monday, November 13, 2017 5:36 PM
-> To: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org; Paolo Bonzini
-> <pbonzini@redhat.com>; Christoffer Dall <christoffer.dall@linaro.org>;
-> kvm at vger.kernel.org; Radim Kr?m?? <rkrcmar@redhat.com>
-> Subject: Re: RCU stall with high number of KVM vcpus
-> 
-> On Mon, Nov 13, 2017 at 01:47:38PM +0000, Marc Zyngier wrote:
-> > On 13/11/17 13:10, Jan Glauber wrote:
-> > > I'm seeing RCU stalls in the host with 4.14 when I run KVM on ARM64
-> (ThunderX2) with a high
-> > > number of vcpus (60). I only use one guest that does kernel compiles in
-> >
-> > Is that only reproducible on 4.14? With or without VHE? Can you
-> > reproduce this on another implementation (such as ThunderX-1)?
-> 
-> I've reproduced it on a distro 4.13 and several vanilla 4.14 rc's and
-> tip/locking. VHE is enabled. I've not yet tried to reproduce it with
-> older kernels or ThunderX-1. I can check if it happens also on ThunderX-1.
-> 
-> > > a loop. After some hours (less likely the more debugging options are
-> > > enabled, more likely with more vcpus) RCU stalls are happening in both
-> host & guest.
-> > >
-> > > Both host & guest recover after some time, until the issue is triggered
-> > > again.
-> > >
-> > > Stack traces in the guest are next to useless, everything is messed up
-> > > there. The host seems to stave on kvm->mmu_lock spin lock, the lock_stat
-> >
-> > Please elaborate. Messed in what way? Corrupted? The guest crashing? Or
-> > is that a tooling issue?
-> 
-> Every vcpu that oopses prints one line in parallel, so I get blocks like:
-> [58880.179814] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.179834] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.179847] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.179873] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.179893] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.179911] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.179917] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.180288] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.180303] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.180336] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.180363] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.180384] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.180415] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> [58880.180461] [<ffff000008084b98>] ret_from_fork+0x10/0x18
-> 
-> I can send the full log if you want to have a look.
-> 
-> > > numbers don't look good, see waittime-max:
-> > >
-> > > ---------------------------------------------------------------------------------------------------
-> -------------------------------------------------------------------------------------------------------
-> -------------------
-> > >                               class name    con-bounces    contentions   waittime-min
-> waittime-max waittime-total   waittime-avg    acq-bounces   acquisitions
-> holdtime-min   holdtime-max holdtime-total   holdtime-avg
-> > > ---------------------------------------------------------------------------------------------------
-> -------------------------------------------------------------------------------------------------------
-> -------------------
-> > >
-> > >                 &(&kvm->mmu_lock)->rlock:      99346764       99406604
-> 0.14  1321260806.59 710654434972.0        7148.97      154228320
-> 225122857           0.13   917688890.60  3705916481.39          16.46
-> > >                 ------------------------
-> > >                 &(&kvm->mmu_lock)->rlock       99365598
-> [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
-> > >                 &(&kvm->mmu_lock)->rlock          25164
-> [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
-> > >                 &(&kvm->mmu_lock)->rlock          14934
-> [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
-> > >                 &(&kvm->mmu_lock)->rlock            908
-> [<ffff00000810a1f0>] __cond_resched_lock+0x68/0xb8
-> > >                 ------------------------
-> > >                 &(&kvm->mmu_lock)->rlock              3          [<ffff0000080b34c8>]
-> stage2_flush_vm+0x60/0xd8
-> > >                 &(&kvm->mmu_lock)->rlock       99186296
-> [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
-> > >                 &(&kvm->mmu_lock)->rlock         179238
-> [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
-> > >                 &(&kvm->mmu_lock)->rlock          19181
-> [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
+So for all practical purposes any typical active low interrupt line 
+connected to a GPIO should be configured as TRIGGER_LOW in the
+device tree.
 
-That looks like something similar we had on our hip07 platform when multiple VMs
-were launched.  The issue was tracked down to CONFIG_NUMA set with memory_less
-nodes. This results in lot of individual 4K pages and unmap_stage2_ptes() takes a good
-amount of time coupled with some HW cache flush latencies. I am not sure you are
-seeing the same thing, but may be worth checking.
+Under this assumption:
 
-Thanks,
-Shameer
+There are actually quite a few drivers that are having a /INT
+line, but are configured in the DT bindings as 2 - hence 
+TRIGGER_FALLING.
+
+Two of those are:
+* Documentation/devicetree/bindings/net/can/microchip,mcp251x.txt
+* Documentation/devicetree/bindings/net/microchip,enc28j60.txt
+
+The enc28j60 does use flags = 0, which seems could be ok, as it is
+not requesting some specific kind of irq, while the other
+is using flags = IRQF_ONESHOT | IRQF_TRIGGER_FALLING, which is
+incorrect.
+
+That was one of the reasons why I was adding this subsequent question
+for clarification.
+
+So I wonder how one would go about correcting those devices...
+
+> 
+>> In my case I probably could write some more code that would allow edge
+>> interrupts to work (without race-conditions on spi transfers - probably
+>> by using spi_async to reenable interrupts on the HW device), but it
+>> would not be as straight-forward and a bit more complex.
+> 
+> And more or less wrong, given that the spec sheet calls out "active low"
+> interrupts.
+It would have been a workaround which would not have been accepted
+anyway.
+
+>> Summary: Essentially the driver has to match the interrupt type -
+>> otherwise it will fail (on second initialization).
+> 
+> And even that is not quite right. The driver should fail straight
+> away. on the first request. I don't have the HW to track it down, but
+> I'd appreciate it if you could have a look and enlighten me.
+
+When I have finished this driver I am working on right now, then
+I may look into it in detail.
+
+But if I remember the bits and pieces I have been looking at before
+asking this question: I remember that there is some code in 
+irq_create_fwspec_mapping that allows for first time initialization.
+
+The best I can do is:
+* in __setup_irq:
+  * the Trigger-type flags are set to ?defaults? if none are set
+  * otherwise the flags are used without matching them against
+    what is configured in the device tree.
+  * so there is no validation happening in case the types disagree.
+
+Something like this patch would trigger an error on first try 
+(unless flags = 0 or flags = ?correct?):
+
+diff --git a/kernel/irq/manage.c b/kernel/irq/manage.c
+index ea41820ab12e..c2dd1b4b879a 100644
+--- a/kernel/irq/manage.c
++++ b/kernel/irq/manage.c
+@@ -1136,8 +1136,15 @@ __setup_irq(unsigned int irq, struct irq_desc *desc, struct irqaction *new)
+         * If the trigger type is not specified by the caller,
+         * then use the default for this interrupt.
+         */
+-       if (!(new->flags & IRQF_TRIGGER_MASK))
+-               new->flags |= irqd_get_trigger_type(&desc->irq_data);
++       flags = irqd_get_trigger_type(&desc->irq_data);
++       if (!(new->flags & IRQF_TRIGGER_MASK)) {
++               new->flags |= flags;
++       } else if ((new->flags & IRQF_TRIGGER_MASK) != flags) {
++               pr_err("Requested trigger type %i does not match default %lu\n",
++                      new->flags & IRQF_TRIGGER_MASK,
++                      flags);
++               return -EINVAL;
++       }
+
+        /*
+         * Check whether the interrupt nests into another interrupt
+
+Patch is against 4.9.57 - please ignore the whitespace issue as it
+is a simple console cut/paste. 
+
+It does not trigger anything else on my system, but there may
+be other use-cases that would fail because of this.
+
+Here some of the debugging output (see the irq_flags module parameter)
+root at raspcm:~# rmmod mcp2517fd; dmesg -c; modprobe mcp2517fd irq_flags=2; dmesg -c; grep mcp2517fd /proc/interrupts
+rmmod: ERROR: Module mcp2517fd is not currently loaded
+[   36.329522] genirq: Requested trigger type 2 does not match default 8
+[   36.329556] mcp2517fd spi0.0: failed to acquire irq 176 - -22
+[   36.329611] mcp2517fd: probe of spi0.0 failed with error -22
+root at raspcm:~# rmmod mcp2517fd; dmesg -c; modprobe mcp2517fd irq_flags=0; dmesg -c; grep mcp2517fd /proc/interrupts
+176:          0  pinctrl-bcm2835  16 Level     mcp2517fd
+root at raspcm:~# rmmod mcp2517fd; dmesg -c; modprobe mcp2517fd irq_flags=8; dmesg -c; grep mcp2517fd /proc/interrupts
+176:          0  pinctrl-bcm2835  16 Level     mcp2517fd
+
+Hope this analysis helps...
+
+Martin
