@@ -1,136 +1,207 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Mon, 13 Nov 2017 11:03:04 +0200
-Subject: [PATCHv2 2/3] EDAC: ti: add support for TI keystone and DRA7xx
- EDAC
-In-Reply-To: <20171111104650.ypcfvo4lzfvn5jzv@pd.tnic>
-References: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
- <1510302337-31663-1-git-send-email-t-kristo@ti.com>
- <20171111104650.ypcfvo4lzfvn5jzv@pd.tnic>
-Message-ID: <d944de66-9d18-6b3a-fe6f-8222c5f7992d@ti.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 13 Nov 2017 10:17:27 +0100
+Subject: [PULL 02/27] KVM: arm/arm64: vgic: restructure
+ kvm_vgic_(un)map_phys_irq
+In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
+References: <20171113091752.10663-1-christoffer.dall@linaro.org>
+Message-ID: <20171113091752.10663-3-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/17 12:46, Borislav Petkov wrote:
-> On Fri, Nov 10, 2017 at 10:25:37AM +0200, Tero Kristo wrote:
->> TI Keystone and DRA7xx SoCs have support for EDAC on DDR3 memory that can
->> correct one bit errors and detect two bit errors. Add EDAC driver for this
->> feature which plugs into the generic kernel EDAC framework.
-> 
-> ...
-> 
->> +static int ti_edac_probe(struct platform_device *pdev)
->> +{
->> +	int error_irq = 0, ret = -ENODEV;
->> +	struct device *dev = &pdev->dev;
->> +	struct resource *res;
->> +	void __iomem *reg;
->> +	struct mem_ctl_info *mci;
->> +	struct edac_mc_layer layers[1];
->> +	const struct of_device_id *id;
->> +	struct ti_edac *edac;
->> +	int my_id;
->> +
->> +	id = of_match_device(ti_edac_of_match, &pdev->dev);
->> +	if (!id)
->> +		return -ENODEV;
->> +
->> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
->> +	reg = devm_ioremap_resource(dev, res);
->> +	if (IS_ERR(reg)) {
->> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
->> +			    "EMIF controller regs not defined\n");
->> +		return PTR_ERR(reg);
->> +	}
->> +
->> +	layers[0].type = EDAC_MC_LAYER_ALL_MEM;
->> +	layers[0].size = 1;
->> +
->> +	/* Allocate ID number for our EMIF controller */
->> +	my_id = atomic_inc_return(&edac_id) - 1;
-> 
-> You can do ATOMIC_INIT(-1) and then you don't need that silly - 1.
-> 
-> But there's something else wrong with this ID generation:
-> 
->> +
->> +	mci = edac_mc_alloc(my_id, 1, layers, sizeof(*edac));
->> +	if (!mci)
->> +		return -ENOMEM;
-> 
-> <--- if you return here due to error, the next one which succeeds will
-> get the next number and you'd have a hole in the numbering and wonder
-> where did instance 0 go.
+From: Eric Auger <eric.auger@redhat.com>
 
-Yeah, that definitely can happen.
+We want to reuse the core of the map/unmap functions for IRQ
+forwarding. Let's move the computation of the hwirq in
+kvm_vgic_map_phys_irq and pass the linux IRQ as parameter.
+the host_irq is added to struct vgic_irq.
 
-> 
-> So I'm wondering if instead you could derive the ID from some controller
-> registers which are specific to the instance. Or some hardware detail
-> which is instance-specific.
-> 
-> In my driver, for example, the 0th instance has PCI device functions
-> 00:18.x which is node 0, then node 1 has 00:19.x and so on, and this is
-> a stable numbering. If you could do that for your hw you'll be able to
-> pinpoint which instance and which DIMMs we're talking about reliably.
+We introduce kvm_vgic_map/unmap_irq which take a struct vgic_irq
+handle as a parameter.
 
-The only reliable way to determine the instance is to sort them by 
-physical address space they occupy. This will require me to lookup all 
-nodes that have same compatible string, and check their regs. This 
-should probably be okay seeing we have only two EMIF instances at most.
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ include/kvm/arm_vgic.h    |  8 ++++---
+ virt/kvm/arm/arch_timer.c | 24 +------------------
+ virt/kvm/arm/vgic/vgic.c  | 60 +++++++++++++++++++++++++++++++++++------------
+ 3 files changed, 51 insertions(+), 41 deletions(-)
 
-I'll check how to do this most reliably.
-
-
-> 
->> +
->> +	mci->pdev = &pdev->dev;
->> +	edac = mci->pvt_info;
->> +	edac->reg = reg;
->> +	platform_set_drvdata(pdev, mci);
->> +
->> +	mci->mtype_cap = MEM_FLAG_DDR3 | MEM_FLAG_DDR2;
->> +	mci->edac_ctl_cap = EDAC_FLAG_SECDED | EDAC_FLAG_NONE;
->> +	mci->mod_name = EDAC_MOD_NAME;
->> +	mci->ctl_name = id->compatible;
->> +	mci->dev_name = dev_name(&pdev->dev);
->> +
->> +	/* Setup memory layout */
->> +	ti_edac_setup_dimm(mci, (u32)(id->data));
->> +
->> +	ret = edac_mc_add_mc(mci);
-> 
-> Do that...
-> 
->> +	if (ret) {
->> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
->> +			    "Failed to register mci: %d.\n", ret);
->> +		goto err;
->> +	}
->> +
->> +	/* add EMIF ECC error handler */
->> +	error_irq = platform_get_irq(pdev, 0);
->> +	if (!error_irq) {
->> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
->> +			    "EMIF irq number not defined.\n");
->> +		goto err2;
->> +	}
->> +
->> +	ret = devm_request_irq(dev, error_irq, ti_edac_isr, 0,
->> +			       "emif-edac-irq", mci);
->> +	if (ret) {
->> +		edac_printk(KERN_ERR, EDAC_MOD_NAME,
->> +			    "request_irq fail for EMIF EDAC irq\n");
->> +		goto err2;
->> +	}
-> 
-> ... here, after you've requested IRQs successfully and you can save
-> yourself the err2 error path.
-
-Ok.
-
-> 
-> Thx.
-> 
-
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 34dba516ef24..53f631bdec75 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -116,6 +116,7 @@ struct vgic_irq {
+ 	bool hw;			/* Tied to HW IRQ */
+ 	struct kref refcount;		/* Used for LPIs */
+ 	u32 hwintid;			/* HW INTID number */
++	unsigned int host_irq;		/* linux irq corresponding to hwintid */
+ 	union {
+ 		u8 targets;			/* GICv2 target VCPUs mask */
+ 		u32 mpidr;			/* GICv3 target VCPU */
+@@ -307,9 +308,10 @@ void kvm_vgic_init_cpu_hardware(void);
+ 
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level, void *owner);
+-int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq);
+-int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq);
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq);
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
++			  u32 vintid);
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
+ 
+ int kvm_vgic_vcpu_pending_irq(struct kvm_vcpu *vcpu);
+ 
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 4db54ff08d9e..4151250ce8da 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -817,9 +817,6 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ {
+ 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+ 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
+-	struct irq_desc *desc;
+-	struct irq_data *data;
+-	int phys_irq;
+ 	int ret;
+ 
+ 	if (timer->enabled)
+@@ -837,26 +834,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 		return -EINVAL;
+ 	}
+ 
+-	/*
+-	 * Find the physical IRQ number corresponding to the host_vtimer_irq
+-	 */
+-	desc = irq_to_desc(host_vtimer_irq);
+-	if (!desc) {
+-		kvm_err("%s: no interrupt descriptor\n", __func__);
+-		return -EINVAL;
+-	}
+-
+-	data = irq_desc_get_irq_data(desc);
+-	while (data->parent_data)
+-		data = data->parent_data;
+-
+-	phys_irq = data->hwirq;
+-
+-	/*
+-	 * Tell the VGIC that the virtual interrupt is tied to a
+-	 * physical interrupt. We do that once per VCPU.
+-	 */
+-	ret = kvm_vgic_map_phys_irq(vcpu, vtimer->irq.irq, phys_irq);
++	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
+ 	if (ret)
+ 		return ret;
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index e54ef2fdf73d..a05a5700910b 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -17,6 +17,8 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <linux/list_sort.h>
++#include <linux/interrupt.h>
++#include <linux/irq.h>
+ 
+ #include "vgic.h"
+ 
+@@ -409,25 +411,56 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 	return 0;
+ }
+ 
+-int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, u32 virt_irq, u32 phys_irq)
++/* @irq->irq_lock must be held */
++static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
++			    unsigned int host_irq)
+ {
+-	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	struct irq_desc *desc;
++	struct irq_data *data;
++
++	/*
++	 * Find the physical IRQ number corresponding to @host_irq
++	 */
++	desc = irq_to_desc(host_irq);
++	if (!desc) {
++		kvm_err("%s: no interrupt descriptor\n", __func__);
++		return -EINVAL;
++	}
++	data = irq_desc_get_irq_data(desc);
++	while (data->parent_data)
++		data = data->parent_data;
++
++	irq->hw = true;
++	irq->host_irq = host_irq;
++	irq->hwintid = data->hwirq;
++	return 0;
++}
++
++/* @irq->irq_lock must be held */
++static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
++{
++	irq->hw = false;
++	irq->hwintid = 0;
++}
++
++int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
++			  u32 vintid)
++{
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	unsigned long flags;
++	int ret;
+ 
+ 	BUG_ON(!irq);
+ 
+ 	spin_lock_irqsave(&irq->irq_lock, flags);
+-
+-	irq->hw = true;
+-	irq->hwintid = phys_irq;
+-
++	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
+ 	spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 	vgic_put_irq(vcpu->kvm, irq);
+ 
+-	return 0;
++	return ret;
+ }
+ 
+-int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
++int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
+ {
+ 	struct vgic_irq *irq;
+ 	unsigned long flags;
+@@ -435,14 +468,11 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+ 	if (!vgic_initialized(vcpu->kvm))
+ 		return -EAGAIN;
+ 
+-	irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	BUG_ON(!irq);
+ 
+ 	spin_lock_irqsave(&irq->irq_lock, flags);
+-
+-	irq->hw = false;
+-	irq->hwintid = 0;
+-
++	kvm_vgic_unmap_irq(irq);
+ 	spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 	vgic_put_irq(vcpu->kvm, irq);
+ 
+@@ -784,9 +814,9 @@ void vgic_kick_vcpus(struct kvm *kvm)
+ 	}
+ }
+ 
+-bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
++bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid)
+ {
+-	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
++	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	bool map_is_active;
+ 	unsigned long flags;
+ 
+-- 
+2.14.2
