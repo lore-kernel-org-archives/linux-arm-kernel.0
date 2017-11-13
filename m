@@ -1,35 +1,34 @@
-From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
-Date: Mon, 13 Nov 2017 10:56:20 +0100
-Subject: [PATCH] arm: dts: ls1021a: add reboot node to .dtsi
-Message-ID: <1510566980-26602-1-git-send-email-rasmus.villemoes@prevas.dk>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Mon, 13 Nov 2017 18:15:31 +0800
+Subject: [PATCH] MAINTAINERS: change maintainer for Rockchip drm drivers
+Message-ID: <1510568131-28838-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The LS1021A can be reset via the dcfg regmap in the same way as the
-arm64 layerscape SoCs, so add the corresponding DT node.
+For personal reasons, Mark Yao will leave rockchip,
+can not continue maintain drm/rockchip, Sandy Huang
+will take over the drm/rockchip.
 
-Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+Cc: Sandy Huang <hjc@rock-chips.com>
+Cc: Heiko Stuebner <heiko@sntech.de>
+
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 ---
- arch/arm/boot/dts/ls1021a.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ MAINTAINERS | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 9319e1f..3ff2b8a 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -108,6 +108,13 @@
- 			     <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>;
- 	};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 0d77f22..31bf080 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -4627,7 +4627,7 @@ F:	Documentation/devicetree/bindings/display/bridge/renesas,dw-hdmi.txt
+ F:	Documentation/devicetree/bindings/display/renesas,du.txt
  
-+	reboot {
-+		compatible = "syscon-reboot";
-+		regmap = <&dcfg>;
-+		offset = <0xb0>;
-+		mask = <0x02>;
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
+ DRM DRIVERS FOR ROCKCHIP
+-M:	Mark Yao <mark.yao@rock-chips.com>
++M:	Sandy Huang <hjc@rock-chips.com>
+ L:	dri-devel at lists.freedesktop.org
+ S:	Maintained
+ F:	drivers/gpu/drm/rockchip/
 -- 
 2.7.4
