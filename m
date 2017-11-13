@@ -1,82 +1,65 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 14 Nov 2017 00:34:26 +0100
-Subject: [PATCH v2 7/8] soc: actions: sps: Add S700
+Date: Tue, 14 Nov 2017 00:34:25 +0100
+Subject: [PATCH v2 6/8] dt-bindings: power: Add Actions Semi S700 SPS
 In-Reply-To: <20171113233427.5386-1-afaerber@suse.de>
 References: <20171113233427.5386-1-afaerber@suse.de>
-Message-ID: <20171113233427.5386-8-afaerber@suse.de>
+Message-ID: <20171113233427.5386-7-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power domains for S700 SoC.
+Define power domains for Actions Semi S700 SoC Smart Power System (SPS).
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v2: New
  
- drivers/soc/actions/owl-sps.c | 42 ++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+ .../devicetree/bindings/power/actions,owl-sps.txt    |  2 ++
+ include/dt-bindings/power/owl-s700-powergate.h       | 20 ++++++++++++++++++++
+ 2 files changed, 22 insertions(+)
+ create mode 100644 include/dt-bindings/power/owl-s700-powergate.h
 
-diff --git a/drivers/soc/actions/owl-sps.c b/drivers/soc/actions/owl-sps.c
-index 875225bfa21c..8477f0f18e24 100644
---- a/drivers/soc/actions/owl-sps.c
-+++ b/drivers/soc/actions/owl-sps.c
-@@ -17,6 +17,7 @@
- #include <linux/pm_domain.h>
- #include <linux/soc/actions/owl-sps.h>
- #include <dt-bindings/power/owl-s500-powergate.h>
-+#include <dt-bindings/power/owl-s700-powergate.h>
+diff --git a/Documentation/devicetree/bindings/power/actions,owl-sps.txt b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
+index 007b9a7ae723..78edd63641e8 100644
+--- a/Documentation/devicetree/bindings/power/actions,owl-sps.txt
++++ b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
+@@ -2,10 +2,12 @@ Actions Semi Owl Smart Power System (SPS)
  
- struct owl_sps_domain_info {
- 	const char *name;
-@@ -203,8 +204,49 @@ static const struct owl_sps_info s500_sps_info = {
- 	.domains = s500_sps_domains,
- };
+ Required properties:
+ - compatible          :  "actions,s500-sps" for S500
++                         "actions,s700-sps" for S700
+ - reg                 :  Offset and length of the register set for the device.
+ - #power-domain-cells :  Must be 1.
+                          See macros in:
+                           include/dt-bindings/power/owl-s500-powergate.h for S500
++                          include/dt-bindings/power/owl-s700-powergate.h for S700
  
-+static const struct owl_sps_domain_info s700_sps_domains[] = {
-+	[S700_PD_VDE] = {
-+		.name = "VDE",
-+		.pwr_bit = 0,
-+	},
-+	[S700_PD_VCE_SI] = {
-+		.name = "VCE_SI",
-+		.pwr_bit = 1,
-+	},
-+	[S700_PD_USB2_1] = {
-+		.name = "USB2_1",
-+		.pwr_bit = 2,
-+	},
-+	[S700_PD_HDE] = {
-+		.name = "HDE",
-+		.pwr_bit = 7,
-+	},
-+	[S700_PD_DMA] = {
-+		.name = "DMA",
-+		.pwr_bit = 8,
-+	},
-+	[S700_PD_DS] = {
-+		.name = "DS",
-+		.pwr_bit = 9,
-+	},
-+	[S700_PD_USB3] = {
-+		.name = "USB3",
-+		.pwr_bit = 10,
-+	},
-+	[S700_PD_USB2_0] = {
-+		.name = "USB2_0",
-+		.pwr_bit = 11,
-+	},
-+};
+ 
+ Example:
+diff --git a/include/dt-bindings/power/owl-s700-powergate.h b/include/dt-bindings/power/owl-s700-powergate.h
+new file mode 100644
+index 000000000000..4ded16bc074f
+--- /dev/null
++++ b/include/dt-bindings/power/owl-s700-powergate.h
+@@ -0,0 +1,20 @@
++/*
++ * Actions Semi S700 SPS
++ *
++ * Copyright (c) 2017 Andreas F?rber
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++#ifndef DT_BINDINGS_POWER_OWL_S700_POWERGATE_H
++#define DT_BINDINGS_POWER_OWL_S700_POWERGATE_H
 +
-+static const struct owl_sps_info s700_sps_info = {
-+	.num_domains = ARRAY_SIZE(s700_sps_domains),
-+	.domains = s700_sps_domains,
-+};
++#define S700_PD_VDE	0
++#define S700_PD_VCE_SI	1
++#define S700_PD_USB2_1	2
++#define S700_PD_HDE	3
++#define S700_PD_DMA	4
++#define S700_PD_DS	5
++#define S700_PD_USB3	6
++#define S700_PD_USB2_0	7
 +
- static const struct of_device_id owl_sps_of_matches[] = {
- 	{ .compatible = "actions,s500-sps", .data = &s500_sps_info },
-+	{ .compatible = "actions,s700-sps", .data = &s700_sps_info },
- 	{ }
- };
- 
++#endif
 -- 
 2.13.6
