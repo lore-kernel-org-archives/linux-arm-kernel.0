@@ -1,32 +1,27 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Mon, 13 Nov 2017 19:23:49 +0530
-Subject: [PATCH 3/3] irqchip/gic-v3: pr_err() strings should end with newlines
-In-Reply-To: <cover.1510580710.git.arvind.yadav.cs@gmail.com>
-References: <cover.1510580710.git.arvind.yadav.cs@gmail.com>
-Message-ID: <62302a3bd4918e392ca3da16f9f389aa59e76cee.1510580710.git.arvind.yadav.cs@gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 13 Nov 2017 08:01:43 -0600
+Subject: [PATCH] dmaengine: dmatest: move callback wait queue to thread
+ context
+In-Reply-To: <ed768b4f-7bcb-24a2-5fee-82f9f5954122@codeaurora.org>
+References: <1510335864-25997-1-git-send-email-awallis@codeaurora.org>
+ <ed768b4f-7bcb-24a2-5fee-82f9f5954122@codeaurora.org>
+Message-ID: <197cfdcf-a7c3-51c4-21bb-4b9ba7f771a2@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pr_err() messages should end with a new-line to avoid other messages
-being concatenated.
+On 11/13/17 6:52 AM, Adam Wallis wrote:
+> Hmm, I think I would need to submit a v2 of this patch removing the
+> stable at vger.kernel.org  since this is dependent on my WARN patch in dma
+> linux-next tree...however, I don't know what the SHA of that patch will be until
+> it's in Linus' tree.
+> 
+> Any thoughts on that Vinod?
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/irqchip/irq-gic-v3.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+You can specify prerequisite patches in patches for the stable tree.
 
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b5df99c..252fb0c 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -1489,7 +1489,7 @@ static void __init gic_acpi_setup_kvm_info(void)
- 
- 	err = gic_validate_dist_version(acpi_data.dist_base);
- 	if (err) {
--		pr_err("No distributor detected at @%p, giving up",
-+		pr_err("No distributor detected at @%p, giving up\n",
- 		       acpi_data.dist_base);
- 		goto out_dist_unmap;
- 	}
+https://www.kernel.org/doc/html/v4.13/process/stable-kernel-rules.html
+
 -- 
-1.9.1
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
