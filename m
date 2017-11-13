@@ -1,58 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 13 Nov 2017 11:36:19 +0100
-Subject: [GIT PULL] Allwinner DT changes for 4.15, step 2
-In-Reply-To: <CAK8P3a3dL2_oWiBi4p4CnAOa8F7ijcrKje1fRq84j7pWJpqECA@mail.gmail.com>
-References: <20171106092623.tqvmvqhpopyu2mri@flea>
- <CAK8P3a3dL2_oWiBi4p4CnAOa8F7ijcrKje1fRq84j7pWJpqECA@mail.gmail.com>
-Message-ID: <20171113103619.jhethmeiq3yj3uyb@flea.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 13 Nov 2017 11:01:10 +0000
+Subject: [PATCH v4 15/13] firmware: arm_sdei: be more robust against
+ cpu-hotplug
+In-Reply-To: <20171108160624.10355-1-james.morse@arm.com>
+References: <5A031E9E.2090809@arm.com>
+ <20171108160624.10355-1-james.morse@arm.com>
+Message-ID: <20171113110109.GB8968@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, Nov 08, 2017 at 04:06:24PM +0000, James Morse wrote:
+> dpm_suspend() calls the freeze/thaw callbacks for hibernate before
+> disable_non_bootcpus() takes down secondaries.
+> 
+> This leads to a fun race where the freeze/thaw callbacks reset the
+> SDEI interface (as we may be restoring a kernel with a different
+> layout due to KASLR), then the cpu-hotplug callbacks come in to
+> save the current state, which has already been reset.
+> 
+> I tried to solve this with a 'frozen' flag that stops the hotplug
+> callback from overwriting the saved values. Instead this just
+> moves the race around and makes it even harder to think about.
+> 
+> Instead, make it look like the secondaries have gone offline.
+> Call cpuhp_remove_state() in the freeze callback, this will call the
+> teardown hook on all online CPUs, then remove the state. This saves
+> all private events and makes future CPU up/down events invisible.
+> 
+> Change sdei_event_unregister_all()/sdei_reregister_events() to
+> only save/restore shared events, which are all that is left. With
+> this we can remove the frozen flag. We can remove the device
+> suspend/resume calls too as cpuhotplug's teardown call has masked
+> the CPUs.
+> 
+> All that is left is the reboot notifier, (which was abusing the
+> frozen flag). Call cpuhp_remove_state() to make it look like
+> secondary CPUs have gone offline.
+> 
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Signed-off-by: James Morse <james.morse@arm.com>
+> ---
+>  drivers/firmware/arm_sdei.c | 60 +++++++++++++++++++++++----------------------
+>  1 file changed, 31 insertions(+), 29 deletions(-)
 
-On Tue, Nov 07, 2017 at 04:18:30PM +0100, Arnd Bergmann wrote:
-> On Mon, Nov 6, 2017 at 10:26 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> >
-> > Here are a few commits that would be great to get in 4.15, given how
-> > long they've been hanging around.
-> >
-> > The first and most important one is the reintroduction of the EMAC DT
-> > changes after they've been reverted at the last minute in 4.13.
-> >
-> > There's a arm64 patch that crept in because the H5 and H3 share a
-> > common DTSI that is located in arch/arm, and merging that patch
-> > through the arm64 PR, especially given the pull requests that have
-> > already been sent, would just have generated too many conflicts.
->
-> That's all good, in particular as I've been pulling both arm32 and
-> arm64 changes into a shared next/dt branch. Please keep sending
-> them separately when you can, we'll just merge them as needed.
+Thanks, this appears to address my concerns. It's too late for 4.15 now,
+but please resend for 4.16 and Catalin can pick this series up.
 
-Ok.
-
-> One small request: the text you wrote above makes a better changelog
-> text than what you had in the signed tag, so I ended up using your
-> longer description in the merge commit. Try to describe the changes
-> like that in the future too, giving a little more background in what you
-> see as important, instead of just listing lots of small items that
-> we can see from the list of commits.
-
-Yeah, I must admit I never really know what to put in there. I will
-try to enhance that in the future, and let me know if it's still not
-up to what you'd like.
-
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 801 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171113/fe0c4194/attachment.sig>
+Will
