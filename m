@@ -1,5 +1,5 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 13 Nov 2017 09:34:23 +0000
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 13 Nov 2017 10:42:03 +0100
 Subject: linux-next: Tree for Nov 7
 In-Reply-To: <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
 References: <20171107162217.382cd754@canb.auug.org.au>
@@ -8,13 +8,21 @@ References: <20171107162217.382cd754@canb.auug.org.au>
  <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
  <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
  <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
-Message-ID: <20171113093423.GI12318@n2100.armlinux.org.uk>
+Message-ID: <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 13, 2017 at 10:20:06AM +0100, Michal Hocko wrote:
+On Mon 13-11-17 10:20:06, Michal Hocko wrote:
 > [Cc arm and ppc maintainers]
-> 
+
+Hmm, it turned out to be a problem on other architectures as well.
+CCing more maintainers. For your reference, we are talking about
+http://lkml.kernel.org/r/20171023082608.6167-1-mhocko at kernel.org
+which has broken architectures which do apply aligning on the mmap
+address hint without MAP_FIXED applied. See below my proposed way
+around this issue because I belive that the above patch is quite
+valuable on its own to be dropped for all archs.
+
 > Thanks a lot for testing!
 > 
 > On Sun 12-11-17 11:38:02, Joel Stanley wrote:
@@ -68,10 +76,119 @@ On Mon, Nov 13, 2017 at 10:20:06AM +0100, Michal Hocko wrote:
 > CACHEID_VIPT_ALIASING. But this can be always handled later. I find the
 > protection for other archtectures useful enough to have this working for
 > most architectures now and handle others specially.
-
-Can someone provide the background information for this please?
-
+> 
+> [1] http://lkml.kernel.org/r/1510048229.12079.7.camel at abdul.in.ibm.com
+> ---
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 61a0cb15067e..018d041a30e6 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -99,6 +99,7 @@ config ARM
+ 	select PERF_USE_VMALLOC
+ 	select RTC_LIB
+ 	select SYS_SUPPORTS_APM_EMULATION
++	select ARCH_ALIGNED_MMAPS
+ 	# Above selects are sorted alphabetically; please add new ones
+ 	# according to that.  Thanks.
+ 	help
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index 48d91d5be4e9..eca59d27e9f1 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -72,6 +72,7 @@ config MIPS
+ 	select RTC_LIB if !MACH_LOONGSON64
+ 	select SYSCTL_EXCEPTION_TRACE
+ 	select VIRT_TO_BUS
++	select ARCH_ALIGNED_MMAPS
+ 
+ menu "Machine selection"
+ 
+diff --git a/arch/parisc/Kconfig b/arch/parisc/Kconfig
+index 22f27ec8c117..8376d16e0a4a 100644
+--- a/arch/parisc/Kconfig
++++ b/arch/parisc/Kconfig
+@@ -40,6 +40,7 @@ config PARISC
+ 	select GENERIC_CLOCKEVENTS
+ 	select ARCH_NO_COHERENT_DMA_MMAP
+ 	select CPU_NO_EFFICIENT_FFS
++	select ARCH_ALIGNED_MMAPS
+ 
+ 	help
+ 	  The PA-RISC microprocessor is designed by Hewlett-Packard and used
+diff --git a/arch/powerpc/platforms/Kconfig.cputype b/arch/powerpc/platforms/Kconfig.cputype
+index 2f629e0551e9..156f69c09c7f 100644
+--- a/arch/powerpc/platforms/Kconfig.cputype
++++ b/arch/powerpc/platforms/Kconfig.cputype
+@@ -368,6 +368,7 @@ config PPC_MM_SLICES
+ 	bool
+ 	default y if PPC_STD_MMU_64
+ 	default n
++	select ARCH_ALIGNED_MMAPS
+ 
+ config PPC_HAVE_PMU_SUPPORT
+        bool
+diff --git a/arch/sh/Kconfig b/arch/sh/Kconfig
+index 640a85925060..ac1d4637a728 100644
+--- a/arch/sh/Kconfig
++++ b/arch/sh/Kconfig
+@@ -49,6 +49,7 @@ config SUPERH
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_FUTEX_CMPXCHG if FUTEX
+ 	select HAVE_NMI
++	select ARCH_ALIGNED_MMAPS
+ 	help
+ 	  The SuperH is a RISC processor targeted for use in embedded systems
+ 	  and consumer electronics; it was also used in the Sega Dreamcast
+diff --git a/arch/sparc/Kconfig b/arch/sparc/Kconfig
+index 0be3828752e5..c265dcda3d28 100644
+--- a/arch/sparc/Kconfig
++++ b/arch/sparc/Kconfig
+@@ -45,6 +45,7 @@ config SPARC
+ 	select CPU_NO_EFFICIENT_FFS
+ 	select LOCKDEP_SMALL if LOCKDEP
+ 	select ARCH_WANT_RELAX_ORDER
++	select ARCH_ALIGNED_MMAPS if SPARC64
+ 
+ config SPARC32
+ 	def_bool !64BIT
+diff --git a/arch/xtensa/Kconfig b/arch/xtensa/Kconfig
+index 7ad6d77b2f22..a5cf535034d1 100644
+--- a/arch/xtensa/Kconfig
++++ b/arch/xtensa/Kconfig
+@@ -30,6 +30,7 @@ config XTENSA
+ 	select NO_BOOTMEM
+ 	select PERF_USE_VMALLOC
+ 	select VIRT_TO_BUS
++	select ARCH_ALIGNED_MMAPS if MMU
+ 	help
+ 	  Xtensa processors are 32-bit RISC machines designed by Tensilica
+ 	  primarily for embedded systems.  These processors are both
+diff --git a/fs/binfmt_elf.c b/fs/binfmt_elf.c
+index a22718de42db..d23eb89f31c0 100644
+--- a/fs/binfmt_elf.c
++++ b/fs/binfmt_elf.c
+@@ -345,13 +345,19 @@ static unsigned long elf_vm_mmap(struct file *filep, unsigned long addr,
+ 		unsigned long size, int prot, int type, unsigned long off)
+ {
+ 	unsigned long map_addr;
++	unsigned long map_type = type;
+ 
+ 	/*
+ 	 * If caller requests the mapping at a specific place, make sure we fail
+ 	 * rather than potentially clobber an existing mapping which can have
+-	 * security consequences (e.g. smash over the stack area).
++	 * security consequences (e.g. smash over the stack area). Be careful
++	 * about architectures which do not respect the address hint due to
++	 * aligning restrictions for !fixed mappings.
+ 	 */
+-	map_addr = vm_mmap(filep, addr, size, prot, type & ~MAP_FIXED, off);
++	if (!IS_ENABLED(ARCH_ALIGNED_MMAPS))
++		map_type &= ~MAP_FIXED;
++
++	map_addr = vm_mmap(filep, addr, size, prot, map_type, off);
+ 	if (BAD_ADDR(map_addr))
+ 		return map_addr;
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Michal Hocko
+SUSE Labs
