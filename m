@@ -1,39 +1,82 @@
 From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 14 Nov 2017 00:34:27 +0100
-Subject: [PATCH v2 8/8] arm64: dts: actions: Add S700 SPS node
+Date: Tue, 14 Nov 2017 00:34:26 +0100
+Subject: [PATCH v2 7/8] soc: actions: sps: Add S700
 In-Reply-To: <20171113233427.5386-1-afaerber@suse.de>
 References: <20171113233427.5386-1-afaerber@suse.de>
-Message-ID: <20171113233427.5386-9-afaerber@suse.de>
+Message-ID: <20171113233427.5386-8-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a node to the S700 Device Tree for the Smart Power System (SPS).
+Add power domains for S700 SoC.
 
 Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
  v2: New
  
- To be squashed into 5/8 if binding gets acked.
- 
- arch/arm64/boot/dts/actions/s700.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/soc/actions/owl-sps.c | 42 ++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-index b54df405aaeb..6a39968b209f 100644
---- a/arch/arm64/boot/dts/actions/s700.dtsi
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -154,6 +154,12 @@
- 			status = "disabled";
- 		};
+diff --git a/drivers/soc/actions/owl-sps.c b/drivers/soc/actions/owl-sps.c
+index 875225bfa21c..8477f0f18e24 100644
+--- a/drivers/soc/actions/owl-sps.c
++++ b/drivers/soc/actions/owl-sps.c
+@@ -17,6 +17,7 @@
+ #include <linux/pm_domain.h>
+ #include <linux/soc/actions/owl-sps.h>
+ #include <dt-bindings/power/owl-s500-powergate.h>
++#include <dt-bindings/power/owl-s700-powergate.h>
  
-+		sps: power-controller at e01b0100 {
-+			compatible = "actions,s700-sps";
-+			reg = <0x0 0xe01b0100 0x0 0x100>;
-+			#power-domain-cells = <1>;
-+		};
+ struct owl_sps_domain_info {
+ 	const char *name;
+@@ -203,8 +204,49 @@ static const struct owl_sps_info s500_sps_info = {
+ 	.domains = s500_sps_domains,
+ };
+ 
++static const struct owl_sps_domain_info s700_sps_domains[] = {
++	[S700_PD_VDE] = {
++		.name = "VDE",
++		.pwr_bit = 0,
++	},
++	[S700_PD_VCE_SI] = {
++		.name = "VCE_SI",
++		.pwr_bit = 1,
++	},
++	[S700_PD_USB2_1] = {
++		.name = "USB2_1",
++		.pwr_bit = 2,
++	},
++	[S700_PD_HDE] = {
++		.name = "HDE",
++		.pwr_bit = 7,
++	},
++	[S700_PD_DMA] = {
++		.name = "DMA",
++		.pwr_bit = 8,
++	},
++	[S700_PD_DS] = {
++		.name = "DS",
++		.pwr_bit = 9,
++	},
++	[S700_PD_USB3] = {
++		.name = "USB3",
++		.pwr_bit = 10,
++	},
++	[S700_PD_USB2_0] = {
++		.name = "USB2_0",
++		.pwr_bit = 11,
++	},
++};
 +
- 		timer: timer at e024c000 {
- 			compatible = "actions,s700-timer";
- 			reg = <0x0 0xe024c000 0x0 0x4000>;
++static const struct owl_sps_info s700_sps_info = {
++	.num_domains = ARRAY_SIZE(s700_sps_domains),
++	.domains = s700_sps_domains,
++};
++
+ static const struct of_device_id owl_sps_of_matches[] = {
+ 	{ .compatible = "actions,s500-sps", .data = &s500_sps_info },
++	{ .compatible = "actions,s700-sps", .data = &s700_sps_info },
+ 	{ }
+ };
+ 
 -- 
 2.13.6
