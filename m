@@ -1,42 +1,81 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 13 Nov 2017 16:56:35 -0200
-Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <CAOMZO5Bi5PcuGiVRZykw9Zp-ysHmHzThhwNai-cqy3HRTUKQAg@mail.gmail.com>
-References: <D24E577EA1E37B4788A3BFBC418F14A70760C04A@wetsrvex01.loepfe.com>
- <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
- <20171109030327.anzo47xayxckn47r@piout.net>
- <3BB206AB2B1BD448954845CE6FF69A8E01CB52290E@NT-Mail07.beckhoff.com>
- <20171113161522.2kq7un7gl5vg4qlq@piout.net>
- <CAOMZO5Bi5PcuGiVRZykw9Zp-ysHmHzThhwNai-cqy3HRTUKQAg@mail.gmail.com>
-Message-ID: <CAOMZO5AOAo8OU86CrneFeWuu2ti1sea9843UQ16=7AyU5-B11Q@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 13 Nov 2017 20:07:01 +0100
+Subject: [PATCH 26/37] KVM: arm64: Prepare to handle traps on deferred
+ AArch32 sysregs
+In-Reply-To: <20171012104141.26902-27-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-27-christoffer.dall@linaro.org>
+Message-ID: <20171113190701.7vgkady36c6keshh@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 13, 2017 at 2:54 PM, Fabio Estevam <festevam@gmail.com> wrote:
+On Thu, Oct 12, 2017 at 12:41:30PM +0200, Christoffer Dall wrote:
+> Handle accesses to any AArch32 EL1 system registers where we can defer
+> saving and restoring them to vcpu_load and vcpu_put, and which are
+> stored in special EL2 registers only used support 32-bit guests.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm64/kvm/inject_fault.c | 14 +++++++++++++-
+>  1 file changed, 13 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+> index f4513fc..02990f5 100644
+> --- a/arch/arm64/kvm/inject_fault.c
+> +++ b/arch/arm64/kvm/inject_fault.c
+> @@ -59,9 +59,18 @@ static void vcpu_set_elr_el1(struct kvm_vcpu *vcpu, u64 val)
+>  /* Set the SPSR for the current mode */
+>  static void vcpu_set_spsr(struct kvm_vcpu *vcpu, u64 val)
+>  {
+> -	if (vcpu_mode_is_32bit(vcpu))
+> +	if (vcpu_mode_is_32bit(vcpu)) {
+> +		if (vcpu->arch.sysregs_loaded_on_cpu)
+> +			__sysreg32_save_state(vcpu);
+> +
+>  		*vcpu_spsr32(vcpu) = val;
+>  
+> +		if (vcpu->arch.sysregs_loaded_on_cpu)
+> +			__sysreg32_restore_state(vcpu);
+> +
+> +		return;
 
-> I don't recall of any recent change in this area.
+Is this a fix? I don't understand why it's necessary now, but it wasn't
+before.
+
+> +	}
+> +
+>  	if (vcpu->arch.sysregs_loaded_on_cpu)
+>  		write_sysreg_el1(val, spsr);
+>  	else
+> @@ -129,11 +138,13 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+>  	 *   IFAR:  mapped to FAR_EL1
+>  	 *   DFSR:  mapped to ESR_EL1
+>  	 *   TTBCR: mapped to TCR_EL1
+> +	 *   IFSR:  stored in IFSR32_EL2
+>  	 */
+>  	if (vcpu->arch.sysregs_loaded_on_cpu) {
+>  		vcpu->arch.ctxt.sys_regs[FAR_EL1] = read_sysreg_el1(far);
+>  		vcpu->arch.ctxt.sys_regs[ESR_EL1] = read_sysreg_el1(esr);
+>  		vcpu->arch.ctxt.sys_regs[TCR_EL1] = read_sysreg_el1(tcr);
+> +		vcpu->arch.ctxt.sys_regs[IFSR32_EL2] = read_sysreg(ifsr32_el2);
+>  	}
+>  
+>  	if (is_pabt) {
+> @@ -161,6 +172,7 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
+>  	if (vcpu->arch.sysregs_loaded_on_cpu) {
+>  		write_sysreg_el1(vcpu->arch.ctxt.sys_regs[FAR_EL1], far);
+>  		write_sysreg_el1(vcpu->arch.ctxt.sys_regs[ESR_EL1], esr);
+> +		write_sysreg(vcpu->arch.ctxt.sys_regs[IFSR32_EL2], ifsr32_el2);
+
+This appears to be a fix. Why not squash it into the patch that
+save/restore the other registers?
+
+>  	}
+>  }
+>  
+> -- 
+> 2.9.0
 >
-> Patrick/Noel,
->
-> Does the change below help?
->
-> --- a/arch/arm/boot/dts/imx53.dtsi
-> +++ b/arch/arm/boot/dts/imx53.dtsi
-> @@ -436,8 +436,7 @@
->                         srtc: srtc at 53fa4000 {
->                                 compatible = "fsl,imx53-rtc", "fsl,imx25-rtc";
->                                 reg = <0x53fa4000 0x4000>;
-> -                               interrupts = <24>;
-> -                               interrupt-parent = <&tzic>;
-> +                               interrupts = <24 25>;
->                                 clocks = <&clks IMX5_CLK_SRTC_GATE>;
->                                 clock-names = "ipg";
->                         };
 
-With this change I no longer get the spurious interrupts:
-
-# cat /proc/interrupts | grep rtc
- 40:          0      tzic  24 Edge      53fa4000.srtc
- 41:          0      tzic  25 Edge      53fa4000.srtc
-
-The timeout is still present though and we need to figure this out.
+Thanks,
+drew
