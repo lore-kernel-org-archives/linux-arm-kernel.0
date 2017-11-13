@@ -1,34 +1,26 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 13 Nov 2017 11:17:52 -0800
-Subject: [PATCHv3 2/3] EDAC: ti: add support for TI keystone and DRA7xx
- EDAC
-In-Reply-To: <cdaf8a76-c249-cd79-f03b-bfd78a5f7fbf@ti.com>
-References: <1510087139-21885-3-git-send-email-t-kristo@ti.com>
- <1510578490-14510-1-git-send-email-t-kristo@ti.com>
- <47e1810b-a10b-28fb-ba0e-fe28ae337c61@oracle.com>
- <20171113175816.qmvbug4kf3qu5meq@pd.tnic>
- <f9d1b261-7942-6ff6-bfc3-4b3ff22f0e27@oracle.com>
- <20171113180843.hif7mfx5crvndito@pd.tnic>
- <cdaf8a76-c249-cd79-f03b-bfd78a5f7fbf@ti.com>
-Message-ID: <05ed5e76-8c41-37b9-5248-612bf08e70e3@oracle.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 13 Nov 2017 13:19:02 -0600
+Subject: [PATCH 0/4] [v7] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+Message-ID: <c219c289-9cad-f96c-f766-ec28af8f078d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2017 10:49 AM, Tero Kristo wrote:
-> On 13/11/17 20:08, Borislav Petkov wrote:
->> On Mon, Nov 13, 2017 at 10:04:09AM -0800, Santosh Shilimkar wrote:
->>> DTS patches can be merged anytime once its respective driver are in
->>> tree.
->>
->> Works for me too.
->>
-> 
-> I guess you can just merge the dts patch also whenever you like, as 
-> there is currently no support around for ti,emif-keystone. It just won't 
-> do anything.
-> 
-Its not followed practice Tero and I don't want to get flamed for
-it. ;-) I will apply the patches once the driver is in.
+On 11/07/2017 05:07 PM, Timur Tabi wrote:
+> A series of patches that add support for GPIO maps that have holes in
+> them.  That is, even though a client driver has N consecutive GPIOs,
+> some are just unavailable for whatever reason, and the hardware should
+> not be accessed for those GPIOs.
 
-Regards,
-Santosh
+Any chance of these patches going into 4.15?  I've been making lots of 
+changes, but I haven't gotten a lot of feedback.  I still think that v7 
+is more intrusive and risky than v5, with no real benefit.  But at this 
+point, I just want something to be merged so that I stop thinking about it.
+
+
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
