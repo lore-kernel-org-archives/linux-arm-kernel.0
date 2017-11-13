@@ -1,40 +1,108 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 13 Nov 2017 08:55:53 +0100
-Subject: [PATCH] ARM: dts: imx6: Remove unneeded address-cells/size-cells
-In-Reply-To: <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
-References: <1510348378-18150-1-git-send-email-festevam@gmail.com>
- <62f3cb01-ff85-0fe0-2afa-0fe4732a7421@rwth-aachen.de>
-Message-ID: <20171113075553.vseyq3swmzwja3ld@pengutronix.de>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 13 Nov 2017 16:01:55 +0800
+Subject: [PATCH] ARM64: dts: meson-axg: add ethernet mac controller
+Message-ID: <20171113080155.2463-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Add DT info for the stmmac ethernet MAC which found in
+the Amlogic's Meson-AXG SoC, also describe the ethernet
+pinctrl & clock information here.
 
-On Sat, Nov 11, 2017 at 03:24:47PM +0100, Christopher Spinrath wrote:
-> (I'm sorry if I've missed some recipients or broke the email thread but
-> I got Fabio's email from the infradead archive.)
-> 
-> On 11/10/2017 10:12 PM, festevam at gmail.com (Fabio Estevam) wrote:
-> > From: Fabio Estevam <fabio.estevam@nxp.com>
-> > 
-> > According to Documentation/devicetree/bindings/mtd/jedec,spi-nor.txt:
-> > 
-> > "- #address-cells, #size-cells : Must be present if the device has
-> > sub-nodes representing partitions."
-> > 
-> > Remove the occurrences of #address-cells/size-cells where no sub-nodes
-> > representing partitions are present.
-> 
-> This results in a regression for those devices where U-Boot is supposed
-> to inject the partition sub-nodes. For example, this is the case for
-> cm-fx6 module based devices like the Utilite Pro.
+This is tested in the S400 dev board which use a RTL8211F PHY,
+and the pins connect to the 'eth_rgmii_y_pins' group.
 
-sounds like an U-Boot bug that it inserts partition nodes, but doesn't
-ensure matching #address-cells/size-cells are specified.
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  7 ++++
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 53 ++++++++++++++++++++++++++
+ 2 files changed, 60 insertions(+)
 
-Best regards
-Uwe
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index 9eb6aaee155d..7b39a9fe2b0f 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -21,3 +21,10 @@
+ 	status = "okay";
+ };
+ 
++&ethmac {
++	status = "okay";
++	phy-mode = "rgmii";
++
++	pinctrl-0 = <&eth_rgmii_y_pins>;
++	pinctrl-names = "default";
++};
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+index 65945c6c8b65..57faaa9d8013 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+@@ -157,6 +157,19 @@
+ 			#address-cells = <0>;
+ 		};
+ 
++		ethmac: ethernet at ff3f0000 {
++			compatible = "amlogic,meson-axg-dwmac", "amlogic,meson-gxbb-dwmac", "snps,dwmac";
++			reg = <0x0 0xff3f0000 0x0 0x10000
++				0x0 0xff634540 0x0 0x8>;
++			interrupts = <GIC_SPI 8 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names = "macirq";
++			status = "disabled";
++			clocks = <&clkc CLKID_ETH>,
++				 <&clkc CLKID_FCLK_DIV2>,
++				 <&clkc CLKID_MPLL2>;
++			clock-names = "stmmaceth", "clkin0", "clkin1";
++		};
++
+ 		hiubus: hiubus at ff63c000 {
+ 			compatible = "simple-bus";
+ 			reg = <0x0 0xff63c000 0x0 0x1c00>;
+@@ -203,6 +216,46 @@
+ 					#gpio-cells = <2>;
+ 					gpio-ranges = <&pinctrl_periphs 0 0 86>;
+ 				};
++
++				eth_rgmii_x_pins: eth-x-rgmii {
++					mux {
++						groups = "eth_mdio_x",
++						       "eth_mdc_x",
++						       "eth_rgmii_rx_clk_x",
++						       "eth_rx_dv_x",
++						       "eth_rxd0_x",
++						       "eth_rxd1_x",
++						       "eth_rxd2_rgmii",
++						       "eth_rxd3_rgmii",
++						       "eth_rgmii_tx_clk",
++						       "eth_txen_x",
++						       "eth_txd0_x",
++						       "eth_txd1_x",
++						       "eth_txd2_rgmii",
++						       "eth_txd3_rgmii";
++						function = "eth";
++					};
++				};
++
++				eth_rgmii_y_pins: eth-y-rgmii {
++					mux {
++						groups = "eth_mdio_y",
++						       "eth_mdc_y",
++						       "eth_rgmii_rx_clk_y",
++						       "eth_rx_dv_y",
++						       "eth_rxd0_y",
++						       "eth_rxd1_y",
++						       "eth_rxd2_rgmii",
++						       "eth_rxd3_rgmii",
++						       "eth_rgmii_tx_clk",
++						       "eth_txen_y",
++						       "eth_txd0_y",
++						       "eth_txd1_y",
++						       "eth_txd2_rgmii",
++						       "eth_txd3_rgmii";
++						function = "eth";
++					};
++				};
+ 			};
+ 		};
+ 
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+2.14.1
