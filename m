@@ -1,56 +1,39 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 13 Nov 2017 10:17:37 +0100
-Subject: [PULL 12/27] KVM: arm/arm64: GICv4: Propagate affinity changes to the
- physical ITS
+Date: Mon, 13 Nov 2017 10:17:38 +0100
+Subject: [PULL 13/27] KVM: arm/arm64: GICv4: Handle CLEAR applied to a VLPI
 In-Reply-To: <20171113091752.10663-1-christoffer.dall@linaro.org>
 References: <20171113091752.10663-1-christoffer.dall@linaro.org>
-Message-ID: <20171113091752.10663-13-christoffer.dall@linaro.org>
+Message-ID: <20171113091752.10663-14-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-When the guest issues an affinity change, we need to tell the physical
-ITS that we're now targetting a new vcpu.  This is done by extracting
-the current mapping, updating the target, and reapplying the mapping.
+Handling CLEAR is pretty easy. Just ask the ITS driver to clear
+the corresponding pending bit (which will turn into a CLEAR
+command on the physical side).
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Acked-by: Christoffer Dall <cdall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 16 +++++++++++++++-
- 1 file changed, 15 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index ad14af8a4412..80bea7021e2e 100644
+index 80bea7021e2e..15e79285380d 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -338,11 +338,25 @@ static int vgic_copy_lpi_list(struct kvm_vcpu *vcpu, u32 **intid_ptr)
+@@ -1091,6 +1091,10 @@ static int vgic_its_cmd_handle_clear(struct kvm *kvm, struct vgic_its *its,
  
- static int update_affinity(struct vgic_irq *irq, struct kvm_vcpu *vcpu)
- {
-+	int ret = 0;
-+
- 	spin_lock(&irq->irq_lock);
- 	irq->target_vcpu = vcpu;
- 	spin_unlock(&irq->irq_lock);
+ 	ite->irq->pending_latch = false;
  
--	return 0;
-+	if (irq->hw) {
-+		struct its_vlpi_map map;
++	if (ite->irq->hw)
++		return irq_set_irqchip_state(ite->irq->host_irq,
++					     IRQCHIP_STATE_PENDING, false);
 +
-+		ret = its_get_vlpi(irq->host_irq, &map);
-+		if (ret)
-+			return ret;
-+
-+		map.vpe = &vcpu->arch.vgic_cpu.vgic_v3.its_vpe;
-+
-+		ret = its_map_vlpi(irq->host_irq, &map);
-+	}
-+
-+	return ret;
+ 	return 0;
  }
  
- /*
 -- 
 2.14.2
