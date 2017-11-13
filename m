@@ -1,223 +1,103 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun, 12 Nov 2017 19:16:42 -0600
-Subject: [PATCH v2 2/2] arm64: Add software workaround for Falkor erratum 1041
-In-Reply-To: <1510535802-2799-1-git-send-email-shankerd@codeaurora.org>
-References: <1510535802-2799-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <1510535802-2799-3-git-send-email-shankerd@codeaurora.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 13 Nov 2017 01:25:21 +0000
+Subject: [RFC PATCH 1/3] dt-bindings: pinctrl: sunxi: document new generic
+ binding
+In-Reply-To: <20171113012523.2328-1-andre.przywara@arm.com>
+References: <20171113012523.2328-1-andre.przywara@arm.com>
+Message-ID: <20171113012523.2328-2-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ARM architecture defines the memory locations that are permitted
-to be accessed as the result of a speculative instruction fetch from
-an exception level for which all stages of translation are disabled.
-Specifically, the core is permitted to speculatively fetch from the
-4KB region containing the current program counter 4K and next 4K.
+So far all the Allwinner pinctrl drivers provided a table in the
+kernel to describe all the pins and the link between the pinctrl functions
+names (strings) and their respective mux values (register values).
 
-When translation is changed from enabled to disabled for the running
-exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
-Falkor core may errantly speculatively access memory locations outside
-of the 4KB region permitted by the architecture. The errant memory
-access may lead to one of the following unexpected behaviors.
+Extend the binding to put those mappings in the DT, so that any SoC can
+describe its pinctrl and GPIO data fully there instead of relying on
+tables.
+This uses a generic compatible name, to be prepended with an SoC
+specific name in the node.
 
-1) A System Error Interrupt (SEI) being raised by the Falkor core due
-   to the errant memory access attempting to access a region of memory
-   that is protected by a slave-side memory protection unit.
-2) Unpredictable device behavior due to a speculative read from device
-   memory. This behavior may only occur if the instruction cache is
-   disabled prior to or coincident with translation being changed from
-   enabled to disabled.
-
-The conditions leading to this erratum will not occur when either of the
-following occur:
- 1) A higher exception level disables translation of a lower exception level
-   (e.g. EL2 changing SCTLR_EL1[M] from a value of 1 to 0).
- 2) An exception level disabling its stage-1 translation if its stage-2
-    translation is enabled (e.g. EL1 changing SCTLR_EL1[M] from a value of 1
-    to 0 when HCR_EL2[VM] has a value of 1).
-
-To avoid the errant behavior, software must execute an ISB immediately
-prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
-
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- Documentation/arm64/silicon-errata.txt |  1 +
- arch/arm64/Kconfig                     | 10 ++++++++++
- arch/arm64/include/asm/assembler.h     | 18 ++++++++++++++++++
- arch/arm64/include/asm/cpucaps.h       |  3 ++-
- arch/arm64/kernel/cpu-reset.S          |  1 +
- arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
- arch/arm64/kernel/efi-entry.S          |  2 ++
- arch/arm64/kernel/head.S               |  1 +
- arch/arm64/kernel/relocate_kernel.S    |  1 +
- arch/arm64/kvm/hyp-init.S              |  1 +
- 10 files changed, 53 insertions(+), 1 deletion(-)
+ .../bindings/pinctrl/allwinner,sunxi-pinctrl.txt   | 58 ++++++++++++++++++++++
+ 1 file changed, 58 insertions(+)
 
-diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-index 66e8ce1..704770c0 100644
---- a/Documentation/arm64/silicon-errata.txt
-+++ b/Documentation/arm64/silicon-errata.txt
-@@ -74,3 +74,4 @@ stable kernels.
- | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
- | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
- | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
-+| Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0df64a6..8f73eac 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -539,6 +539,16 @@ config QCOM_QDF2400_ERRATUM_0065
+diff --git a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+index 6f2ec9af0de2..c1ea755229da 100644
+--- a/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/allwinner,sunxi-pinctrl.txt
+@@ -28,6 +28,7 @@ Required properties:
+   "allwinner,sun50i-a64-r-pinctrl"
+   "allwinner,sun50i-h5-pinctrl"
+   "nextthing,gr8-pinctrl"
++  "allwinner,sunxi-pinctrl"	(see below)
  
- 	  If unsure, say Y.
+ - reg: Should contain the register physical address and length for the
+   pin controller.
+@@ -69,6 +70,63 @@ Optional sub-node properties:
+   - bias-pull-down
+   - drive-strength
  
-+config QCOM_FALKOR_ERRATUM_E1041
-+	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
-+	default y
-+	help
-+	  Falkor CPU may speculatively fetch instructions from an improper
-+	  memory location when MMU translation is changed from SCTLR_ELn[M]=1
-+	  to SCTLR_ELn[M]=0. Prefix an ISB instruction to fix the problem.
++** Generic pinctrl binding
++The above binding requires knowledge of the actual mux setting values for
++each supported SoC in the code parsing the DT (for instance the kernel).
++The generic binding puts this information in the DT. It uses the
++"allwinner,sunxi-pinctrl" compatible, in addition to some SoC specific string.
++It extends the above described binding as follows:
++Required properties:
++- allwinner,gpio-pins: An array of 32-bit numbers to denote the number of
++  implemented pins per pin controller port. Non-implemented ports can specify
++  0 here. There will be as many ports as this array has elements.
++- allwinner,irq-pin-map: Contains a number of IRQ port maps, describing the
++  relationship between interrupt banks and GPIO pins. Each map has six 32-bit
++  members:
++  <[IRQ port] [1st IRQ pin] [GPIO port] [1st GPIO pin] [mux value] [length]>
++  This maps the first [length] IRQ pins starting with [IRQ port]:[1st IRQ pin]
++  to [GPIO port]:[1st GPIO pin], all using [mux value] to select the IRQ
++  functionality.
 +
-+	  If unsure, say Y.
++Optional properties:
++- allwinner,port-base: The number of GPIO ports to skip at the beginning.
++- allwinner,irq-bank-base: The number of IRQ banks to skip at the beginning.
++- allwinner,irq-read-needs-mux: Specifies that reading the line level of
++  a pin configured as an IRQ pin is not possible. A driver needs to switch
++  to the GPIO-in function to be able to read the level.
 +
- endmenu
- 
- 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index d58a625..eb11cdf 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -499,4 +499,22 @@
- #endif
- 	.endm
- 
-+/**
-+ * Errata workaround prior to disable MMU. Insert an ISB immediately prior
-+ * to executing the MSR that will change SCTLR_ELn[M] from a value of 1 to 0.
-+ */
-+	.macro pre_disable_mmu_workaround
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-+alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1041
-+	isb
-+alternative_else_nop_endif
-+#endif
-+	.end
++Required properties for subnodes:
++- pinmux: An array of mux values to write into the respective MMIO register
++  bits for this pin when selecting the function. If this array has less
++  elements than pins, the *last* value will be used for all pins beyond that.
++  This allows to use a single element for the (likely) case all pins use the
++  same mux value.
 +
-+	.macro pre_disable_mmu_early_workaround
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-+	isb
-+#endif
-+	.end
++The binding described above can be extended in this manner to be supported
++by *both* an existing driver and some generic driver. Existing drivers will
++ignore the new properties and revert to their internal table instead.
 +
- #endif	/* __ASM_ASSEMBLER_H */
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 8da6216..7f7a59d 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -40,7 +40,8 @@
- #define ARM64_WORKAROUND_858921			19
- #define ARM64_WORKAROUND_CAVIUM_30115		20
- #define ARM64_HAS_DCPOP				21
-+#define ARM64_WORKAROUND_QCOM_FALKOR_E1041	22
++Example:
++  pinctrl at 1c20800 {
++	compatible = "allwinner,sun50i-a64-pinctrl",
++		     "allwinner,sunxi-pinctrl";
++	reg = <0x01c20800 0x400>;
++	clocks = <&ccu 58>, <&hosc>, <&losc>;
++	/* No PortA, PB0-PB9, PC0-PC16, PD0-PD24, ... */
++	allwinner,gpio-pins = <0 10 17 25 18 7 14 12>;
++	/* banks B, G and H can trigger interrupts, using mux value 6 */
++	allwinner,irq-pin-map= <0 0 1 0 6 10>,
++			       <1 0 6 0 6 14>,
++			       <2 0 7 0 6 12>;
++	i2c1_pins: i2c1_pins {
++		pins = "PH2", "PH3";
++		function = "i2c1";
++		/* Both pins use a mux value of 2 to select this function. */
++		pinmux = <2>;
++	};
++	...
++  };
++
+ *** Deprecated pin configuration and multiplexing binding
  
--#define ARM64_NCAPS				22
-+#define ARM64_NCAPS				23
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-index 65f42d2..2a752cb 100644
---- a/arch/arm64/kernel/cpu-reset.S
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -37,6 +37,7 @@ ENTRY(__cpu_soft_restart)
- 	mrs	x12, sctlr_el1
- 	ldr	x13, =SCTLR_ELx_FLAGS
- 	bic	x12, x12, x13
-+	pre_disable_mmu_workaround
- 	msr	sctlr_el1, x12
- 	isb
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 0e27f86..2fd1938 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -179,6 +179,22 @@ static int cpu_enable_trap_ctr_access(void *__unused)
- 			   MIDR_CPU_VAR_REV(0, 0)),
- 	},
- #endif
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-+	{
-+		.desc = "Qualcomm Technologies Falkor erratum 1041",
-+		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-+		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
-+			MIDR_CPU_VAR_REV(0, 0),
-+			MIDR_CPU_VAR_REV(0, 0)),
-+	},
-+	{
-+		.desc = "Qualcomm Technologies Falkor erratum 1041",
-+		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-+		MIDR_RANGE(MIDR_QCOM_FALKOR,
-+			MIDR_CPU_VAR_REV(0, 1),
-+			MIDR_CPU_VAR_REV(0, 2)),
-+	},
-+#endif
- #ifdef CONFIG_ARM64_ERRATUM_858921
- 	{
- 	/* Cortex-A73 all versions */
-diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-index 4e6ad35..dc675ba 100644
---- a/arch/arm64/kernel/efi-entry.S
-+++ b/arch/arm64/kernel/efi-entry.S
-@@ -96,6 +96,7 @@ ENTRY(entry)
- 	mrs	x0, sctlr_el2
- 	bic	x0, x0, #1 << 0	// clear SCTLR.M
- 	bic	x0, x0, #1 << 2	// clear SCTLR.C
-+	pre_disable_mmu_early_workaround
- 	msr	sctlr_el2, x0
- 	isb
- 	b	2f
-@@ -103,6 +104,7 @@ ENTRY(entry)
- 	mrs	x0, sctlr_el1
- 	bic	x0, x0, #1 << 0	// clear SCTLR.M
- 	bic	x0, x0, #1 << 2	// clear SCTLR.C
-+	pre_disable_mmu_early_workaround
- 	msr	sctlr_el1, x0
- 	isb
- 2:
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 0b243ec..a807fca 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -732,6 +732,7 @@ __primary_switch:
- 	 * to take into account by discarding the current kernel mapping and
- 	 * creating a new one.
- 	 */
-+	pre_disable_mmu_early_workaround
- 	msr	sctlr_el1, x20			// disable the MMU
- 	isb
- 	bl	__create_page_tables		// recreate kernel mapping
-diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
-index ce704a4..f407e42 100644
---- a/arch/arm64/kernel/relocate_kernel.S
-+++ b/arch/arm64/kernel/relocate_kernel.S
-@@ -45,6 +45,7 @@ ENTRY(arm64_relocate_new_kernel)
- 	mrs	x0, sctlr_el2
- 	ldr	x1, =SCTLR_ELx_FLAGS
- 	bic	x0, x0, x1
-+	pre_disable_mmu_workaround
- 	msr	sctlr_el2, x0
- 	isb
- 1:
-diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f96155..870828c 100644
---- a/arch/arm64/kvm/hyp-init.S
-+++ b/arch/arm64/kvm/hyp-init.S
-@@ -151,6 +151,7 @@ reset:
- 	mrs	x5, sctlr_el2
- 	ldr	x6, =SCTLR_ELx_FLAGS
- 	bic	x5, x5, x6		// Clear SCTL_M and etc
-+	pre_disable_mmu_workaround
- 	msr	sctlr_el2, x5
- 	isb
- 
+ Required subnode-properties:
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.14.1
