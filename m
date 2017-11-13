@@ -1,237 +1,96 @@
-From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Sun, 12 Nov 2017 19:54:10 -0600
-Subject: [PATCH v2 2/2] arm64: Add software workaround for Falkor erratum
- 1041
-In-Reply-To: <1510535802-2799-3-git-send-email-shankerd@codeaurora.org>
-References: <1510535802-2799-1-git-send-email-shankerd@codeaurora.org>
- <1510535802-2799-3-git-send-email-shankerd@codeaurora.org>
-Message-ID: <b602820a-6d5d-5fe1-e100-c1b7be6174bb@codeaurora.org>
+From: minghuan.lian@nxp.com (M.h. Lian)
+Date: Mon, 13 Nov 2017 02:35:48 +0000
+Subject: [PATCHv4 1/3] ARMv8: dts: ls1046a: add the property of IB and OB
+In-Reply-To: <AM4PR0401MB16999BD34AFBB1362BD32EBD8F540@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+References: <20171110034847.17891-1-xiaowei.bao@nxp.com>
+ <20171110034847.17891-2-xiaowei.bao@nxp.com>
+ <20b8f1d2-f817-469f-afbf-66f25d6f8c46@ti.com>
+ <AM4PR0401MB16999BD34AFBB1362BD32EBD8F540@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+Message-ID: <VI1PR04MB161516288A0FF2F507DAA9BEE82B0@VI1PR04MB1615.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, 
 
-Sorry, I've posted a wrong patch which causes the compilation errors.
-Please disregard this patch, I posted v3 patch to fix the build
-issue. 
 
-https://patchwork.kernel.org/patch/10055077/
+> -----Original Message-----
+> From: Leo Li
+> Sent: Saturday, November 11, 2017 5:21 AM
+> To: Kishon Vijay Abraham I <kishon@ti.com>; Xiaowei Bao
+> <xiaowei.bao@nxp.com>; robh+dt at kernel.org; mark.rutland at arm.com;
+> catalin.marinas at arm.com; will.deacon at arm.com; bhelgaas at google.com;
+> shawnguo at kernel.org; Madalin-cristian Bucur <madalin.bucur@nxp.com>;
+> Sumit Garg <sumit.garg@nxp.com>; Y.b. Lu <yangbo.lu@nxp.com>; Andy Tang
+> <andy.tang@nxp.com>; jingoohan1 at gmail.com; pbrobinson at gmail.com;
+> songxiaowei at hisilicon.com; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org; linux-
+> pci at vger.kernel.org; linuxppc-dev at lists.ozlabs.org; Z.q. Hou
+> <zhiqiang.hou@nxp.com>; Mingkai Hu <mingkai.hu@nxp.com>; M.h. Lian
+> <minghuan.lian@nxp.com>
+> Subject: RE: [PATCHv4 1/3] ARMv8: dts: ls1046a: add the property of IB and OB
+> 
+> 
+> 
+> > -----Original Message-----
+> > From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
+> > Sent: Friday, November 10, 2017 12:22 AM
+> > To: Xiaowei Bao <xiaowei.bao@nxp.com>; robh+dt at kernel.org;
+> > mark.rutland at arm.com; catalin.marinas at arm.com; will.deacon at arm.com;
+> > bhelgaas at google.com; shawnguo at kernel.org; Madalin-cristian Bucur
+> > <madalin.bucur@nxp.com>; Sumit Garg <sumit.garg@nxp.com>; Y.b. Lu
+> > <yangbo.lu@nxp.com>; hongtao.jia at nxp.com; Andy Tang
+> > <andy.tang@nxp.com>; Leo Li <leoyang.li@nxp.com>;
+> > jingoohan1 at gmail.com; pbrobinson at gmail.com; songxiaowei at hisilicon.com;
+> > devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> > linux- kernel at vger.kernel.org; linux-pci at vger.kernel.org; linuxppc-
+> > dev at lists.ozlabs.org; Z.q. Hou <zhiqiang.hou@nxp.com>; Mingkai Hu
+> > <mingkai.hu@nxp.com>; M.h. Lian <minghuan.lian@nxp.com>
+> > Subject: Re: [PATCHv4 1/3] ARMv8: dts: ls1046a: add the property of IB
+> > and OB
+> >
+> > Hi Bao,
+> >
+> > On Friday 10 November 2017 09:18 AM, Bao Xiaowei wrote:
+> > > Add the property of inbound and outbound windows number for ep driver.
+> > >
+> > > Signed-off-by: Bao Xiaowei <xiaowei.bao@nxp.com>
+> > > Acked-by: Minghuan Lian <minghuan.Lian@nxp.com>
+> > > ---
+> > >  v2:
+> > >  - no change
+> > >  v3:
+> > >  - modify the commit message
+> > >  v4:
+> > >  - no change
+> > >
+> > >  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 6 ++++++
+> > >  1 file changed, 6 insertions(+)
+> >
+> > $subject should start with something like
+> > arm64: dts: ls1046a: **
+> > >
+> > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > index 06b5e12d04d8..f8332669663c 100644
+> > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > @@ -674,6 +674,8 @@
+> > >  			device_type = "pci";
+> > >  			dma-coherent;
+> > >  			num-lanes = <4>;
+> > > +			num-ib-windows = <6>;
+> > > +			num-ob-windows = <6>;
+> >
+> > EP specific properties shouldn't be added in RC dt node. Ideally you
+> > should have a separate dt node for RC and EP.
+> 
+> It is a single PCIe controller which can be configured to either RC mode or EP
+> mode.  Wouldn't it conflict with the device tree principles to have two device
+> tree nodes for the same PCIe controller?  And obviously the two modes cannot
+> be used at the same time so we cannot have two drivers both probe on the
+> same hardware.
+> 
+[Minghuan Lian]  There is only one PCIe dts node in the dts file. PCIe dts node describes the PCIe controller's hardware properties and does not have work mode.  The new properties  "num-ib-windows " and "num-ob-windows" are used to describe the inbound/outbound window number included in the PCIe hardware. These windows are used in both RC and EP mode.  We can change work mode when resetting via RCW(reset configuration word).
 
-On 11/12/2017 07:16 PM, Shanker Donthineni wrote:
-> The ARM architecture defines the memory locations that are permitted
-> to be accessed as the result of a speculative instruction fetch from
-> an exception level for which all stages of translation are disabled.
-> Specifically, the core is permitted to speculatively fetch from the
-> 4KB region containing the current program counter 4K and next 4K.
-> 
-> When translation is changed from enabled to disabled for the running
-> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
-> Falkor core may errantly speculatively access memory locations outside
-> of the 4KB region permitted by the architecture. The errant memory
-> access may lead to one of the following unexpected behaviors.
-> 
-> 1) A System Error Interrupt (SEI) being raised by the Falkor core due
->    to the errant memory access attempting to access a region of memory
->    that is protected by a slave-side memory protection unit.
-> 2) Unpredictable device behavior due to a speculative read from device
->    memory. This behavior may only occur if the instruction cache is
->    disabled prior to or coincident with translation being changed from
->    enabled to disabled.
-> 
-> The conditions leading to this erratum will not occur when either of the
-> following occur:
->  1) A higher exception level disables translation of a lower exception level
->    (e.g. EL2 changing SCTLR_EL1[M] from a value of 1 to 0).
->  2) An exception level disabling its stage-1 translation if its stage-2
->     translation is enabled (e.g. EL1 changing SCTLR_EL1[M] from a value of 1
->     to 0 when HCR_EL2[VM] has a value of 1).
-> 
-> To avoid the errant behavior, software must execute an ISB immediately
-> prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     | 10 ++++++++++
->  arch/arm64/include/asm/assembler.h     | 18 ++++++++++++++++++
->  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->  arch/arm64/kernel/cpu-reset.S          |  1 +
->  arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
->  arch/arm64/kernel/efi-entry.S          |  2 ++
->  arch/arm64/kernel/head.S               |  1 +
->  arch/arm64/kernel/relocate_kernel.S    |  1 +
->  arch/arm64/kvm/hyp-init.S              |  1 +
->  10 files changed, 53 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/arm64/silicon-errata.txt b/Documentation/arm64/silicon-errata.txt
-> index 66e8ce1..704770c0 100644
-> --- a/Documentation/arm64/silicon-errata.txt
-> +++ b/Documentation/arm64/silicon-errata.txt
-> @@ -74,3 +74,4 @@ stable kernels.
->  | Qualcomm Tech. | Falkor v1       | E1003           | QCOM_FALKOR_ERRATUM_1003    |
->  | Qualcomm Tech. | Falkor v1       | E1009           | QCOM_FALKOR_ERRATUM_1009    |
->  | Qualcomm Tech. | QDF2400 ITS     | E0065           | QCOM_QDF2400_ERRATUM_0065   |
-> +| Qualcomm Tech. | Falkor v{1,2}   | E1041           | QCOM_FALKOR_ERRATUM_1041    |
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0df64a6..8f73eac 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -539,6 +539,16 @@ config QCOM_QDF2400_ERRATUM_0065
->  
->  	  If unsure, say Y.
->  
-> +config QCOM_FALKOR_ERRATUM_E1041
-> +	bool "Falkor E1041: Speculative instruction fetches might cause errant memory access"
-> +	default y
-> +	help
-> +	  Falkor CPU may speculatively fetch instructions from an improper
-> +	  memory location when MMU translation is changed from SCTLR_ELn[M]=1
-> +	  to SCTLR_ELn[M]=0. Prefix an ISB instruction to fix the problem.
-> +
-> +	  If unsure, say Y.
-> +
->  endmenu
->  
->  
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index d58a625..eb11cdf 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -499,4 +499,22 @@
->  #endif
->  	.endm
->  
-> +/**
-> + * Errata workaround prior to disable MMU. Insert an ISB immediately prior
-> + * to executing the MSR that will change SCTLR_ELn[M] from a value of 1 to 0.
-> + */
-> +	.macro pre_disable_mmu_workaround
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1041
-> +	isb
-> +alternative_else_nop_endif
-> +#endif
-> +	.end
-> +
-> +	.macro pre_disable_mmu_early_workaround
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-> +	isb
-> +#endif
-> +	.end
-> +
->  #endif	/* __ASM_ASSEMBLER_H */
-> diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-> index 8da6216..7f7a59d 100644
-> --- a/arch/arm64/include/asm/cpucaps.h
-> +++ b/arch/arm64/include/asm/cpucaps.h
-> @@ -40,7 +40,8 @@
->  #define ARM64_WORKAROUND_858921			19
->  #define ARM64_WORKAROUND_CAVIUM_30115		20
->  #define ARM64_HAS_DCPOP				21
-> +#define ARM64_WORKAROUND_QCOM_FALKOR_E1041	22
->  
-> -#define ARM64_NCAPS				22
-> +#define ARM64_NCAPS				23
->  
->  #endif /* __ASM_CPUCAPS_H */
-> diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-> index 65f42d2..2a752cb 100644
-> --- a/arch/arm64/kernel/cpu-reset.S
-> +++ b/arch/arm64/kernel/cpu-reset.S
-> @@ -37,6 +37,7 @@ ENTRY(__cpu_soft_restart)
->  	mrs	x12, sctlr_el1
->  	ldr	x13, =SCTLR_ELx_FLAGS
->  	bic	x12, x12, x13
-> +	pre_disable_mmu_workaround
->  	msr	sctlr_el1, x12
->  	isb
->  
-> diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-> index 0e27f86..2fd1938 100644
-> --- a/arch/arm64/kernel/cpu_errata.c
-> +++ b/arch/arm64/kernel/cpu_errata.c
-> @@ -179,6 +179,22 @@ static int cpu_enable_trap_ctr_access(void *__unused)
->  			   MIDR_CPU_VAR_REV(0, 0)),
->  	},
->  #endif
-> +#ifdef CONFIG_QCOM_FALKOR_ERRATUM_E1041
-> +	{
-> +		.desc = "Qualcomm Technologies Falkor erratum 1041",
-> +		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-> +		MIDR_RANGE(MIDR_QCOM_FALKOR_V1,
-> +			MIDR_CPU_VAR_REV(0, 0),
-> +			MIDR_CPU_VAR_REV(0, 0)),
-> +	},
-> +	{
-> +		.desc = "Qualcomm Technologies Falkor erratum 1041",
-> +		.capability = ARM64_WORKAROUND_QCOM_FALKOR_E1041,
-> +		MIDR_RANGE(MIDR_QCOM_FALKOR,
-> +			MIDR_CPU_VAR_REV(0, 1),
-> +			MIDR_CPU_VAR_REV(0, 2)),
-> +	},
-> +#endif
->  #ifdef CONFIG_ARM64_ERRATUM_858921
->  	{
->  	/* Cortex-A73 all versions */
-> diff --git a/arch/arm64/kernel/efi-entry.S b/arch/arm64/kernel/efi-entry.S
-> index 4e6ad35..dc675ba 100644
-> --- a/arch/arm64/kernel/efi-entry.S
-> +++ b/arch/arm64/kernel/efi-entry.S
-> @@ -96,6 +96,7 @@ ENTRY(entry)
->  	mrs	x0, sctlr_el2
->  	bic	x0, x0, #1 << 0	// clear SCTLR.M
->  	bic	x0, x0, #1 << 2	// clear SCTLR.C
-> +	pre_disable_mmu_early_workaround
->  	msr	sctlr_el2, x0
->  	isb
->  	b	2f
-> @@ -103,6 +104,7 @@ ENTRY(entry)
->  	mrs	x0, sctlr_el1
->  	bic	x0, x0, #1 << 0	// clear SCTLR.M
->  	bic	x0, x0, #1 << 2	// clear SCTLR.C
-> +	pre_disable_mmu_early_workaround
->  	msr	sctlr_el1, x0
->  	isb
->  2:
-> diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-> index 0b243ec..a807fca 100644
-> --- a/arch/arm64/kernel/head.S
-> +++ b/arch/arm64/kernel/head.S
-> @@ -732,6 +732,7 @@ __primary_switch:
->  	 * to take into account by discarding the current kernel mapping and
->  	 * creating a new one.
->  	 */
-> +	pre_disable_mmu_early_workaround
->  	msr	sctlr_el1, x20			// disable the MMU
->  	isb
->  	bl	__create_page_tables		// recreate kernel mapping
-> diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
-> index ce704a4..f407e42 100644
-> --- a/arch/arm64/kernel/relocate_kernel.S
-> +++ b/arch/arm64/kernel/relocate_kernel.S
-> @@ -45,6 +45,7 @@ ENTRY(arm64_relocate_new_kernel)
->  	mrs	x0, sctlr_el2
->  	ldr	x1, =SCTLR_ELx_FLAGS
->  	bic	x0, x0, x1
-> +	pre_disable_mmu_workaround
->  	msr	sctlr_el2, x0
->  	isb
->  1:
-> diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-> index 3f96155..870828c 100644
-> --- a/arch/arm64/kvm/hyp-init.S
-> +++ b/arch/arm64/kvm/hyp-init.S
-> @@ -151,6 +151,7 @@ reset:
->  	mrs	x5, sctlr_el2
->  	ldr	x6, =SCTLR_ELx_FLAGS
->  	bic	x5, x5, x6		// Clear SCTL_M and etc
-> +	pre_disable_mmu_workaround
->  	msr	sctlr_el2, x5
->  	isb
->  
-> 
 
--- 
-Shanker Donthineni
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> Regards,
+> Leo
