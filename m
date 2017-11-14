@@ -1,39 +1,54 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 14 Nov 2017 11:19:16 +0000
-Subject: [v11,1/4] drivers: jtag: Add JTAG core driver
-In-Reply-To: <20171114111046.GA23820@kroah.com>
-References: <1509724449-26221-2-git-send-email-oleksandrs@mellanox.com>
- <8760aoz78q.fsf@bilbrey.org>
- <DB6PR0501MB219753AC43515148F39CC2D0B1280@DB6PR0501MB2197.eurprd05.prod.outlook.com>
- <20171114111046.GA23820@kroah.com>
-Message-ID: <20171114111916.GO12318@n2100.armlinux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 14 Nov 2017 11:20:57 +0000
+Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
+ regions being no longer mapped as NOMAP
+In-Reply-To: <20171113092730.GA29552@linaro.org>
+References: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
+ <CACi5LpNV_E9pvhTwLcy6vtEj9qbL1ZEHe-5sv=iiW0k9JxPD1Q@mail.gmail.com>
+ <20171113092730.GA29552@linaro.org>
+Message-ID: <CAKv+Gu_eQ-s0J22tKeHKJme4qXcvxvDkS7vKrNW+o_XtMTkMhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 14, 2017 at 12:10:46PM +0100, gregkh at linuxfoundation.org wrote:
-> On Tue, Nov 14, 2017 at 10:34:49AM +0000, Oleksandr Shamray wrote:
-> > Greg, what you can suggest about it. May be better to add again single-open()-per-device lock with right locking way like:
-> > 
-> > >if (mutex_lock_interruptible(&jtag->open_lock)) {
-> 
-> You would stall an open?  Why not just return saying you can't do that?
+On 13 November 2017 at 09:27, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Hi,
+>
+> On Fri, Nov 10, 2017 at 05:41:56PM +0530, Bhupesh Sharma wrote:
+>> Resent with Akashi's correct email address.
+>>
+>> On Fri, Nov 10, 2017 at 5:39 PM, Bhupesh Sharma <bhsharma@redhat.com> wrote:
+>> > Hi Ard, Akashi
+>> >
+>> > I have met an issue on an arm64 board using the latest master branch from Linus.
+>   (snip)
+>> >
+>> > 8. Also, I think now the crashkernel handling changed by
+>> > e7cd190385d17790cc3eb3821b1094b00aacf325 (arm64: mark reserved
+>> > memblock regions explicitly in iomem), needs to be changed to handle
+>> > the change added by Ard to fix this issue on ACPI only machines.
+>> >
+>> > I have a dirty hack in place, but I would like to have your opinions
+>> > about what can be a more concrete fix to this issue (as we mark these
+>> > regions as System RAM now rather than NOMAP) and I don't have a DTB
+>> > based machine to test on currently.
+>
+> I don't know much about acpi reclaim regions,
+> can you please tell me how your change affects your panic case?
+>
 
-Greg, I think you need to look at the code again.
+Does this help at all?
 
->From the snippet in the email, this lock is not held while the device is
-open, as you apparently think it is.  It's a short-term lock that is
-held to ensure atomic access to the jtag->opened member, so that two
-concurrent opens are unable to operate lock-step, resulting in
-jtag->opened becoming 2.
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 7768423b39d3..61d867647cca 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -213,7 +213,7 @@ static void __init request_standard_resources(void)
 
-The open function snippet in the email drops the lock as soon as it has
-incremented jtag->opened, or encounters an error.
-
-It seems entirely sensible, rather than using an atomic_t counter, as
-it means that other openers are held off until the current opener has
-either succeeded in opening the device or failed to open it.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+        for_each_memblock(memory, region) {
+                res = alloc_bootmem_low(sizeof(*res));
+-               if (memblock_is_nomap(region)) {
++               if (memblock_is_nomap(region) || memblock_is_reserved(region)) {
+                        res->name  = "reserved";
+                        res->flags = IORESOURCE_MEM;
+                } else {
