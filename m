@@ -1,73 +1,59 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 14 Nov 2017 08:07:48 +0100
-Subject: linux-next: Tree for Nov 7
-In-Reply-To: <c52fa249-9583-18a2-cbac-28abfb23d5a5@oracle.com>
-References: <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
- <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
- <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
- <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
- <87lgjawgx1.fsf@concordia.ellerman.id.au>
- <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
- <20171113151641.yfqrecpcxllpn5mq@dhcp22.suse.cz>
- <20171113154939.6ui2fmpokpm7g4oj@dhcp22.suse.cz>
- <20171113160637.jhekbdyfpccme3be@dhcp22.suse.cz>
- <c52fa249-9583-18a2-cbac-28abfb23d5a5@oracle.com>
-Message-ID: <20171114070748.in5zdc4giqbxowjy@dhcp22.suse.cz>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 14 Nov 2017 08:17:39 +0100
+Subject: [PATCH v1 3/3] PCI: xilinx: Rename xilinx_pcie_link_is_up() to
+ xilinx_pcie_link_up()
+In-Reply-To: <20171113224058.29024.51914.stgit@bhelgaas-glaptop.roam.corp.google.com>
+References: <20171113224001.29024.87126.stgit@bhelgaas-glaptop.roam.corp.google.com>
+ <20171113224058.29024.51914.stgit@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <d5d907e1-8ee0-763c-63b9-b1f2b30b7a3a@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 13-11-17 09:35:22, Khalid Aziz wrote:
-> On 11/13/2017 09:06 AM, Michal Hocko wrote:
-> > OK, so this one should take care of the backward compatibility while
-> > still not touching the arch code
-> > ---
-> > commit 39ff9bf8597e79a032da0954aea1f0d77d137765
-> > Author: Michal Hocko <mhocko@suse.com>
-> > Date:   Mon Nov 13 17:06:24 2017 +0100
-> > 
-> >      mm: introduce MAP_FIXED_SAFE
-> >      MAP_FIXED is used quite often but it is inherently dangerous because it
-> >      unmaps an existing mapping covered by the requested range. While this
-> >      might be might be really desidered behavior in many cases there are
-> >      others which would rather see a failure than a silent memory corruption.
-> >      Introduce a new MAP_FIXED_SAFE flag for mmap to achive this behavior.
-> >      It is a MAP_FIXED extension with a single exception that it fails with
-> >      ENOMEM if the requested address is already covered by an existing
-> >      mapping. We still do rely on get_unmaped_area to handle all the arch
-> >      specific MAP_FIXED treatment and check for a conflicting vma after it
-> >      returns.
-> >      Signed-off-by: Michal Hocko <mhocko@suse.com>
-> > 
-> > ...... deleted .......
-> > diff --git a/mm/mmap.c b/mm/mmap.c
-> > index 680506faceae..aad8d37f0205 100644
-> > --- a/mm/mmap.c
-> > +++ b/mm/mmap.c
-> > @@ -1358,6 +1358,10 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
-> >   	if (mm->map_count > sysctl_max_map_count)
-> >   		return -ENOMEM;
-> > +	/* force arch specific MAP_FIXED handling in get_unmapped_area */
-> > +	if (flags & MAP_FIXED_SAFE)
-> > +		flags |= MAP_FIXED;
-> > +
-> >   	/* Obtain the address to map to. we verify (or select) it and ensure
-> >   	 * that it represents a valid section of the address space.
-> >   	 */
+On 13.11.2017 23:40, Bjorn Helgaas wrote:
+> From: Bjorn Helgaas <bhelgaas@google.com>
 > 
-> Do you need to move this code above:
+> Rename xilinx_pcie_link_is_up() to xilinx_pcie_link_up() to follow the
+> convention of other drivers.  No functional change intended.
 > 
->         if (!(flags & MAP_FIXED))
->                 addr = round_hint_to_min(addr);
+> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+> ---
+>  drivers/pci/host/pcie-xilinx.c |    6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
 > 
->         /* Careful about overflows.. */
->         len = PAGE_ALIGN(len);
->         if (!len)
->                 return -ENOMEM;
+> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
+> index 94e13cb8608f..7b5325990f5e 100644
+> --- a/drivers/pci/host/pcie-xilinx.c
+> +++ b/drivers/pci/host/pcie-xilinx.c
+> @@ -129,7 +129,7 @@ static inline void pcie_write(struct xilinx_pcie_port *port, u32 val, u32 reg)
+>  	writel(val, port->reg_base + reg);
+>  }
+>  
+> -static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie_port *port)
+> +static inline bool xilinx_pcie_link_up(struct xilinx_pcie_port *port)
+>  {
+>  	return (pcie_read(port, XILINX_PCIE_REG_PSCR) &
+>  		XILINX_PCIE_REG_PSCR_LNKUP) ? 1 : 0;
+> @@ -165,7 +165,7 @@ static bool xilinx_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
+>  
+>  	/* Check if link is up when trying to access downstream ports */
+>  	if (bus->number != port->root_busno)
+> -		if (!xilinx_pcie_link_is_up(port))
+> +		if (!xilinx_pcie_link_up(port))
+>  			return false;
+>  
+>  	/* Only one device down on each root port */
+> @@ -541,7 +541,7 @@ static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
+>  {
+>  	struct device *dev = port->dev;
+>  
+> -	if (xilinx_pcie_link_is_up(port))
+> +	if (xilinx_pcie_link_up(port))
+>  		dev_info(dev, "PCIe Link is UP\n");
+>  	else
+>  		dev_info(dev, "PCIe Link is DOWN\n");
 > 
-> Not doing that might mean the hint address will end up being rounded for
-> MAP_FIXED_SAFE which would change the behavior from MAP_FIXED.
 
-Yes, I will move it.
--- 
-Michal Hocko
-SUSE Labs
+Acked-by: Michal Simek <michal.simek@xilinx.com>
+
+Thanks,
+Michal
