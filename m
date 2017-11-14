@@ -1,71 +1,42 @@
 From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 14 Nov 2017 13:02:32 +0000
-Subject: [PATCH v3 4/4] net: nb8800: Add support for suspend/resume
-In-Reply-To: <ae0d528a-d602-f399-9d75-65bf9bbf1264@sigmadesigns.com> (Marc
- Gonzalez's message of "Tue, 14 Nov 2017 13:04:25 +0100")
+Date: Tue, 14 Nov 2017 13:22:50 +0000
+Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
+In-Reply-To: <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com> (Marc
+ Gonzalez's message of "Tue, 14 Nov 2017 13:56:34 +0100")
 References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <ae0d528a-d602-f399-9d75-65bf9bbf1264@sigmadesigns.com>
-Message-ID: <yw1xshdh109j.fsf@mansr.com>
+ <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
+ <yw1x1sl12fx8.fsf@mansr.com>
+ <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com>
+Message-ID: <yw1xk1yt0zbp.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+> On 14/11/2017 13:38, M?ns Rullg?rd wrote:
+>
+>> Marc Gonzalez writes:
+>> 
+>>> The "flow control enable" bit can be tweaked, even if DMA is enabled.
+>> 
+>> No, it can't.  Maybe on some of your newer chips it can, but not on the
+>> older ones.
+>
+> Again, I suppose you are referring to your SMP8642-based board.
+>
+> Are you saying you tested this patch, and it doesn't work?
+> What are the symptoms?
 
-Missing patch description.  Don't bother though.  I won't approve of
-this implementation.
+I didn't test that patch per se.  I did initially try simply changing
+that bit, and this didn't work.  Either it had no effect, or it locked
+up the controller, I forget which.  The manual explicitly states that
+writes are forbidden while the DMA enabled bit is set.
 
-Suspend support has to depend on the chip since the EMAC core doesn't
-have anything of the kind.
-
-> ---
->  drivers/net/ethernet/aurora/nb8800.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
->
-> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-> index b71d8fb80610..9af2423aed03 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.c
-> +++ b/drivers/net/ethernet/aurora/nb8800.c
-> @@ -1437,6 +1437,26 @@ static int nb8800_remove(struct platform_device *pdev)
->  	return 0;
->  }
->
-> +static int nb8800_suspend(struct platform_device *pdev, pm_message_t state)
-> +{
-> +	struct net_device *dev = platform_get_drvdata(pdev);
-> +
-> +	if (netif_running(dev))
-> +		return nb8800_stop(dev);
-> +
-> +	return 0;
-> +}
-> +
-> +static int nb8800_resume(struct platform_device *pdev)
-> +{
-> +	struct net_device *dev = platform_get_drvdata(pdev);
-> +
-> +	if (netif_running(dev))
-> +		return nb8800_open(dev);
-> +
-> +	return 0;
-> +}
-> +
->  static struct platform_driver nb8800_driver = {
->  	.driver = {
->  		.name		= "nb8800",
-> @@ -1444,6 +1464,8 @@ static struct platform_driver nb8800_driver = {
->  	},
->  	.probe	= nb8800_probe,
->  	.remove	= nb8800_remove,
-> +	.suspend = nb8800_suspend,
-> +	.resume = nb8800_resume,
->  };
->
->  module_platform_driver(nb8800_driver);
-> -- 
-> 2.15.0
->
+If shutting down the DMA really isn't possible, I would rather just
+allow changing the flow control setting only when the interface is
+stopped.  The normal case of getting the initial setting from the
+auto-negotiation will still work properly.  It just won't be possible to
+change it while the link is active.
 
 -- 
 M?ns Rullg?rd
