@@ -1,112 +1,35 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 14 Nov 2017 12:46:48 +0100
-Subject: arm64: next-20171114 GICv4 build failure
-Message-ID: <0f80d433-1018-6ae5-ec19-47d9af1576e4@suse.de>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 14 Nov 2017 11:53:34 +0100
+Subject: [PATCH v3 0/4] Various nb8800 tweaks
+Message-ID: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello,
 
-Yesterday's and today's linux-next fail to build for me on arm64 with
-the following warnings and errors:
+The main feature in this series is suspend/resume support (patch 4).
+It is implemented by closing the device on suspend, and reopening it
+on resume. To achieve this, HW inits are moved to ndo_open (patch 3).
 
-  CC      arch/arm64/kvm/hyp/switch.o
-  CC      mm/shmem.o
-  CC      fs/super.o
-  CC      kernel/ucount.o
-In file included from ../include/kvm/arm_vgic.h:29:0,
-                 from ../arch/arm64/include/asm/kvm_host.h:38,
-                 from ../include/linux/kvm_host.h:37,
-                 from ../arch/arm64/include/asm/kvm_emulate.h:25,
-                 from ../arch/arm64/kvm/hyp/switch.c:22:
-../include/linux/irqchip/arm-gic-v4.h:112:57: warning: 'struct
-irq_domain_ops' declared inside parameter list will not be visible
-outside of this definition or declaration
- int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops
-*ops);
-                                                         ^~~~~~~~~~~~~~
-[...]
+After some back and forth with the HW dev, it turns out that the "raw" IP
+does not support disabling DMA in software, so I want to get rid of the
+nb8800_dma_stop() hack. Since there is no standard way to disable DMA,
+I dropped generic support (patch 1).
 
-  LD      vmlinux.o
-  MODPOST vmlinux.o
-virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_teardown':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:200:
-undefined reference to `its_free_vcpu_irqs'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:200:(.text+0x80):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_free_vcpu_irqs'
-virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_init':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:139:
-undefined reference to `its_alloc_vcpu_irqs'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:139:(.text+0x178):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_alloc_vcpu_irqs'
-virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_sync_hwstate':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:211:
-undefined reference to `its_schedule_vpe'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:211:(.text+0x2b8):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_schedule_vpe'
-virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_flush_hwstate':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:232:
-undefined reference to `its_schedule_vpe'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:232:(.text+0x338):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_schedule_vpe'
-virt/kvm/arm/vgic/vgic-v4.o: In function `kvm_vgic_v4_set_forwarding':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:302:
-undefined reference to `its_map_vlpi'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:302:(.text+0x464):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_map_vlpi'
-virt/kvm/arm/vgic/vgic-v4.o: In function `kvm_vgic_v4_unset_forwarding':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:341:
-undefined reference to `its_unmap_vlpi'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:341:(.text+0x56c):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_unmap_vlpi'
-virt/kvm/arm/vgic/vgic-its.o: In function `update_lpi_config':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:304:
-undefined reference to `its_prop_update_vlpi'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:304:(.text+0x338):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_prop_update_vlpi'
-virt/kvm/arm/vgic/vgic-its.o: In function `its_free_ite':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:656:
-undefined reference to `its_unmap_vlpi'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:656:(.text+0x390):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_unmap_vlpi'
-virt/kvm/arm/vgic/vgic-its.o: In function `update_affinity':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:356:
-undefined reference to `its_get_vlpi'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:356:(.text+0x128c):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_get_vlpi'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:362:
-undefined reference to `its_map_vlpi'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:362:(.text+0x12a4):
-relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
-`its_map_vlpi'
-virt/kvm/arm/vgic/vgic-its.o: In function `vgic_its_cmd_handle_invall':
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1165:
-undefined reference to `its_invall_vpe'
-/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1165:(.text+0x1d48):
-additional relocation overflows omitted from the output
-/home/andreas/MCU/ARM/Bubblegum-96/linux/Makefile:993: recipe for target
-'vmlinux' failed
-make[1]: *** [vmlinux] Error 1
-make[1]: Leaving directory '/home/andreas/MCU/ARM/Bubblegum-96/linux/s900'
-Makefile:146: recipe for target 'sub-make' failed
-make: *** [sub-make] Error 2
+The HW dev has also stated that it is safe to tweak the flow control bit
+in the NB8800_RXC_CR register at any time (patch 2) i.e. no need for
+special handling when RX DMA is enabled, despite the documentation stating:
 
-I'm guessing there's some Kconfig or guard issue? No GICv4 options
-popped up during oldconfig. And my arm config still builds fine.
+> The Receive Channel Control Register holds channel enable, mode, endian,
+> DMA control, and interrupt control information.  This register can only be
+> written when the Receive DMA Channel is idle - the Enable bit in it is "0".
 
-Thanks,
-Andreas
+Marc Gonzalez (4):
+  net: nb8800: Drop generic support
+  net: nb8800: Simplify nb8800_pause_config()
+  net: nb8800: Move HW init to ndo_open()
+  net: nb8800: Add support for suspend/resume
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+ drivers/net/ethernet/aurora/nb8800.c | 189 +++++++++++------------------------
+ drivers/net/ethernet/aurora/nb8800.h |   4 +-
+ 2 files changed, 63 insertions(+), 130 deletions(-)
