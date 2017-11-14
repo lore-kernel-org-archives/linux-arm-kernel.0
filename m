@@ -1,15 +1,14 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Nov 2017 10:04:34 -0800
-Subject: [PATCH] clk: uniphier: fix parent of miodmac clock data
-In-Reply-To: <1508374366-27171-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1508374366-27171-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20171114180434.GA11955@codeaurora.org>
+Date: Tue, 14 Nov 2017 10:04:42 -0800
+Subject: [PATCH] clk: uniphier: fix DAPLL2 clock rate of Pro5
+In-Reply-To: <1507170779-26688-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1507170779-26688-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20171114180442.GB11955@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/19, Masahiro Yamada wrote:
-> The "miodmac" is not a child of "stdmac".  They are independent
-> from each other.  Fix it.
+On 10/05, Masahiro Yamada wrote:
+> The parent of DAPLL2 should be DAPLL1.  Fix the clock connection.
 > 
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > ---
