@@ -1,10 +1,10 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 14 Nov 2017 16:32:12 +0200
-Subject: [PATCH 10/10] dmaengine: s3c24xx-dma: Use vchan_terminate_vdesc()
+Date: Tue, 14 Nov 2017 16:32:08 +0200
+Subject: [PATCH 06/10] dmaengine: dma-jz4780: Use vchan_terminate_vdesc()
  instead of desc_free
 In-Reply-To: <20171114143212.8311-1-peter.ujfalusi@ti.com>
 References: <20171114143212.8311-1-peter.ujfalusi@ti.com>
-Message-ID: <20171114143212.8311-11-peter.ujfalusi@ti.com>
+Message-ID: <20171114143212.8311-7-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,55 +14,47 @@ running transfer.
 Implement the device_synchronize callback to make sure that the terminated
 descriptor is freed.
 
-CC: Krzysztof Kozlowski <krzk@kernel.org>
+CC: Zubair Lutfullah Kakakhel <Zubair.Kakakhel@imgtec.com>
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/s3c24xx-dma.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/dma/dma-jz4780.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/dma/s3c24xx-dma.c b/drivers/dma/s3c24xx-dma.c
-index f04c4702d98b..cd92d696bcf9 100644
---- a/drivers/dma/s3c24xx-dma.c
-+++ b/drivers/dma/s3c24xx-dma.c
-@@ -732,7 +732,7 @@ static int s3c24xx_dma_terminate_all(struct dma_chan *chan)
- 
- 	/* Dequeue current job */
- 	if (s3cchan->at) {
--		s3c24xx_dma_desc_free(&s3cchan->at->vd);
-+		vchan_terminate_vdesc(&s3cchan->at->vd);
- 		s3cchan->at = NULL;
+diff --git a/drivers/dma/dma-jz4780.c b/drivers/dma/dma-jz4780.c
+index 7373b7a555ec..85820a2d69d4 100644
+--- a/drivers/dma/dma-jz4780.c
++++ b/drivers/dma/dma-jz4780.c
+@@ -511,7 +511,7 @@ static int jz4780_dma_terminate_all(struct dma_chan *chan)
+ 	/* Clear the DMA status and stop the transfer. */
+ 	jz4780_dma_writel(jzdma, JZ_DMA_REG_DCS(jzchan->id), 0);
+ 	if (jzchan->desc) {
+-		jz4780_dma_desc_free(&jzchan->desc->vdesc);
++		vchan_terminate_vdesc(&jzchan->desc->vdesc);
+ 		jzchan->desc = NULL;
  	}
  
-@@ -744,6 +744,13 @@ static int s3c24xx_dma_terminate_all(struct dma_chan *chan)
- 	return ret;
+@@ -523,6 +523,13 @@ static int jz4780_dma_terminate_all(struct dma_chan *chan)
+ 	return 0;
  }
  
-+static void s3c24xx_dma_synchronize(struct dma_chan *chan)
++static void jz4780_dma_synchronize(struct dma_chan *chan)
 +{
-+	struct s3c24xx_dma_chan *s3cchan = to_s3c24xx_dma_chan(chan);
++	struct jz4780_dma_chan *jzchan = to_jz4780_dma_chan(chan);
 +
-+	vchan_synchronize(&s3cchan->vc);
++	vchan_synchronize(&jzchan->vchan);
 +}
 +
- static void s3c24xx_dma_free_chan_resources(struct dma_chan *chan)
+ static int jz4780_dma_config(struct dma_chan *chan,
+ 	struct dma_slave_config *config)
  {
- 	/* Ensure all queued descriptors are freed */
-@@ -1282,6 +1289,7 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
- 	s3cdma->memcpy.device_issue_pending = s3c24xx_dma_issue_pending;
- 	s3cdma->memcpy.device_config = s3c24xx_dma_set_runtime_config;
- 	s3cdma->memcpy.device_terminate_all = s3c24xx_dma_terminate_all;
-+	s3cdma->memcpy.device_synchronize = s3c24xx_dma_synchronize;
- 
- 	/* Initialize slave engine for SoC internal dedicated peripherals */
- 	dma_cap_set(DMA_SLAVE, s3cdma->slave.cap_mask);
-@@ -1296,6 +1304,7 @@ static int s3c24xx_dma_probe(struct platform_device *pdev)
- 	s3cdma->slave.device_prep_dma_cyclic = s3c24xx_dma_prep_dma_cyclic;
- 	s3cdma->slave.device_config = s3c24xx_dma_set_runtime_config;
- 	s3cdma->slave.device_terminate_all = s3c24xx_dma_terminate_all;
-+	s3cdma->slave.device_synchronize = s3c24xx_dma_synchronize;
- 	s3cdma->slave.filter.map = pdata->slave_map;
- 	s3cdma->slave.filter.mapcnt = pdata->slavecnt;
- 	s3cdma->slave.filter.fn = s3c24xx_dma_filter;
+@@ -813,6 +820,7 @@ static int jz4780_dma_probe(struct platform_device *pdev)
+ 	dd->device_prep_dma_memcpy = jz4780_dma_prep_dma_memcpy;
+ 	dd->device_config = jz4780_dma_config;
+ 	dd->device_terminate_all = jz4780_dma_terminate_all;
++	dd->device_synchronize = jz4780_dma_synchronize;
+ 	dd->device_tx_status = jz4780_dma_tx_status;
+ 	dd->device_issue_pending = jz4780_dma_issue_pending;
+ 	dd->src_addr_widths = JZ_DMA_BUSWIDTHS;
 -- 
 Peter
 
