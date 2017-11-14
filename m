@@ -1,42 +1,66 @@
-From: btraynor@gmail.com (Bill Traynor)
-Date: Tue, 14 Nov 2017 09:14:37 -0500
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15: fix HDMI LS_OE GPIO
-In-Reply-To: <09c701bd-066a-7af7-14c2-4f9cb2481371@ti.com>
-References: <1472737901-26494-1-git-send-email-tomi.valkeinen@ti.com>
- <b8647621-197c-97d5-8291-26c079e5eae8@ti.com>
- <CAOCHtYhF2KfeK3ccEzZcePbU5H1kwi1tKThZN3NRwXgPsW_bSA@mail.gmail.com>
- <c69aadbf-90e4-7aaf-2b90-4d5b543c252a@ti.com>
- <20160901145757.4oksrst3wpjpsscf@atomide.com>
- <de3bf6ab-a07a-b82d-1e45-5f96a6e1039e@ti.com>
- <CAN20qYqq9DGSgcTaivZHrD+RMY1WLPLNGv2K7xp0pvArJWuGEg@mail.gmail.com>
- <09c701bd-066a-7af7-14c2-4f9cb2481371@ti.com>
-Message-ID: <CAN20qYrw=sW+bo-0pHoPThABzrw8r0ujrdHhZcytxVHbCnromw@mail.gmail.com>
+From: jan.glauber@caviumnetworks.com (Jan Glauber)
+Date: Tue, 14 Nov 2017 15:19:36 +0100
+Subject: RCU stall with high number of KVM vcpus
+In-Reply-To: <e8e1af91-b755-e04e-6ab4-c47b570c9fe0@arm.com>
+References: <20171113131000.GA10546@hc>
+ <2832f775-3cbe-d984-fe4f-e018642b6f1d@arm.com>
+ <20171113173552.GA13282@hc>
+ <7dda7be2-f392-8056-d4d3-372bb867729a@arm.com>
+ <20171113184046.GA14678@hc>
+ <e8e1af91-b755-e04e-6ab4-c47b570c9fe0@arm.com>
+Message-ID: <20171114141936.GA21650@hc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 14, 2017 at 2:33 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
-> On 14/11/17 02:27, Bill Traynor wrote:
->
->> I'm getting this error again with the latest X15 image on my A2
->> version board.  I don't see this patch in the mainline kernel.  Did it
->> never get applied?
->
-> With am57xx-beagle-x15.dts? That seems be the A2 version.
+On Tue, Nov 14, 2017 at 01:30:07PM +0000, Marc Zyngier wrote:
+> On 13/11/17 18:40, Jan Glauber wrote:
+> > On Mon, Nov 13, 2017 at 06:11:19PM +0000, Marc Zyngier wrote:
+> >> On 13/11/17 17:35, Jan Glauber wrote:
+> >>> On Mon, Nov 13, 2017 at 01:47:38PM +0000, Marc Zyngier wrote:
+> > 
+> > [...]
+> > 
+> >>>> Please elaborate. Messed in what way? Corrupted? The guest crashing? Or
+> >>>> is that a tooling issue?
+> >>>
+> >>> Every vcpu that oopses prints one line in parallel, so I get blocks like:
+> >>> [58880.179814] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.179834] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.179847] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.179873] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.179893] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.179911] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.179917] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.180288] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.180303] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.180336] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.180363] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.180384] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.180415] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>> [58880.180461] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+> >>>
+> >>> I can send the full log if you want to have a look.
+> >>
+> >> Sure, send that over (maybe not over email though).
+> > 
+> > Here is the guest dmesg:
+> > http://paste.ubuntu.com/25955682/
+> 
+> Yeah, that's because all the vcpus are getting starved at the same time,
+> and spitting out interleaved traces... Not very useful anyway, as I
+> think this is only a consequence of what's happening on the host.
+> 
+> > 
+> > And the host dmesg as it might have been too big for the lists:
+> > http://paste.ubuntu.com/25955699/
+> 
+> And that one doesn't show much either, apart from indicating that
+> something is keeping the lock for itself. Drat.
+> 
+> We need to narrow down the problem, or make it appear on more common HW.
+> Let me know if you've managed to reproduce it with non-VHE and/or on TX-1.
 
-Yes.
-I see the following in the boot message
+It also shows up when I disable VHE (CONFIG_ARM64_VHE). I'll try
+enabling some tracepoints next.
 
-loading /boot/dtbs/4.9.35-ti-r44/am57xx-beagle-x15.dtb ...
-
-I can get around this by inserting/uninserting an sdcard once the
-kernel starts booting.
-
-This is with the Debian 9.0 2017-07-02 4GB SD LXQT image.
-
-Thanks
-Bill
-
->
-> --
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+--Jan
