@@ -1,20 +1,50 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 14 Nov 2017 09:34:09 +0100
-Subject: [PATCH 2/3] arm64: dts: renesas: eagle: add SCIF0 pins
-In-Reply-To: <20171110200710.769271617@cogentembedded.com>
-References: <20171110200710.769271617@cogentembedded.com>
-Message-ID: <CAMuHMdU95R3bPhLTXmU=-DhGcoV=vyH1Tu7J8j3MSkDcE7H0Fg@mail.gmail.com>
+Date: Tue, 14 Nov 2017 09:44:54 +0100
+Subject: [PATCH 3/3] arm64: dts: renesas: eagle: add EtherAVB pins
+In-Reply-To: <20171110200714.406365231@cogentembedded.com>
+References: <20171110200714.406365231@cogentembedded.com>
+Message-ID: <CAMuHMdWCj=CjA_zyC1GKr=KEk2CNMAtwvREw25R1uJktZucY4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Sergei,
+
 On Fri, Nov 10, 2017 at 9:02 PM, Sergei Shtylyov
 <sergei.shtylyov@cogentembedded.com> wrote:
-> Add the (previously omitted) SCIF0 pin data to the Eagle board's
+> Add the (previously omitted) EtherAVB pin data to the Eagle board's
 > device tree.
 >
 > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Thanks for your patch!
+
+> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+> @@ -34,6 +34,9 @@
+>  };
+>
+>  &avb {
+> +       pinctrl-0 = <&avb_pins>;
+> +       pinctrl-names = "default";
+> +
+>         renesas,no-ether-link;
+>         phy-handle = <&phy0>;
+>         status = "okay";
+> @@ -53,6 +56,11 @@
+>  };
+>
+>  &pfc {
+> +       avb_pins: avb {
+> +               groups = "avb0_mdio", "avb0_mii";
+
+Oh no, its'called "avb0_mdio" here, but "avb(0)_mdc" on all other
+R-Car Gen3 SoCs?
+
+What about "avb0_link", which is connected through "L_LNK"?
+
+> +               function = "avb0";
+> +       };
+> +
 
 Gr{oetje,eeting}s,
 
