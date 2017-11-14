@@ -1,146 +1,107 @@
-From: P.Bruenn@beckhoff.com (=?utf-8?B?UGF0cmljayBCcsO8bm4=?=)
-Date: Tue, 14 Nov 2017 05:00:23 +0000
-Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <CAOMZO5AOAo8OU86CrneFeWuu2ti1sea9843UQ16=7AyU5-B11Q@mail.gmail.com>
-References: <D24E577EA1E37B4788A3BFBC418F14A70760C04A@wetsrvex01.loepfe.com>
- <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
- <20171109030327.anzo47xayxckn47r@piout.net>
- <3BB206AB2B1BD448954845CE6FF69A8E01CB52290E@NT-Mail07.beckhoff.com>
- <20171113161522.2kq7un7gl5vg4qlq@piout.net>
- <CAOMZO5Bi5PcuGiVRZykw9Zp-ysHmHzThhwNai-cqy3HRTUKQAg@mail.gmail.com>
- <CAOMZO5AOAo8OU86CrneFeWuu2ti1sea9843UQ16=7AyU5-B11Q@mail.gmail.com>
-Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB52F4BE@NT-Mail07.beckhoff.com>
+From: raveendra.padasalagi@broadcom.com (Raveendra Padasalagi)
+Date: Tue, 14 Nov 2017 10:59:10 +0530
+Subject: [PATCH v2 1/3] dt-bindings: phy: Add Cygnus usb phy binding
+In-Reply-To: <CAL_JsqL+KaxAHb_u31U07-e+Nm2cW=Wi-oHyTP42B--hBiEyig@mail.gmail.com>
+References: <1510127203-5815-1-git-send-email-raveendra.padasalagi@broadcom.com>
+ <1510127203-5815-2-git-send-email-raveendra.padasalagi@broadcom.com>
+ <20171110214439.rlt5de2c6e6k246d@rob-hp-laptop>
+ <CAAFb_vqKLOixSROUvkRFR=hwOqQvnVyV4mu37=MrEBo-pZaF5w@mail.gmail.com>
+ <CAL_JsqL+KaxAHb_u31U07-e+Nm2cW=Wi-oHyTP42B--hBiEyig@mail.gmail.com>
+Message-ID: <CAAFb_vq+qyA6mEyOEG2kHXS73wsBx8WZTWhWpKn+ouwPk0qY=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Fabio Estevam [mailto:festevam at gmail.com]
->Sent: Montag, 13. November 2017 19:57
->> I don't recall of any recent change in this area.
+Hi Rob,
+
+On Mon, Nov 13, 2017 at 11:23 PM, Rob Herring <robh@kernel.org> wrote:
+> On Sun, Nov 12, 2017 at 10:23 PM, Raveendra Padasalagi
+> <raveendra.padasalagi@broadcom.com> wrote:
+>> Hi,
 >>
-I don't think the behavior changed recently. I tried a kernel 4.4.65 and it shows the same symptoms. I guess Noel really means 3.19-> 4.0.
-
->> Patrick/Noel,
+>> On Sat, Nov 11, 2017 at 3:14 AM, Rob Herring <robh@kernel.org> wrote:
+>>> On Wed, Nov 08, 2017 at 01:16:41PM +0530, Raveendra Padasalagi wrote:
+>>>> Add devicetree binding document for broadcom's
+>>>> Cygnus SoC specific usb phy controller driver.
+>>>>
+>>>> Signed-off-by: Raveendra Padasalagi <raveendra.padasalagi@broadcom.com>
+>>>> ---
+>>>>  .../bindings/phy/brcm,cygnus-usb-phy.txt           | 106 +++++++++++++++++++++
+>>>>  1 file changed, 106 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+>>>> new file mode 100644
+>>>> index 0000000..bbc4b94
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/phy/brcm,cygnus-usb-phy.txt
+>>>> @@ -0,0 +1,106 @@
+>>>> +BROADCOM CYGNUS USB PHY
+>>>> +
+>>>> +Required Properties:
+>>>> +- compatible:  brcm,cygnus-usb-phy
+>>>> +- reg : the register start address and length for
+>>>> +        crmu_usbphy_aon_ctrl,
+>>>> +        cdru usb phy control,
+>>>> +        usb host idm registers,
+>>>> +        usb device idm registers.
+>>>> +- reg-names: a list of the names corresponding to the previous register ranges
+>>>> +  Should contain
+>>>> +        "crmu-usbphy-aon-ctrl",
+>>>> +        "cdru-usbphy",
+>>>> +        "usb2h-idm",
+>>>> +        "usb2d-idm".
+>>>> +- address-cells: should be 1
+>>>> +- size-cells: should be 0
+>>>> +
+>>>> +Sub-nodes:
+>>>> +  Each port's PHY should be represented as a sub-node.
+>>>> +
+>>>> +Sub-nodes required properties:
+>>>> +- reg: the PHY number
+>>>> +- #phy-cells must be 1
+>>>> +  The node that uses the phy must provide 1 integer argument specifying
+>>>> +  port number.
+>>>> +
+>>>> +Optional Properties:
+>>>> +- vbus-p#-supply : The regulator for vbus out control for the host
+>>>
+>>> Is this a literal # or something else?
 >>
->> Does the change below help?
-Unfortunately no. Did you run hwclock or rtctest?
-I still see:
-root at CX9020:~# cat /proc/interrupts | grep rtc
- 40:          0      tzic  24 Edge      53fa4000.srtc
- 41:          0      tzic  25 Edge      53fa4000.srtc
-root at CX9020:~# hwclock -D -r
-hwclock from util-linux 2.29.2
-Using the /dev interface to the clock.
-Last drift adjustment done at 1490885082 seconds after 1969
-Last calibration done at 1490885082 seconds after 1969
-Hardware clock is on UTC time
-Assuming hardware clock is kept in UTC time.
-Waiting for clock tick...
-[   41.035269] irq 40: nobody cared (try booting with the "irqpoll" option)
-[   41.042514] handlers:
-[   41.044847] [<c06031e0>] dryice_irq
-[   41.048398] Disabling IRQ #40
-select() to /dev/rtc to wait for clock tick timed out...synchronization failed
-root at CX9020:~# cat /proc/interrupts | grep rtc
- 40:     100000      tzic  24 Edge      53fa4000.srtc
- 41:          0      tzic  25 Edge      53fa4000.srtc
+>> Yes, this is a literal. It's assumed # will replace numeric 0-2 for
+>> each of the ports.
+>
+> I'm still confused. Which is valid? "vbus-p#-supply" or "vbus-p0-supply"
+>
+I agree, it's creating confusion. Instead of enumerating
+"vbus-p0-supply", "vbus-p1-supply", "vbus-p2-supply" kept "vbus-p#-supply".
 
+Yes, as suggested by you "vbus-supply" should be sufficient as it's in each
+of phy sub node.
 
-or if I run rtctest from tools/testing/selftests/timers/ (after reboot):
+> If the latter, you need to enumerate all valid options. But these are
+> in sub nodes for each port, so just "vbus-supply" should be
+> sufficient.
 
-root at CX9020:~# cat /proc/interrupts | grep rtc
- 40:          0      tzic  24 Edge      53fa4000.srtc
- 41:          0      tzic  25 Edge      53fa4000.srtc
-root at CX9020:~# ./rtctest
+Keeping "vbus-supply" should not create any confusion. Will send out the
+change in next version of the patch.
 
-                        RTC Driver Test Example.
+> One more question, does Vbus actually supply power to the phy or you
+> are just associating the Vbus supply to a connector with a port? The
+> latter needs a connector node instead and Vbus should be part of that.
+> There's been some attempts at USB connectors, but we don't really have
+> one yet (the extcon binding is not it).
 
-Counting 5 update (1/sec) interrupts from reading /dev/rtc0:[   37.550399] irq 40: nobody cared (try booting with the "irqpoll" option)
-[   37.557646] handlers:
-[   37.559980] [<c06031e0>] dryice_irq
-[   37.563532] Disabling IRQ #40
-^C
-root at CX9020:~# cat /proc/interrupts | grep rtc
- 40:     100000      tzic  24 Edge      53fa4000.srtc
- 41:          0      tzic  25 Edge      53fa4000.srtc
+Vbus is not supplied to phy, it's been given to the devices connected on
+the port and in our platform vbus is controlled through an external regulator
+which is controlled through gpio.
+So "vbus-supply" shown above actually points to the phandle of vbus regulator
+node.
 
+>> In the example it's not shown as the regulators specified in vbus-p#-supply
+>> are board specific.
+>
+> Please show in the example. Examples should be complete.
 
-With the attached patch I get rid of the unhandled interrupts. But that patch just ACKs everything.
- root at CX9020:~# cat /proc/interrupts | grep rtc
- 40:          0      tzic  24 Edge      53fa4000.srtc
- 41:          0      tzic  25 Edge      53fa4000.srtc
-root at CX9020:~# hwclock -D -r
-hwclock from util-linux 2.29.2
-Using the /dev interface to the clock.
-Last drift adjustment done at 1490885082 seconds after 1969
-Last calibration done at 1490885082 seconds after 1969
-Hardware clock is on UTC time
-Assuming hardware clock is kept in UTC time.
-Waiting for clock tick...
-select() to /dev/rtc to wait for clock tick timed out...synchronization failed
-root at CX9020:~# cat /proc/interrupts | grep rtc
- 40:     301844      tzic  24 Edge      53fa4000.srtc
- 41:          0      tzic  25 Edge      53fa4000.srtc
+Ok. Sure.
 
->From 422747686f5723ac75b98ad610b3ef4d94ef271f Mon Sep 17 00:00:00 2001
-From: Patrick Bruenn <p.bruenn@beckhoff.com>
-Date: Tue, 14 Nov 2017 05:23:24 +0100
-Subject: [PATCH] XXX: disable interrupts manually
-
----
- drivers/rtc/rtc-imxdi.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/drivers/rtc/rtc-imxdi.c b/drivers/rtc/rtc-imxdi.c
-index 80931114c899..4b64a5350bac 100644
---- a/drivers/rtc/rtc-imxdi.c
-+++ b/drivers/rtc/rtc-imxdi.c
-@@ -686,6 +686,24 @@ static irqreturn_t dryice_irq(int irq, void *dev_id)
-        dier = readl(imxdi->ioaddr + DIER);
-        dsr = readl(imxdi->ioaddr + DSR);
-
-+       /* ack monotonic counter overflow */
-+       if (DSR_MCO == dsr) {
-+               return IRQ_HANDLED;
-+       }
-+       if (dier & DIER_WCIE) {
-+               if (dsr & DSR_MCO) {
-+                       di_int_disable(imxdi, DIER_WCIE);
-+                       return IRQ_HANDLED;
-+               }
-+       }
-+
-+       if (dier & DIER_CAIE) {
-+               if (dsr & DSR_MCO) {
-+                       di_int_disable(imxdi, DIER_CAIE);
-+                       return IRQ_HANDLED;
-+               }
-+       }
-+
-        /* handle the security violation event */
-        if (dier & DIER_SVIE) {
-                if (dsr & DSR_SVF) {
-@@ -710,7 +728,10 @@ static irqreturn_t dryice_irq(int irq, void *dev_id)
-                  operations. It means the interrupt is for DryIce -Security.
-                  IRQ must be returned as none.*/
-                if (list_empty_careful(&imxdi->write_wait.head))
-+               {
-+                       printk("rtc: XXXX: dier: 0x%x dsr: 0x%x\n", dier, dsr);
-                        return rc;
-+               }
-
-                /* DSR_WCF clears itself on DSR read */
-                if (dsr & (DSR_WCF | DSR_WEF)) {
-@@ -737,6 +758,9 @@ static irqreturn_t dryice_irq(int irq, void *dev_id)
-                        rc = IRQ_HANDLED;
-                }
-        }
-+       if (rc != IRQ_HANDLED) {
-+               printk("rtc: XXXX: dier: 0x%x dsr: 0x%x\n", dier, dsr);
-+       }
-        return rc;
- }
-
---
-2.11.0
-Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
-Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
+> Rob
