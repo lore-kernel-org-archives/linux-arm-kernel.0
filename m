@@ -1,28 +1,22 @@
 From: hjc@rock-chips.com (Sandy Huang)
-Date: Tue, 14 Nov 2017 19:27:34 +0800
-Subject: [PATCH 1/2] dt-bindings: add document for rk3126-vop
-In-Reply-To: <1510658851-90160-1-git-send-email-hjc@rock-chips.com>
-References: <1510658851-90160-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <1510658855-90223-1-git-send-email-hjc@rock-chips.com>
+Date: Tue, 14 Nov 2017 19:27:31 +0800
+Subject: [PATCH 0/2] add support rk3126 vop support
+Message-ID: <1510658851-90160-1-git-send-email-hjc@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Sandy Huang <hjc@rock-chips.com>
----
- Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt | 1 +
- 1 file changed, 1 insertion(+)
+The following patch add support RK3126 vop support, there is only one
+VOP at RK3126, and the RK3126 VOP register layout is similar with RK3036,
+so some feature can reuse with RK3036.
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-index 5d835d9..eeda359 100644
---- a/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/rockchip-vop.txt
-@@ -7,6 +7,7 @@ buffer to an external LCD interface.
- Required properties:
- - compatible: value should be one of the following
- 		"rockchip,rk3036-vop";
-+		"rockchip,rk3126-vop";
- 		"rockchip,rk3288-vop";
- 		"rockchip,rk3368-vop";
- 		"rockchip,rk3366-vop";
+Sandy Huang (2):
+  dt-bindings: add document for rk3126-vop
+  drm/rockchip: vop: add rk3126 vop support
+
+ .../bindings/display/rockchip/rockchip-vop.txt     |  1 +
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.c        | 30 ++++++++++++++++++++++
+ drivers/gpu/drm/rockchip/rockchip_vop_reg.h        |  6 +++++
+ 3 files changed, 37 insertions(+)
+
 -- 
 2.7.4
