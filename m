@@ -1,81 +1,44 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Tue, 14 Nov 2017 19:54:59 +1100
-Subject: linux-next: Tree for Nov 7
-In-Reply-To: <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
-References: <20171107162217.382cd754@canb.auug.org.au>
- <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
- <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
- <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
- <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
- <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
- <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
- <87lgjawgx1.fsf@concordia.ellerman.id.au>
- <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
-Message-ID: <87h8txw87w.fsf@concordia.ellerman.id.au>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 14 Nov 2017 11:03:39 +0100
+Subject: [PATCH 0/4] [v7] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <b8bbba8d-f91f-8e8f-8e79-2e772b48d9b9@codeaurora.org>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+ <c219c289-9cad-f96c-f766-ec28af8f078d@codeaurora.org>
+ <CACRpkdbwe9+TovFYoD-W_9kabe+jsVbN6juJQBUzicq=1XDphg@mail.gmail.com>
+ <b8bbba8d-f91f-8e8f-8e79-2e772b48d9b9@codeaurora.org>
+Message-ID: <CACRpkdYT1NDzuEuDU47jC-iXTE8JWxqGnKhJYKp0oGiL1wX7ig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Michal Hocko <mhocko@kernel.org> writes:
-
-> On Mon 13-11-17 22:34:50, Michael Ellerman wrote:
->> Hi Michal,
->> 
->> Michal Hocko <mhocko@kernel.org> writes:
->> > On Mon 13-11-17 10:20:06, Michal Hocko wrote:
->> >> [Cc arm and ppc maintainers]
->> >
->> > Hmm, it turned out to be a problem on other architectures as well.
->> > CCing more maintainers. For your reference, we are talking about
->> > http://lkml.kernel.org/r/20171023082608.6167-1-mhocko at kernel.org
->> > which has broken architectures which do apply aligning on the mmap
->> > address hint without MAP_FIXED applied. See below my proposed way
->> > around this issue because I belive that the above patch is quite
->> > valuable on its own to be dropped for all archs.
->> 
->> I don't really like your solution sorry :)  The fact that you've had to
->> patch seven arches seems like a red flag.
->> 
->> I think this is a generic problem with MAP_FIXED, which I've heard
->> userspace folks complain about in the past.
+On Mon, Nov 13, 2017 at 10:53 PM, Timur Tabi <timur@codeaurora.org> wrote:
+> On 11/13/2017 03:49 PM, Linus Walleij wrote:
+>>
+>>
+>>  From what I have understood Qualcomm has one finger constantly
+>> on the fast-forward button for upstreaming right now, which I think
+>> is good (everyone should have!) but the limited number of trusted
+>> maintainers of core infrastructure code makes bottlenecks form
+>> around these drivers where review is really needed and deep queues
+>> of patches form. Sorry.
 >
-> The thing is that we canno  change MAP_FIXED behavior as it is carved in
-> stone
-
-Yes obviously. I didn't mean to imply we would change MAP_FIXED, rather
-we would add a new flag with the new semantics.
-
->> Currently MAP_FIXED does two things:
->>   1. makes addr not a hint but the required address
->>   2. blasts any existing mapping
->> 
->> You want 1) but not 2).
 >
-> + fail if there is a clashing range
+> That's one of the reasons why I prefer v5 of my patch instead of v7.  v5
+> does not touch the core.  It's much less intrusive and has no risk of
+> breaking other drivers.  I can't say that about v7.
 
-Yep. I thought that was implied :)
+The more intrusive design is on my request so I will look at it in detail
+ASAP. I took a quick look and liked what I saw, I just need to make
+sure about the details. Also it'd be nice to have a nod from Bj?rn.
 
->> So the right solution IMHO would be to add a new mmap flag to request
->> that behaviour, ie. a fixed address but iff there is nothing already
->> mapped there.
->> 
->> I don't know the mm code well enough to know if that's hard for some
->> reason, but it *seems* like it should be doable.
->
-> Yes, I have mentioned that in the previous email but the amount of code
-> would be even larger. Basically every arch which reimplements
-> arch_get_unmapped_area would have to special case new MAP_FIXED flag to
-> do vma lookup.
+The main reason for some of the work is ACPI, am I right?
 
-I'd have to look, but my memory of the arch code is that it doesn't deal
-with the vma so it wouldn't need any change.
+Timur could you look quickly at the series posted by Andy Shevchenko
+(6 patches prefixed gpiolib: acpi: ) for augmenting ACPI GPIOs in the core?
+Especially patch 5 and 6 which introduce the ability to add quirks in the
+core.
 
-> So this was the most simple solution I could come up
-> with. If there was a general interest for MAP_FIXED_SAFE then we can
-> introduce it later of course. I would just like the hardening merged
-> sooner rather than later.
+I'd like to get some ARM-based people to look at it to make sure we
+those systems can also quirk their GPIOs if need be.
 
-Sure. But in the scheme of things one more kernel release is not that
-big a deal to get it right. Given that the simple approach of dropping
-MAP_FIXED turns out to not be simple at all.
-
-cheers
+Yours,
+Linus Walleij
