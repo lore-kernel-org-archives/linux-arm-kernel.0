@@ -1,35 +1,54 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 14 Nov 2017 11:53:34 +0100
-Subject: [PATCH v3 0/4] Various nb8800 tweaks
-Message-ID: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+Date: Tue, 14 Nov 2017 11:55:40 +0100
+Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
+In-Reply-To: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+Message-ID: <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The "flow control enable" bit can be tweaked, even if DMA is enabled.
 
-The main feature in this series is suspend/resume support (patch 4).
-It is implemented by closing the device on suspend, and reopening it
-on resume. To achieve this, HW inits are moved to ndo_open (patch 3).
+Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+---
+ drivers/net/ethernet/aurora/nb8800.c | 18 +-----------------
+ 1 file changed, 1 insertion(+), 17 deletions(-)
 
-After some back and forth with the HW dev, it turns out that the "raw" IP
-does not support disabling DMA in software, so I want to get rid of the
-nb8800_dma_stop() hack. Since there is no standard way to disable DMA,
-I dropped generic support (patch 1).
-
-The HW dev has also stated that it is safe to tweak the flow control bit
-in the NB8800_RXC_CR register at any time (patch 2) i.e. no need for
-special handling when RX DMA is enabled, despite the documentation stating:
-
-> The Receive Channel Control Register holds channel enable, mode, endian,
-> DMA control, and interrupt control information.  This register can only be
-> written when the Receive DMA Channel is idle - the Enable bit in it is "0".
-
-Marc Gonzalez (4):
-  net: nb8800: Drop generic support
-  net: nb8800: Simplify nb8800_pause_config()
-  net: nb8800: Move HW init to ndo_open()
-  net: nb8800: Add support for suspend/resume
-
- drivers/net/ethernet/aurora/nb8800.c | 189 +++++++++++------------------------
- drivers/net/ethernet/aurora/nb8800.h |   4 +-
- 2 files changed, 63 insertions(+), 130 deletions(-)
+diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+index 26f719e2d6ca..09b8001e1ecc 100644
+--- a/drivers/net/ethernet/aurora/nb8800.c
++++ b/drivers/net/ethernet/aurora/nb8800.c
+@@ -633,7 +633,6 @@ static void nb8800_pause_config(struct net_device *dev)
+ {
+ 	struct nb8800_priv *priv = netdev_priv(dev);
+ 	struct phy_device *phydev = dev->phydev;
+-	u32 rxcr;
+ 
+ 	if (priv->pause_aneg) {
+ 		if (!phydev || !phydev->link)
+@@ -644,22 +643,7 @@ static void nb8800_pause_config(struct net_device *dev)
+ 	}
+ 
+ 	nb8800_modb(priv, NB8800_RX_CTL, RX_PAUSE_EN, priv->pause_rx);
+-
+-	rxcr = nb8800_readl(priv, NB8800_RXC_CR);
+-	if (!!(rxcr & RCR_FL) == priv->pause_tx)
+-		return;
+-
+-	if (netif_running(dev)) {
+-		napi_disable(&priv->napi);
+-		netif_tx_lock_bh(dev);
+-		nb8800_dma_stop(dev);
+-		nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
+-		nb8800_start_rx(dev);
+-		netif_tx_unlock_bh(dev);
+-		napi_enable(&priv->napi);
+-	} else {
+-		nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
+-	}
++	nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
+ }
+ 
+ static void nb8800_link_reconfigure(struct net_device *dev)
+-- 
+2.15.0
