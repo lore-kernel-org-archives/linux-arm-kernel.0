@@ -1,16 +1,17 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 13 Nov 2017 17:59:22 -0800
-Subject: [PATCH] clk/spear: Delete five error messages for a failed
- memory allocation
-In-Reply-To: <4283fdab-7005-f774-9594-821582c5a9fb@users.sourceforge.net>
-References: <4283fdab-7005-f774-9594-821582c5a9fb@users.sourceforge.net>
-Message-ID: <20171114015922.GP11955@codeaurora.org>
+Date: Mon, 13 Nov 2017 17:59:29 -0800
+Subject: [PATCH 1/2] clk/ux500: Delete an error message for a failed
+ memory allocation in three functions
+In-Reply-To: <db799483-7084-8e93-2bfe-2da0e426d08b@users.sourceforge.net>
+References: <d23a685d-f8a0-f4ca-078a-414d7b8674ca@users.sourceforge.net>
+ <db799483-7084-8e93-2bfe-2da0e426d08b@users.sourceforge.net>
+Message-ID: <20171114015929.GR11955@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 09/27, SF Markus Elfring wrote:
 > From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Wed, 27 Sep 2017 18:00:21 +0200
+> Date: Wed, 27 Sep 2017 20:23:58 +0200
 > 
 > Omit extra messages for a memory allocation failure in these functions.
 > 
