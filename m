@@ -1,63 +1,42 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 14 Nov 2017 12:38:59 +0000
-Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
-In-Reply-To: <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com> (Marc
- Gonzalez's message of "Tue, 14 Nov 2017 11:55:40 +0100")
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
-Message-ID: <yw1x1sl12fx8.fsf@mansr.com>
+From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
+Date: Tue, 14 Nov 2017 13:39:43 +0100
+Subject: [PATCH] arm: dts: ls1021a: Add label to USB controllers
+Message-ID: <1510663184-19537-1-git-send-email-rasmus.villemoes@prevas.dk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+From: Esben Haabendal <eha@deif.com>
 
-> The "flow control enable" bit can be tweaked, even if DMA is enabled.
+Add usb2 and usb3 labels to USB2 and USB3 controller device tree nodes,
+for easier modification in board dts files.
 
-No, it can't.  Maybe on some of your newer chips it can, but not on the
-older ones.
+Signed-off-by: Esben Haabendal <eha@deif.com>
+Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
+---
+ arch/arm/boot/dts/ls1021a.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
-> ---
->  drivers/net/ethernet/aurora/nb8800.c | 18 +-----------------
->  1 file changed, 1 insertion(+), 17 deletions(-)
->
-> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
-> index 26f719e2d6ca..09b8001e1ecc 100644
-> --- a/drivers/net/ethernet/aurora/nb8800.c
-> +++ b/drivers/net/ethernet/aurora/nb8800.c
-> @@ -633,7 +633,6 @@ static void nb8800_pause_config(struct net_device *dev)
->  {
->  	struct nb8800_priv *priv = netdev_priv(dev);
->  	struct phy_device *phydev = dev->phydev;
-> -	u32 rxcr;
->
->  	if (priv->pause_aneg) {
->  		if (!phydev || !phydev->link)
-> @@ -644,22 +643,7 @@ static void nb8800_pause_config(struct net_device *dev)
->  	}
->
->  	nb8800_modb(priv, NB8800_RX_CTL, RX_PAUSE_EN, priv->pause_rx);
-> -
-> -	rxcr = nb8800_readl(priv, NB8800_RXC_CR);
-> -	if (!!(rxcr & RCR_FL) == priv->pause_tx)
-> -		return;
-> -
-> -	if (netif_running(dev)) {
-> -		napi_disable(&priv->napi);
-> -		netif_tx_lock_bh(dev);
-> -		nb8800_dma_stop(dev);
-> -		nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
-> -		nb8800_start_rx(dev);
-> -		netif_tx_unlock_bh(dev);
-> -		napi_enable(&priv->napi);
-> -	} else {
-> -		nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
-> -	}
-> +	nb8800_modl(priv, NB8800_RXC_CR, RCR_FL, priv->pause_tx);
->  }
->
->  static void nb8800_link_reconfigure(struct net_device *dev)
-> -- 
-
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 9cdec545decc..50ad4dccb22b 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -675,7 +675,7 @@
+ 			};
+ 		};
+ 
+-		usb at 8600000 {
++		usb2: usb at 8600000 {
+ 			compatible = "fsl-usb2-dr-v2.5", "fsl-usb2-dr";
+ 			reg = <0x0 0x8600000 0x0 0x1000>;
+ 			interrupts = <GIC_SPI 171 IRQ_TYPE_LEVEL_HIGH>;
+@@ -683,7 +683,7 @@
+ 			phy_type = "ulpi";
+ 		};
+ 
+-		usb3 at 3100000 {
++		usb3: usb3 at 3100000 {
+ 			compatible = "snps,dwc3";
+ 			reg = <0x0 0x3100000 0x0 0x10000>;
+ 			interrupts = <GIC_SPI 93 IRQ_TYPE_LEVEL_HIGH>;
 -- 
-M?ns Rullg?rd
+2.7.4
