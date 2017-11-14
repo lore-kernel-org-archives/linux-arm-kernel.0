@@ -1,98 +1,53 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 14 Nov 2017 16:42:13 +0000
-Subject: [PATCH 10/37] KVM: arm64: Slightly improve debug save/restore
- functions
-In-Reply-To: <20171012104141.26902-11-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-11-christoffer.dall@linaro.org>
-Message-ID: <e9b8d6b8-6dfa-3e6d-6e8f-c16a1882651f@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Tue, 14 Nov 2017 17:51:50 +0100
+Subject: [PATCH] pinctrl: armada-37xx: Fix direction_output() callback behavior
+Message-ID: <20171114165150.19599-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christopher,
+The direction_output callback of the gpio_chip structure is supposed to
+set the output direction but also to set the value of the gpio. For the
+armada-37xx driver this callback acted as the gpio_set_direction callback
+for the pinctrl.
 
-On 12/10/17 11:41, Christoffer Dall wrote:
-> The debug save/restore functions can be improved by using the has_vhe()
-> static key instead of the instruction alternative.  Using the static key
-> uses the same paradigm as we're going to use elsewhere, it makes the
-> code more readable, and it generates slightly better code (no
-> stack setups and function calls unless necessary).
-> 
-> We also use a static key on the restore path, because it will be
-> marginally faster than loading a value from memory.
-> 
-> Finally, we don't have to conditionally clear the debug dirty flag if
-> it's set, we can just clear it.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->   arch/arm64/kvm/hyp/debug-sr.c | 22 +++++++++-------------
->   1 file changed, 9 insertions(+), 13 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> index 0fc0758..a2291b6 100644
-> --- a/arch/arm64/kvm/hyp/debug-sr.c
-> +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> @@ -75,11 +75,6 @@
->   
->   #define psb_csync()		asm volatile("hint #17")
->   
-> -static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
-> -{
-> -	/* The vcpu can run. but it can't hide. */
-> -}
-> -
->   static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
->   {
->   	u64 reg;
-> @@ -109,10 +104,6 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
->   	dsb(nsh);
->   }
->   
-> -static hyp_alternate_select(__debug_save_spe,
-> -			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
-> -			    ARM64_HAS_VIRT_HOST_EXTN);
-> -
->   static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
->   {
->   	if (!pmscr_el1)
-> @@ -174,17 +165,22 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
->   {
->   	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
->   			   kern_hyp_va(vcpu->arch.host_cpu_context));
-> -	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
-> +
-> +	/* Non-VHE: Disable and flush SPE data generation
-> +	 * VHE: The vcpu can run. but it can't hide. */
-> +	if (!has_vhe())
-> +		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
->   }
->   
->   void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
->   {
-> -	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
-> +	if (!has_vhe())
-> +		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+This patch fixes the behavior of the direction_output callback by also
+applying the value received as parameter.
 
-For consistency, would it be worth naming that function 
-'__debug_restore_spe_nvhe' ?
+Cc: stable at vger.kernel.org
+Fixes: 5715092a458c ("pinctrl: armada-37xx: Add gpio support")
+Reported-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 13 +++++++++++--
+ 1 file changed, 11 insertions(+), 2 deletions(-)
 
-Also, looking at __debug_save_spe_nvhe, I'm not sure how we guarantee 
-that we might not end up using stale data during the restore_spe 
-(though, if this is an issue, it existed before this change).
-The save function might exit without setting a value to saved pmscr_el1.
-
-Basically I'm wondering if the following scenario (in non VHE) is 
-possible and/or whether it is problematic:
-
-- save spe
-- restore spe
-- host starts using spi -> !(PMBLIMITR_EL1 & PMBLIMITR_EL1_E)
-- save spe -> returns early without setting pmscr_el1
-- restore spe with old save instead of doing nothing
-
-
-Cheers,
-
+diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+index 71b944748304..c5fe7d4a9065 100644
+--- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
++++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
+@@ -408,12 +408,21 @@ static int armada_37xx_gpio_direction_output(struct gpio_chip *chip,
+ {
+ 	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
+ 	unsigned int reg = OUTPUT_EN;
+-	unsigned int mask;
++	unsigned int mask, val, ret;
+ 
+ 	armada_37xx_update_reg(&reg, offset);
+ 	mask = BIT(offset);
+ 
+-	return regmap_update_bits(info->regmap, reg, mask, mask);
++	ret = regmap_update_bits(info->regmap, reg, mask, mask);
++
++	if (ret)
++		return ret;
++
++	reg = OUTPUT_VAL;
++	val = value ? mask : 0;
++	regmap_update_bits(info->regmap, reg, mask, val);
++
++	return 0;
+ }
+ 
+ static int armada_37xx_gpio_get(struct gpio_chip *chip, unsigned int offset)
 -- 
-Julien Thierry
+2.14.2
