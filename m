@@ -1,120 +1,56 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 14 Nov 2017 11:53:17 -0800
-Subject: next/master boot: 296 boots: 62 failed, 230 passed with 4
- conflicts (next-20171113)
-In-Reply-To: <59af2937-78a1-7db6-12e4-28d6719efaed@collabora.com>
-References: <5a09ec32.8190df0a.933bb.b974@mx.google.com>
- <59af2937-78a1-7db6-12e4-28d6719efaed@collabora.com>
-Message-ID: <CAGXu5jJJ6jDSpG+X8CtZEkBoijv27k2p1H=5Y+hEhFyTvYVBZQ@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 14 Nov 2017 22:01:33 +0200
+Subject: n900 in next-20170901
+In-Reply-To: <20171114194432.GB28152@atomide.com>
+References: <20171109003639.GB23982@js1304-P5Q-DELUXE>
+ <20171109035031.GA24383@js1304-P5Q-DELUXE>
+ <20171109150854.GC28152@atomide.com>
+ <20171110001315.GA29669@js1304-P5Q-DELUXE>
+ <20171110032610.GJ28152@atomide.com>
+ <20171110063727.GA32073@js1304-P5Q-DELUXE>
+ <20171110153620.GO28152@atomide.com>
+ <20171114063724.GA16969@js1304-P5Q-DELUXE>
+ <20171114173719.GA28152@atomide.com>
+ <5c885f60-bc8c-5f8e-dc81-57eacc57abc8@ti.com>
+ <20171114194432.GB28152@atomide.com>
+Message-ID: <e07fae95-2125-2d50-7295-ad58f9710801@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 14, 2017 at 9:10 AM, Guillaume Tucker
-<guillaume.tucker@collabora.com> wrote:
-> On 13/11/17 19:02, kernelci.org bot wrote:
+On 14/11/17 21:44, Tony Lindgren wrote:
+> * Tero Kristo <t-kristo@ti.com> [171114 19:34]:
+>> I guess you could just use rx51_secure_dispatcher and ditch the
+>> save_secure_ram_context call completely (and most of the other related
+>> code)? That one would handle the cache also in a clean manner.
 >>
->> next/master boot: 296 boots: 62 failed, 230 passed with 4 conflicts
->> (next-20171113)
+>> Something like:
 >>
->> Full Boot Summary:
->> https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20171113/
->> Full Build Summary:
->> https://kernelci.org/build/next/branch/master/kernel/next-20171113/
->>
->> Tree: next
->> Branch: master
->> Git Describe: next-20171113
->> Git Commit: c348a99ee55feac43b5b62a5957c6d8e2b6c3abe
->> Git URL:
->> http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
->> Tested: 52 unique boards, 17 SoC families, 33 builds out of 213
->>
->> Boot Regressions Detected:
->>
->> arm:
->>
-> [...]
->>
->>     multi_v7_defconfig:
->
-> [...]
->>
->>         tegra124-nyan-big:
->>             lab-collabora: failing since 9 days (last pass: next-20171102
->> - first fail: next-20171103)
->
->
->
-> There are several things failing on the tegra124-nyan-big, at
-> least I've isolated one with my latest bisection run:
->
-> 6c78935777d12ead2d32adf3eb525a24faf02d04 is the first bad commit
-> commit 6c78935777d12ead2d32adf3eb525a24faf02d04
-> Author: Kees Cook <keescook@chromium.org>
-> Date:   Fri Nov 10 16:34:52 2017 +0100
->
->     video: fbdev: Convert timers to use timer_setup()
->
->
-> These boot tests are with multi_v7_defconfig with CONFIG_MODULES
-> and CONFIG_DRM_NOUVEAU disabled:
->
-> * the first one on the revision mentioned above, fails:
->   https://lava.collabora.co.uk/scheduler/job/987651
->
-> * then the same but with the commit reverted, passes:
->   https://lava.collabora.co.uk/scheduler/job/987652
->
-> This was found using the still experimental automated bisection
-> tool for kernelci.org, I'm not sure yet how reliable the results
-> are.  I think the manual check with these 2 boots proves it, but
-> I haven't really investigated further than that.
->
-> So I then did the same tests at the top of the branch, on the
-> next-20171113 tag:
->
-> * next-20171113, fails but differently:
->   https://lava.collabora.co.uk/scheduler/job/987653
->
-> * next-20171113 with the commit reverted, still fails:
->   https://lava.collabora.co.uk/scheduler/job/987654
->
-> It's hard to tell whether the commit I mentioned got fixed
-> in-between, I guess it would be best to not have any boot failure
-> in any case.
->
-> The next thing I'll try is start a bisection for the other
-> failure see on next-20171113 tag, with the commit above reverted
-> and see if it leads anywhere...
->
-> Hope this helps!
+>> rx51_secure_dispatcher(25, 0, FLAG_START_CRITICAL, 4,
+>> __pa(omap3_secure_ram_storage), 0, 1, 1);
+> 
+> That's different, as rx51_secure_dispatcher does the following:
+> 
+> - Use arguments + 1 instead of 4, we currently use just 4
+> - Disables local_irq and fiq, we are not doing that now
+> - Flushes and invalidates cache range, we are not doing that
+> - Calls omap_smc3 that only does mov r6, #0xff, and does not
+>    do mov r2, #4
+> - Missing nops after it's done
+> 
+> This just based on a quick look I did earlier. So just
+> because of the extra work it does we don't want to do it
+> even if it worked :)
 
-Thanks for the report! I believe this is fixed with:
+Hmm ok, I was just thinking that all the extra flushes, irq disables 
+etc. might be good to have in place, as a safeguard when entering secure 
+mode. You might get glitches in certain conditions otherwise.
 
-https://marc.info/?l=linux-fbdev&m=151056635200583&w=2
+The things it is missing might just be clutter.
 
-and that commit appears in next-20171114. Please let me know if that
-doesn't fix it, though!
+Anyway, that said, the changes you did look sane, but I might have 
+cleaned it up a bit further. :)
 
--Kees
+-Tero
 
->
-> Guillaume
->
->> ---
->> For more info write to <info@kernelci.org>
->>
->>
->>
->> _______________________________________________
->> Kernel-build-reports mailing list
->> Kernel-build-reports at lists.linaro.org
->> https://lists.linaro.org/mailman/listinfo/kernel-build-reports
->>
->
-
-
-
--- 
-Kees Cook
-Pixel Security
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
