@@ -1,10 +1,10 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Tue, 14 Nov 2017 16:32:10 +0200
-Subject: [PATCH 08/10] dmaengine: img-mdc-dma: Use vchan_terminate_vdesc()
- instead of desc_free
+Date: Tue, 14 Nov 2017 16:32:11 +0200
+Subject: [PATCH 09/10] dmaengine: k3dma: Use vchan_terminate_vdesc() instead
+ of desc_free
 In-Reply-To: <20171114143212.8311-1-peter.ujfalusi@ti.com>
 References: <20171114143212.8311-1-peter.ujfalusi@ti.com>
-Message-ID: <20171114143212.8311-9-peter.ujfalusi@ti.com>
+Message-ID: <20171114143212.8311-10-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,64 +14,47 @@ running transfer.
 Implement the device_synchronize callback to make sure that the terminated
 descriptor is freed.
 
+CC: Zhangfei Gao <zhangfei.gao@linaro.org>
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/img-mdc-dma.c | 17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+ drivers/dma/k3dma.c | 10 +++++++++-
+ 1 file changed, 9 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/dma/img-mdc-dma.c b/drivers/dma/img-mdc-dma.c
-index 0391f930aecc..25cec9c243e1 100644
---- a/drivers/dma/img-mdc-dma.c
-+++ b/drivers/dma/img-mdc-dma.c
-@@ -694,7 +694,6 @@ static unsigned int mdc_get_new_events(struct mdc_chan *mchan)
- static int mdc_terminate_all(struct dma_chan *chan)
- {
- 	struct mdc_chan *mchan = to_mdc_chan(chan);
--	struct mdc_tx_desc *mdesc;
- 	unsigned long flags;
- 	LIST_HEAD(head);
- 
-@@ -703,21 +702,28 @@ static int mdc_terminate_all(struct dma_chan *chan)
- 	mdc_chan_writel(mchan, MDC_CONTROL_AND_STATUS_CANCEL,
- 			MDC_CONTROL_AND_STATUS);
- 
--	mdesc = mchan->desc;
--	mchan->desc = NULL;
-+	if (mchan->desc) {
-+		vchan_terminate_vdesc(&mchan->desc->vd);
-+		mchan->desc = NULL;
-+	}
- 	vchan_get_all_descriptors(&mchan->vc, &head);
- 
- 	mdc_get_new_events(mchan);
- 
- 	spin_unlock_irqrestore(&mchan->vc.lock, flags);
- 
--	if (mdesc)
--		mdc_desc_free(&mdesc->vd);
- 	vchan_dma_desc_free_list(&mchan->vc, &head);
- 
+diff --git a/drivers/dma/k3dma.c b/drivers/dma/k3dma.c
+index 01d2a750a621..26b67455208f 100644
+--- a/drivers/dma/k3dma.c
++++ b/drivers/dma/k3dma.c
+@@ -719,7 +719,7 @@ static int k3_dma_terminate_all(struct dma_chan *chan)
+ 		c->phy = NULL;
+ 		p->vchan = NULL;
+ 		if (p->ds_run) {
+-			k3_dma_free_desc(&p->ds_run->vd);
++			vchan_terminate_vdesc(&p->ds_run->vd);
+ 			p->ds_run = NULL;
+ 		}
+ 		p->ds_done = NULL;
+@@ -730,6 +730,13 @@ static int k3_dma_terminate_all(struct dma_chan *chan)
  	return 0;
  }
  
-+static void mdc_synchronize(struct dma_chan *chan)
++static void k3_dma_synchronize(struct dma_chan *chan)
 +{
-+	struct mdc_chan *mchan = to_mdc_chan(chan);
++	struct k3_dma_chan *c = to_k3_chan(chan);
 +
-+	vchan_synchronize(&mchan->vc);
++	vchan_synchronize(&c->vc);
 +}
 +
- static int mdc_slave_config(struct dma_chan *chan,
- 			    struct dma_slave_config *config)
+ static int k3_dma_transfer_pause(struct dma_chan *chan)
  {
-@@ -952,6 +958,7 @@ static int mdc_dma_probe(struct platform_device *pdev)
- 	mdma->dma_dev.device_tx_status = mdc_tx_status;
- 	mdma->dma_dev.device_issue_pending = mdc_issue_pending;
- 	mdma->dma_dev.device_terminate_all = mdc_terminate_all;
-+	mdma->dma_dev.device_synchronize = mdc_synchronize;
- 	mdma->dma_dev.device_config = mdc_slave_config;
+ 	struct k3_dma_chan *c = to_k3_chan(chan);
+@@ -868,6 +875,7 @@ static int k3_dma_probe(struct platform_device *op)
+ 	d->slave.device_pause = k3_dma_transfer_pause;
+ 	d->slave.device_resume = k3_dma_transfer_resume;
+ 	d->slave.device_terminate_all = k3_dma_terminate_all;
++	d->slave.device_synchronize = k3_dma_synchronize;
+ 	d->slave.copy_align = DMAENGINE_ALIGN_8_BYTES;
  
- 	mdma->dma_dev.directions = BIT(DMA_DEV_TO_MEM) | BIT(DMA_MEM_TO_DEV);
+ 	/* init virtual channel */
 -- 
 Peter
 
