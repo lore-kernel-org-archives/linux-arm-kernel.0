@@ -1,42 +1,33 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 14 Nov 2017 10:04:44 +0100
-Subject: linux-next: Tree for Nov 7
-In-Reply-To: <87h8txw87w.fsf@concordia.ellerman.id.au>
-References: <20171107162217.382cd754@canb.auug.org.au>
- <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
- <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
- <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
- <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
- <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
- <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
- <87lgjawgx1.fsf@concordia.ellerman.id.au>
- <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
- <87h8txw87w.fsf@concordia.ellerman.id.au>
-Message-ID: <20171114090444.lhrkuywuls26g6lu@dhcp22.suse.cz>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 14 Nov 2017 09:07:46 +0000
+Subject: [RFC] kvm: vgic: are these warnings wrong?
+In-Reply-To: <20171114064750.GB29552@linaro.org>
+References: <20171114064750.GB29552@linaro.org>
+Message-ID: <5c77ed5c-3b57-f9ba-b24d-f54729bc6a59@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 14-11-17 19:54:59, Michael Ellerman wrote:
-> Michal Hocko <mhocko@kernel.org> writes:
-[...]
-> > So this was the most simple solution I could come up
-> > with. If there was a general interest for MAP_FIXED_SAFE then we can
-> > introduce it later of course. I would just like the hardening merged
-> > sooner rather than later.
+On 14/11/17 06:47, AKASHI Takahiro wrote:
+> Hi Marc,
 > 
-> Sure. But in the scheme of things one more kernel release is not that
-> big a deal to get it right. Given that the simple approach of dropping
-> MAP_FIXED turns out to not be simple at all.
+> I've just run a static analyzer to v4.14.
+> While most of warnings/errors are false-positive, as you can easily imagine,
+> there are something dubious. Can you please check ones below?
+> 
+> virt/kvm/arm/vgic/vgic-v3.c:352 vgic_v3_save_pending_tables() error: uninitialized symbol 'val'.
+> virt/kvm/arm/vgic/vgic-its.c:424 its_sync_lpi_pending_table() error: uninitialized symbol 'pendmask'.
+> virt/kvm/arm/vgic/vgic-its.c:779 vgic_its_alloc_collection() error: potential null dereference 'collection'.  (kzalloc returns null)
+> virt/kvm/arm/vgic/vgic-irqfd.c:115 kvm_vgic_setup_default_irq_routing() warn: double check that we're allocating correct size: 48 vs 64
+> 
+> # I believe that the messages here are self-describing.
 
-Well, my idea was to push this hardening to older kernels because those
-were more vulnerable for the PIE base vs. stack placement and stack
-controllable size from userspace etc... Anyway, as per [1] it seems that
-the MAP_FIXED_SAFE doesn't look terrible from the backporting POV.
+Hi Takahiro,
 
-If there is a general consensus that this is the preferred way to go, I
-will post the patch as an RFC to linux-api
+All of these are pretty good findings... Out of curiosity, what is the
+tool you've been using?
 
-[1] http://lkml.kernel.org/r/20171113160637.jhekbdyfpccme3be at dhcp22.suse.cz
+Many thanks for reporting these bugs.
+
+	M.
 -- 
-Michal Hocko
-SUSE Labs
+Jazz is not dead. It just smells funny...
