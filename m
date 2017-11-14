@@ -1,72 +1,72 @@
-From: ley.foon.tan@intel.com (Ley Foon Tan)
-Date: Wed, 15 Nov 2017 00:58:40 +0800
-Subject: [PATCH v1 2/3] PCI: altera: Rename altera_pcie_link_is_up() to
- altera_pcie_link_up()
-In-Reply-To: <20171113224051.29024.76516.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20171113224001.29024.87126.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20171113224051.29024.76516.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <1510678720.2460.2.camel@intel.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 14 Nov 2017 20:02:09 +1100
+Subject: linux-next: Tree for Nov 7
+In-Reply-To: <20171113151641.yfqrecpcxllpn5mq@dhcp22.suse.cz>
+References: <20171107162217.382cd754@canb.auug.org.au>
+ <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
+ <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
+ <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
+ <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
+ <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
+ <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
+ <87lgjawgx1.fsf@concordia.ellerman.id.au>
+ <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
+ <20171113151641.yfqrecpcxllpn5mq@dhcp22.suse.cz>
+Message-ID: <87efp1w7vy.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-11-13 at 16:40 -0600, Bjorn Helgaas wrote:
-> From: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> Rename altera_pcie_link_is_up() to altera_pcie_link_up() to follow
-> the
-> convention of other drivers.??No functional change intended.
-> 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+Michal Hocko <mhocko@kernel.org> writes:
+
+> On Mon 13-11-17 13:00:57, Michal Hocko wrote:
+> [...]
+>> Yes, I have mentioned that in the previous email but the amount of code
+>> would be even larger. Basically every arch which reimplements
+>> arch_get_unmapped_area would have to special case new MAP_FIXED flag to
+>> do vma lookup.
+>
+> It turned out that this might be much more easier than I thought after
+> all. It seems we can really handle that in the common code.
+
+Ah nice. I should have read this before replying to your previous mail.
+
+> This would mean that we are exposing a new functionality to the userspace though.
+> Myabe this would be useful on its own though.
+
+Yes I think it would. At least jemalloc seems like it could use it:
+
+  https://github.com/jemalloc/jemalloc/blob/9f455e2786685b443201c33119765c8093461174/src/pages.c#L65
+
+And I have memories of some JIT code I read once which did a loop of
+mmap()s or something to try and get allocations below 4GB or some other
+limit - but I can't remember now what it was.
+
+> Just a quick draft (not
+> even compile tested) whether this makes sense in general. I would be
+> worried about unexpected behavior when somebody set other bit without a
+> good reason and we might fail with ENOMEM for such a call now.
+>
+> Elf loader would then use MAP_FIXED_SAFE rather than MAP_FIXED.
 > ---
-> ?drivers/pci/host/pcie-altera.c |????8 ++++----
-> ?1 file changed, 4 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-altera.c b/drivers/pci/host/pcie-
-> altera.c
-> index b468b8cccf8d..5cc4f594d79a 100644
-> --- a/drivers/pci/host/pcie-altera.c
-> +++ b/drivers/pci/host/pcie-altera.c
-> @@ -105,7 +105,7 @@ static inline u32 cra_readl(struct altera_pcie
-> *pcie, const u32 reg)
-> ????????return readl_relaxed(pcie->cra_base + reg);
-> ?}
-> 
-> -static bool altera_pcie_link_is_up(struct altera_pcie *pcie)
-> +static bool altera_pcie_link_up(struct altera_pcie *pcie)
-> ?{
-> ????????return !!((cra_readl(pcie, RP_LTSSM) & RP_LTSSM_MASK) ==
-> LTSSM_L0);
-> ?}
-> @@ -142,7 +142,7 @@ static bool altera_pcie_valid_device(struct
-> altera_pcie *pcie,
-> ?{
-> ????????/* If there is no link, then there is no device */
-> ????????if (bus->number != pcie->root_bus_nr) {
-> -???????????????if (!altera_pcie_link_is_up(pcie))
-> +???????????????if (!altera_pcie_link_up(pcie))
-> ????????????????????????return false;
-> ????????}
-> 
-> @@ -412,7 +412,7 @@ static void altera_wait_link_retrain(struct
-> altera_pcie *pcie)
-> ????????/* Wait for link is up */
-> ????????start_jiffies = jiffies;
-> ????????for (;;) {
-> -???????????????if (altera_pcie_link_is_up(pcie))
-> +???????????????if (altera_pcie_link_up(pcie))
-> ????????????????????????break;
-> 
-> ????????????????if (time_after(jiffies, start_jiffies +
-> LINK_UP_TIMEOUT)) {
-> @@ -427,7 +427,7 @@ static void altera_pcie_retrain(struct
-> altera_pcie *pcie)
-> ?{
-> ????????u16 linkcap, linkstat, linkctl;
-> 
-> -???????if (!altera_pcie_link_is_up(pcie))
-> +???????if (!altera_pcie_link_up(pcie))
-> ????????????????return;
-> 
-> ????????/*
-> 
-Acked-by: Ley Foon Tan <ley.foon.tan@intel.com>
+> diff --git a/arch/alpha/include/uapi/asm/mman.h b/arch/alpha/include/uapi/asm/mman.h
+> index 3b26cc62dadb..d021c21f9b01 100644
+> --- a/arch/alpha/include/uapi/asm/mman.h
+> +++ b/arch/alpha/include/uapi/asm/mman.h
+> @@ -31,6 +31,9 @@
+>  #define MAP_STACK	0x80000		/* give out an address that is best suited for process/thread stacks */
+>  #define MAP_HUGETLB	0x100000	/* create a huge page mapping */
+>  
+> +#define MAP_KEEP_MAPPING 0x2000000
+> +#define MAP_FIXED_SAFE	MAP_FIXED|MAP_KEEP_MAPPING /* enforce MAP_FIXED without clobbering an existing mapping */
+
+
+So bike-shedding a bit, but I think "SAFE" is too vague a name.
+
+Perhaps MAP_NO_CLOBBER - which has the single semantic of "do not
+clobber any existing mappings".
+
+It would be a flag on its own, so you could pass it with or without
+MAP_FIXED, but it would only change the behaviour when MAP_FIXED is
+specified also.
+
+cheers
