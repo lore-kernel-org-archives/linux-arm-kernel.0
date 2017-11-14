@@ -1,24 +1,50 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Tue, 14 Nov 2017 18:53:33 +0100
-Subject: [PATCH v5] ARM: dts: exynos: add bcm4334 device node to trats2
-In-Reply-To: <20171113005203.GA15175@lineageos.org>
-References: <20171113005203.GA15175@lineageos.org>
-Message-ID: <20171114175333.kosfvgrsspkrv3p6@kozik-lap>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Tue, 14 Nov 2017 21:00:21 +0300
+Subject: [PATCH 3/3] arm64: dts: renesas: eagle: add EtherAVB pins
+In-Reply-To: <CAMuHMdWCj=CjA_zyC1GKr=KEk2CNMAtwvREw25R1uJktZucY4w@mail.gmail.com>
+References: <20171110200714.406365231@cogentembedded.com>
+ <CAMuHMdWCj=CjA_zyC1GKr=KEk2CNMAtwvREw25R1uJktZucY4w@mail.gmail.com>
+Message-ID: <1017d8fb-e353-f212-09a9-a28bf07eddc2@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 13, 2017 at 11:52:03AM +1100, Simon Shields wrote:
-> This patch allows the bcm4334 to power on and enables
-> wifi functionality on trats2.
+Hello.
+
+On 11/14/2017 11:44 AM, Geert Uytterhoeven wrote:
+
+>> Add the (previously omitted) EtherAVB pin data to the Eagle board's
+>> device tree.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Signed-off-by: Simon Shields <simon@lineageos.org>
-> ---
->  arch/arm/boot/dts/exynos4412-trats2.dts | 27 +++++++++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->
+> Thanks for your patch!
+> 
+>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>> @@ -34,6 +34,9 @@
+[...]
+>> @@ -53,6 +56,11 @@
+>>   };
+>>
+>>   &pfc {
+>> +       avb_pins: avb {
+>> +               groups = "avb0_mdio", "avb0_mii";
+> 
+> Oh no, its'called "avb0_mdio" here, but "avb(0)_mdc" on all other
+> R-Car Gen3 SoCs?
 
-Looks good, I'll take it after merge window. For my own reference:
-Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
+    Can you remember the reason? I don;t want to follow the bad example. :-)
 
-Best regards,
-Krzysztof
+> What about "avb0_link", which is connected through "L_LNK"?
+
+    The same as for other gen3 board, the AVB node has renesas,no-ether-link".
+I tried to verify that property on Eagle, and left it intact as a result... 
+Will re-test removing it once more.
+
+[...]
+
+> Gr{oetje,eeting}s,
+> 
+>                          Geert
+
+MBR, Sergei
