@@ -1,76 +1,51 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Tue, 14 Nov 2017 18:11:06 +0200
-Subject: [patch v12 3/4] Documentation: jtag: Add bindings for Aspeed SoC 24xx
- and 25xx families JTAG master driver
-In-Reply-To: <1510675867-24276-1-git-send-email-oleksandrs@mellanox.com>
-References: <1510675867-24276-1-git-send-email-oleksandrs@mellanox.com>
-Message-ID: <1510675867-24276-4-git-send-email-oleksandrs@mellanox.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 14 Nov 2017 18:07:15 +0100
+Subject: [PATCH v3 3/4] net: nb8800: Move HW init to ndo_open()
+In-Reply-To: <yw1xbmk4241h.fsf@mansr.com>
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+ <103bc878-9311-a727-1c21-2070e0a480e5@sigmadesigns.com>
+ <yw1xwp2t11ap.fsf@mansr.com>
+ <4e22ef54-d823-fc29-fedc-d447fa3d9c88@sigmadesigns.com>
+ <yw1xfu9h0xv7.fsf@mansr.com>
+ <30042004-4e13-b7e2-b49d-754db54cc5ce@sigmadesigns.com>
+ <yw1xbmk4241h.fsf@mansr.com>
+Message-ID: <3857a215-1ec0-e4d3-89a0-66c9f41af658@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It has been tested on Mellanox system with BMC equipped with
-Aspeed 2520 SoC for programming CPLD devices.
+On 14/11/2017 17:55, M?ns Rullg?rd wrote:
 
-Signed-off-by: Oleksandr Shamray <oleksandrs@mellanox.com>
-Signed-off-by: Jiri Pirko <jiri@mellanox.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
-v11->v12
-v10->v11
-v9->v10
-v8->v9
-v7->v8
-Comments pointed by pointed by Joel Stanley <joel.stan@gmail.com>
-- Change compatible string to ast2400 and ast2000
+> Marc Gonzalez wrote:
+> 
+>> On 14/11/2017 14:54, M?ns Rullg?rd wrote:
+>>
+>>> The hack originated from your company.
+>>
+>> So why are you so insistent that we keep using it?
+> 
+> Because it's the only way to support some chip variants.  Ones you'd
+> apparently rather forget, but which nonetheless exist.
 
-V6->v7
-Comments pointed by Tobias Klauser <tklauser@distanz.ch>
- - Fix spell "Doccumentation" -> "Documentation"
+Which chip variants do you have in mind?
+All tango3 board supports the reset method.
 
-v5->v6
-Comments pointed by Tobias Klauser <tklauser@distanz.ch>
-- Small nit: s/documentation/Documentation/
+BTW, could you test my patch series on your board?
+(I can't since the board is not supported upstream.)
 
-v4->v5
+>>> Also, I have repeated asked you what happens if the tango5 runs out of
+>>> DMA buffers under normal operation.  Does that also cause it to lock up?
+>>> If so, you have a much bigger problem on your hands.
+>>
+>> I will run iperf3 tests with RX_DESC_COUNT lowered to 2.
+>> Would that produce conclusive results?
+>> Do you have other suggestions?
+> 
+> Leave RX_DESC_COUNT alone but add a delay in the nb8800_poll() loop.
+> That should ensure that queue is drained slowly enough for the buffers
+> to run out.
 
-V3->v4
-Comments pointed by Rob Herring <robh@kernel.org>
-- delete unnecessary "status" and "reg-shift" descriptions in
-  bndings file
+OK. I will test this ASAP on tango4 and tango5.
 
-v2->v3
-Comments pointed by Rob Herring <robh@kernel.org>
-- split Aspeed jtag driver and binding to sepatrate patches
-- delete unnecessary "status" and "reg-shift" descriptions in
-  bndings file
----
- .../devicetree/bindings/jtag/aspeed-jtag.txt       |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
-
-diff --git a/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
-new file mode 100644
-index 0000000..8cfc610
---- /dev/null
-+++ b/Documentation/devicetree/bindings/jtag/aspeed-jtag.txt
-@@ -0,0 +1,18 @@
-+Aspeed JTAG driver for ast2400 and ast2500 SoC
-+
-+Required properties:
-+- compatible:		Should be one of
-+      - "aspeed,ast2400-jtag"
-+      - "aspeed,ast2500-jtag"
-+- reg			contains the offset and length of the JTAG memory
-+			region
-+- clocks		root clock of bus, should reference the APB clock
-+- interrupts		should contain JTAG controller interrupt
-+
-+Example:
-+jtag: jtag at 1e6e4000 {
-+	compatible = "aspeed,ast2500-jtag";
-+	reg = <0x1e6e4000 0x1c>;
-+	clocks = <&clk_apb>;
-+	interrupts = <43>;
-+};
--- 
-1.7.1
+I'll try finding a tango3 board, to check the nb8800_mdio_cmd()
+quirk and the flow_control quirk. Again, the HW dev said they
+are not needed, so if he's wrong, his credibility his shot.
