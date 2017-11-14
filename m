@@ -1,48 +1,83 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Tue, 14 Nov 2017 10:07:31 -0600
-Subject: [PATCH] ARM: dts: am57xx-beagle-x15: fix HDMI LS_OE GPIO
-In-Reply-To: <CAN20qYrw=sW+bo-0pHoPThABzrw8r0ujrdHhZcytxVHbCnromw@mail.gmail.com>
-References: <1472737901-26494-1-git-send-email-tomi.valkeinen@ti.com>
- <b8647621-197c-97d5-8291-26c079e5eae8@ti.com>
- <CAOCHtYhF2KfeK3ccEzZcePbU5H1kwi1tKThZN3NRwXgPsW_bSA@mail.gmail.com>
- <c69aadbf-90e4-7aaf-2b90-4d5b543c252a@ti.com>
- <20160901145757.4oksrst3wpjpsscf@atomide.com>
- <de3bf6ab-a07a-b82d-1e45-5f96a6e1039e@ti.com>
- <CAN20qYqq9DGSgcTaivZHrD+RMY1WLPLNGv2K7xp0pvArJWuGEg@mail.gmail.com>
- <09c701bd-066a-7af7-14c2-4f9cb2481371@ti.com>
- <CAN20qYrw=sW+bo-0pHoPThABzrw8r0ujrdHhZcytxVHbCnromw@mail.gmail.com>
-Message-ID: <CAOCHtYh8BfdGg5BGvM9=BUm0oVonXWTtCe7degdRfdcMGn4AYg@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 14 Nov 2017 16:11:03 +0000
+Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
+ support
+In-Reply-To: <20171113161445.xfqyuntza76ckdmq@hawk.localdomain>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <5A049B20.6000501@arm.com> <20171113112946.GK14144@cbox>
+ <20171113161445.xfqyuntza76ckdmq@hawk.localdomain>
+Message-ID: <5A0B1597.3030809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 14, 2017 at 8:14 AM, Bill Traynor <btraynor@gmail.com> wrote:
-> On Tue, Nov 14, 2017 at 2:33 AM, Tomi Valkeinen <tomi.valkeinen@ti.com> wrote:
->> On 14/11/17 02:27, Bill Traynor wrote:
+Hi Drew,
+
+On 13/11/17 16:14, Andrew Jones wrote:
+> On Mon, Nov 13, 2017 at 12:29:46PM +0100, Christoffer Dall wrote:
+>> On Thu, Nov 09, 2017 at 06:14:56PM +0000, James Morse wrote:
+>>> On 19/10/17 15:57, James Morse wrote:
+>>>> Known issues:
+>>>>  * KVM-Migration: VDISR_EL2 is exposed to userspace as DISR_EL1, but how should
+>>>>    HCR_EL2.VSE or VSESR_EL2 be migrated when the guest has an SError pending but
+>>>>    hasn't taken it yet...?
+>>>
+>>> I've been trying to work out how this pending-SError-migration could work.
+
+[..]
+
+>>> To get out of this corner: why not declare pending-SError-migration an invalid
+>>> thing to do?
 >>
->>> I'm getting this error again with the latest X15 image on my A2
->>> version board.  I don't see this patch in the mainline kernel.  Did it
->>> never get applied?
+>> To answer that question we'd have to know if that is generally a valid
+>> thing to require.  How will higher level tools in the stack deal with
+>> this (e.g. libvirt, and OpenStack).  Is it really valid to tell them
+>> "nope, can't migrate right now".  I'm thinking if you have a failing
+>> host and want to signal some error to the guest, that's probably a
+>> really good time to migrate your mission-critical VM away to a different
+>> host, and being told, "sorry, cannot do this" would be painful.  I'm
+>> cc'ing Drew for his insight into libvirt and how this is done on x86,
+>> but I'm not really crazy about this idea.
+
+> Without actually confirming, I'm pretty sure it's handled with a best
+> effort to cancel the migration, continuing/restoring execution on the
+> source host (or there may be other policies that could be set as well).
+> Naturally, if the source host is going down and the migration is
+> cancelled, then the VM goes down too...
+
+> Anyway, I don't think we would generally want to introduce guest
+> controlled migration blockers. IIUC, this migration blocker would remain
+> until the guest handled the SError, which it may never unmask.
+
+Yes, given the guest can influence this it needs exposing so it can be migrated.
+
+
+[...]
+
+>> My suggestion would be to add some set of VCPU exception state,
+>> potentially as flags, which can be migrated along with the VM, or at
+>> least used by userspace to query the state of the VM, if there exists a
+>> reliable mechanism to restore the state again without any side effects.
 >>
->> With am57xx-beagle-x15.dts? That seems be the A2 version.
->
-> Yes.
-> I see the following in the boot message
->
-> loading /boot/dtbs/4.9.35-ti-r44/am57xx-beagle-x15.dtb ...
->
-> I can get around this by inserting/uninserting an sdcard once the
-> kernel starts booting.
->
-> This is with the Debian 9.0 2017-07-02 4GB SD LXQT image.
+>> I think we have to comb through Documentation/virtual/kvm/api.txt to see
+>> if we can reuse anything, and if not, add something.  We could also
+> 
+> Maybe KVM_GET/SET_VCPU_EVENTS? Looks like the doc mistakenly states it's
+> a VM ioctl, but it's a VCPU ioctl.
 
-Weird, ldo1 is set to always on:
+Hmm, if I suppress my register-size pedantry we can put the lower 32 bits of
+VSESR_EL2 in exception.error_code and use has_error_code to mark it valid.
+'exception' in this struct ends up meaning SError on arm64.
 
-https://github.com/RobertCNelson/linux-stable-rcn-ee/blob/4.9.35-ti-r44/arch/arm/boot/dts/am57xx-beagle-x15-common.dtsi#L276-L283
+(While VSESR_EL2 is 64bit[0], the value gets written into the ESR, which is
+32bit, so I doubt the top 32bits can be used, currently they are all reserved.)
 
-Something else is going on..
+I'll go dig into how x86 uses this...
 
-Regards,
 
--- 
-Robert Nelson
-https://rcn-ee.com/
+Thanks!
+
+James
+
+
+[0]
+https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
