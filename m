@@ -1,63 +1,60 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 14 Nov 2017 22:41:11 +0100
-Subject: [PATCH 5/8] mfd: mtk-mmsys: Add mt8173 nodes
+Date: Tue, 14 Nov 2017 22:41:10 +0100
+Subject: [PATCH 4/8] clk: mediatek: mt2701-mm: switch to mfd device
 In-Reply-To: <20171114214114.15793-1-mbrugger@suse.com>
 References: <20171114214114.15793-1-mbrugger@suse.com>
-Message-ID: <20171114214114.15793-6-mbrugger@suse.com>
+Message-ID: <20171114214114.15793-5-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add devices for the mt8173 SoC.
+As the new mfd device is in place, switch probing
+for the MMSYS to support invocation from the mfd device.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- drivers/mfd/mtk-mmsys.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/clk/mediatek/clk-mt2701-mm.c | 13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
-index 102b491aa28f..45973dfc6010 100644
---- a/drivers/mfd/mtk-mmsys.c
-+++ b/drivers/mfd/mtk-mmsys.c
-@@ -21,6 +21,7 @@
+diff --git a/drivers/clk/mediatek/clk-mt2701-mm.c b/drivers/clk/mediatek/clk-mt2701-mm.c
+index fe1f85072fc5..1725c2c17ca3 100644
+--- a/drivers/clk/mediatek/clk-mt2701-mm.c
++++ b/drivers/clk/mediatek/clk-mt2701-mm.c
+@@ -13,6 +13,7 @@
+  */
  
- enum {
- 	MMSYS_MT2701 = 1,
-+	MMSYS_MT8173,
+ #include <linux/clk-provider.h>
++#include <linux/mfd/mmsys.h>
+ #include <linux/platform_device.h>
+ 
+ #include "clk-mtk.h"
+@@ -87,16 +88,15 @@ static const struct mtk_gate mm_clks[] = {
+ 	GATE_DISP1(CLK_MM_TVE_FMM, "mm_tve_fmm", "mm_sel", 14),
  };
  
- static const struct mfd_cell mmsys_mt2701_devs[] = {
-@@ -28,6 +29,12 @@ static const struct mfd_cell mmsys_mt2701_devs[] = {
- 	{ .name = "drm-mt2701-mm", },
- };
- 
-+static const struct mfd_cell mmsys_mt8173_devs[] = {
-+	{ .name = "clk-mt8173-mm", },
-+	{ .name = "drm-mt8173-mm", },
-+};
-+
-+
- static int mmsys_probe(struct platform_device *pdev)
+-static const struct of_device_id of_match_clk_mt2701_mm[] = {
+-	{ .compatible = "mediatek,mt2701-mmsys", },
+-	{}
+-};
+-
+ static int clk_mt2701_mm_probe(struct platform_device *pdev)
  {
- 	struct mmsys_dev *private;
-@@ -47,6 +54,10 @@ static int mmsys_probe(struct platform_device *pdev)
- 		mmsys_cells = mmsys_mt2701_devs;
- 		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
- 		break;
-+	case MMSYS_MT8173:
-+		mmsys_cells = mmsys_mt8173_devs;
-+		nr_cells = ARRAY_SIZE(mmsys_mt8173_devs);
-+		break;
- 	default:
- 		return -ENODEV;
- 	}
-@@ -74,6 +85,9 @@ static const struct of_device_id of_match_mmsys[] = {
- 	{ .compatible = "mediatek,mt2701-mmsys",
- 	  .data = (void *) MMSYS_MT2701,
+ 	struct clk_onecell_data *clk_data;
+ 	int r;
+-	struct device_node *node = pdev->dev.of_node;
++	struct device_node *node;
++	struct mmsys_dev *mmsys_private;
++
++	mmsys_private = dev_get_drvdata(pdev->dev.parent);
++	node = mmsys_private->of_node;
+ 
+ 	clk_data = mtk_alloc_clk_data(CLK_MM_NR);
+ 
+@@ -116,7 +116,6 @@ static struct platform_driver clk_mt2701_mm_drv = {
+ 	.probe = clk_mt2701_mm_probe,
+ 	.driver = {
+ 		.name = "clk-mt2701-mm",
+-		.of_match_table = of_match_clk_mt2701_mm,
  	},
-+	{ .compatible = "mediatek,mt8173-mmsys",
-+	  .data = (void *) MMSYS_MT8173,
-+	},
- 	{ /* sentinel */ },
  };
  
 -- 
