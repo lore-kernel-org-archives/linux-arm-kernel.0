@@ -1,38 +1,38 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 14 Nov 2017 14:26:29 +0100
-Subject: [PATCH v3 3/4] net: nb8800: Move HW init to ndo_open()
-In-Reply-To: <yw1xwp2t11ap.fsf@mansr.com>
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <103bc878-9311-a727-1c21-2070e0a480e5@sigmadesigns.com>
- <yw1xwp2t11ap.fsf@mansr.com>
-Message-ID: <4e22ef54-d823-fc29-fedc-d447fa3d9c88@sigmadesigns.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 14 Nov 2017 13:27:41 +0000
+Subject: [PATCH] arm64: perf: remove duplicated and unsupported events for
+ Cortex-A73
+In-Reply-To: <20171114124913.np2rtiyhghxipzzx@ukko.fi.intel.com>
+References: <1510662479-9550-1-git-send-email-xuyiping@hisilicon.com>
+ <20171114124913.np2rtiyhghxipzzx@ukko.fi.intel.com>
+Message-ID: <e7909d3c-9e29-a89a-270d-1b6d455ae2a9@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2017 13:40, M?ns Rullg?rd wrote:
+Hi,
 
-> Marc Gonzalez wrote:
+On 14/11/17 12:49, Alexander Shishkin wrote:
+> On Tue, Nov 14, 2017 at 08:27:59PM +0800, Xu YiPing wrote:
+>> bus access read/write events are not supported in A73, and the definition
+>> is duplicated, so delete it.
 > 
->> Power entire ethernet block down in ndo_stop().
->> Power it back up in ndo_open() and perform HW init.
->> Delete nb8800_dma_stop.
+> In the changelog, it would be nice to mention the commit that added these:
 > 
-> Leave it alone, please.  Not all chips might have a separate power
-> domain for this.  Also, it works just fine on the older chips.
+> 5561b6c5e9813 ("arm64: perf: add support for Cortex-A73")
+> 
+> Also it's not clear what is this new statement based on. The original
+> commit at least references a TRM document.
+> 
 
-There is no need for separate power domains. The ethernet block is
-clock-gated when it is held in reset. The reset register is implemented
-on all tango3, tango4, tango5 chips.
+I re-checked the TRM for this core and Xu is right, the BUS_ACCESS 
+events are not available on Cortex-A73. Plus those entries are 
+duplicated, I think something went wrong when I rebased the patch.
 
-nb8800_dma_stop() is a hack. The HW dev has stated that it is not supported.
-One cannot conclude that it "works fine" just because you've never triggered
-the error condition. (On tango5, the error condition triggers systematically.)
+So I think this new patch is doing the right thing.
 
-We have several customer bug reports on tango3 and tango4 chips complaining
-about "broken" ethernet after a link down / link up cycle. They are using a
-different driver, but it implements the same hack in enet_stop_rx().
-There is a high probability that the DMA hack is responsible, and wedged the
-RX DMA state machine.
+Thanks for catching that.
 
-Since older chips do support the reset register, this patch implements
-the same method for all tango chips.
+Cheers,
+
+-- 
+Julien Thierry
