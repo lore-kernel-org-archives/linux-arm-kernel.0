@@ -1,62 +1,47 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 14 Nov 2017 12:54:06 -0800
-Subject: n900 in next-20170901
-In-Reply-To: <e07fae95-2125-2d50-7295-ad58f9710801@ti.com>
-References: <20171109150854.GC28152@atomide.com>
- <20171110001315.GA29669@js1304-P5Q-DELUXE>
- <20171110032610.GJ28152@atomide.com>
- <20171110063727.GA32073@js1304-P5Q-DELUXE>
- <20171110153620.GO28152@atomide.com>
- <20171114063724.GA16969@js1304-P5Q-DELUXE>
- <20171114173719.GA28152@atomide.com>
- <5c885f60-bc8c-5f8e-dc81-57eacc57abc8@ti.com>
- <20171114194432.GB28152@atomide.com>
- <e07fae95-2125-2d50-7295-ad58f9710801@ti.com>
-Message-ID: <20171114205406.GC28152@atomide.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 14 Nov 2017 22:41:06 +0100
+Subject: [PATCH 0/8] arm/arm64: mediatek: Fix mmsys device probing
+Message-ID: <20171114214114.15793-1-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tero Kristo <t-kristo@ti.com> [171114 20:03]:
-> On 14/11/17 21:44, Tony Lindgren wrote:
-> > * Tero Kristo <t-kristo@ti.com> [171114 19:34]:
-> > > I guess you could just use rx51_secure_dispatcher and ditch the
-> > > save_secure_ram_context call completely (and most of the other related
-> > > code)? That one would handle the cache also in a clean manner.
-> > > 
-> > > Something like:
-> > > 
-> > > rx51_secure_dispatcher(25, 0, FLAG_START_CRITICAL, 4,
-> > > __pa(omap3_secure_ram_storage), 0, 1, 1);
-> > 
-> > That's different, as rx51_secure_dispatcher does the following:
-> > 
-> > - Use arguments + 1 instead of 4, we currently use just 4
-> > - Disables local_irq and fiq, we are not doing that now
-> > - Flushes and invalidates cache range, we are not doing that
-> > - Calls omap_smc3 that only does mov r6, #0xff, and does not
-> >    do mov r2, #4
-> > - Missing nops after it's done
-> > 
-> > This just based on a quick look I did earlier. So just
-> > because of the extra work it does we don't want to do it
-> > even if it worked :)
-> 
-> Hmm ok, I was just thinking that all the extra flushes, irq disables etc.
-> might be good to have in place, as a safeguard when entering secure mode.
-> You might get glitches in certain conditions otherwise.
+MMSYS in Mediatek SoCs has some registers to control clock gates (which is 
+used in the clk driver) and some registers to set the routing and enable
+the differnet blocks of the display subsystem.
 
-Well it's been close to 10 years already without those flushes. And
-we only call this once on init.. And further changes should be a lot
-easier now.
+Up to now both drivers, clock and drm are probed with the same device tree
+compatible. But only the first driver get probed, which in effect breaks
+graphics on mt8173 and mt2701.
 
-> The things it is missing might just be clutter.
-> 
-> Anyway, that said, the changes you did look sane, but I might have cleaned
-> it up a bit further. :)
+This patch set introduces a new mfd device, which binds against the mmsys
+compatible and takes care of probing the needed devices. It was tested on the
+bananapi-r2 and the Acer R13 Chromebook.
 
-Yeah OK, let's consider that as a separate patch. This attempts
-to not change the functionality, just move it out of SRAM.
+Matthias Brugger (8):
+  drm/mediatek: Use regmap for register access
+  mfd: mtk-mmsys: Add mmsys driver
+  drm/mediatek: mt2701: switch to mfd probing.
+  clk: mediatek: mt2701-mm: switch to mfd device
+  mfd: mtk-mmsys: Add mt8173 nodes
+  drm/mediatek: Add mfd support for mt8173
+  clk: mediatek: mt8173-mm: switch to mfd device
+  MAINTAINERS: update Mediatek Soc entry
 
-Regards,
+ MAINTAINERS                             |   2 +
+ drivers/clk/mediatek/clk-mt2701-mm.c    |  13 ++--
+ drivers/clk/mediatek/clk-mt8173.c       |  21 ++++++-
+ drivers/gpu/drm/mediatek/mtk_drm_crtc.c |   4 +-
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.c  |  30 +++++----
+ drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |   4 +-
+ drivers/gpu/drm/mediatek/mtk_drm_drv.c  |  35 ++++++-----
+ drivers/gpu/drm/mediatek/mtk_drm_drv.h  |   2 +-
+ drivers/mfd/Kconfig                     |   9 +++
+ drivers/mfd/Makefile                    |   2 +
+ drivers/mfd/mtk-mmsys.c                 | 105 ++++++++++++++++++++++++++++++++
+ include/linux/mfd/mmsys.h               |  18 ++++++
+ 12 files changed, 200 insertions(+), 45 deletions(-)
+ create mode 100644 drivers/mfd/mtk-mmsys.c
+ create mode 100644 include/linux/mfd/mmsys.h
 
-Tony
+-- 
+2.14.2
