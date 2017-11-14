@@ -1,79 +1,98 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 14 Nov 2017 17:41:09 +0100
-Subject: [PATCH v3 3/4] net: nb8800: Move HW init to ndo_open()
-In-Reply-To: <yw1xfu9h0xv7.fsf@mansr.com>
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <103bc878-9311-a727-1c21-2070e0a480e5@sigmadesigns.com>
- <yw1xwp2t11ap.fsf@mansr.com>
- <4e22ef54-d823-fc29-fedc-d447fa3d9c88@sigmadesigns.com>
- <yw1xfu9h0xv7.fsf@mansr.com>
-Message-ID: <30042004-4e13-b7e2-b49d-754db54cc5ce@sigmadesigns.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue, 14 Nov 2017 16:42:13 +0000
+Subject: [PATCH 10/37] KVM: arm64: Slightly improve debug save/restore
+ functions
+In-Reply-To: <20171012104141.26902-11-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-11-christoffer.dall@linaro.org>
+Message-ID: <e9b8d6b8-6dfa-3e6d-6e8f-c16a1882651f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2017 14:54, M?ns Rullg?rd wrote:
+Hi Christopher,
 
-> Marc Gonzalez writes:
+On 12/10/17 11:41, Christoffer Dall wrote:
+> The debug save/restore functions can be improved by using the has_vhe()
+> static key instead of the instruction alternative.  Using the static key
+> uses the same paradigm as we're going to use elsewhere, it makes the
+> code more readable, and it generates slightly better code (no
+> stack setups and function calls unless necessary).
 > 
->> On 14/11/2017 13:40, M?ns Rullg?rd wrote:
->>
->>> Marc Gonzalez wrote:
->>>
->>>> Power entire ethernet block down in ndo_stop().
->>>> Power it back up in ndo_open() and perform HW init.
->>>> Delete nb8800_dma_stop.
->>>
->>> Leave it alone, please.  Not all chips might have a separate power
->>> domain for this.  Also, it works just fine on the older chips.
->>
->> There is no need for separate power domains. The ethernet block is
->> clock-gated when it is held in reset.
+> We also use a static key on the restore path, because it will be
+> marginally faster than loading a value from memory.
 > 
-> So you're not powering it down then.  Please be accurate.
-
-Smirk. That looks like trolling.
-
-
->> The reset register is implemented on all tango3, tango4, tango5 chips.
+> Finally, we don't have to conditionally clear the debug dirty flag if
+> it's set, we can just clear it.
 > 
-> It's still not a core feature.
-
-Correct. But it covers 100% of all chips using this driver.
-There is no point in trying to implement support for chips that
-have never existed, do not exist, and never will.
-
-
->> nb8800_dma_stop() is a hack.
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>   arch/arm64/kvm/hyp/debug-sr.c | 22 +++++++++-------------
+>   1 file changed, 9 insertions(+), 13 deletions(-)
 > 
-> The hack originated from your company.
+> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> index 0fc0758..a2291b6 100644
+> --- a/arch/arm64/kvm/hyp/debug-sr.c
+> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> @@ -75,11 +75,6 @@
+>   
+>   #define psb_csync()		asm volatile("hint #17")
+>   
+> -static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
+> -{
+> -	/* The vcpu can run. but it can't hide. */
+> -}
+> -
+>   static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+>   {
+>   	u64 reg;
+> @@ -109,10 +104,6 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+>   	dsb(nsh);
+>   }
+>   
+> -static hyp_alternate_select(__debug_save_spe,
+> -			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
+> -			    ARM64_HAS_VIRT_HOST_EXTN);
+> -
+>   static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
+>   {
+>   	if (!pmscr_el1)
+> @@ -174,17 +165,22 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+>   {
+>   	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+>   			   kern_hyp_va(vcpu->arch.host_cpu_context));
+> -	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
+> +
+> +	/* Non-VHE: Disable and flush SPE data generation
+> +	 * VHE: The vcpu can run. but it can't hide. */
+> +	if (!has_vhe())
+> +		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
+>   }
+>   
+>   void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+>   {
+> -	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+> +	if (!has_vhe())
+> +		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
 
-So why are you so insistent that we keep using it?
+For consistency, would it be worth naming that function 
+'__debug_restore_spe_nvhe' ?
+
+Also, looking at __debug_save_spe_nvhe, I'm not sure how we guarantee 
+that we might not end up using stale data during the restore_spe 
+(though, if this is an issue, it existed before this change).
+The save function might exit without setting a value to saved pmscr_el1.
+
+Basically I'm wondering if the following scenario (in non VHE) is 
+possible and/or whether it is problematic:
+
+- save spe
+- restore spe
+- host starts using spi -> !(PMBLIMITR_EL1 & PMBLIMITR_EL1_E)
+- save spe -> returns early without setting pmscr_el1
+- restore spe with old save instead of doing nothing
 
 
->> The HW dev has stated that it is not supported.  One cannot conclude
->> that it "works fine" just because you've never triggered the error
->> condition. (On tango5, the error condition triggers systematically.)
-> 
-> That sounds like a problem for tango5.
+Cheers,
 
-tango5 does have its share of issues.
-
-
-> Also, I have repeated asked you what happens if the tango5 runs out of
-> DMA buffers under normal operation.  Does that also cause it to lock up?
-> If so, you have a much bigger problem on your hands.
-
-I will run iperf3 tests with RX_DESC_COUNT lowered to 2.
-Would that produce conclusive results?
-Do you have other suggestions?
-
-
->> We have several customer bug reports on tango3 and tango4 chips complaining
->> about "broken" ethernet after a link down / link up cycle. They are using a
->> different driver, but it implements the same hack in enet_stop_rx().
->> There is a high probability that the DMA hack is responsible, and wedged the
->> RX DMA state machine.
-> 
-> But you have no idea what's really the problem?
-
-I have an idea that enet_stop_rx() wedged the RX DMA state machine.
+-- 
+Julien Thierry
