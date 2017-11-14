@@ -1,36 +1,59 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Tue, 14 Nov 2017 13:43:14 +0100
-Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <20171114105517.74ycmwcjsab7xp2j@piout.net>
-References: <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
- <CAOMZO5CdGAqBkBQ5DdphzNr-tB5r7Sj9jBAhFTFPNezTEjJOMg@mail.gmail.com>
- <20171114105517.74ycmwcjsab7xp2j@piout.net>
-Message-ID: <201711141343.15309.jbe@pengutronix.de>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Tue, 14 Nov 2017 13:47:26 +0100
+Subject: [PATCH v3 1/4] net: nb8800: Drop generic support
+In-Reply-To: <yw1x60ad2fyz.fsf@mansr.com>
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+ <3c0385f3-bae9-8b40-aec4-3818456b2767@sigmadesigns.com>
+ <yw1x60ad2fyz.fsf@mansr.com>
+Message-ID: <f197b96e-55b1-463d-1276-1fecc1e5220d@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 14/11/2017 13:37, M?ns Rullg?rd wrote:
 
-On Tuesday 14 November 2017 11:55:17 Alexandre Belloni wrote:
-> On 14/11/2017 at 08:33:09 -0200, Fabio Estevam wrote:
-> > On Tue, Nov 14, 2017 at 8:26 AM, Alexandre Belloni
-> >
-> > <alexandre.belloni@free-electrons.com> wrote:
-> > >> I have the impression that the dryice driver has never worked in
-> > >> mainlune for mx53.
-> > >
-> > > I doubt that because it seems to have been used by Pengutronix.
-> >
-> > Juergen can confirm, but it seems the dryice driver was only used on
-> > mx25 in mainline.
->
-> Ok, that would explain it.
+> Marc Gonzalez writes:
+> 
+>> According to our HW dev, there is no provision for software to safely
+>> disable RX DMA in the AU-NB8800 hardware block (ethernet DMA). Thus,
+>> it is the responsibility of the SoC designer to provide such a feature.
+>>
+>> The nb8800_dma_stop() implementation is a clever hack that works most
+>> of the times, but it breaks the DMA state machine in rare cases.
+>>
+>> Therefore, let's drop generic support.
+>>
+>> FWIW, tango chips provide a reset register. When the ethernet block
+>> comes out of reset, DMA is disabled.
+>>
+>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>> ---
+>>  drivers/net/ethernet/aurora/nb8800.c | 3 ---
+>>  1 file changed, 3 deletions(-)
+>>
+>> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+>> index e94159507847..26f719e2d6ca 100644
+>> --- a/drivers/net/ethernet/aurora/nb8800.c
+>> +++ b/drivers/net/ethernet/aurora/nb8800.c
+>> @@ -1335,9 +1335,6 @@ static const struct nb8800_ops nb8800_tango4_ops = {
+>>  };
+>>
+>>  static const struct of_device_id nb8800_dt_ids[] = {
+>> -	{
+>> -		.compatible = "aurora,nb8800",
+>> -	},
+>>  	{
+>>  		.compatible = "sigma,smp8642-ethernet",
+>>  		.data = &nb8800_tangox_ops,
+>> -- 
+> 
+> Please leave this.  It works just fine on tango3.
 
-Yes. The development was made on an i.MX25. But currently I have an i.MX53 
-on my desk here and could test...
+What you call "tango3" is your SMP8642-based board, I suppose.
+That is covered by the "sigma,smp8642-ethernet" string.
 
-jb
+There is no need for the generic "aurora,nb8800" string, as no other
+known SoC uses the Aurora SSN8800+NB8800 IP; and as I point out in the
+commit message, the raw IP lacks certain features.
 
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ?? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions ? ? ? ? ? ? ? ?? ?| http://www.pengutronix.de/ ?|
+There is no point in keeping this around. It just adds unnecessary
+existence tests for every use of the ops struct.
