@@ -1,63 +1,62 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 14 Nov 2017 08:49:30 +0000
-Subject: RCU stall with high number of KVM vcpus
-In-Reply-To: <20171114075249.GB16731@hc>
-References: <20171113131000.GA10546@hc>
- <2832f775-3cbe-d984-fe4f-e018642b6f1d@arm.com> <20171113173552.GA13282@hc>
- <7dda7be2-f392-8056-d4d3-372bb867729a@arm.com> <20171114075249.GB16731@hc>
-Message-ID: <a5570c4d-1591-48f6-9aa8-59ac9542217a@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue, 14 Nov 2017 09:52:37 +0100
+Subject: [PATCH v8 0/6] stm32 clocksource driver rework
+Message-ID: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/17 07:52, Jan Glauber wrote:
-> On Mon, Nov 13, 2017 at 06:11:19PM +0000, Marc Zyngier wrote:
->> On 13/11/17 17:35, Jan Glauber wrote:
-> 
-> [...]
-> 
->>>>> numbers don't look good, see waittime-max:
->>>>>
->>>>> -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
->>>>>                               class name    con-bounces    contentions   waittime-min   waittime-max waittime-total   waittime-avg    acq-bounces   acquisitions   holdtime-min   holdtime-max holdtime-total   holdtime-avg
->>>>> -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
->>>>>
->>>>>                 &(&kvm->mmu_lock)->rlock:      99346764       99406604           0.14  1321260806.59 710654434972.0        7148.97      154228320      225122857           0.13   917688890.60  3705916481.39          16.46
->>>>>                 ------------------------
->>>>>                 &(&kvm->mmu_lock)->rlock       99365598          [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
->>>>>                 &(&kvm->mmu_lock)->rlock          25164          [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
->>>>>                 &(&kvm->mmu_lock)->rlock          14934          [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
->>>>>                 &(&kvm->mmu_lock)->rlock            908          [<ffff00000810a1f0>] __cond_resched_lock+0x68/0xb8
->>>>>                 ------------------------
->>>>>                 &(&kvm->mmu_lock)->rlock              3          [<ffff0000080b34c8>] stage2_flush_vm+0x60/0xd8
->>>>>                 &(&kvm->mmu_lock)->rlock       99186296          [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
->>>>>                 &(&kvm->mmu_lock)->rlock         179238          [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
->>>>>                 &(&kvm->mmu_lock)->rlock          19181          [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
->>>>>
->>>>> .............................................................................................................................................................................................................................
->>>> [slots of stuff]
->>>>
->>>> Well, the mmu_lock is clearly contended. Is the box in a state where you
->>>> are swapping? There seem to be as many faults as contentions, which is a
->>>> bit surprising...
->>>
->>> I don't think it is swapping but need to double check.
->>
->> It is the number of aborts that is staggering. And each one of them
->> leads to the mmu_lock being contended. So something seems to be taking
->> its sweet time holding the damned lock.
-> 
-> Can you elaborate on the aborts, I'm not familiar with KVM but from a
-> first look I thought kvm_handle_guest_abort() is in the normal path
-> when a vcpu is stopped. Is that wrong?
+version 8:
+ - rebased on timers/core
+ - change timer_of_exit() name to timer_of_cleanup()
+ - update stm32 clocksource driver to use this function
 
-kvm_handle_guest_abort() is the entry point for our page fault handling
-(hence the mmu_lock being taken). On its own, the number of faults is
-irrelevant. What worries me is that in almost all the cases the lock was
-contended, we were handling a page fault.
+version 7:
+ - reword "clocksource: stm32: only use 32 bits timers" commit message
+   to give more details about why 16 bits are problematics.
 
-What would be interesting is to find out *who* is holding the lock when
-we're being blocked in kvm_handle_guest_abort...
+version 6:
+ - add dedicated patch min delta change
+ - rework commit messages, I hope it will be better now
+ - change new function name from timer_of_deinit to timer_of_exit
+ - make stm32_clock_event_set_next_event() safer like done in other
+   drivers
 
-	M.
+version 6:
+- add timer_of_deinit function in core
+- rework failure cases in probe function
+
+version 5:
+- rebase on top of timer/core branch
+- rework commit message of the first patch
+
+version 4:
+- split patch in 3 parts
+  - convert code to timer_of
+  - only use 32 bits timers
+  - add clocksource support
+
+version 3:
+- fix comments done by Daniel
+- use timer_of helper functions
+
+version 2:
+- fix uninitialized variable
+
+Benjamin Gaignard (6):
+  clocksource: timer_of: rename timer_of_exit to timer_of_cleanup
+  clocksource: stm32: convert driver to timer_of
+  clocksource: stm32: increase min delta value
+  clocksource: stm32: only use 32 bits timers
+  clocksource: stm32: add clocksource support
+  arm: dts: stm32: remove useless clocksource nodes
+
+ arch/arm/boot/dts/stm32f429.dtsi  |  32 -----
+ arch/arm/boot/dts/stm32f746.dtsi  |  32 -----
+ drivers/clocksource/Kconfig       |   1 +
+ drivers/clocksource/timer-of.c    |   9 +-
+ drivers/clocksource/timer-of.h    |   2 +-
+ drivers/clocksource/timer-stm32.c | 242 ++++++++++++++++++++------------------
+ 6 files changed, 138 insertions(+), 180 deletions(-)
+
 -- 
-Jazz is not dead. It just smells funny...
+2.7.4
