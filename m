@@ -1,59 +1,64 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 14 Nov 2017 13:47:26 +0100
-Subject: [PATCH v3 1/4] net: nb8800: Drop generic support
-In-Reply-To: <yw1x60ad2fyz.fsf@mansr.com>
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <3c0385f3-bae9-8b40-aec4-3818456b2767@sigmadesigns.com>
- <yw1x60ad2fyz.fsf@mansr.com>
-Message-ID: <f197b96e-55b1-463d-1276-1fecc1e5220d@sigmadesigns.com>
+From: Noel.Vellemans@visionBMS.com (Vellemans, Noel)
+Date: Tue, 14 Nov 2017 12:56:30 +0000
+Subject: DryIce , RTC not working on imx53.
+In-Reply-To: <201711141343.15309.jbe@pengutronix.de>
+References: <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
+ <CAOMZO5CdGAqBkBQ5DdphzNr-tB5r7Sj9jBAhFTFPNezTEjJOMg@mail.gmail.com>
+ <20171114105517.74ycmwcjsab7xp2j@piout.net>
+ <201711141343.15309.jbe@pengutronix.de>
+Message-ID: <D24E577EA1E37B4788A3BFBC418F14A707646BEA@wetsrvex01.loepfe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2017 13:37, M?ns Rullg?rd wrote:
+Hi all, 
 
-> Marc Gonzalez writes:
-> 
->> According to our HW dev, there is no provision for software to safely
->> disable RX DMA in the AU-NB8800 hardware block (ethernet DMA). Thus,
->> it is the responsibility of the SoC designer to provide such a feature.
->>
->> The nb8800_dma_stop() implementation is a clever hack that works most
->> of the times, but it breaks the DMA state machine in rare cases.
->>
->> Therefore, let's drop generic support.
->>
->> FWIW, tango chips provide a reset register. When the ethernet block
->> comes out of reset, DMA is disabled.
->>
->> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->> ---
->>  drivers/net/ethernet/aurora/nb8800.c | 3 ---
->>  1 file changed, 3 deletions(-)
->>
->> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
->> index e94159507847..26f719e2d6ca 100644
->> --- a/drivers/net/ethernet/aurora/nb8800.c
->> +++ b/drivers/net/ethernet/aurora/nb8800.c
->> @@ -1335,9 +1335,6 @@ static const struct nb8800_ops nb8800_tango4_ops = {
->>  };
->>
->>  static const struct of_device_id nb8800_dt_ids[] = {
->> -	{
->> -		.compatible = "aurora,nb8800",
->> -	},
->>  	{
->>  		.compatible = "sigma,smp8642-ethernet",
->>  		.data = &nb8800_tangox_ops,
->> -- 
-> 
-> Please leave this.  It works just fine on tango3.
+Juergen It won't work ( as it is) , registers are not on the correct offsets and some bits are not on the same positions ( for the IMX53)
+This driver will not work for the INTERNAL-RTC ( rtc into the IMX53), and will never have worked ( on IMX53). 
+I can confirm, it might work for some other variant of the RTC, but it will not do what we all expected for the RTC located into IMX53!
 
-What you call "tango3" is your SMP8642-based board, I suppose.
-That is covered by the "sigma,smp8642-ethernet" string.
+( not sure my previous mail got to the destination)
 
-There is no need for the generic "aurora,nb8800" string, as no other
-known SoC uses the Aurora SSN8800+NB8800 IP; and as I point out in the
-commit message, the raw IP lacks certain features.
+Best Regards
+Noel
 
-There is no point in keeping this around. It just adds unnecessary
-existence tests for every use of the ops struct.
+
+
+
+>>
+>> > Juergen can confirm, but it seems the dryice driver was only used on
+> > mx25 in mainline.
+>>
+>>> Ok, that would explain it.
+>>
+>>Yes. The development was made on an i.MX25. But currently I have an i.MX53 on my desk here and could test...
+>>
+>>jb
+
+>>>
+>>
+>>
+>>
+>>-----Original Message-----
+>>From: Vellemans, Noel 
+>>Sent: Tuesday, November 14, 2017 11:30 AM
+>>To: 'Fabio Estevam'
+>>Cc: Patrick Br?nn; Alexandre Belloni; linux-arm-kernel at lists.infradead.org; linux-rtc at vger.kernel.org
+>>Subject: RE: DryIce , RTC not working on imx53.
+>>
+>>Hi Fabio
+>>
+>>It's been a while... ( but I'm quite sure), if you look closely at the register defines ( into the DRYICE-driver-code) then you will notice... that SOME registers offsets are correct , but others are not matching the INTERNAL rtc of the IMX53.
+>>
+>>When I noticed that ( I skipped RTC driver functionality, under release pressure, I had still many items to test on those kernel , and I was under release pressure.. so I removed RTC for the time being.)
+>>
+>>{ you can get basic RTC , timer only , no alarms/events working... by commenting a lot of things out,  but .. I decided to solve this later the correct way,  when I find some time  ( and to report back when solved, didn't want to bother many people, or otherwise said didn't want make too many noise .... ( because rtc is not critical in my application ) }
+>>
+>>This driver will not work for the INTERNAL-RTC ( rtc into the IMX53), and will never have worked, I can confirm this, it might have worked for some other variant of the RTC, but it will not do what we all expected for the RTC located into IMX53!
+>>
+>>
+>>Regards
+>>Noel
+>>
+>>PS: Just for info,  at this time I'm investigating a NOT booting problem .. and .. it?s a hard one ( keeps me busy for some day's already ... let's say in a 500 boots there is one issue where the 'kernel' locks-up in a 
+>>very very early stage.. (into the first mili-sec of the boot it hangs, some-where around IRQ-initialization .. all blocks , before CPU-identification... no clue yet where exactly..!) 
+>>{ it's only happening in latest kernels 4.4.x / 4.1x.x , older 2.6.35 do not suffer this none boot behavior ( on the same hardware) , so .. digging / debugging / printing.. :-) at this time }
