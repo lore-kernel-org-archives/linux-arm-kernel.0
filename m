@@ -1,99 +1,64 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 14 Nov 2017 22:41:09 +0100
-Subject: [PATCH 3/8] drm/mediatek: mt2701: switch to mfd probing.
+Date: Tue, 14 Nov 2017 22:41:11 +0100
+Subject: [PATCH 5/8] mfd: mtk-mmsys: Add mt8173 nodes
 In-Reply-To: <20171114214114.15793-1-mbrugger@suse.com>
 References: <20171114214114.15793-1-mbrugger@suse.com>
-Message-ID: <20171114214114.15793-4-mbrugger@suse.com>
+Message-ID: <20171114214114.15793-6-mbrugger@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With the mtk-mmsys MFD device in place, we switch the probing for
-mt2701 from device-tree to mfd.
+Add devices for the mt8173 SoC.
 
 Signed-off-by: Matthias Brugger <mbrugger@suse.com>
 ---
- drivers/gpu/drm/mediatek/mtk_drm_drv.c | 32 +++++++++++++++++++++++++-------
- 1 file changed, 25 insertions(+), 7 deletions(-)
+ drivers/mfd/mtk-mmsys.c | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-index dd249cf5121e..5a263aa3ab6e 100644
---- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-+++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+diff --git a/drivers/mfd/mtk-mmsys.c b/drivers/mfd/mtk-mmsys.c
+index 102b491aa28f..45973dfc6010 100644
+--- a/drivers/mfd/mtk-mmsys.c
++++ b/drivers/mfd/mtk-mmsys.c
 @@ -21,6 +21,7 @@
- #include <drm/drm_of.h>
- #include <linux/component.h>
- #include <linux/iommu.h>
-+#include <linux/mfd/mmsys.h>
- #include <linux/mfd/syscon.h>
- #include <linux/of_address.h>
- #include <linux/of_platform.h>
-@@ -392,9 +393,10 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
  
- static int mtk_drm_probe(struct platform_device *pdev)
- {
-+	struct mmsys_dev *mmsys_private;
- 	struct device *dev = &pdev->dev;
- 	struct mtk_drm_private *private;
--	struct device_node *node;
-+	struct device_node *node, *parent_node;
- 	struct component_match *match = NULL;
- 	int ret;
- 	int i;
-@@ -407,12 +409,23 @@ static int mtk_drm_probe(struct platform_device *pdev)
- 	INIT_WORK(&private->commit.work, mtk_atomic_work);
- 	private->data = of_device_get_match_data(dev);
- 
--	private->config_regs = syscon_node_to_regmap(dev->of_node);
--	if (IS_ERR(private->config_regs))
--		return PTR_ERR(private->config_regs);
-+	/* Check if called from mfd */
-+	if (!dev->of_node) {
-+		mmsys_private = dev_get_drvdata(pdev->dev.parent);
-+		private->data = (struct mtk_mmsys_driver_data *)
-+				platform_get_device_id(pdev)->driver_data;
-+		private->config_regs =
-+			syscon_node_to_regmap(mmsys_private->of_node);
-+		parent_node = mmsys_private->of_node->parent;
-+	} else {
-+		private->config_regs = syscon_node_to_regmap(dev->of_node);
-+		if (IS_ERR(private->config_regs))
-+			return PTR_ERR(private->config_regs);
-+		parent_node = dev->of_node->parent;
-+	}
- 
- 	/* Iterate over sibling DISP function blocks */
--	for_each_child_of_node(dev->of_node->parent, node) {
-+	for_each_child_of_node(parent_node, node) {
- 		const struct of_device_id *of_id;
- 		enum mtk_ddp_comp_type comp_type;
- 		int comp_id;
-@@ -553,13 +566,17 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
- 			 mtk_drm_sys_resume);
- 
- static const struct of_device_id mtk_drm_of_ids[] = {
--	{ .compatible = "mediatek,mt2701-mmsys",
--	  .data = &mt2701_mmsys_driver_data},
- 	{ .compatible = "mediatek,mt8173-mmsys",
- 	  .data = &mt8173_mmsys_driver_data},
- 	{ }
+ enum {
+ 	MMSYS_MT2701 = 1,
++	MMSYS_MT8173,
  };
  
-+static const struct platform_device_id mtk_drm_ids[] = {
-+	{ "drm-mt2701-mm", (kernel_ulong_t)&mt2701_mmsys_driver_data },
-+	{ /* sentinel */ },
+ static const struct mfd_cell mmsys_mt2701_devs[] = {
+@@ -28,6 +29,12 @@ static const struct mfd_cell mmsys_mt2701_devs[] = {
+ 	{ .name = "drm-mt2701-mm", },
+ };
+ 
++static const struct mfd_cell mmsys_mt8173_devs[] = {
++	{ .name = "clk-mt8173-mm", },
++	{ .name = "drm-mt8173-mm", },
 +};
-+MODULE_DEVICE_TABLE(platform, mtk_drm_ids);
 +
- static struct platform_driver mtk_drm_platform_driver = {
- 	.probe	= mtk_drm_probe,
- 	.remove	= mtk_drm_remove,
-@@ -568,6 +585,7 @@ static struct platform_driver mtk_drm_platform_driver = {
- 		.of_match_table = mtk_drm_of_ids,
- 		.pm     = &mtk_drm_pm_ops,
++
+ static int mmsys_probe(struct platform_device *pdev)
+ {
+ 	struct mmsys_dev *private;
+@@ -47,6 +54,10 @@ static int mmsys_probe(struct platform_device *pdev)
+ 		mmsys_cells = mmsys_mt2701_devs;
+ 		nr_cells = ARRAY_SIZE(mmsys_mt2701_devs);
+ 		break;
++	case MMSYS_MT8173:
++		mmsys_cells = mmsys_mt8173_devs;
++		nr_cells = ARRAY_SIZE(mmsys_mt8173_devs);
++		break;
+ 	default:
+ 		return -ENODEV;
+ 	}
+@@ -74,6 +85,9 @@ static const struct of_device_id of_match_mmsys[] = {
+ 	{ .compatible = "mediatek,mt2701-mmsys",
+ 	  .data = (void *) MMSYS_MT2701,
  	},
-+	.id_table = mtk_drm_ids,
++	{ .compatible = "mediatek,mt8173-mmsys",
++	  .data = (void *) MMSYS_MT8173,
++	},
+ 	{ /* sentinel */ },
  };
  
- static struct platform_driver * const mtk_drm_drivers[] = {
 -- 
 2.14.2
