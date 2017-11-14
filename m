@@ -1,51 +1,38 @@
 From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Tue, 14 Nov 2017 18:07:15 +0100
-Subject: [PATCH v3 3/4] net: nb8800: Move HW init to ndo_open()
-In-Reply-To: <yw1xbmk4241h.fsf@mansr.com>
+Date: Tue, 14 Nov 2017 18:08:47 +0100
+Subject: [PATCH v3 4/4] net: nb8800: Add support for suspend/resume
+In-Reply-To: <20171114163159.GX30830@lunn.ch>
 References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <103bc878-9311-a727-1c21-2070e0a480e5@sigmadesigns.com>
- <yw1xwp2t11ap.fsf@mansr.com>
- <4e22ef54-d823-fc29-fedc-d447fa3d9c88@sigmadesigns.com>
- <yw1xfu9h0xv7.fsf@mansr.com>
- <30042004-4e13-b7e2-b49d-754db54cc5ce@sigmadesigns.com>
- <yw1xbmk4241h.fsf@mansr.com>
-Message-ID: <3857a215-1ec0-e4d3-89a0-66c9f41af658@sigmadesigns.com>
+ <ae0d528a-d602-f399-9d75-65bf9bbf1264@sigmadesigns.com>
+ <yw1xshdh109j.fsf@mansr.com>
+ <80649328-8d2a-0a6f-a025-6a6c4de62d7e@sigmadesigns.com>
+ <20171114163159.GX30830@lunn.ch>
+Message-ID: <83c8a08a-f369-0bd0-67dd-6c6678ce5ef0@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/2017 17:55, M?ns Rullg?rd wrote:
+On 14/11/2017 17:31, Andrew Lunn wrote:
 
-> Marc Gonzalez wrote:
+> On Tue, Nov 14, 2017 at 03:22:04PM +0100, Marc Gonzalez wrote:
 > 
->> On 14/11/2017 14:54, M?ns Rullg?rd wrote:
+>> On 14/11/2017 14:02, M?ns Rullg?rd wrote:
 >>
->>> The hack originated from your company.
+>>> Missing patch description.  Don't bother though.  I won't approve of
+>>> this implementation.
 >>
->> So why are you so insistent that we keep using it?
+>> I hope I can convince David that you should not have veto power over
+>> this driver just because it was you who submitted it upstream first.
 > 
-> Because it's the only way to support some chip variants.  Ones you'd
-> apparently rather forget, but which nonetheless exist.
-
-Which chip variants do you have in mind?
-All tango3 board supports the reset method.
-
-BTW, could you test my patch series on your board?
-(I can't since the board is not supported upstream.)
-
->>> Also, I have repeated asked you what happens if the tango5 runs out of
->>> DMA buffers under normal operation.  Does that also cause it to lock up?
->>> If so, you have a much bigger problem on your hands.
->>
->> I will run iperf3 tests with RX_DESC_COUNT lowered to 2.
->> Would that produce conclusive results?
->> Do you have other suggestions?
+> In practice, anybody can request a veto on a patch. If a patch
+> introduces a regression, and somebody reports it, that is pretty much
+> an automatic veto.
 > 
-> Leave RX_DESC_COUNT alone but add a delay in the nb8800_poll() loop.
-> That should ensure that queue is drained slowly enough for the buffers
-> to run out.
+> Please work with Mans to ensure you are not breaking the driver for
+> the hardware he cares about.
 
-OK. I will test this ASAP on tango4 and tango5.
+FWIW, removing generic support ("aurora,nb8800") does not break any existing hardware.
 
-I'll try finding a tango3 board, to check the nb8800_mdio_cmd()
-quirk and the flow_control quirk. Again, the HW dev said they
-are not needed, so if he's wrong, his credibility his shot.
+The ethernet controller in the board Mans uses is supported by "sigma,smp8642-ethernet".
+
+I can't test my exact changes on a similar board because support for that board
+is not (yet?) upstream.
