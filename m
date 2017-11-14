@@ -1,7 +1,7 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 14 Nov 2017 11:26:14 +0100
+From: Noel.Vellemans@visionBMS.com (Vellemans, Noel)
+Date: Tue, 14 Nov 2017 10:29:51 +0000
 Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <CAOMZO5B_RcXb6X7gUVSJbDpKSHj9eqtDqcYHjEN1n6zhkyCAjQ@mail.gmail.com>
+In-Reply-To: <CAOMZO5BqhhFMRByY+cHXcqmUiLVVngYHvjmTcNJP8M08ew8xnw@mail.gmail.com>
 References: <D24E577EA1E37B4788A3BFBC418F14A70760C04A@wetsrvex01.loepfe.com>
  <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
  <20171109030327.anzo47xayxckn47r@piout.net>
@@ -10,70 +10,55 @@ References: <D24E577EA1E37B4788A3BFBC418F14A70760C04A@wetsrvex01.loepfe.com>
  <CAOMZO5Bi5PcuGiVRZykw9Zp-ysHmHzThhwNai-cqy3HRTUKQAg@mail.gmail.com>
  <CAOMZO5AOAo8OU86CrneFeWuu2ti1sea9843UQ16=7AyU5-B11Q@mail.gmail.com>
  <3BB206AB2B1BD448954845CE6FF69A8E01CB52F4BE@NT-Mail07.beckhoff.com>
- <CAOMZO5B_RcXb6X7gUVSJbDpKSHj9eqtDqcYHjEN1n6zhkyCAjQ@mail.gmail.com>
-Message-ID: <20171114102614.g2bxstg5qacvmtk6@piout.net>
+ <D24E577EA1E37B4788A3BFBC418F14A707646377@wetsrvex01.loepfe.com>
+ <CAOMZO5BqhhFMRByY+cHXcqmUiLVVngYHvjmTcNJP8M08ew8xnw@mail.gmail.com>
+Message-ID: <D24E577EA1E37B4788A3BFBC418F14A707646790@wetsrvex01.loepfe.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+Cc Juergen
+Hi Fabio
 
-On 14/11/2017 at 08:12:03 -0200, Fabio Estevam wrote:
-> Hi Patrick,
-> 
-> On Tue, Nov 14, 2017 at 3:00 AM, Patrick Br?nn <P.Bruenn@beckhoff.com> wrote:
-> >>From: Fabio Estevam [mailto:festevam at gmail.com]
-> >>Sent: Montag, 13. November 2017 19:57
-> >>> I don't recall of any recent change in this area.
-> >>>
-> > I don't think the behavior changed recently. I tried a kernel 4.4.65 and it shows the same symptoms. I guess Noel really means 3.19-> 4.0.
-> 
-> Or maybe by 'old kernel' he meant the vendor 2.6.35 kernel.
-> 
-> I have the impression that the dryice driver has never worked in
-> mainlune for mx53.
-> 
+It's been a while... ( but I'm quite sure), if you look closely at the register defines ( into the DRYICE-driver-code) then you will notice... that SOME registers offsets are correct , but others are not matching the INTERNAL rtc of the IMX53.
 
-I doubt that because it seems to have been used by Pengutronix.
+When I noticed that ( I skipped RTC driver functionality, under release pressure, I had still many items to test on those kernel , and I was under release pressure.. so I removed RTC for the time being.)
 
-> > Unfortunately no. Did you run hwclock or rtctest?
-> 
-> Yes, this is what I get:
-> 
-> # hwclock -r -D
-> hwclock from util-linux 2.31
-> System Time: 14.876372
-> Trying to open: /dev/rtc0
-> Using the rtc interface to the clock.
-> Last drift adjustment done at 2167 seconds after 1969
-> Last calibrat[   14.892484] imxdi_rtc 53fa4000.srtc: Write-wait timeout val = 08
-> ion done at 2167 seconds after 1969
-> Hardware clock is on UTC time
-> Assuming hardware clock is kept in UTC time.
-> Waiting for clock tick...
-> hwclock: select() to /dev/rtc0 to wait for clock tick timed out
-> ...synchronization failed
-> 
-> 
-> > I still see:
-> > root at CX9020:~# cat /proc/interrupts | grep rtc
-> >  40:          0      tzic  24 Edge      53fa4000.srtc
-> >  41:          0      tzic  25 Edge      53fa4000.srtc
-> > root at CX9020:~# hwclock -D -r
-> > hwclock from util-linux 2.29.2
-> > Using the /dev interface to the clock.
-> > Last drift adjustment done at 1490885082 seconds after 1969
-> > Last calibration done at 1490885082 seconds after 1969
-> > Hardware clock is on UTC time
-> > Assuming hardware clock is kept in UTC time.
-> > Waiting for clock tick...
-> > [   41.035269] irq 40: nobody cared (try booting with the "irqpoll" option)
-> > [   41.042514] handlers:
-> > [   41.044847] [<c06031e0>] dryice_irq
-> > [   41.048398] Disabling IRQ #40
-> 
-> This error I don't get with the 2.31 hwclock version I tried.
+{ you can get basic RTC , timer only , no alarms/events working... by commenting a lot of things out,  but .. I decided to solve this later the correct way,  when I find some time  ( and to report back when solved, didn't want to bother many people, or otherwise said didn't want make too many noise .... ( because rtc is not critical in my application ) }
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+This driver will not work for the INTERNAL-RTC ( rtc into the IMX53), and will never have worked, I can confirm this, it might have worked for some other variant of the RTC, but it will not do what we all expected for the RTC located into IMX53!
+
+
+Regards
+Noel
+
+
+PS: Just for info,  at this time I'm investigating a NOT booting problem .. and .. it?s a hard one ( keeps me busy for some day's already ... let's say in a 500 boots there is one issue where the 'kernel' locks-up in a very very early stage.. (into the first mili-sec of the boot it hangs, some-where around IRQ-initialization .. all blocks , before CPU-identification... no clue yet where exactly..!)
+{ it's only happening in latest kernels 4.4.x / 4.1x.x , older 2.6.35 do not suffer this none boot behavior ( on the same hardware) , so .. digging / debugging / printing.. :-) at this time }
+
+
+_______________________
+Noel Vellemans
+BMS bvba
+
+-----Original Message-----
+From: Fabio Estevam [mailto:festevam at gmail.com] 
+Sent: Tuesday, November 14, 2017 11:13 AM
+To: Vellemans, Noel
+Cc: Patrick Br?nn; Alexandre Belloni; linux-arm-kernel at lists.infradead.org; linux-rtc at vger.kernel.org
+Subject: Re: DryIce , RTC not working on imx53.
+
+Hi Noel,
+
+On Tue, Nov 14, 2017 at 4:40 AM, Vellemans, Noel <Noel.Vellemans@visionbms.com> wrote:
+> HI all,
+>
+> I've been digging a while in the DryIce code (some time ago, it was in a hurry because I needed to release).
+>
+> I finally ended up by NOT using the DryIce code , for the IMX53 ( 
+> internal RTC)
+>
+> If I recall correctly , this is not the correct driver for the 
+> Internal IMX53 RTC, ( for example the register BASE-Addresses / 
+> offsets are not correct..) resulting in all kind of strange behavior, 
+> depending on your situational use-cases:-(
+
+Could you clarify about this? Which base address or offsets are not correct?
