@@ -1,31 +1,21 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 14 Nov 2017 19:01:13 +0100
-Subject: [PATCH 2/3] dt-bindings: arm: actions: Add Sparky
-In-Reply-To: <20171114180114.26408-1-afaerber@suse.de>
-References: <20171114180114.26408-1-afaerber@suse.de>
-Message-ID: <20171114180114.26408-3-afaerber@suse.de>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 14 Nov 2017 10:04:34 -0800
+Subject: [PATCH] clk: uniphier: fix parent of miodmac clock data
+In-Reply-To: <1508374366-27171-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1508374366-27171-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20171114180434.GA11955@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Define a binding for Allo.com Sparky SBC.
+On 10/19, Masahiro Yamada wrote:
+> The "miodmac" is not a child of "stdmac".  They are independent
+> from each other.  Fix it.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 
-Cc: Ioan B. <ioan@allo.com>
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- Documentation/devicetree/bindings/arm/actions.txt | 1 +
- 1 file changed, 1 insertion(+)
+Applied to clk-next
 
-diff --git a/Documentation/devicetree/bindings/arm/actions.txt b/Documentation/devicetree/bindings/arm/actions.txt
-index 544a8855fad5..d54f33c4e0da 100644
---- a/Documentation/devicetree/bindings/arm/actions.txt
-+++ b/Documentation/devicetree/bindings/arm/actions.txt
-@@ -21,6 +21,7 @@ Boards:
- 
- Root node property compatible must contain, depending on board:
- 
-+ - Allo.com Sparky: "allo,sparky"
-  - Cubietech CubieBoard6: "cubietech,cubieboard6"
-  - LeMaker Guitar Base Board rev. B: "lemaker,guitar-bb-rev-b", "lemaker,guitar"
- 
 -- 
-2.13.6
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
