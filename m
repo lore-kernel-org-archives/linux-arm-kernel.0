@@ -1,38 +1,63 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Tue, 14 Nov 2017 13:27:41 +0000
-Subject: [PATCH] arm64: perf: remove duplicated and unsupported events for
- Cortex-A73
-In-Reply-To: <20171114124913.np2rtiyhghxipzzx@ukko.fi.intel.com>
-References: <1510662479-9550-1-git-send-email-xuyiping@hisilicon.com>
- <20171114124913.np2rtiyhghxipzzx@ukko.fi.intel.com>
-Message-ID: <e7909d3c-9e29-a89a-270d-1b6d455ae2a9@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 14 Nov 2017 13:30:07 +0000
+Subject: RCU stall with high number of KVM vcpus
+In-Reply-To: <20171113184046.GA14678@hc>
+References: <20171113131000.GA10546@hc>
+ <2832f775-3cbe-d984-fe4f-e018642b6f1d@arm.com> <20171113173552.GA13282@hc>
+ <7dda7be2-f392-8056-d4d3-372bb867729a@arm.com> <20171113184046.GA14678@hc>
+Message-ID: <e8e1af91-b755-e04e-6ab4-c47b570c9fe0@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 14/11/17 12:49, Alexander Shishkin wrote:
-> On Tue, Nov 14, 2017 at 08:27:59PM +0800, Xu YiPing wrote:
->> bus access read/write events are not supported in A73, and the definition
->> is duplicated, so delete it.
+On 13/11/17 18:40, Jan Glauber wrote:
+> On Mon, Nov 13, 2017 at 06:11:19PM +0000, Marc Zyngier wrote:
+>> On 13/11/17 17:35, Jan Glauber wrote:
+>>> On Mon, Nov 13, 2017 at 01:47:38PM +0000, Marc Zyngier wrote:
 > 
-> In the changelog, it would be nice to mention the commit that added these:
+> [...]
 > 
-> 5561b6c5e9813 ("arm64: perf: add support for Cortex-A73")
+>>>> Please elaborate. Messed in what way? Corrupted? The guest crashing? Or
+>>>> is that a tooling issue?
+>>>
+>>> Every vcpu that oopses prints one line in parallel, so I get blocks like:
+>>> [58880.179814] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.179834] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.179847] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.179873] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.179893] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.179911] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.179917] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.180288] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.180303] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.180336] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.180363] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.180384] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.180415] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>> [58880.180461] [<ffff000008084b98>] ret_from_fork+0x10/0x18
+>>>
+>>> I can send the full log if you want to have a look.
+>>
+>> Sure, send that over (maybe not over email though).
 > 
-> Also it's not clear what is this new statement based on. The original
-> commit at least references a TRM document.
+> Here is the guest dmesg:
+> http://paste.ubuntu.com/25955682/
+
+Yeah, that's because all the vcpus are getting starved at the same time,
+and spitting out interleaved traces... Not very useful anyway, as I
+think this is only a consequence of what's happening on the host.
+
 > 
+> And the host dmesg as it might have been too big for the lists:
+> http://paste.ubuntu.com/25955699/
 
-I re-checked the TRM for this core and Xu is right, the BUS_ACCESS 
-events are not available on Cortex-A73. Plus those entries are 
-duplicated, I think something went wrong when I rebased the patch.
+And that one doesn't show much either, apart from indicating that
+something is keeping the lock for itself. Drat.
 
-So I think this new patch is doing the right thing.
+We need to narrow down the problem, or make it appear on more common HW.
+Let me know if you've managed to reproduce it with non-VHE and/or on TX-1.
 
-Thanks for catching that.
+Thanks,
 
-Cheers,
-
+	M.
 -- 
-Julien Thierry
+Jazz is not dead. It just smells funny...
