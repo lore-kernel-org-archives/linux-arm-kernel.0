@@ -1,134 +1,218 @@
 From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue, 14 Nov 2017 09:52:43 +0100
-Subject: [PATCH v8 6/6] arm: dts: stm32: remove useless clocksource nodes
+Date: Tue, 14 Nov 2017 09:52:42 +0100
+Subject: [PATCH v8 5/6] clocksource: stm32: add clocksource support
 In-Reply-To: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
 References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
-Message-ID: <1510649563-22975-7-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <1510649563-22975-6-git-send-email-benjamin.gaignard@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-16 bits timers aren't accurate enough to be used as
-clocksource, remove them from stm32f4 and stm32f7 devicetree.
+The stm32 timer hardware is currently only used as a clock event device,
+but it can be utilized as a clocksource as well.
+
+Implement this by enabling the free running counter in the hardware block
+and converting the clock event part from a count down event timer to a
+comparator based timer.
 
 Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
 ---
- arch/arm/boot/dts/stm32f429.dtsi | 32 --------------------------------
- arch/arm/boot/dts/stm32f746.dtsi | 32 --------------------------------
- 2 files changed, 64 deletions(-)
+ drivers/clocksource/timer-stm32.c | 116 +++++++++++++++++++++++++++++---------
+ 1 file changed, 88 insertions(+), 28 deletions(-)
 
-diff --git a/arch/arm/boot/dts/stm32f429.dtsi b/arch/arm/boot/dts/stm32f429.dtsi
-index dd7e99b..ac9a3e6 100644
---- a/arch/arm/boot/dts/stm32f429.dtsi
-+++ b/arch/arm/boot/dts/stm32f429.dtsi
-@@ -108,14 +108,6 @@
- 			};
- 		};
+diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+index 8173bcf..c0a62cd 100644
+--- a/drivers/clocksource/timer-stm32.c
++++ b/drivers/clocksource/timer-stm32.c
+@@ -16,6 +16,8 @@
+ #include <linux/of_irq.h>
+ #include <linux/clk.h>
+ #include <linux/reset.h>
++#include <linux/sched_clock.h>
++#include <linux/slab.h>
  
--		timer3: timer at 40000400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000400 0x400>;
--			interrupts = <29>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM3)>;
--			status = "disabled";
--		};
--
- 		timers3: timers at 40000400 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -137,14 +129,6 @@
- 			};
- 		};
+ #include "timer-of.h"
  
--		timer4: timer at 40000800 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000800 0x400>;
--			interrupts = <30>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM4)>;
--			status = "disabled";
--		};
--
- 		timers4: timers at 40000800 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -194,14 +178,6 @@
- 			};
- 		};
+@@ -23,16 +25,16 @@
+ #define TIM_DIER	0x0c
+ #define TIM_SR		0x10
+ #define TIM_EGR		0x14
++#define TIM_CNT		0x24
+ #define TIM_PSC		0x28
+ #define TIM_ARR		0x2c
++#define TIM_CCR1	0x34
  
--		timer6: timer at 40001000 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001000 0x400>;
--			interrupts = <54>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM6)>;
--			status = "disabled";
--		};
--
- 		timers6: timers at 40001000 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-@@ -218,14 +194,6 @@
- 			};
- 		};
+ #define TIM_CR1_CEN	BIT(0)
+-#define TIM_CR1_OPM	BIT(3)
++#define TIM_CR1_UDIS	BIT(1)
+ #define TIM_CR1_ARPE	BIT(7)
  
--		timer7: timer at 40001400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001400 0x400>;
--			interrupts = <55>;
--			clocks = <&rcc 0 STM32F4_APB1_CLOCK(TIM7)>;
--			status = "disabled";
--		};
+-#define TIM_DIER_UIE	BIT(0)
 -
- 		timers7: timers at 40001400 {
- 			#address-cells = <1>;
- 			#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/stm32f746.dtsi b/arch/arm/boot/dts/stm32f746.dtsi
-index 5633860..a9077e6 100644
---- a/arch/arm/boot/dts/stm32f746.dtsi
-+++ b/arch/arm/boot/dts/stm32f746.dtsi
-@@ -82,22 +82,6 @@
- 			status = "disabled";
- 		};
+-#define TIM_SR_UIF	BIT(0)
++#define TIM_DIER_CC1IE	BIT(1)
  
--		timer3: timer at 40000400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000400 0x400>;
--			interrupts = <29>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM3)>;
--			status = "disabled";
--		};
--
--		timer4: timer at 40000800 {
--			compatible = "st,stm32-timer";
--			reg = <0x40000800 0x400>;
--			interrupts = <30>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM4)>;
--			status = "disabled";
--		};
--
- 		timer5: timer at 40000c00 {
- 			compatible = "st,stm32-timer";
- 			reg = <0x40000c00 0x400>;
-@@ -105,22 +89,6 @@
- 			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM5)>;
- 		};
+ #define TIM_EGR_UG	BIT(0)
  
--		timer6: timer at 40001000 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001000 0x400>;
--			interrupts = <54>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM6)>;
--			status = "disabled";
--		};
+@@ -42,28 +44,44 @@ static int stm32_clock_event_shutdown(struct clock_event_device *evt)
+ {
+ 	struct timer_of *to = to_timer_of(evt);
+ 
+-	writel_relaxed(0, timer_of_base(to) + TIM_CR1);
++	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
++
+ 	return 0;
+ }
+ 
+-static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
++static int stm32_clock_event_set_next_event(unsigned long evt,
++					    struct clock_event_device *clkevt)
+ {
+-	struct timer_of *to = to_timer_of(evt);
++	struct timer_of *to = to_timer_of(clkevt);
++	unsigned long now, next;
+ 
+-	writel_relaxed(timer_of_period(to), timer_of_base(to) + TIM_ARR);
+-	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_CEN, timer_of_base(to) + TIM_CR1);
++	next = readl_relaxed(timer_of_base(to) + TIM_CNT) + evt;
++	writel_relaxed(next, timer_of_base(to) + TIM_CCR1);
++	now = readl_relaxed(timer_of_base(to) + TIM_CNT);
++
++	if ((next - now) > evt)
++		return -ETIME;
++
++	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
+ 
+ 	return 0;
+ }
+ 
+-static int stm32_clock_event_set_next_event(unsigned long evt,
+-					    struct clock_event_device *clkevt)
++static int stm32_clock_event_set_periodic(struct clock_event_device *evt)
+ {
+-	struct timer_of *to = to_timer_of(clkevt);
++	struct timer_of *to = to_timer_of(evt);
+ 
+-	writel_relaxed(evt, timer_of_base(to) + TIM_ARR);
+-	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_OPM | TIM_CR1_CEN,
+-		       timer_of_base(to) + TIM_CR1);
++	return stm32_clock_event_set_next_event(timer_of_period(to), evt);
++}
++
++static int stm32_clock_event_set_oneshot(struct clock_event_device *evt)
++{
++	struct timer_of *to = to_timer_of(evt);
++	unsigned long val;
++
++	val = readl_relaxed(timer_of_base(to) + TIM_CNT);
++	writel_relaxed(val, timer_of_base(to) + TIM_CCR1);
++	writel_relaxed(TIM_DIER_CC1IE, timer_of_base(to) + TIM_DIER);
+ 
+ 	return 0;
+ }
+@@ -75,12 +93,57 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+ 
+ 	writel_relaxed(0, timer_of_base(to) + TIM_SR);
+ 
++	if (clockevent_state_periodic(evt))
++		stm32_clock_event_set_periodic(evt);
++	else
++		stm32_clock_event_shutdown(evt);
++
+ 	evt->event_handler(evt);
+ 
+ 	return IRQ_HANDLED;
+ }
+ 
+-static int __init stm32_clockevent_init(struct device_node *node)
++static void __init stm32_clockevent_init(struct timer_of *to)
++{
++	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
++	writel_relaxed(0, timer_of_base(to) + TIM_SR);
++
++	clockevents_config_and_register(&to->clkevt,
++					timer_of_rate(to), MIN_DELTA, ~0U);
++}
++
++static void __iomem *stm32_timer_cnt __read_mostly;
++static u64 notrace stm32_read_sched_clock(void)
++{
++	return readl_relaxed(stm32_timer_cnt);
++}
++
++static int __init stm32_clocksource_init(struct timer_of *to)
++{
++	writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
++	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
++	writel_relaxed(0, timer_of_base(to) + TIM_SR);
++	writel_relaxed(0, timer_of_base(to) + TIM_DIER);
++	writel_relaxed(0, timer_of_base(to) + TIM_SR);
++	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS,
++		       timer_of_base(to) + TIM_CR1);
++
++	/* Make sure that registers are updated */
++	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
++
++	/* Enable controller */
++	writel_relaxed(TIM_CR1_ARPE | TIM_CR1_UDIS | TIM_CR1_CEN,
++		       timer_of_base(to) + TIM_CR1);
++
++	stm32_timer_cnt = timer_of_base(to) + TIM_CNT;
++	sched_clock_register(stm32_read_sched_clock, 32, timer_of_rate(to));
++
++	return clocksource_mmio_init(stm32_timer_cnt, "stm32_timer",
++				     timer_of_rate(to), 250, 32,
++				     clocksource_mmio_readl_up);
++}
++
++static int __init stm32_timer_init(struct device_node *node)
+ {
+ 	struct reset_control *rstc;
+ 	unsigned long max_arr;
+@@ -92,12 +155,13 @@ static int __init stm32_clockevent_init(struct device_node *node)
+ 		return -ENOMEM;
+ 
+ 	to->flags = TIMER_OF_IRQ | TIMER_OF_CLOCK | TIMER_OF_BASE;
++
+ 	to->clkevt.name = "stm32_clockevent";
+ 	to->clkevt.rating = 200;
+-	to->clkevt.features = CLOCK_EVT_FEAT_PERIODIC;
++	to->clkevt.features = CLOCK_EVT_FEAT_ONESHOT | CLOCK_EVT_FEAT_PERIODIC;
+ 	to->clkevt.set_state_shutdown = stm32_clock_event_shutdown;
+ 	to->clkevt.set_state_periodic = stm32_clock_event_set_periodic;
+-	to->clkevt.set_state_oneshot = stm32_clock_event_shutdown;
++	to->clkevt.set_state_oneshot = stm32_clock_event_set_oneshot;
+ 	to->clkevt.tick_resume = stm32_clock_event_shutdown;
+ 	to->clkevt.set_next_event = stm32_clock_event_set_next_event;
+ 
+@@ -122,23 +186,19 @@ static int __init stm32_clockevent_init(struct device_node *node)
+ 		goto deinit;
+ 	}
+ 
+-	writel_relaxed(0, timer_of_base(to) + TIM_ARR);
 -
--		timer7: timer at 40001400 {
--			compatible = "st,stm32-timer";
--			reg = <0x40001400 0x400>;
--			interrupts = <55>;
--			clocks = <&rcc 0 STM32F7_APB1_CLOCK(TIM7)>;
--			status = "disabled";
--		};
--
- 		rtc: rtc at 40002800 {
- 			compatible = "st,stm32-rtc";
- 			reg = <0x40002800 0x400>;
+-	writel_relaxed(0, timer_of_base(to) + TIM_PSC);
+-	writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
+-	writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
+-	writel_relaxed(0, timer_of_base(to) + TIM_SR);
++	ret = stm32_clocksource_init(to);
++	if (ret)
++		goto deinit;
+ 
+-	clockevents_config_and_register(&to->clkevt,
+-					timer_of_period(to), MIN_DELTA, ~0U);
++	stm32_clockevent_init(to);
+ 
+ 	return 0;
+ 
+ deinit:
+-	timer_of_exit(to);
++	timer_of_cleanup(to);
+ err:
+ 	kfree(to);
+ 	return ret;
+ }
+ 
+-TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_clockevent_init);
++TIMER_OF_DECLARE(stm32, "st,stm32-timer", stm32_timer_init);
 -- 
 2.7.4
