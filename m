@@ -1,59 +1,26 @@
-From: michal.simek@xilinx.com (Michal Simek)
-Date: Tue, 14 Nov 2017 08:17:39 +0100
-Subject: [PATCH v1 3/3] PCI: xilinx: Rename xilinx_pcie_link_is_up() to
- xilinx_pcie_link_up()
-In-Reply-To: <20171113224058.29024.51914.stgit@bhelgaas-glaptop.roam.corp.google.com>
-References: <20171113224001.29024.87126.stgit@bhelgaas-glaptop.roam.corp.google.com>
- <20171113224058.29024.51914.stgit@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <d5d907e1-8ee0-763c-63b9-b1f2b30b7a3a@xilinx.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Tue, 14 Nov 2017 09:33:29 +0200
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: fix HDMI LS_OE GPIO
+In-Reply-To: <CAN20qYqq9DGSgcTaivZHrD+RMY1WLPLNGv2K7xp0pvArJWuGEg@mail.gmail.com>
+References: <1472737901-26494-1-git-send-email-tomi.valkeinen@ti.com>
+ <b8647621-197c-97d5-8291-26c079e5eae8@ti.com>
+ <CAOCHtYhF2KfeK3ccEzZcePbU5H1kwi1tKThZN3NRwXgPsW_bSA@mail.gmail.com>
+ <c69aadbf-90e4-7aaf-2b90-4d5b543c252a@ti.com>
+ <20160901145757.4oksrst3wpjpsscf@atomide.com>
+ <de3bf6ab-a07a-b82d-1e45-5f96a6e1039e@ti.com>
+ <CAN20qYqq9DGSgcTaivZHrD+RMY1WLPLNGv2K7xp0pvArJWuGEg@mail.gmail.com>
+Message-ID: <09c701bd-066a-7af7-14c2-4f9cb2481371@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.11.2017 23:40, Bjorn Helgaas wrote:
-> From: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> Rename xilinx_pcie_link_is_up() to xilinx_pcie_link_up() to follow the
-> convention of other drivers.  No functional change intended.
-> 
-> Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> ---
->  drivers/pci/host/pcie-xilinx.c |    6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/pci/host/pcie-xilinx.c b/drivers/pci/host/pcie-xilinx.c
-> index 94e13cb8608f..7b5325990f5e 100644
-> --- a/drivers/pci/host/pcie-xilinx.c
-> +++ b/drivers/pci/host/pcie-xilinx.c
-> @@ -129,7 +129,7 @@ static inline void pcie_write(struct xilinx_pcie_port *port, u32 val, u32 reg)
->  	writel(val, port->reg_base + reg);
->  }
->  
-> -static inline bool xilinx_pcie_link_is_up(struct xilinx_pcie_port *port)
-> +static inline bool xilinx_pcie_link_up(struct xilinx_pcie_port *port)
->  {
->  	return (pcie_read(port, XILINX_PCIE_REG_PSCR) &
->  		XILINX_PCIE_REG_PSCR_LNKUP) ? 1 : 0;
-> @@ -165,7 +165,7 @@ static bool xilinx_pcie_valid_device(struct pci_bus *bus, unsigned int devfn)
->  
->  	/* Check if link is up when trying to access downstream ports */
->  	if (bus->number != port->root_busno)
-> -		if (!xilinx_pcie_link_is_up(port))
-> +		if (!xilinx_pcie_link_up(port))
->  			return false;
->  
->  	/* Only one device down on each root port */
-> @@ -541,7 +541,7 @@ static void xilinx_pcie_init_port(struct xilinx_pcie_port *port)
->  {
->  	struct device *dev = port->dev;
->  
-> -	if (xilinx_pcie_link_is_up(port))
-> +	if (xilinx_pcie_link_up(port))
->  		dev_info(dev, "PCIe Link is UP\n");
->  	else
->  		dev_info(dev, "PCIe Link is DOWN\n");
-> 
+On 14/11/17 02:27, Bill Traynor wrote:
 
-Acked-by: Michal Simek <michal.simek@xilinx.com>
+> I'm getting this error again with the latest X15 image on my A2
+> version board.  I don't see this patch in the mainline kernel.  Did it
+> never get applied?
 
-Thanks,
-Michal
+With am57xx-beagle-x15.dts? That seems be the A2 version.
+
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
