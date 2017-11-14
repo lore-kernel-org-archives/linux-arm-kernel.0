@@ -1,54 +1,29 @@
-From: pprakash@codeaurora.org (Prakash, Prashanth)
-Date: Tue, 14 Nov 2017 09:15:44 -0700
-Subject: [PATCH v2 2/2] ARM64 / cpuidle: Use new cpuidle macro for
- entering retention state
-In-Reply-To: <0b4b13d3-2415-33df-f02b-1c94df4331ea@arm.com>
-References: <1510187922-8218-1-git-send-email-pprakash@codeaurora.org>
- <1510187922-8218-3-git-send-email-pprakash@codeaurora.org>
- <0b4b13d3-2415-33df-f02b-1c94df4331ea@arm.com>
-Message-ID: <73f03603-5878-9f78-55b1-ad8d1267b302@codeaurora.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 14 Nov 2017 17:31:59 +0100
+Subject: [PATCH v3 4/4] net: nb8800: Add support for suspend/resume
+In-Reply-To: <80649328-8d2a-0a6f-a025-6a6c4de62d7e@sigmadesigns.com>
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+ <ae0d528a-d602-f399-9d75-65bf9bbf1264@sigmadesigns.com>
+ <yw1xshdh109j.fsf@mansr.com>
+ <80649328-8d2a-0a6f-a025-6a6c4de62d7e@sigmadesigns.com>
+Message-ID: <20171114163159.GX30830@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 14, 2017 at 03:22:04PM +0100, Marc Gonzalez wrote:
+> On 14/11/2017 14:02, M?ns Rullg?rd wrote:
+> 
+> > Missing patch description.  Don't bother though.  I won't approve of
+> > this implementation.
+> 
+> I hope I can convince David that you should not have veto power over
+> this driver just because it was you who submitted it upstream first.
 
+In practice, anybody can request a veto on a patch. If a patch
+introduces a regression, and somebody reports it, that is pretty much
+an automatic veto.
 
-On 11/13/2017 5:33 AM, Sudeep Holla wrote:
->
-> On 09/11/17 00:38, Prashanth Prakash wrote:
->> CPU_PM_CPU_IDLE_ENTER_RETENTION skips calling cpu_pm_enter() and
->> cpu_pm_exit(). By not calling cpu_pm functions in idle entry/exit
->> paths we can reduce the latency involved in entering and exiting
->> the low power idle state.
->>
->> On ARM64 based Qualcomm server platform we measured below overhead
->> for calling cpu_pm_enter and cpu_pm_exit for retention states.
->>
->> workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
->> 	Average overhead of cpu_pm_enter - 1.2us
->> 	Average overhead of cpu_pm_exit  - 3.1us
->>
->> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
->> ---
->>  arch/arm64/kernel/cpuidle.c | 8 +++++++-
->>  1 file changed, 7 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
->> index fd69108..f2d1381 100644
->> --- a/arch/arm64/kernel/cpuidle.c
->> +++ b/arch/arm64/kernel/cpuidle.c
->> @@ -47,6 +47,8 @@ int arm_cpuidle_suspend(int index)
->>  
->>  #include <acpi/processor.h>
->>  
->> +#define ARM64_LPI_IS_RETENTION_STATE(arch_flags) (!(arch_flags))
->> +
-> This is fine, but just to be safer, is it better to check for all
-> flags to be set as we can't/don't support any partial retention modes.
-I am not sure I completely understand.
+Please work with Mans to ensure you are not breaking the driver for
+the hardware he cares about.
 
-If any bit is set in arch_flags, then we lose the context corresponding to that bit, so
-a full retention state will have no bit set, so that's what we are checking for.
-Or am i missing something?
-
-Thanks,
-Prashanth
+    Andrew
