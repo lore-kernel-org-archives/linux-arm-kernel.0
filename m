@@ -1,45 +1,33 @@
 From: jim2101024@gmail.com (Jim Quinlan)
-Date: Tue, 14 Nov 2017 17:12:09 -0500
-Subject: [PATCH v3 5/8] PCI/MSI: Enable PCI_MSI_IRQ_DOMAIN support for MIPS
+Date: Tue, 14 Nov 2017 17:12:12 -0500
+Subject: [PATCH v3 8/8] MIPS: BMIPS: Enable PCI
 In-Reply-To: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
 References: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
-Message-ID: <1510697532-32828-6-git-send-email-jim2101024@gmail.com>
+Message-ID: <1510697532-32828-9-git-send-email-jim2101024@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add MIPS as an arch that supports PCI_MSI_IRQ_DOMAIN and add
-generation of msi.h in the MIPS arch.
+Adds the Kconfig hooks to enable the Broadcom STB PCIe root complex
+driver for Broadcom MIPS systems.
 
 Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
 ---
- arch/mips/include/asm/Kbuild | 1 +
- drivers/pci/Kconfig          | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ arch/mips/Kconfig | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/mips/include/asm/Kbuild b/arch/mips/include/asm/Kbuild
-index 7c8aab2..8c78ba7 100644
---- a/arch/mips/include/asm/Kbuild
-+++ b/arch/mips/include/asm/Kbuild
-@@ -9,6 +9,7 @@ generic-y += irq_work.h
- generic-y += local64.h
- generic-y += mcs_spinlock.h
- generic-y += mm-arch-hooks.h
-+generic-y += msi.h
- generic-y += parport.h
- generic-y += percpu.h
- generic-y += preempt.h
-diff --git a/drivers/pci/Kconfig b/drivers/pci/Kconfig
-index c32a77f..927c335 100644
---- a/drivers/pci/Kconfig
-+++ b/drivers/pci/Kconfig
-@@ -25,7 +25,7 @@ config PCI_MSI
- 	   If you don't know what to do here, say Y.
- 
- config PCI_MSI_IRQ_DOMAIN
--	def_bool ARC || ARM || ARM64 || X86
-+	def_bool ARC || ARM || ARM64 || MIPS || X86
- 	depends on PCI_MSI
- 	select GENERIC_MSI_IRQ_DOMAIN
- 
+diff --git a/arch/mips/Kconfig b/arch/mips/Kconfig
+index cb7fcc4..83ba54d 100644
+--- a/arch/mips/Kconfig
++++ b/arch/mips/Kconfig
+@@ -209,6 +209,9 @@ config BMIPS_GENERIC
+ 	select BOOT_RAW
+ 	select NO_EXCEPT_FILL
+ 	select USE_OF
++	select HW_HAS_PCI
++	select PCI_DRIVERS_GENERIC
++	select PCI
+ 	select CEVT_R4K
+ 	select CSRC_R4K
+ 	select SYNC_R4K
 -- 
 1.9.0.138.g2de3478
