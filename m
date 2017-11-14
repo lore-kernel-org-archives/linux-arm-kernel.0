@@ -1,63 +1,24 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 14 Nov 2017 17:40:49 +0000
-Subject: [PATCH v2 2/2] ARM64 / cpuidle: Use new cpuidle macro for
- entering retention state
-In-Reply-To: <73f03603-5878-9f78-55b1-ad8d1267b302@codeaurora.org>
-References: <1510187922-8218-1-git-send-email-pprakash@codeaurora.org>
- <1510187922-8218-3-git-send-email-pprakash@codeaurora.org>
- <0b4b13d3-2415-33df-f02b-1c94df4331ea@arm.com>
- <73f03603-5878-9f78-55b1-ad8d1267b302@codeaurora.org>
-Message-ID: <22312902-e63e-6464-ea80-eb76ad40eee2@arm.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Tue, 14 Nov 2017 18:53:33 +0100
+Subject: [PATCH v5] ARM: dts: exynos: add bcm4334 device node to trats2
+In-Reply-To: <20171113005203.GA15175@lineageos.org>
+References: <20171113005203.GA15175@lineageos.org>
+Message-ID: <20171114175333.kosfvgrsspkrv3p6@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 14/11/17 16:15, Prakash, Prashanth wrote:
+On Mon, Nov 13, 2017 at 11:52:03AM +1100, Simon Shields wrote:
+> This patch allows the bcm4334 to power on and enables
+> wifi functionality on trats2.
 > 
-> 
-> On 11/13/2017 5:33 AM, Sudeep Holla wrote:
->>
->> On 09/11/17 00:38, Prashanth Prakash wrote:
->>> CPU_PM_CPU_IDLE_ENTER_RETENTION skips calling cpu_pm_enter() and
->>> cpu_pm_exit(). By not calling cpu_pm functions in idle entry/exit
->>> paths we can reduce the latency involved in entering and exiting
->>> the low power idle state.
->>>
->>> On ARM64 based Qualcomm server platform we measured below overhead
->>> for calling cpu_pm_enter and cpu_pm_exit for retention states.
->>>
->>> workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
->>> 	Average overhead of cpu_pm_enter - 1.2us
->>> 	Average overhead of cpu_pm_exit  - 3.1us
->>>
->>> Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
->>> ---
->>>  arch/arm64/kernel/cpuidle.c | 8 +++++++-
->>>  1 file changed, 7 insertions(+), 1 deletion(-)
->>>
->>> diff --git a/arch/arm64/kernel/cpuidle.c b/arch/arm64/kernel/cpuidle.c
->>> index fd69108..f2d1381 100644
->>> --- a/arch/arm64/kernel/cpuidle.c
->>> +++ b/arch/arm64/kernel/cpuidle.c
->>> @@ -47,6 +47,8 @@ int arm_cpuidle_suspend(int index)
->>>  
->>>  #include <acpi/processor.h>
->>>  
->>> +#define ARM64_LPI_IS_RETENTION_STATE(arch_flags) (!(arch_flags))
->>> +
->> This is fine, but just to be safer, is it better to check for all
->> flags to be set as we can't/don't support any partial retention modes.
-> I am not sure I completely understand.
-> 
-> If any bit is set in arch_flags, then we lose the context corresponding to that bit, so
-> a full retention state will have no bit set, so that's what we are checking for.
-> Or am i missing something?
-> 
+> Signed-off-by: Simon Shields <simon@lineageos.org>
+> ---
+>  arch/arm/boot/dts/exynos4412-trats2.dts | 27 +++++++++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>
 
-Ah you are right, I somehow misinterpreted the flags exactly to be
-opposite(i.e. state retained) rather than state lost, sorry for the noise.
+Looks good, I'll take it after merge window. For my own reference:
+Reviewed-by: Krzysztof Kozlowski <krzk@kernel.org>
 
--- 
-Regards,
-Sudeep
+Best regards,
+Krzysztof
