@@ -1,53 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Tue, 14 Nov 2017 17:51:50 +0100
-Subject: [PATCH] pinctrl: armada-37xx: Fix direction_output() callback behavior
-Message-ID: <20171114165150.19599-1-gregory.clement@free-electrons.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 14 Nov 2017 16:55:38 +0000
+Subject: [PATCH v3 3/4] net: nb8800: Move HW init to ndo_open()
+In-Reply-To: <30042004-4e13-b7e2-b49d-754db54cc5ce@sigmadesigns.com> (Marc
+ Gonzalez's message of "Tue, 14 Nov 2017 17:41:09 +0100")
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+ <103bc878-9311-a727-1c21-2070e0a480e5@sigmadesigns.com>
+ <yw1xwp2t11ap.fsf@mansr.com>
+ <4e22ef54-d823-fc29-fedc-d447fa3d9c88@sigmadesigns.com>
+ <yw1xfu9h0xv7.fsf@mansr.com>
+ <30042004-4e13-b7e2-b49d-754db54cc5ce@sigmadesigns.com>
+Message-ID: <yw1xbmk4241h.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The direction_output callback of the gpio_chip structure is supposed to
-set the output direction but also to set the value of the gpio. For the
-armada-37xx driver this callback acted as the gpio_set_direction callback
-for the pinctrl.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-This patch fixes the behavior of the direction_output callback by also
-applying the value received as parameter.
+> On 14/11/2017 14:54, M?ns Rullg?rd wrote:
+>
+>> Marc Gonzalez writes:
+>> 
+>>> On 14/11/2017 13:40, M?ns Rullg?rd wrote:
+>>>
+>>>> Marc Gonzalez wrote:
+>>>>
+>>>>> Power entire ethernet block down in ndo_stop().
+>>>>> Power it back up in ndo_open() and perform HW init.
+>>>>> Delete nb8800_dma_stop.
+>>>>
+>>>> Leave it alone, please.  Not all chips might have a separate power
+>>>> domain for this.  Also, it works just fine on the older chips.
+>>>
+>>> There is no need for separate power domains. The ethernet block is
+>>> clock-gated when it is held in reset.
+>> 
+>> So you're not powering it down then.  Please be accurate.
+>
+> Smirk. That looks like trolling.
+>
+>>> The reset register is implemented on all tango3, tango4, tango5 chips.
+>> 
+>> It's still not a core feature.
+>
+> Correct. But it covers 100% of all chips using this driver.
+> There is no point in trying to implement support for chips that
+> have never existed, do not exist, and never will.
 
-Cc: stable at vger.kernel.org
-Fixes: 5715092a458c ("pinctrl: armada-37xx: Add gpio support")
-Reported-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/pinctrl/mvebu/pinctrl-armada-37xx.c | 13 +++++++++++--
- 1 file changed, 11 insertions(+), 2 deletions(-)
+You can't know that.
 
-diff --git a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-index 71b944748304..c5fe7d4a9065 100644
---- a/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-+++ b/drivers/pinctrl/mvebu/pinctrl-armada-37xx.c
-@@ -408,12 +408,21 @@ static int armada_37xx_gpio_direction_output(struct gpio_chip *chip,
- {
- 	struct armada_37xx_pinctrl *info = gpiochip_get_data(chip);
- 	unsigned int reg = OUTPUT_EN;
--	unsigned int mask;
-+	unsigned int mask, val, ret;
- 
- 	armada_37xx_update_reg(&reg, offset);
- 	mask = BIT(offset);
- 
--	return regmap_update_bits(info->regmap, reg, mask, mask);
-+	ret = regmap_update_bits(info->regmap, reg, mask, mask);
-+
-+	if (ret)
-+		return ret;
-+
-+	reg = OUTPUT_VAL;
-+	val = value ? mask : 0;
-+	regmap_update_bits(info->regmap, reg, mask, val);
-+
-+	return 0;
- }
- 
- static int armada_37xx_gpio_get(struct gpio_chip *chip, unsigned int offset)
+>>> nb8800_dma_stop() is a hack.
+>> 
+>> The hack originated from your company.
+>
+> So why are you so insistent that we keep using it?
+
+Because it's the only way to support some chip variants.  Ones you'd
+apparently rather forget, but which nonetheless exist.
+
+>> Also, I have repeated asked you what happens if the tango5 runs out of
+>> DMA buffers under normal operation.  Does that also cause it to lock up?
+>> If so, you have a much bigger problem on your hands.
+>
+> I will run iperf3 tests with RX_DESC_COUNT lowered to 2.
+> Would that produce conclusive results?
+> Do you have other suggestions?
+
+Leave RX_DESC_COUNT alone but add a delay in the nb8800_poll() loop.
+That should ensure that queue is drained slowly enough for the buffers
+to run out.
+
 -- 
-2.14.2
+M?ns Rullg?rd
