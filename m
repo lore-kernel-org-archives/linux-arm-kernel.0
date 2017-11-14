@@ -1,50 +1,84 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 14 Nov 2017 21:00:21 +0300
-Subject: [PATCH 3/3] arm64: dts: renesas: eagle: add EtherAVB pins
-In-Reply-To: <CAMuHMdWCj=CjA_zyC1GKr=KEk2CNMAtwvREw25R1uJktZucY4w@mail.gmail.com>
-References: <20171110200714.406365231@cogentembedded.com>
- <CAMuHMdWCj=CjA_zyC1GKr=KEk2CNMAtwvREw25R1uJktZucY4w@mail.gmail.com>
-Message-ID: <1017d8fb-e353-f212-09a9-a28bf07eddc2@cogentembedded.com>
+From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
+Date: Tue, 14 Nov 2017 19:01:14 +0100
+Subject: [PATCH 3/3] arm: dts: owl-s500: Add Sparky
+In-Reply-To: <20171114180114.26408-1-afaerber@suse.de>
+References: <20171114180114.26408-1-afaerber@suse.de>
+Message-ID: <20171114180114.26408-4-afaerber@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Add a Device Tree for the Allo.com Sparky SBC.
 
-On 11/14/2017 11:44 AM, Geert Uytterhoeven wrote:
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
+---
+ arch/arm/boot/dts/Makefile            |  3 ++-
+ arch/arm/boot/dts/owl-s500-sparky.dts | 44 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 46 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/owl-s500-sparky.dts
 
->> Add the (previously omitted) EtherAVB pin data to the Eagle board's
->> device tree.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Thanks for your patch!
-> 
->> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->> @@ -34,6 +34,9 @@
-[...]
->> @@ -53,6 +56,11 @@
->>   };
->>
->>   &pfc {
->> +       avb_pins: avb {
->> +               groups = "avb0_mdio", "avb0_mii";
-> 
-> Oh no, its'called "avb0_mdio" here, but "avb(0)_mdc" on all other
-> R-Car Gen3 SoCs?
-
-    Can you remember the reason? I don;t want to follow the bad example. :-)
-
-> What about "avb0_link", which is connected through "L_LNK"?
-
-    The same as for other gen3 board, the AVB node has renesas,no-ether-link".
-I tried to verify that property on Eagle, and left it intact as a result... 
-Will re-test removing it once more.
-
-[...]
-
-> Gr{oetje,eeting}s,
-> 
->                          Geert
-
-MBR, Sergei
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9caf21..ad77f7656a70 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -707,7 +707,8 @@ dtb-$(CONFIG_ARCH_ORION5X) += \
+ 	orion5x-rd88f5182-nas.dtb
+ dtb-$(CONFIG_ARCH_ACTIONS) += \
+ 	owl-s500-cubieboard6.dtb \
+-	owl-s500-guitar-bb-rev-b.dtb
++	owl-s500-guitar-bb-rev-b.dtb \
++	owl-s500-sparky.dtb
+ dtb-$(CONFIG_ARCH_PRIMA2) += \
+ 	prima2-evb.dtb
+ dtb-$(CONFIG_ARCH_OXNAS) += \
+diff --git a/arch/arm/boot/dts/owl-s500-sparky.dts b/arch/arm/boot/dts/owl-s500-sparky.dts
+new file mode 100644
+index 000000000000..f620548c6c0b
+--- /dev/null
++++ b/arch/arm/boot/dts/owl-s500-sparky.dts
+@@ -0,0 +1,44 @@
++/*
++ * Allo.com Sparky
++ *
++ * Copyright (c) 2017 Andreas F?rber
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++/dts-v1/;
++
++#include "owl-s500.dtsi"
++
++/ {
++	compatible = "allo,sparky", "actions,s500";
++	model = "Allo.com Sparky";
++
++	aliases {
++		serial3 = &uart3;
++	};
++
++	chosen {
++		stdout-path = "serial3:115200n8";
++	};
++
++	memory at 0 {
++		device_type = "memory";
++		reg = <0x0 0x40000000>; /* 1 or 2 GiB */
++	};
++
++	uart3_clk: uart3-clk {
++		compatible = "fixed-clock";
++		clock-frequency = <921600>;
++		#clock-cells = <0>;
++	};
++};
++
++&timer {
++	clocks = <&hosc>;
++};
++
++&uart3 {
++	status = "okay";
++	clocks = <&uart3_clk>;
++};
+-- 
+2.13.6
