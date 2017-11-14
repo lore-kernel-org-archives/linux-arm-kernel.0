@@ -1,72 +1,81 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Tue, 14 Nov 2017 10:29:16 +0100
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 14 Nov 2017 19:54:59 +1100
 Subject: linux-next: Tree for Nov 7
-In-Reply-To: <87a7zpw75f.fsf@concordia.ellerman.id.au>
-References: <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
+In-Reply-To: <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
+References: <20171107162217.382cd754@canb.auug.org.au>
+ <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
+ <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
+ <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
  <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
  <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
  <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
  <87lgjawgx1.fsf@concordia.ellerman.id.au>
  <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
- <20171113151641.yfqrecpcxllpn5mq@dhcp22.suse.cz>
- <20171113154939.6ui2fmpokpm7g4oj@dhcp22.suse.cz>
- <20171113160637.jhekbdyfpccme3be@dhcp22.suse.cz>
- <87a7zpw75f.fsf@concordia.ellerman.id.au>
-Message-ID: <20171114092916.ho5mvwc23xnelmod@dhcp22.suse.cz>
+Message-ID: <87h8txw87w.fsf@concordia.ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 14-11-17 20:18:04, Michael Ellerman wrote:
-> Michal Hocko <mhocko@kernel.org> writes:
-> 
-> > [Sorry for spamming, this one is the last attempt hopefully]
-> >
-> > On Mon 13-11-17 16:49:39, Michal Hocko wrote:
-> >> On Mon 13-11-17 16:16:41, Michal Hocko wrote:
-> >> > On Mon 13-11-17 13:00:57, Michal Hocko wrote:
-> >> > [...]
-> >> > > Yes, I have mentioned that in the previous email but the amount of code
-> >> > > would be even larger. Basically every arch which reimplements
-> >> > > arch_get_unmapped_area would have to special case new MAP_FIXED flag to
-> >> > > do vma lookup.
-> >> > 
-> >> > It turned out that this might be much more easier than I thought after
-> >> > all. It seems we can really handle that in the common code. This would
-> >> > mean that we are exposing a new functionality to the userspace though.
-> >> > Myabe this would be useful on its own though. Just a quick draft (not
-> >> > even compile tested) whether this makes sense in general. I would be
-> >> > worried about unexpected behavior when somebody set other bit without a
-> >> > good reason and we might fail with ENOMEM for such a call now.
-> >> 
-> >> Hmm, the bigger problem would be the backward compatibility actually. We
-> >> would get silent corruptions which is exactly what the flag is trying
-> >> fix. mmap flags handling really sucks. So I guess we would have to make
-> >> the flag internal only :/
-> >
-> > OK, so this one should take care of the backward compatibility while
-> > still not touching the arch code
-> 
-> I'm not sure I understand your worries about backward compatibility?
+Michal Hocko <mhocko@kernel.org> writes:
 
-Just imagine you are running an application which uses the new flag
-combination on an older kernel. You will get no warning, yet you have no
-way to check that you have actually clobbered an existing mapping
-because MAP_FIXED will be used the old way.
+> On Mon 13-11-17 22:34:50, Michael Ellerman wrote:
+>> Hi Michal,
+>> 
+>> Michal Hocko <mhocko@kernel.org> writes:
+>> > On Mon 13-11-17 10:20:06, Michal Hocko wrote:
+>> >> [Cc arm and ppc maintainers]
+>> >
+>> > Hmm, it turned out to be a problem on other architectures as well.
+>> > CCing more maintainers. For your reference, we are talking about
+>> > http://lkml.kernel.org/r/20171023082608.6167-1-mhocko at kernel.org
+>> > which has broken architectures which do apply aligning on the mmap
+>> > address hint without MAP_FIXED applied. See below my proposed way
+>> > around this issue because I belive that the above patch is quite
+>> > valuable on its own to be dropped for all archs.
+>> 
+>> I don't really like your solution sorry :)  The fact that you've had to
+>> patch seven arches seems like a red flag.
+>> 
+>> I think this is a generic problem with MAP_FIXED, which I've heard
+>> userspace folks complain about in the past.
+>
+> The thing is that we canno  change MAP_FIXED behavior as it is carved in
+> stone
 
-> If we add a new mmap flag which is currently unused then what is the
-> problem? Are you worried about user code that accidentally passes that
-> flag already?
+Yes obviously. I didn't mean to imply we would change MAP_FIXED, rather
+we would add a new flag with the new semantics.
 
-If we add a completely new flag, like in this patch, then the code using
-the flag will not clobber an existing mapping on older kernels which do
-not recognize it (we will simply fall back to the default hint based
-implementation). You might not get the mapping you asked for which sucks
-but that is not fixable AFAICS. You can at least do
+>> Currently MAP_FIXED does two things:
+>>   1. makes addr not a hint but the required address
+>>   2. blasts any existing mapping
+>> 
+>> You want 1) but not 2).
+>
+> + fail if there is a clashing range
 
-	mapped_addr = mmap(addr, ... MAP_FIXED_SAFE...);
-	assert(mapped_addr == addr);
+Yep. I thought that was implied :)
 
-So I do not think we can go with the modifier unfortunatelly.
--- 
-Michal Hocko
-SUSE Labs
+>> So the right solution IMHO would be to add a new mmap flag to request
+>> that behaviour, ie. a fixed address but iff there is nothing already
+>> mapped there.
+>> 
+>> I don't know the mm code well enough to know if that's hard for some
+>> reason, but it *seems* like it should be doable.
+>
+> Yes, I have mentioned that in the previous email but the amount of code
+> would be even larger. Basically every arch which reimplements
+> arch_get_unmapped_area would have to special case new MAP_FIXED flag to
+> do vma lookup.
+
+I'd have to look, but my memory of the arch code is that it doesn't deal
+with the vma so it wouldn't need any change.
+
+> So this was the most simple solution I could come up
+> with. If there was a general interest for MAP_FIXED_SAFE then we can
+> introduce it later of course. I would just like the hardening merged
+> sooner rather than later.
+
+Sure. But in the scheme of things one more kernel release is not that
+big a deal to get it right. Given that the simple approach of dropping
+MAP_FIXED turns out to not be simple at all.
+
+cheers
