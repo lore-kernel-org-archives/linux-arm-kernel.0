@@ -1,255 +1,83 @@
-From: afaerber@suse.de (=?UTF-8?q?Andreas=20F=C3=A4rber?=)
-Date: Tue, 14 Nov 2017 00:34:24 +0100
-Subject: [PATCH v2 5/8] arm64: dts: actions: Add S700 and CubieBoard7
-In-Reply-To: <20171113233427.5386-1-afaerber@suse.de>
-References: <20171113233427.5386-1-afaerber@suse.de>
-Message-ID: <20171113233427.5386-6-afaerber@suse.de>
+From: btraynor@gmail.com (Bill Traynor)
+Date: Mon, 13 Nov 2017 19:27:06 -0500
+Subject: [PATCH] ARM: dts: am57xx-beagle-x15: fix HDMI LS_OE GPIO
+In-Reply-To: <de3bf6ab-a07a-b82d-1e45-5f96a6e1039e@ti.com>
+References: <1472737901-26494-1-git-send-email-tomi.valkeinen@ti.com>
+ <b8647621-197c-97d5-8291-26c079e5eae8@ti.com>
+ <CAOCHtYhF2KfeK3ccEzZcePbU5H1kwi1tKThZN3NRwXgPsW_bSA@mail.gmail.com>
+ <c69aadbf-90e4-7aaf-2b90-4d5b543c252a@ti.com>
+ <20160901145757.4oksrst3wpjpsscf@atomide.com>
+ <de3bf6ab-a07a-b82d-1e45-5f96a6e1039e@ti.com>
+Message-ID: <CAN20qYqq9DGSgcTaivZHrD+RMY1WLPLNGv2K7xp0pvArJWuGEg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Device Trees for S700 SoC and Cubietech CubieBoard7.
+On Thu, Sep 1, 2016 at 11:00 AM, Nishanth Menon <nm@ti.com> wrote:
+> On 09/01/2016 09:57 AM, Tony Lindgren wrote:
+>>
+>> * Nishanth Menon <nm@ti.com> [160901 07:15]:
+>>>
+>>> On 09/01/2016 09:12 AM, Robert Nelson wrote:
+>>>>
+>>>> On Thu, Sep 1, 2016 at 9:09 AM, Nishanth Menon <nm@ti.com> wrote:
+>>>>>
+>>>>> On 09/01/2016 08:51 AM, Tomi Valkeinen wrote:
+>>>>>>
+>>>>>>
+>>>>>> LS_OE GPIO was changed from gpio6_28 to gpio2_30 for the Rev B1 board,
+>>>>>> and the current .dts file has the old GPIO.
+>>>>>>
+>>>>>> Rev B1 is the earliest board supported, so we can just change the
+>>>>>> .dts.
+>>>>>>
+>>>>>> This fixes "omapdss error: HDMI I2C Master Error" which causes failure
+>>>>>> to read EDID from the monitor.
+>>
+>> ...
+>>>>>
+>>>>> I believe we have A2s being shipped as well. we dont want to break A2s
+>>>>> either -> I propose we refactor the dts to introduce revb1 X15.
+>>>>
+>>>>
+>>>> There are at-least 200 A2's that have been shipped to end users.
+>>>>
+>>>>
+>>>> http://uk.rs-online.com/web/p/processor-microcontroller-development-kits/8874764/
+>>>
+>>>
+>>>
+>>> Thanks. Tomi: if you are ok - I already do have a refactoring code from
+>>> older kernel. I will rebase to latest and repost.
+>>>
+>>> Tony: is there a branch youd' like me to base the changes on?
+>>
+>>
+>> Probably best to do it against current omapf-for-v4.9/dt as it has all
+>> the skeleton.dtsi removal now applied.
+>
+>
+> Ok will do, will try to post this later today or early tomorrow.
 
-Signed-off-by: Andreas F?rber <afaerber@suse.de>
----
- v1 -> v2: Unchanged
- 
- arch/arm64/boot/dts/actions/Makefile             |   2 +
- arch/arm64/boot/dts/actions/s700-cubieboard7.dts |  47 +++++++
- arch/arm64/boot/dts/actions/s700.dtsi            | 164 +++++++++++++++++++++++
- 3 files changed, 213 insertions(+)
- create mode 100644 arch/arm64/boot/dts/actions/s700-cubieboard7.dts
- create mode 100644 arch/arm64/boot/dts/actions/s700.dtsi
+I'm getting this error again with the latest X15 image on my A2
+version board.  I don't see this patch in the mainline kernel.  Did it
+never get applied?
 
-diff --git a/arch/arm64/boot/dts/actions/Makefile b/arch/arm64/boot/dts/actions/Makefile
-index cc4661256356..d8b923480f5a 100644
---- a/arch/arm64/boot/dts/actions/Makefile
-+++ b/arch/arm64/boot/dts/actions/Makefile
-@@ -1 +1,3 @@
-+dtb-$(CONFIG_ARCH_ACTIONS) += s700-cubieboard7.dtb
-+
- dtb-$(CONFIG_ARCH_ACTIONS) += s900-bubblegum-96.dtb
-diff --git a/arch/arm64/boot/dts/actions/s700-cubieboard7.dts b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-new file mode 100644
-index 000000000000..e562f04c2490
---- /dev/null
-+++ b/arch/arm64/boot/dts/actions/s700-cubieboard7.dts
-@@ -0,0 +1,47 @@
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+/dts-v1/;
-+
-+#include "s700.dtsi"
-+
-+/ {
-+	compatible = "cubietech,cubieboard7", "actions,s700";
-+	model = "CubieBoard7";
-+
-+	aliases {
-+		serial3 = &uart3;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial3:115200n8";
-+	};
-+
-+	memory at 0 {
-+		device_type = "memory";
-+		reg = <0x0 0x0 0x0 0x80000000>;
-+	};
-+
-+	memory at 1,e0000000 {
-+		device_type = "memory";
-+		reg = <0x1 0xe0000000 0x0 0x0>;
-+	};
-+
-+	uart3_clk: uart3-clk {
-+		compatible = "fixed-clock";
-+		clock-frequency = <921600>;
-+		#clock-cells = <0>;
-+	};
-+};
-+
-+&timer {
-+	clocks = <&hosc>;
-+};
-+
-+&uart3 {
-+	status = "okay";
-+	clocks = <&uart3_clk>;
-+};
-diff --git a/arch/arm64/boot/dts/actions/s700.dtsi b/arch/arm64/boot/dts/actions/s700.dtsi
-new file mode 100644
-index 000000000000..b54df405aaeb
---- /dev/null
-+++ b/arch/arm64/boot/dts/actions/s700.dtsi
-@@ -0,0 +1,164 @@
-+/*
-+ * Copyright (c) 2017 Andreas F?rber
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+
-+/ {
-+	compatible = "actions,s700";
-+	interrupt-parent = <&gic>;
-+	#address-cells = <2>;
-+	#size-cells = <2>;
-+
-+	cpus {
-+		#address-cells = <2>;
-+		#size-cells = <0>;
-+
-+		cpu0: cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x0>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x1>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu2: cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x2>;
-+			enable-method = "psci";
-+		};
-+
-+		cpu3: cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a53", "arm,armv8";
-+			reg = <0x0 0x3>;
-+			enable-method = "psci";
-+		};
-+	};
-+
-+	reserved-memory {
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		secmon at 1f000000 {
-+			reg = <0x0 0x1f000000 0x0 0x1000000>;
-+			no-map;
-+		};
-+	};
-+
-+	psci {
-+		compatible = "arm,psci-0.2";
-+		method = "smc";
-+	};
-+
-+	arm-pmu {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupts = <GIC_SPI 4 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 5 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 6 IRQ_TYPE_LEVEL_HIGH>,
-+		             <GIC_SPI 7 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>, <&cpu2>, <&cpu3>;
-+	};
-+
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupts = <GIC_PPI 13
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+			(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
-+
-+	hosc: hosc {
-+		compatible = "fixed-clock";
-+		clock-frequency = <24000000>;
-+		#clock-cells = <0>;
-+	};
-+
-+	soc {
-+		compatible = "simple-bus";
-+		#address-cells = <2>;
-+		#size-cells = <2>;
-+		ranges;
-+
-+		gic: interrupt-controller at e00f1000 {
-+			compatible = "arm,gic-400";
-+			reg = <0x0 0xe00f1000 0x0 0x1000>,
-+			      <0x0 0xe00f2000 0x0 0x2000>,
-+			      <0x0 0xe00f4000 0x0 0x2000>,
-+			      <0x0 0xe00f6000 0x0 0x2000>;
-+			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+		};
-+
-+		uart0: serial at e0120000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0120000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 29 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart1: serial at e0122000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0122000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 30 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart2: serial at e0124000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0124000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 31 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart3: serial at e0126000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0126000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart4: serial at e0128000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe0128000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 33 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart5: serial at e012a000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe012a000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 34 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		uart6: serial at e012c000 {
-+			compatible = "actions,s900-uart", "actions,owl-uart";
-+			reg = <0x0 0xe012c000 0x0 0x2000>;
-+			interrupts = <GIC_SPI 35 IRQ_TYPE_LEVEL_HIGH>;
-+			status = "disabled";
-+		};
-+
-+		timer: timer at e024c000 {
-+			compatible = "actions,s700-timer";
-+			reg = <0x0 0xe024c000 0x0 0x4000>;
-+			interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "timer1";
-+		};
-+	};
-+};
--- 
-2.13.6
+Thanks
+Bill
+
+>
+>
+> --
+> Regards,
+> Nishanth Menon
+>
+> --
+> You received this message because you are subscribed to the Google Groups
+> "beagleboard-x15" group.
+> To unsubscribe from this group and stop receiving emails from it, send an
+> email to beagleboard-x15+unsubscribe at googlegroups.com.
+> To post to this group, send email to beagleboard-x15 at googlegroups.com.
+> To view this discussion on the web visit
+> https://groups.google.com/d/msgid/beagleboard-x15/de3bf6ab-a07a-b82d-1e45-5f96a6e1039e%40ti.com.
+>
+> For more options, visit https://groups.google.com/d/optout.
