@@ -1,67 +1,112 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 14 Nov 2017 11:34:56 +0000
-Subject: RCU stall with high number of KVM vcpus
-In-Reply-To: <a5570c4d-1591-48f6-9aa8-59ac9542217a@arm.com>
-References: <20171113131000.GA10546@hc>
- <2832f775-3cbe-d984-fe4f-e018642b6f1d@arm.com> <20171113173552.GA13282@hc>
- <7dda7be2-f392-8056-d4d3-372bb867729a@arm.com> <20171114075249.GB16731@hc>
- <a5570c4d-1591-48f6-9aa8-59ac9542217a@arm.com>
-Message-ID: <3fb57961-bf47-1d94-1cfb-bf4d01bd166c@arm.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Tue, 14 Nov 2017 12:46:48 +0100
+Subject: arm64: next-20171114 GICv4 build failure
+Message-ID: <0f80d433-1018-6ae5-ec19-47d9af1576e4@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 14/11/17 08:49, Marc Zyngier wrote:
-> On 14/11/17 07:52, Jan Glauber wrote:
->> On Mon, Nov 13, 2017 at 06:11:19PM +0000, Marc Zyngier wrote:
->>> On 13/11/17 17:35, Jan Glauber wrote:
->>
->> [...]
->>
->>>>>> numbers don't look good, see waittime-max:
->>>>>>
->>>>>> -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
->>>>>>                                class name    con-bounces    contentions   waittime-min   waittime-max waittime-total   waittime-avg    acq-bounces   acquisitions   holdtime-min   holdtime-max holdtime-total   holdtime-avg
->>>>>> -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
->>>>>>
->>>>>>                  &(&kvm->mmu_lock)->rlock:      99346764       99406604           0.14  1321260806.59 710654434972.0        7148.97      154228320      225122857           0.13   917688890.60  3705916481.39          16.46
->>>>>>                  ------------------------
->>>>>>                  &(&kvm->mmu_lock)->rlock       99365598          [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
->>>>>>                  &(&kvm->mmu_lock)->rlock          25164          [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
->>>>>>                  &(&kvm->mmu_lock)->rlock          14934          [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
->>>>>>                  &(&kvm->mmu_lock)->rlock            908          [<ffff00000810a1f0>] __cond_resched_lock+0x68/0xb8
->>>>>>                  ------------------------
->>>>>>                  &(&kvm->mmu_lock)->rlock              3          [<ffff0000080b34c8>] stage2_flush_vm+0x60/0xd8
->>>>>>                  &(&kvm->mmu_lock)->rlock       99186296          [<ffff0000080b43b8>] kvm_handle_guest_abort+0x4c0/0x950
->>>>>>                  &(&kvm->mmu_lock)->rlock         179238          [<ffff0000080a4e30>] kvm_mmu_notifier_invalidate_range_start+0x70/0xe8
->>>>>>                  &(&kvm->mmu_lock)->rlock          19181          [<ffff0000080a7eec>] kvm_mmu_notifier_invalidate_range_end+0x24/0x68
->>>>>>
->>>>>> .............................................................................................................................................................................................................................
->>>>> [slots of stuff]
->>>>>
->>>>> Well, the mmu_lock is clearly contended. Is the box in a state where you
->>>>> are swapping? There seem to be as many faults as contentions, which is a
->>>>> bit surprising...
->>>>
->>>> I don't think it is swapping but need to double check.
->>>
->>> It is the number of aborts that is staggering. And each one of them
->>> leads to the mmu_lock being contended. So something seems to be taking
->>> its sweet time holding the damned lock.
->>
->> Can you elaborate on the aborts, I'm not familiar with KVM but from a
->> first look I thought kvm_handle_guest_abort() is in the normal path
->> when a vcpu is stopped. Is that wrong?
-> 
-> kvm_handle_guest_abort() is the entry point for our page fault handling
-> (hence the mmu_lock being taken). On its own, the number of faults is
-> irrelevant. What worries me is that in almost all the cases the lock was
-> contended, we were handling a page fault.
-> 
-> What would be interesting is to find out *who* is holding the lock when
-> we're being blocked in kvm_handle_guest_abort...
+Hello,
 
-Just a thought, turning on the tracepoints for kvm_hva_* might help to get some
-more data on what we are doing with the HVA ranges.
+Yesterday's and today's linux-next fail to build for me on arm64 with
+the following warnings and errors:
 
-Cheers
-Suzuki
+  CC      arch/arm64/kvm/hyp/switch.o
+  CC      mm/shmem.o
+  CC      fs/super.o
+  CC      kernel/ucount.o
+In file included from ../include/kvm/arm_vgic.h:29:0,
+                 from ../arch/arm64/include/asm/kvm_host.h:38,
+                 from ../include/linux/kvm_host.h:37,
+                 from ../arch/arm64/include/asm/kvm_emulate.h:25,
+                 from ../arch/arm64/kvm/hyp/switch.c:22:
+../include/linux/irqchip/arm-gic-v4.h:112:57: warning: 'struct
+irq_domain_ops' declared inside parameter list will not be visible
+outside of this definition or declaration
+ int its_init_v4(struct irq_domain *domain, const struct irq_domain_ops
+*ops);
+                                                         ^~~~~~~~~~~~~~
+[...]
+
+  LD      vmlinux.o
+  MODPOST vmlinux.o
+virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_teardown':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:200:
+undefined reference to `its_free_vcpu_irqs'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:200:(.text+0x80):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_free_vcpu_irqs'
+virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_init':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:139:
+undefined reference to `its_alloc_vcpu_irqs'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:139:(.text+0x178):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_alloc_vcpu_irqs'
+virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_sync_hwstate':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:211:
+undefined reference to `its_schedule_vpe'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:211:(.text+0x2b8):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_schedule_vpe'
+virt/kvm/arm/vgic/vgic-v4.o: In function `vgic_v4_flush_hwstate':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:232:
+undefined reference to `its_schedule_vpe'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:232:(.text+0x338):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_schedule_vpe'
+virt/kvm/arm/vgic/vgic-v4.o: In function `kvm_vgic_v4_set_forwarding':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:302:
+undefined reference to `its_map_vlpi'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:302:(.text+0x464):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_map_vlpi'
+virt/kvm/arm/vgic/vgic-v4.o: In function `kvm_vgic_v4_unset_forwarding':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:341:
+undefined reference to `its_unmap_vlpi'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-v4.c:341:(.text+0x56c):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_unmap_vlpi'
+virt/kvm/arm/vgic/vgic-its.o: In function `update_lpi_config':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:304:
+undefined reference to `its_prop_update_vlpi'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:304:(.text+0x338):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_prop_update_vlpi'
+virt/kvm/arm/vgic/vgic-its.o: In function `its_free_ite':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:656:
+undefined reference to `its_unmap_vlpi'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:656:(.text+0x390):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_unmap_vlpi'
+virt/kvm/arm/vgic/vgic-its.o: In function `update_affinity':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:356:
+undefined reference to `its_get_vlpi'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:356:(.text+0x128c):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_get_vlpi'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:362:
+undefined reference to `its_map_vlpi'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:362:(.text+0x12a4):
+relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol
+`its_map_vlpi'
+virt/kvm/arm/vgic/vgic-its.o: In function `vgic_its_cmd_handle_invall':
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1165:
+undefined reference to `its_invall_vpe'
+/home/andreas/MCU/ARM/Bubblegum-96/linux/s900/../arch/arm64/kvm/../../../virt/kvm/arm/vgic/vgic-its.c:1165:(.text+0x1d48):
+additional relocation overflows omitted from the output
+/home/andreas/MCU/ARM/Bubblegum-96/linux/Makefile:993: recipe for target
+'vmlinux' failed
+make[1]: *** [vmlinux] Error 1
+make[1]: Leaving directory '/home/andreas/MCU/ARM/Bubblegum-96/linux/s900'
+Makefile:146: recipe for target 'sub-make' failed
+make: *** [sub-make] Error 2
+
+I'm guessing there's some Kconfig or guard issue? No GICv4 options
+popped up during oldconfig. And my arm config still builds fine.
+
+Thanks,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
