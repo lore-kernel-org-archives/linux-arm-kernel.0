@@ -1,86 +1,80 @@
 From: jim2101024@gmail.com (Jim Quinlan)
-Date: Tue, 14 Nov 2017 17:12:06 -0500
-Subject: [PATCH v3 2/8] dt-bindings: pci: Add DT docs for Brcmstb PCIe device
-In-Reply-To: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
-References: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
-Message-ID: <1510697532-32828-3-git-send-email-jim2101024@gmail.com>
+Date: Tue, 14 Nov 2017 17:12:04 -0500
+Subject: [PATCH v3 0/8] PCI: brcmstb: Add Broadcom Settopbox PCIe support (V3)
+Message-ID: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The DT bindings description of the Brcmstb PCIe device is described.  This
-node can be used by almost all Broadcom settop box chips, using
-ARM, ARM64, or MIPS CPU architectures.
+This patch series adds support for the Broadcom Settopbox PCIe host
+controller.  It is targeted to Broadcom Settopbox chips running on
+ARM, ARM64, and MIPS platforms.
 
-Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
----
- .../devicetree/bindings/pci/brcmstb-pcie.txt       | 59 ++++++++++++++++++++++
- 1 file changed, 59 insertions(+)
+V3 Changes:
+  - Fold pcie-brcmstb-msi.c into pcie-brcmstb.c
+  - Use PCI_XXX constants for PCIe capability registers
+  - Removal of any unused constants
+  - Change s/pci/pcie/ for filenames, comment text
+  - Config space access now uses 8/16/32 read/writes
+  - Use proper multi-line comment style
+  - Use function names, structure that are common in other host drivers
+  - DT binding 'brcm,ssc' is now 'brcm,enable-ssc'
+  - Dropped DT binding 'xyz-supply'
+  - Not setting CRS support as Linux does it if it is advertised.
+  - Removed code that was considered "debug code".
+  - Use of_get_pcie_domain_nr()
+  - Variable 'bridge_setup_done' removed.
+
+V2 Changes:
+* Patch brcmstb-add-memory-API:
+  - fix DT_PROP_DATA_TO_U32 macro.
+  - dropped one EXPORT_SYMBOL, changed the other to GPL.
+* Patch DT-docs-for-Brcmstb-PCIe:
+  - change 'brcm,gen' prop to standard 'max-link-speed'.
+  - rewrite bindings commit to omit standard prop defs.
+  - change props "supplies", "supply-names" to "xyz-supply"
+* Patch removed: export-symbol-arch_setup_dma_ops [4/9]
+* Patch brcmstb-add-dma-ranges:
+  - use get_dma_ops(); also use a const dma_map_ops structure.
+  - rewrite map_sg(), unmap_sg(), other calls like syng_sg_*()
+  - omit brcm_mapping_error(), but added code in brcm_dma_supported()
+  - put all of the notifier code in one compilation unit.
+
+
+Florian Fainelli (1):
+  SOC: brcmstb: add memory API
+
+Jim Quinlan (7):
+  dt-bindings: pci: Add DT docs for Brcmstb PCIe device
+  PCI: brcmstb: Add Broadcom STB PCIe host controller driver
+  PCI: brcmstb: Add dma-range mapping for inbound traffic
+  PCI/MSI: Enable PCI_MSI_IRQ_DOMAIN support for MIPS
+  PCI: brcmstb: Add MSI capability
+  MIPS: BMIPS: Add PCI bindings for 7425, 7435
+  MIPS: BMIPS: Enable PCI
+
+ .../devicetree/bindings/pci/brcmstb-pcie.txt       |   59 +
+ arch/mips/Kconfig                                  |    3 +
+ arch/mips/boot/dts/brcm/bcm7425.dtsi               |   26 +
+ arch/mips/boot/dts/brcm/bcm7435.dtsi               |   27 +
+ arch/mips/boot/dts/brcm/bcm97425svmb.dts           |    4 +
+ arch/mips/boot/dts/brcm/bcm97435svmb.dts           |    4 +
+ arch/mips/include/asm/Kbuild                       |    1 +
+ drivers/pci/Kconfig                                |    2 +-
+ drivers/pci/host/Kconfig                           |    9 +
+ drivers/pci/host/Makefile                          |    3 +
+ drivers/pci/host/pcie-brcmstb-dma.c                |  319 ++++
+ drivers/pci/host/pcie-brcmstb.c                    | 1591 ++++++++++++++++++++
+ drivers/pci/host/pcie-brcmstb.h                    |   22 +
+ drivers/soc/bcm/brcmstb/Makefile                   |    2 +-
+ drivers/soc/bcm/brcmstb/memory.c                   |  172 +++
+ include/soc/brcmstb/memory_api.h                   |   25 +
+ 16 files changed, 2267 insertions(+), 2 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-brcmstb-dma.c
+ create mode 100644 drivers/pci/host/pcie-brcmstb.c
+ create mode 100644 drivers/pci/host/pcie-brcmstb.h
+ create mode 100644 drivers/soc/bcm/brcmstb/memory.c
+ create mode 100644 include/soc/brcmstb/memory_api.h
 
-diff --git a/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt b/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
-new file mode 100644
-index 0000000..a1a9ad5
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pci/brcmstb-pcie.txt
-@@ -0,0 +1,59 @@
-+Brcmstb PCIe Host Controller Device Tree Bindings
-+
-+Required Properties:
-+- compatible
-+  "brcm,bcm7425-pcie" -- for 7425 family MIPS-based SOCs.
-+  "brcm,bcm7435-pcie" -- for 7435 family MIPS-based SOCs.
-+  "brcm,bcm7445-pcie" -- for 7445 and later ARM based SOCs (not including
-+      the 7278).
-+  "brcm,bcm7278-pcie"  -- for 7278 family ARM-based SOCs.
-+
-+- reg -- the register start address and length for the PCIe reg block.
-+- interrupts -- two interrupts are specified; the first interrupt is for
-+     the PCI host controller and the second is for MSI if the built-in
-+     MSI controller is to be used.
-+- interrupt-names -- names of the interrupts (above): "pcie" and "msi".
-+- #address-cells -- set to <3>.
-+- #size-cells -- set to <2>.
-+- #interrupt-cells: set to <1>.
-+- interrupt-map-mask and interrupt-map, standard PCI properties to define the
-+     mapping of the PCIe interface to interrupt numbers.
-+- ranges: ranges for the PCI memory and I/O regions.
-+- linux,pci-domain -- should be unique per host controller.
-+
-+Optional Properties:
-+- clocks -- phandle of pcie clock.
-+- clock-names -- set to "sw_pcie" if clocks is used.
-+- dma-ranges -- Specifies the inbound memory mapping regions when
-+     an "identity map" is not possible.
-+- msi-controller -- this property is typically specified to have the
-+     PCIe controller use its internal MSI controller.
-+- msi-parent -- set to use an external MSI interrupt controller.
-+- brcm,enable-ssc -- (boolean) indicates usage of spread-spectrum clocking.
-+- max-link-speed --  (integer) indicates desired generation of link:
-+     1 => 2.5 Gbps (gen1), 2 => 5.0 Gbps (gen2), 3 => 8.0 Gbps (gen3).
-+
-+Example Node:
-+
-+pcie0: pcie at f0460000 {
-+		reg = <0x0 0xf0460000 0x0 0x9310>;
-+		interrupts = <0x0 0x0 0x4>;
-+		compatible = "brcm,bcm7445-pcie";
-+		#address-cells = <3>;
-+		#size-cells = <2>;
-+		ranges = <0x02000000 0x00000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x08000000
-+			  0x02000000 0x00000000 0x08000000 0x00000000 0xc8000000 0x00000000 0x08000000>;
-+		#interrupt-cells = <1>;
-+		interrupt-map-mask = <0 0 0 7>;
-+		interrupt-map = <0 0 0 1 &intc 0 47 3
-+				 0 0 0 2 &intc 0 48 3
-+				 0 0 0 3 &intc 0 49 3
-+				 0 0 0 4 &intc 0 50 3>;
-+		clocks = <&sw_pcie0>;
-+		clock-names = "sw_pcie";
-+		msi-parent = <&pcie0>;  /* use PCIe's internal MSI controller */
-+		msi-controller;         /* use PCIe's internal MSI controller */
-+		brcm,ssc;
-+		max-link-speed = <1>;
-+		linux,pci-domain = <0>;
-+	};
 -- 
 1.9.0.138.g2de3478
