@@ -1,61 +1,32 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 14 Nov 2017 09:55:01 -0500
-Subject: [PATCH] dmaengine: qcom_hidma: check pending interrupts
-Message-ID: <1510671301-23223-1-git-send-email-okaya@codeaurora.org>
+From: khalid.aziz@oracle.com (Khalid Aziz)
+Date: Tue, 14 Nov 2017 07:52:25 -0700
+Subject: linux-next: Tree for Nov 7
+In-Reply-To: <20171114090444.lhrkuywuls26g6lu@dhcp22.suse.cz>
+References: <20171107162217.382cd754@canb.auug.org.au>
+ <CACPK8Xfd4nqkf=Lk3n6+TNHAAi327r0dkUfGypZ3TpR0LqfS4Q@mail.gmail.com>
+ <20171108142050.7w3yliulxjeco3b7@dhcp22.suse.cz>
+ <20171110123054.5pnefm3mczsfv7bz@dhcp22.suse.cz>
+ <CACPK8Xe5uUKEytkRiszdX511b_cYTD-z3X=ZsMcNJ-NOYnXfuQ@mail.gmail.com>
+ <20171113092006.cjw2njjukt6limvb@dhcp22.suse.cz>
+ <20171113094203.aofz2e7kueitk55y@dhcp22.suse.cz>
+ <87lgjawgx1.fsf@concordia.ellerman.id.au>
+ <20171113120057.555mvrs4fjq5tyng@dhcp22.suse.cz>
+ <87h8txw87w.fsf@concordia.ellerman.id.au>
+ <20171114090444.lhrkuywuls26g6lu@dhcp22.suse.cz>
+Message-ID: <1510671145.4344.1.camel@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Driver is missing the interrupts if two requests are queued up at the same
-time as the interrupt handler is servicing a request that was just
-delivered.
+On Tue, 2017-11-14 at 10:04 +0100, Michal Hocko wrote:
+> If there is a general consensus that this is the preferred way to go,
+> I
+> will post the patch as an RFC to linux-api
+> 
+> [1] http://lkml.kernel.org/r/20171113160637.jhekbdyfpccme3be at dhcp22.s
+> use.cz
 
-The ISR clears the interrupt at the end but it could be clearing the
-interrupt for an outstanding event. Therefore, second interrupt never
-arrives.
+I prefer the new flag. It is cleaner and avoids unintended breakage for
+existing flag.
 
-Clear the interrupt first and then check for completions.
-
-Also, make sure that request start and interrupt clear do not overlap in
-time by using a spinlock.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/dma/qcom/hidma_ll.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/dma/qcom/hidma_ll.c b/drivers/dma/qcom/hidma_ll.c
-index 4999e26..7c6e2ff 100644
---- a/drivers/dma/qcom/hidma_ll.c
-+++ b/drivers/dma/qcom/hidma_ll.c
-@@ -393,6 +393,8 @@ static int hidma_ll_reset(struct hidma_lldev *lldev)
-  */
- static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev, int cause)
- {
-+	unsigned long irqflags;
-+
- 	if (cause & HIDMA_ERR_INT_MASK) {
- 		dev_err(lldev->dev, "error 0x%x, disabling...\n",
- 				cause);
-@@ -410,6 +412,10 @@ static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev, int cause)
- 		return;
- 	}
- 
-+	spin_lock_irqsave(&lldev->lock, irqflags);
-+	writel_relaxed(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
-+	spin_unlock_irqrestore(&lldev->lock, irqflags);
-+
- 	/*
- 	 * Fine tuned for this HW...
- 	 *
-@@ -421,9 +427,6 @@ static void hidma_ll_int_handler_internal(struct hidma_lldev *lldev, int cause)
- 	 * Try to consume as many EVREs as possible.
- 	 */
- 	hidma_handle_tre_completion(lldev);
--
--	/* We consumed TREs or there are pending TREs or EVREs. */
--	writel_relaxed(cause, lldev->evca + HIDMA_EVCA_IRQ_CLR_REG);
- }
- 
- irqreturn_t hidma_ll_inthandler(int chirq, void *arg)
--- 
-1.9.1
+--
+Khalid
