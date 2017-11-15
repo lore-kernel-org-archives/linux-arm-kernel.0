@@ -1,76 +1,123 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 15 Nov 2017 10:35:38 +0000
-Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
- (liuwenliang@huawei.com's message of "Wed, 15 Nov 2017 10:20:02
- +0000")
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-2-liuwenliang@huawei.com>
- <227e2c6e-f479-849d-8942-1d5ff4ccd440@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063172@dggemm510-mbs.china.huawei.com>
- <8e959f69-a578-793b-6c32-18b5b0cd08c2@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
-Message-ID: <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Wed, 15 Nov 2017 10:43:26 +0000
+Subject: next/master boot: 296 boots: 62 failed, 230 passed with 4
+ conflicts (next-20171113)
+In-Reply-To: <CAGXu5jJJ6jDSpG+X8CtZEkBoijv27k2p1H=5Y+hEhFyTvYVBZQ@mail.gmail.com>
+References: <5a09ec32.8190df0a.933bb.b974@mx.google.com>
+ <59af2937-78a1-7db6-12e4-28d6719efaed@collabora.com>
+ <CAGXu5jJJ6jDSpG+X8CtZEkBoijv27k2p1H=5Y+hEhFyTvYVBZQ@mail.gmail.com>
+Message-ID: <03395b61-f54d-5ca2-52b5-1151eb9c781b@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15 2017 at 10:20:02 am GMT, "Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
-> On 09/11/17 18:11, Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
->>On 09/11/17 07:46, Liuwenliang (Abbott Liu) wrote:
->>> diff --git a/arch/arm/mm/kasan_init.c b/arch/arm/mm/kasan_init.c
->>> index 049ee0a..359a782 100644
->>> --- a/arch/arm/mm/kasan_init.c
->>> +++ b/arch/arm/mm/kasan_init.c
->>> @@ -15,6 +15,7 @@
->>>  #include <asm/proc-fns.h>
->>>  #include <asm/tlbflush.h>
->>>  #include <asm/cp15.h>
->>> +#include <asm/kvm_hyp.h>
+On 14/11/17 19:53, Kees Cook wrote:
+> On Tue, Nov 14, 2017 at 9:10 AM, Guillaume Tucker
+> <guillaume.tucker@collabora.com> wrote:
+>> On 13/11/17 19:02, kernelci.org bot wrote:
+>>>
+>>> next/master boot: 296 boots: 62 failed, 230 passed with 4 conflicts
+>>> (next-20171113)
+>>>
+>>> Full Boot Summary:
+>>> https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20171113/
+>>> Full Build Summary:
+>>> https://kernelci.org/build/next/branch/master/kernel/next-20171113/
+>>>
+>>> Tree: next
+>>> Branch: master
+>>> Git Describe: next-20171113
+>>> Git Commit: c348a99ee55feac43b5b62a5957c6d8e2b6c3abe
+>>> Git URL:
+>>> http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+>>> Tested: 52 unique boards, 17 SoC families, 33 builds out of 213
+>>>
+>>> Boot Regressions Detected:
+>>>
+>>> arm:
+>>>
+>> [...]
+>>>
+>>>     multi_v7_defconfig:
 >>
->>No, please don't do that. You shouldn't have to include KVM stuff in
->>unrelated code. Instead of adding stuff to kvm_hyp.h, move all the
->>__ACCESS_CP15* to cp15.h, and it will be obvious to everyone that this
->>is where new definition should be added.
+>> [...]
+>>>
+>>>         tegra124-nyan-big:
+>>>             lab-collabora: failing since 9 days (last pass: next-20171102
+>>> - first fail: next-20171103)
+>>
+>>
+>>
+>> There are several things failing on the tegra124-nyan-big, at
+>> least I've isolated one with my latest bisection run:
+>>
+>> 6c78935777d12ead2d32adf3eb525a24faf02d04 is the first bad commit
+>> commit 6c78935777d12ead2d32adf3eb525a24faf02d04
+>> Author: Kees Cook <keescook@chromium.org>
+>> Date:   Fri Nov 10 16:34:52 2017 +0100
+>>
+>>     video: fbdev: Convert timers to use timer_setup()
+>>
+>>
+>> These boot tests are with multi_v7_defconfig with CONFIG_MODULES
+>> and CONFIG_DRM_NOUVEAU disabled:
+>>
+>> * the first one on the revision mentioned above, fails:
+>>   https://lava.collabora.co.uk/scheduler/job/987651
+>>
+>> * then the same but with the commit reverted, passes:
+>>   https://lava.collabora.co.uk/scheduler/job/987652
+>>
+>> This was found using the still experimental automated bisection
+>> tool for kernelci.org, I'm not sure yet how reliable the results
+>> are.  I think the manual check with these 2 boots proves it, but
+>> I haven't really investigated further than that.
+>>
+>> So I then did the same tests at the top of the branch, on the
+>> next-20171113 tag:
+>>
+>> * next-20171113, fails but differently:
+>>   https://lava.collabora.co.uk/scheduler/job/987653
+>>
+>> * next-20171113 with the commit reverted, still fails:
+>>   https://lava.collabora.co.uk/scheduler/job/987654
+>>
+>> It's hard to tell whether the commit I mentioned got fixed
+>> in-between, I guess it would be best to not have any boot failure
+>> in any case.
+>>
+>> The next thing I'll try is start a bisection for the other
+>> failure see on next-20171113 tag, with the commit above reverted
+>> and see if it leads anywhere...
+>>
+>> Hope this helps!
 >
-> Thanks for your review.  You are right. It is better to move
-> __ACCESS_CP15* to cp15.h than to include kvm_hyp.h. But I don't think
-> it is a good idea to move registers definition which is used in
-> virtualization to cp15.h, Because there is no virtualization stuff in
-> cp15.h.
-
-It is not about virtualization at all.
-
-It is about what is a CP15 register and what is not. This file is called
-"cp15.h", not "cp15-except-virtualization-and-maybe-some-others.h". But
-at the end of the day, that's for Russell to decide.
-
+> Thanks for the report! I believe this is fixed with:
 >
-> Here is the code which I tested on vexpress_a15 and vexpress_a9:
-> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
-> index dbdbce1..6db1f51 100644
-> --- a/arch/arm/include/asm/cp15.h
-> +++ b/arch/arm/include/asm/cp15.h
-> @@ -64,6 +64,43 @@
->  #define __write_sysreg(v, r, w, c, t)  asm volatile(w " " c : : "r" ((t)(v)))
->  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
+> https://marc.info/?l=linux-fbdev&m=151056635200583&w=2
 >
-> +#ifdef CONFIG_ARM_LPAE
-> +#define TTBR0           __ACCESS_CP15_64(0, c2)
-> +#define TTBR1           __ACCESS_CP15_64(1, c2)
-> +#define PAR             __ACCESS_CP15_64(0, c7)
-> +#else
-> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
-> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
-> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
-> +#endif
+> and that commit appears in next-20171114. Please let me know if that
+> doesn't fix it, though!
 
-Again: there is no point in not having these register encodings
-cohabiting. They are both perfectly defined in the architecture. Just
-suffix one (or even both) with their respective size, making it obvious
-which one you're talking about.
+Thanks, I've applied this patch in-place and confirmed it did fix
+the issue:
 
-Thanks,
+   https://lava.collabora.co.uk/scheduler/job/988891
 
-	M.
--- 
-Jazz is not dead, it just smell funny.
+Will move on to next-20171114 now.
+
+Guillaume
+
+>>> ---
+>>> For more info write to <info@kernelci.org>
+>>>
+>>>
+>>>
+>>> _______________________________________________
+>>> Kernel-build-reports mailing list
+>>> Kernel-build-reports at lists.linaro.org
+>>> https://lists.linaro.org/mailman/listinfo/kernel-build-reports
+>>>
+>>
+>
+>
+>
