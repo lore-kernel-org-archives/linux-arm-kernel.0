@@ -1,58 +1,158 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Wed, 15 Nov 2017 21:00:49 +0100
-Subject: qcom: add firmware file for Adreno and Venus on APQ8096
-Message-ID: <CAP71Wjw-3FrOtHADuui52t+iqv6QkvXXCthjR6akXr7QQTzrAA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 15 Nov 2017 21:12:26 +0100
+Subject: [PATCH v3 3/5] misc serdev: Add w2sg0004 (gps receiver) power
+ control driver
+In-Reply-To: <AFF4418B-740D-4FFE-A3A6-A92E73F0B901@goldelico.com>
+References: <cover.1510759152.git.hns@goldelico.com>
+ <9e1525e72afe890ea390fd153c1f3a1b0866c986.1510759152.git.hns@goldelico.com>
+ <CAK8P3a3ZtqXVobx5hdxUZyAQRYs2Y6Aw2Qpo2puSBb_AVa_aVA@mail.gmail.com>
+ <AFD95D2E-2EBB-4EBF-9B3B-E68ED98E5437@goldelico.com>
+ <CAK8P3a1Ah35mmbw0qN=zp8TMN9HVgdtTSkkSCCayC-5b6Q960A@mail.gmail.com>
+ <AFF4418B-740D-4FFE-A3A6-A92E73F0B901@goldelico.com>
+Message-ID: <CAK8P3a2DT+uOUWYFiYoc_=qFx1oS5xMgWmHde+8tm+BmAENaeg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-hi,
+On Wed, Nov 15, 2017 at 8:55 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
+>> Am 15.11.2017 um 18:03 schrieb Arnd Bergmann <arnd@arndb.de>:
+>> On Wed, Nov 15, 2017 at 5:27 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
+>>>> Am 15.11.2017 um 16:54 schrieb Arnd Bergmann <arnd@arndb.de>:
+>>>> On Wed, Nov 15, 2017 at 4:19 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
+>>>>> Add driver for Wi2Wi W2SG0004/84 GPS module connected through uart.
+>>>
+>>> There is one more goal. Some people are dreaming about a generic GPS interface.
+>>> Then, the driver wouldn't have to register a /dev/GPS tty any more but a
+>>> gps_interface and mangle serial data as requested by that API. This will become
+>>> a simple upgrade.
+>>>
+>>> So you can consider creating a new tty as sort of temporary solution. Like we
+>>> had for years for UART HCI based bluetooth devices using a user-space daemon.
+>>
+>> It shouldn't be hard to split out the tty_driver portion of your file from the
+>> part that registers the port, basically getting two files that each handle
+>> half of the work, and the second one would be generic from the start.
+>
+> Hm. Sounds like a big hack to me instead of using existing API (serdev and tty_port)
+> and making the best out of it.
+>
+> But I may have misunderstood what you mean by splitting out parts of
+> a tty (which one?) and why I need two files?
+>
+> The structure of the driver is:
+>
+> UART --> serdev magic ---> this device driver ---> register something to present data to user space ---> user space read()
+>
+> Data should flow following this arrows.
+> And power control happens this way:
+>
+> UART --> serdev magic ---> this device driver <--- register something to present data to user space <--- user space open()
+> GPIO <----------------------------+
+>
+> So we need one serdev port to communicate with the device and something to present serial data to user-space (where gpsd runs).
 
-This pull request adds firmware files for Adreno 530 GPU and Venus h/w
-codec found on the Qualcomm APQ8096 chipset, such as on Dragonboard
-820c development board.
+My suggestion was directed at replacing the big hack (adding one
+driver per port, and a different driver for each type of GPS hardware)
+with a smaller hack, using one driver to manage the ttyGPS name
+space for any implementation. That same driver could later even be
+expanded to offer additional ioctl interfaces, e.g. for reading the
+current position or time.
 
-The following changes since commit bf04291309d3169c0ad3b8db52564235bbd08e30:
+Let's ignore that point for the moment though and finish the
+discussion below, I think it will become clearer what I meant here
+when the split between init() and probe() function is resolved.
 
-  WHENCE: Add new qed firmware (2017-10-09 18:03:26 +0100)
+>>>>> +       /* initialize the tty driver */
+>>>>> +       data->tty_drv->owner = THIS_MODULE;
+>>>>> +       data->tty_drv->driver_name = "w2sg0004";
+>>>>> +       data->tty_drv->name = "ttyGPS";
+>>>>> +       data->tty_drv->major = 0;
+>>>>> +       data->tty_drv->minor_start = 0;
+>>>>> +       data->tty_drv->type = TTY_DRIVER_TYPE_SERIAL;
+>>>>> +       data->tty_drv->subtype = SERIAL_TYPE_NORMAL;
+>>>>> +       data->tty_drv->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
+>>>>> +       data->tty_drv->init_termios = tty_std_termios;
+>>>>> +       data->tty_drv->init_termios.c_cflag = B9600 | CS8 | CREAD |
+>>>>> +                                             HUPCL | CLOCAL;
+>>>>> +       /*
+>>>>> +        * optional:
+>>>>> +        * tty_termios_encode_baud_rate(&data->tty_drv->init_termios,
+>>>>> +                                       115200, 115200);
+>>>>> +        * w2sg_tty_termios(&data->tty_drv->init_termios);
+>>>>> +        */
+>>>>> +       tty_set_operations(data->tty_drv, &w2sg_serial_ops);
+>>>>
+>>>> While I'm still not sure about why we want nested tty port, it
+>>>> seems that we should have only one tty_driver that gets initialized
+>>>> at module load time, rather than one driver structure per port.
+>>>
+>>> If we have several such chips connected to different serdev UARTs
+>>> we need different /dev/GPS to separate them in user-space.
+>>
+>> I understand that you need multiple devices, but I don't see
+>> what having multiple drivers that all share the same name
+>> "w2sg0004" helps. I would have expected that to fail in
+>> tty_register_driver() when you get to the second driver,
+>> but looking at the code, it doesn't actually try to make the name
+>> unique
+>
+> Yes, that is missing because I copied that from other drivers
+> and have no full understanding what is needed to make it really
+> work with multiple /dev/ttyGPS0 tty ports.
+>
+> Therefore each probe (for each device connected to a different uart
+> of the SoC) should create a different /dev/ttyGPSn. Like you can have
+> multiple and independent i2c clients of the same type and driver.
 
-are available in the git repository at:
+Right, that's what I mean. But each of those devices should
+use the same driver, just like each omap tty port uses the same
+'serial_omap_reg' (which includes a tty driver).
 
-  https://github.com/ndechesne/linux-firmware.git db820c
+>> proc_tty_register_driver() will fail to create the second
+>> procfs file, but we ignore that failure.
+>>
+>> Why not call tty_register_driver() in the init function rather than probe()?
+>
+> We have no dedicated init function. Should we have one?
+>
+> And if I understand correctly it would prohibit to fix the driver for the
+> multiple gps-devices situation. Or makes more work if the device is to be
+> registered as a future GPS interface.
+>
+> So if the ->driver_name or ->name should have a dynamic sequence number,
+> please help me to get it correct.
 
-for you to fetch changes up to e7219334854d854ae7768b13dc290ec85d93a0d9:
+There should only be one driver structure, as in any other tty driver
+implementation. You have an init function inside of the
+module_serdev_device_driver() macro. When you open-code that,
+you can register the tty driver there before registering the serdev driver,
+see serial_omap_init() for a similar example using uart_driver and
+platform_driver.
 
-  qcom: add venus firmware files for v4.2 (2017-11-15 20:49:17 +0100)
+>>> The UART tty would be e.g. /dev/ttyO2 (on OMAP3) if no driver is
+>>> installed. And the new one that is registered is /dev/GPS0. So the
+>>> tty subsystem doesn't (or shouldn't) know they are related. They
+>>> are only related/connected inside this driver. So I assume that
+>>> some locking or reentrancy happens in tty_port_register_device().
+>>
+>> I meant the serdev->dev pointer that you pass into
+>> tty_port_register_device() seems to be the same one that
+>> got passed into the first tty_port_register_device() in the
+>> parent uart_port.
+>
+> Ah, interesting!
+>
+> Well, I copied that from other drivers registering a tty without
+> understanding all side-effects of everything.
+>
+> Documentations of tty_port_register_device() says:
+> @device: parent if exists, otherwise NULL
+>
+> Do we really need a "parent" here? Could we safely pass NULL?
 
-----------------------------------------------------------------
-Nicolas Dechesne (2):
-      qcom: add firmware files for Adreno a530
-      qcom: add venus firmware files for v4.2
+There should be a parent, to make it show up in the right place in sysfs.
 
- WHENCE                   |  16 ++++++++++++++++
- qcom/a530_pfp.fw         | Bin 0 -> 15876 bytes
- qcom/a530_pm4.fw         | Bin 0 -> 19572 bytes
- qcom/a530_zap.b00        | Bin 0 -> 148 bytes
- qcom/a530_zap.b01        | Bin 0 -> 6536 bytes
- qcom/a530_zap.b02        | Bin 0 -> 4900 bytes
- qcom/a530_zap.mdt        | Bin 0 -> 6684 bytes
- qcom/a530v3_gpmu.fw2     | Bin 0 -> 8184 bytes
- qcom/venus-4.2/venus.b00 | Bin 0 -> 212 bytes
- qcom/venus-4.2/venus.b01 | Bin 0 -> 6600 bytes
- qcom/venus-4.2/venus.b02 | Bin 0 -> 884136 bytes
- qcom/venus-4.2/venus.b03 | Bin 0 -> 28976 bytes
- qcom/venus-4.2/venus.b04 |   1 +
- qcom/venus-4.2/venus.mdt | Bin 0 -> 6812 bytes
- 14 files changed, 17 insertions(+)
- create mode 100644 qcom/a530_pfp.fw
- create mode 100644 qcom/a530_pm4.fw
- create mode 100644 qcom/a530_zap.b00
- create mode 100644 qcom/a530_zap.b01
- create mode 100644 qcom/a530_zap.b02
- create mode 100644 qcom/a530_zap.mdt
- create mode 100644 qcom/a530v3_gpmu.fw2
- create mode 100644 qcom/venus-4.2/venus.b00
- create mode 100644 qcom/venus-4.2/venus.b01
- create mode 100644 qcom/venus-4.2/venus.b02
- create mode 100644 qcom/venus-4.2/venus.b03
- create mode 100644 qcom/venus-4.2/venus.b04
- create mode 100644 qcom/venus-4.2/venus.mdt
+Ideally the parent should point to a device representing the original
+uart port. It probably is that right now, so I'd leave it like that if it
+works without getting you into a double probe.
+
+       Arnd
