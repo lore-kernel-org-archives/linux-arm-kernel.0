@@ -1,40 +1,94 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 15 Nov 2017 22:37:56 +0100
-Subject: [PATCH v4 4/5] DTS: gta04: add serdev node for w2sg00x4
-In-Reply-To: <cover.1510781875.git.hns@goldelico.com>
-References: <cover.1510781875.git.hns@goldelico.com>
-Message-ID: <02dde546157359316eebe8e90f5f1de7177bbffa.1510781876.git.hns@goldelico.com>
+From: troy.kisky@boundarydevices.com (Troy Kisky)
+Date: Wed, 15 Nov 2017 15:59:31 -0700
+Subject: [PATCH v4 1/1] tty: serial: imx: remove imx_disable_rx_int
+Message-ID: <20171115225931.22718-1-troy.kisky@boundarydevices.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GTA04 has a W2SG0004/84 connected to UART2 of the OMAP3
-processor. A GPIO can pulse the on/off toggle switch.
+Since imx_disable_rx_int is only called by imx_startup,
+let's integrate it into that function. Notice UCR2_ATEN
+is never set in the driver, but I keep the clear so
+that I am only moving thing. Hopefully, the ageing timer
+will soon be used.
 
-The VSIM regulator is used to power on/off the LNA of an external
-active GPS antenna so that a driver can turn the LNA off if GPS is
-not needed to save battery energy.
-
-Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
 ---
- arch/arm/boot/dts/omap3-gta04.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+v2: new patch
+v3: rebased on tty-next
+v4: Added UCR2_ATEN statement to commit message
+	as suggested by Uwe
+---
+ drivers/tty/serial/imx.c | 36 +++++++++---------------------------
+ 1 file changed, 9 insertions(+), 27 deletions(-)
 
-diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-index 4504908c23fe..e967d738aaaf 100644
---- a/arch/arm/boot/dts/omap3-gta04.dtsi
-+++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-@@ -477,6 +477,12 @@
- &uart2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart2_pins>;
-+
-+	gps: gps {
-+		compatible = "wi2wi,w2sg0004";
-+		lna-supply = <&vsim>;   /* LNA regulator */
-+		enable-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;    /* GPIO_145: trigger for turning on/off w2sg0004 */
-+	};
- };
+diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
+index a67a606c38eb..43dfd82e4e28 100644
+--- a/drivers/tty/serial/imx.c
++++ b/drivers/tty/serial/imx.c
+@@ -703,25 +703,6 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
+ 	return IRQ_HANDLED;
+ }
  
- &uart3 {
+-static void imx_disable_rx_int(struct imx_port *sport)
+-{
+-	unsigned long temp;
+-
+-	/* disable the receiver ready and aging timer interrupts */
+-	temp = readl(sport->port.membase + UCR1);
+-	temp &= ~(UCR1_RRDYEN);
+-	writel(temp, sport->port.membase + UCR1);
+-
+-	temp = readl(sport->port.membase + UCR2);
+-	temp &= ~(UCR2_ATEN);
+-	writel(temp, sport->port.membase + UCR2);
+-
+-	/* disable the rx errors interrupts */
+-	temp = readl(sport->port.membase + UCR4);
+-	temp &= ~UCR4_OREN;
+-	writel(temp, sport->port.membase + UCR4);
+-}
+-
+ static void clear_rx_errors(struct imx_port *sport);
+ 
+ /*
+@@ -1252,18 +1233,21 @@ static int imx_startup(struct uart_port *port)
+ 	if (sport->dma_is_inited && !sport->dma_is_enabled)
+ 		imx_enable_dma(sport);
+ 
+-	temp = readl(sport->port.membase + UCR1);
+-	temp |= UCR1_RRDYEN | UCR1_UARTEN;
++	temp = readl(sport->port.membase + UCR1) & ~UCR1_RRDYEN;
++	if (!sport->dma_is_enabled)
++		temp |= UCR1_RRDYEN;
++	temp |= UCR1_UARTEN;
+ 	if (sport->have_rtscts)
+ 			temp |= UCR1_RTSDEN;
+ 
+ 	writel(temp, sport->port.membase + UCR1);
+ 
+-	temp = readl(sport->port.membase + UCR4);
+-	temp |= UCR4_OREN;
++	temp = readl(sport->port.membase + UCR4) & ~UCR4_OREN;
++	if (!sport->dma_is_enabled)
++		temp |= UCR4_OREN;
+ 	writel(temp, sport->port.membase + UCR4);
+ 
+-	temp = readl(sport->port.membase + UCR2);
++	temp = readl(sport->port.membase + UCR2) & ~UCR2_ATEN;
+ 	temp |= (UCR2_RXEN | UCR2_TXEN);
+ 	if (!sport->have_rtscts)
+ 		temp |= UCR2_IRTS;
+@@ -1297,10 +1281,8 @@ static int imx_startup(struct uart_port *port)
+ 	 * In our iMX53 the average delay for the first reception dropped from
+ 	 * approximately 35000 microseconds to 1000 microseconds.
+ 	 */
+-	if (sport->dma_is_enabled) {
+-		imx_disable_rx_int(sport);
++	if (sport->dma_is_enabled)
+ 		start_rx_dma(sport);
+-	}
+ 
+ 	spin_unlock_irqrestore(&sport->port.lock, flags);
+ 
 -- 
-2.12.2
+2.11.0
