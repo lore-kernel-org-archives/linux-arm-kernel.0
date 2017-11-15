@@ -1,106 +1,122 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 15 Nov 2017 15:14:47 -0600
-Subject: [PATCH v2 4/4] PCI/AER: Dont do recovery when DPC is enabled
-In-Reply-To: <1510721808-27164-5-git-send-email-poza@codeaurora.org>
-References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
- <1510721808-27164-5-git-send-email-poza@codeaurora.org>
-Message-ID: <20171115211447.GA7266@bhelgaas-glaptop.roam.corp.google.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Wed, 15 Nov 2017 13:34:10 -0800
+Subject: [PATCH v2 00/18] Add support for clang LTO
+Message-ID: <20171115213428.22559-1-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 10:26:48AM +0530, Oza Pawandeep wrote:
-> PCI Express Base Specification, Rev. 4.0 Version 0.9
-> 6.2.10: Downstream Port Containment (DPC)
-> 
-> DPC is an optional normative feature of a Downstream Port. DPC halts PCI
-> Express traffic below a Downstream Port after an unmasked uncorrectable
-> error is detected at or below the Port, avoiding the potential spread of
-> any data corruption, and permitting error recovery if supported by
-> software
-> 
-> Triggering DPC disables its Link by directing the LTSSM to the Disabled
-> state. Once the LTSSM reaches the Disabled state, it remains in that
-> state until the DPC Trigger Status bit is Cleared
-> 
-> So when DPC service is active and registered to port driver, AER should
-> not attempt to recover, since DPC will be removing downstream devices,
-> and do the recovery.
-> 
-> Signed-off-by: Oza Pawandeep <poza@codeaurora.org>
-> 
-> diff --git a/drivers/pci/pcie/aer/aerdrv_core.c b/drivers/pci/pcie/aer/aerdrv_core.c
-> index 7448052..a9108ea 100644
-> --- a/drivers/pci/pcie/aer/aerdrv_core.c
-> +++ b/drivers/pci/pcie/aer/aerdrv_core.c
-> @@ -482,6 +482,27 @@ static pci_ers_result_t reset_link(struct pci_dev *dev)
->  }
->  
->  /**
-> + * pcie_port_query_uptream_service - query upstream service
-> + * @dev: pointer to a pci_dev data structure of agent detecting an error
-> + * @service: service to be queried
-> + *
-> + * Invoked to know the status of the service for pci device.
-> + */
-> +static bool pcie_port_query_uptream_service(struct pci_dev *dev, u32 service)
-> +{
-> +	struct pci_dev *upstream_dev = dev;
-> +
-> +	do {
-> +		if (pcie_port_query_service(upstream_dev, service))
-> +			return true;
-> +		upstream_dev = pcie_port_upstream_bridge(upstream_dev);
-> +	} while (upstream_dev);
-> +
-> +	return false;
-> +}
-> +
-> +
-> +/**
->   * do_recovery - handle nonfatal/fatal error recovery process
->   * @dev: pointer to a pci_dev data structure of agent detecting an error
->   * @severity: error severity type
-> @@ -495,6 +516,18 @@ static void do_recovery(struct pci_dev *dev, int severity)
->  	pci_ers_result_t status, result = PCI_ERS_RESULT_RECOVERED;
->  	enum pci_channel_state state;
->  
-> +	/*
-> +	 * If DPC is enabled, there is no need to attempt recovery.
-> +	 * Since DPC disables its Link by directing the LTSSM to
-> +	 * the Disabled state.
-> +	 * DPC driver will take care of the recovery, there is no need
-> +	 * for AER driver to race.
-> +	 */
-> +	if (pcie_port_query_uptream_service(dev, PCIE_PORT_SERVICE_DPC)) {
-> +		dev_info(&dev->dev, "AER: Device recovery to be done by DPC\n");
-> +		return;
-> +	}
+This series adds build system support for compiling the kernel with clang
+Link Time Optimization (LTO), using GNU gold with the LLVMgold plug-in
+for linking. Some background for clang's LTO support is available here:
 
-What happens without this test?
+  https://llvm.org/docs/LinkTimeOptimization.html
 
-Does AER read registers from the now-disabled device and get ~0 data?
-Or is AER reading registers from the port upstream from the disabled
-device and trying to reset the device?
+With -flto, clang produces LLVM bitcode instead of object files, and
+the compilation to native code happens at link time. In addition, clang
+cannot use an external assembler for inline assembly when LTO is enabled,
+which causes further compatibility issues.
 
-It looks like get_device_error_info() reads registers and doesn't
-check to see whether it gets ~0 back.  I'm wondering if we *should* be
-checking there and whether doing that would help mitigate the issue
-here.
+The patches in this series remove intermediate linking steps when LTO is
+used, postpone processing done on object files until after the LTO link
+step, add workarounds for GNU gold incompatibilities, and address inline
+assembly incompatibilities for arm64.
 
-I don't really like the pcie_port_query_uptream_service() approach
-(BTW, the name is misspelled) because it feels a little ad hoc and it
-makes assumptions here in the AER code about what the DPC code is
-doing, e.g., how it has configured PCI_EXP_DPC_CTL.
+These changes allow arm64 defconfig to be compiled with LTO, but other
+architectures are not enabled until compatibility issues have been
+addressed. In particular, x86 inline assembly doesn't currently compile
+with clang's integrated assembler due to this LLVM bug:
 
->  	if (severity == AER_FATAL)
->  		state = pci_channel_io_frozen;
->  	else
-> -- 
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.,
-> a Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+  https://bugs.llvm.org/show_bug.cgi?id=24487
+
+Due to recent bug fixes in the toolchain, it's recommended to use clang
+5.0 or later, and GNU gold from binutils 2.27 or later, although older
+versions may also work depending on your kernel configuration. Here are
+the steps for compiling arm64 defconfig with LTO, assuming LLVMgold.so is
+in LD_LIBRARY_PATH and the rest of the toolchain is in PATH:
+
+  $ make ARCH=arm64 defconfig
+  $ ./scripts/config -e LTO_CLANG
+  $ make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- CC=clang
+
+--
+
+Changes in v2:
+ - Fixed issues found by the 0-day bot.
+ - Moved clang and gold fixes that don't depend on LTO earlier in the
+   patch set.
+ - Added clang support to cc-version.
+ - Renamed CLANG_LTO to LTO_CLANG, added CONFIG_LTO for sharing code
+   with potential gcc LTO work, and added checks for compiler support
+   to prepare-compiler-check.
+ - Added linker selection to Makefile, so LD doesn't have to be passed
+   in make command line.
+ - arm64 specific:
+   - Added -fno-jump-tables to arch/arm64/kvm/hyp to prevent clang
+     from generating jump tables with EL1 virtual addresses for code
+     that runs at EL2.
+   - Adopted Alex's version of the mrs_s / msr_s fix, which uses the
+     same code path for both gcc and clang.
+   - Enabled LLVM bug 30792 workaround only for clang < 6.0.
+   - Instead of disabling PLTs, removed NOLOAD from PLT sections in
+     modules to work around a bug in gold.
+   - Instead of disabling ARM64_ERRATUM_843419 with gold, enabled the
+     previously disabled ADR_PREL_PG_HI21* relocations.
+   - Instead of omitting -m for gold, pass aarch64_elf64_(be|le)_vec.
+
+--
+
+Alex Matveev (1):
+  arm64: make mrs_s and msr_s macros work with LTO
+
+Greg Hackmann (1):
+  arm64: use -mno-implicit-float instead of -mgeneral-regs-only
+
+Sami Tolvanen (16):
+  kbuild: add ld-name macro and support for GNU gold
+  kbuild: fix LD_DEAD_CODE_DATA_ELIMINATION with GNU gold
+  kbuild: move gcc-version.sh to cc-version.sh and add clang support
+  arm64: fix -m for GNU gold
+  arm64: kvm: use -fno-jump-tables with clang
+  arm64: keep .altinstructions and .altinstr_replacement
+  arm64: don't disable ADR_PREL_PG_HI21* with ARM64_ERRATUM_843419
+  arm64: explicitly pass --no-fix-cortex-a53-843419 to GNU gold
+  arm64: add a workaround for GNU gold with ARM64_MODULE_PLTS
+  kbuild: add support for clang LTO
+  kbuild: fix dynamic ftrace with clang LTO
+  scripts/mod: disable LTO for empty.c
+  efi/libstub: disable LTO
+  arm64: crypto: disable LTO for aes-ce-cipher.c
+  arm64: disable RANDOMIZE_MODULE_REGION_FULL with LTO_CLANG
+  arm64: select ARCH_SUPPORTS_LTO_CLANG
+
+ .gitignore                            |   2 +
+ Makefile                              |  59 ++++++++++++++++++-
+ arch/Kconfig                          |  32 ++++++++++
+ arch/arm64/Kconfig                    |   3 +-
+ arch/arm64/Makefile                   |  21 ++++++-
+ arch/arm64/crypto/Makefile            |   2 +-
+ arch/arm64/include/asm/kvm_hyp.h      |   8 ++-
+ arch/arm64/include/asm/sysreg.h       |  55 +++++++++++------
+ arch/arm64/kernel/module.c            |   2 -
+ arch/arm64/kernel/module.lds          |   4 +-
+ arch/arm64/kernel/vmlinux.lds.S       |   4 +-
+ arch/arm64/kvm/hyp/Makefile           |   4 ++
+ drivers/firmware/efi/libstub/Makefile |   3 +-
+ include/asm-generic/vmlinux.lds.h     |   9 +--
+ include/linux/compiler-clang.h        |   7 +++
+ include/linux/compiler_types.h        |   4 ++
+ kernel/trace/ftrace.c                 |   6 +-
+ scripts/Kbuild.include                |   8 ++-
+ scripts/Makefile.build                |  80 ++++++++++++++++++++++++-
+ scripts/Makefile.modpost              |  67 ++++++++++++++++++---
+ scripts/cc-version.sh                 |  45 ++++++++++++++
+ scripts/gcc-version.sh                |  33 -----------
+ scripts/link-vmlinux.sh               | 108 ++++++++++++++++++++++++++++++----
+ scripts/mod/Makefile                  |   1 +
+ scripts/recordmcount.c                |   3 +-
+ 25 files changed, 475 insertions(+), 95 deletions(-)
+ create mode 100755 scripts/cc-version.sh
+ delete mode 100755 scripts/gcc-version.sh
+
+-- 
+2.15.0.448.gf294e3d99a-goog
