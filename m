@@ -1,56 +1,78 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 15 Nov 2017 09:06:15 -0600
-Subject: [PATCH 0/4] [v7] pinctrl: qcom: add support for sparse GPIOs
-In-Reply-To: <CACRpkdYT1NDzuEuDU47jC-iXTE8JWxqGnKhJYKp0oGiL1wX7ig@mail.gmail.com>
-References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
- <c219c289-9cad-f96c-f766-ec28af8f078d@codeaurora.org>
- <CACRpkdbwe9+TovFYoD-W_9kabe+jsVbN6juJQBUzicq=1XDphg@mail.gmail.com>
- <b8bbba8d-f91f-8e8f-8e79-2e772b48d9b9@codeaurora.org>
- <CACRpkdYT1NDzuEuDU47jC-iXTE8JWxqGnKhJYKp0oGiL1wX7ig@mail.gmail.com>
-Message-ID: <8a0fe5e6-b27c-1e23-b9ec-5fc18a0ae27b@codeaurora.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Wed, 15 Nov 2017 15:11:30 +0000
+Subject: [PATCH v3 3/4] net: nb8800: Move HW init to ndo_open()
+In-Reply-To: <a047ecbd-c8a2-a8c0-7c9d-947b28aa8b9a@sigmadesigns.com> (Marc
+ Gonzalez's message of "Wed, 15 Nov 2017 15:58:58 +0100")
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+ <103bc878-9311-a727-1c21-2070e0a480e5@sigmadesigns.com>
+ <yw1xwp2t11ap.fsf@mansr.com>
+ <4e22ef54-d823-fc29-fedc-d447fa3d9c88@sigmadesigns.com>
+ <yw1xfu9h0xv7.fsf@mansr.com>
+ <30042004-4e13-b7e2-b49d-754db54cc5ce@sigmadesigns.com>
+ <yw1xbmk4241h.fsf@mansr.com>
+ <a047ecbd-c8a2-a8c0-7c9d-947b28aa8b9a@sigmadesigns.com>
+Message-ID: <yw1xr2szzie5.fsf@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14/2017 04:03 AM, Linus Walleij wrote:
-> The more intrusive design is on my request so I will look at it in detail
-> ASAP. I took a quick look and liked what I saw, I just need to make
-> sure about the details. Also it'd be nice to have a nod from Bj?rn.
-> 
-> The main reason for some of the work is ACPI, am I right?
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-Yes.  We don't have a nice hierarchical tree that lists the individual 
-pins and their purposes.  We just have a dumb list of GPIOs.
+> On 14/11/2017 17:55, M?ns Rullg?rd wrote:
+>
+>> Marc Gonzalez wrote:
+>> 
+>>> I will run iperf3 tests with RX_DESC_COUNT lowered to 2.
+>>> Would that produce conclusive results?
+>>> Do you have other suggestions?
+>> 
+>> Leave RX_DESC_COUNT alone but add a delay in the nb8800_poll() loop.
+>> That should ensure that queue is drained slowly enough for the buffers
+>> to run out.
+>
+> Using the following patch:
+>
+> diff --git a/drivers/net/ethernet/aurora/nb8800.c b/drivers/net/ethernet/aurora/nb8800.c
+> index 31c3f0f10fbb..646300bb53b6 100644
+> --- a/drivers/net/ethernet/aurora/nb8800.c
+> +++ b/drivers/net/ethernet/aurora/nb8800.c
+> @@ -317,6 +317,7 @@ static int nb8800_poll(struct napi_struct *napi, int budget)
+>
+>                 len = RX_BYTES_TRANSFERRED(rxd->report);
+>
+> +               udelay(200);
+>                 if (IS_RX_ERROR(rxd->report))
+>                         nb8800_rx_error(dev, rxd->report);
+>                 else
+> @@ -1416,9 +1417,9 @@ static int nb8800_probe(struct platform_device *pdev)
+>         netdev_info(dev, "MAC address %pM\n", dev->dev_addr);
+>
+>         /* Auto-negotiate by default */
+> -       priv->pause_aneg = true;
+> -       priv->pause_rx = true;
+> -       priv->pause_tx = true;
+> +       priv->pause_aneg = false;
+> +       priv->pause_rx = false;
+> +       priv->pause_tx = false;
+>
+>         priv->ops = match->data;
+>         priv->ops->power_down(dev);
+> diff --git a/drivers/net/ethernet/aurora/nb8800.h b/drivers/net/ethernet/aurora/nb8800.h
+> index 23fefca54804..9b59ea776e4a 100644
+> --- a/drivers/net/ethernet/aurora/nb8800.h
+> +++ b/drivers/net/ethernet/aurora/nb8800.h
+> @@ -7,7 +7,7 @@
+>  #include <linux/clk.h>
+>  #include <linux/bitops.h>
+>
+> -#define RX_DESC_COUNT                  256
+> +#define RX_DESC_COUNT                  16
+>  #define TX_DESC_COUNT                  256
+>
+>  #define NB8800_DESC_LOW                        4
+>
+> I saw both tango4 and tango5 wedged... :-(
 
-> Timur could you look quickly at the series posted by Andy Shevchenko
-> (6 patches prefixed gpiolib: acpi: ) for augmenting ACPI GPIOs in the core?
-> Especially patch 5 and 6 which introduce the ability to add quirks in the
-> core.
-
-So this is something that I've never really understood with 
-gpiolib-acpi.  I don't think this file is used with the pin control driver.
-
-We do have GpioInt and GpioIo statements in our GPIO table, but they 
-don't appear to be using the TLMM (our GPIO / pin control device)
-
-For example:
-
-GpioInt(Level, ActiveHigh, Exclusive, PullNone, , "\\_SB.TCS0.QIC5") {10}
-
-The \\_SB.TCS0 device is NOT the TLMM.  It's our "irq combiner" which 
-has something to do with performance measurement.  I think the
-
-I don't think Andy's patch set has anything to do with my patches.  My 
-patches just try to register a GPIO device, whereas the gpiolib-acpi 
-patches are about ACPI nodes performing gpio-like operations.
-
-
-> I'd like to get some ARM-based people to look at it to make sure we
-> those systems can also quirk their GPIOs if need be.
-
-My patches aren't about a quirk.  All I'm trying to do is registers 
-specific GPIOs rather than one giant block of them.
+Well, that's not good.  I'll see if I can replicate it later this week.
 
 -- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+M?ns Rullg?rd
