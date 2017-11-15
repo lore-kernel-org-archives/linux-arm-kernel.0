@@ -1,44 +1,57 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Wed, 15 Nov 2017 15:36:22 +0000
-Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
-In-Reply-To: <e3dfc32f-7052-603d-659a-0a7d9d7453b0@sigmadesigns.com> (Marc
- Gonzalez's message of "Wed, 15 Nov 2017 16:19:56 +0100")
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
- <yw1x1sl12fx8.fsf@mansr.com>
- <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com>
- <yw1xk1yt0zbp.fsf@mansr.com>
- <6f534b2b-f69a-bda5-dc5b-0281bf0df129@sigmadesigns.com>
- <20171115141707.GB2130@lunn.ch>
- <01be0b9e-3d6c-bd1e-6b92-e2274ffeea5a@sigmadesigns.com>
- <20171115150331.GA29642@lunn.ch>
- <e3dfc32f-7052-603d-659a-0a7d9d7453b0@sigmadesigns.com>
-Message-ID: <yw1xmv3nzh8p.fsf@mansr.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Wed, 15 Nov 2017 21:06:50 +0530
+Subject: [GIT PULL] Mailbox changes for v4.15
+Message-ID: <CABb+yY2-7WRaOqTHibFnb2JdQ96ki6KX22K61=XW4YV+nE1iPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+Hi Linus,
 
-> On 15/11/2017 16:03, Andrew Lunn wrote:
->
->> On Wed, Nov 15, 2017 at 03:33:47PM +0100, Marc Gonzalez wrote:
->> 
->>> On 15/11/2017 15:17, Andrew Lunn wrote:
->>>
->>> In our local branch, I have completely disabled flow control support,
->>> so I don't have to worry about this problem.
->> 
->> That is an interesting statement. You now know there is an issue here,
->> your solution is to fix your private branch and leave mainline as is.
->
-> All my patches are NACKed, what would you have me do?
->
-> Moreover, mainline still has the nb8800_dma_stop() work-around,
-> which Mans has never seen hang.
+The following changes since commit 15f859ae5c43c7f0a064ed92d33f7a5bc5de6de0:
 
-Here's the thing, if that trick doesn't work, then the dma queue filling
-up from real traffic will also hang the controller, which is a much
-bigger problem.  Your test today suggests that this might be the case.
+  Merge tag 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/dledford/rdma
+(2017-10-26 23:04:14 +0200)
 
--- 
-M?ns Rullg?rd
+are available in the git repository at:
+
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+tags/mailbox-v4.15
+
+for you to fetch changes up to 1f90a2162fb3cdfd9c44380bf16209af00f7acbe:
+
+  mailbox/omap: unregister mbox class (2017-11-14 20:21:35 +0530)
+
+----------------------------------------------------------------
+Change to POLL api and fixes for FlexRM and OMAP driver
+
+- Core: Prefer ACK method over POLL, if both supported
+- Test: use flag instead of special character
+- FlexRM: Usual driver internal minor churn
+- Omap: fix error path
+
+----------------------------------------------------------------
+Anup Patel (4):
+      mailbox: bcm-flexrm-mailbox: Fix FlexRM ring flush sequence
+      mailbox: bcm-flexrm-mailbox: Print ring number in errors and warnings
+      mailbox: bcm-flexrm-mailbox: Use common GPL comment header
+      mailbox: Build Broadcom FlexRM driver as loadable module for iProc SOCs
+
+Arvind Yadav (1):
+      mailbox/omap: unregister mbox class
+
+Scott Branden (1):
+      mailbox: bcm-flexrm-mailbox: add depends on ARCH_BCM_IPROC
+
+Sudeep Holla (2):
+      mailbox: reset txdone_method TXDONE_BY_POLL if client knows_txdone
+      mailbox: mailbox-test: don't rely on rx_buffer content to signal
+data ready
+
+ drivers/mailbox/Kconfig              |  3 +-
+ drivers/mailbox/bcm-flexrm-mailbox.c | 66 ++++++++++++++++++++++++++----------
+ drivers/mailbox/mailbox-test.c       | 11 +++---
+ drivers/mailbox/mailbox.c            |  4 +--
+ drivers/mailbox/omap-mailbox.c       |  6 +++-
+ drivers/mailbox/pcc.c                |  4 +--
+ 6 files changed, 66 insertions(+), 28 deletions(-)
