@@ -1,22 +1,42 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Nov 2017 16:17:05 -0800
-Subject: [PATCH 4/8] clk: mediatek: mt2701-mm: switch to mfd device
-In-Reply-To: <20171114214114.15793-5-mbrugger@suse.com>
-References: <20171114214114.15793-1-mbrugger@suse.com>
- <20171114214114.15793-5-mbrugger@suse.com>
-Message-ID: <20171115001705.GJ11955@codeaurora.org>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 15 Nov 2017 09:34:10 +0900
+Subject: [RFC] kvm: vgic: are these warnings wrong?
+In-Reply-To: <5c77ed5c-3b57-f9ba-b24d-f54729bc6a59@arm.com>
+References: <20171114064750.GB29552@linaro.org>
+ <5c77ed5c-3b57-f9ba-b24d-f54729bc6a59@arm.com>
+Message-ID: <20171115003408.GE29552@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/14, Matthias Brugger wrote:
-> As the new mfd device is in place, switch probing
-> for the MMSYS to support invocation from the mfd device.
+On Tue, Nov 14, 2017 at 09:07:46AM +0000, Marc Zyngier wrote:
+> On 14/11/17 06:47, AKASHI Takahiro wrote:
+> > Hi Marc,
+> > 
+> > I've just run a static analyzer to v4.14.
+> > While most of warnings/errors are false-positive, as you can easily imagine,
+> > there are something dubious. Can you please check ones below?
+> > 
+> > virt/kvm/arm/vgic/vgic-v3.c:352 vgic_v3_save_pending_tables() error: uninitialized symbol 'val'.
+> > virt/kvm/arm/vgic/vgic-its.c:424 its_sync_lpi_pending_table() error: uninitialized symbol 'pendmask'.
+> > virt/kvm/arm/vgic/vgic-its.c:779 vgic_its_alloc_collection() error: potential null dereference 'collection'.  (kzalloc returns null)
+> > virt/kvm/arm/vgic/vgic-irqfd.c:115 kvm_vgic_setup_default_irq_routing() warn: double check that we're allocating correct size: 48 vs 64
+> > 
+> > # I believe that the messages here are self-describing.
 > 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-> ---
+> Hi Takahiro,
+> 
+> All of these are pretty good findings... Out of curiosity, what is the
+> tool you've been using?
 
-Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+smatch!
+https://blogs.oracle.com/linuxkernel/smatch-static-analysis-tool-overview,-by-dan-carpenter
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Many thanks for reporting these bugs.
+
+I want to find more bugs with such tools :) Just kidding.
+
+-Takahiro AKASHI
+
+> 	M.
+> -- 
+> Jazz is not dead. It just smells funny...
