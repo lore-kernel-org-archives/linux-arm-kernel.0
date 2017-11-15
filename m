@@ -1,35 +1,31 @@
-From: xuyiping@hisilicon.com (Xu YiPing)
-Date: Wed, 15 Nov 2017 15:39:26 +0800
-Subject: [PATCH v2] arm64: perf: remove unsupported events for Cortex-A73
-Message-ID: <1510731566-22016-1-git-send-email-xuyiping@hisilicon.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 15 Nov 2017 08:48:50 +0100
+Subject: [PATCH 07/10] dmaengine: amba-pl08x: Use vchan_terminate_vdesc()
+ instead of desc_free
+In-Reply-To: <20171114143212.8311-8-peter.ujfalusi@ti.com>
+References: <20171114143212.8311-1-peter.ujfalusi@ti.com>
+ <20171114143212.8311-8-peter.ujfalusi@ti.com>
+Message-ID: <CACRpkdYCcLdJvNisoi942tyrC4R6vCvb0a=afhEQ4gs5fmfQAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-bus access read/write events are not supported in A73, based on the
-Cortex-A73 TRM r0p2, section 11.9 Events (pages 11-457 to 11-460).
+On Tue, Nov 14, 2017 at 3:32 PM, Peter Ujfalusi <peter.ujfalusi@ti.com> wrote:
 
-Fixes: 5561b6c5e981 "arm64: perf: add support for Cortex-A73"
-Signed-off-by: Xu YiPing <xuyiping@hisilicon.com>
----
- arch/arm64/kernel/perf_event.c | 6 ------
- 1 file changed, 6 deletions(-)
+> To avoid race with vchan_complete, use the race free way to terminate
+> running transfer.
+>
+> Implement the device_synchronize callback to make sure that the terminated
+> descriptor is freed.
+>
+> CC: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 
-diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
-index 9eaef51..3affca3 100644
---- a/arch/arm64/kernel/perf_event.c
-+++ b/arch/arm64/kernel/perf_event.c
-@@ -262,12 +262,6 @@ static const unsigned armv8_a73_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
- 
- 	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_RD,
- 	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WR,
--
--	[C(NODE)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_RD,
--	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR,
--
--	[C(NODE)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_RD,
--	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR,
- };
- 
- static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
--- 
-2.7.4
+I had to read patch 1 before I understood how the descriptor
+gets free:ed now, but now I see it :)
+Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+
+(Good work with hunting down these corner cases, I'm
+very happy you're doing this!)
+
+Yours,
+Linus Walleij
