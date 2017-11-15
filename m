@@ -1,47 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 15 Nov 2017 22:29:12 +0000
-Subject: [PATCH v2 08/18] arm64: don't disable ADR_PREL_PG_HI21* with
- ARM64_ERRATUM_843419
-In-Reply-To: <20171115213428.22559-9-samitolvanen@google.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-9-samitolvanen@google.com>
-Message-ID: <CAKv+Gu-wYwBMV7tdb+Kax_cyPsmAB2R2ZVwJuNi9qM0kaYAs=Q@mail.gmail.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 15 Nov 2017 22:37:52 +0100
+Subject: [PATCH v4 0/5] misc serdev: new serdev based driver for Wi2Wi
+ w2sg00x4 GPS module
+Message-ID: <cover.1510781875.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15 November 2017 at 21:34, Sami Tolvanen <samitolvanen@google.com> wrote:
-> CONFIG_LTO_CLANG depends on GNU gold, which can generate ADR_PREL_PG_HI21*
-> relocations even with --fix-cortex-a53-843419.
->
-> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
-> ---
->  arch/arm64/kernel/module.c | 2 --
->  1 file changed, 2 deletions(-)
->
-> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-> index f469e0435903..fec9a578f122 100644
-> --- a/arch/arm64/kernel/module.c
-> +++ b/arch/arm64/kernel/module.c
-> @@ -336,14 +336,12 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
->                         ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
->                                              AARCH64_INSN_IMM_ADR);
->                         break;
-> -#ifndef CONFIG_ARM64_ERRATUM_843419
->                 case R_AARCH64_ADR_PREL_PG_HI21_NC:
->                         overflow_check = false;
->                 case R_AARCH64_ADR_PREL_PG_HI21:
->                         ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
->                                              AARCH64_INSN_IMM_ADR);
->                         break;
-> -#endif
->                 case R_AARCH64_ADD_ABS_LO12_NC:
->                 case R_AARCH64_LDST8_ABS_LO12_NC:
->                         overflow_check = false;
-> --
-> 2.15.0.448.gf294e3d99a-goog
->
+Changes V4:
+* removed all pdata remains
+* added one missing Signes-off-By
 
-I think this change is reasonable in itself, but i do wonder how we
-can ensure that the adrp instructions that GNU gold does generate are
-not affected by the erratum, given that modules are partially linked
-object files, not shared libraries.
+2017-11-15 16:19:17: Changes V3:
+* worked in suggestions by kbuild test robot
+* added misc+serdev to the subject
+
+2017-11-12 22:00:02: Changes V2:
+* reduced to submit only w2sg00x4 GPS driver code
+* add DT node for GTA04 device to make use of the driver
+* split into base code and a debugging Kconfig option (brings device into false power state after boot)
+* worked in comments by kbuild robot and Rob Herring
+
+2017-05-21 12:44:07: RFC V1
+* RFC concerning new serdev based drivers for Wi2Wi w2sg00x4 GPS module and w2cbw003 bluetooth
+
+H. Nikolaus Schaller (5):
+  dt-bindings: vendor prefix for Wi2Wi, Inc.
+  dt-bindings: gps: add w2sg00x4 bindings documentation (GPS module with
+    UART))
+  misc serdev: Add w2sg0004 (gps receiver) power control driver
+  DTS: gta04: add serdev node for w2sg00x4
+  misc serdev: w2sg0004: add debugging code and Kconfig
+
+ .../devicetree/bindings/gps/wi2wi,w2sg0004.txt     |  24 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/omap3-gta04.dtsi                 |   6 +
+ drivers/misc/Kconfig                               |  18 +
+ drivers/misc/Makefile                              |   1 +
+ drivers/misc/w2sg0004.c                            | 582 +++++++++++++++++++++
+ 6 files changed, 632 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/gps/wi2wi,w2sg0004.txt
+ create mode 100644 drivers/misc/w2sg0004.c
+
+-- 
+2.12.2
