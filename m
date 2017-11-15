@@ -1,71 +1,47 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 15 Nov 2017 13:53:32 -0800
-Subject: [PATCH v2 01/18] kbuild: add ld-name macro and support for GNU
- gold
-In-Reply-To: <20171115213428.22559-2-samitolvanen@google.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 15 Nov 2017 22:29:12 +0000
+Subject: [PATCH v2 08/18] arm64: don't disable ADR_PREL_PG_HI21* with
+ ARM64_ERRATUM_843419
+In-Reply-To: <20171115213428.22559-9-samitolvanen@google.com>
 References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-2-samitolvanen@google.com>
-Message-ID: <CAGXu5jKSPEyfJFjJUP=uUjs5cfU3d04R5Hts5UzxYk+ONcBDhg@mail.gmail.com>
+ <20171115213428.22559-9-samitolvanen@google.com>
+Message-ID: <CAKv+Gu-wYwBMV7tdb+Kax_cyPsmAB2R2ZVwJuNi9qM0kaYAs=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 1:34 PM, Sami Tolvanen <samitolvanen@google.com> wrote:
-> GNU gold may require different flags than GNU ld. Add a macro for
-> detecting the linker and conditionally add gold specific flags from
-> LDFLAGS_GOLD.
+On 15 November 2017 at 21:34, Sami Tolvanen <samitolvanen@google.com> wrote:
+> CONFIG_LTO_CLANG depends on GNU gold, which can generate ADR_PREL_PG_HI21*
+> relocations even with --fix-cortex-a53-843419.
 >
-> Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
 > Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
-
-Reviewed-by: Kees Cook <keescook@chromium.org>
-
-(It does seem weird to have only LDFLAGS instead of KBUILD_LDFLAGS,
-but that's not really a problem for this patch exactly.)
-
--Kees
-
 > ---
->  Makefile               | 5 +++++
->  scripts/Kbuild.include | 4 ++++
->  2 files changed, 9 insertions(+)
+>  arch/arm64/kernel/module.c | 2 --
+>  1 file changed, 2 deletions(-)
 >
-> diff --git a/Makefile b/Makefile
-> index 763ab35df12a..f976af9525bf 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -827,6 +827,11 @@ include scripts/Makefile.kasan
->  include scripts/Makefile.extrawarn
->  include scripts/Makefile.ubsan
->
-> +# Add any flags specific to ld.gold
-> +ifeq ($(ld-name),gold)
-> +LDFLAGS                += $(LDFLAGS_GOLD)
-> +endif
-> +
->  # Add any arch overrides and user supplied CPPFLAGS, AFLAGS and CFLAGS as the
->  # last assignments
->  KBUILD_CPPFLAGS += $(ARCH_CPPFLAGS) $(KCPPFLAGS)
-> diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
-> index 9ffd3dda3889..584d6cecd7c0 100644
-> --- a/scripts/Kbuild.include
-> +++ b/scripts/Kbuild.include
-> @@ -172,6 +172,10 @@ ld-option = $(call try-run,\
->  # Important: no spaces around options
->  ar-option = $(call try-run, $(AR) rc$(1) "$$TMP",$(1),$(2))
->
-> +# ld-name
-> +# Expands to either bfd or gold
-> +ld-name = $(shell $(LD) -v 2>&1 | grep -q "GNU gold" && echo gold || echo bfd)
-> +
->  # ld-version
->  # Note this is mainly for HJ Lu's 3 number binutil versions
->  ld-version = $(shell $(LD) --version | $(srctree)/scripts/ld-version.sh)
+> diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
+> index f469e0435903..fec9a578f122 100644
+> --- a/arch/arm64/kernel/module.c
+> +++ b/arch/arm64/kernel/module.c
+> @@ -336,14 +336,12 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
+>                         ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
+>                                              AARCH64_INSN_IMM_ADR);
+>                         break;
+> -#ifndef CONFIG_ARM64_ERRATUM_843419
+>                 case R_AARCH64_ADR_PREL_PG_HI21_NC:
+>                         overflow_check = false;
+>                 case R_AARCH64_ADR_PREL_PG_HI21:
+>                         ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
+>                                              AARCH64_INSN_IMM_ADR);
+>                         break;
+> -#endif
+>                 case R_AARCH64_ADD_ABS_LO12_NC:
+>                 case R_AARCH64_LDST8_ABS_LO12_NC:
+>                         overflow_check = false;
 > --
 > 2.15.0.448.gf294e3d99a-goog
 >
 
-
-
--- 
-Kees Cook
-Pixel Security
+I think this change is reasonable in itself, but i do wonder how we
+can ensure that the adrp instructions that GNU gold does generate are
+not affected by the erratum, given that modules are partially linked
+object files, not shared libraries.
