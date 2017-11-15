@@ -1,39 +1,45 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Wed, 15 Nov 2017 21:57:04 +0100
-Subject: [PATCH] ARM: dts: bcm2835-rpi: Avoid conflicts on i2c0
-Message-ID: <1510779424-642-1-git-send-email-stefan.wahren@i2se.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 15 Nov 2017 22:12:27 +0100
+Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
+In-Reply-To: <e3dfc32f-7052-603d-659a-0a7d9d7453b0@sigmadesigns.com>
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+ <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
+ <yw1x1sl12fx8.fsf@mansr.com>
+ <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com>
+ <yw1xk1yt0zbp.fsf@mansr.com>
+ <6f534b2b-f69a-bda5-dc5b-0281bf0df129@sigmadesigns.com>
+ <20171115141707.GB2130@lunn.ch>
+ <01be0b9e-3d6c-bd1e-6b92-e2274ffeea5a@sigmadesigns.com>
+ <20171115150331.GA29642@lunn.ch>
+ <e3dfc32f-7052-603d-659a-0a7d9d7453b0@sigmadesigns.com>
+Message-ID: <20171115211227.GE29642@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GPU firmware of the Raspberry Pi 3 uses i2c0 to communicate to
-the FXL6408 gpio expander. It's a bad idea to use the same interface
-from the ARM side. Since this interface isn't used by the other
-RPi boards, it's save to remove the complete node and avoid this
-conflict.
+On Wed, Nov 15, 2017 at 04:19:56PM +0100, Marc Gonzalez wrote:
+> On 15/11/2017 16:03, Andrew Lunn wrote:
+> 
+> > On Wed, Nov 15, 2017 at 03:33:47PM +0100, Marc Gonzalez wrote:
+> > 
+> >> On 15/11/2017 15:17, Andrew Lunn wrote:
+> >>
+> >> In our local branch, I have completely disabled flow control support,
+> >> so I don't have to worry about this problem.
+> > 
+> > That is an interesting statement. You now know there is an issue here,
+> > your solution is to fix your private branch and leave mainline as is.
+> 
+> All my patches are NACKed, what would you have me do?
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-Fixes: 9d56c22a7861 ("ARM: bcm2835: Add devicetree for the Raspberry Pi 3.")
----
- arch/arm/boot/dts/bcm2835-rpi.dtsi | 7 -------
- 1 file changed, 7 deletions(-)
+Hi Marc
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi.dtsi b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-index e36c392..995d17b 100644
---- a/arch/arm/boot/dts/bcm2835-rpi.dtsi
-+++ b/arch/arm/boot/dts/bcm2835-rpi.dtsi
-@@ -44,13 +44,6 @@
- 	};
- };
- 
--&i2c0 {
--	pinctrl-names = "default";
--	pinctrl-0 = <&i2c0_gpio0>;
--	status = "okay";
--	clock-frequency = <100000>;
--};
--
- &i2c1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&i2c1_gpio2>;
--- 
-2.7.4
+You need to consider your own maintenance burden. You want your local
+branch to be as near to mainline as possible. Each change you have
+means additional maintenance work for you. It also possibly means
+additional work for your customers.
+
+You seem to think flow control in your hardware is too broken to be
+usable. So you probably want to submit a patch to mainline disabling
+it. If it is accepted, that is one less patch you need to maintain.
+
+    Andrew
