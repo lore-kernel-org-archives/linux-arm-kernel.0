@@ -1,31 +1,44 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 15 Nov 2017 09:42:25 -0200
-Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <201711151053.13676.jbe@pengutronix.de>
-References: <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
- <20171114105517.74ycmwcjsab7xp2j@piout.net>
- <201711141343.15309.jbe@pengutronix.de>
- <201711151053.13676.jbe@pengutronix.de>
-Message-ID: <CAOMZO5BztTwJcqgG6pF+BVY8wr58wsemw8FVwb=5_vi-16mCgQ@mail.gmail.com>
+Date: Wed, 15 Nov 2017 10:03:53 -0200
+Subject: [PATCH] Revert "ARM: dts: imx53: add srtc node"
+Message-ID: <1510747433-23503-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 7:53 AM, Juergen Borleis <jbe@pengutronix.de> wrote:
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-> After a quick look into the reference manuals:
->
-> Patch 5b72505 ("ARM: dts: imx53: add srtc node") is bad. The i.MX53 provides
-> an RTC more close to the i.MX6 instead (e.g. rtc-snvs.c). But unfortunately
-> it uses a different register layout than the i.MX6 does. So we can't use
-> this driver without i.MX53 specific adaptions.
-> But at least 5b72505 should be reverted.
+This reverts commit 5b725054147deaf966b3919e10a86c6bfe946a18.
 
-Agreed. Looked in the vendor kernel and this is the rtc driver for mx53:
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/rtc/rtc-mxc_v2.c?h=imx_2.6.35_11.09.01
+The rtc block on i.MX53 is a completely different hardware than the
+one found on i.MX25.
 
-,which is a different one from the dryice one:
-http://git.freescale.com/git/cgit.cgi/imx/linux-2.6-imx.git/tree/drivers/rtc/rtc-imxdi.c?h=imx_2.6.35_11.09.01
+Cc: <stable@vger.kernel.org> #4.14
+Reported-by: Noel Vellemans <Noel.Vellemans@visionbms.com>
+Suggested-by: Juergen Borleis <jbe@pengutronix.de>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx53.dtsi | 9 ---------
+ 1 file changed, 9 deletions(-)
 
-I will send a revert for 5b72505 ("ARM: dts: imx53: add srtc node").
-
-Thanks
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index 8bf0d89..2e516f4 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -433,15 +433,6 @@
+ 				clock-names = "ipg", "per";
+ 			};
+ 
+-			srtc: srtc at 53fa4000 {
+-				compatible = "fsl,imx53-rtc", "fsl,imx25-rtc";
+-				reg = <0x53fa4000 0x4000>;
+-				interrupts = <24>;
+-				interrupt-parent = <&tzic>;
+-				clocks = <&clks IMX5_CLK_SRTC_GATE>;
+-				clock-names = "ipg";
+-			};
+-
+ 			iomuxc: iomuxc at 53fa8000 {
+ 				compatible = "fsl,imx53-iomuxc";
+ 				reg = <0x53fa8000 0x4000>;
+-- 
+2.7.4
