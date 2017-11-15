@@ -1,10 +1,10 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Nov 2017 16:16:46 -0800
-Subject: [PATCH 7/8] clk: mediatek: mt8173-mm: switch to mfd device
-In-Reply-To: <20171114214114.15793-8-mbrugger@suse.com>
+Date: Tue, 14 Nov 2017 16:17:05 -0800
+Subject: [PATCH 4/8] clk: mediatek: mt2701-mm: switch to mfd device
+In-Reply-To: <20171114214114.15793-5-mbrugger@suse.com>
 References: <20171114214114.15793-1-mbrugger@suse.com>
- <20171114214114.15793-8-mbrugger@suse.com>
-Message-ID: <20171115001646.GI11955@codeaurora.org>
+ <20171114214114.15793-5-mbrugger@suse.com>
+Message-ID: <20171115001705.GJ11955@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
