@@ -1,60 +1,65 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Nov 2017 16:35:22 -0800
-Subject: [PATCH] arm64: cpu_errata: Add Kryo to Falkor 1003 errata
-In-Reply-To: <20171110172656.zvnpfjkky7rqumyf@armageddon.cambridge.arm.com>
-References: <20171108190029.19835-1-sboyd@codeaurora.org>
- <20171110172656.zvnpfjkky7rqumyf@armageddon.cambridge.arm.com>
-Message-ID: <20171115003522.GL11955@codeaurora.org>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Wed, 15 Nov 2017 09:51:18 +0900
+Subject: n900 in next-20170901
+In-Reply-To: <20171114173719.GA28152@atomide.com>
+References: <20171109001113.GZ28152@atomide.com>
+ <20171109003639.GB23982@js1304-P5Q-DELUXE>
+ <20171109035031.GA24383@js1304-P5Q-DELUXE>
+ <20171109150854.GC28152@atomide.com>
+ <20171110001315.GA29669@js1304-P5Q-DELUXE>
+ <20171110032610.GJ28152@atomide.com>
+ <20171110063727.GA32073@js1304-P5Q-DELUXE>
+ <20171110153620.GO28152@atomide.com>
+ <20171114063724.GA16969@js1304-P5Q-DELUXE>
+ <20171114173719.GA28152@atomide.com>
+Message-ID: <20171115005118.GA21113@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10, Catalin Marinas wrote:
-> On Wed, Nov 08, 2017 at 11:00:29AM -0800, Stephen Boyd wrote:
-> > The Kryo CPUs are also affected by the Falkor 1003 errata, so
-> > we need to do the same workaround on Kryo CPUs. The MIDR is
-> > slightly more complicated here, where the PART number is not
-> > always the same when looking at all the bits from 15 to 4. Drop
-> > the lower 8 bits and just look at the top 4 to see if it's '2'
-> > and then consider those as Kryo CPUs. This covers all the
-> > combinations without having to list them all out.
+On Tue, Nov 14, 2017 at 09:37:19AM -0800, Tony Lindgren wrote:
+> * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171114 06:34]:
+> > On Fri, Nov 10, 2017 at 07:36:20AM -0800, Tony Lindgren wrote:
+> > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171110 06:34]:
+> > > > On Thu, Nov 09, 2017 at 07:26:10PM -0800, Tony Lindgren wrote:
+> > > > > +#define OMAP34XX_SRAM_PHYS	0x40200000
+> > > > > +#define OMAP34XX_SRAM_VIRT	0xd0010000
+> > > > > +#define OMAP34XX_SRAM_SIZE	0x10000
+> > > > 
+> > > > For my testing environment, vmalloc address space is started at
+> > > > roughly 0xe0000000 so 0xd0010000 would not be valid.
+> > > 
+> > > Well we can map it anywhere we want, got any preferences?
 > > 
-> > Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
+> > My testing environment is a beagle-(xm?) for QEMU. It is configured by
+> > CONFIG_VMSPLIT_3G=y so kernel address space is started at 0xc0000000.
+> > And, it has 512 MB memory so 0xc0000000 ~ 0xdff00000 is used for
+> > direct mapping. See below.
 > > 
-> > We may need to introduce another Kconfig option to block software PAN
-> > from being enabled when this errata is enabled (and then have software PAN
-> > depend on this new config being false).
+> > [    0.000000] Memory: 429504K/522240K available (11264K kernel code,
+> > 1562K rwdata, 4288K rodata, 2048K init, 405K bss, 27200K reserved,
+> > 65536K cma-reserved, 0K highmem)
+> > [    0.000000] Virtual kernel memory layout:
+> > [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> > [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+> > [    0.000000]     vmalloc : 0xe0000000 - 0xff800000   ( 504 MB)
+> > [    0.000000]     lowmem  : 0xc0000000 - 0xdff00000   ( 511 MB)
+> > [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+> > [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+> > [    0.000000]       .text : 0xc0208000 - 0xc0e00000   (12256 kB)
+> > [    0.000000]       .init : 0xc1300000 - 0xc1500000   (2048 kB)
+> > [    0.000000]       .data : 0xc1500000 - 0xc1686810   (1563 kB)
+> > [    0.000000]        .bss : 0xc168fc68 - 0xc16f512c   ( 406 kB)
+> > 
+> > Therefore, if OMAP34XX_SRAM_VIRT is 0xd0010000, direct mapping is
+> > broken and the system doesn't work. I guess that we should use more
+> > stable address like as 0xf0000000.
 > 
-> It depends on whether you'd want to use SW PAN together with these CPUs.
-> From a defconfig + single Image perspective, SW PAN is disabled but it
-> would be nice to allow single Image with both E1003 and SW PAN configs
-> enabled (though SW PAN wouldn't be used at run-time).
-> 
-> As a quick hack, something like below but we may want to add a separate
-> cap bit as a minor optimisation (not sure it makes a difference).
-> Untested:
+> OK. Let's forget about adding static mappings and my earlier
+> patches to attempt to fix this. Below is what I now think we should
+> merge as a fix before merging Joonsoo's patches. Please all review
+> and test, adding Tero to Cc also.
 
-Ok. The Falkor CPUs support HW PAN so your patch looks like it
-should work. If we're running on a Kryo CPU we may not see the HW
-PAN capability and then we would still return false here because
-the errata is present. I'll fold it in and test it out.
+Okay. Then, this patch will be merged by yourself as a fix? I'm okay
+with either way. Just let me know. :)
 
-> 
-> ------------------8<--------------------------
-> diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-> index ac67cfc2585a..8d2ddaef70a2 100644
-> --- a/arch/arm64/include/asm/cpufeature.h
-> +++ b/arch/arm64/include/asm/cpufeature.h
-> @@ -268,7 +268,8 @@ static inline bool system_supports_fpsimd(void)
->  static inline bool system_uses_ttbr0_pan(void)
->  {
->  	return IS_ENABLED(CONFIG_ARM64_SW_TTBR0_PAN) &&
-> -		!cpus_have_const_cap(ARM64_HAS_PAN);
-> +		!cpus_have_const_cap(ARM64_HAS_PAN) &&
-> +		!cpus_have_const_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003);
->  }
->  
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks.
