@@ -1,88 +1,53 @@
-From: pprakash@codeaurora.org (Prashanth Prakash)
-Date: Wed, 15 Nov 2017 10:11:49 -0700
-Subject: [PATCH v3 1/2] cpuidle: Add new macro to enter a retention idle state
-In-Reply-To: <1510765910-23739-1-git-send-email-pprakash@codeaurora.org>
-References: <1510765910-23739-1-git-send-email-pprakash@codeaurora.org>
-Message-ID: <1510765910-23739-2-git-send-email-pprakash@codeaurora.org>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Wed, 15 Nov 2017 18:13:51 +0100
+Subject: [PATCH v3 5/5] misc serdev: w2sg0004: add debugging code and
+ Kconfig
+In-Reply-To: <20171115164257.2mbbk7yqhq3puc5a@lenoch>
+References: <cover.1510759152.git.hns@goldelico.com>
+ <9b4969c858d4c3801bb796f92dad5c580799b768.1510759152.git.hns@goldelico.com>
+ <28e16c7a-2688-a302-1548-1cdc2552f0ad@suse.de>
+ <DC57A290-669C-4B3C-A4EE-2ABEA37F47CE@goldelico.com>
+ <20171115164257.2mbbk7yqhq3puc5a@lenoch>
+Message-ID: <2CFA9F17-0E65-4804-9971-922500F5E919@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If a CPU is entering a low power idle state where it doesn't lose any
-context, then there is no need to call cpu_pm_enter()/cpu_pm_exit().
-Add a new macro(CPU_PM_CPU_IDLE_ENTER_RETENTION) to be used by cpuidle
-drivers when they are entering retention state. By not calling
-cpu_pm_enter and cpu_pm_exit we reduce the latency involved in
-entering and exiting the retention idle states.
+Hi Ladislav,
 
-CPU_PM_CPU_IDLE_ENTER_RETENTION assumes that no state is lost and
-hence CPU PM notifiers will not be called. We may need a broader
-change if we need to support partial retention states effeciently.
+> Am 15.11.2017 um 17:42 schrieb Ladislav Michl <ladis@linux-mips.org>:
+> 
+> On Wed, Nov 15, 2017 at 05:29:25PM +0100, H. Nikolaus Schaller wrote:
+>> Hi Andreas,
+>> 
+>>> Am 15.11.2017 um 16:53 schrieb Andreas F?rber <afaerber@suse.de>:
+>>> 
+>>> Hi,
+>>> 
+>>> Am 15.11.2017 um 16:19 schrieb H. Nikolaus Schaller:
+>>>> This allows to set CONFIG_W2SG0004_DEBUG which will
+>>>> make the driver report more activities and it will turn on the
+>>>> GPS module during boot while the driver assumes that it
+>>>> is off. This can be used to debug the correct functioning of
+>>>> the hardware. Therefore we add it as an option to the driver
+>>>> because we think it is of general use (and a little tricky to
+>>>> add by system testers).
+>>>> 
+>>>> Normally it should be off.
+>>>> ---
+>>> 
+>>> If you want to merge this, it is lacking a Sob.
+>> 
+>> Whats is a "Sob" in this context (https://acronyms.thefreedictionary.com/SOB)?
+> 
+> https://acronyms.thefreedictionary.com/Signed-Off-By
 
-On ARM64 based Qualcomm Server Platform we measured below overhead for
-for calling cpu_pm_enter and cpu_pm_exit for retention states.
+Ah, ok. Too obvious to associate :) Tnx.
 
-workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
-        Average overhead of cpu_pm_enter - 1.2us
-        Average overhead of cpu_pm_exit  - 3.1us
+I did never think about that this could be missing. And I don't know why :(
 
-Signed-off-by: Prashanth Prakash <pprakash@codeaurora.org>
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
----
- include/linux/cpuidle.h | 40 ++++++++++++++++++++++++----------------
- 1 file changed, 24 insertions(+), 16 deletions(-)
+> Also please read Documentation/process/submitting-patches.rst
 
-diff --git a/include/linux/cpuidle.h b/include/linux/cpuidle.h
-index 8f7788d..871f9e2 100644
---- a/include/linux/cpuidle.h
-+++ b/include/linux/cpuidle.h
-@@ -257,22 +257,30 @@ static inline int cpuidle_register_governor(struct cpuidle_governor *gov)
- {return 0;}
- #endif
- 
--#define CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx)	\
--({								\
--	int __ret;						\
--								\
--	if (!idx) {						\
--		cpu_do_idle();					\
--		return idx;					\
--	}							\
--								\
--	__ret = cpu_pm_enter();					\
--	if (!__ret) {						\
--		__ret = low_level_idle_enter(idx);		\
--		cpu_pm_exit();					\
--	}							\
--								\
--	__ret ? -1 : idx;					\
-+#define __CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, is_retention) \
-+({									\
-+	int __ret = 0;							\
-+									\
-+	if (!idx) {							\
-+		cpu_do_idle();						\
-+		return idx;						\
-+	}								\
-+									\
-+	if (!is_retention)						\
-+		__ret =  cpu_pm_enter();				\
-+	if (!__ret) {							\
-+		__ret = low_level_idle_enter(idx);			\
-+		if (!is_retention)					\
-+			cpu_pm_exit();					\
-+	}								\
-+									\
-+	__ret ? -1 : idx;						\
- })
- 
-+#define CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx)	\
-+	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 0)
-+
-+#define CPU_PM_CPU_IDLE_ENTER_RETENTION(low_level_idle_enter, idx)	\
-+	__CPU_PM_CPU_IDLE_ENTER(low_level_idle_enter, idx, 1)
-+
- #endif /* _LINUX_CPUIDLE_H */
--- 
-Qualcomm Datacenter Technologies on behalf of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+We have automated things by calling checkpatch but it somwhow failed here.
+
+BR and thanks,
+Nikolaus
