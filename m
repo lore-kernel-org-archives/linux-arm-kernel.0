@@ -1,72 +1,35 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 15 Nov 2017 15:29:55 +0100
-Subject: [PATCH v5 01/15] arm64: dts: renesas: r8a7795: Add IPMMU device
- nodes
-In-Reply-To: <20171110132532.1202-2-horms+renesas@verge.net.au>
+Date: Wed, 15 Nov 2017 15:33:24 +0100
+Subject: [PATCH v5 02/15] arm64: dts: renesas: r8a7795-es1: Add IPMMU
+ device nodes
+In-Reply-To: <20171110132532.1202-3-horms+renesas@verge.net.au>
 References: <20171110132532.1202-1-horms+renesas@verge.net.au>
- <20171110132532.1202-2-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVXJduKrdb0+ujJX7O7_1omvfaWjCjTHwTafFD1sr=q=g@mail.gmail.com>
+ <20171110132532.1202-3-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXZQ1vpKVDqaZ8MOkaT2G264N2n+XV-x0KLWaQm+W5FWg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-Hi Simon,
 
 On Fri, Nov 10, 2017 at 2:25 PM, Simon Horman
 <horms+renesas@verge.net.au> wrote:
 > From: Magnus Damm <damm+renesas@opensource.se>
 >
-> Add r8a7795 IPMMU nodes and keep all disabled by default.
+> Add r8a7795 ES1.x IPMMU nodes and keep all disabled by default.
 >
-> This includes all IPMMU devices for r8a7795 ES2.0. Those
-> not present in r8a7795 ES1.x are removed from the DT for those
-> SoCs using delete-node. A follow-up patch will add IPMMU devices
-> to ES1.x which are not also present in ES2.0.
+> This is a follow-up to a patch that adds IPMMU device nodes that
+> are common to r8a7795 ES1.x and ES2.0
+>
+> Power domains are omitted as they appear to be undocumented.
 >
 > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > ---
 > v5 [Simon Horman]
-> * Correct ES1.x override for ipmmu_vc0
-> * Add ES1.x override for ipmmu_vc1
-> * Drop mostly redundant comments from nodes
-> * Add power domains
-> * Consistently mark all nodes as disabled
+> * Added reviewed-by tag from Geert Uytterhoeven
 
-Thanks for the update!
+Nope, you didn't ;-)
 
-Looks like "power-domains" do work for IOMMU nodes.
-However, adding them seems to postpone initialization of the IOMMUs.
-
-With the two typos below fixed:
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-
-> +               ipmmu_vc0: mmu at fe6b0000 {
-> +                       compatible = "renesas,ipmmu-r8a7795";
-> +                       reg = <0 0xfe6b0000 0 0x1000>;
-> +                       renesas,ipmmu-main = <&ipmmu_mm 12>;
-> +                       power-domains = <&sysc R8A7795_PD_A3VP>;
-
-R8A7795_PD_A3VC
-
-> +                       #iommu-cells = <1>;
-> +                       status = "disabled";
-> +               };
-> +
-> +               ipmmu_vc1: mmu at fe6f0000 {
-> +                       compatible = "renesas,ipmmu-r8a7795";
-> +                       reg = <0 0xfe6f0000 0 0x1000>;
-> +                       renesas,ipmmu-main = <&ipmmu_mm 13>;
-> +                       power-domains = <&sysc R8A7795_PD_A3VP>;
-
-R8A7795_PD_A3VC
-
-> +                       #iommu-cells = <1>;
-> +                       status = "disabled";
-> +               };
 
 Gr{oetje,eeting}s,
 
