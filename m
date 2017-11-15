@@ -1,129 +1,45 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Wed, 15 Nov 2017 13:34:13 -0800
-Subject: [PATCH v2 03/18] kbuild: move gcc-version.sh to cc-version.sh and add
- clang support
+Date: Wed, 15 Nov 2017 13:34:14 -0800
+Subject: [PATCH v2 04/18] arm64: use -mno-implicit-float instead of
+ -mgeneral-regs-only
 In-Reply-To: <20171115213428.22559-1-samitolvanen@google.com>
 References: <20171115213428.22559-1-samitolvanen@google.com>
-Message-ID: <20171115213428.22559-4-samitolvanen@google.com>
+Message-ID: <20171115213428.22559-5-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Greg Hackmann <ghackmann@google.com>
+
+LLVM bug 30792 causes clang's AArch64 backend to crash compiling
+arch/arm64/crypto/aes-ce-cipher.c.  Replacing -mgeneral-regs-only with
+-mno-implicit-float is the suggested workaround.
+
+Signed-off-by: Greg Hackmann <ghackmann@google.com>
+Cc: Matthias Kaehlcke <mka@chromium.org>
+[added cc-ifversion to enable the workaround only for clang <6.0]
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
- scripts/Kbuild.include |  4 ++--
- scripts/cc-version.sh  | 45 +++++++++++++++++++++++++++++++++++++++++++++
- scripts/gcc-version.sh | 33 ---------------------------------
- 3 files changed, 47 insertions(+), 35 deletions(-)
- create mode 100755 scripts/cc-version.sh
- delete mode 100755 scripts/gcc-version.sh
+ arch/arm64/Makefile | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
-index 584d6cecd7c0..de41ab74121e 100644
---- a/scripts/Kbuild.include
-+++ b/scripts/Kbuild.include
-@@ -143,11 +143,11 @@ cc-disable-warning = $(call try-run,\
- cc-name = $(shell $(CC) -v 2>&1 | grep -q "clang version" && echo clang || echo gcc)
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index b35788c909f1..ecd5ed11c764 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -49,7 +49,13 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
+   endif
+ endif
  
- # cc-version
--cc-version = $(shell $(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC))
-+cc-version = $(shell $(CONFIG_SHELL) $(srctree)/scripts/cc-version.sh $(CC))
- 
- # cc-fullversion
- cc-fullversion = $(shell $(CONFIG_SHELL) \
--	$(srctree)/scripts/gcc-version.sh -p $(CC))
-+	$(srctree)/scripts/cc-version.sh -p $(CC))
- 
- # cc-ifversion
- # Usage:  EXTRA_CFLAGS += $(call cc-ifversion, -lt, 0402, -O1)
-diff --git a/scripts/cc-version.sh b/scripts/cc-version.sh
-new file mode 100755
-index 000000000000..6d085a8a07e8
---- /dev/null
-+++ b/scripts/cc-version.sh
-@@ -0,0 +1,45 @@
-+#!/bin/sh
-+# SPDX-License-Identifier: GPL-2.0
-+#
-+# cc-version [-p] cc-command
-+#
-+# Prints the compiler version of `command' in a canonical 4-digit form
-+# such as `0295' for gcc-2.95, `0303' for gcc-3.3, etc.
-+#
-+# With the -p option, prints the patchlevel as well, for example `029503' for
-+# gcc-2.95.3, `030301' for gcc-3.3.1, etc.
-+#
-+
-+if [ "$1" = "-p" ] ; then
-+	with_patchlevel=1;
-+	shift;
-+fi
-+
-+compiler="$*"
-+
-+if [ ${#compiler} -eq 0 ]; then
-+	echo "Error: No compiler specified."
-+	printf "Usage:\n\t$0 <cc-command>\n"
-+	exit 1
-+fi
-+
-+clang=$(echo __clang__ | $compiler -E -x c - | tail -n1)
-+
-+if [ "$clang" == "1" ]; then
-+	major_macro="__clang_major__"
-+	minor_macro="__clang_minor__"
-+	patchlevel_macro="__clang_patchlevel__"
+-KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
++ifeq ($(cc-name),clang)
++# This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792.
++KBUILD_CFLAGS	+= $(call cc-ifversion, -lt, 0600, -mno-implicit-float, -mgeneral-regs-only)
 +else
-+	major_macro="__GNUC__"
-+	minor_macro="__GNUC_MINOR__"
-+	patchlevel_macro="__GNUC_PATCHLEVEL__"
-+fi
-+
-+MAJOR=$(echo $major_macro | $compiler -E -x c - | tail -n 1)
-+MINOR=$(echo $minor_macro | $compiler -E -x c - | tail -n 1)
-+if [ "x$with_patchlevel" != "x" ] ; then
-+	PATCHLEVEL=$(echo $patchlevel_macro | $compiler -E -x c - | tail -n 1)
-+	printf "%02d%02d%02d\\n" $MAJOR $MINOR $PATCHLEVEL
-+else
-+	printf "%02d%02d\\n" $MAJOR $MINOR
-+fi
-diff --git a/scripts/gcc-version.sh b/scripts/gcc-version.sh
-deleted file mode 100755
-index 11bb909845e7..000000000000
---- a/scripts/gcc-version.sh
-+++ /dev/null
-@@ -1,33 +0,0 @@
--#!/bin/sh
--# SPDX-License-Identifier: GPL-2.0
--#
--# gcc-version [-p] gcc-command
--#
--# Prints the gcc version of `gcc-command' in a canonical 4-digit form
--# such as `0295' for gcc-2.95, `0303' for gcc-3.3, etc.
--#
--# With the -p option, prints the patchlevel as well, for example `029503' for
--# gcc-2.95.3, `030301' for gcc-3.3.1, etc.
--#
--
--if [ "$1" = "-p" ] ; then
--	with_patchlevel=1;
--	shift;
--fi
--
--compiler="$*"
--
--if [ ${#compiler} -eq 0 ]; then
--	echo "Error: No compiler specified."
--	printf "Usage:\n\t$0 <gcc-command>\n"
--	exit 1
--fi
--
--MAJOR=$(echo __GNUC__ | $compiler -E -x c - | tail -n 1)
--MINOR=$(echo __GNUC_MINOR__ | $compiler -E -x c - | tail -n 1)
--if [ "x$with_patchlevel" != "x" ] ; then
--	PATCHLEVEL=$(echo __GNUC_PATCHLEVEL__ | $compiler -E -x c - | tail -n 1)
--	printf "%02d%02d%02d\\n" $MAJOR $MINOR $PATCHLEVEL
--else
--	printf "%02d%02d\\n" $MAJOR $MINOR
--fi
++KBUILD_CFLAGS	+= -mgeneral-regs-only
++endif
++KBUILD_CFLAGS	+= $(lseinstr) $(brokengasinst)
+ KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
+ KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
+ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
 -- 
 2.15.0.448.gf294e3d99a-goog
