@@ -1,32 +1,36 @@
 From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Wed, 15 Nov 2017 14:56:46 +0200
-Subject: [PATCH v3 2/4] ARM: dts: at91: sama5d2: added dma property for ADC
- device
+Date: Wed, 15 Nov 2017 14:56:48 +0200
+Subject: [PATCH v3 4/4] iio: adc: at91-sama5d2_adc: ack DRDY irq in direct mode
 In-Reply-To: <1510750608-8697-1-git-send-email-eugen.hristev@microchip.com>
 References: <1510750608-8697-1-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <1510750608-8697-3-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <1510750608-8697-5-git-send-email-eugen.hristev@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added DMA property for ADC device
+Need to acknowledge DRDY irq in direct mode/ software
+triggered mode. Otherwise, on the next conversion, overrun
+flag will be raised, which is not a correct state.
+This doesn't affect the functionality, but will generate
+possible incorrect overrun reports.
 
 Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 ---
- arch/arm/boot/dts/sama5d2.dtsi | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/iio/adc/at91-sama5d2_adc.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-index 38d2216..ca8bf13 100644
---- a/arch/arm/boot/dts/sama5d2.dtsi
-+++ b/arch/arm/boot/dts/sama5d2.dtsi
-@@ -1430,6 +1430,8 @@
- 				atmel,min-sample-rate-hz = <200000>;
- 				atmel,max-sample-rate-hz = <20000000>;
- 				atmel,startup-time-ms = <4>;
-+				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
-+				dma-names = "rx";
- 				status = "disabled";
- 			};
+diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+index 11d34a8..274cb5e 100644
+--- a/drivers/iio/adc/at91-sama5d2_adc.c
++++ b/drivers/iio/adc/at91-sama5d2_adc.c
+@@ -787,6 +787,9 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
+ 		at91_adc_writel(st, AT91_SAMA5D2_IDR, BIT(chan->channel));
+ 		at91_adc_writel(st, AT91_SAMA5D2_CHDR, BIT(chan->channel));
  
++		/* Needed to ACK the DRDY interruption */
++		at91_adc_readl(st, AT91_SAMA5D2_LCDR);
++
+ 		mutex_unlock(&st->lock);
+ 
+ 		iio_device_release_direct_mode(indio_dev);
 -- 
 2.7.4
