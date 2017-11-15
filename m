@@ -1,21 +1,17 @@
 From: salyzyn@android.com (Mark Salyzyn)
-Date: Wed, 15 Nov 2017 14:05:12 -0800
-Subject: [PATCH 2/6] arm64: elf: Set AT_SYSINFO_EHDR in compat processes
+Date: Wed, 15 Nov 2017 14:05:13 -0800
+Subject: [PATCH 3/6] arm64: Refactor vDSO init/setup
 In-Reply-To: <20171115220529.14458-1-salyzyn@android.com>
 References: <20171115220529.14458-1-salyzyn@android.com>
-Message-ID: <20171115220529.14458-3-salyzyn@android.com>
+Message-ID: <20171115220529.14458-4-salyzyn@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Kevin Brodsky <kevin.brodsky@arm.com>
 
-If the compat vDSO is enabled, we need to set AT_SYSINFO_EHDR in the
-auxiliary vector of compat processes to the address of the vDSO code
-page, so that the dynamic linker can find it (just like the regular vDSO).
-
-Note that we cast context.vdso to Elf64_Off, instead of elf_addr_t,
-because elf_addr_t is Elf32_Off in compat_binfmt_elf.c, and casting
-context.vdso to u32 would trigger a pointer narrowing warning.
+Move the logic for setting up mappings and pages for the vDSO into
+static functions. This makes the vDSO setup code more consistent with
+the compat side and will allow to reuse it for the future compat vDSO.
 
 Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
 Signed-off-by: Mark Salyzyn <salyzyn@android.com>
@@ -26,39 +22,187 @@ Cc: "Eric W. Biederman" <ebiederm@xmission.com>
 Cc: linux-arm-kernel at lists.infradead.org
 Cc: linux-kernel at vger.kernel.org
 ---
- arch/arm64/include/asm/elf.h | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/vdso.c | 118 ++++++++++++++++++++++++++++-------------------
+ 1 file changed, 70 insertions(+), 48 deletions(-)
 
-diff --git a/arch/arm64/include/asm/elf.h b/arch/arm64/include/asm/elf.h
-index 33be513ef24c..675fa096d4a4 100644
---- a/arch/arm64/include/asm/elf.h
-+++ b/arch/arm64/include/asm/elf.h
-@@ -144,11 +144,12 @@ typedef struct user_fpsimd_state elf_fpregset_t;
- })
+diff --git a/arch/arm64/kernel/vdso.c b/arch/arm64/kernel/vdso.c
+index 26d510474ffa..48b4111a933f 100644
+--- a/arch/arm64/kernel/vdso.c
++++ b/arch/arm64/kernel/vdso.c
+@@ -39,8 +39,11 @@
+ #include <asm/vdso.h>
+ #include <asm/vdso_datapage.h>
  
- /* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
--#define ARCH_DLINFO							\
-+#define _SET_AUX_ENT_VDSO						\
- do {									\
- 	NEW_AUX_ENT(AT_SYSINFO_EHDR,					\
--		    (elf_addr_t)current->mm->context.vdso);		\
-+		    (Elf64_Off)current->mm->context.vdso);		\
- } while (0)
-+#define ARCH_DLINFO _SET_AUX_ENT_VDSO
+-extern char vdso_start[], vdso_end[];
+-static unsigned long vdso_pages __ro_after_init;
++struct vdso_mappings {
++	unsigned long num_code_pages;
++	struct vm_special_mapping data_mapping;
++	struct vm_special_mapping code_mapping;
++};
  
- #define ARCH_HAS_SETUP_ADDITIONAL_PAGES
- struct linux_binprm;
-@@ -196,7 +197,11 @@ typedef compat_elf_greg_t		compat_elf_gregset_t[COMPAT_ELF_NGREG];
- ({									\
- 	set_thread_flag(TIF_32BIT);					\
-  })
-+#ifdef CONFIG_VDSO32
-+#define COMPAT_ARCH_DLINFO	_SET_AUX_ENT_VDSO
-+#else
- #define COMPAT_ARCH_DLINFO
-+#endif
- extern int aarch32_setup_vectors_page(struct linux_binprm *bprm,
- 				      int uses_interp);
- #define compat_arch_setup_additional_pages \
+ /*
+  * The vDSO data page.
+@@ -164,95 +167,114 @@ static int vdso_mremap(const struct vm_special_mapping *sm,
+ 	return 0;
+ }
+ 
+-static struct vm_special_mapping vdso_spec[2] __ro_after_init = {
+-	{
+-		.name	= "[vvar]",
+-	},
+-	{
+-		.name	= "[vdso]",
+-		.mremap = vdso_mremap,
+-	},
+-};
+-
+-static int __init vdso_init(void)
++static int __init vdso_mappings_init(const char *name,
++				     const char *code_start,
++				     const char *code_end,
++				     struct vdso_mappings *mappings)
+ {
+-	int i;
++	unsigned long i, vdso_page;
+ 	struct page **vdso_pagelist;
+ 	unsigned long pfn;
+ 
+-	if (memcmp(vdso_start, "\177ELF", 4)) {
+-		pr_err("vDSO is not a valid ELF object!\n");
++	if (memcmp(code_start, "\177ELF", 4)) {
++		pr_err("%s is not a valid ELF object!\n", name);
+ 		return -EINVAL;
+ 	}
+ 
+-	vdso_pages = (vdso_end - vdso_start) >> PAGE_SHIFT;
+-	pr_info("vdso: %ld pages (%ld code @ %p, %ld data @ %p)\n",
+-		vdso_pages + 1, vdso_pages, vdso_start, 1L, vdso_data);
+-
+-	/* Allocate the vDSO pagelist, plus a page for the data. */
+-	vdso_pagelist = kcalloc(vdso_pages + 1, sizeof(struct page *),
+-				GFP_KERNEL);
++	vdso_pages = (code_end - code_start) >> PAGE_SHIFT;
++	pr_info("%s: %ld pages (%ld code @ %p, %ld data @ %p)\n",
++		name, vdso_pages + 1, vdso_pages, code_start, 1L,
++		vdso_data);
++
++	/*
++	 * Allocate space for storing pointers to the vDSO code pages + the
++	 * data page. The pointers must have the same lifetime as the mappings,
++	 * which are static, so there is no need to keep track of the pointer
++	 * array to free it.
++	 */
++	vdso_pagelist = kmalloc_array(vdso_pages + 1, sizeof(struct page *),
++				      GFP_KERNEL);
+ 	if (vdso_pagelist == NULL)
+ 		return -ENOMEM;
+ 
+ 	/* Grab the vDSO data page. */
+ 	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
+ 
+-
+ 	/* Grab the vDSO code pages. */
+-	pfn = sym_to_pfn(vdso_start);
++	pfn = sym_to_pfn(code_start);
+ 
+ 	for (i = 0; i < vdso_pages; i++)
+ 		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
+ 
+-	vdso_spec[0].pages = &vdso_pagelist[0];
+-	vdso_spec[1].pages = &vdso_pagelist[1];
++	/* Populate the special mapping structures */
++	mappings->data_mapping = (struct vm_special_mapping) {
++		.name	= "[vvar]",
++		.pages	= &vdso_pagelist[0],
++	};
++
++	mappings->code_mapping = (struct vm_special_mapping) {
++		.name	= "[vdso]",
++		.pages	= &vdso_pagelist[1],
++	};
+ 
++	mappings->num_code_pages = vdso_pages;
+ 	return 0;
+ }
++
++static struct vdso_mappings vdso_mappings __ro_after_init;
++
++static int __init vdso_init(void)
++{
++	extern char vdso_start[], vdso_end[];
++
++	return vdso_mappings_init("vdso", vdso_start, vdso_end,
++				  &vdso_mappings);
++}
+ arch_initcall(vdso_init);
+ 
+-int arch_setup_additional_pages(struct linux_binprm *bprm,
+-				int uses_interp)
++static int vdso_setup(struct mm_struct *mm,
++		      const struct vdso_mappings *mappings)
+ {
+-	struct mm_struct *mm = current->mm;
+ 	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
+ 	void *ret;
+ 
+-	vdso_text_len = vdso_pages << PAGE_SHIFT;
++	vdso_text_len = mappings->num_code_pages << PAGE_SHIFT;
+ 	/* Be sure to map the data page */
+ 	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
+ 
+-	if (down_write_killable(&mm->mmap_sem))
+-		return -EINTR;
+ 	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
+-	if (IS_ERR_VALUE(vdso_base)) {
+-		ret = ERR_PTR(vdso_base);
+-		goto up_fail;
+-	}
++	if (IS_ERR_VALUE(vdso_base))
++		ret = PTR_ERR_OR_ZERO(ERR_PTR(vdso_base));
++
+ 	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
+ 				       VM_READ|VM_MAYREAD,
+-				       &vdso_spec[0]);
++				       &mappings->data_mapping);
+ 	if (IS_ERR(ret))
+-		goto up_fail;
++		return PTR_ERR_OR_ZERO(ret);
+ 
+ 	vdso_base += PAGE_SIZE;
+-	mm->context.vdso = (void *)vdso_base;
+ 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
+ 				       VM_READ|VM_EXEC|
+ 				       VM_MAYREAD|VM_MAYWRITE|VM_MAYEXEC,
+-				       &vdso_spec[1]);
+-	if (IS_ERR(ret))
+-		goto up_fail;
++				       &mappings->code_mapping);
++	if (!IS_ERR(ret))
++		mm->context.vdso = (void *)vdso_base;
++
++	return PTR_ERR_OR_ZERO(ret);
++}
+ 
++int arch_setup_additional_pages(struct linux_binprm *bprm, int uses_interp)
++{
++	struct mm_struct *mm = current->mm;
++	int ret;
+ 
+-	up_write(&mm->mmap_sem);
+-	return 0;
++	if (down_write_killable(&mm->mmap_sem))
++		return -EINTR;
++
++	ret = vdso_setup(mm, &vdso_mappings);
+ 
+-up_fail:
+-	mm->context.vdso = NULL;
+ 	up_write(&mm->mmap_sem);
+-	return PTR_ERR(ret);
++	return ret;
+ }
+ 
+ /*
 -- 
 2.15.0.448.gf294e3d99a-goog
