@@ -1,39 +1,46 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Wed, 15 Nov 2017 13:34:18 -0800
-Subject: [PATCH v2 08/18] arm64: don't disable ADR_PREL_PG_HI21* with
- ARM64_ERRATUM_843419
+Date: Wed, 15 Nov 2017 13:34:15 -0800
+Subject: [PATCH v2 05/18] arm64: fix -m for GNU gold
 In-Reply-To: <20171115213428.22559-1-samitolvanen@google.com>
 References: <20171115213428.22559-1-samitolvanen@google.com>
-Message-ID: <20171115213428.22559-9-samitolvanen@google.com>
+Message-ID: <20171115213428.22559-6-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_LTO_CLANG depends on GNU gold, which can generate ADR_PREL_PG_HI21*
-relocations even with --fix-cortex-a53-843419.
+GNU gold supports different emulations than bfd. Use aarch64_elf64_*_vec
+instead of aarch64linux.
 
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
- arch/arm64/kernel/module.c | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm64/Makefile | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/kernel/module.c b/arch/arm64/kernel/module.c
-index f469e0435903..fec9a578f122 100644
---- a/arch/arm64/kernel/module.c
-+++ b/arch/arm64/kernel/module.c
-@@ -336,14 +336,12 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
- 			ovf = reloc_insn_imm(RELOC_OP_PREL, loc, val, 0, 21,
- 					     AARCH64_INSN_IMM_ADR);
- 			break;
--#ifndef CONFIG_ARM64_ERRATUM_843419
- 		case R_AARCH64_ADR_PREL_PG_HI21_NC:
- 			overflow_check = false;
- 		case R_AARCH64_ADR_PREL_PG_HI21:
- 			ovf = reloc_insn_imm(RELOC_OP_PAGE, loc, val, 12, 21,
- 					     AARCH64_INSN_IMM_ADR);
- 			break;
--#endif
- 		case R_AARCH64_ADD_ABS_LO12_NC:
- 		case R_AARCH64_LDST8_ABS_LO12_NC:
- 			overflow_check = false;
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index ecd5ed11c764..6059c8169513 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -70,14 +70,22 @@ KBUILD_CPPFLAGS	+= -mbig-endian
+ CHECKFLAGS	+= -D__AARCH64EB__
+ AS		+= -EB
+ LD		+= -EB
++ifeq ($(ld-name),gold)
++LDFLAGS		+= -maarch64_elf64_be_vec
++else
+ LDFLAGS		+= -maarch64linuxb
++endif
+ UTS_MACHINE	:= aarch64_be
+ else
+ KBUILD_CPPFLAGS	+= -mlittle-endian
+ CHECKFLAGS	+= -D__AARCH64EL__
+ AS		+= -EL
+ LD		+= -EL
++ifeq ($(ld-name),gold)
++LDFLAGS		+= -maarch64_elf64_le_vec
++else
+ LDFLAGS		+= -maarch64linux
++endif
+ UTS_MACHINE	:= aarch64
+ endif
+ 
 -- 
 2.15.0.448.gf294e3d99a-goog
