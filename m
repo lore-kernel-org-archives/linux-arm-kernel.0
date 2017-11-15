@@ -1,91 +1,122 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 15 Nov 2017 13:13:51 +0000
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <11393e07-b042-180c-3bcd-484bf51eada6@sigmadesigns.com>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
- <20171101175325.2557ce85@alans-desktop>
- <4b707ce0-6067-ab36-e167-1acf348d26bf@free.fr>
- <CA+55aFxxH0HE9SfUoLVqsvDKO0PfeM+vSoDmbXQv85yJcPZoPQ@mail.gmail.com>
- <e03436d1-b140-3f29-59a6-3b1eb6bf9da4@free.fr>
- <11393e07-b042-180c-3bcd-484bf51eada6@sigmadesigns.com>
-Message-ID: <20171115131351.GE31757@n2100.armlinux.org.uk>
+From: liuwenliang@huawei.com (Liuwenliang (Abbott Liu))
+Date: Wed, 15 Nov 2017 13:16:36 +0000
+Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
+In-Reply-To: <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
+References: <20171011082227.20546-1-liuwenliang@huawei.com>
+ <20171011082227.20546-2-liuwenliang@huawei.com>
+ <227e2c6e-f479-849d-8942-1d5ff4ccd440@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063172@dggemm510-mbs.china.huawei.com>
+ <8e959f69-a578-793b-6c32-18b5b0cd08c2@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
+ <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <B8AC3E80E903784988AB3003E3E97330C0063587@dggemm510-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 01:51:54PM +0100, Marc Gonzalez wrote:
-> On 01/11/2017 20:38, Marc Gonzalez wrote:
-> 
-> > OK, I'll just send my patch, and then crawl back under my rock.
-> 
-> Linus,
-> 
-> As promised, the patch is provided below. And as promised, I will
-> no longer bring this up on LKML.
-> 
-> FWIW, I have checked that the computed value matches the expected
-> value for all HZ and delay_us, and for a few clock frequencies,
-> using the following program:
-> 
-> $ cat delays.c
-> #include <stdio.h>
-> #define MEGA 1000000u
-> typedef unsigned int uint;
-> typedef unsigned long long u64;
-> #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
-> 
-> static const uint HZ_tab[] = { 100, 250, 300, 1000 };
-> 
-> static void check_cycle_count(uint freq, uint HZ, uint delay_us)
-> {
-> 	uint UDELAY_MULT = (2147 * HZ) + (483648 * HZ / MEGA);
-> 	uint lpj = DIV_ROUND_UP(freq, HZ);
-> 	uint computed = ((u64)lpj * delay_us * UDELAY_MULT >> 31) + 1;
-> 	uint expected = DIV_ROUND_UP((u64)delay_us * freq, MEGA);
-> 
-> 	if (computed != expected)
-> 		printf("freq=%u HZ=%u delay_us=%u comp=%u exp=%u\n", freq, HZ, delay_us, computed, expected);
-> }
-> 
-> int main(void)
-> {
-> 	uint idx, delay_us, freq;
-> 
-> 	for (freq = 3*MEGA; freq <= 100*MEGA; freq += 3*MEGA)
-> 		for (idx = 0; idx < sizeof HZ_tab / sizeof *HZ_tab; ++idx)
-> 			for (delay_us = 1; delay_us <= 2000; ++delay_us)
-> 				check_cycle_count(freq, HZ_tab[idx], delay_us);
-> 
-> 	return 0;
-> }
-> 
-> 
-> 
-> -- >8 --
-> Subject: [PATCH] ARM: Tweak clock-based udelay implementation
-> 
-> In 9f8197980d87a ("delay: Add explanation of udelay() inaccuracy")
-> Russell pointed out that loop-based delays may return early.
-> 
-> On the arm platform, delays may be either loop-based or clock-based.
-> 
-> This patch tweaks the clock-based implementation so that udelay(N)
-> is guaranteed to spin at least N microseconds.
+On 09/11/17  18:36 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
+>On Wed, Nov 15 2017 at 10:20:02 am GMT, "Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
+>> On 09/11/17 18:11, Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
+>>>On 09/11/17 07:46, Liuwenliang (Abbott Liu) wrote:
+>>>> diff --git a/arch/arm/mm/kasan_init.c b/arch/arm/mm/kasan_init.c
+>>>> index 049ee0a..359a782 100644
+>>>> --- a/arch/arm/mm/kasan_init.c
+>>>> +++ b/arch/arm/mm/kasan_init.c
+>>>> @@ -15,6 +15,7 @@
+>>>>  #include <asm/proc-fns.h>
+>>>>  #include <asm/tlbflush.h>
+>>>>  #include <asm/cp15.h>
+>>>> +#include <asm/kvm_hyp.h>
+>>>
+>>>No, please don't do that. You shouldn't have to include KVM stuff in
+>>>unrelated code. Instead of adding stuff to kvm_hyp.h, move all the
+>>>__ACCESS_CP15* to cp15.h, and it will be obvious to everyone that this
+>>>is where new definition should be added.
+>>
+>> Thanks for your review.  You are right. It is better to move
+>> __ACCESS_CP15* to cp15.h than to include kvm_hyp.h. But I don't think
+>> it is a good idea to move registers definition which is used in
+>> virtualization to cp15.h, Because there is no virtualization stuff in
+>> cp15.h.
+>
+>It is not about virtualization at all.
+>
+>It is about what is a CP15 register and what is not. This file is called
+>"cp15.h", not "cp15-except-virtualization-and-maybe-some-others.h". But
+>at the end of the day, that's for Russell to decide.
 
-As I've already said, I don't want this, because it encourages people
-to use too-small delays in driver code, and if we merge it then you
-will look at your data sheet, decide it says "you need to wait 10us"
-and write in your driver "udelay(10)" which will break on the loops
-based delay.
+Thanks for your review.
+You are right, all __ACCESS_CP15* are cp15 registers. I splited normal cp15 register
+(such as TTBR0/TTBR1/SCTLR and so on) and virtualizaton cp15 registers(such as VTTBR/
+CNTV_CVAL/HCR) because I didn't think we need use those virtualization cp15 registers
+in non virtualization system.
 
-udelay() needs to offer a consistent interface so that drivers know
-what to expect no matter what the implementation is.  Making one
-implementation conform to your ideas while leaving the other
-implementations with other expectations is a recipe for bugs.
+But now I think all __ACCESS_CP15* move to cp15.h may be a better choise. 
 
-If you really want to do this, fix the loops_per_jiffy implementation
-as well so that the consistency is maintained.
+>>
+>> Here is the code which I tested on vexpress_a15 and vexpress_a9:
+>> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+>> index dbdbce1..6db1f51 100644
+>> --- a/arch/arm/include/asm/cp15.h
+>> +++ b/arch/arm/include/asm/cp15.h
+>> @@ -64,6 +64,43 @@
+>>  #define __write_sysreg(v, r, w, c, t)  asm volatile(w " " c : : "r" ((t)(v)))
+>>  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
+>>
+>> +#ifdef CONFIG_ARM_LPAE
+>> +#define TTBR0           __ACCESS_CP15_64(0, c2)
+>> +#define TTBR1           __ACCESS_CP15_64(1, c2)
+>> +#define PAR             __ACCESS_CP15_64(0, c7)
+>> +#else
+>> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
+>> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
+>> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
+>> +#endif
+>
+>Again: there is no point in not having these register encodings
+>cohabiting. They are both perfectly defined in the architecture. Just
+>suffix one (or even both) with their respective size, making it obvious
+>which one you're talking about.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+I am sorry that I didn't point why I need to define TTBR0/ TTBR1/PAR in to different way
+between CONFIG_ARM_LPAE and non CONFIG_ARM_LPAE.
+The following description is the reason:
+Here is the description come from DDI0406C2c_arm_architecture_reference_manual.pdf:
+
+B4.1.155 TTBR0, Translation Table Base Register 0, VMSA
+...
+The Multiprocessing Extensions change the TTBR0 32-bit register format.
+The Large Physical Address Extension extends TTBR0 to a 64-bit register. In an
+implementation that includes the Large Physical Address Extension, TTBCR.EAE
+determines which TTBR0 format is used:
+EAE==0 32-bit format is used. TTBR0[63:32] are ignored.
+EAE==1 64-bit format is used.
+
+B4.1.156 TTBR1, Translation Table Base Register 1, VMSA
+...
+The Multiprocessing Extensions change the TTBR0 32-bit register format.
+The Large Physical Address Extension extends TTBR1 to a 64-bit register. In an
+implementation that includes the Large Physical Address Extension, TTBCR.EAE
+determines which TTBR1 format is used:
+EAE==0 32-bit format is used. TTBR1[63:32] are ignored.
+EAE==1 64-bit format is used.
+
+B4.1.154 TTBCR, Translation Table Base Control Register, VMSA
+...
+EAE, bit[31], if implementation includes the Large Physical Address Extension
+Extended Address Enable. The meanings of the possible values of this bit are:
+0   Use the 32-bit translation system, with the Short-descriptor translation table format. In
+this case, the format of the TTBCR is as described in this section.
+1   Use the 40-bit translation system, with the Long-descriptor translation table format. In
+this case, the format of the TTBCR is as described in TTBCR format when using the
+Long-descriptor translation table format on page B4-1692.
+
+B4.1.112 PAR, Physical Address Register, VMSA
+If the implementation includes the Large Physical Address Extension, the PAR is extended
+to be a 64-bit register and:
+* The 64-bit PAR is used:
+- when using the Long-descriptor translation table format
+- in an implementation that includes the Virtualization Extensions, for the result
+of an ATS1Cxx operation performed from Hyp mode.
+* The 32-bit PAR is used when using the Short-descriptor translation table format. In
+this case, PAR[63:32] is UNK/SBZP.
+Otherwise, the PAR is a 32-bit register.
