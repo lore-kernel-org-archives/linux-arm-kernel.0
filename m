@@ -1,111 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Nov 2017 18:03:03 +0100
-Subject: [PATCH v3 3/5] misc serdev: Add w2sg0004 (gps receiver) power
- control driver
-In-Reply-To: <AFD95D2E-2EBB-4EBF-9B3B-E68ED98E5437@goldelico.com>
-References: <cover.1510759152.git.hns@goldelico.com>
- <9e1525e72afe890ea390fd153c1f3a1b0866c986.1510759152.git.hns@goldelico.com>
- <CAK8P3a3ZtqXVobx5hdxUZyAQRYs2Y6Aw2Qpo2puSBb_AVa_aVA@mail.gmail.com>
- <AFD95D2E-2EBB-4EBF-9B3B-E68ED98E5437@goldelico.com>
-Message-ID: <CAK8P3a1Ah35mmbw0qN=zp8TMN9HVgdtTSkkSCCayC-5b6Q960A@mail.gmail.com>
+From: pprakash@codeaurora.org (Prashanth Prakash)
+Date: Wed, 15 Nov 2017 10:11:48 -0700
+Subject: [PATCH v3 0/2] Avoid calling cpu_pm functions for retention idle
+ states
+Message-ID: <1510765910-23739-1-git-send-email-pprakash@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 5:27 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->> Am 15.11.2017 um 16:54 schrieb Arnd Bergmann <arnd@arndb.de>:
->> On Wed, Nov 15, 2017 at 4:19 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->>> Add driver for Wi2Wi W2SG0004/84 GPS module connected through uart.
->
-> There is one more goal. Some people are dreaming about a generic GPS interface.
-> Then, the driver wouldn't have to register a /dev/GPS tty any more but a
-> gps_interface and mangle serial data as requested by that API. This will become
-> a simple upgrade.
->
-> So you can consider creating a new tty as sort of temporary solution. Like we
-> had for years for UART HCI based bluetooth devices using a user-space daemon.
+CPU_PM_CPU_IDLE_ENTER() treats all idle states whose idx != 0 as a
+state that loses some context, but we can have deeper idle states that
+doesn't lose any software context. If a CPU is entering such a low power
+idle state where it retains the context, then there is no need to call
+cpu_pm_enter()/cpu_pm_exit().
 
-It shouldn't be hard to split out the tty_driver portion of your file from the
-part that registers the port, basically getting two files that each handle
-half of the work, and the second one would be generic from the start.
+Add a new macro(CPU_PM_CPU_IDLE_ENTER_RETENTION) to be used by cpuidle
+drivers when they are entering retention state. By not calling cpu_pm_enter
+and cpu_pm_exit we reduce the latency involved in entering and exiting
+the retention states.
 
->>> +       /* initialize the tty driver */
->>> +       data->tty_drv->owner = THIS_MODULE;
->>> +       data->tty_drv->driver_name = "w2sg0004";
->>> +       data->tty_drv->name = "ttyGPS";
->>> +       data->tty_drv->major = 0;
->>> +       data->tty_drv->minor_start = 0;
->>> +       data->tty_drv->type = TTY_DRIVER_TYPE_SERIAL;
->>> +       data->tty_drv->subtype = SERIAL_TYPE_NORMAL;
->>> +       data->tty_drv->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
->>> +       data->tty_drv->init_termios = tty_std_termios;
->>> +       data->tty_drv->init_termios.c_cflag = B9600 | CS8 | CREAD |
->>> +                                             HUPCL | CLOCAL;
->>> +       /*
->>> +        * optional:
->>> +        * tty_termios_encode_baud_rate(&data->tty_drv->init_termios,
->>> +                                       115200, 115200);
->>> +        * w2sg_tty_termios(&data->tty_drv->init_termios);
->>> +        */
->>> +       tty_set_operations(data->tty_drv, &w2sg_serial_ops);
->>
->> While I'm still not sure about why we want nested tty port, it
->> seems that we should have only one tty_driver that gets initialized
->> at module load time, rather than one driver structure per port.
->
-> If we have several such chips connected to different serdev UARTs
-> we need different /dev/GPS to separate them in user-space.
+On ARM64 based Qualcomm server platform we measured below overhead for
+for calling cpu_pm_enter and cpu_pm_exit for retention states.
 
-I understand that you need multiple devices, but I don't see
-what having multiple drivers that all share the same name
-"w2sg0004" helps. I would have expected that to fail in
-tty_register_driver() when you get to the second driver,
-but looking at the code, it doesn't actually try to make the name
-unique proc_tty_register_driver() will fail to create the second
-procfs file, but we ignore that failure.
+workload: stress --hdd #CPUs --hdd-bytes 32M  -t 30
+Overhead of cpu_pm_enter - 1.2us(Average), 6.5us(Max)
+Overhead of cpu_pm_exit  - 3.1us(Average), 11.1us(Max)
 
-Why not call tty_register_driver() in the init function rather than probe()?
+Listed below are 5 functions that were notified on ENTER/EXIT on the
+test platform:
+      gic_cpu_pm_notifier
+      arch_timer_cpu_pm_notify
+      cpu_pm_pmu_notify
+      hyp_init_cpu_pm_notifier
+      fpsimd_cpu_pm_notifier
 
->>> +       /* register the tty driver */
->>> +       err = tty_register_driver(data->tty_drv);
->>> +       if (err) {
->>> +               pr_err("%s - tty_register_driver failed(%d)\n",
->>> +                       __func__, err);
->>> +               put_tty_driver(data->tty_drv);
->>> +               goto err_rfkill;
->>> +       }
->>> +
->>> +       tty_port_init(&data->port);
->>> +       data->port.ops = &w2sg_port_ops;
->>> +
->>> +/*
->>> + * FIXME: this appears to reenter this probe() function a second time
->>> + * which only fails because the gpio is already assigned
->>> + */
->>> +
->>> +       data->dev = tty_port_register_device(&data->port,
->>> +                       data->tty_drv, minor, &serdev->dev);
->>
->> This seems to be a result of having nested tty ports, and both
->> ports point to the same device.
->
-> The UART tty would be e.g. /dev/ttyO2 (on OMAP3) if no driver is
-> installed. And the new one that is registered is /dev/GPS0. So the
-> tty subsystem doesn't (or shouldn't) know they are related. They
-> are only related/connected inside this driver. So I assume that
-> some locking or reentrancy happens in tty_port_register_device().
+Prashanth Prakash (2):
+  cpuidle: Add new macro to enter a retention idle state
+  ARM64 / cpuidle: Use new cpuidle macro for entering retention state
 
-I meant the serdev->dev pointer that you pass into
-tty_port_register_device() seems to be the same one that
-got passed into the first tty_port_register_device() in the
-parent uart_port.
+Changes in v3:
+ - Added additional clarification to commit message (Sudeep)
 
-I just checked the current mainline code, and it doesn't seem
-to actually call serdev_tty_port_register() from
-tty_port_register_device(), so maybe the comment was
-based on an older version of the serdev framework?
+Changes in v2:
+ - Reordered cpuidle.h macros for better readablity (Rafael)
 
-It seems like something that should be fixed, so maybe
-put a WARN_ON() at the beginning of the probe
-function to see where we come from.
+ arch/arm64/kernel/cpuidle.c |  8 +++++++-
+ include/linux/cpuidle.h     | 40 ++++++++++++++++++++++++----------------
+ 2 files changed, 31 insertions(+), 17 deletions(-)
 
-      Arnd
+-- 
+Qualcomm Datacenter Technologies on behalf of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
