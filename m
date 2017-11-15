@@ -1,52 +1,22 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Nov 2017 17:05:05 -0800
-Subject: [PATCH v3 2/2] arm64: Add software workaround for Falkor erratum
- 1041
-In-Reply-To: <1510537359-9978-3-git-send-email-shankerd@codeaurora.org>
-References: <1510537359-9978-1-git-send-email-shankerd@codeaurora.org>
- <1510537359-9978-3-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20171115010505.GO11955@codeaurora.org>
+Date: Tue, 14 Nov 2017 17:07:11 -0800
+Subject: [RESEND PATCH] clk: stm32h7: fix test of clock config
+In-Reply-To: <1507705044-30458-1-git-send-email-gabriel.fernandez@st.com>
+References: <1507705044-30458-1-git-send-email-gabriel.fernandez@st.com>
+Message-ID: <20171115010711.GQ11955@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12, Shanker Donthineni wrote:
-> The ARM architecture defines the memory locations that are permitted
-> to be accessed as the result of a speculative instruction fetch from
-> an exception level for which all stages of translation are disabled.
-> Specifically, the core is permitted to speculatively fetch from the
-> 4KB region containing the current program counter 4K and next 4K.
+On 10/11, gabriel.fernandez at st.com wrote:
+> From: Gabriel Fernandez <gabriel.fernandez@st.com>
 > 
-> When translation is changed from enabled to disabled for the running
-> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
-> Falkor core may errantly speculatively access memory locations outside
-> of the 4KB region permitted by the architecture. The errant memory
-> access may lead to one of the following unexpected behaviors.
+> fix test of composite clock config (bad copy / past)
 > 
-> 1) A System Error Interrupt (SEI) being raised by the Falkor core due
->    to the errant memory access attempting to access a region of memory
->    that is protected by a slave-side memory protection unit.
-> 2) Unpredictable device behavior due to a speculative read from device
->    memory. This behavior may only occur if the instruction cache is
->    disabled prior to or coincident with translation being changed from
->    enabled to disabled.
-> 
-> The conditions leading to this erratum will not occur when either of the
-> following occur:
->  1) A higher exception level disables translation of a lower exception level
->    (e.g. EL2 changing SCTLR_EL1[M] from a value of 1 to 0).
->  2) An exception level disabling its stage-1 translation if its stage-2
->     translation is enabled (e.g. EL1 changing SCTLR_EL1[M] from a value of 1
->     to 0 when HCR_EL2[VM] has a value of 1).
-> 
-> To avoid the errant behavior, software must execute an ISB immediately
-> prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
-> 
+> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+> Fixes: 3e4d618b0722 ("clk: stm32h7: Add stm32h743 clock driver")
+> ---
 
-This also applies to Kryo CPUs. I have a patch[1] for the 1003
-Falkor errata that adds the Kryo MIDR check which can also be
-used for this errata.
-
-[1] https://patchwork.kernel.org/patch/10048987/
+Applied to clk-next
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
