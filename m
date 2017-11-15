@@ -1,23 +1,75 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 14 Nov 2017 17:07:11 -0800
-Subject: [RESEND PATCH] clk: stm32h7: fix test of clock config
-In-Reply-To: <1507705044-30458-1-git-send-email-gabriel.fernandez@st.com>
-References: <1507705044-30458-1-git-send-email-gabriel.fernandez@st.com>
-Message-ID: <20171115010711.GQ11955@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 14 Nov 2017 18:04:00 -0800
+Subject: n900 in next-20170901
+In-Reply-To: <20171115005118.GA21113@js1304-P5Q-DELUXE>
+References: <20171109003639.GB23982@js1304-P5Q-DELUXE>
+ <20171109035031.GA24383@js1304-P5Q-DELUXE>
+ <20171109150854.GC28152@atomide.com>
+ <20171110001315.GA29669@js1304-P5Q-DELUXE>
+ <20171110032610.GJ28152@atomide.com>
+ <20171110063727.GA32073@js1304-P5Q-DELUXE>
+ <20171110153620.GO28152@atomide.com>
+ <20171114063724.GA16969@js1304-P5Q-DELUXE>
+ <20171114173719.GA28152@atomide.com>
+ <20171115005118.GA21113@js1304-P5Q-DELUXE>
+Message-ID: <20171115020400.GJ28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/11, gabriel.fernandez at st.com wrote:
-> From: Gabriel Fernandez <gabriel.fernandez@st.com>
+* Joonsoo Kim <iamjoonsoo.kim@lge.com> [171115 00:48]:
+> On Tue, Nov 14, 2017 at 09:37:19AM -0800, Tony Lindgren wrote:
+> > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171114 06:34]:
+> > > On Fri, Nov 10, 2017 at 07:36:20AM -0800, Tony Lindgren wrote:
+> > > > * Joonsoo Kim <iamjoonsoo.kim@lge.com> [171110 06:34]:
+> > > > > On Thu, Nov 09, 2017 at 07:26:10PM -0800, Tony Lindgren wrote:
+> > > > > > +#define OMAP34XX_SRAM_PHYS	0x40200000
+> > > > > > +#define OMAP34XX_SRAM_VIRT	0xd0010000
+> > > > > > +#define OMAP34XX_SRAM_SIZE	0x10000
+> > > > > 
+> > > > > For my testing environment, vmalloc address space is started at
+> > > > > roughly 0xe0000000 so 0xd0010000 would not be valid.
+> > > > 
+> > > > Well we can map it anywhere we want, got any preferences?
+> > > 
+> > > My testing environment is a beagle-(xm?) for QEMU. It is configured by
+> > > CONFIG_VMSPLIT_3G=y so kernel address space is started at 0xc0000000.
+> > > And, it has 512 MB memory so 0xc0000000 ~ 0xdff00000 is used for
+> > > direct mapping. See below.
+> > > 
+> > > [    0.000000] Memory: 429504K/522240K available (11264K kernel code,
+> > > 1562K rwdata, 4288K rodata, 2048K init, 405K bss, 27200K reserved,
+> > > 65536K cma-reserved, 0K highmem)
+> > > [    0.000000] Virtual kernel memory layout:
+> > > [    0.000000]     vector  : 0xffff0000 - 0xffff1000   (   4 kB)
+> > > [    0.000000]     fixmap  : 0xffc00000 - 0xfff00000   (3072 kB)
+> > > [    0.000000]     vmalloc : 0xe0000000 - 0xff800000   ( 504 MB)
+> > > [    0.000000]     lowmem  : 0xc0000000 - 0xdff00000   ( 511 MB)
+> > > [    0.000000]     pkmap   : 0xbfe00000 - 0xc0000000   (   2 MB)
+> > > [    0.000000]     modules : 0xbf000000 - 0xbfe00000   (  14 MB)
+> > > [    0.000000]       .text : 0xc0208000 - 0xc0e00000   (12256 kB)
+> > > [    0.000000]       .init : 0xc1300000 - 0xc1500000   (2048 kB)
+> > > [    0.000000]       .data : 0xc1500000 - 0xc1686810   (1563 kB)
+> > > [    0.000000]        .bss : 0xc168fc68 - 0xc16f512c   ( 406 kB)
+> > > 
+> > > Therefore, if OMAP34XX_SRAM_VIRT is 0xd0010000, direct mapping is
+> > > broken and the system doesn't work. I guess that we should use more
+> > > stable address like as 0xf0000000.
+> > 
+> > OK. Let's forget about adding static mappings and my earlier
+> > patches to attempt to fix this. Below is what I now think we should
+> > merge as a fix before merging Joonsoo's patches. Please all review
+> > and test, adding Tero to Cc also.
 > 
-> fix test of composite clock config (bad copy / past)
-> 
-> Signed-off-by: Gabriel Fernandez <gabriel.fernandez@st.com>
-> Fixes: 3e4d618b0722 ("clk: stm32h7: Add stm32h743 clock driver")
-> ---
+> Okay. Then, this patch will be merged by yourself as a fix? I'm okay
+> with either way. Just let me know. :)
 
-Applied to clk-next
+Well what's the plan with your patches? I'd not have mainline
+kernel broken so if this was the only blocker for the v4.15,
+then you should pick it.
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+However, if your patches are now planned for v4.16, then I'll
+queue it for early v4.15-rc.
+
+Regards,
+
+Tony
