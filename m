@@ -1,45 +1,106 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 15 Nov 2017 22:12:27 +0100
-Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
-In-Reply-To: <e3dfc32f-7052-603d-659a-0a7d9d7453b0@sigmadesigns.com>
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
- <yw1x1sl12fx8.fsf@mansr.com>
- <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com>
- <yw1xk1yt0zbp.fsf@mansr.com>
- <6f534b2b-f69a-bda5-dc5b-0281bf0df129@sigmadesigns.com>
- <20171115141707.GB2130@lunn.ch>
- <01be0b9e-3d6c-bd1e-6b92-e2274ffeea5a@sigmadesigns.com>
- <20171115150331.GA29642@lunn.ch>
- <e3dfc32f-7052-603d-659a-0a7d9d7453b0@sigmadesigns.com>
-Message-ID: <20171115211227.GE29642@lunn.ch>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Wed, 15 Nov 2017 15:14:47 -0600
+Subject: [PATCH v2 4/4] PCI/AER: Dont do recovery when DPC is enabled
+In-Reply-To: <1510721808-27164-5-git-send-email-poza@codeaurora.org>
+References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
+ <1510721808-27164-5-git-send-email-poza@codeaurora.org>
+Message-ID: <20171115211447.GA7266@bhelgaas-glaptop.roam.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 04:19:56PM +0100, Marc Gonzalez wrote:
-> On 15/11/2017 16:03, Andrew Lunn wrote:
+On Wed, Nov 15, 2017 at 10:26:48AM +0530, Oza Pawandeep wrote:
+> PCI Express Base Specification, Rev. 4.0 Version 0.9
+> 6.2.10: Downstream Port Containment (DPC)
 > 
-> > On Wed, Nov 15, 2017 at 03:33:47PM +0100, Marc Gonzalez wrote:
-> > 
-> >> On 15/11/2017 15:17, Andrew Lunn wrote:
-> >>
-> >> In our local branch, I have completely disabled flow control support,
-> >> so I don't have to worry about this problem.
-> > 
-> > That is an interesting statement. You now know there is an issue here,
-> > your solution is to fix your private branch and leave mainline as is.
+> DPC is an optional normative feature of a Downstream Port. DPC halts PCI
+> Express traffic below a Downstream Port after an unmasked uncorrectable
+> error is detected at or below the Port, avoiding the potential spread of
+> any data corruption, and permitting error recovery if supported by
+> software
 > 
-> All my patches are NACKed, what would you have me do?
+> Triggering DPC disables its Link by directing the LTSSM to the Disabled
+> state. Once the LTSSM reaches the Disabled state, it remains in that
+> state until the DPC Trigger Status bit is Cleared
+> 
+> So when DPC service is active and registered to port driver, AER should
+> not attempt to recover, since DPC will be removing downstream devices,
+> and do the recovery.
+> 
+> Signed-off-by: Oza Pawandeep <poza@codeaurora.org>
+> 
+> diff --git a/drivers/pci/pcie/aer/aerdrv_core.c b/drivers/pci/pcie/aer/aerdrv_core.c
+> index 7448052..a9108ea 100644
+> --- a/drivers/pci/pcie/aer/aerdrv_core.c
+> +++ b/drivers/pci/pcie/aer/aerdrv_core.c
+> @@ -482,6 +482,27 @@ static pci_ers_result_t reset_link(struct pci_dev *dev)
+>  }
+>  
+>  /**
+> + * pcie_port_query_uptream_service - query upstream service
+> + * @dev: pointer to a pci_dev data structure of agent detecting an error
+> + * @service: service to be queried
+> + *
+> + * Invoked to know the status of the service for pci device.
+> + */
+> +static bool pcie_port_query_uptream_service(struct pci_dev *dev, u32 service)
+> +{
+> +	struct pci_dev *upstream_dev = dev;
+> +
+> +	do {
+> +		if (pcie_port_query_service(upstream_dev, service))
+> +			return true;
+> +		upstream_dev = pcie_port_upstream_bridge(upstream_dev);
+> +	} while (upstream_dev);
+> +
+> +	return false;
+> +}
+> +
+> +
+> +/**
+>   * do_recovery - handle nonfatal/fatal error recovery process
+>   * @dev: pointer to a pci_dev data structure of agent detecting an error
+>   * @severity: error severity type
+> @@ -495,6 +516,18 @@ static void do_recovery(struct pci_dev *dev, int severity)
+>  	pci_ers_result_t status, result = PCI_ERS_RESULT_RECOVERED;
+>  	enum pci_channel_state state;
+>  
+> +	/*
+> +	 * If DPC is enabled, there is no need to attempt recovery.
+> +	 * Since DPC disables its Link by directing the LTSSM to
+> +	 * the Disabled state.
+> +	 * DPC driver will take care of the recovery, there is no need
+> +	 * for AER driver to race.
+> +	 */
+> +	if (pcie_port_query_uptream_service(dev, PCIE_PORT_SERVICE_DPC)) {
+> +		dev_info(&dev->dev, "AER: Device recovery to be done by DPC\n");
+> +		return;
+> +	}
 
-Hi Marc
+What happens without this test?
 
-You need to consider your own maintenance burden. You want your local
-branch to be as near to mainline as possible. Each change you have
-means additional maintenance work for you. It also possibly means
-additional work for your customers.
+Does AER read registers from the now-disabled device and get ~0 data?
+Or is AER reading registers from the port upstream from the disabled
+device and trying to reset the device?
 
-You seem to think flow control in your hardware is too broken to be
-usable. So you probably want to submit a patch to mainline disabling
-it. If it is accepted, that is one less patch you need to maintain.
+It looks like get_device_error_info() reads registers and doesn't
+check to see whether it gets ~0 back.  I'm wondering if we *should* be
+checking there and whether doing that would help mitigate the issue
+here.
 
-    Andrew
+I don't really like the pcie_port_query_uptream_service() approach
+(BTW, the name is misspelled) because it feels a little ad hoc and it
+makes assumptions here in the AER code about what the DPC code is
+doing, e.g., how it has configured PCI_EXP_DPC_CTL.
+
+>  	if (severity == AER_FATAL)
+>  		state = pci_channel_io_frozen;
+>  	else
+> -- 
+> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.,
+> a Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
