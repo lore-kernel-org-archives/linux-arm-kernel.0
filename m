@@ -1,91 +1,80 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 15 Nov 2017 15:17:07 +0100
-Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
-In-Reply-To: <6f534b2b-f69a-bda5-dc5b-0281bf0df129@sigmadesigns.com>
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
- <yw1x1sl12fx8.fsf@mansr.com>
- <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com>
- <yw1xk1yt0zbp.fsf@mansr.com>
- <6f534b2b-f69a-bda5-dc5b-0281bf0df129@sigmadesigns.com>
-Message-ID: <20171115141707.GB2130@lunn.ch>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 15 Nov 2017 15:29:55 +0100
+Subject: [PATCH v5 01/15] arm64: dts: renesas: r8a7795: Add IPMMU device
+ nodes
+In-Reply-To: <20171110132532.1202-2-horms+renesas@verge.net.au>
+References: <20171110132532.1202-1-horms+renesas@verge.net.au>
+ <20171110132532.1202-2-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdVXJduKrdb0+ujJX7O7_1omvfaWjCjTHwTafFD1sr=q=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 11:53:23AM +0100, Marc Gonzalez wrote:
-> On 14/11/2017 14:22, M?ns Rullg?rd wrote:
-> 
-> > Marc Gonzalez wrote:
-> > 
-> >> On 14/11/2017 13:38, M?ns Rullg?rd wrote:
-> >>
-> >>> Marc Gonzalez writes:
-> >>>
-> >>>> The "flow control enable" bit can be tweaked, even if DMA is enabled.
-> >>>
-> >>> No, it can't.  Maybe on some of your newer chips it can, but not on the
-> >>> older ones.
-> >>
-> >> Again, I suppose you are referring to your SMP8642-based board.
-> >>
-> >> Are you saying you tested this patch, and it doesn't work?
-> >> What are the symptoms?
-> > 
-> > I didn't test that patch per se.  I did initially try simply changing
-> > that bit, and this didn't work.  Either it had no effect, or it locked
-> > up the controller, I forget which.  The manual explicitly states that
-> > writes are forbidden while the DMA enabled bit is set.
-> > 
-> > If shutting down the DMA really isn't possible, I would rather just
-> > allow changing the flow control setting only when the interface is
-> > stopped.  The normal case of getting the initial setting from the
-> > auto-negotiation will still work properly.  It just won't be possible to
-> > change it while the link is active.
-> 
-> Hello Mans,
-> 
-> With the default setup,
-> 
-> 	priv->pause_aneg = true;
-> 	priv->pause_rx = true;
-> 	priv->pause_tx = true;
+Hi Simon,
 
-Hi Marc
+On Fri, Nov 10, 2017 at 2:25 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
+>
+> Add r8a7795 IPMMU nodes and keep all disabled by default.
+>
+> This includes all IPMMU devices for r8a7795 ES2.0. Those
+> not present in r8a7795 ES1.x are removed from the DT for those
+> SoCs using delete-node. A follow-up patch will add IPMMU devices
+> to ES1.x which are not also present in ES2.0.
+>
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> v5 [Simon Horman]
+> * Correct ES1.x override for ipmmu_vc0
+> * Add ES1.x override for ipmmu_vc1
+> * Drop mostly redundant comments from nodes
+> * Add power domains
+> * Consistently mark all nodes as disabled
 
-So you are assuming the peer supports pause? Is that a safe assumption
-to make? Should you not have it disabled until auto-neg has completed
-and you then know what the peer can do?
-> 
-> even the very first call to nb8800_pause_config() occurs with netif_running=1
-> as well as the RX DMA bit enabled.
-> 
-> buildroot login: root
-> # ip addr add 172.27.64.23/18 brd 172.27.127.255 dev eth0
-> # ip link set eth0 up
-> [   25.771000] ENTER nb8800_pause_config: netif_running=1
-> [   25.776195] CPU: 0 PID: 193 Comm: kworker/0:1 Not tainted 4.9.54-1-rc6 #18
-> [   25.783102] Hardware name: Sigma Tango DT
-> [   25.787138] Workqueue: events_power_efficient phy_state_machine
-> [   25.793107] [<c010f290>] (unwind_backtrace) from [<c010af34>] (show_stack+0x10/0x14)
-> [   25.800896] [<c010af34>] (show_stack) from [<c02d06e8>] (dump_stack+0x88/0x9c)
-> [   25.808160] [<c02d06e8>] (dump_stack) from [<c03967e4>] (nb8800_pause_config+0x28/0xf0)
-> [   25.816208] [<c03967e4>] (nb8800_pause_config) from [<c03969e0>] (nb8800_link_reconfigure+0x134/0x148)
-> [   25.825565] [<c03969e0>] (nb8800_link_reconfigure) from [<c0391d84>] (phy_state_machine+0x348/0x468)
-> [   25.834750] [<c0391d84>] (phy_state_machine) from [<c012e858>] (process_one_work+0x1d8/0x3f0)
-> [   25.843323] [<c012e858>] (process_one_work) from [<c012f6a4>] (worker_thread+0x4c/0x560)
-> [   25.851459] [<c012f6a4>] (worker_thread) from [<c0134354>] (kthread+0xec/0xf4)
-> [   25.858721] [<c0134354>] (kthread) from [<c01078f8>] (ret_from_fork+0x14/0x3c)
-> [   25.874597] nb8800 26000.ethernet eth0: Link is Up - 100Mbps/Full - flow control rx/tx
-> 
-> 
-> This makes sense, since nb8800_open() calls nb8800_start_rx()
-> before phy_start().
-> 
-> Moving nb8800_start_rx() to after nb8800_pause_config() does
-> appear to work, but I'm not sure it is the correct action?
+Thanks for the update!
 
-nb8800_link_reconfigure() can be called whenever the link to the peer
-changes. auto-neg may happen later because the cable was not plugged
-in until later, etc.
+Looks like "power-domains" do work for IOMMU nodes.
+However, adding them seems to postpone initialization of the IOMMUs.
 
-   Andrew
+With the two typos below fixed:
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+
+> +               ipmmu_vc0: mmu at fe6b0000 {
+> +                       compatible = "renesas,ipmmu-r8a7795";
+> +                       reg = <0 0xfe6b0000 0 0x1000>;
+> +                       renesas,ipmmu-main = <&ipmmu_mm 12>;
+> +                       power-domains = <&sysc R8A7795_PD_A3VP>;
+
+R8A7795_PD_A3VC
+
+> +                       #iommu-cells = <1>;
+> +                       status = "disabled";
+> +               };
+> +
+> +               ipmmu_vc1: mmu at fe6f0000 {
+> +                       compatible = "renesas,ipmmu-r8a7795";
+> +                       reg = <0 0xfe6f0000 0 0x1000>;
+> +                       renesas,ipmmu-main = <&ipmmu_mm 13>;
+> +                       power-domains = <&sysc R8A7795_PD_A3VP>;
+
+R8A7795_PD_A3VC
+
+> +                       #iommu-cells = <1>;
+> +                       status = "disabled";
+> +               };
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
