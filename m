@@ -1,85 +1,19 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Wed, 15 Nov 2017 17:52:06 +0000
-Subject: [PATCH 33/37] KVM: arm/arm64: Move arm64-only vgic-v2-sr.c file
- to arm64
-In-Reply-To: <20171012104141.26902-34-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-34-christoffer.dall@linaro.org>
-Message-ID: <4da8d7ff-28ac-2945-7376-7d0b91e0a018@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 15 Nov 2017 09:52:22 -0800
+Subject: [PATCH v3 5/5] misc serdev: w2sg0004: add debugging code and
+ Kconfig
+In-Reply-To: <2CFA9F17-0E65-4804-9971-922500F5E919@goldelico.com>
+References: <cover.1510759152.git.hns@goldelico.com>
+ <9b4969c858d4c3801bb796f92dad5c580799b768.1510759152.git.hns@goldelico.com>
+ <28e16c7a-2688-a302-1548-1cdc2552f0ad@suse.de>
+ <DC57A290-669C-4B3C-A4EE-2ABEA37F47CE@goldelico.com>
+ <20171115164257.2mbbk7yqhq3puc5a@lenoch>
+ <2CFA9F17-0E65-4804-9971-922500F5E919@goldelico.com>
+Message-ID: <1510768342.2006.54.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Wed, 2017-11-15 at 18:13 +0100, H. Nikolaus Schaller wrote:
+> We have automated things by calling checkpatch but it somwhow failed here.
 
-On 12/10/17 11:41, Christoffer Dall wrote:
-> The vgic-v2-sr.c file now only contains the logic to replay unaligned
-> accesses to the virtual CPU interface on 16K and 64K page systems, which
-> is only relevant on 64-bit platforms.  Therefore move this file to the
-> arm64 KVM tree, remove the compile directive from the 32-bit side
-> makefile, and remove the ifdef in the C file.
-
-I like that one!
-
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-
-Cheers,
-Andre.
-
-> ---
->  arch/arm/kvm/hyp/Makefile                         | 1 -
->  arch/arm64/kvm/hyp/Makefile                       | 2 +-
->  {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c | 2 --
->  3 files changed, 1 insertion(+), 4 deletions(-)
->  rename {virt/kvm/arm => arch/arm64/kvm}/hyp/vgic-v2-sr.c (98%)
-> 
-> diff --git a/arch/arm/kvm/hyp/Makefile b/arch/arm/kvm/hyp/Makefile
-> index 8679405..4be5061 100644
-> --- a/arch/arm/kvm/hyp/Makefile
-> +++ b/arch/arm/kvm/hyp/Makefile
-> @@ -6,7 +6,6 @@ ccflags-y += -fno-stack-protector
->  
->  KVM=../../../../virt/kvm
->  
-> -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
->  
-> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-> index 14c4e3b..b746fa5 100644
-> --- a/arch/arm64/kvm/hyp/Makefile
-> +++ b/arch/arm64/kvm/hyp/Makefile
-> @@ -6,10 +6,10 @@ ccflags-y += -fno-stack-protector
->  
->  KVM=../../../../virt/kvm
->  
-> -obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v3-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/timer-sr.o
->  
-> +obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
->  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-> diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> similarity index 98%
-> rename from virt/kvm/arm/hyp/vgic-v2-sr.c
-> rename to arch/arm64/kvm/hyp/vgic-v2-sr.c
-> index b433257..fcd7b4e 100644
-> --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-> +++ b/arch/arm64/kvm/hyp/vgic-v2-sr.c
-> @@ -22,7 +22,6 @@
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
->  
-> -#ifdef CONFIG_ARM64
->  /*
->   * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
->   *				     guest.
-> @@ -76,4 +75,3 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
->  
->  	return 1;
->  }
-> -#endif
-> 
+what failed?
