@@ -1,47 +1,27 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Wed, 15 Nov 2017 17:04:40 +0100
-Subject: [PATCH 08/37] KVM: arm64: Defer restoring host VFP state to
- vcpu_put
-In-Reply-To: <20171012104141.26902-9-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-9-christoffer.dall@linaro.org>
-Message-ID: <20171115160440.umfucia5rmrioeqs@kamzik.brq.redhat.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 15 Nov 2017 17:12:30 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77970: add GPIO support
+In-Reply-To: <20171113213149.295833059@cogentembedded.com>
+References: <20171113213149.295833059@cogentembedded.com>
+Message-ID: <CAMuHMdX9n6U8vP0NWRW0hFZqLQbMKvcf4U1HZkP4nJdaS4-qNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:12PM +0200, Christoffer Dall wrote:
-> Avoid saving the guest VFP registers and restoring the host VFP
-> registers on every exit from the VM.  Only when we're about to run
-> userspace or other threads in the kernel do we really have to switch the
-> state back to the host state.
+On Mon, Nov 13, 2017 at 10:23 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Describe all 6 GPIO controllers in the R8A77970 device tree.
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Rik van Riel's recently post patch "[PATCH v2 0/2] x86,kvm: move qemu/guest
-FPU switching out to kvm_arch_vcpu_ioctl_run" indicates that for x86 they
-only need to swap guest and userspace VFP registers before exiting VCPU_RUN
-to userspace, not for running other threads. I imagine that's the same for
-ARM as well.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-If so, then I think this hunk
+Gr{oetje,eeting}s,
 
-> @@ -209,4 +212,16 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
->   */
->  void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
->  {
-> +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
-> +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
-> +
-> +	/* Restore host FP/SIMD state */
-> +	if (vcpu->arch.guest_vfp_loaded) {
-> +		if (vcpu_el1_is_32bit(vcpu))
-> +			kvm_call_hyp(__fpsimd32_save_state,
-> +				     kern_hyp_va(guest_ctxt));
-> +		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
-> +		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
-> +		vcpu->arch.guest_vfp_loaded = 0;
-> +	}
->  }
+                        Geert
 
-could be moved to the return of kvm_arch_vcpu_ioctl_run().
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks,
-drew
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
