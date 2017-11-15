@@ -1,53 +1,33 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 15 Nov 2017 18:13:51 +0100
-Subject: [PATCH v3 5/5] misc serdev: w2sg0004: add debugging code and
- Kconfig
-In-Reply-To: <20171115164257.2mbbk7yqhq3puc5a@lenoch>
-References: <cover.1510759152.git.hns@goldelico.com>
- <9b4969c858d4c3801bb796f92dad5c580799b768.1510759152.git.hns@goldelico.com>
- <28e16c7a-2688-a302-1548-1cdc2552f0ad@suse.de>
- <DC57A290-669C-4B3C-A4EE-2ABEA37F47CE@goldelico.com>
- <20171115164257.2mbbk7yqhq3puc5a@lenoch>
-Message-ID: <2CFA9F17-0E65-4804-9971-922500F5E919@goldelico.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Wed, 15 Nov 2017 16:19:56 +0100
+Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
+In-Reply-To: <20171115150331.GA29642@lunn.ch>
+References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
+ <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
+ <yw1x1sl12fx8.fsf@mansr.com>
+ <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com>
+ <yw1xk1yt0zbp.fsf@mansr.com>
+ <6f534b2b-f69a-bda5-dc5b-0281bf0df129@sigmadesigns.com>
+ <20171115141707.GB2130@lunn.ch>
+ <01be0b9e-3d6c-bd1e-6b92-e2274ffeea5a@sigmadesigns.com>
+ <20171115150331.GA29642@lunn.ch>
+Message-ID: <e3dfc32f-7052-603d-659a-0a7d9d7453b0@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ladislav,
+On 15/11/2017 16:03, Andrew Lunn wrote:
 
-> Am 15.11.2017 um 17:42 schrieb Ladislav Michl <ladis@linux-mips.org>:
+> On Wed, Nov 15, 2017 at 03:33:47PM +0100, Marc Gonzalez wrote:
 > 
-> On Wed, Nov 15, 2017 at 05:29:25PM +0100, H. Nikolaus Schaller wrote:
->> Hi Andreas,
->> 
->>> Am 15.11.2017 um 16:53 schrieb Andreas F?rber <afaerber@suse.de>:
->>> 
->>> Hi,
->>> 
->>> Am 15.11.2017 um 16:19 schrieb H. Nikolaus Schaller:
->>>> This allows to set CONFIG_W2SG0004_DEBUG which will
->>>> make the driver report more activities and it will turn on the
->>>> GPS module during boot while the driver assumes that it
->>>> is off. This can be used to debug the correct functioning of
->>>> the hardware. Therefore we add it as an option to the driver
->>>> because we think it is of general use (and a little tricky to
->>>> add by system testers).
->>>> 
->>>> Normally it should be off.
->>>> ---
->>> 
->>> If you want to merge this, it is lacking a Sob.
->> 
->> Whats is a "Sob" in this context (https://acronyms.thefreedictionary.com/SOB)?
+>> On 15/11/2017 15:17, Andrew Lunn wrote:
+>>
+>> In our local branch, I have completely disabled flow control support,
+>> so I don't have to worry about this problem.
 > 
-> https://acronyms.thefreedictionary.com/Signed-Off-By
+> That is an interesting statement. You now know there is an issue here,
+> your solution is to fix your private branch and leave mainline as is.
 
-Ah, ok. Too obvious to associate :) Tnx.
+All my patches are NACKed, what would you have me do?
 
-I did never think about that this could be missing. And I don't know why :(
-
-> Also please read Documentation/process/submitting-patches.rst
-
-We have automated things by calling checkpatch but it somwhow failed here.
-
-BR and thanks,
-Nikolaus
+Moreover, mainline still has the nb8800_dma_stop() work-around,
+which Mans has never seen hang.
