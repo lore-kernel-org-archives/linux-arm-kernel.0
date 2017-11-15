@@ -1,57 +1,54 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Wed, 15 Nov 2017 15:31:31 +0800
-Subject: [RFC PATCH 4/5] arm64: dts: rockchip: add isp0 node for rk3399
+Date: Wed, 15 Nov 2017 15:31:32 +0800
+Subject: [RFC PATCH 5/5] ARM: dts: rockchip: add isp node for rk3288
 In-Reply-To: <20171115073132.30123-1-jacob-chen@iotwrt.com>
 References: <20171115073132.30123-1-jacob-chen@iotwrt.com>
-Message-ID: <20171115073132.30123-4-jacob-chen@iotwrt.com>
+Message-ID: <20171115073132.30123-5-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shunqian Zheng <zhengsq@rock-chips.com>
+From: Jacob Chen <jacob2.chen@rock-chips.com>
 
-rk3399 have two ISP, but we havn't test isp1, so just add isp0 at present.
+rk3288 have a Embedded 13M ISP and MIPI-CSI2 interface.
 
-Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
 Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index ab7629c5b856..f696e62d09dd 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1577,6 +1577,32 @@
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 60658c5c9a48..f9a81137146d 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -962,6 +962,30 @@
  		status = "disabled";
  	};
  
-+	isp0: isp0 at ff910000 {
-+		compatible = "rockchip,rk3399-cif-isp";
++	isp: isp at ff910000 {
++		compatible = "rockchip,rk3288-cif-isp";
 +		reg = <0x0 0xff910000 0x0 0x4000>;
-+		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&cru SCLK_ISP0>,
-+			 <&cru ACLK_ISP0>, <&cru ACLK_ISP0_WRAPPER>,
-+			 <&cru HCLK_ISP0>, <&cru HCLK_ISP0_WRAPPER>;
-+		clock-names = "clk_isp",
-+			      "aclk_isp", "aclk_isp_wrap",
-+			      "hclk_isp", "hclk_isp_wrap";
-+		power-domains = <&power RK3399_PD_ISP0>;
-+		iommus = <&isp0_mmu>;
++		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_ISP>, <&cru ACLK_ISP>,
++			 <&cru HCLK_ISP>, <&cru PCLK_ISP_IN>,
++			 <&cru SCLK_ISP_JPE>;
++		clock-names = "clk_isp", "aclk_isp",
++			      "hclk_isp", "pclk_isp_in",
++			      "sclk_isp_jpe";
++		assigned-clocks = <&cru SCLK_ISP>;
++		assigned-clock-rates = <400000000>;
++		power-domains = <&power RK3288_PD_VIO>;
++		iommus = <&isp_mmu>;
 +		status = "disabled";
-+
-+		isp_mipi_dphy_rx0: isp-mipi-dphy-rx0 {
-+			compatible = "rockchip,rk3399-mipi-dphy";
++		isp_mipi_phy_rx0: isp-mipi-phy-rx0 {
++			compatible = "rockchip,rk3288-mipi-dphy";
 +			rockchip,grf = <&grf>;
-+			clocks = <&cru SCLK_MIPIDPHY_REF>,
-+				 <&cru SCLK_DPHY_RX0_CFG>,
-+				 <&cru PCLK_VIO_GRF>;
-+			clock-names = "dphy-ref", "dphy-cfg", "grf";
-+			power-domains = <&power RK3399_PD_VIO>;
++			clocks = <&cru SCLK_MIPIDSI_24M>, <&cru PCLK_MIPI_CSI>;
++			clock-names = "dphy-ref", "pclk";
 +			status = "disabled";
 +		};
 +	};
 +
- 	isp0_mmu: iommu at ff914000 {
+ 	isp_mmu: iommu at ff914000 {
  		compatible = "rockchip,iommu";
  		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
 -- 
