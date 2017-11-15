@@ -1,47 +1,28 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 16 Nov 2017 00:18:11 +0100
-Subject: [PATCH for sre] Fix "backlight" on N9
-Message-ID: <20171115231811.GA25191@amd>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 15 Nov 2017 17:24:13 -0600
+Subject: [PATCH v3 2/2] arm64: Add software workaround for Falkor erratum
+ 1041
+In-Reply-To: <20171115010505.GO11955@codeaurora.org>
+References: <1510537359-9978-1-git-send-email-shankerd@codeaurora.org>
+ <1510537359-9978-3-git-send-email-shankerd@codeaurora.org>
+ <20171115010505.GO11955@codeaurora.org>
+Message-ID: <CAOZdJXW5CACx4n_ugKCHqjtGyft0gVAX7s5yAz0pEEs5NyYRmQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Tue, Nov 14, 2017 at 7:05 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
 
-This should get "backlight" to work on N9/N950.
+> This also applies to Kryo CPUs. I have a patch[1] for the 1003
+> Falkor errata that adds the Kryo MIDR check which can also be
+> used for this errata.
+>
+> [1] https://patchwork.kernel.org/patch/10048987/
 
-First hunk may not apply to you.
-
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
-
-diff --git a/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c b/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
-index 24b459e..57827a1 100644
---- a/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
-+++ b/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
-@@ -374,8 +374,6 @@ static int dsicm_bl_update_status(struct backlight_device *dev)
- 	else
- 		level = 0;
- 
--	level = 0xff;
--
- 	dev_dbg(&ddata->pdev->dev, "update brightness to %d\n", level);
- 
- 	mutex_lock(&ddata->lock);
-@@ -1382,6 +1380,7 @@ static int dsicm_probe(struct platform_device *pdev)
- 	if (ddata->use_dsi_backlight) {
- 		struct backlight_properties props = { 0 };
- 		props.max_brightness = 255;
-+		props.brightness = 128;
- 		props.type = BACKLIGHT_RAW;
- 
- 		bldev = devm_backlight_device_register(dev, dev_name(dev),
+Please submit a follow-up patch for E1041 after our patch is merged.
+We don't want to submit a patch for your SOCs, even if it's the same
+erratum and work-around.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171116/d2f85956/attachment.sig>
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
