@@ -1,45 +1,33 @@
-From: jbe@pengutronix.de (Juergen Borleis)
-Date: Wed, 15 Nov 2017 10:53:12 +0100
-Subject: DryIce , RTC not working on imx53.
-In-Reply-To: <201711141343.15309.jbe@pengutronix.de>
-References: <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
- <20171114105517.74ycmwcjsab7xp2j@piout.net>
- <201711141343.15309.jbe@pengutronix.de>
-Message-ID: <201711151053.13676.jbe@pengutronix.de>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 15 Nov 2017 17:59:41 +0800
+Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
+ support
+In-Reply-To: <5A0B1597.3030809@arm.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <5A049B20.6000501@arm.com> <20171113112946.GK14144@cbox>
+ <20171113161445.xfqyuntza76ckdmq@hawk.localdomain> <5A0B1597.3030809@arm.com>
+Message-ID: <e73be829-7a05-a354-43f3-538f7a393306@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+> 
+> (While VSESR_EL2 is 64bit[0], the value gets written into the ESR, which is
+> 32bit, so I doubt the top 32bits can be used, currently they are all reserved.)
 
-On Tuesday 14 November 2017 13:43:14 Myself wrote:
-> On Tuesday 14 November 2017 11:55:17 Alexandre Belloni wrote:
-> > On 14/11/2017 at 08:33:09 -0200, Fabio Estevam wrote:
-> > > On Tue, Nov 14, 2017 at 8:26 AM, Alexandre Belloni
-> > >
-> > > <alexandre.belloni@free-electrons.com> wrote:
-> > > >> I have the impression that the dryice driver has never worked in
-> > > >> mainlune for mx53.
-> > > >
-> > > > I doubt that because it seems to have been used by Pengutronix.
-> > >
-> > > Juergen can confirm, but it seems the dryice driver was only used on
-> > > mx25 in mainline.
-> >
-> > Ok, that would explain it.
->
-> Yes. The development was made on an i.MX25. But currently I have an
-> i.MX53 on my desk here and could test...
+In fact the valid bits for vsesr_el2 is 25bit, which will set to ESR.ISS, bits [24:0].
+ESR.IL and ESR.EC are not set by vsesr_el2.
 
-After a quick look into the reference manuals:
-
-Patch 5b72505 ("ARM: dts: imx53: add srtc node") is bad. The i.MX53 provides 
-an RTC more close to the i.MX6 instead (e.g. rtc-snvs.c). But unfortunately 
-it uses a different register layout than the i.MX6 does. So we can't use 
-this driver without i.MX53 specific adaptions.
-But at least 5b72505 should be reverted.
-
-jb
-
--- 
-Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ?? ?| Juergen Borleis ? ? ? ? ? ? |
-Industrial Linux Solutions ? ? ? ? ? ? ? ?? ?| http://www.pengutronix.de/ ?|
+> 
+> I'll go dig into how x86 uses this...
+> 
+> 
+> Thanks!
+> 
+> James
+> 
+> 
+> [0]
+> https://static.docs.arm.com/ddi0587/a/RAS%20Extension-release%20candidate_march_29.pdf
+> 
+> .
+> 
