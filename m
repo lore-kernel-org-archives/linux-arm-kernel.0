@@ -1,264 +1,127 @@
-From: varada@codeaurora.org (Varadarajan Narayanan)
-Date: Wed, 15 Nov 2017 12:17:23 +0530
-Subject: Fwd: [PATCH 4/4] [v3] pinctrl: qcom: qdf2xxx: add support for
- new ACPI HID QCOM8002
-In-Reply-To: <133cd447-c5c8-2b3e-1ae2-484307d5e39d@codeaurora.org>
-References: <1510096056-13765-5-git-send-email-timur@codeaurora.org>
- <133cd447-c5c8-2b3e-1ae2-484307d5e39d@codeaurora.org>
-Message-ID: <20171115064722.GB22802@codeaurora.org>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Wed, 15 Nov 2017 15:29:22 +0800
+Subject: [RFC PATCH 0/5] Rockchip ISP1 Driver
+Message-ID: <20171115072927.29367-1-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Timur,
+This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399 SoC.
 
-> Newer versions of the firmware for the Qualcomm Datacenter Technologies
-> QDF2400 restricts access to a subset of the GPIOs on the TLMM.  To
-> prevent older kernels from accidentally accessing the restricted GPIOs,
-> we change the ACPI HID for the TLMM block from QCOM8001 to QCOM8002,
-> and introduce a new property "gpios".  This property is an array of
-> specific GPIOs that are accessible.  When an older kernel boots on
-> newer (restricted) firmware, it will fail to probe.
->
-> To implement the sparse GPIO map, we register all of the GPIOs, but set
-> the pin count for the unavailable GPIOs to zero.  The pinctrl-msm
-> driver will block those unavailable GPIOs from being accessed.
->
-> To allow newer kernels to support older firmware, the driver retains
-> support for QCOM8001.
->
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->  drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 145 +++++++++++++++++++++++++--------
->  1 file changed, 109 insertions(+), 36 deletions(-)
->
-> diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-> index bb3ce5c3e18b..37f746f6eb8c 100644
-> --- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-> +++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
-> @@ -38,68 +38,147 @@
->  /* maximum size of each gpio name (enough room for "gpioXXX" + null) */
->  #define NAME_SIZE	8
->
-> +enum {
-> +	QDF2XXX_V1,
-> +	QDF2XXX_V2,
-> +};
-> +
-> +static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-> +	{"QCOM8001", QDF2XXX_V1},
-> +	{"QCOM8002", QDF2XXX_V2},
-> +	{},
-> +};
-> +MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-> +
->  static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
->  {
-> +	const struct acpi_device_id *id =
-> +		acpi_match_device(qdf2xxx_acpi_ids, &pdev->dev);
->  	struct pinctrl_pin_desc *pins;
->  	struct msm_pingroup *groups;
->  	char (*names)[NAME_SIZE];
->  	unsigned int i;
->  	u32 num_gpios;
-> +	unsigned int avail_gpios; /* The number of GPIOs we support */
-> +	u16 *gpios; /* An array of supported GPIOs */
->  	int ret;
->
->  	/* Query the number of GPIOs from ACPI */
->  	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
->  	if (ret < 0) {
-> -		dev_warn(&pdev->dev, "missing num-gpios property\n");
-> +		dev_err(&pdev->dev, "missing 'num-gpios' property\n");
->  		return ret;
->  	}
-> -
->  	if (!num_gpios || num_gpios > MAX_GPIOS) {
-> -		dev_warn(&pdev->dev, "invalid num-gpios property\n");
-> +		dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
->  		return -ENODEV;
->  	}
->
-> +	/*
-> +	 * The QCOM8001 HID contains only the number of GPIOs, and assumes
-> +	 * that all of them are available. avail_gpios is the same as num_gpios.
-> +	 *
-> +	 * The QCOM8002 HID introduces the 'gpios' DSD, which lists
-> +	 * specific GPIOs that the driver is allowed to access.
-> +	 *
-> +	 * The make the common code simpler, in both cases we create an
-> +	 * array of GPIOs that are accessible.  So for QCOM8001, that would
-> +	 * be all of the GPIOs.
-> +	 */
-> +	if (id->driver_data == QDF2XXX_V1) {
-> +		avail_gpios = num_gpios;
-> +
-> +		gpios = devm_kcalloc(&pdev->dev, avail_gpios, sizeof(gpios[0]),
-> +				     GFP_KERNEL);
+TODO:
+  - Thomas is rewriting the binding code between isp, phy, sensors, i hope we could get suggestions.
+        https://chromium-review.googlesource.com/c/chromiumos/third_party/kernel/+/768633/2
+    rules:
+      - There are many mipi interfaces("rx0", "dxrx0")(actually it also could be parallel interface) in SoC and isp can decide which one will be used.
+      - Sometimes there will be more than one senor in a mipi phy, the sofrware should decide which one is used(media link).
+      - rk3399 have two isp.
+  - Add a dummy buffer(dma_alloc_coherent) so drvier won't hold buffer.
+  - Finish all TODO comments(mostly about hardware) in driver.
 
-Wouldn't kmalloc suffice since the array gets initialized just below.
+To help do a quick review, i have push source code to my Github.
+  https://github.com/wzyy2/linux/tree/rkisp1/drivers/media/platform/rockchip/isp1
 
-> +		if (!gpios)
-> +			return -ENOMEM;
-> +
-> +		for (i = 0; i < avail_gpios; i++)
-> +			gpios[i] = i;
-> +	} else {
-> +		/* The number of GPIOs in the approved list */
-> +		ret = device_property_read_u16_array(&pdev->dev, "gpios",
-> +						     NULL, 0);
-> +		if (ret < 0) {
-> +			dev_err(&pdev->dev, "missing 'num-gpios' property\n");
-> +			return ret;
-> +		}
-> +		if (!ret || ret > MAX_GPIOS) {
+Below are some infomations about driver/hardware:
 
-Instead of ret > MAX_GPIOS, should we check for ret > num_gpios?
+Rockchip ISP1 have many Hardware Blocks(simplied):
 
-> +			dev_err(&pdev->dev, "invalid 'num-gpios' property\n");
-> +			return -ENODEV;
-> +		}
+  MIPI      --> ISP --> DCrop(Mainpath) --> RSZ(Mainpath) --> DMA(Mainpath)
+  DMA-Input -->     --> DCrop(Selfpath) --> RSZ(Selfpath) --> DMA(Selfpath);)
 
-In both the above error messages 'num-gpios' should be 'gpios'
+(Acutally the TRM(rk3288, isp) could be found online...... which contains a more detailed block diagrams ;-P)
 
-> +		avail_gpios = ret;
-> +
-> +		gpios = devm_kcalloc(&pdev->dev, avail_gpios, sizeof(gpios[0]),
-> +				     GFP_KERNEL);
+The funcitons of each hardware block:
 
-devm_kmalloc?
+  Mainpath : up to 4k resolution, support raw/yuv format
+  Selfpath : up tp 1080p, support rotate, support rgb/yuv format
+  RSZ: scaling 
+  DCrop: crop
+  ISP: 3A, Color processing, Crop
+  MIPI: MIPI Camera interface
 
-Thanks
-Varada
+Media pipelines:
 
-> +		if (!gpios)
-> +			return -ENOMEM;
-> +
-> +		ret = device_property_read_u16_array(&pdev->dev, "gpios", gpios,
-> +						     avail_gpios);
-> +		if (ret < 0) {
-> +			dev_err(&pdev->dev, "could not read list of GPIOs\n");
-> +			return ret;
-> +		}
-> +
-> +		/*
-> +		 * Because we have a specific list of GPIOs, the GPIO map
-> +		 * is 'sparse'.
-> +		 */
-> +		qdf2xxx_pinctrl.sparse = true;
-> +	}
-> +
->  	pins = devm_kcalloc(&pdev->dev, num_gpios,
->  		sizeof(struct pinctrl_pin_desc), GFP_KERNEL);
->  	groups = devm_kcalloc(&pdev->dev, num_gpios,
->  		sizeof(struct msm_pingroup), GFP_KERNEL);
-> -	names = devm_kcalloc(&pdev->dev, num_gpios, NAME_SIZE, GFP_KERNEL);
-> +	names = devm_kcalloc(&pdev->dev, avail_gpios, NAME_SIZE, GFP_KERNEL);
->
->  	if (!pins || !groups || !names)
->  		return -ENOMEM;
->
-> +	/*
-> +	 * Initialize the array.  GPIOs not listed in the 'gpios' array
-> +	 * still need a number, but nothing else.
-> +	 */
->  	for (i = 0; i < num_gpios; i++) {
-> -		snprintf(names[i], NAME_SIZE, "gpio%u", i);
-> -
->  		pins[i].number = i;
-> -		pins[i].name = names[i];
-> -
-> -		groups[i].npins = 1;
-> -		groups[i].name = names[i];
->  		groups[i].pins = &pins[i].number;
-> +	}
->
-> -		groups[i].ctl_reg = 0x10000 * i;
-> -		groups[i].io_reg = 0x04 + 0x10000 * i;
-> -		groups[i].intr_cfg_reg = 0x08 + 0x10000 * i;
-> -		groups[i].intr_status_reg = 0x0c + 0x10000 * i;
-> -		groups[i].intr_target_reg = 0x08 + 0x10000 * i;
-> -
-> -		groups[i].mux_bit = 2;
-> -		groups[i].pull_bit = 0;
-> -		groups[i].drv_bit = 6;
-> -		groups[i].oe_bit = 9;
-> -		groups[i].in_bit = 0;
-> -		groups[i].out_bit = 1;
-> -		groups[i].intr_enable_bit = 0;
-> -		groups[i].intr_status_bit = 0;
-> -		groups[i].intr_target_bit = 5;
-> -		groups[i].intr_target_kpss_val = 1;
-> -		groups[i].intr_raw_status_bit = 4;
-> -		groups[i].intr_polarity_bit = 1;
-> -		groups[i].intr_detection_bit = 2;
-> -		groups[i].intr_detection_width = 2;
-> +	/* Populate the entries that are meant to be exposes as GPIOs. */
-> +	for (i = 0; i < avail_gpios; i++) {
-> +		unsigned int gpio = gpios[i];
-> +
-> +		groups[gpio].npins = 1;
-> +		snprintf(names[i], NAME_SIZE, "gpio%u", gpio);
-> +		pins[gpio].name = names[i];
-> +		groups[gpio].name = names[i];
-> +
-> +		groups[gpio].ctl_reg = 0x10000 * gpio;
-> +		groups[gpio].io_reg = 0x04 + 0x10000 * gpio;
-> +		groups[gpio].intr_cfg_reg = 0x08 + 0x10000 * gpio;
-> +		groups[gpio].intr_status_reg = 0x0c + 0x10000 * gpio;
-> +		groups[gpio].intr_target_reg = 0x08 + 0x10000 * gpio;
-> +
-> +		groups[gpio].mux_bit = 2;
-> +		groups[gpio].pull_bit = 0;
-> +		groups[gpio].drv_bit = 6;
-> +		groups[gpio].oe_bit = 9;
-> +		groups[gpio].in_bit = 0;
-> +		groups[gpio].out_bit = 1;
-> +		groups[gpio].intr_enable_bit = 0;
-> +		groups[gpio].intr_status_bit = 0;
-> +		groups[gpio].intr_target_bit = 5;
-> +		groups[gpio].intr_target_kpss_val = 1;
-> +		groups[gpio].intr_raw_status_bit = 4;
-> +		groups[gpio].intr_polarity_bit = 1;
-> +		groups[gpio].intr_detection_bit = 2;
-> +		groups[gpio].intr_detection_width = 2;
->  	}
->
-> +	devm_kfree(&pdev->dev, gpios);
-> +
->  	qdf2xxx_pinctrl.pins = pins;
->  	qdf2xxx_pinctrl.groups = groups;
->  	qdf2xxx_pinctrl.npins = num_gpios;
-> @@ -109,12 +188,6 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
->  	return msm_pinctrl_probe(pdev, &qdf2xxx_pinctrl);
->  }
->
-> -static const struct acpi_device_id qdf2xxx_acpi_ids[] = {
-> -	{"QCOM8001"},
-> -	{},
-> -};
-> -MODULE_DEVICE_TABLE(acpi, qdf2xxx_acpi_ids);
-> -
->  static struct platform_driver qdf2xxx_pinctrl_driver = {
->  	.driver = {
->  		.name = "qdf2xxx-pinctrl",
-> --
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-> Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-> Code Aurora Forum, a Linux Foundation Collaborative Project.
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> --
-> "QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
->
-> ---
-> This email has been checked for viruses by Avast antivirus software.
-> https://www.avast.com/antivirus
->
+  Mainpath, Selfpath <-- ISP subdev <-- MIPI  <-- Sensor
+  3A stats           <--            <-- 3A parms
 
---
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, hosted by The Linux Foundation
+Code struct:
+
+  capture.c : Mainpath, Selfpath, RSZ, DCROP : capture device.
+  rkisp1.c : ISP : v4l2 sub-device.
+  isp_params.c : 3A parms : output device.
+  isp_stats.c : 3A stats : capture device.
+  mipi_dphy_sy.c : MIPI : sperated v4l2 sub-device.
+
+Usage:
+  ChromiumOS:
+    use below v4l2-ctl command to capture frames.
+
+      v4l2-ctl --verbose -d /dev/video4 --stream-mmap=2
+      --stream-to=/tmp/stream.out --stream-count=60 --stream-poll
+
+    use below command to playback the video on your PC.
+
+      mplayer /tmp/stream.out -loop 0 --demuxer=rawvideo
+      --rawvideo=w=800:h=600:size=$((800*600*2)):format=yuy2
+    or
+      mplayer ./stream.out -loop 0 -demuxer rawvideo -rawvideo
+      w=800:h=600:size=$((800*600*2)):format=yuy2
+
+  Linux:
+    use rkcamsrc gstreamer plugin(just a modified v4l2src) to preview.
+
+      gst-launch-1.0 rkcamsrc device=/dev/video0 io-mode=4 disable-3A=true
+      videoconvert ! video/x-raw,format=NV12,width=640,height=480 ! kmssink
+
+Jacob Chen (2):
+  media: rkisp1: add rockchip isp1 driver
+  ARM: dts: rockchip: add isp node for rk3288
+
+Jeffy Chen (1):
+  media: rkisp1: Add user space ABI definitions
+
+Shunqian Zheng (2):
+  media: videodev2.h, v4l2-ioctl: add rkisp1 meta buffer format
+  arm64: dts: rockchip: add isp0 node for rk3399
+
+ arch/arm/boot/dts/rk3288.dtsi                      |   24 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   26 +
+ drivers/media/platform/Kconfig                     |   10 +
+ drivers/media/platform/Makefile                    |    1 +
+ drivers/media/platform/rockchip/isp1/Makefile      |    9 +
+ drivers/media/platform/rockchip/isp1/capture.c     | 1678 ++++++++++++++++++++
+ drivers/media/platform/rockchip/isp1/capture.h     |   46 +
+ drivers/media/platform/rockchip/isp1/common.h      |  327 ++++
+ drivers/media/platform/rockchip/isp1/dev.c         |  728 +++++++++
+ drivers/media/platform/rockchip/isp1/isp_params.c  | 1556 ++++++++++++++++++
+ drivers/media/platform/rockchip/isp1/isp_params.h  |   81 +
+ drivers/media/platform/rockchip/isp1/isp_stats.c   |  537 +++++++
+ drivers/media/platform/rockchip/isp1/isp_stats.h   |   81 +
+ .../media/platform/rockchip/isp1/mipi_dphy_sy.c    |  619 ++++++++
+ .../media/platform/rockchip/isp1/mipi_dphy_sy.h    |   42 +
+ drivers/media/platform/rockchip/isp1/regs.c        |  251 +++
+ drivers/media/platform/rockchip/isp1/regs.h        | 1578 ++++++++++++++++++
+ drivers/media/platform/rockchip/isp1/rkisp1.c      | 1132 +++++++++++++
+ drivers/media/platform/rockchip/isp1/rkisp1.h      |  130 ++
+ drivers/media/v4l2-core/v4l2-ioctl.c               |    2 +
+ include/uapi/linux/rkisp1-config.h                 |  554 +++++++
+ include/uapi/linux/videodev2.h                     |    4 +
+ 22 files changed, 9416 insertions(+)
+ create mode 100644 drivers/media/platform/rockchip/isp1/Makefile
+ create mode 100644 drivers/media/platform/rockchip/isp1/capture.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/capture.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/common.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/dev.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/regs.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/regs.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.h
+ create mode 100644 include/uapi/linux/rkisp1-config.h
+
+-- 
+2.14.2
