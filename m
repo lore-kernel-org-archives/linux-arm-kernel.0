@@ -1,51 +1,42 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 15 Nov 2017 13:15:12 +0900
-Subject: [URGENT PATCH] arm64: dts: uniphier: route on-board device IRQ to
- GPIO controller for PXs3
-Message-ID: <1510719312-22269-1-git-send-email-yamada.masahiro@socionext.com>
+From: poza@codeaurora.org (Oza Pawandeep)
+Date: Wed, 15 Nov 2017 10:26:45 +0530
+Subject: [PATCH v2 1/4] PCI: Add port service list node for pci_dev.
+In-Reply-To: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
+References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
+Message-ID: <1510721808-27164-2-git-send-email-poza@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 429f203eb712 ("arm64: dts: uniphier: route on-board device IRQ
-to GPIO controller") missed to update this DTS.  It becames a real
-problem when arm and arm64 trees are merged together.
+This patch adds the list node to keep track of services registered to
+pci port driver.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Signed-off-by: Oza Pawandeep <poza@codeaurora.org>
 
-Arnd, Olof,
-
-I think you are sending pull-requests for v4.15-rc1 shortly.
-Can you apply this on top your arm64 tree?
-
-With DT tree merged in Linus' tree today,
-I realized my mistake that was hidden before.
-
-arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dtb: Warning (interrupts_property):
-interrupts size is (12), expected multiple of 8 in /soc at 0/system-bus at 58c00000/support-card at 1,1f00000/ethernet at 0
-
-We do not have much time, so I am sending this patch
-instead of a pull-reuqest.
-
-Please pick up.
-
-
- arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts
-index dad4743..864feeb 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts
-@@ -38,7 +38,8 @@
- };
+diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
+index 14e0ea1..f772979 100644
+--- a/drivers/pci/probe.c
++++ b/drivers/pci/probe.c
+@@ -1931,6 +1931,7 @@ struct pci_dev *pci_alloc_dev(struct pci_bus *bus)
+ 		return NULL;
  
- &ethsc {
--	interrupts = <0 52 4>;
-+	interrupt-parent = <&gpio>;
-+	interrupts = <0 8>;
- };
+ 	INIT_LIST_HEAD(&dev->bus_list);
++	INIT_LIST_HEAD(&dev->service_list);
+ 	dev->dev.type = &pci_dev_type;
+ 	dev->bus = pci_bus_get(bus);
  
- &serial0 {
+diff --git a/include/linux/pci.h b/include/linux/pci.h
+index 96c9498..eb86a4b 100644
+--- a/include/linux/pci.h
++++ b/include/linux/pci.h
+@@ -408,6 +408,8 @@ struct pci_dev {
+ 	struct bin_attribute *res_attr[DEVICE_COUNT_RESOURCE]; /* sysfs file for resources */
+ 	struct bin_attribute *res_attr_wc[DEVICE_COUNT_RESOURCE]; /* sysfs file for WC mapping of resources */
+ 
++	struct list_head service_list;	/* node in per-service list */
++
+ #ifdef CONFIG_PCIE_PTM
+ 	unsigned int	ptm_root:1;
+ 	unsigned int	ptm_enabled:1;
 -- 
-2.7.4
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.,
+a Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
