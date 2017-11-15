@@ -1,55 +1,35 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Wed, 15 Nov 2017 15:31:32 +0800
-Subject: [RFC PATCH 5/5] ARM: dts: rockchip: add isp node for rk3288
-In-Reply-To: <20171115073132.30123-1-jacob-chen@iotwrt.com>
-References: <20171115073132.30123-1-jacob-chen@iotwrt.com>
-Message-ID: <20171115073132.30123-5-jacob-chen@iotwrt.com>
+From: xuyiping@hisilicon.com (Xu YiPing)
+Date: Wed, 15 Nov 2017 15:39:26 +0800
+Subject: [PATCH v2] arm64: perf: remove unsupported events for Cortex-A73
+Message-ID: <1510731566-22016-1-git-send-email-xuyiping@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jacob Chen <jacob2.chen@rock-chips.com>
+bus access read/write events are not supported in A73, based on the
+Cortex-A73 TRM r0p2, section 11.9 Events (pages 11-457 to 11-460).
 
-rk3288 have a Embedded 13M ISP and MIPI-CSI2 interface.
-
-Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+Fixes: 5561b6c5e981 "arm64: perf: add support for Cortex-A73"
+Signed-off-by: Xu YiPing <xuyiping@hisilicon.com>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
+ arch/arm64/kernel/perf_event.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 60658c5c9a48..f9a81137146d 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -962,6 +962,30 @@
- 		status = "disabled";
- 	};
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index 9eaef51..3affca3 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -262,12 +262,6 @@ static const unsigned armv8_a73_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
  
-+	isp: isp at ff910000 {
-+		compatible = "rockchip,rk3288-cif-isp";
-+		reg = <0x0 0xff910000 0x0 0x4000>;
-+		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_ISP>, <&cru ACLK_ISP>,
-+			 <&cru HCLK_ISP>, <&cru PCLK_ISP_IN>,
-+			 <&cru SCLK_ISP_JPE>;
-+		clock-names = "clk_isp", "aclk_isp",
-+			      "hclk_isp", "pclk_isp_in",
-+			      "sclk_isp_jpe";
-+		assigned-clocks = <&cru SCLK_ISP>;
-+		assigned-clock-rates = <400000000>;
-+		power-domains = <&power RK3288_PD_VIO>;
-+		iommus = <&isp_mmu>;
-+		status = "disabled";
-+		isp_mipi_phy_rx0: isp-mipi-phy-rx0 {
-+			compatible = "rockchip,rk3288-mipi-dphy";
-+			rockchip,grf = <&grf>;
-+			clocks = <&cru SCLK_MIPIDSI_24M>, <&cru PCLK_MIPI_CSI>;
-+			clock-names = "dphy-ref", "pclk";
-+			status = "disabled";
-+		};
-+	};
-+
- 	isp_mmu: iommu at ff914000 {
- 		compatible = "rockchip,iommu";
- 		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
+ 	[C(L1D)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_RD,
+ 	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_L1D_CACHE_WR,
+-
+-	[C(NODE)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_RD,
+-	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR,
+-
+-	[C(NODE)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_RD,
+-	[C(NODE)][C(OP_WRITE)][C(RESULT_ACCESS)] = ARMV8_IMPDEF_PERFCTR_BUS_ACCESS_WR,
+ };
+ 
+ static const unsigned armv8_thunder_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
 -- 
-2.14.2
+2.7.4
