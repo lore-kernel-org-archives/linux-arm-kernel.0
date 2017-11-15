@@ -1,39 +1,56 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Wed, 15 Nov 2017 16:03:31 +0100
-Subject: [PATCH v3 2/4] net: nb8800: Simplify nb8800_pause_config()
-In-Reply-To: <01be0b9e-3d6c-bd1e-6b92-e2274ffeea5a@sigmadesigns.com>
-References: <230165aa-eaf1-6e2b-7ff3-45b3ee4ffc62@sigmadesigns.com>
- <dd0c2014-8ef9-749c-16d3-6a56f4161658@sigmadesigns.com>
- <yw1x1sl12fx8.fsf@mansr.com>
- <569542b1-8e56-d7da-f7a0-affd89bfed62@sigmadesigns.com>
- <yw1xk1yt0zbp.fsf@mansr.com>
- <6f534b2b-f69a-bda5-dc5b-0281bf0df129@sigmadesigns.com>
- <20171115141707.GB2130@lunn.ch>
- <01be0b9e-3d6c-bd1e-6b92-e2274ffeea5a@sigmadesigns.com>
-Message-ID: <20171115150331.GA29642@lunn.ch>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 15 Nov 2017 09:06:15 -0600
+Subject: [PATCH 0/4] [v7] pinctrl: qcom: add support for sparse GPIOs
+In-Reply-To: <CACRpkdYT1NDzuEuDU47jC-iXTE8JWxqGnKhJYKp0oGiL1wX7ig@mail.gmail.com>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+ <c219c289-9cad-f96c-f766-ec28af8f078d@codeaurora.org>
+ <CACRpkdbwe9+TovFYoD-W_9kabe+jsVbN6juJQBUzicq=1XDphg@mail.gmail.com>
+ <b8bbba8d-f91f-8e8f-8e79-2e772b48d9b9@codeaurora.org>
+ <CACRpkdYT1NDzuEuDU47jC-iXTE8JWxqGnKhJYKp0oGiL1wX7ig@mail.gmail.com>
+Message-ID: <8a0fe5e6-b27c-1e23-b9ec-5fc18a0ae27b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 03:33:47PM +0100, Marc Gonzalez wrote:
-> On 15/11/2017 15:17, Andrew Lunn wrote:
+On 11/14/2017 04:03 AM, Linus Walleij wrote:
+> The more intrusive design is on my request so I will look at it in detail
+> ASAP. I took a quick look and liked what I saw, I just need to make
+> sure about the details. Also it'd be nice to have a nod from Bj?rn.
 > 
-> > nb8800_link_reconfigure() can be called whenever the link to the peer
-> > changes. auto-neg may happen later because the cable was not plugged
-> > in until later, etc.
-> 
-> Hello Andrew,
-> 
-> AFAICS, Mans was right: trying to toggle the flow control bit when
-> the RX DMA bit is already set "breaks" the HW (ping times out).
-> 
-> Thus, I will drop patch 2/4.
+> The main reason for some of the work is ACPI, am I right?
 
-O.K. Thanks for testing this.
+Yes.  We don't have a nice hierarchical tree that lists the individual 
+pins and their purposes.  We just have a dumb list of GPIOs.
 
-> In our local branch, I have completely disabled flow control support,
-> so I don't have to worry about this problem.
+> Timur could you look quickly at the series posted by Andy Shevchenko
+> (6 patches prefixed gpiolib: acpi: ) for augmenting ACPI GPIOs in the core?
+> Especially patch 5 and 6 which introduce the ability to add quirks in the
+> core.
 
-That is an interesting statement. You now know there is an issue here,
-your solution is to fix your private branch and leave mainline as is.
+So this is something that I've never really understood with 
+gpiolib-acpi.  I don't think this file is used with the pin control driver.
 
-     Andrew
+We do have GpioInt and GpioIo statements in our GPIO table, but they 
+don't appear to be using the TLMM (our GPIO / pin control device)
+
+For example:
+
+GpioInt(Level, ActiveHigh, Exclusive, PullNone, , "\\_SB.TCS0.QIC5") {10}
+
+The \\_SB.TCS0 device is NOT the TLMM.  It's our "irq combiner" which 
+has something to do with performance measurement.  I think the
+
+I don't think Andy's patch set has anything to do with my patches.  My 
+patches just try to register a GPIO device, whereas the gpiolib-acpi 
+patches are about ACPI nodes performing gpio-like operations.
+
+
+> I'd like to get some ARM-based people to look at it to make sure we
+> those systems can also quirk their GPIOs if need be.
+
+My patches aren't about a quirk.  All I'm trying to do is registers 
+specific GPIOs rather than one giant block of them.
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
