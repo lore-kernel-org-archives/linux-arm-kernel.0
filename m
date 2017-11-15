@@ -1,50 +1,40 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 15 Nov 2017 16:19:10 +0100
-Subject: [PATCH v3 2/5] DT: misc serdev: w2sg0004: add bindings documentation
- (GPS module with serdev UART)
+Date: Wed, 15 Nov 2017 16:19:12 +0100
+Subject: [PATCH v3 4/5] DTS: gta04: add serdev node for w2sg00x4
 In-Reply-To: <cover.1510759152.git.hns@goldelico.com>
 References: <cover.1510759152.git.hns@goldelico.com>
-Message-ID: <876b6e7256bbf23cbff7fb2e67c33730592a4990.1510759152.git.hns@goldelico.com>
+Message-ID: <264612e0dc56f46ba082644b304179f517ab43c4.1510759152.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add bindings documentation for Wi2Wi W2SG00x4 GPS module
+GTA04 has a W2SG0004/84 connected to UART2 of the OMAP3
+processor. A GPIO can pulse the on/off toggle switch.
+
+The VSIM regulator is used to power on/off the LNA of an external
+active GPS antenna so that a driver can turn the LNA off if GPS is
+not needed to save battery energy.
 
 Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 ---
- .../devicetree/bindings/misc/wi2wi,w2sg0004.txt    | 24 ++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/misc/wi2wi,w2sg0004.txt
+ arch/arm/boot/dts/omap3-gta04.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/misc/wi2wi,w2sg0004.txt b/Documentation/devicetree/bindings/misc/wi2wi,w2sg0004.txt
-new file mode 100644
-index 000000000000..ccec9361a1a4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/misc/wi2wi,w2sg0004.txt
-@@ -0,0 +1,24 @@
-+Wi2Wi GPS module connected through UART
+diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+index 4504908c23fe..e967d738aaaf 100644
+--- a/arch/arm/boot/dts/omap3-gta04.dtsi
++++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+@@ -477,6 +477,12 @@
+ &uart2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart2_pins>;
 +
-+Should be a subnode of the SoC UART it is connected to (serdev).
-+
-+Required properties:
-+- compatible:	should be one of (depending on precise model)
-+	"wi2wi,w2sg0004"
-+	"wi2wi,w2sg0084"
-+- enable-gpio:	the GPIO that controls the module's power toggle
-+	input. A positive impulse of sufficent length toggles the
-+	power state.
-+
-+Optional properties:
-+- lna-supply:	an (optional) LNA regulator that is enabled together with the GPS receiver
-+
-+Example:
-+
-+&uart2 {
-+	w2sg0004: gps {
++	gps: gps {
 +		compatible = "wi2wi,w2sg0004";
 +		lna-supply = <&vsim>;   /* LNA regulator */
 +		enable-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;    /* GPIO_145: trigger for turning on/off w2sg0004 */
-+        };
-+};
++	};
+ };
+ 
+ &uart3 {
 -- 
 2.12.2
