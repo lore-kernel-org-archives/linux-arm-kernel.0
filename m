@@ -1,158 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 15 Nov 2017 21:12:26 +0100
-Subject: [PATCH v3 3/5] misc serdev: Add w2sg0004 (gps receiver) power
- control driver
-In-Reply-To: <AFF4418B-740D-4FFE-A3A6-A92E73F0B901@goldelico.com>
-References: <cover.1510759152.git.hns@goldelico.com>
- <9e1525e72afe890ea390fd153c1f3a1b0866c986.1510759152.git.hns@goldelico.com>
- <CAK8P3a3ZtqXVobx5hdxUZyAQRYs2Y6Aw2Qpo2puSBb_AVa_aVA@mail.gmail.com>
- <AFD95D2E-2EBB-4EBF-9B3B-E68ED98E5437@goldelico.com>
- <CAK8P3a1Ah35mmbw0qN=zp8TMN9HVgdtTSkkSCCayC-5b6Q960A@mail.gmail.com>
- <AFF4418B-740D-4FFE-A3A6-A92E73F0B901@goldelico.com>
-Message-ID: <CAK8P3a2DT+uOUWYFiYoc_=qFx1oS5xMgWmHde+8tm+BmAENaeg@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 15 Nov 2017 23:21:19 +0300
+Subject: [PATCH 3/3] arm64: dts: renesas: eagle: add EtherAVB pins
+In-Reply-To: <CAMuHMdX8j__iF5xP33Na9pVM1nRWvrE7e68-zg0oE0gE5MOHXw@mail.gmail.com>
+References: <20171110200714.406365231@cogentembedded.com>
+ <CAMuHMdWCj=CjA_zyC1GKr=KEk2CNMAtwvREw25R1uJktZucY4w@mail.gmail.com>
+ <1017d8fb-e353-f212-09a9-a28bf07eddc2@cogentembedded.com>
+ <CAMuHMdX8j__iF5xP33Na9pVM1nRWvrE7e68-zg0oE0gE5MOHXw@mail.gmail.com>
+Message-ID: <a65b8740-b133-eb92-5494-fb532554127b@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 8:55 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->> Am 15.11.2017 um 18:03 schrieb Arnd Bergmann <arnd@arndb.de>:
->> On Wed, Nov 15, 2017 at 5:27 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->>>> Am 15.11.2017 um 16:54 schrieb Arnd Bergmann <arnd@arndb.de>:
->>>> On Wed, Nov 15, 2017 at 4:19 PM, H. Nikolaus Schaller <hns@goldelico.com> wrote:
->>>>> Add driver for Wi2Wi W2SG0004/84 GPS module connected through uart.
->>>
->>> There is one more goal. Some people are dreaming about a generic GPS interface.
->>> Then, the driver wouldn't have to register a /dev/GPS tty any more but a
->>> gps_interface and mangle serial data as requested by that API. This will become
->>> a simple upgrade.
->>>
->>> So you can consider creating a new tty as sort of temporary solution. Like we
->>> had for years for UART HCI based bluetooth devices using a user-space daemon.
+Hello!
+
+On 11/15/2017 07:21 PM, Geert Uytterhoeven wrote:
+
+>>>> Add the (previously omitted) EtherAVB pin data to the Eagle board's
+>>>> device tree.
+> 
+>>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
+>>>> @@ -34,6 +34,9 @@
 >>
->> It shouldn't be hard to split out the tty_driver portion of your file from the
->> part that registers the port, basically getting two files that each handle
->> half of the work, and the second one would be generic from the start.
->
-> Hm. Sounds like a big hack to me instead of using existing API (serdev and tty_port)
-> and making the best out of it.
->
-> But I may have misunderstood what you mean by splitting out parts of
-> a tty (which one?) and why I need two files?
->
-> The structure of the driver is:
->
-> UART --> serdev magic ---> this device driver ---> register something to present data to user space ---> user space read()
->
-> Data should flow following this arrows.
-> And power control happens this way:
->
-> UART --> serdev magic ---> this device driver <--- register something to present data to user space <--- user space open()
-> GPIO <----------------------------+
->
-> So we need one serdev port to communicate with the device and something to present serial data to user-space (where gpsd runs).
-
-My suggestion was directed at replacing the big hack (adding one
-driver per port, and a different driver for each type of GPS hardware)
-with a smaller hack, using one driver to manage the ttyGPS name
-space for any implementation. That same driver could later even be
-expanded to offer additional ioctl interfaces, e.g. for reading the
-current position or time.
-
-Let's ignore that point for the moment though and finish the
-discussion below, I think it will become clearer what I meant here
-when the split between init() and probe() function is resolved.
-
->>>>> +       /* initialize the tty driver */
->>>>> +       data->tty_drv->owner = THIS_MODULE;
->>>>> +       data->tty_drv->driver_name = "w2sg0004";
->>>>> +       data->tty_drv->name = "ttyGPS";
->>>>> +       data->tty_drv->major = 0;
->>>>> +       data->tty_drv->minor_start = 0;
->>>>> +       data->tty_drv->type = TTY_DRIVER_TYPE_SERIAL;
->>>>> +       data->tty_drv->subtype = SERIAL_TYPE_NORMAL;
->>>>> +       data->tty_drv->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
->>>>> +       data->tty_drv->init_termios = tty_std_termios;
->>>>> +       data->tty_drv->init_termios.c_cflag = B9600 | CS8 | CREAD |
->>>>> +                                             HUPCL | CLOCAL;
->>>>> +       /*
->>>>> +        * optional:
->>>>> +        * tty_termios_encode_baud_rate(&data->tty_drv->init_termios,
->>>>> +                                       115200, 115200);
->>>>> +        * w2sg_tty_termios(&data->tty_drv->init_termios);
->>>>> +        */
->>>>> +       tty_set_operations(data->tty_drv, &w2sg_serial_ops);
+>> [...]
 >>>>
->>>> While I'm still not sure about why we want nested tty port, it
->>>> seems that we should have only one tty_driver that gets initialized
->>>> at module load time, rather than one driver structure per port.
+>>>> @@ -53,6 +56,11 @@
+>>>>    };
+>>>>
+>>>>    &pfc {
+>>>> +       avb_pins: avb {
+>>>> +               groups = "avb0_mdio", "avb0_mii";
 >>>
->>> If we have several such chips connected to different serdev UARTs
->>> we need different /dev/GPS to separate them in user-space.
+>>>
+>>> Oh no, its'called "avb0_mdio" here, but "avb(0)_mdc" on all other
+>>> R-Car Gen3 SoCs?
 >>
->> I understand that you need multiple devices, but I don't see
->> what having multiple drivers that all share the same name
->> "w2sg0004" helps. I would have expected that to fail in
->> tty_register_driver() when you get to the second driver,
->> but looking at the code, it doesn't actually try to make the name
->> unique
->
-> Yes, that is missing because I copied that from other drivers
-> and have no full understanding what is needed to make it really
-> work with multiple /dev/ttyGPS0 tty ports.
->
-> Therefore each probe (for each device connected to a different uart
-> of the SoC) should create a different /dev/ttyGPSn. Like you can have
-> multiple and independent i2c clients of the same type and driver.
-
-Right, that's what I mean. But each of those devices should
-use the same driver, just like each omap tty port uses the same
-'serial_omap_reg' (which includes a tty driver).
-
->> proc_tty_register_driver() will fail to create the second
->> procfs file, but we ignore that failure.
 >>
->> Why not call tty_register_driver() in the init function rather than probe()?
->
-> We have no dedicated init function. Should we have one?
->
-> And if I understand correctly it would prohibit to fix the driver for the
-> multiple gps-devices situation. Or makes more work if the device is to be
-> registered as a future GPS interface.
->
-> So if the ->driver_name or ->name should have a dynamic sequence number,
-> please help me to get it correct.
+>>     Can you remember the reason? I don;t want to follow the bad example. :-)
+> 
+> Sorry, I don't know.
 
-There should only be one driver structure, as in any other tty driver
-implementation. You have an init function inside of the
-module_serdev_device_driver() macro. When you open-code that,
-you can register the tty driver there before registering the serdev driver,
-see serial_omap_init() for a similar example using uart_driver and
-platform_driver.
+    Hm, you seem to have participated in the related discussions for H2/M3-W...
+The reason was that omlu AVB_MDC signal was multiplexed, AVB_MDIO signal (and 
+AVB MII signals) was mapped to a dedicated pin without any multiplexing, so 
+the "avb_mdc" group initially contained only AVB_MDC.
 
->>> The UART tty would be e.g. /dev/ttyO2 (on OMAP3) if no driver is
->>> installed. And the new one that is registered is /dev/GPS0. So the
->>> tty subsystem doesn't (or shouldn't) know they are related. They
->>> are only related/connected inside this driver. So I assume that
->>> some locking or reentrancy happens in tty_port_register_device().
->>
->> I meant the serdev->dev pointer that you pass into
->> tty_port_register_device() seems to be the same one that
->> got passed into the first tty_port_register_device() in the
->> parent uart_port.
->
-> Ah, interesting!
->
-> Well, I copied that from other drivers registering a tty without
-> understanding all side-effects of everything.
->
-> Documentations of tty_port_register_device() says:
-> @device: parent if exists, otherwise NULL
->
-> Do we really need a "parent" here? Could we safely pass NULL?
+> Gr{oetje,eeting}s,
 
-There should be a parent, to make it show up in the right place in sysfs.
-
-Ideally the parent should point to a device representing the original
-uart port. It probably is that right now, so I'd leave it like that if it
-works without getting you into a double probe.
-
-       Arnd
+MBR, Sergei
