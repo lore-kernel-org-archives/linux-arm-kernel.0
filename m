@@ -1,35 +1,45 @@
-From: yinbo.zhu@nxp.com (yinbo.zhu at nxp.com)
-Date: Wed, 15 Nov 2017 17:12:01 +0800
-Subject: [PATCH v1] ARM: dts: ls1021a: Enable the esdhc
-Message-ID: <20171115091201.48418-1-yinbo.zhu@nxp.com>
+From: jbe@pengutronix.de (Juergen Borleis)
+Date: Wed, 15 Nov 2017 10:53:12 +0100
+Subject: DryIce , RTC not working on imx53.
+In-Reply-To: <201711141343.15309.jbe@pengutronix.de>
+References: <3BB206AB2B1BD448954845CE6FF69A8E01B8E754AA@NT-Mail07.beckhoff.com>
+ <20171114105517.74ycmwcjsab7xp2j@piout.net>
+ <201711141343.15309.jbe@pengutronix.de>
+Message-ID: <201711151053.13676.jbe@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+Hi all,
 
-Ls1021a esdhc had been enabled in uboot,
-but it had not been enabled it in kernel,
-So set the esdhc's status to "okay".
+On Tuesday 14 November 2017 13:43:14 Myself wrote:
+> On Tuesday 14 November 2017 11:55:17 Alexandre Belloni wrote:
+> > On 14/11/2017 at 08:33:09 -0200, Fabio Estevam wrote:
+> > > On Tue, Nov 14, 2017 at 8:26 AM, Alexandre Belloni
+> > >
+> > > <alexandre.belloni@free-electrons.com> wrote:
+> > > >> I have the impression that the dryice driver has never worked in
+> > > >> mainlune for mx53.
+> > > >
+> > > > I doubt that because it seems to have been used by Pengutronix.
+> > >
+> > > Juergen can confirm, but it seems the dryice driver was only used on
+> > > mx25 in mainline.
+> >
+> > Ok, that would explain it.
+>
+> Yes. The development was made on an i.MX25. But currently I have an
+> i.MX53 on my desk here and could test...
 
-Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
----
- arch/arm/boot/dts/ls1021a-twr.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+After a quick look into the reference manuals:
 
-diff --git a/arch/arm/boot/dts/ls1021a-twr.dts b/arch/arm/boot/dts/ls1021a-twr.dts
-index a8b148ad1dd2..f7946f40d35d 100644
---- a/arch/arm/boot/dts/ls1021a-twr.dts
-+++ b/arch/arm/boot/dts/ls1021a-twr.dts
-@@ -228,6 +228,10 @@
- 	};
- };
- 
-+&esdhc {
-+        status = "okay";
-+};
-+
- &sai1 {
- 	status = "okay";
- };
+Patch 5b72505 ("ARM: dts: imx53: add srtc node") is bad. The i.MX53 provides 
+an RTC more close to the i.MX6 instead (e.g. rtc-snvs.c). But unfortunately 
+it uses a different register layout than the i.MX6 does. So we can't use 
+this driver without i.MX53 specific adaptions.
+But at least 5b72505 should be reverted.
+
+jb
+
 -- 
-2.14.1
+Pengutronix e.K. ? ? ? ? ? ? ? ? ? ? ? ? ?? ?| Juergen Borleis ? ? ? ? ? ? |
+Industrial Linux Solutions ? ? ? ? ? ? ? ?? ?| http://www.pengutronix.de/ ?|
