@@ -1,94 +1,47 @@
-From: troy.kisky@boundarydevices.com (Troy Kisky)
-Date: Wed, 15 Nov 2017 15:59:31 -0700
-Subject: [PATCH v4 1/1] tty: serial: imx: remove imx_disable_rx_int
-Message-ID: <20171115225931.22718-1-troy.kisky@boundarydevices.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 16 Nov 2017 00:18:11 +0100
+Subject: [PATCH for sre] Fix "backlight" on N9
+Message-ID: <20171115231811.GA25191@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since imx_disable_rx_int is only called by imx_startup,
-let's integrate it into that function. Notice UCR2_ATEN
-is never set in the driver, but I keep the clear so
-that I am only moving thing. Hopefully, the ageing timer
-will soon be used.
+Hi!
 
-Signed-off-by: Troy Kisky <troy.kisky@boundarydevices.com>
----
-v2: new patch
-v3: rebased on tty-next
-v4: Added UCR2_ATEN statement to commit message
-	as suggested by Uwe
----
- drivers/tty/serial/imx.c | 36 +++++++++---------------------------
- 1 file changed, 9 insertions(+), 27 deletions(-)
+This should get "backlight" to work on N9/N950.
 
-diff --git a/drivers/tty/serial/imx.c b/drivers/tty/serial/imx.c
-index a67a606c38eb..43dfd82e4e28 100644
---- a/drivers/tty/serial/imx.c
-+++ b/drivers/tty/serial/imx.c
-@@ -703,25 +703,6 @@ static irqreturn_t imx_rxint(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
+First hunk may not apply to you.
+
+Signed-off-by: Pavel Machek <pavel@ucw.cz>
+
+diff --git a/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c b/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
+index 24b459e..57827a1 100644
+--- a/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
++++ b/drivers/gpu/drm/omapdrm/displays/panel-dsi-cm.c
+@@ -374,8 +374,6 @@ static int dsicm_bl_update_status(struct backlight_device *dev)
+ 	else
+ 		level = 0;
  
--static void imx_disable_rx_int(struct imx_port *sport)
--{
--	unsigned long temp;
+-	level = 0xff;
 -
--	/* disable the receiver ready and aging timer interrupts */
--	temp = readl(sport->port.membase + UCR1);
--	temp &= ~(UCR1_RRDYEN);
--	writel(temp, sport->port.membase + UCR1);
--
--	temp = readl(sport->port.membase + UCR2);
--	temp &= ~(UCR2_ATEN);
--	writel(temp, sport->port.membase + UCR2);
--
--	/* disable the rx errors interrupts */
--	temp = readl(sport->port.membase + UCR4);
--	temp &= ~UCR4_OREN;
--	writel(temp, sport->port.membase + UCR4);
--}
--
- static void clear_rx_errors(struct imx_port *sport);
+ 	dev_dbg(&ddata->pdev->dev, "update brightness to %d\n", level);
  
- /*
-@@ -1252,18 +1233,21 @@ static int imx_startup(struct uart_port *port)
- 	if (sport->dma_is_inited && !sport->dma_is_enabled)
- 		imx_enable_dma(sport);
+ 	mutex_lock(&ddata->lock);
+@@ -1382,6 +1380,7 @@ static int dsicm_probe(struct platform_device *pdev)
+ 	if (ddata->use_dsi_backlight) {
+ 		struct backlight_properties props = { 0 };
+ 		props.max_brightness = 255;
++		props.brightness = 128;
+ 		props.type = BACKLIGHT_RAW;
  
--	temp = readl(sport->port.membase + UCR1);
--	temp |= UCR1_RRDYEN | UCR1_UARTEN;
-+	temp = readl(sport->port.membase + UCR1) & ~UCR1_RRDYEN;
-+	if (!sport->dma_is_enabled)
-+		temp |= UCR1_RRDYEN;
-+	temp |= UCR1_UARTEN;
- 	if (sport->have_rtscts)
- 			temp |= UCR1_RTSDEN;
- 
- 	writel(temp, sport->port.membase + UCR1);
- 
--	temp = readl(sport->port.membase + UCR4);
--	temp |= UCR4_OREN;
-+	temp = readl(sport->port.membase + UCR4) & ~UCR4_OREN;
-+	if (!sport->dma_is_enabled)
-+		temp |= UCR4_OREN;
- 	writel(temp, sport->port.membase + UCR4);
- 
--	temp = readl(sport->port.membase + UCR2);
-+	temp = readl(sport->port.membase + UCR2) & ~UCR2_ATEN;
- 	temp |= (UCR2_RXEN | UCR2_TXEN);
- 	if (!sport->have_rtscts)
- 		temp |= UCR2_IRTS;
-@@ -1297,10 +1281,8 @@ static int imx_startup(struct uart_port *port)
- 	 * In our iMX53 the average delay for the first reception dropped from
- 	 * approximately 35000 microseconds to 1000 microseconds.
- 	 */
--	if (sport->dma_is_enabled) {
--		imx_disable_rx_int(sport);
-+	if (sport->dma_is_enabled)
- 		start_rx_dma(sport);
--	}
- 
- 	spin_unlock_irqrestore(&sport->port.lock, flags);
- 
+ 		bldev = devm_backlight_device_register(dev, dev_name(dev),
+
 -- 
-2.11.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171116/d2f85956/attachment.sig>
