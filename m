@@ -1,10 +1,10 @@
 From: mark.yao@rock-chips.com (Mark yao)
-Date: Thu, 16 Nov 2017 13:59:45 +0800
+Date: Thu, 16 Nov 2017 14:00:32 +0800
 Subject: [PATCH 2/2] drm/rockchip: vop: add rk3126 vop support
 In-Reply-To: <1510658857-90299-1-git-send-email-hjc@rock-chips.com>
 References: <1510658851-90160-1-git-send-email-hjc@rock-chips.com>
  <1510658857-90299-1-git-send-email-hjc@rock-chips.com>
-Message-ID: <5cea095e-41fe-32de-2b01-5c03f267b65e@rock-chips.com>
+Message-ID: <d0a8186a-e919-d2de-3ee8-b3cb8d9247d2@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,7 +19,6 @@ On 2017?11?14? 19:27, Sandy Huang wrote:
 > Signed-off-by: Sandy Huang <hjc@rock-chips.com>
 
 Looks good.
-
 Reviewed-by:? Mark Yao <mark.yao@rock-chips.com>
 
 > ---
