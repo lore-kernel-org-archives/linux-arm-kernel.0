@@ -1,23 +1,20 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Nov 2017 19:53:37 +0800
-Subject: [PATCH] Revert "ARM: dts: imx53: add srtc node"
-In-Reply-To: <1510747433-23503-1-git-send-email-festevam@gmail.com>
-References: <1510747433-23503-1-git-send-email-festevam@gmail.com>
-Message-ID: <20171116115336.GT25384@dragon>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Nov 2017 11:54:33 +0000
+Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
+In-Reply-To: <20171115213428.22559-12-samitolvanen@google.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-12-samitolvanen@google.com>
+Message-ID: <20171116115433.GG9361@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 10:03:53AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On Wed, Nov 15, 2017 at 01:34:21PM -0800, Sami Tolvanen wrote:
+> From: Alex Matveev <alxmtvv@gmail.com>
 > 
-> This reverts commit 5b725054147deaf966b3919e10a86c6bfe946a18.
-> 
-> The rtc block on i.MX53 is a completely different hardware than the
-> one found on i.MX25.
-> 
-> Cc: <stable@vger.kernel.org> #4.14
-> Reported-by: Noel Vellemans <Noel.Vellemans@visionbms.com>
-> Suggested-by: Juergen Borleis <jbe@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
+> in-place and workaround gcc and clang limitations on redefining macros
+> across different assembler blocks.
 
-Applied, thanks.
+What limitations? Can you elaborate please? Is this a fix?
+
+Will
