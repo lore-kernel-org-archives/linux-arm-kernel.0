@@ -1,36 +1,32 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu, 16 Nov 2017 09:50:15 +0100
-Subject: [PATCH v2 0/4] Fixes for omapdrm on OpenPandora and GTA04
-Message-ID: <cover.1510822218.git.hns@goldelico.com>
+Date: Thu, 16 Nov 2017 09:50:18 +0100
+Subject: [PATCH v2 3/4] DTS: Pandora: fix panel compatibility string
+In-Reply-To: <cover.1510822218.git.hns@goldelico.com>
+References: <cover.1510822218.git.hns@goldelico.com>
+Message-ID: <f9e764c18a8fc77160ddea4fb61e63f703a0c19e.1510822218.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V2:
-* replaced patch to fix DSI VDDS for OMAP3 by equivalent patch from Laurent Pinchart
-* keep previous compatibility option in panel driver to handle older device tree binaries
+We can remove the "omapdss," prefix because the
+omapdrm driver takes care of it.
 
-2017-11-08 22:09:36:
-This patch set fixes vendor names of the panels
-and fixes a problem on omapdrm with enabling
-VDD_DSI for OMAP3 which is needed for displaying
-the Red and Green channel on OMAP3530 (Pandora).
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+---
+ arch/arm/boot/dts/omap3-pandora-common.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-H. Nikolaus Schaller (3):
-  omapdrm: fix compatible string for td028ttec1
-  DTS: GTA04: fix panel compatibility string
-  DTS: Pandora: fix panel compatibility string
-
-Laurent Pinchart (1):
-  drm: omapdrm: Fix DPI on platforms using the DSI VDDS
-
- .../display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt}      | 4 ++--
- arch/arm/boot/dts/omap3-gta04.dtsi                                    | 2 +-
- arch/arm/boot/dts/omap3-pandora-common.dtsi                           | 2 +-
- drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c               | 4 ++--
- drivers/gpu/drm/omapdrm/dss/dpi.c                                     | 4 ++--
- drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c      | 4 +++-
- 6 files changed, 11 insertions(+), 9 deletions(-)
- rename Documentation/devicetree/bindings/display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt} (84%)
-
+diff --git a/arch/arm/boot/dts/omap3-pandora-common.dtsi b/arch/arm/boot/dts/omap3-pandora-common.dtsi
+index 53e007abdc71..64d967ec8c58 100644
+--- a/arch/arm/boot/dts/omap3-pandora-common.dtsi
++++ b/arch/arm/boot/dts/omap3-pandora-common.dtsi
+@@ -626,7 +626,7 @@
+ 
+ 	lcd: lcd at 1 {
+ 		reg = <1>;	/* CS1 */
+-		compatible =	"omapdss,tpo,td043mtea1";
++		compatible =	"tpo,td043mtea1";
+ 		spi-max-frequency = <100000>;
+ 		spi-cpol;
+ 		spi-cpha;
 -- 
 2.12.2
