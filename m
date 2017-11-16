@@ -1,21 +1,17 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Nov 2017 19:12:25 +0800
-Subject: [PATCH] ARM: dts: imx6qdl-wandboard-revd1: Make EDID functional
-In-Reply-To: <1510064971-18755-1-git-send-email-fabio.estevam@nxp.com>
-References: <1510064971-18755-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20171116111224.GO25384@dragon>
+Date: Thu, 16 Nov 2017 19:19:54 +0800
+Subject: [PATCH] ARM: dts: vf610-zii-dev-c: Fix switch EEPROM size
+In-Reply-To: <1510271336-30769-1-git-send-email-andrew@lunn.ch>
+References: <1510271336-30769-1-git-send-email-andrew@lunn.ch>
+Message-ID: <20171116111953.GP25384@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 12:29:31PM -0200, Fabio Estevam wrote:
-> There are 0 ohm resistors that allow selecting the EDID I2C port to
-> be I2C1 or I2C2.
+On Fri, Nov 10, 2017 at 12:48:56AM +0100, Andrew Lunn wrote:
+> The two Ethernet switches have an AT24C512 each. This is a 64K device,
+> not 512 bytes as currently listed in the device tree.
 > 
-> On revd1 the 0 ohm resistors are populated in such a way that the I2C2
-> is used as DDC I2C bus, so fix it accordingly. 
-> 
-> Reported-by: Lu?s Mendes <luis.p.mendes@gmail.com>
-> Suggested-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> Reported-by: Chris Healy <cphealy@gmail.com>
+> Signed-off-by: Andrew Lunn <andrew@lunn.ch>
 
 Applied, thanks.
