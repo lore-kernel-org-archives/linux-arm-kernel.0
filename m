@@ -1,29 +1,55 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 16 Nov 2017 17:01:13 +0800
-Subject: [PATCH v5 0/2] meson: saradc: drop the sana clock
-Message-ID: <20171116090115.29915-1-yixun.lan@amlogic.com>
+Date: Thu, 16 Nov 2017 17:01:14 +0800
+Subject: [PATCH v5 1/2] ARM64: dts: meson: drop "sana" clock from SAR ADC
+In-Reply-To: <20171116090115.29915-1-yixun.lan@amlogic.com>
+References: <20171116090115.29915-1-yixun.lan@amlogic.com>
+Message-ID: <20171116090115.29915-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is a rework for the patch [v4 4/4] of previous series,
-which mean this will make the patch [1] obsolete.
+From: Xingyu Chen <xingyu.chen@amlogic.com>
 
-Changes since v4:
- * separate DTS for ARM(32bit) vs ARM64
- * add ACK from Martin
+The SAR ADC modules doesn't require The "sana" clock.
 
-[1] [PATCH v4 4/4] ARM64: dts: meson: drop "sana" clock from SAR ADC
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005266.html
-
-Xingyu Chen (2):
-  ARM64: dts: meson: drop "sana" clock from SAR ADC
-  ARM: dts: meson: drop "sana" clock from SAR ADC
-
- arch/arm/boot/dts/meson8.dtsi               | 5 ++---
- arch/arm/boot/dts/meson8b.dtsi              | 5 ++---
+Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
+Singed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
  arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 3 +--
  arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 3 +--
- 4 files changed, 6 insertions(+), 10 deletions(-)
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index af834cdbba79..b77f2593cdc3 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -686,10 +686,9 @@
+ 	compatible = "amlogic,meson-gxbb-saradc", "amlogic,meson-saradc";
+ 	clocks = <&xtal>,
+ 		 <&clkc CLKID_SAR_ADC>,
+-		 <&clkc CLKID_SANA>,
+ 		 <&clkc CLKID_SAR_ADC_CLK>,
+ 		 <&clkc CLKID_SAR_ADC_SEL>;
+-	clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
++	clock-names = "clkin", "core", "adc_clk", "adc_sel";
+ };
+ 
+ &sd_emmc_a {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index d8dd3298b15c..07805a3b4db0 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -628,10 +628,9 @@
+ 	compatible = "amlogic,meson-gxl-saradc", "amlogic,meson-saradc";
+ 	clocks = <&xtal>,
+ 		 <&clkc CLKID_SAR_ADC>,
+-		 <&clkc CLKID_SANA>,
+ 		 <&clkc CLKID_SAR_ADC_CLK>,
+ 		 <&clkc CLKID_SAR_ADC_SEL>;
+-	clock-names = "clkin", "core", "sana", "adc_clk", "adc_sel";
++	clock-names = "clkin", "core", "adc_clk", "adc_sel";
+ };
+ 
+ &sd_emmc_a {
 -- 
 2.14.1
