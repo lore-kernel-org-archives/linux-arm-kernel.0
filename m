@@ -1,19 +1,19 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Nov 2017 11:46:17 +0000
-Subject: [PATCH v2 06/18] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <20171115213428.22559-7-samitolvanen@google.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-7-samitolvanen@google.com>
-Message-ID: <20171116114616.GC9361@arm.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 16 Nov 2017 19:46:13 +0800
+Subject: [PATCH v1] ARM: dts: ls1021a: Enable the esdhc
+In-Reply-To: <20171115091201.48418-1-yinbo.zhu@nxp.com>
+References: <20171115091201.48418-1-yinbo.zhu@nxp.com>
+Message-ID: <20171116114611.GR25384@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 01:34:16PM -0800, Sami Tolvanen wrote:
-> Use -fno-jump-tables to make sure clang doesn't generate branches
-> to EL1 virtual addresses.
+On Wed, Nov 15, 2017 at 05:12:01PM +0800, yinbo.zhu at nxp.com wrote:
+> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+> 
+> Ls1021a esdhc had been enabled in uboot,
+> but it had not been enabled it in kernel,
+> So set the esdhc's status to "okay".
+> 
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
 
-Can you elaborate a bit more on exactly what you saw failing here, please?
-Whilst it's obviously broken to jump to EL1 from EL2 w/o VHE, the commit
-message is a bit cryptic.
-
-Will
+Applied, thanks.
