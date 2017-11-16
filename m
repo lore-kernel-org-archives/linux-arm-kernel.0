@@ -1,29 +1,44 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 16 Nov 2017 15:39:18 +0000
-Subject: [PATCH v3 0/3] KVM: arm64: single step emulation instructions
-Message-ID: <20171116153921.21991-1-alex.bennee@linaro.org>
+Date: Thu, 16 Nov 2017 15:39:21 +0000
+Subject: [PATCH v3 3/3] kvm: arm64: handle single-step of userspace mmio
+ instructions
+In-Reply-To: <20171116153921.21991-1-alex.bennee@linaro.org>
+References: <20171116153921.21991-1-alex.bennee@linaro.org>
+Message-ID: <20171116153921.21991-4-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The system state of KVM when using userspace emulation is not complete
+until we return into KVM_RUN. To handle mmio related updates we wait
+until they have been committed and then schedule our KVM_EXIT_DEBUG.
 
-This is rev 3 of the series, practically the same than rev 2 but fixed
-a return 1->0 in the kvm_run loop that Julien caught. I've added his
-r-b tags to the other patches.
+The kvm_arm_handle_step_debug() helper tells us if we need to return
+and sets up the exit_reason for us.
 
-As usual revision details bellow the --- in each patch.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-Alex Benn?e (3):
-  kvm: arm debug: introduce helper for single-step
-  kvm: arm64: handle single-stepping trapped instructions
-  kvm: arm64: handle single-step of userspace mmio instructions
+---
+v2
+  - call helper directly from kvm_arch_vcpu_ioctl_run
+v3
+  - return 0 (ioctl success) instead of 1
+---
+ virt/kvm/arm/arm.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
- arch/arm/include/asm/kvm_host.h   |  5 +++++
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/kvm/debug.c            | 22 ++++++++++++++++++
- arch/arm64/kvm/handle_exit.c      | 47 +++++++++++++++++++++++++++------------
- virt/kvm/arm/arm.c                |  3 +++
- 5 files changed, 64 insertions(+), 14 deletions(-)
-
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 95cba0799828..b40440defca1 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -625,6 +625,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
+ 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
+ 		if (ret)
+ 			return ret;
++		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
++			return 0;
++
+ 	}
+ 
+ 	if (run->immediate_exit)
 -- 
 2.15.0
