@@ -1,47 +1,35 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Nov 2017 17:58:17 +0000
-Subject: [PATCH 3/7] KVM: arm/arm64: vgic-its: Preserve the revious read from
- the pending table
+Date: Thu, 16 Nov 2017 17:58:18 +0000
+Subject: [PATCH 4/7] KVM: arm/arm64: vgic-its: Check result of allocation
+ before use
 In-Reply-To: <20171116175821.26544-1-marc.zyngier@arm.com>
 References: <20171116175821.26544-1-marc.zyngier@arm.com>
-Message-ID: <20171116175821.26544-4-marc.zyngier@arm.com>
+Message-ID: <20171116175821.26544-5-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current pending table parsing code assumes that we keep the
-previous read of the pending bits, but keep that variable in
-the current block, making sure it is discarded on each loop.
+We miss a test against NULL after allocation.
 
-We end-up using whatever is on the stack. Who knows, it might
-just be the right thing...
-
-Fixes: 33d3bc9556a7d ("KVM: arm64: vgic-its: Read initial LPI pending table")
+Fixes: 6d03a68f8054 ("KVM: arm64: vgic-its: Turn device_id validation into generic ID validation")
 Cc: stable at vger.kernel.org # 4.8
 Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/vgic/vgic-its.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic-its.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
 diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-index a3754ec719c4..370086006838 100644
+index 370086006838..30f7c7e6d2f4 100644
 --- a/virt/kvm/arm/vgic/vgic-its.c
 +++ b/virt/kvm/arm/vgic/vgic-its.c
-@@ -421,6 +421,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
- 	u32 *intids;
- 	int nr_irqs, i;
- 	unsigned long flags;
-+	u8 pendmask;
+@@ -821,6 +821,8 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+ 		return E_ITS_MAPC_COLLECTION_OOR;
  
- 	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
- 	if (nr_irqs < 0)
-@@ -428,7 +429,6 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
+ 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
++	if (!collection)
++		return -ENOMEM;
  
- 	for (i = 0; i < nr_irqs; i++) {
- 		int byte_offset, bit_nr;
--		u8 pendmask;
- 
- 		byte_offset = intids[i] / BITS_PER_BYTE;
- 		bit_nr = intids[i] % BITS_PER_BYTE;
+ 	collection->collection_id = coll_id;
+ 	collection->target_addr = COLLECTION_NOT_MAPPED;
 -- 
 2.14.2
