@@ -1,68 +1,43 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 16 Nov 2017 09:53:39 +0530
-Subject: [PATCH v3 6/9] clocksource: dmtimer: Populate the timer ops to the
- pdata
+Date: Thu, 16 Nov 2017 09:53:35 +0530
+Subject: [PATCH v3 2/9] arm: omap: timer: Wrap the inline functions under
+ OMAP2PLUS define
 In-Reply-To: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
 References: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1510806222-22096-7-git-send-email-j-keerthy@ti.com>
+Message-ID: <1510806222-22096-3-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the timer ops to the platform data
+Wrap the inline functions under OMAP2PLUS/OMAP1 defines.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
-Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
 ---
+ arch/arm/plat-omap/include/plat/dmtimer.h | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Changes in v3:
-
-  * Added Sebastian's Reviewed-by.
-
-Changes in v2:
-
-  * No code changes in this v2 version. Only enhanced patch
-    statistics for renames.
-
- drivers/clocksource/dmtimer.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
-
-diff --git a/drivers/clocksource/dmtimer.c b/drivers/clocksource/dmtimer.c
-index afe1dc9..1cbd954 100644
---- a/drivers/clocksource/dmtimer.c
-+++ b/drivers/clocksource/dmtimer.c
-@@ -922,8 +922,33 @@ static int omap_dm_timer_remove(struct platform_device *pdev)
- 	return ret;
+diff --git a/arch/arm/plat-omap/include/plat/dmtimer.h b/arch/arm/plat-omap/include/plat/dmtimer.h
+index dd79f30..862ad62 100644
+--- a/arch/arm/plat-omap/include/plat/dmtimer.h
++++ b/arch/arm/plat-omap/include/plat/dmtimer.h
+@@ -276,6 +276,12 @@ struct omap_dm_timer {
+ #define OMAP_TIMER_TICK_INT_MASK_COUNT_REG				\
+ 		(_OMAP_TIMER_TICK_INT_MASK_COUNT_OFFSET | (WP_TOWR << WPSHIFT))
+ 
++/*
++ * The below are inlined to optimize code size for system timers. Other code
++ * should not need these@all, see
++ * include/linux/platform_data/pwm_omap_dmtimer.h
++ */
++#if defined(CONFIG_ARCH_OMAP1) || defined(CONFIG_ARCH_OMAP2PLUS)
+ static inline u32 __omap_dm_timer_read(struct omap_dm_timer *timer, u32 reg,
+ 						int posted)
+ {
+@@ -414,5 +420,5 @@ static inline void __omap_dm_timer_write_status(struct omap_dm_timer *timer,
+ {
+ 	writel_relaxed(value, timer->irq_stat);
  }
- 
-+static struct omap_dm_timer_ops dmtimer_ops = {
-+	.request_by_node = omap_dm_timer_request_by_node,
-+	.request_specific = omap_dm_timer_request_specific,
-+	.request = omap_dm_timer_request,
-+	.set_source = omap_dm_timer_set_source,
-+	.get_irq = omap_dm_timer_get_irq,
-+	.set_int_enable = omap_dm_timer_set_int_enable,
-+	.set_int_disable = omap_dm_timer_set_int_disable,
-+	.free = omap_dm_timer_free,
-+	.enable = omap_dm_timer_enable,
-+	.disable = omap_dm_timer_disable,
-+	.get_fclk = omap_dm_timer_get_fclk,
-+	.start = omap_dm_timer_start,
-+	.stop = omap_dm_timer_stop,
-+	.set_load = omap_dm_timer_set_load,
-+	.set_match = omap_dm_timer_set_match,
-+	.set_pwm = omap_dm_timer_set_pwm,
-+	.set_prescaler = omap_dm_timer_set_prescaler,
-+	.read_counter = omap_dm_timer_read_counter,
-+	.write_counter = omap_dm_timer_write_counter,
-+	.read_status = omap_dm_timer_read_status,
-+	.write_status = omap_dm_timer_write_status,
-+};
-+
- static const struct dmtimer_platform_data omap3plus_pdata = {
- 	.timer_errata = OMAP_TIMER_ERRATA_I103_I767,
-+	.timer_ops = &dmtimer_ops,
- };
- 
- static const struct of_device_id omap_timer_match[] = {
+-
++#endif /* CONFIG_ARCH_OMAP1 || CONFIG_ARCH_OMAP2PLUS */
+ #endif /* __ASM_ARCH_DMTIMER_H */
 -- 
 1.9.1
