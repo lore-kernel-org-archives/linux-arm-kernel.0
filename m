@@ -1,24 +1,26 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Nov 2017 15:33:32 +0800
-Subject: [RESEND PATCH] ARM: dts: ls1021a: Add support for QSPI with
- ls1021a SoC
-In-Reply-To: <CADRPPNREzRzzW-VRpm6P3y8_sYwvm_c13n6vjgQZP24fxO9uKQ@mail.gmail.com>
-References: <20170912064925.24571-1-sz.lin@moxa.com>
- <CADRPPNREzRzzW-VRpm6P3y8_sYwvm_c13n6vjgQZP24fxO9uKQ@mail.gmail.com>
-Message-ID: <20171116073331.GA25384@dragon>
+Date: Thu, 16 Nov 2017 15:36:05 +0800
+Subject: [PATCH v5] ARM: dts: imx53-tx53: Fix 'ethernet-phy@0' node with
+ unit name and no reg property
+In-Reply-To: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
+References: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <20171116073604.GB25384@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 25, 2017 at 04:00:36PM -0500, Li Yang wrote:
-> On Tue, Sep 12, 2017 at 1:49 AM, SZ Lin <sz.lin@moxa.com> wrote:
-> > Add QSPI node support, and this function is disabled by default
-> > This setting could be overwritten in board-level definitions
+On Thu, Oct 26, 2017 at 01:25:14PM -0200, Marco Franchi wrote:
+> The following build warning is seen with W=1:
 > 
-> Adding Shawn Guo.
+> Warning (unit_address_vs_reg): Node /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has a unit name, but no reg property
 > 
-> >
-> > Signed-off-by: SZ Lin <sz.lin@moxa.com>
+> Fix this warning by adding reg property from such node and, consequently, 
+> includes a mdio node into the fec node, with the 'address-cells' and 
+> 'size-cells' to avoid these other following warnings:
 > 
-> Acked-by: Li Yang <leoyang.li@nxp.com>
+> Warning (reg_format): "reg" property in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
+> Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+> Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+> 
+> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 
 Applied, thanks.
