@@ -1,89 +1,57 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 16 Nov 2017 14:17:45 -0600
-Subject: [PATCH v2 4/4] PCI/AER: Dont do recovery when DPC is enabled
-In-Reply-To: <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
-References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
- <1510721808-27164-5-git-send-email-poza@codeaurora.org>
- <20171115211447.GA7266@bhelgaas-glaptop.roam.corp.google.com>
- <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
-Message-ID: <20171116201745.GB7266@bhelgaas-glaptop.roam.corp.google.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 16 Nov 2017 12:21:39 -0800
+Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
+In-Reply-To: <CALeDE9OySr2LpcedpTHnz89aFYAk2CknKGHeVx+4ecFCemYZPw@mail.gmail.com>
+References: <20171006220504.7776-1-eric@anholt.net>
+ <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
+ <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
+ <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
+ <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
+ <CALeDE9Oi+DvoJ6X22ButaQxHNyqBzg=H1-mb69_g-rp4RR_fqw@mail.gmail.com>
+ <F3464528-76E5-4F11-BD58-DEB56410687B@holtmann.org>
+ <CALeDE9OySr2LpcedpTHnz89aFYAk2CknKGHeVx+4ecFCemYZPw@mail.gmail.com>
+Message-ID: <87k1yqq8j0.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 09:03:37AM -0500, Sinan Kaya wrote:
-> On 11/15/2017 4:14 PM, Bjorn Helgaas wrote:
-> >> +	if (pcie_port_query_uptream_service(dev, PCIE_PORT_SERVICE_DPC)) {
-> >> +		dev_info(&dev->dev, "AER: Device recovery to be done by DPC\n");
-> >> +		return;
-> >> +	}
-> > What happens without this test?
-> > 
-> > Does AER read registers from the now-disabled device and get ~0 data?
-> > Or is AER reading registers from the port upstream from the disabled
-> > device and trying to reset the device?
-> > 
-> > It looks like get_device_error_info() reads registers and doesn't
-> > check to see whether it gets ~0 back.  I'm wondering if we *should* be
-> > checking there and whether doing that would help mitigate the issue
-> > here.
-> 
-> The issue is two independent software entities are trying to recover
-> the PCIe link simultaneously. AER and DPC have two different
-> approaches to link recovery.
-> 
-> AER makes a callback into the endpoint drivers for non-fatal errors
-> and hope that endpoint driver can recover the link. AER also makes a
-> callback in the fatal error case but resets the link via secondary
-> bus reset.
-> 
-> The DPC on the other hand stops the drivers immediately since HW
-> took care of link disable. (Endpoint register reads return ~0 at
-> this point.) DPC driver clears the interrupt from the DPC capability
-> and brings the link up at the end. Full enumeration/rescan follows
-> this procedure to go back to functioning state. 
-> 
-> If we don't have this AER-DPC coordination, the endpoint driver gets
-> confused since it receives a stop command as well as a recover
-> command at about the same time depending on the timing.
-> 
-> Whether the AER driver reads ~0 or not really depends on timing. The
-> link may come up from the DPC driver by the time AER driver reaches
-> here as an example.
-> 
-> Bad things do happen. We have seen this with e1000e driver.
+Peter Robinson <pbrobinson@gmail.com> writes:
 
-I don't doubt that bad things happen.  I'm just trying to understand
-exactly *what* bad things happen and how, so we can fix them cleanly.
+> Hi Marcel,
+>
+> Sorry for the late response.
+>
+>>>>>> Mainline boots fine if I use console=ttyS1 or drop the console arg
+>>>>>> altogether, but as we don't currently support different boot args per
+>>>>>> tree, and we don't have the manpower to track this patch in all the
+>>>>>> trees we test, we will have to switch to only boot testing mainline
+>>>>>> from now on.
+>>>>> Yes, I've seen the same in Fedora with that patch.
+>>>>>
+>>>>>
+>>>> could you please describe the issue more in detail.
+>>>>
+>>>> Does u-boot or Linux hang? Does u-boot select the wrong UART? Is there a
+>>>> pinmux conflict?
+>>>
+>>> Basically on the RPi3 you use to get ttyAMA0 and ttyS0 but now the
+>>> later is ttyS1
+>>
+>> which UART is which now. It should expose the Bluetooth UART correctly now. And also more importantly usable. The only missing piece with 4.14 would be the DT assigned for serdev. While 4.14 would still require a call to btattach, starting with 4.15 that should no longer be needed.
+>
+> Looks to be ttyAMA0
+>
+> [    4.480469] 3f201000.serial: ttyAMA0 at MMIO 0x3f201000 (irq = 72,
+> base_baud = 0) is a PL011 rev2
+> [    4.497401] serial serial0: tty port ttyAMA0 registered
+>
+> With 4.14 I get the following, the address doesn't look right, do you
+> have a link to the serdev patch headed to 4.15?
 
-I don't know exactly what you mean by "DPC stops the drivers
-immediately".  Since the DPC hardware disables the Link, I *think*
-you probably mean that driver accesses to the device start failing
-(whether the driver notices this is a whole different question).
-
-When the DPC hardware disables the Link, it causes a hot reset for
-downstream components.  The DPC interrupt_event_handler() doesn't do
-much except remove the device (which detaches the driver) and clear
-the DPC Trigger Status bit (which allows hardware to try to retrain
-the Link).
-
-So the "stop" and "recover" commands you mention must be related to
-AER.  I guess these would be some of the driver callbacks
-(error_detected(), mmio_enabled(), slot_reset(), reset_prepare(),
-reset_done(), resume())?
-
-In any case, I agree that it probably doesn't make sense to call any
-of these callbacks if the DPC driver has already detached the driver
-and re-attached it.  The device state is gone because of the hot reset
-and the driver state is gone because of the detach/re-attach.
-
-However, I'm not so sure about the period *before* the DPC driver
-detaches the driver.  The description of error_detected() says it
-cannot assume the device is accessible, so I think there might be an
-argument that AER *should* call this for DPC events so the driver has
-a chance to clean up before being unceremoniously detached.
-
-I suspect this all probably requires tighter integration between DPC
-and AER, and I'm totally fine with that.  I think the current
-separation as separate "drivers" is pretty artificial anyway.
-
-Bjorn
+https://github.com/anholt/linux/commit/fd3372db18d3d44ae4579243a8eacb5247d8c03a
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171116/507988ff/attachment.sig>
