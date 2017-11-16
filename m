@@ -1,37 +1,49 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Nov 2017 17:58:19 +0000
-Subject: [PATCH 5/7] KVM: arm/arm64: vgic-v4: Only perform an unmap for valid
- vLPIs
-In-Reply-To: <20171116175821.26544-1-marc.zyngier@arm.com>
-References: <20171116175821.26544-1-marc.zyngier@arm.com>
-Message-ID: <20171116175821.26544-6-marc.zyngier@arm.com>
+From: alxmtvv@gmail.com (Alex Matveev)
+Date: Thu, 16 Nov 2017 18:14:54 +0000
+Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
+In-Reply-To: <20171116115433.GG9361@arm.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-12-samitolvanen@google.com>
+ <20171116115433.GG9361@arm.com>
+Message-ID: <20171116181454.79ecb9fc@delmar.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Before performing an unmap, let's check that what we have was
-really mapped the first place.
+On Thu, 16 Nov 2017 11:54:33 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- virt/kvm/arm/vgic/vgic-v4.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+> On Wed, Nov 15, 2017 at 01:34:21PM -0800, Sami Tolvanen wrote:
+> > From: Alex Matveev <alxmtvv@gmail.com>
+> > 
+> > Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
+> > in-place and workaround gcc and clang limitations on redefining
+> > macros across different assembler blocks.  
+> 
+> What limitations? Can you elaborate please? Is this a fix?
 
-diff --git a/virt/kvm/arm/vgic/vgic-v4.c b/virt/kvm/arm/vgic/vgic-v4.c
-index 53c324aa44ef..4a37292855bc 100644
---- a/virt/kvm/arm/vgic/vgic-v4.c
-+++ b/virt/kvm/arm/vgic/vgic-v4.c
-@@ -337,8 +337,10 @@ int kvm_vgic_v4_unset_forwarding(struct kvm *kvm, int virq,
- 		goto out;
- 
- 	WARN_ON(!(irq->hw && irq->host_irq == virq));
--	irq->hw = false;
--	ret = its_unmap_vlpi(virq);
-+	if (irq->hw) {
-+		irq->hw = false;
-+		ret = its_unmap_vlpi(virq);
-+	}
- 
- out:
- 	mutex_unlock(&its->its_lock);
--- 
-2.14.2
+Ok, here's the detailed explanation. Current state after preprocessing
+is like this:
+
+asm volatile(".macro mXX_s ... .endm");
+void f()
+{
+	asm volatile("mXX_s a, b");
+}
+
+With GCC, it gives macro redefinition error because sysreg.h is
+included in multiple source files, and assembler code for all of them
+is later combined for LTO (I've seen an intermediate file with hundreds
+of identical definitions).
+
+With clang, it gives macro undefined error because clang doesn't allow
+sharing macros between inline asm statements.
+
+I also seem to remember catching another sort of undefined error with
+GCC due to reordering of macro definition asm statement and generated
+asm code for function that uses the macro.
+
+Solution with defining and undefining for each use, while certainly not
+elegant, satisfies both GCC and clang, LTO and non-LTO.
+
+Regards,
+Alex
