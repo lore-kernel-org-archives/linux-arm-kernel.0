@@ -1,75 +1,34 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu, 16 Nov 2017 17:10:56 +0100
-Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
-In-Reply-To: <d90ee1ee-8a33-de04-bb8b-2f10e0a80a61@ti.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
- <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
- <130D3B71-C0CE-4755-BF06-971681F630BC@goldelico.com>
- <d90ee1ee-8a33-de04-bb8b-2f10e0a80a61@ti.com>
-Message-ID: <908C52B9-83E2-49B3-B5B4-D8F27A96ECD6@goldelico.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Thu, 16 Nov 2017 08:17:31 -0800
+Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
+In-Reply-To: <20171116115810.GH9361@arm.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-19-samitolvanen@google.com>
+ <20171116115810.GH9361@arm.com>
+Message-ID: <20171116161731.GA94341@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On Thu, Nov 16, 2017 at 11:58:11AM +0000, Will Deacon wrote:
+> I'll be honest with you: I'm absolutely terrified about enabling this.
 
-> Am 16.11.2017 um 16:53 schrieb Andrew F. Davis <afd@ti.com>:
-> 
-> On 11/16/2017 07:43 AM, H. Nikolaus Schaller wrote:
->> 
->>> Am 16.11.2017 um 13:32 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
->>> 
->>> On 16/11/17 10:50, H. Nikolaus Schaller wrote:
->>>> The vendor name was "toppoly" but other panels and the vendor list
->>>> have defined it as "tpo". So let's fix it in driver and bindings.
->>>> 
->>>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->>>> ---
->>> 
->>> 
->>>> -MODULE_ALIAS("spi:toppoly,td028ttec1");
->>>> +MODULE_ALIAS("spi:tpo,td028ttec1");
->>> 
->>> Doesn't this mean that the module won't load if you have old bindings?
->> 
->> Hm.
->> 
->> Well, I think it can load but doesn't automatically from DT strings which might
->> be unexpected.
->> 
->>> Can't we have two module aliases?
->> 
->> I think we can. Just a random example:
->> https://elixir.free-electrons.com/linux/latest/source/drivers/w1/slaves/w1_therm.c#L754
->> 
->> So we should keep both.
-> 
-> Even better would be to drop both MODULE_ALIAS and let the
-> MODULE_DEVICE_TABLE macro define them for your from the SPI id table.
+That's understandable, I wouldn't want to enable this by default
+quite yet either. This patch doesn't enable LTO for arm64, just makes
+it possible to enable the feature. I'm perfectly fine with marking
+CONFIG_LTO_CLANG experimental if it makes people more comfortable.
 
-Why would that be better?
+> How much testing has this seen?
 
-As far as I see it will need more code and changes than adding one line of
-MODULE_ALIAS.
+I've been running clang LTO kernels for a few months on a Pixel 2 device
+without any issues. This is on a 4.4 kernel though.
 
-> Although it doesn't look like this driver has an SPI id table, you
-> should probably add one, I be interested to see if this module is always
-> being matched through the "spi" or the "of" alias..
+> Right now, the C standard isn't on our side here and we're relying on
+> the compiler not doing this kind of thing. Can we continue to rely on
+> that in the face of LTO?
 
-Could you please propose how that code should look like, so that I can test?
+I'll have to check with our LLVM experts, but I have not run into these
+issues with current compiler versions. Looking at Andi's old patches,
+looks like gcc might be more aggressive in reordering things with LTO
+than clang.
 
-BR and thanks,
-Nikolaus Schaller
-
-> 
->> 
->> Should I submit a new version?
->> 
->> BR,
->> Nikolaus
->> 
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> 
+Sami
