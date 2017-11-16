@@ -1,90 +1,43 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 16 Nov 2017 14:42:36 +0100
-Subject: [PATCH v2 6/8] dt-bindings: power: Add Actions Semi S700 SPS
-In-Reply-To: <20171116043529.hrrgiga4hpdsy2tc@rob-hp-laptop>
-References: <20171113233427.5386-1-afaerber@suse.de>
- <20171113233427.5386-7-afaerber@suse.de>
- <20171116043529.hrrgiga4hpdsy2tc@rob-hp-laptop>
-Message-ID: <2342385f-b70c-6812-44e8-19c888bb5103@suse.de>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 16 Nov 2017 14:43:52 +0100
+Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
+In-Reply-To: <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
+References: <cover.1510822218.git.hns@goldelico.com>
+ <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
+ <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
+Message-ID: <130D3B71-C0CE-4755-BF06-971681F630BC@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 16.11.2017 um 05:35 schrieb Rob Herring:
-> On Tue, Nov 14, 2017 at 12:34:25AM +0100, Andreas F?rber wrote:
->> Define power domains for Actions Semi S700 SoC Smart Power System (SPS).
->>
->> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+
+> Am 16.11.2017 um 13:32 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
+> 
+> On 16/11/17 10:50, H. Nikolaus Schaller wrote:
+>> The vendor name was "toppoly" but other panels and the vendor list
+>> have defined it as "tpo". So let's fix it in driver and bindings.
+>> 
+>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 >> ---
->>  v2: New
->>  
->>  .../devicetree/bindings/power/actions,owl-sps.txt    |  2 ++
->>  include/dt-bindings/power/owl-s700-powergate.h       | 20 ++++++++++++++++++++
->>  2 files changed, 22 insertions(+)
->>  create mode 100644 include/dt-bindings/power/owl-s700-powergate.h
->>
->> diff --git a/Documentation/devicetree/bindings/power/actions,owl-sps.txt b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
->> index 007b9a7ae723..78edd63641e8 100644
->> --- a/Documentation/devicetree/bindings/power/actions,owl-sps.txt
->> +++ b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
->> @@ -2,10 +2,12 @@ Actions Semi Owl Smart Power System (SPS)
->>  
->>  Required properties:
->>  - compatible          :  "actions,s500-sps" for S500
->> +                         "actions,s700-sps" for S700
->>  - reg                 :  Offset and length of the register set for the device.
->>  - #power-domain-cells :  Must be 1.
->>                           See macros in:
->>                            include/dt-bindings/power/owl-s500-powergate.h for S500
->> +                          include/dt-bindings/power/owl-s700-powergate.h for S700
->>  
->>  
->>  Example:
->> diff --git a/include/dt-bindings/power/owl-s700-powergate.h b/include/dt-bindings/power/owl-s700-powergate.h
->> new file mode 100644
->> index 000000000000..4ded16bc074f
->> --- /dev/null
->> +++ b/include/dt-bindings/power/owl-s700-powergate.h
->> @@ -0,0 +1,20 @@
->> +/*
->> + * Actions Semi S700 SPS
->> + *
->> + * Copyright (c) 2017 Andreas F?rber
->> + *
->> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 > 
-> The decree now for SPDX tags is make this the first line using "//".
-
-Thanks for noticing. Fixed:
-
-diff --git a/include/dt-bindings/power/owl-s700-powergate.h
-b/include/dt-bindings/power/owl-s700-powergate.h
-index 4ded16bc074f..4cf1aefbf09c 100644
---- a/include/dt-bindings/power/owl-s700-powergate.h
-+++ b/include/dt-bindings/power/owl-s700-powergate.h
-@@ -1,9 +1,8 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
- /*
-  * Actions Semi S700 SPS
-  *
-  * Copyright (c) 2017 Andreas F?rber
-- *
-- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-  */
- #ifndef DT_BINDINGS_POWER_OWL_S700_POWERGATE_H
- #define DT_BINDINGS_POWER_OWL_S700_POWERGATE_H
-
 > 
-> Otherwise, 
+>> -MODULE_ALIAS("spi:toppoly,td028ttec1");
+>> +MODULE_ALIAS("spi:tpo,td028ttec1");
 > 
-> Acked-by: Rob Herring <robh@kernel.org>
+> Doesn't this mean that the module won't load if you have old bindings?
 
-Thanks, queued in v4.16/dt64:
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.16/dt64
+Hm.
 
-Regards,
-Andreas
+Well, I think it can load but doesn't automatically from DT strings which might
+be unexpected.
 
--- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+> Can't we have two module aliases?
+
+I think we can. Just a random example:
+https://elixir.free-electrons.com/linux/latest/source/drivers/w1/slaves/w1_therm.c#L754
+
+So we should keep both.
+
+Should I submit a new version?
+
+BR,
+Nikolaus
