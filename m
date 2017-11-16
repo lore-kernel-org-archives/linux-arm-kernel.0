@@ -1,43 +1,76 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu, 16 Nov 2017 14:43:52 +0100
-Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
-In-Reply-To: <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
- <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
-Message-ID: <130D3B71-C0CE-4755-BF06-971681F630BC@goldelico.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 16 Nov 2017 13:55:31 +0000
+Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
+In-Reply-To: <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-12-samitolvanen@google.com>
+ <20171116115433.GG9361@arm.com>
+ <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
+Message-ID: <c0c19191-e090-4768-3c46-b813713d2908@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Am 16.11.2017 um 13:32 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
+On 16/11/17 13:07, Yury Norov wrote:
+> On Thu, Nov 16, 2017 at 11:54:33AM +0000, Will Deacon wrote:
+>> On Wed, Nov 15, 2017 at 01:34:21PM -0800, Sami Tolvanen wrote:
+>>> From: Alex Matveev <alxmtvv@gmail.com>
+>>>
+>>> Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
+>>> in-place and workaround gcc and clang limitations on redefining macros
+>>> across different assembler blocks.
+>>
+>> What limitations? Can you elaborate please? Is this a fix?
 > 
-> On 16/11/17 10:50, H. Nikolaus Schaller wrote:
->> The vendor name was "toppoly" but other panels and the vendor list
->> have defined it as "tpo". So let's fix it in driver and bindings.
->> 
->> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->> ---
+> Hi Will,
 > 
+> Regarding GCC.
 > 
->> -MODULE_ALIAS("spi:toppoly,td028ttec1");
->> +MODULE_ALIAS("spi:tpo,td028ttec1");
+> When it joins preprocessed source files into single asm file,
+> mrs_s/msr_s becomes either not declared or declared multiple times.
 > 
-> Doesn't this mean that the module won't load if you have old bindings?
+> ./ccuFb68h.s:33120: Error: Macro `mrs_s' was already defined
+> ./ccuFb68h.s:33124: Error: Macro `msr_s' was already defined
+> 
+> I'm not sure that GCC works correctly in this case, and I sent the
+> email to Linaro toolchain group to clarify it. See below.
+> 
+> Yury
+> 
+> [...]
+> 
+> Links:
+> My unfinished branch:
+> https://github.com/norov/linux/tree/lto
+> Andi Kleen tree:
+> https://github.com/andikleen/linux-misc/tree/lto-411-1
+> Sami Tolvanen's recent work for clang:
+> https://lkml.org/lkml/2017/11/3/606
+> 
+> Question we have for now:
+> There's mrs_s/msr_s macro that doesn't work with LTO - linker
+> complains very loudly that macro is either not declared, or declared
+> multiple times. (To reproduce - try to build my kernel branch w/o last
+> patch).
+> 
+> The same (?) problem is observed with clang, and people there
+> considered it as feature, not a bug.
+> 
+> https://bugs.llvm.org/show_bug.cgi?id=19749
+> 
+> We have the fix for both clang and gcc, but it looks hacky. Maybe it
+> worth to fix mrs/msr issue on toolchain side?
 
-Hm.
+Given that this whole mrs_s infrastructure is a workaround for older 
+assemblers which don't support the "S<op0>_<op1>_<Cn>_<Cm>_<op2>" syntax 
+for arbitrary unnamed system registers (which IIRC was a fairly late 
+addition to the architecture), the only way it could be "fixed" on the 
+toolchain side is by removing all those older toolchains from existence. 
+Good luck with that ;)
 
-Well, I think it can load but doesn't automatically from DT strings which might
-be unexpected.
+In *theory*, it might be possible to do something similar to what we do 
+with CONFIG_BROKEN_GAS_INST to detect offending assemblers and only 
+define and use these macros when necessary (hopefully Clang and other 
+LTO-capable toolchains do accept the proper syntax), but I've no idea 
+how invasive or difficult that might turn out to be.
 
-> Can't we have two module aliases?
-
-I think we can. Just a random example:
-https://elixir.free-electrons.com/linux/latest/source/drivers/w1/slaves/w1_therm.c#L754
-
-So we should keep both.
-
-Should I submit a new version?
-
-BR,
-Nikolaus
+Robin.
