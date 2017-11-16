@@ -1,60 +1,27 @@
-From: fengguang.wu@intel.com (Fengguang Wu)
-Date: Fri, 17 Nov 2017 07:50:07 +0800
-Subject: [GIT PULL 2/3] ARM: SoC driver updates for 4.15
-In-Reply-To: <CAK8P3a3uwqeeg7--UDTWJ33g7YejXp5rtV9OFt=jrt-AzQi13Q@mail.gmail.com>
-References: <CAK8P3a2Wp6EANLq7JZr=uAReKOhBYrc3VKUA7FpDvq7n3Lc2aQ@mail.gmail.com>
- <CA+55aFyvWnmLzYs+Hb+d=ir9Ww8gLcNn9=Oc=zwKdK=L-nmXZA@mail.gmail.com>
- <CAK8P3a3uwqeeg7--UDTWJ33g7YejXp5rtV9OFt=jrt-AzQi13Q@mail.gmail.com>
-Message-ID: <20171116235007.6caupnnbddaguwqr@wfg-t540p.sh.intel.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Thu, 16 Nov 2017 15:50:19 -0800
+Subject: [PATCH v2 08/18] arm64: don't disable ADR_PREL_PG_HI21* with
+ ARM64_ERRATUM_843419
+In-Reply-To: <CAKv+Gu9pROJ_T5twJtVn2itzav4x5fypyJWsBr5YbjWUTMFokg@mail.gmail.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-9-samitolvanen@google.com>
+ <CAKv+Gu-wYwBMV7tdb+Kax_cyPsmAB2R2ZVwJuNi9qM0kaYAs=Q@mail.gmail.com>
+ <20171116114406.GB9361@arm.com>
+ <20171116163132.GC94341@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu8yPSwZep-S_ke_P5BiZ3o72R=ykhixoXcyGUHa1ZxGGw@mail.gmail.com>
+ <20171116213702.GA10616@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu_3R4SUC2hCUtEX_4ut9admtrBZS-S-mzQnQsoJoHPcBw@mail.gmail.com>
+ <20171116230939.GA38360@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu9pROJ_T5twJtVn2itzav4x5fypyJWsBr5YbjWUTMFokg@mail.gmail.com>
+Message-ID: <20171116235019.GA55530@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 17, 2017 at 12:25:12AM +0100, Arnd Bergmann wrote:
->On Thu, Nov 16, 2017 at 11:29 PM, Linus Torvalds
-><torvalds@linux-foundation.org> wrote:
->> On Thu, Nov 16, 2017 at 2:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>> ARM: SoC driver updates for v4.15
->>
->> No. This is completely broken, and I can't imagine that it has ever
->> compiled for *anybody*.
->>
->>   drivers/soc/renesas/r8a77970-sysc.c:14:10: fatal error:
->> dt-bindings/power/r8a77970-sysc.h: No such file or directory
->>    #include <dt-bindings/power/r8a77970-sysc.h>
->>
->> and the compiler is completely right. This branch added that
->> r8a77970-sysc.c file, but never added the header file.
->>
->> And it's not some odd merge mistake of mine: I checked. That error is
->> there in the original branch too.
->>
->> Tssk.
->
->Right, I need to figure out how this could have slipped through. I did
->get several "BUILD SUCCESS" mails from the kbuild bot (see
->https://pastebin.com/JDw3EKDZ), which claims to have built it
->successfully in all configurations, including allmodconfig builds on
->arm/arm64 and x86-64. Fengguang, do you remember problems
->with false-negatives recently?
+On Thu, Nov 16, 2017 at 11:20:40PM +0000, Ard Biesheuvel wrote:
+> So at which point is the IR in a partially linked object file
+> converted into executable code?
 
-Sorry I checked log and didn't find any 0day reports for that error.
+At the final module link step (cmd_ld_ko_o) in scripts/Makefile.modpost,
+added in patch 12.
 
-It actually hit the errors several times:
-
-drivers/soc/renesas/r8a77970-sysc.c:14:11: sparse: unable to open 'dt-bindings/power/r8a77970-sysc.h'
-
-2017-10-21 07:23:12 on arm-soc/next/drivers 1c6788e8746d5250ad9bd16e1e48140a396f4733 x86_64-allmodconfig
-
-
-drivers/soc/renesas/r8a77970-sysc.c:14:45: fatal error: dt-bindings/power/r8a77970-sysc.h: No such file or directory
-
-2017-11-03 07:45:22 on arm-soc/next/drivers 30f3b0678ce6fc46bcdde61ca35821032d0f25b5 i386-allmodconfig
-2017-11-03 08:42:45 on arm-soc/next/drivers 30f3b0678ce6fc46bcdde61ca35821032d0f25b5 arm-allmodconfig
-2017-11-03 08:43:06 on arm-soc/next/drivers 30f3b0678ce6fc46bcdde61ca35821032d0f25b5 arm64-allmodconfig
-
-So the robot is not working well in that case, I'll work with Philip
-to get that fixed.
-
-Regards,
-Fengguang
+Sami
