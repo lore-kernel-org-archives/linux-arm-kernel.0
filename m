@@ -1,90 +1,58 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Thu, 16 Nov 2017 19:01:47 +0000
-Subject: next/master boot: 210 boots: 35 failed, 174 passed with 1
- conflict (next-20171115)
-In-Reply-To: <3ddf8ad5-e3d9-49cc-9e20-2d8cdbc9685f@nvidia.com>
-References: <5a0c2169.c6a2df0a.13ea3.9c02@mx.google.com>
- <a21b88b2-663d-49fc-527a-87494a23087f@collabora.com>
- <0e2dbcf5-6823-8e48-e2ac-85afa7d6dbaf@collabora.com>
- <3ddf8ad5-e3d9-49cc-9e20-2d8cdbc9685f@nvidia.com>
-Message-ID: <e0e9994c-8d2e-f499-e430-1f15bff7b0e6@collabora.com>
+From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
+Date: Thu, 16 Nov 2017 11:13:07 -0800
+Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
+In-Reply-To: <20171116184508.GC21898@arm.com>
+References: <20171116161731.GA94341@samitolvanen.mtv.corp.google.com>
+ <20171116163054.kcsdsomr7u2mqql2@hirez.programming.kicks-ass.net>
+ <CAKwvOdkV_g0XAbGM+nF2zt=2+tHLLcj=pbSxRDd2HMbrtU3cZg@mail.gmail.com>
+ <20171116165922.llrojrvomuihabrt@hirez.programming.kicks-ass.net>
+ <CAKwvOd=k=iVQvWmzP1E3XHUCYLoJgx+F9zoPuE+R2oaw_ePUVA@mail.gmail.com>
+ <20171116173417.nqsh5dpu65uj7b5s@hirez.programming.kicks-ass.net>
+ <20171116174830.GX3624@linux.vnet.ibm.com>
+ <CAKwvOdkDz1yRo=Skt_mWxs0uucK+adXx8kFQksMbTE3ofnpUMQ@mail.gmail.com>
+ <20171116183950.GA3624@linux.vnet.ibm.com>
+ <20171116184508.GC21898@arm.com>
+Message-ID: <20171116191307.GC3624@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/17 17:55, Jon Hunter wrote:
->
-> On 16/11/17 14:50, Guillaume Tucker wrote:
->> On 16/11/17 14:42, Guillaume Tucker wrote:
->>> On 15/11/17 11:13, kernelci.org bot wrote:
->>>> next/master boot: 210 boots: 35 failed, 174 passed with 1 conflict
->>>> (next-20171115)
->>>>
->>>> Full Boot Summary:
->>>> https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20171115/
->>>>
->>>> Full Build Summary:
->>>> https://kernelci.org/build/next/branch/master/kernel/next-20171115/
->>>>
->>>> Tree: next
->>>> Branch: master
->>>> Git Describe: next-20171115
->>>> Git Commit: 63fb091c80188ec51f53514d07de907c1dd3d61d
->>>> Git URL:
->>>> http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
->>>> Tested: 35 unique boards, 16 SoC families, 30 builds out of 213
->>>>
->>>> Boot Regressions Detected:
->>>>
->>>> arm:
->>> [...]
->>>>     multi_v7_defconfig:
->>>>         tegra124-nyan-big:
->>>>             lab-collabora: failing since 11 days (last pass:
->>>> next-20171102 - first fail: next-20171103)
->>>
->>> I've run another automated bisection with some tweaks to remove
->>> known failures and found this breaking change:
->>>
->>>   commit 859eb05676f67d4960130dff36d3368006716110
->>>   Author: Shawn Nematbakhsh <shawnn@chromium.org>
->>>   Date:   Fri Sep 8 13:50:11 2017 -0700
->>>
->>>       platform/chrome: Use proper protocol transfer function
->>>
->>>
->>
->> Should have added, this is essentially the kernel error:
->>
->> [    1.711581] kernel BUG at drivers/platform/chrome/cros_ec_proto.c:34!
->> [    1.718004] Internal error: Oops - BUG: 0 [#1] SMP ARM
->>
->> Please see the links to the LAVA jobs below for the full logs.
-> This one is a known issue (which I believe I have mentioned a couple
-> times). There is a fix available [0].
+On Thu, Nov 16, 2017 at 06:45:08PM +0000, Will Deacon wrote:
+> On Thu, Nov 16, 2017 at 10:39:51AM -0800, Paul E. McKenney wrote:
+> > On Thu, Nov 16, 2017 at 10:16:22AM -0800, Nick Desaulniers wrote:
+> > > > On Thu, Nov 16, 2017 at 06:34:17PM +0100, Peter Zijlstra wrote:
+> > > >> So the problem is that its very very hard (and painful) to find these
+> > > >> bugs. Getting the tools people to comment on these specific
+> > > >> optimizations would really help lots.
+> > > 
+> > > No doubt; I do not disagree with you.  Kernel developers have very
+> > > important use cases for the language.
+> > > 
+> > > But the core point I'm trying to make is "do we need to block this
+> > > patch set until issues with the C standards body in regards to the
+> > > kernels memory model are resolved?"  I would hope the two are
+> > > orthogonal and that we'd take them and then test them even more
+> > > extensively than the developer has in order to find out.
+> > 
+> > Given that I have been working on getting the C and C++ standards to
+> > correctly handle rcu_dereference() for more than ten years, I recommend
+> > -against- waiting on standardization in the strongest possible terms.
+> > And if you think that ten years is bad, the Java standards community has
+> > been struggling with out-of-thin-air (OOTA) values for almost 20 years.
+> > And the C and C++ standards haven't solved OOTA, either.
+> 
+> The problem is, if we go ahead with this change, the compiler *will* break
+> some address dependencies and something will eventually go wrong. At that
+> point, what do we do? Turn off some random compiler optimisation? Add a
+> random barrier()?
+> 
+> We don't necessarily need standardisation, but we at least need guarantees
+> from the compiler implementation that LTO/PGO will respect source level
+> address dependencies. I don't think we have that today.
 
-Right, it's true that this kernel error showed up in the previous
-bisection I ran last week.  As this time it found another commit
-I thought it might be worthwhile sharing the result.
+Ah, if "this patch set" meant "adding LTO", I stand corrected and I
+apologize for my confusion.
 
-> I am not sure that continuing to bisect this is going to bare any fruit
-> due to the number of issues plaguing this board at the moment. It seems
-> to be a DRM related issue and when I get sometime I will see if I can
-> figure out what is causing this. This is the furtherest I have gotten so
-> far [1].
+I agree that we need LTO/PGO to be housebroken from an LKMM viewpoint
+before it is enabled.
 
-Thanks for the update.  Please keep in mind that DRM_MOUVEAU was
-disabled in every iteration this time, so there might also be
-something else unrelated to DRM.
-
-Agreed, it's not worth bisecting much further.  In fact I found
-these issues mostly as a side effect of working on the automatic
-bisection mechanism in kernelci.org, and linux-next is especially
-tricky to bisect.  On this subject, we'll probably start by
-enabling this on stable trees and mainline, then see what we can
-do with linux-next and other tricky trees at a later stage.
-
-Thanks,
-Guillaume
-
-> [0] https://patchwork.kernel.org/patch/9974835/
-> [1] https://www.spinics.net/lists/arm-kernel/msg616616.html
+							Thanx, Paul
