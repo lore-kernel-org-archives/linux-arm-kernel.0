@@ -1,79 +1,96 @@
-From: nicolas.pitre@linaro.org (Nicolas Pitre)
-Date: Thu, 16 Nov 2017 11:47:20 -0500 (EST)
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <48c38055-20f7-e565-aa56-74f360e6e3d9@sigmadesigns.com>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
- <20171101175325.2557ce85@alans-desktop>
- <4b707ce0-6067-ab36-e167-1acf348d26bf@free.fr>
- <CA+55aFxxH0HE9SfUoLVqsvDKO0PfeM+vSoDmbXQv85yJcPZoPQ@mail.gmail.com>
- <e03436d1-b140-3f29-59a6-3b1eb6bf9da4@free.fr>
- <11393e07-b042-180c-3bcd-484bf51eada6@sigmadesigns.com>
- <20171115131351.GE31757@n2100.armlinux.org.uk>
- <1fa81694-7bd2-564b-e5b9-ae53b9ea6620@sigmadesigns.com>
- <20171116153625.GJ31757@n2100.armlinux.org.uk>
- <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
- <nycvar.YSQ.7.76.1711161106240.20817@knanqh.ubzr>
- <48c38055-20f7-e565-aa56-74f360e6e3d9@sigmadesigns.com>
-Message-ID: <nycvar.YSQ.7.76.1711161140030.20817@knanqh.ubzr>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 16 Nov 2017 16:49:39 +0000
+Subject: [PATCHv4 1/3] ARMv8: dts: ls1046a: add the property of IB and OB
+In-Reply-To: <VI1PR04MB161516288A0FF2F507DAA9BEE82B0@VI1PR04MB1615.eurprd04.prod.outlook.com>
+References: <20171110034847.17891-1-xiaowei.bao@nxp.com>
+ <20171110034847.17891-2-xiaowei.bao@nxp.com>
+ <20b8f1d2-f817-469f-afbf-66f25d6f8c46@ti.com>
+ <AM4PR0401MB16999BD34AFBB1362BD32EBD8F540@AM4PR0401MB1699.eurprd04.prod.outlook.com>
+ <VI1PR04MB161516288A0FF2F507DAA9BEE82B0@VI1PR04MB1615.eurprd04.prod.outlook.com>
+Message-ID: <20171116164939.GA30182@e107981-ln.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 16 Nov 2017, Marc Gonzalez wrote:
+On Mon, Nov 13, 2017 at 02:35:48AM +0000, M.h. Lian wrote:
 
-> On 16/11/2017 17:08, Nicolas Pitre wrote:
-> 
-> > On Thu, 16 Nov 2017, Marc Gonzalez wrote:
+[...]
+
+> > > On Friday 10 November 2017 09:18 AM, Bao Xiaowei wrote:
+> > > > Add the property of inbound and outbound windows number for ep driver.
+> > > >
+> > > > Signed-off-by: Bao Xiaowei <xiaowei.bao@nxp.com>
+> > > > Acked-by: Minghuan Lian <minghuan.Lian@nxp.com>
+> > > > ---
+> > > >  v2:
+> > > >  - no change
+> > > >  v3:
+> > > >  - modify the commit message
+> > > >  v4:
+> > > >  - no change
+> > > >
+> > > >  arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi | 6 ++++++
+> > > >  1 file changed, 6 insertions(+)
+> > >
+> > > $subject should start with something like
+> > > arm64: dts: ls1046a: **
+
+Indeed.
+
+> > > > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > > b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > > index 06b5e12d04d8..f8332669663c 100644
+> > > > --- a/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1046a.dtsi
+> > > > @@ -674,6 +674,8 @@
+> > > >  			device_type = "pci";
+> > > >  			dma-coherent;
+> > > >  			num-lanes = <4>;
+> > > > +			num-ib-windows = <6>;
+> > > > +			num-ob-windows = <6>;
+> > >
+> > > EP specific properties shouldn't be added in RC dt node. Ideally you
+> > > should have a separate dt node for RC and EP.
 > > 
-> >> On 16/11/2017 16:36, Russell King - ARM Linux wrote:
-> >>> On Thu, Nov 16, 2017 at 04:26:51PM +0100, Marc Gonzalez wrote:
-> >>>> On 15/11/2017 14:13, Russell King - ARM Linux wrote:
-> >>>>
-> >>>>> udelay() needs to offer a consistent interface so that drivers know
-> >>>>> what to expect no matter what the implementation is.  Making one
-> >>>>> implementation conform to your ideas while leaving the other
-> >>>>> implementations with other expectations is a recipe for bugs.
-> >>>>>
-> >>>>> If you really want to do this, fix the loops_per_jiffy implementation
-> >>>>> as well so that the consistency is maintained.
-> >>>>
-> >>>> Hello Russell,
-> >>>>
-> >>>> It seems to me that, when using DFS, there's a serious issue with loop-based
-> >>>> delays. (IIRC, it was you who pointed this out a few years ago.)
-> >>>>
-> >>>> If I'm reading arch/arm/kernel/smp.c correctly, loops_per_jiffy is scaled
-> >>>> when the frequency changes.
-> >>>>
-> >>>> But arch/arm/lib/delay-loop.S starts by loading the current value of
-> >>>> loops_per_jiffy, computes the number of times to loop, and then loops.
-> >>>> If the frequency increases when the core is in __loop_delay, the
-> >>>> delay will be much shorter than requested.
-> >>>>
-> >>>> Is this a correct assessment of the situation?
-> >>>
-> >>> Absolutely correct, and it's something that people are aware of, and
-> >>> have already catered for while writing their drivers.
-> >>
-> >> In their cpufreq driver?
-> >> In "real" device drivers that happen to use delays?
-> >>
-> >> On my system, the CPU frequency may ramp up from 120 MHz to 1.2 GHz.
-> >> If the frequency increases at the beginning of __loop_delay, udelay(100)
-> >> would spin only 10 microseconds. This is likely to cause issues in
-> >> any driver using udelay.
-> >>
-> >> How does one cater for that?
+> > It is a single PCIe controller which can be configured to either RC
+> > mode or EP mode.  Wouldn't it conflict with the device tree
+> > principles to have two device tree nodes for the same PCIe
+> > controller?  And obviously the two modes cannot be used at the same
+> > time so we cannot have two drivers both probe on the same hardware.
 > > 
-> > You make sure your delays are based on a stable hardware timer.
-> > Most platforms nowadays should have a suitable timer source.
-> 
-> So you propose fixing loop-based delays by using clock-based delays,
-> is that correct? (That is indeed what I did on my platform.)
-> 
-> Russell stated that there are platforms using loop-based delays with
-> cpufreq enabled. I'm asking how they manage the brokenness.
+> [Minghuan Lian]  There is only one PCIe dts node in the dts file. PCIe
+> dts node describes the PCIe controller's hardware properties and does
+> not have work mode.  The new properties  "num-ib-windows " and
+> "num-ob-windows" are used to describe the inbound/outbound window
+> number included in the PCIe hardware. These windows are used in both
+> RC and EP mode.  We can change work mode when resetting via RCW(reset
+> configuration word).
 
-Look at cpufreq_callback() in arch/arm/kernel/smp.c.
+I am not happy about this (that's what I am asking Rob to chime in
+please on DT side).
 
+1) I do not think it is allowed to have two DT nodes in a dts with same unit
+   address (ie same reg property)
 
-Nicolas
+   https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm/boot/dts/dra7.dtsi?h=v4.14
+
+2) In the Synopsis Designware PCIe interface bindings we have some
+   properties that are for RC mode and some for EP mode but there is
+   no way from a *binding* perspective to detect in what mode the
+   controller is:
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/Documentation/devicetree/bindings/pci/designware-pcie.txt?h=v4.14
+
+3) You can't use properties that in the bindings above are declared EP
+   only for RC mode, we define bindings to respect their rules.
+
+4) I think that a) a compatible should be added to the designware-pcie
+   bindings to define endpoint mode and b) the same should be done for
+   the ls1046a bindings. If the RC is programmed in EP mode DT firmware
+   should be able to provide the information to an operating system, it
+   is actually a _different_ component but on this I need DT people to
+   chime in to define the best way forward.
+
+I cannot review/merge this code until the points above are clarified.
+
+Thanks,
+Lorenzo
