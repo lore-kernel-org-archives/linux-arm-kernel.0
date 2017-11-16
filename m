@@ -1,54 +1,53 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 16 Nov 2017 15:28:38 +0300
-Subject: [PATCH 3/3] arm64: dts: renesas: eagle: add EtherAVB pins
-In-Reply-To: <a65b8740-b133-eb92-5494-fb532554127b@cogentembedded.com>
-References: <20171110200714.406365231@cogentembedded.com>
- <CAMuHMdWCj=CjA_zyC1GKr=KEk2CNMAtwvREw25R1uJktZucY4w@mail.gmail.com>
- <1017d8fb-e353-f212-09a9-a28bf07eddc2@cogentembedded.com>
- <CAMuHMdX8j__iF5xP33Na9pVM1nRWvrE7e68-zg0oE0gE5MOHXw@mail.gmail.com>
- <a65b8740-b133-eb92-5494-fb532554127b@cogentembedded.com>
-Message-ID: <3c89ed4f-cde3-e29c-5513-060216f94c3a@cogentembedded.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Thu, 16 Nov 2017 12:29:48 +0000
+Subject: [PATCH v5 04/20] KVM: arm/arm64: Guard kvm_vgic_map_is_active
+ against !vgic_initialized
+In-Reply-To: <1509093281-15225-5-git-send-email-cdall@linaro.org>
+References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
+ <1509093281-15225-5-git-send-email-cdall@linaro.org>
+Message-ID: <475960cf-8b85-3a9f-d166-455e8bc5a43c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2017 11:21 PM, Sergei Shtylyov wrote:
+Hi,
 
->>>>> Add the (previously omitted) EtherAVB pin data to the Eagle board's
->>>>> device tree.
->>
->>>>> --- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-eagle.dts
->>>>> @@ -34,6 +34,9 @@
->>>
->>> [...]
->>>>>
->>>>> @@ -53,6 +56,11 @@
->>>>>    };
->>>>>
->>>>>    &pfc {
->>>>> +       avb_pins: avb {
->>>>> +               groups = "avb0_mdio", "avb0_mii";
->>>>
->>>>
->>>> Oh no, its'called "avb0_mdio" here, but "avb(0)_mdc" on all other
->>>> R-Car Gen3 SoCs?
->>>
->>>
->>>     Can you remember the reason? I don;t want to follow the bad example. :-)
->>
->> Sorry, I don't know.
+On 27/10/17 09:34, Christoffer Dall wrote:
+> If the vgic is not initialized, don't try to grab its spinlocks or
+> traverse its data structures.
 > 
->     Hm, you seem to have participated in the related discussions for H2/M3-W...
+> This is important because we soon have to start considering the active
+> state of a virtual interrupts when doing vcpu_load, which may happen
+> early on before the vgic is initialized.
 
-    H3, of course...
+I understand this patch is on its way to Linus already, but I just found
+this by browsing for VGIC changes...
 
-> The reason was that omlu AVB_MDC signal was multiplexed, AVB_MDIO signal (and 
-
-    s/omlu/only/.
-
-> AVB MII signals) was mapped to a dedicated pin without any multiplexing, so 
-> the "avb_mdc" group initially contained only AVB_MDC.
+> Signed-off-by: Christoffer Dall <cdall@linaro.org>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic.c | 3 +++
+>  1 file changed, 3 insertions(+)
 > 
->> Gr{oetje,eeting}s,
+> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> index fed717e..e1f7dbc 100644
+> --- a/virt/kvm/arm/vgic/vgic.c
+> +++ b/virt/kvm/arm/vgic/vgic.c
+> @@ -777,6 +777,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
+>  	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
 
-MBR, Sergei
+Isn't vgic_get_irq() already accessing VGIC data structures? In which
+case this assignment should be moved after the vgic_initialized() check
+below?
+
+Cheers,
+Andre.
+
+>  	bool map_is_active;
+>  
+> +	if (!vgic_initialized(vcpu->kvm))
+> +		return false;
+> +
+>  	spin_lock(&irq->irq_lock);
+>  	map_is_active = irq->hw && irq->active;
+>  	spin_unlock(&irq->irq_lock);
+> 
