@@ -1,58 +1,65 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Thu, 16 Nov 2017 09:53:59 -0600
-Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
-In-Reply-To: <130D3B71-C0CE-4755-BF06-971681F630BC@goldelico.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
- <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
- <130D3B71-C0CE-4755-BF06-971681F630BC@goldelico.com>
-Message-ID: <d90ee1ee-8a33-de04-bb8b-2f10e0a80a61@ti.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Thu, 16 Nov 2017 11:08:11 -0500 (EST)
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <20171101175325.2557ce85@alans-desktop>
+ <4b707ce0-6067-ab36-e167-1acf348d26bf@free.fr>
+ <CA+55aFxxH0HE9SfUoLVqsvDKO0PfeM+vSoDmbXQv85yJcPZoPQ@mail.gmail.com>
+ <e03436d1-b140-3f29-59a6-3b1eb6bf9da4@free.fr>
+ <11393e07-b042-180c-3bcd-484bf51eada6@sigmadesigns.com>
+ <20171115131351.GE31757@n2100.armlinux.org.uk>
+ <1fa81694-7bd2-564b-e5b9-ae53b9ea6620@sigmadesigns.com>
+ <20171116153625.GJ31757@n2100.armlinux.org.uk>
+ <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
+Message-ID: <nycvar.YSQ.7.76.1711161106240.20817@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2017 07:43 AM, H. Nikolaus Schaller wrote:
-> 
->> Am 16.11.2017 um 13:32 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
->>
->> On 16/11/17 10:50, H. Nikolaus Schaller wrote:
->>> The vendor name was "toppoly" but other panels and the vendor list
->>> have defined it as "tpo". So let's fix it in driver and bindings.
->>>
->>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->>> ---
->>
->>
->>> -MODULE_ALIAS("spi:toppoly,td028ttec1");
->>> +MODULE_ALIAS("spi:tpo,td028ttec1");
->>
->> Doesn't this mean that the module won't load if you have old bindings?
-> 
-> Hm.
-> 
-> Well, I think it can load but doesn't automatically from DT strings which might
-> be unexpected.
-> 
->> Can't we have two module aliases?
-> 
-> I think we can. Just a random example:
-> https://elixir.free-electrons.com/linux/latest/source/drivers/w1/slaves/w1_therm.c#L754
-> 
-> So we should keep both.
+On Thu, 16 Nov 2017, Marc Gonzalez wrote:
 
-Even better would be to drop both MODULE_ALIAS and let the
-MODULE_DEVICE_TABLE macro define them for your from the SPI id table.
-Although it doesn't look like this driver has an SPI id table, you
-should probably add one, I be interested to see if this module is always
-being matched through the "spi" or the "of" alias..
+> On 16/11/2017 16:36, Russell King - ARM Linux wrote:
+> > On Thu, Nov 16, 2017 at 04:26:51PM +0100, Marc Gonzalez wrote:
+> >> On 15/11/2017 14:13, Russell King - ARM Linux wrote:
+> >>
+> >>> udelay() needs to offer a consistent interface so that drivers know
+> >>> what to expect no matter what the implementation is.  Making one
+> >>> implementation conform to your ideas while leaving the other
+> >>> implementations with other expectations is a recipe for bugs.
+> >>>
+> >>> If you really want to do this, fix the loops_per_jiffy implementation
+> >>> as well so that the consistency is maintained.
+> >>
+> >> Hello Russell,
+> >>
+> >> It seems to me that, when using DFS, there's a serious issue with loop-based
+> >> delays. (IIRC, it was you who pointed this out a few years ago.)
+> >>
+> >> If I'm reading arch/arm/kernel/smp.c correctly, loops_per_jiffy is scaled
+> >> when the frequency changes.
+> >>
+> >> But arch/arm/lib/delay-loop.S starts by loading the current value of
+> >> loops_per_jiffy, computes the number of times to loop, and then loops.
+> >> If the frequency increases when the core is in __loop_delay, the
+> >> delay will be much shorter than requested.
+> >>
+> >> Is this a correct assessment of the situation?
+> > 
+> > Absolutely correct, and it's something that people are aware of, and
+> > have already catered for while writing their drivers.
+> 
+> In their cpufreq driver?
+> In "real" device drivers that happen to use delays?
+> 
+> On my system, the CPU frequency may ramp up from 120 MHz to 1.2 GHz.
+> If the frequency increases at the beginning of __loop_delay, udelay(100)
+> would spin only 10 microseconds. This is likely to cause issues in
+> any driver using udelay.
+> 
+> How does one cater for that?
 
-> 
-> Should I submit a new version?
-> 
-> BR,
-> Nikolaus
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+You make sure your delays are based on a stable hardware timer.
+Most platforms nowdays should have a suitable timer source.
+
+
+Nicolas
