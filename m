@@ -1,85 +1,101 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 16 Nov 2017 15:39:19 +0000
-Subject: [PATCH v3 1/3] kvm: arm debug: introduce helper for single-step
+Date: Thu, 16 Nov 2017 15:39:20 +0000
+Subject: [PATCH v3 2/3] kvm: arm64: handle single-stepping trapped instructions
 In-Reply-To: <20171116153921.21991-1-alex.bennee@linaro.org>
 References: <20171116153921.21991-1-alex.bennee@linaro.org>
-Message-ID: <20171116153921.21991-2-alex.bennee@linaro.org>
+Message-ID: <20171116153921.21991-3-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After emulating instructions we may want return to user-space to
-handle a single-step. If single-step is enabled the helper set the run
-structure for return and returns true.
+If we are using guest debug to single-step the guest we need to ensure
+we exit after emulating the instruction. This only affects
+instructions completely emulated by the kernel. For userspace emulated
+instructions we need to exit and return to complete the emulation.
+
+The kvm_arm_handle_step_debug() helper sets up the necessary exit
+state if needed.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 ---
 v2
-  - kvm_arm_maybe_return_debug -> kvm_arm_handle_step_debug
-  - return bool, true if return to userspace is required
+  - use helper from patch 1
+  - if (handled > 0) instead of if (handled) so errors propagate
 ---
- arch/arm/include/asm/kvm_host.h   |  5 +++++
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/kvm/debug.c            | 22 ++++++++++++++++++++++
- 3 files changed, 28 insertions(+)
+ arch/arm64/kvm/handle_exit.c | 47 +++++++++++++++++++++++++++++++-------------
+ 1 file changed, 33 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 4a879f6ff13b..26a1ea6c6542 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -285,6 +285,11 @@ static inline void kvm_arm_init_debug(void) {}
- static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
- static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
-+static inline bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu,
-+					     struct kvm_run *run)
-+{
-+	return false;
-+}
- 
- int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
- 			       struct kvm_device_attr *attr);
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index e923b58606e2..bbfd6a2adb2b 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -369,6 +369,7 @@ void kvm_arm_init_debug(void);
- void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
- void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
-+bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
- int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
- 			       struct kvm_device_attr *attr);
- int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
-diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
-index dbadfaf850a7..95afd22a4634 100644
---- a/arch/arm64/kvm/debug.c
-+++ b/arch/arm64/kvm/debug.c
-@@ -221,3 +221,25 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
- 		}
- 	}
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 7debb74843a0..af1c804742f6 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -178,6 +178,38 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ 	return arm_exit_handlers[hsr_ec];
  }
-+
-+
+ 
 +/*
-+ * When KVM has successfully emulated the instruction we might want to
-+ * return to user space with a KVM_EXIT_DEBUG. We can only do this
-+ * once the emulation is complete though so for userspace emulations
-+ * we have to wait until we have re-entered KVM before calling this
-+ * helper.
-+ *
-+ * Return true (and set exit_reason) to return to userspace or false
-+ * if no further action required.
++ * We may be single-stepping an emulated instruction. If the emulation
++ * has been completed in-kernel we can return to userspace with a
++ * KVM_EXIT_DEBUG, otherwise the userspace needs to complete its
++ * emulation first.
 + */
 +
-+bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
++static int handle_trap_exceptions(struct kvm_vcpu *vcpu, struct kvm_run *run)
 +{
-+	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-+		run->exit_reason = KVM_EXIT_DEBUG;
-+		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
-+		return true;
++	int handled;
++
++	/*
++	 * See ARM ARM B1.14.1: "Hyp traps on instructions
++	 * that fail their condition code check"
++	 */
++	if (!kvm_condition_valid(vcpu)) {
++		kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
++		handled = 1;
++	} else {
++		exit_handle_fn exit_handler;
++
++		exit_handler = kvm_get_exit_handler(vcpu);
++		handled = exit_handler(vcpu, run);
 +	}
-+	return false;
++
++	/* helper sets exit_reason if we need to return to userspace */
++	if (handled > 0 && kvm_arm_handle_step_debug(vcpu, run))
++		handled = 0;
++
++	return handled;
 +}
++
+ /*
+  * Return > 0 to return to guest, < 0 on error, 0 (and set exit_reason) on
+  * proper exit to userspace.
+@@ -185,8 +217,6 @@ static exit_handle_fn kvm_get_exit_handler(struct kvm_vcpu *vcpu)
+ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		       int exception_index)
+ {
+-	exit_handle_fn exit_handler;
+-
+ 	if (ARM_SERROR_PENDING(exception_index)) {
+ 		u8 hsr_ec = ESR_ELx_EC(kvm_vcpu_get_hsr(vcpu));
+ 
+@@ -214,18 +244,7 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		kvm_inject_vabt(vcpu);
+ 		return 1;
+ 	case ARM_EXCEPTION_TRAP:
+-		/*
+-		 * See ARM ARM B1.14.1: "Hyp traps on instructions
+-		 * that fail their condition code check"
+-		 */
+-		if (!kvm_condition_valid(vcpu)) {
+-			kvm_skip_instr(vcpu, kvm_vcpu_trap_il_is32bit(vcpu));
+-			return 1;
+-		}
+-
+-		exit_handler = kvm_get_exit_handler(vcpu);
+-
+-		return exit_handler(vcpu, run);
++		return handle_trap_exceptions(vcpu, run);
+ 	case ARM_EXCEPTION_HYP_GONE:
+ 		/*
+ 		 * EL2 has been reset to the hyp-stub. This happens when a guest
 -- 
 2.15.0
