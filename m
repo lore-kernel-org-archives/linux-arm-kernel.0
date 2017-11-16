@@ -1,53 +1,29 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Thu, 16 Nov 2017 12:29:48 +0000
-Subject: [PATCH v5 04/20] KVM: arm/arm64: Guard kvm_vgic_map_is_active
- against !vgic_initialized
-In-Reply-To: <1509093281-15225-5-git-send-email-cdall@linaro.org>
-References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
- <1509093281-15225-5-git-send-email-cdall@linaro.org>
-Message-ID: <475960cf-8b85-3a9f-d166-455e8bc5a43c@arm.com>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Thu, 16 Nov 2017 14:32:00 +0200
+Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
+In-Reply-To: <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
+References: <cover.1510822218.git.hns@goldelico.com>
+ <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
+Message-ID: <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 27/10/17 09:34, Christoffer Dall wrote:
-> If the vgic is not initialized, don't try to grab its spinlocks or
-> traverse its data structures.
+On 16/11/17 10:50, H. Nikolaus Schaller wrote:
+> The vendor name was "toppoly" but other panels and the vendor list
+> have defined it as "tpo". So let's fix it in driver and bindings.
 > 
-> This is important because we soon have to start considering the active
-> state of a virtual interrupts when doing vcpu_load, which may happen
-> early on before the vgic is initialized.
-
-I understand this patch is on its way to Linus already, but I just found
-this by browsing for VGIC changes...
-
-> Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
 > ---
->  virt/kvm/arm/vgic/vgic.c | 3 +++
->  1 file changed, 3 insertions(+)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> index fed717e..e1f7dbc 100644
-> --- a/virt/kvm/arm/vgic/vgic.c
-> +++ b/virt/kvm/arm/vgic/vgic.c
-> @@ -777,6 +777,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
->  	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
 
-Isn't vgic_get_irq() already accessing VGIC data structures? In which
-case this assignment should be moved after the vgic_initialized() check
-below?
 
-Cheers,
-Andre.
+> -MODULE_ALIAS("spi:toppoly,td028ttec1");
+> +MODULE_ALIAS("spi:tpo,td028ttec1");
 
->  	bool map_is_active;
->  
-> +	if (!vgic_initialized(vcpu->kvm))
-> +		return false;
-> +
->  	spin_lock(&irq->irq_lock);
->  	map_is_active = irq->hw && irq->active;
->  	spin_unlock(&irq->irq_lock);
-> 
+Doesn't this mean that the module won't load if you have old bindings?
+Can't we have two module aliases?
+
+ Tomi
+
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
