@@ -1,27 +1,35 @@
 From: eric@anholt.net (Eric Anholt)
-Date: Thu, 16 Nov 2017 12:34:53 -0800
-Subject: [PATCH] ARM: dts: bcm2835-rpi: Avoid conflicts on i2c0
-In-Reply-To: <1510779424-642-1-git-send-email-stefan.wahren@i2se.com>
-References: <1510779424-642-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87a7zmq7wy.fsf@anholt.net>
+Date: Thu, 16 Nov 2017 12:39:36 -0800
+Subject: [GIT PULL] bcm2835-dt-next-fixes-2017-11-15
+Message-ID: <20171116203936.23633-1-eric@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+Hi Florian,
 
-> The GPU firmware of the Raspberry Pi 3 uses i2c0 to communicate to
-> the FXL6408 gpio expander. It's a bad idea to use the same interface
-> from the ARM side. Since this interface isn't used by the other
-> RPi boards, it's save to remove the complete node and avoid this
-> conflict.
+This is a little fix from Stefan for a warning that popped up when our
+-next and dtc's -next got merged.  Hopefully it can get pulled for
+4.15 soon.
 
-It's not used by other kernel drivers currently, but should we leave it
-in for the pi0/1/2 folks that might have userspace I2C stuff using it?
-That's a thing people do, right?  I actually don't know.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171116/1a4866da/attachment-0001.sig>
+The following changes since commit fd3372db18d3d44ae4579243a8eacb5247d8c03a:
+
+  ARM: dts: bcm2837-rpi-3-b: Add bcm43438 serial slave (2017-10-06 13:07:21 -0700)
+
+are available in the Git repository at:
+
+  git://github.com/anholt/linux tags/bcm2835-dt-next-fixes-2017-11-15
+
+for you to fetch changes up to 014d6da6cb2525d7f48fb08c705cb130cc7b5f4a:
+
+  ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells (2017-11-15 10:57:47 -0800)
+
+----------------------------------------------------------------
+This pull request brings in a fix for a warning that started occuring
+when dtc from -next got merged.
+
+----------------------------------------------------------------
+Stefan Wahren (1):
+      ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells
+
+ arch/arm/boot/dts/bcm283x.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
