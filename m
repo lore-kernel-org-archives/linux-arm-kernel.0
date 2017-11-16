@@ -1,97 +1,51 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 16 Nov 2017 19:42:35 +0100 (CET)
-Subject: [PATCH RFC] irq-bcm2836: Avoid "Invalid trigger warning"
-In-Reply-To: <e5d7a277-0794-eb10-3c7c-22c001375177@arm.com>
-References: <1510815182-4889-1-git-send-email-stefan.wahren@i2se.com>
- <87tvxur47b.fsf@on-the-bus.cambridge.arm.com>
- <543996743.201290.1510853694865@email.1und1.de>
- <26ca38d8-953a-ff1d-9dd3-cee2608b3a18@raspberrypi.org>
- <e5d7a277-0794-eb10-3c7c-22c001375177@arm.com>
-Message-ID: <2064584856.232280.1510857755863@email.1und1.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Nov 2017 18:45:08 +0000
+Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
+In-Reply-To: <20171116183950.GA3624@linux.vnet.ibm.com>
+References: <20171116115810.GH9361@arm.com>
+ <20171116161731.GA94341@samitolvanen.mtv.corp.google.com>
+ <20171116163054.kcsdsomr7u2mqql2@hirez.programming.kicks-ass.net>
+ <CAKwvOdkV_g0XAbGM+nF2zt=2+tHLLcj=pbSxRDd2HMbrtU3cZg@mail.gmail.com>
+ <20171116165922.llrojrvomuihabrt@hirez.programming.kicks-ass.net>
+ <CAKwvOd=k=iVQvWmzP1E3XHUCYLoJgx+F9zoPuE+R2oaw_ePUVA@mail.gmail.com>
+ <20171116173417.nqsh5dpu65uj7b5s@hirez.programming.kicks-ass.net>
+ <20171116174830.GX3624@linux.vnet.ibm.com>
+ <CAKwvOdkDz1yRo=Skt_mWxs0uucK+adXx8kFQksMbTE3ofnpUMQ@mail.gmail.com>
+ <20171116183950.GA3624@linux.vnet.ibm.com>
+Message-ID: <20171116184508.GC21898@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-> Marc Zyngier <marc.zyngier@arm.com> hat am 16. November 2017 um 19:16 geschrieben:
-> 
-> 
-> On 16/11/17 17:53, Phil Elwell wrote:
-> > Hi Stefan,
+On Thu, Nov 16, 2017 at 10:39:51AM -0800, Paul E. McKenney wrote:
+> On Thu, Nov 16, 2017 at 10:16:22AM -0800, Nick Desaulniers wrote:
+> > > On Thu, Nov 16, 2017 at 06:34:17PM +0100, Peter Zijlstra wrote:
+> > >> So the problem is that its very very hard (and painful) to find these
+> > >> bugs. Getting the tools people to comment on these specific
+> > >> optimizations would really help lots.
 > > 
-> > On 16/11/2017 17:34, Stefan Wahren wrote:
-> >> Hi Phil,
-> >>
-> >>> Marc Zyngier <marc.zyngier@arm.com> hat am 16. November 2017 um 09:57 geschrieben:
-> >>>
-> >>>
-> >>> On Thu, Nov 16 2017 at  7:53:02 am GMT, Stefan Wahren <stefan.wahren@i2se.com> wrote:
-> >>>> From: Phil Elwell <phil@raspberrypi.org>
-> >>>>
-> >>>> Initialise the level for each IRQ to avoid a warning from the
-> >>>> arm arch timer code:
-> >>>>
-> >>>>     arch_timer: WARNING: Invalid trigger for IRQ19, assuming level low
-> >>>>     arch_timer: WARNING: Please fix your firmware
-> >>>>     arch_timer: cp15 timer(s) running at 19.20MHz (virt).
-> >>>>
-> >>>> Signed-off-by: Phil Elwell <phil@raspberrypi.org>
-> >>>> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> >>>> ---
-> >>>>  drivers/irqchip/irq-bcm2836.c | 2 +-
-> >>>>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>>>
-> >>>> diff --git a/drivers/irqchip/irq-bcm2836.c b/drivers/irqchip/irq-bcm2836.c
-> >>>> index 667b9e1..abc9b40 100644
-> >>>> --- a/drivers/irqchip/irq-bcm2836.c
-> >>>> +++ b/drivers/irqchip/irq-bcm2836.c
-> >>>> @@ -104,7 +104,7 @@ static void bcm2836_arm_irqchip_register_irq(int hwirq, struct irq_chip *chip)
-> >>>>  
-> >>>>  	irq_set_percpu_devid(irq);
-> >>>>  	irq_set_chip_and_handler(irq, chip, handle_percpu_devid_irq);
-> >>>> -	irq_set_status_flags(irq, IRQ_NOAUTOEN);
-> >>>> +	irq_set_status_flags(irq, IRQ_NOAUTOEN | IRQ_TYPE_LEVEL_LOW);
-> >>>>  }
-> >>>>  
-> >>>>  static void
-> >>>
-> >>> Why is this only done for the per-cpu interrupts? I can't see what
-> >>> guarantees the same thing for global interrupts...
-> >>
-> >> i don't know. Could you please answer?
-> >>
-> >> I'm only interested to get the rid of this ugly warning ...
-> >>
-> >> and the right fix ;-)
+> > No doubt; I do not disagree with you.  Kernel developers have very
+> > important use cases for the language.
 > > 
-> > That was my motivation too, with a preference for the smallest change that had
-> > the desired effect.
-> > 
-> > The warning message comes from the arch_timer code, which only cares about the
-> > interrupts it has been configured to use. Since these are all per-cpu
-> > interrupts, the state of the global interrupts is irrelevant.
+> > But the core point I'm trying to make is "do we need to block this
+> > patch set until issues with the C standards body in regards to the
+> > kernels memory model are resolved?"  I would hope the two are
+> > orthogonal and that we'd take them and then test them even more
+> > extensively than the developer has in order to find out.
 > 
-> The fact that no driver screams about it doesn't make it right. You're
-> being bitten by the lack of interrupt polarity description in your DT.
-> That is fine as long as you only support one type, but you need to tell
-> the core code what you're doing.
-> 
-> Your whole interrupt registration thing is already quite a departure
-> from the normal flow, where the interrupt should be created via the DT
-> parsing code, and not eagerly like it is done here. I'd rather you
-> address it by using the expected flow for a DT platform, with a xlate
-> method that returns the actual trigger type (I assume all interrupts on
-> this system are level...).
-> 
-> The same issue is present in the bcm2835 interrupt controller, which
-> seems to be the one implementing global interrupts.
+> Given that I have been working on getting the C and C++ standards to
+> correctly handle rcu_dereference() for more than ten years, I recommend
+> -against- waiting on standardization in the strongest possible terms.
+> And if you think that ten years is bad, the Java standards community has
+> been struggling with out-of-thin-air (OOTA) values for almost 20 years.
+> And the C and C++ standards haven't solved OOTA, either.
 
-Okay, thanks for the explanation.
+The problem is, if we go ahead with this change, the compiler *will* break
+some address dependencies and something will eventually go wrong. At that
+point, what do we do? Turn off some random compiler optimisation? Add a
+random barrier()?
 
-Can you please point me to a good reference implementation?
+We don't necessarily need standardisation, but we at least need guarantees
+from the compiler implementation that LTO/PGO will respect source level
+address dependencies. I don't think we have that today.
 
-> 
-> Thanks,
-> 
-> 	M.
-> -- 
-> Jazz is not dead. It just smells funny...
+Will
