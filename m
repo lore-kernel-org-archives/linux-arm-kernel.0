@@ -1,38 +1,58 @@
-From: segher@kernel.crashing.org (Segher Boessenkool)
-Date: Thu, 16 Nov 2017 07:56:50 -0600
-Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
-In-Reply-To: <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-12-samitolvanen@google.com>
- <20171116115433.GG9361@arm.com>
- <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
-Message-ID: <20171116135650.GQ10515@gate.crashing.org>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Thu, 16 Nov 2017 16:47:34 +0100
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <20171116153625.GJ31757@n2100.armlinux.org.uk>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <20171101175325.2557ce85@alans-desktop>
+ <4b707ce0-6067-ab36-e167-1acf348d26bf@free.fr>
+ <CA+55aFxxH0HE9SfUoLVqsvDKO0PfeM+vSoDmbXQv85yJcPZoPQ@mail.gmail.com>
+ <e03436d1-b140-3f29-59a6-3b1eb6bf9da4@free.fr>
+ <11393e07-b042-180c-3bcd-484bf51eada6@sigmadesigns.com>
+ <20171115131351.GE31757@n2100.armlinux.org.uk>
+ <1fa81694-7bd2-564b-e5b9-ae53b9ea6620@sigmadesigns.com>
+ <20171116153625.GJ31757@n2100.armlinux.org.uk>
+Message-ID: <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 04:07:42PM +0300, Yury Norov wrote:
-> > > Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
-> > > in-place and workaround gcc and clang limitations on redefining macros
-> > > across different assembler blocks.
-> > 
-> > What limitations? Can you elaborate please? Is this a fix?
-
-> Regarding GCC.
+On 16/11/2017 16:36, Russell King - ARM Linux wrote:
+> On Thu, Nov 16, 2017 at 04:26:51PM +0100, Marc Gonzalez wrote:
+>> On 15/11/2017 14:13, Russell King - ARM Linux wrote:
+>>
+>>> udelay() needs to offer a consistent interface so that drivers know
+>>> what to expect no matter what the implementation is.  Making one
+>>> implementation conform to your ideas while leaving the other
+>>> implementations with other expectations is a recipe for bugs.
+>>>
+>>> If you really want to do this, fix the loops_per_jiffy implementation
+>>> as well so that the consistency is maintained.
+>>
+>> Hello Russell,
+>>
+>> It seems to me that, when using DFS, there's a serious issue with loop-based
+>> delays. (IIRC, it was you who pointed this out a few years ago.)
+>>
+>> If I'm reading arch/arm/kernel/smp.c correctly, loops_per_jiffy is scaled
+>> when the frequency changes.
+>>
+>> But arch/arm/lib/delay-loop.S starts by loading the current value of
+>> loops_per_jiffy, computes the number of times to loop, and then loops.
+>> If the frequency increases when the core is in __loop_delay, the
+>> delay will be much shorter than requested.
+>>
+>> Is this a correct assessment of the situation?
 > 
-> When it joins preprocessed source files into single asm file,
-> mrs_s/msr_s becomes either not declared or declared multiple times.
-> 
-> ./ccuFb68h.s:33120: Error: Macro `mrs_s' was already defined
-> ./ccuFb68h.s:33124: Error: Macro `msr_s' was already defined
-> 
-> I'm not sure that GCC works correctly in this case, and I sent the
-> email to Linaro toolchain group to clarify it. See below.
+> Absolutely correct, and it's something that people are aware of, and
+> have already catered for while writing their drivers.
 
-The compiler is free to inline code, reorder code, duplicate code, etc.
-Inline assembler is not exempt from this.
+In their cpufreq driver?
+In "real" device drivers that happen to use delays?
 
-The compiler is fine, the assembler is fine (and the linker has nothing
-to do with it).  Your code is not fine.
+On my system, the CPU frequency may ramp up from 120 MHz to 1.2 GHz.
+If the frequency increases at the beginning of __loop_delay, udelay(100)
+would spin only 10 microseconds. This is likely to cause issues in
+any driver using udelay.
 
+How does one cater for that?
 
-Segher
+Regards.
