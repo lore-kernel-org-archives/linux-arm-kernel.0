@@ -1,76 +1,31 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Thu, 16 Nov 2017 13:55:31 +0000
-Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
-In-Reply-To: <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-12-samitolvanen@google.com>
- <20171116115433.GG9361@arm.com>
- <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
-Message-ID: <c0c19191-e090-4768-3c46-b813713d2908@arm.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 16 Nov 2017 15:03:34 +0100
+Subject: [PATCH v2 1/8] dt-bindings: arm: actions: Add S700 and CubieBoard7
+In-Reply-To: <20171113233427.5386-2-afaerber@suse.de>
+References: <20171113233427.5386-1-afaerber@suse.de>
+ <20171113233427.5386-2-afaerber@suse.de>
+Message-ID: <3a3f5487-8bdc-5061-0e5f-eaf558c5c806@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/17 13:07, Yury Norov wrote:
-> On Thu, Nov 16, 2017 at 11:54:33AM +0000, Will Deacon wrote:
->> On Wed, Nov 15, 2017 at 01:34:21PM -0800, Sami Tolvanen wrote:
->>> From: Alex Matveev <alxmtvv@gmail.com>
->>>
->>> Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
->>> in-place and workaround gcc and clang limitations on redefining macros
->>> across different assembler blocks.
->>
->> What limitations? Can you elaborate please? Is this a fix?
+Am 14.11.2017 um 00:34 schrieb Andreas F?rber:
+> Document the Actions Semi S700 SoC and the Cubietech CubieBoard7.
 > 
-> Hi Will,
-> 
-> Regarding GCC.
-> 
-> When it joins preprocessed source files into single asm file,
-> mrs_s/msr_s becomes either not declared or declared multiple times.
-> 
-> ./ccuFb68h.s:33120: Error: Macro `mrs_s' was already defined
-> ./ccuFb68h.s:33124: Error: Macro `msr_s' was already defined
-> 
-> I'm not sure that GCC works correctly in this case, and I sent the
-> email to Linaro toolchain group to clarify it. See below.
-> 
-> Yury
-> 
-> [...]
-> 
-> Links:
-> My unfinished branch:
-> https://github.com/norov/linux/tree/lto
-> Andi Kleen tree:
-> https://github.com/andikleen/linux-misc/tree/lto-411-1
-> Sami Tolvanen's recent work for clang:
-> https://lkml.org/lkml/2017/11/3/606
-> 
-> Question we have for now:
-> There's mrs_s/msr_s macro that doesn't work with LTO - linker
-> complains very loudly that macro is either not declared, or declared
-> multiple times. (To reproduce - try to build my kernel branch w/o last
-> patch).
-> 
-> The same (?) problem is observed with clang, and people there
-> considered it as feature, not a bug.
-> 
-> https://bugs.llvm.org/show_bug.cgi?id=19749
-> 
-> We have the fix for both clang and gcc, but it looks hacky. Maybe it
-> worth to fix mrs/msr issue on toolchain side?
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+> ---
+>  v1 -> v2: Unchanged
+>  
+>  Documentation/devicetree/bindings/arm/actions.txt | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
 
-Given that this whole mrs_s infrastructure is a workaround for older 
-assemblers which don't support the "S<op0>_<op1>_<Cn>_<Cm>_<op2>" syntax 
-for arbitrary unnamed system registers (which IIRC was a fairly late 
-addition to the architecture), the only way it could be "fixed" on the 
-toolchain side is by removing all those older toolchains from existence. 
-Good luck with that ;)
+Queued on v4.16/dt64:
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.16/dt64
 
-In *theory*, it might be possible to do something similar to what we do 
-with CONFIG_BROKEN_GAS_INST to detect offending assemblers and only 
-define and use these macros when necessary (hopefully Clang and other 
-LTO-capable toolchains do accept the proper syntax), but I've no idea 
-how invasive or difficult that might turn out to be.
+Regards,
+Andreas
 
-Robin.
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
