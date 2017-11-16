@@ -1,76 +1,111 @@
 From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 16 Nov 2017 09:53:40 +0530
-Subject: [PATCH v3 7/9] of: platform: Add a function to get platfrom data from
- device node
+Date: Thu, 16 Nov 2017 09:53:41 +0530
+Subject: [PATCH v3 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer
+ pdata ops
 In-Reply-To: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
 References: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <1510806222-22096-8-git-send-email-j-keerthy@ti.com>
+Message-ID: <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a function to get platfrom data from device node.
+Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
 
 Signed-off-by: Keerthy <j-keerthy@ti.com>
 ---
- drivers/of/platform.c       | 23 +++++++++++++++++++++++
- include/linux/of_platform.h |  6 ++++++
- 2 files changed, 29 insertions(+)
 
-diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-index b7cf84b..b9edfcf 100644
---- a/drivers/of/platform.c
-+++ b/drivers/of/platform.c
-@@ -60,6 +60,29 @@ struct platform_device *of_find_device_by_node(struct device_node *np)
- }
- EXPORT_SYMBOL(of_find_device_by_node);
+Changes in v3:
+
+  * Used of_find_platdata_by_node function to fetch platform
+    data for timer node.
+
+ drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+ 1 file changed, 22 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+index 5ad42f3..2caf46b 100644
+--- a/drivers/pwm/pwm-omap-dmtimer.c
++++ b/drivers/pwm/pwm-omap-dmtimer.c
+@@ -23,6 +23,7 @@
+ #include <linux/mutex.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
++#include <linux/platform_data/dmtimer-omap.h>
+ #include <linux/platform_data/pwm_omap_dmtimer.h>
+ #include <linux/platform_device.h>
+ #include <linux/pm_runtime.h>
+@@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+ 	struct pwm_chip chip;
+ 	struct mutex mutex;
+ 	pwm_omap_dmtimer *dm_timer;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	struct platform_device *dm_timer_pdev;
+ };
  
-+/**
-+ * of_find_platdata_by_node - Find the platform_data associated with a node
-+ * @np: Pointer to device tree node
-+ *
-+ * Fetches the platform device pointer of device tree node and in turn gets the
-+ * associated platform data. 
-+ *
-+ * Returns platform_data pointer, or NULL if not found
-+ */
-+void *of_find_platdata_by_node(struct device_node *np)
-+{
-+	struct platform_device *pdev;
+@@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct device_node *timer;
++	struct platform_device *timer_pdev;
+ 	struct pwm_omap_dmtimer_chip *omap;
+-	struct pwm_omap_dmtimer_pdata *pdata;
++	struct dmtimer_platform_data *timer_pdata;
++	struct omap_dm_timer_ops *pdata;
+ 	pwm_omap_dmtimer *dm_timer;
+ 	u32 v;
+ 	int status;
+ 
+-	pdata = dev_get_platdata(&pdev->dev);
+-	if (!pdata) {
+-		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
++	timer = of_parse_phandle(np, "ti,timers", 0);
++	if (!timer)
++		return -ENODEV;
 +
-+	pdev = of_find_device_by_node(np);
-+	if (!pdev) {
-+		pr_err("Unable to find pdev\n");
-+		return pdev;
++	timer_pdev = of_find_device_by_node(timer);
++	if (!timer_pdev) {
++		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
++		return -ENODEV;
 +	}
 +
-+	return dev_get_platdata(&pdev->dev);
-+}
-+EXPORT_SYMBOL(of_find_platdata_by_node);
-+
- #ifdef CONFIG_OF_ADDRESS
- /*
-  * The following routines scan a subtree and registers a device for
-diff --git a/include/linux/of_platform.h b/include/linux/of_platform.h
-index fb908e5..77b770f 100644
---- a/include/linux/of_platform.h
-+++ b/include/linux/of_platform.h
-@@ -59,11 +59,17 @@ extern struct platform_device *of_device_alloc(struct device_node *np,
- 					 struct device *parent);
- #ifdef CONFIG_OF
- extern struct platform_device *of_find_device_by_node(struct device_node *np);
-+extern void *of_find_platdata_by_node(struct device_node *np);
- #else
- static inline struct platform_device *of_find_device_by_node(struct device_node *np)
- {
- 	return NULL;
- }
-+
-+static void *of_find_platdata_by_node(struct device_node *np)
-+{
-+	return NULL;
-+}
- #endif
++	timer_pdata = of_find_platdata_by_node(timer);
++	if (!timer_pdata) {
++		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+ 		return -EINVAL;
+ 	}
  
- /* Platform devices and busses creation */
+-	if (!pdata->request_by_node ||
++	pdata = timer_pdata->timer_ops;
++
++	if (!pdata || !pdata->request_by_node ||
+ 	    !pdata->free ||
+ 	    !pdata->enable ||
+ 	    !pdata->disable ||
+@@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 		return -EINVAL;
+ 	}
+ 
+-	timer = of_parse_phandle(np, "ti,timers", 0);
+-	if (!timer)
+-		return -ENODEV;
+-
+ 	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+ 		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+ 		return -ENODEV;
+@@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+ 
+ 	omap->pdata = pdata;
+ 	omap->dm_timer = dm_timer;
+-
+-	omap->dm_timer_pdev = of_find_device_by_node(timer);
+-	if (!omap->dm_timer_pdev) {
+-		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+-		omap->pdata->free(dm_timer);
+-		return -EINVAL;
+-	}
++	omap->dm_timer_pdev = timer_pdev;
+ 
+ 	/*
+ 	 * Ensure that the timer is stopped before we allow PWM core to call
 -- 
 1.9.1
