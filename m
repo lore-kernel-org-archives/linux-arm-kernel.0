@@ -1,33 +1,30 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 16 Nov 2017 17:23:49 +0100
-Subject: [PATCH v3 3/4] net: nb8800: Move HW init to ndo_open()
-In-Reply-To: <691f71bc-9e1b-5281-1482-fc532151f5ce@sigmadesigns.com>
-References: <103bc878-9311-a727-1c21-2070e0a480e5@sigmadesigns.com>
- <yw1xwp2t11ap.fsf@mansr.com>
- <4e22ef54-d823-fc29-fedc-d447fa3d9c88@sigmadesigns.com>
- <yw1xfu9h0xv7.fsf@mansr.com>
- <30042004-4e13-b7e2-b49d-754db54cc5ce@sigmadesigns.com>
- <yw1xbmk4241h.fsf@mansr.com>
- <a047ecbd-c8a2-a8c0-7c9d-947b28aa8b9a@sigmadesigns.com>
- <yw1xr2szzie5.fsf@mansr.com>
- <bed48cd4-dfc3-2572-ef76-4f5b449be6e2@sigmadesigns.com>
- <691f71bc-9e1b-5281-1482-fc532151f5ce@sigmadesigns.com>
-Message-ID: <20171116162349.GG7627@lunn.ch>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Thu, 16 Nov 2017 08:25:18 -0800
+Subject: [PATCH v2 06/18] arm64: kvm: use -fno-jump-tables with clang
+In-Reply-To: <20171116114616.GC9361@arm.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-7-samitolvanen@google.com>
+ <20171116114616.GC9361@arm.com>
+Message-ID: <20171116162518.GB94341@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> I'm starting to think there is some kind of race condition between
-> SW and HW handling of descriptors. This might also explain the
-> out-of-order warnings.
+On Thu, Nov 16, 2017 at 11:46:17AM +0000, Will Deacon wrote:
+> Can you elaborate a bit more on exactly what you saw failing here,
+> please?
 
-Hi Marc
+Mark noticed that clang built kernels fail to boot when the kernel
+starts at EL2:
 
-Maybe take a look at your memory barriers. Most accesses using the
-_relaxed() version, i.e, no barrier. And then there are specific
-barriers when needed. One could be missing.
+  http://lkml.iu.edu/hypermail/linux/kernel/1711.0/02817.html
 
-As a quick test, drop the _relaxed. Force a barrier with each
-access. If that works, it is a clear indication you have a barrier
-problem.
+Turns out starting with LLVM r308050, the compiler decides to use
+a jump table in __init_stage2_translation, and generates code that
+branches into an EL1 virtual address.
 
-	Andrew
+> Whilst it's obviously broken to jump to EL1 from EL2 w/o VHE, the
+> commit message is a bit cryptic.
+
+I agree, I'll add a more descriptive commit message for v3.
+
+Sami
