@@ -1,25 +1,26 @@
 From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 16 Nov 2017 15:05:42 +0100
-Subject: [PATCH v2 7/8] soc: actions: sps: Add S700
-In-Reply-To: <20171113233427.5386-8-afaerber@suse.de>
+Date: Thu, 16 Nov 2017 15:16:23 +0100
+Subject: [PATCH v2 8/8] arm64: dts: actions: Add S700 SPS node
+In-Reply-To: <20171113233427.5386-9-afaerber@suse.de>
 References: <20171113233427.5386-1-afaerber@suse.de>
- <20171113233427.5386-8-afaerber@suse.de>
-Message-ID: <e8f85090-8200-5080-6bcd-a20dff323619@suse.de>
+ <20171113233427.5386-9-afaerber@suse.de>
+Message-ID: <fffa860b-f8a2-8a8f-ecdf-98d86cafb8f2@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am 14.11.2017 um 00:34 schrieb Andreas F?rber:
-> Add power domains for S700 SoC.
+> Add a node to the S700 Device Tree for the Smart Power System (SPS).
 > 
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
 >  v2: New
 >  
->  drivers/soc/actions/owl-sps.c | 42 ++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 42 insertions(+)
+>  To be squashed into 5/8 if binding gets acked.
+>  
+>  arch/arm64/boot/dts/actions/s700.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
-Queued on v4.16/drivers:
-https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.16/drivers
+Squashed (on bg96-next work branch).
 
 Regards,
 Andreas
