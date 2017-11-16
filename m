@@ -1,27 +1,27 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Thu, 16 Nov 2017 15:50:19 -0800
-Subject: [PATCH v2 08/18] arm64: don't disable ADR_PREL_PG_HI21* with
- ARM64_ERRATUM_843419
-In-Reply-To: <CAKv+Gu9pROJ_T5twJtVn2itzav4x5fypyJWsBr5YbjWUTMFokg@mail.gmail.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-9-samitolvanen@google.com>
- <CAKv+Gu-wYwBMV7tdb+Kax_cyPsmAB2R2ZVwJuNi9qM0kaYAs=Q@mail.gmail.com>
- <20171116114406.GB9361@arm.com>
- <20171116163132.GC94341@samitolvanen.mtv.corp.google.com>
- <CAKv+Gu8yPSwZep-S_ke_P5BiZ3o72R=ykhixoXcyGUHa1ZxGGw@mail.gmail.com>
- <20171116213702.GA10616@samitolvanen.mtv.corp.google.com>
- <CAKv+Gu_3R4SUC2hCUtEX_4ut9admtrBZS-S-mzQnQsoJoHPcBw@mail.gmail.com>
- <20171116230939.GA38360@samitolvanen.mtv.corp.google.com>
- <CAKv+Gu9pROJ_T5twJtVn2itzav4x5fypyJWsBr5YbjWUTMFokg@mail.gmail.com>
-Message-ID: <20171116235019.GA55530@samitolvanen.mtv.corp.google.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 16 Nov 2017 15:55:38 -0800
+Subject: [GIT PULL 2/3] ARM: SoC driver updates for 4.15
+In-Reply-To: <CAK8P3a3uwqeeg7--UDTWJ33g7YejXp5rtV9OFt=jrt-AzQi13Q@mail.gmail.com>
+References: <CAK8P3a2Wp6EANLq7JZr=uAReKOhBYrc3VKUA7FpDvq7n3Lc2aQ@mail.gmail.com>
+ <CA+55aFyvWnmLzYs+Hb+d=ir9Ww8gLcNn9=Oc=zwKdK=L-nmXZA@mail.gmail.com>
+ <CAK8P3a3uwqeeg7--UDTWJ33g7YejXp5rtV9OFt=jrt-AzQi13Q@mail.gmail.com>
+Message-ID: <CA+55aFymY0qyc7kKHBcgx0gF7a+owFfvv+TrjV9BJAGY9k0gJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 11:20:40PM +0000, Ard Biesheuvel wrote:
-> So at which point is the IR in a partially linked object file
-> converted into executable code?
+On Thu, Nov 16, 2017 at 3:25 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>
+> Regarding this pull request 2/3, would you prefer
+>
+> a) pulling it after 3/3, thereby getting a bisection problem
+>     but having contents that are otherwise tested in combination
 
-At the final module link step (cmd_ld_ko_o) in scripts/Makefile.modpost,
-added in patch 12.
+Gaah. I'll do that. You guys have been good for so long that a
+one-time mistake isn't worth worrying about.
 
-Sami
+But please do make sure that your infrastructure actually checks the
+branches individually in the future. Particularly since I only do the
+x86-64 build, so I obviously inevitably miss a lot of potential
+problems in the ARM SoC branches.
+
+               Linus
