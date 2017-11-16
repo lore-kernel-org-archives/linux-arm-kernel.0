@@ -1,182 +1,90 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Thu, 16 Nov 2017 19:56:54 +0100
-Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
-In-Reply-To: <2e67402b-4a32-9da9-3b06-e271c23d2422@ti.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
- <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
- <130D3B71-C0CE-4755-BF06-971681F630BC@goldelico.com>
- <d90ee1ee-8a33-de04-bb8b-2f10e0a80a61@ti.com>
- <908C52B9-83E2-49B3-B5B4-D8F27A96ECD6@goldelico.com>
- <a6b4c02d-a5ff-b0e6-ca59-afaf1148fe2a@ti.com>
- <689D4636-A169-4C4A-89C2-7039C78E853F@goldelico.com>
- <2e67402b-4a32-9da9-3b06-e271c23d2422@ti.com>
-Message-ID: <D565D101-4EAF-4B3C-907F-A826EF53B5AF@goldelico.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Thu, 16 Nov 2017 19:01:47 +0000
+Subject: next/master boot: 210 boots: 35 failed, 174 passed with 1
+ conflict (next-20171115)
+In-Reply-To: <3ddf8ad5-e3d9-49cc-9e20-2d8cdbc9685f@nvidia.com>
+References: <5a0c2169.c6a2df0a.13ea3.9c02@mx.google.com>
+ <a21b88b2-663d-49fc-527a-87494a23087f@collabora.com>
+ <0e2dbcf5-6823-8e48-e2ac-85afa7d6dbaf@collabora.com>
+ <3ddf8ad5-e3d9-49cc-9e20-2d8cdbc9685f@nvidia.com>
+Message-ID: <e0e9994c-8d2e-f499-e430-1f15bff7b0e6@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+On 16/11/17 17:55, Jon Hunter wrote:
+>
+> On 16/11/17 14:50, Guillaume Tucker wrote:
+>> On 16/11/17 14:42, Guillaume Tucker wrote:
+>>> On 15/11/17 11:13, kernelci.org bot wrote:
+>>>> next/master boot: 210 boots: 35 failed, 174 passed with 1 conflict
+>>>> (next-20171115)
+>>>>
+>>>> Full Boot Summary:
+>>>> https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20171115/
+>>>>
+>>>> Full Build Summary:
+>>>> https://kernelci.org/build/next/branch/master/kernel/next-20171115/
+>>>>
+>>>> Tree: next
+>>>> Branch: master
+>>>> Git Describe: next-20171115
+>>>> Git Commit: 63fb091c80188ec51f53514d07de907c1dd3d61d
+>>>> Git URL:
+>>>> http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+>>>> Tested: 35 unique boards, 16 SoC families, 30 builds out of 213
+>>>>
+>>>> Boot Regressions Detected:
+>>>>
+>>>> arm:
+>>> [...]
+>>>>     multi_v7_defconfig:
+>>>>         tegra124-nyan-big:
+>>>>             lab-collabora: failing since 11 days (last pass:
+>>>> next-20171102 - first fail: next-20171103)
+>>>
+>>> I've run another automated bisection with some tweaks to remove
+>>> known failures and found this breaking change:
+>>>
+>>>   commit 859eb05676f67d4960130dff36d3368006716110
+>>>   Author: Shawn Nematbakhsh <shawnn@chromium.org>
+>>>   Date:   Fri Sep 8 13:50:11 2017 -0700
+>>>
+>>>       platform/chrome: Use proper protocol transfer function
+>>>
+>>>
+>>
+>> Should have added, this is essentially the kernel error:
+>>
+>> [    1.711581] kernel BUG at drivers/platform/chrome/cros_ec_proto.c:34!
+>> [    1.718004] Internal error: Oops - BUG: 0 [#1] SMP ARM
+>>
+>> Please see the links to the LAVA jobs below for the full logs.
+> This one is a known issue (which I believe I have mentioned a couple
+> times). There is a fix available [0].
 
-> Am 16.11.2017 um 19:32 schrieb Andrew F. Davis <afd@ti.com>:
-> 
-> On 11/16/2017 12:18 PM, H. Nikolaus Schaller wrote:
->> 
->>> Am 16.11.2017 um 18:08 schrieb Andrew F. Davis <afd@ti.com>:
->>> 
->>> On 11/16/2017 10:10 AM, H. Nikolaus Schaller wrote:
->>>> Hi Andrew,
->>>> 
->>>>> Am 16.11.2017 um 16:53 schrieb Andrew F. Davis <afd@ti.com>:
->>>>> 
->>>>> On 11/16/2017 07:43 AM, H. Nikolaus Schaller wrote:
->>>>>> 
->>>>>>> Am 16.11.2017 um 13:32 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
->>>>>>> 
->>>>>>> On 16/11/17 10:50, H. Nikolaus Schaller wrote:
->>>>>>>> The vendor name was "toppoly" but other panels and the vendor list
->>>>>>>> have defined it as "tpo". So let's fix it in driver and bindings.
->>>>>>>> 
->>>>>>>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->>>>>>>> ---
->>>>>>> 
->>>>>>> 
->>>>>>>> -MODULE_ALIAS("spi:toppoly,td028ttec1");
->>>>>>>> +MODULE_ALIAS("spi:tpo,td028ttec1");
->>>>>>> 
->>>>>>> Doesn't this mean that the module won't load if you have old bindings?
->>>>>> 
->>>>>> Hm.
->>>>>> 
->>>>>> Well, I think it can load but doesn't automatically from DT strings which might
->>>>>> be unexpected.
->>>>>> 
->>>>>>> Can't we have two module aliases?
->>>>>> 
->>>>>> I think we can. Just a random example:
->>>>>> https://elixir.free-electrons.com/linux/latest/source/drivers/w1/slaves/w1_therm.c#L754
->>>>>> 
->>>>>> So we should keep both.
->>>>> 
->>>>> Even better would be to drop both MODULE_ALIAS and let the
->>>>> MODULE_DEVICE_TABLE macro define them for your from the SPI id table.
->>>> 
->>>> Why would that be better?
->>>> 
->>> 
->>> MODULE_ALIAS is ugly, you already have a table (usually) of device names
->>> that are supported by the driver, the module aliases should be generated
->>> from that table. This also keeps supported device list in one place.
->>> 
->>>> As far as I see it will need more code and changes than adding one line of
->>>> MODULE_ALIAS.
->>>> 
->>>>> Although it doesn't look like this driver has an SPI id table, you
->>>>> should probably add one, I be interested to see if this module is always
->>>>> being matched through the "spi" or the "of" alias..
->>>> 
->>>> Could you please propose how that code should look like, so that I can test?
->>>> 
->>> 
->>> Sure,
->>> 
->>> start with
->>> $ udevadm monitor
->>> and see what string the kernel is looking for when trying to find a
->>> module for this device.
->> 
->> Well, the module is loaded automatically from DT at boot time well before
->> I can start udevadm. So that is the most tricky part to setup the system
->> to suppress this...
->> 
->>> 
->>> If it is only ever looking for "of:toppoly,td028ttec1", then you can
->>> drop the MODULE_ALIAS and be done as it was never getting used anyway.
->> 
->> Since it is an SPI client, I am sure it looks for "spi:something.
->> 
->>> 
->>> What I expect though is "spi:toppoly,td028ttec1", in which case you
->>> should add
->>> 
->>> static const struct spi_device_id td028ttec1_ids[] = {
->>> 	{ "toppoly,td028ttec1", 0 },
->>> 	{ "tpo,td028ttec1", 0},
->>> 	{ /* sentinel */ }
->>> };
->>> MODULE_DEVICE_TABLE(spi, td028ttec1_ids);
->> 
->> We already have a static const struct of_device_id td028ttec1_of_match[]
->> table with the same information.
->> 
->> So we still have two places to keep in sync.
->> 
->> Or can we remove the td028ttec1_of_match[]? AFAIK not.
->> 
->>> 
->>> link to it in the td028ttec1_spi_driver struct:
->>> .id_table = td028ttec1_ids,
->>> 
->>> Then test again to see that the module still loads with the new and old
->>> DT string.
->> 
->> In total I am not really convinced that adding 7 lines of code is better
->> than one (the "tpo," alias) that is tested and works...
->> 
->> And it looks like a lot of unplanned code testing for me which takes more
->> than 5 minutes :)
->> 
->> So I'd prefer to leave that exercise of fixing the MODULE_ALIAS/DEVICE_TABLE
->> to someone else...
->> 
-> 
-> That's fine, someday I'll probably get some script to do this for all
-> the drivers that still have MODULE_ALIAS and an existing table.
+Right, it's true that this kernel error showed up in the previous
+bisection I ran last week.  As this time it found another commit
+I thought it might be worthwhile sharing the result.
 
-That would be cool!
+> I am not sure that continuing to bisect this is going to bare any fruit
+> due to the number of issues plaguing this board at the moment. It seems
+> to be a DRM related issue and when I get sometime I will see if I can
+> figure out what is causing this. This is the furtherest I have gotten so
+> far [1].
 
-On a second thought, I think there is a quick experiment for this driver
-not needing to monitor events.
+Thanks for the update.  Please keep in mind that DRM_MOUVEAU was
+disabled in every iteration this time, so there might also be
+something else unrelated to DRM.
 
-1st attempt: remove ALIASES => if it still loads it would be fine
-2nd attempt: add your id table => if it loads again, it is fine
-if not, let's keep ALIASES.
+Agreed, it's not worth bisecting much further.  In fact I found
+these issues mostly as a side effect of working on the automatic
+bisection mechanism in kernelci.org, and linux-next is especially
+tricky to bisect.  On this subject, we'll probably start by
+enabling this on stable trees and mainline, then see what we can
+do with linux-next and other tricky trees at a later stage.
 
-Maybe I can try tomorrow.
+Thanks,
+Guillaume
 
-BR and thanks,
-Nikolaus
-
-> 
->> BR and thanks,
->> Nikolaus
->> 
->>> 
->>> Andrew
->>> 
->>>> BR and thanks,
->>>> Nikolaus Schaller
->>>> 
->>>>> 
->>>>>> 
->>>>>> Should I submit a new version?
->>>>>> 
->>>>>> BR,
->>>>>> Nikolaus
->>>>>> 
->>>>>> --
->>>>>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->>>>>> the body of a message to majordomo at vger.kernel.org
->>>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>>>> 
->>>> 
->>>> --
->>>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->>>> the body of a message to majordomo at vger.kernel.org
->>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>> 
->> 
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->> 
+> [0] https://patchwork.kernel.org/patch/9974835/
+> [1] https://www.spinics.net/lists/arm-kernel/msg616616.html
