@@ -1,35 +1,25 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Thu, 16 Nov 2017 09:28:57 +0000
-Subject: [PATCH v2] arm64: perf: remove unsupported events for Cortex-A73
-In-Reply-To: <20171115175215.GM19071@arm.com>
-References: <1510731566-22016-1-git-send-email-xuyiping@hisilicon.com>
- <20171115175215.GM19071@arm.com>
-Message-ID: <abd5a266-152f-c4ba-7ee0-1992aba7edf0@arm.com>
+From: hjc@rock-chips.com (Sandy Huang)
+Date: Thu, 16 Nov 2017 17:47:11 +0800
+Subject: [PATCH 0/2] add support rk3126 vop support
+In-Reply-To: <1510658851-90160-1-git-send-email-hjc@rock-chips.com>
+References: <1510658851-90160-1-git-send-email-hjc@rock-chips.com>
+Message-ID: <abe45b77-5df6-8f17-a4fc-33b967689708@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+pushed to drm-misc-next.
 
-
-On 15/11/17 17:52, Will Deacon wrote:
-> On Wed, Nov 15, 2017 at 03:39:26PM +0800, Xu YiPing wrote:
->> bus access read/write events are not supported in A73, based on the
->> Cortex-A73 TRM r0p2, section 11.9 Events (pages 11-457 to 11-460).
->>
->> Fixes: 5561b6c5e981 "arm64: perf: add support for Cortex-A73"
->> Signed-off-by: Xu YiPing <xuyiping@hisilicon.com>
->> ---
->>   arch/arm64/kernel/perf_event.c | 6 ------
->>   1 file changed, 6 deletions(-)
+? 2017/11/14 19:27, Sandy Huang ??:
+> The following patch add support RK3126 vop support, there is only one
+> VOP at RK3126, and the RK3126 VOP register layout is similar with RK3036,
+> so some feature can reuse with RK3036.
 > 
-> Julien -- can I have your ack on this, please?
-
-Yes, of course.
-
-Acked-by: Julien Thierry <julien.thierry@arm.com>
-
+> Sandy Huang (2):
+>    dt-bindings: add document for rk3126-vop
+>    drm/rockchip: vop: add rk3126 vop support
 > 
-> Will
+>   .../bindings/display/rockchip/rockchip-vop.txt     |  1 +
+>   drivers/gpu/drm/rockchip/rockchip_vop_reg.c        | 30 ++++++++++++++++++++++
+>   drivers/gpu/drm/rockchip/rockchip_vop_reg.h        |  6 +++++
+>   3 files changed, 37 insertions(+)
 > 
-
--- 
-Julien Thierry
