@@ -1,142 +1,90 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Nov 2017 14:40:40 +0000
-Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
- (liuwenliang@huawei.com's message of "Thu, 16 Nov 2017 14:24:31
- +0000")
-References: <20171011082227.20546-1-liuwenliang@huawei.com>
- <20171011082227.20546-2-liuwenliang@huawei.com>
- <227e2c6e-f479-849d-8942-1d5ff4ccd440@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063172@dggemm510-mbs.china.huawei.com>
- <8e959f69-a578-793b-6c32-18b5b0cd08c2@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
- <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063587@dggemm510-mbs.china.huawei.com>
- <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
- <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
-Message-ID: <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Thu, 16 Nov 2017 14:42:56 +0000
+Subject: next/master boot: 210 boots: 35 failed, 174 passed with 1
+ conflict (next-20171115)
+In-Reply-To: <5a0c2169.c6a2df0a.13ea3.9c02@mx.google.com>
+References: <5a0c2169.c6a2df0a.13ea3.9c02@mx.google.com>
+Message-ID: <a21b88b2-663d-49fc-527a-87494a23087f@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16 2017 at  2:24:31 pm GMT, "Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
-> On 16/11/17  17:54 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
->>On Thu, Nov 16 2017 at 3:07:54 am GMT, "Liuwenliang (Abbott Liu)"
->> <liuwenliang@huawei.com> wrote:
->>>>On 15/11/17 13:16, Liuwenliang (Abbott Liu) wrote:
->>>>> On 09/11/17  18:36 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
->>>>>> On Wed, Nov 15 2017 at 10:20:02 am GMT, "Liuwenliang (Abbott Liu)"
->>>>>> <liuwenliang@huawei.com> wrote:
->>>>>>> diff --git a/arch/arm/include/asm/cp15.h
->>>>>>> b/arch/arm/include/asm/cp15.h index dbdbce1..6db1f51 100644
->>>>>>> --- a/arch/arm/include/asm/cp15.h
->>>>>>> +++ b/arch/arm/include/asm/cp15.h
->>>>>>> @@ -64,6 +64,43 @@
->>>>>>>  #define __write_sysreg(v, r, w, c, t) asm volatile(w " " c : :
->>>>>>> "r" ((t)(v)))
->>>>>>>  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
->>>>>>>
->>>>>>> +#ifdef CONFIG_ARM_LPAE
->>>>>>> +#define TTBR0           __ACCESS_CP15_64(0, c2)
->>>>>>> +#define TTBR1           __ACCESS_CP15_64(1, c2)
->>>>>>> +#define PAR             __ACCESS_CP15_64(0, c7)
->>>>>>> +#else
->>>>>>> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
->>>>>>> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
->>>>>>> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
->>>>>>> +#endif
->>>>>> Again: there is no point in not having these register encodings
->>>>>> cohabiting. They are both perfectly defined in the architecture.
->>>>>> Just suffix one (or even both) with their respective size, making
->>>>>> it obvious which one you're talking about.
->>>>>
->>>>> I am sorry that I didn't point why I need to define TTBR0/ TTBR1/PAR
->>>>> in to different way between CONFIG_ARM_LPAE and non CONFIG_ARM_LPAE.
->>>>> The following description is the reason:
->>>>> Here is the description come from
->>>>> DDI0406C2c_arm_architecture_reference_manual.pdf:
->>>>[...]
->>>>
->>>>You're missing the point. TTBR0 existence as a 64bit CP15 register has
->>>>nothing to do the kernel being compiled with LPAE or not. It has
->>>>everything to do with the HW supporting LPAE, and it is the kernel's job
->>>>to use the right accessor depending on how it is compiled. On a CPU
->>>>supporting LPAE, both TTBR0 accessors are valid. It is the kernel that
->>>>chooses to use one rather than the other.
->>>
->>> Thanks for your review.  I don't think both TTBR0 accessors(64bit
->>> accessor and 32bit accessor) are valid on a CPU supporting LPAE which
->>> the LPAE is enabled. Here is the description come form
->>> DDI0406C2c_arm_architecture_reference_manual.pdf (=ARM? Architecture
->>> Reference Manual ARMv7-A and ARMv7-R edition) which you can get the
->>> document by google "ARM? Architecture Reference Manual ARMv7-A and
->>> ARMv7-R edition".
+On 15/11/17 11:13, kernelci.org bot wrote:
+> next/master boot: 210 boots: 35 failed, 174 passed with 1 conflict (next-20171115)
 >
->>Trust me, from where I seat, I have a much better source than Google for
->>that document. Who would have thought?
+> Full Boot Summary: https://kernelci.org/boot/all/job/next/branch/master/kernel/next-20171115/
+> Full Build Summary: https://kernelci.org/build/next/branch/master/kernel/next-20171115/
 >
->>Nothing in what you randomly quote invalids what I've been saying. And
->>to show you what's wrong with your reasoning, let me describe a
->>scenario,
+> Tree: next
+> Branch: master
+> Git Describe: next-20171115
+> Git Commit: 63fb091c80188ec51f53514d07de907c1dd3d61d
+> Git URL: http://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git
+> Tested: 35 unique boards, 16 SoC families, 30 builds out of 213
 >
->>I have a non-LPAE kernel that runs on my system. It uses the 32bit
->>version of the TTBRs. It turns out that this kernel runs under a
->>hypervisor (KVM, Xen, or your toy of the day). The hypervisor
->>context-switches vcpus without even looking at whether the configuration
->>of that guest. It doesn't have to care. It just blindly uses the 64bit
->>version of the TTBRs.
+> Boot Regressions Detected:
 >
->>The architecture *guarantees* that it works (it even works with a 32bit
->>guest under a 64bit hypervisor). In your world, this doesn't work. I
->>guess the architecture wins.
->
->>> So, I think if you access TTBR0/TTBR1 on CPU supporting LPAE, you must
->>> use "mcrr/mrrc" instruction (__ACCESS_CP15_64). If you access
->>> TTBR0/TTBR1 on CPU supporting LPAE by "mcr/mrc" instruction which is
->>> 32bit version (__ACCESS_CP15), even if the CPU doesn't report error,
->>> you also lose the high or low 32bit of the TTBR0/TTBR1.
->
->>It is not about "supporting LPAE". It is about using the accessor that
->>makes sense in a particular context. Yes, the architecture allows you to
->>do something stupid. Don't do it. It doesn't mean the accessors cannot
->>be used, and I hope that my example above demonstrates it.
->
->>Conclusion: I still stand by my request that both versions of TTBRs/PAR
->>are described without depending on the kernel configuration, because
->>this has nothing to do with the kernel configuration.
->
-> Thanks for your reviews.
-> Yes, you are right. I have tested that "mcrr/mrrc" instruction
-> (__ACCESS_CP15_64) can work on non LPAE on vexpress_a9.
+> arm:
+[...]
+>     multi_v7_defconfig:
+>         tegra124-nyan-big:
+>             lab-collabora: failing since 11 days (last pass: next-20171102 - first fail: next-20171103)
 
-No, it doesn't. It cannot work, because Cortex-A9 predates the invention
-of the 64bit accessor. I suspect that you are testing stuff in QEMU,
-which is giving you a SW model that always supports LPAE. I suggest you
-test this code on *real* HW, and not only on QEMU.
+I've run another automated bisection with some tweaks to remove
+known failures and found this breaking change:
 
-What I have said is:
+   commit 859eb05676f67d4960130dff36d3368006716110
+   Author: Shawn Nematbakhsh <shawnn@chromium.org>
+   Date:   Fri Sep 8 13:50:11 2017 -0700
 
-- If the CPU supports LPAE, then both 32 and 64bit accessors work
-- If the CPU doesn't support LPAE, then only the 32bit accssor work
-- In both cases, that's a function of the CPU, and not of the kernel
-  configuration.
-- Both accessors can be safely defined as long as we ensure that they
-  are used in the right context.
+       platform/chrome: Use proper protocol transfer function
 
-> Here is the code I tested on vexpress_a9 and vexpress_a15:
-> --- a/arch/arm/include/asm/cp15.h
-> +++ b/arch/arm/include/asm/cp15.h
-> @@ -64,6 +64,56 @@
->  #define __write_sysreg(v, r, w, c, t)  asm volatile(w " " c : : "r" ((t)(v)))
->  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
+
+The bisection was run with CONFIG_MODULES and CONFIG_DRM_NOUVEAU
+disabled and d89e2378a97fafdc74cbf997e7c88af75b81610a ("drivers:
+flag buses which demand DMA configuration") reverted in each
+iteration as these things are known to cause other boot failures.
+See the full log here (from staging.kernelci.org Jenkins):
+
+   https://people.collabora.com/~gtucker/kernelci/bisections/20171116-nyan-big-next.txt
+
+As the kernelci.org automated bisection tool is still
+experimental, I then did a couple of checks to confirm whether
+this commit was still an issue:
+
+   * 859eb056 with MODULES and DRM_NOUVEAU disabled, failed:
+     https://lava.collabora.co.uk/scheduler/job/992002
+
+   * same as above but with 859eb056 reverted in-place, passes:
+     https://lava.collabora.co.uk/scheduler/job/992003
+
+   * next-20171115 with MODULES and DRM_NOUVEAU disabled, and
+     d89e2378 reverted, fails:
+     https://lava.collabora.co.uk/scheduler/job/992004
+
+   * same as above but with 859eb056 reverted on top, passes:
+     https://lava.collabora.co.uk/scheduler/job/992005
+
+So this shows the commit found by the bisection seems to be still
+causing problems on tegra124-nyan-big.  I haven't investigated
+any further, I don't know if other platforms show the same
+symptoms.  At least this should narrow things down a bit.
+
+Note: With this in mind, another possible bisection would be to
+enable DRM_NOUVEAU again while reverting the 2 known breaking
+commits and try to find what is actually causing the issue in
+that driver.  I'm not planning to do this right now though...
+
+Hope this helps!
+
+Guillaume
+
+> ---
+> For more info write to <info@kernelci.org>
 >
-> +#define TTBR0           __ACCESS_CP15_64(0, c2)
-> +#define TTBR1           __ACCESS_CP15_64(1, c2)
-> +#define PAR             __ACCESS_CP15_64(0, c7)
-
-You still need to add the 32bit accessors.
-
-	M.
--- 
-Jazz is not dead, it just smell funny.
+>
+>
+> _______________________________________________
+> Kernel-build-reports mailing list
+> Kernel-build-reports at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/kernel-build-reports
+>
