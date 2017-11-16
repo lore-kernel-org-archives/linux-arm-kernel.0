@@ -1,108 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Nov 2017 16:39:21 +0800
-Subject: [PATCH] arm64: dts: ls1088a: add fsl-mc hardware resource
- manager node
-In-Reply-To: <1510147805-24873-1-git-send-email-ioana.ciornei@nxp.com>
-References: <1510147805-24873-1-git-send-email-ioana.ciornei@nxp.com>
-Message-ID: <20171116083920.GK25384@dragon>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Thu, 16 Nov 2017 09:50:15 +0100
+Subject: [PATCH v2 0/4] Fixes for omapdrm on OpenPandora and GTA04
+Message-ID: <cover.1510822218.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 08, 2017 at 03:30:05PM +0200, Ioana Ciornei wrote:
-> Add the fsl-mc node in the LS1088A device tree.
-> 
-> Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 62 ++++++++++++++++++++++++++
->  1 file changed, 62 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> index bd80e9a..aa37ffe 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> @@ -166,6 +166,68 @@
->  			     <1 10 IRQ_TYPE_LEVEL_LOW>;/* Hypervisor PPI */
->  	};
->  
-> +	fsl_mc: fsl-mc at 80c000000 {
+V2:
+* replaced patch to fix DSI VDDS for OMAP3 by equivalent patch from Laurent Pinchart
+* keep previous compatibility option in panel driver to handle older device tree binaries
 
-The unit-address of the node should be somehow related to 'reg'
-property.  Can you please help me understand how they are related?
+2017-11-08 22:09:36:
+This patch set fixes vendor names of the panels
+and fixes a problem on omapdrm with enabling
+VDD_DSI for OMAP3 which is needed for displaying
+the Red and Green channel on OMAP3530 (Pandora).
 
-> +		compatible = "fsl,qoriq-mc";
-> +		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
-> +		      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
-> +		msi-parent = <&its>;
-> +		#address-cells = <3>;
-> +		#size-cells = <1>;
-> +
-> +		/*
-> +		 * Region type 0x0 - MC portals
-> +		 * Region type 0x1 - QBMAN portals
-> +		 */
-> +		ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
-> +			  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
-> +
-> +		dpmacs {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +
-> +			dpmac1: dpmac at 1 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <1>;
-> +			};
+H. Nikolaus Schaller (3):
+  omapdrm: fix compatible string for td028ttec1
+  DTS: GTA04: fix panel compatibility string
+  DTS: Pandora: fix panel compatibility string
 
-Please have a newline in between nodes.
+Laurent Pinchart (1):
+  drm: omapdrm: Fix DPI on platforms using the DSI VDDS
 
-Shawn
+ .../display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt}      | 4 ++--
+ arch/arm/boot/dts/omap3-gta04.dtsi                                    | 2 +-
+ arch/arm/boot/dts/omap3-pandora-common.dtsi                           | 2 +-
+ drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c               | 4 ++--
+ drivers/gpu/drm/omapdrm/dss/dpi.c                                     | 4 ++--
+ drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c      | 4 +++-
+ 6 files changed, 11 insertions(+), 9 deletions(-)
+ rename Documentation/devicetree/bindings/display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt} (84%)
 
-> +			dpmac2: dpmac at 2 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <2>;
-> +			};
-> +			dpmac3: dpmac at 3 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <3>;
-> +			};
-> +			dpmac4: dpmac at 4 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <4>;
-> +			};
-> +			dpmac5: dpmac at 5 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <5>;
-> +			};
-> +			dpmac6: dpmac at 6 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <6>;
-> +			};
-> +			dpmac7: dpmac at 7 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <7>;
-> +			};
-> +			dpmac8: dpmac at 8 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <8>;
-> +			};
-> +			dpmac9: dpmac at 9 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <9>;
-> +			};
-> +			dpmac10: dpmac at 10 {
-> +				compatible = "fsl,qoriq-mc-dpmac";
-> +				reg = <0xa>;
-> +			};
-> +		};
-> +	};
-> +
->  	psci {
->  		compatible = "arm,psci-0.2";
->  		method = "smc";
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-- 
+2.12.2
