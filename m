@@ -1,47 +1,46 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu, 16 Nov 2017 17:58:14 +0000
-Subject: [PATCH 0/7] KVM/ARM fixes for 4.15-rc1
-Message-ID: <20171116175821.26544-1-marc.zyngier@arm.com>
+Date: Thu, 16 Nov 2017 17:58:16 +0000
+Subject: [PATCH 2/7] KVM: arm/arm64: vgic: Preserve the revious read from the
+ pending table
+In-Reply-To: <20171116175821.26544-1-marc.zyngier@arm.com>
+References: <20171116175821.26544-1-marc.zyngier@arm.com>
+Message-ID: <20171116175821.26544-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Christoffer,
+The current pending table parsing code assumes that we keep the
+previous read of the pending bits, but keep that variable in
+the current block, making sure it is discarded on each loop.
 
-Here's a handful of KVM/ARM fixes I've collected over the week:
+We end-up using whatever is on the stack. Who knows, it might
+just be the right thing...
 
-- Four bugs reported by AKASHI Takahiro who ran the SMATCH static
-  analyser on the KVM/ARM code. All great findings! I've split the
-  fixes so that they can be backported individually.
-- A nice corner case found by Kristina Martsenko on arm64 (which she
-  posted separately), which  actually originated from the 32bit port
-  (and I've now included a patch plugging that one as well).
-- One GICv4 leftover.
+Fixes: 280771252c1ba ("KVM: arm64: vgic-v3: KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES")
+Cc: stable at vger.kernel.org # 4.12
+Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/vgic/vgic-v3.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-I've stashed all of that on my kvm-arm64/fixes-4.15 branch.
-
-Thanks,
-
-	M.
-
-Kristina Martsenko (1):
-  arm64: KVM: fix VTTBR_BADDR_MASK BUG_ON off-by-one
-
-Marc Zyngier (6):
-  KVM: arm/arm64: vgic-irqfd: Fix MSI entry allocation
-  KVM: arm/arm64: vgic: Preserve the revious read from the pending table
-  KVM: arm/arm64: vgic-its: Preserve the revious read from the pending
-    table
-  KVM: arm/arm64: vgic-its: Check result of allocation before use
-  KVM: arm/arm64: vgic-v4: Only perform an unmap for valid vLPIs
-  arm: KVM: Fix VTTBR_BADDR_MASK BUG_ON off-by-one
-
- arch/arm/include/asm/kvm_arm.h   | 3 +--
- arch/arm64/include/asm/kvm_arm.h | 3 +--
- virt/kvm/arm/vgic/vgic-irqfd.c   | 3 +--
- virt/kvm/arm/vgic/vgic-its.c     | 4 +++-
- virt/kvm/arm/vgic/vgic-v3.c      | 2 +-
- virt/kvm/arm/vgic/vgic-v4.c      | 6 ++++--
- 6 files changed, 11 insertions(+), 10 deletions(-)
-
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 2f05f732d3fd..f47e8481fa45 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -327,13 +327,13 @@ int vgic_v3_save_pending_tables(struct kvm *kvm)
+ 	int last_byte_offset = -1;
+ 	struct vgic_irq *irq;
+ 	int ret;
++	u8 val;
+ 
+ 	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
+ 		int byte_offset, bit_nr;
+ 		struct kvm_vcpu *vcpu;
+ 		gpa_t pendbase, ptr;
+ 		bool stored;
+-		u8 val;
+ 
+ 		vcpu = irq->target_vcpu;
+ 		if (!vcpu)
 -- 
 2.14.2
