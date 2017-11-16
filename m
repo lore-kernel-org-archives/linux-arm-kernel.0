@@ -1,43 +1,121 @@
-From: bharatku@xilinx.com (Bharat Kumar Gogada)
-Date: Thu, 16 Nov 2017 14:19:36 +0000
-Subject: [RFCv2 PATCH 31/36] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <20171006133203.22803-32-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-32-jean-philippe.brucker@arm.com>
-Message-ID: <BLUPR0201MB150565029F9260A528739ACBA52E0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+From: ioana.ciornei@nxp.com (Ioana Ciornei)
+Date: Thu, 16 Nov 2017 14:24:49 +0000
+Subject: [PATCH] arm64: dts: ls1088a: add fsl-mc hardware resource manager
+ node
+In-Reply-To: <20171116083920.GK25384@dragon>
+References: <1510147805-24873-1-git-send-email-ioana.ciornei@nxp.com>
+ <20171116083920.GK25384@dragon>
+Message-ID: <DB6PR0401MB2264A182C4048471B53BFF89E02E0@DB6PR0401MB2264.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jean,
+See comments inline.
 
-+static size_t
-+arm_smmu_atc_inv_domain(struct arm_smmu_domain *smmu_domain, int ssid,
-+			unsigned long iova, size_t size)
-+{
-+	unsigned long flags;
-+	struct arm_smmu_cmdq_ent cmd;
-+	struct arm_smmu_master_data *master;
-+
-+	arm_smmu_atc_inv_to_cmd(ssid, iova, size, &cmd);
-+
-+	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
-+	list_for_each_entry(master, &smmu_domain->devices, list)
-+		arm_smmu_atc_inv_master(master, &cmd);
-+	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
-+
-+	return size;
-+}
-+
- /* IOMMU API */
- static bool arm_smmu_capable(enum iommu_cap cap)  { @@ -2361,6 +2506,8 @@ static void arm_smmu_detach_dev(struct device *dev)
- 		__iommu_process_unbind_dev_all(&smmu_domain->domain, dev);
+> 
+> On Wed, Nov 08, 2017 at 03:30:05PM +0200, Ioana Ciornei wrote:
+> > Add the fsl-mc node in the LS1088A device tree.
+> >
+> > Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
+> > ---
+> >  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 62
+> ++++++++++++++++++++++++++
+> >  1 file changed, 62 insertions(+)
+> >
+> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > index bd80e9a..aa37ffe 100644
+> > --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> > @@ -166,6 +166,68 @@
+> >  			     <1 10 IRQ_TYPE_LEVEL_LOW>;/* Hypervisor PPI */
+> >  	};
+> >
+> > +	fsl_mc: fsl-mc at 80c000000 {
+> 
+> The unit-address of the node should be somehow related to 'reg'
+> property.  Can you please help me understand how they are related?
+
+The unit-address of the fsl-mc node is the base address of the MC portal described in the first region of the 'reg' property and formed using the 2 address cells.
+Hope this helps.
  
- 	if (smmu_domain) {
-+		arm_smmu_atc_inv_master_all(master, 0);
-+
-In BIND flow, when VFIO_IOMMU_UNBIND is invoked invalidation is sent on allocated PASID for this application.
-When vfio group fd is closed after UNBIND,  arm_smmu_detach_dev is invoked now invalidation is being sent on ssid zero.
-Why  invalidation needs to be sent on ssid zero ?
+> 
+> > +		compatible = "fsl,qoriq-mc";
+> > +		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+> > +		      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
+> > +		msi-parent = <&its>;
+> > +		#address-cells = <3>;
+> > +		#size-cells = <1>;
+> > +
+> > +		/*
+> > +		 * Region type 0x0 - MC portals
+> > +		 * Region type 0x1 - QBMAN portals
+> > +		 */
+> > +		ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
+> > +			  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
+> > +
+> > +		dpmacs {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			dpmac1: dpmac at 1 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <1>;
+> > +			};
+> 
+> Please have a newline in between nodes.
 
-Regards,
-Bharat
+Will do. 
+
+Should I send a rework of this patch right away or better to wait for the merge window to close?
+
+Ioana 
+
+> 
+> Shawn
+> 
+> > +			dpmac2: dpmac at 2 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <2>;
+> > +			};
+> > +			dpmac3: dpmac at 3 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <3>;
+> > +			};
+> > +			dpmac4: dpmac at 4 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <4>;
+> > +			};
+> > +			dpmac5: dpmac at 5 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <5>;
+> > +			};
+> > +			dpmac6: dpmac at 6 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <6>;
+> > +			};
+> > +			dpmac7: dpmac at 7 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <7>;
+> > +			};
+> > +			dpmac8: dpmac at 8 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <8>;
+> > +			};
+> > +			dpmac9: dpmac at 9 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <9>;
+> > +			};
+> > +			dpmac10: dpmac at 10 {
+> > +				compatible = "fsl,qoriq-mc-dpmac";
+> > +				reg = <0xa>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> >  	psci {
+> >  		compatible = "arm,psci-0.2";
+> >  		method = "smc";
+> > --
+> > 1.9.1
+> >
+> >
