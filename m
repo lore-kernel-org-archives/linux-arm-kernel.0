@@ -1,117 +1,31 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Thu, 16 Nov 2017 11:08:30 -0600
-Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
-In-Reply-To: <908C52B9-83E2-49B3-B5B4-D8F27A96ECD6@goldelico.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
- <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
- <130D3B71-C0CE-4755-BF06-971681F630BC@goldelico.com>
- <d90ee1ee-8a33-de04-bb8b-2f10e0a80a61@ti.com>
- <908C52B9-83E2-49B3-B5B4-D8F27A96ECD6@goldelico.com>
-Message-ID: <a6b4c02d-a5ff-b0e6-ca59-afaf1148fe2a@ti.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Thu, 16 Nov 2017 09:11:52 -0800
+Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
+In-Reply-To: <20171116170144.GR10515@gate.crashing.org>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-12-samitolvanen@google.com>
+ <20171116115433.GG9361@arm.com>
+ <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
+ <20171116135650.GQ10515@gate.crashing.org>
+ <20171116164608.GG94341@samitolvanen.mtv.corp.google.com>
+ <20171116170144.GR10515@gate.crashing.org>
+Message-ID: <20171116171152.GH94341@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2017 10:10 AM, H. Nikolaus Schaller wrote:
-> Hi Andrew,
-> 
->> Am 16.11.2017 um 16:53 schrieb Andrew F. Davis <afd@ti.com>:
->>
->> On 11/16/2017 07:43 AM, H. Nikolaus Schaller wrote:
->>>
->>>> Am 16.11.2017 um 13:32 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
->>>>
->>>> On 16/11/17 10:50, H. Nikolaus Schaller wrote:
->>>>> The vendor name was "toppoly" but other panels and the vendor list
->>>>> have defined it as "tpo". So let's fix it in driver and bindings.
->>>>>
->>>>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->>>>> ---
->>>>
->>>>
->>>>> -MODULE_ALIAS("spi:toppoly,td028ttec1");
->>>>> +MODULE_ALIAS("spi:tpo,td028ttec1");
->>>>
->>>> Doesn't this mean that the module won't load if you have old bindings?
->>>
->>> Hm.
->>>
->>> Well, I think it can load but doesn't automatically from DT strings which might
->>> be unexpected.
->>>
->>>> Can't we have two module aliases?
->>>
->>> I think we can. Just a random example:
->>> https://elixir.free-electrons.com/linux/latest/source/drivers/w1/slaves/w1_therm.c#L754
->>>
->>> So we should keep both.
->>
->> Even better would be to drop both MODULE_ALIAS and let the
->> MODULE_DEVICE_TABLE macro define them for your from the SPI id table.
-> 
-> Why would that be better?
-> 
+On Thu, Nov 16, 2017 at 11:01:44AM -0600, Segher Boessenkool wrote:
+> The thing with .purgem can work.  Inelegant, sure, but it can work :-)
 
-MODULE_ALIAS is ugly, you already have a table (usually) of device names
-that are supported by the driver, the module aliases should be generated
-from that table. This also keeps supported device list in one place.
+It works, there are already functions in the kernel that use these
+macros more than once. I agree that this might not be the most elegant
+solution, but at least it allows us to use the same code path for both
+compilers.
 
-> As far as I see it will need more code and changes than adding one line of
-> MODULE_ALIAS.
-> 
->> Although it doesn't look like this driver has an SPI id table, you
->> should probably add one, I be interested to see if this module is always
->> being matched through the "spi" or the "of" alias..
-> 
-> Could you please propose how that code should look like, so that I can test?
-> 
+> Just make sure you do the macro define, the code that uses it, and the
+> undefine, all in the same inline asm statement.
 
-Sure,
+Yes, that's what we're doing here. Only KVM uses msr_s/msr_s directly,
+everything else uses the (read|write)_sysreg_s wrappers instead, which
+means the DEFINE/UNDEFINE macros are only needed in few places.
 
-start with
-$ udevadm monitor
-and see what string the kernel is looking for when trying to find a
-module for this device.
-
-If it is only ever looking for "of:toppoly,td028ttec1", then you can
-drop the MODULE_ALIAS and be done as it was never getting used anyway.
-
-What I expect though is "spi:toppoly,td028ttec1", in which case you
-should add
-
-static const struct spi_device_id td028ttec1_ids[] = {
-	{ "toppoly,td028ttec1", 0 },
-	{ "tpo,td028ttec1", 0},
-	{ /* sentinel */ }
-};
-MODULE_DEVICE_TABLE(spi, td028ttec1_ids);
-
-link to it in the td028ttec1_spi_driver struct:
-.id_table = td028ttec1_ids,
-
-Then test again to see that the module still loads with the new and old
-DT string.
-
-Andrew
-
-> BR and thanks,
-> Nikolaus Schaller
-> 
->>
->>>
->>> Should I submit a new version?
->>>
->>> BR,
->>> Nikolaus
->>>
->>> --
->>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->>> the body of a message to majordomo at vger.kernel.org
->>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->>>
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Sami
