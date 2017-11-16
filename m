@@ -1,26 +1,34 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Nov 2017 15:36:05 +0800
-Subject: [PATCH v5] ARM: dts: imx53-tx53: Fix 'ethernet-phy@0' node with
- unit name and no reg property
-In-Reply-To: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
-References: <1509031514-30602-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <20171116073604.GB25384@dragon>
+Date: Thu, 16 Nov 2017 15:47:44 +0800
+Subject: [PATCH v4 3/3] ARM: imx: Update spi_imx platform data to reflect
+ current state
+In-Reply-To: <20171106194618.9421-4-tpiepho@impinj.com>
+References: <20171106194618.9421-1-tpiepho@impinj.com>
+ <20171106194618.9421-4-tpiepho@impinj.com>
+Message-ID: <20171116074743.GC25384@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 26, 2017 at 01:25:14PM -0200, Marco Franchi wrote:
-> The following build warning is seen with W=1:
+On Mon, Nov 06, 2017 at 11:46:18AM -0800, Trent Piepho wrote:
+> The docs for the spi_imx platform data still refer to a -32 offset used to
+> specify a native chip select.  This was removed in commit 602c8f4485cd
+> ("spi: imx: fix use of native chip-selects with devicetree") and no
+> longer works as documented.  Update documentation.
 > 
-> Warning (unit_address_vs_reg): Node /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has a unit name, but no reg property
+> The macro MXC_SPI_CS() is no longer is needed.
 > 
-> Fix this warning by adding reg property from such node and, consequently, 
-> includes a mdio node into the fec node, with the 'address-cells' and 
-> 'size-cells' to avoid these other following warnings:
+> If a board uses all native chip selects, then it's not necessary to
+> specify a chip select array at all, as all native is the default (this is
+> how device-tree configured SPI masters work too).  Most of the spi-imx
+> platform data users have their chip select arrays removed by this patch.
 > 
-> Warning (reg_format): "reg" property in /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0 has invalid length (4 bytes) (#address-cells == 2, #size-cells == 1)
-> Warning (avoid_default_addr_size): Relying on default #address-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
-> Warning (avoid_default_addr_size): Relying on default #size-cells value for /soc/aips at 60000000/ethernet at 63fec000/ethernet-phy at 0
+> This patch also fixes a bug in mx31moboard introduced in the '602 commit.
+> When that board was updated in commit 901f26bce64a ("ARM: imx: set
+> correct chip_select in platform setup") to reflect the SPI change, only
+> SPI bus 2 was updated and SPI bus 1 was left with non-sequential chip
+> selects.  The mc13783 spi device on bus 1 had its chip select updated as
+> if it were on bus 2.
 > 
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
+> CC: Shawn Guo <shawnguo@kernel.org>
 
-Applied, thanks.
+Acked-by: Shawn Guo <shawnguo@kernel.org>
