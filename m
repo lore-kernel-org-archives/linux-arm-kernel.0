@@ -1,7 +1,9 @@
-From: liuwenliang@huawei.com (Liuwenliang (Abbott Liu))
-Date: Thu, 16 Nov 2017 14:24:31 +0000
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 16 Nov 2017 14:40:40 +0000
 Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
+ (liuwenliang@huawei.com's message of "Thu, 16 Nov 2017 14:24:31
+ +0000")
 References: <20171011082227.20546-1-liuwenliang@huawei.com>
  <20171011082227.20546-2-liuwenliang@huawei.com>
  <227e2c6e-f479-849d-8942-1d5ff4ccd440@arm.com>
@@ -13,213 +15,128 @@ References: <20171011082227.20546-1-liuwenliang@huawei.com>
  <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
  <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
  <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
-Message-ID: <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
+ <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
+Message-ID: <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/17  17:54 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
->On Thu, Nov 16 2017 at  3:07:54 am GMT, "Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
->>>On 15/11/17 13:16, Liuwenliang (Abbott Liu) wrote:
->>>> On 09/11/17  18:36 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
->>>>> On Wed, Nov 15 2017 at 10:20:02 am GMT, "Liuwenliang (Abbott Liu)"
->>>>> <liuwenliang@huawei.com> wrote:
->>>>>> diff --git a/arch/arm/include/asm/cp15.h
->>>>>> b/arch/arm/include/asm/cp15.h index dbdbce1..6db1f51 100644
->>>>>> --- a/arch/arm/include/asm/cp15.h
->>>>>> +++ b/arch/arm/include/asm/cp15.h
->>>>>> @@ -64,6 +64,43 @@
->>>>>>  #define __write_sysreg(v, r, w, c, t) asm volatile(w " " c : :
->>>>>> "r" ((t)(v)))
->>>>>>  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
->>>>>>
->>>>>> +#ifdef CONFIG_ARM_LPAE
->>>>>> +#define TTBR0           __ACCESS_CP15_64(0, c2)
->>>>>> +#define TTBR1           __ACCESS_CP15_64(1, c2)
->>>>>> +#define PAR             __ACCESS_CP15_64(0, c7)
->>>>>> +#else
->>>>>> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
->>>>>> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
->>>>>> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
->>>>>> +#endif
->>>>> Again: there is no point in not having these register encodings
->>>>> cohabiting. They are both perfectly defined in the architecture.
->>>>> Just suffix one (or even both) with their respective size, making
->>>>> it obvious which one you're talking about.
+On Thu, Nov 16 2017 at  2:24:31 pm GMT, "Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
+> On 16/11/17  17:54 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
+>>On Thu, Nov 16 2017 at 3:07:54 am GMT, "Liuwenliang (Abbott Liu)"
+>> <liuwenliang@huawei.com> wrote:
+>>>>On 15/11/17 13:16, Liuwenliang (Abbott Liu) wrote:
+>>>>> On 09/11/17  18:36 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
+>>>>>> On Wed, Nov 15 2017 at 10:20:02 am GMT, "Liuwenliang (Abbott Liu)"
+>>>>>> <liuwenliang@huawei.com> wrote:
+>>>>>>> diff --git a/arch/arm/include/asm/cp15.h
+>>>>>>> b/arch/arm/include/asm/cp15.h index dbdbce1..6db1f51 100644
+>>>>>>> --- a/arch/arm/include/asm/cp15.h
+>>>>>>> +++ b/arch/arm/include/asm/cp15.h
+>>>>>>> @@ -64,6 +64,43 @@
+>>>>>>>  #define __write_sysreg(v, r, w, c, t) asm volatile(w " " c : :
+>>>>>>> "r" ((t)(v)))
+>>>>>>>  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
+>>>>>>>
+>>>>>>> +#ifdef CONFIG_ARM_LPAE
+>>>>>>> +#define TTBR0           __ACCESS_CP15_64(0, c2)
+>>>>>>> +#define TTBR1           __ACCESS_CP15_64(1, c2)
+>>>>>>> +#define PAR             __ACCESS_CP15_64(0, c7)
+>>>>>>> +#else
+>>>>>>> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
+>>>>>>> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
+>>>>>>> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
+>>>>>>> +#endif
+>>>>>> Again: there is no point in not having these register encodings
+>>>>>> cohabiting. They are both perfectly defined in the architecture.
+>>>>>> Just suffix one (or even both) with their respective size, making
+>>>>>> it obvious which one you're talking about.
+>>>>>
+>>>>> I am sorry that I didn't point why I need to define TTBR0/ TTBR1/PAR
+>>>>> in to different way between CONFIG_ARM_LPAE and non CONFIG_ARM_LPAE.
+>>>>> The following description is the reason:
+>>>>> Here is the description come from
+>>>>> DDI0406C2c_arm_architecture_reference_manual.pdf:
+>>>>[...]
 >>>>
->>>> I am sorry that I didn't point why I need to define TTBR0/ TTBR1/PAR
->>>> in to different way between CONFIG_ARM_LPAE and non CONFIG_ARM_LPAE.
->>>> The following description is the reason:
->>>> Here is the description come from
->>>> DDI0406C2c_arm_architecture_reference_manual.pdf:
->>>[...]
+>>>>You're missing the point. TTBR0 existence as a 64bit CP15 register has
+>>>>nothing to do the kernel being compiled with LPAE or not. It has
+>>>>everything to do with the HW supporting LPAE, and it is the kernel's job
+>>>>to use the right accessor depending on how it is compiled. On a CPU
+>>>>supporting LPAE, both TTBR0 accessors are valid. It is the kernel that
+>>>>chooses to use one rather than the other.
 >>>
->>>You're missing the point. TTBR0 existence as a 64bit CP15 register has
->>>nothing to do the kernel being compiled with LPAE or not. It has
->>>everything to do with the HW supporting LPAE, and it is the kernel's job
->>>to use the right accessor depending on how it is compiled. On a CPU
->>>supporting LPAE, both TTBR0 accessors are valid. It is the kernel that
->>>chooses to use one rather than the other.
->>
->> Thanks for your review.  I don't think both TTBR0 accessors(64bit
->> accessor and 32bit accessor) are valid on a CPU supporting LPAE which
->> the LPAE is enabled. Here is the description come form
->> DDI0406C2c_arm_architecture_reference_manual.pdf (=ARM? Architecture
->> Reference Manual ARMv7-A and ARMv7-R edition) which you can get the
->> document by google "ARM? Architecture Reference Manual ARMv7-A and
->> ARMv7-R edition".
+>>> Thanks for your review.  I don't think both TTBR0 accessors(64bit
+>>> accessor and 32bit accessor) are valid on a CPU supporting LPAE which
+>>> the LPAE is enabled. Here is the description come form
+>>> DDI0406C2c_arm_architecture_reference_manual.pdf (=ARM? Architecture
+>>> Reference Manual ARMv7-A and ARMv7-R edition) which you can get the
+>>> document by google "ARM? Architecture Reference Manual ARMv7-A and
+>>> ARMv7-R edition".
+>
+>>Trust me, from where I seat, I have a much better source than Google for
+>>that document. Who would have thought?
+>
+>>Nothing in what you randomly quote invalids what I've been saying. And
+>>to show you what's wrong with your reasoning, let me describe a
+>>scenario,
+>
+>>I have a non-LPAE kernel that runs on my system. It uses the 32bit
+>>version of the TTBRs. It turns out that this kernel runs under a
+>>hypervisor (KVM, Xen, or your toy of the day). The hypervisor
+>>context-switches vcpus without even looking at whether the configuration
+>>of that guest. It doesn't have to care. It just blindly uses the 64bit
+>>version of the TTBRs.
+>
+>>The architecture *guarantees* that it works (it even works with a 32bit
+>>guest under a 64bit hypervisor). In your world, this doesn't work. I
+>>guess the architecture wins.
+>
+>>> So, I think if you access TTBR0/TTBR1 on CPU supporting LPAE, you must
+>>> use "mcrr/mrrc" instruction (__ACCESS_CP15_64). If you access
+>>> TTBR0/TTBR1 on CPU supporting LPAE by "mcr/mrc" instruction which is
+>>> 32bit version (__ACCESS_CP15), even if the CPU doesn't report error,
+>>> you also lose the high or low 32bit of the TTBR0/TTBR1.
+>
+>>It is not about "supporting LPAE". It is about using the accessor that
+>>makes sense in a particular context. Yes, the architecture allows you to
+>>do something stupid. Don't do it. It doesn't mean the accessors cannot
+>>be used, and I hope that my example above demonstrates it.
+>
+>>Conclusion: I still stand by my request that both versions of TTBRs/PAR
+>>are described without depending on the kernel configuration, because
+>>this has nothing to do with the kernel configuration.
+>
+> Thanks for your reviews.
+> Yes, you are right. I have tested that "mcrr/mrrc" instruction
+> (__ACCESS_CP15_64) can work on non LPAE on vexpress_a9.
 
->Trust me, from where I seat, I have a much better source than Google for
->that document. Who would have thought?
+No, it doesn't. It cannot work, because Cortex-A9 predates the invention
+of the 64bit accessor. I suspect that you are testing stuff in QEMU,
+which is giving you a SW model that always supports LPAE. I suggest you
+test this code on *real* HW, and not only on QEMU.
 
->Nothing in what you randomly quote invalids what I've been saying. And
->to show you what's wrong with your reasoning, let me describe a
->scenario,
+What I have said is:
 
->I have a non-LPAE kernel that runs on my system. It uses the 32bit
->version of the TTBRs. It turns out that this kernel runs under a
->hypervisor (KVM, Xen, or your toy of the day). The hypervisor
->context-switches vcpus without even looking at whether the configuration
->of that guest. It doesn't have to care. It just blindly uses the 64bit
->version of the TTBRs.
+- If the CPU supports LPAE, then both 32 and 64bit accessors work
+- If the CPU doesn't support LPAE, then only the 32bit accssor work
+- In both cases, that's a function of the CPU, and not of the kernel
+  configuration.
+- Both accessors can be safely defined as long as we ensure that they
+  are used in the right context.
 
->The architecture *guarantees* that it works (it even works with a 32bit
->guest under a 64bit hypervisor). In your world, this doesn't work. I
->guess the architecture wins.
+> Here is the code I tested on vexpress_a9 and vexpress_a15:
+> --- a/arch/arm/include/asm/cp15.h
+> +++ b/arch/arm/include/asm/cp15.h
+> @@ -64,6 +64,56 @@
+>  #define __write_sysreg(v, r, w, c, t)  asm volatile(w " " c : : "r" ((t)(v)))
+>  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
+>
+> +#define TTBR0           __ACCESS_CP15_64(0, c2)
+> +#define TTBR1           __ACCESS_CP15_64(1, c2)
+> +#define PAR             __ACCESS_CP15_64(0, c7)
 
->> So, I think if you access TTBR0/TTBR1 on CPU supporting LPAE, you must
->> use "mcrr/mrrc" instruction (__ACCESS_CP15_64). If you access
->> TTBR0/TTBR1 on CPU supporting LPAE by "mcr/mrc" instruction which is
->> 32bit version (__ACCESS_CP15), even if the CPU doesn't report error,
->> you also lose the high or low 32bit of the TTBR0/TTBR1.
+You still need to add the 32bit accessors.
 
->It is not about "supporting LPAE". It is about using the accessor that
->makes sense in a particular context. Yes, the architecture allows you to
->do something stupid. Don't do it. It doesn't mean the accessors cannot
->be used, and I hope that my example above demonstrates it.
-
->Conclusion: I still stand by my request that both versions of TTBRs/PAR
->are described without depending on the kernel configuration, because
->this has nothing to do with the kernel configuration.
-
-Thanks for your reviews.
-Yes, you are right. I have tested that "mcrr/mrrc" instruction (__ACCESS_CP15_64)
-can work on non LPAE on vexpress_a9.
-
-Here is the code I tested on vexpress_a9 and vexpress_a15:
---- a/arch/arm/include/asm/cp15.h
-+++ b/arch/arm/include/asm/cp15.h
-@@ -64,6 +64,56 @@
- #define __write_sysreg(v, r, w, c, t)  asm volatile(w " " c : : "r" ((t)(v)))
- #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
-
-+#define TTBR0           __ACCESS_CP15_64(0, c2)
-+#define TTBR1           __ACCESS_CP15_64(1, c2)
-+#define PAR             __ACCESS_CP15_64(0, c7)
-+#define VTTBR           __ACCESS_CP15_64(6, c2)
-+#define CNTV_CVAL       __ACCESS_CP15_64(3, c14)
-+#define CNTVOFF         __ACCESS_CP15_64(4, c14)
-+
-+#define MIDR            __ACCESS_CP15(c0, 0, c0, 0)
-+#define CSSELR          __ACCESS_CP15(c0, 2, c0, 0)
-+#define VPIDR           __ACCESS_CP15(c0, 4, c0, 0)
-+#define VMPIDR          __ACCESS_CP15(c0, 4, c0, 5)
-+#define SCTLR           __ACCESS_CP15(c1, 0, c0, 0)
-+#define CPACR           __ACCESS_CP15(c1, 0, c0, 2)
-+#define HCR             __ACCESS_CP15(c1, 4, c1, 0)
-+#define HDCR            __ACCESS_CP15(c1, 4, c1, 1)
-+#define HCPTR           __ACCESS_CP15(c1, 4, c1, 2)
-+#define HSTR            __ACCESS_CP15(c1, 4, c1, 3)
-+#define TTBCR           __ACCESS_CP15(c2, 0, c0, 2)
-+#define HTCR            __ACCESS_CP15(c2, 4, c0, 2)
-+#define VTCR            __ACCESS_CP15(c2, 4, c1, 2)
-+#define DACR            __ACCESS_CP15(c3, 0, c0, 0)
-+#define DFSR            __ACCESS_CP15(c5, 0, c0, 0)
-+#define IFSR            __ACCESS_CP15(c5, 0, c0, 1)
-+#define ADFSR           __ACCESS_CP15(c5, 0, c1, 0)
-+#define AIFSR           __ACCESS_CP15(c5, 0, c1, 1)
-+#define HSR             __ACCESS_CP15(c5, 4, c2, 0)
-+#define DFAR            __ACCESS_CP15(c6, 0, c0, 0)
-+#define IFAR            __ACCESS_CP15(c6, 0, c0, 2)
-+#define HDFAR           __ACCESS_CP15(c6, 4, c0, 0)
-+#define HIFAR           __ACCESS_CP15(c6, 4, c0, 2)
-+#define HPFAR           __ACCESS_CP15(c6, 4, c0, 4)
-+#define ICIALLUIS       __ACCESS_CP15(c7, 0, c1, 0)
-+#define ATS1CPR         __ACCESS_CP15(c7, 0, c8, 0)
-+#define TLBIALLIS       __ACCESS_CP15(c8, 0, c3, 0)
-+#define TLBIALL         __ACCESS_CP15(c8, 0, c7, 0)
-+#define TLBIALLNSNHIS   __ACCESS_CP15(c8, 4, c3, 4)
-+#define PRRR            __ACCESS_CP15(c10, 0, c2, 0)
-+#define NMRR            __ACCESS_CP15(c10, 0, c2, 1)
-+#define AMAIR0          __ACCESS_CP15(c10, 0, c3, 0)
-+#define AMAIR1          __ACCESS_CP15(c10, 0, c3, 1)
-+#define VBAR            __ACCESS_CP15(c12, 0, c0, 0)
-+#define CID             __ACCESS_CP15(c13, 0, c0, 1)
-+#define TID_URW         __ACCESS_CP15(c13, 0, c0, 2)
-+#define TID_URO         __ACCESS_CP15(c13, 0, c0, 3)
-+#define TID_PRIV        __ACCESS_CP15(c13, 0, c0, 4)
-+#define HTPIDR          __ACCESS_CP15(c13, 4, c0, 2)
-+#define CNTKCTL         __ACCESS_CP15(c14, 0, c1, 0)
-+#define CNTV_CTL        __ACCESS_CP15(c14, 0, c3, 1)
-+#define CNTHCTL         __ACCESS_CP15(c14, 4, c1, 0)
-+
-extern unsigned long cr_alignment;     /* defined in entry-armv.S */
-
- static inline unsigned long get_cr(void)
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index 14b5903..8db8a8c 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -37,56 +37,6 @@
-        __val;                                                  \
- })
-
--#define TTBR0              __ACCESS_CP15_64(0, c2)
--#define TTBR1              __ACCESS_CP15_64(1, c2)
--#define VTTBR              __ACCESS_CP15_64(6, c2)
--#define PAR                __ACCESS_CP15_64(0, c7)
--#define CNTV_CVAL  __ACCESS_CP15_64(3, c14)
--#define CNTVOFF            __ACCESS_CP15_64(4, c14)
--
--#define MIDR               __ACCESS_CP15(c0, 0, c0, 0)
--#define CSSELR             __ACCESS_CP15(c0, 2, c0, 0)
--#define VPIDR              __ACCESS_CP15(c0, 4, c0, 0)
--#define VMPIDR             __ACCESS_CP15(c0, 4, c0, 5)
--#define SCTLR              __ACCESS_CP15(c1, 0, c0, 0)
--#define CPACR              __ACCESS_CP15(c1, 0, c0, 2)
--#define HCR                __ACCESS_CP15(c1, 4, c1, 0)
--#define HDCR               __ACCESS_CP15(c1, 4, c1, 1)
--#define HCPTR              __ACCESS_CP15(c1, 4, c1, 2)
--#define HSTR               __ACCESS_CP15(c1, 4, c1, 3)
--#define TTBCR              __ACCESS_CP15(c2, 0, c0, 2)
--#define HTCR               __ACCESS_CP15(c2, 4, c0, 2)
--#define VTCR               __ACCESS_CP15(c2, 4, c1, 2)
--#define DACR               __ACCESS_CP15(c3, 0, c0, 0)
--#define DFSR               __ACCESS_CP15(c5, 0, c0, 0)
--#define IFSR               __ACCESS_CP15(c5, 0, c0, 1)
--#define ADFSR              __ACCESS_CP15(c5, 0, c1, 0)
--#define AIFSR              __ACCESS_CP15(c5, 0, c1, 1)
--#define HSR                __ACCESS_CP15(c5, 4, c2, 0)
--#define DFAR               __ACCESS_CP15(c6, 0, c0, 0)
--#define IFAR               __ACCESS_CP15(c6, 0, c0, 2)
--#define HDFAR              __ACCESS_CP15(c6, 4, c0, 0)
--#define HIFAR              __ACCESS_CP15(c6, 4, c0, 2)
--#define HPFAR              __ACCESS_CP15(c6, 4, c0, 4)
--#define ICIALLUIS  __ACCESS_CP15(c7, 0, c1, 0)
--#define ATS1CPR            __ACCESS_CP15(c7, 0, c8, 0)
--#define TLBIALLIS  __ACCESS_CP15(c8, 0, c3, 0)
--#define TLBIALL            __ACCESS_CP15(c8, 0, c7, 0)
--#define TLBIALLNSNHIS      __ACCESS_CP15(c8, 4, c3, 4)
--#define PRRR               __ACCESS_CP15(c10, 0, c2, 0)
--#define NMRR               __ACCESS_CP15(c10, 0, c2, 1)
--#define AMAIR0             __ACCESS_CP15(c10, 0, c3, 0)
--#define AMAIR1             __ACCESS_CP15(c10, 0, c3, 1)
--#define VBAR               __ACCESS_CP15(c12, 0, c0, 0)
--#define CID                __ACCESS_CP15(c13, 0, c0, 1)
--#define TID_URW            __ACCESS_CP15(c13, 0, c0, 2)
--#define TID_URO            __ACCESS_CP15(c13, 0, c0, 3)
--#define TID_PRIV   __ACCESS_CP15(c13, 0, c0, 4)
--#define HTPIDR             __ACCESS_CP15(c13, 4, c0, 2)
--#define CNTKCTL            __ACCESS_CP15(c14, 0, c1, 0)
--#define CNTV_CTL   __ACCESS_CP15(c14, 0, c3, 1)
--#define CNTHCTL            __ACCESS_CP15(c14, 4, c1, 0)
--
+	M.
+-- 
+Jazz is not dead, it just smell funny.
