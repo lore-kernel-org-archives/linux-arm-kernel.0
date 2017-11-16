@@ -1,59 +1,70 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Thu, 16 Nov 2017 16:07:42 +0300
-Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
-In-Reply-To: <20171116115433.GG9361@arm.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-12-samitolvanen@google.com>
- <20171116115433.GG9361@arm.com>
-Message-ID: <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 16 Nov 2017 14:34:10 +0100
+Subject: [PATCH v2] arm64: dts: renesas: salvator-common: Add BD9571 PMIC
+Message-ID: <1510839250-11199-1-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 11:54:33AM +0000, Will Deacon wrote:
-> On Wed, Nov 15, 2017 at 01:34:21PM -0800, Sami Tolvanen wrote:
-> > From: Alex Matveev <alxmtvv@gmail.com>
-> > 
-> > Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
-> > in-place and workaround gcc and clang limitations on redefining macros
-> > across different assembler blocks.
-> 
-> What limitations? Can you elaborate please? Is this a fix?
+Add a device node for the ROHM BD9571MWV PMIC.
 
-Hi Will,
+This was based on the example in the DT binding documentation, but using
+IRQ0 instead of a GPIO interrupt, as that matches the schematics, and
+because INTC-EX is a simpler block.
 
-Regarding GCC.
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - Clarify the choice for INTC-EX.
+---
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 29 ++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-When it joins preprocessed source files into single asm file,
-mrs_s/msr_s becomes either not declared or declared multiple times.
-
-./ccuFb68h.s:33120: Error: Macro `mrs_s' was already defined
-./ccuFb68h.s:33124: Error: Macro `msr_s' was already defined
-
-I'm not sure that GCC works correctly in this case, and I sent the
-email to Linaro toolchain group to clarify it. See below.
-
-Yury
-
-[...]
-
-Links:
-My unfinished branch:
-https://github.com/norov/linux/tree/lto
-Andi Kleen tree:
-https://github.com/andikleen/linux-misc/tree/lto-411-1
-Sami Tolvanen's recent work for clang:
-https://lkml.org/lkml/2017/11/3/606
-
-Question we have for now:
-There's mrs_s/msr_s macro that doesn't work with LTO - linker
-complains very loudly that macro is either not declared, or declared
-multiple times. (To reproduce - try to build my kernel branch w/o last
-patch).
-
-The same (?) problem is observed with clang, and people there
-considered it as feature, not a bug.
-
-https://bugs.llvm.org/show_bug.cgi?id=19749
-
-We have the fix for both clang and gcc, but it looks hacky. Maybe it
-worth to fix mrs/msr issue on toolchain side?
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index 24a32c63ce7c1821..b9505a65a793708e 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -355,6 +355,30 @@
+ 
+ &i2c_dvfs {
+ 	status = "okay";
++
++	pmic: pmic at 30 {
++		pinctrl-0 = <&irq0_pins>;
++		pinctrl-names = "default";
++
++		compatible = "rohm,bd9571mwv";
++		reg = <0x30>;
++		interrupt-parent = <&intc_ex>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++
++		regulators {
++			dvfs: dvfs {
++				regulator-name = "dvfs";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt = <1030000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++	};
+ };
+ 
+ &ohci0 {
+@@ -410,6 +434,11 @@
+ 		function = "i2c2";
+ 	};
+ 
++	irq0_pins: irq0 {
++		groups = "intc_ex_irq0";
++		function = "intc_ex";
++	};
++
+ 	pwm1_pins: pwm1 {
+ 		groups = "pwm1_a";
+ 		function = "pwm1";
+-- 
+2.7.4
