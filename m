@@ -1,34 +1,215 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 16 Nov 2017 15:47:44 +0800
-Subject: [PATCH v4 3/3] ARM: imx: Update spi_imx platform data to reflect
- current state
-In-Reply-To: <20171106194618.9421-4-tpiepho@impinj.com>
-References: <20171106194618.9421-1-tpiepho@impinj.com>
- <20171106194618.9421-4-tpiepho@impinj.com>
-Message-ID: <20171116074743.GC25384@dragon>
+Date: Thu, 16 Nov 2017 16:00:22 +0800
+Subject: [PATCH v7 2/2] ARM: dts: TS-4600: add basic device tree
+In-Reply-To: <20171101170645.12918-2-sebastien.bourdelin@savoirfairelinux.com>
+References: <20171101170645.12918-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20171101170645.12918-2-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20171116080021.GD25384@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 06, 2017 at 11:46:18AM -0800, Trent Piepho wrote:
-> The docs for the spi_imx platform data still refer to a -32 offset used to
-> specify a native chip select.  This was removed in commit 602c8f4485cd
-> ("spi: imx: fix use of native chip-selects with devicetree") and no
-> longer works as documented.  Update documentation.
+On Wed, Nov 01, 2017 at 01:06:45PM -0400, Sebastien Bourdelin wrote:
+> These device trees add support for the TS-4600 by Technologic Systems.
 > 
-> The macro MXC_SPI_CS() is no longer is needed.
+> More details here:
+>   http://wiki.embeddedarm.com/wiki/TS-4600
 > 
-> If a board uses all native chip selects, then it's not necessary to
-> specify a chip select array at all, as all native is the default (this is
-> how device-tree configured SPI masters work too).  Most of the spi-imx
-> platform data users have their chip select arrays removed by this patch.
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> ---
+> Changes v6 -> v7:
+>   - rebase on master
+>   - remove unneeded pinctrl-name (suggested by Shawn Guo)
+>   - add reg to the node en-sd-pwr (suggested by Shawn Guo)
+>   - use define for gpio polarity (suggested by Shawn Guo)
+>   - remove the fake bus container for regulator (suggested by Shawn Guo)
 > 
-> This patch also fixes a bug in mx31moboard introduced in the '602 commit.
-> When that board was updated in commit 901f26bce64a ("ARM: imx: set
-> correct chip_select in platform setup") to reflect the SPI change, only
-> SPI bus 2 was updated and SPI bus 1 was left with non-sequential chip
-> selects.  The mc13783 spi device on bus 1 had its chip select updated as
-> if it were on bus 2.
+> Changes v5 -> v6:
+>   - rebase on master
+>   - split the previous patch series into series by subsystem
 > 
-> CC: Shawn Guo <shawnguo@kernel.org>
+> Changes v4 -> v5:
+>   - fix missing signed off
+> 
+> Changes v3 -> v4:
+>   - rebase on master
+> 
+> Changes v2 -> v3:
+>   - rebase on master
+> 
+> Changes v1 -> v2:
+>   - rebase on master
+> ---
+>  arch/arm/boot/dts/Makefile                 |  2 +
+>  arch/arm/boot/dts/imx28-ts4600-common.dtsi | 74 ++++++++++++++++++++++++++++++
+>  arch/arm/boot/dts/imx28-ts4600-rev-a.dts   | 22 +++++++++
+>  arch/arm/boot/dts/imx28-ts4600-rev-b.dts   | 22 +++++++++
+>  4 files changed, 120 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx28-ts4600-common.dtsi
+>  create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-a.dts
+>  create mode 100644 arch/arm/boot/dts/imx28-ts4600-rev-b.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index faf46abaa4a2..430fe7f1e644 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -532,6 +532,8 @@ dtb-$(CONFIG_ARCH_MXS) += \
+>  	imx28-m28cu3.dtb \
+>  	imx28-m28evk.dtb \
+>  	imx28-sps1.dtb \
+> +	imx28-ts4600-rev-a.dtb \
+> +	imx28-ts4600-rev-b.dtb \
+>  	imx28-tx28.dtb
+>  dtb-$(CONFIG_ARCH_NOMADIK) += \
+>  	ste-nomadik-s8815.dtb \
+> diff --git a/arch/arm/boot/dts/imx28-ts4600-common.dtsi b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+> new file mode 100644
+> index 000000000000..c5f6bef87fd5
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-ts4600-common.dtsi
+> @@ -0,0 +1,74 @@
+> +/*
+> + * Copyright (C) 2016 Savoir-Faire Linux
+> + * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +/dts-v1/;
+> +#include "imx28.dtsi"
+> +#include "dt-bindings/gpio/gpio.h"
+> +
+> +/ {
+> +
+> +	compatible = "technologic,imx28-ts4600", "fsl,imx28";
+> +
+> +	apb at 80000000 {
+> +		apbh at 80000000 {
+> +			ssp0: ssp at 80010000 {
+> +				compatible = "fsl,imx28-mmc";
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&mmc0_4bit_pins_a
+> +					     &mmc0_sck_cfg
+> +					     &en_sd_pwr>;
+> +				broken-cd = <1>;
+> +				bus-width = <4>;
+> +				vmmc-supply = <&reg_vddio_sd0>;
+> +				status = "okay";
+> +			};
+> +
+> +			pinctrl at 80018000 {
+> +
+> +				en_sd_pwr: en-sd-pwr at 0 {
+> +					reg = <0>;
+> +					fsl,pinmux-ids = <
+> +						MX28_PAD_PWM3__GPIO_3_28
+> +					>;
+> +					fsl,drive-strength = <MXS_DRIVE_4mA>;
+> +					fsl,voltage = <MXS_VOLTAGE_HIGH>;
+> +					fsl,pull-up = <MXS_PULL_DISABLE>;
+> +				};
+> +
+> +			};
+> +		};
+> +
+> +		apbx at 80040000 {
+> +			pwm: pwm at 80064000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&pwm2_pins_a>;
+> +				status = "okay";
+> +			};
+> +
+> +			duart: serial at 80074000 {
+> +				pinctrl-names = "default";
+> +				pinctrl-0 = <&duart_pins_a>;
+> +				status = "okay";
+> +			};
+> +		};
+> +	};
+> +
+> +	reg_vddio_sd0: regulator-vddio-sd0 {
+> +		compatible = "regulator-fixed";
+> +		regulator-name = "vddio-sd0";
+> +		regulator-min-microvolt = <3300000>;
+> +		regulator-max-microvolt = <3300000>;
+> +		regulator-boot-on;
+> +		gpio = <&gpio3 28 GPIO_ACTIVE_HIGH>;
+> +	};
+> +
+> +};
+> diff --git a/arch/arm/boot/dts/imx28-ts4600-rev-a.dts b/arch/arm/boot/dts/imx28-ts4600-rev-a.dts
+> new file mode 100644
+> index 000000000000..e8cb72988fcf
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-ts4600-rev-a.dts
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2016 Savoir-Faire Linux
+> + * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "imx28-ts4600-common.dtsi"
+> +
+> +/ {
+> +	model = "Technologic Systems i.MX28 TS-4600 Rev A";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x08000000>;   /* 128MB */
 
-Acked-by: Shawn Guo <shawnguo@kernel.org>
+If memory size is the only difference between Rev A and B, can we have
+device tree default to most used revision and ask bootloader to fix up
+memory node for the other revision?  In that case, we only need to
+maintain imx28-ts4600.dts then.
+
+Shawn
+
+> +	};
+> +
+> +};
+> diff --git a/arch/arm/boot/dts/imx28-ts4600-rev-b.dts b/arch/arm/boot/dts/imx28-ts4600-rev-b.dts
+> new file mode 100644
+> index 000000000000..a115f831fe2b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx28-ts4600-rev-b.dts
+> @@ -0,0 +1,22 @@
+> +/*
+> + * Copyright (C) 2016 Savoir-Faire Linux
+> + * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "imx28-ts4600-common.dtsi"
+> +
+> +/ {
+> +	model = "Technologic Systems i.MX28 TS-4600 Rev B";
+> +
+> +	memory {
+> +		reg = <0x40000000 0x10000000>;   /* 256MB */
+> +	};
+> +
+> +};
+> -- 
+> 2.13.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
