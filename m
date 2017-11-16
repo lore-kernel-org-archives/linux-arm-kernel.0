@@ -1,83 +1,91 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Thu, 16 Nov 2017 22:05:43 +0100
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <20171116170527.GL31757@n2100.armlinux.org.uk>
-References: <e03436d1-b140-3f29-59a6-3b1eb6bf9da4@free.fr>
- <11393e07-b042-180c-3bcd-484bf51eada6@sigmadesigns.com>
- <20171115131351.GE31757@n2100.armlinux.org.uk>
- <1fa81694-7bd2-564b-e5b9-ae53b9ea6620@sigmadesigns.com>
- <20171116153625.GJ31757@n2100.armlinux.org.uk>
- <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
- <nycvar.YSQ.7.76.1711161106240.20817@knanqh.ubzr>
- <48c38055-20f7-e565-aa56-74f360e6e3d9@sigmadesigns.com>
- <20171116163254.GK31757@n2100.armlinux.org.uk>
- <fc4ce9e1-8c9d-e6bf-30d3-ead2c5518683@sigmadesigns.com>
- <20171116170527.GL31757@n2100.armlinux.org.uk>
-Message-ID: <9f678f27-38a0-1dbe-50b9-2d9109c639a9@free.fr>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Fri, 17 Nov 2017 00:29:20 +0300
+Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
+In-Reply-To: <c0c19191-e090-4768-3c46-b813713d2908@arm.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-12-samitolvanen@google.com>
+ <20171116115433.GG9361@arm.com>
+ <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
+ <c0c19191-e090-4768-3c46-b813713d2908@arm.com>
+Message-ID: <20171116212920.wixsxoccznyef4aq@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/2017 18:05, Russell King - ARM Linux wrote:
+On Thu, Nov 16, 2017 at 01:55:31PM +0000, Robin Murphy wrote:
+> On 16/11/17 13:07, Yury Norov wrote:
+> > On Thu, Nov 16, 2017 at 11:54:33AM +0000, Will Deacon wrote:
+> > > On Wed, Nov 15, 2017 at 01:34:21PM -0800, Sami Tolvanen wrote:
+> > > > From: Alex Matveev <alxmtvv@gmail.com>
+> > > > 
+> > > > Use UNDEFINE_MRS_S and UNDEFINE_MSR_S to define corresponding macros
+> > > > in-place and workaround gcc and clang limitations on redefining macros
+> > > > across different assembler blocks.
+> > > 
+> > > What limitations? Can you elaborate please? Is this a fix?
+> > 
+> > Hi Will,
+> > 
+> > Regarding GCC.
+> > 
+> > When it joins preprocessed source files into single asm file,
+> > mrs_s/msr_s becomes either not declared or declared multiple times.
+> > 
+> > ./ccuFb68h.s:33120: Error: Macro `mrs_s' was already defined
+> > ./ccuFb68h.s:33124: Error: Macro `msr_s' was already defined
+> > 
+> > I'm not sure that GCC works correctly in this case, and I sent the
+> > email to Linaro toolchain group to clarify it. See below.
+> > 
+> > Yury
+> > 
+> > [...]
+> > 
+> > Links:
+> > My unfinished branch:
+> > https://github.com/norov/linux/tree/lto
+> > Andi Kleen tree:
+> > https://github.com/andikleen/linux-misc/tree/lto-411-1
+> > Sami Tolvanen's recent work for clang:
+> > https://lkml.org/lkml/2017/11/3/606
+> > 
+> > Question we have for now:
+> > There's mrs_s/msr_s macro that doesn't work with LTO - linker
+> > complains very loudly that macro is either not declared, or declared
+> > multiple times. (To reproduce - try to build my kernel branch w/o last
+> > patch).
+> > 
+> > The same (?) problem is observed with clang, and people there
+> > considered it as feature, not a bug.
+> > 
+> > https://bugs.llvm.org/show_bug.cgi?id=19749
+> > 
+> > We have the fix for both clang and gcc, but it looks hacky. Maybe it
+> > worth to fix mrs/msr issue on toolchain side?
+> 
+> Given that this whole mrs_s infrastructure is a workaround for older
+> assemblers which don't support the "S<op0>_<op1>_<Cn>_<Cm>_<op2>" syntax for
+> arbitrary unnamed system registers (which IIRC was a fairly late addition to
+> the architecture), the only way it could be "fixed" on the toolchain side is
+> by removing all those older toolchains from existence. Good luck with that
+> ;)
+> 
+> In *theory*, it might be possible to do something similar to what we do with
+> CONFIG_BROKEN_GAS_INST to detect offending assemblers and only define and
+> use these macros when necessary (hopefully Clang and other LTO-capable
+> toolchains do accept the proper syntax), but I've no idea how invasive or
+> difficult that might turn out to be.
 
-> On Thu, Nov 16, 2017 at 05:42:36PM +0100, Marc Gonzalez wrote:
->
->> Requesting 100 ?s and spinning only 25 ?s is still a problem,
->> don't you agree?
-> 
-> Which is why, as I've said *many* times already, that drivers are written
-> with leaway on the delays.
+Thank you Robin. The "S<op0>_<op1>_<Cn>_<Cm>_<op2>" is the feature I
+was looking for. I'm not going to remove old toolchain from every user
+machine - I believe if I do, I'll be put into jail finally. :)
 
-A delay 75% too short is possible. Roger that.
+But I think we should use this syntax for {read,write}_sysreg_s
+and other functions if assembler supports it. The existing mrs_s/msr_s
+machinery will be deprecated then, and it will be generally good.
 
-> I get the impression that we're just going around in circles, and what
-> you're trying to do is to get me to agree with your point of view.
-> That's not going to happen, because I know the history over about the
-> last /24/ years of kernel development (which is how long I've been
-> involved with the kernel.)  That's almost a quarter of a century!
-> 
-> I know how things were done years ago (which is relevant because we
-> still have support in the kernel for these systems), and I also know the
-> history of facilities like cpufreq - I was the one who took the work
-> that Erik Mouw and others involved with the LART project, and turned it
-> into something a little more generic.  The idea of dynamically scaling
-> the CPU frequency on ARM SoCs was something that the SoC manufacturer
-> had not even considered - it was innovative.
-> 
-> I know that udelay() can return short delays when used in a kernel with
-> cpufreq enabled, and I also know that's almost an impossible problem to
-> solve without going to a timer-based delay.
-> 
-> So, when you think that sending an email about a udelay() that can be
-> 10x shorter might be somehow new information, and might convince people
-> that there's a problem, I'm afraid that it isn't really new information.
-> The SA1110 cpufreq driver is dated 2001, and carries my copyright, and
-> has the ability to make udelay()s 4x shorter or 4x longer depending on
-> the direction of change.
-> 
-> We've discussed solutions in the past (probably 10 years ago) about
-> this, and what can be done, and the conclusion to that was, as Nicolas
-> has said, to switch to using a timer-based delay mechanism where
-> possible.  Where this is not possible, the platform is stuck with the
-> loops based delays, and their inherent variability and inaccuracy.
-> 
-> These platforms have been tested with such a setup over many years.
-> They work even with udelay() having this behaviour, because it's a
-> known issue and drivers cater for it in ways that I've already covered
-> in my many previous emails to you.
-> 
-> These issues are known.  They've been known for the last 15 odd years.
+Sami told that LTO doesn't work with old toolchains, so I think that
+it would be OK to disable LTO for old assemblers that doesn't support
+all necessary features. Anyway, this is not blocking issue because we
+have patch that workarounds it (again).
 
-So you've known for umpteen years that fixing loop-based delays is
-intractable, yet you wrote:
-
-> udelay() needs to offer a consistent interface so that drivers know
-> what to expect no matter what the implementation is.  Making one
-> implementation conform to your ideas while leaving the other
-> implementations with other expectations is a recipe for bugs.
-> 
-> If you really want to do this, fix the loops_per_jiffy implementation
-> as well so that the consistency is maintained.
-
-In other words, "I'll consider your patch as soon as Hell freezes over".
-
-Roger that. I'll drop the subject then.
+Yury
