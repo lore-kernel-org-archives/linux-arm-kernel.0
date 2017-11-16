@@ -1,29 +1,42 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Thu, 16 Nov 2017 14:32:00 +0200
-Subject: [PATCH v2 1/4] omapdrm: fix compatible string for td028ttec1
-In-Reply-To: <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <474bfc72b67e1d0e2a223084a69f04d2baa1dda8.1510822218.git.hns@goldelico.com>
-Message-ID: <4753a425-d050-7f2d-35ae-b387accfd99e@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 16 Nov 2017 11:58:11 +0000
+Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
+In-Reply-To: <20171115213428.22559-19-samitolvanen@google.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-19-samitolvanen@google.com>
+Message-ID: <20171116115810.GH9361@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/17 10:50, H. Nikolaus Schaller wrote:
-> The vendor name was "toppoly" but other panels and the vendor list
-> have defined it as "tpo". So let's fix it in driver and bindings.
+Hi Sami,
+
+On Wed, Nov 15, 2017 at 01:34:28PM -0800, Sami Tolvanen wrote:
+> Allow CONFIG_LTO_CLANG to be enabled for the architecture.
 > 
-> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 > ---
+>  arch/arm64/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 3a70f763e18a..58504327b9f6 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -40,6 +40,7 @@ config ARM64
+>  	select ARCH_INLINE_WRITE_UNLOCK_IRQRESTORE if !PREEMPT
+>  	select ARCH_USE_CMPXCHG_LOCKREF
+>  	select ARCH_USE_QUEUED_RWLOCKS
+> +	select ARCH_SUPPORTS_LTO_CLANG
 
+I'll be honest with you: I'm absolutely terrified about enabling this.
+How much testing has this seen?
 
-> -MODULE_ALIAS("spi:toppoly,td028ttec1");
-> +MODULE_ALIAS("spi:tpo,td028ttec1");
+The main thing that worries me is that this gives the toolchain a lot
+more freedom to break dependency ordering with RCU, leading to subtle
+concurrency issues that would actually break on arm64. Specifically,
+I'm worried about value analysis that could potentially convert an
+address dependency into a control dependency. Right now, the C standard
+isn't on our side here and we're relying on the compiler not doing this
+kind of thing. Can we continue to rely on that in the face of LTO?
 
-Doesn't this mean that the module won't load if you have old bindings?
-Can't we have two module aliases?
-
- Tomi
-
--- 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Will
