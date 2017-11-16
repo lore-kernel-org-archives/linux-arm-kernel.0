@@ -1,86 +1,90 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 16 Nov 2017 14:35:57 +0100
-Subject: [PATCH] ARM: dts: r8a779x: Add '#reset-cells' in cpg-mssr
-Message-ID: <1510839357-11450-1-git-send-email-geert+renesas@glider.be>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 16 Nov 2017 14:42:36 +0100
+Subject: [PATCH v2 6/8] dt-bindings: power: Add Actions Semi S700 SPS
+In-Reply-To: <20171116043529.hrrgiga4hpdsy2tc@rob-hp-laptop>
+References: <20171113233427.5386-1-afaerber@suse.de>
+ <20171113233427.5386-7-afaerber@suse.de>
+ <20171116043529.hrrgiga4hpdsy2tc@rob-hp-laptop>
+Message-ID: <2342385f-b70c-6812-44e8-19c888bb5103@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
+Am 16.11.2017 um 05:35 schrieb Rob Herring:
+> On Tue, Nov 14, 2017 at 12:34:25AM +0100, Andreas F?rber wrote:
+>> Define power domains for Actions Semi S700 SoC Smart Power System (SPS).
+>>
+>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>> ---
+>>  v2: New
+>>  
+>>  .../devicetree/bindings/power/actions,owl-sps.txt    |  2 ++
+>>  include/dt-bindings/power/owl-s700-powergate.h       | 20 ++++++++++++++++++++
+>>  2 files changed, 22 insertions(+)
+>>  create mode 100644 include/dt-bindings/power/owl-s700-powergate.h
+>>
+>> diff --git a/Documentation/devicetree/bindings/power/actions,owl-sps.txt b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
+>> index 007b9a7ae723..78edd63641e8 100644
+>> --- a/Documentation/devicetree/bindings/power/actions,owl-sps.txt
+>> +++ b/Documentation/devicetree/bindings/power/actions,owl-sps.txt
+>> @@ -2,10 +2,12 @@ Actions Semi Owl Smart Power System (SPS)
+>>  
+>>  Required properties:
+>>  - compatible          :  "actions,s500-sps" for S500
+>> +                         "actions,s700-sps" for S700
+>>  - reg                 :  Offset and length of the register set for the device.
+>>  - #power-domain-cells :  Must be 1.
+>>                           See macros in:
+>>                            include/dt-bindings/power/owl-s500-powergate.h for S500
+>> +                          include/dt-bindings/power/owl-s700-powergate.h for S700
+>>  
+>>  
+>>  Example:
+>> diff --git a/include/dt-bindings/power/owl-s700-powergate.h b/include/dt-bindings/power/owl-s700-powergate.h
+>> new file mode 100644
+>> index 000000000000..4ded16bc074f
+>> --- /dev/null
+>> +++ b/include/dt-bindings/power/owl-s700-powergate.h
+>> @@ -0,0 +1,20 @@
+>> +/*
+>> + * Actions Semi S700 SPS
+>> + *
+>> + * Copyright (c) 2017 Andreas F?rber
+>> + *
+>> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+> 
+> The decree now for SPDX tags is make this the first line using "//".
 
-With the latest dtc, we get many warnings about the missing
-'#reset-cells' property in these controllers, e.g.:
+Thanks for noticing. Fixed:
 
-arch/arm/boot/dts/r8a7790-lager.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /can at e6e80000:resets[0])
-arch/arm/boot/dts/r8a7792-blanche.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/dma-controller at e6700000:resets[0])
-arch/arm/boot/dts/r8a7792-wheat.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/ethernet at e6800000:resets[0])
-arch/arm/boot/dts/r8a7793-gose.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /gpio at e6050000:resets[0])
-arch/arm/boot/dts/r8a7794-alt.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /i2c at e6500000:resets[0])
-arch/arm/boot/dts/r8a7794-silk.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /interrupt-controller at e61c0000:resets[0])
+diff --git a/include/dt-bindings/power/owl-s700-powergate.h
+b/include/dt-bindings/power/owl-s700-powergate.h
+index 4ded16bc074f..4cf1aefbf09c 100644
+--- a/include/dt-bindings/power/owl-s700-powergate.h
++++ b/include/dt-bindings/power/owl-s700-powergate.h
+@@ -1,9 +1,8 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+ /*
+  * Actions Semi S700 SPS
+  *
+  * Copyright (c) 2017 Andreas F?rber
+- *
+- * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+  */
+ #ifndef DT_BINDINGS_POWER_OWL_S700_POWERGATE_H
+ #define DT_BINDINGS_POWER_OWL_S700_POWERGATE_H
 
-This adds it for the three r8a779x chips that were lacking it. The
-binding mandates this as <1>, so this is the value I use.
+> 
+> Otherwise, 
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-[geert: Add fix for r8a7793.dtsi]
-Fixes: 34fbd2b12761d111 ("ARM: dts: r8a7790: Add reset control properties")
-Fixes: 6e11a322f1d7505d ("ARM: dts: r8a7792: Add reset control properties")
-Fixes: 84fb19e1d201ba86 ("ARM: dts: r8a7793: Add reset control properties")
-Fixes: 615beb759ca494a4 ("ARM: dts: r8a7794: Add reset control properties")
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm/boot/dts/r8a7790.dtsi | 1 +
- arch/arm/boot/dts/r8a7792.dtsi | 1 +
- arch/arm/boot/dts/r8a7793.dtsi | 1 +
- arch/arm/boot/dts/r8a7794.dtsi | 1 +
- 4 files changed, 4 insertions(+)
+Thanks, queued in v4.16/dt64:
+https://git.kernel.org/pub/scm/linux/kernel/git/afaerber/linux-actions.git/log/?h=v4.16/dt64
 
-diff --git a/arch/arm/boot/dts/r8a7790.dtsi b/arch/arm/boot/dts/r8a7790.dtsi
-index e2c530c330a8eb7e..450bfc0e9796a557 100644
---- a/arch/arm/boot/dts/r8a7790.dtsi
-+++ b/arch/arm/boot/dts/r8a7790.dtsi
-@@ -1202,6 +1202,7 @@
- 		clock-names = "extal", "usb_extal";
- 		#clock-cells = <2>;
- 		#power-domain-cells = <0>;
-+		#reset-cells = <1>;
- 	};
- 
- 	prr: chipid at ff000044 {
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 7b394273031e9a90..ac05fdb91798b88d 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -830,6 +830,7 @@
- 			clock-names = "extal";
- 			#clock-cells = <2>;
- 			#power-domain-cells = <0>;
-+			#reset-cells = <1>;
- 		};
- 	};
- 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index a83c2e9c5723fe2c..61dd291d907da2f5 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -1088,6 +1088,7 @@
- 		clock-names = "extal", "usb_extal";
- 		#clock-cells = <2>;
- 		#power-domain-cells = <0>;
-+		#reset-cells = <1>;
- 	};
- 
- 	rst: reset-controller at e6160000 {
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 96e405e70d9aeea5..106b4e1649ff695b 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -1106,6 +1106,7 @@
- 		clock-names = "extal", "usb_extal";
- 		#clock-cells = <2>;
- 		#power-domain-cells = <0>;
-+		#reset-cells = <1>;
- 	};
- 
- 	rst: reset-controller at e6160000 {
+Regards,
+Andreas
+
 -- 
-2.7.4
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
