@@ -1,26 +1,30 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Thu, 16 Nov 2017 08:35:49 -0800
-Subject: [PATCH v2 09/18] arm64: explicitly pass
- --no-fix-cortex-a53-843419 to GNU gold
-In-Reply-To: <20171116114722.GD9361@arm.com>
+Date: Thu, 16 Nov 2017 08:41:01 -0800
+Subject: [PATCH v2 10/18] arm64: add a workaround for GNU gold with
+ ARM64_MODULE_PLTS
+In-Reply-To: <20171116115012.GE9361@arm.com>
 References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-10-samitolvanen@google.com>
- <20171116114722.GD9361@arm.com>
-Message-ID: <20171116163549.GD94341@samitolvanen.mtv.corp.google.com>
+ <20171115213428.22559-11-samitolvanen@google.com>
+ <20171116115012.GE9361@arm.com>
+Message-ID: <20171116164101.GE94341@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 11:47:23AM +0000, Will Deacon wrote:
-> But if ARM64_ERRATUM_843419 is enabled, we'll go ahead and generate
-> broken code?
+On Thu, Nov 16, 2017 at 11:50:12AM +0000, Will Deacon wrote:
+> Why don't we just not do LTO if the toolchain is busted?
 
-This bug has been fixed in all current versions of GNU gold, but of
-course, if someone is using a broken linker, it will generate broken
-code. We can't do anything about that in the kernel.
+Because LTO can not only potentially improve performance, especially
+when combined with PGO (Profile Guided Optimization), but it also
+makes it possible to enable features like Control Flow Integrity that
+can make kernel vulnerabilities more difficult to exploit:
 
-The reason for this patch is that the linker can be configured to
-enable the erratum fix by default, and we must explicitly disable it
-if we don't want the fix, whether it's because of a broken linker, or
-in our case, because of issues with kernel modules.
+  https://clang.llvm.org/docs/ControlFlowIntegrity.html
+
+> This feels like it will end up being a game of whack-a-mole as code
+> could be introduced that tickles known bugs on older toolchains.
+
+I'm not sure this is much different from dealing with older versions
+of the existing toolchain. Otherwise, we wouldn't need cc-version or
+other similar macros, for example.
 
 Sami
