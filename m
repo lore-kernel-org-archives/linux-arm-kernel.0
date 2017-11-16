@@ -1,32 +1,23 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 16 Nov 2017 18:47:15 +0000
-Subject: [PATCH v2 10/18] arm64: add a workaround for GNU gold with
- ARM64_MODULE_PLTS
-In-Reply-To: <20171116164101.GE94341@samitolvanen.mtv.corp.google.com>
-References: <20171116164101.GE94341@samitolvanen.mtv.corp.google.com>
-Message-ID: <20171116184714.GD21898@arm.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Thu, 16 Nov 2017 10:47:19 -0800
+Subject: [GIT PULL] arm64: updates for 4.15
+In-Reply-To: <20171116115138.GF9361@arm.com>
+References: <20171114201132.GB18699@arm.com>
+ <CA+55aFxnePDimkVKVtv3gNmRGcwc8KQ5mHYvUxY8sAQg6yvVYg@mail.gmail.com>
+ <20171116115138.GF9361@arm.com>
+Message-ID: <CA+55aFzWk=n_GV1=JHdgQfJ2yQU6gXyG87v3J65xdBXWkfTyDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 08:41:01AM -0800, Sami Tolvanen wrote:
-> On Thu, Nov 16, 2017 at 11:50:12AM +0000, Will Deacon wrote:
-> > Why don't we just not do LTO if the toolchain is busted?
-> 
-> Because LTO can not only potentially improve performance, especially
-> when combined with PGO (Profile Guided Optimization), but it also
-> makes it possible to enable features like Control Flow Integrity that
-> can make kernel vulnerabilities more difficult to exploit:
-> 
->   https://clang.llvm.org/docs/ControlFlowIntegrity.html
-> 
-> > This feels like it will end up being a game of whack-a-mole as code
-> > could be introduced that tickles known bugs on older toolchains.
-> 
-> I'm not sure this is much different from dealing with older versions
-> of the existing toolchain. Otherwise, we wouldn't need cc-version or
-> other similar macros, for example.
+On Thu, Nov 16, 2017 at 3:51 AM, Will Deacon <will.deacon@arm.com> wrote:
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Thu, 16 Nov 2017 10:49:34 +0000
+> Subject: [PATCH] irqdesc: Use bool return type instead of int
 
-I think the big difference is that we have no compelling need to support
-older versions of clang or gold.
+Thomas, will you take this in the irq branches, or should I just apply
+it directly because it's "one of Linus' hangups".
 
-Will
+It's not urgent, there hopefully aren't actually any existing bad
+cases, it's purely "future mis-use safety".
+
+                 Linus
