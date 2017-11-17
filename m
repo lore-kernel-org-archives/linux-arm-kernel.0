@@ -1,59 +1,247 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:22:00 +0000
-Subject: [PATCH 17/18] arm64: makefile: Ensure TEXT_OFFSET doesn't overlap
- with trampoline
+Date: Fri, 17 Nov 2017 18:21:49 +0000
+Subject: [PATCH 06/18] arm64: mm: Fix and re-enable ARM64_SW_TTBR0_PAN
 In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-18-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-7-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET=y, we could end up with a
-TEXT_OFFSET of less than 2 * PAGE_SIZE, which would result in an
-overlap with the trampoline and a panic on boot.
-
-Fix this by restricting the minimum value of the random TEXT_OFFSET
-value so that it is not less than 2 pages when CONFIG_UNMAP_KERNEL_AT_EL0
-is enabled.
-
-I do wonder whether we should just remove
-CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET completely, since we're realistically
-never going to be able to change our offset from 0x80000, but this keeps
-the dream alive for now.
+With the ASID now installed in TTBR1, we can re-enable ARM64_SW_TTBR0_PAN
+by ensuring that we switch to a reserved ASID of zero when disabling
+user access and restore the active user ASID on the uaccess enable path.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Makefile | 18 +++++++++++++++---
- 1 file changed, 15 insertions(+), 3 deletions(-)
+ arch/arm64/Kconfig                   |  1 -
+ arch/arm64/include/asm/asm-uaccess.h | 25 +++++++++++++++++--------
+ arch/arm64/include/asm/uaccess.h     | 21 +++++++++++++++++----
+ arch/arm64/kernel/entry.S            |  4 ++--
+ arch/arm64/lib/clear_user.S          |  2 +-
+ arch/arm64/lib/copy_from_user.S      |  2 +-
+ arch/arm64/lib/copy_in_user.S        |  2 +-
+ arch/arm64/lib/copy_to_user.S        |  2 +-
+ arch/arm64/mm/cache.S                |  2 +-
+ arch/arm64/xen/hypercall.S           |  2 +-
+ 10 files changed, 42 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index 939b310913cf..b60ac6c43ccd 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -87,9 +87,21 @@ head-y		:= arch/arm64/kernel/head.o
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 582bbd77c390..0df64a6a56d4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -872,7 +872,6 @@ endif
  
- # The byte offset of the kernel image in RAM from the start of RAM.
- ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
--TEXT_OFFSET := $(shell awk "BEGIN {srand(); printf \"0x%06x\n\", \
--		 int(2 * 1024 * 1024 / (2 ^ $(CONFIG_ARM64_PAGE_SHIFT)) * \
--		 rand()) * (2 ^ $(CONFIG_ARM64_PAGE_SHIFT))}")
-+TEXT_OFFSET := $(shell awk							\
-+		"BEGIN {							\
-+			srand();						\
-+			page_size = 2 ^ $(CONFIG_ARM64_PAGE_SHIFT);		\
-+			tramp_size = 0;						\
-+			if (\" $(CONFIG_UNMAP_KERNEL_AT_EL0)\" == \" y\") {	\
-+				tramp_size = 2 * page_size;			\
-+			}							\
-+			offset = int(2 * 1024 * 1024 / page_size * rand());	\
-+			offset *= page_size;					\
-+			if (offset < tramp_size) {				\
-+				offset = tramp_size;				\
-+			}							\
-+			printf \"0x%06x\n\", offset;				\
-+		}")
- else
- TEXT_OFFSET := 0x00080000
- endif
+ config ARM64_SW_TTBR0_PAN
+ 	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
+-	depends on BROKEN       # Temporary while switch_mm is reworked
+ 	help
+ 	  Enabling this option prevents the kernel from accessing
+ 	  user-space memory directly by pointing TTBR0_EL1 to a reserved
+diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
+index b3da6c886835..21b8cf304028 100644
+--- a/arch/arm64/include/asm/asm-uaccess.h
++++ b/arch/arm64/include/asm/asm-uaccess.h
+@@ -16,11 +16,20 @@
+ 	add	\tmp1, \tmp1, #SWAPPER_DIR_SIZE	// reserved_ttbr0 at the end of swapper_pg_dir
+ 	msr	ttbr0_el1, \tmp1		// set reserved TTBR0_EL1
+ 	isb
++	sub	\tmp1, \tmp1, #SWAPPER_DIR_SIZE
++	bic	\tmp1, \tmp1, #(0xffff << 48)
++	msr	ttbr1_el1, \tmp1		// set reserved ASID
++	isb
+ 	.endm
+ 
+-	.macro	__uaccess_ttbr0_enable, tmp1
++	.macro	__uaccess_ttbr0_enable, tmp1, tmp2
+ 	get_thread_info \tmp1
+ 	ldr	\tmp1, [\tmp1, #TSK_TI_TTBR0]	// load saved TTBR0_EL1
++	mrs	\tmp2, ttbr1_el1
++	extr    \tmp2, \tmp2, \tmp1, #48
++	ror     \tmp2, \tmp2, #16
++	msr	ttbr1_el1, \tmp2		// set the active ASID
++	isb
+ 	msr	ttbr0_el1, \tmp1		// set the non-PAN TTBR0_EL1
+ 	isb
+ 	.endm
+@@ -31,18 +40,18 @@ alternative_if_not ARM64_HAS_PAN
+ alternative_else_nop_endif
+ 	.endm
+ 
+-	.macro	uaccess_ttbr0_enable, tmp1, tmp2
++	.macro	uaccess_ttbr0_enable, tmp1, tmp2, tmp3
+ alternative_if_not ARM64_HAS_PAN
+-	save_and_disable_irq \tmp2		// avoid preemption
+-	__uaccess_ttbr0_enable \tmp1
+-	restore_irq \tmp2
++	save_and_disable_irq \tmp3		// avoid preemption
++	__uaccess_ttbr0_enable \tmp1, \tmp2
++	restore_irq \tmp3
+ alternative_else_nop_endif
+ 	.endm
+ #else
+ 	.macro	uaccess_ttbr0_disable, tmp1
+ 	.endm
+ 
+-	.macro	uaccess_ttbr0_enable, tmp1, tmp2
++	.macro	uaccess_ttbr0_enable, tmp1, tmp2, tmp3
+ 	.endm
+ #endif
+ 
+@@ -56,8 +65,8 @@ alternative_if ARM64_ALT_PAN_NOT_UAO
+ alternative_else_nop_endif
+ 	.endm
+ 
+-	.macro	uaccess_enable_not_uao, tmp1, tmp2
+-	uaccess_ttbr0_enable \tmp1, \tmp2
++	.macro	uaccess_enable_not_uao, tmp1, tmp2, tmp3
++	uaccess_ttbr0_enable \tmp1, \tmp2, \tmp3
+ alternative_if ARM64_ALT_PAN_NOT_UAO
+ 	SET_PSTATE_PAN(0)
+ alternative_else_nop_endif
+diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
+index fc0f9eb66039..750a3b76a01c 100644
+--- a/arch/arm64/include/asm/uaccess.h
++++ b/arch/arm64/include/asm/uaccess.h
+@@ -107,15 +107,19 @@ static inline void __uaccess_ttbr0_disable(void)
+ {
+ 	unsigned long ttbr;
+ 
++	ttbr = read_sysreg(ttbr1_el1);
+ 	/* reserved_ttbr0 placed@the end of swapper_pg_dir */
+-	ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
+-	write_sysreg(ttbr, ttbr0_el1);
++	write_sysreg(ttbr + SWAPPER_DIR_SIZE, ttbr0_el1);
++	isb();
++	/* Set reserved ASID */
++	ttbr &= ~(0xffffUL << 48);
++	write_sysreg(ttbr, ttbr1_el1);
+ 	isb();
+ }
+ 
+ static inline void __uaccess_ttbr0_enable(void)
+ {
+-	unsigned long flags;
++	unsigned long flags, ttbr0, ttbr1;
+ 
+ 	/*
+ 	 * Disable interrupts to avoid preemption between reading the 'ttbr0'
+@@ -123,7 +127,16 @@ static inline void __uaccess_ttbr0_enable(void)
+ 	 * roll-over and an update of 'ttbr0'.
+ 	 */
+ 	local_irq_save(flags);
+-	write_sysreg(current_thread_info()->ttbr0, ttbr0_el1);
++	ttbr0 = current_thread_info()->ttbr0;
++
++	/* Restore active ASID */
++	ttbr1 = read_sysreg(ttbr1_el1);
++	ttbr1 |= ttbr0 & (0xffffUL << 48);
++	write_sysreg(ttbr1, ttbr1_el1);
++	isb();
++
++	/* Restore user page table */
++	write_sysreg(ttbr0, ttbr0_el1);
+ 	isb();
+ 	local_irq_restore(flags);
+ }
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index dd5fa2c3d489..e2afc15a1535 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -184,7 +184,7 @@ alternative_if ARM64_HAS_PAN
+ alternative_else_nop_endif
+ 
+ 	.if	\el != 0
+-	mrs	x21, ttbr0_el1
++	mrs	x21, ttbr1_el1
+ 	tst	x21, #0xffff << 48		// Check for the reserved ASID
+ 	orr	x23, x23, #PSR_PAN_BIT		// Set the emulated PAN in the saved SPSR
+ 	b.eq	1f				// TTBR0 access already disabled
+@@ -246,7 +246,7 @@ alternative_else_nop_endif
+ 	tbnz	x22, #22, 1f			// Skip re-enabling TTBR0 access if the PSR_PAN_BIT is set
+ 	.endif
+ 
+-	__uaccess_ttbr0_enable x0
++	__uaccess_ttbr0_enable x0, x1
+ 
+ 	.if	\el == 0
+ 	/*
+diff --git a/arch/arm64/lib/clear_user.S b/arch/arm64/lib/clear_user.S
+index e88fb99c1561..8f9c4641e706 100644
+--- a/arch/arm64/lib/clear_user.S
++++ b/arch/arm64/lib/clear_user.S
+@@ -30,7 +30,7 @@
+  * Alignment fixed up by hardware.
+  */
+ ENTRY(__clear_user)
+-	uaccess_enable_not_uao x2, x3
++	uaccess_enable_not_uao x2, x3, x4
+ 	mov	x2, x1			// save the size for fixup return
+ 	subs	x1, x1, #8
+ 	b.mi	2f
+diff --git a/arch/arm64/lib/copy_from_user.S b/arch/arm64/lib/copy_from_user.S
+index 4b5d826895ff..69d86a80f3e2 100644
+--- a/arch/arm64/lib/copy_from_user.S
++++ b/arch/arm64/lib/copy_from_user.S
+@@ -64,7 +64,7 @@
+ 
+ end	.req	x5
+ ENTRY(__arch_copy_from_user)
+-	uaccess_enable_not_uao x3, x4
++	uaccess_enable_not_uao x3, x4, x5
+ 	add	end, x0, x2
+ #include "copy_template.S"
+ 	uaccess_disable_not_uao x3
+diff --git a/arch/arm64/lib/copy_in_user.S b/arch/arm64/lib/copy_in_user.S
+index b24a830419ad..e442b531252a 100644
+--- a/arch/arm64/lib/copy_in_user.S
++++ b/arch/arm64/lib/copy_in_user.S
+@@ -65,7 +65,7 @@
+ 
+ end	.req	x5
+ ENTRY(raw_copy_in_user)
+-	uaccess_enable_not_uao x3, x4
++	uaccess_enable_not_uao x3, x4, x5
+ 	add	end, x0, x2
+ #include "copy_template.S"
+ 	uaccess_disable_not_uao x3
+diff --git a/arch/arm64/lib/copy_to_user.S b/arch/arm64/lib/copy_to_user.S
+index 351f0766f7a6..318f15d5c336 100644
+--- a/arch/arm64/lib/copy_to_user.S
++++ b/arch/arm64/lib/copy_to_user.S
+@@ -63,7 +63,7 @@
+ 
+ end	.req	x5
+ ENTRY(__arch_copy_to_user)
+-	uaccess_enable_not_uao x3, x4
++	uaccess_enable_not_uao x3, x4, x5
+ 	add	end, x0, x2
+ #include "copy_template.S"
+ 	uaccess_disable_not_uao x3
+diff --git a/arch/arm64/mm/cache.S b/arch/arm64/mm/cache.S
+index 7f1dbe962cf5..6cd20a8c0952 100644
+--- a/arch/arm64/mm/cache.S
++++ b/arch/arm64/mm/cache.S
+@@ -49,7 +49,7 @@ ENTRY(flush_icache_range)
+  *	- end     - virtual end address of region
+  */
+ ENTRY(__flush_cache_user_range)
+-	uaccess_ttbr0_enable x2, x3
++	uaccess_ttbr0_enable x2, x3, x4
+ 	dcache_line_size x2, x3
+ 	sub	x3, x2, #1
+ 	bic	x4, x0, x3
+diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
+index 401ceb71540c..acdbd2c9e899 100644
+--- a/arch/arm64/xen/hypercall.S
++++ b/arch/arm64/xen/hypercall.S
+@@ -101,7 +101,7 @@ ENTRY(privcmd_call)
+ 	 * need the explicit uaccess_enable/disable if the TTBR0 PAN emulation
+ 	 * is enabled (it implies that hardware UAO and PAN disabled).
+ 	 */
+-	uaccess_ttbr0_enable x6, x7
++	uaccess_ttbr0_enable x6, x7, x8
+ 	hvc XEN_IMM
+ 
+ 	/*
 -- 
 2.1.4
