@@ -1,56 +1,50 @@
-From: khoroshilov@ispras.ru (Alexey Khoroshilov)
-Date: Sat, 18 Nov 2017 00:15:58 +0300
-Subject: [PATCH] rtc: brcmstb-waketimer: fix error handling in
- brcmstb_waketmr_probe()
-Message-ID: <1510953358-7043-1-git-send-email-khoroshilov@ispras.ru>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 17 Nov 2017 13:42:07 -0800
+Subject: [PATCH 3/4] [v6] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <2671cc63-6c8b-987d-ceb3-bd158bb9d1c3@codeaurora.org>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+ <1510096056-13765-4-git-send-email-timur@codeaurora.org>
+ <20171117024332.GU11955@codeaurora.org>
+ <dff45d26-e9df-6a4f-00a9-7d9ec5cbdf49@codeaurora.org>
+ <20171117174617.GA29777@codeaurora.org>
+ <2671cc63-6c8b-987d-ceb3-bd158bb9d1c3@codeaurora.org>
+Message-ID: <20171117214207.GA18379@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-brcmstb_waketmr_probe() does not disable timer->clk on error paths.
+On 11/17, Timur Tabi wrote:
+> On 11/17/2017 11:46 AM, Stephen Boyd wrote:
+> >On 11/16, Timur Tabi wrote:
+> >>On 11/16/17 8:43 PM, Stephen Boyd wrote:
+> >>>>Most access to unavailable GPIOs can be blocked via the gpio_chip.request
+> >>>>function.  The one exception is when gpiochip_add_data() scans all of
+> >>
+> >>>If patch 1 is applied is this statement still true?
+> >>
+> >>Nope.
+> >>
+> >
+> >Ok. So what's the point of this patch then? Put another way, is
+> >there some path that doesn't request the gpio still even with
+> >patch 1 applied?
+> 
+> This patch is how the pinctrl-msm driver actually reports the sparse
+> GPIO map.
+> 
+> Patch 1 prevents gpiolib from accessing GPIOs that haven't been
+> properly requested.
+> 
+> Patch 2 adds an infrastructure for sparse GPIO maps
+> 
+> Patch 3 updates pinctrl-msm to use that expose that new infrastructure
+> 
+> Patch 4 updates pinctrl-qdf2xxx to work with the new feature in pinctrl-msm
+> 
 
-Found by Linux Driver Verification project (linuxtesting.org).
+Ok. What path doesn't request the gpio though? If we don't have a
+path that fails to request the gpio before using it then I don't
+see the need for this patch.
 
-Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
----
- drivers/rtc/rtc-brcmstb-waketimer.c | 15 ++++++++++++---
- 1 file changed, 12 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/rtc/rtc-brcmstb-waketimer.c b/drivers/rtc/rtc-brcmstb-waketimer.c
-index 796ac792a381..6cee61201c30 100644
---- a/drivers/rtc/rtc-brcmstb-waketimer.c
-+++ b/drivers/rtc/rtc-brcmstb-waketimer.c
-@@ -253,7 +253,7 @@ static int brcmstb_waketmr_probe(struct platform_device *pdev)
- 	ret = devm_request_irq(dev, timer->irq, brcmstb_waketmr_irq, 0,
- 			       "brcmstb-waketimer", timer);
- 	if (ret < 0)
--		return ret;
-+		goto err_clk;
- 
- 	timer->reboot_notifier.notifier_call = brcmstb_waketmr_reboot;
- 	register_reboot_notifier(&timer->reboot_notifier);
-@@ -262,12 +262,21 @@ static int brcmstb_waketmr_probe(struct platform_device *pdev)
- 					 &brcmstb_waketmr_ops, THIS_MODULE);
- 	if (IS_ERR(timer->rtc)) {
- 		dev_err(dev, "unable to register device\n");
--		unregister_reboot_notifier(&timer->reboot_notifier);
--		return PTR_ERR(timer->rtc);
-+		ret = PTR_ERR(timer->rtc);
-+		goto err_notifier;
- 	}
- 
- 	dev_info(dev, "registered, with irq %d\n", timer->irq);
- 
-+	return 0;
-+
-+err_notifier:
-+	unregister_reboot_notifier(&timer->reboot_notifier);
-+
-+err_clk:
-+	if (timer->clk)
-+		clk_disable_unprepare(timer->clk);
-+
- 	return ret;
- }
- 
 -- 
-2.7.4
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
