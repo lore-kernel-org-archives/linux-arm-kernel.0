@@ -1,45 +1,37 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Fri, 17 Nov 2017 11:07:47 -0800
-Subject: [PATCH v8 3/3] MAINTAINERS: Add entry for the Nuvoton NPCM
- architecture
-In-Reply-To: <20171117190747.21642-1-brendanhiggins@google.com>
-References: <20171117190747.21642-1-brendanhiggins@google.com>
-Message-ID: <20171117190747.21642-4-brendanhiggins@google.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Sat, 18 Nov 2017 00:45:22 +0530
+Subject: [PATCH 00/10] Handle platform_get_irq's error checking and returns
+Message-ID: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add maintainers and reviewers for the Nuvoton NPCM architecture.
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct and we must check its return value.
 
-Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-Reviewed-by: Avi Fishman <avifishman70@gmail.com>
----
- MAINTAINERS | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Arvind Yadav (10):
+  [PATCH 01/10] Input: ep93xx_keypad: Fix platform_get_irq's error checking
+  [PATCH 02/10] Input: omap4-keypad: Fix platform_get_irq's error checking
+  [PATCH 03/10] Input: twl4030_keypad: Fix platform_get_irq's error checking
+  [PATCH 04/10] Input: serio: Fix platform_get_irq's error checking
+  [PATCH 05/10] Input: cpcap-pwrbutton: Handle return value of platform_get_irq
+  [PATCH 06/10] Input: w90p910_ts: Handle return value of platform_get_irq
+  [PATCH 07/10] Input: sun4i-ts: Handle return value of platform_get_irq
+  [PATCH 08/10] Input: twl4030-pwrbutton: Handle return value of platform_get_irq
+  [PATCH 09/10] Input: sirfsoc-onkey: Handle return value of platform_get_irq
+  [PATCH 10/10] Input: palmas-pwrbutton: Handle return value of platform_get_irq
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 44cb004c765d..ec0d35384a16 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1598,6 +1598,19 @@ F:	drivers/pinctrl/nomadik/
- F:	drivers/i2c/busses/i2c-nomadik.c
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-nomadik.git
- 
-+ARM/NUVOTON NPCM ARCHITECTURE
-+M:	Avi Fishman <avifishman70@gmail.com>
-+M:	Tomer Maimon <tmaimon77@gmail.com>
-+R:	Brendan Higgins <brendanhiggins@google.com>
-+R:	Rick Altherr <raltherr@google.com>
-+L:	openbmc at lists.ozlabs.org (moderated for non-subscribers)
-+S:	Supported
-+F:	arch/arm/mach-npcm/
-+F:	arch/arm/boot/dts/nuvoton-npcm*
-+F:	include/dt-bindings/clock/nuvoton,npcm7xx-clks.h
-+F:	drivers/*/*npcm*
-+F:	Documentation/*/*npcm*
-+
- ARM/NUVOTON W90X900 ARM ARCHITECTURE
- M:	Wan ZongShun <mcuos.com@gmail.com>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ drivers/input/keyboard/ep93xx_keypad.c  | 2 +-
+ drivers/input/keyboard/omap4-keypad.c   | 2 +-
+ drivers/input/keyboard/twl4030_keypad.c | 2 +-
+ drivers/input/misc/cpcap-pwrbutton.c    | 3 +++
+ drivers/input/misc/palmas-pwrbutton.c   | 5 +++++
+ drivers/input/misc/sirfsoc-onkey.c      | 3 +++
+ drivers/input/misc/twl4030-pwrbutton.c  | 3 +++
+ drivers/input/serio/sun4i-ps2.c         | 2 +-
+ drivers/input/touchscreen/sun4i-ts.c    | 3 +++
+ drivers/input/touchscreen/w90p910_ts.c  | 4 ++++
+ 10 files changed, 25 insertions(+), 4 deletions(-)
+
 -- 
-2.15.0.448.gf294e3d99a-goog
+2.7.4
