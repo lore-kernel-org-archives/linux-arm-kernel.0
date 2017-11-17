@@ -1,77 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 17 Nov 2017 10:31:47 +0100
-Subject: [GIT PULL 2/3] ARM: SoC driver updates for 4.15
-In-Reply-To: <CAK8P3a3uwqeeg7--UDTWJ33g7YejXp5rtV9OFt=jrt-AzQi13Q@mail.gmail.com>
-References: <CAK8P3a2Wp6EANLq7JZr=uAReKOhBYrc3VKUA7FpDvq7n3Lc2aQ@mail.gmail.com>
- <CA+55aFyvWnmLzYs+Hb+d=ir9Ww8gLcNn9=Oc=zwKdK=L-nmXZA@mail.gmail.com>
- <CAK8P3a3uwqeeg7--UDTWJ33g7YejXp5rtV9OFt=jrt-AzQi13Q@mail.gmail.com>
-Message-ID: <CAMuHMdWLOxke=gu4KsWxoUD_d+nwNJXyjvO_3ZShPO3M3iOiuQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 17 Nov 2017 09:54:48 +0000
+Subject: [PATCH v2 08/18] arm64: don't disable ADR_PREL_PG_HI21* with
+ ARM64_ERRATUM_843419
+In-Reply-To: <20171116235019.GA55530@samitolvanen.mtv.corp.google.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-9-samitolvanen@google.com>
+ <CAKv+Gu-wYwBMV7tdb+Kax_cyPsmAB2R2ZVwJuNi9qM0kaYAs=Q@mail.gmail.com>
+ <20171116114406.GB9361@arm.com>
+ <20171116163132.GC94341@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu8yPSwZep-S_ke_P5BiZ3o72R=ykhixoXcyGUHa1ZxGGw@mail.gmail.com>
+ <20171116213702.GA10616@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu_3R4SUC2hCUtEX_4ut9admtrBZS-S-mzQnQsoJoHPcBw@mail.gmail.com>
+ <20171116230939.GA38360@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu9pROJ_T5twJtVn2itzav4x5fypyJWsBr5YbjWUTMFokg@mail.gmail.com>
+ <20171116235019.GA55530@samitolvanen.mtv.corp.google.com>
+Message-ID: <CAKv+Gu_A9khxGbMoBX+r=d2XeKpKfLP9cxW0a1E2wGV8az91_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Linus,
-
-On Fri, Nov 17, 2017 at 12:25 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thu, Nov 16, 2017 at 11:29 PM, Linus Torvalds
-> <torvalds@linux-foundation.org> wrote:
->> On Thu, Nov 16, 2017 at 2:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>
->>> ARM: SoC driver updates for v4.15
->>
->> No. This is completely broken, and I can't imagine that it has ever
->> compiled for *anybody*.
->>
->>   drivers/soc/renesas/r8a77970-sysc.c:14:10: fatal error:
->> dt-bindings/power/r8a77970-sysc.h: No such file or directory
->>    #include <dt-bindings/power/r8a77970-sysc.h>
->>
->> and the compiler is completely right. This branch added that
->> r8a77970-sysc.c file, but never added the header file.
->>
->> And it's not some odd merge mistake of mine: I checked. That error is
->> there in the original branch too.
->>
->> Tssk.
+On 16 November 2017 at 23:50, Sami Tolvanen <samitolvanen@google.com> wrote:
+> On Thu, Nov 16, 2017 at 11:20:40PM +0000, Ard Biesheuvel wrote:
+>> So at which point is the IR in a partially linked object file
+>> converted into executable code?
 >
-> Right, I need to figure out how this could have slipped through. I did
-> get several "BUILD SUCCESS" mails from the kbuild bot (see
-> https://pastebin.com/JDw3EKDZ), which claims to have built it
-> successfully in all configurations, including allmodconfig builds on
-> arm/arm64 and x86-64. Fengguang, do you remember problems
-> with false-negatives recently?
+> At the final module link step (cmd_ld_ko_o) in scripts/Makefile.modpost,
+> added in patch 12.
 >
-> I also did my own tests based on the "for-next" branch and looked
-> at the kernelci results of that branch, but that didn't catch the
-> mistake as the file in question was added in the third "dt" branch.
->
-> The dt-bindings/ files have caused endless problems like this
-> in the past, and I've been very careful about spotting missing
-> changes when they happen in my next/dt branch and complained
-> a lot whenever someone sent me crap that didn't compile because
-> of that. Now I've fallen into the same trap in the opposite direction,
-> when the patch was in next/dt but missing in next/drivers.
 
-What happened is that Simon queued up the header file in his
-dt-bindings branch, without noticing it was needed by his drivers branch.
-
-The dt-bindings header files are sometimes needed by both the drivers
-and dt branches, while policy requests they are in their own branch.
-For the dt branch, the current trend is to break the dependency by hardcoding
-the numbers in the DTS files initially, and replacing them by defines during
-the next merge window.
-For the drivers branch, it looks like dt-bindings/power/r8a779*-sysc.h header
-files were just queued up in the drivers branch previously, together with the
-drivers, avoiding the issue, but breaking the policy...
-
-Sorry for the mess. We'll be more careful.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+OK, so all IR objects are converted into a single .o file
+encapsulating the module image. Does this give the same benefits as
+LTO linking IR objects to a fully linked executable? Even if it does,
+partial linking is not something the toolchain people are usually
+crazy about, so it would be nice to have some confirmation that this
+is a usage model that is fully supported.
