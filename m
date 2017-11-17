@@ -1,160 +1,53 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Fri, 17 Nov 2017 15:38:25 +0200
-Subject: [PATCH 01/10] staging: fsl-mc: drop unused dpcon APIs
-Message-ID: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
+Date: Fri, 17 Nov 2017 15:38:26 +0200
+Subject: [PATCH 02/10] staging: fsl-mc/dpio: remove incomplete refcount
+ implementation
+In-Reply-To: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
+References: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
+Message-ID: <20171117133834.4635-2-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-Couple of API functions are not used so lets drop them together with
-the associated structures and defines.
+There's an unfinished implementation of reference counting for dpaa2_io
+structure using atomics. Since it's unused lets remove it for now and,
+if needed at a later time, make use of krefs instead of rolling our
+own refcounting.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dpcon-cmd.h |  6 ---
- drivers/staging/fsl-mc/bus/dpcon.c     | 69 ----------------------------------
- drivers/staging/fsl-mc/include/dpcon.h | 10 -----
- 3 files changed, 85 deletions(-)
+ drivers/staging/fsl-mc/bus/dpio/dpio-service.c | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/dpcon-cmd.h b/drivers/staging/fsl-mc/bus/dpcon-cmd.h
-index 2bb6698..d2ba819 100644
---- a/drivers/staging/fsl-mc/bus/dpcon-cmd.h
-+++ b/drivers/staging/fsl-mc/bus/dpcon-cmd.h
-@@ -45,13 +45,11 @@
- /* Command IDs */
- #define DPCON_CMDID_CLOSE			DPCON_CMD(0x800)
- #define DPCON_CMDID_OPEN			DPCON_CMD(0x808)
--#define DPCON_CMDID_GET_API_VERSION		DPCON_CMD(0xa08)
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
+index a609ec8..591d8b7 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
++++ b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
+@@ -43,7 +43,6 @@
+ #include "qbman-portal.h"
  
- #define DPCON_CMDID_ENABLE			DPCON_CMD(0x002)
- #define DPCON_CMDID_DISABLE			DPCON_CMD(0x003)
- #define DPCON_CMDID_GET_ATTR			DPCON_CMD(0x004)
- #define DPCON_CMDID_RESET			DPCON_CMD(0x005)
--#define DPCON_CMDID_IS_ENABLED			DPCON_CMD(0x006)
+ struct dpaa2_io {
+-	atomic_t refs;
+ 	struct dpaa2_io_desc dpio_desc;
+ 	struct qbman_swp_desc swp_desc;
+ 	struct qbman_swp *swp;
+@@ -126,7 +125,6 @@ struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc)
+ 		return NULL;
+ 	}
  
- #define DPCON_CMDID_SET_NOTIFICATION		DPCON_CMD(0x100)
- 
-@@ -61,10 +59,6 @@ struct dpcon_cmd_open {
- 
- #define DPCON_ENABLE			1
- 
--struct dpcon_rsp_is_enabled {
--	u8 enabled;
--};
--
- struct dpcon_rsp_get_attr {
- 	/* response word 0 */
- 	__le32 id;
-diff --git a/drivers/staging/fsl-mc/bus/dpcon.c b/drivers/staging/fsl-mc/bus/dpcon.c
-index ca1da85..ce7c0bf 100644
---- a/drivers/staging/fsl-mc/bus/dpcon.c
-+++ b/drivers/staging/fsl-mc/bus/dpcon.c
-@@ -156,42 +156,6 @@ int dpcon_disable(struct fsl_mc_io *mc_io,
- EXPORT_SYMBOL(dpcon_disable);
- 
- /**
-- * dpcon_is_enabled() -	Check if the DPCON is enabled.
-- * @mc_io:	Pointer to MC portal's I/O object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @token:	Token of DPCON object
-- * @en:		Returns '1' if object is enabled; '0' otherwise
-- *
-- * Return:	'0' on Success; Error code otherwise.
-- */
--int dpcon_is_enabled(struct fsl_mc_io *mc_io,
--		     u32 cmd_flags,
--		     u16 token,
--		     int *en)
--{
--	struct mc_command cmd = { 0 };
--	struct dpcon_rsp_is_enabled *dpcon_rsp;
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPCON_CMDID_IS_ENABLED,
--					  cmd_flags,
--					  token);
--
--	/* send command to mc*/
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	dpcon_rsp = (struct dpcon_rsp_is_enabled *)cmd.params;
--	*en = dpcon_rsp->enabled & DPCON_ENABLE;
--
--	return 0;
--}
--EXPORT_SYMBOL(dpcon_is_enabled);
--
--/**
-  * dpcon_reset() - Reset the DPCON, returns the object to initial state.
-  * @mc_io:	Pointer to MC portal's I/O object
-  * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-@@ -282,36 +246,3 @@ int dpcon_set_notification(struct fsl_mc_io *mc_io,
- 	return mc_send_command(mc_io, &cmd);
+-	atomic_set(&obj->refs, 1);
+ 	obj->dpio_desc = *desc;
+ 	obj->swp_desc.cena_bar = obj->dpio_desc.regs_cena;
+ 	obj->swp_desc.cinh_bar = obj->dpio_desc.regs_cinh;
+@@ -171,8 +169,6 @@ EXPORT_SYMBOL(dpaa2_io_create);
+  */
+ void dpaa2_io_down(struct dpaa2_io *d)
+ {
+-	if (!atomic_dec_and_test(&d->refs))
+-		return;
+ 	kfree(d);
  }
- EXPORT_SYMBOL(dpcon_set_notification);
--
--/**
-- * dpcon_get_api_version - Get Data Path Concentrator API version
-- * @mc_io:	Pointer to MC portal's DPCON object
-- * @cmd_flags:	Command flags; one or more of 'MC_CMD_FLAG_'
-- * @major_ver:	Major version of DPCON API
-- * @minor_ver:	Minor version of DPCON API
-- *
-- * Return:	'0' on Success; Error code otherwise
-- */
--int dpcon_get_api_version(struct fsl_mc_io *mc_io,
--			  u32 cmd_flags,
--			  u16 *major_ver,
--			  u16 *minor_ver)
--{
--	struct mc_command cmd = { 0 };
--	int err;
--
--	/* prepare command */
--	cmd.header = mc_encode_cmd_header(DPCON_CMDID_GET_API_VERSION,
--					  cmd_flags, 0);
--
--	/* send command to mc */
--	err = mc_send_command(mc_io, &cmd);
--	if (err)
--		return err;
--
--	/* retrieve response parameters */
--	mc_cmd_read_api_version(&cmd, major_ver, minor_ver);
--
--	return 0;
--}
--EXPORT_SYMBOL(dpcon_get_api_version);
-diff --git a/drivers/staging/fsl-mc/include/dpcon.h b/drivers/staging/fsl-mc/include/dpcon.h
-index efa2390..425749e 100644
---- a/drivers/staging/fsl-mc/include/dpcon.h
-+++ b/drivers/staging/fsl-mc/include/dpcon.h
-@@ -62,11 +62,6 @@ int dpcon_disable(struct fsl_mc_io *mc_io,
- 		  u32 cmd_flags,
- 		  u16 token);
- 
--int dpcon_is_enabled(struct fsl_mc_io *mc_io,
--		     u32 cmd_flags,
--		     u16 token,
--		     int *en);
--
- int dpcon_reset(struct fsl_mc_io *mc_io,
- 		u32 cmd_flags,
- 		u16 token);
-@@ -107,9 +102,4 @@ int dpcon_set_notification(struct fsl_mc_io *mc_io,
- 			   u16 token,
- 			   struct dpcon_notification_cfg *cfg);
- 
--int dpcon_get_api_version(struct fsl_mc_io *mc_io,
--			  u32 cmd_flags,
--			  u16 *major_ver,
--			  u16 *minor_ver);
--
- #endif /* __FSL_DPCON_H */
+ EXPORT_SYMBOL(dpaa2_io_down);
 -- 
 2.9.4
