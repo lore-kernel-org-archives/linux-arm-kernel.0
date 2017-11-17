@@ -1,35 +1,37 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 17 Nov 2017 14:08:38 +0100
-Subject: [PATCH 2/3] reset: meson-axg: add compatible string for Meson-AXG
- SoC
-In-Reply-To: <20171110084650.31325-2-yixun.lan@amlogic.com>
-References: <20171110084650.31325-1-yixun.lan@amlogic.com>
- <20171110084650.31325-2-yixun.lan@amlogic.com>
-Message-ID: <6948ecf6-5450-7bc9-0dd4-e761685c46e7@baylibre.com>
+Date: Fri, 17 Nov 2017 14:08:35 +0100
+Subject: [PATCH 3/3] arm64: dts: meson-axg: add new reset DT node
+In-Reply-To: <20171110084659.31641-1-yixun.lan@amlogic.com>
+References: <20171110084659.31641-1-yixun.lan@amlogic.com>
+Message-ID: <04b96767-2412-7242-780c-f3e1e610a62b@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/11/2017 09:46, Yixun Lan wrote:
-> Try to add compatible string explictly to support new Meson-AXG SoC.
+> Add reset DT node for Amlogic's Meson-AXG SoC.
 > 
 > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 > ---
->  drivers/reset/reset-meson.c | 2 ++
->  1 file changed, 2 insertions(+)
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
 > 
-> diff --git a/drivers/reset/reset-meson.c b/drivers/reset/reset-meson.c
-> index c419a3753d00..93cbee1ae8ef 100644
-> --- a/drivers/reset/reset-meson.c
-> +++ b/drivers/reset/reset-meson.c
-> @@ -139,6 +139,8 @@ static const struct of_device_id meson_reset_dt_ids[] = {
->  	   .data = &meson_reset_meson8_ops, },
->  	 { .compatible = "amlogic,meson-gxbb-reset",
->  	   .data = &meson_reset_gx_ops, },
-> +	 { .compatible = "amlogic,meson-axg-reset",
-> +	   .data = &meson_reset_gx_ops, },
->  	 { /* sentinel */ },
->  };
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index e0fb860e12c5..65945c6c8b65 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -123,6 +123,12 @@
+>  			#size-cells = <2>;
+>  			ranges = <0x0 0x0 0x0 0xffd00000 0x0 0x25000>;
 >  
+> +			reset: reset-controller at 1004 {
+> +				compatible = "amlogic,meson-axg-reset";
+> +				reg = <0x0 0x01004 0x0 0x9c>;
+> +				#reset-cells = <1>;
+> +			};
+> +
+>  			uart_A: serial at 24000 {
+>  				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
+>  				reg = <0x0 0x24000 0x0 0x14>;
 > 
 
 Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
