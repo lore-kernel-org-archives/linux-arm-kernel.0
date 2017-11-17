@@ -1,85 +1,65 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:21:52 +0000
-Subject: [PATCH 09/18] arm64: mm: Invalidate both kernel and user ASIDs when
- performing TLBI
+Date: Fri, 17 Nov 2017 18:21:48 +0000
+Subject: [PATCH 05/18] arm64: mm: Rename post_ttbr0_update_workaround
 In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since an mm has both a kernel and a user ASID, we need to ensure that
-broadcast TLB maintenance targets both address spaces so that things
-like CoW continue to work with the uaccess primitives in the kernel.
+The post_ttbr0_update_workaround hook applies to any change to TTBRx_EL1.
+Since we're using TTBR1 for the ASID, rename the hook to make it clearer
+as to what it's doing.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/tlbflush.h | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/assembler.h | 5 ++---
+ arch/arm64/kernel/entry.S          | 2 +-
+ arch/arm64/mm/proc.S               | 2 +-
+ 3 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index af1c76981911..42d250ec74b1 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -23,6 +23,7 @@
- 
- #include <linux/sched.h>
- #include <asm/cputype.h>
-+#include <asm/mmu.h>
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index 8359148858cb..622316a8c82b 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -464,10 +464,9 @@ alternative_endif
+ 	.endm
  
  /*
-  * Raw TLBI operations.
-@@ -54,6 +55,11 @@
- 
- #define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
- 
-+#define __tlbi_user(op, arg) do {						\
-+	if (!arm64_kernel_mapped_at_el0())					\
-+		__tlbi(op, (arg) | USER_ASID_FLAG);				\
-+} while (0)
-+
- /*
-  *	TLB Management
-  *	==============
-@@ -115,6 +121,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
- 
- 	dsb(ishst);
- 	__tlbi(aside1is, asid);
-+	__tlbi_user(aside1is, asid);
- 	dsb(ish);
- }
- 
-@@ -125,6 +132,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
- 
- 	dsb(ishst);
- 	__tlbi(vale1is, addr);
-+	__tlbi_user(vale1is, addr);
- 	dsb(ish);
- }
- 
-@@ -151,10 +159,13 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 
- 	dsb(ishst);
- 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
--		if (last_level)
-+		if (last_level) {
- 			__tlbi(vale1is, addr);
--		else
-+			__tlbi_user(vale1is, addr);
-+		} else {
- 			__tlbi(vae1is, addr);
-+			__tlbi_user(vae1is, addr);
-+		}
- 	}
- 	dsb(ish);
- }
-@@ -194,6 +205,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
- 	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
- 
- 	__tlbi(vae1is, addr);
-+	__tlbi_user(vae1is, addr);
- 	dsb(ish);
- }
+-/*
+- * Errata workaround post TTBR0_EL1 update.
++ * Errata workaround post TTBRx_EL1 update.
+  */
+-	.macro	post_ttbr0_update_workaround
++	.macro	post_ttbr_update_workaround
+ #ifdef CONFIG_CAVIUM_ERRATUM_27456
+ alternative_if ARM64_WORKAROUND_CAVIUM_27456
+ 	ic	iallu
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e1c59d4008a8..dd5fa2c3d489 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -255,7 +255,7 @@ alternative_else_nop_endif
+ 	 * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
+ 	 * corruption).
+ 	 */
+-	post_ttbr0_update_workaround
++	post_ttbr_update_workaround
+ 	.endif
+ 1:
+ 	.if	\el != 0
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 1623150ed0a6..447537c1699d 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -145,7 +145,7 @@ ENTRY(cpu_do_switch_mm)
+ 	isb
+ 	msr	ttbr0_el1, x0			// now update TTBR0
+ 	isb
+-	post_ttbr0_update_workaround
++	post_ttbr_update_workaround
+ 	ret
+ ENDPROC(cpu_do_switch_mm)
  
 -- 
 2.1.4
