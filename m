@@ -1,95 +1,75 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:21:50 +0000
-Subject: [PATCH 07/18] arm64: mm: Allocate ASIDs in pairs
+Date: Fri, 17 Nov 2017 18:21:57 +0000
+Subject: [PATCH 14/18] arm64: erratum: Work around Falkor erratum #E1003 in
+ trampoline code
 In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-15-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for separate kernel/user ASIDs, allocate them in pairs
-for each mm_struct. The bottom bit distinguishes the two: if it is set,
-then the ASID will map only userspace.
+We rely on an atomic swizzling of TTBR1 when transitioning from the entry
+trampoline to the kernel proper on an exception. We can't rely on this
+atomicity in the face of Falkor erratum #E1003, so on affected cores we
+can issue a TLB invalidation prior to jumping into the kernel. There is
+still the possibility of a TLB conflict here due to conflicting walk
+cache entries, but this doesn't appear to be the case on these CPUs in
+practice.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu.h |  1 +
- arch/arm64/mm/context.c      | 25 +++++++++++++++++--------
- 2 files changed, 18 insertions(+), 8 deletions(-)
+ arch/arm64/Kconfig        | 17 +++++------------
+ arch/arm64/kernel/entry.S |  8 ++++++++
+ 2 files changed, 13 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 0d34bf0a89c7..01bfb184f2a8 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -17,6 +17,7 @@
- #define __ASM_MMU_H
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6a56d4..f0fcbfc2262e 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -504,20 +504,13 @@ config CAVIUM_ERRATUM_30115
+ config QCOM_FALKOR_ERRATUM_1003
+ 	bool "Falkor E1003: Incorrect translation due to ASID change"
+ 	default y
+-	select ARM64_PAN if ARM64_SW_TTBR0_PAN
+ 	help
+ 	  On Falkor v1, an incorrect ASID may be cached in the TLB when ASID
+-	  and BADDR are changed together in TTBRx_EL1. The workaround for this
+-	  issue is to use a reserved ASID in cpu_do_switch_mm() before
+-	  switching to the new ASID. Saying Y here selects ARM64_PAN if
+-	  ARM64_SW_TTBR0_PAN is selected. This is done because implementing and
+-	  maintaining the E1003 workaround in the software PAN emulation code
+-	  would be an unnecessary complication. The affected Falkor v1 CPU
+-	  implements ARMv8.1 hardware PAN support and using hardware PAN
+-	  support versus software PAN emulation is mutually exclusive at
+-	  runtime.
+-
+-	  If unsure, say Y.
++	  and BADDR are changed together in TTBRx_EL1. Since we keep the ASID
++	  in TTBR1_EL1, this situation only occurs in the entry trampoline and
++	  then only for entries in the walk cache, since the leaf translation
++	  is unchanged. Work around the erratum by invalidating the walk cache
++	  entries for the trampoline before entering the kernel proper.
  
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
-+#define USER_ASID_FLAG	(UL(1) << 48)
+ config QCOM_FALKOR_ERRATUM_1009
+ 	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index a839b94bba05..a600879939ce 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -941,6 +941,14 @@ __ni_sys_trace:
+ 	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
+ 	bic	\tmp, \tmp, #USER_ASID_FLAG
+ 	msr	ttbr1_el1, \tmp
++alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
++	isb
++	movk	\tmp, #:abs_g2_nc:(TRAMP_VALIAS >> 12)
++	movk	\tmp, #:abs_g1_nc:(TRAMP_VALIAS >> 12)
++	movk	\tmp, #:abs_g0_nc:(TRAMP_VALIAS >> 12)
++	tlbi	vae1, \tmp
++	dsb	nsh
++alternative_else_nop_endif
+ 	.endm
  
- typedef struct {
- 	atomic64_t	id;
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 78816e476491..db28958d9e4f 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -39,7 +39,16 @@ static cpumask_t tlb_flush_pending;
- 
- #define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
- #define ASID_FIRST_VERSION	(1UL << asid_bits)
--#define NUM_USER_ASIDS		ASID_FIRST_VERSION
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+#define NUM_USER_ASIDS		(ASID_FIRST_VERSION >> 1)
-+#define asid2idx(asid)		(((asid) & ~ASID_MASK) >> 1)
-+#define idx2asid(idx)		(((idx) << 1) & ~ASID_MASK)
-+#else
-+#define NUM_USER_ASIDS		(ASID_FIRST_VERSION)
-+#define asid2idx(asid)		((asid) & ~ASID_MASK)
-+#define idx2asid(idx)		asid2idx(idx)
-+#endif
- 
- /* Get the ASIDBits supported by the current CPU */
- static u32 get_cpu_asid_bits(void)
-@@ -104,7 +113,7 @@ static void flush_context(unsigned int cpu)
- 		 */
- 		if (asid == 0)
- 			asid = per_cpu(reserved_asids, i);
--		__set_bit(asid & ~ASID_MASK, asid_map);
-+		__set_bit(asid2idx(asid), asid_map);
- 		per_cpu(reserved_asids, i) = asid;
- 	}
- 
-@@ -156,16 +165,16 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 		 * We had a valid ASID in a previous life, so try to re-use
- 		 * it if possible.
- 		 */
--		asid &= ~ASID_MASK;
--		if (!__test_and_set_bit(asid, asid_map))
-+		if (!__test_and_set_bit(asid2idx(asid), asid_map))
- 			return newasid;
- 	}
- 
- 	/*
- 	 * Allocate a free ASID. If we can't find one, take a note of the
--	 * currently active ASIDs and mark the TLBs as requiring flushes.
--	 * We always count from ASID #1, as we use ASID #0 when setting a
--	 * reserved TTBR0 for the init_mm.
-+	 * currently active ASIDs and mark the TLBs as requiring flushes.  We
-+	 * always count from ASID #2 (index 1), as we use ASID #0 when setting
-+	 * a reserved TTBR0 for the init_mm and we allocate ASIDs in even/odd
-+	 * pairs.
- 	 */
- 	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
- 	if (asid != NUM_USER_ASIDS)
-@@ -182,7 +191,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- set_asid:
- 	__set_bit(asid, asid_map);
- 	cur_idx = asid;
--	return asid | generation;
-+	return idx2asid(asid) | generation;
- }
- 
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+ 	.macro tramp_unmap_kernel, tmp
 -- 
 2.1.4
