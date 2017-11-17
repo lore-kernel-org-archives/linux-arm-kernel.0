@@ -1,78 +1,38 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Fri, 17 Nov 2017 11:41:42 +0000
-Subject: [PATCH 1/2] arm64: Re-order reserved_ttbr0 in linker script
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 17 Nov 2017 12:06:11 +0000
+Subject: [PATCH 0/2] Map larger kernels at early init
 In-Reply-To: <20171117114143.26577-1-steve.capper@arm.com>
 References: <20171117114143.26577-1-steve.capper@arm.com>
-Message-ID: <20171117114143.26577-2-steve.capper@arm.com>
+Message-ID: <CAKv+Gu9JvHRAKdBotsjF6A7dsrLCEV7gHoOpKXpuUAqSa+wmpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently one resolves the location of the reserved_ttbr0 for PAN by
-taking a positive offset from swapper_pg_dir. In a future patch we wish
-to extend the swapper s.t. its size is determined at link time rather
-than comile time, rendering SWAPPER_DIR_SIZE unsuitable for such a low
-level calculation.
+On 17 November 2017 at 11:41, Steve Capper <steve.capper@arm.com> wrote:
+> The early pagetable creation code assumes that a single pgd, pud, pmd
+> and pte are sufficient to map the kernel text for MMU bringup. For 16KB
+> granules this is, unfortunately, rarely the case. Some kernels may be too
+> big even for a 64KB granule employing this scheme.
+>
+> This patch series addresses the problem in two steps: 1) re-order the
+> reserved_ttbr0 to allow its address computation to be independent of
+> swapper_pg_dir size, 2) re-write the early pgtable code to allow for
+> multiple page table entries at each level.
+>
+> Steve Capper (2):
+>   arm64: Re-order reserved_ttbr0 in linker script
+>   arm64: Extend early page table code to allow for larger kernels
+>
+>  arch/arm64/include/asm/asm-uaccess.h    |   6 +-
+>  arch/arm64/include/asm/kernel-pgtable.h |  20 ++++-
+>  arch/arm64/include/asm/pgtable.h        |   2 +-
+>  arch/arm64/include/asm/uaccess.h        |   2 +-
+>  arch/arm64/kernel/head.S                | 148 +++++++++++++++++++++++---------
+>  arch/arm64/kernel/vmlinux.lds.S         |   6 +-
+>  arch/arm64/mm/mmu.c                     |   3 +-
+>  7 files changed, 137 insertions(+), 50 deletions(-)
+>
 
-In this patch we re-arrange the order of the linker script s.t. instead
-one computes reserved_ttbr0 by subtracting RESERVED_TTBR0_SIZE from
-swapper_pg_dir.
+Excellent!
 
-Signed-off-by: Steve Capper <steve.capper@arm.com>
----
- arch/arm64/include/asm/asm-uaccess.h | 6 +++---
- arch/arm64/include/asm/uaccess.h     | 2 +-
- arch/arm64/kernel/vmlinux.lds.S      | 5 ++---
- 3 files changed, 6 insertions(+), 7 deletions(-)
-
-diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-index ecd9788cd298..95ba9865826a 100644
---- a/arch/arm64/include/asm/asm-uaccess.h
-+++ b/arch/arm64/include/asm/asm-uaccess.h
-@@ -11,9 +11,9 @@
-  */
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	.macro	__uaccess_ttbr0_disable, tmp1
--	mrs	\tmp1, ttbr1_el1		// swapper_pg_dir
--	add	\tmp1, \tmp1, #SWAPPER_DIR_SIZE	// reserved_ttbr0 at the end of swapper_pg_dir
--	msr	ttbr0_el1, \tmp1		// set reserved TTBR0_EL1
-+	mrs	\tmp1, ttbr1_el1			// swapper_pg_dir
-+	sub	\tmp1, \tmp1, #RESERVED_TTBR0_SIZE	// reserved_ttbr0 just before swapper_pg_dir
-+	msr	ttbr0_el1, \tmp1			// set reserved TTBR0_EL1
- 	isb
- 	.endm
- 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index fc0f9eb66039..66170fd4b58f 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -108,7 +108,7 @@ static inline void __uaccess_ttbr0_disable(void)
- 	unsigned long ttbr;
- 
- 	/* reserved_ttbr0 placed at the end of swapper_pg_dir */
--	ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
-+	ttbr = read_sysreg(ttbr1_el1) - RESERVED_TTBR0_SIZE;
- 	write_sysreg(ttbr, ttbr0_el1);
- 	isb();
- }
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index fe56c268a7d9..6aa717582f6f 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -205,13 +205,12 @@ SECTIONS
- 	. = ALIGN(PAGE_SIZE);
- 	idmap_pg_dir = .;
- 	. += IDMAP_DIR_SIZE;
--	swapper_pg_dir = .;
--	. += SWAPPER_DIR_SIZE;
--
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- 	reserved_ttbr0 = .;
- 	. += RESERVED_TTBR0_SIZE;
- #endif
-+	swapper_pg_dir = .;
-+	. += SWAPPER_DIR_SIZE;
- 
- 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
- 	_end = .;
--- 
-2.11.0
+This means we can also remove the workaround from the KASLR init code
+that takes care not to put the kernel image across a PMD/PUD boundary.
