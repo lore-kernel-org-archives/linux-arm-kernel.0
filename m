@@ -1,252 +1,116 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Fri, 17 Nov 2017 15:38:31 +0200
-Subject: [PATCH 07/10] staging: fsl-mc: remove some superfluous WARN_ONs
+Date: Fri, 17 Nov 2017 15:38:28 +0200
+Subject: [PATCH 04/10] staging: fsl-mc/dpio: remove couple of unused functions
 In-Reply-To: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
 References: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
-Message-ID: <20171117133834.4635-7-laurentiu.tudor@nxp.com>
+Message-ID: <20171117133834.4635-4-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-These WARN_ONs shouldn't trigger unless something went very wrong.
-Since the driver is in a stable state let's remove these debug
-WARN_ONs.
+These couple of functions are not yet used so lets remove them
+for now and add them back when/if needed.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dprc-driver.c              |  8 --------
- drivers/staging/fsl-mc/bus/fsl-mc-allocator.c         | 10 ----------
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c               | 12 ------------
- drivers/staging/fsl-mc/bus/fsl-mc-msi.c               |  1 -
- .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c    |  3 ---
- drivers/staging/fsl-mc/bus/mc-io.c                    | 19 -------------------
- 6 files changed, 53 deletions(-)
+ drivers/staging/fsl-mc/bus/dpio/dpio-service.c | 58 --------------------------
+ drivers/staging/fsl-mc/include/dpaa2-io.h      |  4 --
+ 2 files changed, 62 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
-index 06df528..d6a84dd 100644
---- a/drivers/staging/fsl-mc/bus/dprc-driver.c
-+++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
-@@ -39,8 +39,6 @@ static int __fsl_mc_device_remove_if_not_in_mc(struct device *dev, void *data)
- 	struct fsl_mc_child_objs *objs;
- 	struct fsl_mc_device *mc_dev;
+diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
+index fca8c90dc..871078d 100644
+--- a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
++++ b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
+@@ -318,37 +318,6 @@ int dpaa2_io_service_rearm(struct dpaa2_io *d,
+ EXPORT_SYMBOL(dpaa2_io_service_rearm);
  
--	WARN_ON(!dev);
--	WARN_ON(!data);
- 	mc_dev = to_fsl_mc_device(dev);
- 	objs = data;
- 
-@@ -60,8 +58,6 @@ static int __fsl_mc_device_remove_if_not_in_mc(struct device *dev, void *data)
- 
- static int __fsl_mc_device_remove(struct device *dev, void *data)
- {
--	WARN_ON(!dev);
--	WARN_ON(data);
- 	fsl_mc_device_remove(to_fsl_mc_device(dev));
- 	return 0;
- }
-@@ -453,8 +449,6 @@ static int disable_dprc_irq(struct fsl_mc_device *mc_dev)
- 	int error;
- 	struct fsl_mc_io *mc_io = mc_dev->mc_io;
- 
--	WARN_ON(mc_dev->obj_desc.irq_count != 1);
+ /**
+- * dpaa2_io_service_pull_fq() - pull dequeue functions from a fq.
+- * @d: the given DPIO service.
+- * @fqid: the given frame queue id.
+- * @s: the dpaa2_io_store object for the result.
+- *
+- * Return 0 for success, or error code for failure.
+- */
+-int dpaa2_io_service_pull_fq(struct dpaa2_io *d, u32 fqid,
+-			     struct dpaa2_io_store *s)
+-{
+-	struct qbman_pull_desc pd;
+-	int err;
 -
- 	/*
- 	 * Disable generation of interrupt, while we configure it:
- 	 */
-@@ -496,8 +490,6 @@ static int register_dprc_irq_handler(struct fsl_mc_device *mc_dev)
- 	int error;
- 	struct fsl_mc_device_irq *irq = mc_dev->irqs[0];
- 
--	WARN_ON(mc_dev->obj_desc.irq_count != 1);
+-	qbman_pull_desc_clear(&pd);
+-	qbman_pull_desc_set_storage(&pd, s->vaddr, s->paddr, 1);
+-	qbman_pull_desc_set_numframes(&pd, (u8)s->max);
+-	qbman_pull_desc_set_fq(&pd, fqid);
 -
- 	/*
- 	 * NOTE: devm_request_threaded_irq() invokes the device-specific
- 	 * function that programs the MSI physically in the device
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-index 8ea3920..d472a85 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
-@@ -199,7 +199,6 @@ int __must_check fsl_mc_resource_allocate(struct fsl_mc_bus *mc_bus,
- 					    struct fsl_mc_resource, node);
- 
- 	if (!resource) {
--		WARN_ON(res_pool->free_count != 0);
- 		error = -ENXIO;
- 		dev_err(&mc_bus_dev->dev,
- 			"No more resources of type %s left\n",
-@@ -474,7 +473,6 @@ int __must_check fsl_mc_allocate_irqs(struct fsl_mc_device *mc_dev)
- 		irqs[i] = to_fsl_mc_irq(resource);
- 		res_allocated_count++;
- 
--		WARN_ON(irqs[i]->mc_dev);
- 		irqs[i]->mc_dev = mc_dev;
- 		irqs[i]->dev_irq_index = i;
- 	}
-@@ -516,7 +514,6 @@ void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev)
- 		return;
- 
- 	for (i = 0; i < irq_count; i++) {
--		WARN_ON(!irqs[i]->mc_dev);
- 		irqs[i]->mc_dev = NULL;
- 		fsl_mc_resource_free(&irqs[i]->resource);
- 	}
-@@ -553,17 +550,10 @@ static void fsl_mc_cleanup_resource_pool(struct fsl_mc_device *mc_bus_dev,
- 					&mc_bus->resource_pools[pool_type];
- 	int free_count = 0;
- 
--	WARN_ON(res_pool->type != pool_type);
--	WARN_ON(res_pool->free_count != res_pool->max_count);
+-	d = service_select(d);
+-	if (!d)
+-		return -ENODEV;
+-	s->swp = d->swp;
+-	err = qbman_swp_pull(d->swp, &pd);
+-	if (err)
+-		s->swp = NULL;
 -
- 	list_for_each_entry_safe(resource, next, &res_pool->free_list, node) {
- 		free_count++;
--		WARN_ON(resource->type != res_pool->type);
--		WARN_ON(resource->parent_pool != res_pool);
- 		devm_kfree(&mc_bus_dev->dev, resource);
- 	}
+-	return err;
+-}
+-EXPORT_SYMBOL(dpaa2_io_service_pull_fq);
 -
--	WARN_ON(free_count != res_pool->free_count);
- }
+-/**
+  * dpaa2_io_service_pull_channel() - pull dequeue functions from a channel.
+  * @d: the given DPIO service.
+  * @channelid: the given channel id.
+@@ -381,33 +350,6 @@ int dpaa2_io_service_pull_channel(struct dpaa2_io *d, u32 channelid,
+ EXPORT_SYMBOL(dpaa2_io_service_pull_channel);
  
- void fsl_mc_cleanup_all_resource_pools(struct fsl_mc_device *mc_bus_dev)
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 409f2b9..1c2fd8d 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -162,12 +162,7 @@ static int fsl_mc_driver_probe(struct device *dev)
- 	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
- 	int error;
- 
--	if (WARN_ON(!dev->driver))
--		return -EINVAL;
+ /**
+- * dpaa2_io_service_enqueue_fq() - Enqueue a frame to a frame queue.
+- * @d: the given DPIO service.
+- * @fqid: the given frame queue id.
+- * @fd: the frame descriptor which is enqueued.
+- *
+- * Return 0 for successful enqueue, -EBUSY if the enqueue ring is not ready,
+- * or -ENODEV if there is no dpio service.
+- */
+-int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d,
+-				u32 fqid,
+-				const struct dpaa2_fd *fd)
+-{
+-	struct qbman_eq_desc ed;
 -
- 	mc_drv = to_fsl_mc_driver(dev->driver);
--	if (WARN_ON(!mc_drv->probe))
--		return -EINVAL;
- 
- 	error = mc_drv->probe(mc_dev);
- 	if (error < 0) {
-@@ -184,9 +179,6 @@ static int fsl_mc_driver_remove(struct device *dev)
- 	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
- 	int error;
- 
--	if (WARN_ON(!dev->driver))
--		return -EINVAL;
+-	d = service_select(d);
+-	if (!d)
+-		return -ENODEV;
 -
- 	error = mc_drv->remove(mc_dev);
- 	if (error < 0) {
- 		dev_err(dev, "%s failed: %d\n", __func__, error);
-@@ -352,8 +344,6 @@ static int translate_mc_addr(struct fsl_mc_device *mc_dev,
- 	struct fsl_mc *mc;
- 
- 	fsl_mc_get_root_dprc(&mc_dev->dev, &root_dprc_dev);
--	if (WARN_ON(!root_dprc_dev))
--		return -EINVAL;
- 	mc = dev_get_drvdata(root_dprc_dev->parent);
- 
- 	if (mc->num_translation_ranges == 0) {
-@@ -401,7 +391,6 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
- 		 * type, as this object type is not supposed to have MMIO
- 		 * regions
- 		 */
--		WARN_ON(true);
- 		return -EINVAL;
- 	}
- 
-@@ -424,7 +413,6 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
- 			goto error_cleanup_regions;
- 		}
- 
--		WARN_ON(region_desc.size == 0);
- 		error = translate_mc_addr(mc_dev, mc_region_type,
- 					  region_desc.base_offset,
- 					  &regions[i].start);
-diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-index f74a6f1..0ce6117 100644
---- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
-@@ -124,7 +124,6 @@ static void fsl_mc_msi_write_msg(struct irq_data *irq_data,
- 	struct fsl_mc_device_irq *mc_dev_irq =
- 		&mc_bus->irq_resources[msi_desc->fsl_mc.msi_index];
- 
--	WARN_ON(mc_dev_irq->msi_desc != msi_desc);
- 	msi_desc->msg = *msg;
- 
- 	/*
-diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-index 123e4af..947378f 100644
---- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-+++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
-@@ -93,9 +93,6 @@ int __init its_fsl_mc_msi_init(void)
- 			continue;
- 		}
- 
--		WARN_ON(mc_msi_domain->host_data !=
--			&its_fsl_mc_msi_domain_info);
+-	qbman_eq_desc_clear(&ed);
+-	qbman_eq_desc_set_no_orp(&ed, 0);
+-	qbman_eq_desc_set_fq(&ed, fqid);
 -
- 		pr_info("fsl-mc MSI: %pOF domain created\n", np);
- 	}
- 
-diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/staging/fsl-mc/bus/mc-io.c
-index f65c23c..5530856 100644
---- a/drivers/staging/fsl-mc/bus/mc-io.c
-+++ b/drivers/staging/fsl-mc/bus/mc-io.c
-@@ -68,12 +68,6 @@ static void fsl_mc_io_unset_dpmcp(struct fsl_mc_io *mc_io)
- 	int error;
- 	struct fsl_mc_device *dpmcp_dev = mc_io->dpmcp_dev;
- 
--	if (WARN_ON(!dpmcp_dev))
--		return;
+-	return qbman_swp_enqueue(d->swp, &ed, fd);
+-}
+-EXPORT_SYMBOL(dpaa2_io_service_enqueue_fq);
 -
--	if (WARN_ON(dpmcp_dev->mc_io != mc_io))
--		return;
--
- 	error = dpmcp_close(mc_io,
- 			    0,
- 			    dpmcp_dev->mc_handle);
-@@ -224,8 +218,6 @@ int __must_check fsl_mc_portal_allocate(struct fsl_mc_device *mc_dev,
+-/**
+  * dpaa2_io_service_enqueue_qd() - Enqueue a frame to a QD.
+  * @d: the given DPIO service.
+  * @qdid: the given queuing destination id.
+diff --git a/drivers/staging/fsl-mc/include/dpaa2-io.h b/drivers/staging/fsl-mc/include/dpaa2-io.h
+index afc2d06..07ad15a 100644
+--- a/drivers/staging/fsl-mc/include/dpaa2-io.h
++++ b/drivers/staging/fsl-mc/include/dpaa2-io.h
+@@ -120,13 +120,9 @@ void dpaa2_io_service_deregister(struct dpaa2_io *service,
+ int dpaa2_io_service_rearm(struct dpaa2_io *service,
+ 			   struct dpaa2_io_notification_ctx *ctx);
  
- 	error = -EINVAL;
- 	dpmcp_dev = resource->data;
--	if (WARN_ON(!dpmcp_dev))
--		goto error_cleanup_resource;
+-int dpaa2_io_service_pull_fq(struct dpaa2_io *d, u32 fqid,
+-			     struct dpaa2_io_store *s);
+ int dpaa2_io_service_pull_channel(struct dpaa2_io *d, u32 channelid,
+ 				  struct dpaa2_io_store *s);
  
- 	if (dpmcp_dev->obj_desc.ver_major < DPMCP_MIN_VER_MAJOR ||
- 	    (dpmcp_dev->obj_desc.ver_major == DPMCP_MIN_VER_MAJOR &&
-@@ -238,15 +230,9 @@ int __must_check fsl_mc_portal_allocate(struct fsl_mc_device *mc_dev,
- 		goto error_cleanup_resource;
- 	}
- 
--	if (WARN_ON(dpmcp_dev->obj_desc.region_count == 0))
--		goto error_cleanup_resource;
--
- 	mc_portal_phys_addr = dpmcp_dev->regions[0].start;
- 	mc_portal_size = resource_size(dpmcp_dev->regions);
- 
--	if (WARN_ON(mc_portal_size != mc_bus_dev->mc_io->portal_size))
--		goto error_cleanup_resource;
--
- 	error = fsl_create_mc_io(&mc_bus_dev->dev,
- 				 mc_portal_phys_addr,
- 				 mc_portal_size, dpmcp_dev,
-@@ -279,8 +265,6 @@ void fsl_mc_portal_free(struct fsl_mc_io *mc_io)
- 	 * to have a DPMCP object associated with.
- 	 */
- 	dpmcp_dev = mc_io->dpmcp_dev;
--	if (WARN_ON(!dpmcp_dev))
--		return;
- 
- 	resource = dpmcp_dev->resource;
- 	if (WARN_ON(!resource || resource->type != FSL_MC_POOL_DPMCP))
-@@ -304,9 +288,6 @@ int fsl_mc_portal_reset(struct fsl_mc_io *mc_io)
- 	int error;
- 	struct fsl_mc_device *dpmcp_dev = mc_io->dpmcp_dev;
- 
--	if (WARN_ON(!dpmcp_dev))
--		return -EINVAL;
--
- 	error = dpmcp_reset(mc_io, 0, dpmcp_dev->mc_handle);
- 	if (error < 0) {
- 		dev_err(&dpmcp_dev->dev, "dpmcp_reset() failed: %d\n", error);
+-int dpaa2_io_service_enqueue_fq(struct dpaa2_io *d, u32 fqid,
+-				const struct dpaa2_fd *fd);
+ int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d, u32 qdid, u8 prio,
+ 				u16 qdbin, const struct dpaa2_fd *fd);
+ int dpaa2_io_service_release(struct dpaa2_io *d, u32 bpid,
 -- 
 2.9.4
