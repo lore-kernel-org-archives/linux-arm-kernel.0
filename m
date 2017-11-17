@@ -1,120 +1,99 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Fri, 17 Nov 2017 16:27:22 +0100
-Subject: [PATCH 1/2] ARM: dts: Add the support for display5 equipped
- with Mitsubishi (800x480) display
-In-Reply-To: <1510931238.8104.20.camel@pengutronix.de>
-References: <20171117102404.6678-1-lukma@denx.de>
- <20171117131047.GE25390@dragon> <20171117151334.041c4684@jawa>
- <1510929383.8104.3.camel@pengutronix.de>
- <20171117160347.5c78be6e@jawa>
- <1510931238.8104.20.camel@pengutronix.de>
-Message-ID: <20171117162722.0bc19a95@jawa>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Fri, 17 Nov 2017 10:28:26 -0500
+Subject: [PATCH v3][for 4.15] dmaengine: dmatest: move callback wait queue
+ to thread context
+In-Reply-To: <CAPcyv4hF=LjEdhPvD3TNWa4+XfN83NCuW2Lv7ERwo4ChFSyTbg@mail.gmail.com>
+References: <1510927894-15297-1-git-send-email-awallis@codeaurora.org>
+ <CAPcyv4hF=LjEdhPvD3TNWa4+XfN83NCuW2Lv7ERwo4ChFSyTbg@mail.gmail.com>
+Message-ID: <7637068c-4079-1235-cd6b-777907a42e8b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 17 Nov 2017 16:07:18 +0100
-Lucas Stach <l.stach@pengutronix.de> wrote:
-
-> Am Freitag, den 17.11.2017, 16:03 +0100 schrieb Lukasz Majewski:
-> > Hi Lucas,
-> >   
-> > > Am Freitag, den 17.11.2017, 15:13 +0100 schrieb Lukasz Majewski:  
-> > > > Hi Shawn,
-> > > > ??  
-> > > > > On Fri, Nov 17, 2017 at 11:24:03AM +0100, Lukasz Majewski
-> > > > > wrote:??  
-> > > > > > This is the support for aa070mc01-ca1 Mitsubishi display.
-> > > > > >   
-> > > > > > > > > > > Signed-off-by: Lukasz Majewski <lukma@denx.de>  
-> > > > > > ---
-> > > > > > ?arch/arm/boot/dts/Makefile?????????????????????????|??1 +
-> > > > > > ?.../imx6q-display5-mitsubishi-aa070-800x480.dts????| 51
-> > > > > > ++++++++++++++++++++++ 2 files changed, 52 insertions(+)
-> > > > > > ?create mode 100644
-> > > > > > arch/arm/boot/dts/imx6q-display5-mitsubishi-aa070-800x480.dts
-> > > > > > 
-> > > > > > diff --git a/arch/arm/boot/dts/Makefile
-> > > > > > b/arch/arm/boot/dts/Makefile
-> > > > > > index d9d0c82e7d20..10b3ad078dea 100644
-> > > > > > --- a/arch/arm/boot/dts/Makefile
-> > > > > > +++ b/arch/arm/boot/dts/Makefile
-> > > > > > @@ -407,6 +407,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \  
-> > > > > > > > > > > ?	imx6q-cm-fx6.dtb \
-> > > > > > > > > > > ?	imx6q-cubox-i.dtb \
-> > > > > > > > > > > ?	imx6q-dfi-fs700-m60.dtb \
-> > > > > > > > > > > +
-> > > > > > > > > > > imx6q-display5-mitsubishi-aa070-800x480.dtb \
-> > > > > > > > > > > imx6q-display5-tianma-tm070-1280x768.dtb \
-> > > > > > > > > > > imx6q-dmo-edmqmx6.dtb \  
-> > > > > > ?	imx6q-evi.dtb \????  
-> > > > > 
-> > > > > <snip>
-> > > > > ??  
-> > > > > > +#include "imx6q-display5.dtsi"
-> > > > > > +
-> > > > > > +&panel {  
-> > > > > > > > > > > +	compatible =
-> > > > > > > > > > > "mitsubishi,aa070mc01-ca1";  
-> > > > > > +};????  
-> > > > > 
-> > > > > How many DTB files do you want to add for this display5
-> > > > > board?????  
-> > > > 
-> > > > This is a single board, which can support panels which I've
-> > > > posted.
-> > > > 
-> > > > Those dtbs I do pack to u-boot' FIT image and don't need to
-> > > > worry that
-> > > > some display is not working (after setting bootloader env
-> > > > variable). 
-> > > > > It's
-> > > > > obvious no fun to maintain a bunch of DTB files for all the
-> > > > > panels this board can support.??  
-> > > > 
-> > > > Please note that those files excessively use #include
-> > > > directive, and there is not so much code added (the longest
-> > > > part is license and comments).
-> > > > ??  
-> > > > > ?Let's stop right here.??  
-> > > > 
-> > > > If I may ask - how shall I proceed? What would be your
-> > > > suggestion to move on (dtb overlays) ???  
-> > > 
-> > > The solution we use for the ZII RDU1 and RDU2 boards is to have
-> > > the bootloader patch in the correct panel compatible strings.?  
-> > 
-> > Do you mean adjusting the DTB accordingly in u-boot for each
-> > display - change panel/compatible to new display name ?  
+On 11/17/2017 10:12 AM, Dan Williams wrote:
+> On Fri, Nov 17, 2017 at 6:11 AM, Adam Wallis <awallis@codeaurora.org> wrote:
+>> Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+>> introduced a bug (that is in fact documented by the patch commit text)
+>> that leaves behind a dangling pointer. Since the done_wait structure is
+>> allocated on the stack, future invocations to the DMATEST can produce
+>> undesirable results (e.g., corrupted spinlocks).
+>>
+>> Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
+>> out") attempted to WARN the user that the stack was likely corrupted but
+>> did not fix the actual issue.
+>>
+>> This patch fixes the issue by pushing the wait queue and callback
+>> structs into the the thread structure. If a failure occurs due to time,
+>> dmaengine_terminate_all will force the callback to safely call
+>> wake_up_all() without possibility of using a freed pointer.
+>>
+>> Cc: stable at vger.kernel.org # 4.13.x: a9df21e: dmatest: Warn User
+>> Cc: stable at vger.kernel.org # 4.13.x
+>> Cc: stable at vger.kernel.org # 4.14.x
 > 
-> Exactly. Simply let the bootloader insert the correct panel compatible
-> string into the DTB.
 
-This would complicate a few other things :-),
+Sure - do you want me to remove them? I was just following the instructions on
+stable.
 
-but yes, this seems to be a technically better idea (in terms of final
-binary size).
-
-Thanks for help.
-
+> You don't need 3 cc stables, you don't even need the "#
+> kernel-version". Since you have the "Fixes:" line the target kernel(s)
+> for the backport can be auto-determined. I should go update
+> Documentation/process/stable-kernel-rules.rst to mention this.
 > 
-> Regards,
-> Lucas
+>> Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
+>> Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+>> Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
+>> Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+>> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+>> ---
+>> changes from v2: Added "Fixes" tag
+>> changes from v1: Added pre-req patches for stable
+>>
+>>  drivers/dma/dmatest.c | 37 ++++++++++++++++---------------------
+>>  1 file changed, 16 insertions(+), 21 deletions(-)
+>>
+>> diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+>> index 47edc7f..2573b6c 100644
+>> --- a/drivers/dma/dmatest.c
+>> +++ b/drivers/dma/dmatest.c
+>> @@ -155,6 +155,12 @@ struct dmatest_params {
+>>  #define PATTERN_COUNT_MASK     0x1f
+>>  #define PATTERN_MEMSET_IDX     0x01
+>>
+>> +/* poor man's completion - we want to use wait_event_freezable() on it */
+>> +struct dmatest_done {
+>> +       bool                    done;
+>> +       wait_queue_head_t       *wait;
+>> +};
+>> +
+>>  struct dmatest_thread {
+>>         struct list_head        node;
+>>         struct dmatest_info     *info;
+>> @@ -165,6 +171,8 @@ struct dmatest_thread {
+>>         u8                      **dsts;
+>>         u8                      **udsts;
+>>         enum dma_transaction_type type;
+>> +       wait_queue_head_t done_wait;
+> 
+> Why are we defining a waitquehead per thread vs defining one globally
+> for the whole module with "static DECLARE_WAIT_QUEUE_HEAD(x);"?
+
+This is how the original dmatest functions. Each thread had a wait queue that it
+created so that it could go to sleep while the DMA transfer occurred. Each
+thread is dependent on its own DMA transaction for the wakeup call. Again, this
+is how the test originally worked. I just moved the wait queue from the stack
+(which was getting corrupted) to the thread context to allow for safe cleanup.
+In other words, I haven't really changed how the test works...just fixing a bug
+with the current implementation.
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
 
 
-
-Best regards,
-
-Lukasz Majewski
-
---
-
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
-Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: not available
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: OpenPGP digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171117/8874a8f2/attachment.sig>
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
