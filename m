@@ -1,112 +1,94 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 17 Nov 2017 14:12:57 +0100
-Subject: [PATCH] ARM64: dts: meson-axg: add ethernet mac controller
-In-Reply-To: <20171113080155.2463-1-yixun.lan@amlogic.com>
-References: <20171113080155.2463-1-yixun.lan@amlogic.com>
-Message-ID: <4d6ef632-a28f-6598-befb-85ad17480f04@baylibre.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Fri, 17 Nov 2017 13:13:28 +0000
+Subject: mainline/master boot: 559 boots: 63 failed, 477 passed with 12
+ offline, 7 conflicts (v4.14-9357-g2bf16b7a73ca)
+In-Reply-To: <5a0e0f76.52bf1c0a.3b738.a646@mx.google.com>
+References: <5a0e0f76.52bf1c0a.3b738.a646@mx.google.com>
+Message-ID: <cd15e8ec-1c91-654c-bd7e-422d600f7f66@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/2017 09:01, Yixun Lan wrote:
-> Add DT info for the stmmac ethernet MAC which found in
-> the Amlogic's Meson-AXG SoC, also describe the ethernet
-> pinctrl & clock information here.
-> 
-> This is tested in the S400 dev board which use a RTL8211F PHY,
-> and the pins connect to the 'eth_rgmii_y_pins' group.
-> 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  7 ++++
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 53 ++++++++++++++++++++++++++
->  2 files changed, 60 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> index 9eb6aaee155d..7b39a9fe2b0f 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> @@ -21,3 +21,10 @@
->  	status = "okay";
->  };
->  
-> +&ethmac {
-> +	status = "okay";
-> +	phy-mode = "rgmii";
-> +
-> +	pinctrl-0 = <&eth_rgmii_y_pins>;
-> +	pinctrl-names = "default";
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index 65945c6c8b65..57faaa9d8013 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -157,6 +157,19 @@
->  			#address-cells = <0>;
->  		};
->  
-> +		ethmac: ethernet at ff3f0000 {
-> +			compatible = "amlogic,meson-axg-dwmac", "amlogic,meson-gxbb-dwmac", "snps,dwmac";
-> +			reg = <0x0 0xff3f0000 0x0 0x10000
-> +				0x0 0xff634540 0x0 0x8>;
-> +			interrupts = <GIC_SPI 8 IRQ_TYPE_EDGE_RISING>;
-> +			interrupt-names = "macirq";
-> +			status = "disabled";
-> +			clocks = <&clkc CLKID_ETH>,
-> +				 <&clkc CLKID_FCLK_DIV2>,
-> +				 <&clkc CLKID_MPLL2>;
-> +			clock-names = "stmmaceth", "clkin0", "clkin1";
-> +		};
-> +
->  		hiubus: hiubus at ff63c000 {
->  			compatible = "simple-bus";
->  			reg = <0x0 0xff63c000 0x0 0x1c00>;
-> @@ -203,6 +216,46 @@
->  					#gpio-cells = <2>;
->  					gpio-ranges = <&pinctrl_periphs 0 0 86>;
->  				};
-> +
-> +				eth_rgmii_x_pins: eth-x-rgmii {
-> +					mux {
-> +						groups = "eth_mdio_x",
-> +						       "eth_mdc_x",
-> +						       "eth_rgmii_rx_clk_x",
-> +						       "eth_rx_dv_x",
-> +						       "eth_rxd0_x",
-> +						       "eth_rxd1_x",
-> +						       "eth_rxd2_rgmii",
-> +						       "eth_rxd3_rgmii",
-> +						       "eth_rgmii_tx_clk",
-> +						       "eth_txen_x",
-> +						       "eth_txd0_x",
-> +						       "eth_txd1_x",
-> +						       "eth_txd2_rgmii",
-> +						       "eth_txd3_rgmii";
-> +						function = "eth";
-> +					};
-> +				};
-> +
-> +				eth_rgmii_y_pins: eth-y-rgmii {
-> +					mux {
-> +						groups = "eth_mdio_y",
-> +						       "eth_mdc_y",
-> +						       "eth_rgmii_rx_clk_y",
-> +						       "eth_rx_dv_y",
-> +						       "eth_rxd0_y",
-> +						       "eth_rxd1_y",
-> +						       "eth_rxd2_rgmii",
-> +						       "eth_rxd3_rgmii",
-> +						       "eth_rgmii_tx_clk",
-> +						       "eth_txen_y",
-> +						       "eth_txd0_y",
-> +						       "eth_txd1_y",
-> +						       "eth_txd2_rgmii",
-> +						       "eth_txd3_rgmii";
-> +						function = "eth";
-> +					};
-> +				};
->  			};
->  		};
->  
-> 
+On 16/11/17 22:21, kernelci.org bot wrote:
+> mainline/master boot: 559 boots: 63 failed, 477 passed with 12 offline, 7 conflicts (v4.14-9357-g2bf16b7a73ca)
+>
+> Full Boot Summary: https://kernelci.org/boot/all/job/mainline/branch/master/kernel/v4.14-9357-g2bf16b7a73ca/
+> Full Build Summary: https://kernelci.org/build/mainline/branch/master/kernel/v4.14-9357-g2bf16b7a73ca/
+>
+> Tree: mainline
+> Branch: master
+> Git Describe: v4.14-9357-g2bf16b7a73ca
+> Git Commit: 2bf16b7a73caf3435f782e4170cfe563675e10f9
+> Git URL: http://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+> Tested: 102 unique boards, 24 SoC families, 36 builds out of 211
+>
+> Boot Regressions Detected:
+>
+> arm:
+[...]
+>     multi_v7_defconfig:
+[...]
+>         tegra124-nyan-big:
+>             lab-collabora: failing since 1 day (last pass: v4.14-3308-g670ffccb2f91 - first fail: v4.14-3453-ge37e0ee01900)
 
-Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+It seems like the automatic bisection job on staging.kernelci.org
+found what might have caused this failure.  It's still an
+experimental tool but hopefully it will eventually be useful and
+save time when looking for the root cause of boot failures...
+
+Here's what it found:
+
+   commit 7313cfa4f6e30384fa04083698d1e865cf812a6a
+   Author: Ben Skeggs <bskeggs@redhat.com>
+   Date:   Wed Nov 1 03:56:19 2017 +1000
+
+       drm/nouveau/bar: move bar1 initialisation into its own function
+     
+       BAR2 being done for practical reasons, this is just for consistency.
+     
+       Flushes have been added after the write to bind the instance block,
+       as later commits will reveal the need for them.
+     
+       Signed-off-by: Ben Skeggs <bskeggs@redhat.com>
+
+
+Kernel error:
+
+[    2.402977] nouveau 57000000.gpu: gr: failed to load fuc409c
+[    2.456166] Unable to handle kernel NULL pointer dereference at virtual address 00000000
+
+
+It looks like the same DRM driver issue that was found previously
+on linux-next (CC Jon Hunter).  I would be interested to know if
+this is actually the commit that introduced the problem, hoping
+it can help getting it fixed but also to collect results from the
+new bisection tool.  It would be great if you could please let me
+know if you find out, and apologies if it isn't.
+
+
+The full bisection job log:
+
+   https://people.collabora.com/~gtucker/kernelci/bisections/20171117-tegra124-nyan-big-mainline-1513.txt
+
+All the LAVA jobs for this bisection, for the full kernel logs:
+
+   https://lava.collabora.co.uk/scheduler/alljobs?length=25&search=lava-bisect-v2-b-1513#table
+
+The boot results can also be found here by searching for "lava-bisect-v2-b-1513":
+
+   https://staging.kernelci.org/boot/
+
+
+Hope this helps!
+
+Guillaume
+
+> ---
+> For more info write to <info@kernelci.org>
+>
+>
+>
+> _______________________________________________
+> Kernel-build-reports mailing list
+> Kernel-build-reports at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/kernel-build-reports
+>
