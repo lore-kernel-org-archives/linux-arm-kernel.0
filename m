@@ -1,73 +1,170 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:21:51 +0000
-Subject: [PATCH 08/18] arm64: mm: Add arm64_kernel_mapped_at_el0 helper using
- static key
+Date: Fri, 17 Nov 2017 18:21:53 +0000
+Subject: [PATCH 10/18] arm64: entry: Add exception trampoline page for
+ exceptions from EL0
 In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for code such as TLB invalidation to operate efficiently when
-the decision to map the kernel at EL0 is determined at runtime, this
-patch introduces a helper function, arm64_kernel_mapped_at_el0, which
-uses a static key that will later be hooked up to a command-line option.
+To allow unmapping of the kernel whilst running at EL0, we need to
+point the exception vectors at an entry trampoline that can map/unmap
+the kernel on entry/exit respectively.
+
+This patch adds the trampoline page, although it is not yet plugged
+into the vector table and is therefore unused.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu.h | 11 +++++++++++
- arch/arm64/mm/mmu.c          |  5 +++++
- 2 files changed, 16 insertions(+)
+ arch/arm64/kernel/entry.S       | 85 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S | 17 +++++++++
+ 2 files changed, 102 insertions(+)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 01bfb184f2a8..a84f851409ca 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -19,6 +19,8 @@
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
- #define USER_ASID_FLAG	(UL(1) << 48)
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index e2afc15a1535..d850af724c8c 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -29,6 +29,7 @@
+ #include <asm/esr.h>
+ #include <asm/irq.h>
+ #include <asm/memory.h>
++#include <asm/mmu.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+ #include <asm/asm-uaccess.h>
+@@ -895,6 +896,90 @@ __ni_sys_trace:
  
-+#ifndef __ASSEMBLY__
-+
- typedef struct {
- 	atomic64_t	id;
- 	void		*vdso;
-@@ -32,6 +34,14 @@ typedef struct {
-  */
- #define ASID(mm)	((mm)->context.id.counter & 0xffff)
- 
-+DECLARE_STATIC_KEY_TRUE(__unmap_kernel_at_el0);
-+
-+static inline bool arm64_kernel_mapped_at_el0(void)
-+{
-+	return !IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0) ||
-+	       !static_branch_likely(&__unmap_kernel_at_el0);
-+}
-+
- extern void paging_init(void);
- extern void bootmem_init(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
-@@ -42,4 +52,5 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
- extern void mark_linear_text_alias_ro(void);
- 
-+#endif	/* !__ASSEMBLY__ */
- #endif
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index f1eb15e0e864..a75858267b6d 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -525,6 +525,11 @@ static int __init parse_rodata(char *arg)
- }
- early_param("rodata", parse_rodata);
+ 	.popsection				// .entry.text
  
 +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+DEFINE_STATIC_KEY_TRUE(__unmap_kernel_at_el0);
-+EXPORT_SYMBOL_GPL(__unmap_kernel_at_el0);
++/*
++ * Exception vectors trampoline.
++ */
++	.pushsection ".entry.tramp.text", "ax"
++
++	.macro tramp_map_kernel, tmp
++	mrs	\tmp, ttbr1_el1
++	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	bic	\tmp, \tmp, #USER_ASID_FLAG
++	msr	ttbr1_el1, \tmp
++	.endm
++
++	.macro tramp_unmap_kernel, tmp
++	mrs	\tmp, ttbr1_el1
++	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	orr	\tmp, \tmp, #USER_ASID_FLAG
++	msr	ttbr1_el1, \tmp
++	/*
++	 * We avoid running the post_ttbr_update_workaround here because the
++	 * user and kernel ASIDs don't have conflicting mappings, so any
++	 * "blessing" as described in:
++	 *
++	 *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
++	 *
++	 * will not hurt correctness. Whilst this may partially defeat the
++	 * point of using split ASIDs in the first place, it avoids
++	 * the hit of invalidating the entire I-cache on every return to
++	 * userspace.
++	 */
++	.endm
++
++	.macro tramp_ventry, regsize = 64
++	.align	7
++1:
++	.if	\regsize == 64
++	msr	tpidrro_el0, x30
++	.endif
++	tramp_map_kernel	x30
++	ldr	x30, =vectors
++	prfm	plil1strm, [x30, #(1b - tramp_vectors)]
++	msr	vbar_el1, x30
++	add	x30, x30, #(1b - tramp_vectors)
++	isb
++	br	x30
++	.endm
++
++	.macro tramp_exit, regsize = 64
++	adr	x30, tramp_vectors
++	msr	vbar_el1, x30
++	tramp_unmap_kernel	x30
++	.if	\regsize == 64
++	mrs	x30, far_el1
++	.endif
++	eret
++	.endm
++
++	.align	11
++ENTRY(tramp_vectors)
++	.space	0x400
++
++	tramp_ventry
++	tramp_ventry
++	tramp_ventry
++	tramp_ventry
++
++	tramp_ventry	32
++	tramp_ventry	32
++	tramp_ventry	32
++	tramp_ventry	32
++END(tramp_vectors)
++
++ENTRY(tramp_exit_native)
++	tramp_exit
++END(tramp_exit_native)
++
++ENTRY(tramp_exit_compat)
++	tramp_exit	32
++END(tramp_exit_compat)
++
++	.ltorg
++	.popsection				// .entry.tramp.text
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
++
+ /*
+  * Special system call wrappers.
+  */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 7da3e5c366a0..6b4260f22aab 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -57,6 +57,17 @@ jiffies = jiffies_64;
+ #define HIBERNATE_TEXT
+ #endif
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define TRAMP_TEXT					\
++	. = ALIGN(PAGE_SIZE);				\
++	VMLINUX_SYMBOL(__entry_tramp_text_start) = .;	\
++	*(.entry.tramp.text)				\
++	. = ALIGN(PAGE_SIZE);				\
++	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
++#else
++#define TRAMP_TEXT
 +#endif
 +
  /*
-  * Create fine-grained mappings for the kernel.
-  */
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -113,6 +124,7 @@ SECTIONS
+ 			HYPERVISOR_TEXT
+ 			IDMAP_TEXT
+ 			HIBERNATE_TEXT
++			TRAMP_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+@@ -214,6 +226,11 @@ SECTIONS
+ 	. += RESERVED_TTBR0_SIZE;
+ #endif
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	tramp_pg_dir = .;
++	. += PAGE_SIZE;
++#endif
++
+ 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+ 	_end = .;
+ 
 -- 
 2.1.4
