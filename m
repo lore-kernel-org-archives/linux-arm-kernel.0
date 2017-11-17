@@ -1,35 +1,37 @@
-From: dave.stevenson@raspberrypi.org (Dave Stevenson)
-Date: Fri, 17 Nov 2017 18:30:23 +0000
-Subject: [PATCH] ARM: dts: bcm2835-rpi: Avoid conflicts on i2c0
-In-Reply-To: <87a7zmq7wy.fsf@anholt.net>
-References: <1510779424-642-1-git-send-email-stefan.wahren@i2se.com>
- <87a7zmq7wy.fsf@anholt.net>
-Message-ID: <CAAoAYcPz6urucU1r_uNk1kvjsGg0p7VUrZwa5GZSDeDgsD=5Fw@mail.gmail.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Fri, 17 Nov 2017 10:49:55 -0800
+Subject: [PATCH v2 08/18] arm64: don't disable ADR_PREL_PG_HI21* with
+ ARM64_ERRATUM_843419
+In-Reply-To: <CAKv+Gu_A9khxGbMoBX+r=d2XeKpKfLP9cxW0a1E2wGV8az91_w@mail.gmail.com>
+References: <CAKv+Gu-wYwBMV7tdb+Kax_cyPsmAB2R2ZVwJuNi9qM0kaYAs=Q@mail.gmail.com>
+ <20171116114406.GB9361@arm.com>
+ <20171116163132.GC94341@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu8yPSwZep-S_ke_P5BiZ3o72R=ykhixoXcyGUHa1ZxGGw@mail.gmail.com>
+ <20171116213702.GA10616@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu_3R4SUC2hCUtEX_4ut9admtrBZS-S-mzQnQsoJoHPcBw@mail.gmail.com>
+ <20171116230939.GA38360@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu9pROJ_T5twJtVn2itzav4x5fypyJWsBr5YbjWUTMFokg@mail.gmail.com>
+ <20171116235019.GA55530@samitolvanen.mtv.corp.google.com>
+ <CAKv+Gu_A9khxGbMoBX+r=d2XeKpKfLP9cxW0a1E2wGV8az91_w@mail.gmail.com>
+Message-ID: <20171117184955.GA39391@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2017 at 20:34, Eric Anholt <eric@anholt.net> wrote:
-> Stefan Wahren <stefan.wahren@i2se.com> writes:
->
->> The GPU firmware of the Raspberry Pi 3 uses i2c0 to communicate to
->> the FXL6408 gpio expander. It's a bad idea to use the same interface
->> from the ARM side. Since this interface isn't used by the other
->> RPi boards, it's save to remove the complete node and avoid this
->> conflict.
->
-> It's not used by other kernel drivers currently, but should we leave it
-> in for the pi0/1/2 folks that might have userspace I2C stuff using it?
-> That's a thing people do, right?  I actually don't know.
+On Fri, Nov 17, 2017 at 09:54:48AM +0000, Ard Biesheuvel wrote:
+> OK, so all IR objects are converted into a single .o file
+> encapsulating the module image. Does this give the same benefits as
+> LTO linking IR objects to a fully linked executable?
 
-The firmware hasn't used BSC0 for the GPIO expander since the end of
-January. It now bit bashes it. Sorry if that information hadn't
-filtered through.
+Yes, it does.
 
-I've got a patch I was about to send to rpi-linux for comment which
-sets up the i2c-mux-pinctrl driver on BSC0 so that it can be used
-either on GPIOs 0&1, or the GPIOs connected to the DSI and CSI
-connectors (I want it to talk to the camera module, and I guess Eric
-won't complain for talking to the DSI display). I'll aim to sort it on
-Monday.
+> Even if it does, partial linking is not something the toolchain
+> people are usually crazy about, so it would be nice to have some
+> confirmation that this is a usage model that is fully supported.
 
-  Dave
+I confirmed with our LLVM developers that while this is less common,
+it's fully supported.
+
+I will also drop this patch in v3 as passing code model to LLVMgold
+fixes the issue with LTO.
+
+Sami
