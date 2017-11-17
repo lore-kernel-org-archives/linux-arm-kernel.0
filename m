@@ -1,69 +1,76 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 17 Nov 2017 16:38:54 +0000
-Subject: [RFC PATCH 3/4] arm64/sve: KVM: Ensure user SVE use traps after vcpu
- execution
+Date: Fri, 17 Nov 2017 16:38:52 +0000
+Subject: [RFC PATCH 1/4] arm64: fpsimd: Abstract out binding of task's fpsimd
+ context to the cpu.
 In-Reply-To: <1510936735-6762-1-git-send-email-Dave.Martin@arm.com>
 References: <1510936735-6762-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1510936735-6762-4-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1510936735-6762-2-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, SVE use can remain untrapped if a KVM vcpu thread is
-preempted inside the kernel and we then switch back to some user
-thread.
+There is currently some duplicate logic to associate current's
+FPSIMD context with the cpu when loading FPSIMD state into the cpu
+regs.
 
-This patch ensures that SVE traps for userspace are enabled before
-switching away from the vcpu thread.
-
-In an attempt to preserve some clarity about why and when this is
-needed, kvm_fpsimd_flush_cpu_state() is used as a hook for doing
-this.  This means that this function needs to be called after
-exiting the vcpu instead of before entry: this patch moves the call
-as appropriate.  As a side-effect, this will avoid the call if vcpu
-entry is shortcircuited by a signal etc.
+Subsequent patches will update that logic, so in order to ensure it
+only needs to be done in one place, this patch factors the relevant
+code out into a new function fpsimd_bind_to_cpu().
 
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
 ---
- arch/arm64/kernel/fpsimd.c | 2 ++
- virt/kvm/arm/arm.c         | 6 +++---
- 2 files changed, 5 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/fpsimd.c | 25 +++++++++++++++----------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 3dc8058..3b135eb 100644
+index 143b3e7..007140b 100644
 --- a/arch/arm64/kernel/fpsimd.c
 +++ b/arch/arm64/kernel/fpsimd.c
-@@ -1083,6 +1083,8 @@ void sve_flush_cpu_state(void)
- 
- 	if (last->st && last->sve_in_use)
- 		fpsimd_flush_cpu_state();
-+
-+	sve_user_disable();
+@@ -992,6 +992,18 @@ void fpsimd_signal_preserve_current_state(void)
  }
- #endif /* CONFIG_ARM64_SVE */
  
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index 772bf74..554b157 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -651,9 +651,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		 */
- 		preempt_disable();
- 
--		/* Flush FP/SIMD state that can't survive guest entry/exit */
--		kvm_fpsimd_flush_cpu_state();
--
- 		kvm_pmu_flush_hwstate(vcpu);
- 
- 		local_irq_disable();
-@@ -754,6 +751,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		guest_exit();
- 		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
- 
-+		/* Flush FP/SIMD state that can't survive guest entry/exit */
-+		kvm_fpsimd_flush_cpu_state();
+ /*
++ * Associate current's FPSIMD context with this cpu
++ * Preemption must be disabled when calling this function.
++ */
++static void fpsimd_bind_to_cpu(void)
++{
++	struct fpsimd_state *st = &current->thread.fpsimd_state;
 +
- 		preempt_enable();
++	__this_cpu_write(fpsimd_last_state, st);
++	st->cpu = smp_processor_id();
++}
++
++/*
+  * Load the userland FPSIMD state of 'current' from memory, but only if the
+  * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
+  * state of 'current'
+@@ -1004,11 +1016,8 @@ void fpsimd_restore_current_state(void)
+ 	local_bh_disable();
  
- 		ret = handle_exit(vcpu, run, ret);
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+-		struct fpsimd_state *st = &current->thread.fpsimd_state;
+-
+ 		task_fpsimd_load();
+-		__this_cpu_write(fpsimd_last_state, st);
+-		st->cpu = smp_processor_id();
++		fpsimd_bind_to_cpu();
+ 	}
+ 
+ 	local_bh_enable();
+@@ -1032,12 +1041,8 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+ 	}
+ 	task_fpsimd_load();
+ 
+-	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+-		struct fpsimd_state *st = &current->thread.fpsimd_state;
+-
+-		__this_cpu_write(fpsimd_last_state, st);
+-		st->cpu = smp_processor_id();
+-	}
++	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
++		fpsimd_bind_to_cpu();
+ 
+ 	local_bh_enable();
+ }
 -- 
 2.1.4
