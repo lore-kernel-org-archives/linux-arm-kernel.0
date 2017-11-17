@@ -1,56 +1,51 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Fri, 17 Nov 2017 21:47:14 +0800
-Subject: [PATCH 1/5] dt-bindings: i2c: update documentation for the
- Meson-AXG
-In-Reply-To: <03c9ea24-5f8d-f5dd-6e96-f53f56db530c@baylibre.com>
-References: <20171117080236.32504-1-yixun.lan@amlogic.com>
- <20171117080236.32504-2-yixun.lan@amlogic.com>
- <03c9ea24-5f8d-f5dd-6e96-f53f56db530c@baylibre.com>
-Message-ID: <dc339e2a-d8ab-7412-0c9e-bf4d052fc17e@amlogic.com>
+From: aleksey.makarov@cavium.com (Aleksey Makarov)
+Date: Fri, 17 Nov 2017 16:49:05 +0300
+Subject: [PATCH net-next v2 0/2] net: thunderx: add support for PTP clock
+Message-ID: <20171117134909.8954-1-aleksey.makarov@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Neil
+This series adds support for IEEE 1588 Precision Time Protocol
+to Cavium ethernet driver.
 
+The first patch adds support for the Precision Time Protocol Clocks and
+Timestamping coprocessor (PTP) found on Cavium processors.
+It registers a new PTP clock in the PTP core and provides functions
+to use the counter in BGX, TNS, GTI, and NIC blocks.
 
-On 11/17/17 21:02, Neil Armstrong wrote:
-> On 17/11/2017 09:02, Yixun Lan wrote:
->> From: Jian Hu <jian.hu@amlogic.com>
->>
->> Update the doc to explicitly add Meson-AXG to support list
->>
->> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
->> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
->> ---
->>  Documentation/devicetree/bindings/i2c/i2c-meson.txt | 1 +
->>  1 file changed, 1 insertion(+)
->>
->> diff --git a/Documentation/devicetree/bindings/i2c/i2c-meson.txt b/Documentation/devicetree/bindings/i2c/i2c-meson.txt
->> index 611b934c7e10..3097d2b44dad 100644
->> --- a/Documentation/devicetree/bindings/i2c/i2c-meson.txt
->> +++ b/Documentation/devicetree/bindings/i2c/i2c-meson.txt
->> @@ -2,6 +2,7 @@ Amlogic Meson I2C controller
->>  
->>  Required properties:
->>   - compatible: must be "amlogic,meson6-i2c" or "amlogic,meson-gxbb-i2c"
->> +						"amlogic,meson-axg-i2c"
-> 
-> Hi Yixun, Jian,
-> 
-> Maybe you should reformat by using :
-> - compatible: must be :
-> 	"amlogic,meson6-i2c" for Meson8 and compatible SoCs
-> 	"amlogic,meson-gxbb-i2c" for GXBB and compatible SoCs
-> 	"amlogic,meson-axg-i2c"for AXG and compatible SoCs
-> 
-> Neil
-> 
-sure, we can do this.
-thanks for the review
->>   - reg: physical address and length of the device registers
->>   - interrupts: a single interrupt specifier
->>   - clocks: clock for the device
->>
-> 
-> .
-> 
+The second patch introduces support for the PTP protocol to the
+Cavium ThunderX ethernet driver.
+
+v2:
+- use readq()/writeq() in place of cavium_ptp_reg_read()/cavium_ptp_reg_write(),
+  don't use readq_relaxed()/writeq_relaxed() (David Daney)
+
+v1:
+  https://lkml.kernel.org/r/20171107190704.15458-1-aleksey.makarov at cavium.com
+
+Radoslaw Biernacki (1):
+  net: add support for Cavium PTP coprocessor
+
+Sunil Goutham (1):
+  net: thunderx: add timestamping support
+
+ drivers/net/ethernet/cavium/Kconfig                |  14 +
+ drivers/net/ethernet/cavium/Makefile               |   1 +
+ drivers/net/ethernet/cavium/common/Makefile        |   1 +
+ drivers/net/ethernet/cavium/common/cavium_ptp.c    | 334 +++++++++++++++++++++
+ drivers/net/ethernet/cavium/common/cavium_ptp.h    |  78 +++++
+ drivers/net/ethernet/cavium/thunder/nic.h          |  15 +
+ drivers/net/ethernet/cavium/thunder/nic_main.c     |  58 +++-
+ drivers/net/ethernet/cavium/thunder/nic_reg.h      |   1 +
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |  29 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 173 ++++++++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  26 ++
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  29 ++
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   4 +
+ 13 files changed, 757 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/net/ethernet/cavium/common/Makefile
+ create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.c
+ create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.h
+
+-- 
+2.15.0
