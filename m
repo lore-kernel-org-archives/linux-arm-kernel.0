@@ -1,56 +1,29 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 17 Nov 2017 09:36:01 -0800
-Subject: [PATCH v3][for 4.15] dmaengine: dmatest: move callback wait queue
- to thread context
-In-Reply-To: <66a44d84-76df-1b2a-4b6b-33011f1687a4@codeaurora.org>
-References: <1510927894-15297-1-git-send-email-awallis@codeaurora.org>
- <CAPcyv4hF=LjEdhPvD3TNWa4+XfN83NCuW2Lv7ERwo4ChFSyTbg@mail.gmail.com>
- <7637068c-4079-1235-cd6b-777907a42e8b@codeaurora.org>
- <CAPcyv4h2O7+nbxu2fyBNtcrisCntqRtFxAzDgP-7D9iAyGJSKw@mail.gmail.com>
- <79ea89ca-d8b6-0bfc-7bb5-053dcf5c40e4@codeaurora.org>
- <66a44d84-76df-1b2a-4b6b-33011f1687a4@codeaurora.org>
-Message-ID: <CAPcyv4hLe+FehxEBHaN1m8GD73ERj-RV0bQ3-qgUm6F34UrZ-g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 17 Nov 2017 09:46:17 -0800
+Subject: [PATCH 3/4] [v6] pinctrl: qcom: disable GPIO groups with no pins
+In-Reply-To: <dff45d26-e9df-6a4f-00a9-7d9ec5cbdf49@codeaurora.org>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+ <1510096056-13765-4-git-send-email-timur@codeaurora.org>
+ <20171117024332.GU11955@codeaurora.org>
+ <dff45d26-e9df-6a4f-00a9-7d9ec5cbdf49@codeaurora.org>
+Message-ID: <20171117174617.GA29777@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 17, 2017 at 9:17 AM, Adam Wallis <awallis@codeaurora.org> wrote:
-> On 11/17/2017 12:01 PM, Adam Wallis wrote:
->> On 11/17/2017 10:57 AM, Dan Williams wrote:
->>> On Fri, Nov 17, 2017 at 7:28 AM, Adam Wallis <awallis@codeaurora.org> wrote:
->>>> On 11/17/2017 10:12 AM, Dan Williams wrote:
->>>>> On Fri, Nov 17, 2017 at 6:11 AM, Adam Wallis <awallis@codeaurora.org> wrote:
->>>>>> Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
->>>>>> introduced a bug (that is in fact documented by the patch commit text)
->>>>>> that leaves behind a dangling pointer. Since the done_wait structure is
->>>>>> allocated on the stack, future invocations to the DMATEST can produce
->>>>>> undesirable results (e.g., corrupted spinlocks).
->>>>>>
->>>>>> Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
->>>>>> out") attempted to WARN the user that the stack was likely corrupted but
->>>>>> did not fix the actual issue.
->>>>>>
->>>>>> This patch fixes the issue by pushing the wait queue and callback
->>>>>> structs into the the thread structure. If a failure occurs due to time,
->>>>>> dmaengine_terminate_all will force the callback to safely call
->>>>>> wake_up_all() without possibility of using a freed pointer.
->>>>>>
->>>>>> Cc: stable at vger.kernel.org # 4.13.x: a9df21e: dmatest: Warn User
->>>>>> Cc: stable at vger.kernel.org # 4.13.x
->>>>>> Cc: stable at vger.kernel.org # 4.14.x
->>>>>
->>>>
->>>> Sure - do you want me to remove them? I was just following the instructions on
->>>> stable.
->>>
->>> It's not broken, just a note for next time.
->>>
-> One last question - if all we need is Fixes and CC stable...how do we indicate a
-> dependency (for a cherry pick)?
+On 11/16, Timur Tabi wrote:
+> On 11/16/17 8:43 PM, Stephen Boyd wrote:
+> >>Most access to unavailable GPIOs can be blocked via the gpio_chip.request
+> >>function.  The one exception is when gpiochip_add_data() scans all of
+> 
+> >If patch 1 is applied is this statement still true?
+> 
+> Nope.
+> 
 
-For cherry picks the document does say to include multiple "Cc:
-stable" lines. So ignore what I said you're following the proper
-process.
+Ok. So what's the point of this patch then? Put another way, is
+there some path that doesn't request the gpio still even with
+patch 1 applied?
 
-The way I've handled this is to just wait for the -stable team to
-notify that the patch does not apply and send a custom backport at
-that point.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
