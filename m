@@ -1,45 +1,50 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 17 Nov 2017 11:49:40 -0600
-Subject: [PATCH 3/4] [v6] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <20171117174617.GA29777@codeaurora.org>
-References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
- <1510096056-13765-4-git-send-email-timur@codeaurora.org>
- <20171117024332.GU11955@codeaurora.org>
- <dff45d26-e9df-6a4f-00a9-7d9ec5cbdf49@codeaurora.org>
- <20171117174617.GA29777@codeaurora.org>
-Message-ID: <2671cc63-6c8b-987d-ceb3-bd158bb9d1c3@codeaurora.org>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Fri, 17 Nov 2017 18:00:46 +0000
+Subject: [PATCH] dt-bindings: qspi: Add r8a7743/5 to the compatible list
+In-Reply-To: <1504858035-3568-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1504858035-3568-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <TY1PR06MB08958546062D685532669977C02F0@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2017 11:46 AM, Stephen Boyd wrote:
-> On 11/16, Timur Tabi wrote:
->> On 11/16/17 8:43 PM, Stephen Boyd wrote:
->>>> Most access to unavailable GPIOs can be blocked via the gpio_chip.request
->>>> function.  The one exception is when gpiochip_add_data() scans all of
->>
->>> If patch 1 is applied is this statement still true?
->>
->> Nope.
->>
-> 
-> Ok. So what's the point of this patch then? Put another way, is
-> there some path that doesn't request the gpio still even with
-> patch 1 applied?
+Dear All,
 
-This patch is how the pinctrl-msm driver actually reports the sparse 
-GPIO map.
+this patch has been around for some time now, it was reviewed-by Geert Uytterhoeven and acked-by Rob Herring, any news?
 
-Patch 1 prevents gpiolib from accessing GPIOs that haven't been properly 
-requested.
+Thanks,
+Fab
 
-Patch 2 adds an infrastructure for sparse GPIO maps
+> Subject: [PATCH] dt-bindings: qspi: Add r8a7743/5 to the compatible list
+>
+> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+> ---
+>  Documentation/devicetree/bindings/spi/spi-rspi.txt | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/Documentation/devicetree/bindings/spi/spi-rspi.txt b/Documentation/devicetree/bindings/spi/spi-rspi.txt
+> index 8f4169f..3b02b3a 100644
+> --- a/Documentation/devicetree/bindings/spi/spi-rspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/spi-rspi.txt
+> @@ -5,11 +5,14 @@ Required properties:
+>       "renesas,rspi-<soctype>", "renesas,rspi" as fallback.
+>       For Renesas Serial Peripheral Interface on RZ/A1H:
+>       "renesas,rspi-<soctype>", "renesas,rspi-rz" as fallback.
+> -     For Quad Serial Peripheral Interface on R-Car Gen2:
+> +     For Quad Serial Peripheral Interface on R-Car Gen2 and
+> +     RZ/G1 devices:
+>       "renesas,qspi-<soctype>", "renesas,qspi" as fallback.
+>       Examples with soctypes are:
+>          - "renesas,rspi-sh7757" (SH)
+>  - "renesas,rspi-r7s72100" (RZ/A1H)
+> +- "renesas,qspi-r8a7743" (RZ/G1M)
+> +- "renesas,qspi-r8a7745" (RZ/G1E)
+>  - "renesas,qspi-r8a7790" (R-Car H2)
+>  - "renesas,qspi-r8a7791" (R-Car M2-W)
+>  - "renesas,qspi-r8a7792" (R-Car V2H)
+> --
+> 2.7.4
 
-Patch 3 updates pinctrl-msm to use that expose that new infrastructure
-
-Patch 4 updates pinctrl-qdf2xxx to work with the new feature in pinctrl-msm
 
 
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
