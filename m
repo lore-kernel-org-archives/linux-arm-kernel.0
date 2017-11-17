@@ -1,63 +1,42 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 17 Nov 2017 14:24:46 +0900
-Subject: [PATCH 2/4] arm64: dts: uniphier: remove unnecessary interrupt-parent
-In-Reply-To: <1510896288-31212-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1510896288-31212-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1510896288-31212-2-git-send-email-yamada.masahiro@socionext.com>
+From: bharatku@xilinx.com (Bharat Kumar Gogada)
+Date: Fri, 17 Nov 2017 06:11:17 +0000
+Subject: [RFCv2 PATCH 31/36] iommu/arm-smmu-v3: Add support for PCI ATS
+In-Reply-To: <673fda01-2ae0-87e4-637e-fe27096b6be0@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-32-jean-philippe.brucker@arm.com>
+ <BLUPR0201MB150565029F9260A528739ACBA52E0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+ <673fda01-2ae0-87e4-637e-fe27096b6be0@arm.com>
+Message-ID: <BLUPR0201MB1505BC86D3838D13F38665E7A52F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These were added to make the ARM64 branch self-contained because
-updates for ARM and ARM64 are supposed to be sent as separate
-pull requests.
+> +
+> +	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
+> +	list_for_each_entry(master, &smmu_domain->devices, list)
+> +		arm_smmu_atc_inv_master(master, &cmd);
+> +	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
+> +
+> +	return size;
+> +}
+> +
+>  /* IOMMU API */
+>  static bool arm_smmu_capable(enum iommu_cap cap)  { @@ -2361,6 +2506,8 @@ static void arm_smmu_detach_dev(struct device *dev)
+>  		__iommu_process_unbind_dev_all(&smmu_domain->domain, dev);
+>  
+>  	if (smmu_domain) {
+> +		arm_smmu_atc_inv_master_all(master, 0);
+> +
+> In BIND flow, when VFIO_IOMMU_UNBIND is invoked invalidation is sent on allocated PASID for this application.
+> When vfio group fd is closed after UNBIND,  arm_smmu_detach_dev is invoked now invalidation is being sent on ssid zero.
+> Why  invalidation needs to be sent on ssid zero ?
 
-Now, they were merged together in Linus' tree and interrupt-parent
-from the arch/arm/boot/dts/uniphier-support-card.dtsi is visible from
-ARM64 DT files by the cross-arch reference.
+It's possible to use bind/unbind and map/unmap APIs at the same time on a domain. map/unmap modifies non-ssid mappings as usual, for context descriptor 0. Note that SSID 0 is converted to "no SSID" by arm_smmu_atc_inv_to_cmd.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+That said, I think VFIO cleans all DMA mappings when the VFIO group fd is closed, which will send individual ATC invalidation for each mapping. But VFIO may not be the only user of this API, and future users may be less careful. It's safer to send this global invalidation whenever we detach the domain, to ensure we're not leaving stale ATC entries for the next user.
 
- arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts | 1 -
- arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 1 -
- arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts | 1 -
- 3 files changed, 3 deletions(-)
+Thanks Jean, I see that currently vfio_group_fops_open does not allow multiple instances. 
+If a device supports multiple PASID there might be different applications running parallel. 
+So why is multiple instances restricted ?
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-index dd7193a..6bdefb2 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
-@@ -40,7 +40,6 @@
- };
- 
- &ethsc {
--	interrupt-parent = <&gpio>;
- 	interrupts = <0 8>;
- };
- 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-index d99e373..254d679 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
-@@ -40,7 +40,6 @@
- };
- 
- &ethsc {
--	interrupt-parent = <&gpio>;
- 	interrupts = <0 8>;
- };
- 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts
-index 864feeb..5c5e9cb 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts
-@@ -38,7 +38,6 @@
- };
- 
- &ethsc {
--	interrupt-parent = <&gpio>;
- 	interrupts = <0 8>;
- };
- 
--- 
-2.7.4
+Regards,
+Bharat
