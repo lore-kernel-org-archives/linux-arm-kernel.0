@@ -1,119 +1,113 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Fri, 17 Nov 2017 11:15:26 +0800
-Subject: [arm:drm-armada-devel 8/30] include/linux/compiler.h:577:38: error:
- call to '__compiletime_assert_85' declared with attribute error: pointer
- type mismatch in container_of()
-Message-ID: <201711171120.BmAh6LGI%fengguang.wu@intel.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 17 Nov 2017 14:24:47 +0900
+Subject: [PATCH 3/4] arm64: dts: uniphier: use macros in dt-bindings header
+In-Reply-To: <1510896288-31212-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1510896288-31212-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1510896288-31212-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git drm-armada-devel
-head:   6e1b66d093d9dccecc5e3932d4ce72f90a55ce25
-commit: 2ef98e6a2c04e6757c5e7a2ae006ca2961b3f598 [8/30] drm/armada: store plane in armada_plane_work
-config: arm-allmodconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 2ef98e6a2c04e6757c5e7a2ae006ca2961b3f598
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+The dt-bindings header was applied to the driver subsystem.  I had to
+wait for a merge window to use it from DT.
 
-Note: the arm/drm-armada-devel HEAD 6e1b66d093d9dccecc5e3932d4ce72f90a55ce25 builds fine.
-      It only hurts bisectibility.
-
-All error/warnings (new ones prefixed by >>):
-
-   In file included from include/uapi/linux/stddef.h:2:0,
-                    from include/linux/stddef.h:5,
-                    from include/uapi/linux/posix_types.h:5,
-                    from include/uapi/linux/types.h:14,
-                    from include/linux/types.h:6,
-                    from include/linux/list.h:5,
-                    from include/linux/agp_backend.h:33,
-                    from include/drm/drmP.h:35,
-                    from drivers/gpu//drm/armada/armada_overlay.c:9:
-   drivers/gpu//drm/armada/armada_overlay.c: In function 'armada_ovl_plane_work':
->> include/linux/compiler.h:577:38: error: call to '__compiletime_assert_85' declared with attribute error: pointer type mismatch in container_of()
-     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-                                         ^
-   include/linux/compiler.h:557:4: note: in definition of macro '__compiletime_assert'
-       prefix ## suffix();    \
-       ^~~~~~
-   include/linux/compiler.h:577:2: note: in expansion of macro '_compiletime_assert'
-     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-     ^~~~~~~~~~~~~~~~~~~
-   include/linux/build_bug.h:47:37: note: in expansion of macro 'compiletime_assert'
-    #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
-                                        ^~~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:929:2: note: in expansion of macro 'BUILD_BUG_ON_MSG'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-     ^~~~~~~~~~~~~~~~
->> drivers/gpu//drm/armada/armada_overlay.c:85:36: note: in expansion of macro 'container_of'
-     struct armada_ovl_plane *dplane = container_of(work->plane, struct armada_ovl_plane, base);
-                                       ^~~~~~~~~~~~
---
-   In file included from include/uapi/linux/stddef.h:2:0,
-                    from include/linux/stddef.h:5,
-                    from include/uapi/linux/posix_types.h:5,
-                    from include/uapi/linux/types.h:14,
-                    from include/linux/types.h:6,
-                    from include/linux/list.h:5,
-                    from include/linux/agp_backend.h:33,
-                    from include/drm/drmP.h:35,
-                    from drivers/gpu/drm/armada/armada_overlay.c:9:
-   drivers/gpu/drm/armada/armada_overlay.c: In function 'armada_ovl_plane_work':
->> include/linux/compiler.h:577:38: error: call to '__compiletime_assert_85' declared with attribute error: pointer type mismatch in container_of()
-     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-                                         ^
-   include/linux/compiler.h:557:4: note: in definition of macro '__compiletime_assert'
-       prefix ## suffix();    \
-       ^~~~~~
-   include/linux/compiler.h:577:2: note: in expansion of macro '_compiletime_assert'
-     _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-     ^~~~~~~~~~~~~~~~~~~
-   include/linux/build_bug.h:47:37: note: in expansion of macro 'compiletime_assert'
-    #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
-                                        ^~~~~~~~~~~~~~~~~~
-   include/linux/kernel.h:929:2: note: in expansion of macro 'BUILD_BUG_ON_MSG'
-     BUILD_BUG_ON_MSG(!__same_type(*(ptr), ((type *)0)->member) && \
-     ^~~~~~~~~~~~~~~~
-   drivers/gpu/drm/armada/armada_overlay.c:85:36: note: in expansion of macro 'container_of'
-     struct armada_ovl_plane *dplane = container_of(work->plane, struct armada_ovl_plane, base);
-                                       ^~~~~~~~~~~~
-
-vim +/__compiletime_assert_85 +577 include/linux/compiler.h
-
-9a8ab1c3 Daniel Santos 2013-02-21  563  
-9a8ab1c3 Daniel Santos 2013-02-21  564  #define _compiletime_assert(condition, msg, prefix, suffix) \
-9a8ab1c3 Daniel Santos 2013-02-21  565  	__compiletime_assert(condition, msg, prefix, suffix)
-9a8ab1c3 Daniel Santos 2013-02-21  566  
-9a8ab1c3 Daniel Santos 2013-02-21  567  /**
-9a8ab1c3 Daniel Santos 2013-02-21  568   * compiletime_assert - break build and emit msg if condition is false
-9a8ab1c3 Daniel Santos 2013-02-21  569   * @condition: a compile-time constant condition to check
-9a8ab1c3 Daniel Santos 2013-02-21  570   * @msg:       a message to emit if condition is false
-9a8ab1c3 Daniel Santos 2013-02-21  571   *
-9a8ab1c3 Daniel Santos 2013-02-21  572   * In tradition of POSIX assert, this macro will break the build if the
-9a8ab1c3 Daniel Santos 2013-02-21  573   * supplied condition is *false*, emitting the supplied error message if the
-9a8ab1c3 Daniel Santos 2013-02-21  574   * compiler has support to do so.
-9a8ab1c3 Daniel Santos 2013-02-21  575   */
-9a8ab1c3 Daniel Santos 2013-02-21  576  #define compiletime_assert(condition, msg) \
-9a8ab1c3 Daniel Santos 2013-02-21 @577  	_compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-9a8ab1c3 Daniel Santos 2013-02-21  578  
-
-:::::: The code at line 577 was first introduced by commit
-:::::: 9a8ab1c39970a4938a72d94e6fd13be88a797590 bug.h, compiler.h: introduce compiletime_assert & BUILD_BUG_ON_MSG
-
-:::::: TO: Daniel Santos <daniel.santos@pobox.com>
-:::::: CC: Linus Torvalds <torvalds@linux-foundation.org>
-
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 63995 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171117/0413a0c1/attachment-0001.gz>
+
+ arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi    | 3 ++-
+ arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 2 +-
+ arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi    | 3 ++-
+ arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi    | 3 ++-
+ 5 files changed, 8 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+index 6bdefb2..54c5317 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts
+@@ -50,7 +50,7 @@
+ &gpio {
+ 	xirq0 {
+ 		gpio-hog;
+-		gpios = <120 0>;
++		gpios = <UNIPHIER_GPIO_IRQ(0) 0>;
+ 		input;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+index 1c63d0a..ce40eb5 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/gpio/uniphier-gpio.h>
+ 
+ /memreserve/ 0x80000000 0x02000000;
+ 
+@@ -100,7 +101,7 @@
+ 
+ 	emmc_pwrseq: emmc-pwrseq {
+ 		compatible = "mmc-pwrseq-emmc";
+-		reset-gpios = <&gpio 26 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&gpio UNIPHIER_GPIO_PORT(3, 2) GPIO_ACTIVE_LOW>;
+ 	};
+ 
+ 	timer {
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+index 254d679..6933710 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts
+@@ -50,7 +50,7 @@
+ &gpio {
+ 	xirq0 {
+ 		gpio-hog;
+-		gpios = <120 0>;
++		gpios = <UNIPHIER_GPIO_IRQ(0) 0>;
+ 		input;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+index 5c81070..8a3276b 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/gpio/uniphier-gpio.h>
+ #include <dt-bindings/thermal/thermal.h>
+ 
+ /memreserve/ 0x80000000 0x02000000;
+@@ -172,7 +173,7 @@
+ 
+ 	emmc_pwrseq: emmc-pwrseq {
+ 		compatible = "mmc-pwrseq-emmc";
+-		reset-gpios = <&gpio 26 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&gpio UNIPHIER_GPIO_PORT(3, 2) GPIO_ACTIVE_LOW>;
+ 	};
+ 
+ 	timer {
+diff --git a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+index 48e7331..d2beadd 100644
+--- a/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
++++ b/arch/arm64/boot/dts/socionext/uniphier-pxs3.dtsi
+@@ -8,6 +8,7 @@
+  */
+ 
+ #include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/gpio/uniphier-gpio.h>
+ 
+ /memreserve/ 0x80000000 0x02000000;
+ 
+@@ -128,7 +129,7 @@
+ 
+ 	emmc_pwrseq: emmc-pwrseq {
+ 		compatible = "mmc-pwrseq-emmc";
+-		reset-gpios = <&gpio 47 GPIO_ACTIVE_LOW>;
++		reset-gpios = <&gpio UNIPHIER_GPIO_PORT(5, 7) GPIO_ACTIVE_LOW>;
+ 	};
+ 
+ 	timer {
+-- 
+2.7.4
