@@ -1,42 +1,35 @@
-From: bharatku@xilinx.com (Bharat Kumar Gogada)
-Date: Fri, 17 Nov 2017 06:11:17 +0000
-Subject: [RFCv2 PATCH 31/36] iommu/arm-smmu-v3: Add support for PCI ATS
-In-Reply-To: <673fda01-2ae0-87e4-637e-fe27096b6be0@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-32-jean-philippe.brucker@arm.com>
- <BLUPR0201MB150565029F9260A528739ACBA52E0@BLUPR0201MB1505.namprd02.prod.outlook.com>
- <673fda01-2ae0-87e4-637e-fe27096b6be0@arm.com>
-Message-ID: <BLUPR0201MB1505BC86D3838D13F38665E7A52F0@BLUPR0201MB1505.namprd02.prod.outlook.com>
+From: liuwenliang@huawei.com (Liuwenliang (Abbott Liu))
+Date: Fri, 17 Nov 2017 07:18:45 +0000
+Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
+In-Reply-To: <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
+References: <20171011082227.20546-1-liuwenliang@huawei.com>
+ <20171011082227.20546-2-liuwenliang@huawei.com>
+ <227e2c6e-f479-849d-8942-1d5ff4ccd440@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063172@dggemm510-mbs.china.huawei.com>
+ <8e959f69-a578-793b-6c32-18b5b0cd08c2@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
+ <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063587@dggemm510-mbs.china.huawei.com>
+ <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
+ <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
+ <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
+Message-ID: <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +
-> +	spin_lock_irqsave(&smmu_domain->devices_lock, flags);
-> +	list_for_each_entry(master, &smmu_domain->devices, list)
-> +		arm_smmu_atc_inv_master(master, &cmd);
-> +	spin_unlock_irqrestore(&smmu_domain->devices_lock, flags);
-> +
-> +	return size;
-> +}
-> +
->  /* IOMMU API */
->  static bool arm_smmu_capable(enum iommu_cap cap)  { @@ -2361,6 +2506,8 @@ static void arm_smmu_detach_dev(struct device *dev)
->  		__iommu_process_unbind_dev_all(&smmu_domain->domain, dev);
->  
->  	if (smmu_domain) {
-> +		arm_smmu_atc_inv_master_all(master, 0);
-> +
-> In BIND flow, when VFIO_IOMMU_UNBIND is invoked invalidation is sent on allocated PASID for this application.
-> When vfio group fd is closed after UNBIND,  arm_smmu_detach_dev is invoked now invalidation is being sent on ssid zero.
-> Why  invalidation needs to be sent on ssid zero ?
+On 16/11/17  22:41 Marc Zyngier [mailto:marc.zyngier at arm.com] wrote:
+>No, it doesn't. It cannot work, because Cortex-A9 predates the invention
+>of the 64bit accessor. I suspect that you are testing stuff in QEMU,
+>which is giving you a SW model that always supports LPAE. I suggest you
+>test this code on *real* HW, and not only on QEMU.
 
-It's possible to use bind/unbind and map/unmap APIs at the same time on a domain. map/unmap modifies non-ssid mappings as usual, for context descriptor 0. Note that SSID 0 is converted to "no SSID" by arm_smmu_atc_inv_to_cmd.
+I am sorry. My test is fault. I only defined TTBR0 as __ACCESS_CP15_64,
+but I don't use the definition TTBR0 as __ACCESS_CP15_64. 
 
-That said, I think VFIO cleans all DMA mappings when the VFIO group fd is closed, which will send individual ATC invalidation for each mapping. But VFIO may not be the only user of this API, and future users may be less careful. It's safer to send this global invalidation whenever we detach the domain, to ensure we're not leaving stale ATC entries for the next user.
+Now I use the definition TTBR0 as __ACCESS_CP15_64 on CPU supporting
+LPAE(vexpress_a9), I find it doesn't work and report undefined instruction error
+when execute "mrrc" instruction.
 
-Thanks Jean, I see that currently vfio_group_fops_open does not allow multiple instances. 
-If a device supports multiple PASID there might be different applications running parallel. 
-So why is multiple instances restricted ?
-
-Regards,
-Bharat
+So, you are right that 64bit accessor of TTBR0 cannot work on LPAE.
