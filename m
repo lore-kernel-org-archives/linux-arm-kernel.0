@@ -1,34 +1,56 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 02:36:53 +0530
-Subject: [PATCH 5/10 v2] Input: cpcap-pwrbutton: Handle return value of
- platform_get_irq
-Message-ID: <ae8e2bcc48ceeb7cf04f4ec19e7cc76d51fcf58f.1510952504.git.arvind.yadav.cs@gmail.com>
+From: khoroshilov@ispras.ru (Alexey Khoroshilov)
+Date: Sat, 18 Nov 2017 00:15:58 +0300
+Subject: [PATCH] rtc: brcmstb-waketimer: fix error handling in
+ brcmstb_waketmr_probe()
+Message-ID: <1510953358-7043-1-git-send-email-khoroshilov@ispras.ru>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+brcmstb_waketmr_probe() does not disable timer->clk on error paths.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Found by Linux Driver Verification project (linuxtesting.org).
+
+Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
 ---
-changes in v2 :
-              return irq instead of -ENODEV.
+ drivers/rtc/rtc-brcmstb-waketimer.c | 15 ++++++++++++---
+ 1 file changed, 12 insertions(+), 3 deletions(-)
 
- drivers/input/misc/cpcap-pwrbutton.c | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/drivers/input/misc/cpcap-pwrbutton.c b/drivers/input/misc/cpcap-pwrbutton.c
-index 0abef63..3a0626b 100644
---- a/drivers/input/misc/cpcap-pwrbutton.c
-+++ b/drivers/input/misc/cpcap-pwrbutton.c
-@@ -57,6 +57,9 @@ static int cpcap_power_button_probe(struct platform_device *pdev)
- 	int irq = platform_get_irq(pdev, 0);
- 	int err;
+diff --git a/drivers/rtc/rtc-brcmstb-waketimer.c b/drivers/rtc/rtc-brcmstb-waketimer.c
+index 796ac792a381..6cee61201c30 100644
+--- a/drivers/rtc/rtc-brcmstb-waketimer.c
++++ b/drivers/rtc/rtc-brcmstb-waketimer.c
+@@ -253,7 +253,7 @@ static int brcmstb_waketmr_probe(struct platform_device *pdev)
+ 	ret = devm_request_irq(dev, timer->irq, brcmstb_waketmr_irq, 0,
+ 			       "brcmstb-waketimer", timer);
+ 	if (ret < 0)
+-		return ret;
++		goto err_clk;
  
-+	if (irq < 0)
-+		return irq;
+ 	timer->reboot_notifier.notifier_call = brcmstb_waketmr_reboot;
+ 	register_reboot_notifier(&timer->reboot_notifier);
+@@ -262,12 +262,21 @@ static int brcmstb_waketmr_probe(struct platform_device *pdev)
+ 					 &brcmstb_waketmr_ops, THIS_MODULE);
+ 	if (IS_ERR(timer->rtc)) {
+ 		dev_err(dev, "unable to register device\n");
+-		unregister_reboot_notifier(&timer->reboot_notifier);
+-		return PTR_ERR(timer->rtc);
++		ret = PTR_ERR(timer->rtc);
++		goto err_notifier;
+ 	}
+ 
+ 	dev_info(dev, "registered, with irq %d\n", timer->irq);
+ 
++	return 0;
 +
- 	button = devm_kmalloc(&pdev->dev, sizeof(*button), GFP_KERNEL);
- 	if (!button)
- 		return -ENOMEM;
++err_notifier:
++	unregister_reboot_notifier(&timer->reboot_notifier);
++
++err_clk:
++	if (timer->clk)
++		clk_disable_unprepare(timer->clk);
++
+ 	return ret;
+ }
+ 
 -- 
 2.7.4
