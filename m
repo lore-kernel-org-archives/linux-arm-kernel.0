@@ -1,122 +1,104 @@
-From: ioana.ciornei@nxp.com (Ioana Ciornei)
-Date: Fri, 17 Nov 2017 13:59:04 +0000
-Subject: [PATCH] arm64: dts: ls1088a: add fsl-mc hardware resource manager
- node
-In-Reply-To: <20171117123530.GA25390@dragon>
-References: <1510147805-24873-1-git-send-email-ioana.ciornei@nxp.com>
- <20171116083920.GK25384@dragon>
- <DB6PR0401MB2264A182C4048471B53BFF89E02E0@DB6PR0401MB2264.eurprd04.prod.outlook.com>
- <20171117123530.GA25390@dragon>
-Message-ID: <DB6PR0401MB22648400A0742C65F9B8E384E02F0@DB6PR0401MB2264.eurprd04.prod.outlook.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Fri, 17 Nov 2017 22:02:32 +0800
+Subject: [PATCH 3/5] ARM64: dts: meson-axg: add I2C DT info for Meson-AXG
+ SoC
+In-Reply-To: <96dc68e3-c394-70c4-eabe-f59d4c36150e@baylibre.com>
+References: <20171117080236.32504-1-yixun.lan@amlogic.com>
+ <20171117080236.32504-4-yixun.lan@amlogic.com>
+ <96dc68e3-c394-70c4-eabe-f59d4c36150e@baylibre.com>
+Message-ID: <1dd88afc-04fd-2443-f948-1d5bcd186ab8@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Thu, Nov 16, 2017 at 02:24:49PM +0000, Ioana Ciornei wrote:
-> ...
-> > > > +	fsl_mc: fsl-mc at 80c000000 {
-> > >
-> > > The unit-address of the node should be somehow related to 'reg'
-> > > property.  Can you please help me understand how they are related?
-> >
-> > The unit-address of the fsl-mc node is the base address of the MC portal
-> described in the first region of the 'reg' property and formed using the 2
-> address cells.
-> > Hope this helps.
-> 
-> Ah, sorry, I forgot that the address-cells is 2.
-> 
-> >
-> > >
-> > > > +		compatible = "fsl,qoriq-mc";
-> > > > +		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal
-> base */
-> > > > +		      <0x00000000 0x08340000 0 0x40000>; /* MC control
-> reg */
-> > > > +		msi-parent = <&its>;
-> > > > +		#address-cells = <3>;
-> > > > +		#size-cells = <1>;
-> > > > +
-> > > > +		/*
-> > > > +		 * Region type 0x0 - MC portals
-> > > > +		 * Region type 0x1 - QBMAN portals
-> > > > +		 */
-> > > > +		ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
-> > > > +			  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
-> > > > +
-> > > > +		dpmacs {
-> > > > +			#address-cells = <1>;
-> > > > +			#size-cells = <0>;
-> > > > +
-> > > > +			dpmac1: dpmac at 1 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <1>;
-> > > > +			};
-> > >
-> > > Please have a newline in between nodes.
-> >
-> > Will do.
-> >
-> > Should I send a rework of this patch right away or better to wait for the
-> merge window to close?
-> 
-> Either way is fine, as I will rebase my branch to v4.15-rc1 after merge window
-> closes.
-> 
-> > > > +			dpmac2: dpmac at 2 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <2>;
-> > > > +			};
-> > > > +			dpmac3: dpmac at 3 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <3>;
-> > > > +			};
-> > > > +			dpmac4: dpmac at 4 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <4>;
-> > > > +			};
-> > > > +			dpmac5: dpmac at 5 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <5>;
-> > > > +			};
-> > > > +			dpmac6: dpmac at 6 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <6>;
-> > > > +			};
-> > > > +			dpmac7: dpmac at 7 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <7>;
-> > > > +			};
-> > > > +			dpmac8: dpmac at 8 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <8>;
-> > > > +			};
-> > > > +			dpmac9: dpmac at 9 {
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <9>;
-> > > > +			};
-> > > > +			dpmac10: dpmac at 10 {
-> 
-> Just noticed this - the unit-address should be hex number, so it should be
-> dpmac at a rather than dpmac at 10, I think.
-> 
+Hi Neil
 
-Yes, that is right, it should be dpmac at a. Will change it.
+see my comments in line
 
-Ioana
-
-> Shawn
+On 11/17/17 21:05, Neil Armstrong wrote:
+> Hi Yixun, Jian,
 > 
-> > > > +				compatible = "fsl,qoriq-mc-dpmac";
-> > > > +				reg = <0xa>;
-> > > > +			};
-> > > > +		};
-> > > > +	};
-> > > > +
-> > > >  	psci {
-> > > >  		compatible = "arm,psci-0.2";
-> > > >  		method = "smc";
-> > > > --
-> > > > 1.9.1
-> > > >
-> > > >
-> >
+> On 17/11/2017 09:02, Yixun Lan wrote:
+>> From: Jian Hu <jian.hu@amlogic.com>
+>>
+>> There are four I2C masters in EE domain, and one I2C Master in
+>> AO domain, the DT info here should describe them all.
+>>
+>> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>> ---
+>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 59 ++++++++++++++++++++++++++++++
+>>  1 file changed, 59 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> index 57faaa9d8013..99e967aff439 100644
+>> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>> @@ -129,6 +129,54 @@
+>>  				#reset-cells = <1>;
+>>  			};
+>>  
+>> +			i2c_m0: i2c at 1f000 {
+> 
+> Can you use a more simple "i2c0" phandle naming instead ? or get back to the "i2c_A/B/C/D" naming like in meson_gx to keep consistency ?
+> 
+Ok, I would prefer to use 'i2c0' then
+
+we had a internal discussion about the inconsistent naming of the I2C
+controller, and reach a consensus to name them as:
+ the EE domain: ee_i2c_m0, ee_i2c_m1 ..
+ the AO domain: ao_i2c_m0, ao_i2c_s0
+in the future datasheet.
+
+note: 'ee' means the EE domain, m0 mean the master 0, s0 mean the I2C
+slave 0
+
+
+> [...]
+> 
+>> +			};
+>> +
+>> +			i2c_m1: i2c at 1e000 {
+> 
+> [...]
+> 
+>> +			};
+>> +
+>> +			i2c_m2: i2c at 1d000 {
+> 
+> [...]
+> 
+>> +			};
+>> +
+>> +			i2c_m3: i2c at 1c000 {
+> 
+> [...]
+> 
+>> +			};
+>> +
+>>  			uart_A: serial at 24000 {
+>>  				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
+>>  				reg = <0x0 0x24000 0x0 0x14>;
+>> @@ -312,6 +360,17 @@
+>>  				};
+>>  			};
+>>  
+>> +			i2c_ao: i2c at 5000 {
+> 
+> Can you keep the same "i2c_AO" as in meson-gx ?
+> 
+> 
+sure, can do
+
+> [...]
+> 
+>> +			};
+>> +
+>>  			uart_AO: serial at 3000 {
+>>  				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
+>>  				reg = <0x0 0x3000 0x0 0x18>;
+>>
+> 
+> Neil
+> 
+> .
+> 
