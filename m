@@ -1,9 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 01:58:22 +0530
-Subject: [PATCH 6/6] mmc: sunxi-mmc: Handle return value of platform_get_irq
+Date: Sat, 18 Nov 2017 01:58:21 +0530
+Subject: [PATCH 5/6] mmc: sh_mmcif: Handle return value of platform_get_irq
 In-Reply-To: <1510950502-22565-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1510950502-22565-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1510950502-22565-7-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1510950502-22565-6-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,24 +11,21 @@ platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/mmc/host/sunxi-mmc.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/mmc/host/sh_mmcif.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index cc98355d..ec2a16b 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1255,6 +1255,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 		goto error_assert_reset;
+diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+index 53fb18b..481f2c4 100644
+--- a/drivers/mmc/host/sh_mmcif.c
++++ b/drivers/mmc/host/sh_mmcif.c
+@@ -1405,7 +1405,7 @@ static int sh_mmcif_probe(struct platform_device *pdev)
  
- 	host->irq = platform_get_irq(pdev, 0);
-+	if (host->irq < 0) {
-+		ret = host->irq;
-+		goto error_assert_reset;
-+	}
-+
- 	return devm_request_threaded_irq(&pdev->dev, host->irq, sunxi_mmc_irq,
- 			sunxi_mmc_handle_manual_stop, 0, "sunxi-mmc", host);
- 
+ 	irq[0] = platform_get_irq(pdev, 0);
+ 	irq[1] = platform_get_irq(pdev, 1);
+-	if (irq[0] < 0) {
++	if (irq[0] < 0 || irq[1] < 0) {
+ 		dev_err(dev, "Get irq error\n");
+ 		return -ENXIO;
+ 	}
 -- 
 2.7.4
