@@ -1,103 +1,145 @@
-From: ioana.ciornei@nxp.com (Ioana Ciornei)
-Date: Fri, 17 Nov 2017 16:05:26 +0200
-Subject: [PATCH v2] arm64: dts: ls1088a: add fsl-mc hardware resource manager
- node
-Message-ID: <1510927526-17492-1-git-send-email-ioana.ciornei@nxp.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Fri, 17 Nov 2017 09:11:34 -0500
+Subject: [PATCH v3][for 4.15] dmaengine: dmatest: move callback wait queue to
+ thread context
+Message-ID: <1510927894-15297-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the fsl-mc node in the LS1088A device tree.
+Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+introduced a bug (that is in fact documented by the patch commit text)
+that leaves behind a dangling pointer. Since the done_wait structure is
+allocated on the stack, future invocations to the DMATEST can produce
+undesirable results (e.g., corrupted spinlocks).
 
-Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
+Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
+out") attempted to WARN the user that the stack was likely corrupted but
+did not fix the actual issue.
+
+This patch fixes the issue by pushing the wait queue and callback
+structs into the the thread structure. If a failure occurs due to time,
+dmaengine_terminate_all will force the callback to safely call
+wake_up_all() without possibility of using a freed pointer.
+
+Cc: stable at vger.kernel.org # 4.13.x: a9df21e: dmatest: Warn User
+Cc: stable at vger.kernel.org # 4.13.x
+Cc: stable at vger.kernel.org # 4.14.x
+Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
+Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
+Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
 ---
-Changes in v2:
-  - add a newline in between nodes
-  - use hexadecimal unit-addresses
+changes from v2: Added "Fixes" tag
+changes from v1: Added pre-req patches for stable
 
- arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi | 71 ++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+ drivers/dma/dmatest.c | 37 ++++++++++++++++---------------------
+ 1 file changed, 16 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-index bd80e9a..e1a96b2 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-@@ -166,6 +166,77 @@
- 			     <1 10 IRQ_TYPE_LEVEL_LOW>;/* Hypervisor PPI */
- 	};
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index 47edc7f..2573b6c 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -155,6 +155,12 @@ struct dmatest_params {
+ #define PATTERN_COUNT_MASK	0x1f
+ #define PATTERN_MEMSET_IDX	0x01
  
-+	fsl_mc: fsl-mc at 80c000000 {
-+		compatible = "fsl,qoriq-mc";
-+		reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
-+		      <0x00000000 0x08340000 0 0x40000>; /* MC control reg */
-+		msi-parent = <&its>;
-+		#address-cells = <3>;
-+		#size-cells = <1>;
++/* poor man's completion - we want to use wait_event_freezable() on it */
++struct dmatest_done {
++	bool			done;
++	wait_queue_head_t	*wait;
++};
 +
-+		/*
-+		 * Region type 0x0 - MC portals
-+		 * Region type 0x1 - QBMAN portals
-+		 */
-+		ranges = <0x0 0x0 0x0 0x8 0x0c000000 0x4000000
-+			  0x1 0x0 0x0 0x8 0x18000000 0x8000000>;
-+
-+		dpmacs {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			dpmac1: dpmac at 1 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <1>;
-+			};
-+
-+			dpmac2: dpmac at 2 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <2>;
-+			};
-+
-+			dpmac3: dpmac at 3 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <3>;
-+			};
-+
-+			dpmac4: dpmac at 4 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <4>;
-+			};
-+
-+			dpmac5: dpmac at 5 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <5>;
-+			};
-+
-+			dpmac6: dpmac at 6 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <6>;
-+			};
-+
-+			dpmac7: dpmac at 7 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <7>;
-+			};
-+
-+			dpmac8: dpmac at 8 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <8>;
-+			};
-+
-+			dpmac9: dpmac at 9 {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <9>;
-+			};
-+
-+			dpmac10: dpmac at a {
-+				compatible = "fsl,qoriq-mc-dpmac";
-+				reg = <0xa>;
-+			};
-+		};
-+	};
-+
- 	psci {
- 		compatible = "arm,psci-0.2";
- 		method = "smc";
+ struct dmatest_thread {
+ 	struct list_head	node;
+ 	struct dmatest_info	*info;
+@@ -165,6 +171,8 @@ struct dmatest_thread {
+ 	u8			**dsts;
+ 	u8			**udsts;
+ 	enum dma_transaction_type type;
++	wait_queue_head_t done_wait;
++	struct dmatest_done test_done;
+ 	bool			done;
+ };
+ 
+@@ -342,11 +350,6 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
+ 	return error_count;
+ }
+ 
+-/* poor man's completion - we want to use wait_event_freezable() on it */
+-struct dmatest_done {
+-	bool			done;
+-	wait_queue_head_t	*wait;
+-};
+ 
+ static void dmatest_callback(void *arg)
+ {
+@@ -424,9 +427,8 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
+  */
+ static int dmatest_func(void *data)
+ {
+-	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(done_wait);
+ 	struct dmatest_thread	*thread = data;
+-	struct dmatest_done	done = { .wait = &done_wait };
++	struct dmatest_done	*done = &thread->test_done;
+ 	struct dmatest_info	*info;
+ 	struct dmatest_params	*params;
+ 	struct dma_chan		*chan;
+@@ -673,9 +675,9 @@ static int dmatest_func(void *data)
+ 			continue;
+ 		}
+ 
+-		done.done = false;
++		done->done = false;
+ 		tx->callback = dmatest_callback;
+-		tx->callback_param = &done;
++		tx->callback_param = done;
+ 		cookie = tx->tx_submit(tx);
+ 
+ 		if (dma_submit_error(cookie)) {
+@@ -688,21 +690,12 @@ static int dmatest_func(void *data)
+ 		}
+ 		dma_async_issue_pending(chan);
+ 
+-		wait_event_freezable_timeout(done_wait, done.done,
++		wait_event_freezable_timeout(thread->done_wait, done->done,
+ 					     msecs_to_jiffies(params->timeout));
+ 
+ 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+ 
+-		if (!done.done) {
+-			/*
+-			 * We're leaving the timed out dma operation with
+-			 * dangling pointer to done_wait.  To make this
+-			 * correct, we'll need to allocate wait_done for
+-			 * each test iteration and perform "who's gonna
+-			 * free it this time?" dancing.  For now, just
+-			 * leave it dangling.
+-			 */
+-			WARN(1, "dmatest: Kernel stack may be corrupted!!\n");
++		if (!done->done) {
+ 			dmaengine_unmap_put(um);
+ 			result("test timed out", total_tests, src_off, dst_off,
+ 			       len, 0);
+@@ -789,7 +782,7 @@ static int dmatest_func(void *data)
+ 		dmatest_KBs(runtime, total_len), ret);
+ 
+ 	/* terminate all transfers on specified channels */
+-	if (ret)
++	if (ret || failed_tests)
+ 		dmaengine_terminate_all(chan);
+ 
+ 	thread->done = true;
+@@ -849,6 +842,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
+ 		thread->info = info;
+ 		thread->chan = dtc->chan;
+ 		thread->type = type;
++		thread->test_done.wait = &thread->done_wait;
++		init_waitqueue_head(&thread->done_wait);
+ 		smp_wmb();
+ 		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
+ 				dma_chan_name(chan), op, i);
 -- 
-1.9.1
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
