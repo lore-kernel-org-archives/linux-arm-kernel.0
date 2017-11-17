@@ -1,35 +1,32 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 01:03:26 +0530
-Subject: [PATCH 3/5] ASoC: nuc900: Fix platform_get_irq's error checking
+Date: Sat, 18 Nov 2017 01:03:27 +0530
+Subject: [PATCH 4/5] ASoC: intel: sst: Handle return value of platform_get_irq
 In-Reply-To: <1510947208-17134-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1510947208-17134-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1510947208-17134-4-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1510947208-17134-5-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- sound/soc/nuc900/nuc900-ac97.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/intel/atom/sst/sst_acpi.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
-index b6615af..383627d 100644
---- a/sound/soc/nuc900/nuc900-ac97.c
-+++ b/sound/soc/nuc900/nuc900-ac97.c
-@@ -346,8 +346,8 @@ static int nuc900_ac97_drvprobe(struct platform_device *pdev)
- 	}
- 
- 	nuc900_audio->irq_num = platform_get_irq(pdev, 0);
--	if (!nuc900_audio->irq_num) {
--		ret = -EBUSY;
-+	if (nuc900_audio->irq_num < 0) {
-+		ret = nuc900_audio->irq_num;
- 		goto out;
- 	}
+diff --git a/sound/soc/intel/atom/sst/sst_acpi.c b/sound/soc/intel/atom/sst/sst_acpi.c
+index 32d6e02..693b970 100644
+--- a/sound/soc/intel/atom/sst/sst_acpi.c
++++ b/sound/soc/intel/atom/sst/sst_acpi.c
+@@ -236,6 +236,9 @@ static int sst_platform_get_resources(struct intel_sst_drv *ctx)
+ 	/* Find the IRQ */
+ 	ctx->irq_num = platform_get_irq(pdev,
+ 				ctx->pdata->res_info->acpi_ipc_irq_index);
++	if (ctx->irq_num < 0)
++		return ctx->irq_num;
++
+ 	return 0;
+ }
  
 -- 
 2.7.4
