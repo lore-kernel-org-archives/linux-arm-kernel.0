@@ -1,247 +1,252 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Fri, 17 Nov 2017 15:38:29 +0200
-Subject: [PATCH 05/10] staging: fsl-mc: consistently use EXPORT_SYMBOL_GPL()
+Date: Fri, 17 Nov 2017 15:38:31 +0200
+Subject: [PATCH 07/10] staging: fsl-mc: remove some superfluous WARN_ONs
 In-Reply-To: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
 References: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
-Message-ID: <20171117133834.4635-5-laurentiu.tudor@nxp.com>
+Message-ID: <20171117133834.4635-7-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-The bus driver is mixing EXPORT_SYMBOL()/EXPORT_SYMBOL_GPL() usage.
-Change it to consistently use EXPORT_SYMBOL_GPL().
+These WARN_ONs shouldn't trigger unless something went very wrong.
+Since the driver is in a stable state let's remove these debug
+WARN_ONs.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dpbp.c   | 16 ++++++++--------
- drivers/staging/fsl-mc/bus/dpcon.c  | 14 +++++++-------
- drivers/staging/fsl-mc/bus/dprc.c   | 16 ++++++++--------
- drivers/staging/fsl-mc/bus/mc-sys.c |  2 +-
- 4 files changed, 24 insertions(+), 24 deletions(-)
+ drivers/staging/fsl-mc/bus/dprc-driver.c              |  8 --------
+ drivers/staging/fsl-mc/bus/fsl-mc-allocator.c         | 10 ----------
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c               | 12 ------------
+ drivers/staging/fsl-mc/bus/fsl-mc-msi.c               |  1 -
+ .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c    |  3 ---
+ drivers/staging/fsl-mc/bus/mc-io.c                    | 19 -------------------
+ 6 files changed, 53 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/dpbp.c b/drivers/staging/fsl-mc/bus/dpbp.c
-index 363730a..fc76e90 100644
---- a/drivers/staging/fsl-mc/bus/dpbp.c
-+++ b/drivers/staging/fsl-mc/bus/dpbp.c
-@@ -77,7 +77,7 @@ int dpbp_open(struct fsl_mc_io *mc_io,
+diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
+index 06df528..d6a84dd 100644
+--- a/drivers/staging/fsl-mc/bus/dprc-driver.c
++++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
+@@ -39,8 +39,6 @@ static int __fsl_mc_device_remove_if_not_in_mc(struct device *dev, void *data)
+ 	struct fsl_mc_child_objs *objs;
+ 	struct fsl_mc_device *mc_dev;
  
- 	return err;
- }
--EXPORT_SYMBOL(dpbp_open);
-+EXPORT_SYMBOL_GPL(dpbp_open);
+-	WARN_ON(!dev);
+-	WARN_ON(!data);
+ 	mc_dev = to_fsl_mc_device(dev);
+ 	objs = data;
  
- /**
-  * dpbp_close() - Close the control session of the object
-@@ -103,7 +103,7 @@ int dpbp_close(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpbp_close);
-+EXPORT_SYMBOL_GPL(dpbp_close);
+@@ -60,8 +58,6 @@ static int __fsl_mc_device_remove_if_not_in_mc(struct device *dev, void *data)
  
- /**
-  * dpbp_enable() - Enable the DPBP.
-@@ -126,7 +126,7 @@ int dpbp_enable(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpbp_enable);
-+EXPORT_SYMBOL_GPL(dpbp_enable);
- 
- /**
-  * dpbp_disable() - Disable the DPBP.
-@@ -149,7 +149,7 @@ int dpbp_disable(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpbp_disable);
-+EXPORT_SYMBOL_GPL(dpbp_disable);
- 
- /**
-  * dpbp_is_enabled() - Check if the DPBP is enabled.
-@@ -183,7 +183,7 @@ int dpbp_is_enabled(struct fsl_mc_io *mc_io,
- 
+ static int __fsl_mc_device_remove(struct device *dev, void *data)
+ {
+-	WARN_ON(!dev);
+-	WARN_ON(data);
+ 	fsl_mc_device_remove(to_fsl_mc_device(dev));
  	return 0;
  }
--EXPORT_SYMBOL(dpbp_is_enabled);
-+EXPORT_SYMBOL_GPL(dpbp_is_enabled);
+@@ -453,8 +449,6 @@ static int disable_dprc_irq(struct fsl_mc_device *mc_dev)
+ 	int error;
+ 	struct fsl_mc_io *mc_io = mc_dev->mc_io;
  
- /**
-  * dpbp_reset() - Reset the DPBP, returns the object to initial state.
-@@ -206,7 +206,7 @@ int dpbp_reset(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
+-	WARN_ON(mc_dev->obj_desc.irq_count != 1);
+-
+ 	/*
+ 	 * Disable generation of interrupt, while we configure it:
+ 	 */
+@@ -496,8 +490,6 @@ static int register_dprc_irq_handler(struct fsl_mc_device *mc_dev)
+ 	int error;
+ 	struct fsl_mc_device_irq *irq = mc_dev->irqs[0];
+ 
+-	WARN_ON(mc_dev->obj_desc.irq_count != 1);
+-
+ 	/*
+ 	 * NOTE: devm_request_threaded_irq() invokes the device-specific
+ 	 * function that programs the MSI physically in the device
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+index 8ea3920..d472a85 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+@@ -199,7 +199,6 @@ int __must_check fsl_mc_resource_allocate(struct fsl_mc_bus *mc_bus,
+ 					    struct fsl_mc_resource, node);
+ 
+ 	if (!resource) {
+-		WARN_ON(res_pool->free_count != 0);
+ 		error = -ENXIO;
+ 		dev_err(&mc_bus_dev->dev,
+ 			"No more resources of type %s left\n",
+@@ -474,7 +473,6 @@ int __must_check fsl_mc_allocate_irqs(struct fsl_mc_device *mc_dev)
+ 		irqs[i] = to_fsl_mc_irq(resource);
+ 		res_allocated_count++;
+ 
+-		WARN_ON(irqs[i]->mc_dev);
+ 		irqs[i]->mc_dev = mc_dev;
+ 		irqs[i]->dev_irq_index = i;
+ 	}
+@@ -516,7 +514,6 @@ void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev)
+ 		return;
+ 
+ 	for (i = 0; i < irq_count; i++) {
+-		WARN_ON(!irqs[i]->mc_dev);
+ 		irqs[i]->mc_dev = NULL;
+ 		fsl_mc_resource_free(&irqs[i]->resource);
+ 	}
+@@ -553,17 +550,10 @@ static void fsl_mc_cleanup_resource_pool(struct fsl_mc_device *mc_bus_dev,
+ 					&mc_bus->resource_pools[pool_type];
+ 	int free_count = 0;
+ 
+-	WARN_ON(res_pool->type != pool_type);
+-	WARN_ON(res_pool->free_count != res_pool->max_count);
+-
+ 	list_for_each_entry_safe(resource, next, &res_pool->free_list, node) {
+ 		free_count++;
+-		WARN_ON(resource->type != res_pool->type);
+-		WARN_ON(resource->parent_pool != res_pool);
+ 		devm_kfree(&mc_bus_dev->dev, resource);
+ 	}
+-
+-	WARN_ON(free_count != res_pool->free_count);
  }
--EXPORT_SYMBOL(dpbp_reset);
-+EXPORT_SYMBOL_GPL(dpbp_reset);
  
- /**
-  * dpbp_get_attributes - Retrieve DPBP attributes.
-@@ -243,7 +243,7 @@ int dpbp_get_attributes(struct fsl_mc_io *mc_io,
+ void fsl_mc_cleanup_all_resource_pools(struct fsl_mc_device *mc_bus_dev)
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+index 409f2b9..1c2fd8d 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+@@ -162,12 +162,7 @@ static int fsl_mc_driver_probe(struct device *dev)
+ 	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
+ 	int error;
  
- 	return 0;
- }
--EXPORT_SYMBOL(dpbp_get_attributes);
-+EXPORT_SYMBOL_GPL(dpbp_get_attributes);
+-	if (WARN_ON(!dev->driver))
+-		return -EINVAL;
+-
+ 	mc_drv = to_fsl_mc_driver(dev->driver);
+-	if (WARN_ON(!mc_drv->probe))
+-		return -EINVAL;
  
- /**
-  * dpbp_get_api_version - Get Data Path Buffer Pool API version
-@@ -276,4 +276,4 @@ int dpbp_get_api_version(struct fsl_mc_io *mc_io,
+ 	error = mc_drv->probe(mc_dev);
+ 	if (error < 0) {
+@@ -184,9 +179,6 @@ static int fsl_mc_driver_remove(struct device *dev)
+ 	struct fsl_mc_device *mc_dev = to_fsl_mc_device(dev);
+ 	int error;
  
- 	return 0;
- }
--EXPORT_SYMBOL(dpbp_get_api_version);
-+EXPORT_SYMBOL_GPL(dpbp_get_api_version);
-diff --git a/drivers/staging/fsl-mc/bus/dpcon.c b/drivers/staging/fsl-mc/bus/dpcon.c
-index ce7c0bf..5ba1a0f 100644
---- a/drivers/staging/fsl-mc/bus/dpcon.c
-+++ b/drivers/staging/fsl-mc/bus/dpcon.c
-@@ -78,7 +78,7 @@ int dpcon_open(struct fsl_mc_io *mc_io,
+-	if (WARN_ON(!dev->driver))
+-		return -EINVAL;
+-
+ 	error = mc_drv->remove(mc_dev);
+ 	if (error < 0) {
+ 		dev_err(dev, "%s failed: %d\n", __func__, error);
+@@ -352,8 +344,6 @@ static int translate_mc_addr(struct fsl_mc_device *mc_dev,
+ 	struct fsl_mc *mc;
  
- 	return 0;
- }
--EXPORT_SYMBOL(dpcon_open);
-+EXPORT_SYMBOL_GPL(dpcon_open);
+ 	fsl_mc_get_root_dprc(&mc_dev->dev, &root_dprc_dev);
+-	if (WARN_ON(!root_dprc_dev))
+-		return -EINVAL;
+ 	mc = dev_get_drvdata(root_dprc_dev->parent);
  
- /**
-  * dpcon_close() - Close the control session of the object
-@@ -105,7 +105,7 @@ int dpcon_close(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpcon_close);
-+EXPORT_SYMBOL_GPL(dpcon_close);
+ 	if (mc->num_translation_ranges == 0) {
+@@ -401,7 +391,6 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
+ 		 * type, as this object type is not supposed to have MMIO
+ 		 * regions
+ 		 */
+-		WARN_ON(true);
+ 		return -EINVAL;
+ 	}
  
- /**
-  * dpcon_enable() - Enable the DPCON
-@@ -129,7 +129,7 @@ int dpcon_enable(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpcon_enable);
-+EXPORT_SYMBOL_GPL(dpcon_enable);
+@@ -424,7 +413,6 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
+ 			goto error_cleanup_regions;
+ 		}
  
- /**
-  * dpcon_disable() - Disable the DPCON
-@@ -153,7 +153,7 @@ int dpcon_disable(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpcon_disable);
-+EXPORT_SYMBOL_GPL(dpcon_disable);
+-		WARN_ON(region_desc.size == 0);
+ 		error = translate_mc_addr(mc_dev, mc_region_type,
+ 					  region_desc.base_offset,
+ 					  &regions[i].start);
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+index f74a6f1..0ce6117 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+@@ -124,7 +124,6 @@ static void fsl_mc_msi_write_msg(struct irq_data *irq_data,
+ 	struct fsl_mc_device_irq *mc_dev_irq =
+ 		&mc_bus->irq_resources[msi_desc->fsl_mc.msi_index];
  
- /**
-  * dpcon_reset() - Reset the DPCON, returns the object to initial state.
-@@ -176,7 +176,7 @@ int dpcon_reset(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpcon_reset);
-+EXPORT_SYMBOL_GPL(dpcon_reset);
+-	WARN_ON(mc_dev_irq->msi_desc != msi_desc);
+ 	msi_desc->msg = *msg;
  
- /**
-  * dpcon_get_attributes() - Retrieve DPCON attributes.
-@@ -214,7 +214,7 @@ int dpcon_get_attributes(struct fsl_mc_io *mc_io,
+ 	/*
+diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+index 123e4af..947378f 100644
+--- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
++++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+@@ -93,9 +93,6 @@ int __init its_fsl_mc_msi_init(void)
+ 			continue;
+ 		}
  
- 	return 0;
- }
--EXPORT_SYMBOL(dpcon_get_attributes);
-+EXPORT_SYMBOL_GPL(dpcon_get_attributes);
+-		WARN_ON(mc_msi_domain->host_data !=
+-			&its_fsl_mc_msi_domain_info);
+-
+ 		pr_info("fsl-mc MSI: %pOF domain created\n", np);
+ 	}
  
- /**
-  * dpcon_set_notification() - Set DPCON notification destination
-@@ -245,4 +245,4 @@ int dpcon_set_notification(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dpcon_set_notification);
-+EXPORT_SYMBOL_GPL(dpcon_set_notification);
-diff --git a/drivers/staging/fsl-mc/bus/dprc.c b/drivers/staging/fsl-mc/bus/dprc.c
-index 6f6c65a..f29ea3e 100644
---- a/drivers/staging/fsl-mc/bus/dprc.c
-+++ b/drivers/staging/fsl-mc/bus/dprc.c
-@@ -71,7 +71,7 @@ int dprc_open(struct fsl_mc_io *mc_io,
+diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/staging/fsl-mc/bus/mc-io.c
+index f65c23c..5530856 100644
+--- a/drivers/staging/fsl-mc/bus/mc-io.c
++++ b/drivers/staging/fsl-mc/bus/mc-io.c
+@@ -68,12 +68,6 @@ static void fsl_mc_io_unset_dpmcp(struct fsl_mc_io *mc_io)
+ 	int error;
+ 	struct fsl_mc_device *dpmcp_dev = mc_io->dpmcp_dev;
  
- 	return 0;
- }
--EXPORT_SYMBOL(dprc_open);
-+EXPORT_SYMBOL_GPL(dprc_open);
+-	if (WARN_ON(!dpmcp_dev))
+-		return;
+-
+-	if (WARN_ON(dpmcp_dev->mc_io != mc_io))
+-		return;
+-
+ 	error = dpmcp_close(mc_io,
+ 			    0,
+ 			    dpmcp_dev->mc_handle);
+@@ -224,8 +218,6 @@ int __must_check fsl_mc_portal_allocate(struct fsl_mc_device *mc_dev,
  
- /**
-  * dprc_close() - Close the control session of the object
-@@ -97,7 +97,7 @@ int dprc_close(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dprc_close);
-+EXPORT_SYMBOL_GPL(dprc_close);
+ 	error = -EINVAL;
+ 	dpmcp_dev = resource->data;
+-	if (WARN_ON(!dpmcp_dev))
+-		goto error_cleanup_resource;
  
- /**
-  * dprc_get_irq() - Get IRQ information from the DPRC.
-@@ -475,7 +475,7 @@ int dprc_get_obj_count(struct fsl_mc_io *mc_io,
+ 	if (dpmcp_dev->obj_desc.ver_major < DPMCP_MIN_VER_MAJOR ||
+ 	    (dpmcp_dev->obj_desc.ver_major == DPMCP_MIN_VER_MAJOR &&
+@@ -238,15 +230,9 @@ int __must_check fsl_mc_portal_allocate(struct fsl_mc_device *mc_dev,
+ 		goto error_cleanup_resource;
+ 	}
  
- 	return 0;
- }
--EXPORT_SYMBOL(dprc_get_obj_count);
-+EXPORT_SYMBOL_GPL(dprc_get_obj_count);
+-	if (WARN_ON(dpmcp_dev->obj_desc.region_count == 0))
+-		goto error_cleanup_resource;
+-
+ 	mc_portal_phys_addr = dpmcp_dev->regions[0].start;
+ 	mc_portal_size = resource_size(dpmcp_dev->regions);
  
- /**
-  * dprc_get_obj() - Get general information on an object
-@@ -531,7 +531,7 @@ int dprc_get_obj(struct fsl_mc_io *mc_io,
- 	obj_desc->label[15] = '\0';
- 	return 0;
- }
--EXPORT_SYMBOL(dprc_get_obj);
-+EXPORT_SYMBOL_GPL(dprc_get_obj);
+-	if (WARN_ON(mc_portal_size != mc_bus_dev->mc_io->portal_size))
+-		goto error_cleanup_resource;
+-
+ 	error = fsl_create_mc_io(&mc_bus_dev->dev,
+ 				 mc_portal_phys_addr,
+ 				 mc_portal_size, dpmcp_dev,
+@@ -279,8 +265,6 @@ void fsl_mc_portal_free(struct fsl_mc_io *mc_io)
+ 	 * to have a DPMCP object associated with.
+ 	 */
+ 	dpmcp_dev = mc_io->dpmcp_dev;
+-	if (WARN_ON(!dpmcp_dev))
+-		return;
  
- /**
-  * dprc_set_obj_irq() - Set IRQ information for object to trigger an interrupt.
-@@ -572,7 +572,7 @@ int dprc_set_obj_irq(struct fsl_mc_io *mc_io,
- 	/* send command to mc*/
- 	return mc_send_command(mc_io, &cmd);
- }
--EXPORT_SYMBOL(dprc_set_obj_irq);
-+EXPORT_SYMBOL_GPL(dprc_set_obj_irq);
+ 	resource = dpmcp_dev->resource;
+ 	if (WARN_ON(!resource || resource->type != FSL_MC_POOL_DPMCP))
+@@ -304,9 +288,6 @@ int fsl_mc_portal_reset(struct fsl_mc_io *mc_io)
+ 	int error;
+ 	struct fsl_mc_device *dpmcp_dev = mc_io->dpmcp_dev;
  
- /**
-  * dprc_get_obj_irq() - Get IRQ information from object.
-@@ -626,7 +626,7 @@ int dprc_get_obj_irq(struct fsl_mc_io *mc_io,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(dprc_get_obj_irq);
-+EXPORT_SYMBOL_GPL(dprc_get_obj_irq);
- 
- /**
-  * dprc_get_res_count() - Obtains the number of free resources that are assigned
-@@ -669,7 +669,7 @@ int dprc_get_res_count(struct fsl_mc_io *mc_io,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(dprc_get_res_count);
-+EXPORT_SYMBOL_GPL(dprc_get_res_count);
- 
- /**
-  * dprc_get_obj_region() - Get region information for a specified object.
-@@ -717,7 +717,7 @@ int dprc_get_obj_region(struct fsl_mc_io *mc_io,
- 
- 	return 0;
- }
--EXPORT_SYMBOL(dprc_get_obj_region);
-+EXPORT_SYMBOL_GPL(dprc_get_obj_region);
- 
- /**
-  * dprc_get_api_version - Get Data Path Resource Container API version
-diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
-index 7ce105b..a2854e5 100644
---- a/drivers/staging/fsl-mc/bus/mc-sys.c
-+++ b/drivers/staging/fsl-mc/bus/mc-sys.c
-@@ -320,4 +320,4 @@ int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd)
- 
- 	return error;
- }
--EXPORT_SYMBOL(mc_send_command);
-+EXPORT_SYMBOL_GPL(mc_send_command);
+-	if (WARN_ON(!dpmcp_dev))
+-		return -EINVAL;
+-
+ 	error = dpmcp_reset(mc_io, 0, dpmcp_dev->mc_handle);
+ 	if (error < 0) {
+ 		dev_err(&dpmcp_dev->dev, "dpmcp_reset() failed: %d\n", error);
 -- 
 2.9.4
