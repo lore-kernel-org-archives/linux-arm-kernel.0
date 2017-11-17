@@ -1,111 +1,529 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Fri, 17 Nov 2017 15:38:30 +0200
-Subject: [PATCH 06/10] staging: fsl-mc/dpio: change to use EXPORT_SYMBOL_GPL()
+Date: Fri, 17 Nov 2017 15:38:32 +0200
+Subject: [PATCH 08/10] staging: fsl-mc: remove debug WARN_ONs doubling error
+ checks
 In-Reply-To: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
 References: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
-Message-ID: <20171117133834.4635-6-laurentiu.tudor@nxp.com>
+Message-ID: <20171117133834.4635-8-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-No need to use EXPORT_SYMBOL() so switch to the GPL variant.
+A lot of error checks are doubled by debug WARN_ONs. Given that the
+driver was thoroughly debugged and is in a stable state, it's time to
+drop them.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dpio/dpio-service.c | 20 ++++++++++----------
- 1 file changed, 10 insertions(+), 10 deletions(-)
+ drivers/staging/fsl-mc/bus/dprc-driver.c           | 20 ++---
+ drivers/staging/fsl-mc/bus/fsl-mc-allocator.c      | 86 +++++++++++-----------
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c            |  8 +-
+ drivers/staging/fsl-mc/bus/fsl-mc-msi.c            | 14 ++--
+ .../staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c |  4 +-
+ drivers/staging/fsl-mc/bus/mc-io.c                 | 13 ++--
+ drivers/staging/fsl-mc/bus/mc-sys.c                |  5 +-
+ 7 files changed, 73 insertions(+), 77 deletions(-)
 
-diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-index 871078d..a8a8e15 100644
---- a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-+++ b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-@@ -258,7 +258,7 @@ int dpaa2_io_service_register(struct dpaa2_io *d,
- 							 ctx->qman64);
- 	return 0;
- }
--EXPORT_SYMBOL(dpaa2_io_service_register);
-+EXPORT_SYMBOL_GPL(dpaa2_io_service_register);
+diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
+index d6a84dd..28a6b87 100644
+--- a/drivers/staging/fsl-mc/bus/dprc-driver.c
++++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
+@@ -382,11 +382,11 @@ static irqreturn_t dprc_irq0_handler_thread(int irq_num, void *arg)
+ 	dev_dbg(dev, "DPRC IRQ %d triggered on CPU %u\n",
+ 		irq_num, smp_processor_id());
  
- /**
-  * dpaa2_io_service_deregister - The opposite of 'register'.
-@@ -281,7 +281,7 @@ void dpaa2_io_service_deregister(struct dpaa2_io *service,
- 	list_del(&ctx->node);
- 	spin_unlock_irqrestore(&d->lock_notifications, irqflags);
- }
--EXPORT_SYMBOL(dpaa2_io_service_deregister);
-+EXPORT_SYMBOL_GPL(dpaa2_io_service_deregister);
+-	if (WARN_ON(!(mc_dev->flags & FSL_MC_IS_DPRC)))
++	if (!(mc_dev->flags & FSL_MC_IS_DPRC))
+ 		return IRQ_HANDLED;
  
- /**
-  * dpaa2_io_service_rearm() - Rearm the notification for the given DPIO service.
-@@ -315,7 +315,7 @@ int dpaa2_io_service_rearm(struct dpaa2_io *d,
+ 	mutex_lock(&mc_bus->scan_mutex);
+-	if (WARN_ON(!msi_desc || msi_desc->irq != (u32)irq_num))
++	if (!msi_desc || msi_desc->irq != (u32)irq_num)
+ 		goto out;
  
- 	return err;
- }
--EXPORT_SYMBOL(dpaa2_io_service_rearm);
-+EXPORT_SYMBOL_GPL(dpaa2_io_service_rearm);
+ 	status = 0;
+@@ -593,20 +593,20 @@ static int dprc_probe(struct fsl_mc_device *mc_dev)
+ 	bool msi_domain_set = false;
+ 	u16 major_ver, minor_ver;
  
- /**
-  * dpaa2_io_service_pull_channel() - pull dequeue functions from a channel.
-@@ -347,7 +347,7 @@ int dpaa2_io_service_pull_channel(struct dpaa2_io *d, u32 channelid,
+-	if (WARN_ON(strcmp(mc_dev->obj_desc.type, "dprc") != 0))
++	if (strcmp(mc_dev->obj_desc.type, "dprc") != 0)
+ 		return -EINVAL;
  
- 	return err;
- }
--EXPORT_SYMBOL(dpaa2_io_service_pull_channel);
-+EXPORT_SYMBOL_GPL(dpaa2_io_service_pull_channel);
+-	if (WARN_ON(dev_get_msi_domain(&mc_dev->dev)))
++	if (dev_get_msi_domain(&mc_dev->dev))
+ 		return -EINVAL;
  
- /**
-  * dpaa2_io_service_enqueue_qd() - Enqueue a frame to a QD.
-@@ -376,7 +376,7 @@ int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d,
+ 	if (!mc_dev->mc_io) {
+ 		/*
+ 		 * This is a child DPRC:
+ 		 */
+-		if (WARN_ON(!dev_is_fsl_mc(parent_dev)))
++		if (!dev_is_fsl_mc(parent_dev))
+ 			return -EINVAL;
  
- 	return qbman_swp_enqueue(d->swp, &ed, fd);
- }
--EXPORT_SYMBOL(dpaa2_io_service_enqueue_qd);
-+EXPORT_SYMBOL_GPL(dpaa2_io_service_enqueue_qd);
+-		if (WARN_ON(mc_dev->obj_desc.region_count == 0))
++		if (mc_dev->obj_desc.region_count == 0)
+ 			return -EINVAL;
  
- /**
-  * dpaa2_io_service_release() - Release buffers to a buffer pool.
-@@ -403,7 +403,7 @@ int dpaa2_io_service_release(struct dpaa2_io *d,
+ 		region_size = resource_size(mc_dev->regions);
+@@ -634,7 +634,7 @@ static int dprc_probe(struct fsl_mc_device *mc_dev)
+ 		 */
+ 		struct irq_domain *mc_msi_domain;
  
- 	return qbman_swp_release(d->swp, &rd, buffers, num_buffers);
- }
--EXPORT_SYMBOL(dpaa2_io_service_release);
-+EXPORT_SYMBOL_GPL(dpaa2_io_service_release);
+-		if (WARN_ON(dev_is_fsl_mc(parent_dev)))
++		if (dev_is_fsl_mc(parent_dev))
+ 			return -EINVAL;
  
- /**
-  * dpaa2_io_service_acquire() - Acquire buffers from a buffer pool.
-@@ -434,7 +434,7 @@ int dpaa2_io_service_acquire(struct dpaa2_io *d,
+ 		error = fsl_mc_find_msi_domain(parent_dev,
+@@ -745,12 +745,12 @@ static int dprc_remove(struct fsl_mc_device *mc_dev)
+ 	int error;
+ 	struct fsl_mc_bus *mc_bus = to_fsl_mc_bus(mc_dev);
  
- 	return err;
- }
--EXPORT_SYMBOL(dpaa2_io_service_acquire);
-+EXPORT_SYMBOL_GPL(dpaa2_io_service_acquire);
+-	if (WARN_ON(strcmp(mc_dev->obj_desc.type, "dprc") != 0))
++	if (strcmp(mc_dev->obj_desc.type, "dprc") != 0)
+ 		return -EINVAL;
+-	if (WARN_ON(!mc_dev->mc_io))
++	if (!mc_dev->mc_io)
+ 		return -EINVAL;
  
- /*
-  * 'Stores' are reusable memory blocks for holding dequeue results, and to
-@@ -488,7 +488,7 @@ struct dpaa2_io_store *dpaa2_io_store_create(unsigned int max_frames,
+-	if (WARN_ON(!mc_bus->irq_resources))
++	if (!mc_bus->irq_resources)
+ 		return -EINVAL;
  
- 	return ret;
- }
--EXPORT_SYMBOL(dpaa2_io_store_create);
-+EXPORT_SYMBOL_GPL(dpaa2_io_store_create);
+ 	if (dev_get_msi_domain(&mc_dev->dev))
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+index d472a85..f7fbebd 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+@@ -41,25 +41,25 @@ static int __must_check fsl_mc_resource_pool_add_device(struct fsl_mc_bus
+ 	struct fsl_mc_device *mc_bus_dev = &mc_bus->mc_dev;
+ 	int error = -EINVAL;
  
- /**
-  * dpaa2_io_store_destroy() - Frees the dma memory storage for dequeue
-@@ -502,7 +502,7 @@ void dpaa2_io_store_destroy(struct dpaa2_io_store *s)
- 	kfree(s->alloced_addr);
- 	kfree(s);
- }
--EXPORT_SYMBOL(dpaa2_io_store_destroy);
-+EXPORT_SYMBOL_GPL(dpaa2_io_store_destroy);
+-	if (WARN_ON(pool_type < 0 || pool_type >= FSL_MC_NUM_POOL_TYPES))
++	if (pool_type < 0 || pool_type >= FSL_MC_NUM_POOL_TYPES)
+ 		goto out;
+-	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
++	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
+ 		goto out;
+-	if (WARN_ON(mc_dev->resource))
++	if (mc_dev->resource)
+ 		goto out;
  
- /**
-  * dpaa2_io_store_next() - Determine when the next dequeue result is available.
-@@ -550,4 +550,4 @@ struct dpaa2_dq *dpaa2_io_store_next(struct dpaa2_io_store *s, int *is_last)
+ 	res_pool = &mc_bus->resource_pools[pool_type];
+-	if (WARN_ON(res_pool->type != pool_type))
++	if (res_pool->type != pool_type)
+ 		goto out;
+-	if (WARN_ON(res_pool->mc_bus != mc_bus))
++	if (res_pool->mc_bus != mc_bus)
+ 		goto out;
  
- 	return ret;
- }
--EXPORT_SYMBOL(dpaa2_io_store_next);
-+EXPORT_SYMBOL_GPL(dpaa2_io_store_next);
+ 	mutex_lock(&res_pool->mutex);
+ 
+-	if (WARN_ON(res_pool->max_count < 0))
++	if (res_pool->max_count < 0)
+ 		goto out_unlock;
+-	if (WARN_ON(res_pool->free_count < 0 ||
+-		    res_pool->free_count > res_pool->max_count))
++	if (res_pool->free_count < 0 ||
++	    res_pool->free_count > res_pool->max_count)
+ 		goto out_unlock;
+ 
+ 	resource = devm_kzalloc(&mc_bus_dev->dev, sizeof(*resource),
+@@ -105,25 +105,25 @@ static int __must_check fsl_mc_resource_pool_remove_device(struct fsl_mc_device
+ 	struct fsl_mc_resource *resource;
+ 	int error = -EINVAL;
+ 
+-	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
++	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
+ 		goto out;
+ 
+ 	resource = mc_dev->resource;
+-	if (WARN_ON(!resource || resource->data != mc_dev))
++	if (!resource || resource->data != mc_dev)
+ 		goto out;
+ 
+ 	mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+ 	mc_bus = to_fsl_mc_bus(mc_bus_dev);
+ 	res_pool = resource->parent_pool;
+-	if (WARN_ON(res_pool != &mc_bus->resource_pools[resource->type]))
++	if (res_pool != &mc_bus->resource_pools[resource->type])
+ 		goto out;
+ 
+ 	mutex_lock(&res_pool->mutex);
+ 
+-	if (WARN_ON(res_pool->max_count <= 0))
++	if (res_pool->max_count <= 0)
+ 		goto out_unlock;
+-	if (WARN_ON(res_pool->free_count <= 0 ||
+-		    res_pool->free_count > res_pool->max_count))
++	if (res_pool->free_count <= 0 ||
++	    res_pool->free_count > res_pool->max_count)
+ 		goto out_unlock;
+ 
+ 	/*
+@@ -187,11 +187,11 @@ int __must_check fsl_mc_resource_allocate(struct fsl_mc_bus *mc_bus,
+ 		     FSL_MC_NUM_POOL_TYPES);
+ 
+ 	*new_resource = NULL;
+-	if (WARN_ON(pool_type < 0 || pool_type >= FSL_MC_NUM_POOL_TYPES))
++	if (pool_type < 0 || pool_type >= FSL_MC_NUM_POOL_TYPES)
+ 		goto out;
+ 
+ 	res_pool = &mc_bus->resource_pools[pool_type];
+-	if (WARN_ON(res_pool->mc_bus != mc_bus))
++	if (res_pool->mc_bus != mc_bus)
+ 		goto out;
+ 
+ 	mutex_lock(&res_pool->mutex);
+@@ -206,12 +206,12 @@ int __must_check fsl_mc_resource_allocate(struct fsl_mc_bus *mc_bus,
+ 		goto out_unlock;
+ 	}
+ 
+-	if (WARN_ON(resource->type != pool_type))
++	if (resource->type != pool_type)
+ 		goto out_unlock;
+-	if (WARN_ON(resource->parent_pool != res_pool))
++	if (resource->parent_pool != res_pool)
+ 		goto out_unlock;
+-	if (WARN_ON(res_pool->free_count <= 0 ||
+-		    res_pool->free_count > res_pool->max_count))
++	if (res_pool->free_count <= 0 ||
++	    res_pool->free_count > res_pool->max_count)
+ 		goto out_unlock;
+ 
+ 	list_del_init(&resource->node);
+@@ -231,15 +231,15 @@ void fsl_mc_resource_free(struct fsl_mc_resource *resource)
+ 	struct fsl_mc_resource_pool *res_pool;
+ 
+ 	res_pool = resource->parent_pool;
+-	if (WARN_ON(resource->type != res_pool->type))
++	if (resource->type != res_pool->type)
+ 		return;
+ 
+ 	mutex_lock(&res_pool->mutex);
+-	if (WARN_ON(res_pool->free_count < 0 ||
+-		    res_pool->free_count >= res_pool->max_count))
++	if (res_pool->free_count < 0 ||
++	    res_pool->free_count >= res_pool->max_count)
+ 		goto out_unlock;
+ 
+-	if (WARN_ON(!list_empty(&resource->node)))
++	if (!list_empty(&resource->node))
+ 		goto out_unlock;
+ 
+ 	list_add_tail(&resource->node, &res_pool->free_list);
+@@ -278,13 +278,13 @@ int __must_check fsl_mc_object_allocate(struct fsl_mc_device *mc_dev,
+ 	struct fsl_mc_resource *resource = NULL;
+ 
+ 	*new_mc_adev = NULL;
+-	if (WARN_ON(mc_dev->flags & FSL_MC_IS_DPRC))
++	if (mc_dev->flags & FSL_MC_IS_DPRC)
+ 		goto error;
+ 
+-	if (WARN_ON(!dev_is_fsl_mc(mc_dev->dev.parent)))
++	if (!dev_is_fsl_mc(mc_dev->dev.parent))
+ 		goto error;
+ 
+-	if (WARN_ON(pool_type == FSL_MC_POOL_DPMCP))
++	if (pool_type == FSL_MC_POOL_DPMCP)
+ 		goto error;
+ 
+ 	mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+@@ -294,7 +294,7 @@ int __must_check fsl_mc_object_allocate(struct fsl_mc_device *mc_dev,
+ 		goto error;
+ 
+ 	mc_adev = resource->data;
+-	if (WARN_ON(!mc_adev))
++	if (!mc_adev)
+ 		goto error;
+ 
+ 	*new_mc_adev = mc_adev;
+@@ -317,9 +317,9 @@ void fsl_mc_object_free(struct fsl_mc_device *mc_adev)
+ 	struct fsl_mc_resource *resource;
+ 
+ 	resource = mc_adev->resource;
+-	if (WARN_ON(resource->type == FSL_MC_POOL_DPMCP))
++	if (resource->type == FSL_MC_POOL_DPMCP)
+ 		return;
+-	if (WARN_ON(resource->data != mc_adev))
++	if (resource->data != mc_adev)
+ 		return;
+ 
+ 	fsl_mc_resource_free(resource);
+@@ -348,8 +348,8 @@ int fsl_mc_populate_irq_pool(struct fsl_mc_bus *mc_bus,
+ 	struct fsl_mc_resource_pool *res_pool =
+ 			&mc_bus->resource_pools[FSL_MC_POOL_IRQ];
+ 
+-	if (WARN_ON(irq_count == 0 ||
+-		    irq_count > FSL_MC_IRQ_POOL_MAX_TOTAL_IRQS))
++	if (irq_count == 0 ||
++	    irq_count > FSL_MC_IRQ_POOL_MAX_TOTAL_IRQS)
+ 		return -EINVAL;
+ 
+ 	error = fsl_mc_msi_domain_alloc_irqs(&mc_bus_dev->dev, irq_count);
+@@ -405,13 +405,13 @@ void fsl_mc_cleanup_irq_pool(struct fsl_mc_bus *mc_bus)
+ 	struct fsl_mc_resource_pool *res_pool =
+ 			&mc_bus->resource_pools[FSL_MC_POOL_IRQ];
+ 
+-	if (WARN_ON(!mc_bus->irq_resources))
++	if (!mc_bus->irq_resources)
+ 		return;
+ 
+-	if (WARN_ON(res_pool->max_count == 0))
++	if (res_pool->max_count == 0)
+ 		return;
+ 
+-	if (WARN_ON(res_pool->free_count != res_pool->max_count))
++	if (res_pool->free_count != res_pool->max_count)
+ 		return;
+ 
+ 	INIT_LIST_HEAD(&res_pool->free_list);
+@@ -435,11 +435,11 @@ int __must_check fsl_mc_allocate_irqs(struct fsl_mc_device *mc_dev)
+ 	struct fsl_mc_bus *mc_bus;
+ 	struct fsl_mc_resource_pool *res_pool;
+ 
+-	if (WARN_ON(mc_dev->irqs))
++	if (mc_dev->irqs)
+ 		return -EINVAL;
+ 
+ 	irq_count = mc_dev->obj_desc.irq_count;
+-	if (WARN_ON(irq_count == 0))
++	if (irq_count == 0)
+ 		return -EINVAL;
+ 
+ 	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
+@@ -447,7 +447,7 @@ int __must_check fsl_mc_allocate_irqs(struct fsl_mc_device *mc_dev)
+ 	else
+ 		mc_bus = to_fsl_mc_bus(to_fsl_mc_device(mc_dev->dev.parent));
+ 
+-	if (WARN_ON(!mc_bus->irq_resources))
++	if (!mc_bus->irq_resources)
+ 		return -EINVAL;
+ 
+ 	res_pool = &mc_bus->resource_pools[FSL_MC_POOL_IRQ];
+@@ -500,7 +500,7 @@ void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev)
+ 	struct fsl_mc_bus *mc_bus;
+ 	struct fsl_mc_device_irq **irqs = mc_dev->irqs;
+ 
+-	if (WARN_ON(!irqs))
++	if (!irqs)
+ 		return;
+ 
+ 	irq_count = mc_dev->obj_desc.irq_count;
+@@ -510,7 +510,7 @@ void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev)
+ 	else
+ 		mc_bus = to_fsl_mc_bus(to_fsl_mc_device(mc_dev->dev.parent));
+ 
+-	if (WARN_ON(!mc_bus->irq_resources))
++	if (!mc_bus->irq_resources)
+ 		return;
+ 
+ 	for (i = 0; i < irq_count; i++) {
+@@ -575,11 +575,11 @@ static int fsl_mc_allocator_probe(struct fsl_mc_device *mc_dev)
+ 	struct fsl_mc_bus *mc_bus;
+ 	int error;
+ 
+-	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
++	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
+ 		return -EINVAL;
+ 
+ 	mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+-	if (WARN_ON(!dev_is_fsl_mc(&mc_bus_dev->dev)))
++	if (!dev_is_fsl_mc(&mc_bus_dev->dev))
+ 		return -EINVAL;
+ 
+ 	mc_bus = to_fsl_mc_bus(mc_bus_dev);
+@@ -604,7 +604,7 @@ static int fsl_mc_allocator_remove(struct fsl_mc_device *mc_dev)
+ {
+ 	int error;
+ 
+-	if (WARN_ON(!fsl_mc_is_allocatable(mc_dev->obj_desc.type)))
++	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
+ 		return -EINVAL;
+ 
+ 	if (mc_dev->resource) {
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+index 1c2fd8d..854bd80 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
+@@ -284,9 +284,9 @@ static int mc_get_version(struct fsl_mc_io *mc_io,
+ static void fsl_mc_get_root_dprc(struct device *dev,
+ 				 struct device **root_dprc_dev)
+ {
+-	if (WARN_ON(!dev)) {
++	if (!dev) {
+ 		*root_dprc_dev = NULL;
+-	} else if (WARN_ON(!dev_is_fsl_mc(dev))) {
++	} else if (!dev_is_fsl_mc(dev)) {
+ 		*root_dprc_dev = NULL;
+ 	} else {
+ 		*root_dprc_dev = dev;
+@@ -532,7 +532,7 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
+ 			/*
+ 			 * device being added is the root DPRC device
+ 			 */
+-			if (WARN_ON(!mc_io)) {
++			if (!mc_io) {
+ 				error = -EINVAL;
+ 				goto error_cleanup_dev;
+ 			}
+@@ -814,7 +814,7 @@ static int fsl_mc_bus_remove(struct platform_device *pdev)
+ {
+ 	struct fsl_mc *mc = platform_get_drvdata(pdev);
+ 
+-	if (WARN_ON(!fsl_mc_is_root_dprc(&mc->root_mc_bus_dev->dev)))
++	if (!fsl_mc_is_root_dprc(&mc->root_mc_bus_dev->dev))
+ 		return -EINVAL;
+ 
+ 	fsl_mc_device_remove(mc->root_mc_bus_dev);
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+index 0ce6117..625ba07 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-msi.c
+@@ -47,7 +47,7 @@ static void fsl_mc_msi_update_dom_ops(struct msi_domain_info *info)
+ {
+ 	struct msi_domain_ops *ops = info->ops;
+ 
+-	if (WARN_ON(!ops))
++	if (!ops)
+ 		return;
+ 
+ 	/*
+@@ -73,7 +73,7 @@ static void __fsl_mc_msi_write_msg(struct fsl_mc_device *mc_bus_dev,
+ 	if (msi_desc->msg.address_lo == 0x0 && msi_desc->msg.address_hi == 0x0)
+ 		return;
+ 
+-	if (WARN_ON(!owner_mc_dev))
++	if (!owner_mc_dev)
+ 		return;
+ 
+ 	irq_cfg.paddr = ((u64)msi_desc->msg.address_hi << 32) |
+@@ -136,7 +136,7 @@ static void fsl_mc_msi_update_chip_ops(struct msi_domain_info *info)
+ {
+ 	struct irq_chip *chip = info->chip;
+ 
+-	if (WARN_ON(!chip))
++	if (!chip)
+ 		return;
+ 
+ 	/*
+@@ -238,7 +238,7 @@ int fsl_mc_msi_domain_alloc_irqs(struct device *dev,
+ 	struct irq_domain *msi_domain;
+ 	int error;
+ 
+-	if (WARN_ON(!list_empty(dev_to_msi_list(dev))))
++	if (!list_empty(dev_to_msi_list(dev)))
+ 		return -EINVAL;
+ 
+ 	error = fsl_mc_msi_alloc_descs(dev, irq_count);
+@@ -246,7 +246,7 @@ int fsl_mc_msi_domain_alloc_irqs(struct device *dev,
+ 		return error;
+ 
+ 	msi_domain = dev_get_msi_domain(dev);
+-	if (WARN_ON(!msi_domain)) {
++	if (!msi_domain) {
+ 		error = -EINVAL;
+ 		goto cleanup_msi_descs;
+ 	}
+@@ -274,12 +274,12 @@ void fsl_mc_msi_domain_free_irqs(struct device *dev)
+ 	struct irq_domain *msi_domain;
+ 
+ 	msi_domain = dev_get_msi_domain(dev);
+-	if (WARN_ON(!msi_domain))
++	if (!msi_domain)
+ 		return;
+ 
+ 	msi_domain_free_irqs(msi_domain, dev);
+ 
+-	if (WARN_ON(list_empty(dev_to_msi_list(dev))))
++	if (list_empty(dev_to_msi_list(dev)))
+ 		return;
+ 
+ 	fsl_mc_msi_free_descs(dev);
+diff --git a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+index 947378f..6d81ac0 100644
+--- a/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
++++ b/drivers/staging/fsl-mc/bus/irq-gic-v3-its-fsl-mc-msi.c
+@@ -32,11 +32,11 @@ static int its_fsl_mc_msi_prepare(struct irq_domain *msi_domain,
+ 	struct fsl_mc_device *mc_bus_dev;
+ 	struct msi_domain_info *msi_info;
+ 
+-	if (WARN_ON(!dev_is_fsl_mc(dev)))
++	if (!dev_is_fsl_mc(dev))
+ 		return -EINVAL;
+ 
+ 	mc_bus_dev = to_fsl_mc_device(dev);
+-	if (WARN_ON(!(mc_bus_dev->flags & FSL_MC_IS_DPRC)))
++	if (!(mc_bus_dev->flags & FSL_MC_IS_DPRC))
+ 		return -EINVAL;
+ 
+ 	/*
+diff --git a/drivers/staging/fsl-mc/bus/mc-io.c b/drivers/staging/fsl-mc/bus/mc-io.c
+index 5530856..3cbf92d 100644
+--- a/drivers/staging/fsl-mc/bus/mc-io.c
++++ b/drivers/staging/fsl-mc/bus/mc-io.c
+@@ -42,13 +42,10 @@ static int fsl_mc_io_set_dpmcp(struct fsl_mc_io *mc_io,
+ {
+ 	int error;
+ 
+-	if (WARN_ON(!dpmcp_dev))
++	if (mc_io->dpmcp_dev)
+ 		return -EINVAL;
+ 
+-	if (WARN_ON(mc_io->dpmcp_dev))
+-		return -EINVAL;
+-
+-	if (WARN_ON(dpmcp_dev->mc_io))
++	if (dpmcp_dev->mc_io)
+ 		return -EINVAL;
+ 
+ 	error = dpmcp_open(mc_io,
+@@ -204,7 +201,7 @@ int __must_check fsl_mc_portal_allocate(struct fsl_mc_device *mc_dev,
+ 	if (mc_dev->flags & FSL_MC_IS_DPRC) {
+ 		mc_bus_dev = mc_dev;
+ 	} else {
+-		if (WARN_ON(!dev_is_fsl_mc(mc_dev->dev.parent)))
++		if (!dev_is_fsl_mc(mc_dev->dev.parent))
+ 			return error;
+ 
+ 		mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+@@ -267,10 +264,10 @@ void fsl_mc_portal_free(struct fsl_mc_io *mc_io)
+ 	dpmcp_dev = mc_io->dpmcp_dev;
+ 
+ 	resource = dpmcp_dev->resource;
+-	if (WARN_ON(!resource || resource->type != FSL_MC_POOL_DPMCP))
++	if (!resource || resource->type != FSL_MC_POOL_DPMCP)
+ 		return;
+ 
+-	if (WARN_ON(resource->data != dpmcp_dev))
++	if (resource->data != dpmcp_dev)
+ 		return;
+ 
+ 	fsl_destroy_mc_io(mc_io);
+diff --git a/drivers/staging/fsl-mc/bus/mc-sys.c b/drivers/staging/fsl-mc/bus/mc-sys.c
+index a2854e5..db3636d 100644
+--- a/drivers/staging/fsl-mc/bus/mc-sys.c
++++ b/drivers/staging/fsl-mc/bus/mc-sys.c
+@@ -85,7 +85,7 @@ static int mc_status_to_error(enum mc_cmd_status status)
+ 		[MC_CMD_STATUS_INVALID_STATE] = -ENODEV,
+ 	};
+ 
+-	if (WARN_ON((u32)status >= ARRAY_SIZE(mc_status_to_error_map)))
++	if ((u32)status >= ARRAY_SIZE(mc_status_to_error_map))
+ 		return -EINVAL;
+ 
+ 	return mc_status_to_error_map[status];
+@@ -273,8 +273,7 @@ int mc_send_command(struct fsl_mc_io *mc_io, struct mc_command *cmd)
+ 	enum mc_cmd_status status;
+ 	unsigned long irq_flags = 0;
+ 
+-	if (WARN_ON(in_irq() &&
+-		    !(mc_io->flags & FSL_MC_IO_ATOMIC_CONTEXT_PORTAL)))
++	if (in_irq() && !(mc_io->flags & FSL_MC_IO_ATOMIC_CONTEXT_PORTAL))
+ 		return -EINVAL;
+ 
+ 	if (mc_io->flags & FSL_MC_IO_ATOMIC_CONTEXT_PORTAL)
 -- 
 2.9.4
