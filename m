@@ -1,28 +1,55 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 16 Nov 2017 20:58:57 -0600
-Subject: [PATCH 3/4] [v6] pinctrl: qcom: disable GPIO groups with no pins
-In-Reply-To: <20171117024332.GU11955@codeaurora.org>
-References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
- <1510096056-13765-4-git-send-email-timur@codeaurora.org>
- <20171117024332.GU11955@codeaurora.org>
-Message-ID: <dff45d26-e9df-6a4f-00a9-7d9ec5cbdf49@codeaurora.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Fri, 17 Nov 2017 13:30:55 +1030
+Subject: [GIT PULL] ARM: dts: aspeed: Changes for v4.15
+In-Reply-To: <CACPK8XcdK9WxFAA-AztO1zfZyt2O4yLwVnnrSb0EnRKGvZmQjw@mail.gmail.com>
+References: <CACPK8XdG=wjKuAJJ7yzu320UPxKAGA-A2DYtrL5=CwCN2DNpBg@mail.gmail.com>
+ <CAK8P3a1PNhysyCne-7CihaFucUvz7_ccWOzJjihsi3y_CjgEDQ@mail.gmail.com>
+ <CACPK8XcdK9WxFAA-AztO1zfZyt2O4yLwVnnrSb0EnRKGvZmQjw@mail.gmail.com>
+Message-ID: <CACPK8XdVXhZHcc6ffGbLFxiK=y8zp9XPK4NNs90UWTRTcN3_ww@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/17 8:43 PM, Stephen Boyd wrote:
->> Most access to unavailable GPIOs can be blocked via the gpio_chip.request
->> function.  The one exception is when gpiochip_add_data() scans all of
+On Fri, Nov 17, 2017 at 1:27 PM, Joel Stanley <joel@jms.id.au> wrote:
+> On Fri, Oct 20, 2017 at 8:19 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> On Fri, Oct 6, 2017 at 9:05 AM, Joel Stanley <joel@jms.id.au> wrote:
+>>> Hello ARM SoC maintainers!
+>>>
+>>> Here are some ASPEED device tree updates for v4.15.
+>>>
+>>> Sadly our clk driver is still under review, so I have not been able to
+>>> include all of the patches I intended to. Alas, these improvements are
+>>> still useful.
+>>
+>> Pulled into next/dt
+>
+> I noticed this didn't make it into Linus tree for 4.15 :(
 
-> If patch 1 is applied is this statement still true?
+Scratch that. My mistake, it is there (I was looking at the wrong part
+of the diffstat). We should still clear up your query about the
+aliases.
 
-Nope.
-
->> the GPIOs without "requesting" them.  To cover this case,
-> s/GPIOs/GPIOs for their direction/ perhaps?
-
-Ok.
-
--- 
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
-Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+>
+> Was it because of your question below?
+>
+>>
+>>>     ARM: dts: aspeed: Add aliases for UARTs
+>>
+>> Can you explain this one? It looks like you now have aliases for
+>> all uart and i2c entries on all machines, even when they don't
+>> actually expose the ports. The purpose of the aliases is to
+>> only list the ones that are actually usable, so they should normally
+>> go into the board specific .dts files.
+>
+> Sorry for not responding to this at the time. I was on vacation.
+>
+> The idea was to maintain expectations for userspace where they assume
+> the character devices match the numbering of the hardware. So
+> /dev/ttyS4 is always the fifth uart, even when the board only has one
+> or two wired up.
+>
+> If we don't do that, our userspace developers have trouble telling
+> which UART is actually /dev/ttyS0, for example.
+>
+> Cheers,
+>
+> Joel
