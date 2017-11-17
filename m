@@ -1,98 +1,34 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:21:46 +0000
-Subject: [PATCH 03/18] arm64: mm: Move ASID from TTBR0 to TTBR1
+Date: Fri, 17 Nov 2017 18:21:45 +0000
+Subject: [PATCH 02/18] arm64: mm: Temporarily disable ARM64_SW_TTBR0_PAN
 In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for mapping kernelspace and userspace with different
-ASIDs, move the ASID to TTBR1 and update switch_mm to context-switch
-TTBR0 via an invalid mapping (the zero page).
+We're about to rework the way ASIDs are allocated, switch_mm is
+implemented and low-level kernel entry/exit is handled, so keep the
+ARM64_SW_TTBR0_PAN code out of the way whilst we do the heavy lifting.
+
+It will be re-enabled in a subsequent patch.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h   | 7 +++++++
- arch/arm64/include/asm/pgtable-hwdef.h | 1 +
- arch/arm64/include/asm/proc-fns.h      | 6 ------
- arch/arm64/mm/proc.S                   | 9 ++++++---
- 4 files changed, 14 insertions(+), 9 deletions(-)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a9b5e..56723bcbfaaa 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -37,6 +37,13 @@
- #include <asm/sysreg.h>
- #include <asm/tlbflush.h>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 0df64a6a56d4..582bbd77c390 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -872,6 +872,7 @@ endif
  
-+#define cpu_switch_mm(pgd,mm)				\
-+do {							\
-+	BUG_ON(pgd == swapper_pg_dir);			\
-+	cpu_set_reserved_ttbr0();			\
-+	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
-+} while (0)
-+
- static inline void contextidr_thread_switch(struct task_struct *next)
- {
- 	if (!IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR))
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index eb0c2bd90de9..8df4cb6ac6f7 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -272,6 +272,7 @@
- #define TCR_TG1_4K		(UL(2) << TCR_TG1_SHIFT)
- #define TCR_TG1_64K		(UL(3) << TCR_TG1_SHIFT)
- 
-+#define TCR_A1			(UL(1) << 22)
- #define TCR_ASID16		(UL(1) << 36)
- #define TCR_TBI0		(UL(1) << 37)
- #define TCR_HA			(UL(1) << 39)
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 14ad6e4e87d1..16cef2e8449e 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -35,12 +35,6 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
- #include <asm/memory.h>
- 
--#define cpu_switch_mm(pgd,mm)				\
--do {							\
--	BUG_ON(pgd == swapper_pg_dir);			\
--	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
--} while (0)
--
- #endif /* __ASSEMBLY__ */
- #endif /* __KERNEL__ */
- #endif /* __ASM_PROCFNS_H */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 877d42fb0df6..0bd7550b7230 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -139,9 +139,12 @@ ENDPROC(cpu_do_resume)
-  */
- ENTRY(cpu_do_switch_mm)
- 	pre_ttbr0_update_workaround x0, x2, x3
-+	mrs	x2, ttbr1_el1
- 	mmid	x1, x1				// get mm->context.id
--	bfi	x0, x1, #48, #16		// set the ASID
--	msr	ttbr0_el1, x0			// set TTBR0
-+	bfi	x2, x1, #48, #16		// set the ASID
-+	msr	ttbr1_el1, x2			// in TTBR1 (since TCR.A1 is set)
-+	isb
-+	msr	ttbr0_el1, x0			// now update TTBR0
- 	isb
- 	post_ttbr0_update_workaround
- 	ret
-@@ -225,7 +228,7 @@ ENTRY(__cpu_setup)
- 	 * both user and kernel.
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
--			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
-+			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
- 	tcr_set_idmap_t0sz	x10, x9
- 
- 	/*
+ config ARM64_SW_TTBR0_PAN
+ 	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
++	depends on BROKEN       # Temporary while switch_mm is reworked
+ 	help
+ 	  Enabling this option prevents the kernel from accessing
+ 	  user-space memory directly by pointing TTBR0_EL1 to a reserved
 -- 
 2.1.4
