@@ -1,8 +1,10 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 02:28:48 +0530
-Subject: [PATCH 1/3 v2] Input: omap4-keypad: Fix platform_get_irq's error
+Date: Sat, 18 Nov 2017 02:28:49 +0530
+Subject: [PATCH 2/3 v2] Input: twl4030_keypad: Fix platform_get_irq's error
  checking
-Message-ID: <f317ec56b23b11b79284c29d12a7004575aa35db.1510951446.git.arvind.yadav.cs@gmail.com>
+In-Reply-To: <f317ec56b23b11b79284c29d12a7004575aa35db.1510951446.git.arvind.yadav.cs@gmail.com>
+References: <f317ec56b23b11b79284c29d12a7004575aa35db.1510951446.git.arvind.yadav.cs@gmail.com>
+Message-ID: <d5ca46d63a41f47411b94c6035d3b8c46bbe8503.1510951446.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,27 +14,39 @@ for zero is not correct.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
-changes ib v2 :
-               Return error(irq) insted of -EINVAL.
+changes in v2 :
+              kp->irq is unsigned. use temporary int variable irq.
 
- drivers/input/keyboard/omap4-keypad.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/input/keyboard/twl4030_keypad.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
-index 940d38b..9ad840c 100644
---- a/drivers/input/keyboard/omap4-keypad.c
-+++ b/drivers/input/keyboard/omap4-keypad.c
-@@ -251,9 +251,9 @@ static int omap4_keypad_probe(struct platform_device *pdev)
+diff --git a/drivers/input/keyboard/twl4030_keypad.c b/drivers/input/keyboard/twl4030_keypad.c
+index f9f98ef..d921238 100644
+--- a/drivers/input/keyboard/twl4030_keypad.c
++++ b/drivers/input/keyboard/twl4030_keypad.c
+@@ -341,6 +341,7 @@ static int twl4030_kp_probe(struct platform_device *pdev)
+ 	struct input_dev *input;
+ 	u8 reg;
+ 	int error;
++	int irq;
+ 
+ 	kp = devm_kzalloc(&pdev->dev, sizeof(*kp), GFP_KERNEL);
+ 	if (!kp)
+@@ -388,11 +389,12 @@ static int twl4030_kp_probe(struct platform_device *pdev)
+ 		return -EINVAL;
  	}
  
- 	irq = platform_get_irq(pdev, 0);
--	if (!irq) {
+-	kp->irq = platform_get_irq(pdev, 0);
+-	if (!kp->irq) {
++	irq = platform_get_irq(pdev, 0);
 +	if (irq < 0) {
  		dev_err(&pdev->dev, "no keyboard irq assigned\n");
 -		return -EINVAL;
 +		return irq;
  	}
++	kp->irq = irq;
  
- 	keypad_data = kzalloc(sizeof(struct omap4_keypad), GFP_KERNEL);
+ 	error = matrix_keypad_build_keymap(keymap_data, NULL,
+ 					   TWL4030_MAX_ROWS,
 -- 
 2.7.4
