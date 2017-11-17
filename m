@@ -1,48 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:21:58 +0000
-Subject: [PATCH 15/18] arm64: tls: Avoid unconditional zeroing of tpidrro_el0
- for native tasks
-In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-16-git-send-email-will.deacon@arm.com>
+From: dave.stevenson@raspberrypi.org (Dave Stevenson)
+Date: Fri, 17 Nov 2017 18:30:23 +0000
+Subject: [PATCH] ARM: dts: bcm2835-rpi: Avoid conflicts on i2c0
+In-Reply-To: <87a7zmq7wy.fsf@anholt.net>
+References: <1510779424-642-1-git-send-email-stefan.wahren@i2se.com>
+ <87a7zmq7wy.fsf@anholt.net>
+Message-ID: <CAAoAYcPz6urucU1r_uNk1kvjsGg0p7VUrZwa5GZSDeDgsD=5Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We zero tpidrro_el0 on return to the exception trampoline since it is
-used as a scratch register during exception entry. When the entry
-trampoline is being used, we can therefore avoid zeroing tpidrro_el0
-in the context-switch for native tasks.
+On 16 November 2017 at 20:34, Eric Anholt <eric@anholt.net> wrote:
+> Stefan Wahren <stefan.wahren@i2se.com> writes:
+>
+>> The GPU firmware of the Raspberry Pi 3 uses i2c0 to communicate to
+>> the FXL6408 gpio expander. It's a bad idea to use the same interface
+>> from the ARM side. Since this interface isn't used by the other
+>> RPi boards, it's save to remove the complete node and avoid this
+>> conflict.
+>
+> It's not used by other kernel drivers currently, but should we leave it
+> in for the pi0/1/2 folks that might have userspace I2C stuff using it?
+> That's a thing people do, right?  I actually don't know.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/process.c | 12 +++++-------
- 1 file changed, 5 insertions(+), 7 deletions(-)
+The firmware hasn't used BSC0 for the GPIO expander since the end of
+January. It now bit bashes it. Sorry if that information hadn't
+filtered through.
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 2dc0f8482210..c2841bda60be 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -305,16 +305,14 @@ void tls_preserve_current_state(void)
- 
- static void tls_thread_switch(struct task_struct *next)
- {
--	unsigned long tpidr, tpidrro;
--
- 	tls_preserve_current_state();
- 
--	tpidr = *task_user_tls(next);
--	tpidrro = is_compat_thread(task_thread_info(next)) ?
--		  next->thread.tp_value : 0;
-+	if (is_compat_thread(task_thread_info(next)))
-+		write_sysreg(next->thread.tp_value, tpidrro_el0);
-+	else if (arm64_kernel_mapped_at_el0())
-+		write_sysreg(0, tpidrro_el0);
- 
--	write_sysreg(tpidr, tpidr_el0);
--	write_sysreg(tpidrro, tpidrro_el0);
-+	write_sysreg(*task_user_tls(next), tpidr_el0);
- }
- 
- /* Restore the UAO state depending on next's addr_limit */
--- 
-2.1.4
+I've got a patch I was about to send to rpi-linux for comment which
+sets up the i2c-mux-pinctrl driver on BSC0 so that it can be used
+either on GPIOs 0&1, or the GPIOs connected to the DSI and CSI
+connectors (I want it to talk to the camera module, and I guess Eric
+won't complain for talking to the DSI display). I'll aim to sort it on
+Monday.
+
+  Dave
