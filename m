@@ -1,5 +1,5 @@
 From: awallis@codeaurora.org (Adam Wallis)
-Date: Fri, 17 Nov 2017 12:17:26 -0500
+Date: Fri, 17 Nov 2017 12:28:37 -0500
 Subject: [PATCH v3][for 4.15] dmaengine: dmatest: move callback wait queue
  to thread context
 In-Reply-To: <79ea89ca-d8b6-0bfc-7bb5-053dcf5c40e4@codeaurora.org>
@@ -8,7 +8,7 @@ References: <1510927894-15297-1-git-send-email-awallis@codeaurora.org>
  <7637068c-4079-1235-cd6b-777907a42e8b@codeaurora.org>
  <CAPcyv4h2O7+nbxu2fyBNtcrisCntqRtFxAzDgP-7D9iAyGJSKw@mail.gmail.com>
  <79ea89ca-d8b6-0bfc-7bb5-053dcf5c40e4@codeaurora.org>
-Message-ID: <66a44d84-76df-1b2a-4b6b-33011f1687a4@codeaurora.org>
+Message-ID: <89ac9914-f1a9-3857-585e-1882668e839b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -42,10 +42,102 @@ On 11/17/2017 12:01 PM, Adam Wallis wrote:
 >>
 >> It's not broken, just a note for next time.
 >>
-One last question - if all we need is Fixes and CC stable...how do we indicate a
-dependency (for a cherry pick)?
+>>>
+>>>> You don't need 3 cc stables, you don't even need the "#
+>>>> kernel-version". Since you have the "Fixes:" line the target kernel(s)
+>>>> for the backport can be auto-determined. I should go update
+>>>> Documentation/process/stable-kernel-rules.rst to mention this.
+>>>>
+>>>>> Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
+>>>>> Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+>>>>> Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
+>>>>> Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+>>>>> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+>>>>> ---
+>>>>> changes from v2: Added "Fixes" tag
+>>>>> changes from v1: Added pre-req patches for stable
+>>>>>
+>>>>>  drivers/dma/dmatest.c | 37 ++++++++++++++++---------------------
+>>>>>  1 file changed, 16 insertions(+), 21 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+>>>>> index 47edc7f..2573b6c 100644
+>>>>> --- a/drivers/dma/dmatest.c
+>>>>> +++ b/drivers/dma/dmatest.c
+>>>>> @@ -155,6 +155,12 @@ struct dmatest_params {
+>>>>>  #define PATTERN_COUNT_MASK     0x1f
+>>>>>  #define PATTERN_MEMSET_IDX     0x01
+>>>>>
+>>>>> +/* poor man's completion - we want to use wait_event_freezable() on it */
+>>>>> +struct dmatest_done {
+>>>>> +       bool                    done;
+>>>>> +       wait_queue_head_t       *wait;
+>>>>> +};
+>>>>> +
+>>>>>  struct dmatest_thread {
+>>>>>         struct list_head        node;
+>>>>>         struct dmatest_info     *info;
+>>>>> @@ -165,6 +171,8 @@ struct dmatest_thread {
+>>>>>         u8                      **dsts;
+>>>>>         u8                      **udsts;
+>>>>>         enum dma_transaction_type type;
+>>>>> +       wait_queue_head_t done_wait;
+>>>>
+>>>> Why are we defining a waitquehead per thread vs defining one globally
+>>>> for the whole module with "static DECLARE_WAIT_QUEUE_HEAD(x);"?
+>>>
+>>> This is how the original dmatest functions. Each thread had a wait queue that it
+>>> created so that it could go to sleep while the DMA transfer occurred. Each
+>>> thread is dependent on its own DMA transaction for the wakeup call. Again, this
+>>> is how the test originally worked. I just moved the wait queue from the stack
+>>> (which was getting corrupted) to the thread context to allow for safe cleanup.
+>>> In other words, I haven't really changed how the test works...just fixing a bug
+>>> with the current implementation.
+>>
+>> Ok, always takes me a bit to re-orient myself to this file since I
+>> only look at it once a year.
+>>
+>> This fix seems incomplete. The next test iteration after a timeout
+>> will now reuse the per-thread 'done' notification. If the engine that
+>> timed out still completes its dma it will collide with the next
+>> operation that is using the same 'done' variable. So it seems to me
+>> that the wait_queue_head should be global, and the 'done' variable
+>> should be either allocated per-operation or we should call
+>> dmaengine_terminate_all() after a timeout. Since not all engines
+>> implement a terminate I think the potential memory leak of a few
+>> 'done' variables is a better option.
+>>
+> Dan
+> An important part of my patch was severed in this v3 submission. My apologies.
+> 
+> There is a change that addresses, I believe, your concern that was in v2
+> 
+>  	/* terminate all transfers on specified channels */
+> -	if (ret)
+> +	if (ret || failed_tests)
+>  		dmaengine_terminate_all(chan);
+> 
+> Will clean up again, retest, and resubmit. Thanks for your patience and instruction.
 
-Thanks
+Dan, I thought the patch was truncated, but it's all there in V3. I should have
+finished my coffee before responding. You are absolutely right that in the timed
+out case that dmaengine_terminate_all(chan) should be called, and that change is
+in fact already included in this patch set
+
+@@ -789,7 +782,7 @@ static int dmatest_func(void *data)
+ 		dmatest_KBs(runtime, total_len), ret);
+
+ 	/* terminate all transfers on specified channels */
+-	if (ret)
++	if (ret || failed_tests)
+ 		dmaengine_terminate_all(chan);
+
+Would you prefer that I add a better description in the commit text to address
+the fact this was in fact added?
+
+> 
+> Adam
+> 
 
 
 -- 
