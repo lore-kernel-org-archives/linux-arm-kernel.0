@@ -1,32 +1,34 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 00:45:29 +0530
-Subject: [PATCH 07/10] Input: sun4i-ts: Handle return value of platform_get_irq
+Date: Sat, 18 Nov 2017 00:45:25 +0530
+Subject: [PATCH 03/10] Input: twl4030_keypad: Fix platform_get_irq's error
+ checking
 In-Reply-To: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1510946132-13554-8-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1510946132-13554-4-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/input/touchscreen/sun4i-ts.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/input/keyboard/twl4030_keypad.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
-index d2e14d9..2753fd3 100644
---- a/drivers/input/touchscreen/sun4i-ts.c
-+++ b/drivers/input/touchscreen/sun4i-ts.c
-@@ -315,6 +315,9 @@ static int sun4i_ts_probe(struct platform_device *pdev)
- 		return PTR_ERR(ts->base);
+diff --git a/drivers/input/keyboard/twl4030_keypad.c b/drivers/input/keyboard/twl4030_keypad.c
+index f9f98ef..f94090e 100644
+--- a/drivers/input/keyboard/twl4030_keypad.c
++++ b/drivers/input/keyboard/twl4030_keypad.c
+@@ -389,7 +389,7 @@ static int twl4030_kp_probe(struct platform_device *pdev)
+ 	}
  
- 	ts->irq = platform_get_irq(pdev, 0);
-+	if (ts->irq < 0)
-+		return ts->irq;
-+
- 	error = devm_request_irq(dev, ts->irq, sun4i_ts_irq, 0, "sun4i-ts", ts);
- 	if (error)
- 		return error;
+ 	kp->irq = platform_get_irq(pdev, 0);
+-	if (!kp->irq) {
++	if (kp->irq < 0) {
+ 		dev_err(&pdev->dev, "no keyboard irq assigned\n");
+ 		return -EINVAL;
+ 	}
 -- 
 2.7.4
