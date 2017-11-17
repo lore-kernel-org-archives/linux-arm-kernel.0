@@ -1,37 +1,46 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 01:50:01 +0530
-Subject: [PATCH 1/10 v2] Input: ep93xx_keypad: Fix platform_get_irq's error
- checking
-Message-ID: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510949239.git.arvind.yadav.cs@gmail.com>
+Date: Sat, 18 Nov 2017 01:50:02 +0530
+Subject: [PATCH 7/10 v2] Input: sun4i-ts: Handle return value of
+ platform_get_irq
+In-Reply-To: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510949239.git.arvind.yadav.cs@gmail.com>
+References: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510949239.git.arvind.yadav.cs@gmail.com>
+Message-ID: <184c9420c0824fe60df98db0922762e3abfb2e05.1510949239.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
-changes in v2c:
-               Return keypad->irq insted of -ENXIO.
+changes in v2:
+             ts->irq is unsigned. use a temporary variable irq.
 
- drivers/input/keyboard/ep93xx_keypad.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/input/touchscreen/sun4i-ts.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
-index f77b295..01788a7 100644
---- a/drivers/input/keyboard/ep93xx_keypad.c
-+++ b/drivers/input/keyboard/ep93xx_keypad.c
-@@ -257,8 +257,8 @@ static int ep93xx_keypad_probe(struct platform_device *pdev)
- 	}
+diff --git a/drivers/input/touchscreen/sun4i-ts.c b/drivers/input/touchscreen/sun4i-ts.c
+index d2e14d9..315f26b 100644
+--- a/drivers/input/touchscreen/sun4i-ts.c
++++ b/drivers/input/touchscreen/sun4i-ts.c
+@@ -251,6 +251,7 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+ 	bool ts_attached;
+ 	u32 tp_sensitive_adjust = 15;
+ 	u32 filter_type = 1;
++	int irq;
  
- 	keypad->irq = platform_get_irq(pdev, 0);
--	if (!keypad->irq) {
--		err = -ENXIO;
-+	if (keypad->irq < 0) {
-+		err = keypad->irq;
- 		goto failed_free;
- 	}
+ 	ts = devm_kzalloc(dev, sizeof(struct sun4i_ts_data), GFP_KERNEL);
+ 	if (!ts)
+@@ -314,7 +315,10 @@ static int sun4i_ts_probe(struct platform_device *pdev)
+ 	if (IS_ERR(ts->base))
+ 		return PTR_ERR(ts->base);
  
+-	ts->irq = platform_get_irq(pdev, 0);
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return irq;
++	ts->irq = irq;
+ 	error = devm_request_irq(dev, ts->irq, sun4i_ts_irq, 0, "sun4i-ts", ts);
+ 	if (error)
+ 		return error;
 -- 
 2.7.4
