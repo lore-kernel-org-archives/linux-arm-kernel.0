@@ -1,86 +1,63 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 17 Nov 2017 05:39:06 -0800
-Subject: [PATCH v5 01/15] arm64: dts: renesas: r8a7795: Add IPMMU device
- nodes
-In-Reply-To: <CAMuHMdVXJduKrdb0+ujJX7O7_1omvfaWjCjTHwTafFD1sr=q=g@mail.gmail.com>
-References: <20171110132532.1202-1-horms+renesas@verge.net.au>
- <20171110132532.1202-2-horms+renesas@verge.net.au>
- <CAMuHMdVXJduKrdb0+ujJX7O7_1omvfaWjCjTHwTafFD1sr=q=g@mail.gmail.com>
-Message-ID: <20171117133905.qqnkjt5ckalcdgdy@verge.net.au>
+From: johan@kernel.org (Johan Hovold)
+Date: Fri, 17 Nov 2017 14:38:31 +0100
+Subject: [PATCH v2] PCI: keystone: fix interrupt-controller-node lookup
+Message-ID: <20171117133831.1300-1-johan@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 03:29:55PM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Fri, Nov 10, 2017 at 2:25 PM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > From: Magnus Damm <damm+renesas@opensource.se>
-> >
-> > Add r8a7795 IPMMU nodes and keep all disabled by default.
-> >
-> > This includes all IPMMU devices for r8a7795 ES2.0. Those
-> > not present in r8a7795 ES1.x are removed from the DT for those
-> > SoCs using delete-node. A follow-up patch will add IPMMU devices
-> > to ES1.x which are not also present in ES2.0.
-> >
-> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> > Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > v5 [Simon Horman]
-> > * Correct ES1.x override for ipmmu_vc0
-> > * Add ES1.x override for ipmmu_vc1
-> > * Drop mostly redundant comments from nodes
-> > * Add power domains
-> > * Consistently mark all nodes as disabled
-> 
-> Thanks for the update!
-> 
-> Looks like "power-domains" do work for IOMMU nodes.
-> However, adding them seems to postpone initialization of the IOMMUs.
-> 
-> With the two typos below fixed:
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Fix child-node lookup during initialisation which was using the wrong
+OF-helper and ended up searching the whole device tree depth-first
+starting at the parent rather than just matching on its children.
 
-Thanks, I have applied this patch with those fixes and your tag.
+To make things worse, the parent pci node could end up being prematurely
+freed as of_find_node_by_name() drops a reference to its first argument.
+Any matching child interrupt-controller node was also leaked.
 
-> 
-> > --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-> 
-> > +               ipmmu_vc0: mmu at fe6b0000 {
-> > +                       compatible = "renesas,ipmmu-r8a7795";
-> > +                       reg = <0 0xfe6b0000 0 0x1000>;
-> > +                       renesas,ipmmu-main = <&ipmmu_mm 12>;
-> > +                       power-domains = <&sysc R8A7795_PD_A3VP>;
-> 
-> R8A7795_PD_A3VC
-> 
-> > +                       #iommu-cells = <1>;
-> > +                       status = "disabled";
-> > +               };
-> > +
-> > +               ipmmu_vc1: mmu at fe6f0000 {
-> > +                       compatible = "renesas,ipmmu-r8a7795";
-> > +                       reg = <0 0xfe6f0000 0 0x1000>;
-> > +                       renesas,ipmmu-main = <&ipmmu_mm 13>;
-> > +                       power-domains = <&sysc R8A7795_PD_A3VP>;
-> 
-> R8A7795_PD_A3VC
-> 
-> > +                       #iommu-cells = <1>;
-> > +                       status = "disabled";
-> > +               };
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+Fixes: 0c4ffcfe1fbc ("PCI: keystone: Add TI Keystone PCIe driver")
+Cc: stable <stable@vger.kernel.org>     # 3.18
+Acked-by: Murali Karicheri <m-karicheri2@ti.com>
+Acked-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Signed-off-by: Johan Hovold <johan@kernel.org>
+---
+
+v2
+ - amend commit message and mention explicitly that of_find_node_by_name()
+   drops a reference to the start node
+ - add Murali's and Lorenzo's acks
+
+
+ drivers/pci/dwc/pci-keystone.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/pci/dwc/pci-keystone.c b/drivers/pci/dwc/pci-keystone.c
+index 5bee3af47588..39405598b22d 100644
+--- a/drivers/pci/dwc/pci-keystone.c
++++ b/drivers/pci/dwc/pci-keystone.c
+@@ -178,7 +178,7 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+ 	}
+ 
+ 	/* interrupt controller is in a child node */
+-	*np_temp = of_find_node_by_name(np_pcie, controller);
++	*np_temp = of_get_child_by_name(np_pcie, controller);
+ 	if (!(*np_temp)) {
+ 		dev_err(dev, "Node for %s is absent\n", controller);
+ 		return -EINVAL;
+@@ -187,6 +187,7 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+ 	temp = of_irq_count(*np_temp);
+ 	if (!temp) {
+ 		dev_err(dev, "No IRQ entries in %s\n", controller);
++		of_node_put(*np_temp);
+ 		return -EINVAL;
+ 	}
+ 
+@@ -204,6 +205,8 @@ static int ks_pcie_get_irq_controller_info(struct keystone_pcie *ks_pcie,
+ 			break;
+ 	}
+ 
++	of_node_put(*np_temp);
++
+ 	if (temp) {
+ 		*num_irqs = temp;
+ 		return 0;
+-- 
+2.15.0
