@@ -1,10 +1,10 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 00:45:24 +0530
-Subject: [PATCH 02/10] Input: omap4-keypad: Fix platform_get_irq's error
+Date: Sat, 18 Nov 2017 00:45:23 +0530
+Subject: [PATCH 01/10] Input: ep93xx_keypad: Fix platform_get_irq's error
  checking
 In-Reply-To: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1510946132-13554-3-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1510946132-13554-2-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,21 +14,21 @@ for zero is not correct.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/input/keyboard/omap4-keypad.c | 2 +-
+ drivers/input/keyboard/ep93xx_keypad.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
-index 940d38b..8a4b161 100644
---- a/drivers/input/keyboard/omap4-keypad.c
-+++ b/drivers/input/keyboard/omap4-keypad.c
-@@ -251,7 +251,7 @@ static int omap4_keypad_probe(struct platform_device *pdev)
+diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
+index f77b295..67efdc9 100644
+--- a/drivers/input/keyboard/ep93xx_keypad.c
++++ b/drivers/input/keyboard/ep93xx_keypad.c
+@@ -257,7 +257,7 @@ static int ep93xx_keypad_probe(struct platform_device *pdev)
  	}
  
- 	irq = platform_get_irq(pdev, 0);
--	if (!irq) {
-+	if (irq < 0) {
- 		dev_err(&pdev->dev, "no keyboard irq assigned\n");
- 		return -EINVAL;
+ 	keypad->irq = platform_get_irq(pdev, 0);
+-	if (!keypad->irq) {
++	if (keypad->irq < 0) {
+ 		err = -ENXIO;
+ 		goto failed_free;
  	}
 -- 
 2.7.4
