@@ -1,37 +1,34 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 00:45:22 +0530
-Subject: [PATCH 00/10] Handle platform_get_irq's error checking and returns
-Message-ID: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
+Date: Sat, 18 Nov 2017 00:45:24 +0530
+Subject: [PATCH 02/10] Input: omap4-keypad: Fix platform_get_irq's error
+ checking
+In-Reply-To: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1510946132-13554-3-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The platform_get_irq() function returns negative if an error occurs.
 zero or positive number on success. platform_get_irq() error checking
-for zero is not correct and we must check its return value.
+for zero is not correct.
 
-Arvind Yadav (10):
-  [PATCH 01/10] Input: ep93xx_keypad: Fix platform_get_irq's error checking
-  [PATCH 02/10] Input: omap4-keypad: Fix platform_get_irq's error checking
-  [PATCH 03/10] Input: twl4030_keypad: Fix platform_get_irq's error checking
-  [PATCH 04/10] Input: serio: Fix platform_get_irq's error checking
-  [PATCH 05/10] Input: cpcap-pwrbutton: Handle return value of platform_get_irq
-  [PATCH 06/10] Input: w90p910_ts: Handle return value of platform_get_irq
-  [PATCH 07/10] Input: sun4i-ts: Handle return value of platform_get_irq
-  [PATCH 08/10] Input: twl4030-pwrbutton: Handle return value of platform_get_irq
-  [PATCH 09/10] Input: sirfsoc-onkey: Handle return value of platform_get_irq
-  [PATCH 10/10] Input: palmas-pwrbutton: Handle return value of platform_get_irq
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+ drivers/input/keyboard/omap4-keypad.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/input/keyboard/ep93xx_keypad.c  | 2 +-
- drivers/input/keyboard/omap4-keypad.c   | 2 +-
- drivers/input/keyboard/twl4030_keypad.c | 2 +-
- drivers/input/misc/cpcap-pwrbutton.c    | 3 +++
- drivers/input/misc/palmas-pwrbutton.c   | 5 +++++
- drivers/input/misc/sirfsoc-onkey.c      | 3 +++
- drivers/input/misc/twl4030-pwrbutton.c  | 3 +++
- drivers/input/serio/sun4i-ps2.c         | 2 +-
- drivers/input/touchscreen/sun4i-ts.c    | 3 +++
- drivers/input/touchscreen/w90p910_ts.c  | 4 ++++
- 10 files changed, 25 insertions(+), 4 deletions(-)
-
+diff --git a/drivers/input/keyboard/omap4-keypad.c b/drivers/input/keyboard/omap4-keypad.c
+index 940d38b..8a4b161 100644
+--- a/drivers/input/keyboard/omap4-keypad.c
++++ b/drivers/input/keyboard/omap4-keypad.c
+@@ -251,7 +251,7 @@ static int omap4_keypad_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+-	if (!irq) {
++	if (irq < 0) {
+ 		dev_err(&pdev->dev, "no keyboard irq assigned\n");
+ 		return -EINVAL;
+ 	}
 -- 
 2.7.4
