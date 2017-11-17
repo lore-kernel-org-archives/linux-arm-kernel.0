@@ -1,33 +1,33 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 00:45:26 +0530
-Subject: [PATCH 04/10] Input: serio: Fix platform_get_irq's error checking
+Date: Sat, 18 Nov 2017 00:45:27 +0530
+Subject: [PATCH 05/10] Input: cpcap-pwrbutton: Handle return value of
+ platform_get_irq
 In-Reply-To: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1510946132-13554-5-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1510946132-13554-6-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/input/serio/sun4i-ps2.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/input/misc/cpcap-pwrbutton.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/input/serio/sun4i-ps2.c b/drivers/input/serio/sun4i-ps2.c
-index 04b96fe..405c82f 100644
---- a/drivers/input/serio/sun4i-ps2.c
-+++ b/drivers/input/serio/sun4i-ps2.c
-@@ -264,7 +264,7 @@ static int sun4i_ps2_probe(struct platform_device *pdev)
+diff --git a/drivers/input/misc/cpcap-pwrbutton.c b/drivers/input/misc/cpcap-pwrbutton.c
+index 0abef63..a4962e7 100644
+--- a/drivers/input/misc/cpcap-pwrbutton.c
++++ b/drivers/input/misc/cpcap-pwrbutton.c
+@@ -57,6 +57,9 @@ static int cpcap_power_button_probe(struct platform_device *pdev)
+ 	int irq = platform_get_irq(pdev, 0);
+ 	int err;
  
- 	/* Get IRQ for the device */
- 	irq = platform_get_irq(pdev, 0);
--	if (!irq) {
-+	if (irq < 0) {
- 		dev_err(dev, "no IRQ found\n");
- 		error = -ENXIO;
- 		goto err_disable_clk;
++	if (irq < 0)
++		return -ENODEV;
++
+ 	button = devm_kmalloc(&pdev->dev, sizeof(*button), GFP_KERNEL);
+ 	if (!button)
+ 		return -ENOMEM;
 -- 
 2.7.4
