@@ -1,38 +1,98 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 17 Nov 2017 18:08:04 +0000
-Subject: [PATCH] dt-bindings: qspi: Add r8a7743/5 to the compatible list
-In-Reply-To: <TY1PR06MB08958546062D685532669977C02F0@TY1PR06MB0895.apcprd06.prod.outlook.com>
-References: <1504858035-3568-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <TY1PR06MB08958546062D685532669977C02F0@TY1PR06MB0895.apcprd06.prod.outlook.com>
-Message-ID: <20171117180804.g2jzdv4c7sq33te7@sirena.org.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 17 Nov 2017 18:21:46 +0000
+Subject: [PATCH 03/18] arm64: mm: Move ASID from TTBR0 to TTBR1
+In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-4-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 17, 2017 at 06:00:46PM +0000, Fabrizio Castro wrote:
+In preparation for mapping kernelspace and userspace with different
+ASIDs, move the ASID to TTBR1 and update switch_mm to context-switch
+TTBR0 via an invalid mapping (the zero page).
 
-> this patch has been around for some time now, it was reviewed-by Geert Uytterhoeven and acked-by Rob Herring, any news?
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/mmu_context.h   | 7 +++++++
+ arch/arm64/include/asm/pgtable-hwdef.h | 1 +
+ arch/arm64/include/asm/proc-fns.h      | 6 ------
+ arch/arm64/mm/proc.S                   | 9 ++++++---
+ 4 files changed, 14 insertions(+), 9 deletions(-)
 
-Please don't send content free pings and please allow a reasonable time
-for review.  People get busy, go on holiday, attend conferences and so 
-on so unless there is some reason for urgency (like critical bug fixes)
-please allow at least a couple of weeks for review.  If there have been
-review comments then people may be waiting for those to be addressed.
-
-Sending content free pings adds to the mail volume (if they are seen at
-all) which is often the problem and since they can't be reviewed
-directly if something has gone wrong you'll have to resend the patches
-anyway, though there are some other maintainers who like them - if in
-doubt look at how patches for the subsystem are normally handled.
-
-Please submit patches using subject lines reflecting the style for the
-subsystem.  This makes it easier for people to identify relevant
-patches.  Look at what existing commits in the area you're changing are
-doing and make sure your subject lines visually resemble what they're
-doing.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171117/502e4646/attachment.sig>
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 3257895a9b5e..56723bcbfaaa 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -37,6 +37,13 @@
+ #include <asm/sysreg.h>
+ #include <asm/tlbflush.h>
+ 
++#define cpu_switch_mm(pgd,mm)				\
++do {							\
++	BUG_ON(pgd == swapper_pg_dir);			\
++	cpu_set_reserved_ttbr0();			\
++	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
++} while (0)
++
+ static inline void contextidr_thread_switch(struct task_struct *next)
+ {
+ 	if (!IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR))
+diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
+index eb0c2bd90de9..8df4cb6ac6f7 100644
+--- a/arch/arm64/include/asm/pgtable-hwdef.h
++++ b/arch/arm64/include/asm/pgtable-hwdef.h
+@@ -272,6 +272,7 @@
+ #define TCR_TG1_4K		(UL(2) << TCR_TG1_SHIFT)
+ #define TCR_TG1_64K		(UL(3) << TCR_TG1_SHIFT)
+ 
++#define TCR_A1			(UL(1) << 22)
+ #define TCR_ASID16		(UL(1) << 36)
+ #define TCR_TBI0		(UL(1) << 37)
+ #define TCR_HA			(UL(1) << 39)
+diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
+index 14ad6e4e87d1..16cef2e8449e 100644
+--- a/arch/arm64/include/asm/proc-fns.h
++++ b/arch/arm64/include/asm/proc-fns.h
+@@ -35,12 +35,6 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
+ 
+ #include <asm/memory.h>
+ 
+-#define cpu_switch_mm(pgd,mm)				\
+-do {							\
+-	BUG_ON(pgd == swapper_pg_dir);			\
+-	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
+-} while (0)
+-
+ #endif /* __ASSEMBLY__ */
+ #endif /* __KERNEL__ */
+ #endif /* __ASM_PROCFNS_H */
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 877d42fb0df6..0bd7550b7230 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -139,9 +139,12 @@ ENDPROC(cpu_do_resume)
+  */
+ ENTRY(cpu_do_switch_mm)
+ 	pre_ttbr0_update_workaround x0, x2, x3
++	mrs	x2, ttbr1_el1
+ 	mmid	x1, x1				// get mm->context.id
+-	bfi	x0, x1, #48, #16		// set the ASID
+-	msr	ttbr0_el1, x0			// set TTBR0
++	bfi	x2, x1, #48, #16		// set the ASID
++	msr	ttbr1_el1, x2			// in TTBR1 (since TCR.A1 is set)
++	isb
++	msr	ttbr0_el1, x0			// now update TTBR0
+ 	isb
+ 	post_ttbr0_update_workaround
+ 	ret
+@@ -225,7 +228,7 @@ ENTRY(__cpu_setup)
+ 	 * both user and kernel.
+ 	 */
+ 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+-			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
++			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
+ 	tcr_set_idmap_t0sz	x10, x9
+ 
+ 	/*
+-- 
+2.1.4
