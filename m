@@ -1,45 +1,29 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Fri, 17 Nov 2017 12:27:54 -0800
-Subject: [PATCH 04/10] Input: serio: Fix platform_get_irq's error checking
-In-Reply-To: <1510946132-13554-5-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1510946132-13554-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1510946132-13554-5-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20171117202754.5h7arnxqxck3yegm@dtor-ws>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Sat, 18 Nov 2017 01:58:16 +0530
+Subject: [PATCH 0/6] mmc: Handle platform_get_irq's error checking and return
+Message-ID: <1510950502-22565-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 18, 2017 at 12:45:26AM +0530, Arvind Yadav wrote:
-> The platform_get_irq() function returns negative if an error occurs.
-> zero or positive number on success. platform_get_irq() error checking
-> for zero is not correct.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/input/serio/sun4i-ps2.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/serio/sun4i-ps2.c b/drivers/input/serio/sun4i-ps2.c
-> index 04b96fe..405c82f 100644
-> --- a/drivers/input/serio/sun4i-ps2.c
-> +++ b/drivers/input/serio/sun4i-ps2.c
-> @@ -264,7 +264,7 @@ static int sun4i_ps2_probe(struct platform_device *pdev)
->  
->  	/* Get IRQ for the device */
->  	irq = platform_get_irq(pdev, 0);
-> -	if (!irq) {
-> +	if (irq < 0) {
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct and and we must check its return value.
 
-irq is unsigned.
+Arvind Yadav (6):
+  [PATCH 1/6] mmc: meson-gx-mmc: Fix platform_get_irq's error checking
+  [PATCH 2/6] mmc: s3cmci: Fix platform_get_irq's error checking
+  [PATCH 3/6] mmc: sdhci-acpi: Handle return value of platform_get_irq
+  [PATCH 4/6] mmc: sdhci-spear: Handle return value of platform_get_irq
+  [PATCH 5/6] mmc: sh_mmcif: Handle return value of platform_get_irq
+  [PATCH 6/6] mmc: sunxi-mmc: Handle return value of platform_get_irq
 
->  		dev_err(dev, "no IRQ found\n");
->  		error = -ENXIO;
-
-I'd rather we did not clobber error.
-
->  		goto err_disable_clk;
-> -- 
-> 2.7.4
-> 
+ drivers/mmc/host/meson-gx-mmc.c | 4 ++--
+ drivers/mmc/host/s3cmci.c       | 4 ++--
+ drivers/mmc/host/sdhci-acpi.c   | 4 ++++
+ drivers/mmc/host/sdhci-spear.c  | 4 ++++
+ drivers/mmc/host/sh_mmcif.c     | 2 +-
+ drivers/mmc/host/sunxi-mmc.c    | 5 +++++
+ 6 files changed, 18 insertions(+), 5 deletions(-)
 
 -- 
-Dmitry
+2.7.4
