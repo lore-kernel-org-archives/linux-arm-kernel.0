@@ -1,145 +1,98 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Fri, 17 Nov 2017 09:11:34 -0500
-Subject: [PATCH v3][for 4.15] dmaengine: dmatest: move callback wait queue to
- thread context
-Message-ID: <1510927894-15297-1-git-send-email-awallis@codeaurora.org>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Fri, 17 Nov 2017 15:13:34 +0100
+Subject: [PATCH 1/2] ARM: dts: Add the support for display5 equipped
+ with Mitsubishi (800x480) display
+In-Reply-To: <20171117131047.GE25390@dragon>
+References: <20171117102404.6678-1-lukma@denx.de>
+ <20171117131047.GE25390@dragon>
+Message-ID: <20171117151334.041c4684@jawa>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
-introduced a bug (that is in fact documented by the patch commit text)
-that leaves behind a dangling pointer. Since the done_wait structure is
-allocated on the stack, future invocations to the DMATEST can produce
-undesirable results (e.g., corrupted spinlocks).
+Hi Shawn,
 
-Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
-out") attempted to WARN the user that the stack was likely corrupted but
-did not fix the actual issue.
+> On Fri, Nov 17, 2017 at 11:24:03AM +0100, Lukasz Majewski wrote:
+> > This is the support for aa070mc01-ca1 Mitsubishi display.
+> > 
+> > Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> > ---
+> >  arch/arm/boot/dts/Makefile                         |  1 +
+> >  .../imx6q-display5-mitsubishi-aa070-800x480.dts    | 51
+> > ++++++++++++++++++++++ 2 files changed, 52 insertions(+)
+> >  create mode 100644
+> > arch/arm/boot/dts/imx6q-display5-mitsubishi-aa070-800x480.dts
+> > 
+> > diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> > index d9d0c82e7d20..10b3ad078dea 100644
+> > --- a/arch/arm/boot/dts/Makefile
+> > +++ b/arch/arm/boot/dts/Makefile
+> > @@ -407,6 +407,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+> >  	imx6q-cm-fx6.dtb \
+> >  	imx6q-cubox-i.dtb \
+> >  	imx6q-dfi-fs700-m60.dtb \
+> > +	imx6q-display5-mitsubishi-aa070-800x480.dtb \
+> >  	imx6q-display5-tianma-tm070-1280x768.dtb \
+> >  	imx6q-dmo-edmqmx6.dtb \
+> >  	imx6q-evi.dtb \  
+> 
+> <snip>
+> 
+> > +#include "imx6q-display5.dtsi"
+> > +
+> > +&panel {
+> > +	compatible = "mitsubishi,aa070mc01-ca1";
+> > +};  
+> 
+> How many DTB files do you want to add for this display5 board?  
 
-This patch fixes the issue by pushing the wait queue and callback
-structs into the the thread structure. If a failure occurs due to time,
-dmaengine_terminate_all will force the callback to safely call
-wake_up_all() without possibility of using a freed pointer.
+This is a single board, which can support panels which I've posted.
 
-Cc: stable at vger.kernel.org # 4.13.x: a9df21e: dmatest: Warn User
-Cc: stable at vger.kernel.org # 4.13.x
-Cc: stable at vger.kernel.org # 4.14.x
-Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
-Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
-Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
-Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
-changes from v2: Added "Fixes" tag
-changes from v1: Added pre-req patches for stable
+Those dtbs I do pack to u-boot' FIT image and don't need to worry that
+some display is not working (after setting bootloader env variable).
 
- drivers/dma/dmatest.c | 37 ++++++++++++++++---------------------
- 1 file changed, 16 insertions(+), 21 deletions(-)
+> It's
+> obvious no fun to maintain a bunch of DTB files for all the panels
+> this board can support.
 
-diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
-index 47edc7f..2573b6c 100644
---- a/drivers/dma/dmatest.c
-+++ b/drivers/dma/dmatest.c
-@@ -155,6 +155,12 @@ struct dmatest_params {
- #define PATTERN_COUNT_MASK	0x1f
- #define PATTERN_MEMSET_IDX	0x01
- 
-+/* poor man's completion - we want to use wait_event_freezable() on it */
-+struct dmatest_done {
-+	bool			done;
-+	wait_queue_head_t	*wait;
-+};
-+
- struct dmatest_thread {
- 	struct list_head	node;
- 	struct dmatest_info	*info;
-@@ -165,6 +171,8 @@ struct dmatest_thread {
- 	u8			**dsts;
- 	u8			**udsts;
- 	enum dma_transaction_type type;
-+	wait_queue_head_t done_wait;
-+	struct dmatest_done test_done;
- 	bool			done;
- };
- 
-@@ -342,11 +350,6 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
- 	return error_count;
- }
- 
--/* poor man's completion - we want to use wait_event_freezable() on it */
--struct dmatest_done {
--	bool			done;
--	wait_queue_head_t	*wait;
--};
- 
- static void dmatest_callback(void *arg)
- {
-@@ -424,9 +427,8 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
-  */
- static int dmatest_func(void *data)
- {
--	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(done_wait);
- 	struct dmatest_thread	*thread = data;
--	struct dmatest_done	done = { .wait = &done_wait };
-+	struct dmatest_done	*done = &thread->test_done;
- 	struct dmatest_info	*info;
- 	struct dmatest_params	*params;
- 	struct dma_chan		*chan;
-@@ -673,9 +675,9 @@ static int dmatest_func(void *data)
- 			continue;
- 		}
- 
--		done.done = false;
-+		done->done = false;
- 		tx->callback = dmatest_callback;
--		tx->callback_param = &done;
-+		tx->callback_param = done;
- 		cookie = tx->tx_submit(tx);
- 
- 		if (dma_submit_error(cookie)) {
-@@ -688,21 +690,12 @@ static int dmatest_func(void *data)
- 		}
- 		dma_async_issue_pending(chan);
- 
--		wait_event_freezable_timeout(done_wait, done.done,
-+		wait_event_freezable_timeout(thread->done_wait, done->done,
- 					     msecs_to_jiffies(params->timeout));
- 
- 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
- 
--		if (!done.done) {
--			/*
--			 * We're leaving the timed out dma operation with
--			 * dangling pointer to done_wait.  To make this
--			 * correct, we'll need to allocate wait_done for
--			 * each test iteration and perform "who's gonna
--			 * free it this time?" dancing.  For now, just
--			 * leave it dangling.
--			 */
--			WARN(1, "dmatest: Kernel stack may be corrupted!!\n");
-+		if (!done->done) {
- 			dmaengine_unmap_put(um);
- 			result("test timed out", total_tests, src_off, dst_off,
- 			       len, 0);
-@@ -789,7 +782,7 @@ static int dmatest_func(void *data)
- 		dmatest_KBs(runtime, total_len), ret);
- 
- 	/* terminate all transfers on specified channels */
--	if (ret)
-+	if (ret || failed_tests)
- 		dmaengine_terminate_all(chan);
- 
- 	thread->done = true;
-@@ -849,6 +842,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
- 		thread->info = info;
- 		thread->chan = dtc->chan;
- 		thread->type = type;
-+		thread->test_done.wait = &thread->done_wait;
-+		init_waitqueue_head(&thread->done_wait);
- 		smp_wmb();
- 		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
- 				dma_chan_name(chan), op, i);
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Please note that those files excessively use #include directive, and
+there is not so much code added (the longest part is license and
+comments).
+
+>  Let's stop right here.
+
+If I may ask - how shall I proceed? What would be your suggestion to
+move on (dtb overlays) ?
+
+
+> 
+> Shawn
+> 
+> > +
+> > +&ldb {
+> > +	lvds0: lvds-channel at 0 {
+> > +		fsl,data-mapping = "spwg";
+> > +		fsl,data-width = <24>;
+> > +	};
+> > +};
+> > -- 
+> > 2.11.0
+> >   
+
+
+
+Best regards,
+
+Lukasz Majewski
+
+--
+
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Phone: (+49)-8142-66989-10 Fax: (+49)-8142-66989-80 Email: wd at denx.de
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: not available
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171117/a2bd84d1/attachment.sig>
