@@ -1,104 +1,73 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:21:55 +0000
-Subject: [PATCH 12/18] arm64: entry: Explicitly pass exception level to
- kernel_ventry macro
+Date: Fri, 17 Nov 2017 18:21:51 +0000
+Subject: [PATCH 08/18] arm64: mm: Add arm64_kernel_mapped_at_el0 helper using
+ static key
 In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-13-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will need to treat exceptions from EL0 differently in kernel_ventry,
-so rework the macro to take the exception level as an argument and
-construct the branch target using that.
+In order for code such as TLB invalidation to operate efficiently when
+the decision to map the kernel at EL0 is determined at runtime, this
+patch introduces a helper function, arm64_kernel_mapped_at_el0, which
+uses a static key that will later be hooked up to a command-line option.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S | 46 +++++++++++++++++++++++-----------------------
- 1 file changed, 23 insertions(+), 23 deletions(-)
+ arch/arm64/include/asm/mmu.h | 11 +++++++++++
+ arch/arm64/mm/mmu.c          |  5 +++++
+ 2 files changed, 16 insertions(+)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index d850af724c8c..e98cf3064509 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -70,7 +70,7 @@
- #define BAD_FIQ		2
- #define BAD_ERROR	3
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 01bfb184f2a8..a84f851409ca 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -19,6 +19,8 @@
+ #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
+ #define USER_ASID_FLAG	(UL(1) << 48)
  
--	.macro kernel_ventry	label
-+	.macro kernel_ventry, el, label, regsize = 64
- 	.align 7
- 	sub	sp, sp, #S_FRAME_SIZE
- #ifdef CONFIG_VMAP_STACK
-@@ -83,7 +83,7 @@
- 	tbnz	x0, #THREAD_SHIFT, 0f
- 	sub	x0, sp, x0			// x0'' = sp' - x0' = (sp + x0) - sp = x0
- 	sub	sp, sp, x0			// sp'' = sp' - x0 = (sp + x0) - x0 = sp
--	b	\label
-+	b	el\()\el\()_\label
++#ifndef __ASSEMBLY__
++
+ typedef struct {
+ 	atomic64_t	id;
+ 	void		*vdso;
+@@ -32,6 +34,14 @@ typedef struct {
+  */
+ #define ASID(mm)	((mm)->context.id.counter & 0xffff)
  
- 0:
- 	/*
-@@ -115,7 +115,7 @@
- 	sub	sp, sp, x0
- 	mrs	x0, tpidrro_el0
++DECLARE_STATIC_KEY_TRUE(__unmap_kernel_at_el0);
++
++static inline bool arm64_kernel_mapped_at_el0(void)
++{
++	return !IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0) ||
++	       !static_branch_likely(&__unmap_kernel_at_el0);
++}
++
+ extern void paging_init(void);
+ extern void bootmem_init(void);
+ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+@@ -42,4 +52,5 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+ extern void mark_linear_text_alias_ro(void);
+ 
++#endif	/* !__ASSEMBLY__ */
  #endif
--	b	\label
-+	b	el\()\el\()_\label
- 	.endm
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index f1eb15e0e864..a75858267b6d 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -525,6 +525,11 @@ static int __init parse_rodata(char *arg)
+ }
+ early_param("rodata", parse_rodata);
  
- 	.macro	kernel_entry, el, regsize = 64
-@@ -366,31 +366,31 @@ tsk	.req	x28		// current thread_info
- 
- 	.align	11
- ENTRY(vectors)
--	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
--	kernel_ventry	el1_irq_invalid			// IRQ EL1t
--	kernel_ventry	el1_fiq_invalid			// FIQ EL1t
--	kernel_ventry	el1_error_invalid		// Error EL1t
-+	kernel_ventry	1, sync_invalid			// Synchronous EL1t
-+	kernel_ventry	1, irq_invalid			// IRQ EL1t
-+	kernel_ventry	1, fiq_invalid			// FIQ EL1t
-+	kernel_ventry	1, error_invalid		// Error EL1t
- 
--	kernel_ventry	el1_sync			// Synchronous EL1h
--	kernel_ventry	el1_irq				// IRQ EL1h
--	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
--	kernel_ventry	el1_error_invalid		// Error EL1h
-+	kernel_ventry	1, sync				// Synchronous EL1h
-+	kernel_ventry	1, irq				// IRQ EL1h
-+	kernel_ventry	1, fiq_invalid			// FIQ EL1h
-+	kernel_ventry	1, error_invalid		// Error EL1h
- 
--	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
--	kernel_ventry	el0_irq				// IRQ 64-bit EL0
--	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
--	kernel_ventry	el0_error_invalid		// Error 64-bit EL0
-+	kernel_ventry	0, sync				// Synchronous 64-bit EL0
-+	kernel_ventry	0, irq				// IRQ 64-bit EL0
-+	kernel_ventry	0, fiq_invalid			// FIQ 64-bit EL0
-+	kernel_ventry	0, error_invalid		// Error 64-bit EL0
- 
- #ifdef CONFIG_COMPAT
--	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
--	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
--	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
--	kernel_ventry	el0_error_invalid_compat	// Error 32-bit EL0
-+	kernel_ventry	0, sync_compat, 32		// Synchronous 32-bit EL0
-+	kernel_ventry	0, irq_compat, 32		// IRQ 32-bit EL0
-+	kernel_ventry	0, fiq_invalid_compat, 32	// FIQ 32-bit EL0
-+	kernel_ventry	0, error_invalid_compat, 32	// Error 32-bit EL0
- #else
--	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
--	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
--	kernel_ventry	el0_fiq_invalid			// FIQ 32-bit EL0
--	kernel_ventry	el0_error_invalid		// Error 32-bit EL0
-+	kernel_ventry	0, sync_invalid, 32		// Synchronous 32-bit EL0
-+	kernel_ventry	0, irq_invalid, 32		// IRQ 32-bit EL0
-+	kernel_ventry	0, fiq_invalid, 32		// FIQ 32-bit EL0
-+	kernel_ventry	0, error_invalid, 32		// Error 32-bit EL0
- #endif
- END(vectors)
- 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++DEFINE_STATIC_KEY_TRUE(__unmap_kernel_at_el0);
++EXPORT_SYMBOL_GPL(__unmap_kernel_at_el0);
++#endif
++
+ /*
+  * Create fine-grained mappings for the kernel.
+  */
 -- 
 2.1.4
