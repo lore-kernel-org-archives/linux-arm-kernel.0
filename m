@@ -1,53 +1,111 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Fri, 17 Nov 2017 15:38:26 +0200
-Subject: [PATCH 02/10] staging: fsl-mc/dpio: remove incomplete refcount
- implementation
+Date: Fri, 17 Nov 2017 15:38:30 +0200
+Subject: [PATCH 06/10] staging: fsl-mc/dpio: change to use EXPORT_SYMBOL_GPL()
 In-Reply-To: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
 References: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
-Message-ID: <20171117133834.4635-2-laurentiu.tudor@nxp.com>
+Message-ID: <20171117133834.4635-6-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-There's an unfinished implementation of reference counting for dpaa2_io
-structure using atomics. Since it's unused lets remove it for now and,
-if needed at a later time, make use of krefs instead of rolling our
-own refcounting.
+No need to use EXPORT_SYMBOL() so switch to the GPL variant.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/dpio/dpio-service.c | 4 ----
- 1 file changed, 4 deletions(-)
+ drivers/staging/fsl-mc/bus/dpio/dpio-service.c | 20 ++++++++++----------
+ 1 file changed, 10 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-index a609ec8..591d8b7 100644
+index 871078d..a8a8e15 100644
 --- a/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
 +++ b/drivers/staging/fsl-mc/bus/dpio/dpio-service.c
-@@ -43,7 +43,6 @@
- #include "qbman-portal.h"
- 
- struct dpaa2_io {
--	atomic_t refs;
- 	struct dpaa2_io_desc dpio_desc;
- 	struct qbman_swp_desc swp_desc;
- 	struct qbman_swp *swp;
-@@ -126,7 +125,6 @@ struct dpaa2_io *dpaa2_io_create(const struct dpaa2_io_desc *desc)
- 		return NULL;
- 	}
- 
--	atomic_set(&obj->refs, 1);
- 	obj->dpio_desc = *desc;
- 	obj->swp_desc.cena_bar = obj->dpio_desc.regs_cena;
- 	obj->swp_desc.cinh_bar = obj->dpio_desc.regs_cinh;
-@@ -171,8 +169,6 @@ EXPORT_SYMBOL(dpaa2_io_create);
-  */
- void dpaa2_io_down(struct dpaa2_io *d)
- {
--	if (!atomic_dec_and_test(&d->refs))
--		return;
- 	kfree(d);
+@@ -258,7 +258,7 @@ int dpaa2_io_service_register(struct dpaa2_io *d,
+ 							 ctx->qman64);
+ 	return 0;
  }
- EXPORT_SYMBOL(dpaa2_io_down);
+-EXPORT_SYMBOL(dpaa2_io_service_register);
++EXPORT_SYMBOL_GPL(dpaa2_io_service_register);
+ 
+ /**
+  * dpaa2_io_service_deregister - The opposite of 'register'.
+@@ -281,7 +281,7 @@ void dpaa2_io_service_deregister(struct dpaa2_io *service,
+ 	list_del(&ctx->node);
+ 	spin_unlock_irqrestore(&d->lock_notifications, irqflags);
+ }
+-EXPORT_SYMBOL(dpaa2_io_service_deregister);
++EXPORT_SYMBOL_GPL(dpaa2_io_service_deregister);
+ 
+ /**
+  * dpaa2_io_service_rearm() - Rearm the notification for the given DPIO service.
+@@ -315,7 +315,7 @@ int dpaa2_io_service_rearm(struct dpaa2_io *d,
+ 
+ 	return err;
+ }
+-EXPORT_SYMBOL(dpaa2_io_service_rearm);
++EXPORT_SYMBOL_GPL(dpaa2_io_service_rearm);
+ 
+ /**
+  * dpaa2_io_service_pull_channel() - pull dequeue functions from a channel.
+@@ -347,7 +347,7 @@ int dpaa2_io_service_pull_channel(struct dpaa2_io *d, u32 channelid,
+ 
+ 	return err;
+ }
+-EXPORT_SYMBOL(dpaa2_io_service_pull_channel);
++EXPORT_SYMBOL_GPL(dpaa2_io_service_pull_channel);
+ 
+ /**
+  * dpaa2_io_service_enqueue_qd() - Enqueue a frame to a QD.
+@@ -376,7 +376,7 @@ int dpaa2_io_service_enqueue_qd(struct dpaa2_io *d,
+ 
+ 	return qbman_swp_enqueue(d->swp, &ed, fd);
+ }
+-EXPORT_SYMBOL(dpaa2_io_service_enqueue_qd);
++EXPORT_SYMBOL_GPL(dpaa2_io_service_enqueue_qd);
+ 
+ /**
+  * dpaa2_io_service_release() - Release buffers to a buffer pool.
+@@ -403,7 +403,7 @@ int dpaa2_io_service_release(struct dpaa2_io *d,
+ 
+ 	return qbman_swp_release(d->swp, &rd, buffers, num_buffers);
+ }
+-EXPORT_SYMBOL(dpaa2_io_service_release);
++EXPORT_SYMBOL_GPL(dpaa2_io_service_release);
+ 
+ /**
+  * dpaa2_io_service_acquire() - Acquire buffers from a buffer pool.
+@@ -434,7 +434,7 @@ int dpaa2_io_service_acquire(struct dpaa2_io *d,
+ 
+ 	return err;
+ }
+-EXPORT_SYMBOL(dpaa2_io_service_acquire);
++EXPORT_SYMBOL_GPL(dpaa2_io_service_acquire);
+ 
+ /*
+  * 'Stores' are reusable memory blocks for holding dequeue results, and to
+@@ -488,7 +488,7 @@ struct dpaa2_io_store *dpaa2_io_store_create(unsigned int max_frames,
+ 
+ 	return ret;
+ }
+-EXPORT_SYMBOL(dpaa2_io_store_create);
++EXPORT_SYMBOL_GPL(dpaa2_io_store_create);
+ 
+ /**
+  * dpaa2_io_store_destroy() - Frees the dma memory storage for dequeue
+@@ -502,7 +502,7 @@ void dpaa2_io_store_destroy(struct dpaa2_io_store *s)
+ 	kfree(s->alloced_addr);
+ 	kfree(s);
+ }
+-EXPORT_SYMBOL(dpaa2_io_store_destroy);
++EXPORT_SYMBOL_GPL(dpaa2_io_store_destroy);
+ 
+ /**
+  * dpaa2_io_store_next() - Determine when the next dequeue result is available.
+@@ -550,4 +550,4 @@ struct dpaa2_dq *dpaa2_io_store_next(struct dpaa2_io_store *s, int *is_last)
+ 
+ 	return ret;
+ }
+-EXPORT_SYMBOL(dpaa2_io_store_next);
++EXPORT_SYMBOL_GPL(dpaa2_io_store_next);
 -- 
 2.9.4
