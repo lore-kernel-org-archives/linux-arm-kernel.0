@@ -1,170 +1,59 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 17 Nov 2017 18:21:53 +0000
-Subject: [PATCH 10/18] arm64: entry: Add exception trampoline page for
- exceptions from EL0
+Date: Fri, 17 Nov 2017 18:22:00 +0000
+Subject: [PATCH 17/18] arm64: makefile: Ensure TEXT_OFFSET doesn't overlap
+ with trampoline
 In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1510942921-12564-11-git-send-email-will.deacon@arm.com>
+Message-ID: <1510942921-12564-18-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow unmapping of the kernel whilst running at EL0, we need to
-point the exception vectors at an entry trampoline that can map/unmap
-the kernel on entry/exit respectively.
+When CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET=y, we could end up with a
+TEXT_OFFSET of less than 2 * PAGE_SIZE, which would result in an
+overlap with the trampoline and a panic on boot.
 
-This patch adds the trampoline page, although it is not yet plugged
-into the vector table and is therefore unused.
+Fix this by restricting the minimum value of the random TEXT_OFFSET
+value so that it is not less than 2 pages when CONFIG_UNMAP_KERNEL_AT_EL0
+is enabled.
+
+I do wonder whether we should just remove
+CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET completely, since we're realistically
+never going to be able to change our offset from 0x80000, but this keeps
+the dream alive for now.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S       | 85 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/vmlinux.lds.S | 17 +++++++++
- 2 files changed, 102 insertions(+)
+ arch/arm64/Makefile | 18 +++++++++++++++---
+ 1 file changed, 15 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index e2afc15a1535..d850af724c8c 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -29,6 +29,7 @@
- #include <asm/esr.h>
- #include <asm/irq.h>
- #include <asm/memory.h>
-+#include <asm/mmu.h>
- #include <asm/ptrace.h>
- #include <asm/thread_info.h>
- #include <asm/asm-uaccess.h>
-@@ -895,6 +896,90 @@ __ni_sys_trace:
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 939b310913cf..b60ac6c43ccd 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -87,9 +87,21 @@ head-y		:= arch/arm64/kernel/head.o
  
- 	.popsection				// .entry.text
- 
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+/*
-+ * Exception vectors trampoline.
-+ */
-+	.pushsection ".entry.tramp.text", "ax"
-+
-+	.macro tramp_map_kernel, tmp
-+	mrs	\tmp, ttbr1_el1
-+	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-+	bic	\tmp, \tmp, #USER_ASID_FLAG
-+	msr	ttbr1_el1, \tmp
-+	.endm
-+
-+	.macro tramp_unmap_kernel, tmp
-+	mrs	\tmp, ttbr1_el1
-+	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-+	orr	\tmp, \tmp, #USER_ASID_FLAG
-+	msr	ttbr1_el1, \tmp
-+	/*
-+	 * We avoid running the post_ttbr_update_workaround here because the
-+	 * user and kernel ASIDs don't have conflicting mappings, so any
-+	 * "blessing" as described in:
-+	 *
-+	 *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
-+	 *
-+	 * will not hurt correctness. Whilst this may partially defeat the
-+	 * point of using split ASIDs in the first place, it avoids
-+	 * the hit of invalidating the entire I-cache on every return to
-+	 * userspace.
-+	 */
-+	.endm
-+
-+	.macro tramp_ventry, regsize = 64
-+	.align	7
-+1:
-+	.if	\regsize == 64
-+	msr	tpidrro_el0, x30
-+	.endif
-+	tramp_map_kernel	x30
-+	ldr	x30, =vectors
-+	prfm	plil1strm, [x30, #(1b - tramp_vectors)]
-+	msr	vbar_el1, x30
-+	add	x30, x30, #(1b - tramp_vectors)
-+	isb
-+	br	x30
-+	.endm
-+
-+	.macro tramp_exit, regsize = 64
-+	adr	x30, tramp_vectors
-+	msr	vbar_el1, x30
-+	tramp_unmap_kernel	x30
-+	.if	\regsize == 64
-+	mrs	x30, far_el1
-+	.endif
-+	eret
-+	.endm
-+
-+	.align	11
-+ENTRY(tramp_vectors)
-+	.space	0x400
-+
-+	tramp_ventry
-+	tramp_ventry
-+	tramp_ventry
-+	tramp_ventry
-+
-+	tramp_ventry	32
-+	tramp_ventry	32
-+	tramp_ventry	32
-+	tramp_ventry	32
-+END(tramp_vectors)
-+
-+ENTRY(tramp_exit_native)
-+	tramp_exit
-+END(tramp_exit_native)
-+
-+ENTRY(tramp_exit_compat)
-+	tramp_exit	32
-+END(tramp_exit_compat)
-+
-+	.ltorg
-+	.popsection				// .entry.tramp.text
-+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
-+
- /*
-  * Special system call wrappers.
-  */
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 7da3e5c366a0..6b4260f22aab 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -57,6 +57,17 @@ jiffies = jiffies_64;
- #define HIBERNATE_TEXT
- #endif
- 
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+#define TRAMP_TEXT					\
-+	. = ALIGN(PAGE_SIZE);				\
-+	VMLINUX_SYMBOL(__entry_tramp_text_start) = .;	\
-+	*(.entry.tramp.text)				\
-+	. = ALIGN(PAGE_SIZE);				\
-+	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
-+#else
-+#define TRAMP_TEXT
-+#endif
-+
- /*
-  * The size of the PE/COFF section that covers the kernel image, which
-  * runs from stext to _edata, must be a round multiple of the PE/COFF
-@@ -113,6 +124,7 @@ SECTIONS
- 			HYPERVISOR_TEXT
- 			IDMAP_TEXT
- 			HIBERNATE_TEXT
-+			TRAMP_TEXT
- 			*(.fixup)
- 			*(.gnu.warning)
- 		. = ALIGN(16);
-@@ -214,6 +226,11 @@ SECTIONS
- 	. += RESERVED_TTBR0_SIZE;
- #endif
- 
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	tramp_pg_dir = .;
-+	. += PAGE_SIZE;
-+#endif
-+
- 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
- 	_end = .;
- 
+ # The byte offset of the kernel image in RAM from the start of RAM.
+ ifeq ($(CONFIG_ARM64_RANDOMIZE_TEXT_OFFSET), y)
+-TEXT_OFFSET := $(shell awk "BEGIN {srand(); printf \"0x%06x\n\", \
+-		 int(2 * 1024 * 1024 / (2 ^ $(CONFIG_ARM64_PAGE_SHIFT)) * \
+-		 rand()) * (2 ^ $(CONFIG_ARM64_PAGE_SHIFT))}")
++TEXT_OFFSET := $(shell awk							\
++		"BEGIN {							\
++			srand();						\
++			page_size = 2 ^ $(CONFIG_ARM64_PAGE_SHIFT);		\
++			tramp_size = 0;						\
++			if (\" $(CONFIG_UNMAP_KERNEL_AT_EL0)\" == \" y\") {	\
++				tramp_size = 2 * page_size;			\
++			}							\
++			offset = int(2 * 1024 * 1024 / page_size * rand());	\
++			offset *= page_size;					\
++			if (offset < tramp_size) {				\
++				offset = tramp_size;				\
++			}							\
++			printf \"0x%06x\n\", offset;				\
++		}")
+ else
+ TEXT_OFFSET := 0x00080000
+ endif
 -- 
 2.1.4
