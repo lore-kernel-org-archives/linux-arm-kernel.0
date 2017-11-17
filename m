@@ -1,172 +1,146 @@
 From: laurentiu.tudor@nxp.com (laurentiu.tudor at nxp.com)
-Date: Fri, 17 Nov 2017 15:38:33 +0200
-Subject: [PATCH 09/10] staging: fsl-mc: add support for device type
+Date: Fri, 17 Nov 2017 15:38:34 +0200
+Subject: [PATCH 10/10] staging: fsl-mc: use device_type instead of strcmp()
 In-Reply-To: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
 References: <20171117133834.4635-1-laurentiu.tudor@nxp.com>
-Message-ID: <20171117133834.4635-9-laurentiu.tudor@nxp.com>
+Message-ID: <20171117133834.4635-10-laurentiu.tudor@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 
-The MC bus has different types of devices and this is supported by
-device model. This patch adds initial support for device types
-(defines them, adds helpers and sets the device type).
+Replace strcmp() based device type checks with the standard device
+model type.
 
 Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
 ---
- drivers/staging/fsl-mc/bus/fsl-mc-bus.c | 67 +++++++++++++++++++++++++++++++++
- drivers/staging/fsl-mc/include/mc.h     | 55 +++++++++++++++++++++++++++
- 2 files changed, 122 insertions(+)
+ drivers/staging/fsl-mc/bus/dprc-driver.c      |  4 ++--
+ drivers/staging/fsl-mc/bus/fsl-mc-allocator.c | 20 ++++++++++----------
+ drivers/staging/fsl-mc/bus/fsl-mc-bus.c       |  8 ++++----
+ 3 files changed, 16 insertions(+), 16 deletions(-)
 
+diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/staging/fsl-mc/bus/dprc-driver.c
+index 28a6b87..131c715 100644
+--- a/drivers/staging/fsl-mc/bus/dprc-driver.c
++++ b/drivers/staging/fsl-mc/bus/dprc-driver.c
+@@ -593,7 +593,7 @@ static int dprc_probe(struct fsl_mc_device *mc_dev)
+ 	bool msi_domain_set = false;
+ 	u16 major_ver, minor_ver;
+ 
+-	if (strcmp(mc_dev->obj_desc.type, "dprc") != 0)
++	if (!is_fsl_mc_bus_dprc(mc_dev))
+ 		return -EINVAL;
+ 
+ 	if (dev_get_msi_domain(&mc_dev->dev))
+@@ -745,7 +745,7 @@ static int dprc_remove(struct fsl_mc_device *mc_dev)
+ 	int error;
+ 	struct fsl_mc_bus *mc_bus = to_fsl_mc_bus(mc_dev);
+ 
+-	if (strcmp(mc_dev->obj_desc.type, "dprc") != 0)
++	if (!is_fsl_mc_bus_dprc(mc_dev))
+ 		return -EINVAL;
+ 	if (!mc_dev->mc_io)
+ 		return -EINVAL;
+diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+index f7fbebd..1000fb3 100644
+--- a/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
++++ b/drivers/staging/fsl-mc/bus/fsl-mc-allocator.c
+@@ -14,11 +14,11 @@
+ 
+ #include "fsl-mc-private.h"
+ 
+-static bool __must_check fsl_mc_is_allocatable(const char *obj_type)
++static bool __must_check fsl_mc_is_allocatable(struct fsl_mc_device *mc_dev)
+ {
+-	return strcmp(obj_type, "dpbp") == 0 ||
+-	       strcmp(obj_type, "dpmcp") == 0 ||
+-	       strcmp(obj_type, "dpcon") == 0;
++	return is_fsl_mc_bus_dpbp(mc_dev) ||
++	       is_fsl_mc_bus_dpmcp(mc_dev) ||
++	       is_fsl_mc_bus_dpcon(mc_dev);
+ }
+ 
+ /**
+@@ -43,7 +43,7 @@ static int __must_check fsl_mc_resource_pool_add_device(struct fsl_mc_bus
+ 
+ 	if (pool_type < 0 || pool_type >= FSL_MC_NUM_POOL_TYPES)
+ 		goto out;
+-	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
++	if (!fsl_mc_is_allocatable(mc_dev))
+ 		goto out;
+ 	if (mc_dev->resource)
+ 		goto out;
+@@ -105,7 +105,7 @@ static int __must_check fsl_mc_resource_pool_remove_device(struct fsl_mc_device
+ 	struct fsl_mc_resource *resource;
+ 	int error = -EINVAL;
+ 
+-	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
++	if (!fsl_mc_is_allocatable(mc_dev))
+ 		goto out;
+ 
+ 	resource = mc_dev->resource;
+@@ -442,7 +442,7 @@ int __must_check fsl_mc_allocate_irqs(struct fsl_mc_device *mc_dev)
+ 	if (irq_count == 0)
+ 		return -EINVAL;
+ 
+-	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
++	if (is_fsl_mc_bus_dprc(mc_dev))
+ 		mc_bus = to_fsl_mc_bus(mc_dev);
+ 	else
+ 		mc_bus = to_fsl_mc_bus(to_fsl_mc_device(mc_dev->dev.parent));
+@@ -505,7 +505,7 @@ void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev)
+ 
+ 	irq_count = mc_dev->obj_desc.irq_count;
+ 
+-	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
++	if (is_fsl_mc_bus_dprc(mc_dev))
+ 		mc_bus = to_fsl_mc_bus(mc_dev);
+ 	else
+ 		mc_bus = to_fsl_mc_bus(to_fsl_mc_device(mc_dev->dev.parent));
+@@ -575,7 +575,7 @@ static int fsl_mc_allocator_probe(struct fsl_mc_device *mc_dev)
+ 	struct fsl_mc_bus *mc_bus;
+ 	int error;
+ 
+-	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
++	if (!fsl_mc_is_allocatable(mc_dev))
+ 		return -EINVAL;
+ 
+ 	mc_bus_dev = to_fsl_mc_device(mc_dev->dev.parent);
+@@ -604,7 +604,7 @@ static int fsl_mc_allocator_remove(struct fsl_mc_device *mc_dev)
+ {
+ 	int error;
+ 
+-	if (!fsl_mc_is_allocatable(mc_dev->obj_desc.type))
++	if (!fsl_mc_is_allocatable(mc_dev))
+ 		return -EINVAL;
+ 
+ 	if (mc_dev->resource) {
 diff --git a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-index 854bd80..aa935f3 100644
+index aa935f3..f84bc14 100644
 --- a/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
 +++ b/drivers/staging/fsl-mc/bus/fsl-mc-bus.c
-@@ -156,6 +156,68 @@ struct bus_type fsl_mc_bus_type = {
- };
- EXPORT_SYMBOL_GPL(fsl_mc_bus_type);
+@@ -442,10 +442,10 @@ static int fsl_mc_device_get_mmio_regions(struct fsl_mc_device *mc_dev,
+ 	struct device *parent_dev = mc_dev->dev.parent;
+ 	enum dprc_region_type mc_region_type;
  
-+struct device_type fsl_mc_bus_dprc_type = {
-+	.name = "fsl_mc_bus_dprc"
-+};
-+
-+struct device_type fsl_mc_bus_dpni_type = {
-+	.name = "fsl_mc_bus_dpni"
-+};
-+
-+struct device_type fsl_mc_bus_dpio_type = {
-+	.name = "fsl_mc_bus_dpio"
-+};
-+
-+struct device_type fsl_mc_bus_dpsw_type = {
-+	.name = "fsl_mc_bus_dpsw"
-+};
-+
-+struct device_type fsl_mc_bus_dpbp_type = {
-+	.name = "fsl_mc_bus_dpbp"
-+};
-+
-+struct device_type fsl_mc_bus_dpcon_type = {
-+	.name = "fsl_mc_bus_dpcon"
-+};
-+
-+struct device_type fsl_mc_bus_dpmcp_type = {
-+	.name = "fsl_mc_bus_dpmcp"
-+};
-+
-+struct device_type fsl_mc_bus_dpmac_type = {
-+	.name = "fsl_mc_bus_dpmac"
-+};
-+
-+struct device_type fsl_mc_bus_dprtc_type = {
-+	.name = "fsl_mc_bus_dprtc"
-+};
-+
-+static struct device_type *fsl_mc_get_device_type(const char *type)
-+{
-+	static const struct {
-+		struct device_type *dev_type;
-+		const char *type;
-+	} dev_types[] = {
-+		{ &fsl_mc_bus_dprc_type, "dprc" },
-+		{ &fsl_mc_bus_dpni_type, "dpni" },
-+		{ &fsl_mc_bus_dpio_type, "dpio" },
-+		{ &fsl_mc_bus_dpsw_type, "dpsw" },
-+		{ &fsl_mc_bus_dpbp_type, "dpbp" },
-+		{ &fsl_mc_bus_dpcon_type, "dpcon" },
-+		{ &fsl_mc_bus_dpmcp_type, "dpmcp" },
-+		{ &fsl_mc_bus_dpmac_type, "dpmac" },
-+		{ &fsl_mc_bus_dprtc_type, "dprtc" },
-+		{ NULL, NULL }
-+	};
-+	int i;
-+
-+	for (i = 0; dev_types[i].dev_type; i++)
-+		if (!strcmp(dev_types[i].type, type))
-+			return dev_types[i].dev_type;
-+
-+	return NULL;
-+}
-+
- static int fsl_mc_driver_probe(struct device *dev)
- {
- 	struct fsl_mc_driver *mc_drv;
-@@ -506,6 +568,11 @@ int fsl_mc_device_add(struct fsl_mc_obj_desc *obj_desc,
- 	mc_dev->dev.parent = parent_dev;
- 	mc_dev->dev.bus = &fsl_mc_bus_type;
- 	mc_dev->dev.release = fsl_mc_device_release;
-+	mc_dev->dev.type = fsl_mc_get_device_type(obj_desc->type);
-+	if (!mc_dev->dev.type) {
-+		dev_err(parent_dev, "unknown device type %s\n", obj_desc->type);
-+		goto error_cleanup_dev;
-+	}
- 	dev_set_name(&mc_dev->dev, "%s.%d", obj_desc->type, obj_desc->id);
+-	if (strcmp(obj_desc->type, "dprc") == 0 ||
+-	    strcmp(obj_desc->type, "dpmcp") == 0) {
++	if (is_fsl_mc_bus_dprc(mc_dev) ||
++	    is_fsl_mc_bus_dpmcp(mc_dev)) {
+ 		mc_region_type = DPRC_REGION_TYPE_MC_PORTAL;
+-	} else if (strcmp(obj_desc->type, "dpio") == 0) {
++	} else if (is_fsl_mc_bus_dpio(mc_dev)) {
+ 		mc_region_type = DPRC_REGION_TYPE_QBMAN_PORTAL;
+ 	} else {
+ 		/*
+@@ -520,7 +520,7 @@ static void fsl_mc_device_release(struct device *dev)
  
- 	if (strcmp(obj_desc->type, "dprc") == 0) {
-diff --git a/drivers/staging/fsl-mc/include/mc.h b/drivers/staging/fsl-mc/include/mc.h
-index aafe63a..15db93d 100644
---- a/drivers/staging/fsl-mc/include/mc.h
-+++ b/drivers/staging/fsl-mc/include/mc.h
-@@ -398,4 +398,59 @@ void fsl_mc_free_irqs(struct fsl_mc_device *mc_dev);
+ 	kfree(mc_dev->regions);
  
- extern struct bus_type fsl_mc_bus_type;
- 
-+extern struct device_type fsl_mc_bus_dprc_type;
-+extern struct device_type fsl_mc_bus_dpni_type;
-+extern struct device_type fsl_mc_bus_dpio_type;
-+extern struct device_type fsl_mc_bus_dpsw_type;
-+extern struct device_type fsl_mc_bus_dpbp_type;
-+extern struct device_type fsl_mc_bus_dpcon_type;
-+extern struct device_type fsl_mc_bus_dpmcp_type;
-+extern struct device_type fsl_mc_bus_dpmac_type;
-+extern struct device_type fsl_mc_bus_dprtc_type;
-+
-+static inline bool is_fsl_mc_bus_dprc(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dprc_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dpni(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dpni_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dpio(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dpio_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dpsw(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dpsw_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dpbp(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dpbp_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dpcon(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dpcon_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dpmcp(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dpmcp_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dpmac(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dpmac_type;
-+}
-+
-+static inline bool is_fsl_mc_bus_dprtc(const struct fsl_mc_device *mc_dev)
-+{
-+	return mc_dev->dev.type == &fsl_mc_bus_dprtc_type;
-+}
-+
- #endif /* _FSL_MC_H_ */
+-	if (strcmp(mc_dev->obj_desc.type, "dprc") == 0)
++	if (is_fsl_mc_bus_dprc(mc_dev))
+ 		kfree(to_fsl_mc_bus(mc_dev));
+ 	else
+ 		kfree(mc_dev);
 -- 
 2.9.4
