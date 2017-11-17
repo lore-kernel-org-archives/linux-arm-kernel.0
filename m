@@ -1,51 +1,90 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Fri, 17 Nov 2017 15:32:09 +0100
-Subject: Again about regression introduced by commit 70d435ba1cd6
- ("ASoC: imx-pcm-dma: simplify pcm_config")
-In-Reply-To: <CAFuYjm4vdToNBsurLrDUruwnUTJGpj0qH_1b9+0g9jEmqtkbUg@mail.gmail.com>
-References: <CAFuYjm4vdToNBsurLrDUruwnUTJGpj0qH_1b9+0g9jEmqtkbUg@mail.gmail.com>
-Message-ID: <1510929129.8104.1.camel@pengutronix.de>
+Date: Fri, 17 Nov 2017 15:36:23 +0100
+Subject: [PATCH 1/2] ARM: dts: Add the support for display5 equipped
+ with Mitsubishi (800x480) display
+In-Reply-To: <20171117151334.041c4684@jawa>
+References: <20171117102404.6678-1-lukma@denx.de>
+ <20171117131047.GE25390@dragon> <20171117151334.041c4684@jawa>
+Message-ID: <1510929383.8104.3.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kalle,
+Am Freitag, den 17.11.2017, 15:13 +0100 schrieb Lukasz Majewski:
+> Hi Shawn,
+> 
+> > On Fri, Nov 17, 2017 at 11:24:03AM +0100, Lukasz Majewski wrote:
+> > > This is the support for aa070mc01-ca1 Mitsubishi display.
+> > > 
+> > > Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> > > ---
+> > > ?arch/arm/boot/dts/Makefile?????????????????????????|??1 +
+> > > ?.../imx6q-display5-mitsubishi-aa070-800x480.dts????| 51
+> > > ++++++++++++++++++++++ 2 files changed, 52 insertions(+)
+> > > ?create mode 100644
+> > > arch/arm/boot/dts/imx6q-display5-mitsubishi-aa070-800x480.dts
+> > > 
+> > > diff --git a/arch/arm/boot/dts/Makefile
+> > > b/arch/arm/boot/dts/Makefile
+> > > index d9d0c82e7d20..10b3ad078dea 100644
+> > > --- a/arch/arm/boot/dts/Makefile
+> > > +++ b/arch/arm/boot/dts/Makefile
+> > > @@ -407,6 +407,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+> > > ?	imx6q-cm-fx6.dtb \
+> > > ?	imx6q-cubox-i.dtb \
+> > > ?	imx6q-dfi-fs700-m60.dtb \
+> > > +	imx6q-display5-mitsubishi-aa070-800x480.dtb \
+> > > ?	imx6q-display5-tianma-tm070-1280x768.dtb \
+> > > ?	imx6q-dmo-edmqmx6.dtb \
+> > > ?	imx6q-evi.dtb \??
+> > 
+> > <snip>
+> > 
+> > > +#include "imx6q-display5.dtsi"
+> > > +
+> > > +&panel {
+> > > +	compatible = "mitsubishi,aa070mc01-ca1";
+> > > +};??
+> > 
+> > How many DTB files do you want to add for this display5 board???
+> 
+> This is a single board, which can support panels which I've posted.
+> 
+> Those dtbs I do pack to u-boot' FIT image and don't need to worry
+> that
+> some display is not working (after setting bootloader env variable).
+> 
+> > It's
+> > obvious no fun to maintain a bunch of DTB files for all the panels
+> > this board can support.
+> 
+> Please note that those files excessively use #include directive, and
+> there is not so much code added (the longest part is license and
+> comments).
+> 
+> > ?Let's stop right here.
+> 
+> If I may ask - how shall I proceed? What would be your suggestion to
+> move on (dtb overlays) ?
 
-Am Freitag, den 17.11.2017, 16:27 +0200 schrieb Kalle Kankare:
-> Hi,
-> 
-> The regression was previously discussed on this mailing list last
-> month (2017-10-04).
-> 
-> As in the previous discussion, this commit restricts the supported
-> sound formats to S24_LE. This problem is experienced in our iMX6q
-> based hardware with SGTL5000 sound chip. I.e.:
-> 
-> # arecord -l | grep 'card 0' -A2
-> card 0: imx6qba16sgtl50 [imx6q-ba16-sgtl5000], device 0: HiFi
-> sgtl5000-0 []
-> ? Subdevices: 1/1
-> ? Subdevice #0: subdevice #0
-> 
-> In kernel 4.11.0:
-> 
-> # arecord --dump-hw-params -D hw:0,0 2>&1 | grep '^FORMAT'
-> FORMAT:? S16_LE
-> 
-> And in now in kernel 4.13.3:
-> 
-> # arecord --dump-hw-params -D hw:0,0 2>&1 | grep '^FORMAT'
-> FORMAT:? S24_LE
-> 
-> By reverting the mentioned commit 70d435ba1cd6, the format returned
-> to S16_LE. However, I'm unsure if that is the proper way to solve
-> this issue. I.e. does reverting the mentioned commit cause some other
-> unwanted effect ?
-> 
-> What would be the best solution that would make the S16_LE format
-> supported again for SGTL5000 ?
+The solution we use for the ZII RDU1 and RDU2 boards is to have the
+bootloader patch in the correct panel compatible strings. This is quite
+a bit simpler than using overlays and if you already have a environment
+variable for this it should be easy to do.
 
-Please cherry-pick f9d4a398f121 (dmaengine: imx-sdma: Correct
-src_addr_widths and directions) from current Linus mainline tree.
+> > 
+> > Shawn
+> > 
+> > > +
+> > > +&ldb {
+> > > +	lvds0: lvds-channel at 0 {
+> > > +		fsl,data-mapping = "spwg";
+> > > +		fsl,data-width = <24>;
+> > > +	};
+> > > +};
+
+This isn't needed. The panel compatible implies the data mapping and
+bus width (at least if you properly filled in this information in the
+panel driver).
 
 Regards,
 Lucas
