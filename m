@@ -1,43 +1,22 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 12:06:33 +0530
-Subject: [PATCH 3/3] mfd: sun4i-gpadc: Handle return value of platform_get_irq
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 18 Nov 2017 08:15:40 +0000
+Subject: [PATCH 0/3] mfd: Handle platform_get_irq's error checking and
+ return
 In-Reply-To: <1510986993-4936-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1510986993-4936-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1510986993-4936-4-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <20171118081540.GQ31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+On Sat, Nov 18, 2017 at 12:06:30PM +0530, Arvind Yadav wrote:
+> The platform_get_irq() function returns negative if an error occurs.
+> zero or positive number on success. platform_get_irq() error checking
+> for zero is not correct and we must check its return value.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
- drivers/mfd/sun4i-gpadc.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+The failure case is <= 0, not < 0.  IRQ0 is not valid.  Please rework
+your patches to that effect, thanks.
 
-diff --git a/drivers/mfd/sun4i-gpadc.c b/drivers/mfd/sun4i-gpadc.c
-index 9cfc881..1c89235 100644
---- a/drivers/mfd/sun4i-gpadc.c
-+++ b/drivers/mfd/sun4i-gpadc.c
-@@ -100,8 +100,8 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	struct resource *mem;
- 	const struct of_device_id *of_id;
- 	const struct mfd_cell *cells;
--	unsigned int irq, size;
--	int ret;
-+	unsigned int size;
-+	int ret, irq;
- 
- 	of_id = of_match_node(sun4i_gpadc_of_match, pdev->dev.of_node);
- 	if (!of_id)
-@@ -148,6 +148,9 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	regmap_write(dev->regmap, SUN4I_GPADC_INT_FIFOC, 0);
- 
- 	irq = platform_get_irq(pdev, 0);
-+	if (irq < 0)
-+		return irq;
-+
- 	ret = devm_regmap_add_irq_chip(&pdev->dev, dev->regmap, irq,
- 				       IRQF_ONESHOT, 0,
- 				       &sun4i_gpadc_regmap_irq_chip,
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
