@@ -1,9 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 15:26:46 +0530
-Subject: [PATCH 2/3 v3] ASoC: mt8173: Fix platform_get_irq's error checking
+Date: Sat, 18 Nov 2017 15:26:47 +0530
+Subject: [PATCH 3/3 v3] ASoC: nuc900: Fix platform_get_irq's error checking
 In-Reply-To: <874375c0dca41790e47b60ce30f88ab353f97b38.1510997839.git.arvind.yadav.cs@gmail.com>
 References: <874375c0dca41790e47b60ce30f88ab353f97b38.1510997839.git.arvind.yadav.cs@gmail.com>
-Message-ID: <f683092949c0a6195b09ebbeb690e358094a0506.1510997839.git.arvind.yadav.cs@gmail.com>
+Message-ID: <19f8c64a4720118a6d6c4fedd5f8defa6938d1db.1510997840.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,37 +14,31 @@ for zero is not correct.
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
 changes in v2 :
-               irq was unsigned. so changed it to signed.
+               irq was unsigned. so using signed variable ret.
 changes in v3 :
               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
 
- sound/soc/mediatek/mt8173/mt8173-afe-pcm.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ sound/soc/nuc900/nuc900-ac97.c | 7 +++----
+ 1 file changed, 3 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c b/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-index 8a643a3..11f5f2a 100644
---- a/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-+++ b/sound/soc/mediatek/mt8173/mt8173-afe-pcm.c
-@@ -1083,7 +1083,7 @@ static int mt8173_afe_init_audio_clk(struct mtk_base_afe *afe)
- static int mt8173_afe_pcm_dev_probe(struct platform_device *pdev)
- {
- 	int ret, i;
--	unsigned int irq_id;
-+	int irq_id;
- 	struct mtk_base_afe *afe;
- 	struct mt8173_afe_private *afe_priv;
- 	struct resource *res;
-@@ -1105,9 +1105,9 @@ static int mt8173_afe_pcm_dev_probe(struct platform_device *pdev)
- 	afe->dev = &pdev->dev;
- 
- 	irq_id = platform_get_irq(pdev, 0);
--	if (!irq_id) {
-+	if (irq_id <= 0) {
- 		dev_err(afe->dev, "np %s no irq\n", afe->dev->of_node->name);
--		return -ENXIO;
-+		return irq_id;
+diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
+index b6615af..71fce7c 100644
+--- a/sound/soc/nuc900/nuc900-ac97.c
++++ b/sound/soc/nuc900/nuc900-ac97.c
+@@ -345,11 +345,10 @@ static int nuc900_ac97_drvprobe(struct platform_device *pdev)
+ 		goto out;
  	}
- 	ret = devm_request_irq(afe->dev, irq_id, mt8173_afe_irq_handler,
- 			       0, "Afe_ISR_Handle", (void *)afe);
+ 
+-	nuc900_audio->irq_num = platform_get_irq(pdev, 0);
+-	if (!nuc900_audio->irq_num) {
+-		ret = -EBUSY;
++	ret = platform_get_irq(pdev, 0);
++	if (ret <= 0)
+ 		goto out;
+-	}
++	nuc900_audio->irq_num = ret;
+ 
+ 	nuc900_ac97_data = nuc900_audio;
+ 
 -- 
 2.7.4
