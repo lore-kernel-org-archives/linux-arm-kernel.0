@@ -1,61 +1,73 @@
-From: thomas@m3y3r.de (Thomas Meyer)
-Date: Sat, 18 Nov 2017 14:37:32 +0100
-Subject: Relevant for 3.18.x?
-Message-ID: <20171118133732.mimo2u6vubut34ql@olymp>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Sat, 18 Nov 2017 13:48:41 +0000
+Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
+References: <8e959f69-a578-793b-6c32-18b5b0cd08c2@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
+ <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063587@dggemm510-mbs.china.huawei.com>
+ <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
+ <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
+ <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
+ <20171117073556.GB28855@cbox>
+ <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
+Message-ID: <20171118134841.3f6c9183@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 18 Nov 2017 10:40:08 +0000
+"Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
 
-I played around a bit with the source code of the linux version running on
-my phone and I stumbled upon this patch and I wanted to ask if this
-patch is maybe also relevant for linux-stable 3.18.x?
+> On Nov 17, 2017  15:36 Christoffer Dall [mailto:cdall at linaro.org]  wrote:
+> >If your processor does support LPAE (like a Cortex-A15 for example),
+> >then you have both the 32-bit accessors (MRC and MCR) and the 64-bit
+> >accessors (MRRC, MCRR), and using the 32-bit accessor will simply access
+> >the lower 32-bits of the 64-bit register.
+> >
+> >Hope this helps,
+> >-Christoffer  
+> 
+> If you know the higher 32-bits of the 64-bits cp15's register is not useful for your system,
+> then you can use the 32-bit accessor to get or set the 64-bit cp15's register.
+> But if the higher 32-bits of the 64-bits cp15's register is useful for your system,
+> then you can't use the 32-bit accessor to get or set the 64-bit cp15's register.
+> 
+> TTBR0/TTBR1/PAR's higher 32-bits is useful for CPU supporting LPAE.
+> The following description which comes from ARM(r) Architecture Reference
+> Manual ARMv7-A and ARMv7-R edition tell us the reason:
+> 
+> 64-bit TTBR0 and TTBR1 format:
+> ...
+> BADDR, bits[39:x] : 
+> Translation table base address, bits[39:x]. Defining the translation table base address width on
+> page B4-1698 describes how x is defined.
+> The value of x determines the required alignment of the translation table, which must be aligned to
+> 2x bytes.
+> 
+> Abbott Liu: Because BADDR on CPU supporting LPAE may be bigger than max value of 32-bit, so bits[39:32] may 
+> be valid value which is useful for the system.
+> 
+> 64-bit PAR format
+> ...
+> PA[39:12]
+> Physical Address. The physical address corresponding to the supplied virtual address. This field
+> returns address bits[39:12].
+> 
+> Abbott Liu: Because Physical Address on CPU supporting LPAE may be bigger than max value of 32-bit, 
+> so bits[39:32] may be valid value which is useful for the system.
+> 
+> Conclusion: Don't use 32-bit accessor to get or set TTBR0/TTBR1/PAR on CPU supporting LPAE,
+> if you do that, your system may run error.
 
-commit 6a5e04b6af54fdea2a8b5815f18632d74da471b2
-Author: Stepan Moskovchenko <stepanm@codeaurora.org>
-Date:   Wed May 14 16:51:06 2014 -0700
+That's not really true. You can run an non-LPAE kernel that uses the
+32bit accessors an a Cortex-A15 that supports LPAE. You're just limited
+to 4GB of physical space. And you're pretty much guaranteed to have
+some memory below 4GB (one way or another), or you'd have a slight
+problem setting up your page tables.
 
-    arm64: Call EDAC error handler on system error
-    
-    One possible cause of a system error exception is an ECC
-    error in the CPU's caches. Call the ARM64 EDAC error
-    handler from the system error exception handler to print
-    EDAC error syndrome information to the kernel log.
-    
-    Change-Id: If8757eda0c7fc82b0fccee573cf09627a752fdf3
-    Signed-off-by: Stepan Moskovchenko <stepanm@codeaurora.org>
-
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index 605f8249325d..ec0d4b22e91e 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -37,6 +37,8 @@
- #include <asm/stacktrace.h>
- #include <asm/exception.h>
- #include <asm/system_misc.h>
-+#include <asm/esr.h>
-+#include <asm/edac.h>
- 
- #include <trace/events/exception.h>
- 
-@@ -442,6 +444,12 @@ asmlinkage void bad_mode(struct pt_regs *regs, int reason, unsigned int esr)
- 	info.si_code  = ILL_ILLOPC;
- 	info.si_addr  = pc;
- 
-+	if (esr >> ESR_EL1_EC_SHIFT == ESR_EL1_EC_SERROR) {
-+		pr_crit("System error detected. ESR.ISS = %08x\n",
-+			esr & 0xffffff);
-+		arm64_check_cache_ecc(NULL);
-+	}
-+
- 	arm64_notify_die("Oops - bad mode", regs, &info, 0);
- }
- 
-And I just realized while writing this email that master and stable-3.18 seem to completely miss the
-cortex EDAC driver:
-https://source.codeaurora.org/quic/la/kernel/msm/log/drivers/edac/cortex_arm64_edac.c?h=aosp-new/android-msm-marlin-3.18-oreo
-
-so never mind.
-
-with kind regards
-thomas
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
