@@ -1,73 +1,199 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Sat, 18 Nov 2017 13:48:41 +0000
-Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
-References: <8e959f69-a578-793b-6c32-18b5b0cd08c2@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
- <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063587@dggemm510-mbs.china.huawei.com>
- <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
- <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
- <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
- <20171117073556.GB28855@cbox>
- <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
-Message-ID: <20171118134841.3f6c9183@why.wild-wind.fr.eu.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 18 Nov 2017 15:25:06 +0000
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
+ (KAISER)
+In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+Message-ID: <CAKv+Gu8YB_qXgWEbd0ZZ6UycxNLXxTZCno87vJ9HH7d6+dKeLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 18 Nov 2017 10:40:08 +0000
-"Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
+On 17 November 2017 at 18:21, Will Deacon <will.deacon@arm.com> wrote:
+> Hi all,
+>
+> This patch series implements something along the lines of KAISER for arm64:
+>
+>   https://gruss.cc/files/kaiser.pdf
+>
+> although I wrote this from scratch because the paper has some funny
+> assumptions about how the architecture works. There is a patch series
+> in review for x86, which follows a similar approach:
+>
+>   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
+>
+> and the topic was recently covered by LWN (currently subscriber-only):
+>
+>   https://lwn.net/Articles/738975/
+>
+> The basic idea is that transitions to and from userspace are proxied
+> through a trampoline page which is mapped into a separate page table and
+> can switch the full kernel mapping in and out on exception entry and
+> exit respectively. This is a valuable defence against various KASLR and
+> timing attacks, particularly as the trampoline page is at a fixed virtual
+> address and therefore the kernel text can be randomized independently.
+>
+> The major consequences of the trampoline are:
+>
+>   * We can no longer make use of global mappings for kernel space, so
+>     each task is assigned two ASIDs: one for user mappings and one for
+>     kernel mappings
+>
+>   * Our ASID moves into TTBR1 so that we can quickly switch between the
+>     trampoline and kernel page tables
+>
+>   * Switching TTBR0 always requires use of the zero page, so we can
+>     dispense with some of our errata workaround code.
+>
+>   * entry.S gets more complicated to read
+>
+> The performance hit from this series isn't as bad as I feared: things
+> like cyclictest and kernbench seem to be largely unaffected, although
+> syscall micro-benchmarks appear to show that syscall overhead is roughly
+> doubled, and this has an impact on things like hackbench which exhibits
+> a ~10% hit due to its heavy context-switching.
+>
+> Patches based on 4.14 and also pushed here:
+>
+>   git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kaiser
+>
+> Feedback welcome,
+>
+> Will
+>
 
-> On Nov 17, 2017  15:36 Christoffer Dall [mailto:cdall at linaro.org]  wrote:
-> >If your processor does support LPAE (like a Cortex-A15 for example),
-> >then you have both the 32-bit accessors (MRC and MCR) and the 64-bit
-> >accessors (MRRC, MCRR), and using the 32-bit accessor will simply access
-> >the lower 32-bits of the 64-bit register.
-> >
-> >Hope this helps,
-> >-Christoffer  
-> 
-> If you know the higher 32-bits of the 64-bits cp15's register is not useful for your system,
-> then you can use the 32-bit accessor to get or set the 64-bit cp15's register.
-> But if the higher 32-bits of the 64-bits cp15's register is useful for your system,
-> then you can't use the 32-bit accessor to get or set the 64-bit cp15's register.
-> 
-> TTBR0/TTBR1/PAR's higher 32-bits is useful for CPU supporting LPAE.
-> The following description which comes from ARM(r) Architecture Reference
-> Manual ARMv7-A and ARMv7-R edition tell us the reason:
-> 
-> 64-bit TTBR0 and TTBR1 format:
-> ...
-> BADDR, bits[39:x] : 
-> Translation table base address, bits[39:x]. Defining the translation table base address width on
-> page B4-1698 describes how x is defined.
-> The value of x determines the required alignment of the translation table, which must be aligned to
-> 2x bytes.
-> 
-> Abbott Liu: Because BADDR on CPU supporting LPAE may be bigger than max value of 32-bit, so bits[39:32] may 
-> be valid value which is useful for the system.
-> 
-> 64-bit PAR format
-> ...
-> PA[39:12]
-> Physical Address. The physical address corresponding to the supplied virtual address. This field
-> returns address bits[39:12].
-> 
-> Abbott Liu: Because Physical Address on CPU supporting LPAE may be bigger than max value of 32-bit, 
-> so bits[39:32] may be valid value which is useful for the system.
-> 
-> Conclusion: Don't use 32-bit accessor to get or set TTBR0/TTBR1/PAR on CPU supporting LPAE,
-> if you do that, your system may run error.
+Very nice! I am quite pleased, because this makes KASLR much more
+useful than it is now.
 
-That's not really true. You can run an non-LPAE kernel that uses the
-32bit accessors an a Cortex-A15 that supports LPAE. You're just limited
-to 4GB of physical space. And you're pretty much guaranteed to have
-some memory below 4GB (one way or another), or you'd have a slight
-problem setting up your page tables.
+My main question is why we need a separate trampoline vector table: it
+seems to me that with some minor surgery (as proposed below), we can
+make the kernel_ventry macro instantiations tolerant for being loaded
+somewhere in the fixmap (which I think is a better place for this than
+at the base of the VMALLOC space), removing the need to change
+vbar_el1 back and forth. The only downside is that exceptions taken
+from EL1 will also use absolute addressing, but I don't think that is
+a huge price to pay.
 
-	M.
--- 
-Without deviation from the norm, progress is not possible.
+-------------->8------------------
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index f8ce4cdd3bb5..7f89ebc690b1 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -71,6 +71,20 @@
+
+  .macro kernel_ventry, el, label, regsize = 64
+  .align 7
++alternative_if_not ARM64_MAP_KERNEL_AT_EL0
++ .if \regsize == 64
++ msr tpidrro_el0, x30 // preserve x30
++ .endif
++ .if \el == 0
++ mrs x30, ttbr1_el1
++ sub x30, x30, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++ bic x30, x30, #USER_ASID_FLAG
++ msr ttbr1_el1, x30
++ isb
++ .endif
++ ldr x30, =el\()\el\()_\label
++alternative_else_nop_endif
++
+  sub sp, sp, #S_FRAME_SIZE
+ #ifdef CONFIG_VMAP_STACK
+  /*
+@@ -82,7 +96,11 @@
+  tbnz x0, #THREAD_SHIFT, 0f
+  sub x0, sp, x0 // x0'' = sp' - x0' = (sp + x0) - sp = x0
+  sub sp, sp, x0 // sp'' = sp' - x0 = (sp + x0) - x0 = sp
++alternative_if_not ARM64_MAP_KERNEL_AT_EL0
++ br x30
++alternative_else
+  b el\()\el\()_\label
++alternative_endif
+
+ 0:
+  /*
+@@ -91,6 +109,10 @@
+  * userspace, and can clobber EL0 registers to free up GPRs.
+  */
+
++alternative_if_not ARM64_MAP_KERNEL_AT_EL0
++ mrs x30, tpidrro_el0 // restore x30
++alternative_else_nop_endif
++
+  /* Stash the original SP (minus S_FRAME_SIZE) in tpidr_el0. */
+  msr tpidr_el0, x0
+
+@@ -98,8 +120,11 @@
+  sub x0, sp, x0
+  msr tpidrro_el0, x0
+
+- /* Switch to the overflow stack */
+- adr_this_cpu sp, overflow_stack + OVERFLOW_STACK_SIZE, x0
++ /* Switch to the overflow stack of this CPU */
++ ldr x0, =overflow_stack + OVERFLOW_STACK_SIZE
++ mov sp, x0
++ mrs x0, tpidr_el1
++ add sp, sp, x0
+
+  /*
+  * Check whether we were already on the overflow stack. This may happen
+@@ -108,19 +133,30 @@
+  mrs x0, tpidr_el0 // sp of interrupted context
+  sub x0, sp, x0 // delta with top of overflow stack
+  tst x0, #~(OVERFLOW_STACK_SIZE - 1) // within range?
+- b.ne __bad_stack // no? -> bad stack pointer
++ b.eq 1f
++ ldr x0, =__bad_stack // no? -> bad stack pointer
++ br x0
+
+  /* We were already on the overflow stack. Restore sp/x0 and carry on. */
+- sub sp, sp, x0
++1: sub sp, sp, x0
+  mrs x0, tpidrro_el0
+ #endif
++alternative_if_not ARM64_MAP_KERNEL_AT_EL0
++ br x30
++alternative_else
+  b el\()\el\()_\label
++alternative_endif
+  .endm
+
+- .macro kernel_entry, el, regsize = 64
++ .macro kernel_entry, el, regsize = 64, restore_x30 = 1
+  .if \regsize == 32
+  mov w0, w0 // zero upper 32 bits of x0
+  .endif
++ .if \restore_x30
++alternative_if_not ARM64_MAP_KERNEL_AT_EL0
++ mrs x30, tpidrro_el0 // restore x30
++alternative_else_nop_endif
++ .endif
+  stp x0, x1, [sp, #16 * 0]
+  stp x2, x3, [sp, #16 * 1]
+  stp x4, x5, [sp, #16 * 2]
+@@ -363,7 +399,7 @@ tsk .req x28 // current thread_info
+  */
+  .pushsection ".entry.text", "ax"
+
+- .align 11
++ .align PAGE_SHIFT
+ ENTRY(vectors)
+  kernel_ventry 1, sync_invalid // Synchronous EL1t
+  kernel_ventry 1, irq_invalid // IRQ EL1t
+@@ -391,6 +427,8 @@ ENTRY(vectors)
+  kernel_ventry 0, fiq_invalid, 32 // FIQ 32-bit EL0
+  kernel_ventry 0, error_invalid, 32 // Error 32-bit EL0
+ #endif
++ .ltorg
++ .align PAGE_SHIFT
+ END(vectors)
+
+ #ifdef CONFIG_VMAP_STACK
+@@ -408,7 +446,7 @@ __bad_stack:
+  * S_FRAME_SIZE) was stashed in tpidr_el0 by kernel_ventry.
+  */
+  sub sp, sp, #S_FRAME_SIZE
+- kernel_entry 1
++ kernel_entry 1, restore_x30=0
+  mrs x0, tpidr_el0
+  add x0, x0, #S_FRAME_SIZE
+  str x0, [sp, #S_SP]
