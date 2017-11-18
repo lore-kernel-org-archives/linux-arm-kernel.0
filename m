@@ -1,25 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Nov 2017 08:20:47 +0000
-Subject: [PATCH 2/3 v2] Input: twl4030_keypad: Fix platform_get_irq's
- error checking
-In-Reply-To: <d5ca46d63a41f47411b94c6035d3b8c46bbe8503.1510951446.git.arvind.yadav.cs@gmail.com>
-References: <f317ec56b23b11b79284c29d12a7004575aa35db.1510951446.git.arvind.yadav.cs@gmail.com>
- <d5ca46d63a41f47411b94c6035d3b8c46bbe8503.1510951446.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171118082047.GZ31757@n2100.armlinux.org.uk>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Sat, 18 Nov 2017 14:20:47 +0530
+Subject: [PATCH 1/3 v2] mfd: ipaq-micro: Fix platform_get_irq's error checking
+Message-ID: <4f12b680d2f0d7554e6a1812f15037185a5a9a2a.1510994294.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 18, 2017 at 02:28:49AM +0530, Arvind Yadav wrote:
-> The platform_get_irq() function returns negative if an error occurs.
-> zero or positive number on success. platform_get_irq() error checking
-> for zero is not correct.
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct.
 
-IRQ 0 is not a valid interrupt.  The correct test here is <= 0.
-Please rework your patches for this.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+changes in v2 :
+              Add failure case '<= 0' instead of '< 0'. If IRQ0 is not valid.
 
-Thanks.
+ drivers/mfd/ipaq-micro.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/mfd/ipaq-micro.c b/drivers/mfd/ipaq-micro.c
+index cd762d0..ea729db 100644
+--- a/drivers/mfd/ipaq-micro.c
++++ b/drivers/mfd/ipaq-micro.c
+@@ -410,8 +410,8 @@ static int __init micro_probe(struct platform_device *pdev)
+ 	micro_reset_comm(micro);
+ 
+ 	irq = platform_get_irq(pdev, 0);
+-	if (!irq)
+-		return -EINVAL;
++	if (irq <= 0)
++		return irq;
+ 	ret = devm_request_irq(&pdev->dev, irq, micro_serial_isr,
+ 			       IRQF_SHARED, "ipaq-micro",
+ 			       micro);
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
