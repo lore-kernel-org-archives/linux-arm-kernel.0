@@ -1,60 +1,56 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 17 Nov 2017 16:19:35 -0800
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+Date: Fri, 17 Nov 2017 16:27:14 -0800
+Subject: [PATCH 14/18] arm64: erratum: Work around Falkor erratum #E1003
+ in trampoline code
+In-Reply-To: <1510942921-12564-15-git-send-email-will.deacon@arm.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20171118001935.GB18379@codeaurora.org>
+ <1510942921-12564-15-git-send-email-will.deacon@arm.com>
+Message-ID: <20171118002714.GC18379@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/17, Will Deacon wrote:
-> Hi all,
+> We rely on an atomic swizzling of TTBR1 when transitioning from the entry
+> trampoline to the kernel proper on an exception. We can't rely on this
+> atomicity in the face of Falkor erratum #E1003, so on affected cores we
+> can issue a TLB invalidation prior to jumping into the kernel. There is
+> still the possibility of a TLB conflict here due to conflicting walk
+> cache entries, but this doesn't appear to be the case on these CPUs in
+> practice.
 > 
-> This patch series implements something along the lines of KAISER for arm64:
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/Kconfig        | 17 +++++------------
+>  arch/arm64/kernel/entry.S |  8 ++++++++
+>  2 files changed, 13 insertions(+), 12 deletions(-)
 > 
->   https://gruss.cc/files/kaiser.pdf
-> 
-> although I wrote this from scratch because the paper has some funny
-> assumptions about how the architecture works. There is a patch series
-> in review for x86, which follows a similar approach:
-> 
->   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
-> 
-> and the topic was recently covered by LWN (currently subscriber-only):
-> 
->   https://lwn.net/Articles/738975/
-> 
-> The basic idea is that transitions to and from userspace are proxied
-> through a trampoline page which is mapped into a separate page table and
-> can switch the full kernel mapping in and out on exception entry and
-> exit respectively. This is a valuable defence against various KASLR and
-> timing attacks, particularly as the trampoline page is at a fixed virtual
-> address and therefore the kernel text can be randomized independently.
-> 
-> The major consequences of the trampoline are:
-> 
->   * We can no longer make use of global mappings for kernel space, so
->     each task is assigned two ASIDs: one for user mappings and one for
->     kernel mappings
-> 
->   * Our ASID moves into TTBR1 so that we can quickly switch between the
->     trampoline and kernel page tables
-> 
->   * Switching TTBR0 always requires use of the zero page, so we can
->     dispense with some of our errata workaround code.
-> 
->   * entry.S gets more complicated to read
-> 
-> The performance hit from this series isn't as bad as I feared: things
-> like cyclictest and kernbench seem to be largely unaffected, although
-> syscall micro-benchmarks appear to show that syscall overhead is roughly
-> doubled, and this has an impact on things like hackbench which exhibits
-> a ~10% hit due to its heavy context-switching.
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 0df64a6a56d4..f0fcbfc2262e 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -504,20 +504,13 @@ config CAVIUM_ERRATUM_30115
+>  config QCOM_FALKOR_ERRATUM_1003
+>  	bool "Falkor E1003: Incorrect translation due to ASID change"
+>  	default y
+> -	select ARM64_PAN if ARM64_SW_TTBR0_PAN
 
-Do you have performance benchmark numbers on CPUs with the Falkor
-errata? I'm interested to see how much the TLB invalidate hurts
-heavy context-switching workloads on these CPUs.
+Cool, this sort of complicates the backport of the Kryo MIDR
+update of this errata to stable trees though.
+
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index a839b94bba05..a600879939ce 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -941,6 +941,14 @@ __ni_sys_trace:
+>  	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
+>  	bic	\tmp, \tmp, #USER_ASID_FLAG
+>  	msr	ttbr1_el1, \tmp
+> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+
+Shouldn't we put this inside an #ifdef QCOM_FALKOR_ERRATUM_1003
+so that we don't even emit nops in case we have the errata
+disabled? Or did I miss something in the alternatives assembly
+code?
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
