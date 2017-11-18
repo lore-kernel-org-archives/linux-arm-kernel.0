@@ -1,25 +1,38 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Nov 2017 08:20:54 +0000
-Subject: [PATCH 4/10 v2] Input: serio: Fix platform_get_irq's error
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Sat, 18 Nov 2017 15:03:43 +0530
+Subject: [PATCH 1/6 v2] mmc: meson-gx-mmc: Fix platform_get_irq's error
  checking
-In-Reply-To: <8104ffc3b7bedee525c0cba9144cedaf04087fd4.1510951446.git.arvind.yadav.cs@gmail.com>
-References: <f317ec56b23b11b79284c29d12a7004575aa35db.1510951446.git.arvind.yadav.cs@gmail.com>
- <8104ffc3b7bedee525c0cba9144cedaf04087fd4.1510951446.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171118082054.GA31757@n2100.armlinux.org.uk>
+Message-ID: <130df0c2c60ed6a0f460b68c586cc0a4167aed0b.1510997223.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 18, 2017 at 02:28:50AM +0530, Arvind Yadav wrote:
-> The platform_get_irq() function returns negative if an error occurs.
-> zero or positive number on success. platform_get_irq() error checking
-> for zero is not correct
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct.
 
-IRQ 0 is not a valid interrupt.  The correct test here is <= 0.
-Please rework your patches for this.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+changes in v2 :
+              Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
 
-Thanks.
+ drivers/mmc/host/meson-gx-mmc.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/mmc/host/meson-gx-mmc.c b/drivers/mmc/host/meson-gx-mmc.c
+index e0862d3..d6a0695 100644
+--- a/drivers/mmc/host/meson-gx-mmc.c
++++ b/drivers/mmc/host/meson-gx-mmc.c
+@@ -1208,9 +1208,9 @@ static int meson_mmc_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	irq = platform_get_irq(pdev, 0);
+-	if (!irq) {
++	if (irq <= 0) {
+ 		dev_err(&pdev->dev, "failed to get interrupt resource.\n");
+-		ret = -EINVAL;
++		ret = irq;
+ 		goto free_host;
+ 	}
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
