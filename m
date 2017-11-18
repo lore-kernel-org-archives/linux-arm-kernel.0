@@ -1,10 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 11:14:26 +0530
-Subject: [PATCH 1/2] misc: aspeed-lpc-snoop: Fix platform_get_irq's error
- checking
+Date: Sat, 18 Nov 2017 11:14:27 +0530
+Subject: [PATCH 2/2] misc: atmel-ssc: Fix platform_get_irq's error checking
 In-Reply-To: <1510983867-2344-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1510983867-2344-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1510983867-2344-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1510983867-2344-3-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,23 +13,24 @@ for zero is not correct.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/misc/aspeed-lpc-snoop.c | 4 ++--
+ drivers/misc/atmel-ssc.c | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/misc/aspeed-lpc-snoop.c b/drivers/misc/aspeed-lpc-snoop.c
-index cb78c98..14c3c90 100644
---- a/drivers/misc/aspeed-lpc-snoop.c
-+++ b/drivers/misc/aspeed-lpc-snoop.c
-@@ -115,8 +115,8 @@ static int aspeed_lpc_snoop_config_irq(struct aspeed_lpc_snoop *lpc_snoop,
- 	int rc;
+diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+index b2a0340..9d9eeae 100644
+--- a/drivers/misc/atmel-ssc.c
++++ b/drivers/misc/atmel-ssc.c
+@@ -235,9 +235,9 @@ static int ssc_probe(struct platform_device *pdev)
+ 	clk_disable_unprepare(ssc->clk);
  
- 	lpc_snoop->irq = platform_get_irq(pdev, 0);
--	if (!lpc_snoop->irq)
--		return -ENODEV;
-+	if (lpc_snoop->irq < 0)
-+		return lpc_snoop->irq;
+ 	ssc->irq = platform_get_irq(pdev, 0);
+-	if (!ssc->irq) {
++	if (ssc->irq < 0) {
+ 		dev_dbg(&pdev->dev, "could not get irq\n");
+-		return -ENXIO;
++		return ssc->irq;
+ 	}
  
- 	rc = devm_request_irq(dev, lpc_snoop->irq,
- 			      aspeed_lpc_snoop_irq, IRQF_SHARED,
+ 	spin_lock(&user_lock);
 -- 
 2.7.4
