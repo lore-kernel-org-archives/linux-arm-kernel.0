@@ -1,9 +1,7 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 10:57:53 +0530
-Subject: [PATCH 3/5 v2] ASoC: nuc900: Fix platform_get_irq's error checking
-In-Reply-To: <874375c0dca41790e47b60ce30f88ab353f97b38.1510982440.git.arvind.yadav.cs@gmail.com>
-References: <874375c0dca41790e47b60ce30f88ab353f97b38.1510982440.git.arvind.yadav.cs@gmail.com>
-Message-ID: <19f8c64a4720118a6d6c4fedd5f8defa6938d1db.1510982440.git.arvind.yadav.cs@gmail.com>
+Date: Sat, 18 Nov 2017 11:14:25 +0530
+Subject: [PATCH 0/2] misc: Fix platform_get_irq's error checking
+Message-ID: <1510983867-2344-1-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,32 +9,13 @@ The platform_get_irq() function returns negative if an error occurs.
 zero or positive number on success. platform_get_irq() error checking
 for zero is not correct.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
-changes in v2 :
-             nuc900_audio->irq_num is unsigned. so handle through signed variable.
+Arvind Yadav (2):
+  [PATCH 1/2] misc: aspeed-lpc-snoop: Fix platform_get_irq's error checking
+  [PATCH 2/2] misc: atmel-ssc: Fix platform_get_irq's error checking
 
- sound/soc/nuc900/nuc900-ac97.c | 7 +++----
- 1 file changed, 3 insertions(+), 4 deletions(-)
+ drivers/misc/aspeed-lpc-snoop.c | 4 ++--
+ drivers/misc/atmel-ssc.c        | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
-index b6615af..71fce7c 100644
---- a/sound/soc/nuc900/nuc900-ac97.c
-+++ b/sound/soc/nuc900/nuc900-ac97.c
-@@ -345,11 +345,10 @@ static int nuc900_ac97_drvprobe(struct platform_device *pdev)
- 		goto out;
- 	}
- 
--	nuc900_audio->irq_num = platform_get_irq(pdev, 0);
--	if (!nuc900_audio->irq_num) {
--		ret = -EBUSY;
-+	ret = platform_get_irq(pdev, 0);
-+	if (ret < 0)
- 		goto out;
--	}
-+	nuc900_audio->irq_num = ret;
- 
- 	nuc900_ac97_data = nuc900_audio;
- 
 -- 
 2.7.4
