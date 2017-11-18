@@ -1,59 +1,39 @@
-From: liuwenliang@huawei.com (Liuwenliang (Abbott Liu))
-Date: Sat, 18 Nov 2017 10:40:08 +0000
-Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
-In-Reply-To: <20171117073556.GB28855@cbox>
-References: <8e959f69-a578-793b-6c32-18b5b0cd08c2@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063545@dggemm510-mbs.china.huawei.com>
- <87a7znsubp.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063587@dggemm510-mbs.china.huawei.com>
- <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
- <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
- <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
- <20171117073556.GB28855@cbox>
-Message-ID: <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
+From: arvind.yadav.cs@gmail.com (Arvind Yadav)
+Date: Sat, 18 Nov 2017 16:25:08 +0530
+Subject: [PATCH 01/10 v3] Input: ep93xx_keypad: Fix platform_get_irq's error
+ checking
+Message-ID: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 17, 2017  15:36 Christoffer Dall [mailto:cdall at linaro.org]  wrote:
->If your processor does support LPAE (like a Cortex-A15 for example),
->then you have both the 32-bit accessors (MRC and MCR) and the 64-bit
->accessors (MRRC, MCRR), and using the 32-bit accessor will simply access
->the lower 32-bits of the 64-bit register.
->
->Hope this helps,
->-Christoffer
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct.
 
-If you know the higher 32-bits of the 64-bits cp15's register is not useful for your system,
-then you can use the 32-bit accessor to get or set the 64-bit cp15's register.
-But if the higher 32-bits of the 64-bits cp15's register is useful for your system,
-then you can't use the 32-bit accessor to get or set the 64-bit cp15's register.
+Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+---
+changes in v2:
+               Return keypad->irq insted of -ENXIO.
+changes in v3 :
+               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
 
-TTBR0/TTBR1/PAR's higher 32-bits is useful for CPU supporting LPAE.
-The following description which comes from ARM(r) Architecture Reference
-Manual ARMv7-A and ARMv7-R edition tell us the reason:
+ drivers/input/keyboard/ep93xx_keypad.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-64-bit TTBR0 and TTBR1 format:
-...
-BADDR, bits[39:x] : 
-Translation table base address, bits[39:x]. Defining the translation table base address width on
-page B4-1698 describes how x is defined.
-The value of x determines the required alignment of the translation table, which must be aligned to
-2x bytes.
-
-Abbott Liu: Because BADDR on CPU supporting LPAE may be bigger than max value of 32-bit, so bits[39:32] may 
-be valid value which is useful for the system.
-
-64-bit PAR format
-...
-PA[39:12]
-Physical Address. The physical address corresponding to the supplied virtual address. This field
-returns address bits[39:12].
-
-Abbott Liu: Because Physical Address on CPU supporting LPAE may be bigger than max value of 32-bit, 
-so bits[39:32] may be valid value which is useful for the system.
-
-Conclusion: Don't use 32-bit accessor to get or set TTBR0/TTBR1/PAR on CPU supporting LPAE,
-if you do that, your system may run error.
+diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
+index f77b295..01788a7 100644
+--- a/drivers/input/keyboard/ep93xx_keypad.c
++++ b/drivers/input/keyboard/ep93xx_keypad.c
+@@ -257,8 +257,8 @@ static int ep93xx_keypad_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	keypad->irq = platform_get_irq(pdev, 0);
+-	if (!keypad->irq) {
+-		err = -ENXIO;
++	if (keypad->irq <= 0) {
++		err = keypad->irq;
+ 		goto failed_free;
+ 	}
+ 
+-- 
+2.7.4
