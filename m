@@ -1,54 +1,37 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 16:25:10 +0530
-Subject: [PATCH 03/10 v3] Input: twl4030_keypad: Fix platform_get_irq's error
- checking
+Date: Sat, 18 Nov 2017 16:25:13 +0530
+Subject: [PATCH 06/10 v2] Input: w90p910_ts: Handle return value of
+ platform_get_irq
 In-Reply-To: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
 References: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
-Message-ID: <d5ca46d63a41f47411b94c6035d3b8c46bbe8503.1510999558.git.arvind.yadav.cs@gmail.com>
+Message-ID: <1d35ad94214f0e0ba6cd50d443067c323121486b.1510999334.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
 changes in v2 :
-              kp->irq is unsigned. use temporary int variable irq.
-changes in v3 :
               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
 
- drivers/input/keyboard/twl4030_keypad.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/input/touchscreen/w90p910_ts.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/input/keyboard/twl4030_keypad.c b/drivers/input/keyboard/twl4030_keypad.c
-index f9f98ef..d921238 100644
---- a/drivers/input/keyboard/twl4030_keypad.c
-+++ b/drivers/input/keyboard/twl4030_keypad.c
-@@ -341,6 +341,7 @@ static int twl4030_kp_probe(struct platform_device *pdev)
- 	struct input_dev *input;
- 	u8 reg;
- 	int error;
-+	int irq;
+diff --git a/drivers/input/touchscreen/w90p910_ts.c b/drivers/input/touchscreen/w90p910_ts.c
+index 638c1d7..fa74f2c 100644
+--- a/drivers/input/touchscreen/w90p910_ts.c
++++ b/drivers/input/touchscreen/w90p910_ts.c
+@@ -277,6 +277,10 @@ static int w90x900ts_probe(struct platform_device *pdev)
+ 	input_set_drvdata(input_dev, w90p910_ts);
  
- 	kp = devm_kzalloc(&pdev->dev, sizeof(*kp), GFP_KERNEL);
- 	if (!kp)
-@@ -388,11 +389,12 @@ static int twl4030_kp_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	kp->irq = platform_get_irq(pdev, 0);
--	if (!kp->irq) {
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0) {
- 		dev_err(&pdev->dev, "no keyboard irq assigned\n");
--		return -EINVAL;
-+		return irq;
- 	}
-+	kp->irq = irq;
- 
- 	error = matrix_keypad_build_keymap(keymap_data, NULL,
- 					   TWL4030_MAX_ROWS,
+ 	w90p910_ts->irq_num = platform_get_irq(pdev, 0);
++	if (w90p910_ts->irq_num <= 0) {
++		err = w90p910_ts->irq_num;
++		goto fail4;
++	}
+ 	if (request_irq(w90p910_ts->irq_num, w90p910_ts_interrupt,
+ 			0, "w90p910ts", w90p910_ts)) {
+ 		err = -EBUSY;
 -- 
 2.7.4
