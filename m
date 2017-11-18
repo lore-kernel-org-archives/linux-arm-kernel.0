@@ -1,57 +1,77 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 17 Nov 2017 16:27:14 -0800
-Subject: [PATCH 14/18] arm64: erratum: Work around Falkor erratum #E1003
- in trampoline code
-In-Reply-To: <1510942921-12564-15-git-send-email-will.deacon@arm.com>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <1510942921-12564-15-git-send-email-will.deacon@arm.com>
-Message-ID: <20171118002714.GC18379@codeaurora.org>
+From: philip.li@intel.com (Li, Philip)
+Date: Sat, 18 Nov 2017 02:03:49 +0000
+Subject: [GIT PULL 2/3] ARM: SoC driver updates for 4.15
+In-Reply-To: <20171116235007.6caupnnbddaguwqr@wfg-t540p.sh.intel.com>
+References: <CAK8P3a2Wp6EANLq7JZr=uAReKOhBYrc3VKUA7FpDvq7n3Lc2aQ@mail.gmail.com>
+ <CA+55aFyvWnmLzYs+Hb+d=ir9Ww8gLcNn9=Oc=zwKdK=L-nmXZA@mail.gmail.com>
+ <CAK8P3a3uwqeeg7--UDTWJ33g7YejXp5rtV9OFt=jrt-AzQi13Q@mail.gmail.com>
+ <20171116235007.6caupnnbddaguwqr@wfg-t540p.sh.intel.com>
+Message-ID: <831EE4E5E37DCC428EB295A351E662494C8CD9E3@shsmsx102.ccr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17, Will Deacon wrote:
-> We rely on an atomic swizzling of TTBR1 when transitioning from the entry
-> trampoline to the kernel proper on an exception. We can't rely on this
-> atomicity in the face of Falkor erratum #E1003, so on affected cores we
-> can issue a TLB invalidation prior to jumping into the kernel. There is
-> still the possibility of a TLB conflict here due to conflicting walk
-> cache entries, but this doesn't appear to be the case on these CPUs in
-> practice.
+On Fri, Nov 17, 2017 at 7:50 AM, Fengguang Wu wrote:
+> On Fri, Nov 17, 2017 at 12:25:12AM +0100, Arnd Bergmann wrote:
+> >On Thu, Nov 16, 2017 at 11:29 PM, Linus Torvalds
+> ><torvalds@linux-foundation.org> wrote:
+> >> On Thu, Nov 16, 2017 at 2:02 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> >>>
+> >>> ARM: SoC driver updates for v4.15
+> >>
+> >> No. This is completely broken, and I can't imagine that it has ever
+> >> compiled for *anybody*.
+> >>
+> >>   drivers/soc/renesas/r8a77970-sysc.c:14:10: fatal error:
+> >> dt-bindings/power/r8a77970-sysc.h: No such file or directory
+> >>    #include <dt-bindings/power/r8a77970-sysc.h>
+> >>
+> >> and the compiler is completely right. This branch added that
+> >> r8a77970-sysc.c file, but never added the header file.
+> >>
+> >> And it's not some odd merge mistake of mine: I checked. That error is
+> >> there in the original branch too.
+> >>
+> >> Tssk.
+> >
+> >Right, I need to figure out how this could have slipped through. I did
+> >get several "BUILD SUCCESS" mails from the kbuild bot (see
+> >https://pastebin.com/JDw3EKDZ), which claims to have built it
+> >successfully in all configurations, including allmodconfig builds on
+> >arm/arm64 and x86-64. Fengguang, do you remember problems
+> >with false-negatives recently?
 > 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/Kconfig        | 17 +++++------------
->  arch/arm64/kernel/entry.S |  8 ++++++++
->  2 files changed, 13 insertions(+), 12 deletions(-)
+> Sorry I checked log and didn't find any 0day reports for that error.
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0df64a6a56d4..f0fcbfc2262e 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -504,20 +504,13 @@ config CAVIUM_ERRATUM_30115
->  config QCOM_FALKOR_ERRATUM_1003
->  	bool "Falkor E1003: Incorrect translation due to ASID change"
->  	default y
-> -	select ARM64_PAN if ARM64_SW_TTBR0_PAN
+> It actually hit the errors several times:
+> 
+> drivers/soc/renesas/r8a77970-sysc.c:14:11: sparse: unable to open 'dt-
+> bindings/power/r8a77970-sysc.h'
+> 
+> 2017-10-21 07:23:12 on arm-soc/next/drivers
+> 1c6788e8746d5250ad9bd16e1e48140a396f4733 x86_64-allmodconfig
+> 
+> 
+> drivers/soc/renesas/r8a77970-sysc.c:14:45: fatal error: dt-
+> bindings/power/r8a77970-sysc.h: No such file or directory
+> 
+> 2017-11-03 07:45:22 on arm-soc/next/drivers
+> 30f3b0678ce6fc46bcdde61ca35821032d0f25b5 i386-allmodconfig
+> 2017-11-03 08:42:45 on arm-soc/next/drivers
+> 30f3b0678ce6fc46bcdde61ca35821032d0f25b5 arm-allmodconfig
+> 2017-11-03 08:43:06 on arm-soc/next/drivers
+> 30f3b0678ce6fc46bcdde61ca35821032d0f25b5 arm64-allmodconfig
+> 
+> So the robot is not working well in that case, I'll work with Philip
+> to get that fixed.
+Thanks Arnd/Fengguang. After the investigation from Shun, it shows the bisect
+works as expected and can identify the bad commit. But this missing report
+issue is because the build test server that runs the bisect happens to have
+permission issue that prevents mutt to lock the "sent" file. 
 
-Cool, this sort of complicates the backport of the Kryo MIDR
-update of this errata to stable trees though.
+This is more serious than expected since the issue has been there for quite long
+time. I apologize for the misleading information provided that there's no error
+reported out. We will monitor all the details carefully.
 
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index a839b94bba05..a600879939ce 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -941,6 +941,14 @@ __ni_sys_trace:
->  	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
->  	bic	\tmp, \tmp, #USER_ASID_FLAG
->  	msr	ttbr1_el1, \tmp
-> +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
-
-Shouldn't we put this inside an #ifdef QCOM_FALKOR_ERRATUM_1003
-so that we don't even emit nops in case we have the errata
-disabled? Or did I miss something in the alternatives assembly
-code?
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> 
+> Regards,
+> Fengguang
