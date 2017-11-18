@@ -1,37 +1,55 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 16:25:13 +0530
-Subject: [PATCH 06/10 v2] Input: w90p910_ts: Handle return value of
- platform_get_irq
+Date: Sat, 18 Nov 2017 16:25:11 +0530
+Subject: [PATCH 04/10 v3] Input: serio: Fix platform_get_irq's error checking
 In-Reply-To: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
 References: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
-Message-ID: <1d35ad94214f0e0ba6cd50d443067c323121486b.1510999334.git.arvind.yadav.cs@gmail.com>
+Message-ID: <8104ffc3b7bedee525c0cba9144cedaf04087fd4.1510999558.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
 changes in v2 :
+              irq is unsigned. used struct sun4i_ps2data int variable drvdata->irq.
+changes in v3 :
               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
 
- drivers/input/touchscreen/w90p910_ts.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/input/serio/sun4i-ps2.c | 8 +++-----
+ 1 file changed, 3 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/input/touchscreen/w90p910_ts.c b/drivers/input/touchscreen/w90p910_ts.c
-index 638c1d7..fa74f2c 100644
---- a/drivers/input/touchscreen/w90p910_ts.c
-+++ b/drivers/input/touchscreen/w90p910_ts.c
-@@ -277,6 +277,10 @@ static int w90x900ts_probe(struct platform_device *pdev)
- 	input_set_drvdata(input_dev, w90p910_ts);
+diff --git a/drivers/input/serio/sun4i-ps2.c b/drivers/input/serio/sun4i-ps2.c
+index 04b96fe..38bb163 100644
+--- a/drivers/input/serio/sun4i-ps2.c
++++ b/drivers/input/serio/sun4i-ps2.c
+@@ -210,7 +210,6 @@ static int sun4i_ps2_probe(struct platform_device *pdev)
+ 	struct sun4i_ps2data *drvdata;
+ 	struct serio *serio;
+ 	struct device *dev = &pdev->dev;
+-	unsigned int irq;
+ 	int error;
  
- 	w90p910_ts->irq_num = platform_get_irq(pdev, 0);
-+	if (w90p910_ts->irq_num <= 0) {
-+		err = w90p910_ts->irq_num;
-+		goto fail4;
-+	}
- 	if (request_irq(w90p910_ts->irq_num, w90p910_ts_interrupt,
- 			0, "w90p910ts", w90p910_ts)) {
- 		err = -EBUSY;
+ 	drvdata = kzalloc(sizeof(struct sun4i_ps2data), GFP_KERNEL);
+@@ -263,14 +262,13 @@ static int sun4i_ps2_probe(struct platform_device *pdev)
+ 	writel(0, drvdata->reg_base + PS2_REG_GCTL);
+ 
+ 	/* Get IRQ for the device */
+-	irq = platform_get_irq(pdev, 0);
+-	if (!irq) {
++	drvdata->irq = platform_get_irq(pdev, 0);
++	if (drvdata->irq <= 0) {
+ 		dev_err(dev, "no IRQ found\n");
+-		error = -ENXIO;
++		error = drvdata->irq;
+ 		goto err_disable_clk;
+ 	}
+ 
+-	drvdata->irq = irq;
+ 	drvdata->serio = serio;
+ 	drvdata->dev = dev;
+ 
 -- 
 2.7.4
