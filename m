@@ -1,18 +1,23 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Nov 2017 08:21:22 +0000
-Subject: [PATCH 5/10 v2] Input: cpcap-pwrbutton: Handle return value of
- platform_get_irq
-In-Reply-To: <ae8e2bcc48ceeb7cf04f4ec19e7cc76d51fcf58f.1510952504.git.arvind.yadav.cs@gmail.com>
-References: <ae8e2bcc48ceeb7cf04f4ec19e7cc76d51fcf58f.1510952504.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171118082122.GB31757@n2100.armlinux.org.uk>
+Date: Sat, 18 Nov 2017 08:20:47 +0000
+Subject: [PATCH 2/3 v2] Input: twl4030_keypad: Fix platform_get_irq's
+ error checking
+In-Reply-To: <d5ca46d63a41f47411b94c6035d3b8c46bbe8503.1510951446.git.arvind.yadav.cs@gmail.com>
+References: <f317ec56b23b11b79284c29d12a7004575aa35db.1510951446.git.arvind.yadav.cs@gmail.com>
+ <d5ca46d63a41f47411b94c6035d3b8c46bbe8503.1510951446.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20171118082047.GZ31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 18, 2017 at 02:36:53AM +0530, Arvind Yadav wrote:
-> platform_get_irq() can fail here and we must check its return value.
+On Sat, Nov 18, 2017 at 02:28:49AM +0530, Arvind Yadav wrote:
+> The platform_get_irq() function returns negative if an error occurs.
+> zero or positive number on success. platform_get_irq() error checking
+> for zero is not correct.
 
-The test should be <= 0, and you need to return an error code for the
-0 case.
+IRQ 0 is not a valid interrupt.  The correct test here is <= 0.
+Please rework your patches for this.
+
+Thanks.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
