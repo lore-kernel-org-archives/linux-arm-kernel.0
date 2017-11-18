@@ -1,39 +1,63 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 14:40:13 +0530
-Subject: [PATCH 2/2 v2] misc: atmel-ssc: Fix platform_get_irq's error checking
-In-Reply-To: <6e238a28aa79c581c90329060805c0b07e2187a7.1510995185.git.arvind.yadav.cs@gmail.com>
-References: <6e238a28aa79c581c90329060805c0b07e2187a7.1510995185.git.arvind.yadav.cs@gmail.com>
-Message-ID: <03c6f3e9df6d3077717e1f14b4775f2864a0304a.1510995185.git.arvind.yadav.cs@gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Sat, 18 Nov 2017 17:12:32 +0800
+Subject: [PATCH v2] arm64: kdump: Avoid to power off nonpanic CPUs
+Message-ID: <1510996352-16684-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
+crash dump for nonpanic cores") introduces ARM64 architecture function
+crash_smp_send_stop() to replace the weak function, this results in
+the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
+power state on ARM64 platforms with the flow:
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+  Panic CPU:
+    machine_crash_shutdown()
+      crash_smp_send_stop()
+	smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
+
+  Nonpanic CPUs:
+    handle_IPI()
+      ipi_cpu_crash_stop()
+        cpu_ops[cpu]->cpu_die()
+
+The upper patch has no issue if enabled crash dump only; but if enabled
+crash dump and Coresight debug module for panic dumping at the meantime,
+nonpanic CPUs are powered off in crash dump flow, later this may
+introduce conflicts with the Coresight debug module because Coresight
+debug registers dumping requires the CPU must be powered on for some
+platforms (e.g. Hi6220 on Hikey board). If we cannot keep the CPUs
+powered on, we can see the hardware lockup issue when access Coresight
+debug registers.
+
+To fix this issue, this commit bypasses CPU hotplug operation in func
+crash_smp_send_stop() when coresight CPU debug module has been enabled
+and let CPUs to run into WFE/WFI states so CPUs can still be powered on
+after crash dump. This finally is more safe for Coresight debug module
+to dump registers and avoid hardware lockup.
+
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: James Morse <james.morse@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
-changes in v2 :
-              Add failure case '<= 0' instead of '< 0'. IRQ 0 is not valid.
+ arch/arm64/kernel/smp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
- drivers/misc/atmel-ssc.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-index b2a0340..9d9eeae 100644
---- a/drivers/misc/atmel-ssc.c
-+++ b/drivers/misc/atmel-ssc.c
-@@ -235,9 +235,9 @@ static int ssc_probe(struct platform_device *pdev)
- 	clk_disable_unprepare(ssc->clk);
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 9f7195a..31dab1f 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -856,7 +856,7 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
  
- 	ssc->irq = platform_get_irq(pdev, 0);
--	if (!ssc->irq) {
-+	if (ssc->irq <= 0) {
- 		dev_dbg(&pdev->dev, "could not get irq\n");
--		return -ENXIO;
-+		return ssc->irq;
- 	}
+ 	local_irq_disable();
  
- 	spin_lock(&user_lock);
+-#ifdef CONFIG_HOTPLUG_CPU
++#if defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_CORESIGHT_CPU_DEBUG)
+ 	if (cpu_ops[cpu]->cpu_die)
+ 		cpu_ops[cpu]->cpu_die(cpu);
+ #endif
 -- 
 2.7.4
