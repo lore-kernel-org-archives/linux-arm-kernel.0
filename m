@@ -1,10 +1,10 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 16:25:17 +0530
-Subject: [PATCH 10/10 v2] Input: palmas-pwrbutton: Handle return value of
+Date: Sat, 18 Nov 2017 16:25:15 +0530
+Subject: [PATCH 08/10 v3] Input: twl4030-pwrbutton: Handle return value of
  platform_get_irq
 In-Reply-To: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
 References: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
-Message-ID: <cf9a8dd0a867bb4a9b151523435146f0fb9e2c06.1510999335.git.arvind.yadav.cs@gmail.com>
+Message-ID: <bed6484b6919f26e7119934a33b6f9b1e94de3c9.1510999334.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,26 +13,26 @@ platform_get_irq() can fail here and we must check its return value.
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
 changes in v2 :
+              return irq instead of -ENODEV.
+changes in v3 :
               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
 
- drivers/input/misc/palmas-pwrbutton.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/input/misc/twl4030-pwrbutton.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/input/misc/palmas-pwrbutton.c b/drivers/input/misc/palmas-pwrbutton.c
-index 1e1baed..f9b05cf 100644
---- a/drivers/input/misc/palmas-pwrbutton.c
-+++ b/drivers/input/misc/palmas-pwrbutton.c
-@@ -210,6 +210,11 @@ static int palmas_pwron_probe(struct platform_device *pdev)
- 	INIT_DELAYED_WORK(&pwron->input_work, palmas_power_button_work);
+diff --git a/drivers/input/misc/twl4030-pwrbutton.c b/drivers/input/misc/twl4030-pwrbutton.c
+index b307cca..0dcf311 100644
+--- a/drivers/input/misc/twl4030-pwrbutton.c
++++ b/drivers/input/misc/twl4030-pwrbutton.c
+@@ -58,6 +58,9 @@ static int twl4030_pwrbutton_probe(struct platform_device *pdev)
+ 	int irq = platform_get_irq(pdev, 0);
+ 	int err;
  
- 	pwron->irq = platform_get_irq(pdev, 0);
-+	if (pwron->irq <= 0) {
-+		error = pwron->irq;
-+		goto err_free_input;
-+	}
++	if (irq <= 0)
++		return irq;
 +
- 	error = request_threaded_irq(pwron->irq, NULL, pwron_irq,
- 				     IRQF_TRIGGER_HIGH |
- 					IRQF_TRIGGER_LOW |
+ 	pwr = devm_input_allocate_device(&pdev->dev);
+ 	if (!pwr) {
+ 		dev_err(&pdev->dev, "Can't allocate power button\n");
 -- 
 2.7.4
