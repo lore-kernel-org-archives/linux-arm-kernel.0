@@ -1,46 +1,33 @@
 From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 18 Nov 2017 14:04:12 +0100
-Subject: [PATCH 1/2] dt-binding: rng: Add interrupt property for BCM2835
+Date: Sat, 18 Nov 2017 14:04:13 +0100
+Subject: [PATCH 2/2] ARM: bcm283x: Add missing interrupt for RNG block
 In-Reply-To: <1511010253-5006-1-git-send-email-stefan.wahren@i2se.com>
 References: <1511010253-5006-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <1511010253-5006-2-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <1511010253-5006-3-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As Sylvain Garrigues pointed out the BCM2835 RNG block has an
-interrupt. Also in preparation for Florian's upcoming patch series
-add this property to the binding. While we are at it fix the
-indenting of the example.
+This patch adds the missing interrupt property to the RNG block
+of BCM283x.
 
 Link: https://github.com/raspberrypi/linux/issues/2195
 CC: Florian Fainelli <f.fainelli@gmail.com>
 Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
 ---
- Documentation/devicetree/bindings/rng/brcm,bcm2835.txt | 9 +++++++--
- 1 file changed, 7 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/bcm283x.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt b/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
-index 2654269..82ef4dd 100644
---- a/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
-+++ b/Documentation/devicetree/bindings/rng/brcm,bcm2835.txt
-@@ -6,11 +6,16 @@ Required properties:
-   "brcm,bcm5301x-rng"
- - reg : Specifies base physical address and size of the registers.
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index 013431e..0c17a81 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -135,6 +135,7 @@
+ 		rng at 7e104000 {
+ 			compatible = "brcm,bcm2835-rng";
+ 			reg = <0x7e104000 0x10>;
++			interrupts = <2 29>;
+ 		};
  
-+Optional properties:
-+
-+- interrupts: specify the interrupt for the RNG block
-+
- Example:
- 
- rng {
--        compatible = "brcm,bcm2835-rng";
--        reg = <0x7e104000 0x10>;
-+	compatible = "brcm,bcm2835-rng";
-+	reg = <0x7e104000 0x10>;
-+	interrupts = <2 29>;
- };
- 
- rng at 18033000 {
+ 		mailbox: mailbox at 7e00b880 {
 -- 
 2.7.4
