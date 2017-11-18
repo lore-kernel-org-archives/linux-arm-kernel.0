@@ -1,63 +1,25 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Sat, 18 Nov 2017 17:12:32 +0800
-Subject: [PATCH v2] arm64: kdump: Avoid to power off nonpanic CPUs
-Message-ID: <1510996352-16684-1-git-send-email-leo.yan@linaro.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Sat, 18 Nov 2017 08:20:54 +0000
+Subject: [PATCH 4/10 v2] Input: serio: Fix platform_get_irq's error
+ checking
+In-Reply-To: <8104ffc3b7bedee525c0cba9144cedaf04087fd4.1510951446.git.arvind.yadav.cs@gmail.com>
+References: <f317ec56b23b11b79284c29d12a7004575aa35db.1510951446.git.arvind.yadav.cs@gmail.com>
+ <8104ffc3b7bedee525c0cba9144cedaf04087fd4.1510951446.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20171118082054.GA31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
-crash dump for nonpanic cores") introduces ARM64 architecture function
-crash_smp_send_stop() to replace the weak function, this results in
-the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
-power state on ARM64 platforms with the flow:
+On Sat, Nov 18, 2017 at 02:28:50AM +0530, Arvind Yadav wrote:
+> The platform_get_irq() function returns negative if an error occurs.
+> zero or positive number on success. platform_get_irq() error checking
+> for zero is not correct
 
-  Panic CPU:
-    machine_crash_shutdown()
-      crash_smp_send_stop()
-	smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
+IRQ 0 is not a valid interrupt.  The correct test here is <= 0.
+Please rework your patches for this.
 
-  Nonpanic CPUs:
-    handle_IPI()
-      ipi_cpu_crash_stop()
-        cpu_ops[cpu]->cpu_die()
+Thanks.
 
-The upper patch has no issue if enabled crash dump only; but if enabled
-crash dump and Coresight debug module for panic dumping at the meantime,
-nonpanic CPUs are powered off in crash dump flow, later this may
-introduce conflicts with the Coresight debug module because Coresight
-debug registers dumping requires the CPU must be powered on for some
-platforms (e.g. Hi6220 on Hikey board). If we cannot keep the CPUs
-powered on, we can see the hardware lockup issue when access Coresight
-debug registers.
-
-To fix this issue, this commit bypasses CPU hotplug operation in func
-crash_smp_send_stop() when coresight CPU debug module has been enabled
-and let CPUs to run into WFE/WFI states so CPUs can still be powered on
-after crash dump. This finally is more safe for Coresight debug module
-to dump registers and avoid hardware lockup.
-
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: James Morse <james.morse@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Mathieu Poirier <mathieu.poirier@linaro.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- arch/arm64/kernel/smp.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 9f7195a..31dab1f 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -856,7 +856,7 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
- 
- 	local_irq_disable();
- 
--#ifdef CONFIG_HOTPLUG_CPU
-+#if defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_CORESIGHT_CPU_DEBUG)
- 	if (cpu_ops[cpu]->cpu_die)
- 		cpu_ops[cpu]->cpu_die(cpu);
- #endif
 -- 
-2.7.4
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync@8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
