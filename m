@@ -1,10 +1,10 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sat, 18 Nov 2017 16:25:16 +0530
-Subject: [PATCH 09/10 v2] Input: sirfsoc-onkey: Handle return value of
+Date: Sat, 18 Nov 2017 16:25:17 +0530
+Subject: [PATCH 10/10 v2] Input: palmas-pwrbutton: Handle return value of
  platform_get_irq
 In-Reply-To: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
 References: <a9a25cd5775ba4c76d47e8b66934e470f58d9e72.1510999558.git.arvind.yadav.cs@gmail.com>
-Message-ID: <fe9a26770ba88ab9efee23dc28782dc0891b1d1a.1510999334.git.arvind.yadav.cs@gmail.com>
+Message-ID: <cf9a8dd0a867bb4a9b151523435146f0fb9e2c06.1510999335.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,22 +15,24 @@ Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 changes in v2 :
               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
 
- drivers/input/misc/sirfsoc-onkey.c | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/input/misc/palmas-pwrbutton.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/input/misc/sirfsoc-onkey.c b/drivers/input/misc/sirfsoc-onkey.c
-index 4fd038d..de04b48 100644
---- a/drivers/input/misc/sirfsoc-onkey.c
-+++ b/drivers/input/misc/sirfsoc-onkey.c
-@@ -149,6 +149,9 @@ static int sirfsoc_pwrc_probe(struct platform_device *pdev)
- 	sirfsoc_pwrc_toggle_interrupts(pwrcdrv, false);
+diff --git a/drivers/input/misc/palmas-pwrbutton.c b/drivers/input/misc/palmas-pwrbutton.c
+index 1e1baed..f9b05cf 100644
+--- a/drivers/input/misc/palmas-pwrbutton.c
++++ b/drivers/input/misc/palmas-pwrbutton.c
+@@ -210,6 +210,11 @@ static int palmas_pwron_probe(struct platform_device *pdev)
+ 	INIT_DELAYED_WORK(&pwron->input_work, palmas_power_button_work);
  
- 	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0)
-+		return irq;
+ 	pwron->irq = platform_get_irq(pdev, 0);
++	if (pwron->irq <= 0) {
++		error = pwron->irq;
++		goto err_free_input;
++	}
 +
- 	error = devm_request_irq(&pdev->dev, irq,
- 				 sirfsoc_pwrc_isr, 0,
- 				 "sirfsoc_pwrc_int", pwrcdrv);
+ 	error = request_threaded_irq(pwron->irq, NULL, pwron_irq,
+ 				     IRQF_TRIGGER_HIGH |
+ 					IRQF_TRIGGER_LOW |
 -- 
 2.7.4
