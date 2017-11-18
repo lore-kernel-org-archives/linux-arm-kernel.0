@@ -1,14 +1,14 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 18 Nov 2017 08:17:49 +0000
-Subject: [PATCH 1/5 v2] ASoC: ep93xx-ac97: Fix platform_get_irq's error
- checking
-In-Reply-To: <874375c0dca41790e47b60ce30f88ab353f97b38.1510982440.git.arvind.yadav.cs@gmail.com>
+Date: Sat, 18 Nov 2017 08:18:06 +0000
+Subject: [PATCH 2/5 v2] ASoC: mt8173: Fix platform_get_irq's error checking
+In-Reply-To: <f683092949c0a6195b09ebbeb690e358094a0506.1510982440.git.arvind.yadav.cs@gmail.com>
 References: <874375c0dca41790e47b60ce30f88ab353f97b38.1510982440.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171118081749.GS31757@n2100.armlinux.org.uk>
+ <f683092949c0a6195b09ebbeb690e358094a0506.1510982440.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20171118081805.GT31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 18, 2017 at 10:57:51AM +0530, Arvind Yadav wrote:
+On Sat, Nov 18, 2017 at 10:57:52AM +0530, Arvind Yadav wrote:
 > The platform_get_irq() function returns negative if an error occurs.
 > zero or positive number on success. platform_get_irq() error checking
 > for zero is not correct.
