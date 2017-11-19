@@ -1,14 +1,15 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 19 Nov 2017 09:38:36 +0100
-Subject: [PATCH 1/2 v3] misc: aspeed-lpc-snoop: Fix platform_get_irq's
- error checking
-In-Reply-To: <3ce95a4e4eb4476b19868f36cd1f11e4b62b6203.1511065797.git.arvind.yadav.cs@gmail.com>
+Date: Sun, 19 Nov 2017 09:39:32 +0100
+Subject: [PATCH 2/2 v3] misc: atmel-ssc: Fix platform_get_irq's error
+ checking
+In-Reply-To: <fbe464e8bd8039463c4984835286b19060509f82.1511065797.git.arvind.yadav.cs@gmail.com>
 References: <3ce95a4e4eb4476b19868f36cd1f11e4b62b6203.1511065797.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171119083836.qx7bbnalum5rebj3@piout.net>
+ <fbe464e8bd8039463c4984835286b19060509f82.1511065797.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20171119083932.7qm2dnqqsgrzbim7@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/2017 at 10:04:00 +0530, Arvind Yadav wrote:
+On 19/11/2017 at 10:04:01 +0530, Arvind Yadav wrote:
 > The platform_get_irq() function returns negative if an error occurs.
 > zero or positive number on success. platform_get_irq() error checking
 > for zero is not correct.
@@ -18,27 +19,28 @@ On 19/11/2017 at 10:04:00 +0530, Arvind Yadav wrote:
 > changes in v2 :
 >               Add failure case '<= 0' instead of '< 0'. IRQ 0 is not valid.
 > changes in v3:
->               Return -ENODEV instead of lpc_snoop->irq.
+>               Return -ENODEV instead of ssc->irq.
 
-What about -EPROBE_DEFER?
+The patch is not doing what you claim here.
+
 
 > 
->  drivers/misc/aspeed-lpc-snoop.c | 2 +-
+>  drivers/misc/atmel-ssc.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/drivers/misc/aspeed-lpc-snoop.c b/drivers/misc/aspeed-lpc-snoop.c
-> index cb78c98..e3be88f 100644
-> --- a/drivers/misc/aspeed-lpc-snoop.c
-> +++ b/drivers/misc/aspeed-lpc-snoop.c
-> @@ -115,7 +115,7 @@ static int aspeed_lpc_snoop_config_irq(struct aspeed_lpc_snoop *lpc_snoop,
->  	int rc;
+> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
+> index b2a0340..2ec0f9e 100644
+> --- a/drivers/misc/atmel-ssc.c
+> +++ b/drivers/misc/atmel-ssc.c
+> @@ -235,7 +235,7 @@ static int ssc_probe(struct platform_device *pdev)
+>  	clk_disable_unprepare(ssc->clk);
 >  
->  	lpc_snoop->irq = platform_get_irq(pdev, 0);
-> -	if (!lpc_snoop->irq)
-> +	if (lpc_snoop->irq <= 0)
->  		return -ENODEV;
->  
->  	rc = devm_request_irq(dev, lpc_snoop->irq,
+>  	ssc->irq = platform_get_irq(pdev, 0);
+> -	if (!ssc->irq) {
+> +	if (ssc->irq <= 0) {
+>  		dev_dbg(&pdev->dev, "could not get irq\n");
+>  		return -ENXIO;
+>  	}
 > -- 
 > 2.7.4
 > 
