@@ -1,41 +1,43 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Sun, 19 Nov 2017 11:41:01 -0500
-Subject: [PATCH v2 4/4] PCI/AER: Dont do recovery when DPC is enabled
-In-Reply-To: <20171118000243.GC16907@bhelgaas-glaptop.roam.corp.google.com>
-References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
- <1510721808-27164-5-git-send-email-poza@codeaurora.org>
- <20171115211447.GA7266@bhelgaas-glaptop.roam.corp.google.com>
- <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
- <20171116201745.GB7266@bhelgaas-glaptop.roam.corp.google.com>
- <16b9ac67-042d-1010-0c8c-205b2fa40a7f@codeaurora.org>
- <20171118000243.GC16907@bhelgaas-glaptop.roam.corp.google.com>
-Message-ID: <dddb6c7a-5bf9-8c26-f753-6223b35f4842@codeaurora.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 19 Nov 2017 16:48:03 +0000
+Subject: [PATCH v2 1/3] dt-bindings: iio: adc: stm32: add support for
+ diff channels
+In-Reply-To: <20171027143729.7oqcps43qvieko4r@rob-hp-laptop>
+References: <1508923665-2274-1-git-send-email-fabrice.gasnier@st.com>
+ <1508923665-2274-2-git-send-email-fabrice.gasnier@st.com>
+ <20171027143729.7oqcps43qvieko4r@rob-hp-laptop>
+Message-ID: <20171119164803.22cd7f7f@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2017 7:02 PM, Bjorn Helgaas wrote:
->> What do you think about the rescan following link up? The only entity
->> that does rescan today is hotplug after DPC recovery. There could be
->> a platform with DPC support but no hotplug support. 
->>
->> How should we handle it?
-> Good question.  If your system does support both DPC and hotplug, I
-> assume the link comes back up after you clear DPC Trigger Status.
-> Does pciehp notice that "link up" event and add the device back?
+On Fri, 27 Oct 2017 09:37:29 -0500
+Rob Herring <robh@kernel.org> wrote:
 
-that's correct. we see a link up indication from hotplug driver followed
-by a rescan.
-
+> On Wed, Oct 25, 2017 at 11:27:43AM +0200, Fabrice Gasnier wrote:
+> > STM32H7 ADC channels may be configured either as single-ended or
+> > differential.
+> > Add 'st,adc-diff-channels' property to support differential channels.
+> > Differential channels are defined as a pair of positive and negative
+> > inputs: vinp & vinn.
+> > 
+> > Signed-off-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+> > ---
+> > Changes in v2:
+> > - Add differential channels example
+> > - Add a note on mixed single-ended / differential channels
+> > ---
+> >  .../devicetree/bindings/iio/adc/st,stm32-adc.txt   | 24 ++++++++++++++++++++++
+> >  1 file changed, 24 insertions(+)  
 > 
-> So I think your question is whether the DPC code should explicitly do
-> a rescan so that if we don't have pciehp, we'll still automatically
-> rediscover the device.  I dunno, maybe.  Seems like a plausible idea
-> anyway.
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+Thanks.  Applied to the togreg branch of iio.git and pushed out as
+testing for the autobuilders to play with it.
 
-OK, will add it to DPC driver for completeness.
+Thanks,
 
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Jonathan
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
