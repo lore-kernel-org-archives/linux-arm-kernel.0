@@ -1,45 +1,37 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sun, 19 Nov 2017 09:45:02 +0530
-Subject: [PATCH 3/5 v4] ASoC: nuc900: Fix platform_get_irq's error checking
+Date: Sun, 19 Nov 2017 09:45:04 +0530
+Subject: [PATCH 5/5 v3] ASoC: intel: mfld: Handle return value of
+ platform_get_irq
 In-Reply-To: <082d4479211d425219f4ab275ecc12e1011eca2f.1511062844.git.arvind.yadav.cs@gmail.com>
 References: <082d4479211d425219f4ab275ecc12e1011eca2f.1511062844.git.arvind.yadav.cs@gmail.com>
-Message-ID: <ff6af1a5db5ee3cb9b8f5846573d0f578950d6a8.1511062844.git.arvind.yadav.cs@gmail.com>
+Message-ID: <64135c4647a3a94261a669d7f49611a356f334bf.1511062844.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
 changes in v2 :
-               irq was unsigned. so using signed variable ret.
-changes in v3 :
               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
-changes in v4 :
-              Return -ENODEV insted of irq.
- sound/soc/nuc900/nuc900-ac97.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+changes in v3 :
+              Return EIO insted of ctx->irq_num.
 
-diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
-index b6615af..893ccf2 100644
---- a/sound/soc/nuc900/nuc900-ac97.c
-+++ b/sound/soc/nuc900/nuc900-ac97.c
-@@ -345,11 +345,12 @@ static int nuc900_ac97_drvprobe(struct platform_device *pdev)
- 		goto out;
- 	}
+ sound/soc/intel/boards/mfld_machine.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/sound/soc/intel/boards/mfld_machine.c b/sound/soc/intel/boards/mfld_machine.c
+index 6f44acf..c819210 100644
+--- a/sound/soc/intel/boards/mfld_machine.c
++++ b/sound/soc/intel/boards/mfld_machine.c
+@@ -372,6 +372,8 @@ static int snd_mfld_mc_probe(struct platform_device *pdev)
  
--	nuc900_audio->irq_num = platform_get_irq(pdev, 0);
--	if (!nuc900_audio->irq_num) {
-+	ret = platform_get_irq(pdev, 0);
-+	if (ret <= 0) {
- 		ret = -EBUSY;
- 		goto out;
- 	}
-+	nuc900_audio->irq_num = ret;
+ 	/* retrive the irq number */
+ 	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0)
++		return -ENODEV;
  
- 	nuc900_ac97_data = nuc900_audio;
- 
+ 	/* audio interrupt base of SRAM location where
+ 	 * interrupts are stored by System FW */
 -- 
 2.7.4
