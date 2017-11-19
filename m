@@ -1,41 +1,102 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 19 Nov 2017 11:28:19 +0000
-Subject: [PATCH v3 4/4] iio: adc: at91-sama5d2_adc: ack DRDY irq in
- direct mode
-In-Reply-To: <1510750608-8697-5-git-send-email-eugen.hristev@microchip.com>
-References: <1510750608-8697-1-git-send-email-eugen.hristev@microchip.com>
- <1510750608-8697-5-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20171119112819.5d128c3f@archlinux>
+Date: Sun, 19 Nov 2017 12:31:15 +0000
+Subject: [PATCH v4 02/12] docs: driver-api: add iio hw consumer section
+In-Reply-To: <1510222354-15290-3-git-send-email-arnaud.pouliquen@st.com>
+References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
+ <1510222354-15290-3-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20171119123115.06eb6d63@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 15 Nov 2017 14:56:48 +0200
-Eugen Hristev <eugen.hristev@microchip.com> wrote:
+On Thu, 9 Nov 2017 11:12:24 +0100
+Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
-> Need to acknowledge DRDY irq in direct mode/ software
-> triggered mode. Otherwise, on the next conversion, overrun
-> flag will be raised, which is not a correct state.
-> This doesn't affect the functionality, but will generate
-> possible incorrect overrun reports.
+> This adds a section about the Hardware consumer
+> Api of the IIO subsystem to the driver API
+> documentation.
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 
-Applied. Thanks.
+Good little bit of docs.  A couple of minor formatting
+comments inline.
+
+Jonathan
+
 > ---
->  drivers/iio/adc/at91-sama5d2_adc.c | 3 +++
->  1 file changed, 3 insertions(+)
+>  Documentation/driver-api/iio/hw-consumer.rst | 50 ++++++++++++++++++++++++++++
+>  Documentation/driver-api/iio/index.rst       |  1 +
+>  2 files changed, 51 insertions(+)
+>  create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
 > 
-> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
-> index 11d34a8..274cb5e 100644
-> --- a/drivers/iio/adc/at91-sama5d2_adc.c
-> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
-> @@ -787,6 +787,9 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
->  		at91_adc_writel(st, AT91_SAMA5D2_IDR, BIT(chan->channel));
->  		at91_adc_writel(st, AT91_SAMA5D2_CHDR, BIT(chan->channel));
->  
-> +		/* Needed to ACK the DRDY interruption */
-> +		at91_adc_readl(st, AT91_SAMA5D2_LCDR);
+> diff --git a/Documentation/driver-api/iio/hw-consumer.rst b/Documentation/driver-api/iio/hw-consumer.rst
+> new file mode 100644
+> index 0000000..b777133
+> --- /dev/null
+> +++ b/Documentation/driver-api/iio/hw-consumer.rst
+> @@ -0,0 +1,50 @@
+> +===========
+> +HW consumer
+> +===========
+> +An IIO device can be directly connected to another device in hardware. in this
+> +case the buffers between IIO provider and IIO consumer are handled by hardware.
+> +The Industrial I/O hw consumer offers a way to bond these IIO devices without
+> +software buffer for data. The implementation can be found under
+> +:file:`drivers/iio/buffer/hw-consumer.c`
 > +
->  		mutex_unlock(&st->lock);
->  
->  		iio_device_release_direct_mode(indio_dev);
+> +
+> +* struct :c:type:`iio_hw_consumer` ? Hardware consumer structure
+> +* :c:func:`iio_hw_consumer_alloc` ? Allocate IIO hardware consumer
+> +* :c:func:`iio_hw_consumer_free` ? Free IIO hardware consumer
+> +* :c:func:`iio_hw_consumer_enable` ? Enable IIO hardware consumer
+> +* :c:func:`iio_hw_consumer_disable` ? Disable IIO hardware consumer
+> +
+> +
+> +HW consumer setup
+> +=================
+> +
+> +As standard IIO device the implementation is based on IIO provider/consumer.
+> +A typical IIO Hw conumer setup looks like this::
+
+HW
+
+> +
+> +	static struct iio_hw_consumer *hwc;
+> +
+> +	static const struct iio_info adc_info = {
+> +		.read_raw = adc_read_raw,
+> +	};
+> +
+> +	static int adc_read_raw(struct iio_dev *indio_dev,
+> +				struct iio_chan_spec const *chan, int *val,
+> +				int *val2, long mask)
+> +	{
+> +		ret = iio_hw_consumer_enable(hwc);
+> +
+> +		/* Acquire data */
+
+Blank line here to make it clear the Acquire data doesn't apply to
+the line below but is representing a missing block.
+
+> +		ret = iio_hw_consumer_disable(hwc);
+> +	}
+> +
+> +	static int adc_probe(struct platform_device *pdev)
+> +	{
+> +		hwc = devm_iio_hw_consumer_alloc(&iio->dev);
+> +	}
+> +
+> +More details
+> +============
+> +.. kernel-doc:: include/linux/iio/hw-consumer.h
+> +.. kernel-doc:: drivers/iio/buffer/industrialio-hw-consumer.c
+> +   :export:
+> +
+> diff --git a/Documentation/driver-api/iio/index.rst b/Documentation/driver-api/iio/index.rst
+> index e5c3922..7fba341 100644
+> --- a/Documentation/driver-api/iio/index.rst
+> +++ b/Documentation/driver-api/iio/index.rst
+> @@ -15,3 +15,4 @@ Contents:
+>     buffers
+>     triggers
+>     triggered-buffers
+> +   hw-consumer
