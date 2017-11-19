@@ -1,51 +1,31 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Sun, 19 Nov 2017 09:39:32 +0100
-Subject: [PATCH 2/2 v3] misc: atmel-ssc: Fix platform_get_irq's error
- checking
-In-Reply-To: <fbe464e8bd8039463c4984835286b19060509f82.1511065797.git.arvind.yadav.cs@gmail.com>
-References: <3ce95a4e4eb4476b19868f36cd1f11e4b62b6203.1511065797.git.arvind.yadav.cs@gmail.com>
- <fbe464e8bd8039463c4984835286b19060509f82.1511065797.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171119083932.7qm2dnqqsgrzbim7@piout.net>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun, 19 Nov 2017 10:57:27 +0100
+Subject: [PATCH] pinctrl: gemini: Add two missing GPIO groups
+Message-ID: <20171119095727.27689-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/2017 at 10:04:01 +0530, Arvind Yadav wrote:
-> The platform_get_irq() function returns negative if an error occurs.
-> zero or positive number on success. platform_get_irq() error checking
-> for zero is not correct.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
-> changes in v2 :
->               Add failure case '<= 0' instead of '< 0'. IRQ 0 is not valid.
-> changes in v3:
->               Return -ENODEV instead of ssc->irq.
+The 3512 has two more GPIO groups on GPIO area 0, so let's
+make it possible to combine these with the function.
 
-The patch is not doing what you claim here.
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ drivers/pinctrl/pinctrl-gemini.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
-> 
->  drivers/misc/atmel-ssc.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/misc/atmel-ssc.c b/drivers/misc/atmel-ssc.c
-> index b2a0340..2ec0f9e 100644
-> --- a/drivers/misc/atmel-ssc.c
-> +++ b/drivers/misc/atmel-ssc.c
-> @@ -235,7 +235,7 @@ static int ssc_probe(struct platform_device *pdev)
->  	clk_disable_unprepare(ssc->clk);
->  
->  	ssc->irq = platform_get_irq(pdev, 0);
-> -	if (!ssc->irq) {
-> +	if (ssc->irq <= 0) {
->  		dev_dbg(&pdev->dev, "could not get irq\n");
->  		return -ENXIO;
->  	}
-> -- 
-> 2.7.4
-> 
-
+diff --git a/drivers/pinctrl/pinctrl-gemini.c b/drivers/pinctrl/pinctrl-gemini.c
+index e9b83e291edf..10f8f3a35fe1 100644
+--- a/drivers/pinctrl/pinctrl-gemini.c
++++ b/drivers/pinctrl/pinctrl-gemini.c
+@@ -2015,7 +2015,8 @@ static const char * const sflashgrps[] = { "sflashgrp" };
+ static const char * const gpio0grps[] = { "gpio0agrp", "gpio0bgrp", "gpio0cgrp",
+ 					  "gpio0dgrp", "gpio0egrp", "gpio0fgrp",
+ 					  "gpio0ggrp", "gpio0hgrp", "gpio0igrp",
+-					  "gpio0jgrp", "gpio0kgrp" };
++					  "gpio0jgrp", "gpio0kgrp", "gpio0lgrp",
++					  "gpio0mgrp" };
+ static const char * const gpio1grps[] = { "gpio1agrp", "gpio1bgrp", "gpio1cgrp",
+ 					  "gpio1dgrp" };
+ static const char * const gpio2grps[] = { "gpio2agrp", "gpio2bgrp", "gpio2cgrp" };
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+2.14.3
