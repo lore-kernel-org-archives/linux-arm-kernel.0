@@ -1,39 +1,49 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sun, 19 Nov 2017 10:22:47 +0530
-Subject: [PATCH 6/6 v3] mmc: sunxi-mmc: Handle return value of platform_get_irq
-In-Reply-To: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
-References: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
-Message-ID: <6ad5c6077b96353a77ea30d1b64651c77d5622f6.1511066652.git.arvind.yadav.cs@gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sun, 19 Nov 2017 09:38:36 +0100
+Subject: [PATCH 1/2 v3] misc: aspeed-lpc-snoop: Fix platform_get_irq's
+ error checking
+In-Reply-To: <3ce95a4e4eb4476b19868f36cd1f11e4b62b6203.1511065797.git.arvind.yadav.cs@gmail.com>
+References: <3ce95a4e4eb4476b19868f36cd1f11e4b62b6203.1511065797.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20171119083836.qx7bbnalum5rebj3@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+On 19/11/2017 at 10:04:00 +0530, Arvind Yadav wrote:
+> The platform_get_irq() function returns negative if an error occurs.
+> zero or positive number on success. platform_get_irq() error checking
+> for zero is not correct.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+> changes in v2 :
+>               Add failure case '<= 0' instead of '< 0'. IRQ 0 is not valid.
+> changes in v3:
+>               Return -ENODEV instead of lpc_snoop->irq.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
-changes in v2 :
-              Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
-changes in v3 :
-              return -EINVAL instead of host->irq.
+What about -EPROBE_DEFER?
 
- drivers/mmc/host/sunxi-mmc.c | 5 +++++
- 1 file changed, 5 insertions(+)
+> 
+>  drivers/misc/aspeed-lpc-snoop.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/misc/aspeed-lpc-snoop.c b/drivers/misc/aspeed-lpc-snoop.c
+> index cb78c98..e3be88f 100644
+> --- a/drivers/misc/aspeed-lpc-snoop.c
+> +++ b/drivers/misc/aspeed-lpc-snoop.c
+> @@ -115,7 +115,7 @@ static int aspeed_lpc_snoop_config_irq(struct aspeed_lpc_snoop *lpc_snoop,
+>  	int rc;
+>  
+>  	lpc_snoop->irq = platform_get_irq(pdev, 0);
+> -	if (!lpc_snoop->irq)
+> +	if (lpc_snoop->irq <= 0)
+>  		return -ENODEV;
+>  
+>  	rc = devm_request_irq(dev, lpc_snoop->irq,
+> -- 
+> 2.7.4
+> 
 
-diff --git a/drivers/mmc/host/sunxi-mmc.c b/drivers/mmc/host/sunxi-mmc.c
-index cc98355d..c926ac8 100644
---- a/drivers/mmc/host/sunxi-mmc.c
-+++ b/drivers/mmc/host/sunxi-mmc.c
-@@ -1255,6 +1255,11 @@ static int sunxi_mmc_resource_request(struct sunxi_mmc_host *host,
- 		goto error_assert_reset;
- 
- 	host->irq = platform_get_irq(pdev, 0);
-+	if (host->irq <= 0) {
-+		ret = -EINVAL;
-+		goto error_assert_reset;
-+	}
-+
- 	return devm_request_threaded_irq(&pdev->dev, host->irq, sunxi_mmc_irq,
- 			sunxi_mmc_handle_manual_stop, 0, "sunxi-mmc", host);
- 
 -- 
-2.7.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
