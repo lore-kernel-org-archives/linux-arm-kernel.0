@@ -1,65 +1,32 @@
-From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
-Date: Sun, 19 Nov 2017 18:21:16 +0100
-Subject: [PATCH] ARM: exynos: add machine description for ODROID-XU3/4
-In-Reply-To: <20171118203544.19431-1-tobetter@gmail.com>
-References: <20171118203544.19431-1-tobetter@gmail.com>
-Message-ID: <9f1311f1-2986-21f1-7016-29efc7b2a543@math.uni-bielefeld.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 19 Nov 2017 19:57:17 +0100
+Subject: [PATCH] [media] c8sectpfe: DVB_C8SECTPFE should depend on HAS_DMA
+Message-ID: <1511117837-24894-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I don't think this approach scales at all. DietPi can just read the devicetree
-through sysfs and retrieve the compatible and/or model of the base node.
+If NO_DMA=y:
 
-- Tobias
+    ERROR: "bad_dma_ops" [drivers/media/platform/sti/c8sectpfe/c8sectpfe.ko] undefined!
 
-Dongjin Kim wrote:
-> This patch is to add the machine descriptions for ODROID-XU3/4 boards
-> in order to present the hardware name at /proc/cputinfo rather than
-> "SAMSUNG EXYNOS (Flattened Device Tree)". An embedded open source project,
-> such as DietPi, reads the hardware name to run different features.
-> 
-> 	$ cat /proc/cpuinfo | grep Hardware
-> 	Hardware        : ODROID-XU4
-> 
-> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
-> ---
->  arch/arm/mach-exynos/exynos.c | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index c404c15ad07f..6197dbf9f48b 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -241,3 +241,31 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
->  	.dt_compat	= exynos_dt_compat,
->  	.dt_fixup	= exynos_dt_fixup,
->  MACHINE_END
-> +
-> +#define ODROID_MACHINE_START(name, compat)			\
-> +	DT_MACHINE_START(EXYNOS5422_ODROID_##name, "ODROID-"#name)	\
-> +		.l2c_aux_val	= 0x3c400001,			\
-> +		.l2c_aux_mask	= 0xc20fffff,			\
-> +		.smp		= smp_ops(exynos_smp_ops),	\
-> +		.map_io		= exynos_init_io,		\
-> +		.init_early	= exynos_firmware_init,		\
-> +		.init_irq	= exynos_init_irq,		\
-> +		.init_machine	= exynos_dt_machine_init,	\
-> +		.init_late	= exynos_init_late,		\
-> +		.dt_compat	= compat,			\
-> +		.dt_fixup	= exynos_dt_fixup,		\
-> +	MACHINE_END
-> +
-> +static char const *const exynos5422_odroidxu3_dt_compat[] __initconst = {
-> +	"hardkernel,odroid-xu3",
-> +	"hardkernel,odroid-xu3-lite",
-> +	NULL,
-> +};
-> +
-> +static char const *const exynos5422_odroidxu4_dt_compat[] __initconst = {
-> +	"hardkernel,odroid-xu4",
-> +	NULL,
-> +};
-> +
-> +ODROID_MACHINE_START(XU3, exynos5422_odroidxu3_dt_compat)
-> +ODROID_MACHINE_START(XU4, exynos5422_odroidxu4_dt_compat)
-> 
+Add a dependency on HAS_DMA to fix this.
+
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+---
+ drivers/media/platform/sti/c8sectpfe/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/media/platform/sti/c8sectpfe/Kconfig b/drivers/media/platform/sti/c8sectpfe/Kconfig
+index 7420a50572d347ef..740190f8a3b606d3 100644
+--- a/drivers/media/platform/sti/c8sectpfe/Kconfig
++++ b/drivers/media/platform/sti/c8sectpfe/Kconfig
+@@ -1,6 +1,6 @@
+ config DVB_C8SECTPFE
+ 	tristate "STMicroelectronics C8SECTPFE DVB support"
+-	depends on PINCTRL && DVB_CORE && I2C
++	depends on PINCTRL && DVB_CORE && I2C && HAS_DMA
+ 	depends on ARCH_STI || ARCH_MULTIPLATFORM || COMPILE_TEST
+ 	select FW_LOADER
+ 	select DEBUG_FS
+-- 
+2.7.4
