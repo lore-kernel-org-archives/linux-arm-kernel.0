@@ -1,31 +1,41 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sun, 19 Nov 2017 10:57:27 +0100
-Subject: [PATCH] pinctrl: gemini: Add two missing GPIO groups
-Message-ID: <20171119095727.27689-1-linus.walleij@linaro.org>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 19 Nov 2017 11:28:19 +0000
+Subject: [PATCH v3 4/4] iio: adc: at91-sama5d2_adc: ack DRDY irq in
+ direct mode
+In-Reply-To: <1510750608-8697-5-git-send-email-eugen.hristev@microchip.com>
+References: <1510750608-8697-1-git-send-email-eugen.hristev@microchip.com>
+ <1510750608-8697-5-git-send-email-eugen.hristev@microchip.com>
+Message-ID: <20171119112819.5d128c3f@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The 3512 has two more GPIO groups on GPIO area 0, so let's
-make it possible to combine these with the function.
+On Wed, 15 Nov 2017 14:56:48 +0200
+Eugen Hristev <eugen.hristev@microchip.com> wrote:
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/pinctrl/pinctrl-gemini.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+> Need to acknowledge DRDY irq in direct mode/ software
+> triggered mode. Otherwise, on the next conversion, overrun
+> flag will be raised, which is not a correct state.
+> This doesn't affect the functionality, but will generate
+> possible incorrect overrun reports.
+> 
+> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
 
-diff --git a/drivers/pinctrl/pinctrl-gemini.c b/drivers/pinctrl/pinctrl-gemini.c
-index e9b83e291edf..10f8f3a35fe1 100644
---- a/drivers/pinctrl/pinctrl-gemini.c
-+++ b/drivers/pinctrl/pinctrl-gemini.c
-@@ -2015,7 +2015,8 @@ static const char * const sflashgrps[] = { "sflashgrp" };
- static const char * const gpio0grps[] = { "gpio0agrp", "gpio0bgrp", "gpio0cgrp",
- 					  "gpio0dgrp", "gpio0egrp", "gpio0fgrp",
- 					  "gpio0ggrp", "gpio0hgrp", "gpio0igrp",
--					  "gpio0jgrp", "gpio0kgrp" };
-+					  "gpio0jgrp", "gpio0kgrp", "gpio0lgrp",
-+					  "gpio0mgrp" };
- static const char * const gpio1grps[] = { "gpio1agrp", "gpio1bgrp", "gpio1cgrp",
- 					  "gpio1dgrp" };
- static const char * const gpio2grps[] = { "gpio2agrp", "gpio2bgrp", "gpio2cgrp" };
--- 
-2.14.3
+Applied. Thanks.
+> ---
+>  drivers/iio/adc/at91-sama5d2_adc.c | 3 +++
+>  1 file changed, 3 insertions(+)
+> 
+> diff --git a/drivers/iio/adc/at91-sama5d2_adc.c b/drivers/iio/adc/at91-sama5d2_adc.c
+> index 11d34a8..274cb5e 100644
+> --- a/drivers/iio/adc/at91-sama5d2_adc.c
+> +++ b/drivers/iio/adc/at91-sama5d2_adc.c
+> @@ -787,6 +787,9 @@ static int at91_adc_read_raw(struct iio_dev *indio_dev,
+>  		at91_adc_writel(st, AT91_SAMA5D2_IDR, BIT(chan->channel));
+>  		at91_adc_writel(st, AT91_SAMA5D2_CHDR, BIT(chan->channel));
+>  
+> +		/* Needed to ACK the DRDY interruption */
+> +		at91_adc_readl(st, AT91_SAMA5D2_LCDR);
+> +
+>  		mutex_unlock(&st->lock);
+>  
+>  		iio_device_release_direct_mode(indio_dev);
