@@ -1,34 +1,36 @@
-From: colin.king@canonical.com (Colin King)
-Date: Sun, 19 Nov 2017 21:17:19 +0000
-Subject: [PATCH] arm: dma-mapping: use vma_pages helper function
-Message-ID: <20171119211719.16859-1-colin.king@canonical.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Sun, 19 Nov 2017 22:28:03 +0100
+Subject: [PATCH 0/4] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <20171116232239.16823-1-lukma@denx.de>
+References: <20171116232239.16823-1-lukma@denx.de>
+Message-ID: <0041277a-f580-1c35-7a6b-5154e676e82f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Colin Ian King <colin.king@canonical.com>
+Hello Lukasz!
 
-Use the vma_pages helper function on vma instead of an explicit
-calculation.
+On 17/11/17 00:22, Lukasz Majewski wrote:
+> This patch series adds support for Liebherr's BK3 board, being
+> a derivative of TS72XX design.
+> 
+> This patchset consists of following patches:
+> 
+> - ts72xx.[c|h] cosmetic cleanup/improvement
+> - Move the common code for ts72xx and BK3 to ts72xx-common.c - this
+>   code can be reused by other designs build around ts72xx
+> - The Liebherr's BK3 board has been added with re-using code of
+>   ts72xx.c
+> 
+> Lukasz Majewski (4):
+>   ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros where applicable
 
-Found by coccinelle spatch "api/vma_pages.cocci"
+The patch 3/4 deletes everything added by patch 1/4, so I don't really see the point of it.
 
-Signed-off-by: Colin Ian King <colin.king@canonical.com>
----
- arch/arm/mm/dma-mapping.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>   ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
+>   ARM: ep93xx: ts72xx: Exclude reusable part of the ts72xx board
+>   ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
 
-diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-index ada8eb206a90..ec0f277d1d4d 100644
---- a/arch/arm/mm/dma-mapping.c
-+++ b/arch/arm/mm/dma-mapping.c
-@@ -831,7 +831,7 @@ static int __arm_dma_mmap(struct device *dev, struct vm_area_struct *vma,
- 		 unsigned long attrs)
- {
- 	int ret;
--	unsigned long nr_vma_pages = (vma->vm_end - vma->vm_start) >> PAGE_SHIFT;
-+	unsigned long nr_vma_pages = vma_pages(vma);
- 	unsigned long nr_pages = PAGE_ALIGN(size) >> PAGE_SHIFT;
- 	unsigned long pfn = dma_to_pfn(dev, dma_addr);
- 	unsigned long off = vma->vm_pgoff;
--- 
-2.14.1
+I tend to agree with Hartley, if you'd just add all BK3-related extras to ts72xx.c it would
+be less than 60 LoCs, you probably even do not need new Kconfig options.
+
+Alex.
