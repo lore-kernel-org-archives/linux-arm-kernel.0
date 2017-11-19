@@ -1,132 +1,40 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sun, 19 Nov 2017 12:34:53 +0000
-Subject: [PATCH v4 03/12] IIO: hw_consumer: add devm_iio_hw_consumer_alloc
-In-Reply-To: <1510222354-15290-4-git-send-email-arnaud.pouliquen@st.com>
-References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
- <1510222354-15290-4-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20171119123453.188da309@archlinux>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sun, 19 Nov 2017 13:41:50 +0100
+Subject: bh1770 hacks: get it to work on n950
+In-Reply-To: <20171117113540.3bapqvq6mfuovxuw@earth>
+References: <20171116115703.GA26735@amd>
+ <20171117113540.3bapqvq6mfuovxuw@earth>
+Message-ID: <20171119124150.GA25154@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 9 Nov 2017 11:12:25 +0100
-Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
-
-> Add devm_iio_hw_consumer_alloc function that calls iio_hw_consumer_free
-> when the device is unbound from the bus.
+On Fri 2017-11-17 12:35:40, Sebastian Reichel wrote:
+> Hi,
 > 
-> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Hmm.. I normally don't like devm for what is a single use case in
-a driver (for now) but I guess this is generic enough it will have
-additional users reasonably soon.  Hence fine.
-
-Jonathan
-> ---
->  drivers/iio/buffer/industrialio-hw-consumer.c | 70 ++++++++++++++++++++++++++-
->  include/linux/iio/hw-consumer.h               |  2 +
->  2 files changed, 70 insertions(+), 2 deletions(-)
+> On Thu, Nov 16, 2017 at 12:57:03PM +0100, Pavel Machek wrote:
+> > Hi!
+> > 
+> > Ok, not for application, but I can get light sensor to work.
+> > 
+> > Signed-off-by: Pavel Machek <pavel@ucw.cz>
 > 
-> diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
-> index 7d4d800..e980a79 100644
-> --- a/drivers/iio/buffer/industrialio-hw-consumer.c
-> +++ b/drivers/iio/buffer/industrialio-hw-consumer.c
-> @@ -129,15 +129,81 @@ EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
->   */
->  void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
->  {
-> -	struct hw_consumer_buffer *buf;
-> +	struct hw_consumer_buffer *buf, *n;
->  
->  	iio_channel_release_all(hwc->channels);
-> -	list_for_each_entry(buf, &hwc->buffers, head)
-> +	list_for_each_entry_safe(buf, n, &hwc->buffers, head)
->  		iio_buffer_put(&buf->buffer);
+> There is no mainline user of this driver and it has a custom API, so
+> I think the driver should be dropped and an IIO based one should be
+> created instead.
 
-This looks like an unrelated fix.  Push back into the
-original patch?
+While I agree IIO interface might be better, and would welcome
+patches, I don't think that dropping the driver is right action at
+this point.
+								Pavel
+								
 
->  	kfree(hwc);
->  }
->  EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
->  
-> +static void devm_iio_hw_consumer_release(struct device *dev, void *res)
-> +{
-> +	iio_hw_consumer_free(*(struct iio_hw_consumer **)res);
-> +}
-> +
-> +static int devm_iio_hw_consumer_match(struct device *dev, void *res, void *data)
-> +{
-> +	struct iio_hw_consumer **r = res;
-> +
-> +	if (!r || !*r) {
-> +		WARN_ON(!r || !*r);
-> +		return 0;
-> +	}
-> +	return *r == data;
-> +}
-> +
-> +/**
-> + * devm_iio_hw_consumer_alloc - Resource-managed iio_hw_consumer_alloc()
-> + * @dev: Pointer to consumer device.
-> + *
-> + * Managed iio_hw_consumer_alloc. iio_hw_consumer allocated with this function
-> + * is automatically freed on driver detach.
-> + *
-> + * If an iio_hw_consumer allocated with this function needs to be freed
-> + * separately, devm_iio_hw_consumer_free() must be used.
-> + *
-> + * returns pointer to allocated iio_hw_consumer on success, NULL on failure.
-> + */
-> +struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev)
-> +{
-> +	struct iio_hw_consumer **ptr, *iio_hwc;
-> +
-> +	ptr = devres_alloc(devm_iio_hw_consumer_release, sizeof(*ptr),
-> +			   GFP_KERNEL);
-> +	if (!ptr)
-> +		return NULL;
-> +
-> +	iio_hwc = iio_hw_consumer_alloc(dev);
-> +	if (IS_ERR(iio_hwc)) {
-> +		devres_free(ptr);
-> +	} else {
-> +		*ptr = iio_hwc;
-> +		devres_add(dev, ptr);
-> +	}
-> +
-> +	return iio_hwc;
-> +}
-> +EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_alloc);
-> +
-> +/**
-> + * devm_iio_hw_consumer_free - Resource-managed iio_hw_consumer_free()
-> + * @dev: Pointer to consumer device.
-> + * @hwc: iio_hw_consumer to free.
-> + *
-> + * Free iio_hw_consumer allocated with devm_iio_hw_consumer_alloc().
-> + */
-> +void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc)
-> +{
-> +	int rc;
-> +
-> +	rc = devres_release(dev, devm_iio_hw_consumer_release,
-> +			    devm_iio_hw_consumer_match, hwc);
-> +	WARN_ON(rc);
-> +}
-> +EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_free);
-> +
->  /**
->   * iio_hw_consumer_enable() - Enable IIO hardware consumer
->   * @hwc: iio_hw_consumer to enable.
-> diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
-> index f16791b..90ecfce 100644
-> --- a/include/linux/iio/hw-consumer.h
-> +++ b/include/linux/iio/hw-consumer.h
-> @@ -14,6 +14,8 @@ struct iio_hw_consumer;
->  
->  struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
->  void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
-> +struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev);
-> +void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc);
->  int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
->  void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
->  
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171119/72be498d/attachment.sig>
