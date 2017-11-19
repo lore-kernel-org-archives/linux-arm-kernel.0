@@ -1,15 +1,14 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sun, 19 Nov 2017 10:22:44 +0530
-Subject: [PATCH 2/6 v3] mmc: s3cmci: Fix platform_get_irq's error checking
+Date: Sun, 19 Nov 2017 10:22:46 +0530
+Subject: [PATCH 4/6 v3] mmc: sdhci-spear: Handle return value of
+ platform_get_irq
 In-Reply-To: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
 References: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
-Message-ID: <870b1a28108a8c0f3885bd345f3d27dda67621d5.1511066652.git.arvind.yadav.cs@gmail.com>
+Message-ID: <23382b551ade00543aadc588aa74b0648958b907.1511066652.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
@@ -18,21 +17,23 @@ changes in v2 :
 changes in v3 :
               return -EINVAL instead of host->irq.
 
- drivers/mmc/host/s3cmci.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/mmc/host/sdhci-spear.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
-index f7f157a..36daee1 100644
---- a/drivers/mmc/host/s3cmci.c
-+++ b/drivers/mmc/host/s3cmci.c
-@@ -1658,7 +1658,7 @@ static int s3cmci_probe(struct platform_device *pdev)
- 	}
- 
+diff --git a/drivers/mmc/host/sdhci-spear.c b/drivers/mmc/host/sdhci-spear.c
+index 8c0f884..e04485e 100644
+--- a/drivers/mmc/host/sdhci-spear.c
++++ b/drivers/mmc/host/sdhci-spear.c
+@@ -82,6 +82,10 @@ static int sdhci_probe(struct platform_device *pdev)
+ 	host->hw_name = "sdhci";
+ 	host->ops = &sdhci_pltfm_ops;
  	host->irq = platform_get_irq(pdev, 0);
--	if (host->irq == 0) {
 +	if (host->irq <= 0) {
- 		dev_err(&pdev->dev, "failed to get interrupt resource.\n");
- 		ret = -EINVAL;
- 		goto probe_iounmap;
++		ret = -EINVAL;
++		goto err_host;
++	}
+ 	host->quirks = SDHCI_QUIRK_BROKEN_ADMA;
+ 
+ 	sdhci = sdhci_priv(host);
 -- 
 2.7.4
