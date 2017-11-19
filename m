@@ -1,83 +1,65 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun, 19 Nov 2017 18:00:27 +0100
-Subject: [PATCH RFC] ARM: dts: bcm283x: Fix probing of bcm2835-i2s
-Message-ID: <1511110827-2726-1-git-send-email-stefan.wahren@i2se.com>
+From: tjakobi@math.uni-bielefeld.de (Tobias Jakobi)
+Date: Sun, 19 Nov 2017 18:21:16 +0100
+Subject: [PATCH] ARM: exynos: add machine description for ODROID-XU3/4
+In-Reply-To: <20171118203544.19431-1-tobetter@gmail.com>
+References: <20171118203544.19431-1-tobetter@gmail.com>
+Message-ID: <9f1311f1-2986-21f1-7016-29efc7b2a543@math.uni-bielefeld.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
-the bcm2835-i2s requires a clock as DT property. Unfortunately
-the necessary DT change has never been applied. While we are at it
-also fix the first PCM register range to cover the PCM_GRAY register.
+I don't think this approach scales at all. DietPi can just read the devicetree
+through sysfs and retrieve the compatible and/or model of the base node.
 
-This patch also fixes the dt-bindings accordlingly.
+- Tobias
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt   | 4 ++--
- Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt | 9 ++++-----
- arch/arm/boot/dts/bcm283x.dtsi                               | 4 ++--
- 3 files changed, 8 insertions(+), 9 deletions(-)
-
-Hi, this is only probe tested with a RPi 1B. I don't have the sound hardware
-to test the drivers function.
-
-diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-index baf9b34..b6a8cc0 100644
---- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-+++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
-@@ -74,8 +74,8 @@ Example:
- 
- bcm2835_i2s: i2s at 7e203000 {
- 	compatible = "brcm,bcm2835-i2s";
--	reg = <	0x7e203000 0x20>,
--	      < 0x7e101098 0x02>;
-+	reg = <	0x7e203000 0x24>;
-+	clocks = <&clocks BCM2835_CLOCK_PCM>;
- 
- 	dmas = <&dma 2>,
- 	       <&dma 3>;
-diff --git a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-index 65783de..7bb0362 100644
---- a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
-@@ -2,9 +2,8 @@
- 
- Required properties:
- - compatible: "brcm,bcm2835-i2s"
--- reg: A list of base address and size entries:
--	* The first entry should cover the PCM registers
--	* The second entry should cover the PCM clock registers
-+- reg: Should contain PCM registers location and length.
-+- clocks: the (PCM) clock to use
- - dmas: List of DMA controller phandle and DMA request line ordered pairs.
- - dma-names: Identifier string for each DMA request line in the dmas property.
-   These strings correspond 1:1 with the ordered pairs in dmas.
-@@ -16,8 +15,8 @@ Example:
- 
- bcm2835_i2s: i2s at 7e203000 {
- 	compatible = "brcm,bcm2835-i2s";
--	reg = <0x7e203000 0x20>,
--	      <0x7e101098 0x02>;
-+	reg = <0x7e203000 0x24>;
-+	clocks = <&clocks BCM2835_CLOCK_PCM>;
- 
- 	dmas = <&dma 2>,
- 	       <&dma 3>;
-diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
-index 431dcfc..01733a9 100644
---- a/arch/arm/boot/dts/bcm283x.dtsi
-+++ b/arch/arm/boot/dts/bcm283x.dtsi
-@@ -391,8 +391,8 @@
- 
- 		i2s: i2s at 7e203000 {
- 			compatible = "brcm,bcm2835-i2s";
--			reg = <0x7e203000 0x20>,
--			      <0x7e101098 0x02>;
-+			reg = <0x7e203000 0x24>;
-+			clocks = <&clocks BCM2835_CLOCK_PCM>;
- 
- 			dmas = <&dma 2>,
- 			       <&dma 3>;
--- 
-2.7.4
+Dongjin Kim wrote:
+> This patch is to add the machine descriptions for ODROID-XU3/4 boards
+> in order to present the hardware name at /proc/cputinfo rather than
+> "SAMSUNG EXYNOS (Flattened Device Tree)". An embedded open source project,
+> such as DietPi, reads the hardware name to run different features.
+> 
+> 	$ cat /proc/cpuinfo | grep Hardware
+> 	Hardware        : ODROID-XU4
+> 
+> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+> ---
+>  arch/arm/mach-exynos/exynos.c | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+> index c404c15ad07f..6197dbf9f48b 100644
+> --- a/arch/arm/mach-exynos/exynos.c
+> +++ b/arch/arm/mach-exynos/exynos.c
+> @@ -241,3 +241,31 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+>  	.dt_compat	= exynos_dt_compat,
+>  	.dt_fixup	= exynos_dt_fixup,
+>  MACHINE_END
+> +
+> +#define ODROID_MACHINE_START(name, compat)			\
+> +	DT_MACHINE_START(EXYNOS5422_ODROID_##name, "ODROID-"#name)	\
+> +		.l2c_aux_val	= 0x3c400001,			\
+> +		.l2c_aux_mask	= 0xc20fffff,			\
+> +		.smp		= smp_ops(exynos_smp_ops),	\
+> +		.map_io		= exynos_init_io,		\
+> +		.init_early	= exynos_firmware_init,		\
+> +		.init_irq	= exynos_init_irq,		\
+> +		.init_machine	= exynos_dt_machine_init,	\
+> +		.init_late	= exynos_init_late,		\
+> +		.dt_compat	= compat,			\
+> +		.dt_fixup	= exynos_dt_fixup,		\
+> +	MACHINE_END
+> +
+> +static char const *const exynos5422_odroidxu3_dt_compat[] __initconst = {
+> +	"hardkernel,odroid-xu3",
+> +	"hardkernel,odroid-xu3-lite",
+> +	NULL,
+> +};
+> +
+> +static char const *const exynos5422_odroidxu4_dt_compat[] __initconst = {
+> +	"hardkernel,odroid-xu4",
+> +	NULL,
+> +};
+> +
+> +ODROID_MACHINE_START(XU3, exynos5422_odroidxu3_dt_compat)
+> +ODROID_MACHINE_START(XU4, exynos5422_odroidxu4_dt_compat)
+> 
