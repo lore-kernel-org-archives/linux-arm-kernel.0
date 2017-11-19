@@ -1,49 +1,37 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sun, 19 Nov 2017 09:56:33 +0530
-Subject: [PATCH 3/3 v3] mfd: sun4i-gpadc: Handle return value of
- platform_get_irq
-In-Reply-To: <1bdd59d511e4acd23aea6af51d06b1cadf09a1b2.1511065331.git.arvind.yadav.cs@gmail.com>
-References: <1bdd59d511e4acd23aea6af51d06b1cadf09a1b2.1511065331.git.arvind.yadav.cs@gmail.com>
-Message-ID: <ae16c65d78c54b01493357fccaf77d7433761dec.1511065331.git.arvind.yadav.cs@gmail.com>
+Date: Sun, 19 Nov 2017 10:04:00 +0530
+Subject: [PATCH 1/2 v3] misc: aspeed-lpc-snoop: Fix platform_get_irq's error
+ checking
+Message-ID: <3ce95a4e4eb4476b19868f36cd1f11e4b62b6203.1511065797.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
 changes in v2 :
-              Add failure case '<= 0' instead of '< 0'. If IRQ0 is not valid.
-changes in v3 :
-              return -EINVAL insted of irq.
+              Add failure case '<= 0' instead of '< 0'. IRQ 0 is not valid.
+changes in v3:
+              Return -ENODEV instead of lpc_snoop->irq.
 
- drivers/mfd/sun4i-gpadc.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/misc/aspeed-lpc-snoop.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mfd/sun4i-gpadc.c b/drivers/mfd/sun4i-gpadc.c
-index 9cfc881..79a39fe 100644
---- a/drivers/mfd/sun4i-gpadc.c
-+++ b/drivers/mfd/sun4i-gpadc.c
-@@ -100,8 +100,8 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	struct resource *mem;
- 	const struct of_device_id *of_id;
- 	const struct mfd_cell *cells;
--	unsigned int irq, size;
--	int ret;
-+	unsigned int size;
-+	int ret, irq;
+diff --git a/drivers/misc/aspeed-lpc-snoop.c b/drivers/misc/aspeed-lpc-snoop.c
+index cb78c98..e3be88f 100644
+--- a/drivers/misc/aspeed-lpc-snoop.c
++++ b/drivers/misc/aspeed-lpc-snoop.c
+@@ -115,7 +115,7 @@ static int aspeed_lpc_snoop_config_irq(struct aspeed_lpc_snoop *lpc_snoop,
+ 	int rc;
  
- 	of_id = of_match_node(sun4i_gpadc_of_match, pdev->dev.of_node);
- 	if (!of_id)
-@@ -148,6 +148,9 @@ static int sun4i_gpadc_probe(struct platform_device *pdev)
- 	regmap_write(dev->regmap, SUN4I_GPADC_INT_FIFOC, 0);
+ 	lpc_snoop->irq = platform_get_irq(pdev, 0);
+-	if (!lpc_snoop->irq)
++	if (lpc_snoop->irq <= 0)
+ 		return -ENODEV;
  
- 	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0)
-+		return -EINVAL;
-+
- 	ret = devm_regmap_add_irq_chip(&pdev->dev, dev->regmap, irq,
- 				       IRQF_ONESHOT, 0,
- 				       &sun4i_gpadc_regmap_irq_chip,
+ 	rc = devm_request_irq(dev, lpc_snoop->irq,
 -- 
 2.7.4
