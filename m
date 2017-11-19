@@ -1,14 +1,15 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sun, 19 Nov 2017 10:22:45 +0530
-Subject: [PATCH 3/6 v3] mmc: sdhci-acpi: Handle return value of
- platform_get_irq
+Date: Sun, 19 Nov 2017 10:22:44 +0530
+Subject: [PATCH 2/6 v3] mmc: s3cmci: Fix platform_get_irq's error checking
 In-Reply-To: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
 References: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
-Message-ID: <ecd11732b6a29aee23a1be94616755e575b0d438.1511066652.git.arvind.yadav.cs@gmail.com>
+Message-ID: <870b1a28108a8c0f3885bd345f3d27dda67621d5.1511066652.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+The platform_get_irq() function returns negative if an error occurs.
+zero or positive number on success. platform_get_irq() error checking
+for zero is not correct.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
@@ -17,23 +18,21 @@ changes in v2 :
 changes in v3 :
               return -EINVAL instead of host->irq.
 
- drivers/mmc/host/sdhci-acpi.c | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/mmc/host/s3cmci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/mmc/host/sdhci-acpi.c b/drivers/mmc/host/sdhci-acpi.c
-index b988997..0d9965b 100644
---- a/drivers/mmc/host/sdhci-acpi.c
-+++ b/drivers/mmc/host/sdhci-acpi.c
-@@ -566,6 +566,10 @@ static int sdhci_acpi_probe(struct platform_device *pdev)
- 	host->hw_name	= "ACPI";
- 	host->ops	= &sdhci_acpi_ops_dflt;
- 	host->irq	= platform_get_irq(pdev, 0);
-+	if (host->irq <= 0) {
-+		err = -EINVAL;
-+		goto err_free;
-+	}
+diff --git a/drivers/mmc/host/s3cmci.c b/drivers/mmc/host/s3cmci.c
+index f7f157a..36daee1 100644
+--- a/drivers/mmc/host/s3cmci.c
++++ b/drivers/mmc/host/s3cmci.c
+@@ -1658,7 +1658,7 @@ static int s3cmci_probe(struct platform_device *pdev)
+ 	}
  
- 	host->ioaddr = devm_ioremap_nocache(dev, iomem->start,
- 					    resource_size(iomem));
+ 	host->irq = platform_get_irq(pdev, 0);
+-	if (host->irq == 0) {
++	if (host->irq <= 0) {
+ 		dev_err(&pdev->dev, "failed to get interrupt resource.\n");
+ 		ret = -EINVAL;
+ 		goto probe_iounmap;
 -- 
 2.7.4
