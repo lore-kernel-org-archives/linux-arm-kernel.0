@@ -1,32 +1,62 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 19 Nov 2017 19:57:17 +0100
-Subject: [PATCH] [media] c8sectpfe: DVB_C8SECTPFE should depend on HAS_DMA
-Message-ID: <1511117837-24894-1-git-send-email-geert@linux-m68k.org>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Sun, 19 Nov 2017 22:10:02 +0100
+Subject: bh1770 hacks: get it to work on n950
+In-Reply-To: <20171119150730.GA2366@amd>
+References: <20171116115703.GA26735@amd>
+ <20171117113540.3bapqvq6mfuovxuw@earth>
+ <20171119124150.GA25154@amd>
+ <20171119141213.my7dnc77xbun3gfj@lenoch>
+ <20171119150730.GA2366@amd>
+Message-ID: <20171119211002.gddsvtxbuotyyznu@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If NO_DMA=y:
+Hi,
 
-    ERROR: "bad_dma_ops" [drivers/media/platform/sti/c8sectpfe/c8sectpfe.ko] undefined!
+On Sun, Nov 19, 2017 at 04:07:30PM +0100, Pavel Machek wrote:
+> On Sun 2017-11-19 15:12:13, Ladislav Michl wrote:
+> > On Sun, Nov 19, 2017 at 01:41:50PM +0100, Pavel Machek wrote:
+> > > On Fri 2017-11-17 12:35:40, Sebastian Reichel wrote:
+> > > > Hi,
+> > > > 
+> > > > On Thu, Nov 16, 2017 at 12:57:03PM +0100, Pavel Machek wrote:
+> > > > > Hi!
+> > > > > 
+> > > > > Ok, not for application, but I can get light sensor to work.
+> > > > > 
+> > > > > Signed-off-by: Pavel Machek <pavel@ucw.cz>
+> > > > 
+> > > > There is no mainline user of this driver and it has a custom API, so
+> > > > I think the driver should be dropped and an IIO based one should be
+> > > > created instead.
+> > > 
+> > > While I agree IIO interface might be better, and would welcome
+> > > patches, I don't think that dropping the driver is right action at
+> > > this point.
+> > 
+> > That's the most elegant solution at all. How would you later motivate
+> > people to try and test IIO driver? Let's pretend this patch have never
+> > existed until someone notices and starts playing "you broke kernel ABI"
+> > game.
+> 
+> I'm using the driver; I'm even interested in fixing it. Please try not
+> to make my job any harder than it needs to be, and I'll try to break
+> ABI.
+> 
+> That goes to Sebastian, too.
+> 
+> If you want to convert the driver to IIO, please do so, I can test
+> the patches.
 
-Add a dependency on HAS_DMA to fix this.
+Looks like I need to be more explicit, so be it:
 
-Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
----
- drivers/media/platform/sti/c8sectpfe/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+NAKed-by: Sebastian Reichel <sre@kernel.org>
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/Kconfig b/drivers/media/platform/sti/c8sectpfe/Kconfig
-index 7420a50572d347ef..740190f8a3b606d3 100644
---- a/drivers/media/platform/sti/c8sectpfe/Kconfig
-+++ b/drivers/media/platform/sti/c8sectpfe/Kconfig
-@@ -1,6 +1,6 @@
- config DVB_C8SECTPFE
- 	tristate "STMicroelectronics C8SECTPFE DVB support"
--	depends on PINCTRL && DVB_CORE && I2C
-+	depends on PINCTRL && DVB_CORE && I2C && HAS_DMA
- 	depends on ARCH_STI || ARCH_MULTIPLATFORM || COMPILE_TEST
- 	select FW_LOADER
- 	select DEBUG_FS
--- 
-2.7.4
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171119/693988a1/attachment.sig>
