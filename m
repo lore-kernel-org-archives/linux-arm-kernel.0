@@ -1,44 +1,80 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 20 Nov 2017 08:00:55 -0600
-Subject: [PATCH] c8sectpfe: fix potential NULL pointer dereference in
- c8sectpfe_timer_interrupt
-Message-ID: <20171120140055.GA728@embeddedor.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Nov 2017 14:04:51 +0000
+Subject: [PATCH] drivers/perf: arm_pmu: save/restore cpu cycle counter in
+ cpu_pm_pmu_notify
+In-Reply-To: <a3c87ec9-e670-d867-3446-7963339067d1@gmail.com>
+References: <1510813648-45090-1-git-send-email-hejianet@gmail.com>
+ <20171120123240.ohcdgv2nnoyrc7ov@lakrids.cambridge.arm.com>
+ <a3c87ec9-e670-d867-3446-7963339067d1@gmail.com>
+Message-ID: <20171120140451.ztr2i24v2vspu364@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-_channel_ is being dereferenced before it is null checked, hence there is a
-potential null pointer dereference. Fix this by moving the pointer dereference
-after _channel_ has been null checked.
+On Mon, Nov 20, 2017 at 09:50:15PM +0800, Jia He wrote:
+> On 11/20/2017 8:32 PM, Mark Rutland Wrote:
+> > On Thu, Nov 16, 2017 at 06:27:28AM +0000, Jia He wrote:
+> > > Sometimes userspace need a high resolution cycle counter by reading
+> > > pmccntr_el0.
+> > > 
+> > > In commit da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM
+> > > notifier"), it resets all the counters even when the pmcr_el0.E and
+> > > pmcntenset_el0.C are both 1 . That is incorrect.
+> > I appreciate that you may wish to make use of the cycle counter from
+> > userspace, but this is the intended behaviour kernel-side. Direct
+> > userspace counter acceess is not supported.
+> Sorry for my previous description. Not only user space, but also any
+> pmccntr_el0 reading
+> in kernel space is 0 except perf infrastructure.
 
-This issue was detected with the help of Coccinelle.
+The only user of PMCCNTR in the kernel is the perf infrastructure.
 
-Fixes: c5f5d0f99794 ("[media] c8sectpfe: STiH407/10 Linux DVB demux support")
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+If you want to perform in-kernel counts, please use
+perf_event_create_kernel_counter() and related functions.
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-index 59280ac..23d0ced 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-@@ -83,7 +83,7 @@ static void c8sectpfe_timer_interrupt(unsigned long ac8sectpfei)
- static void channel_swdemux_tsklet(unsigned long data)
- {
- 	struct channel_info *channel = (struct channel_info *)data;
--	struct c8sectpfei *fei = channel->fei;
-+	struct c8sectpfei *fei;
- 	unsigned long wp, rp;
- 	int pos, num_packets, n, size;
- 	u8 *buf;
-@@ -91,6 +91,8 @@ static void channel_swdemux_tsklet(unsigned long data)
- 	if (unlikely(!channel || !channel->irec))
- 		return;
- 
-+	fei = channel->fei;
-+
- 	wp = readl(channel->irec + DMA_PRDS_BUSWP_TP(0));
- 	rp = readl(channel->irec + DMA_PRDS_BUSRP_TP(0));
- 
--- 
-2.7.4
+> > In power states where context is lost, any perf events are
+> > saved/restored by cpu_pm_pmu_setup(). So we certainly shouldn't be
+> > modifying the counter registers in any other PM code.
+> > 
+> > We *could* expose counters to userspace on homogeneous systems, so long
+> > as users stuck to the usual perf data page interface. However, this
+> > comes with a number of subtle problems, and no-one's done the work to
+> > enable this.
+> > 
+> > Even then, perf may modify counters at any point in time, and
+> > monotonicity (and/or presence) of counters is not guaranteed.
+> 
+> Yes, the cycle counter register pmccntr_el0 will be impacted by perf
+> usage.But do you think pmccntr_el0 is intented for perf only? 
+
+We only intend for the in-kernel perf infrastructure to access
+pmccntr_el0; nothing else should touch it.
+
+> Currently, many user space/kernel space programs will use pmccntr_el0
+> as a timestamp( just likethe rdtsc() on X86).
+
+This is not supported, and will return completely unusable numbers if
+it were. This will be randomly reset/modified, CPUs aren't in lock-step,
+so this isn't monotonic, etc.
+
+If you want a timestamp, the architecture provides an counter that is
+monotonic and uniform across all CPUs. We expose that to userspace via
+the VDSO (e.g. clock_gettime with CLOCK_MONOTONIC_RAW) and it can be
+read in-kernel through the usual clocksource APIs.
+
+PMCCNTR is *not* usable in this manner.
+
+> After commit da4e4f18afe0, all the cycle counter readingis 0 because
+> of CPU PM enter/exit state changes in armv8pmu_reset.
+
+Previously, had a CPU been reset, the counter would hold an UNKNOWN
+value (i.e. it would be reset to junk), and may or may not have been
+accessible depending on what CNTKCTL reset to.
+
+So if you tried to read PMCCNTR in userspace, and happened to have been
+granted access, the values would have been bogus and unusable.
+
+Commit da4e4f18afe0 fixed things and made the behaviour consistent, as
+intended.
+
+Thanks,
+Mark.
