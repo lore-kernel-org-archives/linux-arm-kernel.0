@@ -1,44 +1,25 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Mon, 20 Nov 2017 11:01:43 -0800
-Subject: [PATCH 0/2] STRICT_KERNEL_RWX weakened on ARM by CONFIG_ARM_LPAE=y
-In-Reply-To: <79336dcb-fb10-5880-f888-de7179cba576@gmail.com>
-References: <20171109004144.2246-1-philip@cog.systems>
- <79336dcb-fb10-5880-f888-de7179cba576@gmail.com>
-Message-ID: <CAGXu5jLZKf0yc73BO2bo45sh0sNQ9kYgY7pL9GrMW=RAmCP03w@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 20 Nov 2017 13:03:20 -0600
+Subject: [PATCH v3 1/3] dt-bindings: mailbox: Introduce Hi3660 controller
+ binding
+In-Reply-To: <1510910672-1409-2-git-send-email-xuyiping@hisilicon.com>
+References: <1510910672-1409-1-git-send-email-xuyiping@hisilicon.com>
+ <1510910672-1409-2-git-send-email-xuyiping@hisilicon.com>
+Message-ID: <20171120190320.vg73gsms7grouieg@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 10:45 AM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 11/08/2017 04:41 PM, Philip Derrin wrote:
->> Hi,
->>
->> This patch series fixes a bug which makes CONFIG_STRICT_KERNEL_RWX ineffective
->> when CONFIG_ARM_LPAE is enabled. Specifically, the kernel text and rodata are
->> mapped writeable. This has been the case since DEBUG_RODATA for ARM was first
->> merged in 3.19.
->>
->> The cause was an incorrect conflict resolution in 1e3479225acb ("ARM: 8275/1:
->> mm: fix PMD_SECT_RDONLY undeclared compile error") between the commit that
->> implemented DEBUG_RODATA, 80d6b0c2eed2 ("ARM: mm: allow text and rodata
->> sections to be read-only"), and another that moved the LPAE read-only bit into
->> a software bit, ded947798469 ("ARM: 8109/1: mm: Modify pte_write and pmd_write
->> logic for LPAE").
->>
->> The incorrect mappings were not apparent in the debugfs kernel_page_tables
->> dump because that was checking only the software RO bit, not the hardware RO
->> bit.
->
-> FWIW, on an ARCH_BRCMSTB system with ARM_LPAE=y:
->
-> Tested-by: Florian Fainelli <f.fainelli@gmail.com>
+On Fri, Nov 17, 2017 at 05:24:30PM +0800, Xu YiPing wrote:
+> From: Leo Yan <leo.yan@linaro.org>
+> 
+> Introduce a binding for the Hi3660 mailbox controller, the mailbox is
+> used within application processor (AP), communication processor (CP),
+> HIFI and MCU, etc.
+> 
+> Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> ---
+>  .../bindings/mailbox/hisilicon,hi3660-mailbox.txt  | 51 ++++++++++++++++++++++
+>  1 file changed, 51 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/hisilicon,hi3660-mailbox.txt
 
-Russell, given this fixes an accidentally broken feature, is there any
-hope for this series to land in v4.15?
-
-Thanks!
-
--Kees
-
--- 
-Kees Cook
-Pixel Security
+Acked-by: Rob Herring <robh@kernel.org>
