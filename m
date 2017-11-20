@@ -1,167 +1,88 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 20 Nov 2017 14:01:37 +0800
-Subject: [PATCH V5 12/12] arm64: dts: add clocks for SC9860
+Date: Mon, 20 Nov 2017 14:01:26 +0800
+Subject: [PATCH V5 01/12] drivers: move clock common macros out from vendor
+ directories
 In-Reply-To: <20171120060137.27380-1-chunyan.zhang@spreadtrum.com>
 References: <20171120060137.27380-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171120060137.27380-13-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171120060137.27380-2-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks on SC9860 are in the same address area with syscon devices,
-those are what have a property of 'sprd,syscon' which would refer to
-syscon devices, others would have a reg property indicated their address
-ranges.
+These macros are used by more than one SoC vendor platforms, avoid to
+have many copies of these code, this patch moves them to the common
+clock directory which every clock drivers can access to.
 
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- arch/arm64/boot/dts/sprd/sc9860.dtsi | 115 +++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/sprd/whale2.dtsi |   2 +-
- 2 files changed, 116 insertions(+), 1 deletion(-)
+ drivers/clk/clk_common.h | 60 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 drivers/clk/clk_common.h
 
-diff --git a/arch/arm64/boot/dts/sprd/sc9860.dtsi b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-index 7b7d8ce..bf03da4 100644
---- a/arch/arm64/boot/dts/sprd/sc9860.dtsi
-+++ b/arch/arm64/boot/dts/sprd/sc9860.dtsi
-@@ -7,6 +7,7 @@
-  */
- 
- #include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/clock/sprd,sc9860-clk.h>
- #include "whale2.dtsi"
- 
- / {
-@@ -183,6 +184,120 @@
- 	};
- 
- 	soc {
-+		pmu_gate: pmu-gate {
-+			compatible = "sprd,sc9860-pmu-gate";
-+			sprd,syscon = <&pmu_regs>; /* 0x402b0000 */
-+			clocks = <&ext_26m>;
-+			#clock-cells = <1>;
-+		};
+diff --git a/drivers/clk/clk_common.h b/drivers/clk/clk_common.h
+new file mode 100644
+index 0000000..21e93d2
+--- /dev/null
++++ b/drivers/clk/clk_common.h
+@@ -0,0 +1,60 @@
++/*
++ * drivers/clk/clk_common.h
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
 +
-+		pll: pll {
-+			compatible = "sprd,sc9860-pll";
-+			sprd,syscon = <&ana_regs>; /* 0x40400000 */
-+			clocks = <&pmu_gate 0>;
-+			#clock-cells = <1>;
-+		};
++#ifndef _CLK_COMMON_H_
++#define _CLK_COMMON_H_
 +
-+		ap_clk: clock-controller at 20000000 {
-+			compatible = "sprd,sc9860-ap-clk";
-+			reg = <0 0x20000000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>,
-+				 <&pmu_gate 0>;
-+			#clock-cells = <1>;
-+		};
++#include <linux/clk-provider.h>
 +
-+		aon_prediv: aon-prediv {
-+			compatible = "sprd,sc9860-aon-prediv";
-+			reg = <0 0x402d0000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>,
-+				 <&pmu_gate 0>;
-+			#clock-cells = <1>;
-+		};
++#define CLK_HW_INIT(_name, _parent, _ops, _flags)		\
++	(&(struct clk_init_data) {				\
++		.flags		= _flags,			\
++		.name		= _name,			\
++		.parent_names	= (const char *[]) { _parent },	\
++		.num_parents	= 1,				\
++		.ops		= _ops,				\
++	})
 +
-+		apahb_gate: apahb-gate {
-+			compatible = "sprd,sc9860-apahb-gate";
-+			sprd,syscon = <&ap_ahb_regs>; /* 0x20210000 */
-+			clocks = <&aon_prediv 0>;
-+			#clock-cells = <1>;
-+		};
++#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)	\
++	(&(struct clk_init_data) {				\
++		.flags		= _flags,			\
++		.name		= _name,			\
++		.parent_names	= _parents,			\
++		.num_parents	= ARRAY_SIZE(_parents),		\
++		.ops		= _ops,				\
++	})
 +
-+		aon_gate: aon-gate {
-+			compatible = "sprd,sc9860-aon-gate";
-+			sprd,syscon = <&aon_regs>; /* 0x402e0000 */
-+			clocks = <&aon_prediv 0>;
-+			#clock-cells = <1>;
-+		};
++#define CLK_HW_INIT_NO_PARENT(_name, _ops, _flags)     \
++	(&(struct clk_init_data) {                      \
++		.flags          = _flags,               \
++		.name           = _name,                \
++		.parent_names   = NULL,                 \
++		.num_parents    = 0,                    \
++		.ops            = _ops,                 \
++	})
 +
-+		aonsecure_clk: clock-controller at 40880000 {
-+			compatible = "sprd,sc9860-aonsecure-clk";
-+			reg = <0 0x40880000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
++#define CLK_FIXED_FACTOR(_struct, _name, _parent,			\
++			_div, _mult, _flags)				\
++	struct clk_fixed_factor _struct = {				\
++		.div		= _div,					\
++		.mult		= _mult,				\
++		.hw.init	= CLK_HW_INIT(_name,			\
++					      _parent,			\
++					      &clk_fixed_factor_ops,	\
++					      _flags),			\
++	}
 +
-+		agcp_gate: agcp-gate {
-+			compatible = "sprd,sc9860-agcp-gate";
-+			sprd,syscon = <&agcp_regs>; /* 0x415e0000 */
-+			clocks = <&aon_prediv 0>;
-+			#clock-cells = <1>;
-+		};
++#define CLK_FIXED_RATE(_struct, _name, _flags,				\
++		       _fixed_rate, _fixed_accuracy)			\
++	struct clk_fixed_rate _struct = {				\
++		.fixed_rate	= _fixed_rate,				\
++		.fixed_accuracy	= _fixed_accuracy,			\
++		.hw.init	= CLK_HW_INIT_NO_PARENT(_name,		\
++					  &clk_fixed_rate_ops,		\
++							_flags),	\
++	}
 +
-+		gpu_clk: clock-controller at 60200000 {
-+			compatible = "sprd,sc9860-gpu-clk";
-+			reg = <0 0x60200000 0 0x400>;
-+			clocks = <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		vsp_clk: clock-controller at 61000000 {
-+			compatible = "sprd,sc9860-vsp-clk";
-+			reg = <0 0x61000000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		vsp_gate: vsp-gate {
-+			compatible = "sprd,sc9860-vsp-gate";
-+			sprd,syscon = <&vsp_regs>; /* 0x61100000 */
-+			clocks = <&vsp_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		cam_clk: clock-controller at 62000000 {
-+			compatible = "sprd,sc9860-cam-clk";
-+			reg = <0 0x62000000 0 0x4000>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		cam_gate: cam-gate {
-+			compatible = "sprd,sc9860-cam-gate";
-+			sprd,syscon = <&cam_regs>; /* 0x62100000 */
-+			clocks = <&cam_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		disp_clk: clock-controller at 63000000 {
-+			compatible = "sprd,sc9860-disp-clk";
-+			reg = <0 0x63000000 0 0x400>;
-+			clocks = <&ext_26m>, <&pll 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		disp_gate: disp-gate {
-+			compatible = "sprd,sc9860-disp-gate";
-+			sprd,syscon = <&disp_regs>; /* 0x63100000 */
-+			clocks = <&disp_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
-+		apapb_gate: apapb-gate {
-+			compatible = "sprd,sc9860-apapb-gate";
-+			sprd,syscon = <&ap_apb_regs>; /* 0x70b00000 */
-+			clocks = <&ap_clk 0>;
-+			#clock-cells = <1>;
-+		};
-+
- 		funnel at 10001000 { /* SoC Funnel */
- 			compatible = "arm,coresight-funnel", "arm,primecell";
- 			reg = <0 0x10001000 0 0x1000>;
-diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index 6ea3a75..eb004bb 100644
---- a/arch/arm64/boot/dts/sprd/whale2.dtsi
-+++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -110,6 +110,6 @@
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
- 		clock-frequency = <26000000>;
--		clock-output-names = "ext_26m";
-+		clock-output-names = "ext-26m";
- 	};
- };
++#endif /* _CLK_COMMON_H_ */
 -- 
 2.7.4
