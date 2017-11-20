@@ -1,56 +1,37 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 20 Nov 2017 15:56:10 +0100
-Subject: [PATCH 3/7] KVM: arm/arm64: vgic-its: Preserve the revious read
- from the pending table
-In-Reply-To: <20171116175821.26544-4-marc.zyngier@arm.com>
-References: <20171116175821.26544-1-marc.zyngier@arm.com>
- <20171116175821.26544-4-marc.zyngier@arm.com>
-Message-ID: <20171120145610.GL28855@cbox>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 20 Nov 2017 22:54:15 +0800
+Subject: [PATCH v2 5/5] ARM64: dts: meson-axg: enable I2C Master-1 for the
+ audio speaker
+In-Reply-To: <20171120145415.6581-1-yixun.lan@amlogic.com>
+References: <20171120145415.6581-1-yixun.lan@amlogic.com>
+Message-ID: <20171120145415.6581-6-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 05:58:17PM +0000, Marc Zyngier wrote:
-> The current pending table parsing code assumes that we keep the
-> previous read of the pending bits, but keep that variable in
-> the current block, making sure it is discarded on each loop.
-> 
-> We end-up using whatever is on the stack. Who knows, it might
-> just be the right thing...
+From: Jian Hu <jian.hu@amlogic.com>
 
-And the hits just keep on coming...
+In the S400 board, The I2C master-1 is connecting to
+the audio speaker daughter board.
 
-> 
-> Fixes: 33d3bc9556a7d ("KVM: arm64: vgic-its: Read initial LPI pending table")
-> Cc: stable at vger.kernel.org # 4.8
-> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-
-> ---
->  virt/kvm/arm/vgic/vgic-its.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
-> index a3754ec719c4..370086006838 100644
-> --- a/virt/kvm/arm/vgic/vgic-its.c
-> +++ b/virt/kvm/arm/vgic/vgic-its.c
-> @@ -421,6 +421,7 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
->  	u32 *intids;
->  	int nr_irqs, i;
->  	unsigned long flags;
-> +	u8 pendmask;
->  
->  	nr_irqs = vgic_copy_lpi_list(vcpu, &intids);
->  	if (nr_irqs < 0)
-> @@ -428,7 +429,6 @@ static int its_sync_lpi_pending_table(struct kvm_vcpu *vcpu)
->  
->  	for (i = 0; i < nr_irqs; i++) {
->  		int byte_offset, bit_nr;
-> -		u8 pendmask;
->  
->  		byte_offset = intids[i] / BITS_PER_BYTE;
->  		bit_nr = intids[i] % BITS_PER_BYTE;
-> -- 
-> 2.14.2
-> 
+diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+index 7b39a9fe2b0f..0864d1ff2d9b 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
++++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+@@ -28,3 +28,9 @@
+ 	pinctrl-0 = <&eth_rgmii_y_pins>;
+ 	pinctrl-names = "default";
+ };
++
++&i2c1 {
++	status = "okay";
++	pinctrl-0 = <&i2c1_z_pins>;
++	pinctrl-names = "default";
++};
+-- 
+2.15.0
