@@ -1,48 +1,125 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Nov 2017 17:33:50 +0000
-Subject: [PATCH] arm64: mm: remove stale comment
-In-Reply-To: <20171120172629.24006-1-mark.rutland@arm.com>
-References: <20171120172629.24006-1-mark.rutland@arm.com>
-Message-ID: <20171120173350.GJ32488@arm.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 20 Nov 2017 09:38:46 -0800
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <20171116232206.GM31757@n2100.armlinux.org.uk>
+References: <1fa81694-7bd2-564b-e5b9-ae53b9ea6620@sigmadesigns.com>
+ <20171116153625.GJ31757@n2100.armlinux.org.uk>
+ <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
+ <nycvar.YSQ.7.76.1711161106240.20817@knanqh.ubzr>
+ <48c38055-20f7-e565-aa56-74f360e6e3d9@sigmadesigns.com>
+ <20171116163254.GK31757@n2100.armlinux.org.uk>
+ <fc4ce9e1-8c9d-e6bf-30d3-ead2c5518683@sigmadesigns.com>
+ <20171116170527.GL31757@n2100.armlinux.org.uk>
+ <9f678f27-38a0-1dbe-50b9-2d9109c639a9@free.fr>
+ <CAD=FV=U1FYVS34BYrSTV+0mP6ERhD=MBJGt8ni1bS2-r__Ta4A@mail.gmail.com>
+ <20171116232206.GM31757@n2100.armlinux.org.uk>
+Message-ID: <CAD=FV=W=gS-nYSVLA86pW1FhNnJcaw3dvLkd0g66CL_3d8ezpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 05:26:29PM +0000, Mark Rutland wrote:
-> Since commit:
-> 
->   155433cb365ee466 ("arm64: cache: Remove support for ASID-tagged VIVT I-caches")
-> 
-> ... the ASID rollover code no longer performs I-cache maintenance, yet a
-> leftover comment says it does. The comment doesn't say anything that
-> can't be inferred from the next line, so let's remove it entirely.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arm64/mm/context.c | 1 -
->  1 file changed, 1 deletion(-)
-> 
-> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-> index ab9f5f0fb2c7..b48ec1e18184 100644
-> --- a/arch/arm64/mm/context.c
-> +++ b/arch/arm64/mm/context.c
-> @@ -117,7 +117,6 @@ static void flush_context(unsigned int cpu)
->  		per_cpu(reserved_asids, i) = asid;
->  	}
->  
-> -	/* Queue a TLB invalidate and flush the I-cache if necessary. */
->  	cpumask_setall(&tlb_flush_pending);
+Hi,
 
-Given that we don't normally do TLB invalidation by setting a flag, I'd
-be inclined to say something like
+On Thu, Nov 16, 2017 at 3:22 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Thu, Nov 16, 2017 at 02:15:02PM -0800, Doug Anderson wrote:
+>> Hi,
+>>
+>> On Thu, Nov 16, 2017 at 1:05 PM, Marc Gonzalez
+>> <marc_gonzalez@sigmadesigns.com> wrote:
+>> > On 16/11/2017 18:05, Russell King - ARM Linux wrote:
+>> >
+>> >> On Thu, Nov 16, 2017 at 05:42:36PM +0100, Marc Gonzalez wrote:
+>> >>
+>> >>> Requesting 100 ? and spinning only 25 ? is still a problem,
+>> >>> don't you agree?
+>> >>
+>> >> Which is why, as I've said *many* times already, that drivers are written
+>> >> with leaway on the delays.
+>> >
+>> > A delay 75% too short is possible. Roger that.
+>> >
+>> >> I get the impression that we're just going around in circles, and what
+>> >> you're trying to do is to get me to agree with your point of view.
+>> >> That's not going to happen, because I know the history over about the
+>> >> last /24/ years of kernel development (which is how long I've been
+>> >> involved with the kernel.)  That's almost a quarter of a century!
+>> >>
+>> >> I know how things were done years ago (which is relevant because we
+>> >> still have support in the kernel for these systems), and I also know the
+>> >> history of facilities like cpufreq - I was the one who took the work
+>> >> that Erik Mouw and others involved with the LART project, and turned it
+>> >> into something a little more generic.  The idea of dynamically scaling
+>> >> the CPU frequency on ARM SoCs was something that the SoC manufacturer
+>> >> had not even considered - it was innovative.
+>> >>
+>> >> I know that udelay() can return short delays when used in a kernel with
+>> >> cpufreq enabled, and I also know that's almost an impossible problem to
+>> >> solve without going to a timer-based delay.
+>> >>
+>> >> So, when you think that sending an email about a udelay() that can be
+>> >> 10x shorter might be somehow new information, and might convince people
+>> >> that there's a problem, I'm afraid that it isn't really new information.
+>> >> The SA1110 cpufreq driver is dated 2001, and carries my copyright, and
+>> >> has the ability to make udelay()s 4x shorter or 4x longer depending on
+>> >> the direction of change.
+>> >>
+>> >> We've discussed solutions in the past (probably 10 years ago) about
+>> >> this, and what can be done, and the conclusion to that was, as Nicolas
+>> >> has said, to switch to using a timer-based delay mechanism where
+>> >> possible.  Where this is not possible, the platform is stuck with the
+>> >> loops based delays, and their inherent variability and inaccuracy.
+>> >>
+>> >> These platforms have been tested with such a setup over many years.
+>> >> They work even with udelay() having this behaviour, because it's a
+>> >> known issue and drivers cater for it in ways that I've already covered
+>> >> in my many previous emails to you.
+>> >>
+>> >> These issues are known.  They've been known for the last 15 odd years.
+>> >
+>> > So you've known for umpteen years that fixing loop-based delays is
+>> > intractable, yet you wrote:
+>> >
+>> >> udelay() needs to offer a consistent interface so that drivers know
+>> >> what to expect no matter what the implementation is.  Making one
+>> >> implementation conform to your ideas while leaving the other
+>> >> implementations with other expectations is a recipe for bugs.
+>> >>
+>> >> If you really want to do this, fix the loops_per_jiffy implementation
+>> >> as well so that the consistency is maintained.
+>> >
+>> > In other words, "I'll consider your patch as soon as Hell freezes over".
+>> >
+>> > Roger that. I'll drop the subject then.
+>>
+>> Presumably, though, you could introduce a new API like:
+>>
+>>   udelay_atleast()
+>>
+>> That was guaranteed to delay at least the given number of
+>> microseconds.  Unlike the current udelay(), the new udelay_atleast()
+>> wouldn't really try that hard to get a delay that's approximately the
+>> one requested, it would just guarantee not to ever delay _less_ than
+>> the amount requested.
+>
+> I look forward to reviewing your implementation.
 
-	/*
-	 * Queue a TLB invalidation for each CPU to perform on next
-	 * context-switch.
-	 */
+It's unlikely I'll post a patch in the near term since this isn't
+presenting me with a big problem right now.  Mostly I saw Marc's patch
+and thought it would be a good patch to land and I knew this type of
+thing had bitten me in the past.
 
-Also, if you're bored, there's a comment in asm/cacheflush.h talking about
-ASID-tagged I-cache too.
+One happy result of this whole discussion, though, is that you now
+sound as if you'll be happy the next time someone brings this up since
+you're looking forward to reviewing an implementation.  That's a nice
+change from the original statement questioning why someone was asking
+about this again.  :)
 
-Will
+As I've expressed in the past, IMHO fixing the timer based delays is
+still a sane thing to do even without also fixing all the loop-based
+implementations.  As someone said earlier in this thread, all the old
+platforms using loop-based delays are working great for the platforms
+they support and there's no reason to mess with them, but that doesn't
+mean we shouldn't fix the problems that are easy to fix.
+
+
+-Doug
