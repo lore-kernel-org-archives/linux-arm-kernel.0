@@ -1,47 +1,41 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Nov 2017 15:20:14 +0000
-Subject: [PATCH v2 16/18] arm64: crypto: disable LTO for aes-ce-cipher.c
-In-Reply-To: <20171115213428.22559-17-samitolvanen@google.com>
+Date: Mon, 20 Nov 2017 15:21:40 +0000
+Subject: [PATCH v2 00/18] Add support for clang LTO
+In-Reply-To: <20171115213428.22559-1-samitolvanen@google.com>
 References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-17-samitolvanen@google.com>
-Message-ID: <20171120152014.hftuded4zxwn2r7m@lakrids.cambridge.arm.com>
+Message-ID: <20171120152139.mfqthlbneeeiythr@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 01:34:26PM -0800, Sami Tolvanen wrote:
-> CONFIG_LTO_CLANG requires the use of clang's integrated assembler, which
-> doesn't understand the inline assembly in aes-ce-cipher.c. Disable LTO for
-> the file to work around the issue.
 
-Could you elaborate on what the integrated asembler doesn't like?
+Hi,
 
-It's not entirely clear at a glance, as the asm in that file doesn't
-seem to do anything that obscure.
+On Wed, Nov 15, 2017 at 01:34:10PM -0800, Sami Tolvanen wrote:
+> This series adds build system support for compiling the kernel with clang
+> Link Time Optimization (LTO), using GNU gold with the LLVMgold plug-in
+> for linking. 
 
-Is it a bug?
+As a high-level comment, this path series is rather confusing for
+maintainers, since it's a mixture of basic support, workarounds, and a
+new feature, and the commit messages aren't that helpful for those of us
+unfamiliar with clang.
+
+It would be *very* helpful if this could be split into a few smaller
+patch series that built atop of each other.
+
+Would it be possible to split this into:
+
+(1) (basic) arm64 clang support
+(2) gold support (no LTO)
+(3) LTO support
+
+... with any necessary workarounds added as-required to the relevant
+series?
+
+I think (1) is just the clang-version, -mno-implicit-float, and KVM
+patches, and that might stand a chance of getting in soon. IIUC that
+fixes the outstanding issues with basic clang support, and would give us
+all a common baseline for review, testing, and future debugging.
 
 Thanks,
 Mark.
-
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
-> ---
->  arch/arm64/crypto/Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
-> index b5edc5918c28..af08508521a3 100644
-> --- a/arch/arm64/crypto/Makefile
-> +++ b/arch/arm64/crypto/Makefile
-> @@ -24,7 +24,7 @@ obj-$(CONFIG_CRYPTO_CRC32_ARM64_CE) += crc32-ce.o
->  crc32-ce-y:= crc32-ce-core.o crc32-ce-glue.o
->  
->  obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
-> -CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
-> +CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto $(DISABLE_LTO_CLANG)
->  
->  obj-$(CONFIG_CRYPTO_AES_ARM64_CE_CCM) += aes-ce-ccm.o
->  aes-ce-ccm-y := aes-ce-ccm-glue.o aes-ce-ccm-core.o
-> -- 
-> 2.15.0.448.gf294e3d99a-goog
-> 
