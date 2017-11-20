@@ -1,55 +1,44 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 20 Nov 2017 12:20:58 +0100
-Subject: [PATCH v5 04/20] KVM: arm/arm64: Guard kvm_vgic_map_is_active
- against !vgic_initialized
-In-Reply-To: <475960cf-8b85-3a9f-d166-455e8bc5a43c@arm.com>
-References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
- <1509093281-15225-5-git-send-email-cdall@linaro.org>
- <475960cf-8b85-3a9f-d166-455e8bc5a43c@arm.com>
-Message-ID: <20171120112058.GF28855@cbox>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Nov 2017 12:22:35 +0000
+Subject: [RFC PATCH 1/2] arm64: write __range_ok() in C
+In-Reply-To: <20171116152818.GM9361@arm.com>
+References: <20171026090942.7041-1-mark.rutland@arm.com>
+ <20171026090942.7041-2-mark.rutland@arm.com>
+ <20171116152818.GM9361@arm.com>
+Message-ID: <20171120122235.ku6whdnpgatib6in@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 12:29:48PM +0000, Andre Przywara wrote:
-> Hi,
+On Thu, Nov 16, 2017 at 03:28:19PM +0000, Will Deacon wrote:
+> On Thu, Oct 26, 2017 at 10:09:41AM +0100, Mark Rutland wrote:
+> > +static bool __range_ok_c(unsigned long addr, unsigned long size)
+> > +{
+> > +	unsigned long result;
+> > +
+> > +	if (__builtin_uaddl_overflow(addr, size, &result))
 > 
-> On 27/10/17 09:34, Christoffer Dall wrote:
-> > If the vgic is not initialized, don't try to grab its spinlocks or
-> > traverse its data structures.
-> > 
-> > This is important because we soon have to start considering the active
-> > state of a virtual interrupts when doing vcpu_load, which may happen
-> > early on before the vgic is initialized.
-> 
-> I understand this patch is on its way to Linus already, but I just found
-> this by browsing for VGIC changes...
-> 
-> > Signed-off-by: Christoffer Dall <cdall@linaro.org>
-> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> > ---
-> >  virt/kvm/arm/vgic/vgic.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-> > index fed717e..e1f7dbc 100644
-> > --- a/virt/kvm/arm/vgic/vgic.c
-> > +++ b/virt/kvm/arm/vgic/vgic.c
-> > @@ -777,6 +777,9 @@ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int virt_irq)
-> >  	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, virt_irq);
-> 
-> Isn't vgic_get_irq() already accessing VGIC data structures? In which
-> case this assignment should be moved after the vgic_initialized() check
-> below?
+> I'm not sure if you're planning to revisit this series, but thought I'd
+> give you a heads up that apparently GCC 4.x doesn't have support for this
+> builtin, so we'll need to carry the asm at least for that toolchain.
 
-Theoretically, yes, but we're saved by two things:
+Thanks for the heads-up. I see my Linaro 14.09 GCC 4.9 generates an
+out-of-line call to a __builtin_uaddl_overflow helper.
 
-First, this is only ever called on PPIs from the timer code, which are
-always statically allocated as part of the VCPU.
+We can avoid the builtin, and write the test in C instead, e.g.
 
-Second, this isn't actually needed anymore after the irqchip in
-userspace support, which partially reworked the timer init sequence
-(done after the first version of these patches), so this patch could
-actually have been entirely dropped, or reworked as you suggest.
+static inline bool __range_ok_c(unsigned long addr, unsigned long size)
+{
+        unsigned long end = addr + size;
+
+        if (end < addr)
+                return false;
+
+        return end <= current_thread_info()->addr_limit;
+}
+
+... in my standalone test-case, that generates code that's almost
+identical to the builtin, except that the compiler chooses to look at a
+different flag.
 
 Thanks,
--Christoffer
+Mark.
