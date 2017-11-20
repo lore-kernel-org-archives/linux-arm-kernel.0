@@ -1,84 +1,75 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 20 Nov 2017 14:01:36 +0800
-Subject: [PATCH V5 11/12] arm64: dts: add syscon for whale2 platform
-In-Reply-To: <20171120060137.27380-1-chunyan.zhang@spreadtrum.com>
-References: <20171120060137.27380-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171120060137.27380-12-chunyan.zhang@spreadtrum.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Mon, 20 Nov 2017 08:37:21 +0100
+Subject: [PATCH] ARM: exynos: add machine description for ODROID-XU3/4
+In-Reply-To: <9f1311f1-2986-21f1-7016-29efc7b2a543@math.uni-bielefeld.de>
+References: <20171118203544.19431-1-tobetter@gmail.com>
+ <9f1311f1-2986-21f1-7016-29efc7b2a543@math.uni-bielefeld.de>
+Message-ID: <CAJKOXPc=iMzT_3K9Rysnv4B06wqOmmdXWxSjU6yDTC8vMnujNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks on SC9860 are in the same address area with syscon
-devices, the proper syscon node will be quoted under the
-definitions of those clocks in DT.
+On Sun, Nov 19, 2017 at 6:21 PM, Tobias Jakobi
+<tjakobi@math.uni-bielefeld.de> wrote:
+> I don't think this approach scales at all. DietPi can just read the devicetree
+> through sysfs and retrieve the compatible and/or model of the base node.
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- arch/arm64/boot/dts/sprd/whale2.dtsi | 46 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 45 insertions(+), 1 deletion(-)
+Exactly, do not add new machines just for reading DT. Use
+/sys/firmware/devicetree/base/compatible for this.
 
-diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index 7c217c5..6ea3a75 100644
---- a/arch/arm64/boot/dts/sprd/whale2.dtsi
-+++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -17,6 +17,51 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		ap_ahb_regs: syscon at 20210000 {
-+			compatible = "syscon";
-+			reg = <0 0x20210000 0 0x10000>;
-+		};
-+
-+		pmu_regs: syscon at 402b0000 {
-+			compatible = "syscon";
-+			reg = <0 0x402b0000 0 0x10000>;
-+		};
-+
-+		aon_regs: syscon at 402e0000 {
-+			compatible = "syscon";
-+			reg = <0 0x402e0000 0 0x10000>;
-+		};
-+
-+		ana_regs: syscon at 40400000 {
-+			compatible = "syscon";
-+			reg = <0 0x40400000 0 0x10000>;
-+		};
-+
-+		agcp_regs: syscon at 415e0000 {
-+			compatible = "syscon";
-+			reg = <0 0x415e0000 0 0x1000000>;
-+		};
-+
-+		vsp_regs: syscon at 61100000 {
-+			compatible = "syscon";
-+			reg = <0 0x61100000 0 0x10000>;
-+		};
-+
-+		cam_regs: syscon at 62100000 {
-+			compatible = "syscon";
-+			reg = <0 0x62100000 0 0x10000>;
-+		};
-+
-+		disp_regs: syscon at 63100000 {
-+			compatible = "syscon";
-+			reg = <0 0x63100000 0 0x10000>;
-+		};
-+
-+		ap_apb_regs: syscon at 70b00000 {
-+			compatible = "syscon";
-+			reg = <0 0x70b00000 0 0x40000>;
-+		};
-+
- 		ap-apb {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -59,7 +104,6 @@
- 				status = "disabled";
- 			};
- 		};
--
- 	};
- 
- 	ext_26m: ext-26m {
--- 
-2.7.4
+Best regards,
+Krzysztof
+
+> - Tobias
+>
+> Dongjin Kim wrote:
+>> This patch is to add the machine descriptions for ODROID-XU3/4 boards
+>> in order to present the hardware name at /proc/cputinfo rather than
+>> "SAMSUNG EXYNOS (Flattened Device Tree)". An embedded open source project,
+>> such as DietPi, reads the hardware name to run different features.
+>>
+>>       $ cat /proc/cpuinfo | grep Hardware
+>>       Hardware        : ODROID-XU4
+>>
+>> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
+>> ---
+>>  arch/arm/mach-exynos/exynos.c | 28 ++++++++++++++++++++++++++++
+>>  1 file changed, 28 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
+>> index c404c15ad07f..6197dbf9f48b 100644
+>> --- a/arch/arm/mach-exynos/exynos.c
+>> +++ b/arch/arm/mach-exynos/exynos.c
+>> @@ -241,3 +241,31 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
+>>       .dt_compat      = exynos_dt_compat,
+>>       .dt_fixup       = exynos_dt_fixup,
+>>  MACHINE_END
+>> +
+>> +#define ODROID_MACHINE_START(name, compat)                   \
+>> +     DT_MACHINE_START(EXYNOS5422_ODROID_##name, "ODROID-"#name)      \
+>> +             .l2c_aux_val    = 0x3c400001,                   \
+>> +             .l2c_aux_mask   = 0xc20fffff,                   \
+>> +             .smp            = smp_ops(exynos_smp_ops),      \
+>> +             .map_io         = exynos_init_io,               \
+>> +             .init_early     = exynos_firmware_init,         \
+>> +             .init_irq       = exynos_init_irq,              \
+>> +             .init_machine   = exynos_dt_machine_init,       \
+>> +             .init_late      = exynos_init_late,             \
+>> +             .dt_compat      = compat,                       \
+>> +             .dt_fixup       = exynos_dt_fixup,              \
+>> +     MACHINE_END
+>> +
+>> +static char const *const exynos5422_odroidxu3_dt_compat[] __initconst = {
+>> +     "hardkernel,odroid-xu3",
+>> +     "hardkernel,odroid-xu3-lite",
+>> +     NULL,
+>> +};
+>> +
+>> +static char const *const exynos5422_odroidxu4_dt_compat[] __initconst = {
+>> +     "hardkernel,odroid-xu4",
+>> +     NULL,
+>> +};
+>> +
+>> +ODROID_MACHINE_START(XU3, exynos5422_odroidxu3_dt_compat)
+>> +ODROID_MACHINE_START(XU4, exynos5422_odroidxu4_dt_compat)
+>>
+>
