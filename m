@@ -1,35 +1,166 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Nov 2017 15:25:31 +0000
-Subject: [PATCH v2 16/18] arm64: crypto: disable LTO for aes-ce-cipher.c
-In-Reply-To: <20171120152014.hftuded4zxwn2r7m@lakrids.cambridge.arm.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-17-samitolvanen@google.com>
- <20171120152014.hftuded4zxwn2r7m@lakrids.cambridge.arm.com>
-Message-ID: <CAKv+Gu-hnoeLqNsHbrLXv3xu7qsYB6REiwMtQYW_0CPwZ7jF4g@mail.gmail.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Mon, 20 Nov 2017 10:26:18 -0500
+Subject: [PATCH v4][for 4.15] dmaengine: dmatest: move callback wait queue to
+ thread context
+Message-ID: <1511191578-1781-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2017 at 15:20, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Nov 15, 2017 at 01:34:26PM -0800, Sami Tolvanen wrote:
->> CONFIG_LTO_CLANG requires the use of clang's integrated assembler, which
->> doesn't understand the inline assembly in aes-ce-cipher.c. Disable LTO for
->> the file to work around the issue.
->
-> Could you elaborate on what the integrated asembler doesn't like?
->
-> It's not entirely clear at a glance, as the asm in that file doesn't
-> seem to do anything that obscure.
->
+Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+introduced a bug (that is in fact documented by the patch commit text)
+that leaves behind a dangling pointer. Since the done_wait structure is
+allocated on the stack, future invocations to the DMATEST can produce
+undesirable results (e.g., corrupted spinlocks).
 
-Actually, it just occurred to me that this code does not adhere 100%
-to the kernel mode neon rules, by putting kernel_neon_begin/end and
-the code itself into the same source file. At the time, it seemed
-harmless, given that these functions are only exposed via function
-pointers and never called locally, and the compiler cannot really
-reorder the function calls with the asm block. However, under LTO this
-all changes, and it is no longer guaranteed that the NEON registers
-are only touched between the kernel mode neon begin/end calls.
+Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
+out") attempted to WARN the user that the stack was likely corrupted but
+did not fix the actual issue.
 
-So the correct way to fix this would be to move the asm into its own
-.S file, and call it from between the kernel_mode_neon_begin/end
-calls. That should also fix your compat issue.
+This patch fixes the issue by pushing the wait queue and callback
+structs into the the thread structure. If a failure occurs due to time,
+dmaengine_terminate_all will force the callback to safely call
+wake_up_all() without possibility of using a freed pointer.
+
+Cc: stable at vger.kernel.org
+Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
+Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
+Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+changes from v3: Added check to thread wait variable if terminate_all fails
+changes from v2: Added "Fixes" tag
+changes from v1: Added pre-req patches for stable
+
+ drivers/dma/dmatest.c | 55 +++++++++++++++++++++++++++++----------------------
+ 1 file changed, 31 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index 47edc7f..45a4ee9 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -155,6 +155,12 @@ struct dmatest_params {
+ #define PATTERN_COUNT_MASK	0x1f
+ #define PATTERN_MEMSET_IDX	0x01
+ 
++/* poor man's completion - we want to use wait_event_freezable() on it */
++struct dmatest_done {
++	bool			done;
++	wait_queue_head_t	*wait;
++};
++
+ struct dmatest_thread {
+ 	struct list_head	node;
+ 	struct dmatest_info	*info;
+@@ -165,6 +171,8 @@ struct dmatest_thread {
+ 	u8			**dsts;
+ 	u8			**udsts;
+ 	enum dma_transaction_type type;
++	wait_queue_head_t done_wait;
++	struct dmatest_done test_done;
+ 	bool			done;
+ };
+ 
+@@ -342,18 +350,25 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
+ 	return error_count;
+ }
+ 
+-/* poor man's completion - we want to use wait_event_freezable() on it */
+-struct dmatest_done {
+-	bool			done;
+-	wait_queue_head_t	*wait;
+-};
+ 
+ static void dmatest_callback(void *arg)
+ {
+ 	struct dmatest_done *done = arg;
+-
+-	done->done = true;
+-	wake_up_all(done->wait);
++	struct dmatest_thread *thread =
++		container_of(done, struct dmatest_thread, done_wait);
++	if (!thread->done) {
++		done->done = true;
++		wake_up_all(done->wait);
++	} else {
++		/*
++		 * If thread->done, it means that this callback occurred
++		 * after the parent thread has cleaned up. This can
++		 * happen in the case that driver doesn't implement
++		 * the terminate_all() functionality and a dma operation
++		 * did not occur within the timeout period
++		 */
++		WARN(1, "dmatest: Kernel memory may be corrupted!!\n");
++	}
+ }
+ 
+ static unsigned int min_odd(unsigned int x, unsigned int y)
+@@ -424,9 +439,8 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
+  */
+ static int dmatest_func(void *data)
+ {
+-	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(done_wait);
+ 	struct dmatest_thread	*thread = data;
+-	struct dmatest_done	done = { .wait = &done_wait };
++	struct dmatest_done	*done = &thread->test_done;
+ 	struct dmatest_info	*info;
+ 	struct dmatest_params	*params;
+ 	struct dma_chan		*chan;
+@@ -673,9 +687,9 @@ static int dmatest_func(void *data)
+ 			continue;
+ 		}
+ 
+-		done.done = false;
++		done->done = false;
+ 		tx->callback = dmatest_callback;
+-		tx->callback_param = &done;
++		tx->callback_param = done;
+ 		cookie = tx->tx_submit(tx);
+ 
+ 		if (dma_submit_error(cookie)) {
+@@ -688,21 +702,12 @@ static int dmatest_func(void *data)
+ 		}
+ 		dma_async_issue_pending(chan);
+ 
+-		wait_event_freezable_timeout(done_wait, done.done,
++		wait_event_freezable_timeout(thread->done_wait, done->done,
+ 					     msecs_to_jiffies(params->timeout));
+ 
+ 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+ 
+-		if (!done.done) {
+-			/*
+-			 * We're leaving the timed out dma operation with
+-			 * dangling pointer to done_wait.  To make this
+-			 * correct, we'll need to allocate wait_done for
+-			 * each test iteration and perform "who's gonna
+-			 * free it this time?" dancing.  For now, just
+-			 * leave it dangling.
+-			 */
+-			WARN(1, "dmatest: Kernel stack may be corrupted!!\n");
++		if (!done->done) {
+ 			dmaengine_unmap_put(um);
+ 			result("test timed out", total_tests, src_off, dst_off,
+ 			       len, 0);
+@@ -789,7 +794,7 @@ static int dmatest_func(void *data)
+ 		dmatest_KBs(runtime, total_len), ret);
+ 
+ 	/* terminate all transfers on specified channels */
+-	if (ret)
++	if (ret || failed_tests)
+ 		dmaengine_terminate_all(chan);
+ 
+ 	thread->done = true;
+@@ -849,6 +854,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
+ 		thread->info = info;
+ 		thread->chan = dtc->chan;
+ 		thread->type = type;
++		thread->test_done.wait = &thread->done_wait;
++		init_waitqueue_head(&thread->done_wait);
+ 		smp_wmb();
+ 		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
+ 				dma_chan_name(chan), op, i);
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
