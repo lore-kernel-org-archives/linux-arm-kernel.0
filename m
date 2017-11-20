@@ -1,39 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Nov 2017 14:47:06 +0000
-Subject: [PATCH v2 06/18] arm64: kvm: use -fno-jump-tables with clang
-In-Reply-To: <20171120144306.z5uyeyectmce6plu@lakrids.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Nov 2017 14:47:20 +0000
+Subject: [PATCH v2 09/18] arm64: explicitly pass
+ --no-fix-cortex-a53-843419 to GNU gold
+In-Reply-To: <20171116163549.GD94341@samitolvanen.mtv.corp.google.com>
 References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-7-samitolvanen@google.com>
- <20171120144147.7iawjcw644zc4xes@lakrids.cambridge.arm.com>
- <20171120144306.z5uyeyectmce6plu@lakrids.cambridge.arm.com>
-Message-ID: <CAKv+Gu8z58yJAS7MJW0xwhpf_=a_8ZVLed5gTftawNFHZdM=9A@mail.gmail.com>
+ <20171115213428.22559-10-samitolvanen@google.com>
+ <20171116114722.GD9361@arm.com>
+ <20171116163549.GD94341@samitolvanen.mtv.corp.google.com>
+Message-ID: <20171120144720.bf27bpuwq4huhkdp@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2017 at 14:43, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Nov 20, 2017 at 02:41:47PM +0000, Mark Rutland wrote:
->> On Wed, Nov 15, 2017 at 01:34:16PM -0800, Sami Tolvanen wrote:
->> > Use -fno-jump-tables to make sure clang doesn't generate branches
->> > to EL1 virtual addresses.
->>
->> Are there any other reasons that clang might generate absolute
->> references/relocations?
->>
->> It would be nice if there was the option to disable that more generally,
->> rather than disabling individual optimizations. Is there any PIC/PIE
->> option that we could use?
->>
->> We might need something simnilar for GCC, even if we're not seeing
->> problems today.
->
-> ... and likewise for the EFI stub, which needs to be
-> position-independent much like the hyp code.
->
+On Thu, Nov 16, 2017 at 08:35:49AM -0800, Sami Tolvanen wrote:
+> On Thu, Nov 16, 2017 at 11:47:23AM +0000, Will Deacon wrote:
+> > But if ARM64_ERRATUM_843419 is enabled, we'll go ahead and generate
+> > broken code?
+> 
+> This bug has been fixed in all current versions of GNU gold, but of
+> course, if someone is using a broken linker, it will generate broken
+> code. We can't do anything about that in the kernel.
 
-Actually, we are already using -fpie for the EFI stub, but it is a bit
-fiddly because it requires visibility overrides, given that PIC symbol
-references are usually indirected via GOT entries. At the time, it
-didn't occur to me that the HYP code has similar issues. Of course, in
-the EFI stub we already check for ABS64 relocations to make sure that
-the resulting code is correct (and /me makes mental note to add
-R_AARCH64_GOT_xxx relocations to that as well)
+However, we could instead check ld-version, produce a warning, and abort
+the build in such cases.
+
+Which would be better than silently producing a kernel that won't work
+correctly.
+
+Thanks,
+Mark.
