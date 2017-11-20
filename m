@@ -1,75 +1,37 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 20 Nov 2017 08:37:21 +0100
-Subject: [PATCH] ARM: exynos: add machine description for ODROID-XU3/4
-In-Reply-To: <9f1311f1-2986-21f1-7016-29efc7b2a543@math.uni-bielefeld.de>
-References: <20171118203544.19431-1-tobetter@gmail.com>
- <9f1311f1-2986-21f1-7016-29efc7b2a543@math.uni-bielefeld.de>
-Message-ID: <CAJKOXPc=iMzT_3K9Rysnv4B06wqOmmdXWxSjU6yDTC8vMnujNg@mail.gmail.com>
+From: jc@linux.com (Jesse Chan)
+Date: Sun, 19 Nov 2017 23:47:54 -0800
+Subject: [PATCH v3] media: mtk-vcodec: add missing MODULE_LICENSE/DESCRIPTION
+In-Reply-To: <20171120063930.82066-1-jc@linux.com>
+References: <20171120063930.82066-1-jc@linux.com>
+Message-ID: <20171120074754.67708-1-jc@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 19, 2017 at 6:21 PM, Tobias Jakobi
-<tjakobi@math.uni-bielefeld.de> wrote:
-> I don't think this approach scales at all. DietPi can just read the devicetree
-> through sysfs and retrieve the compatible and/or model of the base node.
+This change resolves a new compile-time warning
+when built as a loadable module:
 
-Exactly, do not add new machines just for reading DT. Use
-/sys/firmware/devicetree/base/compatible for this.
+WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/mtk-vcodec/mtk-vcodec-common.o
+see include/linux/module.h for more information
 
-Best regards,
-Krzysztof
+This adds the license as "GPL v2", which matches the header of the file.
 
-> - Tobias
->
-> Dongjin Kim wrote:
->> This patch is to add the machine descriptions for ODROID-XU3/4 boards
->> in order to present the hardware name at /proc/cputinfo rather than
->> "SAMSUNG EXYNOS (Flattened Device Tree)". An embedded open source project,
->> such as DietPi, reads the hardware name to run different features.
->>
->>       $ cat /proc/cpuinfo | grep Hardware
->>       Hardware        : ODROID-XU4
->>
->> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
->> ---
->>  arch/arm/mach-exynos/exynos.c | 28 ++++++++++++++++++++++++++++
->>  1 file changed, 28 insertions(+)
->>
->> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
->> index c404c15ad07f..6197dbf9f48b 100644
->> --- a/arch/arm/mach-exynos/exynos.c
->> +++ b/arch/arm/mach-exynos/exynos.c
->> @@ -241,3 +241,31 @@ DT_MACHINE_START(EXYNOS_DT, "SAMSUNG EXYNOS (Flattened Device Tree)")
->>       .dt_compat      = exynos_dt_compat,
->>       .dt_fixup       = exynos_dt_fixup,
->>  MACHINE_END
->> +
->> +#define ODROID_MACHINE_START(name, compat)                   \
->> +     DT_MACHINE_START(EXYNOS5422_ODROID_##name, "ODROID-"#name)      \
->> +             .l2c_aux_val    = 0x3c400001,                   \
->> +             .l2c_aux_mask   = 0xc20fffff,                   \
->> +             .smp            = smp_ops(exynos_smp_ops),      \
->> +             .map_io         = exynos_init_io,               \
->> +             .init_early     = exynos_firmware_init,         \
->> +             .init_irq       = exynos_init_irq,              \
->> +             .init_machine   = exynos_dt_machine_init,       \
->> +             .init_late      = exynos_init_late,             \
->> +             .dt_compat      = compat,                       \
->> +             .dt_fixup       = exynos_dt_fixup,              \
->> +     MACHINE_END
->> +
->> +static char const *const exynos5422_odroidxu3_dt_compat[] __initconst = {
->> +     "hardkernel,odroid-xu3",
->> +     "hardkernel,odroid-xu3-lite",
->> +     NULL,
->> +};
->> +
->> +static char const *const exynos5422_odroidxu4_dt_compat[] __initconst = {
->> +     "hardkernel,odroid-xu4",
->> +     NULL,
->> +};
->> +
->> +ODROID_MACHINE_START(XU3, exynos5422_odroidxu3_dt_compat)
->> +ODROID_MACHINE_START(XU4, exynos5422_odroidxu4_dt_compat)
->>
->
+MODULE_DESCRIPTION is also added.
+
+Signed-off-by: Jesse Chan <jc@linux.com>
+---
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
+index 46768c056193..0c28d0b995cc 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
+@@ -115,3 +115,6 @@ struct mtk_vcodec_ctx *mtk_vcodec_get_curr_ctx(struct mtk_vcodec_dev *dev)
+ 	return ctx;
+ }
+ EXPORT_SYMBOL(mtk_vcodec_get_curr_ctx);
++
++MODULE_LICENSE("GPL v2");
++MODULE_DESCRIPTION("Mediatek video codec driver");
+-- 
+2.14.1
