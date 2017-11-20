@@ -1,55 +1,32 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 20 Nov 2017 15:52:00 +0100
-Subject: [PATCH 2/7] KVM: arm/arm64: vgic: Preserve the revious read from
- the pending table
-In-Reply-To: <20171116175821.26544-3-marc.zyngier@arm.com>
-References: <20171116175821.26544-1-marc.zyngier@arm.com>
- <20171116175821.26544-3-marc.zyngier@arm.com>
-Message-ID: <20171120145200.GK28855@cbox>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 20 Nov 2017 22:54:10 +0800
+Subject: [PATCH v2 0/5]  i2c: meson-axg: add I2C controller driver
+Message-ID: <20171120145415.6581-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 05:58:16PM +0000, Marc Zyngier wrote:
-> The current pending table parsing code assumes that we keep the
-> previous read of the pending bits, but keep that variable in
-> the current block, making sure it is discarded on each loop.
-> 
-> We end-up using whatever is on the stack. Who knows, it might
-> just be the right thing...
+This patch set try to add I2C controller driver for
+the Amlogic's Meson-AXG SoC.
 
-ouch, again.
+Changes since v1 [1]
+ - update dt-bindings doc (Neil Armstrong)
+ - make meson_i2c_data const (Martin Blumenstingl)
+ - DTS: adjust naming, change from the 'i2c_m0' to 'i2c0' style
 
-> 
-> Fixes: 280771252c1ba ("KVM: arm64: vgic-v3: KVM_DEV_ARM_VGIC_SAVE_PENDING_TABLES")
-> Cc: stable at vger.kernel.org # 4.12
-> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+[1] http://lkml.kernel.org/r/20171117080236.32504-1-yixun.lan at amlogic.com
 
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Jian Hu (5):
+  dt-bindings: i2c: update documentation for the Meson-AXG
+  i2c: meson: add configurable divider factors
+  ARM64: dts: meson-axg: add I2C DT info for Meson-AXG SoC
+  ARM64: dts: meson-axg: describe pin DT info for I2C controller
+  ARM64: dts: meson-axg: enable I2C Master-1 for the audio speaker
 
-> ---
->  virt/kvm/arm/vgic/vgic-v3.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 2f05f732d3fd..f47e8481fa45 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -327,13 +327,13 @@ int vgic_v3_save_pending_tables(struct kvm *kvm)
->  	int last_byte_offset = -1;
->  	struct vgic_irq *irq;
->  	int ret;
-> +	u8 val;
->  
->  	list_for_each_entry(irq, &dist->lpi_list_head, lpi_list) {
->  		int byte_offset, bit_nr;
->  		struct kvm_vcpu *vcpu;
->  		gpa_t pendbase, ptr;
->  		bool stored;
-> -		u8 val;
->  
->  		vcpu = irq->target_vcpu;
->  		if (!vcpu)
-> -- 
-> 2.14.2
-> 
+ .../devicetree/bindings/i2c/i2c-meson.txt          |   6 +-
+ arch/arm64/boot/dts/amlogic/meson-axg-s400.dts     |   6 +
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi         | 123 +++++++++++++++++++++
+ drivers/i2c/busses/i2c-meson.c                     |  32 +++++-
+ 4 files changed, 162 insertions(+), 5 deletions(-)
+
+-- 
+2.15.0
