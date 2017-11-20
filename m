@@ -1,32 +1,39 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 20 Nov 2017 22:54:10 +0800
-Subject: [PATCH v2 0/5]  i2c: meson-axg: add I2C controller driver
-Message-ID: <20171120145415.6581-1-yixun.lan@amlogic.com>
+Date: Mon, 20 Nov 2017 22:54:11 +0800
+Subject: [PATCH v2 1/5] dt-bindings: i2c: update documentation for the
+ Meson-AXG
+In-Reply-To: <20171120145415.6581-1-yixun.lan@amlogic.com>
+References: <20171120145415.6581-1-yixun.lan@amlogic.com>
+Message-ID: <20171120145415.6581-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch set try to add I2C controller driver for
-the Amlogic's Meson-AXG SoC.
+From: Jian Hu <jian.hu@amlogic.com>
 
-Changes since v1 [1]
- - update dt-bindings doc (Neil Armstrong)
- - make meson_i2c_data const (Martin Blumenstingl)
- - DTS: adjust naming, change from the 'i2c_m0' to 'i2c0' style
+Update the doc to explicitly add Meson-AXG to support list
 
-[1] http://lkml.kernel.org/r/20171117080236.32504-1-yixun.lan at amlogic.com
+Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ Documentation/devicetree/bindings/i2c/i2c-meson.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-Jian Hu (5):
-  dt-bindings: i2c: update documentation for the Meson-AXG
-  i2c: meson: add configurable divider factors
-  ARM64: dts: meson-axg: add I2C DT info for Meson-AXG SoC
-  ARM64: dts: meson-axg: describe pin DT info for I2C controller
-  ARM64: dts: meson-axg: enable I2C Master-1 for the audio speaker
-
- .../devicetree/bindings/i2c/i2c-meson.txt          |   6 +-
- arch/arm64/boot/dts/amlogic/meson-axg-s400.dts     |   6 +
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi         | 123 +++++++++++++++++++++
- drivers/i2c/busses/i2c-meson.c                     |  32 +++++-
- 4 files changed, 162 insertions(+), 5 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-meson.txt b/Documentation/devicetree/bindings/i2c/i2c-meson.txt
+index 611b934c7e10..13d410de077c 100644
+--- a/Documentation/devicetree/bindings/i2c/i2c-meson.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-meson.txt
+@@ -1,7 +1,11 @@
+ Amlogic Meson I2C controller
+ 
+ Required properties:
+- - compatible: must be "amlogic,meson6-i2c" or "amlogic,meson-gxbb-i2c"
++ - compatible: must be:
++	"amlogic,meson6-i2c" for Meson8 and compatible SoCs
++	"amlogic,meson-gxbb-i2c" for GXBB and compatible SoCs
++	"amlogic,meson-axg-i2c"for AXG and compatible SoCs
++
+  - reg: physical address and length of the device registers
+  - interrupts: a single interrupt specifier
+  - clocks: clock for the device
 -- 
 2.15.0
