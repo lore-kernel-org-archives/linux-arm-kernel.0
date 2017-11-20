@@ -1,35 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 20 Nov 2017 11:07:10 +0100
-Subject: [PATCH 0/8] Add CAN support to iwg2[02]d
-In-Reply-To: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20171120100710.f74cqhu5ngbs2faf@verge.net.au>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 20 Nov 2017 18:08:23 +0800
+Subject: [PATCH v2 0/2] add pinctrl driver for Meson-AXG SoC
+Message-ID: <20171120100825.16613-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 03:10:41PM +0000, Fabrizio Castro wrote:
-> Hello,
-> 
-> this series delivers all of the changes necessary to add CAN bus
-> support to the:
-> * iW-RainboW-G22D SODIMM, and
-> * iW-RainboW-G20M-Qseven-RZG1M
-> development platforms, including documentation, pinctrl driver, SoC
-> specific device trees, and board specific device trees.
-> 
-> This work has been based and tested on top of:
-> renesas-devel-20171106-v4.14-rc8
-> 
-> Best regards,
-> 
-> Fabrizio Castro (8):
->   dt-bindings: can: rcar_can: document r8a774[35] can support
->   pinctrl: sh-pfc: r8a7745: Add CAN[01] support
->   ARM: dts: r8a7745: Add CAN[01] SoC support
->   ARM: dts: iwg22d-sodimm: Add can0 support to carrier board
->   ARM: dts: iwg22d-sodimm-dbhd-ca: Add can1 support to HDMI DB
->   ARM: dts: r8a7743: Add CAN[01] SoC support
->   ARM: dts: iwg20d-q7-common: Add can0 support to carrier board
->   ARM: dts: iwg20d-q7-dbcm-ca: Add can1 support to camera DB
+This patchset adds pinctrl support for the Amlogic's Meson-AXG SoC.
+  
+While the gpio and pin configuration part is the same the as previous
+meson SoCs, the pinmux part is different. This requires slightly
+different pinmux operations along with the actual pinctrl driver description.
 
-Thanks, I have applied the "ARM: dts" patches for inclusion in v4.16.
+Changes since v1 at [1]:
+  -- Rename i2c_m0 to i2c0 style (no logic changed)
+  -- Rename uart_tx_ao_XX to uart_ao_tx, etc .. (no logic changed)
+  -- Separate DT part patches
+  -- Add Neil Armstrong's Ack
+
+[1] 
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005270.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005271.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005272.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005273.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005274.html
+
+
+Xingyu Chen (2):
+  pinctrl: meson-axg: Introduce a pinctrl pinmux ops for Meson-AXG SoC
+  pinctrl: meson-axg: Add new pinctrl driver for Meson AXG  SoC
+
+ drivers/pinctrl/meson/Kconfig                 |   9 +
+ drivers/pinctrl/meson/Makefile                |   2 +
+ drivers/pinctrl/meson/pinctrl-meson-axg-pmx.c | 118 ++++
+ drivers/pinctrl/meson/pinctrl-meson-axg-pmx.h |  62 ++
+ drivers/pinctrl/meson/pinctrl-meson-axg.c     | 975 ++++++++++++++++++++++++++
+ drivers/pinctrl/meson/pinctrl-meson.h         |   1 +
+ include/dt-bindings/gpio/meson-axg-gpio.h     | 116 +++
+ 7 files changed, 1283 insertions(+)
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson-axg-pmx.c
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson-axg-pmx.h
+ create mode 100644 drivers/pinctrl/meson/pinctrl-meson-axg.c
+ create mode 100644 include/dt-bindings/gpio/meson-axg-gpio.h
+
+-- 
+2.15.0
