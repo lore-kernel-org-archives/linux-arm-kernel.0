@@ -1,17 +1,23 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 20 Nov 2017 11:22:59 +0100
-Subject: [PATCH v2 4/4] ARM: dts: r8a7745: add VIN dt support
-In-Reply-To: <1510856571-30281-5-git-send-email-fabrizio.castro@bp.renesas.com>
-References: <1510856571-30281-1-git-send-email-fabrizio.castro@bp.renesas.com>
- <1510856571-30281-5-git-send-email-fabrizio.castro@bp.renesas.com>
-Message-ID: <20171120102258.nzndrofzi5cacz5i@verge.net.au>
+Date: Mon, 20 Nov 2017 11:24:07 +0100
+Subject: [PATCH 0/2] Add R8A77970/Eagle I2C support
+In-Reply-To: <20171116210629.732112911@cogentembedded.com>
+References: <20171116210629.732112911@cogentembedded.com>
+Message-ID: <20171120102407.v7pqrv7e4zmpwmdb@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 06:22:51PM +0000, Fabrizio Castro wrote:
-> Add VIN[01] support to SoC dt. Also, add aliases.
+On Fri, Nov 17, 2017 at 12:06:29AM +0300, Sergei Shtylyov wrote:
+> Hello!
 > 
-> Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-> Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+> Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
+> 'renesas-devel-20171113-v4.14' tag. We're adding the R8A77970 I2C nodes
+> and then describing the PCA9654 I/O expander connected to the I2C0 bus.
+> These patches depend on the R8A77970/Eagle PFC suport patchset in order
+> to apply/compile.
 
-Thanks, applied.
+Given the dependency above I have marked these patches as deferred.
+Please repost or otherwise ping me once the dependency has been
+included in an RC release.
+
+Thanks!
