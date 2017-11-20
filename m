@@ -1,91 +1,163 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 20 Nov 2017 13:30:27 +0100
-Subject: [PATCH v3] drm: bridge: synopsys/dw-hdmi: Enable cec clock
-In-Reply-To: <20171026181942.9516-1-phh@phh.me>
-References: <20171026181942.9516-1-phh@phh.me>
-Message-ID: <75adf743-18a2-2c55-b4bb-95d83bd26f03@xs4all.nl>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Nov 2017 12:32:40 +0000
+Subject: [PATCH] drivers/perf: arm_pmu: save/restore cpu cycle counter in
+ cpu_pm_pmu_notify
+In-Reply-To: <1510813648-45090-1-git-send-email-hejianet@gmail.com>
+References: <1510813648-45090-1-git-send-email-hejianet@gmail.com>
+Message-ID: <20171120123240.ohcdgv2nnoyrc7ov@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I didn't see this merged for 4.15, is it too late to include this?
-All other changes needed to get CEC to work on rk3288 and rk3399 are all merged.
+Hi,
 
-Regards,
+On Thu, Nov 16, 2017 at 06:27:28AM +0000, Jia He wrote:
+> Sometimes userspace need a high resolution cycle counter by reading
+> pmccntr_el0.
+> 
+> In commit da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM
+> notifier"), it resets all the counters even when the pmcr_el0.E and
+> pmcntenset_el0.C are both 1 . That is incorrect.
 
-	Hans
+I appreciate that you may wish to make use of the cycle counter from
+userspace, but this is the intended behaviour kernel-side. Direct
+userspace counter acceess is not supported.
 
-On 10/26/2017 08:19 PM, Pierre-Hugues Husson wrote:
-> The documentation already mentions "cec" optional clock, but
-> currently the driver doesn't enable it.
+In power states where context is lost, any perf events are
+saved/restored by cpu_pm_pmu_setup(). So we certainly shouldn't be
+modifying the counter registers in any other PM code.
+
+We *could* expose counters to userspace on homogeneous systems, so long
+as users stuck to the usual perf data page interface. However, this
+comes with a number of subtle problems, and no-one's done the work to
+enable this.
+
+Even then, perf may modify counters at any point in time, and
+monotonicity (and/or presence) of counters is not guaranteed.
+
+> We need to save the registers and counter before CPU_PM_ENTER and
+> restore them after CPU_PM_EXIT.
 > 
-> Changes:
-> v3:
-> - Drop useless braces
-> 
-> v2:
-> - Separate ENOENT errors from others
-> - Propagate other errors (especially -EPROBE_DEFER)
-> 
-> Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
+> Fixes: da4e4f18afe0 ("drivers/perf: arm_pmu: implement CPU_PM notifier")
+
+As above, this patch is not a  fix, and is not currently necessary.
+
+Thanks,
+Mark.
+
+> Signed-off-by: Jia He <jia.he@hxt-semitech.com>
 > ---
->  drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 25 +++++++++++++++++++++++++
->  1 file changed, 25 insertions(+)
+>  drivers/perf/arm_pmu.c | 72 +++++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 66 insertions(+), 6 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> index bf14214fa464..d82b9747a979 100644
-> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-> @@ -138,6 +138,7 @@ struct dw_hdmi {
->  	struct device *dev;
->  	struct clk *isfr_clk;
->  	struct clk *iahb_clk;
-> +	struct clk *cec_clk;
->  	struct dw_hdmi_i2c *i2c;
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index 7bc5eee..cf55c91 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -26,6 +26,12 @@
 >  
->  	struct hdmi_data_info hdmi_data;
-> @@ -2382,6 +2383,26 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		goto err_isfr;
->  	}
+>  #include <asm/irq_regs.h>
 >  
-> +	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
-> +	if (PTR_ERR(hdmi->cec_clk) == -ENOENT) {
-> +		hdmi->cec_clk = NULL;
-> +	} else if (IS_ERR(hdmi->cec_clk)) {
-> +		ret = PTR_ERR(hdmi->cec_clk);
-> +		if (ret != -EPROBE_DEFER)
-> +			dev_err(hdmi->dev, "Cannot get HDMI cec clock: %d\n",
-> +					ret);
+> +#ifdef CONFIG_CPU_PM
+> +DEFINE_PER_CPU(u32, saved_pmcr_el0);
+> +DEFINE_PER_CPU(u32, saved_pmcntenset_el0);
+> +DEFINE_PER_CPU(u64, saved_cycle_cnter);
+> +#endif
 > +
-> +		hdmi->cec_clk = NULL;
-> +		goto err_iahb;
-> +	} else {
-> +		ret = clk_prepare_enable(hdmi->cec_clk);
-> +		if (ret) {
-> +			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
-> +					ret);
-> +			goto err_iahb;
+>  static int
+>  armpmu_map_cache_event(const unsigned (*cache_map)
+>  				      [PERF_COUNT_HW_CACHE_MAX]
+> @@ -719,6 +725,15 @@ static void cpu_pm_pmu_setup(struct arm_pmu *armpmu, unsigned long cmd)
+>  	}
+>  }
+>  
+> +static int pmc_cycle_counter_enabled(void)
+> +{
+> +	if ((read_sysreg(pmcr_el0) & ARMV8_PMU_PMCR_E) &&
+> +				read_sysreg(pmcntenset_el0) & 1<<31)
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+>  static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
+>  			     void *v)
+>  {
+> @@ -729,16 +744,53 @@ static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
+>  	if (!cpumask_test_cpu(smp_processor_id(), &armpmu->supported_cpus))
+>  		return NOTIFY_DONE;
+>  
+> -	/*
+> -	 * Always reset the PMU registers on power-up even if
+> -	 * there are no events running.
+> -	 */
+> -	if (cmd == CPU_PM_EXIT && armpmu->reset)
+> -		armpmu->reset(armpmu);
+> +	if (cmd == CPU_PM_EXIT) {
+> +		/*
+> +		 * Always reset the PMU registers on power-up even if
+> +		 * there are no events running.
+> +		 */
+> +		if (armpmu->reset)
+> +			armpmu->reset(armpmu);
+> +
+> +		/*
+> +		 * Restore the saved pmcr_el0 and pmcntenset_el0
+> +		 * if pmc cycle counter is enabled, restore the counter
+> +		 */
+> +		write_sysreg(get_cpu_var(saved_pmcr_el0), pmcr_el0);
+> +		write_sysreg(get_cpu_var(saved_pmcntenset_el0),
+> +				pmcntenset_el0);
+> +
+> +		if (pmc_cycle_counter_enabled()) {
+> +			write_sysreg(get_cpu_var(saved_cycle_cnter),
+> +					pmccntr_el0);
+> +			put_cpu_var(saved_cycle_cnter);
 > +		}
+> +		put_cpu_var(saved_pmcntenset_el0);
+> +		put_cpu_var(saved_pmcr_el0);
 > +	}
 > +
->  	/* Product and revision IDs */
->  	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
->  		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
-> @@ -2518,6 +2539,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
->  		cec_notifier_put(hdmi->cec_notifier);
+> +	if (cmd == CPU_PM_ENTER) {
+> +		/* If currently pmc cycle counter is enabled,
+> +		 * save the counter to percpu section
+> +		 */
+> +		if (pmc_cycle_counter_enabled()) {
+> +			get_cpu_var(saved_cycle_cnter) = read_sysreg(
+> +							pmccntr_el0);
+> +			put_cpu_var(saved_cycle_cnter);
+> +		}
+> +
+> +		get_cpu_var(saved_pmcr_el0) = read_sysreg(pmcr_el0);
+> +
+> +		get_cpu_var(saved_pmcntenset_el0) = read_sysreg(
+> +							pmcntenset_el0);
+> +		put_cpu_var(saved_pmcntenset_el0);
+> +		put_cpu_var(saved_pmcr_el0);
+> +	}
 >  
->  	clk_disable_unprepare(hdmi->iahb_clk);
-> +	if (hdmi->cec_clk)
-> +		clk_disable_unprepare(hdmi->cec_clk);
->  err_isfr:
->  	clk_disable_unprepare(hdmi->isfr_clk);
->  err_res:
-> @@ -2541,6 +2564,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+>  	if (!enabled)
+>  		return NOTIFY_OK;
 >  
->  	clk_disable_unprepare(hdmi->iahb_clk);
->  	clk_disable_unprepare(hdmi->isfr_clk);
-> +	if (hdmi->cec_clk)
-> +		clk_disable_unprepare(hdmi->cec_clk);
+> +	/* if any hw_events is used */
+>  	switch (cmd) {
+>  	case CPU_PM_ENTER:
+>  		armpmu->stop(armpmu);
+> @@ -758,7 +810,15 @@ static int cpu_pm_pmu_notify(struct notifier_block *b, unsigned long cmd,
 >  
->  	if (hdmi->i2c)
->  		i2c_del_adapter(&hdmi->i2c->adap);
+>  static int cpu_pm_pmu_register(struct arm_pmu *cpu_pmu)
+>  {
+> +	int i;
+>  	cpu_pmu->cpu_pm_nb.notifier_call = cpu_pm_pmu_notify;
+> +
+> +	for_each_possible_cpu(i) {
+> +		per_cpu(saved_pmcr_el0, i) = 0;
+> +		per_cpu(saved_pmcntenset_el0, i) = 0;
+> +		per_cpu(saved_cycle_cnter, i) = 0;
+> +	}
+> +
+>  	return cpu_pm_register_notifier(&cpu_pmu->cpu_pm_nb);
+>  }
+>  
+> -- 
+> 2.7.4
 > 
