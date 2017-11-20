@@ -1,30 +1,45 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Nov 2017 14:47:20 +0000
-Subject: [PATCH v2 09/18] arm64: explicitly pass
- --no-fix-cortex-a53-843419 to GNU gold
-In-Reply-To: <20171116163549.GD94341@samitolvanen.mtv.corp.google.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-10-samitolvanen@google.com>
- <20171116114722.GD9361@arm.com>
- <20171116163549.GD94341@samitolvanen.mtv.corp.google.com>
-Message-ID: <20171120144720.bf27bpuwq4huhkdp@lakrids.cambridge.arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 20 Nov 2017 15:49:57 +0100
+Subject: [PATCH 1/7] KVM: arm/arm64: vgic-irqfd: Fix MSI entry allocation
+In-Reply-To: <20171116175821.26544-2-marc.zyngier@arm.com>
+References: <20171116175821.26544-1-marc.zyngier@arm.com>
+ <20171116175821.26544-2-marc.zyngier@arm.com>
+Message-ID: <20171120144957.GJ28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 08:35:49AM -0800, Sami Tolvanen wrote:
-> On Thu, Nov 16, 2017 at 11:47:23AM +0000, Will Deacon wrote:
-> > But if ARM64_ERRATUM_843419 is enabled, we'll go ahead and generate
-> > broken code?
+On Thu, Nov 16, 2017 at 05:58:15PM +0000, Marc Zyngier wrote:
+> Using the size of the structure we're allocating is a good idea
+> and avoids any surprise... In this case, we're happilly confusing
+> kvm_kernel_irq_routing_entry and kvm_irq_routing_entry...
+
+Yikes.
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
 > 
-> This bug has been fixed in all current versions of GNU gold, but of
-> course, if someone is using a broken linker, it will generate broken
-> code. We can't do anything about that in the kernel.
-
-However, we could instead check ld-version, produce a warning, and abort
-the build in such cases.
-
-Which would be better than silently producing a kernel that won't work
-correctly.
-
-Thanks,
-Mark.
+> Fixes: 95b110ab9a09 ("KVM: arm/arm64: Enable irqchip routing")
+> Cc: stable at vger.kernel.org # 4.8
+> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>  virt/kvm/arm/vgic/vgic-irqfd.c | 3 +--
+>  1 file changed, 1 insertion(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-irqfd.c b/virt/kvm/arm/vgic/vgic-irqfd.c
+> index b7baf581611a..99e026d2dade 100644
+> --- a/virt/kvm/arm/vgic/vgic-irqfd.c
+> +++ b/virt/kvm/arm/vgic/vgic-irqfd.c
+> @@ -112,8 +112,7 @@ int kvm_vgic_setup_default_irq_routing(struct kvm *kvm)
+>  	u32 nr = dist->nr_spis;
+>  	int i, ret;
+>  
+> -	entries = kcalloc(nr, sizeof(struct kvm_kernel_irq_routing_entry),
+> -			  GFP_KERNEL);
+> +	entries = kcalloc(nr, sizeof(*entries), GFP_KERNEL);
+>  	if (!entries)
+>  		return -ENOMEM;
+>  
+> -- 
+> 2.14.2
+> 
