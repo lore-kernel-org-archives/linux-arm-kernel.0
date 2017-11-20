@@ -1,50 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Nov 2017 18:06:39 +0000
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <CAKv+Gu8YB_qXgWEbd0ZZ6UycxNLXxTZCno87vJ9HH7d6+dKeLQ@mail.gmail.com>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <CAKv+Gu8YB_qXgWEbd0ZZ6UycxNLXxTZCno87vJ9HH7d6+dKeLQ@mail.gmail.com>
-Message-ID: <20171120180639.GN32488@arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Nov 2017 18:14:15 +0000
+Subject: [PATCH v4 5/9] drivers: base: cacheinfo: arm64: Add support for
+ ACPI based firmware tables
+In-Reply-To: <e1f2bdcc-e0fa-67d5-d4fe-7077b166988f@arm.com>
+References: <20171109210311.25655-1-jeremy.linton@arm.com>
+ <20171109210311.25655-6-jeremy.linton@arm.com>
+ <20171120165642.GA31395@e107155-lin>
+ <e1f2bdcc-e0fa-67d5-d4fe-7077b166988f@arm.com>
+Message-ID: <c4f8dd3a-75ee-242e-e499-d85710e91b78@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
 
-Cheers for having a look.
 
-On Sat, Nov 18, 2017 at 03:25:06PM +0000, Ard Biesheuvel wrote:
-> On 17 November 2017 at 18:21, Will Deacon <will.deacon@arm.com> wrote:
-> > This patch series implements something along the lines of KAISER for arm64:
+On 20/11/17 18:02, Jeremy Linton wrote:
+> On 11/20/2017 10:56 AM, Sudeep Holla wrote:
 > 
-> Very nice! I am quite pleased, because this makes KASLR much more
-> useful than it is now.
+> (trimming)
+> 
+>>> *    case there's no explicit cache node or the cache node
+>>> itself in the *    device tree + * @firmware_node: Shared with
+>>> of_node. When not using DT, this may contain + *    pointers to
+>>> other firmware based values. Particularly ACPI/PPTT + *    unique
+>>> values. * @disable_sysfs: indicates whether this node is visible
+>>> to the user via *    sysfs or not * @priv: pointer to any private
+>>> data structure specific to particular @@ -64,8 +67,10 @@ struct
+>>> cacheinfo { #define CACHE_ALLOCATE_POLICY_MASK    \ 
+>>> (CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE) #define CACHE_ID
+>>> BIT(4) - -    struct device_node *of_node; +    union { +
+>>> struct device_node *of_node; +        void *firmware_node; +
+>>> };
+>> 
+>> I would prefer struct device_node *of_node; changed to struct
+>> fwnode_handle *fwnode;
+>> 
+>> You can then have struct pptt_fwnode { <.....> /*below fwnode
+>> allocated using acpi_alloc_fwnode_static */ struct fwnode_handle
+>> *fwnode; };
+>> 
+>> This gives a good starting point to abstract DT and ACPI.
+>> 
+>> If not now, we can later implement fwnode.ops=pptt_cache_ops and
+>> then use get property for both DT and ACPI.
+> 
+> 
+> I'm obviously confused why this keeps coming up. On the surface it 
+> sounds like a good idea. But then, given that I've actually
+> implemented a portion of it, what becomes clear is that the PPTT
+> isn't a good match.
 
-Agreed. I might actually start enabling now ;)
+Fair enough.
 
-> My main question is why we need a separate trampoline vector table: it
-> seems to me that with some minor surgery (as proposed below), we can
-> make the kernel_ventry macro instantiations tolerant for being loaded
-> somewhere in the fixmap (which I think is a better place for this than
-> at the base of the VMALLOC space), removing the need to change
-> vbar_el1 back and forth. The only downside is that exceptions taken
-> from EL1 will also use absolute addressing, but I don't think that is
-> a huge price to pay.
+> Converting the OF routines to use the fwnode is fairly
+> straightforward, but that doesn't help the ACPI situation other than
+> to create a lot of misleading code (and the possibility of creating
+> nonstandard DSDT entries). The fact that this hasn't been done for
+> other tables MADT/SLIT/SRAT/etc makes me wonder why we should do it
+> for the PPTT?
+> 
 
-I think there are two aspects to this:
+IRQ/IORT does use it. If we don't want to use it fine. But the union
+doesn't make sense and breaks the flow many other subsystems follow.
+Hence I raised. Sorry, I hadn't followed the last revision/discussion on
+this, my bad. But I had this thought since the beginning, hence I
+brought this up.
 
-1. Moving the vectors to the fixmap
-2. Avoiding the vbar toggle
+> Particularly, when one considers fwnode is more a DSDT<->DT
+> abstraction and thus has a lot of API surface that simply doesn't
+> make any sense given the PPTT binary tree structure. Given that most
+> of the fwnode routines are translating string properties (for
+> example fwnode_property_read_string()) it might be possible to build
+> a translator of some form which takes DT style properties and
+> attempts to map them to the ACPI PPTT tree. What this adds I can't
+> fathom, beyond the fact that suddenly the fwnode interface is a
+> partial/brittle implementation where a large subset of the
+> fwnode_operations will tend to be degenerate cases. The result likely
+> will be a poorly implemented translator which breaks or is
+> meaningless over a large part of the fwnode API surface.
 
-I think (1) is a good idea, so I'll hack that up for v2. The vbar toggle
-isn't as obvious: avoiding it adds some overhead to EL1 irq entry because
-we're writing tpidrro_el0 as well as loading from the literal pool. I think
-that it also makes the code more difficult to reason about because we'd have
-to make sure we don't try to use the fixmap mapping before it's actually
-mapped, which I think would mean we'd need a set of early vectors that we
-then switch away from in a CPU hotplug notifier or something.
+Sure, I just mentioned ops thing, but that's optional. I just didn't
+like the union which has of_node and void ptr instead of fwhandle. I am
+fine if many agree that it's bad idea to use fwhandle here.
 
-I'll see if I can measure the cost of the current vbar switching to get
-an idea of the potential performance available.
+-- 
+Regards,
+Sudeep
 
-Will
+-- 
+Regards,
+Sudeep
