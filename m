@@ -1,22 +1,62 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 20 Nov 2017 11:34:03 +0100
-Subject: [PATCH v2 2/2] pinctrl: meson-axg: Add new pinctrl driver for
- Meson AXG  SoC
-In-Reply-To: <20171120100825.16613-3-yixun.lan@amlogic.com>
-References: <20171120100825.16613-1-yixun.lan@amlogic.com>
- <20171120100825.16613-3-yixun.lan@amlogic.com>
-Message-ID: <1511174043.6971.8.camel@baylibre.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 20 Nov 2017 11:34:30 +0100
+Subject: [PATCH] ARM: dts: r8a779x: Add '#reset-cells' in cpg-mssr
+In-Reply-To: <CAK8P3a345J8JfVu4g+refG+y8r8VmMsjKPkUnYen4kMhQYvtEg@mail.gmail.com>
+References: <1510839357-11450-1-git-send-email-geert+renesas@glider.be>
+ <20171120094957.2seep3qw4j274zrv@verge.net.au>
+ <CAMuHMdXPrv4bwZbGxE=DJp2nufjF5Q6JwFAERDvBFi+UsAXVsA@mail.gmail.com>
+ <20171120102611.hyrufkxou27gspah@verge.net.au>
+ <CAK8P3a345J8JfVu4g+refG+y8r8VmMsjKPkUnYen4kMhQYvtEg@mail.gmail.com>
+Message-ID: <20171120103430.2v2sbzdzbiyabpcb@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-11-20 at 18:08 +0800, Yixun Lan wrote:
-> From: Xingyu Chen <xingyu.chen@amlogic.com>
+On Mon, Nov 20, 2017 at 11:30:49AM +0100, Arnd Bergmann wrote:
+> On Mon, Nov 20, 2017 at 11:26 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Mon, Nov 20, 2017 at 10:57:07AM +0100, Geert Uytterhoeven wrote:
+> >> Hi Simon,
+> >>
+> >> On Mon, Nov 20, 2017 at 10:49 AM, Simon Horman <horms@verge.net.au> wrote:
+> >> > On Thu, Nov 16, 2017 at 02:35:57PM +0100, Geert Uytterhoeven wrote:
+> >> >> From: Arnd Bergmann <arnd@arndb.de>
+> >> >>
+> >> >> With the latest dtc, we get many warnings about the missing
+> >> >> '#reset-cells' property in these controllers, e.g.:
+> >> >>
+> >> >> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /can at e6e80000:resets[0])
+> >> >> arch/arm/boot/dts/r8a7792-blanche.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/dma-controller at e6700000:resets[0])
+> >> >> arch/arm/boot/dts/r8a7792-wheat.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/ethernet at e6800000:resets[0])
+> >> >> arch/arm/boot/dts/r8a7793-gose.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /gpio at e6050000:resets[0])
+> >> >> arch/arm/boot/dts/r8a7794-alt.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /i2c at e6500000:resets[0])
+> >> >> arch/arm/boot/dts/r8a7794-silk.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /interrupt-controller at e61c0000:resets[0])
+> >> >>
+> >> >> This adds it for the three r8a779x chips that were lacking it. The
+> >> >> binding mandates this as <1>, so this is the value I use.
+> >> >>
+> >> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >> >> [geert: Add fix for r8a7793.dtsi]
+> >> >> Fixes: 34fbd2b12761d111 ("ARM: dts: r8a7790: Add reset control properties")
+> >> >> Fixes: 6e11a322f1d7505d ("ARM: dts: r8a7792: Add reset control properties")
+> >> >> Fixes: 84fb19e1d201ba86 ("ARM: dts: r8a7793: Add reset control properties")
+> >> >> Fixes: 615beb759ca494a4 ("ARM: dts: r8a7794: Add reset control properties")
+> >> >> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >> >
+> >> > Thanks for following up on this, its been fouling up my todo list for a
+> >> > while now. Applied for v4.16.
+> >>
+> >> As this is a fix for changes made in v4.15-rc1, don't we want it in v4.15?
+> >
+> > Do the changes have any run-time effect?
+> > If not I'd prefer not to push them into v4.15 as fixes.
 > 
-> Add new pinctrl driver for Amlogic's Meson-AXG SoC.
+> The main effect right now is that we're up from no warnings in the
+> default build to
+> hundreds of warnings, which is really annoying. Obviously there is
+> little gain in
+> fixing these but not the other warnings that were introduced, but I would either
+> want to fix them all, or disable the warning for one more release.
 > 
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> Rob, what do you think we should do here?
 
-Reviewed-by: Jerome Brunet <jbrunet@baylibre.com>
-
-> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Ok, I'll queued these up as fixes for v4.15 as it seems to move things
+in your desired direction.
