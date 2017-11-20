@@ -1,46 +1,51 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Mon, 20 Nov 2017 08:28:14 -0600
-Subject: [PATCH] dmaengine: at_hdmac: fix potential NULL pointer dereference
- in atc_prep_dma_interleaved
-Message-ID: <20171120142814.GA3315@embeddedor.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 20 Nov 2017 14:41:47 +0000
+Subject: [PATCH v2 06/18] arm64: kvm: use -fno-jump-tables with clang
+In-Reply-To: <20171115213428.22559-7-samitolvanen@google.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-7-samitolvanen@google.com>
+Message-ID: <20171120144147.7iawjcw644zc4xes@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-_xt_ is being dereferenced before it is null checked, hence there is a
-potential null pointer dereference.
+On Wed, Nov 15, 2017 at 01:34:16PM -0800, Sami Tolvanen wrote:
+> Use -fno-jump-tables to make sure clang doesn't generate branches
+> to EL1 virtual addresses.
 
-Fix this by moving the pointer dereference after _xt_ has been null
-checked.
+Are there any other reasons that clang might generate absolute
+references/relocations?
 
-This issue was detected with the help of Coccinelle.
+It would be nice if there was the option to disable that more generally,
+rather than disabling individual optimizations. Is there any PIC/PIE
+option that we could use?
 
-Fixes: 4483320e241c ("dmaengine: Use Pointer xt after NULL check.")
-Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
----
- drivers/dma/at_hdmac.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+We might need something simnilar for GCC, even if we're not seeing
+problems today.
 
-diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-index fbab271..a861b5b 100644
---- a/drivers/dma/at_hdmac.c
-+++ b/drivers/dma/at_hdmac.c
-@@ -708,7 +708,7 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
- 			 unsigned long flags)
- {
- 	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
--	struct data_chunk	*first = xt->sgl;
-+	struct data_chunk	*first;
- 	struct at_desc		*desc = NULL;
- 	size_t			xfer_count;
- 	unsigned int		dwidth;
-@@ -720,6 +720,8 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
- 	if (unlikely(!xt || xt->numf != 1 || !xt->frame_size))
- 		return NULL;
- 
-+	first = xt->sgl;
-+
- 	dev_info(chan2dev(chan),
- 		 "%s: src=%pad, dest=%pad, numf=%d, frame_size=%d, flags=0x%lx\n",
- 		__func__, &xt->src_start, &xt->dst_start, xt->numf,
--- 
-2.7.4
+Thanks,
+Mark.
+
+> Suggested-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+> ---
+>  arch/arm64/kvm/hyp/Makefile | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+> index f04400d494b7..19fa1c6b6b69 100644
+> --- a/arch/arm64/kvm/hyp/Makefile
+> +++ b/arch/arm64/kvm/hyp/Makefile
+> @@ -5,6 +5,10 @@
+>  
+>  ccflags-y += -fno-stack-protector -DDISABLE_BRANCH_PROFILING
+>  
+> +ifeq ($(cc-name),clang)
+> +ccflags-y += -fno-jump-tables
+> +endif
+> +
+>  KVM=../../../../virt/kvm
+>  
+>  obj-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/hyp/vgic-v2-sr.o
+> -- 
+> 2.15.0.448.gf294e3d99a-goog
+> 
