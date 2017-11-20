@@ -1,52 +1,41 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 20 Nov 2017 17:00:10 +0000
-Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
- larger kernels
-In-Reply-To: <20171117114143.26577-3-steve.capper@arm.com>
-References: <20171117114143.26577-1-steve.capper@arm.com>
- <20171117114143.26577-3-steve.capper@arm.com>
-Message-ID: <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 20 Nov 2017 17:06:35 +0000
+Subject: [PATCH v4 3/9] arm64/acpi: Create arch specific cpu to acpi id
+ helper
+In-Reply-To: <20171109210311.25655-4-jeremy.linton@arm.com>
+References: <20171109210311.25655-1-jeremy.linton@arm.com>
+ <20171109210311.25655-4-jeremy.linton@arm.com>
+Message-ID: <20171120170634.GB31395@e107155-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 09, 2017 at 03:03:05PM -0600, Jeremy Linton wrote:
+> Its helpful to be able to lookup the acpi_processor_id
+> associated with a logical cpu. Provide an arm64
+> helper to do this.
+> 
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+> ---
+>  arch/arm64/include/asm/acpi.h | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/acpi.h b/arch/arm64/include/asm/acpi.h
+> index 59cca1d6ec54..408e7989d3a2 100644
+> --- a/arch/arm64/include/asm/acpi.h
+> +++ b/arch/arm64/include/asm/acpi.h
+> @@ -86,6 +86,10 @@ static inline bool acpi_has_cpu_in_madt(void)
+>  }
+>  
+>  struct acpi_madt_generic_interrupt *acpi_cpu_get_madt_gicc(int cpu);
+> +static inline u32 get_acpi_id_for_cpu(unsigned int cpu)
+> +{
+> +	return	acpi_cpu_get_madt_gicc(cpu)->uid;
+> +}
 
-On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
-> -#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
-> +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
-> +
-> +#if SWAPPER_PGTABLE_LEVELS > 3
-> +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
-> +#else
-> +#define EARLY_PUDS(vstart, vend) (0)
-> +#endif
-> +
-> +#if SWAPPER_PGTABLE_LEVELS > 2
-> +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
-> +#else
-> +#define EARLY_PMDS(vstart, vend) (0)
-> +#endif
-> +
-> +#define EARLY_PAGES(vstart, vend) ( 1 			/* PGDIR page */				\
-> +			+ EARLY_PGDS((vstart), (vend)) 	/* each PGDIR needs a next level page table */	\
-> +			+ EARLY_PUDS((vstart), (vend))	/* each PUD needs a next level page table */	\
-> +			+ EARLY_PMDS((vstart), (vend)))	/* each PMD needs a next level page table */
-> +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
->  #define IDMAP_DIR_SIZE		(IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
+If I followed the series correctly, this function is used in 2/9 already.
+So this needs to be moved down in the series to avoid build failure during
+bisection.
 
-I'm currently struggling to convince myself as to whether 2M is
-necessary/sufficient slack space for all configurations.
-
-At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
-to cross PGD/PUD/PMD boundaries.
-
-For example with 3 levels of 64K pages, and a huge kernel that takes up
-SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
-and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
-the kernel were to be relocated such that it straddled two PGDs, we'd
-need 2 PGDs and 2 PMDs, needing 5 pages total.
-
-I'm not sure that we have a problem if we don't relax KASLR.
-
-Thanks,
-Mark.
+--
+Regards,
+Sudeep
