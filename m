@@ -1,59 +1,69 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Nov 2017 13:29:03 +0000
-Subject: [RFC PATCH] arm64: ftrace: move ftrace-mod.o contents into
- linker script
-In-Reply-To: <20171120131538.10492-1-ard.biesheuvel@linaro.org>
-References: <20171120131538.10492-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171120132902.GB2687@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 20 Nov 2017 14:37:17 +0100
+Subject: [alsa-devel] [PATCH 1/5 v4] ASoC: ep93xx-ac97: Fix
+ platform_get_irq's error checking
+In-Reply-To: <082d4479211d425219f4ab275ecc12e1011eca2f.1511062844.git.arvind.yadav.cs@gmail.com>
+References: <082d4479211d425219f4ab275ecc12e1011eca2f.1511062844.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20171120133717.kscrjsb3y7gnvd2t@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-Thanks for this. Somebody ran across this internally a while back, but
-it slipped through the cracks. I remember thinking at the time that the
-Kconfig dependencies here looked a little weird too and perhaps
-ARM64_MODULE_PLTS should be selected by RANDOMIZE_MODULE_REGION_FULL
-instead of RANDOMIZE_BASE.
-
-Anyhow, comments below.
-
-On Mon, Nov 20, 2017 at 01:15:38PM +0000, Ard Biesheuvel wrote:
-> When building the arm64 kernel with bot CONFIG_ARM64_MODULE_PLTS and
-> CONFIG_DYNAMIC_FTRACE enabled, the ftrace-mod.o object file is built
-> with the kernel and contains a trampoline that is linked into each
-> module, so that modules can be loaded far away from the kernel and
-> still reach the ftrace entry point in the core kernel with an ordinary
-> relative branch, as is emitted by the compiler instrumentation code
-> dynamic ftrace relies on.
+On 19/11/2017 at 09:45:00 +0530, Arvind Yadav wrote:
+> The platform_get_irq() function returns negative if an error occurs.
+> zero or positive number on success. platform_get_irq() error checking
+> for zero is not correct.
 > 
-> In order to be able to build out of tree modules, this object file
-> needs to be included into the linux-headers or linux-devel packages,
-> which is undesirable, as it makes arm64 a special case (although a
-> precedent does exist for 32-bit PPC).
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+> changes in v2 :
+>                irq was unsigned. so changed it to signed.
+> changes in v3 :
+>               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
+> changes in v4 :
+>               Return -ENODEV insted of irq.
+> 
 
-Agreed that we should avoid the object file, if possible.
+To ensure this doesn't get applied: platform_get_irq can return
+-EPROBE_DEFER and this must be handled properly.
 
-> Given that the trampoline only consists of two instructions, let's
-> hack it into the module linker script instead.
+(Or maybe this has never caused anything and never failed at all and
+nobody cares).
 
-Why do we have to do this in the linker script? Couldn't we just generate
-the .S file we currently use?
 
-> diff --git a/arch/arm64/kernel/module-ftrace.lds b/arch/arm64/kernel/module-ftrace.lds
-> new file mode 100644
-> index 000000000000..9df69ddaa7bb
-> --- /dev/null
-> +++ b/arch/arm64/kernel/module-ftrace.lds
-> @@ -0,0 +1,7 @@
-> +SECTIONS {
-> +	.text.ftrace_trampoline : ALIGN (8) {
-> +		QUAD (0x0);		/* 0:	.quad	0x0		*/
-> +		LONG (0x58ffffd0);	/*	ldr	x16, 0b		*/
-> +		LONG (0xd61f0200);	/*	br	x16		*/
-> +	}
-> +}
+>  sound/soc/cirrus/ep93xx-ac97.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/sound/soc/cirrus/ep93xx-ac97.c b/sound/soc/cirrus/ep93xx-ac97.c
+> index bbf7a92..efeecee 100644
+> --- a/sound/soc/cirrus/ep93xx-ac97.c
+> +++ b/sound/soc/cirrus/ep93xx-ac97.c
+> @@ -365,7 +365,7 @@ static int ep93xx_ac97_probe(struct platform_device *pdev)
+>  {
+>  	struct ep93xx_ac97_info *info;
+>  	struct resource *res;
+> -	unsigned int irq;
+> +	int irq;
+>  	int ret;
+>  
+>  	info = devm_kzalloc(&pdev->dev, sizeof(*info), GFP_KERNEL);
+> @@ -378,7 +378,7 @@ static int ep93xx_ac97_probe(struct platform_device *pdev)
+>  		return PTR_ERR(info->regs);
+>  
+>  	irq = platform_get_irq(pdev, 0);
+> -	if (!irq)
+> +	if (irq <= 0)
+>  		return -ENODEV;
+>  
+>  	ret = devm_request_irq(&pdev->dev, irq, ep93xx_ac97_interrupt,
+> -- 
+> 2.7.4
+> 
+> _______________________________________________
+> Alsa-devel mailing list
+> Alsa-devel at alsa-project.org
+> http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
 
-How do we guarantee these are little-endian?
-
-Will
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
