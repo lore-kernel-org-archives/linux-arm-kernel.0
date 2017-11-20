@@ -1,135 +1,182 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Nov 2017 13:15:38 +0000
-Subject: [RFC PATCH] arm64: ftrace: move ftrace-mod.o contents into linker
- script
-Message-ID: <20171120131538.10492-1-ard.biesheuvel@linaro.org>
+From: hias@horus.com (Matthias Reichl)
+Date: Mon, 20 Nov 2017 14:18:15 +0100
+Subject: [PATCH RFC] ARM: dts: bcm283x: Fix probing of bcm2835-i2s
+In-Reply-To: <1511110827-2726-1-git-send-email-stefan.wahren@i2se.com>
+References: <1511110827-2726-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <20171120131815.2oaa7mvksi2h5bip@camel2.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building the arm64 kernel with bot CONFIG_ARM64_MODULE_PLTS and
-CONFIG_DYNAMIC_FTRACE enabled, the ftrace-mod.o object file is built
-with the kernel and contains a trampoline that is linked into each
-module, so that modules can be loaded far away from the kernel and
-still reach the ftrace entry point in the core kernel with an ordinary
-relative branch, as is emitted by the compiler instrumentation code
-dynamic ftrace relies on.
+Hi Stefan!
 
-In order to be able to build out of tree modules, this object file
-needs to be included into the linux-headers or linux-devel packages,
-which is undesirable, as it makes arm64 a special case (although a
-precedent does exist for 32-bit PPC).
+On Sun, Nov 19, 2017 at 06:00:27PM +0100, Stefan Wahren wrote:
+> Since 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
+> the bcm2835-i2s requires a clock as DT property. Unfortunately
+> the necessary DT change has never been applied. While we are at it
+> also fix the first PCM register range to cover the PCM_GRAY register.
+> 
+> This patch also fixes the dt-bindings accordlingly.
+> 
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> ---
+>  Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt   | 4 ++--
+>  Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt | 9 ++++-----
+>  arch/arm/boot/dts/bcm283x.dtsi                               | 4 ++--
+>  3 files changed, 8 insertions(+), 9 deletions(-)
+> 
+> Hi, this is only probe tested with a RPi 1B. I don't have the sound hardware
+> to test the drivers function.
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+> index baf9b34..b6a8cc0 100644
+> --- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+> +++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+> @@ -74,8 +74,8 @@ Example:
+>  
+>  bcm2835_i2s: i2s at 7e203000 {
+>  	compatible = "brcm,bcm2835-i2s";
+> -	reg = <	0x7e203000 0x20>,
+> -	      < 0x7e101098 0x02>;
+> +	reg = <	0x7e203000 0x24>;
+> +	clocks = <&clocks BCM2835_CLOCK_PCM>;
+>  
+>  	dmas = <&dma 2>,
+>  	       <&dma 3>;
+> diff --git a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+> index 65783de..7bb0362 100644
+> --- a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+> +++ b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+> @@ -2,9 +2,8 @@
+>  
+>  Required properties:
+>  - compatible: "brcm,bcm2835-i2s"
+> -- reg: A list of base address and size entries:
+> -	* The first entry should cover the PCM registers
+> -	* The second entry should cover the PCM clock registers
+> +- reg: Should contain PCM registers location and length.
+> +- clocks: the (PCM) clock to use
+>  - dmas: List of DMA controller phandle and DMA request line ordered pairs.
+>  - dma-names: Identifier string for each DMA request line in the dmas property.
+>    These strings correspond 1:1 with the ordered pairs in dmas.
+> @@ -16,8 +15,8 @@ Example:
+>  
+>  bcm2835_i2s: i2s at 7e203000 {
+>  	compatible = "brcm,bcm2835-i2s";
+> -	reg = <0x7e203000 0x20>,
+> -	      <0x7e101098 0x02>;
+> +	reg = <0x7e203000 0x24>;
+> +	clocks = <&clocks BCM2835_CLOCK_PCM>;
+>  
+>  	dmas = <&dma 2>,
+>  	       <&dma 3>;
+> diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+> index 431dcfc..01733a9 100644
+> --- a/arch/arm/boot/dts/bcm283x.dtsi
+> +++ b/arch/arm/boot/dts/bcm283x.dtsi
+> @@ -391,8 +391,8 @@
+>  
+>  		i2s: i2s at 7e203000 {
+>  			compatible = "brcm,bcm2835-i2s";
+> -			reg = <0x7e203000 0x20>,
+> -			      <0x7e101098 0x02>;
+> +			reg = <0x7e203000 0x24>;
+> +			clocks = <&clocks BCM2835_CLOCK_PCM>;
+>  
+>  			dmas = <&dma 2>,
+>  			       <&dma 3>;
+> -- 
 
-Given that the trampoline only consists of two instructions, let's
-hack it into the module linker script instead.
+Thanks a lot for fixing the DT and binding docs, the register range
+and clock changes look fine to me.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/Makefile                 |  2 +-
- arch/arm64/kernel/Makefile          |  3 ---
- arch/arm64/kernel/ftrace-mod.S      | 18 ------------------
- arch/arm64/kernel/module-ftrace.lds |  7 +++++++
- arch/arm64/kernel/module-plts.c     | 13 +++++++++++++
- 5 files changed, 21 insertions(+), 22 deletions(-)
- delete mode 100644 arch/arm64/kernel/ftrace-mod.S
- create mode 100644 arch/arm64/kernel/module-ftrace.lds
+While testing with a simple card DT overlay I noticed another
+issue: the i2s node is missing the #sound-dai-cells property
+and simple card refuses to load because of that:
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b35788c909f1..be8a38382a57 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -84,7 +84,7 @@ endif
- ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
- KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
- ifeq ($(CONFIG_DYNAMIC_FTRACE),y)
--KBUILD_LDFLAGS_MODULE	+= $(objtree)/arch/arm64/kernel/ftrace-mod.o
-+KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module-ftrace.lds
- endif
- endif
+[    0.956912] OF: /sound/simple-audio-card,cpu: could not get #sound-dai-cells for /soc/i2s at 7e203000
+
+As bcm2835-i2s has only a single DAI I think that property should
+be set to 0:
+
+diff --git a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+index 7bb0362828ec..7349f22bed1b 100644
+--- a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+@@ -7,6 +7,7 @@ Required properties:
+ - dmas: List of DMA controller phandle and DMA request line ordered pairs.
+ - dma-names: Identifier string for each DMA request line in the dmas property.
+   These strings correspond 1:1 with the ordered pairs in dmas.
++- #sound-dai-cells: Must be set to 0.
  
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 8265dd790895..067baace74a0 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -61,6 +61,3 @@ extra-y					+= $(head-y) vmlinux.lds
- ifeq ($(CONFIG_DEBUG_EFI),y)
- AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
- endif
--
--# will be included by each individual module but not by the core kernel itself
--extra-$(CONFIG_DYNAMIC_FTRACE) += ftrace-mod.o
-diff --git a/arch/arm64/kernel/ftrace-mod.S b/arch/arm64/kernel/ftrace-mod.S
-deleted file mode 100644
-index 00c4025be4ff..000000000000
---- a/arch/arm64/kernel/ftrace-mod.S
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/linkage.h>
--#include <asm/assembler.h>
--
--	.section	".text.ftrace_trampoline", "ax"
--	.align		3
--0:	.quad		0
--__ftrace_trampoline:
--	ldr		x16, 0b
--	br		x16
--ENDPROC(__ftrace_trampoline)
-diff --git a/arch/arm64/kernel/module-ftrace.lds b/arch/arm64/kernel/module-ftrace.lds
-new file mode 100644
-index 000000000000..9df69ddaa7bb
---- /dev/null
-+++ b/arch/arm64/kernel/module-ftrace.lds
-@@ -0,0 +1,7 @@
-+SECTIONS {
-+	.text.ftrace_trampoline : ALIGN (8) {
-+		QUAD (0x0);		/* 0:	.quad	0x0		*/
-+		LONG (0x58ffffd0);	/*	ldr	x16, 0b		*/
-+		LONG (0xd61f0200);	/*	br	x16		*/
-+	}
-+}
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index d05dbe658409..d7e85a1c3e1c 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -154,6 +154,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 	unsigned long core_plts = 0;
- 	unsigned long init_plts = 0;
- 	Elf64_Sym *syms = NULL;
-+	Elf_Shdr *ftrace_trampoline = NULL;
- 	int i;
- 
- 	/*
-@@ -165,6 +166,9 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 			mod->arch.core.plt = sechdrs + i;
- 		else if (!strcmp(secstrings + sechdrs[i].sh_name, ".init.plt"))
- 			mod->arch.init.plt = sechdrs + i;
-+		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
-+			 !strcmp(secstrings + sechdrs[i].sh_name, ".text.ftrace_trampoline"))
-+			ftrace_trampoline = sechdrs + i;
- 		else if (sechdrs[i].sh_type == SHT_SYMTAB)
- 			syms = (Elf64_Sym *)sechdrs[i].sh_addr;
- 	}
-@@ -215,5 +219,14 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 	mod->arch.init.plt_num_entries = 0;
- 	mod->arch.init.plt_max_entries = init_plts;
- 
-+	if (ftrace_trampoline)
-+		/*
-+		 * Unfortunately, there does not seem to be a way to force a
-+		 * linker output section consisting solely of QUAD()/LONG()
-+		 * statements to have read-execute permissions after partial
-+		 * linking. So override the permission attributes at load time.
-+		 */
-+		ftrace_trampoline->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-+
- 	return 0;
- }
--- 
-2.11.0
+   One of the DMA channels will be responsible for transmission (should be
+   named "tx") and one for reception (should be named "rx").
+@@ -21,4 +22,5 @@ bcm2835_i2s: i2s at 7e203000 {
+ 	dmas = <&dma 2>,
+ 	       <&dma 3>;
+ 	dma-names = "tx", "rx";
++	#sound-dai-cells = <0>;
+ };
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index e08203c1d74a..bbe890d4dbb5 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -402,6 +402,7 @@
+ 			dmas = <&dma 2>,
+ 			       <&dma 3>;
+ 			dma-names = "tx", "rx";
++			#sound-dai-cells = <0>;
+ 			status = "disabled";
+ 		};
+
+With this additional change I could successfully test the following
+overlay with a PCM5102 codec attached to a RPi B+:
+
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2835";
+
+    fragment at 0 {
+        target = <&i2s>;
+        __overlay__ {
+            status = "okay";
+        };
+    };
+
+    fragment at 1 {
+        target-path = "/";
+        __overlay__ {
+            spdif_codec: spdif-transmitter {
+                #address-cells = <0>;
+                #size-cells = <0>;
+                #sound-dai-cells = <0>;
+                compatible = "linux,spdif-dit";
+            };
+
+            sound {
+                compatible = "simple-audio-card";
+                simple-audio-card,name = "simple";
+                simple-audio-card,format = "i2s";
+                simple-audio-card,bitclock-master = <&dailink_master>;
+                simple-audio-card,frame-master = <&dailink_master>;
+
+                dailink_master: simple-audio-card,cpu {
+                        sound-dai = <&i2s>;
+                };
+
+                simple-audio-card,codec {
+                        sound-dai = <&spdif_codec>;
+                };
+            };
+        };
+    };
+};
+
+BTW: this overlay will work without any hardware attached, you
+just need to enable SND_SIMPLE_CARD and SND_SOC_SPDIF (which
+serves as a generic codec) in your config.
+
+so long,
+
+Hias
