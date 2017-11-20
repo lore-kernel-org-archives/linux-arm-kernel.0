@@ -1,37 +1,28 @@
-From: jc@linux.com (Jesse Chan)
-Date: Mon, 20 Nov 2017 12:58:03 -0800
-Subject: [PATCH] pinctrl: pxa: pxa2xx: add missing
- MODULE_DESCRIPTION/AUTHOR/LICENSE
-Message-ID: <20171120205804.88061-1-jc@linux.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Mon, 20 Nov 2017 13:01:43 -0800
+Subject: [PATCH v2 16/18] arm64: crypto: disable LTO for aes-ce-cipher.c
+In-Reply-To: <CAKv+Gu-hnoeLqNsHbrLXv3xu7qsYB6REiwMtQYW_0CPwZ7jF4g@mail.gmail.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-17-samitolvanen@google.com>
+ <20171120152014.hftuded4zxwn2r7m@lakrids.cambridge.arm.com>
+ <CAKv+Gu-hnoeLqNsHbrLXv3xu7qsYB6REiwMtQYW_0CPwZ7jF4g@mail.gmail.com>
+Message-ID: <20171120210143.GD89108@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change resolves a new compile-time warning
-when built as a loadable module:
+On Mon, Nov 20, 2017 at 03:25:31PM +0000, Ard Biesheuvel wrote:
+> However, under LTO this all changes, and it is no longer guaranteed
+> that the NEON registers are only touched between the kernel mode
+> neon begin/end calls.
 
-WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
-see include/linux/module.h for more information
+LTO operates on LLVM IR, so disabling LTO for this file should make
+sure there won't be any unsafe optimizations. Are there other places
+in the kernel that might have this issue?
 
-This adds the license as "GPL v2", which matches the header of the file.
+> So the correct way to fix this would be to move the asm into its own
+> .S file, and call it from between the kernel_mode_neon_begin/end
+> calls. That should also fix your compat issue.
 
-MODULE_DESCRIPTION and MODULE_AUTHOR are also added.
-
-Signed-off-by: Jesse Chan <jc@linux.com>
----
- drivers/pinctrl/pxa/pinctrl-pxa2xx.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
-index 866aa3ce1ac9..6cf0006d4c8d 100644
---- a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
-+++ b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
-@@ -436,3 +436,7 @@ int pxa2xx_pinctrl_exit(struct platform_device *pdev)
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(pxa2xx_pinctrl_exit);
-+
-+MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
-+MODULE_DESCRIPTION("Marvell PXA2xx pinctrl driver");
-+MODULE_LICENSE("GPL v2");
--- 
-2.14.1
+Sure, that would also work.
+ 
+Sami
