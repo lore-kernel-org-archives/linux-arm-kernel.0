@@ -1,74 +1,63 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 20 Nov 2017 12:02:00 -0600
-Subject: [PATCH v4 5/9] drivers: base: cacheinfo: arm64: Add support for
- ACPI based firmware tables
-In-Reply-To: <20171120165642.GA31395@e107155-lin>
-References: <20171109210311.25655-1-jeremy.linton@arm.com>
- <20171109210311.25655-6-jeremy.linton@arm.com>
- <20171120165642.GA31395@e107155-lin>
-Message-ID: <e1f2bdcc-e0fa-67d5-d4fe-7077b166988f@arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 20 Nov 2017 18:03:26 +0000
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
+ userspace (KAISER)
+In-Reply-To: <20171118001935.GB18379@codeaurora.org>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+ <20171118001935.GB18379@codeaurora.org>
+Message-ID: <20171120180325.GK32488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/20/2017 10:56 AM, Sudeep Holla wrote:
-
-(trimming)
-
->>    *	case there's no explicit cache node or the cache node itself in the
->>    *	device tree
->> + * @firmware_node: Shared with of_node. When not using DT, this may contain
->> + *	pointers to other firmware based values. Particularly ACPI/PPTT
->> + *	unique values.
->>    * @disable_sysfs: indicates whether this node is visible to the user via
->>    *	sysfs or not
->>    * @priv: pointer to any private data structure specific to particular
->> @@ -64,8 +67,10 @@ struct cacheinfo {
->>   #define CACHE_ALLOCATE_POLICY_MASK	\
->>   	(CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE)
->>   #define CACHE_ID		BIT(4)
->> -
->> -	struct device_node *of_node;
->> +	union {
->> +		struct device_node *of_node;
->> +		void *firmware_node;
->> +	};
+On Fri, Nov 17, 2017 at 04:19:35PM -0800, Stephen Boyd wrote:
+> On 11/17, Will Deacon wrote:
+> > Hi all,
+> > 
+> > This patch series implements something along the lines of KAISER for arm64:
+> > 
+> >   https://gruss.cc/files/kaiser.pdf
+> > 
+> > although I wrote this from scratch because the paper has some funny
+> > assumptions about how the architecture works. There is a patch series
+> > in review for x86, which follows a similar approach:
+> > 
+> >   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
+> > 
+> > and the topic was recently covered by LWN (currently subscriber-only):
+> > 
+> >   https://lwn.net/Articles/738975/
+> > 
+> > The basic idea is that transitions to and from userspace are proxied
+> > through a trampoline page which is mapped into a separate page table and
+> > can switch the full kernel mapping in and out on exception entry and
+> > exit respectively. This is a valuable defence against various KASLR and
+> > timing attacks, particularly as the trampoline page is at a fixed virtual
+> > address and therefore the kernel text can be randomized independently.
+> > 
+> > The major consequences of the trampoline are:
+> > 
+> >   * We can no longer make use of global mappings for kernel space, so
+> >     each task is assigned two ASIDs: one for user mappings and one for
+> >     kernel mappings
+> > 
+> >   * Our ASID moves into TTBR1 so that we can quickly switch between the
+> >     trampoline and kernel page tables
+> > 
+> >   * Switching TTBR0 always requires use of the zero page, so we can
+> >     dispense with some of our errata workaround code.
+> > 
+> >   * entry.S gets more complicated to read
+> > 
+> > The performance hit from this series isn't as bad as I feared: things
+> > like cyclictest and kernbench seem to be largely unaffected, although
+> > syscall micro-benchmarks appear to show that syscall overhead is roughly
+> > doubled, and this has an impact on things like hackbench which exhibits
+> > a ~10% hit due to its heavy context-switching.
 > 
-> I would prefer
-> 	struct device_node *of_node;
-> changed to
-> 	struct fwnode_handle *fwnode;
-> 
-> You can then have
-> 	struct pptt_fwnode {
-> 		<.....>
-> 		/*below fwnode  allocated using acpi_alloc_fwnode_static */
-> 		struct fwnode_handle *fwnode;
-> 	};
-> 
-> This gives a good starting point to abstract DT and ACPI.
-> 
-> If not now, we can later implement fwnode.ops=pptt_cache_ops and then
-> use get property for both DT and ACPI.
+> Do you have performance benchmark numbers on CPUs with the Falkor
+> errata? I'm interested to see how much the TLB invalidate hurts
+> heavy context-switching workloads on these CPUs.
 
+I don't, but I'm also not sure what I can do about it if it's an issue.
 
-I'm obviously confused why this keeps coming up. On the surface it 
-sounds like a good idea. But then, given that I've actually implemented 
-a portion of it, what becomes clear is that the PPTT isn't a good match. 
-Converting the OF routines to use the fwnode is fairly straightforward, 
-but that doesn't help the ACPI situation other than to create a lot of 
-misleading code (and the possibility of creating nonstandard DSDT 
-entries). The fact that this hasn't been done for other tables 
-MADT/SLIT/SRAT/etc makes me wonder why we should do it for the PPTT?
-
-Particularly, when one considers fwnode is more a DSDT<->DT abstraction 
-and thus has a lot of API surface that simply doesn't make any sense 
-given the PPTT binary tree structure. Given that most of the fwnode 
-routines are translating string properties (for example 
-fwnode_property_read_string()) it might be possible to build a 
-translator of some form which takes DT style properties and attempts to 
-map them to the ACPI PPTT tree. What this adds I can't fathom, beyond 
-the fact that suddenly the fwnode interface is a partial/brittle 
-implementation where a large subset of the fwnode_operations will tend 
-to be degenerate cases. The result likely will be a poorly implemented 
-translator which breaks or is meaningless over a large part of the 
-fwnode API surface.
+Will
