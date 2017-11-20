@@ -1,62 +1,67 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 20 Nov 2017 18:05:49 +0000
-Subject: [PATCH 14/18] arm64: erratum: Work around Falkor erratum #E1003
- in trampoline code
-In-Reply-To: <20171118002714.GC18379@codeaurora.org>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <1510942921-12564-15-git-send-email-will.deacon@arm.com>
- <20171118002714.GC18379@codeaurora.org>
-Message-ID: <20171120180548.GL32488@arm.com>
+Date: Mon, 20 Nov 2017 18:05:55 +0000
+Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
+In-Reply-To: <20171116201701.GA143965@samitolvanen.mtv.corp.google.com>
+References: <CAKwvOdkV_g0XAbGM+nF2zt=2+tHLLcj=pbSxRDd2HMbrtU3cZg@mail.gmail.com>
+ <20171116165922.llrojrvomuihabrt@hirez.programming.kicks-ass.net>
+ <CAKwvOd=k=iVQvWmzP1E3XHUCYLoJgx+F9zoPuE+R2oaw_ePUVA@mail.gmail.com>
+ <20171116173417.nqsh5dpu65uj7b5s@hirez.programming.kicks-ass.net>
+ <20171116174830.GX3624@linux.vnet.ibm.com>
+ <CAKwvOdkDz1yRo=Skt_mWxs0uucK+adXx8kFQksMbTE3ofnpUMQ@mail.gmail.com>
+ <20171116183950.GA3624@linux.vnet.ibm.com>
+ <20171116184508.GC21898@arm.com>
+ <20171116191307.GC3624@linux.vnet.ibm.com>
+ <20171116201701.GA143965@samitolvanen.mtv.corp.google.com>
+Message-ID: <20171120180554.GM32488@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 17, 2017 at 04:27:14PM -0800, Stephen Boyd wrote:
-> On 11/17, Will Deacon wrote:
-> > We rely on an atomic swizzling of TTBR1 when transitioning from the entry
-> > trampoline to the kernel proper on an exception. We can't rely on this
-> > atomicity in the face of Falkor erratum #E1003, so on affected cores we
-> > can issue a TLB invalidation prior to jumping into the kernel. There is
-> > still the possibility of a TLB conflict here due to conflicting walk
-> > cache entries, but this doesn't appear to be the case on these CPUs in
-> > practice.
-> > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/Kconfig        | 17 +++++------------
-> >  arch/arm64/kernel/entry.S |  8 ++++++++
-> >  2 files changed, 13 insertions(+), 12 deletions(-)
-> > 
-> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> > index 0df64a6a56d4..f0fcbfc2262e 100644
-> > --- a/arch/arm64/Kconfig
-> > +++ b/arch/arm64/Kconfig
-> > @@ -504,20 +504,13 @@ config CAVIUM_ERRATUM_30115
-> >  config QCOM_FALKOR_ERRATUM_1003
-> >  	bool "Falkor E1003: Incorrect translation due to ASID change"
-> >  	default y
-> > -	select ARM64_PAN if ARM64_SW_TTBR0_PAN
+Hi Sami,
+
+On Thu, Nov 16, 2017 at 12:17:01PM -0800, Sami Tolvanen wrote:
+> On Thu, Nov 16, 2017 at 11:13:07AM -0800, Paul E. McKenney wrote:
+> > Ah, if "this patch set" meant "adding LTO", I stand corrected and I
+> > apologize for my confusion.
 > 
-> Cool, this sort of complicates the backport of the Kryo MIDR
-> update of this errata to stable trees though.
+> Again, I'm not proposing for LTO to be enabled by default. These patches
+> just make it possible to enable it. Are you saying the possibility
+> that a future compiler update breaks something is a blocker even for
+> experimental features?
 
-Yeah, you may have to do a separate version for -stable if you don't
-want to backport parts of this series.
+My opinion here is that it's a blocker for LTO on arm64, as the symptoms
+aren't different to building with a compiler that has subtle code generation
+issues. If you *really* want to support LTO, we could consider giving
+acquire semantics to READ_ONCE for LTO builds, but that means trading
+RCU read-side performance for whatever gains are provided by LTO.
 
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index a839b94bba05..a600879939ce 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -941,6 +941,14 @@ __ni_sys_trace:
-> >  	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
-> >  	bic	\tmp, \tmp, #USER_ASID_FLAG
-> >  	msr	ttbr1_el1, \tmp
-> > +alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+Please don't confuse this with a reluctance to support clang; I'm keen to
+see that supported, so let's focus on that for the moment (although I don't
+see a good reason to support old clang builds with known issues).
+
+> > I agree that we need LTO/PGO to be housebroken from an LKMM viewpoint
+> > before it is enabled.
 > 
-> Shouldn't we put this inside an #ifdef QCOM_FALKOR_ERRATUM_1003
-> so that we don't even emit nops in case we have the errata
-> disabled? Or did I miss something in the alternatives assembly
-> code?
+> Can you elaborate what's needed from clang before this can move
+> forward? For example, if you have specific test cases in mind, we can
+> always work on including them in the LLVM test suite.
 
-Yes, you're right. Thanks!
+This is a thorny issue, but RCU (specifically rcu_dereference but probably
+also some READ_ONCEs) relies on being able to utilise syntactic dependency
+chains to order local accesses to shared variables. Paul has spent a
+fair amount of time working to define these dependency chains here:
+
+  https://wg21.link/P0190
+
+Although the current direction of the C++ committee is to prefer
+that dependencies are explicitly "marked", this is not deemed to be
+acceptable for the kernel (in other words, everything is always considered
+"marked").
+
+If a compiler is capable of breaking unmarked dependency chains, then we
+will run into subtle concurrency issues on arm64 because the hardware is
+also capable of reordering independent accesses. My understanding is that
+LTO makes these sort of optimisations far more likely because whole-program
+analysis can enable value prediction, which can convert address dependencies
+into control dependcies; the latter not ordering reads on arm64.
 
 Will
