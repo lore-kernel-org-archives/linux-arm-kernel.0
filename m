@@ -1,33 +1,69 @@
-From: gomonovych@gmail.com (Vasyl Gomonovych)
-Date: Mon, 20 Nov 2017 23:46:47 +0100
-Subject: [PATCH] [media] c8sectpfe: Use resource_size function on memory
- resource
-Message-ID: <1511218007-3577-1-git-send-email-gomonovych@gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Mon, 20 Nov 2017 14:50:58 -0800
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
+ (KAISER)
+In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+Message-ID: <c09d26b4-2612-fb2e-fb95-897c937793ec@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To adapt fei->sram_size calculation via resource_size for memory size
-calculation before, in fei->sram = devm_ioremap_resource(dev, res).
-And make memory initialization range in
-memset_io for fei->sram appropriate
+On 11/17/2017 10:21 AM, Will Deacon wrote:
+> Hi all,
+> 
+> This patch series implements something along the lines of KAISER for arm64:
+> 
+>    https://gruss.cc/files/kaiser.pdf
+> 
+> although I wrote this from scratch because the paper has some funny
+> assumptions about how the architecture works. There is a patch series
+> in review for x86, which follows a similar approach:
+> 
+>    http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
+> 
+> and the topic was recently covered by LWN (currently subscriber-only):
+> 
+>    https://lwn.net/Articles/738975/
+> 
+> The basic idea is that transitions to and from userspace are proxied
+> through a trampoline page which is mapped into a separate page table and
+> can switch the full kernel mapping in and out on exception entry and
+> exit respectively. This is a valuable defence against various KASLR and
+> timing attacks, particularly as the trampoline page is at a fixed virtual
+> address and therefore the kernel text can be randomized independently.
+> 
+> The major consequences of the trampoline are:
+> 
+>    * We can no longer make use of global mappings for kernel space, so
+>      each task is assigned two ASIDs: one for user mappings and one for
+>      kernel mappings
+> 
+>    * Our ASID moves into TTBR1 so that we can quickly switch between the
+>      trampoline and kernel page tables
+> 
+>    * Switching TTBR0 always requires use of the zero page, so we can
+>      dispense with some of our errata workaround code.
+> 
+>    * entry.S gets more complicated to read
+> 
+> The performance hit from this series isn't as bad as I feared: things
+> like cyclictest and kernbench seem to be largely unaffected, although
+> syscall micro-benchmarks appear to show that syscall overhead is roughly
+> doubled, and this has an impact on things like hackbench which exhibits
+> a ~10% hit due to its heavy context-switching.
+> 
+> Patches based on 4.14 and also pushed here:
+> 
+>    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kaiser
+> 
+> Feedback welcome,
+> 
+> Will
+> 
 
-Signed-off-by: Vasyl Gomonovych <gomonovych@gmail.com>
----
- drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Passed some basic tests on Hikey Android and my Mustang box. I'll
+leave the Mustang building kernels for a few days. You're welcome
+to add Tested-by or I can re-test on v2.
 
-diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-index 59280ac31937..283f7289aaa1 100644
---- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-+++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-@@ -691,7 +691,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
- 	if (IS_ERR(fei->sram))
- 		return PTR_ERR(fei->sram);
- 
--	fei->sram_size = res->end - res->start;
-+	fei->sram_size = resource_size(res);
- 
- 	fei->idle_irq = platform_get_irq_byname(pdev, "c8sectpfe-idle-irq");
- 	if (fei->idle_irq < 0) {
--- 
-1.9.1
+Thanks,
+Laura
