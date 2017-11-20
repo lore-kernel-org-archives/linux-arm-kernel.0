@@ -1,69 +1,130 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Nov 2017 18:20:39 +0000
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
- (KAISER)
-In-Reply-To: <20171120180639.GN32488@arm.com>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <CAKv+Gu8YB_qXgWEbd0ZZ6UycxNLXxTZCno87vJ9HH7d6+dKeLQ@mail.gmail.com>
- <20171120180639.GN32488@arm.com>
-Message-ID: <CAKv+Gu8WPU=LKLR90WBpAey2VkCVuuTpQycsde-88G4F_B1wUQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 20 Nov 2017 18:31:26 +0000
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <CAD=FV=W=gS-nYSVLA86pW1FhNnJcaw3dvLkd0g66CL_3d8ezpg@mail.gmail.com>
+References: <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
+ <nycvar.YSQ.7.76.1711161106240.20817@knanqh.ubzr>
+ <48c38055-20f7-e565-aa56-74f360e6e3d9@sigmadesigns.com>
+ <20171116163254.GK31757@n2100.armlinux.org.uk>
+ <fc4ce9e1-8c9d-e6bf-30d3-ead2c5518683@sigmadesigns.com>
+ <20171116170527.GL31757@n2100.armlinux.org.uk>
+ <9f678f27-38a0-1dbe-50b9-2d9109c639a9@free.fr>
+ <CAD=FV=U1FYVS34BYrSTV+0mP6ERhD=MBJGt8ni1bS2-r__Ta4A@mail.gmail.com>
+ <20171116232206.GM31757@n2100.armlinux.org.uk>
+ <CAD=FV=W=gS-nYSVLA86pW1FhNnJcaw3dvLkd0g66CL_3d8ezpg@mail.gmail.com>
+Message-ID: <20171120183126.GE31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20 November 2017 at 18:06, Will Deacon <will.deacon@arm.com> wrote:
-> Hi Ard,
->
-> Cheers for having a look.
->
-> On Sat, Nov 18, 2017 at 03:25:06PM +0000, Ard Biesheuvel wrote:
->> On 17 November 2017 at 18:21, Will Deacon <will.deacon@arm.com> wrote:
->> > This patch series implements something along the lines of KAISER for arm64:
->>
->> Very nice! I am quite pleased, because this makes KASLR much more
->> useful than it is now.
->
-> Agreed. I might actually start enabling now ;)
->
+On Mon, Nov 20, 2017 at 09:38:46AM -0800, Doug Anderson wrote:
+> Hi,
+> 
+> On Thu, Nov 16, 2017 at 3:22 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Thu, Nov 16, 2017 at 02:15:02PM -0800, Doug Anderson wrote:
+> >> Hi,
+> >>
+> >> On Thu, Nov 16, 2017 at 1:05 PM, Marc Gonzalez
+> >> <marc_gonzalez@sigmadesigns.com> wrote:
+> >> > On 16/11/2017 18:05, Russell King - ARM Linux wrote:
+> >> >
+> >> >> On Thu, Nov 16, 2017 at 05:42:36PM +0100, Marc Gonzalez wrote:
+> >> >>
+> >> >>> Requesting 100 ? and spinning only 25 ? is still a problem,
+> >> >>> don't you agree?
+> >> >>
+> >> >> Which is why, as I've said *many* times already, that drivers are written
+> >> >> with leaway on the delays.
+> >> >
+> >> > A delay 75% too short is possible. Roger that.
+> >> >
+> >> >> I get the impression that we're just going around in circles, and what
+> >> >> you're trying to do is to get me to agree with your point of view.
+> >> >> That's not going to happen, because I know the history over about the
+> >> >> last /24/ years of kernel development (which is how long I've been
+> >> >> involved with the kernel.)  That's almost a quarter of a century!
+> >> >>
+> >> >> I know how things were done years ago (which is relevant because we
+> >> >> still have support in the kernel for these systems), and I also know the
+> >> >> history of facilities like cpufreq - I was the one who took the work
+> >> >> that Erik Mouw and others involved with the LART project, and turned it
+> >> >> into something a little more generic.  The idea of dynamically scaling
+> >> >> the CPU frequency on ARM SoCs was something that the SoC manufacturer
+> >> >> had not even considered - it was innovative.
+> >> >>
+> >> >> I know that udelay() can return short delays when used in a kernel with
+> >> >> cpufreq enabled, and I also know that's almost an impossible problem to
+> >> >> solve without going to a timer-based delay.
+> >> >>
+> >> >> So, when you think that sending an email about a udelay() that can be
+> >> >> 10x shorter might be somehow new information, and might convince people
+> >> >> that there's a problem, I'm afraid that it isn't really new information.
+> >> >> The SA1110 cpufreq driver is dated 2001, and carries my copyright, and
+> >> >> has the ability to make udelay()s 4x shorter or 4x longer depending on
+> >> >> the direction of change.
+> >> >>
+> >> >> We've discussed solutions in the past (probably 10 years ago) about
+> >> >> this, and what can be done, and the conclusion to that was, as Nicolas
+> >> >> has said, to switch to using a timer-based delay mechanism where
+> >> >> possible.  Where this is not possible, the platform is stuck with the
+> >> >> loops based delays, and their inherent variability and inaccuracy.
+> >> >>
+> >> >> These platforms have been tested with such a setup over many years.
+> >> >> They work even with udelay() having this behaviour, because it's a
+> >> >> known issue and drivers cater for it in ways that I've already covered
+> >> >> in my many previous emails to you.
+> >> >>
+> >> >> These issues are known.  They've been known for the last 15 odd years.
+> >> >
+> >> > So you've known for umpteen years that fixing loop-based delays is
+> >> > intractable, yet you wrote:
+> >> >
+> >> >> udelay() needs to offer a consistent interface so that drivers know
+> >> >> what to expect no matter what the implementation is.  Making one
+> >> >> implementation conform to your ideas while leaving the other
+> >> >> implementations with other expectations is a recipe for bugs.
+> >> >>
+> >> >> If you really want to do this, fix the loops_per_jiffy implementation
+> >> >> as well so that the consistency is maintained.
+> >> >
+> >> > In other words, "I'll consider your patch as soon as Hell freezes over".
+> >> >
+> >> > Roger that. I'll drop the subject then.
+> >>
+> >> Presumably, though, you could introduce a new API like:
+> >>
+> >>   udelay_atleast()
+> >>
+> >> That was guaranteed to delay at least the given number of
+> >> microseconds.  Unlike the current udelay(), the new udelay_atleast()
+> >> wouldn't really try that hard to get a delay that's approximately the
+> >> one requested, it would just guarantee not to ever delay _less_ than
+> >> the amount requested.
+> >
+> > I look forward to reviewing your implementation.
+> 
+> It's unlikely I'll post a patch in the near term since this isn't
+> presenting me with a big problem right now.  Mostly I saw Marc's patch
+> and thought it would be a good patch to land and I knew this type of
+> thing had bitten me in the past.
+> 
+> One happy result of this whole discussion, though, is that you now
+> sound as if you'll be happy the next time someone brings this up since
+> you're looking forward to reviewing an implementation.  That's a nice
+> change from the original statement questioning why someone was asking
+> about this again.  :)
 
-I think it makes more sense to have enabled on your phone than on the
-devboard on your desk.
+What I'd be happy with, and what I've always been happy with is what I've
+stated: either we fix _all_ implementations or none of them.  We can't
+have the situation where some implementations give one expectation and
+others give something completely different.
 
->> My main question is why we need a separate trampoline vector table: it
->> seems to me that with some minor surgery (as proposed below), we can
->> make the kernel_ventry macro instantiations tolerant for being loaded
->> somewhere in the fixmap (which I think is a better place for this than
->> at the base of the VMALLOC space), removing the need to change
->> vbar_el1 back and forth. The only downside is that exceptions taken
->> from EL1 will also use absolute addressing, but I don't think that is
->> a huge price to pay.
->
-> I think there are two aspects to this:
->
-> 1. Moving the vectors to the fixmap
-> 2. Avoiding the vbar toggle
->
-> I think (1) is a good idea, so I'll hack that up for v2. The vbar toggle
-> isn't as obvious: avoiding it adds some overhead to EL1 irq entry because
-> we're writing tpidrro_el0 as well as loading from the literal pool.
+That's always been my argument against _just_ fixing the timer-based
+delays and ignoring the rest of the problem.
 
-Yeah, but in what workloads are interrupts taken while running in the
-kernel a dominant factor?
+Nothing has changed about my position.
 
-> I think
-> that it also makes the code more difficult to reason about because we'd have
-> to make sure we don't try to use the fixmap mapping before it's actually
-> mapped, which I think would mean we'd need a set of early vectors that we
-> then switch away from in a CPU hotplug notifier or something.
->
-
-I don't think this is necessary. The vector page with absolute
-addressing would tolerate being accessed via its natural mapping
-inside the kernel image as well as via the mapping in the fixmap
-region.
-
-> I'll see if I can measure the cost of the current vbar switching to get
-> an idea of the potential performance available.
->
-
-Yeah, makes sense. If the bulk of the performance hit is elsewhere,
-there's no point in focusing on this bit.
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
