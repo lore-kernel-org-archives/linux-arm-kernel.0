@@ -1,64 +1,56 @@
-From: shile.zhang@nokia-sbell.com (Shile Zhang)
-Date: Mon, 20 Nov 2017 10:34:37 +0800
-Subject: [PATCH v1] arm: fix the spacing/tabbing issue
-In-Reply-To: <1510910417-9610-1-git-send-email-shile.zhang@nokia-sbell.com>
-References: <1510910417-9610-1-git-send-email-shile.zhang@nokia-sbell.com>
-Message-ID: <1511145277-18829-1-git-send-email-shile.zhang@nokia-sbell.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Mon, 20 Nov 2017 06:29:46 +0100
+Subject: [PATCH v4 4/5] DTS: gta04: add serdev node for w2sg00x4
+In-Reply-To: <20171117170857.GO28152@atomide.com>
+References: <cover.1510781875.git.hns@goldelico.com>
+ <02dde546157359316eebe8e90f5f1de7177bbffa.1510781876.git.hns@goldelico.com>
+ <20171117170857.GO28152@atomide.com>
+Message-ID: <DB98ED72-7151-4230-934D-B4FFEC7A397F@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To fix the style issue where spaces where used instead of tabs.
+Hi Tony,
 
-Signed-off-by: Shile Zhang <shile.zhang@nokia-sbell.com>
----
- add more missed lines' fix.
- Thanks!
+> Am 17.11.2017 um 18:08 schrieb Tony Lindgren <tony@atomide.com>:
+> 
+> * H. Nikolaus Schaller <hns@goldelico.com> [171115 21:41]:
+>> GTA04 has a W2SG0004/84 connected to UART2 of the OMAP3
+>> processor. A GPIO can pulse the on/off toggle switch.
+>> 
+>> The VSIM regulator is used to power on/off the LNA of an external
+>> active GPS antenna so that a driver can turn the LNA off if GPS is
+>> not needed to save battery energy.
+>> 
+>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+>> ---
+>> arch/arm/boot/dts/omap3-gta04.dtsi | 6 ++++++
+>> 1 file changed, 6 insertions(+)
+>> 
+>> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+>> index 4504908c23fe..e967d738aaaf 100644
+>> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+>> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+>> @@ -477,6 +477,12 @@
+>> &uart2 {
+>> 	pinctrl-names = "default";
+>> 	pinctrl-0 = <&uart2_pins>;
+>> +
+>> +	gps: gps {
+>> +		compatible = "wi2wi,w2sg0004";
+>> +		lna-supply = <&vsim>;   /* LNA regulator */
+>> +		enable-gpios = <&gpio5 17 GPIO_ACTIVE_HIGH>;    /* GPIO_145: trigger for turning on/off w2sg0004 */
+>> +	};
+>> };
+> 
+> How about move the comment above the node to avoid long lines?
+> Or just change it to gpio_145 for the comment as the property
+> is already enable-gpios?
+> 
+> Regards,
+> 
+> Tony
 
- arch/arm/Kconfig | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+Done so that it will be included in next version.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index d1346a1..3728e7e 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -220,7 +220,7 @@ config ZONE_DMA
- 	bool
- 
- config NEED_DMA_MAP_STATE
--       def_bool y
-+	def_bool y
- 
- config ARCH_SUPPORTS_UPROBES
- 	def_bool y
-@@ -1134,9 +1134,9 @@ config ARM_ERRATA_764369
- 	  in the diagnostic control register of the SCU.
- 
- config ARM_ERRATA_775420
--       bool "ARM errata: A data cache maintenance operation which aborts, might lead to deadlock"
--       depends on CPU_V7
--       help
-+	bool "ARM errata: A data cache maintenance operation which aborts, might lead to deadlock"
-+	depends on CPU_V7
-+	help
- 	 This option enables the workaround for the 775420 Cortex-A9 (r2p2,
- 	 r2p6,r2p8,r2p10,r3p0) erratum. In case a date cache maintenance
- 	 operation aborts with MMU exception, it might cause the processor
-@@ -1697,12 +1697,12 @@ config HW_PERF_EVENTS
- 	depends on ARM_PMU
- 
- config SYS_SUPPORTS_HUGETLBFS
--       def_bool y
--       depends on ARM_LPAE
-+	def_bool y
-+	depends on ARM_LPAE
- 
- config HAVE_ARCH_TRANSPARENT_HUGEPAGE
--       def_bool y
--       depends on ARM_LPAE
-+	def_bool y
-+	depends on ARM_LPAE
- 
- config ARCH_WANT_GENERAL_HUGETLB
- 	def_bool y
--- 
-2.6.2
+BR and thanks,
+Nikolaus
