@@ -1,136 +1,197 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Nov 2017 17:41:29 +0000
-Subject: [PATCH v3 1/2] arm64: module-plts: factor out PLT generation code for
- ftrace
-Message-ID: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
+Date: Mon, 20 Nov 2017 17:41:30 +0000
+Subject: [PATCH v3 2/2] arm64: ftrace: emit ftrace-mod.o contents through code
+In-Reply-To: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
+References: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
+Message-ID: <20171120174130.28626-2-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To allow the ftrace trampoline code to reuse the PLT entry routines,
-factor it out and move it into asm/module.h.
+When building the arm64 kernel with both CONFIG_ARM64_MODULE_PLTS and
+CONFIG_DYNAMIC_FTRACE enabled, the ftrace-mod.o object file is built
+with the kernel and contains a trampoline that is linked into each
+module, so that modules can be loaded far away from the kernel and
+still reach the ftrace entry point in the core kernel with an ordinary
+relative branch, as is emitted by the compiler instrumentation code
+dynamic ftrace relies on.
+
+In order to be able to build out of tree modules, this object file
+needs to be included into the linux-headers or linux-devel packages,
+which is undesirable, as it makes arm64 a special case (although a
+precedent does exist for 32-bit PPC).
+
+Given that the trampoline essentially consists of a PLT entry, let's
+not bother with a source or object file for it, and simply patch it
+in whenever the trampoline is being populated, using the existing
+PLT support routines.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
-v3: new patch
+v3: reuse module plt_entry routines
 
- arch/arm64/include/asm/module.h | 44 ++++++++++++++++++++
- arch/arm64/kernel/module-plts.c | 38 +----------------
- 2 files changed, 46 insertions(+), 36 deletions(-)
+v2: populate the two trampoline instruction slots from the ftrace code so
+    there is no longer a need to have a template .o or .S in the first place
+    don't use a separate linker scripts for ftrace+PLTs
 
+ arch/arm64/Makefile             |  3 ---
+ arch/arm64/include/asm/module.h |  2 +-
+ arch/arm64/kernel/Makefile      |  3 ---
+ arch/arm64/kernel/ftrace-mod.S  | 18 ------------------
+ arch/arm64/kernel/ftrace.c      | 14 ++++++++------
+ arch/arm64/kernel/module-plts.c | 12 ++++++++++++
+ arch/arm64/kernel/module.lds    |  1 +
+ 7 files changed, 22 insertions(+), 31 deletions(-)
+
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index b35788c909f1..b481b4a7c011 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -83,9 +83,6 @@ endif
+ 
+ ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
+ KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
+-ifeq ($(CONFIG_DYNAMIC_FTRACE),y)
+-KBUILD_LDFLAGS_MODULE	+= $(objtree)/arch/arm64/kernel/ftrace-mod.o
+-endif
+ endif
+ 
+ # Default value
 diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-index 19bd97671bb8..11d4aaee82e1 100644
+index 11d4aaee82e1..4f766178fa6f 100644
 --- a/arch/arm64/include/asm/module.h
 +++ b/arch/arm64/include/asm/module.h
-@@ -45,4 +45,48 @@ extern u64 module_alloc_base;
- #define module_alloc_base	((u64)_etext - MODULES_VSIZE)
+@@ -32,7 +32,7 @@ struct mod_arch_specific {
+ 	struct mod_plt_sec	init;
+ 
+ 	/* for CONFIG_DYNAMIC_FTRACE */
+-	void			*ftrace_trampoline;
++	struct plt_entry 	*ftrace_trampoline;
+ };
  #endif
  
-+struct plt_entry {
-+	/*
-+	 * A program that conforms to the AArch64 Procedure Call Standard
-+	 * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
-+	 * IP1 (x17) may be inserted at any branch instruction that is
-+	 * exposed to a relocation that supports long branches. Since that
-+	 * is exactly what we are dealing with here, we are free to use x16
-+	 * as a scratch register in the PLT veneers.
-+	 */
-+	__le32	mov0;	/* movn	x16, #0x....			*/
-+	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
-+	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
-+	__le32	br;	/* br	x16				*/
-+};
-+
-+static inline struct plt_entry get_plt_entry(u64 val)
-+{
-+	/*
-+	 * MOVK/MOVN/MOVZ opcode:
-+	 * +--------+------------+--------+-----------+-------------+---------+
-+	 * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
-+	 * +--------+------------+--------+-----------+-------------+---------+
-+	 *
-+	 * Rd     := 0x10 (x16)
-+	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
-+	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
-+	 * sf     := 1 (64-bit variant)
-+	 */
-+	return (struct plt_entry){
-+		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
-+		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
-+		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
-+		cpu_to_le32(0xd61f0200)
-+	};
-+}
-+
-+static inline bool plt_entries_equal(const struct plt_entry *a,
-+				     const struct plt_entry *b)
-+{
-+	return a->mov0 == b->mov0 &&
-+	       a->mov1 == b->mov1 &&
-+	       a->mov2 == b->mov2;
-+}
-+
- #endif /* __ASM_MODULE_H */
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 8265dd790895..067baace74a0 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -61,6 +61,3 @@ extra-y					+= $(head-y) vmlinux.lds
+ ifeq ($(CONFIG_DEBUG_EFI),y)
+ AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
+ endif
+-
+-# will be included by each individual module but not by the core kernel itself
+-extra-$(CONFIG_DYNAMIC_FTRACE) += ftrace-mod.o
+diff --git a/arch/arm64/kernel/ftrace-mod.S b/arch/arm64/kernel/ftrace-mod.S
+deleted file mode 100644
+index 00c4025be4ff..000000000000
+--- a/arch/arm64/kernel/ftrace-mod.S
++++ /dev/null
+@@ -1,18 +0,0 @@
+-/*
+- * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-#include <linux/linkage.h>
+-#include <asm/assembler.h>
+-
+-	.section	".text.ftrace_trampoline", "ax"
+-	.align		3
+-0:	.quad		0
+-__ftrace_trampoline:
+-	ldr		x16, 0b
+-	br		x16
+-ENDPROC(__ftrace_trampoline)
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index c13b1fca0e5b..50986e388d2b 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -76,7 +76,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ 
+ 	if (offset < -SZ_128M || offset >= SZ_128M) {
+ #ifdef CONFIG_ARM64_MODULE_PLTS
+-		unsigned long *trampoline;
++		struct plt_entry trampoline;
+ 		struct module *mod;
+ 
+ 		/*
+@@ -104,22 +104,24 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
+ 		 * is added in the future, but for now, the pr_err() below
+ 		 * deals with a theoretical issue only.
+ 		 */
+-		trampoline = (unsigned long *)mod->arch.ftrace_trampoline;
+-		if (trampoline[0] != addr) {
+-			if (trampoline[0] != 0) {
++		trampoline = get_plt_entry(addr);
++		if (!plt_entries_equal(mod->arch.ftrace_trampoline,
++				       &trampoline)) {
++			if (!plt_entries_equal(mod->arch.ftrace_trampoline,
++					       &(struct plt_entry){})) {
+ 				pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
+ 				return -EINVAL;
+ 			}
+ 
+ 			/* point the trampoline to our ftrace entry point */
+ 			module_disable_ro(mod);
+-			trampoline[0] = addr;
++			*mod->arch.ftrace_trampoline = trampoline;
+ 			module_enable_ro(mod, true);
+ 
+ 			/* update trampoline before patching in the branch */
+ 			smp_wmb();
+ 		}
+-		addr = (unsigned long)&trampoline[1];
++		addr = (unsigned long)(void *)mod->arch.ftrace_trampoline;
+ #else /* CONFIG_ARM64_MODULE_PLTS */
+ 		return -EINVAL;
+ #endif /* CONFIG_ARM64_MODULE_PLTS */
 diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index d05dbe658409..ebff6c155cac 100644
+index ebff6c155cac..ea640f92fe5a 100644
 --- a/arch/arm64/kernel/module-plts.c
 +++ b/arch/arm64/kernel/module-plts.c
-@@ -11,21 +11,6 @@
- #include <linux/module.h>
- #include <linux/sort.h>
- 
--struct plt_entry {
--	/*
--	 * A program that conforms to the AArch64 Procedure Call Standard
--	 * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
--	 * IP1 (x17) may be inserted at any branch instruction that is
--	 * exposed to a relocation that supports long branches. Since that
--	 * is exactly what we are dealing with here, we are free to use x16
--	 * as a scratch register in the PLT veneers.
--	 */
--	__le32	mov0;	/* movn	x16, #0x....			*/
--	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
--	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
--	__le32	br;	/* br	x16				*/
--};
--
- static bool in_init(const struct module *mod, void *loc)
- {
- 	return (u64)loc - (u64)mod->init_layout.base < mod->init_layout.size;
-@@ -40,33 +25,14 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
- 	int i = pltsec->plt_num_entries;
- 	u64 val = sym->st_value + rela->r_addend;
- 
--	/*
--	 * MOVK/MOVN/MOVZ opcode:
--	 * +--------+------------+--------+-----------+-------------+---------+
--	 * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
--	 * +--------+------------+--------+-----------+-------------+---------+
--	 *
--	 * Rd     := 0x10 (x16)
--	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
--	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
--	 * sf     := 1 (64-bit variant)
--	 */
--	plt[i] = (struct plt_entry){
--		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
--		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
--		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
--		cpu_to_le32(0xd61f0200)
--	};
-+	plt[i] = get_plt_entry(val);
+@@ -120,6 +120,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	unsigned long core_plts = 0;
+ 	unsigned long init_plts = 0;
+ 	Elf64_Sym *syms = NULL;
++	Elf_Shdr *tramp = NULL;
+ 	int i;
  
  	/*
- 	 * Check if the entry we just created is a duplicate. Given that the
- 	 * relocations are sorted, this will be the last entry we allocated.
- 	 * (if one exists).
- 	 */
--	if (i > 0 &&
--	    plt[i].mov0 == plt[i - 1].mov0 &&
--	    plt[i].mov1 == plt[i - 1].mov1 &&
--	    plt[i].mov2 == plt[i - 1].mov2)
-+	if (i > 0 && plt_entries_equal(plt + i, plt + i - 1))
- 		return (u64)&plt[i - 1];
+@@ -131,6 +132,10 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 			mod->arch.core.plt = sechdrs + i;
+ 		else if (!strcmp(secstrings + sechdrs[i].sh_name, ".init.plt"))
+ 			mod->arch.init.plt = sechdrs + i;
++		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
++			 !strcmp(secstrings + sechdrs[i].sh_name,
++				 ".text.ftrace_trampoline"))
++			tramp = sechdrs + i;
+ 		else if (sechdrs[i].sh_type == SHT_SYMTAB)
+ 			syms = (Elf64_Sym *)sechdrs[i].sh_addr;
+ 	}
+@@ -181,5 +186,12 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
+ 	mod->arch.init.plt_num_entries = 0;
+ 	mod->arch.init.plt_max_entries = init_plts;
  
- 	pltsec->plt_num_entries++;
++	if (tramp) {
++		tramp->sh_type = SHT_NOBITS;
++		tramp->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
++		tramp->sh_addralign = __alignof__(struct plt_entry);
++		tramp->sh_size = sizeof(struct plt_entry);
++	}
++
+ 	return 0;
+ }
+diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
+index f7c9781a9d48..22e36a21c113 100644
+--- a/arch/arm64/kernel/module.lds
++++ b/arch/arm64/kernel/module.lds
+@@ -1,4 +1,5 @@
+ SECTIONS {
+ 	.plt (NOLOAD) : { BYTE(0) }
+ 	.init.plt (NOLOAD) : { BYTE(0) }
++	.text.ftrace_trampoline (NOLOAD) : { BYTE(0) }
+ }
 -- 
 2.11.0
