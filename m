@@ -1,57 +1,39 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 20 Nov 2017 08:48:48 +0100
-Subject: [PATCH] MAINTAINERS: change maintainer for Rockchip drm drivers
-In-Reply-To: <1510568131-28838-1-git-send-email-mark.yao@rock-chips.com>
-References: <1510568131-28838-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20171120074848.cg22qkved232pxxf@phenom.ffwll.local>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Mon, 20 Nov 2017 09:53:19 +0100
+Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
+ support
+In-Reply-To: <CAFEAcA_yRT7829=reU=vnAiHWy-9oP1G84v0w_ST8C3VxpskNA@mail.gmail.com>
+References: <20171019145807.23251-1-james.morse@arm.com>
+ <5A049B20.6000501@arm.com> <20171113112946.GK14144@cbox>
+ <CAFEAcA_yRT7829=reU=vnAiHWy-9oP1G84v0w_ST8C3VxpskNA@mail.gmail.com>
+Message-ID: <20171120085319.GC28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 13, 2017 at 06:15:31PM +0800, Mark Yao wrote:
-> For personal reasons, Mark Yao will leave rockchip,
-> can not continue maintain drm/rockchip, Sandy Huang
-> will take over the drm/rockchip.
+On Mon, Nov 13, 2017 at 01:05:19PM +0000, Peter Maydell wrote:
+> On 13 November 2017 at 11:29, Christoffer Dall <cdall@linaro.org> wrote:
+> > I'm thinking this is analogous to migrating a VM that uses an irqchip in
+> > userspace and has set the IRQ or FIQ lines using KVM_IRQ_LINE.  My
+> > feeling is that this is also not supported today.
 > 
-> Cc: Sandy Huang <hjc@rock-chips.com>
-> Cc: Heiko Stuebner <heiko@sntech.de>
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Oops, yes, we completely forgot about migration when we added
+> that feature... I think you're right that we won't get that right.
 
-Since rockchip is in drm-misc that means we need a new maintainer who also
-has drm-misc commit rights. Sandy doesn't yet, so if Sandy is going to be
-the new maintainer we need to fix that.
+So I think it might actually work for the timer, because we migrate the
+timer state, and I think QEMU migrates the timer-to-GIC line state, and
+if we're licky the IRQ line from the userspace GIC to the KVM VCPU would
+get updated after restore.
 
-Also, Heiko, are you interested in becoming co-maintainer? With commit
-rights and all.
--Daniel
+But in general, KVM_IRQ_LINE values don't get migrated, and I think
+that's a problem we've probably had from the initial implementation, and
+not introduced with userspace timers support.
 
-> ---
->  MAINTAINERS | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 0d77f22..31bf080 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4627,7 +4627,7 @@ F:	Documentation/devicetree/bindings/display/bridge/renesas,dw-hdmi.txt
->  F:	Documentation/devicetree/bindings/display/renesas,du.txt
->  
->  DRM DRIVERS FOR ROCKCHIP
-> -M:	Mark Yao <mark.yao@rock-chips.com>
-> +M:	Sandy Huang <hjc@rock-chips.com>
->  L:	dri-devel at lists.freedesktop.org
->  S:	Maintained
->  F:	drivers/gpu/drm/rockchip/
-> -- 
-> 2.7.4
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> https://lists.freedesktop.org/mailman/listinfo/dri-devel
+IIRC, QEMU is really happy to continously call KVM_IRQ_LINE with the
+same value (which could potentially be further optimized), and that
+currently may hide this problem.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+Still, it's something we should look at and ensure is correct,
+especially when adding a new similar state that needs migration.
+
+Thanks,
+-Christoffer
