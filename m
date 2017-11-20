@@ -1,197 +1,74 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 20 Nov 2017 17:41:30 +0000
-Subject: [PATCH v3 2/2] arm64: ftrace: emit ftrace-mod.o contents through code
-In-Reply-To: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
-References: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171120174130.28626-2-ard.biesheuvel@linaro.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 20 Nov 2017 12:02:00 -0600
+Subject: [PATCH v4 5/9] drivers: base: cacheinfo: arm64: Add support for
+ ACPI based firmware tables
+In-Reply-To: <20171120165642.GA31395@e107155-lin>
+References: <20171109210311.25655-1-jeremy.linton@arm.com>
+ <20171109210311.25655-6-jeremy.linton@arm.com>
+ <20171120165642.GA31395@e107155-lin>
+Message-ID: <e1f2bdcc-e0fa-67d5-d4fe-7077b166988f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building the arm64 kernel with both CONFIG_ARM64_MODULE_PLTS and
-CONFIG_DYNAMIC_FTRACE enabled, the ftrace-mod.o object file is built
-with the kernel and contains a trampoline that is linked into each
-module, so that modules can be loaded far away from the kernel and
-still reach the ftrace entry point in the core kernel with an ordinary
-relative branch, as is emitted by the compiler instrumentation code
-dynamic ftrace relies on.
+On 11/20/2017 10:56 AM, Sudeep Holla wrote:
 
-In order to be able to build out of tree modules, this object file
-needs to be included into the linux-headers or linux-devel packages,
-which is undesirable, as it makes arm64 a special case (although a
-precedent does exist for 32-bit PPC).
+(trimming)
 
-Given that the trampoline essentially consists of a PLT entry, let's
-not bother with a source or object file for it, and simply patch it
-in whenever the trampoline is being populated, using the existing
-PLT support routines.
+>>    *	case there's no explicit cache node or the cache node itself in the
+>>    *	device tree
+>> + * @firmware_node: Shared with of_node. When not using DT, this may contain
+>> + *	pointers to other firmware based values. Particularly ACPI/PPTT
+>> + *	unique values.
+>>    * @disable_sysfs: indicates whether this node is visible to the user via
+>>    *	sysfs or not
+>>    * @priv: pointer to any private data structure specific to particular
+>> @@ -64,8 +67,10 @@ struct cacheinfo {
+>>   #define CACHE_ALLOCATE_POLICY_MASK	\
+>>   	(CACHE_READ_ALLOCATE | CACHE_WRITE_ALLOCATE)
+>>   #define CACHE_ID		BIT(4)
+>> -
+>> -	struct device_node *of_node;
+>> +	union {
+>> +		struct device_node *of_node;
+>> +		void *firmware_node;
+>> +	};
+> 
+> I would prefer
+> 	struct device_node *of_node;
+> changed to
+> 	struct fwnode_handle *fwnode;
+> 
+> You can then have
+> 	struct pptt_fwnode {
+> 		<.....>
+> 		/*below fwnode  allocated using acpi_alloc_fwnode_static */
+> 		struct fwnode_handle *fwnode;
+> 	};
+> 
+> This gives a good starting point to abstract DT and ACPI.
+> 
+> If not now, we can later implement fwnode.ops=pptt_cache_ops and then
+> use get property for both DT and ACPI.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
-v3: reuse module plt_entry routines
 
-v2: populate the two trampoline instruction slots from the ftrace code so
-    there is no longer a need to have a template .o or .S in the first place
-    don't use a separate linker scripts for ftrace+PLTs
+I'm obviously confused why this keeps coming up. On the surface it 
+sounds like a good idea. But then, given that I've actually implemented 
+a portion of it, what becomes clear is that the PPTT isn't a good match. 
+Converting the OF routines to use the fwnode is fairly straightforward, 
+but that doesn't help the ACPI situation other than to create a lot of 
+misleading code (and the possibility of creating nonstandard DSDT 
+entries). The fact that this hasn't been done for other tables 
+MADT/SLIT/SRAT/etc makes me wonder why we should do it for the PPTT?
 
- arch/arm64/Makefile             |  3 ---
- arch/arm64/include/asm/module.h |  2 +-
- arch/arm64/kernel/Makefile      |  3 ---
- arch/arm64/kernel/ftrace-mod.S  | 18 ------------------
- arch/arm64/kernel/ftrace.c      | 14 ++++++++------
- arch/arm64/kernel/module-plts.c | 12 ++++++++++++
- arch/arm64/kernel/module.lds    |  1 +
- 7 files changed, 22 insertions(+), 31 deletions(-)
-
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b35788c909f1..b481b4a7c011 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -83,9 +83,6 @@ endif
- 
- ifeq ($(CONFIG_ARM64_MODULE_PLTS),y)
- KBUILD_LDFLAGS_MODULE	+= -T $(srctree)/arch/arm64/kernel/module.lds
--ifeq ($(CONFIG_DYNAMIC_FTRACE),y)
--KBUILD_LDFLAGS_MODULE	+= $(objtree)/arch/arm64/kernel/ftrace-mod.o
--endif
- endif
- 
- # Default value
-diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
-index 11d4aaee82e1..4f766178fa6f 100644
---- a/arch/arm64/include/asm/module.h
-+++ b/arch/arm64/include/asm/module.h
-@@ -32,7 +32,7 @@ struct mod_arch_specific {
- 	struct mod_plt_sec	init;
- 
- 	/* for CONFIG_DYNAMIC_FTRACE */
--	void			*ftrace_trampoline;
-+	struct plt_entry 	*ftrace_trampoline;
- };
- #endif
- 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 8265dd790895..067baace74a0 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -61,6 +61,3 @@ extra-y					+= $(head-y) vmlinux.lds
- ifeq ($(CONFIG_DEBUG_EFI),y)
- AFLAGS_head.o += -DVMLINUX_PATH="\"$(realpath $(objtree)/vmlinux)\""
- endif
--
--# will be included by each individual module but not by the core kernel itself
--extra-$(CONFIG_DYNAMIC_FTRACE) += ftrace-mod.o
-diff --git a/arch/arm64/kernel/ftrace-mod.S b/arch/arm64/kernel/ftrace-mod.S
-deleted file mode 100644
-index 00c4025be4ff..000000000000
---- a/arch/arm64/kernel/ftrace-mod.S
-+++ /dev/null
-@@ -1,18 +0,0 @@
--/*
-- * Copyright (C) 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
-- *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- */
--
--#include <linux/linkage.h>
--#include <asm/assembler.h>
--
--	.section	".text.ftrace_trampoline", "ax"
--	.align		3
--0:	.quad		0
--__ftrace_trampoline:
--	ldr		x16, 0b
--	br		x16
--ENDPROC(__ftrace_trampoline)
-diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-index c13b1fca0e5b..50986e388d2b 100644
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -76,7 +76,7 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 
- 	if (offset < -SZ_128M || offset >= SZ_128M) {
- #ifdef CONFIG_ARM64_MODULE_PLTS
--		unsigned long *trampoline;
-+		struct plt_entry trampoline;
- 		struct module *mod;
- 
- 		/*
-@@ -104,22 +104,24 @@ int ftrace_make_call(struct dyn_ftrace *rec, unsigned long addr)
- 		 * is added in the future, but for now, the pr_err() below
- 		 * deals with a theoretical issue only.
- 		 */
--		trampoline = (unsigned long *)mod->arch.ftrace_trampoline;
--		if (trampoline[0] != addr) {
--			if (trampoline[0] != 0) {
-+		trampoline = get_plt_entry(addr);
-+		if (!plt_entries_equal(mod->arch.ftrace_trampoline,
-+				       &trampoline)) {
-+			if (!plt_entries_equal(mod->arch.ftrace_trampoline,
-+					       &(struct plt_entry){})) {
- 				pr_err("ftrace: far branches to multiple entry points unsupported inside a single module\n");
- 				return -EINVAL;
- 			}
- 
- 			/* point the trampoline to our ftrace entry point */
- 			module_disable_ro(mod);
--			trampoline[0] = addr;
-+			*mod->arch.ftrace_trampoline = trampoline;
- 			module_enable_ro(mod, true);
- 
- 			/* update trampoline before patching in the branch */
- 			smp_wmb();
- 		}
--		addr = (unsigned long)&trampoline[1];
-+		addr = (unsigned long)(void *)mod->arch.ftrace_trampoline;
- #else /* CONFIG_ARM64_MODULE_PLTS */
- 		return -EINVAL;
- #endif /* CONFIG_ARM64_MODULE_PLTS */
-diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
-index ebff6c155cac..ea640f92fe5a 100644
---- a/arch/arm64/kernel/module-plts.c
-+++ b/arch/arm64/kernel/module-plts.c
-@@ -120,6 +120,7 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 	unsigned long core_plts = 0;
- 	unsigned long init_plts = 0;
- 	Elf64_Sym *syms = NULL;
-+	Elf_Shdr *tramp = NULL;
- 	int i;
- 
- 	/*
-@@ -131,6 +132,10 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 			mod->arch.core.plt = sechdrs + i;
- 		else if (!strcmp(secstrings + sechdrs[i].sh_name, ".init.plt"))
- 			mod->arch.init.plt = sechdrs + i;
-+		else if (IS_ENABLED(CONFIG_DYNAMIC_FTRACE) &&
-+			 !strcmp(secstrings + sechdrs[i].sh_name,
-+				 ".text.ftrace_trampoline"))
-+			tramp = sechdrs + i;
- 		else if (sechdrs[i].sh_type == SHT_SYMTAB)
- 			syms = (Elf64_Sym *)sechdrs[i].sh_addr;
- 	}
-@@ -181,5 +186,12 @@ int module_frob_arch_sections(Elf_Ehdr *ehdr, Elf_Shdr *sechdrs,
- 	mod->arch.init.plt_num_entries = 0;
- 	mod->arch.init.plt_max_entries = init_plts;
- 
-+	if (tramp) {
-+		tramp->sh_type = SHT_NOBITS;
-+		tramp->sh_flags = SHF_EXECINSTR | SHF_ALLOC;
-+		tramp->sh_addralign = __alignof__(struct plt_entry);
-+		tramp->sh_size = sizeof(struct plt_entry);
-+	}
-+
- 	return 0;
- }
-diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
-index f7c9781a9d48..22e36a21c113 100644
---- a/arch/arm64/kernel/module.lds
-+++ b/arch/arm64/kernel/module.lds
-@@ -1,4 +1,5 @@
- SECTIONS {
- 	.plt (NOLOAD) : { BYTE(0) }
- 	.init.plt (NOLOAD) : { BYTE(0) }
-+	.text.ftrace_trampoline (NOLOAD) : { BYTE(0) }
- }
--- 
-2.11.0
+Particularly, when one considers fwnode is more a DSDT<->DT abstraction 
+and thus has a lot of API surface that simply doesn't make any sense 
+given the PPTT binary tree structure. Given that most of the fwnode 
+routines are translating string properties (for example 
+fwnode_property_read_string()) it might be possible to build a 
+translator of some form which takes DT style properties and attempts to 
+map them to the ACPI PPTT tree. What this adds I can't fathom, beyond 
+the fact that suddenly the fwnode interface is a partial/brittle 
+implementation where a large subset of the fwnode_operations will tend 
+to be degenerate cases. The result likely will be a poorly implemented 
+translator which breaks or is meaningless over a large part of the 
+fwnode API surface.
