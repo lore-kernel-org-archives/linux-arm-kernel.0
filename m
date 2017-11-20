@@ -1,37 +1,24 @@
-From: jc@linux.com (Jesse Chan)
-Date: Mon, 20 Nov 2017 13:32:01 -0800
-Subject: [PATCH] cpufreq: mediatek: add missing
- MODULE_DESCRIPTION/AUTHOR/LICENSE
-Message-ID: <20171120213201.52606-1-jc@linux.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 20 Nov 2017 15:32:15 -0600
+Subject: [RESEND PATCH v3 1/2] documentation: Add compatibles for Amlogic
+ Meson AXG pin controllers
+In-Reply-To: <20171120102354.5354-2-yixun.lan@amlogic.com>
+References: <20171120102354.5354-1-yixun.lan@amlogic.com>
+ <20171120102354.5354-2-yixun.lan@amlogic.com>
+Message-ID: <20171120213215.ftxasp7eebip3to3@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This change resolves a new compile-time warning
-when built as a loadable module:
+On Mon, Nov 20, 2017 at 06:23:53PM +0800, Yixun Lan wrote:
+> From: Xingyu Chen <xingyu.chen@amlogic.com>
+> 
+> Add compatibles for Amlogic Meson AXG pin controllers
+> 
+> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  Documentation/devicetree/bindings/pinctrl/meson,pinctrl.txt | 2 ++
+>  1 file changed, 2 insertions(+)
 
-WARNING: modpost: missing MODULE_LICENSE() in drivers/cpufreq/mediatek-cpufreq.o
-see include/linux/module.h for more information
-
-This adds the license as "GPL v2", which matches the header of the file.
-
-MODULE_DESCRIPTION and MODULE_AUTHOR are also added.
-
-Signed-off-by: Jesse Chan <jc@linux.com>
----
- drivers/cpufreq/mediatek-cpufreq.c | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
-index 18c4bd9a5c65..e0d5090b303d 100644
---- a/drivers/cpufreq/mediatek-cpufreq.c
-+++ b/drivers/cpufreq/mediatek-cpufreq.c
-@@ -620,3 +620,7 @@ static int __init mtk_cpufreq_driver_init(void)
- 	return 0;
- }
- device_initcall(mtk_cpufreq_driver_init);
-+
-+MODULE_DESCRIPTION("MediaTek CPUFreq driver");
-+MODULE_AUTHOR("Pi-Cheng Chen <pi-cheng.chen@linaro.org>");
-+MODULE_LICENSE("GPL v2");
--- 
-2.14.1
+Acked-by: Rob Herring <robh@kernel.org>
