@@ -1,52 +1,35 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 20 Nov 2017 10:57:07 +0100
-Subject: [PATCH] ARM: dts: r8a779x: Add '#reset-cells' in cpg-mssr
-In-Reply-To: <20171120094957.2seep3qw4j274zrv@verge.net.au>
-References: <1510839357-11450-1-git-send-email-geert+renesas@glider.be>
- <20171120094957.2seep3qw4j274zrv@verge.net.au>
-Message-ID: <CAMuHMdXPrv4bwZbGxE=DJp2nufjF5Q6JwFAERDvBFi+UsAXVsA@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 20 Nov 2017 11:07:10 +0100
+Subject: [PATCH 0/8] Add CAN support to iwg2[02]d
+In-Reply-To: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
+References: <1510067449-17017-1-git-send-email-fabrizio.castro@bp.renesas.com>
+Message-ID: <20171120100710.f74cqhu5ngbs2faf@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue, Nov 07, 2017 at 03:10:41PM +0000, Fabrizio Castro wrote:
+> Hello,
+> 
+> this series delivers all of the changes necessary to add CAN bus
+> support to the:
+> * iW-RainboW-G22D SODIMM, and
+> * iW-RainboW-G20M-Qseven-RZG1M
+> development platforms, including documentation, pinctrl driver, SoC
+> specific device trees, and board specific device trees.
+> 
+> This work has been based and tested on top of:
+> renesas-devel-20171106-v4.14-rc8
+> 
+> Best regards,
+> 
+> Fabrizio Castro (8):
+>   dt-bindings: can: rcar_can: document r8a774[35] can support
+>   pinctrl: sh-pfc: r8a7745: Add CAN[01] support
+>   ARM: dts: r8a7745: Add CAN[01] SoC support
+>   ARM: dts: iwg22d-sodimm: Add can0 support to carrier board
+>   ARM: dts: iwg22d-sodimm-dbhd-ca: Add can1 support to HDMI DB
+>   ARM: dts: r8a7743: Add CAN[01] SoC support
+>   ARM: dts: iwg20d-q7-common: Add can0 support to carrier board
+>   ARM: dts: iwg20d-q7-dbcm-ca: Add can1 support to camera DB
 
-On Mon, Nov 20, 2017 at 10:49 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Nov 16, 2017 at 02:35:57PM +0100, Geert Uytterhoeven wrote:
->> From: Arnd Bergmann <arnd@arndb.de>
->>
->> With the latest dtc, we get many warnings about the missing
->> '#reset-cells' property in these controllers, e.g.:
->>
->> arch/arm/boot/dts/r8a7790-lager.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /can at e6e80000:resets[0])
->> arch/arm/boot/dts/r8a7792-blanche.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/dma-controller at e6700000:resets[0])
->> arch/arm/boot/dts/r8a7792-wheat.dtb: Warning (resets_property): Missing property '#reset-cells' in node /soc/clock-controller at e6150000 or bad phandle (referred from /soc/ethernet at e6800000:resets[0])
->> arch/arm/boot/dts/r8a7793-gose.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /gpio at e6050000:resets[0])
->> arch/arm/boot/dts/r8a7794-alt.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /i2c at e6500000:resets[0])
->> arch/arm/boot/dts/r8a7794-silk.dtb: Warning (resets_property): Missing property '#reset-cells' in node /clock-controller at e6150000 or bad phandle (referred from /interrupt-controller at e61c0000:resets[0])
->>
->> This adds it for the three r8a779x chips that were lacking it. The
->> binding mandates this as <1>, so this is the value I use.
->>
->> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> [geert: Add fix for r8a7793.dtsi]
->> Fixes: 34fbd2b12761d111 ("ARM: dts: r8a7790: Add reset control properties")
->> Fixes: 6e11a322f1d7505d ("ARM: dts: r8a7792: Add reset control properties")
->> Fixes: 84fb19e1d201ba86 ("ARM: dts: r8a7793: Add reset control properties")
->> Fixes: 615beb759ca494a4 ("ARM: dts: r8a7794: Add reset control properties")
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> Thanks for following up on this, its been fouling up my todo list for a
-> while now. Applied for v4.16.
-
-As this is a fix for changes made in v4.15-rc1, don't we want it in v4.15?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks, I have applied the "ARM: dts" patches for inclusion in v4.16.
