@@ -1,23 +1,37 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 20 Nov 2017 11:24:07 +0100
-Subject: [PATCH 0/2] Add R8A77970/Eagle I2C support
-In-Reply-To: <20171116210629.732112911@cogentembedded.com>
-References: <20171116210629.732112911@cogentembedded.com>
-Message-ID: <20171120102407.v7pqrv7e4zmpwmdb@verge.net.au>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 20 Nov 2017 18:23:52 +0800
+Subject: [RESEND PATCH v3 0/2] dt: add pinctrl driver for Meson-AXG SoC
+Message-ID: <20171120102354.5354-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 17, 2017 at 12:06:29AM +0300, Sergei Shtylyov wrote:
-> Hello!
-> 
-> Here's the set of 2 patches against Simon Horman's 'renesas.git' repo's
-> 'renesas-devel-20171113-v4.14' tag. We're adding the R8A77970 I2C nodes
-> and then describing the PCA9654 I/O expander connected to the I2C0 bus.
-> These patches depend on the R8A77970/Eagle PFC suport patchset in order
-> to apply/compile.
+This is DT part patchset for adding pinctrl support for
+the Amlogic's Meson-AXG SoC.
+  
+Changes since v2 at [2]:
+  -- Resend this patch series due to fail to send patch [2/2]
 
-Given the dependency above I have marked these patches as deferred.
-Please repost or otherwise ping me once the dependency has been
-included in an RC release.
+Changes since v1 at [1]:
+  -- Separate DT part patches
+  -- Add Neil Armstrong's Ack
 
-Thanks!
+[2]
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005390.html
+
+[1] 
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005270.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005271.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005272.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005273.html
+http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005274.html
+
+Xingyu Chen (2):
+  documentation: Add compatibles for Amlogic Meson AXG pin controllers
+  ARM64: dts: meson-axg: add pinctrl DT info for Meson-AXG SoC
+
+ .../devicetree/bindings/pinctrl/meson,pinctrl.txt  |  2 +
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi         | 44 ++++++++++++++++++++++
+ 2 files changed, 46 insertions(+)
+
+-- 
+2.15.0
