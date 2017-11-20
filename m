@@ -1,69 +1,37 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 20 Nov 2017 14:50:58 -0800
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
- (KAISER)
-In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
-Message-ID: <c09d26b4-2612-fb2e-fb95-897c937793ec@redhat.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Mon, 20 Nov 2017 21:37:04 -0200
+Subject: [PATCH 2/2] ARM: dts: TS-7970: add basic device tree
+In-Reply-To: <20171120211557.27946-2-sebastien.bourdelin@savoirfairelinux.com>
+References: <20171120211557.27946-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20171120211557.27946-2-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <CAOMZO5AFEqk6FcfzJGO6VH0LpF7uFnkmiMYds9y=jajx8ygdZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2017 10:21 AM, Will Deacon wrote:
-> Hi all,
-> 
-> This patch series implements something along the lines of KAISER for arm64:
-> 
->    https://gruss.cc/files/kaiser.pdf
-> 
-> although I wrote this from scratch because the paper has some funny
-> assumptions about how the architecture works. There is a patch series
-> in review for x86, which follows a similar approach:
-> 
->    http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
-> 
-> and the topic was recently covered by LWN (currently subscriber-only):
-> 
->    https://lwn.net/Articles/738975/
-> 
-> The basic idea is that transitions to and from userspace are proxied
-> through a trampoline page which is mapped into a separate page table and
-> can switch the full kernel mapping in and out on exception entry and
-> exit respectively. This is a valuable defence against various KASLR and
-> timing attacks, particularly as the trampoline page is at a fixed virtual
-> address and therefore the kernel text can be randomized independently.
-> 
-> The major consequences of the trampoline are:
-> 
->    * We can no longer make use of global mappings for kernel space, so
->      each task is assigned two ASIDs: one for user mappings and one for
->      kernel mappings
-> 
->    * Our ASID moves into TTBR1 so that we can quickly switch between the
->      trampoline and kernel page tables
-> 
->    * Switching TTBR0 always requires use of the zero page, so we can
->      dispense with some of our errata workaround code.
-> 
->    * entry.S gets more complicated to read
-> 
-> The performance hit from this series isn't as bad as I feared: things
-> like cyclictest and kernbench seem to be largely unaffected, although
-> syscall micro-benchmarks appear to show that syscall overhead is roughly
-> doubled, and this has an impact on things like hackbench which exhibits
-> a ~10% hit due to its heavy context-switching.
-> 
-> Patches based on 4.14 and also pushed here:
-> 
->    git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kaiser
-> 
-> Feedback welcome,
-> 
-> Will
-> 
+Hi Sebastien,
 
-Passed some basic tests on Hikey Android and my Mustang box. I'll
-leave the Mustang building kernels for a few days. You're welcome
-to add Tested-by or I can re-test on v2.
+On Mon, Nov 20, 2017 at 7:15 PM, Sebastien Bourdelin
+<sebastien.bourdelin@savoirfairelinux.com> wrote:
 
-Thanks,
-Laura
+> +&ecspi2 {
+> +       cs-gpios = <
+> +               &gpio5 31 GPIO_ACTIVE_HIGH
+> +               &gpio7 12 GPIO_ACTIVE_HIGH
+> +               &gpio5 18 GPIO_ACTIVE_HIGH
+> +       >;
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_ecspi2>;
+> +       status = "okay";
+> +
+> +       spidevfpga: spi at 1 {
+> +               compatible = "spidev";
+> +               reg = <1>;
+> +               spi-max-frequency = <1000000>;
+
+According to drivers/spi/spidev.c:
+
+/*
+* spidev should never be referenced in DT without a specific
+* compatible string, it is a Linux implementation thing
+* rather than a description of the hardware.
+*/
