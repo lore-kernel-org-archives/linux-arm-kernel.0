@@ -1,19 +1,22 @@
 From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 20 Nov 2017 11:13:40 +0530
-Subject: [PATCH 4/6] mmc: sdhci-spear: Handle return value of
+Date: Mon, 20 Nov 2017 11:14:15 +0530
+Subject: [PATCH 4/6 v2] mmc: sdhci-spear: Handle return value of
  platform_get_irq
-In-Reply-To: <1510950502-22565-5-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1510950502-22565-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1510950502-22565-5-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20171120054340.GB6125@vireshk-i7>
+In-Reply-To: <d8fc48bacf7cc153d806e10bc39ab507534f4691.1510997223.git.arvind.yadav.cs@gmail.com>
+References: <130df0c2c60ed6a0f460b68c586cc0a4167aed0b.1510997223.git.arvind.yadav.cs@gmail.com>
+ <d8fc48bacf7cc153d806e10bc39ab507534f4691.1510997223.git.arvind.yadav.cs@gmail.com>
+Message-ID: <20171120054415.GC6125@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18-11-17, 01:58, Arvind Yadav wrote:
+On 18-11-17, 15:03, Arvind Yadav wrote:
 > platform_get_irq() can fail here and we must check its return value.
 > 
 > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
+> changes in v2 :
+>               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
+> 
 >  drivers/mmc/host/sdhci-spear.c | 4 ++++
 >  1 file changed, 4 insertions(+)
 > 
@@ -25,7 +28,7 @@ On 18-11-17, 01:58, Arvind Yadav wrote:
 >  	host->hw_name = "sdhci";
 >  	host->ops = &sdhci_pltfm_ops;
 >  	host->irq = platform_get_irq(pdev, 0);
-> +	if (host->irq < 0) {
+> +	if (host->irq <= 0) {
 > +		ret = host->irq;
 > +		goto err_host;
 > +	}
