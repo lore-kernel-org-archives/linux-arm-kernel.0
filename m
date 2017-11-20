@@ -1,5 +1,5 @@
 From: peterz@infradead.org (Peter Zijlstra)
-Date: Mon, 20 Nov 2017 20:25:31 +0100
+Date: Mon, 20 Nov 2017 20:28:06 +0100
 Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
 In-Reply-To: <20171120180554.GM32488@arm.com>
 References: <20171116165922.llrojrvomuihabrt@hirez.programming.kicks-ass.net>
@@ -12,15 +12,18 @@ References: <20171116165922.llrojrvomuihabrt@hirez.programming.kicks-ass.net>
  <20171116191307.GC3624@linux.vnet.ibm.com>
  <20171116201701.GA143965@samitolvanen.mtv.corp.google.com>
  <20171120180554.GM32488@arm.com>
-Message-ID: <20171120192531.53z66fhwg4rdjgdc@hirez.programming.kicks-ass.net>
+Message-ID: <20171120192806.xrbewr6mcffu3i3x@hirez.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, Nov 20, 2017 at 06:05:55PM +0000, Will Deacon wrote:
-> Please don't confuse this with a reluctance to support clang; I'm keen to
-> see that supported, 
+> This is a thorny issue, but RCU (specifically rcu_dereference but probably
+> also some READ_ONCEs) relies on being able to utilise syntactic dependency
+> chains to order local accesses to shared variables.
 
-As an aside; as long as clang doesn't do asm-goto and asm-flag-output
-(as examples of features that clang lacks and developers have at times
-stated they would never support) I can't take them serious as a target
-compiler.
+Well, we used to have READ_ONCE() and smp_read_barrier_depends(), but
+we recently munged them together, in the process getting rid of
+lockless_dereference().
+
+So for sure, READ_ONCE() must be able to do the address dependency
+thing, otherwise tons of code comes apart.
