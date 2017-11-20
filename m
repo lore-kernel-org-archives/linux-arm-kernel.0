@@ -1,34 +1,37 @@
-From: paulmck@linux.vnet.ibm.com (Paul E. McKenney)
-Date: Mon, 20 Nov 2017 12:53:50 -0800
-Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
-In-Reply-To: <20171120193256.e6fnn2arwqc5wqkp@hirez.programming.kicks-ass.net>
-References: <CAKwvOd=k=iVQvWmzP1E3XHUCYLoJgx+F9zoPuE+R2oaw_ePUVA@mail.gmail.com>
- <20171116173417.nqsh5dpu65uj7b5s@hirez.programming.kicks-ass.net>
- <20171116174830.GX3624@linux.vnet.ibm.com>
- <CAKwvOdkDz1yRo=Skt_mWxs0uucK+adXx8kFQksMbTE3ofnpUMQ@mail.gmail.com>
- <20171116183950.GA3624@linux.vnet.ibm.com>
- <20171116184508.GC21898@arm.com>
- <20171116191307.GC3624@linux.vnet.ibm.com>
- <20171116201701.GA143965@samitolvanen.mtv.corp.google.com>
- <20171120180554.GM32488@arm.com>
- <20171120193256.e6fnn2arwqc5wqkp@hirez.programming.kicks-ass.net>
-Message-ID: <20171120205350.GZ3624@linux.vnet.ibm.com>
+From: jc@linux.com (Jesse Chan)
+Date: Mon, 20 Nov 2017 12:58:03 -0800
+Subject: [PATCH] pinctrl: pxa: pxa2xx: add missing
+ MODULE_DESCRIPTION/AUTHOR/LICENSE
+Message-ID: <20171120205804.88061-1-jc@linux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 08:32:56PM +0100, Peter Zijlstra wrote:
-> On Mon, Nov 20, 2017 at 06:05:55PM +0000, Will Deacon wrote:
-> > Although the current direction of the C++ committee is to prefer
-> > that dependencies are explicitly "marked", this is not deemed to be
-> > acceptable for the kernel (in other words, everything is always considered
-> > "marked").
-> 
-> Yeah, that is an attitude not compatible with existing code. Much like
-> the proposal to allow temporary/wide stores on everything not explicitly
-> declared atomic. Such stuff instantly breaks all extant code that does
-> multi-threading with no recourse.
+This change resolves a new compile-time warning
+when built as a loadable module:
 
-If someone suggests temporary/wide stores, even on non-atomics, tell
-them that the standard does not permit them to introduce data races.
+WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
+see include/linux/module.h for more information
 
-							Thanx, Paul
+This adds the license as "GPL v2", which matches the header of the file.
+
+MODULE_DESCRIPTION and MODULE_AUTHOR are also added.
+
+Signed-off-by: Jesse Chan <jc@linux.com>
+---
+ drivers/pinctrl/pxa/pinctrl-pxa2xx.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
+index 866aa3ce1ac9..6cf0006d4c8d 100644
+--- a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
++++ b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
+@@ -436,3 +436,7 @@ int pxa2xx_pinctrl_exit(struct platform_device *pdev)
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(pxa2xx_pinctrl_exit);
++
++MODULE_AUTHOR("Robert Jarzmik <robert.jarzmik@free.fr>");
++MODULE_DESCRIPTION("Marvell PXA2xx pinctrl driver");
++MODULE_LICENSE("GPL v2");
+-- 
+2.14.1
