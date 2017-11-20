@@ -1,125 +1,136 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 20 Nov 2017 09:38:46 -0800
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <20171116232206.GM31757@n2100.armlinux.org.uk>
-References: <1fa81694-7bd2-564b-e5b9-ae53b9ea6620@sigmadesigns.com>
- <20171116153625.GJ31757@n2100.armlinux.org.uk>
- <9a4cfa9d-3940-b7f2-5a4d-59e89af85bb7@sigmadesigns.com>
- <nycvar.YSQ.7.76.1711161106240.20817@knanqh.ubzr>
- <48c38055-20f7-e565-aa56-74f360e6e3d9@sigmadesigns.com>
- <20171116163254.GK31757@n2100.armlinux.org.uk>
- <fc4ce9e1-8c9d-e6bf-30d3-ead2c5518683@sigmadesigns.com>
- <20171116170527.GL31757@n2100.armlinux.org.uk>
- <9f678f27-38a0-1dbe-50b9-2d9109c639a9@free.fr>
- <CAD=FV=U1FYVS34BYrSTV+0mP6ERhD=MBJGt8ni1bS2-r__Ta4A@mail.gmail.com>
- <20171116232206.GM31757@n2100.armlinux.org.uk>
-Message-ID: <CAD=FV=W=gS-nYSVLA86pW1FhNnJcaw3dvLkd0g66CL_3d8ezpg@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 20 Nov 2017 17:41:29 +0000
+Subject: [PATCH v3 1/2] arm64: module-plts: factor out PLT generation code for
+ ftrace
+Message-ID: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+To allow the ftrace trampoline code to reuse the PLT entry routines,
+factor it out and move it into asm/module.h.
 
-On Thu, Nov 16, 2017 at 3:22 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Thu, Nov 16, 2017 at 02:15:02PM -0800, Doug Anderson wrote:
->> Hi,
->>
->> On Thu, Nov 16, 2017 at 1:05 PM, Marc Gonzalez
->> <marc_gonzalez@sigmadesigns.com> wrote:
->> > On 16/11/2017 18:05, Russell King - ARM Linux wrote:
->> >
->> >> On Thu, Nov 16, 2017 at 05:42:36PM +0100, Marc Gonzalez wrote:
->> >>
->> >>> Requesting 100 ? and spinning only 25 ? is still a problem,
->> >>> don't you agree?
->> >>
->> >> Which is why, as I've said *many* times already, that drivers are written
->> >> with leaway on the delays.
->> >
->> > A delay 75% too short is possible. Roger that.
->> >
->> >> I get the impression that we're just going around in circles, and what
->> >> you're trying to do is to get me to agree with your point of view.
->> >> That's not going to happen, because I know the history over about the
->> >> last /24/ years of kernel development (which is how long I've been
->> >> involved with the kernel.)  That's almost a quarter of a century!
->> >>
->> >> I know how things were done years ago (which is relevant because we
->> >> still have support in the kernel for these systems), and I also know the
->> >> history of facilities like cpufreq - I was the one who took the work
->> >> that Erik Mouw and others involved with the LART project, and turned it
->> >> into something a little more generic.  The idea of dynamically scaling
->> >> the CPU frequency on ARM SoCs was something that the SoC manufacturer
->> >> had not even considered - it was innovative.
->> >>
->> >> I know that udelay() can return short delays when used in a kernel with
->> >> cpufreq enabled, and I also know that's almost an impossible problem to
->> >> solve without going to a timer-based delay.
->> >>
->> >> So, when you think that sending an email about a udelay() that can be
->> >> 10x shorter might be somehow new information, and might convince people
->> >> that there's a problem, I'm afraid that it isn't really new information.
->> >> The SA1110 cpufreq driver is dated 2001, and carries my copyright, and
->> >> has the ability to make udelay()s 4x shorter or 4x longer depending on
->> >> the direction of change.
->> >>
->> >> We've discussed solutions in the past (probably 10 years ago) about
->> >> this, and what can be done, and the conclusion to that was, as Nicolas
->> >> has said, to switch to using a timer-based delay mechanism where
->> >> possible.  Where this is not possible, the platform is stuck with the
->> >> loops based delays, and their inherent variability and inaccuracy.
->> >>
->> >> These platforms have been tested with such a setup over many years.
->> >> They work even with udelay() having this behaviour, because it's a
->> >> known issue and drivers cater for it in ways that I've already covered
->> >> in my many previous emails to you.
->> >>
->> >> These issues are known.  They've been known for the last 15 odd years.
->> >
->> > So you've known for umpteen years that fixing loop-based delays is
->> > intractable, yet you wrote:
->> >
->> >> udelay() needs to offer a consistent interface so that drivers know
->> >> what to expect no matter what the implementation is.  Making one
->> >> implementation conform to your ideas while leaving the other
->> >> implementations with other expectations is a recipe for bugs.
->> >>
->> >> If you really want to do this, fix the loops_per_jiffy implementation
->> >> as well so that the consistency is maintained.
->> >
->> > In other words, "I'll consider your patch as soon as Hell freezes over".
->> >
->> > Roger that. I'll drop the subject then.
->>
->> Presumably, though, you could introduce a new API like:
->>
->>   udelay_atleast()
->>
->> That was guaranteed to delay at least the given number of
->> microseconds.  Unlike the current udelay(), the new udelay_atleast()
->> wouldn't really try that hard to get a delay that's approximately the
->> one requested, it would just guarantee not to ever delay _less_ than
->> the amount requested.
->
-> I look forward to reviewing your implementation.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+v3: new patch
 
-It's unlikely I'll post a patch in the near term since this isn't
-presenting me with a big problem right now.  Mostly I saw Marc's patch
-and thought it would be a good patch to land and I knew this type of
-thing had bitten me in the past.
+ arch/arm64/include/asm/module.h | 44 ++++++++++++++++++++
+ arch/arm64/kernel/module-plts.c | 38 +----------------
+ 2 files changed, 46 insertions(+), 36 deletions(-)
 
-One happy result of this whole discussion, though, is that you now
-sound as if you'll be happy the next time someone brings this up since
-you're looking forward to reviewing an implementation.  That's a nice
-change from the original statement questioning why someone was asking
-about this again.  :)
-
-As I've expressed in the past, IMHO fixing the timer based delays is
-still a sane thing to do even without also fixing all the loop-based
-implementations.  As someone said earlier in this thread, all the old
-platforms using loop-based delays are working great for the platforms
-they support and there's no reason to mess with them, but that doesn't
-mean we shouldn't fix the problems that are easy to fix.
-
-
--Doug
+diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+index 19bd97671bb8..11d4aaee82e1 100644
+--- a/arch/arm64/include/asm/module.h
++++ b/arch/arm64/include/asm/module.h
+@@ -45,4 +45,48 @@ extern u64 module_alloc_base;
+ #define module_alloc_base	((u64)_etext - MODULES_VSIZE)
+ #endif
+ 
++struct plt_entry {
++	/*
++	 * A program that conforms to the AArch64 Procedure Call Standard
++	 * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
++	 * IP1 (x17) may be inserted at any branch instruction that is
++	 * exposed to a relocation that supports long branches. Since that
++	 * is exactly what we are dealing with here, we are free to use x16
++	 * as a scratch register in the PLT veneers.
++	 */
++	__le32	mov0;	/* movn	x16, #0x....			*/
++	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
++	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
++	__le32	br;	/* br	x16				*/
++};
++
++static inline struct plt_entry get_plt_entry(u64 val)
++{
++	/*
++	 * MOVK/MOVN/MOVZ opcode:
++	 * +--------+------------+--------+-----------+-------------+---------+
++	 * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
++	 * +--------+------------+--------+-----------+-------------+---------+
++	 *
++	 * Rd     := 0x10 (x16)
++	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
++	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
++	 * sf     := 1 (64-bit variant)
++	 */
++	return (struct plt_entry){
++		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
++		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
++		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
++		cpu_to_le32(0xd61f0200)
++	};
++}
++
++static inline bool plt_entries_equal(const struct plt_entry *a,
++				     const struct plt_entry *b)
++{
++	return a->mov0 == b->mov0 &&
++	       a->mov1 == b->mov1 &&
++	       a->mov2 == b->mov2;
++}
++
+ #endif /* __ASM_MODULE_H */
+diff --git a/arch/arm64/kernel/module-plts.c b/arch/arm64/kernel/module-plts.c
+index d05dbe658409..ebff6c155cac 100644
+--- a/arch/arm64/kernel/module-plts.c
++++ b/arch/arm64/kernel/module-plts.c
+@@ -11,21 +11,6 @@
+ #include <linux/module.h>
+ #include <linux/sort.h>
+ 
+-struct plt_entry {
+-	/*
+-	 * A program that conforms to the AArch64 Procedure Call Standard
+-	 * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
+-	 * IP1 (x17) may be inserted at any branch instruction that is
+-	 * exposed to a relocation that supports long branches. Since that
+-	 * is exactly what we are dealing with here, we are free to use x16
+-	 * as a scratch register in the PLT veneers.
+-	 */
+-	__le32	mov0;	/* movn	x16, #0x....			*/
+-	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
+-	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
+-	__le32	br;	/* br	x16				*/
+-};
+-
+ static bool in_init(const struct module *mod, void *loc)
+ {
+ 	return (u64)loc - (u64)mod->init_layout.base < mod->init_layout.size;
+@@ -40,33 +25,14 @@ u64 module_emit_plt_entry(struct module *mod, void *loc, const Elf64_Rela *rela,
+ 	int i = pltsec->plt_num_entries;
+ 	u64 val = sym->st_value + rela->r_addend;
+ 
+-	/*
+-	 * MOVK/MOVN/MOVZ opcode:
+-	 * +--------+------------+--------+-----------+-------------+---------+
+-	 * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
+-	 * +--------+------------+--------+-----------+-------------+---------+
+-	 *
+-	 * Rd     := 0x10 (x16)
+-	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
+-	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
+-	 * sf     := 1 (64-bit variant)
+-	 */
+-	plt[i] = (struct plt_entry){
+-		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
+-		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
+-		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
+-		cpu_to_le32(0xd61f0200)
+-	};
++	plt[i] = get_plt_entry(val);
+ 
+ 	/*
+ 	 * Check if the entry we just created is a duplicate. Given that the
+ 	 * relocations are sorted, this will be the last entry we allocated.
+ 	 * (if one exists).
+ 	 */
+-	if (i > 0 &&
+-	    plt[i].mov0 == plt[i - 1].mov0 &&
+-	    plt[i].mov1 == plt[i - 1].mov1 &&
+-	    plt[i].mov2 == plt[i - 1].mov2)
++	if (i > 0 && plt_entries_equal(plt + i, plt + i - 1))
+ 		return (u64)&plt[i - 1];
+ 
+ 	pltsec->plt_num_entries++;
+-- 
+2.11.0
