@@ -1,92 +1,43 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 21 Nov 2017 11:08:44 +0800
-Subject: [PATCH v2 4/4] coresight: etm4x: Hook panic dump callback for etmv4
-In-Reply-To: <1511233724-11867-1-git-send-email-leo.yan@linaro.org>
-References: <1511233724-11867-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1511233724-11867-5-git-send-email-leo.yan@linaro.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Tue, 21 Nov 2017 08:58:15 +0530
+Subject: [PATCH] cpufreq: mediatek: add missing
+ MODULE_DESCRIPTION/AUTHOR/LICENSE
+In-Reply-To: <20171120213201.52606-1-jc@linux.com>
+References: <20171120213201.52606-1-jc@linux.com>
+Message-ID: <20171121032815.GF6125@vireshk-i7>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need to dump etmv4 info as metadata, so the data can be used for
-offline checking for configuration and generate 'perf' compatible
-file.  This commit hooks etmv4 callback for panic dump.
+On 20-11-17, 13:32, Jesse Chan wrote:
+> This change resolves a new compile-time warning
+> when built as a loadable module:
+> 
+> WARNING: modpost: missing MODULE_LICENSE() in drivers/cpufreq/mediatek-cpufreq.o
+> see include/linux/module.h for more information
+> 
+> This adds the license as "GPL v2", which matches the header of the file.
+> 
+> MODULE_DESCRIPTION and MODULE_AUTHOR are also added.
+> 
+> Signed-off-by: Jesse Chan <jc@linux.com>
+> ---
+>  drivers/cpufreq/mediatek-cpufreq.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
+> index 18c4bd9a5c65..e0d5090b303d 100644
+> --- a/drivers/cpufreq/mediatek-cpufreq.c
+> +++ b/drivers/cpufreq/mediatek-cpufreq.c
+> @@ -620,3 +620,7 @@ static int __init mtk_cpufreq_driver_init(void)
+>  	return 0;
+>  }
+>  device_initcall(mtk_cpufreq_driver_init);
+> +
+> +MODULE_DESCRIPTION("MediaTek CPUFreq driver");
+> +MODULE_AUTHOR("Pi-Cheng Chen <pi-cheng.chen@linaro.org>");
+> +MODULE_LICENSE("GPL v2");
 
-Signed-off-by: Leo Yan <leo.yan@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etm4x.c | 22 ++++++++++++++++++++++
- drivers/hwtracing/coresight/coresight-etm4x.h | 15 +++++++++++++++
- 2 files changed, 37 insertions(+)
+Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
 
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
-index cf364a5..bf9608b 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.c
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.c
-@@ -418,11 +418,33 @@ static void etm4_disable(struct coresight_device *csdev,
- 		local_set(&drvdata->mode, CS_MODE_DISABLED);
- }
- 
-+static void etm4_panic_cb(void *data)
-+{
-+	struct coresight_device *csdev = (struct coresight_device *)data;
-+	int cpu = smp_processor_id();
-+	struct etmv4_drvdata *drvdata = etmdrvdata[cpu];
-+	struct etmv4_config *config = &drvdata->config;
-+	struct etmv4_metadata *metadata = &drvdata->metadata;
-+
-+	metadata->magic = ETM4_METADATA_MAGIC;
-+	metadata->cpu = cpu;
-+	metadata->trcconfigr = config->cfg;
-+	metadata->trctraceidr = drvdata->trcid;
-+	metadata->trcidr0 = readl_relaxed(drvdata->base + TRCIDR0);
-+	metadata->trcidr1 = readl_relaxed(drvdata->base + TRCIDR1);
-+	metadata->trcidr2 = readl_relaxed(drvdata->base + TRCIDR2);
-+	metadata->trcidr8 = readl_relaxed(drvdata->base + TRCIDR8);
-+	metadata->trcauthstatus = readl_relaxed(drvdata->base + TRCAUTHSTATUS);
-+
-+	coresight_dump_update(csdev, (char *)metadata, sizeof(*metadata));
-+}
-+
- static const struct coresight_ops_source etm4_source_ops = {
- 	.cpu_id		= etm4_cpu_id,
- 	.trace_id	= etm4_trace_id,
- 	.enable		= etm4_enable,
- 	.disable	= etm4_disable,
-+	.panic_cb	= etm4_panic_cb,
- };
- 
- static const struct coresight_ops etm4_cs_ops = {
-diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
-index b3b5ea7..08dc8b7 100644
---- a/drivers/hwtracing/coresight/coresight-etm4x.h
-+++ b/drivers/hwtracing/coresight/coresight-etm4x.h
-@@ -198,6 +198,20 @@
- #define ETM_EXLEVEL_NS_HYP		BIT(14)
- #define ETM_EXLEVEL_NS_NA		BIT(15)
- 
-+#define ETM4_METADATA_MAGIC		0x4040404040404040ULL
-+
-+struct etmv4_metadata {
-+	u64 magic;
-+	u64 cpu;
-+	u64 trcconfigr;
-+	u64 trctraceidr;
-+	u64 trcidr0;
-+	u64 trcidr1;
-+	u64 trcidr2;
-+	u64 trcidr8;
-+	u64 trcauthstatus;
-+};
-+
- /**
-  * struct etmv4_config - configuration information related to an ETMv4
-  * @mode:	Controls various modes supported by this ETM.
-@@ -393,6 +407,7 @@ struct etmv4_drvdata {
- 	bool				atbtrig;
- 	bool				lpoverride;
- 	struct etmv4_config		config;
-+	struct etmv4_metadata		metadata;
- };
- 
- /* Address comparator access types */
 -- 
-2.7.4
+viresh
