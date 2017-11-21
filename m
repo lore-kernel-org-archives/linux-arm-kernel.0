@@ -1,92 +1,69 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 21 Nov 2017 16:47:12 +0000
-Subject: [PATCH v2] arm64: kdump: Avoid to power off nonpanic CPUs
-In-Reply-To: <1510996352-16684-1-git-send-email-leo.yan@linaro.org>
-References: <1510996352-16684-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <5A145890.4070206@arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 21 Nov 2017 14:54:10 -0200
+Subject: [PATCH 2/4] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
+In-Reply-To: <1511281705-30849-3-git-send-email-narmstrong@baylibre.com>
+References: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
+ <1511281705-30849-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAOMZO5BDQxZxHX_dn63QvbwfaVjERQtBqCp3FCT9Q6zvsrgn4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Leo Yan,
+On Tue, Nov 21, 2017 at 2:28 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-On 18/11/17 09:12, Leo Yan wrote:
-> commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
-> crash dump for nonpanic cores") introduces ARM64 architecture function
+> +       reg_wl18xx_vmmc: regulator-wl18xx {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "vwl1807";
+> +               regulator-min-microvolt = <1800000>;
+> +               regulator-max-microvolt = <1800000>;
+> +               gpio = <&gpio7 8 0>;
 
-(This commit fixed a bug where the core-code version was used, this didn't save
-the CPU registers, which made kdump useless.)
+GPIO_ACTIVE_HIGH please.
 
-
-> crash_smp_send_stop() to replace the weak function, this results in
-> the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
-> power state on ARM64 platforms with the flow:
-> 
->   Panic CPU:
->     machine_crash_shutdown()
->       crash_smp_send_stop()
-> 	smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
-> 
->   Nonpanic CPUs:
->     handle_IPI()
->       ipi_cpu_crash_stop()
->         cpu_ops[cpu]->cpu_die()
-> 
-> The upper patch has no issue if enabled crash dump only; but if enabled
-> crash dump and Coresight debug module for panic dumping at the meantime,
-> nonpanic CPUs are powered off in crash dump flow, later this may
-> introduce conflicts with the Coresight debug module because Coresight
-> debug registers dumping requires the CPU must be powered on for some
-> platforms (e.g. Hi6220 on Hikey board).
-
-Is it just Hikey with this problem?
-
-
-> If we cannot keep the CPUs
-> powered on, we can see the hardware lockup issue when access Coresight
-> debug registers.
-
-By 'hardware lockup issue' do you mean you want to use the Coresight debug
-registers to inspect what caused the panic()=>kdump in the first place?
-You mention 'dumping requires the CPU [to] be powered on', I assume it loses
-state when powered off.
-
-...or does the CPU hang if you use PSCI to power it off while the Coresight
-debug is running?
+> +&can2 {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_flexcan2>;
+> +       status = "disabled";
+> +};
+> +
+> +&cpu0 {
+> +       arm-supply = <&sw1a_reg>;
+> +       soc-supply = <&sw1c_reg>;
+> +       operating-points = <
+> +               /* kHz    uV */
+> +               1200000 1350000
+> +               996000  1250000
+> +               852000  1250000
+> +               792000  1175000
+> +               396000  1175000
+> +       >;
+> +       fsl,soc-operating-points = <
+> +               /* ARM kHz  SOC-PU uV */
+> +               1200000 1275000
+> +               996000  1250000
+> +               852000  1250000
+> +               792000  1175000
+> +               396000  1175000
+> +       >;
 
 
-> To fix this issue, this commit bypasses CPU hotplug operation in func
-> crash_smp_send_stop() when coresight CPU debug module has been enabled
-> and let CPUs to run into WFE/WFI states so CPUs can still be powered on
-> after crash dump. This finally is more safe for Coresight debug module
-> to dump registers and avoid hardware lockup.
+Don't the standard operating points described at imx6q.dtsi work on this board?
 
-Ah, there is a hardware-lockup.
+If not, please add a comment explaining why you need custom operating
+points here.
 
-Wouldn't the same thing happen if I poke the sysfs cpu online/offline interface
-while this thing is running? (Not to mention cpu-idle)
+> +       pinctrl_flexcan1: flexcan1grp {
+> +               fsl,pins = <
+> +                       MX6QDL_PAD_GPIO_7__FLEXCAN1_TX          0x80000000
+> +                       MX6QDL_PAD_GPIO_8__FLEXCAN1_RX          0x80000000
 
-Shouldn't this be fixed in firmware? If EL3 can see the Coresight debug is running,
-it can hold the CPU in WFE instead of trying to actually power off. Firmware can
-know if the debug hardware and the CPU are powered together, (which I guess is
-why this is a problem on Hikey).
+Please avoid 0x80000000 and use the real IOMUX values instead.
 
+> +               >;
+> +       };
+> +
+> +       pinctrl_flexcan2: flexcan2grp {
+> +               fsl,pins = <
+> +                       MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX        0x80000000
+> +                       MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX        0x80000000
 
-Thanks,
-
-James
-
-
-> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> index 9f7195a..31dab1f 100644
-> --- a/arch/arm64/kernel/smp.c
-> +++ b/arch/arm64/kernel/smp.c
-> @@ -856,7 +856,7 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
->  
->  	local_irq_disable();
->  
-> -#ifdef CONFIG_HOTPLUG_CPU
-> +#if defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_CORESIGHT_CPU_DEBUG)
->  	if (cpu_ops[cpu]->cpu_die)
->  		cpu_ops[cpu]->cpu_die(cpu);
->  #endif
-> 
+Please avoid 0x80000000 and use the real IOMUX values instead.
