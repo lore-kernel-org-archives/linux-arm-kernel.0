@@ -1,37 +1,49 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 21 Nov 2017 14:50:41 +0000
-Subject: [PATCH] ARM: make decompressor debug output user selectable
-Message-ID: <E1eH9sn-0007yj-E1@rmk-PC.armlinux.org.uk>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 21 Nov 2017 16:06:38 +0100
+Subject: [PATCH] ARM: dts: exynos: correct trats2 panel reset line
+In-Reply-To: <20171121112424.GA6650@lineageos.org>
+References: <CGME20171121112435epcas4p25f529481eebd076f0fde78c500b04395@epcas4p2.samsung.com>
+ <20171121112424.GA6650@lineageos.org>
+Message-ID: <59887245-ed25-ac1b-3bd4-b72c8fd1dd74@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the decompressor debug output user selectable, otherwise merely
-enabling DEBUG_LL causes the decompressor to become board specific,
-thereby preventing a multi-platform kernel from booting.  Enabling
-DEBUG_LL doesn't cause the kernel itself to become platform specific
-unless EARLY_PRINTK is enabled, or one of the debugging routines is
-added in a path that results in it being called.
+Hi Simon,
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/Kconfig.debug | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+On 2017-11-21 12:24, Simon Shields wrote:
+> trats2 uses gpf2-1 as the panel reset GPIO. gpy4-5 was only used
+> on early revisions of the board.
+>
+> Fixes: 420ae8451a22 ("ARM: dts: exynos4412-trats2: add panel node")
+> Signed-off-by: Simon Shields <simon@lineageos.org>
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 6dcea8e8e941..fa021568d051 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1757,9 +1757,9 @@ config DEBUG_UART_8250_FLOW_CONTROL
- 	default y if ARCH_EBSA110 || DEBUG_FOOTBRIDGE_COM1 || DEBUG_GEMINI || ARCH_RPC
- 
- config DEBUG_UNCOMPRESS
--	bool
-+	bool "Enable decompressor debugging via DEBUG_LL output"
- 	depends on ARCH_MULTIPLATFORM || PLAT_SAMSUNG || ARM_SINGLE_ARMV7M
--	default y if DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
-+	depends on DEBUG_LL && !DEBUG_OMAP2PLUS_UART && \
- 		     (!DEBUG_TEGRA_UART || !ZBOOT_ROM) && \
- 		     !DEBUG_BRCMSTB_UART
- 	help
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
+It looks that this has been accidentally copy/pasted from the previous
+dts used for early version of the development board. I've checked the
+Trats2 schematic and indeed gpf2-1 is the correct pin for panel reset
+line.
+
+> ---
+>   arch/arm/boot/dts/exynos4412-trats2.dts | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
+> index 220cdf109405..9f4672ba9943 100644
+> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
+> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
+> @@ -454,7 +454,7 @@
+>   		reg = <0>;
+>   		vdd3-supply = <&lcd_vdd3_reg>;
+>   		vci-supply = <&ldo25_reg>;
+> -		reset-gpios = <&gpy4 5 GPIO_ACTIVE_HIGH>;
+> +		reset-gpios = <&gpf2 1 GPIO_ACTIVE_HIGH>;
+>   		power-on-delay= <50>;
+>   		reset-delay = <100>;
+>   		init-delay = <100>;
+
+Best regards
 -- 
-2.7.4
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
