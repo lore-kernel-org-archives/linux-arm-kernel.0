@@ -1,153 +1,104 @@
-From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 21 Nov 2017 15:32:04 +0100
-Subject: [PATCH v2 6/6] ARM: ep93xx: ts72xx: Add support for BK3 board -
- ts72xx derivative
-In-Reply-To: <20171121143204.1839-1-lukma@denx.de>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171121143204.1839-1-lukma@denx.de>
-Message-ID: <20171121143204.1839-7-lukma@denx.de>
+From: Bhaskar.Upadhaya@nxp.com (Bhaskar Upadhaya)
+Date: Tue, 21 Nov 2017 15:15:03 +0530
+Subject: [PATCH 1/1] arm64: dts: ls1012a: Add LS1012A-2G5RDB board support
+Message-ID: <1511257503-12475-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The BK3 board is a derivative of the ts72xx reference design.
+LS1012A-2G5RDB is similar to LS1012ARDB with below features
+2 2.5G SGMII PFE Block, SATA, USB 2.0/3.0, WiFi, DDR, eMMC
+QuadSPI, UART
 
-Signed-off-by: Lukasz Majewski <lukma@denx.de>
+Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
 ---
-Changes for v2:
-- Place bk3 support code to the ts72xx.c file
----
- arch/arm/mach-ep93xx/Kconfig  |  7 +++++
- arch/arm/mach-ep93xx/ts72xx.c | 64 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm/mach-ep93xx/ts72xx.h |  5 ++++
- arch/arm/tools/mach-types     |  1 +
- 4 files changed, 77 insertions(+)
+ arch/arm64/boot/dts/freescale/Makefile             |  1 +
+ .../boot/dts/freescale/fsl-ls1012a-2g5rdb.dts      | 66 ++++++++++++++++++++++
+ 2 files changed, 67 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts
 
-diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
-index 61a75ca3684e..c095236d7ff8 100644
---- a/arch/arm/mach-ep93xx/Kconfig
-+++ b/arch/arm/mach-ep93xx/Kconfig
-@@ -21,6 +21,13 @@ config MACH_ADSSPHERE
- 	  Say 'Y' here if you want your kernel to support the ADS
- 	  Sphere board.
- 
-+config MACH_BK3
-+	bool "Support Liebherr BK3.1"
-+	select MACH_TS72XX
-+	help
-+	  Say 'Y' here if you want your kernel to support the
-+	  Liebherr controller BK3.1.
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index 72c4b52..b3a0aec 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1,6 +1,7 @@
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-2g5rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts
+new file mode 100644
+index 0000000..99b1835
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts
+@@ -0,0 +1,66 @@
++/*
++ * Device Tree file for NXP LS1012A 2G5RDB Board.
++ *
++ * Copyright 2017 NXP
++ *
++ * Bhaskar Upadhaya <bhaskar.upadhaya@nxp.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
 +
- config MACH_EDB93XX
- 	bool
- 
-diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index 2e8fcc6e87b6..0de19b136ad0 100644
---- a/arch/arm/mach-ep93xx/ts72xx.c
-+++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -18,8 +18,10 @@
- #include <linux/io.h>
- #include <linux/mtd/rawnand.h>
- #include <linux/mtd/partitions.h>
-+#include <linux/amba/bus.h>
- 
- #include <mach/hardware.h>
-+#include <mach/irqs.h>
- 
- #include <asm/mach-types.h>
- #include <asm/mach/map.h>
-@@ -261,3 +263,65 @@ MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
- 	.init_late	= ep93xx_init_late,
- 	.restart	= ep93xx_restart,
- MACHINE_END
++#include "fsl-ls1012a.dtsi"
 +
-+/*************************************************************************
-+ * BK3 support code
-+ *************************************************************************/
-+static struct mtd_partition bk3_nand_parts[] = {
-+	{
-+		.name		= "System",
-+		.offset	= 0x00000000,
-+		.size		= 0x01e00000,
-+	}, {
-+		.name		= "Data",
-+		.offset	= 0x01e00000,
-+		.size		= 0x05f20000
-+	}, {
-+		.name		= "RedBoot",
-+		.offset	= 0x07d20000,
-+		.size		= 0x002e0000,
-+		.mask_flags	= MTD_WRITEABLE,	/* force RO */
-+	},
++/ {
++	model = "LS1012A 2G5RDB Board";
++	compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
++
 +};
 +
-+static AMBA_APB_DEVICE(i2s1, "apb:i2s", 1, EP93XX_I2S_PHYS_BASE,
-+		       { IRQ_EP93XX_SAI }, NULL);
-+
-+static struct map_desc bk3_io_desc[] __initdata = {
-+	{
-+		.virtual	= BK3_CPLDVER_VIRT_BASE,
-+		.pfn		= __phys_to_pfn(BK3_CPLDVER_PHYS_BASE),
-+		.length	= BK3_CPLDVER_SIZE,
-+		.type		= MT_DEVICE,
-+	}
++&duart0 {
++	status = "okay";
 +};
 +
-+static void __init bk3_map_io(void)
-+{
-+	ts72xx_common_map_io();
-+	iotable_init(bk3_io_desc, ARRAY_SIZE(bk3_io_desc));
-+}
++&i2c0 {
++	status = "okay";
++};
 +
-+static void __init bk3_init_machine(void)
-+{
-+	ep93xx_init_devices();
-+
-+	ts72xx_register_flash(bk3_nand_parts, ARRAY_SIZE(bk3_nand_parts),
-+			      EP93XX_CS6_PHYS_BASE);
-+
-+	platform_device_register(&ts72xx_wdt_device);
-+	ep93xx_register_eth(&ts72xx_eth_data, 1);
-+
-+	amba_device_register(&i2s1_device, &iomem_resource);
-+}
-+
-+MACHINE_START(BK3, "Liebherr controller BK3.1")
-+	/* Maintainer: Lukasz Majewski <lukma@denx.de> */
-+	.atag_offset	= 0x100,
-+	.map_io	= bk3_map_io,
-+	.init_irq	= ep93xx_init_irq,
-+	.init_time	= ep93xx_timer_init,
-+	.init_machine	= bk3_init_machine,
-+	.init_late	= ep93xx_init_late,
-+	.restart	= ep93xx_restart,
-+MACHINE_END
-diff --git a/arch/arm/mach-ep93xx/ts72xx.h b/arch/arm/mach-ep93xx/ts72xx.h
-index d9ff04db3221..d3165bb9ee78 100644
---- a/arch/arm/mach-ep93xx/ts72xx.h
-+++ b/arch/arm/mach-ep93xx/ts72xx.h
-@@ -45,6 +45,11 @@
- #define TS72XX_WDT_CONTROL_PHYS_BASE	0x23800000
- #define TS72XX_WDT_FEED_PHYS_BASE	0x23c00000
- 
-+/* BK3 specific defines */
-+#define BK3_CPLDVER_PHYS_BASE		0x23400000
-+#define BK3_CPLDVER_VIRT_BASE		0xfebfd000
-+#define BK3_CPLDVER_SIZE		0x00001000
-+
- #ifndef __ASSEMBLY__
- 
- static inline int ts72xx_model(void)
-diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
-index a9313b66f770..4eac94c1eb6f 100644
---- a/arch/arm/tools/mach-types
-+++ b/arch/arm/tools/mach-types
-@@ -345,6 +345,7 @@ mxlads			MACH_MXLADS		MXLADS			1851
- linkstation_mini	MACH_LINKSTATION_MINI	LINKSTATION_MINI	1858
- afeb9260		MACH_AFEB9260		AFEB9260		1859
- imx27ipcam		MACH_IMX27IPCAM		IMX27IPCAM		1871
-+bk3			MACH_BK3		BK3			1880
- rd88f6183ap_ge		MACH_RD88F6183AP_GE	RD88F6183AP_GE		1894
- realview_pba8		MACH_REALVIEW_PBA8	REALVIEW_PBA8		1897
- realview_pbx		MACH_REALVIEW_PBX	REALVIEW_PBX		1901
++&sata {
++	status = "okay";
++};
 -- 
-2.11.0
+1.9.1
