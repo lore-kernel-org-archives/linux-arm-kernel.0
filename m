@@ -1,8 +1,10 @@
 From: andrea.adami@gmail.com (Andrea Adami)
-Date: Tue, 21 Nov 2017 22:43:48 +0100
-Subject: [PATCH 1/4] ARM: pxa/corgi: Remove hardcoded partitioning,
+Date: Tue, 21 Nov 2017 22:43:51 +0100
+Subject: [PATCH 4/4] ARM: pxa/poodle: Remove hardcoded partitioning,
  use sharpslpart parser
-Message-ID: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+In-Reply-To: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+References: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+Message-ID: <1511300631-1343-4-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,16 +17,16 @@ Emulators like qemu will need to pass the mtdparts in the cmdline.
 
 Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
 ---
- arch/arm/mach-pxa/corgi.c | 31 ++++++++-----------------------
- 1 file changed, 8 insertions(+), 23 deletions(-)
+ arch/arm/mach-pxa/poodle.c | 28 ++++++++--------------------
+ 1 file changed, 8 insertions(+), 20 deletions(-)
 
-diff --git a/arch/arm/mach-pxa/corgi.c b/arch/arm/mach-pxa/corgi.c
-index 7270f0d..9546452 100644
---- a/arch/arm/mach-pxa/corgi.c
-+++ b/arch/arm/mach-pxa/corgi.c
-@@ -606,24 +606,6 @@ static void __init corgi_init_spi(void)
- static inline void corgi_init_spi(void) {}
- #endif
+diff --git a/arch/arm/mach-pxa/poodle.c b/arch/arm/mach-pxa/poodle.c
+index 62a1191..fd01d6b 100644
+--- a/arch/arm/mach-pxa/poodle.c
++++ b/arch/arm/mach-pxa/poodle.c
+@@ -333,24 +333,6 @@ static struct pxafb_mach_info poodle_fb_info = {
+ 	.lcd_conn	= LCD_COLOR_TFT_16BPP,
+ };
  
 -static struct mtd_partition sharpsl_nand_partitions[] = {
 -	{
@@ -35,7 +37,7 @@ index 7270f0d..9546452 100644
 -	{
 -		.name = "Root Filesystem",
 -		.offset = 7 * 1024 * 1024,
--		.size = 25 * 1024 * 1024,
+-		.size = 22 * 1024 * 1024,
 -	},
 -	{
 -		.name = "Home Filesystem",
@@ -47,7 +49,7 @@ index 7270f0d..9546452 100644
  static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
  
  static struct nand_bbt_descr sharpsl_bbt = {
-@@ -633,10 +615,16 @@ static struct nand_bbt_descr sharpsl_bbt = {
+@@ -360,10 +342,16 @@ static struct nand_bbt_descr sharpsl_bbt = {
  	.pattern = scan_ff_pattern
  };
  
@@ -66,15 +68,5 @@ index 7270f0d..9546452 100644
  };
  
  static struct resource sharpsl_nand_resources[] = {
-@@ -750,9 +738,6 @@ static void __init corgi_init(void)
- 
- 	platform_scoop_config = &corgi_pcmcia_config;
- 
--	if (machine_is_husky())
--		sharpsl_nand_partitions[1].size = 53 * 1024 * 1024;
--
- 	platform_add_devices(devices, ARRAY_SIZE(devices));
- 
- 	regulator_has_full_constraints();
 -- 
 2.7.4
