@@ -1,25 +1,36 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 21 Nov 2017 21:56:22 +0100
-Subject: [PATCH 3/6] arm: dts: marvell: Add missing #phy-cells to
- usb-nop-xceiv
-In-Reply-To: <20171109222614.5719-3-robh@kernel.org>
-References: <20171109222614.5719-1-robh@kernel.org>
- <20171109222614.5719-3-robh@kernel.org>
-Message-ID: <20171121205622.GE30040@lunn.ch>
+From: labbott@redhat.com (Laura Abbott)
+Date: Tue, 21 Nov 2017 13:16:58 -0800
+Subject: [PATCH v4 10/12] arm64: vdso: replace gettimeofday.S with global
+ vgettimeofday.C
+In-Reply-To: <20171121180319.tawkc42jjx4ow3hg@tarantula.localdomain>
+References: <20171031183306.81375-1-salyzyn@android.com>
+ <7775cc5e-4a24-1e33-aae5-6181ca018d80@android.com>
+ <61EF90BA-9A6D-4DC4-A1F4-BEAA210D708C@redhat.com>
+ <20171121180319.tawkc42jjx4ow3hg@tarantula.localdomain>
+Message-ID: <2a5d85a3-cc53-087a-97e0-a86db5683963@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 04:26:11PM -0600, Rob Herring wrote:
-> "usb-nop-xceiv" is using the phy binding, but is missing #phy-cells
-> property. This is probably because the binding was the precursor to the phy
-> binding.
+On 11/21/2017 10:03 AM, Jeffrey Bastian wrote:
+> On Thu, Nov 02, 2017 at 12:22:36AM -0400, Jon Masters wrote:
+>> On Nov 2, 2017, at 06:14, Mark Salyzyn <salyzyn@android.com> wrote:
+>>> Holding off respin or followup patch until after we get a response
+>>> from Jon Masters <jcm@readhat.com> on their QE tests on this patch
+>>> series.
+>>
+>> Copying Jeff Bastian who owns QE. Jeff, can you recall what test was
+>> failing when we tried the gettimeofday C rewrite VDSO patches?
 > 
-> Fixes the following warning in Marvell dts files:
+> The LTP clock_getres01 test was failing when we tried the initial
+> implementation of gettimeofday-in-C.  This would be a good place to
+> start when testing the new version of the patches.
 > 
-> Warning (phys_property): Missing property '#phy-cells' in node ...
+> https://github.com/linux-test-project/ltp/blob/master/testcases/kernel/syscalls/clock_getres/clock_getres01.c
 > 
-> Signed-off-by: Rob Herring <robh@kernel.org>
+> 
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+FWIW, I just tried this on my Mustang (4.14 + these patches) with
+both DT and acpi=force and it passed.
 
-    Andrew
+Thanks,
+Laura
