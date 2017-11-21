@@ -1,59 +1,75 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Nov 2017 11:12:59 +0000
-Subject: [PATCH 4/7] KVM: arm/arm64: vgic-its: Check result of allocation
- before use
-In-Reply-To: <20171120145814.GM28855@cbox>
-References: <20171116175821.26544-1-marc.zyngier@arm.com>
- <20171116175821.26544-5-marc.zyngier@arm.com> <20171120145814.GM28855@cbox>
-Message-ID: <dc4ff723-3477-b636-2e74-3bddc48ce9a6@arm.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Tue, 21 Nov 2017 11:13:06 +0000
+Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
+ larger kernels
+In-Reply-To: <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
+References: <20171117114143.26577-1-steve.capper@arm.com>
+ <20171117114143.26577-3-steve.capper@arm.com>
+ <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
+Message-ID: <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/11/17 14:58, Christoffer Dall wrote:
-> On Thu, Nov 16, 2017 at 05:58:18PM +0000, Marc Zyngier wrote:
->> We miss a test against NULL after allocation.
->>
->> Fixes: 6d03a68f8054 ("KVM: arm64: vgic-its: Turn device_id validation into generic ID validation")
->> Cc: stable at vger.kernel.org # 4.8
->> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  virt/kvm/arm/vgic/vgic-its.c | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
->> index 370086006838..30f7c7e6d2f4 100644
->> --- a/virt/kvm/arm/vgic/vgic-its.c
->> +++ b/virt/kvm/arm/vgic/vgic-its.c
->> @@ -821,6 +821,8 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
->>  		return E_ITS_MAPC_COLLECTION_OOR;
->>  
->>  	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
->> +	if (!collection)
->> +		return -ENOMEM;
-> 
-> Our processing of this return value seems to be "shrug, something went
-> wrong, let's move on to the next command".  Is this really a valid thing
-> to do if we're so much under memory pressure that we dannot allocate a
-> collection structure?
+On Mon, Nov 20, 2017 at 05:00:10PM +0000, Mark Rutland wrote:
+> Hi,
 
-The main issue is that we don't currently have a good story when
-returning error in general. The current implementation of the vITS
-doesn't implement the stalling behaviour which would give the guest the
-opportunity to do something. From a host PoV, I'm not really sure what
-we can do. Killing the guest doesn't seem very appropriate.
-
-So I'd rather implement stalling the command queue (see 6.3.2 in the
-GICv3 spec), and implement something to report the error (even though
-this is IMPDEF). Thoughts?
+Hi Mark,
 
 > 
-> My question notwithstanding:
+> On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
+> > -#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+> > +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
+> > +
+> > +#if SWAPPER_PGTABLE_LEVELS > 3
+> > +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
+> > +#else
+> > +#define EARLY_PUDS(vstart, vend) (0)
+> > +#endif
+> > +
+> > +#if SWAPPER_PGTABLE_LEVELS > 2
+> > +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
+> > +#else
+> > +#define EARLY_PMDS(vstart, vend) (0)
+> > +#endif
+> > +
+> > +#define EARLY_PAGES(vstart, vend) ( 1 			/* PGDIR page */				\
+> > +			+ EARLY_PGDS((vstart), (vend)) 	/* each PGDIR needs a next level page table */	\
+> > +			+ EARLY_PUDS((vstart), (vend))	/* each PUD needs a next level page table */	\
+> > +			+ EARLY_PMDS((vstart), (vend)))	/* each PMD needs a next level page table */
+> > +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
+> >  #define IDMAP_DIR_SIZE		(IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
 > 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+> I'm currently struggling to convince myself as to whether 2M is
+> necessary/sufficient slack space for all configurations.
 
-Thanks,
+Agreed, if the possible address range is changed outside these bounds
+then we need to extend them.
 
-	M.
+> 
+> At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
+> to cross PGD/PUD/PMD boundaries.
+> 
+> For example with 3 levels of 64K pages, and a huge kernel that takes up
+> SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
+> and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
+> the kernel were to be relocated such that it straddled two PGDs, we'd
+> need 2 PGDs and 2 PMDs, needing 5 pages total.
+> 
+> I'm not sure that we have a problem if we don't relax KASLR.
+> 
+
+The approach I've adopted is to compute which indices are required for
+PGDs, PUDs, PMDs to map the supplied address range, then count them.
+If we require two PGD entries then that means we need two pages
+containing PMD entries to be allocated.
+
+If we consider just PGDs, for example, the only way I am aware of the
+kernel straddling more PGDs than previously computed is for the mapping
+to begin before vstart or end after vend (or both).
+
+Should I refine the range specified in the SWAPPER_DIR_SIZE for the
+current KASLR? (I thought the random offset was < SZ_2M?)
+
+Cheers,
 -- 
-Jazz is not dead. It just smells funny...
+Steve
