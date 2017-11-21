@@ -1,44 +1,59 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Tue, 21 Nov 2017 11:01:52 +1000
-Subject: [v2,12/18] kbuild: add support for clang LTO
-In-Reply-To: <20171120202152.GA89108@samitolvanen.mtv.corp.google.com>
-References: <20171115213428.22559-13-samitolvanen@google.com>
- <20171118132139.58ac5e4c@roar.ozlabs.ibm.com>
- <20171120202152.GA89108@samitolvanen.mtv.corp.google.com>
-Message-ID: <20171121110152.23fb751a@roar.ozlabs.ibm.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Tue, 21 Nov 2017 11:08:42 +0800
+Subject: [PATCH v2 2/4] coresight: Add and delete dump node for
+ registration/unregistration
+In-Reply-To: <1511233724-11867-1-git-send-email-leo.yan@linaro.org>
+References: <1511233724-11867-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <1511233724-11867-3-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 20 Nov 2017 12:21:52 -0800
-Sami Tolvanen <samitolvanen@google.com> wrote:
+Coresight device registration is a proper time point to insert dump
+node, the dump code utilizes the coresight device has panic callback
+function pointer as flag to indicate if need insert panic node or not.
+If the coresight device has panic callback function isn't NULL, then
+allocates dump node and inserts node into list, otherwise directly
+bail out with success.
 
-> On Sat, Nov 18, 2017 at 01:21:39PM +1000, Nicholas Piggin wrote:
-> > Do you have any kind of numbers for this, out of curiosity? Binary
-> > size, performance, build time?  
-> 
-> I don't have performance numbers to share. Are there any specific
-> benchmarks you'd be interested in seeing? Build time typically
-> increases with LTO and in my experience, binary size tends to increase
-> by ~10-15% as well.
+When coresight device unregistration, it removes dump node from list
+and releases resource properly.
 
-By deduction, then you must see some performance improvement? :) 
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-I just wonder are you doing this because there is some worthwhile
-performance gain? Or to enable more testing and development of LTO?
-Any clues for why a user would want to enable it.
-
-> 
-> > Why is this needed? It would have been nice to get rid of the
-> > !THIN_ARCHIVES option if you can make the patches work with the thin
-> > archives paths.  
-> 
-> I believe LLVMgold doesn't know how to deal with an archive of LLVM IR
-> files, but I can certainly use thin archives as an index and extract
-> the path names for linking. I'll look into it.
-
-Thanks, if you could. Possibly file a request with LLVMgold too, it
-seems to be that toolchain support for archives is quite strong, so it
-will be good to keep pushing for that.
-
-Thanks,
-Nick
+diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+index b8091be..3248f9b 100644
+--- a/drivers/hwtracing/coresight/coresight.c
++++ b/drivers/hwtracing/coresight/coresight.c
+@@ -1044,6 +1044,10 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 	if (ret)
+ 		goto err_device_register;
+ 
++	ret = coresight_dump_add(csdev, desc->pdata ? desc->pdata->cpu : 0);
++	if (ret)
++		goto err_dump_add;
++
+ 	mutex_lock(&coresight_mutex);
+ 
+ 	coresight_fixup_device_conns(csdev);
+@@ -1053,6 +1057,8 @@ struct coresight_device *coresight_register(struct coresight_desc *desc)
+ 
+ 	return csdev;
+ 
++err_dump_add:
++	device_unregister(&csdev->dev);
+ err_device_register:
+ 	kfree(conns);
+ err_kzalloc_conns:
+@@ -1068,6 +1074,7 @@ void coresight_unregister(struct coresight_device *csdev)
+ {
+ 	/* Remove references of that device in the topology */
+ 	coresight_remove_conns(csdev);
++	coresight_dump_del(csdev);
+ 	device_unregister(&csdev->dev);
+ }
+ EXPORT_SYMBOL_GPL(coresight_unregister);
+-- 
+2.7.4
