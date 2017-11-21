@@ -1,82 +1,60 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 21 Nov 2017 15:32:01 +0100
-Subject: [PATCH v2 3/6] ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash()
- to accept parameters
+Date: Tue, 21 Nov 2017 15:31:59 +0100
+Subject: [PATCH v2 1/6] ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros where
+ applicable
 In-Reply-To: <20171121143204.1839-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
  <20171121143204.1839-1-lukma@denx.de>
-Message-ID: <20171121143204.1839-4-lukma@denx.de>
+Message-ID: <20171121143204.1839-2-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extend the ts72xx_register_flash() to accept passed parameters,
-which makes it more reusable.
-
-Now it is possible to accept ep93xx flash start address and partitions.
+This commit cleans up the code by using dedicated macros instead of
+full definitions.
 
 Signed-off-by: Lukasz Majewski <lukma@denx.de>
-
 ---
 Changes for v2:
-- New patch
+- None
 ---
- arch/arm/mach-ep93xx/ts72xx.c | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ arch/arm/mach-ep93xx/ts72xx.c | 18 +++---------------
+ 1 file changed, 3 insertions(+), 15 deletions(-)
 
 diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index 06345b85f27c..00e0e5b8babf 100644
+index 8745162ec05d..06345b85f27c 100644
 --- a/arch/arm/mach-ep93xx/ts72xx.c
 +++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -120,8 +120,6 @@ static struct platform_nand_data ts72xx_nand_data = {
- 		.nr_chips	= 1,
- 		.chip_offset	= 0,
- 		.chip_delay	= 15,
--		.partitions	= ts72xx_nand_parts,
--		.nr_partitions	= ARRAY_SIZE(ts72xx_nand_parts),
- 	},
- 	.ctrl = {
- 		.cmd_ctrl	= ts72xx_nand_hwcontrol,
-@@ -145,8 +143,8 @@ static struct platform_device ts72xx_nand_flash = {
- 	.num_resources		= ARRAY_SIZE(ts72xx_nand_resource),
+@@ -187,16 +187,8 @@ static struct platform_device ts72xx_rtc_device = {
  };
  
--
--static void __init ts72xx_register_flash(void)
-+void __init ts72xx_register_flash(struct mtd_partition *parts, int n,
-+				  resource_size_t start)
- {
- 	/*
- 	 * TS7200 has NOR flash all other TS72xx board have NAND flash.
-@@ -154,16 +152,12 @@ static void __init ts72xx_register_flash(void)
- 	if (board_is_ts7200()) {
- 		ep93xx_register_flash(2, EP93XX_CS6_PHYS_BASE, SZ_16M);
- 	} else {
--		resource_size_t start;
--
--		if (is_ts9420_installed())
--			start = EP93XX_CS7_PHYS_BASE;
--		else
--			start = EP93XX_CS6_PHYS_BASE;
--
- 		ts72xx_nand_resource[0].start = start;
- 		ts72xx_nand_resource[0].end = start + SZ_16M - 1;
+ static struct resource ts72xx_wdt_resources[] = {
+-	{
+-		.start	= TS72XX_WDT_CONTROL_PHYS_BASE,
+-		.end	= TS72XX_WDT_CONTROL_PHYS_BASE + SZ_4K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= TS72XX_WDT_FEED_PHYS_BASE,
+-		.end	= TS72XX_WDT_FEED_PHYS_BASE + SZ_4K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
++	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
+ };
  
-+		ts72xx_nand_data.chip.partitions = parts;
-+		ts72xx_nand_data.chip.nr_partitions = n;
-+
- 		platform_device_register(&ts72xx_nand_flash);
- 	}
- }
-@@ -223,7 +217,9 @@ static struct platform_device ts73xx_fpga_device = {
- static void __init ts72xx_init_machine(void)
- {
- 	ep93xx_init_devices();
--	ts72xx_register_flash();
-+	ts72xx_register_flash(ts72xx_nand_parts, ARRAY_SIZE(ts72xx_nand_parts),
-+			      is_ts9420_installed() ?
-+			      EP93XX_CS7_PHYS_BASE : EP93XX_CS6_PHYS_BASE);
- 	platform_device_register(&ts72xx_rtc_device);
- 	platform_device_register(&ts72xx_wdt_device);
+ static struct platform_device ts72xx_wdt_device = {
+@@ -216,11 +208,7 @@ static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
+ #define TS73XX_FPGA_LOADER_BASE		0x03c00000
  
+ static struct resource ts73xx_fpga_resources[] = {
+-	{
+-		.start	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE,
+-		.end	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE + 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE, 0x01),
+ };
+ 
+ static struct platform_device ts73xx_fpga_device = {
 -- 
 2.11.0
