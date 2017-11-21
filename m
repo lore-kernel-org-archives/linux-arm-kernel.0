@@ -1,44 +1,134 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Tue, 21 Nov 2017 21:41:51 +0530
-Subject: [PATCH 01/10 v5] Input: ep93xx_keypad: Fix platform_get_irq's error
- checking
-Message-ID: <49ba0386f1930f58edfd5ee0f5e65d2a02a46744.1511280261.git.arvind.yadav.cs@gmail.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Tue, 21 Nov 2017 16:14:17 +0000
+Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
+ larger kernels
+In-Reply-To: <CAKv+Gu_aAKbhu5V4Tuk2_yCFd4GG_KqCcNaK-9R7BU_XJw52fA@mail.gmail.com>
+References: <20171117114143.26577-1-steve.capper@arm.com>
+ <20171117114143.26577-3-steve.capper@arm.com>
+ <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
+ <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
+ <20171121131448.gokl6p2upszrgayn@capper-debian.cambridge.arm.com>
+ <CAKv+Gu_aAKbhu5V4Tuk2_yCFd4GG_KqCcNaK-9R7BU_XJw52fA@mail.gmail.com>
+Message-ID: <20171121161417.qdpsh3g55kovcsfz@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+On Tue, Nov 21, 2017 at 01:24:28PM +0000, Ard Biesheuvel wrote:
+> On 21 November 2017 at 13:14, Steve Capper <steve.capper@arm.com> wrote:
+> > On Tue, Nov 21, 2017 at 11:13:06AM +0000, Steve Capper wrote:
+> >> On Mon, Nov 20, 2017 at 05:00:10PM +0000, Mark Rutland wrote:
+> >> > Hi,
+> >>
+> >> Hi Mark,
+> >>
+> >> >
+> >> > On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
+> >> > > -#define SWAPPER_DIR_SIZE (SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+> >> > > +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
+> >> > > +
+> >> > > +#if SWAPPER_PGTABLE_LEVELS > 3
+> >> > > +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
+> >> > > +#else
+> >> > > +#define EARLY_PUDS(vstart, vend) (0)
+> >> > > +#endif
+> >> > > +
+> >> > > +#if SWAPPER_PGTABLE_LEVELS > 2
+> >> > > +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
+> >> > > +#else
+> >> > > +#define EARLY_PMDS(vstart, vend) (0)
+> >> > > +#endif
+> >> > > +
+> >> > > +#define EARLY_PAGES(vstart, vend) ( 1                    /* PGDIR page */                                \
+> >> > > +                 + EARLY_PGDS((vstart), (vend))  /* each PGDIR needs a next level page table */  \
+> >> > > +                 + EARLY_PUDS((vstart), (vend))  /* each PUD needs a next level page table */    \
+> >> > > +                 + EARLY_PMDS((vstart), (vend))) /* each PMD needs a next level page table */
+> >> > > +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
+> >> > >  #define IDMAP_DIR_SIZE           (IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
+> >> >
+> >> > I'm currently struggling to convince myself as to whether 2M is
+> >> > necessary/sufficient slack space for all configurations.
+> >>
+> >> Agreed, if the possible address range is changed outside these bounds
+> >> then we need to extend them.
+> >>
+> >> >
+> >> > At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
+> >> > to cross PGD/PUD/PMD boundaries.
+> >> >
+> >> > For example with 3 levels of 64K pages, and a huge kernel that takes up
+> >> > SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
+> >> > and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
+> >> > the kernel were to be relocated such that it straddled two PGDs, we'd
+> >> > need 2 PGDs and 2 PMDs, needing 5 pages total.
+> >> >
+> >> > I'm not sure that we have a problem if we don't relax KASLR.
+> >> >
+> >>
+> >> The approach I've adopted is to compute which indices are required for
+> >> PGDs, PUDs, PMDs to map the supplied address range, then count them.
+> >> If we require two PGD entries then that means we need two pages
+> >> containing PMD entries to be allocated.
+> >>
+> >> If we consider just PGDs, for example, the only way I am aware of the
+> >> kernel straddling more PGDs than previously computed is for the mapping
+> >> to begin before vstart or end after vend (or both).
+> >>
+> >> Should I refine the range specified in the SWAPPER_DIR_SIZE for the
+> >> current KASLR? (I thought the random offset was < SZ_2M?)
+> >>
+> >
+> > Ahh, I see KASLR offset has the bottom 21 bits masked out, not confined
+> > to the 21 bottom bits :-).
+> >
+> > It may be possible to do something with (vend - vstart) I will have a
+> > think about this.
+> >
+> 
+> Hi Steve,
+> 
+> Please be aware that it is slightly more complicated than that.
+> 
+> The VA randomization offset chosen by the KASLR code is made up of two
+> separate values:
+> - the VA offset modulo 2 MB, which equals the PA offset modulo 2 MB,
+> and is set by the EFI stub when it loads the kernel image into 1:1
+> mapped memory
+> - the VA offset in 2 MB increments, which is set by the kaslr_init
+> call in head.S
+> 
+> The reason for this approach is that it allows randomization at 64 KB
+> granularity without losing the ability to map the kernel using 2 MB
+> block mappings or contiguous page mappings. On a 48-bit VA kernel,
+> this gives us 30 bits of randomization.
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
-changes in v2 :
-              Return keypad->irq insted of -ENXIO.
-changes in v3 :
-              Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
-changes in v4 :
-              Return -ENXIO insted of keypad->irq. Which was not correct in v3.
-changes in v5 :
-              Remove changes of v3 and v4. go back to version v2. Which is correct.
-              No need to check for IRQ0 and return keypad->irq insted of -ENXIO.
 
- drivers/input/keyboard/ep93xx_keypad.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks Ard!
 
-diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
-index f77b295..01788a7 100644
---- a/drivers/input/keyboard/ep93xx_keypad.c
-+++ b/drivers/input/keyboard/ep93xx_keypad.c
-@@ -257,8 +257,8 @@ static int ep93xx_keypad_probe(struct platform_device *pdev)
- 	}
- 
- 	keypad->irq = platform_get_irq(pdev, 0);
--	if (!keypad->irq) {
--		err = -ENXIO;
-+	if (keypad->irq < 0) {
-+		err = keypad->irq;
- 		goto failed_free;
- 	}
- 
+So if I've understood correctly, it is valid for there to exist a VA
+KASLR offset K at runtime s.t.
+
+ K mod 2^SHIFT != 0
+
+For SHIFT = PGDIR_SHIFT, PUD_SHIFT and SWAPPER_TABLE_SHIFT.
+(I need to correct my EARLY_PMDS macro to use SWAPPER_TABLE_SHIFT instead
+of PMD_SHIFT).
+
+I've managed to convince myself that this will mean at most one extra
+page being needed for each strideable level to cover where we get unlucky
+with KASLR. This will make the kernel image up to 3 pages larger with
+KASLR enabled (but shouldn't affect runtime memory as this will be given
+back).
+
+If (vend - vstart) mod 2^SHIFT == 0, then KASLR cannot affect that
+particular level, but we would need to map a much larger kernel for
+that identity to be true.
+
+So I'll remove the 2MB end offset from SWAPPER_DIR_SIZE and add in an
+extra page to EARLY_P[GUM]DS when KASLR is enabled.
+
+If I've understood things correctly, this should be safe with an updated
+KASLR that can cross PMD/PUD boundaries.
+
+Cheers,
 -- 
-2.7.4
+Steve
