@@ -1,47 +1,85 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Tue, 21 Nov 2017 13:28:13 -0800
-Subject: [PATCH v4 10/12] arm64: vdso: replace gettimeofday.S with global
- vgettimeofday.C
-In-Reply-To: <20171121180319.tawkc42jjx4ow3hg@tarantula.localdomain>
-References: <20171031183306.81375-1-salyzyn@android.com>
- <7775cc5e-4a24-1e33-aae5-6181ca018d80@android.com>
- <61EF90BA-9A6D-4DC4-A1F4-BEAA210D708C@redhat.com>
- <20171121180319.tawkc42jjx4ow3hg@tarantula.localdomain>
-Message-ID: <a560894c-fd0d-9f29-3847-9700bf5a1008@android.com>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Tue, 21 Nov 2017 22:43:50 +0100
+Subject: [PATCH 3/4] ARM: pxa/spitz: Remove hardcoded partitioning,
+ use sharpslpart parser
+In-Reply-To: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+References: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+Message-ID: <1511300631-1343-3-git-send-email-andrea.adami@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2017 10:03 AM, Jeffrey Bastian wrote:
-> On Thu, Nov 02, 2017 at 12:22:36AM -0400, Jon Masters wrote:
->> On Nov 2, 2017, at 06:14, Mark Salyzyn <salyzyn@android.com> wrote:
->>> Holding off respin or followup patch until after we get a response
->>> from Jon Masters <jcm@readhat.com> on their QE tests on this patch
->>> series.
->> Copying Jeff Bastian who owns QE. Jeff, can you recall what test was
->> failing when we tried the gettimeofday C rewrite VDSO patches?
-> The LTP clock_getres01 test was failing when we tried the initial
-> implementation of gettimeofday-in-C.  This would be a good place to
-> start when testing the new version of the patches.
->
-> https://github.com/linux-test-project/ltp/blob/master/testcases/kernel/syscalls/clock_getres/clock_getres01.c
->
->
-Thanks.
+With the introduction of sharpslpart partition parser we can now read the
+offsets from NAND: we specify the list of the parsers as platform data, with
+cmdlinepart and ofpart parsers first allowing to override the part. table
+written in NAND. This is done here in the board file.
 
-I ran the test (32 and 64 bit) on my latest work (but back-ported to 
-4.9) and it passes. I did not change __vdso_clock_getres or the fallback 
-(syscall) handler in the patch series though, so the failure has me 
-wondering. Could you re-run the test with latest to be sure, and I will 
-look into setting up to test with a ToT kernel (after the thanksgiving 
-break).
+Emulators like qemu will need to pass the mtdparts in the cmdline.
 
-Using bionic libc, with advance modifications to utilize 
-__vdso_clock_getres; required in order to support the test.
+Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+---
+ arch/arm/mach-pxa/spitz.c | 34 +++++++++-------------------------
+ 1 file changed, 9 insertions(+), 25 deletions(-)
 
-NB: in AOSP _today_ bionic does _not_ propagate the errno correctly on 
-the __vdso_clock_gettime vdso path and will understandably fail the 
-similar tests. The public rubber stamp of __vdso_clock_gettime code to 
-support __vdso_clock_getres will not work. errno propagation issue will 
-be fixed in bionic.
-
--- Mark
+diff --git a/arch/arm/mach-pxa/spitz.c b/arch/arm/mach-pxa/spitz.c
+index 67d66c7..defefa3 100644
+--- a/arch/arm/mach-pxa/spitz.c
++++ b/arch/arm/mach-pxa/spitz.c
+@@ -739,21 +739,6 @@ static inline void spitz_lcd_init(void) {}
+  * NAND Flash
+  ******************************************************************************/
+ #if defined(CONFIG_MTD_NAND_SHARPSL) || defined(CONFIG_MTD_NAND_SHARPSL_MODULE)
+-static struct mtd_partition spitz_nand_partitions[] = {
+-	{
+-		.name = "System Area",
+-		.offset = 0,
+-		.size = 7 * 1024 * 1024,
+-	}, {
+-		.name = "Root Filesystem",
+-		.offset = 7 * 1024 * 1024,
+-	}, {
+-		.name = "Home Filesystem",
+-		.offset = MTDPART_OFS_APPEND,
+-		.size = MTDPART_SIZ_FULL,
+-	},
+-};
+-
+ static uint8_t scan_ff_pattern[] = { 0xff, 0xff };
+ 
+ static struct nand_bbt_descr spitz_nand_bbt = {
+@@ -808,10 +793,16 @@ static const struct mtd_ooblayout_ops akita_ooblayout_ops = {
+ 	.free = akita_ooblayout_free,
+ };
+ 
++static const char * const probes[] = {
++	"cmdlinepart",
++	"ofpart",
++	"sharpslpart",
++	NULL,
++};
++
+ static struct sharpsl_nand_platform_data spitz_nand_pdata = {
+ 	.badblock_pattern	= &spitz_nand_bbt,
+-	.partitions		= spitz_nand_partitions,
+-	.nr_partitions		= ARRAY_SIZE(spitz_nand_partitions),
++	.part_parsers		= probes,
+ };
+ 
+ static struct resource spitz_nand_resources[] = {
+@@ -834,14 +825,7 @@ static struct platform_device spitz_nand_device = {
+ 
+ static void __init spitz_nand_init(void)
+ {
+-	if (machine_is_spitz()) {
+-		spitz_nand_partitions[1].size = 5 * 1024 * 1024;
+-	} else if (machine_is_akita()) {
+-		spitz_nand_partitions[1].size = 58 * 1024 * 1024;
+-		spitz_nand_bbt.len = 1;
+-		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
+-	} else if (machine_is_borzoi()) {
+-		spitz_nand_partitions[1].size = 32 * 1024 * 1024;
++	if (machine_is_akita() || machine_is_borzoi()) {
+ 		spitz_nand_bbt.len = 1;
+ 		spitz_nand_pdata.ecc_layout = &akita_ooblayout_ops;
+ 	}
+-- 
+2.7.4
