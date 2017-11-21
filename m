@@ -1,75 +1,41 @@
-From: puck.chen@hisilicon.com (Chen Feng)
-Date: Tue, 21 Nov 2017 16:37:17 +0800
-Subject: [PATCH] arm64: kaslr: Fix kaslr end boundary of virt addr
-In-Reply-To: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
-References: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <5A13E5BD.70000@hisilicon.com>
+From: patrice.chotard@st.com (Patrice CHOTARD)
+Date: Tue, 21 Nov 2017 08:47:21 +0000
+Subject: [PATCH] [media] c8sectpfe: Use resource_size function on memory
+ resource
+In-Reply-To: <1511218007-3577-1-git-send-email-gomonovych@gmail.com>
+References: <1511218007-3577-1-git-send-email-gomonovych@gmail.com>
+Message-ID: <1d30b010-96b1-cf98-d98f-8c804631fb80@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Vasyl
 
-
-On 2017/11/21 11:44, Chen Feng wrote:
-> With kaslr and kasan enable both, I got the follow issue.
+On 11/20/2017 11:46 PM, Vasyl Gomonovych wrote:
+> To adapt fei->sram_size calculation via resource_size for memory size
+> calculation before, in fei->sram = devm_ioremap_resource(dev, res).
+> And make memory initialization range in
+> memset_io for fei->sram appropriate
 > 
-> [   16.130523s]kasan: reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000
-> [   16.142517s]___alloc_bootmem_nopanic:257
-> [   16.148284s]__alloc_memory_core_early:63, addr = 197fc7fc0
-> [   16.155670s]__alloc_memory_core_early:65, virt = ffffffffd7fc7fc0
-> [   16.163635s]__alloc_memory_core_early:67, toshow = ffffff8ffaff8ff8
-> [   16.171783s]__alloc_memory_core_early:69, show_phy = ffffffe2649f8ff8
-> [   16.180145s]Unable to handle kernel paging request at virtual address ffffff8ffaff8ff8
-> [   16.189971s]pgd = ffffffad9c507000
-> [   16.195220s][ffffff8ffaff8ff8] *pgd=0000000197fc8003, *pud=0000000197fc8003
-> 
-> *reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000*
-> 
-> memstart_addr 0
-> ARM64_MEMSTART_ALIGN 0x40000000
-> memstart_offset_seed 0xffc7
-> PHYS_OFFSET = 0 - memstart_addr = 0 - 3E40000000 = FFFFFFC1C0000000
-> 
-> reg->base = 0x100000000  -> 0xffffffff40000000
-> phys_end  = 0x1c0000000  -> 0xffffffc000000000  This is confused, end less than start.
-> 
-> And In memblock it use "start_addr + size" as the end addr. So in function kasan_init,
-> if the start >= end, it will not map the hole block address. But the memory in this
-> block is valid. And it can be allocated as well.
-> 
-> So donot use the last memory region. Changing "range = range / ARM64_MEMSTART_ALIGN + 1" to
-> range = range / ARM64_MEMSTART_ALIGN;
-> 
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> Signed-off-by: Chen Xiang <chenxiang9@huawei.com>
+> Signed-off-by: Vasyl Gomonovych <gomonovych@gmail.com>
 > ---
->  arch/arm64/mm/init.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
+>   drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 716d122..60112c0 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -267,11 +267,8 @@ void __init arm64_memblock_init(void)
->  		 * margin, the size of the region that the available physical
->  		 * memory spans, randomize the linear region as well.
->  		 */
-> -		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-> -			range = range / ARM64_MEMSTART_ALIGN + 1;
-> -			memstart_addr -= ARM64_MEMSTART_ALIGN *
-> -					 ((range * memstart_offset_seed) >> 16);
-> -		}
-> +		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN)
-> +			memstart_addr -= (range * memstart_offset_seed) >> 16;
->  	}
-Sorry, here is not align to ARM64_MEMSTART_ALIGN
-
-Should be:
-	if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-		range = range / ARM64_MEMSTART_ALIGN;
-		memstart_addr -= ARM64_MEMSTART_ALIGN *
-				 ((range * memstart_offset_seed) >> 16);
-	}
-
->  
->  	/*
+> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> index 59280ac31937..283f7289aaa1 100644
+> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
+> @@ -691,7 +691,7 @@ static int c8sectpfe_probe(struct platform_device *pdev)
+>   	if (IS_ERR(fei->sram))
+>   		return PTR_ERR(fei->sram);
+>   
+> -	fei->sram_size = res->end - res->start;
+> +	fei->sram_size = resource_size(res);
+>   
+>   	fei->idle_irq = platform_get_irq_byname(pdev, "c8sectpfe-idle-irq");
+>   	if (fei->idle_irq < 0) {
 > 
+
+Acked-by: Patrice Chotard <patrice.chotard@st.com>
+
+Thanks
