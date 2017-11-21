@@ -1,40 +1,46 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Tue, 21 Nov 2017 19:31:32 +0800
-Subject: [PATCH v4 00/21] SError rework + RAS&IESB for firmware first
- support
-In-Reply-To: <5A0C8696.7020002@arm.com>
-References: <20171019145807.23251-1-james.morse@arm.com>
- <5A049B20.6000501@arm.com> <20171113112946.GK14144@cbox>
- <5A0B13B5.3000205@arm.com> <e0dea261-a9ef-9d00-682a-a4449d1de5ec@huawei.com>
- <5A0C8696.7020002@arm.com>
-Message-ID: <5de0ad2e-a6dc-705d-80b9-2baf16a480b4@huawei.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 21 Nov 2017 13:42:27 +0200
+Subject: [PATCH 05/10] dmaengine: bcm2835-dma: Use vchan_terminate_vdesc()
+ instead of desc_free
+In-Reply-To: <87k1yr4blm.fsf@anholt.net>
+References: <20171114143212.8311-1-peter.ujfalusi@ti.com>
+ <20171114143212.8311-6-peter.ujfalusi@ti.com> <87k1yr4blm.fsf@anholt.net>
+Message-ID: <2f3d48dd-f6a8-a3ff-635e-296f3e0f75f1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi james,
+Eric,
 
-On 2017/11/16 2:25, James Morse wrote:
-> What about 32bit? The register names and sizes are different. User-space would
-> need a separate implementation to drive this. This is easier for the kernel to do
-I agree with you that using different register names and sizes, such as 32 bit.
-For the hcr_el2.VSE/hcr_el2.VF/hcr_el2.IF(KVM_IRQ_LINE needs hcr_el2.VF/hcr_el2.IF),  we can only export
-the necessary bits that user space need.
-
-Then add the renamed registers to the sys_reg_desc sys_reg_descs[], user space will save these registers in sys_reg_desc sys_reg_descs[]
-before migration, and load these saved value after finish migration, which should be current user space logic, this way will avoid do much change.
-Not sure whether other people have better idea.
-
-static const struct sys_reg_desc sys_reg_descs[] = {
-	..................................
-        { SYS_DESC(SYS_AFSR0_EL1), access_vm_reg, reset_unknown, AFSR0_EL1 },
-        { SYS_DESC(SYS_AFSR1_EL1), access_vm_reg, reset_unknown, AFSR1_EL1 },
-        { SYS_DESC(SYS_ESR_EL1), access_vm_reg, reset_unknown, ESR_EL1 },
-	.................................
-}
-
+On 11/15/2017 08:53 PM, Eric Anholt wrote:
+> Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
 > 
-> We should have an API specific to the feature we are offering user-space. We are
-> offering a way to trigger an SError, with a specified ESR if the system supports
-> that. To be migrated it needs to be able to read this information back.
+>> To avoid race with vchan_complete, use the race free way to terminate
+>> running transfer.
+>>
+>> Implement the device_synchronize callback to make sure that the terminated
+>> descriptor is freed.
+>>
+>> CC: Martin Sperl <kernel@martin.sperl.org>
+>> CC: Eric Anholt <eric@anholt.net>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > 
-> This way we can change the implementation without changing the API.
+> I haven't fully followed the series, but thanks for porting your fix to
+> other platforms!
+I have seen similar patterns in these drivers and it was the right thing to do
+imho.
+Unfortunately I can not test on other platforms than eDMA and sDMA, but I
+firmly believe that based on the usage it should be fine as it survives my
+torture tests.
+
+It would be great to see some Tested-by from others to have more coverage.
+
+> Acked-by: Eric Anholt <eric@anholt.net>
+
+Thank you!
+
+
+-- 
+P?ter
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
