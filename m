@@ -1,43 +1,62 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 21 Nov 2017 08:58:15 +0530
-Subject: [PATCH] cpufreq: mediatek: add missing
- MODULE_DESCRIPTION/AUTHOR/LICENSE
-In-Reply-To: <20171120213201.52606-1-jc@linux.com>
-References: <20171120213201.52606-1-jc@linux.com>
-Message-ID: <20171121032815.GF6125@vireshk-i7>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Tue, 21 Nov 2017 11:44:13 +0800
+Subject: [PATCH] arm64: kaslr: Fix kaslr end boundary of virt addr
+Message-ID: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20-11-17, 13:32, Jesse Chan wrote:
-> This change resolves a new compile-time warning
-> when built as a loadable module:
-> 
-> WARNING: modpost: missing MODULE_LICENSE() in drivers/cpufreq/mediatek-cpufreq.o
-> see include/linux/module.h for more information
-> 
-> This adds the license as "GPL v2", which matches the header of the file.
-> 
-> MODULE_DESCRIPTION and MODULE_AUTHOR are also added.
-> 
-> Signed-off-by: Jesse Chan <jc@linux.com>
-> ---
->  drivers/cpufreq/mediatek-cpufreq.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/cpufreq/mediatek-cpufreq.c b/drivers/cpufreq/mediatek-cpufreq.c
-> index 18c4bd9a5c65..e0d5090b303d 100644
-> --- a/drivers/cpufreq/mediatek-cpufreq.c
-> +++ b/drivers/cpufreq/mediatek-cpufreq.c
-> @@ -620,3 +620,7 @@ static int __init mtk_cpufreq_driver_init(void)
->  	return 0;
->  }
->  device_initcall(mtk_cpufreq_driver_init);
-> +
-> +MODULE_DESCRIPTION("MediaTek CPUFreq driver");
-> +MODULE_AUTHOR("Pi-Cheng Chen <pi-cheng.chen@linaro.org>");
-> +MODULE_LICENSE("GPL v2");
+With kaslr and kasan enable both, I got the follow issue.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+[   16.130523s]kasan: reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000
+[   16.142517s]___alloc_bootmem_nopanic:257
+[   16.148284s]__alloc_memory_core_early:63, addr = 197fc7fc0
+[   16.155670s]__alloc_memory_core_early:65, virt = ffffffffd7fc7fc0
+[   16.163635s]__alloc_memory_core_early:67, toshow = ffffff8ffaff8ff8
+[   16.171783s]__alloc_memory_core_early:69, show_phy = ffffffe2649f8ff8
+[   16.180145s]Unable to handle kernel paging request at virtual address ffffff8ffaff8ff8
+[   16.189971s]pgd = ffffffad9c507000
+[   16.195220s][ffffff8ffaff8ff8] *pgd=0000000197fc8003, *pud=0000000197fc8003
 
+*reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000*
+
+memstart_addr 0
+ARM64_MEMSTART_ALIGN 0x40000000
+memstart_offset_seed 0xffc7
+PHYS_OFFSET = 0 - memstart_addr = 0 - 3E40000000 = FFFFFFC1C0000000
+
+reg->base = 0x100000000  -> 0xffffffff40000000
+phys_end  = 0x1c0000000  -> 0xffffffc000000000  This is confused, end less than start.
+
+And In memblock it use "start_addr + size" as the end addr. So in function kasan_init,
+if the start >= end, it will not map the hole block address. But the memory in this
+block is valid. And it can be allocated as well.
+
+So donot use the last memory region. Changing "range = range / ARM64_MEMSTART_ALIGN + 1" to
+range = range / ARM64_MEMSTART_ALIGN;
+
+Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+Signed-off-by: Chen Xiang <chenxiang9@huawei.com>
+---
+ arch/arm64/mm/init.c | 7 ++-----
+ 1 file changed, 2 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+index 716d122..60112c0 100644
+--- a/arch/arm64/mm/init.c
++++ b/arch/arm64/mm/init.c
+@@ -267,11 +267,8 @@ void __init arm64_memblock_init(void)
+ 		 * margin, the size of the region that the available physical
+ 		 * memory spans, randomize the linear region as well.
+ 		 */
+-		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+-			range = range / ARM64_MEMSTART_ALIGN + 1;
+-			memstart_addr -= ARM64_MEMSTART_ALIGN *
+-					 ((range * memstart_offset_seed) >> 16);
+-		}
++		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN)
++			memstart_addr -= (range * memstart_offset_seed) >> 16;
+ 	}
+ 
+ 	/*
 -- 
-viresh
+1.9.1
