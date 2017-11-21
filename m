@@ -1,64 +1,153 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 21 Nov 2017 15:32:03 +0100
-Subject: [PATCH v2 5/6] ARM: ep93xx: ts72xx: cosmetic: Add some description to
- ts72xx code
+Date: Tue, 21 Nov 2017 15:32:04 +0100
+Subject: [PATCH v2 6/6] ARM: ep93xx: ts72xx: Add support for BK3 board -
+ ts72xx derivative
 In-Reply-To: <20171121143204.1839-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
  <20171121143204.1839-1-lukma@denx.de>
-Message-ID: <20171121143204.1839-6-lukma@denx.de>
+Message-ID: <20171121143204.1839-7-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends readability of ts72xx.c code.
+The BK3 board is a derivative of the ts72xx reference design.
 
 Signed-off-by: Lukasz Majewski <lukma@denx.de>
 ---
 Changes for v2:
-- New patch
+- Place bk3 support code to the ts72xx.c file
 ---
- arch/arm/mach-ep93xx/ts72xx.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-ep93xx/Kconfig  |  7 +++++
+ arch/arm/mach-ep93xx/ts72xx.c | 64 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-ep93xx/ts72xx.h |  5 ++++
+ arch/arm/tools/mach-types     |  1 +
+ 4 files changed, 77 insertions(+)
 
+diff --git a/arch/arm/mach-ep93xx/Kconfig b/arch/arm/mach-ep93xx/Kconfig
+index 61a75ca3684e..c095236d7ff8 100644
+--- a/arch/arm/mach-ep93xx/Kconfig
++++ b/arch/arm/mach-ep93xx/Kconfig
+@@ -21,6 +21,13 @@ config MACH_ADSSPHERE
+ 	  Say 'Y' here if you want your kernel to support the ADS
+ 	  Sphere board.
+ 
++config MACH_BK3
++	bool "Support Liebherr BK3.1"
++	select MACH_TS72XX
++	help
++	  Say 'Y' here if you want your kernel to support the
++	  Liebherr controller BK3.1.
++
+ config MACH_EDB93XX
+ 	bool
+ 
 diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index a6e473b3dcf6..2e8fcc6e87b6 100644
+index 2e8fcc6e87b6..0de19b136ad0 100644
 --- a/arch/arm/mach-ep93xx/ts72xx.c
 +++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -28,6 +28,9 @@
- #include "soc.h"
- #include "ts72xx.h"
+@@ -18,8 +18,10 @@
+ #include <linux/io.h>
+ #include <linux/mtd/rawnand.h>
+ #include <linux/mtd/partitions.h>
++#include <linux/amba/bus.h>
  
+ #include <mach/hardware.h>
++#include <mach/irqs.h>
+ 
+ #include <asm/mach-types.h>
+ #include <asm/mach/map.h>
+@@ -261,3 +263,65 @@ MACHINE_START(TS72XX, "Technologic Systems TS-72xx SBC")
+ 	.init_late	= ep93xx_init_late,
+ 	.restart	= ep93xx_restart,
+ MACHINE_END
++
 +/*************************************************************************
-+ * IO map
++ * BK3 support code
 + *************************************************************************/
- static struct map_desc ts72xx_io_desc[] __initdata = {
- 	{
- 		.virtual	= (unsigned long)TS72XX_OPTIONS_VIRT_BASE,
-@@ -189,6 +192,9 @@ static struct platform_device ts72xx_rtc_device = {
- 	.num_resources 	= ARRAY_SIZE(ts72xx_rtc_resources),
- };
++static struct mtd_partition bk3_nand_parts[] = {
++	{
++		.name		= "System",
++		.offset	= 0x00000000,
++		.size		= 0x01e00000,
++	}, {
++		.name		= "Data",
++		.offset	= 0x01e00000,
++		.size		= 0x05f20000
++	}, {
++		.name		= "RedBoot",
++		.offset	= 0x07d20000,
++		.size		= 0x002e0000,
++		.mask_flags	= MTD_WRITEABLE,	/* force RO */
++	},
++};
++
++static AMBA_APB_DEVICE(i2s1, "apb:i2s", 1, EP93XX_I2S_PHYS_BASE,
++		       { IRQ_EP93XX_SAI }, NULL);
++
++static struct map_desc bk3_io_desc[] __initdata = {
++	{
++		.virtual	= BK3_CPLDVER_VIRT_BASE,
++		.pfn		= __phys_to_pfn(BK3_CPLDVER_PHYS_BASE),
++		.length	= BK3_CPLDVER_SIZE,
++		.type		= MT_DEVICE,
++	}
++};
++
++static void __init bk3_map_io(void)
++{
++	ts72xx_common_map_io();
++	iotable_init(bk3_io_desc, ARRAY_SIZE(bk3_io_desc));
++}
++
++static void __init bk3_init_machine(void)
++{
++	ep93xx_init_devices();
++
++	ts72xx_register_flash(bk3_nand_parts, ARRAY_SIZE(bk3_nand_parts),
++			      EP93XX_CS6_PHYS_BASE);
++
++	platform_device_register(&ts72xx_wdt_device);
++	ep93xx_register_eth(&ts72xx_eth_data, 1);
++
++	amba_device_register(&i2s1_device, &iomem_resource);
++}
++
++MACHINE_START(BK3, "Liebherr controller BK3.1")
++	/* Maintainer: Lukasz Majewski <lukma@denx.de> */
++	.atag_offset	= 0x100,
++	.map_io	= bk3_map_io,
++	.init_irq	= ep93xx_init_irq,
++	.init_time	= ep93xx_timer_init,
++	.init_machine	= bk3_init_machine,
++	.init_late	= ep93xx_init_late,
++	.restart	= ep93xx_restart,
++MACHINE_END
+diff --git a/arch/arm/mach-ep93xx/ts72xx.h b/arch/arm/mach-ep93xx/ts72xx.h
+index d9ff04db3221..d3165bb9ee78 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.h
++++ b/arch/arm/mach-ep93xx/ts72xx.h
+@@ -45,6 +45,11 @@
+ #define TS72XX_WDT_CONTROL_PHYS_BASE	0x23800000
+ #define TS72XX_WDT_FEED_PHYS_BASE	0x23c00000
  
-+/*************************************************************************
-+ * WATCHDOG
-+ *************************************************************************/
- static struct resource ts72xx_wdt_resources[] = {
- 	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
- 	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
-@@ -201,10 +207,16 @@ static struct platform_device ts72xx_wdt_device = {
- 	.resource	= ts72xx_wdt_resources,
- };
++/* BK3 specific defines */
++#define BK3_CPLDVER_PHYS_BASE		0x23400000
++#define BK3_CPLDVER_VIRT_BASE		0xfebfd000
++#define BK3_CPLDVER_SIZE		0x00001000
++
+ #ifndef __ASSEMBLY__
  
-+/*************************************************************************
-+ * ETH
-+ *************************************************************************/
- static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
- 	.phy_id		= 1,
- };
- 
-+/*************************************************************************
-+ * TS72XX support code
-+ *************************************************************************/
- #if IS_ENABLED(CONFIG_FPGA_MGR_TS73XX)
- 
- /* Relative to EP93XX_CS1_PHYS_BASE */
+ static inline int ts72xx_model(void)
+diff --git a/arch/arm/tools/mach-types b/arch/arm/tools/mach-types
+index a9313b66f770..4eac94c1eb6f 100644
+--- a/arch/arm/tools/mach-types
++++ b/arch/arm/tools/mach-types
+@@ -345,6 +345,7 @@ mxlads			MACH_MXLADS		MXLADS			1851
+ linkstation_mini	MACH_LINKSTATION_MINI	LINKSTATION_MINI	1858
+ afeb9260		MACH_AFEB9260		AFEB9260		1859
+ imx27ipcam		MACH_IMX27IPCAM		IMX27IPCAM		1871
++bk3			MACH_BK3		BK3			1880
+ rd88f6183ap_ge		MACH_RD88F6183AP_GE	RD88F6183AP_GE		1894
+ realview_pba8		MACH_REALVIEW_PBA8	REALVIEW_PBA8		1897
+ realview_pbx		MACH_REALVIEW_PBX	REALVIEW_PBX		1901
 -- 
 2.11.0
