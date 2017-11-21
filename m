@@ -1,134 +1,36 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Tue, 21 Nov 2017 16:14:17 +0000
-Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
- larger kernels
-In-Reply-To: <CAKv+Gu_aAKbhu5V4Tuk2_yCFd4GG_KqCcNaK-9R7BU_XJw52fA@mail.gmail.com>
-References: <20171117114143.26577-1-steve.capper@arm.com>
- <20171117114143.26577-3-steve.capper@arm.com>
- <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
- <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
- <20171121131448.gokl6p2upszrgayn@capper-debian.cambridge.arm.com>
- <CAKv+Gu_aAKbhu5V4Tuk2_yCFd4GG_KqCcNaK-9R7BU_XJw52fA@mail.gmail.com>
-Message-ID: <20171121161417.qdpsh3g55kovcsfz@capper-debian.cambridge.arm.com>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Tue, 21 Nov 2017 16:25:09 +0000
+Subject: [PATCH v2 4/4] PCI/AER: Dont do recovery when DPC is enabled
+In-Reply-To: <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
+References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
+ <1510721808-27164-5-git-send-email-poza@codeaurora.org>
+ <20171115211447.GA7266@bhelgaas-glaptop.roam.corp.google.com>
+ <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
+Message-ID: <de047a7ce7334daab4e53ea4e8444421@AcuMS.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 01:24:28PM +0000, Ard Biesheuvel wrote:
-> On 21 November 2017 at 13:14, Steve Capper <steve.capper@arm.com> wrote:
-> > On Tue, Nov 21, 2017 at 11:13:06AM +0000, Steve Capper wrote:
-> >> On Mon, Nov 20, 2017 at 05:00:10PM +0000, Mark Rutland wrote:
-> >> > Hi,
-> >>
-> >> Hi Mark,
-> >>
-> >> >
-> >> > On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
-> >> > > -#define SWAPPER_DIR_SIZE (SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
-> >> > > +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
-> >> > > +
-> >> > > +#if SWAPPER_PGTABLE_LEVELS > 3
-> >> > > +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
-> >> > > +#else
-> >> > > +#define EARLY_PUDS(vstart, vend) (0)
-> >> > > +#endif
-> >> > > +
-> >> > > +#if SWAPPER_PGTABLE_LEVELS > 2
-> >> > > +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
-> >> > > +#else
-> >> > > +#define EARLY_PMDS(vstart, vend) (0)
-> >> > > +#endif
-> >> > > +
-> >> > > +#define EARLY_PAGES(vstart, vend) ( 1                    /* PGDIR page */                                \
-> >> > > +                 + EARLY_PGDS((vstart), (vend))  /* each PGDIR needs a next level page table */  \
-> >> > > +                 + EARLY_PUDS((vstart), (vend))  /* each PUD needs a next level page table */    \
-> >> > > +                 + EARLY_PMDS((vstart), (vend))) /* each PMD needs a next level page table */
-> >> > > +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
-> >> > >  #define IDMAP_DIR_SIZE           (IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
-> >> >
-> >> > I'm currently struggling to convince myself as to whether 2M is
-> >> > necessary/sufficient slack space for all configurations.
-> >>
-> >> Agreed, if the possible address range is changed outside these bounds
-> >> then we need to extend them.
-> >>
-> >> >
-> >> > At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
-> >> > to cross PGD/PUD/PMD boundaries.
-> >> >
-> >> > For example with 3 levels of 64K pages, and a huge kernel that takes up
-> >> > SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
-> >> > and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
-> >> > the kernel were to be relocated such that it straddled two PGDs, we'd
-> >> > need 2 PGDs and 2 PMDs, needing 5 pages total.
-> >> >
-> >> > I'm not sure that we have a problem if we don't relax KASLR.
-> >> >
-> >>
-> >> The approach I've adopted is to compute which indices are required for
-> >> PGDs, PUDs, PMDs to map the supplied address range, then count them.
-> >> If we require two PGD entries then that means we need two pages
-> >> containing PMD entries to be allocated.
-> >>
-> >> If we consider just PGDs, for example, the only way I am aware of the
-> >> kernel straddling more PGDs than previously computed is for the mapping
-> >> to begin before vstart or end after vend (or both).
-> >>
-> >> Should I refine the range specified in the SWAPPER_DIR_SIZE for the
-> >> current KASLR? (I thought the random offset was < SZ_2M?)
-> >>
-> >
-> > Ahh, I see KASLR offset has the bottom 21 bits masked out, not confined
-> > to the 21 bottom bits :-).
-> >
-> > It may be possible to do something with (vend - vstart) I will have a
-> > think about this.
-> >
+From: Sinan Kaya
+> Sent: 16 November 2017 14:04
+...
+> The issue is two independent software entities are trying to recover the PCIe
+> link simultaneously. AER and DPC have two different approaches to link recovery.
 > 
-> Hi Steve,
+> AER makes a callback into the endpoint drivers for non-fatal errors and hope
+> that endpoint driver can recover the link. AER also makes a callback in the
+> fatal error case but resets the link via secondary bus reset.
 > 
-> Please be aware that it is slightly more complicated than that.
-> 
-> The VA randomization offset chosen by the KASLR code is made up of two
-> separate values:
-> - the VA offset modulo 2 MB, which equals the PA offset modulo 2 MB,
-> and is set by the EFI stub when it loads the kernel image into 1:1
-> mapped memory
-> - the VA offset in 2 MB increments, which is set by the kaslr_init
-> call in head.S
-> 
-> The reason for this approach is that it allows randomization at 64 KB
-> granularity without losing the ability to map the kernel using 2 MB
-> block mappings or contiguous page mappings. On a 48-bit VA kernel,
-> this gives us 30 bits of randomization.
+> The DPC on the other hand stops the drivers immediately since HW took care of
+> link disable. (Endpoint register reads return ~0 at this point.)
 
+What happens if the 'user' driver doesn't define the error reporting callbacks?
+It might be hardened against the ~0u returns from reads - so not OOPS.
+It might be appropriate to call the remove() function instead.
 
-Thanks Ard!
+> DPC driver clears
+> the interrupt from the DPC capability and brings the link up at the end. Full
+> enumeration/rescan follows this procedure to go back to functioning state.
 
-So if I've understood correctly, it is valid for there to exist a VA
-KASLR offset K at runtime s.t.
+That might not be a good idea, very likely it will fail again immediately.
 
- K mod 2^SHIFT != 0
-
-For SHIFT = PGDIR_SHIFT, PUD_SHIFT and SWAPPER_TABLE_SHIFT.
-(I need to correct my EARLY_PMDS macro to use SWAPPER_TABLE_SHIFT instead
-of PMD_SHIFT).
-
-I've managed to convince myself that this will mean at most one extra
-page being needed for each strideable level to cover where we get unlucky
-with KASLR. This will make the kernel image up to 3 pages larger with
-KASLR enabled (but shouldn't affect runtime memory as this will be given
-back).
-
-If (vend - vstart) mod 2^SHIFT == 0, then KASLR cannot affect that
-particular level, but we would need to map a much larger kernel for
-that identity to be true.
-
-So I'll remove the 2MB end offset from SWAPPER_DIR_SIZE and add in an
-extra page to EARLY_P[GUM]DS when KASLR is enabled.
-
-If I've understood things correctly, this should be safe with an updated
-KASLR that can cross PMD/PUD boundaries.
-
-Cheers,
--- 
-Steve
+	David
