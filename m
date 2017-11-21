@@ -1,48 +1,63 @@
-From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Tue, 21 Nov 2017 10:37:39 -0500
-Subject: [PATCH 2/2] ARM: dts: TS-7970: add basic device tree
-In-Reply-To: <CAOMZO5AFEqk6FcfzJGO6VH0LpF7uFnkmiMYds9y=jajx8ygdZQ@mail.gmail.com>
-References: <20171120211557.27946-1-sebastien.bourdelin@savoirfairelinux.com>
- <20171120211557.27946-2-sebastien.bourdelin@savoirfairelinux.com>
- <CAOMZO5AFEqk6FcfzJGO6VH0LpF7uFnkmiMYds9y=jajx8ygdZQ@mail.gmail.com>
-Message-ID: <9f24aabd-bf1f-c48f-b997-b0c80e44ca81@savoirfairelinux.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 21 Nov 2017 16:48:27 +0100
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+Message-ID: <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi,
 
-On 11/20/2017 06:37 PM, Fabio Estevam wrote:
-> Hi Sebastien,
+On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
+> Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> and CSI1 is used for parallel interface. This is not documented in
+> datasheet but by testing and guess.
 > 
-> On Mon, Nov 20, 2017 at 7:15 PM, Sebastien Bourdelin
-> <sebastien.bourdelin@savoirfairelinux.com> wrote:
+> This patch implement a v4l2 framework driver for it.
 > 
->> +&ecspi2 {
->> +       cs-gpios = <
->> +               &gpio5 31 GPIO_ACTIVE_HIGH
->> +               &gpio7 12 GPIO_ACTIVE_HIGH
->> +               &gpio5 18 GPIO_ACTIVE_HIGH
->> +       >;
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_ecspi2>;
->> +       status = "okay";
->> +
->> +       spidevfpga: spi at 1 {
->> +               compatible = "spidev";
->> +               reg = <1>;
->> +               spi-max-frequency = <1000000>;
+> Currently, the driver only support the parallel interface. MIPI-CSI2,
+> ISP's support are not included in this patch.
 > 
-> According to drivers/spi/spidev.c:
-> 
-> /*
-> * spidev should never be referenced in DT without a specific
-> * compatible string, it is a Linux implementation thing
-> * rather than a description of the hardware.
-> */
-> 
+> Signed-off-by: Yong Deng <yong.deng@magewell.com>
 
-Thanks, you are right!
-Just to point it, this warning has been introduced in
-956b200a846e324322f6211034c734c65a38e550 in date of march 2015, and it
-seems some devices trees whom had been introduced after still use the
-"spidev" string only.
+Thanks again for this driver.
+
+It seems like at least this iteration is behaving in a weird way with
+DMA transfers for at least YU12 and NV12 (and I would assume YV12).
+
+Starting a transfer of multiple frames in either of these formats,
+using either ffmpeg (ffmpeg -f v4l2 -video_size 640x480 -framerate 30
+-i /dev/video0 output.mkv) or yavta (yavta -c80 -p -F --skip 0 -f NV12
+-s 640x480 $(media-c tl -e 'sun6i-csi')) will end up in a panic.
+
+The panic seems to be generated with random data going into parts of
+the kernel memory, the pattern being in my case something like
+0x8287868a which is very odd (always around 0x88)
+
+It turns out that when you cover the sensor, the values change to
+around 0x28, so it really seems like it's pixels that have been copied
+there.
+
+I've looked quickly at the DMA setup, and it seems reasonable to
+me. Do you have the same issue on your side? Have you been able to
+test those formats using your hardware?
+
+Given that they all are planar formats and YUYV and the likes work
+just fine, maybe we can leave them aside for now?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 801 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171121/bbf4e2c5/attachment.sig>
