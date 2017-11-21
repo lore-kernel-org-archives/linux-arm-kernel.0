@@ -1,62 +1,35 @@
-From: puck.chen@hisilicon.com (Chen Feng)
-Date: Tue, 21 Nov 2017 11:44:13 +0800
-Subject: [PATCH] arm64: kaslr: Fix kaslr end boundary of virt addr
-Message-ID: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
+From: Bharat.Bhushan@nxp.com (Bharat Bhushan)
+Date: Tue, 21 Nov 2017 10:26:18 +0530
+Subject: [PATCH] staging: fsl-mc: fix mc-portal to use uin32_t type
+Message-ID: <1511240178-24672-1-git-send-email-Bharat.Bhushan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-With kaslr and kasan enable both, I got the follow issue.
+According to MC APIs, size of mc-portal in 32bit.
+Also fsl_create_mc_io() storing 32 bit mc-portal size.
+   " mc_io->portal_size = mc_portal_size;"
+   While "mc_io->portal_size" is uin16_t type and
+   "mc_portal_size" is uin32_t type.
 
-[   16.130523s]kasan: reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000
-[   16.142517s]___alloc_bootmem_nopanic:257
-[   16.148284s]__alloc_memory_core_early:63, addr = 197fc7fc0
-[   16.155670s]__alloc_memory_core_early:65, virt = ffffffffd7fc7fc0
-[   16.163635s]__alloc_memory_core_early:67, toshow = ffffff8ffaff8ff8
-[   16.171783s]__alloc_memory_core_early:69, show_phy = ffffffe2649f8ff8
-[   16.180145s]Unable to handle kernel paging request at virtual address ffffff8ffaff8ff8
-[   16.189971s]pgd = ffffffad9c507000
-[   16.195220s][ffffff8ffaff8ff8] *pgd=0000000197fc8003, *pud=0000000197fc8003
+This patches changes mc_io->portal_size from uin16_t to uin32_t
 
-*reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000*
-
-memstart_addr 0
-ARM64_MEMSTART_ALIGN 0x40000000
-memstart_offset_seed 0xffc7
-PHYS_OFFSET = 0 - memstart_addr = 0 - 3E40000000 = FFFFFFC1C0000000
-
-reg->base = 0x100000000  -> 0xffffffff40000000
-phys_end  = 0x1c0000000  -> 0xffffffc000000000  This is confused, end less than start.
-
-And In memblock it use "start_addr + size" as the end addr. So in function kasan_init,
-if the start >= end, it will not map the hole block address. But the memory in this
-block is valid. And it can be allocated as well.
-
-So donot use the last memory region. Changing "range = range / ARM64_MEMSTART_ALIGN + 1" to
-range = range / ARM64_MEMSTART_ALIGN;
-
-Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-Signed-off-by: Chen Xiang <chenxiang9@huawei.com>
+Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
 ---
- arch/arm64/mm/init.c | 7 ++-----
- 1 file changed, 2 insertions(+), 5 deletions(-)
+ drivers/staging/fsl-mc/include/mc-sys.h | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 716d122..60112c0 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -267,11 +267,8 @@ void __init arm64_memblock_init(void)
- 		 * margin, the size of the region that the available physical
- 		 * memory spans, randomize the linear region as well.
- 		 */
--		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
--			range = range / ARM64_MEMSTART_ALIGN + 1;
--			memstart_addr -= ARM64_MEMSTART_ALIGN *
--					 ((range * memstart_offset_seed) >> 16);
--		}
-+		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN)
-+			memstart_addr -= (range * memstart_offset_seed) >> 16;
- 	}
- 
- 	/*
+diff --git a/drivers/staging/fsl-mc/include/mc-sys.h b/drivers/staging/fsl-mc/include/mc-sys.h
+index dca7f90..11d4367 100644
+--- a/drivers/staging/fsl-mc/include/mc-sys.h
++++ b/drivers/staging/fsl-mc/include/mc-sys.h
+@@ -75,7 +75,7 @@
+ struct fsl_mc_io {
+ 	struct device *dev;
+ 	u16 flags;
+-	u16 portal_size;
++	u32 portal_size;
+ 	phys_addr_t portal_phys_addr;
+ 	void __iomem *portal_virt_addr;
+ 	struct fsl_mc_device *dpmcp_dev;
 -- 
-1.9.1
+1.9.3
