@@ -1,60 +1,38 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 21 Nov 2017 15:31:59 +0100
-Subject: [PATCH v2 1/6] ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros where
- applicable
-In-Reply-To: <20171121143204.1839-1-lukma@denx.de>
+Date: Tue, 21 Nov 2017 15:31:58 +0100
+Subject: [PATCH v2 0/6] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <20171116232239.16823-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
- <20171121143204.1839-1-lukma@denx.de>
-Message-ID: <20171121143204.1839-2-lukma@denx.de>
+Message-ID: <20171121143204.1839-1-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit cleans up the code by using dedicated macros instead of
-full definitions.
+This patch series adds support for Liebherr's BK3 board, being
+a derivative of TS72XX design.
 
-Signed-off-by: Lukasz Majewski <lukma@denx.de>
----
-Changes for v2:
-- None
----
- arch/arm/mach-ep93xx/ts72xx.c | 18 +++---------------
- 1 file changed, 3 insertions(+), 15 deletions(-)
+This patchset consists of following patches:
 
-diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index 8745162ec05d..06345b85f27c 100644
---- a/arch/arm/mach-ep93xx/ts72xx.c
-+++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -187,16 +187,8 @@ static struct platform_device ts72xx_rtc_device = {
- };
- 
- static struct resource ts72xx_wdt_resources[] = {
--	{
--		.start	= TS72XX_WDT_CONTROL_PHYS_BASE,
--		.end	= TS72XX_WDT_CONTROL_PHYS_BASE + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
--	{
--		.start	= TS72XX_WDT_FEED_PHYS_BASE,
--		.end	= TS72XX_WDT_FEED_PHYS_BASE + SZ_4K - 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
-+	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
- };
- 
- static struct platform_device ts72xx_wdt_device = {
-@@ -216,11 +208,7 @@ static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
- #define TS73XX_FPGA_LOADER_BASE		0x03c00000
- 
- static struct resource ts73xx_fpga_resources[] = {
--	{
--		.start	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE,
--		.end	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE + 1,
--		.flags	= IORESOURCE_MEM,
--	},
-+	DEFINE_RES_MEM(EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE, 0x01),
- };
- 
- static struct platform_device ts73xx_fpga_device = {
+- ts72xx.[c|h] cosmetic cleanup/improvement
+- Rewrite ts72xx.c to be reusable by bk3
+- The Liebherr's BK3 board has been added with re-using code of
+  ts72xx.c
+
+This series applies on top of v4.14
+
+Lukasz Majewski (6):
+  ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros where applicable
+  ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
+  ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
+    parameters
+  ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
+  ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
+  ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
+
+ arch/arm/mach-ep93xx/Kconfig  |   7 +++
+ arch/arm/mach-ep93xx/ts72xx.c | 137 +++++++++++++++++++++++++++++++-----------
+ arch/arm/mach-ep93xx/ts72xx.h |   9 +++
+ arch/arm/tools/mach-types     |   1 +
+ 4 files changed, 120 insertions(+), 34 deletions(-)
+
 -- 
 2.11.0
