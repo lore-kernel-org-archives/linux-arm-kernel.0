@@ -1,72 +1,59 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 21 Nov 2017 11:38:13 +0100
-Subject: [PATCH v2 4/4] drm: omapdrm: Fix DPI on platforms using the DSI
- VDDS
-In-Reply-To: <7f34033e-4af7-f5f5-47ef-759249ddfe39@ti.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <dd2427920427440e051951071377265fc0a830d4.1510822218.git.hns@goldelico.com>
- <7f34033e-4af7-f5f5-47ef-759249ddfe39@ti.com>
-Message-ID: <040DF543-B168-4537-A3B1-B0D4A2BD1E7D@goldelico.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 21 Nov 2017 11:12:59 +0000
+Subject: [PATCH 4/7] KVM: arm/arm64: vgic-its: Check result of allocation
+ before use
+In-Reply-To: <20171120145814.GM28855@cbox>
+References: <20171116175821.26544-1-marc.zyngier@arm.com>
+ <20171116175821.26544-5-marc.zyngier@arm.com> <20171120145814.GM28855@cbox>
+Message-ID: <dc4ff723-3477-b636-2e74-3bddc48ce9a6@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-> Am 21.11.2017 um 11:25 schrieb Tomi Valkeinen <tomi.valkeinen@ti.com>:
-> 
-> On 16/11/17 10:50, H. Nikolaus Schaller wrote:
->> From: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> 
->> Commit d178e034d565 ("drm: omapdrm: Move FEAT_DPI_USES_VDDS_DSI feature
->> to dpi code") replaced usage of platform data version with SoC matching
->> to configure DPI VDDS. The SoC match entries were incorrect, they should
->> have matched on the machine name instead of the SoC family. Fix it.
->> 
->> The result was observed on OpenPandora with OMAP3530 where the panel only
->> had the Blue channel and Red&Green were missing. It was not observed on
->> GTA04 with DM3730.
->> 
->> Fixes: d178e034d565 ("drm: omapdrm: Move FEAT_DPI_USES_VDDS_DSI feature to dpi code")
->> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
->> Reported-by: H. Nikolaus Schaller <hns@goldelico.com>
->> Tested-by: H. Nikolaus Schaller <hns@goldelico.com>
+On 20/11/17 14:58, Christoffer Dall wrote:
+> On Thu, Nov 16, 2017 at 05:58:18PM +0000, Marc Zyngier wrote:
+>> We miss a test against NULL after allocation.
+>>
+>> Fixes: 6d03a68f8054 ("KVM: arm64: vgic-its: Turn device_id validation into generic ID validation")
+>> Cc: stable at vger.kernel.org # 4.8
+>> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 >> ---
->> drivers/gpu/drm/omapdrm/dss/dpi.c | 4 ++--
->> 1 file changed, 2 insertions(+), 2 deletions(-)
->> 
->> diff --git a/drivers/gpu/drm/omapdrm/dss/dpi.c b/drivers/gpu/drm/omapdrm/dss/dpi.c
->> index 4ed5fde11313..a91e5f1a0490 100644
->> --- a/drivers/gpu/drm/omapdrm/dss/dpi.c
->> +++ b/drivers/gpu/drm/omapdrm/dss/dpi.c
->> @@ -566,8 +566,8 @@ static int dpi_verify_pll(struct dss_pll *pll)
->> }
->> 
->> static const struct soc_device_attribute dpi_soc_devices[] = {
->> -	{ .family = "OMAP3[456]*" },
->> -	{ .family = "[AD]M37*" },
->> +	{ .machine = "OMAP3[456]*" },
->> +	{ .machine = "[AD]M37*" },
->> 	{ /* sentinel */ }
->> };
->> 
->> 
+>>  virt/kvm/arm/vgic/vgic-its.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 370086006838..30f7c7e6d2f4 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -821,6 +821,8 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+>>  		return E_ITS_MAPC_COLLECTION_OOR;
+>>  
+>>  	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
+>> +	if (!collection)
+>> +		return -ENOMEM;
 > 
-> I have picked this one.
+> Our processing of this return value seems to be "shrug, something went
+> wrong, let's move on to the next command".  Is this really a valid thing
+> to do if we're so much under memory pressure that we dannot allocate a
+> collection structure?
 
-Fine.
+The main issue is that we don't currently have a good story when
+returning error in general. The current implementation of the vITS
+doesn't implement the stalling behaviour which would give the guest the
+opportunity to do something. From a host PoV, I'm not really sure what
+we can do. Killing the guest doesn't seem very appropriate.
 
-> I think the rest of the patches are more of a
-> cleanup, right? And you'll be sending v3 at some point.
-
-Yes. Should we wait for more comments or should I send now?
-
-BR and thanks,
-Nikolaus Schaller
-
+So I'd rather implement stalling the command queue (see 6.3.2 in the
+GICv3 spec), and implement something to report the error (even though
+this is IMPDEF). Thoughts?
 
 > 
-> Tomi
+> My question notwithstanding:
 > 
-> -- 
-> Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-> Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
