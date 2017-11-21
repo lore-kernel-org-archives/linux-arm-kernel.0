@@ -1,123 +1,289 @@
 From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Tue, 21 Nov 2017 11:57:58 +0000
-Subject: [RFC 2/9] arm64: limit PA size to supported range
+Date: Tue, 21 Nov 2017 11:57:59 +0000
+Subject: [RFC 3/9] arm64: handle 52-bit addresses in TTBR
 In-Reply-To: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
 References: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
-Message-ID: <1511265485-27163-3-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1511265485-27163-4-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We currently copy the physical address size from
-ID_AA64MMFR0_EL1.PARange directly into TCR.(I)PS. This will not work for
-4k and 16k granule kernels on systems that support 52-bit physical
-addresses, since 52-bit addresses are only permitted with the 64k
-granule.
+The top 4 bits of a 52-bit physical address are positioned at bits 2..5
+in the TTBR registers. Introduce a couple of macros to move the bits
+there, and change all TTBR writers to use them.
 
-To fix this, fall back to 48 bits when configuring the PA size when the
-kernel does not support 52-bit PAs. When it does, fall back to 52, to
-avoid similar problems in the future if the PA size is ever increased
-above 52.
+Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
+52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
+system without 52-bit PA can only use up to 48-bit PAs. Add a kconfig
+dependency to ensure PAN is configured.
+
+In addition, when using 52-bit PA there is a special alignment
+requirement on the top-level table. We don't currently have any VA_BITS
+configuration that would violate the requirement, but one could be added
+in the future, so add a compile-time BUG_ON to check for it.
 
 Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 13 +++++++++++++
- arch/arm64/include/asm/sysreg.h    |  8 ++++++++
- arch/arm64/kvm/hyp-init.S          |  6 ++----
- arch/arm64/kvm/hyp/s2-setup.c      |  2 ++
- arch/arm64/mm/proc.S               |  6 ++----
- 5 files changed, 27 insertions(+), 8 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h       |  2 ++
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/assembler.h   | 17 +++++++++++++++++
+ arch/arm64/include/asm/kvm_mmu.h     |  2 ++
+ arch/arm64/include/asm/mmu_context.h |  2 +-
+ arch/arm64/include/asm/pgtable.h     |  6 ++++++
+ arch/arm64/kernel/head.S             |  6 ++++--
+ arch/arm64/kernel/hibernate-asm.S    | 12 +++++++-----
+ arch/arm64/kernel/hibernate.c        |  2 +-
+ arch/arm64/kvm/hyp-init.S            |  3 ++-
+ arch/arm64/mm/pgd.c                  |  8 ++++++++
+ arch/arm64/mm/proc.S                 | 13 ++++++++-----
+ virt/kvm/arm/arm.c                   |  2 +-
+ 13 files changed, 60 insertions(+), 16 deletions(-)
 
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index fa6f2174276b..8dbec683638b 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -221,6 +221,8 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 	return 8;
+ }
+ 
++#define kvm_phys_to_vttbr(addr)		(addr)
++
+ #endif	/* !__ASSEMBLY__ */
+ 
+ #endif /* __ARM_KVM_MMU_H__ */
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 30d0cc272903..7e63048e3425 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -622,6 +622,7 @@ config ARM64_PA_BITS_48
+ config ARM64_PA_BITS_52
+ 	bool "52-bit (ARMv8.2)"
+ 	depends on ARM64_64K_PAGES
++	depends on ARM64_PAN || !ARM64_SW_TTBR0_PAN
+ 	help
+ 	  Enable support for a 52-bit physical address space, introduced as
+ 	  part of the ARMv8.2-LPA extension.
 diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index d58a6253c6ab..04cf94766b78 100644
+index 04cf94766b78..ba3c796b9fe1 100644
 --- a/arch/arm64/include/asm/assembler.h
 +++ b/arch/arm64/include/asm/assembler.h
-@@ -338,6 +338,19 @@ alternative_endif
+@@ -512,4 +512,21 @@ alternative_else_nop_endif
+ #endif
  	.endm
  
- /*
-+ * tcr_set_pa_size - set TCR.(I)PS to the highest supported
-+ * ID_AA64MMFR0_EL1.PARange value
++/*
++ * Arrange a physical address in a TTBR register, taking care of 52-bit
++ * addresses.
++ *
++ * 	phys:	physical address, preserved
++ * 	ttbr:	returns the TTBR value
 + */
-+	.macro	tcr_set_pa_size, tcr, pos, tmp0, tmp1
-+	mrs	\tmp0, ID_AA64MMFR0_EL1
-+	ubfx	\tmp0, \tmp0, #ID_AA64MMFR0_PARANGE_SHIFT, #3
-+	mov	\tmp1, #ID_AA64MMFR0_PARANGE_MAX
-+	cmp	\tmp0, \tmp1
-+	csel	\tmp0, \tmp1, \tmp0, hi
-+	bfi	\tcr, \tmp0, \pos, #3
++	.macro	phys_to_ttbr, phys, ttbr
++#ifdef CONFIG_ARM64_PA_BITS_52
++	and	\ttbr, \phys, #(1 << 48) - 1
++	orr	\ttbr, \ttbr, \phys, lsr #48 - 2
++	bic	\ttbr, \ttbr, #(1 << 2) - 1
++#else
++	mov	\ttbr, \phys
++#endif
 +	.endm
 +
-+/*
-  * Macro to perform a data cache maintenance for the interval
-  * [kaddr, kaddr + size)
-  *
-diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
-index f707fed5886f..52225165df1a 100644
---- a/arch/arm64/include/asm/sysreg.h
-+++ b/arch/arm64/include/asm/sysreg.h
-@@ -364,6 +364,14 @@
- #define ID_AA64MMFR0_TGRAN64_SUPPORTED	0x0
- #define ID_AA64MMFR0_TGRAN16_NI		0x0
- #define ID_AA64MMFR0_TGRAN16_SUPPORTED	0x1
-+#define ID_AA64MMFR0_PARANGE_48		0x5
-+#define ID_AA64MMFR0_PARANGE_52		0x6
-+
-+#ifdef CONFIG_ARM64_PA_BITS_52
-+#define ID_AA64MMFR0_PARANGE_MAX	ID_AA64MMFR0_PARANGE_52
-+#else
-+#define ID_AA64MMFR0_PARANGE_MAX	ID_AA64MMFR0_PARANGE_48
-+#endif
+ #endif	/* __ASM_ASSEMBLER_H */
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 672c8684d5c2..747bfff92948 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -309,5 +309,7 @@ static inline unsigned int kvm_get_vmid_bits(void)
+ 	return (cpuid_feature_extract_unsigned_field(reg, ID_AA64MMFR1_VMIDBITS_SHIFT) == 2) ? 16 : 8;
+ }
  
- /* id_aa64mmfr1 */
- #define ID_AA64MMFR1_PAN_SHIFT		20
++#define kvm_phys_to_vttbr(addr)		phys_to_ttbr(addr)
++
+ #endif /* __ASSEMBLY__ */
+ #endif /* __ARM64_KVM_MMU_H__ */
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 3257895a9b5e..c0aa2b221769 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -51,7 +51,7 @@ static inline void contextidr_thread_switch(struct task_struct *next)
+  */
+ static inline void cpu_set_reserved_ttbr0(void)
+ {
+-	unsigned long ttbr = __pa_symbol(empty_zero_page);
++	unsigned long ttbr = phys_to_ttbr(__pa_symbol(empty_zero_page));
+ 
+ 	write_sysreg(ttbr, ttbr0_el1);
+ 	isb();
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index b46e54c2399b..dcca52feaea2 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -720,6 +720,12 @@ static inline void update_mmu_cache(struct vm_area_struct *vma,
+ #define kc_vaddr_to_offset(v)	((v) & ~VA_START)
+ #define kc_offset_to_vaddr(o)	((o) | VA_START)
+ 
++#ifdef CONFIG_ARM64_PA_BITS_52
++#define phys_to_ttbr(addr)	(((addr) & GENMASK(47, 6)) | (((addr) & GENMASK(51, 48)) >> 46))
++#else
++#define phys_to_ttbr(addr)	(addr)
++#endif
++
+ #endif /* !__ASSEMBLY__ */
+ 
+ #endif /* __ASM_PGTABLE_H */
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 0b243ecaf7ac..7fcbe23d9ce8 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -661,8 +661,10 @@ ENTRY(__enable_mmu)
+ 	update_early_cpu_boot_status 0, x1, x2
+ 	adrp	x1, idmap_pg_dir
+ 	adrp	x2, swapper_pg_dir
+-	msr	ttbr0_el1, x1			// load TTBR0
+-	msr	ttbr1_el1, x2			// load TTBR1
++	phys_to_ttbr x1, x3
++	phys_to_ttbr x2, x4
++	msr	ttbr0_el1, x3			// load TTBR0
++	msr	ttbr1_el1, x4			// load TTBR1
+ 	isb
+ 	msr	sctlr_el1, x0
+ 	isb
+diff --git a/arch/arm64/kernel/hibernate-asm.S b/arch/arm64/kernel/hibernate-asm.S
+index e56d848b6466..84f5d52fddda 100644
+--- a/arch/arm64/kernel/hibernate-asm.S
++++ b/arch/arm64/kernel/hibernate-asm.S
+@@ -33,12 +33,14 @@
+  * Even switching to our copied tables will cause a changed output address at
+  * each stage of the walk.
+  */
+-.macro break_before_make_ttbr_switch zero_page, page_table
+-	msr	ttbr1_el1, \zero_page
++.macro break_before_make_ttbr_switch zero_page, page_table, tmp
++	phys_to_ttbr \zero_page, \tmp
++	msr	ttbr1_el1, \tmp
+ 	isb
+ 	tlbi	vmalle1
+ 	dsb	nsh
+-	msr	ttbr1_el1, \page_table
++	phys_to_ttbr \page_table, \tmp
++	msr	ttbr1_el1, \tmp
+ 	isb
+ .endm
+ 
+@@ -78,7 +80,7 @@ ENTRY(swsusp_arch_suspend_exit)
+ 	 * We execute from ttbr0, change ttbr1 to our copied linear map tables
+ 	 * with a break-before-make via the zero page
+ 	 */
+-	break_before_make_ttbr_switch	x5, x0
++	break_before_make_ttbr_switch	x5, x0, x6
+ 
+ 	mov	x21, x1
+ 	mov	x30, x2
+@@ -109,7 +111,7 @@ ENTRY(swsusp_arch_suspend_exit)
+ 	dsb	ish		/* wait for PoU cleaning to finish */
+ 
+ 	/* switch to the restored kernels page tables */
+-	break_before_make_ttbr_switch	x25, x21
++	break_before_make_ttbr_switch	x25, x21, x6
+ 
+ 	ic	ialluis
+ 	dsb	ish
+diff --git a/arch/arm64/kernel/hibernate.c b/arch/arm64/kernel/hibernate.c
+index 095d3c170f5d..1ef660ebf049 100644
+--- a/arch/arm64/kernel/hibernate.c
++++ b/arch/arm64/kernel/hibernate.c
+@@ -263,7 +263,7 @@ static int create_safe_exec_page(void *src_start, size_t length,
+ 	 */
+ 	cpu_set_reserved_ttbr0();
+ 	local_flush_tlb_all();
+-	write_sysreg(virt_to_phys(pgd), ttbr0_el1);
++	write_sysreg(phys_to_ttbr(virt_to_phys(pgd)), ttbr0_el1);
+ 	isb();
+ 
+ 	*phys_dst_addr = virt_to_phys((void *)dst);
 diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
-index 3f9615582377..f731a48bd9f1 100644
+index f731a48bd9f1..a99718f32af9 100644
 --- a/arch/arm64/kvm/hyp-init.S
 +++ b/arch/arm64/kvm/hyp-init.S
-@@ -90,11 +90,9 @@ __do_hyp_init:
- 	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
- #endif
+@@ -63,7 +63,8 @@ __do_hyp_init:
+ 	cmp	x0, #HVC_STUB_HCALL_NR
+ 	b.lo	__kvm_handle_stub_hvc
+ 
+-	msr	ttbr0_el2, x0
++	phys_to_ttbr x0, x4
++	msr	ttbr0_el2, x4
+ 
+ 	mrs	x4, tcr_el1
+ 	ldr	x5, =TCR_EL2_MASK
+diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
+index 371c5f03a170..77919e615dfc 100644
+--- a/arch/arm64/mm/pgd.c
++++ b/arch/arm64/mm/pgd.c
+@@ -49,6 +49,14 @@ void __init pgd_cache_init(void)
+ 	if (PGD_SIZE == PAGE_SIZE)
+ 		return;
+ 
++#ifdef CONFIG_ARM64_PA_BITS_52
++	/*
++	 * With 52-bit physical addresses, the architecture requires the
++	 * top-level table to be aligned to at least 64 bytes.
++	 */
++	BUILD_BUG_ON(PGD_SIZE < 64);
++#endif
++
  	/*
--	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the PS bits in
--	 * TCR_EL2.
-+	 * Set the PS bits in TCR_EL2.
+ 	 * Naturally aligned pgds required by the architecture.
  	 */
--	mrs	x5, ID_AA64MMFR0_EL1
--	bfi	x4, x5, #16, #3
-+	tcr_set_pa_size x4, #16, x5, x6
- 
- 	msr	tcr_el2, x4
- 
-diff --git a/arch/arm64/kvm/hyp/s2-setup.c b/arch/arm64/kvm/hyp/s2-setup.c
-index a81f5e10fc8c..603e1ee83e89 100644
---- a/arch/arm64/kvm/hyp/s2-setup.c
-+++ b/arch/arm64/kvm/hyp/s2-setup.c
-@@ -32,6 +32,8 @@ u32 __hyp_text __init_stage2_translation(void)
- 	 * PS is only 3. Fortunately, bit 19 is RES0 in VTCR_EL2...
- 	 */
- 	parange = read_sysreg(id_aa64mmfr0_el1) & 7;
-+	if (parange > ID_AA64MMFR0_PARANGE_MAX)
-+		parange = ID_AA64MMFR0_PARANGE_MAX;
- 	val |= parange << 16;
- 
- 	/* Compute the actual PARange... */
 diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 877d42fb0df6..9f16cfa89dac 100644
+index 9f16cfa89dac..5a29dbc703e2 100644
 --- a/arch/arm64/mm/proc.S
 +++ b/arch/arm64/mm/proc.S
-@@ -229,11 +229,9 @@ ENTRY(__cpu_setup)
- 	tcr_set_idmap_t0sz	x10, x9
+@@ -138,10 +138,11 @@ ENDPROC(cpu_do_resume)
+  *	- pgd_phys - physical address of new TTB
+  */
+ ENTRY(cpu_do_switch_mm)
+-	pre_ttbr0_update_workaround x0, x2, x3
++	phys_to_ttbr x0, x2
++	pre_ttbr0_update_workaround x2, x3, x4
+ 	mmid	x1, x1				// get mm->context.id
+-	bfi	x0, x1, #48, #16		// set the ASID
+-	msr	ttbr0_el1, x0			// set TTBR0
++	bfi	x2, x1, #48, #16		// set the ASID
++	msr	ttbr0_el1, x2			// set TTBR0
+ 	isb
+ 	post_ttbr0_update_workaround
+ 	ret
+@@ -159,14 +160,16 @@ ENTRY(idmap_cpu_replace_ttbr1)
+ 	msr	daifset, #0xf
  
- 	/*
--	 * Read the PARange bits from ID_AA64MMFR0_EL1 and set the IPS bits in
--	 * TCR_EL1.
-+	 * Set the IPS bits in TCR_EL1.
- 	 */
--	mrs	x9, ID_AA64MMFR0_EL1
--	bfi	x10, x9, #32, #3
-+	tcr_set_pa_size x10, #32, x5, x6
- #ifdef CONFIG_ARM64_HW_AFDBM
- 	/*
- 	 * Hardware update of the Access and Dirty bits.
+ 	adrp	x1, empty_zero_page
+-	msr	ttbr1_el1, x1
++	phys_to_ttbr x1, x3
++	msr	ttbr1_el1, x3
+ 	isb
+ 
+ 	tlbi	vmalle1
+ 	dsb	nsh
+ 	isb
+ 
+-	msr	ttbr1_el1, x0
++	phys_to_ttbr x0, x3
++	msr	ttbr1_el1, x3
+ 	isb
+ 
+ 	msr	daif, x2
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 95cba0799828..c208420aa11e 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -506,7 +506,7 @@ static void update_vttbr(struct kvm *kvm)
+ 	pgd_phys = virt_to_phys(kvm->arch.pgd);
+ 	BUG_ON(pgd_phys & ~VTTBR_BADDR_MASK);
+ 	vmid = ((u64)(kvm->arch.vmid) << VTTBR_VMID_SHIFT) & VTTBR_VMID_MASK(kvm_vmid_bits);
+-	kvm->arch.vttbr = pgd_phys | vmid;
++	kvm->arch.vttbr = kvm_phys_to_vttbr(pgd_phys) | vmid;
+ 
+ 	spin_unlock(&kvm_vmid_lock);
+ }
 -- 
 2.1.4
