@@ -1,65 +1,32 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 21 Nov 2017 17:49:42 +0000
-Subject: [PATCH] arm: ensure symbol is a thumb symbol in new binutils
-In-Reply-To: <CAHmME9quDFbdOR9hKRz-Px=Mh3FvYEyhVrs4V_+JT+GjDajMrA@mail.gmail.com>
-References: <20171121172751.29545-1-Jason@zx2c4.com>
- <20171121173857.GJ31757@n2100.armlinux.org.uk>
- <CAHmME9quDFbdOR9hKRz-Px=Mh3FvYEyhVrs4V_+JT+GjDajMrA@mail.gmail.com>
-Message-ID: <20171121174942.GK31757@n2100.armlinux.org.uk>
+From: jbastian@redhat.com (Jeffrey Bastian)
+Date: Tue, 21 Nov 2017 12:03:19 -0600
+Subject: [PATCH v4 10/12] arm64: vdso: replace gettimeofday.S with global
+ vgettimeofday.C
+In-Reply-To: <61EF90BA-9A6D-4DC4-A1F4-BEAA210D708C@redhat.com>
+References: <20171031183306.81375-1-salyzyn@android.com>
+ <7775cc5e-4a24-1e33-aae5-6181ca018d80@android.com>
+ <61EF90BA-9A6D-4DC4-A1F4-BEAA210D708C@redhat.com>
+Message-ID: <20171121180319.tawkc42jjx4ow3hg@tarantula.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 06:46:25PM +0100, Jason A. Donenfeld wrote:
-> Hi Russell,
+On Thu, Nov 02, 2017 at 12:22:36AM -0400, Jon Masters wrote:
+> On Nov 2, 2017, at 06:14, Mark Salyzyn <salyzyn@android.com> wrote:
+> > Holding off respin or followup patch until after we get a response
+> > from Jon Masters <jcm@readhat.com> on their QE tests on this patch
+> > series.
 > 
-> On Tue, Nov 21, 2017 at 6:38 PM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > +toolcheck:
-> > +       @$(CONFIG_SHELL) '$(srctree)/$(src)/toolcheck'
-> 
-> Perhaps faster to put the check for THUMB2_KERNEL around the make
-> target, instead of doing it in the code?
+> Copying Jeff Bastian who owns QE. Jeff, can you recall what test was
+> failing when we tried the gettimeofday C rewrite VDSO patches?
 
-Could do, I was debating about extending this for the buggy linker
-problem too from a few weeks ago.
+The LTP clock_getres01 test was failing when we tried the initial
+implementation of gettimeofday-in-C.  This would be a good place to
+start when testing the new version of the patches.
 
-> > +if grep -q 'CONFIG_THUMB2_KERNEL=y' .config; then
-> 
-> See above.
-> 
-> > +   tmp=$(mktemp -d /tmp/binutils-test.XXXXXXXXXX)
-> > +   cat <<EOF | $AS $ASFLAGS -o $tmp/test.o
-> > +       .syntax unified
-> > +       .thumb
-> > +       .macro  badr, reg, sym
-> > +       adr     \reg, \sym + 1
-> > +       .endm
-> > +
-> > +test:
-> > +       mov     r0, #0
-> > +       badr    lr, test
-> > +EOF
-> > +   if ! $OBJDUMP -d $tmp/test.o | grep -q '4:\s*f2af 0e07'; then
-> > +      echo "Error: your assembler version produces buggy kernels" >&2
-> > +      $AS --version | head -n1 >&2
-> > +      rm $tmp/*.o
-> > +      rmdir $tmp
-> > +      exit 1
-> > +   fi
-> > +   rm $tmp/*.o
-> > +   rmdir $tmp
-> > +fi
-> 
-> This doesn't actually catch the issues. In the buggy binutils, it
-> appears that sometimes adr grabs the right symbol and sometimes it
-> doesn't. I'm not yet able to figure out a minimal condition for it
-> going one way or the other.
+https://github.com/linux-test-project/ltp/blob/master/testcases/kernel/syscalls/clock_getres/clock_getres01.c
 
-What if we locate the "badr" instruction to the same offset - does
-that trigger the binutils bug?  Note that the grep expression will
-need updating...
 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Jeff Bastian
+Kernel QE - Hardware Enablement
+Red Hat
