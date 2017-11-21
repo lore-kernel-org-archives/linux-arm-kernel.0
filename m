@@ -1,147 +1,92 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 21 Nov 2017 14:45:56 -0200
-Subject: [PATCH 3/4] ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board
- support
-In-Reply-To: <1511281705-30849-4-git-send-email-narmstrong@baylibre.com>
-References: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
- <1511281705-30849-4-git-send-email-narmstrong@baylibre.com>
-Message-ID: <CAOMZO5DirsoVpX74oG+5e1LMDA+KpzMyztqy_GXO6P3fUbPypQ@mail.gmail.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 21 Nov 2017 16:47:12 +0000
+Subject: [PATCH v2] arm64: kdump: Avoid to power off nonpanic CPUs
+In-Reply-To: <1510996352-16684-1-git-send-email-leo.yan@linaro.org>
+References: <1510996352-16684-1-git-send-email-leo.yan@linaro.org>
+Message-ID: <5A145890.4070206@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 2:28 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+Hi Leo Yan,
 
-> +       gpio-keys {
-> +               compatible = "gpio-keys";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               autorepeat;
-> +
-> +               button at 0 {
+On 18/11/17 09:12, Leo Yan wrote:
+> commit a88ce63b642c ("arm64: kexec: have own crash_smp_send_stop() for
+> crash dump for nonpanic cores") introduces ARM64 architecture function
 
-If you build this with W=1 it will give you warnings about using a
-unit address without its corresponding reg field.
-
-You could just drop the @x.
-
-> +                       gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_BACK>;
-> +                       label = "Key Back";
-> +                       linux,input-type = <1>;
-> +                       debounce-interval = <100>;
-> +                       gpio-key,wakeup;
-> +               };
-> +
-> +               button at 1 {
-> +                       gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_HOME>;
-> +                       label = "Key Home";
-> +                       linux,input-type = <1>;
-> +                       debounce-interval = <100>;
-> +                       gpio-key,wakeup;
-> +               };
-> +
-> +               button at 2 {
-> +                       gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
-> +                       linux,code = <KEY_MENU>;
-> +                       label = "Key Menu";
-> +                       linux,input-type = <1>;
-> +                       debounce-interval = <100>;
-> +                       gpio-key,wakeup;
-> +               };
-> +       };
-
-> +       panel1: lvds-panel {
-> +               compatible = "sgd,gktw70sdae4se", "panel-lvds";
-
-sgd,gktw70sdae4se is not defined anywhere.
-
-Documentation/devicetree/bindings/display/panel/panel-lvds.txt says"
-
-"- compatible: Shall contain "panel-lvds" in addition to a mandatory
-  panel-specific compatible string defined in individual panel bindings. The
-  "panel-lvds" value shall never be used on its own."
-
-> +               backlight = <&backlight_lvds>;
-> +
-> +               width-mm = <153>;
-> +               height-mm = <86>;
-> +
-> +               label = "gktw70sdae4se";
-> +
-> +               data-mapping = "jeida-18";
-> +
-> +               panel-timing {
-> +                       clock-frequency = <32000000>;
-> +                       hactive = <800>;
-> +                       vactive = <480>;
-> +                       hback-porch = <39>;
-> +                       hfront-porch = <39>;
-> +                       vback-porch = <29>;
-> +                       vfront-porch = <13>;
-> +                       hsync-len = <47>;
-> +                       vsync-len = <2>;
-> +               };
-> +
-> +               port {
-> +                       panel_in: endpoint {
-> +                               remote-endpoint = <&lvds1_out>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       reg_usb_h1_vbus: regulator-usbh1vbus {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "usb_h1_vbus";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               gpio = <&gpio1 28 0>;
-
-It would be better to use:
-gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
+(This commit fixed a bug where the core-code version was used, this didn't save
+the CPU registers, which made kdump useless.)
 
 
-> +               enable-active-high;
-> +       };
-> +
-> +       reg_usb_otg_vbus: regulator-usbotgvbus {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "usb_otg_vbus";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               gpio = <&gpio4 15 0>;
+> crash_smp_send_stop() to replace the weak function, this results in
+> the nonpanic CPUs to be hot-plugged out and CPUs are placed into low
+> power state on ARM64 platforms with the flow:
+> 
+>   Panic CPU:
+>     machine_crash_shutdown()
+>       crash_smp_send_stop()
+> 	smp_cross_call(&mask, IPI_CPU_CRASH_STOP)
+> 
+>   Nonpanic CPUs:
+>     handle_IPI()
+>       ipi_cpu_crash_stop()
+>         cpu_ops[cpu]->cpu_die()
+> 
+> The upper patch has no issue if enabled crash dump only; but if enabled
+> crash dump and Coresight debug module for panic dumping at the meantime,
+> nonpanic CPUs are powered off in crash dump flow, later this may
+> introduce conflicts with the Coresight debug module because Coresight
+> debug registers dumping requires the CPU must be powered on for some
+> platforms (e.g. Hi6220 on Hikey board).
 
-Same here.
-
-> +               enable-active-high;
-> +       };
-> +
-
-> +
-> +&fec {
-> +       status = "okay";
-> +       phy-mode = "rgmii";
-> +       phy-reset-gpios = <&gpio1 25 0>;
-
-GPIO_ACTIVE_LOW please.
+Is it just Hikey with this problem?
 
 
-> +};
-> +
-> +&hdmi {
-> +       ddc-i2c-bus = <&i2c1>;
-> +       status = "okay";
-> +};
-> +
-> +&pcie {
-> +       reset-gpio    = <&gpio4 11 0>;
+> If we cannot keep the CPUs
+> powered on, we can see the hardware lockup issue when access Coresight
+> debug registers.
 
-GPIO_ACTIVE_LOW
+By 'hardware lockup issue' do you mean you want to use the Coresight debug
+registers to inspect what caused the panic()=>kdump in the first place?
+You mention 'dumping requires the CPU [to] be powered on', I assume it loses
+state when powered off.
 
-> +       wake-up-gpio  = <&gpio4 31 1>;
+...or does the CPU hang if you use PSCI to power it off while the Coresight
+debug is running?
 
-This is not a valid property.
 
-> +       disable-gpio  = <&gpio5 5 0>;
+> To fix this issue, this commit bypasses CPU hotplug operation in func
+> crash_smp_send_stop() when coresight CPU debug module has been enabled
+> and let CPUs to run into WFE/WFI states so CPUs can still be powered on
+> after crash dump. This finally is more safe for Coresight debug module
+> to dump registers and avoid hardware lockup.
 
-This is not a valid property.
+Ah, there is a hardware-lockup.
+
+Wouldn't the same thing happen if I poke the sysfs cpu online/offline interface
+while this thing is running? (Not to mention cpu-idle)
+
+Shouldn't this be fixed in firmware? If EL3 can see the Coresight debug is running,
+it can hold the CPU in WFE instead of trying to actually power off. Firmware can
+know if the debug hardware and the CPU are powered together, (which I guess is
+why this is a problem on Hikey).
+
+
+Thanks,
+
+James
+
+
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index 9f7195a..31dab1f 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -856,7 +856,7 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
+>  
+>  	local_irq_disable();
+>  
+> -#ifdef CONFIG_HOTPLUG_CPU
+> +#if defined(CONFIG_HOTPLUG_CPU) && !defined(CONFIG_CORESIGHT_CPU_DEBUG)
+>  	if (cpu_ops[cpu]->cpu_die)
+>  		cpu_ops[cpu]->cpu_die(cpu);
+>  #endif
+> 
