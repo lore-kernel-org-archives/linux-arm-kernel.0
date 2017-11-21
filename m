@@ -1,32 +1,72 @@
-From: hanetzer@startmail.com (Marty E. Plummer)
-Date: Tue, 21 Nov 2017 05:56:12 -0600
-Subject: [PATCH v2 1/3] clk: hisilicon: add CRG driver Hi3521A SoC
-In-Reply-To: <20171024184250.d4wmzr6osd4o53oz@rob-hp-laptop>
-References: <20171017223854.6980-1-hanetzer@startmail.com>
- <20171017223854.6980-2-hanetzer@startmail.com>
- <20171024184250.d4wmzr6osd4o53oz@rob-hp-laptop>
-Message-ID: <20171121115611.bmdriap3uoazmyiw@proprietary-killer.fossland>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 21 Nov 2017 12:12:58 +0000
+Subject: [PATCH v3 0/3] KVM: arm64: single step emulation instructions
+In-Reply-To: <20171120154131.GO28855@cbox>
+References: <20171116153921.21991-1-alex.bennee@linaro.org>
+ <20171120154131.GO28855@cbox>
+Message-ID: <874lpnygmt.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 01:42:50PM -0500, Rob Herring wrote:
-> On Tue, Oct 17, 2017 at 05:38:52PM -0500, Marty E. Plummer wrote:
-> > Add CRG driver for Hi3521A SoC. CRG (Clock and Reset Generator) module
-> > generates clock and reset signals used by other module blocks on SoC.
-> > 
-> > Signed-off-by: Marty E. Plummer <hanetzer@startmail.com>
-> > ---
-> > Changes in v2:
-> >   - Switched to SPDX tags and GPL-2.0+
-> > 
-> >  drivers/clk/hisilicon/Kconfig             |   7 ++
-> >  drivers/clk/hisilicon/Makefile            |   1 +
-> >  drivers/clk/hisilicon/crg-hi3521a.c       | 196 ++++++++++++++++++++++++++++++
-> 
-> >  include/dt-bindings/clock/hi3521a-clock.h |  23 ++++
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-Actually nack this for now. I need to change some stuff over to use a
-different clock for the sp804 timer at 12000000, apparently I'm going to
-need to use CLK_OF_DECLARE to get the clock in question working that
-early in boot.
+
+Christoffer Dall <cdall@linaro.org> writes:
+
+> Hi Alex,
+>
+> On Thu, Nov 16, 2017 at 03:39:18PM +0000, Alex Benn?e wrote:
+>> Hi,
+>>
+>> This is rev 3 of the series, practically the same than rev 2 but fixed
+>> a return 1->0 in the kvm_run loop that Julien caught. I've added his
+>> r-b tags to the other patches.
+>>
+>> As usual revision details bellow the --- in each patch.
+>
+> Thanks for taking care of this.
+>
+> I have applied the series and slightly tweaked the commit messages and
+> commentary.
+>
+> Did we simply decide to not worry about exiting to userspace if we do
+> fast-path emulation, such as for the errata workaround and GIC
+> mashaling in switch.c ?
+
+Hmm I'd forgotten about that - I figured it was all in handle_exit or
+passed to userspace. So I guess in-hyp emulation is a 3rd class of
+instruction emulation?
+
+Which particular interface cases are we covering here?
+
+I suspect if these are regions that are only accessed once the system is
+up and running we are going to run into problems due to single stepping
+while IRQs are enabled. But conceptually we just need to do the same
+flag check after __skip_instr has done before deciding to fall out the
+loop or goto again;
+
+We would have to fake up HSR so handle_exit did the right thing on the
+way out though. That seems a little icky....
+
+>
+> Thanks,
+> -Christoffer
+>
+>>
+>> Alex Benn?e (3):
+>>   kvm: arm debug: introduce helper for single-step
+>>   kvm: arm64: handle single-stepping trapped instructions
+>>   kvm: arm64: handle single-step of userspace mmio instructions
+>>
+>>  arch/arm/include/asm/kvm_host.h   |  5 +++++
+>>  arch/arm64/include/asm/kvm_host.h |  1 +
+>>  arch/arm64/kvm/debug.c            | 22 ++++++++++++++++++
+>>  arch/arm64/kvm/handle_exit.c      | 47 +++++++++++++++++++++++++++------------
+>>  virt/kvm/arm/arm.c                |  3 +++
+>>  5 files changed, 64 insertions(+), 14 deletions(-)
+>>
+>> --
+>> 2.15.0
+>>
+
+
+--
+Alex Benn?e
