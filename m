@@ -1,32 +1,36 @@
-From: jbastian@redhat.com (Jeffrey Bastian)
-Date: Tue, 21 Nov 2017 12:03:19 -0600
-Subject: [PATCH v4 10/12] arm64: vdso: replace gettimeofday.S with global
- vgettimeofday.C
-In-Reply-To: <61EF90BA-9A6D-4DC4-A1F4-BEAA210D708C@redhat.com>
-References: <20171031183306.81375-1-salyzyn@android.com>
- <7775cc5e-4a24-1e33-aae5-6181ca018d80@android.com>
- <61EF90BA-9A6D-4DC4-A1F4-BEAA210D708C@redhat.com>
-Message-ID: <20171121180319.tawkc42jjx4ow3hg@tarantula.localdomain>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 21 Nov 2017 18:04:39 +0000
+Subject: [PATCH v4 05/20] firmware: arm_scmi: add scmi protocol bus to
+ enumerate protocol devices
+In-Reply-To: <1509720477-18936-6-git-send-email-sudeep.holla@arm.com>
+References: <1509720477-18936-1-git-send-email-sudeep.holla@arm.com>
+ <1509720477-18936-6-git-send-email-sudeep.holla@arm.com>
+Message-ID: <273d655b-b1f2-0788-aa60-3d97b84e7304@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 02, 2017 at 12:22:36AM -0400, Jon Masters wrote:
-> On Nov 2, 2017, at 06:14, Mark Salyzyn <salyzyn@android.com> wrote:
-> > Holding off respin or followup patch until after we get a response
-> > from Jon Masters <jcm@readhat.com> on their QE tests on this patch
-> > series.
+Hi Arnd,
+
+On 03/11/17 14:47, Sudeep Holla wrote:
+> The SCMI specification encompasses various protocols. However, not every
+> protocol has to be present on a given platform/implementation as not
+> every protocol is relevant for it.
 > 
-> Copying Jeff Bastian who owns QE. Jeff, can you recall what test was
-> failing when we tried the gettimeofday C rewrite VDSO patches?
-
-The LTP clock_getres01 test was failing when we tried the initial
-implementation of gettimeofday-in-C.  This would be a good place to
-start when testing the new version of the patches.
-
-https://github.com/linux-test-project/ltp/blob/master/testcases/kernel/syscalls/clock_getres/clock_getres01.c
-
+> Furthermore, the platform chooses which protocols it exposes to a given
+> agent. The only protocol that must be implemented is the base protocol.
+> The base protocol is used by an agent to discover which protocols are
+> available to it.
+> 
+> In order to enumerate the discovered implemented protocols, this patch
+> adds support for a separate scmi protocol bus. It also adds mechanism to
+> register support for different protocols.
+> 
+> Cc: Arnd Bergmann <arnd@arndb.de>
+Extremely sorry to both during merge window, but just wanted to check if
+you can spare sometime reviewing these SCMI patches. I know it's too
+early for v4.16 but with holiday period ahead, thought of checking so
+that I won't miss v4.16
 
 -- 
-Jeff Bastian
-Kernel QE - Hardware Enablement
-Red Hat
+Regards,
+Sudeep
