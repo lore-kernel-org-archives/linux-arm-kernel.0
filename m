@@ -1,102 +1,84 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 21 Nov 2017 13:10:50 +0000
-Subject: [PATCH v3 0/3] KVM: arm64: single step emulation instructions
-In-Reply-To: <873757yf8f.fsf@linaro.org>
-References: <20171116153921.21991-1-alex.bennee@linaro.org>
- <20171120154131.GO28855@cbox> <873757yf8f.fsf@linaro.org>
-Message-ID: <5fb5067a-7b94-1d87-5e4b-d162ddd28cd6@arm.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Tue, 21 Nov 2017 13:14:48 +0000
+Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
+ larger kernels
+In-Reply-To: <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
+References: <20171117114143.26577-1-steve.capper@arm.com>
+ <20171117114143.26577-3-steve.capper@arm.com>
+ <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
+ <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
+Message-ID: <20171121131448.gokl6p2upszrgayn@capper-debian.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/17 12:43, Alex Benn?e wrote:
+On Tue, Nov 21, 2017 at 11:13:06AM +0000, Steve Capper wrote:
+> On Mon, Nov 20, 2017 at 05:00:10PM +0000, Mark Rutland wrote:
+> > Hi,
 > 
-> Christoffer Dall <cdall@linaro.org> writes:
+> Hi Mark,
 > 
->> Hi Alex,
->>
->> On Thu, Nov 16, 2017 at 03:39:18PM +0000, Alex Benn?e wrote:
->>> Hi,
->>>
->>> This is rev 3 of the series, practically the same than rev 2 but fixed
->>> a return 1->0 in the kvm_run loop that Julien caught. I've added his
->>> r-b tags to the other patches.
->>>
->>> As usual revision details bellow the --- in each patch.
->>
->> Thanks for taking care of this.
->>
->> I have applied the series and slightly tweaked the commit messages and
->> commentary.
->>
->> Did we simply decide to not worry about exiting to userspace if we do
->> fast-path emulation, such as for the errata workaround and GIC
->> mashaling in switch.c ?
+> > 
+> > On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
+> > > -#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+> > > +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
+> > > +
+> > > +#if SWAPPER_PGTABLE_LEVELS > 3
+> > > +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
+> > > +#else
+> > > +#define EARLY_PUDS(vstart, vend) (0)
+> > > +#endif
+> > > +
+> > > +#if SWAPPER_PGTABLE_LEVELS > 2
+> > > +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
+> > > +#else
+> > > +#define EARLY_PMDS(vstart, vend) (0)
+> > > +#endif
+> > > +
+> > > +#define EARLY_PAGES(vstart, vend) ( 1 			/* PGDIR page */				\
+> > > +			+ EARLY_PGDS((vstart), (vend)) 	/* each PGDIR needs a next level page table */	\
+> > > +			+ EARLY_PUDS((vstart), (vend))	/* each PUD needs a next level page table */	\
+> > > +			+ EARLY_PMDS((vstart), (vend)))	/* each PMD needs a next level page table */
+> > > +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
+> > >  #define IDMAP_DIR_SIZE		(IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
+> > 
+> > I'm currently struggling to convince myself as to whether 2M is
+> > necessary/sufficient slack space for all configurations.
 > 
-> Compile tested only:
+> Agreed, if the possible address range is changed outside these bounds
+> then we need to extend them.
 > 
-> --8<---------------cut here---------------start------------->8---
-> kvm: arm64: handle single-step of hyp emulated mmio
+> > 
+> > At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
+> > to cross PGD/PUD/PMD boundaries.
+> > 
+> > For example with 3 levels of 64K pages, and a huge kernel that takes up
+> > SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
+> > and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
+> > the kernel were to be relocated such that it straddled two PGDs, we'd
+> > need 2 PGDs and 2 PMDs, needing 5 pages total.
+> > 
+> > I'm not sure that we have a problem if we don't relax KASLR.
+> > 
 > 
-> There is a fast-path of MMIO emulation inside hyp mode. The handling
-> of single-step is broadly the same as kvm_arm_handle_step_debug()
-> except we just setup ESR/HSR so handle_exit() does the correct thing
-> as we exit.
+> The approach I've adopted is to compute which indices are required for
+> PGDs, PUDs, PMDs to map the supplied address range, then count them.
+> If we require two PGD entries then that means we need two pages
+> containing PMD entries to be allocated.
 > 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> ---
->  arch/arm64/kvm/hyp/switch.c | 26 +++++++++++++++++++++-----
->  1 file changed, 21 insertions(+), 5 deletions(-)
+> If we consider just PGDs, for example, the only way I am aware of the
+> kernel straddling more PGDs than previously computed is for the mapping
+> to begin before vstart or end after vend (or both).
 > 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 945e79c641c4..841dc79d11fd 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -263,7 +263,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
->  	return true;
->  }
+> Should I refine the range specified in the SWAPPER_DIR_SIZE for the
+> current KASLR? (I thought the random offset was < SZ_2M?)
 > 
-> -static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
-> +/* Skip an instruction which has been emulated. Returns true if
-> + * execution can continue or false if we need to exit hyp mode because
-> + * single-step was in effect.
-> + */
-> +static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  {
->  	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
-> 
-> @@ -276,6 +280,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  	}
-> 
->  	write_sysreg_el2(*vcpu_pc(vcpu), elr);
-> +
-> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> +		vcpu->arch.fault.esr_el2 =
-> +			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
-> +		return false;
-> +	} else {
-> +		return true;
-> +	}
->  }
-> 
->  int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> @@ -336,8 +348,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  			int ret = __vgic_v2_perform_cpuif_access(vcpu);
-> 
->  			if (ret == 1) {
-> -				__skip_instr(vcpu);
-> -				goto again;
-> +				if (__skip_instr(vcpu))
-> +					goto again;
-> +				else
-> +					exit_code = ARM_EXCEPTION_TRAP;
->  			}
-> 
->  			if (ret == -1) {
 
-Here (in the -1 case), we should still report the step to userspace (it
-took place after all), and signal the SError to the guest (because it is
-being stupid).
+Ahh, I see KASLR offset has the bottom 21 bits masked out, not confined
+to the 21 bottom bits :-).
 
-	M. (I really hate that part of the code base...)
+It may be possible to do something with (vend - vstart) I will have a
+think about this.
+
+Cheers,
 -- 
-Jazz is not dead. It just smells funny...
+Steve
