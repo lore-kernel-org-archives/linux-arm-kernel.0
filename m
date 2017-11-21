@@ -1,60 +1,147 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 21 Nov 2017 11:43:32 -0500
-Subject: [PATCH v2 4/4] PCI/AER: Dont do recovery when DPC is enabled
-In-Reply-To: <de047a7ce7334daab4e53ea4e8444421@AcuMS.aculab.com>
-References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
- <1510721808-27164-5-git-send-email-poza@codeaurora.org>
- <20171115211447.GA7266@bhelgaas-glaptop.roam.corp.google.com>
- <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
- <de047a7ce7334daab4e53ea4e8444421@AcuMS.aculab.com>
-Message-ID: <13cf28da-9ab3-33a5-ea91-c62c186c6170@codeaurora.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Tue, 21 Nov 2017 14:45:56 -0200
+Subject: [PATCH 3/4] ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board
+ support
+In-Reply-To: <1511281705-30849-4-git-send-email-narmstrong@baylibre.com>
+References: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
+ <1511281705-30849-4-git-send-email-narmstrong@baylibre.com>
+Message-ID: <CAOMZO5DirsoVpX74oG+5e1LMDA+KpzMyztqy_GXO6P3fUbPypQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/21/2017 11:25 AM, David Laight wrote:
->> The DPC on the other hand stops the drivers immediately since HW took care of
->> link disable. (Endpoint register reads return ~0 at this point.)
-> What happens if the 'user' driver doesn't define the error reporting callbacks?
-> It might be hardened against the ~0u returns from reads - so not OOPS.
-> It might be appropriate to call the remove() function instead.
+On Tue, Nov 21, 2017 at 2:28 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
 
-This is what the DPC driver does in its interrupt handler. 
+> +       gpio-keys {
+> +               compatible = "gpio-keys";
+> +               #address-cells = <1>;
+> +               #size-cells = <0>;
+> +               autorepeat;
+> +
+> +               button at 0 {
 
-http://elixir.free-electrons.com/linux/latest/ident/interrupt_event_handler
+If you build this with W=1 it will give you warnings about using a
+unit address without its corresponding reg field.
 
-My understanding is that this will eventually call the remove() function on the
-endpoint driver eventually. 
+You could just drop the @x.
 
-Bjorn had concerns that we are not calling the error handler if registered and
-then calling remove() callback while the driver is in the middle of something
-could be bad. 
+> +                       gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
+> +                       linux,code = <KEY_BACK>;
+> +                       label = "Key Back";
+> +                       linux,input-type = <1>;
+> +                       debounce-interval = <100>;
+> +                       gpio-key,wakeup;
+> +               };
+> +
+> +               button at 1 {
+> +                       gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
+> +                       linux,code = <KEY_HOME>;
+> +                       label = "Key Home";
+> +                       linux,input-type = <1>;
+> +                       debounce-interval = <100>;
+> +                       gpio-key,wakeup;
+> +               };
+> +
+> +               button at 2 {
+> +                       gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
+> +                       linux,code = <KEY_MENU>;
+> +                       label = "Key Menu";
+> +                       linux,input-type = <1>;
+> +                       debounce-interval = <100>;
+> +                       gpio-key,wakeup;
+> +               };
+> +       };
 
-He had concerns if remove() would leave something in a bad state so recovery
-would really not work at all and kernel crashes eventually due to data corruption. 
+> +       panel1: lvds-panel {
+> +               compatible = "sgd,gktw70sdae4se", "panel-lvds";
 
-Oza and I are looking for a way to plumb DPC's error handling into AER driver
-so that PCI framework has a single place to look for error handling.
+sgd,gktw70sdae4se is not defined anywhere.
 
-for dpc:
-1. If an error handler registered, call it for all children devices
-2. Remove all children devices from the bus
-3. Recover the link with DPC
-4. Rescan the entire bus and install the drivers again
+Documentation/devicetree/bindings/display/panel/panel-lvds.txt says"
 
-> 
->> DPC driver clears
->> the interrupt from the DPC capability and brings the link up at the end. Full
->> enumeration/rescan follows this procedure to go back to functioning state.
-> That might not be a good idea, very likely it will fail again immediately.
+"- compatible: Shall contain "panel-lvds" in addition to a mandatory
+  panel-specific compatible string defined in individual panel bindings. The
+  "panel-lvds" value shall never be used on its own."
 
-We can add a policy parameter and not bring up the link if you want to do
-troubleshooting at the point of failure or have a way to define how the
-system response should be. 
+> +               backlight = <&backlight_lvds>;
+> +
+> +               width-mm = <153>;
+> +               height-mm = <86>;
+> +
+> +               label = "gktw70sdae4se";
+> +
+> +               data-mapping = "jeida-18";
+> +
+> +               panel-timing {
+> +                       clock-frequency = <32000000>;
+> +                       hactive = <800>;
+> +                       vactive = <480>;
+> +                       hback-porch = <39>;
+> +                       hfront-porch = <39>;
+> +                       vback-porch = <29>;
+> +                       vfront-porch = <13>;
+> +                       hsync-len = <47>;
+> +                       vsync-len = <2>;
+> +               };
+> +
+> +               port {
+> +                       panel_in: endpoint {
+> +                               remote-endpoint = <&lvds1_out>;
+> +                       };
+> +               };
+> +       };
+> +
+> +       reg_usb_h1_vbus: regulator-usbh1vbus {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "usb_h1_vbus";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gpio1 28 0>;
 
-DPC causes a hot reset on the bus. Endpoint should go to reset state and we should
-be able to bring up the link without any problems under normal circumstances.
+It would be better to use:
+gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+> +               enable-active-high;
+> +       };
+> +
+> +       reg_usb_otg_vbus: regulator-usbotgvbus {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "usb_otg_vbus";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gpio4 15 0>;
+
+Same here.
+
+> +               enable-active-high;
+> +       };
+> +
+
+> +
+> +&fec {
+> +       status = "okay";
+> +       phy-mode = "rgmii";
+> +       phy-reset-gpios = <&gpio1 25 0>;
+
+GPIO_ACTIVE_LOW please.
+
+
+> +};
+> +
+> +&hdmi {
+> +       ddc-i2c-bus = <&i2c1>;
+> +       status = "okay";
+> +};
+> +
+> +&pcie {
+> +       reset-gpio    = <&gpio4 11 0>;
+
+GPIO_ACTIVE_LOW
+
+> +       wake-up-gpio  = <&gpio4 31 1>;
+
+This is not a valid property.
+
+> +       disable-gpio  = <&gpio5 5 0>;
+
+This is not a valid property.
