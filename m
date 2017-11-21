@@ -1,107 +1,54 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 21 Nov 2017 12:43:12 +0000
-Subject: [PATCH v3 0/3] KVM: arm64: single step emulation instructions
-In-Reply-To: <20171120154131.GO28855@cbox>
-References: <20171116153921.21991-1-alex.bennee@linaro.org>
- <20171120154131.GO28855@cbox>
-Message-ID: <873757yf8f.fsf@linaro.org>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 21 Nov 2017 21:06:27 +0800
+Subject: do page fault in atomic bug on arm
+Message-ID: <d83cdbf1-0d27-fb82-14c8-3d37101c3c06@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi All,
 
-Christoffer Dall <cdall@linaro.org> writes:
+LKFT occasionally found a kernel bug in x15 platform, which is a armv7 board. 
+The bug caught on kernel commit f82786d v4.9.55, but panic could happens in 
+upstream, since there is no much change on the function call chain.
 
-> Hi Alex,
->
-> On Thu, Nov 16, 2017 at 03:39:18PM +0000, Alex Benn?e wrote:
->> Hi,
->>
->> This is rev 3 of the series, practically the same than rev 2 but fixed
->> a return 1->0 in the kvm_run loop that Julien caught. I've added his
->> r-b tags to the other patches.
->>
->> As usual revision details bellow the --- in each patch.
->
-> Thanks for taking care of this.
->
-> I have applied the series and slightly tweaked the commit messages and
-> commentary.
->
-> Did we simply decide to not worry about exiting to userspace if we do
-> fast-path emulation, such as for the errata workaround and GIC
-> mashaling in switch.c ?
+The function call chain is vector___pabt_svc -> do_PrefetchAbort -> 
+	do_page_fault -> might_sleep()
 
-Compile tested only:
+The trick thing is LKFT team can not reproduce the bug. But from the kernel
+panic info, we know the irq_disabled() is 128, that would be the only reason,
+we got the panic -- the code can not return since irqs_disabled() = 128.
+The preempt_offset and preempt_count are both 0 here.
 
---8<---------------cut here---------------start------------->8---
-kvm: arm64: handle single-step of hyp emulated mmio
+line 7726 in kernel/sched/core.c: in function ___might_sleep():
+       if ((preempt_count_equals(preempt_offset) && !irqs_disabled() &&
+             !is_idle_task(current)) ||
+            system_state != SYSTEM_RUNNING || oops_in_progress)
+                return;
 
-There is a fast-path of MMIO emulation inside hyp mode. The handling
-of single-step is broadly the same as kvm_arm_handle_step_debug()
-except we just setup ESR/HSR so handle_exit() does the correct thing
-as we exit.
+I have no more idea on this issue. Any hints are appreciated!
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
----
- arch/arm64/kvm/hyp/switch.c | 26 +++++++++++++++++++++-----
- 1 file changed, 21 insertions(+), 5 deletions(-)
+Regards
+Alex
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 945e79c641c4..841dc79d11fd 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -263,7 +263,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- 	return true;
- }
-
--static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
-+/* Skip an instruction which has been emulated. Returns true if
-+ * execution can continue or false if we need to exit hyp mode because
-+ * single-step was in effect.
-+ */
-+static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- {
- 	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
-
-@@ -276,6 +280,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
-
- 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
-+
-+	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-+		vcpu->arch.fault.esr_el2 =
-+			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
-+		return false;
-+	} else {
-+		return true;
-+	}
- }
-
- int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-@@ -336,8 +348,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 			int ret = __vgic_v2_perform_cpuif_access(vcpu);
-
- 			if (ret == 1) {
--				__skip_instr(vcpu);
--				goto again;
-+				if (__skip_instr(vcpu))
-+					goto again;
-+				else
-+					exit_code = ARM_EXCEPTION_TRAP;
- 			}
-
- 			if (ret == -1) {
-@@ -357,8 +371,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
-
- 		if (ret == 1) {
--			__skip_instr(vcpu);
--			goto again;
-+			if (__skip_instr(vcpu))
-+				goto again;
-+			else
-+				exit_code = ARM_EXCEPTION_TRAP;
- 		}
-
- 		/* 0 falls through to be handled out of EL2 */
---8<---------------cut here---------------end--------------->8---
+ BUG: sleeping function called from invalid context at /srv/oe/build/tmp-rpb-glibc/work-shared/am57xx-evm/kernel-source/arch/arm/mm/fault.c:303
+[   53.264908] in_atomic(): 0, irqs_disabled(): 128, pid: 1691, name: ftracetest
+[   53.272074] 1 lock held by ftracetest/1691:
+[   53.276273]  #0:  (&mm->mmap_sem){++++++}, at: [<c0d60cfc>] do_page_fault+0x90/0x428
+[   53.284095] irq event stamp: 12924
+[   53.287514] hardirqs last  enabled at (12923): [<c0307f10>] no_work_pending+0x4/0x30
+[   53.295289] hardirqs last disabled at (12924): [<c0d605a0>] __pabt_svc+0x60/0xa0
+[   53.302718] softirqs last  enabled at (11474): [<c034c5d0>] __do_softirq+0x280/0x5ac
+[   53.310494] softirqs last disabled at (11433): [<c034cc98>] irq_exit+0xf4/0x158
+[   53.317837] CPU: 0 PID: 1691 Comm: ftracetest Not tainted 4.9.55-dirty #1
+[   53.324652] Hardware name: Generic DRA74X (Flattened Device Tree)
+[   53.330857] [<c03114d8>] (unwind_backtrace) from [<c030cb18>] (show_stack+0x10/0x14)
+[   53.338644] [<c030cb18>] (show_stack) from [<c067e604>] (dump_stack+0xa4/0xd0)
+[   53.345908] [<c067e604>] (dump_stack) from [<c0373808>] (___might_sleep+0x1ac/0x2a0)
+[   53.353694] [<c0373808>] (___might_sleep) from [<c0d60ec8>] (do_page_fault+0x25c/0x428)
+[   53.361739] [<c0d60ec8>] (do_page_fault) from [<c03013e8>] (do_PrefetchAbort+0x38/0x9c)
+[   53.369780] [<c03013e8>] (do_PrefetchAbort) from [<c0d605a8>] (__pabt_svc+0x68/0xa0)
+[   53.377557] Exception stack(0xec6fbfa8 to 0xec6fbff0)
+[   53.382629] bfa0:                   00000001 00000001 ffffffff 00000000 0010ac68 00000007
+[   53.390845] bfc0: 00000001 0000003f 00000009 0000000c fffffffa be9d27a4 000e31fc ec6fbff8
+[   53.399055] bfe0: b6e6d49c b6e6d49c 40070093 ffffffff
+[   53.404137] [<c0d605a8>] (__pabt_svc) from [<b6e6d49c>] (0xb6e6d49c)
