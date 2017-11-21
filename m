@@ -1,28 +1,34 @@
 From: awallis@codeaurora.org (Adam Wallis)
-Date: Tue, 21 Nov 2017 12:18:08 -0500
-Subject: [PATCH 0/2] usb: xhci: addition of timing quirk
-Message-ID: <1511284690-3878-1-git-send-email-awallis@codeaurora.org>
+Date: Tue, 21 Nov 2017 12:18:10 -0500
+Subject: [PATCH 2/2] usb: host: xhci-plat: check relaxed timing quirk bit
+In-Reply-To: <1511284690-3878-1-git-send-email-awallis@codeaurora.org>
+References: <1511284690-3878-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <1511284690-3878-3-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems that allow CPUs to run at an extremely reduced frequency,
-it is possible to create an "interrupt" storm by USB settings that are not
-ideal at these speeds. This patch series introduces a quirk bit that currently
-only touches the Interrupt Control register but might be used in the future
-with other similar registers. This change allows for firmware (or scripts)
-to set these registers as required in place of using hard-coded values
-which might not be ideal for all platforms.
+Check sysdev to see if the relaxed timing quirk ("quirk-relaxed-timing")
+is set.
 
-Adam Wallis (2):
-  usb: xhci: add relaxed timing quirk bit
-  usb: host: xhci-plat: check relaxed timing quirk bit
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+ drivers/usb/host/xhci-plat.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
- Documentation/devicetree/bindings/usb/usb-xhci.txt |  1 +
- drivers/usb/host/xhci-plat.c                       |  3 +++
- drivers/usb/host/xhci.c                            | 25 +++++++++++++++-------
- drivers/usb/host/xhci.h                            |  1 +
- 4 files changed, 22 insertions(+), 8 deletions(-)
-
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 09f164f..ea221f3 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -266,6 +266,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (device_property_read_bool(sysdev, "usb3-lpm-capable"))
+ 		xhci->quirks |= XHCI_LPM_SUPPORT;
+ 
++	if (device_property_read_bool(sysdev, "quirk-relaxed-timing"))
++		xhci->quirks |= XHCI_RELAXED_TIMING_QUIRK;
++
+ 	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+ 		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+ 
 -- 
 Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the
