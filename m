@@ -1,66 +1,75 @@
-From: jeffy.chen@rock-chips.com (Jeffy Chen)
-Date: Tue, 21 Nov 2017 16:25:17 +0800
-Subject: [PATCH] ASoC: rockchip: Use dummy_dai for rt5514 dsp dailink
-Message-ID: <20171121082517.17233-1-jeffy.chen@rock-chips.com>
+From: puck.chen@hisilicon.com (Chen Feng)
+Date: Tue, 21 Nov 2017 16:37:17 +0800
+Subject: [PATCH] arm64: kaslr: Fix kaslr end boundary of virt addr
+In-Reply-To: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
+References: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
+Message-ID: <5A13E5BD.70000@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rt5514 dsp captures pcm data through spi directly, so we should not
-use rockchip-i2s as it's cpu dai like other codecs.
 
-Use dummy_dai for rt5514 dsp dailink to make voice wakeup work again.
 
-Reported-by: Jimmy Cheng-Yi Chiang <cychiang@google.com>
-Fixes: (72cfb0f20c75 ASoC: rockchip: Use codec of_node and dai_name for rt5514 dsp)
-Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
----
+On 2017/11/21 11:44, Chen Feng wrote:
+> With kaslr and kasan enable both, I got the follow issue.
+> 
+> [   16.130523s]kasan: reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000
+> [   16.142517s]___alloc_bootmem_nopanic:257
+> [   16.148284s]__alloc_memory_core_early:63, addr = 197fc7fc0
+> [   16.155670s]__alloc_memory_core_early:65, virt = ffffffffd7fc7fc0
+> [   16.163635s]__alloc_memory_core_early:67, toshow = ffffff8ffaff8ff8
+> [   16.171783s]__alloc_memory_core_early:69, show_phy = ffffffe2649f8ff8
+> [   16.180145s]Unable to handle kernel paging request at virtual address ffffff8ffaff8ff8
+> [   16.189971s]pgd = ffffffad9c507000
+> [   16.195220s][ffffff8ffaff8ff8] *pgd=0000000197fc8003, *pud=0000000197fc8003
+> 
+> *reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000*
+> 
+> memstart_addr 0
+> ARM64_MEMSTART_ALIGN 0x40000000
+> memstart_offset_seed 0xffc7
+> PHYS_OFFSET = 0 - memstart_addr = 0 - 3E40000000 = FFFFFFC1C0000000
+> 
+> reg->base = 0x100000000  -> 0xffffffff40000000
+> phys_end  = 0x1c0000000  -> 0xffffffc000000000  This is confused, end less than start.
+> 
+> And In memblock it use "start_addr + size" as the end addr. So in function kasan_init,
+> if the start >= end, it will not map the hole block address. But the memory in this
+> block is valid. And it can be allocated as well.
+> 
+> So donot use the last memory region. Changing "range = range / ARM64_MEMSTART_ALIGN + 1" to
+> range = range / ARM64_MEMSTART_ALIGN;
+> 
+> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
+> Signed-off-by: Chen Xiang <chenxiang9@huawei.com>
+> ---
+>  arch/arm64/mm/init.c | 7 ++-----
+>  1 file changed, 2 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
+> index 716d122..60112c0 100644
+> --- a/arch/arm64/mm/init.c
+> +++ b/arch/arm64/mm/init.c
+> @@ -267,11 +267,8 @@ void __init arm64_memblock_init(void)
+>  		 * margin, the size of the region that the available physical
+>  		 * memory spans, randomize the linear region as well.
+>  		 */
+> -		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+> -			range = range / ARM64_MEMSTART_ALIGN + 1;
+> -			memstart_addr -= ARM64_MEMSTART_ALIGN *
+> -					 ((range * memstart_offset_seed) >> 16);
+> -		}
+> +		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN)
+> +			memstart_addr -= (range * memstart_offset_seed) >> 16;
+>  	}
+Sorry, here is not align to ARM64_MEMSTART_ALIGN
 
- sound/soc/rockchip/rk3399_gru_sound.c | 19 ++++++++++++++++---
- 1 file changed, 16 insertions(+), 3 deletions(-)
+Should be:
+	if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
+		range = range / ARM64_MEMSTART_ALIGN;
+		memstart_addr -= ARM64_MEMSTART_ALIGN *
+				 ((range * memstart_offset_seed) >> 16);
+	}
 
-diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
-index d64fbbd50544..aa8ffd035377 100644
---- a/sound/soc/rockchip/rk3399_gru_sound.c
-+++ b/sound/soc/rockchip/rk3399_gru_sound.c
-@@ -367,7 +367,8 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
- 	[DAILINK_RT5514_DSP] = {
- 		.name = "RT5514 DSP",
- 		.stream_name = "Wake on Voice",
--		.codec_dai_name = "rt5514-dsp-cpu-dai",
-+		.codec_name = "snd-soc-dummy",
-+		.codec_dai_name = "snd-soc-dummy-dai",
- 	},
- };
- 
-@@ -528,7 +529,18 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 		if (index < 0)
- 			continue;
- 
--		np_cpu = (index == DAILINK_CDNDP) ? np_cpu1 : np_cpu0;
-+		switch (index) {
-+		case DAILINK_CDNDP:
-+			np_cpu = np_cpu1;
-+			break;
-+		case DAILINK_RT5514_DSP:
-+			np_cpu = np_codec;
-+			break;
-+		default:
-+			np_cpu = np_cpu0;
-+			break;
-+		}
-+
- 		if (!np_cpu) {
- 			dev_err(dev, "Missing 'rockchip,cpu' for %s\n",
- 				rockchip_dais[index].name);
-@@ -538,7 +550,8 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
- 		dai = &card->dai_link[card->num_links++];
- 		*dai = rockchip_dais[index];
- 
--		dai->codec_of_node = np_codec;
-+		if (!dai->codec_name)
-+			dai->codec_of_node = np_codec;
- 		dai->platform_of_node = np_cpu;
- 		dai->cpu_of_node = np_cpu;
- 
--- 
-2.11.0
+>  
+>  	/*
+> 
