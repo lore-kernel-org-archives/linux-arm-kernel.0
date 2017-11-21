@@ -1,68 +1,107 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Nov 2017 12:29:38 +0000
-Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH 01/11] Initialize
- the mapping of KASan shadow memory
-In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C0068F12@dggemm510-mbx.china.huawei.com>
-References: <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
- <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
- <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
- <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
- <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
- <20171117073556.GB28855@cbox>
- <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
- <20171118134841.3f6c9183@why.wild-wind.fr.eu.org>
- <B8AC3E80E903784988AB3003E3E97330C0068F12@dggemm510-mbx.china.huawei.com>
-Message-ID: <20171121122938.sydii3i36jbzi7x4@lakrids.cambridge.arm.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Tue, 21 Nov 2017 12:43:12 +0000
+Subject: [PATCH v3 0/3] KVM: arm64: single step emulation instructions
+In-Reply-To: <20171120154131.GO28855@cbox>
+References: <20171116153921.21991-1-alex.bennee@linaro.org>
+ <20171120154131.GO28855@cbox>
+Message-ID: <873757yf8f.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 07:59:01AM +0000, Liuwenliang (Abbott Liu) wrote:
-> On Nov 17, 2017  21:49  Marc Zyngier [mailto:marc.zyngier at arm.com]  wrote:
-> >On Sat, 18 Nov 2017 10:40:08 +0000
-> >"Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
-> >> On Nov 17, 2017  15:36 Christoffer Dall [mailto:cdall at linaro.org]  wrote:
 
-> Please don't ask people to limit to 4GB of physical space on CPU
-> supporting LPAE, please don't ask people to guaranteed to have some
-> memory below 4GB on CPU supporting LPAE.
+Christoffer Dall <cdall@linaro.org> writes:
 
-I don't think that Marc is suggesting that you'd always use the 32-bit
-accessors on an LPAE system, just that all the definitions should exist
-regardless of configuration.
+> Hi Alex,
+>
+> On Thu, Nov 16, 2017 at 03:39:18PM +0000, Alex Benn?e wrote:
+>> Hi,
+>>
+>> This is rev 3 of the series, practically the same than rev 2 but fixed
+>> a return 1->0 in the kvm_run loop that Julien caught. I've added his
+>> r-b tags to the other patches.
+>>
+>> As usual revision details bellow the --- in each patch.
+>
+> Thanks for taking care of this.
+>
+> I have applied the series and slightly tweaked the commit messages and
+> commentary.
+>
+> Did we simply decide to not worry about exiting to userspace if we do
+> fast-path emulation, such as for the errata workaround and GIC
+> mashaling in switch.c ?
 
-So rather than this:
+Compile tested only:
 
-> +#ifdef CONFIG_ARM_LPAE
-> +#define TTBR0           __ACCESS_CP15_64(0, c2)
-> +#define TTBR1           __ACCESS_CP15_64(1, c2)
-> +#define PAR             __ACCESS_CP15_64(0, c7)
-> +#else
-> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
-> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
-> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
-> +#endif
+--8<---------------cut here---------------start------------->8---
+kvm: arm64: handle single-step of hyp emulated mmio
 
-... you'd have the following in cp15.h:
+There is a fast-path of MMIO emulation inside hyp mode. The handling
+of single-step is broadly the same as kvm_arm_handle_step_debug()
+except we just setup ESR/HSR so handle_exit() does the correct thing
+as we exit.
 
-#define TTBR0_64	__ACCESS_CP15_64(0, c2)
-#define TTBR1_64	__ACCESS_CP15_64(1, c2)
-#define PAR_64		__ACCESS_CP15_64(0, c7)
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ arch/arm64/kvm/hyp/switch.c | 26 +++++++++++++++++++++-----
+ 1 file changed, 21 insertions(+), 5 deletions(-)
 
-#define TTBR0_32	__ACCESS_CP15(c2, 0, c0, 0)
-#define TTBR1_32	__ACCESS_CP15(c2, 0, c0, 1)
-#define PAR_32		__ACCESS_CP15(c7, 0, c4, 0)
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 945e79c641c4..841dc79d11fd 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -263,7 +263,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
 
-... and elsewhere, where it matters, we choose which to use depending on
-the kernel configuration, e.g.
+-static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
++/* Skip an instruction which has been emulated. Returns true if
++ * execution can continue or false if we need to exit hyp mode because
++ * single-step was in effect.
++ */
++static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ {
+ 	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
 
-void set_ttbr0(u64 val)
-{
-	if (IS_ENABLED(CONFIG_ARM_LPAE))
-		write_sysreg(val, TTBR0_64);
-	else
-		write_sysreg(val, TTBR0_32);
-}
+@@ -276,6 +280,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ 	}
 
-Thanks,
-Mark.
+ 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
++
++	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
++		vcpu->arch.fault.esr_el2 =
++			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
++		return false;
++	} else {
++		return true;
++	}
+ }
+
+ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+@@ -336,8 +348,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 			int ret = __vgic_v2_perform_cpuif_access(vcpu);
+
+ 			if (ret == 1) {
+-				__skip_instr(vcpu);
+-				goto again;
++				if (__skip_instr(vcpu))
++					goto again;
++				else
++					exit_code = ARM_EXCEPTION_TRAP;
+ 			}
+
+ 			if (ret == -1) {
+@@ -357,8 +371,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+
+ 		if (ret == 1) {
+-			__skip_instr(vcpu);
+-			goto again;
++			if (__skip_instr(vcpu))
++				goto again;
++			else
++				exit_code = ARM_EXCEPTION_TRAP;
+ 		}
+
+ 		/* 0 falls through to be handled out of EL2 */
+--8<---------------cut here---------------end--------------->8---
