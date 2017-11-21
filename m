@@ -1,72 +1,68 @@
-From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
-Date: Tue, 21 Nov 2017 12:12:58 +0000
-Subject: [PATCH v3 0/3] KVM: arm64: single step emulation instructions
-In-Reply-To: <20171120154131.GO28855@cbox>
-References: <20171116153921.21991-1-alex.bennee@linaro.org>
- <20171120154131.GO28855@cbox>
-Message-ID: <874lpnygmt.fsf@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Nov 2017 12:29:38 +0000
+Subject: =?utf-8?B?562U5aSN?= =?utf-8?Q?=3A?= [PATCH 01/11] Initialize
+ the mapping of KASan shadow memory
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C0068F12@dggemm510-mbx.china.huawei.com>
+References: <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
+ <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
+ <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
+ <20171117073556.GB28855@cbox>
+ <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
+ <20171118134841.3f6c9183@why.wild-wind.fr.eu.org>
+ <B8AC3E80E903784988AB3003E3E97330C0068F12@dggemm510-mbx.china.huawei.com>
+Message-ID: <20171121122938.sydii3i36jbzi7x4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 21, 2017 at 07:59:01AM +0000, Liuwenliang (Abbott Liu) wrote:
+> On Nov 17, 2017  21:49  Marc Zyngier [mailto:marc.zyngier at arm.com]  wrote:
+> >On Sat, 18 Nov 2017 10:40:08 +0000
+> >"Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
+> >> On Nov 17, 2017  15:36 Christoffer Dall [mailto:cdall at linaro.org]  wrote:
 
-Christoffer Dall <cdall@linaro.org> writes:
+> Please don't ask people to limit to 4GB of physical space on CPU
+> supporting LPAE, please don't ask people to guaranteed to have some
+> memory below 4GB on CPU supporting LPAE.
 
-> Hi Alex,
->
-> On Thu, Nov 16, 2017 at 03:39:18PM +0000, Alex Benn?e wrote:
->> Hi,
->>
->> This is rev 3 of the series, practically the same than rev 2 but fixed
->> a return 1->0 in the kvm_run loop that Julien caught. I've added his
->> r-b tags to the other patches.
->>
->> As usual revision details bellow the --- in each patch.
->
-> Thanks for taking care of this.
->
-> I have applied the series and slightly tweaked the commit messages and
-> commentary.
->
-> Did we simply decide to not worry about exiting to userspace if we do
-> fast-path emulation, such as for the errata workaround and GIC
-> mashaling in switch.c ?
+I don't think that Marc is suggesting that you'd always use the 32-bit
+accessors on an LPAE system, just that all the definitions should exist
+regardless of configuration.
 
-Hmm I'd forgotten about that - I figured it was all in handle_exit or
-passed to userspace. So I guess in-hyp emulation is a 3rd class of
-instruction emulation?
+So rather than this:
 
-Which particular interface cases are we covering here?
+> +#ifdef CONFIG_ARM_LPAE
+> +#define TTBR0           __ACCESS_CP15_64(0, c2)
+> +#define TTBR1           __ACCESS_CP15_64(1, c2)
+> +#define PAR             __ACCESS_CP15_64(0, c7)
+> +#else
+> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
+> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
+> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
+> +#endif
 
-I suspect if these are regions that are only accessed once the system is
-up and running we are going to run into problems due to single stepping
-while IRQs are enabled. But conceptually we just need to do the same
-flag check after __skip_instr has done before deciding to fall out the
-loop or goto again;
+... you'd have the following in cp15.h:
 
-We would have to fake up HSR so handle_exit did the right thing on the
-way out though. That seems a little icky....
+#define TTBR0_64	__ACCESS_CP15_64(0, c2)
+#define TTBR1_64	__ACCESS_CP15_64(1, c2)
+#define PAR_64		__ACCESS_CP15_64(0, c7)
 
->
-> Thanks,
-> -Christoffer
->
->>
->> Alex Benn?e (3):
->>   kvm: arm debug: introduce helper for single-step
->>   kvm: arm64: handle single-stepping trapped instructions
->>   kvm: arm64: handle single-step of userspace mmio instructions
->>
->>  arch/arm/include/asm/kvm_host.h   |  5 +++++
->>  arch/arm64/include/asm/kvm_host.h |  1 +
->>  arch/arm64/kvm/debug.c            | 22 ++++++++++++++++++
->>  arch/arm64/kvm/handle_exit.c      | 47 +++++++++++++++++++++++++++------------
->>  virt/kvm/arm/arm.c                |  3 +++
->>  5 files changed, 64 insertions(+), 14 deletions(-)
->>
->> --
->> 2.15.0
->>
+#define TTBR0_32	__ACCESS_CP15(c2, 0, c0, 0)
+#define TTBR1_32	__ACCESS_CP15(c2, 0, c0, 1)
+#define PAR_32		__ACCESS_CP15(c7, 0, c4, 0)
 
+... and elsewhere, where it matters, we choose which to use depending on
+the kernel configuration, e.g.
 
---
-Alex Benn?e
+void set_ttbr0(u64 val)
+{
+	if (IS_ENABLED(CONFIG_ARM_LPAE))
+		write_sysreg(val, TTBR0_64);
+	else
+		write_sysreg(val, TTBR0_32);
+}
+
+Thanks,
+Mark.
