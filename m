@@ -1,172 +1,79 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 21 Nov 2017 20:49:59 -0200
-Subject: [PATCH 2/3] ARM: dts: imx6sx-sdb: Rearrange the regulators node
-Message-ID: <1511304601-1149-1-git-send-email-festevam@gmail.com>
+Date: Tue, 21 Nov 2017 20:50:01 -0200
+Subject: [PATCH 1/3] ARM: dts: imx6sx: Fix the PCI representation
+In-Reply-To: <1511304601-1149-1-git-send-email-festevam@gmail.com>
+References: <1511304601-1149-1-git-send-email-festevam@gmail.com>
+Message-ID: <1511304601-1149-3-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-It is not recommended to place regulators inside "simple-bus", so
-move them out. The motivation for doing this is to make it easier to
-adding new regulators.
+Currently the imx pci driver fails to probe on i.MX6SX.
+
+Fix the PCI representation so that the driver can be probed and
+PCI devices can be detected.
+
+Tested on a im6sx-sdb board:
+
+# lspci 
+00:00.0 Class 0604: 16c3:abcd
+01:00.0 Class 0280: 8086:08b1
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 135 +++++++++++++++++---------------------
- 1 file changed, 61 insertions(+), 74 deletions(-)
+We still need to add a power domain description for PCI on i.MX6SX,
+but this can be addded later.
 
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index da81552..d76b458 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -49,86 +49,73 @@
+This current patch is a real improvement as it allows to detect
+PCI devices now.
+
+ arch/arm/boot/dts/imx6sx.dtsi | 25 ++++++++++++++-----------
+ 1 file changed, 14 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
+index 5b03ba3..0e608a4 100644
+--- a/arch/arm/boot/dts/imx6sx.dtsi
++++ b/arch/arm/boot/dts/imx6sx.dtsi
+@@ -1304,25 +1304,28 @@
+ 
+ 		pcie: pcie at 8ffc000 {
+ 			compatible = "fsl,imx6sx-pcie", "snps,dw-pcie";
+-			reg = <0x08ffc000 0x4000>; /* DBI */
++			reg = <0x08ffc000 0x04000>, <0x08f00000 0x80000>;
++			reg-names = "dbi", "config";
+ 			#address-cells = <3>;
+ 			#size-cells = <2>;
+ 			device_type = "pci";
+-				  /* configuration space */
+-			ranges = <0x00000800 0 0x08f00000 0x08f00000 0 0x00080000
+-				  /* downstream I/O */
+-				  0x81000000 0 0          0x08f80000 0 0x00010000
+-				  /* non-prefetchable memory */
+-				  0x82000000 0 0x08000000 0x08000000 0 0x00f00000>;
+ 			bus-range = <0x00 0xff>;
++			ranges = <0x81000000 0 0          0x08f80000 0 0x00010000 /* downstream I/O */
++				  0x82000000 0 0x01000000 0x08000000 0 0x00f00000>; /* non-prefetchable memory */
+ 			num-lanes = <1>;
+ 			interrupts = <GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>;
+-			clocks = <&clks IMX6SX_CLK_PCIE_REF_125M>,
+-				 <&clks IMX6SX_CLK_PCIE_AXI>,
++			interrupt-names = "msi";
++			#interrupt-cells = <1>;
++			interrupt-map-mask = <0 0 0 0x7>;
++			interrupt-map = <0 0 0 1 &gpc GIC_SPI 123 IRQ_TYPE_LEVEL_HIGH>,
++					<0 0 0 2 &gpc GIC_SPI 122 IRQ_TYPE_LEVEL_HIGH>,
++					<0 0 0 3 &gpc GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
++					<0 0 0 4 &gpc GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&clks IMX6SX_CLK_PCIE_AXI>,
+ 				 <&clks IMX6SX_CLK_LVDS1_OUT>,
++				 <&clks IMX6SX_CLK_PCIE_REF_125M>,
+ 				 <&clks IMX6SX_CLK_DISPLAY_AXI>;
+-			clock-names = "pcie_ref_125m", "pcie_axi",
+-				      "lvds_gate", "display_axi";
++			clock-names = "pcie", "pcie_bus", "pcie_phy", "pcie_inbound_axi";
+ 			status = "disabled";
  		};
  	};
- 
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		vcc_sd3: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_vcc_sd3>;
--			regulator-name = "VCC_SD3";
--			regulator-min-microvolt = <3000000>;
--			regulator-max-microvolt = <3000000>;
--			gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	vcc_sd3: regulator-vcc-sd3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_vcc_sd3>;
-+		regulator-name = "VCC_SD3";
-+		regulator-min-microvolt = <3000000>;
-+		regulator-max-microvolt = <3000000>;
-+		gpio = <&gpio2 11 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- 
--		reg_usb_otg1_vbus: regulator at 1 {
--			compatible = "regulator-fixed";
--			reg = <1>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_usb_otg1>;
--			regulator-name = "usb_otg1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usb_otg1>;
-+		regulator-name = "usb_otg1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- 
--		reg_usb_otg2_vbus: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_usb_otg2>;
--			regulator-name = "usb_otg2_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--		};
-+	reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_usb_otg2>;
-+		regulator-name = "usb_otg2_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 12 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
- 
--		reg_psu_5v: regulator at 3 {
--			compatible = "regulator-fixed";
--			reg = <3>;
--			regulator-name = "PSU-5V0";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--		};
-+	reg_psu_5v: regulator-psu-5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "PSU-5V0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
- 
--		reg_lcd_3v3: regulator at 4 {
--			compatible = "regulator-fixed";
--			reg = <4>;
--			regulator-name = "lcd-3v3";
--			gpio = <&gpio3 27 0>;
--			enable-active-high;
--		};
-+	reg_lcd_3v3: regulator-lcd-3v3 {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lcd-3v3";
-+		gpio = <&gpio3 27 0>;
-+		enable-active-high;
-+	};
- 
--		reg_peri_3v3: regulator at 5 {
--			compatible = "regulator-fixed";
--			reg = <5>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_peri_3v3>;
--			regulator-name = "peri_3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio4 16 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
--			regulator-always-on;
--		};
-+	reg_peri_3v3: regulator-peri-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_peri_3v3>;
-+		regulator-name = "peri_3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio4 16 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
- 
--		reg_enet_3v3: regulator at 6 {
--			compatible = "regulator-fixed";
--			reg = <6>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_enet_3v3>;
--			regulator-name = "enet_3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
--		};
-+	reg_enet_3v3: regulator-enet-3v3 {
-+		compatible = "regulator-fixed";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_enet_3v3>;
-+		regulator-name = "enet_3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
- 	};
- 
- 	sound {
 -- 
 2.7.4
