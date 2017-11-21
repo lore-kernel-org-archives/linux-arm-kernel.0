@@ -1,52 +1,66 @@
-From: patrice.chotard@st.com (Patrice CHOTARD)
-Date: Tue, 21 Nov 2017 08:22:39 +0000
-Subject: [PATCH] c8sectpfe: fix potential NULL pointer dereference in
- c8sectpfe_timer_interrupt
-In-Reply-To: <20171120140055.GA728@embeddedor.com>
-References: <20171120140055.GA728@embeddedor.com>
-Message-ID: <dbd98a18-6d11-bc4e-de44-a04383bb3ade@st.com>
+From: jeffy.chen@rock-chips.com (Jeffy Chen)
+Date: Tue, 21 Nov 2017 16:25:17 +0800
+Subject: [PATCH] ASoC: rockchip: Use dummy_dai for rt5514 dsp dailink
+Message-ID: <20171121082517.17233-1-jeffy.chen@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gustavo
+The rt5514 dsp captures pcm data through spi directly, so we should not
+use rockchip-i2s as it's cpu dai like other codecs.
 
-On 11/20/2017 03:00 PM, Gustavo A. R. Silva wrote:
-> _channel_ is being dereferenced before it is null checked, hence there is a
-> potential null pointer dereference. Fix this by moving the pointer dereference
-> after _channel_ has been null checked.
-> 
-> This issue was detected with the help of Coccinelle.
-> 
-> Fixes: c5f5d0f99794 ("[media] c8sectpfe: STiH407/10 Linux DVB demux support")
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
-> ---
->   drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 4 +++-
->   1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-> index 59280ac..23d0ced 100644
-> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
-> @@ -83,7 +83,7 @@ static void c8sectpfe_timer_interrupt(unsigned long ac8sectpfei)
->   static void channel_swdemux_tsklet(unsigned long data)
->   {
->   	struct channel_info *channel = (struct channel_info *)data;
-> -	struct c8sectpfei *fei = channel->fei;
-> +	struct c8sectpfei *fei;
->   	unsigned long wp, rp;
->   	int pos, num_packets, n, size;
->   	u8 *buf;
-> @@ -91,6 +91,8 @@ static void channel_swdemux_tsklet(unsigned long data)
->   	if (unlikely(!channel || !channel->irec))
->   		return;
->   
-> +	fei = channel->fei;
-> +
->   	wp = readl(channel->irec + DMA_PRDS_BUSWP_TP(0));
->   	rp = readl(channel->irec + DMA_PRDS_BUSRP_TP(0));
->   
-> 
+Use dummy_dai for rt5514 dsp dailink to make voice wakeup work again.
 
-Acked-by: Patrice Chotard <patrice.chotard@st.com>
+Reported-by: Jimmy Cheng-Yi Chiang <cychiang@google.com>
+Fixes: (72cfb0f20c75 ASoC: rockchip: Use codec of_node and dai_name for rt5514 dsp)
+Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+---
 
-Thanks
+ sound/soc/rockchip/rk3399_gru_sound.c | 19 ++++++++++++++++---
+ 1 file changed, 16 insertions(+), 3 deletions(-)
+
+diff --git a/sound/soc/rockchip/rk3399_gru_sound.c b/sound/soc/rockchip/rk3399_gru_sound.c
+index d64fbbd50544..aa8ffd035377 100644
+--- a/sound/soc/rockchip/rk3399_gru_sound.c
++++ b/sound/soc/rockchip/rk3399_gru_sound.c
+@@ -367,7 +367,8 @@ static const struct snd_soc_dai_link rockchip_dais[] = {
+ 	[DAILINK_RT5514_DSP] = {
+ 		.name = "RT5514 DSP",
+ 		.stream_name = "Wake on Voice",
+-		.codec_dai_name = "rt5514-dsp-cpu-dai",
++		.codec_name = "snd-soc-dummy",
++		.codec_dai_name = "snd-soc-dummy-dai",
+ 	},
+ };
+ 
+@@ -528,7 +529,18 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
+ 		if (index < 0)
+ 			continue;
+ 
+-		np_cpu = (index == DAILINK_CDNDP) ? np_cpu1 : np_cpu0;
++		switch (index) {
++		case DAILINK_CDNDP:
++			np_cpu = np_cpu1;
++			break;
++		case DAILINK_RT5514_DSP:
++			np_cpu = np_codec;
++			break;
++		default:
++			np_cpu = np_cpu0;
++			break;
++		}
++
+ 		if (!np_cpu) {
+ 			dev_err(dev, "Missing 'rockchip,cpu' for %s\n",
+ 				rockchip_dais[index].name);
+@@ -538,7 +550,8 @@ static int rockchip_sound_of_parse_dais(struct device *dev,
+ 		dai = &card->dai_link[card->num_links++];
+ 		*dai = rockchip_dais[index];
+ 
+-		dai->codec_of_node = np_codec;
++		if (!dai->codec_name)
++			dai->codec_of_node = np_codec;
+ 		dai->platform_of_node = np_cpu;
+ 		dai->cpu_of_node = np_cpu;
+ 
+-- 
+2.11.0
