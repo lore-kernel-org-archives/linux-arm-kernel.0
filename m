@@ -1,36 +1,45 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Tue, 21 Nov 2017 16:25:09 +0000
-Subject: [PATCH v2 4/4] PCI/AER: Dont do recovery when DPC is enabled
-In-Reply-To: <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
-References: <1510721808-27164-1-git-send-email-poza@codeaurora.org>
- <1510721808-27164-5-git-send-email-poza@codeaurora.org>
- <20171115211447.GA7266@bhelgaas-glaptop.roam.corp.google.com>
- <16e82fb4-dda8-3790-e831-675f9a6fd388@codeaurora.org>
-Message-ID: <de047a7ce7334daab4e53ea4e8444421@AcuMS.aculab.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Tue, 21 Nov 2017 17:28:22 +0100
+Subject: [PATCH 1/4] ARM: dts: imx6qdl-pinfunc: Add missing
+ MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT
+In-Reply-To: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
+References: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1511281705-30849-2-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sinan Kaya
-> Sent: 16 November 2017 14:04
-...
-> The issue is two independent software entities are trying to recover the PCIe
-> link simultaneously. AER and DPC have two different approaches to link recovery.
-> 
-> AER makes a callback into the endpoint drivers for non-fatal errors and hope
-> that endpoint driver can recover the link. AER also makes a callback in the
-> fatal error case but resets the link via secondary bus reset.
-> 
-> The DPC on the other hand stops the drivers immediately since HW took care of
-> link disable. (Endpoint register reads return ~0 at this point.)
+Add missing pinmux entry for OSC32K_32K_OUT on pad ENET_RXD0 used by the
+Variscite DART-MX6 SoM.
 
-What happens if the 'user' driver doesn't define the error reporting callbacks?
-It might be hardened against the ~0u returns from reads - so not OOPS.
-It might be appropriate to call the remove() function instead.
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +
+ arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
+ 2 files changed, 2 insertions(+)
 
-> DPC driver clears
-> the interrupt from the DPC capability and brings the link up at the end. Full
-> enumeration/rescan follows this procedure to go back to functioning state.
-
-That might not be a good idea, very likely it will fail again immediately.
-
-	David
+diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h b/arch/arm/boot/dts/imx6dl-pinfunc.h
+index 0ead323..37e430a 100644
+--- a/arch/arm/boot/dts/imx6dl-pinfunc.h
++++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
+@@ -668,6 +668,7 @@
+ #define MX6QDL_PAD_ENET_RX_ER__SPDIF_IN             0x1f4 0x5c4 0x8f0 0x3 0x1
+ #define MX6QDL_PAD_ENET_RX_ER__ENET_1588_EVENT2_OUT 0x1f4 0x5c4 0x000 0x4 0x0
+ #define MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24           0x1f4 0x5c4 0x000 0x5 0x0
++#define MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT        0x1f8 0x5c8 0x000 0x0 0x0
+ #define MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0         0x1f8 0x5c8 0x818 0x1 0x0
+ #define MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK        0x1f8 0x5c8 0x838 0x2 0x0
+ #define MX6QDL_PAD_ENET_RXD0__SPDIF_OUT             0x1f8 0x5c8 0x000 0x3 0x0
+diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
+index 9fc6120..cfb11d3 100644
+--- a/arch/arm/boot/dts/imx6q-pinfunc.h
++++ b/arch/arm/boot/dts/imx6q-pinfunc.h
+@@ -551,6 +551,7 @@
+ #define MX6QDL_PAD_ENET_RXD1__ESAI_TX_FS            0x1e0 0x4f4 0x860 0x2 0x0
+ #define MX6QDL_PAD_ENET_RXD1__ENET_1588_EVENT3_OUT  0x1e0 0x4f4 0x000 0x4 0x0
+ #define MX6QDL_PAD_ENET_RXD1__GPIO1_IO26            0x1e0 0x4f4 0x000 0x5 0x0
++#define MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT        0x1e4 0x4f8 0x000 0x0 0x0
+ #define MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0         0x1e4 0x4f8 0x848 0x1 0x1
+ #define MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK        0x1e4 0x4f8 0x868 0x2 0x0
+ #define MX6QDL_PAD_ENET_RXD0__SPDIF_OUT             0x1e4 0x4f8 0x000 0x3 0x0
+-- 
+2.7.4
