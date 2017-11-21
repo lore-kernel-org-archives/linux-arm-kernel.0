@@ -1,69 +1,92 @@
 From: leo.yan@linaro.org (Leo Yan)
-Date: Tue, 21 Nov 2017 11:08:43 +0800
-Subject: [PATCH v2 3/4] coresight: tmc: Hook panic dump callback for ETB/ETF
+Date: Tue, 21 Nov 2017 11:08:44 +0800
+Subject: [PATCH v2 4/4] coresight: etm4x: Hook panic dump callback for etmv4
 In-Reply-To: <1511233724-11867-1-git-send-email-leo.yan@linaro.org>
 References: <1511233724-11867-1-git-send-email-leo.yan@linaro.org>
-Message-ID: <1511233724-11867-4-git-send-email-leo.yan@linaro.org>
+Message-ID: <1511233724-11867-5-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The panic dump functionality has been ready, this patch is to hook
-panic callback function for ETB/ETF.  Since the driver data structure
-has allocated buffer when the session started, so simply save ETB/ETF
-trace data into the buffer when panic happens and update related info
-into dump node.
+We need to dump etmv4 info as metadata, so the data can be used for
+offline checking for configuration and generate 'perf' compatible
+file.  This commit hooks etmv4 callback for panic dump.
 
 Signed-off-by: Leo Yan <leo.yan@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-tmc-etf.c | 29 +++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ drivers/hwtracing/coresight/coresight-etm4x.c | 22 ++++++++++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm4x.h | 15 +++++++++++++++
+ 2 files changed, 37 insertions(+)
 
-diff --git a/drivers/hwtracing/coresight/coresight-tmc-etf.c b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-index e2513b7..1337c02 100644
---- a/drivers/hwtracing/coresight/coresight-tmc-etf.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc-etf.c
-@@ -504,6 +504,34 @@ static void tmc_update_etf_buffer(struct coresight_device *csdev,
- 	CS_LOCK(drvdata->base);
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.c b/drivers/hwtracing/coresight/coresight-etm4x.c
+index cf364a5..bf9608b 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.c
++++ b/drivers/hwtracing/coresight/coresight-etm4x.c
+@@ -418,11 +418,33 @@ static void etm4_disable(struct coresight_device *csdev,
+ 		local_set(&drvdata->mode, CS_MODE_DISABLED);
  }
  
-+static void tmc_panic_cb(void *data)
++static void etm4_panic_cb(void *data)
 +{
 +	struct coresight_device *csdev = (struct coresight_device *)data;
-+	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+	unsigned long flags;
++	int cpu = smp_processor_id();
++	struct etmv4_drvdata *drvdata = etmdrvdata[cpu];
++	struct etmv4_config *config = &drvdata->config;
++	struct etmv4_metadata *metadata = &drvdata->metadata;
 +
-+	if (WARN_ON_ONCE(drvdata->config_type != TMC_CONFIG_TYPE_ETB &&
-+			 drvdata->config_type != TMC_CONFIG_TYPE_ETF))
-+		return;
++	metadata->magic = ETM4_METADATA_MAGIC;
++	metadata->cpu = cpu;
++	metadata->trcconfigr = config->cfg;
++	metadata->trctraceidr = drvdata->trcid;
++	metadata->trcidr0 = readl_relaxed(drvdata->base + TRCIDR0);
++	metadata->trcidr1 = readl_relaxed(drvdata->base + TRCIDR1);
++	metadata->trcidr2 = readl_relaxed(drvdata->base + TRCIDR2);
++	metadata->trcidr8 = readl_relaxed(drvdata->base + TRCIDR8);
++	metadata->trcauthstatus = readl_relaxed(drvdata->base + TRCAUTHSTATUS);
 +
-+	if (drvdata->mode == CS_MODE_DISABLED)
-+		return;
-+
-+	spin_lock_irqsave(&drvdata->spinlock, flags);
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	tmc_flush_and_stop(drvdata);
-+	tmc_etb_dump_hw(drvdata);
-+
-+	CS_LOCK(drvdata->base);
-+
-+	/* Update buffer info for panic dump */
-+	coresight_dump_update(csdev, drvdata->buf, drvdata->len);
-+
-+	spin_unlock_irqrestore(&drvdata->spinlock, flags);
++	coresight_dump_update(csdev, (char *)metadata, sizeof(*metadata));
 +}
 +
- static const struct coresight_ops_sink tmc_etf_sink_ops = {
- 	.enable		= tmc_enable_etf_sink,
- 	.disable	= tmc_disable_etf_sink,
-@@ -512,6 +540,7 @@ static const struct coresight_ops_sink tmc_etf_sink_ops = {
- 	.set_buffer	= tmc_set_etf_buffer,
- 	.reset_buffer	= tmc_reset_etf_buffer,
- 	.update_buffer	= tmc_update_etf_buffer,
-+	.panic_cb	= tmc_panic_cb,
+ static const struct coresight_ops_source etm4_source_ops = {
+ 	.cpu_id		= etm4_cpu_id,
+ 	.trace_id	= etm4_trace_id,
+ 	.enable		= etm4_enable,
+ 	.disable	= etm4_disable,
++	.panic_cb	= etm4_panic_cb,
  };
  
- static const struct coresight_ops_link tmc_etf_link_ops = {
+ static const struct coresight_ops etm4_cs_ops = {
+diff --git a/drivers/hwtracing/coresight/coresight-etm4x.h b/drivers/hwtracing/coresight/coresight-etm4x.h
+index b3b5ea7..08dc8b7 100644
+--- a/drivers/hwtracing/coresight/coresight-etm4x.h
++++ b/drivers/hwtracing/coresight/coresight-etm4x.h
+@@ -198,6 +198,20 @@
+ #define ETM_EXLEVEL_NS_HYP		BIT(14)
+ #define ETM_EXLEVEL_NS_NA		BIT(15)
+ 
++#define ETM4_METADATA_MAGIC		0x4040404040404040ULL
++
++struct etmv4_metadata {
++	u64 magic;
++	u64 cpu;
++	u64 trcconfigr;
++	u64 trctraceidr;
++	u64 trcidr0;
++	u64 trcidr1;
++	u64 trcidr2;
++	u64 trcidr8;
++	u64 trcauthstatus;
++};
++
+ /**
+  * struct etmv4_config - configuration information related to an ETMv4
+  * @mode:	Controls various modes supported by this ETM.
+@@ -393,6 +407,7 @@ struct etmv4_drvdata {
+ 	bool				atbtrig;
+ 	bool				lpoverride;
+ 	struct etmv4_config		config;
++	struct etmv4_metadata		metadata;
+ };
+ 
+ /* Address comparator access types */
 -- 
 2.7.4
