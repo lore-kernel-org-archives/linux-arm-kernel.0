@@ -1,75 +1,34 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Tue, 21 Nov 2017 11:13:06 +0000
-Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
- larger kernels
-In-Reply-To: <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
-References: <20171117114143.26577-1-steve.capper@arm.com>
- <20171117114143.26577-3-steve.capper@arm.com>
- <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
-Message-ID: <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 21 Nov 2017 11:15:06 +0000
+Subject: [PATCH v2 09/18] arm64: explicitly pass
+ --no-fix-cortex-a53-843419 to GNU gold
+In-Reply-To: <20171120203549.GB89108@samitolvanen.mtv.corp.google.com>
+References: <20171115213428.22559-1-samitolvanen@google.com>
+ <20171115213428.22559-10-samitolvanen@google.com>
+ <20171116114722.GD9361@arm.com>
+ <20171116163549.GD94341@samitolvanen.mtv.corp.google.com>
+ <20171120144720.bf27bpuwq4huhkdp@lakrids.cambridge.arm.com>
+ <20171120203549.GB89108@samitolvanen.mtv.corp.google.com>
+Message-ID: <20171121111506.qmlhtupzyrvfpgjl@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 05:00:10PM +0000, Mark Rutland wrote:
-> Hi,
-
-Hi Mark,
-
+On Mon, Nov 20, 2017 at 12:35:49PM -0800, Sami Tolvanen wrote:
+> On Mon, Nov 20, 2017 at 02:47:20PM +0000, Mark Rutland wrote:
+> > However, we could instead check ld-version, produce a warning, and
+> > abort the build in such cases.
 > 
-> On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
-> > -#define SWAPPER_DIR_SIZE	(SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
-> > +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
-> > +
-> > +#if SWAPPER_PGTABLE_LEVELS > 3
-> > +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
-> > +#else
-> > +#define EARLY_PUDS(vstart, vend) (0)
-> > +#endif
-> > +
-> > +#if SWAPPER_PGTABLE_LEVELS > 2
-> > +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
-> > +#else
-> > +#define EARLY_PMDS(vstart, vend) (0)
-> > +#endif
-> > +
-> > +#define EARLY_PAGES(vstart, vend) ( 1 			/* PGDIR page */				\
-> > +			+ EARLY_PGDS((vstart), (vend)) 	/* each PGDIR needs a next level page table */	\
-> > +			+ EARLY_PUDS((vstart), (vend))	/* each PUD needs a next level page table */	\
-> > +			+ EARLY_PMDS((vstart), (vend)))	/* each PMD needs a next level page table */
-> > +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
-> >  #define IDMAP_DIR_SIZE		(IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
-> 
-> I'm currently struggling to convince myself as to whether 2M is
-> necessary/sufficient slack space for all configurations.
+> I believe the version number of gold didn't change in binutils 2.28.1,
+> where this was fixed, but we could certainly warn about older versions
+> of gold.
 
-Agreed, if the possible address range is changed outside these bounds
-then we need to extend them.
+If that's the case, can we mandate gold version > 2.28.1?
 
-> 
-> At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
-> to cross PGD/PUD/PMD boundaries.
-> 
-> For example with 3 levels of 64K pages, and a huge kernel that takes up
-> SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
-> and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
-> the kernel were to be relocated such that it straddled two PGDs, we'd
-> need 2 PGDs and 2 PMDs, needing 5 pages total.
-> 
-> I'm not sure that we have a problem if we don't relax KASLR.
-> 
+The latest version seems to be 2.29.1, so there's at least one
+(hopefully) working release.
 
-The approach I've adopted is to compute which indices are required for
-PGDs, PUDs, PMDs to map the supplied address range, then count them.
-If we require two PGD entries then that means we need two pages
-containing PMD entries to be allocated.
+That might rule out a few working gold binaries, but it would save on
+unwelcome surprises.
 
-If we consider just PGDs, for example, the only way I am aware of the
-kernel straddling more PGDs than previously computed is for the mapping
-to begin before vstart or end after vend (or both).
-
-Should I refine the range specified in the SWAPPER_DIR_SIZE for the
-current KASLR? (I thought the random offset was < SZ_2M?)
-
-Cheers,
--- 
-Steve
+Thanks,
+Mark.
