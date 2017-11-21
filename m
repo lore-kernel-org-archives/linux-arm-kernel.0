@@ -1,49 +1,48 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Tue, 21 Nov 2017 16:06:38 +0100
-Subject: [PATCH] ARM: dts: exynos: correct trats2 panel reset line
-In-Reply-To: <20171121112424.GA6650@lineageos.org>
-References: <CGME20171121112435epcas4p25f529481eebd076f0fde78c500b04395@epcas4p2.samsung.com>
- <20171121112424.GA6650@lineageos.org>
-Message-ID: <59887245-ed25-ac1b-3bd4-b72c8fd1dd74@samsung.com>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Tue, 21 Nov 2017 10:37:39 -0500
+Subject: [PATCH 2/2] ARM: dts: TS-7970: add basic device tree
+In-Reply-To: <CAOMZO5AFEqk6FcfzJGO6VH0LpF7uFnkmiMYds9y=jajx8ygdZQ@mail.gmail.com>
+References: <20171120211557.27946-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20171120211557.27946-2-sebastien.bourdelin@savoirfairelinux.com>
+ <CAOMZO5AFEqk6FcfzJGO6VH0LpF7uFnkmiMYds9y=jajx8ygdZQ@mail.gmail.com>
+Message-ID: <9f24aabd-bf1f-c48f-b997-b0c80e44ca81@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Fabio,
 
-On 2017-11-21 12:24, Simon Shields wrote:
-> trats2 uses gpf2-1 as the panel reset GPIO. gpy4-5 was only used
-> on early revisions of the board.
->
-> Fixes: 420ae8451a22 ("ARM: dts: exynos4412-trats2: add panel node")
-> Signed-off-by: Simon Shields <simon@lineageos.org>
+On 11/20/2017 06:37 PM, Fabio Estevam wrote:
+> Hi Sebastien,
+> 
+> On Mon, Nov 20, 2017 at 7:15 PM, Sebastien Bourdelin
+> <sebastien.bourdelin@savoirfairelinux.com> wrote:
+> 
+>> +&ecspi2 {
+>> +       cs-gpios = <
+>> +               &gpio5 31 GPIO_ACTIVE_HIGH
+>> +               &gpio7 12 GPIO_ACTIVE_HIGH
+>> +               &gpio5 18 GPIO_ACTIVE_HIGH
+>> +       >;
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&pinctrl_ecspi2>;
+>> +       status = "okay";
+>> +
+>> +       spidevfpga: spi at 1 {
+>> +               compatible = "spidev";
+>> +               reg = <1>;
+>> +               spi-max-frequency = <1000000>;
+> 
+> According to drivers/spi/spidev.c:
+> 
+> /*
+> * spidev should never be referenced in DT without a specific
+> * compatible string, it is a Linux implementation thing
+> * rather than a description of the hardware.
+> */
+> 
 
-Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
-Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
-
-It looks that this has been accidentally copy/pasted from the previous
-dts used for early version of the development board. I've checked the
-Trats2 schematic and indeed gpf2-1 is the correct pin for panel reset
-line.
-
-> ---
->   arch/arm/boot/dts/exynos4412-trats2.dts | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/exynos4412-trats2.dts b/arch/arm/boot/dts/exynos4412-trats2.dts
-> index 220cdf109405..9f4672ba9943 100644
-> --- a/arch/arm/boot/dts/exynos4412-trats2.dts
-> +++ b/arch/arm/boot/dts/exynos4412-trats2.dts
-> @@ -454,7 +454,7 @@
->   		reg = <0>;
->   		vdd3-supply = <&lcd_vdd3_reg>;
->   		vci-supply = <&ldo25_reg>;
-> -		reset-gpios = <&gpy4 5 GPIO_ACTIVE_HIGH>;
-> +		reset-gpios = <&gpf2 1 GPIO_ACTIVE_HIGH>;
->   		power-on-delay= <50>;
->   		reset-delay = <100>;
->   		init-delay = <100>;
-
-Best regards
--- 
-Marek Szyprowski, PhD
-Samsung R&D Institute Poland
+Thanks, you are right!
+Just to point it, this warning has been introduced in
+956b200a846e324322f6211034c734c65a38e550 in date of march 2015, and it
+seems some devices trees whom had been introduced after still use the
+"spidev" string only.
