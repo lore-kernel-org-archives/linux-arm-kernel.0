@@ -1,100 +1,327 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 21 Nov 2017 13:24:28 +0000
-Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
- larger kernels
-In-Reply-To: <20171121131448.gokl6p2upszrgayn@capper-debian.cambridge.arm.com>
-References: <20171117114143.26577-1-steve.capper@arm.com>
- <20171117114143.26577-3-steve.capper@arm.com>
- <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
- <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
- <20171121131448.gokl6p2upszrgayn@capper-debian.cambridge.arm.com>
-Message-ID: <CAKv+Gu_aAKbhu5V4Tuk2_yCFd4GG_KqCcNaK-9R7BU_XJw52fA@mail.gmail.com>
+Date: Tue, 21 Nov 2017 13:40:17 +0000
+Subject: [PATCH] crypto/arm64: aes-ce-cipher - move assembler code to .S file
+Message-ID: <20171121134017.21247-1-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 November 2017 at 13:14, Steve Capper <steve.capper@arm.com> wrote:
-> On Tue, Nov 21, 2017 at 11:13:06AM +0000, Steve Capper wrote:
->> On Mon, Nov 20, 2017 at 05:00:10PM +0000, Mark Rutland wrote:
->> > Hi,
->>
->> Hi Mark,
->>
->> >
->> > On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
->> > > -#define SWAPPER_DIR_SIZE (SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
->> > > +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
->> > > +
->> > > +#if SWAPPER_PGTABLE_LEVELS > 3
->> > > +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
->> > > +#else
->> > > +#define EARLY_PUDS(vstart, vend) (0)
->> > > +#endif
->> > > +
->> > > +#if SWAPPER_PGTABLE_LEVELS > 2
->> > > +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
->> > > +#else
->> > > +#define EARLY_PMDS(vstart, vend) (0)
->> > > +#endif
->> > > +
->> > > +#define EARLY_PAGES(vstart, vend) ( 1                    /* PGDIR page */                                \
->> > > +                 + EARLY_PGDS((vstart), (vend))  /* each PGDIR needs a next level page table */  \
->> > > +                 + EARLY_PUDS((vstart), (vend))  /* each PUD needs a next level page table */    \
->> > > +                 + EARLY_PMDS((vstart), (vend))) /* each PMD needs a next level page table */
->> > > +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
->> > >  #define IDMAP_DIR_SIZE           (IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
->> >
->> > I'm currently struggling to convince myself as to whether 2M is
->> > necessary/sufficient slack space for all configurations.
->>
->> Agreed, if the possible address range is changed outside these bounds
->> then we need to extend them.
->>
->> >
->> > At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
->> > to cross PGD/PUD/PMD boundaries.
->> >
->> > For example with 3 levels of 64K pages, and a huge kernel that takes up
->> > SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
->> > and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
->> > the kernel were to be relocated such that it straddled two PGDs, we'd
->> > need 2 PGDs and 2 PMDs, needing 5 pages total.
->> >
->> > I'm not sure that we have a problem if we don't relax KASLR.
->> >
->>
->> The approach I've adopted is to compute which indices are required for
->> PGDs, PUDs, PMDs to map the supplied address range, then count them.
->> If we require two PGD entries then that means we need two pages
->> containing PMD entries to be allocated.
->>
->> If we consider just PGDs, for example, the only way I am aware of the
->> kernel straddling more PGDs than previously computed is for the mapping
->> to begin before vstart or end after vend (or both).
->>
->> Should I refine the range specified in the SWAPPER_DIR_SIZE for the
->> current KASLR? (I thought the random offset was < SZ_2M?)
->>
->
-> Ahh, I see KASLR offset has the bottom 21 bits masked out, not confined
-> to the 21 bottom bits :-).
->
-> It may be possible to do something with (vend - vstart) I will have a
-> think about this.
->
+Most crypto drivers involving kernel mode NEON take care to put the code
+that actually touches the NEON register file in a separate compilation
+unit, to prevent the compiler from reordering code that preserves or
+restores the NEON context with code that may corrupt it. This is
+necessary because we currently have no way to express the restrictions
+imposed upon use of the NEON in kernel mode in a way that the compiler
+understands.
 
-Hi Steve,
+However, in the case of aes-ce-cipher, it did not seem unreasonable to
+deviate from this rule, given how it does not seem possible for the
+compiler to reorder cross object function calls with asm blocks whose
+in- and output constraints reflect that it reads from and writes to
+memory.
 
-Please be aware that it is slightly more complicated than that.
+Now that LTO is being proposed for the arm64 kernel, it is time to
+revisit this. The link time optimization may replace the function
+calls to kernel_neon_begin() and kernel_neon_end() with instantiations
+of the IR that make up its implementation, allowing further reordering
+with the asm block.
 
-The VA randomization offset chosen by the KASLR code is made up of two
-separate values:
-- the VA offset modulo 2 MB, which equals the PA offset modulo 2 MB,
-and is set by the EFI stub when it loads the kernel image into 1:1
-mapped memory
-- the VA offset in 2 MB increments, which is set by the kaslr_init
-call in head.S
+So let's clean this up, and move the asm() blocks into a separate .S
+file.
 
-The reason for this approach is that it allows randomization at 64 KB
-granularity without losing the ability to map the kernel using 2 MB
-block mappings or contiguous page mappings. On a 48-bit VA kernel,
-this gives us 30 bits of randomization.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/crypto/Makefile                         |   2 +-
+ arch/arm64/crypto/aes-ce-core.S                    |  87 ++++++++++++++++
+ .../crypto/{aes-ce-cipher.c => aes-ce-glue.c}      | 115 +++------------------
+ 3 files changed, 100 insertions(+), 104 deletions(-)
+ create mode 100644 arch/arm64/crypto/aes-ce-core.S
+ rename arch/arm64/crypto/{aes-ce-cipher.c => aes-ce-glue.c} (62%)
+
+diff --git a/arch/arm64/crypto/Makefile b/arch/arm64/crypto/Makefile
+index b5edc5918c28..f5e8295fd756 100644
+--- a/arch/arm64/crypto/Makefile
++++ b/arch/arm64/crypto/Makefile
+@@ -24,7 +24,7 @@ obj-$(CONFIG_CRYPTO_CRC32_ARM64_CE) += crc32-ce.o
+ crc32-ce-y:= crc32-ce-core.o crc32-ce-glue.o
+ 
+ obj-$(CONFIG_CRYPTO_AES_ARM64_CE) += aes-ce-cipher.o
+-CFLAGS_aes-ce-cipher.o += -march=armv8-a+crypto
++aes-ce-cipher-y := aes-ce-core.o aes-ce-glue.o
+ 
+ obj-$(CONFIG_CRYPTO_AES_ARM64_CE_CCM) += aes-ce-ccm.o
+ aes-ce-ccm-y := aes-ce-ccm-glue.o aes-ce-ccm-core.o
+diff --git a/arch/arm64/crypto/aes-ce-core.S b/arch/arm64/crypto/aes-ce-core.S
+new file mode 100644
+index 000000000000..8efdfdade393
+--- /dev/null
++++ b/arch/arm64/crypto/aes-ce-core.S
+@@ -0,0 +1,87 @@
++/*
++ * Copyright (C) 2013 - 2017 Linaro Ltd <ard.biesheuvel@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++
++	.arch		armv8-a+crypto
++
++ENTRY(__aes_ce_encrypt)
++	sub		w3, w3, #2
++	ld1		{v0.16b}, [x2]
++	ld1		{v1.4s}, [x0], #16
++	cmp		w3, #10
++	bmi		0f
++	bne		3f
++	mov		v3.16b, v1.16b
++	b		2f
++0:	mov		v2.16b, v1.16b
++	ld1		{v3.4s}, [x0], #16
++1:	aese		v0.16b, v2.16b
++	aesmc		v0.16b, v0.16b
++2:	ld1		{v1.4s}, [x0], #16
++	aese		v0.16b, v3.16b
++	aesmc		v0.16b, v0.16b
++3:	ld1		{v2.4s}, [x0], #16
++	subs		w3, w3, #3
++	aese		v0.16b, v1.16b
++	aesmc		v0.16b, v0.16b
++	ld1		{v3.4s}, [x0], #16
++	bpl		1b
++	aese		v0.16b, v2.16b
++	eor		v0.16b, v0.16b, v3.16b
++	st1		{v0.16b}, [x1]
++	ret
++ENDPROC(__aes_ce_encrypt)
++
++ENTRY(__aes_ce_decrypt)
++	sub		w3, w3, #2
++	ld1		{v0.16b}, [x2]
++	ld1		{v1.4s}, [x0], #16
++	cmp		w3, #10
++	bmi		0f
++	bne		3f
++	mov		v3.16b, v1.16b
++	b		2f
++0:	mov		v2.16b, v1.16b
++	ld1		{v3.4s}, [x0], #16
++1:	aesd		v0.16b, v2.16b
++	aesimc		v0.16b, v0.16b
++2:	ld1		{v1.4s}, [x0], #16
++	aesd		v0.16b, v3.16b
++	aesimc		v0.16b, v0.16b
++3:	ld1		{v2.4s}, [x0], #16
++	subs		w3, w3, #3
++	aesd		v0.16b, v1.16b
++	aesimc		v0.16b, v0.16b
++	ld1		{v3.4s}, [x0], #16
++	bpl		1b
++	aesd		v0.16b, v2.16b
++	eor		v0.16b, v0.16b, v3.16b
++	st1		{v0.16b}, [x1]
++	ret
++ENDPROC(__aes_ce_decrypt)
++
++/*
++ * __aes_ce_sub() - use the aese instruction to perform the AES sbox
++ *                  substitution on each byte in 'input'
++ */
++ENTRY(__aes_ce_sub)
++	dup		v1.4s, w0
++	movi		v0.16b, #0
++	aese		v0.16b, v1.16b
++	umov		w0, v0.s[0]
++	ret
++ENDPROC(__aes_ce_sub)
++
++ENTRY(__aes_ce_invert)
++	ld1		{v0.4s}, [x1]
++	aesimc		v1.16b, v0.16b
++	st1		{v1.4s}, [x0]
++	ret
++ENDPROC(__aes_ce_invert)
+diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-glue.c
+similarity index 62%
+rename from arch/arm64/crypto/aes-ce-cipher.c
+rename to arch/arm64/crypto/aes-ce-glue.c
+index 6a75cd75ed11..e6b3227bbf57 100644
+--- a/arch/arm64/crypto/aes-ce-cipher.c
++++ b/arch/arm64/crypto/aes-ce-glue.c
+@@ -29,6 +29,13 @@ struct aes_block {
+ 	u8 b[AES_BLOCK_SIZE];
+ };
+ 
++asmlinkage void __aes_ce_encrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
++asmlinkage void __aes_ce_decrypt(u32 *rk, u8 *out, const u8 *in, int rounds);
++
++asmlinkage u32 __aes_ce_sub(u32 l);
++asmlinkage void __aes_ce_invert(struct aes_block *out,
++				const struct aes_block *in);
++
+ static int num_rounds(struct crypto_aes_ctx *ctx)
+ {
+ 	/*
+@@ -44,10 +51,6 @@ static int num_rounds(struct crypto_aes_ctx *ctx)
+ static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+ {
+ 	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
+-	struct aes_block *out = (struct aes_block *)dst;
+-	struct aes_block const *in = (struct aes_block *)src;
+-	void *dummy0;
+-	int dummy1;
+ 
+ 	if (!may_use_simd()) {
+ 		__aes_arm64_encrypt(ctx->key_enc, dst, src, num_rounds(ctx));
+@@ -55,49 +58,13 @@ static void aes_cipher_encrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+ 	}
+ 
+ 	kernel_neon_begin();
+-
+-	__asm__("	ld1	{v0.16b}, %[in]			;"
+-		"	ld1	{v1.4s}, [%[key]], #16		;"
+-		"	cmp	%w[rounds], #10			;"
+-		"	bmi	0f				;"
+-		"	bne	3f				;"
+-		"	mov	v3.16b, v1.16b			;"
+-		"	b	2f				;"
+-		"0:	mov	v2.16b, v1.16b			;"
+-		"	ld1	{v3.4s}, [%[key]], #16		;"
+-		"1:	aese	v0.16b, v2.16b			;"
+-		"	aesmc	v0.16b, v0.16b			;"
+-		"2:	ld1	{v1.4s}, [%[key]], #16		;"
+-		"	aese	v0.16b, v3.16b			;"
+-		"	aesmc	v0.16b, v0.16b			;"
+-		"3:	ld1	{v2.4s}, [%[key]], #16		;"
+-		"	subs	%w[rounds], %w[rounds], #3	;"
+-		"	aese	v0.16b, v1.16b			;"
+-		"	aesmc	v0.16b, v0.16b			;"
+-		"	ld1	{v3.4s}, [%[key]], #16		;"
+-		"	bpl	1b				;"
+-		"	aese	v0.16b, v2.16b			;"
+-		"	eor	v0.16b, v0.16b, v3.16b		;"
+-		"	st1	{v0.16b}, %[out]		;"
+-
+-	:	[out]		"=Q"(*out),
+-		[key]		"=r"(dummy0),
+-		[rounds]	"=r"(dummy1)
+-	:	[in]		"Q"(*in),
+-				"1"(ctx->key_enc),
+-				"2"(num_rounds(ctx) - 2)
+-	:	"cc");
+-
++	__aes_ce_encrypt(ctx->key_enc, dst, src, num_rounds(ctx));
+ 	kernel_neon_end();
+ }
+ 
+ static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+ {
+ 	struct crypto_aes_ctx *ctx = crypto_tfm_ctx(tfm);
+-	struct aes_block *out = (struct aes_block *)dst;
+-	struct aes_block const *in = (struct aes_block *)src;
+-	void *dummy0;
+-	int dummy1;
+ 
+ 	if (!may_use_simd()) {
+ 		__aes_arm64_decrypt(ctx->key_dec, dst, src, num_rounds(ctx));
+@@ -105,62 +72,10 @@ static void aes_cipher_decrypt(struct crypto_tfm *tfm, u8 dst[], u8 const src[])
+ 	}
+ 
+ 	kernel_neon_begin();
+-
+-	__asm__("	ld1	{v0.16b}, %[in]			;"
+-		"	ld1	{v1.4s}, [%[key]], #16		;"
+-		"	cmp	%w[rounds], #10			;"
+-		"	bmi	0f				;"
+-		"	bne	3f				;"
+-		"	mov	v3.16b, v1.16b			;"
+-		"	b	2f				;"
+-		"0:	mov	v2.16b, v1.16b			;"
+-		"	ld1	{v3.4s}, [%[key]], #16		;"
+-		"1:	aesd	v0.16b, v2.16b			;"
+-		"	aesimc	v0.16b, v0.16b			;"
+-		"2:	ld1	{v1.4s}, [%[key]], #16		;"
+-		"	aesd	v0.16b, v3.16b			;"
+-		"	aesimc	v0.16b, v0.16b			;"
+-		"3:	ld1	{v2.4s}, [%[key]], #16		;"
+-		"	subs	%w[rounds], %w[rounds], #3	;"
+-		"	aesd	v0.16b, v1.16b			;"
+-		"	aesimc	v0.16b, v0.16b			;"
+-		"	ld1	{v3.4s}, [%[key]], #16		;"
+-		"	bpl	1b				;"
+-		"	aesd	v0.16b, v2.16b			;"
+-		"	eor	v0.16b, v0.16b, v3.16b		;"
+-		"	st1	{v0.16b}, %[out]		;"
+-
+-	:	[out]		"=Q"(*out),
+-		[key]		"=r"(dummy0),
+-		[rounds]	"=r"(dummy1)
+-	:	[in]		"Q"(*in),
+-				"1"(ctx->key_dec),
+-				"2"(num_rounds(ctx) - 2)
+-	:	"cc");
+-
++	__aes_ce_decrypt(ctx->key_dec, dst, src, num_rounds(ctx));
+ 	kernel_neon_end();
+ }
+ 
+-/*
+- * aes_sub() - use the aese instruction to perform the AES sbox substitution
+- *             on each byte in 'input'
+- */
+-static u32 aes_sub(u32 input)
+-{
+-	u32 ret;
+-
+-	__asm__("dup	v1.4s, %w[in]		;"
+-		"movi	v0.16b, #0		;"
+-		"aese	v0.16b, v1.16b		;"
+-		"umov	%w[out], v0.4s[0]	;"
+-
+-	:	[out]	"=r"(ret)
+-	:	[in]	"r"(input)
+-	:		"v0","v1");
+-
+-	return ret;
+-}
+-
+ int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
+ 		     unsigned int key_len)
+ {
+@@ -189,7 +104,7 @@ int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
+ 		u32 *rki = ctx->key_enc + (i * kwords);
+ 		u32 *rko = rki + kwords;
+ 
+-		rko[0] = ror32(aes_sub(rki[kwords - 1]), 8) ^ rcon[i] ^ rki[0];
++		rko[0] = ror32(__aes_ce_sub(rki[kwords - 1]), 8) ^ rcon[i] ^ rki[0];
+ 		rko[1] = rko[0] ^ rki[1];
+ 		rko[2] = rko[1] ^ rki[2];
+ 		rko[3] = rko[2] ^ rki[3];
+@@ -202,7 +117,7 @@ int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
+ 		} else if (key_len == AES_KEYSIZE_256) {
+ 			if (i >= 6)
+ 				break;
+-			rko[4] = aes_sub(rko[3]) ^ rki[4];
++			rko[4] = __aes_ce_sub(rko[3]) ^ rki[4];
+ 			rko[5] = rko[4] ^ rki[5];
+ 			rko[6] = rko[5] ^ rki[6];
+ 			rko[7] = rko[6] ^ rki[7];
+@@ -221,13 +136,7 @@ int ce_aes_expandkey(struct crypto_aes_ctx *ctx, const u8 *in_key,
+ 
+ 	key_dec[0] = key_enc[j];
+ 	for (i = 1, j--; j > 0; i++, j--)
+-		__asm__("ld1	{v0.4s}, %[in]		;"
+-			"aesimc	v1.16b, v0.16b		;"
+-			"st1	{v1.4s}, %[out]	;"
+-
+-		:	[out]	"=Q"(key_dec[i])
+-		:	[in]	"Q"(key_enc[j])
+-		:		"v0","v1");
++		__aes_ce_invert(key_dec + i, key_enc + j);
+ 	key_dec[i] = key_enc[0];
+ 
+ 	kernel_neon_end();
+-- 
+2.11.0
