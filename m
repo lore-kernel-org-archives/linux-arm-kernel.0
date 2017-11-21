@@ -1,66 +1,351 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 21 Nov 2017 11:59:13 +0000
-Subject: [PATCHv2] arm64: mm: cleanup stale AIVIVT references
-Message-ID: <20171121115913.28127-1-mark.rutland@arm.com>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Tue, 21 Nov 2017 11:58:05 +0000
+Subject: [RFC 9/9] arm64: allow ID map to be extended to 52 bits
+In-Reply-To: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
+References: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
+Message-ID: <1511265485-27163-10-git-send-email-kristina.martsenko@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since commit:
+Currently, when using VA_BITS < 48, if the ID map text happens to be
+placed in physical memory above VA_BITS, we increase the VA size (up to
+48) and create a new table level, in order to map in the ID map text.
+This is okay because the system always supports 48 bits of VA.
 
-  155433cb365ee466 ("arm64: cache: Remove support for ASID-tagged VIVT I-caches")
+This patch extends the code such that if the system supports 52 bits of
+VA, and the ID map text is placed that high up, then we increase the VA
+size accordingly, up to 52.
 
-... the kernel no longer cares about AIVIVT I-caches, as these were
-removed from the architecture.
+One difference from the current implementation is that so far the
+condition of VA_BITS < 48 has meant that the top level table is always
+"full", with the maximum number of entries, and an extra table level is
+always needed. Now, when VA_BITS = 48 (and using 64k pages), the top
+level table is not full, and we simply need to increase the number of
+entries in it, instead of creating a new table level.
 
-This patch removes the stale references to such I-caches.
-
-The comment in flush_context() is also updated to clarify when and where
-the TLB invalidation occurs.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
 ---
- arch/arm64/include/asm/cacheflush.h | 2 +-
- arch/arm64/mm/context.c             | 5 ++++-
- 2 files changed, 5 insertions(+), 2 deletions(-)
+ arch/arm/include/asm/kvm_mmu.h       |  5 +++
+ arch/arm64/include/asm/assembler.h   |  2 -
+ arch/arm64/include/asm/kvm_mmu.h     |  7 +++-
+ arch/arm64/include/asm/mmu_context.h | 14 ++++++-
+ arch/arm64/kernel/head.S             | 76 +++++++++++++++++++++---------------
+ arch/arm64/kvm/hyp-init.S            | 17 ++++----
+ arch/arm64/mm/mmu.c                  |  1 +
+ virt/kvm/arm/mmu.c                   | 12 +++---
+ 8 files changed, 83 insertions(+), 51 deletions(-)
 
-This was previously sent as "arm64: mm: remove stale comment" [1].
-
-Since v1 [1]:
-* remove stale cacheflush comment text
-* clarify TLB invalidation comment
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/543043.html
-
-diff --git a/arch/arm64/include/asm/cacheflush.h b/arch/arm64/include/asm/cacheflush.h
-index 76d1cc85d5b1..955130762a3c 100644
---- a/arch/arm64/include/asm/cacheflush.h
-+++ b/arch/arm64/include/asm/cacheflush.h
-@@ -38,7 +38,7 @@
-  *
-  *	See Documentation/cachetlb.txt for more information. Please note that
-  *	the implementation assumes non-aliasing VIPT D-cache and (aliasing)
-- *	VIPT or ASID-tagged VIVT I-cache.
-+ *	VIPT I-cache.
-  *
-  *	flush_cache_mm(mm)
-  *
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index ab9f5f0fb2c7..28a45a19aae7 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -117,7 +117,10 @@ static void flush_context(unsigned int cpu)
- 		per_cpu(reserved_asids, i) = asid;
- 	}
- 
--	/* Queue a TLB invalidate and flush the I-cache if necessary. */
-+	/*
-+	 * Queue a TLB invalidation for each CPU to perform on next
-+	 * context-switch
-+	 */
- 	cpumask_setall(&tlb_flush_pending);
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index 8dbec683638b..8c5643e2eea4 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -211,6 +211,11 @@ static inline bool __kvm_cpu_uses_extended_idmap(void)
+ 	return false;
  }
  
++static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
++{
++	return PTRS_PER_PGD;
++}
++
+ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
+ 				       pgd_t *hyp_pgd,
+ 				       pgd_t *merged_hyp_pgd,
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index ba3c796b9fe1..106bf1ab4b23 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -331,10 +331,8 @@ alternative_endif
+  * tcr_set_idmap_t0sz - update TCR.T0SZ so that we can load the ID map
+  */
+ 	.macro	tcr_set_idmap_t0sz, valreg, tmpreg
+-#ifndef CONFIG_ARM64_VA_BITS_48
+ 	ldr_l	\tmpreg, idmap_t0sz
+ 	bfi	\valreg, \tmpreg, #TCR_T0SZ_OFFSET, #TCR_TxSZ_WIDTH
+-#endif
+ 	.endm
+ 
+ /*
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 2705f5bd9abe..76f6d96a2762 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -273,7 +273,12 @@ void kvm_toggle_cache(struct kvm_vcpu *vcpu, bool was_enabled);
+ 
+ static inline bool __kvm_cpu_uses_extended_idmap(void)
+ {
+-	return __cpu_uses_extended_idmap();
++	return __cpu_uses_extended_idmap_table();
++}
++
++static inline unsigned long __kvm_idmap_ptrs_per_pgd(void)
++{
++	return idmap_ptrs_per_pgd;
+ }
+ 
+ /*
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index c0aa2b221769..53fe5eac0e0d 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -63,11 +63,21 @@ static inline void cpu_set_reserved_ttbr0(void)
+  * physical memory, in which case it will be smaller.
+  */
+ extern u64 idmap_t0sz;
++extern u64 idmap_ptrs_per_pgd;
+ 
+ static inline bool __cpu_uses_extended_idmap(void)
+ {
+-	return (!IS_ENABLED(CONFIG_ARM64_VA_BITS_48) &&
+-		unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS)));
++	return unlikely(idmap_t0sz != TCR_T0SZ(VA_BITS));
++}
++
++/*
++ * True if the extended ID map requires an extra level of translation table
++ * to be configured.
++ */
++static inline bool __cpu_uses_extended_idmap_table(void)
++{
++	return __cpu_uses_extended_idmap() &&
++		(idmap_ptrs_per_pgd == PTRS_PER_PGD);
+ }
+ 
+ /*
+diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
+index 09f03bac53c5..ae1d8b7c4654 100644
+--- a/arch/arm64/kernel/head.S
++++ b/arch/arm64/kernel/head.S
+@@ -173,7 +173,7 @@ ENDPROC(preserve_boot_args)
+  *	ptrs:	#imm pointers per table page
+  *
+  * Preserves:	virt
+- * Corrupts:	tmp1, tmp2
++ * Corrupts:	ptrs, tmp1, tmp2
+  * Returns:	tbl -> next level table page address
+  */
+ 	.macro	create_table_entry, tbl, virt, shift, ptrs, tmp1, tmp2
+@@ -181,7 +181,8 @@ ENDPROC(preserve_boot_args)
+ 	phys_to_pte \tmp1, \tmp2
+ 	orr	\tmp2, \tmp2, #PMD_TYPE_TABLE	// address of next table and entry type
+ 	lsr	\tmp1, \virt, #\shift
+-	and	\tmp1, \tmp1, #\ptrs - 1	// table index
++	sub	\ptrs, \ptrs, #1
++	and	\tmp1, \tmp1, \ptrs		// table index
+ 	str	\tmp2, [\tbl, \tmp1, lsl #3]
+ 	add	\tbl, \tbl, #PAGE_SIZE		// next level table page
+ 	.endm
+@@ -191,15 +192,17 @@ ENDPROC(preserve_boot_args)
+  * block entry in the next level (tbl) for the given virtual address.
+  *
+  * Preserves:	tbl, next, virt
+- * Corrupts:	tmp1, tmp2
++ * Corrupts:	ptrs_per_pgd, tmp1, tmp2
+  */
+-	.macro	create_pgd_entry, tbl, virt, tmp1, tmp2
+-	create_table_entry \tbl, \virt, PGDIR_SHIFT, PTRS_PER_PGD, \tmp1, \tmp2
++	.macro	create_pgd_entry, tbl, virt, ptrs_per_pgd, tmp1, tmp2
++	create_table_entry \tbl, \virt, PGDIR_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
+ #if SWAPPER_PGTABLE_LEVELS > 3
+-	create_table_entry \tbl, \virt, PUD_SHIFT, PTRS_PER_PUD, \tmp1, \tmp2
++	mov	\ptrs_per_pgd, PTRS_PER_PUD
++	create_table_entry \tbl, \virt, PUD_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
+ #endif
+ #if SWAPPER_PGTABLE_LEVELS > 2
+-	create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, PTRS_PER_PTE, \tmp1, \tmp2
++	mov	\ptrs_per_pgd, PTRS_PER_PTE
++	create_table_entry \tbl, \virt, SWAPPER_TABLE_SHIFT, \ptrs_per_pgd, \tmp1, \tmp2
+ #endif
+ 	.endm
+ 
+@@ -263,26 +266,13 @@ __create_page_tables:
+ 	adrp	x0, idmap_pg_dir
+ 	adrp	x3, __idmap_text_start		// __pa(__idmap_text_start)
+ 
+-#ifndef CONFIG_ARM64_VA_BITS_48
+-#define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
+-#define EXTRA_PTRS	(1 << (48 - EXTRA_SHIFT))
+-
+-	/*
+-	 * If VA_BITS < 48, it may be too small to allow for an ID mapping to be
+-	 * created that covers system RAM if that is located sufficiently high
+-	 * in the physical address space. So for the ID map, use an extended
+-	 * virtual range in that case, by configuring an additional translation
+-	 * level.
+-	 * First, we have to verify our assumption that the current value of
+-	 * VA_BITS was chosen such that all translation levels are fully
+-	 * utilised, and that lowering T0SZ will always result in an additional
+-	 * translation level to be configured.
+-	 */
+-#if VA_BITS != EXTRA_SHIFT
+-#error "Mismatch between VA_BITS and page size/number of translation levels"
+-#endif
+-
+ 	/*
++	 * VA_BITS may be too small to allow for an ID mapping to be created
++	 * that covers system RAM if that is located sufficiently high in the
++	 * physical address space. So for the ID map, use an extended virtual
++	 * range in that case, and configure an additional translation level
++	 * if needed.
++	 *
+ 	 * Calculate the maximum allowed value for TCR_EL1.T0SZ so that the
+ 	 * entire ID map region can be mapped. As T0SZ == (64 - #bits used),
+ 	 * this number conveniently equals the number of leading zeroes in
+@@ -291,18 +281,41 @@ __create_page_tables:
+ 	adrp	x5, __idmap_text_end
+ 	clz	x5, x5
+ 	cmp	x5, TCR_T0SZ(VA_BITS)	// default T0SZ small enough?
+-	b.ge	1f			// .. then skip additional level
++	b.ge	1f			// .. then skip VA range extension
+ 
+ 	adr_l	x6, idmap_t0sz
+ 	str	x5, [x6]
+ 	dmb	sy
+ 	dc	ivac, x6		// Invalidate potentially stale cache line
+ 
+-	create_table_entry x0, x3, EXTRA_SHIFT, EXTRA_PTRS, x5, x6
+-1:
++#if (VA_BITS < 48)
++#define EXTRA_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
++#define EXTRA_PTRS	(1 << (PHYS_MASK_SHIFT - EXTRA_SHIFT))
++
++	/*
++	 * If VA_BITS < 48, we have to configure an additional table level.
++	 * First, we have to verify our assumption that the current value of
++	 * VA_BITS was chosen such that all translation levels are fully
++	 * utilised, and that lowering T0SZ will always result in an additional
++	 * translation level to be configured.
++	 */
++#if VA_BITS != EXTRA_SHIFT
++#error "Mismatch between VA_BITS and page size/number of translation levels"
+ #endif
+ 
+-	create_pgd_entry x0, x3, x5, x6
++	mov	x4, EXTRA_PTRS
++	create_table_entry x0, x3, EXTRA_SHIFT, x4, x5, x6
++#else
++	/*
++	 * If VA_BITS == 48, we don't have to configure an additional
++	 * translation level, but the top-level table has more entries.
++	 */
++	mov	x4, #1 << (PHYS_MASK_SHIFT - PGDIR_SHIFT)
++	str_l	x4, idmap_ptrs_per_pgd, x5
++#endif
++1:
++	ldr_l	x4, idmap_ptrs_per_pgd
++	create_pgd_entry x0, x3, x4, x5, x6
+ 	mov	x5, x3				// __pa(__idmap_text_start)
+ 	adr_l	x6, __idmap_text_end		// __pa(__idmap_text_end)
+ 	create_block_map x0, x7, x3, x5, x6, x4
+@@ -313,7 +326,8 @@ __create_page_tables:
+ 	adrp	x0, swapper_pg_dir
+ 	mov_q	x5, KIMAGE_VADDR + TEXT_OFFSET	// compile time __va(_text)
+ 	add	x5, x5, x23			// add KASLR displacement
+-	create_pgd_entry x0, x5, x3, x6
++	mov	x4, PTRS_PER_PGD
++	create_pgd_entry x0, x5, x4, x3, x6
+ 	adrp	x6, _end			// runtime __pa(_end)
+ 	adrp	x3, _text			// runtime __pa(_text)
+ 	sub	x6, x6, x3			// _end - _text
+diff --git a/arch/arm64/kvm/hyp-init.S b/arch/arm64/kvm/hyp-init.S
+index a99718f32af9..c2ebe4e992df 100644
+--- a/arch/arm64/kvm/hyp-init.S
++++ b/arch/arm64/kvm/hyp-init.S
+@@ -72,24 +72,23 @@ __do_hyp_init:
+ 	mov	x5, #TCR_EL2_RES1
+ 	orr	x4, x4, x5
+ 
+-#ifndef CONFIG_ARM64_VA_BITS_48
+ 	/*
+-	 * If we are running with VA_BITS < 48, we may be running with an extra
+-	 * level of translation in the ID map. This is only the case if system
+-	 * RAM is out of range for the currently configured page size and number
+-	 * of translation levels, in which case we will also need the extra
+-	 * level for the HYP ID map, or we won't be able to enable the EL2 MMU.
++	 * The ID map may be configured to use an extended virtual address
++	 * range. This is only the case if system RAM is out of range for the
++	 * currently configured page size and VA_BITS, in which case we will
++	 * also need the extended virtual range for the HYP ID map, or we won't
++	 * be able to enable the EL2 MMU.
+ 	 *
+ 	 * However, at EL2, there is only one TTBR register, and we can't switch
+ 	 * between translation tables *and* update TCR_EL2.T0SZ@the same
+-	 * time. Bottom line: we need the extra level in *both* our translation
+-	 * tables.
++	 * time. Bottom line: we need to use the extended range with *both* our
++	 * translation tables.
+ 	 *
+ 	 * So use the same T0SZ value we use for the ID map.
+ 	 */
+ 	ldr_l	x5, idmap_t0sz
+ 	bfi	x4, x5, TCR_T0SZ_OFFSET, TCR_TxSZ_WIDTH
+-#endif
++
+ 	/*
+ 	 * Set the PS bits in TCR_EL2.
+ 	 */
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 4152b36033a2..ece47a2b2e68 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -50,6 +50,7 @@
+ #define NO_CONT_MAPPINGS	BIT(1)
+ 
+ u64 idmap_t0sz = TCR_T0SZ(VA_BITS);
++u64 idmap_ptrs_per_pgd = PTRS_PER_PGD;
+ 
+ u64 kimage_voffset __ro_after_init;
+ EXPORT_SYMBOL(kimage_voffset);
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b36945d49986..876caf531d32 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -623,7 +623,7 @@ static int create_hyp_pud_mappings(pgd_t *pgd, unsigned long start,
+ 	return 0;
+ }
+ 
+-static int __create_hyp_mappings(pgd_t *pgdp,
++static int __create_hyp_mappings(pgd_t *pgdp, unsigned long ptrs_per_pgd,
+ 				 unsigned long start, unsigned long end,
+ 				 unsigned long pfn, pgprot_t prot)
+ {
+@@ -636,7 +636,7 @@ static int __create_hyp_mappings(pgd_t *pgdp,
+ 	addr = start & PAGE_MASK;
+ 	end = PAGE_ALIGN(end);
+ 	do {
+-		pgd = pgdp + pgd_index(addr);
++		pgd = pgdp + ((addr >> PGDIR_SHIFT) & (ptrs_per_pgd - 1));
+ 
+ 		if (pgd_none(*pgd)) {
+ 			pud = pud_alloc_one(NULL, addr);
+@@ -699,8 +699,8 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
+ 		int err;
+ 
+ 		phys_addr = kvm_kaddr_to_phys(from + virt_addr - start);
+-		err = __create_hyp_mappings(hyp_pgd, virt_addr,
+-					    virt_addr + PAGE_SIZE,
++		err = __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD,
++					    virt_addr, virt_addr + PAGE_SIZE,
+ 					    __phys_to_pfn(phys_addr),
+ 					    prot);
+ 		if (err)
+@@ -731,7 +731,7 @@ int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
+ 	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
+ 		return -EINVAL;
+ 
+-	return __create_hyp_mappings(hyp_pgd, start, end,
++	return __create_hyp_mappings(hyp_pgd, PTRS_PER_PGD, start, end,
+ 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
+ }
+ 
+@@ -1737,7 +1737,7 @@ static int kvm_map_idmap_text(pgd_t *pgd)
+ 	int err;
+ 
+ 	/* Create the idmap in the boot page tables */
+-	err = 	__create_hyp_mappings(pgd,
++	err = 	__create_hyp_mappings(pgd, __kvm_idmap_ptrs_per_pgd(),
+ 				      hyp_idmap_start, hyp_idmap_end,
+ 				      __phys_to_pfn(hyp_idmap_start),
+ 				      PAGE_HYP_EXEC);
 -- 
-2.11.0
+2.1.4
