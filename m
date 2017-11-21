@@ -1,17 +1,17 @@
 From: Bharat.Bhushan@nxp.com (Bharat Bhushan)
-Date: Tue, 21 Nov 2017 10:26:18 +0530
-Subject: [PATCH] staging: fsl-mc: fix mc-portal to use uin32_t type
-Message-ID: <1511240178-24672-1-git-send-email-Bharat.Bhushan@nxp.com>
+Date: Tue, 21 Nov 2017 10:35:23 +0530
+Subject: [PATCH v2] staging: fsl-mc: fix mc-portal to use u32 type
+Message-ID: <1511240723-24829-1-git-send-email-Bharat.Bhushan@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 According to MC APIs, size of mc-portal in 32bit.
 Also fsl_create_mc_io() storing 32 bit mc-portal size.
    " mc_io->portal_size = mc_portal_size;"
-   While "mc_io->portal_size" is uin16_t type and
-   "mc_portal_size" is uin32_t type.
+   While "mc_io->portal_size" is u16 type and
+   "mc_portal_size" is u32 type.
 
-This patches changes mc_io->portal_size from uin16_t to uin32_t
+This patches changes mc_io->portal_size from u16 to u32
 
 Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
 ---
