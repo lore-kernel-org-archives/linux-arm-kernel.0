@@ -1,38 +1,69 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Tue, 21 Nov 2017 15:31:58 +0100
-Subject: [PATCH v2 0/6] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <20171116232239.16823-1-lukma@denx.de>
+Date: Tue, 21 Nov 2017 15:32:02 +0100
+Subject: [PATCH v2 4/6] ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
+In-Reply-To: <20171121143204.1839-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
-Message-ID: <20171121143204.1839-1-lukma@denx.de>
+ <20171121143204.1839-1-lukma@denx.de>
+Message-ID: <20171121143204.1839-5-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for Liebherr's BK3 board, being
-a derivative of TS72XX design.
+The map IO common code has been excluded to be reused by other ts72xx
+clones.
 
-This patchset consists of following patches:
+Signed-off-by: Lukasz Majewski <lukma@denx.de>
 
-- ts72xx.[c|h] cosmetic cleanup/improvement
-- Rewrite ts72xx.c to be reusable by bk3
-- The Liebherr's BK3 board has been added with re-using code of
-  ts72xx.c
+---
+Changes for v2:
+- New patch
+---
+ arch/arm/mach-ep93xx/ts72xx.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
-This series applies on top of v4.14
-
-Lukasz Majewski (6):
-  ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros where applicable
-  ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
-  ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
-    parameters
-  ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
-  ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
-  ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
-
- arch/arm/mach-ep93xx/Kconfig  |   7 +++
- arch/arm/mach-ep93xx/ts72xx.c | 137 +++++++++++++++++++++++++++++++-----------
- arch/arm/mach-ep93xx/ts72xx.h |   9 +++
- arch/arm/tools/mach-types     |   1 +
- 4 files changed, 120 insertions(+), 34 deletions(-)
-
+diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+index 00e0e5b8babf..a6e473b3dcf6 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.c
++++ b/arch/arm/mach-ep93xx/ts72xx.c
+@@ -30,11 +30,6 @@
+ 
+ static struct map_desc ts72xx_io_desc[] __initdata = {
+ 	{
+-		.virtual	= (unsigned long)TS72XX_MODEL_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_MODEL_PHYS_BASE),
+-		.length		= TS72XX_MODEL_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
+ 		.virtual	= (unsigned long)TS72XX_OPTIONS_VIRT_BASE,
+ 		.pfn		= __phys_to_pfn(TS72XX_OPTIONS_PHYS_BASE),
+ 		.length		= TS72XX_OPTIONS_SIZE,
+@@ -47,12 +42,26 @@ static struct map_desc ts72xx_io_desc[] __initdata = {
+ 	}
+ };
+ 
+-static void __init ts72xx_map_io(void)
++static struct map_desc ts72xx_common_io_desc[] __initdata = {
++	{
++		.virtual	= (unsigned long)TS72XX_MODEL_VIRT_BASE,
++		.pfn		= __phys_to_pfn(TS72XX_MODEL_PHYS_BASE),
++		.length		= TS72XX_MODEL_SIZE,
++		.type		= MT_DEVICE,
++	}
++};
++
++void __init ts72xx_common_map_io(void)
+ {
+ 	ep93xx_map_io();
+-	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
++	iotable_init(ts72xx_common_io_desc, ARRAY_SIZE(ts72xx_common_io_desc));
+ }
+ 
++static void __init ts72xx_map_io(void)
++{
++	ts72xx_common_map_io();
++	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
++}
+ 
+ /*************************************************************************
+  * NAND flash
 -- 
 2.11.0
