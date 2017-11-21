@@ -1,66 +1,139 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Tue, 21 Nov 2017 17:28:25 +0100
-Subject: [PATCH 4/4] ARM: configs: Add missing config for DART-MX6 SoM
-In-Reply-To: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
-References: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1511281705-30849-5-git-send-email-narmstrong@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 21 Nov 2017 16:43:08 +0000
+Subject: [PATCH 2/2] arm64: Extend early page table code to allow for
+ larger kernels
+In-Reply-To: <20171121161417.qdpsh3g55kovcsfz@capper-debian.cambridge.arm.com>
+References: <20171117114143.26577-1-steve.capper@arm.com>
+ <20171117114143.26577-3-steve.capper@arm.com>
+ <20171120170009.jgg6zokg5idorvpc@lakrids.cambridge.arm.com>
+ <20171121111306.qbvth7pv4fcntbui@capper-debian.cambridge.arm.com>
+ <20171121131448.gokl6p2upszrgayn@capper-debian.cambridge.arm.com>
+ <CAKv+Gu_aAKbhu5V4Tuk2_yCFd4GG_KqCcNaK-9R7BU_XJw52fA@mail.gmail.com>
+ <20171121161417.qdpsh3g55kovcsfz@capper-debian.cambridge.arm.com>
+Message-ID: <CAKv+Gu_exefQSWRG2DU-SdYWRF45iBWc=CvkHWD=o0v2sUpF1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the missing configs for the DART-MX6 SoM support :
-- SERDEV bluetooth driver + SERIAL_DEV_BUS configs
-- WL18XX driver
-- DEFAULT_ON Led Trigger
+On 21 November 2017 at 16:14, Steve Capper <steve.capper@arm.com> wrote:
+> On Tue, Nov 21, 2017 at 01:24:28PM +0000, Ard Biesheuvel wrote:
+>> On 21 November 2017 at 13:14, Steve Capper <steve.capper@arm.com> wrote:
+>> > On Tue, Nov 21, 2017 at 11:13:06AM +0000, Steve Capper wrote:
+>> >> On Mon, Nov 20, 2017 at 05:00:10PM +0000, Mark Rutland wrote:
+>> >> > Hi,
+>> >>
+>> >> Hi Mark,
+>> >>
+>> >> >
+>> >> > On Fri, Nov 17, 2017 at 11:41:43AM +0000, Steve Capper wrote:
+>> >> > > -#define SWAPPER_DIR_SIZE (SWAPPER_PGTABLE_LEVELS * PAGE_SIZE)
+>> >> > > +#define EARLY_PGDS(vstart, vend) ((vend >> PGDIR_SHIFT) - (vstart >> PGDIR_SHIFT) + 1)
+>> >> > > +
+>> >> > > +#if SWAPPER_PGTABLE_LEVELS > 3
+>> >> > > +#define EARLY_PUDS(vstart, vend) ((vend >> PUD_SHIFT) - (vstart >> PUD_SHIFT) + 1)
+>> >> > > +#else
+>> >> > > +#define EARLY_PUDS(vstart, vend) (0)
+>> >> > > +#endif
+>> >> > > +
+>> >> > > +#if SWAPPER_PGTABLE_LEVELS > 2
+>> >> > > +#define EARLY_PMDS(vstart, vend) ((vend >> PMD_SHIFT) - (vstart >> PMD_SHIFT) + 1)
+>> >> > > +#else
+>> >> > > +#define EARLY_PMDS(vstart, vend) (0)
+>> >> > > +#endif
+>> >> > > +
+>> >> > > +#define EARLY_PAGES(vstart, vend) ( 1                    /* PGDIR page */                                \
+>> >> > > +                 + EARLY_PGDS((vstart), (vend))  /* each PGDIR needs a next level page table */  \
+>> >> > > +                 + EARLY_PUDS((vstart), (vend))  /* each PUD needs a next level page table */    \
+>> >> > > +                 + EARLY_PMDS((vstart), (vend))) /* each PMD needs a next level page table */
+>> >> > > +#define SWAPPER_DIR_SIZE (PAGE_SIZE * EARLY_PAGES(KIMAGE_VADDR + TEXT_OFFSET, _end + SZ_2M))
+>> >> > >  #define IDMAP_DIR_SIZE           (IDMAP_PGTABLE_LEVELS * PAGE_SIZE)
+>> >> >
+>> >> > I'm currently struggling to convince myself as to whether 2M is
+>> >> > necessary/sufficient slack space for all configurations.
+>> >>
+>> >> Agreed, if the possible address range is changed outside these bounds
+>> >> then we need to extend them.
+>> >>
+>> >> >
+>> >> > At least w.r.t. Ard's comment, we'd need a bit more slack to allow KASLR
+>> >> > to cross PGD/PUD/PMD boundaries.
+>> >> >
+>> >> > For example with 3 levels of 64K pages, and a huge kernel that takes up
+>> >> > SZ_512M - SZ_2M - TEXT_OFFSET. That perfectly fits into 1 PGDIR, 1 PGD,
+>> >> > and 1 PMD. IIUC, the above would allocate us 3 pages for this case. If
+>> >> > the kernel were to be relocated such that it straddled two PGDs, we'd
+>> >> > need 2 PGDs and 2 PMDs, needing 5 pages total.
+>> >> >
+>> >> > I'm not sure that we have a problem if we don't relax KASLR.
+>> >> >
+>> >>
+>> >> The approach I've adopted is to compute which indices are required for
+>> >> PGDs, PUDs, PMDs to map the supplied address range, then count them.
+>> >> If we require two PGD entries then that means we need two pages
+>> >> containing PMD entries to be allocated.
+>> >>
+>> >> If we consider just PGDs, for example, the only way I am aware of the
+>> >> kernel straddling more PGDs than previously computed is for the mapping
+>> >> to begin before vstart or end after vend (or both).
+>> >>
+>> >> Should I refine the range specified in the SWAPPER_DIR_SIZE for the
+>> >> current KASLR? (I thought the random offset was < SZ_2M?)
+>> >>
+>> >
+>> > Ahh, I see KASLR offset has the bottom 21 bits masked out, not confined
+>> > to the 21 bottom bits :-).
+>> >
+>> > It may be possible to do something with (vend - vstart) I will have a
+>> > think about this.
+>> >
+>>
+>> Hi Steve,
+>>
+>> Please be aware that it is slightly more complicated than that.
+>>
+>> The VA randomization offset chosen by the KASLR code is made up of two
+>> separate values:
+>> - the VA offset modulo 2 MB, which equals the PA offset modulo 2 MB,
+>> and is set by the EFI stub when it loads the kernel image into 1:1
+>> mapped memory
+>> - the VA offset in 2 MB increments, which is set by the kaslr_init
+>> call in head.S
+>>
+>> The reason for this approach is that it allows randomization at 64 KB
+>> granularity without losing the ability to map the kernel using 2 MB
+>> block mappings or contiguous page mappings. On a 48-bit VA kernel,
+>> this gives us 30 bits of randomization.
+>
+>
+> Thanks Ard!
+>
+> So if I've understood correctly, it is valid for there to exist a VA
+> KASLR offset K at runtime s.t.
+>
+>  K mod 2^SHIFT != 0
+>
+> For SHIFT = PGDIR_SHIFT, PUD_SHIFT and SWAPPER_TABLE_SHIFT.
 
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 6 ++++++
- 1 file changed, 6 insertions(+)
+The latter only for 4k and 16k pages, given that the KASLR offset
+granularity is 64k, and so K mod 64k must be 0.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0d44949..abd06c3 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -80,6 +80,7 @@ CONFIG_CAN=y
- CONFIG_CAN_FLEXCAN=y
- CONFIG_BT=y
- CONFIG_BT_HCIUART=y
-+CONFIG_BT_HCIUART_SERDEV=y
- CONFIG_BT_HCIUART_H4=y
- CONFIG_BT_HCIUART_LL=y
- CONFIG_CFG80211=y
-@@ -155,6 +156,7 @@ CONFIG_USB_USBNET=y
- CONFIG_USB_NET_CDC_EEM=m
- CONFIG_BRCMFMAC=m
- CONFIG_WL12XX=m
-+CONFIG_WL18XX=m
- CONFIG_WLCORE_SDIO=m
- # CONFIG_WILINK_PLATFORM_DATA is not set
- CONFIG_INPUT_EVDEV=y
-@@ -185,6 +187,8 @@ CONFIG_SERIAL_IMX=y
- CONFIG_SERIAL_IMX_CONSOLE=y
- CONFIG_SERIAL_FSL_LPUART=y
- CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-+CONFIG_SERIAL_DEV_BUS=y
-+CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
- # CONFIG_I2C_COMPAT is not set
- CONFIG_I2C_CHARDEV=y
- CONFIG_I2C_MUX=y
-@@ -248,6 +252,7 @@ CONFIG_VIDEO_OV5640=m
- CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
-+CONFIG_DRM_PANEL_LVDS=y
- CONFIG_DRM_PANEL_SIMPLE=y
- CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
- CONFIG_DRM_DW_HDMI_CEC=y
-@@ -340,6 +345,7 @@ CONFIG_LEDS_TRIGGER_ONESHOT=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_BACKLIGHT=y
- CONFIG_LEDS_TRIGGER_GPIO=y
-+CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_RTC_CLASS=y
- CONFIG_RTC_INTF_DEV_UIE_EMUL=y
- CONFIG_RTC_DRV_DS1307=y
--- 
-2.7.4
+> (I need to correct my EARLY_PMDS macro to use SWAPPER_TABLE_SHIFT instead
+> of PMD_SHIFT).
+>
+> I've managed to convince myself that this will mean at most one extra
+> page being needed for each strideable level to cover where we get unlucky
+> with KASLR. This will make the kernel image up to 3 pages larger with
+> KASLR enabled (but shouldn't affect runtime memory as this will be given
+> back).
+>
+> If (vend - vstart) mod 2^SHIFT == 0, then KASLR cannot affect that
+> particular level, but we would need to map a much larger kernel for
+> that identity to be true.
+>
+> So I'll remove the 2MB end offset from SWAPPER_DIR_SIZE and add in an
+> extra page to EARLY_P[GUM]DS when KASLR is enabled.
+>
+> If I've understood things correctly, this should be safe with an updated
+> KASLR that can cross PMD/PUD boundaries.
+>
+
+Yes, I /think/ that is the case.
