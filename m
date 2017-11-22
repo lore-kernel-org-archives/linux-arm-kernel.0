@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:05 -0500
-Subject: [PATCH 20/30] PCI/syscall: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:00 -0500
+Subject: [PATCH 15/30] bnx2x: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-21-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-16-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,30 +17,56 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/syscall.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c | 10 +++++++++-
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h |  1 +
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pci/syscall.c b/drivers/pci/syscall.c
-index 83efa00..e725f99 100644
---- a/drivers/pci/syscall.c
-+++ b/drivers/pci/syscall.c
-@@ -28,7 +28,7 @@
- 		return -EPERM;
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+index 9ca994d..9f40c23 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+@@ -812,7 +812,7 @@ static u8 bnx2x_vf_is_pcie_pending(struct bnx2x *bp, u8 abs_vfid)
+ 	if (!vf)
+ 		return false;
  
- 	err = -ENODEV;
--	dev = pci_get_bus_and_slot(bus, dfn);
-+	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
- 	if (!dev)
- 		goto error;
+-	dev = pci_get_bus_and_slot(vf->bus, vf->devfn);
++	dev = pci_get_domain_bus_and_slot(vf->domain, vf->bus, vf->devfn);
+ 	if (dev)
+ 		return bnx2x_is_pcie_pending(dev);
+ 	return false;
+@@ -1041,6 +1041,13 @@ void bnx2x_iov_init_dmae(struct bnx2x *bp)
+ 		REG_WR(bp, DMAE_REG_BACKWARD_COMP_EN, 0);
+ }
  
-@@ -96,7 +96,7 @@
- 	if (!capable(CAP_SYS_ADMIN))
- 		return -EPERM;
++static int bnx2x_vf_domain(struct bnx2x *bp, int vfid)
++{
++	struct pci_dev *dev = bp->pdev;
++
++	return pci_domain_nr(dev->bus);
++}
++
+ static int bnx2x_vf_bus(struct bnx2x *bp, int vfid)
+ {
+ 	struct pci_dev *dev = bp->pdev;
+@@ -1611,6 +1618,7 @@ int bnx2x_iov_nic_init(struct bnx2x *bp)
+ 		struct bnx2x_virtf *vf = BP_VF(bp, vfid);
  
--	dev = pci_get_bus_and_slot(bus, dfn);
-+	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
- 	if (!dev)
- 		return -ENODEV;
+ 		/* fill in the BDF and bars */
++		vf->domain = bnx2x_vf_domain(bp, vfid);
+ 		vf->bus = bnx2x_vf_bus(bp, vfid);
+ 		vf->devfn = bnx2x_vf_devfn(bp, vfid);
+ 		bnx2x_vf_set_bars(bp, vf);
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
+index 53466f6..eb814c6 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
+@@ -182,6 +182,7 @@ struct bnx2x_virtf {
+ 	u32 error;	/* 0 means all's-well */
+ 
+ 	/* BDF */
++	unsigned int domain;
+ 	unsigned int bus;
+ 	unsigned int devfn;
  
 -- 
 1.9.1
