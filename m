@@ -1,81 +1,65 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:02 -0500
-Subject: [PATCH 17/30] PCI: cpqhp: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-18-git-send-email-okaya@codeaurora.org>
+From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
+Date: Wed, 22 Nov 2017 15:46:19 +0900
+Subject: [PATCH] nvmem: uniphier: change access unit from 32bit to 8bit
+In-Reply-To: <1511327699-26396-1-git-send-email-hayashi.kunihiko@socionext.com>
+References: <1511327699-26396-1-git-send-email-hayashi.kunihiko@socionext.com>
+Message-ID: <000001d3635d$9a33c9f0$ce9b5dd0$@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
+Reviewed-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
 
-Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
-extract the domain number. Other places, use the actual domain number from
-the device.
+Thanks.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/hotplug/cpqphp_pci.c | 18 ++++++++++++++----
- 1 file changed, 14 insertions(+), 4 deletions(-)
+-----
+Best Regards,
+Keiji Hayashibara
 
-diff --git a/drivers/pci/hotplug/cpqphp_pci.c b/drivers/pci/hotplug/cpqphp_pci.c
-index e220d49..8897a77 100644
---- a/drivers/pci/hotplug/cpqphp_pci.c
-+++ b/drivers/pci/hotplug/cpqphp_pci.c
-@@ -89,7 +89,9 @@ int cpqhp_configure_device(struct controller *ctrl, struct pci_func *func)
- 	pci_lock_rescan_remove();
- 
- 	if (func->pci_dev == NULL)
--		func->pci_dev = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, func->function));
-+		func->pci_dev = pci_get_domain_bus_and_slot(0, func->bus,
-+							PCI_DEVFN(func->device,
-+							func->function));
- 
- 	/* No pci device, we need to create it then */
- 	if (func->pci_dev == NULL) {
-@@ -99,7 +101,9 @@ int cpqhp_configure_device(struct controller *ctrl, struct pci_func *func)
- 		if (num)
- 			pci_bus_add_devices(ctrl->pci_dev->bus);
- 
--		func->pci_dev = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, func->function));
-+		func->pci_dev = pci_get_domain_bus_and_slot(0, func->bus,
-+							PCI_DEVFN(func->device,
-+							func->function));
- 		if (func->pci_dev == NULL) {
- 			dbg("ERROR: pci_dev still null\n");
- 			goto out;
-@@ -129,7 +133,10 @@ int cpqhp_unconfigure_device(struct pci_func *func)
- 
- 	pci_lock_rescan_remove();
- 	for (j = 0; j < 8 ; j++) {
--		struct pci_dev *temp = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, j));
-+		struct pci_dev *temp = pci_get_domain_bus_and_slot(0,
-+							func->bus,
-+							PCI_DEVFN(func->device,
-+							j));
- 		if (temp) {
- 			pci_dev_put(temp);
- 			pci_stop_and_remove_bus_device(temp);
-@@ -319,6 +326,7 @@ int cpqhp_save_config(struct controller *ctrl, int busnumber, int is_hot_plug)
- 	int cloop = 0;
- 	int stop_it;
- 	int index;
-+	u16 devfn;
- 
- 	/* Decide which slots are supported */
- 
-@@ -416,7 +424,9 @@ int cpqhp_save_config(struct controller *ctrl, int busnumber, int is_hot_plug)
- 			new_slot->switch_save = 0x10;
- 			/* In case of unsupported board */
- 			new_slot->status = DevError;
--			new_slot->pci_dev = pci_get_bus_and_slot(new_slot->bus, (new_slot->device << 3) | new_slot->function);
-+			devfn = (new_slot->device << 3) | new_slot->function;
-+			new_slot->pci_dev = pci_get_domain_bus_and_slot(0,
-+							new_slot->bus, devfn);
- 
- 			for (cloop = 0; cloop < 0x20; cloop++) {
- 				rc = pci_bus_read_config_dword(ctrl->pci_bus, PCI_DEVFN(device, function), cloop << 2, (u32 *) &(new_slot->config_space[cloop]));
--- 
-1.9.1
+> -----Original Message-----
+> From: Kunihiko Hayashi [mailto:hayashi.kunihiko at socionext.com]
+> Sent: Wednesday, November 22, 2017 2:15 PM
+> To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Cc: Yamada, Masahiro/?? ?? <yamada.masahiro@socionext.com>; Hayashibara, Keiji/?? ??
+> <hayashibara.keiji@socionext.com>; masami.hiramatsu at linaro.org; jaswinder.singh at linaro.org;
+> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Hayashi, Kunihiko/? ??
+> <hayashi.kunihiko@socionext.com>
+> Subject: [PATCH] nvmem: uniphier: change access unit from 32bit to 8bit
+> 
+> The efuse on UniPhier allows 8bit access according to the specification.
+> Since bit offset of nvmem is limited to 0-7, it is desiable to change access unit of nvmem to 8bit.
+> 
+> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+> ---
+>  drivers/nvmem/uniphier-efuse.c | 10 +++++-----
+>  1 file changed, 5 insertions(+), 5 deletions(-)
+> 
+> diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c index 2bb45c4..fac3122 100644
+> --- a/drivers/nvmem/uniphier-efuse.c
+> +++ b/drivers/nvmem/uniphier-efuse.c
+> @@ -27,11 +27,11 @@ static int uniphier_reg_read(void *context,
+>  			     unsigned int reg, void *_val, size_t bytes)  {
+>  	struct uniphier_efuse_priv *priv = context;
+> -	u32 *val = _val;
+> +	u8 *val = _val;
+>  	int offs;
+> 
+> -	for (offs = 0; offs < bytes; offs += sizeof(u32))
+> -		*val++ = readl(priv->base + reg + offs);
+> +	for (offs = 0; offs < bytes; offs += sizeof(u8))
+> +		*val++ = readb(priv->base + reg + offs);
+> 
+>  	return 0;
+>  }
+> @@ -53,8 +53,8 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
+>  	if (IS_ERR(priv->base))
+>  		return PTR_ERR(priv->base);
+> 
+> -	econfig.stride = 4;
+> -	econfig.word_size = 4;
+> +	econfig.stride = 1;
+> +	econfig.word_size = 1;
+>  	econfig.read_only = true;
+>  	econfig.reg_read = uniphier_reg_read;
+>  	econfig.size = resource_size(res);
+> --
+> 2.7.4
