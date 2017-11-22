@@ -1,45 +1,49 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 11:15:47 -0500
-Subject: [PATCH 29/30] i7300_idle: deprecate pci_get_bus_and_slot()
-In-Reply-To: <20171122075345.GC26583@kroah.com>
-References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
- <1511328675-21981-30-git-send-email-okaya@codeaurora.org>
- <20171122075345.GC26583@kroah.com>
-Message-ID: <81de37c1-26b5-41f7-ab32-b98012890971@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Wed, 22 Nov 2017 17:19:14 +0100
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
+ userspace (KAISER)
+In-Reply-To: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20171122161913.GB12684@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2017 2:53 AM, Greg Kroah-Hartman wrote:
->> +++ b/include/linux/i7300_idle.h
->> @@ -48,7 +48,7 @@ static inline int i7300_idle_platform_probe(struct pci_dev **fbd_dev,
->>  	int i;
->>  	struct pci_dev *memdev, *dmadev;
->>  
->> -	memdev = pci_get_bus_and_slot(MEMCTL_BUS, MEMCTL_DEVFN);
->> +	memdev = pci_get_domain_bus_and_slot(0, MEMCTL_BUS, MEMCTL_DEVFN);
-> You have a pci_dev, why can't you use it here to get the domain?
+Hi!
+
+> This patch series implements something along the lines of KAISER for arm64:
 > 
+>   https://gruss.cc/files/kaiser.pdf
+> 
+> although I wrote this from scratch because the paper has some funny
+> assumptions about how the architecture works. There is a patch series
+> in review for x86, which follows a similar approach:
+> 
+>   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
+> 
+> and the topic was recently covered by LWN (currently subscriber-only):
+> 
+>   https://lwn.net/Articles/738975/
+> 
+> The basic idea is that transitions to and from userspace are proxied
+> through a trampoline page which is mapped into a separate page table and
+> can switch the full kernel mapping in and out on exception entry and
+> exit respectively. This is a valuable defence against various KASLR and
+> timing attacks, particularly as the trampoline page is at a fixed virtual
+> address and therefore the kernel text can be randomized
+> independently.
 
-Both fbd_dev and ioat_dev are output parameters. 
+If I'm willing to do timing attacks to defeat KASLR... what prevents
+me from using CPU caches to do that?
 
-dmadev = pci_get_bus_and_slot(IOAT_BUS, IOAT_DEVFN);
-memdev = pci_get_bus_and_slot(MEMCTL_BUS, MEMCTL_DEVFN);
-
-	for (i = 0; fbd_ioat_list[i].vendor != 0; i++) {
-		if (dmadev->vendor == fbd_ioat_list[i].vendor &&
-		    dmadev->device == fbd_ioat_list[i].ioat_dev) {
-			if (!(fbd_ioat_list[i].enabled || enable_all))
-				continue;
-
-			if (fbd_dev)
-				*fbd_dev = memdev;
-			if (ioat_dev)
-				*ioat_dev = dmadev;
-
-Funny thing is nobody is calling this function. Maybe, I should just kill it
-instead.
-
+There was blackhat talk about exactly that IIRC...
+									Pavel
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171122/576180b2/attachment.sig>
