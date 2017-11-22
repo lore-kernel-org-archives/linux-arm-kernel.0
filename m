@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:03 -0500
-Subject: [PATCH 18/30] PCI: ibmphp: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:07 -0500
+Subject: [PATCH 22/30] openprom: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-19-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-23-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,40 +17,24 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/hotplug/ibmphp_core.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/sbus/char/openprom.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
-index 73cf846..92dd882 100644
---- a/drivers/pci/hotplug/ibmphp_core.c
-+++ b/drivers/pci/hotplug/ibmphp_core.c
-@@ -707,7 +707,8 @@ static void ibm_unconfigure_device(struct pci_func *func)
- 	pci_lock_rescan_remove();
+diff --git a/drivers/sbus/char/openprom.c b/drivers/sbus/char/openprom.c
+index 2c2e6a3..7b31f19 100644
+--- a/drivers/sbus/char/openprom.c
++++ b/drivers/sbus/char/openprom.c
+@@ -251,8 +251,9 @@ static int oprompci2node(void __user *argp, struct device_node *dp, struct openp
+ 		struct pci_dev *pdev;
+ 		struct device_node *dp;
  
- 	for (j = 0; j < 0x08; j++) {
--		temp = pci_get_bus_and_slot(func->busno, (func->device << 3) | j);
-+		temp = pci_get_domain_bus_and_slot(0, func->busno,
-+						   (func->device << 3) | j);
- 		if (temp) {
- 			pci_stop_and_remove_bus_device(temp);
- 			pci_dev_put(temp);
-@@ -780,7 +781,7 @@ static int ibm_configure_device(struct pci_func *func)
- 	if (!(bus_structure_fixup(func->busno)))
- 		flag = 1;
- 	if (func->dev == NULL)
--		func->dev = pci_get_bus_and_slot(func->busno,
-+		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
- 				PCI_DEVFN(func->device, func->function));
+-		pdev = pci_get_bus_and_slot (((int *) op->oprom_array)[0],
+-				      ((int *) op->oprom_array)[1]);
++		pdev = pci_get_domain_bus_and_slot(0,
++						((int *) op->oprom_array)[0],
++						((int *) op->oprom_array)[1]);
  
- 	if (func->dev == NULL) {
-@@ -793,7 +794,7 @@ static int ibm_configure_device(struct pci_func *func)
- 		if (num)
- 			pci_bus_add_devices(bus);
- 
--		func->dev = pci_get_bus_and_slot(func->busno,
-+		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
- 				PCI_DEVFN(func->device, func->function));
- 		if (func->dev == NULL) {
- 			err("ERROR... : pci_dev still NULL\n");
+ 		dp = pci_device_to_OF_node(pdev);
+ 		data->current_node = dp;
 -- 
 1.9.1
