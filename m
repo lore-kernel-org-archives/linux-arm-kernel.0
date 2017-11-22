@@ -1,98 +1,115 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Wed, 22 Nov 2017 13:04:22 +0000
-Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
-In-Reply-To: <588ad6f0-e78a-63de-e27a-3da4de4ab2ab@huawei.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-2-jean-philippe.brucker@arm.com>
- <588ad6f0-e78a-63de-e27a-3da4de4ab2ab@huawei.com>
-Message-ID: <42f815ee-2a9a-ac49-2392-5c03c1d4c809@arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Nov 2017 13:06:18 +0000
+Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
+In-Reply-To: <B8AC3E80E903784988AB3003E3E97330C0069032@dggemm510-mbx.china.huawei.com>
+References: <bbf43f92-3d0c-940d-b66b-68f92eb9b282@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C00635F3@dggemm510-mbs.china.huawei.com>
+ <87po8ir1kg.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C006371B@dggemm510-mbs.china.huawei.com>
+ <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
+ <20171117073556.GB28855@cbox>
+ <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
+ <20171118134841.3f6c9183@why.wild-wind.fr.eu.org>
+ <B8AC3E80E903784988AB3003E3E97330C0068F12@dggemm510-mbx.china.huawei.com>
+ <20171121122938.sydii3i36jbzi7x4@lakrids.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0069032@dggemm510-mbx.china.huawei.com>
+Message-ID: <757534e5-fcea-3eb4-3c8d-b8c7e709f555@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/17 03:15, Bob Liu wrote:
-> Hey Jean,
+On 22/11/17 12:56, Liuwenliang (Abbott Liu) wrote:
+> On Nov 22, 2017  20:30  Mark Rutland [mailto:mark.rutland at arm.com] wrote:
+>> On Tue, Nov 21, 2017 at 07:59:01AM +0000, Liuwenliang (Abbott Liu) wrote:
+>>> On Nov 17, 2017  21:49  Marc Zyngier [mailto:marc.zyngier at arm.com]  wrote:
+>>>> On Sat, 18 Nov 2017 10:40:08 +0000
+>>>> "Liuwenliang (Abbott Liu)" <liuwenliang@huawei.com> wrote:
+>>>>> On Nov 17, 2017  15:36 Christoffer Dall [mailto:cdall at linaro.org]  wrote:
 > 
-> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
->> IOMMU drivers need a way to bind Linux processes to devices. This is used
->> for Shared Virtual Memory (SVM), where devices support paging. In that
->> mode, DMA can directly target virtual addresses of a process.
->>
->> Introduce boilerplate code for allocating process structures and binding
->> them to devices. Four operations are added to IOMMU drivers:
->>
->> * process_alloc, process_free: to create an iommu_process structure and
->>   perform architecture-specific operations required to grab the process
->>   (for instance on ARM SMMU, pin down the CPU ASID). There is a single
->>   iommu_process structure per Linux process.
->>
+>>> Please don't ask people to limit to 4GB of physical space on CPU
+>>> supporting LPAE, please don't ask people to guaranteed to have some
+>>> memory below 4GB on CPU supporting LPAE.
 > 
-> I'm a bit confused here.
-> The original meaning of iommu_domain is a virtual addrspace defined by a set of io page table.
-> (fix me if I misunderstood).
+>> I don't think that Marc is suggesting that you'd always use the 32-bit
+>> accessors on an LPAE system, just that all the definitions should exist
+>> regardless of configuration.
+> 
+>> So rather than this:
+> 
+>>> +#ifdef CONFIG_ARM_LPAE
+>>> +#define TTBR0           __ACCESS_CP15_64(0, c2)
+>>> +#define TTBR1           __ACCESS_CP15_64(1, c2)
+>>> +#define PAR             __ACCESS_CP15_64(0, c7)
+>>> +#else
+>>> +#define TTBR0           __ACCESS_CP15(c2, 0, c0, 0)
+>>> +#define TTBR1           __ACCESS_CP15(c2, 0, c0, 1)
+>>> +#define PAR             __ACCESS_CP15(c7, 0, c4, 0)
+>>> +#endif
+> 
+>> ... you'd have the following in cp15.h:
+> 
+>> #define TTBR0_64       __ACCESS_CP15_64(0, c2)
+>> #define TTBR1_64       __ACCESS_CP15_64(1, c2)
+>> #define PAR_64         __ACCESS_CP15_64(0, c7)
+> 
+>> #define TTBR0_32       __ACCESS_CP15(c2, 0, c0, 0)
+>> #define TTBR1_32       __ACCESS_CP15(c2, 0, c0, 1)
+>> #define PAR_32         __ACCESS_CP15(c7, 0, c4, 0)
+> 
+>> ... and elsewhere, where it matters, we choose which to use depending on
+>> the kernel configuration, e.g.
+> 
+>> void set_ttbr0(u64 val)
+>> {
+>>       if (IS_ENABLED(CONFIG_ARM_LPAE))
+>>               write_sysreg(val, TTBR0_64);
+>>       else
+>>               write_sysreg(val, TTBR0_32);
+>> }
+> 
+>> Thanks,
+>> Mark.
+> 
+> Thanks for your solution.
+> I didn't know there was a IS_ENABLED macro that I can use, so I can't write a function 
+> like:
+> void set_ttbr0(u64 val)
+> {
+>        if (IS_ENABLED(CONFIG_ARM_LPAE))
+>                write_sysreg(val, TTBR0_64);
+>        else
+>                write_sysreg(val, TTBR0_32);
+> }
+> 
+> 
+> Here is the code I tested on vexpress_a9 and vexpress_a15:
+> diff --git a/arch/arm/include/asm/cp15.h b/arch/arm/include/asm/cp15.h
+> index dbdbce1..5eb0185 100644
+> --- a/arch/arm/include/asm/cp15.h
+> +++ b/arch/arm/include/asm/cp15.h
+> @@ -2,6 +2,7 @@
+>  #define __ASM_ARM_CP15_H
+> 
+>  #include <asm/barrier.h>
+> +#include <linux/stringify.h>
+> 
+>  /*
+>   * CR1 bits (CP#15 CR1)
+> @@ -64,8 +65,93 @@
+>  #define __write_sysreg(v, r, w, c, t)  asm volatile(w " " c : : "r" ((t)(v)))
+>  #define write_sysreg(v, ...)           __write_sysreg(v, __VA_ARGS__)
+> 
+> +#define TTBR0_32           __ACCESS_CP15(c2, 0, c0, 0)
+> +#define TTBR1_32           __ACCESS_CP15(c2, 0, c0, 1)
+> +#define TTBR0_64           __ACCESS_CP15_64(0, c2)
+> +#define TTBR1_64           __ACCESS_CP15_64(1, c2)
+> +#define PAR             __ACCESS_CP15_64(0, c7)
 
-iommu_domain can also be seen as a logical partition of devices that share
-the same address spaces (the concept comes from AMD and Intel IOMMU
-domains, I believe). Without PASIDs it was a single address space, with
-PASIDs it can have multiple address spaces.
-
-> Then what's the meaning of iommu_domain and iommu_process after introducing iommu_process?
-> Could you consider document these concepts? 
-
-iommu_process is used to keep track of Linux process address spaces. I'll
-rename it to io_mm in next version, to make it clear that it doesn't
-represent a Linux task but an mm_struct instead. However the
-implementation stays pretty much identical. A domain can be associated to
-multiple io_mm, and an io_mm can be associated to multiple domains.
-
-In the IOMMU architectures I know, PASID is implemented like this. You
-have the device tables (stream tables on SMMU), pointing to PASID tables
-(context descriptor tables on SMMU). In the following diagram,
-
-                    .->+--------+
-                   / 0 |        |------ io_pgtable
-                  /    +--------+
-                 /   1 |        |------ io_mm->mm X
-    +--------+  /      +--------+
-  0 |      A |-'     2 |        |-.
-    +--------+         +--------+  \
-  1 |        |       3 |        |   \
-    +--------+         +--------+    -- io_mm->mm Y
-  2 |      B |--.     PASID tables  /
-    +--------+   \                 |
-  3 |      B |----+--->+--------+  |
-    +--------+   /   0 |        |- | -- io_pgtable
-  4 |      B |--'      +--------+  |
-    +--------+       1 |        |  |
-  Device tables        +--------+  |
-                     2 |        |--'
-                       +--------+
-                     3 |        |------ io_mm->priv io_pgtable
-                       +--------+
-                      PASID tables
-
-* Device 0 (e.g. PCI 0000:00:00.0) is in domain A.
-* Devices 2, 3 and 4 are in domain B.
-* Domain A has the top set of PASID tables.
-* Domain B has the bottom set of PASID tables.
-
-* Domain A is bound to process address space X.
-  -> Device 0 can access X with PASID 1.
-* Both domains A and B are bound to process address space Y.
-  -> Devices 0, 2, 3 and 4 can access Y with PASID 2
-
-* PASID 0 is special on Arm SMMU (with S1DSS=0b10). It will always be
-  reserved for classic DMA map/unmap. Even for hypothetical devices that
-  don't support non-pasid transactions, I'd like to keep this convention.
-  It should be quite useful for device drivers to have PASID 0 available
-  with DMA map/unmap.
-
-* When introducing "private" PASID address spaces (that many are asking
-  for), which are backed by a set of io-pgtable and map/unmap ops, I
-  suppose they would reuse the io_mm structure. In this example PASID 3 is
-  associated to a private address space and not backed by an mm. Since the
-  PASID space is global, PASID 3 won't be available for any other domain.
-
-Does this clarify the current design, or is it just more confusing?
+Please define both PAR accessors. Yes, I know the 32bit version is not
+used yet, but it doesn't hurt to make it visible.
 
 Thanks,
-Jean
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
