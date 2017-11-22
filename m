@@ -1,49 +1,58 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 17:49:24 -0500
-Subject: [PATCH V2 29/29] PCI: remove pci_get_bus_and_slot() function
-In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511390964-9979-30-git-send-email-okaya@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 22 Nov 2017 23:19:09 +0000
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
+ (KAISER)
+In-Reply-To: <20171122223355.GA5877@amd>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+ <20171122161913.GB12684@amd>
+ <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
+ <20171122223355.GA5877@amd>
+Message-ID: <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
 
-Now that all users of pci_get_bus_and_slot() switched to
-pci_get_domain_bus_and_slot(), it is now safe to remove this function.
+> On 22 Nov 2017, at 22:33, Pavel Machek <pavel@ucw.cz> wrote:
+> 
+>> On Wed 2017-11-22 21:19:28, Ard Biesheuvel wrote:
+>>> On 22 November 2017 at 16:19, Pavel Machek <pavel@ucw.cz> wrote:
+>>> Hi!
+>>> 
+>>>> This patch series implements something along the lines of KAISER for arm64:
+>>>> 
+>>>>  https://gruss.cc/files/kaiser.pdf
+>>>> 
+>>>> although I wrote this from scratch because the paper has some funny
+>>>> assumptions about how the architecture works. There is a patch series
+>>>> in review for x86, which follows a similar approach:
+>>>> 
+>>>>  http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
+>>>> 
+>>>> and the topic was recently covered by LWN (currently subscriber-only):
+>>>> 
+>>>>  https://lwn.net/Articles/738975/
+>>>> 
+>>>> The basic idea is that transitions to and from userspace are proxied
+>>>> through a trampoline page which is mapped into a separate page table and
+>>>> can switch the full kernel mapping in and out on exception entry and
+>>>> exit respectively. This is a valuable defence against various KASLR and
+>>>> timing attacks, particularly as the trampoline page is at a fixed virtual
+>>>> address and therefore the kernel text can be randomized
+>>>> independently.
+>>> 
+>>> If I'm willing to do timing attacks to defeat KASLR... what prevents
+>>> me from using CPU caches to do that?
+>>> 
+>> 
+>> Because it is impossible to get a cache hit on an access to an
+>> unmapped address?
+> 
+> Um, no, I don't need to be able to directly access kernel addresses. I
+> just put some data in _same place in cache where kernel data would
+> go_, then do syscall and look if my data are still cached. Caches
+> don't have infinite associativity.
+> 
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- include/linux/pci.h | 8 --------
- 1 file changed, 8 deletions(-)
+Ah ok. Interesting.
 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index d16a7c0..8c1b650 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -957,11 +957,6 @@ struct pci_dev *pci_get_subsys(unsigned int vendor, unsigned int device,
- struct pci_dev *pci_get_slot(struct pci_bus *bus, unsigned int devfn);
- struct pci_dev *pci_get_domain_bus_and_slot(int domain, unsigned int bus,
- 					    unsigned int devfn);
--static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
--						   unsigned int devfn)
--{
--	return pci_get_domain_bus_and_slot(0, bus, devfn);
--}
- struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from);
- int pci_dev_present(const struct pci_device_id *ids);
- 
-@@ -1676,9 +1671,6 @@ static inline struct pci_bus *pci_find_next_bus(const struct pci_bus *from)
- static inline struct pci_dev *pci_get_slot(struct pci_bus *bus,
- 						unsigned int devfn)
- { return NULL; }
--static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
--						unsigned int devfn)
--{ return NULL; }
- 
- static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
- static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
--- 
-1.9.1
+But how does that leak address bits that are covered by the tag?
