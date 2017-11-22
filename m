@@ -1,51 +1,44 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 22 Nov 2017 15:41:25 +0800
-Subject: [PATCH] media: mtk-vcodec: add missing MODULE_LICENSE/DESCRIPTION
-In-Reply-To: <20171120062607.124734-1-jc@linux.com>
-References: <20171120062607.124734-1-jc@linux.com>
-Message-ID: <201711221521.lmq1l8ci%fengguang.wu@intel.com>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 22 Nov 2017 08:51:24 +0100
+Subject: [PATCH 30/30] PCI: remove pci_get_bus_and_slot() function
+In-Reply-To: <25ec431a-2c1b-d352-f9ef-c663864664b6@codeaurora.org>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-31-git-send-email-okaya@codeaurora.org>
+ <c0df99c9-9170-be3a-3789-6b25be30936f@codeaurora.org>
+ <6a78596e-720a-80a2-9d96-dcc79a32f677@codeaurora.org>
+ <25ec431a-2c1b-d352-f9ef-c663864664b6@codeaurora.org>
+Message-ID: <20171122075124.GA26583@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jesse,
+On Wed, Nov 22, 2017 at 12:08:45AM -0600, Timur Tabi wrote:
+> On 11/21/17 11:55 PM, Sinan Kaya wrote:
+> > For places where domain number information is available, I extracted domain number
+> > and added into pci_get_domain_bus_and_slot() call such as xen or bn drivers.
+> 
+> My suggestion is that you restrict your first patch set to only these
+> patches.
+> 
+> > The assumption at this point is for pci_get_bus_and_slot() usages to be caught
+> > in code-review.
+> 
+> How about this:
+> 
+> static inline struct pci_dev * __deprecated pci_get_bus_and_slot(unsigned
+> int bus,
+> 						   unsigned int devfn)
+> {
+> 	return pci_get_domain_bus_and_slot(0, bus, devfn);
+> }
 
-Thank you for the patch! Yet something to improve:
+Ick, no, why?  What is wrong with removing this function as is?  Don't
+mark something as __depreciated if there are no in-kernel users, just
+delete it and move on.
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on v4.14 next-20171121]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+If you have out-of-tree drivers, then yes, they can make a wrapper for
+this function like this if they really feel the need, or they can get
+their code merged :)
 
-url:    https://github.com/0day-ci/linux/commits/Jesse-Chan/media-mtk-vcodec-add-missing-MODULE_LICENSE-DESCRIPTION/20171122-124620
-base:   git://linuxtv.org/media_tree.git master
-config: xtensa-allmodconfig (attached as .config)
-compiler: xtensa-linux-gcc (GCC) 4.9.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=xtensa 
+thanks,
 
-All errors (new ones prefixed by >>):
-
->> drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c:55:16: error: expected declaration specifiers or '...' before string constant
-    MODULE_LICENSE("GPL v2");
-                   ^
-   drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c:56:20: error: expected declaration specifiers or '...' before string constant
-    MODULE_DESCRIPTION("Mediatek video codec driver");
-                       ^
-
-vim +55 drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c
-
-    54	
-  > 55	MODULE_LICENSE("GPL v2");
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 51526 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171122/78bae7d9/attachment-0001.gz>
+greg k-h
