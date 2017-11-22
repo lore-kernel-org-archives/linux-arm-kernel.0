@@ -1,85 +1,30 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:12 -0500
-Subject: [PATCH 27/30] video: fbdev: nvidia: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 21 Nov 2017 23:45:37 -0600
+Subject: [PATCH 30/30] PCI: remove pci_get_bus_and_slot() function
+In-Reply-To: <1511328675-21981-31-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-28-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-31-git-send-email-okaya@codeaurora.org>
+Message-ID: <c0df99c9-9170-be3a-3789-6b25be30936f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
+On 11/21/17 11:31 PM, Sinan Kaya wrote:
+> Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+> extract the domain number. Other places, use the actual domain number from
+> the device.
+> 
+> Now that all users of pci_get_bus_and_slot() switched to
+> pci_get_domain_bus_and_slot(), it is now safe to remove this function.
 
-Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
-extract the domain number. Other places, use the actual domain number from
-the device.
+This doesn't really eliminate pci_get_bus_and_slot(), because it doesn't 
+force developers to support non-zero domains.  What's to stop a driver 
+developer from doing this?
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/video/fbdev/nvidia/nv_hw.c    | 10 +++++-----
- drivers/video/fbdev/nvidia/nv_setup.c |  2 +-
- 2 files changed, 6 insertions(+), 6 deletions(-)
+#define pci_get_bus_and_slot(b, d) pci_get_domain_bus_and_slot(0, b, d)
 
-diff --git a/drivers/video/fbdev/nvidia/nv_hw.c b/drivers/video/fbdev/nvidia/nv_hw.c
-index 81c80ac..3374c5d 100644
---- a/drivers/video/fbdev/nvidia/nv_hw.c
-+++ b/drivers/video/fbdev/nvidia/nv_hw.c
-@@ -686,7 +686,7 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 
- 	if ((par->Chipset & 0x0FF0) == 0x01A0) {
- 		unsigned int uMClkPostDiv;
--		dev = pci_get_bus_and_slot(0, 3);
-+		dev = pci_get_domain_bus_and_slot(0, 0, 3);
- 		pci_read_config_dword(dev, 0x6C, &uMClkPostDiv);
- 		uMClkPostDiv = (uMClkPostDiv >> 8) & 0xf;
- 
-@@ -694,7 +694,7 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 			uMClkPostDiv = 4;
- 		MClk = 400000 / uMClkPostDiv;
- 	} else {
--		dev = pci_get_bus_and_slot(0, 5);
-+		dev = pci_get_domain_bus_and_slot(0, 0, 5);
- 		pci_read_config_dword(dev, 0x4c, &MClk);
- 		MClk /= 1000;
- 	}
-@@ -707,13 +707,13 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 	sim_data.pix_bpp = (char)pixelDepth;
- 	sim_data.enable_video = 0;
- 	sim_data.enable_mp = 0;
--	dev = pci_get_bus_and_slot(0, 1);
-+	dev = pci_get_domain_bus_and_slot(0, 0, 1);
- 	pci_read_config_dword(dev, 0x7C, &sim_data.memory_type);
- 	pci_dev_put(dev);
- 	sim_data.memory_type = (sim_data.memory_type >> 12) & 1;
- 	sim_data.memory_width = 64;
- 
--	dev = pci_get_bus_and_slot(0, 3);
-+	dev = pci_get_domain_bus_and_slot(0, 0, 3);
- 	pci_read_config_dword(dev, 0, &memctrl);
- 	pci_dev_put(dev);
- 	memctrl >>= 16;
-@@ -721,7 +721,7 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
- 	if ((memctrl == 0x1A9) || (memctrl == 0x1AB) || (memctrl == 0x1ED)) {
- 		u32 dimm[3];
- 
--		dev = pci_get_bus_and_slot(0, 2);
-+		dev = pci_get_domain_bus_and_slot(0, 0, 2);
- 		pci_read_config_dword(dev, 0x40, &dimm[0]);
- 		dimm[0] = (dimm[0] >> 8) & 0x4f;
- 		pci_read_config_dword(dev, 0x44, &dimm[1]);
-diff --git a/drivers/video/fbdev/nvidia/nv_setup.c b/drivers/video/fbdev/nvidia/nv_setup.c
-index 2f2e162..79806ff 100644
---- a/drivers/video/fbdev/nvidia/nv_setup.c
-+++ b/drivers/video/fbdev/nvidia/nv_setup.c
-@@ -264,7 +264,7 @@ static void nv10GetConfig(struct nvidia_par *par)
- 	}
- #endif
- 
--	dev = pci_get_bus_and_slot(0, 1);
-+	dev = pci_get_domain_bus_and_slot(0, 0, 1);
- 	if ((par->Chipset & 0xffff) == 0x01a0) {
- 		u32 amt;
- 
+thereby completely ignoring what you're trying to do?
+
 -- 
-1.9.1
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
