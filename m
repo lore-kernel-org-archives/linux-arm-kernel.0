@@ -1,126 +1,81 @@
-From: yinbo.zhu@nxp.com (Yinbo Zhu)
-Date: Wed, 22 Nov 2017 01:32:22 +0000
-Subject: [PATCH v2] arm64: dts: ls1088a: Add USB support
-In-Reply-To: <AM3PR04MB12515DB71B8ACF7422A20244E9280@AM3PR04MB1251.eurprd04.prod.outlook.com>
-References: <20170913091009.21448-1-yinbo.zhu@nxp.com>
- <20170922065454.GF26358@dragon>
- <VI1PR04MB1262D160BA8625330E32CAF9E9470@VI1PR04MB1262.eurprd04.prod.outlook.com>
- <AM3PR04MB12515DB71B8ACF7422A20244E9280@AM3PR04MB1251.eurprd04.prod.outlook.com>
-Message-ID: <VI1PR04MB1262DD3C6A18257DEE2E907DE9200@VI1PR04MB1262.eurprd04.prod.outlook.com>
+From: yong.deng@magewell.com (Yong)
+Date: Wed, 22 Nov 2017 09:33:06 +0800
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
+Message-ID: <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Tue, 21 Nov 2017 16:48:27 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 
------Original Message-----
-From: Yinbo Zhu 
-Sent: Tuesday, November 14, 2017 4:00 PM
-To: 'Shawn Guo' <shawnguo@kernel.org>
-Cc: 'Rob Herring' <robh+dt@kernel.org>; 'Mark Rutland' <mark.rutland@arm.com>; 'Catalin Marinas )' <catalin.marinas@arm.com>; 'Will Deacon )' <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; 'Raghav Dogra' <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; 'open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS' <devicetree@vger.kernel.org>; 'linux-arm-kernel at lists.infradead.org' <linux-arm-kernel@lists.infradead.org>; 'open list' <linux-kernel@vger.kernel.org>
-Subject: RE: [PATCH v2] arm64: dts: ls1088a: Add USB support
-
-
-
------Original Message-----
-From: Yinbo Zhu 
-Sent: Tuesday, October 24, 2017 5:15 PM
-To: Shawn Guo <shawnguo@kernel.org>
-Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; Raghav Dogra <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open list <linux-kernel@vger.kernel.org>
-Subject: RE: [PATCH v2] arm64: dts: ls1088a: Add USB support
-
-
------Original Message-----
-From: Shawn Guo [mailto:shawnguo at kernel.org] 
-Sent: Friday, September 22, 2017 2:55 PM
-To: Yinbo Zhu <yinbo.zhu@nxp.com>
-Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; Raghav Dogra <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open list <linux-kernel@vger.kernel.org>
-Subject: Re: [PATCH v2] arm64: dts: ls1088a: Add USB support
-
-On Wed, Sep 13, 2017 at 05:10:09PM +0800, yinbo.zhu at nxp.com wrote:
-> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+> Hi,
 > 
-> Fix the issue that usb is not detected on ls1088ardb
-
->It's not really about fixing issue but adding support.
-
-The patch had been tested on upstream 4.14 code, it can fix the issue. 
+> On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
+> > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> > and CSI1 is used for parallel interface. This is not documented in
+> > datasheet but by testing and guess.
+> > 
+> > This patch implement a v4l2 framework driver for it.
+> > 
+> > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > ISP's support are not included in this patch.
+> > 
+> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
 > 
-> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
-> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
-> ---
+> Thanks again for this driver.
+> 
+> It seems like at least this iteration is behaving in a weird way with
+> DMA transfers for at least YU12 and NV12 (and I would assume YV12).
+> 
+> Starting a transfer of multiple frames in either of these formats,
+> using either ffmpeg (ffmpeg -f v4l2 -video_size 640x480 -framerate 30
+> -i /dev/video0 output.mkv) or yavta (yavta -c80 -p -F --skip 0 -f NV12
+> -s 640x480 $(media-c tl -e 'sun6i-csi')) will end up in a panic.
+> 
+> The panic seems to be generated with random data going into parts of
+> the kernel memory, the pattern being in my case something like
+> 0x8287868a which is very odd (always around 0x88)
+> 
+> It turns out that when you cover the sensor, the values change to
+> around 0x28, so it really seems like it's pixels that have been copied
+> there.
+> 
+> I've looked quickly at the DMA setup, and it seems reasonable to
+> me. Do you have the same issue on your side? Have you been able to
+> test those formats using your hardware?
 
->You should better have a version history here to tell what's changed between version.
+I had tested the following formats with BT1120 input:
+V4L2_PIX_FMT_NV12		-> NV12
+V4L2_PIX_FMT_NV21		-> NV21
+V4L2_PIX_FMT_NV16		-> NV16
+V4L2_PIX_FMT_NV61		-> NV61
+V4L2_PIX_FMT_YUV420		-> YU12
+V4L2_PIX_FMT_YVU420		-> YV12
+V4L2_PIX_FMT_YUV422P		-> 422P
+And they all work fine.
 
->I will add a version history on next v3 patch
-Hi,
+> 
+> Given that they all are planar formats and YUYV and the likes work
+> just fine, maybe we can leave them aside for now?
 
-I had modified the code as v4 version, 
-https://patchwork.kernel.org/patch/10027393/
-please check.
+V4L2_PIX_FMT_YUV422P and V4L2_PIX_FMT_YUYV is OK, and V4L2_PIX_FMT_NV12
+is bad? It's really weird.
+
+What's your input bus code format, type and width?
+
+> 
+> Thanks!
+> Maxime
+> 
+> -- 
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+
 
 Thanks,
-BRs
->  arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
->  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
->  2 files changed, 28 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts 
-> b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-> index 213abb72de93..6c3c3bc4b681 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
-> @@ -118,6 +118,14 @@
->  	status = "okay";
->  };
->  
-> +&usb0 {
-> +	status = "okay";
-> +};
-> +
-> +&usb1 {
-> +	status = "okay";
-> +};
-> +
->  &esdhc {
-
->Please sort these labeled nodes alphabetically.
-
->Shawn
-
->  	status = "okay";
->  };
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi 
-> b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> index c144d06a6e33..c23fede8cf5d 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
-> @@ -359,6 +359,26 @@
->  			status = "disabled";
->  		};
->  
-> +		usb0: usb3 at 3100000 {
-> +			compatible = "snps,dwc3";
-> +			reg = <0x0 0x3100000 0x0 0x10000>;
-> +			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
-> +			dr_mode = "host";
-> +			snps,quirk-frame-length-adjustment = <0x20>;
-> +			snps,dis_rxdet_inp3_quirk;
-> +			status = "disabled";
-> +		};
-> +
-> +		usb1: usb3 at 3110000 {
-> +			compatible = "snps,dwc3";
-> +			reg = <0x0 0x3110000 0x0 0x10000>;
-> +			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
-> +			dr_mode = "host";
-> +			snps,quirk-frame-length-adjustment = <0x20>;
-> +			snps,dis_rxdet_inp3_quirk;
-> +			status = "disabled";
-> +		};
-> +
->  		sata: sata at 3200000 {
->  			compatible = "fsl,ls1088a-ahci";
->  			reg = <0x0 0x3200000 0x0 0x10000>,
-> --
-> 2.14.1
-> 
+Yong
