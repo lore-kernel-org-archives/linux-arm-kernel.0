@@ -1,404 +1,114 @@
-From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 22 Nov 2017 20:43:19 +0900
-Subject: [PATCH 6/8] ASoC: uniphier: add support for UniPhier LD11/LD20 AIO
- driver
-In-Reply-To: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
-References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20171122114321.29196-7-suzuki.katsuhiro@socionext.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Wed, 22 Nov 2017 12:46:29 +0100
+Subject: [PATCH v3 0/3] KVM: arm64: single step emulation instructions
+In-Reply-To: <873757yf8f.fsf@linaro.org>
+References: <20171116153921.21991-1-alex.bennee@linaro.org>
+ <20171120154131.GO28855@cbox> <873757yf8f.fsf@linaro.org>
+Message-ID: <20171122114629.GP28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for UniPhier AIO sound driver
-which is included in UniPhier LD11/LD20 SoCs.
+On Tue, Nov 21, 2017 at 12:43:12PM +0000, Alex Benn?e wrote:
+> 
+> Christoffer Dall <cdall@linaro.org> writes:
+> 
+> > Hi Alex,
+> >
+> > On Thu, Nov 16, 2017 at 03:39:18PM +0000, Alex Benn?e wrote:
+> >> Hi,
+> >>
+> >> This is rev 3 of the series, practically the same than rev 2 but fixed
+> >> a return 1->0 in the kvm_run loop that Julien caught. I've added his
+> >> r-b tags to the other patches.
+> >>
+> >> As usual revision details bellow the --- in each patch.
+> >
+> > Thanks for taking care of this.
+> >
+> > I have applied the series and slightly tweaked the commit messages and
+> > commentary.
+> >
+> > Did we simply decide to not worry about exiting to userspace if we do
+> > fast-path emulation, such as for the errata workaround and GIC
+> > mashaling in switch.c ?
+> 
+> Compile tested only:
+> 
+> --8<---------------cut here---------------start------------->8---
+> kvm: arm64: handle single-step of hyp emulated mmio
+> 
+> There is a fast-path of MMIO emulation inside hyp mode. The handling
+> of single-step is broadly the same as kvm_arm_handle_step_debug()
+> except we just setup ESR/HSR so handle_exit() does the correct thing
+> as we exit.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+> ---
+>  arch/arm64/kvm/hyp/switch.c | 26 +++++++++++++++++++++-----
+>  1 file changed, 21 insertions(+), 5 deletions(-)
+> 
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 945e79c641c4..841dc79d11fd 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -263,7 +263,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+>  	return true;
+>  }
+> 
+> -static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+> +/* Skip an instruction which has been emulated. Returns true if
+> + * execution can continue or false if we need to exit hyp mode because
+> + * single-step was in effect.
+> + */
+> +static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>  {
+>  	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
+> 
+> @@ -276,6 +280,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+>  	}
+> 
+>  	write_sysreg_el2(*vcpu_pc(vcpu), elr);
+> +
+> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+> +		vcpu->arch.fault.esr_el2 =
+> +			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
+> +		return false;
+> +	} else {
+> +		return true;
+> +	}
+>  }
+> 
+>  int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> @@ -336,8 +348,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  			int ret = __vgic_v2_perform_cpuif_access(vcpu);
+> 
+>  			if (ret == 1) {
+> -				__skip_instr(vcpu);
+> -				goto again;
+> +				if (__skip_instr(vcpu))
+> +					goto again;
+> +				else
+> +					exit_code = ARM_EXCEPTION_TRAP;
+>  			}
+> 
+>  			if (ret == -1) {
+> @@ -357,8 +371,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+>  		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+> 
+>  		if (ret == 1) {
+> -			__skip_instr(vcpu);
+> -			goto again;
+> +			if (__skip_instr(vcpu))
+> +				goto again;
+> +			else
+> +				exit_code = ARM_EXCEPTION_TRAP;
+>  		}
+> 
+>  		/* 0 falls through to be handled out of EL2 */
+> --8<---------------cut here---------------end--------------->8---
 
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
----
- sound/soc/uniphier/Kconfig    |  10 ++
- sound/soc/uniphier/Makefile   |   1 +
- sound/soc/uniphier/aio-ld11.c | 343 ++++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 354 insertions(+)
- create mode 100644 sound/soc/uniphier/aio-ld11.c
+Assuming you fix Marc's comment this looks reasonable to me.  Please
+send as a separate patch.
 
-diff --git a/sound/soc/uniphier/Kconfig b/sound/soc/uniphier/Kconfig
-index 38a02879b9d5..8da628a46a9b 100644
---- a/sound/soc/uniphier/Kconfig
-+++ b/sound/soc/uniphier/Kconfig
-@@ -13,6 +13,16 @@ config SND_SOC_UNIPHIER_AIO
- 	select REGMAP_MMIO
- 	depends on SND_SOC_UNIPHIER
- 
-+config SND_SOC_UNIPHIER_LD11
-+	tristate "UniPhier LD11/LD20 Device Driver"
-+	depends on SND_SOC_UNIPHIER
-+	select SND_SOC_UNIPHIER_AIO
-+	help
-+	  This adds ASoC driver for Socionext UniPhier LD11/LD20
-+	  input and output that can be used with other codecs.
-+	  Select Y if you use such device.
-+	  If unsure select "N".
-+
- config SND_SOC_UNIPHIER_EVEA_CODEC
- 	tristate "UniPhier SoC internal audio codec"
- 	depends on SND_SOC_UNIPHIER
-diff --git a/sound/soc/uniphier/Makefile b/sound/soc/uniphier/Makefile
-index 705a60cb2aa5..55a77ad1192e 100644
---- a/sound/soc/uniphier/Makefile
-+++ b/sound/soc/uniphier/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- snd-soc-uniphier-aio-objs := aio-regctrl.o aio-dma.o aio-core.o
-+snd-soc-uniphier-aio-$(CONFIG_SND_SOC_UNIPHIER_LD11) += aio-ld11.o
- 
- obj-$(CONFIG_SND_SOC_UNIPHIER_AIO) += snd-soc-uniphier-aio.o
- 
-diff --git a/sound/soc/uniphier/aio-ld11.c b/sound/soc/uniphier/aio-ld11.c
-new file mode 100644
-index 000000000000..b6e3bd11f23a
---- /dev/null
-+++ b/sound/soc/uniphier/aio-ld11.c
-@@ -0,0 +1,343 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Socionext UniPhier AIO ALSA driver for LD11/LD20.
-+ *
-+ * Copyright (c) 2016-2017 Socionext Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License
-+ * as published by the Free Software Foundation; version 2
-+ * of the License.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program; if not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include "aio.h"
-+
-+static const struct uniphier_aio_spec uniphier_aio_ld11[] = {
-+	/* for HDMI PCM In, Pin:AI1Dx */
-+	{
-+		.name = AUD_NAME_PCMIN1,
-+		.gname = AUD_GNAME_HDMI,
-+		.swm = {
-+			.type  = PORT_TYPE_I2S,
-+			.dir   = PORT_DIR_INPUT,
-+			.rb    = { 21, 14, },
-+			.ch    = { 21, 14, },
-+			.iif   = { 5, 3, },
-+			.iport = { 0, AUD_HW_PCMIN1, },
-+		},
-+	},
-+
-+	/* for SIF In, Pin:AI2Dx */
-+	{
-+		.name = AUD_NAME_PCMIN2,
-+		.swm = {
-+			.type  = PORT_TYPE_I2S,
-+			.dir   = PORT_DIR_INPUT,
-+			.rb    = { 22, 15, },
-+			.ch    = { 22, 15, },
-+			.iif   = { 6, 4, },
-+			.iport = { 1, AUD_HW_PCMIN2, },
-+		},
-+	},
-+
-+	/* for Line In, Pin:AI3Dx */
-+	{
-+		.name = AUD_NAME_PCMIN3,
-+		.gname = AUD_GNAME_LINE,
-+		.swm = {
-+			.type  = PORT_TYPE_EVE,
-+			.dir   = PORT_DIR_INPUT,
-+			.rb    = { 23, 16, },
-+			.ch    = { 23, 16, },
-+			.iif   = { 7, 5, },
-+			.iport = { 2, AUD_HW_PCMIN3, },
-+		},
-+	},
-+
-+	/* for S/PDIF In, Pin:AI1IEC */
-+	{
-+		.name = AUD_NAME_IECIN1,
-+		.gname = AUD_GNAME_IEC,
-+		.swm = {
-+			.type  = PORT_TYPE_SPDIF,
-+			.dir   = PORT_DIR_INPUT,
-+			.rb    = { 26, 17, },
-+			.ch    = { 26, 17, },
-+			.iif   = { 10, 6, },
-+			.iport = { 3, AUD_HW_IECIN1, },
-+		},
-+	},
-+
-+	/* for Speaker, Pin:AO1Dx */
-+	{
-+		.name = AUD_NAME_HPCMOUT1,
-+		.swm = {
-+			.type  = PORT_TYPE_I2S,
-+			.dir   = PORT_DIR_OUTPUT,
-+			.rb    = { 0, 0, },
-+			.ch    = { 0, 0, },
-+			.oif   = { 0, 0, },
-+			.oport = { 0, AUD_HW_HPCMOUT1, },
-+		},
-+	},
-+
-+	/* for HDMI PCM, Pin:AO2Dx */
-+	{
-+		.name = AUD_NAME_PCMOUT1,
-+		.gname = AUD_GNAME_HDMI,
-+		.swm = {
-+			.type  = PORT_TYPE_I2S,
-+			.dir   = PORT_DIR_OUTPUT,
-+			.rb    = { 0, 0, },
-+			.ch    = { 0, 0, },
-+			.oif   = { 0, 0, },
-+			.oport = { 3, AUD_HW_PCMOUT1, },
-+		},
-+	},
-+
-+	/* for Line Out, Pin:LO2_x */
-+	{
-+		.name = AUD_NAME_PCMOUT2,
-+		.gname = AUD_GNAME_LINE,
-+		.swm = {
-+			.type  = PORT_TYPE_EVE,
-+			.dir   = PORT_DIR_OUTPUT,
-+			.rb    = { 2, 2, },
-+			.ch    = { 2, 2, },
-+			.oif   = { 2, 2, },
-+			.oport = { 1, AUD_HW_PCMOUT2, },
-+		},
-+	},
-+
-+	/* for Headphone, Pin:HP1_x */
-+	{
-+		.name = AUD_NAME_PCMOUT3,
-+		.swm = {
-+			.type  = PORT_TYPE_EVE,
-+			.dir   = PORT_DIR_OUTPUT,
-+			.rb    = { 3, 3, },
-+			.ch    = { 3, 3, },
-+			.oif   = { 3, 3, },
-+			.oport = { 2, AUD_HW_PCMOUT3, },
-+		},
-+	},
-+
-+	/* for HW Sampling Rate Converter */
-+	{
-+		.name = AUD_NAME_EPCMOUT2,
-+		.swm = {
-+			.type  = PORT_TYPE_CONV,
-+			.dir   = PORT_DIR_OUTPUT,
-+			.rb    = { 7, 5, },
-+			.ch    = { 7, 5, },
-+			.oif   = { 7, 5, },
-+			.oport = { 6, AUD_HW_EPCMOUT2, },
-+			.och   = { 17, 12, },
-+			.iif   = { 1, 1, },
-+		},
-+	},
-+
-+	/* for HW Sampling Rate Converter 2 */
-+	{
-+		.name = AUD_NAME_EPCMOUT3,
-+		.swm = {
-+			.type  = PORT_TYPE_CONV,
-+			.dir   = PORT_DIR_OUTPUT,
-+			.rb    = { 8, 6, },
-+			.ch    = { 8, 6, },
-+			.oif   = { 8, 6, },
-+			.oport = { 7, AUD_HW_EPCMOUT3, },
-+			.och   = { 18, 13, },
-+			.iif   = { 2, 2, },
-+		},
-+	},
-+
-+	/* for S/PDIF Out, Pin:AO1IEC */
-+	{
-+		.name = AUD_NAME_HIECOUT1,
-+		.gname = AUD_GNAME_IEC,
-+		.swm = {
-+			.type  = PORT_TYPE_SPDIF,
-+			.dir   = PORT_DIR_OUTPUT,
-+			.rb    = { 1, 1, },
-+			.ch    = { 1, 1, },
-+			.oif   = { 1, 1, },
-+			.oport = { 12, AUD_HW_HIECOUT1, },
-+		},
-+	},
-+};
-+
-+static const struct snd_soc_dai_ops uniphier_aio_ops = {
-+	.startup   = uniphier_aio_startup,
-+	.shutdown  = uniphier_aio_shutdown,
-+	.hw_params = uniphier_aio_hw_params,
-+	.hw_free   = uniphier_aio_hw_free,
-+	.prepare   = uniphier_aio_prepare,
-+};
-+
-+static struct snd_soc_dai_driver uniphier_aio_dai_ld11[] = {
-+	{
-+		.name    = AUD_GNAME_HDMI,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.playback = {
-+			.stream_name = AUD_NAME_PCMOUT1,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.capture = {
-+			.stream_name = AUD_NAME_PCMIN1,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000 |
-+				SNDRV_PCM_RATE_44100 |
-+				SNDRV_PCM_RATE_32000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+	{
-+		.name    = AUD_NAME_PCMIN2,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.capture = {
-+			.stream_name = AUD_NAME_PCMIN2,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+	{
-+		.name    = AUD_GNAME_LINE,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.playback = {
-+			.stream_name = AUD_NAME_PCMOUT2,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.capture = {
-+			.stream_name = AUD_NAME_PCMIN3,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+	{
-+		.name    = AUD_NAME_HPCMOUT1,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.playback = {
-+			.stream_name = AUD_NAME_HPCMOUT1,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+	{
-+		.name    = AUD_NAME_PCMOUT3,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.playback = {
-+			.stream_name = AUD_NAME_PCMOUT3,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+	{
-+		.name    = AUD_NAME_HIECOUT1,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.playback = {
-+			.stream_name = AUD_NAME_HIECOUT1,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+	{
-+		.name    = AUD_NAME_EPCMOUT2,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.playback = {
-+			.stream_name = AUD_NAME_EPCMOUT2,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000 |
-+				SNDRV_PCM_RATE_44100 |
-+				SNDRV_PCM_RATE_32000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+	{
-+		.name    = AUD_NAME_EPCMOUT3,
-+		.probe   = uniphier_aio_dai_probe,
-+		.remove  = uniphier_aio_dai_remove,
-+		.suspend = uniphier_aio_dai_suspend,
-+		.resume  = uniphier_aio_dai_resume,
-+		.playback = {
-+			.stream_name = AUD_NAME_EPCMOUT3,
-+			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
-+			.rates       = SNDRV_PCM_RATE_48000 |
-+				SNDRV_PCM_RATE_44100 |
-+				SNDRV_PCM_RATE_32000,
-+			.channels_min = 2,
-+			.channels_max = 2,
-+		},
-+		.ops = &uniphier_aio_ops,
-+	},
-+};
-+
-+const struct uniphier_aio_chip_spec uniphier_aio_ld11_spec = {
-+	.aio_specs     = uniphier_aio_ld11,
-+	.num_aio_specs = ARRAY_SIZE(uniphier_aio_ld11),
-+	.dais          = uniphier_aio_dai_ld11,
-+	.num_dais      = ARRAY_SIZE(uniphier_aio_dai_ld11),
-+	.addr_ext      = 0,
-+};
-+
-+const struct uniphier_aio_chip_spec uniphier_aio_ld20_spec = {
-+	.aio_specs     = uniphier_aio_ld11,
-+	.num_aio_specs = ARRAY_SIZE(uniphier_aio_ld11),
-+	.dais          = uniphier_aio_dai_ld11,
-+	.num_dais      = ARRAY_SIZE(uniphier_aio_dai_ld11),
-+	.addr_ext      = 1,
-+};
--- 
-2.15.0
+Thanks,
+-Christoffer
