@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 17:49:19 -0500
-Subject: [PATCH V2 24/29] backlight: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 17:49:14 -0500
+Subject: [PATCH V2 19/29] PCI/syscall: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
 References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511390964-9979-25-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511390964-9979-20-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,25 +14,35 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Hard-coding the domain as 0.
+Hard-coding the domain value as 0 because the domain information is not
+coming from the userspace.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/video/backlight/apple_bl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/syscall.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
-index d843296..6a34ab9 100644
---- a/drivers/video/backlight/apple_bl.c
-+++ b/drivers/video/backlight/apple_bl.c
-@@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
- 	struct pci_dev *host;
- 	int intensity;
+diff --git a/drivers/pci/syscall.c b/drivers/pci/syscall.c
+index 83efa00..e725f99 100644
+--- a/drivers/pci/syscall.c
++++ b/drivers/pci/syscall.c
+@@ -28,7 +28,7 @@
+ 		return -EPERM;
  
--	host = pci_get_bus_and_slot(0, 0);
-+	host = pci_get_domain_bus_and_slot(0, 0, 0);
+ 	err = -ENODEV;
+-	dev = pci_get_bus_and_slot(bus, dfn);
++	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 	if (!dev)
+ 		goto error;
  
- 	if (!host) {
- 		pr_err("unable to find PCI host\n");
+@@ -96,7 +96,7 @@
+ 	if (!capable(CAP_SYS_ADMIN))
+ 		return -EPERM;
+ 
+-	dev = pci_get_bus_and_slot(bus, dfn);
++	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 	if (!dev)
+ 		return -ENODEV;
+ 
 -- 
 1.9.1
