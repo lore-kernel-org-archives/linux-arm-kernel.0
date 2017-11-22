@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:07 -0500
-Subject: [PATCH 22/30] openprom: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:10 -0500
+Subject: [PATCH 25/30] backlight: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-23-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-26-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,24 +17,21 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/sbus/char/openprom.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ drivers/video/backlight/apple_bl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/sbus/char/openprom.c b/drivers/sbus/char/openprom.c
-index 2c2e6a3..7b31f19 100644
---- a/drivers/sbus/char/openprom.c
-+++ b/drivers/sbus/char/openprom.c
-@@ -251,8 +251,9 @@ static int oprompci2node(void __user *argp, struct device_node *dp, struct openp
- 		struct pci_dev *pdev;
- 		struct device_node *dp;
+diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
+index d843296..6a34ab9 100644
+--- a/drivers/video/backlight/apple_bl.c
++++ b/drivers/video/backlight/apple_bl.c
+@@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
+ 	struct pci_dev *host;
+ 	int intensity;
  
--		pdev = pci_get_bus_and_slot (((int *) op->oprom_array)[0],
--				      ((int *) op->oprom_array)[1]);
-+		pdev = pci_get_domain_bus_and_slot(0,
-+						((int *) op->oprom_array)[0],
-+						((int *) op->oprom_array)[1]);
+-	host = pci_get_bus_and_slot(0, 0);
++	host = pci_get_domain_bus_and_slot(0, 0, 0);
  
- 		dp = pci_device_to_OF_node(pdev);
- 		data->current_node = dp;
+ 	if (!host) {
+ 		pr_err("unable to find PCI host\n");
 -- 
 1.9.1
