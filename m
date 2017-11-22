@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 17:49:10 -0500
-Subject: [PATCH V2 15/29] pch_gbe: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 17:49:12 -0500
+Subject: [PATCH V2 17/29] PCI: ibmphp: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
 References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511390964-9979-16-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511390964-9979-18-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,30 +14,45 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Use the domain information from pdev while calling into
-pci_get_domain_bus_and_slot() function.
+Hard-coding the domain parameter as 0 since the code doesn't seem to be
+ready for multiple domains.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/pci/hotplug/ibmphp_core.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-index 5ae9681..4be7806 100644
---- a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-+++ b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-@@ -2603,8 +2603,10 @@ static int pch_gbe_probe(struct pci_dev *pdev,
- 	if (adapter->pdata && adapter->pdata->platform_init)
- 		adapter->pdata->platform_init(pdev);
+diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
+index 73cf846..92dd882 100644
+--- a/drivers/pci/hotplug/ibmphp_core.c
++++ b/drivers/pci/hotplug/ibmphp_core.c
+@@ -707,7 +707,8 @@ static void ibm_unconfigure_device(struct pci_func *func)
+ 	pci_lock_rescan_remove();
  
--	adapter->ptp_pdev = pci_get_bus_and_slot(adapter->pdev->bus->number,
--					       PCI_DEVFN(12, 4));
-+	adapter->ptp_pdev =
-+		pci_get_domain_bus_and_slot(pci_domain_nr(adapter->pdev->bus),
-+					    adapter->pdev->bus->number,
-+					    PCI_DEVFN(12, 4));
+ 	for (j = 0; j < 0x08; j++) {
+-		temp = pci_get_bus_and_slot(func->busno, (func->device << 3) | j);
++		temp = pci_get_domain_bus_and_slot(0, func->busno,
++						   (func->device << 3) | j);
+ 		if (temp) {
+ 			pci_stop_and_remove_bus_device(temp);
+ 			pci_dev_put(temp);
+@@ -780,7 +781,7 @@ static int ibm_configure_device(struct pci_func *func)
+ 	if (!(bus_structure_fixup(func->busno)))
+ 		flag = 1;
+ 	if (func->dev == NULL)
+-		func->dev = pci_get_bus_and_slot(func->busno,
++		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
+ 				PCI_DEVFN(func->device, func->function));
  
- 	netdev->netdev_ops = &pch_gbe_netdev_ops;
- 	netdev->watchdog_timeo = PCH_GBE_WATCHDOG_PERIOD;
+ 	if (func->dev == NULL) {
+@@ -793,7 +794,7 @@ static int ibm_configure_device(struct pci_func *func)
+ 		if (num)
+ 			pci_bus_add_devices(bus);
+ 
+-		func->dev = pci_get_bus_and_slot(func->busno,
++		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
+ 				PCI_DEVFN(func->device, func->function));
+ 		if (func->dev == NULL) {
+ 			err("ERROR... : pci_dev still NULL\n");
 -- 
 1.9.1
