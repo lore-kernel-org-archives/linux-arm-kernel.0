@@ -1,170 +1,103 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Nov 2017 20:52:30 +0100
-Subject: [RFC] KVM API extensions for SVE
-In-Reply-To: <20171121134913.GI22781@e103592.cambridge.arm.com>
-References: <20171121134913.GI22781@e103592.cambridge.arm.com>
-Message-ID: <20171122195230.GT28855@cbox>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Wed, 22 Nov 2017 14:56:01 -0500
+Subject: [PATCH 1/2] usb: xhci: add relaxed timing quirk bit
+In-Reply-To: <ee0ca959-1812-a4e4-346f-d57a1fdade13@linux.intel.com>
+References: <1511284690-3878-1-git-send-email-awallis@codeaurora.org>
+ <1511284690-3878-2-git-send-email-awallis@codeaurora.org>
+ <20171121191103.5oczqvrlo4gtwjqc@rob-hp-laptop>
+ <f200ce55-ac67-02f9-4dbf-7a3ba5b52b39@codeaurora.org>
+ <CAL_JsqLZgnTTEiLXD8ZOK-0qd58i16e7h_-2yjHN+zRFfqvH4Q@mail.gmail.com>
+ <32f8dc7e-9fde-5e45-1570-a9ec372579fa@codeaurora.org>
+ <ee0ca959-1812-a4e4-346f-d57a1fdade13@linux.intel.com>
+Message-ID: <fa14acbc-268e-be31-fbb9-4772d3840579@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
-
-On Tue, Nov 21, 2017 at 01:49:16PM +0000, Dave Martin wrote:
-> Hi all,
+On 11/22/2017 10:24 AM, Mathias Nyman wrote:
+> On 22.11.2017 02:07, Adam Wallis wrote:
+>> On 11/21/2017 3:06 PM, Rob Herring wrote:
+>>
+>> [..]
+>>
+>>>> I like where you are going with this. Are you saying that I could read for a
+>>>> device property read from firmware (for DTB or ACPI) like DWC3 does for
+>>>> "snps,hird-threshold"?
+>>>
+>>> Is that for the same thing? If so, drop the vendor prefix and use
+>>> that. Otherwise, a separate property should really be something that
+>>> is per board rather than per SoC.
+>>
+>> I don't think that's exactly the same property, but it's the same idea I would
+>> prefer to go with. That way, an integer can be passed in via the firmware tables.
+>>
+>>>
+>>>> If you mean this, where do you recommend I store the
+>>>> desired IRQ_CONTROL value - in struct xhci_hcd ?
+>>>
+>>> No idea.
+>>>
+>>>> Or by "compatible" strings, did you mean storing hard-coded values in the
+>>>> of_device_id usb_xhci_of_match[] array? This would still be hard-coding
+>>>> (which I
+>>>> would like to avoid) and also would not work for the ACPI case.
+>>>
+>>> ACPI has match tables too?
+>>>
+>>
+>> Yes, you can use DSD in a way that is similar to OF properties
+>>
+>>> It would only be hardcoded per compatible which should be per SoC. Do
+>>> you need per board/device tuning? If so, use a property.
+>>>
+>>
+>> The reason why I think it should dynamic via firmware tables is that
+>>
+>> * It's much less invasive for vendors to update their DT tables if they need to
+>> adjust on a per device/controller/family/etc basis then to adjust a properties
+>> table in xhci-plat
+>> * This would lead to less polluting in xhci-plat code
+>>
+>>> Rob
+>>> -- 
+>>> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+>>> the body of a message to majordomo at vger.kernel.org
+>>> More majordomo info at? http://vger.kernel.org/majordomo-info.html
+>>>
+>>
+>> I will provide an updated proposed patch sometime this week. I also hope to get
+>> some feedback from Mathias to see what he prefers.
 > 
-> SVE adds some new registers, and their size depends on the hardware ando
-> on runtime sysreg settings.
+> We know have at least two hosts/platforms that need custom interrupt moderation
+> values
 > 
-> Before coding something, I'd like to get people's views on my current
-> approach here.
+> How about adding a u32 device property for xhci with the interrupt moderation
+> interval in
+> nanoseconds?? And also add a u32 imod_interval variable to struct xhci_hcd?
+> ?
+> imod_interval can be set to the current default 40000ns (160*250ns) and
+> overwritten if
+> device_property_read_u32() returns something else.
 > 
-> --8<--
-> 
-> New vcpu feature flag:
-> /*
->  * userspace can support regs up to at least 2048 bits in size via ioctl,
->  * and will honour the size field in the reg iD
->  */
-> #define KVM_ARM_VCPU_LARGE_REGS	4
-> 
-> Should we just error out of userspace fails to set this on a system that
-> supports SVE, or is that too brutal?  
-
-That would break older userspace on newer kernels on certain hardware,
-which would certainly not be acceptable.  Or did I misunderstand?
-
-> If we do treat that as an error,
-> then we can unconditionally enable SVE for the guest when the host
-> supports it -- which cuts down on unnecessary implementation complexity.
-
-I think it makes sense to be able to disable SVE, especially if there's
-high overhead related to context switching the state.  Since you say the
-implementation complexity is unnecessary, I may be missing some larger
-point?
-
-> 
-> Alternatively, we would need logic to disable SVE if userspace is too
-> old, i.e., doesn't set this flag.  Then we might need to enforce that
-> the flag is set the same on every vcpu -- but from the kernel's PoV
-> it probably doesn't matter.
-
-Not sure I understand why it doesn't matter from the kernel's PoV.
-
-I think SVE should be disabled by default (as it is now) and then we
-should expose a capability (potentially simply via the vcpu attributes
-being present), and let userspace enable SVE and set a vector length.
-
-It makes sense that userspace needs to know about SVE for VMs to use it,
-doesn't it?
-
-I assume SVE systems will have SVE on all CPUs in an SMP system, or am I
-being way too optimistic about the ARM ecosystem here?  Just like we
-don't model big.LITTLE, I think we should enforce in the kernel, that
-userspace configures all VCPUs with the same SVE properties.
-
-> 
-> 
-> /*
->  * For the SVE regs, we add some new reg IDs.
->  * Zn are presented in 2048-bit slices; Pn, FFR are presented in 256-bit
->  * slices.  This is sufficient for only a single slice to be required
->  * per register for SVE, but ensures expansion room in case future arch
->  * versions grow the maximum size.
->  */
-
-I don't understand the last part of this comment?
-
-> #define KVM_REG_SIZE_U2048 (ULL(8) << KVM_REG_SIZE_MASK)
-
-Shift left by KVM_REG_SIZE_MASK?  I'm confused.
-
-> #define KVM_REG_ARM64_SVE_Z(n, i) /* Zn[2048 * (i + 1) - 1 : 2048 * i] */ \
-> 	((0x0014 << KVM_REG_ARM_COPROC_SHIFT) | KVM_REG_SIZE_U2048 |	\
-> 		((n) << 5) | (i))
-> #define KVM_REG_ARM64_SVE_P(n, i) /* Pn[256 * (i + 1) - 1 : 256 * i] */	\
-> 	((0x0014 << KVM_REG_ARM_COPROC_SHIFT) | KVM_REG_SIZE_U256 |	\
-> 		(((n) + 32) << 5) | (i))
-> #define KVM_REG_ARM64_SVE_FFR(i) /* FFR[256 * (i + 1) - 1 : 256 * i] */	\
-> 	 KVM_REG_ARM64_SVE_P(16, i)
-> 
-> For j in [0,3], KVM_REG_ARM64_SVE_Z(n, 0) bits [32(j + 1) - 1 : 32 * j]
-> 	alias KVM_REG_ARM_CORE_REG(fp_regs.vregs[n]) + j
+> XHCI_MTK_HOST could then use whatever preferred device propery interval value,
+> and we can get rid of using XHCI_MTK_HOST quirk flag when setting up the IMODI
+> ?
+> -Mathias
 > 
 
-This is hard to read and understand the way presented here.  I would
-suggest you formulate this suggestion in the form of an RFC patch to
-Documentation/virtual/kvm/api.txt plus the header definitions.
+This sounds excellent Mathias. Let me put together a patch along these lines.
+Thanks for the feedback!
 
-(I'm not sure where to look to look to decode the "<< 5" and the
-" + 32) << 5)" stuff above.
+Adam
 
 > 
-> Bits above the max vector length could be
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at? http://vger.kernel.org/majordomo-info.html
 
-Which bits are these and where are they, and why do we have them?
 
-Is the max vector length the max architecturally (current version)
-defined length, or what is chosen for this VM?
-
->  * don't care (or not copied at all) on read; ignored on write
->  * zero on read; ignored on write
->  * zero on read; must be zero on write
-> 
-> Bits between the current and max vector length are trickier to specify:
-> the "current" vector length for ioctl access is ill-defined, because
-> we would need to specify ordering dependencies between Zn/Pn/FFR access
-> and access to ZCR_EL1.
-
-I think you want userspace to be able to read/write these values in any
-order compared to configuring SVE for the VM, and then fix up whatever
-needs masking etc. in the kernel later, if possible.  Ordering
-requirements to userspace accesses have shown to be hard to enforce and
-get right in the past.
-
-What happens on hardware if you give a certain vector length to EL0, EL0
-writes a value of the full length, and then EL1 restricts the length to
-something smaller, and subsequently expands it again?  Is the original
-full value visible or are some bits potentially lost?  IOW, can't we
-rely on what the architecture says here?
-
-> 
-> So, it may be simpler to expose the full maximum supported vector size
-> unconditionally through ioctl, and pack/unpack as necessary.
-
-yes, I think this was what I tried to say.
-
-> 
-> Currently, data is packed in the vcpu struct in a vector length
-> dependent format, since this seems optimal for low-level save/restore,
-> so there will be potential data loss / zero padding when converting.
-> 
-> This may cause some unexpected effects.  For example:
-> 
-> KVM_SET_ONE_REG(ZCR_EL1, 0) 
-> /* Guest's current vector length will be 128 bits when started */
-> 
-> KVM_SET_ONE_REG(Z0, (uint256_t)1 << 128)
-> KVM_GET_ONE_REG(Z0) /* yields (uint256_t)1 << 128 */
-> 
-> KVM_RUN /* reg data packed down to 128-bit in vcpu struct */
-> 
-> KVM_GET_ONE_REG(Z0) /* yields 0 even if guest doesn't use SVE */
-> 
-
-I really don't know how to parse this or what the point here is?  Sorry.
-
-> 
-> Since the guest should be treated mostly as a black box, I'm not sure
-> how big a deal this is.  The guest _might_ have explicitly set those
-> bits to 0... who are we to say?
-
-How big a deal what is?  I'm lost.
-
-> 
-> Can anyone think of a scenario where effects like this would matter?
-> 
-
-I think we need more information.
-
-Thanks,
--Christoffer
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
