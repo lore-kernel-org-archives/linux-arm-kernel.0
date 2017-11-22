@@ -1,76 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 17:49:09 -0500
-Subject: [PATCH V2 14/29] bnx2x: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511390964-9979-15-git-send-email-okaya@codeaurora.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 23 Nov 2017 00:06:33 +0100
+Subject: [PATCH 3/4] ARM: pxa/spitz: Remove hardcoded partitioning, use
+ sharpslpart parser
+In-Reply-To: <1511300631-1343-3-git-send-email-andrea.adami@gmail.com>
+References: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+ <1511300631-1343-3-git-send-email-andrea.adami@gmail.com>
+Message-ID: <20171122230633.GC3623@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
+On Tue 2017-11-21 22:43:50, Andrea Adami wrote:
+> With the introduction of sharpslpart partition parser we can now read the
+> offsets from NAND: we specify the list of the parsers as platform data, with
+> cmdlinepart and ofpart parsers first allowing to override the part. table
+> written in NAND. This is done here in the board file.
+> 
+> Emulators like qemu will need to pass the mtdparts in the cmdline.
 
-Getting ready to remove pci_get_bus_and_slot() function in favor of
-pci_get_domain_bus_and_slot().
+IOW this will be regression for people emulating zaurus in qemu.
 
-Introduce bnx2x_vf_domain() function to extract the domain information
-and save it to VF specific data structure.
+...
 
-Use the saved domain value while calling pci_get_domain_bus_and_slot().
+Is it good idea? Its not like this platform data is particulary big or
+changes very often...
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c | 10 +++++++++-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h |  1 +
- 2 files changed, 10 insertions(+), 1 deletion(-)
+> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-index 9ca994d..9f40c23 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-@@ -812,7 +812,7 @@ static u8 bnx2x_vf_is_pcie_pending(struct bnx2x *bp, u8 abs_vfid)
- 	if (!vf)
- 		return false;
- 
--	dev = pci_get_bus_and_slot(vf->bus, vf->devfn);
-+	dev = pci_get_domain_bus_and_slot(vf->domain, vf->bus, vf->devfn);
- 	if (dev)
- 		return bnx2x_is_pcie_pending(dev);
- 	return false;
-@@ -1041,6 +1041,13 @@ void bnx2x_iov_init_dmae(struct bnx2x *bp)
- 		REG_WR(bp, DMAE_REG_BACKWARD_COMP_EN, 0);
- }
- 
-+static int bnx2x_vf_domain(struct bnx2x *bp, int vfid)
-+{
-+	struct pci_dev *dev = bp->pdev;
-+
-+	return pci_domain_nr(dev->bus);
-+}
-+
- static int bnx2x_vf_bus(struct bnx2x *bp, int vfid)
- {
- 	struct pci_dev *dev = bp->pdev;
-@@ -1611,6 +1618,7 @@ int bnx2x_iov_nic_init(struct bnx2x *bp)
- 		struct bnx2x_virtf *vf = BP_VF(bp, vfid);
- 
- 		/* fill in the BDF and bars */
-+		vf->domain = bnx2x_vf_domain(bp, vfid);
- 		vf->bus = bnx2x_vf_bus(bp, vfid);
- 		vf->devfn = bnx2x_vf_devfn(bp, vfid);
- 		bnx2x_vf_set_bars(bp, vf);
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
-index 53466f6..eb814c6 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
-@@ -182,6 +182,7 @@ struct bnx2x_virtf {
- 	u32 error;	/* 0 means all's-well */
- 
- 	/* BDF */
-+	unsigned int domain;
- 	unsigned int bus;
- 	unsigned int devfn;
- 
 -- 
-1.9.1
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/49171f1f/attachment-0001.sig>
