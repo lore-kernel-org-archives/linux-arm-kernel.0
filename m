@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:04 -0500
-Subject: [PATCH 19/30] PCI/quirks: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:05 -0500
+Subject: [PATCH 20/30] PCI/syscall: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-20-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-21-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +17,30 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/pci/quirks.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/syscall.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
-index 911b3b6..85a5308 100644
---- a/drivers/pci/quirks.c
-+++ b/drivers/pci/quirks.c
-@@ -2699,7 +2699,7 @@ static void __nv_msi_ht_cap_quirk(struct pci_dev *dev, int all)
- 	 * HT MSI mapping should be disabled on devices that are below
- 	 * a non-Hypertransport host bridge. Locate the host bridge...
- 	 */
--	host_bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	host_bridge = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
- 	if (host_bridge == NULL) {
- 		dev_warn(&dev->dev, "nv_msi_ht_cap_quirk didn't locate host bridge\n");
- 		return;
+diff --git a/drivers/pci/syscall.c b/drivers/pci/syscall.c
+index 83efa00..e725f99 100644
+--- a/drivers/pci/syscall.c
++++ b/drivers/pci/syscall.c
+@@ -28,7 +28,7 @@
+ 		return -EPERM;
+ 
+ 	err = -ENODEV;
+-	dev = pci_get_bus_and_slot(bus, dfn);
++	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 	if (!dev)
+ 		goto error;
+ 
+@@ -96,7 +96,7 @@
+ 	if (!capable(CAP_SYS_ADMIN))
+ 		return -EPERM;
+ 
+-	dev = pci_get_bus_and_slot(bus, dfn);
++	dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 	if (!dev)
+ 		return -ENODEV;
+ 
 -- 
 1.9.1
