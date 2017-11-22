@@ -1,43 +1,29 @@
-From: adrian.hunter@intel.com (Adrian Hunter)
-Date: Wed, 22 Nov 2017 14:02:58 +0200
-Subject: [PATCH 3/6 v3] mmc: sdhci-acpi: Handle return value of
- platform_get_irq
-In-Reply-To: <ecd11732b6a29aee23a1be94616755e575b0d438.1511066652.git.arvind.yadav.cs@gmail.com>
-References: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
- <ecd11732b6a29aee23a1be94616755e575b0d438.1511066652.git.arvind.yadav.cs@gmail.com>
-Message-ID: <f40f2259-1f79-6c79-8997-76d955fd7714@intel.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 22 Nov 2017 12:04:58 +0000
+Subject: [PATCH] crypto/arm64: aes-ce-cipher - move assembler code to .S
+ file
+In-Reply-To: <CAKv+Gu8Tde_yu-3MWFEgdaWDWtf1SssUAMc1s396zL=J-j+buA@mail.gmail.com>
+References: <20171121134017.21247-1-ard.biesheuvel@linaro.org>
+ <20171122100558.717b7973@delmar.localdomain>
+ <CAKv+Gu8Tde_yu-3MWFEgdaWDWtf1SssUAMc1s396zL=J-j+buA@mail.gmail.com>
+Message-ID: <20171122120457.cf47mwmg4pudzoy4@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 19/11/17 06:52, Arvind Yadav wrote:
-> platform_get_irq() can fail here and we must check its return value.
+On Wed, Nov 22, 2017 at 10:12:17AM +0000, Ard Biesheuvel wrote:
+> On 22 November 2017 at 10:05, Alex Matveev <alxmtvv@gmail.com> wrote:
+> > This is better than my simple fix, thank you.
+> >
+> > Out of curiosity, why doesn't NEON code use barrier() to prevent
+> > reordering?
 > 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> Because barrier() affects ordering of memory accesses, not register accesses.
 
-Acked-by: Adrian Hunter <adrian.hunter@intel.com>
+My understanding was that barrier() also hazards with any volatile asm
+(and that in general, volatile asm block couldn't be re-ordered w.r.t.
+one another). I'm sure we rely on this, even if it's not true. :/
 
-> ---
-> changes in v2 :
->               Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
-> changes in v3 :
->               return -EINVAL instead of host->irq.
-> 
->  drivers/mmc/host/sdhci-acpi.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/drivers/mmc/host/sdhci-acpi.c b/drivers/mmc/host/sdhci-acpi.c
-> index b988997..0d9965b 100644
-> --- a/drivers/mmc/host/sdhci-acpi.c
-> +++ b/drivers/mmc/host/sdhci-acpi.c
-> @@ -566,6 +566,10 @@ static int sdhci_acpi_probe(struct platform_device *pdev)
->  	host->hw_name	= "ACPI";
->  	host->ops	= &sdhci_acpi_ops_dflt;
->  	host->irq	= platform_get_irq(pdev, 0);
-> +	if (host->irq <= 0) {
-> +		err = -EINVAL;
-> +		goto err_free;
-> +	}
->  
->  	host->ioaddr = devm_ioremap_nocache(dev, iomem->start,
->  					    resource_size(iomem));
-> 
+So making the asm statements volatile might work too.
+
+Thanks,
+Mark.
