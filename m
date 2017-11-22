@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:00 -0500
-Subject: [PATCH 15/30] bnx2x: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:30:58 -0500
+Subject: [PATCH 13/30] iommu/amd: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-16-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-14-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,56 +17,67 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c | 10 +++++++++-
- drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h |  1 +
- 2 files changed, 10 insertions(+), 1 deletion(-)
+ drivers/iommu/amd_iommu.c      |  3 ++-
+ drivers/iommu/amd_iommu_init.c | 10 ++++++----
+ drivers/iommu/amd_iommu_v2.c   |  3 ++-
+ 3 files changed, 10 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-index 9ca994d..9f40c23 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
-@@ -812,7 +812,7 @@ static u8 bnx2x_vf_is_pcie_pending(struct bnx2x *bp, u8 abs_vfid)
- 	if (!vf)
- 		return false;
+diff --git a/drivers/iommu/amd_iommu.c b/drivers/iommu/amd_iommu.c
+index 8e8874d..2c3452f 100644
+--- a/drivers/iommu/amd_iommu.c
++++ b/drivers/iommu/amd_iommu.c
+@@ -528,7 +528,8 @@ static void amd_iommu_report_page_fault(u16 devid, u16 domain_id,
+ 	struct iommu_dev_data *dev_data = NULL;
+ 	struct pci_dev *pdev;
  
--	dev = pci_get_bus_and_slot(vf->bus, vf->devfn);
-+	dev = pci_get_domain_bus_and_slot(vf->domain, vf->bus, vf->devfn);
- 	if (dev)
- 		return bnx2x_is_pcie_pending(dev);
- 	return false;
-@@ -1041,6 +1041,13 @@ void bnx2x_iov_init_dmae(struct bnx2x *bp)
- 		REG_WR(bp, DMAE_REG_BACKWARD_COMP_EN, 0);
- }
+-	pdev = pci_get_bus_and_slot(PCI_BUS_NUM(devid), devid & 0xff);
++	pdev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(devid),
++					   devid & 0xff);
+ 	if (pdev)
+ 		dev_data = get_dev_data(&pdev->dev);
  
-+static int bnx2x_vf_domain(struct bnx2x *bp, int vfid)
-+{
-+	struct pci_dev *dev = bp->pdev;
-+
-+	return pci_domain_nr(dev->bus);
-+}
-+
- static int bnx2x_vf_bus(struct bnx2x *bp, int vfid)
- {
- 	struct pci_dev *dev = bp->pdev;
-@@ -1611,6 +1618,7 @@ int bnx2x_iov_nic_init(struct bnx2x *bp)
- 		struct bnx2x_virtf *vf = BP_VF(bp, vfid);
+diff --git a/drivers/iommu/amd_iommu_init.c b/drivers/iommu/amd_iommu_init.c
+index 6fe2d03..8d159ff 100644
+--- a/drivers/iommu/amd_iommu_init.c
++++ b/drivers/iommu/amd_iommu_init.c
+@@ -1697,8 +1697,8 @@ static int iommu_init_pci(struct amd_iommu *iommu)
+ 	u32 range, misc, low, high;
+ 	int ret;
  
- 		/* fill in the BDF and bars */
-+		vf->domain = bnx2x_vf_domain(bp, vfid);
- 		vf->bus = bnx2x_vf_bus(bp, vfid);
- 		vf->devfn = bnx2x_vf_devfn(bp, vfid);
- 		bnx2x_vf_set_bars(bp, vf);
-diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
-index 53466f6..eb814c6 100644
---- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
-+++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
-@@ -182,6 +182,7 @@ struct bnx2x_virtf {
- 	u32 error;	/* 0 means all's-well */
+-	iommu->dev = pci_get_bus_and_slot(PCI_BUS_NUM(iommu->devid),
+-					  iommu->devid & 0xff);
++	iommu->dev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(iommu->devid),
++						 iommu->devid & 0xff);
+ 	if (!iommu->dev)
+ 		return -ENODEV;
  
- 	/* BDF */
-+	unsigned int domain;
- 	unsigned int bus;
- 	unsigned int devfn;
+@@ -1763,9 +1763,11 @@ static int iommu_init_pci(struct amd_iommu *iommu)
  
+ 	if (is_rd890_iommu(iommu->dev)) {
+ 		int i, j;
++		u16 busnr = iommu->dev->bus->number;
++		u16 devfn = PCI_DEVFN(0, 0);
+ 
+-		iommu->root_pdev = pci_get_bus_and_slot(iommu->dev->bus->number,
+-				PCI_DEVFN(0, 0));
++		iommu->root_pdev = pci_get_domain_bus_and_slot(0, busnr,
++							       devfn);
+ 
+ 		/*
+ 		 * Some rd890 systems may not be fully reconfigured by the
+diff --git a/drivers/iommu/amd_iommu_v2.c b/drivers/iommu/amd_iommu_v2.c
+index 7d94e1d..8696382 100644
+--- a/drivers/iommu/amd_iommu_v2.c
++++ b/drivers/iommu/amd_iommu_v2.c
+@@ -564,7 +564,8 @@ static int ppr_notifier(struct notifier_block *nb, unsigned long e, void *data)
+ 	finish      = (iommu_fault->tag >> 9) & 1;
+ 
+ 	devid = iommu_fault->device_id;
+-	pdev = pci_get_bus_and_slot(PCI_BUS_NUM(devid), devid & 0xff);
++	pdev = pci_get_domain_bus_and_slot(0, PCI_BUS_NUM(devid),
++					   devid & 0xff);
+ 	if (!pdev)
+ 		return -ENODEV;
+ 	dev_data = get_dev_data(&pdev->dev);
 -- 
 1.9.1
