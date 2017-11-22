@@ -1,30 +1,25 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Wed, 22 Nov 2017 21:43:59 +0900
-Subject: [PATCH] arm64: pgd: Mark pgd_cache as __ro_after_init
-Message-ID: <20171122124359.GA4150@pjb1027-Latitude-E5410>
+From: jgross@suse.com (Juergen Gross)
+Date: Wed, 22 Nov 2017 13:53:58 +0100
+Subject: [PATCH 21/30] xen: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511328675-21981-22-git-send-email-okaya@codeaurora.org>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-22-git-send-email-okaya@codeaurora.org>
+Message-ID: <780202b1-3819-6e0f-10e8-059235845799@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pgd_cache is setup once while init stage and never changed after
-that, so it is good candidate for __ro_after_init
+On 22/11/17 06:31, Sinan Kaya wrote:
+> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> where a PCI device is present. This restricts the device drivers to be
+> reused for other domain numbers.
+> 
+> Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+> extract the domain number. Other places, use the actual domain number from
+> the device.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
----
- arch/arm64/mm/pgd.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Reviewed-by: Juergen Gross <jgross@suse.com>
 
-diff --git a/arch/arm64/mm/pgd.c b/arch/arm64/mm/pgd.c
-index 371c5f0..051e71e 100644
---- a/arch/arm64/mm/pgd.c
-+++ b/arch/arm64/mm/pgd.c
-@@ -26,7 +26,7 @@
- #include <asm/page.h>
- #include <asm/tlbflush.h>
- 
--static struct kmem_cache *pgd_cache;
-+static struct kmem_cache *pgd_cache __ro_after_init;
- 
- pgd_t *pgd_alloc(struct mm_struct *mm)
- {
--- 
-1.9.1
+
+Juergen
