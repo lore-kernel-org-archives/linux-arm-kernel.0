@@ -1,88 +1,86 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 22 Nov 2017 10:14:36 +0100
-Subject: [PATCH 2/4] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
-In-Reply-To: <CAOMZO5BDQxZxHX_dn63QvbwfaVjERQtBqCp3FCT9Q6zvsrgn4w@mail.gmail.com>
-References: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
- <1511281705-30849-3-git-send-email-narmstrong@baylibre.com>
- <CAOMZO5BDQxZxHX_dn63QvbwfaVjERQtBqCp3FCT9Q6zvsrgn4w@mail.gmail.com>
-Message-ID: <b1a1ac14-5ff3-08bf-a3ee-27dd7641c7fe@baylibre.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 22 Nov 2017 10:45:26 +0100
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
+ <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
+Message-ID: <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+Hi,
 
-On 21/11/2017 17:54, Fabio Estevam wrote:
-> On Tue, Nov 21, 2017 at 2:28 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+On Wed, Nov 22, 2017 at 09:33:06AM +0800, Yong wrote:
+> > On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
+> > > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> > > and CSI1 is used for parallel interface. This is not documented in
+> > > datasheet but by testing and guess.
+> > > 
+> > > This patch implement a v4l2 framework driver for it.
+> > > 
+> > > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > > ISP's support are not included in this patch.
+> > > 
+> > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > 
+> > Thanks again for this driver.
+> > 
+> > It seems like at least this iteration is behaving in a weird way with
+> > DMA transfers for at least YU12 and NV12 (and I would assume YV12).
+> > 
+> > Starting a transfer of multiple frames in either of these formats,
+> > using either ffmpeg (ffmpeg -f v4l2 -video_size 640x480 -framerate 30
+> > -i /dev/video0 output.mkv) or yavta (yavta -c80 -p -F --skip 0 -f NV12
+> > -s 640x480 $(media-c tl -e 'sun6i-csi')) will end up in a panic.
+> > 
+> > The panic seems to be generated with random data going into parts of
+> > the kernel memory, the pattern being in my case something like
+> > 0x8287868a which is very odd (always around 0x88)
+> > 
+> > It turns out that when you cover the sensor, the values change to
+> > around 0x28, so it really seems like it's pixels that have been copied
+> > there.
+> > 
+> > I've looked quickly at the DMA setup, and it seems reasonable to
+> > me. Do you have the same issue on your side? Have you been able to
+> > test those formats using your hardware?
 > 
->> +       reg_wl18xx_vmmc: regulator-wl18xx {
->> +               compatible = "regulator-fixed";
->> +               regulator-name = "vwl1807";
->> +               regulator-min-microvolt = <1800000>;
->> +               regulator-max-microvolt = <1800000>;
->> +               gpio = <&gpio7 8 0>;
-> 
-> GPIO_ACTIVE_HIGH please.
+> I had tested the following formats with BT1120 input:
+> V4L2_PIX_FMT_NV12		-> NV12
+> V4L2_PIX_FMT_NV21		-> NV21
+> V4L2_PIX_FMT_NV16		-> NV16
+> V4L2_PIX_FMT_NV61		-> NV61
+> V4L2_PIX_FMT_YUV420		-> YU12
+> V4L2_PIX_FMT_YVU420		-> YV12
+> V4L2_PIX_FMT_YUV422P		-> 422P
+> And they all work fine.
 
-OK
+Ok, that's good to know.
 
+> > Given that they all are planar formats and YUYV and the likes work
+> > just fine, maybe we can leave them aside for now?
 > 
->> +&can2 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_flexcan2>;
->> +       status = "disabled";
->> +};
->> +
->> +&cpu0 {
->> +       arm-supply = <&sw1a_reg>;
->> +       soc-supply = <&sw1c_reg>;
->> +       operating-points = <
->> +               /* kHz    uV */
->> +               1200000 1350000
->> +               996000  1250000
->> +               852000  1250000
->> +               792000  1175000
->> +               396000  1175000
->> +       >;
->> +       fsl,soc-operating-points = <
->> +               /* ARM kHz  SOC-PU uV */
->> +               1200000 1275000
->> +               996000  1250000
->> +               852000  1250000
->> +               792000  1175000
->> +               396000  1175000
->> +       >;
+> V4L2_PIX_FMT_YUV422P and V4L2_PIX_FMT_YUYV is OK, and V4L2_PIX_FMT_NV12
+> is bad? It's really weird.
 > 
-> 
-> Don't the standard operating points described at imx6q.dtsi work on this board?
-> 
-> If not, please add a comment explaining why you need custom operating
-> points here.
+> What's your input bus code format, type and width?
 
-It should, I will remove them, anyway it will conflict with the ones in imx6dl.dtsi.
+The sensor is an ov5640, so the MBUS code for the bus is
+MEDIA_BUS_FMT_YUYV8_2X8.
 
-> 
->> +       pinctrl_flexcan1: flexcan1grp {
->> +               fsl,pins = <
->> +                       MX6QDL_PAD_GPIO_7__FLEXCAN1_TX          0x80000000
->> +                       MX6QDL_PAD_GPIO_8__FLEXCAN1_RX          0x80000000
-> 
-> Please avoid 0x80000000 and use the real IOMUX values instead.
+Thanks!
+Maxime
 
-Ok, will replace with 0x1b0b0
-
-> 
->> +               >;
->> +       };
->> +
->> +       pinctrl_flexcan2: flexcan2grp {
->> +               fsl,pins = <
->> +                       MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX        0x80000000
->> +                       MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX        0x80000000
-> 
-> Please avoid 0x80000000 and use the real IOMUX values instead.
-> 
-
-Same here.
-
-Thanks,
-Neil
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171122/9e94da67/attachment-0001.sig>
