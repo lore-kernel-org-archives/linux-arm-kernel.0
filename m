@@ -1,25 +1,59 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 11:50:53 -0500
-Subject: [PATCH 29/30] i7300_idle: deprecate pci_get_bus_and_slot()
-In-Reply-To: <20171122164546.GB30812@kroah.com>
-References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
- <1511328675-21981-30-git-send-email-okaya@codeaurora.org>
- <20171122075345.GC26583@kroah.com>
- <81de37c1-26b5-41f7-ab32-b98012890971@codeaurora.org>
- <20171122164546.GB30812@kroah.com>
-Message-ID: <3cca8693-72bf-db72-f698-f111c9ef707c@codeaurora.org>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 22 Nov 2017 16:52:36 +0000
+Subject: [PATCH 18/18] arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
+In-Reply-To: <1510942921-12564-19-git-send-email-will.deacon@arm.com>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+ <1510942921-12564-19-git-send-email-will.deacon@arm.com>
+Message-ID: <f82c5329-6547-ccfb-9846-5a59fd471720@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/2017 11:45 AM, Greg Kroah-Hartman wrote:
->> Funny thing is nobody is calling this function. Maybe, I should just kill it
->> instead.
-> Yes, delete it.  Why doesn't the build warn about it not being used?
+Hi Will,
+
+On 17/11/17 18:22, Will Deacon wrote:
+> Add a Kconfig entry to control use of the entry trampoline, which allows
+> us to unmap the kernel whilst running in userspace and improve the
+> robustness of KASLR.
+> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/Kconfig | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index f0fcbfc2262e..f99ffb88843a 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -796,6 +796,19 @@ config FORCE_MAX_ZONEORDER
+>  	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
+>  	  4M allocations matching the default size used by generic code.
+>  
+> +config UNMAP_KERNEL_AT_EL0
+> +	bool "Unmap kernel when running in userspace (aka \"KAISER\")"
+> +	default y
+> +	help
+> +	  Some attacks against KASLR make use of the timing difference between
+> +	  a permission fault which could arise from a page table entry that is
+> +	  present in the TLB, and a translation fault which always requires a
+> +	  page table walk. This option defends against these attacks by unmapping
+> +	  the kernel whilst running in userspace, therefore forcing translation
+> +	  faults for all of kernel space.
+> +
+> +	  If unsure, say Y.
+> +
+>  menuconfig ARMV8_DEPRECATED
+>  	bool "Emulate deprecated/obsolete ARMv8 instructions"
+>  	depends on COMPAT
 > 
 
-OK. Because it is in a header file that nobody includes.
+Since this seems to be the recommended setting, I wonder if there is any
+real value in keeping the old code around. My hunch is that the lack of
+use in the field will make it fragile and that it will eventually bit-rot.
 
+Do you have any plan to eventually drop the non-KAISER switch code?
+
+Thanks,
+
+	M.
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Jazz is not dead. It just smells funny...
