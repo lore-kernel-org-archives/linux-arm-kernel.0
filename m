@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:08 -0500
-Subject: [PATCH 23/30] [media] atomisp: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:06 -0500
+Subject: [PATCH 21/30] xen: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-24-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-22-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,35 +17,29 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c               | 2 +-
- drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/pci/xen-pcifront.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c b/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c
-index 663aa91..95b9c7a 100644
---- a/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c
-+++ b/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c
-@@ -1233,7 +1233,7 @@ static int atomisp_pci_probe(struct pci_dev *dev,
- 	isp->pdev = dev;
- 	isp->dev = &dev->dev;
- 	isp->sw_contex.power_state = ATOM_ISP_POWER_UP;
--	isp->pci_root = pci_get_bus_and_slot(0, 0);
-+	isp->pci_root = pci_get_domain_bus_and_slot(0, 0, 0);
- 	if (!isp->pci_root) {
- 		dev_err(&dev->dev, "Unable to find PCI host\n");
- 		return -ENODEV;
-diff --git a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
-index 4631b1d..51dcef57 100644
---- a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
-+++ b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
-@@ -39,7 +39,7 @@ static inline int platform_is(u8 model)
+diff --git a/drivers/pci/xen-pcifront.c b/drivers/pci/xen-pcifront.c
+index 8fc2e95..94b25b5 100644
+--- a/drivers/pci/xen-pcifront.c
++++ b/drivers/pci/xen-pcifront.c
+@@ -595,6 +595,7 @@ static pci_ers_result_t pcifront_common_process(int cmd,
+ 	struct pci_driver *pdrv;
+ 	int bus = pdev->sh_info->aer_op.bus;
+ 	int devfn = pdev->sh_info->aer_op.devfn;
++	int domain = pdev->sh_info->aer_op.domain;
+ 	struct pci_dev *pcidev;
+ 	int flag = 0;
  
- static int intel_mid_msgbus_init(void)
- {
--	pci_root = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	pci_root = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
- 	if (!pci_root) {
- 		pr_err("%s: Error: msgbus PCI handle NULL\n", __func__);
- 		return -ENODEV;
+@@ -603,7 +604,7 @@ static pci_ers_result_t pcifront_common_process(int cmd,
+ 		cmd, bus, devfn);
+ 	result = PCI_ERS_RESULT_NONE;
+ 
+-	pcidev = pci_get_bus_and_slot(bus, devfn);
++	pcidev = pci_get_domain_bus_and_slot(domain, bus, devfn);
+ 	if (!pcidev || !pcidev->driver) {
+ 		dev_err(&pdev->xdev->dev, "device or AER driver is NULL\n");
+ 		pci_dev_put(pcidev);
 -- 
 1.9.1
