@@ -1,73 +1,51 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Wed, 22 Nov 2017 23:36:50 +0100
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <20171122193713.GL22648@arm.com>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <20171122161913.GB12684@amd> <20171122193713.GL22648@arm.com>
-Message-ID: <20171122223650.GA6130@amd>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 22 Nov 2017 17:48:56 -0500
+Subject: [PATCH V2 01/29] alpha/PCI: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
+References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511390964-9979-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2017-11-22 19:37:14, Will Deacon wrote:
-> On Wed, Nov 22, 2017 at 05:19:14PM +0100, Pavel Machek wrote:
-> > > This patch series implements something along the lines of KAISER for arm64:
-> > > 
-> > >   https://gruss.cc/files/kaiser.pdf
-> > > 
-> > > although I wrote this from scratch because the paper has some funny
-> > > assumptions about how the architecture works. There is a patch series
-> > > in review for x86, which follows a similar approach:
-> > > 
-> > >   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
-> > > 
-> > > and the topic was recently covered by LWN (currently subscriber-only):
-> > > 
-> > >   https://lwn.net/Articles/738975/
-> > > 
-> > > The basic idea is that transitions to and from userspace are proxied
-> > > through a trampoline page which is mapped into a separate page table and
-> > > can switch the full kernel mapping in and out on exception entry and
-> > > exit respectively. This is a valuable defence against various KASLR and
-> > > timing attacks, particularly as the trampoline page is at a fixed virtual
-> > > address and therefore the kernel text can be randomized
-> > > independently.
-> > 
-> > If I'm willing to do timing attacks to defeat KASLR... what prevents
-> > me from using CPU caches to do that?
-> 
-> Is that a rhetorical question? If not, then I'm probably not the best person
-> to answer it. All I'm doing here is protecting against a class of attacks on
-> kaslr that make use of the TLB/page-table walker to determine where the
-> kernel is mapped.
+pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+where a PCI device is present. This restricts the device drivers to be
+reused for other domain numbers.
 
-Yeah. What I'm saying is that I can use cache effects to probe where
-kernel is mapped (and what it is doing).
+Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+extract the domain number. Other places, use the actual domain number from
+the device.
 
-> > There was blackhat talk about exactly that IIRC...
-> 
-> Got a link? I'd be interested to see how the idea works in case there's an
-> orthogonal defence against it.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ arch/alpha/kernel/pci.c          | 2 +-
+ arch/alpha/kernel/sys_nautilus.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-https://www.youtube.com/watch?v=9KsnFWejpQg
-
-(Tell me if it is not the right one).
-
-As of defenses... yes. "maxcpus=1" and flush caches on switch to
-usermode will do the trick :-).
-
-Ok, so that was sarcastic. I'm not sure if good defense exists. ARM is
-better than i386 because reading time and cache flushing is
-priviledged, but...
-
-									Pavel
+diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
+index 08235bb..e866daf 100644
+--- a/arch/alpha/kernel/pci.c
++++ b/arch/alpha/kernel/pci.c
+@@ -416,7 +416,7 @@ struct resource * __init
+ 		if (bus == 0 && dfn == 0) {
+ 			hose = pci_isa_hose;
+ 		} else {
+-			dev = pci_get_bus_and_slot(bus, dfn);
++			dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 			if (!dev)
+ 				return -ENODEV;
+ 			hose = dev->sysdata;
+diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
+index 239dc0e..ff4f54b 100644
+--- a/arch/alpha/kernel/sys_nautilus.c
++++ b/arch/alpha/kernel/sys_nautilus.c
+@@ -237,7 +237,7 @@
+ 	bus = hose->bus = bridge->bus;
+ 	pcibios_claim_one_bus(bus);
+ 
+-	irongate = pci_get_bus_and_slot(0, 0);
++	irongate = pci_get_domain_bus_and_slot(pci_domain_nr(bus), 0, 0);
+ 	bus->self = irongate;
+ 	bus->resource[0] = &irongate_io;
+ 	bus->resource[1] = &irongate_mem;
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171122/40227b9d/attachment.sig>
+1.9.1
