@@ -1,81 +1,34 @@
-From: yong.deng@magewell.com (Yong)
-Date: Wed, 22 Nov 2017 09:33:06 +0800
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
-Message-ID: <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
+From: liubo95@huawei.com (Bob Liu)
+Date: Wed, 22 Nov 2017 11:15:24 +0800
+Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
+In-Reply-To: <20171006133203.22803-2-jean-philippe.brucker@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-2-jean-philippe.brucker@arm.com>
+Message-ID: <588ad6f0-e78a-63de-e27a-3da4de4ab2ab@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 21 Nov 2017 16:48:27 +0100
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hey Jean,
 
-> Hi,
+On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+> IOMMU drivers need a way to bind Linux processes to devices. This is used
+> for Shared Virtual Memory (SVM), where devices support paging. In that
+> mode, DMA can directly target virtual addresses of a process.
 > 
-> On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
-> > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
-> > and CSI1 is used for parallel interface. This is not documented in
-> > datasheet but by testing and guess.
-> > 
-> > This patch implement a v4l2 framework driver for it.
-> > 
-> > Currently, the driver only support the parallel interface. MIPI-CSI2,
-> > ISP's support are not included in this patch.
-> > 
-> > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> Introduce boilerplate code for allocating process structures and binding
+> them to devices. Four operations are added to IOMMU drivers:
 > 
-> Thanks again for this driver.
+> * process_alloc, process_free: to create an iommu_process structure and
+>   perform architecture-specific operations required to grab the process
+>   (for instance on ARM SMMU, pin down the CPU ASID). There is a single
+>   iommu_process structure per Linux process.
 > 
-> It seems like at least this iteration is behaving in a weird way with
-> DMA transfers for at least YU12 and NV12 (and I would assume YV12).
-> 
-> Starting a transfer of multiple frames in either of these formats,
-> using either ffmpeg (ffmpeg -f v4l2 -video_size 640x480 -framerate 30
-> -i /dev/video0 output.mkv) or yavta (yavta -c80 -p -F --skip 0 -f NV12
-> -s 640x480 $(media-c tl -e 'sun6i-csi')) will end up in a panic.
-> 
-> The panic seems to be generated with random data going into parts of
-> the kernel memory, the pattern being in my case something like
-> 0x8287868a which is very odd (always around 0x88)
-> 
-> It turns out that when you cover the sensor, the values change to
-> around 0x28, so it really seems like it's pixels that have been copied
-> there.
-> 
-> I've looked quickly at the DMA setup, and it seems reasonable to
-> me. Do you have the same issue on your side? Have you been able to
-> test those formats using your hardware?
 
-I had tested the following formats with BT1120 input:
-V4L2_PIX_FMT_NV12		-> NV12
-V4L2_PIX_FMT_NV21		-> NV21
-V4L2_PIX_FMT_NV16		-> NV16
-V4L2_PIX_FMT_NV61		-> NV61
-V4L2_PIX_FMT_YUV420		-> YU12
-V4L2_PIX_FMT_YVU420		-> YV12
-V4L2_PIX_FMT_YUV422P		-> 422P
-And they all work fine.
-
-> 
-> Given that they all are planar formats and YUYV and the likes work
-> just fine, maybe we can leave them aside for now?
-
-V4L2_PIX_FMT_YUV422P and V4L2_PIX_FMT_YUYV is OK, and V4L2_PIX_FMT_NV12
-is bad? It's really weird.
-
-What's your input bus code format, type and width?
-
-> 
-> Thanks!
-> Maxime
-> 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
-
+I'm a bit confused here.
+The original meaning of iommu_domain is a virtual addrspace defined by a set of io page table.
+(fix me if I misunderstood).
+Then what's the meaning of iommu_domain and iommu_process after introducing iommu_process?
+Could you consider document these concepts? 
 
 Thanks,
-Yong
+Liubo
