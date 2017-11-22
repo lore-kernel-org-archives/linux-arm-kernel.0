@@ -1,59 +1,35 @@
-From: garsilva@embeddedor.com (Gustavo A. R. Silva)
-Date: Wed, 22 Nov 2017 08:21:04 -0600
-Subject: [PATCH] c8sectpfe: fix potential NULL pointer dereference in
- c8sectpfe_timer_interrupt
-In-Reply-To: <dbd98a18-6d11-bc4e-de44-a04383bb3ade@st.com>
-References: <20171120140055.GA728@embeddedor.com>
- <dbd98a18-6d11-bc4e-de44-a04383bb3ade@st.com>
-Message-ID: <88bb41ea-8973-0be4-fcdd-84f23c5d2117@embeddedor.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 22 Nov 2017 08:42:35 -0600
+Subject: [PATCH 30/30] PCI: remove pci_get_bus_and_slot() function
+In-Reply-To: <20171122075124.GA26583@kroah.com>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-31-git-send-email-okaya@codeaurora.org>
+ <c0df99c9-9170-be3a-3789-6b25be30936f@codeaurora.org>
+ <6a78596e-720a-80a2-9d96-dcc79a32f677@codeaurora.org>
+ <25ec431a-2c1b-d352-f9ef-c663864664b6@codeaurora.org>
+ <20171122075124.GA26583@kroah.com>
+Message-ID: <a443e88e-3abd-0dab-2828-9753326e8d5d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/22/17 1:51 AM, Greg KH wrote:
+> Ick, no, why?  What is wrong with removing this function as is?  Don't
+> mark something as __depreciated if there are no in-kernel users, just
+> delete it and move on.
+> 
+> If you have out-of-tree drivers, then yes, they can make a wrapper for
+> this function like this if they really feel the need, or they can get
+> their code merged:)
 
-On 11/21/2017 02:22 AM, Patrice CHOTARD wrote:
-> Hi Gustavo
->
-> On 11/20/2017 03:00 PM, Gustavo A. R. Silva wrote:
->> _channel_ is being dereferenced before it is null checked, hence there is a
->> potential null pointer dereference. Fix this by moving the pointer dereference
->> after _channel_ has been null checked.
->>
->> This issue was detected with the help of Coccinelle.
->>
->> Fixes: c5f5d0f99794 ("[media] c8sectpfe: STiH407/10 Linux DVB demux support")
->> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
->> ---
->>    drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c | 4 +++-
->>    1 file changed, 3 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
->> index 59280ac..23d0ced 100644
->> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
->> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-core.c
->> @@ -83,7 +83,7 @@ static void c8sectpfe_timer_interrupt(unsigned long ac8sectpfei)
->>    static void channel_swdemux_tsklet(unsigned long data)
->>    {
->>    	struct channel_info *channel = (struct channel_info *)data;
->> -	struct c8sectpfei *fei = channel->fei;
->> +	struct c8sectpfei *fei;
->>    	unsigned long wp, rp;
->>    	int pos, num_packets, n, size;
->>    	u8 *buf;
->> @@ -91,6 +91,8 @@ static void channel_swdemux_tsklet(unsigned long data)
->>    	if (unlikely(!channel || !channel->irec))
->>    		return;
->>    
->> +	fei = channel->fei;
->> +
->>    	wp = readl(channel->irec + DMA_PRDS_BUSWP_TP(0));
->>    	rp = readl(channel->irec + DMA_PRDS_BUSRP_TP(0));
->>    
->>
-> Acked-by: Patrice Chotard <patrice.chotard@st.com>
->
-> Thanks
+Sorry, I guess I should have been clearer.  My suggestion was to fix 
+some of the drivers where the domain can be determined, and for the 
+rest, just mark the old function as deprecated.
 
-Thank you, Patrice.
+If that's still a terrible idea, well, okay.  I'm just unsure that 
+simply hard-coding a 0 for the domain for some drivers is really a 
+solution.  Don't we really want all drivers to properly support all domains?
 
---
-Gustavo A. R. Silva
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
