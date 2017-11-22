@@ -1,69 +1,88 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Nov 2017 08:55:14 +0000
-Subject: [PATCH] crypto: arm64/aes - do not call crypto_unregister_skcipher
- twice on error
-In-Reply-To: <1511338114-39583-1-git-send-email-clabbe@baylibre.com>
-References: <1511338114-39583-1-git-send-email-clabbe@baylibre.com>
-Message-ID: <CAKv+Gu9m3v_iMdg8ngX-3x1HT+c8D52dhjJ=MiTp11VByD=ewA@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 22 Nov 2017 10:14:36 +0100
+Subject: [PATCH 2/4] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
+In-Reply-To: <CAOMZO5BDQxZxHX_dn63QvbwfaVjERQtBqCp3FCT9Q6zvsrgn4w@mail.gmail.com>
+References: <1511281705-30849-1-git-send-email-narmstrong@baylibre.com>
+ <1511281705-30849-3-git-send-email-narmstrong@baylibre.com>
+ <CAOMZO5BDQxZxHX_dn63QvbwfaVjERQtBqCp3FCT9Q6zvsrgn4w@mail.gmail.com>
+Message-ID: <b1a1ac14-5ff3-08bf-a3ee-27dd7641c7fe@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Corentin,
+Hi Fabio,
 
-On 22 November 2017 at 08:08, Corentin Labbe <clabbe@baylibre.com> wrote:
-> When a cipher fail
+On 21/11/2017 17:54, Fabio Estevam wrote:
+> On Tue, Nov 21, 2017 at 2:28 PM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> 
+>> +       reg_wl18xx_vmmc: regulator-wl18xx {
+>> +               compatible = "regulator-fixed";
+>> +               regulator-name = "vwl1807";
+>> +               regulator-min-microvolt = <1800000>;
+>> +               regulator-max-microvolt = <1800000>;
+>> +               gpio = <&gpio7 8 0>;
+> 
+> GPIO_ACTIVE_HIGH please.
 
-fails
+OK
 
-> to register in aes_init(), the error path go thought
+> 
+>> +&can2 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&pinctrl_flexcan2>;
+>> +       status = "disabled";
+>> +};
+>> +
+>> +&cpu0 {
+>> +       arm-supply = <&sw1a_reg>;
+>> +       soc-supply = <&sw1c_reg>;
+>> +       operating-points = <
+>> +               /* kHz    uV */
+>> +               1200000 1350000
+>> +               996000  1250000
+>> +               852000  1250000
+>> +               792000  1175000
+>> +               396000  1175000
+>> +       >;
+>> +       fsl,soc-operating-points = <
+>> +               /* ARM kHz  SOC-PU uV */
+>> +               1200000 1275000
+>> +               996000  1250000
+>> +               852000  1250000
+>> +               792000  1175000
+>> +               396000  1175000
+>> +       >;
+> 
+> 
+> Don't the standard operating points described at imx6q.dtsi work on this board?
+> 
+> If not, please add a comment explaining why you need custom operating
+> points here.
 
-goes through
+It should, I will remove them, anyway it will conflict with the ones in imx6dl.dtsi.
 
-> aes_exit() then crypto_unregister_skciphers().
-> Since aes_exit calls also crypto_unregister_skcipher, this trigger a
+> 
+>> +       pinctrl_flexcan1: flexcan1grp {
+>> +               fsl,pins = <
+>> +                       MX6QDL_PAD_GPIO_7__FLEXCAN1_TX          0x80000000
+>> +                       MX6QDL_PAD_GPIO_8__FLEXCAN1_RX          0x80000000
+> 
+> Please avoid 0x80000000 and use the real IOMUX values instead.
 
-triggers
+Ok, will replace with 0x1b0b0
 
-> refcount_t: underflow; use-after-free.
->
-> Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
-> ---
->  arch/arm64/crypto/aes-glue.c | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-> index 998ba519a026..9e42ec96243e 100644
-> --- a/arch/arm64/crypto/aes-glue.c
-> +++ b/arch/arm64/crypto/aes-glue.c
-> @@ -664,7 +664,10 @@ static int __init aes_init(void)
->         return 0;
->
->  unregister_simds:
-> -       aes_exit();
-> +       for (i = 0; i < ARRAY_SIZE(aes_simd_algs); i++)
-> +               if (aes_simd_algs[i])
-> +                       simd_skcipher_free(aes_simd_algs[i]);
-> +       crypto_unregister_shashes(mac_algs, ARRAY_SIZE(mac_algs));
->  unregister_ciphers:
->         crypto_unregister_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
->         return err;
-> --
-> 2.13.6
->
->
+> 
+>> +               >;
+>> +       };
+>> +
+>> +       pinctrl_flexcan2: flexcan2grp {
+>> +               fsl,pins = <
+>> +                       MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX        0x80000000
+>> +                       MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX        0x80000000
+> 
+> Please avoid 0x80000000 and use the real IOMUX values instead.
+> 
 
+Same here.
 
-Would this also fix it?
-
-diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-index 998ba519a026..2fa850e86aa8 100644
---- a/arch/arm64/crypto/aes-glue.c
-+++ b/arch/arm64/crypto/aes-glue.c
-@@ -665,6 +665,7 @@ static int __init aes_init(void)
-
- unregister_simds:
-        aes_exit();
-+       return err;
- unregister_ciphers:
-        crypto_unregister_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
-        return err;
+Thanks,
+Neil
