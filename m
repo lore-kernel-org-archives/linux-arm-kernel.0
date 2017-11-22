@@ -1,48 +1,28 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Nov 2017 19:37:14 +0000
+Date: Wed, 22 Nov 2017 19:37:19 +0000
 Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
  userspace (KAISER)
-In-Reply-To: <20171122161913.GB12684@amd>
+In-Reply-To: <CAKv+Gu8WPU=LKLR90WBpAey2VkCVuuTpQycsde-88G4F_B1wUQ@mail.gmail.com>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <20171122161913.GB12684@amd>
-Message-ID: <20171122193713.GL22648@arm.com>
+ <CAKv+Gu8YB_qXgWEbd0ZZ6UycxNLXxTZCno87vJ9HH7d6+dKeLQ@mail.gmail.com>
+ <20171120180639.GN32488@arm.com>
+ <CAKv+Gu8WPU=LKLR90WBpAey2VkCVuuTpQycsde-88G4F_B1wUQ@mail.gmail.com>
+Message-ID: <20171122193719.GM22648@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 05:19:14PM +0100, Pavel Machek wrote:
-> > This patch series implements something along the lines of KAISER for arm64:
-> > 
-> >   https://gruss.cc/files/kaiser.pdf
-> > 
-> > although I wrote this from scratch because the paper has some funny
-> > assumptions about how the architecture works. There is a patch series
-> > in review for x86, which follows a similar approach:
-> > 
-> >   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
-> > 
-> > and the topic was recently covered by LWN (currently subscriber-only):
-> > 
-> >   https://lwn.net/Articles/738975/
-> > 
-> > The basic idea is that transitions to and from userspace are proxied
-> > through a trampoline page which is mapped into a separate page table and
-> > can switch the full kernel mapping in and out on exception entry and
-> > exit respectively. This is a valuable defence against various KASLR and
-> > timing attacks, particularly as the trampoline page is at a fixed virtual
-> > address and therefore the kernel text can be randomized
-> > independently.
+On Mon, Nov 20, 2017 at 06:20:39PM +0000, Ard Biesheuvel wrote:
+> On 20 November 2017 at 18:06, Will Deacon <will.deacon@arm.com> wrote:
+> > I'll see if I can measure the cost of the current vbar switching to get
+> > an idea of the potential performance available.
+> >
 > 
-> If I'm willing to do timing attacks to defeat KASLR... what prevents
-> me from using CPU caches to do that?
+> Yeah, makes sense. If the bulk of the performance hit is elsewhere,
+> there's no point in focusing on this bit.
 
-Is that a rhetorical question? If not, then I'm probably not the best person
-to answer it. All I'm doing here is protecting against a class of attacks on
-kaslr that make use of the TLB/page-table walker to determine where the
-kernel is mapped.
-
-> There was blackhat talk about exactly that IIRC...
-
-Got a link? I'd be interested to see how the idea works in case there's an
-orthogonal defence against it.
+I had a go at implementing a variant on your suggestion where we avoid
+swizzling the vbar on exception entry/exit but I couldn't reliably measure a
+difference in performance. It appears that the ISB needed by the TTBR change
+is dominant, so the vbar write is insignificant.
 
 Will
