@@ -1,39 +1,30 @@
-From: Bharat.Bhushan@nxp.com (Bharat Bhushan)
-Date: Wed, 22 Nov 2017 13:18:43 +0530
-Subject: [PATCH v3] staging: fsl-mc: use 32bits to support 64K size mc-portals
-Message-ID: <1511336923-610-1-git-send-email-Bharat.Bhushan@nxp.com>
+From: gregkh@linuxfoundation.org (Greg KH)
+Date: Wed, 22 Nov 2017 08:53:02 +0100
+Subject: [PATCH 12/30] Drivers: ide: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511328675-21981-13-git-send-email-okaya@codeaurora.org>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-13-git-send-email-okaya@codeaurora.org>
+Message-ID: <20171122075302.GB26583@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As per APIs each mc-portal is of 64K size while currently
-16bits (type u16) is used to store size of mc-portal.
-In these cases upper bit of portal size gets truncated.
+On Wed, Nov 22, 2017 at 12:30:57AM -0500, Sinan Kaya wrote:
+> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> where a PCI device is present. This restricts the device drivers to be
+> reused for other domain numbers.
+> 
+> Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+> extract the domain number. Other places, use the actual domain number from
+> the device.
 
-Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
----
-v2->v3:
- - v2 patch: https://patchwork.kernel.org/patch/10067661/
- - Changes patch subject and description
+While this is a great generic text, you might want to make it a bit more
+custom to each specific patch.  For example, you don't use a domain of 0
+in this one, so the text is a bit wrong and confusing if you look at it
+stand-alone.
 
-v1->v2:
- - v1 patch: https://patchwork.kernel.org/patch/10067657/
- - replace uin32_t to u32 in patch subject/description
+I like the series and the idea, just fix up this text in some of the
+patches and you should be fine.
 
- drivers/staging/fsl-mc/include/mc.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+thanks,
 
-diff --git a/drivers/staging/fsl-mc/include/mc.h b/drivers/staging/fsl-mc/include/mc.h
-index aafe63a..2cf15b0 100644
---- a/drivers/staging/fsl-mc/include/mc.h
-+++ b/drivers/staging/fsl-mc/include/mc.h
-@@ -325,7 +325,7 @@ static inline void mc_cmd_read_api_version(struct mc_command *cmd,
- struct fsl_mc_io {
- 	struct device *dev;
- 	u16 flags;
--	u16 portal_size;
-+	u32 portal_size;
- 	phys_addr_t portal_phys_addr;
- 	void __iomem *portal_virt_addr;
- 	struct fsl_mc_device *dpmcp_dev;
--- 
-1.9.3
+greg k-h
