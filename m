@@ -1,48 +1,51 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Wed, 22 Nov 2017 14:14:59 +0900
-Subject: [PATCH] nvmem: uniphier: change access unit from 32bit to 8bit
-Message-ID: <1511327699-26396-1-git-send-email-hayashi.kunihiko@socionext.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 22 Nov 2017 00:30:46 -0500
+Subject: [PATCH 01/30] alpha/PCI: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The efuse on UniPhier allows 8bit access according to the specification.
-Since bit offset of nvmem is limited to 0-7, it is desiable to change
-access unit of nvmem to 8bit.
+pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+where a PCI device is present. This restricts the device drivers to be
+reused for other domain numbers.
 
-Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+extract the domain number. Other places, use the actual domain number from
+the device.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/nvmem/uniphier-efuse.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ arch/alpha/kernel/pci.c          | 2 +-
+ arch/alpha/kernel/sys_nautilus.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
-index 2bb45c4..fac3122 100644
---- a/drivers/nvmem/uniphier-efuse.c
-+++ b/drivers/nvmem/uniphier-efuse.c
-@@ -27,11 +27,11 @@ static int uniphier_reg_read(void *context,
- 			     unsigned int reg, void *_val, size_t bytes)
- {
- 	struct uniphier_efuse_priv *priv = context;
--	u32 *val = _val;
-+	u8 *val = _val;
- 	int offs;
+diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
+index 08235bb..e866daf 100644
+--- a/arch/alpha/kernel/pci.c
++++ b/arch/alpha/kernel/pci.c
+@@ -416,7 +416,7 @@ struct resource * __init
+ 		if (bus == 0 && dfn == 0) {
+ 			hose = pci_isa_hose;
+ 		} else {
+-			dev = pci_get_bus_and_slot(bus, dfn);
++			dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 			if (!dev)
+ 				return -ENODEV;
+ 			hose = dev->sysdata;
+diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
+index 239dc0e..5eacaf9 100644
+--- a/arch/alpha/kernel/sys_nautilus.c
++++ b/arch/alpha/kernel/sys_nautilus.c
+@@ -237,7 +237,7 @@
+ 	bus = hose->bus = bridge->bus;
+ 	pcibios_claim_one_bus(bus);
  
--	for (offs = 0; offs < bytes; offs += sizeof(u32))
--		*val++ = readl(priv->base + reg + offs);
-+	for (offs = 0; offs < bytes; offs += sizeof(u8))
-+		*val++ = readb(priv->base + reg + offs);
- 
- 	return 0;
- }
-@@ -53,8 +53,8 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
- 	if (IS_ERR(priv->base))
- 		return PTR_ERR(priv->base);
- 
--	econfig.stride = 4;
--	econfig.word_size = 4;
-+	econfig.stride = 1;
-+	econfig.word_size = 1;
- 	econfig.read_only = true;
- 	econfig.reg_read = uniphier_reg_read;
- 	econfig.size = resource_size(res);
+-	irongate = pci_get_bus_and_slot(0, 0);
++	irongate = pci_get_domain_bus_and_slot(0, 0, 0);
+ 	bus->self = irongate;
+ 	bus->resource[0] = &irongate_io;
+ 	bus->resource[1] = &irongate_mem;
 -- 
-2.7.4
+1.9.1
