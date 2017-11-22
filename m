@@ -1,86 +1,71 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Nov 2017 20:23:44 +0100
-Subject: [RFC PATCH 3/4] arm64/sve: KVM: Ensure user SVE use traps after
- vcpu execution
-In-Reply-To: <1510936735-6762-4-git-send-email-Dave.Martin@arm.com>
-References: <1510936735-6762-1-git-send-email-Dave.Martin@arm.com>
- <1510936735-6762-4-git-send-email-Dave.Martin@arm.com>
-Message-ID: <20171122192344.GS28855@cbox>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 22 Nov 2017 19:36:57 +0000
+Subject: [PATCH 18/18] arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
+In-Reply-To: <f82c5329-6547-ccfb-9846-5a59fd471720@arm.com>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+ <1510942921-12564-19-git-send-email-will.deacon@arm.com>
+ <f82c5329-6547-ccfb-9846-5a59fd471720@arm.com>
+Message-ID: <20171122193656.GJ22648@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 17, 2017 at 04:38:54PM +0000, Dave Martin wrote:
-> Currently, SVE use can remain untrapped if a KVM vcpu thread is
-> preempted inside the kernel and we then switch back to some user
-> thread.
+Hi Marc,
+
+On Wed, Nov 22, 2017 at 04:52:36PM +0000, Marc Zyngier wrote:
+> On 17/11/17 18:22, Will Deacon wrote:
+> > Add a Kconfig entry to control use of the entry trampoline, which allows
+> > us to unmap the kernel whilst running in userspace and improve the
+> > robustness of KASLR.
+> > 
+> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/Kconfig | 13 +++++++++++++
+> >  1 file changed, 13 insertions(+)
+> > 
+> > diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> > index f0fcbfc2262e..f99ffb88843a 100644
+> > --- a/arch/arm64/Kconfig
+> > +++ b/arch/arm64/Kconfig
+> > @@ -796,6 +796,19 @@ config FORCE_MAX_ZONEORDER
+> >  	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
+> >  	  4M allocations matching the default size used by generic code.
+> >  
+> > +config UNMAP_KERNEL_AT_EL0
+> > +	bool "Unmap kernel when running in userspace (aka \"KAISER\")"
+> > +	default y
+> > +	help
+> > +	  Some attacks against KASLR make use of the timing difference between
+> > +	  a permission fault which could arise from a page table entry that is
+> > +	  present in the TLB, and a translation fault which always requires a
+> > +	  page table walk. This option defends against these attacks by unmapping
+> > +	  the kernel whilst running in userspace, therefore forcing translation
+> > +	  faults for all of kernel space.
+> > +
+> > +	  If unsure, say Y.
+> > +
+> >  menuconfig ARMV8_DEPRECATED
+> >  	bool "Emulate deprecated/obsolete ARMv8 instructions"
+> >  	depends on COMPAT
+> > 
 > 
-> This patch ensures that SVE traps for userspace are enabled before
-> switching away from the vcpu thread.
-
-I don't really understand why KVM is any different then any other thread
-which could be using SVE that gets preempted?
-
+> Since this seems to be the recommended setting, I wonder if there is any
+> real value in keeping the old code around. My hunch is that the lack of
+> use in the field will make it fragile and that it will eventually bit-rot.
 > 
-> In an attempt to preserve some clarity about why and when this is
-> needed, kvm_fpsimd_flush_cpu_state() is used as a hook for doing
-> this.  This means that this function needs to be called after
-> exiting the vcpu instead of before entry: 
+> Do you have any plan to eventually drop the non-KAISER switch code?
 
-I don't understand why the former means the latter?
+Good question. I think having a command-line option for this makes sense,
+but I'd expect distributions to run with the config option enabled. That
+basically leaves us with two changes we could make by forcing the option
+to be enabled:
 
-> this patch moves the call
-> as appropriate.  As a side-effect, this will avoid the call if vcpu
-> entry is shortcircuited by a signal etc.
-> 
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> ---
->  arch/arm64/kernel/fpsimd.c | 2 ++
->  virt/kvm/arm/arm.c         | 6 +++---
->  2 files changed, 5 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 3dc8058..3b135eb 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -1083,6 +1083,8 @@ void sve_flush_cpu_state(void)
->  
->  	if (last->st && last->sve_in_use)
->  		fpsimd_flush_cpu_state();
-> +
-> +	sve_user_disable();
->  }
->  #endif /* CONFIG_ARM64_SVE */
->  
-> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> index 772bf74..554b157 100644
-> --- a/virt/kvm/arm/arm.c
-> +++ b/virt/kvm/arm/arm.c
-> @@ -651,9 +651,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		 */
->  		preempt_disable();
->  
-> -		/* Flush FP/SIMD state that can't survive guest entry/exit */
-> -		kvm_fpsimd_flush_cpu_state();
-> -
->  		kvm_pmu_flush_hwstate(vcpu);
->  
->  		local_irq_disable();
-> @@ -754,6 +751,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
->  		guest_exit();
->  		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
->  
-> +		/* Flush FP/SIMD state that can't survive guest entry/exit */
-> +		kvm_fpsimd_flush_cpu_state();
-> +
+  1. The changes in the linker script could be made unconditional
+  2. We could drop support for global mappings altogether
 
-Could this be done in kvm_arch_vcpu_put() instead?
+I'd be in favour of that because it avoids some conceptual complexity and
+would allow us to rely on nG mappings in the future (there might be
+something fun we can do with the percpu area, but there are dragons here).
 
->  		preempt_enable();
->  
->  		ret = handle_exit(vcpu, run, ret);
-> -- 
-> 2.1.4
-> 
+I'd be interested in other people's opinions on this one.
 
-Thanks,
--Christoffer
+Will
