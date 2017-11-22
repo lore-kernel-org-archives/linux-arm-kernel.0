@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 17:49:00 -0500
-Subject: [PATCH V2 05/29] agp: nvidia: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 17:49:02 -0500
+Subject: [PATCH V2 07/29] ibft: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
 References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511390964-9979-6-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511390964-9979-8-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,53 +14,30 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Replace pci_get_bus_and_slot() with pci_get_domain_bus_and_slot()
-and extract the domain number from struct pci_dev.
+We don't search for the device in other domains than zero. This is because
+on x86 platforms the BIOS executes only devices which are in domain 0.
+Furthermore, the iBFT spec doesn't have a domain id field.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/char/agp/nvidia-agp.c | 12 +++++++++---
- drivers/char/agp/sworks-agp.c |  3 ++-
- 2 files changed, 11 insertions(+), 4 deletions(-)
+ drivers/firmware/iscsi_ibft.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/char/agp/nvidia-agp.c b/drivers/char/agp/nvidia-agp.c
-index 828b344..623205b 100644
---- a/drivers/char/agp/nvidia-agp.c
-+++ b/drivers/char/agp/nvidia-agp.c
-@@ -340,11 +340,17 @@ static int agp_nvidia_probe(struct pci_dev *pdev,
- 	u8 cap_ptr;
- 
- 	nvidia_private.dev_1 =
--		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 1));
-+		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-+					    (unsigned int)pdev->bus->number,
-+					    PCI_DEVFN(0, 1));
- 	nvidia_private.dev_2 =
--		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(0, 2));
-+		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-+					    (unsigned int)pdev->bus->number,
-+					    PCI_DEVFN(0, 2));
- 	nvidia_private.dev_3 =
--		pci_get_bus_and_slot((unsigned int)pdev->bus->number, PCI_DEVFN(30, 0));
-+		pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-+					    (unsigned int)pdev->bus->number,
-+					    PCI_DEVFN(30, 0));
- 
- 	if (!nvidia_private.dev_1 || !nvidia_private.dev_2 || !nvidia_private.dev_3) {
- 		printk(KERN_INFO PFX "Detected an NVIDIA nForce/nForce2 "
-diff --git a/drivers/char/agp/sworks-agp.c b/drivers/char/agp/sworks-agp.c
-index 03be4ac..4dbdd3b 100644
---- a/drivers/char/agp/sworks-agp.c
-+++ b/drivers/char/agp/sworks-agp.c
-@@ -474,7 +474,8 @@ static int agp_serverworks_probe(struct pci_dev *pdev,
- 	}
- 
- 	/* Everything is on func 1 here so we are hardcoding function one */
--	bridge_dev = pci_get_bus_and_slot((unsigned int)pdev->bus->number,
-+	bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-+			(unsigned int)pdev->bus->number,
- 			PCI_DEVFN(0, 1));
- 	if (!bridge_dev) {
- 		dev_info(&pdev->dev, "can't find secondary device\n");
+diff --git a/drivers/firmware/iscsi_ibft.c b/drivers/firmware/iscsi_ibft.c
+index 14042a6..6bc8e66 100644
+--- a/drivers/firmware/iscsi_ibft.c
++++ b/drivers/firmware/iscsi_ibft.c
+@@ -719,8 +719,9 @@ static int __init ibft_create_kobject(struct acpi_table_ibft *header,
+ 		* executes only devices which are in domain 0. Furthermore, the
+ 		* iBFT spec doesn't have a domain id field :-(
+ 		*/
+-		pci_dev = pci_get_bus_and_slot((nic->pci_bdf & 0xff00) >> 8,
+-					       (nic->pci_bdf & 0xff));
++		pci_dev = pci_get_domain_bus_and_slot(0,
++						(nic->pci_bdf & 0xff00) >> 8,
++						(nic->pci_bdf & 0xff));
+ 		if (pci_dev) {
+ 			rc = sysfs_create_link(&boot_kobj->kobj,
+ 					       &pci_dev->dev.kobj, "device");
 -- 
 1.9.1
