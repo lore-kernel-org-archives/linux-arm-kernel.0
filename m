@@ -1,34 +1,48 @@
-From: liubo95@huawei.com (Bob Liu)
-Date: Wed, 22 Nov 2017 11:15:24 +0800
-Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
-In-Reply-To: <20171006133203.22803-2-jean-philippe.brucker@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-2-jean-philippe.brucker@arm.com>
-Message-ID: <588ad6f0-e78a-63de-e27a-3da4de4ab2ab@huawei.com>
+From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
+Date: Wed, 22 Nov 2017 14:14:59 +0900
+Subject: [PATCH] nvmem: uniphier: change access unit from 32bit to 8bit
+Message-ID: <1511327699-26396-1-git-send-email-hayashi.kunihiko@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Jean,
+The efuse on UniPhier allows 8bit access according to the specification.
+Since bit offset of nvmem is limited to 0-7, it is desiable to change
+access unit of nvmem to 8bit.
 
-On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
-> IOMMU drivers need a way to bind Linux processes to devices. This is used
-> for Shared Virtual Memory (SVM), where devices support paging. In that
-> mode, DMA can directly target virtual addresses of a process.
-> 
-> Introduce boilerplate code for allocating process structures and binding
-> them to devices. Four operations are added to IOMMU drivers:
-> 
-> * process_alloc, process_free: to create an iommu_process structure and
->   perform architecture-specific operations required to grab the process
->   (for instance on ARM SMMU, pin down the CPU ASID). There is a single
->   iommu_process structure per Linux process.
-> 
+Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
+---
+ drivers/nvmem/uniphier-efuse.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-I'm a bit confused here.
-The original meaning of iommu_domain is a virtual addrspace defined by a set of io page table.
-(fix me if I misunderstood).
-Then what's the meaning of iommu_domain and iommu_process after introducing iommu_process?
-Could you consider document these concepts? 
-
-Thanks,
-Liubo
+diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c
+index 2bb45c4..fac3122 100644
+--- a/drivers/nvmem/uniphier-efuse.c
++++ b/drivers/nvmem/uniphier-efuse.c
+@@ -27,11 +27,11 @@ static int uniphier_reg_read(void *context,
+ 			     unsigned int reg, void *_val, size_t bytes)
+ {
+ 	struct uniphier_efuse_priv *priv = context;
+-	u32 *val = _val;
++	u8 *val = _val;
+ 	int offs;
+ 
+-	for (offs = 0; offs < bytes; offs += sizeof(u32))
+-		*val++ = readl(priv->base + reg + offs);
++	for (offs = 0; offs < bytes; offs += sizeof(u8))
++		*val++ = readb(priv->base + reg + offs);
+ 
+ 	return 0;
+ }
+@@ -53,8 +53,8 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
+ 	if (IS_ERR(priv->base))
+ 		return PTR_ERR(priv->base);
+ 
+-	econfig.stride = 4;
+-	econfig.word_size = 4;
++	econfig.stride = 1;
++	econfig.word_size = 1;
+ 	econfig.read_only = true;
+ 	econfig.reg_read = uniphier_reg_read;
+ 	econfig.size = resource_size(res);
+-- 
+2.7.4
