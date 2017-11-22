@@ -1,64 +1,63 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 22 Nov 2017 20:43:13 +0900
-Subject: [PATCH 0/8] add UniPhier audio system support
-Message-ID: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
+Date: Wed, 22 Nov 2017 20:43:16 +0900
+Subject: [PATCH 3/8] ASoC: uniphier: add DT bindings documentation for
+ UniPhier AIO
+In-Reply-To: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
+References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
+Message-ID: <20171122114321.29196-4-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series adds support for Socionext audio system for
-UniPhier LD11/LD20 SoCs. This driver supports I2S output
-for Line-In, Line-Out and S/PDIF output.
+This patch adds DT binding documentation for UniPhier
+AIO audio subsystem.
 
-UniPhier AIO DAI driver provides sound devices such as I2S, S/PDIF.
-Since the AIO has mixed register map for those I/Os, it is hard to
-split register areas for each sound devices.
-
-UniPhier EVEA is a codec core for Line-In, Line-Out. Since this core
-is only in internal of UniPhier series SoC, this driver works
-independently but only UniPhier SoC can use it.
-
-Katsuhiro Suzuki (8):
-  ASoC: spdif: Add S32_LE support for S/PDIF dummy codec drivers
-  ASoC: uniphier: add DT bindings documentation for UniPhier EVEA
-  ASoC: uniphier: add DT bindings documentation for UniPhier AIO
-  ASoC: uniphier: add support for UniPhier EVEA codec
-  ASoC: uniphier: add support for UniPhier AIO driver
-  ASoC: uniphier: add support for UniPhier LD11/LD20 AIO driver
-  MAINTAINERS: add entries for UniPhier ASoC sound drivers
-  arm64: dts: uniphier: add sound node for UniPhier
-
- .../devicetree/bindings/sound/uniphier,aio.txt     |  36 ++
- .../devicetree/bindings/sound/uniphier,evea.txt    |  26 +
- MAINTAINERS                                        |   6 +
- .../boot/dts/socionext/uniphier-ld11-global.dts    |  72 +++
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   |  31 +
- .../boot/dts/socionext/uniphier-ld20-global.dts    |  72 +++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   |  35 ++
- sound/soc/Kconfig                                  |   1 +
- sound/soc/Makefile                                 |   1 +
- sound/soc/codecs/spdif_receiver.c                  |   5 +-
- sound/soc/codecs/spdif_transmitter.c               |   5 +-
- sound/soc/uniphier/Kconfig                         |  34 +
- sound/soc/uniphier/Makefile                        |   8 +
- sound/soc/uniphier/aio-core.c                      | 368 +++++++++++
- sound/soc/uniphier/aio-dma.c                       | 266 ++++++++
- sound/soc/uniphier/aio-ld11.c                      | 343 ++++++++++
- sound/soc/uniphier/aio-regctrl.c                   | 699 +++++++++++++++++++++
- sound/soc/uniphier/aio-regctrl.h                   | 495 +++++++++++++++
- sound/soc/uniphier/aio.h                           | 261 ++++++++
- sound/soc/uniphier/evea.c                          | 567 +++++++++++++++++
- 20 files changed, 3327 insertions(+), 4 deletions(-)
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+---
+ .../devicetree/bindings/sound/uniphier,aio.txt     | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/sound/uniphier,aio.txt
- create mode 100644 Documentation/devicetree/bindings/sound/uniphier,evea.txt
- create mode 100644 sound/soc/uniphier/Kconfig
- create mode 100644 sound/soc/uniphier/Makefile
- create mode 100644 sound/soc/uniphier/aio-core.c
- create mode 100644 sound/soc/uniphier/aio-dma.c
- create mode 100644 sound/soc/uniphier/aio-ld11.c
- create mode 100644 sound/soc/uniphier/aio-regctrl.c
- create mode 100644 sound/soc/uniphier/aio-regctrl.h
- create mode 100644 sound/soc/uniphier/aio.h
- create mode 100644 sound/soc/uniphier/evea.c
 
+diff --git a/Documentation/devicetree/bindings/sound/uniphier,aio.txt b/Documentation/devicetree/bindings/sound/uniphier,aio.txt
+new file mode 100644
+index 000000000000..73f6c27ae4f7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/uniphier,aio.txt
+@@ -0,0 +1,36 @@
++Socionext UniPhier SoC audio driver
++
++The Socionext UniPhier audio subsystem consists of I2S and S/PDIF blocks in
++the same register space.
++
++Required properties:
++- compatible      : should be one of the following:
++		    "socionext,uniphier-ld11-aio"
++		    "socionext,uniphier-ld20-aio"
++- reg             : offset and length of the register set for the device.
++- interrupts      : should contain I2S or S/PDIF interrupt.
++- pinctrl-names   : should be "default".
++- pinctrl-0       : defined I2S signal pins for an external codec chip.
++- clock-names     : should include following entries:
++                    "aio"
++- clocks          : a list of phandle, should contain an entry for each
++                    entry in clock-names.
++- reset-names     : should include following entries:
++                    "aio"
++- resets          : a list of phandle, should contain an entry for each
++                    entry in reset-names.
++- #sound-dai-cells: should be 1.
++
++Example:
++	audio {
++		compatible = "socionext,uniphier-ld20-aio";
++		reg = <0x56000000 0x80000>;
++		interrupts = <0 144 4>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_aout>;
++		clock-names = "aio";
++		clocks = <&sys_clk 40>;
++		reset-names = "aio";
++		resets = <&sys_rst 40>;
++		#sound-dai-cells = <1>;
++	};
 -- 
 2.15.0
