@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:30:56 -0500
-Subject: [PATCH 11/30] hwmon: (coretemp) deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:30:57 -0500
+Subject: [PATCH 12/30] Drivers: ide: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-12-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-13-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,22 +17,24 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/hwmon/coretemp.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/ide/sl82c105.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/hwmon/coretemp.c b/drivers/hwmon/coretemp.c
-index c13a4fd..4bdbf77 100644
---- a/drivers/hwmon/coretemp.c
-+++ b/drivers/hwmon/coretemp.c
-@@ -246,7 +246,8 @@ static int adjust_tjmax(struct cpuinfo_x86 *c, u32 id, struct device *dev)
- 	int err;
- 	u32 eax, edx;
- 	int i;
--	struct pci_dev *host_bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	u16 devfn = PCI_DEVFN(0, 0);
-+	struct pci_dev *host_bridge = pci_get_domain_bus_and_slot(0, 0, devfn);
- 
+diff --git a/drivers/ide/sl82c105.c b/drivers/ide/sl82c105.c
+index 8755df3..3300dac 100644
+--- a/drivers/ide/sl82c105.c
++++ b/drivers/ide/sl82c105.c
+@@ -239,8 +239,9 @@ static u8 sl82c105_bridge_revision(struct pci_dev *dev)
  	/*
- 	 * Explicit tjmax table entries override heuristics.
+ 	 * The bridge should be part of the same device, but function 0.
+ 	 */
+-	bridge = pci_get_bus_and_slot(dev->bus->number,
+-			       PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
++	bridge = pci_get_domain_bus_and_slot(pci_domain_nr(dev->bus),
++					dev->bus->number,
++					PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
+ 	if (!bridge)
+ 		return -1;
+ 
 -- 
 1.9.1
