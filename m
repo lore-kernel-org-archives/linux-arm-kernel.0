@@ -1,65 +1,51 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Wed, 22 Nov 2017 15:46:19 +0900
-Subject: [PATCH] nvmem: uniphier: change access unit from 32bit to 8bit
-In-Reply-To: <1511327699-26396-1-git-send-email-hayashi.kunihiko@socionext.com>
-References: <1511327699-26396-1-git-send-email-hayashi.kunihiko@socionext.com>
-Message-ID: <000001d3635d$9a33c9f0$ce9b5dd0$@socionext.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 22 Nov 2017 15:41:25 +0800
+Subject: [PATCH] media: mtk-vcodec: add missing MODULE_LICENSE/DESCRIPTION
+In-Reply-To: <20171120062607.124734-1-jc@linux.com>
+References: <20171120062607.124734-1-jc@linux.com>
+Message-ID: <201711221521.lmq1l8ci%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Reviewed-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
+Hi Jesse,
 
-Thanks.
+Thank you for the patch! Yet something to improve:
 
------
-Best Regards,
-Keiji Hayashibara
+[auto build test ERROR on linuxtv-media/master]
+[also build test ERROR on v4.14 next-20171121]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-> -----Original Message-----
-> From: Kunihiko Hayashi [mailto:hayashi.kunihiko at socionext.com]
-> Sent: Wednesday, November 22, 2017 2:15 PM
-> To: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: Yamada, Masahiro/?? ?? <yamada.masahiro@socionext.com>; Hayashibara, Keiji/?? ??
-> <hayashibara.keiji@socionext.com>; masami.hiramatsu at linaro.org; jaswinder.singh at linaro.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Hayashi, Kunihiko/? ??
-> <hayashi.kunihiko@socionext.com>
-> Subject: [PATCH] nvmem: uniphier: change access unit from 32bit to 8bit
-> 
-> The efuse on UniPhier allows 8bit access according to the specification.
-> Since bit offset of nvmem is limited to 0-7, it is desiable to change access unit of nvmem to 8bit.
-> 
-> Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> ---
->  drivers/nvmem/uniphier-efuse.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/nvmem/uniphier-efuse.c b/drivers/nvmem/uniphier-efuse.c index 2bb45c4..fac3122 100644
-> --- a/drivers/nvmem/uniphier-efuse.c
-> +++ b/drivers/nvmem/uniphier-efuse.c
-> @@ -27,11 +27,11 @@ static int uniphier_reg_read(void *context,
->  			     unsigned int reg, void *_val, size_t bytes)  {
->  	struct uniphier_efuse_priv *priv = context;
-> -	u32 *val = _val;
-> +	u8 *val = _val;
->  	int offs;
-> 
-> -	for (offs = 0; offs < bytes; offs += sizeof(u32))
-> -		*val++ = readl(priv->base + reg + offs);
-> +	for (offs = 0; offs < bytes; offs += sizeof(u8))
-> +		*val++ = readb(priv->base + reg + offs);
-> 
->  	return 0;
->  }
-> @@ -53,8 +53,8 @@ static int uniphier_efuse_probe(struct platform_device *pdev)
->  	if (IS_ERR(priv->base))
->  		return PTR_ERR(priv->base);
-> 
-> -	econfig.stride = 4;
-> -	econfig.word_size = 4;
-> +	econfig.stride = 1;
-> +	econfig.word_size = 1;
->  	econfig.read_only = true;
->  	econfig.reg_read = uniphier_reg_read;
->  	econfig.size = resource_size(res);
-> --
-> 2.7.4
+url:    https://github.com/0day-ci/linux/commits/Jesse-Chan/media-mtk-vcodec-add-missing-MODULE_LICENSE-DESCRIPTION/20171122-124620
+base:   git://linuxtv.org/media_tree.git master
+config: xtensa-allmodconfig (attached as .config)
+compiler: xtensa-linux-gcc (GCC) 4.9.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=xtensa 
+
+All errors (new ones prefixed by >>):
+
+>> drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c:55:16: error: expected declaration specifiers or '...' before string constant
+    MODULE_LICENSE("GPL v2");
+                   ^
+   drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c:56:20: error: expected declaration specifiers or '...' before string constant
+    MODULE_DESCRIPTION("Mediatek video codec driver");
+                       ^
+
+vim +55 drivers/media/platform/mtk-vcodec/mtk_vcodec_intr.c
+
+    54	
+  > 55	MODULE_LICENSE("GPL v2");
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 51526 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171122/78bae7d9/attachment-0001.gz>
