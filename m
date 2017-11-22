@@ -1,157 +1,66 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Wed, 22 Nov 2017 21:41:58 +0100
-Subject: [RFC PATCH] kvm: arm64: handle single-step of hyp emulated mmio
- instructions
-In-Reply-To: <20171122170747.12192-1-alex.bennee@linaro.org>
-References: <20171122170747.12192-1-alex.bennee@linaro.org>
-Message-ID: <20171122204158.GW28855@cbox>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 22 Nov 2017 18:48:12 -0200
+Subject: [PATCH v2 2/2] ARM: dts: TS-7970: add basic device tree
+In-Reply-To: <20171122203233.2649-2-sebastien.bourdelin@savoirfairelinux.com>
+References: <20171122203233.2649-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20171122203233.2649-2-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <CAOMZO5CzXo63fbFZWE-KR1FC7VQ4DzKvR-SdDmp+5L5+=Rd10Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 05:07:46PM +0000, Alex Benn?e wrote:
-> There is a fast-path of MMIO emulation inside hyp mode. The handling
-> of single-step is broadly the same as kvm_arm_handle_step_debug()
-> except we just setup ESR/HSR so handle_exit() does the correct thing
-> as we exit.
-> 
-> For the case of an emulated illegal access causing an SError we signal
-> to handle_exit() by clearing the DBG_SPSR_SS bit as would have
-> actually happened had the hardware really single-stepped the
-> instruction.
-> 
-> [AJB: currently compile tested only]
-> 
-> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-> ---
->  arch/arm64/kvm/handle_exit.c |  8 +++++++-
->  arch/arm64/kvm/hyp/switch.c  | 37 ++++++++++++++++++++++++++++++-------
->  2 files changed, 37 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-> index af1c804742f6..128120f04e0e 100644
-> --- a/arch/arm64/kvm/handle_exit.c
-> +++ b/arch/arm64/kvm/handle_exit.c
-> @@ -28,6 +28,7 @@
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_mmu.h>
->  #include <asm/kvm_psci.h>
-> +#include <asm/debug-monitors.h>
->  
->  #define CREATE_TRACE_POINTS
->  #include "trace.h"
-> @@ -242,7 +243,12 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
->  		return 1;
->  	case ARM_EXCEPTION_EL1_SERROR:
->  		kvm_inject_vabt(vcpu);
-> -		return 1;
-> +		/* We may still need to return for single-step */
-> +		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
-> +			&& kvm_arm_handle_step_debug(vcpu, run))
-> +			return 0;
-> +		else
-> +			return 1;
+On Wed, Nov 22, 2017 at 6:32 PM, Sebastien Bourdelin
+<sebastien.bourdelin@savoirfairelinux.com> wrote:
 
-I think you need to describe in the commit message that this is actually
-fixing an additional potential problem, not necessarily related to mmio
-emulation.  Hmmm, maybe it is easier to see this in two separate patches
-after all, introducing this logic first to plug the "debug step
-exception vs. SError from guest priority is implementation defined"
-problem, and then using it afterwards for the mmio emulation as well.
-
-Come to think of it, we should probably expand on the comment above as
-well.
-
->  	case ARM_EXCEPTION_TRAP:
->  		return handle_trap_exceptions(vcpu, run);
->  	case ARM_EXCEPTION_HYP_GONE:
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 945e79c641c4..a6712f179b52 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -22,6 +22,7 @@
->  #include <asm/kvm_emulate.h>
->  #include <asm/kvm_hyp.h>
->  #include <asm/fpsimd.h>
-> +#include <asm/debug-monitors.h>
->  
->  static bool __hyp_text __fpsimd_enabled_nvhe(void)
->  {
-> @@ -263,7 +264,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
->  	return true;
->  }
->  
-> -static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
-> +/* Skip an instruction which has been emulated. Returns true if
-> + * execution can continue or false if we need to exit hyp mode because
-> + * single-step was in effect.
-> + */
-> +static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  {
->  	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
->  
-> @@ -276,6 +281,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
->  	}
->  
->  	write_sysreg_el2(*vcpu_pc(vcpu), elr);
+> +/dts-v1/;
+> +#include "imx6q.dtsi"
+> +#include "imx6qdl-ts7970.dtsi"
 > +
-> +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-> +		vcpu->arch.fault.esr_el2 =
-> +			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
-> +		return false;
-> +	} else {
-> +		return true;
-> +	}
->  }
->  
->  int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> @@ -336,13 +349,21 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  			int ret = __vgic_v2_perform_cpuif_access(vcpu);
->  
->  			if (ret == 1) {
-> -				__skip_instr(vcpu);
-> -				goto again;
-> +				if (__skip_instr(vcpu))
-> +					goto again;
-> +				else
-> +					exit_code = ARM_EXCEPTION_TRAP;
->  			}
->  
->  			if (ret == -1) {
-> -				/* Promote an illegal access to an SError */
-> -				__skip_instr(vcpu);
-> +				/* Promote an illegal access to an
-> +				 * SError. If we would be returning
-> +				 * due to single-step clear the SS
-> +				 * bit so handle_exit knows what to
-> +				 * do after dealing with the error.
-> +				 */
-> +				if (!__skip_instr(vcpu))
-> +					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+> +/ {
+> +       model = "Technologic Systems i.MX6 Quad TS-7970 (Default Devuice Tree)";
 
-Could this be overriding guest state if the guest is debugging itself
-and we don't have (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) ?
+Typo: Devuice--> Device
 
->  				exit_code = ARM_EXCEPTION_EL1_SERROR;
->  			}
->  
-> @@ -357,8 +378,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  		int ret = __vgic_v3_perform_cpuif_access(vcpu);
->  
->  		if (ret == 1) {
-> -			__skip_instr(vcpu);
-> -			goto again;
-> +			if (__skip_instr(vcpu))
-> +				goto again;
-> +			else
-> +				exit_code = ARM_EXCEPTION_TRAP;
->  		}
->  
->  		/* 0 falls through to be handled out of EL2 */
-> -- 
-> 2.15.0
-> 
+> +       reg_can1_3v3: reg_can1_3v3 {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "reg_can1_3v3";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
 
-Other than that, this looks good.
+Are you sure this is GPIO_ACTIVE_HIGH?
 
-Thanks,
--Christoffer
+If so, then it would need the 'enable-active-high' property.
+
+
+> +       };
+> +
+> +       reg_can2_3v3: en-reg_can2_3v3 {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "reg_can2_3v3";
+> +               regulator-min-microvolt = <3300000>;
+> +               regulator-max-microvolt = <3300000>;
+> +               gpio = <&gpio6 31 GPIO_ACTIVE_HIGH>;
+
+Same here.
+
+> +
+> +&fec {
+> +       pinctrl-names = "default";
+> +       pinctrl-0 = <&pinctrl_enet>;
+> +       interrupts-extended = <&gpio1 6 0x04>, <&gpc 0 119 0x04>;
+
+I think you meant to say:
+
+interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
+      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
+fsl,err006687-workaround-present;
+
+> +&pcie {
+> +       reset-gpio = <&gpio2 21 GPIO_ACTIVE_HIGH>;
+
+Are you sure it is GPIO_ACTIVE_HIGH? if so, it would need a
+reset-gpio-active-high property.
+
+Most likely this should be:
+
+reset-gpio = <&gpio2 21 GPIO_ACTIVE_LOW>;
