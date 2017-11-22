@@ -1,66 +1,47 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 22 Nov 2017 18:48:12 -0200
-Subject: [PATCH v2 2/2] ARM: dts: TS-7970: add basic device tree
-In-Reply-To: <20171122203233.2649-2-sebastien.bourdelin@savoirfairelinux.com>
-References: <20171122203233.2649-1-sebastien.bourdelin@savoirfairelinux.com>
- <20171122203233.2649-2-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <CAOMZO5CzXo63fbFZWE-KR1FC7VQ4DzKvR-SdDmp+5L5+=Rd10Q@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 22 Nov 2017 21:19:28 +0000
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
+ (KAISER)
+In-Reply-To: <20171122161913.GB12684@amd>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+ <20171122161913.GB12684@amd>
+Message-ID: <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 6:32 PM, Sebastien Bourdelin
-<sebastien.bourdelin@savoirfairelinux.com> wrote:
+On 22 November 2017 at 16:19, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+>
+>> This patch series implements something along the lines of KAISER for arm64:
+>>
+>>   https://gruss.cc/files/kaiser.pdf
+>>
+>> although I wrote this from scratch because the paper has some funny
+>> assumptions about how the architecture works. There is a patch series
+>> in review for x86, which follows a similar approach:
+>>
+>>   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
+>>
+>> and the topic was recently covered by LWN (currently subscriber-only):
+>>
+>>   https://lwn.net/Articles/738975/
+>>
+>> The basic idea is that transitions to and from userspace are proxied
+>> through a trampoline page which is mapped into a separate page table and
+>> can switch the full kernel mapping in and out on exception entry and
+>> exit respectively. This is a valuable defence against various KASLR and
+>> timing attacks, particularly as the trampoline page is at a fixed virtual
+>> address and therefore the kernel text can be randomized
+>> independently.
+>
+> If I'm willing to do timing attacks to defeat KASLR... what prevents
+> me from using CPU caches to do that?
+>
 
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include "imx6qdl-ts7970.dtsi"
-> +
-> +/ {
-> +       model = "Technologic Systems i.MX6 Quad TS-7970 (Default Devuice Tree)";
+Because it is impossible to get a cache hit on an access to an unmapped address?
 
-Typo: Devuice--> Device
-
-> +       reg_can1_3v3: reg_can1_3v3 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "reg_can1_3v3";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +               gpio = <&gpio4 21 GPIO_ACTIVE_HIGH>;
-
-Are you sure this is GPIO_ACTIVE_HIGH?
-
-If so, then it would need the 'enable-active-high' property.
-
-
-> +       };
-> +
-> +       reg_can2_3v3: en-reg_can2_3v3 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "reg_can2_3v3";
-> +               regulator-min-microvolt = <3300000>;
-> +               regulator-max-microvolt = <3300000>;
-> +               gpio = <&gpio6 31 GPIO_ACTIVE_HIGH>;
-
-Same here.
-
-> +
-> +&fec {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_enet>;
-> +       interrupts-extended = <&gpio1 6 0x04>, <&gpc 0 119 0x04>;
-
-I think you meant to say:
-
-interrupts-extended = <&gpio1 6 IRQ_TYPE_LEVEL_HIGH>,
-      <&intc 0 119 IRQ_TYPE_LEVEL_HIGH>;
-fsl,err006687-workaround-present;
-
-> +&pcie {
-> +       reset-gpio = <&gpio2 21 GPIO_ACTIVE_HIGH>;
-
-Are you sure it is GPIO_ACTIVE_HIGH? if so, it would need a
-reset-gpio-active-high property.
-
-Most likely this should be:
-
-reset-gpio = <&gpio2 21 GPIO_ACTIVE_LOW>;
+> There was blackhat talk about exactly that IIRC...
+>                                                                         Pavel
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
