@@ -1,23 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 22 Nov 2017 19:37:09 +0000
+Date: Wed, 22 Nov 2017 19:37:14 +0000
 Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
  userspace (KAISER)
-In-Reply-To: <c09d26b4-2612-fb2e-fb95-897c937793ec@redhat.com>
+In-Reply-To: <20171122161913.GB12684@amd>
 References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <c09d26b4-2612-fb2e-fb95-897c937793ec@redhat.com>
-Message-ID: <20171122193709.GK22648@arm.com>
+ <20171122161913.GB12684@amd>
+Message-ID: <20171122193713.GL22648@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 02:50:58PM -0800, Laura Abbott wrote:
-> On 11/17/2017 10:21 AM, Will Deacon wrote:
-> >This patch series implements something along the lines of KAISER for arm64:
+On Wed, Nov 22, 2017 at 05:19:14PM +0100, Pavel Machek wrote:
+> > This patch series implements something along the lines of KAISER for arm64:
+> > 
+> >   https://gruss.cc/files/kaiser.pdf
+> > 
+> > although I wrote this from scratch because the paper has some funny
+> > assumptions about how the architecture works. There is a patch series
+> > in review for x86, which follows a similar approach:
+> > 
+> >   http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
+> > 
+> > and the topic was recently covered by LWN (currently subscriber-only):
+> > 
+> >   https://lwn.net/Articles/738975/
+> > 
+> > The basic idea is that transitions to and from userspace are proxied
+> > through a trampoline page which is mapped into a separate page table and
+> > can switch the full kernel mapping in and out on exception entry and
+> > exit respectively. This is a valuable defence against various KASLR and
+> > timing attacks, particularly as the trampoline page is at a fixed virtual
+> > address and therefore the kernel text can be randomized
+> > independently.
 > 
-> Passed some basic tests on Hikey Android and my Mustang box. I'll
-> leave the Mustang building kernels for a few days. You're welcome
-> to add Tested-by or I can re-test on v2.
+> If I'm willing to do timing attacks to defeat KASLR... what prevents
+> me from using CPU caches to do that?
 
-Cheers, Laura. I've got a few changes for v2 based on Ard's feedback, so if
-you could retest that when I post it then it would be much appreciated.
+Is that a rhetorical question? If not, then I'm probably not the best person
+to answer it. All I'm doing here is protecting against a class of attacks on
+kaslr that make use of the TLB/page-table walker to determine where the
+kernel is mapped.
+
+> There was blackhat talk about exactly that IIRC...
+
+Got a link? I'd be interested to see how the idea works in case there's an
+orthogonal defence against it.
 
 Will
