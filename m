@@ -1,58 +1,28 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 22 Nov 2017 23:19:09 +0000
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
- (KAISER)
-In-Reply-To: <20171122223355.GA5877@amd>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <20171122161913.GB12684@amd>
- <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
- <20171122223355.GA5877@amd>
-Message-ID: <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 22 Nov 2017 18:25:02 -0500
+Subject: [PATCH V2 09/29] drm/i915: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511390964-9979-10-git-send-email-okaya@codeaurora.org>
+References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
+ <1511390964-9979-10-git-send-email-okaya@codeaurora.org>
+Message-ID: <4c12bca7-3827-c85a-56d5-d5d10890d40d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/22/2017 5:49 PM, Sinan Kaya wrote:
+>  static int i915_get_bridge_dev(struct drm_i915_private *dev_priv)
+>  {
+> -	dev_priv->bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
+> +	u32 domain = pci_domain_nr(dev_priv->drm.pdev->bus);
 
-> On 22 Nov 2017, at 22:33, Pavel Machek <pavel@ucw.cz> wrote:
-> 
->> On Wed 2017-11-22 21:19:28, Ard Biesheuvel wrote:
->>> On 22 November 2017 at 16:19, Pavel Machek <pavel@ucw.cz> wrote:
->>> Hi!
->>> 
->>>> This patch series implements something along the lines of KAISER for arm64:
->>>> 
->>>>  https://gruss.cc/files/kaiser.pdf
->>>> 
->>>> although I wrote this from scratch because the paper has some funny
->>>> assumptions about how the architecture works. There is a patch series
->>>> in review for x86, which follows a similar approach:
->>>> 
->>>>  http://lkml.kernel.org/r/<20171110193058.BECA7D88@viggo.jf.intel.com>
->>>> 
->>>> and the topic was recently covered by LWN (currently subscriber-only):
->>>> 
->>>>  https://lwn.net/Articles/738975/
->>>> 
->>>> The basic idea is that transitions to and from userspace are proxied
->>>> through a trampoline page which is mapped into a separate page table and
->>>> can switch the full kernel mapping in and out on exception entry and
->>>> exit respectively. This is a valuable defence against various KASLR and
->>>> timing attacks, particularly as the trampoline page is at a fixed virtual
->>>> address and therefore the kernel text can be randomized
->>>> independently.
->>> 
->>> If I'm willing to do timing attacks to defeat KASLR... what prevents
->>> me from using CPU caches to do that?
->>> 
->> 
->> Because it is impossible to get a cache hit on an access to an
->> unmapped address?
-> 
-> Um, no, I don't need to be able to directly access kernel addresses. I
-> just put some data in _same place in cache where kernel data would
-> go_, then do syscall and look if my data are still cached. Caches
-> don't have infinite associativity.
-> 
+I'll convert domain type to int on the next version across the series.
 
-Ah ok. Interesting.
+I tried to convert most of the drivers to use pci_domain_nr() per feedback
+from Greg KH. I'll hold onto posting a new version until I gather feedback
+with the approach I have taken.
 
-But how does that leak address bits that are covered by the tag?
+I just did a build test with the series.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
