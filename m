@@ -1,78 +1,133 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 22 Nov 2017 17:59:23 +0100
-Subject: [PATCH 3/6] arm: dts: marvell: Add missing #phy-cells to
- usb-nop-xceiv
-In-Reply-To: <CAK8P3a1x7mnpvfgsnwVJdX4OFwJZn0GpTE9ATfoLuQPB5ev=gg@mail.gmail.com>
- (Arnd Bergmann's message of "Tue, 21 Nov 2017 21:45:49 +0100")
-References: <20171109222614.5719-1-robh@kernel.org>
- <20171109222614.5719-3-robh@kernel.org>
- <CAL_JsqJhq7TqdaS+i8yk8rRJM0hH2hyk8eybXsnR0D8QoncXZg@mail.gmail.com>
- <20171121200922.GD30040@lunn.ch>
- <CAK8P3a1x7mnpvfgsnwVJdX4OFwJZn0GpTE9ATfoLuQPB5ev=gg@mail.gmail.com>
-Message-ID: <87po8az1uc.fsf@free-electrons.com>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Wed, 22 Nov 2017 17:07:46 +0000
+Subject: [RFC PATCH] kvm: arm64: handle single-step of hyp emulated mmio
+ instructions
+Message-ID: <20171122170747.12192-1-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+There is a fast-path of MMIO emulation inside hyp mode. The handling
+of single-step is broadly the same as kvm_arm_handle_step_debug()
+except we just setup ESR/HSR so handle_exit() does the correct thing
+as we exit.
+
+For the case of an emulated illegal access causing an SError we signal
+to handle_exit() by clearing the DBG_SPSR_SS bit as would have
+actually happened had the hardware really single-stepped the
+instruction.
+
+[AJB: currently compile tested only]
+
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ arch/arm64/kvm/handle_exit.c |  8 +++++++-
+ arch/arm64/kvm/hyp/switch.c  | 37 ++++++++++++++++++++++++++++++-------
+ 2 files changed, 37 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index af1c804742f6..128120f04e0e 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
++#include <asm/debug-monitors.h>
  
- On mar., nov. 21 2017, Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Tue, Nov 21, 2017 at 9:09 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->> On Tue, Nov 21, 2017 at 12:29:48PM -0600, Rob Herring wrote:
->>> On Thu, Nov 9, 2017 at 4:26 PM, Rob Herring <robh@kernel.org> wrote:
->>> > "usb-nop-xceiv" is using the phy binding, but is missing #phy-cells
->>> > property. This is probably because the binding was the precursor to the phy
->>> > binding.
->>> >
->>> > Fixes the following warning in Marvell dts files:
->>> >
->>> > Warning (phys_property): Missing property '#phy-cells' in node ...
->>> >
->>> > Signed-off-by: Rob Herring <robh@kernel.org>
->>> > Cc: Jason Cooper <jason@lakedaemon.net>
->>> > Cc: Andrew Lunn <andrew@lunn.ch>
->>> > Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>> > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>> > ---
->>> > Please apply to Marvell tree.
->>>
->>> Ping.
->>>
->>> Arnd, can you apply if you'd like the warnings fixed and Marvell
->>> maintainers don't respond.
->>
->> Hi Rob
->>
->> Patches submitted a week before the merge window opens are generally
->> deferred to the next cycle. I expect that once -rc1 is out, Gregory
->> will pick up this patch.
->
-> These are real bugfixes, I want them in 4.15, since we now get a
-> loud warning for them. I'd rather not shut up that warning because
-> it's not a false-positive.
-
-As pointed by Andrew, I planned to take them once the 4.15-rc1 would be
-released. It was not obvious for me that it was real fixes. Actually I
-would have expected to have first the dts fixed in a release and then
-the warning enabled.
-
-I am fine if you take this patch, especially if it is merged in
-4.15-rc1.
-
-So for this patch:
-
-Acked-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-
-Thanks,
-
-Gregory
-
-
->
->        Arnd
-
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -242,7 +243,12 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+ 		kvm_inject_vabt(vcpu);
+-		return 1;
++		/* We may still need to return for single-step */
++		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
++			&& kvm_arm_handle_step_debug(vcpu, run))
++			return 0;
++		else
++			return 1;
+ 	case ARM_EXCEPTION_TRAP:
+ 		return handle_trap_exceptions(vcpu, run);
+ 	case ARM_EXCEPTION_HYP_GONE:
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 945e79c641c4..a6712f179b52 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -22,6 +22,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_hyp.h>
+ #include <asm/fpsimd.h>
++#include <asm/debug-monitors.h>
+ 
+ static bool __hyp_text __fpsimd_enabled_nvhe(void)
+ {
+@@ -263,7 +264,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+ 	return true;
+ }
+ 
+-static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
++/* Skip an instruction which has been emulated. Returns true if
++ * execution can continue or false if we need to exit hyp mode because
++ * single-step was in effect.
++ */
++static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ {
+ 	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
+ 
+@@ -276,6 +281,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+ 	}
+ 
+ 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
++
++	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
++		vcpu->arch.fault.esr_el2 =
++			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
++		return false;
++	} else {
++		return true;
++	}
+ }
+ 
+ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+@@ -336,13 +349,21 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 			int ret = __vgic_v2_perform_cpuif_access(vcpu);
+ 
+ 			if (ret == 1) {
+-				__skip_instr(vcpu);
+-				goto again;
++				if (__skip_instr(vcpu))
++					goto again;
++				else
++					exit_code = ARM_EXCEPTION_TRAP;
+ 			}
+ 
+ 			if (ret == -1) {
+-				/* Promote an illegal access to an SError */
+-				__skip_instr(vcpu);
++				/* Promote an illegal access to an
++				 * SError. If we would be returning
++				 * due to single-step clear the SS
++				 * bit so handle_exit knows what to
++				 * do after dealing with the error.
++				 */
++				if (!__skip_instr(vcpu))
++					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
+ 				exit_code = ARM_EXCEPTION_EL1_SERROR;
+ 			}
+ 
+@@ -357,8 +378,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+ 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
+ 
+ 		if (ret == 1) {
+-			__skip_instr(vcpu);
+-			goto again;
++			if (__skip_instr(vcpu))
++				goto again;
++			else
++				exit_code = ARM_EXCEPTION_TRAP;
+ 		}
+ 
+ 		/* 0 falls through to be handled out of EL2 */
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.15.0
