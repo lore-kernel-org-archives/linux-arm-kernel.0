@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:30:59 -0500
-Subject: [PATCH 14/30] powerpc/powermac: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:03 -0500
+Subject: [PATCH 18/30] PCI: ibmphp: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-15-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-19-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,21 +17,40 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/macintosh/via-pmu.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/hotplug/ibmphp_core.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/macintosh/via-pmu.c b/drivers/macintosh/via-pmu.c
-index c4c2b3b..3e8b3b6 100644
---- a/drivers/macintosh/via-pmu.c
-+++ b/drivers/macintosh/via-pmu.c
-@@ -1799,7 +1799,7 @@ static int powerbook_sleep_grackle(void)
- 	struct adb_request req;
- 	struct pci_dev *grackle;
+diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
+index 73cf846..92dd882 100644
+--- a/drivers/pci/hotplug/ibmphp_core.c
++++ b/drivers/pci/hotplug/ibmphp_core.c
+@@ -707,7 +707,8 @@ static void ibm_unconfigure_device(struct pci_func *func)
+ 	pci_lock_rescan_remove();
  
--	grackle = pci_get_bus_and_slot(0, 0);
-+	grackle = pci_get_domain_bus_and_slot(0, 0, 0);
- 	if (!grackle)
- 		return -ENODEV;
+ 	for (j = 0; j < 0x08; j++) {
+-		temp = pci_get_bus_and_slot(func->busno, (func->device << 3) | j);
++		temp = pci_get_domain_bus_and_slot(0, func->busno,
++						   (func->device << 3) | j);
+ 		if (temp) {
+ 			pci_stop_and_remove_bus_device(temp);
+ 			pci_dev_put(temp);
+@@ -780,7 +781,7 @@ static int ibm_configure_device(struct pci_func *func)
+ 	if (!(bus_structure_fixup(func->busno)))
+ 		flag = 1;
+ 	if (func->dev == NULL)
+-		func->dev = pci_get_bus_and_slot(func->busno,
++		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
+ 				PCI_DEVFN(func->device, func->function));
  
+ 	if (func->dev == NULL) {
+@@ -793,7 +794,7 @@ static int ibm_configure_device(struct pci_func *func)
+ 		if (num)
+ 			pci_bus_add_devices(bus);
+ 
+-		func->dev = pci_get_bus_and_slot(func->busno,
++		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
+ 				PCI_DEVFN(func->device, func->function));
+ 		if (func->dev == NULL) {
+ 			err("ERROR... : pci_dev still NULL\n");
 -- 
 1.9.1
