@@ -1,51 +1,45 @@
-From: eric.dumazet@gmail.com (Eric Dumazet)
-Date: Wed, 22 Nov 2017 07:57:18 -0800
-Subject: [PATCH net] net: thunderx: Fix TCP/UDP checksum offload for
- IPv6 pkts
-In-Reply-To: <20171122123727.23580-1-aleksey.makarov@auriga.com>
-References: <20171122123727.23580-1-aleksey.makarov@auriga.com>
-Message-ID: <1511366238.16595.1.camel@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 22 Nov 2017 11:15:47 -0500
+Subject: [PATCH 29/30] i7300_idle: deprecate pci_get_bus_and_slot()
+In-Reply-To: <20171122075345.GC26583@kroah.com>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-30-git-send-email-okaya@codeaurora.org>
+ <20171122075345.GC26583@kroah.com>
+Message-ID: <81de37c1-26b5-41f7-ab32-b98012890971@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-11-22 at 15:37 +0300, Aleksey Makarov wrote:
-> From: Sunil Goutham <sgoutham@cavium.com>
+On 11/22/2017 2:53 AM, Greg Kroah-Hartman wrote:
+>> +++ b/include/linux/i7300_idle.h
+>> @@ -48,7 +48,7 @@ static inline int i7300_idle_platform_probe(struct pci_dev **fbd_dev,
+>>  	int i;
+>>  	struct pci_dev *memdev, *dmadev;
+>>  
+>> -	memdev = pci_get_bus_and_slot(MEMCTL_BUS, MEMCTL_DEVFN);
+>> +	memdev = pci_get_domain_bus_and_slot(0, MEMCTL_BUS, MEMCTL_DEVFN);
+> You have a pci_dev, why can't you use it here to get the domain?
 > 
-> This fixes a previous patch which missed some changes
-> and due to which L3 checksum offload was getting enabled
-> for IPv6 pkts. And HW is dropping these pkts as it assumes
-> the pkt is IPv4 when IP csum offload is set in the SQ
-> descriptor.
-> 
-> Fixes: bbbb494fd005 ("net: thunderx: Enable TSO and checksum offloads
-> for ipv6")
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@auriga.com>
-> ---
-> ?drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 3 ++-
-> ?1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> index d4496e9afcdf..184d5bdbe7e0 100644
-> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-> @@ -1355,10 +1355,11 @@ nicvf_sq_add_hdr_subdesc(struct nicvf *nic,
-> struct snd_queue *sq, int qentry,
-> ?
-> ?	/* Offload checksum calculation to HW */
-> ?	if (skb->ip_summed == CHECKSUM_PARTIAL) {
-> -		hdr->csum_l3 = 1; /* Enable IP csum calculation */
-> ?		hdr->l3_offset = skb_network_offset(skb);
-> ?		hdr->l4_offset = skb_transport_offset(skb);
-> ?
-> +		/* Enable IP HDR csum calculation for V4 pkts */
-> +		hdr->csum_l3 = (ip.v4->version == 4) ? 1 : 0;
 
-Have you tried to set hdr->csum_l3 to 0 regardless of version being 4
-or 6 ?
+Both fbd_dev and ioat_dev are output parameters. 
 
-This would remove the need for yet another conditional.
+dmadev = pci_get_bus_and_slot(IOAT_BUS, IOAT_DEVFN);
+memdev = pci_get_bus_and_slot(MEMCTL_BUS, MEMCTL_DEVFN);
 
-AFAIK, linux does not offload IPv4 header checksums to NIC, it is not
-worth the trouble.
+	for (i = 0; fbd_ioat_list[i].vendor != 0; i++) {
+		if (dmadev->vendor == fbd_ioat_list[i].vendor &&
+		    dmadev->device == fbd_ioat_list[i].ioat_dev) {
+			if (!(fbd_ioat_list[i].enabled || enable_all))
+				continue;
+
+			if (fbd_dev)
+				*fbd_dev = memdev;
+			if (ioat_dev)
+				*ioat_dev = dmadev;
+
+Funny thing is nobody is calling this function. Maybe, I should just kill it
+instead.
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
