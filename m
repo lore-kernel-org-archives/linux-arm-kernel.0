@@ -1,48 +1,82 @@
 From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 22 Nov 2017 16:42:03 +0200
-Subject: [PATCH 1/3] dt-bindings: thermal/armada: describe AP806 and CP110
-Message-ID: <7102bb32704ac9f70ef3ae61682d50de8af61b57.1511361725.git.baruch@tkos.co.il>
+Date: Wed, 22 Nov 2017 16:42:04 +0200
+Subject: [PATCH 2/3] thermal: armada: add support for AP806
+In-Reply-To: <7102bb32704ac9f70ef3ae61682d50de8af61b57.1511361725.git.baruch@tkos.co.il>
+References: <7102bb32704ac9f70ef3ae61682d50de8af61b57.1511361725.git.baruch@tkos.co.il>
+Message-ID: <320800cce532d6ae1927b36f82b007f04c740a15.1511361725.git.baruch@tkos.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add compatible strings for AP806 and CP110 that are part of the Armada 8k/7k
-line of SoCs.
-
-Add a note on the difference in the size of the control area in different
-bindings. This is an existing difference between the Armada 375 binding and
-the rest. The new AP806 and CP110 bindings are similar to the existing Armada
-375 in this regard.
+The AP806 component is integrated in the Armada 8k and 7k lines of processors.
 
 Signed-off-by: Baruch Siach <baruch@tkos.co.il>
 ---
- Documentation/devicetree/bindings/thermal/armada-thermal.txt | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/thermal/armada_thermal.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/thermal/armada-thermal.txt b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-index 24aacf8948c5..5ec944d4138b 100644
---- a/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-+++ b/Documentation/devicetree/bindings/thermal/armada-thermal.txt
-@@ -7,12 +7,20 @@ Required properties:
- 		marvell,armada375-thermal
- 		marvell,armada380-thermal
- 		marvell,armadaxp-thermal
-+		marvell,armada-ap806-thermal
-+		marvell,armada-cp110-thermal
+diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
+index ae75328945f7..1f7f81628040 100644
+--- a/drivers/thermal/armada_thermal.c
++++ b/drivers/thermal/armada_thermal.c
+@@ -41,6 +41,10 @@
+ #define A375_HW_RESETn			BIT(8)
+ #define A380_HW_RESET			BIT(8)
  
- - reg:		Device's register space.
- 		Two entries are expected, see the examples below.
- 		The first one is required for the sensor register;
--		the second one is required for the control register
-+		the second one is required for the control area
- 		to be used for sensor initialization (a.k.a. calibration).
-+		The size of the control area must be 4 for
-+		marvell,armada370-thermal, marvell,armada380-thermal, and
-+		marvell,armadaxp-thermal. The size must be 8 for
-+		marvell,armada375-thermal, marvell,armada-ap806-thermal, and
-+		marvell,armada-cp110-thermal.
++#define AP806_START			BIT(0)
++#define AP806_RESET			BIT(1)
++#define AP806_ENABLE			BIT(2)
 +
+ struct armada_thermal_data;
  
- Example:
+ /* Marvell EBU Thermal Sensor Dev Structure */
+@@ -147,6 +151,18 @@ static void armada380_init_sensor(struct platform_device *pdev,
+ 	}
+ }
  
++static void armada_ap806_init_sensor(struct platform_device *pdev,
++				     struct armada_thermal_priv *priv)
++{
++	u32 reg = readl_relaxed(priv->control);
++
++	reg &= ~AP806_RESET;
++	reg |= AP806_START;
++	reg |= AP806_ENABLE;
++	writel(reg, priv->control);
++	mdelay(10);
++}
++
+ static bool armada_is_valid(struct armada_thermal_priv *priv)
+ {
+ 	unsigned long reg = readl_relaxed(priv->sensor);
+@@ -230,6 +246,18 @@ static const struct armada_thermal_data armada380_data = {
+ 	.inverted = true,
+ };
+ 
++static const struct armada_thermal_data armada_ap806_data = {
++	.is_valid = armada_is_valid,
++	.init_sensor = armada_ap806_init_sensor,
++	.is_valid_shift = 16,
++	.temp_shift = 0,
++	.temp_mask = 0x3ff,
++	.coef_b = 1172499100UL,
++	.coef_m = 2000096UL,
++	.coef_div = 4201,
++	.inverted = true,
++};
++
+ static const struct of_device_id armada_thermal_id_table[] = {
+ 	{
+ 		.compatible = "marvell,armadaxp-thermal",
+@@ -247,6 +275,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
+ 		.compatible = "marvell,armada380-thermal",
+ 		.data       = &armada380_data,
+ 	},
++	{
++		.compatible = "marvell,armada-ap806-thermal",
++		.data       = &armada_ap806_data,
++	},
+ 	{
+ 		/* sentinel */
+ 	},
 -- 
 2.15.0
