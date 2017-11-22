@@ -1,292 +1,404 @@
 From: suzuki.katsuhiro@socionext.com (Katsuhiro Suzuki)
-Date: Wed, 22 Nov 2017 20:43:21 +0900
-Subject: [PATCH 8/8] arm64: dts: uniphier: add sound node for UniPhier
+Date: Wed, 22 Nov 2017 20:43:19 +0900
+Subject: [PATCH 6/8] ASoC: uniphier: add support for UniPhier LD11/LD20 AIO
+ driver
 In-Reply-To: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
 References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
-Message-ID: <20171122114321.29196-9-suzuki.katsuhiro@socionext.com>
+Message-ID: <20171122114321.29196-7-suzuki.katsuhiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds audio controller, codec and simple card node of
-UniPhier AIO sound system for LD11/20 SoCs.
+This patch adds support for UniPhier AIO sound driver
+which is included in UniPhier LD11/LD20 SoCs.
 
 Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
 ---
- .../boot/dts/socionext/uniphier-ld11-global.dts    | 72 ++++++++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi   | 31 ++++++++++
- .../boot/dts/socionext/uniphier-ld20-global.dts    | 72 ++++++++++++++++++++++
- arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi   | 35 +++++++++++
- 4 files changed, 210 insertions(+)
+ sound/soc/uniphier/Kconfig    |  10 ++
+ sound/soc/uniphier/Makefile   |   1 +
+ sound/soc/uniphier/aio-ld11.c | 343 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 354 insertions(+)
+ create mode 100644 sound/soc/uniphier/aio-ld11.c
 
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-index 2452b2243f42..4eb8d00a8c02 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11-global.dts
-@@ -37,6 +37,29 @@
- 		device_type = "memory";
- 		reg = <0 0x80000000 0 0x40000000>;
- 	};
-+
-+	soc at 0 {
-+		sound {
-+			compatible = "audio-graph-card";
-+			label = "UniPhier LD11";
-+			widgets = "Headphone", "Headphone Jack";
-+
-+			dais = <&i2s_port2
-+				&i2s_port4
-+				&spdif_port0>;
-+		};
-+
-+		spdif-out {
-+			compatible = "linux,spdif-dit";
-+			#sound-dai-cells = <0>;
-+
-+			port at 0 {
-+				spdif_tx: endpoint {
-+					remote-endpoint = <&spdif_hiecout1>;
-+				};
-+			};
-+		};
-+	};
- };
+diff --git a/sound/soc/uniphier/Kconfig b/sound/soc/uniphier/Kconfig
+index 38a02879b9d5..8da628a46a9b 100644
+--- a/sound/soc/uniphier/Kconfig
++++ b/sound/soc/uniphier/Kconfig
+@@ -13,6 +13,16 @@ config SND_SOC_UNIPHIER_AIO
+ 	select REGMAP_MMIO
+ 	depends on SND_SOC_UNIPHIER
  
- &serial0 {
-@@ -72,3 +95,52 @@
- &nand {
- 	status = "okay";
- };
++config SND_SOC_UNIPHIER_LD11
++	tristate "UniPhier LD11/LD20 Device Driver"
++	depends on SND_SOC_UNIPHIER
++	select SND_SOC_UNIPHIER_AIO
++	help
++	  This adds ASoC driver for Socionext UniPhier LD11/LD20
++	  input and output that can be used with other codecs.
++	  Select Y if you use such device.
++	  If unsure select "N".
 +
-+&audio {
-+	i2s_port0: port at 0 {
-+		i2s_hdmi: endpoint {
-+		};
-+	};
+ config SND_SOC_UNIPHIER_EVEA_CODEC
+ 	tristate "UniPhier SoC internal audio codec"
+ 	depends on SND_SOC_UNIPHIER
+diff --git a/sound/soc/uniphier/Makefile b/sound/soc/uniphier/Makefile
+index 705a60cb2aa5..55a77ad1192e 100644
+--- a/sound/soc/uniphier/Makefile
++++ b/sound/soc/uniphier/Makefile
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ snd-soc-uniphier-aio-objs := aio-regctrl.o aio-dma.o aio-core.o
++snd-soc-uniphier-aio-$(CONFIG_SND_SOC_UNIPHIER_LD11) += aio-ld11.o
+ 
+ obj-$(CONFIG_SND_SOC_UNIPHIER_AIO) += snd-soc-uniphier-aio.o
+ 
+diff --git a/sound/soc/uniphier/aio-ld11.c b/sound/soc/uniphier/aio-ld11.c
+new file mode 100644
+index 000000000000..b6e3bd11f23a
+--- /dev/null
++++ b/sound/soc/uniphier/aio-ld11.c
+@@ -0,0 +1,343 @@
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Socionext UniPhier AIO ALSA driver for LD11/LD20.
++ *
++ * Copyright (c) 2016-2017 Socionext Inc.
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License
++ * as published by the Free Software Foundation; version 2
++ * of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program; if not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+	i2s_port1: port at 1 {
-+		i2s_pcmin2: endpoint {
-+		};
-+	};
++#include "aio.h"
 +
-+	i2s_port2: port at 2 {
-+		i2s_line: endpoint {
-+			remote-endpoint = <&evea_line>;
-+		};
-+	};
++static const struct uniphier_aio_spec uniphier_aio_ld11[] = {
++	/* for HDMI PCM In, Pin:AI1Dx */
++	{
++		.name = AUD_NAME_PCMIN1,
++		.gname = AUD_GNAME_HDMI,
++		.swm = {
++			.type  = PORT_TYPE_I2S,
++			.dir   = PORT_DIR_INPUT,
++			.rb    = { 21, 14, },
++			.ch    = { 21, 14, },
++			.iif   = { 5, 3, },
++			.iport = { 0, AUD_HW_PCMIN1, },
++		},
++	},
 +
-+	i2s_port3: port at 3 {
-+		i2s_hpcmout1: endpoint {
-+		};
-+	};
++	/* for SIF In, Pin:AI2Dx */
++	{
++		.name = AUD_NAME_PCMIN2,
++		.swm = {
++			.type  = PORT_TYPE_I2S,
++			.dir   = PORT_DIR_INPUT,
++			.rb    = { 22, 15, },
++			.ch    = { 22, 15, },
++			.iif   = { 6, 4, },
++			.iport = { 1, AUD_HW_PCMIN2, },
++		},
++	},
 +
-+	i2s_port4: port at 4 {
-+		i2s_pcmout3: endpoint {
-+			remote-endpoint = <&evea_hp>;
-+		};
-+	};
++	/* for Line In, Pin:AI3Dx */
++	{
++		.name = AUD_NAME_PCMIN3,
++		.gname = AUD_GNAME_LINE,
++		.swm = {
++			.type  = PORT_TYPE_EVE,
++			.dir   = PORT_DIR_INPUT,
++			.rb    = { 23, 16, },
++			.ch    = { 23, 16, },
++			.iif   = { 7, 5, },
++			.iport = { 2, AUD_HW_PCMIN3, },
++		},
++	},
 +
-+	spdif_port0: port at 5 {
-+		spdif_hiecout1: endpoint {
-+			remote-endpoint = <&spdif_tx>;
-+		};
-+	};
++	/* for S/PDIF In, Pin:AI1IEC */
++	{
++		.name = AUD_NAME_IECIN1,
++		.gname = AUD_GNAME_IEC,
++		.swm = {
++			.type  = PORT_TYPE_SPDIF,
++			.dir   = PORT_DIR_INPUT,
++			.rb    = { 26, 17, },
++			.ch    = { 26, 17, },
++			.iif   = { 10, 6, },
++			.iport = { 3, AUD_HW_IECIN1, },
++		},
++	},
++
++	/* for Speaker, Pin:AO1Dx */
++	{
++		.name = AUD_NAME_HPCMOUT1,
++		.swm = {
++			.type  = PORT_TYPE_I2S,
++			.dir   = PORT_DIR_OUTPUT,
++			.rb    = { 0, 0, },
++			.ch    = { 0, 0, },
++			.oif   = { 0, 0, },
++			.oport = { 0, AUD_HW_HPCMOUT1, },
++		},
++	},
++
++	/* for HDMI PCM, Pin:AO2Dx */
++	{
++		.name = AUD_NAME_PCMOUT1,
++		.gname = AUD_GNAME_HDMI,
++		.swm = {
++			.type  = PORT_TYPE_I2S,
++			.dir   = PORT_DIR_OUTPUT,
++			.rb    = { 0, 0, },
++			.ch    = { 0, 0, },
++			.oif   = { 0, 0, },
++			.oport = { 3, AUD_HW_PCMOUT1, },
++		},
++	},
++
++	/* for Line Out, Pin:LO2_x */
++	{
++		.name = AUD_NAME_PCMOUT2,
++		.gname = AUD_GNAME_LINE,
++		.swm = {
++			.type  = PORT_TYPE_EVE,
++			.dir   = PORT_DIR_OUTPUT,
++			.rb    = { 2, 2, },
++			.ch    = { 2, 2, },
++			.oif   = { 2, 2, },
++			.oport = { 1, AUD_HW_PCMOUT2, },
++		},
++	},
++
++	/* for Headphone, Pin:HP1_x */
++	{
++		.name = AUD_NAME_PCMOUT3,
++		.swm = {
++			.type  = PORT_TYPE_EVE,
++			.dir   = PORT_DIR_OUTPUT,
++			.rb    = { 3, 3, },
++			.ch    = { 3, 3, },
++			.oif   = { 3, 3, },
++			.oport = { 2, AUD_HW_PCMOUT3, },
++		},
++	},
++
++	/* for HW Sampling Rate Converter */
++	{
++		.name = AUD_NAME_EPCMOUT2,
++		.swm = {
++			.type  = PORT_TYPE_CONV,
++			.dir   = PORT_DIR_OUTPUT,
++			.rb    = { 7, 5, },
++			.ch    = { 7, 5, },
++			.oif   = { 7, 5, },
++			.oport = { 6, AUD_HW_EPCMOUT2, },
++			.och   = { 17, 12, },
++			.iif   = { 1, 1, },
++		},
++	},
++
++	/* for HW Sampling Rate Converter 2 */
++	{
++		.name = AUD_NAME_EPCMOUT3,
++		.swm = {
++			.type  = PORT_TYPE_CONV,
++			.dir   = PORT_DIR_OUTPUT,
++			.rb    = { 8, 6, },
++			.ch    = { 8, 6, },
++			.oif   = { 8, 6, },
++			.oport = { 7, AUD_HW_EPCMOUT3, },
++			.och   = { 18, 13, },
++			.iif   = { 2, 2, },
++		},
++	},
++
++	/* for S/PDIF Out, Pin:AO1IEC */
++	{
++		.name = AUD_NAME_HIECOUT1,
++		.gname = AUD_GNAME_IEC,
++		.swm = {
++			.type  = PORT_TYPE_SPDIF,
++			.dir   = PORT_DIR_OUTPUT,
++			.rb    = { 1, 1, },
++			.ch    = { 1, 1, },
++			.oif   = { 1, 1, },
++			.oport = { 12, AUD_HW_HIECOUT1, },
++		},
++	},
 +};
 +
-+&evea {
-+	port at 0 {
-+		evea_line: endpoint {
-+			remote-endpoint = <&i2s_line>;
-+		};
-+	};
-+
-+	port at 1 {
-+		evea_hp: endpoint {
-+			remote-endpoint = <&i2s_pcmout3>;
-+		};
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-index 1c63d0ab8a58..875e3d832090 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld11.dtsi
-@@ -186,6 +186,29 @@
- 						     <21 217 3>;
- 		};
- 
-+		audio: audio at 56000000 {
-+			compatible = "socionext,uniphier-ld11-aio";
-+			reg = <0x56000000 0x80000>;
-+			interrupts = <0 144 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_aout>;
-+			clock-names = "aio";
-+			clocks = <&sys_clk 40>;
-+			reset-names = "aio";
-+			resets = <&sys_rst 40>;
-+			#sound-dai-cells = <1>;
-+		};
-+
-+		evea: codec at 57900000 {
-+			compatible = "socionext,uniphier-evea";
-+			reg = <0x57900000 0x1000>;
-+			clock-names = "evea", "exiv";
-+			clocks = <&sys_clk 41>, <&sys_clk 42>;
-+			reset-names = "evea", "exiv", "adamv";
-+			resets = <&sys_rst 41>, <&sys_rst 42>, <&adamv_rst 0>;
-+			#sound-dai-cells = <1>;
-+		};
-+
- 		adamv at 57920000 {
- 			compatible = "socionext,uniphier-ld11-adamv",
- 				     "simple-mfd", "syscon";
-@@ -471,3 +494,11 @@
- };
- 
- #include "uniphier-pinctrl.dtsi"
-+
-+&pinctrl_aout {
-+	drive-strength = <4>;	/* default: 4mA */
-+	group_1 {
-+		pins = "AO1ARC";
-+		drive-strength = <8>;	/* 8mA */
-+	};
-+};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-index fc2bc9d75d35..ebcd65631bca 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20-global.dts
-@@ -37,6 +37,29 @@
- 		device_type = "memory";
- 		reg = <0 0x80000000 0 0xc0000000>;
- 	};
-+
-+	soc at 0 {
-+		sound {
-+			compatible = "audio-graph-card";
-+			label = "UniPhier LD20";
-+			widgets = "Headphone", "Headphone Jack";
-+
-+			dais = <&i2s_port2
-+				&i2s_port4
-+				&spdif_port0>;
-+		};
-+
-+		spdif-out {
-+			compatible = "linux,spdif-dit";
-+			#sound-dai-cells = <0>;
-+
-+			port at 0 {
-+				spdif_tx: endpoint {
-+					remote-endpoint = <&spdif_hiecout1>;
-+				};
-+			};
-+		};
-+	};
- };
- 
- &serial0 {
-@@ -54,3 +77,52 @@
- &nand {
- 	status = "okay";
- };
-+
-+&audio {
-+	i2s_port0: port at 0 {
-+		i2s_hdmi: endpoint {
-+		};
-+	};
-+
-+	i2s_port1: port at 1 {
-+		i2s_pcmin2: endpoint {
-+		};
-+	};
-+
-+	i2s_port2: port at 2 {
-+		i2s_line: endpoint {
-+			remote-endpoint = <&evea_line>;
-+		};
-+	};
-+
-+	i2s_port3: port at 3 {
-+		i2s_hpcmout1: endpoint {
-+		};
-+	};
-+
-+	i2s_port4: port at 4 {
-+		i2s_pcmout3: endpoint {
-+			remote-endpoint = <&evea_hp>;
-+		};
-+	};
-+
-+	spdif_port0: port at 5 {
-+		spdif_hiecout1: endpoint {
-+			remote-endpoint = <&spdif_tx>;
-+		};
-+	};
++static const struct snd_soc_dai_ops uniphier_aio_ops = {
++	.startup   = uniphier_aio_startup,
++	.shutdown  = uniphier_aio_shutdown,
++	.hw_params = uniphier_aio_hw_params,
++	.hw_free   = uniphier_aio_hw_free,
++	.prepare   = uniphier_aio_prepare,
 +};
 +
-+&evea {
-+	port at 0 {
-+		evea_line: endpoint {
-+			remote-endpoint = <&i2s_line>;
-+		};
-+	};
-+
-+	port at 1 {
-+		evea_hp: endpoint {
-+			remote-endpoint = <&i2s_pcmout3>;
-+		};
-+	};
++static struct snd_soc_dai_driver uniphier_aio_dai_ld11[] = {
++	{
++		.name    = AUD_GNAME_HDMI,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.playback = {
++			.stream_name = AUD_NAME_PCMOUT1,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.capture = {
++			.stream_name = AUD_NAME_PCMIN1,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000 |
++				SNDRV_PCM_RATE_44100 |
++				SNDRV_PCM_RATE_32000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
++	{
++		.name    = AUD_NAME_PCMIN2,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.capture = {
++			.stream_name = AUD_NAME_PCMIN2,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
++	{
++		.name    = AUD_GNAME_LINE,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.playback = {
++			.stream_name = AUD_NAME_PCMOUT2,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.capture = {
++			.stream_name = AUD_NAME_PCMIN3,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
++	{
++		.name    = AUD_NAME_HPCMOUT1,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.playback = {
++			.stream_name = AUD_NAME_HPCMOUT1,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
++	{
++		.name    = AUD_NAME_PCMOUT3,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.playback = {
++			.stream_name = AUD_NAME_PCMOUT3,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
++	{
++		.name    = AUD_NAME_HIECOUT1,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.playback = {
++			.stream_name = AUD_NAME_HIECOUT1,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
++	{
++		.name    = AUD_NAME_EPCMOUT2,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.playback = {
++			.stream_name = AUD_NAME_EPCMOUT2,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000 |
++				SNDRV_PCM_RATE_44100 |
++				SNDRV_PCM_RATE_32000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
++	{
++		.name    = AUD_NAME_EPCMOUT3,
++		.probe   = uniphier_aio_dai_probe,
++		.remove  = uniphier_aio_dai_remove,
++		.suspend = uniphier_aio_dai_suspend,
++		.resume  = uniphier_aio_dai_resume,
++		.playback = {
++			.stream_name = AUD_NAME_EPCMOUT3,
++			.formats     = SNDRV_PCM_FMTBIT_S32_LE,
++			.rates       = SNDRV_PCM_RATE_48000 |
++				SNDRV_PCM_RATE_44100 |
++				SNDRV_PCM_RATE_32000,
++			.channels_min = 2,
++			.channels_max = 2,
++		},
++		.ops = &uniphier_aio_ops,
++	},
 +};
-diff --git a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-index 5c81070944cc..d42bb1be1137 100644
---- a/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-+++ b/arch/arm64/boot/dts/socionext/uniphier-ld20.dtsi
-@@ -286,6 +286,29 @@
- 						     <21 217 3>;
- 		};
- 
-+		audio: audio at 56000000 {
-+			compatible = "socionext,uniphier-ld20-aio";
-+			reg = <0x56000000 0x80000>;
-+			interrupts = <0 144 4>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_aout>;
-+			clock-names = "aio";
-+			clocks = <&sys_clk 40>;
-+			reset-names = "aio";
-+			resets = <&sys_rst 40>;
-+			#sound-dai-cells = <1>;
-+		};
 +
-+		evea: codec at 57900000 {
-+			compatible = "socionext,uniphier-evea";
-+			reg = <0x57900000 0x1000>;
-+			clock-names = "evea", "exiv";
-+			clocks = <&sys_clk 41>, <&sys_clk 42>;
-+			reset-names = "evea", "exiv", "adamv";
-+			resets = <&sys_rst 41>, <&sys_rst 42>, <&adamv_rst 0>;
-+			#sound-dai-cells = <1>;
-+		};
++const struct uniphier_aio_chip_spec uniphier_aio_ld11_spec = {
++	.aio_specs     = uniphier_aio_ld11,
++	.num_aio_specs = ARRAY_SIZE(uniphier_aio_ld11),
++	.dais          = uniphier_aio_dai_ld11,
++	.num_dais      = ARRAY_SIZE(uniphier_aio_dai_ld11),
++	.addr_ext      = 0,
++};
 +
- 		adamv at 57920000 {
- 			compatible = "socionext,uniphier-ld20-adamv",
- 				     "simple-mfd", "syscon";
-@@ -527,3 +550,15 @@
- };
- 
- #include "uniphier-pinctrl.dtsi"
-+
-+&pinctrl_aout {
-+	drive-strength = <4>;	/* default: 3.5mA */
-+	group_1 {
-+		pins = "AO1DACCK";
-+		drive-strength = <5>;	/* 5mA */
-+	};
-+	group_2 {
-+		pins = "AO1ARC";
-+		drive-strength = <11>;	/* 11mA */
-+	};
++const struct uniphier_aio_chip_spec uniphier_aio_ld20_spec = {
++	.aio_specs     = uniphier_aio_ld11,
++	.num_aio_specs = ARRAY_SIZE(uniphier_aio_ld11),
++	.dais          = uniphier_aio_dai_ld11,
++	.num_dais      = ARRAY_SIZE(uniphier_aio_dai_ld11),
++	.addr_ext      = 1,
 +};
 -- 
 2.15.0
