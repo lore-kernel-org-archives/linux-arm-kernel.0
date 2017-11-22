@@ -1,24 +1,50 @@
-From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Thu, 23 Nov 2017 00:34:08 +0100
-Subject: [PATCH] arm: ensure symbol is a thumb symbol in new binutils
-In-Reply-To: <20171121174942.GK31757@n2100.armlinux.org.uk>
-References: <20171121172751.29545-1-Jason@zx2c4.com>
- <20171121173857.GJ31757@n2100.armlinux.org.uk>
- <CAHmME9quDFbdOR9hKRz-Px=Mh3FvYEyhVrs4V_+JT+GjDajMrA@mail.gmail.com>
- <20171121174942.GK31757@n2100.armlinux.org.uk>
-Message-ID: <CAHmME9oMTNJFnOwfhu26QSRSP92Axbc-+v9cCPsTKxekZvGvxg@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 23 Nov 2017 00:37:38 +0100
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
+ userspace (KAISER)
+In-Reply-To: <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+ <20171122161913.GB12684@amd>
+ <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
+ <20171122223355.GA5877@amd>
+ <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
+Message-ID: <20171122233738.GA25313@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 6:49 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> What if we locate the "badr" instruction to the same offset - does
-> that trigger the binutils bug?  Note that the grep expression will
-> need updating...
+Hi!
 
-Nope, this too does not reproduce it. I'm having a bit of trouble
-making a minimal test case to reproduce it. But I can reproduce it
-everytime by simply assembling the file in question using that
-binutils.
+> >>> If I'm willing to do timing attacks to defeat KASLR... what prevents
+> >>> me from using CPU caches to do that?
+> >>> 
+> >> 
+> >> Because it is impossible to get a cache hit on an access to an
+> >> unmapped address?
+> > 
+> > Um, no, I don't need to be able to directly access kernel addresses. I
+> > just put some data in _same place in cache where kernel data would
+> > go_, then do syscall and look if my data are still cached. Caches
+> > don't have infinite associativity.
+> > 
+> 
+> Ah ok. Interesting.
+> 
+> But how does that leak address bits that are covered by the tag?
 
-Jason
+Same as leaking any other address bits? Caches are "virtually
+indexed", and tag does not come into play...
+
+Maybe this explains it?
+
+https://www.youtube.com/watch?v=9KsnFWejpQg
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/cd26b01c/attachment.sig>
