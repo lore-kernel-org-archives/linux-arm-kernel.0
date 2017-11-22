@@ -1,34 +1,41 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 22 Nov 2017 14:11:01 +0100
-Subject: [PATCH 2/2] arm64: dts: renesas: eagle: add I2C0 support
-In-Reply-To: <20171116210801.215014557@cogentembedded.com>
-References: <20171116210801.215014557@cogentembedded.com>
-Message-ID: <CAMuHMdW76avXBqHqjFL7tF4c9LypsYM0zPuo9+muKkiRUMx03Q@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 22 Nov 2017 09:05:08 -0500
+Subject: [PATCH 23/30] [media] atomisp: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511353247.3539.10.camel@linux.intel.com>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-24-git-send-email-okaya@codeaurora.org>
+ <1511353247.3539.10.camel@linux.intel.com>
+Message-ID: <b87604f8-07f5-5cdc-b022-286c17ea66eb@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 10:06 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Define the Eagle board dependent part of the I2C0 device node.
->
-> The I2C0 bus is populated by ON Semiconductor PCA9653 I/O expander and
-> Analog Devices ADV7511W HDMI transmitter (but we're only describing the
-> former chip now).
->
-> Based on the original (and large) patch by Vladimir Barinov.
->
-> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+Hi Alex,
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On 11/22/2017 7:20 AM, Alan Cox wrote:
+> On Wed, 2017-11-22 at 00:31 -0500, Sinan Kaya wrote:
+>> pci_get_bus_and_slot() is restrictive such that it assumes domain=0
+>> as
+>> where a PCI device is present. This restricts the device drivers to
+>> be
+>> reused for other domain numbers.
+> 
+> The ISP v2 will always been in domain 0.
+> 
 
-Gr{oetje,eeting}s,
+Sorry, I didn't get what you mean. Do you mean that you are OK with the
+change (thus, can I get a reviewed by) or do you mean that I should fix
+the commit message?
 
-                        Geert
+I wrote a generic commit message and applied it to all 30 patches that
+are more or less similar. I can certainly tailor the message a little
+bit for atomisp since you confirmed domain 0.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> Alan
+> 
+> 
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
