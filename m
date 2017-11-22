@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:11 -0500
-Subject: [PATCH 26/30] video: fbdev: intelfb: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:09 -0500
+Subject: [PATCH 24/30] staging: rts5208: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-27-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-25-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,29 +17,21 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/video/fbdev/intelfb/intelfbhw.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/staging/rts5208/rtsx.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/video/fbdev/intelfb/intelfbhw.c b/drivers/video/fbdev/intelfb/intelfbhw.c
-index d31ed4e..496c045 100644
---- a/drivers/video/fbdev/intelfb/intelfbhw.c
-+++ b/drivers/video/fbdev/intelfb/intelfbhw.c
-@@ -175,13 +175,15 @@ int intelfbhw_get_memory(struct pci_dev *pdev, int *aperture_size,
- {
- 	struct pci_dev *bridge_dev;
- 	u16 tmp;
-+	u16 devfn;
- 	int stolen_overhead;
+diff --git a/drivers/staging/rts5208/rtsx.c b/drivers/staging/rts5208/rtsx.c
+index 89e2cfe..13b14fe 100644
+--- a/drivers/staging/rts5208/rtsx.c
++++ b/drivers/staging/rts5208/rtsx.c
+@@ -281,7 +281,7 @@ int rtsx_read_pci_cfg_byte(u8 bus, u8 dev, u8 func, u8 offset, u8 *val)
+ 	u8 data;
+ 	u8 devfn = (dev << 3) | func;
  
- 	if (!pdev || !aperture_size || !stolen_size)
- 		return 1;
+-	pdev = pci_get_bus_and_slot(bus, devfn);
++	pdev = pci_get_domain_bus_and_slot(0, bus, devfn);
+ 	if (!pdev)
+ 		return -1;
  
-+	devfn = PCI_DEVFN(0, 0);
- 	/* Find the bridge device.  It is always 0:0.0 */
--	if (!(bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0)))) {
-+	if (!(bridge_dev = pci_get_domain_bus_and_slot(0, 0, devfn))) {
- 		ERR_MSG("cannot find bridge device\n");
- 		return 1;
- 	}
 -- 
 1.9.1
