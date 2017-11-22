@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 00:31:01 -0500
-Subject: [PATCH 16/30] pch_gbe: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 00:31:02 -0500
+Subject: [PATCH 17/30] PCI: cpqhp: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
 References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511328675-21981-17-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511328675-21981-18-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -17,33 +17,65 @@ the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ drivers/pci/hotplug/cpqphp_pci.c | 18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-index 5ae9681..0df94ac 100644
---- a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-+++ b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-@@ -2560,6 +2560,7 @@ static int pch_gbe_probe(struct pci_dev *pdev,
- {
- 	struct net_device *netdev;
- 	struct pch_gbe_adapter *adapter;
-+	int domainnr, busnr;
- 	int ret;
+diff --git a/drivers/pci/hotplug/cpqphp_pci.c b/drivers/pci/hotplug/cpqphp_pci.c
+index e220d49..8897a77 100644
+--- a/drivers/pci/hotplug/cpqphp_pci.c
++++ b/drivers/pci/hotplug/cpqphp_pci.c
+@@ -89,7 +89,9 @@ int cpqhp_configure_device(struct controller *ctrl, struct pci_func *func)
+ 	pci_lock_rescan_remove();
  
- 	ret = pcim_enable_device(pdev);
-@@ -2603,8 +2604,10 @@ static int pch_gbe_probe(struct pci_dev *pdev,
- 	if (adapter->pdata && adapter->pdata->platform_init)
- 		adapter->pdata->platform_init(pdev);
+ 	if (func->pci_dev == NULL)
+-		func->pci_dev = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, func->function));
++		func->pci_dev = pci_get_domain_bus_and_slot(0, func->bus,
++							PCI_DEVFN(func->device,
++							func->function));
  
--	adapter->ptp_pdev = pci_get_bus_and_slot(adapter->pdev->bus->number,
--					       PCI_DEVFN(12, 4));
-+	domainnr = pci_domain_nr(adapter->pdev->bus);
-+	busnr = adapter->pdev->bus->number
-+	adapter->ptp_pdev = pci_get_domain_bus_and_slot(domainnr, busnr,
-+							PCI_DEVFN(12, 4));
+ 	/* No pci device, we need to create it then */
+ 	if (func->pci_dev == NULL) {
+@@ -99,7 +101,9 @@ int cpqhp_configure_device(struct controller *ctrl, struct pci_func *func)
+ 		if (num)
+ 			pci_bus_add_devices(ctrl->pci_dev->bus);
  
- 	netdev->netdev_ops = &pch_gbe_netdev_ops;
- 	netdev->watchdog_timeo = PCH_GBE_WATCHDOG_PERIOD;
+-		func->pci_dev = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, func->function));
++		func->pci_dev = pci_get_domain_bus_and_slot(0, func->bus,
++							PCI_DEVFN(func->device,
++							func->function));
+ 		if (func->pci_dev == NULL) {
+ 			dbg("ERROR: pci_dev still null\n");
+ 			goto out;
+@@ -129,7 +133,10 @@ int cpqhp_unconfigure_device(struct pci_func *func)
+ 
+ 	pci_lock_rescan_remove();
+ 	for (j = 0; j < 8 ; j++) {
+-		struct pci_dev *temp = pci_get_bus_and_slot(func->bus, PCI_DEVFN(func->device, j));
++		struct pci_dev *temp = pci_get_domain_bus_and_slot(0,
++							func->bus,
++							PCI_DEVFN(func->device,
++							j));
+ 		if (temp) {
+ 			pci_dev_put(temp);
+ 			pci_stop_and_remove_bus_device(temp);
+@@ -319,6 +326,7 @@ int cpqhp_save_config(struct controller *ctrl, int busnumber, int is_hot_plug)
+ 	int cloop = 0;
+ 	int stop_it;
+ 	int index;
++	u16 devfn;
+ 
+ 	/* Decide which slots are supported */
+ 
+@@ -416,7 +424,9 @@ int cpqhp_save_config(struct controller *ctrl, int busnumber, int is_hot_plug)
+ 			new_slot->switch_save = 0x10;
+ 			/* In case of unsupported board */
+ 			new_slot->status = DevError;
+-			new_slot->pci_dev = pci_get_bus_and_slot(new_slot->bus, (new_slot->device << 3) | new_slot->function);
++			devfn = (new_slot->device << 3) | new_slot->function;
++			new_slot->pci_dev = pci_get_domain_bus_and_slot(0,
++							new_slot->bus, devfn);
+ 
+ 			for (cloop = 0; cloop < 0x20; cloop++) {
+ 				rc = pci_bus_read_config_dword(ctrl->pci_bus, PCI_DEVFN(device, function), cloop << 2, (u32 *) &(new_slot->config_space[cloop]));
 -- 
 1.9.1
