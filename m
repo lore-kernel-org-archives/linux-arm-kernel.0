@@ -1,41 +1,58 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Wed, 22 Nov 2017 08:54:22 +0100
-Subject: [PATCH 24/30] staging: rts5208: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511328675-21981-25-git-send-email-okaya@codeaurora.org>
-References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
- <1511328675-21981-25-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171122075422.GD26583@kroah.com>
+From: loic.poulain@gmail.com (Loic Poulain)
+Date: Wed, 22 Nov 2017 09:07:45 +0100
+Subject: [GIT PULL 1/2] bcm2835-dt-fixes-2017-10-06
+In-Reply-To: <CALeDE9NpTQCSC7AJ1NhkNuA-FgMQSme8LUJtyizXirthCh6chA@mail.gmail.com>
+References: <20171006220504.7776-1-eric@anholt.net>
+ <edb03edb-f2a6-549e-6060-eccfae554d92@gmail.com>
+ <CAJsfgeU5Zq-2zSfto8WUZ5Xud1Ksedu9XdLG9pWR7YBZGVaHBA@mail.gmail.com>
+ <CALeDE9NsjYHpaR6kyHgABGr2eE=EhpJstttK60WwRkAj0u1m7Q@mail.gmail.com>
+ <910a98ca-57f6-baca-73ac-f6c8c1ff04db@i2se.com>
+ <CALeDE9Oi+DvoJ6X22ButaQxHNyqBzg=H1-mb69_g-rp4RR_fqw@mail.gmail.com>
+ <F3464528-76E5-4F11-BD58-DEB56410687B@holtmann.org>
+ <CALeDE9OySr2LpcedpTHnz89aFYAk2CknKGHeVx+4ecFCemYZPw@mail.gmail.com>
+ <CAM9fo8MktM-WX-AGFCLeCrcoRDR4XjR09BGcbNb5X4G4yVaU2A@mail.gmail.com>
+ <CALeDE9NpTQCSC7AJ1NhkNuA-FgMQSme8LUJtyizXirthCh6chA@mail.gmail.com>
+Message-ID: <CAM9fo8NMHvvMhhiBufj9Uz8wW5+a-YGJQja74CBwubwrqk4R5w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 12:31:09AM -0500, Sinan Kaya wrote:
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
-> extract the domain number. Other places, use the actual domain number from
-> the device.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/staging/rts5208/rtsx.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/staging/rts5208/rtsx.c b/drivers/staging/rts5208/rtsx.c
-> index 89e2cfe..13b14fe 100644
-> --- a/drivers/staging/rts5208/rtsx.c
-> +++ b/drivers/staging/rts5208/rtsx.c
-> @@ -281,7 +281,7 @@ int rtsx_read_pci_cfg_byte(u8 bus, u8 dev, u8 func, u8 offset, u8 *val)
->  	u8 data;
->  	u8 devfn = (dev << 3) | func;
->  
-> -	pdev = pci_get_bus_and_slot(bus, devfn);
-> +	pdev = pci_get_domain_bus_and_slot(0, bus, devfn);
+Hi Peter,
 
-Ugh, this whole function should go away, but it's good enough for now,
-I'll queue it up after -rc1 is out.
+> So it seems it's actually working fine albeit the strange mac addr, no
+> idea what I was trying before, although there's an error about loading
+> firmware:
+>
+> [   31.035291] Bluetooth: hci0: BCM: chip id 94
+> [   31.035801] Bluetooth: hci0: BCM: features 0x2e
+> [   31.037483] Bluetooth: hci0: BCM43430A1
+> [   31.037498] Bluetooth: hci0: BCM43430A1 (001.002.009) build 0000
+> [   31.037694] bluetooth hci0: Direct firmware load for
+> brcm/BCM43430A1.hcd failed with error -2
+> [   31.037704] Bluetooth: hci0: BCM: Patch brcm/BCM43430A1.hcd not found
 
-thanks,
+Ok, think that's why you have this kind of 'default' address, you should be able
+to provision a valid address with btmgmt tool. The chip can work
+without applying
+patch file, original firmware is then executed, which is potentially
+more or less buggy.
 
-greg k-h
+
+> By adding a firmware [1] to the location it actually now stops
+> working, although shows up with a hciconfig, and had the following
+> errors.
+>
+> [   26.078038] Bluetooth: hci0: BCM: chip id 94
+> [   26.096797] Bluetooth: hci0: BCM: features 0x2e
+> [   28.130753] Bluetooth: hci0 command 0x0c14 tx timeout
+> [   36.322725] Bluetooth: hci0: BCM: Reading local name failed (-110)
+
+Really weird, because these steps are prior firmware loading, moreover on HCI
+command timeout, the HCI core is supposed to retry sending of the command,
+here nothing happened between [28.13] and [36.32]....
+
+Could you please try to load hci_uart.ko manually after boot to see if it could
+be related to some init timings/concurrency.
+
+
+Regards,
+Loic
