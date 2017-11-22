@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 17:48:58 -0500
-Subject: [PATCH V2 03/29] x86/PCI: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 17:48:59 -0500
+Subject: [PATCH V2 04/29] ata: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
 References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511390964-9979-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511390964-9979-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,27 +14,27 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Use domain number of 0 as the domain number is not available in struct
-irq_routing_table.
+Use pci_get_domain_bus_and_slot() and extract the actual domain number
+from the pdev passed in.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/x86/pci/irq.c | 3 ++-
+ drivers/ata/pata_ali.c | 3 ++-
  1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/x86/pci/irq.c b/arch/x86/pci/irq.c
-index 04526291..52e5510 100644
---- a/arch/x86/pci/irq.c
-+++ b/arch/x86/pci/irq.c
-@@ -839,7 +839,8 @@ static void __init pirq_find_router(struct irq_router *r)
- 	DBG(KERN_DEBUG "PCI: Attempting to find IRQ router for [%04x:%04x]\n",
- 	    rt->rtr_vendor, rt->rtr_device);
- 
--	pirq_router_dev = pci_get_bus_and_slot(rt->rtr_bus, rt->rtr_devfn);
-+	pirq_router_dev = pci_get_domain_bus_and_slot(0, rt->rtr_bus,
-+						      rt->rtr_devfn);
- 	if (!pirq_router_dev) {
- 		DBG(KERN_DEBUG "PCI: Interrupt router not found at "
- 			"%02x:%02x\n", rt->rtr_bus, rt->rtr_devfn);
+diff --git a/drivers/ata/pata_ali.c b/drivers/ata/pata_ali.c
+index d19cd88..0b122f9 100644
+--- a/drivers/ata/pata_ali.c
++++ b/drivers/ata/pata_ali.c
+@@ -466,7 +466,8 @@ static void ali_init_chipset(struct pci_dev *pdev)
+ 			tmp |= 0x01;	/* CD_ROM enable for DMA */
+ 		pci_write_config_byte(pdev, 0x53, tmp);
+ 	}
+-	north = pci_get_bus_and_slot(0, PCI_DEVFN(0,0));
++	north = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus), 0,
++					    PCI_DEVFN(0, 0));
+ 	if (north && north->vendor == PCI_VENDOR_ID_AL && ali_isa_bridge) {
+ 		/* Configure the ALi bridge logic. For non ALi rely on BIOS.
+ 		   Set the south bridge enable bit */
 -- 
 1.9.1
