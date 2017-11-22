@@ -1,9 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 22 Nov 2017 17:49:18 -0500
-Subject: [PATCH V2 23/29] staging: rts5208: deprecate pci_get_bus_and_slot()
+Date: Wed, 22 Nov 2017 17:49:20 -0500
+Subject: [PATCH V2 25/29] video: fbdev: intelfb: deprecate
+ pci_get_bus_and_slot()
 In-Reply-To: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
 References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511390964-9979-24-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511390964-9979-26-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,54 +15,27 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Remove unused rtsx_read_pci_cfg_byte() function.
+Find the domain number from pdev.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/staging/rts5208/rtsx.c | 17 -----------------
- drivers/staging/rts5208/rtsx.h |  2 --
- 2 files changed, 19 deletions(-)
+ drivers/video/fbdev/intelfb/intelfbhw.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/staging/rts5208/rtsx.c b/drivers/staging/rts5208/rtsx.c
-index 89e2cfe..70e0b86 100644
---- a/drivers/staging/rts5208/rtsx.c
-+++ b/drivers/staging/rts5208/rtsx.c
-@@ -275,23 +275,6 @@ static int rtsx_acquire_irq(struct rtsx_dev *dev)
- 	return 0;
- }
+diff --git a/drivers/video/fbdev/intelfb/intelfbhw.c b/drivers/video/fbdev/intelfb/intelfbhw.c
+index d31ed4e..f695867 100644
+--- a/drivers/video/fbdev/intelfb/intelfbhw.c
++++ b/drivers/video/fbdev/intelfb/intelfbhw.c
+@@ -181,7 +181,9 @@ int intelfbhw_get_memory(struct pci_dev *pdev, int *aperture_size,
+ 		return 1;
  
--int rtsx_read_pci_cfg_byte(u8 bus, u8 dev, u8 func, u8 offset, u8 *val)
--{
--	struct pci_dev *pdev;
--	u8 data;
--	u8 devfn = (dev << 3) | func;
--
--	pdev = pci_get_bus_and_slot(bus, devfn);
--	if (!pdev)
--		return -1;
--
--	pci_read_config_byte(pdev, offset, &data);
--	if (val)
--		*val = data;
--
--	return 0;
--}
--
- #ifdef CONFIG_PM
- /*
-  * power management
-diff --git a/drivers/staging/rts5208/rtsx.h b/drivers/staging/rts5208/rtsx.h
-index 575e573..62e467c 100644
---- a/drivers/staging/rts5208/rtsx.h
-+++ b/drivers/staging/rts5208/rtsx.h
-@@ -174,8 +174,6 @@ static inline void get_current_time(u8 *timeval_buf, int buf_len)
- /* struct scsi_cmnd transfer buffer access utilities */
- enum xfer_buf_dir	{TO_XFER_BUF, FROM_XFER_BUF};
- 
--int rtsx_read_pci_cfg_byte(u8 bus, u8 dev, u8 func, u8 offset, u8 *val);
--
- #define _MSG_TRACE
- 
- #include "trace.h"
+ 	/* Find the bridge device.  It is always 0:0.0 */
+-	if (!(bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0)))) {
++	bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus), 0,
++						 PCI_DEVFN(0, 0));
++	if (!bridge_dev) {
+ 		ERR_MSG("cannot find bridge device\n");
+ 		return 1;
+ 	}
 -- 
 1.9.1
