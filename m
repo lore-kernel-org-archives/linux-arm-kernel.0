@@ -1,87 +1,45 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Wed, 22 Nov 2017 16:42:05 +0200
-Subject: [PATCH 3/3] thermal: armada: add support for CP110
-In-Reply-To: <7102bb32704ac9f70ef3ae61682d50de8af61b57.1511361725.git.baruch@tkos.co.il>
-References: <7102bb32704ac9f70ef3ae61682d50de8af61b57.1511361725.git.baruch@tkos.co.il>
-Message-ID: <adccb0e7b20cc128663701eadcf6ebce412dfe5e.1511361725.git.baruch@tkos.co.il>
+From: greg@kroah.com (Greg KH)
+Date: Wed, 22 Nov 2017 15:49:59 +0100
+Subject: [PATCH 30/30] PCI: remove pci_get_bus_and_slot() function
+In-Reply-To: <a443e88e-3abd-0dab-2828-9753326e8d5d@codeaurora.org>
+References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
+ <1511328675-21981-31-git-send-email-okaya@codeaurora.org>
+ <c0df99c9-9170-be3a-3789-6b25be30936f@codeaurora.org>
+ <6a78596e-720a-80a2-9d96-dcc79a32f677@codeaurora.org>
+ <25ec431a-2c1b-d352-f9ef-c663864664b6@codeaurora.org>
+ <20171122075124.GA26583@kroah.com>
+ <a443e88e-3abd-0dab-2828-9753326e8d5d@codeaurora.org>
+Message-ID: <20171122144959.GA8081@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CP110 component is integrated in the Armada 8k and 7k lines of processors.
+On Wed, Nov 22, 2017 at 08:42:35AM -0600, Timur Tabi wrote:
+> On 11/22/17 1:51 AM, Greg KH wrote:
+> > Ick, no, why?  What is wrong with removing this function as is?  Don't
+> > mark something as __depreciated if there are no in-kernel users, just
+> > delete it and move on.
+> > 
+> > If you have out-of-tree drivers, then yes, they can make a wrapper for
+> > this function like this if they really feel the need, or they can get
+> > their code merged:)
+> 
+> Sorry, I guess I should have been clearer.  My suggestion was to fix some of
+> the drivers where the domain can be determined, and for the rest, just mark
+> the old function as deprecated.
 
-This patch also adds an option of offset to the MSB of the control
-register. The existing DT binding for Armada 38x refers to a single 32 bit
-control register. It turns out that this is actually only the MSB of the
-control area. Changing the binding to fix that would break existing DT files,
-so the Armada 38x binding is left as is.
+So the build now gets warnings?  That's annoying, and then someone else
+will have to make the exact same patches that were created here?
 
-The new CP110 binding increases the size of the control area to 64 bits, thus
-moving the MSB to offset 4.
+> If that's still a terrible idea, well, okay.  I'm just unsure that simply
+> hard-coding a 0 for the domain for some drivers is really a solution.  Don't
+> we really want all drivers to properly support all domains?
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
- drivers/thermal/armada_thermal.c | 24 ++++++++++++++++++++++--
- 1 file changed, 22 insertions(+), 2 deletions(-)
+I bet all of those drivers don't care because they are running only in
+systems with 1 domain, otherwise they would be broken today, right?  But
+really, it shouldn't be that hard to get to the "real" PCI device to
+provide the correct pointer to the domain for most of these, as I
+pointed out in one patch review already.
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 1f7f81628040..542db578ce36 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -72,6 +72,7 @@ struct armada_thermal_data {
- 	unsigned int temp_shift;
- 	unsigned int temp_mask;
- 	unsigned int is_valid_shift;
-+	unsigned int control_msb_offset;
- };
- 
- static void armadaxp_init_sensor(struct platform_device *pdev,
-@@ -141,12 +142,14 @@ static void armada375_init_sensor(struct platform_device *pdev,
- static void armada380_init_sensor(struct platform_device *pdev,
- 				  struct armada_thermal_priv *priv)
- {
--	unsigned long reg = readl_relaxed(priv->control);
-+	void __iomem *control_msb =
-+		priv->control + priv->data->control_msb_offset;
-+	unsigned long reg = readl_relaxed(control_msb);
- 
- 	/* Reset hardware once */
- 	if (!(reg & A380_HW_RESET)) {
- 		reg |= A380_HW_RESET;
--		writel(reg, priv->control);
-+		writel(reg, control_msb);
- 		mdelay(10);
- 	}
- }
-@@ -258,6 +261,19 @@ static const struct armada_thermal_data armada_ap806_data = {
- 	.inverted = true,
- };
- 
-+static const struct armada_thermal_data armada_cp110_data = {
-+	.is_valid = armada_is_valid,
-+	.init_sensor = armada380_init_sensor,
-+	.is_valid_shift = 10,
-+	.temp_shift = 0,
-+	.temp_mask = 0x3ff,
-+	.control_msb_offset = 4,
-+	.coef_b = 1172499100UL,
-+	.coef_m = 2000096UL,
-+	.coef_div = 4201,
-+	.inverted = true,
-+};
-+
- static const struct of_device_id armada_thermal_id_table[] = {
- 	{
- 		.compatible = "marvell,armadaxp-thermal",
-@@ -279,6 +295,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
- 		.compatible = "marvell,armada-ap806-thermal",
- 		.data       = &armada_ap806_data,
- 	},
-+	{
-+		.compatible = "marvell,armada-cp110-thermal",
-+		.data       = &armada_cp110_data,
-+	},
- 	{
- 		/* sentinel */
- 	},
--- 
-2.15.0
+thanks,
+
+greg k-h
