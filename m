@@ -1,25 +1,41 @@
-From: jgross@suse.com (Juergen Gross)
-Date: Wed, 22 Nov 2017 13:53:58 +0100
-Subject: [PATCH 21/30] xen: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511328675-21981-22-git-send-email-okaya@codeaurora.org>
-References: <1511328675-21981-1-git-send-email-okaya@codeaurora.org>
- <1511328675-21981-22-git-send-email-okaya@codeaurora.org>
-Message-ID: <780202b1-3819-6e0f-10e8-059235845799@suse.com>
+From: aleksey.makarov@auriga.com (Aleksey Makarov)
+Date: Wed, 22 Nov 2017 15:37:25 +0300
+Subject: [PATCH net] net: thunderx: Fix TCP/UDP checksum offload for IPv6 pkts
+Message-ID: <20171122123727.23580-1-aleksey.makarov@auriga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/11/17 06:31, Sinan Kaya wrote:
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
-> extract the domain number. Other places, use the actual domain number from
-> the device.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+From: Sunil Goutham <sgoutham@cavium.com>
 
-Reviewed-by: Juergen Gross <jgross@suse.com>
+This fixes a previous patch which missed some changes
+and due to which L3 checksum offload was getting enabled
+for IPv6 pkts. And HW is dropping these pkts as it assumes
+the pkt is IPv4 when IP csum offload is set in the SQ
+descriptor.
 
+Fixes: bbbb494fd005 ("net: thunderx: Enable TSO and checksum offloads for ipv6")
+Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+Signed-off-by: Aleksey Makarov <aleksey.makarov@auriga.com>
+---
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-Juergen
+diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+index d4496e9afcdf..184d5bdbe7e0 100644
+--- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
++++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
+@@ -1355,10 +1355,11 @@ nicvf_sq_add_hdr_subdesc(struct nicvf *nic, struct snd_queue *sq, int qentry,
+ 
+ 	/* Offload checksum calculation to HW */
+ 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+-		hdr->csum_l3 = 1; /* Enable IP csum calculation */
+ 		hdr->l3_offset = skb_network_offset(skb);
+ 		hdr->l4_offset = skb_transport_offset(skb);
+ 
++		/* Enable IP HDR csum calculation for V4 pkts */
++		hdr->csum_l3 = (ip.v4->version == 4) ? 1 : 0;
+ 		proto = (ip.v4->version == 4) ? ip.v4->protocol :
+ 			ip.v6->nexthdr;
+ 
+-- 
+2.15.0
