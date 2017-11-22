@@ -1,46 +1,84 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 22 Nov 2017 12:02:35 +0100
-Subject: [PATCH v2 1/6] ARM: dts: imx6qdl-pinfunc: Add missing
- MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT
-In-Reply-To: <1511348560-28505-1-git-send-email-narmstrong@baylibre.com>
-References: <1511348560-28505-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1511348560-28505-2-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 22 Nov 2017 12:02:34 +0100
+Subject: [PATCH v2 0/6] ARM: Add Variscite DART-MX6 SoM and Carrier-board
+ support
+Message-ID: <1511348560-28505-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing pinmux entry for OSC32K_32K_OUT on pad ENET_RXD0 used by the
-Variscite DART-MX6 SoM.
+This patchset adds support for the Variscite DART-MX6 SoM with :
+- i.MX6 Quad or Dual Lite SoC
+- 1Gb/2Gb LPDDR2
+- 4-64 GB eMMC
+- Camera Interface
+- HDMI+CEC interface
+- LVDS / DSI / Parallel RGB interfaces
+- Ethernet RGMII interface
+- On-SoM Wi-Fi/Bluetooth with WiLink wl1835 SDIO Module
+- SD/MMC/SDIO interface
+- USB Host + USB OTG interface
+- I2C interfaces
+- SPI interfaces
+- PCI-Express 2.0 interface
+- on-SoM Audio Codec with HP/Line-In interfaces + DMIC interface
+- Digital Audio interface
+- S/PDIF interface
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +
- arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
- 2 files changed, 2 insertions(+)
+And the Carrier-Board with the following :
+- LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
+- HDMI Connector
+- USB Host + USB OTG Connector
+- 10/100/1000 Mbps Ethernet
+- miniPCI-Express slot
+- SD Card connector
+- Audio Headphone/Line In jack connectors
+- On-board DMIC
+- CAN bus header
+- SPI header
+- Camera Interfaces header
+- 4xButtons, 2xLeds
+- OnBoard RTC with Coin Backup battery socket
+- RS232 Header + USB-Serial debug port
 
-diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h b/arch/arm/boot/dts/imx6dl-pinfunc.h
-index 0ead323..37e430a 100644
---- a/arch/arm/boot/dts/imx6dl-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
-@@ -668,6 +668,7 @@
- #define MX6QDL_PAD_ENET_RX_ER__SPDIF_IN             0x1f4 0x5c4 0x8f0 0x3 0x1
- #define MX6QDL_PAD_ENET_RX_ER__ENET_1588_EVENT2_OUT 0x1f4 0x5c4 0x000 0x4 0x0
- #define MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24           0x1f4 0x5c4 0x000 0x5 0x0
-+#define MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT        0x1f8 0x5c8 0x000 0x0 0x0
- #define MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0         0x1f8 0x5c8 0x818 0x1 0x0
- #define MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK        0x1f8 0x5c8 0x838 0x2 0x0
- #define MX6QDL_PAD_ENET_RXD0__SPDIF_OUT             0x1f8 0x5c8 0x000 0x3 0x0
-diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
-index 9fc6120..cfb11d3 100644
---- a/arch/arm/boot/dts/imx6q-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6q-pinfunc.h
-@@ -551,6 +551,7 @@
- #define MX6QDL_PAD_ENET_RXD1__ESAI_TX_FS            0x1e0 0x4f4 0x860 0x2 0x0
- #define MX6QDL_PAD_ENET_RXD1__ENET_1588_EVENT3_OUT  0x1e0 0x4f4 0x000 0x4 0x0
- #define MX6QDL_PAD_ENET_RXD1__GPIO1_IO26            0x1e0 0x4f4 0x000 0x5 0x0
-+#define MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT        0x1e4 0x4f8 0x000 0x0 0x0
- #define MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0         0x1e4 0x4f8 0x848 0x1 0x1
- #define MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK        0x1e4 0x4f8 0x868 0x2 0x0
- #define MX6QDL_PAD_ENET_RXD0__SPDIF_OUT             0x1e4 0x4f8 0x000 0x3 0x0
+First patch contains a missing pinmux define used by the SoM.
+Last patch contains configs used by the SoM DT like SERDEV or WL18XX support.
+
+On-Board DMIC and Camera Interfaces are not handled yet.
+
+Changes since v1 at [1]:
+- Add lvds display vendor prefix and bindings
+- fix all gpio phandle arguments with correct ACTIVE_XXX define
+- drop pcie support
+- drop custom operating points
+- fix arm/pu/soc vin-supply instead of &cpu node override
+- fix can pinmux value
+- changed button node name
+- add revied-by tags on first and last patches
+
+[1] http://lkml.kernel.org/r/1511281705-30849-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (6):
+  ARM: dts: imx6qdl-pinfunc: Add missing
+    MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT
+  dt-bindings: Add vendor prefix for Solomon Goldentek Display
+    Corporation
+  devicetree/bindings: display: Add bindings for SGD GKTW70SDAE4SE Panel
+  ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
+  ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board support
+  ARM: configs: Add missing config for DART-MX6 SoM
+
+ .../bindings/display/panel/sgd,gktw70sdae4se.txt   |  41 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/imx6dl-pinfunc.h                 |   1 +
+ arch/arm/boot/dts/imx6q-pinfunc.h                  |   1 +
+ arch/arm/boot/dts/imx6q-var-dt6customboard.dts     | 238 ++++++++++
+ arch/arm/boot/dts/imx6qdl-var-dart.dtsi            | 501 +++++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   6 +
+ 8 files changed, 790 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
+ create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-var-dart.dtsi
+
 -- 
 2.7.4
