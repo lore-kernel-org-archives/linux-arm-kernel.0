@@ -1,33 +1,28 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Thu, 23 Nov 2017 19:37:12 +0100
-Subject: [PATCH 2/8] mfd: mtk-mmsys: Add mmsys driver
-In-Reply-To: <1511427867.8489.9.camel@mtksdaap41>
-References: <20171114214114.15793-1-mbrugger@suse.com>
- <20171114214114.15793-3-mbrugger@suse.com>
- <1511427867.8489.9.camel@mtksdaap41>
-Message-ID: <f65015fa-7103-30bc-2660-7401037f7e12@gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 24 Nov 2017 03:39:36 +0900 (KST)
+Subject: [PATCH net v2] net: thunderx: Fix TCP/UDP checksum offload for
+ IPv6 pkts
+In-Reply-To: <20171123144158.26111-1-aleksey.makarov@auriga.com>
+References: <20171123144158.26111-1-aleksey.makarov@auriga.com>
+Message-ID: <20171124.033936.1934188261920003091.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Aleksey Makarov <aleksey.makarov@auriga.com>
+Date: Thu, 23 Nov 2017 17:41:56 +0300
 
-
-On 11/23/2017 10:04 AM, CK Hu wrote:
-
->> +static const struct of_device_id of_match_mmsys[] = {
->> +	{ .compatible = "mediatek,mt2701-mmsys",
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> Because this driver replace the original "mediatek,mt2701-mmsys" driver,
-> could you modify the binding document of "mediatek,mt2701-mmsys" [1]?
+> Don't offload IP header checksum to NIC.
 > 
-> [1]
-> https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+> This fixes a previous patch which enabled checksum offloading
+> for both IPv4 and IPv6 packets.  So L3 checksum offload was
+> getting enabled for IPv6 pkts.  And HW is dropping these pkts
+> as it assumes the pkt is IPv4 when IP csum offload is set
+> in the SQ descriptor.
 > 
+> Fixes: bbbb494fd005 ("net: thunderx: Enable TSO and checksum offloads for ipv6")
 
-Well we are actually no replacing the compatible but keeping it. But yes, the
-documentation should be updated.
+This fixes tag contains an invalid GIT SHA1-ID.
 
-Apart right now we have the definition twice. The other location is here:
-Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
-
-Regards,
-Matthias
+Please fix this up.
