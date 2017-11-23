@@ -1,33 +1,34 @@
 From: jan.tuerk@emtrion.com (Jan Tuerk)
-Date: Thu, 23 Nov 2017 13:55:52 +0100
-Subject: [PATCH 2/5] dt-bindings: Add vendor prefix for emtrion GmbH
+Date: Thu, 23 Nov 2017 13:55:53 +0100
+Subject: [PATCH 3/5] ARM: dts: imx: Add an cpu0 label for imx6dl devices.
 In-Reply-To: <20171123125600.41562-1-jan.tuerk@emtrion.com>
 References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
-Message-ID: <20171123125600.41562-3-jan.tuerk@emtrion.com>
+Message-ID: <20171123125600.41562-4-jan.tuerk@emtrion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-emtrion is a system integrator and manufacturer of embedded systems.
-
-Website: https://www.emtrion.de
+Adding the label cpu0 allows the adjustment of cpu-parameters
+by reference in overlaying dtsi files in the same way as it
+is possible for imx6q devices.
 
 Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/boot/dts/imx6dl.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 0994bdd82cd3..5215c5767260 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -102,6 +102,7 @@ eeti        eGalax_eMPIA Technology Inc
- elan   Elan Microelectronic Corp.
- embest Shenzhen Embest Technology Co., Ltd.
- emmicro        EM Microelectronic
-+emtrion        emtrion GmbH
- energymicro    Silicon Laboratories (formerly Energy Micro AS)
- engicam        Engicam S.r.l.
- epcos  EPCOS AG
+diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
+index 4d693a75ce98..623c12519b81 100644
+--- a/arch/arm/boot/dts/imx6dl.dtsi
++++ b/arch/arm/boot/dts/imx6dl.dtsi
+@@ -21,7 +21,7 @@
+                #address-cells = <1>;
+                #size-cells = <0>;
+
+-               cpu at 0 {
++               cpu0: cpu at 0 {
+                        compatible = "arm,cortex-a9";
+                        device_type = "cpu";
+                        reg = <0>;
 --
 2.11.0
 
