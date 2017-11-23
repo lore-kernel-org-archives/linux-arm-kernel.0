@@ -1,80 +1,76 @@
-From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
-Date: Thu, 23 Nov 2017 10:25:49 +0100
-Subject: qcom: add firmware file for Adreno and Venus on APQ8096
-In-Reply-To: <1511402612.14687.23.camel@decadent.org.uk>
-References: <CAP71Wjw-3FrOtHADuui52t+iqv6QkvXXCthjR6akXr7QQTzrAA@mail.gmail.com>
- <1511402612.14687.23.camel@decadent.org.uk>
-Message-ID: <CAP71WjxpHYEpZsYAXTL552jHGoUgjgtH8PDdmrUHMfKGfsL2EA@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 23 Nov 2017 10:27:55 +0100
+Subject: [PATCH] arm64: dts: renesas: r8a7795: Move nodes which have no
+ reg property out of bus
+In-Reply-To: <20171120110125.12267-1-horms+renesas@verge.net.au>
+References: <20171120110125.12267-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXqPqhiCZFseBGFDEh9R+_kFcrmjWWgCSudtnHkuXoFgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 3:03 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
-> On Wed, 2017-11-15 at 21:00 +0100, Nicolas Dechesne wrote:
->> hi,
->>
->> This pull request adds firmware files for Adreno 530 GPU and Venus h/w
->> codec found on the Qualcomm APQ8096 chipset, such as on Dragonboard
->> 820c development board.
->
-> Pulled, thanks.
+Hi Simon,
 
-thanks!
+On Mon, Nov 20, 2017 at 12:01 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
+> The nodes that have been moved do not have any register properties and thus
+> shouldn't be placed on the bus.
+>
+> This problem is flagged by the compiler as follows:
+> $ make
+> ...
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
 
->
-> By the way, it looks like you should update the MODULE_FIRMWARE
-> declarations in the DRM driver to the "new" firmware paths.
+[...]
 
-oh, you're right, indeed.
+Thanks for your patch!
 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -126,6 +126,86 @@
+
+The node above is called "cpus".
+
+>                 };
+>         };
 >
-> Ben.
->
->> The following changes since commit bf04291309d3169c0ad3b8db52564235bbd08e30:
->>
->>   WHENCE: Add new qed firmware (2017-10-09 18:03:26 +0100)
->>
->> are available in the git repository at:
->>
->>   https://github.com/ndechesne/linux-firmware.git db820c
->>
->> for you to fetch changes up to e7219334854d854ae7768b13dc290ec85d93a0d9:
->>
->>   qcom: add venus firmware files for v4.2 (2017-11-15 20:49:17 +0100)
->>
->> ----------------------------------------------------------------
->> Nicolas Dechesne (2):
->>       qcom: add firmware files for Adreno a530
->>       qcom: add venus firmware files for v4.2
->>
->>  WHENCE                   |  16 ++++++++++++++++
->>  qcom/a530_pfp.fw         | Bin 0 -> 15876 bytes
->>  qcom/a530_pm4.fw         | Bin 0 -> 19572 bytes
->>  qcom/a530_zap.b00        | Bin 0 -> 148 bytes
->>  qcom/a530_zap.b01        | Bin 0 -> 6536 bytes
->>  qcom/a530_zap.b02        | Bin 0 -> 4900 bytes
->>  qcom/a530_zap.mdt        | Bin 0 -> 6684 bytes
->>  qcom/a530v3_gpmu.fw2     | Bin 0 -> 8184 bytes
->>  qcom/venus-4.2/venus.b00 | Bin 0 -> 212 bytes
->>  qcom/venus-4.2/venus.b01 | Bin 0 -> 6600 bytes
->>  qcom/venus-4.2/venus.b02 | Bin 0 -> 884136 bytes
->>  qcom/venus-4.2/venus.b03 | Bin 0 -> 28976 bytes
->>  qcom/venus-4.2/venus.b04 |   1 +
->>  qcom/venus-4.2/venus.mdt | Bin 0 -> 6812 bytes
->>  14 files changed, 17 insertions(+)
->>  create mode 100644 qcom/a530_pfp.fw
->>  create mode 100644 qcom/a530_pm4.fw
->>  create mode 100644 qcom/a530_zap.b00
->>  create mode 100644 qcom/a530_zap.b01
->>  create mode 100644 qcom/a530_zap.b02
->>  create mode 100644 qcom/a530_zap.mdt
->>  create mode 100644 qcom/a530v3_gpmu.fw2
->>  create mode 100644 qcom/venus-4.2/venus.b00
->>  create mode 100644 qcom/venus-4.2/venus.b01
->>  create mode 100644 qcom/venus-4.2/venus.b02
->>  create mode 100644 qcom/venus-4.2/venus.b03
->>  create mode 100644 qcom/venus-4.2/venus.b04
->>  create mode 100644 qcom/venus-4.2/venus.mdt
-> --
-> Ben Hutchings
-> When in doubt, use brute force. - Ken Thompson
->
+> +       pmu_a57 {
+
+> +       };
+> +
+> +       pmu_a53 {
+
+> +       };
+> +
+> +       timer {
+
+> +       };
+> +
+> +       thermal-zones {
+
+> +       };
+> +
+>         extal_clk: extal {
+>                 compatible = "fixed-clock";
+>                 #clock-cells = <0>;
+
+Any sorting rules (alphabetically?) for nodes at the root level?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
