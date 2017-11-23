@@ -1,8 +1,10 @@
 From: aleksey.makarov@auriga.com (Aleksey Makarov)
-Date: Thu, 23 Nov 2017 22:30:12 +0300
+Date: Thu, 23 Nov 2017 22:34:31 +0300
 Subject: [PATCH net v3] net: thunderx: Fix TCP/UDP checksum offload for IPv6
  pkts
-Message-ID: <20171123193014.6632-1-aleksey.makarov@auriga.com>
+In-Reply-To: <20171123193014.6632-1-aleksey.makarov@auriga.com>
+References: <20171123193014.6632-1-aleksey.makarov@auriga.com>
+Message-ID: <20171123193432.6925-1-aleksey.makarov@auriga.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,12 +21,14 @@ in the SQ descriptor.
 Fixes:  3a9024f52c2e ("net: thunderx: Enable TSO and checksum offloads for ipv6")
 Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
 Signed-off-by: Aleksey Makarov <aleksey.makarov@auriga.com>
+Reviewed-by: Eric Dumazet <edumazet@google.com>
 ---
  drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 1 -
  1 file changed, 1 deletion(-)
 
 v3:
 - fix the Fixes: tag (David Miller)
+- add Reviewed-by Eric Dumazet
 
 v2: https://lkml.kernel.org/r/20171123144158.26111-1-aleksey.makarov at auriga.com
 - don't enable checksum offloading both for IPv4 and IPv6 (Eric Dumazet)
