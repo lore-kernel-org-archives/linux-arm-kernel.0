@@ -1,54 +1,67 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Nov 2017 06:51:09 +0000
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
- (KAISER)
-In-Reply-To: <20171122233738.GA25313@amd>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <20171122161913.GB12684@amd>
- <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
- <20171122223355.GA5877@amd> <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
- <20171122233738.GA25313@amd>
-Message-ID: <D3BCED36-58D1-4E30-9171-16F06A5DC65D@linaro.org>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 23 Nov 2017 13:21:50 +0530
+Subject: [PATCH 2/6] ARM: dts: keystone-k2g-evm: Fix botched up merge
+In-Reply-To: <20171123075154.3938-1-vigneshr@ti.com>
+References: <20171123075154.3938-1-vigneshr@ti.com>
+Message-ID: <20171123075154.3938-3-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+spi1 and ecap0 pinmuxes ended up under root node instead of k2g_pinctrl
+node. Fix this by moving them under k2g_pinctrl node.
 
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+ arch/arm/boot/dts/keystone-k2g-evm.dts | 30 ++++++++++++++----------------
+ 1 file changed, 14 insertions(+), 16 deletions(-)
 
-> On 22 Nov 2017, at 23:37, Pavel Machek <pavel@ucw.cz> wrote:
-> 
-> Hi!
-> 
->>>>> If I'm willing to do timing attacks to defeat KASLR... what prevents
->>>>> me from using CPU caches to do that?
->>>>> 
->>>> 
->>>> Because it is impossible to get a cache hit on an access to an
->>>> unmapped address?
->>> 
->>> Um, no, I don't need to be able to directly access kernel addresses. I
->>> just put some data in _same place in cache where kernel data would
->>> go_, then do syscall and look if my data are still cached. Caches
->>> don't have infinite associativity.
->>> 
->> 
->> Ah ok. Interesting.
->> 
->> But how does that leak address bits that are covered by the tag?
-> 
-> Same as leaking any other address bits? Caches are "virtually
-> indexed",
-
-Not on arm64, although I don?t see how that is relevant if you are trying to defeat kaslr.
-
-> and tag does not come into play...
-> 
-
-Well, I must be missing something then, because I don?t see how knowledge about which userland address shares a cache way with a kernel address can leak anything beyond the bits that make up the index (i.e., which cache way is being shared)
-
-> Maybe this explains it?
-> 
-
-No not really. It explains how cache timing can be used as a side channel, not how it defeats kaslr.
-
-Thanks,
-Ard.
+diff --git a/arch/arm/boot/dts/keystone-k2g-evm.dts b/arch/arm/boot/dts/keystone-k2g-evm.dts
+index 656af194a518..298a50555e46 100644
+--- a/arch/arm/boot/dts/keystone-k2g-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2g-evm.dts
+@@ -45,22 +45,6 @@
+ 		regulator-max-microvolt = <3300000>;
+ 		regulator-always-on;
+ 	};
+-
+-	ecap0_pins: ecap0_pins {
+-		pinctrl-single,pins = <
+-			K2G_CORE_IOPAD(0x1374) (BUFFER_CLASS_B | MUX_MODE4)	/* pr1_mdio_data.ecap0_in_apwm0_out */
+-		>;
+-	};
+-
+-	spi1_pins: pinmux_spi1_pins {
+-		pinctrl-single,pins = <
+-			K2G_CORE_IOPAD(0x11a4) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_scs0.spi1_scs0 */
+-			K2G_CORE_IOPAD(0x11ac) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_clk.spi1_clk */
+-			K2G_CORE_IOPAD(0x11b0) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_miso.spi1_miso */
+-			K2G_CORE_IOPAD(0x11b4) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_mosi.spi1_mosi */
+-		>;
+-	};
+-
+ };
+ 
+ &k2g_pinctrl {
+@@ -105,6 +89,20 @@
+ 		>;
+ 	};
+ 
++	ecap0_pins: ecap0_pins {
++		pinctrl-single,pins = <
++			K2G_CORE_IOPAD(0x1374) (BUFFER_CLASS_B | MUX_MODE4)	/* pr1_mdio_data.ecap0_in_apwm0_out */
++		>;
++	};
++
++	spi1_pins: pinmux_spi1_pins {
++		pinctrl-single,pins = <
++			K2G_CORE_IOPAD(0x11a4) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_scs0.spi1_scs0 */
++			K2G_CORE_IOPAD(0x11ac) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_clk.spi1_clk */
++			K2G_CORE_IOPAD(0x11b0) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_miso.spi1_miso */
++			K2G_CORE_IOPAD(0x11b4) (BUFFER_CLASS_B | PULL_DISABLE | MUX_MODE0)	/* spi1_mosi.spi1_mosi */
++		>;
++	};
+ };
+ 
+ &uart0 {
+-- 
+2.15.0
