@@ -1,28 +1,39 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 23 Nov 2017 13:08:44 -0200
-Subject: [PATCH 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
-In-Reply-To: <20171123125600.41562-2-jan.tuerk@emtrion.com>
+From: Jan.Tuerk@emtrion.de (=?utf-8?B?VMO8cmssIEphbg==?=)
+Date: Thu, 23 Nov 2017 16:18:23 +0100
+Subject: AW: [PATCH 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
+In-Reply-To: <CAOMZO5D_xAWAnuH47BjAt4xNtz=c2dGn+kL6X8gW_auOTmDq5g@mail.gmail.com>
 References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
  <20171123125600.41562-2-jan.tuerk@emtrion.com>
-Message-ID: <CAOMZO5D_xAWAnuH47BjAt4xNtz=c2dGn+kL6X8gW_auOTmDq5g@mail.gmail.com>
+ <CAOMZO5D_xAWAnuH47BjAt4xNtz=c2dGn+kL6X8gW_auOTmDq5g@mail.gmail.com>
+Message-ID: <95F51F4B902CAC40AF459205F6322F01B7F903E17B@BMK019S01.emtrion.local>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jan,
+Hi Fabio,
 
-On Thu, Nov 23, 2017 at 10:55 AM, Jan Tuerk <jan.tuerk@emtrion.com> wrote:
-> The Emerging Display Technology ETM0700G0BDH6 is exactly
-> the same display as the ETM0700G0DH6, exept the pixelclock
-> polarity. Therefore re-use the ETM0700G0DH6 modes. It is
-> used by default on emtrion Avari based development kits.
->
-> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
-
-Please run ./scripts/checkpatch.pl on your patch. Currently it gives:
-total: 18 errors, 13 warnings, 39 lines checked
-
-Please fix and resend. Also, you could try git send-email in the next time.
+I've used git send-email and tested the patches by checkpatch.pl before without any problems.
+So it might have been touched by the mail server, so can you send me your checkpatch.pl log (directly)?
 
 Regards,
+Jan Tuerk
 
-Fabio Estevam
+
+
+emtrion GmbH
+Kreativpark - Alter Schlachthof 45
+76131 Karlsruhe
+GERMANY
+http://www.emtrion.de
+_______________________________________
+
+Amtsgericht Mannheim
+HRB 110 300
+Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
+_______________________________________
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: winmail.dat
+Type: application/ms-tnef
+Size: 4465 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/8a643524/attachment.bin>
