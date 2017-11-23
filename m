@@ -1,192 +1,111 @@
 From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 23 Nov 2017 13:44:09 +0800
-Subject: [PATCH 1/8] drm/mediatek: Use regmap for register access
-In-Reply-To: <20171114214114.15793-2-mbrugger@suse.com>
+Date: Thu, 23 Nov 2017 13:48:12 +0800
+Subject: [PATCH 3/8] drm/mediatek: mt2701: switch to mfd probing.
+In-Reply-To: <20171114214114.15793-4-mbrugger@suse.com>
 References: <20171114214114.15793-1-mbrugger@suse.com>
- <20171114214114.15793-2-mbrugger@suse.com>
-Message-ID: <1511415849.20405.1.camel@mtksdaap41>
+ <20171114214114.15793-4-mbrugger@suse.com>
+Message-ID: <1511416092.20405.4.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi, Matthias:
 
 On Tue, 2017-11-14 at 22:41 +0100, Matthias Brugger wrote:
-> The mmsys memory space is shared between the drm and the
-> clk driver. Use regmap to access it.
+> With the mtk-mmsys MFD device in place, we switch the probing for
+> mt2701 from device-tree to mfd.
 > 
 > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-
-Acked-by: CK Hu <ck.hu@mediatek.com>
-
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |  4 ++--
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 30 +++++++++++++++++-------------
->  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  4 ++--
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 13 ++++---------
->  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  2 +-
->  5 files changed, 26 insertions(+), 27 deletions(-)
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 32 +++++++++++++++++++++++++-------
+>  1 file changed, 25 insertions(+), 7 deletions(-)
 > 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> index 658b8dd45b83..4c65873b4867 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_crtc.c
-> @@ -33,7 +33,7 @@
->   * @enabled: records whether crtc_enable succeeded
->   * @planes: array of 4 drm_plane structures, one for each overlay plane
->   * @pending_planes: whether any plane has pending changes to be applied
-> - * @config_regs: memory mapped mmsys configuration register space
-> + * @config_regs: regmap mapped mmsys configuration register space
->   * @mutex: handle to one of the ten disp_mutex streams
->   * @ddp_comp_nr: number of components in ddp_comp
->   * @ddp_comp: array of pointers the mtk_ddp_comp structures used by this crtc
-> @@ -48,7 +48,7 @@ struct mtk_drm_crtc {
->  	struct drm_plane		planes[OVL_LAYER_NR];
->  	bool				pending_planes;
->  
-> -	void __iomem			*config_regs;
-> +	struct regmap			*config_regs;
->  	struct mtk_disp_mutex		*mutex;
->  	unsigned int			ddp_comp_nr;
->  	struct mtk_ddp_comp		**ddp_comp;
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> index 8130f3dab661..1227d6db07da 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
-> @@ -185,16 +185,16 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
->  	return value;
->  }
->  
-> -static void mtk_ddp_sout_sel(void __iomem *config_regs,
-> +static void mtk_ddp_sout_sel(struct regmap *config_regs,
->  			     enum mtk_ddp_comp_id cur,
->  			     enum mtk_ddp_comp_id next)
->  {
->  	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
-> -		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
-> -			       config_regs + DISP_REG_CONFIG_OUT_SEL);
-> +		regmap_write(config_regs, DISP_REG_CONFIG_OUT_SEL,
-> +				BLS_TO_DSI_RDMA1_TO_DPI1);
->  }
->  
-> -void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
-> +void mtk_ddp_add_comp_to_path(struct regmap *config_regs,
->  			      enum mtk_ddp_comp_id cur,
->  			      enum mtk_ddp_comp_id next)
->  {
-> @@ -202,20 +202,22 @@ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
->  
->  	value = mtk_ddp_mout_en(cur, next, &addr);
->  	if (value) {
-> -		reg = readl_relaxed(config_regs + addr) | value;
-> -		writel_relaxed(reg, config_regs + addr);
-> +		regmap_read(config_regs, addr, &reg);
-> +		reg |= value;
-> +		regmap_write(config_regs, addr, reg);
->  	}
->  
->  	mtk_ddp_sout_sel(config_regs, cur, next);
->  
->  	value = mtk_ddp_sel_in(cur, next, &addr);
->  	if (value) {
-> -		reg = readl_relaxed(config_regs + addr) | value;
-> -		writel_relaxed(reg, config_regs + addr);
-> +		regmap_read(config_regs, addr, &reg);
-> +		reg |= value;
-> +		regmap_write(config_regs, addr, reg);
->  	}
->  }
->  
-> -void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
-> +void mtk_ddp_remove_comp_from_path(struct regmap *config_regs,
->  				   enum mtk_ddp_comp_id cur,
->  				   enum mtk_ddp_comp_id next)
->  {
-> @@ -223,14 +225,16 @@ void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
->  
->  	value = mtk_ddp_mout_en(cur, next, &addr);
->  	if (value) {
-> -		reg = readl_relaxed(config_regs + addr) & ~value;
-> -		writel_relaxed(reg, config_regs + addr);
-> +		regmap_read(config_regs, addr, &reg);
-> +		reg &= ~value;
-> +		regmap_write(config_regs, addr, reg);
->  	}
->  
->  	value = mtk_ddp_sel_in(cur, next, &addr);
->  	if (value) {
-> -		reg = readl_relaxed(config_regs + addr) & ~value;
-> -		writel_relaxed(reg, config_regs + addr);
-> +		regmap_read(config_regs, addr, &reg);
-> +		reg &= ~value;
-> +		regmap_write(config_regs, addr, reg);
->  	}
->  }
->  
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-> index f9a799168077..32e12f33b76a 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.h
-> @@ -20,10 +20,10 @@ struct regmap;
->  struct device;
->  struct mtk_disp_mutex;
->  
-> -void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
-> +void mtk_ddp_add_comp_to_path(struct regmap *config_regs,
->  			      enum mtk_ddp_comp_id cur,
->  			      enum mtk_ddp_comp_id next);
-> -void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
-> +void mtk_ddp_remove_comp_from_path(struct regmap *config_regs,
->  				   enum mtk_ddp_comp_id cur,
->  				   enum mtk_ddp_comp_id next);
->  
 > diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index b2ad19bd1e00..dd249cf5121e 100644
+> index dd249cf5121e..5a263aa3ab6e 100644
 > --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
 > +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
 > @@ -21,6 +21,7 @@
 >  #include <drm/drm_of.h>
 >  #include <linux/component.h>
 >  #include <linux/iommu.h>
-> +#include <linux/mfd/syscon.h>
+> +#include <linux/mfd/mmsys.h>
+>  #include <linux/mfd/syscon.h>
 >  #include <linux/of_address.h>
 >  #include <linux/of_platform.h>
->  #include <linux/pm_runtime.h>
-> @@ -393,7 +394,6 @@ static int mtk_drm_probe(struct platform_device *pdev)
+> @@ -392,9 +393,10 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+>  
+>  static int mtk_drm_probe(struct platform_device *pdev)
 >  {
+> +	struct mmsys_dev *mmsys_private;
 >  	struct device *dev = &pdev->dev;
 >  	struct mtk_drm_private *private;
-> -	struct resource *mem;
->  	struct device_node *node;
+> -	struct device_node *node;
+> +	struct device_node *node, *parent_node;
 >  	struct component_match *match = NULL;
 >  	int ret;
-> @@ -407,14 +407,9 @@ static int mtk_drm_probe(struct platform_device *pdev)
+>  	int i;
+> @@ -407,12 +409,23 @@ static int mtk_drm_probe(struct platform_device *pdev)
 >  	INIT_WORK(&private->commit.work, mtk_atomic_work);
 >  	private->data = of_device_get_match_data(dev);
 >  
-> -	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> -	private->config_regs = devm_ioremap_resource(dev, mem);
-> -	if (IS_ERR(private->config_regs)) {
-> -		ret = PTR_ERR(private->config_regs);
-> -		dev_err(dev, "Failed to ioremap mmsys-config resource: %d\n",
-> -			ret);
-> -		return ret;
-> -	}
-> +	private->config_regs = syscon_node_to_regmap(dev->of_node);
-> +	if (IS_ERR(private->config_regs))
-> +		return PTR_ERR(private->config_regs);
+> -	private->config_regs = syscon_node_to_regmap(dev->of_node);
+> -	if (IS_ERR(private->config_regs))
+> -		return PTR_ERR(private->config_regs);
+> +	/* Check if called from mfd */
+> +	if (!dev->of_node) {
+> +		mmsys_private = dev_get_drvdata(pdev->dev.parent);
+
+Why do you directly access parent's driver data? You just need the
+device node of mmsys, maybe you could refer to [1].
+
+[1]
+https://elixir.free-electrons.com/linux/latest/source/drivers/reset/reset-berlin.c#L78
+
+Regards,
+CK
+
+> +		private->data = (struct mtk_mmsys_driver_data *)
+> +				platform_get_device_id(pdev)->driver_data;
+> +		private->config_regs =
+> +			syscon_node_to_regmap(mmsys_private->of_node);
+> +		parent_node = mmsys_private->of_node->parent;
+> +	} else {
+> +		private->config_regs = syscon_node_to_regmap(dev->of_node);
+> +		if (IS_ERR(private->config_regs))
+> +			return PTR_ERR(private->config_regs);
+> +		parent_node = dev->of_node->parent;
+> +	}
 >  
 >  	/* Iterate over sibling DISP function blocks */
->  	for_each_child_of_node(dev->of_node->parent, node) {
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.h b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> index 4edc0023684c..86cec19193c4 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.h
-> @@ -44,7 +44,7 @@ struct mtk_drm_private {
+> -	for_each_child_of_node(dev->of_node->parent, node) {
+> +	for_each_child_of_node(parent_node, node) {
+>  		const struct of_device_id *of_id;
+>  		enum mtk_ddp_comp_type comp_type;
+>  		int comp_id;
+> @@ -553,13 +566,17 @@ static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
+>  			 mtk_drm_sys_resume);
 >  
->  	struct device_node *mutex_node;
->  	struct device *mutex_dev;
-> -	void __iomem *config_regs;
-> +	struct regmap *config_regs;
->  	struct device_node *comp_node[DDP_COMPONENT_ID_MAX];
->  	struct mtk_ddp_comp *ddp_comp[DDP_COMPONENT_ID_MAX];
->  	const struct mtk_mmsys_driver_data *data;
+>  static const struct of_device_id mtk_drm_of_ids[] = {
+> -	{ .compatible = "mediatek,mt2701-mmsys",
+> -	  .data = &mt2701_mmsys_driver_data},
+>  	{ .compatible = "mediatek,mt8173-mmsys",
+>  	  .data = &mt8173_mmsys_driver_data},
+>  	{ }
+>  };
+>  
+> +static const struct platform_device_id mtk_drm_ids[] = {
+> +	{ "drm-mt2701-mm", (kernel_ulong_t)&mt2701_mmsys_driver_data },
+> +	{ /* sentinel */ },
+> +};
+> +MODULE_DEVICE_TABLE(platform, mtk_drm_ids);
+> +
+>  static struct platform_driver mtk_drm_platform_driver = {
+>  	.probe	= mtk_drm_probe,
+>  	.remove	= mtk_drm_remove,
+> @@ -568,6 +585,7 @@ static struct platform_driver mtk_drm_platform_driver = {
+>  		.of_match_table = mtk_drm_of_ids,
+>  		.pm     = &mtk_drm_pm_ops,
+>  	},
+> +	.id_table = mtk_drm_ids,
+>  };
+>  
+>  static struct platform_driver * const mtk_drm_drivers[] = {
