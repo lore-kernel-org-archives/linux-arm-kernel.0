@@ -1,747 +1,643 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 23 Nov 2017 17:05:21 +0100
-Subject: [RFC PATCH] KVM: Only register preempt notifiers and load arch cpu
- state as needed
-Message-ID: <20171123160521.27260-1-christoffer.dall@linaro.org>
+From: afd@ti.com (Andrew F. Davis)
+Date: Thu, 23 Nov 2017 10:06:11 -0600
+Subject: [PATCH v4 3/5] misc serdev: Add w2sg0004 (gps receiver) power
+ control driver
+In-Reply-To: <871b744f878be8a0a4758ce549ff6ecaea8b6894.1510781876.git.hns@goldelico.com>
+References: <cover.1510781875.git.hns@goldelico.com>
+ <871b744f878be8a0a4758ce549ff6ecaea8b6894.1510781876.git.hns@goldelico.com>
+Message-ID: <8dcd4cbb-02eb-b1d4-186e-63823199d5bb@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some architectures may decide to do different things during
-kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
-arm64 is about to do significant work in vcpu load/put when running a
-vcpu, but not when doing things like KVM_SET_ONE_REG or
-KVM_SET_MP_STATE.
+On 11/15/2017 03:37 PM, H. Nikolaus Schaller wrote:
+> Add driver for Wi2Wi W2SG0004/84 GPS module connected through uart.
+> 
+> Use serdev API hooks to monitor and forward the UART traffic to /dev/ttyGPSn
+> and turn on/off the module. It also detects if the module is turned on (sends data)
+> but should be off, e.g. if it was already turned on during boot or power-on-reset.
+> 
+> Additionally, rfkill block/unblock can be used to control an external LNA
+> (and power down the module if not needed).
+> 
+> The driver concept is based on code developed by NeilBrown <neilb@suse.de>
+> but simplified and adapted to use the new serdev API introduced in 4.11.
+> 
+> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+> ---
+>  drivers/misc/Kconfig    |  10 +
+>  drivers/misc/Makefile   |   1 +
+>  drivers/misc/w2sg0004.c | 545 ++++++++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 556 insertions(+)
+>  create mode 100644 drivers/misc/w2sg0004.c
+> 
+> diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+> index 8136dc7e863d..09d171d68408 100644
+> --- a/drivers/misc/Kconfig
+> +++ b/drivers/misc/Kconfig
+> @@ -518,4 +518,14 @@ source "drivers/misc/mic/Kconfig"
+>  source "drivers/misc/genwqe/Kconfig"
+>  source "drivers/misc/echo/Kconfig"
+>  source "drivers/misc/cxl/Kconfig"
+> +
+> +config W2SG0004
+> +	tristate "W2SG00x4 on/off control"
+> +	depends on GPIOLIB && SERIAL_DEV_BUS
+> +	help
+> +          Enable on/off control of W2SG00x4 GPS moduled connected
+> +	  to some SoC UART to allow powering up/down if the /dev/ttyGPSn
+> +	  is opened/closed.
+> +	  It also provides a rfkill gps name to control the LNA power.
+> +
+>  endmenu
+> diff --git a/drivers/misc/Makefile b/drivers/misc/Makefile
+> index ad0e64fdba34..abcb667e0ff0 100644
+> --- a/drivers/misc/Makefile
+> +++ b/drivers/misc/Makefile
+> @@ -51,6 +51,7 @@ obj-$(CONFIG_SRAM_EXEC)		+= sram-exec.o
+>  obj-y				+= mic/
+>  obj-$(CONFIG_GENWQE)		+= genwqe/
+>  obj-$(CONFIG_ECHO)		+= echo/
+> +obj-$(CONFIG_W2SG0004)		+= w2sg0004.o
+>  obj-$(CONFIG_VEXPRESS_SYSCFG)	+= vexpress-syscfg.o
+>  obj-$(CONFIG_CXL_BASE)		+= cxl/
+>  obj-$(CONFIG_ASPEED_LPC_CTRL)	+= aspeed-lpc-ctrl.o
+> diff --git a/drivers/misc/w2sg0004.c b/drivers/misc/w2sg0004.c
+> new file mode 100644
+> index 000000000000..12e14b5e0a99
+> --- /dev/null
+> +++ b/drivers/misc/w2sg0004.c
+> @@ -0,0 +1,545 @@
+> +// SPDX-License-Identifier: GPL-2.0
 
-Therefore, take the mutex directly in the main kvm ioctl dispatch
-function and leave it up to architecture-specific functions to register
-preempt notifiers and to call the architecture specific load operations
-when needed.
+Damn this looks ugly, oh well :/
 
-A new function is introduced for arch specific code, __vcpu_load(),
-which can be called when already holding the vcpu mutex.  vcpu_load() is
-then only used by x86, which calls it from outside the main vcpu ioctl
-path, and the function now takes the vcpu mutex and calls __vcpu_load().
+> +/*
+> + * Driver for power controlling the w2sg0004/w2sg0084 GPS receiver.
+> + *
 
-Suggested-by: Andrew Jones <drjones@redhat.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
-Hi all,
 
-Drew suggested this as an alternative approach to recording the ioctl
-number on the vcpu struct [1] as it may benefit other architectures in
-general.
+Think you still need copyright tag here somewhere.
 
-I had a look at some of the specific ioctls across architectures, but
-must admit that I can't easily tell which architecture specific logic
-relies on having registered preempt notifiers and having called the
-architecture specific load function.
+> + * This receiver has an ON/OFF pin which must be toggled to
+> + * turn the device 'on' of 'off'.  A high->low->high toggle
+> + * will switch the device on if it is off, and off if it is on.
+> + *
+> + * To enable receiving on/off requests we register with the
+> + * UART power management notifications.
+> + *
+> + * It is not possible to directly detect the state of the device.
+> + * However when it is on it will send characters on a UART line
+> + * regularly.
+> + *
+> + * To detect that the power state is out of sync (e.g. if GPS
+> + * was enabled before a reboot), we register for UART data received
+> + * notifications.
+> + *
+> + * In addition we register as a rfkill client so that we can
+> + * control the LNA power.
+> + *
+> + */
+> +
+> +#include <linux/delay.h>
+> +#include <linux/err.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/irq.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/of_gpio.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/rfkill.h>
+> +#include <linux/serdev.h>
+> +#include <linux/sched.h>
+> +#include <linux/slab.h>
+> +#include <linux/tty.h>
+> +#include <linux/tty_flip.h>
+> +#include <linux/workqueue.h>
+> +
+> +/*
+> + * There seems to be restrictions on how quickly we can toggle the
+> + * on/off line.  data sheets says "two rtc ticks", whatever that means.
+> + * If we do it too soon it doesn't work.
+> + * So we have a state machine which uses the common work queue to ensure
+> + * clean transitions.
+> + * When a change is requested we record that request and only act on it
+> + * once the previous change has completed.
+> + * A change involves a 10ms low pulse, and a 990ms raised level, so only
+> + * one change per second.
+> + */
+> +
+> +enum w2sg_state {
+> +	W2SG_IDLE,	/* is not changing state */
+> +	W2SG_PULSE,	/* activate on/off impulse */
+> +	W2SG_NOPULSE	/* deactivate on/off impulse */
+> +};
+> +
+> +struct w2sg_data {
+> +	struct		rfkill *rf_kill;
+> +	struct		regulator *lna_regulator;
+> +	int		lna_blocked;	/* rfkill block gps active */
+> +	int		lna_is_off;	/* LNA is currently off */
+> +	int		is_on;		/* current state (0/1) */
+> +	unsigned long	last_toggle;
+> +	unsigned long	backoff;	/* time to wait since last_toggle */
+> +	int		on_off_gpio;	/* the on-off gpio number */
+> +	struct		serdev_device *uart;	/* uart connected to the chip */
+> +	struct		tty_driver *tty_drv;	/* this is the user space tty */
+> +	struct		device *dev;	/* from tty_port_register_device() */
+> +	struct		tty_port port;
+> +	int		open_count;	/* how often we were opened */
+> +	enum		w2sg_state state;
+> +	int		requested;	/* requested state (0/1) */
+> +	int		suspended;
+> +	struct delayed_work work;
+> +	int		discard_count;
+> +};
+> +
 
-It would be great if you would let me know if you think this is
-generally useful or if you prefer the less invasive approach, and in
-case this is useful, if you could have a look at all the vcpu ioctls for
-your architecture and let me know if I am being too loose or too
-careful in calling __vcpu_load() in this patch.
+Kernel doc style.
 
-Much thanks,
--Christoffer
+> +static struct w2sg_data *w2sg_by_minor[1];
+> +
 
-[1]:
-https://lists.cs.columbia.edu/pipermail/kvmarm/2017-October/027528.html
----
- arch/mips/kvm/mips.c          | 50 ++++++++++++++++++++++++++++++------------
- arch/powerpc/kvm/booke.c      | 29 ++++++++++++++++--------
- arch/powerpc/kvm/powerpc.c    |  9 +++++++-
- arch/s390/kvm/kvm-s390.c      | 45 ++++++++++++++++++++++++++++----------
- arch/x86/kvm/x86.c            | 51 ++++++++++++++++++++++++++++++++++---------
- include/linux/kvm_host.h      |  2 ++
- virt/kvm/arm/arch_timer.c     |  4 ----
- virt/kvm/arm/arm.c            |  4 +++-
- virt/kvm/arm/vgic/vgic-init.c | 11 ----------
- virt/kvm/kvm_main.c           | 36 ++++++++++++++++++------------
- 10 files changed, 165 insertions(+), 76 deletions(-)
+If you can only have one right now then just drop the array.
 
-diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
-index d535edc01434..6e81724de32a 100644
---- a/arch/mips/kvm/mips.c
-+++ b/arch/mips/kvm/mips.c
-@@ -447,6 +447,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	int r = -EINTR;
- 	sigset_t sigsaved;
- 
-+	__vcpu_load(vcpu);
-+
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &vcpu->sigset, &sigsaved);
- 
-@@ -483,6 +485,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
- 
-+	__vcpu_put(vcpu);
-+
- 	return r;
- }
- 
-@@ -908,41 +912,54 @@ long kvm_arch_vcpu_ioctl(struct file *filp, unsigned int ioctl,
- {
- 	struct kvm_vcpu *vcpu = filp->private_data;
- 	void __user *argp = (void __user *)arg;
--	long r;
-+	long r = 0;
-+
-+	__vcpu_load(vcpu);
- 
- 	switch (ioctl) {
- 	case KVM_SET_ONE_REG:
- 	case KVM_GET_ONE_REG: {
- 		struct kvm_one_reg reg;
- 
--		if (copy_from_user(&reg, argp, sizeof(reg)))
--			return -EFAULT;
-+		if (copy_from_user(&reg, argp, sizeof(reg))) {
-+			r = -EFAULT;
-+			goto out;
-+		}
-+
- 		if (ioctl == KVM_SET_ONE_REG)
--			return kvm_mips_set_reg(vcpu, &reg);
-+			r = kvm_mips_set_reg(vcpu, &reg);
- 		else
--			return kvm_mips_get_reg(vcpu, &reg);
-+			r = kvm_mips_get_reg(vcpu, &reg);
-+		break;
- 	}
- 	case KVM_GET_REG_LIST: {
- 		struct kvm_reg_list __user *user_list = argp;
- 		struct kvm_reg_list reg_list;
- 		unsigned n;
- 
--		if (copy_from_user(&reg_list, user_list, sizeof(reg_list)))
--			return -EFAULT;
-+		if (copy_from_user(&reg_list, user_list, sizeof(reg_list))) {
-+			r = -EFAULT;
-+			goto out;
-+		}
-+
- 		n = reg_list.n;
- 		reg_list.n = kvm_mips_num_regs(vcpu);
- 		if (copy_to_user(user_list, &reg_list, sizeof(reg_list)))
--			return -EFAULT;
-+			r = -EFAULT;
- 		if (n < reg_list.n)
--			return -E2BIG;
--		return kvm_mips_copy_reg_indices(vcpu, user_list->reg);
-+			r = -E2BIG;
-+		if (!r)
-+			r = kvm_mips_copy_reg_indices(vcpu, user_list->reg);
-+		break;
- 	}
- 	case KVM_INTERRUPT:
- 		{
- 			struct kvm_mips_interrupt irq;
- 
--			if (copy_from_user(&irq, argp, sizeof(irq)))
--				return -EFAULT;
-+			if (copy_from_user(&irq, argp, sizeof(irq))) {
-+				r = -EFAULT;
-+				goto out;
-+			}
- 			kvm_debug("[%d] %s: irq: %d\n", vcpu->vcpu_id, __func__,
- 				  irq.irq);
- 
-@@ -952,14 +969,19 @@ long kvm_arch_vcpu_ioctl(struct file *filp, unsigned int ioctl,
- 	case KVM_ENABLE_CAP: {
- 		struct kvm_enable_cap cap;
- 
--		if (copy_from_user(&cap, argp, sizeof(cap)))
--			return -EFAULT;
-+		if (copy_from_user(&cap, argp, sizeof(cap))) {
-+			r = -EFAULT;
-+			goto out;
-+		}
- 		r = kvm_vcpu_ioctl_enable_cap(vcpu, &cap);
- 		break;
- 	}
- 	default:
- 		r = -ENOIOCTLCMD;
- 	}
-+
-+out:
-+	__vcpu_put(vcpu);
- 	return r;
- }
- 
-diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
-index 071b87ee682f..9d8b74d871bb 100644
---- a/arch/powerpc/kvm/booke.c
-+++ b/arch/powerpc/kvm/booke.c
-@@ -1997,12 +1997,15 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- {
- 	struct debug_reg *dbg_reg;
- 	int n, b = 0, w = 0;
-+	int ret = 0;
-+
-+	__vcpu_load(vcpu);
- 
- 	if (!(dbg->control & KVM_GUESTDBG_ENABLE)) {
- 		vcpu->arch.dbg_reg.dbcr0 = 0;
- 		vcpu->guest_debug = 0;
- 		kvm_guest_protect_msr(vcpu, MSR_DE, false);
--		return 0;
-+		goto out;
- 	}
- 
- 	kvm_guest_protect_msr(vcpu, MSR_DE, true);
-@@ -2034,7 +2037,7 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- #endif
- 
- 	if (!(vcpu->guest_debug & KVM_GUESTDBG_USE_HW_BP))
--		return 0;
-+		goto out;
- 
- 	for (n = 0; n < (KVMPPC_BOOKE_IAC_NUM + KVMPPC_BOOKE_DAC_NUM); n++) {
- 		uint64_t addr = dbg->arch.bp[n].addr;
-@@ -2045,22 +2048,30 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 
- 		if (type & ~(KVMPPC_DEBUG_WATCH_READ |
- 			     KVMPPC_DEBUG_WATCH_WRITE |
--			     KVMPPC_DEBUG_BREAKPOINT))
--			return -EINVAL;
-+			     KVMPPC_DEBUG_BREAKPOINT)) {
-+			ret = -EINVAL;
-+			goto out;
-+		}
- 
- 		if (type & KVMPPC_DEBUG_BREAKPOINT) {
- 			/* Setting H/W breakpoint */
--			if (kvmppc_booke_add_breakpoint(dbg_reg, addr, b++))
--				return -EINVAL;
-+			if (kvmppc_booke_add_breakpoint(dbg_reg, addr, b++)) {
-+				ret = -EINVAL;
-+				goto out;
-+			}
- 		} else {
- 			/* Setting H/W watchpoint */
- 			if (kvmppc_booke_add_watchpoint(dbg_reg, addr,
--							type, w++))
--				return -EINVAL;
-+							type, w++)) {
-+				ret = -EINVAL;
-+				goto out;
-+			}
- 		}
- 	}
- 
--	return 0;
-+out:
-+	__vcpu_put(vcpu);
-+	return ret;
- }
- 
- void kvmppc_booke_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
-diff --git a/arch/powerpc/kvm/powerpc.c b/arch/powerpc/kvm/powerpc.c
-index 3480faaf1ef8..35361963c706 100644
---- a/arch/powerpc/kvm/powerpc.c
-+++ b/arch/powerpc/kvm/powerpc.c
-@@ -1410,6 +1410,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	int r;
- 	sigset_t sigsaved;
- 
-+	__vcpu_load(vcpu);
-+
- 	if (vcpu->mmio_needed) {
- 		vcpu->mmio_needed = 0;
- 		if (!vcpu->mmio_is_write)
-@@ -1424,7 +1426,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			r = kvmppc_emulate_mmio_vsx_loadstore(vcpu, run);
- 			if (r == RESUME_HOST) {
- 				vcpu->mmio_needed = 1;
--				return r;
-+				goto out;
- 			}
- 		}
- #endif
-@@ -1460,6 +1462,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
- 
-+out:
-+	__vcpu_put(vcpu);
- 	return r;
- }
- 
-@@ -1614,6 +1618,8 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	void __user *argp = (void __user *)arg;
- 	long r;
- 
-+	__vcpu_load(vcpu);
-+
- 	switch (ioctl) {
- 	case KVM_INTERRUPT: {
- 		struct kvm_interrupt irq;
-@@ -1663,6 +1669,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	}
- 
- out:
-+	__vcpu_put(vcpu);
- 	return r;
- }
- 
-diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
-index 40d0a1a97889..82ddfb3787db 100644
---- a/arch/s390/kvm/kvm-s390.c
-+++ b/arch/s390/kvm/kvm-s390.c
-@@ -2793,13 +2793,19 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- {
- 	int rc = 0;
- 
-+	__vcpu_load(vcpu);
-+
- 	vcpu->guest_debug = 0;
- 	kvm_s390_clear_bp_data(vcpu);
- 
--	if (dbg->control & ~VALID_GUESTDBG_FLAGS)
--		return -EINVAL;
--	if (!sclp.has_gpere)
--		return -EINVAL;
-+	if (dbg->control & ~VALID_GUESTDBG_FLAGS) {
-+		rc = -EINVAL;
-+		goto out;
-+	}
-+	if (!sclp.has_gpere) {
-+		rc = -EINVAL;
-+		goto out;
-+	}
- 
- 	if (dbg->control & KVM_GUESTDBG_ENABLE) {
- 		vcpu->guest_debug = dbg->control;
-@@ -2819,6 +2825,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 		atomic_andnot(CPUSTAT_P, &vcpu->arch.sie_block->cpuflags);
- 	}
- 
-+out:
-+	__vcpu_put(vcpu);
- 	return rc;
- }
- 
-@@ -3375,12 +3383,17 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
- 	int rc;
- 	sigset_t sigsaved;
- 
--	if (kvm_run->immediate_exit)
--		return -EINTR;
-+	__vcpu_load(vcpu);
-+
-+	if (kvm_run->immediate_exit) {
-+		rc = -EINTR;
-+		goto out;
-+	}
- 
- 	if (guestdbg_exit_pending(vcpu)) {
- 		kvm_s390_prepare_debug_exit(vcpu);
--		return 0;
-+		rc = 0;
-+		goto out;
- 	}
- 
- 	if (vcpu->sigset_active)
-@@ -3391,7 +3404,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
- 	} else if (is_vcpu_stopped(vcpu)) {
- 		pr_err_ratelimited("can't run stopped vcpu %d\n",
- 				   vcpu->vcpu_id);
--		return -EINVAL;
-+		rc = -EINVAL;
-+		goto out;
- 	}
- 
- 	sync_regs(vcpu, kvm_run);
-@@ -3422,6 +3436,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
- 
- 	vcpu->stat.exit_userspace++;
-+out:
-+	__vcpu_put(vcpu);
- 	return rc;
- }
- 
-@@ -3691,6 +3707,8 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	int idx;
- 	long r;
- 
-+	__vcpu_load(vcpu);
-+
- 	switch (ioctl) {
- 	case KVM_S390_IRQ: {
- 		struct kvm_s390_irq s390irq;
-@@ -3705,12 +3723,13 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		struct kvm_s390_interrupt s390int;
- 		struct kvm_s390_irq s390irq;
- 
--		r = -EFAULT;
-+		r = 0;
- 		if (copy_from_user(&s390int, argp, sizeof(s390int)))
--			break;
-+			r = -EFAULT;
- 		if (s390int_to_s390irq(&s390int, &s390irq))
--			return -EINVAL;
--		r = kvm_s390_inject_vcpu(vcpu, &s390irq);
-+			r = -EINVAL;
-+		if (!r)
-+			r = kvm_s390_inject_vcpu(vcpu, &s390irq);
- 		break;
- 	}
- 	case KVM_S390_STORE_STATUS:
-@@ -3835,6 +3854,8 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	default:
- 		r = -ENOTTY;
- 	}
-+
-+	__vcpu_put(vcpu);
- 	return r;
- }
- 
-diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index 03869eb7fcd6..008a8c238fd8 100644
---- a/arch/x86/kvm/x86.c
-+++ b/arch/x86/kvm/x86.c
-@@ -3453,6 +3453,8 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		void *buffer;
- 	} u;
- 
-+	__vcpu_load(vcpu);
-+
- 	u.buffer = NULL;
- 	switch (ioctl) {
- 	case KVM_GET_LAPIC: {
-@@ -3478,8 +3480,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 		if (!lapic_in_kernel(vcpu))
- 			goto out;
- 		u.lapic = memdup_user(argp, sizeof(*u.lapic));
--		if (IS_ERR(u.lapic))
--			return PTR_ERR(u.lapic);
-+		if (IS_ERR(u.lapic)) {
-+			r = PTR_ERR(u.lapic);
-+			goto out;
-+		}
- 
- 		r = kvm_vcpu_ioctl_set_lapic(vcpu, u.lapic);
- 		break;
-@@ -3653,8 +3657,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	}
- 	case KVM_SET_XSAVE: {
- 		u.xsave = memdup_user(argp, sizeof(*u.xsave));
--		if (IS_ERR(u.xsave))
--			return PTR_ERR(u.xsave);
-+		if (IS_ERR(u.xsave)) {
-+			r = PTR_ERR(u.xsave);
-+			goto out;
-+		}
- 
- 		r = kvm_vcpu_ioctl_x86_set_xsave(vcpu, u.xsave);
- 		break;
-@@ -3676,8 +3682,10 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	}
- 	case KVM_SET_XCRS: {
- 		u.xcrs = memdup_user(argp, sizeof(*u.xcrs));
--		if (IS_ERR(u.xcrs))
--			return PTR_ERR(u.xcrs);
-+		if (IS_ERR(u.xcrs)) {
-+			r = PTR_ERR(u.xcrs);
-+			goto out;
-+		}
- 
- 		r = kvm_vcpu_ioctl_x86_set_xcrs(vcpu, u.xcrs);
- 		break;
-@@ -3721,6 +3729,7 @@ long kvm_arch_vcpu_ioctl(struct file *filp,
- 	}
- out:
- 	kfree(u.buffer);
-+	__vcpu_put(vcpu);
- 	return r;
- }
- 
-@@ -7225,6 +7234,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
- 	int r;
- 	sigset_t sigsaved;
- 
-+	__vcpu_load(vcpu);
-+
- 	fpu__initialize(fpu);
- 
- 	if (vcpu->sigset_active)
-@@ -7274,11 +7285,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
- 
-+	__vcpu_put(vcpu);
- 	return r;
- }
- 
- int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
- {
-+	__vcpu_load(vcpu);
- 	if (vcpu->arch.emulate_regs_need_sync_to_vcpu) {
- 		/*
- 		 * We are here if userspace calls get_regs() in the middle of
-@@ -7312,11 +7325,14 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
- 	regs->rip = kvm_rip_read(vcpu);
- 	regs->rflags = kvm_get_rflags(vcpu);
- 
-+	__vcpu_put(vcpu);
- 	return 0;
- }
- 
- int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
- {
-+	__vcpu_load(vcpu);
-+
- 	vcpu->arch.emulate_regs_need_sync_from_vcpu = true;
- 	vcpu->arch.emulate_regs_need_sync_to_vcpu = false;
- 
-@@ -7346,6 +7362,7 @@ int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
- 
- 	kvm_make_request(KVM_REQ_EVENT, vcpu);
- 
-+	__vcpu_put(vcpu);
- 	return 0;
- }
- 
-@@ -7364,6 +7381,8 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
- {
- 	struct desc_ptr dt;
- 
-+	__vcpu_load(vcpu);
-+
- 	kvm_get_segment(vcpu, &sregs->cs, VCPU_SREG_CS);
- 	kvm_get_segment(vcpu, &sregs->ds, VCPU_SREG_DS);
- 	kvm_get_segment(vcpu, &sregs->es, VCPU_SREG_ES);
-@@ -7395,12 +7414,15 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
- 		set_bit(vcpu->arch.interrupt.nr,
- 			(unsigned long *)sregs->interrupt_bitmap);
- 
-+	__vcpu_put(vcpu);
- 	return 0;
- }
- 
- int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
- 				    struct kvm_mp_state *mp_state)
- {
-+	__vcpu_load(vcpu);
-+
- 	kvm_apic_accept_events(vcpu);
- 	if (vcpu->arch.mp_state == KVM_MP_STATE_HALTED &&
- 					vcpu->arch.pv.pv_unhalted)
-@@ -7408,6 +7430,7 @@ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
- 	else
- 		mp_state->mp_state = vcpu->arch.mp_state;
- 
-+	__vcpu_put(vcpu);
- 	return 0;
- }
- 
-@@ -7461,15 +7484,18 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 	int mmu_reset_needed = 0;
- 	int pending_vec, max_bits, idx;
- 	struct desc_ptr dt;
-+	int ret = -EINVAL;
- 
- 	if (!guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
- 			(sregs->cr4 & X86_CR4_OSXSAVE))
--		return -EINVAL;
-+		goto out;
- 
- 	apic_base_msr.data = sregs->apic_base;
- 	apic_base_msr.host_initiated = true;
- 	if (kvm_set_apic_base(vcpu, &apic_base_msr))
--		return -EINVAL;
-+		goto out;
-+
-+	__vcpu_load(vcpu);
- 
- 	dt.size = sregs->idt.limit;
- 	dt.address = sregs->idt.base;
-@@ -7535,7 +7561,10 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 
- 	kvm_make_request(KVM_REQ_EVENT, vcpu);
- 
--	return 0;
-+	ret = 0;
-+out:
-+	__vcpu_put(vcpu);
-+	return ret;
- }
- 
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
-@@ -7544,6 +7573,8 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 	unsigned long rflags;
- 	int i, r;
- 
-+	__vcpu_load(vcpu);
-+
- 	if (dbg->control & (KVM_GUESTDBG_INJECT_DB | KVM_GUESTDBG_INJECT_BP)) {
- 		r = -EBUSY;
- 		if (vcpu->arch.exception.pending)
-@@ -7589,7 +7620,7 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
- 	r = 0;
- 
- out:
--
-+	__vcpu_put(vcpu);
- 	return r;
- }
- 
-diff --git a/include/linux/kvm_host.h b/include/linux/kvm_host.h
-index 6882538eda32..5c760925af6c 100644
---- a/include/linux/kvm_host.h
-+++ b/include/linux/kvm_host.h
-@@ -533,7 +533,9 @@ static inline int kvm_vcpu_get_idx(struct kvm_vcpu *vcpu)
- int kvm_vcpu_init(struct kvm_vcpu *vcpu, struct kvm *kvm, unsigned id);
- void kvm_vcpu_uninit(struct kvm_vcpu *vcpu);
- 
-+void __vcpu_load(struct kvm_vcpu *vcpu);
- int __must_check vcpu_load(struct kvm_vcpu *vcpu);
-+void __vcpu_put(struct kvm_vcpu *vcpu);
- void vcpu_put(struct kvm_vcpu *vcpu);
- 
- #ifdef __KVM_HAVE_IOAPIC
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 7b27316d4c3f..ecc88a1713e3 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -845,11 +845,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return ret;
- 
- no_vgic:
--	preempt_disable();
- 	timer->enabled = 1;
--	kvm_timer_vcpu_load_vgic(vcpu);
--	preempt_enable();
--
- 	return 0;
- }
- 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a6bd563e5455..4c4566f5ed42 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -629,12 +629,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 			return ret;
- 		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
- 			return 0;
--
- 	}
- 
- 	if (run->immediate_exit)
- 		return -EINTR;
- 
-+	__vcpu_load(vcpu);
-+
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &vcpu->sigset, &sigsaved);
- 
-@@ -770,6 +771,7 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &sigsaved, NULL);
-+	__vcpu_put(vcpu);
- 	return ret;
- }
- 
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 62310122ee78..a0688ef52ad7 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -300,17 +300,6 @@ int vgic_init(struct kvm *kvm)
- 
- 	dist->initialized = true;
- 
--	/*
--	 * If we're initializing GICv2 on-demand when first running the VCPU
--	 * then we need to load the VGIC state onto the CPU.  We can detect
--	 * this easily by checking if we are in between vcpu_load and vcpu_put
--	 * when we just initialized the VGIC.
--	 */
--	preempt_disable();
--	vcpu = kvm_arm_get_running_vcpu();
--	if (vcpu)
--		kvm_vgic_load(vcpu);
--	preempt_enable();
- out:
- 	return ret;
- }
-diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 9deb5a245b83..089a92e786fe 100644
---- a/virt/kvm/kvm_main.c
-+++ b/virt/kvm/kvm_main.c
-@@ -144,29 +144,38 @@ bool kvm_is_reserved_pfn(kvm_pfn_t pfn)
- 	return true;
- }
- 
--/*
-- * Switches to specified vcpu, until a matching vcpu_put()
-- */
--int vcpu_load(struct kvm_vcpu *vcpu)
-+/* Load the vcpu from ioctl context after the vcpu mutex is already taken */
-+void __vcpu_load(struct kvm_vcpu *vcpu)
- {
--	int cpu;
--
--	if (mutex_lock_killable(&vcpu->mutex))
--		return -EINTR;
--	cpu = get_cpu();
-+	int cpu = get_cpu();
- 	preempt_notifier_register(&vcpu->preempt_notifier);
- 	kvm_arch_vcpu_load(vcpu, cpu);
- 	put_cpu();
-+}
-+EXPORT_SYMBOL_GPL(__vcpu_load);
-+
-+/* Use this to load the vcpu without already holding the vcpu mutex */
-+int vcpu_load(struct kvm_vcpu *vcpu)
-+{
-+	if (mutex_lock_killable(&vcpu->mutex))
-+		return -EINTR;
-+	__vcpu_load(vcpu);
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(vcpu_load);
- 
--void vcpu_put(struct kvm_vcpu *vcpu)
-+void __vcpu_put(struct kvm_vcpu *vcpu)
- {
- 	preempt_disable();
- 	kvm_arch_vcpu_put(vcpu);
- 	preempt_notifier_unregister(&vcpu->preempt_notifier);
- 	preempt_enable();
-+}
-+EXPORT_SYMBOL_GPL(__vcpu_put);
-+
-+void vcpu_put(struct kvm_vcpu *vcpu)
-+{
-+	__vcpu_put(vcpu);
- 	mutex_unlock(&vcpu->mutex);
- }
- EXPORT_SYMBOL_GPL(vcpu_put);
-@@ -2529,9 +2538,8 @@ static long kvm_vcpu_ioctl(struct file *filp,
- #endif
- 
- 
--	r = vcpu_load(vcpu);
--	if (r)
--		return r;
-+	if (mutex_lock_killable(&vcpu->mutex))
-+		return -EINTR;
- 	switch (ioctl) {
- 	case KVM_RUN: {
- 		struct pid *oldpid;
-@@ -2703,7 +2711,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
- 		r = kvm_arch_vcpu_ioctl(filp, ioctl, arg);
- 	}
- out:
--	vcpu_put(vcpu);
-+	mutex_unlock(&vcpu->mutex);
- 	kfree(fpu);
- 	kfree(kvm_sregs);
- 	return r;
--- 
-2.14.2
+> +static int w2sg_set_lna_power(struct w2sg_data *data)
+> +{
+> +	int ret = 0;
+> +	int off = data->suspended || !data->requested || data->lna_blocked;
+> +
+> +	pr_debug("%s: %s\n", __func__, off ? "off" : "on");
+> +
+> +	if (off != data->lna_is_off) {
+> +		data->lna_is_off = off;
+> +		if (!IS_ERR_OR_NULL(data->lna_regulator)) {
+> +			if (off)
+> +				regulator_disable(data->lna_regulator);
+> +			else
+> +				ret = regulator_enable(data->lna_regulator);
+> +		}
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static void w2sg_set_power(void *pdata, int val)
+> +{
+> +	struct w2sg_data *data = (struct w2sg_data *) pdata;
+> +
+> +	pr_debug("%s to state=%d (requested=%d)\n", __func__, val, data->requested);
+> +
+> +	if (val && !data->requested) {
+> +		data->requested = true;
+> +	} else if (!val && data->requested) {
+> +		data->backoff = HZ;
+> +		data->requested = false;
+> +	} else
+> +		return;
+> +
+> +	pr_debug("w2sg00x4 scheduled for %d\n", data->requested);
+> +
+> +	if (!data->suspended)
+> +		schedule_delayed_work(&data->work, 0);
+> +}
+> +
+> +/* called each time data is received by the UART (i.e. sent by the w2sg0004) */
+> +
+> +static int w2sg_uart_receive_buf(struct serdev_device *serdev,
+> +				const unsigned char *rxdata,
+> +				size_t count)
+> +{
+> +	struct w2sg_data *data =
+> +		(struct w2sg_data *) serdev_device_get_drvdata(serdev);
+> +
+> +	if (!data->requested && !data->is_on) {
+> +		/*
+> +		 * we have received characters while the w2sg
+> +		 * should have been be turned off
+> +		 */
+> +		data->discard_count += count;
+> +		if ((data->state == W2SG_IDLE) &&
+> +		    time_after(jiffies,
+> +		    data->last_toggle + data->backoff)) {
+> +			/* Should be off by now, time to toggle again */
+> +			pr_debug("w2sg00x4 has sent %d characters data although it should be off!\n",
+> +				data->discard_count);
+> +
+> +			data->discard_count = 0;
+> +
+> +			data->is_on = true;
+> +			data->backoff *= 2;
+> +			if (!data->suspended)
+> +				schedule_delayed_work(&data->work, 0);
+> +		}
+> +	} else if (data->open_count > 0) {
+> +		int n;
+> +
+> +		pr_debug("w2sg00x4: push %lu chars to tty port\n",
+> +			(unsigned long) count);
+> +
+> +		/* pass to user-space */
+> +		n = tty_insert_flip_string(&data->port, rxdata, count);
+> +		if (n != count)
+> +			pr_err("w2sg00x4: did loose %lu characters\n",
+> +				(unsigned long) (count - n));
+> +		tty_flip_buffer_push(&data->port);
+> +		return n;
+> +	}
+> +
+> +	/* assume we have processed everything */
+> +	return count;
+> +}
+> +
+> +/* try to toggle the power state by sending a pulse to the on-off GPIO */
+> +
+
+drop extra line, same everywhere
+
+> +static void toggle_work(struct work_struct *work)
+> +{
+> +	struct w2sg_data *data = container_of(work, struct w2sg_data,
+> +					      work.work);
+> +
+> +	switch (data->state) {
+> +	case W2SG_IDLE:
+> +		if (data->requested == data->is_on)
+> +			return;
+> +
+> +		w2sg_set_lna_power(data);	/* update LNA power state */
+> +		gpio_set_value_cansleep(data->on_off_gpio, 0);
+> +		data->state = W2SG_PULSE;
+> +
+> +		pr_debug("w2sg: power gpio ON\n");
+> +
+> +		schedule_delayed_work(&data->work,
+> +				      msecs_to_jiffies(10));
+> +		break;
+> +
+> +	case W2SG_PULSE:
+> +		gpio_set_value_cansleep(data->on_off_gpio, 1);
+> +		data->last_toggle = jiffies;
+> +		data->state = W2SG_NOPULSE;
+> +		data->is_on = !data->is_on;
+> +
+> +		pr_debug("w2sg: power gpio OFF\n");
+> +
+> +		schedule_delayed_work(&data->work,
+> +				      msecs_to_jiffies(10));
+> +		break;
+> +
+> +	case W2SG_NOPULSE:
+> +		data->state = W2SG_IDLE;
+> +
+> +		pr_debug("w2sg: idle\n");
+> +
+> +		break;
+> +
+> +	}
+> +}
+> +
+> +static int w2sg_rfkill_set_block(void *pdata, bool blocked)
+> +{
+> +	struct w2sg_data *data = pdata;
+> +
+> +	pr_debug("%s: blocked: %d\n", __func__, blocked);
+> +
+> +	data->lna_blocked = blocked;
+> +
+> +	return w2sg_set_lna_power(data);
+> +}
+> +
+> +static struct rfkill_ops w2sg0004_rfkill_ops = {
+> +	.set_block = w2sg_rfkill_set_block,
+> +};
+> +
+> +static struct serdev_device_ops serdev_ops = {
+> +	.receive_buf = w2sg_uart_receive_buf,
+> +};
+> +
+> +/*
+> + * we are a man-in the middle between the user-space visible tty port
+> + * and the serdev tty where the chip is connected.
+> + * This allows us to recognise when the device should be powered on
+> + * or off and handle the "false" state that data arrives while no
+> + * users-space tty client exists.
+> + */
+> +
+> +static struct w2sg_data *w2sg_get_by_minor(unsigned int minor)
+> +{
+> +	return w2sg_by_minor[minor];
+> +}
+> +
+> +static int w2sg_tty_install(struct tty_driver *driver, struct tty_struct *tty)
+> +{
+> +	struct w2sg_data *data;
+> +	int retval;
+> +
+> +	pr_debug("%s() tty = %p\n", __func__, tty);
+> +
+> +	data = w2sg_get_by_minor(tty->index);
+> +
+> +	if (!data)
+> +		return -ENODEV;
+> +
+> +	retval = tty_standard_install(driver, tty);
+> +	if (retval)
+> +		goto error_init_termios;
+> +
+> +	tty->driver_data = data;
+> +
+> +	return 0;
+> +
+> +error_init_termios:
+> +	tty_port_put(&data->port);
+> +	return retval;
+> +}
+> +
+> +static int w2sg_tty_open(struct tty_struct *tty, struct file *file)
+> +{
+> +	struct w2sg_data *data = tty->driver_data;
+> +
+> +	pr_debug("%s() data = %p open_count = ++%d\n", __func__, data, data->open_count);
+> +
+> +	w2sg_set_power(data, ++data->open_count > 0);
+> +
+> +	return tty_port_open(&data->port, tty, file);
+> +}
+> +
+> +static void w2sg_tty_close(struct tty_struct *tty, struct file *file)
+> +{
+> +	struct w2sg_data *data = tty->driver_data;
+> +
+> +	pr_debug("%s()\n", __func__);
+> +
+> +	w2sg_set_power(data, --data->open_count > 0);
+> +
+> +	tty_port_close(&data->port, tty, file);
+> +}
+> +
+> +static int w2sg_tty_write(struct tty_struct *tty,
+> +		const unsigned char *buffer, int count)
+> +{
+> +	struct w2sg_data *data = tty->driver_data;
+> +
+> +	/* simply pass down to UART */
+> +	return serdev_device_write_buf(data->uart, buffer, count);
+> +}
+> +
+> +static const struct tty_operations w2sg_serial_ops = {
+> +	.install = w2sg_tty_install,
+> +	.open = w2sg_tty_open,
+> +	.close = w2sg_tty_close,
+> +	.write = w2sg_tty_write,
+> +};
+> +
+> +static const struct tty_port_operations w2sg_port_ops = {
+> +};
+
+drop the brackets? or use NULL below, not sure if this needs memory.
+
+> +
+> +static int w2sg_probe(struct serdev_device *serdev)
+> +{
+> +	struct w2sg_data *data;
+> +	struct rfkill *rf_kill;
+> +	int err;
+> +	int minor;
+> +	enum of_gpio_flags flags;
+> +
+> +	pr_debug("%s()\n", __func__);
+> +
+> +	minor = 0;
+> +	if (w2sg_by_minor[minor]) {
+> +		pr_err("w2sg minor is already in use!\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	data = devm_kzalloc(&serdev->dev, sizeof(*data), GFP_KERNEL);
+> +	if (data == NULL)
+> +		return -ENOMEM;
+> +
+> +	w2sg_by_minor[minor] = data;
+> +
+> +	serdev_device_set_drvdata(serdev, data);
+> +
+> +	data->on_off_gpio = of_get_named_gpio_flags(serdev->dev.of_node,
+> +						     "enable-gpios", 0,
+> +						     &flags);
+> +	/* defer until we have all gpios */
+> +	if (data->on_off_gpio == -EPROBE_DEFER)
+> +		return -EPROBE_DEFER;
+> +
+> +	data->lna_regulator = devm_regulator_get_optional(&serdev->dev,
+> +							"lna");
+> +	if (IS_ERR(data->lna_regulator)) {
+> +		/* defer until we can get the regulator */
+> +		if (PTR_ERR(data->lna_regulator) == -EPROBE_DEFER)
+> +			return -EPROBE_DEFER;
+> +
+> +		data->lna_regulator = NULL;
+> +	}
+> +	pr_debug("%s() lna_regulator = %p\n", __func__, data->lna_regulator);
+> +
+> +	data->lna_blocked = true;
+> +	data->lna_is_off = true;
+> +
+> +	data->is_on = false;
+> +	data->requested = false;
+> +	data->state = W2SG_IDLE;
+> +	data->last_toggle = jiffies;
+> +	data->backoff = HZ;
+> +
+> +	data->uart = serdev;
+> +
+> +	INIT_DELAYED_WORK(&data->work, toggle_work);
+> +
+> +	err = devm_gpio_request(&serdev->dev, data->on_off_gpio,
+> +				"w2sg0004-on-off");
+> +	if (err < 0)
+> +		goto out;
+> +
+> +	gpio_direction_output(data->on_off_gpio, false);
+> +
+> +	serdev_device_set_client_ops(data->uart, &serdev_ops);
+> +	serdev_device_open(data->uart);
+> +
+> +	serdev_device_set_baudrate(data->uart, 9600);
+> +	serdev_device_set_flow_control(data->uart, false);
+> +
+> +	rf_kill = rfkill_alloc("GPS", &serdev->dev, RFKILL_TYPE_GPS,
+> +				&w2sg0004_rfkill_ops, data);
+> +	if (rf_kill == NULL) {
+> +		err = -ENOMEM;
+> +		goto err_rfkill;
+> +	}
+> +
+> +	err = rfkill_register(rf_kill);
+> +	if (err) {
+> +		dev_err(&serdev->dev, "Cannot register rfkill device\n");
+> +		goto err_rfkill;
+> +	}
+> +
+> +	data->rf_kill = rf_kill;
+> +
+> +	/* allocate the tty driver */
+> +	data->tty_drv = alloc_tty_driver(1);
+> +	if (!data->tty_drv)
+> +		return -ENOMEM;
+> +
+> +	/* initialize the tty driver */
+> +	data->tty_drv->owner = THIS_MODULE;
+> +	data->tty_drv->driver_name = "w2sg0004";
+> +	data->tty_drv->name = "ttyGPS";
+> +	data->tty_drv->major = 0;
+> +	data->tty_drv->minor_start = 0;
+> +	data->tty_drv->type = TTY_DRIVER_TYPE_SERIAL;
+> +	data->tty_drv->subtype = SERIAL_TYPE_NORMAL;
+> +	data->tty_drv->flags = TTY_DRIVER_REAL_RAW | TTY_DRIVER_DYNAMIC_DEV;
+> +	data->tty_drv->init_termios = tty_std_termios;
+> +	data->tty_drv->init_termios.c_cflag = B9600 | CS8 | CREAD |
+> +					      HUPCL | CLOCAL;
+> +	/*
+> +	 * optional:
+> +	 * tty_termios_encode_baud_rate(&data->tty_drv->init_termios,
+> +					115200, 115200);
+> +	 * w2sg_tty_termios(&data->tty_drv->init_termios);
+> +	 */
+> +	tty_set_operations(data->tty_drv, &w2sg_serial_ops);
+> +
+> +	/* register the tty driver */
+> +	err = tty_register_driver(data->tty_drv);
+> +	if (err) {
+> +		pr_err("%s - tty_register_driver failed(%d)\n",
+> +			__func__, err);
+> +		put_tty_driver(data->tty_drv);
+> +		goto err_rfkill;
+> +	}
+> +
+> +	tty_port_init(&data->port);
+> +	data->port.ops = &w2sg_port_ops;
+> +
+> +	pr_debug("w2sg call tty_port_register_device\n");
+> +
+> +	data->dev = tty_port_register_device(&data->port,
+> +			data->tty_drv, minor, &serdev->dev);
+> +
+> +	pr_debug("w2sg probed\n");
+> +
+> +	/* keep off until user space requests the device */
+> +	w2sg_set_power(data, false);
+> +
+> +	return 0;
+> +
+> +err_rfkill:
+> +	rfkill_destroy(rf_kill);
+> +	serdev_device_close(data->uart);
+> +out:
+> +	return err;
+> +}
+> +
+> +static void w2sg_remove(struct serdev_device *serdev)
+> +{
+> +	struct w2sg_data *data = serdev_device_get_drvdata(serdev);
+> +	int minor;
+> +
+> +	cancel_delayed_work_sync(&data->work);
+> +
+> +	/* what is the right sequence to avoid problems? */
+> +	serdev_device_close(data->uart);
+> +
+> +	minor = 0;
+> +	tty_unregister_device(data->tty_drv, minor);
+> +
+> +	tty_unregister_driver(data->tty_drv);
+> +}
+> +
+> +static int w2sg_suspend(struct device *dev)
+
+__maybe_unused, or if PM is disabled you will get a warning.
+
+> +{
+> +	struct w2sg_data *data = dev_get_drvdata(dev);
+> +
+> +	data->suspended = true;
+> +
+> +	cancel_delayed_work_sync(&data->work);
+> +
+> +	w2sg_set_lna_power(data);	/* shuts down if needed */
+> +
+> +	if (data->state == W2SG_PULSE) {
+> +		msleep(10);
+> +		gpio_set_value_cansleep(data->on_off_gpio, 1);
+> +		data->last_toggle = jiffies;
+> +		data->is_on = !data->is_on;
+> +		data->state = W2SG_NOPULSE;
+> +	}
+> +
+> +	if (data->state == W2SG_NOPULSE) {
+> +		msleep(10);
+> +		data->state = W2SG_IDLE;
+> +	}
+> +
+> +	if (data->is_on) {
+> +		pr_info("GPS off for suspend %d %d %d\n", data->requested,
+> +			data->is_on, data->lna_is_off);
+> +
+> +		gpio_set_value_cansleep(data->on_off_gpio, 0);
+> +		msleep(10);
+> +		gpio_set_value_cansleep(data->on_off_gpio, 1);
+> +		data->is_on = 0;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int w2sg_resume(struct device *dev)
+> +{
+> +	struct w2sg_data *data = dev_get_drvdata(dev);
+> +
+> +	data->suspended = false;
+> +
+> +	pr_info("GPS resuming %d %d %d\n", data->requested,
+> +		data->is_on, data->lna_is_off);
+> +
+> +	schedule_delayed_work(&data->work, 0);	/* enables LNA if needed */
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct of_device_id w2sg0004_of_match[] = {
+> +	{ .compatible = "wi2wi,w2sg0004" },
+> +	{ .compatible = "wi2wi,w2sg0084" },
+> +	{},
+> +};
+> +MODULE_DEVICE_TABLE(of, w2sg0004_of_match);
+> +
+> +SIMPLE_DEV_PM_OPS(w2sg_pm_ops, w2sg_suspend, w2sg_resume);
+> +
+> +static struct serdev_device_driver w2sg_driver = {
+> +	.probe		= w2sg_probe,
+> +	.remove		= w2sg_remove,
+> +	.driver = {
+> +		.name	= "w2sg0004",
+> +		.owner	= THIS_MODULE,
+> +		.pm	= &w2sg_pm_ops,
+> +		.of_match_table = of_match_ptr(w2sg0004_of_match)
+> +	},
+> +};
+> +
+> +module_serdev_device_driver(w2sg_driver);
+> +
+> +MODULE_ALIAS("w2sg0004");
+
+Is this needed?
+
+> +
+> +MODULE_AUTHOR("NeilBrown <neilb@suse.de>");
+
+Who really wrote this?
+
+> +MODULE_DESCRIPTION("w2sg0004 GPS power management driver");
+> +MODULE_LICENSE("GPL v2");
+> 
