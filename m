@@ -1,66 +1,104 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 23 Nov 2017 18:48:04 +0100
-Subject: [RFC PATCH] KVM: Only register preempt notifiers and load arch
- cpu state as needed
-In-Reply-To: <62ae4eb1-fd57-c525-cd73-e3f646d340e1@redhat.com>
-References: <20171123160521.27260-1-christoffer.dall@linaro.org>
- <72357599-798d-14d0-336a-69a083f17863@redhat.com>
- <20171123170642.GA28855@cbox>
- <62ae4eb1-fd57-c525-cd73-e3f646d340e1@redhat.com>
-Message-ID: <20171123174804.GB28855@cbox>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 23 Nov 2017 18:54:17 +0100
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
+ userspace (KAISER)
+In-Reply-To: <CAKv+Gu8dthibwF-Tm8umM+Q_k_taJsZY8x-OQC=zSbbkwNgV6g@mail.gmail.com>
+References: <20171122161913.GB12684@amd>
+ <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
+ <20171122223355.GA5877@amd>
+ <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
+ <20171122233738.GA25313@amd>
+ <D3BCED36-58D1-4E30-9171-16F06A5DC65D@linaro.org>
+ <20171123090747.GA6948@amd>
+ <CAKv+Gu-vsQiDS1kobmaBmnWv__vTuOcKHs6t2rMiVu=rriHeEQ@mail.gmail.com>
+ <20171123104656.GA17990@amd>
+ <CAKv+Gu8dthibwF-Tm8umM+Q_k_taJsZY8x-OQC=zSbbkwNgV6g@mail.gmail.com>
+Message-ID: <20171123175417.GA25538@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 06:12:41PM +0100, Paolo Bonzini wrote:
-> On 23/11/2017 18:06, Christoffer Dall wrote:
-> > On Thu, Nov 23, 2017 at 05:17:00PM +0100, Paolo Bonzini wrote:
-> >> On 23/11/2017 17:05, Christoffer Dall wrote:
-> >>> For example,
-> >>> arm64 is about to do significant work in vcpu load/put when running a
-> >>> vcpu, but not when doing things like KVM_SET_ONE_REG or
-> >>> KVM_SET_MP_STATE.
+On Thu 2017-11-23 11:38:52, Ard Biesheuvel wrote:
+> On 23 November 2017 at 10:46, Pavel Machek <pavel@ucw.cz> wrote:
+> > On Thu 2017-11-23 09:23:02, Ard Biesheuvel wrote:
+> >> On 23 November 2017 at 09:07, Pavel Machek <pavel@ucw.cz> wrote:
+> >> > Hi!
+> >> >
+> >> >> > On 22 Nov 2017, at 23:37, Pavel Machek <pavel@ucw.cz> wrote:
+> >> >> >
+> >> >> > Hi!
+> >> >> >
+> >> >> >>>>> If I'm willing to do timing attacks to defeat KASLR... what prevents
+> >> >> >>>>> me from using CPU caches to do that?
+> >> >> >>>>>
+> >> >> >>>>
+> >> >> >>>> Because it is impossible to get a cache hit on an access to an
+> >> >> >>>> unmapped address?
+> >> >> >>>
+> >> >> >>> Um, no, I don't need to be able to directly access kernel addresses. I
+> >> >> >>> just put some data in _same place in cache where kernel data would
+> >> >> >>> go_, then do syscall and look if my data are still cached. Caches
+> >> >> >>> don't have infinite associativity.
+> >> >> >>>
+> >> >> >>
+> >> >> >> Ah ok. Interesting.
+> >> >> >>
+> >> >> >> But how does that leak address bits that are covered by the tag?
+> >> >> >
+> >> >> > Same as leaking any other address bits? Caches are "virtually
+> >> >> > indexed",
+> >> >>
+> >> >> Not on arm64, although I don?t see how that is relevant if you are trying to defeat kaslr.
+> >> >>
+> >> >> > and tag does not come into play...
+> >> >> >
+> >> >>
+> >> >> Well, I must be missing something then, because I don?t see how knowledge about which userland address shares a cache way with a kernel address can leak anything beyond the bits that make up the index (i.e., which cache way is being shared)
+> >> >>
+> >> >
+> >> > Well, KASLR is about keeping bits of kernel virtual address secret
+> >> > from userland. Leaking them through cache sidechannel means KASLR is
+> >> > defeated.
+> >> >
 > >>
-> >> Out of curiosity, in what circumstances are these ioctls a hot path?
-> >> Especially KVM_SET_MP_STATE.
-> > 
-> > Perhaps my commit message was misleading; we only want to do that for
-> > KVM_RUN, and not for anything else.  We're already doing things like
-> > potentially jumping to hyp mode and flushing VMIDs which really
-> > shouldn't be done unless we actually plan on running a VCPU, and we're
-> > going to do things like setting up the timer to handle timer interrupts
-> > in an ISR, which doesn't make sense unless the VCPU is running.
-> > 
-> > Add to that, that loading an entire VM's state onto hardware, only to
-> > read back a single register from hardware and returning it to user
-> > space, doesn't really fall within optimization vs. non-optimization in
-> > the critical path, but is just wrong, IMHO.
+> >> Yes, that is what you claim. But you are not explaining how any of the
+> >> bits that we do want to keep secret can be discovered by making
+> >> inferences from which lines in a primed cache were evicted during a
+> >> syscall.
+> >>
+> >> The cache index maps to low order bits. You can use this, e.g., to
+> >> attack table based AES, because there is only ~4 KB worth of tables,
+> >> and you are interested in finding out which exact entries of the table
+> >> were read by the process under attack.
+> >>
+> >> You are saying the same approach will help you discover 30 high order
+> >> bits of a virtual kernel address, by observing the cache evictions in
+> >> a physically indexed physically tagged cache. How?
+> >
+> > I assumed high bits are hashed into cache index. I might have been
+> > wrong. Anyway, page tables are about same size as AES tables. So...:
+> >
+> > http://cve.circl.lu/cve/CVE-2017-5927
+> >
 > 
-> For GET/SET_ONE_REG it certainly makes sense.  For everything else, I'm
-> wondering which ioctls (and how many calls to each of them) exactly you
-> are seeing, and also on which userspace paths.
-> 
+> Very interesting paper. Can you explain why you think its findings can
+> be extrapolated to apply to attacks across address spaces? Because
+> that is what would be required for it to be able to defeat KASLR.
 
-Outside of migration, not many.  It's not about optimizing certain
-ioctl's, but rather that I think it's wrong and potentially vulnerable
-to do significant work on the system which is strictly unnecessary.
+Can you explain why not?
 
-> > That doesn't solve my need as I want to *only* do the arch vcpu_load for
-> > KVM_RUN, I should have been more clear in the commit message.
-> 
-> That's what you want to do, but it might not be what you need to do.
-> 
+You clearly understand AES tables can be attacked cross-address-space,
+and there's no reason page tables could not be attacked same way. I'm
+not saying that's the best way to launch the attack, but it certainly
+looks possible to me.
 
-Well, why would we want to do a lot of work when there's absolutely no
-need to?
-
-I see that this patch is invasive, and that's why I originally proposed
-the other approach of recording the ioctl number.
-
-While it may be possible to call kvm_arch_vcpu_load() for a number of
-non-KVM_RUN ioctls, it makes the KVM/ARM code more difficult to reason
-about, especially after my optimization series, because a lot of things
-can now happen, where we have to consider if we're really in the process
-of running a vcpu or not.
-
-Thanks,
--Christoffer
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/714ab6f6/attachment.sig>
