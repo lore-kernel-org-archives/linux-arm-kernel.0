@@ -1,9 +1,9 @@
 From: Jason@zx2c4.com (Jason A. Donenfeld)
-Date: Thu, 23 Nov 2017 12:48:02 +0100
-Subject: [PATCH] arm: detect buggy binutils when in thumb2 mode
-In-Reply-To: <CAHmME9qBxgDV-HGeqj75ohr=4Bf+TD73PcC0DUqTRh5PTOKyhQ@mail.gmail.com>
-References: <CAHmME9qBxgDV-HGeqj75ohr=4Bf+TD73PcC0DUqTRh5PTOKyhQ@mail.gmail.com>
-Message-ID: <20171123114802.24942-1-Jason@zx2c4.com>
+Date: Thu, 23 Nov 2017 12:50:21 +0100
+Subject: [PATCH v2] arm: detect buggy binutils when in thumb2 mode
+In-Reply-To: <20171123114802.24942-1-Jason@zx2c4.com>
+References: <20171123114802.24942-1-Jason@zx2c4.com>
+Message-ID: <20171123115021.25213-1-Jason@zx2c4.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -65,11 +65,14 @@ Cc: Russell King <linux@armlinux.org.uk>
 Cc: nickc at redhat.com
 Cc: stable at vger.kernel.org
 ---
+Had the file mode wrong on the submission from a second ago, sorry about
+that.
+
  arch/arm/Makefile        |  7 +++++--
  arch/arm/tools/Makefile  |  5 ++++-
  arch/arm/tools/toolcheck | 44 ++++++++++++++++++++++++++++++++++++++++++++
  3 files changed, 53 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/tools/toolcheck
+ create mode 100755 arch/arm/tools/toolcheck
 
 diff --git a/arch/arm/Makefile b/arch/arm/Makefile
 index 80351e505fd5..bd4e248a7f8f 100644
@@ -119,7 +122,7 @@ index ddb89a7db36f..0a283756f1c5 100644
  _dummy := $(shell [ -d '$(kapi)' ] || mkdir -p '$(kapi)') \
            $(shell [ -d '$(uapi)' ] || mkdir -p '$(uapi)')
 diff --git a/arch/arm/tools/toolcheck b/arch/arm/tools/toolcheck
-new file mode 100644
+new file mode 100755
 index 000000000000..04fc44b750d2
 --- /dev/null
 +++ b/arch/arm/tools/toolcheck
