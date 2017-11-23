@@ -1,103 +1,76 @@
-From: liubo95@huawei.com (Bob Liu)
-Date: Thu, 23 Nov 2017 18:33:47 +0800
-Subject: [RFCv2 PATCH 01/36] iommu: Keep track of processes and PASIDs
-In-Reply-To: <42f815ee-2a9a-ac49-2392-5c03c1d4c809@arm.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-2-jean-philippe.brucker@arm.com>
- <588ad6f0-e78a-63de-e27a-3da4de4ab2ab@huawei.com>
- <42f815ee-2a9a-ac49-2392-5c03c1d4c809@arm.com>
-Message-ID: <82690672-1746-b740-1471-1b136a457ac7@huawei.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Nov 2017 10:35:19 +0000
+Subject: [PATCH] arm: ensure symbol is a thumb symbol in new binutils
+In-Reply-To: <CAHmME9oMTNJFnOwfhu26QSRSP92Axbc-+v9cCPsTKxekZvGvxg@mail.gmail.com>
+References: <20171121172751.29545-1-Jason@zx2c4.com>
+ <20171121173857.GJ31757@n2100.armlinux.org.uk>
+ <CAHmME9quDFbdOR9hKRz-Px=Mh3FvYEyhVrs4V_+JT+GjDajMrA@mail.gmail.com>
+ <20171121174942.GK31757@n2100.armlinux.org.uk>
+ <CAHmME9oMTNJFnOwfhu26QSRSP92Axbc-+v9cCPsTKxekZvGvxg@mail.gmail.com>
+Message-ID: <20171123103518.GL31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/11/22 21:04, Jean-Philippe Brucker wrote:
-> On 22/11/17 03:15, Bob Liu wrote:
->> Hey Jean,
->>
->> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
->>> IOMMU drivers need a way to bind Linux processes to devices. This is used
->>> for Shared Virtual Memory (SVM), where devices support paging. In that
->>> mode, DMA can directly target virtual addresses of a process.
->>>
->>> Introduce boilerplate code for allocating process structures and binding
->>> them to devices. Four operations are added to IOMMU drivers:
->>>
->>> * process_alloc, process_free: to create an iommu_process structure and
->>>   perform architecture-specific operations required to grab the process
->>>   (for instance on ARM SMMU, pin down the CPU ASID). There is a single
->>>   iommu_process structure per Linux process.
->>>
->>
->> I'm a bit confused here.
->> The original meaning of iommu_domain is a virtual addrspace defined by a set of io page table.
->> (fix me if I misunderstood).
+On Thu, Nov 23, 2017 at 12:34:08AM +0100, Jason A. Donenfeld wrote:
+> On Tue, Nov 21, 2017 at 6:49 PM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > What if we locate the "badr" instruction to the same offset - does
+> > that trigger the binutils bug?  Note that the grep expression will
+> > need updating...
 > 
-> iommu_domain can also be seen as a logical partition of devices that share
-> the same address spaces (the concept comes from AMD and Intel IOMMU
-> domains, I believe). Without PASIDs it was a single address space, with
-> PASIDs it can have multiple address spaces.
-> 
->> Then what's the meaning of iommu_domain and iommu_process after introducing iommu_process?
->> Could you consider document these concepts? 
-> 
-> iommu_process is used to keep track of Linux process address spaces. I'll
-> rename it to io_mm in next version, to make it clear that it doesn't
-> represent a Linux task but an mm_struct instead. However the
-> implementation stays pretty much identical. A domain can be associated to
-> multiple io_mm, and an io_mm can be associated to multiple domains.
-> 
-> In the IOMMU architectures I know, PASID is implemented like this. You
-> have the device tables (stream tables on SMMU), pointing to PASID tables
-> (context descriptor tables on SMMU). In the following diagram,
-> 
->                     .->+--------+
->                    / 0 |        |------ io_pgtable
->                   /    +--------+
->                  /   1 |        |------ io_mm->mm X
->     +--------+  /      +--------+
->   0 |      A |-'     2 |        |-.
->     +--------+         +--------+  \
->   1 |        |       3 |        |   \
->     +--------+         +--------+    -- io_mm->mm Y
->   2 |      B |--.     PASID tables  /
->     +--------+   \                 |
->   3 |      B |----+--->+--------+  |
->     +--------+   /   0 |        |- | -- io_pgtable
->   4 |      B |--'      +--------+  |
->     +--------+       1 |        |  |
->   Device tables        +--------+  |
->                      2 |        |--'
->                        +--------+
->                      3 |        |------ io_mm->priv io_pgtable
->                        +--------+
->                       PASID tables
-> 
-> * Device 0 (e.g. PCI 0000:00:00.0) is in domain A.
-> * Devices 2, 3 and 4 are in domain B.
-> * Domain A has the top set of PASID tables.
-> * Domain B has the bottom set of PASID tables.
-> 
-> * Domain A is bound to process address space X.
->   -> Device 0 can access X with PASID 1.
-> * Both domains A and B are bound to process address space Y.
->   -> Devices 0, 2, 3 and 4 can access Y with PASID 2
-> 
-> * PASID 0 is special on Arm SMMU (with S1DSS=0b10). It will always be
->   reserved for classic DMA map/unmap. Even for hypothetical devices that
->   don't support non-pasid transactions, I'd like to keep this convention.
->   It should be quite useful for device drivers to have PASID 0 available
->   with DMA map/unmap.
-> 
-> * When introducing "private" PASID address spaces (that many are asking
->   for), which are backed by a set of io-pgtable and map/unmap ops, I
->   suppose they would reuse the io_mm structure. In this example PASID 3 is
->   associated to a private address space and not backed by an mm. Since the
->   PASID space is global, PASID 3 won't be available for any other domain.
-> 
-> Does this clarify the current design, or is it just more confusing?
-> 
+> Nope, this too does not reproduce it. I'm having a bit of trouble
+> making a minimal test case to reproduce it. But I can reproduce it
+> everytime by simply assembling the file in question using that
+> binutils.
 
-It's very helpful, thank you very much!
+If it's that hard to reproduce it, it makes me wonder if it's being
+caused by some memory allocation being re-used without full
+initialisation, and it's reading stale data.
 
-Regards,
-Liubo
+We can't easily build entry-common.o and check it for the problem as the
+position of the "local_restart" code depends on various configuration
+options.
+
+I found this URL:
+
+https://fossies.org/diffs/binutils/2.28_vs_2.29/gas/config/tc-arm.c-diff.html
+
+and if you search down to around "line 8358", which is in do_adr(),
+there is this new code added:
+
+      if (inst.reloc.exp.X_op == O_symbol
+          && inst.reloc.exp.X_add_symbol != NULL
+          && S_IS_DEFINED (inst.reloc.exp.X_add_symbol)
+          && THUMB_IS_FUNC (inst.reloc.exp.X_add_symbol))
+        inst.reloc.exp.X_add_number += 1;
+
+which would account for the issue you're seeing.
+
+Given that this change breaks openssl, and breaks the kernel, and
+this behaviour is something that we've come to rely upon in the
+kernel since T2 was introduced, and there's no way around it without
+adding additional instructions, I have to ask what the hell binutils
+people think they are doing changing the behaviour of the assembler
+in such a gratuitous way, and how they think that users of their
+crapware are going to be able to write code that assembles correctly
+on both pre-2.29 assemblers and post-2.29 assemblers.
+
+Sorry, but gratuitous changes like this in the toolchain really
+annoy me, and just give me more reason to stick with my old known
+working versions (binutils 2.25, gcc 4.7.4!) rather than move
+forward and then not know whether bugs are due to crappy toolchains
+or really something wrong in the program.
+
+binutils people need to realise that what they offer is an interface
+for converting assembly code into opcodes and if they change the
+translation of that in a visible way, people are going to get
+annoyed - just like if we in the kernel change the kernel's user
+visible API.
+
+IMHO, binutils should have exactly the same rules - if a change causes
+a regression for a user, the change is wrong and should be reverted.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
