@@ -1,43 +1,73 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 23 Nov 2017 13:21:49 +0530
-Subject: [PATCH 1/6] ARM: dts: keystone-k2g: Add QSPI DT entry
-In-Reply-To: <20171123075154.3938-1-vigneshr@ti.com>
-References: <20171123075154.3938-1-vigneshr@ti.com>
-Message-ID: <20171123075154.3938-2-vigneshr@ti.com>
+From: mbrugger@suse.com (Matthias Brugger)
+Date: Thu, 23 Nov 2017 09:30:17 +0100
+Subject: [PATCH 3/8] drm/mediatek: mt2701: switch to mfd probing.
+In-Reply-To: <1511416092.20405.4.camel@mtksdaap41>
+References: <20171114214114.15793-1-mbrugger@suse.com>
+ <20171114214114.15793-4-mbrugger@suse.com>
+ <1511416092.20405.4.camel@mtksdaap41>
+Message-ID: <66be07f1-c084-8db1-c845-86b2057a0d5d@suse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add DT node for Cadence QSPI IP present in 66AK2G SoC.
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
-index 8f313ff406b9..01d29320b04c 100644
---- a/arch/arm/boot/dts/keystone-k2g.dtsi
-+++ b/arch/arm/boot/dts/keystone-k2g.dtsi
-@@ -377,6 +377,20 @@
- 			power-domains = <&k2g_pds 0xc>;
- 			clocks = <&k2g_clks 0xc 1>, <&k2g_clks 0xc 2>;
- 			clock-names = "fck", "mmchsdb_fck";
-+		};
-+
-+		qspi: qspi at 2940000 {
-+			compatible = "ti,k2g-qspi", "cdns,qspi-nor";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x02940000 0x1000>,
-+			      <0x24000000 0x4000000>;
-+			interrupts = <GIC_SPI 198 IRQ_TYPE_EDGE_RISING>;
-+			cdns,fifo-depth = <256>;
-+			cdns,fifo-width = <4>;
-+			cdns,trigger-address = <0x24000000>;
-+			clocks = <&k2g_clks 0x43 0x0>;
-+			power-domains = <&k2g_pds 0x43>;
- 			status = "disabled";
- 		};
- 
--- 
-2.15.0
+On 11/23/2017 06:48 AM, CK Hu wrote:
+> Hi, Matthias:
+> 
+> On Tue, 2017-11-14 at 22:41 +0100, Matthias Brugger wrote:
+>> With the mtk-mmsys MFD device in place, we switch the probing for
+>> mt2701 from device-tree to mfd.
+>>
+>> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+>> ---
+>>  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 32 +++++++++++++++++++++++++-------
+>>  1 file changed, 25 insertions(+), 7 deletions(-)
+>>
+>> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> index dd249cf5121e..5a263aa3ab6e 100644
+>> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
+>> @@ -21,6 +21,7 @@
+>>  #include <drm/drm_of.h>
+>>  #include <linux/component.h>
+>>  #include <linux/iommu.h>
+>> +#include <linux/mfd/mmsys.h>
+>>  #include <linux/mfd/syscon.h>
+>>  #include <linux/of_address.h>
+>>  #include <linux/of_platform.h>
+>> @@ -392,9 +393,10 @@ static const struct of_device_id mtk_ddp_comp_dt_ids[] = {
+>>  
+>>  static int mtk_drm_probe(struct platform_device *pdev)
+>>  {
+>> +	struct mmsys_dev *mmsys_private;
+>>  	struct device *dev = &pdev->dev;
+>>  	struct mtk_drm_private *private;
+>> -	struct device_node *node;
+>> +	struct device_node *node, *parent_node;
+>>  	struct component_match *match = NULL;
+>>  	int ret;
+>>  	int i;
+>> @@ -407,12 +409,23 @@ static int mtk_drm_probe(struct platform_device *pdev)
+>>  	INIT_WORK(&private->commit.work, mtk_atomic_work);
+>>  	private->data = of_device_get_match_data(dev);
+>>  
+>> -	private->config_regs = syscon_node_to_regmap(dev->of_node);
+>> -	if (IS_ERR(private->config_regs))
+>> -		return PTR_ERR(private->config_regs);
+>> +	/* Check if called from mfd */
+>> +	if (!dev->of_node) {
+>> +		mmsys_private = dev_get_drvdata(pdev->dev.parent);
+> 
+> Why do you directly access parent's driver data? You just need the
+> device node of mmsys, maybe you could refer to [1].
+> 
+> [1]
+> https://elixir.free-electrons.com/linux/latest/source/drivers/reset/reset-berlin.c#L78
+> 
+
+The difference is, that the driver you mentioned gets probed via device tree
+matching, while we get invoked here through the id_table. So there is no device
+node (the if actually checkes for pdev->dev.of_node to identify exactly this case).
+
+Regards,
+Matthias
