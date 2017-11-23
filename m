@@ -1,22 +1,48 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 23 Nov 2017 12:11:32 +0000
-Subject: [PATCH v1 0/2] Additional single-step-cases
-Message-ID: <20171123121134.11050-1-alex.bennee@linaro.org>
+Date: Thu, 23 Nov 2017 12:11:33 +0000
+Subject: [PATCH v1 1/2] kvm: arm64: handle single-step during SError exceptions
+In-Reply-To: <20171123121134.11050-1-alex.bennee@linaro.org>
+References: <20171123121134.11050-1-alex.bennee@linaro.org>
+Message-ID: <20171123121134.11050-2-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When an SError arrives during single-step it may be delivered before
+the step completes. In that case the DBG_SPSR_SS bit will have flipped
+as the instruction executed. After handling the abort in handle_exit()
+we test to see if the bit is clear and we were single-stepping before
+deciding if we need to exit to user space.
 
-This is now split into two patches as the first case of SError is
-separate from behaviour of stepping instructions.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+---
+ arch/arm64/kvm/handle_exit.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-Alex Benn?e (2):
-  kvm: arm64: handle single-step during SError exceptions
-  kvm: arm64: handle single-step of hyp emulated mmio instructions
-
- arch/arm64/kvm/handle_exit.c |  8 +++++++-
- arch/arm64/kvm/hyp/switch.c  | 37 ++++++++++++++++++++++++++++++-------
- 2 files changed, 37 insertions(+), 8 deletions(-)
-
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 3e645ec9e751..3ba8c4a3bcff 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
++#include <asm/debug-monitors.h>
+ 
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -250,7 +251,12 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+ 		kvm_inject_vabt(vcpu);
+-		return 1;
++		/* We may still need to return for single-step */
++		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
++			&& kvm_arm_handle_step_debug(vcpu, run))
++			return 0;
++		else
++			return 1;
+ 	case ARM_EXCEPTION_TRAP:
+ 		return handle_trap_exceptions(vcpu, run);
+ 	case ARM_EXCEPTION_HYP_GONE:
 -- 
 2.15.0
