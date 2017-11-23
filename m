@@ -1,94 +1,33 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 23 Nov 2017 19:32:55 +0100
-Subject: [RFC PATCH] KVM: Only register preempt notifiers and load arch
- cpu state as needed
-In-Reply-To: <57693a50-e682-9b3b-7d8c-c46b66e33d84@de.ibm.com>
-References: <20171123160521.27260-1-christoffer.dall@linaro.org>
- <72357599-798d-14d0-336a-69a083f17863@redhat.com>
- <20171123170642.GA28855@cbox>
- <57693a50-e682-9b3b-7d8c-c46b66e33d84@de.ibm.com>
-Message-ID: <20171123183255.GD28855@cbox>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 23 Nov 2017 19:37:12 +0100
+Subject: [PATCH 2/8] mfd: mtk-mmsys: Add mmsys driver
+In-Reply-To: <1511427867.8489.9.camel@mtksdaap41>
+References: <20171114214114.15793-1-mbrugger@suse.com>
+ <20171114214114.15793-3-mbrugger@suse.com>
+ <1511427867.8489.9.camel@mtksdaap41>
+Message-ID: <f65015fa-7103-30bc-2660-7401037f7e12@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 07:05:07PM +0100, Christian Borntraeger wrote:
-> 
-> 
-> On 11/23/2017 06:06 PM, Christoffer Dall wrote:
-> > On Thu, Nov 23, 2017 at 05:17:00PM +0100, Paolo Bonzini wrote:
-> >> On 23/11/2017 17:05, Christoffer Dall wrote:
-> >>> For example,
-> >>> arm64 is about to do significant work in vcpu load/put when running a
-> >>> vcpu, but not when doing things like KVM_SET_ONE_REG or
-> >>> KVM_SET_MP_STATE.
-> >>
-> >> Out of curiosity, in what circumstances are these ioctls a hot path?
-> >> Especially KVM_SET_MP_STATE.
-> >>
-> > 
-> > Perhaps my commit message was misleading; we only want to do that for
-> > KVM_RUN, and not for anything else.  We're already doing things like
-> > potentially jumping to hyp mode and flushing VMIDs which really
-> > shouldn't be done unless we actually plan on running a VCPU, and we're
-> > going to do things like setting up the timer to handle timer interrupts
-> > in an ISR, which doesn't make sense unless the VCPU is running.
-> > 
-> > Add to that, that loading an entire VM's state onto hardware, only to
-> > read back a single register from hardware and returning it to user
-> > space, doesn't really fall within optimization vs. non-optimization in
-> > the critical path, but is just wrong, IMHO.
-> > 
-> >>> Hi all,
-> >>>
-> >>> Drew suggested this as an alternative approach to recording the ioctl
-> >>> number on the vcpu struct [1] as it may benefit other architectures in
-> >>> general.
-> >>>
-> >>> I had a look at some of the specific ioctls across architectures, but
-> >>> must admit that I can't easily tell which architecture specific logic
-> >>> relies on having registered preempt notifiers and having called the
-> >>> architecture specific load function.
-> >>>
-> >>> It would be great if you would let me know if you think this is
-> >>> generally useful or if you prefer the less invasive approach, and in
-> >>> case this is useful, if you could have a look at all the vcpu ioctls for
-> >>> your architecture and let me know if I am being too loose or too
-> >>> careful in calling __vcpu_load() in this patch.
-> >>
-> >> I can suggest a third approach:
-> >>
-> >>         if (ioctl == KVM_GET_ONE_REG || ioctl == KVM_SET_ONE_REG)
-> >>                 return kvm_arch_vcpu_ioctl(filp, ioctl, arg);
-> >>
-> >> in kvm_vcpu_ioctl before "r = vcpu_load(vcpu);", or even better:
-> >>
-> >>         if (ioctl == KVM_GET_ONE_REG)
-> >> 		// call kvm_arch_vcpu_get_one_reg_ioctl(vcpu, &reg);
-> >> 		// and do copy_to_user
-> >> 		return kvm_vcpu_get_one_reg_ioctl(vcpu, arg);
-> >>         if (ioctl == KVM_SET_ONE_REG)
-> >> 		// do copy_from_user then call
-> >> 		// kvm_arch_vcpu_set_one_reg_ioctl(vcpu, &reg);
-> >> 		return kvm_vcpu_set_one_reg_ioctl(vcpu, arg);
-> >>
-> >> so that the kvm_arch_vcpu_get/set_one_reg_ioctl functions are called
-> >> without the lock.
-> >>
-> >> Then all architectures except ARM can be switched to do
-> >> vcpu_load/vcpu_put in kvm_arch_vcpu_get/set_one_reg_ioctl
-> > 
-> > That doesn't solve my need as I want to *only* do the arch vcpu_load for
-> > KVM_RUN, I should have been more clear in the commit message.
-> 
-> What about splitting arch_vcpu_load/put into two callbacks and call the 2nd
-> one only for VCPU_run? e.g. keep arch_vcpu_load and add arch_vcpu_load_run
-> and arch_vcpu_unload_run
-> 
-> Then every architecture can move things from arch_vcpu_load into arch_vcpu_load_run
-> if its only necessary for RUN.
-> 
-Unfortunately that doesn't work because the preempt notifiers don't know
-which of the two functions they should call.
 
-Thanks,
--Christoffer
+
+On 11/23/2017 10:04 AM, CK Hu wrote:
+
+>> +static const struct of_device_id of_match_mmsys[] = {
+>> +	{ .compatible = "mediatek,mt2701-mmsys",
+> 
+> Because this driver replace the original "mediatek,mt2701-mmsys" driver,
+> could you modify the binding document of "mediatek,mt2701-mmsys" [1]?
+> 
+> [1]
+> https://www.kernel.org/doc/Documentation/devicetree/bindings/arm/mediatek/mediatek,mmsys.txt
+> 
+
+Well we are actually no replacing the compatible but keeping it. But yes, the
+documentation should be updated.
+
+Apart right now we have the definition twice. The other location is here:
+Documentation/devicetree/bindings/display/mediatek/mediatek,disp.txt
+
+Regards,
+Matthias
