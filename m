@@ -1,63 +1,106 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Thu, 23 Nov 2017 12:59:45 +0200
-Subject: [PATCH 1/2] usb: xhci: add relaxed timing quirk bit
-In-Reply-To: <3c44d4d0-e10c-bacc-8e7f-df04bed5dc21@codeaurora.org>
-References: <1511284690-3878-1-git-send-email-awallis@codeaurora.org>
- <1511284690-3878-2-git-send-email-awallis@codeaurora.org>
- <20171121191103.5oczqvrlo4gtwjqc@rob-hp-laptop>
- <f200ce55-ac67-02f9-4dbf-7a3ba5b52b39@codeaurora.org>
- <CAL_JsqLZgnTTEiLXD8ZOK-0qd58i16e7h_-2yjHN+zRFfqvH4Q@mail.gmail.com>
- <32f8dc7e-9fde-5e45-1570-a9ec372579fa@codeaurora.org>
- <ee0ca959-1812-a4e4-346f-d57a1fdade13@linux.intel.com>
- <3c44d4d0-e10c-bacc-8e7f-df04bed5dc21@codeaurora.org>
-Message-ID: <c46e19a2-4b37-473c-a563-6fddf0c62070@linux.intel.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Thu, 23 Nov 2017 12:08:10 +0100
+Subject: [PATCH 07/37] KVM: arm/arm64: Add kvm_vcpu_load_sysregs and
+ kvm_vcpu_put_sysregs
+In-Reply-To: <20171122203417.GV28855@cbox>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-8-christoffer.dall@linaro.org>
+ <20171107111000.uwpiofgbchm3s5gn@kamzik.brq.redhat.com>
+ <20171122203417.GV28855@cbox>
+Message-ID: <20171123110810.qofr2akh4jhux7m3@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23.11.2017 01:32, Adam Wallis wrote:
-> On 11/22/2017 10:24 AM, Mathias Nyman wrote:
-> [..]
->>
->> We know have at least two hosts/platforms that need custom interrupt moderation
->> values
->>
->> How about adding a u32 device property for xhci with the interrupt moderation
->> interval in
->> nanoseconds?? And also add a u32 imod_interval variable to struct xhci_hcd?
->>   
->> imod_interval can be set to the current default 40000ns (160*250ns) and
->> overwritten if
->> device_property_read_u32() returns something else.
->>
+On Wed, Nov 22, 2017 at 09:34:17PM +0100, Christoffer Dall wrote:
+> On Tue, Nov 07, 2017 at 12:10:00PM +0100, Andrew Jones wrote:
+> > On Thu, Oct 12, 2017 at 12:41:11PM +0200, Christoffer Dall wrote:
+> > > As we are about to move a buch of save/restore logic for VHE kernels to
+> > > the load and put functions, we need some infrastructure to do this.
+> > > 
+> > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > > ---
+> > >  arch/arm/include/asm/kvm_host.h   |  3 +++
+> > >  arch/arm64/include/asm/kvm_host.h |  3 +++
+> > >  arch/arm64/kvm/hyp/sysreg-sr.c    | 27 +++++++++++++++++++++++++++
+> > >  virt/kvm/arm/arm.c                |  2 ++
+> > >  4 files changed, 35 insertions(+)
+> > > 
+> > > diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> > > index 1100170..13f8165 100644
+> > > --- a/arch/arm/include/asm/kvm_host.h
+> > > +++ b/arch/arm/include/asm/kvm_host.h
+> > > @@ -290,4 +290,7 @@ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+> > >  int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
+> > >  			       struct kvm_device_attr *attr);
+> > >  
+> > > +static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
+> > > +static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
+> > > +
+> > >  #endif /* __ARM_KVM_HOST_H__ */
+> > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > > index 27305e7..7d3bfa7 100644
+> > > --- a/arch/arm64/include/asm/kvm_host.h
+> > > +++ b/arch/arm64/include/asm/kvm_host.h
+> > > @@ -383,4 +383,7 @@ static inline void __cpu_init_stage2(void)
+> > >  		  "PARange is %d bits, unsupported configuration!", parange);
+> > >  }
+> > >  
+> > > +void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
+> > > +void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
+> > > +
+> > >  #endif /* __ARM64_KVM_HOST_H__ */
+> > > diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+> > > index c54cc2a..b7438c8 100644
+> > > --- a/arch/arm64/kvm/hyp/sysreg-sr.c
+> > > +++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+> > > @@ -183,3 +183,30 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
+> > >  	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+> > >  		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
+> > >  }
+> > > +
+> > > +/**
+> > > + * kvm_vcpu_load_sysregs - Load guest system register to physical CPU
+> > > + *
+> > > + * @vcpu: The VCPU pointer
+> > > + *
+> > > + * If the kernel runs in EL2 then load the system register state for the VCPU
+> > > + * for EL1 onto the physical CPU so that we can go back and foward between the
+> > > + * VM and the hypervisor without switching all this state around.
+> > 
+> > Actually, on second thought, I'm a bit confused by this comment. Maybe
+> > it'll be clearer after the code that goes here will be added, but, ATM,
+> > I'm not sure why we want to specifically load EL1 VCPU state here. Will
+> > that always be the case, even with nested? Also, I'm not sure what
+> > alternative loading scheme we're avoiding in order to ensure the state
+> > isn't "switched around", which I don't really understand either.
+> > 
 > 
-> Isn't the 160 value quite aggressive anyway? Section 5.5.2.2 of the xHCI spec
-> says that maximum observable interrupt rate should never exceed 8000
-> interrupts/second. I believe the IMOD value in the most aggressive case would
-> then be 500 by this statement [ 1 / (250e-9 * 500) = 8000 irqs/second ]
+> I was referring to the EL1 hardware state.  Even for nesting, that's the
+> best we can do, because we can't load EL2 state if we're running in EL2,
+> or EL1 state if we're running in EL1, because we'd be shooting ourselves
+> in the foot.
 > 
-> Perhaps I am misreading the spec or just doing the math wrong? With the default
-> value of 160, we are interrupting 25,000 irq/second...which is over 3 times the
-> maximum stated value (again, assuming I did the math right)
+> The alternative loading scheme is what we have today, where we save and
+> restore everything every time we exit/enter the VM, even though we don't
+> have to.
 > 
-> Anyway, my preference would be to set the IMOD default val to 4000 (~1ms) per
-> the recommended value in Table 49 of the spec and allow platforms to adjust as
-> necessary from that point.
+> How about:
 > 
-> Thoughts on this?
-> 
+> /*
+>  * Load system registers that do not affect the host's execution, for
+>  * example EL1 system registers on a VHE system where the host kernel
+>  * runs at EL2.  This function is called from KVM's vcpu_load() function
+>  * and loading system register state early avoids having to load them on
+>  * every entry to the VM.
+>  */
 
-I think current 40us is still reasonable, it's about ~3 times per
-usb microframe (125us) .8000 interrupts per second just covers the microframe rate,
-which is the shortest interval a interrupt transfer can require service.
+Yeah, I like this. Thanks for the clarification.
 
-1ms interrupt interval is too long. In the worst case ~8 microframes could pass
-before the driver is aware of a error it needs to take care of.
-USB 3.1 devices can transfer 6 burst of 16 max sized packets (6 x 16 x 2014) bytes
-per microframe.
+(I guess it's time for me to return to reviewing this series. Sorry for
+ stalling out on it.)
 
-closer to 125us could probably work as well, but unless we are fixing some issue or
-getting some other bigger benefit out of it I don't think it's worth changing it
-just to see if it breaks stuff.
+drew
 
-Thanks
--Mathias
+> 
+> Thanks,
+> -Christoffer
