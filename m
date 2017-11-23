@@ -1,82 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 23 Nov 2017 09:23:02 +0000
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
- (KAISER)
-In-Reply-To: <20171123090747.GA6948@amd>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <20171122161913.GB12684@amd>
- <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
- <20171122223355.GA5877@amd> <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
- <20171122233738.GA25313@amd> <D3BCED36-58D1-4E30-9171-16F06A5DC65D@linaro.org>
- <20171123090747.GA6948@amd>
-Message-ID: <CAKv+Gu-vsQiDS1kobmaBmnWv__vTuOcKHs6t2rMiVu=rriHeEQ@mail.gmail.com>
+From: nicolas.dechesne@linaro.org (Nicolas Dechesne)
+Date: Thu, 23 Nov 2017 10:25:49 +0100
+Subject: qcom: add firmware file for Adreno and Venus on APQ8096
+In-Reply-To: <1511402612.14687.23.camel@decadent.org.uk>
+References: <CAP71Wjw-3FrOtHADuui52t+iqv6QkvXXCthjR6akXr7QQTzrAA@mail.gmail.com>
+ <1511402612.14687.23.camel@decadent.org.uk>
+Message-ID: <CAP71WjxpHYEpZsYAXTL552jHGoUgjgtH8PDdmrUHMfKGfsL2EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2017 at 09:07, Pavel Machek <pavel@ucw.cz> wrote:
-> Hi!
+On Thu, Nov 23, 2017 at 3:03 AM, Ben Hutchings <ben@decadent.org.uk> wrote:
+> On Wed, 2017-11-15 at 21:00 +0100, Nicolas Dechesne wrote:
+>> hi,
+>>
+>> This pull request adds firmware files for Adreno 530 GPU and Venus h/w
+>> codec found on the Qualcomm APQ8096 chipset, such as on Dragonboard
+>> 820c development board.
 >
->> > On 22 Nov 2017, at 23:37, Pavel Machek <pavel@ucw.cz> wrote:
->> >
->> > Hi!
->> >
->> >>>>> If I'm willing to do timing attacks to defeat KASLR... what prevents
->> >>>>> me from using CPU caches to do that?
->> >>>>>
->> >>>>
->> >>>> Because it is impossible to get a cache hit on an access to an
->> >>>> unmapped address?
->> >>>
->> >>> Um, no, I don't need to be able to directly access kernel addresses. I
->> >>> just put some data in _same place in cache where kernel data would
->> >>> go_, then do syscall and look if my data are still cached. Caches
->> >>> don't have infinite associativity.
->> >>>
->> >>
->> >> Ah ok. Interesting.
->> >>
->> >> But how does that leak address bits that are covered by the tag?
->> >
->> > Same as leaking any other address bits? Caches are "virtually
->> > indexed",
->>
->> Not on arm64, although I don?t see how that is relevant if you are trying to defeat kaslr.
->>
->> > and tag does not come into play...
->> >
->>
->> Well, I must be missing something then, because I don?t see how knowledge about which userland address shares a cache way with a kernel address can leak anything beyond the bits that make up the index (i.e., which cache way is being shared)
->>
->
-> Well, KASLR is about keeping bits of kernel virtual address secret
-> from userland. Leaking them through cache sidechannel means KASLR is
-> defeated.
->
+> Pulled, thanks.
 
-Yes, that is what you claim. But you are not explaining how any of the
-bits that we do want to keep secret can be discovered by making
-inferences from which lines in a primed cache were evicted during a
-syscall.
-
-The cache index maps to low order bits. You can use this, e.g., to
-attack table based AES, because there is only ~4 KB worth of tables,
-and you are interested in finding out which exact entries of the table
-were read by the process under attack.
-
-You are saying the same approach will help you discover 30 high order
-bits of a virtual kernel address, by observing the cache evictions in
-a physically indexed physically tagged cache. How?
+thanks!
 
 >
->> > Maybe this explains it?
->> >
->>
->> No not really. It explains how cache timing can be used as a side channel, not how it defeats kaslr.
->
-> Ok, look at this one:
->
-> https://www.blackhat.com/docs/us-16/materials/us-16-Jang-Breaking-Kernel-Address-Space-Layout-Randomization-KASLR-With-Intel-TSX-wp.pdf
->
-> You can use timing instead of TSX, right?
+> By the way, it looks like you should update the MODULE_FIRMWARE
+> declarations in the DRM driver to the "new" firmware paths.
 
-The TSX attack is TLB based not cache based.
+oh, you're right, indeed.
+
+>
+> Ben.
+>
+>> The following changes since commit bf04291309d3169c0ad3b8db52564235bbd08e30:
+>>
+>>   WHENCE: Add new qed firmware (2017-10-09 18:03:26 +0100)
+>>
+>> are available in the git repository at:
+>>
+>>   https://github.com/ndechesne/linux-firmware.git db820c
+>>
+>> for you to fetch changes up to e7219334854d854ae7768b13dc290ec85d93a0d9:
+>>
+>>   qcom: add venus firmware files for v4.2 (2017-11-15 20:49:17 +0100)
+>>
+>> ----------------------------------------------------------------
+>> Nicolas Dechesne (2):
+>>       qcom: add firmware files for Adreno a530
+>>       qcom: add venus firmware files for v4.2
+>>
+>>  WHENCE                   |  16 ++++++++++++++++
+>>  qcom/a530_pfp.fw         | Bin 0 -> 15876 bytes
+>>  qcom/a530_pm4.fw         | Bin 0 -> 19572 bytes
+>>  qcom/a530_zap.b00        | Bin 0 -> 148 bytes
+>>  qcom/a530_zap.b01        | Bin 0 -> 6536 bytes
+>>  qcom/a530_zap.b02        | Bin 0 -> 4900 bytes
+>>  qcom/a530_zap.mdt        | Bin 0 -> 6684 bytes
+>>  qcom/a530v3_gpmu.fw2     | Bin 0 -> 8184 bytes
+>>  qcom/venus-4.2/venus.b00 | Bin 0 -> 212 bytes
+>>  qcom/venus-4.2/venus.b01 | Bin 0 -> 6600 bytes
+>>  qcom/venus-4.2/venus.b02 | Bin 0 -> 884136 bytes
+>>  qcom/venus-4.2/venus.b03 | Bin 0 -> 28976 bytes
+>>  qcom/venus-4.2/venus.b04 |   1 +
+>>  qcom/venus-4.2/venus.mdt | Bin 0 -> 6812 bytes
+>>  14 files changed, 17 insertions(+)
+>>  create mode 100644 qcom/a530_pfp.fw
+>>  create mode 100644 qcom/a530_pm4.fw
+>>  create mode 100644 qcom/a530_zap.b00
+>>  create mode 100644 qcom/a530_zap.b01
+>>  create mode 100644 qcom/a530_zap.b02
+>>  create mode 100644 qcom/a530_zap.mdt
+>>  create mode 100644 qcom/a530v3_gpmu.fw2
+>>  create mode 100644 qcom/venus-4.2/venus.b00
+>>  create mode 100644 qcom/venus-4.2/venus.b01
+>>  create mode 100644 qcom/venus-4.2/venus.b02
+>>  create mode 100644 qcom/venus-4.2/venus.b03
+>>  create mode 100644 qcom/venus-4.2/venus.b04
+>>  create mode 100644 qcom/venus-4.2/venus.mdt
+> --
+> Ben Hutchings
+> When in doubt, use brute force. - Ken Thompson
+>
