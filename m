@@ -1,69 +1,29 @@
-From: jan.tuerk@emtrion.com (Jan Tuerk)
-Date: Thu, 23 Nov 2017 13:55:55 +0100
-Subject: [PATCH 5/5] ARM: imx_v6_v7_defconfig: Enable DA0963 PMIC support.
-In-Reply-To: <20171123125600.41562-1-jan.tuerk@emtrion.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 23 Nov 2017 13:58:57 +0100
+Subject: [PATCH 2/5] dt-bindings: Add vendor prefix for emtrion GmbH
+In-Reply-To: <20171123125600.41562-3-jan.tuerk@emtrion.com>
 References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
-Message-ID: <20171123125600.41562-6-jan.tuerk@emtrion.com>
+ <20171123125600.41562-3-jan.tuerk@emtrion.com>
+Message-ID: <6a2330f8-5d63-cc28-fa9b-6ee0a5c21d5c@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All recent emtrion modules based on i.mx6 make use of the DA0963.
-Therefore enable it with the following defaults:
-        - CONFIG_MFD_DA9063=y
-        - CONFIG_REGULATOR_DA9063=y
-        - CONFIG_DA9063_WATCHDOG=m
-        - CONFIG_RTC_DRV_DA9063=m
-MFD and REGULATOR are built-in to have it at Kernel boot-time.
-The WATCHDOG and RTC are optional and could be loaded from userspace.
+Am 23.11.2017 um 13:55 schrieb Jan Tuerk:
+> emtrion is a system integrator and manufacturer of embedded systems.
+> 
+> Website: https://www.emtrion.de
+> 
+> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
 
-Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
----
- arch/arm/configs/imx_v6_v7_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+Reviewed-by: Andreas F?rber <afaerber@suse.de>
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 0d4494922561..09cd8048b0c1 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -215,8 +215,10 @@ CONFIG_THERMAL_WRITABLE_TRIPS=y
- CONFIG_CPU_THERMAL=y
- CONFIG_IMX_THERMAL=y
- CONFIG_WATCHDOG=y
-+CONFIG_DA9063_WATCHDOG=m
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
-+CONFIG_MFD_DA9063=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_MFD_STMPE=y
-@@ -224,6 +226,7 @@ CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
- CONFIG_REGULATOR_DA9052=y
-+CONFIG_REGULATOR_DA9063=y
- CONFIG_REGULATOR_GPIO=y
- CONFIG_REGULATOR_MC13783=y
- CONFIG_REGULATOR_MC13892=y
-@@ -349,6 +352,7 @@ CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_M41T80=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
-+CONFIG_RTC_DRV_DA9063=m
- CONFIG_RTC_DRV_SNVS=y
- CONFIG_DMADEVICES=y
- CONFIG_FSL_EDMA=y
---
-2.11.0
+Regards,
+Andreas
 
-
-emtrion GmbH
-Kreativpark - Alter Schlachthof 45
-76131 Karlsruhe
-GERMANY
-http://www.emtrion.de
-_______________________________________
-
-Amtsgericht Mannheim
-HRB 110 300
-Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
-_______________________________________
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
