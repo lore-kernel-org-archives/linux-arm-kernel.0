@@ -1,166 +1,66 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Thu, 23 Nov 2017 23:05:36 +0530
-Subject: [PATCH] arm64: allwinner: a64: Enable AXP803 for Orangepi Win
-Message-ID: <1511458536-5315-1-git-send-email-jagan@amarulasolutions.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 23 Nov 2017 18:48:04 +0100
+Subject: [RFC PATCH] KVM: Only register preempt notifiers and load arch
+ cpu state as needed
+In-Reply-To: <62ae4eb1-fd57-c525-cd73-e3f646d340e1@redhat.com>
+References: <20171123160521.27260-1-christoffer.dall@linaro.org>
+ <72357599-798d-14d0-336a-69a083f17863@redhat.com>
+ <20171123170642.GA28855@cbox>
+ <62ae4eb1-fd57-c525-cd73-e3f646d340e1@redhat.com>
+Message-ID: <20171123174804.GB28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable AXP803 PMIC and regulators for Orangepi Win.
+On Thu, Nov 23, 2017 at 06:12:41PM +0100, Paolo Bonzini wrote:
+> On 23/11/2017 18:06, Christoffer Dall wrote:
+> > On Thu, Nov 23, 2017 at 05:17:00PM +0100, Paolo Bonzini wrote:
+> >> On 23/11/2017 17:05, Christoffer Dall wrote:
+> >>> For example,
+> >>> arm64 is about to do significant work in vcpu load/put when running a
+> >>> vcpu, but not when doing things like KVM_SET_ONE_REG or
+> >>> KVM_SET_MP_STATE.
+> >>
+> >> Out of curiosity, in what circumstances are these ioctls a hot path?
+> >> Especially KVM_SET_MP_STATE.
+> > 
+> > Perhaps my commit message was misleading; we only want to do that for
+> > KVM_RUN, and not for anything else.  We're already doing things like
+> > potentially jumping to hyp mode and flushing VMIDs which really
+> > shouldn't be done unless we actually plan on running a VCPU, and we're
+> > going to do things like setting up the timer to handle timer interrupts
+> > in an ISR, which doesn't make sense unless the VCPU is running.
+> > 
+> > Add to that, that loading an entire VM's state onto hardware, only to
+> > read back a single register from hardware and returning it to user
+> > space, doesn't really fall within optimization vs. non-optimization in
+> > the critical path, but is just wrong, IMHO.
+> 
+> For GET/SET_ONE_REG it certainly makes sense.  For everything else, I'm
+> wondering which ioctls (and how many calls to each of them) exactly you
+> are seeing, and also on which userspace paths.
+> 
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
- .../boot/dts/allwinner/sun50i-a64-orangepi-win.dts | 125 +++++++++++++++++++--
- 1 file changed, 117 insertions(+), 8 deletions(-)
+Outside of migration, not many.  It's not about optimizing certain
+ioctl's, but rather that I think it's wrong and potentially vulnerable
+to do significant work on the system which is strictly unnecessary.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-index 5f8ff40..240d357 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-orangepi-win.dts
-@@ -57,13 +57,6 @@
- 	chosen {
- 		stdout-path = "serial0:115200n8";
- 	};
--
--	reg_vcc3v3: vcc3v3 {
--		compatible = "regulator-fixed";
--		regulator-name = "vcc3v3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--	};
- };
- 
- &ehci1 {
-@@ -73,7 +66,7 @@
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
--	vmmc-supply = <&reg_vcc3v3>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>;
- 	cd-inverted;
- 	status = "okay";
-@@ -83,6 +76,122 @@
- 	status = "okay";
- };
- 
-+&r_rsb {
-+	status = "okay";
-+
-+	axp803: pmic at 3a3 {
-+		compatible = "x-powers,axp803";
-+		reg = <0x3a3>;
-+		interrupt-parent = <&r_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+#include "axp803.dtsi"
-+
-+&reg_aldo1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "afvcc-csi";
-+};
-+
-+&reg_aldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-pl";
-+};
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-pll-avcc";
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-3v3";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1040000>;
-+	regulator-max-microvolt = <1300000>;
-+	regulator-name = "vdd-cpux";
-+};
-+
-+/* DCDC3 is polyphased with DCDC2 */
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_dcdc6 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1100000>;
-+	regulator-max-microvolt = <1100000>;
-+	regulator-name = "vdd-sys";
-+};
-+
-+&reg_dldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-hdmi-dsi";
-+};
-+
-+&reg_dldo2 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
-+&reg_dldo3 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avdd-csi";
-+};
-+
-+&reg_dldo4 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi-io";
-+};
-+
-+&reg_eldo1 {
-+	regulator-min-microvolt = <1800000>;
-+	regulator-max-microvolt = <1800000>;
-+	regulator-name = "cpvdd";
-+};
-+
-+&reg_fldo1 {
-+	regulator-min-microvolt = <1200000>;
-+	regulator-max-microvolt = <1200000>;
-+	regulator-name = "vcc-1v2-hsic";
-+};
-+
-+/*
-+ * The A64 chip cannot work without this regulator off, although
-+ * it seems to be only driving the AR100 core.
-+ * Maybe we don't still know well about CPUs domain.
-+ */
-+&reg_fldo2 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1100000>;
-+	regulator-max-microvolt = <1100000>;
-+	regulator-name = "vdd-cpus";
-+};
-+
-+&reg_rtc_ldo {
-+	regulator-name = "vcc-rtc";
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
--- 
-2.7.4
+> > That doesn't solve my need as I want to *only* do the arch vcpu_load for
+> > KVM_RUN, I should have been more clear in the commit message.
+> 
+> That's what you want to do, but it might not be what you need to do.
+> 
+
+Well, why would we want to do a lot of work when there's absolutely no
+need to?
+
+I see that this patch is invasive, and that's why I originally proposed
+the other approach of recording the ioctl number.
+
+While it may be possible to call kvm_arch_vcpu_load() for a number of
+non-KVM_RUN ioctls, it makes the KVM/ARM code more difficult to reason
+about, especially after my optimization series, because a lot of things
+can now happen, where we have to consider if we're really in the process
+of running a vcpu or not.
+
+Thanks,
+-Christoffer
