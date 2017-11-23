@@ -1,50 +1,97 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 23 Nov 2017 00:37:38 +0100
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <20171122161913.GB12684@amd>
- <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
- <20171122223355.GA5877@amd>
- <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
-Message-ID: <20171122233738.GA25313@amd>
+From: yong.deng@magewell.com (Yong)
+Date: Thu, 23 Nov 2017 09:14:44 +0800
+Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
+In-Reply-To: <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
+References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
+ <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
+ <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
+ <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
+ <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
+Message-ID: <20171123091444.4bed66dffeb36ecea8dfa706@magewell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-> >>> If I'm willing to do timing attacks to defeat KASLR... what prevents
-> >>> me from using CPU caches to do that?
-> >>> 
-> >> 
-> >> Because it is impossible to get a cache hit on an access to an
-> >> unmapped address?
-> > 
-> > Um, no, I don't need to be able to directly access kernel addresses. I
-> > just put some data in _same place in cache where kernel data would
-> > go_, then do syscall and look if my data are still cached. Caches
-> > don't have infinite associativity.
-> > 
+On Wed, 22 Nov 2017 10:45:26 +0100
+Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+
+> Hi,
 > 
-> Ah ok. Interesting.
+> On Wed, Nov 22, 2017 at 09:33:06AM +0800, Yong wrote:
+> > > On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
+> > > > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
+> > > > and CSI1 is used for parallel interface. This is not documented in
+> > > > datasheet but by testing and guess.
+> > > > 
+> > > > This patch implement a v4l2 framework driver for it.
+> > > > 
+> > > > Currently, the driver only support the parallel interface. MIPI-CSI2,
+> > > > ISP's support are not included in this patch.
+> > > > 
+> > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
+> > > 
+> > > Thanks again for this driver.
+> > > 
+> > > It seems like at least this iteration is behaving in a weird way with
+> > > DMA transfers for at least YU12 and NV12 (and I would assume YV12).
+> > > 
+> > > Starting a transfer of multiple frames in either of these formats,
+> > > using either ffmpeg (ffmpeg -f v4l2 -video_size 640x480 -framerate 30
+> > > -i /dev/video0 output.mkv) or yavta (yavta -c80 -p -F --skip 0 -f NV12
+> > > -s 640x480 $(media-c tl -e 'sun6i-csi')) will end up in a panic.
+> > > 
+> > > The panic seems to be generated with random data going into parts of
+> > > the kernel memory, the pattern being in my case something like
+> > > 0x8287868a which is very odd (always around 0x88)
+> > > 
+> > > It turns out that when you cover the sensor, the values change to
+> > > around 0x28, so it really seems like it's pixels that have been copied
+> > > there.
+> > > 
+> > > I've looked quickly at the DMA setup, and it seems reasonable to
+> > > me. Do you have the same issue on your side? Have you been able to
+> > > test those formats using your hardware?
+> > 
+> > I had tested the following formats with BT1120 input:
+> > V4L2_PIX_FMT_NV12		-> NV12
+> > V4L2_PIX_FMT_NV21		-> NV21
+> > V4L2_PIX_FMT_NV16		-> NV16
+> > V4L2_PIX_FMT_NV61		-> NV61
+> > V4L2_PIX_FMT_YUV420		-> YU12
+> > V4L2_PIX_FMT_YVU420		-> YV12
+> > V4L2_PIX_FMT_YUV422P		-> 422P
+> > And they all work fine.
 > 
-> But how does that leak address bits that are covered by the tag?
+> Ok, that's good to know.
+> 
+> > > Given that they all are planar formats and YUYV and the likes work
+> > > just fine, maybe we can leave them aside for now?
+> > 
+> > V4L2_PIX_FMT_YUV422P and V4L2_PIX_FMT_YUYV is OK, and V4L2_PIX_FMT_NV12
+> > is bad? It's really weird.
+> > 
+> > What's your input bus code format, type and width?
+> 
+> The sensor is an ov5640, so the MBUS code for the bus is
+> MEDIA_BUS_FMT_YUYV8_2X8.
 
-Same as leaking any other address bits? Caches are "virtually
-indexed", and tag does not come into play...
+Did you test on V3s?
+I haven't tested it with MEDIA_BUS_FMT_YUYV8_2X8.
 
-Maybe this explains it?
+The Allwinner CSI's DMA is definitely weird. Ond?ej Jirman thought
+that CSI has an internal queue (Ond?ej's commit has explained in detail).
+I think CSI just pick up the buffer address before the frame done 
+interrupt triggered. 
+The patch in attachment can deal with this. You can see if it is
+useful to solve your problem.
 
-https://www.youtube.com/watch?v=9KsnFWejpQg
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Thanks,
+Yong
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/cd26b01c/attachment.sig>
+Name: sun6i_csi_fix_writing_to_incorrect_buffer.patch
+Type: application/octet-stream
+Size: 10429 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/59977f67/attachment.obj>
