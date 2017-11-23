@@ -1,110 +1,59 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 23 Nov 2017 16:10:40 +0000
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171123153637.kbqcd2jsek4ybeic@piout.net>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <20171123150439.GB18754@mellanox.com>
- <20171123153637.kbqcd2jsek4ybeic@piout.net>
-Message-ID: <20171123161040.GS31757@n2100.armlinux.org.uk>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Thu, 23 Nov 2017 17:17:00 +0100
+Subject: [RFC PATCH] KVM: Only register preempt notifiers and load arch
+ cpu state as needed
+In-Reply-To: <20171123160521.27260-1-christoffer.dall@linaro.org>
+References: <20171123160521.27260-1-christoffer.dall@linaro.org>
+Message-ID: <72357599-798d-14d0-336a-69a083f17863@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 04:36:37PM +0100, Alexandre Belloni wrote:
-> On 23/11/2017 at 08:04:39 -0700, Jason Gunthorpe wrote:
-> > On Thu, Nov 23, 2017 at 10:54:56AM +0100, Alexandre Belloni wrote:
-> > You can't really measure the offset without doing a time set, many
-> > embedded RTCs do not hook up interrupts, etc.
+On 23/11/2017 17:05, Christoffer Dall wrote:
+> For example,
+> arm64 is about to do significant work in vcpu load/put when running a
+> vcpu, but not when doing things like KVM_SET_ONE_REG or
+> KVM_SET_MP_STATE.
+
+Out of curiosity, in what circumstances are these ioctls a hot path?
+Especially KVM_SET_MP_STATE.
+
+> Hi all,
 > 
-> If you don't hook up the interrupt, then all you did is completely
-> pointless because you will never be able to read the correct time from
-> the RTC, you'll have up to a 1s offset.
+> Drew suggested this as an alternative approach to recording the ioctl
+> number on the vcpu struct [1] as it may benefit other architectures in
+> general.
+> 
+> I had a look at some of the specific ioctls across architectures, but
+> must admit that I can't easily tell which architecture specific logic
+> relies on having registered preempt notifiers and having called the
+> architecture specific load function.
+> 
+> It would be great if you would let me know if you think this is
+> generally useful or if you prefer the less invasive approach, and in
+> case this is useful, if you could have a look at all the vcpu ioctls for
+> your architecture and let me know if I am being too loose or too
+> careful in calling __vcpu_load() in this patch.
 
-That is incorrect.  The kernel provides emulation for the update
-interrupt - it polls the RTC every 1/HZ checking it for a change
-in seconds.
+I can suggest a third approach:
 
-So, you end up with up to a 1/HZ offset where no interrupt is
-present.
+        if (ioctl == KVM_GET_ONE_REG || ioctl == KVM_SET_ONE_REG)
+                return kvm_arch_vcpu_ioctl(filp, ioctl, arg);
 
-Please don't base your assumptions on the output of hwclock(8) -
-the output of that which comes after the timezone specifier is
-not documented in the man page, and appears on the face of it to
-be rather random:
+in kvm_vcpu_ioctl before "r = vcpu_load(vcpu);", or even better:
 
-root at clearfog21:~# hwclock -r --noadjfile --utc
-Thu 23 Nov 2017 15:52:35 GMT  -0.547531 seconds
-root at clearfog21:~# hwclock -r --noadjfile --utc
-Thu 23 Nov 2017 15:52:37 GMT  -0.399859 seconds
-root at clearfog21:~# hwclock -r --noadjfile --utc
-Thu 23 Nov 2017 15:52:38 GMT  -0.275654 seconds
+        if (ioctl == KVM_GET_ONE_REG)
+		// call kvm_arch_vcpu_get_one_reg_ioctl(vcpu, &reg);
+		// and do copy_to_user
+		return kvm_vcpu_get_one_reg_ioctl(vcpu, arg);
+        if (ioctl == KVM_SET_ONE_REG)
+		// do copy_from_user then call
+		// kvm_arch_vcpu_set_one_reg_ioctl(vcpu, &reg);
+		return kvm_vcpu_set_one_reg_ioctl(vcpu, arg);
 
-Using my program instead:
+so that the kvm_arch_vcpu_get/set_one_reg_ioctl functions are called
+without the lock.
 
-root at clearfog21:~# ./test-rtc
+Then all architectures except ARM can be switched to do
+vcpu_load/vcpu_put in kvm_arch_vcpu_get/set_one_reg_ioctl
 
-Warning: NTP synchronisation is enabled, measurements may be affected
-
-RTC is currently trimmed to -39112 ppb
-Takes average of 65127ns to read RTC
-Took 64411ns to read RTC on second change
-
-RTC Time: 23-11-2017 15:52:50
-System Time was:     15:52:50.000
-
-root at clearfog21:~# ./test-rtc
-
-Warning: NTP synchronisation is enabled, measurements may be affected
-
-RTC is currently trimmed to -39112 ppb
-Takes average of 64560ns to read RTC
-Took 63884ns to read RTC on second change
-
-RTC Time: 23-11-2017 15:53:14
-System Time was:     15:53:14.000
-root at clearfog21:~# ./test-rtc
-
-Warning: NTP synchronisation is enabled, measurements may be affected
-
-RTC is currently trimmed to -39112 ppb
-Takes average of 64467ns to read RTC
-Took 74642ns to read RTC on second change
-
-RTC Time: 23-11-2017 15:53:17
-System Time was:     15:53:17.000
-
-root at clearfog21:~#
-
-So, the RTC is closely synchronised with the system time, and is
-certainly not variable as hwclock(8) _appears_ to suggest.  So the
-figure it comes out with after printing the time is _not_ the
-difference betwen system time and RTC time.
-
-It seems to be the negative amount of time from an arbitary point
-after hwclock() starts execution to the point just after waiting
-for the update interrupt:
-
-root at clearfog21:~# strace -tt -T hwclock -r --noadjfile --utc --debug
-15:58:32.411876 execve("/sbin/hwclock", ["hwclock", "-r", "--noadjfile", "--utc", "--debug"], [/* 16 vars */]) = 0 <0.000834>
-...
-15:58:32.425566 gettimeofday({1511452712, 425707}, NULL) = 0 <0.000134>
-...
-15:58:32.436914 write(1, "Waiting for clock tick...\n", 26Waiting for clock tick...
-) = 26 <0.000233>
-15:58:32.437303 ioctl(3, PHN_SET_REGS or RTC_UIE_ON, 0) = 0 <0.000391>
-15:58:32.437859 select(4, [3], NULL, NULL, {10, 0}) = 1 (in [3], left {9, 438030}) <0.562095>
-15:58:33.002175 ioctl(3, PHN_NOT_OH or RTC_UIE_OFF, 0) = 0 <0.000186>
-15:58:33.002592 write(1, "...got clock tick\n", 18...got clock tick
-) = 18 <0.000314>
-15:58:33.003217 gettimeofday({1511452713, 3378}, NULL) = 0 <0.000159>
-...
-15:58:33.009146 write(1, "Thu 23 Nov 2017 15:58:33 GMT  -0"..., 48Thu 23 Nov 2017 15:58:33 GMT  -0.577671 seconds
-
-1511452713.003378 - 1511452712.425707 = 0.577671s - the figure printed
-by hwclock(8) after the time.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Paolo
