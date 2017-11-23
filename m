@@ -1,106 +1,66 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 23 Nov 2017 12:11:34 +0000
-Subject: [PATCH v1 2/2] kvm: arm64: handle single-step of hyp emulated mmio
- instructions
-In-Reply-To: <20171123121134.11050-1-alex.bennee@linaro.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 23 Nov 2017 13:33:27 +0100
+Subject: [PATCH v1 1/2] kvm: arm64: handle single-step during SError
+ exceptions
+In-Reply-To: <20171123121134.11050-2-alex.bennee@linaro.org>
 References: <20171123121134.11050-1-alex.bennee@linaro.org>
-Message-ID: <20171123121134.11050-3-alex.bennee@linaro.org>
+ <20171123121134.11050-2-alex.bennee@linaro.org>
+Message-ID: <20171123123327.GY28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a fast-path of MMIO emulation inside hyp mode. The handling
-of single-step is broadly the same as kvm_arm_handle_step_debug()
-except we just setup ESR/HSR so handle_exit() does the correct thing
-as we exit.
+On Thu, Nov 23, 2017 at 12:11:33PM +0000, Alex Benn?e wrote:
+> When an SError arrives during single-step it may be delivered before
+> the step completes. 
 
-For the case of an emulated illegal access causing an SError we will
-exit via the ARM_EXCEPTION_EL1_SERROR path in handle_exit(). We behave
-as we would during a real SError and clear the DBG_SPSR_SS bit for the
-emulated instruction.
+nit: this is not entirely accurate wording comparing with the ARM ARM,
+which says that the step would be completed, but you'll now have both a
+pending debug exception and a pending SError interrupt at the same time,
+and the architecture doesn't prevent the SError from being taken first.
 
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
----
- arch/arm64/kvm/hyp/switch.c | 37 ++++++++++++++++++++++++++++++-------
- 1 file changed, 30 insertions(+), 7 deletions(-)
+I can fix this up on commit though.
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 525c01f48867..f7c651f3a8c0 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -22,6 +22,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
- #include <asm/fpsimd.h>
-+#include <asm/debug-monitors.h>
- 
- static bool __hyp_text __fpsimd_enabled_nvhe(void)
- {
-@@ -269,7 +270,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- 	return true;
- }
- 
--static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
-+/* Skip an instruction which has been emulated. Returns true if
-+ * execution can continue or false if we need to exit hyp mode because
-+ * single-step was in effect.
-+ */
-+static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- {
- 	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
- 
-@@ -282,6 +287,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
- 
- 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
-+
-+	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-+		vcpu->arch.fault.esr_el2 =
-+			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
-+		return false;
-+	} else {
-+		return true;
-+	}
- }
- 
- int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-@@ -342,13 +355,21 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 			int ret = __vgic_v2_perform_cpuif_access(vcpu);
- 
- 			if (ret == 1) {
--				__skip_instr(vcpu);
--				goto again;
-+				if (__skip_instr(vcpu))
-+					goto again;
-+				else
-+					exit_code = ARM_EXCEPTION_TRAP;
- 			}
- 
- 			if (ret == -1) {
--				/* Promote an illegal access to an SError */
--				__skip_instr(vcpu);
-+				/* Promote an illegal access to an
-+				 * SError. If we would be returning
-+				 * due to single-step clear the SS
-+				 * bit so handle_exit knows what to
-+				 * do after dealing with the error.
-+				 */
-+				if (!__skip_instr(vcpu))
-+					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
- 				exit_code = ARM_EXCEPTION_EL1_SERROR;
- 			}
- 
-@@ -363,8 +384,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
- 
- 		if (ret == 1) {
--			__skip_instr(vcpu);
--			goto again;
-+			if (__skip_instr(vcpu))
-+				goto again;
-+			else
-+				exit_code = ARM_EXCEPTION_TRAP;
- 		}
- 
- 		/* 0 falls through to be handled out of EL2 */
--- 
-2.15.0
+> In that case the DBG_SPSR_SS bit will have flipped
+> as the instruction executed. After handling the abort in handle_exit()
+> we test to see if the bit is clear and we were single-stepping before
+> deciding if we need to exit to user space.
+> 
+> Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+
+Thanks!
+
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+> ---
+>  arch/arm64/kvm/handle_exit.c | 8 +++++++-
+>  1 file changed, 7 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+> index 3e645ec9e751..3ba8c4a3bcff 100644
+> --- a/arch/arm64/kvm/handle_exit.c
+> +++ b/arch/arm64/kvm/handle_exit.c
+> @@ -28,6 +28,7 @@
+>  #include <asm/kvm_emulate.h>
+>  #include <asm/kvm_mmu.h>
+>  #include <asm/kvm_psci.h>
+> +#include <asm/debug-monitors.h>
+>  
+>  #define CREATE_TRACE_POINTS
+>  #include "trace.h"
+> @@ -250,7 +251,12 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+>  		return 1;
+>  	case ARM_EXCEPTION_EL1_SERROR:
+>  		kvm_inject_vabt(vcpu);
+> -		return 1;
+> +		/* We may still need to return for single-step */
+> +		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
+> +			&& kvm_arm_handle_step_debug(vcpu, run))
+> +			return 0;
+> +		else
+> +			return 1;
+>  	case ARM_EXCEPTION_TRAP:
+>  		return handle_trap_exceptions(vcpu, run);
+>  	case ARM_EXCEPTION_HYP_GONE:
+> -- 
+> 2.15.0
+> 
