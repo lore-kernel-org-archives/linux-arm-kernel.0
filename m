@@ -1,35 +1,43 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 23 Nov 2017 13:21:54 +0530
-Subject: [PATCH 6/6] ARM: configs: keystone_defconfig: Enable few peripheral
- drivers
+Date: Thu, 23 Nov 2017 13:21:49 +0530
+Subject: [PATCH 1/6] ARM: dts: keystone-k2g: Add QSPI DT entry
 In-Reply-To: <20171123075154.3938-1-vigneshr@ti.com>
 References: <20171123075154.3938-1-vigneshr@ti.com>
-Message-ID: <20171123075154.3938-7-vigneshr@ti.com>
+Message-ID: <20171123075154.3938-2-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable drivers for QSPI, LEDS, gpio-decoder that are present on 66AK2G EVM
-and 66AK2G ICE boards.
+Add DT node for Cadence QSPI IP present in 66AK2G SoC.
 
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- arch/arm/configs/keystone_defconfig | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm/boot/dts/keystone-k2g.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/configs/keystone_defconfig b/arch/arm/configs/keystone_defconfig
-index f710c192b33a..2536c231eea1 100644
---- a/arch/arm/configs/keystone_defconfig
-+++ b/arch/arm/configs/keystone_defconfig
-@@ -228,3 +228,10 @@ CONFIG_CRYPTO_DES=y
- CONFIG_CRYPTO_ANSI_CPRNG=y
- CONFIG_CRYPTO_USER_API_HASH=y
- CONFIG_CRYPTO_USER_API_SKCIPHER=y
-+CONFIG_SPI_CADENCE_QUADSPI=y
-+CONFIG_INPUT_MISC=y
-+CONFIG_INPUT_EVDEV=m
-+CONFIG_INPUT_GPIO_DECODER=m
-+CONFIG_GPIO_PCA953X=m
-+CONFIG_LEDS_TRIGGER_ACTIVITY=y
-+CONFIG_LEDS_TRIGGER_CPU=y
+diff --git a/arch/arm/boot/dts/keystone-k2g.dtsi b/arch/arm/boot/dts/keystone-k2g.dtsi
+index 8f313ff406b9..01d29320b04c 100644
+--- a/arch/arm/boot/dts/keystone-k2g.dtsi
++++ b/arch/arm/boot/dts/keystone-k2g.dtsi
+@@ -377,6 +377,20 @@
+ 			power-domains = <&k2g_pds 0xc>;
+ 			clocks = <&k2g_clks 0xc 1>, <&k2g_clks 0xc 2>;
+ 			clock-names = "fck", "mmchsdb_fck";
++		};
++
++		qspi: qspi at 2940000 {
++			compatible = "ti,k2g-qspi", "cdns,qspi-nor";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0x02940000 0x1000>,
++			      <0x24000000 0x4000000>;
++			interrupts = <GIC_SPI 198 IRQ_TYPE_EDGE_RISING>;
++			cdns,fifo-depth = <256>;
++			cdns,fifo-width = <4>;
++			cdns,trigger-address = <0x24000000>;
++			clocks = <&k2g_clks 0x43 0x0>;
++			power-domains = <&k2g_pds 0x43>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
 2.15.0
