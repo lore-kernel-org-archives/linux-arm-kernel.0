@@ -1,90 +1,68 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 23 Nov 2017 11:46:56 +0100
-Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <CAKv+Gu-vsQiDS1kobmaBmnWv__vTuOcKHs6t2rMiVu=rriHeEQ@mail.gmail.com>
-References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
- <20171122161913.GB12684@amd>
- <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
- <20171122223355.GA5877@amd>
- <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
- <20171122233738.GA25313@amd>
- <D3BCED36-58D1-4E30-9171-16F06A5DC65D@linaro.org>
- <20171123090747.GA6948@amd>
- <CAKv+Gu-vsQiDS1kobmaBmnWv__vTuOcKHs6t2rMiVu=rriHeEQ@mail.gmail.com>
-Message-ID: <20171123104656.GA17990@amd>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Nov 2017 10:52:20 +0000
+Subject: problem of kexec
+In-Reply-To: <CACi5LpMUJPRCjbbahSeLkQ8oWUMjp1RBn4AGZeEbmj-h=1YQEw@mail.gmail.com>
+References: <33D4DBCAC5F2D74E96B07F6E7632BF732EEA03D3@G08CNEXMBPEKD01.g08.fujitsu.local>
+ <CAHM4w1k0ZhiuYKuqQc2+V0=FbMCgUASR8Q6o43JY_9eP6t3X5w@mail.gmail.com>
+ <CAAbOZyeXCM9UMZSQenbjAZb3oVruBhJaKt--=A6Ou4=2bG+kGQ@mail.gmail.com>
+ <CACi5LpMUJPRCjbbahSeLkQ8oWUMjp1RBn4AGZeEbmj-h=1YQEw@mail.gmail.com>
+Message-ID: <20171123105220.GM31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 2017-11-23 09:23:02, Ard Biesheuvel wrote:
-> On 23 November 2017 at 09:07, Pavel Machek <pavel@ucw.cz> wrote:
-> > Hi!
-> >
-> >> > On 22 Nov 2017, at 23:37, Pavel Machek <pavel@ucw.cz> wrote:
-> >> >
-> >> > Hi!
-> >> >
-> >> >>>>> If I'm willing to do timing attacks to defeat KASLR... what prevents
-> >> >>>>> me from using CPU caches to do that?
-> >> >>>>>
-> >> >>>>
-> >> >>>> Because it is impossible to get a cache hit on an access to an
-> >> >>>> unmapped address?
-> >> >>>
-> >> >>> Um, no, I don't need to be able to directly access kernel addresses. I
-> >> >>> just put some data in _same place in cache where kernel data would
-> >> >>> go_, then do syscall and look if my data are still cached. Caches
-> >> >>> don't have infinite associativity.
-> >> >>>
-> >> >>
-> >> >> Ah ok. Interesting.
-> >> >>
-> >> >> But how does that leak address bits that are covered by the tag?
-> >> >
-> >> > Same as leaking any other address bits? Caches are "virtually
-> >> > indexed",
-> >>
-> >> Not on arm64, although I don?t see how that is relevant if you are trying to defeat kaslr.
-> >>
-> >> > and tag does not come into play...
-> >> >
-> >>
-> >> Well, I must be missing something then, because I don?t see how knowledge about which userland address shares a cache way with a kernel address can leak anything beyond the bits that make up the index (i.e., which cache way is being shared)
-> >>
-> >
-> > Well, KASLR is about keeping bits of kernel virtual address secret
-> > from userland. Leaking them through cache sidechannel means KASLR is
-> > defeated.
-> >
-> 
-> Yes, that is what you claim. But you are not explaining how any of the
-> bits that we do want to keep secret can be discovered by making
-> inferences from which lines in a primed cache were evicted during a
-> syscall.
-> 
-> The cache index maps to low order bits. You can use this, e.g., to
-> attack table based AES, because there is only ~4 KB worth of tables,
-> and you are interested in finding out which exact entries of the table
-> were read by the process under attack.
-> 
-> You are saying the same approach will help you discover 30 high order
-> bits of a virtual kernel address, by observing the cache evictions in
-> a physically indexed physically tagged cache. How?
+On Thu, Nov 23, 2017 at 03:52:25PM +0530, Bhupesh Sharma wrote:
+> Cc: linux-arm and kexec mailing lists for further inputs (Hoping some
+> NXP guys would see this and be able to help with the DPAA issue -
+> Q/BMAN issues you are seeing the crash boot logs)..
 
-I assumed high bits are hashed into cache index. I might have been
-wrong. Anyway, page tables are about same size as AES tables. So...:
+...
 
-http://cve.circl.lu/cve/CVE-2017-5927
+> 1. crashkernel logs with DTB being passed:
+> 
+> a. I am pasting the logs below again for reference -
+> 
+> root at ubinux-armv8:~# kexec -l ./Image --dtb="./fsl-ls1046a-rdb-sdk.dtb" --comman
+> d-line="$(cat /proc/cmdline)"
+> root at ubinux-armv8:~#
+> root at ubinux-armv8:~#
+> root at ubinux-armv8:~# kexec -e
+...
+> [    0.000000] cma: Failed to reserve 16 MiB
+> [    0.000000] Kernel panic - not syncing: ERROR: Failed to allocate 0x1000 byte
+> s below 0x0.
 
-									Pavel
+This is as I've said previously.
+
+The kernel here knows nothing about the MEMORY on your platform, so it
+can't do any memory allocations, and so it panics.
+
+kexec assumes that the dtb you pass it contains everything needed to
+boot the platform, including all the platform modifications that the
+boot loader would have done.  In other words, it expects that the dtb
+is the exact dtb that gets passed to the kernel, as already updated
+by the boot loader with parameters such as the location and size of
+memory, ethernet addresses, etc.
+
+The exceptions to that are the command line (/chosen/bootargs) and
+the initial disk image.
+
+So, passing the .dtb that was generated by the kernel build system won't
+work, because that hasn't had these other parameters added to it by the
+boot loader.
+
+If you don't use the --dtb option, then kexec will read the existing
+kernel's dtb from /proc/device-tree, and that device tree will include
+all the changes that the boot loader has done, including adding details
+of the available memory in the system.
+
+My general advice is: avoid the --dtb option unless you _really_ need
+to supply a different dtb, and if you do need to supply a different dtb,
+then make sure you've updated it with whatever modifications that the
+boot loader has done to (eg) tell the kernel about where memory is in
+your system, and all the other modifications.  If you don't know what
+those are, stay away from the --dtb option.
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/1f7f838b/attachment.sig>
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
