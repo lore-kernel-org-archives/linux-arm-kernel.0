@@ -1,79 +1,116 @@
-From: ck.hu@mediatek.com (CK Hu)
-Date: Thu, 23 Nov 2017 16:51:27 +0800
-Subject: [PATCH 6/8] drm/mediatek: Add mfd support for mt8173
-In-Reply-To: <20171114214114.15793-7-mbrugger@suse.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 23 Nov 2017 09:54:42 +0100
+Subject: [PATCH 1/8] drm/mediatek: Use regmap for register access
+In-Reply-To: <20171114214114.15793-2-mbrugger@suse.com>
 References: <20171114214114.15793-1-mbrugger@suse.com>
- <20171114214114.15793-7-mbrugger@suse.com>
-Message-ID: <1511427087.8489.4.camel@mtksdaap41>
+ <20171114214114.15793-2-mbrugger@suse.com>
+Message-ID: <1511427282.7685.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Matthias:
+Hi Matthias,
 
 On Tue, 2017-11-14 at 22:41 +0100, Matthias Brugger wrote:
-> Use the MFD device for SoC mt8173. Probing via devicetree
-> is no longer needed for any SoC, so delete it.
+> The mmsys memory space is shared between the drm and the
+> clk driver. Use regmap to access it.
 > 
 > Signed-off-by: Matthias Brugger <mbrugger@suse.com>
-
-Acked-by: CK Hu <ck.hu@mediatek.com>
-
 > ---
->  drivers/gpu/drm/mediatek/mtk_drm_drv.c | 28 +++++++---------------------
->  1 file changed, 7 insertions(+), 21 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_drv.c b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> index 5a263aa3ab6e..1eb02acf229a 100644
-> --- a/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> +++ b/drivers/gpu/drm/mediatek/mtk_drm_drv.c
-> @@ -409,20 +409,12 @@ static int mtk_drm_probe(struct platform_device *pdev)
->  	INIT_WORK(&private->commit.work, mtk_atomic_work);
->  	private->data = of_device_get_match_data(dev);
+>  drivers/gpu/drm/mediatek/mtk_drm_crtc.c |  4 ++--
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.c  | 30 +++++++++++++++++-------------
+>  drivers/gpu/drm/mediatek/mtk_drm_ddp.h  |  4 ++--
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.c  | 13 ++++---------
+>  drivers/gpu/drm/mediatek/mtk_drm_drv.h  |  2 +-
+>  5 files changed, 26 insertions(+), 27 deletions(-)
+[...]
+> diff --git a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> index 8130f3dab661..1227d6db07da 100644
+> --- a/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> +++ b/drivers/gpu/drm/mediatek/mtk_drm_ddp.c
+> @@ -185,16 +185,16 @@ static unsigned int mtk_ddp_sel_in(enum mtk_ddp_comp_id cur,
+>  	return value;
+>  }
 >  
-> -	/* Check if called from mfd */
-> -	if (!dev->of_node) {
-> -		mmsys_private = dev_get_drvdata(pdev->dev.parent);
-> -		private->data = (struct mtk_mmsys_driver_data *)
-> -				platform_get_device_id(pdev)->driver_data;
-> -		private->config_regs =
-> -			syscon_node_to_regmap(mmsys_private->of_node);
-> -		parent_node = mmsys_private->of_node->parent;
-> -	} else {
-> -		private->config_regs = syscon_node_to_regmap(dev->of_node);
-> -		if (IS_ERR(private->config_regs))
-> -			return PTR_ERR(private->config_regs);
-> -		parent_node = dev->of_node->parent;
-> -	}
-> +	mmsys_private = dev_get_drvdata(pdev->dev.parent);
-> +	private->data = (struct mtk_mmsys_driver_data *)
-> +			platform_get_device_id(pdev)->driver_data;
-> +	private->config_regs =
-> +		syscon_node_to_regmap(mmsys_private->of_node);
-> +	parent_node = mmsys_private->of_node->parent;
+> -static void mtk_ddp_sout_sel(void __iomem *config_regs,
+> +static void mtk_ddp_sout_sel(struct regmap *config_regs,
+>  			     enum mtk_ddp_comp_id cur,
+>  			     enum mtk_ddp_comp_id next)
+>  {
+>  	if (cur == DDP_COMPONENT_BLS && next == DDP_COMPONENT_DSI0)
+> -		writel_relaxed(BLS_TO_DSI_RDMA1_TO_DPI1,
+> -			       config_regs + DISP_REG_CONFIG_OUT_SEL);
+> +		regmap_write(config_regs, DISP_REG_CONFIG_OUT_SEL,
+> +				BLS_TO_DSI_RDMA1_TO_DPI1);
+>  }
 >  
->  	/* Iterate over sibling DISP function blocks */
->  	for_each_child_of_node(parent_node, node) {
-> @@ -565,14 +557,9 @@ static int mtk_drm_sys_resume(struct device *dev)
->  static SIMPLE_DEV_PM_OPS(mtk_drm_pm_ops, mtk_drm_sys_suspend,
->  			 mtk_drm_sys_resume);
+> -void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
+> +void mtk_ddp_add_comp_to_path(struct regmap *config_regs,
+>  			      enum mtk_ddp_comp_id cur,
+>  			      enum mtk_ddp_comp_id next)
+>  {
+> @@ -202,20 +202,22 @@ void mtk_ddp_add_comp_to_path(void __iomem *config_regs,
 >  
-> -static const struct of_device_id mtk_drm_of_ids[] = {
-> -	{ .compatible = "mediatek,mt8173-mmsys",
-> -	  .data = &mt8173_mmsys_driver_data},
-> -	{ }
-> -};
-> -
->  static const struct platform_device_id mtk_drm_ids[] = {
->  	{ "drm-mt2701-mm", (kernel_ulong_t)&mt2701_mmsys_driver_data },
-> +	{ "drm-mt8173-mm", (kernel_ulong_t)&mt8173_mmsys_driver_data },
->  	{ /* sentinel */ },
->  };
->  MODULE_DEVICE_TABLE(platform, mtk_drm_ids);
-> @@ -582,7 +569,6 @@ static struct platform_driver mtk_drm_platform_driver = {
->  	.remove	= mtk_drm_remove,
->  	.driver	= {
->  		.name	= "mediatek-drm",
-> -		.of_match_table = mtk_drm_of_ids,
->  		.pm     = &mtk_drm_pm_ops,
->  	},
->  	.id_table = mtk_drm_ids,
+>  	value = mtk_ddp_mout_en(cur, next, &addr);
+>  	if (value) {
+> -		reg = readl_relaxed(config_regs + addr) | value;
+> -		writel_relaxed(reg, config_regs + addr);
+> +		regmap_read(config_regs, addr, &reg);
+> +		reg |= value;
+> +		regmap_write(config_regs, addr, reg);
+
+You can use
+
+		regmap_update_bits(config_regs, addr, value, value);
+
+here and drop the local variable reg.
+
+>  	}
+>  
+>  	mtk_ddp_sout_sel(config_regs, cur, next);
+>  
+>  	value = mtk_ddp_sel_in(cur, next, &addr);
+>  	if (value) {
+> -		reg = readl_relaxed(config_regs + addr) | value;
+> -		writel_relaxed(reg, config_regs + addr);
+> +		regmap_read(config_regs, addr, &reg);
+> +		reg |= value;
+> +		regmap_write(config_regs, addr, reg);
+
+		regmap_update_bits(config_regs, addr, value, value);
+
+>  	}
+>  }
+>  
+> -void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
+> +void mtk_ddp_remove_comp_from_path(struct regmap *config_regs,
+>  				   enum mtk_ddp_comp_id cur,
+>  				   enum mtk_ddp_comp_id next)
+>  {
+> @@ -223,14 +225,16 @@ void mtk_ddp_remove_comp_from_path(void __iomem *config_regs,
+>  
+>  	value = mtk_ddp_mout_en(cur, next, &addr);
+>  	if (value) {
+> -		reg = readl_relaxed(config_regs + addr) & ~value;
+> -		writel_relaxed(reg, config_regs + addr);
+> +		regmap_read(config_regs, addr, &reg);
+> +		reg &= ~value;
+> +		regmap_write(config_regs, addr, reg);
+
+		regmap_update_bits(config_regs, addr, value, 0);
+
+>  	}
+>  
+>  	value = mtk_ddp_sel_in(cur, next, &addr);
+>  	if (value) {
+> -		reg = readl_relaxed(config_regs + addr) & ~value;
+> -		writel_relaxed(reg, config_regs + addr);
+> +		regmap_read(config_regs, addr, &reg);
+> +		reg &= ~value;
+> +		regmap_write(config_regs, addr, reg);
+
+		regmap_update_bits(config_regs, addr, value, 0);
+
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+
+regards
+Philipp
