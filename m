@@ -1,44 +1,46 @@
-From: fabio.estevam@nxp.com (Fabio Estevam)
-Date: Thu, 23 Nov 2017 13:00:13 -0200
-Subject: [PATCH 2/2] ARM: dts: imx6qdl-sabreauto: Add CEC support
-In-Reply-To: <1511449213-13855-1-git-send-email-fabio.estevam@nxp.com>
-References: <1511449213-13855-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <1511449213-13855-2-git-send-email-fabio.estevam@nxp.com>
+From: jgg@mellanox.com (Jason Gunthorpe)
+Date: Thu, 23 Nov 2017 08:04:39 -0700
+Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
+ ntp
+In-Reply-To: <20171123095456.lkc4nkuzsd2q26mm@piout.net>
+References: <20171013175433.GA22062@obsidianresearch.com>
+ <20171123095456.lkc4nkuzsd2q26mm@piout.net>
+Message-ID: <20171123150439.GB18754@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-HDMI_TX_CEC_LINE pin is used for CEC, so pass it in the device tree.
+On Thu, Nov 23, 2017 at 10:54:56AM +0100, Alexandre Belloni wrote:
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx6qdl-sabreauto.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+> So I'm discovering that this patch made it upstream silently. While it
+> somewhat solves the issue for some RTCs, it is not a proper solution for
+> most.
 
-diff --git a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-index de9bf47..82d6ccb 100644
---- a/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-sabreauto.dtsi
-@@ -235,6 +235,8 @@
- };
- 
- &hdmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hdmi_cec>;
- 	ddc-i2c-bus = <&i2c2>;
- 	status = "okay";
- };
-@@ -454,6 +456,12 @@
- 			>;
- 		};
- 
-+		pinctrl_hdmi_cec: hdmicecgrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_EIM_A25__HDMI_TX_CEC_LINE	0x1f8b0
-+			>;
-+		};
-+
- 		pinctrl_i2c2: i2c2grp {
- 			fsl,pins = <
- 				MX6QDL_PAD_EIM_EB2__I2C2_SCL	0x4001b8b1
--- 
-2.7.4
+It was cc'd all the right lists?
+
+> With this patch, set_offset_nsec will be hardcoded in the driver and
+> this basically work for the mc146818 but many RTCs are connected on a
+> slow bus (let's say i2c) and that bus may have various latencies
+> depending on the platform so the value actually depends on the platform
+> rather than on the RTC itself.
+
+The intention of the patch is for the actual RTC driver to set the
+value to what it needs.
+
+If some RTCs are dealing with variable latency busses then they should
+do an bus IO to measure their bus latency then tweak their value.
+
+In any event, having the correct offset for the RTC chip (eg 0.5 vs 0)
+is a big improvement, even if there are some small I2C latencies.
+
+> I really think that we should simply consider dropping hctosys,
+> systohc and update_persistent_clock. Most distributions have been
+
+Like Russell has said already, the kernel is the only place that could
+actually have all the information needed. User space would have to use
+some kind of trail and error approach to figure out what the offset
+should be.
+
+You can't really measure the offset without doing a time set, many
+embedded RTCs do not hook up interrupts, etc.
+
+Jason
