@@ -1,79 +1,74 @@
-From: ben@decadent.org.uk (Ben Hutchings)
-Date: Thu, 23 Nov 2017 02:03:32 +0000
-Subject: qcom: add firmware file for Adreno and Venus on APQ8096
-In-Reply-To: <CAP71Wjw-3FrOtHADuui52t+iqv6QkvXXCthjR6akXr7QQTzrAA@mail.gmail.com>
-References: <CAP71Wjw-3FrOtHADuui52t+iqv6QkvXXCthjR6akXr7QQTzrAA@mail.gmail.com>
-Message-ID: <1511402612.14687.23.camel@decadent.org.uk>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 23 Nov 2017 10:34:24 +0800
+Subject: [PATCH V5 10/12] clk: sprd: add clocks support for SC9860
+In-Reply-To: <20171120060137.27380-11-chunyan.zhang@spreadtrum.com>
+References: <20171120060137.27380-11-chunyan.zhang@spreadtrum.com>
+Message-ID: <201711230950.T3TiGuSx%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-11-15 at 21:00 +0100, Nicolas Dechesne wrote:
-> hi,
-> 
-> This pull request adds firmware files for Adreno 530 GPU and Venus h/w
-> codec found on the Qualcomm APQ8096 chipset, such as on Dragonboard
-> 820c development board.
+Hi Chunyan,
 
-Pulled, thanks.
+Thank you for the patch! Perhaps something to improve:
 
-By the way, it looks like you should update the MODULE_FIRMWARE
-declarations in the DRM driver to the "new" firmware paths.
+[auto build test WARNING on clk/clk-next]
+[also build test WARNING on v4.14 next-20171122]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-Ben.
+url:    https://github.com/0day-ci/linux/commits/Chunyan-Zhang/add-clock-driver-for-Spreadtrum-platforms/20171123-072852
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-> The following changes since commit bf04291309d3169c0ad3b8db52564235bbd08e30:
-> 
->   WHENCE: Add new qed firmware (2017-10-09 18:03:26 +0100)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/ndechesne/linux-firmware.git db820c
-> 
-> for you to fetch changes up to e7219334854d854ae7768b13dc290ec85d93a0d9:
-> 
->   qcom: add venus firmware files for v4.2 (2017-11-15 20:49:17 +0100)
-> 
-> ----------------------------------------------------------------
-> Nicolas Dechesne (2):
->       qcom: add firmware files for Adreno a530
->       qcom: add venus firmware files for v4.2
-> 
->  WHENCE                   |  16 ++++++++++++++++
->  qcom/a530_pfp.fw         | Bin 0 -> 15876 bytes
->  qcom/a530_pm4.fw         | Bin 0 -> 19572 bytes
->  qcom/a530_zap.b00        | Bin 0 -> 148 bytes
->  qcom/a530_zap.b01        | Bin 0 -> 6536 bytes
->  qcom/a530_zap.b02        | Bin 0 -> 4900 bytes
->  qcom/a530_zap.mdt        | Bin 0 -> 6684 bytes
->  qcom/a530v3_gpmu.fw2     | Bin 0 -> 8184 bytes
->  qcom/venus-4.2/venus.b00 | Bin 0 -> 212 bytes
->  qcom/venus-4.2/venus.b01 | Bin 0 -> 6600 bytes
->  qcom/venus-4.2/venus.b02 | Bin 0 -> 884136 bytes
->  qcom/venus-4.2/venus.b03 | Bin 0 -> 28976 bytes
->  qcom/venus-4.2/venus.b04 |   1 +
->  qcom/venus-4.2/venus.mdt | Bin 0 -> 6812 bytes
->  14 files changed, 17 insertions(+)
->  create mode 100644 qcom/a530_pfp.fw
->  create mode 100644 qcom/a530_pm4.fw
->  create mode 100644 qcom/a530_zap.b00
->  create mode 100644 qcom/a530_zap.b01
->  create mode 100644 qcom/a530_zap.b02
->  create mode 100644 qcom/a530_zap.mdt
->  create mode 100644 qcom/a530v3_gpmu.fw2
->  create mode 100644 qcom/venus-4.2/venus.b00
->  create mode 100644 qcom/venus-4.2/venus.b01
->  create mode 100644 qcom/venus-4.2/venus.b02
->  create mode 100644 qcom/venus-4.2/venus.b03
->  create mode 100644 qcom/venus-4.2/venus.b04
->  create mode 100644 qcom/venus-4.2/venus.mdt
--- 
-Ben Hutchings
-When in doubt, use brute force. - Ken Thompson
+All warnings (new ones prefixed by >>):
 
+>> drivers/clk/sprd/sc9860-clk.c:128:18: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const u64 const itable1[4] = {3, 780000000, 988000000, 1196000000};
+                     ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:133:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_mpll0[PLL_FACT_MAX] = {
+                                      ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:150:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_mpll1[PLL_FACT_MAX] = {
+                                      ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:166:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_dpll[PLL_FACT_MAX] = {
+                                      ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:185:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_rpll[PLL_FACT_MAX] = {
+                                      ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:204:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_twpll[PLL_FACT_MAX] = {
+                                      ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:220:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_ltepll[PLL_FACT_MAX] = {
+                                      ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:240:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_gpll[PLL_FACT_MAX] = {
+                                      ^~~~~
+   drivers/clk/sprd/sc9860-clk.c:257:35: warning: duplicate 'const' declaration specifier [-Wduplicate-decl-specifier]
+    static const struct clk_bit_field const f_cppll[PLL_FACT_MAX] = {
+                                      ^~~~~
+
+vim +/const +128 drivers/clk/sprd/sc9860-clk.c
+
+   126	
+   127	/* GPLL/LPLL/DPLL/RPLL/CPLL */
+ > 128	static const u64 const itable1[4] = {3, 780000000, 988000000, 1196000000};
+   129	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: This is a digitally signed message part
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/dc1858da/attachment.sig>
+Name: .config.gz
+Type: application/gzip
+Size: 36946 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171123/6795d49f/attachment-0001.gz>
