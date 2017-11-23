@@ -1,49 +1,22 @@
-From: daniel.thompson@linaro.org (Daniel Thompson)
-Date: Thu, 23 Nov 2017 12:11:16 +0000
-Subject: [PATCH V2 24/29] backlight: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511390964-9979-25-git-send-email-okaya@codeaurora.org>
-References: <1511390964-9979-1-git-send-email-okaya@codeaurora.org>
- <1511390964-9979-25-git-send-email-okaya@codeaurora.org>
-Message-ID: <337c09a3-08c9-8172-8430-3579aee20829@linaro.org>
+From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
+Date: Thu, 23 Nov 2017 12:11:32 +0000
+Subject: [PATCH v1 0/2] Additional single-step-cases
+Message-ID: <20171123121134.11050-1-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+This is now split into two patches as the first case of SError is
+separate from behaviour of stepping instructions.
 
-On 22/11/17 22:49, Sinan Kaya wrote:
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Getting ready to remove pci_get_bus_and_slot() function in favor of
-> pci_get_domain_bus_and_slot().
-> 
-> Hard-coding the domain as 0.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Alex Benn?e (2):
+  kvm: arm64: handle single-step during SError exceptions
+  kvm: arm64: handle single-step of hyp emulated mmio instructions
 
-I've no opinion on the wisdom or otherwise of removing the restrictive 
-API but, providing the removal of that API from the header file collects 
-the appropriate ack, then:
+ arch/arm64/kvm/handle_exit.c |  8 +++++++-
+ arch/arm64/kvm/hyp/switch.c  | 37 ++++++++++++++++++++++++++++++-------
+ 2 files changed, 37 insertions(+), 8 deletions(-)
 
-Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
-
-
-> ---
->   drivers/video/backlight/apple_bl.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
-> index d843296..6a34ab9 100644
-> --- a/drivers/video/backlight/apple_bl.c
-> +++ b/drivers/video/backlight/apple_bl.c
-> @@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
->   	struct pci_dev *host;
->   	int intensity;
->   
-> -	host = pci_get_bus_and_slot(0, 0);
-> +	host = pci_get_domain_bus_and_slot(0, 0, 0);
->   
->   	if (!host) {
->   		pr_err("unable to find PCI host\n");
-> 
+-- 
+2.15.0
