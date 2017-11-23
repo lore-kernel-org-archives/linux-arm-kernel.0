@@ -1,116 +1,149 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Thu, 23 Nov 2017 21:59:02 +0100
-Subject: [PATCH 01/37] KVM: arm64: Avoid storing the vcpu pointer on the
- stack
-In-Reply-To: <ef4bffe5-b3c5-5fdd-cb8b-1840d2243ae1@arm.com>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-2-christoffer.dall@linaro.org>
- <ef4bffe5-b3c5-5fdd-cb8b-1840d2243ae1@arm.com>
-Message-ID: <20171123205902.GF28855@cbox>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Thu, 23 Nov 2017 16:04:10 -0500
+Subject: [PATCH v8 2/2] ARM: dts: TS-4600: add basic device tree
+In-Reply-To: <20171123210410.7107-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20171123210410.7107-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20171123210410.7107-2-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc,
+These device trees add support for the TS-4600 by Technologic Systems.
 
-On Thu, Oct 12, 2017 at 04:49:44PM +0100, Marc Zyngier wrote:
-> On 12/10/17 11:41, Christoffer Dall wrote:
-> > We already have the percpu area for the host cpu state, which points to
-> > the VCPU, so there's no need to store the VCPU pointer on the stack on
-> > every context switch.  We can be a little more clever and just use
-> > tpidr_el2 for the percpu offset and load the VCPU pointer from the host
-> > context.
-> > 
-> > This requires us to have a scratch register though, so we take the
-> > chance to rearrange some of the el1_sync code to only look at the
-> > vttbr_el2 to determine if this is a trap from the guest or an HVC from
-> > the host.  We do add an extra check to call the panic code if the kernel
-> > is configured with debugging enabled and we saw a trap from the host
-> > which wasn't an HVC, indicating that we left some EL2 trap configured by
-> > mistake.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm64/include/asm/kvm_asm.h | 20 ++++++++++++++++++++
-> >  arch/arm64/kernel/asm-offsets.c  |  1 +
-> >  arch/arm64/kvm/hyp/entry.S       |  5 +----
-> >  arch/arm64/kvm/hyp/hyp-entry.S   | 39 ++++++++++++++++++---------------------
-> >  arch/arm64/kvm/hyp/switch.c      |  2 +-
-> >  5 files changed, 41 insertions(+), 26 deletions(-)
-> > 
-> > diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> > index ab4d0a9..7e48a39 100644
-> > --- a/arch/arm64/include/asm/kvm_asm.h
-> > +++ b/arch/arm64/include/asm/kvm_asm.h
-> > @@ -70,4 +70,24 @@ extern u32 __init_stage2_translation(void);
-> >  
-> >  #endif
-> >  
-> > +#ifdef __ASSEMBLY__
-> > +.macro get_host_ctxt reg, tmp
-> > +	/*
-> > +	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
-> > +	 * not be accessible by this address from EL2, hyp_panic() converts
-> > +	 * it with kern_hyp_va() before use.
-> > +	 */
-> 
-> This really looks like a stale comment, as there is no hyp_panic
-> involved here anymore (thankfully!).
-> 
-> > +	ldr	\reg, =kvm_host_cpu_state
-> > +	mrs	\tmp, tpidr_el2
-> > +	add	\reg, \reg, \tmp
-> > +	kern_hyp_va \reg
-> 
-> Here, we're trading a load from the stack for a load from the constant
-> pool. Can't we do something like:
-> 
-> 	adr_l	\reg, kvm_host_cpu_state
-> 	msr	\tmp, tpidr_el2
-> 	add	\reg, \reg, \tmp
-> 
-> and that's it? This relies on the property that the kernel/hyp offset is
-> constant, and that it doesn't matter if we add the offset to a kernel VA
-> or a HYP VA... Completely untested of course!
-> 
+More details here:
+  http://wiki.embeddedarm.com/wiki/TS-4600
 
-Coming back to this one, annoyingly, it doesn't seem to work.  This is
-the code I use for get_host_ctxt:
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+---
+Changes v7 -> v8:
+  - rebase on master
+  - merge the rev A and B into one device tree based on the last rev B
+  because only the memory size change between the two rev currently
+  (suggested by Shawn Guo)
 
-.macro get_host_ctxt reg, tmp
-	adr_l	\reg, kvm_host_cpu_state
-	mrs	\tmp, tpidr_el2
-	add	\reg, \reg, \tmp
-	kern_hyp_va \reg
-.endm
+Changes v6 -> v7:
+  - rebase on master
+  - remove unneeded pinctrl-name (suggested by Shawn Guo)
+  - add reg to the node en-sd-pwr (suggested by Shawn Guo)
+  - use define for gpio polarity (suggested by Shawn Guo)
+  - remove the fake bus container for regulator (suggested by Shawn Guo)
 
-And this is the disassembly for one of the uses in the hyp code:
+Changes v5 -> v6:
+  - rebase on master
+  - split the previous patch series into series by subsystem
 
-	adrp	x0, ffff000008ca9000 <overflow_stack+0xd20>
-	add	x0, x0, #0x7f0
-	mrs	x1, tpidr_el2
-	add	x0, x0, x1
-	and	x0, x0, #0xffffffffffff
-	
-For comparison, the following C-code:
+Changes v4 -> v5:
+  - fix missing signed off
 
-	struct kvm_cpu_context *host_ctxt;
-	host_ctxt = this_cpu_ptr(&kvm_host_cpu_state);
-	host_ctxt = kern_hyp_va(host_ctxt);
+Changes v3 -> v4:
+  - rebase on master
 
-Gets compiled into this:
+Changes v2 -> v3:
+  - rebase on master
 
-	adrp	x0, ffff000008ca9000 <overflow_stack+0xd20>
-	add	x0, x0, #0x7d0
-	mrs	x1, tpidr_el1
-	add	x0, x0, #0x20
-	add	x0, x0, x1
-	and	x0, x0, #0xffffffffffff
+Changes v1 -> v2:
+  - rebase on master
+---
+ arch/arm/boot/dts/Makefile         |  1 +
+ arch/arm/boot/dts/imx28-ts4600.dts | 79 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 80 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx28-ts4600.dts
 
-And, during hyp init we do:
-	mrs	x1, tpidr_el1
-	msr	tpidr_el2, x1
-
-Any ideas what could be going on here?
-
-Thanks,
--Christoffer
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9caf21..678373d299d8 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -558,6 +558,7 @@ dtb-$(CONFIG_ARCH_MXS) += \
+ 	imx28-m28cu3.dtb \
+ 	imx28-m28evk.dtb \
+ 	imx28-sps1.dtb \
++	imx28-ts4600.dtb \
+ 	imx28-tx28.dtb
+ dtb-$(CONFIG_ARCH_NOMADIK) += \
+ 	ste-nomadik-s8815.dtb \
+diff --git a/arch/arm/boot/dts/imx28-ts4600.dts b/arch/arm/boot/dts/imx28-ts4600.dts
+new file mode 100644
+index 000000000000..f37d81381620
+--- /dev/null
++++ b/arch/arm/boot/dts/imx28-ts4600.dts
+@@ -0,0 +1,79 @@
++/*
++ * Copyright (C) 2016 Savoir-Faire Linux
++ * Author: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++#include "imx28.dtsi"
++#include "dt-bindings/gpio/gpio.h"
++
++/ {
++
++	model = "Technologic Systems i.MX28 TS-4600";
++	compatible = "technologic,imx28-ts4600", "fsl,imx28";
++
++	memory {
++		reg = <0x40000000 0x10000000>;   /* 256MB */
++	};
++
++	apb at 80000000 {
++		apbh at 80000000 {
++			ssp0: ssp at 80010000 {
++				compatible = "fsl,imx28-mmc";
++				pinctrl-names = "default";
++				pinctrl-0 = <&mmc0_4bit_pins_a
++					     &mmc0_sck_cfg
++					     &en_sd_pwr>;
++				broken-cd = <1>;
++				bus-width = <4>;
++				vmmc-supply = <&reg_vddio_sd0>;
++				status = "okay";
++			};
++
++			pinctrl at 80018000 {
++
++				en_sd_pwr: en-sd-pwr at 0 {
++					reg = <0>;
++					fsl,pinmux-ids = <
++						MX28_PAD_PWM3__GPIO_3_28
++					>;
++					fsl,drive-strength = <MXS_DRIVE_4mA>;
++					fsl,voltage = <MXS_VOLTAGE_HIGH>;
++					fsl,pull-up = <MXS_PULL_DISABLE>;
++				};
++
++			};
++		};
++
++		apbx at 80040000 {
++			pwm: pwm at 80064000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pwm2_pins_a>;
++				status = "okay";
++			};
++
++			duart: serial at 80074000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&duart_pins_a>;
++				status = "okay";
++			};
++		};
++	};
++
++	reg_vddio_sd0: regulator-vddio-sd0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vddio-sd0";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		gpio = <&gpio3 28 GPIO_ACTIVE_HIGH>;
++	};
++
++};
+-- 
+2.15.0
