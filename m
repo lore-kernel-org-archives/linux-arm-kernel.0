@@ -1,22 +1,82 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 23 Nov 2017 10:13:08 +0100
-Subject: [PATCH 6/8] drm/mediatek: Add mfd support for mt8173
-In-Reply-To: <20171114214114.15793-7-mbrugger@suse.com>
-References: <20171114214114.15793-1-mbrugger@suse.com>
- <20171114214114.15793-7-mbrugger@suse.com>
-Message-ID: <1511428388.7685.11.camel@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 23 Nov 2017 09:23:02 +0000
+Subject: [PATCH 00/18] arm64: Unmap the kernel whilst running in userspace
+ (KAISER)
+In-Reply-To: <20171123090747.GA6948@amd>
+References: <1510942921-12564-1-git-send-email-will.deacon@arm.com>
+ <20171122161913.GB12684@amd>
+ <CAKv+Gu9xw92F_K5XhDwpuSWCSbVJOMGSszuGBkyrhqboLhA-Mw@mail.gmail.com>
+ <20171122223355.GA5877@amd> <C271F3D3-A849-43F5-AE0A-6997890A3857@linaro.org>
+ <20171122233738.GA25313@amd> <D3BCED36-58D1-4E30-9171-16F06A5DC65D@linaro.org>
+ <20171123090747.GA6948@amd>
+Message-ID: <CAKv+Gu-vsQiDS1kobmaBmnWv__vTuOcKHs6t2rMiVu=rriHeEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-11-14 at 22:41 +0100, Matthias Brugger wrote:
-> Use the MFD device for SoC mt8173. Probing via devicetree
-> is no longer needed for any SoC, so delete it.
-> 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+On 23 November 2017 at 09:07, Pavel Machek <pavel@ucw.cz> wrote:
+> Hi!
+>
+>> > On 22 Nov 2017, at 23:37, Pavel Machek <pavel@ucw.cz> wrote:
+>> >
+>> > Hi!
+>> >
+>> >>>>> If I'm willing to do timing attacks to defeat KASLR... what prevents
+>> >>>>> me from using CPU caches to do that?
+>> >>>>>
+>> >>>>
+>> >>>> Because it is impossible to get a cache hit on an access to an
+>> >>>> unmapped address?
+>> >>>
+>> >>> Um, no, I don't need to be able to directly access kernel addresses. I
+>> >>> just put some data in _same place in cache where kernel data would
+>> >>> go_, then do syscall and look if my data are still cached. Caches
+>> >>> don't have infinite associativity.
+>> >>>
+>> >>
+>> >> Ah ok. Interesting.
+>> >>
+>> >> But how does that leak address bits that are covered by the tag?
+>> >
+>> > Same as leaking any other address bits? Caches are "virtually
+>> > indexed",
+>>
+>> Not on arm64, although I don?t see how that is relevant if you are trying to defeat kaslr.
+>>
+>> > and tag does not come into play...
+>> >
+>>
+>> Well, I must be missing something then, because I don?t see how knowledge about which userland address shares a cache way with a kernel address can leak anything beyond the bits that make up the index (i.e., which cache way is being shared)
+>>
+>
+> Well, KASLR is about keeping bits of kernel virtual address secret
+> from userland. Leaking them through cache sidechannel means KASLR is
+> defeated.
+>
 
-Apart from the mmsys_private issue noted in previous patches,
+Yes, that is what you claim. But you are not explaining how any of the
+bits that we do want to keep secret can be discovered by making
+inferences from which lines in a primed cache were evicted during a
+syscall.
 
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+The cache index maps to low order bits. You can use this, e.g., to
+attack table based AES, because there is only ~4 KB worth of tables,
+and you are interested in finding out which exact entries of the table
+were read by the process under attack.
 
-regards
-Philipp
+You are saying the same approach will help you discover 30 high order
+bits of a virtual kernel address, by observing the cache evictions in
+a physically indexed physically tagged cache. How?
+
+>
+>> > Maybe this explains it?
+>> >
+>>
+>> No not really. It explains how cache timing can be used as a side channel, not how it defeats kaslr.
+>
+> Ok, look at this one:
+>
+> https://www.blackhat.com/docs/us-16/materials/us-16-Jang-Breaking-Kernel-Address-Space-Layout-Randomization-KASLR-With-Intel-TSX-wp.pdf
+>
+> You can use timing instead of TSX, right?
+
+The TSX attack is TLB based not cache based.
