@@ -1,112 +1,79 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 23 Nov 2017 14:34:04 +0000
-Subject: [RFC PATCH 3/4] arm64/sve: KVM: Ensure user SVE use traps after
- vcpu execution
-In-Reply-To: <20171122192344.GS28855@cbox>
-References: <1510936735-6762-1-git-send-email-Dave.Martin@arm.com>
- <1510936735-6762-4-git-send-email-Dave.Martin@arm.com>
- <20171122192344.GS28855@cbox>
-Message-ID: <20171123143403.GK22781@e103592.cambridge.arm.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Thu, 23 Nov 2017 09:35:50 -0500
+Subject: [PATCH 1/2] usb: xhci: add relaxed timing quirk bit
+In-Reply-To: <c46e19a2-4b37-473c-a563-6fddf0c62070@linux.intel.com>
+References: <1511284690-3878-1-git-send-email-awallis@codeaurora.org>
+ <1511284690-3878-2-git-send-email-awallis@codeaurora.org>
+ <20171121191103.5oczqvrlo4gtwjqc@rob-hp-laptop>
+ <f200ce55-ac67-02f9-4dbf-7a3ba5b52b39@codeaurora.org>
+ <CAL_JsqLZgnTTEiLXD8ZOK-0qd58i16e7h_-2yjHN+zRFfqvH4Q@mail.gmail.com>
+ <32f8dc7e-9fde-5e45-1570-a9ec372579fa@codeaurora.org>
+ <ee0ca959-1812-a4e4-346f-d57a1fdade13@linux.intel.com>
+ <3c44d4d0-e10c-bacc-8e7f-df04bed5dc21@codeaurora.org>
+ <c46e19a2-4b37-473c-a563-6fddf0c62070@linux.intel.com>
+Message-ID: <e75a5df9-eaac-bc98-62a5-f1cd242c11c0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 08:23:44PM +0100, Christoffer Dall wrote:
-> On Fri, Nov 17, 2017 at 04:38:54PM +0000, Dave Martin wrote:
-> > Currently, SVE use can remain untrapped if a KVM vcpu thread is
-> > preempted inside the kernel and we then switch back to some user
-> > thread.
-> > 
-> > This patch ensures that SVE traps for userspace are enabled before
-> > switching away from the vcpu thread.
+On 11/23/2017 5:59 AM, Mathias Nyman wrote:
+> On 23.11.2017 01:32, Adam Wallis wrote:
+>> On 11/22/2017 10:24 AM, Mathias Nyman wrote:
+>> [..]
+>>>
+>>> We know have at least two hosts/platforms that need custom interrupt moderation
+>>> values
+>>>
+>>> How about adding a u32 device property for xhci with the interrupt moderation
+>>> interval in
+>>> nanoseconds?? And also add a u32 imod_interval variable to struct xhci_hcd?
+>>> ? imod_interval can be set to the current default 40000ns (160*250ns) and
+>>> overwritten if
+>>> device_property_read_u32() returns something else.
+>>>
+>>
+>> Isn't the 160 value quite aggressive anyway? Section 5.5.2.2 of the xHCI spec
+>> says that maximum observable interrupt rate should never exceed 8000
+>> interrupts/second. I believe the IMOD value in the most aggressive case would
+>> then be 500 by this statement [ 1 / (250e-9 * 500) = 8000 irqs/second ]
+>>
+>> Perhaps I am misreading the spec or just doing the math wrong? With the default
+>> value of 160, we are interrupting 25,000 irq/second...which is over 3 times the
+>> maximum stated value (again, assuming I did the math right)
+>>
+>> Anyway, my preference would be to set the IMOD default val to 4000 (~1ms) per
+>> the recommended value in Table 49 of the spec and allow platforms to adjust as
+>> necessary from that point.
+>>
+>> Thoughts on this?
+>>
 > 
-> I don't really understand why KVM is any different then any other thread
-> which could be using SVE that gets preempted?
-
-The state of CPACR_EL1.ZEN is part of the per-task SVE state in the host,
-and needs to be context switched.  This is different from CPACR_EL1.FEN
-which is always 0b11 in the host.  KVM currently is unaware of the
-context handling on flow in the host though, and corrupts the ZEN field
-rather than saving/restoring it.
-
-We could truly save/restore ZEN, but this feels like a misstep: firstly
-this only applies to the VHE case so will be a bit ugly, and secondly
-I expect context handling cleanup that makes KVM aware of the host
-FPSIMD/SVE handling flow will make such save/restore unnecessary, in
-any case, the affected ZEN bit is already recorded as the TIF_SVE flag,
-so saving it is redundant.
-
-> > In an attempt to preserve some clarity about why and when this is
-> > needed, kvm_fpsimd_flush_cpu_state() is used as a hook for doing
-> > this.  This means that this function needs to be called after
-> > exiting the vcpu instead of before entry: 
+> I think current 40us is still reasonable, it's about ~3 times per
+> usb microframe (125us) .8000 interrupts per second just covers the microframe rate,
+> which is the shortest interval a interrupt transfer can require service.
 > 
-> I don't understand why the former means the latter?
+> 1ms interrupt interval is too long. In the worst case ~8 microframes could pass
+> before the driver is aware of a error it needs to take care of.
+> USB 3.1 devices can transfer 6 burst of 16 max sized packets (6 x 16 x 2014) bytes
+> per microframe.
+> 
+> closer to 125us could probably work as well, but unless we are fixing some issue or
+> getting some other bigger benefit out of it I don't think it's worth changing it
+> just to see if it breaks stuff.
 
-I preferred to keep sve_flush_cpu_state() as the "invalidate any SVE
-context cached in the CPU" notification, but if we handle CPACR here
-then we need to do this after running the vcpu -- because the hyp
-switch code will corrupt the trap state anyway in the VHE case, as a
-side effect of disabling traps on vcpu exit.
-
-Alternatively, the hyp trap disable code could be changed to actually
-_enable_ SVE traps in the VHE case, but I thought this was both
-confusing and tends to hide the real rationale.
+I agree - my patch will just stick with the current default as the fallback
+value if no device property is submitted.
 
 > 
-> > this patch moves the call
-> > as appropriate.  As a side-effect, this will avoid the call if vcpu
-> > entry is shortcircuited by a signal etc.
-> > 
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > ---
-> >  arch/arm64/kernel/fpsimd.c | 2 ++
-> >  virt/kvm/arm/arm.c         | 6 +++---
-> >  2 files changed, 5 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> > index 3dc8058..3b135eb 100644
-> > --- a/arch/arm64/kernel/fpsimd.c
-> > +++ b/arch/arm64/kernel/fpsimd.c
-> > @@ -1083,6 +1083,8 @@ void sve_flush_cpu_state(void)
-> >  
-> >  	if (last->st && last->sve_in_use)
-> >  		fpsimd_flush_cpu_state();
-> > +
-> > +	sve_user_disable();
-> >  }
-> >  #endif /* CONFIG_ARM64_SVE */
-> >  
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index 772bf74..554b157 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -651,9 +651,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  		 */
-> >  		preempt_disable();
-> >  
-> > -		/* Flush FP/SIMD state that can't survive guest entry/exit */
-> > -		kvm_fpsimd_flush_cpu_state();
-> > -
-> >  		kvm_pmu_flush_hwstate(vcpu);
-> >  
-> >  		local_irq_disable();
-> > @@ -754,6 +751,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  		guest_exit();
-> >  		trace_kvm_exit(ret, kvm_vcpu_trap_get_class(vcpu), *vcpu_pc(vcpu));
-> >  
-> > +		/* Flush FP/SIMD state that can't survive guest entry/exit */
-> > +		kvm_fpsimd_flush_cpu_state();
-> > +
-> 
-> Could this be done in kvm_arch_vcpu_put() instead?
-
-I think so -- I didn't want to take the VHE optimisation series into
-account yet so I wasn't tracking a moving target, but I think this would
-fit naturally there.
+> Thanks
+> -Mathias
+> -- 
+> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at? http://vger.kernel.org/majordomo-info.html
 
 
-All of this is fairly confusing, so if there is a way to make it
-clearer, I'd be happy to pick it up...
-
-Cheers
----Dave
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
