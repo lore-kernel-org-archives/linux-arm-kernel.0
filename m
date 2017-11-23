@@ -1,105 +1,339 @@
-From: glider@google.com (Alexander Potapenko)
-Date: Thu, 23 Nov 2017 14:42:44 +0100
-Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
-In-Reply-To: <CAKwvOdkDz1yRo=Skt_mWxs0uucK+adXx8kFQksMbTE3ofnpUMQ@mail.gmail.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-19-samitolvanen@google.com>
- <20171116115810.GH9361@arm.com>
- <20171116161731.GA94341@samitolvanen.mtv.corp.google.com>
- <20171116163054.kcsdsomr7u2mqql2@hirez.programming.kicks-ass.net>
- <CAKwvOdkV_g0XAbGM+nF2zt=2+tHLLcj=pbSxRDd2HMbrtU3cZg@mail.gmail.com>
- <20171116165922.llrojrvomuihabrt@hirez.programming.kicks-ass.net>
- <CAKwvOd=k=iVQvWmzP1E3XHUCYLoJgx+F9zoPuE+R2oaw_ePUVA@mail.gmail.com>
- <20171116173417.nqsh5dpu65uj7b5s@hirez.programming.kicks-ass.net>
- <20171116174830.GX3624@linux.vnet.ibm.com>
- <CAKwvOdkDz1yRo=Skt_mWxs0uucK+adXx8kFQksMbTE3ofnpUMQ@mail.gmail.com>
-Message-ID: <CAG_fn=UsmiQCXmdbED_SxgBj=xR0u0_mPS2+EhF0Me1ACBfWzw@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 23 Nov 2017 14:02:29 +0000
+Subject: Fwd: [PATCH] arm: ensure symbol is a thumb symbol in new binutils
+In-Reply-To: <CAHmME9qBxgDV-HGeqj75ohr=4Bf+TD73PcC0DUqTRh5PTOKyhQ@mail.gmail.com>
+References: <20171121172751.29545-1-Jason@zx2c4.com>
+ <20171121173857.GJ31757@n2100.armlinux.org.uk>
+ <CAHmME9quDFbdOR9hKRz-Px=Mh3FvYEyhVrs4V_+JT+GjDajMrA@mail.gmail.com>
+ <20171121174942.GK31757@n2100.armlinux.org.uk>
+ <CAHmME9oMTNJFnOwfhu26QSRSP92Axbc-+v9cCPsTKxekZvGvxg@mail.gmail.com>
+ <20171123103518.GL31757@n2100.armlinux.org.uk>
+ <CAHmME9qBxgDV-HGeqj75ohr=4Bf+TD73PcC0DUqTRh5PTOKyhQ@mail.gmail.com>
+Message-ID: <20171123140228.GP31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 7:16 PM, Nick Desaulniers
-<ndesaulniers@google.com> wrote:
-> On Thu, Nov 16, 2017 at 9:48 AM, Paul E. McKenney
-> <paulmck@linux.vnet.ibm.com> wrote:
->> On Thu, Nov 16, 2017 at 06:34:17PM +0100, Peter Zijlstra wrote:
->>> On Thu, Nov 16, 2017 at 09:16:49AM -0800, Nick Desaulniers wrote:
->>> > On Thu, Nov 16, 2017 at 8:59 AM, Peter Zijlstra <peterz@infradead.org> wrote:
->>> > > On Thu, Nov 16, 2017 at 08:50:41AM -0800, Nick Desaulniers wrote:
->>> > >> On Thu, Nov 16, 2017 at 8:30 AM, Peter Zijlstra <peterz@infradead.org> wrote:
->>> > >>
->>> > >> > Ideally we'd get the toolchain people to commit to supporting the kernel
->>> > >> > memory model along side the C11 one. That would help a ton.
->>> > >>
->>> > >> Does anyone from the kernel side participate in the C standardization process?
->>> > >
->>> > > Yes, Paul McKenney and Will Deacon. Doesn't mean these two can still be
->>> > > reconciled though. From what I understand C11 (and onwards) are
->>> > > incompatible with the kernel model on a number of subtle points.
->>> >
->>> > It would be good to have these incompatibilities written down, then
->>> > for the sake of argument, they can be cited both for discussions on
->>> > LKML and in the C standardization process.  For example, a running
->>> > list in Documentation/ or something would make it so that anyone could
->>> > understand and cite current issues with the latest C standard.
->>>
->>> Will should be able to produce this list; I know he's done before, I
->>> just can't find it -- my Google-foo isn't strong today.
->>
->> Here you go:
->>
->> http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0124r4.html
->
-> Great, thanks! Will take some time to digest, but happy to refer
-> others to this important work in the future.
->
-> I wonder if we have anything like a case study that shows specifically
-> how a compiler generated a subtle bug due to specifics of the memory
-> model, like a "if you do this, here's the problematic code that will
-> get generated, and why it's problematic due to the memory model."
-> That may be a good way to raise issues with toolchain developers with
-> concrete and actionable examples.
->
->>> > I don't understand why we'd block patches for enabling experimental
->>> > features.  We've been running this patch-set on actual devices for
->>> > months and would love to provide them to the community for further
->>> > testing.  If bugs are found, then there's more evidence to bring to
->>> > the C standards committee.  Otherwise we're shutting down feature
->>> > development for the sake of potential bugs in a C standard we're not
->>> > even using.
->>>
->>> So the problem is that its very very hard (and painful) to find these
->>> bugs. Getting the tools people to comment on these specific
->>> optimizations would really help lots.
->
-> No doubt; I do not disagree with you.  Kernel developers have very
-> important use cases for the language.
->
-> But the core point I'm trying to make is "do we need to block this
-> patch set until issues with the C standards body in regards to the
-> kernels memory model are resolved?"  I would hope the two are
-> orthogonal and that we'd take them and then test them even more
-> extensively than the developer has in order to find out.
->
->> It would be good to get something similar to LKMM into KTSAN, for
->> example.  There would probably be a few differences due to efficiency
->> concerns, but closer is better than less close.  ;-)
->
-> + glider, who may be able to comment on the state of KTSAN.
-We haven't touched KTSAN for a while, so it's probably broken right now.
-It should be possible to revive it, the question is how much code will
-need to be annotated to prevent the tool from overwhelming the
-developers with reports.
-+Dima and Andrey, who should know better.
+On Thu, Nov 23, 2017 at 11:47:56AM +0100, Jason A. Donenfeld wrote:
+> Hello Nick & Binutils developers,
+> 
+> It would appear that recent changes in the binutils assembler (perhaps
+> 52a86f843b6dee1de9977293da9786649b146b05? perhaps not?) have broken
+> the kernel when compiled in thumb2 mode. We currently do not have a
+> way of working around your breaking changes without adding additional
+> runtime instructions, which isn't acceptable for us. Details are
+> included in the thread below.
 
+Hi Nick,
+
+I have to ask why it was thought a good idea to change the behaviour
+of the assembler's "adr" pseudo-instruction after it's had the existing
+behaviour for such a long time.
+
+I see in the bug report https://sourceware.org/bugzilla/show_bug.cgi?id=21458
+that guidance was sort from ARM Ltd, but none was forthcoming - which
+implies that there was little technical input to make the change.
+Given that the change has been known to break at least three programs
+(the Linux kernel, libavcodec and openssl), that there's no technical
+reason to make the change, and that it introduces inconsistency in
+the assembler, is there enough reason to get the change at least
+partially removed - restoring the long-standing "adr" behaviour?
+
+The inconsistency is introduced in that "adr" now behaves differently
+depending on whether the symbol is marked as a thumb function (which
+requires an explicit pseudo-op) or not.  This means that either we
+need additional labels that are not marked as a thumb function for use
+with "adr" or we need to mark _every_ symbol in thumb code that is used
+with "adr" with a .thumb_func annotation, including the numeric local
+labels.
+
+This makes it much harder to review patches for projects and ensure
+that they are correct as it means that reviewers now need to do detailed
+in-depth analysis of the code after /any/ patch that uses "adr" has been
+applied.  Given that the failure is will only be seen at runtime, this
+is particularly bad.
+
+> 
+> Thanks,
+> Jason
+> 
+> Forwarded conversation
+> Subject: [PATCH] arm: ensure symbol is a thumb symbol in new binutils
+> ------------------------
+> 
+> From: Jason A. Donenfeld <Jason@zx2c4.com>
+> Date: Tue, Nov 21, 2017 at 6:27 PM
+> To: linux at armlinux.org.uk, linux-arm-kernel at lists.infradead.org
+> Cc: "Jason A. Donenfeld" <Jason@zx2c4.com>, stable at vger.kernel.org
+> 
+> 
+> On older versions of binutils, \sym points to an aligned address. On
+> newer versions of binutils, \sym sometimes points to the unaligned thumb
+> address in mysterious and buggy circumstances. In order to homogenize
+> this behavior, rather than adding 1, we simply OR in 1, so that already
+> unaligned instructions don't change. This fix is required for a
+> pedestrian THUMB2_KERNEL to boot without crashing when built with
+> non-old binutils.
+> 
+> While it works, the downside is that we have to add an `orr` instruction
+> to a fast path. The assembler can't do this at assemble time via "|1"
+> because "invalid operands (.text and *ABS* sections) for `|'", so we're
+> forced to do this. A better solution would be to have consistent
+> binutils behavior, or to have some kind of \sym feature detection that
+> won't turn into a maze of version comparisons. However, it's at the
+> moment unclear how to achieve this.
+> 
+> The rest of this commit message contains all of the relevant
+> information.
+> 
+> My tests concerned these versions:
+>     broken: GNU ld (Gentoo 2.29.1 p3) 2.29.1
+>     working: GNU ld (GNU Binutils for Ubuntu) 2.26.1
+> 
+> These produced the following code:
+> --- broken      2017-11-21 17:44:14.523416082 +0100
+> +++ working     2017-11-21 17:44:44.548461234 +0100
+> @@ -133,7 +133,7 @@
+>   160:  f01a 0ff0       tst.w   sl, #240        ; 0xf0
+>   164:  d111            bne.n   18a <__sys_trace>
+>   166:  f5b7 7fc8       cmp.w   r7, #400        ; 0x190
+> - 16a:  f2af 1e6a       subw    lr, pc, #362    ; 0x16a
+> + 16a:  f2af 1e6b       subw    lr, pc, #363    ; 0x16b
+>   16e:  bf38            it      cc
+>   170:  f858 f027       ldrcc.w pc, [r8, r7, lsl #2]
+>   174:  a902            add     r1, sp, #8
+> 
+> The differing instruction corresponds with this actual line in
+> arch/arm/kernel/entry-common.S:
+>       badr    lr, ret_fast_syscall            @ return address
+> 
+> Running the broken kernel results in a runtime OOPS with:
+>     PC is at ret_fast_syscall+0x4/0x52
+>     LR is at ret_fast_syscall+0x2/0x52
+> 
+> The disassembly of that function for the crashing kernel is:
+> .text:00000000 ret_fast_syscall                        ; CODE XREF:
+> sys_syscall+1C?j
+> .text:00000000                 CPSID           I       ; jumptable
+> 00000840 cases 15,18-376
+> .text:00000002
+> .text:00000002 loc_2                                   ; DATA XREF:
+> sys_syscall-6BA?o
+> .text:00000002                 LDR.W           R2, [R9,#8]
+> .text:00000006                 CMP.W           R2, #0xBF000000
+> 
+> Signed-off-by: Jason A. Donenfeld <Jason@zx2c4.com>
+> Cc: stable at vger.kernel.org
+> ---
+>  arch/arm/include/asm/assembler.h | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index ad301f107dd2..c62a3b6b0a3e 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -194,10 +194,9 @@
+>   */
+>         .irp    c,,eq,ne,cs,cc,mi,pl,vs,vc,hi,ls,ge,lt,gt,le,hs,lo
+>         .macro  badr\c, rd, sym
+> -#ifdef CONFIG_THUMB2_KERNEL
+> -       adr\c   \rd, \sym + 1
+> -#else
+>         adr\c   \rd, \sym
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +       orr\c   \rd, \rd, 1
+>  #endif
+>         .endm
+>         .endr
+> --
+> 2.15.0
+> 
+> 
+> ----------
+> From: Russell King - ARM Linux <linux@armlinux.org.uk>
+> Date: Tue, Nov 21, 2017 at 6:38 PM
+> To: "Jason A. Donenfeld" <Jason@zx2c4.com>, Will Deacon <will.deacon@arm.com>
+> Cc: linux-arm-kernel at lists.infradead.org, lkml at vger.kernel.org,
+> stable at vger.kernel.org
+> 
+> 
+> As it just seems to be a limited range of binutils versions that are
+> affected, I'd rather not impact the kernel fast-paths with extra
+> cycles just because binutils decided to change behaviour.  I'd prefer
+> to inform people about the problem and get them to change to a non-
+> buggy binutils.
+> 
+> This seems to be the second binutils bug that's biting us within the
+> last month... what's going on with binutils QA?
+> 
+>  arch/arm/Makefile        |  7 +++++--
+>  arch/arm/tools/Makefile  |  5 ++++-
+>  arch/arm/tools/toolcheck | 24 ++++++++++++++++++++++++
+>  3 files changed, 33 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
+> index 1cfac5119545..9e70d0435121 100644
+> --- a/arch/arm/Makefile
+> +++ b/arch/arm/Makefile
+> @@ -319,16 +319,19 @@ all:      $(notdir $(KBUILD_IMAGE)) $(KBUILD_DTBS)
+>  archheaders:
+>         $(Q)$(MAKE) $(build)=arch/arm/tools uapi
+> 
+> -archprepare:
+> +archprepare: toolcheck
+>         $(Q)$(MAKE) $(build)=arch/arm/tools kapi
+> 
+> +toolcheck:
+> +       $(Q)$(MAKE) $(build)=arch/arm/tools $@
+> +
+>  # Convert bzImage to zImage
+>  bzImage: zImage
+> 
+>  BOOT_TARGETS   = zImage Image xipImage bootpImage uImage
+>  INSTALL_TARGETS        = zinstall uinstall install
+> 
+> -PHONY += bzImage $(BOOT_TARGETS) $(INSTALL_TARGETS)
+> +PHONY += bzImage $(BOOT_TARGETS) $(INSTALL_TARGETS) toolcheck
+> 
+>  bootpImage uImage: zImage
+>  zImage: Image
+> diff --git a/arch/arm/tools/Makefile b/arch/arm/tools/Makefile
+> index ddb89a7db36f..fa77351ccefd 100644
+> --- a/arch/arm/tools/Makefile
+> +++ b/arch/arm/tools/Makefile
+> @@ -23,12 +23,15 @@ uapi-hdrs-y += $(uapi)/unistd-eabi.h
+> 
+>  targets += $(addprefix ../../../,$(gen-y) $(kapi-hdrs-y) $(uapi-hdrs-y))
+> 
+> -PHONY += kapi uapi
+> +PHONY += kapi uapi toolcheck
+> 
+>  kapi:  $(kapi-hdrs-y) $(gen-y)
+> 
+>  uapi:  $(uapi-hdrs-y)
+> 
+> +toolcheck:
+> +       @$(CONFIG_SHELL) '$(srctree)/$(src)/toolcheck'
+> +
+>  # Create output directory if not already present
+>  _dummy := $(shell [ -d '$(kapi)' ] || mkdir -p '$(kapi)') \
+>            $(shell [ -d '$(uapi)' ] || mkdir -p '$(uapi)')
+> diff --git a/arch/arm/tools/toolcheck b/arch/arm/tools/toolcheck
+> index e69de29bb2d1..97bbeeb691da 100644
+> --- a/arch/arm/tools/toolcheck
+> +++ b/arch/arm/tools/toolcheck
+> @@ -0,0 +1,24 @@
+> +#!/bin/sh -ex
+> +if grep -q 'CONFIG_THUMB2_KERNEL=y' .config; then
+> +   tmp=$(mktemp -d /tmp/binutils-test.XXXXXXXXXX)
+> +   cat <<EOF | $AS $ASFLAGS -o $tmp/test.o
+> +       .syntax unified
+> +       .thumb
+> +       .macro  badr, reg, sym
+> +       adr     \reg, \sym + 1
+> +       .endm
+> +
+> +test:
+> +       mov     r0, #0
+> +       badr    lr, test
+> +EOF
+> +   if ! $OBJDUMP -d $tmp/test.o | grep -q '4:\s*f2af 0e07'; then
+> +      echo "Error: your assembler version produces buggy kernels" >&2
+> +      $AS --version | head -n1 >&2
+> +      rm $tmp/*.o
+> +      rmdir $tmp
+> +      exit 1
+> +   fi
+> +   rm $tmp/*.o
+> +   rmdir $tmp
+> +fi
+> 
+> ----------
+> From: Jason A. Donenfeld <Jason@zx2c4.com>
+> Date: Tue, Nov 21, 2017 at 6:46 PM
+> To: Russell King - ARM Linux <linux@armlinux.org.uk>
+> Cc: Will Deacon <will.deacon@arm.com>,
+> linux-arm-kernel at lists.infradead.org, lkml at vger.kernel.org,
+> stable at vger.kernel.org
+> 
+> 
+> Hi Russell,
+> 
+> This doesn't actually catch the issues. In the buggy binutils, it
+> appears that sometimes adr grabs the right symbol and sometimes it
+> doesn't. I'm not yet able to figure out a minimal condition for it
+> going one way or the other.
+> 
+> Jason
+> 
+> ----------
+> From: Russell King - ARM Linux <linux@armlinux.org.uk>
+> Date: Thu, Nov 23, 2017 at 11:35 AM
+> To: "Jason A. Donenfeld" <Jason@zx2c4.com>
+> Cc: Will Deacon <will.deacon@arm.com>,
+> linux-arm-kernel at lists.infradead.org, lkml at vger.kernel.org,
+> stable at vger.kernel.org
+> 
+> 
+> On Thu, Nov 23, 2017 at 12:34:08AM +0100, Jason A. Donenfeld wrote:
+> > On Tue, Nov 21, 2017 at 6:49 PM, Russell King - ARM Linux
+> > <linux@armlinux.org.uk> wrote:
+> > > What if we locate the "badr" instruction to the same offset - does
+> > > that trigger the binutils bug?  Note that the grep expression will
+> > > need updating...
+> >
+> > Nope, this too does not reproduce it. I'm having a bit of trouble
+> > making a minimal test case to reproduce it. But I can reproduce it
+> > everytime by simply assembling the file in question using that
+> > binutils.
+> 
+> If it's that hard to reproduce it, it makes me wonder if it's being
+> caused by some memory allocation being re-used without full
+> initialisation, and it's reading stale data.
+> 
+> We can't easily build entry-common.o and check it for the problem as the
+> position of the "local_restart" code depends on various configuration
+> options.
+> 
+> I found this URL:
+> 
+> https://fossies.org/diffs/binutils/2.28_vs_2.29/gas/config/tc-arm.c-diff.html
+> 
+> and if you search down to around "line 8358", which is in do_adr(),
+> there is this new code added:
+> 
+>       if (inst.reloc.exp.X_op == O_symbol
+>           && inst.reloc.exp.X_add_symbol != NULL
+>           && S_IS_DEFINED (inst.reloc.exp.X_add_symbol)
+>           && THUMB_IS_FUNC (inst.reloc.exp.X_add_symbol))
+>         inst.reloc.exp.X_add_number += 1;
+> 
+> which would account for the issue you're seeing.
+> 
+> Given that this change breaks openssl, and breaks the kernel, and
+> this behaviour is something that we've come to rely upon in the
+> kernel since T2 was introduced, and there's no way around it without
+> adding additional instructions, I have to ask what the hell binutils
+> people think they are doing changing the behaviour of the assembler
+> in such a gratuitous way, and how they think that users of their
+> crapware are going to be able to write code that assembles correctly
+> on both pre-2.29 assemblers and post-2.29 assemblers.
+> 
+> Sorry, but gratuitous changes like this in the toolchain really
+> annoy me, and just give me more reason to stick with my old known
+> working versions (binutils 2.25, gcc 4.7.4!) rather than move
+> forward and then not know whether bugs are due to crappy toolchains
+> or really something wrong in the program.
+> 
+> binutils people need to realise that what they offer is an interface
+> for converting assembly code into opcodes and if they change the
+> translation of that in a visible way, people are going to get
+> annoyed - just like if we in the kernel change the kernel's user
+> visible API.
+> 
+> IMHO, binutils should have exactly the same rules - if a change causes
+> a regression for a user, the change is wrong and should be reverted.
 
 -- 
-Alexander Potapenko
-Software Engineer
-
-Google Germany GmbH
-Erika-Mann-Stra?e, 33
-80636 M?nchen
-
-Gesch?ftsf?hrer: Paul Manicle, Halimah DeLaine Prado
-Registergericht und -nummer: Hamburg, HRB 86891
-Sitz der Gesellschaft: Hamburg
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
