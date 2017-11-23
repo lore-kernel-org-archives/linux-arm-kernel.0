@@ -1,66 +1,45 @@
-From: sunil.kovvuri@gmail.com (Sunil Kovvuri)
-Date: Thu, 23 Nov 2017 09:49:36 +0530
-Subject: [PATCH net] net: thunderx: Fix TCP/UDP checksum offload for IPv6
- pkts
-In-Reply-To: <1511366238.16595.1.camel@gmail.com>
-References: <20171122123727.23580-1-aleksey.makarov@auriga.com>
- <1511366238.16595.1.camel@gmail.com>
-Message-ID: <CA+sq2Ce+Qx=ouzieFLBQBhyhMMduzvQKu-iV837njnEMuCdWyg@mail.gmail.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 23 Nov 2017 13:40:14 +0800
+Subject: [PATCH] arm64: dts: Hi3660: Fix state id for 'CPU_NAP' state
+Message-ID: <1511415614-9859-1-git-send-email-leo.yan@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 9:27 PM, Eric Dumazet <eric.dumazet@gmail.com> wrote:
-> On Wed, 2017-11-22 at 15:37 +0300, Aleksey Makarov wrote:
->> From: Sunil Goutham <sgoutham@cavium.com>
->>
->> This fixes a previous patch which missed some changes
->> and due to which L3 checksum offload was getting enabled
->> for IPv6 pkts. And HW is dropping these pkts as it assumes
->> the pkt is IPv4 when IP csum offload is set in the SQ
->> descriptor.
->>
->> Fixes: bbbb494fd005 ("net: thunderx: Enable TSO and checksum offloads
->> for ipv6")
->> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
->> Signed-off-by: Aleksey Makarov <aleksey.makarov@auriga.com>
->> ---
->>  drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 3 ++-
->>  1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
->> b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
->> index d4496e9afcdf..184d5bdbe7e0 100644
->> --- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
->> +++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
->> @@ -1355,10 +1355,11 @@ nicvf_sq_add_hdr_subdesc(struct nicvf *nic,
->> struct snd_queue *sq, int qentry,
->>
->>       /* Offload checksum calculation to HW */
->>       if (skb->ip_summed == CHECKSUM_PARTIAL) {
->> -             hdr->csum_l3 = 1; /* Enable IP csum calculation */
->>               hdr->l3_offset = skb_network_offset(skb);
->>               hdr->l4_offset = skb_transport_offset(skb);
->>
->> +             /* Enable IP HDR csum calculation for V4 pkts */
->> +             hdr->csum_l3 = (ip.v4->version == 4) ? 1 : 0;
->
-> Have you tried to set hdr->csum_l3 to 0 regardless of version being 4
-> or 6 ?
->
-> This would remove the need for yet another conditional.
->
-> AFAIK, linux does not offload IPv4 header checksums to NIC, it is not
-> worth the trouble.
+Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
+idle state. From ftrace log we can observe CA73 CPUs can be easily waken
+up from 'CPU_NAP' state but the 'waken up' CPUs doesn't handle anything
+and sleep again; so there have tons of trace events for CA73 CPUs
+entering and exiting idle state.
 
-Looks like I misunderstood the IPSUM netdev feature flag.
-Thanks, will check.
+On Hi3660 CA73 has retention state 'CPU_NAP' for CPU idle, this state we
+set its psci parameter as '0x0000001' and from this parameter it can
+calculate state id is 1. Unfortunately ARM trusted firmware (ARM-TF)
+takes 1 as a invalid value for state id, so the CPU cannot enter idle
+state and directly bail out to kernel.
 
-Sunil.
+This commit changes psci parameter to '0x00000000' for state id = 0;
+this id is accepted by ARM trusted firmware and finally CPU can stay
+properly in 'CPU_NAP' state.
 
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Cc: Vincent Guittot <vincent.guittot@linaro.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Leo Yan <leo.yan@linaro.org>
+---
+ arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+index ab0b95b..5666d29 100644
+--- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
+@@ -147,7 +147,7 @@
+ 
+ 			CPU_NAP: cpu-nap {
+ 				compatible = "arm,idle-state";
+-				arm,psci-suspend-param = <0x0000001>;
++				arm,psci-suspend-param = <0x0000000>;
+ 				entry-latency-us = <7>;
+ 				exit-latency-us = <2>;
+ 				min-residency-us = <15>;
+-- 
+2.7.4
