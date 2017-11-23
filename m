@@ -1,36 +1,59 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 23 Nov 2017 19:01:49 +0900
-Subject: [PATCH] gpio: uniphier: fix mismatch between license text and
- MODULE_LICENSE
-Message-ID: <1511431310-9892-1-git-send-email-yamada.masahiro@socionext.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 23 Nov 2017 11:11:53 +0100
+Subject: [PATCH] dmaengine: at_hdmac: fix potential NULL pointer
+ dereference in atc_prep_dma_interleaved
+In-Reply-To: <20171120142814.GA3315@embeddedor.com>
+References: <20171120142814.GA3315@embeddedor.com>
+Message-ID: <20171123101153.ghjlhdhahvuanwnj@rfolt0960.corp.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The comment block of this file indicates GPL-2.0 "only", while the
-MODULE_LICENSE is GPL-2.0 "or later", as include/linux/module.h
-describes as follows:
+On Mon, Nov 20, 2017 at 08:28:14AM -0600, Gustavo A. R. Silva wrote:
+> _xt_ is being dereferenced before it is null checked, hence there is a
+> potential null pointer dereference.
+> 
+> Fix this by moving the pointer dereference after _xt_ has been null
+> checked.
+> 
+> This issue was detected with the help of Coccinelle.
+> 
+> Fixes: 4483320e241c ("dmaengine: Use Pointer xt after NULL check.")
+> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
+Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
 
-  "GPL"                           [GNU Public License v2 or later]
-  "GPL v2"                        [GNU Public License v2]
+Thanks
 
-I am the author of this driver, and my intention is GPL-2.0 "only".
-
-Fixes: dbe776c2ca54 ("gpio: uniphier: add UniPhier GPIO controller driver")
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/gpio/gpio-uniphier.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/gpio/gpio-uniphier.c b/drivers/gpio/gpio-uniphier.c
-index 016d742..761d827 100644
---- a/drivers/gpio/gpio-uniphier.c
-+++ b/drivers/gpio/gpio-uniphier.c
-@@ -505,4 +505,4 @@ module_platform_driver(uniphier_gpio_driver);
- 
- MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
- MODULE_DESCRIPTION("UniPhier GPIO driver");
--MODULE_LICENSE("GPL");
-+MODULE_LICENSE("GPL v2");
--- 
-2.7.4
+> ---
+>  drivers/dma/at_hdmac.c | 4 +++-
+>  1 file changed, 3 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index fbab271..a861b5b 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -708,7 +708,7 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
+>  			 unsigned long flags)
+>  {
+>  	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+> -	struct data_chunk	*first = xt->sgl;
+> +	struct data_chunk	*first;
+>  	struct at_desc		*desc = NULL;
+>  	size_t			xfer_count;
+>  	unsigned int		dwidth;
+> @@ -720,6 +720,8 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
+>  	if (unlikely(!xt || xt->numf != 1 || !xt->frame_size))
+>  		return NULL;
+>  
+> +	first = xt->sgl;
+> +
+>  	dev_info(chan2dev(chan),
+>  		 "%s: src=%pad, dest=%pad, numf=%d, frame_size=%d, flags=0x%lx\n",
+>  		__func__, &xt->src_start, &xt->dst_start, xt->numf,
+> -- 
+> 2.7.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
