@@ -1,16 +1,74 @@
 From: jan.tuerk@emtrion.com (Jan Tuerk)
-Date: Thu, 23 Nov 2017 13:55:50 +0100
-Subject: [PATCH 0/5] Add basic support for emtrion emCON-MX6 modules
-Message-ID: <20171123125600.41562-1-jan.tuerk@emtrion.com>
+Date: Thu, 23 Nov 2017 13:55:51 +0100
+Subject: [PATCH 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
+In-Reply-To: <20171123125600.41562-1-jan.tuerk@emtrion.com>
+References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
+Message-ID: <20171123125600.41562-2-jan.tuerk@emtrion.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following patch-series adds support for emtrion's emCON-MX6 modules
-with all their dependencies. The focus is based on the emtion standard
-developer-kit configuration. It includes a new vendor-prefix,
-an new simple-panel type, a small modification of the imx6dl.dtsi,
-as well as modifications of the common imx_v6_v8_defconfig.
-And finally the board devicetrees themselves.
+The Emerging Display Technology ETM0700G0BDH6 is exactly
+the same display as the ETM0700G0DH6, exept the pixelclock
+polarity. Therefore re-use the ETM0700G0DH6 modes. It is
+used by default on emtrion Avari based development kits.
+
+Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
+---
+ .../bindings/display/panel/edt,etm0700g0bdh6.txt          |  9 +++++++++
+ drivers/gpu/drm/panel/panel-simple.c                      | 15 +++++++++++++++
+ 2 files changed, 24 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt
+
+diff --git a/Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt b/Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt
+new file mode 100644
+index 000000000000..099e30bfa17f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt
+@@ -0,0 +1,9 @@
++Emerging Display Technology Corp. ETM0700G0BDH6 7.0" WVGA TFT LCD panel
++
++Required properties:
++       compatible: "edt,etm0700g0bdh6"
++
++This panel is exactly the same as ETM0700G0DH6 except the pixelclock polarity.
++
++This binding is compatible with the simple-panel binding, which is specified
++in simple-panel.txt in this directory.
+diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+index b7c4709f7b34..42442034b53e 100644
+--- a/drivers/gpu/drm/panel/panel-simple.c
++++ b/drivers/gpu/drm/panel/panel-simple.c
+@@ -886,6 +886,18 @@ static const struct panel_desc edt_etm0700g0dh6 = {
+        .bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_NEGEDGE,
+ };
+
++static const struct panel_desc edt_etm0700g0bdh6 = {
++       .modes = &edt_etm0700g0dh6_mode,
++       .num_modes = 1,
++       .bpc = 6,
++       .size = {
++               .width = 152,
++               .height = 91,
++       },
++       .bus_format = MEDIA_BUS_FMT_RGB666_1X18,
++       .bus_flags = DRM_BUS_FLAG_DE_HIGH | DRM_BUS_FLAG_PIXDATA_POSEDGE,
++};
++
+ static const struct drm_display_mode foxlink_fl500wvr00_a0t_mode = {
+        .clock = 32260,
+        .hdisplay = 800,
+@@ -2029,6 +2041,9 @@ static const struct of_device_id platform_of_match[] = {
+                .compatible = "edt,etm0700g0dh6",
+                .data = &edt_etm0700g0dh6,
+        }, {
++               .compatible = "edt,etm0700g0bdh6",
++               .data = &edt_etm0700g0bdh6,
++       }, {
+                .compatible = "foxlink,fl500wvr00-a0t",
+                .data = &foxlink_fl500wvr00_a0t,
+        }, {
+--
+2.11.0
 
 
 emtrion GmbH
