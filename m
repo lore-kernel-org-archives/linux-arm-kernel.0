@@ -1,59 +1,93 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 23 Nov 2017 11:11:53 +0100
-Subject: [PATCH] dmaengine: at_hdmac: fix potential NULL pointer
- dereference in atc_prep_dma_interleaved
-In-Reply-To: <20171120142814.GA3315@embeddedor.com>
-References: <20171120142814.GA3315@embeddedor.com>
-Message-ID: <20171123101153.ghjlhdhahvuanwnj@rfolt0960.corp.atmel.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Thu, 23 Nov 2017 11:20:07 +0100
+Subject: [RFC PATCH] kvm: arm64: handle single-step of hyp emulated mmio
+ instructions
+In-Reply-To: <20171122204158.GW28855@cbox>
+References: <20171122170747.12192-1-alex.bennee@linaro.org>
+ <20171122204158.GW28855@cbox>
+Message-ID: <20171123102007.GX28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 08:28:14AM -0600, Gustavo A. R. Silva wrote:
-> _xt_ is being dereferenced before it is null checked, hence there is a
-> potential null pointer dereference.
-> 
-> Fix this by moving the pointer dereference after _xt_ has been null
-> checked.
-> 
-> This issue was detected with the help of Coccinelle.
-> 
-> Fixes: 4483320e241c ("dmaengine: Use Pointer xt after NULL check.")
-> Signed-off-by: Gustavo A. R. Silva <garsilva@embeddedor.com>
-Acked-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+Replying to myself here, because I'm an idiot...
 
-Thanks
+On Wed, Nov 22, 2017 at 09:41:58PM +0100, Christoffer Dall wrote:
 
-> ---
->  drivers/dma/at_hdmac.c | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+[...]
 > 
-> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
-> index fbab271..a861b5b 100644
-> --- a/drivers/dma/at_hdmac.c
-> +++ b/drivers/dma/at_hdmac.c
-> @@ -708,7 +708,7 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
->  			 unsigned long flags)
->  {
->  	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
-> -	struct data_chunk	*first = xt->sgl;
-> +	struct data_chunk	*first;
->  	struct at_desc		*desc = NULL;
->  	size_t			xfer_count;
->  	unsigned int		dwidth;
-> @@ -720,6 +720,8 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
->  	if (unlikely(!xt || xt->numf != 1 || !xt->frame_size))
->  		return NULL;
->  
-> +	first = xt->sgl;
-> +
->  	dev_info(chan2dev(chan),
->  		 "%s: src=%pad, dest=%pad, numf=%d, frame_size=%d, flags=0x%lx\n",
->  		__func__, &xt->src_start, &xt->dst_start, xt->numf,
-> -- 
-> 2.7.4
+> >  	case ARM_EXCEPTION_TRAP:
+> >  		return handle_trap_exceptions(vcpu, run);
+> >  	case ARM_EXCEPTION_HYP_GONE:
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 945e79c641c4..a6712f179b52 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -22,6 +22,7 @@
+> >  #include <asm/kvm_emulate.h>
+> >  #include <asm/kvm_hyp.h>
+> >  #include <asm/fpsimd.h>
+> > +#include <asm/debug-monitors.h>
+> >  
+> >  static bool __hyp_text __fpsimd_enabled_nvhe(void)
+> >  {
+> > @@ -263,7 +264,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+> >  	return true;
+> >  }
+> >  
+> > -static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+> > +/* Skip an instruction which has been emulated. Returns true if
+> > + * execution can continue or false if we need to exit hyp mode because
+> > + * single-step was in effect.
+> > + */
+> > +static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+> >  {
+> >  	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
+> >  
+> > @@ -276,6 +281,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
+> >  	}
+> >  
+> >  	write_sysreg_el2(*vcpu_pc(vcpu), elr);
+> > +
+> > +	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
+> > +		vcpu->arch.fault.esr_el2 =
+> > +			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
+> > +		return false;
+> > +	} else {
+> > +		return true;
+> > +	}
+> >  }
+> >  
+> >  int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> > @@ -336,13 +349,21 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> >  			int ret = __vgic_v2_perform_cpuif_access(vcpu);
+> >  
+> >  			if (ret == 1) {
+> > -				__skip_instr(vcpu);
+> > -				goto again;
+> > +				if (__skip_instr(vcpu))
+> > +					goto again;
+> > +				else
+> > +					exit_code = ARM_EXCEPTION_TRAP;
+> >  			}
+> >  
+> >  			if (ret == -1) {
+> > -				/* Promote an illegal access to an SError */
+> > -				__skip_instr(vcpu);
+> > +				/* Promote an illegal access to an
+> > +				 * SError. If we would be returning
+> > +				 * due to single-step clear the SS
+> > +				 * bit so handle_exit knows what to
+> > +				 * do after dealing with the error.
+> > +				 */
+> > +				if (!__skip_instr(vcpu))
+> > +					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
 > 
+> Could this be overriding guest state if the guest is debugging itself
+> and we don't have (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) ?
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+... this is nonsense, __kvm_skip_intr will check for
+KVM_GUESTDBG_SINGLESTEP, so there's no issue here.
+
+Sorry about the noise.
+-Christoffer
