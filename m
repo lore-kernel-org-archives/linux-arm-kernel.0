@@ -1,121 +1,122 @@
 From: ar@linux.vnet.ibm.com (Andrea Reale)
-Date: Thu, 23 Nov 2017 11:14:11 +0000
-Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory state
- before hotremove
+Date: Thu, 23 Nov 2017 11:14:38 +0000
+Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
+ removed vmemmap mem
 In-Reply-To: <cover.1511433386.git.ar@linux.vnet.ibm.com>
 References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
-Message-ID: <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
+Message-ID: <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
-introduced an assumption whereas when control
-reaches remove_memory the corresponding memory has been already
-offlined. In that case, the acpi_memhotplug was making sure that
-the assumption held.
-This assumption, however, is not necessarily true if offlining
-and removal are not done by the same "controller" (for example,
-when first offlining via sysfs).
+When hot-removing memory we need to free vmemmap memory.
+However, depending on the memory is being removed, it might
+not be always possible to free a full vmemmap page / huge-page
+because part of it might still be used.
 
-Removing this assumption for the generic remove_memory code
-and moving it in the specific acpi_memhotplug code. This is
-a dependency for the software-aided arm64 offlining and removal
-process.
+Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
+hot-remove") introduced a workaround for x86
+hot-remove, by which partially unused areas are filled with
+the 0xFD constant. Full pages are only removed when fully
+filled by 0xFDs.
+
+This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
+the goal of using it in place of 0xFDs. For now, this will be used for
+the arm64 port of memory hot remove, but the idea is to eventually use
+the same mechanism for x86 as well.
 
 Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
+Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
 ---
- drivers/acpi/acpi_memhotplug.c |  2 +-
- include/linux/memory_hotplug.h |  9 ++++++---
- mm/memory_hotplug.c            | 13 +++++++++----
- 3 files changed, 16 insertions(+), 8 deletions(-)
+ include/linux/memblock.h | 12 ++++++++++++
+ mm/memblock.c            | 32 ++++++++++++++++++++++++++++++++
+ 2 files changed, 44 insertions(+)
 
-diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
-index 6b0d3ef..b0126a0 100644
---- a/drivers/acpi/acpi_memhotplug.c
-+++ b/drivers/acpi/acpi_memhotplug.c
-@@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
- 			nid = memory_add_physaddr_to_nid(info->start_addr);
+diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+index bae11c7..0daec05 100644
+--- a/include/linux/memblock.h
++++ b/include/linux/memblock.h
+@@ -26,6 +26,9 @@ enum {
+ 	MEMBLOCK_HOTPLUG	= 0x1,	/* hotpluggable region */
+ 	MEMBLOCK_MIRROR		= 0x2,	/* mirrored region */
+ 	MEMBLOCK_NOMAP		= 0x4,	/* don't add to kernel direct mapping */
++#ifdef CONFIG_MEMORY_HOTREMOVE
++	MEMBLOCK_UNUSED_VMEMMAP	= 0x8,  /* Mark VMEMAP blocks as dirty */
++#endif
+ };
  
- 		acpi_unbind_memory_blocks(info);
--		remove_memory(nid, info->start_addr, info->length);
-+		BUG_ON(remove_memory(nid, info->start_addr, info->length));
- 		list_del(&info->list);
- 		kfree(info);
- 	}
-diff --git a/include/linux/memory_hotplug.h b/include/linux/memory_hotplug.h
-index 58e110a..1a9c7b2 100644
---- a/include/linux/memory_hotplug.h
-+++ b/include/linux/memory_hotplug.h
-@@ -295,7 +295,7 @@ static inline bool movable_node_is_enabled(void)
- extern bool is_mem_section_removable(unsigned long pfn, unsigned long nr_pages);
- extern void try_offline_node(int nid);
- extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
--extern void remove_memory(int nid, u64 start, u64 size);
-+extern int remove_memory(int nid, u64 start, u64 size);
+ struct memblock_region {
+@@ -90,6 +93,10 @@ int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+ int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
+ int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
+ ulong choose_memblock_flags(void);
++#ifdef CONFIG_MEMORY_HOTREMOVE
++int memblock_mark_unused_vmemmap(phys_addr_t base, phys_addr_t size);
++int memblock_clear_unused_vmemmap(phys_addr_t base, phys_addr_t size);
++#endif
  
- #else
- static inline bool is_mem_section_removable(unsigned long pfn,
-@@ -311,7 +311,10 @@ static inline int offline_pages(unsigned long start_pfn, unsigned long nr_pages)
- 	return -EINVAL;
+ /* Low level functions */
+ int memblock_add_range(struct memblock_type *type,
+@@ -182,6 +189,11 @@ static inline bool memblock_is_nomap(struct memblock_region *m)
+ 	return m->flags & MEMBLOCK_NOMAP;
  }
  
--static inline void remove_memory(int nid, u64 start, u64 size) {}
-+static inline int remove_memory(int nid, u64 start, u64 size)
++#ifdef CONFIG_MEMORY_HOTREMOVE
++bool memblock_is_vmemmap_unused_range(struct memblock_type *mt,
++		phys_addr_t start, phys_addr_t end);
++#endif
++
+ #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+ int memblock_search_pfn_nid(unsigned long pfn, unsigned long *start_pfn,
+ 			    unsigned long  *end_pfn);
+diff --git a/mm/memblock.c b/mm/memblock.c
+index 9120578..30d5aa4 100644
+--- a/mm/memblock.c
++++ b/mm/memblock.c
+@@ -809,6 +809,18 @@ int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
+ 	return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
+ }
+ 
++#ifdef CONFIG_MEMORY_HOTREMOVE
++int __init_memblock memblock_mark_unused_vmemmap(phys_addr_t base,
++		phys_addr_t size)
 +{
-+	return -EINVAL;
++	return memblock_setclr_flag(base, size, 1, MEMBLOCK_UNUSED_VMEMMAP);
 +}
- #endif /* CONFIG_MEMORY_HOTREMOVE */
- 
- extern int walk_memory_range(unsigned long start_pfn, unsigned long end_pfn,
-@@ -323,7 +326,7 @@ extern void move_pfn_range_to_zone(struct zone *zone, unsigned long start_pfn,
- 		unsigned long nr_pages);
- extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
- extern bool is_memblock_offlined(struct memory_block *mem);
--extern void remove_memory(int nid, u64 start, u64 size);
-+extern int remove_memory(int nid, u64 start, u64 size);
- extern int sparse_add_one_section(struct pglist_data *pgdat, unsigned long start_pfn);
- extern void sparse_remove_one_section(struct zone *zone, struct mem_section *ms,
- 		unsigned long map_offset);
-diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
-index d4b5f29..d5f15af 100644
---- a/mm/memory_hotplug.c
-+++ b/mm/memory_hotplug.c
-@@ -1892,7 +1892,7 @@ EXPORT_SYMBOL(try_offline_node);
-  * and online/offline operations before this call, as required by
-  * try_offline_node().
-  */
--void __ref remove_memory(int nid, u64 start, u64 size)
-+int __ref remove_memory(int nid, u64 start, u64 size)
- {
- 	int ret;
- 
-@@ -1908,18 +1908,23 @@ void __ref remove_memory(int nid, u64 start, u64 size)
- 	ret = walk_memory_range(PFN_DOWN(start), PFN_UP(start + size - 1), NULL,
- 				check_memblock_offlined_cb);
- 	if (ret)
--		BUG();
-+		goto end_remove;
-+
-+	ret = arch_remove_memory(start, size);
-+
-+	if (ret)
-+		goto end_remove;
- 
- 	/* remove memmap entry */
- 	firmware_map_remove(start, start + size, "System RAM");
- 	memblock_free(start, size);
- 	memblock_remove(start, size);
- 
--	arch_remove_memory(start, size);
--
- 	try_offline_node(nid);
- 
-+end_remove:
- 	mem_hotplug_done();
-+	return ret;
++int __init_memblock memblock_clear_unused_vmemmap(phys_addr_t base,
++		phys_addr_t size)
++{
++	return memblock_setclr_flag(base, size, 0, MEMBLOCK_UNUSED_VMEMMAP);
++}
++#endif
+ /**
+  * __next_reserved_mem_region - next function for for_each_reserved_region()
+  * @idx: pointer to u64 loop variable
+@@ -1696,6 +1708,26 @@ void __init_memblock memblock_trim_memory(phys_addr_t align)
+ 	}
  }
- EXPORT_SYMBOL_GPL(remove_memory);
- #endif /* CONFIG_MEMORY_HOTREMOVE */
+ 
++#ifdef CONFIG_MEMORY_HOTREMOVE
++bool __init_memblock memblock_is_vmemmap_unused_range(struct memblock_type *mt,
++		phys_addr_t start, phys_addr_t end)
++{
++	u64 i;
++	struct memblock_region *r;
++
++	i = memblock_search(mt, start);
++	r = &(mt->regions[i]);
++	while (r->base < end) {
++		if (!(r->flags & MEMBLOCK_UNUSED_VMEMMAP))
++			return 0;
++
++		r = &(memblock.memory.regions[++i]);
++	}
++
++	return 1;
++}
++#endif
++
+ void __init_memblock memblock_set_current_limit(phys_addr_t limit)
+ {
+ 	memblock.current_limit = limit;
 -- 
 2.7.4
