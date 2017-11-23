@@ -1,52 +1,45 @@
-From: aleksey.makarov@auriga.com (Aleksey Makarov)
-Date: Thu, 23 Nov 2017 22:34:31 +0300
-Subject: [PATCH net v3] net: thunderx: Fix TCP/UDP checksum offload for IPv6
- pkts
-In-Reply-To: <20171123193014.6632-1-aleksey.makarov@auriga.com>
-References: <20171123193014.6632-1-aleksey.makarov@auriga.com>
-Message-ID: <20171123193432.6925-1-aleksey.makarov@auriga.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Thu, 23 Nov 2017 11:40:21 -0800
+Subject: mainline boot: 8 passed 1 failed (mainline/v4.14)
+In-Reply-To: <CAK8P3a1OWob9We9zfvhBRN=fQYsw+nkZpqMJ9z6Q_A-N9_V3rQ@mail.gmail.com>
+References: <5a16144d.0be9620a.4490d.4375@mx.google.com>
+ <CAK8P3a1OWob9We9zfvhBRN=fQYsw+nkZpqMJ9z6Q_A-N9_V3rQ@mail.gmail.com>
+Message-ID: <CAOesGMgdqNrZbF5dOEdHKmuNVZiiFoV0_ipsPBi5HkGZUgYm_g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+On Thu, Nov 23, 2017 at 1:49 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thu, Nov 23, 2017 at 1:20 AM, Olof's autobooter <build@lixom.net> wrote:
+>>
+>> Full logs are available at http://arm-soc.lixom.net/bootlogs/mainline/v4.14/
+>>
+>> Failed boards:
+>>
+>>     arndale            arm-multi_v7_nosmp_defconfig  :  FAILED          1:15.09
+>>
+>> Successful boards:
+>>     cubie2             arm-multi_v7_nosmp_defconfig  :  warnings        0:46.50
+>> ...
+>>
+>>         Last entries of failed logs below:
+>
+> It looks like Olof's boot bot came back after a time without running
+> any tests, and found
+> a regression on Arndale when running with CONFIG_SMP disabled. cubie2 did not
+> run into the same problem.
+>
+> The backtrace looks a bit suspicous. I can see __switch_to() calling
+> the notifiers, which would be vfp_notifier_block and contextidr_notifier_block
+> on both those machines.
 
-Don't offload IP header checksum to NIC.
+I was doing a trial run with just a few boards, it's a bit premature
+to claim it's back. I didn't mean for the email to go out.
 
-This fixes a previous patch which enabled checksum offloading
-for both IPv4 and IPv6 packets.  So L3 checksum offload was
-getting enabled for IPv6 pkts.  And HW is dropping these pkts
-as it assumes the pkt is IPv4 when IP csum offload is set
-in the SQ descriptor.
+Looks like kernelci doesn't cover CONFIG_SMP=n boots, so I guess this
+might be a new issue.
 
-Fixes:  3a9024f52c2e ("net: thunderx: Enable TSO and checksum offloads for ipv6")
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-Signed-off-by: Aleksey Makarov <aleksey.makarov@auriga.com>
-Reviewed-by: Eric Dumazet <edumazet@google.com>
----
- drivers/net/ethernet/cavium/thunder/nicvf_queues.c | 1 -
- 1 file changed, 1 deletion(-)
-
-v3:
-- fix the Fixes: tag (David Miller)
-- add Reviewed-by Eric Dumazet
-
-v2: https://lkml.kernel.org/r/20171123144158.26111-1-aleksey.makarov at auriga.com
-- don't enable checksum offloading both for IPv4 and IPv6 (Eric Dumazet)
-
-v1: https://lkml.kernel.org/r/20171122123727.23580-1-aleksey.makarov at auriga.com
+I haven't automated the new setup yet, so this was a one-off. I'll
+bisect it over the weekend.
 
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-index d4496e9afcdf..8b2c31e2a2b0 100644
---- a/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-+++ b/drivers/net/ethernet/cavium/thunder/nicvf_queues.c
-@@ -1355,7 +1355,6 @@ nicvf_sq_add_hdr_subdesc(struct nicvf *nic, struct snd_queue *sq, int qentry,
- 
- 	/* Offload checksum calculation to HW */
- 	if (skb->ip_summed == CHECKSUM_PARTIAL) {
--		hdr->csum_l3 = 1; /* Enable IP csum calculation */
- 		hdr->l3_offset = skb_network_offset(skb);
- 		hdr->l4_offset = skb_transport_offset(skb);
- 
--- 
-2.15.0
+-Olof
