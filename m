@@ -1,65 +1,83 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 23 Nov 2017 16:36:37 +0100
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171123150439.GB18754@mellanox.com>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <20171123150439.GB18754@mellanox.com>
-Message-ID: <20171123153637.kbqcd2jsek4ybeic@piout.net>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Thu, 23 Nov 2017 17:02:58 +0100
+Subject: [PATCH v2 0/5] Memory hotplug support for arm64 - complete
+ patchset v2
+In-Reply-To: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+Message-ID: <20171123160258.xmw5lxnjfch2dxfw@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/2017 at 08:04:39 -0700, Jason Gunthorpe wrote:
-> On Thu, Nov 23, 2017 at 10:54:56AM +0100, Alexandre Belloni wrote:
-> 
-> > So I'm discovering that this patch made it upstream silently. While it
-> > somewhat solves the issue for some RTCs, it is not a proper solution for
-> > most.
-> 
-> It was cc'd all the right lists?
-> 
+On Thu 23-11-17 11:13:35, Andrea Reale wrote:
+> Hi all,
 
-It wasn't sent to the RTC ML but that's fine.
+Hi,
 
-> > With this patch, set_offset_nsec will be hardcoded in the driver and
-> > this basically work for the mc146818 but many RTCs are connected on a
-> > slow bus (let's say i2c) and that bus may have various latencies
-> > depending on the platform so the value actually depends on the platform
-> > rather than on the RTC itself.
 > 
-> The intention of the patch is for the actual RTC driver to set the
-> value to what it needs.
+> this is a second round of patches to introduce memory hotplug and
+> hotremove support for arm64. It builds on the work previously published at
+> [1] and it implements the feedback received in the first round of reviews.
 > 
-> If some RTCs are dealing with variable latency busses then they should
-> do an bus IO to measure their bus latency then tweak their value.
+> The patchset applies and has been tested on commit bebc6082da0a ("Linux
+> 4.14"). 
 > 
-> In any event, having the correct offset for the RTC chip (eg 0.5 vs 0)
-> is a big improvement, even if there are some small I2C latencies.
+> Due to a small regression introduced with commit 8135d8926c08
+> ("mm: memory_hotplug: memory hotremove supports thp migration"), you
+> will need to appy patch [2] first, until the fix is not upstreamed.
 > 
-> > I really think that we should simply consider dropping hctosys,
-> > systohc and update_persistent_clock. Most distributions have been
+> Comments and feedback are gold.
 > 
-> Like Russell has said already, the kernel is the only place that could
-> actually have all the information needed. User space would have to use
-> some kind of trail and error approach to figure out what the offset
-> should be.
-> 
+> [1] https://lkml.org/lkml/2017/4/11/536
+> [2] https://lkml.org/lkml/2017/11/20/902
 
-And I don't see how this is different from doing it in the kernel. You
-currently don't give any feedback loop so the RTC driver doesn't know
-whether it's own offset is correct or not.
-
-> You can't really measure the offset without doing a time set, many
-> embedded RTCs do not hook up interrupts, etc.
+I will try to have a look but I do not expect to understand any of arm64
+specific changes so I will focus on the generic code but it would help a
+_lot_ if the cover letter provided some overview of what has been done
+from a higher level POV. What are the arch pieces and what is the
+generic code missing. A quick glance over patches suggests that
+changelogs for specific patches are modest as well. Could you give us
+more information please? Reviewing hundreds lines of code without
+context is a pain.
+ 
+> Changes v1->v2:
+> - swapper pgtable updated in place on hot add, avoiding unnecessary copy
+> - stop_machine used to updated swapper on hot add, avoiding races
+> - introduced check on offlining state before hot remove
+> - new memblock flag used to mark partially unused vmemmap pages, avoiding
+>   the nasty 0xFD hack used in the prev rev (and in x86 hot remove code)
+> - proper cleaning sequence for p[um]ds,ptes and related TLB management
+> - Removed macros that changed hot remove behavior based on number
+>   of pgtable levels. Now this is hidden in the pgtable traversal macros.
+> - Check on the corner case where P[UM]Ds would have to be split during
+>   hot remove: now this is forbidden.
+> - Minor fixes and refactoring.
 > 
-
-If you don't hook up the interrupt, then all you did is completely
-pointless because you will never be able to read the correct time from
-the RTC, you'll have up to a 1s offset.
-
+> Andrea Reale (4):
+>   mm: memory_hotplug: Remove assumption on memory state before hotremove
+>   mm: memory_hotplug: memblock to track partially removed vmemmap mem
+>   mm: memory_hotplug: Add memory hotremove probe device
+>   mm: memory-hotplug: Add memory hot remove support for arm64
+> 
+> Maciej Bielski (1):
+>   mm: memory_hotplug: Memory hotplug (add) support for arm64
+> 
+>  arch/arm64/Kconfig             |  15 +
+>  arch/arm64/configs/defconfig   |   2 +
+>  arch/arm64/include/asm/mmu.h   |   7 +
+>  arch/arm64/mm/init.c           | 116 ++++++++
+>  arch/arm64/mm/mmu.c            | 609 ++++++++++++++++++++++++++++++++++++++++-
+>  drivers/acpi/acpi_memhotplug.c |   2 +-
+>  drivers/base/memory.c          |  34 ++-
+>  include/linux/memblock.h       |  12 +
+>  include/linux/memory_hotplug.h |   9 +-
+>  mm/memblock.c                  |  32 +++
+>  mm/memory_hotplug.c            |  13 +-
+>  11 files changed, 835 insertions(+), 16 deletions(-)
+> 
+> -- 
+> 2.7.4
+> 
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Michal Hocko
+SUSE Labs
