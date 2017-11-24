@@ -1,45 +1,40 @@
-From: smueller@chronox.de (Stephan Mueller)
-Date: Fri, 24 Nov 2017 17:04:19 +0100
-Subject: [PATCH v3] crypto: AF_ALG - remove locking in async callback
-In-Reply-To: <20171124073739.GB15597@gondor.apana.org.au>
-References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
- <1966139.WIlnTlQG5u@positron.chronox.de>
- <20171124073739.GB15597@gondor.apana.org.au>
-Message-ID: <12422115.UWn9hbrTTi@tauon.chronox.de>
+From: javierm@redhat.com (Javier Martinez Canillas)
+Date: Fri, 24 Nov 2017 17:27:47 +0100
+Subject: [RESEND PATCH 1/4] ARM: dts: efm32: Add generic compatible string for
+ I2C EEPROM
+Message-ID: <20171124162750.18756-1-javierm@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 24. November 2017, 08:37:39 CET schrieb Herbert Xu:
+The at24 driver allows to register I2C EEPROM chips using different vendor
+and devices, but the I2C subsystem does not take the vendor into account
+when matching using the I2C table since it only has device entries.
 
-Hi Herbert,
+But when matching using an OF table, both the vendor and device has to be
+taken into account so the driver defines only a set of compatible strings
+using the "atmel" vendor as a generic fallback for compatible I2C devices.
 
-> On Fri, Nov 10, 2017 at 01:20:55PM +0100, Stephan M?ller wrote:
-> > The code paths protected by the socket-lock do not use or modify the
-> > socket in a non-atomic fashion. The actions pertaining the socket do not
-> > even need to be handled as an atomic operation. Thus, the socket-lock
-> > can be safely ignored.
-> > 
-> > This fixes a bug regarding scheduling in atomic as the callback function
-> > may be invoked in interrupt context.
-> > 
-> > In addition, the sock_hold is moved before the AIO encrypt/decrypt
-> > operation to ensure that the socket is always present. This avoids a
-> > tiny race window where the socket is unprotected and yet used by the AIO
-> > operation.
-> > 
-> > Finally, the release of resources for a crypto operation is moved into a
-> > common function of af_alg_free_resources.
-> > 
-> > Fixes: e870456d8e7c8 ("crypto: algif_skcipher - overhaul memory
-> > management") Fixes: d887c52d6ae43 ("crypto: algif_aead - overhaul memory
-> > management") Reported-by: Romain Izard <romain.izard.pro@gmail.com>
-> > Signed-off-by: Stephan Mueller <smueller@chronox.de>
-> 
-> Patch applied.  Thanks.
+So add this generic fallback to the device node compatible string to make
+the device to match the driver using the OF device ID table.
 
-Thanks a lot.
+Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+---
 
-Would it make sense to feed it to stable?
+ arch/arm/boot/dts/efm32gg-dk3750.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Ciao
-Stephan
+diff --git a/arch/arm/boot/dts/efm32gg-dk3750.dts b/arch/arm/boot/dts/efm32gg-dk3750.dts
+index c9f3ea29cf9e..adfa559a488b 100644
+--- a/arch/arm/boot/dts/efm32gg-dk3750.dts
++++ b/arch/arm/boot/dts/efm32gg-dk3750.dts
+@@ -37,7 +37,7 @@
+ 			};
+ 
+ 			eeprom at 50 {
+-				compatible = "microchip,24c02";
++				compatible = "microchip,24c02", "atmel,24c02";
+ 				reg = <0x50>;
+ 				pagesize = <16>;
+ 			};
+-- 
+2.14.3
