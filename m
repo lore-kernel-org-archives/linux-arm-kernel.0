@@ -1,94 +1,147 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Fri, 24 Nov 2017 11:57:45 +0000
-Subject: [PATCH v3 0/2] arm: remove cpu_efficiency
-In-Reply-To: <316592bf-5aa4-3847-79cd-3a26adbb1231@arm.com>
-References: <20171024102718.16113-1-dietmar.eggemann@arm.com>
- <20171024105227.GD20805@n2100.armlinux.org.uk>
- <316592bf-5aa4-3847-79cd-3a26adbb1231@arm.com>
-Message-ID: <d441d28a-5a11-6f46-76e9-06cea47e20a7@arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 24 Nov 2017 11:58:54 +0000
+Subject: [RFC PATCH 1/3] dt-bindings: pinctrl: sunxi: document new generic
+ binding
+In-Reply-To: <CACRpkdbpfkM4odz425+4qyUCF5vqPWBQ=F5Yk7AtJL5SqXghpg@mail.gmail.com>
+References: <20171113012523.2328-1-andre.przywara@arm.com>
+ <20171113012523.2328-2-andre.przywara@arm.com>
+ <CACRpkdbpfkM4odz425+4qyUCF5vqPWBQ=F5Yk7AtJL5SqXghpg@mail.gmail.com>
+Message-ID: <d3bbbcb4-eb91-7f6a-bc0e-a99bb69351c4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2017 03:31 PM, Dietmar Eggemann wrote:
-> Hi Russel,
+Hi Linus,
+
+thanks for having a look!
+
+On 24/11/17 10:19, Linus Walleij wrote:
+> On Mon, Nov 13, 2017 at 2:25 AM, Andre Przywara <andre.przywara@arm.com> wrote:
 > 
-> Thanks for the review!
-> 
-> On 24/10/17 11:52, Russell King - ARM Linux wrote:
->> On Tue, Oct 24, 2017 at 11:27:16AM +0100, Dietmar Eggemann wrote:
->>> With the dt related patches for exynos and renesas now in the
->>> appropriated for-next branches for v4.15 there are no Cortex-A15/A7 arm
->>> big.LITTLE systems left relying on the 'cpu_efficiency/clock-frequency
->>> dt property' based solution anymore.
+>> So far all the Allwinner pinctrl drivers provided a table in the
+>> kernel to describe all the pins and the link between the pinctrl functions
+>> names (strings) and their respective mux values (register values).
 >>
->> This is way too early to remove support for something that has been
->> in place since 2012.  As you've just shown, people are using it with
->> DT files today.  We don't know how long people will persist using
->> older files, and we don't know whether there are DT files out in the
->> wild that we don't know about.
+>> Extend the binding to put those mappings in the DT, so that any SoC can
+>> describe its pinctrl and GPIO data fully there instead of relying on
+>> tables.
+>> This uses a generic compatible name, to be prepended with an SoC
+>> specific name in the node.
+>>
+>> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> (...)
 > 
-> Understood. But do we really care about out of tree dt files?
+> I definately want feedback from Maxime before I do anything with
+> this patch series.
 > 
-> In case the mentioned exynos and renesas Cortex-A15/A7 platforms change
-> to using 'capacity-dmips-mhz' in v4.15 there shouldn't be any
-> Cortex-A15/A7 platforms in mainline left using the cpu_efficiency
-> solution anymore.
+>> +** Generic pinctrl binding
+>> +The above binding requires knowledge of the actual mux setting values for
+>> +each supported SoC in the code parsing the DT (for instance the kernel).
+>> +The generic binding puts this information in the DT. It uses the
+>> +"allwinner,sunxi-pinctrl" compatible, in addition to some SoC specific string.
+>> +It extends the above described binding as follows:
+>> +Required properties:
+>> +- allwinner,gpio-pins: An array of 32-bit numbers to denote the number of
+>> +  implemented pins per pin controller port. Non-implemented ports can specify
+>> +  0 here. There will be as many ports as this array has elements.
 > 
->> Our general rule is that we maintain compatibility for older DT.
+> I don't understand what this adds that gpio-ranges does not already
+> provide.
+> Documentation/devicetree/bindings/gpio/gpio.txt
+> at the end of the file.
+
+Ah, thanks for the pointer, will try to see if that fits in here.
+Although here (despite my clumsy naming) I think this is more about the
+"pinmux" pins than the GPIOs. I am not sure if it's just my
+understanding or if on Allwinner we just happen to have every pinmux pin
+being a GPIO pin as well, so the distinction between the two isn't so clear.
+
+> These ranges exist exactly to map pin controller pins in a pin controller
+> to GPIO lines in a gpiochip.
+
+Which makes it a bit more confusing because we have the pinctrl and GPIO
+controller drivers combined in one file.
+
+>> +- allwinner,irq-pin-map: Contains a number of IRQ port maps, describing the
+>> +  relationship between interrupt banks and GPIO pins. Each map has six 32-bit
+>> +  members:
+>> +  <[IRQ port] [1st IRQ pin] [GPIO port] [1st GPIO pin] [mux value] [length]>
+>> +  This maps the first [length] IRQ pins starting with [IRQ port]:[1st IRQ pin]
+>> +  to [GPIO port]:[1st GPIO pin], all using [mux value] to select the IRQ
+>> +  functionality.
 > 
-> OK.
+> We have recently added GPIO "bank" awareness into gpiolib
+> via Thierry Reding's patches, so a gpiochip can use the generic
+> GPIOLIB_IRQCHIP and specify multiple IRQ parents with a map.
 > 
->> NAK.
+> Please see if you can use this instead.
 
-Morten reminded me that the per-cpu capacity functionality for
-heterogeneous systems (different values than the default 1024 
-(SCHED_CAPACITY_SCALE)) has been broken since v4.4 (Jan 2016) due to 
-8cd5601c5060 "sched/fair: Convert arch_scale_cpu_capacity() from weak 
-function to #define".
+Thanks for the hint, will have a look.
 
-So even people had cpu clock-frequency specified in their dt for their
-Cortex-A15/A7 arm platforms, they didn't noticed (or cared) that the
-task scheduler sees all cpus with the capacity of 1024 rather than
-different values for the A15's and A7's.
+> If any of this should be expressed in the DT bindings it should
+> be genericized and not use any "allwinner,*" prefixes, and it
+> should preferably just be hard-coded in the driver and switched
+> in from the compatible string IMO.
 
-As an example, a v4.3 TC2 (w/ 'clock-frequency = <1000000000>' added for 
-A15 and ,clock-frequency = <800000000>, added for a A7) had the 
-following cpu capacity values
-The log snippet (for cpu0: A15) comes from sched_domain_debug_one() 
-[kernel/sched/core.c] which appears if scheduler debugging is enabled:
+I agree, this allwinner prefix was just a first shot for the RFC.
 
-   ...
-   CPU0 attaching sched-domain:
-    domain 0: span 0-1 level MC
-     groups: 0 (cpu_capacity = 1441) 1 (cpu_capacity = 1441)
-     domain 1: span 0-4 level DIE
-      groups: 0-1 (cpu_capacity = 2882) 2-4 (cpu_capacity = 1818)
-   ...
+The reason for this map is that older Allwinner SoCs have *one* IRQ pin
+bank, which contains pins from *multiple* GPIO banks. The A10/A20 for
+instance maps the first 22 IRQ pins to Port H0-H21, the remaining 10 IRQ
+pins are on port I10-I19. This irq-pin-map is an admittedly
+over-engineered attempt to express this is a generic way, trying to
+embrace the DT way of mapping things, like we do with the "ranges"
+property, for instance.
 
-   So A15 has 1441 and A7 has 606 as cpu capacity.
+Recent SoCs just have some GPIO banks which map directly to IRQ pin
+banks (on the A64 ports B, G and H map to IRQ bank 0, 1 and 2), so this
+is not really needed here. My first version indeed just had a simpler
+list to express this.
 
-Whereas with v4.4 it switched back to:
+This series aims to build on top of the existing driver as much as
+possible, so some things are not as elegant as they could be.
 
-  ...
-  CPU0 attaching sched-domain:
-   domain 0: span 0-1 level MC
-    groups: 0 1
-    domain 1: span 0-4 level DIE
-     groups: 0-1 (cpu_capacity = 2048) 2-4 (cpu_capacity = 3072)
-  ...
+>> +Optional properties:
+>> +- allwinner,port-base: The number of GPIO ports to skip at the beginning.
+>> +- allwinner,irq-bank-base: The number of IRQ banks to skip at the beginning.
+> 
+> I don't understand this. It looks hacky. Can you elaborate why this
+> is needed?
 
-    So A15 and A7 have 1024 (SCHED_CAPACITY_SCALE).
+It is indeed hacky, and just maps the irq_bank_base member of struct
+sunxi_pinctrl_desc into the DT. My understanding is that the A33 skips
+the first interrupt bank in the register map, for whatever reason. Might
+just be an implementation oddity.
+I am just wondering if this could be expressed with the irq-pin-map
+above. Or if it's more or less an A33 bug, we could derive this from the
+compatible string.
 
+>> +- allwinner,irq-read-needs-mux: Specifies that reading the line level of
+>> +  a pin configured as an IRQ pin is not possible. A driver needs to switch
+>> +  to the GPIO-in function to be able to read the level.
+> 
+> I guess it is a bool flag?
 
-So maybe the requirement to maintain compatibility for older DT's is
-less important in this specific case and the argument that we can get
-rid of a lot of code and make arm/arm64 consistent in this area is more
-important than backward compatibility?
+Right, should mention that.
 
-BTW, the missing bit, the #define of arch_scale_cpu_capacity, is only
-provided with 552c4653bf89 "arm: wire cpu-invariant accounting support
-up to the task scheduler" which is currently queued for v4.15-rc1.
+>> +Required properties for subnodes:
+>> +- pinmux: An array of mux values to write into the respective MMIO register
+>> +  bits for this pin when selecting the function. If this array has less
+>> +  elements than pins, the *last* value will be used for all pins beyond that.
+>> +  This allows to use a single element for the (likely) case all pins use the
+>> +  same mux value.
+> 
+> This is a standard bindings so I don't have much against it. But I
+> need Maxime's input here, I think we should keep Allwinner consistent
+> across SoCs.
 
--- Dietmar
+I can understand that, and that's why I choose the new binding to just
+be an extension of what we have already.
 
-[...]
+I am happy to have a discussion on that in general - actually this was
+one aim of this series. See the other thread.
+
+I might even write some summary on how it works today and why I believe
+it should be improved, I just wasn't sure that was actually needed.
+
+Cheers,
+Andre.
