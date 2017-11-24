@@ -1,74 +1,142 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Nov 2017 10:30:42 +0100
-Subject: [PATCH 2/5] gpio: pca953x: Name the gpiochip after the I2C address
+Date: Fri, 24 Nov 2017 10:30:43 +0100
+Subject: [PATCH 3/5] ARM: davinci: Switch DA850EVM to use GPIO descriptors
 In-Reply-To: <20171124093045.5961-1-linus.walleij@linaro.org>
 References: <20171124093045.5961-1-linus.walleij@linaro.org>
-Message-ID: <20171124093045.5961-3-linus.walleij@linaro.org>
+Message-ID: <20171124093045.5961-4-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just putting the name of the I2C device as name for the
-GPIO chip (label) is ambigous, and makes it hard for us
-to use GPIO descriptor tables on systems such as DaVinci
-DA850EVM which has two chips but on I2C address 0x20 and 0x21.
+To get rid of the global GPIO numberspace we need to move
+to using descriptor tables with local offsets on the GPIO
+chip to reference the GPIO lines used by kernel drivers.
 
-Instead, append "-XX" to the GPIOchip name using the I2C
-address so we get a unique chip name that can be used
-in descriptor tables, such as "tca6416-20" and
-"tca6416-21" on the DaVinci DA850EVM.
+This moves the DaVinci DA850EVM board over to using GPIO
+descriptors for passing GPIOs to the GPIO keys.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/gpio/gpio-pca953x.c | 17 ++++++++++++++---
- 1 file changed, 14 insertions(+), 3 deletions(-)
+ arch/arm/mach-davinci/board-da850-evm.c | 57 ++++++++++++++++++++++++++++-----
+ 1 file changed, 49 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/gpio/gpio-pca953x.c b/drivers/gpio/gpio-pca953x.c
-index babb7bd2ba59..bab09f1a6bc9 100644
---- a/drivers/gpio/gpio-pca953x.c
-+++ b/drivers/gpio/gpio-pca953x.c
-@@ -413,10 +413,17 @@ static void pca953x_gpio_set_multiple(struct gpio_chip *gc,
- 	mutex_unlock(&chip->i2c_lock);
- }
+diff --git a/arch/arm/mach-davinci/board-da850-evm.c b/arch/arm/mach-davinci/board-da850-evm.c
+index cbde0030c092..3792d760020f 100644
+--- a/arch/arm/mach-davinci/board-da850-evm.c
++++ b/arch/arm/mach-davinci/board-da850-evm.c
+@@ -404,11 +404,9 @@ static const char * const da850_evm_ui_exp[] = {
+ static struct gpio_keys_button da850_evm_ui_keys[] = {
+ 	[0 ... DA850_N_UI_PB - 1] = {
+ 		.type			= EV_KEY,
+-		.active_low		= 1,
+ 		.wakeup			= 0,
+ 		.debounce_interval	= DA850_KEYS_DEBOUNCE_MS,
+ 		.code			= -1, /* assigned at runtime */
+-		.gpio			= -1, /* assigned at runtime */
+ 		.desc			= NULL, /* assigned at runtime */
+ 	},
+ };
+@@ -427,6 +425,29 @@ static struct platform_device da850_evm_ui_keys_device = {
+ 	},
+ };
  
--static void pca953x_setup_gpio(struct pca953x_chip *chip, int gpios)
-+static int pca953x_setup_gpio(struct pca953x_chip *chip, int gpios)
- {
-+	struct i2c_client *client = chip->client;
- 	struct gpio_chip *gc;
-+	static char *chipname;
- 
-+	/* Gives a chip name from the chip name and I2C address */
-+	chipname = devm_kasprintf(&client->dev, GFP_KERNEL, "%s-%02x",
-+				  client->name, client->addr);
-+	if (!chipname)
-+		return -ENOMEM;
- 	gc = &chip->gpio_chip;
- 
- 	gc->direction_input  = pca953x_gpio_direction_input;
-@@ -429,10 +436,12 @@ static void pca953x_setup_gpio(struct pca953x_chip *chip, int gpios)
- 
- 	gc->base = chip->gpio_start;
- 	gc->ngpio = gpios;
--	gc->label = chip->client->name;
-+	gc->label = chipname;
- 	gc->parent = &chip->client->dev;
- 	gc->owner = THIS_MODULE;
- 	gc->names = chip->names;
++static struct gpiod_lookup_table da850_evm_ui_keys_gpios_table = {
++	.dev_id = "gpio-keys-polled",
++	.table = {
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB8,
++			    "pb8", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB7,
++			    "pb7", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB6,
++			    "pb6", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB5,
++			    "pb5", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB4,
++			    "pb4", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB3,
++			    "pb3", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB2,
++			    "pb2", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-20", DA850_EVM_UI_EXP_PB1,
++			    "pb1", GPIO_ACTIVE_LOW),
 +
-+	return 0;
++	},
++};
++
+ static void da850_evm_ui_keys_init(unsigned gpio)
+ {
+ 	int i;
+@@ -436,8 +457,8 @@ static void da850_evm_ui_keys_init(unsigned gpio)
+ 		button = &da850_evm_ui_keys[i];
+ 		button->code = KEY_F8 - i;
+ 		button->desc = da850_evm_ui_exp[DA850_EVM_UI_EXP_PB8 + i];
+-		button->gpio = gpio + DA850_EVM_UI_EXP_PB8 + i;
+ 	}
++	gpiod_add_lookup_table(&da850_evm_ui_keys_gpios_table);
  }
  
- #ifdef CONFIG_GPIO_PCA953X_IRQ
-@@ -848,7 +857,9 @@ static int pca953x_probe(struct i2c_client *client,
- 	/* initialize cached registers from their original values.
- 	 * we can't share this chip with another i2c master.
- 	 */
--	pca953x_setup_gpio(chip, chip->driver_data & PCA_GPIO_MASK);
-+	ret = pca953x_setup_gpio(chip, chip->driver_data & PCA_GPIO_MASK);
-+	if (ret)
-+		goto err_exit;
+ #ifdef CONFIG_DA850_UI_SD_VIDEO_PORT
+@@ -572,21 +593,17 @@ static const char * const da850_evm_bb_exp[] = {
+ static struct gpio_keys_button da850_evm_bb_keys[] = {
+ 	[0] = {
+ 		.type			= EV_KEY,
+-		.active_low		= 1,
+ 		.wakeup			= 0,
+ 		.debounce_interval	= DA850_KEYS_DEBOUNCE_MS,
+ 		.code			= KEY_PROG1,
+ 		.desc			= NULL, /* assigned at runtime */
+-		.gpio			= -1, /* assigned at runtime */
+ 	},
+ 	[1 ... DA850_N_BB_USER_SW] = {
+ 		.type			= EV_SW,
+-		.active_low		= 1,
+ 		.wakeup			= 0,
+ 		.debounce_interval	= DA850_KEYS_DEBOUNCE_MS,
+ 		.code			= -1, /* assigned at runtime */
+ 		.desc			= NULL, /* assigned at runtime */
+-		.gpio			= -1, /* assigned at runtime */
+ 	},
+ };
  
- 	if (chip->gpio_chip.ngpio <= 8) {
- 		chip->write_regs = pca953x_write_regs_8;
+@@ -604,6 +621,30 @@ static struct platform_device da850_evm_bb_keys_device = {
+ 	},
+ };
+ 
++static struct gpiod_lookup_table da850_evm_bb_keys_gpios_table = {
++	.dev_id = "gpio-keys-polled",
++	.table = {
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_PB1,
++			    "user_pb1", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW1,
++			    "user_sw1", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW2,
++			    "user_sw2", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW3,
++			    "user_sw3", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW4,
++			    "user_sw4", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW5,
++			    "user_sw5", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW6,
++			    "user_sw6", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW7,
++			    "user_sw7", GPIO_ACTIVE_LOW),
++		GPIO_LOOKUP("tca6416-21", DA850_EVM_BB_EXP_USER_SW8,
++			    "user_sw8", GPIO_ACTIVE_LOW),
++	},
++};
++
+ static void da850_evm_bb_keys_init(unsigned gpio)
+ {
+ 	int i;
+@@ -617,8 +658,8 @@ static void da850_evm_bb_keys_init(unsigned gpio)
+ 		button = &da850_evm_bb_keys[i + 1];
+ 		button->code = SW_LID + i;
+ 		button->desc = da850_evm_bb_exp[DA850_EVM_BB_EXP_USER_SW1 + i];
+-		button->gpio = gpio + DA850_EVM_BB_EXP_USER_SW1 + i;
+ 	}
++	gpiod_add_lookup_table(&da850_evm_bb_keys_gpios_table);
+ }
+ 
+ #define DA850_N_BB_USER_LED	2
 -- 
 2.14.3
