@@ -1,84 +1,143 @@
-From: ar@linux.vnet.ibm.com (Andrea Reale)
-Date: Fri, 24 Nov 2017 14:49:17 +0000
-Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory
- state before hotremove
-In-Reply-To: <CAJZ5v0i7vOxwhgA1LWYDqxCKkHaYikCf_HZZQCbgApLpoyV2JA@mail.gmail.com>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
- <CAJZ5v0i7vOxwhgA1LWYDqxCKkHaYikCf_HZZQCbgApLpoyV2JA@mail.gmail.com>
-Message-ID: <20171124144917.GB1966@samekh>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Fri, 24 Nov 2017 15:48:54 +0100
+Subject: [PATCH v4 03/12] IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+In-Reply-To: <20171119123453.188da309@archlinux>
+References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
+ <1510222354-15290-4-git-send-email-arnaud.pouliquen@st.com>
+ <20171119123453.188da309@archlinux>
+Message-ID: <f840aa0d-bd0c-2507-ee31-e2a0165b51c8@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
 
-On Fri 24 Nov 2017, 15:39, Rafael J. Wysocki wrote:
-> On Fri, Nov 24, 2017 at 11:22 AM, Andrea Reale <ar@linux.vnet.ibm.com> wrote:
-> > Resending the patch adding linux-acpi in CC, as suggested by Rafael.
-> > Everyone else: apologies for the noise.
-> >
-> > Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
-> > introduced an assumption whereas when control
-> > reaches remove_memory the corresponding memory has been already
-> > offlined. In that case, the acpi_memhotplug was making sure that
-> > the assumption held.
-> > This assumption, however, is not necessarily true if offlining
-> > and removal are not done by the same "controller" (for example,
-> > when first offlining via sysfs).
-> >
-> > Removing this assumption for the generic remove_memory code
-> > and moving it in the specific acpi_memhotplug code. This is
-> > a dependency for the software-aided arm64 offlining and removal
-> > process.
-> >
-> > Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> > Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
-> > ---
-> >  drivers/acpi/acpi_memhotplug.c |  2 +-
-> >  include/linux/memory_hotplug.h |  9 ++++++---
-> >  mm/memory_hotplug.c            | 13 +++++++++----
-> >  3 files changed, 16 insertions(+), 8 deletions(-)
-> >
-> > diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
-> > index 6b0d3ef..b0126a0 100644
-> > --- a/drivers/acpi/acpi_memhotplug.c
-> > +++ b/drivers/acpi/acpi_memhotplug.c
-> > @@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
-> >                         nid = memory_add_physaddr_to_nid(info->start_addr);
-> >
-> >                 acpi_unbind_memory_blocks(info);
-> > -               remove_memory(nid, info->start_addr, info->length);
-> > +               BUG_ON(remove_memory(nid, info->start_addr, info->length));
+
+On 11/19/2017 01:34 PM, Jonathan Cameron wrote:
+> On Thu, 9 Nov 2017 11:12:25 +0100
+> Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 > 
-> Why does this have to be BUG_ON()?  Is it really necessary to kill the
-> system here?
-
-Actually, I hoped you would help me understand that: that BUG() call was introduced
-by yourself in Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
-in memory_hoptlug.c:remove_memory()). 
-
-Just reading at that commit my understanding was that you were assuming
-that acpi_memory_remove_memory() have already done the job of offlining
-the target memory, so there would be a bug if that wasn't the case.
-
-In my case, that assumption did not hold and I found that it might not
-hold for other platforms that do not use ACPI. In fact, the purpose of
-this patch is to move this assumption out of the generic hotplug code
-and move it to ACPI code where it originated. 
-
-Thanks,
-Andrea
-
-> If it is, please add a comment describing why continuing is not an option here.
+>> Add devm_iio_hw_consumer_alloc function that calls iio_hw_consumer_free
+>> when the device is unbound from the bus.
+>> 
+>> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> Hmm.. I normally don't like devm for what is a single use case in
+> a driver (for now) but I guess this is generic enough it will have
+> additional users reasonably soon.? Hence fine.
 > 
-> >                 list_del(&info->list);
-> >                 kfree(info);
-> >         }
+> Jonathan
+>> ---
+>>? drivers/iio/buffer/industrialio-hw-consumer.c | 70 ++++++++++++++++++++++++++-
+>>? include/linux/iio/hw-consumer.h?????????????? |? 2 +
+>>? 2 files changed, 70 insertions(+), 2 deletions(-)
+>> 
+>> diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
+>> index 7d4d800..e980a79 100644
+>> --- a/drivers/iio/buffer/industrialio-hw-consumer.c
+>> +++ b/drivers/iio/buffer/industrialio-hw-consumer.c
+>> @@ -129,15 +129,81 @@ EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
+>>?? */
+>>? void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
+>>? {
+>> -???? struct hw_consumer_buffer *buf;
+>> +???? struct hw_consumer_buffer *buf, *n;
+>>? 
+>>??????? iio_channel_release_all(hwc->channels);
+>> -???? list_for_each_entry(buf, &hwc->buffers, head)
+>> +???? list_for_each_entry_safe(buf, n, &hwc->buffers, head)
+>>??????????????? iio_buffer_put(&buf->buffer);
 > 
-> Thanks,
-> Rafael
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> This looks like an unrelated fix.? Push back into the
+> original patch?
+Yes, I missed to apply this fix directly in Lars's patch:
+[01/12] iio: Add hardware consumer buffer support
+
+Thanks
+
+Arnaud
+> 
+>>??????? kfree(hwc);
+>>? }
+>>? EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
+>>? 
+>> +static void devm_iio_hw_consumer_release(struct device *dev, void *res)
+>> +{
+>> +???? iio_hw_consumer_free(*(struct iio_hw_consumer **)res);
+>> +}
+>> +
+>> +static int devm_iio_hw_consumer_match(struct device *dev, void *res, void *data)
+>> +{
+>> +???? struct iio_hw_consumer **r = res;
+>> +
+>> +???? if (!r || !*r) {
+>> +???????????? WARN_ON(!r || !*r);
+>> +???????????? return 0;
+>> +???? }
+>> +???? return *r == data;
+>> +}
+>> +
+>> +/**
+>> + * devm_iio_hw_consumer_alloc - Resource-managed iio_hw_consumer_alloc()
+>> + * @dev: Pointer to consumer device.
+>> + *
+>> + * Managed iio_hw_consumer_alloc. iio_hw_consumer allocated with this function
+>> + * is automatically freed on driver detach.
+>> + *
+>> + * If an iio_hw_consumer allocated with this function needs to be freed
+>> + * separately, devm_iio_hw_consumer_free() must be used.
+>> + *
+>> + * returns pointer to allocated iio_hw_consumer on success, NULL on failure.
+>> + */
+>> +struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev)
+>> +{
+>> +???? struct iio_hw_consumer **ptr, *iio_hwc;
+>> +
+>> +???? ptr = devres_alloc(devm_iio_hw_consumer_release, sizeof(*ptr),
+>> +??????????????????????? GFP_KERNEL);
+>> +???? if (!ptr)
+>> +???????????? return NULL;
+>> +
+>> +???? iio_hwc = iio_hw_consumer_alloc(dev);
+>> +???? if (IS_ERR(iio_hwc)) {
+>> +???????????? devres_free(ptr);
+>> +???? } else {
+>> +???????????? *ptr = iio_hwc;
+>> +???????????? devres_add(dev, ptr);
+>> +???? }
+>> +
+>> +???? return iio_hwc;
+>> +}
+>> +EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_alloc);
+>> +
+>> +/**
+>> + * devm_iio_hw_consumer_free - Resource-managed iio_hw_consumer_free()
+>> + * @dev: Pointer to consumer device.
+>> + * @hwc: iio_hw_consumer to free.
+>> + *
+>> + * Free iio_hw_consumer allocated with devm_iio_hw_consumer_alloc().
+>> + */
+>> +void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc)
+>> +{
+>> +???? int rc;
+>> +
+>> +???? rc = devres_release(dev, devm_iio_hw_consumer_release,
+>> +???????????????????????? devm_iio_hw_consumer_match, hwc);
+>> +???? WARN_ON(rc);
+>> +}
+>> +EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_free);
+>> +
+>>? /**
+>>?? * iio_hw_consumer_enable() - Enable IIO hardware consumer
+>>?? * @hwc: iio_hw_consumer to enable.
+>> diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
+>> index f16791b..90ecfce 100644
+>> --- a/include/linux/iio/hw-consumer.h
+>> +++ b/include/linux/iio/hw-consumer.h
+>> @@ -14,6 +14,8 @@ struct iio_hw_consumer;
+>>? 
+>>? struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
+>>? void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
+>> +struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev);
+>> +void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc);
+>>? int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
+>>? void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
+>>? 
 > 
