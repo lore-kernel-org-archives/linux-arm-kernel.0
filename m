@@ -1,126 +1,53 @@
-From: rafael.j.wysocki@intel.com (Rafael J. Wysocki)
-Date: Thu, 23 Nov 2017 23:18:42 +0100
-Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory
- state before hotremove
-In-Reply-To: <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
-Message-ID: <cad46441-bbf6-4a3c-3487-db754919ba3b@intel.com>
+From: elseifthen@gmx.com (J William Piggott)
+Date: Thu, 23 Nov 2017 19:13:58 -0500
+Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
+ ntp
+In-Reply-To: <20171123125300.GO31757@n2100.armlinux.org.uk>
+References: <20171013175433.GA22062@obsidianresearch.com>
+ <20171123095456.lkc4nkuzsd2q26mm@piout.net>
+ <20171123112338.GN31757@n2100.armlinux.org.uk>
+ <20171123120451.v74j3z2c5oodxlud@piout.net>
+ <20171123125300.GO31757@n2100.armlinux.org.uk>
+Message-ID: <f034d236-22e2-57d9-1d64-2b2821ba1839@gmx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/23/2017 12:14 PM, Andrea Reale wrote:
-> Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
-> introduced an assumption whereas when control
-> reaches remove_memory the corresponding memory has been already
-> offlined. In that case, the acpi_memhotplug was making sure that
-> the assumption held.
-> This assumption, however, is not necessarily true if offlining
-> and removal are not done by the same "controller" (for example,
-> when first offlining via sysfs).
->
-> Removing this assumption for the generic remove_memory code
-> and moving it in the specific acpi_memhotplug code. This is
-> a dependency for the software-aided arm64 offlining and removal
-> process.
->
-> Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
 
-Please resend this with a CC to linux-acpi.
 
-Thanks!
+On 11/23/2017 07:53 AM, Russell King - ARM Linux wrote:
+> On Thu, Nov 23, 2017 at 01:04:51PM +0100, Alexandre Belloni wrote:
+>>
 
-> ---
->   drivers/acpi/acpi_memhotplug.c |  2 +-
->   include/linux/memory_hotplug.h |  9 ++++++---
->   mm/memory_hotplug.c            | 13 +++++++++----
->   3 files changed, 16 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
-> index 6b0d3ef..b0126a0 100644
-> --- a/drivers/acpi/acpi_memhotplug.c
-> +++ b/drivers/acpi/acpi_memhotplug.c
-> @@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
->   			nid = memory_add_physaddr_to_nid(info->start_addr);
->   
->   		acpi_unbind_memory_blocks(info);
-> -		remove_memory(nid, info->start_addr, info->length);
-> +		BUG_ON(remove_memory(nid, info->start_addr, info->length));
->   		list_del(&info->list);
->   		kfree(info);
->   	}
-> diff --git a/include/linux/memory_hotplug.h b/include/linux/memory_hotplug.h
-> index 58e110a..1a9c7b2 100644
-> --- a/include/linux/memory_hotplug.h
-> +++ b/include/linux/memory_hotplug.h
-> @@ -295,7 +295,7 @@ static inline bool movable_node_is_enabled(void)
->   extern bool is_mem_section_removable(unsigned long pfn, unsigned long nr_pages);
->   extern void try_offline_node(int nid);
->   extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
-> -extern void remove_memory(int nid, u64 start, u64 size);
-> +extern int remove_memory(int nid, u64 start, u64 size);
->   
->   #else
->   static inline bool is_mem_section_removable(unsigned long pfn,
-> @@ -311,7 +311,10 @@ static inline int offline_pages(unsigned long start_pfn, unsigned long nr_pages)
->   	return -EINVAL;
->   }
->   
-> -static inline void remove_memory(int nid, u64 start, u64 size) {}
-> +static inline int remove_memory(int nid, u64 start, u64 size)
-> +{
-> +	return -EINVAL;
-> +}
->   #endif /* CONFIG_MEMORY_HOTREMOVE */
->   
->   extern int walk_memory_range(unsigned long start_pfn, unsigned long end_pfn,
-> @@ -323,7 +326,7 @@ extern void move_pfn_range_to_zone(struct zone *zone, unsigned long start_pfn,
->   		unsigned long nr_pages);
->   extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
->   extern bool is_memblock_offlined(struct memory_block *mem);
-> -extern void remove_memory(int nid, u64 start, u64 size);
-> +extern int remove_memory(int nid, u64 start, u64 size);
->   extern int sparse_add_one_section(struct pglist_data *pgdat, unsigned long start_pfn);
->   extern void sparse_remove_one_section(struct zone *zone, struct mem_section *ms,
->   		unsigned long map_offset);
-> diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
-> index d4b5f29..d5f15af 100644
-> --- a/mm/memory_hotplug.c
-> +++ b/mm/memory_hotplug.c
-> @@ -1892,7 +1892,7 @@ EXPORT_SYMBOL(try_offline_node);
->    * and online/offline operations before this call, as required by
->    * try_offline_node().
->    */
-> -void __ref remove_memory(int nid, u64 start, u64 size)
-> +int __ref remove_memory(int nid, u64 start, u64 size)
->   {
->   	int ret;
->   
-> @@ -1908,18 +1908,23 @@ void __ref remove_memory(int nid, u64 start, u64 size)
->   	ret = walk_memory_range(PFN_DOWN(start), PFN_UP(start + size - 1), NULL,
->   				check_memblock_offlined_cb);
->   	if (ret)
-> -		BUG();
-> +		goto end_remove;
-> +
-> +	ret = arch_remove_memory(start, size);
-> +
-> +	if (ret)
-> +		goto end_remove;
->   
->   	/* remove memmap entry */
->   	firmware_map_remove(start, start + size, "System RAM");
->   	memblock_free(start, size);
->   	memblock_remove(start, size);
->   
-> -	arch_remove_memory(start, size);
-> -
->   	try_offline_node(nid);
->   
-> +end_remove:
->   	mem_hotplug_done();
-> +	return ret;
->   }
->   EXPORT_SYMBOL_GPL(remove_memory);
->   #endif /* CONFIG_MEMORY_HOTREMOVE */
+ 8<
+
+>> But nothing prevents you from using hwclock every 11 minutes from
+>> userspace. I really don't think this should be done from the kernel.
+> 
+> It's not just about running hwclock every 11 minutes.  It's about
+> running hwclock when NTP sync'd.  If the local clock is not sync'd
+> you don't want to be running hwclock, especially if you've trimmed
+> the RTC.  So merely throwing hwclock -uw into a cron job really
+> doesn't solve it.
+> 
+> A way around that would be to install adjtimex, so that the kernel's
+> NTP flags can be read out.  However, that comes with its own set of
+> problems.
+> 
+> On Debian, installing adjtimex will disrupt the timekeeping because
+> of the post-install scripts debian runs.  It seems Debian assumes
+> that if you install something, it has the right to modify the system
+> timekeeping parameters immediately, screwing up ntpd in the process,
+> if it's running.  The thought that you're installing adjtimex because
+> you want to _inspect_ the kernel ntp parameters is not one that
+> Debian folk appear to have considered as being a reason for installing
+> the package.
+> 
+
+IMO, adjtimex is broken anyway. Use ntptime, it should be included
+in the ntp package:
+
+ $ /usr/sbin/ntptime | grep status
+  status 0x40 (UNSYNC),
+
+'ntptime -f ppm' allows correcting the system clock. So adjtimex really
+isn't needed anymore.
