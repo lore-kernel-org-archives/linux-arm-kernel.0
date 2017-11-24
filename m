@@ -1,51 +1,62 @@
 From: jerome.forissier@linaro.org (Jerome Forissier)
-Date: Fri, 24 Nov 2017 15:47:17 +0100
-Subject: [PATCH 1/2] tee: optee: GET_OS_REVISION: document a2 as a build
- identifier
+Date: Fri, 24 Nov 2017 15:47:18 +0100
+Subject: [PATCH 2/2] tee: optee: report OP-TEE revision information
 In-Reply-To: <cover.1511533457.git.jerome.forissier@linaro.org>
 References: <cover.1511533457.git.jerome.forissier@linaro.org>
-Message-ID: <23a6eaf6eeeb7111649280ecd6fd6be3d7900a07.1511533457.git.jerome.forissier@linaro.org>
+Message-ID: <00cdd293320d68f0d315ffc4c1957cfa90fdfb73.1511533457.git.jerome.forissier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In the OPTEE_SMC_CALL_GET_OS_REVISION request, the previously reserved
-parameter a2 is now documented as being an optional build identifier
-(such as an SCM revision or commit ID, for instance).
-
-A new structure optee_smc_call_get_os_revision_result is introduced to
-be used when querying the secure OS version, instead of re-using the
-struct defined for OPTEE_SMC_CALLS_REVISION.
+When the driver initializes, report the following information
+about the OP-TEE OS:
+- major and minor version,
+- build identifier (if available).
 
 Signed-off-by: Jerome Forissier <jerome.forissier@linaro.org>
 ---
- drivers/tee/optee/optee_smc.h | 10 +++++++++-
- 1 file changed, 9 insertions(+), 1 deletion(-)
+ drivers/tee/optee/core.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
-index 069c8e1429de..d0b67c65ea8f 100644
---- a/drivers/tee/optee/optee_smc.h
-+++ b/drivers/tee/optee/optee_smc.h
-@@ -112,12 +112,20 @@ struct optee_smc_calls_revision_result {
-  * Trusted OS, not of the API.
-  *
-  * Returns revision in a0-1 in the same way as OPTEE_SMC_CALLS_REVISION
-- * described above.
-+ * described above. May optionally return a 32-bit build identifier in a2,
-+ * with zero meaning unspecified.
-  */
- #define OPTEE_SMC_FUNCID_GET_OS_REVISION OPTEE_MSG_FUNCID_GET_OS_REVISION
- #define OPTEE_SMC_CALL_GET_OS_REVISION \
- 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_GET_OS_REVISION)
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 7952357df9c8..d04f4617aed2 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -302,6 +302,27 @@ static bool optee_msg_api_uid_is_optee_api(optee_invoke_fn *invoke_fn)
+ 	return false;
+ }
  
-+struct optee_smc_call_get_os_revision_result {
-+	unsigned long major;
-+	unsigned long minor;
-+	unsigned long build_id;
-+	unsigned long reserved1;
-+};
++static void optee_msg_get_os_revision(optee_invoke_fn *invoke_fn)
++{
++	union {
++		struct arm_smccc_res smccc;
++		struct optee_smc_call_get_os_revision_result result;
++	} res = {
++		.result = {
++			.build_id = 0
++		}
++	};
 +
- /*
-  * Call with struct optee_msg_arg as argument
-  *
++	invoke_fn(OPTEE_SMC_CALL_GET_OS_REVISION, 0, 0, 0, 0, 0, 0, 0,
++		  &res.smccc);
++
++	if (res.result.build_id)
++		pr_info("revision %lu.%lu (%08lx)", res.result.major,
++			res.result.minor, res.result.build_id);
++	else
++		pr_info("revision %lu.%lu", res.result.major, res.result.minor);
++}
++
+ static bool optee_msg_api_revision_is_compatible(optee_invoke_fn *invoke_fn)
+ {
+ 	union {
+@@ -465,6 +486,8 @@ static struct optee *optee_probe(struct device_node *np)
+ 		return ERR_PTR(-EINVAL);
+ 	}
+ 
++	optee_msg_get_os_revision(invoke_fn);
++
+ 	if (!optee_msg_api_revision_is_compatible(invoke_fn)) {
+ 		pr_warn("api revision mismatch\n");
+ 		return ERR_PTR(-EINVAL);
 -- 
 2.7.4
