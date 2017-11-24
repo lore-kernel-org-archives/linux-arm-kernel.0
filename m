@@ -1,36 +1,41 @@
-From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Fri, 24 Nov 2017 10:37:03 +0800
-Subject: [PATCH v2 08/11] ARM: dts: rockchip: add rx0 mipi-phy for rk3288
-In-Reply-To: <20171124023706.5702-1-jacob-chen@iotwrt.com>
-References: <20171124023706.5702-1-jacob-chen@iotwrt.com>
-Message-ID: <20171124023706.5702-9-jacob-chen@iotwrt.com>
+From: sudeepkumar@cem-solutions.net (sudeep kumar)
+Date: Fri, 24 Nov 2017 09:30:25 +0530
+Subject: [PATCH 2/3] dt-bindings: arm: actions: Add Sparky
+In-Reply-To: <20171114180114.26408-3-afaerber@suse.de>
+References: <20171114180114.26408-1-afaerber@suse.de>
+ <20171114180114.26408-3-afaerber@suse.de>
+Message-ID: <00d701d364d8$c8a75780$59f60680$@cem-solutions.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It's a Designware MIPI D-PHY, used by ISP in rk3288.
+Acked-by : sudeep <sudeepkumar@cem-solutions.net>
 
-Signed-off-by: Jacob Chen <jacob-chen@iotwrt.com>
+-----Original Message-----
+From: Andreas F?rber [mailto:afaerber at suse.de] 
+Sent: Tuesday, November 14, 2017 11:31 PM
+To: linux-arm-kernel at lists.infradead.org
+Cc: Thomas Liau <thomas.liau@actions-semi.com>; Jeff Chen <jeff.chen@actions-semi.com>; ??? <zhangdf@actions-semi.com>; ?? <liuwei@actions-semi.com>; ??? <tyzhang@actions-semi.com>; ?? <harrymei@actions-semi.com>; Ioan B <ioan@allo.com>; Sudeep Kumar <sudeepkumar@cem-solutions.net>; linux-kernel at vger.kernel.org; Andreas F?rber <afaerber@suse.de>; Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; devicetree at vger.kernel.org
+Subject: [PATCH 2/3] dt-bindings: arm: actions: Add Sparky
+
+Define a binding for Allo.com Sparky SBC.
+
+Cc: Ioan B. <ioan@allo.com>
+Signed-off-by: Andreas F?rber <afaerber@suse.de>
 ---
- arch/arm/boot/dts/rk3288.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ Documentation/devicetree/bindings/arm/actions.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 30677a0167fe..8b7d5a9b521f 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -864,6 +864,13 @@
- 			status = "disabled";
- 		};
+diff --git a/Documentation/devicetree/bindings/arm/actions.txt b/Documentation/devicetree/bindings/arm/actions.txt
+index 544a8855fad5..d54f33c4e0da 100644
+--- a/Documentation/devicetree/bindings/arm/actions.txt
++++ b/Documentation/devicetree/bindings/arm/actions.txt
+@@ -21,6 +21,7 @@ Boards:
  
-+		mipi_phy_rx0: mipi-phy-rx0 {
-+			compatible = "rockchip,rk3288-mipi-dphy";
-+			clocks = <&cru SCLK_MIPIDSI_24M>, <&cru PCLK_MIPI_CSI>;
-+			clock-names = "dphy-ref", "pclk";
-+			status = "disabled";
-+		};
-+
- 		io_domains: io-domains {
- 			compatible = "rockchip,rk3288-io-voltage-domain";
- 			status = "disabled";
+ Root node property compatible must contain, depending on board:
+ 
++ - Allo.com Sparky: "allo,sparky"
+  - Cubietech CubieBoard6: "cubietech,cubieboard6"
+  - LeMaker Guitar Base Board rev. B: "lemaker,guitar-bb-rev-b", "lemaker,guitar"
+ 
 -- 
-2.15.0
+2.13.6
