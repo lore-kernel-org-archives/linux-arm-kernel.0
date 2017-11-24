@@ -1,39 +1,77 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 24 Nov 2017 18:37:39 +1100
-Subject: [PATCH v3] crypto: AF_ALG - remove locking in async callback
-In-Reply-To: <1966139.WIlnTlQG5u@positron.chronox.de>
-References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
- <2510520.gYBNS8MAsP@positron.chronox.de>
- <20171110111058.GA25914@gondor.apana.org.au>
- <1966139.WIlnTlQG5u@positron.chronox.de>
-Message-ID: <20171124073739.GB15597@gondor.apana.org.au>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 24 Nov 2017 16:43:17 +0100
+Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory
+ state before hotremove
+In-Reply-To: <20171124144917.GB1966@samekh>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
+ <CAJZ5v0i7vOxwhgA1LWYDqxCKkHaYikCf_HZZQCbgApLpoyV2JA@mail.gmail.com>
+ <20171124144917.GB1966@samekh>
+Message-ID: <20171124154317.copbe3u6y2q4mura@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 01:20:55PM +0100, Stephan M?ller wrote:
-> The code paths protected by the socket-lock do not use or modify the
-> socket in a non-atomic fashion. The actions pertaining the socket do not
-> even need to be handled as an atomic operation. Thus, the socket-lock
-> can be safely ignored.
+On Fri 24-11-17 14:49:17, Andrea Reale wrote:
+> Hi Rafael,
 > 
-> This fixes a bug regarding scheduling in atomic as the callback function
-> may be invoked in interrupt context.
+> On Fri 24 Nov 2017, 15:39, Rafael J. Wysocki wrote:
+> > On Fri, Nov 24, 2017 at 11:22 AM, Andrea Reale <ar@linux.vnet.ibm.com> wrote:
+> > > Resending the patch adding linux-acpi in CC, as suggested by Rafael.
+> > > Everyone else: apologies for the noise.
+> > >
+> > > Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
+> > > introduced an assumption whereas when control
+> > > reaches remove_memory the corresponding memory has been already
+> > > offlined. In that case, the acpi_memhotplug was making sure that
+> > > the assumption held.
+> > > This assumption, however, is not necessarily true if offlining
+> > > and removal are not done by the same "controller" (for example,
+> > > when first offlining via sysfs).
+> > >
+> > > Removing this assumption for the generic remove_memory code
+> > > and moving it in the specific acpi_memhotplug code. This is
+> > > a dependency for the software-aided arm64 offlining and removal
+> > > process.
+> > >
+> > > Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+> > > Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
+> > > ---
+> > >  drivers/acpi/acpi_memhotplug.c |  2 +-
+> > >  include/linux/memory_hotplug.h |  9 ++++++---
+> > >  mm/memory_hotplug.c            | 13 +++++++++----
+> > >  3 files changed, 16 insertions(+), 8 deletions(-)
+> > >
+> > > diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
+> > > index 6b0d3ef..b0126a0 100644
+> > > --- a/drivers/acpi/acpi_memhotplug.c
+> > > +++ b/drivers/acpi/acpi_memhotplug.c
+> > > @@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
+> > >                         nid = memory_add_physaddr_to_nid(info->start_addr);
+> > >
+> > >                 acpi_unbind_memory_blocks(info);
+> > > -               remove_memory(nid, info->start_addr, info->length);
+> > > +               BUG_ON(remove_memory(nid, info->start_addr, info->length));
+> > 
+> > Why does this have to be BUG_ON()?  Is it really necessary to kill the
+> > system here?
 > 
-> In addition, the sock_hold is moved before the AIO encrypt/decrypt
-> operation to ensure that the socket is always present. This avoids a
-> tiny race window where the socket is unprotected and yet used by the AIO
-> operation.
+> Actually, I hoped you would help me understand that: that BUG() call was introduced
+> by yourself in Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
+> in memory_hoptlug.c:remove_memory()). 
 > 
-> Finally, the release of resources for a crypto operation is moved into a
-> common function of af_alg_free_resources.
+> Just reading at that commit my understanding was that you were assuming
+> that acpi_memory_remove_memory() have already done the job of offlining
+> the target memory, so there would be a bug if that wasn't the case.
 > 
-> Fixes: e870456d8e7c8 ("crypto: algif_skcipher - overhaul memory management")
-> Fixes: d887c52d6ae43 ("crypto: algif_aead - overhaul memory management")
-> Reported-by: Romain Izard <romain.izard.pro@gmail.com>
-> Signed-off-by: Stephan Mueller <smueller@chronox.de>
+> In my case, that assumption did not hold and I found that it might not
+> hold for other platforms that do not use ACPI. In fact, the purpose of
+> this patch is to move this assumption out of the generic hotplug code
+> and move it to ACPI code where it originated. 
 
-Patch applied.  Thanks.
+remove_memory failure is basically impossible to handle AFAIR. The
+original code to BUG in remove_memory is ugly as hell and we do not want
+to spread that out of that function. Instead we really want to get rid
+of it.
 -- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+Michal Hocko
+SUSE Labs
