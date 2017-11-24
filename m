@@ -1,79 +1,125 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 24 Nov 2017 18:16:29 +0000
-Subject: v4.14-rc{4,7} null pointer dereference in event_sched_out()
-In-Reply-To: <20171124181056.vhpjuucr3kewrj2v@lakrids.cambridge.arm.com>
-References: <20171030162314.yxi2fyli6omtphvw@lakrids.cambridge.arm.com>
- <20171115180019.GO19071@arm.com>
- <20171124181056.vhpjuucr3kewrj2v@lakrids.cambridge.arm.com>
-Message-ID: <20171124181629.tjvjuhqlr2bm5bqh@lakrids.cambridge.arm.com>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Fri, 24 Nov 2017 19:17:41 +0100
+Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory
+ state before hotremove
+In-Reply-To: <20171124155458.GC1966@samekh>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
+ <CAJZ5v0i7vOxwhgA1LWYDqxCKkHaYikCf_HZZQCbgApLpoyV2JA@mail.gmail.com>
+ <20171124144917.GB1966@samekh>
+ <20171124154317.copbe3u6y2q4mura@dhcp22.suse.cz>
+ <20171124155458.GC1966@samekh>
+Message-ID: <20171124164042.3crcoz2lwgwv725l@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 06:10:56PM +0000, Mark Rutland wrote:
-> On Wed, Nov 15, 2017 at 06:00:20PM +0000, Will Deacon wrote:
-> > On Mon, Oct 30, 2017 at 04:23:15PM +0000, Mark Rutland wrote:
-> > > As a heads-up, while fuzzing arm64 v4.14-rc{4,7} with Syzkaller, I hit a
-> > > KASAN splat in event_sched_out():
-> > Did you get anywhere with this?
+On Fri 24-11-17 15:54:59, Andrea Reale wrote:
+> On Fri 24 Nov 2017, 16:43, Michal Hocko wrote:
+> > On Fri 24-11-17 14:49:17, Andrea Reale wrote:
+> > > Hi Rafael,
+> > > 
+> > > On Fri 24 Nov 2017, 15:39, Rafael J. Wysocki wrote:
+> > > > On Fri, Nov 24, 2017 at 11:22 AM, Andrea Reale <ar@linux.vnet.ibm.com> wrote:
+> > > > > Resending the patch adding linux-acpi in CC, as suggested by Rafael.
+> > > > > Everyone else: apologies for the noise.
+> > > > >
+> > > > > Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
+> > > > > introduced an assumption whereas when control
+> > > > > reaches remove_memory the corresponding memory has been already
+> > > > > offlined. In that case, the acpi_memhotplug was making sure that
+> > > > > the assumption held.
+> > > > > This assumption, however, is not necessarily true if offlining
+> > > > > and removal are not done by the same "controller" (for example,
+> > > > > when first offlining via sysfs).
+> > > > >
+> > > > > Removing this assumption for the generic remove_memory code
+> > > > > and moving it in the specific acpi_memhotplug code. This is
+> > > > > a dependency for the software-aided arm64 offlining and removal
+> > > > > process.
+> > > > >
+> > > > > Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+> > > > > Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
+> > > > > ---
+> > > > >  drivers/acpi/acpi_memhotplug.c |  2 +-
+> > > > >  include/linux/memory_hotplug.h |  9 ++++++---
+> > > > >  mm/memory_hotplug.c            | 13 +++++++++----
+> > > > >  3 files changed, 16 insertions(+), 8 deletions(-)
+> > > > >
+> > > > > diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
+> > > > > index 6b0d3ef..b0126a0 100644
+> > > > > --- a/drivers/acpi/acpi_memhotplug.c
+> > > > > +++ b/drivers/acpi/acpi_memhotplug.c
+> > > > > @@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
+> > > > >                         nid = memory_add_physaddr_to_nid(info->start_addr);
+> > > > >
+> > > > >                 acpi_unbind_memory_blocks(info);
+> > > > > -               remove_memory(nid, info->start_addr, info->length);
+> > > > > +               BUG_ON(remove_memory(nid, info->start_addr, info->length));
+> > > > 
+> > > > Why does this have to be BUG_ON()?  Is it really necessary to kill the
+> > > > system here?
+> > > 
+> > > Actually, I hoped you would help me understand that: that BUG() call was introduced
+> > > by yourself in Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
+> > > in memory_hoptlug.c:remove_memory()). 
+> > > 
+> > > Just reading at that commit my understanding was that you were assuming
+> > > that acpi_memory_remove_memory() have already done the job of offlining
+> > > the target memory, so there would be a bug if that wasn't the case.
+> > > 
+> > > In my case, that assumption did not hold and I found that it might not
+> > > hold for other platforms that do not use ACPI. In fact, the purpose of
+> > > this patch is to move this assumption out of the generic hotplug code
+> > > and move it to ACPI code where it originated. 
+> > 
+> > remove_memory failure is basically impossible to handle AFAIR. The
+> > original code to BUG in remove_memory is ugly as hell and we do not want
+> > to spread that out of that function. Instead we really want to get rid
+> > of it.
 > 
-> I got a *bit* further, but I haven't figured out the underlying issue
-> yet.
+> Today, BUG() is called even in the simple case where remove fails
+> because the section we are removing is not offline.
 
-Forgot to mention, the above all applies to a vanilla v4.14 arm64
-kernel; defconfig + KASAN_INLINE.
+You cannot hotremove memory which is still online. This is what caller
+should enforce. This is too late to handle the failure. At least for
+ACPI.
 
-Thanks,
-Mark.
+> I cannot see any need to
+> BUG() in such a case: an error code seems more than sufficient to me.
 
-> 
-> I minimized the reproducer down to the following:
-> 
-> ----
-> # {Threaded:true Collide:true Repeat:true Procs:1 Sandbox:none Fault:false FaultCall:-1 FaultNth:0 EnableTun:true UseTmpDir:true HandleSegv:true WaitRepeat:true Debug:false Repro:false}
-> 
-> r2 = gettid()
-> mmap(&(0x7f0000000000/0xd3f000)=nil, 0xd3f000, 0x3, 0x32, 0xffffffffffffffff, 0x0)
-> r0 = perf_event_open(&(0x7f0000d15000-0x78)={0x1, 0x78, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x9, 0x30, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, r2, 0xffffffff, 0xffffffffffffffff, 0x0)
-> mmap(&(0x7f0000d3f000/0x1000)=nil, 0x1000, 0x3, 0x32, 0xffffffffffffffff, 0x0)
-> r1 = perf_event_open(&(0x7f0000d15000-0x78)={0x1, 0x78, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, r2, 0xffffffff, r0, 0x0)
-> dup3(0, 0, 0)
-> perf_event_open(&(0x7f0000b13000-0x78)={0x0, 0x78, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x30, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0}, r2, 0xffffffff, r0, 0x0)
-> ----
-> 
-> Note: the dup3() is an expensive NOP (since oldfd == newfd), but I think
-> it's triggering an interesting scheduling pattern, since thus far I
-> haven't managed to trigger the bug without it.
-> 
-> That creates a perf_cpu_clock event, adds another to that group, and
-> adds a HW event to that same group. In parallel.
-> 
-> Sometimes at the point the HW event is added, the leading SW event is in
-> PERF_EVENT_STATE_INACTIVE, but the follower SW event is in
-> PERF_EVENT_STATE_ACTIVE. The context both are held in is inactive, so
-> the follower event's state makes no sense.
-> 
-> I added a dump to event_sched_out() that catches this:
-> 
-> [   35.995144] Uh-oh:
-> [   35.995144]   event ffff800039a1f880
-> [   35.995144]   event->state 1
-> [   35.995144]   event->cpu -1
-> [   35.995144]   pmu ffff20000a3b2600 (perf_cpu_clock, AKA (null))
-> [   35.995144]   leader ffff800039a1a480
-> [   35.995144]   leader->state -1
-> [   35.995144]   pmu ffff20000a3b2600 (perf_cpu_clock, AKA (null))
-> [   35.995144]   ctx ffff80003932e180, pmu ffff20000a3b2600 (perf_cpu_clock AKA (null))
-> 
-> I'll try to dig into this a bit more next week.
-> 
-> I can't reproduce this with Syzkaller running in a single thread, nor
-> with some multi-threaded tests I wrote in C, so I guess there's a subtle
-> race I'm not managing to hit.
-> 
-> Thanks,
-> Mark.
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+I do not rememeber details but AFAIR ACPI is in a deferred (kworker)
+context here and cannot simply communicate error code down the road.
+I agree that we should be able to simply return an error but what is the
+actual error condition that might happen here?
+
+> This is why this patch removes the BUG() call when the "offline" check
+> fails from the generic code. 
+
+As I've said we should simply get rid of BUG rather than move it around.
+
+> It moves it back to the ACPI call, where the assumption
+> originated. Honestlly, I cannot tell if it makes sense to BUG() there:
+> I have nothing against removing it from ACPI hotplug too, but
+> I don't know enough to feel free to change the acpi semantics myself, so I
+> moved it there to keep the original behavior unchanged for x86 code.
+
+Heh, yeah that is an easier path for sure. I would prefer sorting this
+out ;) Not that I would enforce that, though. My concern is that the
+previous hotplug development followed this "I do not understand exactly
+so I will simply put my on top of existing code" mantra and it ended up
+in a huge mess.
+
+> In this arm64 hot-remove port, offline and remove are done in two separate
+> steps, and is conceivable that an user tries erroneusly to remove some
+> section that he forgot to offline first: in that case, with the patch,
+> remove will just report an erro without BUGing.
+
+As I've said it is the caller to enforce that.
+
+> Is my reasoning flawed?
+
+I wouldn't say flawed but this is a low-level call that should already
+happen in a reasonable context.
+-- 
+Michal Hocko
+SUSE Labs
