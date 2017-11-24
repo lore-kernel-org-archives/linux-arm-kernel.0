@@ -1,99 +1,115 @@
-From: kernel@martin.sperl.org (kernel at martin.sperl.org)
-Date: Fri, 24 Nov 2017 12:18:13 +0000
-Subject: [PATCH] ARM: dts: add minimal device tree for compute model 3
-Message-ID: <20171124121813.11318-1-kernel@martin.sperl.org>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Fri, 24 Nov 2017 20:17:53 +0800
+Subject: [PATCH v2 4/5] mm: memory_hotplug: Add memory hotremove probe
+ device
+In-Reply-To: <20171124104401.GD18120@samekh>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
+ <5A17F5DF.2040108@huawei.com> <20171124104401.GD18120@samekh>
+Message-ID: <5A180DF1.8060009@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Martin Sperl <kernel@martin.sperl.org>
+Hi, Andrea
 
-Add a minimal working device tree for the compute model 3
-for both arm and arm64.
+most of server will benefit from NUMA ,it is best to sovle the issue without
+spcial restrictions.
 
-Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
----
- arch/arm/boot/dts/Makefile                       |  1 +
- arch/arm/boot/dts/bcm2837-rpi-cm3.dts            | 38 ++++++++++++++++++++++++
- arch/arm64/boot/dts/broadcom/Makefile            |  1 +
- arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts |  2 ++
- 4 files changed, 42 insertions(+)
- create mode 100644 arch/arm/boot/dts/bcm2837-rpi-cm3.dts
- create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts
+At least we can obtain the numa information from dtb. therefore, The memory can
+online correctly.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index eff87a344566..b24a682c450d 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -75,6 +75,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
- 	bcm2835-rpi-a-plus.dtb \
- 	bcm2836-rpi-2-b.dtb \
- 	bcm2837-rpi-3-b.dtb \
-+	bcm2837-rpi-cm3.dtb \
- 	bcm2835-rpi-zero.dtb \
- 	bcm2835-rpi-zero-w.dtb
- dtb-$(CONFIG_ARCH_BCM_5301X) += \
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-cm3.dts b/arch/arm/boot/dts/bcm2837-rpi-cm3.dts
-new file mode 100644
-index 000000000000..f387bd8bd707
---- /dev/null
-+++ b/arch/arm/boot/dts/bcm2837-rpi-cm3.dts
-@@ -0,0 +1,38 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/dts-v1/;
-+#include "bcm2837.dtsi"
-+#include "bcm2835-rpi.dtsi"
-+#include "bcm283x-rpi-usb-host.dtsi"
-+
-+/ {
-+	compatible = "raspberrypi,3-compute-model", "brcm,bcm2837";
-+	model = "Raspberry Pi Compute Module 3";
-+
-+	memory {
-+		reg = <0 0x40000000>;
-+	};
-+
-+	leds {
-+		act {
-+			gpios = <&gpio 47 0>;
-+		};
-+	};
-+};
-+
-+&hdmi {
-+	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_gpio14>;
-+	status = "okay";
-+};
-+
-+/* SDHOST is used to drive the SD card */
-+&sdhost {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&sdhost_gpio48>;
-+	status = "okay";
-+	bus-width = <4>;
-+};
-diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
-index 3df2db7f8878..aecf58f503ae 100644
---- a/arch/arm64/boot/dts/broadcom/Makefile
-+++ b/arch/arm64/boot/dts/broadcom/Makefile
-@@ -1,5 +1,6 @@
- # SPDX-License-Identifier: GPL-2.0
- dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
-+dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-cm3.dtb
- 
- dts-dirs	+= northstar2
- dts-dirs	+= stingray
-diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts
-new file mode 100644
-index 000000000000..a1bba71462ed
---- /dev/null
-+++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts
-@@ -0,0 +1,2 @@
-+// SPDX-License-Identifier: GPL-2.0
-+#include "arm/bcm2837-rpi-cm3.dts"
--- 
-2.11.0
+Thanks
+zhongjiang
+
+On 2017/11/24 18:44, Andrea Reale wrote:
+> Hi zhongjiang,
+>
+> On Fri 24 Nov 2017, 18:35, zhong jiang wrote:
+>> HI, Andrea
+>>
+>> I don't see "memory_add_physaddr_to_nid" in arch/arm64.
+>> Am I miss something?
+> When !CONFIG_NUMA it is defined in include/linux/memory_hotplug.h as 0.
+> In patch 1/5 of this series we require !NUMA to enable
+> ARCH_ENABLE_MEMORY_HOTPLUG.
+>
+> The reason for this simplification is simply that we would not know how
+> to decide the correct node to which to add memory when NUMA is on.
+> Any suggestion on that matter is welcome. 
+>
+> Thanks,
+> Andrea
+>
+>> Thnaks
+>> zhongjiang
+>>
+>> On 2017/11/23 19:14, Andrea Reale wrote:
+>>> Adding a "remove" sysfs handle that can be used to trigger
+>>> memory hotremove manually, exactly simmetrically with
+>>> what happens with the "probe" device for hot-add.
+>>>
+>>> This is usueful for architecture that do not rely on
+>>> ACPI for memory hot-remove.
+>>>
+>>> Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+>>> Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
+>>> ---
+>>>  drivers/base/memory.c | 34 +++++++++++++++++++++++++++++++++-
+>>>  1 file changed, 33 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/base/memory.c b/drivers/base/memory.c
+>>> index 1d60b58..8ccb67c 100644
+>>> --- a/drivers/base/memory.c
+>>> +++ b/drivers/base/memory.c
+>>> @@ -530,7 +530,36 @@ memory_probe_store(struct device *dev, struct device_attribute *attr,
+>>>  }
+>>>  
+>>>  static DEVICE_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
+>>> -#endif
+>>> +
+>>> +#ifdef CONFIG_MEMORY_HOTREMOVE
+>>> +static ssize_t
+>>> +memory_remove_store(struct device *dev,
+>>> +		struct device_attribute *attr, const char *buf, size_t count)
+>>> +{
+>>> +	u64 phys_addr;
+>>> +	int nid, ret;
+>>> +	unsigned long pages_per_block = PAGES_PER_SECTION * sections_per_block;
+>>> +
+>>> +	ret = kstrtoull(buf, 0, &phys_addr);
+>>> +	if (ret)
+>>> +		return ret;
+>>> +
+>>> +	if (phys_addr & ((pages_per_block << PAGE_SHIFT) - 1))
+>>> +		return -EINVAL;
+>>> +
+>>> +	nid = memory_add_physaddr_to_nid(phys_addr);
+>>> +	ret = lock_device_hotplug_sysfs();
+>>> +	if (ret)
+>>> +		return ret;
+>>> +
+>>> +	remove_memory(nid, phys_addr,
+>>> +			 MIN_MEMORY_BLOCK_SIZE * sections_per_block);
+>>> +	unlock_device_hotplug();
+>>> +	return count;
+>>> +}
+>>> +static DEVICE_ATTR(remove, S_IWUSR, NULL, memory_remove_store);
+>>> +#endif /* CONFIG_MEMORY_HOTREMOVE */
+>>> +#endif /* CONFIG_ARCH_MEMORY_PROBE */
+>>>  
+>>>  #ifdef CONFIG_MEMORY_FAILURE
+>>>  /*
+>>> @@ -790,6 +819,9 @@ bool is_memblock_offlined(struct memory_block *mem)
+>>>  static struct attribute *memory_root_attrs[] = {
+>>>  #ifdef CONFIG_ARCH_MEMORY_PROBE
+>>>  	&dev_attr_probe.attr,
+>>> +#ifdef CONFIG_MEMORY_HOTREMOVE
+>>> +	&dev_attr_remove.attr,
+>>> +#endif
+>>>  #endif
+>>>  
+>>>  #ifdef CONFIG_MEMORY_FAILURE
+>>
+>
+> .
+>
