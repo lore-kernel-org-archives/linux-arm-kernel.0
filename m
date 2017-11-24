@@ -1,9 +1,9 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Fri, 24 Nov 2017 12:25:29 +0530
-Subject: [PATCH 2/6] clk: lpc32xx: pr_err() strings should end with newlines
+Date: Fri, 24 Nov 2017 12:25:31 +0530
+Subject: [PATCH 4/6] SPEAr: clk: pr_err() strings should end with newlines
 In-Reply-To: <cover.1511505932.git.arvind.yadav.cs@gmail.com>
 References: <cover.1511505932.git.arvind.yadav.cs@gmail.com>
-Message-ID: <1dddfd71153339875c7bedf6e562483607180a4d.1511505932.git.arvind.yadav.cs@gmail.com>
+Message-ID: <35a712ed8ee10491c0a605d0cc825250286370a4.1511505932.git.arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,29 +12,20 @@ being concatenated.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/clk/nxp/clk-lpc32xx.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/clk/spear/clk-gpt-synth.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/clk/nxp/clk-lpc32xx.c b/drivers/clk/nxp/clk-lpc32xx.c
-index 7b359af..b669a5c 100644
---- a/drivers/clk/nxp/clk-lpc32xx.c
-+++ b/drivers/clk/nxp/clk-lpc32xx.c
-@@ -526,7 +526,7 @@ static unsigned long clk_pll_recalc_rate(struct clk_hw *hw,
- 	    !(pll_is_valid(parent_rate, 1, 1000000, 20000000)
- 	      && pll_is_valid(cco_rate, 1, 156000000, 320000000)
- 	      && pll_is_valid(ref_rate, 1, 1000000, 27000000)))
--		pr_err("%s: PLL clocks are not in valid ranges: %lu/%lu/%lu",
-+		pr_err("%s: PLL clocks are not in valid ranges: %lu/%lu/%lu\n",
- 		       clk_hw_get_name(hw),
- 		       parent_rate, cco_rate, ref_rate);
+diff --git a/drivers/clk/spear/clk-gpt-synth.c b/drivers/clk/spear/clk-gpt-synth.c
+index 1a722e9..1cf219a6 100644
+--- a/drivers/clk/spear/clk-gpt-synth.c
++++ b/drivers/clk/spear/clk-gpt-synth.c
+@@ -120,7 +120,7 @@ struct clk *clk_register_gpt(const char *name, const char *parent_name, unsigned
+ 	struct clk *clk;
  
-@@ -1505,7 +1505,7 @@ static void __init lpc32xx_clk_init(struct device_node *np)
- 		return;
- 	}
- 	if (clk_get_rate(clk_32k) != 32768) {
--		pr_err("invalid clock rate of external 32KHz oscillator");
-+		pr_err("invalid clock rate of external 32KHz oscillator\n");
- 		return;
+ 	if (!name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
+-		pr_err("Invalid arguments passed");
++		pr_err("Invalid arguments passed\n");
+ 		return ERR_PTR(-EINVAL);
  	}
  
 -- 
