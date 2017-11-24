@@ -1,35 +1,67 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 24 Nov 2017 16:47:18 +0800
-Subject: arm64 crashkernel fails to boot on acpi-only machines due to
- ACPI regions being no longer mapped as NOMAP
-In-Reply-To: <3df4c6c5-0abe-01ee-730d-2edaa5f497d2@redhat.com>
-References: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
- <CACi5LpNV_E9pvhTwLcy6vtEj9qbL1ZEHe-5sv=iiW0k9JxPD1Q@mail.gmail.com>
- <20171113092730.GA29552@linaro.org>
- <CAKv+Gu_eQ-s0J22tKeHKJme4qXcvxvDkS7vKrNW+o_XtMTkMhQ@mail.gmail.com>
- <3df4c6c5-0abe-01ee-730d-2edaa5f497d2@redhat.com>
-Message-ID: <20171124084718.GA4089@dhcp-128-65.nay.redhat.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 Nov 2017 10:30:40 +0100
+Subject: [PATCH 0/5] Make gpio_keys accept board descriptors
+Message-ID: <20171124093045.5961-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[snip]
-> > diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-> > index 7768423b39d3..61d867647cca 100644
-> > --- a/arch/arm64/kernel/setup.c
-> > +++ b/arch/arm64/kernel/setup.c
-> > @@ -213,7 +213,7 @@ static void __init request_standard_resources(void)
-> > 
-> >         for_each_memblock(memory, region) {
-> >                 res = alloc_bootmem_low(sizeof(*res));
-> > -               if (memblock_is_nomap(region)) {
-> > +               if (memblock_is_nomap(region) || memblock_is_reserved(region)) {
-> >                         res->name  = "reserved";
-> >                         res->flags = IORESOURCE_MEM;
-> >                 } else {
-> > 
-> 
+The goal I'm working toward is to rid the kernel of the global
+GPIO numberspace.
 
-Bhupesh, does insert resource work in efi_init/reserve_regions()?
+This means GPIO lines should be references by the local offset
+on the GPIO chip.
 
-Thanks
-Dave
+This patch set starts to move gpio_keys toward using GPIO
+look-up tables instead of global GPIO numbers to find their
+GPIOs.
+
+As an example I did (I think) the necessary patches to
+convert DaVinci and i.MX to use this. There are several users
+also x86 platform devices.
+
+Strategy:
+
+- Merge the patch to input/keyboard/gpio_keys* to support
+  using descriptors from board files.
+
+- Refactor the whole universe to get proper names on GPIO
+  chips, and reference the GPIO lines with local offsets using
+  tables, as in the example patches in this series. These
+  can trickle in after the first patch is merged in Input.
+  The work to be done can be seen if you type:
+  git grep gpio_keys_platform_data
+
+- When all are refactored, remove the "gpio" and "active low"
+  members from the platform data and delete the associated
+  legacy GPIO handling in the input driver for gpio_keys.
+
+Posting this with the examples to get buy-in from Dmitry
+before I go and spend time refactoring the world.
+
+I.e. I'm happy if patch 1 gets merged, the rest I will push
+through ARM SoC etc, or if nothing else works (like
+nonresponsive maintainers) I can push it through the GPIO
+tree without bothering Dmitry.
+
+Linus Walleij (5):
+  Input: gpio-keys: Support getting descriptors from board
+  gpio: pca953x: Name the gpiochip after the I2C address
+  ARM: davinci: Switch DA850EVM to use GPIO descriptors
+  ARM: imx: Give all GPIO chips a unique name
+  ARM: imx: Use GPIO descriptors for gpio_keys
+
+ arch/arm/mach-davinci/board-da850-evm.c     | 57 ++++++++++++++---
+ arch/arm/mach-imx/mach-armadillo5x0.c       | 19 ++++--
+ arch/arm/mach-imx/mach-imx27_visstrim_m10.c | 26 ++++++--
+ arch/arm/mach-imx/mach-pcm037_eet.c         | 52 +++++++++++----
+ arch/arm/mach-imx/mach-vpr200.c             | 99 ++++++++++++++++++++++++-----
+ arch/arm/mach-imx/mm-imx21.c                | 12 ++--
+ arch/arm/mach-imx/mm-imx27.c                | 12 ++--
+ arch/arm/mach-imx/mm-imx3.c                 | 12 ++--
+ drivers/gpio/gpio-pca953x.c                 | 17 ++++-
+ drivers/input/keyboard/gpio_keys.c          | 14 +++-
+ drivers/input/keyboard/gpio_keys_polled.c   | 10 +++
+ 11 files changed, 259 insertions(+), 71 deletions(-)
+
+-- 
+2.14.3
