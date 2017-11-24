@@ -1,57 +1,38 @@
-From: Jan.Tuerk@emtrion.de (=?utf-8?B?VMO8cmssIEphbg==?=)
-Date: Fri, 24 Nov 2017 15:59:30 +0100
-Subject: AW: [PATCH 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
-In-Reply-To: <CAOMZO5C+LST4xky5cDV=+aKjEic-cO2eX1J7X+jhK-nUZ_ATMw@mail.gmail.com>
-References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
- <20171123125600.41562-2-jan.tuerk@emtrion.com>
- <CAOMZO5D_xAWAnuH47BjAt4xNtz=c2dGn+kL6X8gW_auOTmDq5g@mail.gmail.com>
- <95F51F4B902CAC40AF459205F6322F01B7F903E17B@BMK019S01.emtrion.local>
- <CAOMZO5C+LST4xky5cDV=+aKjEic-cO2eX1J7X+jhK-nUZ_ATMw@mail.gmail.com>
-Message-ID: <95F51F4B902CAC40AF459205F6322F01B7F903E181@BMK019S01.emtrion.local>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 24 Nov 2017 15:03:17 +0000
+Subject: [RFC] KVM API extensions for SVE
+In-Reply-To: <20171124144538.GG28855@cbox>
+References: <20171121134913.GI22781@e103592.cambridge.arm.com>
+ <20171122195230.GT28855@cbox>
+ <20171123184050.GM22781@e103592.cambridge.arm.com>
+ <20171124144538.GG28855@cbox>
+Message-ID: <CAFEAcA_czAp1=n+BENZNiyn7k6bjRXOk3dYBQHgddDZXUP2osg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
-(and all others)
-> Von: Fabio Estevam [mailto:festevam at gmail.com]
-> Gesendet: Freitag, 24. November 2017 15:22
-> Betreff: Re: [PATCH 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
+On 24 November 2017 at 14:45, Christoffer Dall <cdall@linaro.org> wrote:
+> On Thu, Nov 23, 2017 at 06:40:50PM +0000, Dave Martin wrote:
+>> This creates another issue: if SVE is supported by the host kernel
+>> but not enabled for the guest, do I need to hist the SVE regs from
+>> KVM_GET_REG_LIST?
 >
-> Hi Jan,
->
-> On Thu, Nov 23, 2017 at 1:18 PM, T?rk, Jan <Jan.Tuerk@emtrion.de> wrote:
-> > Hi Fabio,
-> >
-> > I've used git send-email and tested the patches by checkpatch.pl before
-> without any problems.
-> > So it might have been touched by the mail server, so can you send me your
-> checkpatch.pl log (directly)?
->
-> Take a look at your patch here: https://patchwork.kernel.org/patch/10072765/
->
-> Click in the "patch" link and download it. You will notice that all tabs have been
-> converted into spaces.
->
-> checkpatch will warn about it.
+> I don't think so.  We should check with QEMU and kvmtool, but I think
+> the way it works is that userspace matches the KVM list with its own
+> internal list, and matches up anything it knows about, and discards the
+> rest.  Certainly in the past we haven't been afraid of adding registers
+> to KVM_GET_REG_LIST.
 
-thanks for your feedback. Meanwhile I also did some investigation and found out that our SMTP modified the message in the redmond style.
-I'll resend the patches as soon as the issue has been solved.
+QEMU userspace doesn't discard things it doesn't knows about, it
+just blindly passes them along in the migration stream to the
+destination.
 
-emtrion GmbH
-Kreativpark - Alter Schlachthof 45
-76131 Karlsruhe
-GERMANY
-http://www.emtrion.de
-_______________________________________
+The awkward bit for SVE is that its registers for KVM_GET_REG_LIST
+will be bigger than 64 bits. If you do that for existing QEMU
+binaries they'll assert because of the check in kvm_arm_init_cpreg_list()
+that the register size is something it can handle. So we mustn't
+list the SVE regs in GET_REG_LIST unless userspace has told us it
+can handle them (by setting a feature bit in the arguments to
+KVM_ARM_VCPU_INIT, presumably).
 
-Amtsgericht Mannheim
-HRB 110 300
-Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
-_______________________________________
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: winmail.dat
-Type: application/ms-tnef
-Size: 5649 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171124/53f7e5ae/attachment-0001.bin>
+thanks
+-- PMM
