@@ -1,26 +1,55 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 24 Nov 2017 11:14:27 +0000
-Subject: mainline boot: 8 passed 1 failed (mainline/v4.14)
-In-Reply-To: <CAOesGMgdqNrZbF5dOEdHKmuNVZiiFoV0_ipsPBi5HkGZUgYm_g@mail.gmail.com>
-References: <5a16144d.0be9620a.4490d.4375@mx.google.com>
- <CAK8P3a1OWob9We9zfvhBRN=fQYsw+nkZpqMJ9z6Q_A-N9_V3rQ@mail.gmail.com>
- <CAOesGMgdqNrZbF5dOEdHKmuNVZiiFoV0_ipsPBi5HkGZUgYm_g@mail.gmail.com>
-Message-ID: <20171124111427.zzfi6dw27fm6y2rb@sirena.org.uk>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Fri, 24 Nov 2017 09:21:51 -0200
+Subject: [PATCH] ARM: dts: imx6qdl-nitrogen6x: Add SPI NOR partitions
+Message-ID: <20171124112151.2758-1-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 11:40:21AM -0800, Olof Johansson wrote:
+This adds the partitions definition for the SPI NOR to provide
+backward compatibility with the documented[1] layout used with
+Boundary Devices BSP.
 
-> Looks like kernelci doesn't cover CONFIG_SMP=n boots, so I guess this
-> might be a new issue.
+1. https://boundarydevices.com/boot-flash-access-linux/
 
-We turned it off because it was constantly broken and nobody really
-cared - personally I'm not sure it's worth doing on systems that aren't
-actually uniprocessor.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171124/65714912/attachment.sig>
+It exports to Linux:
+
+ mtd0: U-Boot
+ mtd1: U-Boot Environment
+ mtd2: Bootsplash
+
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
+
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 4bdf29169d2a..f8b267875e1c 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -276,6 +276,23 @@
+ 		compatible = "sst,sst25vf016b", "jedec,spi-nor";
+ 		spi-max-frequency = <20000000>;
+ 		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "U-Boot";
++			reg = <0x0 0xc0000>;
++		};
++
++		partition at c0000 {
++			label = "U-Boot Environment";
++			reg = <0xc0000 0x2000>;
++		};
++
++		partition at c2000 {
++			label = "Bootsplash";
++			reg = <0xc2000 0x13e000>;
++		};
+ 	};
+ };
+ 
+-- 
+2.15.0
