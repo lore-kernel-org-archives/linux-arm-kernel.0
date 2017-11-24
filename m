@@ -1,56 +1,32 @@
-From: robert.walker@arm.com (Robert Walker)
-Date: Fri, 24 Nov 2017 09:58:45 +0000
-Subject: [PATCH] coresight: Fix disabling of CoreSight TPIU
-Message-ID: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 24 Nov 2017 11:04:04 +0100
+Subject: [PATCH v2] ARM: sa1100: simpad: Correct I2C GPIO offsets
+In-Reply-To: <CAK8P3a3s-1mD+eVagHBr-YL-nAyr_QN2VZNo7qBn=FZCQfEEkg@mail.gmail.com>
+References: <20171107201857.5752-1-linus.walleij@linaro.org>
+ <20171110145038.i4jnqsctdzkfmoe5@ninjato>
+ <CACRpkdangY192aFpSd1hVaie6A8kY+sASORhR_ncHLYLeUJMWw@mail.gmail.com>
+ <CAK8P3a3s-1mD+eVagHBr-YL-nAyr_QN2VZNo7qBn=FZCQfEEkg@mail.gmail.com>
+Message-ID: <CACRpkdbrcUOExjRmv5zN1hOvBAT18GOfRw9=5+e3d+MhS3q9+w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CoreSight TPIU should be disabled when tracing to other sinks to allow
-them to operate at full bandwidth.
+On Fri, Nov 10, 2017 at 4:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 
-This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
-configuring the TPIU to stop on flush, initiating a manual flush, waiting
-for the flush to complete and then waits for the TPIU to indicate it has
-stopped.
+> I have this in my ~/.gitconfig:
+>
+> [core]
+>         abbrev = 12
+> [alias]
+>         fixes = show --format='Fixes: %h (\"%s\")' -s
+>
+> So 'git fixes b2e63555592f81331c8da3afaa607d8cf83e8138' produces
+> Fixes: b2e63555592f ("i2c: gpio: Convert to use descriptors")
+>
+> which I then copy into a changelog as the last line, or use only the reference.
 
-Signed-off-by: Robert Walker <robert.walker@arm.com>
----
- drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
- 1 file changed, 10 insertions(+), 3 deletions(-)
+That's a neat trick.
 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index bef49a3..4b46c49 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -46,8 +46,11 @@
- #define TPIU_ITATBCTR0		0xef8
- 
- /** register definition **/
-+/* FFSR - 0x300 */
-+#define FFSR_FT_STOPPED		BIT(1)
- /* FFCR - 0x304 */
- #define FFCR_FON_MAN		BIT(6)
-+#define FFCR_STOP_FI		BIT(12)
- 
- /**
-  * @base:	memory mapped base address for this component.
-@@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
- {
- 	CS_UNLOCK(drvdata->base);
- 
--	/* Clear formatter controle reg. */
--	writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
-+	/* Clear formatter and stop on flush */
-+	writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
- 	/* Generate manual flush */
--	writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-+	writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-+	/* Wait for flush to complete */
-+	coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
-+	/* Wait for formatter to stop */
-+	coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
- 
- 	CS_LOCK(drvdata->base);
- }
--- 
-1.9.1
+I stole it :)
+
+Yours,
+Linus Walleij
