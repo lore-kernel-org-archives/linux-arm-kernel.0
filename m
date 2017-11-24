@@ -1,10 +1,10 @@
 From: javierm@redhat.com (Javier Martinez Canillas)
-Date: Fri, 24 Nov 2017 17:27:50 +0100
-Subject: [RESEND PATCH 4/4] ARM: dts: socfpga: Add generic compatible string
+Date: Fri, 24 Nov 2017 17:27:48 +0100
+Subject: [RESEND PATCH 2/4] ARM: dts: keystone: Add generic compatible string
  for I2C EEPROM
 In-Reply-To: <20171124162750.18756-1-javierm@redhat.com>
 References: <20171124162750.18756-1-javierm@redhat.com>
-Message-ID: <20171124162750.18756-4-javierm@redhat.com>
+Message-ID: <20171124162750.18756-2-javierm@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -20,24 +20,51 @@ So add this generic fallback to the device node compatible string to make
 the device to match the driver using the OF device ID table.
 
 Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
-
 ---
 
- arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/keystone-k2e-evm.dts  | 2 +-
+ arch/arm/boot/dts/keystone-k2hk-evm.dts | 2 +-
+ arch/arm/boot/dts/keystone-k2l-evm.dts  | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-index 655fe87e272d..2459d133f1be 100644
---- a/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-+++ b/arch/arm/boot/dts/socfpga_cyclone5_vining_fpga.dts
-@@ -237,7 +237,7 @@
- 	clock-frequency = <100000>;
+diff --git a/arch/arm/boot/dts/keystone-k2e-evm.dts b/arch/arm/boot/dts/keystone-k2e-evm.dts
+index f1f32c54e72f..2c59f4cb3b44 100644
+--- a/arch/arm/boot/dts/keystone-k2e-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2e-evm.dts
+@@ -82,7 +82,7 @@
  
- 	at24 at 50 {
--		compatible = "at24,24c02";
-+		compatible = "atmel,24c02";
- 		pagesize = <8>;
+ &i2c0 {
+ 	dtt at 50 {
+-		compatible = "at,24c1024";
++		compatible = "atmel,24c1024";
  		reg = <0x50>;
  	};
+ };
+diff --git a/arch/arm/boot/dts/keystone-k2hk-evm.dts b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+index 6dd13b98aaba..13759db99d81 100644
+--- a/arch/arm/boot/dts/keystone-k2hk-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2hk-evm.dts
+@@ -158,7 +158,7 @@
+ 
+ &i2c0 {
+ 	dtt at 50 {
+-		compatible = "at,24c1024";
++		compatible = "atmel,24c1024";
+ 		reg = <0x50>;
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/keystone-k2l-evm.dts b/arch/arm/boot/dts/keystone-k2l-evm.dts
+index 528667618db4..e6de1ae33c73 100644
+--- a/arch/arm/boot/dts/keystone-k2l-evm.dts
++++ b/arch/arm/boot/dts/keystone-k2l-evm.dts
+@@ -55,7 +55,7 @@
+ 
+ &i2c0 {
+ 	dtt at 50 {
+-		compatible = "at,24c1024";
++		compatible = "atmel,24c1024";
+ 		reg = <0x50>;
+ 	};
+ };
 -- 
 2.14.3
