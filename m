@@ -1,40 +1,74 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Fri, 24 Nov 2017 10:58:32 +0000
-Subject: [RFCv2 PATCH 10/36] vfio: Add support for Shared Virtual Memory
-In-Reply-To: <419afe22-816d-263f-9c85-1a9e28c723b7@huawei.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-11-jean-philippe.brucker@arm.com>
- <419afe22-816d-263f-9c85-1a9e28c723b7@huawei.com>
-Message-ID: <f297c4a8-559f-bf23-d5c2-219763bba289@arm.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 24 Nov 2017 12:09:47 +0100
+Subject: [PATCH v2] arm64: dts: renesas: r8a7795: Move nodes which have no
+ reg property out of bus
+In-Reply-To: <20171124105234.25774-1-horms+renesas@verge.net.au>
+References: <20171124105234.25774-1-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdW9V6Bkh5uS9qNA7awtygEs=qRd7jigwSHmpV2VM3n9dA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/17 08:23, Bob Liu wrote:
-> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
->> Add two new ioctl for VFIO containers. VFIO_DEVICE_BIND_PROCESS creates a
->> bond between a container and a process address space, identified by a
->> device-specific ID named PASID. This allows the device to target DMA
->> transactions at the process virtual addresses without a need for mapping
->> and unmapping buffers explicitly in the IOMMU. The process page tables are
->> shared with the IOMMU, and mechanisms such as PCI ATS/PRI may be used to
->> handle faults. VFIO_DEVICE_UNBIND_PROCESS removed a bond identified by a
->> PASID.
->> 
-> 
-> How about hide bind/unbind into ioctl(VFIO_SET_IOMMU)?
-> e.g always bind to current process in SET_IOMMU.
-> 
-> Not sure about the real use case.
+On Fri, Nov 24, 2017 at 11:52 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
+> The nodes that have been moved do not have any register properties and thus
+> shouldn't be placed on the bus.
+>
+> This problem is flagged by the compiler as follows:
+> $ make
+> ...
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+>   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+> v2
+> * Preserve alphabetical order of nodes present in root node.
 
-I guess you could introduce a new VFIO IOMMU type for this. I think this
-would be useful for SVA without PASID: if the device supports I/O page
-faults, use SET_IOMMU with a VFIO_SVA_IOMMU type (for example) and the
-process is bound automatically to the default translation context of the
-device. This requires a new IOMMU type because the MAP/UNMAP ioctl won't
-work anymore.
+Thanks for the update!
 
-I'm not keen on introducing loads of new features in the APIs at the
-moment, because I only have the IOMMU point of view, not many endpoint users.
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks,
-Jean
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
