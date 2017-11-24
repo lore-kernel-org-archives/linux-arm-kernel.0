@@ -1,65 +1,85 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 24 Nov 2017 11:28:36 +0100
-Subject: [RFC PATCH 0/3] pinctrl: sunxi: Add DT-based generic pinctrl
- driver
-In-Reply-To: <20171113012523.2328-1-andre.przywara@arm.com>
-References: <20171113012523.2328-1-andre.przywara@arm.com>
-Message-ID: <CACRpkdYFoUmGJYdKz0t9gsrkK=u8-oJjaRBXtNYHaUt9kSa3_g@mail.gmail.com>
+From: zhongjiang@huawei.com (zhong jiang)
+Date: Fri, 24 Nov 2017 18:35:11 +0800
+Subject: [PATCH v2 4/5] mm: memory_hotplug: Add memory hotremove probe
+ device
+In-Reply-To: <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
+Message-ID: <5A17F5DF.2040108@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 13, 2017 at 2:25 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+HI, Andrea
 
-> so far the pinctrl driver for supporting a particular Allwinner SoC requires
-> a hardcoded table in the kernel code.
-(...)
-> This series here moves the data encoded in the table so far into the DT itself,
-> removing the need for a hardcoded table in the kernel.
-(...)
+I don't see "memory_add_physaddr_to_nid" in arch/arm64.
+Am I miss something?
 
-The DT maintainers have been pretty clear on that they don't like
-using the the DT as a generic fit-all information dump. They
-prefer to look up hardware data from per-soc compatible strings.
+Thnaks
+zhongjiang
 
-I have been sceptic about it too, on the grounds that I think it
-make configuration and multiplatform kernels easy, while making
-debugging and reading code+device tree hard, also affecting
-maintenance cost.
-
-I'd like to have Maxime's buy-in before we progress and also some
-discussion on these themes in general.
-
-> The approach taken here is to parse the DT and generate the table with
-> the help of additional properties, then hand this table over to the existing
-> driver. This is covered by three basic extensions to the DT binding:
-
-I adressed this in the bindings patch.
-
-> The benefit of this series is two-fold:
-> - Future SoCs don't need an in-kernel table anymore. They can describe
->   everything in the DT,
-
-It can be debated whether that is really a good thing or actually
-a bad thing for the reasons stated above.
-
-Also an additional bad thing is inconsistency between different
-SoCs.
-
-What we have in the kernel for all-DT is pinctrl-single.c.
-
-This exists for the case where there is exactly one register per
-pin and all you have is strange macro files from the ASIC people
-that noone understands. OMAP and HiSilicon is using this.
-It's a compromise, I'm not super-happy with that driver at all times
-but it is for a very strongly specified case.
-
-Would it be possible for you guys to simply use/embrace/extend
-pinctrl-single.c if you want to go this route?
-
-Any higher order of complexity than "one register per pin" I think
-is better handled by open coding it than trying to push things into
-the device tree, because of readability, debuggability and maintenance
-issues.
-
-Yours,
-Linus Walleij
+On 2017/11/23 19:14, Andrea Reale wrote:
+> Adding a "remove" sysfs handle that can be used to trigger
+> memory hotremove manually, exactly simmetrically with
+> what happens with the "probe" device for hot-add.
+>
+> This is usueful for architecture that do not rely on
+> ACPI for memory hot-remove.
+>
+> Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+> Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
+> ---
+>  drivers/base/memory.c | 34 +++++++++++++++++++++++++++++++++-
+>  1 file changed, 33 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/base/memory.c b/drivers/base/memory.c
+> index 1d60b58..8ccb67c 100644
+> --- a/drivers/base/memory.c
+> +++ b/drivers/base/memory.c
+> @@ -530,7 +530,36 @@ memory_probe_store(struct device *dev, struct device_attribute *attr,
+>  }
+>  
+>  static DEVICE_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
+> -#endif
+> +
+> +#ifdef CONFIG_MEMORY_HOTREMOVE
+> +static ssize_t
+> +memory_remove_store(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	u64 phys_addr;
+> +	int nid, ret;
+> +	unsigned long pages_per_block = PAGES_PER_SECTION * sections_per_block;
+> +
+> +	ret = kstrtoull(buf, 0, &phys_addr);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (phys_addr & ((pages_per_block << PAGE_SHIFT) - 1))
+> +		return -EINVAL;
+> +
+> +	nid = memory_add_physaddr_to_nid(phys_addr);
+> +	ret = lock_device_hotplug_sysfs();
+> +	if (ret)
+> +		return ret;
+> +
+> +	remove_memory(nid, phys_addr,
+> +			 MIN_MEMORY_BLOCK_SIZE * sections_per_block);
+> +	unlock_device_hotplug();
+> +	return count;
+> +}
+> +static DEVICE_ATTR(remove, S_IWUSR, NULL, memory_remove_store);
+> +#endif /* CONFIG_MEMORY_HOTREMOVE */
+> +#endif /* CONFIG_ARCH_MEMORY_PROBE */
+>  
+>  #ifdef CONFIG_MEMORY_FAILURE
+>  /*
+> @@ -790,6 +819,9 @@ bool is_memblock_offlined(struct memory_block *mem)
+>  static struct attribute *memory_root_attrs[] = {
+>  #ifdef CONFIG_ARCH_MEMORY_PROBE
+>  	&dev_attr_probe.attr,
+> +#ifdef CONFIG_MEMORY_HOTREMOVE
+> +	&dev_attr_remove.attr,
+> +#endif
+>  #endif
+>  
+>  #ifdef CONFIG_MEMORY_FAILURE
