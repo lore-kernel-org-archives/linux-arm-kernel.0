@@ -1,53 +1,38 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 24 Nov 2017 15:46:18 +0100
-Subject: [PATCH v2 4/6] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM
- support
-In-Reply-To: <CAOMZO5Brey5G=SM0A143=srmWnLstHaSMrPx-PO5PQc4KtBtBA@mail.gmail.com>
-References: <1511348560-28505-1-git-send-email-narmstrong@baylibre.com>
- <1511348560-28505-5-git-send-email-narmstrong@baylibre.com>
- <CAOMZO5CuxBsMv1zabi3JtYyX0wNpv1rZZmZG28BBfo9a155siQ@mail.gmail.com>
- <bbbd71e2-eb31-4d43-7dfc-0ef817c5e13e@baylibre.com>
- <CAOMZO5Brey5G=SM0A143=srmWnLstHaSMrPx-PO5PQc4KtBtBA@mail.gmail.com>
-Message-ID: <0d9fe511-392d-74a5-3e65-ef7edd7b8d9b@baylibre.com>
+From: jerome.forissier@linaro.org (Jerome Forissier)
+Date: Fri, 24 Nov 2017 15:47:16 +0100
+Subject: [PATCH 0/2] tee: optee: report OP-TEE revision information
+Message-ID: <cover.1511533457.git.jerome.forissier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24/11/2017 15:44, Fabio Estevam wrote:
-> Hi Neil,
-> 
-> On Fri, Nov 24, 2017 at 12:41 PM, Neil Armstrong
-> <narmstrong@baylibre.com> wrote:
-> 
->>>> +&hdmi {
->>>
->>> No ddc-i2c-bus property?
->>
->> It's in the board dts.
-> 
-> Yes, I saw it while reviewing the other patch.
-> 
-> Do different boards use different I2C ports for the HDMI EDID?
-> 
-> If not, then you could probably put it here instead.
+Hi,
 
-Not at my knowledge, but it's typically something routed on the carrier board.
+This patchset updates the OP-TEE driver to report the version of the
+secure OS upon initialization. To further facilitate troubleshooting,
+an optional build ID is introduced in the response to the
+OPTEE_SMC_CALL_GET_OS_REVISION request. Upstream OP-TEE uses this field
+to report its Git SHA1 since commit 29cff5cf09aa ("core: GET_OS_REVISION:
+return SHA1 of current Git commit").
 
-Anyway I can set it here.
+Typical boot log (>> is introduced by this patchset):
 
-> 
->>>> +&pcie {
->>>> +       fsl,tx-swing-full = <103>;
->>>> +       fsl,tx-swing-low = <103>;
->>>> +       status = "disabled";
->>>
->>> No 'reset-gpio' property?
->>>
->>
->> It will be in the board dts.
-> 
-> Same here.
-> 
+    optee: probing for conduit method from DT.
+ >> optee: revision 2.6 (947cfeec)
+    optee: initialized driver
 
-Ok.
+...or, if the build ID is not set by the TEE or set to zero:
 
-Neil
+    optee: probing for conduit method from DT.
+ >> optee: revision 2.6
+    optee: initialized driver
+
+Jerome Forissier (2):
+  tee: optee: GET_OS_REVISION: document a2 as a build identifier
+  tee: optee: report OP-TEE revision information
+
+ drivers/tee/optee/core.c      | 23 +++++++++++++++++++++++
+ drivers/tee/optee/optee_smc.h | 10 +++++++++-
+ 2 files changed, 32 insertions(+), 1 deletion(-)
+
+-- 
+2.7.4
