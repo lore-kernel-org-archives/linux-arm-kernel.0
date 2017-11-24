@@ -1,120 +1,111 @@
-From: dvyukov@google.com (Dmitry Vyukov)
-Date: Fri, 24 Nov 2017 08:52:38 +0100
-Subject: [PATCH v2 18/18] arm64: select ARCH_SUPPORTS_LTO_CLANG
-In-Reply-To: <CAG_fn=UsmiQCXmdbED_SxgBj=xR0u0_mPS2+EhF0Me1ACBfWzw@mail.gmail.com>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-19-samitolvanen@google.com>
- <20171116115810.GH9361@arm.com>
- <20171116161731.GA94341@samitolvanen.mtv.corp.google.com>
- <20171116163054.kcsdsomr7u2mqql2@hirez.programming.kicks-ass.net>
- <CAKwvOdkV_g0XAbGM+nF2zt=2+tHLLcj=pbSxRDd2HMbrtU3cZg@mail.gmail.com>
- <20171116165922.llrojrvomuihabrt@hirez.programming.kicks-ass.net>
- <CAKwvOd=k=iVQvWmzP1E3XHUCYLoJgx+F9zoPuE+R2oaw_ePUVA@mail.gmail.com>
- <20171116173417.nqsh5dpu65uj7b5s@hirez.programming.kicks-ass.net>
- <20171116174830.GX3624@linux.vnet.ibm.com>
- <CAKwvOdkDz1yRo=Skt_mWxs0uucK+adXx8kFQksMbTE3ofnpUMQ@mail.gmail.com>
- <CAG_fn=UsmiQCXmdbED_SxgBj=xR0u0_mPS2+EhF0Me1ACBfWzw@mail.gmail.com>
-Message-ID: <CACT4Y+bBN=R21nLtFavArK55D0=zGiYe14AjGxtWv=R1D+s8jw@mail.gmail.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 24 Nov 2017 13:34:06 +0530
+Subject: [PATCH v3] drm: bridge: synopsys/dw-hdmi: Enable cec clock
+In-Reply-To: <75adf743-18a2-2c55-b4bb-95d83bd26f03@xs4all.nl>
+References: <20171026181942.9516-1-phh@phh.me>
+ <75adf743-18a2-2c55-b4bb-95d83bd26f03@xs4all.nl>
+Message-ID: <0cf328e7-772b-f634-e1b1-6653b513f2ec@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 2:42 PM, Alexander Potapenko <glider@google.com> wrote:
->>>> > >> > Ideally we'd get the toolchain people to commit to supporting the kernel
->>>> > >> > memory model along side the C11 one. That would help a ton.
->>>> > >>
->>>> > >> Does anyone from the kernel side participate in the C standardization process?
->>>> > >
->>>> > > Yes, Paul McKenney and Will Deacon. Doesn't mean these two can still be
->>>> > > reconciled though. From what I understand C11 (and onwards) are
->>>> > > incompatible with the kernel model on a number of subtle points.
->>>> >
->>>> > It would be good to have these incompatibilities written down, then
->>>> > for the sake of argument, they can be cited both for discussions on
->>>> > LKML and in the C standardization process.  For example, a running
->>>> > list in Documentation/ or something would make it so that anyone could
->>>> > understand and cite current issues with the latest C standard.
->>>>
->>>> Will should be able to produce this list; I know he's done before, I
->>>> just can't find it -- my Google-foo isn't strong today.
->>>
->>> Here you go:
->>>
->>> http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2017/p0124r4.html
->>
->> Great, thanks! Will take some time to digest, but happy to refer
->> others to this important work in the future.
->>
->> I wonder if we have anything like a case study that shows specifically
->> how a compiler generated a subtle bug due to specifics of the memory
->> model, like a "if you do this, here's the problematic code that will
->> get generated, and why it's problematic due to the memory model."
->> That may be a good way to raise issues with toolchain developers with
->> concrete and actionable examples.
->>
->>>> > I don't understand why we'd block patches for enabling experimental
->>>> > features.  We've been running this patch-set on actual devices for
->>>> > months and would love to provide them to the community for further
->>>> > testing.  If bugs are found, then there's more evidence to bring to
->>>> > the C standards committee.  Otherwise we're shutting down feature
->>>> > development for the sake of potential bugs in a C standard we're not
->>>> > even using.
->>>>
->>>> So the problem is that its very very hard (and painful) to find these
->>>> bugs. Getting the tools people to comment on these specific
->>>> optimizations would really help lots.
->>
->> No doubt; I do not disagree with you.  Kernel developers have very
->> important use cases for the language.
->>
->> But the core point I'm trying to make is "do we need to block this
->> patch set until issues with the C standards body in regards to the
->> kernels memory model are resolved?"  I would hope the two are
->> orthogonal and that we'd take them and then test them even more
->> extensively than the developer has in order to find out.
->>
->>> It would be good to get something similar to LKMM into KTSAN, for
->>> example.  There would probably be a few differences due to efficiency
->>> concerns, but closer is better than less close.  ;-)
->>
->> + glider, who may be able to comment on the state of KTSAN.
-> We haven't touched KTSAN for a while, so it's probably broken right now.
-> It should be possible to revive it, the question is how much code will
-> need to be annotated to prevent the tool from overwhelming the
-> developers with reports.
-> +Dima and Andrey, who should know better.
-
 Hi,
 
-KTSAN checks acquire/release pairs, and that's very useful. But as far
-as I understand this thread is about more subtle things and areas of
-kernel/compiler tension. I afraid this in this context KTSAN is in the
-same boat as compiler. Because, well, we need to write code that
-implements precise algorithms. And if control-dependencies are defined
-as "extreme care is required to avoid control-dependency-destroying
-compiler optimizations" (that is, code is correct if it does not break
-against the current set of enabled optimizations in the current
-compiler, what?) and data-dependencies are defined akin to C11
-definition (read -- non-implementable, unicorns); then KTSAN can't
-help.
+On 11/20/2017 06:00 PM, Hans Verkuil wrote:
+> I didn't see this merged for 4.15, is it too late to include this?
+> All other changes needed to get CEC to work on rk3288 and rk3399 are all merged.
 
-When/if C provides implementable rules for data-dependencies
-(_Dependency) and that's implemented in compilers and kernel sticks to
-this model, then I guess it should be possible to extract that info
-from compiler and check against it in KTSAN (e.g. 2 synchronization
-domains, one for dependent accesses and one for everything else).
-Kernel could as well define own model, and KTSAN could check against
-it. But that model must be implemented in compilers first anyway.
-Because (1) doing it just for KTSAN does not look reasonable, (2)
-until compiler supports that model there is little point in checking
-(the fact that compiler uses a different model is the major gaping
-hole and we are aware of it without tooling help).
+Sorry for the late reply. I was out last week.
 
-And, yes, I agree that we should not block this LTO patch. All
-problems are already there and are orthogonal to LTO. Compiler sees
-enough code already (large TUs, lots of code in headers) and we move
-code. I also have not seen any special rules wrt rcu and translation
-units, I have not seen developers doing any additional analysis re
-TUs, move code to separate files, nor I seen comments says that this
-code must be in separate TU than that code. From what I see usually
-it's assumed that things will just work. If anything LTO will be
-useful to shake out latent bugs that will pop up later.
+Dave recently sent the second pull request for 4.15, so I think it would be hard to get it
+in the merge window now. We could target it for the 4.15-rcs since it is preventing the
+feature from working. Is it possible to rephrase the commit message a bit so that it's clear
+that we need it for CEC to work?
+
+Thanks,
+Archit
+
+> 
+> Regards,
+> 
+> 	Hans
+> 
+> On 10/26/2017 08:19 PM, Pierre-Hugues Husson wrote:
+>> The documentation already mentions "cec" optional clock, but
+>> currently the driver doesn't enable it.
+>>
+>> Changes:
+>> v3:
+>> - Drop useless braces
+>>
+>> v2:
+>> - Separate ENOENT errors from others
+>> - Propagate other errors (especially -EPROBE_DEFER)
+>>
+>> Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
+>> ---
+>>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 25 +++++++++++++++++++++++++
+>>   1 file changed, 25 insertions(+)
+>>
+>> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> index bf14214fa464..d82b9747a979 100644
+>> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+>> @@ -138,6 +138,7 @@ struct dw_hdmi {
+>>   	struct device *dev;
+>>   	struct clk *isfr_clk;
+>>   	struct clk *iahb_clk;
+>> +	struct clk *cec_clk;
+>>   	struct dw_hdmi_i2c *i2c;
+>>   
+>>   	struct hdmi_data_info hdmi_data;
+>> @@ -2382,6 +2383,26 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>   		goto err_isfr;
+>>   	}
+>>   
+>> +	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
+>> +	if (PTR_ERR(hdmi->cec_clk) == -ENOENT) {
+>> +		hdmi->cec_clk = NULL;
+>> +	} else if (IS_ERR(hdmi->cec_clk)) {
+>> +		ret = PTR_ERR(hdmi->cec_clk);
+>> +		if (ret != -EPROBE_DEFER)
+>> +			dev_err(hdmi->dev, "Cannot get HDMI cec clock: %d\n",
+>> +					ret);
+>> +
+>> +		hdmi->cec_clk = NULL;
+>> +		goto err_iahb;
+>> +	} else {
+>> +		ret = clk_prepare_enable(hdmi->cec_clk);
+>> +		if (ret) {
+>> +			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
+>> +					ret);
+>> +			goto err_iahb;
+>> +		}
+>> +	}
+>> +
+>>   	/* Product and revision IDs */
+>>   	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
+>>   		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
+>> @@ -2518,6 +2539,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>>   		cec_notifier_put(hdmi->cec_notifier);
+>>   
+>>   	clk_disable_unprepare(hdmi->iahb_clk);
+>> +	if (hdmi->cec_clk)
+>> +		clk_disable_unprepare(hdmi->cec_clk);
+>>   err_isfr:
+>>   	clk_disable_unprepare(hdmi->isfr_clk);
+>>   err_res:
+>> @@ -2541,6 +2564,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+>>   
+>>   	clk_disable_unprepare(hdmi->iahb_clk);
+>>   	clk_disable_unprepare(hdmi->isfr_clk);
+>> +	if (hdmi->cec_clk)
+>> +		clk_disable_unprepare(hdmi->cec_clk);
+>>   
+>>   	if (hdmi->i2c)
+>>   		i2c_del_adapter(&hdmi->i2c->adap);
+>>
+> 
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
