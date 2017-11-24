@@ -1,35 +1,32 @@
-From: clabbe@baylibre.com (Corentin Labbe)
-Date: Fri, 24 Nov 2017 08:22:07 +0000
-Subject: [PATCH v2] ARM64: crypto: do not call crypto_unregister_skcipher
- twice on error
-Message-ID: <1511511727-15385-1-git-send-email-clabbe@baylibre.com>
+From: liubo95@huawei.com (Bob Liu)
+Date: Fri, 24 Nov 2017 16:23:26 +0800
+Subject: [RFCv2 PATCH 10/36] vfio: Add support for Shared Virtual Memory
+In-Reply-To: <20171006133203.22803-11-jean-philippe.brucker@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-11-jean-philippe.brucker@arm.com>
+Message-ID: <419afe22-816d-263f-9c85-1a9e28c723b7@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a cipher fails to register in aes_init(), the error path goes thought
-aes_exit() then crypto_unregister_skciphers().
-Since aes_exit calls also crypto_unregister_skcipher, this triggers a
-refcount_t: underflow; use-after-free.
+On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+> Add two new ioctl for VFIO containers. VFIO_DEVICE_BIND_PROCESS creates a
+> bond between a container and a process address space, identified by a
+> device-specific ID named PASID. This allows the device to target DMA
+> transactions at the process virtual addresses without a need for mapping
+> and unmapping buffers explicitly in the IOMMU. The process page tables are
+> shared with the IOMMU, and mechanisms such as PCI ATS/PRI may be used to
+> handle faults. VFIO_DEVICE_UNBIND_PROCESS removed a bond identified by a
+> PASID.
+> 
 
-Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
----
-Changes since v1:
-- Instead of duplicate code from aes_exit() minus crypto_unregister_skciphers, simply use it and return after
-as suggested by Ard Biesheuvel
- arch/arm64/crypto/aes-glue.c | 1 +
- 1 file changed, 1 insertion(+)
+How about hide bind/unbind into ioctl(VFIO_SET_IOMMU)? 
+e.g always bind to current process in SET_IOMMU.
 
-diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
-index 998ba519a026..2fa850e86aa8 100644
---- a/arch/arm64/crypto/aes-glue.c
-+++ b/arch/arm64/crypto/aes-glue.c
-@@ -665,6 +665,7 @@ static int __init aes_init(void)
- 
- unregister_simds:
- 	aes_exit();
-+	return err;
- unregister_ciphers:
- 	crypto_unregister_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
- 	return err;
--- 
-2.13.6
+Not sure about the real use case.
+
+> Signed-off-by: Jean-Philippe Brucker <jean-philippe.brucker@arm.com>
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 243 +++++++++++++++++++++++++++++++++++++++-
+>  include/uapi/linux/vfio.h       |  69 ++++++++++++
+>  2 files changed, 311 insertions(+), 1 deletion(-)
+> 
