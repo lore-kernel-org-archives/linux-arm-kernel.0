@@ -1,43 +1,48 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Fri, 24 Nov 2017 10:37:06 +0800
-Subject: [PATCH v2 11/11] MAINTAINERS: add entry for Rockchip ISP1 driver
+Date: Fri, 24 Nov 2017 10:37:02 +0800
+Subject: [PATCH v2 07/11] ARM: dts: rockchip: add isp node for rk3288
 In-Reply-To: <20171124023706.5702-1-jacob-chen@iotwrt.com>
 References: <20171124023706.5702-1-jacob-chen@iotwrt.com>
-Message-ID: <20171124023706.5702-12-jacob-chen@iotwrt.com>
+Message-ID: <20171124023706.5702-8-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jacob Chen <jacob2.chen@rock-chips.com>
 
-Add MAINTAINERS entry for the rockchip isp1 driver.
-This driver is maintained by rockchip officially and it
-will be used for rockchip SoC on all linux-kernel based OS.
+rk3288 have a Embedded 13M ISP
 
 Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
 ---
- MAINTAINERS | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/rk3288.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b05bc2c5e85c..614196ed7265 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -11665,6 +11665,16 @@ F:	drivers/hid/hid-roccat*
- F:	include/linux/hid-roccat*
- F:	Documentation/ABI/*/sysfs-driver-hid-roccat*
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index f3e7f98c2724..30677a0167fe 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -962,6 +962,23 @@
+ 		status = "disabled";
+ 	};
  
-+ROCKCHIP ISP V1 DRIVER
-+M:	Jacob chen <jacob2.chen@rock-chips.com>
-+M:	Shunqian Zheng <zhengsq@rock-chips.com>
-+M:	Yichong Zhong <zyc@rock-chips.com>
-+L:	linux-media at vger.kernel.org
-+S:	Maintained
-+F:	drivers/media/platform/rockchip/isp1/
-+F:	Documentation/devicetree/bindings/media/rockchip-isp1.txt
-+F:	Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
++	isp: isp at ff910000 {
++		compatible = "rockchip,rk3288-cif-isp";
++		reg = <0x0 0xff910000 0x0 0x4000>;
++		interrupts = <GIC_SPI 14 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_ISP>, <&cru ACLK_ISP>,
++			 <&cru HCLK_ISP>, <&cru PCLK_ISP_IN>,
++			 <&cru SCLK_ISP_JPE>;
++		clock-names = "clk_isp", "aclk_isp",
++			      "hclk_isp", "pclk_isp_in",
++			      "sclk_isp_jpe";
++		assigned-clocks = <&cru SCLK_ISP>;
++		assigned-clock-rates = <400000000>;
++		power-domains = <&power RK3288_PD_VIO>;
++		iommus = <&isp_mmu>;
++		status = "disabled";
++	};
 +
- ROCKCHIP RASTER 2D GRAPHIC ACCELERATION UNIT DRIVER
- M:	Jacob chen <jacob2.chen@rock-chips.com>
- L:	linux-media at vger.kernel.org
+ 	isp_mmu: iommu at ff914000 {
+ 		compatible = "rockchip,iommu";
+ 		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
 -- 
 2.15.0
