@@ -1,52 +1,45 @@
-From: bharat.bhushan@nxp.com (Bharat Bhushan)
-Date: Fri, 24 Nov 2017 16:00:42 +0000
-Subject: [PATCH v3] staging: fsl-mc: use 32bits to support 64K size
- mc-portals
-In-Reply-To: <20171124155848.GA8630@kroah.com>
-References: <1511336923-610-1-git-send-email-Bharat.Bhushan@nxp.com>
- <5A155642.70809@nxp.com> <20171124155848.GA8630@kroah.com>
-Message-ID: <AM5PR0401MB2545B2636B0CDE3AFB838E7C9A260@AM5PR0401MB2545.eurprd04.prod.outlook.com>
+From: smueller@chronox.de (Stephan Mueller)
+Date: Fri, 24 Nov 2017 17:04:19 +0100
+Subject: [PATCH v3] crypto: AF_ALG - remove locking in async callback
+In-Reply-To: <20171124073739.GB15597@gondor.apana.org.au>
+References: <CAGkQfmNKbSwue13zPh2K1F_kLkpm1_AhsAHK4spRFA0xMvU5PA@mail.gmail.com>
+ <1966139.WIlnTlQG5u@positron.chronox.de>
+ <20171124073739.GB15597@gondor.apana.org.au>
+Message-ID: <12422115.UWn9hbrTTi@tauon.chronox.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
+Am Freitag, 24. November 2017, 08:37:39 CET schrieb Herbert Xu:
 
-> -----Original Message-----
-> From: gregkh at linuxfoundation.org [mailto:gregkh at linuxfoundation.org]
-> Sent: Friday, November 24, 2017 9:29 PM
-> To: Laurentiu Tudor <laurentiu.tudor@nxp.com>
-> Cc: Bharat Bhushan <bharat.bhushan@nxp.com>; Ruxandra Ioana Radulescu
-> <ruxandra.radulescu@nxp.com>; devel at driverdev.osuosl.org;
-> stuyoder at gmail.com; Roy Pledge <roy.pledge@nxp.com>; linux-
-> kernel at vger.kernel.org; Leo Li <leoyang.li@nxp.com>; Bogdan Purcareata
-> <bogdan.purcareata@nxp.com>; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [PATCH v3] staging: fsl-mc: use 32bits to support 64K size mc-
-> portals
-> 
-> On Wed, Nov 22, 2017 at 10:49:50AM +0000, Laurentiu Tudor wrote:
-> >
-> >
-> > On 11/22/2017 09:48 AM, Bharat Bhushan wrote:
-> > > As per APIs each mc-portal is of 64K size while currently 16bits
-> > > (type u16) is used to store size of mc-portal.
-> > > In these cases upper bit of portal size gets truncated.
-> > >
-> > > Signed-off-by: Bharat Bhushan <Bharat.Bhushan@nxp.com>
-> > > ---
-> >
-> > Ok, so just to clarify this fixes the case where size is equal (or
-> > maybe larger in the future) to 0x10000.
-> 
-> Is this something that can happen today?  Is this needed in 4.14 to fix a
-> problem people are having and need to be backported to stable, or can it
-> wait until 4.15?
+Hi Herbert,
 
-We can wait for 4.15 and no need to backport.
-
-Thanks
--Bharat
-
+> On Fri, Nov 10, 2017 at 01:20:55PM +0100, Stephan M?ller wrote:
+> > The code paths protected by the socket-lock do not use or modify the
+> > socket in a non-atomic fashion. The actions pertaining the socket do not
+> > even need to be handled as an atomic operation. Thus, the socket-lock
+> > can be safely ignored.
+> > 
+> > This fixes a bug regarding scheduling in atomic as the callback function
+> > may be invoked in interrupt context.
+> > 
+> > In addition, the sock_hold is moved before the AIO encrypt/decrypt
+> > operation to ensure that the socket is always present. This avoids a
+> > tiny race window where the socket is unprotected and yet used by the AIO
+> > operation.
+> > 
+> > Finally, the release of resources for a crypto operation is moved into a
+> > common function of af_alg_free_resources.
+> > 
+> > Fixes: e870456d8e7c8 ("crypto: algif_skcipher - overhaul memory
+> > management") Fixes: d887c52d6ae43 ("crypto: algif_aead - overhaul memory
+> > management") Reported-by: Romain Izard <romain.izard.pro@gmail.com>
+> > Signed-off-by: Stephan Mueller <smueller@chronox.de>
 > 
-> thanks,
-> 
-> greg k-h
+> Patch applied.  Thanks.
+
+Thanks a lot.
+
+Would it make sense to feed it to stable?
+
+Ciao
+Stephan
