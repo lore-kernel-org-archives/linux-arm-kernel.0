@@ -1,57 +1,52 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 24 Nov 2017 13:36:01 +0100
-Subject: [PATCH v2] ARM: sa1100: simpad: Correct I2C GPIO offsets
-In-Reply-To: <CAK8P3a3s-1mD+eVagHBr-YL-nAyr_QN2VZNo7qBn=FZCQfEEkg@mail.gmail.com>
-References: <20171107201857.5752-1-linus.walleij@linaro.org>
- <20171110145038.i4jnqsctdzkfmoe5@ninjato>
- <CACRpkdangY192aFpSd1hVaie6A8kY+sASORhR_ncHLYLeUJMWw@mail.gmail.com>
- <CAK8P3a3s-1mD+eVagHBr-YL-nAyr_QN2VZNo7qBn=FZCQfEEkg@mail.gmail.com>
-Message-ID: <20171124123601.vyw6vejwa56xmun6@ninjato>
+From: andrea.adami@gmail.com (Andrea Adami)
+Date: Fri, 24 Nov 2017 13:52:22 +0100
+Subject: [PATCH 3/4] ARM: pxa/spitz: Remove hardcoded partitioning, use
+ sharpslpart parser
+In-Reply-To: <20171122230633.GC3623@amd>
+References: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+ <1511300631-1343-3-git-send-email-andrea.adami@gmail.com>
+ <20171122230633.GC3623@amd>
+Message-ID: <CAAQYJAs4H=8nUkP2fXzxk=RYfCyQkVBu-JfeqQh7SRc0BSoH0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 04:17:26PM +0100, Arnd Bergmann wrote:
-> On Fri, Nov 10, 2017 at 4:01 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> > On Fri, Nov 10, 2017 at 3:50 PM, Wolfram Sang <wsa@the-dreams.de> wrote:
-> >
-> >> Applied to for-next, thanks!
-> >
-> > Thanks man.
-> >
-> >> This from checkpatch makes sense to me:
-> >>
-> >> ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit b2e63555592f ("i2c: gpio: Convert to use descriptors")'
-> >> #21:
-> >> commit b2e63555592f81331c8da3afaa607d8cf83e8138
-> >
-> > I never understood that thingie, I thought the check was
-> > only there in order to stop Fixes: tags from running wild.
-> > But feel free to cut it if you want.
-> 
-> I have this in my ~/.gitconfig:
-> 
-> [core]
->         abbrev = 12
-> [alias]
->         fixes = show --format='Fixes: %h (\"%s\")' -s
-> 
-> So 'git fixes b2e63555592f81331c8da3afaa607d8cf83e8138' produces
-> Fixes: b2e63555592f ("i2c: gpio: Convert to use descriptors")
-> 
-> which I then copy into a changelog as the last line, or use only the reference.
+On Thu, Nov 23, 2017 at 12:06 AM, Pavel Machek <pavel@ucw.cz> wrote:
+> On Tue 2017-11-21 22:43:50, Andrea Adami wrote:
+>> With the introduction of sharpslpart partition parser we can now read the
+>> offsets from NAND: we specify the list of the parsers as platform data, with
+>> cmdlinepart and ofpart parsers first allowing to override the part. table
+>> written in NAND. This is done here in the board file.
+>>
+>> Emulators like qemu will need to pass the mtdparts in the cmdline.
+>
+> IOW this will be regression for people emulating zaurus in qemu.
+>
+> ...
+>
+> Is it good idea? Its not like this platform data is particulary big or
+> changes very often...
 
-Kinda similar, since I have a white background, I use:
+Hello Pavel,
 
-[alias]
-lg = log --format='%C(yellow)%h %Cgreen(\"%Creset%s%Cgreen\")'
+afais defining the partitions in the board file is today deprecated,
+more than this the definitions are not totally correct,
+e.g. ignoring the differences between 3100 and 3200 models.
 
-which is easy on my eye when reading 'git lg' but already has the proper
-format when copy pasting its output around.
+The original Zaurus kernels did specify mtdparts= in the cmdline so I
+don't see this being a big limitation for QEMU.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171124/f2c78282/attachment.sig>
+We are trying to clean out the board files and hopefully move the pxa
+Zaurus to devicetree one day...
+I think that removing the parttioning differences will ease the task.
+Please correct me if I am wrong.
+
+Cheers
+Andrea
+
+
+>
+>> Signed-off-by: Andrea Adami <andrea.adami@gmail.com>
+>
+> --
+> (english) http://www.livejournal.com/~pavelmachek
+> (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
