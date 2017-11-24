@@ -1,102 +1,137 @@
-From: ar@linux.vnet.ibm.com (Andrea Reale)
-Date: Fri, 24 Nov 2017 10:44:01 +0000
-Subject: [PATCH v2 4/5] mm: memory_hotplug: Add memory hotremove probe
- device
-In-Reply-To: <5A17F5DF.2040108@huawei.com>
+From: m.bielski@virtualopensystems.com (Maciej Bielski)
+Date: Fri, 24 Nov 2017 11:53:08 +0100
+Subject: [PATCH v2 1/5] mm: memory_hotplug: Memory hotplug (add) support
+ for arm64
+In-Reply-To: <20171124094232.GA18120@samekh>
 References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
- <5A17F5DF.2040108@huawei.com>
-Message-ID: <20171124104401.GD18120@samekh>
+ <ba9c72239dc5986edc6ca29fc58fefb306e4b52d.1511433386.git.ar@linux.vnet.ibm.com>
+ <CAKZGPAPN7migyvpNJDu1bA+ditb0TJV4WLqZuPdkxOU3kYQ9Ng@mail.gmail.com>
+ <20171124094232.GA18120@samekh>
+Message-ID: <20171124105308.GA10023@tpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi zhongjiang,
-
-On Fri 24 Nov 2017, 18:35, zhong jiang wrote:
-> HI, Andrea
-> 
-> I don't see "memory_add_physaddr_to_nid" in arch/arm64.
-> Am I miss something?
-
-When !CONFIG_NUMA it is defined in include/linux/memory_hotplug.h as 0.
-In patch 1/5 of this series we require !NUMA to enable
-ARCH_ENABLE_MEMORY_HOTPLUG.
-
-The reason for this simplification is simply that we would not know how
-to decide the correct node to which to add memory when NUMA is on.
-Any suggestion on that matter is welcome. 
-
-Thanks,
-Andrea
-
-> Thnaks
-> zhongjiang
-> 
-> On 2017/11/23 19:14, Andrea Reale wrote:
-> > Adding a "remove" sysfs handle that can be used to trigger
-> > memory hotremove manually, exactly simmetrically with
-> > what happens with the "probe" device for hot-add.
+On Fri, Nov 24, 2017 at 09:42:33AM +0000, Andrea Reale wrote:
+> Hi Arun,
+>
+>
+> On Fri 24 Nov 2017, 11:25, Arun KS wrote:
+> > On Thu, Nov 23, 2017 at 4:43 PM, Maciej Bielski
+> > <m.bielski@virtualopensystems.com> wrote:
+> >> [ ...]
+> > > Introduces memory hotplug functionality (hot-add) for arm64.
+> > > @@ -615,6 +616,44 @@ void __init paging_init(void)
+> > >                       SWAPPER_DIR_SIZE - PAGE_SIZE);
+> > >  }
+> > >
+> > > +#ifdef CONFIG_MEMORY_HOTPLUG
+> > > +
+> > > +/*
+> > > + * hotplug_paging() is used by memory hotplug to build new page tables
+> > > + * for hot added memory.
+> > > + */
+> > > +
+> > > +struct mem_range {
+> > > +       phys_addr_t base;
+> > > +       phys_addr_t size;
+> > > +};
+> > > +
+> > > +static int __hotplug_paging(void *data)
+> > > +{
+> > > +       int flags = 0;
+> > > +       struct mem_range *section = data;
+> > > +
+> > > +       if (debug_pagealloc_enabled())
+> > > +               flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
+> > > +
+> > > +       __create_pgd_mapping(swapper_pg_dir, section->base,
+> > > +                       __phys_to_virt(section->base), section->size,
+> > > +                       PAGE_KERNEL, pgd_pgtable_alloc, flags);
 > >
-> > This is usueful for architecture that do not rely on
-> > ACPI for memory hot-remove.
+> > Hello Andrea,
 > >
-> > Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> > Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
-> > ---
-> >  drivers/base/memory.c | 34 +++++++++++++++++++++++++++++++++-
-> >  1 file changed, 33 insertions(+), 1 deletion(-)
+> > __hotplug_paging runs on stop_machine context.
+> > cpu stop callbacks must not sleep.
+> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/kernel/stop_machine.c?h=v4.14#n479
 > >
-> > diff --git a/drivers/base/memory.c b/drivers/base/memory.c
-> > index 1d60b58..8ccb67c 100644
-> > --- a/drivers/base/memory.c
-> > +++ b/drivers/base/memory.c
-> > @@ -530,7 +530,36 @@ memory_probe_store(struct device *dev, struct device_attribute *attr,
-> >  }
-> >  
-> >  static DEVICE_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
-> > -#endif
-> > +
-> > +#ifdef CONFIG_MEMORY_HOTREMOVE
-> > +static ssize_t
-> > +memory_remove_store(struct device *dev,
-> > +		struct device_attribute *attr, const char *buf, size_t count)
-> > +{
-> > +	u64 phys_addr;
-> > +	int nid, ret;
-> > +	unsigned long pages_per_block = PAGES_PER_SECTION * sections_per_block;
-> > +
-> > +	ret = kstrtoull(buf, 0, &phys_addr);
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	if (phys_addr & ((pages_per_block << PAGE_SHIFT) - 1))
-> > +		return -EINVAL;
-> > +
-> > +	nid = memory_add_physaddr_to_nid(phys_addr);
-> > +	ret = lock_device_hotplug_sysfs();
-> > +	if (ret)
-> > +		return ret;
-> > +
-> > +	remove_memory(nid, phys_addr,
-> > +			 MIN_MEMORY_BLOCK_SIZE * sections_per_block);
-> > +	unlock_device_hotplug();
-> > +	return count;
-> > +}
-> > +static DEVICE_ATTR(remove, S_IWUSR, NULL, memory_remove_store);
-> > +#endif /* CONFIG_MEMORY_HOTREMOVE */
-> > +#endif /* CONFIG_ARCH_MEMORY_PROBE */
-> >  
-> >  #ifdef CONFIG_MEMORY_FAILURE
-> >  /*
-> > @@ -790,6 +819,9 @@ bool is_memblock_offlined(struct memory_block *mem)
-> >  static struct attribute *memory_root_attrs[] = {
-> >  #ifdef CONFIG_ARCH_MEMORY_PROBE
-> >  	&dev_attr_probe.attr,
-> > +#ifdef CONFIG_MEMORY_HOTREMOVE
-> > +	&dev_attr_remove.attr,
-> > +#endif
-> >  #endif
-> >  
-> >  #ifdef CONFIG_MEMORY_FAILURE
-> 
-> 
+> > __create_pgd_mapping uses pgd_pgtable_alloc. which does
+> > __get_free_page(PGALLOC_GFP)
+> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/mm/mmu.c?h=v4.14#n342
+> >
+> > PGALLOC_GFP has GFP_KERNEL which inturn has __GFP_RECLAIM
+> >
+> > #define PGALLOC_GFP     (GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)
+> > #define GFP_KERNEL      (__GFP_RECLAIM | __GFP_IO | __GFP_FS)
+> >
+> > Now, prepare_alloc_pages() called by __alloc_pages_nodemask checks for
+> >
+> > might_sleep_if(gfp_mask & __GFP_DIRECT_RECLAIM);
+> >
+> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/mm/page_alloc.c?h=v4.14#n4150
+> >
+> > and then BUG()
+>
+> Well spotted, thanks for reporting the problem. One possible solution
+> would be to revert back to building the updated page tables on a copy
+> pgdir (as it was done in v1 of this patchset) and then replacing swapper
+> atomically with stop_machine.
+>
+> Actually, I am not sure if stop_machine is strictly needed,
+> if we modify the swapper pgdir live: for example, in x86_64
+> kernel_physical_mapping_init, atomicity is ensured by spin-locking on
+> init_mm.page_table_lock.
+> https://elixir.free-electrons.com/linux/v4.14/source/arch/x86/mm/init_64.c#L684
+> I'll spend some time investigating whoever else could be working
+> concurrently on the swapper pgdir.
+>
+> Any suggestion or pointer is very welcome.
+
+Hi Andrea, Arun,
+
+Alternative approach could be implementing pgd_pgtable_alloc_nosleep() and
+pointing this to hotplug_paging(). Subsequently, it could use different flags,
+eg:
+
+#define PGALLOC_GFP_NORECLAIM	(__GFP_IO | __GFP_FS | __GFP_NOTRACK | __GFP_ZERO)
+
+Is this unefficient approach in any way?
+Do we like the fact that the memory-attaching thread can go to sleep?
+
+BR,
+
+>
+> Thanks,
+> Andrea
+>
+> > I was testing on 4.4 kernel, but cross checked with 4.14 as well.
+> >
+> > Regards,
+> > Arun
+> >
+> >
+> > > +
+> > > +       return 0;
+> > > +}
+> > > +
+> > > +inline void hotplug_paging(phys_addr_t start, phys_addr_t size)
+> > > +{
+> > > +       struct mem_range section = {
+> > > +               .base = start,
+> > > +               .size = size,
+> > > +       };
+> > > +
+> > > +       stop_machine(__hotplug_paging, &section, NULL);
+> > > +}
+> > > +#endif /* CONFIG_MEMORY_HOTPLUG */
+> > > +
+> > >  /*
+> > >   * Check whether a kernel address is valid (derived from arch/x86/).
+> > >   */
+> > > --
+> > > 2.7.4
+> > >
+> >
+>
+
+--
+Maciej Bielski
