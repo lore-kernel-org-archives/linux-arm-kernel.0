@@ -1,22 +1,77 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Fri, 24 Nov 2017 15:55:59 +1100
+From: clabbe@baylibre.com (LABBE Corentin)
+Date: Fri, 24 Nov 2017 06:52:33 +0100
 Subject: [PATCH] crypto: arm64/aes - do not call
  crypto_unregister_skcipher twice on error
 In-Reply-To: <CAKv+Gu9m3v_iMdg8ngX-3x1HT+c8D52dhjJ=MiTp11VByD=ewA@mail.gmail.com>
 References: <1511338114-39583-1-git-send-email-clabbe@baylibre.com>
  <CAKv+Gu9m3v_iMdg8ngX-3x1HT+c8D52dhjJ=MiTp11VByD=ewA@mail.gmail.com>
-Message-ID: <20171124045558.GA14676@gondor.apana.org.au>
+Message-ID: <20171124055233.GA16381@Red>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Wed, Nov 22, 2017 at 08:55:14AM +0000, Ard Biesheuvel wrote:
->
+> Hello Corentin,
+> 
+> On 22 November 2017 at 08:08, Corentin Labbe <clabbe@baylibre.com> wrote:
+> > When a cipher fail
+> 
+> fails
+> 
+> > to register in aes_init(), the error path go thought
+> 
+> goes through
+> 
+> > aes_exit() then crypto_unregister_skciphers().
+> > Since aes_exit calls also crypto_unregister_skcipher, this trigger a
+> 
+> triggers
+> 
+> > refcount_t: underflow; use-after-free.
+> >
+> > Signed-off-by: Corentin Labbe <clabbe@baylibre.com>
+> > ---
+> >  arch/arm64/crypto/aes-glue.c | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
+> > index 998ba519a026..9e42ec96243e 100644
+> > --- a/arch/arm64/crypto/aes-glue.c
+> > +++ b/arch/arm64/crypto/aes-glue.c
+> > @@ -664,7 +664,10 @@ static int __init aes_init(void)
+> >         return 0;
+> >
+> >  unregister_simds:
+> > -       aes_exit();
+> > +       for (i = 0; i < ARRAY_SIZE(aes_simd_algs); i++)
+> > +               if (aes_simd_algs[i])
+> > +                       simd_skcipher_free(aes_simd_algs[i]);
+> > +       crypto_unregister_shashes(mac_algs, ARRAY_SIZE(mac_algs));
+> >  unregister_ciphers:
+> >         crypto_unregister_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
+> >         return err;
+> > --
+> > 2.13.6
+> >
+> >
+> 
+> 
 > Would this also fix it?
+> 
+> diff --git a/arch/arm64/crypto/aes-glue.c b/arch/arm64/crypto/aes-glue.c
+> index 998ba519a026..2fa850e86aa8 100644
+> --- a/arch/arm64/crypto/aes-glue.c
+> +++ b/arch/arm64/crypto/aes-glue.c
+> @@ -665,6 +665,7 @@ static int __init aes_init(void)
+> 
+>  unregister_simds:
+>         aes_exit();
+> +       return err;
+>  unregister_ciphers:
+>         crypto_unregister_skciphers(aes_algs, ARRAY_SIZE(aes_algs));
+>         return err;
 
-Looks good.  Could you resubmit with a sign-off?
+Yes it is better.
 
-Thanks,
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+I will send a v2 today.
+
+Regards
