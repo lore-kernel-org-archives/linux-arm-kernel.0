@@ -1,98 +1,99 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 24 Nov 2017 12:05:37 +0000
-Subject: [RFC PATCH 0/3] pinctrl: sunxi: Add DT-based generic pinctrl
- driver
-In-Reply-To: <CACRpkdYFoUmGJYdKz0t9gsrkK=u8-oJjaRBXtNYHaUt9kSa3_g@mail.gmail.com>
-References: <20171113012523.2328-1-andre.przywara@arm.com>
- <CACRpkdYFoUmGJYdKz0t9gsrkK=u8-oJjaRBXtNYHaUt9kSa3_g@mail.gmail.com>
-Message-ID: <54ecfdf7-cf4a-3eae-2661-47fa668a6066@arm.com>
+From: kernel@martin.sperl.org (kernel at martin.sperl.org)
+Date: Fri, 24 Nov 2017 12:18:13 +0000
+Subject: [PATCH] ARM: dts: add minimal device tree for compute model 3
+Message-ID: <20171124121813.11318-1-kernel@martin.sperl.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Martin Sperl <kernel@martin.sperl.org>
 
-On 24/11/17 10:28, Linus Walleij wrote:
-> On Mon, Nov 13, 2017 at 2:25 AM, Andre Przywara <andre.przywara@arm.com> wrote:
-> 
->> so far the pinctrl driver for supporting a particular Allwinner SoC requires
->> a hardcoded table in the kernel code.
-> (...)
->> This series here moves the data encoded in the table so far into the DT itself,
->> removing the need for a hardcoded table in the kernel.
-> (...)
-> 
-> The DT maintainers have been pretty clear on that they don't like
-> using the the DT as a generic fit-all information dump. They
-> prefer to look up hardware data from per-soc compatible strings.
-> 
-> I have been sceptic about it too, on the grounds that I think it
-> make configuration and multiplatform kernels easy, while making
-> debugging and reading code+device tree hard, also affecting
-> maintenance cost.
-> 
-> I'd like to have Maxime's buy-in before we progress and also some
-> discussion on these themes in general.
+Add a minimal working device tree for the compute model 3
+for both arm and arm64.
 
-Indeed this was one of the goals of this series. I can understand were
-we came from and that we had those in-kernel tables in the past.
-I am just a bit worried that with Allwinner recently playing the SKU
-game we end up with tons of tables for only slightly different SoCs (see
-the H3 and H5, for instance). And with single image kernels we pile up
-quite some *data* in each kernel, which is of little interest for
-everyone else.
+Signed-off-by: Martin Sperl <kernel@martin.sperl.org>
+---
+ arch/arm/boot/dts/Makefile                       |  1 +
+ arch/arm/boot/dts/bcm2837-rpi-cm3.dts            | 38 ++++++++++++++++++++++++
+ arch/arm64/boot/dts/broadcom/Makefile            |  1 +
+ arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts |  2 ++
+ 4 files changed, 42 insertions(+)
+ create mode 100644 arch/arm/boot/dts/bcm2837-rpi-cm3.dts
+ create mode 100644 arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts
 
-Also my understanding is that the actual Allwinner pin controller IP
-(register map) is very much the same across all SoCs. Mostly the only
-difference is the mapping between pins and mux functions, which we
-express in the DT already anyway (in the subnodes). And this is really a
-poster book example of what DT should be doing: express the specific
-mappings of a particular implementation. I don't see why this would need
-to be per-board only, if we can pull this up to the SoC level.
-
->> The approach taken here is to parse the DT and generate the table with
->> the help of additional properties, then hand this table over to the existing
->> driver. This is covered by three basic extensions to the DT binding:
-> 
-> I adressed this in the bindings patch.
-> 
->> The benefit of this series is two-fold:
->> - Future SoCs don't need an in-kernel table anymore. They can describe
->>   everything in the DT,
-> 
-> It can be debated whether that is really a good thing or actually
-> a bad thing for the reasons stated above.
-
-The point is that we already rely on the DT anyway, just that we use a
-*string* to specify a certain mux function. The in-kernel table just
-maps this to an actual SoC-specific register value. I think the GPIO
-subsystem needs the name, hence I am just adding the pinmux property.
-
-> Also an additional bad thing is inconsistency between different
-> SoCs.
-
-Well, does that mean that we should never change anything? Consistency
-is nice, but should not be an excuse for not improving things. And I
-tried to embrace the existing driver by designing this on top of it.
-
-> What we have in the kernel for all-DT is pinctrl-single.c.
-> 
-> This exists for the case where there is exactly one register per
-> pin and all you have is strange macro files from the ASIC people
-> that noone understands. OMAP and HiSilicon is using this.
-> It's a compromise, I'm not super-happy with that driver at all times
-> but it is for a very strongly specified case.
-> 
-> Would it be possible for you guys to simply use/embrace/extend
-> pinctrl-single.c if you want to go this route?
-
-Thanks for the pointer, I will have a look.
-
-> Any higher order of complexity than "one register per pin" I think
-> is better handled by open coding it than trying to push things into
-> the device tree, because of readability, debuggability and maintenance
-> issues.
-
-I don't see how this binding would make this worse.
-
-Cheers,
-Andre.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index eff87a344566..b24a682c450d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -75,6 +75,7 @@ dtb-$(CONFIG_ARCH_BCM2835) += \
+ 	bcm2835-rpi-a-plus.dtb \
+ 	bcm2836-rpi-2-b.dtb \
+ 	bcm2837-rpi-3-b.dtb \
++	bcm2837-rpi-cm3.dtb \
+ 	bcm2835-rpi-zero.dtb \
+ 	bcm2835-rpi-zero-w.dtb
+ dtb-$(CONFIG_ARCH_BCM_5301X) += \
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-cm3.dts b/arch/arm/boot/dts/bcm2837-rpi-cm3.dts
+new file mode 100644
+index 000000000000..f387bd8bd707
+--- /dev/null
++++ b/arch/arm/boot/dts/bcm2837-rpi-cm3.dts
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: GPL-2.0
++/dts-v1/;
++#include "bcm2837.dtsi"
++#include "bcm2835-rpi.dtsi"
++#include "bcm283x-rpi-usb-host.dtsi"
++
++/ {
++	compatible = "raspberrypi,3-compute-model", "brcm,bcm2837";
++	model = "Raspberry Pi Compute Module 3";
++
++	memory {
++		reg = <0 0x40000000>;
++	};
++
++	leds {
++		act {
++			gpios = <&gpio 47 0>;
++		};
++	};
++};
++
++&hdmi {
++	hpd-gpios = <&gpio 46 GPIO_ACTIVE_LOW>;
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_gpio14>;
++	status = "okay";
++};
++
++/* SDHOST is used to drive the SD card */
++&sdhost {
++	pinctrl-names = "default";
++	pinctrl-0 = <&sdhost_gpio48>;
++	status = "okay";
++	bus-width = <4>;
++};
+diff --git a/arch/arm64/boot/dts/broadcom/Makefile b/arch/arm64/boot/dts/broadcom/Makefile
+index 3df2db7f8878..aecf58f503ae 100644
+--- a/arch/arm64/boot/dts/broadcom/Makefile
++++ b/arch/arm64/boot/dts/broadcom/Makefile
+@@ -1,5 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-3-b.dtb
++dtb-$(CONFIG_ARCH_BCM2835) += bcm2837-rpi-cm3.dtb
+ 
+ dts-dirs	+= northstar2
+ dts-dirs	+= stingray
+diff --git a/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts
+new file mode 100644
+index 000000000000..a1bba71462ed
+--- /dev/null
++++ b/arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3.dts
+@@ -0,0 +1,2 @@
++// SPDX-License-Identifier: GPL-2.0
++#include "arm/bcm2837-rpi-cm3.dts"
+-- 
+2.11.0
