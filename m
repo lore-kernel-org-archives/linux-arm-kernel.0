@@ -1,137 +1,55 @@
-From: m.bielski@virtualopensystems.com (Maciej Bielski)
-Date: Fri, 24 Nov 2017 11:53:08 +0100
-Subject: [PATCH v2 1/5] mm: memory_hotplug: Memory hotplug (add) support
- for arm64
-In-Reply-To: <20171124094232.GA18120@samekh>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <ba9c72239dc5986edc6ca29fc58fefb306e4b52d.1511433386.git.ar@linux.vnet.ibm.com>
- <CAKZGPAPN7migyvpNJDu1bA+ditb0TJV4WLqZuPdkxOU3kYQ9Ng@mail.gmail.com>
- <20171124094232.GA18120@samekh>
-Message-ID: <20171124105308.GA10023@tpad>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 24 Nov 2017 11:52:40 +0100
+Subject: [RFC PATCH 1/3] dt-bindings: pinctrl: sunxi: document new
+ generic binding
+In-Reply-To: <CACRpkdbpfkM4odz425+4qyUCF5vqPWBQ=F5Yk7AtJL5SqXghpg@mail.gmail.com>
+References: <20171113012523.2328-1-andre.przywara@arm.com>
+ <20171113012523.2328-2-andre.przywara@arm.com>
+ <CACRpkdbpfkM4odz425+4qyUCF5vqPWBQ=F5Yk7AtJL5SqXghpg@mail.gmail.com>
+Message-ID: <20171124105240.GB3792@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 09:42:33AM +0000, Andrea Reale wrote:
-> Hi Arun,
->
->
-> On Fri 24 Nov 2017, 11:25, Arun KS wrote:
-> > On Thu, Nov 23, 2017 at 4:43 PM, Maciej Bielski
-> > <m.bielski@virtualopensystems.com> wrote:
-> >> [ ...]
-> > > Introduces memory hotplug functionality (hot-add) for arm64.
-> > > @@ -615,6 +616,44 @@ void __init paging_init(void)
-> > >                       SWAPPER_DIR_SIZE - PAGE_SIZE);
-> > >  }
-> > >
-> > > +#ifdef CONFIG_MEMORY_HOTPLUG
-> > > +
-> > > +/*
-> > > + * hotplug_paging() is used by memory hotplug to build new page tables
-> > > + * for hot added memory.
-> > > + */
-> > > +
-> > > +struct mem_range {
-> > > +       phys_addr_t base;
-> > > +       phys_addr_t size;
-> > > +};
-> > > +
-> > > +static int __hotplug_paging(void *data)
-> > > +{
-> > > +       int flags = 0;
-> > > +       struct mem_range *section = data;
-> > > +
-> > > +       if (debug_pagealloc_enabled())
-> > > +               flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
-> > > +
-> > > +       __create_pgd_mapping(swapper_pg_dir, section->base,
-> > > +                       __phys_to_virt(section->base), section->size,
-> > > +                       PAGE_KERNEL, pgd_pgtable_alloc, flags);
+On Fri, Nov 24, 2017 at 11:19:52AM +0100, Linus Walleij wrote:
+> On Mon, Nov 13, 2017 at 2:25 AM, Andre Przywara <andre.przywara@arm.com> wrote:
+> 
+> > So far all the Allwinner pinctrl drivers provided a table in the
+> > kernel to describe all the pins and the link between the pinctrl functions
+> > names (strings) and their respective mux values (register values).
 > >
-> > Hello Andrea,
-> >
-> > __hotplug_paging runs on stop_machine context.
-> > cpu stop callbacks must not sleep.
-> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/kernel/stop_machine.c?h=v4.14#n479
-> >
-> > __create_pgd_mapping uses pgd_pgtable_alloc. which does
-> > __get_free_page(PGALLOC_GFP)
-> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/mm/mmu.c?h=v4.14#n342
-> >
-> > PGALLOC_GFP has GFP_KERNEL which inturn has __GFP_RECLAIM
-> >
-> > #define PGALLOC_GFP     (GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)
-> > #define GFP_KERNEL      (__GFP_RECLAIM | __GFP_IO | __GFP_FS)
-> >
-> > Now, prepare_alloc_pages() called by __alloc_pages_nodemask checks for
-> >
-> > might_sleep_if(gfp_mask & __GFP_DIRECT_RECLAIM);
-> >
-> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/mm/page_alloc.c?h=v4.14#n4150
-> >
-> > and then BUG()
->
-> Well spotted, thanks for reporting the problem. One possible solution
-> would be to revert back to building the updated page tables on a copy
-> pgdir (as it was done in v1 of this patchset) and then replacing swapper
-> atomically with stop_machine.
->
-> Actually, I am not sure if stop_machine is strictly needed,
-> if we modify the swapper pgdir live: for example, in x86_64
-> kernel_physical_mapping_init, atomicity is ensured by spin-locking on
-> init_mm.page_table_lock.
-> https://elixir.free-electrons.com/linux/v4.14/source/arch/x86/mm/init_64.c#L684
-> I'll spend some time investigating whoever else could be working
-> concurrently on the swapper pgdir.
->
-> Any suggestion or pointer is very welcome.
+> > Extend the binding to put those mappings in the DT, so that any SoC can
+> > describe its pinctrl and GPIO data fully there instead of relying on
+> > tables.
+> > This uses a generic compatible name, to be prepended with an SoC
+> > specific name in the node.
 
-Hi Andrea, Arun,
+This seems backwards to me. I'm not sure if Rob has any hard rules on
+this, but in the past I've seen a lot of drivers stick this kind of data
+into drivers. I personally also prefer that approach because the data is
+completely static and there's no way for any specific board to customize
+it. So the tables are in fact implied completely by the SoC compatible
+string.
 
-Alternative approach could be implementing pgd_pgtable_alloc_nosleep() and
-pointing this to hotplug_paging(). Subsequently, it could use different flags,
-eg:
+Moving all of this data into device tree has a number of disadvantages:
 
-#define PGALLOC_GFP_NORECLAIM	(__GFP_IO | __GFP_FS | __GFP_NOTRACK | __GFP_ZERO)
+  * Existing boards already use the static tables in the driver, and the
+    device trees don't contain any data, so you can't get rid of any of
+    the existing tables because it would break ABI.
 
-Is this unefficient approach in any way?
-Do we like the fact that the memory-attaching thread can go to sleep?
+  * Moving the table into the DT doesn't actually solve anything because
+    the driver would have to validate the DT description to make sure it
+    contains valid data. And in order to validate DT content, the driver
+    would need a copy of the table anyway.
 
-BR,
+I don't think you're going to do yourself any favours by pushing this. I
+also don't see the commit description give any reason why you want to
+move the table into device tree. Do you see any advantages in doing so?
 
->
-> Thanks,
-> Andrea
->
-> > I was testing on 4.4 kernel, but cross checked with 4.14 as well.
-> >
-> > Regards,
-> > Arun
-> >
-> >
-> > > +
-> > > +       return 0;
-> > > +}
-> > > +
-> > > +inline void hotplug_paging(phys_addr_t start, phys_addr_t size)
-> > > +{
-> > > +       struct mem_range section = {
-> > > +               .base = start,
-> > > +               .size = size,
-> > > +       };
-> > > +
-> > > +       stop_machine(__hotplug_paging, &section, NULL);
-> > > +}
-> > > +#endif /* CONFIG_MEMORY_HOTPLUG */
-> > > +
-> > >  /*
-> > >   * Check whether a kernel address is valid (derived from arch/x86/).
-> > >   */
-> > > --
-> > > 2.7.4
-> > >
-> >
->
-
---
-Maciej Bielski
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171124/70f02bb4/attachment.sig>
