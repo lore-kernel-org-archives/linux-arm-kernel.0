@@ -1,117 +1,59 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 24 Nov 2017 14:39:47 +0000
-Subject: [PATCH] arm64: dts: Hi3660: Fix state id for 'CPU_NAP' state
-In-Reply-To: <20171124065623.GD13184@leoy-linaro>
-References: <1511415614-9859-1-git-send-email-leo.yan@linaro.org>
- <17639ecc-8ff8-e118-f6e1-51e2cfe4342b@arm.com>
- <20171124065623.GD13184@leoy-linaro>
-Message-ID: <b62517be-1d4d-7b2e-7a6e-1c2abbb4ecee@arm.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 24 Nov 2017 15:41:13 +0100
+Subject: [PATCH v2 4/6] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM
+ support
+In-Reply-To: <CAOMZO5CuxBsMv1zabi3JtYyX0wNpv1rZZmZG28BBfo9a155siQ@mail.gmail.com>
+References: <1511348560-28505-1-git-send-email-narmstrong@baylibre.com>
+ <1511348560-28505-5-git-send-email-narmstrong@baylibre.com>
+ <CAOMZO5CuxBsMv1zabi3JtYyX0wNpv1rZZmZG28BBfo9a155siQ@mail.gmail.com>
+Message-ID: <bbbd71e2-eb31-4d43-7dfc-0ef817c5e13e@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Fabio,
 
+On 24/11/2017 15:31, Fabio Estevam wrote:
+> On Wed, Nov 22, 2017 at 9:02 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> 
+>> +       reg_wl18xx_vmmc: regulator-wl18xx {
+>> +               compatible = "regulator-fixed";
+>> +               regulator-name = "vwl1807";
+>> +               regulator-min-microvolt = <1800000>;
+>> +               regulator-max-microvolt = <1800000>;
+>> +               gpio = <&gpio7 8 GPIO_ACTIVE_HIGH>;
+> 
+> Is this really GPIO_ACTIVE_HIGH?
+> 
+> If so, then a 'enable-active-high' property would be needed.
 
-On 24/11/17 06:56, Leo Yan wrote:
-> Hi Sudeep,
-> 
-> On Thu, Nov 23, 2017 at 02:03:51PM +0000, Sudeep Holla wrote:
->> Hi Daniel,
->>
->> Thanks a lot for pointing me to this and having some useful discussion
->> in private. That helped to dig a bit further on this.
->>
->> On 23/11/17 05:40, Leo Yan wrote:
->>> Thanks a lot for Vincent Guittot careful work to find bug for 'CPU_NAP'
->>> idle state. From ftrace log we can observe CA73 CPUs can be easily waken
->>> up from 'CPU_NAP' state but the 'waken up' CPUs doesn't handle anything
->>> and sleep again; so there have tons of trace events for CA73 CPUs
->>> entering and exiting idle state.
->>>
->>> On Hi3660 CA73 has retention state 'CPU_NAP' for CPU idle, this state we
->>> set its psci parameter as '0x0000001' and from this parameter it can
->>> calculate state id is 1. Unfortunately ARM trusted firmware (ARM-TF)
->>> takes 1 as a invalid value for state id, so the CPU cannot enter idle
->>> state and directly bail out to kernel.
->>>
->>> This commit changes psci parameter to '0x00000000' for state id = 0;
->>> this id is accepted by ARM trusted firmware and finally CPU can stay
->>> properly in 'CPU_NAP' state.
->>>
->>
->> I would like to conditionally NACK this patch. If we can't update the
->> ARM TF at all then, I will agree with this change reluctantly.
-> 
-> Thanks for reviewing. Just like Daniel said, we need to figure out the
-> right method for this. So suggestions are very welcome!
-> 
+Indeed, it's quite redundant with the GPIO_ACTIVE_* flag, but whatever.
 
-Sure, thanks for such a quick response and resolution :)
-
->> This looks like an artifact of copy paste in ARM TF port for this
->> platform. If you look as PSCI specification, CPU suspend parameter has
->> some recommendations and it's good to follow then unless you have strong
->> reasons not to.
->>
->> As Daniel pointed to me, this patch is required to satisfy TF
->> particularly [1]. Now that looks like copy pasted from Juno or FVP port
->> and if you look deeper, it's clearly under !ARM_RECOM_STATE_ID_ENC [2]
->> which was not copied IIUC :).
 > 
-> Thanks for sharing pointers. It's shame that the copying is not
-> correct for Hikey960 :)
+>> +&hdmi {
+> 
+> No ddc-i2c-bus property?
+
+It's in the board dts.
+
+> 
+>> +       pinctrl_pmic: pmicgrp {
+>> +               fsl,pins = <
+>> +                       /* PMIC INT */
+>> +                       MX6QDL_PAD_GPIO_17__GPIO7_IO12          0x80000000
+> 
+> No 0x80000000 please. Use the real IOMUX value here instead.
+
+Ok
+
+> 
+>> +&pcie {
+>> +       fsl,tx-swing-full = <103>;
+>> +       fsl,tx-swing-low = <103>;
+>> +       status = "disabled";
+> 
+> No 'reset-gpio' property?
 > 
 
-Indeed.
+It will be in the board dts.
 
-> Come back to recommended state id, I reviewed Juno board defintion and
-> I found it's not align with PSCI spec defintion, in ARM-TF Juno code
-> defines state as below [1]:
-> 
-
-Yes Juno is almost 4 years old now, so it may not be too good a
-reference platform for latest and greatest platforms like hikey2 ;)
-As I said, Juno predates the recommendation in the PSCI spec.
-
-> #define ARM_LOCAL_STATE_RUN     0
-> #define ARM_LOCAL_STATE_RET     1
-> #define ARM_LOCAL_STATE_OFF     2
-> 
-> In PSCI spec chapter "6.5 Recommended StateID Encoding" recommends power
-> state id as below:
-> 
-> 0: Run
-> 1: Standby
-> 2: Retention
-> 3: Powerdown
-> 
-> So could you confirm on Hikey960 we should follow PSCI definition for
-> state id definition?
-> 
-
-Yes, I don't see any reason not to, as this may become reference to some
-other platform, it's good to keep it aligned so that copy paste happens
-in a good sense for future platforms. :)
-
->> Juno's implementation is legacy as these recommendations were added
->> later in the specification while Juno is 3 year old platform now.
->>
->> Though strictly speaking it's not violation of the PSCI specification,
->> but I would rather get this fixed not before it's too late and copied to
->> the next generation of platforms. Since the firmware can be easily
->> upgraded that shouldn't be that difficult.
-> 
-> If completely compliant with PSCI recommended state id, we need change
-> both for ARM-TF and kernel for this. In ARM-TF, I have sent PR [2].
-> 
-
-OK
-
-> For the kernel patch, we should change state id as below. Please let me
-> know if you have suggestion for this.
-> 
-
-I would wait until ATF changes are merged before you patch DT in the kernel.
-
--- 
-Regards,
-Sudeep
+Neil
