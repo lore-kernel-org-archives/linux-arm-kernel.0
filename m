@@ -1,125 +1,143 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Fri, 24 Nov 2017 19:17:41 +0100
-Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory
- state before hotremove
-In-Reply-To: <20171124155458.GC1966@samekh>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
- <CAJZ5v0i7vOxwhgA1LWYDqxCKkHaYikCf_HZZQCbgApLpoyV2JA@mail.gmail.com>
- <20171124144917.GB1966@samekh>
- <20171124154317.copbe3u6y2q4mura@dhcp22.suse.cz>
- <20171124155458.GC1966@samekh>
-Message-ID: <20171124164042.3crcoz2lwgwv725l@dhcp22.suse.cz>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 24 Nov 2017 19:27:00 +0000
+Subject: do page fault in atomic bug on arm
+In-Reply-To: <64cbcda0-d040-4872-4a6b-7cd18375b4aa@linaro.org>
+References: <d83cdbf1-0d27-fb82-14c8-3d37101c3c06@linaro.org>
+ <20171121132001.GH31757@n2100.armlinux.org.uk>
+ <64cbcda0-d040-4872-4a6b-7cd18375b4aa@linaro.org>
+Message-ID: <20171124192700.GU31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 24-11-17 15:54:59, Andrea Reale wrote:
-> On Fri 24 Nov 2017, 16:43, Michal Hocko wrote:
-> > On Fri 24-11-17 14:49:17, Andrea Reale wrote:
-> > > Hi Rafael,
-> > > 
-> > > On Fri 24 Nov 2017, 15:39, Rafael J. Wysocki wrote:
-> > > > On Fri, Nov 24, 2017 at 11:22 AM, Andrea Reale <ar@linux.vnet.ibm.com> wrote:
-> > > > > Resending the patch adding linux-acpi in CC, as suggested by Rafael.
-> > > > > Everyone else: apologies for the noise.
-> > > > >
-> > > > > Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
-> > > > > introduced an assumption whereas when control
-> > > > > reaches remove_memory the corresponding memory has been already
-> > > > > offlined. In that case, the acpi_memhotplug was making sure that
-> > > > > the assumption held.
-> > > > > This assumption, however, is not necessarily true if offlining
-> > > > > and removal are not done by the same "controller" (for example,
-> > > > > when first offlining via sysfs).
-> > > > >
-> > > > > Removing this assumption for the generic remove_memory code
-> > > > > and moving it in the specific acpi_memhotplug code. This is
-> > > > > a dependency for the software-aided arm64 offlining and removal
-> > > > > process.
-> > > > >
-> > > > > Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> > > > > Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
-> > > > > ---
-> > > > >  drivers/acpi/acpi_memhotplug.c |  2 +-
-> > > > >  include/linux/memory_hotplug.h |  9 ++++++---
-> > > > >  mm/memory_hotplug.c            | 13 +++++++++----
-> > > > >  3 files changed, 16 insertions(+), 8 deletions(-)
-> > > > >
-> > > > > diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
-> > > > > index 6b0d3ef..b0126a0 100644
-> > > > > --- a/drivers/acpi/acpi_memhotplug.c
-> > > > > +++ b/drivers/acpi/acpi_memhotplug.c
-> > > > > @@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
-> > > > >                         nid = memory_add_physaddr_to_nid(info->start_addr);
-> > > > >
-> > > > >                 acpi_unbind_memory_blocks(info);
-> > > > > -               remove_memory(nid, info->start_addr, info->length);
-> > > > > +               BUG_ON(remove_memory(nid, info->start_addr, info->length));
-> > > > 
-> > > > Why does this have to be BUG_ON()?  Is it really necessary to kill the
-> > > > system here?
-> > > 
-> > > Actually, I hoped you would help me understand that: that BUG() call was introduced
-> > > by yourself in Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
-> > > in memory_hoptlug.c:remove_memory()). 
-> > > 
-> > > Just reading at that commit my understanding was that you were assuming
-> > > that acpi_memory_remove_memory() have already done the job of offlining
-> > > the target memory, so there would be a bug if that wasn't the case.
-> > > 
-> > > In my case, that assumption did not hold and I found that it might not
-> > > hold for other platforms that do not use ACPI. In fact, the purpose of
-> > > this patch is to move this assumption out of the generic hotplug code
-> > > and move it to ACPI code where it originated. 
-> > 
-> > remove_memory failure is basically impossible to handle AFAIR. The
-> > original code to BUG in remove_memory is ugly as hell and we do not want
-> > to spread that out of that function. Instead we really want to get rid
-> > of it.
-> 
-> Today, BUG() is called even in the simple case where remove fails
-> because the section we are removing is not offline.
+On Fri, Nov 24, 2017 at 11:09:30PM +0800, Alex Shi wrote:
+> Full agree with your analysis. Is it possible to stain PC value with
+> heavy stress on thermal or sth else? the ARM64 board run well with
+> ftracetest of LTP.
 
-You cannot hotremove memory which is still online. This is what caller
-should enforce. This is too late to handle the failure. At least for
-ACPI.
+In your first email, you said "x15 platform, which is a armv7 board."
+Here you say "ARM64 board" which isn't armv7.  There's x15 DTS under
+arch/arm/boot/dts, so I guess you mean 32-bit ARM, but who knows...
 
-> I cannot see any need to
-> BUG() in such a case: an error code seems more than sufficient to me.
+Anyway, I've tried running ftracetest on an OMAP4430 SDP board, and
+after a while with the patch I sent you, I get:
 
-I do not rememeber details but AFAIR ACPI is in a deferred (kworker)
-context here and cannot simply communicate error code down the road.
-I agree that we should be able to simply return an error but what is the
-actual error condition that might happen here?
+Internal error: Oops - BUG: 0 [#1] SMP ARM
+Modules linked in:
+CPU: 1 PID: 2948 Comm: ftracetest Not tainted 4.14.0+ #557
+Hardware name: Generic OMAP4 (Flattened Device Tree)
+task: ce41c100 task.stack: cc7b8000
+PC is at oops+0x0/0x4
+LR is at trace_hardirqs_on_caller+0x154/0x1e0
+pc : [<c0015adc>]    lr : [<c0086840>]    psr: 20000193
+sp : cc7b9fb0  ip : cc7b9f80  fp : 00000000
+r10: 00000000  r9 : cc7b8000  r8 : c0015c28
+r7 : 00000006  r6 : 00000004  r5 : 0009fed4  r4 : 00000001
+r3 : 00000000  r2 : cc7b9fb0  r1 : 60000193  r0 : 00000001
+Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 10c5387d  Table: 8e7b804a  DAC: 00000055
+Process ftracetest (pid: 2948, stack limit = 0xcc7b8210)
+Stack: (0xcc7b9fb0 to 0xcc7ba000)
+9fa0:                                     00000000 00000000 0009b008 0000000d
+9fc0: 00000001 0009fed4 00000004 00000006 0009b3e0 000a17d4 00000000 beaf6e3c
+9fe0: 0009fed0 beaf6e20 000319e0 b6e7199c 60000193 00000001 6b6b6b6b a56b6b6b
+Backtrace: no frame pointer
+Code: e9527fff e1a00000 e28dd048 e1b0f00e (e7f001f2)
+---[ end trace 390efe5843605357 ]---
 
-> This is why this patch removes the BUG() call when the "offline" check
-> fails from the generic code. 
+The other CPU also oopses:
 
-As I've said we should simply get rid of BUG rather than move it around.
+Internal error: Oops - BUG: 0 [#3] SMP ARM
+Modules linked in:
+CPU: 1 PID: 1 Comm: init Tainted: G      D         4.14.0+ #557
+Hardware name: Generic OMAP4 (Flattened Device Tree)
+task: ced04c00 task.stack: ced06000
+PC is at oops+0x0/0x4
+LR is at trace_hardirqs_on+0x14/0x18
+pc : [<c0015adc>]    lr : [<c00868e0>]    psr: 20000193
+sp : ced07fb0  ip : ced07fa0  fp : 00000000
+r10: 00000000  r9 : ced06000  r8 : c0015c28
+r7 : 0000004e  r6 : bec0acd4  r5 : 000176b4  r4 : bec0ac3c
+r3 : 00000000  r2 : ced07fb0  r1 : 60000193  r0 : c0015aa8
+Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
+Control: 10c5387d  Table: 8e2d804a  DAC: 00000055
+Process init (pid: 1, stack limit = 0xced06210)
+Stack: (0xced07fb0 to 0xced08000)
+7fa0:                                     00000000 00000000 00000000 00000000
+7fc0: bec0ac3c 000176b4 bec0acd4 0000004e 10000000 00000000 0000a1d0 bec0ac44
+7fe0: bec0acd8 bec0ac28 b6e54544 b6e5456c 60000193 bec0ac28 005d5555 00020201
+Backtrace: no frame pointer
+Code: e9527fff e1a00000 e28dd048 e1b0f00e (e7f001f2)
+---[ end trace 390efe5843605358 ]---
 
-> It moves it back to the ACPI call, where the assumption
-> originated. Honestlly, I cannot tell if it makes sense to BUG() there:
-> I have nothing against removing it from ACPI hotplug too, but
-> I don't know enough to feel free to change the acpi semantics myself, so I
-> moved it there to keep the original behavior unchanged for x86 code.
+which is exactly your bug, but caught a bit earlier.
 
-Heh, yeah that is an easier path for sure. I would prefer sorting this
-out ;) Not that I would enforce that, though. My concern is that the
-previous hotplug development followed this "I do not understand exactly
-so I will simply put my on top of existing code" mantra and it ended up
-in a huge mess.
+This happens while executing this ftrace test:
 
-> In this arm64 hot-remove port, offline and remove are done in two separate
-> steps, and is conceivable that an user tries erroneusly to remove some
-> section that he forgot to offline first: in that case, with the patch,
-> remove will just report an erro without BUGing.
+[28] Register/unregister many kprobe events
 
-As I've said it is the caller to enforce that.
+and needs a kernel with ftrace and kprobes enabled.
 
-> Is my reasoning flawed?
+Unfortunately, the debug is immediately after a call to
+trace_hardirqs_on() in no_work_pending, so the LR value is
+meaningless.
 
-I wouldn't say flawed but this is a low-level call that should already
-happen in a reasonable context.
+So, now that we know it's tracing kprobes triggering it - it's
+trying to set tracepoints on the first 256 symbols in the kernel's
+kallsyms, which includes all sorts of things.
+
+With some extra debug, this doesn't look clever:
+
+trace_kprobe: Inserting kprobe at ret_fast_syscall+0
+trace_kprobe: Inserting kprobe at slow_work_pending+0
+trace_kprobe: Inserting kprobe at ret_slow_syscall+0
+trace_kprobe: Could not insert probe at ret_slow_syscall+0: -22
+trace_kprobe: Inserting kprobe at ret_to_user+0
+trace_kprobe: Could not insert probe at ret_to_user+0: -22
+trace_kprobe: Inserting kprobe at ret_to_user_from_irq+0
+trace_kprobe: Inserting kprobe at no_work_pending+0
+trace_kprobe: Inserting kprobe at oops+0
+trace_kprobe: Could not insert probe at oops+0: -22
+trace_kprobe: Inserting kprobe at ret_from_fork+0
+trace_kprobe: Inserting kprobe at vector_swi+0
+trace_kprobe: Inserting kprobe at local_restart+0
+trace_kprobe: Inserting kprobe at __sys_trace+0
+trace_kprobe: Inserting kprobe at __sys_trace_return+0
+trace_kprobe: Inserting kprobe at __sys_trace_return_nosave+0
+trace_kprobe: Could not insert probe at __sys_trace_return_nosave+0: -22
+trace_kprobe: Inserting kprobe at __cr_alignment+0
+trace_kprobe: Could not insert probe at __cr_alignment+0: -22
+trace_kprobe: Inserting kprobe at sys_call_table+0
+trace_kprobe: Inserting kprobe at sys_syscall+0
+trace_kprobe: Inserting kprobe at sys_sigreturn_wrapper+0
+trace_kprobe: Inserting kprobe at sys_rt_sigreturn_wrapper+0
+trace_kprobe: Inserting kprobe at sys_statfs64_wrapper+0
+trace_kprobe: Inserting kprobe at sys_fstatfs64_wrapper+0
+
+I wouldn't be surprised if some of those were the cause of it -
+for example, what guarantee do we have that a trace kprobe inserted
+at ret_fast_syscall which starts with this:
+
+c0015a40:       e5ad0008        str     r0, [sp, #8]!
+
+will be handled correctly?  I can't say, I've virtually no knowledge
+about kprobes, but I guess it isn't - especially as there's this
+comment in the ARM kprobes code:
+
+         * Never instrument insn like 'str r0, [sp, +/-r1]'. Also, insn likes
+         * 'str r0, [sp, #-68]' should also be prohibited.
+
+Clearly, that's not the case as the kprobes insert on
+ret_fast_syscall succeeded.
+
+Adding Tixy, as he's more knowledgable in this area - I suggest
+someone knowledgable in this area runs
+
+	ftracetest test.d/kprobe/multiple_kprobes.tc
+
+and fixes these bugs... also running the entire ftracetest suite
+would probably also be a very good idea.
+
 -- 
-Michal Hocko
-SUSE Labs
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
