@@ -1,48 +1,89 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Sat, 25 Nov 2017 11:33:02 +0000
-Subject: [PATCH 0/2] Fix ftracetest issues
-Message-ID: <20171125113302.GY31757@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Sat, 25 Nov 2017 11:33:53 +0000
+Subject: [PATCH 1/2] ARM: BUG if jumping to usermode address in kernel mode
+In-Reply-To: <20171125113302.GY31757@n2100.armlinux.org.uk>
+References: <20171125113302.GY31757@n2100.armlinux.org.uk>
+Message-ID: <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ftracetest provokes the kernel to try and return to userspace addresses
-in kernel mode.  These two patches prevent that.
+Detect if we are returning to usermode via the normal kernel exit paths
+but the saved PSR value indicates that we are in kernel mode.  This
+could occur due to corrupted stack state, which has been observed with
+"ftracetest".
 
-The first patch, which I intend merging with Linus tonight, ensures that
-we catch the condition before we hit userspace, meaning that there is no
-possibility of executing user code while in kernel mode.
+This ensures that we catch the problem case before we get to user code.
 
-The second patch fixes the ftracetest issue itself by ensuring that it
-is not possible to set a kprobe on any of the "special" assembler code.
-Such code includes:
-- the kernel primary/secondary CPU startup code
-- exception entry code
-- idmap code
-
-This is because the conditions under which this code is executed does
-not meet the kprobes requirements, which is basically that the
-"function" is C-like - it does something and then returns to the parent,
-and has a stack.  This is just not universally true of the above code.
-
-This patch is larger than one may desire as we re-organise the sections
-that some code ends up in, the way the unwinder works, and how we print
-stack frames.
-
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
- arch/arm/include/asm/exception.h |  3 +--
- arch/arm/include/asm/sections.h  | 21 +++++++++++++++++++++
- arch/arm/include/asm/traps.h     | 12 ------------
- arch/arm/kernel/entry-armv.S     |  6 +-----
- arch/arm/kernel/entry-common.S   |  1 +
  arch/arm/kernel/entry-header.S   |  6 ++++++
- arch/arm/kernel/stacktrace.c     | 14 ++------------
- arch/arm/kernel/traps.c          |  4 ++--
- arch/arm/kernel/vmlinux.lds.S    |  6 +++---
- arch/arm/mm/fault.c              |  5 ++---
- arch/arm/probes/kprobes/core.c   | 14 +++++++++++---
- 12 files changed, 68 insertions(+), 42 deletions(-)
+ 2 files changed, 24 insertions(+)
 
+diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+index ad301f107dd2..bc8d4bbd82e2 100644
+--- a/arch/arm/include/asm/assembler.h
++++ b/arch/arm/include/asm/assembler.h
+@@ -518,4 +518,22 @@ THUMB(	orr	\reg , \reg , #PSR_T_BIT	)
+ #endif
+ 	.endm
+ 
++	.macro	bug, msg, line
++#ifdef CONFIG_THUMB2_KERNEL
++1:	.inst	0xde02
++#else
++1:	.inst	0xe7f001f2
++#endif
++#ifdef CONFIG_DEBUG_BUGVERBOSE
++	.pushsection .rodata.str, "aMS", %progbits, 1
++2:	.asciz	"\msg"
++	.popsection
++	.pushsection __bug_table, "aw"
++	.align	2
++	.word	1b, 2b
++	.hword	\line
++	.popsection
++#endif
++	.endm
++
+ #endif /* __ASM_ASSEMBLER_H__ */
+diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+index d523cd8439a3..7f4d80c2db6b 100644
+--- a/arch/arm/kernel/entry-header.S
++++ b/arch/arm/kernel/entry-header.S
+@@ -300,6 +300,8 @@
+ 	mov	r2, sp
+ 	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
+ 	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
++	tst	r1, #0xcf
++	bne	1f
+ 	msr	spsr_cxsf, r1			@ save in spsr_svc
+ #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
+ 	@ We must avoid clrex due to Cortex-A15 erratum #830321
+@@ -314,6 +316,7 @@
+ 						@ after ldm {}^
+ 	add	sp, sp, #\offset + PT_REGS_SIZE
+ 	movs	pc, lr				@ return & move spsr_svc into cpsr
++1:	bug	"Returning to usermode but unexpected PSR bits set?", \@
+ #elif defined(CONFIG_CPU_V7M)
+ 	@ V7M restore.
+ 	@ Note that we don't need to do clrex here as clearing the local
+@@ -329,6 +332,8 @@
+ 	ldr	r1, [sp, #\offset + S_PSR]	@ get calling cpsr
+ 	ldr	lr, [sp, #\offset + S_PC]	@ get pc
+ 	add	sp, sp, #\offset + S_SP
++	tst	r1, #0xcf
++	bne	1f
+ 	msr	spsr_cxsf, r1			@ save in spsr_svc
+ 
+ 	@ We must avoid clrex due to Cortex-A15 erratum #830321
+@@ -341,6 +346,7 @@
+ 	.endif
+ 	add	sp, sp, #PT_REGS_SIZE - S_SP
+ 	movs	pc, lr				@ return & move spsr_svc into cpsr
++1:	bug	"Returning to usermode but unexpected PSR bits set?", \@
+ #endif	/* !CONFIG_THUMB2_KERNEL */
+ 	.endm
+ 
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
