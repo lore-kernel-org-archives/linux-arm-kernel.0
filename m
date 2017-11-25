@@ -1,30 +1,28 @@
-From: davem@davemloft.net (David Miller)
-Date: Sat, 25 Nov 2017 23:54:54 +0900 (KST)
-Subject: [PATCH net v3] net: thunderx: Fix TCP/UDP checksum offload for
- IPv6 pkts
-In-Reply-To: <20171123193432.6925-1-aleksey.makarov@auriga.com>
-References: <20171123193014.6632-1-aleksey.makarov@auriga.com>
- <20171123193432.6925-1-aleksey.makarov@auriga.com>
-Message-ID: <20171125.235454.1853975778488578912.davem@davemloft.net>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sat, 25 Nov 2017 16:56:40 +0100
+Subject: [PATCH] arm64: allwinner: a64: Enable AXP803 for Orangepi Win
+In-Reply-To: <1511458536-5315-1-git-send-email-jagan@amarulasolutions.com>
+References: <1511458536-5315-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <20171125155640.4ejcymgwrngfkgzc@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aleksey Makarov <aleksey.makarov@auriga.com>
-Date: Thu, 23 Nov 2017 22:34:31 +0300
+On Thu, Nov 23, 2017 at 11:05:36PM +0530, Jagan Teki wrote:
+> Enable AXP803 PMIC and regulators for Orangepi Win.
+> 
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 
-> From: Sunil Goutham <sgoutham@cavium.com>
-> 
-> Don't offload IP header checksum to NIC.
-> 
-> This fixes a previous patch which enabled checksum offloading
-> for both IPv4 and IPv6 packets.  So L3 checksum offload was
-> getting enabled for IPv6 pkts.  And HW is dropping these pkts
-> as it assumes the pkt is IPv4 when IP csum offload is set
-> in the SQ descriptor.
-> 
-> Fixes:  3a9024f52c2e ("net: thunderx: Enable TSO and checksum offloads for ipv6")
-> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-> Signed-off-by: Aleksey Makarov <aleksey.makarov@auriga.com>
-> Reviewed-by: Eric Dumazet <edumazet@google.com>
+Applied, thanks!
+Maxime
 
-Applied.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171125/6d91d78f/attachment.sig>
