@@ -1,28 +1,19 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Sat, 25 Nov 2017 18:40:18 +0100
-Subject: [RFC] KVM API extensions for SVE
-In-Reply-To: <20171124144538.GG28855@cbox>
-References: <20171121134913.GI22781@e103592.cambridge.arm.com>
- <20171122195230.GT28855@cbox>
- <20171123184050.GM22781@e103592.cambridge.arm.com>
- <20171124144538.GG28855@cbox>
-Message-ID: <20171125174018.vzu2qsiql2einnpu@kamzik.brq.redhat.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sat, 25 Nov 2017 09:41:58 -0800
+Subject: [PATCH] ARM: dts: bcm283x: Use GPIO polarity defines consequently
+In-Reply-To: <1511616845-16298-1-git-send-email-stefan.wahren@i2se.com>
+References: <1511616845-16298-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <54a972b3-c981-a365-0b30-3c292a88cb12@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 03:45:38PM +0100, Christoffer Dall wrote:
-> On Thu, Nov 23, 2017 at 06:40:50PM +0000, Dave Martin wrote:
-> > 
-> > I don't think it's all that bad, but there doesn't seem to be any
-> > example of an optional architecture feature for a guest today --
-> > so I wanted to check before setting a precedent here.
-> 
-> We don't enable the GIC unless userspace asks for it, same with the
-> PMU...
->
+Hi Stefan,
 
-And this reminds me that we need to apply the new ID register
-trapping support Dave added to hiding the PMU when userspace
-doesn't enable it. Patch coming in a couple seconds...
+On 11/25/2017 05:34 AM, Stefan Wahren wrote:
+> Currently most of the Raspberry Pi DTS have a mixture of magic
+> numbers and the proper GPIO polarity defines. So use the latter
+> one consequently.
 
-drew
+Did you intend to mean "consistently" in your commit subject and message?
+-- 
+Florian
