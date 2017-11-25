@@ -1,104 +1,28 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sat, 25 Nov 2017 17:02:33 +0100
-Subject: [PATCH v2 1/3] media: V3s: Add support for Allwinner CSI.
-In-Reply-To: <20171123091444.4bed66dffeb36ecea8dfa706@magewell.com>
-References: <1501131697-1359-1-git-send-email-yong.deng@magewell.com>
- <1501131697-1359-2-git-send-email-yong.deng@magewell.com>
- <20171121154827.5a35xa6zlqrrvkxx@flea.lan>
- <20171122093306.d30fe641f269d62daa1f66b4@magewell.com>
- <20171122094526.nqxfy2e5jzxw7nl4@flea.lan>
- <20171123091444.4bed66dffeb36ecea8dfa706@magewell.com>
-Message-ID: <20171125160233.skefdpkjy4peh7et@flea.lan>
+From: drjones@redhat.com (Andrew Jones)
+Date: Sat, 25 Nov 2017 18:40:18 +0100
+Subject: [RFC] KVM API extensions for SVE
+In-Reply-To: <20171124144538.GG28855@cbox>
+References: <20171121134913.GI22781@e103592.cambridge.arm.com>
+ <20171122195230.GT28855@cbox>
+ <20171123184050.GM22781@e103592.cambridge.arm.com>
+ <20171124144538.GG28855@cbox>
+Message-ID: <20171125174018.vzu2qsiql2einnpu@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 09:14:44AM +0800, Yong wrote:
-> > On Wed, Nov 22, 2017 at 09:33:06AM +0800, Yong wrote:
-> > > > On Thu, Jul 27, 2017 at 01:01:35PM +0800, Yong Deng wrote:
-> > > > > Allwinner V3s SoC have two CSI module. CSI0 is used for MIPI interface
-> > > > > and CSI1 is used for parallel interface. This is not documented in
-> > > > > datasheet but by testing and guess.
-> > > > > 
-> > > > > This patch implement a v4l2 framework driver for it.
-> > > > > 
-> > > > > Currently, the driver only support the parallel interface. MIPI-CSI2,
-> > > > > ISP's support are not included in this patch.
-> > > > > 
-> > > > > Signed-off-by: Yong Deng <yong.deng@magewell.com>
-> > > > 
-> > > > Thanks again for this driver.
-> > > > 
-> > > > It seems like at least this iteration is behaving in a weird way with
-> > > > DMA transfers for at least YU12 and NV12 (and I would assume YV12).
-> > > > 
-> > > > Starting a transfer of multiple frames in either of these formats,
-> > > > using either ffmpeg (ffmpeg -f v4l2 -video_size 640x480 -framerate 30
-> > > > -i /dev/video0 output.mkv) or yavta (yavta -c80 -p -F --skip 0 -f NV12
-> > > > -s 640x480 $(media-c tl -e 'sun6i-csi')) will end up in a panic.
-> > > > 
-> > > > The panic seems to be generated with random data going into parts of
-> > > > the kernel memory, the pattern being in my case something like
-> > > > 0x8287868a which is very odd (always around 0x88)
-> > > > 
-> > > > It turns out that when you cover the sensor, the values change to
-> > > > around 0x28, so it really seems like it's pixels that have been copied
-> > > > there.
-> > > > 
-> > > > I've looked quickly at the DMA setup, and it seems reasonable to
-> > > > me. Do you have the same issue on your side? Have you been able to
-> > > > test those formats using your hardware?
-> > > 
-> > > I had tested the following formats with BT1120 input:
-> > > V4L2_PIX_FMT_NV12		-> NV12
-> > > V4L2_PIX_FMT_NV21		-> NV21
-> > > V4L2_PIX_FMT_NV16		-> NV16
-> > > V4L2_PIX_FMT_NV61		-> NV61
-> > > V4L2_PIX_FMT_YUV420		-> YU12
-> > > V4L2_PIX_FMT_YVU420		-> YV12
-> > > V4L2_PIX_FMT_YUV422P		-> 422P
-> > > And they all work fine.
+On Fri, Nov 24, 2017 at 03:45:38PM +0100, Christoffer Dall wrote:
+> On Thu, Nov 23, 2017 at 06:40:50PM +0000, Dave Martin wrote:
 > > 
-> > Ok, that's good to know.
-> > 
-> > > > Given that they all are planar formats and YUYV and the likes work
-> > > > just fine, maybe we can leave them aside for now?
-> > > 
-> > > V4L2_PIX_FMT_YUV422P and V4L2_PIX_FMT_YUYV is OK, and V4L2_PIX_FMT_NV12
-> > > is bad? It's really weird.
-> > > 
-> > > What's your input bus code format, type and width?
-> > 
-> > The sensor is an ov5640, so the MBUS code for the bus is
-> > MEDIA_BUS_FMT_YUYV8_2X8.
+> > I don't think it's all that bad, but there doesn't seem to be any
+> > example of an optional architecture feature for a guest today --
+> > so I wanted to check before setting a precedent here.
 > 
-> Did you test on V3s?
+> We don't enable the GIC unless userspace asks for it, same with the
+> PMU...
+>
 
-No, this is on an H3, but that would be the first difference so far.
+And this reminds me that we need to apply the new ID register
+trapping support Dave added to hiding the PMU when userspace
+doesn't enable it. Patch coming in a couple seconds...
 
-> I haven't tested it with MEDIA_BUS_FMT_YUYV8_2X8.
-
-Ok, it's good to know that at least it works on your end, it's useful
-for us to debug things :)
-
-> The Allwinner CSI's DMA is definitely weird. Ond?ej Jirman thought
-> that CSI has an internal queue (Ond?ej's commit has explained in detail).
-> I think CSI just pick up the buffer address before the frame done 
-> interrupt triggered. 
-> The patch in attachment can deal with this. You can see if it is
-> useful to solve your problem.
-
-I'll test that on monday, thanks!
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171125/9a844a66/attachment-0001.sig>
+drew
