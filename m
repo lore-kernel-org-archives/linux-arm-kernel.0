@@ -1,37 +1,54 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat, 25 Nov 2017 20:51:07 -0200
-Subject: [PATCH] ARM: dts: imx53-cx9020: Fix the Ethernet PHY reset GPIO
- polarity
-Message-ID: <1511650267-21933-1-git-send-email-festevam@gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Sat, 25 Nov 2017 15:33:24 -0800
+Subject: [PATCH 0/5] Make gpio_keys accept board descriptors
+In-Reply-To: <20171124093045.5961-1-linus.walleij@linaro.org>
+References: <20171124093045.5961-1-linus.walleij@linaro.org>
+Message-ID: <20171125233324.afdt4netamvkrkm2@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Linus,
 
-As explained in Documentation/devicetree/bindings/net/fsl-fec.txt the
-phy-reset-gpios is active high only if the 'phy-reset-active-high' is
-present.
+On Fri, Nov 24, 2017 at 10:30:40AM +0100, Linus Walleij wrote:
+> The goal I'm working toward is to rid the kernel of the global
+> GPIO numberspace.
+> 
+> This means GPIO lines should be references by the local offset
+> on the GPIO chip.
+> 
+> This patch set starts to move gpio_keys toward using GPIO
+> look-up tables instead of global GPIO numbers to find their
+> GPIOs.
+> 
+> As an example I did (I think) the necessary patches to
+> convert DaVinci and i.MX to use this. There are several users
+> also x86 platform devices.
+> 
+> Strategy:
+> 
+> - Merge the patch to input/keyboard/gpio_keys* to support
+>   using descriptors from board files.
+> 
+> - Refactor the whole universe to get proper names on GPIO
+>   chips, and reference the GPIO lines with local offsets using
+>   tables, as in the example patches in this series. These
+>   can trickle in after the first patch is merged in Input.
+>   The work to be done can be seen if you type:
+>   git grep gpio_keys_platform_data
+> 
+> - When all are refactored, remove the "gpio" and "active low"
+>   members from the platform data and delete the associated
+>   legacy GPIO handling in the input driver for gpio_keys.
+> 
+> Posting this with the examples to get buy-in from Dmitry
+> before I go and spend time refactoring the world.
 
-As 'phy-reset-active-high' is not used here, fix the device tree
-description by passing GPIO_ACTIVE_LOW flag.
+I think this is a worthy goal, but I wonder if we could get static GPIO
+descriptors work with fwnode_get_named_gpiod() so we could retire the
+platform data parsing altogether. We'd need to extend static device
+properties to have notion of children though.
 
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx53-cx9020.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thanks.
 
-diff --git a/arch/arm/boot/dts/imx53-cx9020.dts b/arch/arm/boot/dts/imx53-cx9020.dts
-index 4f54fd4..5e67e43 100644
---- a/arch/arm/boot/dts/imx53-cx9020.dts
-+++ b/arch/arm/boot/dts/imx53-cx9020.dts
-@@ -152,7 +152,7 @@
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_fec>;
- 	phy-mode = "rmii";
--	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_HIGH>;
-+	phy-reset-gpios = <&gpio7 6 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
- 
 -- 
-2.7.4
+Dmitry
