@@ -1,158 +1,112 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Sat, 25 Nov 2017 21:57:10 +0100
-Subject: [PATCH 07/15] KVM: Move vcpu_load to arch-specific
- kvm_arch_vcpu_ioctl_set_sregs
+Date: Sat, 25 Nov 2017 21:57:11 +0100
+Subject: [PATCH 08/15] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_get_mpstate
 In-Reply-To: <20171125205718.7731-1-christoffer.dall@linaro.org>
 References: <20171125205718.7731-1-christoffer.dall@linaro.org>
-Message-ID: <20171125205718.7731-8-christoffer.dall@linaro.org>
+Message-ID: <20171125205718.7731-9-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Move vcpu_load() and vcpu_put() into the architecture specific
-implementations of kvm_arch_vcpu_ioctl_set_sregs().
+implementations of kvm_arch_vcpu_ioctl_get_mpstate().
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/powerpc/kvm/book3s.c | 10 +++++++++-
- arch/powerpc/kvm/booke.c  | 17 +++++++++++++----
- arch/s390/kvm/kvm-s390.c  |  8 ++++++++
- arch/x86/kvm/x86.c        | 15 ++++++++++++---
- virt/kvm/kvm_main.c       |  4 ----
- 5 files changed, 42 insertions(+), 12 deletions(-)
+ arch/s390/kvm/kvm-s390.c | 13 +++++++++++--
+ arch/x86/kvm/x86.c       |  7 +++++++
+ virt/kvm/arm/arm.c       |  7 +++++++
+ virt/kvm/kvm_main.c      |  4 ----
+ 4 files changed, 25 insertions(+), 6 deletions(-)
 
-diff --git a/arch/powerpc/kvm/book3s.c b/arch/powerpc/kvm/book3s.c
-index b7db75010843..63e68c24af0e 100644
---- a/arch/powerpc/kvm/book3s.c
-+++ b/arch/powerpc/kvm/book3s.c
-@@ -498,7 +498,15 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
- int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 				  struct kvm_sregs *sregs)
+diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+index 51569cc97a07..ccaf5088b73e 100644
+--- a/arch/s390/kvm/kvm-s390.c
++++ b/arch/s390/kvm/kvm-s390.c
+@@ -2853,9 +2853,18 @@ int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
  {
--	return vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
 +	int ret;
 +
 +	ret = vcpu_load(vcpu);
 +	if (ret)
 +		return ret;
-+	ret = vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
++
+ 	/* CHECK_STOP and LOAD are not supported yet */
+-	return is_vcpu_stopped(vcpu) ? KVM_MP_STATE_STOPPED :
+-				       KVM_MP_STATE_OPERATING;
++	ret = is_vcpu_stopped(vcpu) ? KVM_MP_STATE_STOPPED :
++				      KVM_MP_STATE_OPERATING;
 +
 +	vcpu_put(vcpu);
 +	return ret;
  }
  
- int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
-diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
-index d770f465cb9d..59d1d0bd6909 100644
---- a/arch/powerpc/kvm/booke.c
-+++ b/arch/powerpc/kvm/booke.c
-@@ -1641,18 +1641,27 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 1a701a2f25a3..71f0572a4e4a 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -7426,6 +7426,12 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
  {
- 	int ret;
- 
++	int ret;
++
 +	ret = vcpu_load(vcpu);
 +	if (ret)
 +		return ret;
 +
-+	ret = -EINVAL;
- 	if (vcpu->arch.pvr != sregs->pvr)
--		return -EINVAL;
-+		goto out;
+ 	kvm_apic_accept_events(vcpu);
+ 	if (vcpu->arch.mp_state == KVM_MP_STATE_HALTED &&
+ 					vcpu->arch.pv.pv_unhalted)
+@@ -7433,6 +7439,7 @@ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ 	else
+ 		mp_state->mp_state = vcpu->arch.mp_state;
  
- 	ret = set_sregs_base(vcpu, sregs);
- 	if (ret < 0)
--		return ret;
-+		goto out;
- 
- 	ret = set_sregs_arch206(vcpu, sregs);
- 	if (ret < 0)
--		return ret;
-+		goto out;
-+
-+	ret = vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
- 
--	return vcpu->kvm->arch.kvm_ops->set_sregs(vcpu, sregs);
-+out:
-+	vcpu_put(vcpu);
-+	return ret;
- }
- 
- int kvmppc_get_one_reg(struct kvm_vcpu *vcpu, u64 id,
-diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
-index 93a19e7e4f59..51569cc97a07 100644
---- a/arch/s390/kvm/kvm-s390.c
-+++ b/arch/s390/kvm/kvm-s390.c
-@@ -2738,8 +2738,16 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
- int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 				  struct kvm_sregs *sregs)
- {
-+	int r;
-+
-+	r = vcpu_load(vcpu);
-+	if (r)
-+		return r;
-+
- 	memcpy(&vcpu->run->s.regs.acrs, &sregs->acrs, sizeof(sregs->acrs));
- 	memcpy(&vcpu->arch.sie_block->gcr, &sregs->crs, sizeof(sregs->crs));
-+
 +	vcpu_put(vcpu);
  	return 0;
  }
  
-diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index 7faa9479e8d8..1a701a2f25a3 100644
---- a/arch/x86/kvm/x86.c
-+++ b/arch/x86/kvm/x86.c
-@@ -7486,15 +7486,21 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 	int mmu_reset_needed = 0;
- 	int pending_vec, max_bits, idx;
- 	struct desc_ptr dt;
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index 54d9aa533df9..4f36e6dd4d5e 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -381,11 +381,18 @@ static void vcpu_power_off(struct kvm_vcpu *vcpu)
+ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
+ {
 +	int ret;
 +
 +	ret = vcpu_load(vcpu);
 +	if (ret)
 +		return ret;
++
+ 	if (vcpu->arch.power_off)
+ 		mp_state->mp_state = KVM_MP_STATE_STOPPED;
+ 	else
+ 		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
  
-+	ret = -EINVAL;
- 	if (!guest_cpuid_has(vcpu, X86_FEATURE_XSAVE) &&
- 			(sregs->cr4 & X86_CR4_OSXSAVE))
--		return -EINVAL;
-+		goto out;
- 
- 	apic_base_msr.data = sregs->apic_base;
- 	apic_base_msr.host_initiated = true;
- 	if (kvm_set_apic_base(vcpu, &apic_base_msr))
--		return -EINVAL;
-+		goto out;
- 
- 	dt.size = sregs->idt.limit;
- 	dt.address = sregs->idt.base;
-@@ -7560,7 +7566,10 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- 
- 	kvm_make_request(KVM_REQ_EVENT, vcpu);
- 
--	return 0;
-+	ret = 0;
-+out:
 +	vcpu_put(vcpu);
-+	return ret;
+ 	return 0;
  }
  
- int kvm_arch_vcpu_ioctl_set_guest_debug(struct kvm_vcpu *vcpu,
 diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index dbfaf190fca3..f68f45e64967 100644
+index f68f45e64967..8b7c821e0244 100644
 --- a/virt/kvm/kvm_main.c
 +++ b/virt/kvm/kvm_main.c
-@@ -2605,11 +2605,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
- 			kvm_sregs = NULL;
- 			goto out;
- 		}
+@@ -2611,11 +2611,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+ 	case KVM_GET_MP_STATE: {
+ 		struct kvm_mp_state mp_state;
+ 
 -		r = vcpu_load(vcpu);
 -		if (r)
 -			goto out;
- 		r = kvm_arch_vcpu_ioctl_set_sregs(vcpu, kvm_sregs);
+ 		r = kvm_arch_vcpu_ioctl_get_mpstate(vcpu, &mp_state);
 -		vcpu_put(vcpu);
- 		break;
- 	}
- 	case KVM_GET_MP_STATE: {
+ 		if (r)
+ 			goto out;
+ 		r = -EFAULT;
 -- 
 2.14.2
