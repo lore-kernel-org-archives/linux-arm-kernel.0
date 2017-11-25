@@ -1,29 +1,55 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 25 Nov 2017 18:54:56 +0100 (CET)
-Subject: [PATCH] ARM: dts: bcm283x: Use GPIO polarity defines consequently
-In-Reply-To: <54a972b3-c981-a365-0b30-3c292a88cb12@gmail.com>
-References: <1511616845-16298-1-git-send-email-stefan.wahren@i2se.com>
- <54a972b3-c981-a365-0b30-3c292a88cb12@gmail.com>
-Message-ID: <663459099.95081.1511632496421@email.1und1.de>
+From: hanetzer@startmail.com (Marty E. Plummer)
+Date: Sat, 25 Nov 2017 13:02:03 -0600
+Subject: hi3521a syscon-reboot issue, reboot fails oddly.
+Message-ID: <20171125190203.24521-1-hanetzer@startmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Greetings,
 
-> Florian Fainelli <f.fainelli@gmail.com> hat am 25. November 2017 um 18:41 geschrieben:
-> 
-> 
-> Hi Stefan,
-> 
-> On 11/25/2017 05:34 AM, Stefan Wahren wrote:
-> > Currently most of the Raspberry Pi DTS have a mixture of magic
-> > numbers and the proper GPIO polarity defines. So use the latter
-> > one consequently.
-> 
-> Did you intend to mean "consistently" in your commit subject and message?
+Having a slight issue with getting reboot to work on the board I'm tinkering
+with; according to the documentation writing any value to 0x12050004 should
+reset the system, as such I have the following snippet in my dts to make it
+work:
 
-Okay, this would be better.
+sysctrl: system-controller at 12050000 {
+	compatible = "hisilicon,hi3521a-sysctrl", "syscon";
+	reg = <0x12050000 0x1000>;
+	#clock-cells = <1>;
+	#reset-cells = <2>;
+};
 
-Thanks
+reboot {
+	compatible = "syscon-reboot";
+	regmap = <&sysctrl>;
+	offset = <0x4>;
+	mask = <0xdeadbeef>;
+};
 
-> -- 
-> Florian
+The above is primarily based on the hi3519.dtsi setup, whose docs indicate
+it resets in the same manner.
+
+However, issuing a `reboot' ends up putting the cpu into a wierd state, with
+the serial port getting spammed with '0x0a2020202020...0a20202020...' in what
+appears to be an infinite amount of time (let it sit in this state overnight,
+remaining in this state.
+
+It doesn't make much sense to me, as I can't find anything in the bsp regarding
+reset excluding a small bit in linux-3.10.y/arch/arm/mach-hi3521a/core.c:
+
+void hi3521a_restart(char mode, const char *cmd)
+{
+	writel(~0, __io_address(REG_BASE_SCTL + REG_SC_SYSRES));
+}
+
+which effectively does the same thing as syscon-reboot.
+
+This happens whether I reboot via command or by killing the process feeding the
+watchdog (procd on lede's initramfs).
+
+Was hoping you guys could perhaps provide some guidance regarding this matter.
+
+Regards,
+Marty
+-- 
+2.15.0
