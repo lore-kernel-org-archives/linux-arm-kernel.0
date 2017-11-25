@@ -1,99 +1,30 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 25 Nov 2017 14:36:10 +0000
-Subject: [PATCH v4 09/12] IIO: ADC: add stm32 DFSDM support for PDM
- microphone
-In-Reply-To: <4362763f-2182-a3cf-cbd6-6c71df59af52@st.com>
-References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
- <1510222354-15290-10-git-send-email-arnaud.pouliquen@st.com>
- <20171119141830.29f1cfc9@archlinux>
- <4362763f-2182-a3cf-cbd6-6c71df59af52@st.com>
-Message-ID: <20171125143610.3dba71da@archlinux>
+From: davem@davemloft.net (David Miller)
+Date: Sat, 25 Nov 2017 23:54:54 +0900 (KST)
+Subject: [PATCH net v3] net: thunderx: Fix TCP/UDP checksum offload for
+ IPv6 pkts
+In-Reply-To: <20171123193432.6925-1-aleksey.makarov@auriga.com>
+References: <20171123193014.6632-1-aleksey.makarov@auriga.com>
+ <20171123193432.6925-1-aleksey.makarov@auriga.com>
+Message-ID: <20171125.235454.1853975778488578912.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 24 Nov 2017 15:52:26 +0100
-Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
+From: Aleksey Makarov <aleksey.makarov@auriga.com>
+Date: Thu, 23 Nov 2017 22:34:31 +0300
 
-> On 11/19/2017 03:18 PM, Jonathan Cameron wrote:
-> > On Thu, 9 Nov 2017 11:12:31 +0100
-> > Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
-> >   
-> >> This code offers a way to handle PDM audio microphones in
-> >> ASOC framework. Audio driver should use consumer API.
-> >> A specific management is implemented for DMA, with a
-> >> callback, to allows to handle audio buffers efficiently.
-> >> 
-> >> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>  
-> > 
-> > A few minor points inline.? I'm not sure I really 'like' the
-> > solution we've ended up with currently but if it works it will
-> > do just fine for now :)
-> > 
-> > Jonathan
-> > 
-> >   
-> >> ---
-> >> V3 -> V4 changes:
-> >>? - Merge audio implementation in stm32-dfsdm-adc.c instead of creating separate file
-> >>? - Add sysfs document for exported attributes
-> >> 
-> >>? .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32????? |? 22 +
-> >>? drivers/iio/adc/stm32-dfsdm-adc.c????????????????? | 517 ++++++++++++++++++++-
-> >>? include/linux/iio/adc/stm32-dfsdm-adc.h??????????? |? 27 ++
-> >>? 3 files changed, 562 insertions(+), 4 deletions(-)
-> >>? create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
-> >>? create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
-> >> 
-> >> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
-> >> new file mode 100644
-> >> index 0000000..0ce5508
-> >> --- /dev/null
-> >> +++ b/Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
-> >> @@ -0,0 +1,22 @@
-> >> +What:??????????????? /sys/bus/iio/devices/iio:deviceX/in_voltage_audio_sampling_rate
-> >> +KernelVersion:?????? 4.14
-> >> +Contact:???? arnaud.pouliquen at st.com
-> >> +Description:
-> >> +???????????? For audio purpose only.
-> >> +???????????? Used by audio driver to set/get the audio sampling rate.
-> >> +???????????? Reading returns current audio sample frequency.
-> >> +???????????? Writing value before starting conversions.  
-> > 
-> > I would like to see a note here on why sampling_frequency can't be used for
-> > this purpose.  
-> The IIO_CHAN_INFO_SAMP_FREQ can not be used because consumer API allows
-> only to access to ext_info attributes.
-> An alternate is to export channel attribute functions the consumer API.
-> - iio_read_channel_attribute (already exist)
-> - iio_write_channel_attribute
-
-Yes - add these please.  Just not been a usecase before for the general write.
-
+> From: Sunil Goutham <sgoutham@cavium.com>
 > 
-> Please, tell me your preference.
-
-<snip>
-
-> >> +/**
-> >> + * stm32_dfsdm_get_buff_cb - register a callback
-> >> + *?? that will be called when DMA transfer period is achieved.  
-> > Please run kernel-doc over this file. I'm fairly sure this isn't
-> > quite meeting the spec...  
-> Sorry it is not crystal clear for me, could you detail what you would
-> mean by
-> "I'm fairly sure this isn't quite meeting the spec.."?
-
-I don't think it lets you have multiple lines for the short description
-IIRC.  Not sure about the indented function parameters.. Might be
-new since I last looked!
-
+> Don't offload IP header checksum to NIC.
 > 
-> >   
-> >> + *
-> >> + * @iio_dev: Handle to IIO device.
-> >> + * @cb: pointer to callback function.
-> >> + *?? @data: pointer to data buffer
-> >> + *?? @size: size in byte of the data buffer
-> >> + *?? @private: pointer to consumer private structure
-> >> + * @private: pointer to consumer private structure
-> >> + */
+> This fixes a previous patch which enabled checksum offloading
+> for both IPv4 and IPv6 packets.  So L3 checksum offload was
+> getting enabled for IPv6 pkts.  And HW is dropping these pkts
+> as it assumes the pkt is IPv4 when IP csum offload is set
+> in the SQ descriptor.
+> 
+> Fixes:  3a9024f52c2e ("net: thunderx: Enable TSO and checksum offloads for ipv6")
+> Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+> Signed-off-by: Aleksey Makarov <aleksey.makarov@auriga.com>
+> Reviewed-by: Eric Dumazet <edumazet@google.com>
+
+Applied.
