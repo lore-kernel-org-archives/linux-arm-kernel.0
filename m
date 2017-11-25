@@ -1,133 +1,99 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sat, 25 Nov 2017 14:34:05 +0100
-Subject: [PATCH] ARM: dts: bcm283x: Use GPIO polarity defines consequently
-Message-ID: <1511616845-16298-1-git-send-email-stefan.wahren@i2se.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 25 Nov 2017 14:36:10 +0000
+Subject: [PATCH v4 09/12] IIO: ADC: add stm32 DFSDM support for PDM
+ microphone
+In-Reply-To: <4362763f-2182-a3cf-cbd6-6c71df59af52@st.com>
+References: <1510222354-15290-1-git-send-email-arnaud.pouliquen@st.com>
+ <1510222354-15290-10-git-send-email-arnaud.pouliquen@st.com>
+ <20171119141830.29f1cfc9@archlinux>
+ <4362763f-2182-a3cf-cbd6-6c71df59af52@st.com>
+Message-ID: <20171125143610.3dba71da@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently most of the Raspberry Pi DTS have a mixture of magic
-numbers and the proper GPIO polarity defines. So use the latter
-one consequently.
+On Fri, 24 Nov 2017 15:52:26 +0100
+Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 4 ++--
- arch/arm/boot/dts/bcm2835-rpi-a.dts      | 2 +-
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 4 ++--
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 2 +-
- arch/arm/boot/dts/bcm2835-rpi-b.dts      | 2 +-
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 4 ++--
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 2 +-
- 7 files changed, 10 insertions(+), 10 deletions(-)
+> On 11/19/2017 03:18 PM, Jonathan Cameron wrote:
+> > On Thu, 9 Nov 2017 11:12:31 +0100
+> > Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
+> >   
+> >> This code offers a way to handle PDM audio microphones in
+> >> ASOC framework. Audio driver should use consumer API.
+> >> A specific management is implemented for DMA, with a
+> >> callback, to allows to handle audio buffers efficiently.
+> >> 
+> >> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>  
+> > 
+> > A few minor points inline.? I'm not sure I really 'like' the
+> > solution we've ended up with currently but if it works it will
+> > do just fine for now :)
+> > 
+> > Jonathan
+> > 
+> >   
+> >> ---
+> >> V3 -> V4 changes:
+> >>? - Merge audio implementation in stm32-dfsdm-adc.c instead of creating separate file
+> >>? - Add sysfs document for exported attributes
+> >> 
+> >>? .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32????? |? 22 +
+> >>? drivers/iio/adc/stm32-dfsdm-adc.c????????????????? | 517 ++++++++++++++++++++-
+> >>? include/linux/iio/adc/stm32-dfsdm-adc.h??????????? |? 27 ++
+> >>? 3 files changed, 562 insertions(+), 4 deletions(-)
+> >>? create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
+> >>? create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
+> >> 
+> >> diff --git a/Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32 b/Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
+> >> new file mode 100644
+> >> index 0000000..0ce5508
+> >> --- /dev/null
+> >> +++ b/Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
+> >> @@ -0,0 +1,22 @@
+> >> +What:??????????????? /sys/bus/iio/devices/iio:deviceX/in_voltage_audio_sampling_rate
+> >> +KernelVersion:?????? 4.14
+> >> +Contact:???? arnaud.pouliquen at st.com
+> >> +Description:
+> >> +???????????? For audio purpose only.
+> >> +???????????? Used by audio driver to set/get the audio sampling rate.
+> >> +???????????? Reading returns current audio sample frequency.
+> >> +???????????? Writing value before starting conversions.  
+> > 
+> > I would like to see a note here on why sampling_frequency can't be used for
+> > this purpose.  
+> The IIO_CHAN_INFO_SAMP_FREQ can not be used because consumer API allows
+> only to access to ext_info attributes.
+> An alternate is to export channel attribute functions the consumer API.
+> - iio_read_channel_attribute (already exist)
+> - iio_write_channel_attribute
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index f81ae0a..aa1fc7b 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -10,12 +10,12 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		pwr {
- 			label = "PWR";
--			gpios = <&gpio 35 0>;
-+			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
- 			default-state = "keep";
- 			linux,default-trigger = "default-on";
- 		};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-index 7a960a0..425f6b0 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-@@ -10,7 +10,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 16 1>;
-+			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index 0161a84..effa195 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -11,12 +11,12 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		pwr {
- 			label = "PWR";
--			gpios = <&gpio 35 0>;
-+			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
- 			default-state = "keep";
- 			linux,default-trigger = "default-on";
- 		};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index 4bc70ef..772ec3b 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -11,7 +11,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 16 1>;
-+			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index cca4a75..434483d 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -11,7 +11,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 16 1>;
-+			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index 6669355..5c339ad 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -15,12 +15,12 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		pwr {
- 			label = "PWR";
--			gpios = <&gpio 35 0>;
-+			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
- 			default-state = "keep";
- 			linux,default-trigger = "default-on";
- 		};
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index a8844d0..3e4ed7c 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -20,7 +20,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
- };
--- 
-2.7.4
+Yes - add these please.  Just not been a usecase before for the general write.
+
+> 
+> Please, tell me your preference.
+
+<snip>
+
+> >> +/**
+> >> + * stm32_dfsdm_get_buff_cb - register a callback
+> >> + *?? that will be called when DMA transfer period is achieved.  
+> > Please run kernel-doc over this file. I'm fairly sure this isn't
+> > quite meeting the spec...  
+> Sorry it is not crystal clear for me, could you detail what you would
+> mean by
+> "I'm fairly sure this isn't quite meeting the spec.."?
+
+I don't think it lets you have multiple lines for the short description
+IIRC.  Not sure about the indented function parameters.. Might be
+new since I last looked!
+
+> 
+> >   
+> >> + *
+> >> + * @iio_dev: Handle to IIO device.
+> >> + * @cb: pointer to callback function.
+> >> + *?? @data: pointer to data buffer
+> >> + *?? @size: size in byte of the data buffer
+> >> + *?? @private: pointer to consumer private structure
+> >> + * @private: pointer to consumer private structure
+> >> + */
