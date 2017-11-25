@@ -1,89 +1,59 @@
-From: phh@phh.me (Pierre-Hugues Husson)
-Date: Sat, 25 Nov 2017 21:18:44 +0100
-Subject: [PATCH v4] drm: bridge: synopsys/dw-hdmi: Enable cec clock
-Message-ID: <20171125201844.11353-1-phh@phh.me>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Sat, 25 Nov 2017 21:57:03 +0100
+Subject: [PATCH 00/15] Move vcpu_load and vcpu_put calls to arch code
+Message-ID: <20171125205718.7731-1-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support the "cec" optional clock. The documentation already mentions "cec"
-optional clock and it is used by several boards, but currently the driver
-doesn't enable it, thus preventing cec from working on those boards.
+Some architectures may decide to do different things during
+kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
+arm64 is about to do significant work in vcpu load/put when running a
+vcpu, but it's problematic to do this for any other vcpu ioctl than
+KVM_RUN.
 
-And even worse: a /dev/cecX device will appear for those boards, but it
-won't be functioning without configuring this clock.
+Further, while it may be possible to call kvm_arch_vcpu_load() for a
+number of non-KVM_RUN ioctls, it makes the KVM/ARM code more difficult
+to reason about, especially after my optimization series, because a lot
+of things can now happen, where we have to consider if we're really in
+the process of running a vcpu or not.
 
-Changes:
-v4:
-- Change commit message to stress the importance of this patch
+This series will first move the vcpu_load() and vcpu_put() calls in the
+arch generic dispatch function into each case of the switch statement
+and then, one-by-one, pushed the calls down into the architecture
+specific code making the changes for each ioctl as required.
 
-v3:
-- Drop useless braces
+Thanks,
+-Christoffer
 
-v2:
-- Separate ENOENT errors from others
-- Propagate other errors (especially -EPROBE_DEFER)
+Christoffer Dall (15):
+  KVM: Prepare for moving vcpu_load/vcpu_put into arch specific code
+  KVM: Factor out vcpu->pid adjustment for KVM_RUN
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_run
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_regs
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_regs
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_sregs
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_sregs
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_mpstate
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_mpstate
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_translate
+  KVM: Move vcpu_load to arch-specific
+    kvm_arch_vcpu_ioctl_set_guest_debug
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_fpu
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_fpu
+  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl
+  KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls than KVM_RUN
 
-Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
----
- drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm64/kvm/guest.c     |  17 +++++--
+ arch/mips/kvm/mips.c       |  72 +++++++++++++++++++--------
+ arch/powerpc/kvm/book3s.c  |  38 +++++++++++++-
+ arch/powerpc/kvm/booke.c   |  65 +++++++++++++++++++-----
+ arch/powerpc/kvm/powerpc.c |  24 ++++++---
+ arch/s390/kvm/kvm-s390.c   | 119 +++++++++++++++++++++++++++++++++++++-------
+ arch/x86/kvm/x86.c         | 121 ++++++++++++++++++++++++++++++++++++++-------
+ include/linux/kvm_host.h   |   2 +
+ virt/kvm/arm/arm.c         |  91 +++++++++++++++++++++++++---------
+ virt/kvm/kvm_main.c        |  43 +++++++---------
+ 10 files changed, 463 insertions(+), 129 deletions(-)
 
-diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-index bf14214fa464..d82b9747a979 100644
---- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-+++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
-@@ -138,6 +138,7 @@ struct dw_hdmi {
- 	struct device *dev;
- 	struct clk *isfr_clk;
- 	struct clk *iahb_clk;
-+	struct clk *cec_clk;
- 	struct dw_hdmi_i2c *i2c;
- 
- 	struct hdmi_data_info hdmi_data;
-@@ -2382,6 +2383,26 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 		goto err_isfr;
- 	}
- 
-+	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
-+	if (PTR_ERR(hdmi->cec_clk) == -ENOENT) {
-+		hdmi->cec_clk = NULL;
-+	} else if (IS_ERR(hdmi->cec_clk)) {
-+		ret = PTR_ERR(hdmi->cec_clk);
-+		if (ret != -EPROBE_DEFER)
-+			dev_err(hdmi->dev, "Cannot get HDMI cec clock: %d\n",
-+					ret);
-+
-+		hdmi->cec_clk = NULL;
-+		goto err_iahb;
-+	} else {
-+		ret = clk_prepare_enable(hdmi->cec_clk);
-+		if (ret) {
-+			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
-+					ret);
-+			goto err_iahb;
-+		}
-+	}
-+
- 	/* Product and revision IDs */
- 	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
- 		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
-@@ -2518,6 +2539,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
- 		cec_notifier_put(hdmi->cec_notifier);
- 
- 	clk_disable_unprepare(hdmi->iahb_clk);
-+	if (hdmi->cec_clk)
-+		clk_disable_unprepare(hdmi->cec_clk);
- err_isfr:
- 	clk_disable_unprepare(hdmi->isfr_clk);
- err_res:
-@@ -2541,6 +2564,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
- 
- 	clk_disable_unprepare(hdmi->iahb_clk);
- 	clk_disable_unprepare(hdmi->isfr_clk);
-+	if (hdmi->cec_clk)
-+		clk_disable_unprepare(hdmi->cec_clk);
- 
- 	if (hdmi->i2c)
- 		i2c_del_adapter(&hdmi->i2c->adap);
 -- 
-2.15.0
+2.14.2
