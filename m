@@ -1,183 +1,145 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Sun, 26 Nov 2017 17:39:02 +0300
-Subject: [PATCH 35/37] KVM: arm/arm64: Get rid of vgic_elrsr
-In-Reply-To: <20171012104141.26902-36-christoffer.dall@linaro.org>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-36-christoffer.dall@linaro.org>
-Message-ID: <20171126143902.vwunp2uucw42xvwo@yury-thinkpad>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Sun, 26 Nov 2017 22:58:08 +0800
+Subject: do page fault in atomic bug on arm
+In-Reply-To: <20171124155649.GT31757@n2100.armlinux.org.uk>
+References: <d83cdbf1-0d27-fb82-14c8-3d37101c3c06@linaro.org>
+ <20171121132001.GH31757@n2100.armlinux.org.uk>
+ <64cbcda0-d040-4872-4a6b-7cd18375b4aa@linaro.org>
+ <20171124155649.GT31757@n2100.armlinux.org.uk>
+Message-ID: <17ed7101-f076-f68c-b8f3-7cc62d24a641@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 12, 2017 at 12:41:39PM +0200, Christoffer Dall wrote:
-> There is really no need to store the vgic_elrsr on the VGIC data
-> structures as the only need we have for the elrsr is to figure out if an
-> LR is inavtive when we save the VGIC state upon returning from the
-> guest.  We can might as well store this in a temporary local variable.
+
+
+On 11/24/2017 11:56 PM, Russell King - ARM Linux wrote:
+> On Fri, Nov 24, 2017 at 11:09:30PM +0800, Alex Shi wrote:
+>>
+>>>> [   53.302718] softirqs last  enabled at (11474): [<c034c5d0>] __do_softirq+0x280/0x5ac
+>>>> [   53.310494] softirqs last disabled at (11433): [<c034cc98>] irq_exit+0xf4/0x158
+>>>> [   53.317837] CPU: 0 PID: 1691 Comm: ftracetest Not tainted 4.9.55-dirty #1
+>>>> [   53.324652] Hardware name: Generic DRA74X (Flattened Device Tree)
+>>>> [   53.330857] [<c03114d8>] (unwind_backtrace) from [<c030cb18>] (show_stack+0x10/0x14)
+>>>> [   53.338644] [<c030cb18>] (show_stack) from [<c067e604>] (dump_stack+0xa4/0xd0)
+>>>> [   53.345908] [<c067e604>] (dump_stack) from [<c0373808>] (___might_sleep+0x1ac/0x2a0)
+>>>> [   53.353694] [<c0373808>] (___might_sleep) from [<c0d60ec8>] (do_page_fault+0x25c/0x428)
+>>>> [   53.361739] [<c0d60ec8>] (do_page_fault) from [<c03013e8>] (do_PrefetchAbort+0x38/0x9c)
+>>>> [   53.369780] [<c03013e8>] (do_PrefetchAbort) from [<c0d605a8>] (__pabt_svc+0x68/0xa0)
+>>>> [   53.377557] Exception stack(0xec6fbfa8 to 0xec6fbff0)
+>>>> [   53.382629] bfa0:                   00000001 00000001 ffffffff 00000000 0010ac68 00000007
+>>>> [   53.390845] bfc0: 00000001 0000003f 00000009 0000000c fffffffa be9d27a4 000e31fc ec6fbff8
+>>>> [   53.399055] bfe0: b6e6d49c b6e6d49c 40070093 ffffffff
+>>>> [   53.404137] [<c0d605a8>] (__pabt_svc) from [<b6e6d49c>] (0xb6e6d49c)
+>>>
+>>> It also doesn't help that the backtrace stops at this point, and it looks
+>>> very strange:
+>>>
+>>> 1. the value of PC looks like it's outside of the module space.
+>>> 2. the CPSR indicates that the CPU was in SVC mode in the parent context
+>>>    with IRQs disabled.
+>>> 3. We're right at the top of the kernel stack, which suggests no further
+>>>    stack frames above this.
+>>>
+>>> We should never be in SVC mode without further stack frames on the kernel
+>>> stack.
+>>>
+>>> We don't seem to have overflowed the kernel stack, as the thread info
+>>> seems correct - and it would also be unlikely that the saved SP value
+>>> would end in ff8 in the exception stack frame.
+>>
+>> Hi Russell,
+>>
+>> Sorry for response late!
+>> Is this SP was stained by sth? As my understand, SP should be times of
+>> 32bits. But why stack print out correct with a incorrect SP?
 > 
-> This also gets rid of the endianness conversion in the VGIC save
-> function, which is completely unnecessary and would actually result in
-> incorrect functionality on big-endian systems,
+> There's nothing wrong with SP.
 
-Does it mean that existing code in mainline is broken for BE systems?
-If so, I think that it should be fixed in separated patch...
-
-> because we are only using
-> typed values here and not converting pointers and reading different
-> types here.
+Got it. Thanks a lot!
 > 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  include/kvm/arm_vgic.h        |  2 --
->  virt/kvm/arm/hyp/vgic-v3-sr.c |  6 +++---
->  virt/kvm/arm/vgic/vgic-v2.c   | 33 +++++++--------------------------
->  virt/kvm/arm/vgic/vgic-v3.c   |  1 -
->  4 files changed, 10 insertions(+), 32 deletions(-)
+> Looking deeper at this, I think that the kernel stack somehow got
+> corrupted earlier:
 > 
-> diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-> index 34dba51..79c9e67 100644
-> --- a/include/kvm/arm_vgic.h
-> +++ b/include/kvm/arm_vgic.h
-> @@ -237,7 +237,6 @@ struct vgic_dist {
->  struct vgic_v2_cpu_if {
->  	u32		vgic_hcr;
->  	u32		vgic_vmcr;
-> -	u64		vgic_elrsr;	/* Saved only */
->  	u32		vgic_apr;
->  	u32		vgic_lr[VGIC_V2_MAX_LRS];
->  };
-> @@ -246,7 +245,6 @@ struct vgic_v3_cpu_if {
->  	u32		vgic_hcr;
->  	u32		vgic_vmcr;
->  	u32		vgic_sre;	/* Restored only, change ignored */
-> -	u32		vgic_elrsr;	/* Saved only */
->  	u32		vgic_ap0r[4];
->  	u32		vgic_ap1r[4];
->  	u64		vgic_lr[VGIC_V3_MAX_LRS];
-> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> index 91728fa..05548b2 100644
-> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
-> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
-> @@ -222,15 +222,16 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  	if (used_lrs) {
->  		int i;
->  		u32 nr_pre_bits;
-> +		u32 elrsr;
->  
-> -		cpu_if->vgic_elrsr = read_gicreg(ICH_ELSR_EL2);
-> +		elrsr = read_gicreg(ICH_ELSR_EL2);
->  
->  		write_gicreg(0, ICH_HCR_EL2);
->  		val = read_gicreg(ICH_VTR_EL2);
->  		nr_pre_bits = vtr_to_nr_pre_bits(val);
->  
->  		for (i = 0; i < used_lrs; i++) {
-> -			if (cpu_if->vgic_elrsr & (1 << i))
-> +			if (elrsr & (1 << i))
+> irq event stamp: 12924
+> hardirqs last  enabled at (12923): [<c0307f10>] no_work_pending+0x4/0x30
+> hardirqs last disabled at (12924): [<c0d605a0>] __pabt_svc+0x60/0xa0
+> 
+> The hard IRQ disable is as a result of taking a prefetch abort in
+> SVC mode.  The saved context agrees with that:
+> 
+>                         R0       R1       R2       R3       R4       R5
+> bfa0:                   00000001 00000001 ffffffff 00000000 0010ac68 00000007
+>       R6       R7       R8       R9       R10      FP       IP       SP
+> bfc0: 00000001 0000003f 00000009 0000000c fffffffa be9d27a4 000e31fc ec6fbff8
+>       LR       PC       PSR
+> bfe0: b6e6d49c b6e6d49c 40070093 ffffffff
+> 
+> The PSR lower 5 bits are 0x13, which is SVC mode.  Bit 7 set means IRQs
+> disabled.  The PC address was 0xb6e6d49c.
+> 
 
-Same comments as to patch 28. Here should be test_bit(), I think.
-And if it's possible, for set bits in elrsr it's simpler not to write
-~ICH_LR_STATE to cpu_if->vgic_lr, but directly to IO memory in
-__vgic_v3_restore_state().
+Thank you very much for detailed explanations! :)
 
->  				cpu_if->vgic_lr[i] &= ~ICH_LR_STATE;
->  			else
->  				cpu_if->vgic_lr[i] = __gic_v3_get_lr(i);
-> @@ -261,7 +262,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
->  		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
->  			write_gicreg(0, ICH_HCR_EL2);
->  
-> -		cpu_if->vgic_elrsr = 0xffff;
->  		cpu_if->vgic_ap0r[0] = 0;
->  		cpu_if->vgic_ap0r[1] = 0;
->  		cpu_if->vgic_ap0r[2] = 0;
-> diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-> index 259079b..df7e03b 100644
-> --- a/virt/kvm/arm/vgic/vgic-v2.c
-> +++ b/virt/kvm/arm/vgic/vgic-v2.c
-> @@ -247,7 +247,6 @@ void vgic_v2_enable(struct kvm_vcpu *vcpu)
->  	 * anyway.
->  	 */
->  	vcpu->arch.vgic_cpu.vgic_v2.vgic_vmcr = 0;
-> -	vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr = ~0;
->  
->  	/* Get the show on the road... */
->  	vcpu->arch.vgic_cpu.vgic_v2.vgic_hcr = GICH_HCR_EN;
-> @@ -404,33 +403,19 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
->  	return ret;
->  }
->  
-> -static void save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
-> -{
-> -	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-> -	int nr_lr = kvm_vgic_global_state.nr_lr;
-> -	u32 elrsr0, elrsr1;
-> -
-> -	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-> -	if (unlikely(nr_lr > 32))
-> -		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
-> -	else
-> -		elrsr1 = 0;
-> -
-> -#ifdef CONFIG_CPU_BIG_ENDIAN
-> -	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
-> -#else
-> -	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
-> -#endif
-> -}
-> -
->  static void save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
->  {
->  	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
-> -	int i;
->  	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> The last record we have of interrupts being enabled was in
+> no_work_pending, which is the exit path to usermode - but if we were
+> returning to usermode:
+> 
+> (a) how did we get into SVC mode instead
 
-Not to this patch, but anyway, what for to reserve u64 for used_lrs
-here and in struct vgic_cpu, when maximum value for it is 64?
+We return to user mode correctly in no_work_pending, the irq enabled
+then we get a pabt_svc?
 
-> +	u64 elrsr;
-> +	int i;
+> (b) why are interrupts disabled
 
-Nit. What for you move 'int i' declaration?
+it was disabled in __pabt_svc, objdump show a extra irq disable with arm
+defconfig.
+...
+ 2a0:   ebfffffe        bl      0 <v7_pabort>
+ 2a4:   f10c0080        cpsid   i
+...
+> (c) why was mm->mmap_sem still held
 
-> +
-> +	elrsr = readl_relaxed(base + GICH_ELRSR0);
-> +	if (unlikely(used_lrs > 32))
-> +		elrsr |= ((u64)readl_relaxed(base + GICH_ELRSR1)) << 32;
->  
->  	for (i = 0; i < used_lrs; i++) {
-> -		if (cpu_if->vgic_elrsr & (1UL << i))
-> +		if (elrsr & (1UL << i))
+the bug was caught here, just with mmap_sem, the pabt_svc happens.
+> 
+> Can you try the following patch to try and catch the problem earlier?
+> I haven't tested it myself, and adding code may move things around in
+> the kernel and make this bug disappear.
 
-test_bit()
+Do we still need to try this patch? I saw you tried it and do further more.
+> 
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index d523cd8439a3..ff577177b286 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -299,6 +299,8 @@
+>  	@ ARM mode restore
+>  	mov	r2, sp
+>  	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
+> +	tst	r1, #0xcf
+> +	bne	oops
+>  	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
+>  	msr	spsr_cxsf, r1			@ save in spsr_svc
+>  #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
+> @@ -314,6 +316,15 @@
+>  						@ after ldm {}^
+>  	add	sp, sp, #\offset + PT_REGS_SIZE
+>  	movs	pc, lr				@ return & move spsr_svc into cpsr
+> +oops:	.word	0xe7f001f2
 
->  			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
->  		else
->  			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
-> @@ -452,13 +437,9 @@ void vgic_v2_save_state(struct kvm_vcpu *vcpu)
->  
->  	if (used_lrs) {
->  		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
-> -
-> -		save_elrsr(vcpu, base);
->  		save_lrs(vcpu, base);
-> -
->  		writel_relaxed(0, base + GICH_HCR);
->  	} else {
-> -		cpu_if->vgic_elrsr = ~0UL;
->  		cpu_if->vgic_apr = 0;
->  	}
->  }
-> diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
-> index 863351c..0900649 100644
-> --- a/virt/kvm/arm/vgic/vgic-v3.c
-> +++ b/virt/kvm/arm/vgic/vgic-v3.c
-> @@ -237,7 +237,6 @@ void vgic_v3_enable(struct kvm_vcpu *vcpu)
->  	 * anyway.
->  	 */
->  	vgic_v3->vgic_vmcr = 0;
-> -	vgic_v3->vgic_elrsr = ~0;
->  
->  	/*
->  	 * If we are emulating a GICv3, we do it in an non-GICv2-compatible
-> -- 
-> 2.9.0
+This oops cause allnoconfig with arm failed in build. but it's fine for
+a multi_v7_defconfig
+arch/arm/kernel/entry-common.S:106: Error: symbol `oops' is already defined
+
+> +	.pushsection .rodata.str, "aMS", %progbits, 1
+> +2:	.asciz	"Returning to usermode but unexpected PSR bits set?"
+> +	.popsection
+> +	.pushsection __bug_table, "aw"
+> +	.align	2
+> +	.word	oops, 2b
+> +	.hword	\@
+> +	.popsection
+>  #elif defined(CONFIG_CPU_V7M)
+>  	@ V7M restore.
+>  	@ Note that we don't need to do clrex here as clearing the local
+> 
+> 
