@@ -1,57 +1,177 @@
-From: alex.shi@linaro.org (Alex Shi)
-Date: Sun, 26 Nov 2017 23:23:42 +0800
-Subject: do page fault in atomic bug on arm
-In-Reply-To: <17ed7101-f076-f68c-b8f3-7cc62d24a641@linaro.org>
-References: <d83cdbf1-0d27-fb82-14c8-3d37101c3c06@linaro.org>
- <20171121132001.GH31757@n2100.armlinux.org.uk>
- <64cbcda0-d040-4872-4a6b-7cd18375b4aa@linaro.org>
- <20171124155649.GT31757@n2100.armlinux.org.uk>
- <17ed7101-f076-f68c-b8f3-7cc62d24a641@linaro.org>
-Message-ID: <c26314ab-90c0-cb04-4c55-ebcf2a7045e4@linaro.org>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Sun, 26 Nov 2017 17:04:23 +0100
+Subject: [PATCH 04/37] KVM: arm/arm64: Get rid of vcpu->arch.irq_lines
+In-Reply-To: <9315cfbb-fe23-6443-01be-ac376c457a14@arm.com>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-5-christoffer.dall@linaro.org>
+ <9315cfbb-fe23-6443-01be-ac376c457a14@arm.com>
+Message-ID: <20171126160423.GJ28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sorry, this patch should be passed off, since we got your new fixing
-patches. I shouldn't mentioned here.
-
-Regards
-Alex
-
-On 11/26/2017 10:58 PM, Alex Shi wrote:
->> Can you try the following patch to try and catch the problem earlier?
->> I haven't tested it myself, and adding code may move things around in
->> the kernel and make this bug disappear.
-> Do we still need to try this patch? I saw you tried it and do further more.
->> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
->> index d523cd8439a3..ff577177b286 100644
->> --- a/arch/arm/kernel/entry-header.S
->> +++ b/arch/arm/kernel/entry-header.S
->> @@ -299,6 +299,8 @@
->>  	@ ARM mode restore
->>  	mov	r2, sp
->>  	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
->> +	tst	r1, #0xcf
->> +	bne	oops
->>  	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
->>  	msr	spsr_cxsf, r1			@ save in spsr_svc
->>  #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
->> @@ -314,6 +316,15 @@
->>  						@ after ldm {}^
->>  	add	sp, sp, #\offset + PT_REGS_SIZE
->>  	movs	pc, lr				@ return & move spsr_svc into cpsr
->> +oops:	.word	0xe7f001f2
-> This oops cause allnoconfig with arm failed in build. but it's fine for
-> a multi_v7_defconfig
-> arch/arm/kernel/entry-common.S:106: Error: symbol `oops' is already defined
+On Tue, Nov 14, 2017 at 12:17:44PM +0000, Julien Thierry wrote:
+> Hi Christoffer,
 > 
->> +	.pushsection .rodata.str, "aMS", %progbits, 1
->> +2:	.asciz	"Returning to usermode but unexpected PSR bits set?"
->> +	.popsection
->> +	.pushsection __bug_table, "aw"
->> +	.align	2
->> +	.word	oops, 2b
->> +	.hword	\@
->> +	.popsection
->>  #elif defined(CONFIG_CPU_V7M)
->>  	@ V7M restore.
->>  	@ Note that we don't need to do clrex here as clearing the local
+> On 12/10/17 11:41, Christoffer Dall wrote:
+> >We currently have a separate read-modify-write of the HCR_EL2 on entry
+> >to the guest for the sole purpose of setting the VF and VI bits, if set.
+> >Since this is most rarely the case (only when using userspace IRQ chip
+> >and interrupts are in flight), let's get rid of this operation and
+> >instead modify the bits in the vcpu->arch.hcr[_el2] directly when
+> >needed.
+> >
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >---
+> >  arch/arm/include/asm/kvm_emulate.h   |  9 ++-------
+> >  arch/arm/include/asm/kvm_host.h      |  3 ---
+> >  arch/arm/kvm/emulate.c               |  2 +-
+> >  arch/arm/kvm/hyp/switch.c            |  2 +-
+> >  arch/arm64/include/asm/kvm_emulate.h |  9 ++-------
+> >  arch/arm64/include/asm/kvm_host.h    |  3 ---
+> >  arch/arm64/kvm/hyp/switch.c          |  6 ------
+> >  arch/arm64/kvm/inject_fault.c        |  2 +-
+> >  virt/kvm/arm/arm.c                   | 11 ++++++-----
+> >  virt/kvm/arm/mmu.c                   |  6 +++---
+> >  10 files changed, 16 insertions(+), 37 deletions(-)
+> >
+> >diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
+> >index 98089ff..34663a8 100644
+> >--- a/arch/arm/include/asm/kvm_emulate.h
+> >+++ b/arch/arm/include/asm/kvm_emulate.h
+> >@@ -62,14 +62,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+> >  	vcpu->arch.hcr = HCR_GUEST_MASK;
+> >  }
+> >-static inline unsigned long vcpu_get_hcr(const struct kvm_vcpu *vcpu)
+> >+static inline unsigned long *vcpu_hcr(const struct kvm_vcpu *vcpu)
+> >  {
+> >-	return vcpu->arch.hcr;
+> >-}
+> >-
+> >-static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+> >-{
+> >-	vcpu->arch.hcr = hcr;
+> >+	return (unsigned long *)&vcpu->arch.hcr;
+> >  }
+> >  static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
+> >diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+> >index 4a879f6..1100170 100644
+> >--- a/arch/arm/include/asm/kvm_host.h
+> >+++ b/arch/arm/include/asm/kvm_host.h
+> >@@ -153,9 +153,6 @@ struct kvm_vcpu_arch {
+> >  	/* HYP trapping configuration */
+> >  	u32 hcr;
+> >-	/* Interrupt related fields */
+> >-	u32 irq_lines;		/* IRQ and FIQ levels */
+> >-
+> >  	/* Exception Information */
+> >  	struct kvm_vcpu_fault_info fault;
+> >diff --git a/arch/arm/kvm/emulate.c b/arch/arm/kvm/emulate.c
+> >index 0064b86..4286a89 100644
+> >--- a/arch/arm/kvm/emulate.c
+> >+++ b/arch/arm/kvm/emulate.c
+> >@@ -313,5 +313,5 @@ void kvm_inject_pabt(struct kvm_vcpu *vcpu, unsigned long addr)
+> >   */
+> >  void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+> >  {
+> >-	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VA);
+> >+	*vcpu_hcr(vcpu) |= HCR_VA;
+> >  }
+> >diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+> >index 330c9ce..c3b9799 100644
+> >--- a/arch/arm/kvm/hyp/switch.c
+> >+++ b/arch/arm/kvm/hyp/switch.c
+> >@@ -43,7 +43,7 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu, u32 *fpexc_host)
+> >  		isb();
+> >  	}
+> >-	write_sysreg(vcpu->arch.hcr | vcpu->arch.irq_lines, HCR);
+> >+	write_sysreg(vcpu->arch.hcr, HCR);
+> >  	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
+> >  	write_sysreg(HSTR_T(15), HSTR);
+> >  	write_sysreg(HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11), HCPTR);
+> >diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> >index e5df3fc..1fbfe96 100644
+> >--- a/arch/arm64/include/asm/kvm_emulate.h
+> >+++ b/arch/arm64/include/asm/kvm_emulate.h
+> >@@ -51,14 +51,9 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
+> >  		vcpu->arch.hcr_el2 &= ~HCR_RW;
+> >  }
+> >-static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
+> >+static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+> >  {
+> >-	return vcpu->arch.hcr_el2;
+> >-}
+> >-
+> >-static inline void vcpu_set_hcr(struct kvm_vcpu *vcpu, unsigned long hcr)
+> >-{
+> >-	vcpu->arch.hcr_el2 = hcr;
+> >+	return (unsigned long *)&vcpu->arch.hcr_el2;
+> >  }
+> >  static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+> >diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> >index 806ccef..27305e7 100644
+> >--- a/arch/arm64/include/asm/kvm_host.h
+> >+++ b/arch/arm64/include/asm/kvm_host.h
+> >@@ -266,9 +266,6 @@ struct kvm_vcpu_arch {
+> >  	/* IO related fields */
+> >  	struct kvm_decode mmio_decode;
+> >-	/* Interrupt related fields */
+> >-	u64 irq_lines;		/* IRQ and FIQ levels */
+> >-
+> >  	/* Cache some mmu pages needed inside spinlock regions */
+> >  	struct kvm_mmu_memory_cache mmu_page_cache;
+> >diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> >index bcf1a79..7703d63 100644
+> >--- a/arch/arm64/kvm/hyp/switch.c
+> >+++ b/arch/arm64/kvm/hyp/switch.c
+> >@@ -168,12 +168,6 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+> >  static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+> >  {
+> >-	u64 val;
+> >-
+> >-	val = read_sysreg(hcr_el2);
+> >-	val |= vcpu->arch.irq_lines;
+> >-	write_sysreg(val, hcr_el2);
+> >-
+> >  	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> >  		__vgic_v3_restore_state(vcpu);
+> >  	else
+> >diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+> >index da6a8cf..45c7026 100644
+> >--- a/arch/arm64/kvm/inject_fault.c
+> >+++ b/arch/arm64/kvm/inject_fault.c
+> >@@ -241,5 +241,5 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
+> >   */
+> >  void kvm_inject_vabt(struct kvm_vcpu *vcpu)
+> >  {
+> >-	vcpu_set_hcr(vcpu, vcpu_get_hcr(vcpu) | HCR_VSE);
+> >+	*vcpu_hcr(vcpu) |= HCR_VSE;
+> >  }
+> >diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> >index 7f9296a..6e9513e 100644
+> >--- a/virt/kvm/arm/arm.c
+> >+++ b/virt/kvm/arm/arm.c
+> >@@ -411,7 +411,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+> >   */
+> >  int kvm_arch_vcpu_runnable(struct kvm_vcpu *v)
+> >  {
+> >-	return ((!!v->arch.irq_lines || kvm_vgic_vcpu_pending_irq(v))
+> >+	bool irq_lines = *vcpu_hcr(v) & (HCR_VI | HCR_VF);
+> 
+> Hmmm, I might be nitpicking here, but in my mind bool should be used
+> only to contain true (1) or false (0) values.
+> Here the non-false values are never 1.
+> 
+> Not sure if the definition of _Bool guaranties to be able to contain
+> other values than 1 and 0, although I agree it is unlikely it will
+> be less than a byte which works in your case.
+
+As you found out, this is fine as long as we use _Bool.  If we had used
+an integer type, it would be bad practice indeed.
+
+> 
+> Other than that:
+> 
+> Reviewed-by: Julien Thierry <julien.thierry@arm.com>
+> 
+Thanks for the review!
+-Christoffer
