@@ -1,21 +1,85 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 26 Nov 2017 12:58:25 -0600
-Subject: [PATCH v2 2/6] dt-bindings: Add vendor prefix for Solomon
- Goldentek Display Corporation
-In-Reply-To: <1511348560-28505-3-git-send-email-narmstrong@baylibre.com>
-References: <1511348560-28505-1-git-send-email-narmstrong@baylibre.com>
- <1511348560-28505-3-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20171126185825.kkynet5kwp5gy2xj@rob-hp-laptop>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Sun, 26 Nov 2017 21:58:52 +0300
+Subject: [PATCH 08/37] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20171126161716.GK28855@cbox>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-9-christoffer.dall@linaro.org>
+ <20171125075221.oj5euwo7hnktxxsj@yury-thinkpad>
+ <20171126161716.GK28855@cbox>
+Message-ID: <20171126185852.bjte7raycorctft2@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 12:02:36PM +0100, Neil Armstrong wrote:
-> Solomon Goldentek Display Corporation is a Taiwanese LCD/LCM manufacturer.
-> Company Site: http://www.goldentek.com.tw
+On Sun, Nov 26, 2017 at 05:17:16PM +0100, Christoffer Dall wrote:
+> Hi Yury,
 > 
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> On Sat, Nov 25, 2017 at 10:52:21AM +0300, Yury Norov wrote:
+> > 
+> > On Thu, Oct 12, 2017 at 12:41:12PM +0200, Christoffer Dall wrote:
+> > > Avoid saving the guest VFP registers and restoring the host VFP
+> > > registers on every exit from the VM.  Only when we're about to run
+> > > userspace or other threads in the kernel do we really have to switch the
+> > > state back to the host state.
+> > > 
+> > > We still initially configure the VFP registers to trap when entering the
+> > > VM, but the difference is that we now leave the guest state in the
+> > > hardware registers while running the VM.
+> > > 
+> > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > > ---
+> > >  arch/arm64/include/asm/kvm_emulate.h |  5 ++++
+> > >  arch/arm64/include/asm/kvm_host.h    |  3 +++
+> > >  arch/arm64/kernel/asm-offsets.c      |  1 +
+> > >  arch/arm64/kvm/hyp/entry.S           |  3 +++
+> > >  arch/arm64/kvm/hyp/switch.c          | 47 +++++++++++-------------------------
+> > >  arch/arm64/kvm/hyp/sysreg-sr.c       | 21 +++++++++++++---
+> > >  6 files changed, 44 insertions(+), 36 deletions(-)
+> > > 
+> > > diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> > > index 1fbfe96..630dd60 100644
+> > > --- a/arch/arm64/include/asm/kvm_emulate.h
+> > > +++ b/arch/arm64/include/asm/kvm_emulate.h
+> > > @@ -56,6 +56,11 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+> > >  	return (unsigned long *)&vcpu->arch.hcr_el2;
+> > >  }
+> > >  
+> > > +static inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
+> > > +{
+> > > +	return (!(vcpu->arch.hcr_el2 & HCR_RW));
+> > > +}
+> > > +
+> > >  static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+> > >  {
+> > >  	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
+> > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > > index 7d3bfa7..5e09eb9 100644
+> > > --- a/arch/arm64/include/asm/kvm_host.h
+> > > +++ b/arch/arm64/include/asm/kvm_host.h
+> > > @@ -210,6 +210,9 @@ struct kvm_vcpu_arch {
+> > >  	/* Guest debug state */
+> > >  	u64 debug_flags;
+> > >  
+> > > +	/* 1 if the guest VFP state is loaded into the hardware */
+> > > +	u64 guest_vfp_loaded;
+> > 
+> > May it be just u8/bool?
+> > 
+> This particular field is accessed from assembly code, and I'm not sure
+> what guarantees the compiler makes in terms of how a u8/bool is
+> allocated with respect to padding and alignment, and I think that's why
+> we've been using u64 fields in the past.
+> 
+> I don't actually remember the details, but I'd rather err on the side of
+> caution than trying to save a few bytes.  However, if someone can
+> convince me there's a completely safe way to do this, then I'm happy to
+> change it.
 
-Acked-by: Rob Herring <robh@kernel.org>
+'strb     w0, [x3, #VCPU_GUEST_VFP_LOADED]' would work. See
+C6.6.181 STRB (register) in ARM64 ARM.
+
+The only thing I would recommend is to reorder fields in kvm_vcpu_arch
+to avoid unneeded holes in the structure. It already spend 10 bytes for
+nothing in 3 holes.
+
+Yury
