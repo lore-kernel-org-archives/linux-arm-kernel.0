@@ -1,131 +1,101 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 26 Nov 2017 20:55:02 +0100
-Subject: [PATCH 36/37] KVM: arm/arm64: Move VGIC APR save/restore to vgic
- put/load
-In-Reply-To: <20171126150925.n2c24dqjh2h4g4wb@yury-thinkpad>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-37-christoffer.dall@linaro.org>
- <20171126150925.n2c24dqjh2h4g4wb@yury-thinkpad>
-Message-ID: <20171126195502.GR28855@cbox>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 26 Nov 2017 16:14:39 -0600
+Subject: [PATCH v2 05/11] dt-bindings: Document the Rockchip ISP1 bindings
+In-Reply-To: <20171124023706.5702-6-jacob-chen@iotwrt.com>
+References: <20171124023706.5702-1-jacob-chen@iotwrt.com>
+ <20171124023706.5702-6-jacob-chen@iotwrt.com>
+Message-ID: <20171126221439.iodzrhdmd6nu6vga@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 26, 2017 at 06:09:25PM +0300, Yury Norov wrote:
-> On Thu, Oct 12, 2017 at 12:41:40PM +0200, Christoffer Dall wrote:
-> > The APRs can only have bits set when the guest acknowledges an interrupt
-> > in the LR and can only have a bit cleared when the guest EOIs an
-> > interrupt in the LR.  Therefore, if we have no LRs with any
-> > pending/active interrupts, the APR cannot change value and there is no
-> > need to clear it on every exit from the VM (hint: it will have already
-> > been cleared when we exited the guest the last time with the LRs all
-> > EOIed).
-> > 
-> > The only case we need to take care of is when we migrate the VCPU away
-> > from a CPU or migrate a new VCPU onto a CPU, or when we return to
-> > userspace to capture the state of the VCPU for migration.  To make sure
-> > this works, factor out the APR save/restore functionality into separate
-> > functions called from the VCPU (and by extension VGIC) put/load hooks.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm/include/asm/kvm_hyp.h   |   2 +
-> >  arch/arm64/include/asm/kvm_hyp.h |   2 +
-> >  virt/kvm/arm/hyp/vgic-v3-sr.c    | 123 +++++++++++++++++++++------------------
-> >  virt/kvm/arm/vgic/vgic-v2.c      |   7 +--
-> >  virt/kvm/arm/vgic/vgic-v3.c      |   5 ++
-> >  5 files changed, 77 insertions(+), 62 deletions(-)
+On Fri, Nov 24, 2017 at 10:37:00AM +0800, Jacob Chen wrote:
+> From: Jacob Chen <jacob2.chen@rock-chips.com>
 > 
-> [...]
+> Add DT bindings documentation for Rockchip ISP1
 > 
-> > @@ -361,6 +304,72 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
-> >  		     ICC_SRE_EL2);
-> >  }
-> >  
-> > +void __hyp_text __vgic_v3_save_aprs(struct kvm_vcpu *vcpu)
-> > +{
-> > +	struct vgic_v3_cpu_if *cpu_if;
-> > +	u64 val;
-> > +	u32 nr_pre_bits;
-> > +
-> > +	vcpu = kern_hyp_va(vcpu);
-> > +	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-> > +
-> > +	val = read_gicreg(ICH_VTR_EL2);
-> > +	nr_pre_bits = vtr_to_nr_pre_bits(val);
-> > +
-> > +	switch (nr_pre_bits) {
-> > +	case 7:
-> > +		cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
-> > +		cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
-> > +	case 6:
-> > +		cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
-> > +	default:
-> > +		cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
-> > +	}
-> > +
-> > +	switch (nr_pre_bits) {
-> > +	case 7:
-> > +		cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
-> > +		cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
-> > +	case 6:
-> > +		cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
-> > +	default:
-> > +		cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
-> > +	}
-> > +}
+> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+> ---
+>  .../devicetree/bindings/media/rockchip-isp1.txt    | 61 ++++++++++++++++++++++
+>  1 file changed, 61 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
 > 
-> What for 2 switch-cases here? At first glance, you can join them:
-> 	switch (nr_pre_bits) {
-> 	case 7:
-> 		cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
-> 		cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
-> 		cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
-> 		cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
-> 	case 6:
-> 		cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
-> 		cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
-> 	default:
-> 		cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
-> 		cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
-> 	}
-> 
-> > +
-> > +void __hyp_text __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu)
-> > +{
-> > +	struct vgic_v3_cpu_if *cpu_if;
-> > +	u64 val;
-> > +	u32 nr_pre_bits;
-> > +
-> > +	vcpu = kern_hyp_va(vcpu);
-> > +	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
-> > +
-> > +	val = read_gicreg(ICH_VTR_EL2);
-> > +	nr_pre_bits = vtr_to_nr_pre_bits(val);
-> > +
-> > +	switch (nr_pre_bits) {
-> > +	case 7:
-> > +		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
-> > +		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
-> > +	case 6:
-> > +		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
-> > +	default:
-> > +		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
-> > +	}
-> > +
-> > +	switch (nr_pre_bits) {
-> > +	case 7:
-> > +		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
-> > +		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
-> > +	case 6:
-> > +		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
-> > +	default:
-> > +		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
-> > +	}
-> 
-> And here
-> 
+> diff --git a/Documentation/devicetree/bindings/media/rockchip-isp1.txt b/Documentation/devicetree/bindings/media/rockchip-isp1.txt
+> new file mode 100644
+> index 000000000000..5e5b72edcf81
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/rockchip-isp1.txt
+> @@ -0,0 +1,61 @@
+> +Rockchip SoC Image Signal Processing unit v1
+> +----------------------------------------------
+> +
+> +Rockchip ISP1 is the Camera interface for the Rockchip series of SoCs
+> +which contains image processing, scaling, and compression funcitons.
+> +
+> +Currently device tree nodes for the Rockchip ISP1 driver includes:
 
-Sure.
+Bindings describe the h/w, not drivers.
 
-Thanks,
--Christoffer
+> +MIPI D-PHY, ISP.
+> +
+> +Required properties:
+> +  - compatible: value should be one of the following
+> +      "rockchip,rk3288-cif-isp";
+> +      "rockchip,rk3399-cif-isp";
+> +  - reg : offset and length of the register set for the device.
+> +  - interrupts: should contain ISP interrupt.
+> +  - clocks: phandle to the required clocks.
+> +  - clock-names: required clock name.
+> +  - iommus: required a iommu node.
+> +
+> +The device node should contain one 'port' child node with child 'endpoint'
+> +nodes, according to the bindings defined in Documentation/devicetree/bindings/
+> +media/video-interfaces.txt.
+
+You need to enumerate the endpoints (mipi and parallel), too.
+ 
+> +
+> +Example:
+> +SoC-specific DT entry:
+> +	isp0: isp0 at ff910000 {
+> +		compatible = "rockchip,rk3399-cif-isp";
+> +		reg = <0x0 0xff910000 0x0 0x4000>;
+> +		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH 0>;
+> +		clocks = <&cru SCLK_ISP0>,
+> +			 <&cru ACLK_ISP0>, <&cru ACLK_ISP0_WRAPPER>,
+> +			 <&cru HCLK_ISP0>, <&cru HCLK_ISP0_WRAPPER>;
+> +		clock-names = "clk_isp",
+> +			      "aclk_isp", "aclk_isp_wrap",
+> +			      "hclk_isp", "hclk_isp_wrap";
+> +		power-domains = <&power RK3399_PD_ISP0>;
+> +		iommus = <&isp0_mmu>;
+> +		status = "disabled";
+> +	};
+> +
+> +Board-specific:
+
+Just show the complete example. The SoC and board split is purely source 
+level convention.
+
+> +	isp0: isp0 at ff910000 {
+> +		port {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+> +			/* mipi */
+> +			isp0_mipi_in: endpoint at 0 {
+> +				reg = <0>;
+> +				remote-endpoint = <&dphy_rx0_out>;
+> +			};
+> +
+> +			/* parallel */
+> +			isp0_parallel_in: endpoint at 1 {
+> +				reg = <1>;
+> +				remote-endpoint = <&ov5640_out>;
+> +			};
+> +		};
+> +	};
+> +
+> +The MIPI-DPHY device binding is defined in rockchip-mipi-dphy.txt.
+> -- 
+> 2.15.0
+> 
