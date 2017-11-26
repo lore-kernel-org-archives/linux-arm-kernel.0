@@ -1,149 +1,117 @@
-From: arunks.linux@gmail.com (Arun KS)
-Date: Sun, 26 Nov 2017 12:28:01 +0530
-Subject: [PATCH v2 1/5] mm: memory_hotplug: Memory hotplug (add) support
- for arm64
-In-Reply-To: <20171124105308.GA10023@tpad>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <ba9c72239dc5986edc6ca29fc58fefb306e4b52d.1511433386.git.ar@linux.vnet.ibm.com>
- <CAKZGPAPN7migyvpNJDu1bA+ditb0TJV4WLqZuPdkxOU3kYQ9Ng@mail.gmail.com>
- <20171124094232.GA18120@samekh> <20171124105308.GA10023@tpad>
-Message-ID: <CAKZGPAMByPKcEmWf_QMm6k4WomH8ZJjjj3YNyBU617DZN1VwMQ@mail.gmail.com>
+From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
+Date: Sun, 26 Nov 2017 13:59:08 +0530
+Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
+ regions being no longer mapped as NOMAP
+In-Reply-To: <20171116070005.GI29552@linaro.org>
+References: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
+ <CACi5LpNV_E9pvhTwLcy6vtEj9qbL1ZEHe-5sv=iiW0k9JxPD1Q@mail.gmail.com>
+ <20171113092730.GA29552@linaro.org>
+ <CAKv+Gu_eQ-s0J22tKeHKJme4qXcvxvDkS7vKrNW+o_XtMTkMhQ@mail.gmail.com>
+ <3df4c6c5-0abe-01ee-730d-2edaa5f497d2@redhat.com>
+ <20171116070005.GI29552@linaro.org>
+Message-ID: <CAFTCetQHmpprAVu6uYO+rc5Xi4EUVhmovbmSaU6nM1n1mAH62w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 4:23 PM, Maciej Bielski
-<m.bielski@virtualopensystems.com> wrote:
-> On Fri, Nov 24, 2017 at 09:42:33AM +0000, Andrea Reale wrote:
->> Hi Arun,
->>
->>
->> On Fri 24 Nov 2017, 11:25, Arun KS wrote:
->> > On Thu, Nov 23, 2017 at 4:43 PM, Maciej Bielski
->> > <m.bielski@virtualopensystems.com> wrote:
->> >> [ ...]
->> > > Introduces memory hotplug functionality (hot-add) for arm64.
->> > > @@ -615,6 +616,44 @@ void __init paging_init(void)
->> > >                       SWAPPER_DIR_SIZE - PAGE_SIZE);
->> > >  }
->> > >
->> > > +#ifdef CONFIG_MEMORY_HOTPLUG
->> > > +
->> > > +/*
->> > > + * hotplug_paging() is used by memory hotplug to build new page tables
->> > > + * for hot added memory.
->> > > + */
->> > > +
->> > > +struct mem_range {
->> > > +       phys_addr_t base;
->> > > +       phys_addr_t size;
->> > > +};
->> > > +
->> > > +static int __hotplug_paging(void *data)
->> > > +{
->> > > +       int flags = 0;
->> > > +       struct mem_range *section = data;
->> > > +
->> > > +       if (debug_pagealloc_enabled())
->> > > +               flags = NO_BLOCK_MAPPINGS | NO_CONT_MAPPINGS;
->> > > +
->> > > +       __create_pgd_mapping(swapper_pg_dir, section->base,
->> > > +                       __phys_to_virt(section->base), section->size,
->> > > +                       PAGE_KERNEL, pgd_pgtable_alloc, flags);
->> >
->> > Hello Andrea,
->> >
->> > __hotplug_paging runs on stop_machine context.
->> > cpu stop callbacks must not sleep.
->> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/kernel/stop_machine.c?h=v4.14#n479
->> >
->> > __create_pgd_mapping uses pgd_pgtable_alloc. which does
->> > __get_free_page(PGALLOC_GFP)
->> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/arch/arm64/mm/mmu.c?h=v4.14#n342
->> >
->> > PGALLOC_GFP has GFP_KERNEL which inturn has __GFP_RECLAIM
->> >
->> > #define PGALLOC_GFP     (GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO)
->> > #define GFP_KERNEL      (__GFP_RECLAIM | __GFP_IO | __GFP_FS)
->> >
->> > Now, prepare_alloc_pages() called by __alloc_pages_nodemask checks for
->> >
->> > might_sleep_if(gfp_mask & __GFP_DIRECT_RECLAIM);
->> >
->> > https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/tree/mm/page_alloc.c?h=v4.14#n4150
->> >
->> > and then BUG()
->>
->> Well spotted, thanks for reporting the problem. One possible solution
->> would be to revert back to building the updated page tables on a copy
->> pgdir (as it was done in v1 of this patchset) and then replacing swapper
->> atomically with stop_machine.
->>
->> Actually, I am not sure if stop_machine is strictly needed,
->> if we modify the swapper pgdir live: for example, in x86_64
->> kernel_physical_mapping_init, atomicity is ensured by spin-locking on
->> init_mm.page_table_lock.
->> https://elixir.free-electrons.com/linux/v4.14/source/arch/x86/mm/init_64.c#L684
->> I'll spend some time investigating whoever else could be working
->> concurrently on the swapper pgdir.
->>
->> Any suggestion or pointer is very welcome.
->
-> Hi Andrea, Arun,
->
-> Alternative approach could be implementing pgd_pgtable_alloc_nosleep() and
-> pointing this to hotplug_paging(). Subsequently, it could use different flags,
-> eg:
->
-> #define PGALLOC_GFP_NORECLAIM   (__GFP_IO | __GFP_FS | __GFP_NOTRACK | __GFP_ZERO)
+Hi Akashi,
 
-This solves the problem with __get_free_page.
-
-But pgd_pgtable_alloc() ->  pgtable_page_ctor() -> ptlock_alloc() and
-then kmem_cache_alloc(page_ptl_cachep, GFP_KERNEL)
-Same BUG again.
-
-Regards,
-Arun
-
+On Thu, Nov 16, 2017 at 12:30 PM, AKASHI Takahiro
+<takahiro.akashi@linaro.org> wrote:
+> Bhupesh,
 >
-> Is this unefficient approach in any way?
-> Do we like the fact that the memory-attaching thread can go to sleep?
->
-> BR,
->
+> On Wed, Nov 15, 2017 at 04:28:55PM +0530, Bhupesh Sharma wrote:
 >>
->> Thanks,
->> Andrea
->>
->> > I was testing on 4.4 kernel, but cross checked with 4.14 as well.
->> >
->> > Regards,
->> > Arun
->> >
->> >
->> > > +
->> > > +       return 0;
->> > > +}
->> > > +
->> > > +inline void hotplug_paging(phys_addr_t start, phys_addr_t size)
->> > > +{
->> > > +       struct mem_range section = {
->> > > +               .base = start,
->> > > +               .size = size,
->> > > +       };
->> > > +
->> > > +       stop_machine(__hotplug_paging, &section, NULL);
->> > > +}
->> > > +#endif /* CONFIG_MEMORY_HOTPLUG */
->> > > +
->> > >  /*
->> > >   * Check whether a kernel address is valid (derived from arch/x86/).
->> > >   */
->> > > --
->> > > 2.7.4
->> > >
->> >
->>
+>   (snip)
 >
-> --
-> Maciej Bielski
+>> # dmesg | grep -B 2 -i "ACPI reclaim"
+>> [    0.000000] efi:   0x000039670000-0x0000396bffff [Runtime Code |RUN|  |
+>> |  |  |  |  |   |WB|WT|WC|UC]
+>> [    0.000000] efi:   0x0000396c0000-0x00003970ffff [Boot Code |   |  |  |
+>> |  |  |  |   |WB|WT|WC|UC]
+>> [    0.000000] efi:   0x000039710000-0x00003975ffff [ACPI Reclaim Memory|
+>> |  |  |  |  |  |  |   |WB|WT|WC|UC]
+>>
+>> 2. Now, I am not sure which kernel layer does the following changes (I am
+>> still trying to dig it out more), but I see that the 'Boot Code' and ACPI
+>> DSDT table regions are somehow merged into one memblock_region and appear as
+>> range '396c0000-3975ffff' in the '/proc/iomem' interface:
+>>
+>> # cat /proc/iomem | grep -A 2 -B 2 39
+>> 00000000-3961ffff : System RAM
+>>   00080000-00b6ffff : Kernel code
+>>   00cb0000-0167ffff : Kernel data
+>>   0e800000-2e7fffff : Crash kernel
+>> 39620000-396bffff : reserved
+>> 396c0000-3975ffff : System RAM
+>> 39760000-3976ffff : reserved
+>> 39770000-397affff : reserved
+>> 397b0000-3989ffff : reserved
+>> 398a0000-398bffff : reserved
+>> 398c0000-39d3ffff : reserved
+>> 39d40000-3ed2ffff : System RAM
+>>
+>   (snip)
+>>
+>> So, I am looking at what could be causing the 'Boot Code' and 'ACPI DSDT
+>> table' ranges to be merged into a single region at
+>> '0x0000396c0000-0x00003970ffff' which cannot be marked as RESERVED using
+>> 'memblock_is_reserved'.
+>
+> Simple:) The short answer is that memblock_add() does.
+>
+> The long answer:
+> First, please note that memblock maintains two type of regions list,
+> "memory" and "reserved".
+>
+> efi_init()
+>     reserve_regions()
+>         early_init_dt_add_memory_arch()
+>             memblock_add()
+>                 memblock_add_range(memblock.memory)
+>
+> The memory regions described in efi.memmap are added to "memory" list
+> with all the neighboring regions being merged into ones,
+> in this case, "Runtime Code", "Boot Code", "ACPI Reclaim Memory" and others.
+>
+> The secret here is that "Runtime Code" is also marked with "NOMAP" flag in
+> reserve_regions(), which creates an isolated region since it now has
+> a different attribute.
+> Consequently only "Boot Code" and "ACPI Reclaim Memory" are
+> unified.
+>
+> Look at request_standard_resources(). It handles only "memory" list,
+> and doesn't care about whether any arbitrary part of memory is in
+> "reserved" list or not.
+
+Thanks for the pointers. Now I did some experiments and traversed the
+whole memblock path and I see
+how these two regions get merged into a single region which is later
+on recognized by
+'request_standard_resources()' as a System RAM region rather than a
+RESERVED region.
+
+I recently reproduced this on a APM mustang with latest kernel as well
+when acpi is used to boot the machine, which makes me believe that
+this is a generic issue for arm64 machines with the 4.14 kernel and if
+they use acpi=force as the boot method.
+
+I am not sure, if a fix/or hack would be suitable for all underlying
+arm64 machines, but I am trying one on the arm64 machines I have to
+see if it fixes the issue.
+
+@Ard:
+
+Hi Ard,
+
+I think to create and test a clean solution for all arm64 boards it
+will take some time, in the meantime should we consider reverting the
+commit [1] to make sure that acpi enabled arm64 machines can boot with
+4.14?
+
+Please let me know your opinion.
+
+[1] f56ab9a5b73ca2aee777ccdf2d355ae2dd31db5a (efi/arm: Don't mark
+ACPI reclaim memory as MEMBLOCK_NOMAP)
+
+Thanks,
+Bhupesh
