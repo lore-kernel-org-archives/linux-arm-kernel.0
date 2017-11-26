@@ -1,145 +1,74 @@
 From: alex.shi@linaro.org (Alex Shi)
-Date: Sun, 26 Nov 2017 22:58:08 +0800
+Date: Sun, 26 Nov 2017 22:59:58 +0800
 Subject: do page fault in atomic bug on arm
-In-Reply-To: <20171124155649.GT31757@n2100.armlinux.org.uk>
+In-Reply-To: <20171124202553.GV31757@n2100.armlinux.org.uk>
 References: <d83cdbf1-0d27-fb82-14c8-3d37101c3c06@linaro.org>
  <20171121132001.GH31757@n2100.armlinux.org.uk>
  <64cbcda0-d040-4872-4a6b-7cd18375b4aa@linaro.org>
- <20171124155649.GT31757@n2100.armlinux.org.uk>
-Message-ID: <17ed7101-f076-f68c-b8f3-7cc62d24a641@linaro.org>
+ <20171124192700.GU31757@n2100.armlinux.org.uk>
+ <20171124202553.GV31757@n2100.armlinux.org.uk>
+Message-ID: <08bb4658-5b62-e306-5aa8-366be25986ca@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+cc mhiramat at kernel.org
 
+Thanks a lot for look into this! :)
 
-On 11/24/2017 11:56 PM, Russell King - ARM Linux wrote:
-> On Fri, Nov 24, 2017 at 11:09:30PM +0800, Alex Shi wrote:
+Regards
+Alex
+
+On 11/25/2017 04:25 AM, Russell King - ARM Linux wrote:
+> On Fri, Nov 24, 2017 at 07:27:00PM +0000, Russell King - ARM Linux wrote:
+>> Adding Tixy, as he's more knowledgable in this area - I suggest
+>> someone knowledgable in this area runs
 >>
->>>> [   53.302718] softirqs last  enabled at (11474): [<c034c5d0>] __do_softirq+0x280/0x5ac
->>>> [   53.310494] softirqs last disabled at (11433): [<c034cc98>] irq_exit+0xf4/0x158
->>>> [   53.317837] CPU: 0 PID: 1691 Comm: ftracetest Not tainted 4.9.55-dirty #1
->>>> [   53.324652] Hardware name: Generic DRA74X (Flattened Device Tree)
->>>> [   53.330857] [<c03114d8>] (unwind_backtrace) from [<c030cb18>] (show_stack+0x10/0x14)
->>>> [   53.338644] [<c030cb18>] (show_stack) from [<c067e604>] (dump_stack+0xa4/0xd0)
->>>> [   53.345908] [<c067e604>] (dump_stack) from [<c0373808>] (___might_sleep+0x1ac/0x2a0)
->>>> [   53.353694] [<c0373808>] (___might_sleep) from [<c0d60ec8>] (do_page_fault+0x25c/0x428)
->>>> [   53.361739] [<c0d60ec8>] (do_page_fault) from [<c03013e8>] (do_PrefetchAbort+0x38/0x9c)
->>>> [   53.369780] [<c03013e8>] (do_PrefetchAbort) from [<c0d605a8>] (__pabt_svc+0x68/0xa0)
->>>> [   53.377557] Exception stack(0xec6fbfa8 to 0xec6fbff0)
->>>> [   53.382629] bfa0:                   00000001 00000001 ffffffff 00000000 0010ac68 00000007
->>>> [   53.390845] bfc0: 00000001 0000003f 00000009 0000000c fffffffa be9d27a4 000e31fc ec6fbff8
->>>> [   53.399055] bfe0: b6e6d49c b6e6d49c 40070093 ffffffff
->>>> [   53.404137] [<c0d605a8>] (__pabt_svc) from [<b6e6d49c>] (0xb6e6d49c)
->>>
->>> It also doesn't help that the backtrace stops at this point, and it looks
->>> very strange:
->>>
->>> 1. the value of PC looks like it's outside of the module space.
->>> 2. the CPSR indicates that the CPU was in SVC mode in the parent context
->>>    with IRQs disabled.
->>> 3. We're right at the top of the kernel stack, which suggests no further
->>>    stack frames above this.
->>>
->>> We should never be in SVC mode without further stack frames on the kernel
->>> stack.
->>>
->>> We don't seem to have overflowed the kernel stack, as the thread info
->>> seems correct - and it would also be unlikely that the saved SP value
->>> would end in ff8 in the exception stack frame.
+>> 	ftracetest test.d/kprobe/multiple_kprobes.tc
 >>
->> Hi Russell,
->>
->> Sorry for response late!
->> Is this SP was stained by sth? As my understand, SP should be times of
->> 32bits. But why stack print out correct with a incorrect SP?
+>> and fixes these bugs... also running the entire ftracetest suite
+>> would probably also be a very good idea.
 > 
-> There's nothing wrong with SP.
-
-Got it. Thanks a lot!
+> There's some other stupidities as well:
 > 
-> Looking deeper at this, I think that the kernel stack somehow got
-> corrupted earlier:
+> trace_kprobe: Inserting kprobe at __error_lpae+0
+> trace_kprobe: Inserting kprobe at str_lpae+0
+> trace_kprobe: Inserting kprobe at __error_p+0
+> trace_kprobe: Inserting kprobe at str_p1+0
+> trace_kprobe: Inserting kprobe at str_p2+0
+> trace_kprobe: Could not insert probe at str_p2+0: -22
 > 
-> irq event stamp: 12924
-> hardirqs last  enabled at (12923): [<c0307f10>] no_work_pending+0x4/0x30
-> hardirqs last disabled at (12924): [<c0d605a0>] __pabt_svc+0x60/0xa0
+> str_lpae: .asciz "\nError: Kernel with LPAE support, but CPU does not support LPAE.\n"
+> str_p1: .asciz  "\nError: unrecognized/unsupported processor variant (0x"
+> str_p2: .asciz  ").\n"
 > 
-> The hard IRQ disable is as a result of taking a prefetch abort in
-> SVC mode.  The saved context agrees with that:
+> So we successfully placed a kprobe on some ASCII strings, which are
+> used prior to the kernel being properly up and running, which means
+> we have to use relative references to these strings, and relative
+> references to strings in other sections is not simple.
 > 
->                         R0       R1       R2       R3       R4       R5
-> bfa0:                   00000001 00000001 ffffffff 00000000 0010ac68 00000007
->       R6       R7       R8       R9       R10      FP       IP       SP
-> bfc0: 00000001 0000003f 00000009 0000000c fffffffa be9d27a4 000e31fc ec6fbff8
->       LR       PC       PSR
-> bfe0: b6e6d49c b6e6d49c 40070093 ffffffff
+> More worrying:
 > 
-> The PSR lower 5 bits are 0x13, which is SVC mode.  Bit 7 set means IRQs
-> disabled.  The PC address was 0xb6e6d49c.
+> trace_kprobe: Inserting kprobe at __turn_mmu_on+0
+> trace_kprobe: Inserting kprobe at __idmap_text_start+0
+> trace_kprobe: Inserting kprobe at __turn_mmu_on_end+0
+> ...
+> trace_kprobe: Inserting kprobe at __idmap_text_end+0
+> ...
+> trace_kprobe: Inserting kprobe at secondary_startup+0
+> trace_kprobe: Inserting kprobe at secondary_startup_arm+0
+> trace_kprobe: Inserting kprobe at __secondary_switched+0
+> trace_kprobe: Inserting kprobe at __secondary_data+0
+> trace_kprobe: Inserting kprobe at __enable_mmu+0
+> trace_kprobe: Inserting kprobe at __do_fixup_smp_on_up+0
+> trace_kprobe: Inserting kprobe at __fixup_a_pv_table+0
+> trace_kprobe: Inserting kprobe at fixup_pv_table+0
+> trace_kprobe: Inserting kprobe at __lookup_processor_type+0
+> trace_kprobe: Inserting kprobe at __lookup_processor_type_data+0
 > 
-
-Thank you very much for detailed explanations! :)
-
-> The last record we have of interrupts being enabled was in
-> no_work_pending, which is the exit path to usermode - but if we were
-> returning to usermode:
+> These are definitely a no-no for tracing, because they're part of the
+> early startup code for the kernel when no stacks are available.
 > 
-> (a) how did we get into SVC mode instead
-
-We return to user mode correctly in no_work_pending, the irq enabled
-then we get a pabt_svc?
-
-> (b) why are interrupts disabled
-
-it was disabled in __pabt_svc, objdump show a extra irq disable with arm
-defconfig.
-...
- 2a0:   ebfffffe        bl      0 <v7_pabort>
- 2a4:   f10c0080        cpsid   i
-...
-> (c) why was mm->mmap_sem still held
-
-the bug was caught here, just with mmap_sem, the pabt_svc happens.
-> 
-> Can you try the following patch to try and catch the problem earlier?
-> I haven't tested it myself, and adding code may move things around in
-> the kernel and make this bug disappear.
-
-Do we still need to try this patch? I saw you tried it and do further more.
-> 
-> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-> index d523cd8439a3..ff577177b286 100644
-> --- a/arch/arm/kernel/entry-header.S
-> +++ b/arch/arm/kernel/entry-header.S
-> @@ -299,6 +299,8 @@
->  	@ ARM mode restore
->  	mov	r2, sp
->  	ldr	r1, [r2, #\offset + S_PSR]	@ get calling cpsr
-> +	tst	r1, #0xcf
-> +	bne	oops
->  	ldr	lr, [r2, #\offset + S_PC]!	@ get pc
->  	msr	spsr_cxsf, r1			@ save in spsr_svc
->  #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
-> @@ -314,6 +316,15 @@
->  						@ after ldm {}^
->  	add	sp, sp, #\offset + PT_REGS_SIZE
->  	movs	pc, lr				@ return & move spsr_svc into cpsr
-> +oops:	.word	0xe7f001f2
-
-This oops cause allnoconfig with arm failed in build. but it's fine for
-a multi_v7_defconfig
-arch/arm/kernel/entry-common.S:106: Error: symbol `oops' is already defined
-
-> +	.pushsection .rodata.str, "aMS", %progbits, 1
-> +2:	.asciz	"Returning to usermode but unexpected PSR bits set?"
-> +	.popsection
-> +	.pushsection __bug_table, "aw"
-> +	.align	2
-> +	.word	oops, 2b
-> +	.hword	\@
-> +	.popsection
->  #elif defined(CONFIG_CPU_V7M)
->  	@ V7M restore.
->  	@ Note that we don't need to do clrex here as clearing the local
-> 
+> Some of these can't live in the special "do not use kprobes here"
+> section as they need to be in other sections (like .idmap) because
+> they need to be part of the identity-mapped code.
 > 
