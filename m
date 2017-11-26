@@ -1,39 +1,104 @@
-From: peng.fan@nxp.com (Peng Fan)
-Date: Sun, 26 Nov 2017 20:25:30 +0800
-Subject: [PATCH] arm: l2c: unlock ways when in non-secure mode
-Message-ID: <20171126122530.857-1-peng.fan@nxp.com>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Sun, 26 Nov 2017 18:16:23 +0530
+Subject: [PATCH v4] drm: bridge: synopsys/dw-hdmi: Enable cec clock
+In-Reply-To: <20171125201844.11353-1-phh@phh.me>
+References: <20171125201844.11353-1-phh@phh.me>
+Message-ID: <bc8b4aea-eb0d-4d96-0e55-62afce664dc4@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To boot Linux in Non-secure mode with l2x0, the l2x0 controller
-is enabled in secure mode and ways locked to make it seems L2 cache
-disabled during linux boot process. So during l2x0 initialization,
-need to unlock the ways to make l2x0 could cache data/inst.
 
-Signed-off-by: Peng Fan <peng.fan@nxp.com>
-Cc: Russell King <linux@armlinux.org.uk>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Chris Brandt <chris.brandt@renesas.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm/mm/cache-l2x0.c | 4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
-index 808efbb89b88..de8eed0871ec 100644
---- a/arch/arm/mm/cache-l2x0.c
-+++ b/arch/arm/mm/cache-l2x0.c
-@@ -879,6 +879,10 @@ static int __init __l2c_init(const struct l2c_init_data *data,
- 		l2x0_saved_regs.aux_ctrl = aux;
- 
- 		data->enable(l2x0_base, data->num_lock);
-+	} else {
-+		pr_info("%s: unlock cache controller\n", data->type);
-+
-+		data->unlock(l2x0_base, data->num_lock);
- 	}
- 
- 	outer_cache = fns;
+On 11/26/2017 01:48 AM, Pierre-Hugues Husson wrote:
+> Support the "cec" optional clock. The documentation already mentions "cec"
+> optional clock and it is used by several boards, but currently the driver
+> doesn't enable it, thus preventing cec from working on those boards.
+> 
+> And even worse: a /dev/cecX device will appear for those boards, but it
+> won't be functioning without configuring this clock.
+
+Thanks for the updating the commit message. I will queue this to drm-misc-fixes once
+it's updated with the 4.15-rc1 tag.
+
+Thanks,
+Archit
+
+> 
+> Changes:
+> v4:
+> - Change commit message to stress the importance of this patch
+> 
+> v3:
+> - Drop useless braces
+> 
+> v2:
+> - Separate ENOENT errors from others
+> - Propagate other errors (especially -EPROBE_DEFER)
+> 
+> Signed-off-by: Pierre-Hugues Husson <phh@phh.me>
+> ---
+>   drivers/gpu/drm/bridge/synopsys/dw-hdmi.c | 25 +++++++++++++++++++++++++
+>   1 file changed, 25 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> index bf14214fa464..d82b9747a979 100644
+> --- a/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> +++ b/drivers/gpu/drm/bridge/synopsys/dw-hdmi.c
+> @@ -138,6 +138,7 @@ struct dw_hdmi {
+>   	struct device *dev;
+>   	struct clk *isfr_clk;
+>   	struct clk *iahb_clk;
+> +	struct clk *cec_clk;
+>   	struct dw_hdmi_i2c *i2c;
+>   
+>   	struct hdmi_data_info hdmi_data;
+> @@ -2382,6 +2383,26 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>   		goto err_isfr;
+>   	}
+>   
+> +	hdmi->cec_clk = devm_clk_get(hdmi->dev, "cec");
+> +	if (PTR_ERR(hdmi->cec_clk) == -ENOENT) {
+> +		hdmi->cec_clk = NULL;
+> +	} else if (IS_ERR(hdmi->cec_clk)) {
+> +		ret = PTR_ERR(hdmi->cec_clk);
+> +		if (ret != -EPROBE_DEFER)
+> +			dev_err(hdmi->dev, "Cannot get HDMI cec clock: %d\n",
+> +					ret);
+> +
+> +		hdmi->cec_clk = NULL;
+> +		goto err_iahb;
+> +	} else {
+> +		ret = clk_prepare_enable(hdmi->cec_clk);
+> +		if (ret) {
+> +			dev_err(hdmi->dev, "Cannot enable HDMI cec clock: %d\n",
+> +					ret);
+> +			goto err_iahb;
+> +		}
+> +	}
+> +
+>   	/* Product and revision IDs */
+>   	hdmi->version = (hdmi_readb(hdmi, HDMI_DESIGN_ID) << 8)
+>   		      | (hdmi_readb(hdmi, HDMI_REVISION_ID) << 0);
+> @@ -2518,6 +2539,8 @@ __dw_hdmi_probe(struct platform_device *pdev,
+>   		cec_notifier_put(hdmi->cec_notifier);
+>   
+>   	clk_disable_unprepare(hdmi->iahb_clk);
+> +	if (hdmi->cec_clk)
+> +		clk_disable_unprepare(hdmi->cec_clk);
+>   err_isfr:
+>   	clk_disable_unprepare(hdmi->isfr_clk);
+>   err_res:
+> @@ -2541,6 +2564,8 @@ static void __dw_hdmi_remove(struct dw_hdmi *hdmi)
+>   
+>   	clk_disable_unprepare(hdmi->iahb_clk);
+>   	clk_disable_unprepare(hdmi->isfr_clk);
+> +	if (hdmi->cec_clk)
+> +		clk_disable_unprepare(hdmi->cec_clk);
+>   
+>   	if (hdmi->i2c)
+>   		i2c_del_adapter(&hdmi->i2c->adap);
+> 
+
 -- 
-2.14.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
