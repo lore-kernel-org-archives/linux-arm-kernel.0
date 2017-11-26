@@ -1,23 +1,41 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 26 Nov 2017 13:05:39 -0600
-Subject: [PATCH 1/3] ASoC: stm32: fix sync property description in SAI
- bindings
-In-Reply-To: <1511362947-14747-2-git-send-email-olivier.moysan@st.com>
-References: <1511362947-14747-1-git-send-email-olivier.moysan@st.com>
- <1511362947-14747-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <20171126190539.ordmumh3vekfsqls@rob-hp-laptop>
+Date: Sun, 26 Nov 2017 13:10:37 -0600
+Subject: [PATCH 1/5] drm/panel: Add support for the EDT ETM0700G0BDH6
+In-Reply-To: <20171123125600.41562-2-jan.tuerk@emtrion.com>
+References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
+ <20171123125600.41562-2-jan.tuerk@emtrion.com>
+Message-ID: <20171126191037.7zhb3c6c5ufmogp5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 04:02:25PM +0100, Olivier Moysan wrote:
-> SAI sync property must be described in SAI subnodes
-> section, as it is a property of child node.
-> This patch fixes commit 14f0e5f8d97e632695d92f41f2e91d10d8005d47
-> "ASoC: stm32: Add synchronization to SAI bindings".
+On Thu, Nov 23, 2017 at 01:55:51PM +0100, Jan Tuerk wrote:
+> The Emerging Display Technology ETM0700G0BDH6 is exactly
+> the same display as the ETM0700G0DH6, exept the pixelclock
+> polarity. Therefore re-use the ETM0700G0DH6 modes. It is
+> used by default on emtrion Avari based development kits.
 > 
-> Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
 > ---
->  Documentation/devicetree/bindings/sound/st,stm32-sai.txt | 12 +++++++-----
->  1 file changed, 7 insertions(+), 5 deletions(-)
+>  .../bindings/display/panel/edt,etm0700g0bdh6.txt          |  9 +++++++++
+>  drivers/gpu/drm/panel/panel-simple.c                      | 15 +++++++++++++++
+>  2 files changed, 24 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt b/Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt
+> new file mode 100644
+> index 000000000000..099e30bfa17f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/panel/edt,etm0700g0bdh6.txt
+> @@ -0,0 +1,9 @@
+> +Emerging Display Technology Corp. ETM0700G0BDH6 7.0" WVGA TFT LCD panel
+> +
+> +Required properties:
+> +       compatible: "edt,etm0700g0bdh6"
+> +
+> +This panel is exactly the same as ETM0700G0DH6 except the pixelclock polarity.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Perhaps document them together.
+
+> +
+> +This binding is compatible with the simple-panel binding, which is specified
+> +in simple-panel.txt in this directory.
