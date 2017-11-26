@@ -1,1542 +1,494 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 26 Nov 2017 13:24:10 -0600
-Subject: [PATCH 4/5] ARM: dts: Add support for emtrion emCON-MX6 series
-In-Reply-To: <20171123125600.41562-5-jan.tuerk@emtrion.com>
-References: <20171123125600.41562-1-jan.tuerk@emtrion.com>
- <20171123125600.41562-5-jan.tuerk@emtrion.com>
-Message-ID: <20171126192410.4eoujidx4nv3b2jf@rob-hp-laptop>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Sun, 26 Nov 2017 20:37:06 +0100
+Subject: [PATCH 32/37] KVM: arm/arm64: Handle VGICv2 save/restore from
+ the main VGIC code
+In-Reply-To: <2f7e5d1f-4d60-cd53-f6ff-f4af127bc0b6@arm.com>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-33-christoffer.dall@linaro.org>
+ <2f7e5d1f-4d60-cd53-f6ff-f4af127bc0b6@arm.com>
+Message-ID: <20171126193706.GO28855@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 01:55:54PM +0100, Jan Tuerk wrote:
-> This patch adds support for the emtrion GmbH emCON-MX6 modules.
-> They are available with imx.6 Solo, Dual-Lite, Dual and Quad
-> equipped with Memory from 512MB to 2GB (configured by U-Boot).
+On Wed, Nov 15, 2017 at 05:50:07PM +0000, Andre Przywara wrote:
+> Hi,
 > 
-> Our default developer-Kit ships with the Avari baseboard and the
-> EDT ETM0700G0BDH6 Display (imx6[q|dl]-emcon-avari).
+> those last few patches are actually helpful for the Xen port ...
+
+cool!
+
 > 
-> The devicetree is split into the common part providing all module
-> components and the basic support for all SoC versions
-> (imx6qdl-emcon.dtsi) and parts which are i.mx6 S|DL and D|Q relevant.
-> Finally the support for the avari baseboard in the developer-kit
-> configuration is provided by the emcon-avari dts files.
+> On 12/10/17 11:41, Christoffer Dall wrote:
+> > We can program the GICv2 hypervisor control interface logic directly
+> > from the core vgic code and can instead do the save/restore directly
+> > from the flush/sync functions, which can lead to a number of future
+> > optimizations.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm/kvm/hyp/switch.c        |  4 --
+> >  arch/arm64/include/asm/kvm_hyp.h |  2 -
+> >  arch/arm64/kvm/hyp/switch.c      |  4 --
+> >  virt/kvm/arm/hyp/vgic-v2-sr.c    | 83 ------------------------------------
+> >  virt/kvm/arm/vgic/vgic-init.c    | 22 ++++++----
+> >  virt/kvm/arm/vgic/vgic-v2.c      | 92 ++++++++++++++++++++++++++++++++++++++++
+> >  virt/kvm/arm/vgic/vgic.c         | 21 ++++++++-
+> >  virt/kvm/arm/vgic/vgic.h         |  5 +++
+> >  8 files changed, 130 insertions(+), 103 deletions(-)
+> > 
+> > diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+> > index c3b9799..0d834f8 100644
+> > --- a/arch/arm/kvm/hyp/switch.c
+> > +++ b/arch/arm/kvm/hyp/switch.c
+> > @@ -91,16 +91,12 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+> >  {
+> >  	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> >  		__vgic_v3_save_state(vcpu);
+> > -	else
+> > -		__vgic_v2_save_state(vcpu);
+> >  }
+> >  
+> >  static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+> >  {
+> >  	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> >  		__vgic_v3_restore_state(vcpu);
+> > -	else
+> > -		__vgic_v2_restore_state(vcpu);
+> >  }
+> >  
+> >  static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+> > diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> > index 28d5f3c..bd3fe64 100644
+> > --- a/arch/arm64/include/asm/kvm_hyp.h
+> > +++ b/arch/arm64/include/asm/kvm_hyp.h
+> > @@ -121,8 +121,6 @@ typeof(orig) * __hyp_text fname(void)					\
+> >  	return val;							\
+> >  }
+> >  
+> > -void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
+> > -void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
+> >  int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+> >  
+> >  void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 5692aa0..90da506 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -186,16 +186,12 @@ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
+> >  {
+> >  	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> >  		__vgic_v3_save_state(vcpu);
+> > -	else
+> > -		__vgic_v2_save_state(vcpu);
+> >  }
+> >  
+> >  static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+> >  {
+> >  	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> >  		__vgic_v3_restore_state(vcpu);
+> > -	else
+> > -		__vgic_v2_restore_state(vcpu);
+> >  }
+> >  
+> >  static bool __hyp_text __true_value(void)
+> > diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+> > index a3f18d3..b433257 100644
+> > --- a/virt/kvm/arm/hyp/vgic-v2-sr.c
+> > +++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+> > @@ -22,89 +22,6 @@
+> >  #include <asm/kvm_emulate.h>
+> >  #include <asm/kvm_hyp.h>
+> >  
+> > -static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+> > -{
+> > -	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > -	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
+> > -	u32 elrsr0, elrsr1;
+> > -
+> > -	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+> > -	if (unlikely(nr_lr > 32))
+> > -		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
+> > -	else
+> > -		elrsr1 = 0;
+> > -
+> > -#ifdef CONFIG_CPU_BIG_ENDIAN
+> > -	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
+> > -#else
+> > -	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
+> > -#endif
+> > -}
+> > -
+> > -static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+> > -{
+> > -	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > -	int i;
+> > -	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> > -
+> > -	for (i = 0; i < used_lrs; i++) {
+> > -		if (cpu_if->vgic_elrsr & (1UL << i))
+> > -			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
+> > -		else
+> > -			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+> > -
+> > -		writel_relaxed(0, base + GICH_LR0 + (i * 4));
+> > -	}
+> > -}
+> > -
+> > -/* vcpu is already in the HYP VA space */
+> > -void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+> > -{
+> > -	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> > -	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > -	struct vgic_dist *vgic = &kvm->arch.vgic;
+> > -	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+> > -	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> > -
+> > -	if (!base)
+> > -		return;
+> > -
+> > -	if (used_lrs) {
+> > -		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
+> > -
+> > -		save_elrsr(vcpu, base);
+> > -		save_lrs(vcpu, base);
+> > -
+> > -		writel_relaxed(0, base + GICH_HCR);
+> > -	} else {
+> > -		cpu_if->vgic_elrsr = ~0UL;
+> > -		cpu_if->vgic_apr = 0;
+> > -	}
+> > -}
+> > -
+> > -/* vcpu is already in the HYP VA space */
+> > -void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+> > -{
+> > -	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+> > -	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > -	struct vgic_dist *vgic = &kvm->arch.vgic;
+> > -	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
+> > -	int i;
+> > -	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> > -
+> > -	if (!base)
+> > -		return;
+> > -
+> > -	if (used_lrs) {
+> > -		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+> > -		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+> > -		for (i = 0; i < used_lrs; i++) {
+> > -			writel_relaxed(cpu_if->vgic_lr[i],
+> > -				       base + GICH_LR0 + (i * 4));
+> > -		}
+> > -	}
+> > -}
+> > -
+> >  #ifdef CONFIG_ARM64
+> >  /*
+> >   * __vgic_v2_perform_cpuif_access -- perform a GICV access on behalf of the
+> > diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+> > index 5801261f..fa2b565 100644
+> > --- a/virt/kvm/arm/vgic/vgic-init.c
+> > +++ b/virt/kvm/arm/vgic/vgic-init.c
+> > @@ -425,14 +425,16 @@ static int vgic_init_cpu_dying(unsigned int cpu)
+> >  	return 0;
+> >  }
+> >  
+> > -static irqreturn_t vgic_maintenance_handler(int irq, void *data)
+> > +static irqreturn_t vgic_v3_maintenance_handler(int irq, void *data)
+> >  {
+> > -	/*
+> > -	 * We cannot rely on the vgic maintenance interrupt to be
+> > -	 * delivered synchronously. This means we can only use it to
+> > -	 * exit the VM, and we perform the handling of EOIed
+> > -	 * interrupts on the exit path (see vgic_process_maintenance).
+> > -	 */
 > 
-> Signed-off-by: Jan Tuerk <jan.tuerk@emtrion.com>
-> ---
->  Documentation/devicetree/bindings/arm/emtrion.txt |  13 +
->  arch/arm/boot/dts/Makefile                        |   2 +
->  arch/arm/boot/dts/imx6dl-emcon-avari.dts          | 233 ++++++
->  arch/arm/boot/dts/imx6dl-emcon.dtsi               |  37 +
->  arch/arm/boot/dts/imx6q-emcon-avari.dts           | 233 ++++++
->  arch/arm/boot/dts/imx6q-emcon.dtsi                |  37 +
->  arch/arm/boot/dts/imx6qdl-emcon.dtsi              | 849 ++++++++++++++++++++++
->  7 files changed, 1404 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/emtrion.txt
->  create mode 100644 arch/arm/boot/dts/imx6dl-emcon-avari.dts
->  create mode 100644 arch/arm/boot/dts/imx6dl-emcon.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6q-emcon-avari.dts
->  create mode 100644 arch/arm/boot/dts/imx6q-emcon.dtsi
->  create mode 100644 arch/arm/boot/dts/imx6qdl-emcon.dtsi
+> I always found this comment quite enlightening, especially as it points
+> out that we need to deviate somewhat from the architectural idea here.
+> I see that you have shortened it below. Is it no longer true? Can we
+> keep the more elaborate version? If not here, then below?
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/emtrion.txt b/Documentation/devicetree/bindings/arm/emtrion.txt
-> new file mode 100644
-> index 000000000000..3ff6c6c2034d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/emtrion.txt
-> @@ -0,0 +1,13 @@
-> +Emtrion Devicetree Bindings
-> +===========================
-> +
-> +emCON Series:
-> +-------------
-> +
-> +Required root node properties
-> +       - compatible:
-> +       - "emtrion,emcon-mx6", "fsl,imx6q", "fsl,imx6dl"; : emCON-MX6 Generic SoM
-> +       - "emtrion,emcon-mx6", "fsl,imx6q";             : emCON-MX6D or emCON-MX6Q SoM
-> +       - "emtrion,emcon-mx6-avari", "fsl,imx6q";       : emCON-MX6D or emCON-MX6Q SoM on Avari Base
-> +       - "emtrion,emcon-mx6", "fsl,imx6dl";            : emCON-MX6S or emCON-MX6DL SoM
-> +       - "emtrion,emcon-mx6-avari", "fsl,imx6dl";      : emCON-MX6S or emCON-MX6DL SoM on Avari Base
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d0381e9caf21..5ce643ece228 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -373,6 +373,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->         imx6dl-colibri-eval-v3.dtb \
->         imx6dl-cubox-i.dtb \
->         imx6dl-dfi-fs700-m60.dtb \
-> +       imx6dl-emcon-avari.dtb \
->         imx6dl-gw51xx.dtb \
->         imx6dl-gw52xx.dtb \
->         imx6dl-gw53xx.dtb \
-> @@ -424,6 +425,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->         imx6q-dfi-fs700-m60.dtb \
->         imx6q-display5-tianma-tm070-1280x768.dtb \
->         imx6q-dmo-edmqmx6.dtb \
-> +       imx6q-emcon-avari.dtb \
->         imx6q-evi.dtb \
->         imx6q-gk802.dtb \
->         imx6q-gw51xx.dtb \
-> diff --git a/arch/arm/boot/dts/imx6dl-emcon-avari.dts b/arch/arm/boot/dts/imx6dl-emcon-avari.dts
-> new file mode 100644
-> index 000000000000..f8ca63258eda
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-emcon-avari.dts
-> @@ -0,0 +1,233 @@
-> +/*
-> + * Copyright (C) 2017 emtrion GmbH
-> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + *
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx6dl.dtsi"
-> +#include "imx6qdl-emcon.dtsi"
-> +#include "imx6dl-emcon.dtsi" /*Include camera2 pinmux*/
-> +
-> +/ {
-> +       model = "emtrion SoM emCON-MX6 Solo/Dual-Lite Avari";
-> +       compatible = "emtrion,emcon-mx6-avari", "fsl,imx6dl";
-> +
-> +       aliases {
-> +               mmc0 = &usdhc3;
-> +               mmc2 = &usdhc1;
-> +               mmc1 = &usdhc2;
-> +               mmc3 = &usdhc4;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = <&uart1>;
-> +       };
-> +
-> +       memory {
-> +               reg = <0x10000000 0x40000000>;
-> +       };
-> +
-> +       supplies {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               wallplug5p0: supply at 0 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <0>;
-> +                       regulator-name = "WALL-PLUG";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
-> +               };
-> +
-> +               base3p3: supply at 1 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <1>;
-> +                       vin-supply = <&wallplug5p0>;
-> +                       regulator-name = "3V3-avari";
-> +                       regulator-min-microvolt = <3300000>;
-> +                       regulator-max-microvolt = <3300000>;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
-> +               };
-> +
-> +               base1p5: supply at 2 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <2>;
-> +                       vin-supply = <&base3p3>;
-> +                       regulator-name = "1V5-avari";
-> +                       regulator-min-microvolt = <1500000>;
-> +                       regulator-max-microvolt = <1500000>;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
-> +               };
-> +
-> +               reg_usb_otg: otgvbus {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <3>;
-> +                       vin-supply = <&wallplug5p0>;
-> +                       regulator-name = "OTG_VBUS";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
-> +                       regulator-always-on;
-> +               };
-> +
-> +       };
-> +
-> +
-> +       sndosc: 12MHZosc {
-> +               compatible = "fixed-clock";
-> +               #clock-cells = <0>;
-> +               clock-frequency  = <12000000>;
-> +       };
-> +
-> +       sound {
-> +               compatible = "fsl,imx-audio-sgtl5000";
-> +               model = "emCON-avari-sgtl5000";
-> +               ssi-controller = <&ssi2>;
-> +               audio-codec = <&sgtl5000>;
-> +               audio-routing =
-> +                       "Headphone Jack", "HP_OUT";
-> +               mux-int-port = <2>;
-> +               mux-ext-port = <3>;
-> +       };
-> +
-> +};
-> +
-> +
-> +&iomuxc {
-> +       pinctrl-names = "default";
-> +       /*Unused emCON-MX6 outputs on AVARI*/
-> +       pinctrl-0 = <
-> +                                &pinctrl_emcon_gpio1 &pinctrl_emcon_gpio2
-> +                                &pinctrl_emcon_gpio3 &pinctrl_emcon_gpio5
-> +                                &pinctrl_emcon_gpio6 &pinctrl_emcon_gpio7
-> +                                &pinctrl_emcon_gpio8 &pinctrl_emcon_irq_a
-> +                                &pinctrl_emcon_irq_b &pinctrl_emcon_irq_c
-> +                                &pinctrl_emcon_irq_pwr &pinctrl_nor_flash
-> +                                &pinctrl_usdhc2
-> +                                &pinctrl_spdif_out     &pinctrl_spdif_in
-> +                                &pinctrl_cpi1          &pinctrl_cpi2
-> +                               >;
-> +};
-> +
-> +&audmux {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_audmux>;
-> +       status = "okay";
-> +};
-> +
-> +
-> +
-> +&i2c3 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c3>;
-> +       status = "okay";
-> +
-> +       sgtl5000: sgtl5000 at 0a {
 
-audio-codec at a
+I think I found it a bit misleading or harder to understand now that we
+may actually do some work in the maintenance handler (disable the vgic).
+But if you think it's better to keep it, I'm happy to make that change
+for v2.
 
-same errors repeat below.
-
-> +               compatible = "fsl,sgtl5000";
-> +               reg = <0x0a>;
-> +               clocks = <&sndosc>;
-> +               VDDA-supply = <&base3p3>;
-> +               VDDIO-supply = <&base3p3>;
-> +       };
-> +
-> +       boardID: pca8754a at 3A {
-
-... at 3a
-
-> +               compatible = "nxp,pca8574";
-> +               reg = <0x3A>;
-
-0x3a
-
-> +               gpio-controller;
-> +               #gpio-cells = <1>;
-> +       };
-> +
-> +       captouch: edt-ft5x06 at 38 {
-
-touchscreen at 38
-
-> +               reg = <0x38>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_irq_touch2 &pinctrl_emcon_gpio4>;
-> +               interrupt-parent = <&gpio6>;
-> +               interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
-> +               compatible = "edt,edt-ft5406";
-> +               wake-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
-> +               wakeup-source;
-> +       };
-> +};
-> +
-> +&ssi2 {
-> +       status = "okay";
-> +};
-> +
-> +&rgb_encoder {
-> +       status = "okay";
-> +};
-> +
-> +&rgb_panel {
-> +       compatible = "edt,etm0700g0bdh6";
-> +       status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +       status = "okay";
-> +};
-> +
-> +&hdmi {
-> +       ddc-i2c-bus = <&i2c2>;
-> +       status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +       status = "okay";
-> +};
-> +
-> +&usbotg {
-> +       status = "okay";
-> +};
-> +
-> +&pcie {
-> +       status = "okay";
-> +};
-> +
-> +&usdhc1 {
-> +       status = "okay";
-> +};
-> +
-> +&can1 {
-> +       status = "okay";
-> +};
-> +
-> +&can2 {
-> +       status = "okay";
-> +};
-> +
-> +&uart2 {
-> +       status = "okay";
-> +       uart-has-rtscts;
-> +};
-> +
-> +&uart3 {
-> +       status = "okay";
-> +};
-> +
-> +&uart4 {
-> +       status = "okay";
-> +};
-> +
-> +&uart5 {
-> +       status = "okay";
-> +};
-> +
-> +&ecspi2 {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/imx6dl-emcon.dtsi b/arch/arm/boot/dts/imx6dl-emcon.dtsi
-> new file mode 100644
-> index 000000000000..47f43bae5ac5
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6dl-emcon.dtsi
-> @@ -0,0 +1,37 @@
-> +/*
-> + * Copyright (C) 2017 emtrion GmbH
-> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + *
-> + */
-> +
-> +/ {
-> +       model = "emtrion SoM emCON-MX6 Solo/DualLite";
-> +       compatible = "emtrion,emcon-mx6","fsl,imx6dl";
-> +};
-> +
-> +&iomuxc {
-> +       pinctrl_cpi2: csi1grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_D17__IPU1_CSI1_PIXCLK    0x0b0b1
-> +                       MX6QDL_PAD_EIM_EB3__IPU1_CSI1_HSYNC             0x1b0b1
-> +                       MX6QDL_PAD_EIM_D29__IPU1_CSI1_VSYNC             0x1b0b1
-> +                       MX6QDL_PAD_EIM_A17__IPU1_CSI1_DATA12    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D27__IPU1_CSI1_DATA13    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D26__IPU1_CSI1_DATA14    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D20__IPU1_CSI1_DATA15    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D19__IPU1_CSI1_DATA16    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D18__IPU1_CSI1_DATA17    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D16__IPU1_CSI1_DATA18    0x1b0b1
-> +                       MX6QDL_PAD_EIM_EB2__IPU1_CSI1_DATA19    0x1b0b1
-> +               >;
-> +       };
-> +};
-> diff --git a/arch/arm/boot/dts/imx6q-emcon-avari.dts b/arch/arm/boot/dts/imx6q-emcon-avari.dts
-> new file mode 100644
-> index 000000000000..bccfd6344c18
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-emcon-avari.dts
-> @@ -0,0 +1,233 @@
-> +/*
-> + * Copyright (C) 2017 emtrion GmbH
-> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + *
-> + */
-> +
-> +/dts-v1/;
-> +#include "imx6q.dtsi"
-> +#include "imx6qdl-emcon.dtsi"
-> +#include "imx6q-emcon.dtsi" /*Include camera2 pinmux*/
-> +
-> +/ {
-> +       model = "emtrion SoM emCON-MX6 Dual/Quad on Avari";
-> +       compatible = "emtrion,emcon-mx6-avari", "fsl,imx6q";
-> +
-> +       aliases {
-> +               mmc0 = &usdhc3;
-> +               mmc2 = &usdhc1;
-> +               mmc1 = &usdhc2;
-> +               mmc3 = &usdhc4;
-> +       };
-> +
-> +       chosen {
-> +               stdout-path = <&uart1>;
-> +       };
-> +
-> +       memory {
-> +               reg = <0x10000000 0x40000000>;
-> +       };
-> +
-> +       supplies {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               wallplug5p0: supply at 0 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <0>;
-> +                       regulator-name = "WALL-PLUG";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
-> +               };
-> +
-> +               base3p3: supply at 1 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <1>;
-> +                       vin-supply = <&wallplug5p0>;
-> +                       regulator-name = "3V3-avari";
-> +                       regulator-min-microvolt = <3300000>;
-> +                       regulator-max-microvolt = <3300000>;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
-> +               };
-> +
-> +               base1p5: supply at 2 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <2>;
-> +                       vin-supply = <&base3p3>;
-> +                       regulator-name = "1V5-avari";
-> +                       regulator-min-microvolt = <1500000>;
-> +                       regulator-max-microvolt = <1500000>;
-> +                       regulator-always-on;
-> +                       regulator-boot-on;
-> +               };
-> +
-> +               reg_usb_otg: otgvbus {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <3>;
-> +                       vin-supply = <&wallplug5p0>;
-> +                       regulator-name = "OTG_VBUS";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio1 8 GPIO_ACTIVE_LOW>;
-> +                       regulator-always-on;
-> +               };
-> +
-> +       };
-> +
-> +
-> +       sndosc: 12MHZosc {
-> +               compatible = "fixed-clock";
-> +               #clock-cells = <0>;
-> +               clock-frequency  = <12000000>;
-> +       };
-> +
-> +       sound {
-> +               compatible = "fsl,imx-audio-sgtl5000";
-> +               model = "emCON-avari-sgtl5000";
-> +               ssi-controller = <&ssi2>;
-> +               audio-codec = <&sgtl5000>;
-> +               audio-routing =
-> +                       "Headphone Jack", "HP_OUT";
-> +               mux-int-port = <2>;
-> +               mux-ext-port = <3>;
-> +       };
-> +
-> +};
-> +
-> +
-> +&iomuxc {
-> +       pinctrl-names = "default";
-> +       /*Unused emCON-MX6 pingroups on AVARI baseboard, enable defaults*/
-> +       pinctrl-0 = <
-> +                                &pinctrl_emcon_gpio1 &pinctrl_emcon_gpio2
-> +                                &pinctrl_emcon_gpio3 &pinctrl_emcon_gpio5
-> +                                &pinctrl_emcon_gpio6 &pinctrl_emcon_gpio7
-> +                                &pinctrl_emcon_gpio8 &pinctrl_emcon_irq_a
-> +                                &pinctrl_emcon_irq_b &pinctrl_emcon_irq_c
-> +                                &pinctrl_emcon_irq_pwr &pinctrl_nor_flash
-> +                                &pinctrl_usdhc2
-> +                                &pinctrl_spdif_out     &pinctrl_spdif_in
-> +                                &pinctrl_cpi1          &pinctrl_cpi2
-> +                               >;
-> +};
-> +
-> +&audmux {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_audmux>;
-> +       status = "okay";
-> +};
-> +
-> +
-> +
-> +&i2c3 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c3>;
-> +       status = "okay";
-> +
-> +       sgtl5000: sgtl5000 at 0a {
-> +               compatible = "fsl,sgtl5000";
-> +               reg = <0x0a>;
-> +               clocks = <&sndosc>;
-> +               VDDA-supply = <&base3p3>;
-> +               VDDIO-supply = <&base3p3>;
-> +       };
-> +
-> +       boardID: pca8754a at 3A {
-> +               compatible = "nxp,pca8574";
-> +               reg = <0x3A>;
-> +               gpio-controller;
-> +               #gpio-cells = <1>;
-> +       };
-> +
-> +       captouch: edt-ft5x06 at 38 {
-> +               reg = <0x38>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_irq_touch2 &pinctrl_emcon_gpio4>;
-> +               interrupt-parent = <&gpio6>;
-> +               interrupts = <31 IRQ_TYPE_EDGE_FALLING>;
-> +               compatible = "edt,edt-ft5406";
-> +               wake-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
-> +               wakeup-source;
-> +       };
-> +};
-> +
-> +&ssi2 {
-> +       status = "okay";
-> +};
-> +
-> +&rgb_encoder {
-> +       status = "okay";
-> +};
-> +
-> +&rgb_panel {
-> +       compatible = "edt,etm0700g0bdh6";
-> +       status = "okay";
-> +};
-> +
-> +&i2c2 {
-> +       status = "okay";
-> +};
-> +
-> +&hdmi {
-> +       ddc-i2c-bus = <&i2c2>;
-> +       status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +       status = "okay";
-> +};
-> +
-> +&usbotg {
-> +       status = "okay";
-> +};
-> +
-> +&pcie {
-> +       status = "okay";
-> +};
-> +
-> +&usdhc1 {
-> +       status = "okay";
-> +};
-> +
-> +&can1 {
-> +       status = "okay";
-> +};
-> +
-> +&can2 {
-> +       status = "okay";
-> +};
-> +
-> +&uart2 {
-> +       status = "okay";
-> +       uart-has-rtscts;
-> +};
-> +
-> +&uart3 {
-> +       status = "okay";
-> +};
-> +
-> +&uart4 {
-> +       status = "okay";
-> +};
-> +
-> +&uart5 {
-> +       status = "okay";
-> +};
-> +
-> +&ecspi2 {
-> +       status = "okay";
-> +};
-> diff --git a/arch/arm/boot/dts/imx6q-emcon.dtsi b/arch/arm/boot/dts/imx6q-emcon.dtsi
-> new file mode 100644
-> index 000000000000..64fc0cd74c05
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-emcon.dtsi
-> @@ -0,0 +1,37 @@
-> +/*
-> + * Copyright (C) 2017 emtrion GmbH
-> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + *
-> + */
-> +
-> +/ {
-> +       model = "emtrion SoM emCON-MX6 Dual/Quad";
-> +       compatible = "emtrion,emcon-mx6","fsl,imx6q";
-> +};
-> +
-> +&iomuxc {
-> +       pinctrl_cpi2: csi1grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_D17__IPU2_CSI1_PIXCLK    0x0b0b1
-> +                       MX6QDL_PAD_EIM_EB3__IPU2_CSI1_HSYNC             0x1b0b1
-> +                       MX6QDL_PAD_EIM_D29__IPU2_CSI1_VSYNC             0x1b0b1
-> +                       MX6QDL_PAD_EIM_A17__IPU2_CSI1_DATA12    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D27__IPU2_CSI1_DATA13    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D26__IPU2_CSI1_DATA14    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D20__IPU2_CSI1_DATA15    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D19__IPU2_CSI1_DATA16    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D18__IPU2_CSI1_DATA17    0x1b0b1
-> +                       MX6QDL_PAD_EIM_D16__IPU2_CSI1_DATA18    0x1b0b1
-> +                       MX6QDL_PAD_EIM_EB2__IPU2_CSI1_DATA19    0x1b0b1
-> +               >;
-> +       };
-> +};
-> diff --git a/arch/arm/boot/dts/imx6qdl-emcon.dtsi b/arch/arm/boot/dts/imx6qdl-emcon.dtsi
-> new file mode 100644
-> index 000000000000..22ad05880ea7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6qdl-emcon.dtsi
-> @@ -0,0 +1,849 @@
-> +/*
-> + * Copyright (C) 2017 emtrion GmbH
-> + * Author: Jan Tuerk  <jan.tuerk@emtrion.com>
-> + *
-> + * The code contained herein is licensed under the GNU General Public
-> + * License. You may obtain a copy of the GNU General Public License
-> + * Version 2 or later at the following locations:
-> + *
-> + * http://www.opensource.org/licenses/gpl-license.html
-> + * http://www.gnu.org/copyleft/gpl.html
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + *
-> + */
-> +
-> +#include <dt-bindings/gpio/gpio.h>
-> +#include <dt-bindings/pwm/pwm.h>
-> +#include <dt-bindings/input/input.h>
-> +
-> +/ {
-> +
-> +       model = "emtrion SoM emCON-MX6";
-> +       compatible = "emtrion,emcon-mx6","fsl,imx6q", "fsl,imx6dl";
-> +
-> +       aliases {
-> +               mmc0 = &usdhc3;
-> +               mmc2 = &usdhc1;
-> +               mmc1 = &usdhc2;
-> +       };
-> +
-> +       regulators {
-> +               compatible = "simple-bus";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               reg_parallel_disp: regulator at 0 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <0>;
-> +                       pinctrl-names = "default";
-> +                       pinctrl-0 = <&pinctrl_rgb_bl_en>;
-> +                       regulator-name = "LCD-Supply";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio7 9 GPIO_ACTIVE_HIGH>;
-> +                       enable-active-high;
-> +               };
-> +
-> +               reg_lvds_disp: regulator at 1 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <1>;
-> +                       regulator-name = "LVDS-Supply";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +                       gpio = <&gpio7 10 GPIO_ACTIVE_HIGH>;
-> +                       enable-active-high;
-> +               };
-> +       };
-> +
-> +       som_leds: leds {
-> +               compatible = "gpio-leds";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_som_leds>;
-> +
-> +               green {
-> +                       label = "som:green";
-> +                       gpios = <&gpio3 0 GPIO_ACTIVE_HIGH>;
-> +                       linux,default-trigger = "heartbeat";
-> +                       default-state = "on";
-> +               };
-> +
-> +               red {
-> +                       label = "som:red";
-> +                       gpios = <&gpio3 1 GPIO_ACTIVE_LOW>;
-> +                       default-state = "keep";
-> +               };
-> +
-> +       };
-> +
-> +       gpio-keys {
-> +               compatible = "gpio-keys";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_emcon_wake>;
-> +
-> +               wake {
-> +                       label = "Wake";
-> +                       linux,code = <KEY_WAKEUP>;
-> +                       gpios = <&gpio3 2 GPIO_ACTIVE_LOW>;
-> +                       wakeup-source;
-> +               };
-> +       };
-> +
-> +       pwm_fan: pwm-fan {
-> +               compatible = "pwm-fan";
-> +               cooling-min-state = <0>;
-> +               cooling-max-state = <4>;
-> +               #cooling-cells = <2>;
-> +               pwms = <&pwm4 0 50000>;
-> +               cooling-levels = <0 64 127 191 255>;
-> +               status = "disabled";
-> +       };
-> +
-> +       rgb_encoder: lcd at di0 {
-> +               compatible = "fsl,imx-parallel-display";
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_rgb24_display>;
-> +               status = "disabled";
-> +
-> +               port at 0 {
-> +                       reg = <0>;
-> +                       rgb_encoder_in: endpoint {
-> +                               remote-endpoint = <&ipu1_di0_disp0>;
-> +                       };
-> +               };
-> +
-> +               port at 1 {
-> +                       reg = <1>;
-> +                       rgb_encoder_out: endpoint {
-> +                               remote-endpoint = <&rgb_panel_in>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       rgb_panel: panel {
-> +               backlight = <&rgb_backlight>;
-> +               power-supply = <&reg_prallel_disp>;
-> +               port {
-> +                       rgb_panel_in: endpoint {
-> +                               remote-endpoint = <&rgb_encoder_out>;
-> +                       };
-> +               };
-> +       };
-> +
-> +       rgb_backlight: rgb_backlight {
-
-rgb-backlight {
-
-> +               compatible = "pwm-backlight";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_rgb_bl>;
-> +               enable-gpios = <&gpio6 8 GPIO_ACTIVE_HIGH>;
-> +               pwms = <&pwm3 0 5000000>;
-> +               brightness-levels = <250 176 160 144 128 112
-> +                                                       96 80 64 48 32 16 8 1
-> +                                                       >;
-> +               default-brightness-level = <13>;
-> +               status = "okay";
-> +       };
-> +
-> +       lvds_backlight: lvds_backlight {
-
-lvds-backlight {
-
-> +               compatible = "pwm-backlight";
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_lvds_bl>;
-> +               enable-gpios = <&gpio6 9 GPIO_ACTIVE_HIGH>;
-> +               pwms = <&pwm1 0 50000>;
-> +               brightness-levels = <0 4 8 16 32 64 80 96 112
-> +                                                       128 144 160 176 250
-> +                                                       >;
-> +               default-brightness-level = <13>;
-> +               status = "okay";
-> +       };
-> +};
-> +
-> +
-> +&iomuxc {
-> +
-> +       pinctrl_secure: securegrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_GPIO_18__GPIO7_IO13                  0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_uart1: uart1grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA    0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA    0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_uart2: uart2grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD4_DAT5__UART2_RTS_B                0x1b0b1
-> +                       MX6QDL_PAD_SD4_DAT6__UART2_CTS_B                0x1b0b1
-> +                       MX6QDL_PAD_SD4_DAT7__UART2_TX_DATA              0x1b0b1
-> +                       MX6QDL_PAD_SD4_DAT4__UART2_RX_DATA              0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_uart3: uart3grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_D24__UART3_TX_DATA               0x1b0b1
-> +                       MX6QDL_PAD_EIM_D25__UART3_RX_DATA               0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_uart4: uart4grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_KEY_COL0__UART4_TX_DATA              0x1b0b1
-> +                       MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA              0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_uart5: uart5grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_KEY_COL1__UART5_TX_DATA              0x1b0b1
-> +                       MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA              0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio1: emcongpio1 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D0__GPIO2_IO00                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio2: emcongpio2 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D1__GPIO2_IO01                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio3: emcongpio3 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D2__GPIO2_IO02                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio4: emcongpio4 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D3__GPIO2_IO03                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio5: emcongpio5 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D4__GPIO2_IO04                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio6: emcongpio6 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D5__GPIO2_IO05                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio7: emcongpio7 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D6__GPIO2_IO06                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_gpio8: emcongpio8 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_D7__GPIO2_IO07                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_irq_a: emconirqa {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_CLE__GPIO6_IO07                0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_irq_b: emconirqb {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_CS2__GPIO6_IO15                0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_irq_c: emconirqc {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_CS3__GPIO6_IO16                0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_wake: emconwake {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_DA2__GPIO3_IO02                  0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_emcon_irq_pwr: emconirqpwr {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_D23__GPIO3_IO23                  0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_som_leds: somledgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_DA0__GPIO3_IO00                  0x0b0b1
-> +                       MX6QDL_PAD_EIM_DA1__GPIO3_IO01                  0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_nor_flash: norflashgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_NANDF_CS0__GPIO6_IO11                0x1b0b1
-> +                       MX6QDL_PAD_EIM_D21__ECSPI4_SCLK                 0x100b1
-> +                       MX6QDL_PAD_EIM_D28__ECSPI4_MOSI                 0x100b1
-> +                       MX6QDL_PAD_EIM_D22__ECSPI4_MISO                 0x100b1
-> +                       MX6QDL_PAD_EIM_A25__GPIO5_IO02                  0x100b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_ecspi2: ecspi2grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_CS0__ECSPI2_SCLK                 0x100b1
-> +                       MX6QDL_PAD_EIM_CS1__ECSPI2_MOSI                 0x100b1
-> +                       MX6QDL_PAD_EIM_OE__ECSPI2_MISO                  0x100b1
-> +                       MX6QDL_PAD_EIM_LBA__GPIO2_IO27                  0x100b1
-> +                       MX6QDL_PAD_EIM_RW__GPIO2_IO26                   0x100b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_pwm_fan: pwmfan {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD4_DAT2__PWM4_OUT                   0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_can1: can1grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_KEY_COL2__FLEXCAN1_TX                0x1b0b1
-> +                       MX6QDL_PAD_KEY_ROW2__FLEXCAN1_RX                0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_can2: can2grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX                0x1b0b1
-> +                       MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX                0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_spdif_out: spdifout {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_GPIO_19__SPDIF_OUT                   0x13091
-> +               >;
-> +       };
-> +
-> +       pinctrl_spdif_in: spdifin {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_GPIO_16__SPDIF_IN                    0x1b0b0
-> +               >;
-> +       };
-> +
-> +       pinctrl_cpi1: csi0grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_CSI0_PIXCLK__IPU1_CSI0_PIXCLK 0xb0b1
-> +                       MX6QDL_PAD_CSI0_MCLK__IPU1_CSI0_HSYNC   0x1b0b1
-> +                       MX6QDL_PAD_CSI0_VSYNC__IPU1_CSI0_VSYNC  0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT12__IPU1_CSI0_DATA12 0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT13__IPU1_CSI0_DATA13 0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT14__IPU1_CSI0_DATA14 0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT15__IPU1_CSI0_DATA15 0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT16__IPU1_CSI0_DATA16 0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT17__IPU1_CSI0_DATA17 0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT18__IPU1_CSI0_DATA18 0x1b0b1
-> +                       MX6QDL_PAD_CSI0_DAT19__IPU1_CSI0_DATA19 0x1b0b1
-> +               >;
-> +       };
-> +
-> +       /*camera2-pinctrl is in imx6q-emcon.dtsi or imx6dl-emcon.dtsi*/
-> +
-> +       pinctrl_pcie_ctrl: pciegrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_A16__GPIO2_IO22                  0x1b0b1
-> +                       MX6QDL_PAD_GPIO_17__GPIO7_IO12                  0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_audmux: audmux {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_CSI0_DAT7__AUD3_RXD                  0x130b0
-> +                       MX6QDL_PAD_CSI0_DAT4__AUD3_TXC                  0x1b060
-> +                       MX6QDL_PAD_CSI0_DAT5__AUD3_TXD                  0x130B0
-> +                       MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS                 0x1b060
-> +               >;
-> +       };
-> +
-> +       pinctrl_i2c1: i2c1grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_CSI0_DAT8__I2C1_SDA          0x4001b8b1
-> +                       MX6QDL_PAD_CSI0_DAT9__I2C1_SCL          0x4001b8b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_i2c2: i2c2grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_KEY_COL3__I2C2_SCL           0x4001b8b1
-> +                       MX6QDL_PAD_KEY_ROW3__I2C2_SDA           0x4001b8b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_i2c3: i2c3grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_GPIO_3__I2C3_SCL             0x4000b070
-> +                       MX6QDL_PAD_GPIO_6__I2C3_SDA             0x4001b870
-> +               >;
-> +       };
-> +
-> +       pinctrl_pmic: pmicgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD4_DAT0__GPIO2_IO08                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_usb_host1: usbhgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_D31__USB_H1_PWR                  0x1B058
-> +                       MX6QDL_PAD_EIM_D30__USB_H1_OC                   0x1B058
-> +               >;
-> +       };
-> +
-> +       pinctrl_usb_otg: usbotggrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID               0x17059
-> +                       MX6QDL_PAD_GPIO_7__GPIO1_IO07                   0x17059
-> +                       MX6QDL_PAD_GPIO_8__GPIO1_IO08                   0x17059
-> +               >;
-> +       };
-> +
-> +       pinctrl_lvds_reg: lvdsreggrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD4_CLK__GPIO7_IO10                  0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_lvds_bl: lvdsbacklightgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_GPIO_9__PWM1_OUT                     0x0b0b1
-> +                       MX6QDL_PAD_NANDF_WP_B__GPIO6_IO09               0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_irq_touch1: irqtouch1 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_GPIO_5__GPIO1_IO05                   0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_rgb_bl_en: rgbenable {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD4_CMD__GPIO7_IO09                  0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_irq_touch2: irqtouch2 {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_EIM_BCLK__GPIO6_IO31                 0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_rgb_bl: rgbbacklightgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD4_DAT1__PWM3_OUT                   0x0b0b1
-> +                       MX6QDL_PAD_NANDF_ALE__GPIO6_IO08                0x0b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_rgb24_display: rgbgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_DI0_DISP_CLK__IPU1_DI0_DISP_CLK 0x10
-> +                       MX6QDL_PAD_DI0_PIN15__IPU1_DI0_PIN15       0x10
-> +                       MX6QDL_PAD_DI0_PIN2__IPU1_DI0_PIN02        0x10
-> +                       MX6QDL_PAD_DI0_PIN3__IPU1_DI0_PIN03        0x10
-> +                       MX6QDL_PAD_DISP0_DAT0__IPU1_DISP0_DATA00   0x10
-> +                       MX6QDL_PAD_DISP0_DAT1__IPU1_DISP0_DATA01   0x10
-> +                       MX6QDL_PAD_DISP0_DAT2__IPU1_DISP0_DATA02   0x10
-> +                       MX6QDL_PAD_DISP0_DAT3__IPU1_DISP0_DATA03   0x10
-> +                       MX6QDL_PAD_DISP0_DAT4__IPU1_DISP0_DATA04   0x10
-> +                       MX6QDL_PAD_DISP0_DAT5__IPU1_DISP0_DATA05   0x10
-> +                       MX6QDL_PAD_DISP0_DAT6__IPU1_DISP0_DATA06   0x10
-> +                       MX6QDL_PAD_DISP0_DAT7__IPU1_DISP0_DATA07   0x10
-> +                       MX6QDL_PAD_DISP0_DAT8__IPU1_DISP0_DATA08   0x10
-> +                       MX6QDL_PAD_DISP0_DAT9__IPU1_DISP0_DATA09   0x10
-> +                       MX6QDL_PAD_DISP0_DAT10__IPU1_DISP0_DATA10  0x10
-> +                       MX6QDL_PAD_DISP0_DAT11__IPU1_DISP0_DATA11  0x10
-> +                       MX6QDL_PAD_DISP0_DAT12__IPU1_DISP0_DATA12  0x10
-> +                       MX6QDL_PAD_DISP0_DAT13__IPU1_DISP0_DATA13  0x10
-> +                       MX6QDL_PAD_DISP0_DAT14__IPU1_DISP0_DATA14  0x10
-> +                       MX6QDL_PAD_DISP0_DAT15__IPU1_DISP0_DATA15  0x10
-> +                       MX6QDL_PAD_DISP0_DAT16__IPU1_DISP0_DATA16  0x10
-> +                       MX6QDL_PAD_DISP0_DAT17__IPU1_DISP0_DATA17  0x10
-> +                       MX6QDL_PAD_DISP0_DAT18__IPU1_DISP0_DATA18  0x10
-> +                       MX6QDL_PAD_DISP0_DAT19__IPU1_DISP0_DATA19  0x10
-> +                       MX6QDL_PAD_DISP0_DAT20__IPU1_DISP0_DATA20  0x10
-> +                       MX6QDL_PAD_DISP0_DAT21__IPU1_DISP0_DATA21  0x10
-> +                       MX6QDL_PAD_DISP0_DAT22__IPU1_DISP0_DATA22  0x10
-> +                       MX6QDL_PAD_DISP0_DAT23__IPU1_DISP0_DATA23  0x10
-> +               >;
-> +       };
-> +
-> +       pinctrl_enet: enetgrp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_ENET_MDIO__ENET_MDIO                 0x1b030
-> +                       MX6QDL_PAD_ENET_MDC__ENET_MDC                   0x1b030
-> +                       MX6QDL_PAD_RGMII_TXC__RGMII_TXC                 0x1b030
-> +                       MX6QDL_PAD_RGMII_TD0__RGMII_TD0                 0x1b030
-> +                       MX6QDL_PAD_RGMII_TD1__RGMII_TD1                 0x1b030
-> +                       MX6QDL_PAD_RGMII_TD2__RGMII_TD2                 0x1b030
-> +                       MX6QDL_PAD_RGMII_TD3__RGMII_TD3                 0x1b030
-> +                       MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL   0x1b030
-> +                       MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK    0x4001a0b1
-> +                       MX6QDL_PAD_RGMII_RXC__RGMII_RXC                 0x1b030
-> +                       MX6QDL_PAD_RGMII_RD0__RGMII_RD0                 0x1b030
-> +                       MX6QDL_PAD_RGMII_RD1__RGMII_RD1                 0x1b030
-> +                       MX6QDL_PAD_RGMII_RD2__RGMII_RD2                 0x1b030
-> +                       MX6QDL_PAD_RGMII_RD3__RGMII_RD3                 0x1b030
-> +                       MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL   0x1b0b0
-> +                       MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20             0x1b058
-> +                       MX6QDL_PAD_ENET_TXD0__GPIO1_IO30                0x1b0b0
-> +                >;
-> +       };
-> +
-> +
-> +       pinctrl_usdhc3: usdhc3grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD3_CMD__SD3_CMD                     0x17059
-> +                       MX6QDL_PAD_SD3_CLK__SD3_CLK                     0x10059
-> +                       MX6QDL_PAD_SD3_DAT0__SD3_DATA0                  0x17059
-> +                       MX6QDL_PAD_SD3_DAT1__SD3_DATA1                  0x17059
-> +                       MX6QDL_PAD_SD3_DAT2__SD3_DATA2                  0x17059
-> +                       MX6QDL_PAD_SD3_DAT3__SD3_DATA3                  0x17059
-> +                       MX6QDL_PAD_SD3_DAT4__SD3_DATA4                  0x17059
-> +                       MX6QDL_PAD_SD3_DAT5__SD3_DATA5                  0x17059
-> +                       MX6QDL_PAD_SD3_DAT6__SD3_DATA6                  0x17059
-> +                       MX6QDL_PAD_SD3_DAT7__SD3_DATA7                  0x17059
-> +                       MX6QDL_PAD_SD3_RST__SD3_RESET                   0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_usdhc1: usdhc1grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD1_CMD__SD1_CMD                     0x17059
-> +                       MX6QDL_PAD_SD1_CLK__SD1_CLK                     0x10059
-> +                       MX6QDL_PAD_SD1_DAT0__SD1_DATA0                  0x17059
-> +                       MX6QDL_PAD_SD1_DAT1__SD1_DATA1                  0x17059
-> +                       MX6QDL_PAD_SD1_DAT2__SD1_DATA2                  0x17059
-> +                       MX6QDL_PAD_SD1_DAT3__SD1_DATA3                  0x17059
-> +                       MX6QDL_PAD_GPIO_1__SD1_CD_B                     0x1b0b1
-> +                       MX6QDL_PAD_DI0_PIN4__SD1_WP                     0x1b0b1
-> +               >;
-> +       };
-> +
-> +       pinctrl_usdhc2: usdhc2grp {
-> +               fsl,pins = <
-> +                       MX6QDL_PAD_SD2_CMD__SD2_CMD                     0x17059
-> +                       MX6QDL_PAD_SD2_CLK__SD2_CLK                     0x10059
-> +                       MX6QDL_PAD_SD2_DAT0__SD2_DATA0                  0x17059
-> +                       MX6QDL_PAD_SD2_DAT1__SD2_DATA1                  0x17059
-> +                       MX6QDL_PAD_SD2_DAT2__SD2_DATA2                  0x17059
-> +                       MX6QDL_PAD_SD2_DAT3__SD2_DATA3                  0x17059
-> +                       MX6QDL_PAD_GPIO_4__SD2_CD_B                     0x1b0b1
-> +                       MX6QDL_PAD_GPIO_2__SD2_WP                       0x1b0b1
-> +               >;
-> +       };
-> +
-> +};
-> +
-> +
-> +&i2c1 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c1>;
-> +       status = "okay";
-> +
-> +       rtc: rtc at 68 {
-> +               compatible = "dallas,ds1307";
-> +               reg = <0x68>;
-> +       };
-> +
-> +       da9063: da9063 at 58 {
-
-pmic at 38
-
-> +               compatible = "dlg,da9063";
-> +               reg = <0x58>;
-> +               pinctrl-names = "default";
-> +               pinctrl-0 = <&pinctrl_pmic>;
-> +               interrupt-parent = <&gpio2>;
-> +               interrupts = <8 IRQ_TYPE_LEVEL_LOW>;
-> +               interrupt-controller;
-> +
-> +               onkey {
-> +                       wakeup-source;
-> +                       compatible = "dlg,da9063-onkey";
-> +               };
-> +
-> +               wdt {
-> +                       compatible = "dlg,da9063-watchdog";
-> +                       timeout-sec = <0>;
-> +               };
-> +
-> +               regulators {
-> +                       vddcore_reg: bcore1 {
-> +                               regulator-min-microvolt = <1100000>;
-> +                               regulator-max-microvolt = <1450000>;
-> +                               regulator-ramp-delay = <20000>;
-> +                               regulator-name = "DA9063_CORE";
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vddsoc_reg: bcore2 {
-> +                               regulator-min-microvolt = <1100000>;
-> +                               regulator-max-microvolt = <1450000>;
-> +                               regulator-ramp-delay = <20000>;
-> +                               regulator-name = "DA9063_SOC";
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_ddr3_reg: bpro {
-> +                               regulator-min-microvolt = <1500000>;
-> +                               regulator-max-microvolt = <1500000>;
-> +                               regulator-ramp-delay = <20000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_3v3_reg: bperi {
-> +                               regulator-min-microvolt = <3300000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-ramp-delay = <20000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_sata_reg: ldo3 {
-> +                               regulator-min-microvolt = <2500000>;
-> +                               regulator-max-microvolt = <2500000>;
-> +                               regulator-always-on;
-> +                       };
-> +                       vdd_mipi_reg: ldo4 {
-> +                               regulator-min-microvolt = <2500000>;
-> +                               regulator-max-microvolt = <2500000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_mx6_snvs_reg: ldo5 {
-> +                               regulator-min-microvolt = <3300000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_hdmi_reg: ldo6 {
-> +                               regulator-min-microvolt = <2500000>;
-> +                               regulator-max-microvolt = <2500000>;
-> +                               regulator-always-on;
-> +                               regulator-boot-on;
-> +                       };
-> +
-> +                       vdd_pcie_reg: ldo7 {
-> +                               regulator-min-microvolt = <2500000>;
-> +                               regulator-max-microvolt = <2500000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_1V8_reg: ldo8 {
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <1800000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_3V3_sdc_reg: ldo9 {
-> +                               regulator-min-microvolt = <1800000>;
-> +                               regulator-max-microvolt = <3300000>;
-> +                               regulator-always-on;
-> +                       };
-> +
-> +                       vdd_1V2_reg: ldo10 {
-> +                               regulator-min-microvolt = <1200000>;
-> +                               regulator-max-microvolt = <1200000>;
-> +                               regulator-always-on;
-> +                       };
-> +               };
-> +       };
-> +};
-> +
-> +&uart1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart1>;
-> +       status = "okay";
-> +};
-> +
-> +&uart2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart2>;
-> +};
-> +
-> +&uart3 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart3>;
-> +};
-> +
-> +&uart4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart4>;
-> +};
-> +
-> +&uart5 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_uart5>;
-> +};
-> +
-> +&fec {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_enet>;
-> +       phy-mode = "rgmii";
-> +       phy-reset-gpios = <&gpio5 20 GPIO_ACTIVE_LOW>;
-> +       phy-reset-duration = <50>;
-> +       phy-supply = <&vdd_1V8_reg>;
-> +       phy-handle = <&ksz9031>;
-> +       status = "okay";
-> +
-> +
-> +       mdio {
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               ksz9031: phy {
-
-phy at 0
-
-Building with W=2 or W=1 will tell you this.
-
-> +                       reg = <0>;
-> +                       compatible = "ethernet-phy-ieee802.3-c22";
-> +                       interrupt-parent = <&gpio1>;
-> +                       interrupts = <30 IRQ_TYPE_EDGE_FALLING>;
-> +                       rxdv-skew-ps = <480>;
-> +                       txen-skew-ps = <480>;
-> +                       rxd0-skew-ps = <480>;
-> +                       rxd1-skew-ps = <480>;
-> +                       rxd2-skew-ps = <480>;
-> +                       rxd3-skew-ps = <480>;
-> +                       txd0-skew-ps = <420>;
-> +                       txd1-skew-ps = <420>;
-> +                       txd2-skew-ps = <360>;
-> +                       txd3-skew-ps = <360>;
-> +                       txc-skew-ps = <1020>;
-> +                       rxc-skew-ps = <960>;
-> +               };
-> +       };
-> +};
-> +
-> +
-> +&usdhc3 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usdhc3>;
-> +       non-removable;
-> +       bus-width = <8>;
-> +       status = "okay";
-> +};
-> +
-> +&pcie {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_pcie_ctrl>;
-> +       reset-gpio = <&gpio7 12 GPIO_ACTIVE_LOW>;
-> +       disable-gpio = <&gpio2 22 GPIO_ACTIVE_LOW>;
-> +};
-> +
-> +&i2c2 {
-> +       clock-frequency = <100000>;
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_i2c2>;
-> +};
-> +
-> +&usdhc1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usdhc1>;
-> +       fsl,wp-controller;
-> +};
-> +
-> +&usdhc2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usdhc2>;
-> +       fsl,wp-controller;
-> +};
-> +
-> +
-> +&ipu1_di0_disp0 {
-> +       remote-endpoint = <&rgb_encoder_in>;
-> +};
-> +
-> +&pwm1 {
-> +       status = "okay";
-> +};
-> +
-> +&pwm3 {
-> +       status = "okay";
-> +};
-> +
-> +&pwm4 {
-> +       status = "okay";
-> +};
-> +
-> +&ecspi2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_ecspi2>;
-> +       cs-gpios =  <&gpio2 25 GPIO_ACTIVE_HIGH>,
-> +                               <&gpio2 26 GPIO_ACTIVE_HIGH>;
-> +};
-> +
-> +&ecspi4 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_nor_flash>;
-> +};
-> +
-> +&can1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_can1>;
-> +};
-> +
-> +&can2 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_can2>;
-> +};
-> +
-> +&usbh1 {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usb_host1>;
-> +};
-> +
-> +&usbotg {
-> +       pinctrl-names = "default";
-> +       pinctrl-0 = <&pinctrl_usb_otg>;
-> +       vbus-supply = <&reg_usb_otg>;
-> +       dr_mode = "peripheral";
-> +};
-> +
-> +/******device power Management*********/
-> +
-> +&cpu0 {
-> +       voltage-tolerance = <2>;
-> +};
-> +
-> +&reg_arm {
-> +       vin-supply = <&vddcore_reg>;
-> +};
-> +
-> +&reg_soc {
-> +       vin-supply = <&vddsoc_reg>;
-> +};
-> +
-> +&reg_pu {
-> +       vin-supply = <&vddsoc_reg>;
-> +};
-> +
-> +
-> +
-> +/*******Disabled HW following***********/
-> +
-> +
-> +&weim {
-> +       status = "disabled";
-> +};
-> +
-> +&snvs_rtc {
-> +       status = "disabled";
-> +};
-> +
-> --
-> 2.11.0
+> > +	BUG(); /* Not implemented lazy save/restore on GICv3 */
+> > +	return IRQ_HANDLED;
+> > +}
+> > +
+> > +static irqreturn_t vgic_v2_maintenance_handler(int irq, void *data)
+> > +{
+> > +	struct kvm_vcpu *vcpu = (struct kvm_vcpu *)data;
 > 
+> I think you need an empty line here, to separate variable declaration
+> from code.
 > 
-> emtrion GmbH
-> Kreativpark - Alter Schlachthof 45
-> 76131 Karlsruhe
-> GERMANY
-> http://www.emtrion.de
-> _______________________________________
+
+sure
+
+> > +	vgic_v2_handle_maintenance(vcpu);
 > 
-> Amtsgericht Mannheim
-> HRB 110 300
-> Gesch?ftsf?hrer: Dieter Baur, Ramona Maurer
-> _______________________________________
+> >  	return IRQ_HANDLED;
+> >  }
+> >  
+> > @@ -464,6 +466,7 @@ void kvm_vgic_init_cpu_hardware(void)
+> >  int kvm_vgic_hyp_init(void)
+> >  {
+> >  	const struct gic_kvm_info *gic_kvm_info;
+> > +	irqreturn_t (*handler)(int irq, void *data);
+> >  	int ret;
+> >  
+> >  	gic_kvm_info = gic_get_kvm_info();
+> > @@ -478,6 +481,7 @@ int kvm_vgic_hyp_init(void)
+> >  	switch (gic_kvm_info->type) {
+> >  	case GIC_V2:
+> >  		ret = vgic_v2_probe(gic_kvm_info);
+> > +		handler = vgic_v2_maintenance_handler;
+> >  		break;
+> 1>  	case GIC_V3:
+> >  		ret = vgic_v3_probe(gic_kvm_info);
+> > @@ -485,6 +489,7 @@ int kvm_vgic_hyp_init(void)
+> >  			static_branch_enable(&kvm_vgic_global_state.gicv3_cpuif);
+> >  			kvm_info("GIC system register CPU interface enabled\n");
+> >  		}
+> > +		handler = vgic_v3_maintenance_handler;
+> >  		break;
+> >  	default:
+> >  		ret = -ENODEV;
+> > @@ -494,8 +499,7 @@ int kvm_vgic_hyp_init(void)
+> >  		return ret;
+> >  
+> >  	kvm_vgic_global_state.maint_irq = gic_kvm_info->maint_irq;
+> > -	ret = request_percpu_irq(kvm_vgic_global_state.maint_irq,
+> > -				 vgic_maintenance_handler,
+> > +	ret = request_percpu_irq(kvm_vgic_global_state.maint_irq, handler,
+> >  				 "vgic", kvm_get_running_vcpus());
+> >  	if (ret) {
+> >  		kvm_err("Cannot register interrupt %d\n",
+> > diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+> > index 8089710..259079b 100644
+> > --- a/virt/kvm/arm/vgic/vgic-v2.c
+> > +++ b/virt/kvm/arm/vgic/vgic-v2.c
+> > @@ -37,6 +37,17 @@ void vgic_v2_init_lrs(void)
+> >  		vgic_v2_write_lr(i, 0);
+> >  }
+> >  
+> > +void vgic_v2_handle_maintenance(struct kvm_vcpu *vcpu)
+> > +{
+> > +	void __iomem *base = kvm_vgic_global_state.vctrl_base;
+> > +
+> > +	/*
+> > +	 * Disable maintenance interrupt as we only use it to generate an exit
+> > +	 * from the VM.
+> > +	 */
+> 
+> Isn't that comment a bit misleading, as writing 0 to HCR not only
+> disables all interrupt sources, but also the whole GICV interface
+> altogether (bit 0: EN)?
+> I see that it gets enabled later on when writing ->vgic_hcr into the
+> register, but this function here looks a bit surprising to me.
+
+I don't think the comment is misleading and I'm not trying to explain
+how the whole hardware works, but the intention behind this code.
+
+I'll try to expand this comment and the commit message.
+
+The point is that we want to get back out of the hyp code (or just back
+to the vgic sync function on VHE) so that we in the case of no
+interrupts in flight, only check a single variable, and then in the case
+of having interrupts in flight, manage the hardware then.  That means
+that we leave the VGIC on, which in turn means that we may now actually
+see the maintenance interrupt firing, and in that case, we want to
+disable the VGIC to prevent continuous maintenance interrupts from
+firing, but we still only handle the actual maintenance (resample the
+line) in the sync function.
+
+I'll try to find some nice way of explaining this.
+
+> 
+> In general these changes to the interrupt handling leave me a bit
+> puzzled. Should this be a separate patch? Or explained in the commit
+> message?
+> 
+
+Should definitely be explained.  I tried splitting the logic, but
+couldn't find a nice working way to do that.  I'll have another look.
+
+> > +	writel_relaxed(0, base + GICH_HCR);
+> > +}
+> > +
+> >  void vgic_v2_set_underflow(struct kvm_vcpu *vcpu)
+> >  {
+> >  	struct vgic_v2_cpu_if *cpuif = &vcpu->arch.vgic_cpu.vgic_v2;
+> > @@ -393,6 +404,87 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+> >  	return ret;
+> >  }
+> >  
+> > +static void save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+> > +{
+> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > +	int nr_lr = kvm_vgic_global_state.nr_lr;
+> > +	u32 elrsr0, elrsr1;
+> > +
+> > +	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+> > +	if (unlikely(nr_lr > 32))
+> > +		elrsr1 = readl_relaxed(base + GICH_ELRSR1);
+> > +	else
+> > +		elrsr1 = 0;
+> > +
+> > +#ifdef CONFIG_CPU_BIG_ENDIAN
+> > +	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
+> > +#else
+> > +	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
+> > +#endif
+> 
+> I have some gut feeling that this is really broken, since we mix up
+> endian *byte* ordering with *bit* ordering here, don't we?
+
+Yes, it's broken, as I also noted in the commit message later.
+
+> 
+> I understand it's just copied and gets removed later on, so I was
+> wondering if you could actually move patch 35/37 ("Get rid of
+> vgic_elrsr") before this patch here, to avoid copying bogus code around?
+> Or does 35/37 depend on 34/37 to be correct?
+> 
+
+I don't remember.  I'll give it a try.
+
+> > +}
+> > +
+> > +static void save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+> > +{
+> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > +	int i;
+> > +	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> > +
+> > +	for (i = 0; i < used_lrs; i++) {
+> > +		if (cpu_if->vgic_elrsr & (1UL << i))
+> > +			cpu_if->vgic_lr[i] &= ~GICH_LR_STATE;
+> > +		else
+> > +			cpu_if->vgic_lr[i] = readl_relaxed(base + GICH_LR0 + (i * 4));
+> > +
+> > +		writel_relaxed(0, base + GICH_LR0 + (i * 4));
+> > +	}
+> > +}
+> > +
+> > +void vgic_v2_save_state(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct kvm *kvm = vcpu->kvm;
+> > +	struct vgic_dist *vgic = &kvm->arch.vgic;
+> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > +	void __iomem *base = vgic->vctrl_base;
+> > +	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> > +
+> > +	if (!base)
+> > +		return;
+> > +
+> > +	if (used_lrs) {
+> > +		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
+> > +
+> > +		save_elrsr(vcpu, base);
+> > +		save_lrs(vcpu, base);
+> > +
+> > +		writel_relaxed(0, base + GICH_HCR);
+> > +	} else {
+> > +		cpu_if->vgic_elrsr = ~0UL;
+> > +		cpu_if->vgic_apr = 0;
+> > +	}
+> > +}
+> > +
+> > +void vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+> > +{
+> > +	struct kvm *kvm = vcpu->kvm;
+> > +	struct vgic_dist *vgic = &kvm->arch.vgic;
+> > +	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > +	void __iomem *base = vgic->vctrl_base;
+> > +	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> > +	int i;
+> > +
+> > +	if (!base)
+> > +		return;
+> > +
+> > +	if (used_lrs) {
+> > +		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+> > +		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+> > +		for (i = 0; i < used_lrs; i++) {
+> > +			writel_relaxed(cpu_if->vgic_lr[i],
+> > +				       base + GICH_LR0 + (i * 4));
+> > +		}
+> > +	}
+> > +}
+> > +
+> >  void vgic_v2_load(struct kvm_vcpu *vcpu)
+> >  {
+> >  	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+> > diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+> > index b1bd238..790fd66 100644
+> > --- a/virt/kvm/arm/vgic/vgic.c
+> > +++ b/virt/kvm/arm/vgic/vgic.c
+> > @@ -18,6 +18,8 @@
+> >  #include <linux/kvm_host.h>
+> >  #include <linux/list_sort.h>
+> >  
+> > +#include <asm/kvm_hyp.h>
+> 
+> Why do you need that? Commenting this out seems to compile anyway for me.
+> 
+
+Probably while I was rearranging patches this got in there somehow.
+
+> > +
+> >  #include "vgic.h"
+> >  
+> >  #define CREATE_TRACE_POINTS
+> > @@ -683,11 +685,19 @@ static void vgic_flush_lr_state(struct kvm_vcpu *vcpu)
+> >  		vgic_clear_lr(vcpu, count);
+> >  }
+> >  
+> > +static inline void vgic_save_state(struct kvm_vcpu *vcpu)
+> 
+> Isn't "inline" frowned upon in .c files?
+> 
+
+Opinions seem to vary on this one.  I actually observed this making a
+difference in the compilation for some of these smaller functions with
+my compiler so I included it, and there are certainly examples of this
+in the kernel.
+
+If there's a policy I missed or someone has a strong argument that I
+have to remove the inline word here, then let me know.
+
+> > +{
+> > +	if (!static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
+> > +		vgic_v2_save_state(vcpu);
+> > +}
+> > +
+> >  /* Sync back the hardware VGIC state into our emulation after a guest's run. */
+> >  void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+> >  {
+> >  	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+> >  
+> > +	vgic_save_state(vcpu);
+> > +
+> >  	/* An empty ap_list_head implies used_lrs == 0 */
+> >  	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+> >  		return;
+> > @@ -697,6 +707,12 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+> >  	vgic_prune_ap_list(vcpu);
+> >  }
+> >  
+> > +static inline void vgic_restore_state(struct kvm_vcpu *vcpu)
+> 
+> Same here.
+> 
+> Apart from those rather cosmetic issues I have at least verified that
+> the code is actually moved from vgic-v2-sr.c to vgic-v2.c, plus/minus
+> the required changes when moving this from HYP to vGIC/EL1.
+> 
+
+Thanks for having a look!
+
+-Christoffer
