@@ -1,150 +1,86 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 27 Nov 2017 01:04:20 +0800
-Subject: [PATCH v2 04/11] media: rkisp1: add Rockchip MIPI Synopsys DPHY
- driver
-In-Reply-To: <20171124023706.5702-5-jacob-chen@iotwrt.com>
-References: <20171124023706.5702-5-jacob-chen@iotwrt.com>
-Message-ID: <201711262328.Wu1Q1zu3%fengguang.wu@intel.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun, 26 Nov 2017 18:25:11 +0100
+Subject: [PATCH V2] ARM: dts: bcm283x: Fix probing of bcm2835-i2s
+Message-ID: <1511717111-6055-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jacob,
+Since 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
+the bcm2835-i2s requires a clock as DT property. Unfortunately
+the necessary DT change has never been applied. While we are at it
+also fix the first PCM register range to cover the PCM_GRAY register.
 
-Thank you for the patch! Yet something to improve:
+This patch also fixes the dt-bindings accordlingly.
 
-[auto build test ERROR on linuxtv-media/master]
-[also build test ERROR on next-20171124]
-[cannot apply to rockchip/for-next v4.14]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Jacob-Chen/Rockchip-ISP1-Driver/20171126-224713
-base:   git://linuxtv.org/media_tree.git master
-config: blackfin-allmodconfig (attached as .config)
-compiler: bfin-uclinux-gcc (GCC) 6.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=blackfin 
-
-All errors (new ones prefixed by >>):
-
->> drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c:634:66: error: expected identifier or '(' before '=' token
-    struct v4l2_async_notifier_operationsrockchip_mipidphy_async_ops = {
-                                                                     ^
-   drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c: In function 'rockchip_mipidphy_media_init':
->> drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c:707:24: error: 'rockchip_mipidphy_async_ops' undeclared (first use in this function)
-     priv->notifier.ops = &rockchip_mipidphy_async_ops;
-                           ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c:707:24: note: each undeclared identifier is reported only once for each function it appears in
-   At top level:
-   drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c:593:1: warning: 'rockchip_mipidphy_notifier_complete' defined but not used [-Wunused-function]
-    rockchip_mipidphy_notifier_complete(struct v4l2_async_notifier *notifier)
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c:579:1: warning: 'rockchip_mipidphy_notifier_unbind' defined but not used [-Wunused-function]
-    rockchip_mipidphy_notifier_unbind(struct v4l2_async_notifier *notifier,
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-   drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c:555:1: warning: 'rockchip_mipidphy_notifier_bound' defined but not used [-Wunused-function]
-    rockchip_mipidphy_notifier_bound(struct v4l2_async_notifier *notifier,
-    ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-vim +634 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
-
-   632	
-   633	static const
- > 634	struct v4l2_async_notifier_operationsrockchip_mipidphy_async_ops = {
-   635		.bound = rockchip_mipidphy_notifier_bound,
-   636		.unbind = rockchip_mipidphy_notifier_unbind,
-   637		.complete = rockchip_mipidphy_notifier_complete,
-   638	};
-   639	
-   640	static int rockchip_mipidphy_fwnode_parse(struct device *dev,
-   641				     struct v4l2_fwnode_endpoint *vep,
-   642				     struct v4l2_async_subdev *asd)
-   643	{
-   644		struct sensor_async_subdev *s_asd =
-   645				container_of(asd, struct sensor_async_subdev, asd);
-   646		struct v4l2_mbus_config *config = &s_asd->mbus;
-   647	
-   648		if (vep->bus_type != V4L2_MBUS_CSI2) {
-   649			dev_err(dev, "Only CSI2 bus type is currently supported\n");
-   650			return -EINVAL;
-   651		}
-   652	
-   653		if (vep->base.port != 0) {
-   654			dev_err(dev, "The PHY has only port 0\n");
-   655			return -EINVAL;
-   656		}
-   657	
-   658		config->type = V4L2_MBUS_CSI2;
-   659		config->flags = vep->bus.mipi_csi2.flags;
-   660		s_asd->lanes = vep->bus.mipi_csi2.num_data_lanes;
-   661	
-   662		switch (vep->bus.mipi_csi2.num_data_lanes) {
-   663		case 1:
-   664			config->flags |= V4L2_MBUS_CSI2_1_LANE;
-   665			break;
-   666		case 2:
-   667			config->flags |= V4L2_MBUS_CSI2_2_LANE;
-   668			break;
-   669		case 3:
-   670			config->flags |= V4L2_MBUS_CSI2_3_LANE;
-   671			break;
-   672		case 4:
-   673			config->flags |= V4L2_MBUS_CSI2_4_LANE;
-   674			break;
-   675		default:
-   676			return -EINVAL;
-   677		}
-   678	
-   679		return 0;
-   680	}
-   681	
-   682	static int rockchip_mipidphy_media_init(struct mipidphy_priv *priv)
-   683	{
-   684		int ret;
-   685	
-   686		priv->pads[MIPI_DPHY_SY_PAD_SOURCE].flags =
-   687			MEDIA_PAD_FL_SOURCE | MEDIA_PAD_FL_MUST_CONNECT;
-   688		priv->pads[MIPI_DPHY_SY_PAD_SINK].flags =
-   689			MEDIA_PAD_FL_SINK | MEDIA_PAD_FL_MUST_CONNECT;
-   690	
-   691		ret = media_entity_pads_init(&priv->sd.entity,
-   692					 MIPI_DPHY_SY_PADS_NUM, priv->pads);
-   693		if (ret < 0)
-   694			return ret;
-   695	
-   696		ret = v4l2_async_notifier_parse_fwnode_endpoints_by_port(
-   697			priv->dev, &priv->notifier,
-   698			sizeof(struct sensor_async_subdev), 0,
-   699			rockchip_mipidphy_fwnode_parse);
-   700		if (ret < 0)
-   701			return ret;
-   702	
-   703		if (!priv->notifier.num_subdevs)
-   704			return -ENODEV;	/* no endpoint */
-   705	
-   706		priv->sd.subdev_notifier = &priv->notifier;
- > 707		priv->notifier.ops = &rockchip_mipidphy_async_ops;
-   708		ret = v4l2_async_subdev_notifier_register(&priv->sd, &priv->notifier);
-   709		if (ret) {
-   710			dev_err(priv->dev,
-   711				"failed to register async notifier : %d\n", ret);
-   712			v4l2_async_notifier_cleanup(&priv->notifier);
-   713			return ret;
-   714		}
-   715	
-   716		return v4l2_async_register_subdev(&priv->sd);
-   717	}
-   718	
-
+Fixes: 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+Reviewed-by: Eric Anholt <eric@anholt.net>
+Tested-by: Matthias Reichl <hias@horus.com>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 45924 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/2804215a/attachment-0001.gz>
+ Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt   | 4 ++--
+ Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt | 9 ++++-----
+ arch/arm/boot/dts/bcm283x.dtsi                               | 4 ++--
+ 3 files changed, 8 insertions(+), 9 deletions(-)
+
+Changes in V2:
+* add Fixes, Reviewed-by and Tested-by tags
+
+diff --git a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+index baf9b34..b6a8cc0 100644
+--- a/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
++++ b/Documentation/devicetree/bindings/dma/brcm,bcm2835-dma.txt
+@@ -74,8 +74,8 @@ Example:
+ 
+ bcm2835_i2s: i2s at 7e203000 {
+ 	compatible = "brcm,bcm2835-i2s";
+-	reg = <	0x7e203000 0x20>,
+-	      < 0x7e101098 0x02>;
++	reg = <	0x7e203000 0x24>;
++	clocks = <&clocks BCM2835_CLOCK_PCM>;
+ 
+ 	dmas = <&dma 2>,
+ 	       <&dma 3>;
+diff --git a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+index 65783de..7bb0362 100644
+--- a/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
++++ b/Documentation/devicetree/bindings/sound/brcm,bcm2835-i2s.txt
+@@ -2,9 +2,8 @@
+ 
+ Required properties:
+ - compatible: "brcm,bcm2835-i2s"
+-- reg: A list of base address and size entries:
+-	* The first entry should cover the PCM registers
+-	* The second entry should cover the PCM clock registers
++- reg: Should contain PCM registers location and length.
++- clocks: the (PCM) clock to use
+ - dmas: List of DMA controller phandle and DMA request line ordered pairs.
+ - dma-names: Identifier string for each DMA request line in the dmas property.
+   These strings correspond 1:1 with the ordered pairs in dmas.
+@@ -16,8 +15,8 @@ Example:
+ 
+ bcm2835_i2s: i2s at 7e203000 {
+ 	compatible = "brcm,bcm2835-i2s";
+-	reg = <0x7e203000 0x20>,
+-	      <0x7e101098 0x02>;
++	reg = <0x7e203000 0x24>;
++	clocks = <&clocks BCM2835_CLOCK_PCM>;
+ 
+ 	dmas = <&dma 2>,
+ 	       <&dma 3>;
+diff --git a/arch/arm/boot/dts/bcm283x.dtsi b/arch/arm/boot/dts/bcm283x.dtsi
+index dcde93c..f493761 100644
+--- a/arch/arm/boot/dts/bcm283x.dtsi
++++ b/arch/arm/boot/dts/bcm283x.dtsi
+@@ -396,8 +396,8 @@
+ 
+ 		i2s: i2s at 7e203000 {
+ 			compatible = "brcm,bcm2835-i2s";
+-			reg = <0x7e203000 0x20>,
+-			      <0x7e101098 0x02>;
++			reg = <0x7e203000 0x24>;
++			clocks = <&clocks BCM2835_CLOCK_PCM>;
+ 
+ 			dmas = <&dma 2>,
+ 			       <&dma 3>;
+-- 
+2.7.4
