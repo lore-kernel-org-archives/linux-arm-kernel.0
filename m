@@ -1,21 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Sun, 26 Nov 2017 16:16:50 -0600
-Subject: [PATCH v2 06/11] dt-bindings: Document the Rockchip MIPI RX
- D-PHY bindings
-In-Reply-To: <20171124023706.5702-7-jacob-chen@iotwrt.com>
-References: <20171124023706.5702-1-jacob-chen@iotwrt.com>
- <20171124023706.5702-7-jacob-chen@iotwrt.com>
-Message-ID: <20171126221650.wbmiuva3qp3r3ke7@rob-hp-laptop>
+Date: Sun, 26 Nov 2017 16:29:05 -0600
+Subject: [PATCH] arm64: renesas: document V3MSK board bindings
+In-Reply-To: <20171124204748.920422106@cogentembedded.com>
+References: <20171124204748.920422106@cogentembedded.com>
+Message-ID: <20171126222905.62qkvnvep2rkqcb6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 10:37:01AM +0800, Jacob Chen wrote:
-> Add DT bindings documentation for Rockchip MIPI D-PHY RX
+On Fri, Nov 24, 2017 at 11:47:39PM +0300, Sergei Shtylyov wrote:
+> Document the V3M Starter Kit device tree bindings, listing it as
+> a supported board.
 > 
-> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+> This allows to use checkpatch.pl to validate .dts files referring to
+> the V3MSK board.
+> 
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> 
 > ---
->  .../bindings/media/rockchip-mipi-dphy.txt          | 77 ++++++++++++++++++++++
->  1 file changed, 77 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+>  Documentation/devicetree/bindings/arm/shmobile.txt |    2 ++
+>  1 file changed, 2 insertions(+)
 
-Same comments apply to this one.
+Acked-by: Rob Herring <robh@kernel.org>
