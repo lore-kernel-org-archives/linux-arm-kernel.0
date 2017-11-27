@@ -1,74 +1,162 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 27 Nov 2017 12:04:31 +0100
-Subject: [PATCH v2] arm64: dts: renesas: r8a7795: Move nodes which have
- no reg property out of bus
-In-Reply-To: <CAMuHMdW9V6Bkh5uS9qNA7awtygEs=qRd7jigwSHmpV2VM3n9dA@mail.gmail.com>
-References: <20171124105234.25774-1-horms+renesas@verge.net.au>
- <CAMuHMdW9V6Bkh5uS9qNA7awtygEs=qRd7jigwSHmpV2VM3n9dA@mail.gmail.com>
-Message-ID: <20171127110430.ulgjrzgy3pdugs2s@verge.net.au>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 27 Nov 2017 11:11:20 +0000
+Subject: [PATCH 01/37] KVM: arm64: Avoid storing the vcpu pointer on the
+ stack
+In-Reply-To: <20171123205902.GF28855@cbox>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-2-christoffer.dall@linaro.org>
+ <ef4bffe5-b3c5-5fdd-cb8b-1840d2243ae1@arm.com> <20171123205902.GF28855@cbox>
+Message-ID: <5A1BF2D8.1050907@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 12:09:47PM +0100, Geert Uytterhoeven wrote:
-> On Fri, Nov 24, 2017 at 11:52 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
-> > The nodes that have been moved do not have any register properties and thus
-> > shouldn't be placed on the bus.
-> >
-> > This problem is flagged by the compiler as follows:
-> > $ make
-> > ...
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-> >
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> > v2
-> > * Preserve alphabetical order of nodes present in root node.
+Hi Christoffer,
+
+On 23/11/17 20:59, Christoffer Dall wrote:
+> On Thu, Oct 12, 2017 at 04:49:44PM +0100, Marc Zyngier wrote:
+>> On 12/10/17 11:41, Christoffer Dall wrote:
+>>> We already have the percpu area for the host cpu state, which points to
+>>> the VCPU, so there's no need to store the VCPU pointer on the stack on
+>>> every context switch.  We can be a little more clever and just use
+>>> tpidr_el2 for the percpu offset and load the VCPU pointer from the host
+>>> context.
+>>>
+>>> This requires us to have a scratch register though, so we take the
+>>> chance to rearrange some of the el1_sync code to only look at the
+>>> vttbr_el2 to determine if this is a trap from the guest or an HVC from
+>>> the host.  We do add an extra check to call the panic code if the kernel
+>>> is configured with debugging enabled and we saw a trap from the host
+>>> which wasn't an HVC, indicating that we left some EL2 trap configured by
+>>> mistake.
+
+>>> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+>>> index ab4d0a9..7e48a39 100644
+>>> --- a/arch/arm64/include/asm/kvm_asm.h
+>>> +++ b/arch/arm64/include/asm/kvm_asm.h
+>>> @@ -70,4 +70,24 @@ extern u32 __init_stage2_translation(void);
+>>>  
+>>>  #endif
+>>>  
+>>> +#ifdef __ASSEMBLY__
+>>> +.macro get_host_ctxt reg, tmp
+>>> +	/*
+>>> +	 * '=kvm_host_cpu_state' is a host VA from the constant pool, it may
+>>> +	 * not be accessible by this address from EL2, hyp_panic() converts
+>>> +	 * it with kern_hyp_va() before use.
+>>> +	 */
+>>
+>> This really looks like a stale comment, as there is no hyp_panic
+>> involved here anymore (thankfully!).
+>>
+>>> +	ldr	\reg, =kvm_host_cpu_state
+>>> +	mrs	\tmp, tpidr_el2
+>>> +	add	\reg, \reg, \tmp
+
+This looks like the arch code's adr_this_cpu.
+
+
+>>> +	kern_hyp_va \reg
+>>
+>> Here, we're trading a load from the stack for a load from the constant
+>> pool. Can't we do something like:
+>>
+>> 	adr_l	\reg, kvm_host_cpu_state
+>> 	msr	\tmp, tpidr_el2
+>> 	add	\reg, \reg, \tmp
+>>
+>> and that's it? This relies on the property that the kernel/hyp offset is
+>> constant, and that it doesn't matter if we add the offset to a kernel VA
+>> or a HYP VA... Completely untested of course!
+>>
 > 
-> Thanks for the update!
+> Coming back to this one, annoyingly, it doesn't seem to work. 
+
+The disassembly looks wrong?, or it generates the wrong address?
+
+
+> This is the code I use for get_host_ctxt:
 > 
-> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> .macro get_host_ctxt reg, tmp
+> 	adr_l	\reg, kvm_host_cpu_state
+> 	mrs	\tmp, tpidr_el2
+> 	add	\reg, \reg, \tmp
 
-I just noticed that with this patch applied I now see:
+(adr_this_cpu)
 
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
+> 	kern_hyp_va \reg
 
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
+As we know adr_l used adrp to generate a PC-relative address, when executed at
+EL2 it should always generate an EL2 address, so the kern_hyp_va will just mask
+out some bits that are already zero.
+
+(this subtly depends on KVM's EL2 code not being a module, and
+kvm_host_cpu_state not being percpu_alloc()d)
+
+
+> .endm
+> 
+> And this is the disassembly for one of the uses in the hyp code:
+> 
+> 	adrp	x0, ffff000008ca9000 <overflow_stack+0xd20>
+> 	add	x0, x0, #0x7f0
+> 	mrs	x1, tpidr_el2
+> 	add	x0, x0, x1
+> 	and	x0, x0, #0xffffffffffff
+
+(that looks right to me).
+
+
+> For comparison, the following C-code:
+> 
+> 	struct kvm_cpu_context *host_ctxt;
+> 	host_ctxt = this_cpu_ptr(&kvm_host_cpu_state);
+> 	host_ctxt = kern_hyp_va(host_ctxt);
+> 
+> Gets compiled into this:
+> 
+> 	adrp	x0, ffff000008ca9000 <overflow_stack+0xd20>
+> 	add	x0, x0, #0x7d0
+> 	mrs	x1, tpidr_el1
+> 	add	x0, x0, #0x20
+> 	add	x0, x0, x1
+> 	and	x0, x0, #0xffffffffffff
+
+> Any ideas what could be going on here?
+
+You expected tpidr_el2 in the above disassembly?
+
+The patch 'arm64: alternatives: use tpidr_el2 on VHE hosts'[0] wraps the tpidr
+access in adr_this_cpu,ldr_this_cpu and __my_cpu_offset() in
+ARM64_HAS_VIRT_HOST_EXTN alternatives.
+
+You should have an altinstr_replacement section that contains the 'mrs x1,
+tpidr_el2' for this sequence, which will get patched in by the cpufeature code
+when we find VHE.
+
+
+I'm guessing you want to always use tpidr_el2 as cpu_offset for KVM, even on
+v8.0 hardware. To do this you can't use the kernel's 'this_cpu_ptr' as its
+defined in percpu-defs.h as:
+> SHIFT_PERCPU_PTR(ptr, my_cpu_offset)
+
+... and the arch code provides a static-inline 'my_cpu_offset' that resolves to
+the correct tpidr for EL1.
+
+I guess you need an asm-accessor for each per-cpu variable you want to access,
+or a kvm_this_per_cpu().
+
+
+> And, during hyp init we do:
+> 	mrs	x1, tpidr_el1
+> 	msr	tpidr_el2, x1
+
+In the SDEI series this was so that the asm that used tpidr_el2 directly had the
+correct value on non-VHE hardware.
+
+
+Thanks,
+
+James
+
+
+[0] https://patchwork.kernel.org/patch/10012641/
