@@ -1,10 +1,10 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:58:02 -0500
-Subject: [PATCH V3 25/29] video: fbdev: intelfb: deprecate
+Date: Mon, 27 Nov 2017 11:58:03 -0500
+Subject: [PATCH V3 26/29] video: fbdev: nvidia: deprecate
  pci_get_bus_and_slot()
 In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
 References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-26-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-27-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,27 +15,80 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Find the domain number from pdev.
+struct nvidia_par has a pointer to struct pci_dev. Use the pci_dev
+member to extract the domain information and pass it to
+pci_get_domain_bus_and_slot() function.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/video/fbdev/intelfb/intelfbhw.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/video/fbdev/nvidia/nv_hw.c    | 11 ++++++-----
+ drivers/video/fbdev/nvidia/nv_setup.c |  3 ++-
+ 2 files changed, 8 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/video/fbdev/intelfb/intelfbhw.c b/drivers/video/fbdev/intelfb/intelfbhw.c
-index d31ed4e..f695867 100644
---- a/drivers/video/fbdev/intelfb/intelfbhw.c
-+++ b/drivers/video/fbdev/intelfb/intelfbhw.c
-@@ -181,7 +181,9 @@ int intelfbhw_get_memory(struct pci_dev *pdev, int *aperture_size,
- 		return 1;
+diff --git a/drivers/video/fbdev/nvidia/nv_hw.c b/drivers/video/fbdev/nvidia/nv_hw.c
+index 81c80ac..8335da4 100644
+--- a/drivers/video/fbdev/nvidia/nv_hw.c
++++ b/drivers/video/fbdev/nvidia/nv_hw.c
+@@ -683,10 +683,11 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
+ 	nv10_sim_state sim_data;
+ 	unsigned int M, N, P, pll, MClk, NVClk, memctrl;
+ 	struct pci_dev *dev;
++	int domain = pci_domain_nr(par->pci_dev->bus);
  
- 	/* Find the bridge device.  It is always 0:0.0 */
--	if (!(bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0)))) {
-+	bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus), 0,
-+						 PCI_DEVFN(0, 0));
-+	if (!bridge_dev) {
- 		ERR_MSG("cannot find bridge device\n");
- 		return 1;
+ 	if ((par->Chipset & 0x0FF0) == 0x01A0) {
+ 		unsigned int uMClkPostDiv;
+-		dev = pci_get_bus_and_slot(0, 3);
++		dev = pci_get_domain_bus_and_slot(domain, 0, 3);
+ 		pci_read_config_dword(dev, 0x6C, &uMClkPostDiv);
+ 		uMClkPostDiv = (uMClkPostDiv >> 8) & 0xf;
+ 
+@@ -694,7 +695,7 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
+ 			uMClkPostDiv = 4;
+ 		MClk = 400000 / uMClkPostDiv;
+ 	} else {
+-		dev = pci_get_bus_and_slot(0, 5);
++		dev = pci_get_domain_bus_and_slot(domain, 0, 5);
+ 		pci_read_config_dword(dev, 0x4c, &MClk);
+ 		MClk /= 1000;
  	}
+@@ -707,13 +708,13 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
+ 	sim_data.pix_bpp = (char)pixelDepth;
+ 	sim_data.enable_video = 0;
+ 	sim_data.enable_mp = 0;
+-	dev = pci_get_bus_and_slot(0, 1);
++	dev = pci_get_domain_bus_and_slot(domain, 0, 1);
+ 	pci_read_config_dword(dev, 0x7C, &sim_data.memory_type);
+ 	pci_dev_put(dev);
+ 	sim_data.memory_type = (sim_data.memory_type >> 12) & 1;
+ 	sim_data.memory_width = 64;
+ 
+-	dev = pci_get_bus_and_slot(0, 3);
++	dev = pci_get_domain_bus_and_slot(domain, 0, 3);
+ 	pci_read_config_dword(dev, 0, &memctrl);
+ 	pci_dev_put(dev);
+ 	memctrl >>= 16;
+@@ -721,7 +722,7 @@ static void nForceUpdateArbitrationSettings(unsigned VClk,
+ 	if ((memctrl == 0x1A9) || (memctrl == 0x1AB) || (memctrl == 0x1ED)) {
+ 		u32 dimm[3];
+ 
+-		dev = pci_get_bus_and_slot(0, 2);
++		dev = pci_get_domain_bus_and_slot(domain, 0, 2);
+ 		pci_read_config_dword(dev, 0x40, &dimm[0]);
+ 		dimm[0] = (dimm[0] >> 8) & 0x4f;
+ 		pci_read_config_dword(dev, 0x44, &dimm[1]);
+diff --git a/drivers/video/fbdev/nvidia/nv_setup.c b/drivers/video/fbdev/nvidia/nv_setup.c
+index 2f2e162..b17acd2 100644
+--- a/drivers/video/fbdev/nvidia/nv_setup.c
++++ b/drivers/video/fbdev/nvidia/nv_setup.c
+@@ -264,7 +264,8 @@ static void nv10GetConfig(struct nvidia_par *par)
+ 	}
+ #endif
+ 
+-	dev = pci_get_bus_and_slot(0, 1);
++	dev = pci_get_domain_bus_and_slot(pci_domain_nr(par->pci_dev->bus),
++					  0, 1);
+ 	if ((par->Chipset & 0xffff) == 0x01a0) {
+ 		u32 amt;
+ 
 -- 
 1.9.1
