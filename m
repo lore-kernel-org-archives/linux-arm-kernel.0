@@ -1,76 +1,176 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Mon, 27 Nov 2017 09:35:30 -0800
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171123095456.lkc4nkuzsd2q26mm@piout.net>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
-Message-ID: <CALAqxLUBWd-mv_3iiFrXLf0ka685t0an89jjduHpT-2jjv5O2Q@mail.gmail.com>
+From: ar@linux.vnet.ibm.com (Andrea Reale)
+Date: Mon, 27 Nov 2017 17:38:36 +0000
+Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
+ removed vmemmap mem
+In-Reply-To: <f21d2b81-e0f5-b186-22e3-ded138505dc9@arm.com>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
+ <f21d2b81-e0f5-b186-22e3-ded138505dc9@arm.com>
+Message-ID: <20171127173835.GC12687@samekh>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 1:54 AM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> Hi,
+Hi Robin,
+
+On Mon 27 Nov 2017, 15:20, Robin Murphy wrote:
+> On 23/11/17 11:14, Andrea Reale wrote:
+> >When hot-removing memory we need to free vmemmap memory.
+> 
+> What problems arise if we don't? Is it only for the sake of freeing up some
+> pages here and there, or is there something more fundamental?
 >
-> On 13/10/2017 at 11:54:33 -0600, Jason Gunthorpe wrote:
->> ntp is currently hardwired to try and call the rtc set when wall clock
->> tv_nsec is 0.5 seconds. This historical behaviour works well with certain
->> PC RTCs, but is not universal to all rtc hardware.
->>
->> Change how this works by introducing the driver specific concept of
->> set_offset_nsec, the delay between current wall clock time and the target
->> time to set (with a 0 tv_nsecs).
->>
->> For x86-style CMOS set_offset_nsec should be -0.5 s which causes the last
->> second to be written 0.5 s after it has started.
->>
->> For compat with the old rtc_set_ntp_time, the value is defaulted to
->> + 0.5 s, which causes the next second to be written 0.5s before it starts,
->> as things were before this patch.
->>
->> Testing shows many non-x86 RTCs would like set_offset_nsec ~= 0,
->> so ultimately each RTC driver should set the set_offset_nsec according
->> to its needs, and non x86 architectures should stop using
->> update_persistent_clock64 in order to access this feature.
->> Future patches will revise the drivers as needed.
->>
->> Since CMOS and RTC now have very different handling they are split
->> into two dedicated code paths, sharing the support code, and ifdefs
->> are replaced with IS_ENABLED.
->>
->> Signed-off-by: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
->> ---
->>  drivers/rtc/class.c   |   3 +
->>  drivers/rtc/systohc.c |  53 +++++++++++-----
->>  include/linux/rtc.h   |  43 ++++++++++++-
->>  kernel/time/ntp.c     | 166 ++++++++++++++++++++++++++++++++++----------------
->>  4 files changed, 196 insertions(+), 69 deletions(-)
->>
->> Hello All,
->>
->> Here is the latest version of this patch that was circulating between
->> RMK and myself. I have done a few more minor changed and been able to
->> test it myself on x86 KVM and on the ARM system that motivated the
->> original CONFIG_RTC_SYSTOHC patch.
->>
->> From all my testing, this patch does not change the existing behavior
->> at all, but provides the base infrastructure to fix individual RTCs
->> one at a time.
->>
->> There are a few followup patches that will set the set_offset_nsec
->> value for various RTC drivers, and I still have to look at RMK's
->> hrtimer patch, but those are all incremental on top of this.
->>
->
-> So I'm discovering that this patch made it upstream silently. While it
-> somewhat solves the issue for some RTCs, it is not a proper solution for
-> most.
 
-Sorry. I thought the discussion had finished up and it looked ok, so I
-queued it up. Apologies.
+It is just for freeing up pages, but imho we are talking about a relevant
+number of pages. For example, assuming 4K pages, to describe one hot
+added section of 1GB of new memory we need ~14MBs of vmemmap space (if
+my back of the envelope math is not wrong). This
+memory would be leaked if we do not do the cleanup in hot remove. 
+If we do hot remove sections many times in the lifetime of a system, 
+this quantity can become sizeable.
 
-Shall I revert it?
+> >However, depending on the memory is being removed, it might
+> >not be always possible to free a full vmemmap page / huge-page
+> >because part of it might still be used.
+> >
+> >Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
+> >hot-remove") introduced a workaround for x86
+> >hot-remove, by which partially unused areas are filled with
+> >the 0xFD constant. Full pages are only removed when fully
+> >filled by 0xFDs.
+> >
+> >This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
+> >the goal of using it in place of 0xFDs. For now, this will be used for
+> >the arm64 port of memory hot remove, but the idea is to eventually use
+> >the same mechanism for x86 as well.
+> >
+> >Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+> >Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
+> >---
+> >  include/linux/memblock.h | 12 ++++++++++++
+> >  mm/memblock.c            | 32 ++++++++++++++++++++++++++++++++
+> >  2 files changed, 44 insertions(+)
+> >
+> >diff --git a/include/linux/memblock.h b/include/linux/memblock.h
+> >index bae11c7..0daec05 100644
+> >--- a/include/linux/memblock.h
+> >+++ b/include/linux/memblock.h
+> >@@ -26,6 +26,9 @@ enum {
+> >  	MEMBLOCK_HOTPLUG	= 0x1,	/* hotpluggable region */
+> >  	MEMBLOCK_MIRROR		= 0x2,	/* mirrored region */
+> >  	MEMBLOCK_NOMAP		= 0x4,	/* don't add to kernel direct mapping */
+> >+#ifdef CONFIG_MEMORY_HOTREMOVE
+> >+	MEMBLOCK_UNUSED_VMEMMAP	= 0x8,  /* Mark VMEMAP blocks as dirty */
+> 
+> I'm not sure I get what "dirty" is supposed to mean in this context. Also,
+> this appears to be specific to CONFIG_SPARSEMEM_VMEMMAP, whilst only
+> tangentially related to CONFIG_MEMORY_HOTREMOVE, so the dependencies look a
+> bit off.
+> 
+> In fact, now that I think about it, why does this need to be in memblock at
+> all? If it is specific to sparsemem, shouldn't the section map already be
+> enough to tell us what's supposed to be present or not?
+> 
+> Robin.
 
-thanks
--john
+The story is: when we are hot-removing one section, we cannot be sure that
+the full block  can be fully removed, for example,
+because we might have used only a portion of it at hot-add time and the
+rest might have been used by other hot adds we are not aware of.
+So when we hot-remove, we mark the page structs of the removed memory,
+and we only remove the full page when it is all marked.
+This is exactly symmetrical to the issue described in commit
+ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
+hot-remove") - introducing hot-remove for x86. 
+
+In that commit, partially unused vmemmap pages where filled with the
+0XFD constant. In the previous iteration of this patchset, it was
+rightfully suggested that marking the pages by writing inside them was
+not the best way to achieve the result. That's why we reverted to do
+this marking using memblock. This is only used in memory hot remove,
+that's why the CONFIG_MEMORY_HOTREMOVE dependency. 
+
+Right now, I cannot think of how I could use sparse mem to tell: the
+only thing I know at the moment of trying to free a vmemmap block is that I
+have some physical addresses that might or not be in use to describe some
+pages. I canot think of any way to know which struct pages could be occupying this
+vmemmap block, besides maybe walking all pagetables and check if I have
+some matching mapping.
+However, I might be missing something, so suggestions are welcome.
+
+Thanks,
+Andrea
+
+> >+#endif
+> >  };
+> >  struct memblock_region {
+> >@@ -90,6 +93,10 @@ int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
+> >  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
+> >  int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
+> >  ulong choose_memblock_flags(void);
+> >+#ifdef CONFIG_MEMORY_HOTREMOVE
+> >+int memblock_mark_unused_vmemmap(phys_addr_t base, phys_addr_t size);
+> >+int memblock_clear_unused_vmemmap(phys_addr_t base, phys_addr_t size);
+> >+#endif
+> >  /* Low level functions */
+> >  int memblock_add_range(struct memblock_type *type,
+> >@@ -182,6 +189,11 @@ static inline bool memblock_is_nomap(struct memblock_region *m)
+> >  	return m->flags & MEMBLOCK_NOMAP;
+> >  }
+> >+#ifdef CONFIG_MEMORY_HOTREMOVE
+> >+bool memblock_is_vmemmap_unused_range(struct memblock_type *mt,
+> >+		phys_addr_t start, phys_addr_t end);
+> >+#endif
+> >+
+> >  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
+> >  int memblock_search_pfn_nid(unsigned long pfn, unsigned long *start_pfn,
+> >  			    unsigned long  *end_pfn);
+> >diff --git a/mm/memblock.c b/mm/memblock.c
+> >index 9120578..30d5aa4 100644
+> >--- a/mm/memblock.c
+> >+++ b/mm/memblock.c
+> >@@ -809,6 +809,18 @@ int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
+> >  	return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
+> >  }
+> >+#ifdef CONFIG_MEMORY_HOTREMOVE
+> >+int __init_memblock memblock_mark_unused_vmemmap(phys_addr_t base,
+> >+		phys_addr_t size)
+> >+{
+> >+	return memblock_setclr_flag(base, size, 1, MEMBLOCK_UNUSED_VMEMMAP);
+> >+}
+> >+int __init_memblock memblock_clear_unused_vmemmap(phys_addr_t base,
+> >+		phys_addr_t size)
+> >+{
+> >+	return memblock_setclr_flag(base, size, 0, MEMBLOCK_UNUSED_VMEMMAP);
+> >+}
+> >+#endif
+> >  /**
+> >   * __next_reserved_mem_region - next function for for_each_reserved_region()
+> >   * @idx: pointer to u64 loop variable
+> >@@ -1696,6 +1708,26 @@ void __init_memblock memblock_trim_memory(phys_addr_t align)
+> >  	}
+> >  }
+> >+#ifdef CONFIG_MEMORY_HOTREMOVE
+> >+bool __init_memblock memblock_is_vmemmap_unused_range(struct memblock_type *mt,
+> >+		phys_addr_t start, phys_addr_t end)
+> >+{
+> >+	u64 i;
+> >+	struct memblock_region *r;
+> >+
+> >+	i = memblock_search(mt, start);
+> >+	r = &(mt->regions[i]);
+> >+	while (r->base < end) {
+> >+		if (!(r->flags & MEMBLOCK_UNUSED_VMEMMAP))
+> >+			return 0;
+> >+
+> >+		r = &(memblock.memory.regions[++i]);
+> >+	}
+> >+
+> >+	return 1;
+> >+}
+> >+#endif
+> >+
+> >  void __init_memblock memblock_set_current_limit(phys_addr_t limit)
+> >  {
+> >  	memblock.current_limit = limit;
+> >
+> 
