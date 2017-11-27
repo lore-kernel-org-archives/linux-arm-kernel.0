@@ -1,37 +1,62 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Nov 2017 09:23:50 +0100
-Subject: [PATCH 1/2] arm64: dts: allwinner: H5: remove redundant MMC0
- card detect pin
-In-Reply-To: <20171125120200.23294-2-andre.przywara@arm.com>
-References: <20171125120200.23294-1-andre.przywara@arm.com>
- <20171125120200.23294-2-andre.przywara@arm.com>
-Message-ID: <20171127082350.7yzg44mdmei3w47i@flea.home>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 27 Nov 2017 09:32:34 +0100
+Subject: [PATCH 08/37] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20171126161756.GL28855@cbox>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-9-christoffer.dall@linaro.org>
+ <20171115160440.umfucia5rmrioeqs@kamzik.brq.redhat.com>
+ <20171126161756.GL28855@cbox>
+Message-ID: <20171127083234.5ouevx4mhnfxibnc@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 25, 2017 at 12:01:59PM +0000, Andre Przywara wrote:
-> PF6 is mostly used as the CD pin for the microSD slot on H5 based
-> boards. So far we were referencing this pin twice: once using the
-> mmc0_cd_pin phandle, and then again directly as a GPIO via the pinctrl
-> phandle.
-> This will cause problems if the pinctrl driver enables strict mode, as
-> the second request will fail now, leading to a driver init failure.
-> Remove the redundant pin reference via the mmc0_cd_pin phandle.
+On Sun, Nov 26, 2017 at 05:17:56PM +0100, Christoffer Dall wrote:
+> Hi Drew,
 > 
-> Signed-off-by: Andre Przywara <andre.przywara@arm.com>
-> Reported-by: Chris Obbard <obbardc@gmail.com>
+> On Wed, Nov 15, 2017 at 05:04:40PM +0100, Andrew Jones wrote:
+> > On Thu, Oct 12, 2017 at 12:41:12PM +0200, Christoffer Dall wrote:
+> > > Avoid saving the guest VFP registers and restoring the host VFP
+> > > registers on every exit from the VM.  Only when we're about to run
+> > > userspace or other threads in the kernel do we really have to switch the
+> > > state back to the host state.
+> > 
+> > Rik van Riel's recently post patch "[PATCH v2 0/2] x86,kvm: move qemu/guest
+> > FPU switching out to kvm_arch_vcpu_ioctl_run" indicates that for x86 they
+> > only need to swap guest and userspace VFP registers before exiting VCPU_RUN
+> > to userspace, not for running other threads. I imagine that's the same for
+> > ARM as well.
+> > 
+> > If so, then I think this hunk
+> > 
+> > > @@ -209,4 +212,16 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+> > >   */
+> > >  void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+> > >  {
+> > > +	struct kvm_cpu_context *host_ctxt = vcpu->arch.host_cpu_context;
+> > > +	struct kvm_cpu_context *guest_ctxt = &vcpu->arch.ctxt;
+> > > +
+> > > +	/* Restore host FP/SIMD state */
+> > > +	if (vcpu->arch.guest_vfp_loaded) {
+> > > +		if (vcpu_el1_is_32bit(vcpu))
+> > > +			kvm_call_hyp(__fpsimd32_save_state,
+> > > +				     kern_hyp_va(guest_ctxt));
+> > > +		__fpsimd_save_state(&guest_ctxt->gp_regs.fp_regs);
+> > > +		__fpsimd_restore_state(&host_ctxt->gp_regs.fp_regs);
+> > > +		vcpu->arch.guest_vfp_loaded = 0;
+> > > +	}
+> > >  }
+> > 
+> > could be moved to the return of kvm_arch_vcpu_ioctl_run().
+> > 
+> That sounds cool.
+> 
+> I'll keep this patch as it is now, and look at Rik's patches and post a
+> follow up later, does that sound ok?
 
-Applied for 4.16, thanks!
-Maxime
+Works for me. I'm guessing there's also going to be some overlap with
+Dave Martin's SVE work. So whichever series goes second can probably
+be the one to put the most consideration into it.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/bdda0a9e/attachment.sig>
+Thanks,
+drew
