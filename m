@@ -1,26 +1,66 @@
-From: jgg@mellanox.com (Jason Gunthorpe)
-Date: Mon, 27 Nov 2017 13:29:55 -0700
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171127201812.GB21126@piout.net>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <20171123112338.GN31757@n2100.armlinux.org.uk>
- <20171123120451.v74j3z2c5oodxlud@piout.net>
- <20171123125300.GO31757@n2100.armlinux.org.uk>
- <20171127201812.GB21126@piout.net>
-Message-ID: <20171127202955.GF13962@mellanox.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 27 Nov 2017 13:37:18 -0700
+Subject: [PATCH] coresight: Deduplicate bus_find_device() by name matching
+In-Reply-To: <7b21d96aaabc9ae20bda658bc1ed5b0981e3fc61.1511605972.git.lukas@wunner.de>
+References: <7b21d96aaabc9ae20bda658bc1ed5b0981e3fc61.1511605972.git.lukas@wunner.de>
+Message-ID: <CANLsYkxaW2aeWR6MAbjcVyMW3i_8T40bT=y+A6Fg4bBikO58Aw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 09:18:12PM +0100, Alexandre Belloni wrote:
- 
-> Also, fixing systohc will not fix the offset for people using hwclock or
-> any other tools (e.g. systemd).
+On 25 November 2017 at 03:51, Lukas Wunner <lukas@wunner.de> wrote:
+> No need to reinvent the wheel, we have bus_find_device_by_name().
+>
+> Signed-off-by: Lukas Wunner <lukas@wunner.de>
 
-When I was talking this over with Russel originally I imagined the
-systohc fix as a first step, and we could eventually add an rtc API to
-let user space do a precise write to the RTC, with the kernel taking
-care of the required sleep, etc.
+Applied - thanks.
+Mathieu
 
-Jason
+> ---
+>  drivers/hwtracing/coresight/coresight.c | 25 +++++--------------------
+>  1 file changed, 5 insertions(+), 20 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
+> index b8091bef21dc..389c4baeca9d 100644
+> --- a/drivers/hwtracing/coresight/coresight.c
+> +++ b/drivers/hwtracing/coresight/coresight.c
+> @@ -843,32 +843,17 @@ static void coresight_fixup_orphan_conns(struct coresight_device *csdev)
+>  }
+>
+>
+> -static int coresight_name_match(struct device *dev, void *data)
+> -{
+> -       char *to_match;
+> -       struct coresight_device *i_csdev;
+> -
+> -       to_match = data;
+> -       i_csdev = to_coresight_device(dev);
+> -
+> -       if (to_match && !strcmp(to_match, dev_name(&i_csdev->dev)))
+> -               return 1;
+> -
+> -       return 0;
+> -}
+> -
+>  static void coresight_fixup_device_conns(struct coresight_device *csdev)
+>  {
+>         int i;
+> -       struct device *dev = NULL;
+> -       struct coresight_connection *conn;
+>
+>         for (i = 0; i < csdev->nr_outport; i++) {
+> -               conn = &csdev->conns[i];
+> -               dev = bus_find_device(&coresight_bustype, NULL,
+> -                                     (void *)conn->child_name,
+> -                                     coresight_name_match);
+> +               struct coresight_connection *conn = &csdev->conns[i];
+> +               struct device *dev = NULL;
+>
+> +               if (conn->child_name)
+> +                       dev = bus_find_device_by_name(&coresight_bustype, NULL,
+> +                                                     conn->child_name);
+>                 if (dev) {
+>                         conn->child_dev = to_coresight_device(dev);
+>                         /* and put reference from 'bus_find_device()' */
+> --
+> 2.11.0
+>
