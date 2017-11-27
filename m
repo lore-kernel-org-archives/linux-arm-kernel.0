@@ -1,36 +1,26 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 27 Nov 2017 18:18:40 -0200
-Subject: [PATCH 00/13] SolidRun Hummingboard DT updates
-In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
-References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <CAOMZO5DY+6BkaFSVHg-mbZ6_vcM_wcwin16WmPbp22p1AX4yzA@mail.gmail.com>
+From: jgg@mellanox.com (Jason Gunthorpe)
+Date: Mon, 27 Nov 2017 13:29:55 -0700
+Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
+ ntp
+In-Reply-To: <20171127201812.GB21126@piout.net>
+References: <20171013175433.GA22062@obsidianresearch.com>
+ <20171123095456.lkc4nkuzsd2q26mm@piout.net>
+ <20171123112338.GN31757@n2100.armlinux.org.uk>
+ <20171123120451.v74j3z2c5oodxlud@piout.net>
+ <20171123125300.GO31757@n2100.armlinux.org.uk>
+ <20171127201812.GB21126@piout.net>
+Message-ID: <20171127202955.GF13962@mellanox.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 2:51 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> Hi Shawn,
->
-> This series updates the SolidRun Hummingboard platforms to:
-> (a) make the DT more reflective of the schematics
-> (b) re-organise how we deal with the differences between various board
->     versions in preparation for the new 1.5 microsom.
->
-> The idea with (b) is that we add the support for the board + usom
-> combination by including the appropriate dtsi files.
->
-> For example, in mainline at the moment, we support two variants of the
-> Hummingboards - both with Broadcom Wi-Fi and without eMMC.  Going
-> forward, when a 1.5 usom is fitted (which modern Hummingboards will all
-> have) the boards will have TI Wi-Fi and potentially eMMC on the usom.
->
-> So, this prepares the ground to support these combinations, and maybe
-> if I can get agreement from Jon, move forward with Hummingboard2
-> support.
+On Mon, Nov 27, 2017 at 09:18:12PM +0100, Alexandre Belloni wrote:
+ 
+> Also, fixing systohc will not fix the offset for people using hwclock or
+> any other tools (e.g. systemd).
 
-Looks good. Only a few minor nits that I found and replied in the
-respective patches.
+When I was talking this over with Russel originally I imagined the
+systohc fix as a first step, and we could eventually add an rtc API to
+let user space do a precise write to the RTC, with the kernel taking
+care of the required sleep, etc.
 
-For the whole series:
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+Jason
