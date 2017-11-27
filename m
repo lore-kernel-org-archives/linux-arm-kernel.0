@@ -1,234 +1,73 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 27 Nov 2017 18:01:05 +0800
-Subject: [PATCH V6 02/12] clk: sprd: Add common infrastructure
-In-Reply-To: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
-References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171127100115.20655-3-chunyan.zhang@spreadtrum.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Mon, 27 Nov 2017 11:44:39 +0100
+Subject: [PATCH v8 0/6] stm32 clocksource driver rework
+In-Reply-To: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <CA+M3ks5BsC5_2OJ8g0rjd0vQnZ+pYbDhWc807F0J2EejdN6bKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added Spreadtrum's clock driver framework together with common
-structures and interface functions.
+2017-11-14 9:52 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
+> version 8:
+>  - rebased on timers/core
+>  - change timer_of_exit() name to timer_of_cleanup()
+>  - update stm32 clocksource driver to use this function
+>
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- drivers/clk/Kconfig       |  1 +
- drivers/clk/Makefile      |  1 +
- drivers/clk/sprd/Kconfig  |  4 ++
- drivers/clk/sprd/Makefile |  3 ++
- drivers/clk/sprd/common.c | 99 +++++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sprd/common.h | 52 +++++++++++++++++++++++++
- 6 files changed, 160 insertions(+)
- create mode 100644 drivers/clk/sprd/Kconfig
- create mode 100644 drivers/clk/sprd/Makefile
- create mode 100644 drivers/clk/sprd/common.c
- create mode 100644 drivers/clk/sprd/common.h
+Gentle ping to get this v8 reviewed, the first patch has already been merged
+int v4.15-rc1
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 1c4e1aa..ce1a32be 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -236,6 +236,7 @@ source "drivers/clk/mvebu/Kconfig"
- source "drivers/clk/qcom/Kconfig"
- source "drivers/clk/renesas/Kconfig"
- source "drivers/clk/samsung/Kconfig"
-+source "drivers/clk/sprd/Kconfig"
- source "drivers/clk/sunxi-ng/Kconfig"
- source "drivers/clk/tegra/Kconfig"
- source "drivers/clk/ti/Kconfig"
-diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
-index f7f761b..d880d13 100644
---- a/drivers/clk/Makefile
-+++ b/drivers/clk/Makefile
-@@ -85,6 +85,7 @@ obj-$(CONFIG_COMMON_CLK_SAMSUNG)	+= samsung/
- obj-$(CONFIG_ARCH_SIRF)			+= sirf/
- obj-$(CONFIG_ARCH_SOCFPGA)		+= socfpga/
- obj-$(CONFIG_PLAT_SPEAR)		+= spear/
-+obj-$(CONFIG_ARCH_SPRD)			+= sprd/
- obj-$(CONFIG_ARCH_STI)			+= st/
- obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
- obj-$(CONFIG_ARCH_SUNXI)		+= sunxi-ng/
-diff --git a/drivers/clk/sprd/Kconfig b/drivers/clk/sprd/Kconfig
-new file mode 100644
-index 0000000..67a3287
---- /dev/null
-+++ b/drivers/clk/sprd/Kconfig
-@@ -0,0 +1,4 @@
-+config SPRD_COMMON_CLK
-+	tristate "Clock support for Spreadtrum SoCs"
-+	depends on ARCH_SPRD || COMPILE_TEST
-+	default ARCH_SPRD
-diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-new file mode 100644
-index 0000000..74f4b80
---- /dev/null
-+++ b/drivers/clk/sprd/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
-+
-+clk-sprd-y	+= common.o
-diff --git a/drivers/clk/sprd/common.c b/drivers/clk/sprd/common.c
-new file mode 100644
-index 0000000..4e38b74a
---- /dev/null
-+++ b/drivers/clk/sprd/common.c
-@@ -0,0 +1,99 @@
-+/*
-+ * Spreadtrum clock infrastructure
-+ *
-+ * Copyright (C) 2017 Spreadtrum, Inc.
-+ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+#include <linux/mfd/syscon.h>
-+#include <linux/module.h>
-+#include <linux/of_address.h>
-+#include <linux/of_platform.h>
-+#include <linux/regmap.h>
-+
-+#include "common.h"
-+
-+static const struct regmap_config sprdclk_regmap_config = {
-+	.reg_bits	= 32,
-+	.reg_stride	= 4,
-+	.val_bits	= 32,
-+	.max_register	= 0xffff,
-+	.fast_io	= true,
-+};
-+
-+static void sprd_clk_set_regmap(const struct sprd_clk_desc *desc,
-+			 struct regmap *regmap)
-+{
-+	int i;
-+	struct sprd_clk_common *cclk;
-+
-+	for (i = 0; i < desc->num_clk_clks; i++) {
-+		cclk = desc->clk_clks[i];
-+		if (!cclk)
-+			continue;
-+
-+		cclk->regmap = regmap;
-+	}
-+}
-+
-+int sprd_clk_regmap_init(struct platform_device *pdev,
-+			 const struct sprd_clk_desc *desc)
-+{
-+	void __iomem *base;
-+	struct device_node *node = pdev->dev.of_node;
-+	struct regmap *regmap = NULL;
-+
-+	if (of_find_property(node, "sprd,syscon", NULL)) {
-+		regmap = syscon_regmap_lookup_by_phandle(node, "sprd,syscon");
-+		if (IS_ERR(regmap)) {
-+			pr_err("%s: failed to get syscon regmap\n", __func__);
-+			return PTR_ERR(regmap);
-+		}
-+	} else {
-+		base = of_iomap(node, 0);
-+		regmap = devm_regmap_init_mmio(&pdev->dev, base,
-+					       &sprdclk_regmap_config);
-+		if (IS_ERR(regmap)) {
-+			pr_err("failed to init regmap.\n");
-+			return PTR_ERR(regmap);
-+		}
-+	}
-+
-+	sprd_clk_set_regmap(desc, regmap);
-+
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(sprd_clk_regmap_init);
-+
-+int sprd_clk_probe(struct device *dev, struct clk_hw_onecell_data *clkhw)
-+{
-+	int i, ret = 0;
-+	struct clk_hw *hw;
-+
-+	for (i = 0; i < clkhw->num; i++) {
-+
-+		hw = clkhw->hws[i];
-+
-+		if (!hw)
-+			continue;
-+
-+		ret = devm_clk_hw_register(dev, hw);
-+		if (ret) {
-+			dev_err(dev, "Couldn't register clock %d - %s\n",
-+				i, hw->init->name);
-+			return ret;
-+		}
-+	}
-+
-+	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-+				     clkhw);
-+	if (ret)
-+		dev_err(dev, "Failed to add clock provider.\n");
-+
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(sprd_clk_probe);
-+
-+MODULE_LICENSE("GPL v2");
-diff --git a/drivers/clk/sprd/common.h b/drivers/clk/sprd/common.h
-new file mode 100644
-index 0000000..8cd774e
---- /dev/null
-+++ b/drivers/clk/sprd/common.h
-@@ -0,0 +1,52 @@
-+/*
-+ * Spreadtrum clock infrastructure
-+ *
-+ * Copyright (C) 2017 Spreadtrum, Inc.
-+ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
-+
-+#ifndef _SPRD_CLK_COMMON_H_
-+#define _SPRD_CLK_COMMON_H_
-+
-+#include <linux/clk-provider.h>
-+#include <linux/of_platform.h>
-+#include <linux/regmap.h>
-+
-+#include "../clk_common.h"
-+
-+struct device_node;
-+
-+struct sprd_clk_common {
-+	struct regmap	*regmap;
-+	u32		reg;
-+	struct clk_hw	hw;
-+};
-+
-+struct sprd_clk_desc {
-+	struct sprd_clk_common		**clk_clks;
-+	unsigned long			num_clk_clks;
-+	struct clk_hw_onecell_data      *hw_clks;
-+};
-+
-+#define sprd_regmap_read(map, reg, val)				\
-+({								\
-+	(map) ? regmap_read((map), (reg), (val)) : (-EINVAL);	\
-+})
-+
-+#define sprd_regmap_write(map, reg, val)			\
-+({								\
-+	(map) ? regmap_write((map), (reg), (val)) : (-EINVAL);	\
-+})
-+
-+static inline struct sprd_clk_common *
-+	hw_to_sprd_clk_common(const struct clk_hw *hw)
-+{
-+	return container_of(hw, struct sprd_clk_common, hw);
-+}
-+int sprd_clk_regmap_init(struct platform_device *pdev,
-+			 const struct sprd_clk_desc *desc);
-+int sprd_clk_probe(struct device *dev, struct clk_hw_onecell_data *clkhw);
-+
-+#endif /* _SPRD_CLK_COMMON_H_ */
--- 
-2.7.4
+Thanks,
+Benjamin
+
+> version 7:
+>  - reword "clocksource: stm32: only use 32 bits timers" commit message
+>    to give more details about why 16 bits are problematics.
+>
+> version 6:
+>  - add dedicated patch min delta change
+>  - rework commit messages, I hope it will be better now
+>  - change new function name from timer_of_deinit to timer_of_exit
+>  - make stm32_clock_event_set_next_event() safer like done in other
+>    drivers
+>
+> version 6:
+> - add timer_of_deinit function in core
+> - rework failure cases in probe function
+>
+> version 5:
+> - rebase on top of timer/core branch
+> - rework commit message of the first patch
+>
+> version 4:
+> - split patch in 3 parts
+>   - convert code to timer_of
+>   - only use 32 bits timers
+>   - add clocksource support
+>
+> version 3:
+> - fix comments done by Daniel
+> - use timer_of helper functions
+>
+> version 2:
+> - fix uninitialized variable
+>
+> Benjamin Gaignard (6):
+>   clocksource: timer_of: rename timer_of_exit to timer_of_cleanup
+>   clocksource: stm32: convert driver to timer_of
+>   clocksource: stm32: increase min delta value
+>   clocksource: stm32: only use 32 bits timers
+>   clocksource: stm32: add clocksource support
+>   arm: dts: stm32: remove useless clocksource nodes
+>
+>  arch/arm/boot/dts/stm32f429.dtsi  |  32 -----
+>  arch/arm/boot/dts/stm32f746.dtsi  |  32 -----
+>  drivers/clocksource/Kconfig       |   1 +
+>  drivers/clocksource/timer-of.c    |   9 +-
+>  drivers/clocksource/timer-of.h    |   2 +-
+>  drivers/clocksource/timer-stm32.c | 242 ++++++++++++++++++++------------------
+>  6 files changed, 138 insertions(+), 180 deletions(-)
+>
+> --
+> 2.7.4
+>
