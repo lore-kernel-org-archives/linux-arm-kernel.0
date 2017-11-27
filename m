@@ -1,40 +1,101 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:57:41 -0500
-Subject: [PATCH V3 04/29] ata: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-5-git-send-email-okaya@codeaurora.org>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 27 Nov 2017 16:53:06 +0000
+Subject: [PATCH 12/13] ARM: dts: imx6qdl-cubox-i: rename regulators to match
+ schematic
+In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
+References: <20171127165134.GH31757@n2100.armlinux.org.uk>
+Message-ID: <E1eJMeY-0002rm-9W@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
+Make the regulators match the schematic - name the regulators after
+one of their schematic supply names, and arrange them into their
+heirarchy.
 
-Getting ready to remove pci_get_bus_and_slot() function in favor of
-pci_get_domain_bus_and_slot().
-
-Use pci_get_domain_bus_and_slot() and extract the actual domain number
-from the pdev passed in.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- drivers/ata/pata_ali.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 32 +++++++++++++++++++-------------
+ 1 file changed, 19 insertions(+), 13 deletions(-)
 
-diff --git a/drivers/ata/pata_ali.c b/drivers/ata/pata_ali.c
-index d19cd88..0b122f9 100644
---- a/drivers/ata/pata_ali.c
-+++ b/drivers/ata/pata_ali.c
-@@ -466,7 +466,8 @@ static void ali_init_chipset(struct pci_dev *pdev)
- 			tmp |= 0x01;	/* CD_ROM enable for DMA */
- 		pci_write_config_byte(pdev, 0x53, tmp);
- 	}
--	north = pci_get_bus_and_slot(0, PCI_DEVFN(0,0));
-+	north = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus), 0,
-+					    PCI_DEVFN(0, 0));
- 	if (north && north->vendor == PCI_VENDOR_ID_AL && ali_isa_bridge) {
- 		/* Configure the ALi bridge logic. For non ALi rely on BIOS.
- 		   Set the south bridge enable bit */
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index 98ec7ce1f2a3..7a3fba776661 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -62,34 +62,36 @@
+ 		};
+ 	};
+ 
+-	reg_3p3v: 3p3v {
++	v_5v0: regulator-v-5v0 {
+ 		compatible = "regulator-fixed";
+-		regulator-name = "3P3V";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+ 		regulator-always-on;
++		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_5v0";
+ 	};
+ 
+-	reg_usbh1_vbus: usb-h1-vbus {
++	v_usb2: regulator-v-usb2 {
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+ 		gpio = <&gpio1 0 0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
+-		regulator-name = "usb_h1_vbus";
+-		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_usb2";
++		vin-supply = <&v_5v0>;
+ 	};
+ 
+-	reg_usbotg_vbus: usb-otg-vbus {
++	v_usb1: regulator-v-usb1 {
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+ 		gpio = <&gpio3 22 0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
+-		regulator-name = "usb_otg_vbus";
+-		regulator-min-microvolt = <5000000>;
+ 		regulator-max-microvolt = <5000000>;
++		regulator-min-microvolt = <5000000>;
++		regulator-name = "v_usb1";
++		vin-supply = <&v_5v0>;
+ 	};
+ 
+ 	sound-spdif {
+@@ -237,21 +239,25 @@
+ &usbh1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_cubox_i_usbh1>;
+-	vbus-supply = <&reg_usbh1_vbus>;
++	vbus-supply = <&v_usb2>;
+ 	status = "okay";
+ };
+ 
+ &usbotg {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_cubox_i_usbotg>;
+-	vbus-supply = <&reg_usbotg_vbus>;
++	vbus-supply = <&v_usb1>;
+ 	status = "okay";
+ };
+ 
+ &usdhc2 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_cubox_i_usdhc2_aux &pinctrl_cubox_i_usdhc2>;
+-	vmmc-supply = <&reg_3p3v>;
++	vmmc-supply = <&vcc_3v3>;
+ 	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
++
++&vcc_3v3 {
++	vin-supply = <&v_5v0>;
++};
 -- 
-1.9.1
+2.7.4
