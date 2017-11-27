@@ -1,55 +1,88 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Mon, 27 Nov 2017 18:30:11 +0100
-Subject: [PATCH 0/8] sa1100fb updates
-In-Reply-To: <20171127171145.GI31757@n2100.armlinux.org.uk>
-References: <CGME20170929105024epcas5p336177e386c65b530c4cb5fac379cedfa@epcas5p3.samsung.com>
- <2590375.JKTUJ5JGIV@amdc3058> <20171127171145.GI31757@n2100.armlinux.org.uk>
-Message-ID: <4330027.F5ASplytpk@amdc3058>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 28 Nov 2017 01:30:18 +0800
+Subject: [PATCH] sunxi-rsb: Include OF based modalias in device uevent
+In-Reply-To: <2479565.qdx1IVDIGC@pebbles>
+References: <a99fc4e8-49e3-486a-b508-d764a952d9f8@rwthex-w2-a.rwth-ad.de>
+ <20171127153502.4wcqtimppgpfklmr@flea.home> <2479565.qdx1IVDIGC@pebbles>
+Message-ID: <CAGb2v67_-HA=q3+cWwVKrVuG-GaLF3xz4GNQ2+6FJZgSTN=rzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 27, 2017 05:11:45 PM Russell King - ARM Linux wrote:
-> On Tue, Oct 17, 2017 at 03:32:30PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > On Friday, September 29, 2017 11:50:04 AM Russell King - ARM Linux wrote:
-> > > Hi Bart,
-> > 
-> > Hi Russell,
-> > 
-> > > This series updates the sa1100fb fbdev driver's initialisation paths
-> > > to be more robust.  In doing these updates, I realised that we omitted
-> > > to free some memory which was allocated for the framebuffer if
-> > > initialisation fails - something that was hidden due to the complex
-> > > cleanup that the driver performs.  Switching to managed resources made
-> > > this more obvious.
-> > > 
-> > > Tested on H3600 iPAQ and Assabet.
-> > > 
-> > >  drivers/video/fbdev/sa1100fb.c | 75 +++++++++++++++---------------------------
-> > >  drivers/video/fbdev/sa1100fb.h |  2 ++
-> > >  2 files changed, 29 insertions(+), 48 deletions(-)
-> > 
-> > I queued all patches for 4.15, thanks!
-> 
-> Now that 4.15-rc1 is out, something tells me that was not actually
-> the case.  Any ideas what happened?
+On Tue, Nov 28, 2017 at 1:19 AM, Stefan Br?ns
+<stefan.bruens@rwth-aachen.de> wrote:
+> On Monday, November 27, 2017 4:35:02 PM CET Maxime Ripard wrote:
+>> Hi,
+>>
+>> On Mon, Nov 27, 2017 at 01:17:25PM +0100, Stefan Br?ns wrote:
+>> > Include the OF-based modalias in the uevent sent when registering devices
+>> > on the sunxi RSB bus, so that user space has a chance to autoload the
+>> > kernel module for the device.
+>> >
+>> > Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
+>> > pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
+>> > the AXP803 PMIC is built as a module, it is not loaded and the system
+>> > ends up with an disfunctional MMC controller.
+>> >
+>> > Cc: stable <stable@vger.kernel.org>
+>> > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+>> > ---
+>> >
+>> >  drivers/bus/sunxi-rsb.c | 13 +++++++++++++
+>> >  1 file changed, 13 insertions(+)
+>> >
+>> > diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+>> > index 328ca93781cf..37cb57244cbe 100644
+>> > --- a/drivers/bus/sunxi-rsb.c
+>> > +++ b/drivers/bus/sunxi-rsb.c
+>> > @@ -173,11 +173,24 @@ static int sunxi_rsb_device_remove(struct device
+>> > *dev)>
+>> >     return drv->remove(to_sunxi_rsb_device(dev));
+>> >
+>> >  }
+>> >
+>> > +static int sunxi_rsb_device_uevent(struct device *dev,
+>> > +                              struct kobj_uevent_env *env)
+>> > +{
+>> > +   int ret;
+>> > +
+>> > +   ret = of_device_uevent_modalias(dev, env);
+>> > +   if (ret != -ENODEV)
+>> > +           return ret;
+>>
+>> A comment explaining why we need to ignore the ENODEV error code would
+>> be great here.
+>
+> Lazy answer - everyone else is doing the same, and nobody cared to add an
+> explanation.
+>
+> For *some* drivers, this is likely because the same device may be enumerated
+> from e.g ACPI or OF, and for an ACPI device -ENODEV will be returned, as
+> dev->of_node is NULL.
+>
+> For devices which are only usable in an OF context, this is bogus. Not sure
+> about sunxi-rsb.
 
-Could you please explain the issue that you are seeing a bit more?
+sunxi-rsb (and Allwinner support in mainline in general) is OF only. With the
+exception of mfd sub-devices, if someone is enumerating devices in some other
+fashion, it should rightly blow up in their face.
 
-For me it looks all fine:
+>> > +   return 0;
+>> > +}
+>> > +
+>> >
+>> >  static struct bus_type sunxi_rsb_bus = {
+>> >
+>> >     .name           = RSB_CTRL_NAME,
+>> >     .match          = sunxi_rsb_device_match,
+>> >     .probe          = sunxi_rsb_device_probe,
+>> >     .remove         = sunxi_rsb_device_remove,
+>> >
+>> > +   .uevent         = sunxi_rsb_device_uevent,
+>>
+>> Any reason to not use of_device_uevent_modalias directly here?
+>
+> *If* sunxi-rsb can be used without OF, then yes, otherwise no.
 
-$ git log --oneline v4.15-rc1 drivers/video/fbdev/sa1100fb.c
-cb6bc3f video: sa1100fb: move pseudo palette into sa1100fb_info structure
-0ab7658 video: sa1100fb: fix video memory allocation leak
-c244f8e video: sa1100fb: clean up failure path
-5634cba video: sa1100fb: use devm_gpio_request_one()
-f6fc8c9 video: sa1100fb: use devm_request_irq()
-df6b228 video: sa1100fb: use devm_ioremap_resource()
-e43064c video: sa1100fb: use devm_clk_get()
-ba1d36b video: sa1100fb: use devm_kzalloc()
-...
+You can just use of_device_uevent_modalias, like the other OF platforms.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+ChenYu
