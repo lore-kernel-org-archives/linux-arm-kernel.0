@@ -1,40 +1,40 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:52:30 +0000
-Subject: [PATCH 05/13] ARM: dts: imx6qdl-microsom-brcm: rename sdio clock
+Date: Mon, 27 Nov 2017 16:52:35 +0000
+Subject: [PATCH 06/13] ARM: dts: imx6qdl-microsom: add 3.3V vcc regulator
 In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
 References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMdy-0002qx-BD@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eJMe3-0002r4-Fd@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SDIO clock is really the Broadcom clock.  Rename it as such.
+Add a 3.3V regulator for devices connected to the vcc_3v3 supply
+signal on the microsom.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi
-index 809d7896775c..b55af61dfeca 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi
-@@ -40,7 +40,7 @@
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index 612f626a59c1..d1dba0d94960 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -40,6 +40,16 @@
   */
  #include <dt-bindings/gpio/gpio.h>
- / {
--	clk_sdio: sdio-clock {
-+	clk_brcm: brcm-clock {
- 		compatible = "gpio-gate-clock";
- 		#clock-cells = <0>;
- 		pinctrl-names = "default";
-@@ -64,7 +64,7 @@
- 		compatible = "mmc-pwrseq-simple";
- 		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>,
- 			      <&gpio6 0 GPIO_ACTIVE_LOW>;
--		clocks = <&clk_sdio>;
-+		clocks = <&clk_brcm>;
- 		clock-names = "ext_clock";
- 	};
- };
+ 
++/ {
++	vcc_3v3: regulator-vcc-3v3 {
++		compatible = "regulator-fixed";
++		regulator-always-on;
++		regulator-name = "vcc_3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++	};
++};
++
+ &fec {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_microsom_enet_ar8035>;
 -- 
 2.7.4
