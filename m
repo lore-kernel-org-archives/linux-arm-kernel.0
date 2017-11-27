@@ -1,37 +1,49 @@
-From: vladimir.murzin@arm.com (Vladimir Murzin)
-Date: Mon, 27 Nov 2017 09:56:58 +0000
-Subject: [PATCH] ARM: NOMMU: Allow userspace to access background MPU region
-Message-ID: <1511776618-9018-1-git-send-email-vladimir.murzin@arm.com>
+From: john.garry@huawei.com (John Garry)
+Date: Mon, 27 Nov 2017 10:04:52 +0000
+Subject: [PATCH v9 0/5] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <20171107012355.GC13514@arm.com>
+References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
+ <20171107012355.GC13514@arm.com>
+Message-ID: <f01a7071-7db9-973c-1ac1-c37e4559c5cf@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, with MPU enabled, we prohibit userspace access to anything
-except RAM. Benjamin, reported that because of that his userspace
-application cannot access framebuffer's memory he reserved in device
-tree. It turns out we have no option other than to allow userspace
-access memory covered by background region.
+On 07/11/2017 01:23, Will Deacon wrote:
+> Hi Arnaldo,
+>
+> On Tue, Oct 17, 2017 at 12:02:17AM +0530, Ganapatrao Kulkarni wrote:
+>> Extending json/jevent framework for parsing arm64 event files.
+>> Adding jevents for ThunderX2 implementation defined PMU events.
+>>
+>> v9:
+>>    - Rebased to [3] and resolved conficts in PATCH 1/5 and reworked PATCH 3/5.
+>>    - Added PATCH 5 to fix segmentation fault in perf_pmu__find_map
+>>
+>> [3] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
+>
+> I'm happy with this version of the series (it's all Acked now), so would you
+> be able to pick it up for mainline, please?
+>
+> Cheers,
+>
 
-Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
----
-KernelVersion: 4.15-rc1
+So this patchset has not been merged.
 
- arch/arm/mm/pmsa-v7.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We have a patchset waiting for HiSilicon hip08 support, which includes 
+the requested feature for the ARM64 IMP DEFINED recommended events 
+refactoring-out.
 
-diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
-index 976df60..6509989 100644
---- a/arch/arm/mm/pmsa-v7.c
-+++ b/arch/arm/mm/pmsa-v7.c
-@@ -433,7 +433,7 @@ void __init mpu_setup(void)
- 
- 	/* Background */
- 	err |= mpu_setup_region(region++, 0, 32,
--				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA,
-+				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0RW,
- 				0, false);
- 
- #ifdef CONFIG_XIP_KERNEL
--- 
-1.9.1
+We can send our hip08 patchset now as an RFC, based in this patchset. 
+Depending on the comments and general acceptance of the approaches, it 
+may be appropriate to merge the patchsets (or at least merge the 
+refactoring part).
+
+Thanks,
+John
+
+
+> Will
+>
+> .
+>
