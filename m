@@ -1,133 +1,107 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Nov 2017 16:38:03 +0000
-Subject: [PATCHv2 09/12] arm64/kvm: preserve host HCR_EL2 value
-In-Reply-To: <20171127163806.31435-1-mark.rutland@arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
-Message-ID: <20171127163806.31435-10-mark.rutland@arm.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 27 Nov 2017 08:48:37 -0800
+Subject: [PATCH v2 1/2] hwmon: (jc42) optionally try to disable the SMBUS
+ timeout
+In-Reply-To: <20171127163101.27859-2-peda@axentia.se>
+References: <20171127163101.27859-1-peda@axentia.se>
+ <20171127163101.27859-2-peda@axentia.se>
+Message-ID: <20171127164837.GA19580@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When restoring HCR_EL2 for the host, KVM uses HCR_HOST_VHE_FLAGS, which
-is a constant value. This works today, as the host HCR_EL2 value is
-always the same, but this will get in the way of supporting extensions
-that require HCR_EL2 bits to be set conditionally for the host.
+On Mon, Nov 27, 2017 at 05:31:00PM +0100, Peter Rosin wrote:
+> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
+> is not always capable of avoiding the 25-35 ms timeout as specified by
+> the SMBUS protocol. This may cause silent corruption of the last bit of
+> any transfer, e.g. a one is read instead of a zero if the sensor chip
+> times out. This also affects the eeprom half of the nxp-se97 chip, where
+> this silent corruption was originally noticed. Other I2C adapters probably
+> suffer similar issues, e.g. bit-banging comes to mind as risky...
+> 
+> The SMBUS register in the nxp chip is not a standard Jedec register, but
+> it is not special to the nxp chips either, at least the atmel chips
+> have the same mechanism. Therefore, do not special case this on the
+> manufacturer, it is opt-in via the device property anyway.
+> 
+> Signed-off-by: Peter Rosin <peda@axentia.se>
 
-To allow such features to work without KVM having to explicitly handle
-every possible host feature combination, this patch has KVM save/restore
-the host HCR when switching to/from a guest HCR.
+Looks ok to me. I'll apply after Rob's approval.
 
-For __{activate,deactivate}_traps(), the HCR save/restore is made common
-across the !VHE and VHE paths. As the host and guest HCR values must
-have E2H set when VHE is in use, register redirection should always be
-in effect at EL2, and this change should not adversely affect the VHE
-code.
+Guenter
 
-For the hyp TLB maintenance code, __tlb_switch_to_host_vhe() is updated
-to toggle the TGE bit with a RMW sequence, as we already do in
-__tlb_switch_to_guest_vhe().
-
-The now unused HCR_HOST_VHE_FLAGS definition is removed.
-
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reviewed-by: Christoffer Dall <cdall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: kvmarm at lists.cs.columbia.edu
----
- arch/arm64/include/asm/kvm_arm.h  | 1 -
- arch/arm64/include/asm/kvm_host.h | 5 ++++-
- arch/arm64/kvm/hyp/switch.c       | 5 +++--
- arch/arm64/kvm/hyp/tlb.c          | 6 +++++-
- 4 files changed, 12 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 62854d5d1d3b..aa02b05430e8 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -84,7 +84,6 @@
- 			 HCR_AMO | HCR_SWIO | HCR_TIDCP | HCR_RW)
- #define HCR_VIRT_EXCP_MASK (HCR_VSE | HCR_VI | HCR_VF)
- #define HCR_INT_OVERRIDE   (HCR_FMO | HCR_IMO)
--#define HCR_HOST_VHE_FLAGS (HCR_RW | HCR_TGE | HCR_E2H)
- 
- /* TCR_EL2 Registers bits */
- #define TCR_EL2_RES1		((1 << 31) | (1 << 23))
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index 674912d7a571..39184aa3e2f2 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -199,10 +199,13 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
- struct kvm_vcpu_arch {
- 	struct kvm_cpu_context ctxt;
- 
--	/* HYP configuration */
-+	/* Guest HYP configuration */
- 	u64 hcr_el2;
- 	u32 mdcr_el2;
- 
-+	/* Host HYP configuration */
-+	u64 host_hcr_el2;
-+
- 	/* Exception Information */
- 	struct kvm_vcpu_fault_info fault;
- 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 525c01f48867..2205f0be3ced 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -71,6 +71,8 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- {
- 	u64 val;
- 
-+	vcpu->arch.host_hcr_el2 = read_sysreg(hcr_el2);
-+
- 	/*
- 	 * We are about to set CPTR_EL2.TFP to trap all floating point
- 	 * register accesses to EL2, however, the ARM ARM clearly states that
-@@ -116,7 +118,6 @@ static void __hyp_text __deactivate_traps_vhe(void)
- 		    MDCR_EL2_TPMS;
- 
- 	write_sysreg(mdcr_el2, mdcr_el2);
--	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
- 	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
- 	write_sysreg(vectors, vbar_el1);
- }
-@@ -129,7 +130,6 @@ static void __hyp_text __deactivate_traps_nvhe(void)
- 	mdcr_el2 |= MDCR_EL2_E2PB_MASK << MDCR_EL2_E2PB_SHIFT;
- 
- 	write_sysreg(mdcr_el2, mdcr_el2);
--	write_sysreg(HCR_RW, hcr_el2);
- 	write_sysreg(CPTR_EL2_DEFAULT, cptr_el2);
- }
- 
-@@ -151,6 +151,7 @@ static void __hyp_text __deactivate_traps(struct kvm_vcpu *vcpu)
- 	__deactivate_traps_arch()();
- 	write_sysreg(0, hstr_el2);
- 	write_sysreg(0, pmuserenr_el0);
-+	write_sysreg(vcpu->arch.host_hcr_el2, hcr_el2);
- }
- 
- static void __hyp_text __activate_vm(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
-index 73464a96c365..c2b0680efa2c 100644
---- a/arch/arm64/kvm/hyp/tlb.c
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -49,12 +49,16 @@ static hyp_alternate_select(__tlb_switch_to_guest,
- 
- static void __hyp_text __tlb_switch_to_host_vhe(struct kvm *kvm)
- {
-+	u64 val;
-+
- 	/*
- 	 * We're done with the TLB operation, let's restore the host's
- 	 * view of HCR_EL2.
- 	 */
- 	write_sysreg(0, vttbr_el2);
--	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
-+	val = read_sysreg(hcr_el2);
-+	val |= HCR_TGE;
-+	write_sysreg(val, hcr_el2);
- }
- 
- static void __hyp_text __tlb_switch_to_host_nvhe(struct kvm *kvm)
--- 
-2.11.0
+> ---
+>  Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
+>  drivers/hwmon/jc42.c                             | 21 +++++++++++++++++++++
+>  2 files changed, 25 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
+> index 07a250498fbb..f569db58f64a 100644
+> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
+> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
+> @@ -34,6 +34,10 @@ Required properties:
+>  
+>  - reg: I2C address
+>  
+> +Optional properties:
+> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
+> +			 This is not supported on all chips.
+> +
+>  Example:
+>  
+>  temp-sensor at 1a {
+> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
+> index 5f11dc014ed6..e5234f953a6d 100644
+> --- a/drivers/hwmon/jc42.c
+> +++ b/drivers/hwmon/jc42.c
+> @@ -22,6 +22,7 @@
+>   * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+>   */
+>  
+> +#include <linux/bitops.h>
+>  #include <linux/module.h>
+>  #include <linux/init.h>
+>  #include <linux/slab.h>
+> @@ -45,6 +46,7 @@ static const unsigned short normal_i2c[] = {
+>  #define JC42_REG_TEMP		0x05
+>  #define JC42_REG_MANID		0x06
+>  #define JC42_REG_DEVICEID	0x07
+> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
+>  
+>  /* Status bits in temperature register */
+>  #define JC42_ALARM_CRIT_BIT	15
+> @@ -75,6 +77,9 @@ static const unsigned short normal_i2c[] = {
+>  #define GT_MANID		0x1c68	/* Giantec */
+>  #define GT_MANID2		0x132d	/* Giantec, 2nd mfg ID */
+>  
+> +/* SMBUS register */
+> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
+> +
+>  /* Supported chips */
+>  
+>  /* Analog Devices */
+> @@ -495,6 +500,22 @@ static int jc42_probe(struct i2c_client *client, const struct i2c_device_id *id)
+>  
+>  	data->extended = !!(cap & JC42_CAP_RANGE);
+>  
+> +	if (device_property_read_bool(dev, "smbus-timeout-disable")) {
+> +		int smbus;
+> +
+> +		/*
+> +		 * Not all chips support this register, but from a
+> +		 * quick read of various datasheets no chip appears
+> +		 * incompatible with the below attempt to disable
+> +		 * the timeout. And the whole thing is opt-in...
+> +		 */
+> +		smbus = i2c_smbus_read_word_swapped(client, JC42_REG_SMBUS);
+> +		if (smbus < 0)
+> +			return smbus;
+> +		i2c_smbus_write_word_swapped(client, JC42_REG_SMBUS,
+> +					     smbus | SMBUS_STMOUT);
+> +	}
+> +
+>  	config = i2c_smbus_read_word_swapped(client, JC42_REG_CONFIG);
+>  	if (config < 0)
+>  		return config;
+> -- 
+> 2.11.0
+> 
