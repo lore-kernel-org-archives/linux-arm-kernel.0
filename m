@@ -1,28 +1,32 @@
 From: srinivas.kandagatla@linaro.org (srinivas.kandagatla at linaro.org)
-Date: Mon, 27 Nov 2017 11:44:55 +0000
-Subject: [PATCH 0/3] ARM: qcom_defconfig: display related configs.
-Message-ID: <20171127114458.20976-1-srinivas.kandagatla@linaro.org>
+Date: Mon, 27 Nov 2017 11:44:57 +0000
+Subject: [PATCH 2/3] ARM: qcom_defconfig: enable MSM IOMMU for display
+In-Reply-To: <20171127114458.20976-1-srinivas.kandagatla@linaro.org>
+References: <20171127114458.20976-1-srinivas.kandagatla@linaro.org>
+Message-ID: <20171127114458.20976-3-srinivas.kandagatla@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
 
-Hi Andy, 
-Here are some Kconfig options that are required to test display on 8064.
+MSM IOMMU is required for apq8064 display, so enable it by default.
 
-Without which we have to manually enable these configs for display testing
-based on mainline.
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ arch/arm/configs/qcom_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-srini
-
-Srinivas Kandagatla (3):
-  ARM: qcom_defconfig: Enable DRM for 8064 display
-  ARM: qcom_defconfig: enable MSM IOMMU for display
-  ARM: qcom_defconfig: Enable Frambuffer console support
-
- arch/arm/configs/qcom_defconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
+diff --git a/arch/arm/configs/qcom_defconfig b/arch/arm/configs/qcom_defconfig
+index 8a340c316a9a..237aa79339f6 100644
+--- a/arch/arm/configs/qcom_defconfig
++++ b/arch/arm/configs/qcom_defconfig
+@@ -201,6 +201,7 @@ CONFIG_MSM_LCC_8960=y
+ CONFIG_MDM_LCC_9615=y
+ CONFIG_MSM_MMCC_8960=y
+ CONFIG_MSM_MMCC_8974=y
++CONFIG_MSM_IOMMU=y
+ CONFIG_HWSPINLOCK=y
+ CONFIG_HWSPINLOCK_QCOM=y
+ CONFIG_REMOTEPROC=y
 -- 
 2.15.0
