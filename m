@@ -1,126 +1,55 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:52:56 +0000
-Subject: [PATCH 10/13] ARM: dts: imx6qdl-hummingboard: rename regulators to
- match schematic
-In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
-References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMeO-0002rX-0U@rmk-PC.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Nov 2017 16:38:05 +0000
+Subject: [PATCHv2 11/12] arm64: enable pointer authentication
+In-Reply-To: <20171127163806.31435-1-mark.rutland@arm.com>
+References: <20171127163806.31435-1-mark.rutland@arm.com>
+Message-ID: <20171127163806.31435-12-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the regulators match the schematic - name the regulators after
-one of their schematic supply names, and arrange them into their
-heirarchy.
+Now that all the necessary bits are in place for userspace / KVM guest
+pointer authentication, add the necessary Kconfig logic to allow this to
+be enabled.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 43 +++++++++++++++++++----------
- 1 file changed, 29 insertions(+), 14 deletions(-)
+ arch/arm64/Kconfig | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 1b33cd6752f4..66bda5a04582 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -51,12 +51,21 @@
- 		pinctrl-0 = <&pinctrl_hummingboard_gpio3_5>;
- 	};
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a93339f5178f..f7cb4ca8a6fc 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -1013,6 +1013,29 @@ config ARM64_PMEM
  
--	reg_3p3v: 3p3v {
-+	v_3v2: regulator-v-3v2 {
- 		compatible = "regulator-fixed";
--		regulator-name = "3P3V";
--		regulator-min-microvolt = <3300000>;
-+		regulator-always-on;
- 		regulator-max-microvolt = <3300000>;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-name = "v_3v2";
-+		vin-supply = <&v_5v0>;
-+	};
+ endmenu
+ 
++menu "ARMv8.3 architectural features"
 +
-+	v_5v0: regulator-v-5v0 {
-+		compatible = "regulator-fixed";
- 		regulator-always-on;
-+		regulator-max-microvolt = <5000000>;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-name = "v_5v0";
- 	};
- 
- 	v_sd: regulator-v-sd {
-@@ -69,29 +78,31 @@
- 		regulator-min-microvolt = <3300000>;
- 		regulator-name = "v_sd";
- 		startup-delay-us = <1000>;
--		vin-supply = <&reg_3p3v>;
-+		vin-supply = <&v_3v2>;
- 	};
- 
--	reg_usbh1_vbus: usb-h1-vbus {
-+	v_usb2: regulator-v-usb2 {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
- 		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
--		regulator-name = "usb_h1_vbus";
--		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-name = "v_usb2";
-+		vin-supply = <&v_5v0>;
- 	};
- 
--	reg_usbotg_vbus: usb-otg-vbus {
-+	v_usb1: regulator-v-usb1 {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
- 		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
--		regulator-name = "usb_otg_vbus";
--		regulator-min-microvolt = <5000000>;
- 		regulator-max-microvolt = <5000000>;
-+		regulator-min-microvolt = <5000000>;
-+		regulator-name = "v_usb1";
-+		vin-supply = <&v_5v0>;
- 	};
- 
- 	sound-sgtl5000 {
-@@ -151,8 +162,8 @@
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_hummingboard_sgtl5000>;
- 		reg = <0x0a>;
--		VDDA-supply = <&reg_3p3v>;
--		VDDIO-supply = <&reg_3p3v>;
-+		VDDA-supply = <&v_3v2>;
-+		VDDIO-supply = <&v_3v2>;
- 	};
- };
- 
-@@ -292,7 +303,7 @@
- 
- &usbh1 {
- 	disable-over-current;
--	vbus-supply = <&reg_usbh1_vbus>;
-+	vbus-supply = <&v_usb2>;
- 	status = "okay";
- };
- 
-@@ -300,7 +311,7 @@
- 	disable-over-current;
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_hummingboard_usbotg_id>;
--	vbus-supply = <&reg_usbotg_vbus>;
-+	vbus-supply = <&v_usb1>;
- 	status = "okay";
- };
- 
-@@ -314,3 +325,7 @@
- 	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
++config ARM64_POINTER_AUTHENTICATION
++	bool "Enable support for pointer authentication"
++	default y
++	help
++	  Pointer authentication (part of the ARMv8.3 Extensions) provides
++	  instructions for signing and authenticating pointers against secret
++	  keys, which can be used to mitigate Return Oriented Programming (ROP)
++	  and other attacks.
 +
-+&vcc_3v3 {
-+	vin-supply = <&v_3v2>;
-+};
++	  This option enables these instructions at EL0 (i.e. for userspace).
++
++	  Choosing this option will cause the kernel to initialise secret keys
++	  for each process at exec() time, with these keys being
++	  context-switched along with the process.
++
++	  The feature is detected at runtime. If the feature is not present in
++	  hardware it will not be advertised to userspace nor will it be
++	  enabled.
++
++endmenu
++
+ config ARM64_SVE
+ 	bool "ARM Scalable Vector Extension support"
+ 	default y
 -- 
-2.7.4
+2.11.0
