@@ -1,48 +1,108 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 27 Nov 2017 21:57:45 +0100
-Subject: [PATCH 12/17] drm/sun4i: Add CCSC property to DE2 configuration
+Date: Mon, 27 Nov 2017 21:57:39 +0100
+Subject: [PATCH 06/17] drm/sun4i: Add multi plane support to DE2 driver
 In-Reply-To: <20171127205750.19277-1-jernej.skrabec@siol.net>
 References: <20171127205750.19277-1-jernej.skrabec@siol.net>
-Message-ID: <20171127205750.19277-13-jernej.skrabec@siol.net>
+Message-ID: <20171127205750.19277-7-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Base addresses of channel output CSC (CCSC) depends whether mixer in
-question is first or second and if it is second, if supports VEP or not.
-This new property will tell which set of base addresses to take.
+Support for multiple UI planes can now be easily enabled just by adding
+more planes with different index.
 
-0 - first mixer or second mixer with VEP support
-1 - second mixer without VEP support
+For now, add immutable zpos property.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 1 +
- drivers/gpu/drm/sun4i/sun8i_mixer.h | 1 +
- 2 files changed, 2 insertions(+)
+ drivers/gpu/drm/sun4i/sun8i_layer.c | 38 +++++++++++++++++--------------------
+ 1 file changed, 17 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 7c9c87a0535b..2276eff8798d 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -622,6 +622,7 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.vi_num = 2,
- 	.ui_num = 1,
- 	.scaler_mask = 0x3,
-+	.ccsc = 0,
+diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
+index 511d2f8afef6..371d6b359262 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
+@@ -22,12 +22,6 @@
+ #include "sun8i_layer.h"
+ #include "sun8i_mixer.h"
+ 
+-struct sun8i_plane_desc {
+-	       enum drm_plane_type     type;
+-	       const uint32_t          *formats;
+-	       uint32_t                nformats;
+-};
+-
+ static int sun8i_mixer_layer_atomic_check(struct drm_plane *plane,
+ 					  struct drm_plane_state *state)
+ {
+@@ -100,35 +94,38 @@ static const uint32_t sun8i_mixer_layer_formats[] = {
+ 	DRM_FORMAT_XRGB8888,
  };
  
- static const struct of_device_id sun8i_mixer_of_table[] = {
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index 355a45e6cfb4..4fcf1653e345 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -136,6 +136,7 @@ struct sun8i_mixer_cfg {
- 	int		vi_num;
- 	int		ui_num;
- 	int		scaler_mask;
-+	int		ccsc;
- };
+-static const struct sun8i_plane_desc sun8i_mixer_planes[] = {
+-	{
+-		.type = DRM_PLANE_TYPE_PRIMARY,
+-		.formats = sun8i_mixer_layer_formats,
+-		.nformats = ARRAY_SIZE(sun8i_mixer_layer_formats),
+-	},
+-};
+-
+ static struct sun8i_layer *sun8i_layer_init_one(struct drm_device *drm,
+ 						struct sun8i_mixer *mixer,
+-						const struct sun8i_plane_desc *plane)
++						int index)
+ {
+ 	struct sun8i_layer *layer;
++	enum drm_plane_type type;
+ 	int ret;
  
- struct sun8i_mixer {
+ 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
+ 	if (!layer)
+ 		return ERR_PTR(-ENOMEM);
+ 
++	type = index == 0 ? DRM_PLANE_TYPE_PRIMARY : DRM_PLANE_TYPE_OVERLAY;
++
+ 	/* possible crtcs are set later */
+ 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
+ 				       &sun8i_mixer_layer_funcs,
+-				       plane->formats, plane->nformats,
+-				       NULL, plane->type, NULL);
++				       sun8i_mixer_layer_formats,
++				       ARRAY_SIZE(sun8i_mixer_layer_formats),
++				       NULL, type, NULL);
+ 	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialize layer\n");
+ 		return ERR_PTR(ret);
+ 	}
+ 
++	/* fixed zpos for now */
++	ret = drm_plane_create_zpos_immutable_property(&layer->plane, index);
++	if (ret) {
++		dev_err(drm->dev, "Couldn't add zpos property\n");
++		return ERR_PTR(ret);
++	}
++
+ 	drm_plane_helper_add(&layer->plane,
+ 			     &sun8i_mixer_layer_helper_funcs);
+ 	layer->mixer = mixer;
+@@ -143,16 +140,15 @@ struct drm_plane **sun8i_layers_init(struct drm_device *drm,
+ 	struct sun8i_mixer *mixer = engine_to_sun8i_mixer(engine);
+ 	int i;
+ 
+-	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun8i_mixer_planes) + 1,
++	planes = devm_kcalloc(drm->dev, mixer->cfg->ui_num + 1,
+ 			      sizeof(*planes), GFP_KERNEL);
+ 	if (!planes)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	for (i = 0; i < ARRAY_SIZE(sun8i_mixer_planes); i++) {
+-		const struct sun8i_plane_desc *plane = &sun8i_mixer_planes[i];
++	for (i = 0; i < mixer->cfg->ui_num; i++) {
+ 		struct sun8i_layer *layer;
+ 
+-		layer = sun8i_layer_init_one(drm, mixer, plane);
++		layer = sun8i_layer_init_one(drm, mixer, i);
+ 		if (IS_ERR(layer)) {
+ 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
+ 				i ? "overlay" : "primary");
 -- 
 2.15.0
