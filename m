@@ -1,40 +1,35 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Nov 2017 09:19:38 +0000
-Subject: [PATCH] arm: l2c: unlock ways when in non-secure mode
-In-Reply-To: <DB6PR04MB3221D60D0EC8D5B31869AA6588240@DB6PR04MB3221.eurprd04.prod.outlook.com>
-References: <20171126122530.857-1-peng.fan@nxp.com>
- <20171126131812.GZ31757@n2100.armlinux.org.uk>
- <DB6PR04MB3221D60D0EC8D5B31869AA6588240@DB6PR04MB3221.eurprd04.prod.outlook.com>
-Message-ID: <20171127091937.GA31757@n2100.armlinux.org.uk>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 27 Nov 2017 09:31:21 +0000
+Subject: [PATCH] staging: fsl-mc: fix uninitialized variable use
+In-Reply-To: <20171127090817.GA14195@kroah.com>
+References: <20171127090134.19125-1-laurentiu.tudor@nxp.com>
+ <20171127090817.GA14195@kroah.com>
+Message-ID: <5A1BDB08.5070808@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 26, 2017 at 11:56:10PM +0000, Peng Fan wrote:
-> Hi Russell,
-> 
-> > Subject: Re: [PATCH] arm: l2c: unlock ways when in non-secure mode
-> > 
-> > On Sun, Nov 26, 2017 at 08:25:30PM +0800, Peng Fan wrote:
-> > > To boot Linux in Non-secure mode with l2x0, the l2x0 controller is
-> > > enabled in secure mode and ways locked to make it seems L2 cache
-> > > disabled during linux boot process. So during l2x0 initialization,
-> > > need to unlock the ways to make l2x0 could cache data/inst.
-> > 
-> > Why was this chosen instead of doing what everyone else does?
-> 
-> I am not aware of how other platform handles the l2x0 unlock in non
-> secure mode. Could you please share with me what others choose?
 
-That's not what I was asking.
 
-Everyone else provides a way for the l2x0 controller to be enabled and
-disabled from non-secure mode.
+On 11/27/2017 11:08 AM, Greg KH wrote:
+> On Mon, Nov 27, 2017 at 11:01:34AM +0200, laurentiu.tudor at nxp.com wrote:
+>> From: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>
+>> Fix this warning triggering on a powerpc build:
+>> warning: 'error' may be used uninitialized in this function [-Wmaybe-uninitialized]
+>>
+>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>> ---
+>
+> You forgot a reported-by line :(
+>
+> And I beat you by about 30 minutes to this patch, sorry about that.
 
-Why have you decided to enable the l2x0 controller and leave it enabled,
-and then lock down all the cache ways - which means you need the kernel
-to do something entirely different for your platform.
+Sorry, I guess I'm slow on mondays before having my morning coffee. :-(
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> Next time always test-build your patches...
+
+I did but it didn't show up on my version of powerpc toolchain (gcc 
+4.8.1). Maybe it's too old ...
+
+---
+Best Regards, Laurentiu
