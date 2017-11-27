@@ -1,129 +1,50 @@
-From: stefan@olimex.com (Stefan Mavrodiev)
-Date: Mon, 27 Nov 2017 14:03:51 +0200
-Subject: [PATCH 1/1] ARM: dts: sunxi: Update dts for A20-OLinuXino boards
-Message-ID: <1511784231-6485-1-git-send-email-stefan@olimex.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 27 Nov 2017 13:11:39 +0100
+Subject: [PATCH] ARM: imx: don't abort MMDC probe if power saving status
+ doesn't match
+Message-ID: <20171127121139.15584-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There will be option with 16MB flash for the following boards:
+The power saving status bit will not signal if the MMDC is under load,
+which is likely during kernel boot. There is no point in checking this
+bit and aborting the probe, as there is nothing depending on power
+saving being enabled, so we can trust the memory controller to enable
+power saving when we allow it.
 
-  * A20-OLinuXino-MICRO Rev.K
-  * A20-OLinuXino-LIME Rev.J
-  * A20-OLinuXino-LIME2 Rev.J
-  * A20-SOM-EVB Rev.E
-
-The used flash chip is Winbond W25Q128FV, which is connected to
-SPI0 port. Since this is optional feature, spi0 node is dissabled
-by default. Also this option is incompatible with NAND flash, so
-they shouldn't be enabled at the same time.
-
-Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
 ---
- arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts  | 14 ++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts  | 14 ++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 14 ++++++++++++++
- arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 14 ++++++++++++++
- 4 files changed, 56 insertions(+)
+ arch/arm/mach-imx/mmdc.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-index 64c8ef9..98b7697 100644
---- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
-@@ -291,6 +291,20 @@
- 	status = "okay";
- };
+diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+index 78262899a590..5fb1d2254b5e 100644
+--- a/arch/arm/mach-imx/mmdc.c
++++ b/arch/arm/mach-imx/mmdc.c
+@@ -547,7 +547,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
+ 	struct device_node *np = pdev->dev.of_node;
+ 	void __iomem *mmdc_base, *reg;
+ 	u32 val;
+-	int timeout = 0x400;
  
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_b>,<&spi0_cs0_pins_b>;
-+	status = "disabled";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q128","jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+	};
-+};
-+
- &spi1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&spi1_pins_a>,
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-index edf9c3c..354af5d 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts
-@@ -218,6 +218,20 @@
- 	status = "okay";
- };
+ 	mmdc_base = of_iomap(np, 0);
+ 	WARN_ON(!mmdc_base);
+@@ -565,16 +564,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
+ 	val &= ~(1 << BP_MMDC_MAPSR_PSD);
+ 	writel_relaxed(val, reg);
  
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_b>,<&spi0_cs0_pins_b>;
-+	status = "disabled";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q128","jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-index ba25018..6fcdd6e 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts
-@@ -268,6 +268,20 @@
- 	status = "okay";
- };
+-	/* Ensure it's successfully enabled */
+-	while (!(readl_relaxed(reg) & 1 << BP_MMDC_MAPSR_PSS) && --timeout)
+-		cpu_relax();
+-
+-	if (unlikely(!timeout)) {
+-		pr_warn("%s: failed to enable automatic power saving\n",
+-			__func__);
+-		return -EBUSY;
+-	}
+-
+ 	return imx_mmdc_perf_init(pdev, mmdc_base);
+ }
  
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_b>,<&spi0_cs0_pins_b>;
-+	status = "disabled";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q128","jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pins_a>;
-diff --git a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-index dffbaa2..db85895 100644
---- a/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-+++ b/arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts
-@@ -331,6 +331,20 @@
- 	status = "okay";
- };
- 
-+&spi0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&spi0_pins_b>,<&spi0_cs0_pins_b>;
-+	status = "disabled";
-+
-+	flash at 0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "winbond,w25q128","jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <40000000>;
-+	};
-+};
-+
- &spi1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&spi1_pins_a>,
 -- 
-2.7.4
+2.11.0
