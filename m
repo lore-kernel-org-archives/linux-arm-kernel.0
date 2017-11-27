@@ -1,176 +1,64 @@
-From: ar@linux.vnet.ibm.com (Andrea Reale)
-Date: Mon, 27 Nov 2017 17:38:36 +0000
-Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
- removed vmemmap mem
-In-Reply-To: <f21d2b81-e0f5-b186-22e3-ded138505dc9@arm.com>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
- <f21d2b81-e0f5-b186-22e3-ded138505dc9@arm.com>
-Message-ID: <20171127173835.GC12687@samekh>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Nov 2017 17:40:28 +0000
+Subject: [PATCH 0/8] sa1100fb updates
+In-Reply-To: <4330027.F5ASplytpk@amdc3058>
+References: <CGME20170929105024epcas5p336177e386c65b530c4cb5fac379cedfa@epcas5p3.samsung.com>
+ <2590375.JKTUJ5JGIV@amdc3058>
+ <20171127171145.GI31757@n2100.armlinux.org.uk>
+ <4330027.F5ASplytpk@amdc3058>
+Message-ID: <20171127174028.GJ31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
-
-On Mon 27 Nov 2017, 15:20, Robin Murphy wrote:
-> On 23/11/17 11:14, Andrea Reale wrote:
-> >When hot-removing memory we need to free vmemmap memory.
+On Mon, Nov 27, 2017 at 06:30:11PM +0100, Bartlomiej Zolnierkiewicz wrote:
+> On Monday, November 27, 2017 05:11:45 PM Russell King - ARM Linux wrote:
+> > On Tue, Oct 17, 2017 at 03:32:30PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> > > On Friday, September 29, 2017 11:50:04 AM Russell King - ARM Linux wrote:
+> > > > Hi Bart,
+> > > 
+> > > Hi Russell,
+> > > 
+> > > > This series updates the sa1100fb fbdev driver's initialisation paths
+> > > > to be more robust.  In doing these updates, I realised that we omitted
+> > > > to free some memory which was allocated for the framebuffer if
+> > > > initialisation fails - something that was hidden due to the complex
+> > > > cleanup that the driver performs.  Switching to managed resources made
+> > > > this more obvious.
+> > > > 
+> > > > Tested on H3600 iPAQ and Assabet.
+> > > > 
+> > > >  drivers/video/fbdev/sa1100fb.c | 75 +++++++++++++++---------------------------
+> > > >  drivers/video/fbdev/sa1100fb.h |  2 ++
+> > > >  2 files changed, 29 insertions(+), 48 deletions(-)
+> > > 
+> > > I queued all patches for 4.15, thanks!
+> > 
+> > Now that 4.15-rc1 is out, something tells me that was not actually
+> > the case.  Any ideas what happened?
 > 
-> What problems arise if we don't? Is it only for the sake of freeing up some
-> pages here and there, or is there something more fundamental?
->
-
-It is just for freeing up pages, but imho we are talking about a relevant
-number of pages. For example, assuming 4K pages, to describe one hot
-added section of 1GB of new memory we need ~14MBs of vmemmap space (if
-my back of the envelope math is not wrong). This
-memory would be leaked if we do not do the cleanup in hot remove. 
-If we do hot remove sections many times in the lifetime of a system, 
-this quantity can become sizeable.
-
-> >However, depending on the memory is being removed, it might
-> >not be always possible to free a full vmemmap page / huge-page
-> >because part of it might still be used.
-> >
-> >Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
-> >hot-remove") introduced a workaround for x86
-> >hot-remove, by which partially unused areas are filled with
-> >the 0xFD constant. Full pages are only removed when fully
-> >filled by 0xFDs.
-> >
-> >This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
-> >the goal of using it in place of 0xFDs. For now, this will be used for
-> >the arm64 port of memory hot remove, but the idea is to eventually use
-> >the same mechanism for x86 as well.
-> >
-> >Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> >Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
-> >---
-> >  include/linux/memblock.h | 12 ++++++++++++
-> >  mm/memblock.c            | 32 ++++++++++++++++++++++++++++++++
-> >  2 files changed, 44 insertions(+)
-> >
-> >diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> >index bae11c7..0daec05 100644
-> >--- a/include/linux/memblock.h
-> >+++ b/include/linux/memblock.h
-> >@@ -26,6 +26,9 @@ enum {
-> >  	MEMBLOCK_HOTPLUG	= 0x1,	/* hotpluggable region */
-> >  	MEMBLOCK_MIRROR		= 0x2,	/* mirrored region */
-> >  	MEMBLOCK_NOMAP		= 0x4,	/* don't add to kernel direct mapping */
-> >+#ifdef CONFIG_MEMORY_HOTREMOVE
-> >+	MEMBLOCK_UNUSED_VMEMMAP	= 0x8,  /* Mark VMEMAP blocks as dirty */
+> Could you please explain the issue that you are seeing a bit more?
 > 
-> I'm not sure I get what "dirty" is supposed to mean in this context. Also,
-> this appears to be specific to CONFIG_SPARSEMEM_VMEMMAP, whilst only
-> tangentially related to CONFIG_MEMORY_HOTREMOVE, so the dependencies look a
-> bit off.
+> For me it looks all fine:
 > 
-> In fact, now that I think about it, why does this need to be in memblock at
-> all? If it is specific to sparsemem, shouldn't the section map already be
-> enough to tell us what's supposed to be present or not?
-> 
-> Robin.
+> $ git log --oneline v4.15-rc1 drivers/video/fbdev/sa1100fb.c
+> cb6bc3f video: sa1100fb: move pseudo palette into sa1100fb_info structure
+> 0ab7658 video: sa1100fb: fix video memory allocation leak
+> c244f8e video: sa1100fb: clean up failure path
+> 5634cba video: sa1100fb: use devm_gpio_request_one()
+> f6fc8c9 video: sa1100fb: use devm_request_irq()
+> df6b228 video: sa1100fb: use devm_ioremap_resource()
+> e43064c video: sa1100fb: use devm_clk_get()
+> ba1d36b video: sa1100fb: use devm_kzalloc()
+> ...
 
-The story is: when we are hot-removing one section, we cannot be sure that
-the full block  can be fully removed, for example,
-because we might have used only a portion of it at hot-add time and the
-rest might have been used by other hot adds we are not aware of.
-So when we hot-remove, we mark the page structs of the removed memory,
-and we only remove the full page when it is all marked.
-This is exactly symmetrical to the issue described in commit
-ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
-hot-remove") - introducing hot-remove for x86. 
+Looks like I hadn't rebased that particular branch, so they were still
+showing up in my origin.. git log.  Sorry about the false warning.
 
-In that commit, partially unused vmemmap pages where filled with the
-0XFD constant. In the previous iteration of this patchset, it was
-rightfully suggested that marking the pages by writing inside them was
-not the best way to achieve the result. That's why we reverted to do
-this marking using memblock. This is only used in memory hot remove,
-that's why the CONFIG_MEMORY_HOTREMOVE dependency. 
+This is the problem of carrying close to 400 patches in separate
+branches, and git log origin.. not able to show the commits that the
+selection are based upon.
 
-Right now, I cannot think of how I could use sparse mem to tell: the
-only thing I know at the moment of trying to free a vmemmap block is that I
-have some physical addresses that might or not be in use to describe some
-pages. I canot think of any way to know which struct pages could be occupying this
-vmemmap block, besides maybe walking all pagetables and check if I have
-some matching mapping.
-However, I might be missing something, so suggestions are welcome.
-
-Thanks,
-Andrea
-
-> >+#endif
-> >  };
-> >  struct memblock_region {
-> >@@ -90,6 +93,10 @@ int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
-> >  int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
-> >  int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
-> >  ulong choose_memblock_flags(void);
-> >+#ifdef CONFIG_MEMORY_HOTREMOVE
-> >+int memblock_mark_unused_vmemmap(phys_addr_t base, phys_addr_t size);
-> >+int memblock_clear_unused_vmemmap(phys_addr_t base, phys_addr_t size);
-> >+#endif
-> >  /* Low level functions */
-> >  int memblock_add_range(struct memblock_type *type,
-> >@@ -182,6 +189,11 @@ static inline bool memblock_is_nomap(struct memblock_region *m)
-> >  	return m->flags & MEMBLOCK_NOMAP;
-> >  }
-> >+#ifdef CONFIG_MEMORY_HOTREMOVE
-> >+bool memblock_is_vmemmap_unused_range(struct memblock_type *mt,
-> >+		phys_addr_t start, phys_addr_t end);
-> >+#endif
-> >+
-> >  #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
-> >  int memblock_search_pfn_nid(unsigned long pfn, unsigned long *start_pfn,
-> >  			    unsigned long  *end_pfn);
-> >diff --git a/mm/memblock.c b/mm/memblock.c
-> >index 9120578..30d5aa4 100644
-> >--- a/mm/memblock.c
-> >+++ b/mm/memblock.c
-> >@@ -809,6 +809,18 @@ int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
-> >  	return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
-> >  }
-> >+#ifdef CONFIG_MEMORY_HOTREMOVE
-> >+int __init_memblock memblock_mark_unused_vmemmap(phys_addr_t base,
-> >+		phys_addr_t size)
-> >+{
-> >+	return memblock_setclr_flag(base, size, 1, MEMBLOCK_UNUSED_VMEMMAP);
-> >+}
-> >+int __init_memblock memblock_clear_unused_vmemmap(phys_addr_t base,
-> >+		phys_addr_t size)
-> >+{
-> >+	return memblock_setclr_flag(base, size, 0, MEMBLOCK_UNUSED_VMEMMAP);
-> >+}
-> >+#endif
-> >  /**
-> >   * __next_reserved_mem_region - next function for for_each_reserved_region()
-> >   * @idx: pointer to u64 loop variable
-> >@@ -1696,6 +1708,26 @@ void __init_memblock memblock_trim_memory(phys_addr_t align)
-> >  	}
-> >  }
-> >+#ifdef CONFIG_MEMORY_HOTREMOVE
-> >+bool __init_memblock memblock_is_vmemmap_unused_range(struct memblock_type *mt,
-> >+		phys_addr_t start, phys_addr_t end)
-> >+{
-> >+	u64 i;
-> >+	struct memblock_region *r;
-> >+
-> >+	i = memblock_search(mt, start);
-> >+	r = &(mt->regions[i]);
-> >+	while (r->base < end) {
-> >+		if (!(r->flags & MEMBLOCK_UNUSED_VMEMMAP))
-> >+			return 0;
-> >+
-> >+		r = &(memblock.memory.regions[++i]);
-> >+	}
-> >+
-> >+	return 1;
-> >+}
-> >+#endif
-> >+
-> >  void __init_memblock memblock_set_current_limit(phys_addr_t limit)
-> >  {
-> >  	memblock.current_limit = limit;
-> >
-> 
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
