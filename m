@@ -1,36 +1,85 @@
-From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
-Date: Mon, 27 Nov 2017 20:05:34 +0100
-Subject: [PATCH v2] sunxi-rsb: Include OF based modalias in device uevent
-Message-ID: <53cb17f5-6077-419a-8e5c-6c80f9dfa9dc@rwthex-w2-a.rwth-ad.de>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 27 Nov 2017 20:15:11 +0100
+Subject: [PATCH 2/6] ARM: sa1111: remove legacy suspend/resume methods
+In-Reply-To: <E1eJOIj-0006oR-1t@rmk-PC.armlinux.org.uk>
+References: <20171127183811.GM31757@n2100.armlinux.org.uk>
+ <E1eJOIj-0006oR-1t@rmk-PC.armlinux.org.uk>
+Message-ID: <CAJZ5v0iHZEPuJQ+ROhSyu1WjBEpkUO69N44aH4-F=OPdoqVcvg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Include the OF-based modalias in the uevent sent when registering devices
-on the sunxi RSB bus, so that user space has a chance to autoload the
-kernel module for the device.
+On Mon, Nov 27, 2017 at 7:38 PM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
+> The legacy device-driver suspend/resume methods are not used by any of
+> our drivers, so let's remove this redundant code.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 
-Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
-pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
-the AXP803 PMIC is built as a module, it is not loaded and the system
-ends up with an disfunctional MMC controller.
+Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
 
-Cc: stable <stable@vger.kernel.org>
-Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
----
- drivers/bus/sunxi-rsb.c | 1 +
- 1 file changed, 1 insertion(+)
+Thanks!
 
-diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
-index 328ca93781cf..1b76d9585902 100644
---- a/drivers/bus/sunxi-rsb.c
-+++ b/drivers/bus/sunxi-rsb.c
-@@ -178,6 +178,7 @@ static struct bus_type sunxi_rsb_bus = {
- 	.match		= sunxi_rsb_device_match,
- 	.probe		= sunxi_rsb_device_probe,
- 	.remove		= sunxi_rsb_device_remove,
-+	.uevent		= of_device_uevent_modalias,
- };
- 
- static void sunxi_rsb_dev_release(struct device *dev)
--- 
-2.15.0
+
+> ---
+>  arch/arm/common/sa1111.c               | 24 ------------------------
+>  arch/arm/include/asm/hardware/sa1111.h |  2 --
+>  2 files changed, 26 deletions(-)
+>
+> diff --git a/arch/arm/common/sa1111.c b/arch/arm/common/sa1111.c
+> index 1fcf06d1cda8..c5f5341c05b7 100644
+> --- a/arch/arm/common/sa1111.c
+> +++ b/arch/arm/common/sa1111.c
+> @@ -1379,28 +1379,6 @@ static int sa1111_match(struct device *_dev, struct device_driver *_drv)
+>         return !!(dev->devid & drv->devid);
+>  }
+>
+> -static int sa1111_bus_suspend(struct device *dev, pm_message_t state)
+> -{
+> -       struct sa1111_dev *sadev = to_sa1111_device(dev);
+> -       struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+> -       int ret = 0;
+> -
+> -       if (drv && drv->suspend)
+> -               ret = drv->suspend(sadev, state);
+> -       return ret;
+> -}
+> -
+> -static int sa1111_bus_resume(struct device *dev)
+> -{
+> -       struct sa1111_dev *sadev = to_sa1111_device(dev);
+> -       struct sa1111_driver *drv = SA1111_DRV(dev->driver);
+> -       int ret = 0;
+> -
+> -       if (drv && drv->resume)
+> -               ret = drv->resume(sadev);
+> -       return ret;
+> -}
+> -
+>  static int sa1111_bus_probe(struct device *dev)
+>  {
+>         struct sa1111_dev *sadev = to_sa1111_device(dev);
+> @@ -1428,8 +1406,6 @@ struct bus_type sa1111_bus_type = {
+>         .match          = sa1111_match,
+>         .probe          = sa1111_bus_probe,
+>         .remove         = sa1111_bus_remove,
+> -       .suspend        = sa1111_bus_suspend,
+> -       .resume         = sa1111_bus_resume,
+>  };
+>  EXPORT_SYMBOL(sa1111_bus_type);
+>
+> diff --git a/arch/arm/include/asm/hardware/sa1111.h b/arch/arm/include/asm/hardware/sa1111.h
+> index b4411add2ea8..29fb44f51c92 100644
+> --- a/arch/arm/include/asm/hardware/sa1111.h
+> +++ b/arch/arm/include/asm/hardware/sa1111.h
+> @@ -431,8 +431,6 @@ struct sa1111_driver {
+>         unsigned int            devid;
+>         int (*probe)(struct sa1111_dev *);
+>         int (*remove)(struct sa1111_dev *);
+> -       int (*suspend)(struct sa1111_dev *, pm_message_t);
+> -       int (*resume)(struct sa1111_dev *);
+>  };
+>
+>  #define SA1111_DRV(_d) container_of((_d), struct sa1111_driver, drv)
+> --
+> 2.7.4
+>
