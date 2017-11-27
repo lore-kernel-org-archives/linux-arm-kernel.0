@@ -1,34 +1,58 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 28 Nov 2017 06:14:20 +0800
-Subject: [arm:sa1100 98/106] ERROR: "ipaq_micro_tx_msg"
- [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
-Message-ID: <201711280612.o88JUXEw%fengguang.wu@intel.com>
+From: mail@maciej.szmigiero.name (Maciej S. Szmigiero)
+Date: Mon, 27 Nov 2017 23:22:28 +0100
+Subject: [PATCH] ARM: dts: imx6qdl-udoo: add support for powering off
+Message-ID: <475cb655-a88f-0cc2-2e00-405458f80433@maciej.szmigiero.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git sa1100
-head:   616977b2124c571e4df56d5d705b25c27bdab0f7
-commit: 32ea308fd19516a9d9c2d552adafdf0410c01f01 [98/106] ARM: sa1100/h3xxx: sleeve support
-config: arm-hackkit_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 32ea308fd19516a9d9c2d552adafdf0410c01f01
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+UDOO board has a possibility to disable most of imx6 SoC power supplies via
+"EN_5V" signal, which is connected to "NANDF_D4" pad.
 
-All errors (new ones prefixed by >>):
+This reduces current consumption after shutdown from ~350 mA to ~40 mA and
+prevents a SoC watchdog from starting it again on its own after the
+watchdog timeout expires (previously it was not possible to shut down the
+SoC permanently if its watchdog was ever enabled since it was still ticking
+after the shutdown).
 
->> ERROR: "ipaq_micro_tx_msg" [arch/arm/mach-sa1100/h3xxx-sleeve.ko] undefined!
+Unfortunately, this does not extinguish the "Power" LED (as it is powered
+from an always-on voltage regulator).
 
+To power the SoC up again press the power button (SW2, the one with a long
+shaft).
+
+Signed-off-by: Maciej S. Szmigiero <mail@maciej.szmigiero.name>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 12328 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/23333b12/attachment-0001.gz>
+ arch/arm/boot/dts/imx6qdl-udoo.dtsi | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-udoo.dtsi b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+index dd69e8397116..442a6d69ede8 100644
+--- a/arch/arm/boot/dts/imx6qdl-udoo.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-udoo.dtsi
+@@ -30,6 +30,13 @@
+ 		status = "disabled";
+ 	};
+ 
++	gpio-poweroff {
++		compatible = "gpio-poweroff";
++		gpios = <&gpio2 4 0>;
++		pinctrl-0 = <&pinctrl_power_off>;
++		pinctrl-names = "default";
++	};
++
+ 	memory {
+ 		reg = <0x10000000 0x40000000>;
+ 	};
+@@ -163,6 +170,12 @@
+ 			>;
+ 		};
+ 
++		pinctrl_power_off: poweroffgrp {
++			fsl,pins = <
++				MX6QDL_PAD_NANDF_D4__GPIO2_IO04		0x30
++			>;
++		};
++
+ 		pinctrl_touchscreenp7: touchscreenp7grp {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_SD2_DAT0__GPIO1_IO15		0x70
