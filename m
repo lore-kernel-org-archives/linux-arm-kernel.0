@@ -1,105 +1,71 @@
-From: naresh.kamboju@linaro.org (Naresh Kamboju)
-Date: Mon, 27 Nov 2017 22:55:46 +0530
-Subject: [PATCH 0/2] Fix ftracetest issues
-In-Reply-To: <101d41c7-2096-295e-b978-05224e16073e@linaro.org>
-References: <20171125113302.GY31757@n2100.armlinux.org.uk>
- <101d41c7-2096-295e-b978-05224e16073e@linaro.org>
-Message-ID: <CA+G9fYuMVZpJAfw09_nnx36oKgtpHmS+jY2=3d30inAko0YgHA@mail.gmail.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Mon, 27 Nov 2017 10:30:04 -0700
+Subject: [PATCH] coresight: Fix disabling of CoreSight TPIU
+In-Reply-To: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
+References: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
+Message-ID: <CANLsYkzV+h=69dtqngZFCOdmyoCmBTc0-5fGb1TkVNE8Gd1UXg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex Shi,
+Hi Robert,
 
-On 26 November 2017 at 20:46, Alex Shi <alex.shi@linaro.org> wrote:
-> CC Naresh,
+On 24 November 2017 at 02:58, Robert Walker <robert.walker@arm.com> wrote:
+> The CoreSight TPIU should be disabled when tracing to other sinks to allow
+> them to operate at full bandwidth.
 >
-> Could you like to test the patch for our bug 3297?
+> This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
+> configuring the TPIU to stop on flush, initiating a manual flush, waiting
+> for the flush to complete and then waits for the TPIU to indicate it has
+> stopped.
 >
-> BTW,
-> The 2nd has 2 build error on stm32_defconfig:
+> Signed-off-by: Robert Walker <robert.walker@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
 >
-> arch/arm/kernel/traps.o: In function `dump_backtrace_entry':
-> /mmkernels/kernel/arch/arm/kernel/traps.c:77: undefined reference to
-> `__entry_text_start'
-> /mmkernels/kernel/arch/arm/kernel/traps.c:77: undefined reference to
-> `__entry_text_end'
+> diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+> index bef49a3..4b46c49 100644
+> --- a/drivers/hwtracing/coresight/coresight-tpiu.c
+> +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+> @@ -46,8 +46,11 @@
+>  #define TPIU_ITATBCTR0         0xef8
 >
+>  /** register definition **/
+> +/* FFSR - 0x300 */
+> +#define FFSR_FT_STOPPED                BIT(1)
+>  /* FFCR - 0x304 */
+>  #define FFCR_FON_MAN           BIT(6)
+> +#define FFCR_STOP_FI           BIT(12)
+>
+>  /**
+>   * @base:      memory mapped base address for this component.
+> @@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
+>  {
+>         CS_UNLOCK(drvdata->base);
+>
+> -       /* Clear formatter controle reg. */
+> -       writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
+> +       /* Clear formatter and stop on flush */
+> +       writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
+>         /* Generate manual flush */
+> -       writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+> +       writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+> +       /* Wait for flush to complete */
+> +       coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
+> +       /* Wait for formatter to stop */
+> +       coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
+>
+>         CS_LOCK(drvdata->base);
+>  }
 
-Case 1: Build PASS on linux-4.14.y
------------
-Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
-Branch: linux-4.14.y
-Commit id: f9f0b03dedc1 (HEAD -> linux-4.14.y, tag: v4.14.2,
-origin/linux-4.14.y) Linux 4.14.2
+Shouldn't we also do this at boot time when the TPIU in _probed() ?
+That way the TPIU doesn't have to explicitly be enabled and disabled
+prior to running other tracing sessions.
 
-Patches 1 and 2 applies smooth and build PASS with defconfig.
-Ftrace test did not hang on beagleboard x15.
+Thanks,
+Mathieu
 
 
-
-Case 2: Build failed on linux-4.9.y and linux-4.4.y
------------
-Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
-Branch: linux-4.9.y
-Commit id: 133e6ccf46f1 (HEAD -> linux-4.9.y, tag: v4.9.65,
-origin/linux-4.9.y) Linux 4.9.65
-
-Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
-Branch: linux-4.4.y
-Commit id: 29ffb9c1fb4a (HEAD, tag: v4.4.102, origin/linux-4.4.y) Linux 4.4.102
-
-Patch-1 : Patch applied smooth.
-Patch-2: Patch failed to apply. Manually changed this file
-"arch/arm/include/asm/traps.h"
-
-Build failed on linux-4.9.y and linux-4.4.y with defconfig.
-
-Build Error
----------------
-arch/arm/kernel/traps.c: In function ?dump_backtrace_entry?:
-arch/arm/kernel/traps.c:73:2: error: implicit declaration of function
-?in_entry_text? [-Werror=implicit-function-declaration]
-cc1: some warnings being treated as errors
-make[1]: *** [arch/arm/kernel/traps.o] Error 1
-make: *** [arch/arm/kernel] Error 2
-
-- Naresh
-
-> On 11/25/2017 07:33 PM, Russell King - ARM Linux wrote:
->> ftracetest provokes the kernel to try and return to userspace addresses
->> in kernel mode.  These two patches prevent that.
->>
->> The first patch, which I intend merging with Linus tonight, ensures that
->> we catch the condition before we hit userspace, meaning that there is no
->> possibility of executing user code while in kernel mode.
->>
->> The second patch fixes the ftracetest issue itself by ensuring that it
->> is not possible to set a kprobe on any of the "special" assembler code.
->> Such code includes:
->> - the kernel primary/secondary CPU startup code
->> - exception entry code
->> - idmap code
->>
->> This is because the conditions under which this code is executed does
->> not meet the kprobes requirements, which is basically that the
->> "function" is C-like - it does something and then returns to the parent,
->> and has a stack.  This is just not universally true of the above code.
->>
->> This patch is larger than one may desire as we re-organise the sections
->> that some code ends up in, the way the unwinder works, and how we print
->> stack frames.
->>
->>  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
->>  arch/arm/include/asm/exception.h |  3 +--
->>  arch/arm/include/asm/sections.h  | 21 +++++++++++++++++++++
->>  arch/arm/include/asm/traps.h     | 12 ------------
->>  arch/arm/kernel/entry-armv.S     |  6 +-----
->>  arch/arm/kernel/entry-common.S   |  1 +
->>  arch/arm/kernel/entry-header.S   |  6 ++++++
->>  arch/arm/kernel/stacktrace.c     | 14 ++------------
->>  arch/arm/kernel/traps.c          |  4 ++--
->>  arch/arm/kernel/vmlinux.lds.S    |  6 +++---
->>  arch/arm/mm/fault.c              |  5 ++---
->>  arch/arm/probes/kprobes/core.c   | 14 +++++++++++---
->>  12 files changed, 68 insertions(+), 42 deletions(-)
->>
+> --
+> 1.9.1
+>
