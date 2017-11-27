@@ -1,44 +1,195 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Nov 2017 16:51:34 +0000
-Subject: [PATCH 00/13] SolidRun Hummingboard DT updates
-Message-ID: <20171127165134.GH31757@n2100.armlinux.org.uk>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 27 Nov 2017 16:52:09 +0000
+Subject: [PATCH 01/13] ARM: dts: imx6qdl: SolidRun: remove redundant
+ regulators node
+In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
+References: <20171127165134.GH31757@n2100.armlinux.org.uk>
+Message-ID: <E1eJMdd-0002qR-Or@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
+The regulators node is redundant, and serves no useful function.
+Remove it from i.MX6 SolidRun platforms.
 
-This series updates the SolidRun Hummingboard platforms to:
-(a) make the DT more reflective of the schematics
-(b) re-organise how we deal with the differences between various board
-    versions in preparation for the new 1.5 microsom.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi      | 56 ++++++++++++++---------------
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 56 ++++++++++++++---------------
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi     | 24 ++++++-------
+ 3 files changed, 62 insertions(+), 74 deletions(-)
 
-The idea with (b) is that we add the support for the board + usom
-combination by including the appropriate dtsi files.
-
-For example, in mainline at the moment, we support two variants of the
-Hummingboards - both with Broadcom Wi-Fi and without eMMC.  Going
-forward, when a 1.5 usom is fitted (which modern Hummingboards will all
-have) the boards will have TI Wi-Fi and potentially eMMC on the usom.
-
-So, this prepares the ground to support these combinations, and maybe
-if I can get agreement from Jon, move forward with Hummingboard2
-support.
-
- arch/arm/boot/dts/imx6dl-cubox-i.dts           |   2 +
- arch/arm/boot/dts/imx6dl-hummingboard.dts      |   2 +
- arch/arm/boot/dts/imx6q-cubox-i.dts            |   2 +
- arch/arm/boot/dts/imx6q-h100.dts               |   2 +-
- arch/arm/boot/dts/imx6q-hummingboard.dts       |   2 +
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         |  72 +++++------
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    | 103 +++++++++------
- arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi |  99 --------------
- arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi   | 144 +++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi   |  70 ++++++++++
- arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi     | 170 +++++++++++++++++++++++++
- arch/arm/boot/dts/imx6qdl-microsom.dtsi        | 148 ++++++++-------------
- 12 files changed, 548 insertions(+), 268 deletions(-)
-
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index 14fff4ee6516..b20508237046 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -64,38 +64,34 @@
+ 		};
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_3p3v: 3p3v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
+ 
+-		reg_usbh1_vbus: usb-h1-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio1 0 0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbh1_vbus: usb-h1-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio1 0 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
+ 
+-		reg_usbotg_vbus: usb-otg-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio3 22 0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbotg_vbus: usb-otg-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 22 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
+ 	};
+ 
+ 	sound-spdif {
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index 37c07c0748aa..0a0a7e4b956b 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -53,38 +53,34 @@
+ 		pinctrl-0 = <&pinctrl_hummingboard_gpio3_5>;
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_3p3v: 3p3v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
+ 
+-		reg_usbh1_vbus: usb-h1-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbh1_vbus: usb-h1-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
+ 
+-		reg_usbotg_vbus: usb-otg-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbotg_vbus: usb-otg-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
+ 	};
+ 
+ 	sound-sgtl5000 {
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index 6a410160c9ee..f7266ae2534c 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -48,20 +48,16 @@
+ 		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_brcm: brcm-reg {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio3 19 0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
+-			regulator-name = "brcm_reg";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			startup-delay-us = <200000>;
+-		};
++	reg_brcm: brcm-reg {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 19 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
++		regulator-name = "brcm_reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <200000>;
+ 	};
+ 
+ 	usdhc1_pwrseq: usdhc1_pwrseq {
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.7.4
