@@ -1,30 +1,53 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 27 Nov 2017 17:44:06 +0530
-Subject: [PATCH 1/2] ARM: davinci: make the function argument as const
-In-Reply-To: <1508148504-2771-2-git-send-email-bhumirks@gmail.com>
-References: <1508148504-2771-1-git-send-email-bhumirks@gmail.com>
- <1508148504-2771-2-git-send-email-bhumirks@gmail.com>
-Message-ID: <0f817e2b-2251-7473-a60b-46ff66c0e77e@ti.com>
+From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
+Date: Mon, 27 Nov 2017 13:17:25 +0100
+Subject: [PATCH] sunxi-rsb: Include OF based modalias in device uevent
+Message-ID: <a99fc4e8-49e3-486a-b508-d764a952d9f8@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 October 2017 03:38 PM, Bhumika Goyal wrote:
-> Make the function argument of the function davinci_common_init
-> as const as it's memory contents are only copied during a
-> memcpy call. So, the fields of the structure to which the argument
-> soc_info points to never gets modified and therefore the argument can
-> be made const.
-> Add const to the prototype too.
-> 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+Include the OF-based modalias in the uevent sent when registering devices
+on the sunxi RSB bus, so that user space has a chance to autoload the
+kernel module for the device.
 
-The subject line is written too generically. I changed that to
+Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
+pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
+the AXP803 PMIC is built as a module, it is not loaded and the system
+ends up with an disfunctional MMC controller.
 
-"
-ARM: davinci: make argument to davinci_common_init() as const
-"
+Cc: stable <stable@vger.kernel.org>
+Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+---
+ drivers/bus/sunxi-rsb.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-while applying to v4.16/fixes-non-critical
-
-Thanks,
-Sekhar
+diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+index 328ca93781cf..37cb57244cbe 100644
+--- a/drivers/bus/sunxi-rsb.c
++++ b/drivers/bus/sunxi-rsb.c
+@@ -173,11 +173,24 @@ static int sunxi_rsb_device_remove(struct device *dev)
+ 	return drv->remove(to_sunxi_rsb_device(dev));
+ }
+ 
++static int sunxi_rsb_device_uevent(struct device *dev,
++				   struct kobj_uevent_env *env)
++{
++	int ret;
++
++	ret = of_device_uevent_modalias(dev, env);
++	if (ret != -ENODEV)
++		return ret;
++
++	return 0;
++}
++
+ static struct bus_type sunxi_rsb_bus = {
+ 	.name		= RSB_CTRL_NAME,
+ 	.match		= sunxi_rsb_device_match,
+ 	.probe		= sunxi_rsb_device_probe,
+ 	.remove		= sunxi_rsb_device_remove,
++	.uevent		= sunxi_rsb_device_uevent,
+ };
+ 
+ static void sunxi_rsb_dev_release(struct device *dev)
+-- 
+2.15.0
