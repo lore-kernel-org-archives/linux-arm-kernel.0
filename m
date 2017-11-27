@@ -1,27 +1,27 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:52:40 +0000
-Subject: [PATCH 07/13] ARM: dts: imx6qdl-microsom: add support for TI Wi-Fi
+Date: Mon, 27 Nov 2017 16:52:45 +0000
+Subject: [PATCH 08/13] ARM: dts: ixm6qdl-microsom: add support for eMMC
 In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
 References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMe8-0002rB-Is@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eJMeD-0002rI-Nn@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the TI Wi-Fi WL1837 device on SolidRun's revision
-1.5 microsoms.
+Rev 1.5 microsoms include eMMC support on-board.  Add a microsom include
+file which can be used to add support for this.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi | 170 +++++++++++++++++++++++++++++
- 1 file changed, 170 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi
+ arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi | 70 ++++++++++++++++++++++++++++
+ 1 file changed, 70 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi
 
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi
 new file mode 100644
-index 000000000000..44a97ba93a95
+index 000000000000..5f3b8baab20f
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi
-@@ -0,0 +1,170 @@
++++ b/arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi
+@@ -0,0 +1,70 @@
 +/*
 + * Copyright (C) 2013,2014 Russell King
 + *
@@ -62,135 +62,35 @@ index 000000000000..44a97ba93a95
 + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 + *     OTHER DEALINGS IN THE SOFTWARE.
 + */
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	nvcc_sd1: regulator-nvcc-sd1 {
-+		compatible = "regulator-fixed";
-+		regulator-always-on;
-+		regulator-name = "nvcc_sd1";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		vin-supply = <&vcc_3v3>;
-+	};
-+
-+	clk_ti_wifi: ti-wifi-clock {
-+		/* This is a hack around the kernel - using "fixed clock"
-+		 * results in the "pinctrl" properties being ignored, and
-+		 * the clock not being output.  Instead, use a gated clock
-+		 * and the unrouted WL_XTAL_PU gpio.
-+		 */
-+		compatible = "gpio-gate-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_microsom_ti_clk>;
-+		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	pwrseq_ti_wifi: ti-wifi-pwrseq {
-+		compatible = "mmc-pwrseq-simple";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_microsom_ti_wifi_en>;
-+		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>;
-+		post-power-on-delay-ms = <200>;
-+		clocks = <&clk_ti_wifi>;
-+		clock-names = "ext_clock";
-+	};
-+};
 +
 +&iomuxc {
 +	microsom {
-+		pinctrl_microsom_ti_bt: microsom-ti-bt {
++		pinctrl_microsom_usdhc3: microsom-usdhc3 {
 +			fsl,pins = <
-+				/* BT_EN_SOC */
-+				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
-+			>;
-+		};
-+
-+		pinctrl_microsom_ti_clk: microsom-ti-clk {
-+			fsl,pins = <
-+				/* EXT_32K */
-+				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
-+				/* WL_XTAL_PU (unrouted) */
-+				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05 0x40013070
-+			>;
-+		};
-+
-+		pinctrl_microsom_ti_wifi_en: microsom-ti-wifi-en {
-+			fsl,pins = <
-+				/* WLAN_EN_SOC */
-+				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
-+			>;
-+		};
-+
-+		pinctrl_microsom_ti_wifi_irq: microsom-ti-wifi-irq {
-+			fsl,pins = <
-+				/* WLAN_IRQ */
-+				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
-+			>;
-+		};
-+
-+		pinctrl_microsom_uart4: microsom-uart4 {
-+			fsl,pins = <
-+				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
-+				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
-+				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
-+				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
-+			>;
-+		};
-+
-+		pinctrl_microsom_usdhc1: microsom-usdhc1 {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
-+				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
-+				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
-+				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
-+				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
-+				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
++				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
++				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
++				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
++				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
++				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
++				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
++				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
++				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
++				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
++				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
++				MX6QDL_PAD_SD3_RST__SD3_RESET  0x17059
 +			>;
 +		};
 +	};
 +};
 +
-+/* UART4 - Connected to optional TI Wi-Fi/BT/FM */
-+&uart4 {
++/* USDHC3 - eMMC */
++&usdhc3 {
 +	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_microsom_uart4>;
-+	uart-has-rtscts;
-+	status = "okay";
-+
-+	bluetooth {
-+		compatible = "ti,wl1837-st";
-+		clocks = <&clk_ti_wifi>;
-+		clock-names = "ext_clock";
-+		enable-gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_microsom_ti_bt>;
-+	};
-+};
-+
-+/* USDHC1 - Connected to optional TI Wi-Fi/BT/FM */
-+&usdhc1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_microsom_usdhc1>;
-+	bus-width = <4>;
-+	keep-power-in-suspend;
-+	mmc-pwrseq = <&pwrseq_ti_wifi>;
++	pinctrl-0 = <&pinctrl_microsom_usdhc3>;
++	bus-width = <8>;
 +	non-removable;
 +	vmmc-supply = <&vcc_3v3>;
-+	/* vqmmc-supply = <&nvcc_sd1>; - MMC layer doesn't like it! */
 +	status = "okay";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+
-+	wlcore at 2 {
-+		compatible = "ti,wl1837";
-+		reg = <2>;
-+		interrupts-extended = <&gpio6 4 IRQ_TYPE_LEVEL_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_microsom_ti_wifi_irq>;
-+	};
 +};
 -- 
 2.7.4
