@@ -1,92 +1,180 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 01:20:28 -0500
-Subject: [PATCH V2 7/7] PCI: make reset poll time adjustable
-In-Reply-To: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
-References: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511763628-11856-8-git-send-email-okaya@codeaurora.org>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Mon, 27 Nov 2017 09:25:57 +0300
+Subject: [PATCH 08/37] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20171126191834.GN28855@cbox>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-9-christoffer.dall@linaro.org>
+ <20171125075221.oj5euwo7hnktxxsj@yury-thinkpad>
+ <20171126161716.GK28855@cbox>
+ <20171126185852.bjte7raycorctft2@yury-thinkpad>
+ <20171126191834.GN28855@cbox>
+Message-ID: <20171126201352.yjcexe235azk3sdf@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce pci=resetpolltime= argument to override 60 seconds poll time in
-units of milliseconds.
+On Sun, Nov 26, 2017 at 08:18:34PM +0100, Christoffer Dall wrote:
+> On Sun, Nov 26, 2017 at 09:58:52PM +0300, Yury Norov wrote:
+> > On Sun, Nov 26, 2017 at 05:17:16PM +0100, Christoffer Dall wrote:
+> > > Hi Yury,
+> > > 
+> > > On Sat, Nov 25, 2017 at 10:52:21AM +0300, Yury Norov wrote:
+> > > > 
+> > > > On Thu, Oct 12, 2017 at 12:41:12PM +0200, Christoffer Dall wrote:
+> > > > > Avoid saving the guest VFP registers and restoring the host VFP
+> > > > > registers on every exit from the VM.  Only when we're about to run
+> > > > > userspace or other threads in the kernel do we really have to switch the
+> > > > > state back to the host state.
+> > > > > 
+> > > > > We still initially configure the VFP registers to trap when entering the
+> > > > > VM, but the difference is that we now leave the guest state in the
+> > > > > hardware registers while running the VM.
+> > > > > 
+> > > > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > > > > ---
+> > > > >  arch/arm64/include/asm/kvm_emulate.h |  5 ++++
+> > > > >  arch/arm64/include/asm/kvm_host.h    |  3 +++
+> > > > >  arch/arm64/kernel/asm-offsets.c      |  1 +
+> > > > >  arch/arm64/kvm/hyp/entry.S           |  3 +++
+> > > > >  arch/arm64/kvm/hyp/switch.c          | 47 +++++++++++-------------------------
+> > > > >  arch/arm64/kvm/hyp/sysreg-sr.c       | 21 +++++++++++++---
+> > > > >  6 files changed, 44 insertions(+), 36 deletions(-)
+> > > > > 
+> > > > > diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> > > > > index 1fbfe96..630dd60 100644
+> > > > > --- a/arch/arm64/include/asm/kvm_emulate.h
+> > > > > +++ b/arch/arm64/include/asm/kvm_emulate.h
+> > > > > @@ -56,6 +56,11 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+> > > > >  	return (unsigned long *)&vcpu->arch.hcr_el2;
+> > > > >  }
+> > > > >  
+> > > > > +static inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
+> > > > > +{
+> > > > > +	return (!(vcpu->arch.hcr_el2 & HCR_RW));
+> > > > > +}
+> > > > > +
+> > > > >  static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+> > > > >  {
+> > > > >  	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
+> > > > > diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+> > > > > index 7d3bfa7..5e09eb9 100644
+> > > > > --- a/arch/arm64/include/asm/kvm_host.h
+> > > > > +++ b/arch/arm64/include/asm/kvm_host.h
+> > > > > @@ -210,6 +210,9 @@ struct kvm_vcpu_arch {
+> > > > >  	/* Guest debug state */
+> > > > >  	u64 debug_flags;
+> > > > >  
+> > > > > +	/* 1 if the guest VFP state is loaded into the hardware */
+> > > > > +	u64 guest_vfp_loaded;
+> > > > 
+> > > > May it be just u8/bool?
+> > > > 
+> > > This particular field is accessed from assembly code, and I'm not sure
+> > > what guarantees the compiler makes in terms of how a u8/bool is
+> > > allocated with respect to padding and alignment, and I think that's why
+> > > we've been using u64 fields in the past.
+> > > 
+> > > I don't actually remember the details, but I'd rather err on the side of
+> > > caution than trying to save a few bytes.  However, if someone can
+> > > convince me there's a completely safe way to do this, then I'm happy to
+> > > change it.
+> > 
+> > 'strb     w0, [x3, #VCPU_GUEST_VFP_LOADED]' would work. See
+> > C6.6.181 STRB (register) in ARM64 ARM.
+> 
+> I'm well aware of this instruction.  Thank you though.
+> 
+> The concern was that we haven't done this in the past.  I think that was
+> because the size of a _Bool is not well-defined and we really didn't
+> care about a couple of handful of bytes when talking about vcpu
+> structures.  Really.
+> 
+> A u8 should work though, but probably this will all be moot if I combine
+> the flags into a single field.
+> 
+> > 
+> > The only thing I would recommend is to reorder fields in kvm_vcpu_arch
+> > to avoid unneeded holes in the structure. It already spend 10 bytes for
+> > nothing in 3 holes.
+> > 
+> Patches are welcome.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- Documentation/admin-guide/kernel-parameters.txt |  2 ++
- drivers/pci/pci.c                               | 13 ++++++++-----
- 2 files changed, 10 insertions(+), 5 deletions(-)
+Heh :) I meant reordering only this field if it is changed.
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 0549662..a07d4f5 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -3071,6 +3071,8 @@
- 		pcie_scan_all	Scan all possible PCIe devices.  Otherwise we
- 				only look for one device below a PCIe downstream
- 				port.
-+		resetpolltime=	Adjusts the default poll time following hot reset
-+				and D3->D0 transition.
+If you want me to reorder the whole structure and remove all holes...
+
+Patches of that sort (I mean moving fields here and there just to save
+couple of bytes) are looking weird. At most because there is general
+assumption that the hole exists because author prefers to have clean
+logic in field order even with the cost of few holes. But if you give
+me indulgence...
+
+Nevertheless, for this specific structure:
+Before:
+/* size: 8176, cachelines: 128, members: 23 */
+/* sum members: 8152, holes: 3, sum holes: 10 */
+/* padding: 14 */
+/* last cacheline: 48 bytes */
+
+After:
+/* size: 8160, cachelines: 128, members: 23 */
+/* padding: 8 */
+/* last cacheline: 32 bytes */
+
+The patch is below.
+
+Yury
+
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index dcded44b4180..3739471c39ac 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -200,10 +200,6 @@ typedef struct kvm_cpu_context kvm_cpu_context_t;
+ struct kvm_vcpu_arch {
+ 	struct kvm_cpu_context ctxt;
  
- 	pcie_aspm=	[PCIE] Forcibly enable or disable PCIe Active State Power
- 			Management.
-diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-index 8472c24..a6c3e25 100644
---- a/drivers/pci/pci.c
-+++ b/drivers/pci/pci.c
-@@ -127,7 +127,7 @@ static int __init pcie_port_pm_setup(char *str)
- 
- /* time to wait after a reset for device to become responsive */
- #define PCIE_RESET_READY_POLL_MS 60000
+-	/* HYP configuration */
+-	u64 hcr_el2;
+-	u32 mdcr_el2;
 -
-+static unsigned long pci_reset_polltime = PCIE_RESET_READY_POLL_MS;
- /**
-  * pci_bus_max_busnr - returns maximum PCI bus number of given bus' children
-  * @bus: pointer to PCI bus structure to search
-@@ -3904,7 +3904,7 @@ int pcie_flr(struct pci_dev *dev)
+ 	/* Exception Information */
+ 	struct kvm_vcpu_fault_info fault;
+ 
+@@ -249,6 +245,20 @@ struct kvm_vcpu_arch {
+ 	 * here.
  	 */
- 	msleep(100);
  
--	return pci_dev_wait(dev, "FLR", PCIE_RESET_READY_POLL_MS);
-+	return pci_dev_wait(dev, "FLR", pci_reset_polltime);
- }
- EXPORT_SYMBOL_GPL(pcie_flr);
++	/* IO related fields */
++	struct kvm_decode mmio_decode;
++
++	/* Cache some mmu pages needed inside spinlock regions */
++	struct kvm_mmu_memory_cache mmu_page_cache;
++
++	/* HYP configuration */
++	u64 hcr_el2;
++	u32 mdcr_el2;
++
++	/* Target CPU and feature flags */
++	int target;
++	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
++
+ 	/*
+ 	 * Guest registers we preserve during guest debugging.
+ 	 *
+@@ -266,16 +276,6 @@ struct kvm_vcpu_arch {
+ 	/* Don't run the guest (internal implementation need) */
+ 	bool pause;
  
-@@ -3945,7 +3945,7 @@ static int pci_af_flr(struct pci_dev *dev, int probe)
- 	 */
- 	msleep(100);
+-	/* IO related fields */
+-	struct kvm_decode mmio_decode;
+-
+-	/* Cache some mmu pages needed inside spinlock regions */
+-	struct kvm_mmu_memory_cache mmu_page_cache;
+-
+-	/* Target CPU and feature flags */
+-	int target;
+-	DECLARE_BITMAP(features, KVM_VCPU_MAX_FEATURES);
+-
+ 	/* Detect first run of a vcpu */
+ 	bool has_run_once;
  
--	return pci_dev_wait(dev, "AF_FLR", PCIE_RESET_READY_POLL_MS);
-+	return pci_dev_wait(dev, "AF_FLR", pci_reset_polltime);
- }
- 
- /**
-@@ -3990,7 +3990,7 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
- 	pci_write_config_word(dev, dev->pm_cap + PCI_PM_CTRL, csr);
- 	pci_dev_d3_sleep(dev);
- 
--	return pci_dev_wait(dev, "PM D3->D0", PCIE_RESET_READY_POLL_MS);
-+	return pci_dev_wait(dev, "PM D3->D0", pci_reset_polltime);
- }
- 
- void pci_reset_secondary_bus(struct pci_dev *dev)
-@@ -4035,7 +4035,7 @@ int pci_reset_bridge_secondary_bus(struct pci_dev *dev)
- {
- 	pcibios_reset_secondary_bus(dev);
- 
--	return pci_dev_wait(dev, "bus reset", PCIE_RESET_READY_POLL_MS);
-+	return pci_dev_wait(dev, "bus reset", pci_reset_polltime);
- }
- EXPORT_SYMBOL_GPL(pci_reset_bridge_secondary_bus);
- 
-@@ -5528,6 +5528,9 @@ static int __init pci_setup(char *str)
- 				pcie_bus_config = PCIE_BUS_PEER2PEER;
- 			} else if (!strncmp(str, "pcie_scan_all", 13)) {
- 				pci_add_flags(PCI_SCAN_ALL_PCIE_DEVS);
-+			} else if (!strncmp(str, "resetpolltime=", 14)) {
-+				pci_reset_polltime =
-+					simple_strtoul(str + 14, &str, 0);
- 			} else {
- 				printk(KERN_ERR "PCI: Unknown option `%s'\n",
- 						str);
--- 
-1.9.1
