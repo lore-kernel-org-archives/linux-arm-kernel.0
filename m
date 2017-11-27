@@ -1,93 +1,19 @@
-From: stefan.bruens@rwth-aachen.de (Stefan =?ISO-8859-1?Q?Br=FCns?=)
-Date: Mon, 27 Nov 2017 18:19:13 +0100
-Subject: [PATCH] sunxi-rsb: Include OF based modalias in device uevent
-In-Reply-To: <20171127153502.4wcqtimppgpfklmr@flea.home>
-References: <a99fc4e8-49e3-486a-b508-d764a952d9f8@rwthex-w2-a.rwth-ad.de>
- <20171127153502.4wcqtimppgpfklmr@flea.home>
-Message-ID: <2479565.qdx1IVDIGC@pebbles>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Mon, 27 Nov 2017 09:15:50 -0800
+Subject: [PATCH] arm64: fix missing 'const' qualifiers
+In-Reply-To: <20171125094127.7536-1-ynorov@caviumnetworks.com>
+References: <20171125094127.7536-1-ynorov@caviumnetworks.com>
+Message-ID: <CAKwvOdm+65Fx1gLZR3h7Vz-Ma4DNWR4W=cOL8KpKZXMgN-nCLg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 27, 2017 4:35:02 PM CET Maxime Ripard wrote:
-> Hi,
-> 
-> On Mon, Nov 27, 2017 at 01:17:25PM +0100, Stefan Br?ns wrote:
-> > Include the OF-based modalias in the uevent sent when registering devices
-> > on the sunxi RSB bus, so that user space has a chance to autoload the
-> > kernel module for the device.
-> > 
-> > Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
-> > pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
-> > the AXP803 PMIC is built as a module, it is not loaded and the system
-> > ends up with an disfunctional MMC controller.
-> > 
-> > Cc: stable <stable@vger.kernel.org>
-> > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
-> > ---
-> > 
-> >  drivers/bus/sunxi-rsb.c | 13 +++++++++++++
-> >  1 file changed, 13 insertions(+)
-> > 
-> > diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
-> > index 328ca93781cf..37cb57244cbe 100644
-> > --- a/drivers/bus/sunxi-rsb.c
-> > +++ b/drivers/bus/sunxi-rsb.c
-> > @@ -173,11 +173,24 @@ static int sunxi_rsb_device_remove(struct device
-> > *dev)> 
-> >  	return drv->remove(to_sunxi_rsb_device(dev));
-> >  
-> >  }
-> > 
-> > +static int sunxi_rsb_device_uevent(struct device *dev,
-> > +				   struct kobj_uevent_env *env)
-> > +{
-> > +	int ret;
-> > +
-> > +	ret = of_device_uevent_modalias(dev, env);
-> > +	if (ret != -ENODEV)
-> > +		return ret;
-> 
-> A comment explaining why we need to ignore the ENODEV error code would
-> be great here.
+Checked call sites, looks like no one tries to modify these pointers.
+I too prefer to make things as const as possible, though I recently
+had a coworker refer to the propagation of const in a code base as a
+"Gordian knot," which I thought was eloquent.
 
-Lazy answer - everyone else is doing the same, and nobody cared to add an 
-explanation.
+checkpatch mentions that there's one line that's over 80 chars, and
+that there's M$ DOS style line endings (but that may just be my client
+gmail, or yours (exchange?)).  If you fix up that long line, then:
 
-For *some* drivers, this is likely because the same device may be enumerated 
-from e.g ACPI or OF, and for an ACPI device -ENODEV will be returned, as
-dev->of_node is NULL.
-
-For devices which are only usable in an OF context, this is bogus. Not sure 
-about sunxi-rsb.
-
-> > +	return 0;
-> > +}
-> > +
-> > 
-> >  static struct bus_type sunxi_rsb_bus = {
-> >  
-> >  	.name		= RSB_CTRL_NAME,
-> >  	.match		= sunxi_rsb_device_match,
-> >  	.probe		= sunxi_rsb_device_probe,
-> >  	.remove		= sunxi_rsb_device_remove,
-> > 
-> > +	.uevent		= sunxi_rsb_device_uevent,
-> 
-> Any reason to not use of_device_uevent_modalias directly here?
-
-*If* sunxi-rsb can be used without OF, then yes, otherwise no.
-
-Regards,
-
-Stefan
-
--- 
-Stefan Br?ns  /  Bergstra?e 21  /  52062 Aachen
-home: +49 241 53809034     mobile: +49 151 50412019
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 195 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/807caf5a/attachment-0001.sig>
+Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
