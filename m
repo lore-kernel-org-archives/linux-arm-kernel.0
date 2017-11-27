@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:57:40 -0500
-Subject: [PATCH V3 03/29] x86/PCI: deprecate pci_get_bus_and_slot()
+Date: Mon, 27 Nov 2017 11:57:38 -0500
+Subject: [PATCH V3 01/29] alpha/PCI: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
 References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,30 +11,41 @@ pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
 where a PCI device is present. This restricts the device drivers to be
 reused for other domain numbers.
 
-Getting ready to remove pci_get_bus_and_slot() function in favor of
-pci_get_domain_bus_and_slot().
-
-Use domain number of 0 as the domain number is not available in struct
-irq_routing_table.
+Use pci_get_domain_bus_and_slot() with a domain number of 0 where we can't
+extract the domain number. Other places, use the actual domain number from
+the device.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/x86/pci/irq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/alpha/kernel/pci.c          | 2 +-
+ arch/alpha/kernel/sys_nautilus.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/x86/pci/irq.c b/arch/x86/pci/irq.c
-index 04526291..52e5510 100644
---- a/arch/x86/pci/irq.c
-+++ b/arch/x86/pci/irq.c
-@@ -839,7 +839,8 @@ static void __init pirq_find_router(struct irq_router *r)
- 	DBG(KERN_DEBUG "PCI: Attempting to find IRQ router for [%04x:%04x]\n",
- 	    rt->rtr_vendor, rt->rtr_device);
+diff --git a/arch/alpha/kernel/pci.c b/arch/alpha/kernel/pci.c
+index 08235bb..e866daf 100644
+--- a/arch/alpha/kernel/pci.c
++++ b/arch/alpha/kernel/pci.c
+@@ -416,7 +416,7 @@ struct resource * __init
+ 		if (bus == 0 && dfn == 0) {
+ 			hose = pci_isa_hose;
+ 		} else {
+-			dev = pci_get_bus_and_slot(bus, dfn);
++			dev = pci_get_domain_bus_and_slot(0, bus, dfn);
+ 			if (!dev)
+ 				return -ENODEV;
+ 			hose = dev->sysdata;
+diff --git a/arch/alpha/kernel/sys_nautilus.c b/arch/alpha/kernel/sys_nautilus.c
+index 239dc0e..ff4f54b 100644
+--- a/arch/alpha/kernel/sys_nautilus.c
++++ b/arch/alpha/kernel/sys_nautilus.c
+@@ -237,7 +237,7 @@
+ 	bus = hose->bus = bridge->bus;
+ 	pcibios_claim_one_bus(bus);
  
--	pirq_router_dev = pci_get_bus_and_slot(rt->rtr_bus, rt->rtr_devfn);
-+	pirq_router_dev = pci_get_domain_bus_and_slot(0, rt->rtr_bus,
-+						      rt->rtr_devfn);
- 	if (!pirq_router_dev) {
- 		DBG(KERN_DEBUG "PCI: Interrupt router not found at "
- 			"%02x:%02x\n", rt->rtr_bus, rt->rtr_devfn);
+-	irongate = pci_get_bus_and_slot(0, 0);
++	irongate = pci_get_domain_bus_and_slot(pci_domain_nr(bus), 0, 0);
+ 	bus->self = irongate;
+ 	bus->resource[0] = &irongate_io;
+ 	bus->resource[1] = &irongate_mem;
 -- 
 1.9.1
