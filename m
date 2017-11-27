@@ -1,107 +1,38 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 27 Nov 2017 08:48:37 -0800
-Subject: [PATCH v2 1/2] hwmon: (jc42) optionally try to disable the SMBUS
- timeout
-In-Reply-To: <20171127163101.27859-2-peda@axentia.se>
-References: <20171127163101.27859-1-peda@axentia.se>
- <20171127163101.27859-2-peda@axentia.se>
-Message-ID: <20171127164837.GA19580@roeck-us.net>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 27 Nov 2017 17:50:12 +0100
+Subject: [PATCH v5 19/20] KVM: arm/arm64: Get rid of
+ kvm_timer_flush_hwstate
+In-Reply-To: <1509093281-15225-20-git-send-email-cdall@linaro.org>
+References: <1509093281-15225-1-git-send-email-cdall@linaro.org>
+ <1509093281-15225-20-git-send-email-cdall@linaro.org>
+Message-ID: <20171127165012.2egz3dos6h4zj7ub@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:31:00PM +0100, Peter Rosin wrote:
-> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
-> is not always capable of avoiding the 25-35 ms timeout as specified by
-> the SMBUS protocol. This may cause silent corruption of the last bit of
-> any transfer, e.g. a one is read instead of a zero if the sensor chip
-> times out. This also affects the eeprom half of the nxp-se97 chip, where
-> this silent corruption was originally noticed. Other I2C adapters probably
-> suffer similar issues, e.g. bit-banging comes to mind as risky...
-> 
-> The SMBUS register in the nxp chip is not a standard Jedec register, but
-> it is not special to the nxp chips either, at least the atmel chips
-> have the same mechanism. Therefore, do not special case this on the
-> manufacturer, it is opt-in via the device property anyway.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-
-Looks ok to me. I'll apply after Rob's approval.
-
-Guenter
-
-> ---
->  Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
->  drivers/hwmon/jc42.c                             | 21 +++++++++++++++++++++
->  2 files changed, 25 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> index 07a250498fbb..f569db58f64a 100644
-> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
-> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> @@ -34,6 +34,10 @@ Required properties:
+On Fri, Oct 27, 2017 at 10:34:40AM +0200, Christoffer Dall wrote:
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index 132d39a..14c50d1 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -656,7 +656,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
 >  
->  - reg: I2C address
+>  		local_irq_disable();
 >  
-> +Optional properties:
-> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
-> +			 This is not supported on all chips.
-> +
->  Example:
+> -		kvm_timer_flush_hwstate(vcpu);
+>  		kvm_vgic_flush_hwstate(vcpu);
 >  
->  temp-sensor at 1a {
-> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
-> index 5f11dc014ed6..e5234f953a6d 100644
-> --- a/drivers/hwmon/jc42.c
-> +++ b/drivers/hwmon/jc42.c
-> @@ -22,6 +22,7 @@
->   * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
->   */
->  
-> +#include <linux/bitops.h>
->  #include <linux/module.h>
->  #include <linux/init.h>
->  #include <linux/slab.h>
-> @@ -45,6 +46,7 @@ static const unsigned short normal_i2c[] = {
->  #define JC42_REG_TEMP		0x05
->  #define JC42_REG_MANID		0x06
->  #define JC42_REG_DEVICEID	0x07
-> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
->  
->  /* Status bits in temperature register */
->  #define JC42_ALARM_CRIT_BIT	15
-> @@ -75,6 +77,9 @@ static const unsigned short normal_i2c[] = {
->  #define GT_MANID		0x1c68	/* Giantec */
->  #define GT_MANID2		0x132d	/* Giantec, 2nd mfg ID */
->  
-> +/* SMBUS register */
-> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
-> +
->  /* Supported chips */
->  
->  /* Analog Devices */
-> @@ -495,6 +500,22 @@ static int jc42_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  
->  	data->extended = !!(cap & JC42_CAP_RANGE);
->  
-> +	if (device_property_read_bool(dev, "smbus-timeout-disable")) {
-> +		int smbus;
-> +
-> +		/*
-> +		 * Not all chips support this register, but from a
-> +		 * quick read of various datasheets no chip appears
-> +		 * incompatible with the below attempt to disable
-> +		 * the timeout. And the whole thing is opt-in...
-> +		 */
-> +		smbus = i2c_smbus_read_word_swapped(client, JC42_REG_SMBUS);
-> +		if (smbus < 0)
-> +			return smbus;
-> +		i2c_smbus_write_word_swapped(client, JC42_REG_SMBUS,
-> +					     smbus | SMBUS_STMOUT);
-> +	}
-> +
->  	config = i2c_smbus_read_word_swapped(client, JC42_REG_CONFIG);
->  	if (config < 0)
->  		return config;
+>  		/*
 > -- 
-> 2.11.0
-> 
+> 2.7.4
+
+Hi Christoffer,
+
+I realize this is already merged, but I have a question about the
+above hunk. IIUC, the patch "KVM: arm/arm64: Move timer/vgic
+flush/sync under disabled irq" only moved kvm_vgic_flush_hwstate()
+under disabled irq because it had to be run after
+kvm_timer_flush_hwstate(). Now that kvm_timer_flush_hwstate() is
+gone can/should it be moved back out?
+
+Thanks,
+drew
