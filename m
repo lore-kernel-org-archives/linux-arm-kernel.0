@@ -1,90 +1,73 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 27 Nov 2017 15:33:01 +0000
-Subject: [PATCH v2 4/5] mm: memory_hotplug: Add memory hotremove probe
- device
-In-Reply-To: <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
-Message-ID: <198063b0-fcc9-7beb-7476-86ed5f04734c@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Nov 2017 16:35:02 +0100
+Subject: [PATCH] sunxi-rsb: Include OF based modalias in device uevent
+In-Reply-To: <a99fc4e8-49e3-486a-b508-d764a952d9f8@rwthex-w2-a.rwth-ad.de>
+References: <a99fc4e8-49e3-486a-b508-d764a952d9f8@rwthex-w2-a.rwth-ad.de>
+Message-ID: <20171127153502.4wcqtimppgpfklmr@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/17 11:14, Andrea Reale wrote:
-> Adding a "remove" sysfs handle that can be used to trigger
-> memory hotremove manually, exactly simmetrically with
-> what happens with the "probe" device for hot-add.
+Hi,
+
+On Mon, Nov 27, 2017 at 01:17:25PM +0100, Stefan Br?ns wrote:
+> Include the OF-based modalias in the uevent sent when registering devices
+> on the sunxi RSB bus, so that user space has a chance to autoload the
+> kernel module for the device.
 > 
-> This is usueful for architecture that do not rely on
-> ACPI for memory hot-remove.
-
-Is there a real-world use-case for this, or is it mostly just a handy 
-development feature?
-
-> Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
+> Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
+> pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
+> the AXP803 PMIC is built as a module, it is not loaded and the system
+> ends up with an disfunctional MMC controller.
+> 
+> Cc: stable <stable@vger.kernel.org>
+> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
 > ---
->   drivers/base/memory.c | 34 +++++++++++++++++++++++++++++++++-
->   1 file changed, 33 insertions(+), 1 deletion(-)
+>  drivers/bus/sunxi-rsb.c | 13 +++++++++++++
+>  1 file changed, 13 insertions(+)
 > 
-> diff --git a/drivers/base/memory.c b/drivers/base/memory.c
-> index 1d60b58..8ccb67c 100644
-> --- a/drivers/base/memory.c
-> +++ b/drivers/base/memory.c
-> @@ -530,7 +530,36 @@ memory_probe_store(struct device *dev, struct device_attribute *attr,
->   }
->   
->   static DEVICE_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
-> -#endif
-> +
-> +#ifdef CONFIG_MEMORY_HOTREMOVE
-> +static ssize_t
-> +memory_remove_store(struct device *dev,
-> +		struct device_attribute *attr, const char *buf, size_t count)
+> diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+> index 328ca93781cf..37cb57244cbe 100644
+> --- a/drivers/bus/sunxi-rsb.c
+> +++ b/drivers/bus/sunxi-rsb.c
+> @@ -173,11 +173,24 @@ static int sunxi_rsb_device_remove(struct device *dev)
+>  	return drv->remove(to_sunxi_rsb_device(dev));
+>  }
+>  
+> +static int sunxi_rsb_device_uevent(struct device *dev,
+> +				   struct kobj_uevent_env *env)
 > +{
-> +	u64 phys_addr;
-> +	int nid, ret;
-> +	unsigned long pages_per_block = PAGES_PER_SECTION * sections_per_block;
+> +	int ret;
 > +
-> +	ret = kstrtoull(buf, 0, &phys_addr);
-> +	if (ret)
+> +	ret = of_device_uevent_modalias(dev, env);
+> +	if (ret != -ENODEV)
 > +		return ret;
-> +
-> +	if (phys_addr & ((pages_per_block << PAGE_SHIFT) - 1))
-> +		return -EINVAL;
-> +
-> +	nid = memory_add_physaddr_to_nid(phys_addr);
 
-This call looks a bit odd, since you're not doing a memory add. In fact, 
-any memory being removed should already be fully known-about, so AFAICS 
-it should be simple to get everything you need to know (including 
-potentially the online status as mentioned earlier), through 'normal' 
-methods, e.g. page_to_nid() or similar.
+A comment explaining why we need to ignore the ENODEV error code would
+be great here.
 
-Robin.
-
-> +	ret = lock_device_hotplug_sysfs();
-> +	if (ret)
-> +		return ret;
-> +
-> +	remove_memory(nid, phys_addr,
-> +			 MIN_MEMORY_BLOCK_SIZE * sections_per_block);
-> +	unlock_device_hotplug();
-> +	return count;
+> +	return 0;
 > +}
-> +static DEVICE_ATTR(remove, S_IWUSR, NULL, memory_remove_store);
-> +#endif /* CONFIG_MEMORY_HOTREMOVE */
-> +#endif /* CONFIG_ARCH_MEMORY_PROBE */
->   
->   #ifdef CONFIG_MEMORY_FAILURE
->   /*
-> @@ -790,6 +819,9 @@ bool is_memblock_offlined(struct memory_block *mem)
->   static struct attribute *memory_root_attrs[] = {
->   #ifdef CONFIG_ARCH_MEMORY_PROBE
->   	&dev_attr_probe.attr,
-> +#ifdef CONFIG_MEMORY_HOTREMOVE
-> +	&dev_attr_remove.attr,
-> +#endif
->   #endif
->   
->   #ifdef CONFIG_MEMORY_FAILURE
-> 
+> +
+>  static struct bus_type sunxi_rsb_bus = {
+>  	.name		= RSB_CTRL_NAME,
+>  	.match		= sunxi_rsb_device_match,
+>  	.probe		= sunxi_rsb_device_probe,
+>  	.remove		= sunxi_rsb_device_remove,
+> +	.uevent		= sunxi_rsb_device_uevent,
+
+Any reason to not use of_device_uevent_modalias directly here?
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/2f550d85/attachment.sig>
