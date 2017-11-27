@@ -1,62 +1,55 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Nov 2017 17:40:28 +0000
-Subject: [PATCH 0/8] sa1100fb updates
-In-Reply-To: <4330027.F5ASplytpk@amdc3058>
-References: <CGME20170929105024epcas5p336177e386c65b530c4cb5fac379cedfa@epcas5p3.samsung.com>
- <2590375.JKTUJ5JGIV@amdc3058>
- <20171127171145.GI31757@n2100.armlinux.org.uk>
- <4330027.F5ASplytpk@amdc3058>
-Message-ID: <20171127174028.GJ31757@n2100.armlinux.org.uk>
+Date: Mon, 27 Nov 2017 17:43:23 +0000
+Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
+ ntp
+In-Reply-To: <20171127154316.GG31757@n2100.armlinux.org.uk>
+References: <20171013175433.GA22062@obsidianresearch.com>
+ <20171123095456.lkc4nkuzsd2q26mm@piout.net>
+ <20171123150439.GB18754@mellanox.com>
+ <20171127154316.GG31757@n2100.armlinux.org.uk>
+Message-ID: <20171127174323.GK31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 06:30:11PM +0100, Bartlomiej Zolnierkiewicz wrote:
-> On Monday, November 27, 2017 05:11:45 PM Russell King - ARM Linux wrote:
-> > On Tue, Oct 17, 2017 at 03:32:30PM +0200, Bartlomiej Zolnierkiewicz wrote:
-> > > On Friday, September 29, 2017 11:50:04 AM Russell King - ARM Linux wrote:
-> > > > Hi Bart,
-> > > 
-> > > Hi Russell,
-> > > 
-> > > > This series updates the sa1100fb fbdev driver's initialisation paths
-> > > > to be more robust.  In doing these updates, I realised that we omitted
-> > > > to free some memory which was allocated for the framebuffer if
-> > > > initialisation fails - something that was hidden due to the complex
-> > > > cleanup that the driver performs.  Switching to managed resources made
-> > > > this more obvious.
-> > > > 
-> > > > Tested on H3600 iPAQ and Assabet.
-> > > > 
-> > > >  drivers/video/fbdev/sa1100fb.c | 75 +++++++++++++++---------------------------
-> > > >  drivers/video/fbdev/sa1100fb.h |  2 ++
-> > > >  2 files changed, 29 insertions(+), 48 deletions(-)
-> > > 
-> > > I queued all patches for 4.15, thanks!
-> > 
-> > Now that 4.15-rc1 is out, something tells me that was not actually
-> > the case.  Any ideas what happened?
+On Mon, Nov 27, 2017 at 03:43:16PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 23, 2017 at 08:04:39AM -0700, Jason Gunthorpe wrote:
+> > Like Russell has said already, the kernel is the only place that could
+> > actually have all the information needed. User space would have to use
+> > some kind of trail and error approach to figure out what the offset
+> > should be.
 > 
-> Could you please explain the issue that you are seeing a bit more?
+> Jason,
 > 
-> For me it looks all fine:
+> Now that -rc1 is out, and I'm rebasing the branches, what I find is
+> the patch that was merged is not the patch that I last tested.  The
+> last patch I had from you was 22 Sep 2017.
 > 
-> $ git log --oneline v4.15-rc1 drivers/video/fbdev/sa1100fb.c
-> cb6bc3f video: sa1100fb: move pseudo palette into sa1100fb_info structure
-> 0ab7658 video: sa1100fb: fix video memory allocation leak
-> c244f8e video: sa1100fb: clean up failure path
-> 5634cba video: sa1100fb: use devm_gpio_request_one()
-> f6fc8c9 video: sa1100fb: use devm_request_irq()
-> df6b228 video: sa1100fb: use devm_ioremap_resource()
-> e43064c video: sa1100fb: use devm_clk_get()
-> ba1d36b video: sa1100fb: use devm_kzalloc()
-> ...
+> The most obvious difference is in drivers/rtc/class.c:
+> 
+> -+      /* Drivers can revise this default after allocating the device. */
+> ++      /* Drivers can revise this default after allocating the device. It
+> ++       * should be the value of wallclock tv_nsec that the driver needs in
+> ++       * order to synchronize the second tick over during set.
+> ++       */
+> 
+> but there's also considerable differences in kernel/time/ntp.c, which
+> seems to miss out on some fixes for bugs I reported along the way:
+> 
+>  +      getnstimeofday64(&now);
+>  +
+> -+      adjust = now;
+> ++      now = adjust;
+> 
+> What's going on?
+> 
+> I've got a rebase mess here to sort out, and it's a horrid mess.
+> 
+> I think what's in -rc1 is rather fscked.
 
-Looks like I hadn't rebased that particular branch, so they were still
-showing up in my origin.. git log.  Sorry about the false warning.
-
-This is the problem of carrying close to 400 patches in separate
-branches, and git log origin.. not able to show the commits that the
-selection are based upon.
+Having been through the conflict mess and come out with a resolution,
+I think it might be okay, with the exception of the missing explanation
+in drivers/rtc/class.c.  I do need to run some tests on it to make sure
+though.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
