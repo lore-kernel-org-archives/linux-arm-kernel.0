@@ -1,64 +1,99 @@
-From: hverkuil@xs4all.nl (Hans Verkuil)
-Date: Mon, 27 Nov 2017 11:17:50 +0100
-Subject: [PATCH v2 01/11] media: videodev2.h, v4l2-ioctl: add rkisp1 meta
- buffer format
-In-Reply-To: <20171124023706.5702-2-jacob-chen@iotwrt.com>
-References: <20171124023706.5702-1-jacob-chen@iotwrt.com>
- <20171124023706.5702-2-jacob-chen@iotwrt.com>
-Message-ID: <cae70249-d558-0e6d-19d4-1289630d20e7@xs4all.nl>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Nov 2017 10:19:13 +0000
+Subject: [PATCH] arm: l2c: unlock ways when in non-secure mode
+In-Reply-To: <DB6PR04MB322104DB1B2FCBD535AAA49488250@DB6PR04MB3221.eurprd04.prod.outlook.com>
+References: <20171126122530.857-1-peng.fan@nxp.com>
+ <20171126131812.GZ31757@n2100.armlinux.org.uk>
+ <DB6PR04MB3221D60D0EC8D5B31869AA6588240@DB6PR04MB3221.eurprd04.prod.outlook.com>
+ <20171127091937.GA31757@n2100.armlinux.org.uk>
+ <DB6PR04MB322104DB1B2FCBD535AAA49488250@DB6PR04MB3221.eurprd04.prod.outlook.com>
+Message-ID: <20171127101911.GC31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/2017 03:36 AM, Jacob Chen wrote:
-> From: Shunqian Zheng <zhengsq@rock-chips.com>
+On Mon, Nov 27, 2017 at 09:43:41AM +0000, Peng Fan wrote:
+> Hi Russell,
 > 
-> Add the Rockchip ISP1 specific processing parameter format
-> V4L2_META_FMT_RK_ISP1_PARAMS and metadata format
-> V4L2_META_FMT_RK_ISP1_STAT_3A for 3A.
-
-These formats are not documented in the V4L2 spec. I think it is documented in
-rkisp1-config.h, so you need to add something to meta-formats.rst. It's OK to
-refer to that header, as long as it is clear where the documentation of the
-format can be found.
-
-Regards,
-
-	Hans
-
+> > -----Original Message-----
+> > From: Russell King - ARM Linux [mailto:linux at armlinux.org.uk]
+> > Sent: Monday, November 27, 2017 5:20 PM
+> > To: Peng Fan <peng.fan@nxp.com>
+> > Cc: linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org;
+> > van.freenix at gmail.com; Mark Rutland <mark.rutland@arm.com>; Thomas
+> > Gleixner <tglx@linutronix.de>; Chris Brandt <chris.brandt@renesas.com>; Will
+> > Deacon <will.deacon@arm.com>
+> > Subject: Re: [PATCH] arm: l2c: unlock ways when in non-secure mode
+> > 
+> > On Sun, Nov 26, 2017 at 11:56:10PM +0000, Peng Fan wrote:
+> > > Hi Russell,
+> > >
+> > > > Subject: Re: [PATCH] arm: l2c: unlock ways when in non-secure mode
+> > > >
+> > > > On Sun, Nov 26, 2017 at 08:25:30PM +0800, Peng Fan wrote:
+> > > > > To boot Linux in Non-secure mode with l2x0, the l2x0 controller is
+> > > > > enabled in secure mode and ways locked to make it seems L2 cache
+> > > > > disabled during linux boot process. So during l2x0 initialization,
+> > > > > need to unlock the ways to make l2x0 could cache data/inst.
+> > > >
+> > > > Why was this chosen instead of doing what everyone else does?
+> > >
+> > > I am not aware of how other platform handles the l2x0 unlock in non
+> > > secure mode. Could you please share with me what others choose?
+> > 
+> > That's not what I was asking.
+> > 
+> > Everyone else provides a way for the l2x0 controller to be enabled and disabled
+> > from non-secure mode.
 > 
-> Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
-> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
-> ---
->  drivers/media/v4l2-core/v4l2-ioctl.c | 2 ++
->  include/uapi/linux/videodev2.h       | 4 ++++
->  2 files changed, 6 insertions(+)
+> Thanks for the information. I see that some platforms implements l2c_write_sec.
 > 
-> diff --git a/drivers/media/v4l2-core/v4l2-ioctl.c b/drivers/media/v4l2-core/v4l2-ioctl.c
-> index d6587b3ec33e..0604ae9ea444 100644
-> --- a/drivers/media/v4l2-core/v4l2-ioctl.c
-> +++ b/drivers/media/v4l2-core/v4l2-ioctl.c
-> @@ -1252,6 +1252,8 @@ static void v4l_fill_fmtdesc(struct v4l2_fmtdesc *fmt)
->  	case V4L2_TCH_FMT_TU08:		descr = "8-bit unsigned touch data"; break;
->  	case V4L2_META_FMT_VSP1_HGO:	descr = "R-Car VSP1 1-D Histogram"; break;
->  	case V4L2_META_FMT_VSP1_HGT:	descr = "R-Car VSP1 2-D Histogram"; break;
-> +	case V4L2_META_FMT_RK_ISP1_PARAMS:	descr = "Rockchip ISP1 3A params"; break;
-> +	case V4L2_META_FMT_RK_ISP1_STAT_3A:	descr = "Rockchip ISP1 3A statistics"; break;
->  
->  	default:
->  		/* Compressed formats */
-> diff --git a/include/uapi/linux/videodev2.h b/include/uapi/linux/videodev2.h
-> index 7c871291c1fa..961545e64c12 100644
-> --- a/include/uapi/linux/videodev2.h
-> +++ b/include/uapi/linux/videodev2.h
-> @@ -691,6 +691,10 @@ struct v4l2_pix_format {
->  #define V4L2_META_FMT_VSP1_HGO    v4l2_fourcc('V', 'S', 'P', 'H') /* R-Car VSP1 1-D Histogram */
->  #define V4L2_META_FMT_VSP1_HGT    v4l2_fourcc('V', 'S', 'P', 'T') /* R-Car VSP1 2-D Histogram */
->  
-> +/* Vendor specific - used for IPU3 camera sub-system */
-> +#define V4L2_META_FMT_RK_ISP1_PARAMS	v4l2_fourcc('R', 'K', '1', 'P') /* Rockchip ISP1 params */
-> +#define V4L2_META_FMT_RK_ISP1_STAT_3A	v4l2_fourcc('R', 'K', '1', 'S') /* Rockchip ISP1 3A statistics */
-> +
->  /* priv field value to indicates that subsequent fields are valid. */
->  #define V4L2_PIX_FMT_PRIV_MAGIC		0xfeedcafe
->  
+> > 
+> > Why have you decided to enable the l2x0 controller and leave it enabled, and
+> > then lock down all the cache ways - which means you need the kernel to do
+> > something entirely different for your platform.
 > 
+> Currently we are running OP-TEE on i.MX6/7 with Linux in non-secure mode. See
+> In https://github.com/OP-TEE/optee_os/blob/master/core/arch/arm/kernel/generic_entry_a32.S#L428
+> Pl310 is enabled. And In
+> https://github.com/OP-TEE/optee_os/blob/master/core/arch/arm/kernel/generic_entry_a32.S#L461
+> pl310 locked before returning back to Linux.
+> 
+> I see ti platform not enabled pl310 in OP-TEE, leaving Linux to enable it. platform-sam/stm/ zynq7k/imx
+> Have pl310 enabled in OP-TEE.
+> 
+> I could switch to use l2c_write_sec dedicated for i.MX. But I think this patch is also a valid point.
+> What do you suggest?
+
+What I'm concerned about is that there's a valid scenario where the L2
+cache would be enabled and left enabled by the secure mode code - that
+is if the secure mode wishes to take advantage of the L2 cache, and has
+locked down some ways for its own use.
+
+In this scenario, the secure world would have set the L2 cache up to
+prevent the non-secure side unlocking those ways.  This would mean
+that the NS_LOCKDOWN bit in the auxiliary control register would be
+clear.  The PL310 TRM has this to say:
+
+"On reset the Non-Secure Lockdown Enable bit is set to 0 and Lockdown
+ Registers are not permitted to be modified by non-secure accesses. In
+ that configuration, if a non-secure access tries to write to those
+ registers, the write response returns a DECERR response."
+
+which means that if we blindly try and unlock the ways, we will end
+up triggering an exception, and that will crash the kernel.
+
+Given that the kernel does _not_ handle this scenario today, I fail to
+see why OP-TEE would decide that, on ARM by default, it will enable
+the L2 cache and lock all ways.
+
+As you have already found, at least OMAP has decided to do things
+sensibly.  I fail to see why everyone else can't also decide to do the
+sensible thing.
+
+Please talk to the OP-TEE folk to see whether the OP-TEE behaviour can
+be changed first.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
