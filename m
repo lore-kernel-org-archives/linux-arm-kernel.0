@@ -1,126 +1,166 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Mon, 27 Nov 2017 17:01:49 +0100
-Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
-In-Reply-To: <1c4f6b275597dec7d97b5c1d9f749ba27c0610f3.1511797218.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <1c4f6b275597dec7d97b5c1d9f749ba27c0610f3.1511797218.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <2744508.m82qQEPny3@jernej-laptop>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Mon, 27 Nov 2017 10:45:01 -0500
+Subject: [PATCH v5] dmaengine: dmatest: move callback wait queue to thread
+ context
+Message-ID: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+introduced a bug (that is in fact documented by the patch commit text)
+that leaves behind a dangling pointer. Since the done_wait structure is
+allocated on the stack, future invocations to the DMATEST can produce
+undesirable results (e.g., corrupted spinlocks).
 
-Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard napisal(a):
-> Add support for the A83T display pipeline.
-> 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
->  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
->  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
->  4 files changed, 14 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
-> d4259a4f5171..d6b52e5c48c0 100644
-> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> @@ -93,6 +93,7 @@ Required properties:
->     * allwinner,sun6i-a31s-tcon
->     * allwinner,sun7i-a20-tcon
->     * allwinner,sun8i-a33-tcon
-> +   * allwinner,sun8i-a83t-tcon-lcd
->     * allwinner,sun8i-v3s-tcon
->   - reg: base address and size of memory-mapped region
->   - interrupts: interrupt associated to this IP
-> @@ -224,6 +225,7 @@ supported.
-> 
->  Required properties:
->    - compatible: value must be one of:
-> +    * allwinner,sun8i-a83t-de2-mixer
+Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
+out") attempted to WARN the user that the stack was likely corrupted but
+did not fix the actual issue.
 
-What will be the name of the second mixer, once support for HDMI is added? 
-Should we start directly with 0 and 1 postfix ?
+This patch fixes the issue by pushing the wait queue and callback
+structs into the the thread structure. If a failure occurs due to time,
+dmaengine_terminate_all will force the callback to safely call
+wake_up_all() without possibility of using a freed pointer.
 
->      * allwinner,sun8i-v3s-de2-mixer
->    - reg: base address and size of the memory-mapped region.
->    - clocks: phandles to the clocks feeding the mixer
-> @@ -253,6 +255,7 @@ Required properties:
->      * allwinner,sun6i-a31s-display-engine
->      * allwinner,sun7i-a20-display-engine
->      * allwinner,sun8i-a33-display-engine
-> +    * allwinner,sun8i-a83t-display-engine
->      * allwinner,sun8i-v3s-display-engine
-> 
->    - allwinner,pipelines: list of phandle to the display engine
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> b/drivers/gpu/drm/sun4i/sun4i_drv.c index 75c76cdd82bc..c418be2f22be 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> @@ -193,6 +193,7 @@ static bool sun4i_drv_node_is_tcon(struct device_node
-> *node) of_device_is_compatible(node, "allwinner,sun6i-a31s-tcon") ||
->  		of_device_is_compatible(node, "allwinner,sun7i-a20-tcon") ||
->  		of_device_is_compatible(node, "allwinner,sun8i-a33-tcon") ||
-> +		of_device_is_compatible(node, "allwinner,sun8i-a83t-tcon-lcd") ||
->  		of_device_is_compatible(node, "allwinner,sun8i-v3s-tcon");
->  }
-> 
-> @@ -353,6 +354,7 @@ static const struct of_device_id sun4i_drv_of_table[] =
-> { { .compatible = "allwinner,sun6i-a31s-display-engine" },
->  	{ .compatible = "allwinner,sun7i-a20-display-engine" },
->  	{ .compatible = "allwinner,sun8i-a33-display-engine" },
-> +	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
->  	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
->  	{ }
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 46ce6daa0b1a..871df75793a9
-> 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -1132,6 +1132,10 @@ static const struct sun4i_tcon_quirks
-> sun8i_a33_quirks = { .has_lvds_pll		= true,
->  };
-> 
-> +static const struct sun4i_tcon_quirks sun8i_a83t_quirks = {
-> +	/* nothing is supported */
-> +};
-> +
->  static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
->  	/* nothing is supported */
->  };
-> @@ -1143,6 +1147,7 @@ static const struct of_device_id sun4i_tcon_of_table[]
-> = { { .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks
-> }, { .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks },
-> { .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
-> +	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data =
-> &sun8i_a83t_quirks }, { .compatible = "allwinner,sun8i-v3s-tcon", .data =
-> &sun8i_v3s_quirks }, { }
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> b/drivers/gpu/drm/sun4i/sun8i_mixer.c index 44d5e639ebb2..5a1376965270
-> 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> @@ -395,6 +395,10 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg
-> = {
-> 
->  static const struct of_device_id sun8i_mixer_of_table[] = {
->  	{
-> +		.compatible = "allwinner,sun8i-a83t-de2-mixer",
-> +		.data = &sun8i_v3s_mixer_cfg,
-> +	},
-> +	{
+Cc: stable at vger.kernel.org
+Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
+Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
+Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+changes from v4: Change "done" to "arg" in container_of for x86 compiler
+changes from v3: Added check to thread wait variable if terminate_all fails
+changes from v2: Added "Fixes" tag
+changes from v1: Added pre-req patches for stable
+ drivers/dma/dmatest.c | 55 +++++++++++++++++++++++++++++----------------------
+ 1 file changed, 31 insertions(+), 24 deletions(-)
 
-Maybe you want to squash 12 patch since this works only by luck.
-
-Best regards,
-Jernej
-
->  		.compatible = "allwinner,sun8i-v3s-de2-mixer",
->  		.data = &sun8i_v3s_mixer_cfg,
->  	},
-> --
-> git-series 0.9.1
+diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
+index 47edc7f..ec5f9d2 100644
+--- a/drivers/dma/dmatest.c
++++ b/drivers/dma/dmatest.c
+@@ -155,6 +155,12 @@ struct dmatest_params {
+ #define PATTERN_COUNT_MASK	0x1f
+ #define PATTERN_MEMSET_IDX	0x01
+ 
++/* poor man's completion - we want to use wait_event_freezable() on it */
++struct dmatest_done {
++	bool			done;
++	wait_queue_head_t	*wait;
++};
++
+ struct dmatest_thread {
+ 	struct list_head	node;
+ 	struct dmatest_info	*info;
+@@ -165,6 +171,8 @@ struct dmatest_thread {
+ 	u8			**dsts;
+ 	u8			**udsts;
+ 	enum dma_transaction_type type;
++	wait_queue_head_t done_wait;
++	struct dmatest_done test_done;
+ 	bool			done;
+ };
+ 
+@@ -342,18 +350,25 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
+ 	return error_count;
+ }
+ 
+-/* poor man's completion - we want to use wait_event_freezable() on it */
+-struct dmatest_done {
+-	bool			done;
+-	wait_queue_head_t	*wait;
+-};
+ 
+ static void dmatest_callback(void *arg)
+ {
+ 	struct dmatest_done *done = arg;
+-
+-	done->done = true;
+-	wake_up_all(done->wait);
++	struct dmatest_thread *thread =
++		container_of(arg, struct dmatest_thread, done_wait);
++	if (!thread->done) {
++		done->done = true;
++		wake_up_all(done->wait);
++	} else {
++		/*
++		 * If thread->done, it means that this callback occurred
++		 * after the parent thread has cleaned up. This can
++		 * happen in the case that driver doesn't implement
++		 * the terminate_all() functionality and a dma operation
++		 * did not occur within the timeout period
++		 */
++		WARN(1, "dmatest: Kernel memory may be corrupted!!\n");
++	}
+ }
+ 
+ static unsigned int min_odd(unsigned int x, unsigned int y)
+@@ -424,9 +439,8 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
+  */
+ static int dmatest_func(void *data)
+ {
+-	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(done_wait);
+ 	struct dmatest_thread	*thread = data;
+-	struct dmatest_done	done = { .wait = &done_wait };
++	struct dmatest_done	*done = &thread->test_done;
+ 	struct dmatest_info	*info;
+ 	struct dmatest_params	*params;
+ 	struct dma_chan		*chan;
+@@ -673,9 +687,9 @@ static int dmatest_func(void *data)
+ 			continue;
+ 		}
+ 
+-		done.done = false;
++		done->done = false;
+ 		tx->callback = dmatest_callback;
+-		tx->callback_param = &done;
++		tx->callback_param = done;
+ 		cookie = tx->tx_submit(tx);
+ 
+ 		if (dma_submit_error(cookie)) {
+@@ -688,21 +702,12 @@ static int dmatest_func(void *data)
+ 		}
+ 		dma_async_issue_pending(chan);
+ 
+-		wait_event_freezable_timeout(done_wait, done.done,
++		wait_event_freezable_timeout(thread->done_wait, done->done,
+ 					     msecs_to_jiffies(params->timeout));
+ 
+ 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+ 
+-		if (!done.done) {
+-			/*
+-			 * We're leaving the timed out dma operation with
+-			 * dangling pointer to done_wait.  To make this
+-			 * correct, we'll need to allocate wait_done for
+-			 * each test iteration and perform "who's gonna
+-			 * free it this time?" dancing.  For now, just
+-			 * leave it dangling.
+-			 */
+-			WARN(1, "dmatest: Kernel stack may be corrupted!!\n");
++		if (!done->done) {
+ 			dmaengine_unmap_put(um);
+ 			result("test timed out", total_tests, src_off, dst_off,
+ 			       len, 0);
+@@ -789,7 +794,7 @@ static int dmatest_func(void *data)
+ 		dmatest_KBs(runtime, total_len), ret);
+ 
+ 	/* terminate all transfers on specified channels */
+-	if (ret)
++	if (ret || failed_tests)
+ 		dmaengine_terminate_all(chan);
+ 
+ 	thread->done = true;
+@@ -849,6 +854,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
+ 		thread->info = info;
+ 		thread->chan = dtc->chan;
+ 		thread->type = type;
++		thread->test_done.wait = &thread->done_wait;
++		init_waitqueue_head(&thread->done_wait);
+ 		smp_wmb();
+ 		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
+ 				dma_chan_name(chan), op, i);
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
