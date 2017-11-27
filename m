@@ -1,352 +1,179 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 27 Nov 2017 21:57:41 +0100
-Subject: [PATCH 08/17] drm/sun4i: Add support for DE2 VI planes
+Date: Mon, 27 Nov 2017 21:57:46 +0100
+Subject: [PATCH 13/17] drm/sun4i: Add DE2 CSC library
 In-Reply-To: <20171127205750.19277-1-jernej.skrabec@siol.net>
 References: <20171127205750.19277-1-jernej.skrabec@siol.net>
-Message-ID: <20171127205750.19277-9-jernej.skrabec@siol.net>
+Message-ID: <20171127205750.19277-14-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds basic support for VI planes. They are meant for video
-overlay and because of that they support YUV formats too. However, using
-YUV planes is not straightforward, so only RGB support for now.
+DE2 have many CSC units - channel input CSC, channel output CSC and
+mixer output CSC and maybe more.
+
+Fortunately, they have all same register layout, only base offsets
+differs.
+
+Add support only for channel output CSC for now.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_layer.c |  40 +++++++---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 144 +++++++++++++++++++++++++++++++++---
- drivers/gpu/drm/sun4i/sun8i_mixer.h |  38 ++++++++--
- 3 files changed, 196 insertions(+), 26 deletions(-)
+ drivers/gpu/drm/sun4i/Makefile    |  2 +-
+ drivers/gpu/drm/sun4i/sun8i_csc.c | 90 +++++++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_csc.h | 36 ++++++++++++++++
+ 3 files changed, 127 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.h
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
-index 49ccdd0149bd..e1b6ad82145e 100644
---- a/drivers/gpu/drm/sun4i/sun8i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
-@@ -47,13 +47,22 @@ static int sun8i_mixer_layer_atomic_check(struct drm_plane *plane,
- 					    true, true);
- }
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index 70df480792f9..f82cc69ede72 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -9,7 +9,7 @@ sun4i-drm-hdmi-y		+= sun4i_hdmi_enc.o
+ sun4i-drm-hdmi-y		+= sun4i_hdmi_i2c.o
+ sun4i-drm-hdmi-y		+= sun4i_hdmi_tmds_clk.o
  
-+static void sun8i_mixer_layer_enable(struct sun8i_layer *layer, bool enable)
+-sun8i-mixer-y			+= sun8i_mixer.o sun8i_layer.o sun8i_scaler.o
++sun8i-mixer-y			+= sun8i_mixer.o sun8i_layer.o sun8i_scaler.o sun8i_csc.o
+ 
+ sun4i-tcon-y			+= sun4i_crtc.o
+ sun4i-tcon-y			+= sun4i_dotclock.o
+diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.c b/drivers/gpu/drm/sun4i/sun8i_csc.c
+new file mode 100644
+index 000000000000..d48c28f8d568
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun8i_csc.c
+@@ -0,0 +1,90 @@
++/*
++ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#include "sun8i_csc.h"
++
++static const u32 ccsc_base[2][2] = {
++	{CCSC00_OFFSET, CCSC01_OFFSET},
++	{CCSC10_OFFSET, CCSC11_OFFSET},
++};
++
++/*
++ * Factors are in two's complement format, 10 bits for fractinal part.
++ * First tree values in each line are multiplication factor and last
++ * value is constant, which is added at the end.
++ */
++static const u32 yuv2rgb[] = {
++	0x000004A8, 0x00000000, 0x00000662, 0xFFFC845A,
++	0x000004A8, 0xFFFFFE6F, 0xFFFFFCBF, 0x00021DF4,
++	0x000004A8, 0x00000813, 0x00000000, 0xFFFBAC4A,
++};
++
++static const u32 yvu2rgb[] = {
++	0x000004A8, 0x00000662, 0x00000000, 0xFFFC845A,
++	0x000004A8, 0xFFFFFCBF, 0xFFFFFE6F, 0x00021DF4,
++	0x000004A8, 0x00000000, 0x00000813, 0xFFFBAC4A,
++};
++
++static void sun8i_csc_set_coefficients(struct regmap *map, u32 base,
++				       enum sun8i_csc_mode mode)
 +{
-+	struct sun8i_mixer *mixer = layer->mixer;
++	const u32 *table;
++	int i, data;
 +
-+	if (layer->id < mixer->cfg->vi_num)
-+		sun8i_mixer_vi_layer_enable(mixer, layer->id, enable);
-+	else
-+		sun8i_mixer_ui_layer_enable(mixer, layer->id, enable);
-+}
-+
- static void sun8i_mixer_layer_atomic_disable(struct drm_plane *plane,
- 					       struct drm_plane_state *old_state)
- {
- 	struct sun8i_layer *layer = plane_to_sun8i_layer(plane);
--	struct sun8i_mixer *mixer = layer->mixer;
- 
--	sun8i_mixer_layer_enable(mixer, layer->id, false);
-+	sun8i_mixer_layer_enable(layer, false);
- }
- 
- static void sun8i_mixer_layer_atomic_update(struct drm_plane *plane,
-@@ -63,14 +72,21 @@ static void sun8i_mixer_layer_atomic_update(struct drm_plane *plane,
- 	struct sun8i_mixer *mixer = layer->mixer;
- 
- 	if (!plane->state->visible) {
--		sun8i_mixer_layer_enable(mixer, layer->id, false);
-+		sun8i_mixer_layer_enable(layer, false);
- 		return;
- 	}
- 
--	sun8i_mixer_update_layer_coord(mixer, layer->id, plane);
--	sun8i_mixer_update_layer_formats(mixer, layer->id, plane);
--	sun8i_mixer_update_layer_buffer(mixer, layer->id, plane);
--	sun8i_mixer_layer_enable(mixer, layer->id, true);
-+	if (layer->id < mixer->cfg->vi_num) {
-+		sun8i_mixer_update_vi_layer_coord(mixer, layer->id, plane);
-+		sun8i_mixer_update_vi_layer_formats(mixer, layer->id, plane);
-+		sun8i_mixer_update_vi_layer_buffer(mixer, layer->id, plane);
-+	} else {
-+		sun8i_mixer_update_ui_layer_coord(mixer, layer->id, plane);
-+		sun8i_mixer_update_ui_layer_formats(mixer, layer->id, plane);
-+		sun8i_mixer_update_ui_layer_buffer(mixer, layer->id, plane);
++	switch (mode) {
++	case SUN8I_CSC_MODE_YUV2RGB:
++		table = yuv2rgb;
++		break;
++	case SUN8I_CSC_MODE_YVU2RGB:
++		table = yvu2rgb;
++		break;
++	default:
++		WARN(1, "Wrong CSC mode specified.");
++		return;
 +	}
 +
-+	sun8i_mixer_layer_enable(layer, true);
- }
- 
- static struct drm_plane_helper_funcs sun8i_mixer_layer_helper_funcs = {
-@@ -123,7 +139,8 @@ static struct sun8i_layer *sun8i_layer_init_one(struct drm_device *drm,
- 	if (!layer)
- 		return ERR_PTR(-ENOMEM);
- 
--	type = index == 0 ? DRM_PLANE_TYPE_PRIMARY : DRM_PLANE_TYPE_OVERLAY;
-+	type = index == mixer->cfg->vi_num ?
-+		DRM_PLANE_TYPE_PRIMARY : DRM_PLANE_TYPE_OVERLAY;
- 
- 	/* possible crtcs are set later */
- 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
-@@ -162,17 +179,18 @@ struct drm_plane **sun8i_layers_init(struct drm_device *drm,
- 	if (!planes)
- 		return ERR_PTR(-ENOMEM);
- 
--	for (i = 0; i < mixer->cfg->ui_num; i++) {
-+	for (i = 0; i < mixer->cfg->vi_num + mixer->cfg->ui_num; i++) {
- 		struct sun8i_layer *layer;
- 
- 		layer = sun8i_layer_init_one(drm, mixer, i);
- 		if (IS_ERR(layer)) {
- 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
--				i ? "overlay" : "primary");
-+				i == mixer->cfg->vi_num ?
-+					"overlay" : "primary");
- 			return ERR_CAST(layer);
- 		};
- 
--		layer->id = mixer->cfg->vi_num + i;
-+		layer->id = i;
- 		planes[i] = &layer->plane;
- 	};
- 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index fe81c048cc08..dc97351be973 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -136,12 +136,13 @@ static void sun8i_mixer_commit(struct sunxi_engine *engine)
- 		     SUN8I_MIXER_GLOBAL_DBUFF_ENABLE);
- }
- 
--void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
--				int layer, bool enable)
-+void sun8i_mixer_ui_layer_enable(struct sun8i_mixer *mixer,
-+				 int layer, bool enable)
- {
- 	u32 val;
- 
--	DRM_DEBUG_DRIVER("%sabling layer %d\n", enable ? "En" : "Dis", layer);
-+	DRM_DEBUG_DRIVER("%sabling UI layer %d\n",
-+			 enable ? "En" : "Dis", layer);
- 
- 	if (enable)
- 		val = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN;
-@@ -162,8 +163,35 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
- 			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(layer), val);
- }
- 
--int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
--				     int layer, struct drm_plane *plane)
-+void sun8i_mixer_vi_layer_enable(struct sun8i_mixer *mixer,
-+				 int layer, bool enable)
++	for (i = 0; i < 12; i++) {
++		data = table[i];
++		/* For some reason, 0x200 must be added to constant parts */
++		if (((i + 1) & 3) == 0)
++			data += 0x200;
++		regmap_write(map, SUN8I_CSC_COEFF(base, i), data);
++	}
++}
++
++static void sun8i_csc_enable(struct regmap *map, u32 base, bool enable)
 +{
 +	u32 val;
 +
-+	DRM_DEBUG_DRIVER("%sabling VI layer %d\n",
-+			 enable ? "En" : "Dis", layer);
-+
 +	if (enable)
-+		val = SUN8I_MIXER_CHAN_VI_LAYER_ATTR_EN;
++		val = SUN8I_CSC_CTRL_EN;
 +	else
 +		val = 0;
 +
-+	regmap_update_bits(mixer->engine.regs,
-+			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR(layer, 0),
-+			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR_EN, val);
-+
-+	if (enable)
-+		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(layer);
-+	else
-+		val = 0;
-+
-+	regmap_update_bits(mixer->engine.regs,
-+			   SUN8I_MIXER_BLEND_PIPE_CTL,
-+			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(layer), val);
++	regmap_update_bits(map, SUN8I_CSC_CTRL(base), SUN8I_CSC_CTRL_EN, val);
 +}
 +
-+int sun8i_mixer_update_ui_layer_coord(struct sun8i_mixer *mixer,
-+				      int layer, struct drm_plane *plane)
- {
- 	struct drm_plane_state *state = plane->state;
- 	u32 width, height, size;
-@@ -230,8 +258,46 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
- 	return 0;
- }
- 
--int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
--				       int layer, struct drm_plane *plane)
-+int sun8i_mixer_update_vi_layer_coord(struct sun8i_mixer *mixer,
-+				      int layer, struct drm_plane *plane)
++void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
++				     enum sun8i_csc_mode mode)
 +{
-+	struct drm_plane_state *state = plane->state;
-+	u32 width, height, size;
++	u32 base;
 +
-+	DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
++	base = ccsc_base[mixer->cfg->ccsc][layer];
 +
-+	/*
-+	 * Same source and destination width and height are guaranteed
-+	 * by atomic check function.
-+	 */
-+	width = drm_rect_width(&state->dst);
-+	height = drm_rect_height(&state->dst);
-+	size = SUN8I_MIXER_SIZE(width, height);
-+
-+	/* Set height and width */
-+	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n", width, height);
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_CHAN_VI_LAYER_SIZE(layer, 0),
-+		     size);
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_CHAN_VI_OVL_SIZE(layer),
-+		     size);
-+
-+	/* Set base coordinates */
-+	DRM_DEBUG_DRIVER("Layer coordinates X: %d Y: %d\n",
-+			 state->dst.x1, state->dst.y1);
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_BLEND_ATTR_COORD(layer),
-+		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_BLEND_ATTR_INSIZE(layer),
-+		     size);
-+
-+	return 0;
++	sun8i_csc_set_coefficients(mixer->engine.regs, base, mode);
 +}
 +
-+int sun8i_mixer_update_ui_layer_formats(struct sun8i_mixer *mixer,
-+					int layer, struct drm_plane *plane)
- {
- 	struct drm_plane_state *state = plane->state;
- 	const struct de2_fmt_info *fmt_info;
-@@ -251,8 +317,31 @@ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
- 	return 0;
- }
- 
--int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
--				      int layer, struct drm_plane *plane)
-+int sun8i_mixer_update_vi_layer_formats(struct sun8i_mixer *mixer,
-+					int layer, struct drm_plane *plane)
++void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable)
 +{
-+	struct drm_plane_state *state = plane->state;
-+	const struct de2_fmt_info *fmt_info;
-+	u32 val;
++	u32 base;
 +
-+	fmt_info = sun8i_mixer_format_info(state->fb->format->format);
-+	if (!fmt_info) {
-+		DRM_DEBUG_DRIVER("Invalid format\n");
-+		return -EINVAL;
-+	}
++	base = ccsc_base[mixer->cfg->ccsc][layer];
 +
-+	val = fmt_info->de2_fmt << SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET;
-+	regmap_update_bits(mixer->engine.regs,
-+			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR(layer, 0),
-+			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR_FBFMT_MASK |
-+			   SUN8I_MIXER_CHAN_VI_LAYER_ATTR_RGB_MODE,
-+			   val | SUN8I_MIXER_CHAN_VI_LAYER_ATTR_RGB_MODE);
-+
-+	return 0;
++	sun8i_csc_enable(mixer->engine.regs, base, enable);
 +}
+diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.h b/drivers/gpu/drm/sun4i/sun8i_csc.h
+new file mode 100644
+index 000000000000..19ae1dda06c4
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun8i_csc.h
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
 +
-+int sun8i_mixer_update_ui_layer_buffer(struct sun8i_mixer *mixer,
-+				       int layer, struct drm_plane *plane)
- {
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
-@@ -288,6 +377,43 @@ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
- 	return 0;
- }
- 
-+int sun8i_mixer_update_vi_layer_buffer(struct sun8i_mixer *mixer,
-+				       int layer, struct drm_plane *plane)
-+{
-+	struct drm_plane_state *state = plane->state;
-+	struct drm_framebuffer *fb = state->fb;
-+	struct drm_gem_cma_object *gem;
-+	dma_addr_t paddr;
-+	int bpp;
++#ifndef _SUN8I_CSC_H_
++#define _SUN8I_CSC_H_
 +
-+	/* Get the physical address of the buffer in memory */
-+	gem = drm_fb_cma_get_gem_obj(fb, 0);
++#include "sun8i_mixer.h"
 +
-+	DRM_DEBUG_DRIVER("Using GEM @ %pad\n", &gem->paddr);
++/* VI channel CSC units offsets */
++#define CCSC00_OFFSET 0xAA050
++#define CCSC01_OFFSET 0xFA000
++#define CCSC10_OFFSET 0xA0000
++#define CCSC11_OFFSET 0xF0000
 +
-+	/* Compute the start of the displayed memory */
-+	bpp = fb->format->cpp[0];
-+	paddr = gem->paddr + fb->offsets[0];
++#define SUN8I_CSC_CTRL(base)		(base + 0x0)
++#define SUN8I_CSC_COEFF(base, i)	(base + 0x10 + 4 * i)
 +
-+	/* Fixup framebuffer address for src coordinates */
-+	paddr += (state->src.x1 >> 16) * bpp;
-+	paddr += (state->src.y1 >> 16) * fb->pitches[0];
++#define SUN8I_CSC_CTRL_EN		BIT(0)
 +
-+	/* Set the line width */
-+	DRM_DEBUG_DRIVER("Layer line width: %d bytes\n", fb->pitches[0]);
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_CHAN_VI_LAYER_PITCH(layer, 0, 0),
-+		     fb->pitches[0]);
++enum sun8i_csc_mode {
++	SUN8I_CSC_MODE_OFF,
++	SUN8I_CSC_MODE_YUV2RGB,
++	SUN8I_CSC_MODE_YVU2RGB,
++};
 +
-+	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
++void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
++				     enum sun8i_csc_mode mode);
++void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable);
 +
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_CHAN_VI_LAYER_TOP_LADDR(layer, 0, 0),
-+		     lower_32_bits(paddr));
-+
-+	return 0;
-+}
-+
- static const struct sunxi_engine_ops sun8i_engine_ops = {
- 	.commit		= sun8i_mixer_commit,
- 	.layers_init	= sun8i_layers_init,
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index caebd9cc550f..572ef184a21a 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -81,6 +81,24 @@
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET	8
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK	GENMASK(31, 24)
- 
-+#define SUN8I_MIXER_CHAN_VI_LAYER_ATTR(ch, layer) \
-+		(0x2000 + 0x1000 * (ch) + 0x30 * (layer) + 0x0)
-+#define SUN8I_MIXER_CHAN_VI_LAYER_SIZE(ch, layer) \
-+		(0x2000 + 0x1000 * (ch) + 0x30 * (layer) + 0x4)
-+#define SUN8I_MIXER_CHAN_VI_LAYER_COORD(ch, layer) \
-+		(0x2000 + 0x1000 * (ch) + 0x30 * (layer) + 0x8)
-+#define SUN8I_MIXER_CHAN_VI_LAYER_PITCH(ch, layer, plane) \
-+		(0x2000 + 0x1000 * (ch) + 0x30 * (layer) + 0xc + 4 * (plane))
-+#define SUN8I_MIXER_CHAN_VI_LAYER_TOP_LADDR(ch, layer, plane) \
-+		(0x2000 + 0x1000 * (ch) + 0x30 * (layer) + 0x18 + 4 * (plane))
-+#define SUN8I_MIXER_CHAN_VI_OVL_SIZE(ch)	(0x2000 + 0x1000 * (ch) + 0xe8)
-+
-+#define SUN8I_MIXER_CHAN_VI_LAYER_ATTR_EN		BIT(0)
-+/* RGB mode should be set for RGB formats and cleared for YCbCr */
-+#define SUN8I_MIXER_CHAN_VI_LAYER_ATTR_RGB_MODE		BIT(15)
-+#define SUN8I_MIXER_CHAN_VI_LAYER_ATTR_FBFMT_OFFSET	8
-+#define SUN8I_MIXER_CHAN_VI_LAYER_ATTR_FBFMT_MASK	GENMASK(12, 8)
-+
- #define SUN8I_MIXER_FBFMT_ARGB8888	0
- #define SUN8I_MIXER_FBFMT_ABGR8888	1
- #define SUN8I_MIXER_FBFMT_RGBA8888	2
-@@ -140,12 +158,20 @@ engine_to_sun8i_mixer(struct sunxi_engine *engine)
- 	return container_of(engine, struct sun8i_mixer, engine);
- }
- 
--void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
--				int layer, bool enable);
--int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
--				     int layer, struct drm_plane *plane);
--int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
-+void sun8i_mixer_ui_layer_enable(struct sun8i_mixer *mixer,
-+				 int layer, bool enable);
-+int sun8i_mixer_update_ui_layer_coord(struct sun8i_mixer *mixer,
-+				      int layer, struct drm_plane *plane);
-+int sun8i_mixer_update_ui_layer_formats(struct sun8i_mixer *mixer,
-+					int layer, struct drm_plane *plane);
-+int sun8i_mixer_update_ui_layer_buffer(struct sun8i_mixer *mixer,
- 				       int layer, struct drm_plane *plane);
--int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
-+void sun8i_mixer_vi_layer_enable(struct sun8i_mixer *mixer,
-+				 int layer, bool enable);
-+int sun8i_mixer_update_vi_layer_coord(struct sun8i_mixer *mixer,
- 				      int layer, struct drm_plane *plane);
-+int sun8i_mixer_update_vi_layer_formats(struct sun8i_mixer *mixer,
-+					int layer, struct drm_plane *plane);
-+int sun8i_mixer_update_vi_layer_buffer(struct sun8i_mixer *mixer,
-+				       int layer, struct drm_plane *plane);
- #endif /* _SUN8I_MIXER_H_ */
++#endif
 -- 
 2.15.0
