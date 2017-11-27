@@ -1,50 +1,36 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Nov 2017 15:43:16 +0000
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171123150439.GB18754@mellanox.com>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <20171123150439.GB18754@mellanox.com>
-Message-ID: <20171127154316.GG31757@n2100.armlinux.org.uk>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Nov 2017 16:41:41 +0100
+Subject: [PATCH v2 17/18] ARM: dts: sun8i: a711: Reinstate the PMIC compatible
+In-Reply-To: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <97e9c55836808d869f962c376f30d17b774f2251.1511797218.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 08:04:39AM -0700, Jason Gunthorpe wrote:
-> Like Russell has said already, the kernel is the only place that could
-> actually have all the information needed. User space would have to use
-> some kind of trail and error approach to figure out what the offset
-> should be.
+When we added the regulator support in commit 90c5d7cdae64 ("ARM: dts:
+sun8i: a711: Add regulator support"), we also dropped the PMIC's
+compatible. Since it's not in the PMIC DTSI, unlike most other PMIC
+DTSI, it obviously wasn't probing anymore.
 
-Jason,
+Re-add it so that everything works again.
 
-Now that -rc1 is out, and I'm rebasing the branches, what I find is
-the patch that was merged is not the patch that I last tested.  The
-last patch I had from you was 22 Sep 2017.
+Fixes: 90c5d7cdae64 ("ARM: dts: sun8i: a711: Add regulator support")
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-The most obvious difference is in drivers/rtc/class.c:
-
--+      /* Drivers can revise this default after allocating the device. */
-++      /* Drivers can revise this default after allocating the device. It
-++       * should be the value of wallclock tv_nsec that the driver needs in
-++       * order to synchronize the second tick over during set.
-++       */
-
-but there's also considerable differences in kernel/time/ntp.c, which
-seems to miss out on some fixes for bugs I reported along the way:
-
- +      getnstimeofday64(&now);
- +
--+      adjust = now;
-++      now = adjust;
-
-What's going on?
-
-I've got a rebase mess here to sort out, and it's a horrid mess.
-
-I think what's in -rc1 is rather fscked.
-
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 98715538932f..a021ee6da396 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -146,6 +146,7 @@
+ 	status = "okay";
+ 
+ 	axp81x: pmic at 3a3 {
++		compatible = "x-powers,axp813";
+ 		reg = <0x3a3>;
+ 		interrupt-parent = <&r_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+git-series 0.9.1
