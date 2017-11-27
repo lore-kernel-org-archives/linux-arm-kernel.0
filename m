@@ -1,44 +1,43 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 27 Nov 2017 10:46:20 +0100
-Subject: [PATCH] fix perl locale warnings in arch/arm/boot/
-In-Reply-To: <CAK7LNARWMpxxC9hT8f7rGj5McjdNU1GXfjML9NbWFTCGyQ++dg@mail.gmail.com>
-References: <20171119222703.GA12824@amd>
- <CAK7LNARWMpxxC9hT8f7rGj5McjdNU1GXfjML9NbWFTCGyQ++dg@mail.gmail.com>
-Message-ID: <20171127094620.GA18072@amd>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Mon, 27 Nov 2017 17:48:42 +0800
+Subject: [PATCH v2 0/2] add clk controller driver for Meson-AXG SoC
+Message-ID: <20171127094844.16742-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add driver for the clk controller which found in Meson AXG SoC
 
-Commit 429f7a062e3b5cf6fcf01eb00600cee5fe4d751f introduced perl into
-arch/arm/boot/compressed/Makefile, which unfortunately leads to locale
-warnings.
+  Note, we deliberately create a seperate source file for the Meson AXG
+series, instead of sharing code with previous GXBB/GXL - the file axg.c
+It would help us maintaining the code more easily.
 
-Fix it by setting default locale.
+Changes since v1 [1]:
+ - rework register definion, use '(offset << 2)' to better match
+   the description from data sheet
+ - drop "#include dt-bindings/clock/gxbb-aoclkc.h" from dts
+ - rebase code to v4.15-rc1
 
-Signed-off-by: Pavel Machek <pavel@ucw.cz>
+[1] 
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005239.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005240.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005241.html
 
-diff --git a/arch/arm/boot/compressed/Makefile b/arch/arm/boot/compressed/Makefile
-index 45a6b9b..4656e98 100644
---- a/arch/arm/boot/compressed/Makefile
-+++ b/arch/arm/boot/compressed/Makefile
-@@ -118,7 +118,7 @@ asflags-y := -DZIMAGE
- 
- # Supply kernel BSS size to the decompressor via a linker symbol.
- KBSS_SZ = $(shell $(CROSS_COMPILE)nm $(obj)/../../../../vmlinux | \
--		perl -e 'while (<>) { \
-+		LC_ALL=C perl -e 'while (<>) { \
- 			$$bss_start=hex($$1) if /^([[:xdigit:]]+) B __bss_start$$/; \
- 			$$bss_end=hex($$1) if /^([[:xdigit:]]+) B __bss_stop$$/; \
- 		}; printf "%d\n", $$bss_end - $$bss_start;')
 
+Qiufang Dai (2):
+  clk: meson-axg: add clock controller drivers
+  arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
+
+ arch/arm64/Kconfig.platforms               |   1 +
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi |  15 +
+ drivers/clk/meson/Kconfig                  |   8 +
+ drivers/clk/meson/Makefile                 |   1 +
+ drivers/clk/meson/axg.c                    | 948 +++++++++++++++++++++++++++++
+ drivers/clk/meson/axg.h                    | 126 ++++
+ include/dt-bindings/clock/axg-clkc.h       |  72 +++
+ 7 files changed, 1171 insertions(+)
+ create mode 100644 drivers/clk/meson/axg.c
+ create mode 100644 drivers/clk/meson/axg.h
+ create mode 100644 include/dt-bindings/clock/axg-clkc.h
 
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/252b7f1a/attachment.sig>
+2.15.0
