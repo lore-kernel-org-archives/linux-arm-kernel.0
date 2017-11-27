@@ -1,287 +1,149 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Nov 2017 16:38:00 +0000
-Subject: [PATCHv2 06/12] arm64: add basic pointer authentication support
+Date: Mon, 27 Nov 2017 16:38:06 +0000
+Subject: [PATCHv2 12/12] arm64: docs: document pointer authentication
 In-Reply-To: <20171127163806.31435-1-mark.rutland@arm.com>
 References: <20171127163806.31435-1-mark.rutland@arm.com>
-Message-ID: <20171127163806.31435-7-mark.rutland@arm.com>
+Message-ID: <20171127163806.31435-13-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds basic support for pointer authentication, allowing
-userspace to make use of APIAKey. The kernel maintains an APIAKey value
-for each process (shared by all threads within), which is initialised to
-a random value at exec() time.
-
-To describe that address authentication instructions are available, the
-ID_AA64ISAR0.{APA,API} fields are exposed to userspace. A new hwcap,
-APIA, is added to describe that the kernel manages APIAKey.
-
-Instructions using other keys (APIBKey, APDAKey, APDBKey) are disabled,
-and will behave as NOPs. These may be made use of in future patches.
-
-No support is added for the generic key (APGAKey), though this cannot be
-trapped or made to behave as a NOP. Its presence is not advertised with
-a hwcap.
+Now that we've added code to support pointer authentication, add some
+documentation so that people can figure out if/how to use it.
 
 Signed-off-by: Mark Rutland <mark.rutland@arm.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki K Poulose <suzuki.poulose@arm.com>
 Cc: Will Deacon <will.deacon@arm.com>
+Cc: Yao Qi <yao.qi@arm.com>
 ---
- arch/arm64/include/asm/mmu.h          |  5 ++
- arch/arm64/include/asm/mmu_context.h  | 25 +++++++++-
- arch/arm64/include/asm/pointer_auth.h | 89 +++++++++++++++++++++++++++++++++++
- arch/arm64/include/uapi/asm/hwcap.h   |  1 +
- arch/arm64/kernel/cpufeature.c        | 17 ++++++-
- arch/arm64/kernel/cpuinfo.c           |  1 +
- 6 files changed, 134 insertions(+), 4 deletions(-)
- create mode 100644 arch/arm64/include/asm/pointer_auth.h
+ Documentation/arm64/booting.txt                |  8 +++
+ Documentation/arm64/elf_hwcaps.txt             |  6 ++
+ Documentation/arm64/pointer-authentication.txt | 85 ++++++++++++++++++++++++++
+ 3 files changed, 99 insertions(+)
+ create mode 100644 Documentation/arm64/pointer-authentication.txt
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 0d34bf0a89c7..2bcdf7f923ba 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -16,12 +16,17 @@
- #ifndef __ASM_MMU_H
- #define __ASM_MMU_H
+diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
+index 8d0df62c3fe0..8df9f4658d6f 100644
+--- a/Documentation/arm64/booting.txt
++++ b/Documentation/arm64/booting.txt
+@@ -205,6 +205,14 @@ Before jumping into the kernel, the following conditions must be met:
+     ICC_SRE_EL2.SRE (bit 0) must be initialised to 0b0.
+   - The DT or ACPI tables must describe a GICv2 interrupt controller.
  
-+#include <asm/pointer_auth.h>
++  For CPUs with pointer authentication functionality:
++  - If EL3 is present:
++    SCR_EL3.APK (bit 16) must be initialised to 0b1
++    SCR_EL3.API (bit 17) must be initialised to 0b1
++  - If the kernel is entered at EL1:
++    HCR_EL2.APK (bit 40) must be initialised to 0b1
++    HCR_EL2.API (bit 41) must be initialised to 0b1
 +
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
+ The requirements described above for CPU mode, caches, MMUs, architected
+ timers, coherency and system registers apply to all CPUs.  All CPUs must
+ enter the kernel in the same exception level.
+diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
+index 89edba12a9e0..6cf40e419a9d 100644
+--- a/Documentation/arm64/elf_hwcaps.txt
++++ b/Documentation/arm64/elf_hwcaps.txt
+@@ -158,3 +158,9 @@ HWCAP_SHA512
+ HWCAP_SVE
  
- typedef struct {
- 	atomic64_t	id;
- 	void		*vdso;
- 	unsigned long	flags;
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	struct ptrauth_keys	ptrauth_keys;
-+#endif
- } mm_context_t;
- 
- /*
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a9b5e..06757a537bd7 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -31,7 +31,6 @@
- #include <asm/cacheflush.h>
- #include <asm/cpufeature.h>
- #include <asm/proc-fns.h>
--#include <asm-generic/mm_hooks.h>
- #include <asm/cputype.h>
- #include <asm/pgtable.h>
- #include <asm/sysreg.h>
-@@ -154,7 +153,14 @@ static inline void cpu_replace_ttbr1(pgd_t *pgd)
- #define destroy_context(mm)		do { } while(0)
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
- 
--#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
-+static inline int init_new_context(struct task_struct *tsk,
-+			struct mm_struct *mm)
-+{
-+	atomic64_set(&mm->context.id, 0);
-+	mm_ctx_ptrauth_init(&mm->context);
+     Functionality implied by ID_AA64PFR0_EL1.SVE == 0b0001.
 +
-+	return 0;
-+}
- 
- /*
-  * This is called when "tsk" is about to enter lazy TLB mode.
-@@ -200,6 +206,8 @@ static inline void __switch_mm(struct mm_struct *next)
- 		return;
- 	}
- 
-+	mm_ctx_ptrauth_switch(&next->context);
++HWCAP_APIA
 +
- 	check_and_switch_context(next, cpu);
- }
- 
-@@ -226,6 +234,19 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
- 
- void verify_cpu_asid_bits(void);
- 
-+static inline void arch_dup_mmap(struct mm_struct *oldmm,
-+				 struct mm_struct *mm)
-+{
-+	mm_ctx_ptrauth_dup(&oldmm->context, &mm->context);
-+}
-+#define arch_dup_mmap arch_dup_mmap
++    EL0 AddPac and Auth functionality using APIAKey_EL1 is enabled, as
++    described by Documentation/arm64/pointer-authentication.txt.
 +
-+/*
-+ * We need to override arch_dup_mmap before including the generic hooks, which
-+ * are otherwise sufficient for us.
-+ */
-+#include <asm-generic/mm_hooks.h>
-+
- #endif /* !__ASSEMBLY__ */
- 
- #endif /* !__ASM_MMU_CONTEXT_H */
-diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
 new file mode 100644
-index 000000000000..964da0c3dc48
+index 000000000000..e9b5c6bdb84f
 --- /dev/null
-+++ b/arch/arm64/include/asm/pointer_auth.h
-@@ -0,0 +1,89 @@
-+/*
-+ * Copyright (C) 2016 ARM Ltd.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+#ifndef __ASM_POINTER_AUTH_H
-+#define __ASM_POINTER_AUTH_H
++++ b/Documentation/arm64/pointer-authentication.txt
+@@ -0,0 +1,85 @@
++Pointer authentication in AArch64 Linux
++=======================================
 +
-+#include <linux/random.h>
++Author: Mark Rutland <mark.rutland@arm.com>
++Date: 2017-07-19
 +
-+#include <asm/cpufeature.h>
-+#include <asm/sysreg.h>
++This document briefly describes the provision of pointer authentication
++functionality in AArch64 Linux.
 +
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+/*
-+ * Each key is a 128-bit quantity which is split accross a pair of 64-bit
-+ * registers (Lo and Hi).
-+ */
-+struct ptrauth_key {
-+	unsigned long lo, hi;
-+};
 +
-+/*
-+ * We give each process its own instruction A key (APIAKey), which is shared by
-+ * all threads. This is inherited upon fork(), and reinitialised upon exec*().
-+ * All other keys are currently unused, with APIBKey, APDAKey, and APBAKey
-+ * instructions behaving as NOPs.
-+ */
-+struct ptrauth_keys {
-+	struct ptrauth_key apia;
-+};
++Architecture overview
++---------------------
 +
-+static inline void ptrauth_keys_init(struct ptrauth_keys *keys)
-+{
-+	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return;
++The ARMv8.3 Pointer Authentication extension adds primitives that can be
++used to mitigate certain classes of attack where an attacker can corrupt
++the contents of some memory (e.g. the stack).
 +
-+	get_random_bytes(keys, sizeof(*keys));
-+}
++The extension uses a Pointer Authentication Code (PAC) to determine
++whether pointers have been modified unexpectedly. A PAC is derived from
++a pointer, another value (such as the stack pointer), and a secret key
++held in system registers.
 +
-+#define __ptrauth_key_install(k, v)			\
-+do {							\
-+	write_sysreg_s(v.lo, SYS_ ## k ## KEYLO_EL1);	\
-+	write_sysreg_s(v.hi, SYS_ ## k ## KEYHI_EL1);	\
-+} while (0)
++The extension adds instructions to insert a valid PAC into a pointer,
++and to verify/remove the PAC from a pointer. The PAC occupies a number
++of high-order bits of the pointer, which varies dependent on the
++configured virtual address size and whether pointer tagging is in use.
 +
-+static inline void ptrauth_keys_switch(struct ptrauth_keys *keys)
-+{
-+	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return;
++A subset of these instructions have been allocated from the HINT
++encoding space. In the absence of the extension (or when disabled),
++these instructions behave as NOPs. Applications and libraries using
++these instructions operate correctly regardless of the presence of the
++extension.
 +
-+	__ptrauth_key_install(APIA, keys->apia);
-+}
 +
-+static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
-+				    struct ptrauth_keys *new)
-+{
-+	if (!cpus_have_const_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return;
++Basic support
++-------------
 +
-+	*new = *old;
-+}
++When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and relevant HW
++support is present, the kernel will assign a random APIAKey value to
++each process at exec*() time. This key is shared by all threads within
++the process, and the key is preserved across fork(). Presence of
++functionality using APIAKey is advertised via HWCAP_APIA.
 +
-+#define mm_ctx_ptrauth_init(ctx) \
-+	ptrauth_keys_init(&(ctx)->ptrauth_keys)
++Recent versions of GCC can compile code with APIAKey-based return
++address protection when passed the -msign-return-address option. This
++uses instructions in the HINT space, and such code can run on systems
++without the pointer authentication extension.
 +
-+#define mm_ctx_ptrauth_switch(ctx) \
-+	ptrauth_keys_switch(&(ctx)->ptrauth_keys)
++The remaining instruction and data keys (APIBKey, APDAKey, APDBKey) are
++reserved for future use, and instructions using these keys must not be
++used by software until a purpose and scope for their use has been
++decided. To enable future software using these keys to function on
++contemporary kernels, where possible, instructions using these keys are
++made to behave as NOPs.
 +
-+#define mm_ctx_ptrauth_dup(oldctx, newctx) \
-+	ptrauth_keys_dup(&(oldctx)->ptrauth_keys, &(newctx)->ptrauth_keys)
++The generic key (APGAKey) is currently unsupported. Instructions using
++the generic key must not be used by software.
 +
-+#else
-+#define mm_ctx_ptrauth_init(ctx)
-+#define mm_ctx_ptrauth_switch(ctx)
-+#define mm_ctx_ptrauth_dup(oldctx, newctx)
-+#endif
 +
-+#endif /* __ASM_POINTER_AUTH_H */
-diff --git a/arch/arm64/include/uapi/asm/hwcap.h b/arch/arm64/include/uapi/asm/hwcap.h
-index cda76fa8b9b2..20daa89d839c 100644
---- a/arch/arm64/include/uapi/asm/hwcap.h
-+++ b/arch/arm64/include/uapi/asm/hwcap.h
-@@ -43,5 +43,6 @@
- #define HWCAP_ASIMDDP		(1 << 20)
- #define HWCAP_SHA512		(1 << 21)
- #define HWCAP_SVE		(1 << 22)
-+#define HWCAP_APIA		(1 << 23)
- 
- #endif /* _UAPI__ASM_HWCAP_H */
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index babd4c173092..9df232d16845 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -145,8 +145,8 @@ static const struct arm64_ftr_bits ftr_id_aa64isar1[] = {
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_FCMA_SHIFT, 4, 0),
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_JSCVT_SHIFT, 4, 0),
- #ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
--	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_API_SHIFT, 4, 0),
--	ARM64_FTR_BITS(FTR_HIDDEN, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_APA_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_API_SHIFT, 4, 0),
-+	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_APA_SHIFT, 4, 0),
- #endif
- 	ARM64_FTR_BITS(FTR_VISIBLE, FTR_STRICT, FTR_LOWER_SAFE, ID_AA64ISAR1_DPB_SHIFT, 4, 0),
- 	ARM64_FTR_END,
-@@ -832,6 +832,15 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
- 	return is_kernel_in_hyp_mode();
- }
- 
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+static int cpu_enable_address_auth(void *__unused)
-+{
-+	config_sctlr_el1(0, SCTLR_ELx_ENIA);
++Debugging
++---------
 +
-+	return 0;
-+}
-+#endif /* CONFIG_ARM64_POINTER_AUTHENTICATION */
++When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and relevant HW
++support is present, the kernel will expose the position of TTBR0 PAC
++bits in the NT_ARM_PAC_MASK regset (struct user_pac_mask), which
++userspace can acqure via PTRACE_GETREGSET.
 +
- static bool hyp_offset_low(const struct arm64_cpu_capabilities *entry,
- 			   int __unused)
- {
-@@ -1025,6 +1034,7 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.capability = ARM64_HAS_ADDRESS_AUTH,
- 		.def_scope = SCOPE_SYSTEM,
- 		.matches = has_address_auth,
-+		.enable = cpu_enable_address_auth,
- 	},
- 	{
- 		.desc = "Generic authentication (architected algorithm)",
-@@ -1092,6 +1102,9 @@ static const struct arm64_cpu_capabilities arm64_elf_hwcaps[] = {
- #ifdef CONFIG_ARM64_SVE
- 	HWCAP_CAP(SYS_ID_AA64PFR0_EL1, ID_AA64PFR0_SVE_SHIFT, FTR_UNSIGNED, ID_AA64PFR0_SVE, CAP_HWCAP, HWCAP_SVE),
- #endif
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	HWCAP_CAP(SYS_ID_AA64ISAR1_EL1, ID_AA64ISAR1_APA_SHIFT, FTR_UNSIGNED, 1, CAP_HWCAP, HWCAP_APIA),
-+#endif
- 	{},
- };
- 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 1e2554543506..88db0328c366 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -76,6 +76,7 @@ static const char *const hwcap_str[] = {
- 	"asimddp",
- 	"sha512",
- 	"sve",
-+	"apia",
- 	NULL
- };
- 
++Separate masks are exposed for data pointers and instruction pointers,
++as the set of PAC bits can vary between the two. Debuggers should not
++expect that HWCAP_APIA implies the presence (or non-presence) of this
++regset -- in future the kernel may support the use of APIBKey, APDAKey,
++and/or APBAKey, even in the absence of APIAKey.
++
++Note that the masks apply to TTBR0 addresses, and are not valid to apply
++to TTBR1 addresses (e.g. kernel pointers).
++
++
++Virtualization
++--------------
++
++When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and uniform HW
++support is present, KVM will context switch all keys used by vCPUs.
++Otherwise, the feature is disabled. When disabled, accesses to keys, or
++use of instructions enabled within the guest will trap to EL2, and an
++UNDEFINED exception will be injected into the guest.
 -- 
 2.11.0
