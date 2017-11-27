@@ -1,58 +1,29 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:57:54 -0500
-Subject: [PATCH V3 17/29] PCI: ibmphp: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-18-git-send-email-okaya@codeaurora.org>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 27 Nov 2017 08:59:42 -0800
+Subject: [PATCH] ARM: AM33xx: PRM: Remove am33xx_pwrdm_read_prev_pwrst
+ function
+In-Reply-To: <1510313212-29660-1-git-send-email-j-keerthy@ti.com>
+References: <1510313212-29660-1-git-send-email-j-keerthy@ti.com>
+Message-ID: <20171127165942.GQ28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
+* Keerthy <j-keerthy@ti.com> [171110 03:29]:
+> Referring TRM Am335X series:
+> http://www.ti.com/lit/ug/spruh73p/spruh73p.pdf
+> 
+> The LastPowerStateEntered bitfield is present only for PM_CEFUSE
+> domain. This is not present in any of the other power domains. Hence
+> remove the generic am33xx_pwrdm_read_prev_pwrst hook which wrongly
+> reads the reserved bit fields for all the other power domains.
+> 
+> Reading the reserved bits leads to wrongly interpreting the low
+> power transitions for various power domains that do not have the
+> LastPowerStateEntered field. The pm debug counters values are wrong
+> currently as we are incrementing them based on the reserved bits.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
 
-Getting ready to remove pci_get_bus_and_slot() function in favor of
-pci_get_domain_bus_and_slot().
+Applying into omap-for-v4.15/fixes thanks.
 
-Hard-coding the domain parameter as 0 since the code doesn't seem to be
-ready for multiple domains.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/pci/hotplug/ibmphp_core.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/pci/hotplug/ibmphp_core.c b/drivers/pci/hotplug/ibmphp_core.c
-index 73cf846..92dd882 100644
---- a/drivers/pci/hotplug/ibmphp_core.c
-+++ b/drivers/pci/hotplug/ibmphp_core.c
-@@ -707,7 +707,8 @@ static void ibm_unconfigure_device(struct pci_func *func)
- 	pci_lock_rescan_remove();
- 
- 	for (j = 0; j < 0x08; j++) {
--		temp = pci_get_bus_and_slot(func->busno, (func->device << 3) | j);
-+		temp = pci_get_domain_bus_and_slot(0, func->busno,
-+						   (func->device << 3) | j);
- 		if (temp) {
- 			pci_stop_and_remove_bus_device(temp);
- 			pci_dev_put(temp);
-@@ -780,7 +781,7 @@ static int ibm_configure_device(struct pci_func *func)
- 	if (!(bus_structure_fixup(func->busno)))
- 		flag = 1;
- 	if (func->dev == NULL)
--		func->dev = pci_get_bus_and_slot(func->busno,
-+		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
- 				PCI_DEVFN(func->device, func->function));
- 
- 	if (func->dev == NULL) {
-@@ -793,7 +794,7 @@ static int ibm_configure_device(struct pci_func *func)
- 		if (num)
- 			pci_bus_add_devices(bus);
- 
--		func->dev = pci_get_bus_and_slot(func->busno,
-+		func->dev = pci_get_domain_bus_and_slot(0, func->busno,
- 				PCI_DEVFN(func->device, func->function));
- 		if (func->dev == NULL) {
- 			err("ERROR... : pci_dev still NULL\n");
--- 
-1.9.1
+Tony
