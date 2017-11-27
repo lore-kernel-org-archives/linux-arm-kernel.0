@@ -1,105 +1,46 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 27 Nov 2017 12:15:39 +0100
-Subject: [PATCH v2] arm64: dts: renesas: r8a7795: Move nodes which have no
- reg property out of bus
-In-Reply-To: <20171127110430.ulgjrzgy3pdugs2s@verge.net.au>
-References: <20171124105234.25774-1-horms+renesas@verge.net.au>
- <CAMuHMdW9V6Bkh5uS9qNA7awtygEs=qRd7jigwSHmpV2VM3n9dA@mail.gmail.com>
- <20171127110430.ulgjrzgy3pdugs2s@verge.net.au>
-Message-ID: <CAMuHMdUm=PiGVWVg9pyNTR5z2WjLcoG1uecBNBeKsSxbAxBt8w@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Mon, 27 Nov 2017 12:17:41 +0100
+Subject: [GIT PULL] Renesas ARM Based SoC DT Fixes for v4.15
+Message-ID: <cover.1511781272.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Olof, Hi Kevin, Hi Arnd,
 
-On Mon, Nov 27, 2017 at 12:04 PM, Simon Horman <horms@verge.net.au> wrote:
-> On Fri, Nov 24, 2017 at 12:09:47PM +0100, Geert Uytterhoeven wrote:
->> On Fri, Nov 24, 2017 at 11:52 AM, Simon Horman
->> <horms+renesas@verge.net.au> wrote:
->> > Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
->> > The nodes that have been moved do not have any register properties and thus
->> > shouldn't be placed on the bus.
->> >
->> > This problem is flagged by the compiler as follows:
->> > $ make
->> > ...
->> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
->> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
->> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
->> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
->> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
->> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
->> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
->> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
->> >
->> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> > ---
->> > v2
->> > * Preserve alphabetical order of nodes present in root node.
->>
->> Thanks for the update!
->>
->> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->
-> I just noticed that with this patch applied I now see:
->
-> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
-> arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53
-> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
-> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
->
-> arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
+Please consider this Renesas ARM based SoC DT fix for v4.15.
 
-Right, the "interrupt-parent = <&gic>;" inside the /soc node applies to child
-nodes of the /soc node only.
+It is from Arnd adding missing '#reset-cells' property to cpg nodes.
+This flagged by recent dtc.
 
-You can find this in two ways:
+This pull request is based on
+"[GIT PULL] Second Round of Renesas ARM Based SoC DT Updates for v4.15"
+which is tagged as renesas-dt2-for-v4.15 and you have already pulled.
 
-  1. Add "interrupt-parent = <&gic>;" to the /pmu_a57 and /pmu_a53 nodes.
-  2. Switch those nodes from "interrupt" to "interrupts-extended", e.g. turn
 
-        interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+The following changes since commit b6d3b649441936621c87b79bff8dd436e2397e3c:
 
-     into
+  ARM: dts: r8a7743: Add xhci support to SoC dtsi (2017-10-18 07:21:36 +0200)
 
-        interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+are available in the git repository at:
 
-The latter is what e.g. arch/arm/boot/dts/armada-375.dtsi does.
+  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-dt-fixes-for-v4.15
 
-Gr{oetje,eeting}s,
+for you to fetch changes up to 098f53050154498876ef3febde706ff5c8b25cf4:
 
-                        Geert
+  ARM: dts: r8a779x: Add '#reset-cells' in cpg-mssr (2017-11-20 11:35:41 +0100)
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+----------------------------------------------------------------
+Renesas ARM Based SoC DT Fixes for v4.15
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Add missing '#reset-cells' property to cpg nodes.
+This flagged by recent dtc.
+
+----------------------------------------------------------------
+Arnd Bergmann (1):
+      ARM: dts: r8a779x: Add '#reset-cells' in cpg-mssr
+
+ arch/arm/boot/dts/r8a7790.dtsi | 1 +
+ arch/arm/boot/dts/r8a7792.dtsi | 1 +
+ arch/arm/boot/dts/r8a7793.dtsi | 1 +
+ arch/arm/boot/dts/r8a7794.dtsi | 1 +
+ 4 files changed, 4 insertions(+)
