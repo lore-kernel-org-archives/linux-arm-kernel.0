@@ -1,51 +1,67 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 27 Nov 2017 13:28:34 +0100
-Subject: [PATCH v3 4/6] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
+Date: Mon, 27 Nov 2017 13:28:35 +0100
+Subject: [PATCH v3 5/6] ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board
+ support
 In-Reply-To: <1511785716-23492-1-git-send-email-narmstrong@baylibre.com>
 References: <1511785716-23492-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1511785716-23492-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1511785716-23492-6-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the Variscite DART-MX6 SoM with :
-- i.MX6 Quad or Dual Lite SoC
-- 1Gb/2Gb LPDDR2
-- 4-64 GB eMMC
-- Camera Interface
-- HDMI+CEC interface
-- LVDS / DSI / Parallel RGB interfaces
-- Ethernet RGMII interface
-- On-SoM Wi-Fi/Bluetooth with WiLink wl1835 SDIO Module
-- SD/MMC/SDIO interface
-- USB Host + USB OTG interface
-- I2C interfaces
-- SPI interfaces
-- PCI-Express 2.0 interface
-- on-SoM Audio Codec with HP/Line-In interfaces + DMIC interface
-- Digital Audio interface
-- S/PDIF interface
+This patch adds support for the i.MX6 Quad variant of the Variscite DART-MX6
+SoM Carrier-Board.
 
-Product website : http://www.variscite.com/products/system-on-module-som/cortex-a9/dart-mx6-cpu-freescale-imx6
+This Carrier-Board has the following :
+- LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
+- HDMI Connector
+- USB Host + USB OTG Connector
+- 10/100/1000 Mbps Ethernet
+- miniPCI-Express slot
+- SD Card connector
+- Audio Headphone/Line In jack connectors
+- On-board DMIC
+- CAN bus header
+- SPI header
+- Camera Interfaces header
+- 4xButtons, 2xLeds
+- OnBoard RTC with Coin Backup battery socket
+- RS232 Header + USB-Serial debug port
 
-Support is handled with a SoM-centric dtsi exporting the default interfaces
-along the default pinmuxing to be enabled by the board dts file.
+Product Page : http://www.variscite.com/products/evaluation-kits/dart-mx6-kits
 
-Only board-independent devices like WiFi, eMMC or PMIC are enabled in the dtsi.
+The board support is done with all on-board and header interfaces enabled.
+7" LVDS Touchscreen is enabled by default along HDMI output.
+Audio interface is supported with the "simple-card" bindings.
+
+PCIe slot, On-Board DMIC and Camera Interfaces are not handled yet.
 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/boot/dts/imx6qdl-var-dart.dtsi | 504 ++++++++++++++++++++++++++++++++
- 1 file changed, 504 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qdl-var-dart.dtsi
+ arch/arm/boot/dts/Makefile                     |   1 +
+ arch/arm/boot/dts/imx6q-var-dt6customboard.dts | 239 +++++++++++++++++++++++++
+ 2 files changed, 240 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
 
-diff --git a/arch/arm/boot/dts/imx6qdl-var-dart.dtsi b/arch/arm/boot/dts/imx6qdl-var-dart.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9..148ff15 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -470,6 +470,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-tx6q-11x0-mb7.dtb \
+ 	imx6q-udoo.dtb \
+ 	imx6q-utilite-pro.dtb \
++	imx6q-var-dt6customboard.dtb \
+ 	imx6q-wandboard.dtb \
+ 	imx6q-wandboard-revb1.dtb \
+ 	imx6q-wandboard-revd1.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
 new file mode 100644
-index 0000000..0b61612
+index 0000000..76faaff
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-var-dart.dtsi
-@@ -0,0 +1,504 @@
++++ b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
+@@ -0,0 +1,239 @@
 +/*
-+ * Support for Variscite DART-MX6 Module
++ * Support for Variscite DART-MX6 Carrier-board
 + *
 + * Copyright 2017 BayLibre, SAS
 + * Author: Neil Armstrong <narmstrong@baylibre.com>
@@ -53,499 +69,234 @@ index 0000000..0b61612
 + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 + */
 +
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/sound/fsl-imx-audmux.h>
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-var-dart.dtsi"
++#include <dt-bindings/input/linux-event-codes.h>
 +
 +/ {
-+	memory {
-+		reg = <0x10000000 0x40000000>;
++	model = "Variscite DART-MX6 Carrier-board";
++	compatible = "variscite,dt6customboard", "fsl,imx6q";
++
++	backlight_lvds: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&pwm2 0 50000>;
++		brightness-levels = <0 4 8 16 32 64 128 248>;
++		default-brightness-level = <7>;
++		status = "okay";
 +	};
 +
-+	reg_3p3v: regulator-3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
++	gpio-keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		autorepeat;
++
++		back {
++			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_BACK>;
++			label = "Key Back";
++			linux,input-type = <1>;
++			debounce-interval = <100>;
++			gpio-key,wakeup;
++		};
++
++		home {
++			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_HOME>;
++			label = "Key Home";
++			linux,input-type = <1>;
++			debounce-interval = <100>;
++			gpio-key,wakeup;
++		};
++
++		menu {
++			gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
++			linux,code = <KEY_MENU>;
++			label = "Key Menu";
++			linux,input-type = <1>;
++			debounce-interval = <100>;
++			gpio-key,wakeup;
++		};
 +	};
 +
-+	reg_wl18xx_vmmc: regulator-wl18xx {
-+		compatible = "regulator-fixed";
-+		regulator-name = "vwl1807";
-+		regulator-min-microvolt = <1800000>;
-+		regulator-max-microvolt = <1800000>;
-+		gpio = <&gpio7 8 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		startup-delay-us = <70000>;
-+	};
-+};
++	gpio-leds {
++		compatible = "gpio-leds";
 +
-+&audmux {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_audmux>;
-+	status = "okay";
++		led1 {
++			gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
 +
-+	ssi2 {
-+		fsl,audmux-port = <1>;
-+		fsl,port-config = <
-+			(IMX_AUDMUX_V2_PTCR_SYN |
-+			IMX_AUDMUX_V2_PTCR_TFSDIR |
-+			IMX_AUDMUX_V2_PTCR_TFSEL(2) |
-+			IMX_AUDMUX_V2_PTCR_TCLKDIR |
-+			IMX_AUDMUX_V2_PTCR_TCSEL(2))
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(2)
-+		>;
++		led2 {
++			gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-on";
++		};
 +	};
 +
-+	aud3 {
-+		fsl,audmux-port = <2>;
-+		fsl,port-config = <
-+			IMX_AUDMUX_V2_PTCR_SYN
-+			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
-+		>;
-+	};
-+};
++	panel1: lvds-panel {
++		compatible = "sgd,gktw70sdae4se", "panel-lvds";
++		backlight = <&backlight_lvds>;
 +
-+&can1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan1>;
-+	status = "disabled";
-+};
++		width-mm = <153>;
++		height-mm = <86>;
 +
-+&can2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_flexcan2>;
-+	status = "disabled";
-+};
++		label = "gktw70sdae4se";
 +
-+&ecspi1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_ecspi1>;
-+	status = "disabled";
-+};
++		data-mapping = "jeida-18";
 +
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_enet>;
-+	phy-mode = "rgmii";
-+	status = "disabled";
-+};
++		panel-timing {
++			clock-frequency = <32000000>;
++			hactive = <800>;
++			vactive = <480>;
++			hback-porch = <39>;
++			hfront-porch = <39>;
++			vback-porch = <29>;
++			vfront-porch = <13>;
++			hsync-len = <47>;
++			vsync-len = <2>;
++		};
 +
-+&hdmi {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_hdmicec>;
-+	ddc-i2c-bus = <&i2c1>;
-+	status = "disabled";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c1>;
-+	status = "disabled";
-+};
-+
-+&i2c2 {
-+	clock-frequency = <100000>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c2>;
-+	status = "okay";
-+
-+	pmic at 08 {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_pmic>;
-+		compatible = "fsl,pfuze100";
-+		reg = <0x08>;
-+
-+		regulators {
-+			sw1a_reg: sw1ab {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw1c_reg: sw1c {
-+				regulator-min-microvolt = <300000>;
-+				regulator-max-microvolt = <1875000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+				regulator-ramp-delay = <6250>;
-+			};
-+
-+			sw2_reg: sw2 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3300000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3a_reg: sw3a {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw3b_reg: sw3b {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			sw4_reg: sw4 {
-+				regulator-min-microvolt = <800000>;
-+				regulator-max-microvolt = <3950000>;
-+			};
-+
-+			snvs_reg: vsnvs {
-+				regulator-min-microvolt = <1200000>;
-+				regulator-max-microvolt = <3000000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vref_reg: vrefddr {
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+
-+			vgen6_reg: vgen6 {
-+				regulator-min-microvolt = <2800000>;
-+				regulator-max-microvolt = <2800000>;
-+				regulator-always-on;
-+				regulator-boot-on;
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&lvds1_out>;
 +			};
 +		};
 +	};
 +
-+	codec: codec at 1b {
-+		compatible = "ti,tlv320aic3106";
-+		reg = <0x1b>;
-+		#sound-dai-cells = <0>;
-+		DRVDD-supply = <&reg_3p3v>;
-+		AVDD-supply = <&reg_3p3v>;
-+		IOVDD-supply = <&reg_3p3v>;
-+		DVDD-supply = <&reg_3p3v>;
-+		ai3x-ocmv = <0>;
-+		gpio-reset = <&gpio5 5 GPIO_ACTIVE_LOW>;
++	reg_usb_h1_vbus: regulator-usbh1vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
 +	};
++
++	reg_usb_otg_vbus: regulator-usbotgvbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	sound {
++		compatible = "simple-audio-card";
++		simple-audio-card,name = "dt6-customboard-audio";
++		simple-audio-card,format = "i2s";
++		simple-audio-card,bitclock-master = <&sound_codec>;
++		simple-audio-card,frame-master = <&sound_codec>;
++		simple-audio-card,widgets = "Headphone", "Headphone Jack",
++					    "Line", "Line In";
++		simple-audio-card,routing = "Headphone Jack", "HPLOUT",
++					    "Headphone Jack", "HPROUT",
++					    "LINE1L", "Line In",
++					    "LINE1R", "Line In";
++
++		sound_cpu: simple-audio-card,cpu {
++			sound-dai = <&ssi2>;
++		};
++
++		sound_codec: simple-audio-card,codec {
++			sound-dai = <&codec>;
++			clocks = <&clks IMX6QDL_CLK_CKO>;
++		};
++	};
++};
++
++&can1 {
++	status = "okay";
++};
++
++&ecspi1 {
++	cs-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>,
++		   <&gpio4 10 GPIO_ACTIVE_HIGH>;
++	status = "okay";
++};
++
++&fec {
++	status = "okay";
++	phy-mode = "rgmii";
++	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
++};
++
++&hdmi {
++	status = "okay";
++};
++
++&i2c1 {
++	clock-frequency = <100000>;
++	status = "okay";
 +};
 +
 +&i2c3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_i2c3>;
-+	status = "disabled";
-+};
++	clock-frequency = <100000>;
++	status = "okay";
 +
-+&iomuxc {
-+	pinctrl_audmux: audmux {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT7__AUD3_RXD		0x130b0
-+			MX6QDL_PAD_CSI0_DAT4__AUD3_TXC		0x130b0
-+			MX6QDL_PAD_CSI0_DAT5__AUD3_TXD		0x110b0
-+			MX6QDL_PAD_CSI0_DAT6__AUD3_TXFS		0x130b0
-+			/* Audio Clock */
-+			MX6QDL_PAD_GPIO_0__CCM_CLKO1		0x130b0
-+		>;
++	touchscreen at 38 {
++		compatible = "edt,edt-ft5x06";
++		reg = <0x38>;
++		interrupt-parent = <&gpio1>;
++		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
++		touchscreen-size-x = <800>;
++		touchscreen-size-y = <480>;
++		touchscreen-inverted-x;
++		touchscreen-inverted-y;
 +	};
 +
-+	pinctrl_bt: bt {
-+		fsl,pins = <
-+			/* Bluetooth enable */
-+			MX6QDL_PAD_SD3_DAT6__GPIO6_IO18		0x1b0b1
-+			/* Bluetooth Slow Clock */
-+			MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT	0x000b0
-+		>;
-+	};
-+
-+	pinctrl_ecspi1: ecspi1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL1__ECSPI1_MISO	0x100b1
-+			MX6QDL_PAD_KEY_ROW0__ECSPI1_MOSI	0x100b1
-+			MX6QDL_PAD_KEY_COL0__ECSPI1_SCLK	0x100b1
-+			/* SPI1 CS0 */
-+			MX6QDL_PAD_KEY_ROW1__GPIO4_IO09		0x1b0b0
-+			/* SPI1 CS1 */
-+			MX6QDL_PAD_KEY_COL2__GPIO4_IO10		0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_enet: enetgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x100b0
-+			MX6QDL_PAD_ENET_MDC__ENET_MDC		0x100b0
-+			MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x10030
-+			MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x10030
-+			MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x10030
-+			MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x10030
-+			MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x10030
-+			MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x10030
-+			MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x100b0
-+			MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
-+			MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x1b030
-+			MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x1b030
-+			MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
-+			MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
-+			MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x1b030
-+		>;
-+	};
-+
-+	pinctrl_flexcan1: flexcan1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_7__FLEXCAN1_TX	0x1b0b0
-+			MX6QDL_PAD_GPIO_8__FLEXCAN1_RX	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_flexcan2: flexcan2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL4__FLEXCAN2_TX	0x1b0b0
-+			MX6QDL_PAD_KEY_ROW4__FLEXCAN2_RX	0x1b0b0
-+		>;
-+	};
-+
-+	pinctrl_hdmicec: hdmicecgrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_ROW2__HDMI_TX_CEC_LINE	0x1f8b0
-+		>;
-+	};
-+
-+	pinctrl_i2c1: i2c1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT8__I2C1_SDA	0x4001b8b1
-+			MX6QDL_PAD_CSI0_DAT9__I2C1_SCL	0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_KEY_COL3__I2C2_SCL	0x4001b8b1
-+			MX6QDL_PAD_KEY_ROW3__I2C2_SDA	0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_i2c3: i2c3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_GPIO_5__I2C3_SCL	0x4001b8b1
-+			MX6QDL_PAD_GPIO_16__I2C3_SDA	0x4001b8b1
-+		>;
-+	};
-+
-+	pinctrl_pmic: pmicgrp {
-+		fsl,pins = <
-+			/* PMIC INT */
-+			MX6QDL_PAD_GPIO_17__GPIO7_IO12	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_pwm2: pwm2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_DISP0_DAT9__PWM2_OUT	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart1: uart1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA 0x1b0b1
-+			MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA 0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart2: uart2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_DAT4__UART2_RX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD3_DAT5__UART2_TX_DATA	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT6__UART2_CTS_B	0x1b0b1
-+			MX6QDL_PAD_SD4_DAT5__UART2_RTS_B	0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_uart3: uart3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
-+			MX6QDL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
-+			MX6QDL_PAD_EIM_D23__UART3_CTS_B   0x1b0b1
-+			MX6QDL_PAD_EIM_EB3__UART3_RTS_B   0x1b0b1
-+		>;
-+	};
-+
-+	pinctrl_usbotg: usbotggrp {
-+		fsl,pins = <
-+			MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc1: usdhc1grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD1_CMD__SD1_CMD	0x17059
-+			MX6QDL_PAD_SD1_CLK__SD1_CLK	0x10059
-+			MX6QDL_PAD_SD1_DAT0__SD1_DATA0	0x17059
-+			MX6QDL_PAD_SD1_DAT1__SD1_DATA1	0x17059
-+			MX6QDL_PAD_SD1_DAT2__SD1_DATA2	0x17059
-+			MX6QDL_PAD_SD1_DAT3__SD1_DATA3	0x17059
-+			/* WL_EN */
-+			MX6QDL_PAD_SD3_DAT7__GPIO6_IO17 0x17071
-+			/* WL_IRQ */
-+			MX6QDL_PAD_SD3_RST__GPIO7_IO08  0x17071
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_100mhz: usdhc1grp100mhz {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD1_CMD__SD1_CMD	0x170B9
-+			MX6QDL_PAD_SD1_CLK__SD1_CLK	0x100B9
-+			MX6QDL_PAD_SD1_DAT0__SD1_DATA0	0x170B9
-+			MX6QDL_PAD_SD1_DAT1__SD1_DATA1	0x170B9
-+			MX6QDL_PAD_SD1_DAT2__SD1_DATA2	0x170B9
-+			MX6QDL_PAD_SD1_DAT3__SD1_DATA3	0x170B9
-+		>;
-+	};
-+
-+	pinctrl_usdhc1_200mhz: usdhc1grp200mhz {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD1_CMD__SD1_CMD	0x170F9
-+			MX6QDL_PAD_SD1_CLK__SD1_CLK	0x100F9
-+			MX6QDL_PAD_SD1_DAT0__SD1_DATA0	0x170F9
-+			MX6QDL_PAD_SD1_DAT1__SD1_DATA1	0x170F9
-+			MX6QDL_PAD_SD1_DAT2__SD1_DATA2	0x170F9
-+			MX6QDL_PAD_SD1_DAT3__SD1_DATA3	0x170F9
-+		>;
-+	};
-+
-+	pinctrl_usdhc2: usdhc2grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD2_CMD__SD2_CMD	0x17059
-+			MX6QDL_PAD_SD2_CLK__SD2_CLK	0x10059
-+			MX6QDL_PAD_SD2_DAT0__SD2_DATA0	0x17059
-+			MX6QDL_PAD_SD2_DAT1__SD2_DATA1	0x17059
-+			MX6QDL_PAD_SD2_DAT2__SD2_DATA2	0x17059
-+			MX6QDL_PAD_SD2_DAT3__SD2_DATA3	0x17059
-+		>;
-+	};
-+
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX6QDL_PAD_SD3_CMD__SD3_CMD	0x17059
-+			MX6QDL_PAD_SD3_CLK__SD3_CLK	0x10059
-+			MX6QDL_PAD_SD3_DAT0__SD3_DATA0	0x17059
-+			MX6QDL_PAD_SD3_DAT1__SD3_DATA1	0x17059
-+			MX6QDL_PAD_SD3_DAT2__SD3_DATA2	0x17059
-+			MX6QDL_PAD_SD3_DAT3__SD3_DATA3	0x17059
-+		>;
++	rtc at 68 {
++		compatible = "isil,isl12057";
++		reg = <0x68>;
 +	};
 +};
 +
-+&pcie {
-+	fsl,tx-swing-full = <103>;
-+	fsl,tx-swing-low = <103>;
-+	reset-gpio = <&gpio4 11 GPIO_ACTIVE_HIGH>;
-+	status = "disabled";
++&ldb {
++	status = "okay";
++
++	lvds-channel at 1 {
++		status = "okay";
++
++		port at 4 {
++			reg = <4>;
++
++			lvds1_out: endpoint {
++				remote-endpoint = <&panel_in>;
++			};
++		};
++	};
 +};
 +
 +&pwm2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pwm2>;
-+	status = "disabled";
-+};
-+
-+&reg_arm {
-+       vin-supply = <&sw1a_reg>;
-+};
-+
-+&reg_pu {
-+       vin-supply = <&sw1c_reg>;
-+};
-+
-+&reg_soc {
-+       vin-supply = <&sw1c_reg>;
++	status = "okay";
 +};
 +
 +&uart1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart1>;
-+	status = "disabled";
-+};
-+
-+&uart2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart2 &pinctrl_bt>;
-+	uart-has-rtscts;
 +	status = "okay";
-+
-+	bluetooth {
-+		compatible = "ti,wl1835-st";
-+		enable-gpios = <&gpio6 18 GPIO_ACTIVE_HIGH>;
-+	};
 +};
 +
 +&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	uart-has-rtscts;
-+	status = "disabled";
++	status = "okay";
 +};
 +
 +&usbh1 {
-+	status = "disabled";
++	vbus-supply = <&reg_usb_h1_vbus>;
++	status = "okay";
 +};
 +
 +&usbotg {
 +	vbus-supply = <&reg_usb_otg_vbus>;
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usbotg>;
-+	disable-over-current;
-+	status = "disabled";
-+};
-+
-+&usdhc1 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc1>;
-+	pinctrl-1 = <&pinctrl_usdhc1_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc1_200mhz>;
-+	bus-width = <4>;
-+	vmmc-supply = <&reg_wl18xx_vmmc>;
-+	non-removable;
-+	wakeup-source;
-+	keep-power-in-suspend;
-+	cap-power-off-card;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
++	dr_mode = "otg";
++	srp-disable;
++	hnp-disable;
++	adp-disable;
 +	status = "okay";
-+
-+	wlcore: wlcore at 2 {
-+		compatible = "ti,wl1835";
-+		reg = <2>;
-+		interrupt-parent = <&gpio6>;
-+		interrupts = <17 IRQ_TYPE_LEVEL_HIGH>;
-+		ref-clock-frequency = <38400000>;
-+	};
 +};
 +
 +&usdhc2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc2>;
-+	no-1-8-v;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "disabled";
-+};
-+
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	non-removable;
-+	keep-power-in-suspend;
-+	wakeup-source;
-+	status = "okay";
-+};
-+
-+&ssi2 {
-+	status = "okay";
-+};
-+
-+&snvs_poweroff {
++	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
 +	status = "okay";
 +};
 -- 
