@@ -1,52 +1,46 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Mon, 27 Nov 2017 18:12:59 +0530
-Subject: [PATCH 2/2] ARM: davinci: make davinci_soc_info structures const
-In-Reply-To: <1508148504-2771-3-git-send-email-bhumirks@gmail.com>
-References: <1508148504-2771-1-git-send-email-bhumirks@gmail.com>
- <1508148504-2771-3-git-send-email-bhumirks@gmail.com>
-Message-ID: <19265c2a-4ae4-a2f8-3ddf-01c2a4c2b11a@ti.com>
+From: bp@alien8.de (Borislav Petkov)
+Date: Mon, 27 Nov 2017 14:12:22 +0100
+Subject: [PATCHv3 2/3] EDAC: ti: add support for TI keystone and DRA7xx
+ EDAC
+In-Reply-To: <1510578490-14510-1-git-send-email-t-kristo@ti.com>
+References: <1510087139-21885-3-git-send-email-t-kristo@ti.com>
+ <1510578490-14510-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20171127131222.gr6pofces6fts3iv@pd.tnic>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 October 2017 03:38 PM, Bhumika Goyal wrote:
-> This is a followup patch for [PATCH 1/2].
-
-This line is not relevant once the patch gets committed.
-
+On Mon, Nov 13, 2017 at 03:08:10PM +0200, Tero Kristo wrote:
+> TI Keystone and DRA7xx SoCs have support for EDAC on DDR3 memory that can
+> correct one bit errors and detect two bit errors. Add EDAC driver for this
+> feature which plugs into the generic kernel EDAC framework.
 > 
-> Make the structures const as they are either passed to the function
-
-Patch description should be readable independent of subject line so we
-need to be more specific than "the structures"
-
-> davinci_common_init having the argument as const or their field cpu_clks
-> of type struct clk_lookup * is passed to the function davinci_clk_init.
-> So, the fields are never modified and the structures can be const. 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> ---
+> v3:
+>  * dropped the atomic edac_id counter
+>  * added _emif_get_id which calculates the emif ID based on the sorted
+>    address order of all emif instances
+>  * changed the order of irq allocation and edac_mc_add_mc() within probe
 > 
-> Done using Coccinelle.
-> 
-> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+> v2:
+>  * fixed checkpatch errors
+>  * improved error cleanup for failed probe
+>  * converted to use edac_printk
+>  * added MAINTAINERS entry
+>  * dropped mutex and used atomic counter for ID
+>  * ... and some minor cosmetic changes
+>  
+>  MAINTAINERS            |   6 +
+>  drivers/edac/Kconfig   |   7 +
+>  drivers/edac/Makefile  |   1 +
+>  drivers/edac/ti_edac.c | 340 +++++++++++++++++++++++++++++++++++++++++++++++++
+>  4 files changed, 354 insertions(+)
+>  create mode 100644 drivers/edac/ti_edac.c
 
-I made fixes to commit description per above and here is the updated text.
+Applied, thanks.
 
-"
-ARM: davinci: make davinci_soc_info structures const
+-- 
+Regards/Gruss,
+    Boris.
 
-Make davinci_soc_info structures const as they are either passed to the
-function davinci_common_init having the argument as const or their field
-cpu_clks of type struct clk_lookup * is passed to the function
-davinci_clk_init.
-
-So, the fields are never modified and the structures can be const.
-
-Done using Coccinelle.
-
-Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
-[nsekhar at ti.com: minor commit message adjustment]
-Signed-off-by: Sekhar Nori <nsekhar@ti.com>
-"
-
-With that I applied the patch to v4.16/fixes-non-critical
-
-Thanks,
-Sekhar
+Good mailing practices for 400: avoid top-posting and trim the reply.
