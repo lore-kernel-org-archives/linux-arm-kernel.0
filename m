@@ -1,39 +1,33 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 01:20:21 -0500
-Subject: [PATCH V2 0/7] PCI: handle CRS response following Hot Reset and
- D3hot->D0
-Message-ID: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
+Date: Mon, 27 Nov 2017 01:20:25 -0500
+Subject: [PATCH V2 4/7] PCI: wait device ready after pci_pm_reset()
+In-Reply-To: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
+References: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511763628-11856-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rev 3.1 Sec 2.3.1 Request Handling Rules:
-Valid reset conditions after which a device is permitted to return CRS
-are:
-* Cold, Warm, and Hot Resets,
-* FLR
-* A reset initiated in response to a D3hot to D0 uninitialized
+Rev 3.1 Sec 2.3.1 Request Handling Rules says a device can issue CRS
+following a D3hot->D0 transition. Add pci_dev_wait() call to see if
+device is available before returning.
 
-Try to reuse FLR implementation towards other reset types.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/pci/pci.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Changes from v1:
-* PCI: add a return type for pci_reset_bridge_secondary_bus()
-* set waittime as a global variable and have a kernel command line to
-* override.
-* get rid of initial sleep parameter
-
-Sinan Kaya (7):
-  PCI: protect restore with device lock to be consistent
-  PCI: handle FLR failure and allow other reset types
-  PCI: make pci_flr_wait() generic and rename to pci_dev_wait()
-  PCI: wait device ready after pci_pm_reset()
-  PCI: add a return type for pci_reset_bridge_secondary_bus()
-  PCI: add device wait after slot and bus reset
-  PCI: make reset poll time adjustable
-
- Documentation/admin-guide/kernel-parameters.txt |  2 +
- drivers/pci/pci.c                               | 72 ++++++++++++++++---------
- include/linux/pci.h                             |  4 +-
- 3 files changed, 51 insertions(+), 27 deletions(-)
-
+diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+index ed3c3bc..87e4688 100644
+--- a/drivers/pci/pci.c
++++ b/drivers/pci/pci.c
+@@ -3990,7 +3990,7 @@ static int pci_pm_reset(struct pci_dev *dev, int probe)
+ 	pci_write_config_word(dev, dev->pm_cap + PCI_PM_CTRL, csr);
+ 	pci_dev_d3_sleep(dev);
+ 
+-	return 0;
++	return pci_dev_wait(dev, "PM D3->D0", PCIE_RESET_READY_POLL_MS);
+ }
+ 
+ void pci_reset_secondary_bus(struct pci_dev *dev)
 -- 
 1.9.1
