@@ -1,80 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Nov 2017 16:38:02 +0000
-Subject: [PATCHv2 08/12] arm64: perf: strip PAC when unwinding userspace
-In-Reply-To: <20171127163806.31435-1-mark.rutland@arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
-Message-ID: <20171127163806.31435-9-mark.rutland@arm.com>
+From: clg@kaod.org (=?UTF-8?Q?C=c3=a9dric_Le_Goater?=)
+Date: Mon, 27 Nov 2017 17:55:04 +0100
+Subject: [PATCH 1/2] ARM: BUG if jumping to usermode address in kernel mode
+In-Reply-To: <CAFEAcA_Bq1AtsGtv0gZLpcWwUrZ8b=OGGKmvz=EujJUkK9osOQ@mail.gmail.com>
+References: <20171125113302.GY31757@n2100.armlinux.org.uk>
+ <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
+ <CACPK8XdvUtvKiX_uqTnnb8U-jKuhy4Kw+cda=OKvzabfaffjgQ@mail.gmail.com>
+ <20171127094436.GB31757@n2100.armlinux.org.uk>
+ <ff0993df-8c3f-e985-8b1c-641a8de7dc21@kaod.org>
+ <20171127104717.GD31757@n2100.armlinux.org.uk>
+ <CAFEAcA_Bq1AtsGtv0gZLpcWwUrZ8b=OGGKmvz=EujJUkK9osOQ@mail.gmail.com>
+Message-ID: <08ef70f9-c70a-ca2c-1084-3920de9fe98e@kaod.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When the kernel is unwinding userspace callchains, we can't expect that
-the userspace consumer of these callchains has the data necessary to
-strip the PAC from the stored LR.
+On 11/27/2017 12:50 PM, Peter Maydell wrote:
+> On 27 November 2017 at 11:47, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+>> On Mon, Nov 27, 2017 at 11:16:06AM +0100, C?dric Le Goater wrote:
+>>> Additional QEMU logging gives us :
+>>>
+>>>   Ignoring attempt to switch CPSR_A flag from non-secure world with SCR.AW bit clear
+>>>   Ignoring attempt to switch CPSR_F flag from non-secure world with SCR.FW bit clear
+> 
+>> From what it sounds like, when you run the kernel without uboot, QEMU
+>> decides to run the kernel in the nonsecure world.  If it did the same
+>> with u-boot, u-boot would not be able to change the SCR register, so
+>> u-boot must run in the secure world if it's setting the AW and FW
+>> bits.
+> 
+> Yes, this seems like a QEMU bug. (Added qemu-devel to cc: accordingly).
+> We'll print this warning for a v7 CPU which has the Security Extensions
+> but not the Virtualization Extensions (which is the case where the
+> architecture mandates that NS not be able to change the CPSR.A and
+> F bits), but we shouldn't (in theory) get into that situation
+> because either:
+>  * we started the emulation by running a secure bootrom, which
+>    should have initialized SCR.AW/FW correctly before booting the
+>    NS kernel (I assume this is the "run from u-boot" setup)
+>  * we started the kernel directly from QEMU, in which case QEMU's
+>    internal "act like a bootloader" code should have done the
+>    setting of SCR.AW/FW.
+> 
+> Cedric's command line is the second of these types, so something's
+> gone wrong in our internal bootloader. The code in
+> hw/arm/boot.c:arm_write_secure_board_setup_dummy_smc() sets up
+> a little bit of guest code that runs in secure mode and sets
+> SCR.AW/FW. I suspect the romulus-bmc machine model isn't invoking
+> that code.
 
-This patch has the kernel strip the PAC from user stackframes when the
-in-kernel unwinder is used. This only affects the LR value, and not the
-FP.
+Indeed, it is missing. 
 
-This only affects the in-kernel unwinder. When userspace performs
-unwinding, it is up to userspace to strip PACs as necessary (which can
-be determined from DWARF information).
+With a quick hack adding the extra secure boot loader, I could 
+boot the QEMU romulus-bmc machine (armv6 CPU) with 4.15-rc1 kernel.
+All is fine.  
+  
+But the code of the Aspeed machines also covers the ast2400 SoC 
+which uses an armv5 CPU. So it needs some rework. That will be for
+QEMU 2.12 I suppose.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Yao Qi <yao.qi@arm.com>
----
- arch/arm64/include/asm/pointer_auth.h | 7 +++++++
- arch/arm64/kernel/perf_callchain.c    | 5 ++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
+Thank,
 
-diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-index b08ebec4b806..07788ce755bc 100644
---- a/arch/arm64/include/asm/pointer_auth.h
-+++ b/arch/arm64/include/asm/pointer_auth.h
-@@ -79,6 +79,12 @@ static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
-  */
- #define ptrauth_pac_mask() 	GENMASK(54, VA_BITS)
- 
-+/* Only valid for EL0 TTBR0 instruction pointers */
-+static inline unsigned long ptrauth_strip_insn_pac(unsigned long ptr)
-+{
-+	return ptr & ~ptrauth_pac_mask();
-+}
-+
- #define mm_ctx_ptrauth_init(ctx) \
- 	ptrauth_keys_init(&(ctx)->ptrauth_keys)
- 
-@@ -89,6 +95,7 @@ static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
- 	ptrauth_keys_dup(&(oldctx)->ptrauth_keys, &(newctx)->ptrauth_keys)
- 
- #else
-+#define ptrauth_strip_insn_pac(lr)	(lr)
- #define mm_ctx_ptrauth_init(ctx)
- #define mm_ctx_ptrauth_switch(ctx)
- #define mm_ctx_ptrauth_dup(oldctx, newctx)
-diff --git a/arch/arm64/kernel/perf_callchain.c b/arch/arm64/kernel/perf_callchain.c
-index bcafd7dcfe8b..928204f6ab08 100644
---- a/arch/arm64/kernel/perf_callchain.c
-+++ b/arch/arm64/kernel/perf_callchain.c
-@@ -35,6 +35,7 @@ user_backtrace(struct frame_tail __user *tail,
- {
- 	struct frame_tail buftail;
- 	unsigned long err;
-+	unsigned long lr;
- 
- 	/* Also check accessibility of one struct frame_tail beyond */
- 	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
-@@ -47,7 +48,9 @@ user_backtrace(struct frame_tail __user *tail,
- 	if (err)
- 		return NULL;
- 
--	perf_callchain_store(entry, buftail.lr);
-+	lr = ptrauth_strip_insn_pac(buftail.lr);
-+
-+	perf_callchain_store(entry, lr);
- 
- 	/*
- 	 * Frame pointers should strictly progress back up the stack
--- 
-2.11.0
+C.
+
+
+> Most QEMU users shouldn't be affected by this because not
+> many board models default to enabling the security extensions
+> in the emulated CPU, and the highbank and raspi boards at least
+> do do this secure-mode setup I think.
+> 
+> thanks
+> -- PMM
+> 
