@@ -1,39 +1,26 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Mon, 27 Nov 2017 15:33:25 -0800
-Subject: [PATCH] ARM64: dts: meson-gxl: Add alternate ARM Trusted Firmware
- reserved memory zone
-In-Reply-To: <1507735392-20005-1-git-send-email-narmstrong@baylibre.com> (Neil
- Armstrong's message of "Wed, 11 Oct 2017 17:23:12 +0200")
-References: <1507735392-20005-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <7h8tere1q2.fsf@baylibre.com>
+Date: Mon, 27 Nov 2017 15:42:08 -0800
+Subject: [PATCH] ARM: meson: fix spelling mistake: "Couln't" -> "Couldn't"
+In-Reply-To: <CAFBinCAHRg8y-=ELPu3_tRnskjgPe6gXAG67tmEt75OeSBn-sw@mail.gmail.com>
+ (Martin Blumenstingl's message of "Thu, 2 Nov 2017 22:06:44 +0100")
+References: <20171102092737.16957-1-colin.king@canonical.com>
+ <CAFBinCAHRg8y-=ELPu3_tRnskjgPe6gXAG67tmEt75OeSBn-sw@mail.gmail.com>
+Message-ID: <7hwp2bcmr3.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Greg,
+Martin Blumenstingl <martin.blumenstingl@googlemail.com> writes:
 
-Neil Armstrong <narmstrong@baylibre.com> writes:
-
-> This year, Amlogic updated the ARM Trusted Firmware reserved memory mapping
-> for Meson GXL SoCs and products sold since May 2017 uses this alternate
-> reserved memory mapping.
-> But products had been sold using the previous mapping.
+> On Thu, Nov 2, 2017 at 10:27 AM, Colin King <colin.king@canonical.com> wrote:
+>> From: Colin Ian King <colin.king@canonical.com>
+>>
+>> Trivial fix to spelling mistake in pr_err error message
+>>
+>> Signed-off-by: Colin Ian King <colin.king@canonical.com>
+> Acked-by: Martin Blumenstingl <martin.blumenstingl@googlemail.com>
 >
-> This issue has been explained in [1] and a dynamic solution is yet to be
-> found to avoid loosing another 3Mbytes of reservable memory.
->
-> In the meantime, this patch adds this alternate memory zone only for
-> the GXL and GXM SoCs since GXBB based new products stopped earlier.
->
-> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-October/004860.html
->
-> Fixes: bba8e3f42736 ("ARM64: dts: meson-gx: Add firmware reserved memory zones")
-> Reported-by: Jerome Brunet <jbrunet@baylibre.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> thank you for catching and fixing this!
 
-I missed the Fixes tag on this one, but it's now commit 4ee8e51b9edf upstream.
-
-Please apply to stable v4.10+
-
-Thanks,
+Applied to v4.15/fixes for v4.15-rc,
 
 Kevin
