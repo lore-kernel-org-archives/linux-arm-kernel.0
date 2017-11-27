@@ -1,62 +1,125 @@
-From: hjc@rock-chips.com (Sandy Huang)
-Date: Mon, 27 Nov 2017 10:22:11 +0800
-Subject: [PATCH] MAINTAINERS: change maintainer for Rockchip drm drivers
-In-Reply-To: <20171124145106.hdtybw3hgizlg6gs@phenom.ffwll.local>
-References: <1510568131-28838-1-git-send-email-mark.yao@rock-chips.com>
- <20171120074848.cg22qkved232pxxf@phenom.ffwll.local>
- <83984459.7UdiCfbSkg@phil>
- <20171124145106.hdtybw3hgizlg6gs@phenom.ffwll.local>
-Message-ID: <f69c94b4-f9d7-ac35-4d88-261f27d84d17@rock-chips.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 27 Nov 2017 11:31:48 +0900
+Subject: [PATCH] clk: samsung: s3c: Remove unneeded enumeration
+References: <CGME20171127023145epcas1p1b97c3c66ce624f5362c8d9bf74997c7f@epcas1p1.samsung.com>
+Message-ID: <1511749908-29777-1-git-send-email-cw00.choi@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-     I register the account and get the drm-misc commit rights now, thanks.
+This patch just removes the unneeded enumeration for PLL index.
 
-? 2017/11/24 22:51, Daniel Vetter ??:
-> On Fri, Nov 24, 2017 at 09:28:59AM +0100, Heiko Stuebner wrote:
->> Hi Daniel,
->>
->> [somehow my email address seems to have gotten lost, so
->> only saw this by chance on the list itself now.
->> I've also re-added Sandy to the recipients]
->>
->> Am Montag, 20. November 2017, 08:48:48 CET schrieb Daniel Vetter:
->>> On Mon, Nov 13, 2017 at 06:15:31PM +0800, Mark Yao wrote:
->>>> For personal reasons, Mark Yao will leave rockchip,
->>>> can not continue maintain drm/rockchip, Sandy Huang
->>>> will take over the drm/rockchip.
->>>>
->>>> Cc: Sandy Huang <hjc@rock-chips.com>
->>>> Cc: Heiko Stuebner <heiko@sntech.de>
->>>>
->>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->>>
->>> Since rockchip is in drm-misc that means we need a new maintainer who also
->>> has drm-misc commit rights. Sandy doesn't yet, so if Sandy is going to be
->>> the new maintainer we need to fix that.
->>>
->>> Also, Heiko, are you interested in becoming co-maintainer? With commit
->>> rights and all.
->>
->> I always feel somewhat inadequate judging the fast-paced drm stuff, as in
->> the past once I got my head wrapped around something, drm always
->> somehow moved another mile already ;-) .
->>
->> But somewhere I read that drm-pace for big changes is supposed to slow a
->> bit now that atomic modesetting is done in a lot of places, so we could give
->> co-maintainership for the Rockchip-drm a try - with Sandy wearing the
->> actual hat for big changes though ;-) .
-> 
-> Yeah I think on the modeset side it calmed down a lot. We're still
-> fine-tuning the helper libraries as we're figuring out better ways to
-> write drivers. But right now I think a lot of the action is all in details
-> not relevant for many drivers.
-> 
-> If Sandy's ok with that too pls request an fd.o account for drm-misc and
-> set up the tooling per our quickstart guide:
-> 
-> https://01.org/linuxgraphics/gfx-docs/maintainer-tools/dim.html#quickstart
-> 
-> Thanks, Daniel
-> 
+Signed-off-by: Chanwoo Choi <cw00.choi@samsung.com>
+---
+ drivers/clk/samsung/clk-s3c2412.c | 11 ++---------
+ drivers/clk/samsung/clk-s3c2443.c | 17 ++++-------------
+ drivers/clk/samsung/clk-s3c64xx.c | 17 ++++++-----------
+ 3 files changed, 12 insertions(+), 33 deletions(-)
+
+diff --git a/drivers/clk/samsung/clk-s3c2412.c b/drivers/clk/samsung/clk-s3c2412.c
+index b8340a49921b..1555e407529e 100644
+--- a/drivers/clk/samsung/clk-s3c2412.c
++++ b/drivers/clk/samsung/clk-s3c2412.c
+@@ -27,11 +27,6 @@
+ #define CLKSRC		0x1c
+ #define SWRST		0x30
+ 
+-/* list of PLLs to be registered */
+-enum s3c2412_plls {
+-	mpll, upll,
+-};
+-
+ static void __iomem *reg_base;
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -144,10 +139,8 @@ struct samsung_mux_clock s3c2412_muxes[] __initdata = {
+ };
+ 
+ static struct samsung_pll_clock s3c2412_plls[] __initdata = {
+-	[mpll] = PLL(pll_s3c2440_mpll, MPLL, "mpll", "xti",
+-						LOCKTIME, MPLLCON, NULL),
+-	[upll] = PLL(pll_s3c2410_upll, UPLL, "upll", "urefclk",
+-						LOCKTIME, UPLLCON, NULL),
++	PLL(pll_s3c2440_mpll, MPLL, "mpll", "xti", LOCKTIME, MPLLCON, NULL),
++	PLL(pll_s3c2410_upll, UPLL, "upll", "urefclk", LOCKTIME, UPLLCON, NULL),
+ };
+ 
+ struct samsung_gate_clock s3c2412_gates[] __initdata = {
+diff --git a/drivers/clk/samsung/clk-s3c2443.c b/drivers/clk/samsung/clk-s3c2443.c
+index d94b85a42356..9580a6baf4d7 100644
+--- a/drivers/clk/samsung/clk-s3c2443.c
++++ b/drivers/clk/samsung/clk-s3c2443.c
+@@ -41,11 +41,6 @@ enum supported_socs {
+ 	S3C2450,
+ };
+ 
+-/* list of PLLs to be registered */
+-enum s3c2443_plls {
+-	mpll, epll,
+-};
+-
+ static void __iomem *reg_base;
+ 
+ #ifdef CONFIG_PM_SLEEP
+@@ -225,10 +220,8 @@ struct samsung_clock_alias s3c2443_common_aliases[] __initdata = {
+ /* S3C2416 specific clocks */
+ 
+ static struct samsung_pll_clock s3c2416_pll_clks[] __initdata = {
+-	[mpll] = PLL(pll_6552_s3c2416, MPLL, "mpll", "mpllref",
+-						LOCKCON0, MPLLCON, NULL),
+-	[epll] = PLL(pll_6553, EPLL, "epll", "epllref",
+-						LOCKCON1, EPLLCON, NULL),
++	PLL(pll_6552_s3c2416, MPLL, "mpll", "mpllref", LOCKCON0, MPLLCON, NULL),
++	PLL(pll_6553, EPLL, "epll", "epllref", LOCKCON1, EPLLCON, NULL),
+ };
+ 
+ PNAME(s3c2416_hsmmc0_p) = { "sclk_hsmmc0", "sclk_hsmmcext" };
+@@ -279,10 +272,8 @@ struct samsung_clock_alias s3c2416_aliases[] __initdata = {
+ /* S3C2443 specific clocks */
+ 
+ static struct samsung_pll_clock s3c2443_pll_clks[] __initdata = {
+-	[mpll] = PLL(pll_3000, MPLL, "mpll", "mpllref",
+-						LOCKCON0, MPLLCON, NULL),
+-	[epll] = PLL(pll_2126, EPLL, "epll", "epllref",
+-						LOCKCON1, EPLLCON, NULL),
++	PLL(pll_3000, MPLL, "mpll", "mpllref", LOCKCON0, MPLLCON, NULL),
++	PLL(pll_2126, EPLL, "epll", "epllref", LOCKCON1, EPLLCON, NULL),
+ };
+ 
+ static struct clk_div_table armdiv_s3c2443_d[] = {
+diff --git a/drivers/clk/samsung/clk-s3c64xx.c b/drivers/clk/samsung/clk-s3c64xx.c
+index 7306867a0ab8..6db01cf5ab83 100644
+--- a/drivers/clk/samsung/clk-s3c64xx.c
++++ b/drivers/clk/samsung/clk-s3c64xx.c
+@@ -56,11 +56,6 @@
+ #define GATE_ON(_id, cname, pname, o, b) \
+ 		GATE(_id, cname, pname, o, b, CLK_IGNORE_UNUSED, 0)
+ 
+-/* list of PLLs to be registered */
+-enum s3c64xx_plls {
+-	apll, mpll, epll,
+-};
+-
+ static void __iomem *reg_base;
+ static bool is_s3c6400;
+ 
+@@ -364,12 +359,12 @@ static void __init s3c64xx_clk_sleep_init(void) {}
+ 
+ /* List of PLL clocks. */
+ static struct samsung_pll_clock s3c64xx_pll_clks[] __initdata = {
+-	[apll] = PLL(pll_6552, FOUT_APLL, "fout_apll", "fin_pll",
+-						APLL_LOCK, APLL_CON, NULL),
+-	[mpll] = PLL(pll_6552, FOUT_MPLL, "fout_mpll", "fin_pll",
+-						MPLL_LOCK, MPLL_CON, NULL),
+-	[epll] = PLL(pll_6553, FOUT_EPLL, "fout_epll", "fin_pll",
+-						EPLL_LOCK, EPLL_CON0, NULL),
++	PLL(pll_6552, FOUT_APLL, "fout_apll", "fin_pll",
++					APLL_LOCK, APLL_CON, NULL),
++	PLL(pll_6552, FOUT_MPLL, "fout_mpll", "fin_pll",
++					MPLL_LOCK, MPLL_CON, NULL),
++	PLL(pll_6553, FOUT_EPLL, "fout_epll", "fin_pll",
++					EPLL_LOCK, EPLL_CON0, NULL),
+ };
+ 
+ /* Aliases for common s3c64xx clocks. */
+-- 
+1.9.1
