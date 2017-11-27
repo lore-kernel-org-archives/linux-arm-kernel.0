@@ -1,18 +1,36 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 27 Nov 2017 14:47:54 +0800
-Subject: [PATCH] pinctrl: sunxi: Fix A64 UART mux value
-In-Reply-To: <20171125121230.23555-1-andre.przywara@arm.com>
-References: <20171125121230.23555-1-andre.przywara@arm.com>
-Message-ID: <CAGb2v65jB68TgGpnfZFy8K07qcM=WT5Qq9p8DQdS+eYAyc73Nw@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Nov 2017 09:22:52 +0100
+Subject: [PATCH 2/2] pinctrl: sunxi: Disable strict mode for H5 driver
+In-Reply-To: <20171125120200.23294-3-andre.przywara@arm.com>
+References: <20171125120200.23294-1-andre.przywara@arm.com>
+ <20171125120200.23294-3-andre.przywara@arm.com>
+Message-ID: <20171127082252.wpf6vhe6f2zxshpn@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 25, 2017 at 8:12 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> To use pin PF4 as the RX signal of UART0, we have to write 0b011 into
-> the respective pin controller register.
-> Fix the wrong value we had in our table so far.
->
+On Sat, Nov 25, 2017 at 12:02:00PM +0000, Andre Przywara wrote:
+> All of the H5 boards in the kernel reference the MMC0 CD pin twice in
+> their DT, so strict mode will make the MMC driver fail to load.
+> To keep existing DTs working, disable strict mode in the H5 driver.
+> 
 > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+> Reported-by: Chris Obbard <obbardc@gmail.com>
 
-Fixes: 96851d391d02 ("drivers: pinctrl: add driver for Allwinner A64 SoC")
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+
+Sorry for missing that one...
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/9ab5f5ee/attachment.sig>
