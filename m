@@ -1,71 +1,55 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Mon, 27 Nov 2017 10:30:04 -0700
-Subject: [PATCH] coresight: Fix disabling of CoreSight TPIU
-In-Reply-To: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
-References: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
-Message-ID: <CANLsYkzV+h=69dtqngZFCOdmyoCmBTc0-5fGb1TkVNE8Gd1UXg@mail.gmail.com>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Mon, 27 Nov 2017 18:30:11 +0100
+Subject: [PATCH 0/8] sa1100fb updates
+In-Reply-To: <20171127171145.GI31757@n2100.armlinux.org.uk>
+References: <CGME20170929105024epcas5p336177e386c65b530c4cb5fac379cedfa@epcas5p3.samsung.com>
+ <2590375.JKTUJ5JGIV@amdc3058> <20171127171145.GI31757@n2100.armlinux.org.uk>
+Message-ID: <4330027.F5ASplytpk@amdc3058>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
+On Monday, November 27, 2017 05:11:45 PM Russell King - ARM Linux wrote:
+> On Tue, Oct 17, 2017 at 03:32:30PM +0200, Bartlomiej Zolnierkiewicz wrote:
+> > On Friday, September 29, 2017 11:50:04 AM Russell King - ARM Linux wrote:
+> > > Hi Bart,
+> > 
+> > Hi Russell,
+> > 
+> > > This series updates the sa1100fb fbdev driver's initialisation paths
+> > > to be more robust.  In doing these updates, I realised that we omitted
+> > > to free some memory which was allocated for the framebuffer if
+> > > initialisation fails - something that was hidden due to the complex
+> > > cleanup that the driver performs.  Switching to managed resources made
+> > > this more obvious.
+> > > 
+> > > Tested on H3600 iPAQ and Assabet.
+> > > 
+> > >  drivers/video/fbdev/sa1100fb.c | 75 +++++++++++++++---------------------------
+> > >  drivers/video/fbdev/sa1100fb.h |  2 ++
+> > >  2 files changed, 29 insertions(+), 48 deletions(-)
+> > 
+> > I queued all patches for 4.15, thanks!
+> 
+> Now that 4.15-rc1 is out, something tells me that was not actually
+> the case.  Any ideas what happened?
 
-On 24 November 2017 at 02:58, Robert Walker <robert.walker@arm.com> wrote:
-> The CoreSight TPIU should be disabled when tracing to other sinks to allow
-> them to operate at full bandwidth.
->
-> This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
-> configuring the TPIU to stop on flush, initiating a manual flush, waiting
-> for the flush to complete and then waits for the TPIU to indicate it has
-> stopped.
->
-> Signed-off-by: Robert Walker <robert.walker@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-> index bef49a3..4b46c49 100644
-> --- a/drivers/hwtracing/coresight/coresight-tpiu.c
-> +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-> @@ -46,8 +46,11 @@
->  #define TPIU_ITATBCTR0         0xef8
->
->  /** register definition **/
-> +/* FFSR - 0x300 */
-> +#define FFSR_FT_STOPPED                BIT(1)
->  /* FFCR - 0x304 */
->  #define FFCR_FON_MAN           BIT(6)
-> +#define FFCR_STOP_FI           BIT(12)
->
->  /**
->   * @base:      memory mapped base address for this component.
-> @@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
->  {
->         CS_UNLOCK(drvdata->base);
->
-> -       /* Clear formatter controle reg. */
-> -       writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
-> +       /* Clear formatter and stop on flush */
-> +       writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
->         /* Generate manual flush */
-> -       writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-> +       writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-> +       /* Wait for flush to complete */
-> +       coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
-> +       /* Wait for formatter to stop */
-> +       coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
->
->         CS_LOCK(drvdata->base);
->  }
+Could you please explain the issue that you are seeing a bit more?
 
-Shouldn't we also do this at boot time when the TPIU in _probed() ?
-That way the TPIU doesn't have to explicitly be enabled and disabled
-prior to running other tracing sessions.
+For me it looks all fine:
 
-Thanks,
-Mathieu
+$ git log --oneline v4.15-rc1 drivers/video/fbdev/sa1100fb.c
+cb6bc3f video: sa1100fb: move pseudo palette into sa1100fb_info structure
+0ab7658 video: sa1100fb: fix video memory allocation leak
+c244f8e video: sa1100fb: clean up failure path
+5634cba video: sa1100fb: use devm_gpio_request_one()
+f6fc8c9 video: sa1100fb: use devm_request_irq()
+df6b228 video: sa1100fb: use devm_ioremap_resource()
+e43064c video: sa1100fb: use devm_clk_get()
+ba1d36b video: sa1100fb: use devm_kzalloc()
+...
 
-
-> --
-> 1.9.1
->
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
