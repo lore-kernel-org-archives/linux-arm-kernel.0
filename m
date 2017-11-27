@@ -1,179 +1,305 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 27 Nov 2017 21:57:46 +0100
-Subject: [PATCH 13/17] drm/sun4i: Add DE2 CSC library
+Date: Mon, 27 Nov 2017 21:57:47 +0100
+Subject: [PATCH 14/17] drm/sun4i: Add DE2 definitions for YUV formats
 In-Reply-To: <20171127205750.19277-1-jernej.skrabec@siol.net>
 References: <20171127205750.19277-1-jernej.skrabec@siol.net>
-Message-ID: <20171127205750.19277-14-jernej.skrabec@siol.net>
+Message-ID: <20171127205750.19277-15-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DE2 have many CSC units - channel input CSC, channel output CSC and
-mixer output CSC and maybe more.
+This commit expands translation of DRM YUV format to HW specific
+information.
 
-Fortunately, they have all same register layout, only base offsets
-differs.
-
-Add support only for channel output CSC for now.
+It doesn't do any functional changes.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/Makefile    |  2 +-
- drivers/gpu/drm/sun4i/sun8i_csc.c | 90 +++++++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_csc.h | 36 ++++++++++++++++
- 3 files changed, 127 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.h
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 147 +++++++++++++++++++++++++++++++++++-
+ drivers/gpu/drm/sun4i/sun8i_mixer.h |  16 ++++
+ 2 files changed, 159 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index 70df480792f9..f82cc69ede72 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -9,7 +9,7 @@ sun4i-drm-hdmi-y		+= sun4i_hdmi_enc.o
- sun4i-drm-hdmi-y		+= sun4i_hdmi_i2c.o
- sun4i-drm-hdmi-y		+= sun4i_hdmi_tmds_clk.o
- 
--sun8i-mixer-y			+= sun8i_mixer.o sun8i_layer.o sun8i_scaler.o
-+sun8i-mixer-y			+= sun8i_mixer.o sun8i_layer.o sun8i_scaler.o sun8i_csc.o
- 
- sun4i-tcon-y			+= sun4i_crtc.o
- sun4i-tcon-y			+= sun4i_dotclock.o
-diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.c b/drivers/gpu/drm/sun4i/sun8i_csc.c
-new file mode 100644
-index 000000000000..d48c28f8d568
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun8i_csc.c
-@@ -0,0 +1,90 @@
-+/*
-+ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 2276eff8798d..00edfdc98499 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -29,92 +29,231 @@
+ #include "sun8i_layer.h"
+ #include "sunxi_engine.h"
+ #include "sun8i_scaler.h"
 +#include "sun8i_csc.h"
+ 
+ struct de2_fmt_info {
+-	u32 drm_fmt;
+-	u32 de2_fmt;
++	u32			drm_fmt;
++	u32			de2_fmt;
++	bool			rgb;
++	enum sun8i_csc_mode	csc;
+ };
+ 
+ static const struct de2_fmt_info de2_formats[] = {
+ 	{
+ 		.drm_fmt = DRM_FORMAT_ARGB8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_ARGB8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_ABGR8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_ABGR8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_RGBA8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_RGBA8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_BGRA8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_BGRA8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_XRGB8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_XRGB8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_XBGR8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_XBGR8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_RGBX8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_RGBX8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_BGRX8888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_BGRX8888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_RGB888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_RGB888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_BGR888,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_BGR888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_RGB565,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_RGB565,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_BGR565,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_BGR565,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_ARGB4444,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_ARGB4444,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_ABGR4444,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_ABGR4444,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_RGBA4444,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_RGBA4444,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_BGRA4444,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_BGRA4444,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_ARGB1555,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_ARGB1555,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_ABGR1555,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_ABGR1555,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_RGBA5551,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_RGBA5551,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
+ 	},
+ 	{
+ 		.drm_fmt = DRM_FORMAT_BGRA5551,
+ 		.de2_fmt = SUN8I_MIXER_FBFMT_BGRA5551,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_OFF,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_UYVY,
++		.de2_fmt = SUN8I_MIXER_FBFMT_UYVY,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_VYUY,
++		.de2_fmt = SUN8I_MIXER_FBFMT_VYUY,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YUYV,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YUYV,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YVYU,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YVYU,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_NV16,
++		.de2_fmt = SUN8I_MIXER_FBFMT_NV16,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_NV61,
++		.de2_fmt = SUN8I_MIXER_FBFMT_NV61,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_NV12,
++		.de2_fmt = SUN8I_MIXER_FBFMT_NV12,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_NV21,
++		.de2_fmt = SUN8I_MIXER_FBFMT_NV21,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YUV444,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGB888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YUV422,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YUV422,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YUV420,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YUV420,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YUV411,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YUV411,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YUV2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YVU444,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGB888,
++		.rgb = true,
++		.csc = SUN8I_CSC_MODE_YVU2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YVU422,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YUV422,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YVU2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YVU420,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YUV420,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YVU2RGB,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_YVU411,
++		.de2_fmt = SUN8I_MIXER_FBFMT_YUV411,
++		.rgb = false,
++		.csc = SUN8I_CSC_MODE_YVU2RGB,
+ 	},
+ };
+ 
+@@ -349,7 +488,7 @@ int sun8i_mixer_update_ui_layer_formats(struct sun8i_mixer *mixer,
+ 	u32 val;
+ 
+ 	fmt_info = sun8i_mixer_format_info(state->fb->format->format);
+-	if (!fmt_info) {
++	if (!fmt_info || !fmt_info->rgb) {
+ 		DRM_DEBUG_DRIVER("Invalid format\n");
+ 		return -EINVAL;
+ 	}
+@@ -370,7 +509,7 @@ int sun8i_mixer_update_vi_layer_formats(struct sun8i_mixer *mixer,
+ 	u32 val;
+ 
+ 	fmt_info = sun8i_mixer_format_info(state->fb->format->format);
+-	if (!fmt_info) {
++	if (!fmt_info || !fmt_info->rgb) {
+ 		DRM_DEBUG_DRIVER("Invalid format\n");
+ 		return -EINVAL;
+ 	}
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index 4fcf1653e345..c4fcaa0de40b 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -120,6 +120,22 @@
+ #define SUN8I_MIXER_FBFMT_RGBA5551	18
+ #define SUN8I_MIXER_FBFMT_BGRA5551	19
+ 
++#define SUN8I_MIXER_FBFMT_YUYV		0
++#define SUN8I_MIXER_FBFMT_UYVY		1
++#define SUN8I_MIXER_FBFMT_YVYU		2
++#define SUN8I_MIXER_FBFMT_VYUY		3
++#define SUN8I_MIXER_FBFMT_NV16		4
++#define SUN8I_MIXER_FBFMT_NV61		5
++#define SUN8I_MIXER_FBFMT_YUV422	6
++/* format 7 doesn't exist */
++#define SUN8I_MIXER_FBFMT_NV12		8
++#define SUN8I_MIXER_FBFMT_NV21		9
++#define SUN8I_MIXER_FBFMT_YUV420	10
++/* format 11 doesn't exist */
++/* format 12 is semi-planar YUV411 UVUV */
++/* format 13 is semi-planar YUV411 VUVU */
++#define SUN8I_MIXER_FBFMT_YUV411	14
 +
-+static const u32 ccsc_base[2][2] = {
-+	{CCSC00_OFFSET, CCSC01_OFFSET},
-+	{CCSC10_OFFSET, CCSC11_OFFSET},
-+};
-+
-+/*
-+ * Factors are in two's complement format, 10 bits for fractinal part.
-+ * First tree values in each line are multiplication factor and last
-+ * value is constant, which is added at the end.
-+ */
-+static const u32 yuv2rgb[] = {
-+	0x000004A8, 0x00000000, 0x00000662, 0xFFFC845A,
-+	0x000004A8, 0xFFFFFE6F, 0xFFFFFCBF, 0x00021DF4,
-+	0x000004A8, 0x00000813, 0x00000000, 0xFFFBAC4A,
-+};
-+
-+static const u32 yvu2rgb[] = {
-+	0x000004A8, 0x00000662, 0x00000000, 0xFFFC845A,
-+	0x000004A8, 0xFFFFFCBF, 0xFFFFFE6F, 0x00021DF4,
-+	0x000004A8, 0x00000000, 0x00000813, 0xFFFBAC4A,
-+};
-+
-+static void sun8i_csc_set_coefficients(struct regmap *map, u32 base,
-+				       enum sun8i_csc_mode mode)
-+{
-+	const u32 *table;
-+	int i, data;
-+
-+	switch (mode) {
-+	case SUN8I_CSC_MODE_YUV2RGB:
-+		table = yuv2rgb;
-+		break;
-+	case SUN8I_CSC_MODE_YVU2RGB:
-+		table = yvu2rgb;
-+		break;
-+	default:
-+		WARN(1, "Wrong CSC mode specified.");
-+		return;
-+	}
-+
-+	for (i = 0; i < 12; i++) {
-+		data = table[i];
-+		/* For some reason, 0x200 must be added to constant parts */
-+		if (((i + 1) & 3) == 0)
-+			data += 0x200;
-+		regmap_write(map, SUN8I_CSC_COEFF(base, i), data);
-+	}
-+}
-+
-+static void sun8i_csc_enable(struct regmap *map, u32 base, bool enable)
-+{
-+	u32 val;
-+
-+	if (enable)
-+		val = SUN8I_CSC_CTRL_EN;
-+	else
-+		val = 0;
-+
-+	regmap_update_bits(map, SUN8I_CSC_CTRL(base), SUN8I_CSC_CTRL_EN, val);
-+}
-+
-+void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
-+				     enum sun8i_csc_mode mode)
-+{
-+	u32 base;
-+
-+	base = ccsc_base[mixer->cfg->ccsc][layer];
-+
-+	sun8i_csc_set_coefficients(mixer->engine.regs, base, mode);
-+}
-+
-+void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable)
-+{
-+	u32 base;
-+
-+	base = ccsc_base[mixer->cfg->ccsc][layer];
-+
-+	sun8i_csc_enable(mixer->engine.regs, base, enable);
-+}
-diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.h b/drivers/gpu/drm/sun4i/sun8i_csc.h
-new file mode 100644
-index 000000000000..19ae1dda06c4
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun8i_csc.h
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#ifndef _SUN8I_CSC_H_
-+#define _SUN8I_CSC_H_
-+
-+#include "sun8i_mixer.h"
-+
-+/* VI channel CSC units offsets */
-+#define CCSC00_OFFSET 0xAA050
-+#define CCSC01_OFFSET 0xFA000
-+#define CCSC10_OFFSET 0xA0000
-+#define CCSC11_OFFSET 0xF0000
-+
-+#define SUN8I_CSC_CTRL(base)		(base + 0x0)
-+#define SUN8I_CSC_COEFF(base, i)	(base + 0x10 + 4 * i)
-+
-+#define SUN8I_CSC_CTRL_EN		BIT(0)
-+
-+enum sun8i_csc_mode {
-+	SUN8I_CSC_MODE_OFF,
-+	SUN8I_CSC_MODE_YUV2RGB,
-+	SUN8I_CSC_MODE_YVU2RGB,
-+};
-+
-+void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
-+				     enum sun8i_csc_mode mode);
-+void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable);
-+
-+#endif
+ /*
+  * These sub-engines are still unknown now, the EN registers are here only to
+  * be used to disable these sub-engines.
 -- 
 2.15.0
