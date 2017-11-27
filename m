@@ -1,53 +1,34 @@
-From: otavio.salvador@ossystems.com.br (Otavio Salvador)
-Date: Mon, 27 Nov 2017 11:28:03 -0200
-Subject: [PATCH v2] ARM: dts: imx6qdl-nitrogen6x: Add SPI NOR partitions
-In-Reply-To: <20171127101739.qs6ws3232hd5qwgv@t450s.lan>
-References: <20171124170004.31133-1-otavio@ossystems.com.br>
- <CAP9ODKoefNEcQtrCCLEa7hzx2D_2vJTit0t8ooQGTx7Uyds1mQ@mail.gmail.com>
- <20171127101739.qs6ws3232hd5qwgv@t450s.lan>
-Message-ID: <CAP9ODKr-5Q3TgZQHFPNHQcjNfm9NZM0a-C8f-MuFQtRCj1FiAQ@mail.gmail.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 27 Nov 2017 14:29:03 +0100
+Subject: [PATCH] ARM: dts: imx53-cx9020: Fix the Ethernet PHY reset GPIO
+ polarity
+In-Reply-To: <1511650267-21933-1-git-send-email-festevam@gmail.com>
+References: <1511650267-21933-1-git-send-email-festevam@gmail.com>
+Message-ID: <20171127132903.GD19413@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 8:17 AM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
-> Hi Otavio,
->
-> On Sat, Nov 25, 2017 at 07:55:53AM -0200, Otavio Salvador wrote:
->> On Fri, Nov 24, 2017 at 3:00 PM, Otavio Salvador
->> <otavio@ossystems.com.br> wrote:
->> > This adds the partitions definition for the SPI NOR to provide
->> > backward compatibility with the documented[1] layout used with
->> > Boundary Devices BSP.
->> >
->> > 1. https://boundarydevices.com/boot-flash-access-linux/
->> >
->> > It exports to Linux:
->> >
->> >  mtd0: bootloader
->> >  mtd1: env
->> >  mtd2: splash
->> >
->> > Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
->>
->> After thinking a bit about Fabio's recommendation to use 'read-only'
->> to protect the partitions, I think it'd be better to use 'lock' so it
->> is still possible to write them on Linux but it requires a unlock
->> prior changing it.
->>
->> In my case, I am interested in being capable of upgrading the
->> bootloader from Linux.
->>
->> What people think?
->
-> Agreed, I would rather have the lock option, especially for the splash
-> and environment.
+On Sat, Nov 25, 2017 at 08:51:07PM -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> As explained in Documentation/devicetree/bindings/net/fsl-fec.txt the
+> phy-reset-gpios is active high only if the 'phy-reset-active-high' is
+> present.
+> 
+> As 'phy-reset-active-high' is not used here, fix the device tree
+> description by passing GPIO_ACTIVE_LOW flag.
+> 
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-I will prepare a new patch using the lock option on the three
-partitions so we allow the user to change them but knowing it may
-break the system.
+Hi Fabio
 
--- 
-Otavio Salvador                             O.S. Systems
-http://www.ossystems.com.br        http://code.ossystems.com.br
-Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
+Do you have a bigger plan than just 'documentation'. Given that device
+tree is an ABI, the GPIO_ACTIVE_ flag has to be ignored. Having it
+correct is just documentation.
+
+If you want to fix them all, is it worth adding in a warning to detect
+a miss match between the GPIO_ACTIVE_* and phy-reset-active-high?
+
+Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+
+    Andrew
