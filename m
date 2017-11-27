@@ -1,27 +1,58 @@
 From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 27 Nov 2017 14:37:10 +0100
-Subject: [PATCH v4 1/4] clk: meson: gxbb: fix wrong clock for SARADC/SANA
-In-Reply-To: <20171107141223.1507-1-yixun.lan@amlogic.com>
-References: <20171107141223.1507-1-yixun.lan@amlogic.com>
-Message-ID: <1511789830.30519.3.camel@baylibre.com>
+Date: Mon, 27 Nov 2017 14:48:09 +0100
+Subject: [PATCH v2 0/2] add clk controller driver for Meson-AXG SoC
+In-Reply-To: <20171127094844.16742-1-yixun.lan@amlogic.com>
+References: <20171127094844.16742-1-yixun.lan@amlogic.com>
+Message-ID: <1511790489.30519.11.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2017-11-07 at 22:12 +0800, Yixun Lan wrote:
-> According to the datasheet, in Meson-GXBB/GXL series,
-> The clock gate bit for SARADC is HHI_GCLK_MPEG2 bit[22],
-> while clock gate bit for SANA is HHI_GCLK_MPEG0 bit[10].
+On Mon, 2017-11-27 at 17:48 +0800, Yixun Lan wrote:
+> Add driver for the clk controller which found in Meson AXG SoC
 > 
-> Test passed at gxl-s905x-p212 board.
-> 
-> The following published datasheets are wrong and should be updated
-> [1] GXBB v1.1.4
-> [2] GXL v0.3_20170314
-> 
-> Fixes: 738f66d3211d ("clk: gxbb: add AmLogic GXBB clk controller driver")
-> Tested-by: Xingyu Chen <xingyu.chen@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
+>   Note, we deliberately create a seperate source file for the Meson AXG
+> series, instead of sharing code with previous GXBB/GXL - the file axg.c
+> It would help us maintaining the code more easily.
 
-Applied fixes/drivers
-Thanks
+But this will be the last meson SoC added this way. We need factor the code the
+between meson8, gx and axg series since there is a lot of duplication there.
+
+> 
+> Changes since v1 [1]:
+>  - rework register definion, use '(offset << 2)' to better match
+
+As previously discussed, please drop these calculations and just write what the
+offset actually are. Putting one comment@the top, explaining the translation,
+would be nice though. 
+
+>    the description from data sheet
+>  - drop "#include dt-bindings/clock/gxbb-aoclkc.h" from dts
+>  - rebase code to v4.15-rc1
+> 
+> [1] 
+>   http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005239.html
+>   http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005240.html
+>   http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005241.html
+> 
+> 
+> Qiufang Dai (2):
+
+First patch of the series should be adding the compatible documentation, which
+is missing here (unless it has gone through another channel and I missed it)
+
+>   clk: meson-axg: add clock controller drivers
+>   arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
+> 
+>  arch/arm64/Kconfig.platforms               |   1 +
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi |  15 +
+>  drivers/clk/meson/Kconfig                  |   8 +
+>  drivers/clk/meson/Makefile                 |   1 +
+>  drivers/clk/meson/axg.c                    | 948
+> +++++++++++++++++++++++++++++
+>  drivers/clk/meson/axg.h                    | 126 ++++
+>  include/dt-bindings/clock/axg-clkc.h       |  72 +++
+>  7 files changed, 1171 insertions(+)
+>  create mode 100644 drivers/clk/meson/axg.c
+>  create mode 100644 drivers/clk/meson/axg.h
+>  create mode 100644 include/dt-bindings/clock/axg-clkc.h
+> 
