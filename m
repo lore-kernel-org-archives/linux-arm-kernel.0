@@ -1,139 +1,82 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 27 Nov 2017 15:20:56 +0000
-Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
- removed vmemmap mem
-In-Reply-To: <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
-Message-ID: <f21d2b81-e0f5-b186-22e3-ded138505dc9@arm.com>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Mon, 27 Nov 2017 15:32:28 +0000
+Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20171103151711.GA22453@kroah.com>
+References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
+ <20170831160430.GB11200@kroah.com> <20171103151711.GA22453@kroah.com>
+Message-ID: <5A1C2FEB.2080006@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/17 11:14, Andrea Reale wrote:
-> When hot-removing memory we need to free vmemmap memory.
 
-What problems arise if we don't? Is it only for the sake of freeing up 
-some pages here and there, or is there something more fundamental?
 
-> However, depending on the memory is being removed, it might
-> not be always possible to free a full vmemmap page / huge-page
-> because part of it might still be used.
-> 
-> Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
-> hot-remove") introduced a workaround for x86
-> hot-remove, by which partially unused areas are filled with
-> the 0xFD constant. Full pages are only removed when fully
-> filled by 0xFDs.
-> 
-> This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
-> the goal of using it in place of 0xFDs. For now, this will be used for
-> the arm64 port of memory hot remove, but the idea is to eventually use
-> the same mechanism for x86 as well.
-> 
-> Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
-> ---
->   include/linux/memblock.h | 12 ++++++++++++
->   mm/memblock.c            | 32 ++++++++++++++++++++++++++++++++
->   2 files changed, 44 insertions(+)
-> 
-> diff --git a/include/linux/memblock.h b/include/linux/memblock.h
-> index bae11c7..0daec05 100644
-> --- a/include/linux/memblock.h
-> +++ b/include/linux/memblock.h
-> @@ -26,6 +26,9 @@ enum {
->   	MEMBLOCK_HOTPLUG	= 0x1,	/* hotpluggable region */
->   	MEMBLOCK_MIRROR		= 0x2,	/* mirrored region */
->   	MEMBLOCK_NOMAP		= 0x4,	/* don't add to kernel direct mapping */
-> +#ifdef CONFIG_MEMORY_HOTREMOVE
-> +	MEMBLOCK_UNUSED_VMEMMAP	= 0x8,  /* Mark VMEMAP blocks as dirty */
+On 11/03/2017 05:17 PM, Greg KH wrote:
+> On Thu, Aug 31, 2017 at 06:04:30PM +0200, Greg KH wrote:
+>> On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
+>>> From: Stuart Yoder <stuart.yoder@nxp.com>
+>>>
+>>> Move the source files out of staging into their final locations:
+>>>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
+>>>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
+>>>    -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
+>>>    -README.txt, providing and overview of DPAA goes to
+>>>     Documentation/dpaa2/overview.txt
+>>>
+>>> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
+>>> Update dpaa2_eth and dpio staging drivers.
+>>>
+>>> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
+>>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
+>>> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
+>>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>>> Cc: Jason Cooper <jason@lakedaemon.net>
+>>> Cc: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> This is going to have to wait until I get a chunk of time to do the
+>> review.  Probably after 4.13-final is out.
+>
+> Ok, review comments as I go through the code:
+> 	mc-sys.c             323 EXPORT_SYMBOL(mc_send_command);
+>
+> should be EXPORT_SYMBOL_GPL(fsl_mc_send_command); to match up with your
+> other exports and global namespace, right?
+>
+> You export a lot of dpcon_* symbols that no one uses, please do not do
+> that.  Verify that all of them are actually used right now, if not,
+> remove them.  If you think you are going to use them in the future,
+> wonderful, add them in then.
+>
+> Same for your dpaa2_* exported symbols, most are not used from what I
+> can see.
+>
+> struct dpaa2_io {
+>          atomic_t refs;
+>
+> That's a kref, please use it instead of trying to roll your own.
+>
+> And even for this, your locking is not correct (i.e. you do not have
+> any), that needs to be fixed so that teardown works correctly.
+>
+> You have a lot of WARN_ON() calls, that's going to be ignored and should
+> all not be needed now that the code is debugged and working properly.
+> Please remove them, or turn them into dev_err() calls with a real if ()
+> check instead.
+>
+> You are checking "strings" for the type of device in a lot of places,
+> like this:
+> 	        if (strcmp(obj_desc->type, "dprc") == 0) {
+> why are you not just using the built-in driver model .type field and
+> comparing that to the different type structures?  It's much easier, and
+> you don't have to again, "roll your own".  See the USB or Greybus code
+> for examples of busses that have different "types" of devices on them at
+> the same time.
+>
+> Ok, that's enough for now, please work on this, and we can go from
+> there...
+>
 
-I'm not sure I get what "dirty" is supposed to mean in this context. 
-Also, this appears to be specific to CONFIG_SPARSEMEM_VMEMMAP, whilst 
-only tangentially related to CONFIG_MEMORY_HOTREMOVE, so the 
-dependencies look a bit off.
+What would the next steps be, now that the patches are in staging-next?
+Are there plans for a new round of review?
 
-In fact, now that I think about it, why does this need to be in memblock 
-at all? If it is specific to sparsemem, shouldn't the section map 
-already be enough to tell us what's supposed to be present or not?
-
-Robin.
-
-> +#endif
->   };
->   
->   struct memblock_region {
-> @@ -90,6 +93,10 @@ int memblock_mark_mirror(phys_addr_t base, phys_addr_t size);
->   int memblock_mark_nomap(phys_addr_t base, phys_addr_t size);
->   int memblock_clear_nomap(phys_addr_t base, phys_addr_t size);
->   ulong choose_memblock_flags(void);
-> +#ifdef CONFIG_MEMORY_HOTREMOVE
-> +int memblock_mark_unused_vmemmap(phys_addr_t base, phys_addr_t size);
-> +int memblock_clear_unused_vmemmap(phys_addr_t base, phys_addr_t size);
-> +#endif
->   
->   /* Low level functions */
->   int memblock_add_range(struct memblock_type *type,
-> @@ -182,6 +189,11 @@ static inline bool memblock_is_nomap(struct memblock_region *m)
->   	return m->flags & MEMBLOCK_NOMAP;
->   }
->   
-> +#ifdef CONFIG_MEMORY_HOTREMOVE
-> +bool memblock_is_vmemmap_unused_range(struct memblock_type *mt,
-> +		phys_addr_t start, phys_addr_t end);
-> +#endif
-> +
->   #ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
->   int memblock_search_pfn_nid(unsigned long pfn, unsigned long *start_pfn,
->   			    unsigned long  *end_pfn);
-> diff --git a/mm/memblock.c b/mm/memblock.c
-> index 9120578..30d5aa4 100644
-> --- a/mm/memblock.c
-> +++ b/mm/memblock.c
-> @@ -809,6 +809,18 @@ int __init_memblock memblock_clear_nomap(phys_addr_t base, phys_addr_t size)
->   	return memblock_setclr_flag(base, size, 0, MEMBLOCK_NOMAP);
->   }
->   
-> +#ifdef CONFIG_MEMORY_HOTREMOVE
-> +int __init_memblock memblock_mark_unused_vmemmap(phys_addr_t base,
-> +		phys_addr_t size)
-> +{
-> +	return memblock_setclr_flag(base, size, 1, MEMBLOCK_UNUSED_VMEMMAP);
-> +}
-> +int __init_memblock memblock_clear_unused_vmemmap(phys_addr_t base,
-> +		phys_addr_t size)
-> +{
-> +	return memblock_setclr_flag(base, size, 0, MEMBLOCK_UNUSED_VMEMMAP);
-> +}
-> +#endif
->   /**
->    * __next_reserved_mem_region - next function for for_each_reserved_region()
->    * @idx: pointer to u64 loop variable
-> @@ -1696,6 +1708,26 @@ void __init_memblock memblock_trim_memory(phys_addr_t align)
->   	}
->   }
->   
-> +#ifdef CONFIG_MEMORY_HOTREMOVE
-> +bool __init_memblock memblock_is_vmemmap_unused_range(struct memblock_type *mt,
-> +		phys_addr_t start, phys_addr_t end)
-> +{
-> +	u64 i;
-> +	struct memblock_region *r;
-> +
-> +	i = memblock_search(mt, start);
-> +	r = &(mt->regions[i]);
-> +	while (r->base < end) {
-> +		if (!(r->flags & MEMBLOCK_UNUSED_VMEMMAP))
-> +			return 0;
-> +
-> +		r = &(memblock.memory.regions[++i]);
-> +	}
-> +
-> +	return 1;
-> +}
-> +#endif
-> +
->   void __init_memblock memblock_set_current_limit(phys_addr_t limit)
->   {
->   	memblock.current_limit = limit;
-> 
+---
+Thanks & Best Regards, Laurentiu
