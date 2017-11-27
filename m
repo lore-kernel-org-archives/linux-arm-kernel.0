@@ -1,38 +1,34 @@
-From: peng.fan@nxp.com (Peng Fan)
-Date: Sun, 26 Nov 2017 23:56:10 +0000
-Subject: [PATCH] arm: l2c: unlock ways when in non-secure mode
-In-Reply-To: <20171126131812.GZ31757@n2100.armlinux.org.uk>
-References: <20171126122530.857-1-peng.fan@nxp.com>
- <20171126131812.GZ31757@n2100.armlinux.org.uk>
-Message-ID: <DB6PR04MB3221D60D0EC8D5B31869AA6588240@DB6PR04MB3221.eurprd04.prod.outlook.com>
+From: liuwenliang@huawei.com (Liuwenliang (Abbott Liu))
+Date: Mon, 27 Nov 2017 01:23:50 +0000
+Subject: [PATCH 01/11] Initialize the mapping of KASan shadow memory
+In-Reply-To: <20171123152218.GQ31757@n2100.armlinux.org.uk>
+References: <87375eqobb.fsf@on-the-bus.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0063816@dggemm510-mbs.china.huawei.com>
+ <20171117073556.GB28855@cbox>
+ <B8AC3E80E903784988AB3003E3E97330C00638D4@dggemm510-mbs.china.huawei.com>
+ <20171118134841.3f6c9183@why.wild-wind.fr.eu.org>
+ <B8AC3E80E903784988AB3003E3E97330C0068F12@dggemm510-mbx.china.huawei.com>
+ <20171121122938.sydii3i36jbzi7x4@lakrids.cambridge.arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0069032@dggemm510-mbx.china.huawei.com>
+ <757534e5-fcea-3eb4-3c8d-b8c7e709f555@arm.com>
+ <B8AC3E80E903784988AB3003E3E97330C0069083@dggemm510-mbx.china.huawei.com>
+ <20171123152218.GQ31757@n2100.armlinux.org.uk>
+Message-ID: <B8AC3E80E903784988AB3003E3E97330C006B4D7@dggemm510-mbs.china.huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
-
-> Subject: Re: [PATCH] arm: l2c: unlock ways when in non-secure mode
-> 
-> On Sun, Nov 26, 2017 at 08:25:30PM +0800, Peng Fan wrote:
-> > To boot Linux in Non-secure mode with l2x0, the l2x0 controller is
-> > enabled in secure mode and ways locked to make it seems L2 cache
-> > disabled during linux boot process. So during l2x0 initialization,
-> > need to unlock the ways to make l2x0 could cache data/inst.
-> 
-> Why was this chosen instead of doing what everyone else does?
-
-I am not aware of how other platform handles the l2x0 unlock in non
-secure mode. Could you please share with me what others choose?
-
-Thanks,
-Peng.
-
-> 
-> --
-> RMK's Patch system:
-> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
-> armlinux.org.uk%2Fdeveloper%2Fpatches%2F&data=02%7C01%7Cpeng.fan%4
-> 0nxp.com%7C277f5508e3ef412c3dc908d534d031ab%7C686ea1d3bc2b4c6fa92cd
-> 99c5c301635%7C0%7C0%7C636472991153380699&sdata=6QBrJCdmtU%2B4GO8
-> YsYMvcvRwwk5ST2B87%2BWY%2BhPRxP8%3D&reserved=0
-> FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-> According to speedtest.net: 8.21Mbps down 510kbps up
+On Nov 23, 2017  23:22  Russell King - ARM Linux [mailto:linux at armlinux.org.uk]  wrote:
+>Please pay attention to the project coding style whenever creating code
+>for a program.  It doesn't matter what the project coding style is, as
+>long as you write your code to match the style that is already there.
+>
+>For the kernel, that is: tabs not spaces for indentation of code.
+>You seem to be using a variable number of spaces for all the new code
+>above.
+>
+>Some of it seems to be your email client thinking it knows better about
+>white space - and such behaviours basically makes patches unapplyable.
+>See Documentation/process/email-clients.rst for hints about email
+>clients.
+Thanks for your review.
+I'm going to change it in the new version.  
