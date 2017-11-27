@@ -1,96 +1,64 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:52:45 +0000
-Subject: [PATCH 08/13] ARM: dts: ixm6qdl-microsom: add support for eMMC
+Date: Mon, 27 Nov 2017 16:52:50 +0000
+Subject: [PATCH 09/13] ARM: dts: imx6qdl-hummingboard: add SD card regulator
 In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
 References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMeD-0002rI-Nn@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eJMeI-0002rP-Rt@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rev 1.5 microsoms include eMMC support on-board.  Add a microsom include
-file which can be used to add support for this.
+Add the SD card regulator, which allows the SD card power to be switched
+on/off.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi | 70 ++++++++++++++++++++++++++++
- 1 file changed, 70 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi
-new file mode 100644
-index 000000000000..5f3b8baab20f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6qdl-microsom-emmc.dtsi
-@@ -0,0 +1,70 @@
-+/*
-+ * Copyright (C) 2013,2014 Russell King
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index 84e6392fee1f..1b33cd6752f4 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -59,6 +59,19 @@
+ 		regulator-always-on;
+ 	};
+ 
++	v_sd: regulator-v-sd {
++		compatible = "regulator-fixed";
++		gpio = <&gpio4 30 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hummingboard_vmmc>;
++		regulator-boot-on;
++		regulator-max-microvolt = <3300000>;
++		regulator-min-microvolt = <3300000>;
++		regulator-name = "v_sd";
++		startup-delay-us = <1000>;
++		vin-supply = <&reg_3p3v>;
++	};
 +
-+&iomuxc {
-+	microsom {
-+		pinctrl_microsom_usdhc3: microsom-usdhc3 {
+ 	reg_usbh1_vbus: usb-h1-vbus {
+ 		compatible = "regulator-fixed";
+ 		enable-active-high;
+@@ -241,6 +254,11 @@
+ 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
+ 			>;
+ 		};
++		pinctrl_hummingboard_vmmc: hummingboard-vmmc {
 +			fsl,pins = <
-+				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
-+				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
-+				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
-+				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
-+				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
-+				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
-+				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
-+				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
-+				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
-+				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
-+				MX6QDL_PAD_SD3_RST__SD3_RESET  0x17059
++				MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
 +			>;
 +		};
-+	};
-+};
-+
-+/* USDHC3 - eMMC */
-+&usdhc3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_microsom_usdhc3>;
-+	bus-width = <8>;
-+	non-removable;
-+	vmmc-supply = <&vcc_3v3>;
-+	status = "okay";
-+};
+ 	};
+ };
+ 
+@@ -292,7 +310,7 @@
+ 		&pinctrl_hummingboard_usdhc2_aux
+ 		&pinctrl_hummingboard_usdhc2
+ 	>;
+-	vmmc-supply = <&reg_3p3v>;
++	vmmc-supply = <&v_sd>;
+ 	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+ 	status = "okay";
+ };
 -- 
 2.7.4
