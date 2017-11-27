@@ -1,171 +1,93 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 27 Nov 2017 16:38:01 +0000
-Subject: [PATCHv2 07/12] arm64: expose user PAC bit positions via ptrace
-In-Reply-To: <20171127163806.31435-1-mark.rutland@arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
-Message-ID: <20171127163806.31435-8-mark.rutland@arm.com>
+From: stefan.bruens@rwth-aachen.de (Stefan =?ISO-8859-1?Q?Br=FCns?=)
+Date: Mon, 27 Nov 2017 18:19:13 +0100
+Subject: [PATCH] sunxi-rsb: Include OF based modalias in device uevent
+In-Reply-To: <20171127153502.4wcqtimppgpfklmr@flea.home>
+References: <a99fc4e8-49e3-486a-b508-d764a952d9f8@rwthex-w2-a.rwth-ad.de>
+ <20171127153502.4wcqtimppgpfklmr@flea.home>
+Message-ID: <2479565.qdx1IVDIGC@pebbles>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When pointer authentication is in use, data/instruction pointers have a
-number of PAC bits inserted into them. The number and position of these
-bits depends on the configured TCR_ELx.TxSZ and whether tagging is
-enabled. ARMv8.3 allows tagging to differ for instruction and data
-pointers.
+On Monday, November 27, 2017 4:35:02 PM CET Maxime Ripard wrote:
+> Hi,
+> 
+> On Mon, Nov 27, 2017 at 01:17:25PM +0100, Stefan Br?ns wrote:
+> > Include the OF-based modalias in the uevent sent when registering devices
+> > on the sunxi RSB bus, so that user space has a chance to autoload the
+> > kernel module for the device.
+> > 
+> > Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
+> > pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
+> > the AXP803 PMIC is built as a module, it is not loaded and the system
+> > ends up with an disfunctional MMC controller.
+> > 
+> > Cc: stable <stable@vger.kernel.org>
+> > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+> > ---
+> > 
+> >  drivers/bus/sunxi-rsb.c | 13 +++++++++++++
+> >  1 file changed, 13 insertions(+)
+> > 
+> > diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+> > index 328ca93781cf..37cb57244cbe 100644
+> > --- a/drivers/bus/sunxi-rsb.c
+> > +++ b/drivers/bus/sunxi-rsb.c
+> > @@ -173,11 +173,24 @@ static int sunxi_rsb_device_remove(struct device
+> > *dev)> 
+> >  	return drv->remove(to_sunxi_rsb_device(dev));
+> >  
+> >  }
+> > 
+> > +static int sunxi_rsb_device_uevent(struct device *dev,
+> > +				   struct kobj_uevent_env *env)
+> > +{
+> > +	int ret;
+> > +
+> > +	ret = of_device_uevent_modalias(dev, env);
+> > +	if (ret != -ENODEV)
+> > +		return ret;
+> 
+> A comment explaining why we need to ignore the ENODEV error code would
+> be great here.
 
-For userspace debuggers to unwind the stack and/or to follow pointer
-chains, they need to be able to remove the PAC bits before attempting to
-use a pointer.
+Lazy answer - everyone else is doing the same, and nobody cared to add an 
+explanation.
 
-This patch adds a new structure with masks describing the location of
-the PAC bits in userspace instruction and data pointers (i.e. those
-addressable via TTBR0), which userspace can query via PTRACE_GETREGSET.
-By clearing these bits from pointers, userspace can acquire the PAC-less
-versions.
+For *some* drivers, this is likely because the same device may be enumerated 
+from e.g ACPI or OF, and for an ACPI device -ENODEV will be returned, as
+dev->of_node is NULL.
 
-This new regset is exposed when the kernel is built with (user) pointer
-authentication support, and the feature is enabled. Otherwise, it is
-hidden.
+For devices which are only usable in an OF context, this is bogus. Not sure 
+about sunxi-rsb.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Yao Qi <yao.qi@arm.com>
----
- arch/arm64/include/asm/pointer_auth.h |  8 ++++++++
- arch/arm64/include/uapi/asm/ptrace.h  |  7 +++++++
- arch/arm64/kernel/ptrace.c            | 38 +++++++++++++++++++++++++++++++++++
- include/uapi/linux/elf.h              |  1 +
- 4 files changed, 54 insertions(+)
+> > +	return 0;
+> > +}
+> > +
+> > 
+> >  static struct bus_type sunxi_rsb_bus = {
+> >  
+> >  	.name		= RSB_CTRL_NAME,
+> >  	.match		= sunxi_rsb_device_match,
+> >  	.probe		= sunxi_rsb_device_probe,
+> >  	.remove		= sunxi_rsb_device_remove,
+> > 
+> > +	.uevent		= sunxi_rsb_device_uevent,
+> 
+> Any reason to not use of_device_uevent_modalias directly here?
 
-diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
-index 964da0c3dc48..b08ebec4b806 100644
---- a/arch/arm64/include/asm/pointer_auth.h
-+++ b/arch/arm64/include/asm/pointer_auth.h
-@@ -16,9 +16,11 @@
- #ifndef __ASM_POINTER_AUTH_H
- #define __ASM_POINTER_AUTH_H
- 
-+#include <linux/bitops.h>
- #include <linux/random.h>
- 
- #include <asm/cpufeature.h>
-+#include <asm/memory.h>
- #include <asm/sysreg.h>
- 
- #ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-@@ -71,6 +73,12 @@ static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
- 	*new = *old;
- }
- 
-+/*
-+ * The EL0 pointer bits used by a pointer authentication code.
-+ * This is dependent on TBI0 being enabled, or bits 63:56 would also apply.
-+ */
-+#define ptrauth_pac_mask() 	GENMASK(54, VA_BITS)
-+
- #define mm_ctx_ptrauth_init(ctx) \
- 	ptrauth_keys_init(&(ctx)->ptrauth_keys)
- 
-diff --git a/arch/arm64/include/uapi/asm/ptrace.h b/arch/arm64/include/uapi/asm/ptrace.h
-index 98c4ce55d9c3..4994d718771a 100644
---- a/arch/arm64/include/uapi/asm/ptrace.h
-+++ b/arch/arm64/include/uapi/asm/ptrace.h
-@@ -228,6 +228,13 @@ struct user_sve_header {
- 		  SVE_PT_SVE_OFFSET + SVE_PT_SVE_SIZE(vq, flags)	\
- 		: SVE_PT_FPSIMD_OFFSET + SVE_PT_FPSIMD_SIZE(vq, flags))
- 
-+/* pointer authentication masks (NT_ARM_PAC_MASK) */
-+
-+struct user_pac_mask {
-+	__u64		data_mask;
-+	__u64		insn_mask;
-+};
-+
- #endif /* __ASSEMBLY__ */
- 
- #endif /* _UAPI__ASM_PTRACE_H */
-diff --git a/arch/arm64/kernel/ptrace.c b/arch/arm64/kernel/ptrace.c
-index 7c44658b316d..6901dce44c8d 100644
---- a/arch/arm64/kernel/ptrace.c
-+++ b/arch/arm64/kernel/ptrace.c
-@@ -44,6 +44,7 @@
- #include <asm/cpufeature.h>
- #include <asm/debug-monitors.h>
- #include <asm/pgtable.h>
-+#include <asm/pointer_auth.h>
- #include <asm/stacktrace.h>
- #include <asm/syscall.h>
- #include <asm/traps.h>
-@@ -951,6 +952,30 @@ static int sve_set(struct task_struct *target,
- 
- #endif /* CONFIG_ARM64_SVE */
- 
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+static int pac_mask_get(struct task_struct *target,
-+			const struct user_regset *regset,
-+			unsigned int pos, unsigned int count,
-+			void *kbuf, void __user *ubuf)
-+{
-+	/*
-+	 * The PAC bits can differ across data and instruction pointers
-+	 * depending on TCR_EL1.TBID*, which we may make use of in future, so
-+	 * we expose separate masks.
-+	 */
-+	unsigned long mask = ptrauth_pac_mask();
-+	struct user_pac_mask uregs = {
-+		.data_mask = mask,
-+		.insn_mask = mask,
-+	};
-+
-+	if (!cpus_have_cap(ARM64_HAS_ADDRESS_AUTH))
-+		return -EINVAL;
-+
-+	return user_regset_copyout(&pos, &count, &kbuf, &ubuf, &uregs, 0, -1);
-+}
-+#endif /* CONFIG_ARM64_POINTER_AUTHENTICATION */
-+
- enum aarch64_regset {
- 	REGSET_GPR,
- 	REGSET_FPR,
-@@ -963,6 +988,9 @@ enum aarch64_regset {
- #ifdef CONFIG_ARM64_SVE
- 	REGSET_SVE,
- #endif
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	REGSET_PAC_MASK,
-+#endif
- };
- 
- static const struct user_regset aarch64_regsets[] = {
-@@ -1032,6 +1060,16 @@ static const struct user_regset aarch64_regsets[] = {
- 		.get_size = sve_get_size,
- 	},
- #endif
-+#ifdef CONFIG_ARM64_POINTER_AUTHENTICATION
-+	[REGSET_PAC_MASK] = {
-+		.core_note_type = NT_ARM_PAC_MASK,
-+		.n = sizeof(struct user_pac_mask) / sizeof(u64),
-+		.size = sizeof(u64),
-+		.align = sizeof(u64),
-+		.get = pac_mask_get,
-+		/* this cannot be set dynamically */
-+	},
-+#endif
- };
- 
- static const struct user_regset_view user_aarch64_view = {
-diff --git a/include/uapi/linux/elf.h b/include/uapi/linux/elf.h
-index bb6836986200..4ca58005e04a 100644
---- a/include/uapi/linux/elf.h
-+++ b/include/uapi/linux/elf.h
-@@ -419,6 +419,7 @@ typedef struct elf64_shdr {
- #define NT_ARM_HW_WATCH	0x403		/* ARM hardware watchpoint registers */
- #define NT_ARM_SYSTEM_CALL	0x404	/* ARM system call number */
- #define NT_ARM_SVE	0x405		/* ARM Scalable Vector Extension registers */
-+#define NT_ARM_PAC_MASK		0x406	/* ARM pointer authentication code masks */
- #define NT_METAG_CBUF	0x500		/* Metag catch buffer registers */
- #define NT_METAG_RPIPE	0x501		/* Metag read pipeline state */
- #define NT_METAG_TLS	0x502		/* Metag TLS pointer */
+*If* sunxi-rsb can be used without OF, then yes, otherwise no.
+
+Regards,
+
+Stefan
+
 -- 
-2.11.0
+Stefan Br?ns  /  Bergstra?e 21  /  52062 Aachen
+home: +49 241 53809034     mobile: +49 151 50412019
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 195 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/807caf5a/attachment-0001.sig>
