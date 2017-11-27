@@ -1,108 +1,138 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Mon, 27 Nov 2017 21:57:39 +0100
-Subject: [PATCH 06/17] drm/sun4i: Add multi plane support to DE2 driver
+Date: Mon, 27 Nov 2017 21:57:38 +0100
+Subject: [PATCH 05/17] drm/sun4i: Reorder some code in DE2
 In-Reply-To: <20171127205750.19277-1-jernej.skrabec@siol.net>
 References: <20171127205750.19277-1-jernej.skrabec@siol.net>
-Message-ID: <20171127205750.19277-7-jernej.skrabec@siol.net>
+Message-ID: <20171127205750.19277-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for multiple UI planes can now be easily enabled just by adding
-more planes with different index.
+While DE2 driver works, parts of the code are not in optimal place. Reorder
+it so it will be easier to support multiple planes.
 
-For now, add immutable zpos property.
+This commit doesn't do any functional change besides removing two not
+very useful debug messages.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_layer.c | 38 +++++++++++++++++--------------------
- 1 file changed, 17 insertions(+), 21 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 60 ++++++++++++++++++++-----------------
+ 1 file changed, 32 insertions(+), 28 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
-index 511d2f8afef6..371d6b359262 100644
---- a/drivers/gpu/drm/sun4i/sun8i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
-@@ -22,12 +22,6 @@
- #include "sun8i_layer.h"
- #include "sun8i_mixer.h"
- 
--struct sun8i_plane_desc {
--	       enum drm_plane_type     type;
--	       const uint32_t          *formats;
--	       uint32_t                nformats;
--};
--
- static int sun8i_mixer_layer_atomic_check(struct drm_plane *plane,
- 					  struct drm_plane_state *state)
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index 6aa3240186c1..c1b7685603fe 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -90,7 +90,6 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+ 				     int layer, struct drm_plane *plane)
  {
-@@ -100,35 +94,38 @@ static const uint32_t sun8i_mixer_layer_formats[] = {
- 	DRM_FORMAT_XRGB8888,
- };
+ 	struct drm_plane_state *state = plane->state;
+-	struct drm_framebuffer *fb = state->fb;
+ 	u32 width, height, size;
  
--static const struct sun8i_plane_desc sun8i_mixer_planes[] = {
--	{
--		.type = DRM_PLANE_TYPE_PRIMARY,
--		.formats = sun8i_mixer_layer_formats,
--		.nformats = ARRAY_SIZE(sun8i_mixer_layer_formats),
--	},
--};
--
- static struct sun8i_layer *sun8i_layer_init_one(struct drm_device *drm,
- 						struct sun8i_mixer *mixer,
--						const struct sun8i_plane_desc *plane)
-+						int index)
+ 	DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
+@@ -104,34 +103,43 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+ 	size = SUN8I_MIXER_SIZE(width, height);
+ 
+ 	if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
++		bool interlaced = false;
++		u32 val;
++
+ 		DRM_DEBUG_DRIVER("Primary layer, updating global size W: %u H: %u\n",
+ 				 width, height);
+ 		regmap_write(mixer->engine.regs,
+ 			     SUN8I_MIXER_GLOBAL_SIZE,
+ 			     size);
+-		DRM_DEBUG_DRIVER("Updating blender size\n");
+-		regmap_write(mixer->engine.regs,
+-			     SUN8I_MIXER_BLEND_ATTR_INSIZE(layer),
+-			     size);
+ 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTSIZE,
+ 			     size);
+-		DRM_DEBUG_DRIVER("Updating channel size\n");
+-		regmap_write(mixer->engine.regs,
+-			     SUN8I_MIXER_CHAN_UI_OVL_SIZE(layer),
+-			     size);
+-	}
+ 
+-	/* Set the line width */
+-	DRM_DEBUG_DRIVER("Layer line width: %d bytes\n", fb->pitches[0]);
+-	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_CHAN_UI_LAYER_PITCH(layer, 0),
+-		     fb->pitches[0]);
++		if (state->crtc)
++			interlaced = state->crtc->state->adjusted_mode.flags
++				& DRM_MODE_FLAG_INTERLACE;
++
++		if (interlaced)
++			val = SUN8I_MIXER_BLEND_OUTCTL_INTERLACED;
++		else
++			val = 0;
++
++		regmap_update_bits(mixer->engine.regs,
++				   SUN8I_MIXER_BLEND_OUTCTL,
++				   SUN8I_MIXER_BLEND_OUTCTL_INTERLACED,
++				   val);
++
++		DRM_DEBUG_DRIVER("Switching display mixer interlaced mode %s\n",
++				 interlaced ? "on" : "off");
++	}
+ 
+ 	/* Set height and width */
+ 	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n", width, height);
+ 	regmap_write(mixer->engine.regs,
+ 		     SUN8I_MIXER_CHAN_UI_LAYER_SIZE(layer, 0),
+ 		     size);
++	regmap_write(mixer->engine.regs,
++		     SUN8I_MIXER_CHAN_UI_OVL_SIZE(layer),
++		     size);
+ 
+ 	/* Set base coordinates */
+ 	DRM_DEBUG_DRIVER("Layer coordinates X: %d Y: %d\n",
+@@ -139,6 +147,9 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+ 	regmap_write(mixer->engine.regs,
+ 		     SUN8I_MIXER_BLEND_ATTR_COORD(layer),
+ 		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
++	regmap_write(mixer->engine.regs,
++		     SUN8I_MIXER_BLEND_ATTR_INSIZE(layer),
++		     size);
+ 
+ 	return 0;
+ }
+@@ -148,22 +159,9 @@ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
  {
- 	struct sun8i_layer *layer;
-+	enum drm_plane_type type;
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_framebuffer *fb = state->fb;
+-	bool interlaced = false;
+ 	u32 val;
  	int ret;
  
- 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
- 	if (!layer)
- 		return ERR_PTR(-ENOMEM);
- 
-+	type = index == 0 ? DRM_PLANE_TYPE_PRIMARY : DRM_PLANE_TYPE_OVERLAY;
-+
- 	/* possible crtcs are set later */
- 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
- 				       &sun8i_mixer_layer_funcs,
--				       plane->formats, plane->nformats,
--				       NULL, plane->type, NULL);
-+				       sun8i_mixer_layer_formats,
-+				       ARRAY_SIZE(sun8i_mixer_layer_formats),
-+				       NULL, type, NULL);
+-	if (plane->state->crtc)
+-		interlaced = plane->state->crtc->state->adjusted_mode.flags
+-			& DRM_MODE_FLAG_INTERLACE;
+-
+-	regmap_update_bits(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTCTL,
+-			   SUN8I_MIXER_BLEND_OUTCTL_INTERLACED,
+-			   interlaced ?
+-			   SUN8I_MIXER_BLEND_OUTCTL_INTERLACED : 0);
+-
+-	DRM_DEBUG_DRIVER("Switching display mixer interlaced mode %s\n",
+-			 interlaced ? "on" : "off");
+-
+ 	ret = sun8i_mixer_drm_format_to_layer(plane, fb->format->format,
+ 						&val);
  	if (ret) {
- 		dev_err(drm->dev, "Couldn't initialize layer\n");
- 		return ERR_PTR(ret);
- 	}
+@@ -201,6 +199,12 @@ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
+ 	paddr += (state->src.x1 >> 16) * bpp;
+ 	paddr += (state->src.y1 >> 16) * fb->pitches[0];
  
-+	/* fixed zpos for now */
-+	ret = drm_plane_create_zpos_immutable_property(&layer->plane, index);
-+	if (ret) {
-+		dev_err(drm->dev, "Couldn't add zpos property\n");
-+		return ERR_PTR(ret);
-+	}
++	/* Set the line width */
++	DRM_DEBUG_DRIVER("Layer line width: %d bytes\n", fb->pitches[0]);
++	regmap_write(mixer->engine.regs,
++		     SUN8I_MIXER_CHAN_UI_LAYER_PITCH(layer, 0),
++		     fb->pitches[0]);
 +
- 	drm_plane_helper_add(&layer->plane,
- 			     &sun8i_mixer_layer_helper_funcs);
- 	layer->mixer = mixer;
-@@ -143,16 +140,15 @@ struct drm_plane **sun8i_layers_init(struct drm_device *drm,
- 	struct sun8i_mixer *mixer = engine_to_sun8i_mixer(engine);
- 	int i;
+ 	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
  
--	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun8i_mixer_planes) + 1,
-+	planes = devm_kcalloc(drm->dev, mixer->cfg->ui_num + 1,
- 			      sizeof(*planes), GFP_KERNEL);
- 	if (!planes)
- 		return ERR_PTR(-ENOMEM);
- 
--	for (i = 0; i < ARRAY_SIZE(sun8i_mixer_planes); i++) {
--		const struct sun8i_plane_desc *plane = &sun8i_mixer_planes[i];
-+	for (i = 0; i < mixer->cfg->ui_num; i++) {
- 		struct sun8i_layer *layer;
- 
--		layer = sun8i_layer_init_one(drm, mixer, plane);
-+		layer = sun8i_layer_init_one(drm, mixer, i);
- 		if (IS_ERR(layer)) {
- 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
- 				i ? "overlay" : "primary");
+ 	regmap_write(mixer->engine.regs,
 -- 
 2.15.0
