@@ -1,34 +1,65 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 27 Nov 2017 14:29:03 +0100
-Subject: [PATCH] ARM: dts: imx53-cx9020: Fix the Ethernet PHY reset GPIO
- polarity
-In-Reply-To: <1511650267-21933-1-git-send-email-festevam@gmail.com>
-References: <1511650267-21933-1-git-send-email-festevam@gmail.com>
-Message-ID: <20171127132903.GD19413@lunn.ch>
+From: otavio@ossystems.com.br (Otavio Salvador)
+Date: Mon, 27 Nov 2017 11:31:27 -0200
+Subject: [PATCH v3] ARM: dts: imx6qdl-nitrogen6x: Add SPI NOR partitions
+Message-ID: <20171127133127.16985-1-otavio@ossystems.com.br>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 25, 2017 at 08:51:07PM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> As explained in Documentation/devicetree/bindings/net/fsl-fec.txt the
-> phy-reset-gpios is active high only if the 'phy-reset-active-high' is
-> present.
-> 
-> As 'phy-reset-active-high' is not used here, fix the device tree
-> description by passing GPIO_ACTIVE_LOW flag.
-> 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+This adds the partitions definition for the SPI NOR to provide
+backward compatibility with the documented[1] layout used with
+Boundary Devices BSP.
 
-Hi Fabio
+1. https://boundarydevices.com/boot-flash-access-linux/
 
-Do you have a bigger plan than just 'documentation'. Given that device
-tree is an ABI, the GPIO_ACTIVE_ flag has to be ignored. Having it
-correct is just documentation.
+It exports to Linux:
 
-If you want to fix them all, is it worth adding in a warning to detect
-a miss match between the GPIO_ACTIVE_* and phy-reset-active-high?
+ mtd0: bootloader
+ mtd1: env
+ mtd2: splash
 
-Reviewed-by: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+---
 
-    Andrew
+Changes in v3:
+ - use lock instead of read-only (Gary Bisson)
+
+Changes in v2:
+ - rework labels (Fabio Estevam)
+ - add read-only flags (Fabio Estevam)
+
+ arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi | 20 ++++++++++++++++++++
+ 1 file changed, 20 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+index 4bdf29169d2a..f855d802533e 100644
+--- a/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-nitrogen6x.dtsi
+@@ -276,6 +276,26 @@
+ 		compatible = "sst,sst25vf016b", "jedec,spi-nor";
+ 		spi-max-frequency = <20000000>;
+ 		reg = <0>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++
++		partition at 0 {
++			label = "bootloader";
++			reg = <0x0 0xc0000>;
++			lock;
++		};
++
++		partition at c0000 {
++			label = "env";
++			reg = <0xc0000 0x2000>;
++			lock;
++		};
++
++		partition at c2000 {
++			label = "splash";
++			reg = <0xc2000 0x13e000>;
++			lock;
++		};
+ 	};
+ };
+ 
+-- 
+2.15.0
