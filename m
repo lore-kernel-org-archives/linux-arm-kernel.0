@@ -1,82 +1,90 @@
-From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
-Date: Mon, 27 Nov 2017 15:32:28 +0000
-Subject: [PATCH v2] staging: fsl-mc: move bus driver out of staging
-In-Reply-To: <20171103151711.GA22453@kroah.com>
-References: <20170828105405.19552-1-laurentiu.tudor@nxp.com>
- <20170831160430.GB11200@kroah.com> <20171103151711.GA22453@kroah.com>
-Message-ID: <5A1C2FEB.2080006@nxp.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Mon, 27 Nov 2017 15:33:01 +0000
+Subject: [PATCH v2 4/5] mm: memory_hotplug: Add memory hotremove probe
+ device
+In-Reply-To: <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <22d34fe30df0fbacbfceeb47e20cb1184af73585.1511433386.git.ar@linux.vnet.ibm.com>
+Message-ID: <198063b0-fcc9-7beb-7476-86ed5f04734c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 23/11/17 11:14, Andrea Reale wrote:
+> Adding a "remove" sysfs handle that can be used to trigger
+> memory hotremove manually, exactly simmetrically with
+> what happens with the "probe" device for hot-add.
+> 
+> This is usueful for architecture that do not rely on
+> ACPI for memory hot-remove.
 
+Is there a real-world use-case for this, or is it mostly just a handy 
+development feature?
 
-On 11/03/2017 05:17 PM, Greg KH wrote:
-> On Thu, Aug 31, 2017 at 06:04:30PM +0200, Greg KH wrote:
->> On Mon, Aug 28, 2017 at 01:54:05PM +0300, laurentiu.tudor at nxp.com wrote:
->>> From: Stuart Yoder <stuart.yoder@nxp.com>
->>>
->>> Move the source files out of staging into their final locations:
->>>    -include files in drivers/staging/fsl-mc/include go to include/linux/fsl
->>>    -irq-gic-v3-its-fsl-mc-msi.c goes to drivers/irqchip
->>>    -source in drivers/staging/fsl-mc/bus goes to drivers/bus/fsl-mc
->>>    -README.txt, providing and overview of DPAA goes to
->>>     Documentation/dpaa2/overview.txt
->>>
->>> Update or delete other remaining staging files-- Makefile, Kconfig, TODO.
->>> Update dpaa2_eth and dpio staging drivers.
->>>
->>> Signed-off-by: Stuart Yoder <stuyoder@gmail.com>
->>> Signed-off-by: Laurentiu Tudor <laurentiu.tudor@nxp.com>
->>> [Laurentiu: rebased, add dpaa2_eth and dpio #include updates]
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> Cc: Jason Cooper <jason@lakedaemon.net>
->>> Cc: Marc Zyngier <marc.zyngier@arm.com>
->>
->> This is going to have to wait until I get a chunk of time to do the
->> review.  Probably after 4.13-final is out.
->
-> Ok, review comments as I go through the code:
-> 	mc-sys.c             323 EXPORT_SYMBOL(mc_send_command);
->
-> should be EXPORT_SYMBOL_GPL(fsl_mc_send_command); to match up with your
-> other exports and global namespace, right?
->
-> You export a lot of dpcon_* symbols that no one uses, please do not do
-> that.  Verify that all of them are actually used right now, if not,
-> remove them.  If you think you are going to use them in the future,
-> wonderful, add them in then.
->
-> Same for your dpaa2_* exported symbols, most are not used from what I
-> can see.
->
-> struct dpaa2_io {
->          atomic_t refs;
->
-> That's a kref, please use it instead of trying to roll your own.
->
-> And even for this, your locking is not correct (i.e. you do not have
-> any), that needs to be fixed so that teardown works correctly.
->
-> You have a lot of WARN_ON() calls, that's going to be ignored and should
-> all not be needed now that the code is debugged and working properly.
-> Please remove them, or turn them into dev_err() calls with a real if ()
-> check instead.
->
-> You are checking "strings" for the type of device in a lot of places,
-> like this:
-> 	        if (strcmp(obj_desc->type, "dprc") == 0) {
-> why are you not just using the built-in driver model .type field and
-> comparing that to the different type structures?  It's much easier, and
-> you don't have to again, "roll your own".  See the USB or Greybus code
-> for examples of busses that have different "types" of devices on them at
-> the same time.
->
-> Ok, that's enough for now, please work on this, and we can go from
-> there...
->
+> Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+> Signed-off-by: Maciej Bielski <m.bielski@virtualopensystems.com>
+> ---
+>   drivers/base/memory.c | 34 +++++++++++++++++++++++++++++++++-
+>   1 file changed, 33 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/base/memory.c b/drivers/base/memory.c
+> index 1d60b58..8ccb67c 100644
+> --- a/drivers/base/memory.c
+> +++ b/drivers/base/memory.c
+> @@ -530,7 +530,36 @@ memory_probe_store(struct device *dev, struct device_attribute *attr,
+>   }
+>   
+>   static DEVICE_ATTR(probe, S_IWUSR, NULL, memory_probe_store);
+> -#endif
+> +
+> +#ifdef CONFIG_MEMORY_HOTREMOVE
+> +static ssize_t
+> +memory_remove_store(struct device *dev,
+> +		struct device_attribute *attr, const char *buf, size_t count)
+> +{
+> +	u64 phys_addr;
+> +	int nid, ret;
+> +	unsigned long pages_per_block = PAGES_PER_SECTION * sections_per_block;
+> +
+> +	ret = kstrtoull(buf, 0, &phys_addr);
+> +	if (ret)
+> +		return ret;
+> +
+> +	if (phys_addr & ((pages_per_block << PAGE_SHIFT) - 1))
+> +		return -EINVAL;
+> +
+> +	nid = memory_add_physaddr_to_nid(phys_addr);
 
-What would the next steps be, now that the patches are in staging-next?
-Are there plans for a new round of review?
+This call looks a bit odd, since you're not doing a memory add. In fact, 
+any memory being removed should already be fully known-about, so AFAICS 
+it should be simple to get everything you need to know (including 
+potentially the online status as mentioned earlier), through 'normal' 
+methods, e.g. page_to_nid() or similar.
 
----
-Thanks & Best Regards, Laurentiu
+Robin.
+
+> +	ret = lock_device_hotplug_sysfs();
+> +	if (ret)
+> +		return ret;
+> +
+> +	remove_memory(nid, phys_addr,
+> +			 MIN_MEMORY_BLOCK_SIZE * sections_per_block);
+> +	unlock_device_hotplug();
+> +	return count;
+> +}
+> +static DEVICE_ATTR(remove, S_IWUSR, NULL, memory_remove_store);
+> +#endif /* CONFIG_MEMORY_HOTREMOVE */
+> +#endif /* CONFIG_ARCH_MEMORY_PROBE */
+>   
+>   #ifdef CONFIG_MEMORY_FAILURE
+>   /*
+> @@ -790,6 +819,9 @@ bool is_memblock_offlined(struct memory_block *mem)
+>   static struct attribute *memory_root_attrs[] = {
+>   #ifdef CONFIG_ARCH_MEMORY_PROBE
+>   	&dev_attr_probe.attr,
+> +#ifdef CONFIG_MEMORY_HOTREMOVE
+> +	&dev_attr_remove.attr,
+> +#endif
+>   #endif
+>   
+>   #ifdef CONFIG_MEMORY_FAILURE
+> 
