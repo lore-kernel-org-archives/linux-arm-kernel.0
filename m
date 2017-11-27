@@ -1,120 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Nov 2017 16:41:42 +0100
-Subject: [PATCH v2 18/18] ARM: dts: sun8i: a711: Enable the LCD
-In-Reply-To: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
-References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1a9c9ec49f2b0c55e9a72205e87474a0bc34d9f7.1511797218.git-series.maxime.ripard@free-electrons.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Nov 2017 15:43:16 +0000
+Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
+ ntp
+In-Reply-To: <20171123150439.GB18754@mellanox.com>
+References: <20171013175433.GA22062@obsidianresearch.com>
+ <20171123095456.lkc4nkuzsd2q26mm@piout.net>
+ <20171123150439.GB18754@mellanox.com>
+Message-ID: <20171127154316.GG31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A711 has 1024x600 LVDS panel, with a PWM-based backlight. Add it to our
-DT.
+On Thu, Nov 23, 2017 at 08:04:39AM -0700, Jason Gunthorpe wrote:
+> Like Russell has said already, the kernel is the only place that could
+> actually have all the information needed. User space would have to use
+> some kind of trail and error approach to figure out what the offset
+> should be.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
----
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 61 ++++++++++++++++++++++++-
- 1 file changed, 61 insertions(+)
+Jason,
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-index a021ee6da396..511fca491fe8 100644
---- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-@@ -45,6 +45,7 @@
- #include "sun8i-a83t.dtsi"
- 
- #include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pwm/pwm.h>
- 
- / {
- 	model = "TBS A711 Tablet";
-@@ -59,6 +60,44 @@
- 		stdout-path = "serial0:115200n8";
- 	};
- 
-+	backlight: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 0 50000 PWM_POLARITY_INVERTED>;
-+		enable-gpios = <&pio 3 29 GPIO_ACTIVE_HIGH>;
-+
-+		brightness-levels = <0 1 2 4 8 16 32 64 128 255>;
-+		default-brightness-level = <9>;
-+	};
-+
-+	panel {
-+		compatible = "tbs,a711-panel", "panel-lvds";
-+		backlight = <&backlight>;
-+		power-supply = <&reg_sw>;
-+
-+		width-mm = <153>;
-+		height-mm = <90>;
-+		data-mapping = "vesa-24";
-+
-+		panel-timing {
-+			/* 1024x600 @60Hz */
-+			clock-frequency = <52000000>;
-+			hactive = <1024>;
-+			vactive = <600>;
-+			hsync-len = <20>;
-+			hfront-porch = <180>;
-+			hback-porch = <160>;
-+			vfront-porch = <12>;
-+			vback-porch = <23>;
-+			vsync-len = <5>;
-+		};
-+
-+		port {
-+			panel_input: endpoint {
-+				remote-endpoint = <&tcon0_out_lcd>;
-+			};
-+		};
-+	};
-+
- 	reg_vbat: reg-vbat {
- 		compatible = "regulator-fixed";
- 		regulator-name = "vbat";
-@@ -89,6 +128,10 @@
- 	};
- };
- 
-+&de {
-+	status = "okay";
-+};
-+
- /*
-  * An USB-2 hub is connected here, which also means we don't need to
-  * enable the OHCI controller.
-@@ -142,6 +185,12 @@
- 	status = "okay";
- };
- 
-+&pwm {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pwm_pin>;
-+	status = "okay";
-+};
-+
- &r_rsb {
- 	status = "okay";
- 
-@@ -323,6 +372,18 @@
- 	regulator-name = "vcc-lcd";
- };
- 
-+&tcon0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&lcd_lvds_pins>;
-+};
-+
-+&tcon0_out {
-+	tcon0_out_lcd: endpoint at 0 {
-+		reg = <0>;
-+		remote-endpoint = <&panel_input>;
-+	};
-+};
-+
- &uart0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&uart0_pb_pins>;
+Now that -rc1 is out, and I'm rebasing the branches, what I find is
+the patch that was merged is not the patch that I last tested.  The
+last patch I had from you was 22 Sep 2017.
+
+The most obvious difference is in drivers/rtc/class.c:
+
+-+      /* Drivers can revise this default after allocating the device. */
+++      /* Drivers can revise this default after allocating the device. It
+++       * should be the value of wallclock tv_nsec that the driver needs in
+++       * order to synchronize the second tick over during set.
+++       */
+
+but there's also considerable differences in kernel/time/ntp.c, which
+seems to miss out on some fixes for bugs I reported along the way:
+
+ +      getnstimeofday64(&now);
+ +
+-+      adjust = now;
+++      now = adjust;
+
+What's going on?
+
+I've got a rebase mess here to sort out, and it's a horrid mess.
+
+I think what's in -rc1 is rather fscked.
+
 -- 
-git-series 0.9.1
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
