@@ -1,64 +1,80 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:52:50 +0000
-Subject: [PATCH 09/13] ARM: dts: imx6qdl-hummingboard: add SD card regulator
-In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
-References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMeI-0002rP-Rt@rmk-PC.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 27 Nov 2017 16:38:02 +0000
+Subject: [PATCHv2 08/12] arm64: perf: strip PAC when unwinding userspace
+In-Reply-To: <20171127163806.31435-1-mark.rutland@arm.com>
+References: <20171127163806.31435-1-mark.rutland@arm.com>
+Message-ID: <20171127163806.31435-9-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the SD card regulator, which allows the SD card power to be switched
-on/off.
+When the kernel is unwinding userspace callchains, we can't expect that
+the userspace consumer of these callchains has the data necessary to
+strip the PAC from the stored LR.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+This patch has the kernel strip the PAC from user stackframes when the
+in-kernel unwinder is used. This only affects the LR value, and not the
+FP.
+
+This only affects the in-kernel unwinder. When userspace performs
+unwinding, it is up to userspace to strip PACs as necessary (which can
+be determined from DWARF information).
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Yao Qi <yao.qi@arm.com>
 ---
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/pointer_auth.h | 7 +++++++
+ arch/arm64/kernel/perf_callchain.c    | 5 ++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 84e6392fee1f..1b33cd6752f4 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -59,6 +59,19 @@
- 		regulator-always-on;
- 	};
+diff --git a/arch/arm64/include/asm/pointer_auth.h b/arch/arm64/include/asm/pointer_auth.h
+index b08ebec4b806..07788ce755bc 100644
+--- a/arch/arm64/include/asm/pointer_auth.h
++++ b/arch/arm64/include/asm/pointer_auth.h
+@@ -79,6 +79,12 @@ static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
+  */
+ #define ptrauth_pac_mask() 	GENMASK(54, VA_BITS)
  
-+	v_sd: regulator-v-sd {
-+		compatible = "regulator-fixed";
-+		gpio = <&gpio4 30 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_hummingboard_vmmc>;
-+		regulator-boot-on;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-min-microvolt = <3300000>;
-+		regulator-name = "v_sd";
-+		startup-delay-us = <1000>;
-+		vin-supply = <&reg_3p3v>;
-+	};
++/* Only valid for EL0 TTBR0 instruction pointers */
++static inline unsigned long ptrauth_strip_insn_pac(unsigned long ptr)
++{
++	return ptr & ~ptrauth_pac_mask();
++}
 +
- 	reg_usbh1_vbus: usb-h1-vbus {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
-@@ -241,6 +254,11 @@
- 				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x13059
- 			>;
- 		};
-+		pinctrl_hummingboard_vmmc: hummingboard-vmmc {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT9__GPIO4_IO30 0x1b0b0
-+			>;
-+		};
- 	};
- };
+ #define mm_ctx_ptrauth_init(ctx) \
+ 	ptrauth_keys_init(&(ctx)->ptrauth_keys)
  
-@@ -292,7 +310,7 @@
- 		&pinctrl_hummingboard_usdhc2_aux
- 		&pinctrl_hummingboard_usdhc2
- 	>;
--	vmmc-supply = <&reg_3p3v>;
-+	vmmc-supply = <&v_sd>;
- 	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
- 	status = "okay";
- };
+@@ -89,6 +95,7 @@ static inline void ptrauth_keys_dup(struct ptrauth_keys *old,
+ 	ptrauth_keys_dup(&(oldctx)->ptrauth_keys, &(newctx)->ptrauth_keys)
+ 
+ #else
++#define ptrauth_strip_insn_pac(lr)	(lr)
+ #define mm_ctx_ptrauth_init(ctx)
+ #define mm_ctx_ptrauth_switch(ctx)
+ #define mm_ctx_ptrauth_dup(oldctx, newctx)
+diff --git a/arch/arm64/kernel/perf_callchain.c b/arch/arm64/kernel/perf_callchain.c
+index bcafd7dcfe8b..928204f6ab08 100644
+--- a/arch/arm64/kernel/perf_callchain.c
++++ b/arch/arm64/kernel/perf_callchain.c
+@@ -35,6 +35,7 @@ user_backtrace(struct frame_tail __user *tail,
+ {
+ 	struct frame_tail buftail;
+ 	unsigned long err;
++	unsigned long lr;
+ 
+ 	/* Also check accessibility of one struct frame_tail beyond */
+ 	if (!access_ok(VERIFY_READ, tail, sizeof(buftail)))
+@@ -47,7 +48,9 @@ user_backtrace(struct frame_tail __user *tail,
+ 	if (err)
+ 		return NULL;
+ 
+-	perf_callchain_store(entry, buftail.lr);
++	lr = ptrauth_strip_insn_pac(buftail.lr);
++
++	perf_callchain_store(entry, lr);
+ 
+ 	/*
+ 	 * Frame pointers should strictly progress back up the stack
 -- 
-2.7.4
+2.11.0
