@@ -1,92 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 27 Nov 2017 14:19:56 +0100
-Subject: [PATCH 4/8] [media] staging: bcm2835-camera use ktime_t for timestamps
-In-Reply-To: <20171127132027.1734806-1-arnd@arndb.de>
-References: <20171127132027.1734806-1-arnd@arndb.de>
-Message-ID: <20171127132027.1734806-4-arnd@arndb.de>
+From: otavio.salvador@ossystems.com.br (Otavio Salvador)
+Date: Mon, 27 Nov 2017 11:28:03 -0200
+Subject: [PATCH v2] ARM: dts: imx6qdl-nitrogen6x: Add SPI NOR partitions
+In-Reply-To: <20171127101739.qs6ws3232hd5qwgv@t450s.lan>
+References: <20171124170004.31133-1-otavio@ossystems.com.br>
+ <CAP9ODKoefNEcQtrCCLEa7hzx2D_2vJTit0t8ooQGTx7Uyds1mQ@mail.gmail.com>
+ <20171127101739.qs6ws3232hd5qwgv@t450s.lan>
+Message-ID: <CAP9ODKr-5Q3TgZQHFPNHQcjNfm9NZM0a-C8f-MuFQtRCj1FiAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct timeval is deprecated for in-kernel use, and converting
-this function to use ktime_t makes it simpler as well.
+On Mon, Nov 27, 2017 at 8:17 AM, Gary Bisson
+<gary.bisson@boundarydevices.com> wrote:
+> Hi Otavio,
+>
+> On Sat, Nov 25, 2017 at 07:55:53AM -0200, Otavio Salvador wrote:
+>> On Fri, Nov 24, 2017 at 3:00 PM, Otavio Salvador
+>> <otavio@ossystems.com.br> wrote:
+>> > This adds the partitions definition for the SPI NOR to provide
+>> > backward compatibility with the documented[1] layout used with
+>> > Boundary Devices BSP.
+>> >
+>> > 1. https://boundarydevices.com/boot-flash-access-linux/
+>> >
+>> > It exports to Linux:
+>> >
+>> >  mtd0: bootloader
+>> >  mtd1: env
+>> >  mtd2: splash
+>> >
+>> > Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+>>
+>> After thinking a bit about Fabio's recommendation to use 'read-only'
+>> to protect the partitions, I think it'd be better to use 'lock' so it
+>> is still possible to write them on Linux but it requires a unlock
+>> prior changing it.
+>>
+>> In my case, I am interested in being capable of upgrading the
+>> bootloader from Linux.
+>>
+>> What people think?
+>
+> Agreed, I would rather have the lock option, especially for the splash
+> and environment.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 37 ++++++----------------
- .../vc04_services/bcm2835-camera/bcm2835-camera.h  |  2 +-
- 2 files changed, 10 insertions(+), 29 deletions(-)
+I will prepare a new patch using the lock option on the three
+partitions so we allow the user to change them but knowing it may
+break the system.
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-index be936b8fe317..d8766b166675 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-@@ -343,37 +343,18 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
- 		if (dev->capture.frame_count) {
- 			if (dev->capture.vc_start_timestamp != -1 &&
- 			    pts != 0) {
--				struct timeval timestamp;
-+				ktime_t timestamp;
- 				s64 runtime_us = pts -
- 				    dev->capture.vc_start_timestamp;
--				u32 div = 0;
--				u32 rem = 0;
--
--				div =
--				    div_u64_rem(runtime_us, USEC_PER_SEC, &rem);
--				timestamp.tv_sec =
--				    dev->capture.kernel_start_ts.tv_sec + div;
--				timestamp.tv_usec =
--				    dev->capture.kernel_start_ts.tv_usec + rem;
--
--				if (timestamp.tv_usec >=
--				    USEC_PER_SEC) {
--					timestamp.tv_sec++;
--					timestamp.tv_usec -=
--					    USEC_PER_SEC;
--				}
-+				timestamp = ktime_add_us(dev->capture.kernel_start_ts,
-+							 runtime_us);
- 				v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
--					 "Convert start time %d.%06d and %llu "
--					 "with offset %llu to %d.%06d\n",
--					 (int)dev->capture.kernel_start_ts.
--					 tv_sec,
--					 (int)dev->capture.kernel_start_ts.
--					 tv_usec,
-+					 "Convert start time %llu and %llu "
-+					 "with offset %llu to %llu\n",
-+					 ktime_to_ns(dev->capture.kernel_start_ts),
- 					 dev->capture.vc_start_timestamp, pts,
--					 (int)timestamp.tv_sec,
--					 (int)timestamp.tv_usec);
--				buf->vb.vb2_buf.timestamp = timestamp.tv_sec * 1000000000ULL +
--					timestamp.tv_usec * 1000ULL;
-+					 ktime_to_ns(timestamp));
-+				buf->vb.vb2_buf.timestamp = ktime_to_ns(timestamp);
- 			} else {
- 				buf->vb.vb2_buf.timestamp = ktime_get_ns();
- 			}
-@@ -547,7 +528,7 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
- 			 "Start time %lld size %d\n",
- 			 dev->capture.vc_start_timestamp, parameter_size);
- 
--	v4l2_get_timestamp(&dev->capture.kernel_start_ts);
-+	dev->capture.kernel_start_ts = ktime_get();
- 
- 	/* enable the camera port */
- 	dev->capture.port->cb_ctx = dev;
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.h b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.h
-index 404037476bc5..83920683a448 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.h
-+++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.h
-@@ -92,7 +92,7 @@ struct bm2835_mmal_dev {
- 		/* VC start timestamp for streaming */
- 		s64         vc_start_timestamp;
- 		/* Kernel start timestamp for streaming */
--		struct timeval kernel_start_ts;
-+		ktime_t kernel_start_ts;
- 
- 		struct vchiq_mmal_port  *port; /* port being used for capture */
- 		/* camera port being used for capture */
 -- 
-2.9.0
+Otavio Salvador                             O.S. Systems
+http://www.ossystems.com.br        http://code.ossystems.com.br
+Mobile: +55 (53) 9981-7854            Mobile: +1 (347) 903-9750
