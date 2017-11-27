@@ -1,166 +1,88 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Mon, 27 Nov 2017 10:45:01 -0500
-Subject: [PATCH v5] dmaengine: dmatest: move callback wait queue to thread
- context
-Message-ID: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 27 Nov 2017 16:41:33 +0100
+Subject: [PATCH v2 09/18] drm/sun4i: Create minimal multipliers and dividers
+In-Reply-To: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <f97d73e8f107438e211a3d9e445f8da7b799413f.1511797218.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
-introduced a bug (that is in fact documented by the patch commit text)
-that leaves behind a dangling pointer. Since the done_wait structure is
-allocated on the stack, future invocations to the DMATEST can produce
-undesirable results (e.g., corrupted spinlocks).
+The various outputs the TCON can provide have different constraints on the
+dotclock divider. Let's make them configurable by the various mode_set
+functions.
 
-Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
-out") attempted to WARN the user that the stack was likely corrupted but
-did not fix the actual issue.
-
-This patch fixes the issue by pushing the wait queue and callback
-structs into the the thread structure. If a failure occurs due to time,
-dmaengine_terminate_all will force the callback to safely call
-wake_up_all() without possibility of using a freed pointer.
-
-Cc: stable at vger.kernel.org
-Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
-Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
-Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
-Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
-changes from v4: Change "done" to "arg" in container_of for x86 compiler
-changes from v3: Added check to thread wait variable if terminate_all fails
-changes from v2: Added "Fixes" tag
-changes from v1: Added pre-req patches for stable
- drivers/dma/dmatest.c | 55 +++++++++++++++++++++++++++++----------------------
- 1 file changed, 31 insertions(+), 24 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c | 10 +++++++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c     |  2 ++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h     |  2 ++
+ 3 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/dma/dmatest.c b/drivers/dma/dmatest.c
-index 47edc7f..ec5f9d2 100644
---- a/drivers/dma/dmatest.c
-+++ b/drivers/dma/dmatest.c
-@@ -155,6 +155,12 @@ struct dmatest_params {
- #define PATTERN_COUNT_MASK	0x1f
- #define PATTERN_MEMSET_IDX	0x01
+diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+index d401156490f3..023f39bda633 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
++++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+@@ -17,8 +17,9 @@
+ #include "sun4i_dotclock.h"
  
-+/* poor man's completion - we want to use wait_event_freezable() on it */
-+struct dmatest_done {
-+	bool			done;
-+	wait_queue_head_t	*wait;
-+};
-+
- struct dmatest_thread {
- 	struct list_head	node;
- 	struct dmatest_info	*info;
-@@ -165,6 +171,8 @@ struct dmatest_thread {
- 	u8			**dsts;
- 	u8			**udsts;
- 	enum dma_transaction_type type;
-+	wait_queue_head_t done_wait;
-+	struct dmatest_done test_done;
- 	bool			done;
+ struct sun4i_dclk {
+-	struct clk_hw	hw;
+-	struct regmap	*regmap;
++	struct clk_hw		hw;
++	struct regmap		*regmap;
++	struct sun4i_tcon	*tcon;
  };
  
-@@ -342,18 +350,25 @@ static unsigned int dmatest_verify(u8 **bufs, unsigned int start,
- 	return error_count;
- }
- 
--/* poor man's completion - we want to use wait_event_freezable() on it */
--struct dmatest_done {
--	bool			done;
--	wait_queue_head_t	*wait;
--};
- 
- static void dmatest_callback(void *arg)
+ static inline struct sun4i_dclk *hw_to_dclk(struct clk_hw *hw)
+@@ -73,11 +74,13 @@ static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
+ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				  unsigned long *parent_rate)
  {
- 	struct dmatest_done *done = arg;
--
--	done->done = true;
--	wake_up_all(done->wait);
-+	struct dmatest_thread *thread =
-+		container_of(arg, struct dmatest_thread, done_wait);
-+	if (!thread->done) {
-+		done->done = true;
-+		wake_up_all(done->wait);
-+	} else {
-+		/*
-+		 * If thread->done, it means that this callback occurred
-+		 * after the parent thread has cleaned up. This can
-+		 * happen in the case that driver doesn't implement
-+		 * the terminate_all() functionality and a dma operation
-+		 * did not occur within the timeout period
-+		 */
-+		WARN(1, "dmatest: Kernel memory may be corrupted!!\n");
-+	}
- }
++	struct sun4i_dclk *dclk = hw_to_dclk(hw);
++	struct sun4i_tcon *tcon = dclk->tcon;
+ 	unsigned long best_parent = 0;
+ 	u8 best_div = 1;
+ 	int i;
  
- static unsigned int min_odd(unsigned int x, unsigned int y)
-@@ -424,9 +439,8 @@ static unsigned long long dmatest_KBs(s64 runtime, unsigned long long len)
-  */
- static int dmatest_func(void *data)
- {
--	DECLARE_WAIT_QUEUE_HEAD_ONSTACK(done_wait);
- 	struct dmatest_thread	*thread = data;
--	struct dmatest_done	done = { .wait = &done_wait };
-+	struct dmatest_done	*done = &thread->test_done;
- 	struct dmatest_info	*info;
- 	struct dmatest_params	*params;
- 	struct dma_chan		*chan;
-@@ -673,9 +687,9 @@ static int dmatest_func(void *data)
- 			continue;
- 		}
+-	for (i = 6; i <= 127; i++) {
++	for (i = tcon->dclk_min_div; i <= tcon->dclk_max_div; i++) {
+ 		unsigned long ideal = rate * i;
+ 		unsigned long rounded;
  
--		done.done = false;
-+		done->done = false;
- 		tx->callback = dmatest_callback;
--		tx->callback_param = &done;
-+		tx->callback_param = done;
- 		cookie = tx->tx_submit(tx);
+@@ -167,6 +170,7 @@ int sun4i_dclk_create(struct device *dev, struct sun4i_tcon *tcon)
+ 	dclk = devm_kzalloc(dev, sizeof(*dclk), GFP_KERNEL);
+ 	if (!dclk)
+ 		return -ENOMEM;
++	dclk->tcon = tcon;
  
- 		if (dma_submit_error(cookie)) {
-@@ -688,21 +702,12 @@ static int dmatest_func(void *data)
- 		}
- 		dma_async_issue_pending(chan);
+ 	init.name = clk_name;
+ 	init.ops = &sun4i_dclk_ops;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index f4284b51bdca..5b6cd7c43e4b 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -177,6 +177,8 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	u8 clk_delay;
+ 	u32 val = 0;
  
--		wait_event_freezable_timeout(done_wait, done.done,
-+		wait_event_freezable_timeout(thread->done_wait, done->done,
- 					     msecs_to_jiffies(params->timeout));
++	tcon->dclk_min_div = 6;
++	tcon->dclk_max_div = 127;
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
  
- 		status = dma_async_is_tx_complete(chan, cookie, NULL, NULL);
+ 	/* Adjust clock delay */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index f61bf6d83b4a..4141fbd97ddf 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -169,6 +169,8 @@ struct sun4i_tcon {
  
--		if (!done.done) {
--			/*
--			 * We're leaving the timed out dma operation with
--			 * dangling pointer to done_wait.  To make this
--			 * correct, we'll need to allocate wait_done for
--			 * each test iteration and perform "who's gonna
--			 * free it this time?" dancing.  For now, just
--			 * leave it dangling.
--			 */
--			WARN(1, "dmatest: Kernel stack may be corrupted!!\n");
-+		if (!done->done) {
- 			dmaengine_unmap_put(um);
- 			result("test timed out", total_tests, src_off, dst_off,
- 			       len, 0);
-@@ -789,7 +794,7 @@ static int dmatest_func(void *data)
- 		dmatest_KBs(runtime, total_len), ret);
+ 	/* Pixel clock */
+ 	struct clk			*dclk;
++	u8				dclk_max_div;
++	u8				dclk_min_div;
  
- 	/* terminate all transfers on specified channels */
--	if (ret)
-+	if (ret || failed_tests)
- 		dmaengine_terminate_all(chan);
- 
- 	thread->done = true;
-@@ -849,6 +854,8 @@ static int dmatest_add_threads(struct dmatest_info *info,
- 		thread->info = info;
- 		thread->chan = dtc->chan;
- 		thread->type = type;
-+		thread->test_done.wait = &thread->done_wait;
-+		init_waitqueue_head(&thread->done_wait);
- 		smp_wmb();
- 		thread->task = kthread_create(dmatest_func, thread, "%s-%s%u",
- 				dma_chan_name(chan), op, i);
+ 	/* Reset control */
+ 	struct reset_control		*lcd_rst;
 -- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+git-series 0.9.1
