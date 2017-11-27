@@ -1,126 +1,69 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 13:52:23 -0500
-Subject: [PATCH V3 10/29] drm/nouveau: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511801886-6753-11-git-send-email-okaya@codeaurora.org>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
- <1511801886-6753-11-git-send-email-okaya@codeaurora.org>
-Message-ID: <665f33c6-fb2f-b505-fd19-5875eae8193a@codeaurora.org>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 27 Nov 2017 18:53:52 +0000
+Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
+ ntp
+In-Reply-To: <20171127184411.GA19577@piout.net>
+References: <20171013175433.GA22062@obsidianresearch.com>
+ <20171123095456.lkc4nkuzsd2q26mm@piout.net>
+ <CALAqxLUBWd-mv_3iiFrXLf0ka685t0an89jjduHpT-2jjv5O2Q@mail.gmail.com>
+ <20171127175254.GL31757@n2100.armlinux.org.uk>
+ <20171127184411.GA19577@piout.net>
+Message-ID: <20171127185352.GN31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+nouveau at lists.freedesktop.org
+On Mon, Nov 27, 2017 at 07:44:11PM +0100, Alexandre Belloni wrote:
+> On 27/11/2017 at 17:52:54 +0000, Russell King - ARM Linux wrote:
+> > I'm actually rather disappointed that Alexandre Belloni has only now
+> > brought up his dis-satisfaction with the approach after all the effort
+> > that Jason and myself have put in to it.  It's not like Alexandre was
+> > not copied on the patches and discussion.
+> > 
+> > If Alexandre could not be bothered to bring up his concerns while the
+> > discussion was on-going in September, and didn't bother raising them
+> > in October, I'd say that Alexandre's opinion at this point doesn't
+> > count for much - if it wasn't important to state at the time or for
+> > a couple of months after, why does it become important to state after
+> > the thing has been merged.
+> > 
+> > Maybe the idea here is basically to waste people's time letting them
+> > develop a patch for an approach, and then object at the last minute
+> > to that approach.  Hardly seems fair or even reasonable.
+> > 
+> 
+> How unfair that is! Really, you are not in a position to make that kind
+> of comment because you are not even replying to patches in your own
+> subsystem. But maybe my time doesn't count as much as yours.
 
+You are, yet again, wrong.
 
-On 11/27/2017 11:57 AM, Sinan Kaya wrote:
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Getting ready to remove pci_get_bus_and_slot() function in favor of
-> pci_get_domain_bus_and_slot().
-> 
-> Replace pci_get_bus_and_slot() with pci_get_domain_bus_and_slot()
-> and extract the domain number from
-> 1. struct pci_dev
-> 2. struct pci_dev through drm_device->pdev
-> 3. struct pci_dev through fb->subdev->drm_device->pdev
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/gpu/drm/nouveau/dispnv04/arb.c           |  4 +++-
->  drivers/gpu/drm/nouveau/dispnv04/hw.c            | 10 +++++++---
->  drivers/gpu/drm/nouveau/nouveau_drm.c            |  3 ++-
->  drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c | 10 +++++++++-
->  4 files changed, 21 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/nouveau/dispnv04/arb.c b/drivers/gpu/drm/nouveau/dispnv04/arb.c
-> index 90075b6..c79160c 100644
-> --- a/drivers/gpu/drm/nouveau/dispnv04/arb.c
-> +++ b/drivers/gpu/drm/nouveau/dispnv04/arb.c
-> @@ -213,8 +213,10 @@ struct nv_sim_state {
->  	if ((dev->pdev->device & 0xffff) == 0x01a0 /*CHIPSET_NFORCE*/ ||
->  	    (dev->pdev->device & 0xffff) == 0x01f0 /*CHIPSET_NFORCE2*/) {
->  		uint32_t type;
-> +		int domain = pci_domain_nr(dev->pdev->bus);
->  
-> -		pci_read_config_dword(pci_get_bus_and_slot(0, 1), 0x7c, &type);
-> +		pci_read_config_dword(pci_get_domain_bus_and_slot(domain, 0, 1),
-> +				      0x7c, &type);
->  
->  		sim_data.memory_type = (type >> 12) & 1;
->  		sim_data.memory_width = 64;
-> diff --git a/drivers/gpu/drm/nouveau/dispnv04/hw.c b/drivers/gpu/drm/nouveau/dispnv04/hw.c
-> index b985990..0c9bdf0 100644
-> --- a/drivers/gpu/drm/nouveau/dispnv04/hw.c
-> +++ b/drivers/gpu/drm/nouveau/dispnv04/hw.c
-> @@ -216,12 +216,15 @@
->  {
->  	struct nvkm_pll_vals pllvals;
->  	int ret;
-> +	int domain;
-> +
-> +	domain = pci_domain_nr(dev->pdev->bus);
->  
->  	if (plltype == PLL_MEMORY &&
->  	    (dev->pdev->device & 0x0ff0) == CHIPSET_NFORCE) {
->  		uint32_t mpllP;
-> -
-> -		pci_read_config_dword(pci_get_bus_and_slot(0, 3), 0x6c, &mpllP);
-> +		pci_read_config_dword(pci_get_domain_bus_and_slot(domain, 0, 3),
-> +				      0x6c, &mpllP);
->  		mpllP = (mpllP >> 8) & 0xf;
->  		if (!mpllP)
->  			mpllP = 4;
-> @@ -232,7 +235,8 @@
->  	    (dev->pdev->device & 0xff0) == CHIPSET_NFORCE2) {
->  		uint32_t clock;
->  
-> -		pci_read_config_dword(pci_get_bus_and_slot(0, 5), 0x4c, &clock);
-> +		pci_read_config_dword(pci_get_domain_bus_and_slot(domain, 0, 5),
-> +				      0x4c, &clock);
->  		return clock / 1000;
->  	}
->  
-> diff --git a/drivers/gpu/drm/nouveau/nouveau_drm.c b/drivers/gpu/drm/nouveau/nouveau_drm.c
-> index 595630d..0b6c639 100644
-> --- a/drivers/gpu/drm/nouveau/nouveau_drm.c
-> +++ b/drivers/gpu/drm/nouveau/nouveau_drm.c
-> @@ -406,7 +406,8 @@ static int nouveau_drm_probe(struct pci_dev *pdev,
->  	}
->  
->  	/* subfunction one is a hdmi audio device? */
-> -	drm->hdmi_device = pci_get_bus_and_slot((unsigned int)pdev->bus->number,
-> +	drm->hdmi_device = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-> +						(unsigned int)pdev->bus->number,
->  						PCI_DEVFN(PCI_SLOT(pdev->devfn), 1));
->  
->  	if (!drm->hdmi_device) {
-> diff --git a/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c b/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c
-> index 3c6a871..8849b71 100644
-> --- a/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c
-> +++ b/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c
-> @@ -28,8 +28,16 @@
->  {
->  	struct pci_dev *bridge;
->  	u32 mem, mib;
-> +	int domain = 0;
-> +	struct pci_dev *pdev = NULL;
->  
-> -	bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0, 1));
-> +	if (dev_is_pci(fb->subdev.device->dev))
-> +		pdev = to_pci_dev(fb->subdev.device->dev);
-> +
-> +	if (pdev)
-> +		domain = pci_domain_nr(pdev->bus);
-> +
-> +	bridge = pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(0, 1));
->  	if (!bridge) {
->  		nvkm_error(&fb->subdev, "no bridge device\n");
->  		return -ENODEV;
-> 
+I am in a position to make the comment because it was me who identified
+the problem, put in the hours to work on, develop and extensively test
+Jason's patch.  So, it's partly my time that you seem to be wasting,
+and that gives me every right to complain at this point.
 
+You, on the other hand, were copied with every single email, and did
+nothing to discuss the issue except for the "easy" bits when I posted
+a relatively smaller patch - but you ignored the bigger issue.
+
+Now that the patch was merged, you throw your toys out of the pram and
+start blaming everyone else for "silently" merging the patch and how it
+wasn't sent to the right email addresses.
+
+And now that someone dare criticise your abilities, you decide to revert
+the change and restore Linux back to a crippled state.
+
+Honestly, I don't _care_ if you revert it and if you want to cripple
+the kernel as a result in regards to this issue, I can carry the patch
+ad infinitum, no skin off my back.  You're only going to be hurting
+yourself and other people through your spite by doing that revert.
+
+I suggest you take a good long hard look at what you're about to do and
+ask whether you are being reasonable, given that it's taken you over
+two months whole months to raise any _technical_ issues with the approach
+that Jason and myself came up with.
 
 -- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
