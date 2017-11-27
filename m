@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:57:52 -0500
-Subject: [PATCH V3 15/29] pch_gbe: deprecate pci_get_bus_and_slot()
+Date: Mon, 27 Nov 2017 11:57:51 -0500
+Subject: [PATCH V3 14/29] bnx2x: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
 References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-16-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-15-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,30 +14,63 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Use the domain information from pdev while calling into
-pci_get_domain_bus_and_slot() function.
+Introduce bnx2x_vf_domain() function to extract the domain information
+and save it to VF specific data structure.
+
+Use the saved domain value while calling pci_get_domain_bus_and_slot().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c | 10 +++++++++-
+ drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h |  1 +
+ 2 files changed, 10 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-index 5ae9681..4be7806 100644
---- a/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-+++ b/drivers/net/ethernet/oki-semi/pch_gbe/pch_gbe_main.c
-@@ -2603,8 +2603,10 @@ static int pch_gbe_probe(struct pci_dev *pdev,
- 	if (adapter->pdata && adapter->pdata->platform_init)
- 		adapter->pdata->platform_init(pdev);
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+index 9ca994d..9f40c23 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.c
+@@ -812,7 +812,7 @@ static u8 bnx2x_vf_is_pcie_pending(struct bnx2x *bp, u8 abs_vfid)
+ 	if (!vf)
+ 		return false;
  
--	adapter->ptp_pdev = pci_get_bus_and_slot(adapter->pdev->bus->number,
--					       PCI_DEVFN(12, 4));
-+	adapter->ptp_pdev =
-+		pci_get_domain_bus_and_slot(pci_domain_nr(adapter->pdev->bus),
-+					    adapter->pdev->bus->number,
-+					    PCI_DEVFN(12, 4));
+-	dev = pci_get_bus_and_slot(vf->bus, vf->devfn);
++	dev = pci_get_domain_bus_and_slot(vf->domain, vf->bus, vf->devfn);
+ 	if (dev)
+ 		return bnx2x_is_pcie_pending(dev);
+ 	return false;
+@@ -1041,6 +1041,13 @@ void bnx2x_iov_init_dmae(struct bnx2x *bp)
+ 		REG_WR(bp, DMAE_REG_BACKWARD_COMP_EN, 0);
+ }
  
- 	netdev->netdev_ops = &pch_gbe_netdev_ops;
- 	netdev->watchdog_timeo = PCH_GBE_WATCHDOG_PERIOD;
++static int bnx2x_vf_domain(struct bnx2x *bp, int vfid)
++{
++	struct pci_dev *dev = bp->pdev;
++
++	return pci_domain_nr(dev->bus);
++}
++
+ static int bnx2x_vf_bus(struct bnx2x *bp, int vfid)
+ {
+ 	struct pci_dev *dev = bp->pdev;
+@@ -1611,6 +1618,7 @@ int bnx2x_iov_nic_init(struct bnx2x *bp)
+ 		struct bnx2x_virtf *vf = BP_VF(bp, vfid);
+ 
+ 		/* fill in the BDF and bars */
++		vf->domain = bnx2x_vf_domain(bp, vfid);
+ 		vf->bus = bnx2x_vf_bus(bp, vfid);
+ 		vf->devfn = bnx2x_vf_devfn(bp, vfid);
+ 		bnx2x_vf_set_bars(bp, vf);
+diff --git a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
+index 53466f6..eb814c6 100644
+--- a/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
++++ b/drivers/net/ethernet/broadcom/bnx2x/bnx2x_sriov.h
+@@ -182,6 +182,7 @@ struct bnx2x_virtf {
+ 	u32 error;	/* 0 means all's-well */
+ 
+ 	/* BDF */
++	unsigned int domain;
+ 	unsigned int bus;
+ 	unsigned int devfn;
+ 
 -- 
 1.9.1
