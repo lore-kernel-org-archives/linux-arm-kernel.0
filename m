@@ -1,24 +1,36 @@
-From: jgg@ziepe.ca (Jason Gunthorpe)
-Date: Mon, 27 Nov 2017 11:59:22 -0700
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171127174323.GK31757@n2100.armlinux.org.uk>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <20171123150439.GB18754@mellanox.com>
- <20171127154316.GG31757@n2100.armlinux.org.uk>
- <20171127174323.GK31757@n2100.armlinux.org.uk>
-Message-ID: <20171127185922.GE13962@mellanox.com>
+From: stefan.bruens@rwth-aachen.de (=?UTF-8?q?Stefan=20Br=C3=BCns?=)
+Date: Mon, 27 Nov 2017 20:05:34 +0100
+Subject: [PATCH v2] sunxi-rsb: Include OF based modalias in device uevent
+Message-ID: <53cb17f5-6077-419a-8e5c-6c80f9dfa9dc@rwthex-w2-a.rwth-ad.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:43:23PM +0000, Russell King - ARM Linux wrote:
+Include the OF-based modalias in the uevent sent when registering devices
+on the sunxi RSB bus, so that user space has a chance to autoload the
+kernel module for the device.
 
-> Having been through the conflict mess and come out with a resolution,
-> I think it might be okay, with the exception of the missing explanation
-> in drivers/rtc/class.c.  I do need to run some tests on it to make sure
-> though.
+Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
+pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
+the AXP803 PMIC is built as a module, it is not loaded and the system
+ends up with an disfunctional MMC controller.
 
-Okay thanks, let me know if more is needed.
+Cc: stable <stable@vger.kernel.org>
+Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+---
+ drivers/bus/sunxi-rsb.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Jason
+diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+index 328ca93781cf..1b76d9585902 100644
+--- a/drivers/bus/sunxi-rsb.c
++++ b/drivers/bus/sunxi-rsb.c
+@@ -178,6 +178,7 @@ static struct bus_type sunxi_rsb_bus = {
+ 	.match		= sunxi_rsb_device_match,
+ 	.probe		= sunxi_rsb_device_probe,
+ 	.remove		= sunxi_rsb_device_remove,
++	.uevent		= of_device_uevent_modalias,
+ };
+ 
+ static void sunxi_rsb_dev_release(struct device *dev)
+-- 
+2.15.0
