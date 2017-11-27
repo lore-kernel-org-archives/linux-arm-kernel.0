@@ -1,154 +1,90 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Mon, 27 Nov 2017 12:05:19 +1030
-Subject: [PATCH 1/2] ARM: BUG if jumping to usermode address in kernel mode
-In-Reply-To: <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
-References: <20171125113302.GY31757@n2100.armlinux.org.uk>
- <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
-Message-ID: <CACPK8XdvUtvKiX_uqTnnb8U-jKuhy4Kw+cda=OKvzabfaffjgQ@mail.gmail.com>
+From: mhiramat@kernel.org (Masami Hiramatsu)
+Date: Mon, 27 Nov 2017 10:40:34 +0900
+Subject: do page fault in atomic bug on arm
+In-Reply-To: <08bb4658-5b62-e306-5aa8-366be25986ca@linaro.org>
+References: <d83cdbf1-0d27-fb82-14c8-3d37101c3c06@linaro.org>
+ <20171121132001.GH31757@n2100.armlinux.org.uk>
+ <64cbcda0-d040-4872-4a6b-7cd18375b4aa@linaro.org>
+ <20171124192700.GU31757@n2100.armlinux.org.uk>
+ <20171124202553.GV31757@n2100.armlinux.org.uk>
+ <08bb4658-5b62-e306-5aa8-366be25986ca@linaro.org>
+Message-ID: <20171127104034.205fc0b50e9bf9dafdcd05c7@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Russell,
+On Sun, 26 Nov 2017 22:59:58 +0800
+Alex Shi <alex.shi@linaro.org> wrote:
 
-On Sat, Nov 25, 2017 at 10:03 PM, Russell King
-<rmk+kernel@armlinux.org.uk> wrote:
-> Detect if we are returning to usermode via the normal kernel exit paths
-> but the saved PSR value indicates that we are in kernel mode.  This
-> could occur due to corrupted stack state, which has been observed with
-> "ftracetest".
->
-> This ensures that we catch the problem case before we get to user code.
->
-> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
-> ---
+> cc mhiramat at kernel.org
+> 
+> Thanks a lot for look into this! :)
+> 
+> Regards
+> Alex
+> 
+> On 11/25/2017 04:25 AM, Russell King - ARM Linux wrote:
+> > On Fri, Nov 24, 2017 at 07:27:00PM +0000, Russell King - ARM Linux wrote:
+> >> Adding Tixy, as he's more knowledgable in this area - I suggest
+> >> someone knowledgable in this area runs
+> >>
+> >> 	ftracetest test.d/kprobe/multiple_kprobes.tc
+> >>
+> >> and fixes these bugs... also running the entire ftracetest suite
+> >> would probably also be a very good idea.
+> > 
+> > There's some other stupidities as well:
+> > 
+> > trace_kprobe: Inserting kprobe at __error_lpae+0
+> > trace_kprobe: Inserting kprobe at str_lpae+0
+> > trace_kprobe: Inserting kprobe at __error_p+0
+> > trace_kprobe: Inserting kprobe at str_p1+0
+> > trace_kprobe: Inserting kprobe at str_p2+0
+> > trace_kprobe: Could not insert probe at str_p2+0: -22
+> > 
+> > str_lpae: .asciz "\nError: Kernel with LPAE support, but CPU does not support LPAE.\n"
+> > str_p1: .asciz  "\nError: unrecognized/unsupported processor variant (0x"
+> > str_p2: .asciz  ").\n"
+> > 
+> > So we successfully placed a kprobe on some ASCII strings, which are
+> > used prior to the kernel being properly up and running, which means
+> > we have to use relative references to these strings, and relative
+> > references to strings in other sections is not simple.
 
-This patch breaks my 32 bit ARM system when running under Qemu. I get
-this continually:
+Oops, that's my mistake. It should pick only text symbols.
 
-[    2.130043] ------------[ cut here ]------------
-[    2.130132] kernel BUG at Returning to usermode but unexpected PSR
-bits set?:9!
-[    2.130233] Internal error: Oops - BUG: 0 [#1] ARM
-[    2.130375] Modules linked in:
-[    2.130805] CPU: 0 PID: 154 Comm: modprobe Not tainted 4.15.0-rc1 #3
-[    2.130874] Hardware name: Generic DT based system
-[    2.131023] task: 87a02800 task.stack: 87970000
-[    2.131158] PC is at no_work_pending+0x2c/0x30
-[    2.131402] LR is at 0x76f18ae8
-[    2.131462] pc : [<8000a600>]    lr : [<76f18ae8>]    psr: 200001d3
-[    2.131516] sp : 87971fb0  ip : 80014484  fp : 00000000
-[    2.131567] r10: 00000000  r9 : 87970000  r8 : 00000000
-[    2.131627] r7 : 00c5387d  r6 : ffffffff  r5 : 00000150  r4 : 76f18ae8
-[    2.131686] r3 : 00000000  r2 : 87971fec  r1 : 00000150  r0 : 00000000
-[    2.131818] Flags: nzCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM
-Segment user
-[    2.131894] Control: 00c5387d  Table: 8794c008  DAC: 00000055
-[    2.131971] Process modprobe (pid: 154, stack limit = 0x87970188)
-[    2.132075] Stack: (0x87971fb0 to 0x87972000)
-[    2.132273] 1fa0:                                     00000000
-00000000 00000000 00000000
-[    2.132344] 1fc0: 00000000 00000000 00000000 00000000 00000000
-00000000 00000000 00000000
-[    2.132395] 1fe0: 00000000 7ec5fec0 00000000 76f18ae8 00000150
-ffffffff e3a00001 e58d300c
-[    2.133146] Code: e9527fff e1a00000 e28dd048 e1b0f00e (e7f001f2)
-[    2.133593] ---[ end trace 46087be8f22855bc ]---
+> > 
+> > More worrying:
+> > 
+> > trace_kprobe: Inserting kprobe at __turn_mmu_on+0
+> > trace_kprobe: Inserting kprobe at __idmap_text_start+0
+> > trace_kprobe: Inserting kprobe at __turn_mmu_on_end+0
+> > ...
+> > trace_kprobe: Inserting kprobe at __idmap_text_end+0
+> > ...
+> > trace_kprobe: Inserting kprobe at secondary_startup+0
+> > trace_kprobe: Inserting kprobe at secondary_startup_arm+0
+> > trace_kprobe: Inserting kprobe at __secondary_switched+0
+> > trace_kprobe: Inserting kprobe at __secondary_data+0
+> > trace_kprobe: Inserting kprobe at __enable_mmu+0
+> > trace_kprobe: Inserting kprobe at __do_fixup_smp_on_up+0
+> > trace_kprobe: Inserting kprobe at __fixup_a_pv_table+0
+> > trace_kprobe: Inserting kprobe at fixup_pv_table+0
+> > trace_kprobe: Inserting kprobe at __lookup_processor_type+0
+> > trace_kprobe: Inserting kprobe at __lookup_processor_type_data+0
+> > 
+> > These are definitely a no-no for tracing, because they're part of the
+> > early startup code for the kernel when no stacks are available.
 
-This is 4.15-rc1, booting aspeed_g5_defconfig on Qemu master
-(v2.11.0-rc2-14-ge7b47c2).
+It should be rejected by kprobes arch dependent code.
 
-qemu-system-arm -nographic -nodefaults -serial stdio -M romulus-bmc \
- -kernel arch/arm/boot/zImage -dtb
-arch/arm/boot/dts/aspeed-bmc-opp-romulus.dtb \
- -initrd arm.cpio.xz
+> > Some of these can't live in the special "do not use kprobes here"
+> > section as they need to be in other sections (like .idmap) because
+> > they need to be part of the identity-mapped code.
 
-If I revert the patch userspace runs as expected.
+kprobes already has a blacklist on x86, so it is a good time to start
+making it on arm/arm64 too.
 
-Cheers,
+Thank you,
 
-Joel
-
->  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
->  arch/arm/kernel/entry-header.S   |  6 ++++++
->  2 files changed, 24 insertions(+)
->
-> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
-> index ad301f107dd2..bc8d4bbd82e2 100644
-> --- a/arch/arm/include/asm/assembler.h
-> +++ b/arch/arm/include/asm/assembler.h
-> @@ -518,4 +518,22 @@ THUMB(     orr     \reg , \reg , #PSR_T_BIT        )
->  #endif
->         .endm
->
-> +       .macro  bug, msg, line
-> +#ifdef CONFIG_THUMB2_KERNEL
-> +1:     .inst   0xde02
-> +#else
-> +1:     .inst   0xe7f001f2
-> +#endif
-> +#ifdef CONFIG_DEBUG_BUGVERBOSE
-> +       .pushsection .rodata.str, "aMS", %progbits, 1
-> +2:     .asciz  "\msg"
-> +       .popsection
-> +       .pushsection __bug_table, "aw"
-> +       .align  2
-> +       .word   1b, 2b
-> +       .hword  \line
-> +       .popsection
-> +#endif
-> +       .endm
-> +
->  #endif /* __ASM_ASSEMBLER_H__ */
-> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
-> index d523cd8439a3..7f4d80c2db6b 100644
-> --- a/arch/arm/kernel/entry-header.S
-> +++ b/arch/arm/kernel/entry-header.S
-> @@ -300,6 +300,8 @@
->         mov     r2, sp
->         ldr     r1, [r2, #\offset + S_PSR]      @ get calling cpsr
->         ldr     lr, [r2, #\offset + S_PC]!      @ get pc
-> +       tst     r1, #0xcf
-> +       bne     1f
->         msr     spsr_cxsf, r1                   @ save in spsr_svc
->  #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
->         @ We must avoid clrex due to Cortex-A15 erratum #830321
-> @@ -314,6 +316,7 @@
->                                                 @ after ldm {}^
->         add     sp, sp, #\offset + PT_REGS_SIZE
->         movs    pc, lr                          @ return & move spsr_svc into cpsr
-> +1:     bug     "Returning to usermode but unexpected PSR bits set?", \@
->  #elif defined(CONFIG_CPU_V7M)
->         @ V7M restore.
->         @ Note that we don't need to do clrex here as clearing the local
-> @@ -329,6 +332,8 @@
->         ldr     r1, [sp, #\offset + S_PSR]      @ get calling cpsr
->         ldr     lr, [sp, #\offset + S_PC]       @ get pc
->         add     sp, sp, #\offset + S_SP
-> +       tst     r1, #0xcf
-> +       bne     1f
->         msr     spsr_cxsf, r1                   @ save in spsr_svc
->
->         @ We must avoid clrex due to Cortex-A15 erratum #830321
-> @@ -341,6 +346,7 @@
->         .endif
->         add     sp, sp, #PT_REGS_SIZE - S_SP
->         movs    pc, lr                          @ return & move spsr_svc into cpsr
-> +1:     bug     "Returning to usermode but unexpected PSR bits set?", \@
->  #endif /* !CONFIG_THUMB2_KERNEL */
->         .endm
->
-> --
-> 2.7.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: linux-4.15-rc1-dmesg
-Type: application/octet-stream
-Size: 11762 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/44b0b540/attachment-0001.obj>
+-- 
+Masami Hiramatsu <mhiramat@kernel.org>
