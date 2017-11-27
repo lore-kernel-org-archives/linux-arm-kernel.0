@@ -1,193 +1,259 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 27 Nov 2017 16:41:32 +0100
-Subject: [PATCH v2 08/18] drm/sun4i: Reorder and document DE2 mixer registers
+Date: Mon, 27 Nov 2017 16:41:31 +0100
+Subject: [PATCH v2 07/18] drm/sun4i: sun8i: Rework the UI channels code
 In-Reply-To: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
 References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <eade3012b16bfe687baff576349cca9609a664e3.1511797218.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <38e9e5efac848777c59b4662b2b5440d275f3bb4.1511797218.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some registers values have been hardcoded so far, or were not as
-descriptive as supposed to, because of missing information. The various
-BSP that poped up since have given us more details, some hopefully we can
-be more explicit about things.
+The current code makes the assumption that the only channel we want to use
+for the first (and only) UI channel is the number of VI channels (so last
+VI + 1), which is accurate.
+
+However, it does so in pretty much every plane-related function using a
+local variable that makes it quite difficult to rework when we'll have to
+deal with multiple UI channels.
+
+Refactor the current code a bit to associate the ID of the channel to the
+sun8i_ui structure directly, and have all our callbacks use that instead.
+
+As the current code registers only one UI channel, we'll fill that field
+with the same value that was there before (ie number of VI channels), but
+this time we'll only have to change it where the planes are instatiated,
+and not in the whole code.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 25 ++++----
- drivers/gpu/drm/sun4i/sun8i_mixer.h | 89 ++++++++++++++++--------------
- 2 files changed, 63 insertions(+), 51 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 43 +++++++++++++-----------------
+ drivers/gpu/drm/sun4i/sun8i_mixer.h | 12 ++++----
+ drivers/gpu/drm/sun4i/sun8i_ui.c    | 12 ++++----
+ drivers/gpu/drm/sun4i/sun8i_ui.h    |  1 +-
+ 4 files changed, 34 insertions(+), 34 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 648a6ad3104a..44d5e639ebb2 100644
+index f503bd000893..648a6ad3104a 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -61,7 +61,7 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer, struct sun8i_ui *ui,
- 	regmap_update_bits(mixer->engine.regs,
- 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(ui->chan, ui->id),
- 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK,
--			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF);
-+			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA(255));
+@@ -37,14 +37,12 @@ static void sun8i_mixer_commit(struct sunxi_engine *engine)
+ 		     SUN8I_MIXER_GLOBAL_DBUFF_ENABLE);
  }
  
- static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
-@@ -329,19 +329,20 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+-void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+-				int layer, bool enable)
++void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer, struct sun8i_ui *ui,
++			      bool enable)
+ {
+ 	u32 val;
+-	/* Currently the first UI channel is used */
+-	int chan = mixer->cfg->vi_num;
  
- 	/* Initialize blender */
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_FCOLOR_CTL,
--		     SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF);
--	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PREMULTIPLY,
--		     SUN8I_MIXER_BLEND_PREMULTIPLY_DEF);
-+		     SUN8I_MIXER_BLEND_FCOLOR_CTL_FCOLOR_EN(0) |
-+		     SUN8I_MIXER_BLEND_FCOLOR_CTL_EN(0));
-+	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PREMULTIPLY, 0);
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
--		     SUN8I_MIXER_BLEND_BKCOLOR_DEF);
-+		     SUN8I_MIXER_BLEND_BKCOLOR_ALPHA(255));
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(0),
--		     SUN8I_MIXER_BLEND_MODE_DEF);
--	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_CK_CTL,
--		     SUN8I_MIXER_BLEND_CK_CTL_DEF);
--
--	regmap_write(mixer->engine.regs,
--		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
--		     SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF);
-+		     SUN8I_MIXER_BLEND_MODE_PIXEL_FS(1) |
-+		     SUN8I_MIXER_BLEND_MODE_PIXEL_FD(3) |
-+		     SUN8I_MIXER_BLEND_MODE_ALPHA_FS(1) |
-+		     SUN8I_MIXER_BLEND_MODE_ALPHA_FD(3));
-+	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_CK_CTL, 0);
-+
-+	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
-+		     SUN8I_MIXER_BLEND_ATTR_FCOLOR_ALPHA(255));
+-	DRM_DEBUG_DRIVER("Enabling layer %d in channel %d\n", layer, chan);
++	DRM_DEBUG_DRIVER("Enabling layer %d in channel %d\n", ui->id, ui->chan);
  
- 	/* Select the first UI channel */
- 	DRM_DEBUG_DRIVER("Selecting channel %d (first UI channel)\n",
+ 	if (enable)
+ 		val = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN;
+@@ -52,16 +50,16 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+ 		val = 0;
+ 
+ 	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
++			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(ui->chan, ui->id),
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
+ 
+ 	/* Set the alpha configuration */
+ 	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
++			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(ui->chan, ui->id),
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_MASK,
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF);
+ 	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
++			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(ui->chan, ui->id),
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK,
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF);
+ }
+@@ -90,14 +88,13 @@ static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
+ }
+ 
+ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+-				     int layer, struct drm_plane *plane)
++				   struct sun8i_ui *ui)
+ {
++	struct drm_plane *plane = &ui->plane;
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_framebuffer *fb = state->fb;
+-	/* Currently the first UI channel is used */
+-	int chan = mixer->cfg->vi_num;
+ 
+-	DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
++	DRM_DEBUG_DRIVER("Updating layer %d\n", ui->id);
+ 
+ 	if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
+ 		DRM_DEBUG_DRIVER("Primary layer, updating global size W: %u H: %u\n",
+@@ -115,7 +112,7 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+ 					      state->crtc_h));
+ 		DRM_DEBUG_DRIVER("Updating channel size\n");
+ 		regmap_write(mixer->engine.regs,
+-			     SUN8I_MIXER_CHAN_UI_OVL_SIZE(chan),
++			     SUN8I_MIXER_CHAN_UI_OVL_SIZE(ui->chan),
+ 			     SUN8I_MIXER_SIZE(state->crtc_w,
+ 					      state->crtc_h));
+ 	}
+@@ -123,35 +120,34 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+ 	/* Set the line width */
+ 	DRM_DEBUG_DRIVER("Layer line width: %d bytes\n", fb->pitches[0]);
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_CHAN_UI_LAYER_PITCH(chan, layer),
++		     SUN8I_MIXER_CHAN_UI_LAYER_PITCH(ui->chan, ui->id),
+ 		     fb->pitches[0]);
+ 
+ 	/* Set height and width */
+ 	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n",
+ 			 state->crtc_w, state->crtc_h);
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_CHAN_UI_LAYER_SIZE(chan, layer),
++		     SUN8I_MIXER_CHAN_UI_LAYER_SIZE(ui->chan, ui->id),
+ 		     SUN8I_MIXER_SIZE(state->crtc_w, state->crtc_h));
+ 
+ 	/* Set base coordinates */
+ 	DRM_DEBUG_DRIVER("Layer coordinates X: %d Y: %d\n",
+ 			 state->crtc_x, state->crtc_y);
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_CHAN_UI_LAYER_COORD(chan, layer),
++		     SUN8I_MIXER_CHAN_UI_LAYER_COORD(ui->chan, ui->id),
+ 		     SUN8I_MIXER_COORD(state->crtc_x, state->crtc_y));
+ 
+ 	return 0;
+ }
+ 
+ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
+-				       int layer, struct drm_plane *plane)
++				     struct sun8i_ui *ui)
+ {
++	struct drm_plane *plane = &ui->plane;
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_framebuffer *fb = state->fb;
+ 	bool interlaced = false;
+ 	u32 val;
+-	/* Currently the first UI channel is used */
+-	int chan = mixer->cfg->vi_num;
+ 	int ret;
+ 
+ 	if (plane->state->crtc)
+@@ -174,21 +170,20 @@ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
+ 	}
+ 
+ 	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
++			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(ui->chan, ui->id),
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_MASK, val);
+ 
+ 	return 0;
+ }
+ 
+ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
+-				      int layer, struct drm_plane *plane)
++				    struct sun8i_ui *ui)
+ {
++	struct drm_plane *plane = &ui->plane;
+ 	struct drm_plane_state *state = plane->state;
+ 	struct drm_framebuffer *fb = state->fb;
+ 	struct drm_gem_cma_object *gem;
+ 	dma_addr_t paddr;
+-	/* Currently the first UI channel is used */
+-	int chan = mixer->cfg->vi_num;
+ 	int bpp;
+ 
+ 	/* Get the physical address of the buffer in memory */
+@@ -220,7 +215,7 @@ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
+ 	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+ 
+ 	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_CHAN_UI_LAYER_TOP_LADDR(chan, layer),
++		     SUN8I_MIXER_CHAN_UI_LAYER_TOP_LADDR(ui->chan, ui->id),
+ 		     lower_32_bits(paddr));
+ 
+ 	return 0;
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index ce984c436246..b6512198af55 100644
+index 4785ac090b8c..ce984c436246 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -22,71 +22,82 @@
- #define SUN8I_MIXER_COORD(x, y)			((y) << 16 | (x))
+@@ -104,6 +104,8 @@
+ #define SUN8I_MIXER_FCC_EN			0xaa000
+ #define SUN8I_MIXER_DCSC_EN			0xb0000
  
- #define SUN8I_MIXER_GLOBAL_CTL			0x0
-+#define SUN8I_MIXER_GLOBAL_CTL_RT_EN			BIT(0)
++struct sun8i_ui;
 +
- #define SUN8I_MIXER_GLOBAL_STATUS		0x4
- #define SUN8I_MIXER_GLOBAL_DBUFF		0x8
--#define SUN8I_MIXER_GLOBAL_SIZE			0xc
--
--#define SUN8I_MIXER_GLOBAL_CTL_RT_EN		0x1
-+#define SUN8I_MIXER_GLOBAL_DBUFF_ENABLE			BIT(0)
+ struct sun8i_mixer_cfg {
+ 	int		vi_num;
+ 	int		ui_num;
+@@ -126,12 +128,12 @@ engine_to_sun8i_mixer(struct sunxi_engine *engine)
+ 	return container_of(engine, struct sun8i_mixer, engine);
+ }
  
--#define SUN8I_MIXER_GLOBAL_DBUFF_ENABLE		0x1
-+#define SUN8I_MIXER_GLOBAL_SIZE			0xc
+-void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+-				int layer, bool enable);
++void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer, struct sun8i_ui *ui,
++			      bool enable);
+ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+-				     int layer, struct drm_plane *plane);
++				   struct sun8i_ui *ui);
+ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
+-				       int layer, struct drm_plane *plane);
++				     struct sun8i_ui *ui);
+ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer,
+-				      int layer, struct drm_plane *plane);
++				    struct sun8i_ui *ui);
+ #endif /* _SUN8I_MIXER_H_ */
+diff --git a/drivers/gpu/drm/sun4i/sun8i_ui.c b/drivers/gpu/drm/sun4i/sun8i_ui.c
+index 3986cb08509c..edc65d9df598 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_ui.c
++++ b/drivers/gpu/drm/sun4i/sun8i_ui.c
+@@ -32,7 +32,7 @@ static void sun8i_mixer_ui_atomic_disable(struct drm_plane *plane,
+ 	struct sun8i_ui *ui = plane_to_sun8i_ui(plane);
+ 	struct sun8i_mixer *mixer = ui->mixer;
  
- #define SUN8I_MIXER_BLEND_FCOLOR_CTL		0x1000
-+#define SUN8I_MIXER_BLEND_FCOLOR_CTL_EN(x)		BIT(8 + (x))
-+#define SUN8I_MIXER_BLEND_FCOLOR_CTL_FCOLOR_EN(x)	BIT(x)
-+
- #define SUN8I_MIXER_BLEND_ATTR_FCOLOR(x)	(0x1004 + 0x10 * (x) + 0x0)
-+#define SUN8I_MIXER_BLEND_ATTR_FCOLOR_ALPHA(x)		(((x) & 0xff) << 24)
-+
- #define SUN8I_MIXER_BLEND_ATTR_INSIZE(x)	(0x1004 + 0x10 * (x) + 0x4)
-+
- #define SUN8I_MIXER_BLEND_ATTR_OFFSET(x)	(0x1004 + 0x10 * (x) + 0x8)
- #define SUN8I_MIXER_BLEND_ROUTE			0x1080
- #define SUN8I_MIXER_BLEND_PREMULTIPLY		0x1084
-+
- #define SUN8I_MIXER_BLEND_BKCOLOR		0x1088
-+#define SUN8I_MIXER_BLEND_BKCOLOR_ALPHA(x)		(((x) & 0xff) << 24)
-+
- #define SUN8I_MIXER_BLEND_OUTSIZE		0x108c
-+
- #define SUN8I_MIXER_BLEND_MODE(x)		(0x1090 + 0x04 * (x))
-+#define SUN8I_MIXER_BLEND_MODE_ALPHA_FD(x)		(((x) & 0xf) << 24)
-+#define SUN8I_MIXER_BLEND_MODE_ALPHA_FS(x)		(((x) & 0xf) << 16)
-+#define SUN8I_MIXER_BLEND_MODE_PIXEL_FD(x)		(((x) & 0xf) << 8)
-+#define SUN8I_MIXER_BLEND_MODE_PIXEL_FS(x)		((x) & 0xf)
-+
- #define SUN8I_MIXER_BLEND_CK_CTL		0x10b0
- #define SUN8I_MIXER_BLEND_CK_CFG		0x10b4
- #define SUN8I_MIXER_BLEND_CK_MAX(x)		(0x10c0 + 0x04 * (x))
- #define SUN8I_MIXER_BLEND_CK_MIN(x)		(0x10e0 + 0x04 * (x))
--#define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
--
--/* The following numbers are some still unknown magic numbers */
--#define SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF	0xff000000
--#define SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF	0x00000101
--#define SUN8I_MIXER_BLEND_PREMULTIPLY_DEF	0x0
--#define SUN8I_MIXER_BLEND_BKCOLOR_DEF		0xff000000
--#define SUN8I_MIXER_BLEND_MODE_DEF		0x03010301
--#define SUN8I_MIXER_BLEND_CK_CTL_DEF		0x0
+-	sun8i_mixer_layer_enable(mixer, ui->id, false);
++	sun8i_mixer_layer_enable(mixer, ui, false);
+ }
  
--#define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
-+#define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
-+#define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED		BIT(1)
+ static void sun8i_mixer_ui_atomic_update(struct drm_plane *plane,
+@@ -41,10 +41,10 @@ static void sun8i_mixer_ui_atomic_update(struct drm_plane *plane,
+ 	struct sun8i_ui *ui = plane_to_sun8i_ui(plane);
+ 	struct sun8i_mixer *mixer = ui->mixer;
  
- /*
-  * VI channels are not used now, but the support of them may be introduced in
-  * the future.
-  */
+-	sun8i_mixer_update_layer_coord(mixer, ui->id, plane);
+-	sun8i_mixer_update_layer_formats(mixer, ui->id, plane);
+-	sun8i_mixer_update_layer_buffer(mixer, ui->id, plane);
+-	sun8i_mixer_layer_enable(mixer, ui->id, true);
++	sun8i_mixer_update_layer_coord(mixer, ui);
++	sun8i_mixer_update_layer_formats(mixer, ui);
++	sun8i_mixer_update_layer_buffer(mixer, ui);
++	sun8i_mixer_layer_enable(mixer, ui, true);
+ }
  
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR(ch, layer) \
--			(0x2000 + 0x1000 * (ch) + 0x20 * (layer) + 0x0)
--#define SUN8I_MIXER_CHAN_UI_LAYER_SIZE(ch, layer) \
--			(0x2000 + 0x1000 * (ch) + 0x20 * (layer) + 0x4)
--#define SUN8I_MIXER_CHAN_UI_LAYER_COORD(ch, layer) \
--			(0x2000 + 0x1000 * (ch) + 0x20 * (layer) + 0x8)
--#define SUN8I_MIXER_CHAN_UI_LAYER_PITCH(ch, layer) \
--			(0x2000 + 0x1000 * (ch) + 0x20 * (layer) + 0xc)
--#define SUN8I_MIXER_CHAN_UI_LAYER_TOP_LADDR(ch, layer) \
--			(0x2000 + 0x1000 * (ch) + 0x20 * (layer) + 0x10)
--#define SUN8I_MIXER_CHAN_UI_LAYER_BOT_LADDR(ch, layer) \
--			(0x2000 + 0x1000 * (ch) + 0x20 * (layer) + 0x14)
--#define SUN8I_MIXER_CHAN_UI_LAYER_FCOLOR(ch, layer) \
--			(0x2000 + 0x1000 * (ch) + 0x20 * (layer) + 0x18)
--#define SUN8I_MIXER_CHAN_UI_TOP_HADDR(ch)	(0x2000 + 0x1000 * (ch) + 0x80)
--#define SUN8I_MIXER_CHAN_UI_BOT_HADDR(ch)	(0x2000 + 0x1000 * (ch) + 0x84)
--#define SUN8I_MIXER_CHAN_UI_OVL_SIZE(ch)	(0x2000 + 0x1000 * (ch) + 0x88)
-+#define SUN8I_MIXER_CHAN(ch)		(0x2000 + 0x1000 * (ch))
-+#define SUN8I_MIXER_UI_LAYER(ch, layer)	(SUN8I_MIXER_CHAN(ch) + 0x20 * (layer))
+ static struct drm_plane_helper_funcs sun8i_mixer_ui_helper_funcs = {
+@@ -126,6 +126,8 @@ struct drm_plane **sun8i_ui_init(struct drm_device *drm,
+ 			return ERR_CAST(ui);
+ 		};
  
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN		BIT(0)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_MASK	GENMASK(2, 1)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_MASK	GENMASK(11, 8)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR(ch, layer)	\
-+	(SUN8I_MIXER_UI_LAYER(ch, layer) + 0x00)
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK	GENMASK(31, 24)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF	(1 << 1)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_ARGB8888	(0 << 8)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_XRGB8888	(4 << 8)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888	(8 << 8)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA(x)			(0xff << 24)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_MASK	GENMASK(11, 8)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888		(8 << 8)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_XRGB8888		(4 << 8)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_ARGB8888		(0 << 8)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_MASK	GENMASK(2, 1)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF		(1 << 1)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN		BIT(0)
-+
-+#define SUN8I_MIXER_CHAN_UI_LAYER_SIZE(ch, layer)	\
-+	(SUN8I_MIXER_UI_LAYER(ch, layer) + 0x04)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_COORD(ch, layer)	\
-+	(SUN8I_MIXER_UI_LAYER(ch, layer) + 0x08)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_PITCH(ch, layer)	\
-+	(SUN8I_MIXER_UI_LAYER(ch, layer) + 0x0c)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_TOP_LADDR(ch, layer)	\
-+	(SUN8I_MIXER_UI_LAYER(ch, layer) + 0x10)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_BOT_LADDR(ch, layer)	\
-+	(SUN8I_MIXER_UI_LAYER(ch, layer) + 0x14)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_FCOLOR(ch, layer)	\
-+	(SUN8I_MIXER_UI_LAYER(ch, layer) + 0x18)
-+
-+#define SUN8I_MIXER_CHAN_UI_TOP_HADDR(ch)	(SUN8I_MIXER_CHAN(ch) + 0x80)
-+#define SUN8I_MIXER_CHAN_UI_BOT_HADDR(ch)	(SUN8I_MIXER_CHAN(ch) + 0x84)
-+#define SUN8I_MIXER_CHAN_UI_OVL_SIZE(ch)	(SUN8I_MIXER_CHAN(ch) + 0x88)
++		/* TODO: Support several UI channels */
++		ui->chan = mixer->cfg->vi_num;
+ 		ui->id = i;
+ 		planes[i] = &ui->plane;
+ 	};
+diff --git a/drivers/gpu/drm/sun4i/sun8i_ui.h b/drivers/gpu/drm/sun4i/sun8i_ui.h
+index 17dfc92ccc9f..3c3185878ad1 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_ui.h
++++ b/drivers/gpu/drm/sun4i/sun8i_ui.h
+@@ -22,6 +22,7 @@ struct sun8i_ui {
+ 	struct drm_plane	plane;
+ 	struct sun4i_drv	*drv;
+ 	struct sun8i_mixer	*mixer;
++	u8			chan;
+ 	int			id;
+ };
  
- /*
-  * These sub-engines are still unknown now, the EN registers are here only to
 -- 
 git-series 0.9.1
