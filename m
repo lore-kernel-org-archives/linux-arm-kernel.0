@@ -1,49 +1,230 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Mon, 27 Nov 2017 19:48:18 +0100
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171123161040.GS31757@n2100.armlinux.org.uk>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <20171123150439.GB18754@mellanox.com>
- <20171123153637.kbqcd2jsek4ybeic@piout.net>
- <20171123161040.GS31757@n2100.armlinux.org.uk>
-Message-ID: <20171127184818.GB19577@piout.net>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 27 Nov 2017 13:49:34 -0500
+Subject: [PATCH V3 08/29] drm/gma500: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511801886-6753-9-git-send-email-okaya@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <1511801886-6753-9-git-send-email-okaya@codeaurora.org>
+Message-ID: <bc70349c-5582-015c-63cd-2b324435ef6f@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/2017 at 16:10:40 +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 23, 2017 at 04:36:37PM +0100, Alexandre Belloni wrote:
-> > On 23/11/2017 at 08:04:39 -0700, Jason Gunthorpe wrote:
-> > > On Thu, Nov 23, 2017 at 10:54:56AM +0100, Alexandre Belloni wrote:
-> > > You can't really measure the offset without doing a time set, many
-> > > embedded RTCs do not hook up interrupts, etc.
-> > 
-> > If you don't hook up the interrupt, then all you did is completely
-> > pointless because you will never be able to read the correct time from
-> > the RTC, you'll have up to a 1s offset.
-> 
-> That is incorrect.  The kernel provides emulation for the update
-> interrupt - it polls the RTC every 1/HZ checking it for a change
-> in seconds.
-> 
-> So, you end up with up to a 1/HZ offset where no interrupt is
-> present.
-> 
++dri-devel at lists.freedesktop.org
 
-Yes, I forgot about the UIE emulation.
-
-> Please don't base your assumptions on the output of hwclock(8) -
-> the output of that which comes after the timezone specifier is
-> not documented in the man page, and appears on the face of it to
-> be rather random:
+On 11/27/2017 11:57 AM, Sinan Kaya wrote:
+> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> where a PCI device is present. This restricts the device drivers to be
+> reused for other domain numbers.
 > 
-
-I'm not basing myself on hwclock's output because it is indeed quite
-random.
+> Getting ready to remove pci_get_bus_and_slot() function in favor of
+> pci_get_domain_bus_and_slot().
+> 
+> Add domain parameter to CDV_MSG_READ32, CDV_MSG_WRITE32, MRST_MSG_READ32,
+> MRST_MSG_WRITE32, MDFLD_MSG_READ32, MDFLD_MSG_WRITE32.
+> 
+> Extract pci_dev from struct drm_device and use pdev to find the domain
+> number while calling pci_get_domain_bus_and_slot().
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/gpu/drm/gma500/cdv_device.c | 16 +++++++++-------
+>  drivers/gpu/drm/gma500/gma_device.c |  4 +++-
+>  drivers/gpu/drm/gma500/mid_bios.c   | 12 +++++++++---
+>  drivers/gpu/drm/gma500/psb_drv.c    | 10 ++++++++--
+>  drivers/gpu/drm/gma500/psb_drv.h    | 18 ++++++++++--------
+>  5 files changed, 39 insertions(+), 21 deletions(-)
+> 
+> diff --git a/drivers/gpu/drm/gma500/cdv_device.c b/drivers/gpu/drm/gma500/cdv_device.c
+> index 8745971..3a3bf75 100644
+> --- a/drivers/gpu/drm/gma500/cdv_device.c
+> +++ b/drivers/gpu/drm/gma500/cdv_device.c
+> @@ -185,21 +185,22 @@ static int cdv_backlight_init(struct drm_device *dev)
+>   *	for this and the MID devices.
+>   */
+>  
+> -static inline u32 CDV_MSG_READ32(uint port, uint offset)
+> +static inline u32 CDV_MSG_READ32(int domain, uint port, uint offset)
+>  {
+>  	int mcr = (0x10<<24) | (port << 16) | (offset << 8);
+>  	uint32_t ret_val = 0;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root = pci_get_domain_bus_and_slot(domain, 0, 0);
+>  	pci_write_config_dword(pci_root, 0xD0, mcr);
+>  	pci_read_config_dword(pci_root, 0xD4, &ret_val);
+>  	pci_dev_put(pci_root);
+>  	return ret_val;
+>  }
+>  
+> -static inline void CDV_MSG_WRITE32(uint port, uint offset, u32 value)
+> +static inline void CDV_MSG_WRITE32(int domain, uint port, uint offset,
+> +				   u32 value)
+>  {
+>  	int mcr = (0x11<<24) | (port << 16) | (offset << 8) | 0xF0;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root = pci_get_domain_bus_and_slot(domain, 0, 0);
+>  	pci_write_config_dword(pci_root, 0xD4, value);
+>  	pci_write_config_dword(pci_root, 0xD0, mcr);
+>  	pci_dev_put(pci_root);
+> @@ -216,11 +217,12 @@ static void cdv_init_pm(struct drm_device *dev)
+>  {
+>  	struct drm_psb_private *dev_priv = dev->dev_private;
+>  	u32 pwr_cnt;
+> +	int domain = pci_domain_nr(dev->pdev->bus);
+>  	int i;
+>  
+> -	dev_priv->apm_base = CDV_MSG_READ32(PSB_PUNIT_PORT,
+> +	dev_priv->apm_base = CDV_MSG_READ32(domain, PSB_PUNIT_PORT,
+>  							PSB_APMBA) & 0xFFFF;
+> -	dev_priv->ospm_base = CDV_MSG_READ32(PSB_PUNIT_PORT,
+> +	dev_priv->ospm_base = CDV_MSG_READ32(domain, PSB_PUNIT_PORT,
+>  							PSB_OSPMBA) & 0xFFFF;
+>  
+>  	/* Power status */
+> @@ -251,7 +253,7 @@ static void cdv_errata(struct drm_device *dev)
+>  	 *	Bonus Launch to work around the issue, by degrading
+>  	 *	performance.
+>  	 */
+> -	 CDV_MSG_WRITE32(3, 0x30, 0x08027108);
+> +	 CDV_MSG_WRITE32(pci_domain_nr(dev->pdev->bus), 3, 0x30, 0x08027108);
+>  }
+>  
+>  /**
+> diff --git a/drivers/gpu/drm/gma500/gma_device.c b/drivers/gpu/drm/gma500/gma_device.c
+> index 4a295f9..a7fb6de 100644
+> --- a/drivers/gpu/drm/gma500/gma_device.c
+> +++ b/drivers/gpu/drm/gma500/gma_device.c
+> @@ -19,7 +19,9 @@
+>  void gma_get_core_freq(struct drm_device *dev)
+>  {
+>  	uint32_t clock;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root =
+> +		pci_get_domain_bus_and_slot(pci_domain_nr(dev->pdev->bus),
+> +					    0, 0);
+>  	struct drm_psb_private *dev_priv = dev->dev_private;
+>  
+>  	/*pci_write_config_dword(pci_root, 0xD4, 0x00C32004);*/
+> diff --git a/drivers/gpu/drm/gma500/mid_bios.c b/drivers/gpu/drm/gma500/mid_bios.c
+> index d75ecb3..5c23d4e 100644
+> --- a/drivers/gpu/drm/gma500/mid_bios.c
+> +++ b/drivers/gpu/drm/gma500/mid_bios.c
+> @@ -32,7 +32,9 @@
+>  static void mid_get_fuse_settings(struct drm_device *dev)
+>  {
+>  	struct drm_psb_private *dev_priv = dev->dev_private;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root =
+> +		pci_get_domain_bus_and_slot(pci_domain_nr(dev->pdev->bus),
+> +					    0, 0);
+>  	uint32_t fuse_value = 0;
+>  	uint32_t fuse_value_tmp = 0;
+>  
+> @@ -104,7 +106,9 @@ static void mid_get_fuse_settings(struct drm_device *dev)
+>  static void mid_get_pci_revID(struct drm_psb_private *dev_priv)
+>  {
+>  	uint32_t platform_rev_id = 0;
+> -	struct pci_dev *pci_gfx_root = pci_get_bus_and_slot(0, PCI_DEVFN(2, 0));
+> +	int domain = pci_domain_nr(dev_priv->dev->pdev->bus);
+> +	struct pci_dev *pci_gfx_root =
+> +		pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(2, 0));
+>  
+>  	if (pci_gfx_root == NULL) {
+>  		WARN_ON(1);
+> @@ -281,7 +285,9 @@ static void mid_get_vbt_data(struct drm_psb_private *dev_priv)
+>  	u32 addr;
+>  	u8 __iomem *vbt_virtual;
+>  	struct mid_vbt_header vbt_header;
+> -	struct pci_dev *pci_gfx_root = pci_get_bus_and_slot(0, PCI_DEVFN(2, 0));
+> +	struct pci_dev *pci_gfx_root =
+> +		pci_get_domain_bus_and_slot(pci_domain_nr(dev->pdev->bus),
+> +					    0, PCI_DEVFN(2, 0));
+>  	int ret = -1;
+>  
+>  	/* Get the address of the platform config vbt */
+> diff --git a/drivers/gpu/drm/gma500/psb_drv.c b/drivers/gpu/drm/gma500/psb_drv.c
+> index 37a3be7..99d6527 100644
+> --- a/drivers/gpu/drm/gma500/psb_drv.c
+> +++ b/drivers/gpu/drm/gma500/psb_drv.c
+> @@ -261,7 +261,11 @@ static int psb_driver_load(struct drm_device *dev, unsigned long flags)
+>  		goto out_err;
+>  
+>  	if (IS_MRST(dev)) {
+> -		dev_priv->aux_pdev = pci_get_bus_and_slot(0, PCI_DEVFN(3, 0));
+> +		int domain = pci_domain_nr(dev->pdev->bus);
+> +
+> +		dev_priv->aux_pdev =
+> +			pci_get_domain_bus_and_slot(domain, 0,
+> +						    PCI_DEVFN(3, 0));
+>  
+>  		if (dev_priv->aux_pdev) {
+>  			resource_start = pci_resource_start(dev_priv->aux_pdev,
+> @@ -281,7 +285,9 @@ static int psb_driver_load(struct drm_device *dev, unsigned long flags)
+>  		}
+>  		dev_priv->gmbus_reg = dev_priv->aux_reg;
+>  
+> -		dev_priv->lpc_pdev = pci_get_bus_and_slot(0, PCI_DEVFN(31, 0));
+> +		dev_priv->lpc_pdev =
+> +			pci_get_domain_bus_and_slot(domain, 0,
+> +						    PCI_DEVFN(31, 0));
+>  		if (dev_priv->lpc_pdev) {
+>  			pci_read_config_word(dev_priv->lpc_pdev, PSB_LPC_GBA,
+>  				&dev_priv->lpc_gpio_base);
+> diff --git a/drivers/gpu/drm/gma500/psb_drv.h b/drivers/gpu/drm/gma500/psb_drv.h
+> index 821497d..d409e02 100644
+> --- a/drivers/gpu/drm/gma500/psb_drv.h
+> +++ b/drivers/gpu/drm/gma500/psb_drv.h
+> @@ -781,38 +781,40 @@ extern int psb_gem_dumb_create(struct drm_file *file, struct drm_device *dev,
+>  extern int drm_idle_check_interval;
+>  
+>  /* Utilities */
+> -static inline u32 MRST_MSG_READ32(uint port, uint offset)
+> +static inline u32 MRST_MSG_READ32(int domain, uint port, uint offset)
+>  {
+>  	int mcr = (0xD0<<24) | (port << 16) | (offset << 8);
+>  	uint32_t ret_val = 0;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root = pci_get_domain_bus_and_slot(domain, 0, 0);
+>  	pci_write_config_dword(pci_root, 0xD0, mcr);
+>  	pci_read_config_dword(pci_root, 0xD4, &ret_val);
+>  	pci_dev_put(pci_root);
+>  	return ret_val;
+>  }
+> -static inline void MRST_MSG_WRITE32(uint port, uint offset, u32 value)
+> +static inline void MRST_MSG_WRITE32(int domain, uint port, uint offset,
+> +				    u32 value)
+>  {
+>  	int mcr = (0xE0<<24) | (port << 16) | (offset << 8) | 0xF0;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root = pci_get_domain_bus_and_slot(domain, 0, 0);
+>  	pci_write_config_dword(pci_root, 0xD4, value);
+>  	pci_write_config_dword(pci_root, 0xD0, mcr);
+>  	pci_dev_put(pci_root);
+>  }
+> -static inline u32 MDFLD_MSG_READ32(uint port, uint offset)
+> +static inline u32 MDFLD_MSG_READ32(int domain, uint port, uint offset)
+>  {
+>  	int mcr = (0x10<<24) | (port << 16) | (offset << 8);
+>  	uint32_t ret_val = 0;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root = pci_get_domain_bus_and_slot(domain, 0, 0);
+>  	pci_write_config_dword(pci_root, 0xD0, mcr);
+>  	pci_read_config_dword(pci_root, 0xD4, &ret_val);
+>  	pci_dev_put(pci_root);
+>  	return ret_val;
+>  }
+> -static inline void MDFLD_MSG_WRITE32(uint port, uint offset, u32 value)
+> +static inline void MDFLD_MSG_WRITE32(int domain, uint port, uint offset,
+> +				     u32 value)
+>  {
+>  	int mcr = (0x11<<24) | (port << 16) | (offset << 8) | 0xF0;
+> -	struct pci_dev *pci_root = pci_get_bus_and_slot(0, 0);
+> +	struct pci_dev *pci_root = pci_get_domain_bus_and_slot(domain, 0, 0);
+>  	pci_write_config_dword(pci_root, 0xD4, value);
+>  	pci_write_config_dword(pci_root, 0xD0, mcr);
+>  	pci_dev_put(pci_root);
+> 
 
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
