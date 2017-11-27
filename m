@@ -1,76 +1,44 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Mon, 27 Nov 2017 20:58:30 +0100
-Subject: [PATCH 01/15] KVM: Prepare for moving vcpu_load/vcpu_put into
- arch specific code
-In-Reply-To: <838db374-6040-c805-82f3-187a2cdfc40d@redhat.com>
-References: <20171125205718.7731-1-christoffer.dall@linaro.org>
- <20171125205718.7731-2-christoffer.dall@linaro.org>
- <838db374-6040-c805-82f3-187a2cdfc40d@redhat.com>
-Message-ID: <20171127195830.GB16941@cbox>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 27 Nov 2017 12:08:17 -0800
+Subject: [GIT PULL 1/1] Broadcom devicetree fixes for 4.15
+Message-ID: <20171127200817.32647-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:53:01PM +0100, Paolo Bonzini wrote:
-> On 25/11/2017 21:57, Christoffer Dall wrote:
-> > In preparation for moving calls to vcpu_load() and vcpu_put() into the
-> > architecture specific implementations of the KVM vcpu ioctls, move the
-> > calls in the main kvm_vcpu_ioctl() dispatcher function to each case
-> > of the ioctl select statement.  This allows us to move the vcpu_load()
-> > and vcpu_put() calls into architecture specific implementations of vcpu
-> > ioctls, one by one.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  virt/kvm/kvm_main.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++-----
-> >  1 file changed, 48 insertions(+), 5 deletions(-)
-> > 
-> > diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> > index 9deb5a245b83..fafafcc38b5a 100644
-> > --- a/virt/kvm/kvm_main.c
-> > +++ b/virt/kvm/kvm_main.c
-> > @@ -2528,16 +2528,15 @@ static long kvm_vcpu_ioctl(struct file *filp,
-> >  		return kvm_arch_vcpu_ioctl(filp, ioctl, arg);
-> >  #endif
-> >  
-> > -
-> > -	r = vcpu_load(vcpu);
-> > -	if (r)
-> > -		return r;
-> >  	switch (ioctl) {
-> >  	case KVM_RUN: {
-> >  		struct pid *oldpid;
-> >  		r = -EINVAL;
-> >  		if (arg)
-> >  			goto out;
-> > +		r = vcpu_load(vcpu);
-> > +		if (r)
-> > +			goto out;
-> >  		oldpid = rcu_access_pointer(vcpu->pid);
-> 
-> If it is not a problem for ARM, maybe it would actually be best to leave
-> the locking in kvm_vcpu_ioctl (with the already existing exception of
-> KVM_INTERRUPT).  This would make vcpu_load void, and would also let you
-> keep the PID adjustment in common code.  This would be more similar to
-> the previous version, but without introducing __vcpu_load/__vcpu_put.
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Yes, that's not a problem for ARM, and it was actually what I started
-out with, and you can see the result here (rebased on v4.15-rc1):
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vcpu-load-put-keeplock
+are available in the git repository at:
 
-I got a bit into getting rid of the (IMHO) ugly ifdef-shortcut
-dispatcher code, and thus reworked it to the submitted version.
+  http://github.com/Broadcom/stblinux.git tags/arm-soc/for-4.15/devicetree-fixes-1
 
-Going back and looking, it's nicer to avoid the pid adjustment call, and
-having vcpu_load be void is also convenient, but we're stuck with the
-ifdef.  I guess I lean towards your suggestion as well, given that my
-problem with the ifdef is not a technical one, but an aesthetic one.
+for you to fetch changes up to babd8a3e31fbb0abb4c37ee3548974732080b996:
 
-> 
-> Looks good apart from this doubt!  Thanks,
-> 
-Let me know if you want to have a quick glance at the branch above and
-prefer that I send that as v2.
+  Merge tag 'bcm2835-dt-next-fixes-2017-11-15' into devicetree/fixes (2017-11-27 11:28:23 -0800)
 
-Thanks,
--Christoffer
+----------------------------------------------------------------
+This pull request contains Broadcom ARM-based SoCs Device Tree fixes for 4.15,
+please pull the following:
+
+- Stefan provides a fix for the BCM2835 (Raspberry Pi) to fix warnings about
+  missing "#phy-cells" properties
+
+- Florian provides two fixes for Nortsthar Plus, one that uses the correct
+  interrupt specifiers for the timer/watchdog and one that disables SATA
+  on BCM9582**HR boards since that leads to unidentified hangs right now
+
+----------------------------------------------------------------
+Florian Fainelli (3):
+      ARM: dts: NSP: Disable AHCI controller for HR NSP boards
+      ARM: dts: NSP: Fix PPI interrupt types
+      Merge tag 'bcm2835-dt-next-fixes-2017-11-15' into devicetree/fixes
+
+Stefan Wahren (1):
+      ARM: dts: bcm283x: Fix DTC warnings about missing phy-cells
+
+ arch/arm/boot/dts/bcm-nsp.dtsi    | 4 ++--
+ arch/arm/boot/dts/bcm283x.dtsi    | 1 +
+ arch/arm/boot/dts/bcm958623hr.dts | 4 ----
+ arch/arm/boot/dts/bcm958625hr.dts | 4 ----
+ 4 files changed, 3 insertions(+), 10 deletions(-)
