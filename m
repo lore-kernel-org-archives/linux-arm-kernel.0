@@ -1,91 +1,84 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 27 Nov 2017 18:01:11 +0800
-Subject: [PATCH V6 08/12] dt-bindings: Add Spreadtrum clock binding
- documentation
+Date: Mon, 27 Nov 2017 18:01:14 +0800
+Subject: [PATCH V6 11/12] arm64: dts: add syscon for whale2 platform
 In-Reply-To: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
 References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171127100115.20655-9-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171127100115.20655-12-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce a new binding with its documentation for Spreadtrum clock
-sub-framework.
+Some clocks on SC9860 are in the same address area with syscon
+devices, the proper syscon node will be quoted under the
+definitions of those clocks in DT.
 
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/clock/sprd.txt | 63 ++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/clock/sprd.txt
+ arch/arm64/boot/dts/sprd/whale2.dtsi | 46 +++++++++++++++++++++++++++++++++++-
+ 1 file changed, 45 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sprd.txt b/Documentation/devicetree/bindings/clock/sprd.txt
-new file mode 100644
-index 0000000..e9d179e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/sprd.txt
-@@ -0,0 +1,63 @@
-+Spreadtrum Clock Binding
-+------------------------
+diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
+index 7c217c5..6ea3a75 100644
+--- a/arch/arm64/boot/dts/sprd/whale2.dtsi
++++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
+@@ -17,6 +17,51 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		ap_ahb_regs: syscon at 20210000 {
++			compatible = "syscon";
++			reg = <0 0x20210000 0 0x10000>;
++		};
 +
-+Required properties:
-+- compatible: should contain the following compatible strings:
-+	- "sprd,sc9860-pmu-gate"
-+	- "sprd,sc9860-pll"
-+	- "sprd,sc9860-ap-clk"
-+	- "sprd,sc9860-aon-prediv"
-+	- "sprd,sc9860-apahb-gate"
-+	- "sprd,sc9860-aon-gate"
-+	- "sprd,sc9860-aonsecure-clk"
-+	- "sprd,sc9860-agcp-gate"
-+	- "sprd,sc9860-gpu-clk"
-+	- "sprd,sc9860-vsp-clk"
-+	- "sprd,sc9860-vsp-gate"
-+	- "sprd,sc9860-cam-clk"
-+	- "sprd,sc9860-cam-gate"
-+	- "sprd,sc9860-disp-clk"
-+	- "sprd,sc9860-disp-gate"
-+	- "sprd,sc9860-apapb-gate"
++		pmu_regs: syscon at 402b0000 {
++			compatible = "syscon";
++			reg = <0 0x402b0000 0 0x10000>;
++		};
 +
-+- #clock-cells: must be 1
++		aon_regs: syscon at 402e0000 {
++			compatible = "syscon";
++			reg = <0 0x402e0000 0 0x10000>;
++		};
 +
-+- clocks : Should be the input parent clock(s) phandle for the clock, this
-+	   property here just simply shows which clock group the clocks'
-+	   parents are in, since each clk node would represent many clocks
-+	   which are defined in the driver.  The detailed dependency
-+	   relationship (i.e. how many parents and which are the parents)
-+	   are implemented in driver code.
++		ana_regs: syscon at 40400000 {
++			compatible = "syscon";
++			reg = <0 0x40400000 0 0x10000>;
++		};
 +
-+Optional properties:
++		agcp_regs: syscon at 415e0000 {
++			compatible = "syscon";
++			reg = <0 0x415e0000 0 0x1000000>;
++		};
 +
-+- reg:	Contain the registers base address and length. It must be configured
-+	only if no 'sprd,syscon' under the node.
++		vsp_regs: syscon at 61100000 {
++			compatible = "syscon";
++			reg = <0 0x61100000 0 0x10000>;
++		};
 +
-+- sprd,syscon: phandle to the syscon which is in the same address area with
-+	       the clock, and so we can get regmap for the clocks from the
-+	       syscon device.
++		cam_regs: syscon at 62100000 {
++			compatible = "syscon";
++			reg = <0 0x62100000 0 0x10000>;
++		};
 +
-+Example:
++		disp_regs: syscon at 63100000 {
++			compatible = "syscon";
++			reg = <0 0x63100000 0 0x10000>;
++		};
 +
-+	pmu_gate: pmu-gate {
-+		compatible = "sprd,sc9860-pmu-gate";
-+		sprd,syscon = <&pmu_regs>;
-+		clocks = <&ext_26m>;
-+		#clock-cells = <1>;
-+	};
++		ap_apb_regs: syscon at 70b00000 {
++			compatible = "syscon";
++			reg = <0 0x70b00000 0 0x40000>;
++		};
 +
-+	pll: pll {
-+		compatible = "sprd,sc9860-pll";
-+		sprd,syscon = <&ana_regs>;
-+		clocks = <&pmu_gate 0>;
-+		#clock-cells = <1>;
-+	};
-+
-+	ap_clk: clock-controller at 20000000 {
-+		compatible = "sprd,sc9860-ap-clk";
-+		reg = <0 0x20000000 0 0x400>;
-+		clocks = <&ext_26m>, <&pll 0>,
-+			 <&pmu_gate 0>;
-+		#clock-cells = <1>;
-+	};
+ 		ap-apb {
+ 			compatible = "simple-bus";
+ 			#address-cells = <1>;
+@@ -59,7 +104,6 @@
+ 				status = "disabled";
+ 			};
+ 		};
+-
+ 	};
+ 
+ 	ext_26m: ext-26m {
 -- 
 2.7.4
