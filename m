@@ -1,168 +1,154 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Mon, 27 Nov 2017 10:34:13 +0900
-Subject: do page fault in atomic bug on arm
-In-Reply-To: <bc36ecbb-0bec-3b89-4fed-199e440f2218@linaro.org>
-References: <d83cdbf1-0d27-fb82-14c8-3d37101c3c06@linaro.org>
- <20171121132001.GH31757@n2100.armlinux.org.uk>
- <64cbcda0-d040-4872-4a6b-7cd18375b4aa@linaro.org>
- <20171124192700.GU31757@n2100.armlinux.org.uk>
- <bc36ecbb-0bec-3b89-4fed-199e440f2218@linaro.org>
-Message-ID: <20171127103413.adc046190aad180430d942ec@kernel.org>
+From: joel@jms.id.au (Joel Stanley)
+Date: Mon, 27 Nov 2017 12:05:19 +1030
+Subject: [PATCH 1/2] ARM: BUG if jumping to usermode address in kernel mode
+In-Reply-To: <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
+References: <20171125113302.GY31757@n2100.armlinux.org.uk>
+ <E1eIYiX-0007t0-AH@rmk-PC.armlinux.org.uk>
+Message-ID: <CACPK8XdvUtvKiX_uqTnnb8U-jKuhy4Kw+cda=OKvzabfaffjgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 26 Nov 2017 20:07:43 +0800
-Alex Shi <alex.shi@linaro.org> wrote:
+Hello Russell,
 
-> CC Masami Hiramatsu for ftracetest part.
-> 
-> Hi Russell King,
-> 
-> Thanks a lot for quick response!
-> 
-> Regards
-> Alex
-> 
-> On 11/25/2017 03:27 AM, Russell King - ARM Linux wrote:
-> > On Fri, Nov 24, 2017 at 11:09:30PM +0800, Alex Shi wrote:
-> >> Full agree with your analysis. Is it possible to stain PC value with
-> >> heavy stress on thermal or sth else? the ARM64 board run well with
-> >> ftracetest of LTP.
-> > 
-> > In your first email, you said "x15 platform, which is a armv7 board."
-> > Here you say "ARM64 board" which isn't armv7.  There's x15 DTS under
-> > arch/arm/boot/dts, so I guess you mean 32-bit ARM, but who knows...
-> > 
-> > Anyway, I've tried running ftracetest on an OMAP4430 SDP board, and
-> > after a while with the patch I sent you, I get:
-> > 
-> > Internal error: Oops - BUG: 0 [#1] SMP ARM
-> > Modules linked in:
-> > CPU: 1 PID: 2948 Comm: ftracetest Not tainted 4.14.0+ #557
-> > Hardware name: Generic OMAP4 (Flattened Device Tree)
-> > task: ce41c100 task.stack: cc7b8000
-> > PC is at oops+0x0/0x4
-> > LR is at trace_hardirqs_on_caller+0x154/0x1e0
-> > pc : [<c0015adc>]    lr : [<c0086840>]    psr: 20000193
-> > sp : cc7b9fb0  ip : cc7b9f80  fp : 00000000
-> > r10: 00000000  r9 : cc7b8000  r8 : c0015c28
-> > r7 : 00000006  r6 : 00000004  r5 : 0009fed4  r4 : 00000001
-> > r3 : 00000000  r2 : cc7b9fb0  r1 : 60000193  r0 : 00000001
-> > Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> > Control: 10c5387d  Table: 8e7b804a  DAC: 00000055
-> > Process ftracetest (pid: 2948, stack limit = 0xcc7b8210)
-> > Stack: (0xcc7b9fb0 to 0xcc7ba000)
-> > 9fa0:                                     00000000 00000000 0009b008 0000000d
-> > 9fc0: 00000001 0009fed4 00000004 00000006 0009b3e0 000a17d4 00000000 beaf6e3c
-> > 9fe0: 0009fed0 beaf6e20 000319e0 b6e7199c 60000193 00000001 6b6b6b6b a56b6b6b
-> > Backtrace: no frame pointer
-> > Code: e9527fff e1a00000 e28dd048 e1b0f00e (e7f001f2)
-> > ---[ end trace 390efe5843605357 ]---
-> > 
-> > The other CPU also oopses:
-> > 
-> > Internal error: Oops - BUG: 0 [#3] SMP ARM
-> > Modules linked in:
-> > CPU: 1 PID: 1 Comm: init Tainted: G      D         4.14.0+ #557
-> > Hardware name: Generic OMAP4 (Flattened Device Tree)
-> > task: ced04c00 task.stack: ced06000
-> > PC is at oops+0x0/0x4
-> > LR is at trace_hardirqs_on+0x14/0x18
-> > pc : [<c0015adc>]    lr : [<c00868e0>]    psr: 20000193
-> > sp : ced07fb0  ip : ced07fa0  fp : 00000000
-> > r10: 00000000  r9 : ced06000  r8 : c0015c28
-> > r7 : 0000004e  r6 : bec0acd4  r5 : 000176b4  r4 : bec0ac3c
-> > r3 : 00000000  r2 : ced07fb0  r1 : 60000193  r0 : c0015aa8
-> > Flags: nzCv  IRQs off  FIQs on  Mode SVC_32  ISA ARM  Segment user
-> > Control: 10c5387d  Table: 8e2d804a  DAC: 00000055
-> > Process init (pid: 1, stack limit = 0xced06210)
-> > Stack: (0xced07fb0 to 0xced08000)
-> > 7fa0:                                     00000000 00000000 00000000 00000000
-> > 7fc0: bec0ac3c 000176b4 bec0acd4 0000004e 10000000 00000000 0000a1d0 bec0ac44
-> > 7fe0: bec0acd8 bec0ac28 b6e54544 b6e5456c 60000193 bec0ac28 005d5555 00020201
-> > Backtrace: no frame pointer
-> > Code: e9527fff e1a00000 e28dd048 e1b0f00e (e7f001f2)
-> > ---[ end trace 390efe5843605358 ]---
-> > 
-> > which is exactly your bug, but caught a bit earlier.
-> > 
-> > This happens while executing this ftrace test:
-> > 
-> > [28] Register/unregister many kprobe events
-> > 
-> > and needs a kernel with ftrace and kprobes enabled.
-> > 
-> > Unfortunately, the debug is immediately after a call to
-> > trace_hardirqs_on() in no_work_pending, so the LR value is
-> > meaningless.
-> > 
-> > So, now that we know it's tracing kprobes triggering it - it's
-> > trying to set tracepoints on the first 256 symbols in the kernel's
-> > kallsyms, which includes all sorts of things.
-> > 
-> > With some extra debug, this doesn't look clever:
-> > 
-> > trace_kprobe: Inserting kprobe at ret_fast_syscall+0
-> > trace_kprobe: Inserting kprobe at slow_work_pending+0
-> > trace_kprobe: Inserting kprobe at ret_slow_syscall+0
-> > trace_kprobe: Could not insert probe at ret_slow_syscall+0: -22
-> > trace_kprobe: Inserting kprobe at ret_to_user+0
-> > trace_kprobe: Could not insert probe at ret_to_user+0: -22
-> > trace_kprobe: Inserting kprobe at ret_to_user_from_irq+0
-> > trace_kprobe: Inserting kprobe at no_work_pending+0
-> > trace_kprobe: Inserting kprobe at oops+0
-> > trace_kprobe: Could not insert probe at oops+0: -22
-> > trace_kprobe: Inserting kprobe at ret_from_fork+0
-> > trace_kprobe: Inserting kprobe at vector_swi+0
-> > trace_kprobe: Inserting kprobe at local_restart+0
-> > trace_kprobe: Inserting kprobe at __sys_trace+0
-> > trace_kprobe: Inserting kprobe at __sys_trace_return+0
-> > trace_kprobe: Inserting kprobe at __sys_trace_return_nosave+0
-> > trace_kprobe: Could not insert probe at __sys_trace_return_nosave+0: -22
-> > trace_kprobe: Inserting kprobe at __cr_alignment+0
-> > trace_kprobe: Could not insert probe at __cr_alignment+0: -22
-> > trace_kprobe: Inserting kprobe at sys_call_table+0
-> > trace_kprobe: Inserting kprobe at sys_syscall+0
-> > trace_kprobe: Inserting kprobe at sys_sigreturn_wrapper+0
-> > trace_kprobe: Inserting kprobe at sys_rt_sigreturn_wrapper+0
-> > trace_kprobe: Inserting kprobe at sys_statfs64_wrapper+0
-> > trace_kprobe: Inserting kprobe at sys_fstatfs64_wrapper+0
-> > 
-> > I wouldn't be surprised if some of those were the cause of it -
-> > for example, what guarantee do we have that a trace kprobe inserted
-> > at ret_fast_syscall which starts with this:
-> > 
-> > c0015a40:       e5ad0008        str     r0, [sp, #8]!
-> > 
-> > will be handled correctly?  I can't say, I've virtually no knowledge
-> > about kprobes, but I guess it isn't - especially as there's this
-> > comment in the ARM kprobes code:
-> > 
-> >          * Never instrument insn like 'str r0, [sp, +/-r1]'. Also, insn likes
-> >          * 'str r0, [sp, #-68]' should also be prohibited.
-> > 
-> > Clearly, that's not the case as the kprobes insert on
-> > ret_fast_syscall succeeded.
-> > 
-> > Adding Tixy, as he's more knowledgable in this area - I suggest
-> > someone knowledgable in this area runs
-> > 
-> > 	ftracetest test.d/kprobe/multiple_kprobes.tc
-> > 
-> > and fixes these bugs... also running the entire ftracetest suite
-> > would probably also be a very good idea.
+On Sat, Nov 25, 2017 at 10:03 PM, Russell King
+<rmk+kernel@armlinux.org.uk> wrote:
+> Detect if we are returning to usermode via the normal kernel exit paths
+> but the saved PSR value indicates that we are in kernel mode.  This
+> could occur due to corrupted stack state, which has been observed with
+> "ftracetest".
+>
+> This ensures that we catch the problem case before we get to user code.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
 
-This test case is to test whether we can safely put multiple kprobes
-on different functions or not. If it causes kernel crashes, it means
-kprobes has a bug on that function (the last "Inserting kprobe at ...").
+This patch breaks my 32 bit ARM system when running under Qemu. I get
+this continually:
 
-Since the ftrace kprobe event interface is opened to userspace (but
-also requires root priv), it must be fixed.
+[    2.130043] ------------[ cut here ]------------
+[    2.130132] kernel BUG at Returning to usermode but unexpected PSR
+bits set?:9!
+[    2.130233] Internal error: Oops - BUG: 0 [#1] ARM
+[    2.130375] Modules linked in:
+[    2.130805] CPU: 0 PID: 154 Comm: modprobe Not tainted 4.15.0-rc1 #3
+[    2.130874] Hardware name: Generic DT based system
+[    2.131023] task: 87a02800 task.stack: 87970000
+[    2.131158] PC is at no_work_pending+0x2c/0x30
+[    2.131402] LR is at 0x76f18ae8
+[    2.131462] pc : [<8000a600>]    lr : [<76f18ae8>]    psr: 200001d3
+[    2.131516] sp : 87971fb0  ip : 80014484  fp : 00000000
+[    2.131567] r10: 00000000  r9 : 87970000  r8 : 00000000
+[    2.131627] r7 : 00c5387d  r6 : ffffffff  r5 : 00000150  r4 : 76f18ae8
+[    2.131686] r3 : 00000000  r2 : 87971fec  r1 : 00000150  r0 : 00000000
+[    2.131818] Flags: nzCv  IRQs off  FIQs off  Mode SVC_32  ISA ARM
+Segment user
+[    2.131894] Control: 00c5387d  Table: 8794c008  DAC: 00000055
+[    2.131971] Process modprobe (pid: 154, stack limit = 0x87970188)
+[    2.132075] Stack: (0x87971fb0 to 0x87972000)
+[    2.132273] 1fa0:                                     00000000
+00000000 00000000 00000000
+[    2.132344] 1fc0: 00000000 00000000 00000000 00000000 00000000
+00000000 00000000 00000000
+[    2.132395] 1fe0: 00000000 7ec5fec0 00000000 76f18ae8 00000150
+ffffffff e3a00001 e58d300c
+[    2.133146] Code: e9527fff e1a00000 e28dd048 e1b0f00e (e7f001f2)
+[    2.133593] ---[ end trace 46087be8f22855bc ]---
 
-BTW, the test is not care about failure or blacklisted functions.
-I'll update it to check blacklist functions if available.
+This is 4.15-rc1, booting aspeed_g5_defconfig on Qemu master
+(v2.11.0-rc2-14-ge7b47c2).
 
-Thank you,
+qemu-system-arm -nographic -nodefaults -serial stdio -M romulus-bmc \
+ -kernel arch/arm/boot/zImage -dtb
+arch/arm/boot/dts/aspeed-bmc-opp-romulus.dtb \
+ -initrd arm.cpio.xz
 
--- 
-Masami Hiramatsu <mhiramat@kernel.org>
+If I revert the patch userspace runs as expected.
+
+Cheers,
+
+Joel
+
+>  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
+>  arch/arm/kernel/entry-header.S   |  6 ++++++
+>  2 files changed, 24 insertions(+)
+>
+> diff --git a/arch/arm/include/asm/assembler.h b/arch/arm/include/asm/assembler.h
+> index ad301f107dd2..bc8d4bbd82e2 100644
+> --- a/arch/arm/include/asm/assembler.h
+> +++ b/arch/arm/include/asm/assembler.h
+> @@ -518,4 +518,22 @@ THUMB(     orr     \reg , \reg , #PSR_T_BIT        )
+>  #endif
+>         .endm
+>
+> +       .macro  bug, msg, line
+> +#ifdef CONFIG_THUMB2_KERNEL
+> +1:     .inst   0xde02
+> +#else
+> +1:     .inst   0xe7f001f2
+> +#endif
+> +#ifdef CONFIG_DEBUG_BUGVERBOSE
+> +       .pushsection .rodata.str, "aMS", %progbits, 1
+> +2:     .asciz  "\msg"
+> +       .popsection
+> +       .pushsection __bug_table, "aw"
+> +       .align  2
+> +       .word   1b, 2b
+> +       .hword  \line
+> +       .popsection
+> +#endif
+> +       .endm
+> +
+>  #endif /* __ASM_ASSEMBLER_H__ */
+> diff --git a/arch/arm/kernel/entry-header.S b/arch/arm/kernel/entry-header.S
+> index d523cd8439a3..7f4d80c2db6b 100644
+> --- a/arch/arm/kernel/entry-header.S
+> +++ b/arch/arm/kernel/entry-header.S
+> @@ -300,6 +300,8 @@
+>         mov     r2, sp
+>         ldr     r1, [r2, #\offset + S_PSR]      @ get calling cpsr
+>         ldr     lr, [r2, #\offset + S_PC]!      @ get pc
+> +       tst     r1, #0xcf
+> +       bne     1f
+>         msr     spsr_cxsf, r1                   @ save in spsr_svc
+>  #if defined(CONFIG_CPU_V6) || defined(CONFIG_CPU_32v6K)
+>         @ We must avoid clrex due to Cortex-A15 erratum #830321
+> @@ -314,6 +316,7 @@
+>                                                 @ after ldm {}^
+>         add     sp, sp, #\offset + PT_REGS_SIZE
+>         movs    pc, lr                          @ return & move spsr_svc into cpsr
+> +1:     bug     "Returning to usermode but unexpected PSR bits set?", \@
+>  #elif defined(CONFIG_CPU_V7M)
+>         @ V7M restore.
+>         @ Note that we don't need to do clrex here as clearing the local
+> @@ -329,6 +332,8 @@
+>         ldr     r1, [sp, #\offset + S_PSR]      @ get calling cpsr
+>         ldr     lr, [sp, #\offset + S_PC]       @ get pc
+>         add     sp, sp, #\offset + S_SP
+> +       tst     r1, #0xcf
+> +       bne     1f
+>         msr     spsr_cxsf, r1                   @ save in spsr_svc
+>
+>         @ We must avoid clrex due to Cortex-A15 erratum #830321
+> @@ -341,6 +346,7 @@
+>         .endif
+>         add     sp, sp, #PT_REGS_SIZE - S_SP
+>         movs    pc, lr                          @ return & move spsr_svc into cpsr
+> +1:     bug     "Returning to usermode but unexpected PSR bits set?", \@
+>  #endif /* !CONFIG_THUMB2_KERNEL */
+>         .endm
+>
+> --
+> 2.7.4
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: linux-4.15-rc1-dmesg
+Type: application/octet-stream
+Size: 11762 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171127/44b0b540/attachment-0001.obj>
