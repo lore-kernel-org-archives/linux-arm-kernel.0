@@ -1,88 +1,91 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 27 Nov 2017 18:01:04 +0800
-Subject: [PATCH V6 01/12] drivers: move clock common macros out from vendor
- directories
+Date: Mon, 27 Nov 2017 18:01:11 +0800
+Subject: [PATCH V6 08/12] dt-bindings: Add Spreadtrum clock binding
+ documentation
 In-Reply-To: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
 References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171127100115.20655-2-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171127100115.20655-9-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These macros are used by more than one SoC vendor platforms, avoid to
-have many copies of these code, this patch moves them to the common
-clock directory which every clock drivers can access to.
+Introduce a new binding with its documentation for Spreadtrum clock
+sub-framework.
 
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/clk/clk_common.h | 60 ++++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 60 insertions(+)
- create mode 100644 drivers/clk/clk_common.h
+ Documentation/devicetree/bindings/clock/sprd.txt | 63 ++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/sprd.txt
 
-diff --git a/drivers/clk/clk_common.h b/drivers/clk/clk_common.h
+diff --git a/Documentation/devicetree/bindings/clock/sprd.txt b/Documentation/devicetree/bindings/clock/sprd.txt
 new file mode 100644
-index 0000000..21e93d2
+index 0000000..e9d179e
 --- /dev/null
-+++ b/drivers/clk/clk_common.h
-@@ -0,0 +1,60 @@
-+/*
-+ * drivers/clk/clk_common.h
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
++++ b/Documentation/devicetree/bindings/clock/sprd.txt
+@@ -0,0 +1,63 @@
++Spreadtrum Clock Binding
++------------------------
 +
-+#ifndef _CLK_COMMON_H_
-+#define _CLK_COMMON_H_
++Required properties:
++- compatible: should contain the following compatible strings:
++	- "sprd,sc9860-pmu-gate"
++	- "sprd,sc9860-pll"
++	- "sprd,sc9860-ap-clk"
++	- "sprd,sc9860-aon-prediv"
++	- "sprd,sc9860-apahb-gate"
++	- "sprd,sc9860-aon-gate"
++	- "sprd,sc9860-aonsecure-clk"
++	- "sprd,sc9860-agcp-gate"
++	- "sprd,sc9860-gpu-clk"
++	- "sprd,sc9860-vsp-clk"
++	- "sprd,sc9860-vsp-gate"
++	- "sprd,sc9860-cam-clk"
++	- "sprd,sc9860-cam-gate"
++	- "sprd,sc9860-disp-clk"
++	- "sprd,sc9860-disp-gate"
++	- "sprd,sc9860-apapb-gate"
 +
-+#include <linux/clk-provider.h>
++- #clock-cells: must be 1
 +
-+#define CLK_HW_INIT(_name, _parent, _ops, _flags)		\
-+	(&(struct clk_init_data) {				\
-+		.flags		= _flags,			\
-+		.name		= _name,			\
-+		.parent_names	= (const char *[]) { _parent },	\
-+		.num_parents	= 1,				\
-+		.ops		= _ops,				\
-+	})
++- clocks : Should be the input parent clock(s) phandle for the clock, this
++	   property here just simply shows which clock group the clocks'
++	   parents are in, since each clk node would represent many clocks
++	   which are defined in the driver.  The detailed dependency
++	   relationship (i.e. how many parents and which are the parents)
++	   are implemented in driver code.
 +
-+#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)	\
-+	(&(struct clk_init_data) {				\
-+		.flags		= _flags,			\
-+		.name		= _name,			\
-+		.parent_names	= _parents,			\
-+		.num_parents	= ARRAY_SIZE(_parents),		\
-+		.ops		= _ops,				\
-+	})
++Optional properties:
 +
-+#define CLK_HW_INIT_NO_PARENT(_name, _ops, _flags)     \
-+	(&(struct clk_init_data) {                      \
-+		.flags          = _flags,               \
-+		.name           = _name,                \
-+		.parent_names   = NULL,                 \
-+		.num_parents    = 0,                    \
-+		.ops            = _ops,                 \
-+	})
++- reg:	Contain the registers base address and length. It must be configured
++	only if no 'sprd,syscon' under the node.
 +
-+#define CLK_FIXED_FACTOR(_struct, _name, _parent,			\
-+			_div, _mult, _flags)				\
-+	struct clk_fixed_factor _struct = {				\
-+		.div		= _div,					\
-+		.mult		= _mult,				\
-+		.hw.init	= CLK_HW_INIT(_name,			\
-+					      _parent,			\
-+					      &clk_fixed_factor_ops,	\
-+					      _flags),			\
-+	}
++- sprd,syscon: phandle to the syscon which is in the same address area with
++	       the clock, and so we can get regmap for the clocks from the
++	       syscon device.
 +
-+#define CLK_FIXED_RATE(_struct, _name, _flags,				\
-+		       _fixed_rate, _fixed_accuracy)			\
-+	struct clk_fixed_rate _struct = {				\
-+		.fixed_rate	= _fixed_rate,				\
-+		.fixed_accuracy	= _fixed_accuracy,			\
-+		.hw.init	= CLK_HW_INIT_NO_PARENT(_name,		\
-+					  &clk_fixed_rate_ops,		\
-+							_flags),	\
-+	}
++Example:
 +
-+#endif /* _CLK_COMMON_H_ */
++	pmu_gate: pmu-gate {
++		compatible = "sprd,sc9860-pmu-gate";
++		sprd,syscon = <&pmu_regs>;
++		clocks = <&ext_26m>;
++		#clock-cells = <1>;
++	};
++
++	pll: pll {
++		compatible = "sprd,sc9860-pll";
++		sprd,syscon = <&ana_regs>;
++		clocks = <&pmu_gate 0>;
++		#clock-cells = <1>;
++	};
++
++	ap_clk: clock-controller at 20000000 {
++		compatible = "sprd,sc9860-ap-clk";
++		reg = <0 0x20000000 0 0x400>;
++		clocks = <&ext_26m>, <&pll 0>,
++			 <&pmu_gate 0>;
++		#clock-cells = <1>;
++	};
 -- 
 2.7.4
