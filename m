@@ -1,88 +1,110 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 28 Nov 2017 01:30:18 +0800
-Subject: [PATCH] sunxi-rsb: Include OF based modalias in device uevent
-In-Reply-To: <2479565.qdx1IVDIGC@pebbles>
-References: <a99fc4e8-49e3-486a-b508-d764a952d9f8@rwthex-w2-a.rwth-ad.de>
- <20171127153502.4wcqtimppgpfklmr@flea.home> <2479565.qdx1IVDIGC@pebbles>
-Message-ID: <CAGb2v67_-HA=q3+cWwVKrVuG-GaLF3xz4GNQ2+6FJZgSTN=rzQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 27 Nov 2017 11:58:05 -0500
+Subject: [PATCH V3 28/29] i7300_idle: remove unused file
+In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-29-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 1:19 AM, Stefan Br?ns
-<stefan.bruens@rwth-aachen.de> wrote:
-> On Monday, November 27, 2017 4:35:02 PM CET Maxime Ripard wrote:
->> Hi,
->>
->> On Mon, Nov 27, 2017 at 01:17:25PM +0100, Stefan Br?ns wrote:
->> > Include the OF-based modalias in the uevent sent when registering devices
->> > on the sunxi RSB bus, so that user space has a chance to autoload the
->> > kernel module for the device.
->> >
->> > Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
->> > pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
->> > the AXP803 PMIC is built as a module, it is not loaded and the system
->> > ends up with an disfunctional MMC controller.
->> >
->> > Cc: stable <stable@vger.kernel.org>
->> > Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
->> > ---
->> >
->> >  drivers/bus/sunxi-rsb.c | 13 +++++++++++++
->> >  1 file changed, 13 insertions(+)
->> >
->> > diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
->> > index 328ca93781cf..37cb57244cbe 100644
->> > --- a/drivers/bus/sunxi-rsb.c
->> > +++ b/drivers/bus/sunxi-rsb.c
->> > @@ -173,11 +173,24 @@ static int sunxi_rsb_device_remove(struct device
->> > *dev)>
->> >     return drv->remove(to_sunxi_rsb_device(dev));
->> >
->> >  }
->> >
->> > +static int sunxi_rsb_device_uevent(struct device *dev,
->> > +                              struct kobj_uevent_env *env)
->> > +{
->> > +   int ret;
->> > +
->> > +   ret = of_device_uevent_modalias(dev, env);
->> > +   if (ret != -ENODEV)
->> > +           return ret;
->>
->> A comment explaining why we need to ignore the ENODEV error code would
->> be great here.
->
-> Lazy answer - everyone else is doing the same, and nobody cared to add an
-> explanation.
->
-> For *some* drivers, this is likely because the same device may be enumerated
-> from e.g ACPI or OF, and for an ACPI device -ENODEV will be returned, as
-> dev->of_node is NULL.
->
-> For devices which are only usable in an OF context, this is bogus. Not sure
-> about sunxi-rsb.
+i7300_idle.h is not being called by any source file and contains calls to
+pci_get_bus_and_slot() that we are trying to deprecate. Remove unused file.
 
-sunxi-rsb (and Allwinner support in mainline in general) is OF only. With the
-exception of mfd sub-devices, if someone is enumerating devices in some other
-fashion, it should rightly blow up in their face.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ include/linux/i7300_idle.h | 84 ----------------------------------------------
+ 1 file changed, 84 deletions(-)
+ delete mode 100644 include/linux/i7300_idle.h
 
->> > +   return 0;
->> > +}
->> > +
->> >
->> >  static struct bus_type sunxi_rsb_bus = {
->> >
->> >     .name           = RSB_CTRL_NAME,
->> >     .match          = sunxi_rsb_device_match,
->> >     .probe          = sunxi_rsb_device_probe,
->> >     .remove         = sunxi_rsb_device_remove,
->> >
->> > +   .uevent         = sunxi_rsb_device_uevent,
->>
->> Any reason to not use of_device_uevent_modalias directly here?
->
-> *If* sunxi-rsb can be used without OF, then yes, otherwise no.
-
-You can just use of_device_uevent_modalias, like the other OF platforms.
-
-ChenYu
+diff --git a/include/linux/i7300_idle.h b/include/linux/i7300_idle.h
+deleted file mode 100644
+index 4dbe651..0000000
+--- a/include/linux/i7300_idle.h
++++ /dev/null
+@@ -1,84 +0,0 @@
+-/* SPDX-License-Identifier: GPL-2.0 */
+-
+-#ifndef I7300_IDLE_H
+-#define I7300_IDLE_H
+-
+-#include <linux/pci.h>
+-
+-/*
+- * I/O AT controls (PCI bus 0 device 8 function 0)
+- * DIMM controls (PCI bus 0 device 16 function 1)
+- */
+-#define IOAT_BUS 0
+-#define IOAT_DEVFN PCI_DEVFN(8, 0)
+-#define MEMCTL_BUS 0
+-#define MEMCTL_DEVFN PCI_DEVFN(16, 1)
+-
+-struct fbd_ioat {
+-	unsigned int vendor;
+-	unsigned int ioat_dev;
+-	unsigned int enabled;
+-};
+-
+-/*
+- * The i5000 chip-set has the same hooks as the i7300
+- * but it is not enabled by default and must be manually
+- * manually enabled with "forceload=1" because it is
+- * only lightly validated.
+- */
+-
+-static const struct fbd_ioat fbd_ioat_list[] = {
+-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_IOAT_CNB, 1},
+-	{PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_IOAT, 0},
+-	{0, 0}
+-};
+-
+-/* table of devices that work with this driver */
+-static const struct pci_device_id pci_tbl[] = {
+-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_FBD_CNB) },
+-	{ PCI_DEVICE(PCI_VENDOR_ID_INTEL, PCI_DEVICE_ID_INTEL_5000_ERR) },
+-	{ } /* Terminating entry */
+-};
+-
+-/* Check for known platforms with I/O-AT */
+-static inline int i7300_idle_platform_probe(struct pci_dev **fbd_dev,
+-						struct pci_dev **ioat_dev,
+-						int enable_all)
+-{
+-	int i;
+-	struct pci_dev *memdev, *dmadev;
+-
+-	memdev = pci_get_bus_and_slot(MEMCTL_BUS, MEMCTL_DEVFN);
+-	if (!memdev)
+-		return -ENODEV;
+-
+-	for (i = 0; pci_tbl[i].vendor != 0; i++) {
+-		if (memdev->vendor == pci_tbl[i].vendor &&
+-		    memdev->device == pci_tbl[i].device) {
+-			break;
+-		}
+-	}
+-	if (pci_tbl[i].vendor == 0)
+-		return -ENODEV;
+-
+-	dmadev = pci_get_bus_and_slot(IOAT_BUS, IOAT_DEVFN);
+-	if (!dmadev)
+-		return -ENODEV;
+-
+-	for (i = 0; fbd_ioat_list[i].vendor != 0; i++) {
+-		if (dmadev->vendor == fbd_ioat_list[i].vendor &&
+-		    dmadev->device == fbd_ioat_list[i].ioat_dev) {
+-			if (!(fbd_ioat_list[i].enabled || enable_all))
+-				continue;
+-			if (fbd_dev)
+-				*fbd_dev = memdev;
+-			if (ioat_dev)
+-				*ioat_dev = dmadev;
+-
+-			return 0;
+-		}
+-	}
+-	return -ENODEV;
+-}
+-
+-#endif
+-- 
+1.9.1
