@@ -1,33 +1,69 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 27 Nov 2017 13:28:32 +0100
-Subject: [PATCH v3 2/6] dt-bindings: Add vendor prefix for Solomon Goldentek
- Display Corporation
+Date: Mon, 27 Nov 2017 13:28:33 +0100
+Subject: [PATCH v3 3/6] dt-bindings: display: Add bindings for SGD
+ GKTW70SDAE4SE Panel
 In-Reply-To: <1511785716-23492-1-git-send-email-narmstrong@baylibre.com>
 References: <1511785716-23492-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1511785716-23492-3-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1511785716-23492-4-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Solomon Goldentek Display Corporation is a Taiwanese LCD/LCM manufacturer.
-Company Site: http://www.goldentek.com.tw
+The GKTW70SDAE4SE is an LVDS display panel.
+Their bindings are modelled on the the LVDS panel bindings.
 
 Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ .../bindings/display/panel/sgd,gktw70sdae4se.txt   | 41 ++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 0994bdd..b0d3bef 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -305,6 +305,7 @@ seagate	Seagate Technology PLC
- semtech	Semtech Corporation
- sensirion	Sensirion AG
- sff	Small Form Factor Committee
-+sgd	Solomon Goldentek Display Corporation
- sgx	SGX Sensortech
- sharp	Sharp Corporation
- shimafuji	Shimafuji Electric, Inc.
+diff --git a/Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt b/Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
+new file mode 100644
+index 0000000..d06644b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
+@@ -0,0 +1,41 @@
++Solomon Goldentek Display GKTW70SDAE4SE LVDS Display Panel
++==========================================================
++
++The GKTW70SDAE4SE is a 7" WVGA TFT-LCD display panel.
++
++These DT bindings follow the LVDS panel bindings defined in panel-lvds.txt
++with the following device-specific properties.
++
++Required properties:
++
++- compatible: Shall contain "sgd,gktw70sdae4se" and "panel-lvds", in that order.
++
++Example
++-------
++
++panel {
++	compatible = "sgd,gktw70sdae4se", "panel-lvds";
++
++	width-mm = <153>;
++	height-mm = <86>;
++
++	data-mapping = "jeida-18";
++
++	panel-timing {
++		clock-frequency = <32000000>;
++		hactive = <800>;
++		vactive = <480>;
++		hback-porch = <39>;
++		hfront-porch = <39>;
++		vback-porch = <29>;
++		vfront-porch = <13>;
++		hsync-len = <47>;
++		vsync-len = <2>;
++	};
++
++	port {
++		panel_in: endpoint {
++			remote-endpoint = <&lvds_encoder>;
++		};
++	};
++};
 -- 
 2.7.4
