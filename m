@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:58:06 -0500
-Subject: [PATCH V3 29/29] PCI: remove pci_get_bus_and_slot() function
+Date: Mon, 27 Nov 2017 11:57:59 -0500
+Subject: [PATCH V3 22/29] [media] atomisp: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
 References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-30-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-23-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -11,39 +11,41 @@ pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
 where a PCI device is present. This restricts the device drivers to be
 reused for other domain numbers.
 
-Now that all users of pci_get_bus_and_slot() switched to
-pci_get_domain_bus_and_slot(), it is now safe to remove this function.
+Getting ready to remove pci_get_bus_and_slot() function. Since ISP always
+uses domain 0, hard-code it in the code when calling the replacement
+function pci_get_domain_bus_and_slot().
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- include/linux/pci.h | 8 --------
- 1 file changed, 8 deletions(-)
+ drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c               | 2 +-
+ drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/include/linux/pci.h b/include/linux/pci.h
-index d16a7c0..8c1b650 100644
---- a/include/linux/pci.h
-+++ b/include/linux/pci.h
-@@ -957,11 +957,6 @@ struct pci_dev *pci_get_subsys(unsigned int vendor, unsigned int device,
- struct pci_dev *pci_get_slot(struct pci_bus *bus, unsigned int devfn);
- struct pci_dev *pci_get_domain_bus_and_slot(int domain, unsigned int bus,
- 					    unsigned int devfn);
--static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
--						   unsigned int devfn)
--{
--	return pci_get_domain_bus_and_slot(0, bus, devfn);
--}
- struct pci_dev *pci_get_class(unsigned int class, struct pci_dev *from);
- int pci_dev_present(const struct pci_device_id *ids);
+diff --git a/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c b/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c
+index 663aa91..95b9c7a 100644
+--- a/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c
++++ b/drivers/staging/media/atomisp/pci/atomisp2/atomisp_v4l2.c
+@@ -1233,7 +1233,7 @@ static int atomisp_pci_probe(struct pci_dev *dev,
+ 	isp->pdev = dev;
+ 	isp->dev = &dev->dev;
+ 	isp->sw_contex.power_state = ATOM_ISP_POWER_UP;
+-	isp->pci_root = pci_get_bus_and_slot(0, 0);
++	isp->pci_root = pci_get_domain_bus_and_slot(0, 0, 0);
+ 	if (!isp->pci_root) {
+ 		dev_err(&dev->dev, "Unable to find PCI host\n");
+ 		return -ENODEV;
+diff --git a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
+index 4631b1d..51dcef57 100644
+--- a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
++++ b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
+@@ -39,7 +39,7 @@ static inline int platform_is(u8 model)
  
-@@ -1676,9 +1671,6 @@ static inline struct pci_bus *pci_find_next_bus(const struct pci_bus *from)
- static inline struct pci_dev *pci_get_slot(struct pci_bus *bus,
- 						unsigned int devfn)
- { return NULL; }
--static inline struct pci_dev *pci_get_bus_and_slot(unsigned int bus,
--						unsigned int devfn)
--{ return NULL; }
- 
- static inline int pci_domain_nr(struct pci_bus *bus) { return 0; }
- static inline struct pci_dev *pci_dev_get(struct pci_dev *dev) { return NULL; }
+ static int intel_mid_msgbus_init(void)
+ {
+-	pci_root = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
++	pci_root = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
+ 	if (!pci_root) {
+ 		pr_err("%s: Error: msgbus PCI handle NULL\n", __func__);
+ 		return -ENODEV;
 -- 
 1.9.1
