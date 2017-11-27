@@ -1,40 +1,196 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:52:35 +0000
-Subject: [PATCH 06/13] ARM: dts: imx6qdl-microsom: add 3.3V vcc regulator
+Date: Mon, 27 Nov 2017 16:52:40 +0000
+Subject: [PATCH 07/13] ARM: dts: imx6qdl-microsom: add support for TI Wi-Fi
 In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
 References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMe3-0002r4-Fd@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eJMe8-0002rB-Is@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a 3.3V regulator for devices connected to the vcc_3v3 supply
-signal on the microsom.
+Add support for the TI Wi-Fi WL1837 device on SolidRun's revision
+1.5 microsoms.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-microsom.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi | 170 +++++++++++++++++++++++++++++
+ 1 file changed, 170 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi
 
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-index 612f626a59c1..d1dba0d94960 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-@@ -40,6 +40,16 @@
-  */
- #include <dt-bindings/gpio/gpio.h>
- 
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi
+new file mode 100644
+index 000000000000..44a97ba93a95
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-microsom-ti.dtsi
+@@ -0,0 +1,170 @@
++/*
++ * Copyright (C) 2013,2014 Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++#include <dt-bindings/gpio/gpio.h>
++
 +/ {
-+	vcc_3v3: regulator-vcc-3v3 {
++	nvcc_sd1: regulator-nvcc-sd1 {
 +		compatible = "regulator-fixed";
 +		regulator-always-on;
-+		regulator-name = "vcc_3v3";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
++		regulator-name = "nvcc_sd1";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&vcc_3v3>;
++	};
++
++	clk_ti_wifi: ti-wifi-clock {
++		/* This is a hack around the kernel - using "fixed clock"
++		 * results in the "pinctrl" properties being ignored, and
++		 * the clock not being output.  Instead, use a gated clock
++		 * and the unrouted WL_XTAL_PU gpio.
++		 */
++		compatible = "gpio-gate-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_clk>;
++		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
++	};
++
++	pwrseq_ti_wifi: ti-wifi-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_wifi_en>;
++		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>;
++		post-power-on-delay-ms = <200>;
++		clocks = <&clk_ti_wifi>;
++		clock-names = "ext_clock";
 +	};
 +};
 +
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_microsom_enet_ar8035>;
++&iomuxc {
++	microsom {
++		pinctrl_microsom_ti_bt: microsom-ti-bt {
++			fsl,pins = <
++				/* BT_EN_SOC */
++				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_ti_clk: microsom-ti-clk {
++			fsl,pins = <
++				/* EXT_32K */
++				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
++				/* WL_XTAL_PU (unrouted) */
++				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05 0x40013070
++			>;
++		};
++
++		pinctrl_microsom_ti_wifi_en: microsom-ti-wifi-en {
++			fsl,pins = <
++				/* WLAN_EN_SOC */
++				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_ti_wifi_irq: microsom-ti-wifi-irq {
++			fsl,pins = <
++				/* WLAN_IRQ */
++				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_uart4: microsom-uart4 {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
++			>;
++		};
++
++		pinctrl_microsom_usdhc1: microsom-usdhc1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
++				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
++				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
++			>;
++		};
++	};
++};
++
++/* UART4 - Connected to optional TI Wi-Fi/BT/FM */
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_uart4>;
++	uart-has-rtscts;
++	status = "okay";
++
++	bluetooth {
++		compatible = "ti,wl1837-st";
++		clocks = <&clk_ti_wifi>;
++		clock-names = "ext_clock";
++		enable-gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_bt>;
++	};
++};
++
++/* USDHC1 - Connected to optional TI Wi-Fi/BT/FM */
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_usdhc1>;
++	bus-width = <4>;
++	keep-power-in-suspend;
++	mmc-pwrseq = <&pwrseq_ti_wifi>;
++	non-removable;
++	vmmc-supply = <&vcc_3v3>;
++	/* vqmmc-supply = <&nvcc_sd1>; - MMC layer doesn't like it! */
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	wlcore at 2 {
++		compatible = "ti,wl1837";
++		reg = <2>;
++		interrupts-extended = <&gpio6 4 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_wifi_irq>;
++	};
++};
 -- 
 2.7.4
