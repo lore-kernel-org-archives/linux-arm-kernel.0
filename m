@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:57:46 -0500
-Subject: [PATCH V3 09/29] drm/i915: deprecate pci_get_bus_and_slot()
+Date: Mon, 27 Nov 2017 11:57:44 -0500
+Subject: [PATCH V3 07/29] ibft: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
 References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-8-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,29 +14,31 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Extract the domain number from drm_device and pass it into
-pci_get_domain_bus_and_slot() function.
+We don't search for the device in other domains than zero. This is because
+on x86 platforms the BIOS executes only devices which are in domain 0.
+Furthermore, the iBFT spec doesn't have a domain id field.
 
+Acked-by: Konrad Rzeszutek Wilk <konrad@kernel.org>
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/gpu/drm/i915/i915_drv.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ drivers/firmware/iscsi_ibft.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/gpu/drm/i915/i915_drv.c b/drivers/gpu/drm/i915/i915_drv.c
-index 9f45cfe..5a8cb79 100644
---- a/drivers/gpu/drm/i915/i915_drv.c
-+++ b/drivers/gpu/drm/i915/i915_drv.c
-@@ -419,7 +419,10 @@ static int i915_getparam(struct drm_device *dev, void *data,
- 
- static int i915_get_bridge_dev(struct drm_i915_private *dev_priv)
- {
--	dev_priv->bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	int domain = pci_domain_nr(dev_priv->drm.pdev->bus);
-+
-+	dev_priv->bridge_dev =
-+		pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(0, 0));
- 	if (!dev_priv->bridge_dev) {
- 		DRM_ERROR("bridge device not found\n");
- 		return -1;
+diff --git a/drivers/firmware/iscsi_ibft.c b/drivers/firmware/iscsi_ibft.c
+index 14042a6..6bc8e66 100644
+--- a/drivers/firmware/iscsi_ibft.c
++++ b/drivers/firmware/iscsi_ibft.c
+@@ -719,8 +719,9 @@ static int __init ibft_create_kobject(struct acpi_table_ibft *header,
+ 		* executes only devices which are in domain 0. Furthermore, the
+ 		* iBFT spec doesn't have a domain id field :-(
+ 		*/
+-		pci_dev = pci_get_bus_and_slot((nic->pci_bdf & 0xff00) >> 8,
+-					       (nic->pci_bdf & 0xff));
++		pci_dev = pci_get_domain_bus_and_slot(0,
++						(nic->pci_bdf & 0xff00) >> 8,
++						(nic->pci_bdf & 0xff));
+ 		if (pci_dev) {
+ 			rc = sysfs_create_link(&boot_kobj->kobj,
+ 					       &pci_dev->dev.kobj, "device");
 -- 
 1.9.1
