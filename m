@@ -1,69 +1,85 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Mon, 27 Nov 2017 18:53:52 +0000
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171127184411.GA19577@piout.net>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <CALAqxLUBWd-mv_3iiFrXLf0ka685t0an89jjduHpT-2jjv5O2Q@mail.gmail.com>
- <20171127175254.GL31757@n2100.armlinux.org.uk>
- <20171127184411.GA19577@piout.net>
-Message-ID: <20171127185352.GN31757@n2100.armlinux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 27 Nov 2017 18:53:21 +0000
+Subject: Applied "ASoC: stm32: fix sync property description in SAI bindings"
+ to the asoc tree
+In-Reply-To: <1511362947-14747-2-git-send-email-olivier.moysan@st.com>
+Message-ID: <E1eJOWv-0007GX-88@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 07:44:11PM +0100, Alexandre Belloni wrote:
-> On 27/11/2017 at 17:52:54 +0000, Russell King - ARM Linux wrote:
-> > I'm actually rather disappointed that Alexandre Belloni has only now
-> > brought up his dis-satisfaction with the approach after all the effort
-> > that Jason and myself have put in to it.  It's not like Alexandre was
-> > not copied on the patches and discussion.
-> > 
-> > If Alexandre could not be bothered to bring up his concerns while the
-> > discussion was on-going in September, and didn't bother raising them
-> > in October, I'd say that Alexandre's opinion at this point doesn't
-> > count for much - if it wasn't important to state at the time or for
-> > a couple of months after, why does it become important to state after
-> > the thing has been merged.
-> > 
-> > Maybe the idea here is basically to waste people's time letting them
-> > develop a patch for an approach, and then object at the last minute
-> > to that approach.  Hardly seems fair or even reasonable.
-> > 
-> 
-> How unfair that is! Really, you are not in a position to make that kind
-> of comment because you are not even replying to patches in your own
-> subsystem. But maybe my time doesn't count as much as yours.
+The patch
 
-You are, yet again, wrong.
+   ASoC: stm32: fix sync property description in SAI bindings
 
-I am in a position to make the comment because it was me who identified
-the problem, put in the hours to work on, develop and extensively test
-Jason's patch.  So, it's partly my time that you seem to be wasting,
-and that gives me every right to complain at this point.
+has been applied to the asoc tree at
 
-You, on the other hand, were copied with every single email, and did
-nothing to discuss the issue except for the "easy" bits when I posted
-a relatively smaller patch - but you ignored the bigger issue.
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-Now that the patch was merged, you throw your toys out of the pram and
-start blaming everyone else for "silently" merging the patch and how it
-wasn't sent to the right email addresses.
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-And now that someone dare criticise your abilities, you decide to revert
-the change and restore Linux back to a crippled state.
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-Honestly, I don't _care_ if you revert it and if you want to cripple
-the kernel as a result in regards to this issue, I can carry the patch
-ad infinitum, no skin off my back.  You're only going to be hurting
-yourself and other people through your spite by doing that revert.
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-I suggest you take a good long hard look at what you're about to do and
-ask whether you are being reasonable, given that it's taken you over
-two months whole months to raise any _technical_ issues with the approach
-that Jason and myself came up with.
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
+Thanks,
+Mark
+
+>From 4be0ffdf284046eb7289fa66cc7b2eb8d7efdc64 Mon Sep 17 00:00:00 2001
+From: olivier moysan <olivier.moysan@st.com>
+Date: Wed, 22 Nov 2017 16:02:25 +0100
+Subject: [PATCH] ASoC: stm32: fix sync property description in SAI bindings
+
+SAI sync property must be described in SAI subnodes
+section, as it is a property of child node.
+This patch fixes commit 14f0e5f8d97e632695d92f41f2e91d10d8005d47
+"ASoC: stm32: Add synchronization to SAI bindings".
+
+Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ Documentation/devicetree/bindings/sound/st,stm32-sai.txt | 12 +++++++-----
+ 1 file changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+index 1f9cd7095337..b1acc1a256ba 100644
+--- a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
++++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
+@@ -20,11 +20,6 @@ Required properties:
+ 
+ Optional properties:
+   - resets: Reference to a reset controller asserting the SAI
+-  - st,sync: specify synchronization mode.
+-	By default SAI sub-block is in asynchronous mode.
+-	This property sets SAI sub-block as slave of another SAI sub-block.
+-	Must contain the phandle and index of the sai sub-block providing
+-	the synchronization.
+ 
+ SAI subnodes:
+ Two subnodes corresponding to SAI sub-block instances A et B can be defined.
+@@ -44,6 +39,13 @@ SAI subnodes required properties:
+   - pinctrl-names: should contain only value "default"
+   - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+ 
++SAI subnodes Optional properties:
++  - st,sync: specify synchronization mode.
++	By default SAI sub-block is in asynchronous mode.
++	This property sets SAI sub-block as slave of another SAI sub-block.
++	Must contain the phandle and index of the sai sub-block providing
++	the synchronization.
++
+ The device node should contain one 'port' child node with one child 'endpoint'
+ node, according to the bindings defined in Documentation/devicetree/bindings/
+ graph.txt.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+2.15.0
