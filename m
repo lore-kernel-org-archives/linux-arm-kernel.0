@@ -1,29 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 27 Nov 2017 08:59:42 -0800
-Subject: [PATCH] ARM: AM33xx: PRM: Remove am33xx_pwrdm_read_prev_pwrst
- function
-In-Reply-To: <1510313212-29660-1-git-send-email-j-keerthy@ti.com>
-References: <1510313212-29660-1-git-send-email-j-keerthy@ti.com>
-Message-ID: <20171127165942.GQ28152@atomide.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 27 Nov 2017 11:58:02 -0500
+Subject: [PATCH V3 25/29] video: fbdev: intelfb: deprecate
+ pci_get_bus_and_slot()
+In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-26-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Keerthy <j-keerthy@ti.com> [171110 03:29]:
-> Referring TRM Am335X series:
-> http://www.ti.com/lit/ug/spruh73p/spruh73p.pdf
-> 
-> The LastPowerStateEntered bitfield is present only for PM_CEFUSE
-> domain. This is not present in any of the other power domains. Hence
-> remove the generic am33xx_pwrdm_read_prev_pwrst hook which wrongly
-> reads the reserved bit fields for all the other power domains.
-> 
-> Reading the reserved bits leads to wrongly interpreting the low
-> power transitions for various power domains that do not have the
-> LastPowerStateEntered field. The pm debug counters values are wrong
-> currently as we are incrementing them based on the reserved bits.
-> 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+where a PCI device is present. This restricts the device drivers to be
+reused for other domain numbers.
 
-Applying into omap-for-v4.15/fixes thanks.
+Getting ready to remove pci_get_bus_and_slot() function in favor of
+pci_get_domain_bus_and_slot().
 
-Tony
+Find the domain number from pdev.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/video/fbdev/intelfb/intelfbhw.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/video/fbdev/intelfb/intelfbhw.c b/drivers/video/fbdev/intelfb/intelfbhw.c
+index d31ed4e..f695867 100644
+--- a/drivers/video/fbdev/intelfb/intelfbhw.c
++++ b/drivers/video/fbdev/intelfb/intelfbhw.c
+@@ -181,7 +181,9 @@ int intelfbhw_get_memory(struct pci_dev *pdev, int *aperture_size,
+ 		return 1;
+ 
+ 	/* Find the bridge device.  It is always 0:0.0 */
+-	if (!(bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0)))) {
++	bridge_dev = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus), 0,
++						 PCI_DEVFN(0, 0));
++	if (!bridge_dev) {
+ 		ERR_MSG("cannot find bridge device\n");
+ 		return 1;
+ 	}
+-- 
+1.9.1
