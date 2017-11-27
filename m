@@ -1,49 +1,88 @@
-From: john.garry@huawei.com (John Garry)
-Date: Mon, 27 Nov 2017 10:04:52 +0000
-Subject: [PATCH v9 0/5] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <20171107012355.GC13514@arm.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171107012355.GC13514@arm.com>
-Message-ID: <f01a7071-7db9-973c-1ac1-c37e4559c5cf@huawei.com>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Mon, 27 Nov 2017 18:01:04 +0800
+Subject: [PATCH V6 01/12] drivers: move clock common macros out from vendor
+ directories
+In-Reply-To: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
+References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171127100115.20655-2-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/11/2017 01:23, Will Deacon wrote:
-> Hi Arnaldo,
->
-> On Tue, Oct 17, 2017 at 12:02:17AM +0530, Ganapatrao Kulkarni wrote:
->> Extending json/jevent framework for parsing arm64 event files.
->> Adding jevents for ThunderX2 implementation defined PMU events.
->>
->> v9:
->>    - Rebased to [3] and resolved conficts in PATCH 1/5 and reworked PATCH 3/5.
->>    - Added PATCH 5 to fix segmentation fault in perf_pmu__find_map
->>
->> [3] https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
->
-> I'm happy with this version of the series (it's all Acked now), so would you
-> be able to pick it up for mainline, please?
->
-> Cheers,
->
+These macros are used by more than one SoC vendor platforms, avoid to
+have many copies of these code, this patch moves them to the common
+clock directory which every clock drivers can access to.
 
-So this patchset has not been merged.
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ drivers/clk/clk_common.h | 60 ++++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
+ create mode 100644 drivers/clk/clk_common.h
 
-We have a patchset waiting for HiSilicon hip08 support, which includes 
-the requested feature for the ARM64 IMP DEFINED recommended events 
-refactoring-out.
-
-We can send our hip08 patchset now as an RFC, based in this patchset. 
-Depending on the comments and general acceptance of the approaches, it 
-may be appropriate to merge the patchsets (or at least merge the 
-refactoring part).
-
-Thanks,
-John
-
-
-> Will
->
-> .
->
+diff --git a/drivers/clk/clk_common.h b/drivers/clk/clk_common.h
+new file mode 100644
+index 0000000..21e93d2
+--- /dev/null
++++ b/drivers/clk/clk_common.h
+@@ -0,0 +1,60 @@
++/*
++ * drivers/clk/clk_common.h
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#ifndef _CLK_COMMON_H_
++#define _CLK_COMMON_H_
++
++#include <linux/clk-provider.h>
++
++#define CLK_HW_INIT(_name, _parent, _ops, _flags)		\
++	(&(struct clk_init_data) {				\
++		.flags		= _flags,			\
++		.name		= _name,			\
++		.parent_names	= (const char *[]) { _parent },	\
++		.num_parents	= 1,				\
++		.ops		= _ops,				\
++	})
++
++#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)	\
++	(&(struct clk_init_data) {				\
++		.flags		= _flags,			\
++		.name		= _name,			\
++		.parent_names	= _parents,			\
++		.num_parents	= ARRAY_SIZE(_parents),		\
++		.ops		= _ops,				\
++	})
++
++#define CLK_HW_INIT_NO_PARENT(_name, _ops, _flags)     \
++	(&(struct clk_init_data) {                      \
++		.flags          = _flags,               \
++		.name           = _name,                \
++		.parent_names   = NULL,                 \
++		.num_parents    = 0,                    \
++		.ops            = _ops,                 \
++	})
++
++#define CLK_FIXED_FACTOR(_struct, _name, _parent,			\
++			_div, _mult, _flags)				\
++	struct clk_fixed_factor _struct = {				\
++		.div		= _div,					\
++		.mult		= _mult,				\
++		.hw.init	= CLK_HW_INIT(_name,			\
++					      _parent,			\
++					      &clk_fixed_factor_ops,	\
++					      _flags),			\
++	}
++
++#define CLK_FIXED_RATE(_struct, _name, _flags,				\
++		       _fixed_rate, _fixed_accuracy)			\
++	struct clk_fixed_rate _struct = {				\
++		.fixed_rate	= _fixed_rate,				\
++		.fixed_accuracy	= _fixed_accuracy,			\
++		.hw.init	= CLK_HW_INIT_NO_PARENT(_name,		\
++					  &clk_fixed_rate_ops,		\
++							_flags),	\
++	}
++
++#endif /* _CLK_COMMON_H_ */
+-- 
+2.7.4
