@@ -1,30 +1,35 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Mon, 27 Nov 2017 19:12:13 +0100
-Subject: [PATCH v2 1/2] ARM: dts: exynos: Switch to dedicated Odroid-XU3
- sound card binding
-In-Reply-To: <20171103165446.15438-2-s.nawrocki@samsung.com>
-References: <20171103165446.15438-1-s.nawrocki@samsung.com>
- <CGME20171103165539epcas1p48cc87811574dace9dfe91d8e9ec6f7ca@epcas1p4.samsung.com>
- <20171103165446.15438-2-s.nawrocki@samsung.com>
-Message-ID: <20171127181213.lxtbbiw75wbz2dbz@kozik-lap>
+Date: Mon, 27 Nov 2017 19:12:42 +0100
+Subject: [PATCH] ARM: dts: exynos: correct trats2 panel reset line
+In-Reply-To: <59887245-ed25-ac1b-3bd4-b72c8fd1dd74@samsung.com>
+References: <CGME20171121112435epcas4p25f529481eebd076f0fde78c500b04395@epcas4p2.samsung.com>
+ <20171121112424.GA6650@lineageos.org>
+ <59887245-ed25-ac1b-3bd4-b72c8fd1dd74@samsung.com>
+Message-ID: <20171127181242.qaqlxpj6tnfyf3ei@kozik-lap>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 03, 2017 at 05:54:45PM +0100, Sylwester Nawrocki wrote:
-> The new sound card DT binding is used for Odroid XU3 in order
-> to properly support the HDMI audio path.
-> Clocks configuration is changed so the I2S controller is now the bit
-> and the frame clock master with EPLL as the root clock source.
+On Tue, Nov 21, 2017 at 04:06:38PM +0100, Marek Szyprowski wrote:
+> Hi Simon,
 > 
-> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos4.dtsi                    |  1 +
->  arch/arm/boot/dts/exynos5420.dtsi                 |  1 +
->  arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi | 60 ++++++++++++++---------
->  3 files changed, 40 insertions(+), 22 deletions(-)
+> On 2017-11-21 12:24, Simon Shields wrote:
+> > trats2 uses gpf2-1 as the panel reset GPIO. gpy4-5 was only used
+> > on early revisions of the board.
+> > 
+> > Fixes: 420ae8451a22 ("ARM: dts: exynos4412-trats2: add panel node")
+> > Signed-off-by: Simon Shields <simon@lineageos.org>
 > 
+> Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> Tested-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> 
+> It looks that this has been accidentally copy/pasted from the previous
+> dts used for early version of the development board. I've checked the
+> Trats2 schematic and indeed gpf2-1 is the correct pin for panel reset
+> line.
 
-Thanks, applied both.
+Thanks for testing.
+
+Thanks, applied.
 
 Best regards,
 Krzysztof
