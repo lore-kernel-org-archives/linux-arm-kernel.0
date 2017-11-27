@@ -1,32 +1,40 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:53:11 +0000
-Subject: [PATCH 13/13] ARM: dts: imx6qdl-cubox-i: fix node names
-In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
-References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMed-0002rt-Cm@rmk-PC.armlinux.org.uk>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 27 Nov 2017 11:57:55 -0500
+Subject: [PATCH V3 18/29] PCI/quirks: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-19-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Node names are supposed to be generic, fix the RTC node name.  We
-also don't need the alias.
+pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+where a PCI device is present. This restricts the device drivers to be
+reused for other domain numbers.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Getting ready to remove pci_get_bus_and_slot() function in favor of
+pci_get_domain_bus_and_slot().
+
+Extract the domain number from pdev while calling into
+pci_get_domain_bus_and_slot() function.
+
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pci/quirks.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index 7a3fba776661..ca04ec56d2af 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -135,7 +135,7 @@
- 
- 	status = "okay";
- 
--	rtc: pcf8523 at 68 {
-+	rtc at 68 {
- 		compatible = "nxp,pcf8523";
- 		reg = <0x68>;
- 	};
+diff --git a/drivers/pci/quirks.c b/drivers/pci/quirks.c
+index 911b3b6..4c46cc5 100644
+--- a/drivers/pci/quirks.c
++++ b/drivers/pci/quirks.c
+@@ -2699,7 +2699,8 @@ static void __nv_msi_ht_cap_quirk(struct pci_dev *dev, int all)
+ 	 * HT MSI mapping should be disabled on devices that are below
+ 	 * a non-Hypertransport host bridge. Locate the host bridge...
+ 	 */
+-	host_bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
++	host_bridge = pci_get_domain_bus_and_slot(pci_domain_nr(dev->bus), 0,
++						  PCI_DEVFN(0, 0));
+ 	if (host_bridge == NULL) {
+ 		dev_warn(&dev->dev, "nv_msi_ht_cap_quirk didn't locate host bridge\n");
+ 		return;
 -- 
-2.7.4
+1.9.1
