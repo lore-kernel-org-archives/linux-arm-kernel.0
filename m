@@ -1,237 +1,56 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Mon, 27 Nov 2017 16:52:14 +0000
-Subject: [PATCH 02/13] ARM: dts: imx6qdl: SolidRun: move AR8035 into microsom
-In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
-References: <20171127165134.GH31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJMdi-0002qY-Ta@rmk-PC.armlinux.org.uk>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Mon, 27 Nov 2017 17:53:01 +0100
+Subject: [PATCH 01/15] KVM: Prepare for moving vcpu_load/vcpu_put into
+ arch specific code
+In-Reply-To: <20171125205718.7731-2-christoffer.dall@linaro.org>
+References: <20171125205718.7731-1-christoffer.dall@linaro.org>
+ <20171125205718.7731-2-christoffer.dall@linaro.org>
+Message-ID: <838db374-6040-c805-82f3-187a2cdfc40d@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As all SolidRun microsoms are fitted with an AR8035, it's pointless
-having the ethernet support as a separate include file.  Move the
-AR8035 support into the main imx6qdl-microsom file.
+On 25/11/2017 21:57, Christoffer Dall wrote:
+> In preparation for moving calls to vcpu_load() and vcpu_put() into the
+> architecture specific implementations of the KVM vcpu ioctls, move the
+> calls in the main kvm_vcpu_ioctl() dispatcher function to each case
+> of the ioctl select statement.  This allows us to move the vcpu_load()
+> and vcpu_put() calls into architecture specific implementations of vcpu
+> ioctls, one by one.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/kvm_main.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++-----
+>  1 file changed, 48 insertions(+), 5 deletions(-)
+> 
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 9deb5a245b83..fafafcc38b5a 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2528,16 +2528,15 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		return kvm_arch_vcpu_ioctl(filp, ioctl, arg);
+>  #endif
+>  
+> -
+> -	r = vcpu_load(vcpu);
+> -	if (r)
+> -		return r;
+>  	switch (ioctl) {
+>  	case KVM_RUN: {
+>  		struct pid *oldpid;
+>  		r = -EINVAL;
+>  		if (arg)
+>  			goto out;
+> +		r = vcpu_load(vcpu);
+> +		if (r)
+> +			goto out;
+>  		oldpid = rcu_access_pointer(vcpu->pid);
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/dts/imx6q-h100.dts               |  1 -
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi         |  1 -
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi    |  1 -
- arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi | 99 --------------------------
- arch/arm/boot/dts/imx6qdl-microsom.dtsi        | 53 ++++++++++++++
- 5 files changed, 53 insertions(+), 102 deletions(-)
- delete mode 100644 arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
+If it is not a problem for ARM, maybe it would actually be best to leave
+the locking in kvm_vcpu_ioctl (with the already existing exception of
+KVM_INTERRUPT).  This would make vcpu_load void, and would also let you
+keep the PID adjustment in common code.  This would be more similar to
+the previous version, but without introducing __vcpu_load/__vcpu_put.
 
-diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
-index a3269f57df2b..bf5dfc9c8127 100644
---- a/arch/arm/boot/dts/imx6q-h100.dts
-+++ b/arch/arm/boot/dts/imx6q-h100.dts
-@@ -43,7 +43,6 @@
- 
- #include "imx6q.dtsi"
- #include "imx6qdl-microsom.dtsi"
--#include "imx6qdl-microsom-ar8035.dtsi"
- 
- / {
- 	model = "Auvidea H100";
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index b20508237046..57ce2dbb6ad9 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -39,7 +39,6 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- #include "imx6qdl-microsom.dtsi"
--#include "imx6qdl-microsom-ar8035.dtsi"
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
- 
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 0a0a7e4b956b..afd981e9b5e3 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -39,7 +39,6 @@
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
- #include "imx6qdl-microsom.dtsi"
--#include "imx6qdl-microsom-ar8035.dtsi"
- 
- / {
- 	chosen {
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-deleted file mode 100644
-index 900e8c781f91..000000000000
---- a/arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi
-+++ /dev/null
-@@ -1,99 +0,0 @@
--/*
-- * Copyright (C) 2013,2014 Russell King
-- *
-- * This describes the hookup for an AR8035 to the iMX6 on the SolidRun
-- * MicroSOM.
-- *
-- * This file is dual-licensed: you can use it either under the terms
-- * of the GPL or the X11 license, at your option. Note that this dual
-- * licensing only applies to this file, and not this project as a
-- * whole.
-- *
-- *  a) This file is free software; you can redistribute it and/or
-- *     modify it under the terms of the GNU General Public License
-- *     version 2 as published by the Free Software Foundation.
-- *
-- *     This file is distributed in the hope that it will be useful,
-- *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-- *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- *     GNU General Public License for more details.
-- *
-- * Or, alternatively,
-- *
-- *  b) Permission is hereby granted, free of charge, to any person
-- *     obtaining a copy of this software and associated documentation
-- *     files (the "Software"), to deal in the Software without
-- *     restriction, including without limitation the rights to use,
-- *     copy, modify, merge, publish, distribute, sublicense, and/or
-- *     sell copies of the Software, and to permit persons to whom the
-- *     Software is furnished to do so, subject to the following
-- *     conditions:
-- *
-- *     The above copyright notice and this permission notice shall be
-- *     included in all copies or substantial portions of the Software.
-- *
-- *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-- *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-- *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-- *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-- *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-- *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-- *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-- *     OTHER DEALINGS IN THE SOFTWARE.
-- */
--&fec {
--	pinctrl-names = "default";
--	pinctrl-0 = <&pinctrl_microsom_enet_ar8035>;
--	phy-mode = "rgmii";
--	phy-reset-duration = <2>;
--	phy-reset-gpios = <&gpio4 15 GPIO_ACTIVE_LOW>;
--	status = "okay";
--};
--
--&iomuxc {
--	enet {
--		pinctrl_microsom_enet_ar8035: microsom-enet-ar8035 {
--			fsl,pins = <
--				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
--				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
--				/* AR8035 reset */
--				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x130b0
--				/* AR8035 interrupt */
--				MX6QDL_PAD_DI0_PIN2__GPIO4_IO18		0x80000000
--				/* GPIO16 -> AR8035 25MHz */
--				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000
--				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
--				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
--				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
--				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
--				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
--				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
--				/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
--				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
--				/* AR8035 pin strapping: IO voltage: pull up */
--				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
--				/* AR8035 pin strapping: PHYADDR#0: pull down */
--				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x13030
--				/* AR8035 pin strapping: PHYADDR#1: pull down */
--				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x13030
--				/* AR8035 pin strapping: MODE#1: pull up */
--				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
--				/* AR8035 pin strapping: MODE#3: pull up */
--				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
--				/* AR8035 pin strapping: MODE#0: pull down */
--				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x13030
--
--				/*
--				 * As the RMII pins are also connected to RGMII
--				 * so that an AR8030 can be placed, set these
--				 * to high-z with the same pulls as above.
--				 * Use the GPIO settings to avoid changing the
--				 * input select registers.
--				 */
--				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x03000
--				MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x03000
--				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26	0x03000
--			>;
--		};
--	};
--};
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-index f7266ae2534c..c1541f2ecf3a 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-@@ -69,6 +69,15 @@
- 	};
- };
- 
-+&fec {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_microsom_enet_ar8035>;
-+	phy-mode = "rgmii";
-+	phy-reset-duration = <2>;
-+	phy-reset-gpios = <&gpio4 15 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	microsom {
- 		pinctrl_microsom_brcm_bt: microsom-brcm-bt {
-@@ -100,6 +109,50 @@
- 			>;
- 		};
- 
-+		pinctrl_microsom_enet_ar8035: microsom-enet-ar8035 {
-+			fsl,pins = <
-+				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
-+				MX6QDL_PAD_ENET_MDC__ENET_MDC		0x1b0b0
-+				/* AR8035 reset */
-+				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15		0x130b0
-+				/* AR8035 interrupt */
-+				MX6QDL_PAD_DI0_PIN2__GPIO4_IO18		0x80000000
-+				/* GPIO16 -> AR8035 25MHz */
-+				MX6QDL_PAD_GPIO_16__ENET_REF_CLK	0xc0000000
-+				MX6QDL_PAD_RGMII_TXC__RGMII_TXC		0x80000000
-+				MX6QDL_PAD_RGMII_TD0__RGMII_TD0		0x1b030
-+				MX6QDL_PAD_RGMII_TD1__RGMII_TD1		0x1b030
-+				MX6QDL_PAD_RGMII_TD2__RGMII_TD2		0x1b030
-+				MX6QDL_PAD_RGMII_TD3__RGMII_TD3		0x1b030
-+				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL	0x1b030
-+				/* AR8035 CLK_25M --> ENET_REF_CLK (V22) */
-+				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK	0x0a0b1
-+				/* AR8035 pin strapping: IO voltage: pull up */
-+				MX6QDL_PAD_RGMII_RXC__RGMII_RXC		0x1b030
-+				/* AR8035 pin strapping: PHYADDR#0: pull down */
-+				MX6QDL_PAD_RGMII_RD0__RGMII_RD0		0x13030
-+				/* AR8035 pin strapping: PHYADDR#1: pull down */
-+				MX6QDL_PAD_RGMII_RD1__RGMII_RD1		0x13030
-+				/* AR8035 pin strapping: MODE#1: pull up */
-+				MX6QDL_PAD_RGMII_RD2__RGMII_RD2		0x1b030
-+				/* AR8035 pin strapping: MODE#3: pull up */
-+				MX6QDL_PAD_RGMII_RD3__RGMII_RD3		0x1b030
-+				/* AR8035 pin strapping: MODE#0: pull down */
-+				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL	0x13030
-+
-+				/*
-+				 * As the RMII pins are also connected to RGMII
-+				 * so that an AR8030 can be placed, set these
-+				 * to high-z with the same pulls as above.
-+				 * Use the GPIO settings to avoid changing the
-+				 * input select registers.
-+				 */
-+				MX6QDL_PAD_ENET_CRS_DV__GPIO1_IO25	0x03000
-+				MX6QDL_PAD_ENET_RXD0__GPIO1_IO27	0x03000
-+				MX6QDL_PAD_ENET_RXD1__GPIO1_IO26	0x03000
-+			>;
-+		};
-+
- 		pinctrl_microsom_uart1: microsom-uart1 {
- 			fsl,pins = <
- 				MX6QDL_PAD_CSI0_DAT10__UART1_TX_DATA	0x1b0b1
--- 
-2.7.4
+Looks good apart from this doubt!  Thanks,
+
+Paolo
