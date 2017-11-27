@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:57:47 -0500
-Subject: [PATCH V3 10/29] drm/nouveau: deprecate pci_get_bus_and_slot()
+Date: Mon, 27 Nov 2017 11:57:39 -0500
+Subject: [PATCH V3 02/29] powerpc/PCI: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
 References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-11-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,103 +14,65 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Replace pci_get_bus_and_slot() with pci_get_domain_bus_and_slot()
-and extract the domain number from
-1. struct pci_dev
-2. struct pci_dev through drm_device->pdev
-3. struct pci_dev through fb->subdev->drm_device->pdev
+Use pci_get_domain_bus_and_slot() with a domain number of 0 as the code
+is not ready to consume multiple domains and existing code used domain
+number 0.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/gpu/drm/nouveau/dispnv04/arb.c           |  4 +++-
- drivers/gpu/drm/nouveau/dispnv04/hw.c            | 10 +++++++---
- drivers/gpu/drm/nouveau/nouveau_drm.c            |  3 ++-
- drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c | 10 +++++++++-
- 4 files changed, 21 insertions(+), 6 deletions(-)
+ arch/powerpc/kernel/pci_32.c              | 3 ++-
+ arch/powerpc/platforms/powermac/feature.c | 2 +-
+ arch/powerpc/sysdev/mv64x60_pci.c         | 4 ++--
+ 3 files changed, 5 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/gpu/drm/nouveau/dispnv04/arb.c b/drivers/gpu/drm/nouveau/dispnv04/arb.c
-index 90075b6..c79160c 100644
---- a/drivers/gpu/drm/nouveau/dispnv04/arb.c
-+++ b/drivers/gpu/drm/nouveau/dispnv04/arb.c
-@@ -213,8 +213,10 @@ struct nv_sim_state {
- 	if ((dev->pdev->device & 0xffff) == 0x01a0 /*CHIPSET_NFORCE*/ ||
- 	    (dev->pdev->device & 0xffff) == 0x01f0 /*CHIPSET_NFORCE2*/) {
- 		uint32_t type;
-+		int domain = pci_domain_nr(dev->pdev->bus);
+diff --git a/arch/powerpc/kernel/pci_32.c b/arch/powerpc/kernel/pci_32.c
+index 1d817f4..85ad2f7 100644
+--- a/arch/powerpc/kernel/pci_32.c
++++ b/arch/powerpc/kernel/pci_32.c
+@@ -96,7 +96,8 @@
+ 		reg = of_get_property(node, "reg", NULL);
+ 		if (!reg)
+ 			continue;
+-		dev = pci_get_bus_and_slot(pci_bus, ((reg[0] >> 8) & 0xff));
++		dev = pci_get_domain_bus_and_slot(0, pci_bus,
++						  ((reg[0] >> 8) & 0xff));
+ 		if (!dev || !dev->subordinate) {
+ 			pci_dev_put(dev);
+ 			continue;
+diff --git a/arch/powerpc/platforms/powermac/feature.c b/arch/powerpc/platforms/powermac/feature.c
+index 9e3f39d..ed8b166 100644
+--- a/arch/powerpc/platforms/powermac/feature.c
++++ b/arch/powerpc/platforms/powermac/feature.c
+@@ -829,7 +829,7 @@ static long core99_scc_enable(struct device_node *node, long param, long value)
  
--		pci_read_config_dword(pci_get_bus_and_slot(0, 1), 0x7c, &type);
-+		pci_read_config_dword(pci_get_domain_bus_and_slot(domain, 0, 1),
-+				      0x7c, &type);
+ 	if (value) {
+ 		if (pci_device_from_OF_node(node, &pbus, &pid) == 0)
+-			pdev = pci_get_bus_and_slot(pbus, pid);
++			pdev = pci_get_domain_bus_and_slot(0, pbus, pid);
+ 		if (pdev == NULL)
+ 			return 0;
+ 		rc = pci_enable_device(pdev);
+diff --git a/arch/powerpc/sysdev/mv64x60_pci.c b/arch/powerpc/sysdev/mv64x60_pci.c
+index d52b3b8..6fe9104 100644
+--- a/arch/powerpc/sysdev/mv64x60_pci.c
++++ b/arch/powerpc/sysdev/mv64x60_pci.c
+@@ -37,7 +37,7 @@ static ssize_t mv64x60_hs_reg_read(struct file *filp, struct kobject *kobj,
+ 	if (count < MV64X60_VAL_LEN_MAX)
+ 		return -EINVAL;
  
- 		sim_data.memory_type = (type >> 12) & 1;
- 		sim_data.memory_width = 64;
-diff --git a/drivers/gpu/drm/nouveau/dispnv04/hw.c b/drivers/gpu/drm/nouveau/dispnv04/hw.c
-index b985990..0c9bdf0 100644
---- a/drivers/gpu/drm/nouveau/dispnv04/hw.c
-+++ b/drivers/gpu/drm/nouveau/dispnv04/hw.c
-@@ -216,12 +216,15 @@
- {
- 	struct nvkm_pll_vals pllvals;
- 	int ret;
-+	int domain;
-+
-+	domain = pci_domain_nr(dev->pdev->bus);
- 
- 	if (plltype == PLL_MEMORY &&
- 	    (dev->pdev->device & 0x0ff0) == CHIPSET_NFORCE) {
- 		uint32_t mpllP;
--
--		pci_read_config_dword(pci_get_bus_and_slot(0, 3), 0x6c, &mpllP);
-+		pci_read_config_dword(pci_get_domain_bus_and_slot(domain, 0, 3),
-+				      0x6c, &mpllP);
- 		mpllP = (mpllP >> 8) & 0xf;
- 		if (!mpllP)
- 			mpllP = 4;
-@@ -232,7 +235,8 @@
- 	    (dev->pdev->device & 0xff0) == CHIPSET_NFORCE2) {
- 		uint32_t clock;
- 
--		pci_read_config_dword(pci_get_bus_and_slot(0, 5), 0x4c, &clock);
-+		pci_read_config_dword(pci_get_domain_bus_and_slot(domain, 0, 5),
-+				      0x4c, &clock);
- 		return clock / 1000;
- 	}
- 
-diff --git a/drivers/gpu/drm/nouveau/nouveau_drm.c b/drivers/gpu/drm/nouveau/nouveau_drm.c
-index 595630d..0b6c639 100644
---- a/drivers/gpu/drm/nouveau/nouveau_drm.c
-+++ b/drivers/gpu/drm/nouveau/nouveau_drm.c
-@@ -406,7 +406,8 @@ static int nouveau_drm_probe(struct pci_dev *pdev,
- 	}
- 
- 	/* subfunction one is a hdmi audio device? */
--	drm->hdmi_device = pci_get_bus_and_slot((unsigned int)pdev->bus->number,
-+	drm->hdmi_device = pci_get_domain_bus_and_slot(pci_domain_nr(pdev->bus),
-+						(unsigned int)pdev->bus->number,
- 						PCI_DEVFN(PCI_SLOT(pdev->devfn), 1));
- 
- 	if (!drm->hdmi_device) {
-diff --git a/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c b/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c
-index 3c6a871..8849b71 100644
---- a/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c
-+++ b/drivers/gpu/drm/nouveau/nvkm/subdev/fb/ramnv1a.c
-@@ -28,8 +28,16 @@
- {
- 	struct pci_dev *bridge;
- 	u32 mem, mib;
-+	int domain = 0;
-+	struct pci_dev *pdev = NULL;
- 
--	bridge = pci_get_bus_and_slot(0, PCI_DEVFN(0, 1));
-+	if (dev_is_pci(fb->subdev.device->dev))
-+		pdev = to_pci_dev(fb->subdev.device->dev);
-+
-+	if (pdev)
-+		domain = pci_domain_nr(pdev->bus);
-+
-+	bridge = pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(0, 1));
- 	if (!bridge) {
- 		nvkm_error(&fb->subdev, "no bridge device\n");
+-	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
++	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
+ 	if (!phb)
  		return -ENODEV;
+ 	pci_read_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, &v);
+@@ -61,7 +61,7 @@ static ssize_t mv64x60_hs_reg_write(struct file *filp, struct kobject *kobj,
+ 	if (sscanf(buf, "%i", &v) != 1)
+ 		return -EINVAL;
+ 
+-	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
++	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
+ 	if (!phb)
+ 		return -ENODEV;
+ 	pci_write_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, v);
 -- 
 1.9.1
