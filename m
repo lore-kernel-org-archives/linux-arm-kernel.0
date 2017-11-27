@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 27 Nov 2017 18:53:21 +0000
-Subject: Applied "ASoC: stm32: fix sync property description in SAI bindings"
- to the asoc tree
-In-Reply-To: <1511362947-14747-2-git-send-email-olivier.moysan@st.com>
-Message-ID: <E1eJOWv-0007GX-88@debutante>
+Date: Mon, 27 Nov 2017 18:53:18 +0000
+Subject: Applied "ASoC: stm32: sai: simplify sync modes management" to the
+ asoc tree
+In-Reply-To: <1511362947-14747-3-git-send-email-olivier.moysan@st.com>
+Message-ID: <E1eJOWs-0007FC-7e@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: stm32: fix sync property description in SAI bindings
+   ASoC: stm32: sai: simplify sync modes management
 
 has been applied to the asoc tree at
 
@@ -34,52 +34,184 @@ to this mail.
 Thanks,
 Mark
 
->From 4be0ffdf284046eb7289fa66cc7b2eb8d7efdc64 Mon Sep 17 00:00:00 2001
+>From 7dd0d835582ff72b0b3bd0f4fa074967dff1ce82 Mon Sep 17 00:00:00 2001
 From: olivier moysan <olivier.moysan@st.com>
-Date: Wed, 22 Nov 2017 16:02:25 +0100
-Subject: [PATCH] ASoC: stm32: fix sync property description in SAI bindings
+Date: Wed, 22 Nov 2017 16:02:26 +0100
+Subject: [PATCH] ASoC: stm32: sai: simplify sync modes management
 
-SAI sync property must be described in SAI subnodes
-section, as it is a property of child node.
-This patch fixes commit 14f0e5f8d97e632695d92f41f2e91d10d8005d47
-"ASoC: stm32: Add synchronization to SAI bindings".
+Use function of_find_device_by_node() to retrieve SAI
+synchro provider device and private data.
+This allows to remove registration of probed SAI
+in a linked list.
 
 Signed-off-by: Olivier Moysan <olivier.moysan@st.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- Documentation/devicetree/bindings/sound/st,stm32-sai.txt | 12 +++++++-----
- 1 file changed, 7 insertions(+), 5 deletions(-)
+ sound/soc/stm/stm32_sai.c | 105 ++++++++++------------------------------------
+ 1 file changed, 22 insertions(+), 83 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-index 1f9cd7095337..b1acc1a256ba 100644
---- a/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-+++ b/Documentation/devicetree/bindings/sound/st,stm32-sai.txt
-@@ -20,11 +20,6 @@ Required properties:
+diff --git a/sound/soc/stm/stm32_sai.c b/sound/soc/stm/stm32_sai.c
+index d6f71a3406e9..0a1f06418bf4 100644
+--- a/sound/soc/stm/stm32_sai.c
++++ b/sound/soc/stm/stm32_sai.c
+@@ -28,16 +28,6 @@
  
- Optional properties:
-   - resets: Reference to a reset controller asserting the SAI
--  - st,sync: specify synchronization mode.
--	By default SAI sub-block is in asynchronous mode.
--	This property sets SAI sub-block as slave of another SAI sub-block.
--	Must contain the phandle and index of the sai sub-block providing
--	the synchronization.
+ #include "stm32_sai.h"
  
- SAI subnodes:
- Two subnodes corresponding to SAI sub-block instances A et B can be defined.
-@@ -44,6 +39,13 @@ SAI subnodes required properties:
-   - pinctrl-names: should contain only value "default"
-   - pinctrl-0: see Documentation/devicetree/bindings/pinctrl/pinctrl-stm32.txt
+-static LIST_HEAD(sync_providers);
+-static DEFINE_MUTEX(sync_mutex);
+-
+-struct sync_provider {
+-	struct list_head link;
+-	struct device_node *node;
+-	int  (*sync_conf)(void *data, int synco);
+-	void *data;
+-};
+-
+ static const struct stm32_sai_conf stm32_sai_conf_f4 = {
+ 	.version = SAI_STM32F4,
+ };
+@@ -70,9 +60,8 @@ static int stm32_sai_sync_conf_client(struct stm32_sai_data *sai, int synci)
+ 	return 0;
+ }
  
-+SAI subnodes Optional properties:
-+  - st,sync: specify synchronization mode.
-+	By default SAI sub-block is in asynchronous mode.
-+	This property sets SAI sub-block as slave of another SAI sub-block.
-+	Must contain the phandle and index of the sai sub-block providing
-+	the synchronization.
-+
- The device node should contain one 'port' child node with one child 'endpoint'
- node, according to the bindings defined in Documentation/devicetree/bindings/
- graph.txt.
+-static int stm32_sai_sync_conf_provider(void *data, int synco)
++static int stm32_sai_sync_conf_provider(struct stm32_sai_data *sai, int synco)
+ {
+-	struct stm32_sai_data *sai = (struct stm32_sai_data *)data;
+ 	u32 prev_synco;
+ 	int ret;
+ 
+@@ -103,73 +92,34 @@ static int stm32_sai_sync_conf_provider(void *data, int synco)
+ 	return 0;
+ }
+ 
+-static int stm32_sai_set_sync_provider(struct device_node *np, int synco)
++static int stm32_sai_set_sync(struct stm32_sai_data *sai_client,
++			      struct device_node *np_provider,
++			      int synco, int synci)
+ {
+-	struct sync_provider *provider;
++	struct platform_device *pdev = of_find_device_by_node(np_provider);
++	struct stm32_sai_data *sai_provider;
+ 	int ret;
+ 
+-	mutex_lock(&sync_mutex);
+-	list_for_each_entry(provider, &sync_providers, link) {
+-		if (provider->node == np) {
+-			ret = provider->sync_conf(provider->data, synco);
+-			mutex_unlock(&sync_mutex);
+-			return ret;
+-		}
++	if (!pdev) {
++		dev_err(&sai_client->pdev->dev,
++			"Device not found for node %s\n", np_provider->name);
++		return -ENODEV;
+ 	}
+-	mutex_unlock(&sync_mutex);
+ 
+-	/* SAI sync provider not found */
+-	return -ENODEV;
+-}
+-
+-static int stm32_sai_set_sync(struct stm32_sai_data *sai,
+-			      struct device_node *np_provider,
+-			      int synco, int synci)
+-{
+-	int ret;
++	sai_provider = platform_get_drvdata(pdev);
++	if (!sai_provider) {
++		dev_err(&sai_client->pdev->dev,
++			"SAI sync provider data not found\n");
++		return -EINVAL;
++	}
+ 
+ 	/* Configure sync client */
+-	stm32_sai_sync_conf_client(sai, synci);
++	ret = stm32_sai_sync_conf_client(sai_client, synci);
++	if (ret < 0)
++		return ret;
+ 
+ 	/* Configure sync provider */
+-	ret = stm32_sai_set_sync_provider(np_provider, synco);
+-
+-	return ret;
+-}
+-
+-static int stm32_sai_sync_add_provider(struct platform_device *pdev,
+-				       void *data)
+-{
+-	struct sync_provider *sp;
+-
+-	sp = devm_kzalloc(&pdev->dev, sizeof(*sp), GFP_KERNEL);
+-	if (!sp)
+-		return -ENOMEM;
+-
+-	sp->node = of_node_get(pdev->dev.of_node);
+-	sp->data = data;
+-	sp->sync_conf = &stm32_sai_sync_conf_provider;
+-
+-	mutex_lock(&sync_mutex);
+-	list_add(&sp->link, &sync_providers);
+-	mutex_unlock(&sync_mutex);
+-
+-	return 0;
+-}
+-
+-static void stm32_sai_sync_del_provider(struct device_node *np)
+-{
+-	struct sync_provider *sp;
+-
+-	mutex_lock(&sync_mutex);
+-	list_for_each_entry(sp, &sync_providers, link) {
+-		if (sp->node == np) {
+-			list_del(&sp->link);
+-			of_node_put(sp->node);
+-			break;
+-		}
+-	}
+-	mutex_unlock(&sync_mutex);
++	return stm32_sai_sync_conf_provider(sai_provider, synco);
+ }
+ 
+ static int stm32_sai_probe(struct platform_device *pdev)
+@@ -179,7 +129,6 @@ static int stm32_sai_probe(struct platform_device *pdev)
+ 	struct reset_control *rst;
+ 	struct resource *res;
+ 	const struct of_device_id *of_id;
+-	int ret;
+ 
+ 	sai = devm_kzalloc(&pdev->dev, sizeof(*sai), GFP_KERNEL);
+ 	if (!sai)
+@@ -231,27 +180,17 @@ static int stm32_sai_probe(struct platform_device *pdev)
+ 		reset_control_deassert(rst);
+ 	}
+ 
+-	ret = stm32_sai_sync_add_provider(pdev, sai);
+-	if (ret < 0)
+-		return ret;
+-	sai->set_sync = &stm32_sai_set_sync;
+-
+ 	sai->pdev = pdev;
++	sai->set_sync = &stm32_sai_set_sync;
+ 	platform_set_drvdata(pdev, sai);
+ 
+-	ret = of_platform_populate(np, NULL, NULL, &pdev->dev);
+-	if (ret < 0)
+-		stm32_sai_sync_del_provider(np);
+-
+-	return ret;
++	return of_platform_populate(np, NULL, NULL, &pdev->dev);
+ }
+ 
+ static int stm32_sai_remove(struct platform_device *pdev)
+ {
+ 	of_platform_depopulate(&pdev->dev);
+ 
+-	stm32_sai_sync_del_provider(pdev->dev.of_node);
+-
+ 	return 0;
+ }
+ 
 -- 
 2.15.0
