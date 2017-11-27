@@ -1,137 +1,234 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Mon, 27 Nov 2017 18:01:03 +0800
-Subject: [PATCH V6 00/12] add clock driver for Spreadtrum platforms
-Message-ID: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
+Date: Mon, 27 Nov 2017 18:01:05 +0800
+Subject: [PATCH V6 02/12] clk: sprd: Add common infrastructure
+In-Reply-To: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
+References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171127100115.20655-3-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Chunyan Zhang <zhang.chunyan@linaro.org>
+Added Spreadtrum's clock driver framework together with common
+structures and interface functions.
 
-This series adds Spreadtrum clock support together with its binding
-documentation and devicetree data.
-
-This patchset also added a few common clock mactos into drivers/clk/clk_common.h,
-which are generally useful for all vendors' clock driver, sunxi-ng, zte, sprd
-(added in this patchse) use them (or part of them) at present, once this patchset
-is merged, I can help to remove the duplicated code which is under the vendors'
-respective directories.
-
-Thanks,
-Chunyan
-
-Changes from V5: (https://lkml.org/lkml/2017/11/20/21)
-* Rebased the whole patch-set to 4.15-rc1;
-* Fixed kbuild-test warnings;
-* Switched to use devm_clk_hw_register() instead of clk_hw_register();
-* Removed useless debug information from sc9860-clk.c.
-  
-Changes from V4: (https://lkml.org/lkml/2017/11/10/30)
-* Added acked-by of Rob Herring;
-* Removed spin lock from Spreadtrum's gate, mux, div drivers, since we have
-  switched to use regmap.
-
-Changes from V3: (https://lkml.org/lkml/2017/11/2/61)
-* Addressed comments from Julien Thierry:
-  - Clean the if branch of sprd_mux_helper_get_parent()
-  - Have the Gate clock macros and ops for both mode (i.e. sc_gate and gate) separate;
-  - Have the Mux clock macros with/without table separate, and same changes
-    for the composite clock.
-* Switched the function name from _endisable to _toggle;
-* Fixed Kbuild test error:
-  - Added exporting sprd_clk_regmap_init() which would be used in other module(s);
-* Change the function sprd_clk_set_regmap() to the static one, and removed the
-  declear from the include file;
-* Addressed comments from Rob:
-  - Separate the dt-binding include file from the driver patch;
-  - Documented more for the property "clocks"
-* Changed the syscon device names;
-* Changed the name of 'sprd_mux_internal' to 'sprd_mux_ssel'
-  
-
-Changes from V2: (http://lkml.iu.edu/hypermail/linux/kernel/1707.1/01504.html)
-* Switch to use regmap to access registers;
-* Splited all clocks into 16 separated nodes, for each belongs to a single address area; 
-* Rearranged the order of clock declaration in sc9860-clk.c, sorted them upon the address area;
-* Added syscon device tree nodes which will be quoted by the node of clocks which are in
-  the same address area with the syscon device;
-* Revised the binding documentation according to the dt modification. 
-
-Changes from V1: (https://lkml.org/lkml/2017/6/17/356)
-* Address Stephen's comments:
-  - Switch to use platform device driver instead of the DT probing mechanism.
-  - Move the common clock macro out from vendor directory, but need to remove those
-    overlap code from other vendors (such as sunxi-ng) once this get merged.
-  - Add support to be built as a module.
-  - Add 'sprd_' prefix for all spin locks used in these drivers.
-  - Mark input parameter of sprd_x with const.
-  - Remove unreasonable dependencies to CONFIG_64BIT.
-  - Add readl() after writing the same register.
-  - Remove CLK_IS_BASIC which is no longer used.
-  - Remove unnecessery CLK_IGNORE_UNUSED when defining a clock.
-  - Change to expose all clock index.
-  - Use clk_ instead of ccu.
-  - Add Kconfig for sprd clocks.
-  - Move the fixed clocks out from the soc node.
-  - Switch to use 64-bit math in pll driver instead of 32-bit math.
-* Revise binding documentation according to dt modification.
-* Rename sc9860.c to sc9860-clk.c
-
-
-Chunyan Zhang (12):
-  drivers: move clock common macros out from vendor directories
-  clk: sprd: Add common infrastructure
-  clk: sprd: add gate clock support
-  clk: sprd: add mux clock support
-  clk: sprd: add divider clock support
-  clk: sprd: add composite clock support
-  clk: sprd: add adjustable pll support
-  dt-bindings: Add Spreadtrum clock binding documentation
-  clk: sprd: Add dt-bindings include file for SC9860
-  clk: sprd: add clocks support for SC9860
-  arm64: dts: add syscon for whale2 platform
-  arm64: dts: add clocks for SC9860
-
- Documentation/devicetree/bindings/clock/sprd.txt |   63 +
- arch/arm64/boot/dts/sprd/sc9860.dtsi             |  115 ++
- arch/arm64/boot/dts/sprd/whale2.dtsi             |   48 +-
- drivers/clk/Kconfig                              |    1 +
- drivers/clk/Makefile                             |    1 +
- drivers/clk/clk_common.h                         |   60 +
- drivers/clk/sprd/Kconfig                         |   14 +
- drivers/clk/sprd/Makefile                        |   11 +
- drivers/clk/sprd/common.c                        |   99 ++
- drivers/clk/sprd/common.h                        |   52 +
- drivers/clk/sprd/composite.c                     |   62 +
- drivers/clk/sprd/composite.h                     |   53 +
- drivers/clk/sprd/div.c                           |   92 +
- drivers/clk/sprd/div.h                           |   77 +
- drivers/clk/sprd/gate.c                          |  113 ++
- drivers/clk/sprd/gate.h                          |   61 +
- drivers/clk/sprd/mux.c                           |   78 +
- drivers/clk/sprd/mux.h                           |   76 +
- drivers/clk/sprd/pll.c                           |  268 +++
- drivers/clk/sprd/pll.h                           |  110 ++
- drivers/clk/sprd/sc9860-clk.c                    | 1981 ++++++++++++++++++++++
- include/dt-bindings/clock/sprd,sc9860-clk.h      |  408 +++++
- 22 files changed, 3841 insertions(+), 2 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/clock/sprd.txt
- create mode 100644 drivers/clk/clk_common.h
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ drivers/clk/Kconfig       |  1 +
+ drivers/clk/Makefile      |  1 +
+ drivers/clk/sprd/Kconfig  |  4 ++
+ drivers/clk/sprd/Makefile |  3 ++
+ drivers/clk/sprd/common.c | 99 +++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sprd/common.h | 52 +++++++++++++++++++++++++
+ 6 files changed, 160 insertions(+)
  create mode 100644 drivers/clk/sprd/Kconfig
  create mode 100644 drivers/clk/sprd/Makefile
  create mode 100644 drivers/clk/sprd/common.c
  create mode 100644 drivers/clk/sprd/common.h
- create mode 100644 drivers/clk/sprd/composite.c
- create mode 100644 drivers/clk/sprd/composite.h
- create mode 100644 drivers/clk/sprd/div.c
- create mode 100644 drivers/clk/sprd/div.h
- create mode 100644 drivers/clk/sprd/gate.c
- create mode 100644 drivers/clk/sprd/gate.h
- create mode 100644 drivers/clk/sprd/mux.c
- create mode 100644 drivers/clk/sprd/mux.h
- create mode 100644 drivers/clk/sprd/pll.c
- create mode 100644 drivers/clk/sprd/pll.h
- create mode 100644 drivers/clk/sprd/sc9860-clk.c
- create mode 100644 include/dt-bindings/clock/sprd,sc9860-clk.h
 
+diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
+index 1c4e1aa..ce1a32be 100644
+--- a/drivers/clk/Kconfig
++++ b/drivers/clk/Kconfig
+@@ -236,6 +236,7 @@ source "drivers/clk/mvebu/Kconfig"
+ source "drivers/clk/qcom/Kconfig"
+ source "drivers/clk/renesas/Kconfig"
+ source "drivers/clk/samsung/Kconfig"
++source "drivers/clk/sprd/Kconfig"
+ source "drivers/clk/sunxi-ng/Kconfig"
+ source "drivers/clk/tegra/Kconfig"
+ source "drivers/clk/ti/Kconfig"
+diff --git a/drivers/clk/Makefile b/drivers/clk/Makefile
+index f7f761b..d880d13 100644
+--- a/drivers/clk/Makefile
++++ b/drivers/clk/Makefile
+@@ -85,6 +85,7 @@ obj-$(CONFIG_COMMON_CLK_SAMSUNG)	+= samsung/
+ obj-$(CONFIG_ARCH_SIRF)			+= sirf/
+ obj-$(CONFIG_ARCH_SOCFPGA)		+= socfpga/
+ obj-$(CONFIG_PLAT_SPEAR)		+= spear/
++obj-$(CONFIG_ARCH_SPRD)			+= sprd/
+ obj-$(CONFIG_ARCH_STI)			+= st/
+ obj-$(CONFIG_ARCH_SUNXI)		+= sunxi/
+ obj-$(CONFIG_ARCH_SUNXI)		+= sunxi-ng/
+diff --git a/drivers/clk/sprd/Kconfig b/drivers/clk/sprd/Kconfig
+new file mode 100644
+index 0000000..67a3287
+--- /dev/null
++++ b/drivers/clk/sprd/Kconfig
+@@ -0,0 +1,4 @@
++config SPRD_COMMON_CLK
++	tristate "Clock support for Spreadtrum SoCs"
++	depends on ARCH_SPRD || COMPILE_TEST
++	default ARCH_SPRD
+diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
+new file mode 100644
+index 0000000..74f4b80
+--- /dev/null
++++ b/drivers/clk/sprd/Makefile
+@@ -0,0 +1,3 @@
++obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
++
++clk-sprd-y	+= common.o
+diff --git a/drivers/clk/sprd/common.c b/drivers/clk/sprd/common.c
+new file mode 100644
+index 0000000..4e38b74a
+--- /dev/null
++++ b/drivers/clk/sprd/common.c
+@@ -0,0 +1,99 @@
++/*
++ * Spreadtrum clock infrastructure
++ *
++ * Copyright (C) 2017 Spreadtrum, Inc.
++ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/of_address.h>
++#include <linux/of_platform.h>
++#include <linux/regmap.h>
++
++#include "common.h"
++
++static const struct regmap_config sprdclk_regmap_config = {
++	.reg_bits	= 32,
++	.reg_stride	= 4,
++	.val_bits	= 32,
++	.max_register	= 0xffff,
++	.fast_io	= true,
++};
++
++static void sprd_clk_set_regmap(const struct sprd_clk_desc *desc,
++			 struct regmap *regmap)
++{
++	int i;
++	struct sprd_clk_common *cclk;
++
++	for (i = 0; i < desc->num_clk_clks; i++) {
++		cclk = desc->clk_clks[i];
++		if (!cclk)
++			continue;
++
++		cclk->regmap = regmap;
++	}
++}
++
++int sprd_clk_regmap_init(struct platform_device *pdev,
++			 const struct sprd_clk_desc *desc)
++{
++	void __iomem *base;
++	struct device_node *node = pdev->dev.of_node;
++	struct regmap *regmap = NULL;
++
++	if (of_find_property(node, "sprd,syscon", NULL)) {
++		regmap = syscon_regmap_lookup_by_phandle(node, "sprd,syscon");
++		if (IS_ERR(regmap)) {
++			pr_err("%s: failed to get syscon regmap\n", __func__);
++			return PTR_ERR(regmap);
++		}
++	} else {
++		base = of_iomap(node, 0);
++		regmap = devm_regmap_init_mmio(&pdev->dev, base,
++					       &sprdclk_regmap_config);
++		if (IS_ERR(regmap)) {
++			pr_err("failed to init regmap.\n");
++			return PTR_ERR(regmap);
++		}
++	}
++
++	sprd_clk_set_regmap(desc, regmap);
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(sprd_clk_regmap_init);
++
++int sprd_clk_probe(struct device *dev, struct clk_hw_onecell_data *clkhw)
++{
++	int i, ret = 0;
++	struct clk_hw *hw;
++
++	for (i = 0; i < clkhw->num; i++) {
++
++		hw = clkhw->hws[i];
++
++		if (!hw)
++			continue;
++
++		ret = devm_clk_hw_register(dev, hw);
++		if (ret) {
++			dev_err(dev, "Couldn't register clock %d - %s\n",
++				i, hw->init->name);
++			return ret;
++		}
++	}
++
++	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
++				     clkhw);
++	if (ret)
++		dev_err(dev, "Failed to add clock provider.\n");
++
++	return ret;
++}
++EXPORT_SYMBOL_GPL(sprd_clk_probe);
++
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/clk/sprd/common.h b/drivers/clk/sprd/common.h
+new file mode 100644
+index 0000000..8cd774e
+--- /dev/null
++++ b/drivers/clk/sprd/common.h
+@@ -0,0 +1,52 @@
++/*
++ * Spreadtrum clock infrastructure
++ *
++ * Copyright (C) 2017 Spreadtrum, Inc.
++ * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
++
++#ifndef _SPRD_CLK_COMMON_H_
++#define _SPRD_CLK_COMMON_H_
++
++#include <linux/clk-provider.h>
++#include <linux/of_platform.h>
++#include <linux/regmap.h>
++
++#include "../clk_common.h"
++
++struct device_node;
++
++struct sprd_clk_common {
++	struct regmap	*regmap;
++	u32		reg;
++	struct clk_hw	hw;
++};
++
++struct sprd_clk_desc {
++	struct sprd_clk_common		**clk_clks;
++	unsigned long			num_clk_clks;
++	struct clk_hw_onecell_data      *hw_clks;
++};
++
++#define sprd_regmap_read(map, reg, val)				\
++({								\
++	(map) ? regmap_read((map), (reg), (val)) : (-EINVAL);	\
++})
++
++#define sprd_regmap_write(map, reg, val)			\
++({								\
++	(map) ? regmap_write((map), (reg), (val)) : (-EINVAL);	\
++})
++
++static inline struct sprd_clk_common *
++	hw_to_sprd_clk_common(const struct clk_hw *hw)
++{
++	return container_of(hw, struct sprd_clk_common, hw);
++}
++int sprd_clk_regmap_init(struct platform_device *pdev,
++			 const struct sprd_clk_desc *desc);
++int sprd_clk_probe(struct device *dev, struct clk_hw_onecell_data *clkhw);
++
++#endif /* _SPRD_CLK_COMMON_H_ */
 -- 
 2.7.4
