@@ -1,50 +1,30 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 27 Nov 2017 13:11:39 +0100
-Subject: [PATCH] ARM: imx: don't abort MMDC probe if power saving status
- doesn't match
-Message-ID: <20171127121139.15584-1-l.stach@pengutronix.de>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Mon, 27 Nov 2017 17:44:06 +0530
+Subject: [PATCH 1/2] ARM: davinci: make the function argument as const
+In-Reply-To: <1508148504-2771-2-git-send-email-bhumirks@gmail.com>
+References: <1508148504-2771-1-git-send-email-bhumirks@gmail.com>
+ <1508148504-2771-2-git-send-email-bhumirks@gmail.com>
+Message-ID: <0f817e2b-2251-7473-a60b-46ff66c0e77e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power saving status bit will not signal if the MMDC is under load,
-which is likely during kernel boot. There is no point in checking this
-bit and aborting the probe, as there is nothing depending on power
-saving being enabled, so we can trust the memory controller to enable
-power saving when we allow it.
+On Monday 16 October 2017 03:38 PM, Bhumika Goyal wrote:
+> Make the function argument of the function davinci_common_init
+> as const as it's memory contents are only copied during a
+> memcpy call. So, the fields of the structure to which the argument
+> soc_info points to never gets modified and therefore the argument can
+> be made const.
+> Add const to the prototype too.
+> 
+> Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/mach-imx/mmdc.c | 11 -----------
- 1 file changed, 11 deletions(-)
+The subject line is written too generically. I changed that to
 
-diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-index 78262899a590..5fb1d2254b5e 100644
---- a/arch/arm/mach-imx/mmdc.c
-+++ b/arch/arm/mach-imx/mmdc.c
-@@ -547,7 +547,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
- 	struct device_node *np = pdev->dev.of_node;
- 	void __iomem *mmdc_base, *reg;
- 	u32 val;
--	int timeout = 0x400;
- 
- 	mmdc_base = of_iomap(np, 0);
- 	WARN_ON(!mmdc_base);
-@@ -565,16 +564,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
- 	val &= ~(1 << BP_MMDC_MAPSR_PSD);
- 	writel_relaxed(val, reg);
- 
--	/* Ensure it's successfully enabled */
--	while (!(readl_relaxed(reg) & 1 << BP_MMDC_MAPSR_PSS) && --timeout)
--		cpu_relax();
--
--	if (unlikely(!timeout)) {
--		pr_warn("%s: failed to enable automatic power saving\n",
--			__func__);
--		return -EBUSY;
--	}
--
- 	return imx_mmdc_perf_init(pdev, mmdc_base);
- }
- 
--- 
-2.11.0
+"
+ARM: davinci: make argument to davinci_common_init() as const
+"
+
+while applying to v4.16/fixes-non-critical
+
+Thanks,
+Sekhar
