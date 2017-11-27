@@ -1,56 +1,367 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Mon, 27 Nov 2017 17:53:01 +0100
-Subject: [PATCH 01/15] KVM: Prepare for moving vcpu_load/vcpu_put into
- arch specific code
-In-Reply-To: <20171125205718.7731-2-christoffer.dall@linaro.org>
-References: <20171125205718.7731-1-christoffer.dall@linaro.org>
- <20171125205718.7731-2-christoffer.dall@linaro.org>
-Message-ID: <838db374-6040-c805-82f3-187a2cdfc40d@redhat.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Mon, 27 Nov 2017 16:52:25 +0000
+Subject: [PATCH 04/13] ARM: dts: imx6qdl-microsom: split out Broadcom Wi-Fi
+ support
+In-Reply-To: <20171127165134.GH31757@n2100.armlinux.org.uk>
+References: <20171127165134.GH31757@n2100.armlinux.org.uk>
+Message-ID: <E1eJMdt-0002qq-6W@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/11/2017 21:57, Christoffer Dall wrote:
-> In preparation for moving calls to vcpu_load() and vcpu_put() into the
-> architecture specific implementations of the KVM vcpu ioctls, move the
-> calls in the main kvm_vcpu_ioctl() dispatcher function to each case
-> of the ioctl select statement.  This allows us to move the vcpu_load()
-> and vcpu_put() calls into architecture specific implementations of vcpu
-> ioctls, one by one.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/kvm_main.c | 53 ++++++++++++++++++++++++++++++++++++++++++++++++-----
->  1 file changed, 48 insertions(+), 5 deletions(-)
-> 
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index 9deb5a245b83..fafafcc38b5a 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -2528,16 +2528,15 @@ static long kvm_vcpu_ioctl(struct file *filp,
->  		return kvm_arch_vcpu_ioctl(filp, ioctl, arg);
->  #endif
->  
-> -
-> -	r = vcpu_load(vcpu);
-> -	if (r)
-> -		return r;
->  	switch (ioctl) {
->  	case KVM_RUN: {
->  		struct pid *oldpid;
->  		r = -EINVAL;
->  		if (arg)
->  			goto out;
-> +		r = vcpu_load(vcpu);
-> +		if (r)
-> +			goto out;
->  		oldpid = rcu_access_pointer(vcpu->pid);
+There are two variants of the imx6qdl microsom: one with Broadcom Wi-Fi
+and another with Texas Instruments Wi-Fi.  The two Wi-Fi devices require
+different DT bindings, so it's necessary to split out the Broadcom
+specifics.
 
-If it is not a problem for ARM, maybe it would actually be best to leave
-the locking in kvm_vcpu_ioctl (with the already existing exception of
-KVM_INTERRUPT).  This would make vcpu_load void, and would also let you
-keep the PID adjustment in common code.  This would be more similar to
-the previous version, but without introducing __vcpu_load/__vcpu_put.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/imx6dl-cubox-i.dts         |   1 +
+ arch/arm/boot/dts/imx6dl-hummingboard.dts    |   1 +
+ arch/arm/boot/dts/imx6q-cubox-i.dts          |   1 +
+ arch/arm/boot/dts/imx6q-h100.dts             |   1 +
+ arch/arm/boot/dts/imx6q-hummingboard.dts     |   1 +
+ arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi | 144 +++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi      |  99 ------------------
+ 7 files changed, 149 insertions(+), 99 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi
 
-Looks good apart from this doubt!  Thanks,
-
-Paolo
+diff --git a/arch/arm/boot/dts/imx6dl-cubox-i.dts b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+index 222c269f687a..4d5bea875ded 100644
+--- a/arch/arm/boot/dts/imx6dl-cubox-i.dts
++++ b/arch/arm/boot/dts/imx6dl-cubox-i.dts
+@@ -42,6 +42,7 @@
+ 
+ #include "imx6dl.dtsi"
+ #include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-microsom-brcm.dtsi"
+ #include "imx6qdl-cubox-i.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+index 1709810de77e..fb16e1dc1e92 100644
+--- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
++++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
+@@ -43,6 +43,7 @@
+ 
+ #include "imx6dl.dtsi"
+ #include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-microsom-brcm.dtsi"
+ #include "imx6qdl-hummingboard.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
+index 8f39682c33a9..1c1542241e2b 100644
+--- a/arch/arm/boot/dts/imx6q-cubox-i.dts
++++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
+@@ -42,6 +42,7 @@
+ 
+ #include "imx6q.dtsi"
+ #include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-microsom-brcm.dtsi"
+ #include "imx6qdl-cubox-i.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
+index bf5dfc9c8127..77d64284b596 100644
+--- a/arch/arm/boot/dts/imx6q-h100.dts
++++ b/arch/arm/boot/dts/imx6q-h100.dts
+@@ -43,6 +43,7 @@
+ 
+ #include "imx6q.dtsi"
+ #include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-microsom-brcm.dtsi"
+ 
+ / {
+ 	model = "Auvidea H100";
+diff --git a/arch/arm/boot/dts/imx6q-hummingboard.dts b/arch/arm/boot/dts/imx6q-hummingboard.dts
+index 6fc692940e6b..131224394ced 100644
+--- a/arch/arm/boot/dts/imx6q-hummingboard.dts
++++ b/arch/arm/boot/dts/imx6q-hummingboard.dts
+@@ -43,6 +43,7 @@
+ 
+ #include "imx6q.dtsi"
+ #include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-microsom-brcm.dtsi"
+ #include "imx6qdl-hummingboard.dtsi"
+ 
+ / {
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi b/arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi
+new file mode 100644
+index 000000000000..809d7896775c
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-microsom-brcm.dtsi
+@@ -0,0 +1,144 @@
++/*
++ * Copyright (C) 2013,2014 Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++#include <dt-bindings/gpio/gpio.h>
++/ {
++	clk_sdio: sdio-clock {
++		compatible = "gpio-gate-clock";
++		#clock-cells = <0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
++		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
++	};
++
++	reg_brcm: brcm-reg {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 19 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
++		regulator-name = "brcm_reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <200000>;
++	};
++
++	usdhc1_pwrseq: usdhc1_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>,
++			      <&gpio6 0 GPIO_ACTIVE_LOW>;
++		clocks = <&clk_sdio>;
++		clock-names = "ext_clock";
++	};
++};
++
++&iomuxc {
++	microsom {
++		pinctrl_microsom_brcm_bt: microsom-brcm-bt {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
++				MX6QDL_PAD_CSI0_DAT15__GPIO6_IO01	0x40013070
++				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_osc: microsom-brcm-osc {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_reg: microsom-brcm-reg {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x40013070
++			>;
++		};
++
++		pinctrl_microsom_brcm_wifi: microsom-brcm-wifi {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
++				MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x40013070
++				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
++				MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_uart4: microsom-uart4 {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
++			>;
++		};
++
++		pinctrl_microsom_usdhc1: microsom-usdhc1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
++				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
++				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
++			>;
++		};
++	};
++};
++
++/* UART4 - Connected to optional BRCM Wifi/BT/FM */
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_brcm_bt &pinctrl_microsom_uart4>;
++	uart-has-rtscts;
++	status = "okay";
++};
++
++/* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_brcm_wifi &pinctrl_microsom_usdhc1>;
++	bus-width = <4>;
++	mmc-pwrseq = <&usdhc1_pwrseq>;
++	keep-power-in-suspend;
++	no-1-8-v;
++	non-removable;
++	vmmc-supply = <&reg_brcm>;
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index c1541f2ecf3a..612f626a59c1 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -39,35 +39,6 @@
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+ #include <dt-bindings/gpio/gpio.h>
+-/ {
+-	clk_sdio: sdio-clock {
+-		compatible = "gpio-gate-clock";
+-		#clock-cells = <0>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_microsom_brcm_osc>;
+-		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+-	};
+-
+-	reg_brcm: brcm-reg {
+-		compatible = "regulator-fixed";
+-		enable-active-high;
+-		gpio = <&gpio3 19 0>;
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
+-		regulator-name = "brcm_reg";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		startup-delay-us = <200000>;
+-	};
+-
+-	usdhc1_pwrseq: usdhc1_pwrseq {
+-		compatible = "mmc-pwrseq-simple";
+-		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>,
+-			      <&gpio6 0 GPIO_ACTIVE_LOW>;
+-		clocks = <&clk_sdio>;
+-		clock-names = "ext_clock";
+-	};
+-};
+ 
+ &fec {
+ 	pinctrl-names = "default";
+@@ -80,35 +51,6 @@
+ 
+ &iomuxc {
+ 	microsom {
+-		pinctrl_microsom_brcm_bt: microsom-brcm-bt {
+-			fsl,pins = <
+-				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
+-				MX6QDL_PAD_CSI0_DAT15__GPIO6_IO01	0x40013070
+-				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
+-			>;
+-		};
+-
+-		pinctrl_microsom_brcm_osc: microsom-brcm-osc {
+-			fsl,pins = <
+-				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05	0x40013070
+-			>;
+-		};
+-
+-		pinctrl_microsom_brcm_reg: microsom-brcm-reg {
+-			fsl,pins = <
+-				MX6QDL_PAD_EIM_D19__GPIO3_IO19		0x40013070
+-			>;
+-		};
+-
+-		pinctrl_microsom_brcm_wifi: microsom-brcm-wifi {
+-			fsl,pins = <
+-				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
+-				MX6QDL_PAD_CSI0_DATA_EN__GPIO5_IO20	0x40013070
+-				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
+-				MX6QDL_PAD_CSI0_DAT9__GPIO5_IO27	0x40013070
+-			>;
+-		};
+-
+ 		pinctrl_microsom_enet_ar8035: microsom-enet-ar8035 {
+ 			fsl,pins = <
+ 				MX6QDL_PAD_ENET_MDIO__ENET_MDIO		0x1b8b0
+@@ -159,26 +101,6 @@
+ 				MX6QDL_PAD_CSI0_DAT11__UART1_RX_DATA	0x1b0b1
+ 			>;
+ 		};
+-
+-		pinctrl_microsom_uart4: microsom-uart4 {
+-			fsl,pins = <
+-				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
+-				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
+-				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
+-				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
+-			>;
+-		};
+-
+-		pinctrl_microsom_usdhc1: microsom-usdhc1 {
+-			fsl,pins = <
+-				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
+-				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
+-				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
+-				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
+-				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
+-				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
+-			>;
+-		};
+ 	};
+ };
+ 
+@@ -187,24 +109,3 @@
+ 	pinctrl-0 = <&pinctrl_microsom_uart1>;
+ 	status = "okay";
+ };
+-
+-/* UART4 - Connected to optional BRCM Wifi/BT/FM */
+-&uart4 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_microsom_brcm_bt &pinctrl_microsom_uart4>;
+-	uart-has-rtscts;
+-	status = "okay";
+-};
+-
+-/* USDHC1 - Connected to optional BRCM Wifi/BT/FM */
+-&usdhc1 {
+-	pinctrl-names = "default";
+-	pinctrl-0 = <&pinctrl_microsom_brcm_wifi &pinctrl_microsom_usdhc1>;
+-	bus-width = <4>;
+-	mmc-pwrseq = <&usdhc1_pwrseq>;
+-	keep-power-in-suspend;
+-	no-1-8-v;
+-	non-removable;
+-	vmmc-supply = <&reg_brcm>;
+-	status = "okay";
+-};
+-- 
+2.7.4
