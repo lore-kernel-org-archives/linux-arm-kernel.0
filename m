@@ -1,55 +1,37 @@
-From: mhiramat@kernel.org (Masami Hiramatsu)
-Date: Mon, 27 Nov 2017 18:54:08 +0900
-Subject: [PATCH 2/2] selftest: ftrace: Fix to add 256 kprobe events correctly
-In-Reply-To: <151177638973.11564.2545351695862460866.stgit@devbox>
-References: <151177638973.11564.2545351695862460866.stgit@devbox>
-Message-ID: <151177644794.11564.534512133433506021.stgit@devbox>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Mon, 27 Nov 2017 09:56:58 +0000
+Subject: [PATCH] ARM: NOMMU: Allow userspace to access background MPU region
+Message-ID: <1511776618-9018-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current multiple-kprobe testcase only tries to add
-kprobe events on first 256 text symbols. However
-kprobes fails to probe on some text symbols (like
-blacklisted symbols). Thus in the worst case,
-the test can not add any kprobe events.
+Currently, with MPU enabled, we prohibit userspace access to anything
+except RAM. Benjamin, reported that because of that his userspace
+application cannot access framebuffer's memory he reserved in device
+tree. It turns out we have no option other than to allow userspace
+access memory covered by background region.
 
-To avoid that, continue to try adding kprobe events
-until 256 events. Also it confirms the number of
-registered kprobe events.
-
-Signed-off-by: Masami Hiramatsu <mhiramat@kernel.org>
+Reported-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Tested-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
 ---
- .../ftrace/test.d/kprobe/multiple_kprobes.tc       |   19 +++++++++++++++++--
- 1 file changed, 17 insertions(+), 2 deletions(-)
+KernelVersion: 4.15-rc1
 
-diff --git a/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc b/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc
-index e297bd7a2e79..ce361b9d62cf 100644
---- a/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc
-+++ b/tools/testing/selftests/ftrace/test.d/kprobe/multiple_kprobes.tc
-@@ -12,9 +12,24 @@ case `uname -m` in
-   *) OFFS=0;;
- esac
+ arch/arm/mm/pmsa-v7.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/mm/pmsa-v7.c b/arch/arm/mm/pmsa-v7.c
+index 976df60..6509989 100644
+--- a/arch/arm/mm/pmsa-v7.c
++++ b/arch/arm/mm/pmsa-v7.c
+@@ -433,7 +433,7 @@ void __init mpu_setup(void)
  
--echo "Setup up kprobes on first 256 text symbols"
-+if [ -d events/kprobes ]; then
-+  echo 0 > events/kprobes/enable
-+  echo > kprobe_events
-+fi
-+
-+N=0
-+echo "Setup up kprobes on first available 256 text symbols"
- grep -i " t " /proc/kallsyms | cut -f3 -d" " | grep -v .*\\..* | \
--head -n 256 | while read i; do echo p ${i}+${OFFS} ; done > kprobe_events ||:
-+while read i; do
-+  echo p ${i}+${OFFS} >> kprobe_events && N=$((N+1)) ||:
-+  test $N -eq 256 && break
-+done
-+
-+L=`wc -l kprobe_events`
-+if [ $L -ne $N ]; then
-+  echo "The number of kprobes events ($L) is not $N"
-+  exit_fail
-+fi
+ 	/* Background */
+ 	err |= mpu_setup_region(region++, 0, 32,
+-				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0NA,
++				MPU_ACR_XN | MPU_RGN_STRONGLY_ORDERED | MPU_AP_PL1RW_PL0RW,
+ 				0, false);
  
- echo 1 > events/kprobes/enable
- echo 0 > events/kprobes/enable
+ #ifdef CONFIG_XIP_KERNEL
+-- 
+1.9.1
