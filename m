@@ -1,9 +1,9 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 27 Nov 2017 11:57:39 -0500
-Subject: [PATCH V3 02/29] powerpc/PCI: deprecate pci_get_bus_and_slot()
+Date: Mon, 27 Nov 2017 11:58:01 -0500
+Subject: [PATCH V3 24/29] backlight: deprecate pci_get_bus_and_slot()
 In-Reply-To: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
 References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1511801886-6753-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1511801886-6753-25-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,65 +14,26 @@ reused for other domain numbers.
 Getting ready to remove pci_get_bus_and_slot() function in favor of
 pci_get_domain_bus_and_slot().
 
-Use pci_get_domain_bus_and_slot() with a domain number of 0 as the code
-is not ready to consume multiple domains and existing code used domain
-number 0.
+Hard-coding the domain as 0.
 
+Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/powerpc/kernel/pci_32.c              | 3 ++-
- arch/powerpc/platforms/powermac/feature.c | 2 +-
- arch/powerpc/sysdev/mv64x60_pci.c         | 4 ++--
- 3 files changed, 5 insertions(+), 4 deletions(-)
+ drivers/video/backlight/apple_bl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/powerpc/kernel/pci_32.c b/arch/powerpc/kernel/pci_32.c
-index 1d817f4..85ad2f7 100644
---- a/arch/powerpc/kernel/pci_32.c
-+++ b/arch/powerpc/kernel/pci_32.c
-@@ -96,7 +96,8 @@
- 		reg = of_get_property(node, "reg", NULL);
- 		if (!reg)
- 			continue;
--		dev = pci_get_bus_and_slot(pci_bus, ((reg[0] >> 8) & 0xff));
-+		dev = pci_get_domain_bus_and_slot(0, pci_bus,
-+						  ((reg[0] >> 8) & 0xff));
- 		if (!dev || !dev->subordinate) {
- 			pci_dev_put(dev);
- 			continue;
-diff --git a/arch/powerpc/platforms/powermac/feature.c b/arch/powerpc/platforms/powermac/feature.c
-index 9e3f39d..ed8b166 100644
---- a/arch/powerpc/platforms/powermac/feature.c
-+++ b/arch/powerpc/platforms/powermac/feature.c
-@@ -829,7 +829,7 @@ static long core99_scc_enable(struct device_node *node, long param, long value)
+diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
+index d843296..6a34ab9 100644
+--- a/drivers/video/backlight/apple_bl.c
++++ b/drivers/video/backlight/apple_bl.c
+@@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
+ 	struct pci_dev *host;
+ 	int intensity;
  
- 	if (value) {
- 		if (pci_device_from_OF_node(node, &pbus, &pid) == 0)
--			pdev = pci_get_bus_and_slot(pbus, pid);
-+			pdev = pci_get_domain_bus_and_slot(0, pbus, pid);
- 		if (pdev == NULL)
- 			return 0;
- 		rc = pci_enable_device(pdev);
-diff --git a/arch/powerpc/sysdev/mv64x60_pci.c b/arch/powerpc/sysdev/mv64x60_pci.c
-index d52b3b8..6fe9104 100644
---- a/arch/powerpc/sysdev/mv64x60_pci.c
-+++ b/arch/powerpc/sysdev/mv64x60_pci.c
-@@ -37,7 +37,7 @@ static ssize_t mv64x60_hs_reg_read(struct file *filp, struct kobject *kobj,
- 	if (count < MV64X60_VAL_LEN_MAX)
- 		return -EINVAL;
+-	host = pci_get_bus_and_slot(0, 0);
++	host = pci_get_domain_bus_and_slot(0, 0, 0);
  
--	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
- 	if (!phb)
- 		return -ENODEV;
- 	pci_read_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, &v);
-@@ -61,7 +61,7 @@ static ssize_t mv64x60_hs_reg_write(struct file *filp, struct kobject *kobj,
- 	if (sscanf(buf, "%i", &v) != 1)
- 		return -EINVAL;
- 
--	phb = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-+	phb = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
- 	if (!phb)
- 		return -ENODEV;
- 	pci_write_config_dword(phb, MV64X60_PCICFG_CPCI_HOTSWAP, v);
+ 	if (!host) {
+ 		pr_err("unable to find PCI host\n");
 -- 
 1.9.1
