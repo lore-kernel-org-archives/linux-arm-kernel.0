@@ -1,34 +1,38 @@
 From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Nov 2017 06:55:21 -0800
-Subject: [PATCH] ARM: OMAP2+: Missing error code in omap_device_build()
-In-Reply-To: <20171114060648.frwveus2pjpx5idw@mwanda>
-References: <20171114060648.frwveus2pjpx5idw@mwanda>
-Message-ID: <20171128145521.GX28152@atomide.com>
+Date: Tue, 28 Nov 2017 06:57:27 -0800
+Subject: [PATCH v2 2/4] DTS: GTA04: fix panel compatibility string
+In-Reply-To: <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
+References: <cover.1510822218.git.hns@goldelico.com>
+ <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
+Message-ID: <20171128145727.GY28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dan Carpenter <dan.carpenter@oracle.com> [171113 22:10]:
-> We need to set the error code if omap_device_alloc() fails.
+* H. Nikolaus Schaller <hns@goldelico.com> [171116 08:53]:
+> Vendor string is "tpo" and not "toppoly".
 > 
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+> ---
+>  arch/arm/boot/dts/omap3-gta04.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-> index 184acd95c216..f0388058b7da 100644
-> --- a/arch/arm/mach-omap2/omap_device.c
-> +++ b/arch/arm/mach-omap2/omap_device.c
-> @@ -514,8 +514,10 @@ struct platform_device __init *omap_device_build(const char *pdev_name,
->  		goto odbs_exit1;
+> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+> index 4504908c23fe..ec27ed67a22a 100644
+> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+> @@ -86,7 +86,7 @@
 >  
->  	od = omap_device_alloc(pdev, &oh, 1);
-> -	if (IS_ERR(od))
-> +	if (IS_ERR(od)) {
-> +		ret = PTR_ERR(od);
->  		goto odbs_exit1;
-> +	}
->  
->  	ret = platform_device_add_data(pdev, pdata, pdata_len);
->  	if (ret)
+>  		/* lcd panel */
+>  		lcd: td028ttec1 at 0 {
+> -			compatible = "toppoly,td028ttec1";
+> +			compatible = "tpo,td028ttec1";
+>  			reg = <0>;
+>  			spi-max-frequency = <100000>;
+>  			spi-cpol;
 
-Applying into omap-for-v4.15/fixes thanks.
+Applying into omap-for-v4.15/fixes thanks. The other dts patch seems
+like it can wait for v4.16 merge window.
+
+Regards,
 
 Tony
