@@ -1,42 +1,311 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 28 Nov 2017 15:03:16 +0000
-Subject: [PATCH v2 16/16] ARM: dts: imx6qdl-cubox-i: update GPIO specification
+Date: Tue, 28 Nov 2017 15:03:06 +0000
+Subject: [PATCH v2 14/16] ARM: dts: imx6qdl: SolidRun: add v1.5 som without
+ eMMC
 In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
 References: <20171128150045.GV31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJhPo-0006Om-To@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eJhPe-0006OY-LE@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fabio Estevam suggested using GPIO_ACTIVE_HIGH in the gpio specification
-for the USB regulators.  Change them to conform.
+Add Cubox-i and Hummingboard variants for v1.5 SOMs, which have TI
+Wi-Fi instead of Broadcom Wi-Fi.  This variant does not include
+SOM eMMC support.
 
-Suggested-by: Fabio Estevam <festevam@gmail.com>
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/Makefile                        |  4 ++
+ arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts      | 51 +++++++++++++++++++
+ arch/arm/boot/dts/imx6dl-hummingboard-som-v15.dts | 52 ++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts       | 59 ++++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-hummingboard-som-v15.dts  | 60 +++++++++++++++++++++++
+ 5 files changed, 226 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts
+ create mode 100644 arch/arm/boot/dts/imx6dl-hummingboard-som-v15.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-hummingboard-som-v15.dts
 
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index ca04ec56d2af..d1cfdc264126 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -73,7 +73,7 @@
- 	v_usb2: regulator-v-usb2 {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
--		gpio = <&gpio1 0 0>;
-+		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
- 		regulator-max-microvolt = <5000000>;
-@@ -85,7 +85,7 @@
- 	v_usb1: regulator-v-usb1 {
- 		compatible = "regulator-fixed";
- 		enable-active-high;
--		gpio = <&gpio3 22 0>;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
- 		pinctrl-names = "default";
- 		pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
- 		regulator-max-microvolt = <5000000>;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index d0381e9caf21..1f3d331c22c2 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -372,6 +372,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-aristainetos2_7.dtb \
+ 	imx6dl-colibri-eval-v3.dtb \
+ 	imx6dl-cubox-i.dtb \
++	imx6dl-cubox-i-som-v15.dtb \
+ 	imx6dl-dfi-fs700-m60.dtb \
+ 	imx6dl-gw51xx.dtb \
+ 	imx6dl-gw52xx.dtb \
+@@ -384,6 +385,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-gw5903.dtb \
+ 	imx6dl-gw5904.dtb \
+ 	imx6dl-hummingboard.dtb \
++	imx6dl-hummingboard-som-v15.dtb \
+ 	imx6dl-icore.dtb \
+ 	imx6dl-icore-rqs.dtb \
+ 	imx6dl-nit6xlite.dtb \
+@@ -421,6 +423,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-b850v3.dtb \
+ 	imx6q-cm-fx6.dtb \
+ 	imx6q-cubox-i.dtb \
++	imx6q-cubox-i-som-v15.dtb \
+ 	imx6q-dfi-fs700-m60.dtb \
+ 	imx6q-display5-tianma-tm070-1280x768.dtb \
+ 	imx6q-dmo-edmqmx6.dtb \
+@@ -439,6 +442,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-gw5904.dtb \
+ 	imx6q-h100.dtb \
+ 	imx6q-hummingboard.dtb \
++	imx6q-hummingboard-som-v15.dtb \
+ 	imx6q-icore.dtb \
+ 	imx6q-icore-ofcap10.dtb \
+ 	imx6q-icore-ofcap12.dtb \
+diff --git a/arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts b/arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts
+new file mode 100644
+index 000000000000..e09c565d1d1f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (C) 2014 Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-cubox-i.dtsi"
++
++/ {
++	model = "SolidRun Cubox-i Solo/DualLite (1.5som)";
++	compatible = "solidrun,cubox-i/dl", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6dl-hummingboard-som-v15.dts b/arch/arm/boot/dts/imx6dl-hummingboard-som-v15.dts
+new file mode 100644
+index 000000000000..66a06cf3cdf3
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6dl-hummingboard-som-v15.dts
+@@ -0,0 +1,52 @@
++/*
++ * Copyright (C) 2014 Rabeeh Khoury (rabeeh at solid-run.com)
++ * Based on dt work by Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6dl.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-hummingboard.dtsi"
++
++/ {
++	model = "SolidRun HummingBoard Solo/DualLite (1.5som)";
++	compatible = "solidrun,hummingboard/dl", "fsl,imx6dl";
++};
+diff --git a/arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts b/arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts
+new file mode 100644
+index 000000000000..dab70d1230a2
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts
+@@ -0,0 +1,59 @@
++/*
++ * Copyright (C) 2014 Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-cubox-i.dtsi"
++
++/ {
++	model = "SolidRun Cubox-i Dual/Quad (1.5som)";
++	compatible = "solidrun,cubox-i/q", "fsl,imx6q";
++};
++
++&sata {
++	status = "okay";
++	fsl,transmit-level-mV = <1104>;
++	fsl,transmit-boost-mdB = <0>;
++	fsl,transmit-atten-16ths = <9>;
++	fsl,no-spread-spectrum;
++};
+diff --git a/arch/arm/boot/dts/imx6q-hummingboard-som-v15.dts b/arch/arm/boot/dts/imx6q-hummingboard-som-v15.dts
+new file mode 100644
+index 000000000000..e4132d62ffa2
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-hummingboard-som-v15.dts
+@@ -0,0 +1,60 @@
++/*
++ * Copyright (C) 2014 Rabeeh Khoury (rabeeh at solid-run.com)
++ * Based on dt work by Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-sr-som.dtsi"
++#include "imx6qdl-sr-som-ti.dtsi"
++#include "imx6qdl-hummingboard.dtsi"
++
++/ {
++	model = "SolidRun HummingBoard Dual/Quad (1.5som)";
++	compatible = "solidrun,hummingboard/q", "fsl,imx6q";
++};
++
++&sata {
++	status = "okay";
++	fsl,transmit-level-mV = <1025>;
++	fsl,transmit-boost-mdB = <3330>;
++	fsl,transmit-atten-16ths = <9>;
++	fsl,receive-eq-mdB = <3000>;
++};
 -- 
 2.7.4
