@@ -1,20 +1,26 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 28 Nov 2017 22:50:44 +0100
-Subject: [PATCH v2 0/2] ARM: pxa: move pxa-i2c.h to platform_data
-In-Reply-To: <20171113172739.1996-1-wsa@the-dreams.de> (Wolfram Sang's message
- of "Mon, 13 Nov 2017 18:27:37 +0100")
-References: <20171113172739.1996-1-wsa@the-dreams.de>
-Message-ID: <87indu6pjf.fsf@belgarion.home>
+Date: Tue, 28 Nov 2017 22:52:43 +0100
+Subject: [PATCH 3/4] ARM: pxa/spitz: Remove hardcoded partitioning,
+ use sharpslpart parser
+In-Reply-To: <CAAQYJAs4H=8nUkP2fXzxk=RYfCyQkVBu-JfeqQh7SRc0BSoH0Q@mail.gmail.com>
+ (Andrea Adami's message of "Fri, 24 Nov 2017 13:52:22 +0100")
+References: <1511300631-1343-1-git-send-email-andrea.adami@gmail.com>
+ <1511300631-1343-3-git-send-email-andrea.adami@gmail.com>
+ <20171122230633.GC3623@amd>
+ <CAAQYJAs4H=8nUkP2fXzxk=RYfCyQkVBu-JfeqQh7SRc0BSoH0Q@mail.gmail.com>
+Message-ID: <87efoi6pg4.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram Sang <wsa@the-dreams.de> writes:
+Andrea Adami <andrea.adami@gmail.com> writes:
 
-> As discussed previously, we move the declarations now to devices.h and the
-> platform_data to the platform_data directory. Only build tested, but buildbot
-> is happy (this time really!)
+> On Thu, Nov 23, 2017 at 12:06 AM, Pavel Machek <pavel@ucw.cz> wrote:
+>> On Tue 2017-11-21 22:43:50, Andrea Adami wrote:
 
-Applied to pxa/for-next now the merge window is close.
+Pavel, given that you didn't challenge Andrea's statement, I assume QEMU users
+will switch to mtdparts again.
+
+I'll apply the serie to pxa/for-next.
 
 Cheers.
 
