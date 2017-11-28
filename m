@@ -1,38 +1,60 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Nov 2017 06:57:27 -0800
-Subject: [PATCH v2 2/4] DTS: GTA04: fix panel compatibility string
-In-Reply-To: <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
-Message-ID: <20171128145727.GY28152@atomide.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 28 Nov 2017 15:00:46 +0000
+Subject: [PATCH v2 00/16] SolidRun Hummingboard DT updates
+Message-ID: <20171128150045.GV31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* H. Nikolaus Schaller <hns@goldelico.com> [171116 08:53]:
-> Vendor string is "tpo" and not "toppoly".
-> 
-> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-> ---
->  arch/arm/boot/dts/omap3-gta04.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
-> index 4504908c23fe..ec27ed67a22a 100644
-> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
-> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
-> @@ -86,7 +86,7 @@
->  
->  		/* lcd panel */
->  		lcd: td028ttec1 at 0 {
-> -			compatible = "toppoly,td028ttec1";
-> +			compatible = "tpo,td028ttec1";
->  			reg = <0>;
->  			spi-max-frequency = <100000>;
->  			spi-cpol;
+Hi Shawn,
 
-Applying into omap-for-v4.15/fixes thanks. The other dts patch seems
-like it can wait for v4.16 merge window.
+This series updates the SolidRun Hummingboard platforms to:
+(a) make the DT more reflective of the schematics
+(b) re-organise how we deal with the differences between various board
+    versions in preparation for the new 1.5 SOM.
 
-Regards,
+The idea with (b) is that we add the support for the board + usom
+combination by including the appropriate dtsi files.
 
-Tony
+For example, in mainline at the moment, we support two variants of the
+Hummingboards - both with Broadcom Wi-Fi and without eMMC.  Going
+forward, when a 1.5 SOM is fitted (which modern Hummingboards will all
+have) the boards will have TI Wi-Fi and potentially eMMC on the usom.
+
+This series adds the dtsi files for the new SOM and dts files for the
+platform variants (v1.5 SOM without eMMC, v1.5 SOM with eMMC.)  It's
+unfortunate that the w/o eMMC variant can't detect the lack of eMMC,
+running the eMMC version without eMMC on the boards results in an
+almost constant stream of kernel messages.
+
+Feedback from the previous posting has been addressed, and additional
+changes adding the v1.5 SOM board level files added through discussion
+with Jon.
+
+ arch/arm/boot/dts/Makefile                         |   8 +
+ arch/arm/boot/dts/imx6dl-cubox-i-emmc-som-v15.dts  |  52 +++++++
+ arch/arm/boot/dts/imx6dl-cubox-i-som-v15.dts       |  51 +++++++
+ arch/arm/boot/dts/imx6dl-cubox-i.dts               |   2 +
+ .../boot/dts/imx6dl-hummingboard-emmc-som-v15.dts  |  53 +++++++
+ arch/arm/boot/dts/imx6dl-hummingboard-som-v15.dts  |  52 +++++++
+ arch/arm/boot/dts/imx6dl-hummingboard.dts          |   2 +
+ arch/arm/boot/dts/imx6q-cubox-i-emmc-som-v15.dts   |  60 ++++++++
+ arch/arm/boot/dts/imx6q-cubox-i-som-v15.dts        |  59 +++++++
+ arch/arm/boot/dts/imx6q-cubox-i.dts                |   2 +
+ arch/arm/boot/dts/imx6q-h100.dts                   |   4 +-
+ .../boot/dts/imx6q-hummingboard-emmc-som-v15.dts   |  61 ++++++++
+ arch/arm/boot/dts/imx6q-hummingboard-som-v15.dts   |  60 ++++++++
+ arch/arm/boot/dts/imx6q-hummingboard.dts           |   2 +
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi             |  72 ++++-----
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi        | 103 ++++++++-----
+ arch/arm/boot/dts/imx6qdl-microsom-ar8035.dtsi     |  99 ------------
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi            | 161 -------------------
+ arch/arm/boot/dts/imx6qdl-sr-som-brcm.dtsi         | 144 +++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-sr-som-emmc.dtsi         |  70 +++++++++
+ arch/arm/boot/dts/imx6qdl-sr-som-ti.dtsi           | 170 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-sr-som.dtsi              | 121 +++++++++++++++
+ 22 files changed, 1072 insertions(+), 336 deletions(-)
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
