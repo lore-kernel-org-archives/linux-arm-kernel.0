@@ -1,26 +1,38 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Tue, 28 Nov 2017 18:38:26 +0100
-Subject: [PATCH] net: stmmac: dwmac-sun8i: fix allwinner,leds-active-low
- handling
-In-Reply-To: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
-References: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
-Message-ID: <20171128173826.GE14512@lunn.ch>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 28 Nov 2017 12:42:39 -0500
+Subject: [PATCH resend V3 24/29] backlight: deprecate pci_get_bus_and_slot()
+Message-ID: <1511890959-6706-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 05:48:22PM +0100, Corentin Labbe wrote:
-> The driver expect "allwinner,leds-active-low" to be in PHY node, but
-> the binding doc expect it to be in MAC node.
-> 
-> Since all board DT use it also in MAC node, the driver need to search
-> allwinner,leds-active-low in MAC node.
+pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+where a PCI device is present. This restricts the device drivers to be
+reused for other domain numbers.
 
-Hi Corentin
+Getting ready to remove pci_get_bus_and_slot() function in favor of
+pci_get_domain_bus_and_slot().
 
-I'm having trouble working out how this worked before. This is code
-you moved around, when adding external/internal MDIOs. But the very
-first version of this driver code used priv->plat->phy_node. Did that
-somehow point to the MAC node when the internal PHY is used? Or has it
-been broken all the time?
+Hard-coding the domain as 0.
 
-	Andrew
+Acked-by: Jingoo Han <jingoohan1@gmail.com>
+Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/video/backlight/apple_bl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
+index d843296..6a34ab9 100644
+--- a/drivers/video/backlight/apple_bl.c
++++ b/drivers/video/backlight/apple_bl.c
+@@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
+ 	struct pci_dev *host;
+ 	int intensity;
+ 
+-	host = pci_get_bus_and_slot(0, 0);
++	host = pci_get_domain_bus_and_slot(0, 0, 0);
+ 
+ 	if (!host) {
+ 		pr_err("unable to find PCI host\n");
+-- 
+1.9.1
