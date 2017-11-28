@@ -1,62 +1,71 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Nov 2017 21:44:57 +0100
-Subject: [PATCH 12/17] drm/sun4i: Add CCSC property to DE2 configuration
-In-Reply-To: <20171127205750.19277-13-jernej.skrabec@siol.net>
-References: <20171127205750.19277-1-jernej.skrabec@siol.net>
- <20171127205750.19277-13-jernej.skrabec@siol.net>
-Message-ID: <20171128204457.gvqjskiw7kruw24v@flea.home>
+From: david@redhat.com (David Hildenbrand)
+Date: Tue, 28 Nov 2017 21:55:20 +0100
+Subject: [PATCH 00/15] Move vcpu_load and vcpu_put calls to arch code
+In-Reply-To: <20171125205718.7731-1-christoffer.dall@linaro.org>
+References: <20171125205718.7731-1-christoffer.dall@linaro.org>
+Message-ID: <dd738b4f-3d99-ec3b-fa5e-d166230f9d2b@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 09:57:45PM +0100, Jernej Skrabec wrote:
-> Base addresses of channel output CSC (CCSC) depends whether mixer in
-> question is first or second and if it is second, if supports VEP or not.
-> This new property will tell which set of base addresses to take.
+On 25.11.2017 21:57, Christoffer Dall wrote:
+> Some architectures may decide to do different things during
+> kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
+> arm64 is about to do significant work in vcpu load/put when running a
+> vcpu, but it's problematic to do this for any other vcpu ioctl than
+> KVM_RUN.
 > 
-> 0 - first mixer or second mixer with VEP support
-> 1 - second mixer without VEP support
+> Further, while it may be possible to call kvm_arch_vcpu_load() for a
+> number of non-KVM_RUN ioctls, it makes the KVM/ARM code more difficult
+> to reason about, especially after my optimization series, because a lot
+> of things can now happen, where we have to consider if we're really in
+> the process of running a vcpu or not.
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/sun8i_mixer.c | 1 +
->  drivers/gpu/drm/sun4i/sun8i_mixer.h | 1 +
->  2 files changed, 2 insertions(+)
+> This series will first move the vcpu_load() and vcpu_put() calls in the
+> arch generic dispatch function into each case of the switch statement
+> and then, one-by-one, pushed the calls down into the architecture
+> specific code making the changes for each ioctl as required.
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> index 7c9c87a0535b..2276eff8798d 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> @@ -622,6 +622,7 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
->  	.vi_num = 2,
->  	.ui_num = 1,
->  	.scaler_mask = 0x3,
-> +	.ccsc = 0,
->  };
->  
->  static const struct of_device_id sun8i_mixer_of_table[] = {
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-> index 355a45e6cfb4..4fcf1653e345 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-> @@ -136,6 +136,7 @@ struct sun8i_mixer_cfg {
->  	int		vi_num;
->  	int		ui_num;
->  	int		scaler_mask;
-> +	int		ccsc;
+> Thanks,
+> -Christoffer
+> 
+> Christoffer Dall (15):
+>   KVM: Prepare for moving vcpu_load/vcpu_put into arch specific code
+>   KVM: Factor out vcpu->pid adjustment for KVM_RUN
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_run
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_regs
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_regs
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_sregs
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_sregs
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_mpstate
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_mpstate
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_translate
+>   KVM: Move vcpu_load to arch-specific
+>     kvm_arch_vcpu_ioctl_set_guest_debug
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_fpu
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_fpu
+>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl
+>   KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls than KVM_RUN
+> 
+>  arch/arm64/kvm/guest.c     |  17 +++++--
+>  arch/mips/kvm/mips.c       |  72 +++++++++++++++++++--------
+>  arch/powerpc/kvm/book3s.c  |  38 +++++++++++++-
+>  arch/powerpc/kvm/booke.c   |  65 +++++++++++++++++++-----
+>  arch/powerpc/kvm/powerpc.c |  24 ++++++---
+>  arch/s390/kvm/kvm-s390.c   | 119 +++++++++++++++++++++++++++++++++++++-------
+>  arch/x86/kvm/x86.c         | 121 ++++++++++++++++++++++++++++++++++++++-------
+>  include/linux/kvm_host.h   |   2 +
+>  virt/kvm/arm/arm.c         |  91 +++++++++++++++++++++++++---------
+>  virt/kvm/kvm_main.c        |  43 +++++++---------
+>  10 files changed, 463 insertions(+), 129 deletions(-)
+> 
 
-Having some documentation for that one would be great too.
+Looking at the amount of code we duplicate, I wonder if simple ifdefery
+(if possible) would be easier for the single known "special" case.
 
-Thanks!
-Maxime
+(most probably an unpopular opinion :) )
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/786e0968/attachment.sig>
+
+Thanks,
+
+David / dhildenb
