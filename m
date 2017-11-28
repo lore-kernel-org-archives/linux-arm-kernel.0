@@ -1,147 +1,88 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 28 Nov 2017 16:05:50 +0100
-Subject: [PATCH v5 06/13] IIO: ADC: add sigma delta modulator support
+Date: Tue, 28 Nov 2017 16:05:56 +0100
+Subject: [PATCH v5 12/13] ASoC: add bindings for stm32 DFSDM filter
 In-Reply-To: <1511881557-28596-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1511881557-28596-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1511881557-28596-7-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1511881557-28596-13-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add generic driver to support sigma delta modulators.
-Typically, this device is hardware connected to
-an IIO device in charge of the conversion. Devices are
-bonded through the hardware consumer API.
+Add bindings that describes audio settings to support
+Digital Filter for pulse density modulation(PDM) microphone.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 ---
-V4-> v5
-  - Add mare descritpion in commit message.
-  - Suppress scan_index specification in iio_chan_spec .
- 
- drivers/iio/adc/Kconfig            | 12 ++++++
- drivers/iio/adc/Makefile           |  1 +
- drivers/iio/adc/sd_adc_modulator.c | 81 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 94 insertions(+)
- create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+ .../devicetree/bindings/sound/st,stm32-adfsdm.txt  | 62 ++++++++++++++++++++++
+ 1 file changed, 62 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 5762565..c5db62f 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -626,6 +626,18 @@ config SPEAR_ADC
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called spear_adc.
- 
-+config SD_ADC_MODULATOR
-+	tristate "Generic sigma delta modulator"
-+	depends on OF
-+	select IIO_BUFFER
-+	select IIO_TRIGGERED_BUFFER
-+	help
-+	  Select this option to enables sigma delta modulator. This driver can
-+	  support generic sigma delta modulators.
-+
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called sd_adc_modulator.
-+
- config STM32_ADC_CORE
- 	tristate "STMicroelectronics STM32 adc core"
- 	depends on ARCH_STM32 || COMPILE_TEST
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index 9874e05..d800325 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -81,3 +81,4 @@ obj-$(CONFIG_VF610_ADC) += vf610_adc.o
- obj-$(CONFIG_VIPERBOARD_ADC) += viperboard_adc.o
- xilinx-xadc-y := xilinx-xadc-core.o xilinx-xadc-events.o
- obj-$(CONFIG_XILINX_XADC) += xilinx-xadc.o
-+obj-$(CONFIG_SD_ADC_MODULATOR) += sd_adc_modulator.o
-diff --git a/drivers/iio/adc/sd_adc_modulator.c b/drivers/iio/adc/sd_adc_modulator.c
+diff --git a/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
 new file mode 100644
-index 0000000..08bd7b6
+index 0000000..2782cda
 --- /dev/null
-+++ b/drivers/iio/adc/sd_adc_modulator.c
-@@ -0,0 +1,81 @@
-+/*
-+ * Generic sigma delta modulator driver
-+ *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author: Arnaud Pouliquen <arnaud.pouliquen@st.com>.
-+ *
-+ * License type: GPLv2
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-+ * or FITNESS FOR A PARTICULAR PURPOSE.
-+ * See the GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
++++ b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+@@ -0,0 +1,62 @@
++STMicroelectronics Audio Digital Filter Sigma Delta modulators(DFSDM)
 +
-+#include <linux/iio/iio.h>
-+#include <linux/iio/triggered_buffer.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
++The DFSDM allows PDM microphones capture through SPI interface. The Audio
++interface is seems as a sub block of the DFSDM device.
++For details on DFSDM bindings refer to ../iio/adc/st,stm32-dfsdm-adc.txt
 +
-+static const struct iio_info iio_sd_mod_iio_info;
++Required properties:
++  - compatible: "st,stm32h7-dfsdm-dai".
 +
-+static const struct iio_chan_spec iio_sd_mod_ch = {
-+	.type = IIO_VOLTAGE,
-+	.indexed = 1,
-+	.scan_type = {
-+		.sign = 'u',
-+		.realbits = 1,
-+		.shift = 0,
-+	},
-+};
++  - #sound-dai-cells : Must be equal to 0
 +
-+static int iio_sd_mod_probe(struct platform_device *pdev)
-+{
-+	struct device *dev = &pdev->dev;
-+	struct iio_dev *iio;
++  - io-channels : phandle to iio dfsdm instance node.
 +
-+	iio = devm_iio_device_alloc(dev, 0);
-+	if (!iio)
-+		return -ENOMEM;
++Example of a sound card using audio DFSDM node.
 +
-+	iio->dev.parent = dev;
-+	iio->dev.of_node = dev->of_node;
-+	iio->name = dev_name(dev);
-+	iio->info = &iio_sd_mod_iio_info;
-+	iio->modes = INDIO_BUFFER_HARDWARE;
++	sound_card {
++		compatible = "audio-graph-card";
 +
-+	iio->num_channels = 1;
-+	iio->channels = &iio_sd_mod_ch;
++		dais = <&cpu_port>;
++	};
 +
-+	platform_set_drvdata(pdev, iio);
++	dfsdm: dfsdm at 40017000 {
++		compatible = "st,stm32h7-dfsdm";
++		reg = <0x40017000 0x400>;
++		clocks = <&rcc DFSDM1_CK>;
++		clock-names = "dfsdm";
++		#address-cells = <1>;
++		#size-cells = <0>;
 +
-+	return devm_iio_device_register(&pdev->dev, iio);
-+}
++		dfsdm_adc0: dfsdm-adc at 0 {
++			compatible = "st,stm32-dfsdm-dmic";
++			reg = <0>;
++			interrupts = <110>;
++			dmas = <&dmamux1 101 0x400 0x00>;
++			dma-names = "rx";
++			st,adc-channels = <1>;
++			st,adc-channel-names = "dmic0";
++			st,adc-channel-types = "SPI_R";
++			st,adc-channel-clk-src = "CLKOUT";
++			st,filter-order = <5>;
 +
-+static const struct of_device_id sd_adc_of_match[] = {
-+	{ .compatible = "sd-modulator" },
-+	{ .compatible = "ads1201" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sd_adc_of_match);
++			dfsdm_dai0: dfsdm-dai {
++				compatible = "st,stm32h7-dfsdm-dai";
++				#sound-dai-cells = <0>;
++				io-channels = <&dfsdm_adc0 0>;
++				cpu_port: port {
++				dfsdm_endpoint: endpoint {
++					remote-endpoint = <&dmic0_endpoint>;
++				};
++			};
++		};
++	};
 +
-+static struct platform_driver iio_sd_mod_adc = {
-+	.driver = {
-+		.name = "iio_sd_adc_mod",
-+		.of_match_table = of_match_ptr(sd_adc_of_match),
-+	},
-+	.probe = iio_sd_mod_probe,
-+};
-+
-+module_platform_driver(iio_sd_mod_adc);
-+
-+MODULE_DESCRIPTION("Basic sigma delta modulator");
-+MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
-+MODULE_LICENSE("GPL v2");
++	dmic0: dmic at 0 {
++		compatible = "dmic-codec";
++		#sound-dai-cells = <0>;
++		port {
++			dmic0_endpoint: endpoint {
++				remote-endpoint = <&dfsdm_endpoint>;
++			};
++		};
++	};
 -- 
 2.7.4
