@@ -1,173 +1,75 @@
-From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 28 Nov 2017 15:28:21 +0800
-Subject: [PATCH v7 5/6] arm: dts: mt2712: Add clock controller device nodes
-In-Reply-To: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
-References: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1511854102-23195-7-git-send-email-weiyi.lu@mediatek.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Tue, 28 Nov 2017 16:29:10 +0900
+Subject: [PATCH] dt-bindings: uniphier: add bindings for UniPhier SoC family
+Message-ID: <1511854150-26346-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add clock controller nodes for MT2712, include topckgen, infracfg,
-pericfg, mcucfg and apmixedsys. This patch also add six oscillators that
-provide clocks for MT2712.
-
-Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
- arch/arm64/boot/dts/mediatek/mt2712e.dtsi | 115 ++++++++++++++++++++++++++++++
- 1 file changed, 115 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-index 5d4e406..5703793 100644
---- a/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt2712e.dtsi
-@@ -5,6 +5,7 @@
-  * SPDX-License-Identifier: (GPL-2.0 OR MIT)
-  */
- 
-+#include <dt-bindings/clock/mt2712-clk.h>
- #include <dt-bindings/interrupt-controller/irq.h>
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- 
-@@ -98,6 +99,48 @@
- 		#clock-cells = <0>;
- 	};
- 
-+	clk26m: oscillator at 0 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+		clock-output-names = "clk26m";
-+	};
+ Documentation/devicetree/bindings/arm/uniphier.txt | 40 ++++++++++++++++++++++
+ MAINTAINERS                                        |  1 +
+ 2 files changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/uniphier.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/uniphier.txt b/Documentation/devicetree/bindings/arm/uniphier.txt
+new file mode 100644
+index 0000000..08d3cf3
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/uniphier.txt
+@@ -0,0 +1,40 @@
++Socionext UniPhier SoC family
 +
-+	clk32k: oscillator at 1 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <32768>;
-+		clock-output-names = "clk32k";
-+	};
++Required properties in the root node:
++  - compatible: should contain board and SoC compatible strings
 +
-+	clkfpc: oscillator at 2 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <50000000>;
-+		clock-output-names = "clkfpc";
-+	};
++    SoC compatibles:
++      - "socionext,uniphier-ld4"   - LD4 SoC
++      - "socionext,uniphier-pro4"  - Pro4 SoC
++      - "socionext,uniphier-sld8"  - sLD8 SoC
++      - "socionext,uniphier-pro5"  - Pro5 SoC
++      - "socionext,uniphier-pxs2"  - PXs2 SoC
++      - "socionext,uniphier-ld6b"  - LD6b SoC
++      - "socionext,uniphier-ld11"  - LD11 SoC
++      - "socionext,uniphier-ld20"  - LD20 SoC
++      - "socionext,uniphier-pxs3"  - PXs3 SoC
 +
-+	clkaud_ext_i_0: oscillator at 3 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <6500000>;
-+		clock-output-names = "clkaud_ext_i_0";
-+	};
++    Board compatibles:
++      - "socionext,uniphier-ld4-ref"      - LD4 Reference Board
++      - "socionext,uniphier-pro4-ref"     - Pro4 Reference Board
++      - "socionext,uniphier-pro4-ace"     - Pro4 Ace Board
++      - "socionext,uniphier-pro4-sanji"   - Pro4 Sanji Board
++      - "socionext,uniphier-sld8-ref"     - sLD8 Reference Board
++      - "socionext,uniphier-pxs2-gentil"  - PXs2 Gentil Board
++      - "socionext,uniphier-pxs2-vodka"   - PXs2 Vodka Board
++      - "socionext,uniphier-ld6b-ref"     - LD6b Reference Board
++      - "socionext,uniphier-ld11-ref"     - LD11 Reference Board
++      - "socionext,uniphier-ld11-global"  - LD11 Global Board
++      - "socionext,uniphier-ld20-ref"     - LD20 Reference Board
++      - "socionext,uniphier-ld20-global"  - LD20 Global Board
++      - "socionext,uniphier-pxs3-ref"     - PXs3 Reference Board
 +
-+	clkaud_ext_i_1: oscillator at 4 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <196608000>;
-+		clock-output-names = "clkaud_ext_i_1";
-+	};
++Example:
 +
-+	clkaud_ext_i_2: oscillator at 5 {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <180633600>;
-+		clock-output-names = "clkaud_ext_i_2";
-+	};
++/dts-v1/;
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupt-parent = <&gic>;
-@@ -111,6 +154,24 @@
- 			      (GIC_CPU_MASK_RAW(0x13) | IRQ_TYPE_LEVEL_LOW)>;
- 	};
- 
-+	topckgen: syscon at 10000000 {
-+		compatible = "mediatek,mt2712-topckgen", "syscon";
-+		reg = <0 0x10000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
++/ {
++	compatible = "socionext,uniphier-ld20-ref", "socionext,uniphier-ld20";
 +
-+	infracfg: syscon at 10001000 {
-+		compatible = "mediatek,mt2712-infracfg", "syscon";
-+		reg = <0 0x10001000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	pericfg: syscon at 10003000 {
-+		compatible = "mediatek,mt2712-pericfg", "syscon";
-+		reg = <0 0x10003000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
- 	uart5: serial at 1000f000 {
- 		compatible = "mediatek,mt2712-uart",
- 			     "mediatek,mt6577-uart";
-@@ -121,6 +182,18 @@
- 		status = "disabled";
- 	};
- 
-+	apmixedsys: syscon at 10209000 {
-+		compatible = "mediatek,mt2712-apmixedsys", "syscon";
-+		reg = <0 0x10209000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	mcucfg: syscon at 10220000 {
-+		compatible = "mediatek,mt2712-mcucfg", "syscon";
-+		reg = <0 0x10220000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
- 	sysirq: interrupt-controller at 10220a80 {
- 		compatible = "mediatek,mt2712-sysirq",
- 			     "mediatek,mt6577-sysirq";
-@@ -192,5 +265,47 @@
- 		clock-names = "baud", "bus";
- 		status = "disabled";
- 	};
-+
-+	mfgcfg: syscon at 13000000 {
-+		compatible = "mediatek,mt2712-mfgcfg", "syscon";
-+		reg = <0 0x13000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	mmsys: syscon at 14000000 {
-+		compatible = "mediatek,mt2712-mmsys", "syscon";
-+		reg = <0 0x14000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	imgsys: syscon at 15000000 {
-+		compatible = "mediatek,mt2712-imgsys", "syscon";
-+		reg = <0 0x15000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	bdpsys: syscon at 15010000 {
-+		compatible = "mediatek,mt2712-bdpsys", "syscon";
-+		reg = <0 0x15010000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	vdecsys: syscon at 16000000 {
-+		compatible = "mediatek,mt2712-vdecsys", "syscon";
-+		reg = <0 0x16000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	vencsys: syscon at 18000000 {
-+		compatible = "mediatek,mt2712-vencsys", "syscon";
-+		reg = <0 0x18000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
-+
-+	jpgdecsys: syscon at 19000000 {
-+		compatible = "mediatek,mt2712-jpgdecsys", "syscon";
-+		reg = <0 0x19000000 0 0x1000>;
-+		#clock-cells = <1>;
-+	};
- };
- 
++	...
++};
+diff --git a/MAINTAINERS b/MAINTAINERS
+index cbb89bb..1fcbd65 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -2041,6 +2041,7 @@ M:	Masahiro Yamada <yamada.masahiro@socionext.com>
+ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ T:	git git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+ S:	Maintained
++F:	Documentation/devicetree/bindings/arm/uniphier.txt
+ F:	Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+ F:	arch/arm/boot/dts/uniphier*
+ F:	arch/arm/include/asm/hardware/cache-uniphier.h
 -- 
-1.9.1
+2.7.4
