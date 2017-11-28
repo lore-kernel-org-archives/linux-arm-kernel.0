@@ -1,81 +1,108 @@
 From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 28 Nov 2017 10:03:10 +0000
+Date: Tue, 28 Nov 2017 10:20:25 +0000
 Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
  ntp
-In-Reply-To: <20171127201812.GB21126@piout.net>
+In-Reply-To: <20171127193135.GA21126@piout.net>
 References: <20171013175433.GA22062@obsidianresearch.com>
  <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <20171123112338.GN31757@n2100.armlinux.org.uk>
- <20171123120451.v74j3z2c5oodxlud@piout.net>
- <20171123125300.GO31757@n2100.armlinux.org.uk>
- <20171127201812.GB21126@piout.net>
-Message-ID: <20171128100309.GS31757@n2100.armlinux.org.uk>
+ <CALAqxLUBWd-mv_3iiFrXLf0ka685t0an89jjduHpT-2jjv5O2Q@mail.gmail.com>
+ <20171127175254.GL31757@n2100.armlinux.org.uk>
+ <20171127184411.GA19577@piout.net>
+ <20171127185352.GN31757@n2100.armlinux.org.uk>
+ <20171127193135.GA21126@piout.net>
+Message-ID: <20171128102025.GT31757@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 09:18:12PM +0100, Alexandre Belloni wrote:
-> On 23/11/2017 at 12:53:00 +0000, Russell King - ARM Linux wrote:
-> > systohc is more questionable, and always has been.  The "push it out
-> > to userspace" approach has been tried in the past, yet we seem to
-> > have it back in the kernel.  IIRC, it was originally decided that
-> > rtclib would not support it, and that it was going to be done in
-> > userspace.
+On Mon, Nov 27, 2017 at 08:31:35PM +0100, Alexandre Belloni wrote:
+> On 27/11/2017 at 18:53:52 +0000, Russell King - ARM Linux wrote:
+> > You are, yet again, wrong.
 > > 
-> > However, the userspace part never appeared, and instead rtclib
-> > eventually gained support for it, because it's what people want to
-> > see.
+> > I am in a position to make the comment because it was me who identified
+> > the problem, put in the hours to work on, develop and extensively test
+> > Jason's patch.  So, it's partly my time that you seem to be wasting,
+> > and that gives me every right to complain at this point.
 > > 
-> > I'm not yet convinced by the "lets push it all into userspace" argument
-> > because that's vapourware - and we've been there before.  It's "nice"
-> > to state but if no one steps up and does it, it's of no benefit and
-> > just results in people carrying local hacks (eg in vendor kernels), or
-> > working around those who state it.
+> > You, on the other hand, were copied with every single email, and did
+> > nothing to discuss the issue except for the "easy" bits when I posted
+> > a relatively smaller patch - but you ignored the bigger issue.
+> 
+> And this is exactly what you do with other people patches/time when you
+> don't like their changes.
+> You simply ignore the patch series until they go away.
+
+That is not intentional.
+
+> I would really expect people merging code in any subsystem to wait for
+> the ack of the maintainer of that subsystem.
+> 
+> I didn't complain about any missing email addresses, I said the RTC ML
+> was not copied but that is didn't matter.
+
+A mailing list is an email address.
+
+> You're not even happy about the patch that was merged because it was the
+> wrong one!
+
+That's not what I said.  I was concerned that an _old_ patch had been
+merged, but as it turns out, it was not an old patch, but a newer
+patch that I'd missed.
+
+> > And now that someone dare criticise your abilities, you decide to revert
+> > the change and restore Linux back to a crippled state.
+> > 
+> > Honestly, I don't _care_ if you revert it and if you want to cripple
+> > the kernel as a result in regards to this issue, I can carry the patch
+> > ad infinitum, no skin off my back.  You're only going to be hurting
+> > yourself and other people through your spite by doing that revert.
+> > 
+> > I suggest you take a good long hard look at what you're about to do and
+> > ask whether you are being reasonable, given that it's taken you over
+> > two months whole months to raise any _technical_ issues with the approach
+> > that Jason and myself came up with.
 > > 
 > 
-> What I see is that people that care about precisely setting the RTC are
-> not using systohc because of the 0.5s offset issue or because it doesn't
-> do what they want and instead are using their own userspace tool to set
-> the RTC time.
+> What I don't get is that it has been broken for almost 5 years and now
+> you seem to think it has to be fixed urgently.
 
-If that is the case, where are these tools?
+Now you're making crap up.  I've not made any comment about this being
+something that needs fixing urgently.  In fact, as I've said several
+times already, I really don't care what you do with the mainline kernel,
+because I have a fix here locally that I intend to use and maintain
+into the future.  For me, the issue is fixed and resolved, and I intend
+to spend no further time developing any fixes for it.
 
-> They have the right to keep those tools closed if they desire so.
-> 
-> The necessary ABI for userspace to do the right thing is already there
-> and you are going to add a new one.
+My comments are about the _two months_ its taken to get to the stage of
+finding out that you don't like the approach.
 
-Sorry, I don't think userspace has the information to do a good job.
-The idea of setting the RTC to measure the offset is a hack - it's
-something that is going to have to be measured each and every time
-that the RTC is set, and would need to be done by a real-time process
-to ensure that other system noise does not affect it.
+The result of this is, most likely, one of:
+1. you'll revert the patch (which, incidentally, has no real effect until
+   my other patches get merged) and everyone will either be stuck with a
+   kernel that sets their RTC time wrong when they have NTP installed
 
-> Also, fixing systohc will not fix the offset for people using hwclock or
-> any other tools (e.g. systemd).
+2. you'll remove the systohc code, people won't realise that their kernel
+   no longer sync's the RTC time, and systems that are on the Internet
+   (eg, providing stratum 1 NTP servers) will be unreliable if they are
+   rebooted even more so than they are today.
 
-As has already been said, Jason's suggestion is to export this
-information to userspace so that hwclock can be fixed in a similar
-way.  hwclock isn't too relevant to the NTP question though, because
-it isn't used while ntpd is running.
+> On my side, I want to take the opportunity to think about systohc before
+> adding an ABI that we will maybe regret later.
 
-> I pretty much prefer trying to fix existing userspace tools or if this
-> is not possible have a new tool to handle reading/setting the RTC time.
+Fine, but bear in mind that I don't care anymore, because I have
+perfectly good fixes locally, and I'm not wasting any further time
+in this issue.
 
-I suspect that won't happen, because there won't be enough interest
-in fixing it.  As I've said, this issue had come up years ago, and
-the same suggestions were made at that time.  Here we are today,
-still without a userspace tool to do it.  What's different this
-time around?
+While you think about it, I would encourage anyone who wishing to run
+or running a public NTP server using rtclib to ditch Linux and use
+FreeBSD instead to avoid their NTP server supplying false time, even
+when synchronised to a reference clock.  A reboot of such a server
+will supply false time for a period of a few hours depending on how
+far the time is out (which can be up to a couple of seconds) after
+such an event.  In such a scenario, NTP will not step-correct the
+time but will gradually slew it instead.
 
-Are you going to put the effort in yourself to solve this problem,
-or are you going to leave it to some ghostly apperition to do,
-resulting in yet another vapourware tool that never actually
-materialises?
-
-I'll repeat that I have no interest in creating such a tool as I
-already have a working in-kernel solution that doesn't need me to
-create any userspace tooling, and I don't care that it isn't in
-mainline.
+This goes for systems that some ISPs deploy as stratum 1 NTP servers,
+which today tend to be Raspberry Pis.
 
 -- 
 RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
