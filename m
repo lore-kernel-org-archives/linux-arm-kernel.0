@@ -1,65 +1,90 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Tue, 28 Nov 2017 16:05:55 +0100
-Subject: [PATCH v5 11/13] IIO: consumer: allow to set buffer sizes
+Date: Tue, 28 Nov 2017 16:05:46 +0100
+Subject: [PATCH v5 02/13] docs: driver-api: add iio hw consumer section
 In-Reply-To: <1511881557-28596-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1511881557-28596-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1511881557-28596-12-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1511881557-28596-3-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add iio consumer API to set buffer size and watermark according
-to sysfs API.
+This adds a section about the Hardware consumer
+API of the IIO subsystem to the driver API
+documentation.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
-Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
 ---
- drivers/iio/buffer/industrialio-buffer-cb.c | 11 +++++++++++
- include/linux/iio/consumer.h                | 11 +++++++++++
- 2 files changed, 22 insertions(+)
+V4->V5: Minor formating fixes.
 
-diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
-index 4847534..ea63c83 100644
---- a/drivers/iio/buffer/industrialio-buffer-cb.c
-+++ b/drivers/iio/buffer/industrialio-buffer-cb.c
-@@ -104,6 +104,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
- }
- EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
- 
-+int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buff,
-+					size_t watermark)
-+{
-+	if (!watermark)
-+		return -EINVAL;
-+	cb_buff->buffer.watermark = watermark;
+ Documentation/driver-api/iio/hw-consumer.rst | 51 ++++++++++++++++++++++++++++
+ Documentation/driver-api/iio/index.rst       |  1 +
+ 2 files changed, 52 insertions(+)
+ create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
+
+diff --git a/Documentation/driver-api/iio/hw-consumer.rst b/Documentation/driver-api/iio/hw-consumer.rst
+new file mode 100644
+index 0000000..8facce6
+--- /dev/null
++++ b/Documentation/driver-api/iio/hw-consumer.rst
+@@ -0,0 +1,51 @@
++===========
++HW consumer
++===========
++An IIO device can be directly connected to another device in hardware. in this
++case the buffers between IIO provider and IIO consumer are handled by hardware.
++The Industrial I/O HW consumer offers a way to bond these IIO devices without
++software buffer for data. The implementation can be found under
++:file:`drivers/iio/buffer/hw-consumer.c`
 +
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(iio_channel_cb_set_buffer_watermark);
 +
- int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
- {
- 	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
-diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
-index 2017f35..9887f4f 100644
---- a/include/linux/iio/consumer.h
-+++ b/include/linux/iio/consumer.h
-@@ -134,6 +134,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
- 						       void *private),
- 					     void *private);
- /**
-+ * iio_channel_cb_set_buffer_watermark() - set the buffer watermark.
-+ * @cb_buffer:		The callback buffer from whom we want the channel
-+ *			information.
-+ * @watermark: buffer watermark in bytes.
-+ *
-+ * This function allows to configure the buffer watermark.
-+ */
-+int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buffer,
-+					size_t watermark);
++* struct :c:type:`iio_hw_consumer` ? Hardware consumer structure
++* :c:func:`iio_hw_consumer_alloc` ? Allocate IIO hardware consumer
++* :c:func:`iio_hw_consumer_free` ? Free IIO hardware consumer
++* :c:func:`iio_hw_consumer_enable` ? Enable IIO hardware consumer
++* :c:func:`iio_hw_consumer_disable` ? Disable IIO hardware consumer
 +
-+/**
-  * iio_channel_release_all_cb() - release and unregister the callback.
-  * @cb_buffer:		The callback buffer that was allocated.
-  */
++
++HW consumer setup
++=================
++
++As standard IIO device the implementation is based on IIO provider/consumer.
++A typical IIO HW consumer setup looks like this::
++
++	static struct iio_hw_consumer *hwc;
++
++	static const struct iio_info adc_info = {
++		.read_raw = adc_read_raw,
++	};
++
++	static int adc_read_raw(struct iio_dev *indio_dev,
++				struct iio_chan_spec const *chan, int *val,
++				int *val2, long mask)
++	{
++		ret = iio_hw_consumer_enable(hwc);
++
++		/* Acquire data */
++
++		ret = iio_hw_consumer_disable(hwc);
++	}
++
++	static int adc_probe(struct platform_device *pdev)
++	{
++		hwc = devm_iio_hw_consumer_alloc(&iio->dev);
++	}
++
++More details
++============
++.. kernel-doc:: include/linux/iio/hw-consumer.h
++.. kernel-doc:: drivers/iio/buffer/industrialio-hw-consumer.c
++   :export:
++
+diff --git a/Documentation/driver-api/iio/index.rst b/Documentation/driver-api/iio/index.rst
+index e5c3922..7fba341 100644
+--- a/Documentation/driver-api/iio/index.rst
++++ b/Documentation/driver-api/iio/index.rst
+@@ -15,3 +15,4 @@ Contents:
+    buffers
+    triggers
+    triggered-buffers
++   hw-consumer
 -- 
 2.7.4
