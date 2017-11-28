@@ -1,38 +1,62 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 28 Nov 2017 12:42:39 -0500
-Subject: [PATCH resend V3 24/29] backlight: deprecate pci_get_bus_and_slot()
-Message-ID: <1511890959-6706-1-git-send-email-okaya@codeaurora.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 28 Nov 2017 11:48:47 -0600
+Subject: [PATCH v2 01/18] dt-bindings: panel: lvds: Document power-supply
+ property
+In-Reply-To: <583a46dd967456aac07fb29529f74d91a10bdfeb.1511797218.git-series.maxime.ripard@free-electrons.com>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <583a46dd967456aac07fb29529f74d91a10bdfeb.1511797218.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAL_Jsq+PHzDGE_RreBmVZV+sg3dh5OG2vWZU+eobxF514Fpo_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-where a PCI device is present. This restricts the device drivers to be
-reused for other domain numbers.
+Please CC DT list.
 
-Getting ready to remove pci_get_bus_and_slot() function in favor of
-pci_get_domain_bus_and_slot().
+On Mon, Nov 27, 2017 at 9:41 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The power-supply property is used by a vast majority of panels, including
+> panel-simple. Let's document it as a common property
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
+>  Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
+>  2 files changed, 7 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> index ec52c472c845..125ea68052af 100644
+> --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> @@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
+>    while active. Active high reset signals can be supported by inverting the
+>    GPIO specifier polarity flag.
+>
+> +Power
+> +-----
+> +
+> +- power-supply: many display panels need an additional power supply in
+> +  order to be fully powered-up. For such panels, power-supply contains
+> +  a phandle to the regulator powering the panel.
+>
+>  Backlight
+>  ---------
+> diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> index b938269f841e..250850a2150b 100644
+> --- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> +++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> @@ -32,6 +32,7 @@ Optional properties:
+>  - label: See panel-common.txt.
+>  - gpios: See panel-common.txt.
+>  - backlight: See panel-common.txt.
+> +- power-supply: See panel-common.txt.
 
-Hard-coding the domain as 0.
+simple-panel.txt should do the same.
 
-Acked-by: Jingoo Han <jingoohan1@gmail.com>
-Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/video/backlight/apple_bl.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Really, I'd like to see panel-common.txt and simple-panel.txt merged
+and simple-panel.txt removed altogether. But there are a lot of
+references back to simple-panel.txt. A given panel still needs to say
+what common properties it uses or doesn't use. Omitting a property
+like power-supply is ambiguous and can either mean "I only have 1
+supply" or "I haven't thought about supplies yet there are more than
+1".
 
-diff --git a/drivers/video/backlight/apple_bl.c b/drivers/video/backlight/apple_bl.c
-index d843296..6a34ab9 100644
---- a/drivers/video/backlight/apple_bl.c
-+++ b/drivers/video/backlight/apple_bl.c
-@@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
- 	struct pci_dev *host;
- 	int intensity;
- 
--	host = pci_get_bus_and_slot(0, 0);
-+	host = pci_get_domain_bus_and_slot(0, 0, 0);
- 
- 	if (!host) {
- 		pr_err("unable to find PCI host\n");
--- 
-1.9.1
+Rob
