@@ -1,33 +1,67 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Nov 2017 09:01:42 -0600
-Subject: [PATCH v2 1/2] hwmon: (jc42) optionally try to disable the SMBUS
- timeout
-In-Reply-To: <20171127163101.27859-2-peda@axentia.se>
-References: <20171127163101.27859-1-peda@axentia.se>
- <20171127163101.27859-2-peda@axentia.se>
-Message-ID: <20171128150142.dpxg5xdkza5y6qqg@rob-hp-laptop>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 28 Nov 2017 15:02:10 +0000
+Subject: [PATCH v2 03/16] ARM: dts: imx6qdl-microsom: rename to imx6qdl-sr-som
+In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
+References: <20171128150045.GV31757@n2100.armlinux.org.uk>
+Message-ID: <E1eJhOk-0006NH-8m@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:31:00PM +0100, Peter Rosin wrote:
-> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
-> is not always capable of avoiding the 25-35 ms timeout as specified by
-> the SMBUS protocol. This may cause silent corruption of the last bit of
-> any transfer, e.g. a one is read instead of a zero if the sensor chip
-> times out. This also affects the eeprom half of the nxp-se97 chip, where
-> this silent corruption was originally noticed. Other I2C adapters probably
-> suffer similar issues, e.g. bit-banging comes to mind as risky...
-> 
-> The SMBUS register in the nxp chip is not a standard Jedec register, but
-> it is not special to the nxp chips either, at least the atmel chips
-> have the same mechanism. Therefore, do not special case this on the
-> manufacturer, it is opt-in via the device property anyway.
-> 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
-> ---
->  Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
+Jon and myself feel that "imx6qdl-microsom" is too generic a name for
+SolidRun's microsom - some other manufacturer could have their own
+microsom.  Change the name to the shorter "imx6qdl-sr-som".
 
-Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/imx6q-h100.dts                                 | 2 +-
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi                           | 2 +-
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi                      | 2 +-
+ arch/arm/boot/dts/{imx6qdl-microsom.dtsi => imx6qdl-sr-som.dtsi} | 0
+ 4 files changed, 3 insertions(+), 3 deletions(-)
+ rename arch/arm/boot/dts/{imx6qdl-microsom.dtsi => imx6qdl-sr-som.dtsi} (100%)
 
->  drivers/hwmon/jc42.c                             | 21 +++++++++++++++++++++
->  2 files changed, 25 insertions(+)
+diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
+index bf5dfc9c8127..815e9437e3f0 100644
+--- a/arch/arm/boot/dts/imx6q-h100.dts
++++ b/arch/arm/boot/dts/imx6q-h100.dts
+@@ -42,7 +42,7 @@
+ /dts-v1/;
+ 
+ #include "imx6q.dtsi"
+-#include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-sr-som.dtsi"
+ 
+ / {
+ 	model = "Auvidea H100";
+diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+index 57ce2dbb6ad9..0bc1734d8bdf 100644
+--- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
+@@ -38,7 +38,7 @@
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+-#include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-sr-som.dtsi"
+ #include <dt-bindings/input/input.h>
+ #include <dt-bindings/gpio/gpio.h>
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+index afd981e9b5e3..246984992ad0 100644
+--- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
+@@ -38,7 +38,7 @@
+  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+  *     OTHER DEALINGS IN THE SOFTWARE.
+  */
+-#include "imx6qdl-microsom.dtsi"
++#include "imx6qdl-sr-som.dtsi"
+ 
+ / {
+ 	chosen {
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-sr-som.dtsi
+similarity index 100%
+rename from arch/arm/boot/dts/imx6qdl-microsom.dtsi
+rename to arch/arm/boot/dts/imx6qdl-sr-som.dtsi
+-- 
+2.7.4
