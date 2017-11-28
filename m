@@ -1,157 +1,218 @@
 From: robin.murphy@arm.com (Robin Murphy)
-Date: Tue, 28 Nov 2017 17:27:06 +0000
-Subject: [PATCH 3/4] iommu/arm-smmu-v3: Support 52-bit physical address
+Date: Tue, 28 Nov 2017 17:27:04 +0000
+Subject: [PATCH 1/4] iommu/arm-smmu-v3: Clean up address masking
 In-Reply-To: <cover.1511807303.git.robin.murphy@arm.com>
 References: <cover.1511807303.git.robin.murphy@arm.com>
-Message-ID: <9bd8616795de1dec4b7afbedf89b06b7b027e162.1511807303.git.robin.murphy@arm.com>
+Message-ID: <992f858619986284139dd002c67beba870b7d513.1511807303.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement SMMUv3.1 support for 52-bit physical addresses. Since a 52-bit
-OAS implies 64KB translation granule support, permitting level 1 block
-entries there is simple, and the rest is just extending address fields.
+Before trying to add the SMMUv3.1 support for 52-bit addresses, make
+things bearable by cleaning up the various address mask definitions to
+use GENMASK_ULL() consistently. The fact that doing so reveals (and
+fixes) a latent off-by-one in Q_BASE_ADDR_MASK only goes to show what a
+jolly good idea it is...
 
 Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 35 ++++++++++++++++++++---------------
- 1 file changed, 20 insertions(+), 15 deletions(-)
+ drivers/iommu/arm-smmu-v3.c | 52 ++++++++++++++++++---------------------------
+ 1 file changed, 21 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 89bcd39d213c..e251762663c6 100644
+index f122071688fd..89bcd39d213c 100644
 --- a/drivers/iommu/arm-smmu-v3.c
 +++ b/drivers/iommu/arm-smmu-v3.c
-@@ -101,6 +101,7 @@
- #define IDR5_OAS_42_BIT			(3 << IDR5_OAS_SHIFT)
- #define IDR5_OAS_44_BIT			(4 << IDR5_OAS_SHIFT)
- #define IDR5_OAS_48_BIT			(5 << IDR5_OAS_SHIFT)
-+#define IDR5_OAS_52_BIT			(6 << IDR5_OAS_SHIFT)
+@@ -22,6 +22,7 @@
  
- #define ARM_SMMU_CR0			0x20
- #define CR0_CMDQEN			(1 << 3)
-@@ -159,7 +160,7 @@
+ #include <linux/acpi.h>
+ #include <linux/acpi_iort.h>
++#include <linux/bitops.h>
+ #include <linux/delay.h>
+ #include <linux/dma-iommu.h>
+ #include <linux/err.h>
+@@ -158,8 +159,7 @@
  
  #define ARM_SMMU_STRTAB_BASE		0x80
  #define STRTAB_BASE_RA			(1UL << 62)
--#define STRTAB_BASE_ADDR_MASK		GENMASK_ULL(47, 6)
-+#define STRTAB_BASE_ADDR_MASK		GENMASK_ULL(51, 6)
+-#define STRTAB_BASE_ADDR_SHIFT		6
+-#define STRTAB_BASE_ADDR_MASK		0x3ffffffffffUL
++#define STRTAB_BASE_ADDR_MASK		GENMASK_ULL(47, 6)
  
  #define ARM_SMMU_STRTAB_BASE_CFG	0x88
  #define STRTAB_BASE_CFG_LOG2SIZE_SHIFT	0
-@@ -190,7 +191,7 @@
+@@ -190,8 +190,7 @@
  #define ARM_SMMU_PRIQ_IRQ_CFG2		0xdc
  
  /* Common MSI config fields */
--#define MSI_CFG0_ADDR_MASK		GENMASK_ULL(47, 2)
-+#define MSI_CFG0_ADDR_MASK		GENMASK_ULL(51, 2)
+-#define MSI_CFG0_ADDR_SHIFT		2
+-#define MSI_CFG0_ADDR_MASK		0x3fffffffffffUL
++#define MSI_CFG0_ADDR_MASK		GENMASK_ULL(47, 2)
  #define MSI_CFG2_SH_SHIFT		4
  #define MSI_CFG2_SH_NSH			(0UL << MSI_CFG2_SH_SHIFT)
  #define MSI_CFG2_SH_OSH			(2UL << MSI_CFG2_SH_SHIFT)
-@@ -206,7 +207,7 @@
+@@ -207,8 +206,7 @@
  					 Q_IDX(q, p) * (q)->ent_dwords)
  
  #define Q_BASE_RWA			(1UL << 62)
--#define Q_BASE_ADDR_MASK		GENMASK_ULL(47, 5)
-+#define Q_BASE_ADDR_MASK		GENMASK_ULL(51, 5)
+-#define Q_BASE_ADDR_SHIFT		5
+-#define Q_BASE_ADDR_MASK		0xfffffffffffUL
++#define Q_BASE_ADDR_MASK		GENMASK_ULL(47, 5)
  #define Q_BASE_LOG2SIZE_SHIFT		0
  #define Q_BASE_LOG2SIZE_MASK		0x1fUL
  
-@@ -223,7 +224,7 @@
+@@ -225,8 +223,7 @@
  #define STRTAB_L1_DESC_DWORDS		1
  #define STRTAB_L1_DESC_SPAN_SHIFT	0
  #define STRTAB_L1_DESC_SPAN_MASK	0x1fUL
--#define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(47, 6)
-+#define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(51, 6)
+-#define STRTAB_L1_DESC_L2PTR_SHIFT	6
+-#define STRTAB_L1_DESC_L2PTR_MASK	0x3ffffffffffUL
++#define STRTAB_L1_DESC_L2PTR_MASK	GENMASK_ULL(47, 6)
  
  #define STRTAB_STE_DWORDS		8
  #define STRTAB_STE_0_V			(1UL << 0)
-@@ -236,7 +237,7 @@
+@@ -239,8 +236,7 @@
  
  #define STRTAB_STE_0_S1FMT_SHIFT	4
  #define STRTAB_STE_0_S1FMT_LINEAR	(0UL << STRTAB_STE_0_S1FMT_SHIFT)
--#define STRTAB_STE_0_S1CTXPTR_MASK	GENMASK_ULL(47, 6)
-+#define STRTAB_STE_0_S1CTXPTR_MASK	GENMASK_ULL(51, 6)
+-#define STRTAB_STE_0_S1CTXPTR_SHIFT	6
+-#define STRTAB_STE_0_S1CTXPTR_MASK	0x3ffffffffffUL
++#define STRTAB_STE_0_S1CTXPTR_MASK	GENMASK_ULL(47, 6)
  #define STRTAB_STE_0_S1CDMAX_SHIFT	59
  #define STRTAB_STE_0_S1CDMAX_MASK	0x1fUL
  
-@@ -274,7 +275,7 @@
+@@ -278,8 +274,7 @@
  #define STRTAB_STE_2_S2PTW		(1UL << 54)
  #define STRTAB_STE_2_S2R		(1UL << 58)
  
--#define STRTAB_STE_3_S2TTB_MASK		GENMASK_ULL(47, 4)
-+#define STRTAB_STE_3_S2TTB_MASK		GENMASK_ULL(51, 4)
+-#define STRTAB_STE_3_S2TTB_SHIFT	4
+-#define STRTAB_STE_3_S2TTB_MASK		0xfffffffffffUL
++#define STRTAB_STE_3_S2TTB_MASK		GENMASK_ULL(47, 4)
  
  /* Context descriptor (stage-1 only) */
  #define CTXDESC_CD_DWORDS		8
-@@ -320,7 +321,7 @@
+@@ -325,8 +320,7 @@
  #define CTXDESC_CD_0_ASID_SHIFT		48
  #define CTXDESC_CD_0_ASID_MASK		0xffffUL
  
--#define CTXDESC_CD_1_TTB0_MASK		GENMASK_ULL(47, 4)
-+#define CTXDESC_CD_1_TTB0_MASK		GENMASK_ULL(51, 4)
+-#define CTXDESC_CD_1_TTB0_SHIFT		4
+-#define CTXDESC_CD_1_TTB0_MASK		0xfffffffffffUL
++#define CTXDESC_CD_1_TTB0_MASK		GENMASK_ULL(47, 4)
  
  #define CTXDESC_CD_3_MAIR_SHIFT		0
  
-@@ -357,7 +358,7 @@
+@@ -351,7 +345,7 @@
+ 
+ #define CMDQ_PREFETCH_0_SID_SHIFT	32
+ #define CMDQ_PREFETCH_1_SIZE_SHIFT	0
+-#define CMDQ_PREFETCH_1_ADDR_MASK	~0xfffUL
++#define CMDQ_PREFETCH_1_ADDR_MASK	GENMASK_ULL(63, 12)
+ 
+ #define CMDQ_CFGI_0_SID_SHIFT		32
+ #define CMDQ_CFGI_0_SID_MASK		0xffffffffUL
+@@ -362,8 +356,8 @@
+ #define CMDQ_TLBI_0_VMID_SHIFT		32
  #define CMDQ_TLBI_0_ASID_SHIFT		48
  #define CMDQ_TLBI_1_LEAF		(1UL << 0)
- #define CMDQ_TLBI_1_VA_MASK		GENMASK_ULL(63, 12)
--#define CMDQ_TLBI_1_IPA_MASK		GENMASK_ULL(47, 12)
-+#define CMDQ_TLBI_1_IPA_MASK		GENMASK_ULL(51, 12)
+-#define CMDQ_TLBI_1_VA_MASK		~0xfffUL
+-#define CMDQ_TLBI_1_IPA_MASK		0xfffffffff000UL
++#define CMDQ_TLBI_1_VA_MASK		GENMASK_ULL(63, 12)
++#define CMDQ_TLBI_1_IPA_MASK		GENMASK_ULL(47, 12)
  
  #define CMDQ_PRI_0_SSID_SHIFT		12
  #define CMDQ_PRI_0_SSID_MASK		0xfffffUL
-@@ -380,7 +381,7 @@
+@@ -386,8 +380,7 @@
  #define CMDQ_SYNC_0_MSIATTR_OIWB	(0xfUL << CMDQ_SYNC_0_MSIATTR_SHIFT)
  #define CMDQ_SYNC_0_MSIDATA_SHIFT	32
  #define CMDQ_SYNC_0_MSIDATA_MASK	0xffffffffUL
--#define CMDQ_SYNC_1_MSIADDR_MASK	GENMASK_ULL(47, 2)
-+#define CMDQ_SYNC_1_MSIADDR_MASK	GENMASK_ULL(51, 2)
+-#define CMDQ_SYNC_1_MSIADDR_SHIFT	0
+-#define CMDQ_SYNC_1_MSIADDR_MASK	0xffffffffffffcUL
++#define CMDQ_SYNC_1_MSIADDR_MASK	GENMASK_ULL(47, 2)
  
  /* Event queue */
  #define EVTQ_ENT_DWORDS			4
-@@ -1687,7 +1688,7 @@ static int arm_smmu_domain_finalise(struct iommu_domain *domain)
- 		return -ENOMEM;
+@@ -413,8 +406,7 @@
  
- 	domain->pgsize_bitmap = pgtbl_cfg.pgsize_bitmap;
--	domain->geometry.aperture_end = (1UL << ias) - 1;
-+	domain->geometry.aperture_end = (1UL << pgtbl_cfg.ias) - 1;
- 	domain->geometry.force_aperture = true;
- 	smmu_domain->pgtbl_ops = pgtbl_ops;
+ #define PRIQ_1_PRG_IDX_SHIFT		0
+ #define PRIQ_1_PRG_IDX_MASK		0x1ffUL
+-#define PRIQ_1_ADDR_SHIFT		12
+-#define PRIQ_1_ADDR_MASK		0xfffffffffffffUL
++#define PRIQ_1_ADDR_MASK		GENMASK_ULL(63, 12)
  
-@@ -2694,11 +2695,6 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 	if (reg & IDR5_GRAN4K)
- 		smmu->pgsize_bitmap |= SZ_4K | SZ_2M | SZ_1G;
+ /* High-level queue structures */
+ #define ARM_SMMU_POLL_TIMEOUT_US	100
+@@ -1093,7 +1085,7 @@ static void arm_smmu_write_ctx_desc(struct arm_smmu_device *smmu,
  
--	if (arm_smmu_ops.pgsize_bitmap == -1UL)
--		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
--	else
--		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
--
- 	/* Output address size */
- 	switch (reg & IDR5_OAS_MASK << IDR5_OAS_SHIFT) {
- 	case IDR5_OAS_32_BIT:
-@@ -2716,6 +2712,10 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 	case IDR5_OAS_44_BIT:
- 		smmu->oas = 44;
- 		break;
-+	case IDR5_OAS_52_BIT:
-+		smmu->oas = 52;
-+		smmu->pgsize_bitmap |= 1ULL << 42; /* 4TB */
-+		break;
- 	default:
- 		dev_info(smmu->dev,
- 			"unknown output address size. Truncating to 48-bit\n");
-@@ -2724,6 +2724,11 @@ static int arm_smmu_device_hw_probe(struct arm_smmu_device *smmu)
- 		smmu->oas = 48;
+ 	cfg->cdptr[0] = cpu_to_le64(val);
+ 
+-	val = cfg->cd.ttbr & CTXDESC_CD_1_TTB0_MASK << CTXDESC_CD_1_TTB0_SHIFT;
++	val = cfg->cd.ttbr & CTXDESC_CD_1_TTB0_MASK;
+ 	cfg->cdptr[1] = cpu_to_le64(val);
+ 
+ 	cfg->cdptr[3] = cpu_to_le64(cfg->cd.mair << CTXDESC_CD_3_MAIR_SHIFT);
+@@ -1108,7 +1100,7 @@ arm_smmu_write_strtab_l1_desc(__le64 *dst, struct arm_smmu_strtab_l1_desc *desc)
+ 	val |= (desc->span & STRTAB_L1_DESC_SPAN_MASK)
+ 		<< STRTAB_L1_DESC_SPAN_SHIFT;
+ 	val |= desc->l2ptr_dma &
+-	       STRTAB_L1_DESC_L2PTR_MASK << STRTAB_L1_DESC_L2PTR_SHIFT;
++	       STRTAB_L1_DESC_L2PTR_MASK;
+ 
+ 	*dst = cpu_to_le64(val);
+ }
+@@ -1214,8 +1206,7 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 		   !(smmu->features & ARM_SMMU_FEAT_STALL_FORCE))
+ 			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
+ 
+-		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
+-		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
++		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK) |
+ 			STRTAB_STE_0_CFG_S1_TRANS;
  	}
  
-+	if (arm_smmu_ops.pgsize_bitmap == -1UL)
-+		arm_smmu_ops.pgsize_bitmap = smmu->pgsize_bitmap;
-+	else
-+		arm_smmu_ops.pgsize_bitmap |= smmu->pgsize_bitmap;
-+
- 	/* Set the DMA mask for our table walker */
- 	if (dma_set_mask_and_coherent(smmu->dev, DMA_BIT_MASK(smmu->oas)))
- 		dev_warn(smmu->dev,
+@@ -1232,7 +1223,7 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 			 STRTAB_STE_2_S2R);
+ 
+ 		dst[3] = cpu_to_le64(ste->s2_cfg->vttbr &
+-			 STRTAB_STE_3_S2TTB_MASK << STRTAB_STE_3_S2TTB_SHIFT);
++			 STRTAB_STE_3_S2TTB_MASK);
+ 
+ 		val |= STRTAB_STE_0_CFG_S2_TRANS;
+ 	}
+@@ -1337,7 +1328,7 @@ static void arm_smmu_handle_ppr(struct arm_smmu_device *smmu, u64 *evt)
+ 		 evt[0] & PRIQ_0_PERM_READ ? "R" : "",
+ 		 evt[0] & PRIQ_0_PERM_WRITE ? "W" : "",
+ 		 evt[0] & PRIQ_0_PERM_EXEC ? "X" : "",
+-		 evt[1] & PRIQ_1_ADDR_MASK << PRIQ_1_ADDR_SHIFT);
++		 evt[1] & PRIQ_1_ADDR_MASK);
+ 
+ 	if (last) {
+ 		struct arm_smmu_cmdq_ent cmd = {
+@@ -2093,7 +2084,7 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+ 	q->ent_dwords	= dwords;
+ 
+ 	q->q_base  = Q_BASE_RWA;
+-	q->q_base |= q->base_dma & Q_BASE_ADDR_MASK << Q_BASE_ADDR_SHIFT;
++	q->q_base |= q->base_dma & Q_BASE_ADDR_MASK;
+ 	q->q_base |= (q->max_n_shift & Q_BASE_LOG2SIZE_MASK)
+ 		     << Q_BASE_LOG2SIZE_SHIFT;
+ 
+@@ -2230,8 +2221,7 @@ static int arm_smmu_init_strtab(struct arm_smmu_device *smmu)
+ 		return ret;
+ 
+ 	/* Set the strtab base address */
+-	reg  = smmu->strtab_cfg.strtab_dma &
+-	       STRTAB_BASE_ADDR_MASK << STRTAB_BASE_ADDR_SHIFT;
++	reg  = smmu->strtab_cfg.strtab_dma & STRTAB_BASE_ADDR_MASK;
+ 	reg |= STRTAB_BASE_RA;
+ 	smmu->strtab_cfg.strtab_base = reg;
+ 
+@@ -2294,7 +2284,7 @@ static void arm_smmu_write_msi_msg(struct msi_desc *desc, struct msi_msg *msg)
+ 	phys_addr_t *cfg = arm_smmu_msi_cfg[desc->platform.msi_index];
+ 
+ 	doorbell = (((u64)msg->address_hi) << 32) | msg->address_lo;
+-	doorbell &= MSI_CFG0_ADDR_MASK << MSI_CFG0_ADDR_SHIFT;
++	doorbell &= MSI_CFG0_ADDR_MASK;
+ 
+ 	writeq_relaxed(doorbell, smmu->base + cfg[0]);
+ 	writel_relaxed(msg->data, smmu->base + cfg[1]);
 -- 
 2.13.4.dirty
