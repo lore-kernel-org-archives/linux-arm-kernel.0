@@ -1,79 +1,56 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 28 Nov 2017 15:28:17 +0800
-Subject: [PATCH v7 1/6] dt-bindings: soc: add MT2712 power dt-bindings
+Date: Tue, 28 Nov 2017 15:28:16 +0800
+Subject: [PATCH v7 0/6] Mediatek MT2712 clock and scpsys support
 In-Reply-To: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
 References: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1511854102-23195-3-git-send-email-weiyi.lu@mediatek.com>
+Message-ID: <1511854102-23195-2-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add power dt-bindings for MT2712.
+This series is based on v4.15-rc1 and composed of
+scpsys control (PATCH 1-4) and device tree (PATCH 5-6)
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
----
- .../devicetree/bindings/soc/mediatek/scpsys.txt    |  3 +++
- include/dt-bindings/power/mt2712-power.h           | 26 ++++++++++++++++++++++
- 2 files changed, 29 insertions(+)
+changes since v6:
+- Rebase to v4.15-rc1.
+
+changes since v5:
+- Refine bus protection with proper variable name
+  and better implementation for the if statement.
+
+changes since v4:
+- Refine scpsys and infracfg for bus protection by passing
+  a boolean flag to determine the register update method
+
+changes since v3:
+- Rebase to v4.14-rc1.
+
+changes since v2:
+- ensure the clocks used by clocksource driver are registered
+  before clocksource init() by using CLK_OF_DECLARE()
+- correct the frequency of clk32k/clkrtc_ext/clkrtc_int
+
+changes since v1:
+- Rebase to v4.13-next-soc.
+- Refine scpsys and infracfg for bus protection.
+
+*** BLURB HERE ***
+
+Weiyi Lu (6):
+  dt-bindings: soc: add MT2712 power dt-bindings
+  soc: mediatek: extend bus protection API
+  soc: mediatek: add dependent clock jpgdec/audio for scpsys
+  soc: mediatek: add MT2712 scpsys support
+  arm: dts: mt2712: Add clock controller device nodes
+  arm: dts: Add power controller device node of MT2712
+
+ .../devicetree/bindings/soc/mediatek/scpsys.txt    |   3 +
+ arch/arm64/boot/dts/mediatek/mt2712e.dtsi          | 131 +++++++++++++++++++
+ drivers/soc/mediatek/mtk-infracfg.c                |  26 +++-
+ drivers/soc/mediatek/mtk-scpsys.c                  | 140 ++++++++++++++++++---
+ include/dt-bindings/power/mt2712-power.h           |  26 ++++
+ include/linux/soc/mediatek/infracfg.h              |   7 +-
+ 6 files changed, 311 insertions(+), 22 deletions(-)
  create mode 100644 include/dt-bindings/power/mt2712-power.h
 
-diff --git a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-index 40056f7..76bf45b 100644
---- a/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-+++ b/Documentation/devicetree/bindings/soc/mediatek/scpsys.txt
-@@ -12,11 +12,13 @@ power/power_domain.txt. It provides the power domains defined in
- - include/dt-bindings/power/mt8173-power.h
- - include/dt-bindings/power/mt6797-power.h
- - include/dt-bindings/power/mt2701-power.h
-+- include/dt-bindings/power/mt2712-power.h
- - include/dt-bindings/power/mt7622-power.h
- 
- Required properties:
- - compatible: Should be one of:
- 	- "mediatek,mt2701-scpsys"
-+	- "mediatek,mt2712-scpsys"
- 	- "mediatek,mt6797-scpsys"
- 	- "mediatek,mt7622-scpsys"
- 	- "mediatek,mt8173-scpsys"
-@@ -27,6 +29,7 @@ Required properties:
-                       These are clocks which hardware needs to be
-                       enabled before enabling certain power domains.
- 	Required clocks for MT2701: "mm", "mfg", "ethif"
-+	Required clocks for MT2712: "mm", "mfg", "venc", "jpgdec", "audio", "vdec"
- 	Required clocks for MT6797: "mm", "mfg", "vdec"
- 	Required clocks for MT7622: "hif_sel"
- 	Required clocks for MT8173: "mm", "mfg", "venc", "venc_lt"
-diff --git a/include/dt-bindings/power/mt2712-power.h b/include/dt-bindings/power/mt2712-power.h
-new file mode 100644
-index 0000000..92b46d7
---- /dev/null
-+++ b/include/dt-bindings/power/mt2712-power.h
-@@ -0,0 +1,26 @@
-+/*
-+ * Copyright (C) 2017 MediaTek Inc.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
-+ * See http://www.gnu.org/licenses/gpl-2.0.html for more details.
-+ */
-+
-+#ifndef _DT_BINDINGS_POWER_MT2712_POWER_H
-+#define _DT_BINDINGS_POWER_MT2712_POWER_H
-+
-+#define MT2712_POWER_DOMAIN_MM		0
-+#define MT2712_POWER_DOMAIN_VDEC	1
-+#define MT2712_POWER_DOMAIN_VENC	2
-+#define MT2712_POWER_DOMAIN_ISP		3
-+#define MT2712_POWER_DOMAIN_AUDIO	4
-+#define MT2712_POWER_DOMAIN_USB		5
-+#define MT2712_POWER_DOMAIN_USB2	6
-+#define MT2712_POWER_DOMAIN_MFG		7
-+
-+#endif /* _DT_BINDINGS_POWER_MT2712_POWER_H */
 -- 
 1.9.1
