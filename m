@@ -1,41 +1,85 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Tue, 28 Nov 2017 14:31:03 -0200
-Subject: [PATCH v2 00/16] SolidRun Hummingboard DT updates
-In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
-References: <20171128150045.GV31757@n2100.armlinux.org.uk>
-Message-ID: <CAOMZO5B6KEbmrgm3An=NXidD8Lfu35dMebWPPbLzjFL8Bmuupw@mail.gmail.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Tue, 28 Nov 2017 16:48:55 +0100
+Subject: [PATCH v3 2/4] omapdrm: panel: td028ttec1: replace MODULE_ALIAS by
+ MODULE_DEVICE_TABLE
+In-Reply-To: <cover.1511884135.git.hns@goldelico.com>
+References: <cover.1511884135.git.hns@goldelico.com>
+Message-ID: <655c9a39d590a5fa7187350269c2914b781d84cc.1511884135.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 1:00 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> Hi Shawn,
->
-> This series updates the SolidRun Hummingboard platforms to:
-> (a) make the DT more reflective of the schematics
-> (b) re-organise how we deal with the differences between various board
->     versions in preparation for the new 1.5 SOM.
->
-> The idea with (b) is that we add the support for the board + usom
-> combination by including the appropriate dtsi files.
->
-> For example, in mainline at the moment, we support two variants of the
-> Hummingboards - both with Broadcom Wi-Fi and without eMMC.  Going
-> forward, when a 1.5 SOM is fitted (which modern Hummingboards will all
-> have) the boards will have TI Wi-Fi and potentially eMMC on the usom.
->
-> This series adds the dtsi files for the new SOM and dts files for the
-> platform variants (v1.5 SOM without eMMC, v1.5 SOM with eMMC.)  It's
-> unfortunate that the w/o eMMC variant can't detect the lack of eMMC,
-> running the eMMC version without eMMC on the boards results in an
-> almost constant stream of kernel messages.
->
-> Feedback from the previous posting has been addressed, and additional
-> changes adding the v1.5 SOM board level files added through discussion
-> with Jon.
+to make it easier to keep in sync with the OF device table.
 
-Looks good, thanks.
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+---
+ drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c      | 12 ++++++++++--
+ .../video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c | 11 +++++++++--
+ 2 files changed, 19 insertions(+), 4 deletions(-)
 
-For the whole series:
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+diff --git a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+index a0dfa14f4fab..2721a86ac5e7 100644
+--- a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
++++ b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+@@ -460,9 +460,19 @@ static const struct of_device_id td028ttec1_of_match[] = {
+ 
+ MODULE_DEVICE_TABLE(of, td028ttec1_of_match);
+ 
++static const struct spi_device_id td028ttec1_ids[] = {
++	{ "toppoly,td028ttec1", 0 },
++	{ "tpo,td028ttec1", 0},
++	{ /* sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(spi, td028ttec1_ids);
++
++
+ static struct spi_driver td028ttec1_spi_driver = {
+ 	.probe		= td028ttec1_panel_probe,
+ 	.remove		= td028ttec1_panel_remove,
++	.id_table	= td028ttec1_ids,
+ 
+ 	.driver         = {
+ 		.name   = "panel-tpo-td028ttec1",
+@@ -473,8 +483,6 @@ static struct spi_driver td028ttec1_spi_driver = {
+ 
+ module_spi_driver(td028ttec1_spi_driver);
+ 
+-MODULE_ALIAS("spi:tpo,td028ttec1");
+-MODULE_ALIAS("spi:toppoly,td028ttec1");
+ MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
+ MODULE_DESCRIPTION("Toppoly TD028TTEC1 panel driver");
+ MODULE_LICENSE("GPL");
+diff --git a/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c b/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
+index 4aeb908f2d1e..f6da8755b859 100644
+--- a/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
++++ b/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
+@@ -463,9 +463,18 @@ static const struct of_device_id td028ttec1_of_match[] = {
+ 
+ MODULE_DEVICE_TABLE(of, td028ttec1_of_match);
+ 
++static const struct spi_device_id td028ttec1_ids[] = {
++	{ "toppoly,td028ttec1", 0 },
++	{ "tpo,td028ttec1", 0},
++	{ /* sentinel */ }
++};
++
++MODULE_DEVICE_TABLE(spi, td028ttec1_ids);
++
+ static struct spi_driver td028ttec1_spi_driver = {
+ 	.probe		= td028ttec1_panel_probe,
+ 	.remove		= td028ttec1_panel_remove,
++	.id_table	= td028ttec1_ids,
+ 
+ 	.driver         = {
+ 		.name   = "panel-tpo-td028ttec1",
+@@ -476,8 +485,6 @@ static struct spi_driver td028ttec1_spi_driver = {
+ 
+ module_spi_driver(td028ttec1_spi_driver);
+ 
+-MODULE_ALIAS("spi:tpo,td028ttec1");
+-MODULE_ALIAS("spi:toppoly,td028ttec1");
+ MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
+ MODULE_DESCRIPTION("Toppoly TD028TTEC1 panel driver");
+ MODULE_LICENSE("GPL");
+-- 
+2.12.2
