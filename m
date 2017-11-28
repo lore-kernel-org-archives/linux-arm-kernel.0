@@ -1,53 +1,65 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 28 Nov 2017 15:03:01 +0000
-Subject: [PATCH v2 13/16] ARM: dts: imx6qdl: SolidRun: fix node names
-In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
-References: <20171128150045.GV31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJhPZ-0006OR-He@rmk-PC.armlinux.org.uk>
+From: ville.syrjala@linux.intel.com (Ville =?iso-8859-1?Q?Syrj=E4l=E4?=)
+Date: Tue, 28 Nov 2017 17:30:51 +0200
+Subject: [Intel-gfx] [PATCH V3 09/29] drm/i915: deprecate
+ pci_get_bus_and_slot()
+In-Reply-To: <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
+Message-ID: <20171128153051.GU10981@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Node names are supposed to be generic, fix the RTC and codec node
-names for both Hummingboard and Cubox-i.
+On Mon, Nov 27, 2017 at 11:57:46AM -0500, Sinan Kaya wrote:
+> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> where a PCI device is present. This restricts the device drivers to be
+> reused for other domain numbers.
+> 
+> Getting ready to remove pci_get_bus_and_slot() function in favor of
+> pci_get_domain_bus_and_slot().
+> 
+> Extract the domain number from drm_device and pass it into
+> pci_get_domain_bus_and_slot() function.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/gpu/drm/i915/i915_drv.c | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/gpu/drm/i915/i915_drv.c b/drivers/gpu/drm/i915/i915_drv.c
+> index 9f45cfe..5a8cb79 100644
+> --- a/drivers/gpu/drm/i915/i915_drv.c
+> +++ b/drivers/gpu/drm/i915/i915_drv.c
+> @@ -419,7 +419,10 @@ static int i915_getparam(struct drm_device *dev, void *data,
+>  
+>  static int i915_get_bridge_dev(struct drm_i915_private *dev_priv)
+>  {
+> -	dev_priv->bridge_dev = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
+> +	int domain = pci_domain_nr(dev_priv->drm.pdev->bus);
+> +
+> +	dev_priv->bridge_dev =
+> +		pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(0, 0));
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi      | 2 +-
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 4 ++--
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Maybe just pci_get_slot(pdev->bus, PCI_DEVFN(0, 0)) ?
 
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index 7a3fba776661..ca04ec56d2af 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -135,7 +135,7 @@
- 
- 	status = "okay";
- 
--	rtc: pcf8523 at 68 {
-+	rtc at 68 {
- 		compatible = "nxp,pcf8523";
- 		reg = <0x68>;
- 	};
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 66bda5a04582..92583238ca4a 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -150,13 +150,13 @@
- 	status = "okay";
- 
- 	/* Pro baseboard model */
--	rtc: pcf8523 at 68 {
-+	rtc at 68 {
- 		compatible = "nxp,pcf8523";
- 		reg = <0x68>;
- 	};
- 
- 	/* Pro baseboard model */
--	sgtl5000: sgtl5000 at a {
-+	sgtl5000: codec at a {
- 		clocks = <&clks IMX6QDL_CLK_CKO>;
- 		compatible = "fsl,sgtl5000";
- 		pinctrl-names = "default";
+I guess if we want to be pedantic we could go for:
+
+bus = pci_find_host_bridge(pdev->bus)->bus;
+pci_get_slot(bus, PCI_DEVFN(0, 0))
+
+but I think the GPU should always be on the root bus, so the simpler
+form should be fine.
+
+>  	if (!dev_priv->bridge_dev) {
+>  		DRM_ERROR("bridge device not found\n");
+>  		return -1;
+> -- 
+> 1.9.1
+> 
+> _______________________________________________
+> Intel-gfx mailing list
+> Intel-gfx at lists.freedesktop.org
+> https://lists.freedesktop.org/mailman/listinfo/intel-gfx
+
 -- 
-2.7.4
+Ville Syrj?l?
+Intel OTC
