@@ -1,65 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Nov 2017 20:22:13 +0000
-Subject: Applied "spi: meson-axg: add SPICC driver support" to the spi tree
-In-Reply-To: <20171128132926.19051-3-yixun.lan@amlogic.com>
-Message-ID: <E1eJmOT-0008CS-OP@debutante>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Nov 2017 21:40:19 +0100
+Subject: [PATCH 09/17] drm/sun4i: Add scaler library for DE2
+In-Reply-To: <20171127205750.19277-10-jernej.skrabec@siol.net>
+References: <20171127205750.19277-1-jernej.skrabec@siol.net>
+ <20171127205750.19277-10-jernej.skrabec@siol.net>
+Message-ID: <20171128204019.tzyfn45gnwxe5uao@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi,
 
-   spi: meson-axg: add SPICC driver support
+On Mon, Nov 27, 2017 at 09:57:42PM +0100, Jernej Skrabec wrote:
+> Scaler library currently supports scaling only RGB planes on VI planes.
+> 
+> Coefficients and algorithm which ones to select are taken from BSP driver.
+> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  drivers/gpu/drm/sun4i/Makefile       |   2 +-
+>  drivers/gpu/drm/sun4i/sun8i_scaler.c | 667 +++++++++++++++++++++++++++++++++++
+>  drivers/gpu/drm/sun4i/sun8i_scaler.h |  78 ++++
+>  3 files changed, 746 insertions(+), 1 deletion(-)
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_scaler.c
+>  create mode 100644 drivers/gpu/drm/sun4i/sun8i_scaler.h
+> 
+> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+> index 0c2f8c7facae..70df480792f9 100644
+> --- a/drivers/gpu/drm/sun4i/Makefile
+> +++ b/drivers/gpu/drm/sun4i/Makefile
+> @@ -9,7 +9,7 @@ sun4i-drm-hdmi-y		+= sun4i_hdmi_enc.o
+>  sun4i-drm-hdmi-y		+= sun4i_hdmi_i2c.o
+>  sun4i-drm-hdmi-y		+= sun4i_hdmi_tmds_clk.o
+>  
+> -sun8i-mixer-y			+= sun8i_mixer.o sun8i_layer.o
+> +sun8i-mixer-y			+= sun8i_mixer.o sun8i_layer.o sun8i_scaler.o
+>  
+>  sun4i-tcon-y			+= sun4i_crtc.o
+>  sun4i-tcon-y			+= sun4i_dotclock.o
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_scaler.c b/drivers/gpu/drm/sun4i/sun8i_scaler.c
+> new file mode 100644
+> index 000000000000..23525beceaa2
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun8i_scaler.c
+> @@ -0,0 +1,667 @@
+> +/*
+> + * Copyright (C) 2017 Jernej Skrabec <jernej.skrabec@siol.net>
+> + *
+> + * Coefficients are taken from BSP driver, which is:
+> + * Copyright (C) 2014-2015 Allwinner
 
-has been applied to the spi tree at
+Saying from which BSP you got them would be great for future reference
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+It looks good otherwise. I kind of hate those big array of
+undocumented data, but there's nothing you can do about it either, so
+we'll have to deal with it :)
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
+Thanks!
+Maxime
 
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From a5db27c00da37654ba518b814925d4e9cd05259c Mon Sep 17 00:00:00 2001
-From: Sunny Luo <sunny.luo@amlogic.com>
-Date: Tue, 28 Nov 2017 21:29:25 +0800
-Subject: [PATCH] spi: meson-axg: add SPICC driver support
-
-Add new compatible string to support SPICC controller which
-found at Amlogic Meson-AXG SoC. This is aiming at adding
-a couple of enhanced feature patches.
-
-Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- drivers/spi/spi-meson-spicc.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/spi/spi-meson-spicc.c b/drivers/spi/spi-meson-spicc.c
-index 7f8429635502..5c82910e3480 100644
---- a/drivers/spi/spi-meson-spicc.c
-+++ b/drivers/spi/spi-meson-spicc.c
-@@ -599,6 +599,7 @@ static int meson_spicc_remove(struct platform_device *pdev)
- 
- static const struct of_device_id meson_spicc_of_match[] = {
- 	{ .compatible = "amlogic,meson-gx-spicc", },
-+	{ .compatible = "amlogic,meson-axg-spicc", },
- 	{ /* sentinel */ }
- };
- MODULE_DEVICE_TABLE(of, meson_spicc_of_match);
 -- 
-2.15.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/b0cd538b/attachment.sig>
