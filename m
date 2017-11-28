@@ -1,97 +1,195 @@
 From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 28 Nov 2017 15:02:15 +0000
-Subject: [PATCH v2 04/16] ARM: dts: imx6qdl: SolidRun: move microsom includes
- into .dts
+Date: Tue, 28 Nov 2017 15:01:59 +0000
+Subject: [PATCH v2 01/16] ARM: dts: imx6qdl: SolidRun: remove redundant
+ regulators node
 In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
 References: <20171128150045.GV31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJhOp-0006NO-Ci@rmk-PC.armlinux.org.uk>
+Message-ID: <E1eJhOZ-0006N3-WC@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move the microsom includes into the .dts files so different options can
-be accomodated at the lowest level.
+The regulators node is redundant, and serves no useful function.
+Remove it from i.MX6 SolidRun platforms.
 
 Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
 ---
- arch/arm/boot/dts/imx6dl-cubox-i.dts        | 1 +
- arch/arm/boot/dts/imx6dl-hummingboard.dts   | 1 +
- arch/arm/boot/dts/imx6q-cubox-i.dts         | 1 +
- arch/arm/boot/dts/imx6q-hummingboard.dts    | 1 +
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi      | 1 -
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 1 -
- 6 files changed, 4 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/imx6qdl-cubox-i.dtsi      | 56 ++++++++++++++---------------
+ arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 56 ++++++++++++++---------------
+ arch/arm/boot/dts/imx6qdl-microsom.dtsi     | 24 ++++++-------
+ 3 files changed, 62 insertions(+), 74 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-cubox-i.dts b/arch/arm/boot/dts/imx6dl-cubox-i.dts
-index f10a36b8647d..045e59de5ffe 100644
---- a/arch/arm/boot/dts/imx6dl-cubox-i.dts
-+++ b/arch/arm/boot/dts/imx6dl-cubox-i.dts
-@@ -41,6 +41,7 @@
- /dts-v1/;
- 
- #include "imx6dl.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-cubox-i.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/imx6dl-hummingboard.dts b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-index 39c2602fa87c..c3b826f4cab9 100644
---- a/arch/arm/boot/dts/imx6dl-hummingboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-hummingboard.dts
-@@ -42,6 +42,7 @@
- /dts-v1/;
- 
- #include "imx6dl.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-hummingboard.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/imx6q-cubox-i.dts b/arch/arm/boot/dts/imx6q-cubox-i.dts
-index b68aa0e57f20..b9f581d0fa86 100644
---- a/arch/arm/boot/dts/imx6q-cubox-i.dts
-+++ b/arch/arm/boot/dts/imx6q-cubox-i.dts
-@@ -41,6 +41,7 @@
- /dts-v1/;
- 
- #include "imx6q.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-cubox-i.dtsi"
- 
- / {
-diff --git a/arch/arm/boot/dts/imx6q-hummingboard.dts b/arch/arm/boot/dts/imx6q-hummingboard.dts
-index 69a7a0a1cb21..5f218856c3e5 100644
---- a/arch/arm/boot/dts/imx6q-hummingboard.dts
-+++ b/arch/arm/boot/dts/imx6q-hummingboard.dts
-@@ -42,6 +42,7 @@
- /dts-v1/;
- 
- #include "imx6q.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- #include "imx6qdl-hummingboard.dtsi"
- 
- / {
 diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index 0bc1734d8bdf..98ec7ce1f2a3 100644
+index 14fff4ee6516..b20508237046 100644
 --- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -38,7 +38,6 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
--#include "imx6qdl-sr-som.dtsi"
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
+@@ -64,38 +64,34 @@
+ 		};
+ 	};
  
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_3p3v: 3p3v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
+ 
+-		reg_usbh1_vbus: usb-h1-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio1 0 0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbh1_vbus: usb-h1-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio1 0 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
+ 
+-		reg_usbotg_vbus: usb-otg-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio3 22 0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbotg_vbus: usb-otg-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 22 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
+ 	};
+ 
+ 	sound-spdif {
 diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 246984992ad0..84e6392fee1f 100644
+index 37c07c0748aa..0a0a7e4b956b 100644
 --- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -38,7 +38,6 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
--#include "imx6qdl-sr-som.dtsi"
+@@ -53,38 +53,34 @@
+ 		pinctrl-0 = <&pinctrl_hummingboard_gpio3_5>;
+ 	};
  
- / {
- 	chosen {
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_3p3v: 3p3v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
+ 
+-		reg_usbh1_vbus: usb-h1-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbh1_vbus: usb-h1-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
+ 
+-		reg_usbotg_vbus: usb-otg-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbotg_vbus: usb-otg-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
+ 	};
+ 
+ 	sound-sgtl5000 {
+diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+index 6a410160c9ee..f7266ae2534c 100644
+--- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
+@@ -48,20 +48,16 @@
+ 		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
+ 	};
+ 
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_brcm: brcm-reg {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio3 19 0>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
+-			regulator-name = "brcm_reg";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			startup-delay-us = <200000>;
+-		};
++	reg_brcm: brcm-reg {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio3 19 0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
++		regulator-name = "brcm_reg";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		startup-delay-us = <200000>;
+ 	};
+ 
+ 	usdhc1_pwrseq: usdhc1_pwrseq {
 -- 
 2.7.4
