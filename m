@@ -1,101 +1,232 @@
-From: jack@suse.cz (Jan Kara)
-Date: Tue, 28 Nov 2017 10:12:34 +0100
-Subject: [PATCH 1/2] mm: make faultaround produce old ptes
-In-Reply-To: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
-References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
-Message-ID: <20171128091234.GH5977@quack2.suse.cz>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 28 Nov 2017 17:26:37 +0800
+Subject: [linux-sunxi] Re: [PATCH] ARM: dts: sun8i: h3: Add dts file for
+ Libre Computer Board ALL-H3-CC H3 ver.
+In-Reply-To: <20171128084359.rzplftb3z53cgukp@flea.home>
+References: <20171128041211.17375-1-wens@csie.org>
+ <20171128084359.rzplftb3z53cgukp@flea.home>
+Message-ID: <CAGb2v67dg1dCw+n3aQ1aFqtZXU245v6jQ0E=4onPYjUOpUHjPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 28-11-17 10:37:49, Vinayak Menon wrote:
-> Based on Kirill's patch [1].
-> 
-> Currently, faultaround code produces young pte.  This can screw up
-> vmscan behaviour[2], as it makes vmscan think that these pages are hot
-> and not push them out on first round.
-> 
-> During sparse file access faultaround gets more pages mapped and all of
-> them are young.  Under memory pressure, this makes vmscan swap out anon
-> pages instead, or to drop other page cache pages which otherwise stay
-> resident.
-> 
-> Modify faultaround to produce old ptes, so they can easily be reclaimed
-> under memory pressure.
-> 
-> This can to some extend defeat the purpose of faultaround on machines
-> without hardware accessed bit as it will not help us with reducing the
-> number of minor page faults.
-> 
-> Making the faultaround ptes old results in a unixbench regression for some
-> architectures [3][4]. But on some architectures it is not found to cause
-> any regression. So by default produce young ptes and provide an option for
-> architectures to make the ptes old.
-> 
-> [1] http://lkml.kernel.org/r/1463488366-47723-1-git-send-email-kirill.shutemov at linux.intel.com
-> [2] https://lkml.kernel.org/r/1460992636-711-1-git-send-email-vinmenon at codeaurora.org
-> [3] https://marc.info/?l=linux-kernel&m=146582237922378&w=2
-> [4] https://marc.info/?l=linux-mm&m=146589376909424&w=2
-> 
-> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
-> ---
->  include/linux/mm-arch-hooks.h | 7 +++++++
->  include/linux/mm.h            | 2 ++
->  mm/filemap.c                  | 4 ++++
->  mm/memory.c                   | 5 +++++
->  4 files changed, 18 insertions(+)
-> 
-> diff --git a/include/linux/mm-arch-hooks.h b/include/linux/mm-arch-hooks.h
-> index 4efc3f56..0322b98 100644
-> --- a/include/linux/mm-arch-hooks.h
-> +++ b/include/linux/mm-arch-hooks.h
-> @@ -22,4 +22,11 @@ static inline void arch_remap(struct mm_struct *mm,
->  #define arch_remap arch_remap
->  #endif
->  
-> +#ifndef arch_faultaround_pte_mkold
-> +static inline void arch_faultaround_pte_mkold(struct vm_fault *vmf)
-> +{
-> +}
-> +#define arch_faultaround_pte_mkold arch_faultaround_pte_mkold
-> +#endif
-> +
->  #endif /* _LINUX_MM_ARCH_HOOKS_H */
-> diff --git a/include/linux/mm.h b/include/linux/mm.h
-> index 7661156..be689a0 100644
-> --- a/include/linux/mm.h
-> +++ b/include/linux/mm.h
-> @@ -302,6 +302,7 @@ extern int overcommit_kbytes_handler(struct ctl_table *, int, void __user *,
->  #define FAULT_FLAG_USER		0x40	/* The fault originated in userspace */
->  #define FAULT_FLAG_REMOTE	0x80	/* faulting for non current tsk/mm */
->  #define FAULT_FLAG_INSTRUCTION  0x100	/* The fault was during an instruction fetch */
-> +#define FAULT_FLAG_MKOLD	0x200	/* Make faultaround ptes old */
+On Tue, Nov 28, 2017 at 4:43 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Tue, Nov 28, 2017 at 12:12:11PM +0800, Chen-Yu Tsai wrote:
+>> The Libre Computer Board ALL-H3-CC from Libre Technology is a Raspberry
+>> Pi B+ form factor single board computer based on the Allwinner H3 SoC.
+>> The board has 1GB DDR3 SDRAM, provided by 4 2Gb chips. The mounting holes
+>> and connectors are in the exact same position as on the Raspberry Pi B+.
+>>
+>> Raspberry Pi B+ like peripherals supported on this board include:
+>>
+>>   - Power input through micro-USB connector (without USB OTG)
+>>   - Native 100 Mbps ethernet using the internal PHY, as opposed to
+>>     USB-based on the RPi
+>>   - 4x USB 2.0 host ports, directly connected to the SoC, as opposed to
+>>     being connected through a USB 2.0 hub on the RPi
+>>   - TV and audio output on a 3.5mm TRRS jack
+>>   - HDMI output
+>>   - Micro-SD card slot
+>>   - Standard RPi B+ GPIO header, with the standard peripherals routed to
+>>     the same pins.
+>>
+>>     * 5V, 3.3V power, and ground
+>>     * I2C0 on the H3 is routed to I2C1 pins on the RPi header
+>>     * I2C1 on the H3 is routed to I2C0 pins on the RPi header
+>>     * UART1 on the H3 is routed to UART0 pins on the RPi header
+>>     * SPI0 on the H3 is routed to SPI0 pins on the RPi header,
+>>       with GPIO pin PA17 replacing the missing Chip Select 1
+>>     * I2S1 on the H3 is routed to PCM pins on the RPi header
+>>
+>>   - Additional peripherals from the H3 are available on different pins.
+>>     These include I2S0, JTAG, PWM1, SPDIF, SPI1, and UART3
+>>
+>> In addition, there are a number of new features:
+>>
+>>   - Console UART header
+>>   - Consumer IR receiver
+>>   - Camera interface (not compatible with RPi)
+>>   - Onboard microphone
+>>   - eMMC expansion module port
+>>   - Heatsink mounting holes
+>>
+>> This patch adds a dts file for this board that enables all "onboard"
+>> peripherals currently supported. This means no display or camera
+>> support.
+>>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> ---
+>>
+>> There are two other variants [1] of this board, with different SoCs and
+>> DRAM configuration. But the board remains the same, thanks to the SoCs
+>> being pin compatible.
+>>
+>> Do we need different board compatible strings?
+>
+> Yes.
+>
+>> FWIW the soc compatible string already encodes the soc variant, and
+>> the DRAM stuff is handled by the bootloader. The filename also has
+>> the SoC family and chip name.  The displayed board model also has
+>> the SoC variant included. The board itself is named "ALL-H3-CC".
+>
+> The point of a board compatible is to identify the way a board
+> behaves. If we ever need to make any quirks for one particular board,
+> we have to have a compatible that uniquely identifies it.
+>
+> However, we can have an intermediate compatible as well to catch all
+> those similar boards.
+>
+> Something like:
+>    compatible = "libretech,h3-tritium", "libretech,tritium", "allwinner,sun8i-h3";
 
-Nit: Can we make this FAULT_FLAG_PREFAULT_OLD or something like that so
-that it is clear from the flag name that this is about prefaulting of
-pages?
+compatible = "libretech,all-h3-cc-h3", "libretech,all-h3-cc",
+"allwinner,sun8i-h3";
 
->  #define FAULT_FLAG_TRACE \
->  	{ FAULT_FLAG_WRITE,		"WRITE" }, \
-> @@ -330,6 +331,7 @@ struct vm_fault {
->  	gfp_t gfp_mask;			/* gfp mask to be used for allocations */
->  	pgoff_t pgoff;			/* Logical page offset based on vma */
->  	unsigned long address;		/* Faulting virtual address */
-> +	unsigned long fault_address;    /* Saved faulting virtual address */
+(See below about the names.) Does that look confusing?
 
-Ugh, so I dislike how you hide the decision about whether the *particular*
-PTE should be old or young in the arch code. Sure the arch wants to decide
-whether the prefaulted PTEs should be old or young and that it has to tell
-us but the arch code has no business in checking whether this is prefault
-or a normal fault - that decision belongs to filemap_map_pages(). So I'd do
-in filemap_map_pages() something like:
+>
+>> I'm asking as we have the same issue with the Bananapi M2+ [2], where
+>> they've released new variants with different SoCs and DRAM capacities
+>> using the same board. Not sure if they are commercially available though.
+>
+> You can have a look at the way we handled all the q8 tablets that were
+> pretty much in the same case. It's been working quite well.
 
-	if (iter.index > start_pgoff && arch_wants_old_faultaround_pte())
-		vmf->flags |= FAULT_FLAG_PREFAULT_OLD;
+You mean the sun?i-reference-tablet-design.dtsi files? I'm thinking we
+might not have to go that far. The other variants could have:
 
-And then there's no need for new fault_address in vm_fault or messing with
-addresses and fault flags in arch specific code.
+    #include "sun8i-h3-libretech-all-h3-cc.dts"
+    #include "sun8i-h5.dtsi"
 
-								Honza
--- 
-Jan Kara <jack@suse.com>
-SUSE Labs, CR
+    And then override the board compatible and model.
+
+Might not work. I'm not sure at this moment.
+
+>
+>> Last, the LED polarity is wrong. This is due to the EMAC driver not
+>> following the DT binding and looking for the "allwinner,leds-active-low"
+>> under the PHY node, instead of the EMAC node. I've notified Corentin of
+>> this issue.
+>
+> The DT should be correct, even if the code isn't. This seems to be a
+> driver bug that should be fixed, but we don't want to change the DT.
+
+So I'll leave it as is, as in the DT is correct.
+
+>
+>> [1] https://www.kickstarter.com/projects/librecomputer/libre-computer-board-tritium-sbc-linux-android-7-n
+>> [2] http://www.banana-pi.org/m2plus.html
+>> ---
+>>  arch/arm/boot/dts/Makefile                         |   1 +
+>>  arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 196 +++++++++++++++++++++
+>>  2 files changed, 197 insertions(+)
+>>  create mode 100644 arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index 3c139c63098f..aa68f719692f 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -953,6 +953,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+>>       sun8i-h2-plus-orangepi-zero.dtb \
+>>       sun8i-h3-bananapi-m2-plus.dtb \
+>>       sun8i-h3-beelink-x2.dtb \
+>> +     sun8i-h3-libretech-all-h3-cc.dtb \
+>
+> Any reason to use the code name and not the "marketing" name?
+
+I've asked and this is the preferred name. "Tritium" is more of an internal
+codename.
+
+>
+>>       sun8i-h3-nanopi-m1.dtb  \
+>>       sun8i-h3-nanopi-m1-plus.dtb \
+>>       sun8i-h3-nanopi-neo.dtb \
+>> diff --git a/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+>> new file mode 100644
+>> index 000000000000..6f544e007f71
+>> --- /dev/null
+>> +++ b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+>> @@ -0,0 +1,196 @@
+>> +/*
+>> + * Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
+>> + *
+>> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "sun8i-h3.dtsi"
+>> +
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +#include <dt-bindings/input/input.h>
+>> +
+>> +/ {
+>> +     model = "Libre Computer Board ALL-H3-CC H3";
+>> +     compatible = "libretech,all-h3-cc", "allwinner,sun8i-h3";
+>> +
+>> +     aliases {
+>> +             ethernet0 = &emac;
+>> +             serial0 = &uart0;
+>> +     };
+>> +
+>> +     chosen {
+>> +             stdout-path = "serial0:115200n8";
+>> +     };
+>> +
+>> +     leds {
+>> +             compatible = "gpio-leds";
+>> +
+>> +             pwr_led {
+>> +                     label = "librecomputer:pwr";
+>
+> You should have the color there too.
+>
+>> +                     gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
+>> +                     default-state = "on";
+>> +             };
+>> +
+>> +             status_led {
+>> +                     label = "librecomputer:status";
+>
+> Same thing here.
+
+OK.
+
+>
+>> +                     gpios = <&pio 0 7 GPIO_ACTIVE_HIGH>; /* PA7 */
+>> +             };
+>> +     };
+>> +
+>> +     gpio_keys {
+>> +             compatible = "gpio-keys";
+>> +
+>> +             recovery {
+>> +                     label = "recovery";
+>> +                     linux,code = <BTN_0>;
+>
+> How did you pick that keycode?
+
+It's the same as the Orange Pis. The board however does mark it as
+"Power Key". However the H3 (on mainline) does not have the ability
+to come back up once powered down, nor do we have the ability to
+power it off right now. (We could turn it off using "gpio-poweroff",
+though I'm sensing the GPIO usage would conflict with the regulator
+drivers.) I'll ask about the intended usage and behavior.
+
+ChenYu
+
+>
+> Looks good otherwise, thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
