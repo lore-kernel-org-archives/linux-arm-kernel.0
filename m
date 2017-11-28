@@ -1,73 +1,53 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 28 Nov 2017 17:14:06 +0100
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Nov 2017 08:18:34 -0800
 Subject: [PATCH v3 4/4] DTS: Pandora: fix panel compatibility string
-In-Reply-To: <20171128160437.GD28152@atomide.com>
+In-Reply-To: <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
 References: <cover.1511884135.git.hns@goldelico.com>
  <b6001c7b7fb98e7a3ad4c712084fea9dae9e6b27.1511884135.git.hns@goldelico.com>
  <20171128160437.GD28152@atomide.com>
-Message-ID: <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
+ <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
+Message-ID: <20171128161834.GE28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
-
-> Am 28.11.2017 um 17:04 schrieb Tony Lindgren <tony@atomide.com>:
+* H. Nikolaus Schaller <hns@goldelico.com> [171128 16:17]:
+> Hi Tony,
 > 
-> * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:52]:
->> We can remove the unnecessary "omapdss," prefix because
->> the omapdrm driver takes care of it when matching with
->> the driver table.
+> > Am 28.11.2017 um 17:04 schrieb Tony Lindgren <tony@atomide.com>:
+> > 
+> > * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:52]:
+> >> We can remove the unnecessary "omapdss," prefix because
+> >> the omapdrm driver takes care of it when matching with
+> >> the driver table.
+> > 
+> > So is this needed as a fix or is this another clean-up?
+> > 
+> > So is this is really needed as a fix?
 > 
-> So is this needed as a fix or is this another clean-up?
+> Hm. How do you differentiate between "fix" and "cleanup"?
+> Maybe it is more a wording than a content issue...
 > 
-> So is this is really needed as a fix?
+> For me it is a "fix" because it is semantically wrong to have
+> a prefix where it is not needed. And "fixing" it changes the
+> compiler output by 8 bytes.
 
-Hm. How do you differentiate between "fix" and "cleanup"?
-Maybe it is more a wording than a content issue...
+How about let's call it a "typo fix" then? :)
 
-For me it is a "fix" because it is semantically wrong to have
-a prefix where it is not needed. And "fixing" it changes the
-compiler output by 8 bytes.
-
-"Cleanup" would be for me removing whitespace or empty lines
-or typos in comments.
-
+> "Cleanup" would be for me removing whitespace or empty lines
+> or typos in comments.
+>
+> > If this is just clean-up, again, please resend once the driver
+> > changes have cleared.
 > 
-> If this is just clean-up, again, please resend once the driver
-> changes have cleared.
-
-There is no change to the pandora driver involved here. The Pandora
-panel driver is already correct. Just the DTS has some redundant
-content which should be removed.
-
-So there is no dependency for this patch.
-
-BR,
-Nikolaus
-
+> There is no change to the pandora driver involved here. The Pandora
+> panel driver is already correct. Just the DTS has some redundant
+> content which should be removed.
 > 
-> Regards,
-> 
-> Tony
-> 
->> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->> ---
->> arch/arm/boot/dts/omap3-pandora-common.dtsi | 2 +-
->> 1 file changed, 1 insertion(+), 1 deletion(-)
->> 
->> diff --git a/arch/arm/boot/dts/omap3-pandora-common.dtsi b/arch/arm/boot/dts/omap3-pandora-common.dtsi
->> index 53e007abdc71..64d967ec8c58 100644
->> --- a/arch/arm/boot/dts/omap3-pandora-common.dtsi
->> +++ b/arch/arm/boot/dts/omap3-pandora-common.dtsi
->> @@ -626,7 +626,7 @@
->> 
->> 	lcd: lcd at 1 {
->> 		reg = <1>;	/* CS1 */
->> -		compatible =	"omapdss,tpo,td043mtea1";
->> +		compatible =	"tpo,td043mtea1";
->> 		spi-max-frequency = <100000>;
->> 		spi-cpol;
->> 		spi-cpha;
->> -- 
->> 2.12.2
->> 
+> So there is no dependency for this patch.
+
+OK please resend separately after the driver changes have merged
+then.
+
+Regards,
+
+Tony
