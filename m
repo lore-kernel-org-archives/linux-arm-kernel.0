@@ -1,29 +1,32 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Tue, 28 Nov 2017 18:26:49 +0100
-Subject: [PATCH] MAINTAINERS: exclude other Socionext SoC DT files from
- ARM/UNIPHIER entry
-In-Reply-To: <1511838833-26663-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1511838833-26663-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <61f49e3d-4414-0091-7436-9b212c5f358c@suse.de>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 28 Nov 2017 17:27:03 +0000
+Subject: [PATCH 0/4] SMMU 52-bit address support
+Message-ID: <cover.1511807303.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 28.11.2017 um 04:13 schrieb Masahiro Yamada:
-> There are several product lines in Socionext.  I maintain only
-> DT files prefixed with "uniphier".
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  MAINTAINERS | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+Hi all,
 
-Reviewed-by: Andreas F?rber <afaerber@suse.de>
+Hot on the heels of CPU 52-bit PA support[1], here's the SMMU counterpart
+as promised (with bonus VA support since it's so trivial). Attempts to
+extend the selftests to cope with the 64KB granule dependency for these
+sizes have evolved into a larger effort to clean up and factor out common
+parts of the selftest infrastructure, which will follow at a later date.
 
-Regards,
-Andreas
+Robin.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/543127.html
+
+
+Robin Murphy (4):
+  iommu/arm-smmu-v3: Clean up address masking
+  iommu/io-pgtable-arm: Support 52-bit physical address
+  iommu/arm-smmu-v3: Support 52-bit physical address
+  iommu/arm-smmu-v3: Support 52-bit virtual address
+
+ drivers/iommu/arm-smmu-v3.c    | 75 ++++++++++++++++++++++--------------------
+ drivers/iommu/io-pgtable-arm.c | 65 ++++++++++++++++++++++++++----------
+ 2 files changed, 86 insertions(+), 54 deletions(-)
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.13.4.dirty
