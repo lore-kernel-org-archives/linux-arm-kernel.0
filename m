@@ -1,62 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Nov 2017 21:31:57 +0100
-Subject: [PATCH 10/17] drm/sun4i: Add scaler configuration to DE2 mixers
-In-Reply-To: <20171127205750.19277-11-jernej.skrabec@siol.net>
-References: <20171127205750.19277-1-jernej.skrabec@siol.net>
- <20171127205750.19277-11-jernej.skrabec@siol.net>
-Message-ID: <20171128203157.id6mflespftuavbq@flea.home>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Tue, 28 Nov 2017 15:32:29 -0500
+Subject: [PATCH v1] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <20171128193500.GA30609@kroah.com>
+References: <1511889106-9239-1-git-send-email-awallis@codeaurora.org>
+ <20171128193500.GA30609@kroah.com>
+Message-ID: <22b57b69-3728-d879-42c6-92e87e7c7955@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Nov 27, 2017 at 09:57:43PM +0100, Jernej Skrabec wrote:
-> No all SoCs support scaling on all channels. For example, V3s support
-> scaling only on VI channels. Because of that, add additional
-> configuration bitmask which tells which channel support scaler.
+On 11/28/2017 2:35 PM, Greg Kroah-Hartman wrote:
+> On Tue, Nov 28, 2017 at 12:11:46PM -0500, Adam Wallis wrote:
+>> The xHCI driver currently has the IMOD set to 160, which
+>> translates to an IMOD interval of 40,000ns (160 * 250)ns
+>>
+[..]
+>> --- a/drivers/usb/host/xhci-plat.c
+>> +++ b/drivers/usb/host/xhci-plat.c
+>> @@ -23,6 +23,7 @@
+>>  #include "xhci-plat.h"
+>>  #include "xhci-mvebu.h"
+>>  #include "xhci-rcar.h"
+>> +#include "xhci-mtk.h"
+>>  
+>>  static struct hc_driver __read_mostly xhci_plat_hc_driver;
+>>  
+>> @@ -269,6 +270,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+>>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+>>  
+>> +	/* imod interval in nanoseconds */
+>> +	if (device_property_read_u32(sysdev,
+>> +		"imod-interval", &xhci->imod_interval))
+>> +		xhci->imod_interval = 40000;
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> ---
->  drivers/gpu/drm/sun4i/sun8i_mixer.c | 1 +
->  drivers/gpu/drm/sun4i/sun8i_mixer.h | 1 +
->  2 files changed, 2 insertions(+)
+> So no matter what value you read, you set it to 40000?  Or am I reading
+> this code incorrectly?
+
+I think you may be reading the code incorrectly. device_property_read_u32()
+returns 0 when the property is found and valid...and stored into
+xhci->imod_interval. When 0 is returned in this case, the default value of
+40,000 is skipped over.
+
+If the property is not found, a number of different errors could be returned,
+but any of them will cause the default value to be used.
+
+> There's a good reason putting function calls inside if() is considered a
+> bad coding style :)
+
+I do not disagree with you, however, I was trying to maintain style consistency
+with the device property reads with the xhci_plat_probe function.
+
+If I break that consistency, a couple of ways I might write this cleaner
+
+1) set xhci->imod_interval to 40,000 before the call to
+device_property_read_u32. If the property exists in a firmware node, it will
+update the imod_interval value...if it does not exist, it will not update this
+value and the default will be used. In this case, I would not even check the
+return value. This method is used quite a bit in the kernel.
+
+2) use a if (device_property_present()) and check to see if that property is
+even present. If so, call device_property_read_u32() without check return value.
+This has the downside of still using a function call within the if() which you
+have already indicated is not your preference.
+
+3) add a retval and test off of this instead of using the function directly in
+the if()
+
+> thanks,
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> index dc97351be973..291dd8806444 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> @@ -576,6 +576,7 @@ static int sun8i_mixer_remove(struct platform_device *pdev)
->  static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
->  	.vi_num = 2,
->  	.ui_num = 1,
-> +	.scaler_mask = 0x3,
->  };
->  
->  static const struct of_device_id sun8i_mixer_of_table[] = {
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-> index 572ef184a21a..ad5aef5846ae 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-> @@ -139,6 +139,7 @@
->  struct sun8i_mixer_cfg {
->  	int		vi_num;
->  	int		ui_num;
-> +	int		scaler_mask;
+> greg k-h
 
-Can you add a comment there to explain what the scaler_mask is ?
-(ideally in kerneldoc)
+Thanks for taking time to review my patch. I really have no strong preference on
+how call device_property_read_u32() is tested and I am open to any suggestions.
+Adam
 
-Thanks!
-Maxime
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/273e37ec/attachment.sig>
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
