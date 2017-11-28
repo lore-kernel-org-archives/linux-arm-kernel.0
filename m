@@ -1,71 +1,38 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 28 Nov 2017 18:35:52 +0000
-Subject: [PATCH] arm64: kaslr: Fix kaslr end boundary of virt addr
-In-Reply-To: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
-References: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
-Message-ID: <20171128183551.GP9266@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Nov 2017 18:37:30 +0000
+Subject: [PATCH v3 2/2] arm64: ftrace: emit ftrace-mod.o contents through
+ code
+In-Reply-To: <20171128183121.GN9266@arm.com>
+References: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
+ <20171120174130.28626-2-ard.biesheuvel@linaro.org>
+ <20171128183121.GN9266@arm.com>
+Message-ID: <CAKv+Gu9x0zXJVSwOr-M9K2+r3_A=GmNG4Ljx3dLP5tNB5asWHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 11:44:13AM +0800, Chen Feng wrote:
-> With kaslr and kasan enable both, I got the follow issue.
-> 
-> [   16.130523s]kasan: reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000
-> [   16.142517s]___alloc_bootmem_nopanic:257
-> [   16.148284s]__alloc_memory_core_early:63, addr = 197fc7fc0
-> [   16.155670s]__alloc_memory_core_early:65, virt = ffffffffd7fc7fc0
-> [   16.163635s]__alloc_memory_core_early:67, toshow = ffffff8ffaff8ff8
-> [   16.171783s]__alloc_memory_core_early:69, show_phy = ffffffe2649f8ff8
-> [   16.180145s]Unable to handle kernel paging request at virtual address ffffff8ffaff8ff8
-> [   16.189971s]pgd = ffffffad9c507000
-> [   16.195220s][ffffff8ffaff8ff8] *pgd=0000000197fc8003, *pud=0000000197fc8003
-> 
-> *reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000*
-> 
-> memstart_addr 0
-> ARM64_MEMSTART_ALIGN 0x40000000
-> memstart_offset_seed 0xffc7
-> PHYS_OFFSET = 0 - memstart_addr = 0 - 3E40000000 = FFFFFFC1C0000000
-> 
-> reg->base = 0x100000000  -> 0xffffffff40000000
-> phys_end  = 0x1c0000000  -> 0xffffffc000000000  This is confused, end less than start.
-> 
-> And In memblock it use "start_addr + size" as the end addr. So in function kasan_init,
-> if the start >= end, it will not map the hole block address. But the memory in this
-> block is valid. And it can be allocated as well.
-> 
-> So donot use the last memory region. Changing "range = range / ARM64_MEMSTART_ALIGN + 1" to
-> range = range / ARM64_MEMSTART_ALIGN;
-> 
-> Signed-off-by: Chen Feng <puck.chen@hisilicon.com>
-> Signed-off-by: Chen Xiang <chenxiang9@huawei.com>
-> ---
->  arch/arm64/mm/init.c | 7 ++-----
->  1 file changed, 2 insertions(+), 5 deletions(-)
+On 28 November 2017 at 18:31, Will Deacon <will.deacon@arm.com> wrote:
+> On Mon, Nov 20, 2017 at 05:41:30PM +0000, Ard Biesheuvel wrote:
+>> When building the arm64 kernel with both CONFIG_ARM64_MODULE_PLTS and
+>> CONFIG_DYNAMIC_FTRACE enabled, the ftrace-mod.o object file is built
+>> with the kernel and contains a trampoline that is linked into each
+>> module, so that modules can be loaded far away from the kernel and
+>> still reach the ftrace entry point in the core kernel with an ordinary
+>> relative branch, as is emitted by the compiler instrumentation code
+>> dynamic ftrace relies on.
+>>
+>> In order to be able to build out of tree modules, this object file
+>> needs to be included into the linux-headers or linux-devel packages,
+>> which is undesirable, as it makes arm64 a special case (although a
+>> precedent does exist for 32-bit PPC).
+>>
+>> Given that the trampoline essentially consists of a PLT entry, let's
+>> not bother with a source or object file for it, and simply patch it
+>> in whenever the trampoline is being populated, using the existing
+>> PLT support routines.
+>
+> I'll pick these two up for 4.15. Do you think they need to go to stable as
+> well?
+>
 
-Ard -- can you take a look at this please? I've not found time to page this
-in, but if there's a fix in here somewhere then I'm happy to apply it.
-
-Will
-
-> diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-> index 716d122..60112c0 100644
-> --- a/arch/arm64/mm/init.c
-> +++ b/arch/arm64/mm/init.c
-> @@ -267,11 +267,8 @@ void __init arm64_memblock_init(void)
->  		 * margin, the size of the region that the available physical
->  		 * memory spans, randomize the linear region as well.
->  		 */
-> -		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN) {
-> -			range = range / ARM64_MEMSTART_ALIGN + 1;
-> -			memstart_addr -= ARM64_MEMSTART_ALIGN *
-> -					 ((range * memstart_offset_seed) >> 16);
-> -		}
-> +		if (memstart_offset_seed > 0 && range >= ARM64_MEMSTART_ALIGN)
-> +			memstart_addr -= (range * memstart_offset_seed) >> 16;
->  	}
->  
->  	/*
-> -- 
-> 1.9.1
-> 
+It is either that, or the distros need to backport themselves. Not
+sure whether it matters much tbh.
