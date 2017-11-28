@@ -1,236 +1,65 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 28 Nov 2017 09:58:10 +0100
-Subject: [PATCH v3] arm64: dts: renesas: r8a7795: Move nodes which have no reg
- property out of bus
-Message-ID: <20171128085810.2099-1-horms+renesas@verge.net.au>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Nov 2017 09:58:26 +0100
+Subject: [PATCH v2 05/18] drm/sun4i: Force the mixer rate at 150MHz
+In-Reply-To: <9630064.mDmGGWOQGt@jernej-laptop>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <55becb3a86a0a28ccca3f7c831ac6f6cf4854390.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <9630064.mDmGGWOQGt@jernej-laptop>
+Message-ID: <20171128085826.snmflonvbic5put3@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
-The nodes that have been moved do not have any register properties and thus
-shouldn't be placed on the bus.
+On Mon, Nov 27, 2017 at 05:07:04PM +0100, Jernej ?krabec wrote:
+> Hi Maxime,
+> 
+> Dne ponedeljek, 27. november 2017 ob 16:41:29 CET je Maxime Ripard napisal(a):
+> > It seems like the mixer can only run properly when clocked at 150MHz. In
+> > order to have something more robust than simply a fire-and-forget
+> > assigned-clocks-rate, let's put that in the code.
+> > 
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/gpu/drm/sun4i/sun8i_mixer.c | 7 +++++++
+> >  1 file changed, 7 insertions(+)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > b/drivers/gpu/drm/sun4i/sun8i_mixer.c index cb193c5f1686..c0cdccf772a2
+> > 100644
+> > --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > @@ -315,6 +315,13 @@ static int sun8i_mixer_bind(struct device *dev, struct
+> > device *master, }
+> >  	clk_prepare_enable(mixer->mod_clk);
+> > 
+> > +	/*
+> > +	 * It seems that we need to enforce that rate for whatever
+> > +	 * reason for the mixer to be functional. Make sure it's the
+> > +	 * case.
+> > +	 */
+> > +	clk_set_rate(mixer->mod_clk, 150000000);
+> > +
+> 
+> H3 mixer works at much higher rate and if we want to support tv out, it must 
+> be dividable by 432 MHz, so either 432 MHz or maybe even 864 MHz.
+> 
+> We talked about that few months ago.
+> 
+> I guess this should be read from mixer configuration structure.
 
-This problem is flagged by the compiler as follows:
-$ make
-...
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb
-arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb
-arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
-  DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
-arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+That works for me. Actually, I didn't need it at all for the LVDS
+output on the A83t, the default seems to work just fine. Do you know
+what it's related to? Maybe we can make that a bit more dynamic?
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-v3
-* Add interrupt-parent property to /pmu_* and /timer nodes as
-  it is no longer inherited from the parent node
-v2
-* Preserve alphabetical order of nodes present in root node.
----
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 137 ++++++++++++++++---------------
- 1 file changed, 70 insertions(+), 67 deletions(-)
+Maxime
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 6db4f10376a1..b8e5b7194aee 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -184,6 +184,32 @@
- 		clock-frequency = <0>;
- 	};
- 
-+	pmu_a57 {
-+		compatible = "arm,cortex-a57-pmu";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a57_0>,
-+				     <&a57_1>,
-+				     <&a57_2>,
-+				     <&a57_3>;
-+	};
-+
-+	pmu_a53 {
-+		compatible = "arm,cortex-a53-pmu";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&a53_0>,
-+				     <&a53_1>,
-+				     <&a53_2>,
-+				     <&a53_3>;
-+	};
-+
- 	soc: soc {
- 		compatible = "simple-bus";
- 		interrupt-parent = <&gic>;
-@@ -338,42 +364,6 @@
- 			resets = <&cpg 905>;
- 		};
- 
--		pmu_a57 {
--			compatible = "arm,cortex-a57-pmu";
--			interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
--				     <GIC_SPI 73 IRQ_TYPE_LEVEL_HIGH>,
--				     <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>,
--				     <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-affinity = <&a57_0>,
--					     <&a57_1>,
--					     <&a57_2>,
--					     <&a57_3>;
--		};
--
--		pmu_a53 {
--			compatible = "arm,cortex-a53-pmu";
--			interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>,
--				     <GIC_SPI 85 IRQ_TYPE_LEVEL_HIGH>,
--				     <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>,
--				     <GIC_SPI 87 IRQ_TYPE_LEVEL_HIGH>;
--			interrupt-affinity = <&a53_0>,
--					     <&a53_1>,
--					     <&a53_2>,
--					     <&a53_3>;
--		};
--
--		timer {
--			compatible = "arm,armv8-timer";
--			interrupts = <GIC_PPI 13
--					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 14
--					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 11
--					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
--				     <GIC_PPI 10
--					(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
--		};
--
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a7795-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
-@@ -2331,47 +2321,60 @@
- 			#thermal-sensor-cells = <1>;
- 			status = "okay";
- 		};
-+	};
- 
--		thermal-zones {
--			sensor_thermal1: sensor-thermal1 {
--				polling-delay-passive = <250>;
--				polling-delay = <1000>;
--				thermal-sensors = <&tsc 0>;
-+	timer {
-+		compatible = "arm,armv8-timer";
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_PPI 13
-+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 14
-+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 11
-+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>,
-+			     <GIC_PPI 10
-+				(GIC_CPU_MASK_SIMPLE(8) | IRQ_TYPE_LEVEL_LOW)>;
-+	};
- 
--				trips {
--					sensor1_crit: sensor1-crit {
--						temperature = <120000>;
--						hysteresis = <2000>;
--						type = "critical";
--					};
-+	thermal-zones {
-+		sensor_thermal1: sensor-thermal1 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+			thermal-sensors = <&tsc 0>;
-+
-+			trips {
-+				sensor1_crit: sensor1-crit {
-+					temperature = <120000>;
-+					hysteresis = <2000>;
-+					type = "critical";
- 				};
- 			};
-+		};
- 
--			sensor_thermal2: sensor-thermal2 {
--				polling-delay-passive = <250>;
--				polling-delay = <1000>;
--				thermal-sensors = <&tsc 1>;
-+		sensor_thermal2: sensor-thermal2 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+			thermal-sensors = <&tsc 1>;
- 
--				trips {
--					sensor2_crit: sensor2-crit {
--						temperature = <120000>;
--						hysteresis = <2000>;
--						type = "critical";
--					};
-+			trips {
-+				sensor2_crit: sensor2-crit {
-+					temperature = <120000>;
-+					hysteresis = <2000>;
-+					type = "critical";
- 				};
- 			};
-+		};
- 
--			sensor_thermal3: sensor-thermal3 {
--				polling-delay-passive = <250>;
--				polling-delay = <1000>;
--				thermal-sensors = <&tsc 2>;
-+		sensor_thermal3: sensor-thermal3 {
-+			polling-delay-passive = <250>;
-+			polling-delay = <1000>;
-+			thermal-sensors = <&tsc 2>;
- 
--				trips {
--					sensor3_crit: sensor3-crit {
--						temperature = <120000>;
--						hysteresis = <2000>;
--						type = "critical";
--					};
-+			trips {
-+				sensor3_crit: sensor3-crit {
-+					temperature = <120000>;
-+					hysteresis = <2000>;
-+					type = "critical";
- 				};
- 			};
- 		};
 -- 
-2.11.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/c95f43bf/attachment-0001.sig>
