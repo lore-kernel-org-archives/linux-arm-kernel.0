@@ -1,72 +1,76 @@
-From: pbonzini@redhat.com (Paolo Bonzini)
-Date: Tue, 28 Nov 2017 22:29:05 +0100
-Subject: [PATCH 00/15] Move vcpu_load and vcpu_put calls to arch code
-In-Reply-To: <dd738b4f-3d99-ec3b-fa5e-d166230f9d2b@redhat.com>
-References: <20171125205718.7731-1-christoffer.dall@linaro.org>
- <dd738b4f-3d99-ec3b-fa5e-d166230f9d2b@redhat.com>
-Message-ID: <abcdc95d-0f78-3e42-1784-56393f502c68@redhat.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Nov 2017 22:32:53 +0100
+Subject: [PATCH 1/1] ARM: dts: sunxi: Update dts for A20-OLinuXino boards
+In-Reply-To: <1511784231-6485-1-git-send-email-stefan@olimex.com>
+References: <1511784231-6485-1-git-send-email-stefan@olimex.com>
+Message-ID: <20171128213252.2bysq3kzubio7cxw@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28/11/2017 21:55, David Hildenbrand wrote:
-> On 25.11.2017 21:57, Christoffer Dall wrote:
->> Some architectures may decide to do different things during
->> kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
->> arm64 is about to do significant work in vcpu load/put when running a
->> vcpu, but it's problematic to do this for any other vcpu ioctl than
->> KVM_RUN.
->>
->> Further, while it may be possible to call kvm_arch_vcpu_load() for a
->> number of non-KVM_RUN ioctls, it makes the KVM/ARM code more difficult
->> to reason about, especially after my optimization series, because a lot
->> of things can now happen, where we have to consider if we're really in
->> the process of running a vcpu or not.
->>
->> This series will first move the vcpu_load() and vcpu_put() calls in the
->> arch generic dispatch function into each case of the switch statement
->> and then, one-by-one, pushed the calls down into the architecture
->> specific code making the changes for each ioctl as required.
->>
->> Thanks,
->> -Christoffer
->>
->> Christoffer Dall (15):
->>   KVM: Prepare for moving vcpu_load/vcpu_put into arch specific code
->>   KVM: Factor out vcpu->pid adjustment for KVM_RUN
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_run
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_regs
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_regs
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_sregs
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_sregs
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_mpstate
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_mpstate
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_translate
->>   KVM: Move vcpu_load to arch-specific
->>     kvm_arch_vcpu_ioctl_set_guest_debug
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_fpu
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_fpu
->>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl
->>   KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls than KVM_RUN
->>
->>  arch/arm64/kvm/guest.c     |  17 +++++--
->>  arch/mips/kvm/mips.c       |  72 +++++++++++++++++++--------
->>  arch/powerpc/kvm/book3s.c  |  38 +++++++++++++-
->>  arch/powerpc/kvm/booke.c   |  65 +++++++++++++++++++-----
->>  arch/powerpc/kvm/powerpc.c |  24 ++++++---
->>  arch/s390/kvm/kvm-s390.c   | 119 +++++++++++++++++++++++++++++++++++++-------
->>  arch/x86/kvm/x86.c         | 121 ++++++++++++++++++++++++++++++++++++++-------
->>  include/linux/kvm_host.h   |   2 +
->>  virt/kvm/arm/arm.c         |  91 +++++++++++++++++++++++++---------
->>  virt/kvm/kvm_main.c        |  43 +++++++---------
->>  10 files changed, 463 insertions(+), 129 deletions(-)
->>
-> 
-> Looking at the amount of code we duplicate, I wonder if simple ifdefery
-> (if possible) would be easier for the single known "special" case.
-> 
-> (most probably an unpopular opinion :) )
+Hi Stefan,
 
-No, also because the duplicate code will go down sensibly in the next
-version.
+On Mon, Nov 27, 2017 at 02:03:51PM +0200, Stefan Mavrodiev wrote:
+> There will be option with 16MB flash for the following boards:
+> 
+>   * A20-OLinuXino-MICRO Rev.K
+>   * A20-OLinuXino-LIME Rev.J
+>   * A20-OLinuXino-LIME2 Rev.J
+>   * A20-SOM-EVB Rev.E
+> 
+> The used flash chip is Winbond W25Q128FV, which is connected to
+> SPI0 port. Since this is optional feature, spi0 node is dissabled
+> by default. Also this option is incompatible with NAND flash, so
+> they shouldn't be enabled at the same time.
+> 
+> Signed-off-by: Stefan Mavrodiev <stefan@olimex.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts  | 14 ++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime.dts  | 14 ++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-lime2.dts | 14 ++++++++++++++
+>  arch/arm/boot/dts/sun7i-a20-olinuxino-micro.dts | 14 ++++++++++++++
+>  4 files changed, 56 insertions(+)
+> 
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> index 64c8ef9..98b7697 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> @@ -291,6 +291,20 @@
+>  	status = "okay";
+>  };
+>  
+> +&spi0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&spi0_pins_b>,<&spi0_cs0_pins_b>;
+> +	status = "disabled";
+> +
+> +	flash at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "winbond,w25q128","jedec,spi-nor";
+> +		reg = <0>;
+> +		spi-max-frequency = <40000000>;
+> +	};
+> +};
+> +
 
-Paolo
+So those kind of variations are usually best handled using overlays.
+
+This as become quite convenient using the FIT image rework that
+Pantelis did here:
+https://lists.denx.de/pipermail/u-boot/2017-June/296879.html
+
+and got merged since 2017.11.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/d60e5b39/attachment-0001.sig>
