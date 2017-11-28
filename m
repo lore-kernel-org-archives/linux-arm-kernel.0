@@ -1,36 +1,28 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 29 Nov 2017 04:08:46 +0800
-Subject: [stericsson:earlydebug 1/1] main.c:undefined reference to `printascii'
-Message-ID: <201711290440.2cL5TqiJ%fengguang.wu@intel.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Nov 2017 20:20:40 +0000
+Subject: [PATCH 1/3] dt-bindings: spicc: update compatible string for the
+ Meson-AXG
+In-Reply-To: <20171128132926.19051-2-yixun.lan@amlogic.com>
+References: <20171128132926.19051-1-yixun.lan@amlogic.com>
+ <20171128132926.19051-2-yixun.lan@amlogic.com>
+Message-ID: <20171128202040.q6et5al2koy3msze@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
-head:   15a1a5ef4038297935f97586a2e994123dc56980
-commit: 15a1a5ef4038297935f97586a2e994123dc56980 [1/1] uglyhack printascii
-config: arm-mvebu_v5_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 15a1a5ef4038297935f97586a2e994123dc56980
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Tue, Nov 28, 2017 at 09:29:24PM +0800, Yixun Lan wrote:
+> From: Sunny Luo <sunny.luo@amlogic.com>
+> 
+> Update the compatbile string to support Meson-AXG SoCs.
 
-All errors (new ones prefixed by >>):
-
-   init/main.o: In function `start_kernel':
->> main.c:(.init.text+0x580): undefined reference to `printascii'
-   kernel/printk/printk.o: In function `vprintk_emit':
->> printk.c:(.text+0x277c): undefined reference to `printascii'
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+Please submit patches using subject lines reflecting the style for the
+subsystem.  This makes it easier for people to identify relevant
+patches.  Look at what existing commits in the area you're changing are
+doing and make sure your subject lines visually resemble what they're
+doing.
 -------------- next part --------------
 A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23627 bytes
+Name: signature.asc
+Type: application/pgp-signature
+Size: 484 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171129/8e28f283/attachment-0001.gz>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/c10b9daa/attachment.sig>
