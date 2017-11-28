@@ -1,128 +1,70 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Tue, 28 Nov 2017 12:27:28 -0600
-Subject: [PATCH v3 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
- dmtimer pdata ops
-In-Reply-To: <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
-References: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
- <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
-Message-ID: <2c5e3e04-9940-43c3-62b1-8cef7d22c5e1@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 28 Nov 2017 18:30:09 +0000
+Subject: [PATCH v3 1/2] arm64: module-plts: factor out PLT generation
+ code for ftrace
+In-Reply-To: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
+References: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
+Message-ID: <20171128183009.GM9266@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/15/2017 10:23 PM, Keerthy wrote:
-> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+On Mon, Nov 20, 2017 at 05:41:29PM +0000, Ard Biesheuvel wrote:
+> To allow the ftrace trampoline code to reuse the PLT entry routines,
+> factor it out and move it into asm/module.h.
 > 
-> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
+> v3: new patch
 > 
-> Changes in v3:
+>  arch/arm64/include/asm/module.h | 44 ++++++++++++++++++++
+>  arch/arm64/kernel/module-plts.c | 38 +----------------
+>  2 files changed, 46 insertions(+), 36 deletions(-)
 > 
->    * Used of_find_platdata_by_node function to fetch platform
->      data for timer node.
-> 
->   drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
->   1 file changed, 22 insertions(+), 17 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
-> index 5ad42f3..2caf46b 100644
-> --- a/drivers/pwm/pwm-omap-dmtimer.c
-> +++ b/drivers/pwm/pwm-omap-dmtimer.c
-> @@ -23,6 +23,7 @@
->   #include <linux/mutex.h>
->   #include <linux/of.h>
->   #include <linux/of_platform.h>
-> +#include <linux/platform_data/dmtimer-omap.h>
->   #include <linux/platform_data/pwm_omap_dmtimer.h>
->   #include <linux/platform_device.h>
->   #include <linux/pm_runtime.h>
-> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
->   	struct pwm_chip chip;
->   	struct mutex mutex;
->   	pwm_omap_dmtimer *dm_timer;
-> -	struct pwm_omap_dmtimer_pdata *pdata;
-> +	struct omap_dm_timer_ops *pdata;
->   	struct platform_device *dm_timer_pdev;
->   };
->   
-> @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->   {
->   	struct device_node *np = pdev->dev.of_node;
->   	struct device_node *timer;
-> +	struct platform_device *timer_pdev;
->   	struct pwm_omap_dmtimer_chip *omap;
-> -	struct pwm_omap_dmtimer_pdata *pdata;
-> +	struct dmtimer_platform_data *timer_pdata;
-> +	struct omap_dm_timer_ops *pdata;
->   	pwm_omap_dmtimer *dm_timer;
->   	u32 v;
->   	int status;
->   
-> -	pdata = dev_get_platdata(&pdev->dev);
-> -	if (!pdata) {
-> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
-> +	timer = of_parse_phandle(np, "ti,timers", 0);
-> +	if (!timer)
-> +		return -ENODEV;
+> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
+> index 19bd97671bb8..11d4aaee82e1 100644
+> --- a/arch/arm64/include/asm/module.h
+> +++ b/arch/arm64/include/asm/module.h
+> @@ -45,4 +45,48 @@ extern u64 module_alloc_base;
+>  #define module_alloc_base	((u64)_etext - MODULES_VSIZE)
+>  #endif
+>  
+> +struct plt_entry {
+> +	/*
+> +	 * A program that conforms to the AArch64 Procedure Call Standard
+> +	 * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
+> +	 * IP1 (x17) may be inserted at any branch instruction that is
+> +	 * exposed to a relocation that supports long branches. Since that
+> +	 * is exactly what we are dealing with here, we are free to use x16
+> +	 * as a scratch register in the PLT veneers.
+> +	 */
+> +	__le32	mov0;	/* movn	x16, #0x....			*/
+> +	__le32	mov1;	/* movk	x16, #0x...., lsl #16		*/
+> +	__le32	mov2;	/* movk	x16, #0x...., lsl #32		*/
+> +	__le32	br;	/* br	x16				*/
+> +};
 > +
-> +	timer_pdev = of_find_device_by_node(timer);
-> +	if (!timer_pdev) {
-> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	timer_pdata = of_find_platdata_by_node(timer);
-> +	if (!timer_pdata) {
-> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
->   		return -EINVAL;
->   	}
+> +static inline struct plt_entry get_plt_entry(u64 val)
+> +{
+> +	/*
+> +	 * MOVK/MOVN/MOVZ opcode:
+> +	 * +--------+------------+--------+-----------+-------------+---------+
+> +	 * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
+> +	 * +--------+------------+--------+-----------+-------------+---------+
+> +	 *
+> +	 * Rd     := 0x10 (x16)
+> +	 * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
+> +	 * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
+> +	 * sf     := 1 (64-bit variant)
+> +	 */
+> +	return (struct plt_entry){
+> +		cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
+> +		cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
+> +		cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
+> +		cpu_to_le32(0xd61f0200)
+> +	};
+> +}
 
-Huh. I think It might be better if you add smth. like
+Not one for this series, but do you think we could use insn.c to generate
+these?
 
-struct omap_dm_timer *dm_timer = of_omap_dm_timer_get(parent_np, "ti,timers", idx);
-
-struct omap_dm_timer_ops *pdata = omap_dm_timer_get_ops(dm_timer);
-
-so all DT and platdata implementation details will be hidden.
-
-
->   
-> -	if (!pdata->request_by_node ||
-> +	pdata = timer_pdata->timer_ops;
-> +
-> +	if (!pdata || !pdata->request_by_node ||
->   	    !pdata->free ||
->   	    !pdata->enable ||
->   	    !pdata->disable ||
-> @@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->   		return -EINVAL;
->   	}
->   
-> -	timer = of_parse_phandle(np, "ti,timers", 0);
-> -	if (!timer)
-> -		return -ENODEV;
-> -
->   	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
->   		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
->   		return -ENODEV;
-> @@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->   
->   	omap->pdata = pdata;
->   	omap->dm_timer = dm_timer;
-> -
-> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
-> -	if (!omap->dm_timer_pdev) {
-> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
-> -		omap->pdata->free(dm_timer);
-> -		return -EINVAL;
-> -	}
-> +	omap->dm_timer_pdev = timer_pdev;
->   
->   	/*
->   	 * Ensure that the timer is stopped before we allow PWM core to call
-> 
-
--- 
-regards,
--grygorii
+Will
