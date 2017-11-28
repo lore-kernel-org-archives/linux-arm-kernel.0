@@ -1,68 +1,39 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 28 Nov 2017 20:22:16 +0000
-Subject: Applied "spi: meson-axg: update compatible string for the Meson-AXG"
- to the spi tree
-In-Reply-To: <20171128132926.19051-2-yixun.lan@amlogic.com>
-Message-ID: <E1eJmOW-0008Dj-RE@debutante>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Nov 2017 21:26:45 +0100
+Subject: [PATCH 05/17] drm/sun4i: Reorder some code in DE2
+In-Reply-To: <20171127205750.19277-6-jernej.skrabec@siol.net>
+References: <20171127205750.19277-1-jernej.skrabec@siol.net>
+ <20171127205750.19277-6-jernej.skrabec@siol.net>
+Message-ID: <20171128202645.gyf42cdlwebfu66l@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+Hi,
 
-   spi: meson-axg: update compatible string for the Meson-AXG
+On Mon, Nov 27, 2017 at 09:57:38PM +0100, Jernej Skrabec wrote:
+> While DE2 driver works, parts of the code are not in optimal place. Reorder
+> it so it will be easier to support multiple planes.
+> 
+> This commit doesn't do any functional change besides removing two not
+> very useful debug messages.
+> 
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-has been applied to the spi tree at
+So I have the same feeling here that it could be split into several
+patches, but you should at least explain why and how that code is more
+optimal than it used to.
 
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+Thanks!
+Maxime
 
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From a78841479696efa557a2251c86462c936a208f90 Mon Sep 17 00:00:00 2001
-From: Sunny Luo <sunny.luo@amlogic.com>
-Date: Tue, 28 Nov 2017 21:29:24 +0800
-Subject: [PATCH] spi: meson-axg: update compatible string for the Meson-AXG
-
-Update the compatbile string to support Meson-AXG SoCs.
-
-Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- Documentation/devicetree/bindings/spi/spi-meson.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
-index 825c39cae74a..b7f5e86fed22 100644
---- a/Documentation/devicetree/bindings/spi/spi-meson.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
-@@ -27,7 +27,9 @@ The Meson SPICC is generic SPI controller for general purpose Full-Duplex
- communications with dedicated 16 words RX/TX PIO FIFOs.
- 
- Required properties:
-- - compatible: should be "amlogic,meson-gx-spicc" on Amlogic GX SoCs.
-+ - compatible: should be:
-+	"amlogic,meson-gx-spicc" on Amlogic GX and compatible SoCs.
-+	"amlogic,meson-axg-spicc" on Amlogic AXG and compatible SoCs
-  - reg: physical base address and length of the controller registers
-  - interrupts: The interrupt specifier
-  - clock-names: Must contain "core"
 -- 
-2.15.0
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/3843501c/attachment.sig>
