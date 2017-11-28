@@ -1,52 +1,32 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 28 Nov 2017 17:04:38 +0100
-Subject: [PATCH v2 2/4] DTS: GTA04: fix panel compatibility string
-In-Reply-To: <20171128160057.GB28152@atomide.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
- <20171128145727.GY28152@atomide.com>
- <C108B0B6-FED7-44DB-9A18-39E3BE93E586@goldelico.com>
- <20171128151039.GZ28152@atomide.com>
- <F14B3797-8154-4958-82AB-8E39C75BB97B@goldelico.com>
- <20171128160057.GB28152@atomide.com>
-Message-ID: <AB65CE5D-C055-4344-9872-F3556981BCEE@goldelico.com>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 28 Nov 2017 17:04:51 +0100
+Subject: [PATCH v3] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20171128152757.1058-1-laurentiu.tudor@nxp.com>
+References: <20171128152757.1058-1-laurentiu.tudor@nxp.com>
+Message-ID: <20171128160451.GC14512@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 28, 2017 at 05:27:57PM +0200, laurentiu.tudor at nxp.com wrote:
+> diff --git a/drivers/staging/fsl-mc/bus/dpmcp.h b/drivers/bus/fsl-mc/dpmcp.h
+> similarity index 100%
+> rename from drivers/staging/fsl-mc/bus/dpmcp.h
+> rename to drivers/bus/fsl-mc/dpmcp.h
+> diff --git a/drivers/staging/fsl-mc/bus/dpmng-cmd.h b/drivers/bus/fsl-mc/dpmng-cmd.h
+> similarity index 100%
+> rename from drivers/staging/fsl-mc/bus/dpmng-cmd.h
+> rename to drivers/bus/fsl-mc/dpmng-cmd.h
+> diff --git a/drivers/staging/fsl-mc/bus/dprc-cmd.h b/drivers/bus/fsl-mc/dprc-cmd.h
+> similarity index 100%
+> rename from drivers/staging/fsl-mc/bus/dprc-cmd.h
+> rename to drivers/bus/fsl-mc/dprc-cmd.h
+> diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/bus/fsl-mc/dprc-driver.c
+> similarity index 99%
+> rename from drivers/staging/fsl-mc/bus/dprc-driver.c
+> rename to drivers/bus/fsl-mc/dprc-driver.c
 
-> Am 28.11.2017 um 17:00 schrieb Tony Lindgren <tony@atomide.com>:
-> 
-> * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:51]:
->>> Am 28.11.2017 um 16:10 schrieb Tony Lindgren <tony@atomide.com>:
->>> OK fine dropping both. Please update the description in both dts
->>> patches to make it clear they are needed as a fix. Preferrably
->>> with a proper fixes tag.
->> 
->> Well, it is not "needed" in a strong sense since current mainline&stable
->> works. It is more a style and consistency fix to use "tpo," everywhere.
->> 
->>> 
->>> Having "We can remove the "omapdss," prefix" in the description sure
->>> does not sounds like it's needed as a fix :)
->> 
->> The description has been improved on -v3.
-> 
-> Thanks.
-> 
->>> Sounds like maybe these two should be just a single patch for
->>> a proper fix?
->> 
->> Hm. I usually get the feedback to separate DT and driver fixes into
->> separate commits... Therefore I submit patch sets in the hope they
->> are not picked apart :)
-> 
-> See "both dts patches" part above. Yes the dts patches can and should
-> be sent separately. In almost every case if the dts patches cannot be
-> applied separately it means your driver changes are breaking things.
+Hi Laurentiu
 
-That is why the v3 driver now accepts both, the old and the new vendor
-name. This means applying the driver alone is safe. Applying or not
-applying DTS patch afterwards is also safe.
+It is hard to review code when we don't see it. 
 
-BR,
-Nikolaus
+   Andrew
