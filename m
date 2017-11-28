@@ -1,52 +1,45 @@
-From: arvind.yadav.cs@gmail.com (arvindY)
-Date: Tue, 28 Nov 2017 21:29:36 +0530
-Subject: [PATCH 01/10 v5] Input: ep93xx_keypad: Fix platform_get_irq's
- error checking
-In-Reply-To: <49ba0386f1930f58edfd5ee0f5e65d2a02a46744.1511280261.git.arvind.yadav.cs@gmail.com>
-References: <49ba0386f1930f58edfd5ee0f5e65d2a02a46744.1511280261.git.arvind.yadav.cs@gmail.com>
-Message-ID: <5A1D87E8.3020801@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Tue, 28 Nov 2017 08:00:57 -0800
+Subject: [PATCH v2 2/4] DTS: GTA04: fix panel compatibility string
+In-Reply-To: <F14B3797-8154-4958-82AB-8E39C75BB97B@goldelico.com>
+References: <cover.1510822218.git.hns@goldelico.com>
+ <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
+ <20171128145727.GY28152@atomide.com>
+ <C108B0B6-FED7-44DB-9A18-39E3BE93E586@goldelico.com>
+ <20171128151039.GZ28152@atomide.com>
+ <F14B3797-8154-4958-82AB-8E39C75BB97B@goldelico.com>
+Message-ID: <20171128160057.GB28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dmitry,
+* H. Nikolaus Schaller <hns@goldelico.com> [171128 15:51]:
+> > Am 28.11.2017 um 16:10 schrieb Tony Lindgren <tony@atomide.com>:
+> > OK fine dropping both. Please update the description in both dts
+> > patches to make it clear they are needed as a fix. Preferrably
+> > with a proper fixes tag.
+> 
+> Well, it is not "needed" in a strong sense since current mainline&stable
+> works. It is more a style and consistency fix to use "tpo," everywhere.
+> 
+> > 
+> > Having "We can remove the "omapdss," prefix" in the description sure
+> > does not sounds like it's needed as a fix :)
+> 
+> The description has been improved on -v3.
 
-Sorry for troubling you. I need to push others also. Please share
-your review comment.
+Thanks.
 
-Thanks,
+> > Sounds like maybe these two should be just a single patch for
+> > a proper fix?
+> 
+> Hm. I usually get the feedback to separate DT and driver fixes into
+> separate commits... Therefore I submit patch sets in the hope they
+> are not picked apart :)
 
-On Tuesday 21 November 2017 09:41 PM, Arvind Yadav wrote:
-> The platform_get_irq() function returns negative if an error occurs.
-> zero or positive number on success. platform_get_irq() error checking
-> for zero is not correct.
->
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
-> changes in v2 :
->                Return keypad->irq insted of -ENXIO.
-> changes in v3 :
->                Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
-> changes in v4 :
->                Return -ENXIO insted of keypad->irq. Which was not correct in v3.
-> changes in v5 :
->                Remove changes of v3 and v4. go back to version v2. Which is correct.
->                No need to check for IRQ0 and return keypad->irq insted of -ENXIO.
->
->   drivers/input/keyboard/ep93xx_keypad.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/input/keyboard/ep93xx_keypad.c b/drivers/input/keyboard/ep93xx_keypad.c
-> index f77b295..01788a7 100644
-> --- a/drivers/input/keyboard/ep93xx_keypad.c
-> +++ b/drivers/input/keyboard/ep93xx_keypad.c
-> @@ -257,8 +257,8 @@ static int ep93xx_keypad_probe(struct platform_device *pdev)
->   	}
->   
->   	keypad->irq = platform_get_irq(pdev, 0);
-> -	if (!keypad->irq) {
-> -		err = -ENXIO;
-> +	if (keypad->irq < 0) {
-> +		err = keypad->irq;
->   		goto failed_free;
->   	}
->   
+See "both dts patches" part above. Yes the dts patches can and should
+be sent separately. In almost every case if the dts patches cannot be
+applied separately it means your driver changes are breaking things.
+
+Regards,
+
+Tony
