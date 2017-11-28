@@ -1,156 +1,70 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 28 Nov 2017 20:43:32 +0800
-Subject: [arm:phy 25/27] include/linux/export.h:67:20: error: redefinition of
- '__kstrtab___mdiobus_read'
-Message-ID: <201711282027.oQYt1Au5%fengguang.wu@intel.com>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Tue, 28 Nov 2017 20:47:09 +0800
+Subject: [PATCH v2 0/2] add clk controller driver for Meson-AXG SoC
+In-Reply-To: <1511790489.30519.11.camel@baylibre.com>
+References: <20171127094844.16742-1-yixun.lan@amlogic.com>
+ <1511790489.30519.11.camel@baylibre.com>
+Message-ID: <78b268eb-6aff-a9c4-e358-f91069e12da5@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   git://git.armlinux.org.uk/~rmk/linux-arm.git phy
-head:   95353e987453895fce5681bfa7077ae165af7cdb
-commit: 442f18665fea21c9a2c571aaace96f7e36253962 [25/27] net: mdiobus: add unlocked accessors
-config: i386-randconfig-x016-201748 (attached as .config)
-compiler: gcc-7 (Debian 7.2.0-12) 7.2.1 20171025
-reproduce:
-        git checkout 442f18665fea21c9a2c571aaace96f7e36253962
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+Hi jerome:
 
-All error/warnings (new ones prefixed by >>):
 
-   In file included from include/linux/linkage.h:7:0,
-                    from include/linux/kernel.h:7,
-                    from drivers/net/phy/mdio_bus.c:16:
->> include/linux/export.h:67:20: error: redefinition of '__kstrtab___mdiobus_read'
-     static const char __kstrtab_##sym[]    \
-                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
->> drivers/net/phy/mdio_bus.c:542:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
-   include/linux/export.h:67:20: note: previous definition of '__kstrtab___mdiobus_read' was here
-     static const char __kstrtab_##sym[]    \
-                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
-   drivers/net/phy/mdio_bus.c:517:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
-   include/linux/export.h:70:36: error: redefinition of '__ksymtab___mdiobus_read'
-     static const struct kernel_symbol __ksymtab_##sym  \
-                                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
->> drivers/net/phy/mdio_bus.c:542:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
-   include/linux/export.h:70:36: note: previous definition of '__ksymtab___mdiobus_read' was here
-     static const struct kernel_symbol __ksymtab_##sym  \
-                                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
-   drivers/net/phy/mdio_bus.c:517:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
---
-   In file included from include/linux/linkage.h:7:0,
-                    from include/linux/kernel.h:7,
-                    from drivers/net//phy/mdio_bus.c:16:
->> include/linux/export.h:67:20: error: redefinition of '__kstrtab___mdiobus_read'
-     static const char __kstrtab_##sym[]    \
-                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
-   drivers/net//phy/mdio_bus.c:542:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
-   include/linux/export.h:67:20: note: previous definition of '__kstrtab___mdiobus_read' was here
-     static const char __kstrtab_##sym[]    \
-                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
-   drivers/net//phy/mdio_bus.c:517:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
-   include/linux/export.h:70:36: error: redefinition of '__ksymtab___mdiobus_read'
-     static const struct kernel_symbol __ksymtab_##sym  \
-                                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
-   drivers/net//phy/mdio_bus.c:542:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
-   include/linux/export.h:70:36: note: previous definition of '__ksymtab___mdiobus_read' was here
-     static const struct kernel_symbol __ksymtab_##sym  \
-                                       ^
-   include/linux/export.h:100:25: note: in expansion of macro '___EXPORT_SYMBOL'
-    #define __EXPORT_SYMBOL ___EXPORT_SYMBOL
-                            ^~~~~~~~~~~~~~~~
-   include/linux/export.h:104:2: note: in expansion of macro '__EXPORT_SYMBOL'
-     __EXPORT_SYMBOL(sym, "")
-     ^~~~~~~~~~~~~~~
-   drivers/net//phy/mdio_bus.c:517:1: note: in expansion of macro 'EXPORT_SYMBOL'
-    EXPORT_SYMBOL(__mdiobus_read);
-    ^~~~~~~~~~~~~
+On 11/27/17 21:48, Jerome Brunet wrote:
+> On Mon, 2017-11-27 at 17:48 +0800, Yixun Lan wrote:
+>> Add driver for the clk controller which found in Meson AXG SoC
+>>
+>>   Note, we deliberately create a seperate source file for the Meson AXG
+>> series, instead of sharing code with previous GXBB/GXL - the file axg.c
+>> It would help us maintaining the code more easily.
+> 
+> But this will be the last meson SoC added this way. We need factor the code the
+> between meson8, gx and axg series since there is a lot of duplication there.
+> 
+>>
+>> Changes since v1 [1]:
+>>  - rework register definion, use '(offset << 2)' to better match
+> 
+> As previously discussed, please drop these calculations and just write what the
+> offset actually are. Putting one comment at the top, explaining the translation,
+> would be nice though. 
+> 
+can drop the calculations, but there is already a comment at top here..
 
-vim +/__kstrtab___mdiobus_read +67 include/linux/export.h
+>>    the description from data sheet
+>>  - drop "#include dt-bindings/clock/gxbb-aoclkc.h" from dts
+>>  - rebase code to v4.15-rc1
+>>
+>> [1] 
+>>   http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005239.html
+>>   http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005240.html
+>>   http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005241.html
+>>
+>>
+>> Qiufang Dai (2):
+> 
+> First patch of the series should be adding the compatible documentation, which
+> is missing here (unless it has gone through another channel and I missed it)
+> 
+I missed the dt-binding, will fix in next version
 
-f5016932 Paul Gortmaker  2011-05-23  62  
-f5016932 Paul Gortmaker  2011-05-23  63  /* For every exported symbol, place a struct in the __ksymtab section */
-f2355416 Nicolas Pitre   2016-01-22  64  #define ___EXPORT_SYMBOL(sym, sec)					\
-f5016932 Paul Gortmaker  2011-05-23  65  	extern typeof(sym) sym;						\
-f5016932 Paul Gortmaker  2011-05-23  66  	__CRC_SYMBOL(sym, sec)						\
-f5016932 Paul Gortmaker  2011-05-23 @67  	static const char __kstrtab_##sym[]				\
-f5016932 Paul Gortmaker  2011-05-23  68  	__attribute__((section("__ksymtab_strings"), aligned(1)))	\
-b92021b0 Rusty Russell   2013-03-15  69  	= VMLINUX_SYMBOL_STR(sym);					\
-b67067f1 Nicholas Piggin 2016-08-24  70  	static const struct kernel_symbol __ksymtab_##sym		\
-f5016932 Paul Gortmaker  2011-05-23  71  	__used								\
-b67067f1 Nicholas Piggin 2016-08-24  72  	__attribute__((section("___ksymtab" sec "+" #sym), used))	\
-f5016932 Paul Gortmaker  2011-05-23  73  	= { (unsigned long)&sym, __kstrtab_##sym }
-f5016932 Paul Gortmaker  2011-05-23  74  
-
-:::::: The code at line 67 was first introduced by commit
-:::::: f50169324df4ad942e544386d136216c8617636a module.h: split out the EXPORT_SYMBOL into export.h
-
-:::::: TO: Paul Gortmaker <paul.gortmaker@windriver.com>
-:::::: CC: Paul Gortmaker <paul.gortmaker@windriver.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 26861 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/e8393ea8/attachment-0001.gz>
+>>   clk: meson-axg: add clock controller drivers
+>>   arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
+>>
+>>  arch/arm64/Kconfig.platforms               |   1 +
+>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi |  15 +
+>>  drivers/clk/meson/Kconfig                  |   8 +
+>>  drivers/clk/meson/Makefile                 |   1 +
+>>  drivers/clk/meson/axg.c                    | 948
+>> +++++++++++++++++++++++++++++
+>>  drivers/clk/meson/axg.h                    | 126 ++++
+>>  include/dt-bindings/clock/axg-clkc.h       |  72 +++
+>>  7 files changed, 1171 insertions(+)
+>>  create mode 100644 drivers/clk/meson/axg.c
+>>  create mode 100644 drivers/clk/meson/axg.h
+>>  create mode 100644 include/dt-bindings/clock/axg-clkc.h
+>>
+> 
+> .
+> 
