@@ -1,47 +1,43 @@
-From: milan.o.stevanovic@gmail.com (Milan Stevanovic)
-Date: Tue, 28 Nov 2017 01:02:57 +0100
-Subject: [PATCH] mmc: sdhci-of-arasan: Add sdhci_arasan_set_power
-Message-ID: <1511827377-2021-1-git-send-email-milan.o.stevanovic@gmail.com>
+From: tobetter@gmail.com (Dongjin Kim)
+Date: Mon, 27 Nov 2017 19:15:01 -0500
+Subject: [REBASED PATCH] ARM: dts: exynos: fix property values of LDO15/17 for
+ ODROID-XU3/4
+Message-ID: <20171128001501.12740-1-tobetter@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power register needs to have a valid voltage set
-even when the power supply is managed by  an external regulator.
+Looking at the schematic, LDO15 and LDO17 are tied as a power source of a
+builtin network chipset. The voltage on LDO15 is corrected to 3.3V and the
+name of LDO17 is corrected to "vdd_ldo17".
 
-Signed-off-by: Milan Stevanovic <milan.o.stevanovic@gmail.com>
+Signed-off-by: Dongjin Kim <tobetter@gmail.com>
 ---
- drivers/mmc/host/sdhci-of-arasan.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-index 0720ea7..fb57206 100644
---- a/drivers/mmc/host/sdhci-of-arasan.c
-+++ b/drivers/mmc/host/sdhci-of-arasan.c
-@@ -262,6 +262,17 @@ static int sdhci_arasan_voltage_switch(struct mmc_host *mmc,
- 	return -EINVAL;
- }
+diff --git a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+index a5b8d0f0877e..81cbb77204a8 100644
+--- a/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
++++ b/arch/arm/boot/dts/exynos5422-odroid-core.dtsi
+@@ -233,8 +233,8 @@
  
-+static void sdhci_arasan_set_power(struct sdhci_host *host, unsigned char mode,
-+		     unsigned short vdd)
-+{
-+	if (!IS_ERR(host->mmc->supply.vmmc)) {
-+		struct mmc_host *mmc = host->mmc;
-+
-+		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-+	}
-+	sdhci_set_power_noreg(host, mode, vdd);
-+}
-+
- static const struct sdhci_ops sdhci_arasan_ops = {
- 	.set_clock = sdhci_arasan_set_clock,
- 	.get_max_clock = sdhci_pltfm_clk_get_max_clock,
-@@ -269,6 +280,7 @@ static const struct sdhci_ops sdhci_arasan_ops = {
- 	.set_bus_width = sdhci_set_bus_width,
- 	.reset = sdhci_arasan_reset,
- 	.set_uhs_signaling = sdhci_set_uhs_signaling,
-+	.set_power = sdhci_arasan_set_power,
- };
+ 			ldo15_reg: LDO15 {
+ 				regulator-name = "vdd_ldo15";
+-				regulator-min-microvolt = <3100000>;
+-				regulator-max-microvolt = <3100000>;
++				regulator-min-microvolt = <3300000>;
++				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
+ 			};
  
- static const struct sdhci_pltfm_data sdhci_arasan_pdata = {
+@@ -246,7 +246,7 @@
+ 			};
+ 
+ 			ldo17_reg: LDO17 {
+-				regulator-name = "tsp_avdd";
++				regulator-name = "vdd_ldo17";
+ 				regulator-min-microvolt = <3300000>;
+ 				regulator-max-microvolt = <3300000>;
+ 				regulator-always-on;
 -- 
-2.7.4
+2.11.0
