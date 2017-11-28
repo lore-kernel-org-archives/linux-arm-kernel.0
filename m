@@ -1,96 +1,94 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Tue, 28 Nov 2017 21:11:29 +0800
-Subject: [PATCH v4 0/4] fix the clock setting for SAR ADC
-In-Reply-To: <20171111003737.000038f0@huawei.com>
-References: <20171107140942.29243-1-yixun.lan@amlogic.com>
- <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
- <20171111003737.000038f0@huawei.com>
-Message-ID: <15745fd0-1af9-c7c0-8769-063f218a3d28@amlogic.com>
+From: alex.shi@linaro.org (Alex Shi)
+Date: Tue, 28 Nov 2017 21:17:07 +0800
+Subject: [PATCH 0/2] Fix ftracetest issues
+In-Reply-To: <CA+G9fYuMVZpJAfw09_nnx36oKgtpHmS+jY2=3d30inAko0YgHA@mail.gmail.com>
+References: <20171125113302.GY31757@n2100.armlinux.org.uk>
+ <101d41c7-2096-295e-b978-05224e16073e@linaro.org>
+ <CA+G9fYuMVZpJAfw09_nnx36oKgtpHmS+jY2=3d30inAko0YgHA@mail.gmail.com>
+Message-ID: <a4c802f6-a231-b640-b60a-643232eedfd6@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 11/11/17 08:37, Jonathan Cameron wrote:
-> On Tue, 7 Nov 2017 22:36:00 +0100
-> Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
+> Case 1: Build PASS on linux-4.14.y
+> -----------
+> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
+> Branch: linux-4.14.y
+> Commit id: f9f0b03dedc1 (HEAD -> linux-4.14.y, tag: v4.14.2,
+> origin/linux-4.14.y) Linux 4.14.2
 > 
->> Hi Yixun,
->>
->> On Tue, Nov 7, 2017 at 3:09 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
->>> patch [1/4]:
->>>   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
->>> the published datasheets[4] also has wrong description about this.
->>>   This patch should be explicitly merged *before* other patches.
+> Patches 1 and 2 applies smooth and build PASS with defconfig.
+> Ftrace test did not hang on beagleboard x15.
+> 
+
+Thanks  Naresh, could you like to give a 'tested-by:' for theses patches?
+
+
+> 
+> 
+> Case 2: Build failed on linux-4.9.y and linux-4.4.y
+> -----------
+> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
+> Branch: linux-4.9.y
+> Commit id: 133e6ccf46f1 (HEAD -> linux-4.9.y, tag: v4.9.65,
+> origin/linux-4.9.y) Linux 4.9.65
+> 
+> Tree: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux-stable-rc.git
+> Branch: linux-4.4.y
+> Commit id: 29ffb9c1fb4a (HEAD, tag: v4.4.102, origin/linux-4.4.y) Linux 4.4.102
+> 
+> Patch-1 : Patch applied smooth.
+> Patch-2: Patch failed to apply. Manually changed this file
+> "arch/arm/include/asm/traps.h"
+> 
+> Build failed on linux-4.9.y and linux-4.4.y with defconfig.
+> 
+> Build Error
+> ---------------
+> arch/arm/kernel/traps.c: In function ?dump_backtrace_entry?:
+> arch/arm/kernel/traps.c:73:2: error: implicit declaration of function
+> ?in_entry_text? [-Werror=implicit-function-declaration]
+> cc1: some warnings being treated as errors
+> make[1]: *** [arch/arm/kernel/traps.o] Error 1
+> make: *** [arch/arm/kernel] Error 2
+> 
+> - Naresh
+> 
+>> On 11/25/2017 07:33 PM, Russell King - ARM Linux wrote:
+>>> ftracetest provokes the kernel to try and return to userspace addresses
+>>> in kernel mode.  These two patches prevent that.
 >>>
->>> patch [2-4/4]:
->>>   Drop the "sana" clock from SAR ADC module,  
->> I agree with Jerome that patch 2/4 should be applied last.
-> 
-> Let me know when I should take this.
-> 
-> Thanks,
-> 
-> Jonathan
-> 
->> when I wrote the driver I couldn't get it to work on my GXBB board
->> (which unfortunately has died since then) because the clocks were
->> disabled (they weren't enabled by the bootloader). people who are
->> using an old .dtb would get the same problem again until the clock
->> driver is merged
->>
->>>   From the hardware perspective, the SAR ADC module doesn't
->>> require "sana" clock to wrok. This should apply to all SoC,
->>> including meson6,8, GXBB, GXL..  
->> thank you for clarifying this!
->>
->>> Note: the whole patchset series has been tested at GXL-P212 board,
->>> we haven't got any meson6,8 board to test, so I would appreciate
->>> if someone (Martin?) could help to confirm it works there.  
->> I can test this on a Meson8b and a Meson8m2 board on the weekend -
->> I'll let you know about the results
->>
->>
->> Regards
->> Martin
->> --
->> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-> 
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
-> 
-> .
-> 
-
-Hi Jonathan Cameron & Kevin Hilman:
-
- since the clk part patch has been applied[1], can we proceed with others?
-
-to Jonathan:
-I think the iio part(patch [2/4]) should be merged via your iio tree?
-see [2]
-
-to Kevin:
-could you take the DTS part? see [3], and the patch [4/4] has a rework
-version, see [4], to separate dt64 vs dt32 device tree.
-
-
-[1]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005472.html
-
-[2]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005264.html
-
-[3]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005265.html
-
-[4]
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005304.html
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005305.html
-http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005306.html
-
-Yixun
+>>> The first patch, which I intend merging with Linus tonight, ensures that
+>>> we catch the condition before we hit userspace, meaning that there is no
+>>> possibility of executing user code while in kernel mode.
+>>>
+>>> The second patch fixes the ftracetest issue itself by ensuring that it
+>>> is not possible to set a kprobe on any of the "special" assembler code.
+>>> Such code includes:
+>>> - the kernel primary/secondary CPU startup code
+>>> - exception entry code
+>>> - idmap code
+>>>
+>>> This is because the conditions under which this code is executed does
+>>> not meet the kprobes requirements, which is basically that the
+>>> "function" is C-like - it does something and then returns to the parent,
+>>> and has a stack.  This is just not universally true of the above code.
+>>>
+>>> This patch is larger than one may desire as we re-organise the sections
+>>> that some code ends up in, the way the unwinder works, and how we print
+>>> stack frames.
+>>>
+>>>  arch/arm/include/asm/assembler.h | 18 ++++++++++++++++++
+>>>  arch/arm/include/asm/exception.h |  3 +--
+>>>  arch/arm/include/asm/sections.h  | 21 +++++++++++++++++++++
+>>>  arch/arm/include/asm/traps.h     | 12 ------------
+>>>  arch/arm/kernel/entry-armv.S     |  6 +-----
+>>>  arch/arm/kernel/entry-common.S   |  1 +
+>>>  arch/arm/kernel/entry-header.S   |  6 ++++++
+>>>  arch/arm/kernel/stacktrace.c     | 14 ++------------
+>>>  arch/arm/kernel/traps.c          |  4 ++--
+>>>  arch/arm/kernel/vmlinux.lds.S    |  6 +++---
+>>>  arch/arm/mm/fault.c              |  5 ++---
+>>>  arch/arm/probes/kprobes/core.c   | 14 +++++++++++---
+>>>  12 files changed, 68 insertions(+), 42 deletions(-)
+>>>
