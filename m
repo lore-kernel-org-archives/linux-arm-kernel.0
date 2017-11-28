@@ -1,166 +1,68 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 28 Nov 2017 23:15:45 +0300
-Subject: [PATCH 2/2] arm64: dts: renesas: r8a77970: use SYSC power domain
- macros
-Message-ID: <20171128202109.031715810@cogentembedded.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 28 Nov 2017 20:22:16 +0000
+Subject: Applied "spi: meson-axg: update compatible string for the Meson-AXG"
+ to the spi tree
+In-Reply-To: <20171128132926.19051-2-yixun.lan@amlogic.com>
+Message-ID: <E1eJmOW-0008Dj-RE@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that the commit 833bdb47c826 ("dt-bindings: power: add R8A77970 SYSC
-power domain definitions") has hit Linus' tree, we can replace the  bare
-numbers  (we had to use to avoid a cross tree dependency) with these macro
-definitions...
+The patch
 
-Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+   spi: meson-axg: update compatible string for the Meson-AXG
 
+has been applied to the spi tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From a78841479696efa557a2251c86462c936a208f90 Mon Sep 17 00:00:00 2001
+From: Sunny Luo <sunny.luo@amlogic.com>
+Date: Tue, 28 Nov 2017 21:29:24 +0800
+Subject: [PATCH] spi: meson-axg: update compatible string for the Meson-AXG
+
+Update the compatbile string to support Meson-AXG SoCs.
+
+Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi |   32 +++++++++++++++---------------
- 1 file changed, 16 insertions(+), 16 deletions(-)
+ Documentation/devicetree/bindings/spi/spi-meson.txt | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-Index: renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-===================================================================
---- renesas.orig/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ renesas/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -33,14 +33,14 @@
- 			compatible = "arm,cortex-a53", "arm,armv8";
- 			reg = <0>;
- 			clocks = <&cpg CPG_CORE R8A77970_CLK_Z2>;
--			power-domains = <&sysc 5>;
-+			power-domains = <&sysc R8A77970_PD_CA53_CPU0>;
- 			next-level-cache = <&L2_CA53>;
- 			enable-method = "psci";
- 		};
+diff --git a/Documentation/devicetree/bindings/spi/spi-meson.txt b/Documentation/devicetree/bindings/spi/spi-meson.txt
+index 825c39cae74a..b7f5e86fed22 100644
+--- a/Documentation/devicetree/bindings/spi/spi-meson.txt
++++ b/Documentation/devicetree/bindings/spi/spi-meson.txt
+@@ -27,7 +27,9 @@ The Meson SPICC is generic SPI controller for general purpose Full-Duplex
+ communications with dedicated 16 words RX/TX PIO FIFOs.
  
- 		L2_CA53: cache-controller {
- 			compatible = "cache";
--			power-domains = <&sysc 21>;
-+			power-domains = <&sysc R8A77970_PD_CA53_SCU>;
- 			cache-unified;
- 			cache-level = <2>;
- 		};
-@@ -88,7 +88,7 @@
- 				      IRQ_TYPE_LEVEL_HIGH)>;
- 			clocks = <&cpg CPG_MOD 408>;
- 			clock-names = "clk";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 408>;
- 		};
- 
-@@ -109,7 +109,7 @@
- 				     "renesas,rcar-gen3-wdt";
- 			reg = <0 0xe6020000 0 0x0c>;
- 			clocks = <&cpg CPG_MOD 402>;
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 402>;
- 			status = "disabled";
- 		};
-@@ -190,7 +190,7 @@
- 				      GIC_SPI 18 IRQ_TYPE_LEVEL_HIGH
- 				      GIC_SPI 161 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 407>;
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 407>;
- 		};
- 
-@@ -217,7 +217,7 @@
- 					  "ch4", "ch5", "ch6", "ch7";
- 			clocks = <&cpg CPG_MOD 218>;
- 			clock-names = "fck";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 218>;
- 			#dma-cells = <1>;
- 			dma-channels = <8>;
-@@ -245,7 +245,7 @@
- 					  "ch4", "ch5", "ch6", "ch7";
- 			clocks = <&cpg CPG_MOD 217>;
- 			clock-names = "fck";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 217>;
- 			#dma-cells = <1>;
- 			dma-channels = <8>;
-@@ -268,7 +268,7 @@
- 			dmas = <&dmac1 0x31>, <&dmac1 0x30>,
- 			       <&dmac2 0x31>, <&dmac2 0x30>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 520>;
- 			status = "disabled";
- 		};
-@@ -286,7 +286,7 @@
- 			dmas = <&dmac1 0x33>, <&dmac1 0x32>,
- 			       <&dmac2 0x33>, <&dmac2 0x32>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 519>;
- 			status = "disabled";
- 		};
-@@ -304,7 +304,7 @@
- 			dmas = <&dmac1 0x35>, <&dmac1 0x34>,
- 			       <&dmac2 0x35>, <&dmac2 0x34>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 518>;
- 			status = "disabled";
- 		};
-@@ -321,7 +321,7 @@
- 			dmas = <&dmac1 0x37>, <&dmac1 0x36>,
- 			       <&dmac2 0x37>, <&dmac2 0x36>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 517>;
- 			status = "disabled";
- 		};
-@@ -339,7 +339,7 @@
- 			dmas = <&dmac1 0x51>, <&dmac1 0x50>,
- 			       <&dmac2 0x51>, <&dmac2 0x50>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 207>;
- 			status = "disabled";
- 		};
-@@ -357,7 +357,7 @@
- 			dmas = <&dmac1 0x53>, <&dmac1 0x52>,
- 			       <&dmac2 0x53>, <&dmac2 0x52>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 206>;
- 			status = "disabled";
- 		};
-@@ -375,7 +375,7 @@
- 			dmas = <&dmac1 0x57>, <&dmac1 0x56>,
- 			       <&dmac2 0x57>, <&dmac2 0x56>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 204>;
- 			status = "disabled";
- 		};
-@@ -392,7 +392,7 @@
- 			dmas = <&dmac1 0x59>, <&dmac1 0x58>,
- 			       <&dmac2 0x59>, <&dmac2 0x58>;
- 			dma-names = "tx", "rx", "tx", "rx";
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 203>;
- 			status = "disabled";
- 		};
-@@ -434,7 +434,7 @@
- 					  "ch20", "ch21", "ch22", "ch23",
- 					  "ch24";
- 			clocks = <&cpg CPG_MOD 812>;
--			power-domains = <&sysc 32>;
-+			power-domains = <&sysc R8A77970_PD_ALWAYS_ON>;
- 			resets = <&cpg 812>;
- 			phy-mode = "rgmii-id";
- 			iommus = <&ipmmu_rt 3>;
+ Required properties:
+- - compatible: should be "amlogic,meson-gx-spicc" on Amlogic GX SoCs.
++ - compatible: should be:
++	"amlogic,meson-gx-spicc" on Amlogic GX and compatible SoCs.
++	"amlogic,meson-axg-spicc" on Amlogic AXG and compatible SoCs
+  - reg: physical base address and length of the controller registers
+  - interrupts: The interrupt specifier
+  - clock-names: Must contain "core"
+-- 
+2.15.0
