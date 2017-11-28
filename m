@@ -1,37 +1,32 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Nov 2017 21:42:32 +0100
-Subject: [PATCH 11/17] drm/sun4i: Wire in DE2 scaler support
-In-Reply-To: <20171127205750.19277-12-jernej.skrabec@siol.net>
+Date: Tue, 28 Nov 2017 21:43:53 +0100
+Subject: [PATCH 12/17] drm/sun4i: Add CCSC property to DE2 configuration
+In-Reply-To: <1763fe2cf572135ef030a26a32b907d7@aosc.io>
 References: <20171127205750.19277-1-jernej.skrabec@siol.net>
- <20171127205750.19277-12-jernej.skrabec@siol.net>
-Message-ID: <20171128204232.rf2jhb2fih5eo7r4@flea.home>
+ <20171127205750.19277-13-jernej.skrabec@siol.net>
+ <1763fe2cf572135ef030a26a32b907d7@aosc.io>
+Message-ID: <20171128204353.imy2rd6fy7hzrvzg@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 09:57:44PM +0100, Jernej Skrabec wrote:
-> Calculate scaling parameters and call appropriate scaler set up
-> function.
+On Tue, Nov 28, 2017 at 08:02:26PM +0800, Icenowy Zheng wrote:
+> ? 2017-11-28 04:57?Jernej Skrabec ???
+> > Base addresses of channel output CSC (CCSC) depends whether mixer in
+> > question is first or second and if it is second, if supports VEP or not.
+> > This new property will tell which set of base addresses to take.
+> > 
+> > 0 - first mixer or second mixer with VEP support
+> > 1 - second mixer without VEP support
 > 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> Maxime,
+> 
+> I think here the ID of the mixer matters.
+> 
+> P.S. I didn't found any SoC with a second mixer with VEP currently
 
-I'm not sure there's been something wrong, but I didn't receive your
-patch 10. I guess this one could be folded in patch 9.
+Then we'll have an allwinner,has-vep; property (or whatever) for all
+those SoCs' mixer0. What's the big deal about it?
 
-> @@ -194,29 +195,34 @@ int sun8i_mixer_update_ui_layer_coord(struct sun8i_mixer *mixer,
->  				      int layer, struct drm_plane *plane)
->  {
->  	struct drm_plane_state *state = plane->state;
-> -	u32 width, height, size;
-> +	u32 src_w, src_h, dst_w, dst_h;
-> +	u32 outsize, insize;
-> +	u32 hphase, vphase;
->  
-> -	DRM_DEBUG_DRIVER("Updating layer %d\n", layer);
-> +	DRM_DEBUG_DRIVER("Updating UI layer %d\n", layer);
-
-And this would be part of the VI support patch 
-
-Thanks!
 Maxime
 
 -- 
@@ -44,4 +39,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/e4282780/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/c61690bf/attachment.sig>
