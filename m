@@ -1,49 +1,82 @@
 From: dianders@chromium.org (Doug Anderson)
-Date: Tue, 28 Nov 2017 15:32:52 -0800
-Subject: [PATCH 0/4] Move DP phy switch to PHY driver
-In-Reply-To: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
-References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
-Message-ID: <CAD=FV=VdUhfL+_MShYynoXKQW1-KpAOsW=x+hAxGZO78rJEyeQ@mail.gmail.com>
+Date: Tue, 28 Nov 2017 15:42:36 -0800
+Subject: [PATCH] MAINTAINERS: change maintainer for Rockchip drm drivers
+In-Reply-To: <f69c94b4-f9d7-ac35-4d88-261f27d84d17@rock-chips.com>
+References: <1510568131-28838-1-git-send-email-mark.yao@rock-chips.com>
+ <20171120074848.cg22qkved232pxxf@phenom.ffwll.local>
+ <83984459.7UdiCfbSkg@phil>
+ <20171124145106.hdtybw3hgizlg6gs@phenom.ffwll.local>
+ <f69c94b4-f9d7-ac35-4d88-261f27d84d17@rock-chips.com>
+Message-ID: <CAD=FV=W_c-ftX_jkZ7_RAdMZOtqcykiBOEMyB6dLWjuzkKwbDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Feb 9, 2017 at 11:44 PM, Chris Zhong <zyw@rock-chips.com> wrote:
->
-> There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
-> only one PHY can connect to DP controller at one time, the other should
-> be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
-> set this bit means enable PHY 1, clear this bit means enable PHY 0.
->
-> If the board has 2 Type-C ports, the DP driver get the phy id from
-> devm_of_phy_get_by_index, and then control this switch according to
-> this id. But some others board only has one Type-C port, it may be PHY 0
-> or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
-> this switch to PHY driver, the PHY driver can distinguish between PHY 0
-> and PHY 1, and then write the correct register bit.
+On Sun, Nov 26, 2017 at 6:22 PM, Sandy Huang <hjc@rock-chips.com> wrote:
+> Hi Daniel,
+>     I register the account and get the drm-misc commit rights now, thanks.
 >
 >
->
-> Chris Zhong (4):
->   Documentation: bindings: add uphy-dp-sel for Rockchip USB Type-C PHY
->   arm64: dts: rockchip: add rockchip,uphy-dp-sel for Type-C phy
->   phy: rockchip-typec: support DP phy switch
->   drm/rockchip: cdn-dp: remove the DP phy switch
->
->  Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 5 +++++
->  arch/arm64/boot/dts/rockchip/rk3399.dtsi                     | 2 ++
->  drivers/gpu/drm/rockchip/cdn-dp-core.c                       | 7 -------
->  drivers/phy/phy-rockchip-typec.c                             | 9 +++++++++
->  4 files changed, 16 insertions(+), 7 deletions(-)
+> ? 2017/11/24 22:51, Daniel Vetter ??:
+>>
+>> On Fri, Nov 24, 2017 at 09:28:59AM +0100, Heiko Stuebner wrote:
+>>>
+>>> Hi Daniel,
+>>>
+>>> [somehow my email address seems to have gotten lost, so
+>>> only saw this by chance on the list itself now.
+>>> I've also re-added Sandy to the recipients]
+>>>
+>>> Am Montag, 20. November 2017, 08:48:48 CET schrieb Daniel Vetter:
+>>>>
+>>>> On Mon, Nov 13, 2017 at 06:15:31PM +0800, Mark Yao wrote:
+>>>>>
+>>>>> For personal reasons, Mark Yao will leave rockchip,
+>>>>> can not continue maintain drm/rockchip, Sandy Huang
+>>>>> will take over the drm/rockchip.
+>>>>>
+>>>>> Cc: Sandy Huang <hjc@rock-chips.com>
+>>>>> Cc: Heiko Stuebner <heiko@sntech.de>
+>>>>>
+>>>>> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+>>>>
+>>>>
+>>>> Since rockchip is in drm-misc that means we need a new maintainer who
+>>>> also
+>>>> has drm-misc commit rights. Sandy doesn't yet, so if Sandy is going to
+>>>> be
+>>>> the new maintainer we need to fix that.
+>>>>
+>>>> Also, Heiko, are you interested in becoming co-maintainer? With commit
+>>>> rights and all.
+>>>
+>>>
+>>> I always feel somewhat inadequate judging the fast-paced drm stuff, as in
+>>> the past once I got my head wrapped around something, drm always
+>>> somehow moved another mile already ;-) .
+>>>
+>>> But somewhere I read that drm-pace for big changes is supposed to slow a
+>>> bit now that atomic modesetting is done in a lot of places, so we could
+>>> give
+>>> co-maintainership for the Rockchip-drm a try - with Sandy wearing the
+>>> actual hat for big changes though ;-) .
+>>
+>>
+>> Yeah I think on the modeset side it calmed down a lot. We're still
+>> fine-tuning the helper libraries as we're figuring out better ways to
+>> write drivers. But right now I think a lot of the action is all in details
+>> not relevant for many drivers.
+>>
+>> If Sandy's ok with that too pls request an fd.o account for drm-misc and
+>> set up the tooling per our quickstart guide:
+>>
+>> https://01.org/linuxgraphics/gfx-docs/maintainer-tools/dim.html#quickstart
+>>
+>> Thanks, Daniel
 
-What ever happened to this series?  It seemed like it just dropped on
-the floor...
-
-There was a bit of contention on patch #3
-<https://patchwork.kernel.org/patch/9566095/> about the fact that we
-were specifying addresses in the device tree vs. hardcoding them in
-the driver.  Any way we can just make a decision and go with it?
-
+I just got a bounced mail from Mark Yao's old email address and
+noticed that linux-next still shows him as the maintainer.  It'd be
+great if we could land the change to update the MAINTAINERS file.  :-P
 
 -Doug
