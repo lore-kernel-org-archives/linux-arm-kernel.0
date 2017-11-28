@@ -1,43 +1,40 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 28 Nov 2017 09:32:32 +0100
-Subject: [PATCH v2 0/2] dts: renesas: r8a77995: IPMMU upstream integration
-In-Reply-To: <20171110132605.1537-1-horms+renesas@verge.net.au>
-References: <20171110132605.1537-1-horms+renesas@verge.net.au>
-Message-ID: <20171128083232.qqqlrt6l2ds44xoo@verge.net.au>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 28 Nov 2017 09:39:51 +0100
+Subject: [PATCH] ARM64: dts: meson-gxl: Add alternate ARM Trusted
+ Firmware reserved memory zone
+In-Reply-To: <7h8tere1q2.fsf@baylibre.com>
+References: <1507735392-20005-1-git-send-email-narmstrong@baylibre.com>
+ <7h8tere1q2.fsf@baylibre.com>
+Message-ID: <20171128083951.GD9413@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 10, 2017 at 02:26:03PM +0100, Simon Horman wrote:
-> This series adds DT nodes for IPMMU instances on r8a77995 together with
-> connections to the r8a77995 on-chip device Ethernet-AVB.
+On Mon, Nov 27, 2017 at 03:33:25PM -0800, Kevin Hilman wrote:
+> Greg,
 > 
-> With these patches applied a white list enabled IPMMU driver may be used
-> to check silicon revision and then enable IPMMU in the known working cases.
+> Neil Armstrong <narmstrong@baylibre.com> writes:
 > 
-> The recommended test stack for this patchset is a merge of
-> * The iommu/next branch of the vfio tree
-> * renesas-devel-20171110-v4.14-rc8 tag of the renesas tree
+> > This year, Amlogic updated the ARM Trusted Firmware reserved memory mapping
+> > for Meson GXL SoCs and products sold since May 2017 uses this alternate
+> > reserved memory mapping.
+> > But products had been sold using the previous mapping.
+> >
+> > This issue has been explained in [1] and a dynamic solution is yet to be
+> > found to avoid loosing another 3Mbytes of reservable memory.
+> >
+> > In the meantime, this patch adds this alternate memory zone only for
+> > the GXL and GXM SoCs since GXBB based new products stopped earlier.
+> >
+> > [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-October/004860.html
+> >
+> > Fixes: bba8e3f42736 ("ARM64: dts: meson-gx: Add firmware reserved memory zones")
+> > Reported-by: Jerome Brunet <jbrunet@baylibre.com>
+> > Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 > 
-> With the following applied:
->  [PATCH v4 0/3] iommu/ipmmu-vmsa: r8a7796 support V4
->  [PATCH 0/2] iommu/ipmmu-vmsa: r8a779(70|95) support
+> I missed the Fixes tag on this one, but it's now commit 4ee8e51b9edf upstream.
 > 
-> A patch to enable IPMMU devices is not included in this series
-> as Ethernet-AVB, the only device to which IPMMU is hooked up to,
-> is disabled.
-> 
-> The DT binding for r8a77995 has been submitted (as part of the
-> r8a779(70|95) series noted above) in conjunction with this patchset.
-> 
-> This is based on work by Magnus Damm.
-> 
-> Based on renesas-devel-20171110-v4.14-rc8
-> 
-> Changes since V1:
-> * Drop mostly redundant comments from nodes
-> 
-> Simon Horman (2):
->   arm64: dts: renesas: r8a77995: Add IPMMU device nodes
->   arm64: dts: renesas: r8a77995: Connect Ethernet-AVB to IPMMU-RT
+> Please apply to stable v4.10+
 
-Applied for v4.16.
+Now applied, thanks.
+
+greg k-h
