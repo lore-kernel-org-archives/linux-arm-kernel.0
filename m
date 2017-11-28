@@ -1,23 +1,35 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Nov 2017 10:38:13 -0600
-Subject: [PATCH 1/3] dt-bindings: spicc: update compatible string for the
- Meson-AXG
-In-Reply-To: <20171128132926.19051-2-yixun.lan@amlogic.com>
-References: <20171128132926.19051-1-yixun.lan@amlogic.com>
- <20171128132926.19051-2-yixun.lan@amlogic.com>
-Message-ID: <20171128163813.f3twbivk4ioyn6y7@rob-hp-laptop>
+From: clabbe.montjoie@gmail.com (Corentin Labbe)
+Date: Tue, 28 Nov 2017 17:48:22 +0100
+Subject: [PATCH] net: stmmac: dwmac-sun8i: fix allwinner,
+ leds-active-low handling
+Message-ID: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 09:29:24PM +0800, Yixun Lan wrote:
-> From: Sunny Luo <sunny.luo@amlogic.com>
-> 
-> Update the compatbile string to support Meson-AXG SoCs.
-> 
-> Signed-off-by: Sunny Luo <sunny.luo@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  Documentation/devicetree/bindings/spi/spi-meson.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
+The driver expect "allwinner,leds-active-low" to be in PHY node, but
+the binding doc expect it to be in MAC node.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Since all board DT use it also in MAC node, the driver need to search
+allwinner,leds-active-low in MAC node.
+
+Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+---
+ drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+index e5ff734d4f9b..9eb7f65d8000 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-sun8i.c
+@@ -808,8 +808,7 @@ static int sun8i_dwmac_set_syscon(struct stmmac_priv *priv)
+ 			 val, reg);
+ 
+ 	if (gmac->variant->soc_has_internal_phy) {
+-		if (of_property_read_bool(priv->plat->phy_node,
+-					  "allwinner,leds-active-low"))
++		if (of_property_read_bool(node, "allwinner,leds-active-low"))
+ 			reg |= H3_EPHY_LED_POL;
+ 		else
+ 			reg &= ~H3_EPHY_LED_POL;
+-- 
+2.13.6
