@@ -1,67 +1,112 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 28 Nov 2017 15:02:10 +0000
-Subject: [PATCH v2 03/16] ARM: dts: imx6qdl-microsom: rename to imx6qdl-sr-som
-In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
-References: <20171128150045.GV31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJhOk-0006NH-8m@rmk-PC.armlinux.org.uk>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Tue, 28 Nov 2017 16:05:47 +0100
+Subject: [PATCH v5 03/13] IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+In-Reply-To: <1511881557-28596-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1511881557-28596-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1511881557-28596-4-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jon and myself feel that "imx6qdl-microsom" is too generic a name for
-SolidRun's microsom - some other manufacturer could have their own
-microsom.  Change the name to the shorter "imx6qdl-sr-som".
+Add devm_iio_hw_consumer_alloc function that calls iio_hw_consumer_free
+when the device is unbound from the bus.
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 ---
- arch/arm/boot/dts/imx6q-h100.dts                                 | 2 +-
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi                           | 2 +-
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi                      | 2 +-
- arch/arm/boot/dts/{imx6qdl-microsom.dtsi => imx6qdl-sr-som.dtsi} | 0
- 4 files changed, 3 insertions(+), 3 deletions(-)
- rename arch/arm/boot/dts/{imx6qdl-microsom.dtsi => imx6qdl-sr-som.dtsi} (100%)
+V4->V5 No delta.
 
-diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
-index bf5dfc9c8127..815e9437e3f0 100644
---- a/arch/arm/boot/dts/imx6q-h100.dts
-+++ b/arch/arm/boot/dts/imx6q-h100.dts
-@@ -42,7 +42,7 @@
- /dts-v1/;
+ drivers/iio/buffer/industrialio-hw-consumer.c | 66 +++++++++++++++++++++++++++
+ include/linux/iio/hw-consumer.h               |  2 +
+ 2 files changed, 68 insertions(+)
+
+diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
+index 0253be1..e980a79 100644
+--- a/drivers/iio/buffer/industrialio-hw-consumer.c
++++ b/drivers/iio/buffer/industrialio-hw-consumer.c
+@@ -138,6 +138,72 @@ void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
+ }
+ EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
  
- #include "imx6q.dtsi"
--#include "imx6qdl-microsom.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
++static void devm_iio_hw_consumer_release(struct device *dev, void *res)
++{
++	iio_hw_consumer_free(*(struct iio_hw_consumer **)res);
++}
++
++static int devm_iio_hw_consumer_match(struct device *dev, void *res, void *data)
++{
++	struct iio_hw_consumer **r = res;
++
++	if (!r || !*r) {
++		WARN_ON(!r || !*r);
++		return 0;
++	}
++	return *r == data;
++}
++
++/**
++ * devm_iio_hw_consumer_alloc - Resource-managed iio_hw_consumer_alloc()
++ * @dev: Pointer to consumer device.
++ *
++ * Managed iio_hw_consumer_alloc. iio_hw_consumer allocated with this function
++ * is automatically freed on driver detach.
++ *
++ * If an iio_hw_consumer allocated with this function needs to be freed
++ * separately, devm_iio_hw_consumer_free() must be used.
++ *
++ * returns pointer to allocated iio_hw_consumer on success, NULL on failure.
++ */
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev)
++{
++	struct iio_hw_consumer **ptr, *iio_hwc;
++
++	ptr = devres_alloc(devm_iio_hw_consumer_release, sizeof(*ptr),
++			   GFP_KERNEL);
++	if (!ptr)
++		return NULL;
++
++	iio_hwc = iio_hw_consumer_alloc(dev);
++	if (IS_ERR(iio_hwc)) {
++		devres_free(ptr);
++	} else {
++		*ptr = iio_hwc;
++		devres_add(dev, ptr);
++	}
++
++	return iio_hwc;
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_alloc);
++
++/**
++ * devm_iio_hw_consumer_free - Resource-managed iio_hw_consumer_free()
++ * @dev: Pointer to consumer device.
++ * @hwc: iio_hw_consumer to free.
++ *
++ * Free iio_hw_consumer allocated with devm_iio_hw_consumer_alloc().
++ */
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc)
++{
++	int rc;
++
++	rc = devres_release(dev, devm_iio_hw_consumer_release,
++			    devm_iio_hw_consumer_match, hwc);
++	WARN_ON(rc);
++}
++EXPORT_SYMBOL_GPL(devm_iio_hw_consumer_free);
++
+ /**
+  * iio_hw_consumer_enable() - Enable IIO hardware consumer
+  * @hwc: iio_hw_consumer to enable.
+diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
+index f16791b..90ecfce 100644
+--- a/include/linux/iio/hw-consumer.h
++++ b/include/linux/iio/hw-consumer.h
+@@ -14,6 +14,8 @@ struct iio_hw_consumer;
  
- / {
- 	model = "Auvidea H100";
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index 57ce2dbb6ad9..0bc1734d8bdf 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -38,7 +38,7 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
--#include "imx6qdl-microsom.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- #include <dt-bindings/input/input.h>
- #include <dt-bindings/gpio/gpio.h>
+ struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
+ void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
++struct iio_hw_consumer *devm_iio_hw_consumer_alloc(struct device *dev);
++void devm_iio_hw_consumer_free(struct device *dev, struct iio_hw_consumer *hwc);
+ int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
+ void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
  
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index afd981e9b5e3..246984992ad0 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -38,7 +38,7 @@
-  *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-  *     OTHER DEALINGS IN THE SOFTWARE.
-  */
--#include "imx6qdl-microsom.dtsi"
-+#include "imx6qdl-sr-som.dtsi"
- 
- / {
- 	chosen {
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-sr-som.dtsi
-similarity index 100%
-rename from arch/arm/boot/dts/imx6qdl-microsom.dtsi
-rename to arch/arm/boot/dts/imx6qdl-sr-som.dtsi
 -- 
 2.7.4
