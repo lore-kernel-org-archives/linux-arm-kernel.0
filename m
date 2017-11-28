@@ -1,37 +1,78 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Nov 2017 16:47:34 +0100
-Subject: [PATCH v2] sunxi-rsb: Include OF based modalias in device uevent
-In-Reply-To: <53cb17f5-6077-419a-8e5c-6c80f9dfa9dc@rwthex-w2-a.rwth-ad.de>
-References: <53cb17f5-6077-419a-8e5c-6c80f9dfa9dc@rwthex-w2-a.rwth-ad.de>
-Message-ID: <20171128154734.v2yog6lwiombv3io@flea.home>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Tue, 28 Nov 2017 16:48:26 +0100
+Subject: [PATCH v2 2/4] DTS: GTA04: fix panel compatibility string
+In-Reply-To: <20171128151039.GZ28152@atomide.com>
+References: <cover.1510822218.git.hns@goldelico.com>
+ <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
+ <20171128145727.GY28152@atomide.com>
+ <C108B0B6-FED7-44DB-9A18-39E3BE93E586@goldelico.com>
+ <20171128151039.GZ28152@atomide.com>
+Message-ID: <F14B3797-8154-4958-82AB-8E39C75BB97B@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 08:05:34PM +0100, Stefan Br?ns wrote:
-> Include the OF-based modalias in the uevent sent when registering devices
-> on the sunxi RSB bus, so that user space has a chance to autoload the
-> kernel module for the device.
+Hi Tony,
+
+> Am 28.11.2017 um 16:10 schrieb Tony Lindgren <tony@atomide.com>:
 > 
-> Fixes a regression caused by commit 3f241bfa60bd ("arm64: allwinner: a64:
-> pine64: Use dcdc1 regulator for mmc0"). When the axp20x-rsb module for
-> the AXP803 PMIC is built as a module, it is not loaded and the system
-> ends up with an disfunctional MMC controller.
+> * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:04]:
+>> Hi Tony,
+>> 
+>>> Am 28.11.2017 um 15:57 schrieb Tony Lindgren <tony@atomide.com>:
+>>> 
+>>> * H. Nikolaus Schaller <hns@goldelico.com> [171116 08:53]:
+>>>> Vendor string is "tpo" and not "toppoly".
+>>>> 
+>>>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+>>>> ---
+>>>> arch/arm/boot/dts/omap3-gta04.dtsi | 2 +-
+>>>> 1 file changed, 1 insertion(+), 1 deletion(-)
+>>>> 
+>>>> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+>>>> index 4504908c23fe..ec27ed67a22a 100644
+>>>> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
+>>>> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+>>>> @@ -86,7 +86,7 @@
+>>>> 
+>>>> 		/* lcd panel */
+>>>> 		lcd: td028ttec1 at 0 {
+>>>> -			compatible = "toppoly,td028ttec1";
+>>>> +			compatible = "tpo,td028ttec1";
+>>>> 			reg = <0>;
+>>>> 			spi-max-frequency = <100000>;
+>>>> 			spi-cpol;
+>>> 
+>>> Applying into omap-for-v4.15/fixes thanks. The other dts patch seems
+>>> like it can wait for v4.16 merge window.
+>> 
+>> Hm. Not really. It needs the panel driver to match. So either both or
+>> none should be applied or it will break the panel from working.
+>> 
+>> I am just 1-2 hours away from submitting a -v3 (rebased and tested
+>> on top of 4.15-rc1).
 > 
-> Cc: stable <stable@vger.kernel.org>
-> Signed-off-by: Stefan Br?ns <stefan.bruens@rwth-aachen.de>
+> OK fine dropping both. Please update the description in both dts
+> patches to make it clear they are needed as a fix. Preferrably
+> with a proper fixes tag.
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Well, it is not "needed" in a strong sense since current mainline&stable
+works. It is more a style and consistency fix to use "tpo," everywhere.
 
-Maxime
+> 
+> Having "We can remove the "omapdss," prefix" in the description sure
+> does not sounds like it's needed as a fix :)
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/d025d6a0/attachment.sig>
+The description has been improved on -v3.
+
+> 
+> Sounds like maybe these two should be just a single patch for
+> a proper fix?
+
+Hm. I usually get the feedback to separate DT and driver fixes into
+separate commits... Therefore I submit patch sets in the hope they
+are not picked apart :)
+
+As promised -v3 is following now.
+
+BR,
+Nikolaus
