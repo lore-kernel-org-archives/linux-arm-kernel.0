@@ -1,54 +1,76 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Tue, 28 Nov 2017 11:40:05 +0000
-Subject: [question] extract the feature bits width to 4
-In-Reply-To: <17ab0a11-7ca2-ff22-35d6-7446dbccc3ea@huawei.com>
-References: <17ab0a11-7ca2-ff22-35d6-7446dbccc3ea@huawei.com>
-Message-ID: <f9d9af3e-e7c0-88fe-156e-a7969ca7394f@arm.com>
+From: icenowy@aosc.io (Icenowy Zheng)
+Date: Tue, 28 Nov 2017 19:50:19 +0800
+Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
+In-Reply-To: <20171128090223.mqp3v2t6koyu6hk4@flea.home>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <1c4f6b275597dec7d97b5c1d9f749ba27c0610f3.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <2744508.m82qQEPny3@jernej-laptop>
+ <20171128090223.mqp3v2t6koyu6hk4@flea.home>
+Message-ID: <2edae31575bbdb5abe989ad3b9d403a7@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc: linux-arm-kernel
+? 2017-11-28 17:02?Maxime Ripard ???
+> Hi,
+> 
+> On Mon, Nov 27, 2017 at 05:01:49PM +0100, Jernej ?krabec wrote:
+>> Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard 
+>> napisal(a):
+>> > Add support for the A83T display pipeline.
+>> >
+>> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+>> >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
+>> >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
+>> >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
+>> >  4 files changed, 14 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+>> > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
+>> > d4259a4f5171..d6b52e5c48c0 100644
+>> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+>> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+>> > @@ -93,6 +93,7 @@ Required properties:
+>> >     * allwinner,sun6i-a31s-tcon
+>> >     * allwinner,sun7i-a20-tcon
+>> >     * allwinner,sun8i-a33-tcon
+>> > +   * allwinner,sun8i-a83t-tcon-lcd
+>> >     * allwinner,sun8i-v3s-tcon
+>> >   - reg: base address and size of memory-mapped region
+>> >   - interrupts: interrupt associated to this IP
+>> > @@ -224,6 +225,7 @@ supported.
+>> >
+>> >  Required properties:
+>> >    - compatible: value must be one of:
+>> > +    * allwinner,sun8i-a83t-de2-mixer
+>> 
+>> What will be the name of the second mixer, once support for HDMI is 
+>> added?
+>> Should we start directly with 0 and 1 postfix ?
+> 
+> What are the differences exactly without the two mixers?
+> 
+> I was hoping to be able to cover them all using properties, indices
+> are usually pretty badly received in compatibles.
 
-On 28/11/17 11:17, gengdongjiu wrote:
-> Hi,suzuki/mark,
-
-Hello!
-
-Please Cc linux-arm-kernel mailing list in the future for any arm/arm64 kernel
-related queries.
+1. VEP is only available on the VI channel in mixer0. (VEP may mean
+Video Enhance Processor)
+2. Smart Backlight is only available in mixer0's on SoCs with LCD.
+3. Writeback function is only available in mixer0.
 
 > 
->    very sorry to disturb you, I have a question that want to consult with you. For the CPU feature detection,
-> why we use extract 4 bits width for the feature match instead of the actual bits number[1]?  may be the actual hardware feature bit more than 4 bits.
-
-
-There are features which could be more or less than 4bit wide. However,
-all the arm64_cpu_capabilities features are 4bits and hence the hard coded
-bits there. If we ever come across handling capabilities which are not
-standard size, we could add the necessary code to support it.
-
-Are you planning to add something which does require the change ? Please
-feel free to send patches.
-
-Cheers
-
-Suzuki
-
-
-> thanks!
+>> >  static const struct of_device_id sun8i_mixer_of_table[] = {
+>> >  	{
+>> > +		.compatible = "allwinner,sun8i-a83t-de2-mixer",
+>> > +		.data = &sun8i_v3s_mixer_cfg,
+>> > +	},
+>> > +	{
+>> 
+>> Maybe you want to squash 12 patch since this works only by luck.
 > 
-> static inline int __attribute_const__
-> cpuid_feature_extract_field(u64 features, int field, bool sign)
-> {
->          return cpuid_feature_extract_field_width(features, field, 4, sign);
-> }
+> Yeah, I totally meant to do that :)
 > 
-> static bool
-> feature_matches(u64 reg, const struct arm64_cpu_capabilities *entry)
-> {
->          int val = cpuid_feature_extract_field(reg, entry->field_pos, entry->sign);
-> 
->          return val >= entry->min_field_value;
-> }
-> 
-> 
+> Thanks!
+> Maxime
