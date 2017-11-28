@@ -1,49 +1,50 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 28 Nov 2017 14:45:55 +0100 (CET)
-Subject: [PATCH V3 03/29] x86/PCI: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511801886-6753-4-git-send-email-okaya@codeaurora.org>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
- <1511801886-6753-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <alpine.DEB.2.20.1711281445440.1723@nanos>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Tue, 28 Nov 2017 14:47:30 +0100
+Subject: [PATCH v4 06/12] ARM: dts: r8a73a4: Remove CMT renesas,channels-mask
+In-Reply-To: <1511876856-9495-1-git-send-email-geert+renesas@glider.be>
+References: <1511876856-9495-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1511876856-9495-7-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Magnus Damm <damm+renesas@opensource.se>
 
-On Mon, 27 Nov 2017, Sinan Kaya wrote:
+Update the DTS to remove the now deprecated "renesas,channels-mask"
+property.
 
-> pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> where a PCI device is present. This restricts the device drivers to be
-> reused for other domain numbers.
-> 
-> Getting ready to remove pci_get_bus_and_slot() function in favor of
-> pci_get_domain_bus_and_slot().
-> 
-> Use domain number of 0 as the domain number is not available in struct
-> irq_routing_table.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+The channel information is now kept in the device driver and can easily
+be determined based on the compat string.
 
-Acked-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v4:
+  - Rebased against renesas-devel-20171127-v4.15-rc1,
 
-> ---
->  arch/x86/pci/irq.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/x86/pci/irq.c b/arch/x86/pci/irq.c
-> index 04526291..52e5510 100644
-> --- a/arch/x86/pci/irq.c
-> +++ b/arch/x86/pci/irq.c
-> @@ -839,7 +839,8 @@ static void __init pirq_find_router(struct irq_router *r)
->  	DBG(KERN_DEBUG "PCI: Attempting to find IRQ router for [%04x:%04x]\n",
->  	    rt->rtr_vendor, rt->rtr_device);
->  
-> -	pirq_router_dev = pci_get_bus_and_slot(rt->rtr_bus, rt->rtr_devfn);
-> +	pirq_router_dev = pci_get_domain_bus_and_slot(0, rt->rtr_bus,
-> +						      rt->rtr_devfn);
->  	if (!pirq_router_dev) {
->  		DBG(KERN_DEBUG "PCI: Interrupt router not found at "
->  			"%02x:%02x\n", rt->rtr_bus, rt->rtr_devfn);
-> -- 
-> 1.9.1
-> 
-> 
+v3:
+  - Take over from Magnus,
+  - Split in per-SoC patches,
+
+v2:
+  - Rebased on top of power-domain changes,
+  - Added Acked-by and Tested-by from Geert.
+---
+ arch/arm/boot/dts/r8a73a4.dtsi | 3 ---
+ 1 file changed, 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
+index 805b0fd70f53820d..8e48090e4fdc1412 100644
+--- a/arch/arm/boot/dts/r8a73a4.dtsi
++++ b/arch/arm/boot/dts/r8a73a4.dtsi
+@@ -138,9 +138,6 @@
+ 		clocks = <&mstp3_clks R8A73A4_CLK_CMT1>;
+ 		clock-names = "fck";
+ 		power-domains = <&pd_c5>;
+-
+-		renesas,channels-mask = <0xff>;
+-
+ 		status = "disabled";
+ 	};
+ 
+-- 
+2.7.4
