@@ -1,65 +1,65 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 28 Nov 2017 16:49:45 +0900
-Subject: [PATCH] dt-bindings: pinctrl: uniphier: add UniPhier pinctrl binding
-Message-ID: <1511855386-10421-1-git-send-email-yamada.masahiro@socionext.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 28 Nov 2017 08:13:42 +0000
+Subject: [PATCH V3 24/29] backlight: deprecate pci_get_bus_and_slot()
+In-Reply-To: <000001d367b8$726bd7f0$574387d0$@gmail.com>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <1511801886-6753-25-git-send-email-okaya@codeaurora.org>
+ <000001d367b8$726bd7f0$574387d0$@gmail.com>
+Message-ID: <20171128081342.qvylfa6p5rvqoyxk@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver has been in the tree for a while, but its binding document
-is missing.  Hence, here it is.
+On Mon, 27 Nov 2017, Jingoo Han wrote:
+> On Monday, November 27, 2017 11:58 AM, Sinan Kaya wrote:
+> > 
+> > pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
+> > where a PCI device is present. This restricts the device drivers to be
+> > reused for other domain numbers.
+> 
+> I think that this will be useful. I introduced multi domains into
+> ARM-based PCIe driver. (e.g. domain 0, and domain 1) So, APIs to choose
+> domain will be used later.
+> 
+> > 
+> > Getting ready to remove pci_get_bus_and_slot() function in favor of
+> > pci_get_domain_bus_and_slot().
+> > 
+> > Hard-coding the domain as 0.
+> > 
+> > Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
+> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> 
+> Acked-by: Jingoo Han <jingoohan1@gmail.com>
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+I can't apply this.
 
- .../pinctrl/socionext,uniphier-pinctrl.txt         | 27 ++++++++++++++++++++++
- MAINTAINERS                                        |  1 +
- 2 files changed, 28 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
+It looks like I was missing from the list of addressees.
 
-diff --git a/Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
-new file mode 100644
-index 0000000..8173b12
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
-@@ -0,0 +1,27 @@
-+UniPhier SoCs pin controller
-+
-+Required properties:
-+- compatible: should be one of the following:
-+    "socionext,uniphier-ld4-pinctrl"  - for LD4 SoC
-+    "socionext,uniphier-pro4-pinctrl" - for Pro4 SoC
-+    "socionext,uniphier-sld8-pinctrl" - for sLD8 SoC
-+    "socionext,uniphier-pro5-pinctrl" - for Pro5 SoC
-+    "socionext,uniphier-pxs2-pinctrl" - for PXs2 SoC
-+    "socionext,uniphier-ld6b-pinctrl" - for LD6b SoC
-+    "socionext,uniphier-ld11-pinctrl" - for LD11 SoC
-+    "socionext,uniphier-ld20-pinctrl" - for LD20 SoC
-+    "socionext,uniphier-pxs3-pinctrl" - for PXs3 SoC
-+
-+Note:
-+The UniPhier pinctrl should be a subnode of a "syscon" compatible node.
-+
-+Example:
-+	soc-glue at 5f800000 {
-+		compatible = "socionext,uniphier-pro4-soc-glue",
-+			     "simple-mfd", "syscon";
-+		reg = <0x5f800000 0x2000>;
-+
-+		pinctrl: pinctrl {
-+			compatible = "socionext,uniphier-pro4-pinctrl";
-+		};
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aa71ab52f..38b0ddc 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -2042,6 +2042,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- T:	git git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
- S:	Maintained
- F:	Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
-+F:	Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
- F:	arch/arm/boot/dts/uniphier*
- F:	arch/arm/include/asm/hardware/cache-uniphier.h
- F:	arch/arm/mach-uniphier/
+Please resend v3 with all the Acks you've acquired.
+
+> > ---
+> >  drivers/video/backlight/apple_bl.c | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/drivers/video/backlight/apple_bl.c
+> > b/drivers/video/backlight/apple_bl.c
+> > index d843296..6a34ab9 100644
+> > --- a/drivers/video/backlight/apple_bl.c
+> > +++ b/drivers/video/backlight/apple_bl.c
+> > @@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
+> >  	struct pci_dev *host;
+> >  	int intensity;
+> > 
+> > -	host = pci_get_bus_and_slot(0, 0);
+> > +	host = pci_get_domain_bus_and_slot(0, 0, 0);
+> > 
+> >  	if (!host) {
+> >  		pr_err("unable to find PCI host\n");
+> 
+> 
+
 -- 
-2.7.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
