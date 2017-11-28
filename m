@@ -1,195 +1,98 @@
-From: rmk+kernel@armlinux.org.uk (Russell King)
-Date: Tue, 28 Nov 2017 15:01:59 +0000
-Subject: [PATCH v2 01/16] ARM: dts: imx6qdl: SolidRun: remove redundant
- regulators node
-In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
-References: <20171128150045.GV31757@n2100.armlinux.org.uk>
-Message-ID: <E1eJhOZ-0006N3-WC@rmk-PC.armlinux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 28 Nov 2017 09:25:41 -0600
+Subject: [PATCH] dt-bindings: uniphier: add bindings for UniPhier SoC
+ family
+In-Reply-To: <1511854150-26346-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1511854150-26346-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20171128152541.jdd2k5n5mjpppqxv@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regulators node is redundant, and serves no useful function.
-Remove it from i.MX6 SolidRun platforms.
+On Tue, Nov 28, 2017 at 04:29:10PM +0900, Masahiro Yamada wrote:
 
-Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
----
- arch/arm/boot/dts/imx6qdl-cubox-i.dtsi      | 56 ++++++++++++++---------------
- arch/arm/boot/dts/imx6qdl-hummingboard.dtsi | 56 ++++++++++++++---------------
- arch/arm/boot/dts/imx6qdl-microsom.dtsi     | 24 ++++++-------
- 3 files changed, 62 insertions(+), 74 deletions(-)
+Commit msg?
 
-diff --git a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-index 14fff4ee6516..b20508237046 100644
---- a/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-cubox-i.dtsi
-@@ -64,38 +64,34 @@
- 		};
- 	};
- 
--	regulators {
--		compatible = "simple-bus";
--
--		reg_3p3v: 3p3v {
--			compatible = "regulator-fixed";
--			regulator-name = "3P3V";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			regulator-always-on;
--		};
-+	reg_3p3v: 3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
- 
--		reg_usbh1_vbus: usb-h1-vbus {
--			compatible = "regulator-fixed";
--			enable-active-high;
--			gpio = <&gpio1 0 0>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--		};
-+	reg_usbh1_vbus: usb-h1-vbus {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio1 0 0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_cubox_i_usbh1_vbus>;
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
- 
--		reg_usbotg_vbus: usb-otg-vbus {
--			compatible = "regulator-fixed";
--			enable-active-high;
--			gpio = <&gpio3 22 0>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
--			regulator-name = "usb_otg_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--		};
-+	reg_usbotg_vbus: usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio3 22 0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_cubox_i_usbotg_vbus>;
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
- 	};
- 
- 	sound-spdif {
-diff --git a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-index 37c07c0748aa..0a0a7e4b956b 100644
---- a/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-hummingboard.dtsi
-@@ -53,38 +53,34 @@
- 		pinctrl-0 = <&pinctrl_hummingboard_gpio3_5>;
- 	};
- 
--	regulators {
--		compatible = "simple-bus";
--
--		reg_3p3v: 3p3v {
--			compatible = "regulator-fixed";
--			regulator-name = "3P3V";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			regulator-always-on;
--		};
-+	reg_3p3v: 3p3v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "3P3V";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		regulator-always-on;
-+	};
- 
--		reg_usbh1_vbus: usb-h1-vbus {
--			compatible = "regulator-fixed";
--			enable-active-high;
--			gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
--			regulator-name = "usb_h1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--		};
-+	reg_usbh1_vbus: usb-h1-vbus {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_hummingboard_usbh1_vbus>;
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
- 
--		reg_usbotg_vbus: usb-otg-vbus {
--			compatible = "regulator-fixed";
--			enable-active-high;
--			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
--			regulator-name = "usb_otg_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--		};
-+	reg_usbotg_vbus: usb-otg-vbus {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_hummingboard_usbotg_vbus>;
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
- 	};
- 
- 	sound-sgtl5000 {
-diff --git a/arch/arm/boot/dts/imx6qdl-microsom.dtsi b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-index 6a410160c9ee..f7266ae2534c 100644
---- a/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-microsom.dtsi
-@@ -48,20 +48,16 @@
- 		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
- 	};
- 
--	regulators {
--		compatible = "simple-bus";
--
--		reg_brcm: brcm-reg {
--			compatible = "regulator-fixed";
--			enable-active-high;
--			gpio = <&gpio3 19 0>;
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
--			regulator-name = "brcm_reg";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			startup-delay-us = <200000>;
--		};
-+	reg_brcm: brcm-reg {
-+		compatible = "regulator-fixed";
-+		enable-active-high;
-+		gpio = <&gpio3 19 0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_microsom_brcm_reg>;
-+		regulator-name = "brcm_reg";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		startup-delay-us = <200000>;
- 	};
- 
- 	usdhc1_pwrseq: usdhc1_pwrseq {
--- 
-2.7.4
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  Documentation/devicetree/bindings/arm/uniphier.txt | 40 ++++++++++++++++++++++
+
+Perhaps arm/socionext/uniphier.txt instead.
+
+>  MAINTAINERS                                        |  1 +
+>  2 files changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/uniphier.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/uniphier.txt b/Documentation/devicetree/bindings/arm/uniphier.txt
+> new file mode 100644
+> index 0000000..08d3cf3
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/uniphier.txt
+> @@ -0,0 +1,40 @@
+> +Socionext UniPhier SoC family
+> +
+> +Required properties in the root node:
+> +  - compatible: should contain board and SoC compatible strings
+> +
+> +    SoC compatibles:
+> +      - "socionext,uniphier-ld4"   - LD4 SoC
+> +      - "socionext,uniphier-pro4"  - Pro4 SoC
+> +      - "socionext,uniphier-sld8"  - sLD8 SoC
+> +      - "socionext,uniphier-pro5"  - Pro5 SoC
+> +      - "socionext,uniphier-pxs2"  - PXs2 SoC
+> +      - "socionext,uniphier-ld6b"  - LD6b SoC
+> +      - "socionext,uniphier-ld11"  - LD11 SoC
+> +      - "socionext,uniphier-ld20"  - LD20 SoC
+> +      - "socionext,uniphier-pxs3"  - PXs3 SoC
+
+Sort this? Or are these in chronological order?
+
+> +
+> +    Board compatibles:
+> +      - "socionext,uniphier-ld4-ref"      - LD4 Reference Board
+> +      - "socionext,uniphier-pro4-ref"     - Pro4 Reference Board
+> +      - "socionext,uniphier-pro4-ace"     - Pro4 Ace Board
+> +      - "socionext,uniphier-pro4-sanji"   - Pro4 Sanji Board
+> +      - "socionext,uniphier-sld8-ref"     - sLD8 Reference Board
+> +      - "socionext,uniphier-pxs2-gentil"  - PXs2 Gentil Board
+> +      - "socionext,uniphier-pxs2-vodka"   - PXs2 Vodka Board
+> +      - "socionext,uniphier-ld6b-ref"     - LD6b Reference Board
+> +      - "socionext,uniphier-ld11-ref"     - LD11 Reference Board
+> +      - "socionext,uniphier-ld11-global"  - LD11 Global Board
+> +      - "socionext,uniphier-ld20-ref"     - LD20 Reference Board
+> +      - "socionext,uniphier-ld20-global"  - LD20 Global Board
+> +      - "socionext,uniphier-pxs3-ref"     - PXs3 Reference Board
+
+I would group boards by each SoC. Then it clear which board compatibles
+go with each SoC compatible and you don't have to have the SoC name in 
+the board compatible.
+
+> +
+> +Example:
+> +
+> +/dts-v1/;
+> +
+> +/ {
+> +	compatible = "socionext,uniphier-ld20-ref", "socionext,uniphier-ld20";
+> +
+> +	...
+> +};
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index cbb89bb..1fcbd65 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -2041,6 +2041,7 @@ M:	Masahiro Yamada <yamada.masahiro@socionext.com>
+>  L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+>  T:	git git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+>  S:	Maintained
+> +F:	Documentation/devicetree/bindings/arm/uniphier.txt
+>  F:	Documentation/devicetree/bindings/gpio/gpio-uniphier.txt
+>  F:	arch/arm/boot/dts/uniphier*
+>  F:	arch/arm/include/asm/hardware/cache-uniphier.h
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
