@@ -1,9 +1,9 @@
 From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Tue, 28 Nov 2017 14:47:33 +0100
-Subject: [PATCH v4 09/12] ARM: dts: r8a7791: Remove CMT renesas,channels-mask
+Date: Tue, 28 Nov 2017 14:47:35 +0100
+Subject: [PATCH v4 11/12] ARM: dts: r8a7794: Remove CMT renesas,channels-mask
 In-Reply-To: <1511876856-9495-1-git-send-email-geert+renesas@glider.be>
 References: <1511876856-9495-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1511876856-9495-10-git-send-email-geert+renesas@glider.be>
+Message-ID: <1511876856-9495-12-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -29,15 +29,15 @@ v2:
   - Rebased on top of power-domain changes,
   - Added Acked-by and Tested-by from Geert.
 ---
- arch/arm/boot/dts/r8a7791.dtsi | 4 ----
+ arch/arm/boot/dts/r8a7794.dtsi | 4 ----
  1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
-index a69d6f883b34519f..dfc1c406179fbf3a 100644
---- a/arch/arm/boot/dts/r8a7791.dtsi
-+++ b/arch/arm/boot/dts/r8a7791.dtsi
-@@ -266,8 +266,6 @@
- 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 52f6d5ec5d210f44..54f412db4a6ecf3f 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -190,8 +190,6 @@
+ 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
  		resets = <&cpg 124>;
  
 -		renesas,channels-mask = <0x60>;
@@ -45,8 +45,8 @@ index a69d6f883b34519f..dfc1c406179fbf3a 100644
  		status = "disabled";
  	};
  
-@@ -287,8 +285,6 @@
- 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+@@ -211,8 +209,6 @@
+ 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
  		resets = <&cpg 329>;
  
 -		renesas,channels-mask = <0xff>;
