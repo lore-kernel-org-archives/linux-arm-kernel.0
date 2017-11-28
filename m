@@ -1,47 +1,32 @@
 From: weiyi.lu@mediatek.com (Weiyi Lu)
-Date: Tue, 28 Nov 2017 15:28:19 +0800
-Subject: [PATCH v7 3/6] soc: mediatek: add dependent clock jpgdec/audio for
- scpsys
-In-Reply-To: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
-References: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
-Message-ID: <1511854102-23195-5-git-send-email-weiyi.lu@mediatek.com>
+Date: Tue, 28 Nov 2017 15:28:15 +0800
+Subject: [PATCH v7 0/6] Mediatek MT2712 clock and scpsys support 
+Message-ID: <1511854102-23195-1-git-send-email-weiyi.lu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are dependent clock jpgdec/audio in scpsys on MT2712,
-and will exist three dependent clocks on MT2712 VDEC.
+This series is based on v4.15-rc1 and composed of
+scpsys control (PATCH 1-4) and device tree (PATCH 5-6)
 
-Signed-off-by: Weiyi Lu <weiyi.lu@mediatek.com>
----
- drivers/soc/mediatek/mtk-scpsys.c | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+changes since v6:
+- Rebase to v4.15-rc1.
 
-diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
-index 4c484b1..c0f3219 100644
---- a/drivers/soc/mediatek/mtk-scpsys.c
-+++ b/drivers/soc/mediatek/mtk-scpsys.c
-@@ -84,6 +84,8 @@ enum clk_id {
- 	CLK_ETHIF,
- 	CLK_VDEC,
- 	CLK_HIFSEL,
-+	CLK_JPGDEC,
-+	CLK_AUDIO,
- 	CLK_MAX,
- };
- 
-@@ -96,10 +98,12 @@ enum clk_id {
- 	"ethif",
- 	"vdec",
- 	"hif_sel",
-+	"jpgdec",
-+	"audio",
- 	NULL,
- };
- 
--#define MAX_CLKS	2
-+#define MAX_CLKS	3
- 
- struct scp_domain_data {
- 	const char *name;
--- 
-1.9.1
+changes since v5:
+- Refine bus protection with proper variable name
+  and better implementation for the if statement.
+
+changes since v4:
+- Refine scpsys and infracfg for bus protection by passing 
+  a boolean flag to determine the register update method
+
+changes since v3:
+- Rebase to v4.14-rc1.
+
+changes since v2:
+- ensure the clocks used by clocksource driver are registered
+  before clocksource init() by using CLK_OF_DECLARE()
+- correct the frequency of clk32k/clkrtc_ext/clkrtc_int
+
+changes since v1:
+- Rebase to v4.13-next-soc.
+- Refine scpsys and infracfg for bus protection.
