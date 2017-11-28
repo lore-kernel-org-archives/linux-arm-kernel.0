@@ -1,76 +1,227 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 28 Nov 2017 18:41:42 +0000
-Subject: [PATCH v3 1/2] arm64: module-plts: factor out PLT generation code
- for ftrace
-In-Reply-To: <20171128183009.GM9266@arm.com>
-References: <20171120174130.28626-1-ard.biesheuvel@linaro.org>
- <20171128183009.GM9266@arm.com>
-Message-ID: <CAKv+Gu9Ymts-_Jm-GNuhfkqm_cYSke2Y_DF_ktvrdOrfyksewg@mail.gmail.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Tue, 28 Nov 2017 19:49:53 +0100
+Subject: [PATCH 01/17] drm/sun4i: Refactor DE2 code
+In-Reply-To: <20171128155442.fpmmf4xfb3rbf67p@flea.home>
+References: <20171127205750.19277-1-jernej.skrabec@siol.net>
+ <20171127205750.19277-2-jernej.skrabec@siol.net>
+ <20171128155442.fpmmf4xfb3rbf67p@flea.home>
+Message-ID: <2003282.xphKHtc6QX@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2017 at 18:30, Will Deacon <will.deacon@arm.com> wrote:
-> On Mon, Nov 20, 2017 at 05:41:29PM +0000, Ard Biesheuvel wrote:
->> To allow the ftrace trampoline code to reuse the PLT entry routines,
->> factor it out and move it into asm/module.h.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> v3: new patch
->>
->>  arch/arm64/include/asm/module.h | 44 ++++++++++++++++++++
->>  arch/arm64/kernel/module-plts.c | 38 +----------------
->>  2 files changed, 46 insertions(+), 36 deletions(-)
->>
->> diff --git a/arch/arm64/include/asm/module.h b/arch/arm64/include/asm/module.h
->> index 19bd97671bb8..11d4aaee82e1 100644
->> --- a/arch/arm64/include/asm/module.h
->> +++ b/arch/arm64/include/asm/module.h
->> @@ -45,4 +45,48 @@ extern u64 module_alloc_base;
->>  #define module_alloc_base    ((u64)_etext - MODULES_VSIZE)
->>  #endif
->>
->> +struct plt_entry {
->> +     /*
->> +      * A program that conforms to the AArch64 Procedure Call Standard
->> +      * (AAPCS64) must assume that a veneer that alters IP0 (x16) and/or
->> +      * IP1 (x17) may be inserted at any branch instruction that is
->> +      * exposed to a relocation that supports long branches. Since that
->> +      * is exactly what we are dealing with here, we are free to use x16
->> +      * as a scratch register in the PLT veneers.
->> +      */
->> +     __le32  mov0;   /* movn x16, #0x....                    */
->> +     __le32  mov1;   /* movk x16, #0x...., lsl #16           */
->> +     __le32  mov2;   /* movk x16, #0x...., lsl #32           */
->> +     __le32  br;     /* br   x16                             */
->> +};
->> +
->> +static inline struct plt_entry get_plt_entry(u64 val)
->> +{
->> +     /*
->> +      * MOVK/MOVN/MOVZ opcode:
->> +      * +--------+------------+--------+-----------+-------------+---------+
->> +      * | sf[31] | opc[30:29] | 100101 | hw[22:21] | imm16[20:5] | Rd[4:0] |
->> +      * +--------+------------+--------+-----------+-------------+---------+
->> +      *
->> +      * Rd     := 0x10 (x16)
->> +      * hw     := 0b00 (no shift), 0b01 (lsl #16), 0b10 (lsl #32)
->> +      * opc    := 0b11 (MOVK), 0b00 (MOVN), 0b10 (MOVZ)
->> +      * sf     := 1 (64-bit variant)
->> +      */
->> +     return (struct plt_entry){
->> +             cpu_to_le32(0x92800010 | (((~val      ) & 0xffff)) << 5),
->> +             cpu_to_le32(0xf2a00010 | ((( val >> 16) & 0xffff)) << 5),
->> +             cpu_to_le32(0xf2c00010 | ((( val >> 32) & 0xffff)) << 5),
->> +             cpu_to_le32(0xd61f0200)
->> +     };
->> +}
->
-> Not one for this series, but do you think we could use insn.c to generate
-> these?
->
+Hi!
 
-I think we could, yes. Another question is whether/when we need to fix
-this code for 52-bit VAs, so that may be an appropriate time to
-revisit the implementation (unless the kernel will never use that many
-bits)
+Dne torek, 28. november 2017 ob 16:54:42 CET je Maxime Ripard napisal(a):
+> Hi,
+> 
+> On Mon, Nov 27, 2017 at 09:57:34PM +0100, Jernej Skrabec wrote:
+> > Since the time initial DE2 driver was written, some knowledge was gained
+> > what setting are really necessary and what most of the magic values
+> > mean.
+> > 
+> > This commit renames some of the macro names to better fit the real
+> > meaning, replace default values with self explaining macros where
+> > possible and removes settings which are not really needed.
+> > 
+> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> 
+> While those changes are quite welcome, it should be split in a number
+> of patches...
+
+You're right, I went over the changes again and now I have 8 patches instead 
+of one with much more explanation why each change is needed.
+
+I'll send v2 as soon as I get some feedback on rest of the series.
+
+Regards,
+Jernej
+
+> 
+> > ---
+> > 
+> >  drivers/gpu/drm/sun4i/sun8i_mixer.c | 65
+> >  +++++++++++++++++++------------------
+> >  drivers/gpu/drm/sun4i/sun8i_mixer.h | 31 ++++++++----------
+> >  2 files changed, 47 insertions(+), 49 deletions(-)
+> > 
+> > diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > b/drivers/gpu/drm/sun4i/sun8i_mixer.c index cb193c5f1686..015943c0ed5a
+> > 100644
+> > --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > @@ -44,7 +44,8 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+> > 
+> >  	/* Currently the first UI channel is used */
+> >  	int chan = mixer->cfg->vi_num;
+> > 
+> > -	DRM_DEBUG_DRIVER("Enabling layer %d in channel %d\n", layer, chan);
+> > +	DRM_DEBUG_DRIVER("%sabling layer %d in channel %d\n",
+> > +			 enable ? "En" : "Dis", layer, chan);
+> > 
+> >  	if (enable)
+> >  	
+> >  		val = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN;
+> > 
+> > @@ -55,15 +56,14 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer
+> > *mixer,> 
+> >  			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+> >  			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
+> > 
+> > -	/* Set the alpha configuration */
+> > -	regmap_update_bits(mixer->engine.regs,
+> > -			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+> > -			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_MASK,
+> > -			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF);
+> > +	if (enable)
+> > +		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(chan);
+> > +	else
+> > +		val = 0;
+> > +
+> > 
+> >  	regmap_update_bits(mixer->engine.regs,
+> > 
+> > -			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+> > -			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK,
+> > -			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF);
+> > +			   SUN8I_MIXER_BLEND_PIPE_CTL,
+> > +			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(chan), val);
+> 
+> ... For example, this part right here will remove the alpha setup
+> part, without any justification in the commit log ...
+> 
+> >  }
+> >  
+> >  static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
+> > 
+> > @@ -71,15 +71,15 @@ static int sun8i_mixer_drm_format_to_layer(struct
+> > drm_plane *plane,> 
+> >  {
+> >  
+> >  	switch (format) {
+> > 
+> >  	case DRM_FORMAT_ARGB8888:
+> > -		*mode = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_ARGB8888;
+> > +		*mode = SUN8I_MIXER_FBFMT_ARGB8888;
+> > 
+> >  		break;
+> >  	
+> >  	case DRM_FORMAT_XRGB8888:
+> > -		*mode = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_XRGB8888;
+> > +		*mode = SUN8I_MIXER_FBFMT_XRGB8888;
+> > 
+> >  		break;
+> >  	
+> >  	case DRM_FORMAT_RGB888:
+> > -		*mode = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888;
+> > +		*mode = SUN8I_MIXER_FBFMT_RGB888;
+> > 
+> >  		break;
+> >  	
+> >  	default:
+> > @@ -107,7 +107,7 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer
+> > *mixer,> 
+> >  					      state->crtc_h));
+> >  		
+> >  		DRM_DEBUG_DRIVER("Updating blender size\n");
+> >  		regmap_write(mixer->engine.regs,
+> > 
+> > -			     SUN8I_MIXER_BLEND_ATTR_INSIZE(0),
+> > +			     SUN8I_MIXER_BLEND_ATTR_INSIZE(chan),
+> 
+> I guess that one is fixing a bug too.
+> 
+> >  			     SUN8I_MIXER_SIZE(state->crtc_w,
+> >  			     
+> >  					      state->crtc_h));
+> >  		
+> >  		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTSIZE,
+> > 
+> > @@ -173,6 +173,7 @@ int sun8i_mixer_update_layer_formats(struct
+> > sun8i_mixer *mixer,> 
+> >  		return ret;
+> >  	
+> >  	}
+> > 
+> > +	val <<= SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET;
+> > 
+> >  	regmap_update_bits(mixer->engine.regs,
+> >  	
+> >  			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+> >  			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_MASK, val);
+> > 
+> > @@ -247,6 +248,7 @@ static int sun8i_mixer_bind(struct device *dev, struct
+> > device *master,> 
+> >  	struct sun8i_mixer *mixer;
+> >  	struct resource *res;
+> >  	void __iomem *regs;
+> > 
+> > +	int plane_cnt;
+> > 
+> >  	int i, ret;
+> >  	
+> >  	/*
+> > 
+> > @@ -325,27 +327,26 @@ static int sun8i_mixer_bind(struct device *dev,
+> > struct device *master,> 
+> >  	regmap_write(mixer->engine.regs, SUN8I_MIXER_GLOBAL_CTL,
+> >  	
+> >  		     SUN8I_MIXER_GLOBAL_CTL_RT_EN);
+> > 
+> > -	/* Initialize blender */
+> > -	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_FCOLOR_CTL,
+> > -		     SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF);
+> > -	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PREMULTIPLY,
+> > -		     SUN8I_MIXER_BLEND_PREMULTIPLY_DEF);
+> > +	/* Set background color to black */
+> > 
+> >  	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
+> > 
+> > -		     SUN8I_MIXER_BLEND_BKCOLOR_DEF);
+> > -	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(0),
+> > -		     SUN8I_MIXER_BLEND_MODE_DEF);
+> > -	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_CK_CTL,
+> > -		     SUN8I_MIXER_BLEND_CK_CTL_DEF);
+> > +		     SUN8I_MIXER_BLEND_COLOR_BLACK);
+> > 
+> > -	regmap_write(mixer->engine.regs,
+> > -		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
+> > -		     SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF);
+> > -
+> > -	/* Select the first UI channel */
+> > -	DRM_DEBUG_DRIVER("Selecting channel %d (first UI channel)\n",
+> > -			 mixer->cfg->vi_num);
+> > -	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE,
+> > -		     mixer->cfg->vi_num);
+> > +	/*
+> > +	 * Set fill color of bottom plane to black. Generally not needed
+> > +	 * except when VI plane is at bottom (zpos = 0) and enabled.
+> > +	 */
+> > +	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PIPE_CTL,
+> > +		     SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(0));
+> > +	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
+> > +		     SUN8I_MIXER_BLEND_COLOR_BLACK);
+> > +
+> > +	/* Fixed zpos for now */
+> > +	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE, 0x43210);
+> > +
+> > +	plane_cnt = mixer->cfg->vi_num + mixer->cfg->ui_num;
+> > +	for (i = 0; i < plane_cnt; i++)
+> > +		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(i),
+> > +			     SUN8I_MIXER_BLEND_MODE_DEF);
+> 
+> You're reworking a significant part here as well, with some part
+> moving (or being removed) and no clear justifications as to why you
+> need to do that.
+> 
+> This is not only an issue when you want to review this code, but also
+> if you happen to introduce a bug, then someone bisects and finds that
+> commit. It's quite difficult in that case what part is actually
+> breaking stuff.
+> 
+> Thanks!
+> Maxime
+> 
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
