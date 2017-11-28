@@ -1,72 +1,101 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 28 Nov 2017 10:04:00 +0100
-Subject: [PATCH v2] arm64: dts: renesas: r8a7795: Move nodes which have no
- reg property out of bus
-In-Reply-To: <20171128085645.ofrk33bfqd736sip@verge.net.au>
-References: <20171124105234.25774-1-horms+renesas@verge.net.au>
- <CAMuHMdW9V6Bkh5uS9qNA7awtygEs=qRd7jigwSHmpV2VM3n9dA@mail.gmail.com>
- <20171127110430.ulgjrzgy3pdugs2s@verge.net.au>
- <CAMuHMdUm=PiGVWVg9pyNTR5z2WjLcoG1uecBNBeKsSxbAxBt8w@mail.gmail.com>
- <20171128085645.ofrk33bfqd736sip@verge.net.au>
-Message-ID: <CAMuHMdXoDNt7j-hEZmDA2BFFPUAfsi1ukZWowJ3=kTswyYMk5Q@mail.gmail.com>
+From: jack@suse.cz (Jan Kara)
+Date: Tue, 28 Nov 2017 10:12:34 +0100
+Subject: [PATCH 1/2] mm: make faultaround produce old ptes
+In-Reply-To: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
+References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
+Message-ID: <20171128091234.GH5977@quack2.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Tue 28-11-17 10:37:49, Vinayak Menon wrote:
+> Based on Kirill's patch [1].
+> 
+> Currently, faultaround code produces young pte.  This can screw up
+> vmscan behaviour[2], as it makes vmscan think that these pages are hot
+> and not push them out on first round.
+> 
+> During sparse file access faultaround gets more pages mapped and all of
+> them are young.  Under memory pressure, this makes vmscan swap out anon
+> pages instead, or to drop other page cache pages which otherwise stay
+> resident.
+> 
+> Modify faultaround to produce old ptes, so they can easily be reclaimed
+> under memory pressure.
+> 
+> This can to some extend defeat the purpose of faultaround on machines
+> without hardware accessed bit as it will not help us with reducing the
+> number of minor page faults.
+> 
+> Making the faultaround ptes old results in a unixbench regression for some
+> architectures [3][4]. But on some architectures it is not found to cause
+> any regression. So by default produce young ptes and provide an option for
+> architectures to make the ptes old.
+> 
+> [1] http://lkml.kernel.org/r/1463488366-47723-1-git-send-email-kirill.shutemov at linux.intel.com
+> [2] https://lkml.kernel.org/r/1460992636-711-1-git-send-email-vinmenon at codeaurora.org
+> [3] https://marc.info/?l=linux-kernel&m=146582237922378&w=2
+> [4] https://marc.info/?l=linux-mm&m=146589376909424&w=2
+> 
+> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
+> ---
+>  include/linux/mm-arch-hooks.h | 7 +++++++
+>  include/linux/mm.h            | 2 ++
+>  mm/filemap.c                  | 4 ++++
+>  mm/memory.c                   | 5 +++++
+>  4 files changed, 18 insertions(+)
+> 
+> diff --git a/include/linux/mm-arch-hooks.h b/include/linux/mm-arch-hooks.h
+> index 4efc3f56..0322b98 100644
+> --- a/include/linux/mm-arch-hooks.h
+> +++ b/include/linux/mm-arch-hooks.h
+> @@ -22,4 +22,11 @@ static inline void arch_remap(struct mm_struct *mm,
+>  #define arch_remap arch_remap
+>  #endif
+>  
+> +#ifndef arch_faultaround_pte_mkold
+> +static inline void arch_faultaround_pte_mkold(struct vm_fault *vmf)
+> +{
+> +}
+> +#define arch_faultaround_pte_mkold arch_faultaround_pte_mkold
+> +#endif
+> +
+>  #endif /* _LINUX_MM_ARCH_HOOKS_H */
+> diff --git a/include/linux/mm.h b/include/linux/mm.h
+> index 7661156..be689a0 100644
+> --- a/include/linux/mm.h
+> +++ b/include/linux/mm.h
+> @@ -302,6 +302,7 @@ extern int overcommit_kbytes_handler(struct ctl_table *, int, void __user *,
+>  #define FAULT_FLAG_USER		0x40	/* The fault originated in userspace */
+>  #define FAULT_FLAG_REMOTE	0x80	/* faulting for non current tsk/mm */
+>  #define FAULT_FLAG_INSTRUCTION  0x100	/* The fault was during an instruction fetch */
+> +#define FAULT_FLAG_MKOLD	0x200	/* Make faultaround ptes old */
 
-On Tue, Nov 28, 2017 at 9:56 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Mon, Nov 27, 2017 at 12:15:39PM +0100, Geert Uytterhoeven wrote:
->> On Mon, Nov 27, 2017 at 12:04 PM, Simon Horman <horms@verge.net.au> wrote:
->> > I just noticed that with this patch applied I now see:
->> >
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
->> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
->> >
->> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
->>
->> Right, the "interrupt-parent = <&gic>;" inside the /soc node applies to child
->> nodes of the /soc node only.
->>
->> You can find this in two ways:
+Nit: Can we make this FAULT_FLAG_PREFAULT_OLD or something like that so
+that it is clear from the flag name that this is about prefaulting of
+pages?
 
-s/find/fix/
+>  #define FAULT_FLAG_TRACE \
+>  	{ FAULT_FLAG_WRITE,		"WRITE" }, \
+> @@ -330,6 +331,7 @@ struct vm_fault {
+>  	gfp_t gfp_mask;			/* gfp mask to be used for allocations */
+>  	pgoff_t pgoff;			/* Logical page offset based on vma */
+>  	unsigned long address;		/* Faulting virtual address */
+> +	unsigned long fault_address;    /* Saved faulting virtual address */
 
->>
->>   1. Add "interrupt-parent = <&gic>;" to the /pmu_a57 and /pmu_a53 nodes.
->>   2. Switch those nodes from "interrupt" to "interrupts-extended", e.g. turn
->>
->>         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
->>
->>      into
->>
->>         interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
->>
->> The latter is what e.g. arch/arm/boot/dts/armada-375.dtsi does.
->
-> Thanks, I took option 1 as it seems consistent with the rest of the
-> Renesas DT files. I also added it to the /timer node.
+Ugh, so I dislike how you hide the decision about whether the *particular*
+PTE should be old or young in the arch code. Sure the arch wants to decide
+whether the prefaulted PTEs should be old or young and that it has to tell
+us but the arch code has no business in checking whether this is prefault
+or a normal fault - that decision belongs to filemap_map_pages(). So I'd do
+in filemap_map_pages() something like:
 
-Actually we recently had a discussion about this on IRC, triggered by a
-similar issue in board files (see e.g, Ethernet PHY interrupts).
+	if (iter.index > start_pgoff && arch_wants_old_faultaround_pte())
+		vmf->flags |= FAULT_FLAG_PREFAULT_OLD;
 
-Given the following comment:
+And then there's no need for new fault_address in vm_fault or messing with
+addresses and fault flags in arch specific code.
 
-drivers/of/irq.c:       /* Try the new-style interrupts-extended first */
-drivers/of/irq.c:       res = of_parse_phandle_with_args(device,
-"interrupts-extended",
-
-I think it would be better to use interrupts-extended for individual/isolated
-use outside the /soc node.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+								Honza
+-- 
+Jan Kara <jack@suse.com>
+SUSE Labs, CR
