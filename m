@@ -1,107 +1,39 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Tue, 28 Nov 2017 16:48:55 +0100
-Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
-In-Reply-To: <20171128090223.mqp3v2t6koyu6hk4@flea.home>
-References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <2744508.m82qQEPny3@jernej-laptop>
- <20171128090223.mqp3v2t6koyu6hk4@flea.home>
-Message-ID: <2908242.WKit1ZIWoJ@jernej-laptop>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Tue, 28 Nov 2017 16:48:53 +0100
+Subject: [PATCH v3 0/4] Fixes for omapdrm on OpenPandora and GTA04
+Message-ID: <cover.1511884135.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Changes V3:
+* stay compatible with old DTB files which still use "toppoly" (suggested by Tomi Valkeinen)
+* replaced MODULE_ALIAS entries by MODULE_DEVICE_TABLE (suggested by Andrew F. Davis)
+* removed DSI VDDS patch as it has already been accepted
 
-Dne torek, 28. november 2017 ob 10:02:23 CET je Maxime Ripard napisal(a):
-> Hi,
-> 
-> On Mon, Nov 27, 2017 at 05:01:49PM +0100, Jernej ?krabec wrote:
-> > Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard 
-napisal(a):
-> > > Add support for the A83T display pipeline.
-> > > 
-> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > > 
-> > >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
-> > >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
-> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
-> > >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
-> > >  4 files changed, 14 insertions(+)
-> > > 
-> > > diff --git
-> > > a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
-> > > d4259a4f5171..d6b52e5c48c0 100644
-> > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > 
-> > > @@ -93,6 +93,7 @@ Required properties:
-> > >     * allwinner,sun6i-a31s-tcon
-> > >     * allwinner,sun7i-a20-tcon
-> > >     * allwinner,sun8i-a33-tcon
-> > > 
-> > > +   * allwinner,sun8i-a83t-tcon-lcd
-> > > 
-> > >     * allwinner,sun8i-v3s-tcon
-> > >   
-> > >   - reg: base address and size of memory-mapped region
-> > >   - interrupts: interrupt associated to this IP
-> > > 
-> > > @@ -224,6 +225,7 @@ supported.
-> > > 
-> > >  Required properties:
-> > >    - compatible: value must be one of:
-> > > +    * allwinner,sun8i-a83t-de2-mixer
-> > 
-> > What will be the name of the second mixer, once support for HDMI is added?
-> > Should we start directly with 0 and 1 postfix ?
-> 
-> What are the differences exactly without the two mixers?
+2017-11-16 09:50:22: Changes V2:
+* replaced patch to fix DSI VDDS for OMAP3 by equivalent patch from Laurent Pinchart
+* keep previous compatibility option in panel driver to handle older device tree binaries
 
-Mixer properties:
-- mixer index (0 or 1), important for determining CCSC base (see my patches)
-- number of VI planes (usually 1)
-- number of UI planes (usually 1 or 3)
-- writeback support (yes/no)
-- scale line buffer length (2048 or 4096)
-- smart backligth support (yes/no)
+2017-11-08 22:09:36:
+This patch set fixes vendor names of the panels
+and fixes a problem on omapdrm with enabling
+VDD_DSI for OMAP3 which is needed for displaying
+the Red and Green channel on OMAP3530 (Pandora).
 
-channel properties (for both, VI and UI):
-- scaler support (yes/no, usually yes)
-- overlay count (seems to be always 4)
-- VEP support (yes/no)
+H. Nikolaus Schaller (4):
+  omapdrm: panel: fix compatible vendor string for td028ttec1
+  omapdrm: panel: td028ttec1: replace MODULE_ALIAS by
+    MODULE_DEVICE_TABLE
+  DTS: GTA04: fix panel compatibility string
+  DTS: Pandora: fix panel compatibility string
 
-Those are properties found in BSP de_feat.c, so I guess that's enough to make 
-any kind of decision in the code.
+ .../panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt}    |  4 ++--
+ arch/arm/boot/dts/omap3-gta04.dtsi                          |  2 +-
+ arch/arm/boot/dts/omap3-pandora-common.dtsi                 |  2 +-
+ drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c     | 13 ++++++++++++-
+ .../fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c      | 12 +++++++++++-
+ 5 files changed, 27 insertions(+), 6 deletions(-)
+ rename Documentation/devicetree/bindings/display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt} (84%)
 
-Usually, but we can't count on that, first mixer has 1 VI and 3 UI planes and 
-second mixer has 1 VI and 1 UI plane.
-
-Best regards,
-Jernej
-
-> 
-> I was hoping to be able to cover them all using properties, indices
-> are usually pretty badly received in compatibles.
-> 
-> > >  static const struct of_device_id sun8i_mixer_of_table[] = {
-> > >  
-> > >  	{
-> > > 
-> > > +		.compatible = "allwinner,sun8i-a83t-de2-mixer",
-> > > +		.data = &sun8i_v3s_mixer_cfg,
-> > > +	},
-> > > +	{
-> > 
-> > Maybe you want to squash 12 patch since this works only by luck.
-> 
-> Yeah, I totally meant to do that :)
-> 
-> Thanks!
-> Maxime
-> 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+-- 
+2.12.2
