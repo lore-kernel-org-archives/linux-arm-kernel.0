@@ -1,104 +1,51 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Nov 2017 23:00:14 +0100
-Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
-In-Reply-To: <2908242.WKit1ZIWoJ@jernej-laptop>
-References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <2744508.m82qQEPny3@jernej-laptop>
- <20171128090223.mqp3v2t6koyu6hk4@flea.home>
- <2908242.WKit1ZIWoJ@jernej-laptop>
-Message-ID: <20171128220014.w35rcliusubfdvoe@flea.home>
+From: dianders@chromium.org (Doug Anderson)
+Date: Tue, 28 Nov 2017 14:02:01 -0800
+Subject: [PATCH] phy: rockchip-typec: add pm_runtime_disable in err case
+In-Reply-To: <1473356291-19247-1-git-send-email-zyw@rock-chips.com>
+References: <1473356291-19247-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <CAD=FV=Wt6iS7dxwmqiSX2ZB=THoujhXZJ2Tu8s0CZC4jp5_TTQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Thu, Sep 8, 2016 at 10:38 AM, Chris Zhong <zyw@rock-chips.com> wrote:
+> Add pm_runtime_disable in err case to make the pm_runtime_enable/disable
+> is invoked balanced.
+>
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+>
+> ---
+>
+>  drivers/phy/phy-rockchip-typec.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/phy/phy-rockchip-typec.c b/drivers/phy/phy-rockchip-typec.c
+> index 7cfb0f8..dd257c7 100644
+> --- a/drivers/phy/phy-rockchip-typec.c
+> +++ b/drivers/phy/phy-rockchip-typec.c
+> @@ -977,6 +977,7 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
+>                 if (IS_ERR(phy)) {
+>                         dev_err(dev, "failed to create phy: %s\n",
+>                                 child_np->name);
+> +                       pm_runtime_disable(dev);
+>                         return PTR_ERR(phy);
+>                 }
+>
+> @@ -986,6 +987,7 @@ static int rockchip_typec_phy_probe(struct platform_device *pdev)
+>         phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+>         if (IS_ERR(phy_provider)) {
+>                 dev_err(dev, "Failed to register phy provider\n");
+> +               pm_runtime_disable(dev);
+>                 return PTR_ERR(phy_provider);
+>         }
+>
+> --
+> 1.9.1
 
-On Tue, Nov 28, 2017 at 04:48:55PM +0100, Jernej ?krabec wrote:
-> > On Mon, Nov 27, 2017 at 05:01:49PM +0100, Jernej ?krabec wrote:
-> > > Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard 
-> napisal(a):
-> > > > Add support for the A83T display pipeline.
-> > > > 
-> > > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > > ---
-> > > > 
-> > > >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
-> > > >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
-> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
-> > > >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
-> > > >  4 files changed, 14 insertions(+)
-> > > > 
-> > > > diff --git
-> > > > a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
-> > > > d4259a4f5171..d6b52e5c48c0 100644
-> > > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-> > > > 
-> > > > @@ -93,6 +93,7 @@ Required properties:
-> > > >     * allwinner,sun6i-a31s-tcon
-> > > >     * allwinner,sun7i-a20-tcon
-> > > >     * allwinner,sun8i-a33-tcon
-> > > > 
-> > > > +   * allwinner,sun8i-a83t-tcon-lcd
-> > > > 
-> > > >     * allwinner,sun8i-v3s-tcon
-> > > >   
-> > > >   - reg: base address and size of memory-mapped region
-> > > >   - interrupts: interrupt associated to this IP
-> > > > 
-> > > > @@ -224,6 +225,7 @@ supported.
-> > > > 
-> > > >  Required properties:
-> > > >    - compatible: value must be one of:
-> > > > +    * allwinner,sun8i-a83t-de2-mixer
-> > > 
-> > > What will be the name of the second mixer, once support for HDMI is added?
-> > > Should we start directly with 0 and 1 postfix ?
-> > 
-> > What are the differences exactly without the two mixers?
-> 
-> Mixer properties:
-> - mixer index (0 or 1), important for determining CCSC base (see my patches)
+The patch is a little stale, but it still tastes OK to me.  Maybe a
+good time to land it?  :-P
 
-Is that the only thing we need to determine?
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 
-> - number of VI planes (usually 1)
-
-Usually or always?
-
-> - number of UI planes (usually 1 or 3)
-
-Same question.
-
-> - writeback support (yes/no)
-> - scale line buffer length (2048 or 4096)
-> - smart backligth support (yes/no)
-> 
-> channel properties (for both, VI and UI):
-> - scaler support (yes/no, usually yes)
-> - overlay count (seems to be always 4)
-> - VEP support (yes/no)
-> 
-> Those are properties found in BSP de_feat.c, so I guess that's enough to make 
-> any kind of decision in the code.
-> 
-> Usually, but we can't count on that, first mixer has 1 VI and 3 UI planes and 
-> second mixer has 1 VI and 1 UI plane.
-
-Right. So that would be easy to support using a property as well. The
-only difference would be the CSC base.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/dd8a04d5/attachment.sig>
+-Doug
