@@ -1,72 +1,50 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 28 Nov 2017 13:38:00 -0600
-Subject: [PATCH 3/6] arm: dts: marvell: Add missing #phy-cells to
- usb-nop-xceiv
-In-Reply-To: <87po8az1uc.fsf@free-electrons.com>
-References: <20171109222614.5719-1-robh@kernel.org>
- <20171109222614.5719-3-robh@kernel.org>
- <CAL_JsqJhq7TqdaS+i8yk8rRJM0hH2hyk8eybXsnR0D8QoncXZg@mail.gmail.com>
- <20171121200922.GD30040@lunn.ch>
- <CAK8P3a1x7mnpvfgsnwVJdX4OFwJZn0GpTE9ATfoLuQPB5ev=gg@mail.gmail.com>
- <87po8az1uc.fsf@free-electrons.com>
-Message-ID: <CAL_JsqK1rVRnKaYf7PCiy9vTw7VZb6xEiNa80NSe41yQUavvxg@mail.gmail.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Tue, 28 Nov 2017 11:45:27 -0800
+Subject: [PATCH 1/2] mm: make faultaround produce old ptes
+In-Reply-To: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
+References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
+Message-ID: <CAADWXX8FmAs1qB9=fsWZjt8xTEnGOAMS=eCHnuDLJrZiX6x=7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 10:59 AM, Gregory CLEMENT
-<gregory.clement@free-electrons.com> wrote:
-> Hi Arnd,
+On Mon, Nov 27, 2017 at 9:07 PM, Vinayak Menon <vinmenon@codeaurora.org> wrote:
 >
->  On mar., nov. 21 2017, Arnd Bergmann <arnd@arndb.de> wrote:
->
->> On Tue, Nov 21, 2017 at 9:09 PM, Andrew Lunn <andrew@lunn.ch> wrote:
->>> On Tue, Nov 21, 2017 at 12:29:48PM -0600, Rob Herring wrote:
->>>> On Thu, Nov 9, 2017 at 4:26 PM, Rob Herring <robh@kernel.org> wrote:
->>>> > "usb-nop-xceiv" is using the phy binding, but is missing #phy-cells
->>>> > property. This is probably because the binding was the precursor to the phy
->>>> > binding.
->>>> >
->>>> > Fixes the following warning in Marvell dts files:
->>>> >
->>>> > Warning (phys_property): Missing property '#phy-cells' in node ...
->>>> >
->>>> > Signed-off-by: Rob Herring <robh@kernel.org>
->>>> > Cc: Jason Cooper <jason@lakedaemon.net>
->>>> > Cc: Andrew Lunn <andrew@lunn.ch>
->>>> > Cc: Gregory Clement <gregory.clement@free-electrons.com>
->>>> > Cc: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
->>>> > ---
->>>> > Please apply to Marvell tree.
->>>>
->>>> Ping.
->>>>
->>>> Arnd, can you apply if you'd like the warnings fixed and Marvell
->>>> maintainers don't respond.
->>>
->>> Hi Rob
->>>
->>> Patches submitted a week before the merge window opens are generally
->>> deferred to the next cycle. I expect that once -rc1 is out, Gregory
->>> will pick up this patch.
->>
->> These are real bugfixes, I want them in 4.15, since we now get a
->> loud warning for them. I'd rather not shut up that warning because
->> it's not a false-positive.
->
-> As pointed by Andrew, I planned to take them once the 4.15-rc1 would be
-> released. It was not obvious for me that it was real fixes. Actually I
-> would have expected to have first the dts fixed in a release and then
-> the warning enabled.
+> Making the faultaround ptes old results in a unixbench regression for some
+> architectures [3][4]. But on some architectures it is not found to cause
+> any regression. So by default produce young ptes and provide an option for
+> architectures to make the ptes old.
 
-I didn't plan to fix everyone's warnings for them. Unfortunately, the
-combination of linux-next being infrequent in Oct and kernelci.org
-failing to report dtc warnings caused all the warnings started to get
-noticed late, so I fixed the noisier cases. The only way anyone pays
-attention is when dtc is updated and warnings appear. I've emailed out
-warnings in advance before. I've turned off the more subjective ones
-by default. Neither seems to get widely noticed (now in reviews
-instead of saying "don't do X", I say "don't do X and building with
-W=2 will tell you this"). More dtc checks are coming, so I'm open to
-suggestions on the process.
+Ugh. This hidden random behavior difference annoys me.
 
-Rob
+It should also be better documented in the code if we end up doing it.
+
+The reason x86 seems to prefer young pte's is simply that a TLB lookup
+of an old entry basically causes a micro-fault that then sets the
+accessed bit (using a locked cycle) and then a restart.
+
+Those microfaults are not visible to software, but they are pretty
+expensive in hardware, probably because they basically serialize
+execution as if a real page fault had happened.
+
+HOWEVER - and this is the part that annoys me most about the hidden
+behavior - I suspect it ends up being very dependent on
+microarchitectural details in addition to the actual load. So it might
+be more true on some cores than others, and it might be very
+load-dependent. So hiding it as some architectural helper function
+really feels wrong to me. It would likely be better off as a real
+flag, and then maybe we could make the default behavior be set by
+architecture (or even dynamically by the architecture bootup code if
+it turns out to be enough of an issue).
+
+And I'm actually somewhat suspicious of your claim that it's not
+noticeable on arm64. It's entirely possible that the serialization
+cost of the hardware access flag is much lower, but I thought that in
+virtualization you actually end up taking a SW fault, which in turn
+would be much more expensive. In fact, I don't even find that
+"Hardware Accessed" bit in my armv8 docs at all, so I'm guessing it's
+new to 8.1? So this is very much not about architectures at all, but
+about small details in microarchitectural behavior.
+
+Maybe I'm wrong. Will/Catalin?
+
+               Linus
