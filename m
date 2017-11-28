@@ -1,85 +1,66 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 28 Nov 2017 16:48:55 +0100
-Subject: [PATCH v3 2/4] omapdrm: panel: td028ttec1: replace MODULE_ALIAS by
- MODULE_DEVICE_TABLE
-In-Reply-To: <cover.1511884135.git.hns@goldelico.com>
-References: <cover.1511884135.git.hns@goldelico.com>
-Message-ID: <655c9a39d590a5fa7187350269c2914b781d84cc.1511884135.git.hns@goldelico.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 28 Nov 2017 16:32:42 +0000
+Subject: [PATCH] ARM: verify size of zImage
+In-Reply-To: <E1eJiiq-0006k9-FE@rmk-PC.armlinux.org.uk>
+References: <E1eJiiq-0006k9-FE@rmk-PC.armlinux.org.uk>
+Message-ID: <CAKv+Gu-oXSpUcJ6acBKyohQ3WxSDp3sK7A4No2y4CHCFw1kSaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-to make it easier to keep in sync with the OF device table.
+(+ Gregory)
 
-Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
----
- drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c      | 12 ++++++++++--
- .../video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c | 11 +++++++++--
- 2 files changed, 19 insertions(+), 4 deletions(-)
+On 28 November 2017 at 16:27, Russell King <rmk+kernel@armlinux.org.uk> wrote:
+> The linker can sometimes add additional sections to the zImage ELF file
+> which results in the zImage binary being larger than expected.  This
+> causes appended DT blobs to fail.
+>
+> Verify that the zImage binary is the expected size, and fail the build
+> if this is not the case.
+>
+> Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+> ---
+> As this patch is different, I've dropped Matthias' tested-by.  I'd
+> appreciate a replacement, thanks.  Also, I seem to remember that
+> Ard's toolchain was giving issues - maybe this alternative will
+> finally resolve them.
+>
 
-diff --git a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
-index a0dfa14f4fab..2721a86ac5e7 100644
---- a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
-+++ b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
-@@ -460,9 +460,19 @@ static const struct of_device_id td028ttec1_of_match[] = {
- 
- MODULE_DEVICE_TABLE(of, td028ttec1_of_match);
- 
-+static const struct spi_device_id td028ttec1_ids[] = {
-+	{ "toppoly,td028ttec1", 0 },
-+	{ "tpo,td028ttec1", 0},
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(spi, td028ttec1_ids);
-+
-+
- static struct spi_driver td028ttec1_spi_driver = {
- 	.probe		= td028ttec1_panel_probe,
- 	.remove		= td028ttec1_panel_remove,
-+	.id_table	= td028ttec1_ids,
- 
- 	.driver         = {
- 		.name   = "panel-tpo-td028ttec1",
-@@ -473,8 +483,6 @@ static struct spi_driver td028ttec1_spi_driver = {
- 
- module_spi_driver(td028ttec1_spi_driver);
- 
--MODULE_ALIAS("spi:tpo,td028ttec1");
--MODULE_ALIAS("spi:toppoly,td028ttec1");
- MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
- MODULE_DESCRIPTION("Toppoly TD028TTEC1 panel driver");
- MODULE_LICENSE("GPL");
-diff --git a/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c b/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
-index 4aeb908f2d1e..f6da8755b859 100644
---- a/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
-+++ b/drivers/video/fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c
-@@ -463,9 +463,18 @@ static const struct of_device_id td028ttec1_of_match[] = {
- 
- MODULE_DEVICE_TABLE(of, td028ttec1_of_match);
- 
-+static const struct spi_device_id td028ttec1_ids[] = {
-+	{ "toppoly,td028ttec1", 0 },
-+	{ "tpo,td028ttec1", 0},
-+	{ /* sentinel */ }
-+};
-+
-+MODULE_DEVICE_TABLE(spi, td028ttec1_ids);
-+
- static struct spi_driver td028ttec1_spi_driver = {
- 	.probe		= td028ttec1_panel_probe,
- 	.remove		= td028ttec1_panel_remove,
-+	.id_table	= td028ttec1_ids,
- 
- 	.driver         = {
- 		.name   = "panel-tpo-td028ttec1",
-@@ -476,8 +485,6 @@ static struct spi_driver td028ttec1_spi_driver = {
- 
- module_spi_driver(td028ttec1_spi_driver);
- 
--MODULE_ALIAS("spi:tpo,td028ttec1");
--MODULE_ALIAS("spi:toppoly,td028ttec1");
- MODULE_AUTHOR("H. Nikolaus Schaller <hns@goldelico.com>");
- MODULE_DESCRIPTION("Toppoly TD028TTEC1 panel driver");
- MODULE_LICENSE("GPL");
--- 
-2.12.2
+$ nm arch/arm/boot/compressed/vmlinux |grep _edata
+007b8200 D _edata
+007b8200 D _edata_real
+
+Tested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+although I don't remember seeing this fail. It think it may have been
+Gregory who was having these issues?
+
+
+
+>  arch/arm/boot/compressed/vmlinux.lds.S | 7 +++++++
+>  1 file changed, 7 insertions(+)
+>
+> diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+> index e6bf6774c4bb..ed53ca9f482e 100644
+> --- a/arch/arm/boot/compressed/vmlinux.lds.S
+> +++ b/arch/arm/boot/compressed/vmlinux.lds.S
+> @@ -101,6 +101,12 @@ SECTIONS
+>     * this symbol allows further debug in the near future.
+>     */
+>    .image_end (NOLOAD) : {
+> +    /*
+> +     * EFI requires that the image is aligned to 512 bytes, and appended
+> +     * DTB requires that we know where the end of the image is.  Ensure
+> +     * that both are satisfied by ensuring that there are no additional
+> +     * sections emitted into the decompressor image.
+> +     */
+>      _edata_real = .;
+>    }
+>
+> @@ -128,3 +134,4 @@ SECTIONS
+>    .stab.indexstr 0     : { *(.stab.indexstr) }
+>    .comment 0           : { *(.comment) }
+>  }
+> +ASSERT(_edata_real == _edata, "error: zImage file size is incorrect");
+> --
+> 2.7.4
+>
