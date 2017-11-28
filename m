@@ -1,122 +1,72 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Tue, 28 Nov 2017 22:28:31 +0100
-Subject: [PATCH 08/17] drm/sun4i: Add support for DE2 VI planes
-In-Reply-To: <20171128210001.zhncdfkjzvwwxnnf@flea.home>
-References: <20171127205750.19277-1-jernej.skrabec@siol.net>
- <20171127205750.19277-9-jernej.skrabec@siol.net>
- <20171128210001.zhncdfkjzvwwxnnf@flea.home>
-Message-ID: <4054154.28n3JIyj6e@jernej-laptop>
+From: pbonzini@redhat.com (Paolo Bonzini)
+Date: Tue, 28 Nov 2017 22:29:05 +0100
+Subject: [PATCH 00/15] Move vcpu_load and vcpu_put calls to arch code
+In-Reply-To: <dd738b4f-3d99-ec3b-fa5e-d166230f9d2b@redhat.com>
+References: <20171125205718.7731-1-christoffer.dall@linaro.org>
+ <dd738b4f-3d99-ec3b-fa5e-d166230f9d2b@redhat.com>
+Message-ID: <abcdc95d-0f78-3e42-1784-56393f502c68@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
-
-Dne torek, 28. november 2017 ob 22:00:01 CET je Maxime Ripard napisal(a):
-> Hi,
+On 28/11/2017 21:55, David Hildenbrand wrote:
+> On 25.11.2017 21:57, Christoffer Dall wrote:
+>> Some architectures may decide to do different things during
+>> kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
+>> arm64 is about to do significant work in vcpu load/put when running a
+>> vcpu, but it's problematic to do this for any other vcpu ioctl than
+>> KVM_RUN.
+>>
+>> Further, while it may be possible to call kvm_arch_vcpu_load() for a
+>> number of non-KVM_RUN ioctls, it makes the KVM/ARM code more difficult
+>> to reason about, especially after my optimization series, because a lot
+>> of things can now happen, where we have to consider if we're really in
+>> the process of running a vcpu or not.
+>>
+>> This series will first move the vcpu_load() and vcpu_put() calls in the
+>> arch generic dispatch function into each case of the switch statement
+>> and then, one-by-one, pushed the calls down into the architecture
+>> specific code making the changes for each ioctl as required.
+>>
+>> Thanks,
+>> -Christoffer
+>>
+>> Christoffer Dall (15):
+>>   KVM: Prepare for moving vcpu_load/vcpu_put into arch specific code
+>>   KVM: Factor out vcpu->pid adjustment for KVM_RUN
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_run
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_regs
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_regs
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_sregs
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_sregs
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_mpstate
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_mpstate
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_translate
+>>   KVM: Move vcpu_load to arch-specific
+>>     kvm_arch_vcpu_ioctl_set_guest_debug
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_fpu
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_fpu
+>>   KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl
+>>   KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls than KVM_RUN
+>>
+>>  arch/arm64/kvm/guest.c     |  17 +++++--
+>>  arch/mips/kvm/mips.c       |  72 +++++++++++++++++++--------
+>>  arch/powerpc/kvm/book3s.c  |  38 +++++++++++++-
+>>  arch/powerpc/kvm/booke.c   |  65 +++++++++++++++++++-----
+>>  arch/powerpc/kvm/powerpc.c |  24 ++++++---
+>>  arch/s390/kvm/kvm-s390.c   | 119 +++++++++++++++++++++++++++++++++++++-------
+>>  arch/x86/kvm/x86.c         | 121 ++++++++++++++++++++++++++++++++++++++-------
+>>  include/linux/kvm_host.h   |   2 +
+>>  virt/kvm/arm/arm.c         |  91 +++++++++++++++++++++++++---------
+>>  virt/kvm/kvm_main.c        |  43 +++++++---------
+>>  10 files changed, 463 insertions(+), 129 deletions(-)
+>>
 > 
-> On Mon, Nov 27, 2017 at 09:57:41PM +0100, Jernej Skrabec wrote:
-> > This commit adds basic support for VI planes. They are meant for video
-> > overlay and because of that they support YUV formats too. However, using
-> > YUV planes is not straightforward, so only RGB support for now.
-> > 
-> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
-> > ---
-> > 
-> >  drivers/gpu/drm/sun4i/sun8i_layer.c |  40 +++++++---
-> >  drivers/gpu/drm/sun4i/sun8i_mixer.c | 144
-> >  +++++++++++++++++++++++++++++++++--- drivers/gpu/drm/sun4i/sun8i_mixer.h
-> >  |  38 ++++++++--
-> >  3 files changed, 196 insertions(+), 26 deletions(-)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c
-> > b/drivers/gpu/drm/sun4i/sun8i_layer.c index 49ccdd0149bd..e1b6ad82145e
-> > 100644
-> > --- a/drivers/gpu/drm/sun4i/sun8i_layer.c
-> > +++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
-> > @@ -47,13 +47,22 @@ static int sun8i_mixer_layer_atomic_check(struct
-> > drm_plane *plane,> 
-> >  					    true, true);
-> >  
-> >  }
-> > 
-> > +static void sun8i_mixer_layer_enable(struct sun8i_layer *layer, bool
-> > enable) +{
-> > +	struct sun8i_mixer *mixer = layer->mixer;
-> > +
-> > +	if (layer->id < mixer->cfg->vi_num)
-> > +		sun8i_mixer_vi_layer_enable(mixer, layer->id, enable);
-> > +	else
-> > +		sun8i_mixer_ui_layer_enable(mixer, layer->id, enable);
-> > +}
-> > +
-> > 
-> >  static void sun8i_mixer_layer_atomic_disable(struct drm_plane *plane,
-> >  
-> >  					       struct drm_plane_state *old_state)
-> >  
-> >  {
-> >  
-> >  	struct sun8i_layer *layer = plane_to_sun8i_layer(plane);
-> > 
-> > -	struct sun8i_mixer *mixer = layer->mixer;
-> > 
-> > -	sun8i_mixer_layer_enable(mixer, layer->id, false);
-> > +	sun8i_mixer_layer_enable(layer, false);
-> > 
-> >  }
-> >  
-> >  static void sun8i_mixer_layer_atomic_update(struct drm_plane *plane,
-> > 
-> > @@ -63,14 +72,21 @@ static void sun8i_mixer_layer_atomic_update(struct
-> > drm_plane *plane,> 
-> >  	struct sun8i_mixer *mixer = layer->mixer;
-> >  	
-> >  	if (!plane->state->visible) {
-> > 
-> > -		sun8i_mixer_layer_enable(mixer, layer->id, false);
-> > +		sun8i_mixer_layer_enable(layer, false);
-> > 
-> >  		return;
-> >  	
-> >  	}
-> > 
-> > -	sun8i_mixer_update_layer_coord(mixer, layer->id, plane);
-> > -	sun8i_mixer_update_layer_formats(mixer, layer->id, plane);
-> > -	sun8i_mixer_update_layer_buffer(mixer, layer->id, plane);
-> > -	sun8i_mixer_layer_enable(mixer, layer->id, true);
-> > +	if (layer->id < mixer->cfg->vi_num) {
-> > +		sun8i_mixer_update_vi_layer_coord(mixer, layer->id, plane);
-> > +		sun8i_mixer_update_vi_layer_formats(mixer, layer->id, plane);
-> > +		sun8i_mixer_update_vi_layer_buffer(mixer, layer->id, plane);
-> > +	} else {
-> > +		sun8i_mixer_update_ui_layer_coord(mixer, layer->id, plane);
-> > +		sun8i_mixer_update_ui_layer_formats(mixer, layer->id, plane);
-> > +		sun8i_mixer_update_ui_layer_buffer(mixer, layer->id, plane);
-> > +	}
-> > +
-> > +	sun8i_mixer_layer_enable(layer, true);
+> Looking at the amount of code we duplicate, I wonder if simple ifdefery
+> (if possible) would be easier for the single known "special" case.
 > 
-> So you can probably tell by the patches I had in my other serie, but
-> we should really split the UI and VI support in two files, especially
-> since it has pretty much no code path or data in common (if you
-> combine this patch with the YUV support).
+> (most probably an unpopular opinion :) )
 
-Yeah, that would probably be best. But how to split it? sun8i_layer.c seems to 
-be pretty common apart from those calls. Or would you prefer sun8i_[ui|
-vi]_layer.c anyway? But that would mean having two sun8i_layers_init() 
-functions which doesn't fit well into current concept afaik.
+No, also because the duplicate code will go down sensibly in the next
+version.
 
-How would you split sun8i_mixer.c ? Leave common code (HW initialization) in 
-it and create two new files sun8i_[ui|vi]_channel.c ? Common code could be 
-later extended with zpos adjusting code.
-
-Best regards,
-Jernej
-
-> 
-> Maxime
-> 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+Paolo
