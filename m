@@ -1,93 +1,99 @@
-From: robert.walker@arm.com (Robert Walker)
-Date: Tue, 28 Nov 2017 08:55:31 -0000
-Subject: [PATCH] coresight: Fix disabling of CoreSight TPIU
-In-Reply-To: <CANLsYkzV+h=69dtqngZFCOdmyoCmBTc0-5fGb1TkVNE8Gd1UXg@mail.gmail.com>
-References: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
- <CANLsYkzV+h=69dtqngZFCOdmyoCmBTc0-5fGb1TkVNE8Gd1UXg@mail.gmail.com>
-Message-ID: <000001d36826$a6a62a70$f3f27f50$@arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Nov 2017 09:56:51 +0100
+Subject: [PATCH v2] arm64: dts: renesas: r8a7795: Move nodes which have
+ no reg property out of bus
+In-Reply-To: <CAMuHMdUm=PiGVWVg9pyNTR5z2WjLcoG1uecBNBeKsSxbAxBt8w@mail.gmail.com>
+References: <20171124105234.25774-1-horms+renesas@verge.net.au>
+ <CAMuHMdW9V6Bkh5uS9qNA7awtygEs=qRd7jigwSHmpV2VM3n9dA@mail.gmail.com>
+ <20171127110430.ulgjrzgy3pdugs2s@verge.net.au>
+ <CAMuHMdUm=PiGVWVg9pyNTR5z2WjLcoG1uecBNBeKsSxbAxBt8w@mail.gmail.com>
+Message-ID: <20171128085645.ofrk33bfqd736sip@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mathieu,
+On Mon, Nov 27, 2017 at 12:15:39PM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Mon, Nov 27, 2017 at 12:04 PM, Simon Horman <horms@verge.net.au> wrote:
+> > On Fri, Nov 24, 2017 at 12:09:47PM +0100, Geert Uytterhoeven wrote:
+> >> On Fri, Nov 24, 2017 at 11:52 AM, Simon Horman
+> >> <horms+renesas@verge.net.au> wrote:
+> >> > Move pmu_a5[73], timer and thermal-zones nodes from soc node to root node.
+> >> > The nodes that have been moved do not have any register properties and thus
+> >> > shouldn't be placed on the bus.
+> >> >
+> >> > This problem is flagged by the compiler as follows:
+> >> > $ make
+> >> > ...
+> >> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+> >> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+> >> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+> >> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-salvator-xs.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+> >> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+> >> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+> >> >   DTC     arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a57 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/pmu_a53 missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+> >> > arch/arm64/boot/dts/renesas/r8a7795-es1-h3ulcb-kf.dtb: Warning (simple_bus_reg): Node /soc/thermal-zones missing or empty reg/ranges property
+> >> >
+> >> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> >> > ---
+> >> > v2
+> >> > * Preserve alphabetical order of nodes present in root node.
+> >>
+> >> Thanks for the update!
+> >>
+> >> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> >
+> > I just noticed that with this patch applied I now see:
+> >
+> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
+> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53
+> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
+> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
+> >
+> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
+> 
+> Right, the "interrupt-parent = <&gic>;" inside the /soc node applies to child
+> nodes of the /soc node only.
+> 
+> You can find this in two ways:
+> 
+>   1. Add "interrupt-parent = <&gic>;" to the /pmu_a57 and /pmu_a53 nodes.
+>   2. Switch those nodes from "interrupt" to "interrupts-extended", e.g. turn
+> 
+>         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> 
+>      into
+> 
+>         interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+> 
+> The latter is what e.g. arch/arm/boot/dts/armada-375.dtsi does.
 
-> -----Original Message-----
-> From: Mathieu Poirier [mailto:mathieu.poirier at linaro.org]
-> Sent: 27 November 2017 17:30
-> To: Robert Walker <Robert.Walker@arm.com>
-> Cc: linux-arm-kernel at lists.infradead.org; CoreSight at lists.linaro.org
-> Subject: Re: [PATCH] coresight: Fix disabling of CoreSight TPIU
-> 
-> Hi Robert,
-> 
-> On 24 November 2017 at 02:58, Robert Walker <robert.walker@arm.com>
-> wrote:
-> > The CoreSight TPIU should be disabled when tracing to other sinks to
-> > allow them to operate at full bandwidth.
-> >
-> > This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
-> > configuring the TPIU to stop on flush, initiating a manual flush,
-> > waiting for the flush to complete and then waits for the TPIU to
-> > indicate it has stopped.
-> >
-> > Signed-off-by: Robert Walker <robert.walker@arm.com>
-> > ---
-> >  drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
-> >  1 file changed, 10 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c
-> > b/drivers/hwtracing/coresight/coresight-tpiu.c
-> > index bef49a3..4b46c49 100644
-> > --- a/drivers/hwtracing/coresight/coresight-tpiu.c
-> > +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-> > @@ -46,8 +46,11 @@
-> >  #define TPIU_ITATBCTR0         0xef8
-> >
-> >  /** register definition **/
-> > +/* FFSR - 0x300 */
-> > +#define FFSR_FT_STOPPED                BIT(1)
-> >  /* FFCR - 0x304 */
-> >  #define FFCR_FON_MAN           BIT(6)
-> > +#define FFCR_STOP_FI           BIT(12)
-> >
-> >  /**
-> >   * @base:      memory mapped base address for this component.
-> > @@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata
-> > *drvdata)  {
-> >         CS_UNLOCK(drvdata->base);
-> >
-> > -       /* Clear formatter controle reg. */
-> > -       writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
-> > +       /* Clear formatter and stop on flush */
-> > +       writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
-> >         /* Generate manual flush */
-> > -       writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-> > +       writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base +
-> TPIU_FFCR);
-> > +       /* Wait for flush to complete */
-> > +       coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
-> > +       /* Wait for formatter to stop */
-> > +       coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED,
-> > + 1);
-> >
-> >         CS_LOCK(drvdata->base);
-> >  }
-> 
-> Shouldn't we also do this at boot time when the TPIU in _probed() ?
-> That way the TPIU doesn't have to explicitly be enabled and disabled prior to
-> running other tracing sessions.
-> 
-> Thanks,
-> Mathieu
-
-There already is a call to tpiu_disable_hw() in tpiu_probe(), so the TPIU is disabled on boot.
-When tracing to another sink (e.g. ETR), the TPIU won't be enabled / disabled (i.e. tpiu_enable_hw() and tpiu_disable_hw() won't be called) as it's not on the direct path from source to sink.
-
-Regards
-
-Rob
-
-> 
-> 
-> > --
-> > 1.9.1
-> >
+Thanks, I took option 1 as it seems consistent with the rest of the
+Renesas DT files. I also added it to the /timer node.
