@@ -1,75 +1,104 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Tue, 28 Nov 2017 22:56:31 +0100
-Subject: [PATCH v2 05/18] drm/sun4i: Force the mixer rate at 150MHz
-In-Reply-To: <20171128085826.snmflonvbic5put3@flea.home>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 28 Nov 2017 23:00:14 +0100
+Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
+In-Reply-To: <2908242.WKit1ZIWoJ@jernej-laptop>
 References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <9630064.mDmGGWOQGt@jernej-laptop>
- <20171128085826.snmflonvbic5put3@flea.home>
-Message-ID: <2326800.o3FEWRaSfH@jernej-laptop>
+ <2744508.m82qQEPny3@jernej-laptop>
+ <20171128090223.mqp3v2t6koyu6hk4@flea.home>
+ <2908242.WKit1ZIWoJ@jernej-laptop>
+Message-ID: <20171128220014.w35rcliusubfdvoe@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
 
-Dne torek, 28. november 2017 ob 09:58:26 CET je Maxime Ripard napisal(a):
-> On Mon, Nov 27, 2017 at 05:07:04PM +0100, Jernej ?krabec wrote:
-> > Hi Maxime,
+
+On Tue, Nov 28, 2017 at 04:48:55PM +0100, Jernej ?krabec wrote:
+> > On Mon, Nov 27, 2017 at 05:01:49PM +0100, Jernej ?krabec wrote:
+> > > Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard 
+> napisal(a):
+> > > > Add support for the A83T display pipeline.
+> > > > 
+> > > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > ---
+> > > > 
+> > > >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+> > > >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
+> > > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
+> > > >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
+> > > >  4 files changed, 14 insertions(+)
+> > > > 
+> > > > diff --git
+> > > > a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
+> > > > d4259a4f5171..d6b52e5c48c0 100644
+> > > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > 
+> > > > @@ -93,6 +93,7 @@ Required properties:
+> > > >     * allwinner,sun6i-a31s-tcon
+> > > >     * allwinner,sun7i-a20-tcon
+> > > >     * allwinner,sun8i-a33-tcon
+> > > > 
+> > > > +   * allwinner,sun8i-a83t-tcon-lcd
+> > > > 
+> > > >     * allwinner,sun8i-v3s-tcon
+> > > >   
+> > > >   - reg: base address and size of memory-mapped region
+> > > >   - interrupts: interrupt associated to this IP
+> > > > 
+> > > > @@ -224,6 +225,7 @@ supported.
+> > > > 
+> > > >  Required properties:
+> > > >    - compatible: value must be one of:
+> > > > +    * allwinner,sun8i-a83t-de2-mixer
+> > > 
+> > > What will be the name of the second mixer, once support for HDMI is added?
+> > > Should we start directly with 0 and 1 postfix ?
 > > 
-> > Dne ponedeljek, 27. november 2017 ob 16:41:29 CET je Maxime Ripard 
-napisal(a):
-> > > It seems like the mixer can only run properly when clocked at 150MHz. In
-> > > order to have something more robust than simply a fire-and-forget
-> > > assigned-clocks-rate, let's put that in the code.
-> > > 
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > > 
-> > >  drivers/gpu/drm/sun4i/sun8i_mixer.c | 7 +++++++
-> > >  1 file changed, 7 insertions(+)
-> > > 
-> > > diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > > b/drivers/gpu/drm/sun4i/sun8i_mixer.c index cb193c5f1686..c0cdccf772a2
-> > > 100644
-> > > --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > > +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > > @@ -315,6 +315,13 @@ static int sun8i_mixer_bind(struct device *dev,
-> > > struct
-> > > device *master, }
-> > > 
-> > >  	clk_prepare_enable(mixer->mod_clk);
-> > > 
-> > > +	/*
-> > > +	 * It seems that we need to enforce that rate for whatever
-> > > +	 * reason for the mixer to be functional. Make sure it's the
-> > > +	 * case.
-> > > +	 */
-> > > +	clk_set_rate(mixer->mod_clk, 150000000);
-> > > +
-> > 
-> > H3 mixer works at much higher rate and if we want to support tv out, it
-> > must be dividable by 432 MHz, so either 432 MHz or maybe even 864 MHz.
-> > 
-> > We talked about that few months ago.
-> > 
-> > I guess this should be read from mixer configuration structure.
+> > What are the differences exactly without the two mixers?
 > 
-> That works for me. Actually, I didn't need it at all for the LVDS
-> output on the A83t, the default seems to work just fine. Do you know
-> what it's related to? Maybe we can make that a bit more dynamic?
+> Mixer properties:
+> - mixer index (0 or 1), important for determining CCSC base (see my patches)
 
-There doesn't seem to be any rule to determine which frequency is best, except 
-on H3. Obviously, it must be high enough to process data for current 
-resolution, which means 150 MHz should be just enough for 1920x1080 at 60Hz. I 
-guess we should just check BSP configuration and use same rate since AW 
-engineers may know something we don't.
+Is that the only thing we need to determine?
 
-Best regards,
-Jernej
+> - number of VI planes (usually 1)
 
+Usually or always?
+
+> - number of UI planes (usually 1 or 3)
+
+Same question.
+
+> - writeback support (yes/no)
+> - scale line buffer length (2048 or 4096)
+> - smart backligth support (yes/no)
 > 
-> Maxime
+> channel properties (for both, VI and UI):
+> - scaler support (yes/no, usually yes)
+> - overlay count (seems to be always 4)
+> - VEP support (yes/no)
 > 
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+> Those are properties found in BSP de_feat.c, so I guess that's enough to make 
+> any kind of decision in the code.
+> 
+> Usually, but we can't count on that, first mixer has 1 VI and 3 UI planes and 
+> second mixer has 1 VI and 1 UI plane.
+
+Right. So that would be easy to support using a property as well. The
+only difference would be the CSC base.
+
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/dd8a04d5/attachment.sig>
