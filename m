@@ -1,53 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Tue, 28 Nov 2017 08:18:34 -0800
-Subject: [PATCH v3 4/4] DTS: Pandora: fix panel compatibility string
-In-Reply-To: <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
-References: <cover.1511884135.git.hns@goldelico.com>
- <b6001c7b7fb98e7a3ad4c712084fea9dae9e6b27.1511884135.git.hns@goldelico.com>
- <20171128160437.GD28152@atomide.com>
- <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
-Message-ID: <20171128161834.GE28152@atomide.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 28 Nov 2017 16:27:00 +0000
+Subject: [PATCH] ARM: verify size of zImage
+Message-ID: <E1eJiiq-0006k9-FE@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* H. Nikolaus Schaller <hns@goldelico.com> [171128 16:17]:
-> Hi Tony,
-> 
-> > Am 28.11.2017 um 17:04 schrieb Tony Lindgren <tony@atomide.com>:
-> > 
-> > * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:52]:
-> >> We can remove the unnecessary "omapdss," prefix because
-> >> the omapdrm driver takes care of it when matching with
-> >> the driver table.
-> > 
-> > So is this needed as a fix or is this another clean-up?
-> > 
-> > So is this is really needed as a fix?
-> 
-> Hm. How do you differentiate between "fix" and "cleanup"?
-> Maybe it is more a wording than a content issue...
-> 
-> For me it is a "fix" because it is semantically wrong to have
-> a prefix where it is not needed. And "fixing" it changes the
-> compiler output by 8 bytes.
+The linker can sometimes add additional sections to the zImage ELF file
+which results in the zImage binary being larger than expected.  This
+causes appended DT blobs to fail.
 
-How about let's call it a "typo fix" then? :)
+Verify that the zImage binary is the expected size, and fail the build
+if this is not the case.
 
-> "Cleanup" would be for me removing whitespace or empty lines
-> or typos in comments.
->
-> > If this is just clean-up, again, please resend once the driver
-> > changes have cleared.
-> 
-> There is no change to the pandora driver involved here. The Pandora
-> panel driver is already correct. Just the DTS has some redundant
-> content which should be removed.
-> 
-> So there is no dependency for this patch.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+As this patch is different, I've dropped Matthias' tested-by.  I'd
+appreciate a replacement, thanks.  Also, I seem to remember that
+Ard's toolchain was giving issues - maybe this alternative will
+finally resolve them.
 
-OK please resend separately after the driver changes have merged
-then.
+ arch/arm/boot/compressed/vmlinux.lds.S | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Regards,
-
-Tony
+diff --git a/arch/arm/boot/compressed/vmlinux.lds.S b/arch/arm/boot/compressed/vmlinux.lds.S
+index e6bf6774c4bb..ed53ca9f482e 100644
+--- a/arch/arm/boot/compressed/vmlinux.lds.S
++++ b/arch/arm/boot/compressed/vmlinux.lds.S
+@@ -101,6 +101,12 @@ SECTIONS
+    * this symbol allows further debug in the near future.
+    */
+   .image_end (NOLOAD) : {
++    /*
++     * EFI requires that the image is aligned to 512 bytes, and appended
++     * DTB requires that we know where the end of the image is.  Ensure
++     * that both are satisfied by ensuring that there are no additional
++     * sections emitted into the decompressor image.
++     */
+     _edata_real = .;
+   }
+ 
+@@ -128,3 +134,4 @@ SECTIONS
+   .stab.indexstr 0	: { *(.stab.indexstr) }
+   .comment 0		: { *(.comment) }
+ }
++ASSERT(_edata_real == _edata, "error: zImage file size is incorrect");
+-- 
+2.7.4
