@@ -1,34 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 28 Nov 2017 11:29:44 -0500
-Subject: [Intel-gfx] [PATCH V3 09/29] drm/i915: deprecate
- pci_get_bus_and_slot()
-In-Reply-To: <20171128153051.GU10981@intel.com>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
- <1511801886-6753-10-git-send-email-okaya@codeaurora.org>
- <20171128153051.GU10981@intel.com>
-Message-ID: <9046d23e-412d-9d9f-147f-a3bc6eea34fc@codeaurora.org>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 28 Nov 2017 10:30:22 -0600
+Subject: [PATCH v3 2/3] clk: meson-axg: add clock controller drivers
+In-Reply-To: <20171128125330.363-3-yixun.lan@amlogic.com>
+References: <20171128125330.363-1-yixun.lan@amlogic.com>
+ <20171128125330.363-3-yixun.lan@amlogic.com>
+Message-ID: <20171128163022.7b7wvfqedkhhnaj6@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28/2017 10:30 AM, Ville Syrj?l? wrote:
->> +	dev_priv->bridge_dev =
->> +		pci_get_domain_bus_and_slot(domain, 0, PCI_DEVFN(0, 0));
-> Maybe just pci_get_slot(pdev->bus, PCI_DEVFN(0, 0)) ?
+On Tue, Nov 28, 2017 at 08:53:29PM +0800, Yixun Lan wrote:
+> From: Qiufang Dai <qiufang.dai@amlogic.com>
 > 
-> I guess if we want to be pedantic we could go for:
+> Add clock controller drivers for Amlogic Meson-AXG SoC.
 > 
-> bus = pci_find_host_bridge(pdev->bus)->bus;
-> pci_get_slot(bus, PCI_DEVFN(0, 0))
-> 
-> but I think the GPU should always be on the root bus, so the simpler
-> form should be fine.
-> 
+> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  arch/arm64/Kconfig.platforms         |   1 +
+>  drivers/clk/meson/Kconfig            |   8 +
+>  drivers/clk/meson/Makefile           |   1 +
+>  drivers/clk/meson/axg.c              | 948 +++++++++++++++++++++++++++++++++++
+>  drivers/clk/meson/axg.h              | 126 +++++
 
-All three of these should be correct. 
+>  include/dt-bindings/clock/axg-clkc.h |  72 +++
 
-I'll use pci_get_slot(pdev->bus, PCI_DEVFN(0, 0)) as you suggested.
+This belongs in the binding patch.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Otherwise, 
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+
+>  6 files changed, 1156 insertions(+)
+>  create mode 100644 drivers/clk/meson/axg.c
+>  create mode 100644 drivers/clk/meson/axg.h
+>  create mode 100644 include/dt-bindings/clock/axg-clkc.h
