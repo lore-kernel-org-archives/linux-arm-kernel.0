@@ -1,165 +1,196 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Tue, 28 Nov 2017 16:07:26 +0100
-Subject: [PATCHv2 12/12] arm64: docs: document pointer authentication
-In-Reply-To: <20171127163806.31435-13-mark.rutland@arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-13-mark.rutland@arm.com>
-Message-ID: <20171128150726.xui5i23uigvfo52w@kamzik.brq.redhat.com>
+From: rmk+kernel@armlinux.org.uk (Russell King)
+Date: Tue, 28 Nov 2017 15:02:41 +0000
+Subject: [PATCH v2 09/16] ARM: dts: imx6qdl-sr-som: add support for TI Wi-Fi
+In-Reply-To: <20171128150045.GV31757@n2100.armlinux.org.uk>
+References: <20171128150045.GV31757@n2100.armlinux.org.uk>
+Message-ID: <E1eJhPF-0006Ny-1F@rmk-PC.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add support for the TI Wi-Fi WL1837 device on SolidRun's revision
+1.5 microsoms.
 
-On Mon, Nov 27, 2017 at 04:38:06PM +0000, Mark Rutland wrote:
-> Now that we've added code to support pointer authentication, add some
-> documentation so that people can figure out if/how to use it.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Yao Qi <yao.qi@arm.com>
-> ---
->  Documentation/arm64/booting.txt                |  8 +++
->  Documentation/arm64/elf_hwcaps.txt             |  6 ++
->  Documentation/arm64/pointer-authentication.txt | 85 ++++++++++++++++++++++++++
->  3 files changed, 99 insertions(+)
->  create mode 100644 Documentation/arm64/pointer-authentication.txt
-> 
-> diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-> index 8d0df62c3fe0..8df9f4658d6f 100644
-> --- a/Documentation/arm64/booting.txt
-> +++ b/Documentation/arm64/booting.txt
-> @@ -205,6 +205,14 @@ Before jumping into the kernel, the following conditions must be met:
->      ICC_SRE_EL2.SRE (bit 0) must be initialised to 0b0.
->    - The DT or ACPI tables must describe a GICv2 interrupt controller.
->  
-> +  For CPUs with pointer authentication functionality:
-> +  - If EL3 is present:
-> +    SCR_EL3.APK (bit 16) must be initialised to 0b1
-> +    SCR_EL3.API (bit 17) must be initialised to 0b1
-> +  - If the kernel is entered at EL1:
-> +    HCR_EL2.APK (bit 40) must be initialised to 0b1
-> +    HCR_EL2.API (bit 41) must be initialised to 0b1
-> +
->  The requirements described above for CPU mode, caches, MMUs, architected
->  timers, coherency and system registers apply to all CPUs.  All CPUs must
->  enter the kernel in the same exception level.
-> diff --git a/Documentation/arm64/elf_hwcaps.txt b/Documentation/arm64/elf_hwcaps.txt
-> index 89edba12a9e0..6cf40e419a9d 100644
-> --- a/Documentation/arm64/elf_hwcaps.txt
-> +++ b/Documentation/arm64/elf_hwcaps.txt
-> @@ -158,3 +158,9 @@ HWCAP_SHA512
->  HWCAP_SVE
->  
->      Functionality implied by ID_AA64PFR0_EL1.SVE == 0b0001.
-> +
-> +HWCAP_APIA
-> +
-> +    EL0 AddPac and Auth functionality using APIAKey_EL1 is enabled, as
-> +    described by Documentation/arm64/pointer-authentication.txt.
-> +
-> diff --git a/Documentation/arm64/pointer-authentication.txt b/Documentation/arm64/pointer-authentication.txt
-> new file mode 100644
-> index 000000000000..e9b5c6bdb84f
-> --- /dev/null
-> +++ b/Documentation/arm64/pointer-authentication.txt
-> @@ -0,0 +1,85 @@
-> +Pointer authentication in AArch64 Linux
-> +=======================================
-> +
-> +Author: Mark Rutland <mark.rutland@arm.com>
-> +Date: 2017-07-19
-> +
-> +This document briefly describes the provision of pointer authentication
-> +functionality in AArch64 Linux.
-> +
-> +
-> +Architecture overview
-> +---------------------
-> +
-> +The ARMv8.3 Pointer Authentication extension adds primitives that can be
-> +used to mitigate certain classes of attack where an attacker can corrupt
-> +the contents of some memory (e.g. the stack).
-> +
-> +The extension uses a Pointer Authentication Code (PAC) to determine
-> +whether pointers have been modified unexpectedly. A PAC is derived from
-> +a pointer, another value (such as the stack pointer), and a secret key
-> +held in system registers.
-> +
-> +The extension adds instructions to insert a valid PAC into a pointer,
-> +and to verify/remove the PAC from a pointer. The PAC occupies a number
-> +of high-order bits of the pointer, which varies dependent on the
-> +configured virtual address size and whether pointer tagging is in use.
-> +
-> +A subset of these instructions have been allocated from the HINT
-> +encoding space. In the absence of the extension (or when disabled),
-> +these instructions behave as NOPs. Applications and libraries using
-> +these instructions operate correctly regardless of the presence of the
-> +extension.
+Signed-off-by: Russell King <rmk+kernel@armlinux.org.uk>
+---
+ arch/arm/boot/dts/imx6qdl-sr-som-ti.dtsi | 170 +++++++++++++++++++++++++++++++
+ 1 file changed, 170 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6qdl-sr-som-ti.dtsi
 
-Correctly, but obviously without the additional security. So I assume
-it's expected that applications that demand this security to probe for
-it themselves, presumably by the checking the HWCAP. Is that correct?
-
-> +
-> +
-> +Basic support
-> +-------------
-> +
-> +When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and relevant HW
-> +support is present, the kernel will assign a random APIAKey value to
-> +each process at exec*() time. This key is shared by all threads within
-> +the process, and the key is preserved across fork(). Presence of
-> +functionality using APIAKey is advertised via HWCAP_APIA.
-> +
-> +Recent versions of GCC can compile code with APIAKey-based return
-> +address protection when passed the -msign-return-address option. This
-> +uses instructions in the HINT space, and such code can run on systems
-> +without the pointer authentication extension.
-> +
-> +The remaining instruction and data keys (APIBKey, APDAKey, APDBKey) are
-> +reserved for future use, and instructions using these keys must not be
-> +used by software until a purpose and scope for their use has been
-> +decided. To enable future software using these keys to function on
-> +contemporary kernels, where possible, instructions using these keys are
-> +made to behave as NOPs.
-> +
-> +The generic key (APGAKey) is currently unsupported. Instructions using
-> +the generic key must not be used by software.
-> +
-> +
-> +Debugging
-> +---------
-> +
-> +When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and relevant HW
-> +support is present, the kernel will expose the position of TTBR0 PAC
-> +bits in the NT_ARM_PAC_MASK regset (struct user_pac_mask), which
-> +userspace can acqure via PTRACE_GETREGSET.
-> +
-> +Separate masks are exposed for data pointers and instruction pointers,
-> +as the set of PAC bits can vary between the two. Debuggers should not
-> +expect that HWCAP_APIA implies the presence (or non-presence) of this
-> +regset -- in future the kernel may support the use of APIBKey, APDAKey,
-> +and/or APBAKey, even in the absence of APIAKey.
-> +
-> +Note that the masks apply to TTBR0 addresses, and are not valid to apply
-> +to TTBR1 addresses (e.g. kernel pointers).
-> +
-> +
-> +Virtualization
-> +--------------
-> +
-> +When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and uniform HW
-> +support is present, KVM will context switch all keys used by vCPUs.
-> +Otherwise, the feature is disabled. When disabled, accesses to keys, or
-> +use of instructions enabled within the guest will trap to EL2, and an
-> +UNDEFINED exception will be injected into the guest.
-
-If host applications will just run, with the instructions behaving like
-NOPs, when the extension is either not present or not enabled, then
-shouldn't guest applications also just run? I.e. instead of injecting
-UNDEF, just treat the instructions as NOPs. Or did I misunderstand the
-trapping? Does use of the instructions at EL0 trap to EL1 or EL2?
-
-Thanks,
-drew
+diff --git a/arch/arm/boot/dts/imx6qdl-sr-som-ti.dtsi b/arch/arm/boot/dts/imx6qdl-sr-som-ti.dtsi
+new file mode 100644
+index 000000000000..44a97ba93a95
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-sr-som-ti.dtsi
+@@ -0,0 +1,170 @@
++/*
++ * Copyright (C) 2013,2014 Russell King
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License
++ *     version 2 as published by the Free Software Foundation.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	nvcc_sd1: regulator-nvcc-sd1 {
++		compatible = "regulator-fixed";
++		regulator-always-on;
++		regulator-name = "nvcc_sd1";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		vin-supply = <&vcc_3v3>;
++	};
++
++	clk_ti_wifi: ti-wifi-clock {
++		/* This is a hack around the kernel - using "fixed clock"
++		 * results in the "pinctrl" properties being ignored, and
++		 * the clock not being output.  Instead, use a gated clock
++		 * and the unrouted WL_XTAL_PU gpio.
++		 */
++		compatible = "gpio-gate-clock";
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_clk>;
++		enable-gpios = <&gpio5 5 GPIO_ACTIVE_HIGH>;
++	};
++
++	pwrseq_ti_wifi: ti-wifi-pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_wifi_en>;
++		reset-gpios = <&gpio5 26 GPIO_ACTIVE_LOW>;
++		post-power-on-delay-ms = <200>;
++		clocks = <&clk_ti_wifi>;
++		clock-names = "ext_clock";
++	};
++};
++
++&iomuxc {
++	microsom {
++		pinctrl_microsom_ti_bt: microsom-ti-bt {
++			fsl,pins = <
++				/* BT_EN_SOC */
++				MX6QDL_PAD_CSI0_DAT14__GPIO6_IO00	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_ti_clk: microsom-ti-clk {
++			fsl,pins = <
++				/* EXT_32K */
++				MX6QDL_PAD_GPIO_8__XTALOSC_REF_CLK_32K	0x1b0b0
++				/* WL_XTAL_PU (unrouted) */
++				MX6QDL_PAD_DISP0_DAT11__GPIO5_IO05 0x40013070
++			>;
++		};
++
++		pinctrl_microsom_ti_wifi_en: microsom-ti-wifi-en {
++			fsl,pins = <
++				/* WLAN_EN_SOC */
++				MX6QDL_PAD_CSI0_DAT8__GPIO5_IO26	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_ti_wifi_irq: microsom-ti-wifi-irq {
++			fsl,pins = <
++				/* WLAN_IRQ */
++				MX6QDL_PAD_CSI0_DAT18__GPIO6_IO04	0x40013070
++			>;
++		};
++
++		pinctrl_microsom_uart4: microsom-uart4 {
++			fsl,pins = <
++				MX6QDL_PAD_CSI0_DAT12__UART4_TX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT13__UART4_RX_DATA 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT16__UART4_RTS_B 0x1b0b1
++				MX6QDL_PAD_CSI0_DAT17__UART4_CTS_B 0x1b0b1
++			>;
++		};
++
++		pinctrl_microsom_usdhc1: microsom-usdhc1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17059
++				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10059
++				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17059
++				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17059
++				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17059
++				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17059
++			>;
++		};
++	};
++};
++
++/* UART4 - Connected to optional TI Wi-Fi/BT/FM */
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_uart4>;
++	uart-has-rtscts;
++	status = "okay";
++
++	bluetooth {
++		compatible = "ti,wl1837-st";
++		clocks = <&clk_ti_wifi>;
++		clock-names = "ext_clock";
++		enable-gpios = <&gpio6 0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_bt>;
++	};
++};
++
++/* USDHC1 - Connected to optional TI Wi-Fi/BT/FM */
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_microsom_usdhc1>;
++	bus-width = <4>;
++	keep-power-in-suspend;
++	mmc-pwrseq = <&pwrseq_ti_wifi>;
++	non-removable;
++	vmmc-supply = <&vcc_3v3>;
++	/* vqmmc-supply = <&nvcc_sd1>; - MMC layer doesn't like it! */
++	status = "okay";
++	#address-cells = <1>;
++	#size-cells = <0>;
++
++	wlcore at 2 {
++		compatible = "ti,wl1837";
++		reg = <2>;
++		interrupts-extended = <&gpio6 4 IRQ_TYPE_LEVEL_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_microsom_ti_wifi_irq>;
++	};
++};
+-- 
+2.7.4
