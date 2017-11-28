@@ -1,76 +1,65 @@
 From: icenowy@aosc.io (Icenowy Zheng)
-Date: Tue, 28 Nov 2017 19:50:19 +0800
-Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
-In-Reply-To: <20171128090223.mqp3v2t6koyu6hk4@flea.home>
-References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <1c4f6b275597dec7d97b5c1d9f749ba27c0610f3.1511797218.git-series.maxime.ripard@free-electrons.com>
- <2744508.m82qQEPny3@jernej-laptop>
- <20171128090223.mqp3v2t6koyu6hk4@flea.home>
-Message-ID: <2edae31575bbdb5abe989ad3b9d403a7@aosc.io>
+Date: Tue, 28 Nov 2017 20:02:26 +0800
+Subject: [PATCH 12/17] drm/sun4i: Add CCSC property to DE2 configuration
+In-Reply-To: <20171127205750.19277-13-jernej.skrabec@siol.net>
+References: <20171127205750.19277-1-jernej.skrabec@siol.net>
+ <20171127205750.19277-13-jernej.skrabec@siol.net>
+Message-ID: <1763fe2cf572135ef030a26a32b907d7@aosc.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-? 2017-11-28 17:02?Maxime Ripard ???
-> Hi,
+? 2017-11-28 04:57?Jernej Skrabec ???
+> Base addresses of channel output CSC (CCSC) depends whether mixer in
+> question is first or second and if it is second, if supports VEP or 
+> not.
+> This new property will tell which set of base addresses to take.
 > 
-> On Mon, Nov 27, 2017 at 05:01:49PM +0100, Jernej ?krabec wrote:
->> Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard 
->> napisal(a):
->> > Add support for the A83T display pipeline.
->> >
->> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->> >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
->> >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
->> >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
->> >  4 files changed, 14 insertions(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
->> > d4259a4f5171..d6b52e5c48c0 100644
->> > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
->> > @@ -93,6 +93,7 @@ Required properties:
->> >     * allwinner,sun6i-a31s-tcon
->> >     * allwinner,sun7i-a20-tcon
->> >     * allwinner,sun8i-a33-tcon
->> > +   * allwinner,sun8i-a83t-tcon-lcd
->> >     * allwinner,sun8i-v3s-tcon
->> >   - reg: base address and size of memory-mapped region
->> >   - interrupts: interrupt associated to this IP
->> > @@ -224,6 +225,7 @@ supported.
->> >
->> >  Required properties:
->> >    - compatible: value must be one of:
->> > +    * allwinner,sun8i-a83t-de2-mixer
->> 
->> What will be the name of the second mixer, once support for HDMI is 
->> added?
->> Should we start directly with 0 and 1 postfix ?
-> 
-> What are the differences exactly without the two mixers?
-> 
-> I was hoping to be able to cover them all using properties, indices
-> are usually pretty badly received in compatibles.
+> 0 - first mixer or second mixer with VEP support
+> 1 - second mixer without VEP support
 
-1. VEP is only available on the VI channel in mixer0. (VEP may mean
-Video Enhance Processor)
-2. Smart Backlight is only available in mixer0's on SoCs with LCD.
-3. Writeback function is only available in mixer0.
+Maxime,
+
+I think here the ID of the mixer matters.
+
+P.S. I didn't found any SoC with a second mixer with VEP currently
+
+Thanks!
 
 > 
->> >  static const struct of_device_id sun8i_mixer_of_table[] = {
->> >  	{
->> > +		.compatible = "allwinner,sun8i-a83t-de2-mixer",
->> > +		.data = &sun8i_v3s_mixer_cfg,
->> > +	},
->> > +	{
->> 
->> Maybe you want to squash 12 patch since this works only by luck.
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+> ---
+>  drivers/gpu/drm/sun4i/sun8i_mixer.c | 1 +
+>  drivers/gpu/drm/sun4i/sun8i_mixer.h | 1 +
+>  2 files changed, 2 insertions(+)
 > 
-> Yeah, I totally meant to do that :)
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> index 7c9c87a0535b..2276eff8798d 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> @@ -622,6 +622,7 @@ static const struct sun8i_mixer_cfg 
+> sun8i_v3s_mixer_cfg = {
+>  	.vi_num = 2,
+>  	.ui_num = 1,
+>  	.scaler_mask = 0x3,
+> +	.ccsc = 0,
+
+Jernej, the lowlevel_sun8iw8/de_feat.c in the BSP DE2 source code
+claims that V3/V3s have no VEP support even for mixer0.
+
+>  };
 > 
-> Thanks!
-> Maxime
+>  static const struct of_device_id sun8i_mixer_of_table[] = {
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h
+> b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+> index 355a45e6cfb4..4fcf1653e345 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
+> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+> @@ -136,6 +136,7 @@ struct sun8i_mixer_cfg {
+>  	int		vi_num;
+>  	int		ui_num;
+>  	int		scaler_mask;
+> +	int		ccsc;
+>  };
+> 
+>  struct sun8i_mixer {
