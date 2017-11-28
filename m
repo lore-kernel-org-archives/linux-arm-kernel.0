@@ -1,85 +1,128 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Tue, 28 Nov 2017 10:18:38 -0800
-Subject: [PATCH v3] kbuild: Set KBUILD_CFLAGS before incl. arch Makefile
-In-Reply-To: <CAK7LNASGYZfQFkM3yMRQaHLUwW5Lhp8CxHGX0bJ9sVja0f=n+A@mail.gmail.com>
-References: <CAK7LNAS1NaqPRhK6FOXN=YTMhLagpSrR2=tXn-uWZbpzr=NeoQ@mail.gmail.com>
- <20171115204231.34914-1-ndesaulniers@google.com>
- <CAK7LNAQNEHRapzFem3nr7=EWJPYvZby9K7vem-R99ijYNoguEg@mail.gmail.com>
- <CAK7LNASGYZfQFkM3yMRQaHLUwW5Lhp8CxHGX0bJ9sVja0f=n+A@mail.gmail.com>
-Message-ID: <CAKwvOdmcthyd1KbxRr54QztBcmeZ7JA=M_7N1xfmVurVOG=77w@mail.gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 28 Nov 2017 12:27:28 -0600
+Subject: [PATCH v3 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
+ dmtimer pdata ops
+In-Reply-To: <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
+References: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
+ <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
+Message-ID: <2c5e3e04-9940-43c3-62b1-8cef7d22c5e1@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
 
-Thanks for merging Chris' patch, and sorry for taking so long to respond.
 
-On Wed, Nov 22, 2017 at 8:24 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> Linus suggests to move compiler flag testing to Kconfig.
+On 11/15/2017 10:23 PM, Keerthy wrote:
+> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+> 
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> ---
+> 
+> Changes in v3:
+> 
+>    * Used of_find_platdata_by_node function to fetch platform
+>      data for timer node.
+> 
+>   drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+>   1 file changed, 22 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+> index 5ad42f3..2caf46b 100644
+> --- a/drivers/pwm/pwm-omap-dmtimer.c
+> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+> @@ -23,6 +23,7 @@
+>   #include <linux/mutex.h>
+>   #include <linux/of.h>
+>   #include <linux/of_platform.h>
+> +#include <linux/platform_data/dmtimer-omap.h>
+>   #include <linux/platform_data/pwm_omap_dmtimer.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/pm_runtime.h>
+> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+>   	struct pwm_chip chip;
+>   	struct mutex mutex;
+>   	pwm_omap_dmtimer *dm_timer;
+> -	struct pwm_omap_dmtimer_pdata *pdata;
+> +	struct omap_dm_timer_ops *pdata;
+>   	struct platform_device *dm_timer_pdev;
+>   };
+>   
+> @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>   {
+>   	struct device_node *np = pdev->dev.of_node;
+>   	struct device_node *timer;
+> +	struct platform_device *timer_pdev;
+>   	struct pwm_omap_dmtimer_chip *omap;
+> -	struct pwm_omap_dmtimer_pdata *pdata;
+> +	struct dmtimer_platform_data *timer_pdata;
+> +	struct omap_dm_timer_ops *pdata;
+>   	pwm_omap_dmtimer *dm_timer;
+>   	u32 v;
+>   	int status;
+>   
+> -	pdata = dev_get_platdata(&pdev->dev);
+> -	if (!pdata) {
+> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
+> +	timer = of_parse_phandle(np, "ti,timers", 0);
+> +	if (!timer)
+> +		return -ENODEV;
+> +
+> +	timer_pdev = of_find_device_by_node(timer);
+> +	if (!timer_pdev) {
+> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
+> +		return -ENODEV;
+> +	}
+> +
+> +	timer_pdata = of_find_platdata_by_node(timer);
+> +	if (!timer_pdata) {
+> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+>   		return -EINVAL;
+>   	}
 
-Do you have an LKML link for context?
+Huh. I think It might be better if you add smth. like
 
-On Wed, Nov 15, 2017 at 6:32 PM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> BTW, I notice another issue.
->
-> If we move clang settings before including arch Makefile,
-> "ifneq ($(CROSS_COMPILE),)" comes early.
->
-> Some arch Makefiles (arch/mips/Makefile, arch/blackfin/Makefile, etc.)
-> set CROSS_COMPILE there if CROSS_COMPILE is not given.
->
-> Then, we have a conflict between two requirements among arch.
->
-> [1] arm64, powerpc use ld-option in their Makefile.
->     So, clang flags must be set before inc. arch Makefile.
-> [2] mips, blackfin, etc. may set CROSS_COMPILE in their Makefile.
->     So, we want to reference CROSS_COMPILE only after inc. arch Makefile
->
-> I have no idea how to solve it.
->
-> At this moment, I guess clang is intended to support
-> only limited architectures.
->
-> It might be OK to be compromised here.
+struct omap_dm_timer *dm_timer = of_omap_dm_timer_get(parent_np, "ti,timers", idx);
 
-I definitely find it curious that certain arch's define CROSS_COMPILE
-themselves.  The benefit is one less argument to supply at compile
-time, but it assumes that the toolchain always has a certain prefix.
-This makes sense to me when cross compiling, but seems odd when
-compiling natively on that arch as the host and target.  Maybe those
-arch's use that convention, or simply are always cross compiled for?
+struct omap_dm_timer_ops *pdata = omap_dm_timer_get_ops(dm_timer);
 
-Taking a survey of all arch's currently in the kernel via `cd arch; ag
-CROSS_COMPILE` and quickly eyeballing the result:
+so all DT and platdata implementation details will be hidden.
 
-m68k if not set
-arc if not set
-openrisc for some configs (openrisc/configs/or1ksim_defconfig,
-openrisc/configs/simple_smp_defconfig)
-blackfin if not set
-hexagon for some configs (hexagon/configs/comet_defconfig)
-parisc if not set
-sh if not set
-xtensa if not set
-score always
-arm for some configs (arm/configs/lpc18xx_defconfig)
-h8300 if not set
-mips if not set (and explicitly emptied for some configs,
-mips/configs/nlm_xlr_defconfig )
-unicore32 if not set
-tile if not set
 
-The * if not set (or not being on the list) seems correct, as the top
-level Makefile will handle this correctly.  Setting it for some
-configs seems curious (not necessarily wrong?), emptying it/always
-setting it via config sounds wrong to me, but maybe those hosts don't
-have toolchains and must always be cross compiled for?
+>   
+> -	if (!pdata->request_by_node ||
+> +	pdata = timer_pdata->timer_ops;
+> +
+> +	if (!pdata || !pdata->request_by_node ||
+>   	    !pdata->free ||
+>   	    !pdata->enable ||
+>   	    !pdata->disable ||
+> @@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>   		return -EINVAL;
+>   	}
+>   
+> -	timer = of_parse_phandle(np, "ti,timers", 0);
+> -	if (!timer)
+> -		return -ENODEV;
+> -
+>   	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
+>   		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
+>   		return -ENODEV;
+> @@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>   
+>   	omap->pdata = pdata;
+>   	omap->dm_timer = dm_timer;
+> -
+> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
+> -	if (!omap->dm_timer_pdev) {
+> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
+> -		omap->pdata->free(dm_timer);
+> -		return -EINVAL;
+> -	}
+> +	omap->dm_timer_pdev = timer_pdev;
+>   
+>   	/*
+>   	 * Ensure that the timer is stopped before we allow PWM core to call
+> 
 
-For reference, this file in LLVM source defines the supported backend
-targets: https://llvm.org/doxygen/Triple_8h_source.html
-
-Either way, it sounds like we're all set here, I guess I'm just
-curious about the LKML link/context and why some configs set
-CROSS_COMPILE themselves?
+-- 
+regards,
+-grygorii
