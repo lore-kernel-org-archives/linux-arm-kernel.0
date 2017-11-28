@@ -1,78 +1,107 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Tue, 28 Nov 2017 16:48:26 +0100
-Subject: [PATCH v2 2/4] DTS: GTA04: fix panel compatibility string
-In-Reply-To: <20171128151039.GZ28152@atomide.com>
-References: <cover.1510822218.git.hns@goldelico.com>
- <09d975dd62afa1dfa43d94079cc9a44731af4b3b.1510822218.git.hns@goldelico.com>
- <20171128145727.GY28152@atomide.com>
- <C108B0B6-FED7-44DB-9A18-39E3BE93E586@goldelico.com>
- <20171128151039.GZ28152@atomide.com>
-Message-ID: <F14B3797-8154-4958-82AB-8E39C75BB97B@goldelico.com>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Tue, 28 Nov 2017 16:48:55 +0100
+Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
+In-Reply-To: <20171128090223.mqp3v2t6koyu6hk4@flea.home>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <2744508.m82qQEPny3@jernej-laptop>
+ <20171128090223.mqp3v2t6koyu6hk4@flea.home>
+Message-ID: <2908242.WKit1ZIWoJ@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Hi,
 
-> Am 28.11.2017 um 16:10 schrieb Tony Lindgren <tony@atomide.com>:
+Dne torek, 28. november 2017 ob 10:02:23 CET je Maxime Ripard napisal(a):
+> Hi,
 > 
-> * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:04]:
->> Hi Tony,
->> 
->>> Am 28.11.2017 um 15:57 schrieb Tony Lindgren <tony@atomide.com>:
->>> 
->>> * H. Nikolaus Schaller <hns@goldelico.com> [171116 08:53]:
->>>> Vendor string is "tpo" and not "toppoly".
->>>> 
->>>> Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
->>>> ---
->>>> arch/arm/boot/dts/omap3-gta04.dtsi | 2 +-
->>>> 1 file changed, 1 insertion(+), 1 deletion(-)
->>>> 
->>>> diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
->>>> index 4504908c23fe..ec27ed67a22a 100644
->>>> --- a/arch/arm/boot/dts/omap3-gta04.dtsi
->>>> +++ b/arch/arm/boot/dts/omap3-gta04.dtsi
->>>> @@ -86,7 +86,7 @@
->>>> 
->>>> 		/* lcd panel */
->>>> 		lcd: td028ttec1 at 0 {
->>>> -			compatible = "toppoly,td028ttec1";
->>>> +			compatible = "tpo,td028ttec1";
->>>> 			reg = <0>;
->>>> 			spi-max-frequency = <100000>;
->>>> 			spi-cpol;
->>> 
->>> Applying into omap-for-v4.15/fixes thanks. The other dts patch seems
->>> like it can wait for v4.16 merge window.
->> 
->> Hm. Not really. It needs the panel driver to match. So either both or
->> none should be applied or it will break the panel from working.
->> 
->> I am just 1-2 hours away from submitting a -v3 (rebased and tested
->> on top of 4.15-rc1).
+> On Mon, Nov 27, 2017 at 05:01:49PM +0100, Jernej ?krabec wrote:
+> > Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard 
+napisal(a):
+> > > Add support for the A83T display pipeline.
+> > > 
+> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > > 
+> > >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+> > >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
+> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
+> > >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
+> > >  4 files changed, 14 insertions(+)
+> > > 
+> > > diff --git
+> > > a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt index
+> > > d4259a4f5171..d6b52e5c48c0 100644
+> > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > 
+> > > @@ -93,6 +93,7 @@ Required properties:
+> > >     * allwinner,sun6i-a31s-tcon
+> > >     * allwinner,sun7i-a20-tcon
+> > >     * allwinner,sun8i-a33-tcon
+> > > 
+> > > +   * allwinner,sun8i-a83t-tcon-lcd
+> > > 
+> > >     * allwinner,sun8i-v3s-tcon
+> > >   
+> > >   - reg: base address and size of memory-mapped region
+> > >   - interrupts: interrupt associated to this IP
+> > > 
+> > > @@ -224,6 +225,7 @@ supported.
+> > > 
+> > >  Required properties:
+> > >    - compatible: value must be one of:
+> > > +    * allwinner,sun8i-a83t-de2-mixer
+> > 
+> > What will be the name of the second mixer, once support for HDMI is added?
+> > Should we start directly with 0 and 1 postfix ?
 > 
-> OK fine dropping both. Please update the description in both dts
-> patches to make it clear they are needed as a fix. Preferrably
-> with a proper fixes tag.
+> What are the differences exactly without the two mixers?
 
-Well, it is not "needed" in a strong sense since current mainline&stable
-works. It is more a style and consistency fix to use "tpo," everywhere.
+Mixer properties:
+- mixer index (0 or 1), important for determining CCSC base (see my patches)
+- number of VI planes (usually 1)
+- number of UI planes (usually 1 or 3)
+- writeback support (yes/no)
+- scale line buffer length (2048 or 4096)
+- smart backligth support (yes/no)
+
+channel properties (for both, VI and UI):
+- scaler support (yes/no, usually yes)
+- overlay count (seems to be always 4)
+- VEP support (yes/no)
+
+Those are properties found in BSP de_feat.c, so I guess that's enough to make 
+any kind of decision in the code.
+
+Usually, but we can't count on that, first mixer has 1 VI and 3 UI planes and 
+second mixer has 1 VI and 1 UI plane.
+
+Best regards,
+Jernej
 
 > 
-> Having "We can remove the "omapdss," prefix" in the description sure
-> does not sounds like it's needed as a fix :)
-
-The description has been improved on -v3.
-
+> I was hoping to be able to cover them all using properties, indices
+> are usually pretty badly received in compatibles.
 > 
-> Sounds like maybe these two should be just a single patch for
-> a proper fix?
-
-Hm. I usually get the feedback to separate DT and driver fixes into
-separate commits... Therefore I submit patch sets in the hope they
-are not picked apart :)
-
-As promised -v3 is following now.
-
-BR,
-Nikolaus
+> > >  static const struct of_device_id sun8i_mixer_of_table[] = {
+> > >  
+> > >  	{
+> > > 
+> > > +		.compatible = "allwinner,sun8i-a83t-de2-mixer",
+> > > +		.data = &sun8i_v3s_mixer_cfg,
+> > > +	},
+> > > +	{
+> > 
+> > Maybe you want to squash 12 patch since this works only by luck.
+> 
+> Yeah, I totally meant to do that :)
+> 
+> Thanks!
+> Maxime
+> 
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
