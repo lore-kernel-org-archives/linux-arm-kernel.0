@@ -1,36 +1,42 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 28 Nov 2017 08:12:39 +0530
-Subject: [PATCH 4/6] SPEAr: clk: pr_err() strings should end with newlines
-In-Reply-To: <35a712ed8ee10491c0a605d0cc825250286370a4.1511505932.git.arvind.yadav.cs@gmail.com>
-References: <cover.1511505932.git.arvind.yadav.cs@gmail.com>
- <35a712ed8ee10491c0a605d0cc825250286370a4.1511505932.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171128024239.GD11413@vireshk-i7>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Tue, 28 Nov 2017 10:55:52 +0800
+Subject: [RESEND PATCH] ARM: Fix csum_partial_copy_from_user() stack mismatch
+Message-ID: <20171128025552.24927-1-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 24-11-17, 12:25, Arvind Yadav wrote:
-> pr_err() messages should end with a new-line to avoid other messages
-> being concatenated.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
->  drivers/clk/spear/clk-gpt-synth.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/clk/spear/clk-gpt-synth.c b/drivers/clk/spear/clk-gpt-synth.c
-> index 1a722e9..1cf219a6 100644
-> --- a/drivers/clk/spear/clk-gpt-synth.c
-> +++ b/drivers/clk/spear/clk-gpt-synth.c
-> @@ -120,7 +120,7 @@ struct clk *clk_register_gpt(const char *name, const char *parent_name, unsigned
->  	struct clk *clk;
->  
->  	if (!name || !parent_name || !reg || !rtbl || !rtbl_cnt) {
-> -		pr_err("Invalid arguments passed");
-> +		pr_err("Invalid arguments passed\n");
->  		return ERR_PTR(-EINVAL);
->  	}
+From: Lvqiang Huang <Lvqiang.Huang@spreadtrum.com>
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+An additional 'ip' will be pushed to the stack, for restoring the
+DACR later, if CONFIG_CPU_SW_DOMAIN_PAN defined.
 
+However, the fixup still get the err_ptr by add #8*4 to sp, which
+results in the fact that the code area pointed by the LR will be
+overwritten, or the kernel will crash if CONFIG_DEBUG_RODATA is enabled.
+
+This patch fixes the stack mismatch.
+
+Signed-off-by: Lvqiang Huang <Lvqiang.Huang@spreadtrum.com>
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ arch/arm/lib/csumpartialcopyuser.S | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/lib/csumpartialcopyuser.S b/arch/arm/lib/csumpartialcopyuser.S
+index 1712f13..b83fdc0 100644
+--- a/arch/arm/lib/csumpartialcopyuser.S
++++ b/arch/arm/lib/csumpartialcopyuser.S
+@@ -85,7 +85,11 @@
+ 		.pushsection .text.fixup,"ax"
+ 		.align	4
+ 9001:		mov	r4, #-EFAULT
++#ifdef CONFIG_CPU_SW_DOMAIN_PAN
++		ldr	r5, [sp, #9*4]		@ *err_ptr
++#else
+ 		ldr	r5, [sp, #8*4]		@ *err_ptr
++#endif
+ 		str	r4, [r5]
+ 		ldmia	sp, {r1, r2}		@ retrieve dst, len
+ 		add	r2, r2, r1
 -- 
-viresh
+2.7.4
