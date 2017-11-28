@@ -1,33 +1,39 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Tue, 28 Nov 2017 07:58:23 +0100
-Subject: [PATCH] clk: fix compile testing of scpi clk driver
-Message-ID: <24058ecb-9f12-f7e1-503d-bd98eb894c6c@gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Tue, 28 Nov 2017 07:16:29 +0000
+Subject: [PATCH] irqchip/gic-v3: Support MSIs via aliases and distributor
+In-Reply-To: <20171127102408.6631-1-sboyd@codeaurora.org>
+References: <20171127102408.6631-1-sboyd@codeaurora.org>
+Message-ID: <c77120d6-a3b9-02e6-f578-52e1d13b92d0@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We now have a hard dependency on ARM_SCPI_PROTOCOL and may end up with
-the following error:
-ERROR: "get_scpi_ops" [drivers/clk/clk-scpi.ko] undefined!
-Fix this by removing COMPILE_TEST from COMMON_CLK_SCPI dependencies.
 
-Fixes: f7fee8be06a6 "firmware: arm_scpi: remove default for get_scpi_ops if not reachable"
-Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
----
- drivers/clk/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Hi Stephen,
 
-diff --git a/drivers/clk/Kconfig b/drivers/clk/Kconfig
-index 1c4e1aa67..fe6fd705f 100644
---- a/drivers/clk/Kconfig
-+++ b/drivers/clk/Kconfig
-@@ -64,7 +64,7 @@ config COMMON_CLK_HI655X
- 
- config COMMON_CLK_SCPI
- 	tristate "Clock driver controlled via SCPI interface"
--	depends on ARM_SCPI_PROTOCOL || COMPILE_TEST
-+	depends on ARM_SCPI_PROTOCOL
- 	  ---help---
- 	  This driver provides support for clocks that are controlled
- 	  by firmware that implements the SCPI interface.
--- 
-2.15.0
+Thanks for the patch.
+On 27/11/17 10:24, Stephen Boyd wrote:
+> Some GIC configurations don't have an accessible ITS, but they
+> want to support MSIs through the distributor's SETSPI registers
+> or through the IMPLEMENTATION DEFINED message-based interrupt
+> request register region. This mode of operation is similar to the
+> v2m support on gic-400, but we don't necessarily know what
+> particular SPIs are supported as MSIs so we need some help from
+> firmware to know what to do.
+> 
+> Introduce an "arm,spi-ranges" property for this, similar to the
+> "marvell,spi-ranges" property, that indicates the base and size
+> of each MSI range. This property applies equally to the
+> distributor and alias registers. In either case, we detect this
+> mode of operation by looking for a node with the "msi-controller"
+> property and then probe the v2m frame code on top of it. Assume
+> these nodes will have the "arm,spi-ranges" property in them so
+> that the v2m code works mostly unmodified.
+> 
+> Cc: <devicetree@vger.kernel.org>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Tested it on DB820c board.
+
+Tested-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
