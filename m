@@ -1,65 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 28 Nov 2017 08:13:42 +0000
-Subject: [PATCH V3 24/29] backlight: deprecate pci_get_bus_and_slot()
-In-Reply-To: <000001d367b8$726bd7f0$574387d0$@gmail.com>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
- <1511801886-6753-25-git-send-email-okaya@codeaurora.org>
- <000001d367b8$726bd7f0$574387d0$@gmail.com>
-Message-ID: <20171128081342.qvylfa6p5rvqoyxk@dell>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 28 Nov 2017 09:29:45 +0100
+Subject: [PATCH v2 0/5] arm64: dts: renesas: r8a77970: IPMMU upstream
+ integration
+In-Reply-To: <20171110132553.1461-1-horms+renesas@verge.net.au>
+References: <20171110132553.1461-1-horms+renesas@verge.net.au>
+Message-ID: <20171128082945.3aqjlyfktyokdhyk@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Nov 2017, Jingoo Han wrote:
-> On Monday, November 27, 2017 11:58 AM, Sinan Kaya wrote:
-> > 
-> > pci_get_bus_and_slot() is restrictive such that it assumes domain=0 as
-> > where a PCI device is present. This restricts the device drivers to be
-> > reused for other domain numbers.
+On Fri, Nov 10, 2017 at 02:25:48PM +0100, Simon Horman wrote:
+> This series adds DT nodes for IPMMU instances on r8a77970 together with
+> connections to r8a77970 on-chip devices: SYS-DMAC and Ethernet-AVB.
 > 
-> I think that this will be useful. I introduced multi domains into
-> ARM-based PCIe driver. (e.g. domain 0, and domain 1) So, APIs to choose
-> domain will be used later.
+> With these patches applied a white list enabled IPMMU driver may be used
+> to check silicon revision and then enable IPMMU in the known working cases.
 > 
-> > 
-> > Getting ready to remove pci_get_bus_and_slot() function in favor of
-> > pci_get_domain_bus_and_slot().
-> > 
-> > Hard-coding the domain as 0.
-> > 
-> > Acked-by: Daniel Thompson <daniel.thompson@linaro.org>
-> > Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> The recommended test stack for this patchset is a merge of
+> * The iommu/next branch of the vfio tree
+> * renesas-devel-20171110-v4.14-rc8 tag of the renesas tree
 > 
-> Acked-by: Jingoo Han <jingoohan1@gmail.com>
-
-I can't apply this.
-
-It looks like I was missing from the list of addressees.
-
-Please resend v3 with all the Acks you've acquired.
-
-> > ---
-> >  drivers/video/backlight/apple_bl.c | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > 
-> > diff --git a/drivers/video/backlight/apple_bl.c
-> > b/drivers/video/backlight/apple_bl.c
-> > index d843296..6a34ab9 100644
-> > --- a/drivers/video/backlight/apple_bl.c
-> > +++ b/drivers/video/backlight/apple_bl.c
-> > @@ -143,7 +143,7 @@ static int apple_bl_add(struct acpi_device *dev)
-> >  	struct pci_dev *host;
-> >  	int intensity;
-> > 
-> > -	host = pci_get_bus_and_slot(0, 0);
-> > +	host = pci_get_domain_bus_and_slot(0, 0, 0);
-> > 
-> >  	if (!host) {
-> >  		pr_err("unable to find PCI host\n");
+> With the following applied:
+> * [PATCH v4 0/3] iommu/ipmmu-vmsa: r8a7796 support V4
+> * [PATCH 0/2] iommu/ipmmu-vmsa: r8a779(70|95) support
 > 
+> The final patch in the series enable IPMMU support for all IPMMU
+> instances on r8a77970 that are used by IPMMU devices listed above.
 > 
+> The DT binding for r8a77970 are been submitted (as part of the
+> r8a779(70|95) series noted above) in conjunction with this patchset.
+> 
+> This is based on work by Magnus Damm.
+> 
+> Based on renesas-devel-20171110-v4.14-rc8
+> 
+> Changes since V1:
+> * Drop mostly redundant comments from nodes
+> * Add power domains
+> * Correct compat string used for IPMMU-DS1
+> 
+> Simon Horman (5):
+>   arm64: dts: renesas: r8a77970: sort includes
+>   arm64: dts: renesas: r8a77970: Add IPMMU device nodes
+>   arm64: dts: renesas: r8a77970: Tie SYS-DMAC to IPMMU-DS1
+>   arm64: dts: renesas: r8a77970: Connect Ethernet-AVB to IPMMU-RT
+>   arm64: dts: renesas: r8a77970: Enable IPMMU-DS1, RT and MM
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+This series has been applied for v4.16.
