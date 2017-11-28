@@ -1,74 +1,84 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 28 Nov 2017 20:27:43 +0100
-Subject: [PATCH v3] kbuild: Set KBUILD_CFLAGS before incl. arch Makefile
-In-Reply-To: <CAKwvOdmcthyd1KbxRr54QztBcmeZ7JA=M_7N1xfmVurVOG=77w@mail.gmail.com>
-References: <CAK7LNAS1NaqPRhK6FOXN=YTMhLagpSrR2=tXn-uWZbpzr=NeoQ@mail.gmail.com>
- <20171115204231.34914-1-ndesaulniers@google.com>
- <CAK7LNAQNEHRapzFem3nr7=EWJPYvZby9K7vem-R99ijYNoguEg@mail.gmail.com>
- <CAK7LNASGYZfQFkM3yMRQaHLUwW5Lhp8CxHGX0bJ9sVja0f=n+A@mail.gmail.com>
- <CAKwvOdmcthyd1KbxRr54QztBcmeZ7JA=M_7N1xfmVurVOG=77w@mail.gmail.com>
-Message-ID: <CAMuHMdVcs6zYtP=TN6BwH-CPDnJ3PhZ789c0Zd-89BgO+VNHZA@mail.gmail.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Tue, 28 Nov 2017 20:35:00 +0100
+Subject: [PATCH v1] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <1511889106-9239-1-git-send-email-awallis@codeaurora.org>
+References: <1511889106-9239-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <20171128193500.GA30609@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nick,
+On Tue, Nov 28, 2017 at 12:11:46PM -0500, Adam Wallis wrote:
+> The xHCI driver currently has the IMOD set to 160, which
+> translates to an IMOD interval of 40,000ns (160 * 250)ns
+> 
+> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
+> introduced a QUIRK for the MTK platform to adjust this interval to 20,
+> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
+> due to the fact that the MTK controller IMOD interval is 8 times
+> as much as defined in xHCI spec.
+> 
+> Instead of adding more quirk bits for additional platforms, this patch
+> introduces the ability for vendors to set the IMOD_INTERVAL as is
+> optimal for their platform. By using device_property_read_u32() on
+> "imod-interval", the IMOD INTERVAL can be specified in nano seconds. If
+> no interval is specified, the default of 40,000ns (IMOD=160) will be
+> used.
+> 
+> No bounds checking has been implemented due to the fact that a vendor
+> may have violated the spec and would need to specify a value outside of
+> the max 8,000 IRQs/second limit specified in the xHCI spec.
+> 
+> Backwards compatibility is maintained for MTK_HOSTS through the quirk
+> bit, however, imod_interval should be pushed into device tree at a
+> future point and this quirk should be removed from xhci_plat_probe
+> 
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
+>  Documentation/devicetree/bindings/usb/usb-xhci.txt |  1 +
+>  drivers/usb/host/xhci-plat.c                       | 15 +++++++++++++++
+>  drivers/usb/host/xhci.c                            |  7 ++-----
+>  drivers/usb/host/xhci.h                            |  2 ++
+>  4 files changed, 20 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> index ae6e484..3998459 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> @@ -29,6 +29,7 @@ Optional properties:
+>    - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+>    - usb3-lpm-capable: determines if platform is USB3 LPM capable
+>    - quirk-broken-port-ped: set if the controller has broken port disable mechanism
+> +  - imod-interval: IMOD_INTERVAL in nano-seconds. Default is 40000
+>  
+>  Example:
+>  	usb at f0931000 {
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 09f164f..f7730c8 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -23,6 +23,7 @@
+>  #include "xhci-plat.h"
+>  #include "xhci-mvebu.h"
+>  #include "xhci-rcar.h"
+> +#include "xhci-mtk.h"
+>  
+>  static struct hc_driver __read_mostly xhci_plat_hc_driver;
+>  
+> @@ -269,6 +270,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+>  
+> +	/* imod interval in nanoseconds */
+> +	if (device_property_read_u32(sysdev,
+> +		"imod-interval", &xhci->imod_interval))
+> +		xhci->imod_interval = 40000;
 
-On Tue, Nov 28, 2017 at 7:18 PM, Nick Desaulniers
-<ndesaulniers@google.com> wrote:
-> Thanks for merging Chris' patch, and sorry for taking so long to respond.
->
-> On Wed, Nov 22, 2017 at 8:24 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Linus suggests to move compiler flag testing to Kconfig.
->
-> Do you have an LKML link for context?
->
-> On Wed, Nov 15, 2017 at 6:32 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> BTW, I notice another issue.
->>
->> If we move clang settings before including arch Makefile,
->> "ifneq ($(CROSS_COMPILE),)" comes early.
->>
->> Some arch Makefiles (arch/mips/Makefile, arch/blackfin/Makefile, etc.)
->> set CROSS_COMPILE there if CROSS_COMPILE is not given.
->>
->> Then, we have a conflict between two requirements among arch.
->>
->> [1] arm64, powerpc use ld-option in their Makefile.
->>     So, clang flags must be set before inc. arch Makefile.
->> [2] mips, blackfin, etc. may set CROSS_COMPILE in their Makefile.
->>     So, we want to reference CROSS_COMPILE only after inc. arch Makefile
->>
->> I have no idea how to solve it.
->>
->> At this moment, I guess clang is intended to support
->> only limited architectures.
->>
->> It might be OK to be compromised here.
->
-> I definitely find it curious that certain arch's define CROSS_COMPILE
-> themselves.  The benefit is one less argument to supply at compile
-> time, but it assumes that the toolchain always has a certain prefix.
-> This makes sense to me when cross compiling, but seems odd when
-> compiling natively on that arch as the host and target.  Maybe those
-> arch's use that convention, or simply are always cross compiled for?
->
-> Taking a survey of all arch's currently in the kernel via `cd arch; ag
-> CROSS_COMPILE` and quickly eyeballing the result:
->
-> m68k if not set
+So no matter what value you read, you set it to 40000?  Or am I reading
+this code incorrectly?
 
-And inside "ifneq ($(SUBARCH),$(ARCH))", so the prefix is not used for
-native compilation.
+There's a good reason putting function calls inside if() is considered a
+bad coding style :)
 
-Gr{oetje,eeting}s,
+thanks,
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+greg k-h
