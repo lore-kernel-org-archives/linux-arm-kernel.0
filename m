@@ -1,54 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 28 Nov 2017 09:58:26 +0100
-Subject: [PATCH v2 05/18] drm/sun4i: Force the mixer rate at 150MHz
-In-Reply-To: <9630064.mDmGGWOQGt@jernej-laptop>
+Date: Tue, 28 Nov 2017 09:59:21 +0100
+Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
+In-Reply-To: <CAGb2v67iWKJXE8oVEgTQcamaG-UKkunCLJbZWZyM3SPSHkU7BA@mail.gmail.com>
 References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <55becb3a86a0a28ccca3f7c831ac6f6cf4854390.1511797218.git-series.maxime.ripard@free-electrons.com>
- <9630064.mDmGGWOQGt@jernej-laptop>
-Message-ID: <20171128085826.snmflonvbic5put3@flea.home>
+ <1c4f6b275597dec7d97b5c1d9f749ba27c0610f3.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <CAGb2v67iWKJXE8oVEgTQcamaG-UKkunCLJbZWZyM3SPSHkU7BA@mail.gmail.com>
+Message-ID: <20171128085921.gyvbpmvhwzvchjkf@flea.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:07:04PM +0100, Jernej ?krabec wrote:
-> Hi Maxime,
-> 
-> Dne ponedeljek, 27. november 2017 ob 16:41:29 CET je Maxime Ripard napisal(a):
-> > It seems like the mixer can only run properly when clocked at 150MHz. In
-> > order to have something more robust than simply a fire-and-forget
-> > assigned-clocks-rate, let's put that in the code.
-> > 
+Hi,
+
+On Tue, Nov 28, 2017 at 12:19:44AM +0800, Chen-Yu Tsai wrote:
+> On Mon, Nov 27, 2017 at 11:41 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Add support for the A83T display pipeline.
+> >
+> > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > > ---
-> >  drivers/gpu/drm/sun4i/sun8i_mixer.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
-> > 
-> > diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > b/drivers/gpu/drm/sun4i/sun8i_mixer.c index cb193c5f1686..c0cdccf772a2
-> > 100644
-> > --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > @@ -315,6 +315,13 @@ static int sun8i_mixer_bind(struct device *dev, struct
-> > device *master, }
-> >  	clk_prepare_enable(mixer->mod_clk);
-> > 
-> > +	/*
-> > +	 * It seems that we need to enforce that rate for whatever
-> > +	 * reason for the mixer to be functional. Make sure it's the
-> > +	 * case.
-> > +	 */
-> > +	clk_set_rate(mixer->mod_clk, 150000000);
-> > +
+> >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
 > 
-> H3 mixer works at much higher rate and if we want to support tv out, it must 
-> be dividable by 432 MHz, so either 432 MHz or maybe even 864 MHz.
-> 
-> We talked about that few months ago.
-> 
-> I guess this should be read from mixer configuration structure.
+> Rob mentioned that he'd like to see these multiple one-liners be
+> in a separate patch.
 
-That works for me. Actually, I didn't need it at all for the LVDS
-output on the A83t, the default seems to work just fine. Do you know
-what it's related to? Maybe we can make that a bit more dynamic?
+I'll change that.
+
+> 
+> >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2 ++
+> >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5 +++++
+> >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4 ++++
+> >  4 files changed, 14 insertions(+)
+> 
+> Also not sure why you have two patches with the same subject.
+
+Yeah, it's a rebase gone wrong... The second one was meant to be
+folded into this one.
 
 Maxime
 
@@ -62,4 +49,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/c95f43bf/attachment-0001.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171128/077b4c7b/attachment.sig>
