@@ -1,135 +1,48 @@
-From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
-Date: Wed, 29 Nov 2017 07:08:09 -0500
-Subject: [PATCH 6/7] media: exynos4-is: fix kernel-doc warnings
-In-Reply-To: <c73fcbc4af259923feac19eda4bb5e996b6de0fd.1511952403.git.mchehab@s-opensource.com>
-References: <c73fcbc4af259923feac19eda4bb5e996b6de0fd.1511952403.git.mchehab@s-opensource.com>
-Message-ID: <103fee5da9bdde4ed9b1dfa56c078022008de2dd.1511952403.git.mchehab@s-opensource.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Nov 2017 12:15:14 +0000
+Subject: [PATCH 3/3] arm64: use -mno-implicit-float instead of
+ -mgeneral-regs-only
+In-Reply-To: <20171129000011.55235-4-samitolvanen@google.com>
+References: <20171129000011.55235-1-samitolvanen@google.com>
+ <20171129000011.55235-4-samitolvanen@google.com>
+Message-ID: <CAKv+Gu99XM5jLcOTkqPJPj5oZnUCNv2c7C=5X2hFCM4-4_gwNg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Fix those kernel-doc warnings:
+On 29 November 2017 at 00:00, Sami Tolvanen <samitolvanen@google.com> wrote:
+> From: Greg Hackmann <ghackmann@google.com>
+>
+> LLVM bug 30792 causes clang's AArch64 backend to crash compiling
+> arch/arm64/crypto/aes-ce-cipher.c.  Replacing -mgeneral-regs-only with
+> -mno-implicit-float is the suggested workaround.
+>
 
-    drivers/media/platform/exynos4-is/mipi-csis.c:229: warning: No description found for parameter 'clk_frequency'
-    drivers/media/platform/exynos4-is/mipi-csis.c:229: warning: Excess struct member 'clock_frequency' description in 'csis_state'
-    drivers/media/platform/exynos4-is/media-dev.c:69: warning: No description found for parameter 'p'
-    drivers/media/platform/exynos4-is/media-dev.c:160: warning: No description found for parameter 'p'
-    drivers/media/platform/exynos4-is/media-dev.c:160: warning: No description found for parameter 'on'
-    drivers/media/platform/exynos4-is/media-dev.c:160: warning: Excess function parameter 'fimc' description in 'fimc_pipeline_s_power'
-    drivers/media/platform/exynos4-is/media-dev.c:160: warning: Excess function parameter 'state' description in 'fimc_pipeline_s_power'
-    drivers/media/platform/exynos4-is/media-dev.c:229: warning: No description found for parameter 'ep'
-    drivers/media/platform/exynos4-is/media-dev.c:260: warning: No description found for parameter 'ep'
-    drivers/media/platform/exynos4-is/media-dev.c:260: warning: Excess function parameter 'fimc' description in '__fimc_pipeline_close'
-    drivers/media/platform/exynos4-is/media-dev.c:288: warning: No description found for parameter 'ep'
-    drivers/media/platform/exynos4-is/media-dev.c:288: warning: Excess function parameter 'pipeline' description in '__fimc_pipeline_s_stream'
-    drivers/media/platform/exynos4-is/media-dev.c:916: warning: No description found for parameter 'fmd'
-    drivers/media/platform/exynos4-is/fimc-capture.c:155: warning: No description found for parameter 'ctx'
-    drivers/media/platform/exynos4-is/fimc-capture.c:868: warning: No description found for parameter 'num_planes'
-    drivers/media/platform/exynos4-is/fimc-capture.c:1108: warning: No description found for parameter 'fimc'
+Do we still need these patches now that the AES code has been fixed?
 
-Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
----
- drivers/media/platform/exynos4-is/fimc-capture.c |  3 +++
- drivers/media/platform/exynos4-is/media-dev.c    | 11 +++++++----
- drivers/media/platform/exynos4-is/mipi-csis.c    |  2 +-
- 3 files changed, 11 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/media/platform/exynos4-is/fimc-capture.c b/drivers/media/platform/exynos4-is/fimc-capture.c
-index 948fe01f6c96..ed9302caa004 100644
---- a/drivers/media/platform/exynos4-is/fimc-capture.c
-+++ b/drivers/media/platform/exynos4-is/fimc-capture.c
-@@ -146,6 +146,7 @@ static int fimc_stop_capture(struct fimc_dev *fimc, bool suspend)
- 
- /**
-  * fimc_capture_config_update - apply the camera interface configuration
-+ * @ctx: FIMC capture context
-  *
-  * To be called from within the interrupt handler with fimc.slock
-  * spinlock held. It updates the camera pixel crop, rotation and
-@@ -858,6 +859,7 @@ static int fimc_pipeline_try_format(struct fimc_ctx *ctx,
-  * fimc_get_sensor_frame_desc - query the sensor for media bus frame parameters
-  * @sensor: pointer to the sensor subdev
-  * @plane_fmt: provides plane sizes corresponding to the frame layout entries
-+ * @num_planes: number of planes
-  * @try: true to set the frame parameters, false to query only
-  *
-  * This function is used by this driver only for compressed/blob data formats.
-@@ -1101,6 +1103,7 @@ static int fimc_cap_g_input(struct file *file, void *priv, unsigned int *i)
- /**
-  * fimc_pipeline_validate - check for formats inconsistencies
-  *                          between source and sink pad of each link
-+ * @fimc:	the FIMC device this context applies to
-  *
-  * Return 0 if all formats match or -EPIPE otherwise.
-  */
-diff --git a/drivers/media/platform/exynos4-is/media-dev.c b/drivers/media/platform/exynos4-is/media-dev.c
-index c15596b56dc9..0ef583cfc424 100644
---- a/drivers/media/platform/exynos4-is/media-dev.c
-+++ b/drivers/media/platform/exynos4-is/media-dev.c
-@@ -60,6 +60,7 @@ static void __setup_sensor_notification(struct fimc_md *fmd,
- 
- /**
-  * fimc_pipeline_prepare - update pipeline information with subdevice pointers
-+ * @p: fimc pipeline
-  * @me: media entity terminating the pipeline
-  *
-  * Caller holds the graph mutex.
-@@ -151,8 +152,8 @@ static int __subdev_set_power(struct v4l2_subdev *sd, int on)
- 
- /**
-  * fimc_pipeline_s_power - change power state of all pipeline subdevs
-- * @fimc: fimc device terminating the pipeline
-- * @state: true to power on, false to power off
-+ * @p: fimc device terminating the pipeline
-+ * @on: true to power on, false to power off
-  *
-  * Needs to be called with the graph mutex held.
-  */
-@@ -219,6 +220,7 @@ static int __fimc_pipeline_enable(struct exynos_media_pipeline *ep,
- /**
-  * __fimc_pipeline_open - update the pipeline information, enable power
-  *                        of all pipeline subdevs and the sensor clock
-+ * @ep: fimc device terminating the pipeline
-  * @me: media entity to start graph walk with
-  * @prepare: true to walk the current pipeline and acquire all subdevs
-  *
-@@ -252,7 +254,7 @@ static int __fimc_pipeline_open(struct exynos_media_pipeline *ep,
- 
- /**
-  * __fimc_pipeline_close - disable the sensor clock and pipeline power
-- * @fimc: fimc device terminating the pipeline
-+ * @ep: fimc device terminating the pipeline
-  *
-  * Disable power of all subdevs and turn the external sensor clock off.
-  */
-@@ -281,7 +283,7 @@ static int __fimc_pipeline_close(struct exynos_media_pipeline *ep)
- 
- /**
-  * __fimc_pipeline_s_stream - call s_stream() on pipeline subdevs
-- * @pipeline: video pipeline structure
-+ * @ep: video pipeline structure
-  * @on: passed as the s_stream() callback argument
-  */
- static int __fimc_pipeline_s_stream(struct exynos_media_pipeline *ep, bool on)
-@@ -902,6 +904,7 @@ static int __fimc_md_create_fimc_is_links(struct fimc_md *fmd)
- 
- /**
-  * fimc_md_create_links - create default links between registered entities
-+ * @fmd: fimc media device
-  *
-  * Parallel interface sensor entities are connected directly to FIMC capture
-  * entities. The sensors using MIPI CSIS bus are connected through immutable
-diff --git a/drivers/media/platform/exynos4-is/mipi-csis.c b/drivers/media/platform/exynos4-is/mipi-csis.c
-index 560aadabcb11..cba46a656338 100644
---- a/drivers/media/platform/exynos4-is/mipi-csis.c
-+++ b/drivers/media/platform/exynos4-is/mipi-csis.c
-@@ -189,7 +189,7 @@ struct csis_drvdata {
-  * @irq: requested s5p-mipi-csis irq number
-  * @interrupt_mask: interrupt mask of the all used interrupts
-  * @flags: the state variable for power and streaming control
-- * @clock_frequency: device bus clock frequency
-+ * @clk_frequency: device bus clock frequency
-  * @hs_settle: HS-RX settle time
-  * @num_lanes: number of MIPI-CSI data lanes used
-  * @max_num_lanes: maximum number of MIPI-CSI data lanes supported
--- 
-2.14.3
+> Signed-off-by: Greg Hackmann <ghackmann@google.com>
+> Cc: Matthias Kaehlcke <mka@chromium.org>
+> [added clang-ifversion to enable the workaround only for clang <6.0]
+> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+> ---
+>  arch/arm64/Makefile | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+> index b35788c909f1..d2efb5a0212f 100644
+> --- a/arch/arm64/Makefile
+> +++ b/arch/arm64/Makefile
+> @@ -49,7 +49,10 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
+>    endif
+>  endif
+>
+> -KBUILD_CFLAGS  += -mgeneral-regs-only $(lseinstr) $(brokengasinst)
+> +# This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792.
+> +KBUILD_CFLAGS  += $(call clang-ifversion, -lt, 0600, -mno-implicit-float, -mgeneral-regs-only)
+> +
+> +KBUILD_CFLAGS  += $(lseinstr) $(brokengasinst)
+>  KBUILD_CFLAGS  += -fno-asynchronous-unwind-tables
+>  KBUILD_CFLAGS  += $(call cc-option, -mpc-relative-literal-loads)
+>  KBUILD_AFLAGS  += $(lseinstr) $(brokengasinst)
+> --
+> 2.15.0.417.g466bffb3ac-goog
+>
