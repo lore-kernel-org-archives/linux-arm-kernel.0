@@ -1,19 +1,25 @@
-From: hch@infradead.org (Christoph Hellwig)
-Date: Wed, 29 Nov 2017 09:39:05 -0800
-Subject: [PATCH V2 6/7] PCI: add device wait after slot and bus reset
-In-Reply-To: <1511763628-11856-7-git-send-email-okaya@codeaurora.org>
-References: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
- <1511763628-11856-7-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171129173905.GG27742@infradead.org>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 29 Nov 2017 09:38:52 -0800
+Subject: [v2,01/12] hwrng: bcm2835 - Obtain base register via resource
+In-Reply-To: <20171129063028.GB21594@gondor.apana.org.au>
+References: <20171108004449.32730-2-f.fainelli@gmail.com>
+ <20171129063028.GB21594@gondor.apana.org.au>
+Message-ID: <ac49deb2-6f81-1daf-596d-16fd6bd6af32@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 01:20:27AM -0500, Sinan Kaya wrote:
-> Rev 3.1 Sec 2.3.1 Request Handling Rules indicates that a device can issue
-> CRS following secondary bus reset. Handle device presence gracefully.
+On 11/28/2017 10:30 PM, Herbert Xu wrote:
+> On Tue, Nov 07, 2017 at 04:44:38PM -0800, Florian Fainelli wrote:
+>> In preparation for consolidating bcm63xx-rng into bcm2835-rng, make sure
+>> that we obtain the base register via platform_get_resource() since we
+>> need to support the non-DT enabled MIPS-based BCM63xx DSL SoCs.
+>>
+>> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> All applied.  Thanks.
 
-Looks good,
-
-Reviewed-by: Christoph Hellwig <hch@lst.de>
+Hu, okay, I actually had a v3 prepared that I was going to post
+addressing some of the comments. Should I send an incremental set of
+changes now?
+-- 
+Florian
