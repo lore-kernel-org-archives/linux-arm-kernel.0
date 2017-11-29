@@ -1,59 +1,32 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 29 Nov 2017 16:06:16 +0100
-Subject: [PATCH] i2c: stm32: Fix copyrights
-In-Reply-To: <20171129142142.23183-1-benjamin.gaignard@st.com>
-References: <20171129142142.23183-1-benjamin.gaignard@st.com>
-Message-ID: <7c5808a6-c85d-e668-91f4-af36f504575a@st.com>
+Date: Wed, 29 Nov 2017 16:06:32 +0100
+Subject: [PATCH] irqchip: stm32: Fix copyright
+In-Reply-To: <20171129142252.23286-1-benjamin.gaignard@st.com>
+References: <20171129142252.23286-1-benjamin.gaignard@st.com>
+Message-ID: <c5c6d2e6-1078-b78b-e757-844091569ec3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 11/29/2017 03:21 PM, Benjamin Gaignard wrote:
-> Uniformize STMicroelectronics copyrights headers
+On 11/29/2017 03:22 PM, Benjamin Gaignard wrote:
+> Uniformize STMicroelectronics copyrights header
 > 
 > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
->   drivers/i2c/busses/i2c-stm32.h   | 1 +
->   drivers/i2c/busses/i2c-stm32f4.c | 1 +
->   drivers/i2c/busses/i2c-stm32f7.c | 1 +
->   3 files changed, 3 insertions(+)
+>   drivers/irqchip/irq-stm32-exti.c | 1 +
+>   1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/i2c/busses/i2c-stm32.h b/drivers/i2c/busses/i2c-stm32.h
-> index dab51761f8c5..490f6e6bebc2 100644
-> --- a/drivers/i2c/busses/i2c-stm32.h
-> +++ b/drivers/i2c/busses/i2c-stm32.h
-> @@ -2,6 +2,7 @@
->    * i2c-stm32.h
->    *
->    * Copyright (C) M'boumba Cedric Madianga 2017
+> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+> index 31ab0dee2ce7..c54217878af7 100644
+> --- a/drivers/irqchip/irq-stm32-exti.c
+> +++ b/drivers/irqchip/irq-stm32-exti.c
+> @@ -1,5 +1,6 @@
+>   /*
+>    * Copyright (C) Maxime Coquelin 2015
 > + * Copyright (C) STMicroelectronics SA 2017
->    * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->    *
+>    * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
 >    * License terms:  GNU General Public License (GPL), version 2
-> diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
-> index 4ec108496f15..f399ef344d30 100644
-> --- a/drivers/i2c/busses/i2c-stm32f4.c
-> +++ b/drivers/i2c/busses/i2c-stm32f4.c
-> @@ -6,6 +6,7 @@
->    * http://www.st.com/resource/en/reference_manual/DM00031020.pdf
->    *
->    * Copyright (C) M'boumba Cedric Madianga 2016
-> + * Copyright (C) STMicroelectronics SA 2017
->    * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->    *
->    * This driver is based on i2c-st.c
-> diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-> index d4a6e9c2e9aa..e85f4b7aedf6 100644
-> --- a/drivers/i2c/busses/i2c-stm32f7.c
-> +++ b/drivers/i2c/busses/i2c-stm32f7.c
-> @@ -7,6 +7,7 @@
->    * http://www.st.com/resource/en/reference_manual/dm00124865.pdf
->    *
->    * Copyright (C) M'boumba Cedric Madianga 2017
-> + * Copyright (C) STMicroelectronics SA 2017
->    * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->    *
->    * This driver is based on i2c-stm32f4.c
+>    */
 > 
 Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
