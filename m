@@ -1,46 +1,113 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Wed, 29 Nov 2017 14:48:28 +0200
-Subject: [RESEND PATCH v2 04/14] tee: shm: add page accessor functions
+Date: Wed, 29 Nov 2017 14:48:29 +0200
+Subject: [RESEND PATCH v2 05/14] tee: optee: Update protocol definitions
 In-Reply-To: <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
  <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1511959718-5421-5-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1511959718-5421-6-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-In order to register a shared buffer in TEE, we need accessor
-function that return list of pages for that buffer.
+There were changes in REE<->OP-TEE ABI recently.
+Now ABI allows us to pass non-contiguous memory buffers as list of
+pages to OP-TEE. This can be achieved by using new parameter attribute
+OPTEE_MSG_ATTR_NONCONTIG.
+
+OP-TEE also is able to use all non-secure RAM for shared buffers. This
+new capability is enabled with OPTEE_SMC_SEC_CAP_DYNAMIC_SHM flag.
+
+This patch adds necessary definitions to the protocol definition files at
+Linux side.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- include/linux/tee_drv.h | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ drivers/tee/optee/optee_msg.h | 38 ++++++++++++++++++++++++++++++++------
+ drivers/tee/optee/optee_smc.h |  7 +++++++
+ 2 files changed, 39 insertions(+), 6 deletions(-)
 
-diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-index 0d7f2a5..5489c38 100644
---- a/include/linux/tee_drv.h
-+++ b/include/linux/tee_drv.h
-@@ -394,6 +394,19 @@ static inline size_t tee_shm_get_size(struct tee_shm *shm)
- }
+diff --git a/drivers/tee/optee/optee_msg.h b/drivers/tee/optee/optee_msg.h
+index dd7a06e..3050490 100644
+--- a/drivers/tee/optee/optee_msg.h
++++ b/drivers/tee/optee/optee_msg.h
+@@ -67,11 +67,32 @@
+ #define OPTEE_MSG_ATTR_META			BIT(8)
  
- /**
-+ * tee_shm_get_pages() - Get list of pages that hold shared buffer
-+ * @shm:	Shared memory handle
-+ * @num_pages:	Number of pages will be stored there
-+ * @returns pointer to pages array
+ /*
+- * The temporary shared memory object is not physically contigous and this
+- * temp memref is followed by another fragment until the last temp memref
+- * that doesn't have this bit set.
++ * Pointer to a list of pages used to register user-defined SHM buffer.
++ * Used with OPTEE_MSG_ATTR_TYPE_TMEM_*.
++ * buf_ptr should point to the beginning of the buffer. Buffer will contain
++ * list of page addresses. OP-TEE core can reconstruct contiguous buffer from
++ * that page addresses list. Page addresses are stored as 64 bit values.
++ * Last entry on a page should point to the next page of buffer.
++ * Every entry in buffer should point to a 4k page beginning (12 least
++ * significant bits must be equal to zero).
++ *
++ * 12 least significant bints of optee_msg_param.u.tmem.buf_ptr should hold page
++ * offset of the user buffer.
++ *
++ * So, entries should be placed like members of this structure:
++ *
++ * struct page_data {
++ *   uint64_t pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) - 1];
++ *   uint64_t next_page_data;
++ * };
++ *
++ * Structure is designed to exactly fit into the page size
++ * OPTEE_MSG_NONCONTIG_PAGE_SIZE which is a standard 4KB page.
++ *
++ * The size of 4KB is chosen because this is the smallest page size for ARM
++ * architectures. If REE uses larger pages, it should divide them to 4KB ones.
+  */
+-#define OPTEE_MSG_ATTR_FRAGMENT			BIT(9)
++#define OPTEE_MSG_ATTR_NONCONTIG		BIT(9)
+ 
+ /*
+  * Memory attributes for caching passed with temp memrefs. The actual value
+@@ -94,6 +115,11 @@
+ #define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
+ #define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
+ 
++/*
++ * Page size used in non-contiguous buffer entries
 + */
-+static inline struct page **tee_shm_get_pages(struct tee_shm *shm,
-+					      size_t *num_pages)
-+{
-+	*num_pages = shm->num_pages;
-+	return shm->pages;
-+}
++#define OPTEE_MSG_NONCONTIG_PAGE_SIZE		4096
 +
-+/**
-  * tee_shm_get_page_offset() - Get shared buffer offset from page start
-  * @shm:	Shared memory handle
-  * @returns page offset of shared buffer
+ /**
+  * struct optee_msg_param_tmem - temporary memory reference parameter
+  * @buf_ptr:	Address of the buffer
+@@ -145,8 +171,8 @@ struct optee_msg_param_value {
+  *
+  * @attr & OPTEE_MSG_ATTR_TYPE_MASK indicates if tmem, rmem or value is used in
+  * the union. OPTEE_MSG_ATTR_TYPE_VALUE_* indicates value,
+- * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates tmem and
+- * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates rmem.
++ * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates @tmem and
++ * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates @rmem,
+  * OPTEE_MSG_ATTR_TYPE_NONE indicates that none of the members are used.
+  */
+ struct optee_msg_param {
+diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
+index 069c8e1..7cd3272 100644
+--- a/drivers/tee/optee/optee_smc.h
++++ b/drivers/tee/optee/optee_smc.h
+@@ -222,6 +222,13 @@ struct optee_smc_get_shm_config_result {
+ #define OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM	BIT(0)
+ /* Secure world can communicate via previously unregistered shared memory */
+ #define OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM	BIT(1)
++
++/*
++ * Secure world supports commands "register/unregister shared memory",
++ * secure world accepts command buffers located in any parts of non-secure RAM
++ */
++#define OPTEE_SMC_SEC_CAP_DYNAMIC_SHM		BIT(2)
++
+ #define OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES	9
+ #define OPTEE_SMC_EXCHANGE_CAPABILITIES \
+ 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES)
 -- 
 2.7.4
