@@ -1,44 +1,45 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Nov 2017 16:54:41 -0200
-Subject: [PATCH v2 08/11] ARM: dts: imx7s: Add unit address and reg for the
- anatop nodes
-In-Reply-To: <1511981684-13433-1-git-send-email-festevam@gmail.com>
-References: <1511981684-13433-1-git-send-email-festevam@gmail.com>
-Message-ID: <1511981684-13433-8-git-send-email-festevam@gmail.com>
+From: mchehab@s-opensource.com (Mauro Carvalho Chehab)
+Date: Wed, 29 Nov 2017 14:08:28 -0500
+Subject: [PATCH 10/22] media: vdec: fix some kernel-doc warnings
+In-Reply-To: <73497577f67fbb917e40ab4328104ff310a7c356.1511982439.git.mchehab@s-opensource.com>
+References: <73497577f67fbb917e40ab4328104ff310a7c356.1511982439.git.mchehab@s-opensource.com>
+Message-ID: <0ddb6632dd9afa919656e0bd8f0651af82e98a9d.1511982439.git.mchehab@s-opensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Fix those warnings:
+  drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c:69: warning: No description found for parameter 'reserved'
+  drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c:175: warning: Excess struct member 'dev' description in 'vdec_vp8_inst'
 
-Add unit address and reg for the anatop nodes in order to fix the
-following build warnings with W=1:
-
-arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30000000/anatop at 30360000/regulator-vdd1p0d missing or empty reg/ranges property
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+Signed-off-by: Mauro Carvalho Chehab <mchehab@s-opensource.com>
 ---
-Changes since v1:
-- None
+ drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c | 1 +
+ drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c  | 1 -
+ 2 files changed, 1 insertion(+), 1 deletion(-)
 
- arch/arm/boot/dts/imx7s.dtsi | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 81467ac..2ceb37d 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -522,8 +522,11 @@
- 				reg = <0x30360000 0x10000>;
- 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
- 					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
- 
--				reg_1p0d: regulator-vdd1p0d {
-+				reg_1p0d: regulator-vdd1p0d at 30360210 {
-+					reg = <0x30360210>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p0d";
- 					regulator-min-microvolt = <800000>;
+diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
+index b7731b18ecae..aa3ce41898bc 100644
+--- a/drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
++++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_h264_if.c
+@@ -59,6 +59,7 @@ struct h264_fb {
+  * @read_idx  : read index
+  * @write_idx : write index
+  * @count     : buffer count in list
++ * @reserved  : for 8 bytes alignment
+  */
+ struct h264_ring_fb_list {
+ 	struct h264_fb fb_list[H264_MAX_FB_NUM];
+diff --git a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c
+index b9fad6a48879..3e84a761db3a 100644
+--- a/drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c
++++ b/drivers/media/platform/mtk-vcodec/vdec/vdec_vp8_if.c
+@@ -155,7 +155,6 @@ struct vdec_vp8_vpu_inst {
+  * @reg_base		   : HW register base address
+  * @frm_cnt		   : decode frame count
+  * @ctx			   : V4L2 context
+- * @dev			   : platform device
+  * @vpu			   : VPU instance for decoder
+  * @vsi			   : VPU share information
+  */
 -- 
-2.7.4
+2.14.3
