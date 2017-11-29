@@ -1,74 +1,116 @@
 From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Wed, 29 Nov 2017 22:59:49 +0100
-Subject: [linux-sunxi] [PATCH 11/17] drm/sun4i: Wire in DE2 scaler support
-In-Reply-To: <CAGRGNgX_ZP9bpVuHzgmkyj18TKAMUpNgudiEzFRkJV-Z4MN4fQ@mail.gmail.com>
+Date: Wed, 29 Nov 2017 23:01:31 +0100
+Subject: [PATCH 08/17] drm/sun4i: Add support for DE2 VI planes
+In-Reply-To: <20171128210001.zhncdfkjzvwwxnnf@flea.home>
 References: <20171127205750.19277-1-jernej.skrabec@siol.net>
- <20171127205750.19277-12-jernej.skrabec@siol.net>
- <CAGRGNgX_ZP9bpVuHzgmkyj18TKAMUpNgudiEzFRkJV-Z4MN4fQ@mail.gmail.com>
-Message-ID: <4143236.xN3VOcVO54@jernej-laptop>
+ <20171127205750.19277-9-jernej.skrabec@siol.net>
+ <20171128210001.zhncdfkjzvwwxnnf@flea.home>
+Message-ID: <2148508.4McZUg54DD@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+Hi,
 
-Dne sreda, 29. november 2017 ob 22:48:34 CET je Julian Calaby napisal(a):
-> Hi Jernej,
+Dne torek, 28. november 2017 ob 22:00:01 CET je Maxime Ripard napisal(a):
+> Hi,
 > 
-> On Tue, Nov 28, 2017 at 7:57 AM, Jernej Skrabec <jernej.skrabec@siol.net> 
-wrote:
-> > Calculate scaling parameters and call appropriate scaler set up
-> > function.
+> On Mon, Nov 27, 2017 at 09:57:41PM +0100, Jernej Skrabec wrote:
+> > This commit adds basic support for VI planes. They are meant for video
+> > overlay and because of that they support YUV formats too. However, using
+> > YUV planes is not straightforward, so only RGB support for now.
 > > 
 > > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > > ---
 > > 
-> >  drivers/gpu/drm/sun4i/sun8i_layer.c |  12 +++-
-> >  drivers/gpu/drm/sun4i/sun8i_mixer.c | 115
-> >  +++++++++++++++++++++++++----------- drivers/gpu/drm/sun4i/sun8i_mixer.h
-> >  |   4 --
-> >  3 files changed, 90 insertions(+), 41 deletions(-)
+> >  drivers/gpu/drm/sun4i/sun8i_layer.c |  40 +++++++---
+> >  drivers/gpu/drm/sun4i/sun8i_mixer.c | 144
+> >  +++++++++++++++++++++++++++++++++--- drivers/gpu/drm/sun4i/sun8i_mixer.h
+> >  |  38 ++++++++--
+> >  3 files changed, 196 insertions(+), 26 deletions(-)
 > > 
 > > diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c
-> > b/drivers/gpu/drm/sun4i/sun8i_layer.c index e1b6ad82145e..6860271e5415
+> > b/drivers/gpu/drm/sun4i/sun8i_layer.c index 49ccdd0149bd..e1b6ad82145e
 > > 100644
 > > --- a/drivers/gpu/drm/sun4i/sun8i_layer.c
 > > +++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
-> > @@ -41,9 +44,14 @@ static int sun8i_mixer_layer_atomic_check(struct
+> > @@ -47,13 +47,22 @@ static int sun8i_mixer_layer_atomic_check(struct
 > > drm_plane *plane,> 
-> >         clip.x2 = crtc_state->adjusted_mode.hdisplay;
-> >         clip.y2 = crtc_state->adjusted_mode.vdisplay;
+> >  					    true, true);
+> >  
+> >  }
 > > 
-> > +       scaler_supported = !!(layer->mixer->cfg->scaler_mask &
-> > BIT(layer->id)); +
-> > +       min_scale = scaler_supported ? 1 : DRM_PLANE_HELPER_NO_SCALING;
-> > +       max_scale = scaler_supported ? (1UL << 20) - 1 :
-> > +                                      DRM_PLANE_HELPER_NO_SCALING;
+> > +static void sun8i_mixer_layer_enable(struct sun8i_layer *layer, bool
+> > enable) +{
+> > +	struct sun8i_mixer *mixer = layer->mixer;
 > > +
+> > +	if (layer->id < mixer->cfg->vi_num)
+> > +		sun8i_mixer_vi_layer_enable(mixer, layer->id, enable);
+> > +	else
+> > +		sun8i_mixer_ui_layer_enable(mixer, layer->id, enable);
+> > +}
+> > +
+> > 
+> >  static void sun8i_mixer_layer_atomic_disable(struct drm_plane *plane,
+> >  
+> >  					       struct drm_plane_state *old_state)
+> >  
+> >  {
+> >  
+> >  	struct sun8i_layer *layer = plane_to_sun8i_layer(plane);
+> > 
+> > -	struct sun8i_mixer *mixer = layer->mixer;
+> > 
+> > -	sun8i_mixer_layer_enable(mixer, layer->id, false);
+> > +	sun8i_mixer_layer_enable(layer, false);
+> > 
+> >  }
+> >  
+> >  static void sun8i_mixer_layer_atomic_update(struct drm_plane *plane,
+> > 
+> > @@ -63,14 +72,21 @@ static void sun8i_mixer_layer_atomic_update(struct
+> > drm_plane *plane,> 
+> >  	struct sun8i_mixer *mixer = layer->mixer;
+> >  	
+> >  	if (!plane->state->visible) {
+> > 
+> > -		sun8i_mixer_layer_enable(mixer, layer->id, false);
+> > +		sun8i_mixer_layer_enable(layer, false);
+> > 
+> >  		return;
+> >  	
+> >  	}
+> > 
+> > -	sun8i_mixer_update_layer_coord(mixer, layer->id, plane);
+> > -	sun8i_mixer_update_layer_formats(mixer, layer->id, plane);
+> > -	sun8i_mixer_update_layer_buffer(mixer, layer->id, plane);
+> > -	sun8i_mixer_layer_enable(mixer, layer->id, true);
+> > +	if (layer->id < mixer->cfg->vi_num) {
+> > +		sun8i_mixer_update_vi_layer_coord(mixer, layer->id, plane);
+> > +		sun8i_mixer_update_vi_layer_formats(mixer, layer->id, plane);
+> > +		sun8i_mixer_update_vi_layer_buffer(mixer, layer->id, plane);
+> > +	} else {
+> > +		sun8i_mixer_update_ui_layer_coord(mixer, layer->id, plane);
+> > +		sun8i_mixer_update_ui_layer_formats(mixer, layer->id, plane);
+> > +		sun8i_mixer_update_ui_layer_buffer(mixer, layer->id, plane);
+> > +	}
+> > +
+> > +	sun8i_mixer_layer_enable(layer, true);
 > 
-> Disclaimer: I hate ternaries, but this looks like it'd be better
-> written as an if statement. I.e.
-> 
-> min_scale = DRM_PLANE_HELPER_NO_SCALING;
-> max_scale = DRM_PLANE_HELPER_NO_SCALING;
-> 
-> if (layer->mixer->cfg->scaler_mask & BIT(layer->id)) {
->     min_scale = 1;
->     max_scale = (1UL << 20) - 1;
-> }
-> 
-> However the compiler will probably sort it all out anyway, so it
-> probably doesn't matter that much, except for style.
+> So you can probably tell by the patches I had in my other serie, but
+> we should really split the UI and VI support in two files, especially
+> since it has pretty much no code path or data in common (if you
+> combine this patch with the YUV support).
 
-That indeed looks much better. I will use it in next version.
+I guess same goes for UI and VI scalers. I will try to do some reasonable 
+split in next version.
 
-Thanks,
+Best regards,
 Jernej
 
 > 
-> Thanks,
+> Maxime
 > 
 > --
-> Julian Calaby
-> 
-> Email: julian.calaby at gmail.com
-> Profile: http://www.google.com/profiles/julian.calaby/
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
