@@ -1,94 +1,43 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Wed, 29 Nov 2017 10:42:06 +0000
-Subject: [RESEND PATCH] ARM: Fix csum_partial_copy_from_user() stack
- mismatch
-In-Reply-To: <20171128025552.24927-1-chunyan.zhang@spreadtrum.com>
-References: <20171128025552.24927-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171129104205.GA12900@n2100.armlinux.org.uk>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 29 Nov 2017 11:46:44 +0100
+Subject: [PATCH v4 00/12] ARM: dts: renesas: Update DTS for CMT DT
+ binding rework
+In-Reply-To: <1511876856-9495-1-git-send-email-geert+renesas@glider.be>
+References: <1511876856-9495-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20171129104643.7gcfalflbbcxqf3y@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Sorry for the late response, _all_ your messages are going into my junk
-mailboxes because your mail server DNS is incorrectly configured.
-
-$ host 222.66.158.135
-135.158.66.222.in-addr.arpa domain name pointer sci-ig2.spreadtrum.com.
-$ host sci-ig2.spreadtrum.com
-sci-ig2.spreadtrum.com is an alias for ig.f5.spreadtrum.com.
-ig.f5.spreadtrum.com has address 114.30.40.213
-
-This makes it look like 222.66.158.135 is not authoritively a
-spreadtrum.com server - anyone can place a reverse DNS entry pointing
-to any domain on the planet.  The thing that makes reverse DNS
-believable is when the forward DNS resolves back to the IP address.
-It's a tactic spammers have used to try and get their messages through.
-
-It gets worse...
-
-$ host 114.30.40.213
-213.40.30.114.in-addr.arpa domain name pointer sci-ig4.spreadtrum.com.
-$ host sci-ig4.spreadtrum.com.
-sci-ig4.spreadtrum.com has address 61.155.194.126
-$ host 61.155.194.126
-Host 126.194.155.61.in-addr.arpa. not found: 3(NXDOMAIN)
-
-And according to whois:
-inetnum:        222.66.158.128 - 222.66.158.143
-descr:          SPREADTRUM COMMUNICATIONS (SHANGHAI) CO., LTD.
-country:        CN
-
-inetnum:        114.30.32.0 - 114.30.47.255
-country:        TW
-
-inetnum:        61.155.0.0 - 61.155.255.255
-descr:          CHINANET jiangsu province network
-
-Your messages will continue going into my junk folders until the DNS
-is resolved, which means it'll take considerable time for me to
-discover your messages.
-
-
-On Tue, Nov 28, 2017 at 10:55:52AM +0800, Chunyan Zhang wrote:
-> From: Lvqiang Huang <Lvqiang.Huang@spreadtrum.com>
+On Tue, Nov 28, 2017 at 02:47:24PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> An additional 'ip' will be pushed to the stack, for restoring the
-> DACR later, if CONFIG_CPU_SW_DOMAIN_PAN defined.
+> This patch series updates the CMT device nodes in the various Renesas DTS
+> files sh_cmt clocksource driver for the recent DT binding rework that was
+> merged in v4.14-rc1 and v4.15-rc1.
 > 
-> However, the fixup still get the err_ptr by add #8*4 to sp, which
-> results in the fact that the code area pointed by the LR will be
-> overwritten, or the kernel will crash if CONFIG_DEBUG_RODATA is enabled.
+> This series is an evolutionary improvement of Magnus Damm's series "[PATCH
+> v2 00/11] clocksource: sh_cmt: DT binding rework V2":
 > 
-> This patch fixes the stack mismatch.
+>   - Patches 1-5 update the compatible values for the CMT0 and CMT1 device
+>     nodes on R-Mobile APE6 and R-Car Gen2,
+>   - Patches 6-12 remove the now obsolete "renesas,channels-mask" properties
+>     from the CMT device nodes on all affected SoCs.
 > 
-> Signed-off-by: Lvqiang Huang <Lvqiang.Huang@spreadtrum.com>
-> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> ---
->  arch/arm/lib/csumpartialcopyuser.S | 4 ++++
->  1 file changed, 4 insertions(+)
+> Changes compared to v3:
+>   - Rebase against renesas-devel-20171127-v4.15-rc1,
 > 
-> diff --git a/arch/arm/lib/csumpartialcopyuser.S b/arch/arm/lib/csumpartialcopyuser.S
-> index 1712f13..b83fdc0 100644
-> --- a/arch/arm/lib/csumpartialcopyuser.S
-> +++ b/arch/arm/lib/csumpartialcopyuser.S
-> @@ -85,7 +85,11 @@
->  		.pushsection .text.fixup,"ax"
->  		.align	4
->  9001:		mov	r4, #-EFAULT
-> +#ifdef CONFIG_CPU_SW_DOMAIN_PAN
-> +		ldr	r5, [sp, #9*4]		@ *err_ptr
-> +#else
->  		ldr	r5, [sp, #8*4]		@ *err_ptr
-> +#endif
->  		str	r4, [r5]
->  		ldmia	sp, {r1, r2}		@ retrieve dst, len
->  		add	r2, r2, r1
+> Changes compared to v2:
+>   - Take over from Magnus,
+>   - Update compatible values,
+>   - Split in per-SoC patches,
+> 
+> Dependencies:
+>   - "[PATCH v3 0/7] clocksource: sh_cmt: Update driver for DT binding
+>     rework" was merged in v4.15-rc1.
+> 
+> This has been part of renesas-drivers for more than two months, and part
+> of my local development tree for more than two years.
+> 
+> Thanks for applying!
 
-Yes, the patch looks correct.  Please queue it with the patch system
-(see URL below).  Thanks.
-
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Thanks, applied.
