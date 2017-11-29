@@ -1,45 +1,86 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 29 Nov 2017 12:53:11 -0800
-Subject: [PATCH v2 2/2] ARM: dts: at91: disable the nxp,se97b SMBUS
- timeout on the TSE-850
-In-Reply-To: <20171127163101.27859-3-peda@axentia.se>
-References: <20171127163101.27859-1-peda@axentia.se>
- <20171127163101.27859-3-peda@axentia.se>
-Message-ID: <20171129205311.GA20551@roeck-us.net>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 29 Nov 2017 21:54:36 +0100
+Subject: [PATCH v2 3/6] ARM: ep93xx: ts72xx: Rewrite
+ ts72xx_register_flash() to accept parameters
+In-Reply-To: <20171121143204.1839-4-lukma@denx.de>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171121143204.1839-1-lukma@denx.de> <20171121143204.1839-4-lukma@denx.de>
+Message-ID: <2de38480-c994-dc8c-f107-61c2862647b2@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:31:01PM +0100, Peter Rosin wrote:
-> The I2C adapter driver is sometimes slow, causing the SCL line to
-> be stuck low for more than the stipulated SMBUS timeout of 25-35 ms.
-> This causes the client device to give up which in turn causes silent
-> corruption of data. So, disable the SMBUS timeout in the client device.
+Hi!
+
+On 21/11/17 15:32, Lukasz Majewski wrote:
+> This commit extend the ts72xx_register_flash() to accept passed parameters,
+> which makes it more reusable.
 > 
-> Signed-off-by: Peter Rosin <peda@axentia.se>
+> Now it is possible to accept ep93xx flash start address and partitions.
+> 
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
 
-Acked-by: Guenter Roeck <linux@roeck-us.net>
+Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 
-I assume this will be sent upstream through an arm tree.
-
-Thanks,
-Guenter
-
+> 
 > ---
->  arch/arm/boot/dts/at91-tse850-3.dts | 1 +
->  1 file changed, 1 insertion(+)
+> Changes for v2:
+> - New patch
+> ---
+>  arch/arm/mach-ep93xx/ts72xx.c | 20 ++++++++------------
+>  1 file changed, 8 insertions(+), 12 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
-> index 5f29010cdbd8..9b82cc8843e1 100644
-> --- a/arch/arm/boot/dts/at91-tse850-3.dts
-> +++ b/arch/arm/boot/dts/at91-tse850-3.dts
-> @@ -221,6 +221,7 @@
->  	jc42 at 18 {
->  		compatible = "nxp,se97b", "jedec,jc-42.4-temp";
->  		reg = <0x18>;
-> +		smbus-timeout-disable;
->  	};
+> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+> index 06345b85f27c..00e0e5b8babf 100644
+> --- a/arch/arm/mach-ep93xx/ts72xx.c
+> +++ b/arch/arm/mach-ep93xx/ts72xx.c
+> @@ -120,8 +120,6 @@ static struct platform_nand_data ts72xx_nand_data = {
+>  		.nr_chips	= 1,
+>  		.chip_offset	= 0,
+>  		.chip_delay	= 15,
+> -		.partitions	= ts72xx_nand_parts,
+> -		.nr_partitions	= ARRAY_SIZE(ts72xx_nand_parts),
+>  	},
+>  	.ctrl = {
+>  		.cmd_ctrl	= ts72xx_nand_hwcontrol,
+> @@ -145,8 +143,8 @@ static struct platform_device ts72xx_nand_flash = {
+>  	.num_resources		= ARRAY_SIZE(ts72xx_nand_resource),
+>  };
 >  
->  	dpot: mcp4651-104 at 28 {
-> -- 
-> 2.11.0
-> 
+> -
+> -static void __init ts72xx_register_flash(void)
+> +void __init ts72xx_register_flash(struct mtd_partition *parts, int n,
+> +				  resource_size_t start)
+>  {
+>  	/*
+>  	 * TS7200 has NOR flash all other TS72xx board have NAND flash.
+> @@ -154,16 +152,12 @@ static void __init ts72xx_register_flash(void)
+>  	if (board_is_ts7200()) {
+>  		ep93xx_register_flash(2, EP93XX_CS6_PHYS_BASE, SZ_16M);
+>  	} else {
+> -		resource_size_t start;
+> -
+> -		if (is_ts9420_installed())
+> -			start = EP93XX_CS7_PHYS_BASE;
+> -		else
+> -			start = EP93XX_CS6_PHYS_BASE;
+> -
+>  		ts72xx_nand_resource[0].start = start;
+>  		ts72xx_nand_resource[0].end = start + SZ_16M - 1;
+>  
+> +		ts72xx_nand_data.chip.partitions = parts;
+> +		ts72xx_nand_data.chip.nr_partitions = n;
+> +
+>  		platform_device_register(&ts72xx_nand_flash);
+>  	}
+>  }
+> @@ -223,7 +217,9 @@ static struct platform_device ts73xx_fpga_device = {
+>  static void __init ts72xx_init_machine(void)
+>  {
+>  	ep93xx_init_devices();
+> -	ts72xx_register_flash();
+> +	ts72xx_register_flash(ts72xx_nand_parts, ARRAY_SIZE(ts72xx_nand_parts),
+> +			      is_ts9420_installed() ?
+> +			      EP93XX_CS7_PHYS_BASE : EP93XX_CS6_PHYS_BASE);
+>  	platform_device_register(&ts72xx_rtc_device);
+>  	platform_device_register(&ts72xx_wdt_device);
+>  
