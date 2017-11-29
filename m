@@ -1,137 +1,80 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 29 Nov 2017 12:18:47 -0800
-Subject: [PATCH 7/9] soc: brcmstb: biuctrl: Fine tune B53 MCP interface
- settings
+Date: Wed, 29 Nov 2017 12:18:48 -0800
+Subject: [PATCH 8/9] soc: brcmstb: Split initialization
 In-Reply-To: <20171129201849.17522-1-f.fainelli@gmail.com>
 References: <20171129201849.17522-1-f.fainelli@gmail.com>
-Message-ID: <20171129201849.17522-8-f.fainelli@gmail.com>
+Message-ID: <20171129201849.17522-9-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to achieve expected MCP bus throughput on 3 particular chips:
-7268, 7271 and 7278, do the appropriate programming of the MCP
-interface: increase number of MCP write credits, turn on write-back
-throttling when present.
+We may need access to family_id and product_id fairly early on boot for
+other parts of the code (e.g: biuctrl.c), so split the initialization
+between an early_init() and an arch_initcall() which allows us to do
+that.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/soc/bcm/brcmstb/biuctrl.c | 76 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 76 insertions(+)
+ drivers/soc/bcm/brcmstb/common.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
 
-diff --git a/drivers/soc/bcm/brcmstb/biuctrl.c b/drivers/soc/bcm/brcmstb/biuctrl.c
-index d498f9db01ab..dd45bbfe64dd 100644
---- a/drivers/soc/bcm/brcmstb/biuctrl.c
-+++ b/drivers/soc/bcm/brcmstb/biuctrl.c
-@@ -22,6 +22,18 @@
- #include <linux/soc/brcmstb/brcmstb.h>
- 
- #define  CPU_CREDIT_REG_MCPx_WR_PAIRING_EN_MASK	0x70000000
-+#define CPU_CREDIT_REG_MCPx_READ_CRED_MASK	0xf
-+#define CPU_CREDIT_REG_MCPx_WRITE_CRED_MASK	0xf
-+#define CPU_CREDIT_REG_MCPx_READ_CRED_SHIFT(x)	((x) * 8)
-+#define CPU_CREDIT_REG_MCPx_WRITE_CRED_SHIFT(x)	(((x) * 8) + 4)
-+
-+#define CPU_MCP_FLOW_REG_MCPx_RDBUFF_CRED_SHIFT(x)	((x) * 8)
-+#define CPU_MCP_FLOW_REG_MCPx_RDBUFF_CRED_MASK		0xff
-+
-+#define CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_THRESHOLD_MASK	0xf
-+#define CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_TIMEOUT_MASK		0xf
-+#define CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_TIMEOUT_SHIFT	4
-+#define CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_ENABLE		BIT(8)
- 
- static void __iomem *cpubiuctrl_base;
- static bool mcp_wr_pairing_en;
-@@ -59,6 +71,13 @@ static const int b15_cpubiuctrl_regs[] = {
- 	[CPU_WRITEBACK_CTRL_REG] = -1,
+diff --git a/drivers/soc/bcm/brcmstb/common.c b/drivers/soc/bcm/brcmstb/common.c
+index a71730da6385..781ada62d0a3 100644
+--- a/drivers/soc/bcm/brcmstb/common.c
++++ b/drivers/soc/bcm/brcmstb/common.c
+@@ -66,13 +66,10 @@ static const struct of_device_id sun_top_ctrl_match[] = {
+ 	{ }
  };
  
-+/* Odd cases, e.g: 7260 */
-+static const int b53_cpubiuctrl_no_wb_regs[] = {
-+	[CPU_CREDIT_REG] = 0x0b0,
-+	[CPU_MCP_FLOW_REG] = 0x0b4,
-+	[CPU_WRITEBACK_CTRL_REG] = -1,
-+};
-+
- static const int b53_cpubiuctrl_regs[] = {
- 	[CPU_CREDIT_REG] = 0x0b0,
- 	[CPU_MCP_FLOW_REG] = 0x0b4,
-@@ -90,6 +109,59 @@ static int __init mcp_write_pairing_set(void)
- 	return 0;
- }
- 
-+static const u32 b53_mach_compat[] = {
-+	0x7268,
-+	0x7271,
-+	0x7278,
-+};
-+
-+static void __init mcp_b53_set(void)
-+{
-+	unsigned int i;
-+	u32 reg;
-+
-+	reg = brcmstb_get_family_id();
-+
-+	for (i = 0; i < ARRAY_SIZE(b53_mach_compat); i++) {
-+		if (BRCM_ID(reg) == b53_mach_compat[i])
-+			break;
-+	}
-+
-+	if (i == ARRAY_SIZE(b53_mach_compat))
-+		return;
-+
-+	/* Set all 3 MCP interfaces to 8 credits */
-+	reg = cbc_readl(CPU_CREDIT_REG);
-+	for (i = 0; i < 3; i++) {
-+		reg &= ~(CPU_CREDIT_REG_MCPx_WRITE_CRED_MASK <<
-+			 CPU_CREDIT_REG_MCPx_WRITE_CRED_SHIFT(i));
-+		reg &= ~(CPU_CREDIT_REG_MCPx_READ_CRED_MASK <<
-+			 CPU_CREDIT_REG_MCPx_READ_CRED_SHIFT(i));
-+		reg |= 8 << CPU_CREDIT_REG_MCPx_WRITE_CRED_SHIFT(i);
-+		reg |= 8 << CPU_CREDIT_REG_MCPx_READ_CRED_SHIFT(i);
-+	}
-+	cbc_writel(reg, CPU_CREDIT_REG);
-+
-+	/* Max out the number of in-flight Jwords reads on the MCP interface */
-+	reg = cbc_readl(CPU_MCP_FLOW_REG);
-+	for (i = 0; i < 3; i++)
-+		reg |= CPU_MCP_FLOW_REG_MCPx_RDBUFF_CRED_MASK <<
-+			CPU_MCP_FLOW_REG_MCPx_RDBUFF_CRED_SHIFT(i);
-+	cbc_writel(reg, CPU_MCP_FLOW_REG);
-+
-+	/* Enable writeback throttling, set timeout to 128 cycles, 256 cycles
-+	 * threshold
-+	 */
-+	reg = cbc_readl(CPU_WRITEBACK_CTRL_REG);
-+	reg |= CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_ENABLE;
-+	reg &= ~CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_THRESHOLD_MASK;
-+	reg &= ~(CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_TIMEOUT_MASK <<
-+		 CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_TIMEOUT_SHIFT);
-+	reg |= 8;
-+	reg |= 7 << CPU_WRITEBACK_CTRL_REG_WB_THROTTLE_TIMEOUT_SHIFT;
-+	cbc_writel(reg, CPU_WRITEBACK_CTRL_REG);
-+}
-+
- static int __init setup_hifcpubiuctrl_regs(void)
+-static int __init brcmstb_soc_device_init(void)
++static int __init brcmstb_soc_device_early_init(void)
  {
- 	struct device_node *np, *cpu_dn;
-@@ -126,6 +198,9 @@ static int __init setup_hifcpubiuctrl_regs(void)
- 		ret = -EINVAL;
- 	}
- 	of_node_put(cpu_dn);
+-	struct soc_device_attribute *soc_dev_attr;
+-	struct soc_device *soc_dev;
+ 	struct device_node *sun_top_ctrl;
+ 	void __iomem *sun_top_ctrl_base;
+-	int ret = 0;
+ 
+ 	sun_top_ctrl = of_find_matching_node(NULL, sun_top_ctrl_match);
+ 	if (!sun_top_ctrl)
+@@ -84,12 +81,19 @@ static int __init brcmstb_soc_device_init(void)
+ 
+ 	family_id = readl(sun_top_ctrl_base);
+ 	product_id = readl(sun_top_ctrl_base + 0x4);
++	iounmap(sun_top_ctrl_base);
++	return 0;
++}
++early_initcall(brcmstb_soc_device_early_init);
 +
-+	if (BRCM_ID(brcmstb_get_family_id()) == 0x7260)
-+		cpubiuctrl_regs = b53_cpubiuctrl_no_wb_regs;
- out:
- 	of_node_put(np);
- 	return ret;
-@@ -177,6 +252,7 @@ void __init brcmstb_biuctrl_init(void)
- 		return;
++static int __init brcmstb_soc_device_init(void)
++{
++	struct soc_device_attribute *soc_dev_attr;
++	struct soc_device *soc_dev;
+ 
+ 	soc_dev_attr = kzalloc(sizeof(*soc_dev_attr), GFP_KERNEL);
+-	if (!soc_dev_attr) {
+-		ret = -ENOMEM;
+-		goto out;
+-	}
++	if (!soc_dev_attr)
++		return -ENOMEM;
+ 
+ 	soc_dev_attr->family = kasprintf(GFP_KERNEL, "%x",
+ 					 family_id >> 28 ?
+@@ -107,14 +111,9 @@ static int __init brcmstb_soc_device_init(void)
+ 		kfree(soc_dev_attr->soc_id);
+ 		kfree(soc_dev_attr->revision);
+ 		kfree(soc_dev_attr);
+-		ret = -ENODEV;
+-		goto out;
++		return -ENOMEM;
  	}
  
-+	mcp_b53_set();
- #ifdef CONFIG_PM_SLEEP
- 	register_syscore_ops(&brcmstb_cpu_credit_syscore_ops);
- #endif
+ 	return 0;
+-
+-out:
+-	iounmap(sun_top_ctrl_base);
+-	return ret;
+ }
+ arch_initcall(brcmstb_soc_device_init);
 -- 
 2.9.3
