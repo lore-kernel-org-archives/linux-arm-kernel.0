@@ -1,28 +1,51 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 29 Nov 2017 15:18:18 +0100
-Subject: [PATCH] dma: stm32: Fix copyright
-Message-ID: <20171129141818.22843-1-benjamin.gaignard@st.com>
+From: antony@phenome.org (Antony Antony)
+Date: Wed, 29 Nov 2017 15:17:16 +0100
+Subject: [PATCH] arm64: dts: allwinner: h5: NanoPi NEO Plus2 : add EMAC support
+Message-ID: <20171129141716.98951-1-antony@phenome.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uniformize STMicroelectronics copyrights header
+add arm64 H5 dwmac-sun8i support for this board
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Signed-off-by: Antony Antony <antony@phenome.org>
 ---
- drivers/dma/stm32-dma.c | 1 +
- 1 file changed, 1 insertion(+)
+ .../boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-index 786fc8fcc38e..bb013ffe8a5c 100644
---- a/drivers/dma/stm32-dma.c
-+++ b/drivers/dma/stm32-dma.c
-@@ -4,6 +4,7 @@
-  * Inspired by dma-jz4740.c and tegra20-apb-dma.c
-  *
-  * Copyright (C) M'boumba Cedric Madianga 2015
-+ * Copyright (C) STMicroelectronics SA 2017
-  * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-  *
-  * License terms:  GNU General Public License (GPL), version 2
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+index 7c028af..01dace4 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
+@@ -53,6 +53,7 @@
+ 	compatible = "friendlyarm,nanopi-neo-plus2", "allwinner,sun50i-h5";
+ 
+ 	aliases {
++		ethernet0 = &emac;
+ 		serial0 = &uart0;
+ 	};
+ 
+@@ -133,6 +134,22 @@
+ 	status = "okay";
+ };
+ 
++&emac {
++	pinctrl-names = "default";
++	pinctrl-0 = <&emac_rgmii_pins>;
++	phy-supply = <&reg_gmac_3v3>;
++	phy-handle = <&ext_rgmii_phy>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&external_mdio {
++	ext_rgmii_phy: ethernet-phy at 7 {
++		compatible = "ethernet-phy-ieee802.3-c22";
++		reg = <7>;
++	};
++};
++
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
 -- 
-2.15.0
+2.7.4
