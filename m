@@ -1,48 +1,91 @@
-From: seanpaul@chromium.org (Sean Paul)
-Date: Wed, 29 Nov 2017 09:24:42 -0500
-Subject: [PATCH v2] MAINTAINERS: change maintainer for Rockchip drm drivers
-In-Reply-To: <19897082.KH862Wxx3L@diego>
-References: <19897082.KH862Wxx3L@diego>
-Message-ID: <20171129142459.32351-1-seanpaul@chromium.org>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 29 Nov 2017 15:25:32 +0100
+Subject: [PATCH] pinctrl: stm32: Fix copyright
+Message-ID: <20171129142532.23468-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mark Yao <mark.yao@rock-chips.com>
+Uniformize STMicroelectronics copyrights header
 
-For personal reasons, Mark Yao will leave rockchip,
-can not continue maintain drm/rockchip, Sandy Huang
-and Heiko St?bner will take over drm/rockchip.
-
-Cc: Sandy Huang <hjc@rock-chips.com>
-Cc: Heiko St?bner <heiko@sntech.de>
-
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-Acked-by: Heiko Stuebner <heiko@sntech.de>
-[seanpaul added Heiko]
-Signed-off-by: Sean Paul <seanpaul@chromium.org>
-Link: https://patchwork.freedesktop.org/patch/msgid/1510568131-28838-1-git-send-email-mark.yao at rock-chips.com
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
+ drivers/pinctrl/stm32/pinctrl-stm32.c     | 1 +
+ drivers/pinctrl/stm32/pinctrl-stm32.h     | 1 +
+ drivers/pinctrl/stm32/pinctrl-stm32f429.c | 1 +
+ drivers/pinctrl/stm32/pinctrl-stm32f469.c | 4 ++--
+ drivers/pinctrl/stm32/pinctrl-stm32f746.c | 1 +
+ drivers/pinctrl/stm32/pinctrl-stm32h743.c | 4 ++--
+ 6 files changed, 8 insertions(+), 4 deletions(-)
 
-Changed in v2:
-- Added Heiko as co-maintainer
-
-
- MAINTAINERS | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index d4b63c7ffb0e..4f0756a4ff1a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4625,7 +4625,8 @@ F:	Documentation/devicetree/bindings/display/bridge/renesas,dw-hdmi.txt
- F:	Documentation/devicetree/bindings/display/renesas,du.txt
- 
- DRM DRIVERS FOR ROCKCHIP
--M:	Mark Yao <mark.yao@rock-chips.com>
-+M:	Sandy Huang <hjc@rock-chips.com>
-+M:	Heiko St?bner <heiko@sntech.de>
- L:	dri-devel at lists.freedesktop.org
- S:	Maintained
- F:	drivers/gpu/drm/rockchip/
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.c b/drivers/pinctrl/stm32/pinctrl-stm32.c
+index a276c61be217..0676a254caeb 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32.c
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics SA 2017
+  * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+  * License terms:  GNU General Public License (GPL), version 2
+  *
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32.h b/drivers/pinctrl/stm32/pinctrl-stm32.h
+index 8702a9992ce5..76027765144b 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32.h
++++ b/drivers/pinctrl/stm32/pinctrl-stm32.h
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics SA 2017
+  * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+  * License terms:  GNU General Public License (GPL), version 2
+  */
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32f429.c b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
+index 4bbade25acc6..4987fe553a1a 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32f429.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32f429.c
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics SA 2017
+  * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+  * License terms:  GNU General Public License (GPL), version 2
+  */
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32f469.c b/drivers/pinctrl/stm32/pinctrl-stm32f469.c
+index 86c8cebfa9b9..292ec13d7364 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32f469.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32f469.c
+@@ -1,6 +1,6 @@
+ /*
+- * Copyright (C) Alexandre Torgue 2016
+- * Author:  Alexandre Torgue <alexandre.torgue@st.com>
++ * Copyright (C) STMicroelectronics SA 2017
++ * Author:  Alexandre Torgue <alexandre.torgue@st.com> for STMicroelectronics.
+  * License terms:  GNU General Public License (GPL), version 2
+  */
+ #include <linux/init.h>
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32f746.c b/drivers/pinctrl/stm32/pinctrl-stm32f746.c
+index a2fae7357c36..c22972e4b96c 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32f746.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32f746.c
+@@ -1,5 +1,6 @@
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics SA 2017
+  * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+  * License terms:  GNU General Public License (GPL), version 2
+  */
+diff --git a/drivers/pinctrl/stm32/pinctrl-stm32h743.c b/drivers/pinctrl/stm32/pinctrl-stm32h743.c
+index e34b2b9217ce..34ed8220ffdf 100644
+--- a/drivers/pinctrl/stm32/pinctrl-stm32h743.c
++++ b/drivers/pinctrl/stm32/pinctrl-stm32h743.c
+@@ -1,6 +1,6 @@
+ /*
+- * Copyright (C) Alexandre Torgue 2017
+- * Author:  Alexandre Torgue <alexandre.torgue@st.com>
++ * Copyright (C) STMicroelectronics SA 2017
++ * Author:  Alexandre Torgue <alexandre.torgue@st.com> for STMicroelectronics.
+  * License terms:  GNU General Public License (GPL), version 2
+  */
+ #include <linux/init.h>
 -- 
-2.15.0.417.g466bffb3ac-goog
+2.15.0
