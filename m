@@ -1,55 +1,73 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 29 Nov 2017 23:01:57 +0900
-Subject: [GIT PULL] ARM: uniphier: fixes for v4.15
-Message-ID: <CAK7LNARMXg-3Xfz2Mxq47Suys4kPSWuPYKY1o8HkVRBd4fHfSA@mail.gmail.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Wed, 29 Nov 2017 17:03:03 +0300
+Subject: [PATCH v2] arm64: fix missing 'const' qualifiers
+Message-ID: <20171129140303.14283-1-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Olof,
+There's inconsistency in variable declaration and section type. GCC doesn't
+throw error for usual build. But if LTO enabled, build becomes broken, like
+this:
 
-Here are some fixes of ARM UniPhier SoC family.
-There is a mistake in the IRQ number.  Otherwise, I wouldn't have done
-this early pull request.  One more trivial patch to avoid conflict.
-Also, MAINTAINERS update, which is always safe.
-Please pull!
+mm/percpu.c:2168:20: error: pcpu_fc_names causes a section type conflict
+with dt_supported_cpu_ops
+const char * const pcpu_fc_names[PCPU_FC_NR] __initconst = {
+        ^
+arch/arm64/kernel/cpu_ops.c:34:37: note: ?dt_supported_cpu_ops? was declared here
+static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
 
+And so on. Fix it by adding missed const qualifiers.
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+v2: more details in patch description.
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
+---
+ arch/arm64/kernel/cpu_ops.c             | 6 +++---
+ drivers/clk/hisilicon/crg-hi3516cv300.c | 2 +-
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-tags/uniphier-fixes-v4.15
-
-for you to fetch changes up to 0308cadcec379e510f498c48c34aafe582f1af88:
-
-  MAINTAINERS: exclude other Socionext SoC DT files from ARM/UNIPHIER
-entry (2017-11-29 22:22:10 +0900)
-
-----------------------------------------------------------------
-UniPhier ARM SoC fixes for v4.15
-
-- Fix IRQ number of PXs3 SoC
-- Remove redundant interrupt-parent properties
-- Fix arm64 DT path in MAINTAINERS
-
-----------------------------------------------------------------
-Dai Okamura (1):
-      arm64: dts: uniphier: correct on-board device IRQ number for PXs3
-
-Masahiro Yamada (2):
-      arm64: dts: uniphier: remove unnecessary interrupt-parent
-      MAINTAINERS: exclude other Socionext SoC DT files from ARM/UNIPHIER entry
-
- MAINTAINERS                                         | 2 +-
- arch/arm64/boot/dts/socionext/uniphier-ld11-ref.dts | 1 -
- arch/arm64/boot/dts/socionext/uniphier-ld20-ref.dts | 1 -
- arch/arm64/boot/dts/socionext/uniphier-pxs3-ref.dts | 3 +--
- 4 files changed, 2 insertions(+), 5 deletions(-)
-
-
+diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
+index d16978213c5b..ea001241bdd4 100644
+--- a/arch/arm64/kernel/cpu_ops.c
++++ b/arch/arm64/kernel/cpu_ops.c
+@@ -31,13 +31,13 @@ extern const struct cpu_operations cpu_psci_ops;
+ 
+ const struct cpu_operations *cpu_ops[NR_CPUS] __ro_after_init;
+ 
+-static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
++static const struct cpu_operations *const dt_supported_cpu_ops[] __initconst = {
+ 	&smp_spin_table_ops,
+ 	&cpu_psci_ops,
+ 	NULL,
+ };
+ 
+-static const struct cpu_operations *acpi_supported_cpu_ops[] __initconst = {
++static const struct cpu_operations *const acpi_supported_cpu_ops[] __initconst = {
+ #ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
+ 	&acpi_parking_protocol_ops,
+ #endif
+@@ -47,7 +47,7 @@ static const struct cpu_operations *acpi_supported_cpu_ops[] __initconst = {
+ 
+ static const struct cpu_operations * __init cpu_get_ops(const char *name)
+ {
+-	const struct cpu_operations **ops;
++	const struct cpu_operations *const *ops;
+ 
+ 	ops = acpi_disabled ? dt_supported_cpu_ops : acpi_supported_cpu_ops;
+ 
+diff --git a/drivers/clk/hisilicon/crg-hi3516cv300.c b/drivers/clk/hisilicon/crg-hi3516cv300.c
+index 2007123832bb..53450b651e4c 100644
+--- a/drivers/clk/hisilicon/crg-hi3516cv300.c
++++ b/drivers/clk/hisilicon/crg-hi3516cv300.c
+@@ -204,7 +204,7 @@ static const struct hisi_crg_funcs hi3516cv300_crg_funcs = {
+ /* hi3516CV300 sysctrl CRG */
+ #define HI3516CV300_SYSCTRL_NR_CLKS 16
+ 
+-static const char *wdt_mux_p[] __initconst = { "3m", "apb" };
++static const char *const wdt_mux_p[] __initconst = { "3m", "apb" };
+ static u32 wdt_mux_table[] = {0, 1};
+ 
+ static const struct hisi_mux_clock hi3516cv300_sysctrl_mux_clks[] = {
 -- 
-Best Regards
-Masahiro Yamada
+2.11.0
