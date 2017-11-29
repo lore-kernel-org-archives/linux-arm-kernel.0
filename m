@@ -1,36 +1,18 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Wed, 29 Nov 2017 15:44:42 -0800
-Subject: [PATCH 7/7] arm64: add a workaround for GNU gold with
- ARM64_MODULE_PLTS
-In-Reply-To: <20171129234442.655-1-samitolvanen@google.com>
+From: ndesaulniers@google.com (Nick Desaulniers)
+Date: Wed, 29 Nov 2017 15:57:53 -0800
+Subject: [PATCH 5/7] arm64: keep .altinstructions and .altinstr_replacement
+In-Reply-To: <20171129234442.655-6-samitolvanen@google.com>
 References: <20171129234442.655-1-samitolvanen@google.com>
-Message-ID: <20171129234442.655-8-samitolvanen@google.com>
+ <20171129234442.655-6-samitolvanen@google.com>
+Message-ID: <CAKwvOd=PcTVZaMCtY7Wy-OEi7Dd1M4hVz8mpJCQR3M+dVROdmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All current versions of GNU gold crash when linking kernel modules
-with ARM64_MODULE_PLTS due to a known bug:
+On Wed, Nov 29, 2017 at 3:44 PM, Sami Tolvanen <samitolvanen@google.com> wrote:
+> Make sure the linker doesn't remove .altinstructions or
+> .altinstr_replacement when CONFIG_LD_DEAD_CODE_DATA_ELIMINATION is
+> enabled.
 
-  https://sourceware.org/bugzilla/show_bug.cgi?id=14592
-
-To work around the problem, this change removes NOLOAD from .plt
-and .init.plt.
-
-Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
----
- arch/arm64/kernel/module.lds | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
-index f7c9781a9d48..eacb5c67f61e 100644
---- a/arch/arm64/kernel/module.lds
-+++ b/arch/arm64/kernel/module.lds
-@@ -1,4 +1,4 @@
- SECTIONS {
--	.plt (NOLOAD) : { BYTE(0) }
--	.init.plt (NOLOAD) : { BYTE(0) }
-+	.plt : { BYTE(0) }
-+	.init.plt : { BYTE(0) }
- }
--- 
-2.15.0.531.g2ccb3012c9-goog
+This sounds like a bug in the original implementation of
+CONFIG_LD_DEAD_CODE_DATA_ELIMINATION? If so, this can likely get
+merged regardless of the rest of the patchset, ie. gold support.
