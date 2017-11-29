@@ -1,104 +1,45 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 29 Nov 2017 12:52:19 -0800
-Subject: [v2,1/2] hwmon: (jc42) optionally try to disable the SMBUS timeout
-In-Reply-To: <20171127163101.27859-2-peda@axentia.se>
-References: <20171127163101.27859-2-peda@axentia.se>
-Message-ID: <20171129205219.GA20516@roeck-us.net>
+Date: Wed, 29 Nov 2017 12:53:11 -0800
+Subject: [PATCH v2 2/2] ARM: dts: at91: disable the nxp,se97b SMBUS
+ timeout on the TSE-850
+In-Reply-To: <20171127163101.27859-3-peda@axentia.se>
+References: <20171127163101.27859-1-peda@axentia.se>
+ <20171127163101.27859-3-peda@axentia.se>
+Message-ID: <20171129205311.GA20551@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:31:00PM +0100, Peter Rosin wrote:
-> With a nxp,se97 chip on an atmel sama5d31 board, the I2C adapter driver
-> is not always capable of avoiding the 25-35 ms timeout as specified by
-> the SMBUS protocol. This may cause silent corruption of the last bit of
-> any transfer, e.g. a one is read instead of a zero if the sensor chip
-> times out. This also affects the eeprom half of the nxp-se97 chip, where
-> this silent corruption was originally noticed. Other I2C adapters probably
-> suffer similar issues, e.g. bit-banging comes to mind as risky...
-> 
-> The SMBUS register in the nxp chip is not a standard Jedec register, but
-> it is not special to the nxp chips either, at least the atmel chips
-> have the same mechanism. Therefore, do not special case this on the
-> manufacturer, it is opt-in via the device property anyway.
+On Mon, Nov 27, 2017 at 05:31:01PM +0100, Peter Rosin wrote:
+> The I2C adapter driver is sometimes slow, causing the SCL line to
+> be stuck low for more than the stipulated SMBUS timeout of 25-35 ms.
+> This causes the client device to give up which in turn causes silent
+> corruption of data. So, disable the SMBUS timeout in the client device.
 > 
 > Signed-off-by: Peter Rosin <peda@axentia.se>
-> Acked-by: Rob Herring <robh@kernel.org>
 
-Applied to hwmon-next.
+Acked-by: Guenter Roeck <linux@roeck-us.net>
+
+I assume this will be sent upstream through an arm tree.
 
 Thanks,
 Guenter
 
 > ---
->  Documentation/devicetree/bindings/hwmon/jc42.txt |  4 ++++
->  drivers/hwmon/jc42.c                             | 21 +++++++++++++++++++++
->  2 files changed, 25 insertions(+)
+>  arch/arm/boot/dts/at91-tse850-3.dts | 1 +
+>  1 file changed, 1 insertion(+)
 > 
-> diff --git a/Documentation/devicetree/bindings/hwmon/jc42.txt b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> index 07a250498fbb..f569db58f64a 100644
-> --- a/Documentation/devicetree/bindings/hwmon/jc42.txt
-> +++ b/Documentation/devicetree/bindings/hwmon/jc42.txt
-> @@ -34,6 +34,10 @@ Required properties:
+> diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
+> index 5f29010cdbd8..9b82cc8843e1 100644
+> --- a/arch/arm/boot/dts/at91-tse850-3.dts
+> +++ b/arch/arm/boot/dts/at91-tse850-3.dts
+> @@ -221,6 +221,7 @@
+>  	jc42 at 18 {
+>  		compatible = "nxp,se97b", "jedec,jc-42.4-temp";
+>  		reg = <0x18>;
+> +		smbus-timeout-disable;
+>  	};
 >  
->  - reg: I2C address
->  
-> +Optional properties:
-> +- smbus-timeout-disable: When set, the smbus timeout function will be disabled.
-> +			 This is not supported on all chips.
-> +
->  Example:
->  
->  temp-sensor at 1a {
-> diff --git a/drivers/hwmon/jc42.c b/drivers/hwmon/jc42.c
-> index 5f11dc014ed6..e5234f953a6d 100644
-> --- a/drivers/hwmon/jc42.c
-> +++ b/drivers/hwmon/jc42.c
-> @@ -22,6 +22,7 @@
->   * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
->   */
->  
-> +#include <linux/bitops.h>
->  #include <linux/module.h>
->  #include <linux/init.h>
->  #include <linux/slab.h>
-> @@ -45,6 +46,7 @@ static const unsigned short normal_i2c[] = {
->  #define JC42_REG_TEMP		0x05
->  #define JC42_REG_MANID		0x06
->  #define JC42_REG_DEVICEID	0x07
-> +#define JC42_REG_SMBUS		0x22 /* NXP and Atmel, possibly others? */
->  
->  /* Status bits in temperature register */
->  #define JC42_ALARM_CRIT_BIT	15
-> @@ -75,6 +77,9 @@ static const unsigned short normal_i2c[] = {
->  #define GT_MANID		0x1c68	/* Giantec */
->  #define GT_MANID2		0x132d	/* Giantec, 2nd mfg ID */
->  
-> +/* SMBUS register */
-> +#define SMBUS_STMOUT		BIT(7)  /* SMBus time-out, active low */
-> +
->  /* Supported chips */
->  
->  /* Analog Devices */
-> @@ -495,6 +500,22 @@ static int jc42_probe(struct i2c_client *client, const struct i2c_device_id *id)
->  
->  	data->extended = !!(cap & JC42_CAP_RANGE);
->  
-> +	if (device_property_read_bool(dev, "smbus-timeout-disable")) {
-> +		int smbus;
-> +
-> +		/*
-> +		 * Not all chips support this register, but from a
-> +		 * quick read of various datasheets no chip appears
-> +		 * incompatible with the below attempt to disable
-> +		 * the timeout. And the whole thing is opt-in...
-> +		 */
-> +		smbus = i2c_smbus_read_word_swapped(client, JC42_REG_SMBUS);
-> +		if (smbus < 0)
-> +			return smbus;
-> +		i2c_smbus_write_word_swapped(client, JC42_REG_SMBUS,
-> +					     smbus | SMBUS_STMOUT);
-> +	}
-> +
->  	config = i2c_smbus_read_word_swapped(client, JC42_REG_CONFIG);
->  	if (config < 0)
->  		return config;
+>  	dpot: mcp4651-104 at 28 {
+> -- 
+> 2.11.0
+> 
