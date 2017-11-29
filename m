@@ -1,33 +1,37 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 29 Nov 2017 16:05:45 +0100
-Subject: [PATCH] dma: stm32: Fix copyright
-In-Reply-To: <20171129141818.22843-1-benjamin.gaignard@st.com>
-References: <20171129141818.22843-1-benjamin.gaignard@st.com>
-Message-ID: <7cfe5534-9371-be49-98c6-36e08577b26d@st.com>
+Date: Wed, 29 Nov 2017 16:06:01 +0100
+Subject: [PATCH] ethernet: dwmac-stm32: Fix copyright
+In-Reply-To: <20171129142000.22969-1-benjamin.gaignard@st.com>
+References: <20171129142000.22969-1-benjamin.gaignard@st.com>
+Message-ID: <370b0e90-d822-8898-ee64-03f5421d6389@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 11/29/2017 03:18 PM, Benjamin Gaignard wrote:
+On 11/29/2017 03:20 PM, Benjamin Gaignard wrote:
 > Uniformize STMicroelectronics copyrights header
 > 
 > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> CC: Alexandre Torgue <alexandre.torgue@st.com>
 > ---
->   drivers/dma/stm32-dma.c | 1 +
->   1 file changed, 1 insertion(+)
+>   drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
-> index 786fc8fcc38e..bb013ffe8a5c 100644
-> --- a/drivers/dma/stm32-dma.c
-> +++ b/drivers/dma/stm32-dma.c
-> @@ -4,6 +4,7 @@
->    * Inspired by dma-jz4740.c and tegra20-apb-dma.c
+> diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+> index 61cb24810d10..9e6db16af663 100644
+> --- a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+> +++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+> @@ -1,8 +1,8 @@
+>   /*
+>    * dwmac-stm32.c - DWMAC Specific Glue layer for STM32 MCU
 >    *
->    * Copyright (C) M'boumba Cedric Madianga 2015
+> - * Copyright (C) Alexandre Torgue 2015
+> - * Author:  Alexandre Torgue <alexandre.torgue@gmail.com>
 > + * Copyright (C) STMicroelectronics SA 2017
->    * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
->    *
+> + * Author:  Alexandre Torgue <alexandre.torgue@st.com> for STMicroelectronics.
 >    * License terms:  GNU General Public License (GPL), version 2
+>    *
+>    */
 > 
 Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
