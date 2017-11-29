@@ -1,36 +1,65 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 29 Nov 2017 18:10:37 +0800
-Subject: [PATCH 3/3] arm: dts: mt7623: fix card detection issue on bananapi-r2
-In-Reply-To: <cover.1511949769.git.sean.wang@mediatek.com>
-References: <cover.1511949769.git.sean.wang@mediatek.com>
-Message-ID: <88269ed11bdf881087f7b0de331a60d8acfdc977.1511949769.git.sean.wang@mediatek.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 29 Nov 2017 13:14:21 +0300
+Subject: [PATCH 1/2] arm64: dts: renesas: initial V3MSK board device tree
+In-Reply-To: <20171129095109.d2uan35eui4kzav6@verge.net.au>
+References: <20171124210313.219761525@cogentembedded.com>
+ <20171129095109.d2uan35eui4kzav6@verge.net.au>
+Message-ID: <06d59459-86dc-89b1-a0ed-adbd1481abc6@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+Hello!
 
-Fix that bananapi-r2 booting from SD-card would fail since incorrect
-polarity is applied to the previous setup with GPIO_ACTIVE_HIGH.
+On 11/29/2017 12:51 PM, Simon Horman wrote:
 
-Cc: stable at vger.kernel.org # v4.14+
-Fixes: 0eed8d097612 ("arm: dts: mt7623: Add SD-card and EMMC to bananapi-r2")
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
----
- arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+>> Add the initial device  tree for the V3M Starter Kit board.
+>> The board has 1 debug serial port (SCIF0); include support for it,
+>> so that the serial console can work.
+>>
+>> Based on the original (and large) patch by Vladimir Barinov.
+>>
+>> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>>
+>> ---
+>>   arch/arm64/boot/dts/renesas/Makefile           |    2 -
+[...]
+>> Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+>> ===================================================================
+>> --- /dev/null
+>> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+>> @@ -0,0 +1,44 @@
+>> +/*
+>> + * Device Tree Source for the V3M Starter Kit board
+>> + *
+>> + * Copyright (C) 2017 Renesas Electronics Corp.
+>> + * Copyright (C) 2017 Cogent Embedded, Inc.
+>> + *
+>> + * This file is licensed under the terms of the GNU General Public License
+>> + * version 2.  This program is licensed "as is" without any warranty of any
+>> + * kind, whether express or implied.
+>> + */
+>> +
+>> +/dts-v1/;
+>> +#include "r8a77970.dtsi"
+>> +
+>> +/ {
+>> +	model = "Renesas V3M Starter Kit board";
+>> +	compatible = "renesas,v3msk", "renesas,r8a77970";
+>> +
+>> +	aliases {
+>> +		serial0 = &scif0;
+>> +	};
+>> +
+>> +	chosen {
+> 
+> For consistency with other Renesas boards I would like to request the
+> following be added here:
+> 
+> 		bootargs = "ignore_loglevel rw";
 
-diff --git a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-index 688a863..7bf5aa2 100644
---- a/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-+++ b/arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts
-@@ -204,7 +204,7 @@
- 	bus-width = <4>;
- 	max-frequency = <50000000>;
- 	cap-sd-highspeed;
--	cd-gpios = <&pio 261 0>;
-+	cd-gpios = <&pio 261 GPIO_ACTIVE_LOW>;
- 	vmmc-supply = <&mt6323_vmch_reg>;
- 	vqmmc-supply = <&mt6323_vio18_reg>;
- };
--- 
-2.7.4
+    There's currently no consistency as ulcb.dtsi doesn't seem to specify 
+"bootargs" prop at all. Moreover, this prop seems to be ignored by ARM64 
+kernel -- I can only specify "bootargs" in U-Boot....
+
+MBR, Sergei
