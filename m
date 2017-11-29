@@ -1,41 +1,22 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Wed, 29 Nov 2017 18:02:56 +0100
-Subject: [PATCH v3] arch: arm: mach-stm32: Fix copyright
-In-Reply-To: <20171129152523.5262-1-benjamin.gaignard@st.com>
-References: <20171129152523.5262-1-benjamin.gaignard@st.com>
-Message-ID: <CAOFm3uFAnS9x248di7S_re7P90+oPvyyiBGbmtqV26NEoOv7GA@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 29 Nov 2017 09:04:53 -0800
+Subject: [PATCH] clk: fix compile testing of scpi clk driver
+In-Reply-To: <24058ecb-9f12-f7e1-503d-bd98eb894c6c@gmail.com>
+References: <24058ecb-9f12-f7e1-503d-bd98eb894c6c@gmail.com>
+Message-ID: <20171129170453.GA7698@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 4:25 PM, Benjamin Gaignard
-<benjamin.gaignard@linaro.org> wrote:
-> Uniformize STMicroelectronics copyrights header
-> Add SPDX identifier
->
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  arch/arm/mach-stm32/board-dt.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-> index e918686e4191..77899ae4b8ed 100644
-> --- a/arch/arm/mach-stm32/board-dt.c
-> +++ b/arch/arm/mach-stm32/board-dt.c
-> @@ -1,5 +1,7 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * Copyright (C) Maxime Coquelin 2015
-> + * Copyright (C) STMicroelectronics SA 2017
->   * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
->   * License terms:  GNU General Public License (GPL), version 2
->   */
+On 11/28, Heiner Kallweit wrote:
+> We now have a hard dependency on ARM_SCPI_PROTOCOL and may end up with
+> the following error:
+> ERROR: "get_scpi_ops" [drivers/clk/clk-scpi.ko] undefined!
+> Fix this by removing COMPILE_TEST from COMMON_CLK_SCPI dependencies.
+> 
+> Fixes: f7fee8be06a6 "firmware: arm_scpi: remove default for get_scpi_ops if not reachable"
 
-Sorry to be picky there, but you can now rightfully remove this line
-IMHO as the "SPDX-License-Identifier: GPL-2.0" already covers it now
-e.g:
-
-> - * License terms:  GNU General Public License (GPL), version 2
+I don't see this commit anywhere. Is this a future issue?
 
 -- 
-Cordially
-Philippe Ombredanne
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
