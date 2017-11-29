@@ -1,40 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Nov 2017 11:47:44 +0000
-Subject: [PATCH] arm64: fix missing 'const' qualifiers
-In-Reply-To: <20171129093225.tq2cbg6l6yupkeit@yury-thinkpad>
-References: <20171125094127.7536-1-ynorov@caviumnetworks.com>
- <20171128183355.GO9266@arm.com>
- <20171129093225.tq2cbg6l6yupkeit@yury-thinkpad>
-Message-ID: <20171129114744.GB10650@arm.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Wed, 29 Nov 2017 12:51:45 +0100
+Subject: [PATCH] net: ethernet: xilinx: Mark XILINX_LL_TEMAC broken on
+ 64-bit
+In-Reply-To: <1511949669-30379-1-git-send-email-geert+renesas@glider.be>
+References: <1511949669-30379-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <c69c2f1f-0f22-2baf-41a5-d30e2f6d96a0@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 12:32:25PM +0300, Yury Norov wrote:
-> On Tue, Nov 28, 2017 at 06:33:55PM +0000, Will Deacon wrote:
-> > On Sat, Nov 25, 2017 at 12:41:27PM +0300, Yury Norov wrote:
-> > > It was discovered during LTO-enabled compilation with gcc/ld.bfd.
-> > 
-> > What was discovered? Could you provide a bit more information in the
-> > changelog, please? I'm happy to take this as a fix if it's actually fixing
-> > something.
+On 29.11.2017 11:01, Geert Uytterhoeven wrote:
+> On 64-bit (e.g. powerpc64/allmodconfig):
 > 
-> Yes it does. There's inconsistency in variable declaration and
-> section type. GCC doesn't throw error for usual build, but if LTO
-> enabled, build becomes broken, like this:
+>     drivers/net/ethernet/xilinx/ll_temac_main.c: In function 'temac_start_xmit_done':
+>     drivers/net/ethernet/xilinx/ll_temac_main.c:633:22: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> 	dev_kfree_skb_irq((struct sk_buff *)cur_p->app4);
+> 			  ^
 > 
-> mm/percpu.c:2168:20: error: pcpu_fc_names causes a section type conflict
-> with dt_supported_cpu_ops
-> const char * const pcpu_fc_names[PCPU_FC_NR] __initconst = {
->         ^
-> arch/arm64/kernel/cpu_ops.c:34:37: note: ?dt_supported_cpu_ops? was declared here
-> static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
+> cdmac_bd.app4 is u32, so it is too small to hold a kernel pointer.
 > 
-> And so on. Let me know if you need full error log, then I'll resend the
-> patch with it.
+> Note that several other fields in struct cdmac_bd are also too small to
+> hold physical addresses on 64-bit platforms.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+>  drivers/net/ethernet/xilinx/Kconfig | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/net/ethernet/xilinx/Kconfig b/drivers/net/ethernet/xilinx/Kconfig
+> index 6d68c8a8f4f2ac7f..da4ec575ccf9ba4a 100644
+> --- a/drivers/net/ethernet/xilinx/Kconfig
+> +++ b/drivers/net/ethernet/xilinx/Kconfig
+> @@ -34,6 +34,7 @@ config XILINX_AXI_EMAC
+>  config XILINX_LL_TEMAC
+>  	tristate "Xilinx LL TEMAC (LocalLink Tri-mode Ethernet MAC) driver"
+>  	depends on (PPC || MICROBLAZE)
+> +	depends on !64BIT || BROKEN
+>  	select PHYLIB
+>  	---help---
+>  	  This driver supports the Xilinx 10/100/1000 LocalLink TEMAC
+> 
 
-I think it would be helpful to include one of the errors in the commit
-message.
+Yes. This IP is available only on big endian 32bit systems.
 
-Please send a v2 with that.
-
-Will
+Thanks,
+Michal
