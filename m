@@ -1,45 +1,31 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 29 Nov 2017 12:18:40 -0800
-Subject: [PATCH 0/9] soc: brcmstb: biuctrl updates for 64-bit chips
-Message-ID: <20171129201849.17522-1-f.fainelli@gmail.com>
+Date: Wed, 29 Nov 2017 12:18:41 -0800
+Subject: [PATCH 1/9] dt-bindings: arm: Add entry for Broadcom Brahma-B53
+In-Reply-To: <20171129201849.17522-1-f.fainelli@gmail.com>
+References: <20171129201849.17522-1-f.fainelli@gmail.com>
+Message-ID: <20171129201849.17522-2-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Broadcom's Brahma-B53 CPU is an ARMv8A processor used on a number of
+DSL, Cable Modem and Set-top-box SoCs.
 
-This patch series updates the Broadcom STB Bus Interface Unit controller to
-support newer chips such as 7260, 7268, 7271 and 7278. These chips require
-additional tuning in order to provide the expected bus throughput.
+Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
+---
+ Documentation/devicetree/bindings/arm/cpus.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-In the process, we need to re-organize the common.c file a little bit in order
-to extract the family and product identifiers a little earlier.
-
-Finally, by moving the biuctrl initialization an early_initcall level, we can
-remove some code from the ARM-32bit machine descriptor file.
-
-Provided that we are happy with these changes, I would route them through my
-drivers/next branch and a subsequent Broadcom ARM SoC pull request.
-
-Thank you
-
-Florian Fainelli (9):
-  dt-bindings: arm: Add entry for Broadcom Brahma-B53
-  dt-bindings: arm: brcmstb: Correct BIUCTRL node documentation
-  soc: brcmstb: Make CPU credit offset more parameterized
-  soc: brcmstb: Correct CPU_CREDIT_REG offset for Brahma-B53 CPUs
-  soc: brcmstb: biuctrl: Prepare for saving/restoring other registers
-  soc: brcmstb: biuctrl: Wire-up new registers
-  soc: brcmstb: biuctrl: Fine tune B53 MCP interface settings
-  soc: brcmstb: Split initialization
-  soc: brcmstb: biuctrl: Move to early_initcall
-
- .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |  22 +--
- Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
- arch/arm/mach-bcm/brcmstb.c                        |   2 -
- drivers/soc/bcm/brcmstb/biuctrl.c                  | 176 +++++++++++++++++++--
- drivers/soc/bcm/brcmstb/common.c                   |  27 ++--
- include/linux/soc/brcmstb/brcmstb.h                |   6 -
- 6 files changed, 186 insertions(+), 48 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+index a0009b72e9be..f4a777039f03 100644
+--- a/Documentation/devicetree/bindings/arm/cpus.txt
++++ b/Documentation/devicetree/bindings/arm/cpus.txt
+@@ -169,6 +169,7 @@ described below.
+ 			    "arm,cortex-r5"
+ 			    "arm,cortex-r7"
+ 			    "brcm,brahma-b15"
++			    "brcm,brahma-b53"
+ 			    "brcm,vulcan"
+ 			    "cavium,thunder"
+ 			    "cavium,thunder2"
 -- 
 2.9.3
