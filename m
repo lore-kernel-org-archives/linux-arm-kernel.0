@@ -1,35 +1,30 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 29 Nov 2017 15:39:49 -0800
-Subject: [PATCH] arm64: Inform user if software PAN is in use
-Message-ID: <20171129233949.1284-1-sboyd@codeaurora.org>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Wed, 29 Nov 2017 15:44:35 -0800
+Subject: [PATCH 0/7] Add support for GNU gold
+Message-ID: <20171129234442.655-1-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It isn't entirely obvious if we're using software PAN because we
-don't say anything about it in the boot log. But if we're using
-hardware PAN we'll print a nice CPU feature message indicating
-it. Add a print for software PAN too so we know if it's being
-used or not.
+These patches add macros for detecting the linker name and version,
+and apply fixes and workarounds needed to link the arm64 kernel with
+GNU gold.
 
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm64/kernel/cpufeature.c | 3 +++
- 1 file changed, 3 insertions(+)
+Sami Tolvanen (7):
+  kbuild: add ld-name macro and support for GNU gold
+  kbuild: add ld-if-name-version and linker-specific macros
+  kbuild: fix LD_DEAD_CODE_DATA_ELIMINATION with GNU gold
+  arm64: fix -m for GNU gold
+  arm64: keep .altinstructions and .altinstr_replacement
+  arm64: explicitly pass --no-fix-cortex-a53-843419 to GNU gold
+  arm64: add a workaround for GNU gold with ARM64_MODULE_PLTS
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 21e2c95d24e7..c6f8da17146b 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -1189,6 +1189,9 @@ void __init setup_cpu_features(void)
- 	if (system_supports_32bit_el0())
- 		setup_elf_hwcaps(compat_elf_hwcaps);
- 
-+	if (system_uses_ttbr0_pan())
-+		pr_info("Emulating Privileged Access Never (PAN) using TTBR0_EL1 switching\n");
-+
- 	/* Advertise that we have computed the system capabilities */
- 	set_sys_caps_initialised();
- 
+ Makefile                          |  5 +++++
+ arch/arm64/Makefile               | 17 +++++++++++++++++
+ arch/arm64/kernel/module.lds      |  4 ++--
+ arch/arm64/kernel/vmlinux.lds.S   |  4 ++--
+ include/asm-generic/vmlinux.lds.h |  8 ++++----
+ scripts/Kbuild.include            | 16 ++++++++++++++++
+ 6 files changed, 46 insertions(+), 8 deletions(-)
+
 -- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.15.0.531.g2ccb3012c9-goog
