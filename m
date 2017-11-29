@@ -1,17 +1,52 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 29 Nov 2017 10:08:28 -0500 (EST)
-Subject: [PATCH] ethernet: dwmac-stm32: Fix copyright
-In-Reply-To: <20171129142000.22969-1-benjamin.gaignard@st.com>
-References: <20171129142000.22969-1-benjamin.gaignard@st.com>
-Message-ID: <20171129.100828.668851540198301817.davem@davemloft.net>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Wed, 29 Nov 2017 16:16:11 +0100
+Subject: [PATCH] meson-gx-socinfo: Fix package id parsing
+In-Reply-To: <20171129151000.710502415@rtp-net.org>
+References: <20171129151000.710502415@rtp-net.org>
+Message-ID: <2d1b540e-74c3-07e6-eedd-94a9c6f52213@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Benjamin Gaignard <benjamin.gaignard@linaro.org>
-Date: Wed, 29 Nov 2017 15:20:00 +0100
-
-> Uniformize STMicroelectronics copyrights header
+On 29/11/2017 16:09, Arnaud Patard wrote:
+> I've noticed the following message while booting a S905X based board:
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> soc soc0: Amlogic Meson GXL (S905D) Revision 21:82 (b:2) Detected
+> 
+> The S905D string is obviously wrong. The vendor code does:
+> ...
+>         ver = (readl(assist_hw_rev) >> 8) & 0xff;
+>         meson_cpu_version[MESON_CPU_VERSION_LVL_MINOR] = ver;
+>         ver =  (readl(assist_hw_rev) >> 16) & 0xff;
+>         meson_cpu_version[MESON_CPU_VERSION_LVL_PACK] = ver;
+> ...
+> 
+> while the current code does:
+> ...
+> #define SOCINFO_MINOR  GENMASK(23, 16)
+> #define SOCINFO_PACK   GENMASK(15, 8)
+> ...
+> 
+> This means that the current mainline code has package id and minor
+> version reversed.
+> 
+> Fixes: a9daaba2965e8 ("soc: Add Amlogic SoC Information driver")
+> Signed-off-by: Arnaud Patard <apatard@hupstream.com>
+> Index: linux/drivers/soc/amlogic/meson-gx-socinfo.c
+> ===================================================================
+> --- linux.orig/drivers/soc/amlogic/meson-gx-socinfo.c	2017-11-29 10:26:49.081335917 +0100
+> +++ linux/drivers/soc/amlogic/meson-gx-socinfo.c	2017-11-29 10:26:49.041335074 +0100
+> @@ -20,8 +20,8 @@
+>  #define AO_SEC_SOCINFO_OFFSET	AO_SEC_SD_CFG8
+>  
+>  #define SOCINFO_MAJOR	GENMASK(31, 24)
+> -#define SOCINFO_MINOR	GENMASK(23, 16)
+> -#define SOCINFO_PACK	GENMASK(15, 8)
+> +#define SOCINFO_PACK	GENMASK(23, 16)
+> +#define SOCINFO_MINOR	GENMASK(15, 8)
+>  #define SOCINFO_MISC	GENMASK(7, 0)
+>  
+>  static const struct meson_gx_soc_id {
+> 
+> 
 
-Applied.
+Acked-by: Neil Armstrong <narmstrong@baylibre.com>
