@@ -1,74 +1,40 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Nov 2017 10:51:51 +0000
-Subject: [PATCH 1/2] mm: make faultaround produce old ptes
-In-Reply-To: <f09cd880-f647-7dc8-2ca9-67dab411c6c3@codeaurora.org>
-References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
- <CAADWXX8FmAs1qB9=fsWZjt8xTEnGOAMS=eCHnuDLJrZiX6x=7w@mail.gmail.com>
- <f09cd880-f647-7dc8-2ca9-67dab411c6c3@codeaurora.org>
-Message-ID: <20171129105151.GA10179@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 29 Nov 2017 10:53:09 +0000
+Subject: [alsa-devel] [PATCH 1/5 v4] ASoC: ep93xx-ac97: Fix
+ platform_get_irq's error checking
+In-Reply-To: <5A12FC64.3020205@gmail.com>
+References: <082d4479211d425219f4ab275ecc12e1011eca2f.1511062844.git.arvind.yadav.cs@gmail.com>
+ <20171120133717.kscrjsb3y7gnvd2t@piout.net>
+ <5A12FC64.3020205@gmail.com>
+Message-ID: <20171129105309.2wqsbzuzjez5272k@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:35:28AM +0530, Vinayak Menon wrote:
-> On 11/29/2017 1:15 AM, Linus Torvalds wrote:
-> > On Mon, Nov 27, 2017 at 9:07 PM, Vinayak Menon <vinmenon@codeaurora.org> wrote:
-> >> Making the faultaround ptes old results in a unixbench regression for some
-> >> architectures [3][4]. But on some architectures it is not found to cause
-> >> any regression. So by default produce young ptes and provide an option for
-> >> architectures to make the ptes old.
-> > Ugh. This hidden random behavior difference annoys me.
-> >
-> > It should also be better documented in the code if we end up doing it.
-> Okay.
-> > The reason x86 seems to prefer young pte's is simply that a TLB lookup
-> > of an old entry basically causes a micro-fault that then sets the
-> > accessed bit (using a locked cycle) and then a restart.
-> >
-> > Those microfaults are not visible to software, but they are pretty
-> > expensive in hardware, probably because they basically serialize
-> > execution as if a real page fault had happened.
-> >
-> > HOWEVER - and this is the part that annoys me most about the hidden
-> > behavior - I suspect it ends up being very dependent on
-> > microarchitectural details in addition to the actual load. So it might
-> > be more true on some cores than others, and it might be very
-> > load-dependent. So hiding it as some architectural helper function
-> > really feels wrong to me. It would likely be better off as a real
-> > flag, and then maybe we could make the default behavior be set by
-> > architecture (or even dynamically by the architecture bootup code if
-> > it turns out to be enough of an issue).
-> >
-> > And I'm actually somewhat suspicious of your claim that it's not
-> > noticeable on arm64. It's entirely possible that the serialization
-> > cost of the hardware access flag is much lower, but I thought that in
-> > virtualization you actually end up taking a SW fault, which in turn
-> > would be much more expensive. In fact, I don't even find that
-> > "Hardware Accessed" bit in my armv8 docs at all, so I'm guessing it's
-> > new to 8.1? So this is very much not about architectures at all, but
-> > about small details in microarchitectural behavior.
-> The experiments were done on v8.2 hardware with CONFIG_ARM64_HW_AFDBM enabled.
-> I have tried with CONFIG_ARM64_HW_AFDBM "disabled", and the unixbench score drops down,
-> probably due to the SW faults.
+On Mon, Nov 20, 2017 at 09:31:40PM +0530, arvindY wrote:
+> On Monday 20 November 2017 07:07 PM, Alexandre Belloni wrote:
+> > On 19/11/2017 at 09:45:00 +0530, Arvind Yadav wrote:
 
-Sure, but I think the point is that just because a CPU implements hardware
-access/dirty management (DBM -- added in 8.1), it doesn't mean it's going
-to be efficient on all implementations, and so having this keyed off the
-architecture isn't the right thing to do.
+> > To ensure this doesn't get applied: platform_get_irq can return
+> > -EPROBE_DEFER and this must be handled properly.
 
-If we had a flag, as suggested, then we could set that by default on CPUs
-that implement hardware DBM and clear it on a case-by-case basis if
-implementations pop up where it's a performance issue, although I think
-it's more likely that setting the dirty bit is the expensive one since
-it's not allowed to be performed speculatively.
+> Yes, you are right. We should retry to get an irq for device. But ASoC
+>  driver is not retrying. if platfore_get_irq() fail here, Driver is throwing
+> an error.
+> and this patch is only to fix error checking which is not correct in Driver.
 
-Linus -- if you want the latest architecture document, it's now available
-here without a click-through:
+> > >   	irq = platform_get_irq(pdev, 0);
+> > > -	if (!irq)
+> > > +	if (irq <= 0)
+> > >   		return -ENODEV;
 
-https://developer.arm.com/products/architecture/a-profile/docs/ddi0487/latest/arm-architecture-reference-manual-armv8-for-armv8-a-architecture-profile
-
-p2109 has stuff about DBM. It is also available at Stage-2, but nobody's
-done the KVM work yet by the looks of it.
-
-Cheers,
-
-Will
+This is just squashing all error codes into -ENODEV, we'd be handling
+probe deferral properly if we just returned the raw error code here.  We
+need separate handling for irq == 0 which is an error but not an error
+code and for cases where we've got an error code.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171129/f1b57a77/attachment.sig>
