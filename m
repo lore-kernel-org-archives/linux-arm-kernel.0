@@ -1,86 +1,48 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Wed, 29 Nov 2017 21:54:36 +0100
-Subject: [PATCH v2 3/6] ARM: ep93xx: ts72xx: Rewrite
- ts72xx_register_flash() to accept parameters
-In-Reply-To: <20171121143204.1839-4-lukma@denx.de>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171121143204.1839-1-lukma@denx.de> <20171121143204.1839-4-lukma@denx.de>
-Message-ID: <2de38480-c994-dc8c-f107-61c2862647b2@gmail.com>
+From: dvyukov@google.com (Dmitry Vyukov)
+Date: Wed, 29 Nov 2017 21:56:17 +0100
+Subject: kasan: false use-after-scope warnings with KCOV
+In-Reply-To: <CAK8P3a2HhfiYs1fhUGH4TSP+LFeaFJswOyQYN=joxc+HNBcDwA@mail.gmail.com>
+References: <20171128123555.mo4ikj2ru6mkibwo@lakrids.cambridge.arm.com>
+ <CACT4Y+Z2VhaDiFdg3aoi5uEsX7M+5-XMGH4PApys=qXKSMVUFg@mail.gmail.com>
+ <20171128141355.3pwgzfhji32lehf2@lakrids.cambridge.arm.com>
+ <20171128152405.vkwxdbkbuokjt2hv@lakrids.cambridge.arm.com>
+ <CAK8P3a2HhfiYs1fhUGH4TSP+LFeaFJswOyQYN=joxc+HNBcDwA@mail.gmail.com>
+Message-ID: <CACT4Y+bYtxACKT77nvJ9wT0rmLAGfz=ebbr0==L78O03aKUiJw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On Wed, Nov 29, 2017 at 9:17 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>> > > As a heads-up, I'm seeing a number of what appear to be false-positive
+>>> > > use-after-scope warnings when I enable both KCOV and KASAN (inline or outline),
+>>> > > when using the Linaro 17.08 GCC7.1.1 for arm64. So far I haven't spotted these
+>>> > > without KCOV selected, and I'm only seeing these for sanitize-use-after-scope.
+>>> > >
+>>> > > The reports vary depending on configuration even with the same trigger. I'm not
+>>> > > sure if it's the reporting that's misleading, or whether the detection is going
+>>> > > wrong.
+>>
+>>> ... it looks suspiciously like something is setting up non-zero shadow
+>>> bytes, but not zeroing them upon return.
+>>
+>> It looks like this is the case.
+>>
+>> The hack below detects leftover poison on an exception return *before*
+>> the false-positive warning (example splat at the end of the email). With
+>> scripts/Makefile.kasan hacked to not pass
+>> -fsanitize-address-use-after-scope, I see no leftover poison.
+>
+> That reminds me that we are still missing my patch to turn off
+> -fsanitize-address-use-after-scope by default and instead re-enable
+> CONFIG_FRAME_WARN when KASAN is turned on.
+>
+> I spent about a year hunting down all the instances that produce more
+> than 2KB stack frames with KASAN (including asan-stack), they should
+> be disabled now, but we still have some seriously large stack frames with
+>  -fsanitize-address-use-after-scope.
+>
+> Maybe it's better to just completely disable  -fsanitize-address-use-after-scope
+> when it has multiple independent problems.
 
-On 21/11/17 15:32, Lukasz Majewski wrote:
-> This commit extend the ts72xx_register_flash() to accept passed parameters,
-> which makes it more reusable.
-> 
-> Now it is possible to accept ep93xx flash start address and partitions.
-> 
-> Signed-off-by: Lukasz Majewski <lukma@denx.de>
 
-Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
-
-> 
-> ---
-> Changes for v2:
-> - New patch
-> ---
->  arch/arm/mach-ep93xx/ts72xx.c | 20 ++++++++------------
->  1 file changed, 8 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-> index 06345b85f27c..00e0e5b8babf 100644
-> --- a/arch/arm/mach-ep93xx/ts72xx.c
-> +++ b/arch/arm/mach-ep93xx/ts72xx.c
-> @@ -120,8 +120,6 @@ static struct platform_nand_data ts72xx_nand_data = {
->  		.nr_chips	= 1,
->  		.chip_offset	= 0,
->  		.chip_delay	= 15,
-> -		.partitions	= ts72xx_nand_parts,
-> -		.nr_partitions	= ARRAY_SIZE(ts72xx_nand_parts),
->  	},
->  	.ctrl = {
->  		.cmd_ctrl	= ts72xx_nand_hwcontrol,
-> @@ -145,8 +143,8 @@ static struct platform_device ts72xx_nand_flash = {
->  	.num_resources		= ARRAY_SIZE(ts72xx_nand_resource),
->  };
->  
-> -
-> -static void __init ts72xx_register_flash(void)
-> +void __init ts72xx_register_flash(struct mtd_partition *parts, int n,
-> +				  resource_size_t start)
->  {
->  	/*
->  	 * TS7200 has NOR flash all other TS72xx board have NAND flash.
-> @@ -154,16 +152,12 @@ static void __init ts72xx_register_flash(void)
->  	if (board_is_ts7200()) {
->  		ep93xx_register_flash(2, EP93XX_CS6_PHYS_BASE, SZ_16M);
->  	} else {
-> -		resource_size_t start;
-> -
-> -		if (is_ts9420_installed())
-> -			start = EP93XX_CS7_PHYS_BASE;
-> -		else
-> -			start = EP93XX_CS6_PHYS_BASE;
-> -
->  		ts72xx_nand_resource[0].start = start;
->  		ts72xx_nand_resource[0].end = start + SZ_16M - 1;
->  
-> +		ts72xx_nand_data.chip.partitions = parts;
-> +		ts72xx_nand_data.chip.nr_partitions = n;
-> +
->  		platform_device_register(&ts72xx_nand_flash);
->  	}
->  }
-> @@ -223,7 +217,9 @@ static struct platform_device ts73xx_fpga_device = {
->  static void __init ts72xx_init_machine(void)
->  {
->  	ep93xx_init_devices();
-> -	ts72xx_register_flash();
-> +	ts72xx_register_flash(ts72xx_nand_parts, ARRAY_SIZE(ts72xx_nand_parts),
-> +			      is_ts9420_installed() ?
-> +			      EP93XX_CS7_PHYS_BASE : EP93XX_CS6_PHYS_BASE);
->  	platform_device_register(&ts72xx_rtc_device);
->  	platform_device_register(&ts72xx_wdt_device);
->  
+This one is not a problem with KASAN. KASAN has detected a very real
+and subtle bug in the code.
