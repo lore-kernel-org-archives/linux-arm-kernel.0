@@ -1,40 +1,48 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Nov 2017 10:53:09 +0000
-Subject: [alsa-devel] [PATCH 1/5 v4] ASoC: ep93xx-ac97: Fix
- platform_get_irq's error checking
-In-Reply-To: <5A12FC64.3020205@gmail.com>
-References: <082d4479211d425219f4ab275ecc12e1011eca2f.1511062844.git.arvind.yadav.cs@gmail.com>
- <20171120133717.kscrjsb3y7gnvd2t@piout.net>
- <5A12FC64.3020205@gmail.com>
-Message-ID: <20171129105309.2wqsbzuzjez5272k@sirena.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Nov 2017 10:55:28 +0000
+Subject: gicv3: 1 of N model implementation related
+In-Reply-To: <20171129103421.niju3tkdah3tzajw@lakrids.cambridge.arm.com>
+References: <e83aac509dcef816bbf279c4ba2bed1a@codeaurora.org>
+ <20171129103421.niju3tkdah3tzajw@lakrids.cambridge.arm.com>
+Message-ID: <394b7dd0-703c-4fc8-e33f-e85d37d33b9d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 09:31:40PM +0530, arvindY wrote:
-> On Monday 20 November 2017 07:07 PM, Alexandre Belloni wrote:
-> > On 19/11/2017 at 09:45:00 +0530, Arvind Yadav wrote:
+Thanks Mark,
 
-> > To ensure this doesn't get applied: platform_get_irq can return
-> > -EPROBE_DEFER and this must be handled properly.
+On 29/11/17 10:34, Mark Rutland wrote:
+> On Tue, Nov 28, 2017 at 04:42:47PM -0800, ckadabi at codeaurora.org wrote:
+>> Hi Mark:
+> 
+> Hi,
+> 
+> I'm afraid I don't know much about GICv3 or the irq infrastrcuture in
+> the kernel . Did you mean to ask Marc Zyngier (Cc'd)?
+> 
+> Thanks,
+> Mark.
+> 
+>> I have some question related to gicv3 driver on 1 of N distribution model.
+>> Looking at the linux kernel implementation the interrupt is always affined
+>> to the first online cpu and does not use the 1 of N distribution model.
+>> As per the Gic spec 1 of N model could help to achieve low latency as
+>> handling the interrupts as there are more PE's participating in handling the
+>> interrupt.
+>>
+>> Is there a reason the Linux kernel driver does not implement the 1 of N
+>> model?
 
-> Yes, you are right. We should retry to get an irq for device. But ASoC
->  driver is not retrying. if platfore_get_irq() fail here, Driver is throwing
-> an error.
-> and this patch is only to fix error checking which is not correct in Driver.
+The 1-N model comes at the expense of interrupting all the participating
+CPUs until one of them actually ACKs the interrupt (and the others only
+see a spurious interrupt). This indeed reduces the latency to service
+the interrupt, and kills the performance of all the CPUs. Not the
+brightest thing, IMO.
 
-> > >   	irq = platform_get_irq(pdev, 0);
-> > > -	if (!irq)
-> > > +	if (irq <= 0)
-> > >   		return -ENODEV;
+It feels to me that a better option is to let an external agent spread
+the interrupts on the less busy CPUs. Something like irqbalance...
 
-This is just squashing all error codes into -ENODEV, we'd be handling
-probe deferral properly if we just returned the raw error code here.  We
-need separate handling for irq == 0 which is an error but not an error
-code and for cases where we've got an error code.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171129/f1b57a77/attachment.sig>
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
