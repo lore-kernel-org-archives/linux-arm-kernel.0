@@ -1,51 +1,32 @@
-From: antony@phenome.org (Antony Antony)
-Date: Wed, 29 Nov 2017 15:17:16 +0100
-Subject: [PATCH] arm64: dts: allwinner: h5: NanoPi NEO Plus2 : add EMAC support
-Message-ID: <20171129141716.98951-1-antony@phenome.org>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 29 Nov 2017 15:20:00 +0100
+Subject: [PATCH] ethernet: dwmac-stm32: Fix copyright
+Message-ID: <20171129142000.22969-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add arm64 H5 dwmac-sun8i support for this board
+Uniformize STMicroelectronics copyrights header
 
-Signed-off-by: Antony Antony <antony@phenome.org>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+CC: Alexandre Torgue <alexandre.torgue@st.com>
 ---
- .../boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts   | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-index 7c028af..01dace4 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-nanopi-neo-plus2.dts
-@@ -53,6 +53,7 @@
- 	compatible = "friendlyarm,nanopi-neo-plus2", "allwinner,sun50i-h5";
- 
- 	aliases {
-+		ethernet0 = &emac;
- 		serial0 = &uart0;
- 	};
- 
-@@ -133,6 +134,22 @@
- 	status = "okay";
- };
- 
-+&emac {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&emac_rgmii_pins>;
-+	phy-supply = <&reg_gmac_3v3>;
-+	phy-handle = <&ext_rgmii_phy>;
-+	phy-mode = "rgmii";
-+	status = "okay";
-+};
-+
-+&external_mdio {
-+	ext_rgmii_phy: ethernet-phy at 7 {
-+		compatible = "ethernet-phy-ieee802.3-c22";
-+		reg = <7>;
-+	};
-+};
-+
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+index 61cb24810d10..9e6db16af663 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-stm32.c
+@@ -1,8 +1,8 @@
+ /*
+  * dwmac-stm32.c - DWMAC Specific Glue layer for STM32 MCU
+  *
+- * Copyright (C) Alexandre Torgue 2015
+- * Author:  Alexandre Torgue <alexandre.torgue@gmail.com>
++ * Copyright (C) STMicroelectronics SA 2017
++ * Author:  Alexandre Torgue <alexandre.torgue@st.com> for STMicroelectronics.
+  * License terms:  GNU General Public License (GPL), version 2
+  *
+  */
 -- 
-2.7.4
+2.15.0
