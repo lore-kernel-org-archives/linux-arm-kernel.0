@@ -1,74 +1,49 @@
 From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Wed, 29 Nov 2017 12:18:44 -0800
-Subject: [PATCH 4/9] soc: brcmstb: Correct CPU_CREDIT_REG offset for
- Brahma-B53 CPUs
+Date: Wed, 29 Nov 2017 12:18:46 -0800
+Subject: [PATCH 6/9] soc: brcmstb: biuctrl: Wire-up new registers
 In-Reply-To: <20171129201849.17522-1-f.fainelli@gmail.com>
 References: <20171129201849.17522-1-f.fainelli@gmail.com>
-Message-ID: <20171129201849.17522-5-f.fainelli@gmail.com>
+Message-ID: <20171129201849.17522-7-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Broadcom Brahma-B53 CPUs, the CPU_CREDIT_REG offset got moved to
-0x0b0 instead of 0x184, correct this such that we correcty
-enable/disable write-pairing for these chips.
+Add definitions for B53 systems register: CPU_MCP_FLOW_REG and
+CPU_WRITEBACK_CTRL_REG. These register will be saved and restored
+accordingly.
 
 Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 ---
- drivers/soc/bcm/brcmstb/biuctrl.c | 24 +++++++++++++++++++++---
- 1 file changed, 21 insertions(+), 3 deletions(-)
+ drivers/soc/bcm/brcmstb/biuctrl.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/soc/bcm/brcmstb/biuctrl.c b/drivers/soc/bcm/brcmstb/biuctrl.c
-index c3c548fcaa8c..e8322e663831 100644
+index 16cbfc2e953a..d498f9db01ab 100644
 --- a/drivers/soc/bcm/brcmstb/biuctrl.c
 +++ b/drivers/soc/bcm/brcmstb/biuctrl.c
-@@ -21,12 +21,13 @@
- #include <linux/syscore_ops.h>
- #include <linux/soc/brcmstb/brcmstb.h>
+@@ -49,17 +49,23 @@ static inline void cbc_writel(u32 val, int reg)
  
--#define CPU_CREDIT_REG_OFFSET			0x184
-+#define B15_CPU_CREDIT_REG_OFFSET		0x184
-+#define B53_CPU_CREDIT_REG_OFFSET		0x0b0
- #define  CPU_CREDIT_REG_MCPx_WR_PAIRING_EN_MASK	0x70000000
+ enum cpubiuctrl_regs {
+ 	CPU_CREDIT_REG = 0,
++	CPU_MCP_FLOW_REG,
++	CPU_WRITEBACK_CTRL_REG
+ };
  
- static void __iomem *cpubiuctrl_base;
- static bool mcp_wr_pairing_en;
--static unsigned int cpu_credit_reg_offset = CPU_CREDIT_REG_OFFSET;
-+static unsigned int cpu_credit_reg_offset;
+ static const int b15_cpubiuctrl_regs[] = {
+ 	[CPU_CREDIT_REG] = 0x184,
++	[CPU_MCP_FLOW_REG] = -1,
++	[CPU_WRITEBACK_CTRL_REG] = -1,
+ };
+ 
+ static const int b53_cpubiuctrl_regs[] = {
+ 	[CPU_CREDIT_REG] = 0x0b0,
++	[CPU_MCP_FLOW_REG] = 0x0b4,
++	[CPU_WRITEBACK_CTRL_REG] = 0x22c,
+ };
+ 
+-#define NUM_CPU_BIUCTRL_REGS	1
++#define NUM_CPU_BIUCTRL_REGS	3
  
  static int __init mcp_write_pairing_set(void)
  {
-@@ -53,7 +54,7 @@ static int __init mcp_write_pairing_set(void)
- 
- static int __init setup_hifcpubiuctrl_regs(void)
- {
--	struct device_node *np;
-+	struct device_node *np, *cpu_dn;
- 	int ret = 0;
- 
- 	np = of_find_compatible_node(NULL, NULL, "brcm,brcmstb-cpu-biu-ctrl");
-@@ -70,6 +71,23 @@ static int __init setup_hifcpubiuctrl_regs(void)
- 	}
- 
- 	mcp_wr_pairing_en = of_property_read_bool(np, "brcm,write-pairing");
-+
-+	cpu_dn = of_get_cpu_node(0, NULL);
-+	if (!cpu_dn) {
-+		pr_err("failed to obtain CPU device node\n");
-+		ret = -ENODEV;
-+		goto out;
-+	}
-+
-+	if (of_device_is_compatible(cpu_dn, "brcm,brahma-b15"))
-+		cpu_credit_reg_offset = B15_CPU_CREDIT_REG_OFFSET;
-+	else if (of_device_is_compatible(cpu_dn, "brcm,brahma-b53"))
-+		cpu_credit_reg_offset = B53_CPU_CREDIT_REG_OFFSET;
-+	else {
-+		pr_err("unsupported CPU\n");
-+		ret = -EINVAL;
-+	}
-+	of_node_put(cpu_dn);
- out:
- 	of_node_put(np);
- 	return ret;
 -- 
 2.9.3
