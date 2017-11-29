@@ -1,33 +1,30 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Wed, 29 Nov 2017 15:30:08 -0800
-Subject: [v2,12/18] kbuild: add support for clang LTO
-In-Reply-To: <20171121110152.23fb751a@roar.ozlabs.ibm.com>
-References: <20171115213428.22559-13-samitolvanen@google.com>
- <20171118132139.58ac5e4c@roar.ozlabs.ibm.com>
- <20171120202152.GA89108@samitolvanen.mtv.corp.google.com>
- <20171121110152.23fb751a@roar.ozlabs.ibm.com>
-Message-ID: <20171129233008.GB138088@samitolvanen.mtv.corp.google.com>
+From: briannorris@chromium.org (Brian Norris)
+Date: Wed, 29 Nov 2017 15:35:41 -0800
+Subject: [PATCH] arm64: dts: rockchip: add rk3399 DSI0 reset
+Message-ID: <20171129233541.51337-1-briannorris@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 11:01:52AM +1000, Nicholas Piggin wrote:
-> I just wonder are you doing this because there is some worthwhile
-> performance gain? Or to enable more testing and development of LTO?
-> Any clues for why a user would want to enable it.
+We've documented this one already, but we didn't add it to the DTSI yet.
 
-I'm primarily interested in CFI, which with clang requires LTO; not
-for the optimizations, but for source visibility. We do expect to see
-performance improvements with LTO though, especially if combined with
-PGO.
+Suggested-by: Nickey Yang <nickey.yang@rock-chips.com>
+Signed-off-by: Brian Norris <briannorris@chromium.org>
+---
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-> Thanks, if you could. Possibly file a request with LLVMgold too, it
-> seems to be that toolchain support for archives is quite strong, so it
-> will be good to keep pushing for that.
-
-It turns out LLVMgold is fine with mixed IR/object archives, but we need
-to use llvm-ar to generate symbol tables for them, and there are some
-compatibility issues with objdump that I had to work around. I'll send
-v3 for review once I receive some feedback for the clang/gold patches we
-need first.
-
-Sami
+diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+index c6dae25a3f23..8940a3dc3670 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
+@@ -1648,6 +1648,8 @@
+ 			 <&cru SCLK_DPHY_TX0_CFG>, <&cru PCLK_VIO_GRF>;
+ 		clock-names = "ref", "pclk", "phy_cfg", "grf";
+ 		power-domains = <&power RK3399_PD_VIO>;
++		resets = <&cru SRST_P_MIPI_DSI0>;
++		reset-names = "apb";
+ 		rockchip,grf = <&grf>;
+ 		status = "disabled";
+ 
+-- 
+2.15.0.531.g2ccb3012c9-goog
