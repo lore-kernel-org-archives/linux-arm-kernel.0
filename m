@@ -1,137 +1,117 @@
-From: jlee@suse.com (joeyli)
-Date: Wed, 29 Nov 2017 09:52:29 +0800
-Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory
- state before hotremove
-In-Reply-To: <20171129004913.GB1469@linux-l9pv.suse>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
- <20171129004913.GB1469@linux-l9pv.suse>
-Message-ID: <20171129015229.GD1469@linux-l9pv.suse>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 29 Nov 2017 11:39:59 +0900
+Subject: [PATCH v3] kbuild: Set KBUILD_CFLAGS before incl. arch Makefile
+In-Reply-To: <CAKwvOdmcthyd1KbxRr54QztBcmeZ7JA=M_7N1xfmVurVOG=77w@mail.gmail.com>
+References: <CAK7LNAS1NaqPRhK6FOXN=YTMhLagpSrR2=tXn-uWZbpzr=NeoQ@mail.gmail.com>
+ <20171115204231.34914-1-ndesaulniers@google.com>
+ <CAK7LNAQNEHRapzFem3nr7=EWJPYvZby9K7vem-R99ijYNoguEg@mail.gmail.com>
+ <CAK7LNASGYZfQFkM3yMRQaHLUwW5Lhp8CxHGX0bJ9sVja0f=n+A@mail.gmail.com>
+ <CAKwvOdmcthyd1KbxRr54QztBcmeZ7JA=M_7N1xfmVurVOG=77w@mail.gmail.com>
+Message-ID: <CAK7LNATx=3k3o+hEpa2k3f67MfsEnWAyWsBSkKmPYQTUK9RYmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 08:49:13AM +0800, joeyli wrote:
-> Hi Andrea, 
-> 
-> On Fri, Nov 24, 2017 at 10:22:35AM +0000, Andrea Reale wrote:
-> > Resending the patch adding linux-acpi in CC, as suggested by Rafael.
-> > Everyone else: apologies for the noise.
-> > 
-> > Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
-> > introduced an assumption whereas when control
-> > reaches remove_memory the corresponding memory has been already
-> > offlined. In that case, the acpi_memhotplug was making sure that
-> > the assumption held.
-> > This assumption, however, is not necessarily true if offlining
-> > and removal are not done by the same "controller" (for example,
-> > when first offlining via sysfs).
-> > 
-> > Removing this assumption for the generic remove_memory code
-> > and moving it in the specific acpi_memhotplug code. This is
-> > a dependency for the software-aided arm64 offlining and removal
-> > process.
-> > 
-> > Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
-> > Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
-> > ---
-> >  drivers/acpi/acpi_memhotplug.c |  2 +-
-> >  include/linux/memory_hotplug.h |  9 ++++++---
-> >  mm/memory_hotplug.c            | 13 +++++++++----
-> >  3 files changed, 16 insertions(+), 8 deletions(-)
-> > 
-> > diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
-> > index 6b0d3ef..b0126a0 100644
-> > --- a/drivers/acpi/acpi_memhotplug.c
-> > +++ b/drivers/acpi/acpi_memhotplug.c
-> > @@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
-> >  			nid = memory_add_physaddr_to_nid(info->start_addr);
-> >  
-> >  		acpi_unbind_memory_blocks(info);
-> > -		remove_memory(nid, info->start_addr, info->length);
-> > +		BUG_ON(remove_memory(nid, info->start_addr, info->length));
-> >  		list_del(&info->list);
-> >  		kfree(info);
-> >  	}
-> > diff --git a/include/linux/memory_hotplug.h b/include/linux/memory_hotplug.h
-> > index 58e110a..1a9c7b2 100644
-> > --- a/include/linux/memory_hotplug.h
-> > +++ b/include/linux/memory_hotplug.h
-> > @@ -295,7 +295,7 @@ static inline bool movable_node_is_enabled(void)
-> >  extern bool is_mem_section_removable(unsigned long pfn, unsigned long nr_pages);
-> >  extern void try_offline_node(int nid);
-> >  extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
-> > -extern void remove_memory(int nid, u64 start, u64 size);
-> > +extern int remove_memory(int nid, u64 start, u64 size);
-> >  
-> >  #else
-> >  static inline bool is_mem_section_removable(unsigned long pfn,
-> > @@ -311,7 +311,10 @@ static inline int offline_pages(unsigned long start_pfn, unsigned long nr_pages)
-> >  	return -EINVAL;
-> >  }
-> >  
-> > -static inline void remove_memory(int nid, u64 start, u64 size) {}
-> > +static inline int remove_memory(int nid, u64 start, u64 size)
-> > +{
-> > +	return -EINVAL;
-> > +}
-> >  #endif /* CONFIG_MEMORY_HOTREMOVE */
-> >  
-> >  extern int walk_memory_range(unsigned long start_pfn, unsigned long end_pfn,
-> > @@ -323,7 +326,7 @@ extern void move_pfn_range_to_zone(struct zone *zone, unsigned long start_pfn,
-> >  		unsigned long nr_pages);
-> >  extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
-> >  extern bool is_memblock_offlined(struct memory_block *mem);
-> > -extern void remove_memory(int nid, u64 start, u64 size);
-> > +extern int remove_memory(int nid, u64 start, u64 size);
-> >  extern int sparse_add_one_section(struct pglist_data *pgdat, unsigned long start_pfn);
-> >  extern void sparse_remove_one_section(struct zone *zone, struct mem_section *ms,
-> >  		unsigned long map_offset);
-> > diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
-> > index d4b5f29..d5f15af 100644
-> > --- a/mm/memory_hotplug.c
-> > +++ b/mm/memory_hotplug.c
-> > @@ -1892,7 +1892,7 @@ EXPORT_SYMBOL(try_offline_node);
-> >   * and online/offline operations before this call, as required by
-> >   * try_offline_node().
-> >   */
-> > -void __ref remove_memory(int nid, u64 start, u64 size)
-> > +int __ref remove_memory(int nid, u64 start, u64 size)
-> >  {
-> >  	int ret;
-> >  
-> > @@ -1908,18 +1908,23 @@ void __ref remove_memory(int nid, u64 start, u64 size)
-> >  	ret = walk_memory_range(PFN_DOWN(start), PFN_UP(start + size - 1), NULL,
-> >  				check_memblock_offlined_cb);
-> >  	if (ret)
-> > -		BUG();
-> > +		goto end_remove;
-> > +
-> > +	ret = arch_remove_memory(start, size);
+Hi Nick,
 
-Should not include arch_remove_memory() to BUG().
+2017-11-29 3:18 GMT+09:00 Nick Desaulniers <ndesaulniers@google.com>:
+> Hi Masahiro,
+>
+> Thanks for merging Chris' patch, and sorry for taking so long to respond.
+>
+> On Wed, Nov 22, 2017 at 8:24 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> Linus suggests to move compiler flag testing to Kconfig.
+>
+> Do you have an LKML link for context?
 
-> > +
-> > +	if (ret)
-> > +		goto end_remove;
-> 
-> The original code triggers BUG() when any memblock is not offlined. Why
-> the new logic includes the result of arch_remove_memory()?
-> 
-> But I agreed the we don't need BUG(). Returning a error is better.
 
-Actually, I lost one thing.
+https://lkml.org/lkml/2017/11/19/291
 
-The BUG() have caught a issue about the offline state doesn't sync between
-memory_block and device object. like:
-        mem->dev.offline != (mem->state == MEM_OFFLINE)
 
-So, the BUG() is useful to capture state issue in memory subsystem. But, I
-understood your concern about the two steps offline/remove from userland. 
 
-Maybe we should move the BUG() to somewhere but not just remove it. Or if
-we think that the BUG() is too intense, at least we should print out a error
-message, and ACPI should checks the return value from subsystem to
-interrupt memory-hotplug process.
+> On Wed, Nov 15, 2017 at 6:32 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>> BTW, I notice another issue.
+>>
+>> If we move clang settings before including arch Makefile,
+>> "ifneq ($(CROSS_COMPILE),)" comes early.
+>>
+>> Some arch Makefiles (arch/mips/Makefile, arch/blackfin/Makefile, etc.)
+>> set CROSS_COMPILE there if CROSS_COMPILE is not given.
+>>
+>> Then, we have a conflict between two requirements among arch.
+>>
+>> [1] arm64, powerpc use ld-option in their Makefile.
+>>     So, clang flags must be set before inc. arch Makefile.
+>> [2] mips, blackfin, etc. may set CROSS_COMPILE in their Makefile.
+>>     So, we want to reference CROSS_COMPILE only after inc. arch Makefile
+>>
+>> I have no idea how to solve it.
+>>
+>> At this moment, I guess clang is intended to support
+>> only limited architectures.
+>>
+>> It might be OK to be compromised here.
+>
+> I definitely find it curious that certain arch's define CROSS_COMPILE
+> themselves.  The benefit is one less argument to supply at compile
+> time, but it assumes that the toolchain always has a certain prefix.
+> This makes sense to me when cross compiling, but seems odd when
+> compiling natively on that arch as the host and target.  Maybe those
+> arch's use that convention, or simply are always cross compiled for?
+>
+> Taking a survey of all arch's currently in the kernel via `cd arch; ag
+> CROSS_COMPILE` and quickly eyeballing the result:
+>
+> m68k if not set
+> arc if not set
+> openrisc for some configs (openrisc/configs/or1ksim_defconfig,
+> openrisc/configs/simple_smp_defconfig)
+> blackfin if not set
+> hexagon for some configs (hexagon/configs/comet_defconfig)
+> parisc if not set
+> sh if not set
+> xtensa if not set
+> score always
+> arm for some configs (arm/configs/lpc18xx_defconfig)
+> h8300 if not set
+> mips if not set (and explicitly emptied for some configs,
+> mips/configs/nlm_xlr_defconfig )
+> unicore32 if not set
+> tile if not set
+>
+> The * if not set (or not being on the list) seems correct, as the top
+> level Makefile will handle this correctly.  Setting it for some
+> configs seems curious (not necessarily wrong?),
 
-Thanks a lot!
-Joey Lee 
+Perhaps, the maintainer of those platforms may want to save
+one command-line argument at compile time.
+
+> emptying it/always
+> setting it via config sounds wrong to me,
+
+arch/mips/configs/nlm_xlr_defconfig explicitly empties it.
+It is just redundant because CONFIG_CROSS_COMPILE=""
+is the default in Kconfig.
+Not necessarily wrong, I think.
+
+
+> but maybe those hosts don't
+> have toolchains and must always be cross compiled for?
+>
+> For reference, this file in LLVM source defines the supported backend
+> targets: https://llvm.org/doxygen/Triple_8h_source.html
+>
+> Either way, it sounds like we're all set here, I guess I'm just
+> curious about the LKML link/context and why some configs set
+> CROSS_COMPILE themselves?
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
