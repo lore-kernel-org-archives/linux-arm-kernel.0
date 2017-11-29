@@ -1,59 +1,54 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Wed, 29 Nov 2017 15:44:38 -0800
-Subject: [PATCH 3/7] kbuild: fix LD_DEAD_CODE_DATA_ELIMINATION with GNU gold
+Date: Wed, 29 Nov 2017 15:44:41 -0800
+Subject: [PATCH 6/7] arm64: explicitly pass --no-fix-cortex-a53-843419 to GNU
+ gold
 In-Reply-To: <20171129234442.655-1-samitolvanen@google.com>
 References: <20171129234442.655-1-samitolvanen@google.com>
-Message-ID: <20171129234442.655-4-samitolvanen@google.com>
+Message-ID: <20171129234442.655-7-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Don't remove .head.text or .exitcall.exit when linking with --gc-sections,
-and include .init.text.* in .init.text and .init.rodata.* in .init.rodata.
+Some versions of GNU gold are known to produce broken code with
+--fix-cortex-a53-843419 as explained in this bug:
+
+  https://sourceware.org/bugzilla/show_bug.cgi?id=21491
+
+If ARM64_ERRATUM_843419 is disabled and we're using GNU gold, pass
+--no-fix-cortex-a53-843419 to the linker to ensure the erratum
+fix is not used even if the linker is configured to enable it by
+default.
+
+This change also adds a warning if the erratum fix is enabled and
+gold version <1.14 is used.
 
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
 ---
- include/asm-generic/vmlinux.lds.h | 8 ++++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+ arch/arm64/Makefile | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-diff --git a/include/asm-generic/vmlinux.lds.h b/include/asm-generic/vmlinux.lds.h
-index ee8b707d9fa9..eb4199c12bd2 100644
---- a/include/asm-generic/vmlinux.lds.h
-+++ b/include/asm-generic/vmlinux.lds.h
-@@ -515,7 +515,7 @@
- 		VMLINUX_SYMBOL(__softirqentry_text_end) = .;
+diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
+index 82a0df6e865e..81a12713f7af 100644
+--- a/arch/arm64/Makefile
++++ b/arch/arm64/Makefile
+@@ -26,10 +26,19 @@ ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
+   ifeq ($(call ld-option, --fix-cortex-a53-843419),)
+ $(warning ld does not support --fix-cortex-a53-843419; kernel may be susceptible to erratum)
+   else
++    ifeq ($(call gold-ifversion, -lt, 114000000, y), y)
++$(warning This version of GNU gold may generate incorrect code with --fix-cortex-a53-843419;\
++	see https://sourceware.org/bugzilla/show_bug.cgi?id=21491)
++    endif
+ LDFLAGS_vmlinux	+= --fix-cortex-a53-843419
+   endif
+ endif
  
- /* Section used for early init (in .S files) */
--#define HEAD_TEXT  *(.head.text)
-+#define HEAD_TEXT  KEEP(*(.head.text))
++ifeq ($(CONFIG_ARM64_ERRATUM_843419),)
++# https://sourceware.org/bugzilla/show_bug.cgi?id=21491
++LDFLAGS_GOLD	+= --no-fix-cortex-a53-843419
++endif
++
+ KBUILD_DEFCONFIG := defconfig
  
- #define HEAD_TEXT_SECTION							\
- 	.head.text : AT(ADDR(.head.text) - LOAD_OFFSET) {		\
-@@ -560,7 +560,7 @@
- 	MEM_DISCARD(init.data)						\
- 	KERNEL_CTORS()							\
- 	MCOUNT_REC()							\
--	*(.init.rodata)							\
-+	*(.init.rodata .init.rodata.*)					\
- 	FTRACE_EVENTS()							\
- 	TRACE_SYSCALLS()						\
- 	KPROBE_BLACKLIST()						\
-@@ -579,7 +579,7 @@
- 	EARLYCON_TABLE()
- 
- #define INIT_TEXT							\
--	*(.init.text)							\
-+	*(.init.text .init.text.*)					\
- 	*(.text.startup)						\
- 	MEM_DISCARD(init.text)
- 
-@@ -596,7 +596,7 @@
- 	MEM_DISCARD(exit.text)
- 
- #define EXIT_CALL							\
--	*(.exitcall.exit)
-+	KEEP(*(.exitcall.exit))
- 
- /*
-  * bss (Block Started by Symbol) - uninitialized data
+ # Check for binutils support for specific extensions
 -- 
 2.15.0.531.g2ccb3012c9-goog
