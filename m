@@ -1,22 +1,20 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 29 Nov 2017 22:11:41 +0100
-Subject: [PATCH] rtc: brcmstb-waketimer: fix error handling in
- brcmstb_waketmr_probe()
-In-Reply-To: <1510953358-7043-1-git-send-email-khoroshilov@ispras.ru>
-References: <1510953358-7043-1-git-send-email-khoroshilov@ispras.ru>
-Message-ID: <20171129211141.GR21126@piout.net>
+Date: Wed, 29 Nov 2017 22:22:02 +0100
+Subject: [PATCH] rtc: stm32: Fix copyright
+In-Reply-To: <20171129142644.23576-1-benjamin.gaignard@st.com>
+References: <20171129142644.23576-1-benjamin.gaignard@st.com>
+Message-ID: <20171129212202.GU21126@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/2017 at 00:15:58 +0300, Alexey Khoroshilov wrote:
-> brcmstb_waketmr_probe() does not disable timer->clk on error paths.
+On 29/11/2017 at 15:26:44 +0100, Benjamin Gaignard wrote:
+> Uniformize STMicroelectronics copyrights header
 > 
-> Found by Linux Driver Verification project (linuxtesting.org).
-> 
-> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> CC: Amelie Delaunay <amelie.delaunay@st.com>
 > ---
->  drivers/rtc/rtc-brcmstb-waketimer.c | 15 ++++++++++++---
->  1 file changed, 12 insertions(+), 3 deletions(-)
+>  drivers/rtc/rtc-stm32.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
 Applied, thanks.
 
