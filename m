@@ -1,270 +1,368 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Nov 2017 16:46:11 -0200
-Subject: [PATCH 03/11] ARM: dts: imx6: Add unit address and reg for the anatop
- nodes
+Date: Wed, 29 Nov 2017 16:46:10 -0200
+Subject: [PATCH 02/11] ARM: dts: imx6: Move nodes which have no reg property
+ out of bus
 In-Reply-To: <1511981179-12660-1-git-send-email-festevam@gmail.com>
 References: <1511981179-12660-1-git-send-email-festevam@gmail.com>
-Message-ID: <1511981179-12660-3-git-send-email-festevam@gmail.com>
+Message-ID: <1511981179-12660-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Add unit address and reg for the anatop nodes in order to fix the
-following build warnings with W=1:
+Move tempmon, ldb and pmu nodes from soc node to root node.
 
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-1p1 missing or empty reg/ranges property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-3p0 missing or empty reg/ranges property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-2p5 missing or empty reg/ranges property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddcore missing or empty reg/ranges property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddpu missing or empty reg/ranges property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/anatop at 20c8000/regulator-vddsoc missing or empty reg/ranges property
+The nodes that have been moved do not have any register properties and thus
+shouldn't be placed on the bus.
+
+This fixes the following build warnings with W=1:
+
+arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/tempmon missing or empty reg/ranges property
+arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/ldb missing or empty reg/ranges property
+arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/pmu missing or empty reg/ranges property
+
+Based on a patch from Simon Horman for r8a7795.dtsi.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 20 ++++++++++++++------
- arch/arm/boot/dts/imx6sl.dtsi  | 20 ++++++++++++++------
- arch/arm/boot/dts/imx6sx.dtsi  | 20 ++++++++++++++------
- arch/arm/boot/dts/imx6ul.dtsi  | 11 ++++++++---
- 4 files changed, 50 insertions(+), 21 deletions(-)
+ arch/arm/boot/dts/imx6qdl.dtsi | 136 +++++++++++++++++++++--------------------
+ arch/arm/boot/dts/imx6sl.dtsi  |  28 +++++----
+ arch/arm/boot/dts/imx6sx.dtsi  |  30 ++++-----
+ arch/arm/boot/dts/imx6ul.dtsi  |  32 +++++-----
+ 4 files changed, 117 insertions(+), 109 deletions(-)
 
 diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index a0f6712..7edd209 100644
+index ac4f9ec..a0f6712 100644
 --- a/arch/arm/boot/dts/imx6qdl.dtsi
 +++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -695,8 +695,11 @@
- 				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 127 IRQ_TYPE_LEVEL_HIGH>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
+@@ -80,6 +80,75 @@
+ 		};
+ 	};
  
--				regulator-1p1 {
-+				regulator-1p1 at 20c8110 {
-+					reg = <0x20c8110>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <1000000>;
-@@ -711,7 +714,8 @@
- 					anatop-enable-bit = <0>;
++	tempmon: tempmon {
++		compatible = "fsl,imx6q-tempmon";
++		interrupt-parent = <&gpc>;
++		interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
++		fsl,tempmon = <&anatop>;
++		fsl,tempmon-data = <&ocotp>;
++		clocks = <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
++	};
++
++	ldb: ldb {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
++		gpr = <&gpr>;
++		status = "disabled";
++
++		lvds-channel at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <0>;
++			status = "disabled";
++
++			port at 0 {
++				reg = <0>;
++
++				lvds0_mux_0: endpoint {
++					remote-endpoint = <&ipu1_di0_lvds0>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				lvds0_mux_1: endpoint {
++					remote-endpoint = <&ipu1_di1_lvds0>;
++				};
++			};
++		};
++
++		lvds-channel at 1 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			reg = <1>;
++			status = "disabled";
++
++			port at 0 {
++				reg = <0>;
++
++				lvds1_mux_0: endpoint {
++					remote-endpoint = <&ipu1_di0_lvds1>;
++				};
++			};
++
++			port at 1 {
++				reg = <1>;
++
++				lvds1_mux_1: endpoint {
++					remote-endpoint = <&ipu1_di1_lvds1>;
++				};
++			};
++		};
++	};
++
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&gpc>;
++		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -224,11 +293,6 @@
+ 			status = "disabled";
+ 		};
+ 
+-		pmu {
+-			compatible = "arm,cortex-a9-pmu";
+-			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
+-		};
+-
+ 		aips-bus at 2000000 { /* AIPS1 */
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+@@ -729,14 +793,6 @@
  				};
+ 			};
  
--				regulator-3p0 {
-+				regulator-3p0 at 20c8120 {
-+					reg = <0x20c8120>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -726,7 +730,8 @@
- 					anatop-enable-bit = <0>;
- 				};
+-			tempmon: tempmon {
+-				compatible = "fsl,imx6q-tempmon";
+-				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
+-				fsl,tempmon = <&anatop>;
+-				fsl,tempmon-data = <&ocotp>;
+-				clocks = <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
+-			};
+-
+ 			usbphy1: usbphy at 20c9000 {
+ 				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020c9000 0x1000>;
+@@ -841,60 +897,6 @@
+ 				reg = <0x20e0000 0x4000>;
+ 			};
  
--				regulator-2p5 {
-+				regulator-2p5 at 20c8130 {
-+					reg = <0x20c8130>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2250000>;
-@@ -741,7 +746,8 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore {
-+				reg_arm: regulator-vddcore at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -758,7 +764,8 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pu: regulator-vddpu {
-+				reg_pu: regulator-vddpu at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
-@@ -775,7 +782,8 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc {
-+				reg_soc: regulator-vddsoc at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
+-			ldb: ldb {
+-				#address-cells = <1>;
+-				#size-cells = <0>;
+-				compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
+-				gpr = <&gpr>;
+-				status = "disabled";
+-
+-				lvds-channel at 0 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <0>;
+-					status = "disabled";
+-
+-					port at 0 {
+-						reg = <0>;
+-
+-						lvds0_mux_0: endpoint {
+-							remote-endpoint = <&ipu1_di0_lvds0>;
+-						};
+-					};
+-
+-					port at 1 {
+-						reg = <1>;
+-
+-						lvds0_mux_1: endpoint {
+-							remote-endpoint = <&ipu1_di1_lvds0>;
+-						};
+-					};
+-				};
+-
+-				lvds-channel at 1 {
+-					#address-cells = <1>;
+-					#size-cells = <0>;
+-					reg = <1>;
+-					status = "disabled";
+-
+-					port at 0 {
+-						reg = <0>;
+-
+-						lvds1_mux_0: endpoint {
+-							remote-endpoint = <&ipu1_di0_lvds1>;
+-						};
+-					};
+-
+-					port at 1 {
+-						reg = <1>;
+-
+-						lvds1_mux_1: endpoint {
+-							remote-endpoint = <&ipu1_di1_lvds1>;
+-						};
+-					};
+-				};
+-			};
+-
+ 			dcic1: dcic at 20e4000 {
+ 				reg = <0x020e4000 0x4000>;
+ 				interrupts = <0 124 IRQ_TYPE_LEVEL_HIGH>;
 diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 3365182..ae8df3c 100644
+index 3ea1a41..3365182 100644
 --- a/arch/arm/boot/dts/imx6sl.dtsi
 +++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -527,8 +527,11 @@
- 				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <0 127 IRQ_TYPE_LEVEL_HIGH>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
+@@ -102,6 +102,21 @@
+ 		};
+ 	};
  
--				regulator-1p1 {
-+				regulator-1p1 at 20c8110 {
-+					reg = <0x20c8110>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <800000>;
-@@ -543,7 +546,8 @@
- 					anatop-enable-bit = <0>;
++	tempmon: tempmon {
++		compatible = "fsl,imx6q-tempmon";
++		interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-parent = <&gpc>;
++		fsl,tempmon = <&anatop>;
++		fsl,tempmon-data = <&ocotp>;
++		clocks = <&clks IMX6SL_CLK_PLL3_USB_OTG>;
++	};
++
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&gpc>;
++		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -125,11 +140,6 @@
+ 			arm,data-latency = <4 2 3>;
+ 		};
+ 
+-		pmu {
+-			compatible = "arm,cortex-a9-pmu";
+-			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
+-		};
+-
+ 		aips1: aips-bus at 2000000 {
+ 			compatible = "fsl,aips-bus", "simple-bus";
+ 			#address-cells = <1>;
+@@ -615,14 +625,6 @@
  				};
+ 			};
  
--				regulator-3p0 {
-+				regulator-3p0 at 20c8120 {
-+					reg = <0x20c8120>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -558,7 +562,8 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-2p5 {
-+				regulator-2p5 at 20c8130 {
-+					reg = <0x20c8130>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2100000>;
-@@ -573,7 +578,8 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore {
-+				reg_arm: regulator-vddcore at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -590,7 +596,8 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pu: regulator-vddpu {
-+				reg_pu: regulator-vddpu at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpu";
- 					regulator-min-microvolt = <725000>;
-@@ -607,7 +614,8 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc {
-+				reg_soc: regulator-vddsoc at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
+-			tempmon: tempmon {
+-				compatible = "fsl,imx6q-tempmon";
+-				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
+-				fsl,tempmon = <&anatop>;
+-				fsl,tempmon-data = <&ocotp>;
+-				clocks = <&clks IMX6SL_CLK_PLL3_USB_OTG>;
+-			};
+-
+ 			usbphy1: usbphy at 20c9000 {
+ 				compatible = "fsl,imx6sl-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020c9000 0x1000>;
 diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 4500380..07ba518 100644
+index 40c6738c..4500380 100644
 --- a/arch/arm/boot/dts/imx6sx.dtsi
 +++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -585,8 +585,11 @@
- 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
+@@ -141,6 +141,22 @@
+ 		};
+ 	};
  
--				regulator-1p1 {
-+				regulator-1p1 at 20c8110 {
-+					reg = <0x20c8110>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd1p1";
- 					regulator-min-microvolt = <800000>;
-@@ -601,7 +604,8 @@
- 					anatop-enable-bit = <0>;
++	tempmon: tempmon {
++		compatible = "fsl,imx6sx-tempmon", "fsl,imx6q-tempmon";
++		interrupt-parent = <&gpc>;
++		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++		fsl,tempmon = <&anatop>;
++		nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
++		nvmem-cell-names = "calib", "temp_grade";
++		clocks = <&clks IMX6SX_CLK_PLL3_USB_OTG>;
++	};
++
++	pmu {
++		compatible = "arm,cortex-a9-pmu";
++		interrupt-parent = <&gpc>;
++		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -148,11 +164,6 @@
+ 		interrupt-parent = <&gpc>;
+ 		ranges;
+ 
+-		pmu {
+-			compatible = "arm,cortex-a9-pmu";
+-			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+-		};
+-
+ 		ocram: sram at 900000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0x00900000 0x20000>;
+@@ -671,15 +682,6 @@
  				};
+ 			};
  
--				regulator-3p0 {
-+				regulator-3p0 at 20c8120 {
-+					reg = <0x20c8120>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2800000>;
-@@ -616,7 +620,8 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				regulator-2p5 {
-+				regulator-2p5 at 20c8130 {
-+					reg = <0x20c8130>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd2p5";
- 					regulator-min-microvolt = <2100000>;
-@@ -631,7 +636,8 @@
- 					anatop-enable-bit = <0>;
- 				};
- 
--				reg_arm: regulator-vddcore {
-+				reg_arm: regulator-vddcore at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddarm";
- 					regulator-min-microvolt = <725000>;
-@@ -648,7 +654,8 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_pcie: regulator-vddpcie {
-+				reg_pcie: regulator-vddpcie at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddpcie";
- 					regulator-min-microvolt = <725000>;
-@@ -664,7 +671,8 @@
- 					anatop-max-voltage = <1450000>;
- 				};
- 
--				reg_soc: regulator-vddsoc {
-+				reg_soc: regulator-vddsoc at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
+-			tempmon: tempmon {
+-				compatible = "fsl,imx6sx-tempmon", "fsl,imx6q-tempmon";
+-				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+-				fsl,tempmon = <&anatop>;
+-				nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
+-				nvmem-cell-names = "calib", "temp_grade";
+-				clocks = <&clks IMX6SX_CLK_PLL3_USB_OTG>;
+-			};
+-
+ 			usbphy1: usbphy at 20c9000 {
+ 				compatible = "fsl,imx6sx-usbphy", "fsl,imx23-usbphy";
+ 				reg = <0x020c9000 0x1000>;
 diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index 0e931fd..3233f01 100644
+index e0b4a46..0e931fd 100644
 --- a/arch/arm/boot/dts/imx6ul.dtsi
 +++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -542,8 +542,11 @@
- 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
- 					     <GIC_SPI 127 IRQ_TYPE_LEVEL_HIGH>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
+@@ -136,6 +136,23 @@
+ 		clock-output-names = "ipp_di1";
+ 	};
  
--				reg_3p0: regulator-3p0 {
-+				reg_3p0: regulator-3p0 at 20c8110 {
-+					reg = <0x20c8110>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vdd3p0";
- 					regulator-min-microvolt = <2625000>;
-@@ -557,7 +560,8 @@
- 					anatop-enable-bit = <0>;
- 				};
++	tempmon: tempmon {
++		compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
++		interrupt-parent = <&gpc>;
++		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++		fsl,tempmon = <&anatop>;
++		nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
++		nvmem-cell-names = "calib", "temp_grade";
++		clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
++	};
++
++	pmu {
++		compatible = "arm,cortex-a7-pmu";
++		interrupt-parent = <&gpc>;
++		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
++		status = "disabled";
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -143,12 +160,6 @@
+ 		interrupt-parent = <&gpc>;
+ 		ranges;
  
--				reg_arm: regulator-vddcore {
-+				reg_arm: regulator-vddcore at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "cpu";
- 					regulator-min-microvolt = <725000>;
-@@ -574,7 +578,8 @@
- 					anatop-max-voltage = <1450000>;
- 				};
+-		pmu {
+-			compatible = "arm,cortex-a7-pmu";
+-			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
+-			status = "disabled";
+-		};
+-
+ 		ocram: sram at 900000 {
+ 			compatible = "mmio-sram";
+ 			reg = <0x00900000 0x20000>;
+@@ -599,15 +610,6 @@
+ 				fsl,anatop = <&anatop>;
+ 			};
  
--				reg_soc: regulator-vddsoc {
-+				reg_soc: regulator-vddsoc at 20c8140 {
-+					reg = <0x20c8140>;
- 					compatible = "fsl,anatop-regulator";
- 					regulator-name = "vddsoc";
- 					regulator-min-microvolt = <725000>;
+-			tempmon: tempmon {
+-				compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
+-				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
+-				fsl,tempmon = <&anatop>;
+-				nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
+-				nvmem-cell-names = "calib", "temp_grade";
+-				clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
+-			};
+-
+ 			snvs: snvs at 20cc000 {
+ 				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
+ 				reg = <0x020cc000 0x4000>;
 -- 
 2.7.4
