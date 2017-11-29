@@ -1,27 +1,121 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 29 Nov 2017 23:50:11 +0800
-Subject: [PATCH] net: stmmac: dwmac-sun8i: fix allwinner,
- leds-active-low handling
-In-Reply-To: <20171129154649.GC24881@lunn.ch>
-References: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
- <20171128173826.GE14512@lunn.ch> <20171129090240.GA3699@Red>
- <20171129153712.GA24881@lunn.ch>
- <CAGb2v67hv7ayH=F-MBG-PCCeVt43PH-O-6b3KOyGXSpr2s4DGg@mail.gmail.com>
- <20171129154649.GC24881@lunn.ch>
-Message-ID: <CAGb2v64mEHTLUVa+2ySVNJRgUU2Tc8Pxu6xcW8ywEan_Aq236w@mail.gmail.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Wed, 29 Nov 2017 10:52:55 -0500
+Subject: [PATCH v2] usb: xhci: allow imod-interval to be configurable
+Message-ID: <1511970775-11103-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:46 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> Hi ChenYu
->
->> It worked at one point. During some previous iteration, they lit up as
->> they were supposed to.
->
-> For a released version of the kernel? Or during development work?  If
-> they did work, but broken, it would be good to know which commit broke
-> it. We can then add a fixes: tag to the patch as proposed.
+The xHCI driver currently has the IMOD set to 160, which
+translates to an IMOD interval of 40,000ns (160 * 250)ns
 
-During development work. The bindings / driver was never released.
+Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
+introduced a QUIRK for the MTK platform to adjust this interval to 20,
+which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
+due to the fact that the MTK controller IMOD interval is 8 times
+as much as defined in xHCI spec.
 
-ChenYu
+Instead of adding more quirk bits for additional platforms, this patch
+introduces the ability for vendors to set the IMOD_INTERVAL as is
+optimal for their platform. By using device_property_read_u32() on
+"imod-interval", the IMOD INTERVAL can be specified in nano seconds. If
+no interval is specified, the default of 40,000ns (IMOD=160) will be
+used.
+
+No bounds checking has been implemented due to the fact that a vendor
+may have violated the spec and would need to specify a value outside of
+the max 8,000 IRQs/second limit specified in the xHCI spec.
+
+Backwards compatibility is maintained for MTK_HOSTS through the quirk
+bit, however, imod_interval should be pushed into device tree at a
+future point and this quirk should be removed from xhci_plat_probe
+
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+changes from v1:
+  * Removed device_property_read_u32() per suggestion from greg k-h
+  * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
+
+ Documentation/devicetree/bindings/usb/usb-xhci.txt |  1 +
+ drivers/usb/host/xhci-plat.c                       | 13 +++++++++++++
+ drivers/usb/host/xhci.c                            |  7 ++-----
+ drivers/usb/host/xhci.h                            |  2 ++
+ 4 files changed, 18 insertions(+), 5 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+index ae6e484..3998459 100644
+--- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+@@ -29,6 +29,7 @@ Optional properties:
+   - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+   - usb3-lpm-capable: determines if platform is USB3 LPM capable
+   - quirk-broken-port-ped: set if the controller has broken port disable mechanism
++  - imod-interval: IMOD_INTERVAL in nano-seconds. Default is 40000
+ 
+ Example:
+ 	usb at f0931000 {
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 09f164f..3c63de1 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -23,6 +23,7 @@
+ #include "xhci-plat.h"
+ #include "xhci-mvebu.h"
+ #include "xhci-rcar.h"
++#include "xhci-mtk.h"
+ 
+ static struct hc_driver __read_mostly xhci_plat_hc_driver;
+ 
+@@ -269,6 +270,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+ 		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+ 
++	/*
++	 * imod_interval is the interrupt modulation value in nanoseconds.
++	 * The increment interval is 8 times as much as that defined in
++	 * the xHCI spec on MTK's controller. This quirk check exists to provide
++	 * backwards compatibility, however, this should be pushed into
++	 * the device tree files at some point in the future and
++	 * checking the quirk should be removed from xhci_plat_probe.
++	 */
++	xhci->imod_interval = xhci->quirks & XHCI_MTK_HOST ? 5000 : 40000;
++
++	device_property_read_u32(sysdev, "imod-interval", &xhci->imod_interval);
++
+ 	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
+ 	if (IS_ERR(hcd->usb_phy)) {
+ 		ret = PTR_ERR(hcd->usb_phy);
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+index 2424d30..0b7755b 100644
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
+ 			"// Set the interrupt modulation register");
+ 	temp = readl(&xhci->ir_set->irq_control);
+ 	temp &= ~ER_IRQ_INTERVAL_MASK;
+-	/*
+-	 * the increment interval is 8 times as much as that defined
+-	 * in xHCI spec on MTK's controller
+-	 */
+-	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
++	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
++
+ 	writel(temp, &xhci->ir_set->irq_control);
+ 
+ 	/* Set the HCD state before we enable the irqs */
+diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+index 99a014a..2a4177b 100644
+--- a/drivers/usb/host/xhci.h
++++ b/drivers/usb/host/xhci.h
+@@ -1717,6 +1717,8 @@ struct xhci_hcd {
+ 	u8		max_interrupters;
+ 	u8		max_ports;
+ 	u8		isoc_threshold;
++	/* imod_interval in ns (I * 250ns) */
++	u32		imod_interval;
+ 	int		event_ring_max;
+ 	/* 4KB min, 128MB max */
+ 	int		page_size;
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
