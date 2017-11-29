@@ -1,63 +1,71 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Nov 2017 11:12:27 +0000
-Subject: [PATCH] PM: Provide a config snippet for disabling PM
-Message-ID: <20171129111227.26798-1-broonie@kernel.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Wed, 29 Nov 2017 12:22:20 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: initial V3MSK board device tree
+In-Reply-To: <06d59459-86dc-89b1-a0ed-adbd1481abc6@cogentembedded.com>
+References: <20171124210313.219761525@cogentembedded.com>
+ <20171129095109.d2uan35eui4kzav6@verge.net.au>
+ <06d59459-86dc-89b1-a0ed-adbd1481abc6@cogentembedded.com>
+Message-ID: <20171129112219.7pw5kjwxcvi2r2bn@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A frequent source of build problems is poor handling of optional PM
-support, almost all development is done with the PM options enabled
-but they can be turned off.  Currently few if any of the build test
-services do this as standard as there is no standard config for it and
-the use of selects and def_bool means that simply setting CONFIG_PM=n
-doesn't do what is expected.  To make this easier provide a fragement
-that can be used with KCONFIG_ALLCONFIG to force PM off.
+On Wed, Nov 29, 2017 at 01:14:21PM +0300, Sergei Shtylyov wrote:
+> Hello!
+> 
+> On 11/29/2017 12:51 PM, Simon Horman wrote:
+> 
+> > > Add the initial device  tree for the V3M Starter Kit board.
+> > > The board has 1 debug serial port (SCIF0); include support for it,
+> > > so that the serial console can work.
+> > > 
+> > > Based on the original (and large) patch by Vladimir Barinov.
+> > > 
+> > > Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+> > > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > > 
+> > > ---
+> > >   arch/arm64/boot/dts/renesas/Makefile           |    2 -
+> [...]
+> > > Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+> > > ===================================================================
+> > > --- /dev/null
+> > > +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+> > > @@ -0,0 +1,44 @@
+> > > +/*
+> > > + * Device Tree Source for the V3M Starter Kit board
+> > > + *
+> > > + * Copyright (C) 2017 Renesas Electronics Corp.
+> > > + * Copyright (C) 2017 Cogent Embedded, Inc.
+> > > + *
+> > > + * This file is licensed under the terms of the GNU General Public License
+> > > + * version 2.  This program is licensed "as is" without any warranty of any
+> > > + * kind, whether express or implied.
+> > > + */
+> > > +
+> > > +/dts-v1/;
+> > > +#include "r8a77970.dtsi"
+> > > +
+> > > +/ {
+> > > +	model = "Renesas V3M Starter Kit board";
+> > > +	compatible = "renesas,v3msk", "renesas,r8a77970";
+> > > +
+> > > +	aliases {
+> > > +		serial0 = &scif0;
+> > > +	};
+> > > +
+> > > +	chosen {
+> > 
+> > For consistency with other Renesas boards I would like to request the
+> > following be added here:
+> > 
+> > 		bootargs = "ignore_loglevel rw";
+> 
+>    There's currently no consistency as ulcb.dtsi doesn't seem to specify
+> "bootargs" prop at all. Moreover, this prop seems to be ignored by ARM64
+> kernel -- I can only specify "bootargs" in U-Boot....
 
-CONFIG_XEN is disabled as Xen uses hibernation callbacks which end up
-turning on power management on architectures with Xen.  Some cpuidle
-implementations on ARM select PM so CONFIG_CPU_IDLE is disabled, and
-some ARM architectures unconditionally enable PM so they are also
-disabled.
+I had assumed that ulcb.dtsi should be updated in this regards but
+I now see that bootargs does not seem to have any effect (on
+r8a7796/salvator-x) as you suggest.
 
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- MAINTAINERS                |  1 +
- kernel/configs/nopm.config | 15 +++++++++++++++
- 2 files changed, 16 insertions(+)
- create mode 100644 kernel/configs/nopm.config
-
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 07d9067f68fd..539808dc7928 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -10895,6 +10895,7 @@ F:	include/linux/pm.h
- F:	include/linux/pm_*
- F:	include/linux/powercap.h
- F:	drivers/powercap/
-+F:	kernel/configs/nopm.config
- 
- POWER STATE COORDINATION INTERFACE (PSCI)
- M:	Mark Rutland <mark.rutland@arm.com>
-diff --git a/kernel/configs/nopm.config b/kernel/configs/nopm.config
-new file mode 100644
-index 000000000000..81ff07863576
---- /dev/null
-+++ b/kernel/configs/nopm.config
-@@ -0,0 +1,15 @@
-+CONFIG_PM=n
-+CONFIG_SUSPEND=n
-+CONFIG_HIBERNATION=n
-+
-+# Triggers PM on OMAP
-+CONFIG_CPU_IDLE=n
-+
-+# Triggers enablement via hibernate callbacks
-+CONFIG_XEN=n
-+
-+# ARM/ARM64 architectures that select PM unconditionally
-+CONFIG_ARCH_OMAP2PLUS_TYPICAL=n
-+CONFIG_ARCH_RENESAS=n
-+CONFIG_ARCH_TEGRA=n
-+CONFIG_ARCH_VEXPRESS=n
--- 
-2.15.0
+I have applied this and the following patch.
