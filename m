@@ -1,29 +1,38 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 29 Nov 2017 17:14:35 -0500
-Subject: [PATCH V3 3/4] dmaengine: qcom_hidma: add support for the new
- revision
-In-Reply-To: <20171129135813.GE32417@localhost>
-References: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
- <1510281175-27173-3-git-send-email-okaya@codeaurora.org>
- <20171129135813.GE32417@localhost>
-Message-ID: <dd656bd9-2e70-931b-62d7-f2c5b68d1892@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 29 Nov 2017 23:42:59 +0100
+Subject: [PATCH] ARM: dts: Add basic devicetree for D-Link DNS-313
+In-Reply-To: <20171129161038.GG24881@lunn.ch>
+References: <20171129154720.16662-1-linus.walleij@linaro.org>
+ <20171129161038.GG24881@lunn.ch>
+Message-ID: <CACRpkdZgucPuk=W7KJON-REXuvA87ZY3DNaLrDO98ZVGD-_Rgw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+linux-acpi
+On Wed, Nov 29, 2017 at 5:10 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> +     mdio0: ethernet-phy {
+>> +             compatible = "virtual,mdio-gpio";
+>> +             /* Uses MDC and MDIO */
+>> +             gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
+>> +                     <&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
+>> +             #address-cells = <1>;
+>> +             #size-cells = <0>;
+>> +
+>> +             /* This is a Realtek RTL8211B Gigabit ethernet transceiver */
+>> +             phy0: ethernet-phy at 0 {
+>
+> Hi Linus
+>
+> ethernet-phy at 1
 
-On 11/29/2017 8:58 AM, Vinod Koul wrote:
->> +		cap = (enum hidma_cap) acpi_device_get_match_data(dev);
-> should this not reside in core? How about a device_get_match_data() which
-> returns the data for folks based on node being acpi/of
+Thanks for pointing out all these.
 
-Sure,
+Actually it reflects the most stupid bug I was fighting for
+several days. After almost giving up I realized reg = <1> for
+these PHYs, not reg = 0 ...
 
-I'm preparing a device function to read this as you suggested.
+The error was still in the unit name.
 
-Sinan
+Fixed this and the other DTS files.
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Yours,
+Linus Walleij
