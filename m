@@ -1,27 +1,23 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 29 Nov 2017 15:13:31 +0100
-Subject: [PATCH] arch: arm: mach-stm32: Fix copyright
-Message-ID: <20171129141331.21558-1-benjamin.gaignard@st.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 29 Nov 2017 19:49:30 +0530
+Subject: [PATCH] dmaengine: at_hdmac: fix potential NULL pointer
+ dereference in atc_prep_dma_interleaved
+In-Reply-To: <20171120142814.GA3315@embeddedor.com>
+References: <20171120142814.GA3315@embeddedor.com>
+Message-ID: <20171129141930.GJ32417@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uniformize STMicroelectronics copyrights header
+On Mon, Nov 20, 2017 at 08:28:14AM -0600, Gustavo A. R. Silva wrote:
+> _xt_ is being dereferenced before it is null checked, hence there is a
+> potential null pointer dereference.
+> 
+> Fix this by moving the pointer dereference after _xt_ has been null
+> checked.
+> 
+> This issue was detected with the help of Coccinelle.
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
- arch/arm/mach-stm32/board-dt.c | 1 +
- 1 file changed, 1 insertion(+)
+Applied, thanks
 
-diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-index e918686e4191..df432bb53d03 100644
---- a/arch/arm/mach-stm32/board-dt.c
-+++ b/arch/arm/mach-stm32/board-dt.c
-@@ -1,5 +1,6 @@
- /*
-  * Copyright (C) Maxime Coquelin 2015
-+ * Copyright (C) STMicroelectronics SA 2017
-  * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
-  * License terms:  GNU General Public License (GPL), version 2
-  */
 -- 
-2.15.0
+~Vinod
