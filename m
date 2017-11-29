@@ -1,47 +1,37 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Nov 2017 16:46:13 -0200
-Subject: [PATCH 05/11] ARM: dts: imx6dl: Remove unneeded label and unit address
+Date: Wed, 29 Nov 2017 16:46:19 -0200
+Subject: [PATCH 11/11] ARM: dts: vf500: Fix interrupt-controller unit address
 In-Reply-To: <1511981179-12660-1-git-send-email-festevam@gmail.com>
 References: <1511981179-12660-1-git-send-email-festevam@gmail.com>
-Message-ID: <1511981179-12660-5-git-send-email-festevam@gmail.com>
+Message-ID: <1511981179-12660-11-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Remove unneeded label and unit address in order to fix the following
-build warnings with W=1:
+The correct unit address for interrupt-controller is 0x40003000, so
+change it accordingly in order to fix the following build warning
+with W=1:
 
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2000000/iomuxc-gpr at 20e0000/ipu1_csi0_mux at 34 has a unit name, but no reg property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2000000/iomuxc-gpr at 20e0000/ipu1_csi1_mux at 34 has a unit name, but no
+arch/arm/boot/dts/vf500-colibri-eval-v3.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 40000000/interrupt-controller at 40002000 simple-bus unit address format error, expected "40003000"
 
-Cc: Philipp Zabel <p.zabel@pengutronix.de>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6dl.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/vf500.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl.dtsi b/arch/arm/boot/dts/imx6dl.dtsi
-index d987661..c01674f 100644
---- a/arch/arm/boot/dts/imx6dl.dtsi
-+++ b/arch/arm/boot/dts/imx6dl.dtsi
-@@ -170,7 +170,7 @@
- };
+diff --git a/arch/arm/boot/dts/vf500.dtsi b/arch/arm/boot/dts/vf500.dtsi
+index 3d98961..348bcd3 100644
+--- a/arch/arm/boot/dts/vf500.dtsi
++++ b/arch/arm/boot/dts/vf500.dtsi
+@@ -58,7 +58,7 @@
+ 	soc {
+ 		aips-bus at 40000000 {
  
- &gpr {
--	ipu1_csi0_mux: ipu1_csi0_mux at 34 {
-+	ipu1_csi0_mux {
- 		compatible = "video-mux";
- 		mux-controls = <&mux 0>;
- 		#address-cells = <1>;
-@@ -224,7 +224,7 @@
- 		};
- 	};
- 
--	ipu1_csi1_mux: ipu1_csi1_mux at 34 {
-+	ipu1_csi1_mux {
- 		compatible = "video-mux";
- 		mux-controls = <&mux 1>;
- 		#address-cells = <1>;
+-			intc: interrupt-controller at 40002000 {
++			intc: interrupt-controller at 40003000 {
+ 				compatible = "arm,cortex-a9-gic";
+ 				#interrupt-cells = <3>;
+ 				interrupt-controller;
 -- 
 2.7.4
