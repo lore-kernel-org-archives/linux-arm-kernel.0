@@ -1,25 +1,32 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Nov 2017 22:48:33 +0800
-Subject: [PATCH v4] ARM: dts: imx6qdl-nitrogen6x: Add SPI NOR partitions
-In-Reply-To: <20171128174924.5149-1-otavio@ossystems.com.br>
-References: <20171128174924.5149-1-otavio@ossystems.com.br>
-Message-ID: <20171129144832.GQ9376@dragon>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 29 Nov 2017 09:44:10 -0500 (EST)
+Subject: [PATCH] net: ethernet: xilinx: Mark XILINX_LL_TEMAC broken on
+ 64-bit
+In-Reply-To: <1511949669-30379-1-git-send-email-geert+renesas@glider.be>
+References: <1511949669-30379-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20171129.094410.1537008794654450709.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 03:49:24PM -0200, Otavio Salvador wrote:
-> This adds the partitions definition for the SPI NOR to provide
-> backward compatibility with the documented[1] layout used with
-> Boundary Devices BSP.
-> 
-> 1. https://boundarydevices.com/boot-flash-access-linux/
-> 
-> It exports to Linux:
-> 
->  mtd0: bootloader
->  mtd1: env
->  mtd2: splash
-> 
-> Signed-off-by: Otavio Salvador <otavio@ossystems.com.br>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
+Date: Wed, 29 Nov 2017 11:01:09 +0100
 
-Applied, thanks.
+> On 64-bit (e.g. powerpc64/allmodconfig):
+> 
+>     drivers/net/ethernet/xilinx/ll_temac_main.c: In function 'temac_start_xmit_done':
+>     drivers/net/ethernet/xilinx/ll_temac_main.c:633:22: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+> 	dev_kfree_skb_irq((struct sk_buff *)cur_p->app4);
+> 			  ^
+> 
+> cdmac_bd.app4 is u32, so it is too small to hold a kernel pointer.
+> 
+> Note that several other fields in struct cdmac_bd are also too small to
+> hold physical addresses on 64-bit platforms.
+> 
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Yeah, I can't see much value in implementing a hash table converting between
+32-bit cookies and 64-bit points just for this if it'll never be actually
+used.
+
+Applied, thanks Geert.
