@@ -1,31 +1,20 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 29 Nov 2017 16:18:05 +0000
-Subject: [PATCH v1 0/2] Additional single-step-cases
-In-Reply-To: <20171123121134.11050-1-alex.bennee@linaro.org>
-References: <20171123121134.11050-1-alex.bennee@linaro.org>
-Message-ID: <25e0999c-df1a-b25c-6b56-6a63ebcb690d@arm.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Wed, 29 Nov 2017 08:22:23 -0800
+Subject: [PATCH 3/3] arm64: use -mno-implicit-float instead of
+ -mgeneral-regs-only
+In-Reply-To: <CAKv+Gu99XM5jLcOTkqPJPj5oZnUCNv2c7C=5X2hFCM4-4_gwNg@mail.gmail.com>
+References: <20171129000011.55235-1-samitolvanen@google.com>
+ <20171129000011.55235-4-samitolvanen@google.com>
+ <CAKv+Gu99XM5jLcOTkqPJPj5oZnUCNv2c7C=5X2hFCM4-4_gwNg@mail.gmail.com>
+Message-ID: <20171129162223.GA2959@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/11/17 12:11, Alex Benn?e wrote:
-> Hi,
-> 
-> This is now split into two patches as the first case of SError is
-> separate from behaviour of stepping instructions.
-> 
-> Alex Benn?e (2):
->   kvm: arm64: handle single-step during SError exceptions
->   kvm: arm64: handle single-step of hyp emulated mmio instructions
-> 
->  arch/arm64/kvm/handle_exit.c |  8 +++++++-
->  arch/arm64/kvm/hyp/switch.c  | 37 ++++++++++++++++++++++++++++++-------
->  2 files changed, 37 insertions(+), 8 deletions(-)
-> 
+On Wed, Nov 29, 2017 at 12:15:14PM +0000, Ard Biesheuvel wrote:
+> Do we still need these patches now that the AES code has been fixed?
 
-For both patches:
+With your AES patch that Herbert just applied, this patch is no longer
+needed. Version macros in the first two patches will still be useful in
+future though.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Sami
