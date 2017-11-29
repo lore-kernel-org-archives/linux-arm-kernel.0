@@ -1,22 +1,96 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Wed, 29 Nov 2017 09:39:28 -0800
-Subject: [PATCH 1/3] kbuild: add clang-version.sh
-In-Reply-To: <20171129000011.55235-2-samitolvanen@google.com>
-References: <20171129000011.55235-1-samitolvanen@google.com>
- <20171129000011.55235-2-samitolvanen@google.com>
-Message-ID: <CAKwvOdndEfdXuRCeSsr04pAt0d0tE_z72DUYc2Z9LCnXAQc4Hw@mail.gmail.com>
+From: david@redhat.com (David Hildenbrand)
+Date: Wed, 29 Nov 2017 18:40:24 +0100
+Subject: [PATCH v2 12/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_get_fpu
+In-Reply-To: <20171129164116.16167-13-christoffer.dall@linaro.org>
+References: <20171129164116.16167-1-christoffer.dall@linaro.org>
+ <20171129164116.16167-13-christoffer.dall@linaro.org>
+Message-ID: <ae58005c-4b83-fac0-56aa-b77511249beb@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+# clang-version [-p] clang-command
-+#
-+# Prints the compiler version of `command' in a canonical 4-digit form
+On 29.11.2017 17:41, Christoffer Dall wrote:
+> Move vcpu_load() and vcpu_put() into the architecture specific
+> implementations of kvm_arch_vcpu_ioctl_get_fpu().
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/s390/kvm/kvm-s390.c | 4 ++++
+>  arch/x86/kvm/x86.c       | 7 +++++--
+>  virt/kvm/kvm_main.c      | 2 --
+>  3 files changed, 9 insertions(+), 4 deletions(-)
+> 
+> diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+> index 4bf80b5..88dcb89 100644
+> --- a/arch/s390/kvm/kvm-s390.c
+> +++ b/arch/s390/kvm/kvm-s390.c
+> @@ -2765,6 +2765,8 @@ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+>  
+>  int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+>  {
+> +	vcpu_load(vcpu);
+> +
+>  	/* make sure we have the latest values */
+>  	save_fpu_regs();
+>  	if (MACHINE_HAS_VX)
+> @@ -2773,6 +2775,8 @@ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+>  	else
+>  		memcpy(fpu->fprs, vcpu->run->s.regs.fprs, sizeof(fpu->fprs));
+>  	fpu->fpc = vcpu->run->s.regs.fpc;
+> +
+> +	vcpu_put(vcpu);
 
-small nit: `command` should be `clang-command`, but its just a comment
-(maybe the maintainer can make that change when/if applying).
+This is one example where we need the vcpu_put/load.
 
-The conditional at the end to see if $with_patchlevel using "x" is
-odd, but this is what scripts/gcc-version.sh does and this patch does
-work as expected.
+>  	return 0;
+>  }
+>  
+> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+> index a074b0bd..8b54567 100644
+> --- a/arch/x86/kvm/x86.c
+> +++ b/arch/x86/kvm/x86.c
+> @@ -7679,9 +7679,11 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
+>  
+>  int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+>  {
+> -	struct fxregs_state *fxsave =
+> -			&vcpu->arch.guest_fpu.state.fxsave;
+> +	struct fxregs_state *fxsave;
+>  
+> +	vcpu_load(vcpu);
+> +
+> +	fxsave = &vcpu->arch.guest_fpu.state.fxsave;
+>  	memcpy(fpu->fpr, fxsave->st_space, 128);
+>  	fpu->fcw = fxsave->cwd;
+>  	fpu->fsw = fxsave->swd;
+> @@ -7691,6 +7693,7 @@ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+>  	fpu->last_dp = fxsave->rdp;
+>  	memcpy(fpu->xmm, fxsave->xmm_space, sizeof fxsave->xmm_space);
+>  
+> +	vcpu_put(vcpu);
+>  	return 0;
+>  }
+>  
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index c688eb7..73ad70a 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2673,9 +2673,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		r = -ENOMEM;
+>  		if (!fpu)
+>  			goto out;
+> -		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_get_fpu(vcpu, fpu);
+> -		vcpu_put(vcpu);
+>  		if (r)
+>  			goto out;
+>  		r = -EFAULT;
+> 
 
-Tested-by: Nick Desaulniers <ndesaulniers@google.com>
+Reviewed-by: David Hildenbrand <david@redhat.com>
+
+-- 
+
+Thanks,
+
+David / dhildenb
