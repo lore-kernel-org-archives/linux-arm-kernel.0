@@ -1,57 +1,92 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 29 Nov 2017 11:27:16 +0100
-Subject: [GIT PULL] tee async tee supplicant communication for v4.16
-Message-ID: <20171129102715.dsxcsq6s5tvnep2s@jax>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 29 Nov 2017 10:33:06 +0000
+Subject: [PATCH] arm64: kaslr: Fix kaslr end boundary of virt addr
+In-Reply-To: <CAKv+Gu_Vr9jP5avwLcR0-cB=0SJiMaxmi8REnBfVF98-u+XzYQ@mail.gmail.com>
+References: <1511235853-8407-1-git-send-email-puck.chen@hisilicon.com>
+ <CAKv+Gu_Vr9jP5avwLcR0-cB=0SJiMaxmi8REnBfVF98-u+XzYQ@mail.gmail.com>
+Message-ID: <CAKv+Gu-9r-MU_J1_uA4xpPPgNiCGfGx4FzXpG-N-8=YX6OmqAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi arm-soc maintainers,
+On 28 November 2017 at 20:41, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 21 November 2017 at 03:44, Chen Feng <puck.chen@hisilicon.com> wrote:
+>> With kaslr and kasan enable both, I got the follow issue.
+>>
+>> [   16.130523s]kasan: reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000
+>> [   16.142517s]___alloc_bootmem_nopanic:257
+>> [   16.148284s]__alloc_memory_core_early:63, addr = 197fc7fc0
+>> [   16.155670s]__alloc_memory_core_early:65, virt = ffffffffd7fc7fc0
+>> [   16.163635s]__alloc_memory_core_early:67, toshow = ffffff8ffaff8ff8
+>> [   16.171783s]__alloc_memory_core_early:69, show_phy = ffffffe2649f8ff8
+>> [   16.180145s]Unable to handle kernel paging request at virtual address ffffff8ffaff8ff8
+>> [   16.189971s]pgd = ffffffad9c507000
+>> [   16.195220s][ffffff8ffaff8ff8] *pgd=0000000197fc8003, *pud=0000000197fc8003
+>>
+>> *reg->base = 100000000, phys_end =1c0000000,start = ffffffff40000000, end = ffffffc000000000*
+>>
+>> memstart_addr 0
+>> ARM64_MEMSTART_ALIGN 0x40000000
+>> memstart_offset_seed 0xffc7
+>> PHYS_OFFSET = 0 - memstart_addr = 0 - 3E40000000 = FFFFFFC1C0000000
+>>
+>> reg->base = 0x100000000  -> 0xffffffff40000000
+>> phys_end  = 0x1c0000000  -> 0xffffffc000000000  This is confused, end less than start.
+>>
+>
+> This looks a bit weird because we add the PAGE_OFFSET, but it simply
+> wraps at the top of the address space.
+>
+> So this code in kasan_init()
+>
+> void *start = (void *)__phys_to_virt(reg->base);
+> void *end = (void *)__phys_to_virt(reg->base + reg->size);
+>
+> if (start >= end)
+>      break;
+>
+> is essentially incorrect, because it translates an address that is
+> strictly outside of the current memblock region. If the KASLR code
+> happens to map DRAM all the way at the top of the linear region (which
+> is what occurs in your case), end - 1 is the last valid address.
+>
+> So I think the minimal correct fix would be
+>
+> diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+> index acba49fb5aac..3214aa9d90be 100644
+> --- a/arch/arm64/mm/kasan_init.c
+> +++ b/arch/arm64/mm/kasan_init.c
+> @@ -216,7 +216,7 @@ void __init kasan_init(void)
+>
+>         for_each_memblock(memory, reg) {
+>                 void *start = (void *)__phys_to_virt(reg->base);
+> -               void *end = (void *)__phys_to_virt(reg->base + reg->size);
+> +               void *end = start + reg->size;
+>
+>                 if (start >= end)
+>                         break;
+>
 
-Please pull these tee driver changes. This implements support for
-asynchronous communication with TEE supplicant. This isn't a bugfix so
-I'm aiming for the next merge window.
+This does not actually fix the problem, end will be 0x0 which is still
+< start. We'll need a '-1' in there somewhere to really fix it.
 
-Thanks,
-Jens
+> given that mappings in the linear region are congruent with the
+> underlying physical regions (unless I am missing something wrt special
+> start/end values in memblock, but in that case, they should not be p2v
+> translated before the evaluation)
+>
+> However, since having DRAM at the very top appears to break other things as well
+>
+> vmemmap : 0xffffffbf00000000 - 0xffffffc000000000   (     4 GB maximum)
+>           0xffffffbfff000000 - 0xffffffbf00000000   (17592186040336 MB actual)
+> memory  : 0xffffffffc0000000 - 0x               0   (  1024 MB)
+>
+> I will leave it to Will and/or Catalin to decide whether they prefer
+> to follow your approach instead, and prevent KASLR from mapping DRAM
+> all the way at the top of the address space. Otherwise, we'll need to
+> track down all problematic uses of __phys_to_virt() et al, because
+> there will surely be more.
+>
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  https://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-drv-async-supplicant-for-v4.16
-
-for you to fetch changes up to 1647a5ac175490d7dac2e74532e85b6197fc74e9:
-
-  optee: support asynchronous supplicant requests (2017-11-29 10:37:13 +0100)
-
-----------------------------------------------------------------
-Enable async communication with tee supplicant
-
-This pull request enables asynchronous communication with TEE supplicant
-by introducing meta parameters in the user space API. The meta
-parameters can be used to tag requests with an id that can be matched
-against an asynchronous response as is done here in the OP-TEE driver.
-
-Asynchronous supplicant communication is needed by OP-TEE to implement
-GlobalPlatforms TEE Sockets API Specification v1.0.1. The specification
-is available at https://www.globalplatform.org/specificationsdevice.asp.
-
-This change is backwards compatible allowing older supplicants to work
-with newer kernels and vice versa.
-
-----------------------------------------------------------------
-Jens Wiklander (3):
-      tee: add tee_param_is_memref() for driver use
-      tee: add TEE_IOCTL_PARAM_ATTR_META
-      optee: support asynchronous supplicant requests
-
- drivers/tee/optee/core.c          |  11 +-
- drivers/tee/optee/optee_private.h |  43 ++---
- drivers/tee/optee/rpc.c           |   4 +-
- drivers/tee/optee/supp.c          | 375 ++++++++++++++++++++++++--------------
- drivers/tee/tee_core.c            |  32 ++--
- include/linux/tee_drv.h           |  12 ++
- include/uapi/linux/tee.h          |   7 +
- 7 files changed, 295 insertions(+), 189 deletions(-)
+I guess it takes quite a bit of discipline to deal with overflow in
+all 'end' calculations, although I suppose this is more common on
+32-bit architectures.
