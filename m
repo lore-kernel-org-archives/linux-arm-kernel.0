@@ -1,147 +1,70 @@
-From: shameerali.kolothum.thodi@huawei.com (Shameer Kolothum)
-Date: Wed, 29 Nov 2017 14:14:49 +0000
-Subject: [PATCH v10 3/3] arm64:dts:hisilicon Disable hisilicon smmu node on
- hip06/hip07
-In-Reply-To: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
-References: <20171129141449.120316-1-shameerali.kolothum.thodi@huawei.com>
-Message-ID: <20171129141449.120316-4-shameerali.kolothum.thodi@huawei.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 29 Nov 2017 15:37:01 +0100
+Subject: [PATCH] PM: Provide a config snippet for disabling PM
+In-Reply-To: <20171129111227.26798-1-broonie@kernel.org>
+References: <20171129111227.26798-1-broonie@kernel.org>
+Message-ID: <CAJZ5v0jGZxP5NWHKEhXU7gFfvSjwm-iocSEZ-C2A7UhUM+v2CA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HiSilicon erratum 161010801 describes the limitation of
-HiSilicon platforms hip06/hip07 to support the SMMUv3 mappings
-for MSI transactions.
+On Wed, Nov 29, 2017 at 12:12 PM, Mark Brown <broonie@kernel.org> wrote:
+> A frequent source of build problems is poor handling of optional PM
+> support, almost all development is done with the PM options enabled
+> but they can be turned off.  Currently few if any of the build test
+> services do this as standard as there is no standard config for it and
+> the use of selects and def_bool means that simply setting CONFIG_PM=n
+> doesn't do what is expected.  To make this easier provide a fragement
+> that can be used with KCONFIG_ALLCONFIG to force PM off.
+>
+> CONFIG_XEN is disabled as Xen uses hibernation callbacks which end up
+> turning on power management on architectures with Xen.  Some cpuidle
+> implementations on ARM select PM so CONFIG_CPU_IDLE is disabled, and
+> some ARM architectures unconditionally enable PM so they are also
+> disabled.
+>
+> Signed-off-by: Mark Brown <broonie@kernel.org>
 
-PCIe controller on these platforms has to differentiate the
-MSI payload against other DMA payload and has to modify the
-MSI  payload. This makes it difficult for these platforms to
-have SMMU translation for MSI. In order to workaround this,
-ARM SMMUv3 driver requires a quirk to treat the MSI regions
-separately. Such a quirk is currently missing for DT based
-systems and therefore we need to explicitly disable the
-hip06/hip07 smmu entries in dts.
+I'm going to apply this shortly, sorry for the delay.
 
-Signed-off-by: Shameer Kolothum <shameerali.kolothum.thodi@huawei.com>
-Signed-off-by: Wei Xu <xuwei5@hisilicon.com> 
----
- arch/arm64/boot/dts/hisilicon/hip06.dtsi | 55 ++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/hisilicon/hip07.dtsi | 24 ++++++++++++++
- 2 files changed, 79 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/hisilicon/hip06.dtsi b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-index a049b64..d0d5933 100644
---- a/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip06.dtsi
-@@ -291,6 +291,13 @@
- 			#interrupt-cells = <2>;
- 			num-pins = <128>;
- 		};
-+
-+		mbigen_pcie0: intc_pcie0 {
-+			msi-parent = <&its_dsa 0x40085>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			num-pins = <10>;
-+		};
- 	};
- 
- 	mbigen_dsa at c0080000 {
-@@ -312,6 +319,30 @@
- 		};
- 	};
- 
-+	/** HiSilicon erratum 161010801: This describes the limitation
-+	 *  of HiSilicon platforms hip06/hip07 to support the SMMUv3
-+	 *  mappings for PCIe MSI transactions.
-+	 *  PCIe controller on these platforms has to differentiate the
-+	 *  MSI payload against other DMA payload and has to modify the
-+	 *  MSI payload. This makes it difficult for these platforms to
-+	 *  have a SMMU translation for MSI. In order to workaround this,
-+	 *  ARM SMMUv3 driver requires a quirk to treat the MSI regions
-+	 *  separately. Such a quirk is currently missing for DT based
-+	 *  systems. Hence please make sure that the smmu pcie node on
-+	 *  hip06 is disabled as this will break the PCIe functionality
-+	 *  when iommu-map entry is used along with the PCIe node.
-+	 *  Refer:https://www.spinics.net/lists/arm-kernel/msg602812.html
-+	 */
-+	smmu0: smmu_pcie {
-+		compatible = "arm,smmu-v3";
-+		reg = <0x0 0xa0040000 0x0 0x20000>;
-+		#iommu-cells = <1>;
-+		dma-coherent;
-+		smmu-cb-memtype = <0x0 0x1>;
-+		hisilicon,broken-prefetch-cmd;
-+		status = "disabled";
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
-@@ -676,6 +707,30 @@
- 				     <637 1>,<638 1>,<639 1>;
- 			status = "disabled";
- 		};
-+
-+		pcie0: pcie at a0090000 {
-+			compatible = "hisilicon,hip06-pcie-ecam";
-+			reg = <0 0xb0000000 0 0x2000000>,
-+			      <0 0xa0090000 0 0x10000>;
-+			bus-range = <0  31>;
-+			msi-map = <0x0000 &its_dsa 0x0000 0x2000>;
-+			msi-map-mask = <0xffff>;
-+			#address-cells = <3>;
-+			#size-cells = <2>;
-+			device_type = "pci";
-+			dma-coherent;
-+			ranges = <0x02000000 0 0xb2000000 0x0 0xb2000000 0
-+				 0x5ff0000 0x01000000 0 0 0 0xb7ff0000
-+				 0 0x10000>;
-+			#interrupt-cells = <1>;
-+			interrupt-map-mask = <0xf800 0 0 7>;
-+			interrupt-map = <0x0 0 0 1 &mbigen_pcie0 650 4
-+					0x0 0 0 2 &mbigen_pcie0 650 4
-+					0x0 0 0 3 &mbigen_pcie0 650 4
-+					0x0 0 0 4 &mbigen_pcie0 650 4>;
-+			status = "disabled";
-+		};
-+
- 	};
- 
- };
-diff --git a/arch/arm64/boot/dts/hisilicon/hip07.dtsi b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
-index 2c01a21..58fe013 100644
---- a/arch/arm64/boot/dts/hisilicon/hip07.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hip07.dtsi
-@@ -1083,6 +1083,30 @@
- 		};
- 	};
- 
-+	/** HiSilicon erratum 161010801: This describes the limitation
-+	 *  of HiSilicon platforms hip06/hip07 to support the SMMUv3
-+	 *  mappings for PCIe MSI transactions.
-+	 *  PCIe controller on these platforms has to differentiate the
-+	 *  MSI payload against other DMA payload and has to modify the
-+	 *  MSI payload. This makes it difficult for these platforms to
-+	 *  have a SMMU translation for MSI. In order to workaround this,
-+	 *  ARM SMMUv3 driver requires a quirk to treat the MSI regions
-+	 *  separately. Such a quirk is currently missing for DT based
-+	 *  systems. Hence please make sure that the smmu pcie node on
-+	 *  hip06 is disabled as this will break the PCIe functionality
-+	 *  when iommu-map entry is used along with the PCIe node.
-+	 *  Refer:https://www.spinics.net/lists/arm-kernel/msg602812.html
-+	 */
-+	smmu0: smmu_pcie {
-+		compatible = "arm,smmu-v3";
-+		reg = <0x0 0xa0040000 0x0 0x20000>;
-+		#iommu-cells = <1>;
-+		dma-coherent;
-+		smmu-cb-memtype = <0x0 0x1>;
-+		hisilicon,broken-prefetch-cmd;
-+		status = "disabled";
-+	};
-+
- 	soc {
- 		compatible = "simple-bus";
- 		#address-cells = <2>;
--- 
-1.9.1
+> ---
+>  MAINTAINERS                |  1 +
+>  kernel/configs/nopm.config | 15 +++++++++++++++
+>  2 files changed, 16 insertions(+)
+>  create mode 100644 kernel/configs/nopm.config
+>
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 07d9067f68fd..539808dc7928 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -10895,6 +10895,7 @@ F:      include/linux/pm.h
+>  F:     include/linux/pm_*
+>  F:     include/linux/powercap.h
+>  F:     drivers/powercap/
+> +F:     kernel/configs/nopm.config
+>
+>  POWER STATE COORDINATION INTERFACE (PSCI)
+>  M:     Mark Rutland <mark.rutland@arm.com>
+> diff --git a/kernel/configs/nopm.config b/kernel/configs/nopm.config
+> new file mode 100644
+> index 000000000000..81ff07863576
+> --- /dev/null
+> +++ b/kernel/configs/nopm.config
+> @@ -0,0 +1,15 @@
+> +CONFIG_PM=n
+> +CONFIG_SUSPEND=n
+> +CONFIG_HIBERNATION=n
+> +
+> +# Triggers PM on OMAP
+> +CONFIG_CPU_IDLE=n
+> +
+> +# Triggers enablement via hibernate callbacks
+> +CONFIG_XEN=n
+> +
+> +# ARM/ARM64 architectures that select PM unconditionally
+> +CONFIG_ARCH_OMAP2PLUS_TYPICAL=n
+> +CONFIG_ARCH_RENESAS=n
+> +CONFIG_ARCH_TEGRA=n
+> +CONFIG_ARCH_VEXPRESS=n
+> --
+> 2.15.0
+>
