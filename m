@@ -1,47 +1,36 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Wed, 29 Nov 2017 15:44:39 -0800
-Subject: [PATCH 4/7] arm64: fix -m for GNU gold
+Date: Wed, 29 Nov 2017 15:44:42 -0800
+Subject: [PATCH 7/7] arm64: add a workaround for GNU gold with
+ ARM64_MODULE_PLTS
 In-Reply-To: <20171129234442.655-1-samitolvanen@google.com>
 References: <20171129234442.655-1-samitolvanen@google.com>
-Message-ID: <20171129234442.655-5-samitolvanen@google.com>
+Message-ID: <20171129234442.655-8-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-GNU gold supports different emulations than bfd. Use aarch64_elf64_*_vec
-instead of aarch64linux.
+All current versions of GNU gold crash when linking kernel modules
+with ARM64_MODULE_PLTS due to a known bug:
+
+  https://sourceware.org/bugzilla/show_bug.cgi?id=14592
+
+To work around the problem, this change removes NOLOAD from .plt
+and .init.plt.
 
 Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
-Acked-by: Yury Norov <ynorov@caviumnetworks.com>
 ---
- arch/arm64/Makefile | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/kernel/module.lds | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b35788c909f1..82a0df6e865e 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -64,14 +64,22 @@ KBUILD_CPPFLAGS	+= -mbig-endian
- CHECKFLAGS	+= -D__AARCH64EB__
- AS		+= -EB
- LD		+= -EB
-+ifeq ($(ld-name),gold)
-+LDFLAGS		+= -maarch64_elf64_be_vec
-+else
- LDFLAGS		+= -maarch64linuxb
-+endif
- UTS_MACHINE	:= aarch64_be
- else
- KBUILD_CPPFLAGS	+= -mlittle-endian
- CHECKFLAGS	+= -D__AARCH64EL__
- AS		+= -EL
- LD		+= -EL
-+ifeq ($(ld-name),gold)
-+LDFLAGS		+= -maarch64_elf64_le_vec
-+else
- LDFLAGS		+= -maarch64linux
-+endif
- UTS_MACHINE	:= aarch64
- endif
- 
+diff --git a/arch/arm64/kernel/module.lds b/arch/arm64/kernel/module.lds
+index f7c9781a9d48..eacb5c67f61e 100644
+--- a/arch/arm64/kernel/module.lds
++++ b/arch/arm64/kernel/module.lds
+@@ -1,4 +1,4 @@
+ SECTIONS {
+-	.plt (NOLOAD) : { BYTE(0) }
+-	.init.plt (NOLOAD) : { BYTE(0) }
++	.plt : { BYTE(0) }
++	.init.plt : { BYTE(0) }
+ }
 -- 
 2.15.0.531.g2ccb3012c9-goog
