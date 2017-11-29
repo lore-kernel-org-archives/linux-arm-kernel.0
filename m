@@ -1,46 +1,74 @@
 From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Wed, 29 Nov 2017 21:34:03 +0100
-Subject: [PATCH v2 2/6] ARM: ep93xx: ts72xx: Provide include guards for
- ts72xx.h file
-In-Reply-To: <20171121143204.1839-3-lukma@denx.de>
+Date: Wed, 29 Nov 2017 21:36:48 +0100
+Subject: [PATCH v2 4/6] ARM: ep93xx: ts72xx: Rewrite map IO code to be
+ reusable
+In-Reply-To: <20171121143204.1839-5-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
- <20171121143204.1839-1-lukma@denx.de> <20171121143204.1839-3-lukma@denx.de>
-Message-ID: <ccfbd627-b71b-4417-3c84-e2a04141c64f@gmail.com>
+ <20171121143204.1839-1-lukma@denx.de> <20171121143204.1839-5-lukma@denx.de>
+Message-ID: <d4ece591-74ef-060e-87cd-873fb946867c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
 On 21/11/17 15:32, Lukasz Majewski wrote:
-> This commit adds include file guards to ts72xx.h
+> The map IO common code has been excluded to be reused by other ts72xx
+> clones.
 > 
 > Signed-off-by: Lukasz Majewski <lukma@denx.de>
 
 Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 
+> 
 > ---
 > Changes for v2:
-> - None
+> - New patch
 > ---
->  arch/arm/mach-ep93xx/ts72xx.h | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm/mach-ep93xx/ts72xx.c | 23 ++++++++++++++++-------
+>  1 file changed, 16 insertions(+), 7 deletions(-)
 > 
-> diff --git a/arch/arm/mach-ep93xx/ts72xx.h b/arch/arm/mach-ep93xx/ts72xx.h
-> index b89850f1a965..d9ff04db3221 100644
-> --- a/arch/arm/mach-ep93xx/ts72xx.h
-> +++ b/arch/arm/mach-ep93xx/ts72xx.h
-> @@ -12,6 +12,9 @@
->   * febfd000	22800000	4K	options register #2
->   */
+> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+> index 00e0e5b8babf..a6e473b3dcf6 100644
+> --- a/arch/arm/mach-ep93xx/ts72xx.c
+> +++ b/arch/arm/mach-ep93xx/ts72xx.c
+> @@ -30,11 +30,6 @@
 >  
-> +#ifndef __TS72XX_H_
-> +#define __TS72XX_H_
+>  static struct map_desc ts72xx_io_desc[] __initdata = {
+>  	{
+> -		.virtual	= (unsigned long)TS72XX_MODEL_VIRT_BASE,
+> -		.pfn		= __phys_to_pfn(TS72XX_MODEL_PHYS_BASE),
+> -		.length		= TS72XX_MODEL_SIZE,
+> -		.type		= MT_DEVICE,
+> -	}, {
+>  		.virtual	= (unsigned long)TS72XX_OPTIONS_VIRT_BASE,
+>  		.pfn		= __phys_to_pfn(TS72XX_OPTIONS_PHYS_BASE),
+>  		.length		= TS72XX_OPTIONS_SIZE,
+> @@ -47,12 +42,26 @@ static struct map_desc ts72xx_io_desc[] __initdata = {
+>  	}
+>  };
+>  
+> -static void __init ts72xx_map_io(void)
+> +static struct map_desc ts72xx_common_io_desc[] __initdata = {
+> +	{
+> +		.virtual	= (unsigned long)TS72XX_MODEL_VIRT_BASE,
+> +		.pfn		= __phys_to_pfn(TS72XX_MODEL_PHYS_BASE),
+> +		.length		= TS72XX_MODEL_SIZE,
+> +		.type		= MT_DEVICE,
+> +	}
+> +};
 > +
->  #define TS72XX_MODEL_PHYS_BASE		0x22000000
->  #define TS72XX_MODEL_VIRT_BASE		IOMEM(0xfebff000)
->  #define TS72XX_MODEL_SIZE		0x00001000
-> @@ -86,3 +89,4 @@ static inline int is_ts9420_installed(void)
->  					TS72XX_OPTIONS2_TS9420);
+> +void __init ts72xx_common_map_io(void)
+>  {
+>  	ep93xx_map_io();
+> -	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
+> +	iotable_init(ts72xx_common_io_desc, ARRAY_SIZE(ts72xx_common_io_desc));
 >  }
->  #endif
-> +#endif /* __TS72XX_H_ */
+>  
+> +static void __init ts72xx_map_io(void)
+> +{
+> +	ts72xx_common_map_io();
+> +	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
+> +}
+>  
+>  /*************************************************************************
+>   * NAND flash
