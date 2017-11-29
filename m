@@ -1,23 +1,30 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 29 Nov 2017 19:49:30 +0530
-Subject: [PATCH] dmaengine: at_hdmac: fix potential NULL pointer
- dereference in atc_prep_dma_interleaved
-In-Reply-To: <20171120142814.GA3315@embeddedor.com>
-References: <20171120142814.GA3315@embeddedor.com>
-Message-ID: <20171129141930.GJ32417@localhost>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 29 Nov 2017 15:15:48 +0100
+Subject: [PATCH] clk: stm32-h7: fix copyright
+Message-ID: <20171129141548.21732-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 08:28:14AM -0600, Gustavo A. R. Silva wrote:
-> _xt_ is being dereferenced before it is null checked, hence there is a
-> potential null pointer dereference.
-> 
-> Fix this by moving the pointer dereference after _xt_ has been null
-> checked.
-> 
-> This issue was detected with the help of Coccinelle.
+Uniformize STMicroelectronics copyrights header
 
-Applied, thanks
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+CC: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ drivers/clk/clk-stm32h7.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
+index 61c3e40507d3..16395fdb61ac 100644
+--- a/drivers/clk/clk-stm32h7.c
++++ b/drivers/clk/clk-stm32h7.c
+@@ -1,6 +1,6 @@
+ /*
+- * Copyright (C) Gabriel Fernandez 2017
+- * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
++ * Copyright (C) STMicroelectronics SA 2017
++ * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
+  *
+  * License terms: GPL V2.0.
+  *
 -- 
-~Vinod
+2.15.0
