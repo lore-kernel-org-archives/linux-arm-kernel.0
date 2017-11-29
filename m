@@ -1,69 +1,97 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 29 Nov 2017 11:20:54 +0100
-Subject: [PATCH v4 3/6] dt-bindings: display: Add bindings for SGD
- GKTW70SDAE4SE Panel
-In-Reply-To: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
-References: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1511950857-19292-4-git-send-email-narmstrong@baylibre.com>
+Date: Wed, 29 Nov 2017 11:20:51 +0100
+Subject: [PATCH v4 0/6] ARM: Add Variscite DART-MX6 SoM and Carrier-board
+ support
+Message-ID: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GKTW70SDAE4SE is an LVDS display panel.
-Their bindings are modelled on the the LVDS panel bindings.
+This patchset adds support for the Variscite DART-MX6 SoM with :
+- i.MX6 Quad or Dual Lite SoC
+- 1Gb/2Gb LPDDR2
+- 4-64 GB eMMC
+- Camera Interface
+- HDMI+CEC interface
+- LVDS / DSI / Parallel RGB interfaces
+- Ethernet RGMII interface
+- On-SoM Wi-Fi/Bluetooth with WiLink wl1835 SDIO Module
+- SD/MMC/SDIO interface
+- USB Host + USB OTG interface
+- I2C interfaces
+- SPI interfaces
+- PCI-Express 2.0 interface
+- on-SoM Audio Codec with HP/Line-In interfaces + DMIC interface
+- Digital Audio interface
+- S/PDIF interface
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- .../bindings/display/panel/sgd,gktw70sdae4se.txt   | 41 ++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+And the Carrier-Board with the following :
+- LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
+- HDMI Connector
+- USB Host + USB OTG Connector
+- 10/100/1000 Mbps Ethernet
+- miniPCI-Express slot
+- SD Card connector
+- Audio Headphone/Line In jack connectors
+- On-board DMIC
+- CAN bus header
+- SPI header
+- Camera Interfaces header
+- 4xButtons, 2xLeds
+- OnBoard RTC with Coin Backup battery socket
+- RS232 Header + USB-Serial debug port
+
+First patch contains a missing pinmux define used by the SoM.
+Last patch contains configs used by the SoM DT like SERDEV or WL18XX support.
+
+PCIe, On-Board DMIC and Camera Interfaces are not handled yet.
+
+Changes since v3 at [3]:
+- minor pcie dt fix
+- added tags
+
+Changes since v2 at [2]:
+- Added bindings acks
+- fixed enable-active-high regulators property
+- moved hdmi dd-i2c-bus to son dtsi
+- fixed pinmux IOMUX value
+- add pcie reset-gpio
+
+Changes since v1 at [1]:
+- Add lvds display vendor prefix and bindings
+- fix all gpio phandle arguments with correct ACTIVE_XXX define
+- drop pcie support
+- drop custom operating points
+- fix arm/pu/soc vin-supply instead of &cpu node override
+- fix can pinmux value
+- changed button node name
+- add revied-by tags on first and last patches
+
+[1] http://lkml.kernel.org/r/1511281705-30849-1-git-send-email-narmstrong at baylibre.com
+[2] http://lkml.kernel.org/r/1511348560-28505-1-git-send-email-narmstrong at baylibre.com
+[3] http://lkml.kernel.org/r/1511785716-23492-1-git-send-email-narmstrong at baylibre.com
+
+Neil Armstrong (6):
+  ARM: dts: imx6qdl-pinfunc: Add missing
+    MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT
+  dt-bindings: Add vendor prefix for Solomon Goldentek Display
+    Corporation
+  dt-bindings: display: Add bindings for SGD GKTW70SDAE4SE Panel
+  ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
+  ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board support
+  ARM: configs: Add missing config for DART-MX6 SoM
+
+ .../bindings/display/panel/sgd,gktw70sdae4se.txt   |  41 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/imx6dl-pinfunc.h                 |   1 +
+ arch/arm/boot/dts/imx6q-pinfunc.h                  |   1 +
+ arch/arm/boot/dts/imx6q-var-dt6customboard.dts     | 239 ++++++++++
+ arch/arm/boot/dts/imx6qdl-var-dart.dtsi            | 504 +++++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   6 +
+ 8 files changed, 794 insertions(+)
  create mode 100644 Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
+ create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-var-dart.dtsi
 
-diff --git a/Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt b/Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
-new file mode 100644
-index 0000000..d06644b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
-@@ -0,0 +1,41 @@
-+Solomon Goldentek Display GKTW70SDAE4SE LVDS Display Panel
-+==========================================================
-+
-+The GKTW70SDAE4SE is a 7" WVGA TFT-LCD display panel.
-+
-+These DT bindings follow the LVDS panel bindings defined in panel-lvds.txt
-+with the following device-specific properties.
-+
-+Required properties:
-+
-+- compatible: Shall contain "sgd,gktw70sdae4se" and "panel-lvds", in that order.
-+
-+Example
-+-------
-+
-+panel {
-+	compatible = "sgd,gktw70sdae4se", "panel-lvds";
-+
-+	width-mm = <153>;
-+	height-mm = <86>;
-+
-+	data-mapping = "jeida-18";
-+
-+	panel-timing {
-+		clock-frequency = <32000000>;
-+		hactive = <800>;
-+		vactive = <480>;
-+		hback-porch = <39>;
-+		hfront-porch = <39>;
-+		vback-porch = <29>;
-+		vfront-porch = <13>;
-+		hsync-len = <47>;
-+		vsync-len = <2>;
-+	};
-+
-+	port {
-+		panel_in: endpoint {
-+			remote-endpoint = <&lvds_encoder>;
-+		};
-+	};
-+};
 -- 
 2.7.4
