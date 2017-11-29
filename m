@@ -1,16 +1,26 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Nov 2017 14:24:28 +0800
-Subject: [PATCH 1/2] ARM: dts: imx6qdl-sabreauto: Pass the DDC I2C bus
-In-Reply-To: <1511449213-13855-1-git-send-email-fabio.estevam@nxp.com>
-References: <1511449213-13855-1-git-send-email-fabio.estevam@nxp.com>
-Message-ID: <20171129062427.GG9376@dragon>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Wed, 29 Nov 2017 17:29:08 +1100
+Subject: [PATCH v5 0/2] STM32 CRYP crypto driver
+In-Reply-To: <1508425830-13565-1-git-send-email-fabien.dessenne@st.com>
+References: <1508425830-13565-1-git-send-email-fabien.dessenne@st.com>
+Message-ID: <20171129062908.GA21647@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 01:00:12PM -0200, Fabio Estevam wrote:
-> On imx6qdl-sabreauto the HDMI DDC bus is connected to I2C2, so
-> pass the 'ddc-i2c-bus' property accordingly.
+On Thu, Oct 19, 2017 at 05:10:28PM +0200, Fabien Dessenne wrote:
+> This set of patches adds a new crypto driver for STMicroelectronics stm32 HW.
+> This drivers uses the crypto API and provides with HW-enabled block cipher
+> algorithms.
 > 
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+> This driver was successfully tested with tcrypt / testmgr.
+> 
+> Changes since v5:
+> -add timeout in wait_busy function
+> -clear key after use
+> -misc : remove unused functions, use -Exx, use dev_err
 
-Applied both, thanks.
+All applied.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
