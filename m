@@ -1,19 +1,18 @@
 From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Wed, 29 Nov 2017 21:33:23 +0100
-Subject: [PATCH v2 1/6] ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros
- where applicable
-In-Reply-To: <20171121143204.1839-2-lukma@denx.de>
+Date: Wed, 29 Nov 2017 21:34:03 +0100
+Subject: [PATCH v2 2/6] ARM: ep93xx: ts72xx: Provide include guards for
+ ts72xx.h file
+In-Reply-To: <20171121143204.1839-3-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
- <20171121143204.1839-1-lukma@denx.de> <20171121143204.1839-2-lukma@denx.de>
-Message-ID: <2f0db256-9eea-bcc0-135d-347c1c996640@gmail.com>
+ <20171121143204.1839-1-lukma@denx.de> <20171121143204.1839-3-lukma@denx.de>
+Message-ID: <ccfbd627-b71b-4417-3c84-e2a04141c64f@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi!
 
-On 21/11/17 15:31, Lukasz Majewski wrote:
-> This commit cleans up the code by using dedicated macros instead of
-> full definitions.
+On 21/11/17 15:32, Lukasz Majewski wrote:
+> This commit adds include file guards to ts72xx.h
 > 
 > Signed-off-by: Lukasz Majewski <lukma@denx.de>
 
@@ -23,42 +22,25 @@ Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 > Changes for v2:
 > - None
 > ---
->  arch/arm/mach-ep93xx/ts72xx.c | 18 +++---------------
->  1 file changed, 3 insertions(+), 15 deletions(-)
+>  arch/arm/mach-ep93xx/ts72xx.h | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-> index 8745162ec05d..06345b85f27c 100644
-> --- a/arch/arm/mach-ep93xx/ts72xx.c
-> +++ b/arch/arm/mach-ep93xx/ts72xx.c
-> @@ -187,16 +187,8 @@ static struct platform_device ts72xx_rtc_device = {
->  };
+> diff --git a/arch/arm/mach-ep93xx/ts72xx.h b/arch/arm/mach-ep93xx/ts72xx.h
+> index b89850f1a965..d9ff04db3221 100644
+> --- a/arch/arm/mach-ep93xx/ts72xx.h
+> +++ b/arch/arm/mach-ep93xx/ts72xx.h
+> @@ -12,6 +12,9 @@
+>   * febfd000	22800000	4K	options register #2
+>   */
 >  
->  static struct resource ts72xx_wdt_resources[] = {
-> -	{
-> -		.start	= TS72XX_WDT_CONTROL_PHYS_BASE,
-> -		.end	= TS72XX_WDT_CONTROL_PHYS_BASE + SZ_4K - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> -	{
-> -		.start	= TS72XX_WDT_FEED_PHYS_BASE,
-> -		.end	= TS72XX_WDT_FEED_PHYS_BASE + SZ_4K - 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
-> +	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
->  };
->  
->  static struct platform_device ts72xx_wdt_device = {
-> @@ -216,11 +208,7 @@ static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
->  #define TS73XX_FPGA_LOADER_BASE		0x03c00000
->  
->  static struct resource ts73xx_fpga_resources[] = {
-> -	{
-> -		.start	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE,
-> -		.end	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE + 1,
-> -		.flags	= IORESOURCE_MEM,
-> -	},
-> +	DEFINE_RES_MEM(EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE, 0x01),
->  };
->  
->  static struct platform_device ts73xx_fpga_device = {
+> +#ifndef __TS72XX_H_
+> +#define __TS72XX_H_
+> +
+>  #define TS72XX_MODEL_PHYS_BASE		0x22000000
+>  #define TS72XX_MODEL_VIRT_BASE		IOMEM(0xfebff000)
+>  #define TS72XX_MODEL_SIZE		0x00001000
+> @@ -86,3 +89,4 @@ static inline int is_ts9420_installed(void)
+>  					TS72XX_OPTIONS2_TS9420);
+>  }
+>  #endif
+> +#endif /* __TS72XX_H_ */
