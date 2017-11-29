@@ -1,38 +1,98 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 29 Nov 2017 19:36:10 +0100
-Subject: [PATCH] ARM: dts: exynos: Add missing interrupt-controller properties
- to Exynos5410 PMU
-Message-ID: <20171129183610.26305-1-krzk@kernel.org>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 29 Nov 2017 16:46:09 -0200
+Subject: [PATCH 01/11] ARM: dts: imx53: Move nodes which have no reg property
+ out of bus
+Message-ID: <1511981179-12660-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-PMU (system-controller at 10040000) is used as interrupt-parent for certain
-nodes thus it should be marked as interrupt-controller to silence
-warnings when building Exynos5410-based DTBs:
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-  arch/arm/boot/dts/exynos5410-odroidxu.dtb: Warning (interrupts_property):
-    Missing interrupt-controller or interrupt-map property in /soc/system-controller at 10040000
-  arch/arm/boot/dts/exynos5410-odroidxu.dtb: Warning (interrupts_property):
-    Missing #interrupt-cells in interrupt-parent /soc/system-controller at 10040000
+Move pmu, usbphy0 and usbphy1 nodes from soc node to root node.
 
-Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+The nodes that have been moved do not have any register properties and thus
+shouldn't be placed on the bus.
+
+This fixes the following build warnings with W=1:
+
+arch/arm/boot/dts/imx53-ard.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+arch/arm/boot/dts/imx53-ard.dtb: Warning (simple_bus_reg): Node /soc/aips at 50000000/usbphy-0 missing or empty reg/ranges property
+arch/arm/boot/dts/imx53-ard.dtb: Warning (simple_bus_reg): Node /soc/aips at 50000000/usbphy-1 missing or empty reg/ranges property
+arch/arm/boot/dts/imx53-ard.dtb: Warning (simple_bus_reg): Node /soc/pmu missing or empty reg/ranges property
+
+Based on a patch from Simon Horman for r8a7795.dtsi.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/exynos5410.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/imx53.dtsi | 43 ++++++++++++++++++++++---------------------
+ 1 file changed, 22 insertions(+), 21 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 06713ec86f0d..e234219fe8f1 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -75,6 +75,9 @@
- 			clock-names = "clkout16";
- 			clocks = <&fin_pll>;
- 			#clock-cells = <1>;
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			interrupt-parent = <&gic>;
+diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
+index fb6cdd6..c088a23 100644
+--- a/arch/arm/boot/dts/imx53.dtsi
++++ b/arch/arm/boot/dts/imx53.dtsi
+@@ -116,6 +116,28 @@
  		};
+ 	};
  
- 		clock: clock-controller at 10010000 {
++	pmu {
++		compatible = "arm,cortex-a8-pmu";
++		interrupt-parent = <&tzic>;
++		interrupts = <77>;
++	};
++
++	usbphy0: usbphy-0 {
++		compatible = "usb-nop-xceiv";
++		clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
++		clock-names = "main_clk";
++		#phy-cells = <0>;
++		status = "okay";
++	};
++
++	usbphy1: usbphy-1 {
++		compatible = "usb-nop-xceiv";
++		clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
++		clock-names = "main_clk";
++		#phy-cells = <0>;
++		status = "okay";
++	};
++
+ 	soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
+@@ -299,22 +321,6 @@
+ 				reg = <0x53f00000 0x60>;
+ 			};
+ 
+-			usbphy0: usbphy-0 {
+-				compatible = "usb-nop-xceiv";
+-				clocks = <&clks IMX5_CLK_USB_PHY1_GATE>;
+-				clock-names = "main_clk";
+-				#phy-cells = <0>;
+-				status = "okay";
+-			};
+-
+-			usbphy1: usbphy-1 {
+-				compatible = "usb-nop-xceiv";
+-				clocks = <&clks IMX5_CLK_USB_PHY2_GATE>;
+-				clock-names = "main_clk";
+-				#phy-cells = <0>;
+-				status = "okay";
+-			};
+-
+ 			usbotg: usb at 53f80000 {
+ 				compatible = "fsl,imx53-usb", "fsl,imx27-usb";
+ 				reg = <0x53f80000 0x0200>;
+@@ -815,10 +821,5 @@
+ 			reg = <0xf8000000 0x20000>;
+ 			clocks = <&clks IMX5_CLK_OCRAM>;
+ 		};
+-
+-		pmu {
+-			compatible = "arm,cortex-a8-pmu";
+-			interrupts = <77>;
+-		};
+ 	};
+ };
 -- 
-2.11.0
+2.7.4
