@@ -1,141 +1,56 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Wed, 29 Nov 2017 14:48:31 +0200
-Subject: [RESEND PATCH v2 07/14] tee: optee: add shared buffer registration
- functions
+Date: Wed, 29 Nov 2017 14:48:34 +0200
+Subject: [RESEND PATCH v2 10/14] tee: optee: store OP-TEE capabilities in
+ private data
 In-Reply-To: <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
  <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1511959718-5421-8-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1511959718-5421-11-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-This change adds ops for shm_(un)register functions in tee interface.
-Client application can use these functions to (un)register an own shared
-buffer in OP-TEE address space. This allows zero copy data sharing between
-Normal and Secure Worlds.
-
-Please note that while those functions were added to optee code,
-it does not report to userspace that those functions are available.
-OP-TEE code does not set TEE_GEN_CAP_REG_MEM flag. This flag will be
-enabled only after all other features of dynamic shared memory will be
-implemented in subsequent patches. Of course user can ignore presence of
-TEE_GEN_CAP_REG_MEM flag and try do call those functions. This is okay,
-driver will register shared buffer in OP-TEE, but any attempts to use
-this shared buffer will fail.
+Those capabilities will be used in subsequent patches.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/optee/call.c          | 69 +++++++++++++++++++++++++++++++++++++++
- drivers/tee/optee/core.c          |  2 ++
- drivers/tee/optee/optee_private.h |  4 +++
- 3 files changed, 75 insertions(+)
+ drivers/tee/optee/core.c          | 1 +
+ drivers/tee/optee/optee_private.h | 3 +++
+ 2 files changed, 4 insertions(+)
 
-diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
-index 4db52fe..89116a0 100644
---- a/drivers/tee/optee/call.c
-+++ b/drivers/tee/optee/call.c
-@@ -533,3 +533,72 @@ void optee_free_pages_list(void *list, size_t num_entries)
- 	free_pages_exact(list, get_pages_list_size(num_entries));
- }
- 
-+int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
-+		       struct page **pages, size_t num_pages)
-+{
-+	struct tee_shm *shm_arg = NULL;
-+	struct optee_msg_arg *msg_arg;
-+	u64 *pages_list;
-+	phys_addr_t msg_parg;
-+	int rc = 0;
-+
-+	if (!num_pages)
-+		return -EINVAL;
-+
-+	pages_list = optee_allocate_pages_list(num_pages);
-+	if (!pages_list)
-+		return -ENOMEM;
-+
-+	shm_arg = get_msg_arg(ctx, 1, &msg_arg, &msg_parg);
-+	if (IS_ERR(shm_arg)) {
-+		rc = PTR_ERR(shm_arg);
-+		goto out;
-+	}
-+
-+	optee_fill_pages_list(pages_list, pages, num_pages,
-+			      tee_shm_get_page_offset(shm));
-+
-+	msg_arg->cmd = OPTEE_MSG_CMD_REGISTER_SHM;
-+	msg_arg->params->attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT |
-+				OPTEE_MSG_ATTR_NONCONTIG;
-+	msg_arg->params->u.tmem.shm_ref = (unsigned long)shm;
-+	msg_arg->params->u.tmem.size = tee_shm_get_size(shm);
-+	/*
-+	 * In the least bits of msg_arg->params->u.tmem.buf_ptr we
-+	 * store buffer offset from 4k page, as described in OP-TEE ABI.
-+	 */
-+	msg_arg->params->u.tmem.buf_ptr = virt_to_phys(pages_list) |
-+	  (tee_shm_get_page_offset(shm) & (OPTEE_MSG_NONCONTIG_PAGE_SIZE - 1));
-+
-+	if (optee_do_call_with_arg(ctx, msg_parg) ||
-+	    msg_arg->ret != TEEC_SUCCESS)
-+		rc = -EINVAL;
-+
-+	tee_shm_free(shm_arg);
-+out:
-+	optee_free_pages_list(pages_list, num_pages);
-+	return rc;
-+}
-+
-+int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm)
-+{
-+	struct tee_shm *shm_arg;
-+	struct optee_msg_arg *msg_arg;
-+	phys_addr_t msg_parg;
-+	int rc = 0;
-+
-+	shm_arg = get_msg_arg(ctx, 1, &msg_arg, &msg_parg);
-+	if (IS_ERR(shm_arg))
-+		return PTR_ERR(shm_arg);
-+
-+	msg_arg->cmd = OPTEE_MSG_CMD_UNREGISTER_SHM;
-+
-+	msg_arg->params[0].attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT;
-+	msg_arg->params[0].u.rmem.shm_ref = (unsigned long)shm;
-+
-+	if (optee_do_call_with_arg(ctx, msg_parg) ||
-+	    msg_arg->ret != TEEC_SUCCESS)
-+		rc = -EINVAL;
-+	tee_shm_free(shm_arg);
-+	return rc;
-+}
 diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
-index 7952357..4d448bf 100644
+index d22433c..dbe5a61 100644
 --- a/drivers/tee/optee/core.c
 +++ b/drivers/tee/optee/core.c
-@@ -267,6 +267,8 @@ static const struct tee_driver_ops optee_ops = {
- 	.close_session = optee_close_session,
- 	.invoke_func = optee_invoke_func,
- 	.cancel_req = optee_cancel_req,
-+	.shm_register = optee_shm_register,
-+	.shm_unregister = optee_shm_unregister,
- };
+@@ -545,6 +545,7 @@ static struct optee *optee_probe(struct device_node *np)
+ 	}
  
- static const struct tee_desc optee_desc = {
+ 	optee->invoke_fn = invoke_fn;
++	optee->sec_caps = sec_caps;
+ 
+ 	teedev = tee_device_alloc(&optee_desc, NULL, pool, optee);
+ 	if (IS_ERR(teedev)) {
 diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
-index b63213d..d7bc77d 100644
+index 61a0052..de7962e 100644
 --- a/drivers/tee/optee/optee_private.h
 +++ b/drivers/tee/optee/optee_private.h
-@@ -160,6 +160,10 @@ int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session);
- void optee_enable_shm_cache(struct optee *optee);
- void optee_disable_shm_cache(struct optee *optee);
+@@ -96,6 +96,8 @@ struct optee_supp {
+  * @supp:		supplicant synchronization struct for RPC to supplicant
+  * @pool:		shared memory pool
+  * @memremaped_shm	virtual address of memory in shared memory pool
++ * @sec_caps:		secure world capabilities defined by
++ *			OPTEE_SMC_SEC_CAP_* in optee_smc.h
+  */
+ struct optee {
+ 	struct tee_device *supp_teedev;
+@@ -106,6 +108,7 @@ struct optee {
+ 	struct optee_supp supp;
+ 	struct tee_shm_pool *pool;
+ 	void *memremaped_shm;
++	u32 sec_caps;
+ };
  
-+int optee_shm_register(struct tee_context *ctx, struct tee_shm *shm,
-+		       struct page **pages, size_t num_pages);
-+int optee_shm_unregister(struct tee_context *ctx, struct tee_shm *shm);
-+
- int optee_from_msg_param(struct tee_param *params, size_t num_params,
- 			 const struct optee_msg_param *msg_params);
- int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
+ struct optee_session {
 -- 
 2.7.4
