@@ -1,65 +1,38 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 29 Nov 2017 13:14:21 +0300
-Subject: [PATCH 1/2] arm64: dts: renesas: initial V3MSK board device tree
-In-Reply-To: <20171129095109.d2uan35eui4kzav6@verge.net.au>
-References: <20171124210313.219761525@cogentembedded.com>
- <20171129095109.d2uan35eui4kzav6@verge.net.au>
-Message-ID: <06d59459-86dc-89b1-a0ed-adbd1481abc6@cogentembedded.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 29 Nov 2017 11:16:50 +0100
+Subject: [GIT PULL] tee fix for v4.15
+Message-ID: <20171129101649.3vrhocn65gzbhvkp@jax>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello!
+Hi arm-soc maiantainers,
 
-On 11/29/2017 12:51 PM, Simon Horman wrote:
+Please pull this OP-TEE driver init fix for v4.15
 
->> Add the initial device  tree for the V3M Starter Kit board.
->> The board has 1 debug serial port (SCIF0); include support for it,
->> so that the serial console can work.
->>
->> Based on the original (and large) patch by Vladimir Barinov.
->>
->> Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> ---
->>   arch/arm64/boot/dts/renesas/Makefile           |    2 -
-[...]
->> Index: renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
->> ===================================================================
->> --- /dev/null
->> +++ renesas/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
->> @@ -0,0 +1,44 @@
->> +/*
->> + * Device Tree Source for the V3M Starter Kit board
->> + *
->> + * Copyright (C) 2017 Renesas Electronics Corp.
->> + * Copyright (C) 2017 Cogent Embedded, Inc.
->> + *
->> + * This file is licensed under the terms of the GNU General Public License
->> + * version 2.  This program is licensed "as is" without any warranty of any
->> + * kind, whether express or implied.
->> + */
->> +
->> +/dts-v1/;
->> +#include "r8a77970.dtsi"
->> +
->> +/ {
->> +	model = "Renesas V3M Starter Kit board";
->> +	compatible = "renesas,v3msk", "renesas,r8a77970";
->> +
->> +	aliases {
->> +		serial0 = &scif0;
->> +	};
->> +
->> +	chosen {
-> 
-> For consistency with other Renesas boards I would like to request the
-> following be added here:
-> 
-> 		bootargs = "ignore_loglevel rw";
+Thanks,
+Jens
 
-    There's currently no consistency as ulcb.dtsi doesn't seem to specify 
-"bootargs" prop at all. Moreover, this prop seems to be ignored by ARM64 
-kernel -- I can only specify "bootargs" in U-Boot....
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-MBR, Sergei
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+  https://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-drv-fix-for-4.15
+
+for you to fetch changes up to f044113113dd95ba73916bde10e804d3cdfa2662:
+
+  optee: fix invalid of_node_put() in optee_driver_init() (2017-11-29 10:24:57 +0100)
+
+----------------------------------------------------------------
+One small fix for optee_driver_init()
+
+* Fixes problem with an invalid call to of_node_put() in
+  optee_driver_init()
+
+----------------------------------------------------------------
+Jens Wiklander (1):
+      optee: fix invalid of_node_put() in optee_driver_init()
+
+ drivers/tee/optee/core.c | 1 -
+ 1 file changed, 1 deletion(-)
