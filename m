@@ -1,183 +1,54 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 29 Nov 2017 11:34:33 -0800
-Subject: [PATCH v3 2/3] clk: meson-axg: add clock controller drivers
-In-Reply-To: <20171128125330.363-3-yixun.lan@amlogic.com>
+Date: Wed, 29 Nov 2017 11:35:36 -0800
+Subject: [PATCH v3 3/3] arm64: dts: meson-axg: add clock DT info for
+ Meson AXG SoC
+In-Reply-To: <20171128125330.363-4-yixun.lan@amlogic.com>
 References: <20171128125330.363-1-yixun.lan@amlogic.com>
- <20171128125330.363-3-yixun.lan@amlogic.com>
-Message-ID: <20171129193433.GA19419@codeaurora.org>
+ <20171128125330.363-4-yixun.lan@amlogic.com>
+Message-ID: <20171129193536.GB19419@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/28, Yixun Lan wrote:
-> diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
-> new file mode 100644
-> index 000000000000..51c5b4062715
-> --- /dev/null
-> +++ b/drivers/clk/meson/axg.c
-> @@ -0,0 +1,948 @@
-> +/*
-> + * AmLogic Meson-AXG Clock Controller Driver
-> + *
-> + * Copyright (c) 2016 Baylibre SAS.
-> + * Author: Michael Turquette <mturquette@baylibre.com>
-> + *
-> + * Copyright (c) 2017 Amlogic, inc.
-> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
-> + *
-> + * SPDX-License-Identifier: GPL-2.0+
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/init.h>
-> +
-> +#include "clkc.h"
-> +#include "axg.h"
-> +
-> +static DEFINE_SPINLOCK(clk_lock);
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index b932a784b02a..36a2e98338a8 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -7,6 +7,7 @@
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/axg-clkc.h>
+>  
+>  / {
+>  	compatible = "amlogic,meson-axg";
+> @@ -148,6 +149,20 @@
+>  			#address-cells = <0>;
+>  		};
+>  
+> +		hiubus: hiubus at ff63c000 {
 
-meson_axg_clk_lock?
+Maybe just call the node "bus at ff63c000"?
 
+> +			compatible = "simple-bus";
+> +			reg = <0x0 0xff63c000 0x0 0x1c00>;
+> +			#address-cells = <2>;
+> +			#size-cells = <2>;
+> +			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
 > +
-> +static const struct pll_rate_table sys_pll_rate_table[] = {
-> +	PLL_RATE(24000000, 56, 1, 2),
-> +	PLL_RATE(48000000, 64, 1, 2),
-> +	PLL_RATE(72000000, 72, 1, 2),
-> +	PLL_RATE(96000000, 64, 1, 2),
-> +	PLL_RATE(120000000, 80, 1, 2),
-> +	PLL_RATE(144000000, 96, 1, 2),
-> +	PLL_RATE(168000000, 56, 1, 1),
-> +	PLL_RATE(192000000, 64, 1, 1),
-> +	PLL_RATE(216000000, 72, 1, 1),
-> +	PLL_RATE(240000000, 80, 1, 1),
-[...]
+> +			clkc: clock-controller at 0 {
+> +				compatible = "amlogic,axg-clkc";
+> +				#clock-cells = <1>;
+> +				reg = <0x0 0x0 0x0 0x320>;
+> +			};
+> +		};
 > +
-> +static const struct clkc_data axg_clkc_data = {
-> +	.clk_gates = axg_clk_gates,
-> +	.clk_gates_count = ARRAY_SIZE(axg_clk_gates),
-> +	.clk_mplls = axg_clk_mplls,
-> +	.clk_mplls_count = ARRAY_SIZE(axg_clk_mplls),
-> +	.clk_plls = axg_clk_plls,
-> +	.clk_plls_count = ARRAY_SIZE(axg_clk_plls),
-> +	.clk_muxes = axg_clk_muxes,
-> +	.clk_muxes_count = ARRAY_SIZE(axg_clk_muxes),
-> +	.clk_dividers = axg_clk_dividers,
-> +	.clk_dividers_count = ARRAY_SIZE(axg_clk_dividers),
-> +	.hw_onecell_data = &axg_hw_onecell_data,
-> +};
-> +
-> +static const struct of_device_id clkc_match_table[] = {
-> +	{ .compatible = "amlogic,axg-clkc", .data = &axg_clkc_data },
-> +	{},
-
-Nitpick: Drop the comma. Nothing comes after this.
-
-> +};
-> +
-> +static int axg_clkc_probe(struct platform_device *pdev)
-> +{
-> +	const struct clkc_data *clkc_data;
-> +	void __iomem *clk_base;
-> +	int ret, clkid, i;
-> +	struct device *dev = &pdev->dev;
-> +
-> +	clkc_data = of_device_get_match_data(&pdev->dev);
-> +	if (!clkc_data)
-> +		return -EINVAL;
-> +
-> +	/*  Generic clocks and PLLs */
-> +	clk_base = of_iomap(dev->of_node, 0);
-
-Use platform device APIs for ioremapping?
-
-> +	if (!clk_base) {
-> +		pr_err("%s: Unable to map clk base\n", __func__);
-> +		return -ENXIO;
-> +	}
-> +
-> +	/* Populate base address for PLLs */
-> +	for (i = 0; i < clkc_data->clk_plls_count; i++)
-> +		clkc_data->clk_plls[i]->base = clk_base;
-> +
-> +	/* Populate base address for MPLLs */
-> +	for (i = 0; i < clkc_data->clk_mplls_count; i++)
-> +		clkc_data->clk_mplls[i]->base = clk_base;
-> +
-> +	/* Populate base address for gates */
-> +	for (i = 0; i < clkc_data->clk_gates_count; i++)
-> +		clkc_data->clk_gates[i]->reg = clk_base +
-> +			(u64)clkc_data->clk_gates[i]->reg;
-> +
-> +	/* Populate base address for muxes */
-> +	for (i = 0; i < clkc_data->clk_muxes_count; i++)
-> +		clkc_data->clk_muxes[i]->reg = clk_base +
-> +			(u64)clkc_data->clk_muxes[i]->reg;
-> +
-> +	/* Populate base address for dividers */
-> +	for (i = 0; i < clkc_data->clk_dividers_count; i++)
-> +		clkc_data->clk_dividers[i]->reg = clk_base +
-> +			(u64)clkc_data->clk_dividers[i]->reg;
-> +
-> +	/*
-> +	 * register all clks
-> +	 */
-
-Yes, that's obvious..
-
-> +	for (clkid = 0; clkid < clkc_data->hw_onecell_data->num; clkid++) {
-> +		/* array might be sparse */
-> +		if (!clkc_data->hw_onecell_data->hws[clkid])
-> +			continue;
-> +
-> +		ret = devm_clk_hw_register(dev,
-> +					clkc_data->hw_onecell_data->hws[clkid]);
-> +		if (ret)
-> +			goto iounmap;
-> +	}
-> +
-> +	return of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-> +			clkc_data->hw_onecell_data);
-> +
-> +iounmap:
-> +	iounmap(clk_base);
-> +	return ret;
-> +}
-> +
-> +static struct platform_driver axg_driver = {
-> +	.probe		= axg_clkc_probe,
-> +	.driver		= {
-> +		.name	= "axg-clkc",
-> +		.of_match_table = clkc_match_table,
-> +	},
-> +};
-> +
-> +builtin_platform_driver(axg_driver);
-> diff --git a/include/dt-bindings/clock/axg-clkc.h b/include/dt-bindings/clock/axg-clkc.h
-> new file mode 100644
-> index 000000000000..d2c0f49ba0df
-> --- /dev/null
-> +++ b/include/dt-bindings/clock/axg-clkc.h
-> @@ -0,0 +1,72 @@
-> +/*
-> + * Meson-AXG clock tree IDs
-> + *
-> + * Copyright (c) 2017 Amlogic, Inc. All rights reserved.
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-
-There's a standard way to add these it seems. They should be the
-first line in the file and look like
-
-/* SPDX-License-Identifier: */
-
-for header files and 
-
-// SPDX-License-Identifier: 
-
-for C files.
+>  		mailbox: mailbox at ff63dc00 {
+>  			compatible = "amlogic,meson-gx-mhu", "amlogic,meson-gxbb-mhu";
+>  			reg = <0 0xff63dc00 0 0x400>;
+> -- 
+> 2.15.0
+> 
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
