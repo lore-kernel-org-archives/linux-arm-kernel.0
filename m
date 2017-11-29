@@ -1,29 +1,59 @@
 From: samitolvanen@google.com (Sami Tolvanen)
-Date: Tue, 28 Nov 2017 16:00:08 -0800
-Subject: [PATCH 0/3] Add version macros for clang and fix arm64 for clang <6.0
-Message-ID: <20171129000011.55235-1-samitolvanen@google.com>
+Date: Tue, 28 Nov 2017 16:00:09 -0800
+Subject: [PATCH 1/3] kbuild: add clang-version.sh
+In-Reply-To: <20171129000011.55235-1-samitolvanen@google.com>
+References: <20171129000011.55235-1-samitolvanen@google.com>
+Message-ID: <20171129000011.55235-2-samitolvanen@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to build an arm64 kernel with clang <6.0, we need to work
-around LLVM bug 30792 by using -mno-implicit-float instead of
--mgeneral-regs-only.
+Based on gcc-version.sh, clang-version.sh prints out the correct
+version of clang.
 
-This patch set adds macros for checking clang version, and enable the
-workaround only for affected compiler versions.
-
-Greg Hackmann (1):
-  arm64: use -mno-implicit-float instead of -mgeneral-regs-only
-
-Sami Tolvanen (2):
-  kbuild: add clang-version.sh
-  kbuild: add cc-if-name-version and compiler-specific variants
-
- arch/arm64/Makefile      |  5 ++++-
- scripts/Kbuild.include   | 31 +++++++++++++++++++++++++++++++
+Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+---
  scripts/clang-version.sh | 33 +++++++++++++++++++++++++++++++++
- 3 files changed, 68 insertions(+), 1 deletion(-)
+ 1 file changed, 33 insertions(+)
  create mode 100755 scripts/clang-version.sh
 
+diff --git a/scripts/clang-version.sh b/scripts/clang-version.sh
+new file mode 100755
+index 000000000000..5f14ddc54032
+--- /dev/null
++++ b/scripts/clang-version.sh
+@@ -0,0 +1,33 @@
++#!/bin/sh
++# SPDX-License-Identifier: GPL-2.0
++#
++# clang-version [-p] clang-command
++#
++# Prints the compiler version of `command' in a canonical 4-digit form
++# such as `0500' for clang-5.0 etc.
++#
++# With the -p option, prints the patchlevel as well, for example `050001' for
++# clang-5.0.1 etc.
++#
++
++if [ "$1" = "-p" ] ; then
++	with_patchlevel=1;
++	shift;
++fi
++
++compiler="$*"
++
++if [ ${#compiler} -eq 0 ]; then
++	echo "Error: No compiler specified."
++	printf "Usage:\n\t$0 <clang-command>\n"
++	exit 1
++fi
++
++MAJOR=$(echo __clang_major__ | $compiler -E -x c - | tail -n 1)
++MINOR=$(echo __clang_minor__ | $compiler -E -x c - | tail -n 1)
++if [ "x$with_patchlevel" != "x" ] ; then
++	PATCHLEVEL=$(echo __clang_patchlevel__ | $compiler -E -x c - | tail -n 1)
++	printf "%02d%02d%02d\\n" $MAJOR $MINOR $PATCHLEVEL
++else
++	printf "%02d%02d\\n" $MAJOR $MINOR
++fi
 -- 
 2.15.0.417.g466bffb3ac-goog
