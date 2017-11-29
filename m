@@ -1,45 +1,45 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Wed, 29 Nov 2017 16:16:11 +0100
-Subject: [PATCH v2] arch: arm: mach-stm32: Fix copyright
-In-Reply-To: <20171129145502.30793-1-benjamin.gaignard@st.com>
-References: <20171129145502.30793-1-benjamin.gaignard@st.com>
-Message-ID: <CAOFm3uHk3+WniPNTH82Lc8O+J3ywEYF1fy4raREFkY0p4Mvqcw@mail.gmail.com>
+From: arnaud.patard@rtp-net.org (Arnaud Patard)
+Date: Wed, 29 Nov 2017 16:09:46 +0100
+Subject: [PATCH] meson-gx-socinfo: Fix package id parsing
+Message-ID: <20171129151000.710502415@rtp-net.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 3:55 PM, Benjamin Gaignard
-<benjamin.gaignard@linaro.org> wrote:
-> Uniformize STMicroelectronics copyrights header
-> Add SPDX identifier
->
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  arch/arm/mach-stm32/board-dt.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
-> index e918686e4191..b01f40543e6e 100644
-> --- a/arch/arm/mach-stm32/board-dt.c
-> +++ b/arch/arm/mach-stm32/board-dt.c
-> @@ -1,5 +1,7 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
->  /*
->   * Copyright (C) Maxime Coquelin 2015
-> + * Copyright (C) STMicroelectronics SA 2017
->   * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
->   * License terms:  GNU General Public License (GPL), version 2
->   */
+I've noticed the following message while booting a S905X based board:
 
-My 2 cents:
-Linus commented on the comment style and unless the code demands /**/
-comments as in a few .h also used in assembly, the style to use should
-be a top level line this way:
+soc soc0: Amlogic Meson GXL (S905D) Revision 21:82 (b:2) Detected
 
-> +// SPDX-License-Identifier: GPL-2.0
+The S905D string is obviously wrong. The vendor code does:
+...
+        ver = (readl(assist_hw_rev) >> 8) & 0xff;
+        meson_cpu_version[MESON_CPU_VERSION_LVL_MINOR] = ver;
+        ver =  (readl(assist_hw_rev) >> 16) & 0xff;
+        meson_cpu_version[MESON_CPU_VERSION_LVL_PACK] = ver;
+...
 
-You can check the rationale in recent threads on this very topic.
-Thomas (tglx) also wrote the doc on this.
+while the current code does:
+...
+#define SOCINFO_MINOR  GENMASK(23, 16)
+#define SOCINFO_PACK   GENMASK(15, 8)
+...
 
--- 
-Cordially
-Philippe Ombredanne
+This means that the current mainline code has package id and minor
+version reversed.
+
+Fixes: a9daaba2965e8 ("soc: Add Amlogic SoC Information driver")
+Signed-off-by: Arnaud Patard <apatard@hupstream.com>
+Index: linux/drivers/soc/amlogic/meson-gx-socinfo.c
+===================================================================
+--- linux.orig/drivers/soc/amlogic/meson-gx-socinfo.c	2017-11-29 10:26:49.081335917 +0100
++++ linux/drivers/soc/amlogic/meson-gx-socinfo.c	2017-11-29 10:26:49.041335074 +0100
+@@ -20,8 +20,8 @@
+ #define AO_SEC_SOCINFO_OFFSET	AO_SEC_SD_CFG8
+ 
+ #define SOCINFO_MAJOR	GENMASK(31, 24)
+-#define SOCINFO_MINOR	GENMASK(23, 16)
+-#define SOCINFO_PACK	GENMASK(15, 8)
++#define SOCINFO_PACK	GENMASK(23, 16)
++#define SOCINFO_MINOR	GENMASK(15, 8)
+ #define SOCINFO_MISC	GENMASK(7, 0)
+ 
+ static const struct meson_gx_soc_id {
