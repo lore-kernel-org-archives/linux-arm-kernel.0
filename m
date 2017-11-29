@@ -1,73 +1,62 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 29 Nov 2017 17:03:03 +0300
-Subject: [PATCH v2] arm64: fix missing 'const' qualifiers
-Message-ID: <20171129140303.14283-1-ynorov@caviumnetworks.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 29 Nov 2017 22:06:12 +0800
+Subject: [PATCH] ARM: imx: don't abort MMDC probe if power saving status
+ doesn't match
+In-Reply-To: <20171127121139.15584-1-l.stach@pengutronix.de>
+References: <20171127121139.15584-1-l.stach@pengutronix.de>
+Message-ID: <20171129140610.GM9376@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's inconsistency in variable declaration and section type. GCC doesn't
-throw error for usual build. But if LTO enabled, build becomes broken, like
-this:
+On Mon, Nov 27, 2017 at 01:11:39PM +0100, Lucas Stach wrote:
+> The power saving status bit will not signal if the MMDC is under load,
+> which is likely during kernel boot.
 
-mm/percpu.c:2168:20: error: pcpu_fc_names causes a section type conflict
-with dt_supported_cpu_ops
-const char * const pcpu_fc_names[PCPU_FC_NR] __initconst = {
-        ^
-arch/arm64/kernel/cpu_ops.c:34:37: note: ?dt_supported_cpu_ops? was declared here
-static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
+What is exactly the condition of MMDC is under load?  If it's likely
+hit during kernel boot, why have we not heard any report regarding to
+it before?
 
-And so on. Fix it by adding missed const qualifiers.
+Shawn
 
-v2: more details in patch description.
-
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Reviewed-by: Nick Desaulniers <ndesaulniers@google.com>
----
- arch/arm64/kernel/cpu_ops.c             | 6 +++---
- drivers/clk/hisilicon/crg-hi3516cv300.c | 2 +-
- 2 files changed, 4 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/kernel/cpu_ops.c b/arch/arm64/kernel/cpu_ops.c
-index d16978213c5b..ea001241bdd4 100644
---- a/arch/arm64/kernel/cpu_ops.c
-+++ b/arch/arm64/kernel/cpu_ops.c
-@@ -31,13 +31,13 @@ extern const struct cpu_operations cpu_psci_ops;
- 
- const struct cpu_operations *cpu_ops[NR_CPUS] __ro_after_init;
- 
--static const struct cpu_operations *dt_supported_cpu_ops[] __initconst = {
-+static const struct cpu_operations *const dt_supported_cpu_ops[] __initconst = {
- 	&smp_spin_table_ops,
- 	&cpu_psci_ops,
- 	NULL,
- };
- 
--static const struct cpu_operations *acpi_supported_cpu_ops[] __initconst = {
-+static const struct cpu_operations *const acpi_supported_cpu_ops[] __initconst = {
- #ifdef CONFIG_ARM64_ACPI_PARKING_PROTOCOL
- 	&acpi_parking_protocol_ops,
- #endif
-@@ -47,7 +47,7 @@ static const struct cpu_operations *acpi_supported_cpu_ops[] __initconst = {
- 
- static const struct cpu_operations * __init cpu_get_ops(const char *name)
- {
--	const struct cpu_operations **ops;
-+	const struct cpu_operations *const *ops;
- 
- 	ops = acpi_disabled ? dt_supported_cpu_ops : acpi_supported_cpu_ops;
- 
-diff --git a/drivers/clk/hisilicon/crg-hi3516cv300.c b/drivers/clk/hisilicon/crg-hi3516cv300.c
-index 2007123832bb..53450b651e4c 100644
---- a/drivers/clk/hisilicon/crg-hi3516cv300.c
-+++ b/drivers/clk/hisilicon/crg-hi3516cv300.c
-@@ -204,7 +204,7 @@ static const struct hisi_crg_funcs hi3516cv300_crg_funcs = {
- /* hi3516CV300 sysctrl CRG */
- #define HI3516CV300_SYSCTRL_NR_CLKS 16
- 
--static const char *wdt_mux_p[] __initconst = { "3m", "apb" };
-+static const char *const wdt_mux_p[] __initconst = { "3m", "apb" };
- static u32 wdt_mux_table[] = {0, 1};
- 
- static const struct hisi_mux_clock hi3516cv300_sysctrl_mux_clks[] = {
--- 
-2.11.0
+> There is no point in checking this
+> bit and aborting the probe, as there is nothing depending on power
+> saving being enabled, so we can trust the memory controller to enable
+> power saving when we allow it.
+> 
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/mach-imx/mmdc.c | 11 -----------
+>  1 file changed, 11 deletions(-)
+> 
+> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
+> index 78262899a590..5fb1d2254b5e 100644
+> --- a/arch/arm/mach-imx/mmdc.c
+> +++ b/arch/arm/mach-imx/mmdc.c
+> @@ -547,7 +547,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
+>  	struct device_node *np = pdev->dev.of_node;
+>  	void __iomem *mmdc_base, *reg;
+>  	u32 val;
+> -	int timeout = 0x400;
+>  
+>  	mmdc_base = of_iomap(np, 0);
+>  	WARN_ON(!mmdc_base);
+> @@ -565,16 +564,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
+>  	val &= ~(1 << BP_MMDC_MAPSR_PSD);
+>  	writel_relaxed(val, reg);
+>  
+> -	/* Ensure it's successfully enabled */
+> -	while (!(readl_relaxed(reg) & 1 << BP_MMDC_MAPSR_PSS) && --timeout)
+> -		cpu_relax();
+> -
+> -	if (unlikely(!timeout)) {
+> -		pr_warn("%s: failed to enable automatic power saving\n",
+> -			__func__);
+> -		return -EBUSY;
+> -	}
+> -
+>  	return imx_mmdc_perf_init(pdev, mmdc_base);
+>  }
+>  
+> -- 
+> 2.11.0
+> 
