@@ -1,40 +1,31 @@
-From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Wed, 29 Nov 2017 21:47:13 +0530
-Subject: [PATCH 4/5 v4] ASoC: intel: sst: Handle return value of
- platform_get_irq
-In-Reply-To: <4ce907b8389af30eb0677e70cf543a2b795cca12.1511970158.git.arvind.yadav.cs@gmail.com>
-References: <4ce907b8389af30eb0677e70cf543a2b795cca12.1511970158.git.arvind.yadav.cs@gmail.com>
-Message-ID: <deb09b18d95f81661dbb8136fec947a548af6a77.1511970158.git.arvind.yadav.cs@gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 29 Nov 2017 16:18:05 +0000
+Subject: [PATCH v1 0/2] Additional single-step-cases
+In-Reply-To: <20171123121134.11050-1-alex.bennee@linaro.org>
+References: <20171123121134.11050-1-alex.bennee@linaro.org>
+Message-ID: <25e0999c-df1a-b25c-6b56-6a63ebcb690d@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-platform_get_irq() can fail here and we must check its return value.
+On 23/11/17 12:11, Alex Benn?e wrote:
+> Hi,
+> 
+> This is now split into two patches as the first case of SError is
+> separate from behaviour of stepping instructions.
+> 
+> Alex Benn?e (2):
+>   kvm: arm64: handle single-step during SError exceptions
+>   kvm: arm64: handle single-step of hyp emulated mmio instructions
+> 
+>  arch/arm64/kvm/handle_exit.c |  8 +++++++-
+>  arch/arm64/kvm/hyp/switch.c  | 37 ++++++++++++++++++++++++++++++-------
+>  2 files changed, 37 insertions(+), 8 deletions(-)
+> 
 
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
----
-changes in v2 :
-              Add failure case '<= 0' instead of '< 0'. IRQ0 is not valid.
-changes in v3 :
-              Return -EIO insted of ctx->irq_num.
-changes in v4 :
-              Add separate error for irq == 0 and irq < 0.
+For both patches:
 
- sound/soc/intel/atom/sst/sst_acpi.c | 3 +++
- 1 file changed, 3 insertions(+)
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
 
-diff --git a/sound/soc/intel/atom/sst/sst_acpi.c b/sound/soc/intel/atom/sst/sst_acpi.c
-index 0e928d5..aec7408 100644
---- a/sound/soc/intel/atom/sst/sst_acpi.c
-+++ b/sound/soc/intel/atom/sst/sst_acpi.c
-@@ -236,6 +236,9 @@ static int sst_platform_get_resources(struct intel_sst_drv *ctx)
- 	/* Find the IRQ */
- 	ctx->irq_num = platform_get_irq(pdev,
- 				ctx->pdata->res_info->acpi_ipc_irq_index);
-+	if (ctx->irq_num <= 0)
-+		return ctx->irq_num < 0 ? ctx->irq_num : -EIO;
-+
- 	return 0;
- }
- 
+	M.
 -- 
-2.7.4
+Jazz is not dead. It just smells funny...
