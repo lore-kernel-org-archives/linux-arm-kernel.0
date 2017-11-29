@@ -1,84 +1,94 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Nov 2017 17:41:12 +0100
-Subject: [PATCH v2 12/16] KVM: Move vcpu_load to arch-specific
- kvm_arch_vcpu_ioctl_get_fpu
+Date: Wed, 29 Nov 2017 17:41:13 +0100
+Subject: [PATCH v2 13/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_set_fpu
 In-Reply-To: <20171129164116.16167-1-christoffer.dall@linaro.org>
 References: <20171129164116.16167-1-christoffer.dall@linaro.org>
-Message-ID: <20171129164116.16167-13-christoffer.dall@linaro.org>
+Message-ID: <20171129164116.16167-14-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Move vcpu_load() and vcpu_put() into the architecture specific
-implementations of kvm_arch_vcpu_ioctl_get_fpu().
+implementations of kvm_arch_vcpu_ioctl_set_fpu().
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/s390/kvm/kvm-s390.c | 4 ++++
- arch/x86/kvm/x86.c       | 7 +++++--
- virt/kvm/kvm_main.c      | 2 --
- 3 files changed, 9 insertions(+), 4 deletions(-)
+ arch/s390/kvm/kvm-s390.c | 15 ++++++++++++---
+ arch/x86/kvm/x86.c       |  8 ++++++--
+ virt/kvm/kvm_main.c      |  2 --
+ 3 files changed, 18 insertions(+), 7 deletions(-)
 
 diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
-index 4bf80b5..88dcb89 100644
+index 88dcb89..43278f3 100644
 --- a/arch/s390/kvm/kvm-s390.c
 +++ b/arch/s390/kvm/kvm-s390.c
-@@ -2765,6 +2765,8 @@ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+@@ -2752,15 +2752,24 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
  
- int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
  {
+-	if (test_fp_ctl(fpu->fpc))
+-		return -EINVAL;
++	int ret = 0;
++
 +	vcpu_load(vcpu);
 +
- 	/* make sure we have the latest values */
- 	save_fpu_regs();
++	if (test_fp_ctl(fpu->fpc)) {
++		ret = -EINVAL;
++		goto out;
++	}
+ 	vcpu->run->s.regs.fpc = fpu->fpc;
  	if (MACHINE_HAS_VX)
-@@ -2773,6 +2775,8 @@ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ 		convert_fp_to_vx((__vector128 *) vcpu->run->s.regs.vrs,
+ 				 (freg_t *) fpu->fprs);
  	else
- 		memcpy(fpu->fprs, vcpu->run->s.regs.fprs, sizeof(fpu->fprs));
- 	fpu->fpc = vcpu->run->s.regs.fpc;
+ 		memcpy(vcpu->run->s.regs.fprs, &fpu->fprs, sizeof(fpu->fprs));
+-	return 0;
 +
++out:
 +	vcpu_put(vcpu);
- 	return 0;
++	return ret;
  }
  
+ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
 diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index a074b0bd..8b54567 100644
+index 8b54567..fd8b92f 100644
 --- a/arch/x86/kvm/x86.c
 +++ b/arch/x86/kvm/x86.c
-@@ -7679,9 +7679,11 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
+@@ -7699,8 +7699,11 @@ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
  
- int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
  {
 -	struct fxregs_state *fxsave =
 -			&vcpu->arch.guest_fpu.state.fxsave;
 +	struct fxregs_state *fxsave;
- 
++
 +	vcpu_load(vcpu);
 +
 +	fxsave = &vcpu->arch.guest_fpu.state.fxsave;
- 	memcpy(fpu->fpr, fxsave->st_space, 128);
- 	fpu->fcw = fxsave->cwd;
- 	fpu->fsw = fxsave->swd;
-@@ -7691,6 +7693,7 @@ int kvm_arch_vcpu_ioctl_get_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
- 	fpu->last_dp = fxsave->rdp;
- 	memcpy(fpu->xmm, fxsave->xmm_space, sizeof fxsave->xmm_space);
+ 
+ 	memcpy(fxsave->st_space, fpu->fpr, 128);
+ 	fxsave->cwd = fpu->fcw;
+@@ -7711,6 +7714,7 @@ int kvm_arch_vcpu_ioctl_set_fpu(struct kvm_vcpu *vcpu, struct kvm_fpu *fpu)
+ 	fxsave->rdp = fpu->last_dp;
+ 	memcpy(fxsave->xmm_space, fpu->xmm, sizeof fxsave->xmm_space);
  
 +	vcpu_put(vcpu);
  	return 0;
  }
  
 diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index c688eb7..73ad70a 100644
+index 73ad70a..06751bb 100644
 --- a/virt/kvm/kvm_main.c
 +++ b/virt/kvm/kvm_main.c
-@@ -2673,9 +2673,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
- 		r = -ENOMEM;
- 		if (!fpu)
+@@ -2689,9 +2689,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+ 			fpu = NULL;
  			goto out;
+ 		}
 -		vcpu_load(vcpu);
- 		r = kvm_arch_vcpu_ioctl_get_fpu(vcpu, fpu);
+ 		r = kvm_arch_vcpu_ioctl_set_fpu(vcpu, fpu);
 -		vcpu_put(vcpu);
- 		if (r)
- 			goto out;
- 		r = -EFAULT;
+ 		break;
+ 	}
+ 	default:
 -- 
 2.7.4
