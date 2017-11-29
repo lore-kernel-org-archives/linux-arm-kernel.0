@@ -1,44 +1,24 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 29 Nov 2017 22:05:07 +0100
-Subject: [PATCH v3 2/4] ARM: dts: at91: sama5d2: added dma property for
- ADC device
-In-Reply-To: <1510750608-8697-3-git-send-email-eugen.hristev@microchip.com>
-References: <1510750608-8697-1-git-send-email-eugen.hristev@microchip.com>
- <1510750608-8697-3-git-send-email-eugen.hristev@microchip.com>
-Message-ID: <20171129210507.GQ21126@piout.net>
+Date: Wed, 29 Nov 2017 22:11:41 +0100
+Subject: [PATCH] rtc: brcmstb-waketimer: fix error handling in
+ brcmstb_waketmr_probe()
+In-Reply-To: <1510953358-7043-1-git-send-email-khoroshilov@ispras.ru>
+References: <1510953358-7043-1-git-send-email-khoroshilov@ispras.ru>
+Message-ID: <20171129211141.GR21126@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 15/11/2017 at 14:56:46 +0200, Eugen Hristev wrote:
-> Added DMA property for ADC device
+On 18/11/2017 at 00:15:58 +0300, Alexey Khoroshilov wrote:
+> brcmstb_waketmr_probe() does not disable timer->clk on error paths.
 > 
-> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Signed-off-by: Alexey Khoroshilov <khoroshilov@ispras.ru>
 > ---
->  arch/arm/boot/dts/sama5d2.dtsi | 2 ++
->  1 file changed, 2 insertions(+)
+>  drivers/rtc/rtc-brcmstb-waketimer.c | 15 ++++++++++++---
+>  1 file changed, 12 insertions(+), 3 deletions(-)
 > 
-
-This didn't apply cleanly, please check
-https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=0ae80c039ef2407c08842ddde892af0c9128711b
-
-> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
-> index 38d2216..ca8bf13 100644
-> --- a/arch/arm/boot/dts/sama5d2.dtsi
-> +++ b/arch/arm/boot/dts/sama5d2.dtsi
-> @@ -1430,6 +1430,8 @@
->  				atmel,min-sample-rate-hz = <200000>;
->  				atmel,max-sample-rate-hz = <20000000>;
->  				atmel,startup-time-ms = <4>;
-> +				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
-> +				dma-names = "rx";
->  				status = "disabled";
->  			};
->  
-> -- 
-> 2.7.4
-> 
+Applied, thanks.
 
 -- 
 Alexandre Belloni, Free Electrons
