@@ -1,117 +1,334 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 29 Nov 2017 11:39:59 +0900
-Subject: [PATCH v3] kbuild: Set KBUILD_CFLAGS before incl. arch Makefile
-In-Reply-To: <CAKwvOdmcthyd1KbxRr54QztBcmeZ7JA=M_7N1xfmVurVOG=77w@mail.gmail.com>
-References: <CAK7LNAS1NaqPRhK6FOXN=YTMhLagpSrR2=tXn-uWZbpzr=NeoQ@mail.gmail.com>
- <20171115204231.34914-1-ndesaulniers@google.com>
- <CAK7LNAQNEHRapzFem3nr7=EWJPYvZby9K7vem-R99ijYNoguEg@mail.gmail.com>
- <CAK7LNASGYZfQFkM3yMRQaHLUwW5Lhp8CxHGX0bJ9sVja0f=n+A@mail.gmail.com>
- <CAKwvOdmcthyd1KbxRr54QztBcmeZ7JA=M_7N1xfmVurVOG=77w@mail.gmail.com>
-Message-ID: <CAK7LNATx=3k3o+hEpa2k3f67MfsEnWAyWsBSkKmPYQTUK9RYmg@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 29 Nov 2017 10:59:46 +0800
+Subject: [PATCH] arm, ls1021a: add support for Moxa UC-8410A open platform
+In-Reply-To: <20171116145858.25966-1-sz.lin@moxa.com>
+References: <20171116145858.25966-1-sz.lin@moxa.com>
+Message-ID: <20171129025944.GA9376@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nick,
+On Thu, Nov 16, 2017 at 10:58:57PM +0800, SZ Lin wrote:
+> Add support for Moxa UC-8410A open platform
+> 
+> The UC-8410A computing platform is designed
+> for embedded communication-centric industrial applications
+> 
+> The features of UC-8410A are:
+> * QSPI flash
+> * SD slot
+> * 3x LAN
+> * 8x RS-232/422/485 ports, software-selectable
+> * Mini PCIe form factor with PCIe/USB signal
+> * 2x USB host
+> * TPM
+> * Watchdog
+> * RTC
+> * User LEDs
+> * Beeper
+> 
+> Signed-off-by: Jimmy Chen <jimmy.chen@moxa.com>
+> Signed-off-by: Harry YJ Jhou <harryyj.jhou@moxa.com>
+> Signed-off-by: SZ Lin <sz.lin@moxa.com>
 
-2017-11-29 3:18 GMT+09:00 Nick Desaulniers <ndesaulniers@google.com>:
-> Hi Masahiro,
->
-> Thanks for merging Chris' patch, and sorry for taking so long to respond.
->
-> On Wed, Nov 22, 2017 at 8:24 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> Linus suggests to move compiler flag testing to Kconfig.
->
-> Do you have an LKML link for context?
+We usually prefix arm dts patch with 'ARM: dts: ...'.
 
+> ---
+>  arch/arm/boot/dts/Makefile                  |   1 +
+>  arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts | 230 ++++++++++++++++++++++++++++
+>  2 files changed, 231 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+> 
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index eff87a344566..0165fbcb1d10 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -495,6 +495,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+>  	imx7s-colibri-eval-v3.dtb \
+>  	imx7s-warp.dtb
+>  dtb-$(CONFIG_SOC_LS1021A) += \
+> +	ls1021a-moxa-uc-8410a.dtb \
+>  	ls1021a-qds.dtb \
+>  	ls1021a-twr.dtb
+>  dtb-$(CONFIG_SOC_VF610) += \
+> diff --git a/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+> new file mode 100644
+> index 000000000000..4896b551505b
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/ls1021a-moxa-uc-8410a.dts
+> @@ -0,0 +1,230 @@
+> +/*
+> + * Copyright (C) 2017 Moxa Inc. - https://www.moxa.com/
+> + *
+> + * Author: Harry YJ Jhou (???) <harryyj.jhou@moxa.com>
+> + *         Jimmy Chen (???)    <jimmy.chen@moxa.com>
+> + *         SZ Lin (???)        <sz.lin@moxa.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +/dts-v1/;
+> +
+> +#include "ls1021a.dtsi"
+> +
+> +/ {
+> +	model = "Moxa UC-8410A";
+> +
+> +	aliases {
+> +		enet0_rgmii_phy = &rgmii_phy0;
+> +		enet1_rgmii_phy = &rgmii_phy1;
+> +		enet2_rgmii_phy = &rgmii_phy2;
+> +	};
+> +
+> +	sys_mclk: clock-mclk {
+> +		compatible = "fixed-clock";
+> +		#clock-cells = <0>;
+> +		clock-frequency = <24576000>;
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
 
-https://lkml.org/lkml/2017/11/19/291
+Drop this container node and put fixed regulator directly under root.
 
+> +
+> +		reg_3p3v: regulator at 0 {
 
+Name the fixed regulator like below.
 
-> On Wed, Nov 15, 2017 at 6:32 PM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->> BTW, I notice another issue.
->>
->> If we move clang settings before including arch Makefile,
->> "ifneq ($(CROSS_COMPILE),)" comes early.
->>
->> Some arch Makefiles (arch/mips/Makefile, arch/blackfin/Makefile, etc.)
->> set CROSS_COMPILE there if CROSS_COMPILE is not given.
->>
->> Then, we have a conflict between two requirements among arch.
->>
->> [1] arm64, powerpc use ld-option in their Makefile.
->>     So, clang flags must be set before inc. arch Makefile.
->> [2] mips, blackfin, etc. may set CROSS_COMPILE in their Makefile.
->>     So, we want to reference CROSS_COMPILE only after inc. arch Makefile
->>
->> I have no idea how to solve it.
->>
->> At this moment, I guess clang is intended to support
->> only limited architectures.
->>
->> It might be OK to be compromised here.
->
-> I definitely find it curious that certain arch's define CROSS_COMPILE
-> themselves.  The benefit is one less argument to supply at compile
-> time, but it assumes that the toolchain always has a certain prefix.
-> This makes sense to me when cross compiling, but seems odd when
-> compiling natively on that arch as the host and target.  Maybe those
-> arch's use that convention, or simply are always cross compiled for?
->
-> Taking a survey of all arch's currently in the kernel via `cd arch; ag
-> CROSS_COMPILE` and quickly eyeballing the result:
->
-> m68k if not set
-> arc if not set
-> openrisc for some configs (openrisc/configs/or1ksim_defconfig,
-> openrisc/configs/simple_smp_defconfig)
-> blackfin if not set
-> hexagon for some configs (hexagon/configs/comet_defconfig)
-> parisc if not set
-> sh if not set
-> xtensa if not set
-> score always
-> arm for some configs (arm/configs/lpc18xx_defconfig)
-> h8300 if not set
-> mips if not set (and explicitly emptied for some configs,
-> mips/configs/nlm_xlr_defconfig )
-> unicore32 if not set
-> tile if not set
->
-> The * if not set (or not being on the list) seems correct, as the top
-> level Makefile will handle this correctly.  Setting it for some
-> configs seems curious (not necessarily wrong?),
+	reg_xxx: regulator-xxx {
+		...
+	};
 
-Perhaps, the maintainer of those platforms may want to save
-one command-line argument at compile time.
+> +			compatible = "regulator-fixed";
+> +			reg = <0>;
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +	};
+> +
+> +	leds {
+> +		compatible = "gpio-leds";
 
-> emptying it/always
-> setting it via config sounds wrong to me,
+Have a newline between property list and child node.
 
-arch/mips/configs/nlm_xlr_defconfig explicitly empties it.
-It is just redundant because CONFIG_CROSS_COMPILE=""
-is the default in Kconfig.
-Not necessarily wrong, I think.
+> +		cel_pwr {
 
+We usually use hyphen instead of underscore in node name.
 
-> but maybe those hosts don't
-> have toolchains and must always be cross compiled for?
->
-> For reference, this file in LLVM source defines the supported backend
-> targets: https://llvm.org/doxygen/Triple_8h_source.html
->
-> Either way, it sounds like we're all set here, I guess I'm just
-> curious about the LKML link/context and why some configs set
-> CROSS_COMPILE themselves?
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +			label = "UC8410A:CEL_PWR";
+> +			gpios = <&gpio3 23 1>;
 
+Can you use the polarity defines in include/dt-bindings/gpio/gpio.h to
+make it more readable?
 
+> +			default-state = "off";
+> +		};
+> +
+> +		cel_reset {
+> +			label = "UC8410A:CEL_RESET";
+> +			gpios = <&gpio3 24 1>;
+> +			default-state = "off";
+> +		};
+> +
+> +		str_led {
+> +			label = "UC8410A:RED:PROG";
+> +			gpios = <&gpio0 16 0>;
+> +			linux,default-trigger = "mmc0";
+> +		};
+> +
+> +		sw_ready {
+> +			label = "UC8410A:GREEN:SWRDY";
+> +			gpios = <&gpio0 18 0>;
+> +			default-state = "on";
+> +		};
+> +
+> +		beeper {
+> +			label = "UC8410A:BEEP";
+> +			gpios = <&gpio0 20 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		prog_led0 {
+> +			label = "UC8410A:GREEN:PROG2";
+> +			gpios = <&gpio3 14 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		prog_led1 {
+> +			label = "UC8410A:GREEN:PROG1";
+> +			gpios = <&gpio3 15 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		prog_led2 {
+> +			label = "UC8410A:GREEN:PROG0";
+> +			gpios = <&gpio3 16 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		wifi_signal0 {
+> +			label = "UC8410A:GREEN:CEL2";
+> +			gpios = <&gpio3 17 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		wifi_signal1 {
+> +			label = "UC8410A:GREEN:CEL1";
+> +			gpios = <&gpio3 18 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		wifi_signal2 {
+> +			label = "UC8410A:GREEN:CEL0";
+> +			gpios = <&gpio3 19 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		cpu_diag_red {
+> +			label = "UC8410A:RED:DIA";
+> +			gpios = <&gpio3 20 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		cpu_diag_green {
+> +			label = "UC8410A:GREEN:DIA";
+> +			gpios = <&gpio3 21 0>;
+> +			default-state = "off";
+> +		};
+> +
+> +		cpu_diag_yellow {
+> +			label = "UC8410A:YELLOW:DIA";
+> +			gpios = <&gpio3 22 0>;
+> +			default-state = "off";
+> +		};
+> +	};
+> +};
+> +
+> +&enet0 {
+> +	phy-handle = <&rgmii_phy0>;
+> +	phy-connection-type = "rgmii-id";
+> +	status = "okay";
+> +};
+> +
+> +&enet1 {
+> +	phy-handle = <&rgmii_phy1>;
+> +	phy-connection-type = "rgmii-id";
+> +	status = "okay";
+> +};
+> +
+> +&enet2 {
+> +	phy-handle = <&rgmii_phy2>;
+> +	phy-connection-type = "rgmii-id";
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +	clock-frequency = <100000>;
 
--- 
-Best Regards
-Masahiro Yamada
+We usually put 'status' at the end of property list.
+
+> +
+> +	rtc: rtc at 68 {
+
+The label is meaningless.
+
+> +		compatible = "dallas,ds1374";
+> +		reg = <0x68>;
+> +	};
+> +
+> +	tpm: tpm at 20 {
+
+Ditto
+
+> +		compatible = "infineon,slb9635tt";
+> +		reg = <0x20>;
+> +	};
+> +};
+> +
+> +&lpuart0 {
+> +	status = "okay";
+> +};
+> +
+> +&mdio0 {
+> +	rgmii_phy0: ethernet-phy at 0 {
+> +		compatible = "marvell,88e1118";
+> +		reg = <0x0>;
+> +		marvell,reg-init =
+> +			<3 0x11 0 0x4415>, /* Reg 3,17 */
+> +			<3 0x10 0 0x77>; /* Reg 3,16 */
+> +	};
+
+Have a newline between nodes.
+
+> +	rgmii_phy1: ethernet-phy at 1 {
+> +		compatible = "marvell,88e1118";
+> +		reg = <0x1>;
+> +		marvell,reg-init =
+> +			<3 0x11 0 0x4415>, /* Reg 3,17 */
+> +			<3 0x10 0 0x77>; /* Reg 3,16 */
+> +	};
+> +	rgmii_phy2: ethernet-phy at 2 {
+> +		compatible = "marvell,88e1118";
+> +		reg = <0x2>;
+> +		marvell,reg-init =
+> +			<3 0x11 0 0x4415>, /* Reg 3,17 */
+> +			<3 0x10 0 0x77>; /* Reg 3,16 */
+> +	};
+> +};
+> +
+> +&qspi {
+> +	status = "okay";
+> +	bus-num = <0>;
+> +	fsl,spi-num-chipselects = <2>;
+> +	fsl,spi-flash-chipselects = <0>;
+> +	fsl,qspi-has-second-chip;
+
+Put 'status' here and have a newline.
+
+> +	flash: flash at 0 {
+> +		compatible = "spansion,s25fl064l", "spansion,s25fl164k";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +
+> +		partitions at 0 {
+> +			label = "U-Boot";
+> +			reg = <0x0 0x180000>;
+> +		};
+
+Newline here.
+
+> +		partitions at 1 {
+> +			label = "U-Boot Env";
+> +			reg = <0x180000 0x680000>;
+> +		};
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> +
+> +&uart1 {
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +};
+
+Please sort the labeled node alphabetically.
+
+Shawn
+
+> -- 
+> 2.15.0
+> 
