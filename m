@@ -1,119 +1,127 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Nov 2017 17:41:06 +0100
-Subject: [PATCH v2 06/16] KVM: Move vcpu_load to arch-specific
- kvm_arch_vcpu_ioctl_get_sregs
+Date: Wed, 29 Nov 2017 17:41:09 +0100
+Subject: [PATCH v2 09/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_set_mpstate
 In-Reply-To: <20171129164116.16167-1-christoffer.dall@linaro.org>
 References: <20171129164116.16167-1-christoffer.dall@linaro.org>
-Message-ID: <20171129164116.16167-7-christoffer.dall@linaro.org>
+Message-ID: <20171129164116.16167-10-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Move vcpu_load() and vcpu_put() into the architecture specific
-implementations of kvm_arch_vcpu_ioctl_get_sregs().
+implementations of kvm_arch_vcpu_ioctl_set_mpstate().
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/powerpc/kvm/book3s.c | 8 +++++++-
- arch/powerpc/kvm/booke.c  | 9 ++++++++-
- arch/s390/kvm/kvm-s390.c  | 4 ++++
- arch/x86/kvm/x86.c        | 3 +++
- virt/kvm/kvm_main.c       | 2 --
- 5 files changed, 22 insertions(+), 4 deletions(-)
+ arch/s390/kvm/kvm-s390.c |  3 +++
+ arch/x86/kvm/x86.c       | 15 ++++++++++++---
+ virt/kvm/arm/arm.c       |  9 +++++++--
+ virt/kvm/kvm_main.c      |  2 --
+ 4 files changed, 22 insertions(+), 7 deletions(-)
 
-diff --git a/arch/powerpc/kvm/book3s.c b/arch/powerpc/kvm/book3s.c
-index 24bc7aa..6cc2377 100644
---- a/arch/powerpc/kvm/book3s.c
-+++ b/arch/powerpc/kvm/book3s.c
-@@ -484,7 +484,13 @@ void kvmppc_subarch_vcpu_uninit(struct kvm_vcpu *vcpu)
- int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
- 				  struct kvm_sregs *sregs)
- {
--	return vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
-+	int ret;
-+
-+	vcpu_load(vcpu);
-+	ret = vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
-+	vcpu_put(vcpu);
-+
-+	return ret;
- }
- 
- int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
-diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
-index bcbbedd..f647e12 100644
---- a/arch/powerpc/kvm/booke.c
-+++ b/arch/powerpc/kvm/booke.c
-@@ -1613,11 +1613,18 @@ int kvmppc_set_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
- int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
-                                   struct kvm_sregs *sregs)
- {
-+	int ret;
-+
-+	vcpu_load(vcpu);
-+
- 	sregs->pvr = vcpu->arch.pvr;
- 
- 	get_sregs_base(vcpu, sregs);
- 	get_sregs_arch206(vcpu, sregs);
--	return vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
-+	ret = vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
-+
-+	vcpu_put(vcpu);
-+	return ret;
- }
- 
- int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
 diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
-index e347643..18011fc 100644
+index 396fc3d..8fade85 100644
 --- a/arch/s390/kvm/kvm-s390.c
 +++ b/arch/s390/kvm/kvm-s390.c
-@@ -2737,8 +2737,12 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
- int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
- 				  struct kvm_sregs *sregs)
+@@ -2853,6 +2853,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
  {
+ 	int rc = 0;
+ 
 +	vcpu_load(vcpu);
 +
- 	memcpy(&sregs->acrs, &vcpu->run->s.regs.acrs, sizeof(sregs->acrs));
- 	memcpy(&sregs->crs, &vcpu->arch.sie_block->gcr, sizeof(sregs->crs));
-+
+ 	/* user space knows about this interface - let it control the state */
+ 	vcpu->kvm->arch.user_cpu_state_ctrl = 1;
+ 
+@@ -2870,6 +2872,7 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 		rc = -ENXIO;
+ 	}
+ 
 +	vcpu_put(vcpu);
- 	return 0;
+ 	return rc;
  }
  
 diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-index 75eacce..20a5f67 100644
+index 9bf62c3..ee357b6 100644
 --- a/arch/x86/kvm/x86.c
 +++ b/arch/x86/kvm/x86.c
-@@ -7400,6 +7400,8 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+@@ -7456,15 +7456,20 @@ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
  {
- 	struct desc_ptr dt;
- 
++	int ret;
++
 +	vcpu_load(vcpu);
 +
- 	kvm_get_segment(vcpu, &sregs->cs, VCPU_SREG_CS);
- 	kvm_get_segment(vcpu, &sregs->ds, VCPU_SREG_DS);
- 	kvm_get_segment(vcpu, &sregs->es, VCPU_SREG_ES);
-@@ -7431,6 +7433,7 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
- 		set_bit(vcpu->arch.interrupt.nr,
- 			(unsigned long *)sregs->interrupt_bitmap);
++	ret = -EINVAL;
+ 	if (!lapic_in_kernel(vcpu) &&
+ 	    mp_state->mp_state != KVM_MP_STATE_RUNNABLE)
+-		return -EINVAL;
++		goto out;
  
+ 	/* INITs are latched while in SMM */
+ 	if ((is_smm(vcpu) || vcpu->arch.smi_pending) &&
+ 	    (mp_state->mp_state == KVM_MP_STATE_SIPI_RECEIVED ||
+ 	     mp_state->mp_state == KVM_MP_STATE_INIT_RECEIVED))
+-		return -EINVAL;
++		goto out;
+ 
+ 	if (mp_state->mp_state == KVM_MP_STATE_SIPI_RECEIVED) {
+ 		vcpu->arch.mp_state = KVM_MP_STATE_INIT_RECEIVED;
+@@ -7472,7 +7477,11 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 	} else
+ 		vcpu->arch.mp_state = mp_state->mp_state;
+ 	kvm_make_request(KVM_REQ_EVENT, vcpu);
+-	return 0;
++
++	ret = 0;
++out:
 +	vcpu_put(vcpu);
- 	return 0;
++	return ret;
  }
  
+ int kvm_task_switch(struct kvm_vcpu *vcpu, u16 tss_selector, int idt_index,
+diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+index a717170..9a3acbc 100644
+--- a/virt/kvm/arm/arm.c
++++ b/virt/kvm/arm/arm.c
+@@ -395,6 +395,10 @@ int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 				    struct kvm_mp_state *mp_state)
+ {
++	int ret = 0;
++
++	vcpu_load(vcpu);
++
+ 	switch (mp_state->mp_state) {
+ 	case KVM_MP_STATE_RUNNABLE:
+ 		vcpu->arch.power_off = false;
+@@ -403,10 +407,11 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
+ 		vcpu_power_off(vcpu);
+ 		break;
+ 	default:
+-		return -EINVAL;
++		ret = -EINVAL;
+ 	}
+ 
+-	return 0;
++	vcpu_put(vcpu);
++	return ret;
+ }
+ 
+ /**
 diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-index 963e249..779c03e 100644
+index eac3c29..f360005 100644
 --- a/virt/kvm/kvm_main.c
 +++ b/virt/kvm/kvm_main.c
-@@ -2581,9 +2581,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
- 		r = -ENOMEM;
- 		if (!kvm_sregs)
+@@ -2618,9 +2618,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+ 		r = -EFAULT;
+ 		if (copy_from_user(&mp_state, argp, sizeof(mp_state)))
  			goto out;
 -		vcpu_load(vcpu);
- 		r = kvm_arch_vcpu_ioctl_get_sregs(vcpu, kvm_sregs);
+ 		r = kvm_arch_vcpu_ioctl_set_mpstate(vcpu, &mp_state);
 -		vcpu_put(vcpu);
- 		if (r)
- 			goto out;
- 		r = -EFAULT;
+ 		break;
+ 	}
+ 	case KVM_TRANSLATE: {
 -- 
 2.7.4
