@@ -1,73 +1,119 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 29 Nov 2017 17:41:00 +0100
-Subject: [PATCH v2 00/16] Move vcpu_load and vcpu_put calls to arch code
-Message-ID: <20171129164116.16167-1-christoffer.dall@linaro.org>
+Date: Wed, 29 Nov 2017 17:41:06 +0100
+Subject: [PATCH v2 06/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_get_sregs
+In-Reply-To: <20171129164116.16167-1-christoffer.dall@linaro.org>
+References: <20171129164116.16167-1-christoffer.dall@linaro.org>
+Message-ID: <20171129164116.16167-7-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some architectures may decide to do different things during
-kvm_arch_vcpu_load depending on the ioctl being executed.  For example,
-arm64 is about to do significant work in vcpu load/put when running a
-vcpu, but it's problematic to do this for any other vcpu ioctl than
-KVM_RUN.
+Move vcpu_load() and vcpu_put() into the architecture specific
+implementations of kvm_arch_vcpu_ioctl_get_sregs().
 
-Further, while it may be possible to call kvm_arch_vcpu_load() for a
-number of non-KVM_RUN ioctls, it makes the KVM/ARM code more difficult
-to reason about, especially after my optimization series, because a lot
-of things can now happen, where we have to consider if we're really in
-the process of running a vcpu or not.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/powerpc/kvm/book3s.c | 8 +++++++-
+ arch/powerpc/kvm/booke.c  | 9 ++++++++-
+ arch/s390/kvm/kvm-s390.c  | 4 ++++
+ arch/x86/kvm/x86.c        | 3 +++
+ virt/kvm/kvm_main.c       | 2 --
+ 5 files changed, 22 insertions(+), 4 deletions(-)
 
-This series will first move the vcpu_load() and vcpu_put() calls in the
-arch generic dispatch function into each case of the switch statement
-and then, one-by-one, pushed the calls down into the architecture
-specific code making the changes for each ioctl as required.
-
-Patches also available at:
-git://git.kernel.org/pub/scm/linux/kernel/git/cdall/linux.git vcpu-load-put-v2
-
-Changes since v1:
- - Fix PPC and S390 bugs from v1
- - Take the mutex in the main disaptcher function and make vcpu_load a
-   void, which simplifies the patches overall.
- - Add a patch that moves vcpu_load for arm/arm64 after the first-run
-   init function.
-
-Thanks,
--Christoffer
-
-Christoffer Dall (16):
-  KVM: Take vcpu->mutex outside vcpu_load
-  KVM: Prepare for moving vcpu_load/vcpu_put into arch specific code
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_run
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_regs
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_regs
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_sregs
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_sregs
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_mpstate
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_mpstate
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_translate
-  KVM: Move vcpu_load to arch-specific
-    kvm_arch_vcpu_ioctl_set_guest_debug
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_get_fpu
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl_set_fpu
-  KVM: Move vcpu_load to arch-specific kvm_arch_vcpu_ioctl
-  KVM: arm/arm64: Avoid vcpu_load for other vcpu ioctls than KVM_RUN
-  KVM: arm/arm64: Move vcpu_load call after kvm_vcpu_first_run_init
-
- arch/arm64/kvm/guest.c        |  12 +++--
- arch/mips/kvm/mips.c          |  58 +++++++++++++++--------
- arch/powerpc/kvm/book3s.c     |  24 +++++++++-
- arch/powerpc/kvm/booke.c      |  51 +++++++++++++++-----
- arch/powerpc/kvm/powerpc.c    |  19 +++++---
- arch/s390/kvm/kvm-s390.c      |  90 +++++++++++++++++++++++++++--------
- arch/x86/kvm/vmx.c            |   4 +-
- arch/x86/kvm/x86.c            | 107 ++++++++++++++++++++++++++++++------------
- include/linux/kvm_host.h      |   2 +-
- virt/kvm/arm/arch_timer.c     |   4 --
- virt/kvm/arm/arm.c            |  68 ++++++++++++++++++---------
- virt/kvm/arm/vgic/vgic-init.c |  11 -----
- virt/kvm/kvm_main.c           |  17 ++-----
- 13 files changed, 323 insertions(+), 144 deletions(-)
-
+diff --git a/arch/powerpc/kvm/book3s.c b/arch/powerpc/kvm/book3s.c
+index 24bc7aa..6cc2377 100644
+--- a/arch/powerpc/kvm/book3s.c
++++ b/arch/powerpc/kvm/book3s.c
+@@ -484,7 +484,13 @@ void kvmppc_subarch_vcpu_uninit(struct kvm_vcpu *vcpu)
+ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+ 				  struct kvm_sregs *sregs)
+ {
+-	return vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
++	int ret;
++
++	vcpu_load(vcpu);
++	ret = vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
++	vcpu_put(vcpu);
++
++	return ret;
+ }
+ 
+ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
+index bcbbedd..f647e12 100644
+--- a/arch/powerpc/kvm/booke.c
++++ b/arch/powerpc/kvm/booke.c
+@@ -1613,11 +1613,18 @@ int kvmppc_set_sregs_ivor(struct kvm_vcpu *vcpu, struct kvm_sregs *sregs)
+ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+                                   struct kvm_sregs *sregs)
+ {
++	int ret;
++
++	vcpu_load(vcpu);
++
+ 	sregs->pvr = vcpu->arch.pvr;
+ 
+ 	get_sregs_base(vcpu, sregs);
+ 	get_sregs_arch206(vcpu, sregs);
+-	return vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
++	ret = vcpu->kvm->arch.kvm_ops->get_sregs(vcpu, sregs);
++
++	vcpu_put(vcpu);
++	return ret;
+ }
+ 
+ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+index e347643..18011fc 100644
+--- a/arch/s390/kvm/kvm-s390.c
++++ b/arch/s390/kvm/kvm-s390.c
+@@ -2737,8 +2737,12 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
+ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+ 				  struct kvm_sregs *sregs)
+ {
++	vcpu_load(vcpu);
++
+ 	memcpy(&sregs->acrs, &vcpu->run->s.regs.acrs, sizeof(sregs->acrs));
+ 	memcpy(&sregs->crs, &vcpu->arch.sie_block->gcr, sizeof(sregs->crs));
++
++	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index 75eacce..20a5f67 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -7400,6 +7400,8 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+ {
+ 	struct desc_ptr dt;
+ 
++	vcpu_load(vcpu);
++
+ 	kvm_get_segment(vcpu, &sregs->cs, VCPU_SREG_CS);
+ 	kvm_get_segment(vcpu, &sregs->ds, VCPU_SREG_DS);
+ 	kvm_get_segment(vcpu, &sregs->es, VCPU_SREG_ES);
+@@ -7431,6 +7433,7 @@ int kvm_arch_vcpu_ioctl_get_sregs(struct kvm_vcpu *vcpu,
+ 		set_bit(vcpu->arch.interrupt.nr,
+ 			(unsigned long *)sregs->interrupt_bitmap);
+ 
++	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 963e249..779c03e 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -2581,9 +2581,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+ 		r = -ENOMEM;
+ 		if (!kvm_sregs)
+ 			goto out;
+-		vcpu_load(vcpu);
+ 		r = kvm_arch_vcpu_ioctl_get_sregs(vcpu, kvm_sregs);
+-		vcpu_put(vcpu);
+ 		if (r)
+ 			goto out;
+ 		r = -EFAULT;
 -- 
 2.7.4
