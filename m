@@ -1,45 +1,34 @@
 From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Wed, 29 Nov 2017 18:10:36 +0800
-Subject: [PATCH 2/3] arm: dts: mt7623: update mmc related nodes with the
- appropriate fallback
+Date: Wed, 29 Nov 2017 18:10:35 +0800
+Subject: [PATCH 1/3] mmc: dt-bindings: add mmc support to MT7623 SoC
 In-Reply-To: <cover.1511949769.git.sean.wang@mediatek.com>
 References: <cover.1511949769.git.sean.wang@mediatek.com>
-Message-ID: <e2ef3ec5c4b6646d3d11aa28b46304c3ff0032ec.1511949769.git.sean.wang@mediatek.com>
+Message-ID: <3e2c72d18bbe6d7c762fd820195f0fa0b5a45bbf.1511949769.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Sean Wang <sean.wang@mediatek.com>
 
-The current mmc related nodes should be falling back to MT2701
-as the dt-binding defines and which has more appropriate setup
-for MT7623.
+Add the devicetree binding for MT7623 SoC using MT2701 as the fallback.
 
+Cc: devicetree at vger.kernel.org
 Signed-off-by: Sean Wang <sean.wang@mediatek.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index 0640fb7..343d3b1 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -641,7 +641,7 @@
- 
- 	mmc0: mmc at 11230000 {
- 		compatible = "mediatek,mt7623-mmc",
--			     "mediatek,mt8135-mmc";
-+			     "mediatek,mt2701-mmc";
- 		reg = <0 0x11230000 0 0x1000>;
- 		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_MSDC30_0>,
-@@ -652,7 +652,7 @@
- 
- 	mmc1: mmc at 11240000 {
- 		compatible = "mediatek,mt7623-mmc",
--			     "mediatek,mt8135-mmc";
-+			     "mediatek,mt2701-mmc";
- 		reg = <0 0x11240000 0 0x1000>;
- 		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_MSDC30_1>,
+diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+index 72d2a73..1732588 100644
+--- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
++++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+@@ -12,6 +12,8 @@ Required properties:
+ 	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+ 	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+ 	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
++	"mediatek,mt7623-mmc",
++	"mediatek,mt2701-mmc": for mmc host ip compatible with mt7623
+ - reg: physical base address of the controller and length
+ - interrupts: Should contain MSDC interrupt number
+ - clocks: Should contain phandle for the clock feeding the MMC controller
 -- 
 2.7.4
