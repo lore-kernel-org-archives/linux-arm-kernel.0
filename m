@@ -1,24 +1,59 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 29 Nov 2017 22:22:02 +0100
-Subject: [PATCH] rtc: stm32: Fix copyright
-In-Reply-To: <20171129142644.23576-1-benjamin.gaignard@st.com>
-References: <20171129142644.23576-1-benjamin.gaignard@st.com>
-Message-ID: <20171129212202.GU21126@piout.net>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Thu, 30 Nov 2017 08:48:34 +1100
+Subject: [linux-sunxi] [PATCH 11/17] drm/sun4i: Wire in DE2 scaler support
+In-Reply-To: <20171127205750.19277-12-jernej.skrabec@siol.net>
+References: <20171127205750.19277-1-jernej.skrabec@siol.net>
+ <20171127205750.19277-12-jernej.skrabec@siol.net>
+Message-ID: <CAGRGNgX_ZP9bpVuHzgmkyj18TKAMUpNgudiEzFRkJV-Z4MN4fQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29/11/2017 at 15:26:44 +0100, Benjamin Gaignard wrote:
-> Uniformize STMicroelectronics copyrights header
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> CC: Amelie Delaunay <amelie.delaunay@st.com>
+Hi Jernej,
+
+On Tue, Nov 28, 2017 at 7:57 AM, Jernej Skrabec <jernej.skrabec@siol.net> wrote:
+> Calculate scaling parameters and call appropriate scaler set up
+> function.
+>
+> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 > ---
->  drivers/rtc/rtc-stm32.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-Applied, thanks.
+>  drivers/gpu/drm/sun4i/sun8i_layer.c |  12 +++-
+>  drivers/gpu/drm/sun4i/sun8i_mixer.c | 115 +++++++++++++++++++++++++-----------
+>  drivers/gpu/drm/sun4i/sun8i_mixer.h |   4 --
+>  3 files changed, 90 insertions(+), 41 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
+> index e1b6ad82145e..6860271e5415 100644
+> --- a/drivers/gpu/drm/sun4i/sun8i_layer.c
+> +++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
+> @@ -41,9 +44,14 @@ static int sun8i_mixer_layer_atomic_check(struct drm_plane *plane,
+>         clip.x2 = crtc_state->adjusted_mode.hdisplay;
+>         clip.y2 = crtc_state->adjusted_mode.vdisplay;
+>
+> +       scaler_supported = !!(layer->mixer->cfg->scaler_mask & BIT(layer->id));
+> +
+> +       min_scale = scaler_supported ? 1 : DRM_PLANE_HELPER_NO_SCALING;
+> +       max_scale = scaler_supported ? (1UL << 20) - 1 :
+> +                                      DRM_PLANE_HELPER_NO_SCALING;
+> +
+
+Disclaimer: I hate ternaries, but this looks like it'd be better
+written as an if statement. I.e.
+
+min_scale = DRM_PLANE_HELPER_NO_SCALING;
+max_scale = DRM_PLANE_HELPER_NO_SCALING;
+
+if (layer->mixer->cfg->scaler_mask & BIT(layer->id)) {
+    min_scale = 1;
+    max_scale = (1UL << 20) - 1;
+}
+
+However the compiler will probably sort it all out anyway, so it
+probably doesn't matter that much, except for style.
+
+Thanks,
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Julian Calaby
+
+Email: julian.calaby@gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
