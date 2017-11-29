@@ -1,40 +1,20 @@
 From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Wed, 29 Nov 2017 17:38:52 +1100
-Subject: [PATCH] crypto/arm64: aes-ce-cipher - move assembler code to .S
- file
-In-Reply-To: <20171121134017.21247-1-ard.biesheuvel@linaro.org>
-References: <20171121134017.21247-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171129063852.GM21575@gondor.apana.org.au>
+Date: Wed, 29 Nov 2017 17:30:28 +1100
+Subject: [v2,01/12] hwrng: bcm2835 - Obtain base register via resource
+In-Reply-To: <20171108004449.32730-2-f.fainelli@gmail.com>
+References: <20171108004449.32730-2-f.fainelli@gmail.com>
+Message-ID: <20171129063028.GB21594@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 21, 2017 at 01:40:17PM +0000, Ard Biesheuvel wrote:
-> Most crypto drivers involving kernel mode NEON take care to put the code
-> that actually touches the NEON register file in a separate compilation
-> unit, to prevent the compiler from reordering code that preserves or
-> restores the NEON context with code that may corrupt it. This is
-> necessary because we currently have no way to express the restrictions
-> imposed upon use of the NEON in kernel mode in a way that the compiler
-> understands.
+On Tue, Nov 07, 2017 at 04:44:38PM -0800, Florian Fainelli wrote:
+> In preparation for consolidating bcm63xx-rng into bcm2835-rng, make sure
+> that we obtain the base register via platform_get_resource() since we
+> need to support the non-DT enabled MIPS-based BCM63xx DSL SoCs.
 > 
-> However, in the case of aes-ce-cipher, it did not seem unreasonable to
-> deviate from this rule, given how it does not seem possible for the
-> compiler to reorder cross object function calls with asm blocks whose
-> in- and output constraints reflect that it reads from and writes to
-> memory.
-> 
-> Now that LTO is being proposed for the arm64 kernel, it is time to
-> revisit this. The link time optimization may replace the function
-> calls to kernel_neon_begin() and kernel_neon_end() with instantiations
-> of the IR that make up its implementation, allowing further reordering
-> with the asm block.
-> 
-> So let's clean this up, and move the asm() blocks into a separate .S
-> file.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Patch applied.  Thanks.
+All applied.  Thanks.
 -- 
 Email: Herbert Xu <herbert@gondor.apana.org.au>
 Home Page: http://gondor.apana.org.au/~herbert/
