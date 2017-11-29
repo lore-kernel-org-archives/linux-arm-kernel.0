@@ -1,24 +1,37 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Wed, 29 Nov 2017 09:26:41 -0800
-Subject: [PATCH 3/3] arm64: use -mno-implicit-float instead of
- -mgeneral-regs-only
-In-Reply-To: <20171129162223.GA2959@samitolvanen.mtv.corp.google.com>
-References: <20171129000011.55235-1-samitolvanen@google.com>
- <20171129000011.55235-4-samitolvanen@google.com>
- <CAKv+Gu99XM5jLcOTkqPJPj5oZnUCNv2c7C=5X2hFCM4-4_gwNg@mail.gmail.com>
- <20171129162223.GA2959@samitolvanen.mtv.corp.google.com>
-Message-ID: <CAKwvOdm1rP7ZgiP0N=WOJxSDgjJHcQGd90JXX8g_bHjZU=0QfA@mail.gmail.com>
+From: david@redhat.com (David Hildenbrand)
+Date: Wed, 29 Nov 2017 18:30:33 +0100
+Subject: [PATCH v2 15/16] KVM: arm/arm64: Avoid vcpu_load for other vcpu
+ ioctls than KVM_RUN
+In-Reply-To: <20171129164116.16167-16-christoffer.dall@linaro.org>
+References: <20171129164116.16167-1-christoffer.dall@linaro.org>
+ <20171129164116.16167-16-christoffer.dall@linaro.org>
+Message-ID: <12137903-6f11-6350-6344-30e3bc6542e3@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 8:22 AM, Sami Tolvanen <samitolvanen@google.com> wrote:
-> On Wed, Nov 29, 2017 at 12:15:14PM +0000, Ard Biesheuvel wrote:
->> Do we still need these patches now that the AES code has been fixed?
->
-> With your AES patch that Herbert just applied, this patch is no longer
-> needed. Version macros in the first two patches will still be useful in
-> future though.
 
-Matthias, maybe for your recommended Clang patch sets, you can replace
-this patch with
-https://www.spinics.net/lists/arm-kernel/msg617947.html?
+> +++ b/virt/kvm/arm/arm.c
+> @@ -381,14 +381,11 @@ static void vcpu_power_off(struct kvm_vcpu *vcpu)
+>  int kvm_arch_vcpu_ioctl_get_mpstate(struct kvm_vcpu *vcpu,
+>  				    struct kvm_mp_state *mp_state)
+>  {
+> -	vcpu_load(vcpu);
+> -
+>  	if (vcpu->arch.power_off)
+>  		mp_state->mp_state = KVM_MP_STATE_STOPPED;
+>  	else
+>  		mp_state->mp_state = KVM_MP_STATE_RUNNABLE;
+>  
+> -	vcpu_put(vcpu);
+>  	return 0;
+>  }
+
+Okay, this also makes sense on other architectures. The important thing
+is only that we hold the vcpu mutex.
+
+
+-- 
+
+Thanks,
+
+David / dhildenb
