@@ -1,121 +1,43 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Nov 2017 16:30:28 +0100
-Subject: [PATCH] soc: Add SoC driver for Gemini
-Message-ID: <20171129153028.7313-1-linus.walleij@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 29 Nov 2017 16:37:12 +0100
+Subject: [PATCH] net: stmmac: dwmac-sun8i: fix allwinner,leds-active-low
+ handling
+In-Reply-To: <20171129090240.GA3699@Red>
+References: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
+ <20171128173826.GE14512@lunn.ch> <20171129090240.GA3699@Red>
+Message-ID: <20171129153712.GA24881@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds an SoC driver for the Gemini. Currently there
-is only one thing not fitting into any other framework,
-and that is the bus arbitration setting.
+On Wed, Nov 29, 2017 at 10:02:40AM +0100, Corentin Labbe wrote:
+> On Tue, Nov 28, 2017 at 06:38:26PM +0100, Andrew Lunn wrote:
+> > On Tue, Nov 28, 2017 at 05:48:22PM +0100, Corentin Labbe wrote:
+> > > The driver expect "allwinner,leds-active-low" to be in PHY node, but
+> > > the binding doc expect it to be in MAC node.
+> > > 
+> > > Since all board DT use it also in MAC node, the driver need to search
+> > > allwinner,leds-active-low in MAC node.
+> > 
+> > Hi Corentin
+> > 
+> > I'm having trouble working out how this worked before. This is code
+> > you moved around, when adding external/internal MDIOs. But the very
+> > first version of this driver code used priv->plat->phy_node. Did that
+> > somehow point to the MAC node when the internal PHY is used? Or has it
+> > been broken all the time?
+> > 
+> 
+> Hello
+> 
 
-All Gemini trees seem to be setting this register to
-exactly the same arbitration so we just add a small code
-snippet to do this at subsys_init() time before any other
-drivers kick in.
+> Since this feature control only when the activity LED need to blink,
+> nobody see that it was broken.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- drivers/soc/Makefile            |  1 +
- drivers/soc/gemini/Makefile     |  2 ++
- drivers/soc/gemini/soc-gemini.c | 68 +++++++++++++++++++++++++++++++++++++++++
- 3 files changed, 71 insertions(+)
- create mode 100644 drivers/soc/gemini/Makefile
- create mode 100644 drivers/soc/gemini/soc-gemini.c
+Hi Corentin
 
-diff --git a/drivers/soc/Makefile b/drivers/soc/Makefile
-index deecb16e7256..342768df3530 100644
---- a/drivers/soc/Makefile
-+++ b/drivers/soc/Makefile
-@@ -9,6 +9,7 @@ obj-y				+= bcm/
- obj-$(CONFIG_ARCH_DOVE)		+= dove/
- obj-$(CONFIG_MACH_DOVE)		+= dove/
- obj-y				+= fsl/
-+obj-$(CONFIG_ARCH_GEMINI)	+= gemini/
- obj-$(CONFIG_ARCH_MXC)		+= imx/
- obj-$(CONFIG_SOC_XWAY)		+= lantiq/
- obj-y				+= mediatek/
-diff --git a/drivers/soc/gemini/Makefile b/drivers/soc/gemini/Makefile
-new file mode 100644
-index 000000000000..8cbd1e45db78
---- /dev/null
-+++ b/drivers/soc/gemini/Makefile
-@@ -0,0 +1,2 @@
-+# SPDX-License-Identifier: GPL-2.0
-+obj-y	+= soc-gemini.o
-diff --git a/drivers/soc/gemini/soc-gemini.c b/drivers/soc/gemini/soc-gemini.c
-new file mode 100644
-index 000000000000..3fac4d1905a8
---- /dev/null
-+++ b/drivers/soc/gemini/soc-gemini.c
-@@ -0,0 +1,68 @@
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2017 Linaro Ltd.
-+ *
-+ * Author: Linus Walleij <linus.walleij@linaro.org>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2, as
-+ * published by the Free Software Foundation.
-+ *
-+ */
-+#include <linux/init.h>
-+#include <linux/kernel.h>
-+#include <linux/mfd/syscon.h>
-+#include <linux/regmap.h>
-+#include <linux/of.h>
-+
-+#define GLOBAL_WORD_ID				0x00
-+#define GEMINI_GLOBAL_ARB1_CTRL			0x2c
-+#define GEMINI_ARB1_BURST_MASK			GENMASK(21, 16)
-+#define GEMINI_ARB1_BURST_SHIFT			16
-+/* These all define the priority on the BUS2 backplane */
-+#define GEMINI_ARB1_PRIO_MASK			GENMASK(9, 0)
-+#define GEMINI_ARB1_DMAC_HIGH_PRIO		BIT(0)
-+#define GEMINI_ARB1_IDE_HIGH_PRIO		BIT(1)
-+#define GEMINI_ARB1_RAID_HIGH_PRIO		BIT(2)
-+#define GEMINI_ARB1_SECURITY_HIGH_PRIO		BIT(3)
-+#define GEMINI_ARB1_GMAC0_HIGH_PRIO		BIT(4)
-+#define GEMINI_ARB1_GMAC1_HIGH_PRIO		BIT(5)
-+#define GEMINI_ARB1_USB0_HIGH_PRIO		BIT(6)
-+#define GEMINI_ARB1_USB1_HIGH_PRIO		BIT(7)
-+#define GEMINI_ARB1_PCI_HIGH_PRIO		BIT(8)
-+#define GEMINI_ARB1_TVE_HIGH_PRIO		BIT(9)
-+
-+#define GEMINI_DEFAULT_BURST_SIZE		0x20
-+#define GEMINI_DEFAULT_PRIO			(GEMINI_ARB1_GMAC0_HIGH_PRIO | \
-+						 GEMINI_ARB1_GMAC1_HIGH_PRIO)
-+
-+static int __init gemini_soc_init(void)
-+{
-+	struct gemini_arbitration *arb;
-+	struct regmap *map;
-+	u32 rev;
-+	u32 val;
-+	int ret;
-+
-+	map = syscon_regmap_lookup_by_compatible("cortina,gemini-syscon");
-+	if (IS_ERR(map))
-+		return PTR_ERR(map);
-+	ret = regmap_read(map, GLOBAL_WORD_ID, &rev);
-+	if (ret)
-+		return ret;
-+
-+	val = (GEMINI_DEFAULT_BURST_SIZE << GEMINI_ARB1_BURST_SHIFT) |
-+		GEMINI_DEFAULT_PRIO;
-+
-+	/* Set up system arbitration */
-+	regmap_update_bits(map,
-+			   GEMINI_GLOBAL_ARB1_CTRL,
-+			   GEMINI_ARB1_BURST_MASK | GEMINI_ARB1_PRIO_MASK,
-+			   val);
-+
-+	pr_info("Gemini SoC %04x revision %02x, set arbitration %08x\n",
-+		rev >> 8, rev & 0xff, val);
-+
-+	return 0;
-+}
-+subsys_initcall(gemini_soc_init);
--- 
-2.14.3
+So it never worked?
+
+If it never worked, moving the DT properties into the PHY node, where
+they belong, won't introduce a regression :-)
+
+     Andrew
