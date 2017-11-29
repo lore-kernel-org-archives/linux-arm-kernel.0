@@ -1,62 +1,36 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Wed, 29 Nov 2017 22:06:12 +0800
-Subject: [PATCH] ARM: imx: don't abort MMDC probe if power saving status
- doesn't match
-In-Reply-To: <20171127121139.15584-1-l.stach@pengutronix.de>
-References: <20171127121139.15584-1-l.stach@pengutronix.de>
-Message-ID: <20171129140610.GM9376@dragon>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 29 Nov 2017 19:28:14 +0530
+Subject: [PATCH V3 3/4] dmaengine: qcom_hidma: add support for the new
+ revision
+In-Reply-To: <1510281175-27173-3-git-send-email-okaya@codeaurora.org>
+References: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
+ <1510281175-27173-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <20171129135813.GE32417@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 01:11:39PM +0100, Lucas Stach wrote:
-> The power saving status bit will not signal if the MMDC is under load,
-> which is likely during kernel boot.
+On Thu, Nov 09, 2017 at 09:32:54PM -0500, Sinan Kaya wrote:
 
-What is exactly the condition of MMDC is under load?  If it's likely
-hit during kernel boot, why have we not heard any report regarding to
-it before?
+> -static bool hidma_msi_capable(struct device *dev)
+> +static bool hidma_test_capability(struct device *dev, enum hidma_cap test_cap)
+>  {
+>  	struct acpi_device *adev = ACPI_COMPANION(dev);
+> -	const char *of_compat;
+> -	int ret = -EINVAL;
+> +	enum hidma_cap cap;
+>  
+> -	if (!adev || acpi_disabled) {
+> -		ret = device_property_read_string(dev, "compatible",
+> -						  &of_compat);
+> -		if (ret)
+> -			return false;
+> +	if (!adev || acpi_disabled)
+> +		cap = (enum hidma_cap) of_device_get_match_data(dev);
+> +	else
+> +		cap = (enum hidma_cap) acpi_device_get_match_data(dev);
 
-Shawn
+should this not reside in core? How about a device_get_match_data() which
+returns the data for folks based on node being acpi/of
 
-> There is no point in checking this
-> bit and aborting the probe, as there is nothing depending on power
-> saving being enabled, so we can trust the memory controller to enable
-> power saving when we allow it.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/mach-imx/mmdc.c | 11 -----------
->  1 file changed, 11 deletions(-)
-> 
-> diff --git a/arch/arm/mach-imx/mmdc.c b/arch/arm/mach-imx/mmdc.c
-> index 78262899a590..5fb1d2254b5e 100644
-> --- a/arch/arm/mach-imx/mmdc.c
-> +++ b/arch/arm/mach-imx/mmdc.c
-> @@ -547,7 +547,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
->  	struct device_node *np = pdev->dev.of_node;
->  	void __iomem *mmdc_base, *reg;
->  	u32 val;
-> -	int timeout = 0x400;
->  
->  	mmdc_base = of_iomap(np, 0);
->  	WARN_ON(!mmdc_base);
-> @@ -565,16 +564,6 @@ static int imx_mmdc_probe(struct platform_device *pdev)
->  	val &= ~(1 << BP_MMDC_MAPSR_PSD);
->  	writel_relaxed(val, reg);
->  
-> -	/* Ensure it's successfully enabled */
-> -	while (!(readl_relaxed(reg) & 1 << BP_MMDC_MAPSR_PSS) && --timeout)
-> -		cpu_relax();
-> -
-> -	if (unlikely(!timeout)) {
-> -		pr_warn("%s: failed to enable automatic power saving\n",
-> -			__func__);
-> -		return -EBUSY;
-> -	}
-> -
->  	return imx_mmdc_perf_init(pdev, mmdc_base);
->  }
->  
-> -- 
-> 2.11.0
-> 
+-- 
+~Vinod
