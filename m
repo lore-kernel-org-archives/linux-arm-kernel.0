@@ -1,304 +1,57 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 29 Nov 2017 11:20:56 +0100
-Subject: [PATCH v4 5/6] ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board
- support
-In-Reply-To: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
-References: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1511950857-19292-6-git-send-email-narmstrong@baylibre.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 29 Nov 2017 11:27:16 +0100
+Subject: [GIT PULL] tee async tee supplicant communication for v4.16
+Message-ID: <20171129102715.dsxcsq6s5tvnep2s@jax>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the i.MX6 Quad variant of the Variscite DART-MX6
-SoM Carrier-Board.
+Hi arm-soc maintainers,
 
-This Carrier-Board has the following :
-- LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
-- HDMI Connector
-- USB Host + USB OTG Connector
-- 10/100/1000 Mbps Ethernet
-- miniPCI-Express slot
-- SD Card connector
-- Audio Headphone/Line In jack connectors
-- On-board DMIC
-- CAN bus header
-- SPI header
-- Camera Interfaces header
-- 4xButtons, 2xLeds
-- OnBoard RTC with Coin Backup battery socket
-- RS232 Header + USB-Serial debug port
+Please pull these tee driver changes. This implements support for
+asynchronous communication with TEE supplicant. This isn't a bugfix so
+I'm aiming for the next merge window.
 
-Product Page : http://www.variscite.com/products/evaluation-kits/dart-mx6-kits
+Thanks,
+Jens
 
-The board support is done with all on-board and header interfaces enabled.
-7" LVDS Touchscreen is enabled by default along HDMI output.
-Audio interface is supported with the "simple-card" bindings.
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-PCIe slot, On-Board DMIC and Camera Interfaces are not handled yet.
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/imx6q-var-dt6customboard.dts | 239 +++++++++++++++++++++++++
- 2 files changed, 240 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
+are available in the git repository at:
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..148ff15 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -470,6 +470,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-tx6q-11x0-mb7.dtb \
- 	imx6q-udoo.dtb \
- 	imx6q-utilite-pro.dtb \
-+	imx6q-var-dt6customboard.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6q-wandboard-revb1.dtb \
- 	imx6q-wandboard-revd1.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-new file mode 100644
-index 0000000..76faaff
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-@@ -0,0 +1,239 @@
-+/*
-+ * Support for Variscite DART-MX6 Carrier-board
-+ *
-+ * Copyright 2017 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+#include "imx6qdl-var-dart.dtsi"
-+#include <dt-bindings/input/linux-event-codes.h>
-+
-+/ {
-+	model = "Variscite DART-MX6 Carrier-board";
-+	compatible = "variscite,dt6customboard", "fsl,imx6q";
-+
-+	backlight_lvds: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm2 0 50000>;
-+		brightness-levels = <0 4 8 16 32 64 128 248>;
-+		default-brightness-level = <7>;
-+		status = "okay";
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		back {
-+			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_BACK>;
-+			label = "Key Back";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			gpio-key,wakeup;
-+		};
-+
-+		home {
-+			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_HOME>;
-+			label = "Key Home";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			gpio-key,wakeup;
-+		};
-+
-+		menu {
-+			gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_MENU>;
-+			label = "Key Menu";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			gpio-key,wakeup;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		led1 {
-+			gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		led2 {
-+			gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	panel1: lvds-panel {
-+		compatible = "sgd,gktw70sdae4se", "panel-lvds";
-+		backlight = <&backlight_lvds>;
-+
-+		width-mm = <153>;
-+		height-mm = <86>;
-+
-+		label = "gktw70sdae4se";
-+
-+		data-mapping = "jeida-18";
-+
-+		panel-timing {
-+			clock-frequency = <32000000>;
-+			hactive = <800>;
-+			vactive = <480>;
-+			hback-porch = <39>;
-+			hfront-porch = <39>;
-+			vback-porch = <29>;
-+			vfront-porch = <13>;
-+			hsync-len = <47>;
-+			vsync-len = <2>;
-+		};
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds1_out>;
-+			};
-+		};
-+	};
-+
-+	reg_usb_h1_vbus: regulator-usbh1vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usbotgvbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "dt6-customboard-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&sound_codec>;
-+		simple-audio-card,frame-master = <&sound_codec>;
-+		simple-audio-card,widgets = "Headphone", "Headphone Jack",
-+					    "Line", "Line In";
-+		simple-audio-card,routing = "Headphone Jack", "HPLOUT",
-+					    "Headphone Jack", "HPROUT",
-+					    "LINE1L", "Line In",
-+					    "LINE1R", "Line In";
-+
-+		sound_cpu: simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
-+		};
-+
-+		sound_codec: simple-audio-card,codec {
-+			sound-dai = <&codec>;
-+			clocks = <&clks IMX6QDL_CLK_CKO>;
-+		};
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&ecspi1 {
-+	cs-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>,
-+		   <&gpio4 10 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+
-+	touchscreen at 38 {
-+		compatible = "edt,edt-ft5x06";
-+		reg = <0x38>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <480>;
-+		touchscreen-inverted-x;
-+		touchscreen-inverted-y;
-+	};
-+
-+	rtc at 68 {
-+		compatible = "isil,isl12057";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 1 {
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds1_out: endpoint {
-+				remote-endpoint = <&panel_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	dr_mode = "otg";
-+	srp-disable;
-+	hnp-disable;
-+	adp-disable;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
--- 
-2.7.4
+  https://git.linaro.org/people/jens.wiklander/linux-tee.git tags/tee-drv-async-supplicant-for-v4.16
+
+for you to fetch changes up to 1647a5ac175490d7dac2e74532e85b6197fc74e9:
+
+  optee: support asynchronous supplicant requests (2017-11-29 10:37:13 +0100)
+
+----------------------------------------------------------------
+Enable async communication with tee supplicant
+
+This pull request enables asynchronous communication with TEE supplicant
+by introducing meta parameters in the user space API. The meta
+parameters can be used to tag requests with an id that can be matched
+against an asynchronous response as is done here in the OP-TEE driver.
+
+Asynchronous supplicant communication is needed by OP-TEE to implement
+GlobalPlatforms TEE Sockets API Specification v1.0.1. The specification
+is available at https://www.globalplatform.org/specificationsdevice.asp.
+
+This change is backwards compatible allowing older supplicants to work
+with newer kernels and vice versa.
+
+----------------------------------------------------------------
+Jens Wiklander (3):
+      tee: add tee_param_is_memref() for driver use
+      tee: add TEE_IOCTL_PARAM_ATTR_META
+      optee: support asynchronous supplicant requests
+
+ drivers/tee/optee/core.c          |  11 +-
+ drivers/tee/optee/optee_private.h |  43 ++---
+ drivers/tee/optee/rpc.c           |   4 +-
+ drivers/tee/optee/supp.c          | 375 ++++++++++++++++++++++++--------------
+ drivers/tee/tee_core.c            |  32 ++--
+ include/linux/tee_drv.h           |  12 ++
+ include/uapi/linux/tee.h          |   7 +
+ 7 files changed, 295 insertions(+), 189 deletions(-)
