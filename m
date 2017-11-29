@@ -1,91 +1,68 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Wed, 29 Nov 2017 08:34:31 +0100
-Subject: [PATCH] pwm: meson: fix harware duty calculation
-In-Reply-To: <20171129030308.22036-1-yixun.lan@amlogic.com>
-References: <20171129030308.22036-1-yixun.lan@amlogic.com>
-Message-ID: <1511940871.27425.4.camel@baylibre.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Wed, 29 Nov 2017 09:09:41 +0100
+Subject: [PATCH v1] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <22b57b69-3728-d879-42c6-92e87e7c7955@codeaurora.org>
+References: <1511889106-9239-1-git-send-email-awallis@codeaurora.org>
+ <20171128193500.GA30609@kroah.com>
+ <22b57b69-3728-d879-42c6-92e87e7c7955@codeaurora.org>
+Message-ID: <20171129080941.GA2319@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-11-29 at 11:03 +0800, Yixun Lan wrote:
-> From: Jian Hu <jian.hu@amlogic.com>
+On Tue, Nov 28, 2017 at 03:32:29PM -0500, Adam Wallis wrote:
+> On 11/28/2017 2:35 PM, Greg Kroah-Hartman wrote:
+> > On Tue, Nov 28, 2017 at 12:11:46PM -0500, Adam Wallis wrote:
+> >> The xHCI driver currently has the IMOD set to 160, which
+> >> translates to an IMOD interval of 40,000ns (160 * 250)ns
+> >>
+> [..]
+> >> --- a/drivers/usb/host/xhci-plat.c
+> >> +++ b/drivers/usb/host/xhci-plat.c
+> >> @@ -23,6 +23,7 @@
+> >>  #include "xhci-plat.h"
+> >>  #include "xhci-mvebu.h"
+> >>  #include "xhci-rcar.h"
+> >> +#include "xhci-mtk.h"
+> >>  
+> >>  static struct hc_driver __read_mostly xhci_plat_hc_driver;
+> >>  
+> >> @@ -269,6 +270,20 @@ static int xhci_plat_probe(struct platform_device *pdev)
+> >>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+> >>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+> >>  
+> >> +	/* imod interval in nanoseconds */
+> >> +	if (device_property_read_u32(sysdev,
+> >> +		"imod-interval", &xhci->imod_interval))
+> >> +		xhci->imod_interval = 40000;
+> > 
+> > So no matter what value you read, you set it to 40000?  Or am I reading
+> > this code incorrectly?
 > 
-> The actual HIGH/LOW signal output from the PWM is equal to
-> the value programed to HW register plus one, this is designed by HW.
+> I think you may be reading the code incorrectly. device_property_read_u32()
+> returns 0 when the property is found and valid...and stored into
+> xhci->imod_interval. When 0 is returned in this case, the default value of
+> 40,000 is skipped over.
+
+Yes, it is very hard to read :(
+
+> > There's a good reason putting function calls inside if() is considered a
+> > bad coding style :)
 > 
-> This fix should apply to all Meson SoC(include GX/GXL/GXBB, Meson6,8)
+> I do not disagree with you, however, I was trying to maintain style consistency
+> with the device property reads with the xhci_plat_probe function.
+
+Ok, maybe it should all be fixed :)
+
+> If I break that consistency, a couple of ways I might write this cleaner
 > 
-> Fixes: 211ed630753d ("pwm: Add support for Meson PWM Controller")
-> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  drivers/pwm/pwm-meson.c | 19 ++++++++++++++-----
->  1 file changed, 14 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
-> index d589331d1884..78d9b8c1a4bc 100644
-> --- a/drivers/pwm/pwm-meson.c
-> +++ b/drivers/pwm/pwm-meson.c
-> @@ -193,6 +193,11 @@ static int meson_pwm_calc(struct meson_pwm *meson,
->  			break;
->  	}
->  
-> +	if (cnt < 2) {
-> +		dev_err(meson->chip.dev, "invalid period\n");
-> +		return -EINVAL;
-> +	}
-> +
->  	if (pre_div == MISC_CLK_DIV_MASK) {
->  		dev_err(meson->chip.dev, "unable to get period pre_div\n");
->  		return -EINVAL;
-> @@ -201,19 +206,23 @@ static int meson_pwm_calc(struct meson_pwm *meson,
->  	dev_dbg(meson->chip.dev, "period=%u pre_div=%u cnt=%u\n", period,
->  		pre_div, cnt);
->  
-> +	/*
-> +	 * Due to the design of hardware, values of 'hi', 'lo' are 1 based
-> +	 * which mean the actual output from hardware is 'hi' + 1, 'lo' + 1
-> +	 */
->  	if (duty == period) {
->  		channel->pre_div = pre_div;
-> -		channel->hi = cnt;
-> +		channel->hi = cnt - 1;
->  		channel->lo = 0;
->  	} else if (duty == 0) {
->  		channel->pre_div = pre_div;
->  		channel->hi = 0;
-> -		channel->lo = cnt;
-> +		channel->lo = cnt - 1;
->  	} else {
->  		/* Then check is we can have the duty with the same pre_div
-> */
->  		duty_cnt = DIV_ROUND_CLOSEST_ULL((u64)duty * 1000,
->  						 fin_ps * (pre_div + 1));
-> -		if (duty_cnt > 0xffff) {
-> +		if (duty_cnt > 0xffff || !duty_cnt) {
+> 1) set xhci->imod_interval to 40,000 before the call to
+> device_property_read_u32. If the property exists in a firmware node, it will
+> update the imod_interval value...if it does not exist, it will not update this
+> value and the default will be used. In this case, I would not even check the
+> return value. This method is used quite a bit in the kernel.
 
-duty_cnt = 0 is a valid value here. It will be the case for duty != 0 but low
-enough for the HW (calculation) to approximate the duty cycle to zero.
+Sounds like a reasonable way to do it.
 
->  			dev_err(meson->chip.dev, "unable to get duty
-> cycle\n");
->  			return -EINVAL;
->  		}
-> @@ -222,8 +231,8 @@ static int meson_pwm_calc(struct meson_pwm *meson,
->  			duty, pre_div, duty_cnt);
->  
->  		channel->pre_div = pre_div;
-> -		channel->hi = duty_cnt;
-> -		channel->lo = cnt - duty_cnt;
-> +		channel->hi = duty_cnt - 1;
+thanks,
 
-As explained above, duty_cnt could be zero, you need to take care of this here
-
-> +		channel->lo = cnt - duty_cnt - 1;
-
-Same here, it is possible duty_cnt to be egual to cnt so you also need to be
-careful here
-
->  	}
->  
->  	return 0;
+greg k-h
