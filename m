@@ -1,52 +1,167 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Wed, 29 Nov 2017 12:23:27 -0500
-Subject: [PATCH v5] dmaengine: dmatest: move callback wait queue to thread
- context
-In-Reply-To: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
-References: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <38f9f183-d38d-e1f9-9354-fe3b158ac19d@codeaurora.org>
+From: david@redhat.com (David Hildenbrand)
+Date: Wed, 29 Nov 2017 18:25:46 +0100
+Subject: [PATCH v2 02/16] KVM: Prepare for moving vcpu_load/vcpu_put into
+ arch specific code
+In-Reply-To: <20171129164116.16167-3-christoffer.dall@linaro.org>
+References: <20171129164116.16167-1-christoffer.dall@linaro.org>
+ <20171129164116.16167-3-christoffer.dall@linaro.org>
+Message-ID: <4c2cd2f8-41e6-afdc-a3c0-a5872ba9b929@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27/2017 10:45 AM, Adam Wallis wrote:
-> Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
-> introduced a bug (that is in fact documented by the patch commit text)
-> that leaves behind a dangling pointer. Since the done_wait structure is
-> allocated on the stack, future invocations to the DMATEST can produce
-> undesirable results (e.g., corrupted spinlocks).
+On 29.11.2017 17:41, Christoffer Dall wrote:
+> In preparation for moving calls to vcpu_load() and vcpu_put() into the
+> architecture specific implementations of the KVM vcpu ioctls, move the
+> calls in the main kvm_vcpu_ioctl() dispatcher function to each case
+> of the ioctl select statement.  This allows us to move the vcpu_load()
+> and vcpu_put() calls into architecture specific implementations of vcpu
+> ioctls, one by one.
 > 
-> Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
-> out") attempted to WARN the user that the stack was likely corrupted but
-> did not fix the actual issue.
-> 
-> This patch fixes the issue by pushing the wait queue and callback
-> structs into the the thread structure. If a failure occurs due to time,
-> dmaengine_terminate_all will force the callback to safely call
-> wake_up_all() without possibility of using a freed pointer.
-> 
-> Cc: stable at vger.kernel.org
-> Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
-> Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
-> Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
-> Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
-> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > ---
-> changes from v4: Change "done" to "arg" in container_of for x86 compiler
-> changes from v3: Added check to thread wait variable if terminate_all fails
-> changes from v2: Added "Fixes" tag
-> changes from v1: Added pre-req patches for stable
-[..]
+>  virt/kvm/kvm_main.c | 26 ++++++++++++++++++++++++--
+>  1 file changed, 24 insertions(+), 2 deletions(-)
+> 
+> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+> index 39961fb..480b16c 100644
+> --- a/virt/kvm/kvm_main.c
+> +++ b/virt/kvm/kvm_main.c
+> @@ -2525,13 +2525,13 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  
+>  	if (mutex_lock_killable(&vcpu->mutex))
+>  		return -EINTR;
+> -	vcpu_load(vcpu);
+>  	switch (ioctl) {
+>  	case KVM_RUN: {
+>  		struct pid *oldpid;
+>  		r = -EINVAL;
+>  		if (arg)
+>  			goto out;
+> +		vcpu_load(vcpu);
+>  		oldpid = rcu_access_pointer(vcpu->pid);
+>  		if (unlikely(oldpid != current->pids[PIDTYPE_PID].pid)) {
+>  			/* The thread running this VCPU changed. */
+> @@ -2543,6 +2543,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  			put_pid(oldpid);
+>  		}
+>  		r = kvm_arch_vcpu_ioctl_run(vcpu, vcpu->run);
+> +		vcpu_put(vcpu);
+>  		trace_kvm_userspace_exit(vcpu->run->exit_reason, r);
+>  		break;
+>  	}
+> @@ -2553,7 +2554,9 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		kvm_regs = kzalloc(sizeof(struct kvm_regs), GFP_KERNEL);
+>  		if (!kvm_regs)
+>  			goto out;
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_get_regs(vcpu, kvm_regs);
+> +		vcpu_put(vcpu);
+>  		if (r)
+>  			goto out_free1;
+>  		r = -EFAULT;
+> @@ -2573,7 +2576,9 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  			r = PTR_ERR(kvm_regs);
+>  			goto out;
+>  		}
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_set_regs(vcpu, kvm_regs);
+> +		vcpu_put(vcpu);
+>  		kfree(kvm_regs);
+>  		break;
+>  	}
+> @@ -2582,7 +2587,9 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		r = -ENOMEM;
+>  		if (!kvm_sregs)
+>  			goto out;
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_get_sregs(vcpu, kvm_sregs);
+> +		vcpu_put(vcpu);
+>  		if (r)
+>  			goto out;
+>  		r = -EFAULT;
+> @@ -2598,13 +2605,17 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  			kvm_sregs = NULL;
+>  			goto out;
+>  		}
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_set_sregs(vcpu, kvm_sregs);
+> +		vcpu_put(vcpu);
+>  		break;
+>  	}
+>  	case KVM_GET_MP_STATE: {
+>  		struct kvm_mp_state mp_state;
+>  
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_get_mpstate(vcpu, &mp_state);
+> +		vcpu_put(vcpu);
+>  		if (r)
+>  			goto out;
+>  		r = -EFAULT;
+> @@ -2619,7 +2630,9 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		r = -EFAULT;
+>  		if (copy_from_user(&mp_state, argp, sizeof(mp_state)))
+>  			goto out;
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_set_mpstate(vcpu, &mp_state);
+> +		vcpu_put(vcpu);
+>  		break;
+>  	}
+>  	case KVM_TRANSLATE: {
+> @@ -2628,7 +2641,9 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		r = -EFAULT;
+>  		if (copy_from_user(&tr, argp, sizeof(tr)))
+>  			goto out;
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_translate(vcpu, &tr);
+> +		vcpu_put(vcpu);
+>  		if (r)
+>  			goto out;
+>  		r = -EFAULT;
+> @@ -2643,7 +2658,9 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		r = -EFAULT;
+>  		if (copy_from_user(&dbg, argp, sizeof(dbg)))
+>  			goto out;
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_set_guest_debug(vcpu, &dbg);
+> +		vcpu_put(vcpu);
+>  		break;
+>  	}
+>  	case KVM_SET_SIGNAL_MASK: {
+> @@ -2674,7 +2691,9 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  		r = -ENOMEM;
+>  		if (!fpu)
+>  			goto out;
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_get_fpu(vcpu, fpu);
+> +		vcpu_put(vcpu);
+>  		if (r)
+>  			goto out;
+>  		r = -EFAULT;
+> @@ -2690,14 +2709,17 @@ static long kvm_vcpu_ioctl(struct file *filp,
+>  			fpu = NULL;
+>  			goto out;
+>  		}
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl_set_fpu(vcpu, fpu);
+> +		vcpu_put(vcpu);
+>  		break;
+>  	}
+>  	default:
+> +		vcpu_load(vcpu);
+>  		r = kvm_arch_vcpu_ioctl(filp, ioctl, arg);
+> +		vcpu_put(vcpu);
+>  	}
+>  out:
+> -	vcpu_put(vcpu);
+>  	mutex_unlock(&vcpu->mutex);
+>  	kfree(fpu);
+>  	kfree(kvm_sregs);
+> 
 
-Vinod, did you have any feedback on this patch or any changes that should be
-made? I was still hoping this bugfix would make it into the 4.15 kernel.
-
-Thanks!
-
-Adam
-
+Reviewed-by: David Hildenbrand <david@redhat.com>
 
 -- 
-Adam Wallis
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+
+Thanks,
+
+David / dhildenb
