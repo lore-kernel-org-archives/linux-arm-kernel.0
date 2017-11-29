@@ -1,368 +1,220 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Nov 2017 16:46:10 -0200
-Subject: [PATCH 02/11] ARM: dts: imx6: Move nodes which have no reg property
+Date: Wed, 29 Nov 2017 16:46:14 -0200
+Subject: [PATCH 06/11] ARM: dts: imx7: Move nodes which have no reg property
  out of bus
 In-Reply-To: <1511981179-12660-1-git-send-email-festevam@gmail.com>
 References: <1511981179-12660-1-git-send-email-festevam@gmail.com>
-Message-ID: <1511981179-12660-2-git-send-email-festevam@gmail.com>
+Message-ID: <1511981179-12660-6-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Move tempmon, ldb and pmu nodes from soc node to root node.
+Move usbphynop1, usbphynop2, usbhypnop3, replicator and timer and nodes
+from soc node to root node.
 
 The nodes that have been moved do not have any register properties and thus
 shouldn't be placed on the bus.
 
 This fixes the following build warnings with W=1:
 
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/tempmon missing or empty reg/ranges property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2000000/ldb missing or empty reg/ranges property
-arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (simple_bus_reg): Node /soc/pmu missing or empty reg/ranges property
+arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/replicator missing or empty reg/ranges property
+arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/timer missing or empty reg/ranges property
+arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30800000/usbphynop1 missing or empty reg/ranges property
+arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30800000/usbphynop3 missing or empty reg/ranges property
+arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30800000/usbphynop2 missing or empty reg/ranges property
 
 Based on a patch from Simon Horman for r8a7795.dtsi.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6qdl.dtsi | 136 +++++++++++++++++++++--------------------
- arch/arm/boot/dts/imx6sl.dtsi  |  28 +++++----
- arch/arm/boot/dts/imx6sx.dtsi  |  30 ++++-----
- arch/arm/boot/dts/imx6ul.dtsi  |  32 +++++-----
- 4 files changed, 117 insertions(+), 109 deletions(-)
+ arch/arm/boot/dts/imx7d.dtsi |  14 ++---
+ arch/arm/boot/dts/imx7s.dtsi | 120 +++++++++++++++++++++----------------------
+ 2 files changed, 67 insertions(+), 67 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6qdl.dtsi b/arch/arm/boot/dts/imx6qdl.dtsi
-index ac4f9ec..a0f6712 100644
---- a/arch/arm/boot/dts/imx6qdl.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl.dtsi
-@@ -80,6 +80,75 @@
+diff --git a/arch/arm/boot/dts/imx7d.dtsi b/arch/arm/boot/dts/imx7d.dtsi
+index 7878257..9d92725 100644
+--- a/arch/arm/boot/dts/imx7d.dtsi
++++ b/arch/arm/boot/dts/imx7d.dtsi
+@@ -63,6 +63,13 @@
  		};
  	};
  
-+	tempmon: tempmon {
-+		compatible = "fsl,imx6q-tempmon";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
-+		fsl,tempmon = <&anatop>;
-+		fsl,tempmon-data = <&ocotp>;
-+		clocks = <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
++	usbphynop2: usbphynop2 {
++		compatible = "usb-nop-xceiv";
++		clocks = <&clks IMX7D_USB_PHY2_CLK>;
++		clock-names = "main_clk";
++		#phy-cells = <0>;
 +	};
 +
-+	ldb: ldb {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
-+		gpr = <&gpr>;
-+		status = "disabled";
+ 	soc {
+ 		etm at 3007d000 {
+ 			compatible = "arm,coresight-etm3x", "arm,primecell";
+@@ -105,13 +112,6 @@
+ 		reg = <0x30b20200 0x200>;
+ 	};
+ 
+-	usbphynop2: usbphynop2 {
+-		compatible = "usb-nop-xceiv";
+-		clocks = <&clks IMX7D_USB_PHY2_CLK>;
+-		clock-names = "main_clk";
+-		#phy-cells = <0>;
+-	};
+-
+ 	fec2: ethernet at 30bf0000 {
+ 		compatible = "fsl,imx7d-fec", "fsl,imx6sx-fec";
+ 		reg = <0x30bf0000 0x10000>;
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index e718fd2..81467ac 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -116,6 +116,66 @@
+ 		clock-output-names = "osc";
+ 	};
+ 
++	usbphynop1: usbphynop1 {
++		compatible = "usb-nop-xceiv";
++		clocks = <&clks IMX7D_USB_PHY1_CLK>;
++		clock-names = "main_clk";
++		#phy-cells = <0>;
++	};
 +
-+		lvds-channel at 0 {
++	usbphynop3: usbphynop3 {
++		compatible = "usb-nop-xceiv";
++		clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
++		clock-names = "main_clk";
++		#phy-cells = <0>;
++	};
++
++
++	replicator {
++		/*
++		 * non-configurable replicators don't show up on the
++		 * AMBA bus.  As such no need to add "arm,primecell"
++		 */
++		compatible = "arm,coresight-replicator";
++
++		ports {
 +			#address-cells = <1>;
 +			#size-cells = <0>;
-+			reg = <0>;
-+			status = "disabled";
-+
++				/* replicator output ports */
 +			port at 0 {
 +				reg = <0>;
-+
-+				lvds0_mux_0: endpoint {
-+					remote-endpoint = <&ipu1_di0_lvds0>;
++				replicator_out_port0: endpoint {
++					remote-endpoint = <&tpiu_in_port>;
 +				};
 +			};
 +
 +			port at 1 {
 +				reg = <1>;
-+
-+				lvds0_mux_1: endpoint {
-+					remote-endpoint = <&ipu1_di1_lvds0>;
++				replicator_out_port1: endpoint {
++					remote-endpoint = <&etr_in_port>;
 +				};
 +			};
-+		};
 +
-+		lvds-channel at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <1>;
-+			status = "disabled";
-+
-+			port at 0 {
++			/* replicator input port */
++			port at 2 {
 +				reg = <0>;
-+
-+				lvds1_mux_0: endpoint {
-+					remote-endpoint = <&ipu1_di0_lvds1>;
-+				};
-+			};
-+
-+			port at 1 {
-+				reg = <1>;
-+
-+				lvds1_mux_1: endpoint {
-+					remote-endpoint = <&ipu1_di1_lvds1>;
++				replicator_in_port0: endpoint {
++					slave-mode;
++					remote-endpoint = <&etf_out_port>;
 +				};
 +			};
 +		};
 +	};
 +
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
++	timer {
++		compatible = "arm,armv7-timer";
++		interrupt-parent = <&intc>;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
 +	};
 +
  	soc {
  		#address-cells = <1>;
  		#size-cells = <1>;
-@@ -224,11 +293,6 @@
- 			status = "disabled";
+@@ -260,43 +320,6 @@
+ 			};
  		};
  
--		pmu {
--			compatible = "arm,cortex-a9-pmu";
--			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
--		};
+-		replicator {
+-			/*
+-			 * non-configurable replicators don't show up on the
+-			 * AMBA bus.  As such no need to add "arm,primecell"
+-			 */
+-			compatible = "arm,coresight-replicator";
 -
- 		aips-bus at 2000000 { /* AIPS1 */
- 			compatible = "fsl,aips-bus", "simple-bus";
- 			#address-cells = <1>;
-@@ -729,14 +793,6 @@
- 				};
- 			};
- 
--			tempmon: tempmon {
--				compatible = "fsl,imx6q-tempmon";
--				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
--				fsl,tempmon = <&anatop>;
--				fsl,tempmon-data = <&ocotp>;
--				clocks = <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
--			};
--
- 			usbphy1: usbphy at 20c9000 {
- 				compatible = "fsl,imx6q-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
-@@ -841,60 +897,6 @@
- 				reg = <0x20e0000 0x4000>;
- 			};
- 
--			ldb: ldb {
+-			ports {
 -				#address-cells = <1>;
 -				#size-cells = <0>;
--				compatible = "fsl,imx6q-ldb", "fsl,imx53-ldb";
--				gpr = <&gpr>;
--				status = "disabled";
 -
--				lvds-channel at 0 {
--					#address-cells = <1>;
--					#size-cells = <0>;
+-				/* replicator output ports */
+-				port at 0 {
 -					reg = <0>;
--					status = "disabled";
--
--					port at 0 {
--						reg = <0>;
--
--						lvds0_mux_0: endpoint {
--							remote-endpoint = <&ipu1_di0_lvds0>;
--						};
--					};
--
--					port at 1 {
--						reg = <1>;
--
--						lvds0_mux_1: endpoint {
--							remote-endpoint = <&ipu1_di1_lvds0>;
--						};
+-					replicator_out_port0: endpoint {
+-						remote-endpoint = <&tpiu_in_port>;
 -					};
 -				};
 -
--				lvds-channel at 1 {
--					#address-cells = <1>;
--					#size-cells = <0>;
+-				port at 1 {
 -					reg = <1>;
--					status = "disabled";
--
--					port at 0 {
--						reg = <0>;
--
--						lvds1_mux_0: endpoint {
--							remote-endpoint = <&ipu1_di0_lvds1>;
--						};
+-					replicator_out_port1: endpoint {
+-						remote-endpoint = <&etr_in_port>;
 -					};
+-				};
 -
--					port at 1 {
--						reg = <1>;
--
--						lvds1_mux_1: endpoint {
--							remote-endpoint = <&ipu1_di1_lvds1>;
--						};
+-				/* replicator input port */
+-				port at 2 {
+-					reg = <0>;
+-					replicator_in_port0: endpoint {
+-						slave-mode;
+-						remote-endpoint = <&etf_out_port>;
 -					};
 -				};
 -			};
--
- 			dcic1: dcic at 20e4000 {
- 				reg = <0x020e4000 0x4000>;
- 				interrupts = <0 124 IRQ_TYPE_LEVEL_HIGH>;
-diff --git a/arch/arm/boot/dts/imx6sl.dtsi b/arch/arm/boot/dts/imx6sl.dtsi
-index 3ea1a41..3365182 100644
---- a/arch/arm/boot/dts/imx6sl.dtsi
-+++ b/arch/arm/boot/dts/imx6sl.dtsi
-@@ -102,6 +102,21 @@
- 		};
- 	};
- 
-+	tempmon: tempmon {
-+		compatible = "fsl,imx6q-tempmon";
-+		interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-parent = <&gpc>;
-+		fsl,tempmon = <&anatop>;
-+		fsl,tempmon-data = <&ocotp>;
-+		clocks = <&clks IMX6SL_CLK_PLL3_USB_OTG>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -125,11 +140,6 @@
- 			arm,data-latency = <4 2 3>;
- 		};
- 
--		pmu {
--			compatible = "arm,cortex-a9-pmu";
--			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
 -		};
 -
- 		aips1: aips-bus at 2000000 {
+ 		intc: interrupt-controller at 31001000 {
+ 			compatible = "arm,cortex-a7-gic";
+ 			interrupts = <GIC_PPI 9 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+@@ -309,15 +332,6 @@
+ 			      <0x31006000 0x2000>;
+ 		};
+ 
+-		timer {
+-			compatible = "arm,armv7-timer";
+-			interrupt-parent = <&intc>;
+-			interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>,
+-				     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_LOW)>;
+-		};
+-
+ 		aips1: aips-bus at 30000000 {
  			compatible = "fsl,aips-bus", "simple-bus";
  			#address-cells = <1>;
-@@ -615,14 +625,6 @@
- 				};
+@@ -945,20 +959,6 @@
+ 				reg = <0x30b30200 0x200>;
  			};
  
--			tempmon: tempmon {
--				compatible = "fsl,imx6q-tempmon";
--				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
--				fsl,tempmon = <&anatop>;
--				fsl,tempmon-data = <&ocotp>;
--				clocks = <&clks IMX6SL_CLK_PLL3_USB_OTG>;
+-			usbphynop1: usbphynop1 {
+-				compatible = "usb-nop-xceiv";
+-				clocks = <&clks IMX7D_USB_PHY1_CLK>;
+-				clock-names = "main_clk";
+-				#phy-cells = <0>;
 -			};
 -
- 			usbphy1: usbphy at 20c9000 {
- 				compatible = "fsl,imx6sl-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 40c6738c..4500380 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -141,6 +141,22 @@
- 		};
- 	};
- 
-+	tempmon: tempmon {
-+		compatible = "fsl,imx6sx-tempmon", "fsl,imx6q-tempmon";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+		fsl,tempmon = <&anatop>;
-+		nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
-+		nvmem-cell-names = "calib", "temp_grade";
-+		clocks = <&clks IMX6SX_CLK_PLL3_USB_OTG>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a9-pmu";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -148,11 +164,6 @@
- 		interrupt-parent = <&gpc>;
- 		ranges;
- 
--		pmu {
--			compatible = "arm,cortex-a9-pmu";
--			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
--		};
--
- 		ocram: sram at 900000 {
- 			compatible = "mmio-sram";
- 			reg = <0x00900000 0x20000>;
-@@ -671,15 +682,6 @@
- 				};
- 			};
- 
--			tempmon: tempmon {
--				compatible = "fsl,imx6sx-tempmon", "fsl,imx6q-tempmon";
--				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
--				fsl,tempmon = <&anatop>;
--				nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
--				nvmem-cell-names = "calib", "temp_grade";
--				clocks = <&clks IMX6SX_CLK_PLL3_USB_OTG>;
+-			usbphynop3: usbphynop3 {
+-				compatible = "usb-nop-xceiv";
+-				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
+-				clock-names = "main_clk";
+-				#phy-cells = <0>;
 -			};
 -
- 			usbphy1: usbphy at 20c9000 {
- 				compatible = "fsl,imx6sx-usbphy", "fsl,imx23-usbphy";
- 				reg = <0x020c9000 0x1000>;
-diff --git a/arch/arm/boot/dts/imx6ul.dtsi b/arch/arm/boot/dts/imx6ul.dtsi
-index e0b4a46..0e931fd 100644
---- a/arch/arm/boot/dts/imx6ul.dtsi
-+++ b/arch/arm/boot/dts/imx6ul.dtsi
-@@ -136,6 +136,23 @@
- 		clock-output-names = "ipp_di1";
- 	};
- 
-+	tempmon: tempmon {
-+		compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
-+		fsl,tempmon = <&anatop>;
-+		nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
-+		nvmem-cell-names = "calib", "temp_grade";
-+		clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
-+	};
-+
-+	pmu {
-+		compatible = "arm,cortex-a7-pmu";
-+		interrupt-parent = <&gpc>;
-+		interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
-+		status = "disabled";
-+	};
-+
- 	soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
-@@ -143,12 +160,6 @@
- 		interrupt-parent = <&gpc>;
- 		ranges;
- 
--		pmu {
--			compatible = "arm,cortex-a7-pmu";
--			interrupts = <GIC_SPI 94 IRQ_TYPE_LEVEL_HIGH>;
--			status = "disabled";
--		};
--
- 		ocram: sram at 900000 {
- 			compatible = "mmio-sram";
- 			reg = <0x00900000 0x20000>;
-@@ -599,15 +610,6 @@
- 				fsl,anatop = <&anatop>;
- 			};
- 
--			tempmon: tempmon {
--				compatible = "fsl,imx6ul-tempmon", "fsl,imx6sx-tempmon";
--				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
--				fsl,tempmon = <&anatop>;
--				nvmem-cells = <&tempmon_calib>, <&tempmon_temp_grade>;
--				nvmem-cell-names = "calib", "temp_grade";
--				clocks = <&clks IMX6UL_CLK_PLL3_USB_OTG>;
--			};
--
- 			snvs: snvs at 20cc000 {
- 				compatible = "fsl,sec-v4.0-mon", "syscon", "simple-mfd";
- 				reg = <0x020cc000 0x4000>;
+ 			usdhc1: usdhc at 30b40000 {
+ 				compatible = "fsl,imx7d-usdhc", "fsl,imx6sl-usdhc";
+ 				reg = <0x30b40000 0x10000>;
 -- 
 2.7.4
