@@ -1,48 +1,45 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 29 Nov 2017 21:17:44 +0100
-Subject: kasan: false use-after-scope warnings with KCOV
-In-Reply-To: <20171128152405.vkwxdbkbuokjt2hv@lakrids.cambridge.arm.com>
-References: <20171128123555.mo4ikj2ru6mkibwo@lakrids.cambridge.arm.com>
- <CACT4Y+Z2VhaDiFdg3aoi5uEsX7M+5-XMGH4PApys=qXKSMVUFg@mail.gmail.com>
- <20171128141355.3pwgzfhji32lehf2@lakrids.cambridge.arm.com>
- <20171128152405.vkwxdbkbuokjt2hv@lakrids.cambridge.arm.com>
-Message-ID: <CAK8P3a2HhfiYs1fhUGH4TSP+LFeaFJswOyQYN=joxc+HNBcDwA@mail.gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Wed, 29 Nov 2017 12:18:40 -0800
+Subject: [PATCH 0/9] soc: brcmstb: biuctrl updates for 64-bit chips
+Message-ID: <20171129201849.17522-1-f.fainelli@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 4:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Tue, Nov 28, 2017 at 02:13:55PM +0000, Mark Rutland wrote:
->> On Tue, Nov 28, 2017 at 01:57:49PM +0100, Dmitry Vyukov wrote:
->> > On Tue, Nov 28, 2017 at 1:35 PM, Mark Rutland <mark.rutland@arm.com> wrote:
->> > > As a heads-up, I'm seeing a number of what appear to be false-positive
->> > > use-after-scope warnings when I enable both KCOV and KASAN (inline or outline),
->> > > when using the Linaro 17.08 GCC7.1.1 for arm64. So far I haven't spotted these
->> > > without KCOV selected, and I'm only seeing these for sanitize-use-after-scope.
->> > >
->> > > The reports vary depending on configuration even with the same trigger. I'm not
->> > > sure if it's the reporting that's misleading, or whether the detection is going
->> > > wrong.
->
->> ... it looks suspiciously like something is setting up non-zero shadow
->> bytes, but not zeroing them upon return.
->
-> It looks like this is the case.
->
-> The hack below detects leftover poison on an exception return *before*
-> the false-positive warning (example splat at the end of the email). With
-> scripts/Makefile.kasan hacked to not pass
-> -fsanitize-address-use-after-scope, I see no leftover poison.
+Hi all,
 
-That reminds me that we are still missing my patch to turn off
--fsanitize-address-use-after-scope by default and instead re-enable
-CONFIG_FRAME_WARN when KASAN is turned on.
+This patch series updates the Broadcom STB Bus Interface Unit controller to
+support newer chips such as 7260, 7268, 7271 and 7278. These chips require
+additional tuning in order to provide the expected bus throughput.
 
-I spent about a year hunting down all the instances that produce more
-than 2KB stack frames with KASAN (including asan-stack), they should
-be disabled now, but we still have some seriously large stack frames with
- -fsanitize-address-use-after-scope.
+In the process, we need to re-organize the common.c file a little bit in order
+to extract the family and product identifiers a little earlier.
 
-Maybe it's better to just completely disable  -fsanitize-address-use-after-scope
-when it has multiple independent problems.
+Finally, by moving the biuctrl initialization an early_initcall level, we can
+remove some code from the ARM-32bit machine descriptor file.
 
-        Arnd
+Provided that we are happy with these changes, I would route them through my
+drivers/next branch and a subsequent Broadcom ARM SoC pull request.
+
+Thank you
+
+Florian Fainelli (9):
+  dt-bindings: arm: Add entry for Broadcom Brahma-B53
+  dt-bindings: arm: brcmstb: Correct BIUCTRL node documentation
+  soc: brcmstb: Make CPU credit offset more parameterized
+  soc: brcmstb: Correct CPU_CREDIT_REG offset for Brahma-B53 CPUs
+  soc: brcmstb: biuctrl: Prepare for saving/restoring other registers
+  soc: brcmstb: biuctrl: Wire-up new registers
+  soc: brcmstb: biuctrl: Fine tune B53 MCP interface settings
+  soc: brcmstb: Split initialization
+  soc: brcmstb: biuctrl: Move to early_initcall
+
+ .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   |  22 +--
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm/mach-bcm/brcmstb.c                        |   2 -
+ drivers/soc/bcm/brcmstb/biuctrl.c                  | 176 +++++++++++++++++++--
+ drivers/soc/bcm/brcmstb/common.c                   |  27 ++--
+ include/linux/soc/brcmstb/brcmstb.h                |   6 -
+ 6 files changed, 186 insertions(+), 48 deletions(-)
+
+-- 
+2.9.3
