@@ -1,27 +1,30 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 29 Nov 2017 15:02:41 +0000
-Subject: [PATCH] PM: Provide a config snippet for disabling PM
-In-Reply-To: <CAJZ5v0jGZxP5NWHKEhXU7gFfvSjwm-iocSEZ-C2A7UhUM+v2CA@mail.gmail.com>
-References: <20171129111227.26798-1-broonie@kernel.org>
- <CAJZ5v0jGZxP5NWHKEhXU7gFfvSjwm-iocSEZ-C2A7UhUM+v2CA@mail.gmail.com>
-Message-ID: <20171129150241.yx6zihr3oschz5jb@sirena.org.uk>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Wed, 29 Nov 2017 15:04:12 +0000
+Subject: [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
+In-Reply-To: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <877eu9dt3n.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 03:37:01PM +0100, Rafael J. Wysocki wrote:
-> On Wed, Nov 29, 2017 at 12:12 PM, Mark Brown <broonie@kernel.org> wrote:
 
-> > A frequent source of build problems is poor handling of optional PM
-> > support, almost all development is done with the PM options enabled
+Dave Martin <Dave.Martin@arm.com> writes:
 
-> I'm going to apply this shortly, sorry for the delay.
+> This series implements Linux kernel support for the ARM Scalable Vector
+> Extension (SVE). [1]  It supersedes the previous v3: see [3] for link
+> and full cover letter.
+>
+> This is a minor update to v4, but does contain a couple of important
+> fixes.
+<snip>
 
-Thanks!  I sent it just before the merge window so I was expecting to
-have to resend even when I originally posted it.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171129/bb1c411d/attachment.sig>
+I seem to have run into a regression with normal non-SVE sigcontexts
+while trying to run consecutive RISU runs in the Foundation Model. I'm
+failing to get repeatable results playing back a previous --master run.
+It works OK with the default Debian kernel.
+
+What is the current status of the tree? I'd like to try an narrow it
+down but I seem to recall it was now in a next tree somewhere?
+
+--
+Alex Benn?e
