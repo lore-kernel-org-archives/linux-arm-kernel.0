@@ -1,80 +1,42 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Wed, 29 Nov 2017 18:44:52 +0100
-Subject: [PATCH v2 10/16] KVM: Move vcpu_load to arch-specific
- kvm_arch_vcpu_ioctl_translate
-In-Reply-To: <20171129164116.16167-11-christoffer.dall@linaro.org>
-References: <20171129164116.16167-1-christoffer.dall@linaro.org>
- <20171129164116.16167-11-christoffer.dall@linaro.org>
-Message-ID: <d8bcffcc-5ffc-ed6d-1920-b3c9fb5d6c9a@redhat.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Wed, 29 Nov 2017 18:55:48 +0100
+Subject: [PATCH v2 1/2] ARM: dts: exynos: Switch to dedicated Odroid-XU3
+ sound card binding
+In-Reply-To: <20171127181213.lxtbbiw75wbz2dbz@kozik-lap>
+References: <20171103165446.15438-1-s.nawrocki@samsung.com>
+ <CGME20171103165539epcas1p48cc87811574dace9dfe91d8e9ec6f7ca@epcas1p4.samsung.com>
+ <20171103165446.15438-2-s.nawrocki@samsung.com>
+ <20171127181213.lxtbbiw75wbz2dbz@kozik-lap>
+Message-ID: <CAJKOXPegJsQPrbDH8mXBhypOBnT9+Nn1T6NF=Cav=PV+9b-2MA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.11.2017 17:41, Christoffer Dall wrote:
-> Move vcpu_load() and vcpu_put() into the architecture specific
-> implementations of kvm_arch_vcpu_ioctl_translate().
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  arch/powerpc/kvm/booke.c | 2 ++
->  arch/x86/kvm/x86.c       | 3 +++
->  virt/kvm/kvm_main.c      | 2 --
->  3 files changed, 5 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
-> index cdf0be0..1b491b8 100644
-> --- a/arch/powerpc/kvm/booke.c
-> +++ b/arch/powerpc/kvm/booke.c
-> @@ -1793,7 +1793,9 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
->  {
->  	int r;
->  
-> +	vcpu_load(vcpu);
->  	r = kvmppc_core_vcpu_translate(vcpu, tr);
-> +	vcpu_put(vcpu);
->  	return r;
->  }
->  
-> diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
-> index ee357b6..eb70974 100644
-> --- a/arch/x86/kvm/x86.c
-> +++ b/arch/x86/kvm/x86.c
-> @@ -7661,6 +7661,8 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
->  	gpa_t gpa;
->  	int idx;
->  
-> +	vcpu_load(vcpu);
-> +
->  	idx = srcu_read_lock(&vcpu->kvm->srcu);
->  	gpa = kvm_mmu_gva_to_gpa_system(vcpu, vaddr, NULL);
->  	srcu_read_unlock(&vcpu->kvm->srcu, idx);
-> @@ -7669,6 +7671,7 @@ int kvm_arch_vcpu_ioctl_translate(struct kvm_vcpu *vcpu,
->  	tr->writeable = 1;
->  	tr->usermode = 0;
->  
-> +	vcpu_put(vcpu);
->  	return 0;
->  }
->  
-> diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
-> index f360005..0a8a490 100644
-> --- a/virt/kvm/kvm_main.c
-> +++ b/virt/kvm/kvm_main.c
-> @@ -2627,9 +2627,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
->  		r = -EFAULT;
->  		if (copy_from_user(&tr, argp, sizeof(tr)))
->  			goto out;
-> -		vcpu_load(vcpu);
->  		r = kvm_arch_vcpu_ioctl_translate(vcpu, &tr);
-> -		vcpu_put(vcpu);
->  		if (r)
->  			goto out;
->  		r = -EFAULT;
-> 
+On Mon, Nov 27, 2017 at 7:12 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+> On Fri, Nov 03, 2017 at 05:54:45PM +0100, Sylwester Nawrocki wrote:
+>> The new sound card DT binding is used for Odroid XU3 in order
+>> to properly support the HDMI audio path.
+>> Clocks configuration is changed so the I2S controller is now the bit
+>> and the frame clock master with EPLL as the root clock source.
+>>
+>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>> ---
+>>  arch/arm/boot/dts/exynos4.dtsi                    |  1 +
+>>  arch/arm/boot/dts/exynos5420.dtsi                 |  1 +
+>>  arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi | 60 ++++++++++++++---------
+>>  3 files changed, 40 insertions(+), 22 deletions(-)
+>>
 
-Reviewed-by: David Hildenbrand <david@redhat.com>
 
--- 
+Unfortunately this patch causes the audio card to disappear on Odroid
+XU3. "aplay -L" shows nothing and obviously speaker-test fails.
 
-Thanks,
+Applied on v4.15-rc1... any dependencies are missing?
 
-David / dhildenb
+Full boot-logs are here:
+http://www.krzk.eu/#/builders/1/builds/976
+(test exits on aplay -L).
+
+Should this be dropped?
+
+Best regards,
+Krzysztof
