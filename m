@@ -1,77 +1,16 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Wed, 29 Nov 2017 11:03:08 +0800
-Subject: [PATCH] pwm: meson: fix harware duty calculation
-Message-ID: <20171129030308.22036-1-yixun.lan@amlogic.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 29 Nov 2017 11:04:36 +0800
+Subject: [PATCH v2] arm64: dts: ls1088a: add fsl-mc hardware resource
+ manager node
+In-Reply-To: <1510927526-17492-1-git-send-email-ioana.ciornei@nxp.com>
+References: <1510927526-17492-1-git-send-email-ioana.ciornei@nxp.com>
+Message-ID: <20171129030435.GB9376@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jian Hu <jian.hu@amlogic.com>
+On Fri, Nov 17, 2017 at 04:05:26PM +0200, Ioana Ciornei wrote:
+> Add the fsl-mc node in the LS1088A device tree.
+> 
+> Signed-off-by: Ioana Ciornei <ioana.ciornei@nxp.com>
 
-The actual HIGH/LOW signal output from the PWM is equal to
-the value programed to HW register plus one, this is designed by HW.
-
-This fix should apply to all Meson SoC(include GX/GXL/GXBB, Meson6,8)
-
-Fixes: 211ed630753d ("pwm: Add support for Meson PWM Controller")
-Signed-off-by: Jian Hu <jian.hu@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
----
- drivers/pwm/pwm-meson.c | 19 ++++++++++++++-----
- 1 file changed, 14 insertions(+), 5 deletions(-)
-
-diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
-index d589331d1884..78d9b8c1a4bc 100644
---- a/drivers/pwm/pwm-meson.c
-+++ b/drivers/pwm/pwm-meson.c
-@@ -193,6 +193,11 @@ static int meson_pwm_calc(struct meson_pwm *meson,
- 			break;
- 	}
- 
-+	if (cnt < 2) {
-+		dev_err(meson->chip.dev, "invalid period\n");
-+		return -EINVAL;
-+	}
-+
- 	if (pre_div == MISC_CLK_DIV_MASK) {
- 		dev_err(meson->chip.dev, "unable to get period pre_div\n");
- 		return -EINVAL;
-@@ -201,19 +206,23 @@ static int meson_pwm_calc(struct meson_pwm *meson,
- 	dev_dbg(meson->chip.dev, "period=%u pre_div=%u cnt=%u\n", period,
- 		pre_div, cnt);
- 
-+	/*
-+	 * Due to the design of hardware, values of 'hi', 'lo' are 1 based
-+	 * which mean the actual output from hardware is 'hi' + 1, 'lo' + 1
-+	 */
- 	if (duty == period) {
- 		channel->pre_div = pre_div;
--		channel->hi = cnt;
-+		channel->hi = cnt - 1;
- 		channel->lo = 0;
- 	} else if (duty == 0) {
- 		channel->pre_div = pre_div;
- 		channel->hi = 0;
--		channel->lo = cnt;
-+		channel->lo = cnt - 1;
- 	} else {
- 		/* Then check is we can have the duty with the same pre_div */
- 		duty_cnt = DIV_ROUND_CLOSEST_ULL((u64)duty * 1000,
- 						 fin_ps * (pre_div + 1));
--		if (duty_cnt > 0xffff) {
-+		if (duty_cnt > 0xffff || !duty_cnt) {
- 			dev_err(meson->chip.dev, "unable to get duty cycle\n");
- 			return -EINVAL;
- 		}
-@@ -222,8 +231,8 @@ static int meson_pwm_calc(struct meson_pwm *meson,
- 			duty, pre_div, duty_cnt);
- 
- 		channel->pre_div = pre_div;
--		channel->hi = duty_cnt;
--		channel->lo = cnt - duty_cnt;
-+		channel->hi = duty_cnt - 1;
-+		channel->lo = cnt - duty_cnt - 1;
- 	}
- 
- 	return 0;
--- 
-2.15.0
+Applied, thanks.
