@@ -1,119 +1,118 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 29 Nov 2017 11:20:15 +0800
-Subject: [PATCH 13/17] drm/sun4i: Add DE2 CSC library
-In-Reply-To: <5439299.3c0LKkSZrY@jernej-laptop>
-References: <20171127205750.19277-1-jernej.skrabec@siol.net>
- <20171127205750.19277-14-jernej.skrabec@siol.net>
- <20171128205550.ls23xy5u4xtdlqgj@flea.home>
- <5439299.3c0LKkSZrY@jernej-laptop>
-Message-ID: <CAGb2v67+4AmUVSipY2ncwQ1i8PVZmysuZYSQ-uY9+Uk1KU9EgA@mail.gmail.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Wed, 29 Nov 2017 11:27:31 +0800
+Subject: [PATCH 1/1] arm64: dts: ls1012a: Add LS1012A-2G5RDB board support
+In-Reply-To: <1511257503-12475-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+References: <1511257503-12475-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+Message-ID: <20171129032730.GD9376@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 5:43 AM, Jernej ?krabec <jernej.skrabec@siol.net> wrote:
-> Hi!
->
-> Dne torek, 28. november 2017 ob 21:55:50 CET je Maxime Ripard napisal(a):
->> On Mon, Nov 27, 2017 at 09:57:46PM +0100, Jernej Skrabec wrote:
->> > DE2 have many CSC units - channel input CSC, channel output CSC and
->> > mixer output CSC and maybe more.
->> >
->> > Fortunately, they have all same register layout, only base offsets
->> > differs.
->> >
->> > Add support only for channel output CSC for now.
->> >
->> > Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
->> > ---
->> >
->> >  drivers/gpu/drm/sun4i/Makefile    |  2 +-
->> >  drivers/gpu/drm/sun4i/sun8i_csc.c | 90
->> >  +++++++++++++++++++++++++++++++++++++++
->> >  drivers/gpu/drm/sun4i/sun8i_csc.h | 36 ++++++++++++++++
->> >  3 files changed, 127 insertions(+), 1 deletion(-)
->> >  create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.c
->> >  create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.h
->> >
->> > diff --git a/drivers/gpu/drm/sun4i/Makefile
->> > b/drivers/gpu/drm/sun4i/Makefile index 70df480792f9..f82cc69ede72 100644
->> > --- a/drivers/gpu/drm/sun4i/Makefile
->> > +++ b/drivers/gpu/drm/sun4i/Makefile
->> > @@ -9,7 +9,7 @@ sun4i-drm-hdmi-y            += sun4i_hdmi_enc.o
->> >
->> >  sun4i-drm-hdmi-y           += sun4i_hdmi_i2c.o
->> >  sun4i-drm-hdmi-y           += sun4i_hdmi_tmds_clk.o
->> >
->> > -sun8i-mixer-y                      += sun8i_mixer.o sun8i_layer.o sun8i_scaler.o
->> > +sun8i-mixer-y                      += sun8i_mixer.o sun8i_layer.o sun8i_scaler.o
-> sun8i_csc.o
->>
->> Please wrap that line.
->>
->> >  sun4i-tcon-y                       += sun4i_crtc.o
->> >  sun4i-tcon-y                       += sun4i_dotclock.o
->> >
->> > diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.c
->> > b/drivers/gpu/drm/sun4i/sun8i_csc.c new file mode 100644
->> > index 000000000000..d48c28f8d568
->> > --- /dev/null
->> > +++ b/drivers/gpu/drm/sun4i/sun8i_csc.c
->> > @@ -0,0 +1,90 @@
->> > +/*
->> > + * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
->> > + *
->> > + * This program is free software; you can redistribute it and/or
->> > + * modify it under the terms of the GNU General Public License as
->> > + * published by the Free Software Foundation; either version 2 of
->> > + * the License, or (at your option) any later version.
->> > + */
->> > +
->> > +#include "sun8i_csc.h"
->> > +
->> > +static const u32 ccsc_base[2][2] = {
->> > +   {CCSC00_OFFSET, CCSC01_OFFSET},
->> > +   {CCSC10_OFFSET, CCSC11_OFFSET},
->> > +};
->> > +
->> > +/*
->> > + * Factors are in two's complement format, 10 bits for fractinal part.
->> > + * First tree values in each line are multiplication factor and last
->> > + * value is constant, which is added at the end.
->> > + */
->> > +static const u32 yuv2rgb[] = {
->> > +   0x000004A8, 0x00000000, 0x00000662, 0xFFFC845A,
->> > +   0x000004A8, 0xFFFFFE6F, 0xFFFFFCBF, 0x00021DF4,
->> > +   0x000004A8, 0x00000813, 0x00000000, 0xFFFBAC4A,
->> > +};
->> > +
->> > +static const u32 yvu2rgb[] = {
->> > +   0x000004A8, 0x00000662, 0x00000000, 0xFFFC845A,
->> > +   0x000004A8, 0xFFFFFCBF, 0xFFFFFE6F, 0x00021DF4,
->> > +   0x000004A8, 0x00000000, 0x00000813, 0xFFFBAC4A,
->> > +};
->> > +
->> > +static void sun8i_csc_set_coefficients(struct regmap *map, u32 base,
->> > +                                  enum sun8i_csc_mode mode)
->> > +{
->> > +   const u32 *table;
->> > +   int i, data;
->> > +
->> > +   switch (mode) {
->> > +   case SUN8I_CSC_MODE_YUV2RGB:
->> > +           table = yuv2rgb;
->> > +           break;
->> > +   case SUN8I_CSC_MODE_YVU2RGB:
->> > +           table = yvu2rgb;
->> > +           break;
->> > +   default:
->> > +           WARN(1, "Wrong CSC mode specified.");
->>
->> A hard warn is a bit overkill here. What about a dev_warn?
->
-> dev_warn requires device, which is not available here and seems a bit overkill
-> to have it as parameter just to print warning. What about DRM_WARN()?
+On Tue, Nov 21, 2017 at 03:15:03PM +0530, Bhaskar Upadhaya wrote:
+> LS1012A-2G5RDB is similar to LS1012ARDB with below features
+> 2 2.5G SGMII PFE Block, SATA, USB 2.0/3.0, WiFi, DDR, eMMC
+> QuadSPI, UART
+> 
+> Signed-off-by: Bhaskar Upadhaya <Bhaskar.Upadhaya@nxp.com>
+> ---
+>  arch/arm64/boot/dts/freescale/Makefile             |  1 +
+>  .../boot/dts/freescale/fsl-ls1012a-2g5rdb.dts      | 66 ++++++++++++++++++++++
+>  2 files changed, 67 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+> index 72c4b52..b3a0aec 100644
+> --- a/arch/arm64/boot/dts/freescale/Makefile
+> +++ b/arch/arm64/boot/dts/freescale/Makefile
+> @@ -1,6 +1,7 @@
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-frdm.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-qds.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-rdb.dtb
+> +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1012a-2g5rdb.dtb
 
-dev_warn is just pr_warn that prefixes the device name to the message.
-Not sure about DRM_WARN. If it's anything like DRM_DEBUG* then it probably
-prefixes the function name.
+Please maintain the order in alphabet.
 
-ChenYu
+Shawn
+
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-qds.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
+>  dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1046a-qds.dtb
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts
+> new file mode 100644
+> index 0000000..99b1835
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1012a-2g5rdb.dts
+> @@ -0,0 +1,66 @@
+> +/*
+> + * Device Tree file for NXP LS1012A 2G5RDB Board.
+> + *
+> + * Copyright 2017 NXP
+> + *
+> + * Bhaskar Upadhaya <bhaskar.upadhaya@nxp.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPLv2 or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +/dts-v1/;
+> +
+> +#include "fsl-ls1012a.dtsi"
+> +
+> +/ {
+> +	model = "LS1012A 2G5RDB Board";
+> +	compatible = "fsl,ls1012a-rdb", "fsl,ls1012a";
+> +
+> +};
+> +
+> +&duart0 {
+> +	status = "okay";
+> +};
+> +
+> +&i2c0 {
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +};
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
