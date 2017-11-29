@@ -1,107 +1,98 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 29 Nov 2017 12:57:55 +0900
-Subject: [PATCH] dt-bindings: uniphier: add bindings for UniPhier SoC
- family
-In-Reply-To: <20171128152541.jdd2k5n5mjpppqxv@rob-hp-laptop>
-References: <1511854150-26346-1-git-send-email-yamada.masahiro@socionext.com>
- <20171128152541.jdd2k5n5mjpppqxv@rob-hp-laptop>
-Message-ID: <CAK7LNAQY5cq3K0No0O-qZnVnUvgFOyTARyiujy93EicX2-tG8Q@mail.gmail.com>
+From: vinmenon@codeaurora.org (Vinayak Menon)
+Date: Wed, 29 Nov 2017 10:33:53 +0530
+Subject: [PATCH 1/2] mm: make faultaround produce old ptes
+In-Reply-To: <20171128091234.GH5977@quack2.suse.cz>
+References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
+ <20171128091234.GH5977@quack2.suse.cz>
+Message-ID: <821b6c80-6f71-9f2e-20dd-3e66d51a7946@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-
-2017-11-29 0:25 GMT+09:00 Rob Herring <robh@kernel.org>:
-> On Tue, Nov 28, 2017 at 04:29:10PM +0900, Masahiro Yamada wrote:
->
-> Commit msg?
-
-I will write something to fill the line.
-
-
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+On 11/28/2017 2:42 PM, Jan Kara wrote:
+> On Tue 28-11-17 10:37:49, Vinayak Menon wrote:
+>> Based on Kirill's patch [1].
+>>
+>> Currently, faultaround code produces young pte.  This can screw up
+>> vmscan behaviour[2], as it makes vmscan think that these pages are hot
+>> and not push them out on first round.
+>>
+>> During sparse file access faultaround gets more pages mapped and all of
+>> them are young.  Under memory pressure, this makes vmscan swap out anon
+>> pages instead, or to drop other page cache pages which otherwise stay
+>> resident.
+>>
+>> Modify faultaround to produce old ptes, so they can easily be reclaimed
+>> under memory pressure.
+>>
+>> This can to some extend defeat the purpose of faultaround on machines
+>> without hardware accessed bit as it will not help us with reducing the
+>> number of minor page faults.
+>>
+>> Making the faultaround ptes old results in a unixbench regression for some
+>> architectures [3][4]. But on some architectures it is not found to cause
+>> any regression. So by default produce young ptes and provide an option for
+>> architectures to make the ptes old.
+>>
+>> [1] http://lkml.kernel.org/r/1463488366-47723-1-git-send-email-kirill.shutemov at linux.intel.com
+>> [2] https://lkml.kernel.org/r/1460992636-711-1-git-send-email-vinmenon at codeaurora.org
+>> [3] https://marc.info/?l=linux-kernel&m=146582237922378&w=2
+>> [4] https://marc.info/?l=linux-mm&m=146589376909424&w=2
+>>
+>> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
 >> ---
+>>  include/linux/mm-arch-hooks.h | 7 +++++++
+>>  include/linux/mm.h            | 2 ++
+>>  mm/filemap.c                  | 4 ++++
+>>  mm/memory.c                   | 5 +++++
+>>  4 files changed, 18 insertions(+)
 >>
->>  Documentation/devicetree/bindings/arm/uniphier.txt | 40 ++++++++++++++++++++++
->
-> Perhaps arm/socionext/uniphier.txt instead.
-
-
-I just recalled that I created the directory,
-Documentation/devicetree/bindings/arm/uniphier/
-
-So, perhaps, it should go to
-
-Documentation/devicetree/bindings/arm/uniphier/uniphier.txt
-
-
-
->>  MAINTAINERS                                        |  1 +
->>  2 files changed, 41 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/uniphier.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/uniphier.txt b/Documentation/devicetree/bindings/arm/uniphier.txt
->> new file mode 100644
->> index 0000000..08d3cf3
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/uniphier.txt
->> @@ -0,0 +1,40 @@
->> +Socionext UniPhier SoC family
+>> diff --git a/include/linux/mm-arch-hooks.h b/include/linux/mm-arch-hooks.h
+>> index 4efc3f56..0322b98 100644
+>> --- a/include/linux/mm-arch-hooks.h
+>> +++ b/include/linux/mm-arch-hooks.h
+>> @@ -22,4 +22,11 @@ static inline void arch_remap(struct mm_struct *mm,
+>>  #define arch_remap arch_remap
+>>  #endif
+>>  
+>> +#ifndef arch_faultaround_pte_mkold
+>> +static inline void arch_faultaround_pte_mkold(struct vm_fault *vmf)
+>> +{
+>> +}
+>> +#define arch_faultaround_pte_mkold arch_faultaround_pte_mkold
+>> +#endif
 >> +
->> +Required properties in the root node:
->> +  - compatible: should contain board and SoC compatible strings
->> +
->> +    SoC compatibles:
->> +      - "socionext,uniphier-ld4"   - LD4 SoC
->> +      - "socionext,uniphier-pro4"  - Pro4 SoC
->> +      - "socionext,uniphier-sld8"  - sLD8 SoC
->> +      - "socionext,uniphier-pro5"  - Pro5 SoC
->> +      - "socionext,uniphier-pxs2"  - PXs2 SoC
->> +      - "socionext,uniphier-ld6b"  - LD6b SoC
->> +      - "socionext,uniphier-ld11"  - LD11 SoC
->> +      - "socionext,uniphier-ld20"  - LD20 SoC
->> +      - "socionext,uniphier-pxs3"  - PXs3 SoC
+>>  #endif /* _LINUX_MM_ARCH_HOOKS_H */
+>> diff --git a/include/linux/mm.h b/include/linux/mm.h
+>> index 7661156..be689a0 100644
+>> --- a/include/linux/mm.h
+>> +++ b/include/linux/mm.h
+>> @@ -302,6 +302,7 @@ extern int overcommit_kbytes_handler(struct ctl_table *, int, void __user *,
+>>  #define FAULT_FLAG_USER		0x40	/* The fault originated in userspace */
+>>  #define FAULT_FLAG_REMOTE	0x80	/* faulting for non current tsk/mm */
+>>  #define FAULT_FLAG_INSTRUCTION  0x100	/* The fault was during an instruction fetch */
+>> +#define FAULT_FLAG_MKOLD	0x200	/* Make faultaround ptes old */
+> Nit: Can we make this FAULT_FLAG_PREFAULT_OLD or something like that so
+> that it is clear from the flag name that this is about prefaulting of
+> pages?
+Okay, will change the name.
+
+>>  #define FAULT_FLAG_TRACE \
+>>  	{ FAULT_FLAG_WRITE,		"WRITE" }, \
+>> @@ -330,6 +331,7 @@ struct vm_fault {
+>>  	gfp_t gfp_mask;			/* gfp mask to be used for allocations */
+>>  	pgoff_t pgoff;			/* Logical page offset based on vma */
+>>  	unsigned long address;		/* Faulting virtual address */
+>> +	unsigned long fault_address;    /* Saved faulting virtual address */
+> Ugh, so I dislike how you hide the decision about whether the *particular*
+> PTE should be old or young in the arch code. Sure the arch wants to decide
+> whether the prefaulted PTEs should be old or young and that it has to tell
+> us but the arch code has no business in checking whether this is prefault
+> or a normal fault - that decision belongs to filemap_map_pages(). So I'd do
+> in filemap_map_pages() something like:
 >
-> Sort this? Or are these in chronological order?
+> 	if (iter.index > start_pgoff && arch_wants_old_faultaround_pte())
+> 		vmf->flags |= FAULT_FLAG_PREFAULT_OLD;
+Okay, I will fix it.
 
-This is sorted in the chronological order.
-
-I already put some bindings sorted chronologically
-(for example, Documentation/devicetree/bindings/clock/uniphier-clock.txt)
-
-
-(If the alphabetical sort is highly recommended,
-I will do so, but I do not know what to do for the existing ones.)
-
-
-
-
->> +
->> +    Board compatibles:
->> +      - "socionext,uniphier-ld4-ref"      - LD4 Reference Board
->> +      - "socionext,uniphier-pro4-ref"     - Pro4 Reference Board
->> +      - "socionext,uniphier-pro4-ace"     - Pro4 Ace Board
->> +      - "socionext,uniphier-pro4-sanji"   - Pro4 Sanji Board
->> +      - "socionext,uniphier-sld8-ref"     - sLD8 Reference Board
->> +      - "socionext,uniphier-pxs2-gentil"  - PXs2 Gentil Board
->> +      - "socionext,uniphier-pxs2-vodka"   - PXs2 Vodka Board
->> +      - "socionext,uniphier-ld6b-ref"     - LD6b Reference Board
->> +      - "socionext,uniphier-ld11-ref"     - LD11 Reference Board
->> +      - "socionext,uniphier-ld11-global"  - LD11 Global Board
->> +      - "socionext,uniphier-ld20-ref"     - LD20 Reference Board
->> +      - "socionext,uniphier-ld20-global"  - LD20 Global Board
->> +      - "socionext,uniphier-pxs3-ref"     - PXs3 Reference Board
->
-> I would group boards by each SoC. Then it clear which board compatibles
-> go with each SoC compatible and you don't have to have the SoC name in
-> the board compatible.
->
-
-OK, will do.
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks,
+Vinayak
