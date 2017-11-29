@@ -1,36 +1,34 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 29 Nov 2017 19:28:14 +0530
-Subject: [PATCH V3 3/4] dmaengine: qcom_hidma: add support for the new
- revision
-In-Reply-To: <1510281175-27173-3-git-send-email-okaya@codeaurora.org>
-References: <1510281175-27173-1-git-send-email-okaya@codeaurora.org>
- <1510281175-27173-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171129135813.GE32417@localhost>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 29 Nov 2017 15:12:58 +0100
+Subject: [PATCH] ARM: imx: don't abort MMDC probe if power saving status
+ doesn't match
+In-Reply-To: <20171129140610.GM9376@dragon>
+References: <20171127121139.15584-1-l.stach@pengutronix.de>
+ <20171129140610.GM9376@dragon>
+Message-ID: <1511964778.17442.1.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 09, 2017 at 09:32:54PM -0500, Sinan Kaya wrote:
+Am Mittwoch, den 29.11.2017, 22:06 +0800 schrieb Shawn Guo:
+> On Mon, Nov 27, 2017 at 01:11:39PM +0100, Lucas Stach wrote:
+> > The power saving status bit will not signal if the MMDC is under
+> > load,
+> > which is likely during kernel boot.
+> 
+> What is exactly the condition of MMDC is under load???If it's likely
+> hit during kernel boot, why have we not heard any report regarding to
+> it before?
 
-> -static bool hidma_msi_capable(struct device *dev)
-> +static bool hidma_test_capability(struct device *dev, enum hidma_cap test_cap)
->  {
->  	struct acpi_device *adev = ACPI_COMPANION(dev);
-> -	const char *of_compat;
-> -	int ret = -EINVAL;
-> +	enum hidma_cap cap;
->  
-> -	if (!adev || acpi_disabled) {
-> -		ret = device_property_read_string(dev, "compatible",
-> -						  &of_compat);
-> -		if (ret)
-> -			return false;
-> +	if (!adev || acpi_disabled)
-> +		cap = (enum hidma_cap) of_device_get_match_data(dev);
-> +	else
-> +		cap = (enum hidma_cap) acpi_device_get_match_data(dev);
+There were reports of this before:
+https://patchwork.kernel.org/patch/9289077/
 
-should this not reside in core? How about a device_get_match_data() which
-returns the data for folks based on node being acpi/of
+Maybe nobody really cared about the issue before, as nothing bad
+happened on this check failing. But with the MMDC perf support getting
+skipped now, this is rather unfortunate.
 
--- 
-~Vinod
+I do hit this condition pretty reliably with a recent kernel. Also I
+would say it's expected that the MMDC is loaded with memory
+transactions during system boot.
+
+Regards,
+Lucas
