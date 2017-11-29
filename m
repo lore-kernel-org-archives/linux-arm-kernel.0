@@ -1,113 +1,138 @@
 From: volodymyr_babchuk@epam.com (Volodymyr Babchuk)
-Date: Wed, 29 Nov 2017 14:48:29 +0200
-Subject: [RESEND PATCH v2 05/14] tee: optee: Update protocol definitions
+Date: Wed, 29 Nov 2017 14:48:32 +0200
+Subject: [RESEND PATCH v2 08/14] tee: optee: add registered shared parameters
+ handling
 In-Reply-To: <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
 References: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
  <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <1511959718-5421-6-git-send-email-volodymyr_babchuk@epam.com>
+Message-ID: <1511959718-5421-9-git-send-email-volodymyr_babchuk@epam.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 
-There were changes in REE<->OP-TEE ABI recently.
-Now ABI allows us to pass non-contiguous memory buffers as list of
-pages to OP-TEE. This can be achieved by using new parameter attribute
-OPTEE_MSG_ATTR_NONCONTIG.
+Now, when client applications can register own shared buffers in OP-TEE,
+we need to extend ABI for parameter passing to/from OP-TEE.
 
-OP-TEE also is able to use all non-secure RAM for shared buffers. This
-new capability is enabled with OPTEE_SMC_SEC_CAP_DYNAMIC_SHM flag.
-
-This patch adds necessary definitions to the protocol definition files at
-Linux side.
+So, if OP-TEE core detects that parameter belongs to registered shared
+memory, it will use corresponding parameter attribute.
 
 Signed-off-by: Volodymyr Babchuk <vlad.babchuk@gmail.com>
 ---
- drivers/tee/optee/optee_msg.h | 38 ++++++++++++++++++++++++++++++++------
- drivers/tee/optee/optee_smc.h |  7 +++++++
- 2 files changed, 39 insertions(+), 6 deletions(-)
+ drivers/tee/optee/core.c | 78 ++++++++++++++++++++++++++++++++++++++----------
+ 1 file changed, 63 insertions(+), 15 deletions(-)
 
-diff --git a/drivers/tee/optee/optee_msg.h b/drivers/tee/optee/optee_msg.h
-index dd7a06e..3050490 100644
---- a/drivers/tee/optee/optee_msg.h
-+++ b/drivers/tee/optee/optee_msg.h
-@@ -67,11 +67,32 @@
- #define OPTEE_MSG_ATTR_META			BIT(8)
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+index 4d448bf..3729ebb 100644
+--- a/drivers/tee/optee/core.c
++++ b/drivers/tee/optee/core.c
+@@ -97,6 +97,25 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
+ 					return rc;
+ 			}
+ 			break;
++		case OPTEE_MSG_ATTR_TYPE_RMEM_INPUT:
++		case OPTEE_MSG_ATTR_TYPE_RMEM_OUTPUT:
++		case OPTEE_MSG_ATTR_TYPE_RMEM_INOUT:
++			p->attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT +
++				  attr - OPTEE_MSG_ATTR_TYPE_RMEM_INPUT;
++			p->u.memref.size = mp->u.rmem.size;
++			shm = (struct tee_shm *)(unsigned long)
++				mp->u.rmem.shm_ref;
++
++			if (!shm) {
++				p->u.memref.shm_offs = 0;
++				p->u.memref.shm = NULL;
++				break;
++			}
++			p->u.memref.shm_offs = mp->u.rmem.offs;
++			p->u.memref.shm = shm;
++
++			break;
++
+ 		default:
+ 			return -EINVAL;
+ 		}
+@@ -104,6 +123,46 @@ int optee_from_msg_param(struct tee_param *params, size_t num_params,
+ 	return 0;
+ }
  
- /*
-- * The temporary shared memory object is not physically contigous and this
-- * temp memref is followed by another fragment until the last temp memref
-- * that doesn't have this bit set.
-+ * Pointer to a list of pages used to register user-defined SHM buffer.
-+ * Used with OPTEE_MSG_ATTR_TYPE_TMEM_*.
-+ * buf_ptr should point to the beginning of the buffer. Buffer will contain
-+ * list of page addresses. OP-TEE core can reconstruct contiguous buffer from
-+ * that page addresses list. Page addresses are stored as 64 bit values.
-+ * Last entry on a page should point to the next page of buffer.
-+ * Every entry in buffer should point to a 4k page beginning (12 least
-+ * significant bits must be equal to zero).
-+ *
-+ * 12 least significant bints of optee_msg_param.u.tmem.buf_ptr should hold page
-+ * offset of the user buffer.
-+ *
-+ * So, entries should be placed like members of this structure:
-+ *
-+ * struct page_data {
-+ *   uint64_t pages_array[OPTEE_MSG_NONCONTIG_PAGE_SIZE/sizeof(uint64_t) - 1];
-+ *   uint64_t next_page_data;
-+ * };
-+ *
-+ * Structure is designed to exactly fit into the page size
-+ * OPTEE_MSG_NONCONTIG_PAGE_SIZE which is a standard 4KB page.
-+ *
-+ * The size of 4KB is chosen because this is the smallest page size for ARM
-+ * architectures. If REE uses larger pages, it should divide them to 4KB ones.
-  */
--#define OPTEE_MSG_ATTR_FRAGMENT			BIT(9)
-+#define OPTEE_MSG_ATTR_NONCONTIG		BIT(9)
- 
- /*
-  * Memory attributes for caching passed with temp memrefs. The actual value
-@@ -94,6 +115,11 @@
- #define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
- #define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
- 
-+/*
-+ * Page size used in non-contiguous buffer entries
-+ */
-+#define OPTEE_MSG_NONCONTIG_PAGE_SIZE		4096
++static int to_msg_param_tmp_mem(struct optee_msg_param *mp,
++				const struct tee_param *p)
++{
++	int rc;
++	phys_addr_t pa;
++
++	mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT + p->attr -
++		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
++
++	mp->u.tmem.shm_ref = (unsigned long)p->u.memref.shm;
++	mp->u.tmem.size = p->u.memref.size;
++
++	if (!p->u.memref.shm) {
++		mp->u.tmem.buf_ptr = 0;
++		return 0;
++	}
++
++	rc = tee_shm_get_pa(p->u.memref.shm, p->u.memref.shm_offs, &pa);
++	if (rc)
++		return rc;
++
++	mp->u.tmem.buf_ptr = pa;
++	mp->attr |= OPTEE_MSG_ATTR_CACHE_PREDEFINED <<
++		    OPTEE_MSG_ATTR_CACHE_SHIFT;
++
++	return 0;
++}
++
++static int to_msg_param_reg_mem(struct optee_msg_param *mp,
++				const struct tee_param *p)
++{
++	mp->attr = OPTEE_MSG_ATTR_TYPE_RMEM_INPUT + p->attr -
++		   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
++
++	mp->u.rmem.shm_ref = (unsigned long)p->u.memref.shm;
++	mp->u.rmem.size = p->u.memref.size;
++	mp->u.rmem.offs = p->u.memref.shm_offs;
++	return 0;
++}
 +
  /**
-  * struct optee_msg_param_tmem - temporary memory reference parameter
-  * @buf_ptr:	Address of the buffer
-@@ -145,8 +171,8 @@ struct optee_msg_param_value {
-  *
-  * @attr & OPTEE_MSG_ATTR_TYPE_MASK indicates if tmem, rmem or value is used in
-  * the union. OPTEE_MSG_ATTR_TYPE_VALUE_* indicates value,
-- * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates tmem and
-- * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates rmem.
-+ * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates @tmem and
-+ * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates @rmem,
-  * OPTEE_MSG_ATTR_TYPE_NONE indicates that none of the members are used.
-  */
- struct optee_msg_param {
-diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
-index 069c8e1..7cd3272 100644
---- a/drivers/tee/optee/optee_smc.h
-+++ b/drivers/tee/optee/optee_smc.h
-@@ -222,6 +222,13 @@ struct optee_smc_get_shm_config_result {
- #define OPTEE_SMC_SEC_CAP_HAVE_RESERVED_SHM	BIT(0)
- /* Secure world can communicate via previously unregistered shared memory */
- #define OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM	BIT(1)
-+
-+/*
-+ * Secure world supports commands "register/unregister shared memory",
-+ * secure world accepts command buffers located in any parts of non-secure RAM
-+ */
-+#define OPTEE_SMC_SEC_CAP_DYNAMIC_SHM		BIT(2)
-+
- #define OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES	9
- #define OPTEE_SMC_EXCHANGE_CAPABILITIES \
- 	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES)
+  * optee_to_msg_param() - convert from struct tee_params to OPTEE_MSG parameters
+  * @msg_params:	OPTEE_MSG parameters
+@@ -116,7 +175,6 @@ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
+ {
+ 	int rc;
+ 	size_t n;
+-	phys_addr_t pa;
+ 
+ 	for (n = 0; n < num_params; n++) {
+ 		const struct tee_param *p = params + n;
+@@ -139,22 +197,12 @@ int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
+ 		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
+-			mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT +
+-				   p->attr -
+-				   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
+-			mp->u.tmem.shm_ref = (unsigned long)p->u.memref.shm;
+-			mp->u.tmem.size = p->u.memref.size;
+-			if (!p->u.memref.shm) {
+-				mp->u.tmem.buf_ptr = 0;
+-				break;
+-			}
+-			rc = tee_shm_get_pa(p->u.memref.shm,
+-					    p->u.memref.shm_offs, &pa);
++			if (tee_shm_is_registered(p->u.memref.shm))
++				rc = to_msg_param_reg_mem(mp, p);
++			else
++				rc = to_msg_param_tmp_mem(mp, p);
+ 			if (rc)
+ 				return rc;
+-			mp->u.tmem.buf_ptr = pa;
+-			mp->attr |= OPTEE_MSG_ATTR_CACHE_PREDEFINED <<
+-					OPTEE_MSG_ATTR_CACHE_SHIFT;
+ 			break;
+ 		default:
+ 			return -EINVAL;
 -- 
 2.7.4
