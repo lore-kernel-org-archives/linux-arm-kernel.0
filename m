@@ -1,34 +1,35 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 29 Nov 2017 15:21:40 +0000
-Subject: [PATCH v5 00/30] ARM Scalable Vector Extension (SVE)
-In-Reply-To: <877eu9dt3n.fsf@linaro.org>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <877eu9dt3n.fsf@linaro.org>
-Message-ID: <20171129152140.GD10650@arm.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Wed, 29 Nov 2017 16:07:00 +0100
+Subject: [PATCH] rtc: stm32: Fix copyright
+In-Reply-To: <20171129142644.23576-1-benjamin.gaignard@st.com>
+References: <20171129142644.23576-1-benjamin.gaignard@st.com>
+Message-ID: <ed2a9fbd-4943-2023-a37b-c3ecbe54d7b5@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 03:04:12PM +0000, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > This series implements Linux kernel support for the ARM Scalable Vector
-> > Extension (SVE). [1]  It supersedes the previous v3: see [3] for link
-> > and full cover letter.
-> >
-> > This is a minor update to v4, but does contain a couple of important
-> > fixes.
-> <snip>
-> 
-> I seem to have run into a regression with normal non-SVE sigcontexts
-> while trying to run consecutive RISU runs in the Foundation Model. I'm
-> failing to get repeatable results playing back a previous --master run.
-> It works OK with the default Debian kernel.
-> 
-> What is the current status of the tree? I'd like to try an narrow it
-> down but I seem to recall it was now in a next tree somewhere?
 
-This is in mainline now, so please give a 4.15-rc1 build a spin. If there's
-a user-visible regression then we need to get to the bottom of it ASAP.
 
-Will
+On 11/29/2017 03:26 PM, Benjamin Gaignard wrote:
+> Uniformize STMicroelectronics copyrights header
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> CC: Amelie Delaunay <amelie.delaunay@st.com>
+> ---
+>   drivers/rtc/rtc-stm32.c | 4 ++--
+>   1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-stm32.c b/drivers/rtc/rtc-stm32.c
+> index 3a5c3d7d0c77..f25dabe8fd02 100644
+> --- a/drivers/rtc/rtc-stm32.c
+> +++ b/drivers/rtc/rtc-stm32.c
+> @@ -1,6 +1,6 @@
+>   /*
+> - * Copyright (C) Amelie Delaunay 2016
+> - * Author:  Amelie Delaunay <amelie.delaunay@st.com>
+> + * Copyright (C) STMicroelectronics SA 2017
+> + * Author:  Amelie Delaunay <amelie.delaunay@st.com> for STMicroelectronics.
+>    * License terms:  GNU General Public License (GPL), version 2
+>    */
+>   
+> 
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
