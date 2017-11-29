@@ -1,25 +1,38 @@
 From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Wed, 29 Nov 2017 19:27:44 +0100
-Subject: [REBASED PATCH] ARM: dts: exynos: fix property values of
- LDO15/17 for ODROID-XU3/4
-In-Reply-To: <20171128001501.12740-1-tobetter@gmail.com>
-References: <20171128001501.12740-1-tobetter@gmail.com>
-Message-ID: <20171129182744.6brikrehd6sejwab@kozik-lap>
+Date: Wed, 29 Nov 2017 19:36:10 +0100
+Subject: [PATCH] ARM: dts: exynos: Add missing interrupt-controller properties
+ to Exynos5410 PMU
+Message-ID: <20171129183610.26305-1-krzk@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 07:15:01PM -0500, Dongjin Kim wrote:
-> Looking at the schematic, LDO15 and LDO17 are tied as a power source of a
-> builtin network chipset. The voltage on LDO15 is corrected to 3.3V and the
-> name of LDO17 is corrected to "vdd_ldo17".
-> 
-> Signed-off-by: Dongjin Kim <tobetter@gmail.com>
-> ---
->  arch/arm/boot/dts/exynos5422-odroid-core.dtsi | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
+PMU (system-controller at 10040000) is used as interrupt-parent for certain
+nodes thus it should be marked as interrupt-controller to silence
+warnings when building Exynos5410-based DTBs:
 
-Thanks, applied.
+  arch/arm/boot/dts/exynos5410-odroidxu.dtb: Warning (interrupts_property):
+    Missing interrupt-controller or interrupt-map property in /soc/system-controller at 10040000
+  arch/arm/boot/dts/exynos5410-odroidxu.dtb: Warning (interrupts_property):
+    Missing #interrupt-cells in interrupt-parent /soc/system-controller at 10040000
 
-Best regards,
-Krzysztof
+Signed-off-by: Krzysztof Kozlowski <krzk@kernel.org>
+---
+ arch/arm/boot/dts/exynos5410.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 06713ec86f0d..e234219fe8f1 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -75,6 +75,9 @@
+ 			clock-names = "clkout16";
+ 			clocks = <&fin_pll>;
+ 			#clock-cells = <1>;
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			interrupt-parent = <&gic>;
+ 		};
+ 
+ 		clock: clock-controller at 10010000 {
+-- 
+2.11.0
