@@ -1,32 +1,29 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 29 Nov 2017 09:44:10 -0500 (EST)
-Subject: [PATCH] net: ethernet: xilinx: Mark XILINX_LL_TEMAC broken on
- 64-bit
-In-Reply-To: <1511949669-30379-1-git-send-email-geert+renesas@glider.be>
-References: <1511949669-30379-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20171129.094410.1537008794654450709.davem@davemloft.net>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Wed, 29 Nov 2017 15:55:02 +0100
+Subject: [PATCH v2] arch: arm: mach-stm32: Fix copyright
+Message-ID: <20171129145502.30793-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
-Date: Wed, 29 Nov 2017 11:01:09 +0100
+Uniformize STMicroelectronics copyrights header
+Add SPDX identifier
 
-> On 64-bit (e.g. powerpc64/allmodconfig):
-> 
->     drivers/net/ethernet/xilinx/ll_temac_main.c: In function 'temac_start_xmit_done':
->     drivers/net/ethernet/xilinx/ll_temac_main.c:633:22: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
-> 	dev_kfree_skb_irq((struct sk_buff *)cur_p->app4);
-> 			  ^
-> 
-> cdmac_bd.app4 is u32, so it is too small to hold a kernel pointer.
-> 
-> Note that several other fields in struct cdmac_bd are also too small to
-> hold physical addresses on 64-bit platforms.
-> 
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+---
+ arch/arm/mach-stm32/board-dt.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yeah, I can't see much value in implementing a hash table converting between
-32-bit cookies and 64-bit points just for this if it'll never be actually
-used.
-
-Applied, thanks Geert.
+diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
+index e918686e4191..b01f40543e6e 100644
+--- a/arch/arm/mach-stm32/board-dt.c
++++ b/arch/arm/mach-stm32/board-dt.c
+@@ -1,5 +1,7 @@
++/* SPDX-License-Identifier: GPL-2.0 */
+ /*
+  * Copyright (C) Maxime Coquelin 2015
++ * Copyright (C) STMicroelectronics SA 2017
+  * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+  * License terms:  GNU General Public License (GPL), version 2
+  */
+-- 
+2.15.0
