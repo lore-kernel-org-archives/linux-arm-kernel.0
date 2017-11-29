@@ -1,42 +1,27 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Tue, 28 Nov 2017 16:00:11 -0800
-Subject: [PATCH 3/3] arm64: use -mno-implicit-float instead of
- -mgeneral-regs-only
-In-Reply-To: <20171129000011.55235-1-samitolvanen@google.com>
-References: <20171129000011.55235-1-samitolvanen@google.com>
-Message-ID: <20171129000011.55235-4-samitolvanen@google.com>
+From: ckadabi@codeaurora.org (ckadabi at codeaurora.org)
+Date: Tue, 28 Nov 2017 16:42:47 -0800
+Subject: gicv3: 1 of N model implementation related
+Message-ID: <e83aac509dcef816bbf279c4ba2bed1a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Greg Hackmann <ghackmann@google.com>
+Hi Mark:
 
-LLVM bug 30792 causes clang's AArch64 backend to crash compiling
-arch/arm64/crypto/aes-ce-cipher.c.  Replacing -mgeneral-regs-only with
--mno-implicit-float is the suggested workaround.
+I have some question related to gicv3 driver on 1 of N distribution 
+model.
+Looking at the linux kernel implementation the interrupt is always 
+affined to the first online cpu and does not use the 1 of N distribution 
+model.
+As per the Gic spec 1 of N model could help to achieve low latency as 
+handling the interrupts as there are more PE's participating in handling 
+the interrupt.
 
-Signed-off-by: Greg Hackmann <ghackmann@google.com>
-Cc: Matthias Kaehlcke <mka@chromium.org>
-[added clang-ifversion to enable the workaround only for clang <6.0]
-Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
----
- arch/arm64/Makefile | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Is there a reason the Linux kernel driver does not implement the 1 of N 
+model?
 
-diff --git a/arch/arm64/Makefile b/arch/arm64/Makefile
-index b35788c909f1..d2efb5a0212f 100644
---- a/arch/arm64/Makefile
-+++ b/arch/arm64/Makefile
-@@ -49,7 +49,10 @@ $(warning Detected assembler with broken .inst; disassembly will be unreliable)
-   endif
- endif
- 
--KBUILD_CFLAGS	+= -mgeneral-regs-only $(lseinstr) $(brokengasinst)
-+# This is a workaround for https://bugs.llvm.org/show_bug.cgi?id=30792.
-+KBUILD_CFLAGS	+= $(call clang-ifversion, -lt, 0600, -mno-implicit-float, -mgeneral-regs-only)
-+
-+KBUILD_CFLAGS	+= $(lseinstr) $(brokengasinst)
- KBUILD_CFLAGS	+= -fno-asynchronous-unwind-tables
- KBUILD_CFLAGS	+= $(call cc-option, -mpc-relative-literal-loads)
- KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
--- 
-2.15.0.417.g466bffb3ac-goog
+Thanks,
+Channa
+
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora 
+Forum,
+a Linux Foundation Collaborative Project
