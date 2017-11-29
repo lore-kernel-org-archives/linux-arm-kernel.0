@@ -1,54 +1,95 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Wed, 29 Nov 2017 15:21:42 +0100
-Subject: [PATCH] i2c: stm32: Fix copyrights
-Message-ID: <20171129142142.23183-1-benjamin.gaignard@st.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 29 Nov 2017 22:22:46 +0800
+Subject: [PATCH 2/2] arm64: dts: orange-pi-zero-plus2: enable AP6212a
+ WiFi/BT combo
+In-Reply-To: <CAMty3ZAiDvAG-P-c0J7vKaDyRWQ2CQobLA_xycRva5B20W6SOg@mail.gmail.com>
+References: <20171103195855.15283-1-geomatsi@gmail.com>
+ <20171103195855.15283-3-geomatsi@gmail.com>
+ <CAMty3ZAiDvAG-P-c0J7vKaDyRWQ2CQobLA_xycRva5B20W6SOg@mail.gmail.com>
+Message-ID: <CAGb2v66mNeUL0Pk60aB2s98GK2WiSdhk2_QiZJuMz0Rt=NmEyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Uniformize STMicroelectronics copyrights headers
+On Wed, Nov 29, 2017 at 9:53 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
+> On Sat, Nov 4, 2017 at 1:28 AM, Sergey Matyukevich <geomatsi@gmail.com> wrote:
+>> Enable AP6212a WiFi/BT combo chip on orange-pi-zero-plus2 board:
+>> - WiFi SDIO interface is connected to MMC1
+>> - WiFi REG_ON pin connected to gpio PA9: attach to mmc-pwrseq
+>> - WiFi HOST_WAKE pin connected to gpio PL7
+>> - BT is connected to UART1
+>>
+>> Signed-off-by: Sergey Matyukevich <geomatsi@gmail.com>
+>> ---
+>>  .../allwinner/sun50i-h5-orangepi-zero-plus2.dts    | 32 ++++++++++++++++++++++
+>>  1 file changed, 32 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+>> index a42fd79a62a3..d415b7b67cce 100644
+>> --- a/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+>> +++ b/arch/arm64/boot/dts/allwinner/sun50i-h5-orangepi-zero-plus2.dts
+>> @@ -64,6 +64,13 @@
+>>                 regulator-min-microvolt = <3300000>;
+>>                 regulator-max-microvolt = <3300000>;
+>>         };
+>> +
+>> +       wifi_pwrseq: wifi_pwrseq {
+>> +               compatible = "mmc-pwrseq-simple";
+>> +               pinctrl-names = "default";
+>> +               reset-gpios = <&pio 0 9 GPIO_ACTIVE_LOW>; /* PA9 */
+>> +               post-power-on-delay-ms = <200>;
+>> +       };
+>>  };
+>>
+>>  &mmc0 {
+>> @@ -75,6 +82,25 @@
+>>         status = "okay";
+>>  };
+>>
+>> +&mmc1 {
+>> +       pinctrl-names = "default";
+>> +       pinctrl-0 = <&mmc1_pins_a>;
+>> +       vmmc-supply = <&reg_vcc3v3>;
+>> +       vqmmc-supply = <&reg_vcc3v3>;
+>> +       mmc-pwrseq = <&wifi_pwrseq>;
+>> +       bus-width = <4>;
+>> +       non-removable;
+>> +       status = "okay";
+>> +
+>> +       brcmf: wifi at 1 {
+>> +               reg = <1>;
+>> +               compatible = "brcm,bcm4329-fmac";
+>> +               interrupt-parent = <&r_pio>;
+>> +               interrupts = <0 7 IRQ_TYPE_LEVEL_LOW>;  /* PL7 */
+>> +               interrupt-names = "host-wake";
+>> +       };
+>> +};
+>
+> Did you observe this issue, I'm using firmware from buildroot and
+> couldn't find any *.txt from brcm/ I believe we need ass text file for
+> firmware details, did you tried the same from BR?
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
- drivers/i2c/busses/i2c-stm32.h   | 1 +
- drivers/i2c/busses/i2c-stm32f4.c | 1 +
- drivers/i2c/busses/i2c-stm32f7.c | 1 +
- 3 files changed, 3 insertions(+)
+The text file is not provided as part of the linux-firmware repository.
+You have to fetch it from your vendor BSP. This is documented not just
+for sunxi, but also for the raspberry pi 3.
 
-diff --git a/drivers/i2c/busses/i2c-stm32.h b/drivers/i2c/busses/i2c-stm32.h
-index dab51761f8c5..490f6e6bebc2 100644
---- a/drivers/i2c/busses/i2c-stm32.h
-+++ b/drivers/i2c/busses/i2c-stm32.h
-@@ -2,6 +2,7 @@
-  * i2c-stm32.h
-  *
-  * Copyright (C) M'boumba Cedric Madianga 2017
-+ * Copyright (C) STMicroelectronics SA 2017
-  * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-  *
-  * License terms:  GNU General Public License (GPL), version 2
-diff --git a/drivers/i2c/busses/i2c-stm32f4.c b/drivers/i2c/busses/i2c-stm32f4.c
-index 4ec108496f15..f399ef344d30 100644
---- a/drivers/i2c/busses/i2c-stm32f4.c
-+++ b/drivers/i2c/busses/i2c-stm32f4.c
-@@ -6,6 +6,7 @@
-  * http://www.st.com/resource/en/reference_manual/DM00031020.pdf
-  *
-  * Copyright (C) M'boumba Cedric Madianga 2016
-+ * Copyright (C) STMicroelectronics SA 2017
-  * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-  *
-  * This driver is based on i2c-st.c
-diff --git a/drivers/i2c/busses/i2c-stm32f7.c b/drivers/i2c/busses/i2c-stm32f7.c
-index d4a6e9c2e9aa..e85f4b7aedf6 100644
---- a/drivers/i2c/busses/i2c-stm32f7.c
-+++ b/drivers/i2c/busses/i2c-stm32f7.c
-@@ -7,6 +7,7 @@
-  * http://www.st.com/resource/en/reference_manual/dm00124865.pdf
-  *
-  * Copyright (C) M'boumba Cedric Madianga 2017
-+ * Copyright (C) STMicroelectronics SA 2017
-  * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
-  *
-  * This driver is based on i2c-stm32f4.c
--- 
-2.15.0
+ChenYu
+
+>
+> Log:
+> [    1.872235] mmc1: new high speed SDIO card at address 0001
+> [    1.880919] brcmfmac: brcmf_fw_map_chip_to_name: using
+> brcm/brcmfmac43430-sdio.bin for chip 0x00a9a6(43430) rev 0x000001
+> [    1.908802] EXT4-fs (mmcblk0p1): re-mounted. Opts: data=ordered
+> [    1.927199] brcmfmac mmc1:0001:1: Direct firmware load for
+> brcm/brcmfmac43430-sdio.txt failed with error -2
+> [    2.963478] brcmfmac: brcmf_sdio_htclk: HT Avail timeout (1000000):
+> clkctl 0x50
+> [    3.971888] brcmfmac: brcmf_sdio_htclk: HT Avail timeout (1000000):
+> clkctl 0x50
+>
+> thanks!
+> --
+> Jagan Teki
+> Senior Linux Kernel Engineer | Amarula Solutions
+> U-Boot, Linux | Upstream Maintainer
+> Hyderabad, India.
