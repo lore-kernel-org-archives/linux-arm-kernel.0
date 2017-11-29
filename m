@@ -1,70 +1,95 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 29 Nov 2017 15:37:01 +0100
-Subject: [PATCH] PM: Provide a config snippet for disabling PM
-In-Reply-To: <20171129111227.26798-1-broonie@kernel.org>
-References: <20171129111227.26798-1-broonie@kernel.org>
-Message-ID: <CAJZ5v0jGZxP5NWHKEhXU7gFfvSjwm-iocSEZ-C2A7UhUM+v2CA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Wed, 29 Nov 2017 08:36:46 -0600
+Subject: [PATCH v2] arm64: dts: renesas: r8a7795: Move nodes which have no
+ reg property out of bus
+In-Reply-To: <CAMuHMdVaL6WeOiZhBU2qfXQK7a9NjshUow2GpJJqkwXywiQmaQ@mail.gmail.com>
+References: <20171124105234.25774-1-horms+renesas@verge.net.au>
+ <CAMuHMdW9V6Bkh5uS9qNA7awtygEs=qRd7jigwSHmpV2VM3n9dA@mail.gmail.com>
+ <20171127110430.ulgjrzgy3pdugs2s@verge.net.au>
+ <CAMuHMdUm=PiGVWVg9pyNTR5z2WjLcoG1uecBNBeKsSxbAxBt8w@mail.gmail.com>
+ <20171128085645.ofrk33bfqd736sip@verge.net.au>
+ <CAMuHMdXoDNt7j-hEZmDA2BFFPUAfsi1ukZWowJ3=kTswyYMk5Q@mail.gmail.com>
+ <CAL_JsqKffs+5s92kWFeDivdgk2mVBmHrKuNDCfR9Lb=te5k33A@mail.gmail.com>
+ <CAMuHMdVaL6WeOiZhBU2qfXQK7a9NjshUow2GpJJqkwXywiQmaQ@mail.gmail.com>
+Message-ID: <CAL_JsqKZ68Vf781=1dPManAzJ1hm51obT3SE1hx-brSyzphf8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 12:12 PM, Mark Brown <broonie@kernel.org> wrote:
-> A frequent source of build problems is poor handling of optional PM
-> support, almost all development is done with the PM options enabled
-> but they can be turned off.  Currently few if any of the build test
-> services do this as standard as there is no standard config for it and
-> the use of selects and def_bool means that simply setting CONFIG_PM=n
-> doesn't do what is expected.  To make this easier provide a fragement
-> that can be used with KCONFIG_ALLCONFIG to force PM off.
+On Wed, Nov 29, 2017 at 7:58 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Hi Rob,
 >
-> CONFIG_XEN is disabled as Xen uses hibernation callbacks which end up
-> turning on power management on architectures with Xen.  Some cpuidle
-> implementations on ARM select PM so CONFIG_CPU_IDLE is disabled, and
-> some ARM architectures unconditionally enable PM so they are also
-> disabled.
+> On Wed, Nov 29, 2017 at 2:35 PM, Rob Herring <robh+dt@kernel.org> wrote:
+>> On Tue, Nov 28, 2017 at 3:04 AM, Geert Uytterhoeven
+>> <geert@linux-m68k.org> wrote:
+>>> On Tue, Nov 28, 2017 at 9:56 AM, Simon Horman <horms@verge.net.au> wrote:
+>>>> On Mon, Nov 27, 2017 at 12:15:39PM +0100, Geert Uytterhoeven wrote:
+>>>>> On Mon, Nov 27, 2017 at 12:04 PM, Simon Horman <horms@verge.net.au> wrote:
+>>>>> > I just noticed that with this patch applied I now see:
+>>>>> >
+>>>>> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
+>>>>> > arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53
+>>>>> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a57
+>>>>> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /pmu_a53arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
+>>>>> >
+>>>>> > arch/arm64/boot/dts/renesas/r8a7795-h3ulcb.dtb: Warning (interrupts_property): Missing interrupt-parent for /timer
+>>>>>
+>>>>> Right, the "interrupt-parent = <&gic>;" inside the /soc node applies to child
+>>>>> nodes of the /soc node only.
+>>>>>
+>>>>> You can find this in two ways:
+>>>
+>>> s/find/fix/
+>>>
+>>>>>
+>>>>>   1. Add "interrupt-parent = <&gic>;" to the /pmu_a57 and /pmu_a53 nodes.
+>>>>>   2. Switch those nodes from "interrupt" to "interrupts-extended", e.g. turn
+>>>>>
+>>>>>         interrupts = <GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+>>>>>
+>>>>>      into
+>>>>>
+>>>>>         interrupts-extended = <&gic GIC_SPI 72 IRQ_TYPE_LEVEL_HIGH>,
+>>>>>
+>>>>> The latter is what e.g. arch/arm/boot/dts/armada-375.dtsi does.
+>>>>
+>>>> Thanks, I took option 1 as it seems consistent with the rest of the
+>>>> Renesas DT files. I also added it to the /timer node.
+>>>
+>>> Actually we recently had a discussion about this on IRC, triggered by a
+>>> similar issue in board files (see e.g, Ethernet PHY interrupts).
+>>>
+>>> Given the following comment:
+>>>
+>>> drivers/of/irq.c:       /* Try the new-style interrupts-extended first */
+>>> drivers/of/irq.c:       res = of_parse_phandle_with_args(device,
+>>> "interrupts-extended",
+>>>
+>>> I think it would be better to use interrupts-extended for individual/isolated
+>>> use outside the /soc node.
+>>
+>> I disagree. There's no point to use interrupts-extended unless you
+>> have 2 or more interrupt parents. Just set interrupt-parent in the
+>> root node.
 >
-> Signed-off-by: Mark Brown <broonie@kernel.org>
+> The on-SoC devices (all under the /soc node, except for the weird ones without
+> reg properties that are now being moved out) all have "&gic" as their interrupt
+> parents.
+>
+> Off-SoC devices use one of the on-SoC interrupt controllers for external
+> interrupts ("&irqc", "&irqpin", "&irqpin0", "&irqpin1"), or one of the on-SoC
+> GPIO controllers that can also serve external interrupts ("&gpioN").
+>
+> For the latter, I think interrupts-extended definitely makes sense.
+>
+> For the former (incl. the "pmu_aN" nodes discussed here), it is debatable.
+> But using interrupts-extended makes it easier to catch mistakes in board files,
+> as they will be flagged by dtc ("Missing interrupt-parent").
+> With interrupt-parent in the root node, they may go undetected.
 
-I'm going to apply this shortly, sorry for the delay.
+They would still likely get flagged since the GIC #interrupt-cells is
+3 and it is likely you don't have a multiple of 3.
 
-> ---
->  MAINTAINERS                |  1 +
->  kernel/configs/nopm.config | 15 +++++++++++++++
->  2 files changed, 16 insertions(+)
->  create mode 100644 kernel/configs/nopm.config
->
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 07d9067f68fd..539808dc7928 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -10895,6 +10895,7 @@ F:      include/linux/pm.h
->  F:     include/linux/pm_*
->  F:     include/linux/powercap.h
->  F:     drivers/powercap/
-> +F:     kernel/configs/nopm.config
->
->  POWER STATE COORDINATION INTERFACE (PSCI)
->  M:     Mark Rutland <mark.rutland@arm.com>
-> diff --git a/kernel/configs/nopm.config b/kernel/configs/nopm.config
-> new file mode 100644
-> index 000000000000..81ff07863576
-> --- /dev/null
-> +++ b/kernel/configs/nopm.config
-> @@ -0,0 +1,15 @@
-> +CONFIG_PM=n
-> +CONFIG_SUSPEND=n
-> +CONFIG_HIBERNATION=n
-> +
-> +# Triggers PM on OMAP
-> +CONFIG_CPU_IDLE=n
-> +
-> +# Triggers enablement via hibernate callbacks
-> +CONFIG_XEN=n
-> +
-> +# ARM/ARM64 architectures that select PM unconditionally
-> +CONFIG_ARCH_OMAP2PLUS_TYPICAL=n
-> +CONFIG_ARCH_RENESAS=n
-> +CONFIG_ARCH_TEGRA=n
-> +CONFIG_ARCH_VEXPRESS=n
-> --
-> 2.15.0
->
+But I guess interrupts-extended does make sense in this case.
+
+Rob
