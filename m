@@ -1,34 +1,33 @@
 From: alexandre.torgue@st.com (Alexandre Torgue)
-Date: Wed, 29 Nov 2017 16:05:32 +0100
-Subject: [PATCH] clk: stm32-h7: fix copyright
-In-Reply-To: <20171129141548.21732-1-benjamin.gaignard@st.com>
-References: <20171129141548.21732-1-benjamin.gaignard@st.com>
-Message-ID: <9a33b756-07d9-f8e6-55d4-cc0c18d9b956@st.com>
+Date: Wed, 29 Nov 2017 16:05:45 +0100
+Subject: [PATCH] dma: stm32: Fix copyright
+In-Reply-To: <20171129141818.22843-1-benjamin.gaignard@st.com>
+References: <20171129141818.22843-1-benjamin.gaignard@st.com>
+Message-ID: <7cfe5534-9371-be49-98c6-36e08577b26d@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 11/29/2017 03:15 PM, Benjamin Gaignard wrote:
+
+On 11/29/2017 03:18 PM, Benjamin Gaignard wrote:
 > Uniformize STMicroelectronics copyrights header
 > 
 > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> CC: Gabriel Fernandez <gabriel.fernandez@st.com>
 > ---
->   drivers/clk/clk-stm32h7.c | 4 ++--
->   1 file changed, 2 insertions(+), 2 deletions(-)
+>   drivers/dma/stm32-dma.c | 1 +
+>   1 file changed, 1 insertion(+)
 > 
-> diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
-> index 61c3e40507d3..16395fdb61ac 100644
-> --- a/drivers/clk/clk-stm32h7.c
-> +++ b/drivers/clk/clk-stm32h7.c
-> @@ -1,6 +1,6 @@
->   /*
-> - * Copyright (C) Gabriel Fernandez 2017
-> - * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+> diff --git a/drivers/dma/stm32-dma.c b/drivers/dma/stm32-dma.c
+> index 786fc8fcc38e..bb013ffe8a5c 100644
+> --- a/drivers/dma/stm32-dma.c
+> +++ b/drivers/dma/stm32-dma.c
+> @@ -4,6 +4,7 @@
+>    * Inspired by dma-jz4740.c and tegra20-apb-dma.c
+>    *
+>    * Copyright (C) M'boumba Cedric Madianga 2015
 > + * Copyright (C) STMicroelectronics SA 2017
-> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
+>    * Author: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
 >    *
->    * License terms: GPL V2.0.
->    *
+>    * License terms:  GNU General Public License (GPL), version 2
 > 
 Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
