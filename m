@@ -1,34 +1,40 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Wed, 29 Nov 2017 10:36:39 +0200
-Subject: [PATCH V3 22/29] [media] atomisp: deprecate pci_get_bus_and_slot()
-In-Reply-To: <1511801886-6753-23-git-send-email-okaya@codeaurora.org>
-References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
- <1511801886-6753-23-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171129083639.meuue7eooybr5u7o@valkosipuli.retiisi.org.uk>
+From: laurentiu.tudor@nxp.com (Laurentiu Tudor)
+Date: Wed, 29 Nov 2017 08:40:55 +0000
+Subject: [PATCH v3] staging: fsl-mc: move bus driver out of staging
+In-Reply-To: <20171128160451.GC14512@lunn.ch>
+References: <20171128152757.1058-1-laurentiu.tudor@nxp.com>
+ <20171128160451.GC14512@lunn.ch>
+Message-ID: <5A1E7244.5020805@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+Hi Andrew,
 
-On Mon, Nov 27, 2017 at 11:57:59AM -0500, Sinan Kaya wrote:
-> diff --git a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
-> index 4631b1d..51dcef57 100644
-> --- a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
-> +++ b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
-> @@ -39,7 +39,7 @@ static inline int platform_is(u8 model)
->  
->  static int intel_mid_msgbus_init(void)
->  {
-> -	pci_root = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
-> +	pci_root = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
->  	if (!pci_root) {
->  		pr_err("%s: Error: msgbus PCI handle NULL\n", __func__);
->  		return -ENODEV;
+On 11/28/2017 06:04 PM, Andrew Lunn wrote:
+> On Tue, Nov 28, 2017 at 05:27:57PM +0200, laurentiu.tudor at nxp.com wrote:
+>> diff --git a/drivers/staging/fsl-mc/bus/dpmcp.h b/drivers/bus/fsl-mc/dpmcp.h
+>> similarity index 100%
+>> rename from drivers/staging/fsl-mc/bus/dpmcp.h
+>> rename to drivers/bus/fsl-mc/dpmcp.h
+>> diff --git a/drivers/staging/fsl-mc/bus/dpmng-cmd.h b/drivers/bus/fsl-mc/dpmng-cmd.h
+>> similarity index 100%
+>> rename from drivers/staging/fsl-mc/bus/dpmng-cmd.h
+>> rename to drivers/bus/fsl-mc/dpmng-cmd.h
+>> diff --git a/drivers/staging/fsl-mc/bus/dprc-cmd.h b/drivers/bus/fsl-mc/dprc-cmd.h
+>> similarity index 100%
+>> rename from drivers/staging/fsl-mc/bus/dprc-cmd.h
+>> rename to drivers/bus/fsl-mc/dprc-cmd.h
+>> diff --git a/drivers/staging/fsl-mc/bus/dprc-driver.c b/drivers/bus/fsl-mc/dprc-driver.c
+>> similarity index 99%
+>> rename from drivers/staging/fsl-mc/bus/dprc-driver.c
+>> rename to drivers/bus/fsl-mc/dprc-driver.c
+>
+> Hi Laurentiu
+>
+> It is hard to review code when we don't see it.
 
-This file has been removed, I'm applying the rest of the patch.
+I'll reformat the patch with rename detection disabled, but please note 
+that it will be pretty big (~370KiB).
 
-Please use the media tree as the base in the future. Thanks.
-
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+---
+Best Regards, Laurentiu
