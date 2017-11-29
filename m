@@ -1,21 +1,37 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 29 Nov 2017 09:04:53 -0800
-Subject: [PATCH] clk: fix compile testing of scpi clk driver
-In-Reply-To: <24058ecb-9f12-f7e1-503d-bd98eb894c6c@gmail.com>
-References: <24058ecb-9f12-f7e1-503d-bd98eb894c6c@gmail.com>
-Message-ID: <20171129170453.GA7698@codeaurora.org>
+Date: Wed, 29 Nov 2017 09:06:42 -0800
+Subject: [PATCH] clk: stm32-h7: fix copyright
+In-Reply-To: <20171129141548.21732-1-benjamin.gaignard@st.com>
+References: <20171129141548.21732-1-benjamin.gaignard@st.com>
+Message-ID: <20171129170642.GB7698@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/28, Heiner Kallweit wrote:
-> We now have a hard dependency on ARM_SCPI_PROTOCOL and may end up with
-> the following error:
-> ERROR: "get_scpi_ops" [drivers/clk/clk-scpi.ko] undefined!
-> Fix this by removing COMPILE_TEST from COMMON_CLK_SCPI dependencies.
+On 11/29, Benjamin Gaignard wrote:
+> Uniformize STMicroelectronics copyrights header
 > 
-> Fixes: f7fee8be06a6 "firmware: arm_scpi: remove default for get_scpi_ops if not reachable"
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> CC: Gabriel Fernandez <gabriel.fernandez@st.com>
+> ---
 
-I don't see this commit anywhere. Is this a future issue?
+Can we get Gabriel's Ack on this please?
+
+>  drivers/clk/clk-stm32h7.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
+> index 61c3e40507d3..16395fdb61ac 100644
+> --- a/drivers/clk/clk-stm32h7.c
+> +++ b/drivers/clk/clk-stm32h7.c
+> @@ -1,6 +1,6 @@
+>  /*
+> - * Copyright (C) Gabriel Fernandez 2017
+> - * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+> + * Copyright (C) STMicroelectronics SA 2017
+> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
+>   *
+>   * License terms: GPL V2.0.
+>   *
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
