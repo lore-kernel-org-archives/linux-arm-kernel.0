@@ -1,56 +1,52 @@
-From: david@redhat.com (David Hildenbrand)
-Date: Wed, 29 Nov 2017 18:22:29 +0100
-Subject: [PATCH v2 01/16] KVM: Take vcpu->mutex outside vcpu_load
-In-Reply-To: <1cf0f391-960c-a457-29e5-f31ee410a9d1@redhat.com>
-References: <20171129164116.16167-1-christoffer.dall@linaro.org>
- <20171129164116.16167-2-christoffer.dall@linaro.org>
- <25c1daca-1d8b-48e7-af2d-5cf47d0d278b@redhat.com>
- <1cf0f391-960c-a457-29e5-f31ee410a9d1@redhat.com>
-Message-ID: <51b1bb38-7fa8-d785-3281-5a239639989e@redhat.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Wed, 29 Nov 2017 12:23:27 -0500
+Subject: [PATCH v5] dmaengine: dmatest: move callback wait queue to thread
+ context
+In-Reply-To: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
+References: <1511797501-7877-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <38f9f183-d38d-e1f9-9354-fe3b158ac19d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.11.2017 18:20, Paolo Bonzini wrote:
-> On 29/11/2017 18:17, David Hildenbrand wrote:
->> On 29.11.2017 17:41, Christoffer Dall wrote:
->>> As we're about to call vcpu_load() from architecture-specific
->>> implementations of the KVM vcpu ioctls, but yet we access data
->>> structures protected by the vcpu->mutex in the generic code, factor
->>> this logic out from vcpu_load().
->>>
->>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->>> ---
->>>  arch/x86/kvm/vmx.c       |  4 +---
->>>  arch/x86/kvm/x86.c       | 20 +++++++-------------
->>>  include/linux/kvm_host.h |  2 +-
->>>  virt/kvm/kvm_main.c      | 17 ++++++-----------
->>>  4 files changed, 15 insertions(+), 28 deletions(-)
->>>
->>> diff --git a/arch/x86/kvm/vmx.c b/arch/x86/kvm/vmx.c
->>> index 714a067..e7c46d2 100644
->>> --- a/arch/x86/kvm/vmx.c
->>> +++ b/arch/x86/kvm/vmx.c
->>> @@ -9559,10 +9559,8 @@ static void vmx_switch_vmcs(struct kvm_vcpu *vcpu, struct loaded_vmcs *vmcs)
->>>  static void vmx_free_vcpu_nested(struct kvm_vcpu *vcpu)
->>>  {
->>>         struct vcpu_vmx *vmx = to_vmx(vcpu);
->>> -       int r;
->>>  
->>> -       r = vcpu_load(vcpu);
->>> -       BUG_ON(r);
->>> +       vcpu_load(vcpu);
->> I am most likely missing something, why don't we have to take the lock
->> in these cases?
+On 11/27/2017 10:45 AM, Adam Wallis wrote:
+> Commit adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+> introduced a bug (that is in fact documented by the patch commit text)
+> that leaves behind a dangling pointer. Since the done_wait structure is
+> allocated on the stack, future invocations to the DMATEST can produce
+> undesirable results (e.g., corrupted spinlocks).
 > 
-> See earlier discussion, at these points there can be no concurrent
-> access; the file descriptor is not accessible yet, or is already gone.
+> Commit a9df21e34b42 ("dmaengine: dmatest: warn user when dma test times
+> out") attempted to WARN the user that the stack was likely corrupted but
+> did not fix the actual issue.
 > 
-> Paolo
+> This patch fixes the issue by pushing the wait queue and callback
+> structs into the the thread structure. If a failure occurs due to time,
+> dmaengine_terminate_all will force the callback to safely call
+> wake_up_all() without possibility of using a freed pointer.
+> 
+> Cc: stable at vger.kernel.org
+> Bug: https://bugzilla.kernel.org/show_bug.cgi?id=197605
+> Fixes: adfa543e7314 ("dmatest: don't use set_freezable_with_signal()")
+> Reviewed-by: Sinan Kaya <okaya@codeaurora.org>
+> Suggested-by: Shunyong Yang <shunyong.yang@hxt-semitech.com>
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
+> changes from v4: Change "done" to "arg" in container_of for x86 compiler
+> changes from v3: Added check to thread wait variable if terminate_all fails
+> changes from v2: Added "Fixes" tag
+> changes from v1: Added pre-req patches for stable
+[..]
 
-Thanks, this belongs into the patch description then.
+Vinod, did you have any feedback on this patch or any changes that should be
+made? I was still hoping this bugfix would make it into the 4.15 kernel.
+
+Thanks!
+
+Adam
+
 
 -- 
-
-Thanks,
-
-David / dhildenb
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
