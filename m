@@ -1,45 +1,34 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 29 Nov 2017 09:30:03 +0100
-Subject: [PATCH v4] ARM: dts: r8a7794: Add SMP support
-In-Reply-To: <20171129082636.zwbwetif6vuxxfww@verge.net.au>
-References: <1511876341-8639-1-git-send-email-geert+renesas@glider.be>
- <20171129082636.zwbwetif6vuxxfww@verge.net.au>
-Message-ID: <CAMuHMdWE6=3FaCxjuaLAK4HJdP4UoGXiBJkrdWVXYA6ZR+7uuA@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Wed, 29 Nov 2017 10:36:39 +0200
+Subject: [PATCH V3 22/29] [media] atomisp: deprecate pci_get_bus_and_slot()
+In-Reply-To: <1511801886-6753-23-git-send-email-okaya@codeaurora.org>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <1511801886-6753-23-git-send-email-okaya@codeaurora.org>
+Message-ID: <20171129083639.meuue7eooybr5u7o@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+Hi Sinan,
 
-On Wed, Nov 29, 2017 at 9:26 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Tue, Nov 28, 2017 at 02:39:01PM +0100, Geert Uytterhoeven wrote:
->> From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->>
->> Add the device tree node for the Advanced Power Management Unit (APMU).
->> Use the "enable-method" prop to  point out that the APMU should be used
->> for the SMP support.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> ---
->> Dependency 3fd45a136ff61bb5 ("ARM: shmobile: rcar-gen2: Make sure
->> CNTVOFF is initialized on CA7/15") is part of v4.15-rc1.
->
-> sorry if this is a bit of a sore topic but I'd like to ask what sort of
-> testing this patch has seen. Are there any regressions in the area of
-> CPU hotplug, suspend to RAM and so on...
+On Mon, Nov 27, 2017 at 11:57:59AM -0500, Sinan Kaya wrote:
+> diff --git a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
+> index 4631b1d..51dcef57 100644
+> --- a/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
+> +++ b/drivers/staging/media/atomisp/platform/intel-mid/intel_mid_pcihelpers.c
+> @@ -39,7 +39,7 @@ static inline int platform_is(u8 model)
+>  
+>  static int intel_mid_msgbus_init(void)
+>  {
+> -	pci_root = pci_get_bus_and_slot(0, PCI_DEVFN(0, 0));
+> +	pci_root = pci_get_domain_bus_and_slot(0, 0, PCI_DEVFN(0, 0));
+>  	if (!pci_root) {
+>  		pr_err("%s: Error: msgbus PCI handle NULL\n", __func__);
+>  		return -ENODEV;
 
-Last time I tried, CPU hotplug worked fine (on Alt).
-I cannot test suspend to RAM due to remote access.
+This file has been removed, I'm applying the rest of the patch.
 
-Sergei?
+Please use the media tree as the base in the future. Thanks.
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
