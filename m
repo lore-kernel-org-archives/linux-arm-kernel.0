@@ -1,70 +1,76 @@
-From: vinmenon@codeaurora.org (Vinayak Menon)
-Date: Wed, 29 Nov 2017 16:54:05 +0530
-Subject: [PATCH 1/2] mm: make faultaround produce old ptes
-In-Reply-To: <20171129105151.GA10179@arm.com>
-References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
- <CAADWXX8FmAs1qB9=fsWZjt8xTEnGOAMS=eCHnuDLJrZiX6x=7w@mail.gmail.com>
- <f09cd880-f647-7dc8-2ca9-67dab411c6c3@codeaurora.org>
- <20171129105151.GA10179@arm.com>
-Message-ID: <a175c5fc-2d1a-8674-4212-d2334cf55465@codeaurora.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 29 Nov 2017 11:26:28 +0000
+Subject: kasan: false use-after-scope warnings with KCOV
+In-Reply-To: <CACT4Y+YTeLeUPRF=nsJFn-1wXux+yWCcbjmdcVQQFhXHXdY9YQ@mail.gmail.com>
+References: <20171128123555.mo4ikj2ru6mkibwo@lakrids.cambridge.arm.com>
+ <CACT4Y+Z2VhaDiFdg3aoi5uEsX7M+5-XMGH4PApys=qXKSMVUFg@mail.gmail.com>
+ <20171128141355.3pwgzfhji32lehf2@lakrids.cambridge.arm.com>
+ <20171128152405.vkwxdbkbuokjt2hv@lakrids.cambridge.arm.com>
+ <CACT4Y+YTeLeUPRF=nsJFn-1wXux+yWCcbjmdcVQQFhXHXdY9YQ@mail.gmail.com>
+Message-ID: <20171129112628.7ij3ce62vq65yiwa@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 28, 2017 at 06:52:32PM +0100, Dmitry Vyukov wrote:
+> On Tue, Nov 28, 2017 at 4:24 PM, Mark Rutland <mark.rutland@arm.com> wrote:
 
+> >> ... it looks suspiciously like something is setting up non-zero shadow
+> >> bytes, but not zeroing them upon return.
+> >
+> > It looks like this is the case.
+> >
+> > The hack below detects leftover poison on an exception return *before*
+> > the false-positive warning (example splat at the end of the email). With
+> > scripts/Makefile.kasan hacked to not pass
+> > -fsanitize-address-use-after-scope, I see no leftover poison.
+> >
+> > Unfortunately, there's not enough information left to say where exactly
+> > that happened.
 
-On 11/29/2017 4:21 PM, Will Deacon wrote:
-> On Wed, Nov 29, 2017 at 11:35:28AM +0530, Vinayak Menon wrote:
->> On 11/29/2017 1:15 AM, Linus Torvalds wrote:
->>> On Mon, Nov 27, 2017 at 9:07 PM, Vinayak Menon <vinmenon@codeaurora.org> wrote:
->>>> Making the faultaround ptes old results in a unixbench regression for some
->>>> architectures [3][4]. But on some architectures it is not found to cause
->>>> any regression. So by default produce young ptes and provide an option for
->>>> architectures to make the ptes old.
->>> Ugh. This hidden random behavior difference annoys me.
->>>
->>> It should also be better documented in the code if we end up doing it.
->> Okay.
->>> The reason x86 seems to prefer young pte's is simply that a TLB lookup
->>> of an old entry basically causes a micro-fault that then sets the
->>> accessed bit (using a locked cycle) and then a restart.
->>>
->>> Those microfaults are not visible to software, but they are pretty
->>> expensive in hardware, probably because they basically serialize
->>> execution as if a real page fault had happened.
->>>
->>> HOWEVER - and this is the part that annoys me most about the hidden
->>> behavior - I suspect it ends up being very dependent on
->>> microarchitectural details in addition to the actual load. So it might
->>> be more true on some cores than others, and it might be very
->>> load-dependent. So hiding it as some architectural helper function
->>> really feels wrong to me. It would likely be better off as a real
->>> flag, and then maybe we could make the default behavior be set by
->>> architecture (or even dynamically by the architecture bootup code if
->>> it turns out to be enough of an issue).
->>>
->>> And I'm actually somewhat suspicious of your claim that it's not
->>> noticeable on arm64. It's entirely possible that the serialization
->>> cost of the hardware access flag is much lower, but I thought that in
->>> virtualization you actually end up taking a SW fault, which in turn
->>> would be much more expensive. In fact, I don't even find that
->>> "Hardware Accessed" bit in my armv8 docs at all, so I'm guessing it's
->>> new to 8.1? So this is very much not about architectures at all, but
->>> about small details in microarchitectural behavior.
->> The experiments were done on v8.2 hardware with CONFIG_ARM64_HW_AFDBM enabled.
->> I have tried with CONFIG_ARM64_HW_AFDBM "disabled", and the unixbench score drops down,
->> probably due to the SW faults.
-> Sure, but I think the point is that just because a CPU implements hardware
-> access/dirty management (DBM -- added in 8.1), it doesn't mean it's going
-> to be efficient on all implementations, and so having this keyed off the
-> architecture isn't the right thing to do.
->
-> If we had a flag, as suggested, then we could set that by default on CPUs
-> that implement hardware DBM and clear it on a case-by-case basis if
-> implementations pop up where it's a performance issue, although I think
-> it's more likely that setting the dirty bit is the expensive one since
-> it's not allowed to be performed speculatively.
+> ASAN stack instrumentation actually contains information about frames.
+> I just never got around to using it in KASAN. But user-space ASAN
+> prints the following on stack bugs:
+> 
+> Address 0x7ffdb1c75140 is located in stack of thread T0 at offset 64 in frame
+>     #0 0x527fff  in main test.c:5
+> 
+>   This frame has 2 object(s):
+>     [32, 40) 'p'
+>     [64, 68) 'x' <== Memory access@offset 64 is inside this variable
+> 
+> Function prologue contains code similar to this:
+> 
+>   528062:       48 ba f0 7f 52 00 00    movabs $0x527ff0,%rdx
+>   52806c:       48 be 9c e5 53 00 00    movabs $0x53e59c,%rsi
+>   528076:       48 89 c7                mov    %rax,%rdi
+>   528079:       48 83 c7 20             add    $0x20,%rdi
+>   52807d:       49 89 c0                mov    %rax,%r8
+>   528080:       49 83 c0 40             add    $0x40,%r8
+>   528084:       48 c7 00 b3 8a b5 41    movq   $0x41b58ab3,(%rax)
+>   52808b:       48 89 70 08             mov    %rsi,0x8(%rax)
+>   52808f:       48 89 50 10             mov    %rdx,0x10(%rax)
+> 
+> Here 0x41b58ab3 is marker of frame start, and after it 0x527ff0 and
+> 0x53e59c should be pointers to globals that contain function name and
+> other aux information. Note that's on stack itself, not in shadow.
+> If you can find any of 0x41b58ab3 in the corrupted part of stack, you
+> can figure out what function has left garbage.
 
-Yes, I agree that a flag will be better. I will send a v2 with these changes.
+Thanks for the info! I'll try to give this a go, but I'm probably not
+going to have the chance to investigate much this week.
+
+I'm afraid I'm not that good at reading x86 assembly. IIUC there are
+records on the stack something like:
+
+struct record {
+	u64 magic; /* 0x41b58ab3 */
+	char *func_name;
+	struct aux *data;
+};
+
+... is that correct?
+
+Is there any documentation on this that I can refer to?
 
 Thanks,
-Vinayak
+Mark.
