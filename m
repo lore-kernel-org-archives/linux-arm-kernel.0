@@ -1,75 +1,31 @@
-From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Thu, 30 Nov 2017 04:48:44 +0800
-Subject: [PATCH] KVM: arm64: handle the translation table walk RAS error
-Message-ID: <1511988524-30240-1-git-send-email-gengdongjiu@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 29 Nov 2017 13:48:52 +0100
+Subject: [PATCH v2 0/6] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <20171129104545.0c03e766@jawa>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171121143204.1839-1-lukma@denx.de>
+ <20171129104545.0c03e766@jawa>
+Message-ID: <CAK8P3a0gEam9QGhyop-J0RPBB=yo6LFF8uaEnYLzrC_hzh_jKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For the RAS Synchronous External Abort, there are two types.
-One is memory access, it will be handled by host APEI driver.
-Another is translation table walk, in essence, it is hardware
-memory error on stage1 or stage2 page table.
+On Wed, Nov 29, 2017 at 10:45 AM, Lukasz Majewski <lukma@denx.de> wrote:
+> Dear All,
+>
+>> This patch series adds support for Liebherr's BK3 board, being
+>> a derivative of TS72XX design.
+>>
+>> This patchset consists of following patches:
+>>
+>> - ts72xx.[c|h] cosmetic cleanup/improvement
+>> - Rewrite ts72xx.c to be reusable by bk3
+>> - The Liebherr's BK3 board has been added with re-using code of
+>>   ts72xx.c
+>>
+>> This series applies on top of v4.14
+>
+> Do you have any comments regarding this patch series?
 
-For the guest stage1 translation table error, if host APEI
-driver handles it, APEI driver will unmap this page for the
-stage1 page table, then switch to guest, guest reused this
-page table and generate stage2 data abort, KVM deliver SIGBUS
-to user space. User space inject this error to guest, when
-guest handle this abort, it may also use this stage1 page
-table, but it already unmap by host APEI driver, then
-generate stage2 data abort again, so this will lead to dead
-loop.
+Looks all good to me.
 
-For the guest stage2 translation table error, if host APEI
-driver handles it, it will do nothing.
-
-So for above reasons, we directly inject this Synchronous
-External Abort to guest and let guest handle it, for example,
-kill the guest application or panic guest OS.
-
-Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
----
- arch/arm64/include/asm/kvm_arm.h |  2 ++
- virt/kvm/arm/mmu.c               | 14 ++++++++++++--
- 2 files changed, 14 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_arm.h b/arch/arm64/include/asm/kvm_arm.h
-index 1188272..b8cb67a 100644
---- a/arch/arm64/include/asm/kvm_arm.h
-+++ b/arch/arm64/include/asm/kvm_arm.h
-@@ -217,6 +217,8 @@
- #define FSC_SECC_TTW2	(0x1e)
- #define FSC_SECC_TTW3	(0x1f)
- 
-+#define FSC_SEA_TTW    FSC_SEA_TTW0
-+
- /* Hyp Prefetch Fault Address Register (HPFAR/HDFAR) */
- #define HPFAR_MASK	(~UL(0xf))
- 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index b36945d..6eab82d 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1484,8 +1484,18 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	/* Synchronous External Abort? */
- 	if (kvm_vcpu_dabt_isextabt(vcpu)) {
- 		/*
--		 * For RAS the host kernel may handle this abort.
--		 * There is no need to pass the error into the guest.
-+		 * For RAS translation table walk abort, pass the error
-+		 * into the guest.
-+		 */
-+		if (fault_status == FSC_SEA_TTW) {
-+			kvm_inject_dabt(vcpu, kvm_vcpu_get_hfar(vcpu));
-+			return 1;
-+		}
-+
-+		/*
-+		 * For RAS normal memory access abort, the host kernel may
-+		 * handle this abort. There is no need to pass the error into
-+		 * the guest.
- 		 */
- 		if (!handle_guest_sea(fault_ipa, kvm_vcpu_get_hsr(vcpu)))
- 			return 1;
--- 
-1.9.1
+      Arnd
