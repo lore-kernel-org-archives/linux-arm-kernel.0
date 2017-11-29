@@ -1,25 +1,41 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 29 Nov 2017 20:00:52 +0300
-Subject: [PATCH 1/2] arm64: dts: renesas: r8a77970: use CPG core clock
- macros
-In-Reply-To: <20171129095558.wvvcvfctwfmtrkq4@verge.net.au>
-References: <20171128202105.552196002@cogentembedded.com>
- <20171129095558.wvvcvfctwfmtrkq4@verge.net.au>
-Message-ID: <d904863e-e8c9-76ad-9d12-fd36ed68c3b4@cogentembedded.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Wed, 29 Nov 2017 18:02:56 +0100
+Subject: [PATCH v3] arch: arm: mach-stm32: Fix copyright
+In-Reply-To: <20171129152523.5262-1-benjamin.gaignard@st.com>
+References: <20171129152523.5262-1-benjamin.gaignard@st.com>
+Message-ID: <CAOFm3uFAnS9x248di7S_re7P90+oPvyyiBGbmtqV26NEoOv7GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/29/2017 12:55 PM, Simon Horman wrote:
+On Wed, Nov 29, 2017 at 4:25 PM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
+> Uniformize STMicroelectronics copyrights header
+> Add SPDX identifier
+>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  arch/arm/mach-stm32/board-dt.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/arch/arm/mach-stm32/board-dt.c b/arch/arm/mach-stm32/board-dt.c
+> index e918686e4191..77899ae4b8ed 100644
+> --- a/arch/arm/mach-stm32/board-dt.c
+> +++ b/arch/arm/mach-stm32/board-dt.c
+> @@ -1,5 +1,7 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * Copyright (C) Maxime Coquelin 2015
+> + * Copyright (C) STMicroelectronics SA 2017
+>   * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+>   * License terms:  GNU General Public License (GPL), version 2
+>   */
 
->> Now that the commit ecadea00f588 ("dt-bindings: clock: Add R8A77970 CPG
->> core clock definitions") has hit Linus' tree, we  can replace the bare
->> numbers (we had to use to avoid a cross tree dependency) with these macro
->> definitions...
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> 
-> Thanks, applied.
+Sorry to be picky there, but you can now rightfully remove this line
+IMHO as the "SPDX-License-Identifier: GPL-2.0" already covers it now
+e.g:
 
-    Not seeing these 2 patches in the today's devel branch tho...
+> - * License terms:  GNU General Public License (GPL), version 2
 
-MBR, Sergei
+-- 
+Cordially
+Philippe Ombredanne
