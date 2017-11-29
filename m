@@ -1,124 +1,23 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 29 Nov 2017 16:44:42 +0100
-Subject: [PATCH] ARM: dts: Add ethernet PHYs to the a bunch of Geminis
-Message-ID: <20171129154442.16332-1-linus.walleij@linaro.org>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Wed, 29 Nov 2017 16:46:49 +0100
+Subject: [PATCH] net: stmmac: dwmac-sun8i: fix allwinner,leds-active-low
+ handling
+In-Reply-To: <CAGb2v67hv7ayH=F-MBG-PCCeVt43PH-O-6b3KOyGXSpr2s4DGg@mail.gmail.com>
+References: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
+ <20171128173826.GE14512@lunn.ch> <20171129090240.GA3699@Red>
+ <20171129153712.GA24881@lunn.ch>
+ <CAGb2v67hv7ayH=F-MBG-PCCeVt43PH-O-6b3KOyGXSpr2s4DGg@mail.gmail.com>
+Message-ID: <20171129154649.GC24881@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These Gemini boards have Ethernet PHY on GPIO bit-banged
-MDIO, clearly defined in the corresponding OpenWRT
-ethernet patches since ages. Add them in accordance with
-the OpenWRT patch so we can use them when we add ethernet
-support.
+Hi ChenYu
+ 
+> It worked at one point. During some previous iteration, they lit up as
+> they were supposed to.
 
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/gemini-nas4220b.dts | 13 +++++++++++++
- arch/arm/boot/dts/gemini-rut1xx.dts   | 13 +++++++++++++
- arch/arm/boot/dts/gemini-wbd111.dts   | 13 +++++++++++++
- arch/arm/boot/dts/gemini-wbd222.dts   | 18 ++++++++++++++++++
- 4 files changed, 57 insertions(+)
+For a released version of the kernel? Or during development work?  If
+they did work, but broken, it would be good to know which commit broke
+it. We can then add a fixes: tag to the patch as proposed.
 
-diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
-index d6a22e677c7a..51b8353861c3 100644
---- a/arch/arm/boot/dts/gemini-nas4220b.dts
-+++ b/arch/arm/boot/dts/gemini-nas4220b.dts
-@@ -64,6 +64,19 @@
- 		};
- 	};
- 
-+	mdio0: ethernet-phy {
-+		compatible = "virtual,mdio-gpio";
-+		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
-+			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		phy0: ethernet-phy at 0 {
-+			reg = <1>;
-+			device_type = "ethernet-phy";
-+		};
-+	};
-+
- 	soc {
- 		flash at 30000000 {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/gemini-rut1xx.dts b/arch/arm/boot/dts/gemini-rut1xx.dts
-index 500057b6570e..ea0261d9aa97 100644
---- a/arch/arm/boot/dts/gemini-rut1xx.dts
-+++ b/arch/arm/boot/dts/gemini-rut1xx.dts
-@@ -58,6 +58,19 @@
- 		};
- 	};
- 
-+	mdio0: ethernet-phy {
-+		compatible = "virtual,mdio-gpio";
-+		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
-+			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		phy0: ethernet-phy at 0 {
-+			reg = <1>;
-+			device_type = "ethernet-phy";
-+		};
-+	};
-+
- 	soc {
- 		flash at 30000000 {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/gemini-wbd111.dts b/arch/arm/boot/dts/gemini-wbd111.dts
-index b413fd12c5ba..3399a9fd292d 100644
---- a/arch/arm/boot/dts/gemini-wbd111.dts
-+++ b/arch/arm/boot/dts/gemini-wbd111.dts
-@@ -69,6 +69,19 @@
- 		};
- 	};
- 
-+	mdio0: ethernet-phy {
-+		compatible = "virtual,mdio-gpio";
-+		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
-+			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		phy0: ethernet-phy at 0 {
-+			reg = <1>;
-+			device_type = "ethernet-phy";
-+		};
-+	};
-+
- 	soc {
- 		flash at 30000000 {
- 			status = "okay";
-diff --git a/arch/arm/boot/dts/gemini-wbd222.dts b/arch/arm/boot/dts/gemini-wbd222.dts
-index 3ba710538662..0be3f57bca80 100644
---- a/arch/arm/boot/dts/gemini-wbd222.dts
-+++ b/arch/arm/boot/dts/gemini-wbd222.dts
-@@ -69,6 +69,24 @@
- 		};
- 	};
- 
-+	mdio0: ethernet-phy {
-+		compatible = "virtual,mdio-gpio";
-+		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
-+			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		phy0: ethernet-phy at 0 {
-+			reg = <1>;
-+			device_type = "ethernet-phy";
-+		};
-+
-+		phy1: ethernet-phy at 5 {
-+			reg = <3>;
-+			device_type = "ethernet-phy";
-+		};
-+	};
-+
- 	soc {
- 		flash at 30000000 {
- 			status = "okay";
--- 
-2.14.3
+    Andrew
