@@ -1,36 +1,44 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 29 Nov 2017 16:54:43 -0200
-Subject: [PATCH v2 10/11] ARM: dts: imx6sx: Fix spba-bus unit address
+Date: Wed, 29 Nov 2017 16:54:41 -0200
+Subject: [PATCH v2 08/11] ARM: dts: imx7s: Add unit address and reg for the
+ anatop nodes
 In-Reply-To: <1511981684-13433-1-git-send-email-festevam@gmail.com>
 References: <1511981684-13433-1-git-send-email-festevam@gmail.com>
-Message-ID: <1511981684-13433-10-git-send-email-festevam@gmail.com>
+Message-ID: <1511981684-13433-8-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-The correct unit address for spba-bus is 0x2240000, so change it
-accordingly in order to fix the following build warning with W=1:
+Add unit address and reg for the anatop nodes in order to fix the
+following build warnings with W=1:
 
-arch/arm/boot/dts/imx6sx-sabreauto.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 2200000/spba-bus at 2200000 simple-bus unit address format error, expected "2240000"
+arch/arm/boot/dts/imx7d-cl-som-imx7.dtb: Warning (simple_bus_reg): Node /soc/aips-bus at 30000000/anatop at 30360000/regulator-vdd1p0d missing or empty reg/ranges property
 
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Changes since v1:
+- None
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 07ba518..5a5f796 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -1150,7 +1150,7 @@
- 			reg = <0x02200000 0x100000>;
- 			ranges;
+ arch/arm/boot/dts/imx7s.dtsi | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 81467ac..2ceb37d 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -522,8 +522,11 @@
+ 				reg = <0x30360000 0x10000>;
+ 				interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+ 					<GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
++				#address-cells = <1>;
++				#size-cells = <0>;
  
--			spba-bus at 2200000 {
-+			spba-bus at 2240000 {
- 				compatible = "fsl,spba-bus", "simple-bus";
- 				#address-cells = <1>;
- 				#size-cells = <1>;
+-				reg_1p0d: regulator-vdd1p0d {
++				reg_1p0d: regulator-vdd1p0d at 30360210 {
++					reg = <0x30360210>;
+ 					compatible = "fsl,anatop-regulator";
+ 					regulator-name = "vdd1p0d";
+ 					regulator-min-microvolt = <800000>;
 -- 
 2.7.4
