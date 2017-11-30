@@ -1,104 +1,48 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:40 +0000
-Subject: [PATCH v2 12/18] arm64: entry: Explicitly pass exception level to
- kernel_ventry macro
+Date: Thu, 30 Nov 2017 16:39:43 +0000
+Subject: [PATCH v2 15/18] arm64: tls: Avoid unconditional zeroing of
+ tpidrro_el0 for native tasks
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-13-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-16-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We will need to treat exceptions from EL0 differently in kernel_ventry,
-so rework the macro to take the exception level as an argument and
-construct the branch target using that.
+When unmapping the kernel at EL0, we use tpidrro_el0 as a scratch register
+during exception entry from native tasks and subsequently zero it in
+the kernel_ventry macro. We can therefore avoid zeroing tpidrro_el0
+in the context-switch path for native tasks using the entry trampoline.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S | 46 +++++++++++++++++++++++-----------------------
- 1 file changed, 23 insertions(+), 23 deletions(-)
+ arch/arm64/kernel/process.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index dea196f287a0..688e52f65a8d 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -71,7 +71,7 @@
- #define BAD_FIQ		2
- #define BAD_ERROR	3
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index b2adcce7bc18..aba3a1fb492d 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -361,16 +361,14 @@ void tls_preserve_current_state(void)
  
--	.macro kernel_ventry	label
-+	.macro kernel_ventry, el, label, regsize = 64
- 	.align 7
- 	sub	sp, sp, #S_FRAME_SIZE
- #ifdef CONFIG_VMAP_STACK
-@@ -84,7 +84,7 @@
- 	tbnz	x0, #THREAD_SHIFT, 0f
- 	sub	x0, sp, x0			// x0'' = sp' - x0' = (sp + x0) - sp = x0
- 	sub	sp, sp, x0			// sp'' = sp' - x0 = (sp + x0) - x0 = sp
--	b	\label
-+	b	el\()\el\()_\label
+ static void tls_thread_switch(struct task_struct *next)
+ {
+-	unsigned long tpidr, tpidrro;
+-
+ 	tls_preserve_current_state();
  
- 0:
- 	/*
-@@ -116,7 +116,7 @@
- 	sub	sp, sp, x0
- 	mrs	x0, tpidrro_el0
- #endif
--	b	\label
-+	b	el\()\el\()_\label
- 	.endm
+-	tpidr = *task_user_tls(next);
+-	tpidrro = is_compat_thread(task_thread_info(next)) ?
+-		  next->thread.tp_value : 0;
++	if (is_compat_thread(task_thread_info(next)))
++		write_sysreg(next->thread.tp_value, tpidrro_el0);
++	else if (!arm64_kernel_unmapped_at_el0())
++		write_sysreg(0, tpidrro_el0);
  
- 	.macro	kernel_entry, el, regsize = 64
-@@ -369,31 +369,31 @@ tsk	.req	x28		// current thread_info
+-	write_sysreg(tpidr, tpidr_el0);
+-	write_sysreg(tpidrro, tpidrro_el0);
++	write_sysreg(*task_user_tls(next), tpidr_el0);
+ }
  
- 	.align	11
- ENTRY(vectors)
--	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
--	kernel_ventry	el1_irq_invalid			// IRQ EL1t
--	kernel_ventry	el1_fiq_invalid			// FIQ EL1t
--	kernel_ventry	el1_error_invalid		// Error EL1t
-+	kernel_ventry	1, sync_invalid			// Synchronous EL1t
-+	kernel_ventry	1, irq_invalid			// IRQ EL1t
-+	kernel_ventry	1, fiq_invalid			// FIQ EL1t
-+	kernel_ventry	1, error_invalid		// Error EL1t
- 
--	kernel_ventry	el1_sync			// Synchronous EL1h
--	kernel_ventry	el1_irq				// IRQ EL1h
--	kernel_ventry	el1_fiq_invalid			// FIQ EL1h
--	kernel_ventry	el1_error			// Error EL1h
-+	kernel_ventry	1, sync				// Synchronous EL1h
-+	kernel_ventry	1, irq				// IRQ EL1h
-+	kernel_ventry	1, fiq_invalid			// FIQ EL1h
-+	kernel_ventry	1, error			// Error EL1h
- 
--	kernel_ventry	el0_sync			// Synchronous 64-bit EL0
--	kernel_ventry	el0_irq				// IRQ 64-bit EL0
--	kernel_ventry	el0_fiq_invalid			// FIQ 64-bit EL0
--	kernel_ventry	el0_error			// Error 64-bit EL0
-+	kernel_ventry	0, sync				// Synchronous 64-bit EL0
-+	kernel_ventry	0, irq				// IRQ 64-bit EL0
-+	kernel_ventry	0, fiq_invalid			// FIQ 64-bit EL0
-+	kernel_ventry	0, error			// Error 64-bit EL0
- 
- #ifdef CONFIG_COMPAT
--	kernel_ventry	el0_sync_compat			// Synchronous 32-bit EL0
--	kernel_ventry	el0_irq_compat			// IRQ 32-bit EL0
--	kernel_ventry	el0_fiq_invalid_compat		// FIQ 32-bit EL0
--	kernel_ventry	el0_error_compat		// Error 32-bit EL0
-+	kernel_ventry	0, sync_compat, 32		// Synchronous 32-bit EL0
-+	kernel_ventry	0, irq_compat, 32		// IRQ 32-bit EL0
-+	kernel_ventry	0, fiq_invalid_compat, 32	// FIQ 32-bit EL0
-+	kernel_ventry	0, error_compat, 32		// Error 32-bit EL0
- #else
--	kernel_ventry	el0_sync_invalid		// Synchronous 32-bit EL0
--	kernel_ventry	el0_irq_invalid			// IRQ 32-bit EL0
--	kernel_ventry	el0_fiq_invalid			// FIQ 32-bit EL0
--	kernel_ventry	el0_error_invalid		// Error 32-bit EL0
-+	kernel_ventry	0, sync_invalid, 32		// Synchronous 32-bit EL0
-+	kernel_ventry	0, irq_invalid, 32		// IRQ 32-bit EL0
-+	kernel_ventry	0, fiq_invalid, 32		// FIQ 32-bit EL0
-+	kernel_ventry	0, error_invalid, 32		// Error 32-bit EL0
- #endif
- END(vectors)
- 
+ /* Restore the UAO state depending on next's addr_limit */
 -- 
 2.1.4
