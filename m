@@ -1,43 +1,112 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 30 Nov 2017 13:57:25 +0100
-Subject: [PATCH v2 3/4] ARM: dts: koelsch: Convert to named i2c-gpio bindings
-In-Reply-To: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
-References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <1512046646-15253-4-git-send-email-geert+renesas@glider.be>
+From: marco.franchi@nxp.com (Marco Franchi)
+Date: Thu, 30 Nov 2017 11:00:09 -0200
+Subject: [PATCH] ARM: dts: imx6sl-evk: Add DRM panel,
+ power-enable and backlight support
+Message-ID: <1512046809-18434-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
-named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
-gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
-more error-prone unnamed variant.
+From: Marco Frank <marco.franchi@nxp.com>
 
-Switch to the new bindings, and add the missing GPIO_OPEN_DRAIN I/O
-flags, which were implicitly assumed before.
+It is preferred to use the panel compatible string rather than passing 
+the LCD timming in the device tree.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+So pass the "sii,43wvf1g" compatible string, a new driver for the Seiko 
+Panel, which describes the parallel LCD.
+
+This new driver needs two power supply, so pass 'dvdd-supply' and 
+'avdd-supply', which makes the kernel to turn on the LCD on is own.
+
+Also, pass the 'backlight' property as described in 
+Documentation/devicetree/bindings/display/panel/simple-panel.txt
+
+Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 ---
-v2:
-  - New.
----
- arch/arm/boot/dts/r8a7791-koelsch.dts | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx6sl-evk.dts | 49 ++++++++++++++++++++--------------------
+ 1 file changed, 25 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index fac9cdea49650591..a50924d12b6f37d5 100644
---- a/arch/arm/boot/dts/r8a7791-koelsch.dts
-+++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -312,9 +312,8 @@
- 		#size-cells = <0>;
- 		compatible = "i2c-gpio";
- 		status = "disabled";
--		gpios = <&gpio7 16 GPIO_ACTIVE_HIGH /* sda */
--			 &gpio7 15 GPIO_ACTIVE_HIGH /* scl */
--			>;
-+		sda-gpios = <&gpio7 16 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+		scl-gpios = <&gpio7 15 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
- 		i2c-gpio,delay-us = <5>;
+diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
+index 0a90eea..d5148f4 100644
+--- a/arch/arm/boot/dts/imx6sl-evk.dts
++++ b/arch/arm/boot/dts/imx6sl-evk.dts
+@@ -20,7 +20,7 @@
+ 		reg = <0x80000000 0x40000000>;
  	};
  
+-	backlight {
++	backlight_display: backlight_display {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm1 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+@@ -91,6 +91,14 @@
+ 			gpio = <&gpio4 3 0>;
+ 			enable-active-high;
+ 		};
++
++		reg_lcd_5v: regulator at 5 {
++			compatible = "regulator-fixed";
++			reg = <5>;
++			regulator-name = "lcd-5v0";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++		};
+ 	};
+ 
+ 	sound {
+@@ -108,6 +116,19 @@
+ 		mux-int-port = <2>;
+ 		mux-ext-port = <3>;
+ 	};
++
++	panel {
++		compatible = "sii,43wvf1g";
++		backlight = <&backlight_display>;
++		dvdd-supply = <&reg_lcd_3v3>;
++		avdd-supply = <&reg_lcd_5v>;
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
+ 
+ &audmux {
+@@ -546,31 +567,11 @@
+ &lcdif {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcd>;
+-	lcd-supply = <&reg_lcd_3v3>;
+-	display = <&display0>;
+ 	status = "okay";
+ 
+-	display0: display0 {
+-		bits-per-pixel = <32>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: timing0 {
+-				clock-frequency = <33500000>;
+-				hactive = <800>;
+-				vactive = <480>;
+-				hback-porch = <89>;
+-				hfront-porch = <164>;
+-				vback-porch = <23>;
+-				vfront-porch = <10>;
+-				hsync-len = <10>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port {
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
 -- 
 2.7.4
