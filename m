@@ -1,58 +1,86 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 30 Nov 2017 14:09:56 +0100
-Subject: [PATCH] mmc: sdhci-of-arasan: Add sdhci_arasan_set_power
-In-Reply-To: <1511827377-2021-1-git-send-email-milan.o.stevanovic@gmail.com>
-References: <1511827377-2021-1-git-send-email-milan.o.stevanovic@gmail.com>
-Message-ID: <CAPDyKFqnUE4R=VU9Y9LhahUc3vbx14wE-XuGeTog0vHPrp59rg@mail.gmail.com>
+Date: Thu, 30 Nov 2017 14:21:42 +0100
+Subject: [PATCH v2] PM / Domains: Remove obsolete "samsung,
+ power-domain" check
+In-Reply-To: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
+References: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAPDyKFqnY6KCvhNM3WwGZRcUdyPyzs3PqLJ7LwKSnC7jQBVxEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 November 2017 at 01:02, Milan Stevanovic
-<milan.o.stevanovic@gmail.com> wrote:
-> The power register needs to have a valid voltage set
-> even when the power supply is managed by  an external regulator.
+On 30 November 2017 at 12:54, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Currently the generic PM Domain code code checks for the presence of
+> both (generic) "power-domains" and (Samsung Exynos legacy)
+> "samsung,power-domain" properties in all device tree nodes representing
+> devices.
 >
-> Signed-off-by: Milan Stevanovic <milan.o.stevanovic@gmail.com>
+> There are two issues with this:
+>   1. This imposes a small boot-time penalty on all platforms using DT,
+>   2. Platform-specific checks do not really belong in core framework
+>      code.
+>
+> Remove the platform-specific check, as the last user of
+> "samsung,power-domain" was removed in commit 46dcf0ff0de35da8 ("ARM:
+> dts: exynos: Remove exynos4415.dtsi").  All other users were converted
+> before in commit 0da6587041363033 ("ARM: dts: convert to generic power
+> domain bindings for exynos DT").
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks, applied for next!
+Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
 
 Kind regards
 Uffe
 
 > ---
->  drivers/mmc/host/sdhci-of-arasan.c | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+> This is v2 of 'PM / Domains: Restrict "samsung,power-domain" checks to
+> ARCH_EXYNOS'.
 >
-> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
-> index 0720ea7..fb57206 100644
-> --- a/drivers/mmc/host/sdhci-of-arasan.c
-> +++ b/drivers/mmc/host/sdhci-of-arasan.c
-> @@ -262,6 +262,17 @@ static int sdhci_arasan_voltage_switch(struct mmc_host *mmc,
->         return -EINVAL;
->  }
+> "samsung,power-domain" was only ever used in:
+>   - arch/arm/boot/dts/exynos4415.dtsi: Removed
+>   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
+>   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
+>   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
+>   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
+>   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
 >
-> +static void sdhci_arasan_set_power(struct sdhci_host *host, unsigned char mode,
-> +                    unsigned short vdd)
-> +{
-> +       if (!IS_ERR(host->mmc->supply.vmmc)) {
-> +               struct mmc_host *mmc = host->mmc;
-> +
-> +               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
-> +       }
-> +       sdhci_set_power_noreg(host, mode, vdd);
-> +}
-> +
->  static const struct sdhci_ops sdhci_arasan_ops = {
->         .set_clock = sdhci_arasan_set_clock,
->         .get_max_clock = sdhci_pltfm_clk_get_max_clock,
-> @@ -269,6 +280,7 @@ static const struct sdhci_ops sdhci_arasan_ops = {
->         .set_bus_width = sdhci_set_bus_width,
->         .reset = sdhci_arasan_reset,
->         .set_uhs_signaling = sdhci_set_uhs_signaling,
-> +       .set_power = sdhci_arasan_set_power,
->  };
+> v2:
+>   - Remove the check completely instead of restricting it to
+>     ARCH_EXYNOS, as suggested Javier Martinez Canillas one year ago
+>     ("Removing the support for the deprecated property sound sensible to me",
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462868.html).
+> ---
+>  drivers/base/power/domain.c | 16 ++--------------
+>  1 file changed, 2 insertions(+), 14 deletions(-)
 >
->  static const struct sdhci_pltfm_data sdhci_arasan_pdata = {
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 0c80bea05bcb92be..f9dcc981b6b9328c 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -2199,20 +2199,8 @@ int genpd_dev_pm_attach(struct device *dev)
+>
+>         ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
+>                                         "#power-domain-cells", 0, &pd_args);
+> -       if (ret < 0) {
+> -               if (ret != -ENOENT)
+> -                       return ret;
+> -
+> -               /*
+> -                * Try legacy Samsung-specific bindings
+> -                * (for backwards compatibility of DT ABI)
+> -                */
+> -               pd_args.args_count = 0;
+> -               pd_args.np = of_parse_phandle(dev->of_node,
+> -                                               "samsung,power-domain", 0);
+> -               if (!pd_args.np)
+> -                       return -ENOENT;
+> -       }
+> +       if (ret < 0)
+> +               return ret;
+>
+>         mutex_lock(&gpd_list_lock);
+>         pd = genpd_get_from_provider(&pd_args);
 > --
 > 2.7.4
 >
