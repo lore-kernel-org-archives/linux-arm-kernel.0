@@ -1,86 +1,100 @@
 From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 30 Nov 2017 14:21:42 +0100
-Subject: [PATCH v2] PM / Domains: Remove obsolete "samsung,
- power-domain" check
-In-Reply-To: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
-References: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAPDyKFqnY6KCvhNM3WwGZRcUdyPyzs3PqLJ7LwKSnC7jQBVxEw@mail.gmail.com>
+Date: Thu, 30 Nov 2017 14:24:49 +0100
+Subject: [PATCH] clk: Manage proper runtime PM state in clk_change_rate()
+In-Reply-To: <20171130121451.6710-1-m.szyprowski@samsung.com>
+References: <CGME20171130121511eucas1p1832c1f6e5bc9e263860e40478efca132@eucas1p1.samsung.com>
+ <20171130121451.6710-1-m.szyprowski@samsung.com>
+Message-ID: <CAPDyKFquGA49j5YaO2wohatwaU7fF4RDUYOgKGx-OX1g74Uk-A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 November 2017 at 12:54, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Currently the generic PM Domain code code checks for the presence of
-> both (generic) "power-domains" and (Samsung Exynos legacy)
-> "samsung,power-domain" properties in all device tree nodes representing
-> devices.
+On 30 November 2017 at 13:14, Marek Szyprowski <m.szyprowski@samsung.com> wrote:
+> clk_change_rate() propagates rate change down to all its children. Such
+> operation requires managing proper runtime PM state of each child, what
+> was missing. Add needed calls to clk_pm_runtime*() to ensure that
+> set_rate() clock callback is called on runtime active clock.
 >
-> There are two issues with this:
->   1. This imposes a small boot-time penalty on all platforms using DT,
->   2. Platform-specific checks do not really belong in core framework
->      code.
+> This fixes following issue found on Exynos5433 TM2 board with devfreq
+> enabled:
 >
-> Remove the platform-specific check, as the last user of
-> "samsung,power-domain" was removed in commit 46dcf0ff0de35da8 ("ARM:
-> dts: exynos: Remove exynos4415.dtsi").  All other users were converted
-> before in commit 0da6587041363033 ("ARM: dts: convert to generic power
-> domain bindings for exynos DT").
+> Synchronous External Abort: synchronous external abort (0x96000210) at 0xffffff80093f5600
+> Internal error: : 96000210 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 0 PID: 5 Comm: kworker/u16:0 Not tainted 4.15.0-rc1-next-20171129+ #4
+> Hardware name: Samsung TM2 board (DT)
+> Workqueue: devfreq_wq devfreq_monitor
+> task: ffffffc0ca96b600 task.stack: ffffff80093a8000
+> pstate: a0000085 (NzCv daIf -PAN -UAO)
+> pc : clk_divider_set_rate+0x54/0x118
+> lr : clk_divider_set_rate+0x44/0x118
+> ...
+> Process kworker/u16:0 (pid: 5, stack limit = 0xffffff80093a8000)
+> Call trace:
+>  clk_divider_set_rate+0x54/0x118
+>  clk_change_rate+0xfc/0x4e0
+>  clk_change_rate+0x1f0/0x4e0
+>  clk_change_rate+0x1f0/0x4e0
+>  clk_change_rate+0x1f0/0x4e0
+>  clk_core_set_rate_nolock+0x138/0x148
+>  clk_set_rate+0x28/0x50
+>  exynos_bus_passive_target+0x6c/0x11c
+>  update_devfreq_passive+0x58/0xb4
+>  devfreq_passive_notifier_call+0x50/0x5c
+>  notifier_call_chain+0x4c/0x88
+>  __srcu_notifier_call_chain+0x54/0x80
+>  srcu_notifier_call_chain+0x14/0x1c
+>  update_devfreq+0x100/0x1b4
+>  devfreq_monitor+0x2c/0x88
+>  process_one_work+0x148/0x3d8
+>  worker_thread+0x13c/0x3f8
+>  kthread+0x100/0x12c
+>  ret_from_fork+0x10/0x18
 >
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Reported-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Fixes: 9a34b45397e5 ("clk: Add support for runtime PM")
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
 
-Acked-by: Ulf Hansson <ulf.hansson@linaro.org>
+Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
 
 Kind regards
 Uffe
 
 > ---
-> This is v2 of 'PM / Domains: Restrict "samsung,power-domain" checks to
-> ARCH_EXYNOS'.
+> For some unknown reason handling of this case was missing in the initial
+> patch, which added runtime PM support for clock core. Even tests in
+> linux-next did not revealed this issue. This patch finaly fixes it,
+> as it is now easy to trigger it with v4.15-rc1.
 >
-> "samsung,power-domain" was only ever used in:
->   - arch/arm/boot/dts/exynos4415.dtsi: Removed
->   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
->   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
->   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
->   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
->   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
->
-> v2:
->   - Remove the check completely instead of restricting it to
->     ARCH_EXYNOS, as suggested Javier Martinez Canillas one year ago
->     ("Removing the support for the deprecated property sound sensible to me",
->     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462868.html).
+> Best regards
+> Marek Szyprowski
+> Samsung R&D Institute Poland
 > ---
->  drivers/base/power/domain.c | 16 ++--------------
->  1 file changed, 2 insertions(+), 14 deletions(-)
+>  drivers/clk/clk.c | 5 +++++
+>  1 file changed, 5 insertions(+)
 >
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 0c80bea05bcb92be..f9dcc981b6b9328c 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -2199,20 +2199,8 @@ int genpd_dev_pm_attach(struct device *dev)
+> diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+> index 647d056df88c..8a1860a36c77 100644
+> --- a/drivers/clk/clk.c
+> +++ b/drivers/clk/clk.c
+> @@ -1564,6 +1564,9 @@ static void clk_change_rate(struct clk_core *core)
+>                 best_parent_rate = core->parent->rate;
+>         }
 >
->         ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
->                                         "#power-domain-cells", 0, &pd_args);
-> -       if (ret < 0) {
-> -               if (ret != -ENOENT)
-> -                       return ret;
-> -
-> -               /*
-> -                * Try legacy Samsung-specific bindings
-> -                * (for backwards compatibility of DT ABI)
-> -                */
-> -               pd_args.args_count = 0;
-> -               pd_args.np = of_parse_phandle(dev->of_node,
-> -                                               "samsung,power-domain", 0);
-> -               if (!pd_args.np)
-> -                       return -ENOENT;
-> -       }
-> +       if (ret < 0)
-> +               return ret;
+> +       if (clk_pm_runtime_get(core))
+> +               return;
+> +
+>         if (core->flags & CLK_SET_RATE_UNGATE) {
+>                 unsigned long flags;
 >
->         mutex_lock(&gpd_list_lock);
->         pd = genpd_get_from_provider(&pd_args);
+> @@ -1634,6 +1637,8 @@ static void clk_change_rate(struct clk_core *core)
+>         /* handle the new child who might not be in core->children yet */
+>         if (core->new_child)
+>                 clk_change_rate(core->new_child);
+> +
+> +       clk_pm_runtime_put(core);
+>  }
+>
+>  static int clk_core_set_rate_nolock(struct clk_core *core,
 > --
-> 2.7.4
+> 2.15.0
 >
