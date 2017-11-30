@@ -1,33 +1,42 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Thu, 30 Nov 2017 21:01:34 +0100
-Subject: [PATCH v3 5/6] ARM: ep93xx: ts72xx: cosmetic: Add some
- description to ts72xx code
-In-Reply-To: <BLUPR0101MB155444953DA2E47B0AEE80BFD0380@BLUPR0101MB1554.prod.exchangelabs.com>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171130004510.23887-1-lukma@denx.de>
- <20171130004510.23887-6-lukma@denx.de>
- <BLUPR0101MB155444953DA2E47B0AEE80BFD0380@BLUPR0101MB1554.prod.exchangelabs.com>
-Message-ID: <20171130210134.e6f23f8996e58e6adb79654b@gmail.com>
+From: tyler@opensourcefoundries.com (tyler at opensourcefoundries.com)
+Date: Thu, 30 Nov 2017 12:14:26 -0800
+Subject: [PATCH 0/8] ARM: dts: introduce Compulab IoT Gateway
+Message-ID: <20171130201434.14122-1-tyler@opensourcefoundries.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Hartley!
+From: Tyler Baker <tyler@opensourcefoundries.com>
 
-On Thu, 30 Nov 2017 17:23:02 +0000
-Hartley Sweeten <HartleyS@visionengravers.com> wrote:
+The Compulab IoT Gateway is based on an NXP i.MX7D, dual core
+Cortex-A7 clocking at 1GHz. It supports up to 2GB of DDR3,
+and 32GB of eMMC flash. Onboard, there are two gigabit
+ethernet controllers, 4 x USB2, RS485, and CAN.
 
-> > +/**********************************************************************
-> > +***
-> > + * IO map
-> > + 
-> > +***********************************************************************
-> > +**/
-> 
-> There is also something funny with the patch. The lines above appear to be getting split incorrectly.
+It uses the same SoM as the cl-som-imx7, but includes a baseboard 
+with additional I/O.
 
-That's definitely not the case, I can apply the patch to 4.14 just fine and
-there is no funny wrapping. But you are right about the rest, it should be
-re-based.
+Compulab has provided patches for this platform based on v4.1. 
+I've used these patches as reference to get things working on tip.
+
+The entire series is based on v4.15-rc1.
+
+Tyler Baker (8):
+  ARM: dts: imx7d-sbc-iot: add initial iot gateway dts
+  ARM: dts: imx7: build imx7d-sbc-iot-imx7 dtb
+  ARM: dts: imx7d-cl-som: add nodes for usbh, and usbotg2
+  ARM: dts: imx7s: add dma support
+  ARM: dts: imx7s: add node and supplies for vdd1p2
+  ARM: dts: imx7d-sbc-iot: enable PCIe peripheral
+  ARM: dts: imx7s: add usb hsic phy domain
+  PCIe: imx6: imx7d: add support for phy refclk source
+
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/imx7d-cl-som-imx7.dts  |  36 ++++-
+ arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts | 252 +++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7s.dtsi             |  29 +++-
+ drivers/pci/dwc/pci-imx6.c               |   8 +-
+ 5 files changed, 316 insertions(+), 10 deletions(-)
+ create mode 100644 arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts
 
 -- 
-Alexander Sverdlin.
+2.9.3
