@@ -1,110 +1,70 @@
-From: marco.franchi@nxp.com (Marco Franchi)
-Date: Thu, 30 Nov 2017 11:02:09 -0200
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Add DRM panel,
- power-enable and backlight support
-Message-ID: <1512046929-18597-1-git-send-email-marco.franchi@nxp.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 30 Nov 2017 14:05:54 +0100
+Subject: [PATCH v2] clk: stm32-h7: fix copyright
+In-Reply-To: <CAOFm3uGMHrNyov=BkrXbJQeHnMgZCHK7ogTru8Bj9An7aTz9DQ@mail.gmail.com>
+References: <20171130084108.23083-1-benjamin.gaignard@st.com>
+ <CAOFm3uG_7kChnvxW0SbHSMP5q_KSZeaNxjkKb774ZmcwukJ_Mw@mail.gmail.com>
+ <CA+M3ks41cBBqDrEGFZm5yGO0j8funfTAaTf_u2cJoD1p3XpQUQ@mail.gmail.com>
+ <CAOFm3uGMHrNyov=BkrXbJQeHnMgZCHK7ogTru8Bj9An7aTz9DQ@mail.gmail.com>
+Message-ID: <CA+M3ks4pva9Kg+gj44KeUrDcKf9tn5O-0VkTv5uUebJ=812E3Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is preferred to use the panel compatible string rather than passing 
-the LCD timming in the device tree.
+2017-11-30 13:56 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
+> On Thu, Nov 30, 2017 at 1:47 PM, Benjamin Gaignard
+> <benjamin.gaignard@linaro.org> wrote:
+>> 2017-11-30 12:28 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
+>>> On Thu, Nov 30, 2017 at 9:41 AM, Benjamin Gaignard
+>>> <benjamin.gaignard@linaro.org> wrote:
+>>>> Uniformize STMicroelectronics copyrights header
+>>>> Add SPDX identifier
+>>>>
+>>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>>>> CC: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>> ---
+>>>>  drivers/clk/clk-stm32h7.c | 19 +++----------------
+>>>>  1 file changed, 3 insertions(+), 16 deletions(-)
+>>>>
+>>>> diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
+>>>> index 61c3e40507d3..db2b162c0d4c 100644
+>>>> --- a/drivers/clk/clk-stm32h7.c
+>>>> +++ b/drivers/clk/clk-stm32h7.c
+>>>> @@ -1,20 +1,7 @@
+>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>>  /*
+>>>> - * Copyright (C) Gabriel Fernandez 2017
+>>>> - * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>> - *
+>>>> - * License terms: GPL V2.0.
+>>>> - *
+>>>> - * This program is free software; you can redistribute it and/or modify it
+>>>> - * under the terms and conditions of the GNU General Public License,
+>>>> - * version 2, as published by the Free Software Foundation.
+>>>> - *
+>>>> - * This program is distributed in the hope it will be useful, but WITHOUT
+>>>> - * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>>>> - * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>>>> - * more details.
+>>>> - *
+>>>> - * You should have received a copy of the GNU General Public License along with
+>>>> - * this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>> + * Copyright (C) STMicroelectronics 2017
+>>>> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
+>>>>   */
+>>>>
+>>>>  #include <linux/clk.h>
+>>>
+>>> Awesome! Don't you like it when you remove this type of things?
+>>
+>> Yes but is also means that many other STM files need to be updated...
+>
+> Sure thing. I have a FLOSS tool to help with this FWIW. I would be
+> glad to help as needed.
 
-So pass the "sii,43wvf1g" compatible string, a new driver for the Seiko 
-Panel, which describes the parallel LCD.
+Do you have a link to this tool ?
 
-This new driver needs two power supply, so pass 'dvdd-supply' and 
-'avdd-supply', which makes the kernel to turn on the LCD on is own.
-
-Also, pass the 'backlight' property as described in 
-Documentation/devicetree/bindings/display/panel/simple-panel.txt
-
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
- arch/arm/boot/dts/imx6sx-sdb.dtsi | 49 ++++++++++++++++++++-------------------
- 1 file changed, 25 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-index da81552..3a597a4 100644
---- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-+++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-@@ -24,7 +24,7 @@
- 		reg = <0x80000000 0x40000000>;
- 	};
- 
--	backlight {
-+	backlight_display: backlight-display {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm3 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -129,6 +129,14 @@
- 			regulator-max-microvolt = <3300000>;
- 			gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
- 		};
-+
-+		reg_lcd_5v: regulator at 7 {
-+			compatible = "regulator-fixed";
-+			reg = <7>;
-+			regulator-name = "lcd-5v0";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+		};
- 	};
- 
- 	sound {
-@@ -146,6 +154,19 @@
- 		mux-int-port = <2>;
- 		mux-ext-port = <6>;
- 	};
-+
-+	panel {
-+		compatible = "sii,43wvf1g";
-+		backlight = <&backlight_display>;
-+		dvdd-supply = <&reg_lcd_3v3>;
-+		avdd-supply = <&reg_lcd_5v>;
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&display_out>;
-+			};
-+		};
-+	};
- };
- 
- &audmux {
-@@ -215,31 +236,11 @@
- &lcdif1 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_lcd>;
--	lcd-supply = <&reg_lcd_3v3>;
--	display = <&display0>;
- 	status = "okay";
- 
--	display0: display0 {
--		bits-per-pixel = <16>;
--		bus-width = <24>;
--
--		display-timings {
--			native-mode = <&timing0>;
--			timing0: timing0 {
--				clock-frequency = <33500000>;
--				hactive = <800>;
--				vactive = <480>;
--				hback-porch = <89>;
--				hfront-porch = <164>;
--				vback-porch = <23>;
--				vfront-porch = <10>;
--				hsync-len = <10>;
--				vsync-len = <10>;
--				hsync-active = <0>;
--				vsync-active = <0>;
--				de-active = <1>;
--				pixelclk-active = <0>;
--			};
-+	port {
-+		display_out: endpoint {
-+			remote-endpoint = <&panel_in>;
- 		};
- 	};
- };
--- 
-2.7.4
+>
+> --
+> Cordially
+> Philippe Ombredanne
