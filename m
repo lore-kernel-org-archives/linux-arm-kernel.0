@@ -1,94 +1,58 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 29 Nov 2017 17:11:27 -0800
-Subject: [PATCH] arm64: dts: rockchip: add mipi_dsi1 support for rk3399
-In-Reply-To: <20171130010723.GA133459@google.com>
-References: <20171129233541.51337-1-briannorris@chromium.org>
- <20171130010723.GA133459@google.com>
-Message-ID: <20171130011127.GB124672@google.com>
+From: xieyisheng1@huawei.com (Yisheng Xie)
+Date: Thu, 30 Nov 2017 09:11:58 +0800
+Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
+ from devices
+In-Reply-To: <3338635f-f2ba-4b78-a72b-2568645f7df3@arm.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-6-jean-philippe.brucker@arm.com>
+ <9c364147-12c4-5a8a-9cd9-0642a6b92555@huawei.com>
+ <3338635f-f2ba-4b78-a72b-2568645f7df3@arm.com>
+Message-ID: <7ba3d70a-2364-2a92-39a8-ed112807b83c@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Nickey Yang <nickey.yang@rock-chips.com>
+Hi, Jean,
 
-This patch adds the information for the secondary MIPI DSI controller,
-e.g., interrupts, grf, clocks, ports and so on. Mirrors the existing
-definition for dsi0.
+On 2017/11/29 23:01, Jean-Philippe Brucker wrote:
+> On 29/11/17 06:08, Yisheng Xie wrote:
+>>
+>>
+>> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+>>> +int iommu_process_bind_device(struct device *dev, struct task_struct *task,
+>>> +			      int *pasid, int flags)
+>>> +{
+>> [..]
+>>> +			err = iommu_process_attach_locked(context, dev);
+>>> +			if (err)
+>>> +				iommu_process_put_locked(process);
+>> one ref for a context is enough right? so also need call iommu_process_put_locked()
+>> if attach ok, or will be leak if user call bind twice for the same device and task.
+> 
+> I wasn't sure, I think I prefer taking one ref for each bind. If user
+> calls bind twice, it should call unbind twice as well (in case of leak we
+> free the context on process exit).
+> 
+> Also with this implementation, user can call bind for two devices in the
+> same domain, which will share the same context structure. So we have to
+> take as many refs as bind() calls.
 
-Signed-off-by: Nickey Yang <nickey.yang@rock-chips.com>
-Signed-off-by: Brian Norris <briannorris@chromium.org>
----
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 45 ++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 8940a3dc3670..e7e882d06c68 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1526,6 +1526,11 @@
- 				reg = <2>;
- 				remote-endpoint = <&hdmi_in_vopl>;
- 			};
-+
-+			vopl_out_mipi1: endpoint at 3 {
-+				reg = <3>;
-+				remote-endpoint = <&mipi1_in_vopl>;
-+			};
- 		};
- 	};
- 
-@@ -1573,6 +1578,11 @@
- 				reg = <2>;
- 				remote-endpoint = <&hdmi_in_vopb>;
- 			};
-+
-+			vopb_out_mipi1: endpoint at 3 {
-+				reg = <3>;
-+				remote-endpoint = <&mipi1_in_vopb>;
-+			};
- 		};
- 	};
- 
-@@ -1674,6 +1684,41 @@
- 		};
- 	};
- 
-+	mipi_dsi1: mipi at ff968000 {
-+		compatible = "rockchip,rk3399-mipi-dsi", "snps,dw-mipi-dsi";
-+		reg = <0x0 0xff968000 0x0 0x8000>;
-+		interrupts = <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&cru SCLK_DPHY_PLL>, <&cru PCLK_MIPI_DSI1>,
-+			 <&cru SCLK_DPHY_TX1RX1_CFG>, <&cru PCLK_VIO_GRF>;
-+		clock-names = "ref", "pclk", "phy_cfg", "grf";
-+		power-domains = <&power RK3399_PD_VIO>;
-+		resets = <&cru SRST_P_MIPI_DSI1>;
-+		reset-names = "apb";
-+		rockchip,grf = <&grf>;
-+		status = "disabled";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			mipi1_in: port at 0 {
-+				reg = <0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mipi1_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_mipi1>;
-+				};
-+
-+				mipi1_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_mipi1>;
-+				};
-+			};
-+		};
-+	};
-+
- 	edp: edp at ff970000 {
- 		compatible = "rockchip,rk3399-edp";
- 		reg = <0x0 0xff970000 0x0 0x8000>;
--- 
-2.15.0.531.g2ccb3012c9-goog
+hmm, it has two ref, one for _context_ and the other for *process* (or maybe mm for
+your next version), right? For each bind it will take a ref of context as present
+design. but why also process ref need be taken for each bind? I mean it seems does
+not break _user can call bind for two devices in the same domain_.
+
+And if you really want to take a ref of *process* for echo bind, you should put it when
+unbind, right? I just not find where you put the ref of process when unbind. But just put
+the process ref when free context.
+
+Maybe I just miss something.
+
+Thanks
+Yisheng Xie
+> 
+> Thanks,
+> Jean
+> 
+> .
+> 
