@@ -1,312 +1,80 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Nov 2017 14:40:29 +0100
-Subject: [PATCH 3/3] clk: mvebu: armada-37xx-periph: add DVFS support for cpu
- clocks
-In-Reply-To: <20171130134029.20751-1-gregory.clement@free-electrons.com>
-References: <20171130134029.20751-1-gregory.clement@free-electrons.com>
-Message-ID: <20171130134029.20751-4-gregory.clement@free-electrons.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 30 Nov 2017 14:42:10 +0100
+Subject: [PATCH] rtc: add mxc driver for i.MX53
+In-Reply-To: <3BB206AB2B1BD448954845CE6FF69A8E01CB531330@NT-Mail07.beckhoff.com>
+References: <20171128073927.12035-1-linux-kernel-dev@beckhoff.com>
+ <20171129221114.GV21126@piout.net>
+ <CAOFm3uFb8Jo9detD2CziuYt_DH_ohYD9P=uvqHugKDxpN+xvAQ@mail.gmail.com>
+ <3BB206AB2B1BD448954845CE6FF69A8E01CB531330@NT-Mail07.beckhoff.com>
+Message-ID: <20171130134209.GX21126@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When DVFS is enabled the CPU clock setting is done using an other set of
-registers.
+Hi,
 
-These Power Management registers are exposed through a syscon as they
-will also be used by other drivers such as the cpufreq.
+On 30/11/2017 at 13:36:22 +0000, Patrick Br?nn wrote:
+> >From: Philippe Ombredanne [mailto:pombredanne at nexb.com]
+> >Sent: Donnerstag, 30. November 2017 09:18
+> >>
+> >>> +/*
+> >>> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
+> >Reserved.
+> >>> + */
+> >>> +
+> >>> +/*
+> >>> + * The code contained herein is licensed under the GNU General Public
+> >>> + * License. You may obtain a copy of the GNU General Public License
+> >>> + * Version 2 or later at the following locations:
+> >>> + *
+> >>> + * http://www.opensource.org/licenses/gpl-license.html
+> >>> + * http://www.gnu.org/copyleft/gpl.html
+> >>> + */
+> >
+> >Exactly!
+> >And while you are it , you could replace the boilerplate license text
+> >with the SPDX id.
+> >--
+> 
+> How would a perfect header look like?
+> Looking at :
+> git show b24413180f5600bcb3bb70fbed5cf186b60864bd -- drivers/
+> and:
+> git grep SPDX -- Documentation/
+> 
+> it could be:
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/*
+> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
+> + */
+> or:
+> +// SPDX-License-Identifier: GPL-2.0
+> +/*
+> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
+> + */
+> 
+> Personally I would prefer:
+> +/*
+> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
+> + *
+> + * SPDX-License-Identifier: GPL-2.0
+> + */
+> 
+> So, is there any guideline?
+> 
 
-This patch add the possibility to modify the CPU frequency using the
-associate load level matching the target frequency. Then all the
-frequency switch is handle by the hardware.
+I'm quoting LWN here:
 
-Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
----
- drivers/clk/mvebu/armada-37xx-periph.c | 219 ++++++++++++++++++++++++++++++++-
- 1 file changed, 215 insertions(+), 4 deletions(-)
+"For normal C source files, the string will be a comment using the "//"
+syntax; header files, instead, use traditional (/* */) comments for
+reasons related to tooling."
 
-diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
-index ef725ec73c93..0fd7a671a76d 100644
---- a/drivers/clk/mvebu/armada-37xx-periph.c
-+++ b/drivers/clk/mvebu/armada-37xx-periph.c
-@@ -21,9 +21,11 @@
-  */
- 
- #include <linux/clk-provider.h>
-+#include <linux/mfd/syscon.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
- #include <linux/platform_device.h>
-+#include <linux/regmap.h>
- #include <linux/slab.h>
- 
- #define TBG_SEL		0x0
-@@ -33,6 +35,26 @@
- #define CLK_SEL		0x10
- #define CLK_DIS		0x14
- 
-+#define LOAD_LEVEL_NR	4
-+
-+#define ARMADA_37XX_NB_L0L1	0x18
-+#define ARMADA_37XX_NB_L2L3	0x1C
-+#define		ARMADA_37XX_NB_TBG_DIV_OFF	13
-+#define		ARMADA_37XX_NB_TBG_DIV_MASK	0x7
-+#define		ARMADA_37XX_NB_CLK_SEL_OFF	11
-+#define		ARMADA_37XX_NB_CLK_SEL_MASK	0x1
-+#define		ARMADA_37XX_NB_TBG_SEL_OFF	9
-+#define		ARMADA_37XX_NB_TBG_SEL_MASK	0x3
-+#define		ARMADA_37XX_NB_CONFIG_SHIFT	16
-+#define ARMADA_37XX_NB_DYN_MOD	0x24
-+#define		ARMADA_37XX_NB_DFS_EN	31
-+#define ARMADA_37XX_NB_CPU_LOAD	0x30
-+#define		ARMADA_37XX_NB_CPU_LOAD_MASK	0x3
-+#define		ARMADA_37XX_DVFS_LOAD_0		0
-+#define		ARMADA_37XX_DVFS_LOAD_1		1
-+#define		ARMADA_37XX_DVFS_LOAD_2		2
-+#define		ARMADA_37XX_DVFS_LOAD_3		3
-+
- struct clk_periph_driver_data {
- 	struct clk_hw_onecell_data *hw_data;
- 	spinlock_t lock;
-@@ -53,6 +75,7 @@ struct clk_pm_cpu {
- 	u32 mask_mux;
- 	void __iomem *reg_div;
- 	u8 shift_div;
-+	struct regmap *nb_pm_base;
- };
- 
- #define to_clk_double_div(_hw) container_of(_hw, struct clk_double_div, hw)
-@@ -316,14 +339,94 @@ static const struct clk_ops clk_double_div_ops = {
- 	.recalc_rate = clk_double_div_recalc_rate,
- };
- 
-+static void armada_3700_pm_dvfs_update_regs(unsigned int load_level,
-+					    unsigned int *reg,
-+					    unsigned int *offset)
-+{
-+	if (load_level <= ARMADA_37XX_DVFS_LOAD_1)
-+		*reg = ARMADA_37XX_NB_L0L1;
-+	else
-+		*reg = ARMADA_37XX_NB_L2L3;
-+
-+	if (load_level == ARMADA_37XX_DVFS_LOAD_0 ||
-+	    load_level ==  ARMADA_37XX_DVFS_LOAD_2)
-+		*offset += ARMADA_37XX_NB_CONFIG_SHIFT;
-+}
-+
-+static bool armada_3700_pm_dvfs_is_enabled(struct regmap *base)
-+{
-+	unsigned int val, reg = ARMADA_37XX_NB_DYN_MOD;
-+
-+	if (IS_ERR(base))
-+		return false;
-+
-+	regmap_read(base, reg, &val);
-+
-+	return !!(val & BIT(ARMADA_37XX_NB_DFS_EN));
-+}
-+
-+static unsigned int armada_3700_pm_dvfs_get_cpu_div(struct regmap *base)
-+{
-+	unsigned int reg = ARMADA_37XX_NB_CPU_LOAD;
-+	unsigned int offset = ARMADA_37XX_NB_TBG_DIV_OFF;
-+	unsigned int load_level, div;
-+
-+	/*
-+	 * This function is always called after the function
-+	 * armada_3700_pm_dvfs_is_enabled, so no need to check again
-+	 * if the base is valid.
-+	 */
-+	regmap_read(base, reg, &load_level);
-+
-+	/*
-+	 * The register and the offset inside this register accessed to
-+	 * read the current divider depend on the load level
-+	 */
-+	load_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
-+	armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
-+
-+	regmap_read(base, reg, &div);
-+
-+	return (div >> offset) & ARMADA_37XX_NB_TBG_DIV_MASK;
-+}
-+
-+static unsigned int armada_3700_pm_dvfs_get_cpu_parent(struct regmap *base)
-+{
-+	unsigned int reg = ARMADA_37XX_NB_CPU_LOAD;
-+	unsigned int offset = ARMADA_37XX_NB_TBG_SEL_OFF;
-+	unsigned int load_level, sel;
-+
-+	/*
-+	 * This function is always called after the function
-+	 * armada_3700_pm_dvfs_is_enabled, so no need to check again
-+	 * if the base is valid
-+	 */
-+	regmap_read(base, reg, &load_level);
-+
-+	/*
-+	 * The register and the offset inside this register accessed to
-+	 * read the current divider depend on the load level
-+	 */
-+	load_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
-+	armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
-+
-+	regmap_read(base, reg, &sel);
-+
-+	return (sel >> offset) & ARMADA_37XX_NB_TBG_SEL_MASK;
-+}
-+
- static u8 clk_pm_cpu_get_parent(struct clk_hw *hw)
- {
- 	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
- 	int num_parents = clk_hw_get_num_parents(hw);
- 	u32 val;
- 
--	val = readl(pm_cpu->reg_mux) >> pm_cpu->shift_mux;
--	val &= pm_cpu->mask_mux;
-+	if (armada_3700_pm_dvfs_is_enabled(pm_cpu->nb_pm_base)) {
-+		val = armada_3700_pm_dvfs_get_cpu_parent(pm_cpu->nb_pm_base);
-+	} else {
-+		val = readl(pm_cpu->reg_mux) >> pm_cpu->shift_mux;
-+		val &= pm_cpu->mask_mux;
-+	}
- 
- 	if (val >= num_parents)
- 		return -EINVAL;
-@@ -331,19 +434,124 @@ static u8 clk_pm_cpu_get_parent(struct clk_hw *hw)
- 	return val;
- }
- 
-+static int clk_pm_cpu_set_parent(struct clk_hw *hw, u8 index)
-+{
-+	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
-+	struct regmap *base = pm_cpu->nb_pm_base;
-+	int load_level;
-+
-+	/*
-+	 * We set the clock parent only if the DVFS is available but
-+	 * not enabled.
-+	 */
-+	if (IS_ERR(base) || armada_3700_pm_dvfs_is_enabled(base))
-+		return -EINVAL;
-+
-+	/* Set the parent clock for all the load level */
-+	for (load_level = 0; load_level < LOAD_LEVEL_NR; load_level++) {
-+		unsigned int reg, mask,  val,
-+			offset = ARMADA_37XX_NB_TBG_SEL_OFF;
-+
-+		armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
-+
-+		val = index << offset;
-+		mask = ARMADA_37XX_NB_TBG_SEL_MASK << offset;
-+		regmap_update_bits(base, reg, mask, val);
-+	}
-+	return 0;
-+}
-+
- static unsigned long clk_pm_cpu_recalc_rate(struct clk_hw *hw,
- 					    unsigned long parent_rate)
- {
- 	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
- 	unsigned int div;
- 
--	div = get_div(pm_cpu->reg_div, pm_cpu->shift_div);
--
-+	if (armada_3700_pm_dvfs_is_enabled(pm_cpu->nb_pm_base))
-+		div = armada_3700_pm_dvfs_get_cpu_div(pm_cpu->nb_pm_base);
-+	else
-+		div = get_div(pm_cpu->reg_div, pm_cpu->shift_div);
- 	return DIV_ROUND_UP_ULL((u64)parent_rate, div);
- }
- 
-+static long clk_pm_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
-+				  unsigned long *parent_rate)
-+{
-+	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
-+	struct regmap *base = pm_cpu->nb_pm_base;
-+	unsigned int div = *parent_rate / rate;
-+	unsigned int load_level;
-+	/* only available when DVFS is enabled */
-+	if (!armada_3700_pm_dvfs_is_enabled(base))
-+		return -EINVAL;
-+
-+	for (load_level = 0; load_level < LOAD_LEVEL_NR; load_level++) {
-+		unsigned int reg, val, offset = ARMADA_37XX_NB_TBG_DIV_OFF;
-+
-+		armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
-+
-+		regmap_read(base, reg, &val);
-+
-+		val >>= offset;
-+		val &= ARMADA_37XX_NB_TBG_DIV_MASK;
-+		if (val == div)
-+			/*
-+			 * We found a load level matching the target
-+			 * divider, switch to this load level and
-+			 * return.
-+			 */
-+			return *parent_rate / div;
-+	}
-+
-+	/* We didn't find any valid divider */
-+	return -EINVAL;
-+}
-+
-+static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
-+			       unsigned long parent_rate)
-+{
-+	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
-+	struct regmap *base = pm_cpu->nb_pm_base;
-+	unsigned int div = parent_rate / rate;
-+	unsigned int load_level;
-+
-+	/* only available when DVFS is enabled */
-+	if (!armada_3700_pm_dvfs_is_enabled(base))
-+		return -EINVAL;
-+
-+	for (load_level = 0; load_level < LOAD_LEVEL_NR; load_level++) {
-+		unsigned int reg, mask, val,
-+			offset = ARMADA_37XX_NB_TBG_DIV_OFF;
-+
-+		armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
-+
-+		regmap_read(base, reg, &val);
-+		val >>= offset;
-+		val &= ARMADA_37XX_NB_TBG_DIV_MASK;
-+
-+		if (val == div) {
-+			/*
-+			 * We found a load level matching the target
-+			 * divider, switch to this load level and
-+			 * return.
-+			 */
-+			reg = ARMADA_37XX_NB_CPU_LOAD;
-+			mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
-+			regmap_update_bits(base, reg, mask, load_level);
-+
-+			return rate;
-+		}
-+	}
-+
-+	/* We didn't find any valid divider */
-+	return -EINVAL;
-+}
-+
- static const struct clk_ops clk_pm_cpu_ops = {
- 	.get_parent = clk_pm_cpu_get_parent,
-+	.set_parent = clk_pm_cpu_set_parent,
-+	.round_rate = clk_pm_cpu_round_rate,
-+	.set_rate = clk_pm_cpu_set_rate,
- 	.recalc_rate = clk_pm_cpu_recalc_rate,
- };
- 
-@@ -418,6 +626,9 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
- 		rate_hw = muxrate_hw;
- 		mux_ops = muxrate_hw->init->ops;
- 		rate_ops = muxrate_hw->init->ops;
-+
-+		pmcpu_clk->nb_pm_base =
-+			syscon_regmap_lookup_by_compatible("marvell,armada-3700-nb-pm");
- 	}
- 
- 	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
+> To be clear: I don't want to waste anyone's time on this. But as SPDX
+> was intended for automation, I think it might be good to try having
+> some common pattern here.
+> I don't want to start a discussion, so in case there is no guideline I will
+> just take the /* SPDX */ in firstline version.
+
 -- 
-2.15.0
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
