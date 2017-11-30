@@ -1,64 +1,40 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 30 Nov 2017 09:16:38 -0800
-Subject: [PATCH v2 2/2] ARM: dts: at91: disable the nxp,se97b SMBUS
- timeout on the TSE-850
-In-Reply-To: <20171129205629.GO21126@piout.net>
-References: <20171127163101.27859-1-peda@axentia.se>
- <20171127163101.27859-3-peda@axentia.se>
- <20171129205311.GA20551@roeck-us.net>
- <20171129205629.GO21126@piout.net>
-Message-ID: <20171130171638.GA17788@roeck-us.net>
+From: bhaskar.upadhaya@nxp.com (Bhaskar Upadhaya)
+Date: Thu, 30 Nov 2017 17:16:48 +0000
+Subject: [PATCH 1/1] phy: Add 2.5G SGMII interface mode
+In-Reply-To: <20171130155050.GD7483@lunn.ch>
+References: <1512016235-15909-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <20171130155050.GD7483@lunn.ch>
+Message-ID: <AM3PR04MB4494050122E413E2445BD348C380@AM3PR04MB449.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 09:56:29PM +0100, Alexandre Belloni wrote:
-> On 29/11/2017 at 12:53:11 -0800, Guenter Roeck wrote:
-> > On Mon, Nov 27, 2017 at 05:31:01PM +0100, Peter Rosin wrote:
-> > > The I2C adapter driver is sometimes slow, causing the SCL line to
-> > > be stuck low for more than the stipulated SMBUS timeout of 25-35 ms.
-> > > This causes the client device to give up which in turn causes silent
-> > > corruption of data. So, disable the SMBUS timeout in the client device.
-> > > 
-> > > Signed-off-by: Peter Rosin <peda@axentia.se>
-> > 
-> > Acked-by: Guenter Roeck <linux@roeck-us.net>
-> > 
-> > I assume this will be sent upstream through an arm tree.
-> > 
-> 
-> Yes, I'm applying it right now.
-> 
-Are you going to apply the patch for 4.15, or queue it up for 4.16 ?
-I have been arguing with myself if this is a feature or a bug fix.
-So far I queued the driver change up for 4.16, but I am open to
-applying it to 4.15. Any thoughts ?
+Hi Andrew,
+	Please find answer in lined.
+Regards
+--Bhaskar
+	
 
-Guenter
+-----Original Message-----
+From: Andrew Lunn [mailto:andrew at lunn.ch] 
+Sent: Thursday, November 30, 2017 9:21 PM
+To: Bhaskar Upadhaya <bhaskar.upadhaya@nxp.com>
+Cc: netdev at vger.kernel.org; davem at davemloft.net; linux-arm-kernel at lists.infradead.org
+Subject: Re: [PATCH 1/1] phy: Add 2.5G SGMII interface mode
 
-> > Thanks,
-> > Guenter
-> > 
-> > > ---
-> > >  arch/arm/boot/dts/at91-tse850-3.dts | 1 +
-> > >  1 file changed, 1 insertion(+)
-> > > 
-> > > diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
-> > > index 5f29010cdbd8..9b82cc8843e1 100644
-> > > --- a/arch/arm/boot/dts/at91-tse850-3.dts
-> > > +++ b/arch/arm/boot/dts/at91-tse850-3.dts
-> > > @@ -221,6 +221,7 @@
-> > >  	jc42 at 18 {
-> > >  		compatible = "nxp,se97b", "jedec,jc-42.4-temp";
-> > >  		reg = <0x18>;
-> > > +		smbus-timeout-disable;
-> > >  	};
-> > >  
-> > >  	dpot: mcp4651-104 at 28 {
-> > > -- 
-> > > 2.11.0
-> > > 
-> 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+On Thu, Nov 30, 2017 at 10:00:35AM +0530, Bhaskar Upadhaya wrote:
+> Add 2.5G SGMII interface mode(PHY_INTERFACE_MODE_2500SGMII)
+> in existing phy_interface list.As auto-negotiation is not supported 
+> for 2.5G SGMII
+
+Hi Bhaskar
+
+I've been thinking about this some more...
+
+Is auto negotiation not supported in 2.5G SGMII in general, or just in the system you are using? Is it the PHY or the MAC which does not support it.
+[bhaskar] 2.5G in general needs to operate with auto negotiation in disabled mode. Its 2.5G requirement and not specific to our system.
+ Are we going to get into trouble if we find an 2.5G SGMII link which does negotiate?
+
+My understanding is that one of the main differences between SGMII and 1000BASE-X is the negotiation.
+[Bhaskar] which of SGMII and 1000BASE-X support negotiation ?
+
+	   Andrew
