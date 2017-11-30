@@ -1,29 +1,47 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Nov 2017 15:38:06 +0100
-Subject: [PATCH] gpio: uniphier: fix mismatch between license text and
- MODULE_LICENSE
-In-Reply-To: <1511431310-9892-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1511431310-9892-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdYQZDyFKmg1Ber1fNR+XCN05v1UNZdEYyWc3wUgC3J22w@mail.gmail.com>
+Date: Thu, 30 Nov 2017 15:45:22 +0100
+Subject: [PATCH 2/5] gpio: pca953x: Name the gpiochip after the I2C address
+In-Reply-To: <20171124142627.GG30167@lunn.ch>
+References: <20171124093045.5961-1-linus.walleij@linaro.org>
+ <20171124093045.5961-3-linus.walleij@linaro.org>
+ <20171124142627.GG30167@lunn.ch>
+Message-ID: <CACRpkdY8MRAQ_c+mf5R_mbveuKPaJu4_d2gxTCsRraLCRPqi1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 23, 2017 at 11:01 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Fri, Nov 24, 2017 at 3:26 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+> On Fri, Nov 24, 2017 at 10:30:42AM +0100, Linus Walleij wrote:
+>> Just putting the name of the I2C device as name for the
+>> GPIO chip (label) is ambigous, and makes it hard for us
+>> to use GPIO descriptor tables on systems such as DaVinci
+>> DA850EVM which has two chips but on I2C address 0x20 and 0x21.
+>>
+>> Instead, append "-XX" to the GPIOchip name using the I2C
+>> address so we get a unique chip name that can be used
+>> in descriptor tables, such as "tca6416-20" and
+>> "tca6416-21" on the DaVinci DA850EVM.
+>
+> Hi Linus
+>
+> Are you making the assumption that there are not two devices at the
+> same address but on different I2C busses?
 
-> The comment block of this file indicates GPL-2.0 "only", while the
-> MODULE_LICENSE is GPL-2.0 "or later", as include/linux/module.h
-> describes as follows:
->
->   "GPL"                           [GNU Public License v2 or later]
->   "GPL v2"                        [GNU Public License v2]
->
-> I am the author of this driver, and my intention is GPL-2.0 "only".
->
-> Fixes: dbe776c2ca54 ("gpio: uniphier: add UniPhier GPIO controller driver")
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Yes.
 
-Patch applied.
+> How safe is that assumption? Can you include the adapter ID in the
+> string?
+
+Sure, I just had to come up with something.
+
+The universe of board files is not very big, so the number of
+potentially clashing things is not eternal. This is just a transient
+"contain and deprecate" thing so I think it's unlikely that they
+clash but usually when I say something like that the next day
+it happens...
+
+So I can add the adapter number :)
+
+I am waiting for more feedback on the series before resending.
 
 Yours,
 Linus Walleij
