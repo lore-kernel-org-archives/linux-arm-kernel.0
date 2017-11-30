@@ -1,44 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:45 +0000
-Subject: [PATCH v2 17/18] arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
-In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-18-git-send-email-will.deacon@arm.com>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Thu, 30 Nov 2017 16:59:14 +0000
+Subject: [PATCH v3 1/6] ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros
+ where applicable
+In-Reply-To: <20171130004510.23887-2-lukma@denx.de>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171130004510.23887-1-lukma@denx.de> <20171130004510.23887-2-lukma@denx.de>
+Message-ID: <BLUPR0101MB15548ADB26B57D7944530FEFD0380@BLUPR0101MB1554.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a Kconfig entry to control use of the entry trampoline, which allows
-us to unmap the kernel whilst running in userspace and improve the
-robustness of KASLR.
+On Wednesday, November 29, 2017 5:45 PM, Lukasz Majewski wrote:
+> This commit cleans up the code by using dedicated macros instead of full definitions.
+>
+> Signed-off-by: Lukasz Majewski <lukma@denx.de>
+> Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+<snip>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index fdcc7b9bb15d..3af1657fcac3 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -833,6 +833,19 @@ config FORCE_MAX_ZONEORDER
- 	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
- 	  4M allocations matching the default size used by generic code.
+> @@ -187,16 +187,8 @@ static struct platform_device ts72xx_rtc_device = {  };
+ >
+>  static struct resource ts72xx_wdt_resources[] = {
+> -	{
+> -		.start	= TS72XX_WDT_CONTROL_PHYS_BASE,
+> -		.end	= TS72XX_WDT_CONTROL_PHYS_BASE + SZ_4K - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> -	{
+> -		.start	= TS72XX_WDT_FEED_PHYS_BASE,
+> -		.end	= TS72XX_WDT_FEED_PHYS_BASE + SZ_4K - 1,
+> -		.flags	= IORESOURCE_MEM,
+> -	},
+> +	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
+> +	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
+>  };
  
-+config UNMAP_KERNEL_AT_EL0
-+	bool "Unmap kernel when running in userspace (aka \"KAISER\")"
-+	default y
-+	help
-+	  Some attacks against KASLR make use of the timing difference between
-+	  a permission fault which could arise from a page table entry that is
-+	  present in the TLB, and a translation fault which always requires a
-+	  page table walk. This option defends against these attacks by unmapping
-+	  the kernel whilst running in userspace, therefore forcing translation
-+	  faults for all of kernel space.
-+
-+	  If unsure, say Y.
-+
- menuconfig ARMV8_DEPRECATED
- 	bool "Emulate deprecated/obsolete ARMv8 instructions"
- 	depends on COMPAT
--- 
-2.1.4
+Lukasz,
+
+The chunk above is already cleaned up in linux-next by:
+
+commit 97c3bca922468996c864917c9a8ea6a410233985
+ARM: ep93xx: tidy up TS-72xx Watchdog resources
+
+Can you please rebase this series against linux-next?
+
+I'm reviewing the rest of the series now and will reply with any other issues.
+
+Thanks,
+Hartley
