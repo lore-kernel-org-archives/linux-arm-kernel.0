@@ -1,101 +1,47 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Thu, 30 Nov 2017 10:41:20 +0200
-Subject: [PATCH v2] usb: xhci: allow imod-interval to be configurable
-In-Reply-To: <20171129174619.GB22267@kroah.com>
-References: <1511970775-11103-1-git-send-email-awallis@codeaurora.org>
- <20171129174619.GB22267@kroah.com>
-Message-ID: <ffa34aa3-0a1f-ba85-e7ba-356bdffa4e5a@linux.intel.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 30 Nov 2017 09:41:08 +0100
+Subject: [PATCH v2] clk: stm32-h7: fix copyright
+Message-ID: <20171130084108.23083-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.11.2017 19:46, Greg Kroah-Hartman wrote:
-> On Wed, Nov 29, 2017 at 10:52:55AM -0500, Adam Wallis wrote:
->> The xHCI driver currently has the IMOD set to 160, which
->> translates to an IMOD interval of 40,000ns (160 * 250)ns
->>
->> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
->> introduced a QUIRK for the MTK platform to adjust this interval to 20,
->> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
->> due to the fact that the MTK controller IMOD interval is 8 times
->> as much as defined in xHCI spec.
->>
->> Instead of adding more quirk bits for additional platforms, this patch
->> introduces the ability for vendors to set the IMOD_INTERVAL as is
->> optimal for their platform. By using device_property_read_u32() on
->> "imod-interval", the IMOD INTERVAL can be specified in nano seconds. If
->> no interval is specified, the default of 40,000ns (IMOD=160) will be
->> used.
->>
->> No bounds checking has been implemented due to the fact that a vendor
->> may have violated the spec and would need to specify a value outside of
->> the max 8,000 IRQs/second limit specified in the xHCI spec.
->>
->> Backwards compatibility is maintained for MTK_HOSTS through the quirk
->> bit, however, imod_interval should be pushed into device tree at a
->> future point and this quirk should be removed from xhci_plat_probe
->>
->> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
->> ---
->> changes from v1:
->>    * Removed device_property_read_u32() per suggestion from greg k-h
->>    * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
->>
->>   Documentation/devicetree/bindings/usb/usb-xhci.txt |  1 +
->>   drivers/usb/host/xhci-plat.c                       | 13 +++++++++++++
->>   drivers/usb/host/xhci.c                            |  7 ++-----
->>   drivers/usb/host/xhci.h                            |  2 ++
->>   4 files changed, 18 insertions(+), 5 deletions(-)
->>
->> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
->> index ae6e484..3998459 100644
->> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
->> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
->> @@ -29,6 +29,7 @@ Optional properties:
->>     - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
->>     - usb3-lpm-capable: determines if platform is USB3 LPM capable
->>     - quirk-broken-port-ped: set if the controller has broken port disable mechanism
->> +  - imod-interval: IMOD_INTERVAL in nano-seconds. Default is 40000
->>   
->>   Example:
->>   	usb at f0931000 {
->> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->> index 09f164f..3c63de1 100644
->> --- a/drivers/usb/host/xhci-plat.c
->> +++ b/drivers/usb/host/xhci-plat.c
->> @@ -23,6 +23,7 @@
->>   #include "xhci-plat.h"
->>   #include "xhci-mvebu.h"
->>   #include "xhci-rcar.h"
->> +#include "xhci-mtk.h"
->>   
->>   static struct hc_driver __read_mostly xhci_plat_hc_driver;
->>   
->> @@ -269,6 +270,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
->>   	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
->>   		xhci->quirks |= XHCI_BROKEN_PORT_PED;
->>   
->> +	/*
->> +	 * imod_interval is the interrupt modulation value in nanoseconds.
->> +	 * The increment interval is 8 times as much as that defined in
->> +	 * the xHCI spec on MTK's controller. This quirk check exists to provide
->> +	 * backwards compatibility, however, this should be pushed into
->> +	 * the device tree files at some point in the future and
->> +	 * checking the quirk should be removed from xhci_plat_probe.
->> +	 */
->> +	xhci->imod_interval = xhci->quirks & XHCI_MTK_HOST ? 5000 : 40000;
-> 
-> Personally I hate ? : logic, just write the if statement out.  It
-> doesn't save anything except make it harder to read.
-> 
-> Yeah, the original code had it too.  Oh well, I'll leave it up to the
-> xhci maintainer, he is the one that has to maintain this, not me :)
-> 
+Uniformize STMicroelectronics copyrights header
+Add SPDX identifier
 
-I don't mind that line so much, this still looks better than the original.
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+CC: Gabriel Fernandez <gabriel.fernandez@st.com>
+---
+ drivers/clk/clk-stm32h7.c | 19 +++----------------
+ 1 file changed, 3 insertions(+), 16 deletions(-)
 
-I do however mind that I don't get any default imod interval value for my
-pci based xhci host after this patch.
-That needs to be fixed
-
-Thanks
--Mathias
+diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
+index 61c3e40507d3..db2b162c0d4c 100644
+--- a/drivers/clk/clk-stm32h7.c
++++ b/drivers/clk/clk-stm32h7.c
+@@ -1,20 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+- * Copyright (C) Gabriel Fernandez 2017
+- * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+- *
+- * License terms: GPL V2.0.
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under the terms and conditions of the GNU General Public License,
+- * version 2, as published by the Free Software Foundation.
+- *
+- * This program is distributed in the hope it will be useful, but WITHOUT
+- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+- * more details.
+- *
+- * You should have received a copy of the GNU General Public License along with
+- * this program.  If not, see <http://www.gnu.org/licenses/>.
++ * Copyright (C) STMicroelectronics 2017
++ * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
+  */
+ 
+ #include <linux/clk.h>
+-- 
+2.15.0
