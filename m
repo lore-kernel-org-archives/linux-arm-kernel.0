@@ -1,47 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Nov 2017 15:45:22 +0100
-Subject: [PATCH 2/5] gpio: pca953x: Name the gpiochip after the I2C address
-In-Reply-To: <20171124142627.GG30167@lunn.ch>
-References: <20171124093045.5961-1-linus.walleij@linaro.org>
- <20171124093045.5961-3-linus.walleij@linaro.org>
- <20171124142627.GG30167@lunn.ch>
-Message-ID: <CACRpkdY8MRAQ_c+mf5R_mbveuKPaJu4_d2gxTCsRraLCRPqi1A@mail.gmail.com>
+From: davem@davemloft.net (David Miller)
+Date: Thu, 30 Nov 2017 09:45:35 -0500 (EST)
+Subject: [PATCH] net: stmmac: dwmac-sun8i: fix
+ allwinner,leds-active-low handling
+In-Reply-To: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
+References: <20171128164822.29218-1-clabbe.montjoie@gmail.com>
+Message-ID: <20171130.094535.2076025477631745913.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 3:26 PM, Andrew Lunn <andrew@lunn.ch> wrote:
-> On Fri, Nov 24, 2017 at 10:30:42AM +0100, Linus Walleij wrote:
->> Just putting the name of the I2C device as name for the
->> GPIO chip (label) is ambigous, and makes it hard for us
->> to use GPIO descriptor tables on systems such as DaVinci
->> DA850EVM which has two chips but on I2C address 0x20 and 0x21.
->>
->> Instead, append "-XX" to the GPIOchip name using the I2C
->> address so we get a unique chip name that can be used
->> in descriptor tables, such as "tca6416-20" and
->> "tca6416-21" on the DaVinci DA850EVM.
->
-> Hi Linus
->
-> Are you making the assumption that there are not two devices at the
-> same address but on different I2C busses?
+From: Corentin Labbe <clabbe.montjoie@gmail.com>
+Date: Tue, 28 Nov 2017 17:48:22 +0100
 
-Yes.
+> The driver expect "allwinner,leds-active-low" to be in PHY node, but
+> the binding doc expect it to be in MAC node.
+> 
+> Since all board DT use it also in MAC node, the driver need to search
+> allwinner,leds-active-low in MAC node.
+> 
+> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
 
-> How safe is that assumption? Can you include the adapter ID in the
-> string?
+I've read over this discussion and I think the thing to do is for me
+to simply apply this to 'net' for now.
 
-Sure, I just had to come up with something.
-
-The universe of board files is not very big, so the number of
-potentially clashing things is not eternal. This is just a transient
-"contain and deprecate" thing so I think it's unlikely that they
-clash but usually when I say something like that the next day
-it happens...
-
-So I can add the adapter number :)
-
-I am waiting for more feedback on the series before resending.
-
-Yours,
-Linus Walleij
+Thanks.
