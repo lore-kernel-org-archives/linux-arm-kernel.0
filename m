@@ -1,66 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Nov 2017 07:27:18 -0800
-Subject: [PATCH v3 0/4] Fixes for omapdrm on OpenPandora and GTA04
-In-Reply-To: <27b12bc8-2c3a-6caa-c800-158b75f80d3f@ti.com>
-References: <cover.1511884135.git.hns@goldelico.com>
- <27b12bc8-2c3a-6caa-c800-158b75f80d3f@ti.com>
-Message-ID: <20171130152718.GN28152@atomide.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 30 Nov 2017 16:30:02 +0100
+Subject: [PATCH v2 01/18] dt-bindings: panel: lvds: Document power-supply
+ property
+In-Reply-To: <CAL_Jsq+PHzDGE_RreBmVZV+sg3dh5OG2vWZU+eobxF514Fpo_w@mail.gmail.com>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <583a46dd967456aac07fb29529f74d91a10bdfeb.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <CAL_Jsq+PHzDGE_RreBmVZV+sg3dh5OG2vWZU+eobxF514Fpo_w@mail.gmail.com>
+Message-ID: <20171130153002.3vuqenr72dippg27@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Tomi Valkeinen <tomi.valkeinen@ti.com> [171130 10:56]:
-> On 28/11/17 17:48, H. Nikolaus Schaller wrote:
-> > Changes V3:
-> > * stay compatible with old DTB files which still use "toppoly" (suggested by Tomi Valkeinen)
-> > * replaced MODULE_ALIAS entries by MODULE_DEVICE_TABLE (suggested by Andrew F. Davis)
-> > * removed DSI VDDS patch as it has already been accepted
-> > 
-> > 2017-11-16 09:50:22: Changes V2:
-> > * replaced patch to fix DSI VDDS for OMAP3 by equivalent patch from Laurent Pinchart
-> > * keep previous compatibility option in panel driver to handle older device tree binaries
-> > 
-> > 2017-11-08 22:09:36:
-> > This patch set fixes vendor names of the panels
-> > and fixes a problem on omapdrm with enabling
-> > VDD_DSI for OMAP3 which is needed for displaying
-> > the Red and Green channel on OMAP3530 (Pandora).
-> > 
-> > H. Nikolaus Schaller (4):
-> >   omapdrm: panel: fix compatible vendor string for td028ttec1
-> >   omapdrm: panel: td028ttec1: replace MODULE_ALIAS by
-> >     MODULE_DEVICE_TABLE
-> >   DTS: GTA04: fix panel compatibility string
-> >   DTS: Pandora: fix panel compatibility string
-> > 
-> >  .../panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt}    |  4 ++--
-> >  arch/arm/boot/dts/omap3-gta04.dtsi                          |  2 +-
-> >  arch/arm/boot/dts/omap3-pandora-common.dtsi                 |  2 +-
-> >  drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c     | 13 ++++++++++++-
-> >  .../fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c      | 12 +++++++++++-
-> >  5 files changed, 27 insertions(+), 6 deletions(-)
-> >  rename Documentation/devicetree/bindings/display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt} (84%)
-> > 
+Hi Rob,
+
+On Tue, Nov 28, 2017 at 11:48:47AM -0600, Rob Herring wrote:
+> Please CC DT list.
 > 
-> Thanks. I have picked up patches 1 and 2.
+> On Mon, Nov 27, 2017 at 9:41 AM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The power-supply property is used by a vast majority of panels, including
+> > panel-simple. Let's document it as a common property
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
+> >  Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
+> >  2 files changed, 7 insertions(+)
+> >
+> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> > index ec52c472c845..125ea68052af 100644
+> > --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> > +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+> > @@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
+> >    while active. Active high reset signals can be supported by inverting the
+> >    GPIO specifier polarity flag.
+> >
+> > +Power
+> > +-----
+> > +
+> > +- power-supply: many display panels need an additional power supply in
+> > +  order to be fully powered-up. For such panels, power-supply contains
+> > +  a phandle to the regulator powering the panel.
+> >
+> >  Backlight
+> >  ---------
+> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> > index b938269f841e..250850a2150b 100644
+> > --- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> > +++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+> > @@ -32,6 +32,7 @@ Optional properties:
+> >  - label: See panel-common.txt.
+> >  - gpios: See panel-common.txt.
+> >  - backlight: See panel-common.txt.
+> > +- power-supply: See panel-common.txt.
 > 
-> 3 can be applied when 1 & 2 are in. The change in 4 could be applied
-> independently, but it conflicts with 3.
-> 
-> Tony, how do you want to handle 3 and 4? I will push 1 and 2 to v4.16. I
-> don't think they are real issues, so I don't see a reason to push them
-> as fixes to v4.15. I think they are mostly just cleanups, and we might
-> as well wait until v4.17, but that's quite far away...
+> simple-panel.txt should do the same.
 
-In general to avoid the huge hassle of cross tree dependencies and
-confusion if the dts changes are fixes, I suggest the following:
+I'll make simple-panel do that then
 
-1. Nikolaus reposts the dts changes to not say word "fix" in them
-   and use "update to use new binding" or something similar to avoid
-   patches wrongly getting picked into earlier stable trees
+> Really, I'd like to see panel-common.txt and simple-panel.txt merged
+> and simple-panel.txt removed altogether. But there are a lot of
+> references back to simple-panel.txt. A given panel still needs to say
+> what common properties it uses or doesn't use. Omitting a property
+> like power-supply is ambiguous and can either mean "I only have 1
+> supply" or "I haven't thought about supplies yet there are more than
+> 1".
 
-2. Then I can ack the patches as they are just oneliners and
-   unlikely to conflict with anything else
+While I agree with you here, and in general, power-supply should be
+mandatory, do you expect me to fix all the panel bindings as part of
+this serie?
 
-Regards,
+Maxime
 
-Tony
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171130/77e4646e/attachment.sig>
