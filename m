@@ -1,98 +1,132 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:31 +0000
-Subject: [PATCH v2 03/18] arm64: mm: Move ASID from TTBR0 to TTBR1
+Date: Thu, 30 Nov 2017 16:39:32 +0000
+Subject: [PATCH v2 04/18] arm64: mm: Remove pre_ttbr0_update_workaround for
+ Falkor erratum #E1003
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for mapping kernelspace and userspace with different
-ASIDs, move the ASID to TTBR1 and update switch_mm to context-switch
-TTBR0 via an invalid mapping (the zero page).
+The pre_ttbr0_update_workaround hook is called prior to context-switching
+TTBR0 because Falkor erratum E1003 can cause TLB allocation with the wrong
+ASID if both the ASID and the base address of the TTBR are updated at
+the same time.
+
+With the ASID sitting safely in TTBR1, we no longer update things
+atomically, so we can remove the pre_ttbr0_update_workaround macro as
+it's no longer required. The erratum infrastructure and documentation
+is left around for #E1003, as it will be required by the entry
+trampoline code in a future patch.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h   | 7 +++++++
- arch/arm64/include/asm/pgtable-hwdef.h | 1 +
- arch/arm64/include/asm/proc-fns.h      | 6 ------
- arch/arm64/mm/proc.S                   | 9 ++++++---
- 4 files changed, 14 insertions(+), 9 deletions(-)
+ arch/arm64/include/asm/assembler.h   | 22 ----------------------
+ arch/arm64/include/asm/mmu_context.h |  2 --
+ arch/arm64/mm/context.c              | 11 -----------
+ arch/arm64/mm/proc.S                 |  1 -
+ 4 files changed, 36 deletions(-)
 
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index aef72d886677..e1fa5db858b7 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -26,7 +26,6 @@
+ #include <asm/asm-offsets.h>
+ #include <asm/cpufeature.h>
+ #include <asm/debug-monitors.h>
+-#include <asm/mmu_context.h>
+ #include <asm/page.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+@@ -478,27 +477,6 @@ alternative_endif
+ 	.endm
+ 
+ /*
+- * Errata workaround prior to TTBR0_EL1 update
+- *
+- * 	val:	TTBR value with new BADDR, preserved
+- * 	tmp0:	temporary register, clobbered
+- * 	tmp1:	other temporary register, clobbered
+- */
+-	.macro	pre_ttbr0_update_workaround, val, tmp0, tmp1
+-#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+-alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+-	mrs	\tmp0, ttbr0_el1
+-	mov	\tmp1, #FALKOR_RESERVED_ASID
+-	bfi	\tmp0, \tmp1, #48, #16		// reserved ASID + old BADDR
+-	msr	ttbr0_el1, \tmp0
+-	isb
+-	bfi	\tmp0, \val, #0, #48		// reserved ASID + new BADDR
+-	msr	ttbr0_el1, \tmp0
+-	isb
+-alternative_else_nop_endif
+-#endif
+-	.endm
+-
+ /*
+  * Errata workaround post TTBR0_EL1 update.
+  */
 diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a9b5e..56723bcbfaaa 100644
+index 56723bcbfaaa..6d93bd545906 100644
 --- a/arch/arm64/include/asm/mmu_context.h
 +++ b/arch/arm64/include/asm/mmu_context.h
-@@ -37,6 +37,13 @@
- #include <asm/sysreg.h>
- #include <asm/tlbflush.h>
+@@ -19,8 +19,6 @@
+ #ifndef __ASM_MMU_CONTEXT_H
+ #define __ASM_MMU_CONTEXT_H
  
-+#define cpu_switch_mm(pgd,mm)				\
-+do {							\
-+	BUG_ON(pgd == swapper_pg_dir);			\
-+	cpu_set_reserved_ttbr0();			\
-+	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
-+} while (0)
-+
- static inline void contextidr_thread_switch(struct task_struct *next)
- {
- 	if (!IS_ENABLED(CONFIG_PID_IN_CONTEXTIDR))
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index eb0c2bd90de9..8df4cb6ac6f7 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -272,6 +272,7 @@
- #define TCR_TG1_4K		(UL(2) << TCR_TG1_SHIFT)
- #define TCR_TG1_64K		(UL(3) << TCR_TG1_SHIFT)
- 
-+#define TCR_A1			(UL(1) << 22)
- #define TCR_ASID16		(UL(1) << 36)
- #define TCR_TBI0		(UL(1) << 37)
- #define TCR_HA			(UL(1) << 39)
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 14ad6e4e87d1..16cef2e8449e 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -35,12 +35,6 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
- #include <asm/memory.h>
- 
--#define cpu_switch_mm(pgd,mm)				\
--do {							\
--	BUG_ON(pgd == swapper_pg_dir);			\
--	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
--} while (0)
+-#define FALKOR_RESERVED_ASID	1
 -
- #endif /* __ASSEMBLY__ */
- #endif /* __KERNEL__ */
- #endif /* __ASM_PROCFNS_H */
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/compiler.h>
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index ab9f5f0fb2c7..78816e476491 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -79,13 +79,6 @@ void verify_cpu_asid_bits(void)
+ 	}
+ }
+ 
+-static void set_reserved_asid_bits(void)
+-{
+-	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_1003) &&
+-	    cpus_have_const_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
+-		__set_bit(FALKOR_RESERVED_ASID, asid_map);
+-}
+-
+ static void flush_context(unsigned int cpu)
+ {
+ 	int i;
+@@ -94,8 +87,6 @@ static void flush_context(unsigned int cpu)
+ 	/* Update the list of reserved ASIDs and the ASID bitmap. */
+ 	bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
+ 
+-	set_reserved_asid_bits();
+-
+ 	/*
+ 	 * Ensure the generation bump is observed before we xchg the
+ 	 * active_asids.
+@@ -250,8 +241,6 @@ static int asids_init(void)
+ 		panic("Failed to allocate bitmap for %lu ASIDs\n",
+ 		      NUM_USER_ASIDS);
+ 
+-	set_reserved_asid_bits();
+-
+ 	pr_info("ASID allocator initialised with %lu entries\n", NUM_USER_ASIDS);
+ 	return 0;
+ }
 diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 95233dfc4c39..a8a64898a2aa 100644
+index a8a64898a2aa..f2ff0837577c 100644
 --- a/arch/arm64/mm/proc.S
 +++ b/arch/arm64/mm/proc.S
-@@ -139,9 +139,12 @@ ENDPROC(cpu_do_resume)
+@@ -138,7 +138,6 @@ ENDPROC(cpu_do_resume)
+  *	- pgd_phys - physical address of new TTB
   */
  ENTRY(cpu_do_switch_mm)
- 	pre_ttbr0_update_workaround x0, x2, x3
-+	mrs	x2, ttbr1_el1
+-	pre_ttbr0_update_workaround x0, x2, x3
+ 	mrs	x2, ttbr1_el1
  	mmid	x1, x1				// get mm->context.id
--	bfi	x0, x1, #48, #16		// set the ASID
--	msr	ttbr0_el1, x0			// set TTBR0
-+	bfi	x2, x1, #48, #16		// set the ASID
-+	msr	ttbr1_el1, x2			// in TTBR1 (since TCR.A1 is set)
-+	isb
-+	msr	ttbr0_el1, x0			// now update TTBR0
- 	isb
- 	post_ttbr0_update_workaround
- 	ret
-@@ -224,7 +227,7 @@ ENTRY(__cpu_setup)
- 	 * both user and kernel.
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
--			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
-+			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
- 	tcr_set_idmap_t0sz	x10, x9
- 
- 	/*
+ 	bfi	x2, x1, #48, #16		// set the ASID
 -- 
 2.1.4
