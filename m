@@ -1,36 +1,85 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Nov 2017 14:40:26 +0100
-Subject: [PATCH 0/3] Add DVFS support on CPU clock for Armada 37xx
-Message-ID: <20171130134029.20751-1-gregory.clement@free-electrons.com>
+Date: Thu, 30 Nov 2017 14:40:27 +0100
+Subject: [PATCH 1/3] clk: mvebu: armada-37xx-periph: cosmetic changes
+In-Reply-To: <20171130134029.20751-1-gregory.clement@free-electrons.com>
+References: <20171130134029.20751-1-gregory.clement@free-electrons.com>
+Message-ID: <20171130134029.20751-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patches fixes few cosmetic issues such as alignment, blank lines
+and required space.
 
-This small series is needed to use DVFS on Armada 37xx. When DVFS is
-enabled the CPU clock setting is done using an other set of registers
-from the North Bridge Power Management block.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/clk/mvebu/armada-37xx-periph.c | 17 +++++++++--------
+ 1 file changed, 9 insertions(+), 8 deletions(-)
 
-The series adds the possibility to modify the CPU frequency using the
-associate load level matching the target frequency. However
-configuring the frequencies for each load is done by the cpufreq
-driver submitted in a separate series.
-
-Obviously having both series (cpufreq and clk) is needed to support
-DVFS on Armada 37xx, but there is no dependencies between the series
-(for building or at runtime).
-
-Thanks,
-
-Gregory
-
-Gregory CLEMENT (3):
-  clk: mvebu: armada-37xx-periph: cosmetic changes
-  clk: mvebu: armada-37xx-periph: prepare cpu clk to be used with DVFS
-  clk: mvebu: armada-37xx-periph: add DVFS support for cpu clocks
-
- drivers/clk/mvebu/armada-37xx-periph.c | 310 +++++++++++++++++++++++++++++++--
- 1 file changed, 293 insertions(+), 17 deletions(-)
-
+diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
+index cecb0fdfaef6..6dae21ced18a 100644
+--- a/drivers/clk/mvebu/armada-37xx-periph.c
++++ b/drivers/clk/mvebu/armada-37xx-periph.c
+@@ -79,6 +79,7 @@ static const struct clk_div_table clk_table2[] = {
+ 	{ .val = 1, .div = 4, },
+ 	{ .val = 0, .div = 0, }, /* last entry */
+ };
++
+ static const struct clk_ops clk_double_div_ops;
+ 
+ #define PERIPH_GATE(_name, _bit)		\
+@@ -217,7 +218,7 @@ PERIPH_CLK_FULL(counter, 23, 20, DIV_SEL0, 23, clk_table6);
+ PERIPH_CLK_FULL_DD(eip97, 24, 24, DIV_SEL2, DIV_SEL2, 22, 19);
+ PERIPH_CLK_MUX_DIV(cpu, 22, DIV_SEL0, 28, clk_table6);
+ 
+-static struct clk_periph_data data_nb[] ={
++static struct clk_periph_data data_nb[] = {
+ 	REF_CLK_FULL_DD(mmc),
+ 	REF_CLK_FULL_DD(sata_host),
+ 	REF_CLK_FULL_DD(sec_at),
+@@ -281,7 +282,7 @@ static unsigned int get_div(void __iomem *reg, int shift)
+ }
+ 
+ static unsigned long clk_double_div_recalc_rate(struct clk_hw *hw,
+-		unsigned long parent_rate)
++						unsigned long parent_rate)
+ {
+ 	struct clk_double_div *double_div = to_clk_double_div(hw);
+ 	unsigned int div;
+@@ -303,6 +304,7 @@ static const struct of_device_id armada_3700_periph_clock_of_match[] = {
+ 	.data = data_sb, },
+ 	{ }
+ };
++
+ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
+ 					 void __iomem *reg, spinlock_t *lock,
+ 					 struct device *dev, struct clk_hw **hw)
+@@ -355,9 +357,9 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
+ 	}
+ 
+ 	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
+-				       data->num_parents, mux_hw,
+-				       mux_ops, rate_hw, rate_ops,
+-				       gate_hw, gate_ops, CLK_IGNORE_UNUSED);
++					data->num_parents, mux_hw,
++					mux_ops, rate_hw, rate_ops,
++					gate_hw, gate_ops, CLK_IGNORE_UNUSED);
+ 
+ 	if (IS_ERR(*hw))
+ 		return PTR_ERR(*hw);
+@@ -406,12 +408,11 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
+ 		if (armada_3700_add_composite_clk(&data[i], reg,
+ 						  &driver_data->lock, dev, hw))
+ 			dev_err(dev, "Can't register periph clock %s\n",
+-			       data[i].name);
+-
++				data[i].name);
+ 	}
+ 
+ 	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
+-				  driver_data->hw_data);
++				     driver_data->hw_data);
+ 	if (ret) {
+ 		for (i = 0; i < num_periph; i++)
+ 			clk_hw_unregister(driver_data->hw_data->hws[i]);
 -- 
 2.15.0
