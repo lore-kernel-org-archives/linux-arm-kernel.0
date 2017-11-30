@@ -1,74 +1,73 @@
-From: geert+renesas@glider.be (Geert Uytterhoeven)
-Date: Thu, 30 Nov 2017 12:54:28 +0100
-Subject: [PATCH v2] PM / Domains: Remove obsolete "samsung, power-domain" check
-Message-ID: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 30 Nov 2017 11:56:37 +0000
+Subject: [PATCH] arm64: fpsimd: Fix failure to restore FPSIMD state after
+ signals
+Message-ID: <1512042997-25945-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the generic PM Domain code code checks for the presence of
-both (generic) "power-domains" and (Samsung Exynos legacy)
-"samsung,power-domain" properties in all device tree nodes representing
-devices.
+The fpsimd_update_current_state() function is responsible for
+loading the FPSIMD state from the user signal frame into the
+current task during sigreturn.  When implementing support for SVE,
+conditional code was added to this function in order to handle the
+case where SVE state need to be loaded for the task and merged with
+the FPSIMD data from the signal frame; however, the FPSIMD-only
+case was unintentionally dropped.
 
-There are two issues with this:
-  1. This imposes a small boot-time penalty on all platforms using DT,
-  2. Platform-specific checks do not really belong in core framework
-     code.
+As a result of this, sigreturn does not currently restore the
+FPSIMD state of the task, except in the case where the system
+supports SVE and the signal frame contains SVE state in addition to
+FPSIMD state.
 
-Remove the platform-specific check, as the last user of
-"samsung,power-domain" was removed in commit 46dcf0ff0de35da8 ("ARM:
-dts: exynos: Remove exynos4415.dtsi").  All other users were converted
-before in commit 0da6587041363033 ("ARM: dts: convert to generic power
-domain bindings for exynos DT").
+This patch fixes this bug by making the copy-in of the FPSIMD data
+from the signal frame to thread_struct unconditional.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This remains a performance regression from v4.14, since the FPSIMD
+state is now copied into thread_struct and then loaded back,
+instead of _only_ being loaded into the CPU FPSIMD registers.
+However, it is essential to call task_fpsimd_load() here anyway in
+order to ensure that the SVE enable bit in CPACR_EL1 is set
+correctly before returning to userspace.  This could use some
+refactoring, but since sigreturn is not a fast path I have kept
+this patch as a pure fix and left the refactoring for later.
+
+Fixes: 8cd969d28fd2 ("arm64/sve: Signal handling support")
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reported-by: Alex Benn?e <alex.bennee@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
-This is v2 of 'PM / Domains: Restrict "samsung,power-domain" checks to
-ARCH_EXYNOS'.
 
-"samsung,power-domain" was only ever used in:
-  - arch/arm/boot/dts/exynos4415.dtsi: Removed
-  - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
-  - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
-  - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
-  - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
-  - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
+Initial testing of this patch looks OK, but I will continue to bash it.
 
-v2:
-  - Remove the check completely instead of restricting it to
-    ARCH_EXYNOS, as suggested Javier Martinez Canillas one year ago
-    ("Removing the support for the deprecated property sound sensible to me",
-    http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462868.html).
----
- drivers/base/power/domain.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
+While debugging this issue, I also hit another possible register
+corruption issue that I don't have an explanation for, but I wanted to
+get this patch out first since this issue at least is fairly
+straightforward and fixing it is required anyway.
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 0c80bea05bcb92be..f9dcc981b6b9328c 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -2199,20 +2199,8 @@ int genpd_dev_pm_attach(struct device *dev)
+I will continue to investigate.
+
+ arch/arm64/kernel/fpsimd.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 143b3e7..5084e69 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -1026,10 +1026,10 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
  
- 	ret = of_parse_phandle_with_args(dev->of_node, "power-domains",
- 					"#power-domain-cells", 0, &pd_args);
--	if (ret < 0) {
--		if (ret != -ENOENT)
--			return ret;
--
--		/*
--		 * Try legacy Samsung-specific bindings
--		 * (for backwards compatibility of DT ABI)
--		 */
--		pd_args.args_count = 0;
--		pd_args.np = of_parse_phandle(dev->of_node,
--						"samsung,power-domain", 0);
--		if (!pd_args.np)
--			return -ENOENT;
+ 	local_bh_disable();
+ 
+-	if (system_supports_sve() && test_thread_flag(TIF_SVE)) {
+-		current->thread.fpsimd_state = *state;
++	current->thread.fpsimd_state = *state;
++	if (system_supports_sve() && test_thread_flag(TIF_SVE))
+ 		fpsimd_to_sve(current);
 -	}
-+	if (ret < 0)
-+		return ret;
++
+ 	task_fpsimd_load();
  
- 	mutex_lock(&gpd_list_lock);
- 	pd = genpd_get_from_provider(&pd_args);
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
 -- 
-2.7.4
+2.1.4
