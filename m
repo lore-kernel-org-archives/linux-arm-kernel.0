@@ -1,132 +1,96 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:32 +0000
-Subject: [PATCH v2 04/18] arm64: mm: Remove pre_ttbr0_update_workaround for
- Falkor erratum #E1003
-In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-5-git-send-email-will.deacon@arm.com>
+Date: Thu, 30 Nov 2017 16:39:28 +0000
+Subject: [PATCH v2 00/18] arm64: Unmap the kernel whilst running in userspace
+ (KAISER)
+Message-ID: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The pre_ttbr0_update_workaround hook is called prior to context-switching
-TTBR0 because Falkor erratum E1003 can cause TLB allocation with the wrong
-ASID if both the ASID and the base address of the TTBR are updated at
-the same time.
+Hi again,
 
-With the ASID sitting safely in TTBR1, we no longer update things
-atomically, so we can remove the pre_ttbr0_update_workaround macro as
-it's no longer required. The erratum infrastructure and documentation
-is left around for #E1003, as it will be required by the entry
-trampoline code in a future patch.
+This is version two of the patches previously posted here:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/assembler.h   | 22 ----------------------
- arch/arm64/include/asm/mmu_context.h |  2 --
- arch/arm64/mm/context.c              | 11 -----------
- arch/arm64/mm/proc.S                 |  1 -
- 4 files changed, 36 deletions(-)
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/542751.html
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index aef72d886677..e1fa5db858b7 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -26,7 +26,6 @@
- #include <asm/asm-offsets.h>
- #include <asm/cpufeature.h>
- #include <asm/debug-monitors.h>
--#include <asm/mmu_context.h>
- #include <asm/page.h>
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptrace.h>
-@@ -478,27 +477,6 @@ alternative_endif
- 	.endm
- 
- /*
-- * Errata workaround prior to TTBR0_EL1 update
-- *
-- * 	val:	TTBR value with new BADDR, preserved
-- * 	tmp0:	temporary register, clobbered
-- * 	tmp1:	other temporary register, clobbered
-- */
--	.macro	pre_ttbr0_update_workaround, val, tmp0, tmp1
--#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
--alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
--	mrs	\tmp0, ttbr0_el1
--	mov	\tmp1, #FALKOR_RESERVED_ASID
--	bfi	\tmp0, \tmp1, #48, #16		// reserved ASID + old BADDR
--	msr	ttbr0_el1, \tmp0
--	isb
--	bfi	\tmp0, \val, #0, #48		// reserved ASID + new BADDR
--	msr	ttbr0_el1, \tmp0
--	isb
--alternative_else_nop_endif
--#endif
--	.endm
--
- /*
-  * Errata workaround post TTBR0_EL1 update.
-  */
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 56723bcbfaaa..6d93bd545906 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -19,8 +19,6 @@
- #ifndef __ASM_MMU_CONTEXT_H
- #define __ASM_MMU_CONTEXT_H
- 
--#define FALKOR_RESERVED_ASID	1
--
- #ifndef __ASSEMBLY__
- 
- #include <linux/compiler.h>
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index ab9f5f0fb2c7..78816e476491 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -79,13 +79,6 @@ void verify_cpu_asid_bits(void)
- 	}
- }
- 
--static void set_reserved_asid_bits(void)
--{
--	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_1003) &&
--	    cpus_have_const_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
--		__set_bit(FALKOR_RESERVED_ASID, asid_map);
--}
--
- static void flush_context(unsigned int cpu)
- {
- 	int i;
-@@ -94,8 +87,6 @@ static void flush_context(unsigned int cpu)
- 	/* Update the list of reserved ASIDs and the ASID bitmap. */
- 	bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
- 
--	set_reserved_asid_bits();
--
- 	/*
- 	 * Ensure the generation bump is observed before we xchg the
- 	 * active_asids.
-@@ -250,8 +241,6 @@ static int asids_init(void)
- 		panic("Failed to allocate bitmap for %lu ASIDs\n",
- 		      NUM_USER_ASIDS);
- 
--	set_reserved_asid_bits();
--
- 	pr_info("ASID allocator initialised with %lu entries\n", NUM_USER_ASIDS);
- 	return 0;
- }
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index a8a64898a2aa..f2ff0837577c 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -138,7 +138,6 @@ ENDPROC(cpu_do_resume)
-  *	- pgd_phys - physical address of new TTB
-  */
- ENTRY(cpu_do_switch_mm)
--	pre_ttbr0_update_workaround x0, x2, x3
- 	mrs	x2, ttbr1_el1
- 	mmid	x1, x1				// get mm->context.id
- 	bfi	x2, x1, #48, #16		// set the ASID
+Changes since v1 include:
+
+  * Based on v4.15-rc1
+  * Trampoline moved into FIXMAP area
+  * Explicit static key replaced by cpu cap
+  * Disable SPE for userspace profiling if kernel unmapped at EL0
+  * Changed polarity of cpu feature to match config option
+  * Changed command-line option so we can force on in future if necessary
+  * Changed Falkor workaround to invalidate different page within 2MB region
+  * Reworked alternative sequences in entry.S, since the NOP slides with
+    kaiser=off were measurable
+
+I experimented with leaving the vbar set to point at the kaiser vectors,
+but I couldn't measure any performance improvement from that and it made
+the code slightly more complicated, so I've left it as-is.
+
+Patches based on 4.15-rc1 and also pushed here:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kaiser
+
+Feedback welcome, particularly on a better name for the command-line option.
+
+Will
+
+--->8
+
+Will Deacon (18):
+  arm64: mm: Use non-global mappings for kernel space
+  arm64: mm: Temporarily disable ARM64_SW_TTBR0_PAN
+  arm64: mm: Move ASID from TTBR0 to TTBR1
+  arm64: mm: Remove pre_ttbr0_update_workaround for Falkor erratum
+    #E1003
+  arm64: mm: Rename post_ttbr0_update_workaround
+  arm64: mm: Fix and re-enable ARM64_SW_TTBR0_PAN
+  arm64: mm: Allocate ASIDs in pairs
+  arm64: mm: Add arm64_kernel_unmapped_at_el0 helper
+  arm64: mm: Invalidate both kernel and user ASIDs when performing TLBI
+  arm64: entry: Add exception trampoline page for exceptions from EL0
+  arm64: mm: Map entry trampoline into trampoline and kernel page tables
+  arm64: entry: Explicitly pass exception level to kernel_ventry macro
+  arm64: entry: Hook up entry trampoline to exception vectors
+  arm64: erratum: Work around Falkor erratum #E1003 in trampoline code
+  arm64: tls: Avoid unconditional zeroing of tpidrro_el0 for native
+    tasks
+  arm64: entry: Add fake CPU feature for unmapping the kernel at EL0
+  arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
+  perf: arm_spe: Disallow userspace profiling when
+    arm_kernel_unmapped_at_el0()
+
+ arch/arm64/Kconfig                      |  30 +++--
+ arch/arm64/include/asm/asm-uaccess.h    |  25 +++--
+ arch/arm64/include/asm/assembler.h      |  27 +----
+ arch/arm64/include/asm/cpucaps.h        |   3 +-
+ arch/arm64/include/asm/fixmap.h         |   4 +
+ arch/arm64/include/asm/kernel-pgtable.h |  12 +-
+ arch/arm64/include/asm/mmu.h            |  10 ++
+ arch/arm64/include/asm/mmu_context.h    |   9 +-
+ arch/arm64/include/asm/pgtable-hwdef.h  |   1 +
+ arch/arm64/include/asm/pgtable-prot.h   |  21 +++-
+ arch/arm64/include/asm/pgtable.h        |   1 +
+ arch/arm64/include/asm/proc-fns.h       |   6 -
+ arch/arm64/include/asm/tlbflush.h       |  16 ++-
+ arch/arm64/include/asm/uaccess.h        |  21 +++-
+ arch/arm64/kernel/asm-offsets.c         |   6 +-
+ arch/arm64/kernel/cpufeature.c          |  41 +++++++
+ arch/arm64/kernel/entry.S               | 190 +++++++++++++++++++++++++++-----
+ arch/arm64/kernel/process.c             |  12 +-
+ arch/arm64/kernel/vmlinux.lds.S         |  17 +++
+ arch/arm64/lib/clear_user.S             |   2 +-
+ arch/arm64/lib/copy_from_user.S         |   2 +-
+ arch/arm64/lib/copy_in_user.S           |   2 +-
+ arch/arm64/lib/copy_to_user.S           |   2 +-
+ arch/arm64/mm/cache.S                   |   2 +-
+ arch/arm64/mm/context.c                 |  36 +++---
+ arch/arm64/mm/mmu.c                     |  23 ++++
+ arch/arm64/mm/proc.S                    |  12 +-
+ arch/arm64/xen/hypercall.S              |   2 +-
+ drivers/perf/arm_spe_pmu.c              |   7 ++
+ 29 files changed, 407 insertions(+), 135 deletions(-)
+
 -- 
 2.1.4
