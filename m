@@ -1,42 +1,44 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:46 +0000
-Subject: [PATCH v2 18/18] perf: arm_spe: Disallow userspace profiling when
- arm_kernel_unmapped_at_el0()
+Date: Thu, 30 Nov 2017 16:39:45 +0000
+Subject: [PATCH v2 17/18] arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-19-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-18-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running with the kernel unmapped whilst at EL0, the virtually-addressed
-SPE buffer is also unmapped, which can lead to buffer faults if userspace
-profiling is enabled.
-
-This patch prohibits SPE profiling of userspace when
-arm_kernel_unmapped_at_el0().
+Add a Kconfig entry to control use of the entry trampoline, which allows
+us to unmap the kernel whilst running in userspace and improve the
+robustness of KASLR.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- drivers/perf/arm_spe_pmu.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/Kconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 8ce262fc2561..c028db8973a4 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -675,6 +675,13 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
- 		return -EOPNOTSUPP;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fdcc7b9bb15d..3af1657fcac3 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -833,6 +833,19 @@ config FORCE_MAX_ZONEORDER
+ 	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
+ 	  4M allocations matching the default size used by generic code.
  
- 	/*
-+	 * If kernelspace is unmapped when running at EL0, then the SPE
-+	 * buffer will fault and prematurely terminate the AUX session.
-+	 */
-+	if (arm64_kernel_unmapped_at_el0() && !attr->exclude_user)
-+		dev_warn_once(&spe_pmu->pdev->dev, "unable to write to profiling buffer from EL0. Try passing \"kaiser=off\" on the kernel command line");
++config UNMAP_KERNEL_AT_EL0
++	bool "Unmap kernel when running in userspace (aka \"KAISER\")"
++	default y
++	help
++	  Some attacks against KASLR make use of the timing difference between
++	  a permission fault which could arise from a page table entry that is
++	  present in the TLB, and a translation fault which always requires a
++	  page table walk. This option defends against these attacks by unmapping
++	  the kernel whilst running in userspace, therefore forcing translation
++	  faults for all of kernel space.
 +
-+	/*
- 	 * Feedback-directed frequency throttling doesn't work when we
- 	 * have a buffer of samples. We'd need to manually count the
- 	 * samples in the buffer when it fills up and adjust the event
++	  If unsure, say Y.
++
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+ 	depends on COMPAT
 -- 
 2.1.4
