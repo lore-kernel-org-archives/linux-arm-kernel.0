@@ -1,70 +1,117 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Thu, 30 Nov 2017 23:06:33 +0100
-Subject: [PATCH v3 4/4] DTS: Pandora: fix panel compatibility string
-In-Reply-To: <20171130152430.GM28152@atomide.com>
-References: <cover.1511884135.git.hns@goldelico.com>
- <b6001c7b7fb98e7a3ad4c712084fea9dae9e6b27.1511884135.git.hns@goldelico.com>
- <20171128160437.GD28152@atomide.com>
- <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
- <20171128161834.GE28152@atomide.com>
- <4EE1E298-6461-48FF-977C-958DD16AD83A@goldelico.com>
- <20171130152430.GM28152@atomide.com>
-Message-ID: <20171130220633.imkfyeiqtftnw4j4@earth>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Thu, 30 Nov 2017 23:25:38 +0100
+Subject: [PATCH 5/5] mtd: nand: add ->exec_op() implementation
+In-Reply-To: <20171130215025.67f74437@bbrezillon>
+References: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
+ <20171130170132.27522-6-miquel.raynal@free-electrons.com>
+ <20171130215025.67f74437@bbrezillon>
+Message-ID: <20171130232538.140f17b1@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 30, 2017 at 07:24:30AM -0800, Tony Lindgren wrote:
-> * H. Nikolaus Schaller <hns@goldelico.com> [171128 18:35]:
-> > Hi,
-> > 
-> > > Am 28.11.2017 um 17:18 schrieb Tony Lindgren <tony@atomide.com>:
-> > > 
-> > > * H. Nikolaus Schaller <hns@goldelico.com> [171128 16:17]:
-> > >> Hi Tony,
-> > >> 
-> > >>> Am 28.11.2017 um 17:04 schrieb Tony Lindgren <tony@atomide.com>:
-> > >>> 
-> > >>> * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:52]:
-> > >>>> We can remove the unnecessary "omapdss," prefix because
-> > >>>> the omapdrm driver takes care of it when matching with
-> > >>>> the driver table.
-> > >>> 
-> > >>> So is this needed as a fix or is this another clean-up?
-> > >>> 
-> > >>> So is this is really needed as a fix?
-> > >> 
-> > >> Hm. How do you differentiate between "fix" and "cleanup"?
-> > >> Maybe it is more a wording than a content issue...
-> > >> 
-> > >> For me it is a "fix" because it is semantically wrong to have
-> > >> a prefix where it is not needed. And "fixing" it changes the
-> > >> compiler output by 8 bytes.
-> > > 
-> > > How about let's call it a "typo fix" then? :)
-> > 
-> > Well, it is not really a typo.
+> > diff --git a/drivers/mtd/nand/nand_base.c
+> > b/drivers/mtd/nand/nand_base.c index 52965a8aeb2c..46bf31aff909
+> > 100644 --- a/drivers/mtd/nand/nand_base.c
+> > +++ b/drivers/mtd/nand/nand_base.c
+> > @@ -689,6 +689,59 @@ static void nand_wait_status_ready(struct
+> > mtd_info *mtd, unsigned long timeo) };
+> >  
+> >  /**
+> > + * nand_soft_waitrdy - Read the status waiting for it to be ready
+> > + * @chip: NAND chip structure
+> > + * @timeout_ms: Timeout in ms
+> > + *
+> > + * Poll the status using ->exec_op() until it is ready unless it
+> > takes too
+> > + * much time.
+> > + *
+> > + * This helper is intended to be used by drivers without R/B pin
+> > available to
+> > + * poll for the chip status until ready and may be called at any
+> > time in the
+> > + * middle of any set of instruction. The READ_STATUS just need to
+> > ask a single
+> > + * time for it and then any read will return the status. Once the
+> > READ_STATUS
+> > + * cycles are done, the function will send a READ0 command to
+> > cancel the
+> > + * "READ_STATUS state" and let the normal flow of operation to
+> > continue.
+> > + *
+> > + * This helper *cannot* send a WAITRDY command or ->exec_op()
+> > implementations  
 > 
-> Well what if the stable people pick it into earlier stable series
-> based on the word fix in the subject? That has happened before.
+> 					  ^ instruction
 > 
-> I suggest you update the dts patches to use wording like
-> "update compatible to use new naming" or something similar.
+> > + * using it will enter an infinite loop.  
+> 
+> Hm, not sure why this would be the case, but okay. Maybe you should
+> move this comment outside the kernel doc header, since this is an
+> implementation detail, not something the caller/user should be aware
+> of.
 
-Patch 4/4 is a Fix and should be applied to stable trees. "omapdss,"
-prefix was never supposed to be in the DTS files, is not supposed to
-be in there now and will break some time in the future.
+Right.
 
-Explanation: The early init of omapdss adds the prefix at runtime,
-so that the binding can use generic properties and the kernel can
-use omapdss specific drivers until the generic ones can be used.
+> 
+> There's another important aspect to mention here: this function can
+> only be called from an ->exec_op() implementation if this
+> implementation is re-entrant.
 
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171130/f6407f70/attachment.sig>
+I do not agree with this statement: this function can be called from an
+->exec_op() implementation even if it is not reentrant as long as it
+does not send a WAITRDY instruction itself. No?
+
+Or maybe you wanted to point that the entire ->exec_op()
+implementation must be reentrant in order to use this function in it?
+
+> 
+> > + *
+> > + * Return 0 if the NAND chip is ready, a negative error otherwise.
+> > + */
+> > +int nand_soft_waitrdy(struct nand_chip *chip, unsigned long
+> > timeout_ms) +{
+> > +	u8 status = 0;
+> > +	int ret;
+> > +
+> > +	if (!chip->exec_op)
+> > +		return -ENOTSUPP;
+> > +
+> > +	ret = nand_status_op(chip, NULL);
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	timeout_ms = jiffies + msecs_to_jiffies(timeout_ms);
+> > +	do {
+> > +		ret = nand_read_data_op(chip, &status,
+> > sizeof(status), true);
+> > +		if (ret)
+> > +			break;
+> > +
+> > +		if (status & NAND_STATUS_READY)
+> > +			break;
+> > +
+> > +		udelay(100);  
+> 
+> Sounds a bit high, especially for a read page which takes around 20us.
+
+Well, this value is arbitrary but greping for NAND_OP_WAIT_RDY tells us
+the different timeouts with which this function is usually called, to
+get an idea of the possible wait periods: tR, tBERS, tFEAT, tPROG, tRST.
+
+While a tR_max is 200us, a tRST_max is 250000us. That is why I choose
+100us as period, which I found somehow well tuned for every timeout. But
+if you think most of the time the delay will be smaller, I will update
+the value to repeat the operation every 20us.
+
+> 
+> > +	} while	(time_before(jiffies, timeout_ms));
+> > +
+> > +	nand_exit_status_op(chip);
+> > +
+> > +	if (ret)
+> > +		return ret;
+> > +
+> > +	return status & NAND_STATUS_READY ? 0 : -ETIMEDOUT;
+> > +};
+> > +EXPORT_SYMBOL_GPL(nand_soft_waitrdy);
+> > +
