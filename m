@@ -1,22 +1,74 @@
-From: npiggin@gmail.com (Nicholas Piggin)
-Date: Thu, 30 Nov 2017 12:10:29 +1000
-Subject: [PATCH 3/7] kbuild: fix LD_DEAD_CODE_DATA_ELIMINATION with GNU
- gold
-In-Reply-To: <20171129234442.655-4-samitolvanen@google.com>
-References: <20171129234442.655-1-samitolvanen@google.com>
- <20171129234442.655-4-samitolvanen@google.com>
-Message-ID: <20171130121029.3647ea43@roar.ozlabs.ibm.com>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Thu, 30 Nov 2017 10:27:49 +0800
+Subject: [PATCH 0/4] Move DP phy switch to PHY driver
+In-Reply-To: <CAD=FV=VdUhfL+_MShYynoXKQW1-KpAOsW=x+hAxGZO78rJEyeQ@mail.gmail.com>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+ <CAD=FV=VdUhfL+_MShYynoXKQW1-KpAOsW=x+hAxGZO78rJEyeQ@mail.gmail.com>
+Message-ID: <c6fb4d29-6c6d-7f39-3cdd-3bc42c4519a2@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 29 Nov 2017 15:44:38 -0800
-Sami Tolvanen <samitolvanen@google.com> wrote:
+Hi Doug
 
-> Don't remove .head.text or .exitcall.exit when linking with --gc-sections,
-> and include .init.text.* in .init.text and .init.rodata.* in .init.rodata.
-> 
-> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+Thank you for mentioning this patch.
 
-Fine by me, if you consider my other comments.
+I think the focus of the discussion is: can we put the grf control bit 
+to dts.
 
-Reviewed-by: Nicholas Piggin <npiggin@gmail.com>
+The RK3399 has 2 Type-C phy, but only one DP controller, this "uphy_dp_sel"
+
+can help to switch these 2 phy. So I think this bit can be considered as 
+a part of
+
+Type-C phy, these 2 phy have different bits, just similar to other bits 
+(such as "pipe-status").
+
+Put them to DTS file might be a accepted practice.
+
+
+
+On 2017?11?29? 07:32, Doug Anderson wrote:
+> Hi,
+>
+> On Thu, Feb 9, 2017 at 11:44 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+>> There are 2 Type-c PHYs in RK3399, but only one DP controller. Hence
+>> only one PHY can connect to DP controller at one time, the other should
+>> be disconnected. The GRF_SOC_CON26 register has a switch bit to do it,
+>> set this bit means enable PHY 1, clear this bit means enable PHY 0.
+>>
+>> If the board has 2 Type-C ports, the DP driver get the phy id from
+>> devm_of_phy_get_by_index, and then control this switch according to
+>> this id. But some others board only has one Type-C port, it may be PHY 0
+>> or PHY 1. The dts node id can not tell us the correct PHY id. Hence move
+>> this switch to PHY driver, the PHY driver can distinguish between PHY 0
+>> and PHY 1, and then write the correct register bit.
+>>
+>>
+>>
+>> Chris Zhong (4):
+>>    Documentation: bindings: add uphy-dp-sel for Rockchip USB Type-C PHY
+>>    arm64: dts: rockchip: add rockchip,uphy-dp-sel for Type-C phy
+>>    phy: rockchip-typec: support DP phy switch
+>>    drm/rockchip: cdn-dp: remove the DP phy switch
+>>
+>>   Documentation/devicetree/bindings/phy/phy-rockchip-typec.txt | 5 +++++
+>>   arch/arm64/boot/dts/rockchip/rk3399.dtsi                     | 2 ++
+>>   drivers/gpu/drm/rockchip/cdn-dp-core.c                       | 7 -------
+>>   drivers/phy/phy-rockchip-typec.c                             | 9 +++++++++
+>>   4 files changed, 16 insertions(+), 7 deletions(-)
+> What ever happened to this series?  It seemed like it just dropped on
+> the floor...
+>
+> There was a bit of contention on patch #3
+> <https://patchwork.kernel.org/patch/9566095/> about the fact that we
+> were specifying addresses in the device tree vs. hardcoding them in
+> the driver.  Any way we can just make a decision and go with it?
+>
+>
+> -Doug
+>
+>
+>
+
+-- 
+Chris Zhong
