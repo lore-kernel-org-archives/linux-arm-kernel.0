@@ -1,47 +1,86 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Fri,  1 Dec 2017 00:51:36 +0100
-Subject: [PATCH v4 1/5] ARM: ep93xx: ts72xx: Provide include guards for
- ts72xx.h file
+Date: Fri,  1 Dec 2017 00:51:37 +0100
+Subject: [PATCH v4 2/5] ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash()
+ to accept parameters
 In-Reply-To: <20171130235140.12243-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
  <20171130235140.12243-1-lukma@denx.de>
-Message-ID: <20171130235140.12243-2-lukma@denx.de>
+Message-ID: <20171130235140.12243-3-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit adds include file guards to ts72xx.h
+This commit extend the ts72xx_register_flash() to accept passed parameters,
+which makes it more reusable.
+
+Now it is possible to accept ep93xx flash start address and partitions.
 
 Signed-off-by: Lukasz Majewski <lukma@denx.de>
 Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 ---
 Changes for v2:
-- None
+- New patch
 Changes for v3:
 - None
 Changes for v4:
 - None
 ---
- arch/arm/mach-ep93xx/ts72xx.h | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/mach-ep93xx/ts72xx.c | 20 ++++++++------------
+ 1 file changed, 8 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm/mach-ep93xx/ts72xx.h b/arch/arm/mach-ep93xx/ts72xx.h
-index 8a3206a54b39..7b7490f10fa9 100644
---- a/arch/arm/mach-ep93xx/ts72xx.h
-+++ b/arch/arm/mach-ep93xx/ts72xx.h
-@@ -12,6 +12,9 @@
-  * febfd000	22800000	4K	options register #2
-  */
+diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+index f386ebae0163..141ae4c65a81 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.c
++++ b/arch/arm/mach-ep93xx/ts72xx.c
+@@ -123,8 +123,6 @@ static struct platform_nand_data ts72xx_nand_data = {
+ 		.nr_chips	= 1,
+ 		.chip_offset	= 0,
+ 		.chip_delay	= 15,
+-		.partitions	= ts72xx_nand_parts,
+-		.nr_partitions	= ARRAY_SIZE(ts72xx_nand_parts),
+ 	},
+ 	.ctrl = {
+ 		.cmd_ctrl	= ts72xx_nand_hwcontrol,
+@@ -148,8 +146,8 @@ static struct platform_device ts72xx_nand_flash = {
+ 	.num_resources		= ARRAY_SIZE(ts72xx_nand_resource),
+ };
  
-+#ifndef __TS72XX_H_
-+#define __TS72XX_H_
+-
+-static void __init ts72xx_register_flash(void)
++void __init ts72xx_register_flash(struct mtd_partition *parts, int n,
++				  resource_size_t start)
+ {
+ 	/*
+ 	 * TS7200 has NOR flash all other TS72xx board have NAND flash.
+@@ -157,16 +155,12 @@ static void __init ts72xx_register_flash(void)
+ 	if (board_is_ts7200()) {
+ 		ep93xx_register_flash(2, EP93XX_CS6_PHYS_BASE, SZ_16M);
+ 	} else {
+-		resource_size_t start;
+-
+-		if (is_ts9420_installed())
+-			start = EP93XX_CS7_PHYS_BASE;
+-		else
+-			start = EP93XX_CS6_PHYS_BASE;
+-
+ 		ts72xx_nand_resource[0].start = start;
+ 		ts72xx_nand_resource[0].end = start + SZ_16M - 1;
+ 
++		ts72xx_nand_data.chip.partitions = parts;
++		ts72xx_nand_data.chip.nr_partitions = n;
 +
- #define TS72XX_MODEL_PHYS_BASE		0x22000000
- #define TS72XX_MODEL_VIRT_BASE		IOMEM(0xfebff000)
- #define TS72XX_MODEL_SIZE		0x00001000
-@@ -83,3 +86,4 @@ static inline int is_ts9420_installed(void)
- 					TS72XX_OPTIONS2_TS9420);
+ 		platform_device_register(&ts72xx_nand_flash);
+ 	}
  }
- #endif
-+#endif /* __TS72XX_H_ */
+@@ -257,7 +251,9 @@ static struct ep93xx_spi_info ts72xx_spi_info __initdata = {
+ static void __init ts72xx_init_machine(void)
+ {
+ 	ep93xx_init_devices();
+-	ts72xx_register_flash();
++	ts72xx_register_flash(ts72xx_nand_parts, ARRAY_SIZE(ts72xx_nand_parts),
++			      is_ts9420_installed() ?
++			      EP93XX_CS7_PHYS_BASE : EP93XX_CS6_PHYS_BASE);
+ 	platform_device_register(&ts72xx_rtc_device);
+ 	platform_device_register(&ts72xx_wdt_device);
+ 
 -- 
 2.11.0
