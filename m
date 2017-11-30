@@ -1,95 +1,118 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:35 +0000
-Subject: [PATCH v2 07/18] arm64: mm: Allocate ASIDs in pairs
+Date: Thu, 30 Nov 2017 16:39:39 +0000
+Subject: [PATCH v2 11/18] arm64: mm: Map entry trampoline into trampoline and
+ kernel page tables
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-12-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for separate kernel/user ASIDs, allocate them in pairs
-for each mm_struct. The bottom bit distinguishes the two: if it is set,
-then the ASID will map only userspace.
+The exception entry trampoline needs to be mapped at the same virtual
+address in both the trampoline page table (which maps nothing else)
+and also the kernel page table, so that we can swizzle TTBR1_EL1 on
+exceptions from and return to EL0.
+
+This patch maps the trampoline at a fixed virtual address in the fixmap
+area of the kernel virtual address space, which allows the kernel proper
+to be randomized with respect to the trampoline when KASLR is enabled.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu.h |  1 +
- arch/arm64/mm/context.c      | 25 +++++++++++++++++--------
- 2 files changed, 18 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/fixmap.h  |  4 ++++
+ arch/arm64/include/asm/pgtable.h |  1 +
+ arch/arm64/kernel/asm-offsets.c  |  6 +++++-
+ arch/arm64/mm/mmu.c              | 23 +++++++++++++++++++++++
+ 4 files changed, 33 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 0d34bf0a89c7..01bfb184f2a8 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -17,6 +17,7 @@
- #define __ASM_MMU_H
+diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+index 4052ec39e8db..8119b49be98d 100644
+--- a/arch/arm64/include/asm/fixmap.h
++++ b/arch/arm64/include/asm/fixmap.h
+@@ -58,6 +58,10 @@ enum fixed_addresses {
+ 	FIX_APEI_GHES_NMI,
+ #endif /* CONFIG_ACPI_APEI_GHES */
  
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
-+#define USER_ASID_FLAG	(UL(1) << 48)
- 
- typedef struct {
- 	atomic64_t	id;
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 78816e476491..db28958d9e4f 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -39,7 +39,16 @@ static cpumask_t tlb_flush_pending;
- 
- #define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
- #define ASID_FIRST_VERSION	(1UL << asid_bits)
--#define NUM_USER_ASIDS		ASID_FIRST_VERSION
-+
 +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+#define NUM_USER_ASIDS		(ASID_FIRST_VERSION >> 1)
-+#define asid2idx(asid)		(((asid) & ~ASID_MASK) >> 1)
-+#define idx2asid(idx)		(((idx) << 1) & ~ASID_MASK)
-+#else
-+#define NUM_USER_ASIDS		(ASID_FIRST_VERSION)
-+#define asid2idx(asid)		((asid) & ~ASID_MASK)
-+#define idx2asid(idx)		asid2idx(idx)
-+#endif
- 
- /* Get the ASIDBits supported by the current CPU */
- static u32 get_cpu_asid_bits(void)
-@@ -104,7 +113,7 @@ static void flush_context(unsigned int cpu)
- 		 */
- 		if (asid == 0)
- 			asid = per_cpu(reserved_asids, i);
--		__set_bit(asid & ~ASID_MASK, asid_map);
-+		__set_bit(asid2idx(asid), asid_map);
- 		per_cpu(reserved_asids, i) = asid;
- 	}
- 
-@@ -156,16 +165,16 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 		 * We had a valid ASID in a previous life, so try to re-use
- 		 * it if possible.
- 		 */
--		asid &= ~ASID_MASK;
--		if (!__test_and_set_bit(asid, asid_map))
-+		if (!__test_and_set_bit(asid2idx(asid), asid_map))
- 			return newasid;
- 	}
++	FIX_ENTRY_TRAMP_TEXT,
++#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 	__end_of_permanent_fixed_addresses,
  
  	/*
- 	 * Allocate a free ASID. If we can't find one, take a note of the
--	 * currently active ASIDs and mark the TLBs as requiring flushes.
--	 * We always count from ASID #1, as we use ASID #0 when setting a
--	 * reserved TTBR0 for the init_mm.
-+	 * currently active ASIDs and mark the TLBs as requiring flushes.  We
-+	 * always count from ASID #2 (index 1), as we use ASID #0 when setting
-+	 * a reserved TTBR0 for the init_mm and we allocate ASIDs in even/odd
-+	 * pairs.
- 	 */
- 	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
- 	if (asid != NUM_USER_ASIDS)
-@@ -182,7 +191,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- set_asid:
- 	__set_bit(asid, asid_map);
- 	cur_idx = asid;
--	return asid | generation;
-+	return idx2asid(asid) | generation;
- }
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index c9530b5b5ca8..c8f56b2ca414 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -681,6 +681,7 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
  
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+ extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
++extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
+ 
+ /*
+  * Encode and decode a swap entry:
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 71bf088f1e4b..af247d10252f 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -24,6 +24,7 @@
+ #include <linux/kvm_host.h>
+ #include <linux/suspend.h>
+ #include <asm/cpufeature.h>
++#include <asm/fixmap.h>
+ #include <asm/thread_info.h>
+ #include <asm/memory.h>
+ #include <asm/smp_plat.h>
+@@ -148,11 +149,14 @@ int main(void)
+   DEFINE(ARM_SMCCC_RES_X2_OFFS,		offsetof(struct arm_smccc_res, a2));
+   DEFINE(ARM_SMCCC_QUIRK_ID_OFFS,	offsetof(struct arm_smccc_quirk, id));
+   DEFINE(ARM_SMCCC_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_quirk, state));
+-
+   BLANK();
+   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
+   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
++  BLANK();
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++  DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
++#endif
+   return 0;
+ }
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 267d2b79d52d..c2622525c4d6 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -525,6 +525,29 @@ static int __init parse_rodata(char *arg)
+ }
+ early_param("rodata", parse_rodata);
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++static int __init map_entry_trampoline(void)
++{
++	extern char __entry_tramp_text_start[];
++
++	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
++	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
++
++	/* The trampoline is always mapped and can therefore be global */
++	pgprot_val(prot) &= ~PTE_NG;
++
++	/* Map only the text into the trampoline page table */
++	memset((char *)tramp_pg_dir, 0, PGD_SIZE);
++	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
++			     prot, pgd_pgtable_alloc, 0);
++
++	/* ...as well as the kernel page table */
++	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
++	return 0;
++}
++core_initcall(map_entry_trampoline);
++#endif
++
+ /*
+  * Create fine-grained mappings for the kernel.
+  */
 -- 
 2.1.4
