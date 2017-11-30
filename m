@@ -1,38 +1,90 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 30 Nov 2017 21:09:21 +0900
-Subject: [PATCH 1/3] kbuild: add clang-version.sh
-In-Reply-To: <CAKwvOdndEfdXuRCeSsr04pAt0d0tE_z72DUYc2Z9LCnXAQc4Hw@mail.gmail.com>
-References: <20171129000011.55235-1-samitolvanen@google.com>
- <20171129000011.55235-2-samitolvanen@google.com>
- <CAKwvOdndEfdXuRCeSsr04pAt0d0tE_z72DUYc2Z9LCnXAQc4Hw@mail.gmail.com>
-Message-ID: <CAK7LNATDYV0p8KvA6dL+7or3osNNBBwO2CjUaFz2UV_2iOYADQ@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 30 Nov 2017 13:14:51 +0100
+Subject: [PATCH] clk: Manage proper runtime PM state in clk_change_rate()
+References: <CGME20171130121511eucas1p1832c1f6e5bc9e263860e40478efca132@eucas1p1.samsung.com>
+Message-ID: <20171130121451.6710-1-m.szyprowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-11-30 2:39 GMT+09:00 Nick Desaulniers <ndesaulniers@google.com>:
-> +# clang-version [-p] clang-command
-> +#
-> +# Prints the compiler version of `command' in a canonical 4-digit form
->
-> small nit: `command` should be `clang-command`, but its just a comment
-> (maybe the maintainer can make that change when/if applying).
+clk_change_rate() propagates rate change down to all its children. Such
+operation requires managing proper runtime PM state of each child, what
+was missing. Add needed calls to clk_pm_runtime*() to ensure that
+set_rate() clock callback is called on runtime active clock.
 
+This fixes following issue found on Exynos5433 TM2 board with devfreq
+enabled:
 
-I would be happy to fix it up locally if there were no other issue.
+Synchronous External Abort: synchronous external abort (0x96000210) at 0xffffff80093f5600
+Internal error: : 96000210 [#1] PREEMPT SMP
+Modules linked in:
+CPU: 0 PID: 5 Comm: kworker/u16:0 Not tainted 4.15.0-rc1-next-20171129+ #4
+Hardware name: Samsung TM2 board (DT)
+Workqueue: devfreq_wq devfreq_monitor
+task: ffffffc0ca96b600 task.stack: ffffff80093a8000
+pstate: a0000085 (NzCv daIf -PAN -UAO)
+pc : clk_divider_set_rate+0x54/0x118
+lr : clk_divider_set_rate+0x44/0x118
+...
+Process kworker/u16:0 (pid: 5, stack limit = 0xffffff80093a8000)
+Call trace:
+ clk_divider_set_rate+0x54/0x118
+ clk_change_rate+0xfc/0x4e0
+ clk_change_rate+0x1f0/0x4e0
+ clk_change_rate+0x1f0/0x4e0
+ clk_change_rate+0x1f0/0x4e0
+ clk_core_set_rate_nolock+0x138/0x148
+ clk_set_rate+0x28/0x50
+ exynos_bus_passive_target+0x6c/0x11c
+ update_devfreq_passive+0x58/0xb4
+ devfreq_passive_notifier_call+0x50/0x5c
+ notifier_call_chain+0x4c/0x88
+ __srcu_notifier_call_chain+0x54/0x80
+ srcu_notifier_call_chain+0x14/0x1c
+ update_devfreq+0x100/0x1b4
+ devfreq_monitor+0x2c/0x88
+ process_one_work+0x148/0x3d8
+ worker_thread+0x13c/0x3f8
+ kthread+0x100/0x12c
+ ret_from_fork+0x10/0x18
 
+Reported-by: Chanwoo Choi <cw00.choi@samsung.com>
+Fixes: 9a34b45397e5 ("clk: Add support for runtime PM")
+Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+---
+For some unknown reason handling of this case was missing in the initial
+patch, which added runtime PM support for clock core. Even tests in
+linux-next did not revealed this issue. This patch finaly fixes it,
+as it is now easy to trigger it with v4.15-rc1.
 
-> The conditional at the end to see if $with_patchlevel using "x" is
-> odd, but this is what scripts/gcc-version.sh does and this patch does
-> work as expected.
->
-> Tested-by: Nick Desaulniers <ndesaulniers@google.com>
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Best regards
+Marek Szyprowski
+Samsung R&D Institute Poland
+---
+ drivers/clk/clk.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-
-
+diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
+index 647d056df88c..8a1860a36c77 100644
+--- a/drivers/clk/clk.c
++++ b/drivers/clk/clk.c
+@@ -1564,6 +1564,9 @@ static void clk_change_rate(struct clk_core *core)
+ 		best_parent_rate = core->parent->rate;
+ 	}
+ 
++	if (clk_pm_runtime_get(core))
++		return;
++
+ 	if (core->flags & CLK_SET_RATE_UNGATE) {
+ 		unsigned long flags;
+ 
+@@ -1634,6 +1637,8 @@ static void clk_change_rate(struct clk_core *core)
+ 	/* handle the new child who might not be in core->children yet */
+ 	if (core->new_child)
+ 		clk_change_rate(core->new_child);
++
++	clk_pm_runtime_put(core);
+ }
+ 
+ static int clk_core_set_rate_nolock(struct clk_core *core,
 -- 
-Best Regards
-Masahiro Yamada
+2.15.0
