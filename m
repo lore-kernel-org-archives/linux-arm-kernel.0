@@ -1,52 +1,58 @@
 From: tyler@opensourcefoundries.com (tyler at opensourcefoundries.com)
-Date: Thu, 30 Nov 2017 12:14:32 -0800
-Subject: [PATCH 6/8] ARM: dts: imx7d-sbc-iot: enable PCIe peripheral
+Date: Thu, 30 Nov 2017 12:14:34 -0800
+Subject: [PATCH 8/8] PCIe: imx6: imx7d: add support for phy refclk source
 In-Reply-To: <20171130201434.14122-1-tyler@opensourcefoundries.com>
 References: <20171130201434.14122-1-tyler@opensourcefoundries.com>
-Message-ID: <20171130201434.14122-7-tyler@opensourcefoundries.com>
+Message-ID: <20171130201434.14122-9-tyler@opensourcefoundries.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tyler Baker <tyler@opensourcefoundries.com>
 
-Add a PCIe device tree node to enable PCIe support.
+In the i.MX7D the PCIe PHY can use either externel oscillator or
+internal PLL as a reference clock source.
+Add support for the PHY Reference Clock source including
+device tree property phy-ref-clk.
+External oscillator is used as a default reference clock source.
 
 Signed-off-by: Tyler Baker <tyler@opensourcefoundries.com>
+Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
 ---
- arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/pci/dwc/pci-imx6.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts b/arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts
-index 50dfdd3..7b21366 100644
---- a/arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts
-+++ b/arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts
-@@ -127,6 +127,12 @@
- 		>;
- 	};
+diff --git a/drivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+index b734835..e935db4 100644
+--- a/drivers/pci/dwc/pci-imx6.c
++++ b/drivers/pci/dwc/pci-imx6.c
+@@ -45,6 +45,7 @@ enum imx6_pcie_variants {
+ struct imx6_pcie {
+ 	struct dw_pcie		*pci;
+ 	int			reset_gpio;
++	u32			phy_refclk;
+ 	bool			gpio_active_high;
+ 	struct clk		*pcie_bus;
+ 	struct clk		*pcie_phy;
+@@ -474,7 +475,7 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+ 	switch (imx6_pcie->variant) {
+ 	case IMX7D:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+-				   IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
++				   BIT(5), imx6_pcie->phy_refclk ? BIT(5) : 0);
+ 		break;
+ 	case IMX6SX:
+ 		regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+@@ -733,6 +734,11 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pci->dbi_base))
+ 		return PTR_ERR(pci->dbi_base);
  
-+	pinctrl_pcie: pciegrp {
-+		fsl,pins = <
-+			MX7D_PAD_EPDC_BDR1__GPIO2_IO29		0x34 /* PCIe RST */
-+		>;
-+	};
++	/* Fetch PHY Reference Clock */
++	if (of_property_read_u32(node, "phy-ref-clk", &imx6_pcie->phy_refclk))
++		imx6_pcie->phy_refclk = 0;
++	pr_info("%s: phy_refclk = %d\n", __func__, imx6_pcie->phy_refclk);
 +
- 	pinctrl_uart2: uart2grp {
- 		fsl,pins = <
- 			MX7D_PAD_LCD_ENABLE__UART2_DCE_TX	0x79 /* P7-12 */
-@@ -201,6 +207,14 @@
- 	};
- };
- 
-+&pcie {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_pcie>;
-+	reset-gpio = <&gpio2 29 GPIO_ACTIVE_LOW>;
-+	phy-ref-clk = <1>;
-+	status = "okay";
-+};
-+
- &uart2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_uart2>;
+ 	/* Fetch GPIOs */
+ 	imx6_pcie->reset_gpio = of_get_named_gpio(node, "reset-gpio", 0);
+ 	imx6_pcie->gpio_active_high = of_property_read_bool(node,
 -- 
 2.9.3
