@@ -1,81 +1,111 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 30 Nov 2017 14:45:17 +0100
-Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Enable NFS root
-In-Reply-To: <20171130125217.GE22365@bigcity.dyn.berto.se>
-References: <1493717048-10740-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXbvC90k1QYZsjWx=f7QVQyWOzi_v3u8ShDoDsSAmZsjw@mail.gmail.com>
- <20171130094354.6pktdlcuc3gettji@verge.net.au>
- <20171130125217.GE22365@bigcity.dyn.berto.se>
-Message-ID: <CAMuHMdVKA5YmRPcTTGafKciMF-cKtKTx+PdNJtrDRb20jCxtAA@mail.gmail.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 30 Nov 2017 14:49:28 +0100
+Subject: [PATCH v2] clk: stm32-h7: fix copyright
+In-Reply-To: <CA+M3ks4pva9Kg+gj44KeUrDcKf9tn5O-0VkTv5uUebJ=812E3Q@mail.gmail.com>
+References: <20171130084108.23083-1-benjamin.gaignard@st.com>
+ <CAOFm3uG_7kChnvxW0SbHSMP5q_KSZeaNxjkKb774ZmcwukJ_Mw@mail.gmail.com>
+ <CA+M3ks41cBBqDrEGFZm5yGO0j8funfTAaTf_u2cJoD1p3XpQUQ@mail.gmail.com>
+ <CAOFm3uGMHrNyov=BkrXbJQeHnMgZCHK7ogTru8Bj9An7aTz9DQ@mail.gmail.com>
+ <CA+M3ks4pva9Kg+gj44KeUrDcKf9tn5O-0VkTv5uUebJ=812E3Q@mail.gmail.com>
+Message-ID: <CAOFm3uHsZCz=6tXsgVCtrk33X-AQB7EQKzmqf6MguKasoAH+Tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Niklas,
+Benjamin:
 
-On Thu, Nov 30, 2017 at 1:52 PM, Niklas S?derlund
-<niklas.soderlund@ragnatech.se> wrote:
-> On 2017-11-30 10:43:55 +0100, Simon Horman wrote:
->> On Tue, May 02, 2017 at 11:27:58AM +0200, Geert Uytterhoeven wrote:
->> > On Tue, May 2, 2017 at 11:24 AM, Simon Horman
->> > <horms+renesas@verge.net.au> wrote:
->> > > Enable NFS root on the r8a7795/h3ulcb and r8a7796/m3ulcb
->> > > as per:
->> > > * commit b2407c566ba29215 ("arm64: dts: r8a7795: enable nfs root on Salvator-X board").
->> > > * commit 742a9dfb90f0 ("arm64: dts: r8a7796: salvator-x: Enable NFS root")
->> > >
->> > > Also set ignore_loglevel rw as boot args as is the case for the boards
->> > > for the boards for other Renesas ARM/ARM64 based SoCs.
->> >
->> > s/for the boards//
->> >
->> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->> >
->> > Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
->> >
->> > Gr{oetje,eeting}s,
+On Thu, Nov 30, 2017 at 2:05 PM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
+> 2017-11-30 13:56 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
+>> On Thu, Nov 30, 2017 at 1:47 PM, Benjamin Gaignard
+>> <benjamin.gaignard@linaro.org> wrote:
+>>> 2017-11-30 12:28 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
+>>>> On Thu, Nov 30, 2017 at 9:41 AM, Benjamin Gaignard
+>>>> <benjamin.gaignard@linaro.org> wrote:
+>>>>> Uniformize STMicroelectronics copyrights header
+>>>>> Add SPDX identifier
+>>>>>
+>>>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+>>>>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+>>>>> CC: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>>> ---
+>>>>>  drivers/clk/clk-stm32h7.c | 19 +++----------------
+>>>>>  1 file changed, 3 insertions(+), 16 deletions(-)
+>>>>>
+>>>>> diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
+>>>>> index 61c3e40507d3..db2b162c0d4c 100644
+>>>>> --- a/drivers/clk/clk-stm32h7.c
+>>>>> +++ b/drivers/clk/clk-stm32h7.c
+>>>>> @@ -1,20 +1,7 @@
+>>>>> +// SPDX-License-Identifier: GPL-2.0
+>>>>>  /*
+>>>>> - * Copyright (C) Gabriel Fernandez 2017
+>>>>> - * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
+>>>>> - *
+>>>>> - * License terms: GPL V2.0.
+>>>>> - *
+>>>>> - * This program is free software; you can redistribute it and/or modify it
+>>>>> - * under the terms and conditions of the GNU General Public License,
+>>>>> - * version 2, as published by the Free Software Foundation.
+>>>>> - *
+>>>>> - * This program is distributed in the hope it will be useful, but WITHOUT
+>>>>> - * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>>>>> - * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>>>>> - * more details.
+>>>>> - *
+>>>>> - * You should have received a copy of the GNU General Public License along with
+>>>>> - * this program.  If not, see <http://www.gnu.org/licenses/>.
+>>>>> + * Copyright (C) STMicroelectronics 2017
+>>>>> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
+>>>>>   */
+>>>>>
+>>>>>  #include <linux/clk.h>
+>>>>
+>>>> Awesome! Don't you like it when you remove this type of things?
+>>>
+>>> Yes but is also means that many other STM files need to be updated...
 >>
->> Sergei has pointed out that bootargs has seems to have effect on ARM64
->> kernels. So I think this patch should be withdrawn and we should consider
->> removing bootargs from those ARM64 boards where it is present.
->>
+>> Sure thing. I have a FLOSS tool to help with this FWIW. I would be
+>> glad to help as needed.
 >
-> I don't think this is true.
->
-> I just added a argument to bootargs to salvator-common.dtsi for some
-> hack testing and it took effect. Tested on-top of latest renesas-drivers
-> and H3 ES2.0.
->
->>>> DIFF <<<
-> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> index 7b30044a55367d35..4cb4b44f8be42cb4 100644
-> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-> @@ -42,7 +42,7 @@
->         };
->
->         chosen {
-> -               bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
-> +               bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp adv748x.txbvc=1";
->                 stdout-path = "serial0:115200n8";
->         };
->>>> END DIFF <<<
->
-> # cat /sys/firmware/devicetree/base/chosen/bootargs
-> ignore_loglevel rw root=/dev/nfs ip=dhcp adv748x.txbvc=1
->
-> And the module parameter had the expected effect on the adv7482x driver.
-> Is there another issue here which I'm missing?
+> Do you have a link to this tool ?
 
-1. It may depend on the U-Boot version
-2. Anyone playing with CONFIG_CMDLINE and CONFIG_CMDLINE_FORCE?
+https://github.com/nexB/scancode-toolkit
 
-Gr{oetje,eeting}s,
+And the experimental 833-espedexify [1] branch has a new option such
+that if a single license is detected exactly and is clearly a well
+defined SPDX license, it can also delete the boilerplate and inject
+the correct SPDX identifier at once (though not at the canonical first
+line place, and not being too smart about the comment style that is
+hardcoded to //)
 
-                        Geert
+NB: I only spent a couple hours on this new license text decrapifier
+option [2] and it is very (too) strict, making too many checks before
+deciding to remove boilerplate  ... but that would be my pleasure to
+make it work for you and iron the quirks. I am not qualified to
+contribute code to the kernel (though I dabble enough in C to have a
+few odd patches of mine in strace) BUT I grok Python and a few thing
+about licensing alright.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+FWIW, this is the tool that has been used to help greg k-h and tglx
+injecting the first pass of SPDX ids and that should be useful to do
+more of it. As a weird twist of fate, it does not do (yet) a great job
+at the detection of normalized SPDX-License-Identifiers .... but then
+the whole point is that once you have these a good ole grep is all you
+should need, right?  But it is otherwise best in class for license
+detection and uses eventually a very simple algo: a good ole diff with
+a few twists.
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+It is routinely used by several large and small projects, orgs and
+companies for license detection and compliance and is supposed to be
+the least worst of the tools in that domain. At least I am working on
+hard to make it so.
+
+And bonus: any bug reported or ticket or question reported by a kernel
+contributor gets VIP treatment, whatever this means :)
+
+[1] https://github.com/nexB/scancode-toolkit/tree/833-espedexify
+[2] https://github.com/nexB/scancode-toolkit/blob/833-espedexify/src/scancode/plugin_espedexify.py
+
+-- 
+Cordially
+Philippe Ombredanne
