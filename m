@@ -1,28 +1,47 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Thu, 30 Nov 2017 19:22:42 +0100
-Subject: [PATCH 2/2] ARM: multi_v7_defconfig: Enable missing drivers for
- supported Exynos boards
-In-Reply-To: <20171130091004.22971-2-m.szyprowski@samsung.com>
-References: <20171130091004.22971-1-m.szyprowski@samsung.com>
- <CGME20171130091009eucas1p195871b12e598293afca3c74861b8c5ac@eucas1p1.samsung.com>
- <20171130091004.22971-2-m.szyprowski@samsung.com>
-Message-ID: <20171130182242.fozfzan72bjr7bwn@kozik-lap>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 30 Nov 2017 19:26:21 +0100
+Subject: [PATCH 1/1] phy: Add 2.5G SGMII interface mode
+In-Reply-To: <20171130181520.GF10595@n2100.armlinux.org.uk>
+References: <1512016235-15909-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <20171130155050.GD7483@lunn.ch>
+ <AM3PR04MB4494050122E413E2445BD348C380@AM3PR04MB449.eurprd04.prod.outlook.com>
+ <20171130174127.GA28828@lunn.ch>
+ <20171130181520.GF10595@n2100.armlinux.org.uk>
+Message-ID: <20171130182621.GC28828@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 10:10:04AM +0100, Marek Szyprowski wrote:
-> Enable following drivers for recently merged devices:
-> - CEC and S5P CEC driver for all Exynos4 and Exynos5 boards with HDMI
-> - Sii9234 DRM HDMI-MHL bridge for Trats2
-> - dedicated Odroid ASoC machine driver for Odroid XU3/XU4
+On Thu, Nov 30, 2017 at 06:15:20PM +0000, Russell King - ARM Linux wrote:
+> On Thu, Nov 30, 2017 at 06:41:27PM +0100, Andrew Lunn wrote:
+> > SGMII supports passing auto-negotiation results from the PHY to the
+> > MAC. 1000BASE-X does not.
+> > 
+> > SGMII supports the PHY running at 10, 100, and 1000 Mbps. But to
+> > support this, the MAC needs to replicate the bits 100, or 10 times
+> > when the PHY is running in 10 or 100Mbps mode.
+> > 
+> > So with your 2.5G SGMII, you need to replicate the bits 250, 25, or
+> > 2.5 times if they PHY is running at lower speeds. This last one is
+> > interesting.
 > 
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
->  arch/arm/configs/multi_v7_defconfig | 5 +++++
->  1 file changed, 5 insertions(+)
+> That's not what I've read so far - but I don't know about the PHY
+> in this exact case because the docs are only available under NDA
+> (which makes it incredibly difficult to have this discussion.)
 > 
+> However, from what I can ascertain from a Xilinx document, 2.5G is
+> 1G SGMII clocked 2.5x faster.  When in 2.5G mode, the other modes
+> are unavailable.
 
-Thanks, applied.
+Hi Russell
 
-Best regards,
-Krzysztof
+Thanks for looking into the details.
+
+So you need the PHY driver to see what it has negotiated, and when it
+calls the adjust_link callback, the MAC needs look at the
+phydev->interface and set the MAC to 2.5G SGMII or SGMII.
+
+Same as the Marvell 10G PHY driver flips between
+PHY_INTERFACE_MODE_10GKR and PHY_INTERFACE_MODE_SGMII depending on
+what it has negotiated.
+
+     Andrew
