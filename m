@@ -1,44 +1,44 @@
 From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Thu, 30 Nov 2017 09:18:11 +0100
-Subject: [PATCH] rtc: add mxc driver for i.MX53
-In-Reply-To: <20171129221114.GV21126@piout.net>
-References: <20171128073927.12035-1-linux-kernel-dev@beckhoff.com>
- <20171129221114.GV21126@piout.net>
-Message-ID: <CAOFm3uFb8Jo9detD2CziuYt_DH_ohYD9P=uvqHugKDxpN+xvAQ@mail.gmail.com>
+Date: Thu, 30 Nov 2017 09:21:29 +0100
+Subject: [patch v12 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
+ families JTAG master driver
+In-Reply-To: <CAGMNF6XRwU5QEJhkg-mVwE5zpPigtcGJtRUupZHtcWRdedcsxg@mail.gmail.com>
+References: <1510675867-24276-1-git-send-email-oleksandrs@mellanox.com>
+ <1510675867-24276-3-git-send-email-oleksandrs@mellanox.com>
+ <CAGMNF6XRwU5QEJhkg-mVwE5zpPigtcGJtRUupZHtcWRdedcsxg@mail.gmail.com>
+Message-ID: <CAOFm3uHg8n4A8opaOC3=pNtM1yJU6iy5Ta8XtGOvqT-Euv=X1w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:11 PM, Alexandre Belloni
-<alexandre.belloni@free-electrons.com> wrote:
-> On 28/11/2017 at 08:39:27 +0100, linux-kernel-dev at beckhoff.com wrote:
->> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+On Wed, Nov 29, 2017 at 11:51 PM, Kun Yi <kunyi@google.com> wrote:
+> On Tue, Nov 14, 2017 at 8:11 AM, Oleksandr Shamray
+> <oleksandrs@mellanox.com> wrote:
 []
->> diff --git a/drivers/rtc/rtc-mxc_v2.c b/drivers/rtc/rtc-mxc_v2.c
+>> diff --git a/drivers/jtag/jtag-aspeed.c b/drivers/jtag/jtag-aspeed.c
 >> new file mode 100644
->> index 000000000000..5049b521b38e
+>> index 0000000..a6e2417
 >> --- /dev/null
->> +++ b/drivers/rtc/rtc-mxc_v2.c
->> @@ -0,0 +1,531 @@
->
-> I think SPDX identifier will soon be required on new files, please add
-> one.
->
+>> +++ b/drivers/jtag/jtag-aspeed.c
+>> @@ -0,0 +1,782 @@
 >> +/*
->> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
->> + */
->> +
->> +/*
->> + * The code contained herein is licensed under the GNU General Public
->> + * License. You may obtain a copy of the GNU General Public License
->> + * Version 2 or later at the following locations:
+>> + * drivers/jtag/aspeed-jtag.c
 >> + *
->> + * http://www.opensource.org/licenses/gpl-license.html
->> + * http://www.gnu.org/copyleft/gpl.html
+>> + * Copyright (c) 2017 Mellanox Technologies. All rights reserved.
+>> + * Copyright (c) 2017 Oleksandr Shamray <oleksandrs@mellanox.com>
+>> + *
+>> + * Released under the GPLv2 only.
+>> + * SPDX-License-Identifier: GPL-2.0
 >> + */
 
-Exactly!
-And while you are it , you could replace the boilerplate license text
-with the SPDX id.
+I think the SPDX id should be on the first line as requested by Linus
+and documented by Thomas (tglx) and Greg (greg-kh). And it should use
+// comments, e.g:
+
+// SPDX-License-Identifier: GPL-2.0
+
+See the threads discussing all these.
+
+
 -- 
 Cordially
 Philippe Ombredanne
