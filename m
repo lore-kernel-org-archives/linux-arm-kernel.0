@@ -1,12 +1,10 @@
 From: marco.franchi@nxp.com (Marco Franchi)
-Date: Thu, 30 Nov 2017 11:00:09 -0200
-Subject: [PATCH] ARM: dts: imx6sl-evk: Add DRM panel,
+Date: Thu, 30 Nov 2017 11:02:09 -0200
+Subject: [PATCH] ARM: dts: imx6sx-sdb: Add DRM panel,
  power-enable and backlight support
-Message-ID: <1512046809-18434-1-git-send-email-marco.franchi@nxp.com>
+Message-ID: <1512046929-18597-1-git-send-email-marco.franchi@nxp.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-From: Marco Frank <marco.franchi@nxp.com>
 
 It is preferred to use the panel compatible string rather than passing 
 the LCD timming in the device tree.
@@ -22,30 +20,30 @@ Documentation/devicetree/bindings/display/panel/simple-panel.txt
 
 Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
 ---
- arch/arm/boot/dts/imx6sl-evk.dts | 49 ++++++++++++++++++++--------------------
+ arch/arm/boot/dts/imx6sx-sdb.dtsi | 49 ++++++++++++++++++++-------------------
  1 file changed, 25 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index 0a90eea..d5148f4 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -20,7 +20,7 @@
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index da81552..3a597a4 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -24,7 +24,7 @@
  		reg = <0x80000000 0x40000000>;
  	};
  
 -	backlight {
-+	backlight_display: backlight_display {
++	backlight_display: backlight-display {
  		compatible = "pwm-backlight";
- 		pwms = <&pwm1 0 5000000>;
+ 		pwms = <&pwm3 0 5000000>;
  		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -91,6 +91,14 @@
- 			gpio = <&gpio4 3 0>;
- 			enable-active-high;
+@@ -129,6 +129,14 @@
+ 			regulator-max-microvolt = <3300000>;
+ 			gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
  		};
 +
-+		reg_lcd_5v: regulator at 5 {
++		reg_lcd_5v: regulator at 7 {
 +			compatible = "regulator-fixed";
-+			reg = <5>;
++			reg = <7>;
 +			regulator-name = "lcd-5v0";
 +			regulator-min-microvolt = <5000000>;
 +			regulator-max-microvolt = <5000000>;
@@ -53,9 +51,9 @@ index 0a90eea..d5148f4 100644
  	};
  
  	sound {
-@@ -108,6 +116,19 @@
+@@ -146,6 +154,19 @@
  		mux-int-port = <2>;
- 		mux-ext-port = <3>;
+ 		mux-ext-port = <6>;
  	};
 +
 +	panel {
@@ -73,8 +71,8 @@ index 0a90eea..d5148f4 100644
  };
  
  &audmux {
-@@ -546,31 +567,11 @@
- &lcdif {
+@@ -215,31 +236,11 @@
+ &lcdif1 {
  	pinctrl-names = "default";
  	pinctrl-0 = <&pinctrl_lcd>;
 -	lcd-supply = <&reg_lcd_3v3>;
@@ -82,7 +80,7 @@ index 0a90eea..d5148f4 100644
  	status = "okay";
  
 -	display0: display0 {
--		bits-per-pixel = <32>;
+-		bits-per-pixel = <16>;
 -		bus-width = <24>;
 -
 -		display-timings {
