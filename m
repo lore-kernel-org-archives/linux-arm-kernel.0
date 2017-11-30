@@ -1,69 +1,125 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 30 Nov 2017 15:15:47 -0800
-Subject: [GIT PULL] Amlogic fixes for v4.15-rc
-Message-ID: <7hefofpdcs.fsf@baylibre.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 30 Nov 2017 17:19:51 -0600
+Subject: [PATCH v3 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
+ dmtimer pdata ops
+In-Reply-To: <e632a727-1067-7767-1646-f49ec0f8c2ec@ti.com>
+References: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
+ <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
+ <2c5e3e04-9940-43c3-62b1-8cef7d22c5e1@ti.com>
+ <e632a727-1067-7767-1646-f49ec0f8c2ec@ti.com>
+Message-ID: <7bfa0a0d-27f6-3797-f96b-eeb975158f78@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd, Olof,
-
-A handful of minor v4.15 fixes for Amlogic family SoCs.  They're mostly
-DT, but some trivial non-DT stuff mixed in.  Let me know if you prefer
-those in separate pulls, and I will do so.
-
-Thanks,
-
-Kevin
 
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+On 11/30/2017 03:36 AM, Keerthy wrote:
+> 
+> 
+> On Tuesday 28 November 2017 11:57 PM, Strashko, Grygorii wrote:
+>>
+>>
+>> On 11/15/2017 10:23 PM, Keerthy wrote:
+>>> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+>>>
+>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>> ---
+>>>
+>>> Changes in v3:
+>>>
+>>>     * Used of_find_platdata_by_node function to fetch platform
+>>>       data for timer node.
+>>>
+>>>    drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
+>>>    1 file changed, 22 insertions(+), 17 deletions(-)
+>>>
+>>> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
+>>> index 5ad42f3..2caf46b 100644
+>>> --- a/drivers/pwm/pwm-omap-dmtimer.c
+>>> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+>>> @@ -23,6 +23,7 @@
+>>>    #include <linux/mutex.h>
+>>>    #include <linux/of.h>
+>>>    #include <linux/of_platform.h>
+>>> +#include <linux/platform_data/dmtimer-omap.h>
+>>>    #include <linux/platform_data/pwm_omap_dmtimer.h>
+>>>    #include <linux/platform_device.h>
+>>>    #include <linux/pm_runtime.h>
+>>> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+>>>    	struct pwm_chip chip;
+>>>    	struct mutex mutex;
+>>>    	pwm_omap_dmtimer *dm_timer;
+>>> -	struct pwm_omap_dmtimer_pdata *pdata;
+>>> +	struct omap_dm_timer_ops *pdata;
+>>>    	struct platform_device *dm_timer_pdev;
+>>>    };
+>>>    
+>>> @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
+>>>    {
+>>>    	struct device_node *np = pdev->dev.of_node;
+>>>    	struct device_node *timer;
+>>> +	struct platform_device *timer_pdev;
+>>>    	struct pwm_omap_dmtimer_chip *omap;
+>>> -	struct pwm_omap_dmtimer_pdata *pdata;
+>>> +	struct dmtimer_platform_data *timer_pdata;
+>>> +	struct omap_dm_timer_ops *pdata;
+>>>    	pwm_omap_dmtimer *dm_timer;
+>>>    	u32 v;
+>>>    	int status;
+>>>    
+>>> -	pdata = dev_get_platdata(&pdev->dev);
+>>> -	if (!pdata) {
+>>> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
+>>> +	timer = of_parse_phandle(np, "ti,timers", 0);
+>>> +	if (!timer)
+>>> +		return -ENODEV;
+>>> +
+>>> +	timer_pdev = of_find_device_by_node(timer);
+>>> +	if (!timer_pdev) {
+>>> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
+>>> +		return -ENODEV;
+>>> +	}
+>>> +
+>>> +	timer_pdata = of_find_platdata_by_node(timer);
+>>> +	if (!timer_pdata) {
+>>> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+>>>    		return -EINVAL;
+>>>    	}
+>>
+>> Huh. I think It might be better if you add smth. like
+>>
+>> struct omap_dm_timer *dm_timer = of_omap_dm_timer_get(parent_np, "ti,timers", idx);
+>>
+>> struct omap_dm_timer_ops *pdata = omap_dm_timer_get_ops(dm_timer);
+>>
+>> so all DT and platdata implementation details will be hidden.
+> 
+> Grygorii,
+> 
+> This driver is already fetching:
+> 
+> omap->dm_timer_pdev = of_find_device_by_node(timer);
+> 
+> It stores dm_timer_pdev in struct pwm_omap_dmtimer_chip.
+> So we already need:
+> timer = of_parse_phandle(np, "ti,timers", 0);
+> and
+> omap->dm_timer_pdev = of_find_device_by_node(timer);
+> 
+> So why not just do:
+> 
+> struct omap_dm_timer_ops *pdata =
+> omap_dm_timer_get_ops(omap->dm_timer_pdev);
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+if you dont want to do additional optimizations as part of migration
+might be
+dev_get_platdata(&omap->dm_timer_pdev->dev);
 
-are available in the git repository at:
+would be enough.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git tags/amlogic-fixes
+But, again, PWM driver don't need to know so many details about
+DM timer implementation and internal structure as consumer.
 
-for you to fetch changes up to 1142a3a457d007910df95acc7983d4d7be49645a:
-
-  meson-gx-socinfo: Fix package id parsing (2017-11-29 15:58:00 -0800)
-
-----------------------------------------------------------------
-Amlogic fixes for v4.15-rc
-- GPIO interrupt fixes
-- new nodes for drivers merged late (VPU domains)
-- socinfo fix for GX series
-- fix typo
-
-----------------------------------------------------------------
-Arnaud Patard (1):
-      meson-gx-socinfo: Fix package id parsing
-
-Colin Ian King (1):
-      ARM: meson: fix spelling mistake: "Couln't" -> "Couldn't"
-
-Martin Blumenstingl (2):
-      ARM: dts: meson: correct the sort order for the the gpio_intc node
-      ARM: dts: meson: fix the memory region of the GPIO interrupt controller
-
-Neil Armstrong (4):
-      ARM64: dts: meson-gx: add VPU power domain
-      ARM64: dts: meson-gx: Add HDMI_5V regulator on selected boards
-      ARM64: dts: meson-gx: grow reset controller memory zone
-      ARM64: dts: odroid-c2: Add HDMI and CEC Nodes
-
- arch/arm/boot/dts/meson.dtsi                                 | 18 +++++++++---------
- arch/arm/mach-meson/platsmp.c                                |  2 +-
- arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          | 12 ++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gx.dtsi                    | 13 ++++++++++++-
- arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts          | 30 ++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                  | 43 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905d-p230.dts         |  1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-khadas-vim.dts   |  1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dts         |  1 +
- arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi        | 11 +++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   | 43 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        | 12 ++++++++++++
- drivers/soc/amlogic/meson-gx-socinfo.c                       |  4 ++--
- 14 files changed, 190 insertions(+), 13 deletions(-)
+-- 
+regards,
+-grygorii
