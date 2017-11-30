@@ -1,104 +1,171 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:41 +0000
-Subject: [PATCH v2 13/18] arm64: entry: Hook up entry trampoline to exception
- vectors
+Date: Thu, 30 Nov 2017 16:39:38 +0000
+Subject: [PATCH v2 10/18] arm64: entry: Add exception trampoline page for
+ exceptions from EL0
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-14-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook up the entry trampoline to our exception vectors so that all
-exceptions from and returns to EL0 go via the trampoline, which swizzles
-the vector base register accordingly. Transitioning to and from the
-kernel clobbers x30, so we use tpidrro_el0 and far_el1 as scratch
-registers for native tasks.
+To allow unmapping of the kernel whilst running at EL0, we need to
+point the exception vectors at an entry trampoline that can map/unmap
+the kernel on entry/exit respectively.
+
+This patch adds the trampoline page, although it is not yet plugged
+into the vector table and is therefore unused.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/entry.S | 39 ++++++++++++++++++++++++++++++++++++---
- 1 file changed, 36 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/entry.S       | 86 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S | 17 ++++++++
+ 2 files changed, 103 insertions(+)
 
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 688e52f65a8d..99d105048663 100644
+index d454d8ed45e4..dea196f287a0 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -73,6 +73,17 @@
+@@ -28,6 +28,8 @@
+ #include <asm/errno.h>
+ #include <asm/esr.h>
+ #include <asm/irq.h>
++#include <asm/memory.h>
++#include <asm/mmu.h>
+ #include <asm/processor.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+@@ -943,6 +945,90 @@ __ni_sys_trace:
  
- 	.macro kernel_ventry, el, label, regsize = 64
- 	.align 7
+ 	.popsection				// .entry.text
+ 
 +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	.if	\el == 0
-+	.if	\regsize == 64
-+	mrs	x30, tpidrro_el0
-+	msr	tpidrro_el0, xzr
-+	.else
-+	mov	x30, xzr
-+	.endif
-+	.endif
-+#endif
++/*
++ * Exception vectors trampoline.
++ */
++	.pushsection ".entry.tramp.text", "ax"
 +
- 	sub	sp, sp, #S_FRAME_SIZE
- #ifdef CONFIG_VMAP_STACK
- 	/*
-@@ -119,6 +130,11 @@
- 	b	el\()\el\()_\label
- 	.endm
- 
-+	.macro tramp_alias, dst, sym
-+	mov_q	\dst, TRAMP_VALIAS
-+	add	\dst, \dst, #(\sym - .entry.tramp.text)
++	.macro tramp_map_kernel, tmp
++	mrs	\tmp, ttbr1_el1
++	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	bic	\tmp, \tmp, #USER_ASID_FLAG
++	msr	ttbr1_el1, \tmp
 +	.endm
 +
- 	.macro	kernel_entry, el, regsize = 64
- 	.if	\regsize == 32
- 	mov	w0, w0				// zero upper 32 bits of x0
-@@ -271,18 +287,20 @@ alternative_else_nop_endif
- 	.if	\el == 0
- 	ldr	x23, [sp, #S_SP]		// load return stack pointer
- 	msr	sp_el0, x23
-+	tst	x22, #PSR_MODE32_BIT		// native task?
-+	b.eq	3f
++	.macro tramp_unmap_kernel, tmp
++	mrs	\tmp, ttbr1_el1
++	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	orr	\tmp, \tmp, #USER_ASID_FLAG
++	msr	ttbr1_el1, \tmp
++	/*
++	 * We avoid running the post_ttbr_update_workaround here because the
++	 * user and kernel ASIDs don't have conflicting mappings, so any
++	 * "blessing" as described in:
++	 *
++	 *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
++	 *
++	 * will not hurt correctness. Whilst this may partially defeat the
++	 * point of using split ASIDs in the first place, it avoids
++	 * the hit of invalidating the entire I-cache on every return to
++	 * userspace.
++	 */
++	.endm
 +
- #ifdef CONFIG_ARM64_ERRATUM_845719
- alternative_if ARM64_WORKAROUND_845719
--	tbz	x22, #4, 1f
- #ifdef CONFIG_PID_IN_CONTEXTIDR
- 	mrs	x29, contextidr_el1
- 	msr	contextidr_el1, x29
- #else
- 	msr contextidr_el1, xzr
- #endif
--1:
- alternative_else_nop_endif
- #endif
-+3:
- 	.endif
- 
- 	msr	elr_el1, x21			// set up the return data
-@@ -304,7 +322,22 @@ alternative_else_nop_endif
- 	ldp	x28, x29, [sp, #16 * 14]
- 	ldr	lr, [sp, #S_LR]
- 	add	sp, sp, #S_FRAME_SIZE		// restore sp
--	eret					// return to kernel
-+
-+#ifndef CONFIG_UNMAP_KERNEL_AT_EL0
-+	eret
-+#else
-+	.if	\el == 0
-+	bne	4f
-+	msr	far_el1, x30
-+	tramp_alias	x30, tramp_exit_native
-+	br	x30
-+4:
-+	tramp_alias	x30, tramp_exit_compat
-+	br	x30
-+	.else
-+	eret
++	.macro tramp_ventry, regsize = 64
++	.align	7
++1:
++	.if	\regsize == 64
++	msr	tpidrro_el0, x30
 +	.endif
-+#endif
- 	.endm
++	tramp_map_kernel	x30
++	ldr	x30, =vectors
++	prfm	plil1strm, [x30, #(1b - tramp_vectors)]
++	msr	vbar_el1, x30
++	add	x30, x30, #(1b - tramp_vectors)
++	isb
++	br	x30
++	.endm
++
++	.macro tramp_exit, regsize = 64
++	adr	x30, tramp_vectors
++	msr	vbar_el1, x30
++	tramp_unmap_kernel	x30
++	.if	\regsize == 64
++	mrs	x30, far_el1
++	.endif
++	eret
++	.endm
++
++	.align	11
++ENTRY(tramp_vectors)
++	.space	0x400
++
++	tramp_ventry
++	tramp_ventry
++	tramp_ventry
++	tramp_ventry
++
++	tramp_ventry	32
++	tramp_ventry	32
++	tramp_ventry	32
++	tramp_ventry	32
++END(tramp_vectors)
++
++ENTRY(tramp_exit_native)
++	tramp_exit
++END(tramp_exit_native)
++
++ENTRY(tramp_exit_compat)
++	tramp_exit	32
++END(tramp_exit_compat)
++
++	.ltorg
++	.popsection				// .entry.tramp.text
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
++
+ /*
+  * Special system call wrappers.
+  */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 7da3e5c366a0..6b4260f22aab 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -57,6 +57,17 @@ jiffies = jiffies_64;
+ #define HIBERNATE_TEXT
+ #endif
  
- 	.macro	irq_stack_entry
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define TRAMP_TEXT					\
++	. = ALIGN(PAGE_SIZE);				\
++	VMLINUX_SYMBOL(__entry_tramp_text_start) = .;	\
++	*(.entry.tramp.text)				\
++	. = ALIGN(PAGE_SIZE);				\
++	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
++#else
++#define TRAMP_TEXT
++#endif
++
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -113,6 +124,7 @@ SECTIONS
+ 			HYPERVISOR_TEXT
+ 			IDMAP_TEXT
+ 			HIBERNATE_TEXT
++			TRAMP_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+@@ -214,6 +226,11 @@ SECTIONS
+ 	. += RESERVED_TTBR0_SIZE;
+ #endif
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	tramp_pg_dir = .;
++	. += PAGE_SIZE;
++#endif
++
+ 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+ 	_end = .;
+ 
 -- 
 2.1.4
