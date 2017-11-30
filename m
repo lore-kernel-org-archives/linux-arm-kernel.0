@@ -1,52 +1,53 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Thu, 30 Nov 2017 15:57:34 +0100
-Subject: [PATCH v2 0/5] Memory hotplug support for arm64 - complete
- patchset v2
-In-Reply-To: <20171123173331.GA15535@samekh>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <20171123160258.xmw5lxnjfch2dxfw@dhcp22.suse.cz>
- <20171123173331.GA15535@samekh>
-Message-ID: <20171130145734.c62ggrx3r7335etc@dhcp22.suse.cz>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 30 Nov 2017 16:20:52 +0100
+Subject: [RFC PATCH 0/3] pinctrl: sunxi: Add DT-based generic pinctrl
+ driver
+In-Reply-To: <54ecfdf7-cf4a-3eae-2661-47fa668a6066@arm.com>
+References: <20171113012523.2328-1-andre.przywara@arm.com>
+ <CACRpkdYFoUmGJYdKz0t9gsrkK=u8-oJjaRBXtNYHaUt9kSa3_g@mail.gmail.com>
+ <54ecfdf7-cf4a-3eae-2661-47fa668a6066@arm.com>
+Message-ID: <CACRpkdZQPspH79_nS-WgiSg6d2meXUztgocYbxO07vTgP1HehA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu 23-11-17 17:33:31, Andrea Reale wrote:
-> On Thu 23 Nov 2017, 17:02, Michal Hocko wrote:
-> 
-> Hi Michal,
-> 
-> > I will try to have a look but I do not expect to understand any of arm64
-> > specific changes so I will focus on the generic code but it would help a
-> > _lot_ if the cover letter provided some overview of what has been done
-> > from a higher level POV. What are the arch pieces and what is the
-> > generic code missing. A quick glance over patches suggests that
-> > changelogs for specific patches are modest as well. Could you give us
-> > more information please? Reviewing hundreds lines of code without
-> > context is a pain.
-> 
-> sorry for the lack of details. I will try to provide a better
-> overview in the following. Please, feel free to ask for more details
-> where needed.
-> 
-> Overall, the goal of the patchset is to implement arch_memory_add and
-> arch_memory_remove for arm64, to support the generic memory_hotplug
-> framework. 
-> 
-> Hot add
-> -------
-> Not so many surprises here. We implement the arch specific
-> arch_add_memory, which builds the kernel page tables via hotplug_paging()
-> and then calls arch specific add_pages(). We need the arch specific
-> add_pages() to implement a trick that makes the satus of pages being
-> added accepted by the asumptions made in the generic __add_pages. (See
-> code comments).
+On Fri, Nov 24, 2017 at 1:05 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> On 24/11/17 10:28, Linus Walleij wrote:
 
-Actually I would like to see exactly this explained. The arch support of
-the hotplug should be basically only about arch_add_memory and add_pages
-resp. arch_remove_memory and __remove_pages. Nothing much more, really.
-The core hotplug code should take care of the rest. Ideally you
-shouldn't be really forced to touch the generic code. If yes than this
-should be called out explicitly.
--- 
-Michal Hocko
-SUSE Labs
+>> The DT maintainers have been pretty clear on that they don't like
+>> using the the DT as a generic fit-all information dump. They
+>> prefer to look up hardware data from per-soc compatible strings.
+(...)
+> I am just a bit worried that with Allwinner recently playing the SKU
+> game we end up with tons of tables for only slightly different SoCs (see
+> the H3 and H5, for instance). And with single image kernels we pile up
+> quite some *data* in each kernel, which is of little interest for
+> everyone else.
+
+So what you are saying is that you want to use the DTS for
+data dumping and what I'm saying is that the DT maintainers
+do not like that stance.
+
+They will have to speak on the issue directly before we continue
+I think.
+
+I have been getting a *LOT* of pushback to putting large amounts
+of data and configuration in the DTS recently, so IIUC that is something
+they simply don't like, probably for good reasons.
+
+C.f:
+https://www.spinics.net/lists/dri-devel/msg150321.html
+
+> Also my understanding is that the actual Allwinner pin controller IP
+> (register map) is very much the same across all SoCs. Mostly the only
+> difference is the mapping between pins and mux functions, which we
+> express in the DT already anyway (in the subnodes). And this is really a
+> poster book example of what DT should be doing: express the specific
+> mappings of a particular implementation. I don't see why this would need
+> to be per-board only, if we can pull this up to the SoC level.
+
+It's not me you need to sell this point.
+
+You need to sell it to the DT maintainers.
+
+Yours,
+Linus Walleij
