@@ -1,83 +1,50 @@
-From: fkan@apm.com (Feng Kan)
-Date: Wed, 29 Nov 2017 23:28:14 -0800
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
-Message-ID: <CAL85gmAmAO+RH7KN8C4zokgTHe7nsCtotdjacSLEunK_4778cw@mail.gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Thu, 30 Nov 2017 08:30:11 +0100
+Subject: [PATCH v2 1/2] ARM: dts: exynos: Switch to dedicated Odroid-XU3
+ sound card binding
+In-Reply-To: <CAJKOXPegJsQPrbDH8mXBhypOBnT9+Nn1T6NF=Cav=PV+9b-2MA@mail.gmail.com>
+References: <20171103165446.15438-1-s.nawrocki@samsung.com>
+ <CGME20171103165539epcas1p48cc87811574dace9dfe91d8e9ec6f7ca@epcas1p4.samsung.com>
+ <20171103165446.15438-2-s.nawrocki@samsung.com>
+ <20171127181213.lxtbbiw75wbz2dbz@kozik-lap>
+ <CAJKOXPegJsQPrbDH8mXBhypOBnT9+Nn1T6NF=Cav=PV+9b-2MA@mail.gmail.com>
+Message-ID: <46152007-e599-23eb-6a07-cc5f3ff32c70@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Aug 3, 2017 at 5:32 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> This patch series is v3 of a previous posting:
->
-> v2->v3:
->         - Fixed DMA masks computation
->         - Fixed size computation overflow in acpi_dma_get_range()
->
-> v1->v2:
->         - Reworked acpi_dma_get_range() flow and logs
->         - Added IORT named component address limits
->         - Renamed acpi_dev_get_resources() helper function
->         - Rebased against v4.13-rc3
->
-> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
-> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
->
-> -- Original cover letter --
->
-> As reported in:
->
-> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
->
-> the bus connecting devices to an IOMMU bus can be smaller in size than
-> the IOMMU input address bits which results in devices DMA HW bugs in
-> particular related to IOVA allocation (ie chopping of higher address
-> bits owing to system bus HW capabilities mismatch with the IOMMU).
->
-> Fortunately this problem can be solved through an already present but never
-> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> window for a specific bus in ACPI and therefore all upstream devices
-> connected to it.
->
-> This small patch series enables _DMA parsing in ACPI core code and
-> use it in ACPI IORT code in order to detect DMA ranges for devices and
-> update their data structures to make them work with their related DMA
-> addressing restrictions.
->
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> Cc: Feng Kan <fkan@apm.com>
-> Cc: Jon Masters <jcm@redhat.com>
-> Cc: Robert Moore <robert.moore@intel.com>
-> Cc: Robin Murphy <robin.murphy@arm.com>
-> Cc: Zhang Rui <rui.zhang@intel.com>
-> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->
-> Lorenzo Pieralisi (5):
->   ACPICA: resource_mgr: Allow _DMA method in walk resources
->   ACPI: Make acpi_dev_get_resources() method agnostic
->   ACPI: Introduce DMA ranges parsing
->   ACPI: Make acpi_dma_configure() DMA regions aware
->   ACPI/IORT: Add IORT named component memory address limits
->
->  drivers/acpi/acpica/rsxface.c |  7 ++--
->  drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
->  drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
->  drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
->  include/acpi/acnames.h        |  1 +
->  include/acpi/acpi_bus.h       |  2 +
->  include/linux/acpi.h          |  8 ++++
->  include/linux/acpi_iort.h     |  5 ++-
->  8 files changed, 219 insertions(+), 34 deletions(-)
->
-> --
-> 2.10.0
->
-Lorenzo:
+Hi Krzysztof,
 
-A network driver can use pci_set_dma_mask or its like to override what
-is done with this patch here.
-Which would result in iova allocation greater than the original _DMA
-aperture. Should we force
-the dma_set_mask to not change if an existing mask is already set?
+On 2017-11-29 18:55, Krzysztof Kozlowski wrote:
+> On Mon, Nov 27, 2017 at 7:12 PM, Krzysztof Kozlowski <krzk@kernel.org> wrote:
+>> On Fri, Nov 03, 2017 at 05:54:45PM +0100, Sylwester Nawrocki wrote:
+>>> The new sound card DT binding is used for Odroid XU3 in order
+>>> to properly support the HDMI audio path.
+>>> Clocks configuration is changed so the I2S controller is now the bit
+>>> and the frame clock master with EPLL as the root clock source.
+>>>
+>>> Signed-off-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
+>>> ---
+>>>   arch/arm/boot/dts/exynos4.dtsi                    |  1 +
+>>>   arch/arm/boot/dts/exynos5420.dtsi                 |  1 +
+>>>   arch/arm/boot/dts/exynos5422-odroidxu3-audio.dtsi | 60 ++++++++++++++---------
+>>>   3 files changed, 40 insertions(+), 22 deletions(-)
+>>>
+>
+> Unfortunately this patch causes the audio card to disappear on Odroid
+> XU3. "aplay -L" shows nothing and obviously speaker-test fails.
+>
+> Applied on v4.15-rc1... any dependencies are missing?
+>
+> Full boot-logs are here:
+> http://www.krzk.eu/#/builders/1/builds/976
+> (test exits on aplay -L).
+>
+> Should this be dropped?
+
+Please add CONFIG_SND_SOC_ODROID=y to you .config. Probably exynos_defconfig
+and multi_v7_defconfig should be updated too.
+
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
