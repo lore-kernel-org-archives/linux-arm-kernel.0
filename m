@@ -1,13 +1,13 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Thu, 30 Nov 2017 10:15:24 +0100
-Subject: [PATCH v2] pinctrl: stm32: Fix copyright
-In-Reply-To: <20171130084648.23588-1-benjamin.gaignard@st.com>
-References: <20171130084648.23588-1-benjamin.gaignard@st.com>
-Message-ID: <CALszF6BZurVFk7GYzNE4itv4KhsMbjab4f6TEqG1K7JMBhsbRA@mail.gmail.com>
+Date: Thu, 30 Nov 2017 10:15:52 +0100
+Subject: [PATCH v2] irqchip: stm32: Fix copyright
+In-Reply-To: <20171130084500.23439-1-benjamin.gaignard@st.com>
+References: <20171130084500.23439-1-benjamin.gaignard@st.com>
+Message-ID: <CALszF6Dfj5VzjU8gqbnGjLT3aty_OrXkFjP_8Jtp7mieXz4h=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-11-30 9:46 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
+2017-11-30 9:45 GMT+01:00 Benjamin Gaignard <benjamin.gaignard@linaro.org>:
 > Uniformize STMicroelectronics copyrights header
 > Add SPDX identifier
 >
@@ -15,14 +15,26 @@ List-Id: linux-arm-kernel.lists.infradead.org
 > Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
 > CC: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 > ---
->  drivers/pinctrl/stm32/pinctrl-stm32.c     | 3 ++-
->  drivers/pinctrl/stm32/pinctrl-stm32.h     | 3 ++-
->  drivers/pinctrl/stm32/pinctrl-stm32f429.c | 3 ++-
->  drivers/pinctrl/stm32/pinctrl-stm32f469.c | 6 +++---
->  drivers/pinctrl/stm32/pinctrl-stm32f746.c | 3 ++-
->  drivers/pinctrl/stm32/pinctrl-stm32h743.c | 6 +++---
->  6 files changed, 14 insertions(+), 10 deletions(-)
-
+>  drivers/irqchip/irq-stm32-exti.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/irqchip/irq-stm32-exti.c b/drivers/irqchip/irq-stm32-exti.c
+> index 31ab0dee2ce7..36f0fbe36c35 100644
+> --- a/drivers/irqchip/irq-stm32-exti.c
+> +++ b/drivers/irqchip/irq-stm32-exti.c
+> @@ -1,7 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * Copyright (C) Maxime Coquelin 2015
+> + * Copyright (C) STMicroelectronics 2017
+>   * Author:  Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> - * License terms:  GNU General Public License (GPL), version 2
+>   */
+>
+>  #include <linux/bitops.h>
+> --
+> 2.15.0
+>
 
 Acked-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
