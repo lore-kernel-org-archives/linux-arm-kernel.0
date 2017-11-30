@@ -1,36 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 30 Nov 2017 10:02:26 +0100
-Subject: [PATCH v3 0/6] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <20171130004510.23887-1-lukma@denx.de>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171130004510.23887-1-lukma@denx.de>
-Message-ID: <CAK8P3a3uWpe6HBtt-XPW0H_VTjes-GpSouvs4JHXmQ2ZcvhsEg@mail.gmail.com>
+From: yannick.fertre@st.com (Yannick FERTRE)
+Date: Thu, 30 Nov 2017 09:08:22 +0000
+Subject: [PATCH v2] watchdog: stm32: Fix copyright
+In-Reply-To: <20171130084804.23693-1-benjamin.gaignard@st.com>
+References: <20171130084804.23693-1-benjamin.gaignard@st.com>
+Message-ID: <91ebd76f2d294857a1364de8ac4dfde6@SFHDAG6NODE1.st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 1:45 AM, Lukasz Majewski <lukma@denx.de> wrote:
-> This patch series adds support for Liebherr's BK3 board, being
-> a derivative of TS72XX design.
->
-> This patchset consists of following patches:
->
-> - ts72xx.[c|h] cosmetic cleanup/improvement
-> - Rewrite ts72xx.c to be reusable by bk3
-> - The Liebherr's BK3 board has been added with re-using code of
->   ts72xx.c (detalied list of changes can be found in patch 6/6)
->
-> This series applies on top of v4.14
+-----Original Message-----
+From: Benjamin Gaignard [mailto:benjamin.gaignard at linaro.org] 
+Sent: jeudi 30 novembre 2017 09:48
+To: wim at iguana.be; linux at roeck-us.net; mcoquelin.stm32 at gmail.com; Alexandre TORGUE <alexandre.torgue@st.com>
+Cc: linux-watchdog at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Benjamin GAIGNARD <benjamin.gaignard@st.com>; Yannick FERTRE <yannick.fertre@st.com>
+Subject: [PATCH v2] watchdog: stm32: Fix copyright
 
-Can we clarify who is picking up ep93xx patches these days? The
-last time I think Linus Walleij offered to do it for the 4.14 merge window,
-as neither Hartley nor Alexander had a git tree.
+Uniformize STMicroelectronics copyrights header Add SPDX identifier
 
-I don't care too much who does it in the end, between Hartley, Alexander,
-Linus and even Lukasz directly, but I'd like whoever feels responsible
-for the platform to be listed in the MAINTAINERS file and pick up
-the patches from everyone else to forward them to me as either
-pull requests or separate patches to arm at kernel.org when the
-patches are ready, so I don't have to make a decision about when to
-pick them up from the list.
+Acked-by: Yannick Fertre <yannick.fertre@st.com>
 
-        Arnd
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
+CC: Yannick Fertre <yannick.fertre@st.com>
+---
+ drivers/watchdog/stm32_iwdg.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c index be64a8699de3..c97ad5619cb0 100644
+--- a/drivers/watchdog/stm32_iwdg.c
++++ b/drivers/watchdog/stm32_iwdg.c
+@@ -1,12 +1,12 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Driver for STM32 Independent Watchdog
+  *
+- * Copyright (C) Yannick Fertre 2017
+- * Author: Yannick Fertre <yannick.fertre@st.com>
++ * Copyright (C) STMicroelectronics 2017
++ * Author: Yannick Fertre <yannick.fertre@st.com> for STMicroelectronics.
+  *
+  * This driver is based on tegra_wdt.c
+  *
+- * License terms:  GNU General Public License (GPL), version 2
+  */
+ 
+ #include <linux/clk.h>
+--
+2.15.0
