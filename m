@@ -1,73 +1,90 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 30 Nov 2017 16:30:02 +0100
-Subject: [PATCH v2 01/18] dt-bindings: panel: lvds: Document power-supply
- property
-In-Reply-To: <CAL_Jsq+PHzDGE_RreBmVZV+sg3dh5OG2vWZU+eobxF514Fpo_w@mail.gmail.com>
+Date: Thu, 30 Nov 2017 16:33:12 +0100
+Subject: [PATCH v2 11/18] drm/sun4i: Add A83T support
+In-Reply-To: <1722782.9j9JEoLEfc@jernej-laptop>
 References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <583a46dd967456aac07fb29529f74d91a10bdfeb.1511797218.git-series.maxime.ripard@free-electrons.com>
- <CAL_Jsq+PHzDGE_RreBmVZV+sg3dh5OG2vWZU+eobxF514Fpo_w@mail.gmail.com>
-Message-ID: <20171130153002.3vuqenr72dippg27@flea.lan>
+ <2908242.WKit1ZIWoJ@jernej-laptop>
+ <20171128220014.w35rcliusubfdvoe@flea.home>
+ <1722782.9j9JEoLEfc@jernej-laptop>
+Message-ID: <20171130153312.plmh2wr4n5njhlvb@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
-
-On Tue, Nov 28, 2017 at 11:48:47AM -0600, Rob Herring wrote:
-> Please CC DT list.
+On Tue, Nov 28, 2017 at 11:33:44PM +0100, Jernej ?krabec wrote:
+> Hi!
 > 
-> On Mon, Nov 27, 2017 at 9:41 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The power-supply property is used by a vast majority of panels, including
-> > panel-simple. Let's document it as a common property
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
-> >  Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
-> >  2 files changed, 7 insertions(+)
-> >
-> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> > index ec52c472c845..125ea68052af 100644
-> > --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> > +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-> > @@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
-> >    while active. Active high reset signals can be supported by inverting the
-> >    GPIO specifier polarity flag.
-> >
-> > +Power
-> > +-----
-> > +
-> > +- power-supply: many display panels need an additional power supply in
-> > +  order to be fully powered-up. For such panels, power-supply contains
-> > +  a phandle to the regulator powering the panel.
-> >
-> >  Backlight
-> >  ---------
-> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-> > index b938269f841e..250850a2150b 100644
-> > --- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-> > +++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-> > @@ -32,6 +32,7 @@ Optional properties:
-> >  - label: See panel-common.txt.
-> >  - gpios: See panel-common.txt.
-> >  - backlight: See panel-common.txt.
-> > +- power-supply: See panel-common.txt.
+> Dne torek, 28. november 2017 ob 23:00:14 CET je Maxime Ripard napisal(a):
+> > On Tue, Nov 28, 2017 at 04:48:55PM +0100, Jernej ?krabec wrote:
+> > > > On Mon, Nov 27, 2017 at 05:01:49PM +0100, Jernej ?krabec wrote:
+> > > > > Dne ponedeljek, 27. november 2017 ob 16:41:35 CET je Maxime Ripard
+> > > 
+> > > napisal(a):
+> > > > > > Add support for the A83T display pipeline.
+> > > > > > 
+> > > > > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > > > > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > > > > ---
+> > > > > > 
+> > > > > >  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3
+> > > > > >  +++
+> > > > > >  drivers/gpu/drm/sun4i/sun4i_drv.c                             | 2
+> > > > > >  ++
+> > > > > >  drivers/gpu/drm/sun4i/sun4i_tcon.c                            | 5
+> > > > > >  +++++
+> > > > > >  drivers/gpu/drm/sun4i/sun8i_mixer.c                           | 4
+> > > > > >  ++++
+> > > > > >  4 files changed, 14 insertions(+)
+> > > > > > 
+> > > > > > diff --git
+> > > > > > a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > > > b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > > > index
+> > > > > > d4259a4f5171..d6b52e5c48c0 100644
+> > > > > > --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > > > +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> > > > > > 
+> > > > > > @@ -93,6 +93,7 @@ Required properties:
+> > > > > >     * allwinner,sun6i-a31s-tcon
+> > > > > >     * allwinner,sun7i-a20-tcon
+> > > > > >     * allwinner,sun8i-a33-tcon
+> > > > > > 
+> > > > > > +   * allwinner,sun8i-a83t-tcon-lcd
+> > > > > > 
+> > > > > >     * allwinner,sun8i-v3s-tcon
+> > > > > >   
+> > > > > >   - reg: base address and size of memory-mapped region
+> > > > > >   - interrupts: interrupt associated to this IP
+> > > > > > 
+> > > > > > @@ -224,6 +225,7 @@ supported.
+> > > > > > 
+> > > > > >  Required properties:
+> > > > > >    - compatible: value must be one of:
+> > > > > > +    * allwinner,sun8i-a83t-de2-mixer
+> > > > > 
+> > > > > What will be the name of the second mixer, once support for HDMI is
+> > > > > added?
+> > > > > Should we start directly with 0 and 1 postfix ?
+> > > > 
+> > > > What are the differences exactly without the two mixers?
+> > > 
+> > > Mixer properties:
+> > > - mixer index (0 or 1), important for determining CCSC base (see my
+> > > patches)
+> > Is that the only thing we need to determine?
 > 
-> simple-panel.txt should do the same.
+> For now, mixer index is important only for determining CCSC base in conjuction 
+> with VEP capability. Obviously, I can't exclude that there is some other case 
+> where that mixer index is needed.
 
-I'll make simple-panel do that then
+That's unfortunate...
 
-> Really, I'd like to see panel-common.txt and simple-panel.txt merged
-> and simple-panel.txt removed altogether. But there are a lot of
-> references back to simple-panel.txt. A given panel still needs to say
-> what common properties it uses or doesn't use. Omitting a property
-> like power-supply is ambiguous and can either mean "I only have 1
-> supply" or "I haven't thought about supplies yet there are more than
-> 1".
+> Can't we just add reg property for that?
 
-While I agree with you here, and in general, power-supply should be
-mandatory, do you expect me to fix all the panel bindings as part of
-this serie?
+No, reg is here specifically for the bus address, not for an index,
+and in general, indices are poorly perceived and have been subject to
+a lot of debate in the past. Hence why I'd really like to avoid any
+solution looking like this. But I guess we don't really have the
+choice either.
 
 Maxime
 
@@ -81,4 +98,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171130/77e4646e/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171130/d6798306/attachment.sig>
