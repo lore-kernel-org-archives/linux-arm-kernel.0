@@ -1,38 +1,47 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Fri,  1 Dec 2017 00:51:35 +0100
-Subject: [PATCH v4 0/5] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <20171116232239.16823-1-lukma@denx.de>
+Date: Fri,  1 Dec 2017 00:51:36 +0100
+Subject: [PATCH v4 1/5] ARM: ep93xx: ts72xx: Provide include guards for
+ ts72xx.h file
+In-Reply-To: <20171130235140.12243-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
-Message-ID: <20171130235140.12243-1-lukma@denx.de>
+ <20171130235140.12243-1-lukma@denx.de>
+Message-ID: <20171130235140.12243-2-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series adds support for Liebherr's BK3 board, being
-a derivative of TS72XX design.
+This commit adds include file guards to ts72xx.h
 
-This patchset consists of following patches:
+Signed-off-by: Lukasz Majewski <lukma@denx.de>
+Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
+---
+Changes for v2:
+- None
+Changes for v3:
+- None
+Changes for v4:
+- None
+---
+ arch/arm/mach-ep93xx/ts72xx.h | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-- ts72xx.[c|h] cosmetic cleanup/improvement
-- Rewrite ts72xx.c to be reusable by bk3
-- The Liebherr's BK3 board has been added with re-using code of
-  ts72xx.c (detalied list of changes can be found in patch 6/6)
-
-This series applies on top of linux-next/master (next-20171130)
-
-Lukasz Majewski (5):
-  ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
-  ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
-    parameters
-  ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
-  ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
-  ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
-
- MAINTAINERS                   |   6 ++
- arch/arm/mach-ep93xx/Kconfig  |   7 ++
- arch/arm/mach-ep93xx/ts72xx.c | 198 ++++++++++++++++++++++++++++++++++++++----
- arch/arm/mach-ep93xx/ts72xx.h |   9 ++
- arch/arm/tools/mach-types     |   1 +
- 5 files changed, 202 insertions(+), 19 deletions(-)
-
+diff --git a/arch/arm/mach-ep93xx/ts72xx.h b/arch/arm/mach-ep93xx/ts72xx.h
+index 8a3206a54b39..7b7490f10fa9 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.h
++++ b/arch/arm/mach-ep93xx/ts72xx.h
+@@ -12,6 +12,9 @@
+  * febfd000	22800000	4K	options register #2
+  */
+ 
++#ifndef __TS72XX_H_
++#define __TS72XX_H_
++
+ #define TS72XX_MODEL_PHYS_BASE		0x22000000
+ #define TS72XX_MODEL_VIRT_BASE		IOMEM(0xfebff000)
+ #define TS72XX_MODEL_SIZE		0x00001000
+@@ -83,3 +86,4 @@ static inline int is_ts9420_installed(void)
+ 					TS72XX_OPTIONS2_TS9420);
+ }
+ #endif
++#endif /* __TS72XX_H_ */
 -- 
 2.11.0
