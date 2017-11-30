@@ -1,61 +1,69 @@
-From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
-Date: Thu, 30 Nov 2017 13:39:31 +0000
-Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
- from devices
-In-Reply-To: <7ba3d70a-2364-2a92-39a8-ed112807b83c@huawei.com>
-References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
- <20171006133203.22803-6-jean-philippe.brucker@arm.com>
- <9c364147-12c4-5a8a-9cd9-0642a6b92555@huawei.com>
- <3338635f-f2ba-4b78-a72b-2568645f7df3@arm.com>
- <7ba3d70a-2364-2a92-39a8-ed112807b83c@huawei.com>
-Message-ID: <c4ba0a3d-ef11-6e1a-9c47-7c574233d4fb@arm.com>
+From: P.Bruenn@beckhoff.com (=?utf-8?B?UGF0cmljayBCcsO8bm4=?=)
+Date: Thu, 30 Nov 2017 13:36:22 +0000
+Subject: [PATCH] rtc: add mxc driver for i.MX53
+In-Reply-To: <CAOFm3uFb8Jo9detD2CziuYt_DH_ohYD9P=uvqHugKDxpN+xvAQ@mail.gmail.com>
+References: <20171128073927.12035-1-linux-kernel-dev@beckhoff.com>
+ <20171129221114.GV21126@piout.net>
+ <CAOFm3uFb8Jo9detD2CziuYt_DH_ohYD9P=uvqHugKDxpN+xvAQ@mail.gmail.com>
+Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB531330@NT-Mail07.beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/11/17 01:11, Yisheng Xie wrote:
-> Hi, Jean,
-> 
-> On 2017/11/29 23:01, Jean-Philippe Brucker wrote:
->> On 29/11/17 06:08, Yisheng Xie wrote:
->>>
->>>
->>> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
->>>> +int iommu_process_bind_device(struct device *dev, struct task_struct *task,
->>>> +			      int *pasid, int flags)
->>>> +{
->>> [..]
->>>> +			err = iommu_process_attach_locked(context, dev);
->>>> +			if (err)
->>>> +				iommu_process_put_locked(process);
->>> one ref for a context is enough right? so also need call iommu_process_put_locked()
->>> if attach ok, or will be leak if user call bind twice for the same device and task.
+>From: Philippe Ombredanne [mailto:pombredanne at nexb.com]
+>Sent: Donnerstag, 30. November 2017 09:18
 >>
->> I wasn't sure, I think I prefer taking one ref for each bind. If user
->> calls bind twice, it should call unbind twice as well (in case of leak we
->> free the context on process exit).
->>
->> Also with this implementation, user can call bind for two devices in the
->> same domain, which will share the same context structure. So we have to
->> take as many refs as bind() calls.
-> 
-> 
-> hmm, it has two ref, one for _context_ and the other for *process* (or maybe mm for
-> your next version), right? For each bind it will take a ref of context as present
-> design. but why also process ref need be taken for each bind? I mean it seems does
-> not break _user can call bind for two devices in the same domain_.
-> 
-> And if you really want to take a ref of *process* for echo bind, you should put it when
-> unbind, right? I just not find where you put the ref of process when unbind. But just put
-> the process ref when free context.
-> 
-> Maybe I just miss something.
+>>> +/*
+>>> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
+>Reserved.
+>>> + */
+>>> +
+>>> +/*
+>>> + * The code contained herein is licensed under the GNU General Public
+>>> + * License. You may obtain a copy of the GNU General Public License
+>>> + * Version 2 or later at the following locations:
+>>> + *
+>>> + * http://www.opensource.org/licenses/gpl-license.html
+>>> + * http://www.gnu.org/copyleft/gpl.html
+>>> + */
+>
+>Exactly!
+>And while you are it , you could replace the boilerplate license text
+>with the SPDX id.
+>--
 
-No you're right I misunderstood, sorry about that. Each context has a
-single ref to a process, so we do need to drop the process ref here as you
-pointed out.
+How would a perfect header look like?
+Looking at :
+git show b24413180f5600bcb3bb70fbed5cf186b60864bd -- drivers/
+and:
+git grep SPDX -- Documentation/
 
-I thought I exercised this path though, I'll update my test suite. Also
-attach_locked shouldn't take a context ref if attach fails...
+it could be:
++/* SPDX-License-Identifier: GPL-2.0 */
++/*
++ * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
++ */
+or:
++// SPDX-License-Identifier: GPL-2.0
++/*
++ * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
++ */
 
-Thanks a lot,
-Jean
+Personally I would prefer:
++/*
++ * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
++ *
++ * SPDX-License-Identifier: GPL-2.0
++ */
+
+So, is there any guideline?
+
+To be clear: I don't want to waste anyone's time on this. But as SPDX
+was intended for automation, I think it might be good to try having
+some common pattern here.
+I don't want to start a discussion, so in case there is no guideline I will
+just take the /* SPDX */ in firstline version.
+
+Regards, Patrick
+
+Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
+Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
