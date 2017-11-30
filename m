@@ -1,58 +1,75 @@
-From: peda@axentia.se (Peter Rosin)
-Date: Thu, 30 Nov 2017 19:46:09 +0100
-Subject: [PATCH v2 2/2] ARM: dts: at91: disable the nxp,se97b SMBUS
- timeout on the TSE-850
-In-Reply-To: <20171130172606.GZ21126@piout.net>
-References: <20171127163101.27859-1-peda@axentia.se>
- <20171127163101.27859-3-peda@axentia.se>
- <20171129205311.GA20551@roeck-us.net> <20171129205629.GO21126@piout.net>
- <20171130171638.GA17788@roeck-us.net> <20171130172606.GZ21126@piout.net>
-Message-ID: <acaea4f3-d273-444a-4df4-e6d1b35c876d@axentia.se>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Thu, 30 Nov 2017 18:53:00 +0000
+Subject: [PATCH 1/1] phy: Add 2.5G SGMII interface mode
+In-Reply-To: <20171130182621.GC28828@lunn.ch>
+References: <1512016235-15909-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
+ <20171130155050.GD7483@lunn.ch>
+ <AM3PR04MB4494050122E413E2445BD348C380@AM3PR04MB449.eurprd04.prod.outlook.com>
+ <20171130174127.GA28828@lunn.ch>
+ <20171130181520.GF10595@n2100.armlinux.org.uk>
+ <20171130182621.GC28828@lunn.ch>
+Message-ID: <20171130185300.GG10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-11-30 18:26, Alexandre Belloni wrote:
-> On 30/11/2017 at 09:16:38 -0800, Guenter Roeck wrote:
->> On Wed, Nov 29, 2017 at 09:56:29PM +0100, Alexandre Belloni wrote:
->>> On 29/11/2017 at 12:53:11 -0800, Guenter Roeck wrote:
->>>> On Mon, Nov 27, 2017 at 05:31:01PM +0100, Peter Rosin wrote:
->>>>> The I2C adapter driver is sometimes slow, causing the SCL line to
->>>>> be stuck low for more than the stipulated SMBUS timeout of 25-35 ms.
->>>>> This causes the client device to give up which in turn causes silent
->>>>> corruption of data. So, disable the SMBUS timeout in the client device.
->>>>>
->>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
->>>>
->>>> Acked-by: Guenter Roeck <linux@roeck-us.net>
->>>>
->>>> I assume this will be sent upstream through an arm tree.
->>>>
->>>
->>> Yes, I'm applying it right now.
->>>
->> Are you going to apply the patch for 4.15, or queue it up for 4.16 ?
->> I have been arguing with myself if this is a feature or a bug fix.
->> So far I queued the driver change up for 4.16, but I am open to
->> applying it to 4.15. Any thoughts ?
->>
+On Thu, Nov 30, 2017 at 07:26:21PM +0100, Andrew Lunn wrote:
+> On Thu, Nov 30, 2017 at 06:15:20PM +0000, Russell King - ARM Linux wrote:
+> > On Thu, Nov 30, 2017 at 06:41:27PM +0100, Andrew Lunn wrote:
+> > > SGMII supports passing auto-negotiation results from the PHY to the
+> > > MAC. 1000BASE-X does not.
+> > > 
+> > > SGMII supports the PHY running at 10, 100, and 1000 Mbps. But to
+> > > support this, the MAC needs to replicate the bits 100, or 10 times
+> > > when the PHY is running in 10 or 100Mbps mode.
+> > > 
+> > > So with your 2.5G SGMII, you need to replicate the bits 250, 25, or
+> > > 2.5 times if they PHY is running at lower speeds. This last one is
+> > > interesting.
+> > 
+> > That's not what I've read so far - but I don't know about the PHY
+> > in this exact case because the docs are only available under NDA
+> > (which makes it incredibly difficult to have this discussion.)
+> > 
+> > However, from what I can ascertain from a Xilinx document, 2.5G is
+> > 1G SGMII clocked 2.5x faster.  When in 2.5G mode, the other modes
+> > are unavailable.
 > 
-> I was wondering that myself. I'm open to have it as a fix in 4.15. Or
-> maybe Peter can send the series to stable if he needs it in 4.14.
+> Hi Russell
 > 
-> Peter, what do you think/want?
+> Thanks for looking into the details.
+> 
+> So you need the PHY driver to see what it has negotiated, and when it
+> calls the adjust_link callback, the MAC needs look at the
+> phydev->interface and set the MAC to 2.5G SGMII or SGMII.
 
-TL;DR Either way is fine.
+Yes, it /looks/ that way from what I've read so far.  I'd like to do
+a more comprehensive look around at what various manufacturers are
+doing before saying that definitively.  Even better would be to find
+a specification for 2.5G SGMII!
 
-I think it's a bugfix; it fixes real problems where the application
-misbehave due to faulty content when reading from an eeprom. I'm
-expecting to make a new release for the hw in question RSN and these
-are the only local patches. So, it would be nice if they made it to
-4.14.x before my release happens. However, it's not like it's difficult
-to rebase the patches should that backport not happen or take too long.
+> Same as the Marvell 10G PHY driver flips between
+> PHY_INTERFACE_MODE_10GKR and PHY_INTERFACE_MODE_SGMII depending on
+> what it has negotiated.
 
-The badness started to happen much more frequently due to some timing
-difference affecting the i2c bus driver, but in theory it's a problem
-that has been there from the start. I have just not noticed it before...
+Having played extensively with the Marvell 88x3310 and thoroughly
+inspected its registers and analysed its behaviour, I'd be hessitant
+to compare other PHYs with it.  The 3310 PHY seems to be multiple PHY
+blocks (from two vendors) in a single package, and it dynamically
+switches in the appropriate hardware blocks according to the negotiated
+link modes.
 
-Cheers,
-Peter
+However, given that 1G SGMII is clocked at a different rate from 2.5G
+SGMII, both ends would need to be configured the same.
+
+For example, both mvneta and mvpp2.2 support 2.5G modes merely by
+reconfiguring the comphy block, and all that does is increase the
+serdes clock.  That's used for 2500BASE-X (which I have had working
+locally through a devmem2 pokes on Clearfog and the older Marvell
+pp2x driver on Macchiatobin) but it's more difficult to find 2.5G
+copper SFP modules to test with - which would presumably talk 2.5G
+SGMII.
+
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
