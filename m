@@ -1,27 +1,61 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Nov 2017 14:31:00 +0100
-Subject: [PATCH v2 2/2] pinctrl: meson-axg: Add new pinctrl driver for
- Meson AXG SoC
-In-Reply-To: <20171120100825.16613-3-yixun.lan@amlogic.com>
-References: <20171120100825.16613-1-yixun.lan@amlogic.com>
- <20171120100825.16613-3-yixun.lan@amlogic.com>
-Message-ID: <CACRpkdYsOcBm5pVJwB2X4mWctHpNt_mWhAkPo0MDSyW7NAHccg@mail.gmail.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Thu, 30 Nov 2017 13:39:31 +0000
+Subject: [RFCv2 PATCH 05/36] iommu/process: Bind and unbind process to and
+ from devices
+In-Reply-To: <7ba3d70a-2364-2a92-39a8-ed112807b83c@huawei.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-6-jean-philippe.brucker@arm.com>
+ <9c364147-12c4-5a8a-9cd9-0642a6b92555@huawei.com>
+ <3338635f-f2ba-4b78-a72b-2568645f7df3@arm.com>
+ <7ba3d70a-2364-2a92-39a8-ed112807b83c@huawei.com>
+Message-ID: <c4ba0a3d-ef11-6e1a-9c47-7c574233d4fb@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 20, 2017 at 11:08 AM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+On 30/11/17 01:11, Yisheng Xie wrote:
+> Hi, Jean,
+> 
+> On 2017/11/29 23:01, Jean-Philippe Brucker wrote:
+>> On 29/11/17 06:08, Yisheng Xie wrote:
+>>>
+>>>
+>>> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+>>>> +int iommu_process_bind_device(struct device *dev, struct task_struct *task,
+>>>> +			      int *pasid, int flags)
+>>>> +{
+>>> [..]
+>>>> +			err = iommu_process_attach_locked(context, dev);
+>>>> +			if (err)
+>>>> +				iommu_process_put_locked(process);
+>>> one ref for a context is enough right? so also need call iommu_process_put_locked()
+>>> if attach ok, or will be leak if user call bind twice for the same device and task.
+>>
+>> I wasn't sure, I think I prefer taking one ref for each bind. If user
+>> calls bind twice, it should call unbind twice as well (in case of leak we
+>> free the context on process exit).
+>>
+>> Also with this implementation, user can call bind for two devices in the
+>> same domain, which will share the same context structure. So we have to
+>> take as many refs as bind() calls.
+> 
+> 
+> hmm, it has two ref, one for _context_ and the other for *process* (or maybe mm for
+> your next version), right? For each bind it will take a ref of context as present
+> design. but why also process ref need be taken for each bind? I mean it seems does
+> not break _user can call bind for two devices in the same domain_.
+> 
+> And if you really want to take a ref of *process* for echo bind, you should put it when
+> unbind, right? I just not find where you put the ref of process when unbind. But just put
+> the process ref when free context.
+> 
+> Maybe I just miss something.
 
-> From: Xingyu Chen <xingyu.chen@amlogic.com>
->
-> Add new pinctrl driver for Amlogic's Meson-AXG SoC.
->
-> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
-> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+No you're right I misunderstood, sorry about that. Each context has a
+single ref to a process, so we do need to drop the process ref here as you
+pointed out.
 
-Patch applied with the ACKs.
+I thought I exercised this path though, I'll update my test suite. Also
+attach_locked shouldn't take a context ref if attach fails...
 
-Nice work!
-
-Yours,
-Linus Walleij
+Thanks a lot,
+Jean
