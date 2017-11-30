@@ -1,84 +1,64 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Thu, 30 Nov 2017 01:45:07 +0100
-Subject: [PATCH v3 3/6] ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash()
- to accept parameters
+Date: Thu, 30 Nov 2017 01:45:09 +0100
+Subject: [PATCH v3 5/6] ARM: ep93xx: ts72xx: cosmetic: Add some description to
+ ts72xx code
 In-Reply-To: <20171130004510.23887-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
  <20171130004510.23887-1-lukma@denx.de>
-Message-ID: <20171130004510.23887-4-lukma@denx.de>
+Message-ID: <20171130004510.23887-6-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit extend the ts72xx_register_flash() to accept passed parameters,
-which makes it more reusable.
-
-Now it is possible to accept ep93xx flash start address and partitions.
+This patch extends readability of ts72xx.c code.
 
 Signed-off-by: Lukasz Majewski <lukma@denx.de>
-Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 ---
 Changes for v2:
 - New patch
-Changes for v3:
-- None
 ---
- arch/arm/mach-ep93xx/ts72xx.c | 20 ++++++++------------
- 1 file changed, 8 insertions(+), 12 deletions(-)
+ arch/arm/mach-ep93xx/ts72xx.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index 06345b85f27c..00e0e5b8babf 100644
+index a6e473b3dcf6..2e8fcc6e87b6 100644
 --- a/arch/arm/mach-ep93xx/ts72xx.c
 +++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -120,8 +120,6 @@ static struct platform_nand_data ts72xx_nand_data = {
- 		.nr_chips	= 1,
- 		.chip_offset	= 0,
- 		.chip_delay	= 15,
--		.partitions	= ts72xx_nand_parts,
--		.nr_partitions	= ARRAY_SIZE(ts72xx_nand_parts),
- 	},
- 	.ctrl = {
- 		.cmd_ctrl	= ts72xx_nand_hwcontrol,
-@@ -145,8 +143,8 @@ static struct platform_device ts72xx_nand_flash = {
- 	.num_resources		= ARRAY_SIZE(ts72xx_nand_resource),
+@@ -28,6 +28,9 @@
+ #include "soc.h"
+ #include "ts72xx.h"
+ 
++/*************************************************************************
++ * IO map
++ *************************************************************************/
+ static struct map_desc ts72xx_io_desc[] __initdata = {
+ 	{
+ 		.virtual	= (unsigned long)TS72XX_OPTIONS_VIRT_BASE,
+@@ -189,6 +192,9 @@ static struct platform_device ts72xx_rtc_device = {
+ 	.num_resources 	= ARRAY_SIZE(ts72xx_rtc_resources),
  };
  
--
--static void __init ts72xx_register_flash(void)
-+void __init ts72xx_register_flash(struct mtd_partition *parts, int n,
-+				  resource_size_t start)
- {
- 	/*
- 	 * TS7200 has NOR flash all other TS72xx board have NAND flash.
-@@ -154,16 +152,12 @@ static void __init ts72xx_register_flash(void)
- 	if (board_is_ts7200()) {
- 		ep93xx_register_flash(2, EP93XX_CS6_PHYS_BASE, SZ_16M);
- 	} else {
--		resource_size_t start;
--
--		if (is_ts9420_installed())
--			start = EP93XX_CS7_PHYS_BASE;
--		else
--			start = EP93XX_CS6_PHYS_BASE;
--
- 		ts72xx_nand_resource[0].start = start;
- 		ts72xx_nand_resource[0].end = start + SZ_16M - 1;
++/*************************************************************************
++ * WATCHDOG
++ *************************************************************************/
+ static struct resource ts72xx_wdt_resources[] = {
+ 	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
+ 	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
+@@ -201,10 +207,16 @@ static struct platform_device ts72xx_wdt_device = {
+ 	.resource	= ts72xx_wdt_resources,
+ };
  
-+		ts72xx_nand_data.chip.partitions = parts;
-+		ts72xx_nand_data.chip.nr_partitions = n;
-+
- 		platform_device_register(&ts72xx_nand_flash);
- 	}
- }
-@@ -223,7 +217,9 @@ static struct platform_device ts73xx_fpga_device = {
- static void __init ts72xx_init_machine(void)
- {
- 	ep93xx_init_devices();
--	ts72xx_register_flash();
-+	ts72xx_register_flash(ts72xx_nand_parts, ARRAY_SIZE(ts72xx_nand_parts),
-+			      is_ts9420_installed() ?
-+			      EP93XX_CS7_PHYS_BASE : EP93XX_CS6_PHYS_BASE);
- 	platform_device_register(&ts72xx_rtc_device);
- 	platform_device_register(&ts72xx_wdt_device);
++/*************************************************************************
++ * ETH
++ *************************************************************************/
+ static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
+ 	.phy_id		= 1,
+ };
  
++/*************************************************************************
++ * TS72XX support code
++ *************************************************************************/
+ #if IS_ENABLED(CONFIG_FPGA_MGR_TS73XX)
+ 
+ /* Relative to EP93XX_CS1_PHYS_BASE */
 -- 
 2.11.0
