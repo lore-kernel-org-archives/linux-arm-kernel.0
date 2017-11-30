@@ -1,69 +1,36 @@
-From: P.Bruenn@beckhoff.com (=?utf-8?B?UGF0cmljayBCcsO8bm4=?=)
-Date: Thu, 30 Nov 2017 13:36:22 +0000
-Subject: [PATCH] rtc: add mxc driver for i.MX53
-In-Reply-To: <CAOFm3uFb8Jo9detD2CziuYt_DH_ohYD9P=uvqHugKDxpN+xvAQ@mail.gmail.com>
-References: <20171128073927.12035-1-linux-kernel-dev@beckhoff.com>
- <20171129221114.GV21126@piout.net>
- <CAOFm3uFb8Jo9detD2CziuYt_DH_ohYD9P=uvqHugKDxpN+xvAQ@mail.gmail.com>
-Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB531330@NT-Mail07.beckhoff.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 30 Nov 2017 14:40:26 +0100
+Subject: [PATCH 0/3] Add DVFS support on CPU clock for Armada 37xx
+Message-ID: <20171130134029.20751-1-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Philippe Ombredanne [mailto:pombredanne at nexb.com]
->Sent: Donnerstag, 30. November 2017 09:18
->>
->>> +/*
->>> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
->Reserved.
->>> + */
->>> +
->>> +/*
->>> + * The code contained herein is licensed under the GNU General Public
->>> + * License. You may obtain a copy of the GNU General Public License
->>> + * Version 2 or later at the following locations:
->>> + *
->>> + * http://www.opensource.org/licenses/gpl-license.html
->>> + * http://www.gnu.org/copyleft/gpl.html
->>> + */
->
->Exactly!
->And while you are it , you could replace the boilerplate license text
->with the SPDX id.
->--
+Hi,
 
-How would a perfect header look like?
-Looking at :
-git show b24413180f5600bcb3bb70fbed5cf186b60864bd -- drivers/
-and:
-git grep SPDX -- Documentation/
+This small series is needed to use DVFS on Armada 37xx. When DVFS is
+enabled the CPU clock setting is done using an other set of registers
+from the North Bridge Power Management block.
 
-it could be:
-+/* SPDX-License-Identifier: GPL-2.0 */
-+/*
-+ * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
-+ */
-or:
-+// SPDX-License-Identifier: GPL-2.0
-+/*
-+ * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
-+ */
+The series adds the possibility to modify the CPU frequency using the
+associate load level matching the target frequency. However
+configuring the frequencies for each load is done by the cpufreq
+driver submitted in a separate series.
 
-Personally I would prefer:
-+/*
-+ * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights
-+ *
-+ * SPDX-License-Identifier: GPL-2.0
-+ */
+Obviously having both series (cpufreq and clk) is needed to support
+DVFS on Armada 37xx, but there is no dependencies between the series
+(for building or at runtime).
 
-So, is there any guideline?
+Thanks,
 
-To be clear: I don't want to waste anyone's time on this. But as SPDX
-was intended for automation, I think it might be good to try having
-some common pattern here.
-I don't want to start a discussion, so in case there is no guideline I will
-just take the /* SPDX */ in firstline version.
+Gregory
 
-Regards, Patrick
+Gregory CLEMENT (3):
+  clk: mvebu: armada-37xx-periph: cosmetic changes
+  clk: mvebu: armada-37xx-periph: prepare cpu clk to be used with DVFS
+  clk: mvebu: armada-37xx-periph: add DVFS support for cpu clocks
 
-Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
-Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
+ drivers/clk/mvebu/armada-37xx-periph.c | 310 +++++++++++++++++++++++++++++++--
+ 1 file changed, 293 insertions(+), 17 deletions(-)
+
+-- 
+2.15.0
