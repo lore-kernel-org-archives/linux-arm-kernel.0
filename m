@@ -1,316 +1,63 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 30 Nov 2017 08:43:43 +0800
-Subject: [PATCH v4 5/6] ARM: dts: imx6q: Add Variscite DART-MX6
- Carrier-board support
-In-Reply-To: <1511950857-19292-6-git-send-email-narmstrong@baylibre.com>
-References: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
- <1511950857-19292-6-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20171130004342.GC22908@dragon>
+From: lukma@denx.de (Lukasz Majewski)
+Date: Thu, 30 Nov 2017 01:45:05 +0100
+Subject: [PATCH v3 1/6] ARM: ep93xx: ts72xx: Use DEFINE_RES_MEM macros where
+ applicable
+In-Reply-To: <20171130004510.23887-1-lukma@denx.de>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171130004510.23887-1-lukma@denx.de>
+Message-ID: <20171130004510.23887-2-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:20:56AM +0100, Neil Armstrong wrote:
-> This patch adds support for the i.MX6 Quad variant of the Variscite DART-MX6
-> SoM Carrier-Board.
-> 
-> This Carrier-Board has the following :
-> - LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
-> - HDMI Connector
-> - USB Host + USB OTG Connector
-> - 10/100/1000 Mbps Ethernet
-> - miniPCI-Express slot
-> - SD Card connector
-> - Audio Headphone/Line In jack connectors
-> - On-board DMIC
-> - CAN bus header
-> - SPI header
-> - Camera Interfaces header
-> - 4xButtons, 2xLeds
-> - OnBoard RTC with Coin Backup battery socket
-> - RS232 Header + USB-Serial debug port
-> 
-> Product Page : http://www.variscite.com/products/evaluation-kits/dart-mx6-kits
-> 
-> The board support is done with all on-board and header interfaces enabled.
-> 7" LVDS Touchscreen is enabled by default along HDMI output.
-> Audio interface is supported with the "simple-card" bindings.
-> 
-> PCIe slot, On-Board DMIC and Camera Interfaces are not handled yet.
-> 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> ---
->  arch/arm/boot/dts/Makefile                     |   1 +
->  arch/arm/boot/dts/imx6q-var-dt6customboard.dts | 239 +++++++++++++++++++++++++
->  2 files changed, 240 insertions(+)
->  create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-> 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index d0381e9..148ff15 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -470,6 +470,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->  	imx6q-tx6q-11x0-mb7.dtb \
->  	imx6q-udoo.dtb \
->  	imx6q-utilite-pro.dtb \
-> +	imx6q-var-dt6customboard.dtb \
->  	imx6q-wandboard.dtb \
->  	imx6q-wandboard-revb1.dtb \
->  	imx6q-wandboard-revd1.dtb \
-> diff --git a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-> new file mode 100644
-> index 0000000..76faaff
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-> @@ -0,0 +1,239 @@
-> +/*
-> + * Support for Variscite DART-MX6 Carrier-board
-> + *
-> + * Copyright 2017 BayLibre, SAS
-> + * Author: Neil Armstrong <narmstrong@baylibre.com>
-> + *
-> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> + */
-> +
-> +/dts-v1/;
-> +
-> +#include "imx6q.dtsi"
-> +#include "imx6qdl-var-dart.dtsi"
-> +#include <dt-bindings/input/linux-event-codes.h>
-> +
-> +/ {
-> +	model = "Variscite DART-MX6 Carrier-board";
-> +	compatible = "variscite,dt6customboard", "fsl,imx6q";
-> +
-> +	backlight_lvds: backlight {
-> +		compatible = "pwm-backlight";
-> +		pwms = <&pwm2 0 50000>;
-> +		brightness-levels = <0 4 8 16 32 64 128 248>;
-> +		default-brightness-level = <7>;
-> +		status = "okay";
-> +	};
-> +
-> +	gpio-keys {
-> +		compatible = "gpio-keys";
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		autorepeat;
-> +
-> +		back {
-> +			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-> +			linux,code = <KEY_BACK>;
-> +			label = "Key Back";
-> +			linux,input-type = <1>;
-> +			debounce-interval = <100>;
-> +			gpio-key,wakeup;
+This commit cleans up the code by using dedicated macros instead of
+full definitions.
 
-The gpio-key,wakeup is legacy one.  Use wakeup-source instead.
+Signed-off-by: Lukasz Majewski <lukma@denx.de>
+Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
+---
+Changes for v2:
+- None
+Changes for v3:
+- None
+---
+ arch/arm/mach-ep93xx/ts72xx.c | 18 +++---------------
+ 1 file changed, 3 insertions(+), 15 deletions(-)
 
-> +		};
-> +
-> +		home {
-> +			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
-> +			linux,code = <KEY_HOME>;
-> +			label = "Key Home";
-> +			linux,input-type = <1>;
-> +			debounce-interval = <100>;
-> +			gpio-key,wakeup;
-> +		};
-> +
-> +		menu {
-> +			gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
-> +			linux,code = <KEY_MENU>;
-> +			label = "Key Menu";
-> +			linux,input-type = <1>;
-> +			debounce-interval = <100>;
-> +			gpio-key,wakeup;
-> +		};
-> +	};
-> +
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +
-> +		led1 {
-> +			gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-> +			linux,default-trigger = "heartbeat";
-> +		};
-> +
-> +		led2 {
-> +			gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
-> +			linux,default-trigger = "default-on";
-> +		};
-> +	};
-> +
-> +	panel1: lvds-panel {
-> +		compatible = "sgd,gktw70sdae4se", "panel-lvds";
-> +		backlight = <&backlight_lvds>;
-> +
-> +		width-mm = <153>;
-> +		height-mm = <86>;
-> +
-> +		label = "gktw70sdae4se";
-> +
-
-Nit: these lines in middle of property list is not really necessary.
-Can we drop them?
-
-Shawn
-
-> +		data-mapping = "jeida-18";
-> +
-> +		panel-timing {
-> +			clock-frequency = <32000000>;
-> +			hactive = <800>;
-> +			vactive = <480>;
-> +			hback-porch = <39>;
-> +			hfront-porch = <39>;
-> +			vback-porch = <29>;
-> +			vfront-porch = <13>;
-> +			hsync-len = <47>;
-> +			vsync-len = <2>;
-> +		};
-> +
-> +		port {
-> +			panel_in: endpoint {
-> +				remote-endpoint = <&lvds1_out>;
-> +			};
-> +		};
-> +	};
-> +
-> +	reg_usb_h1_vbus: regulator-usbh1vbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_h1_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +
-> +	reg_usb_otg_vbus: regulator-usbotgvbus {
-> +		compatible = "regulator-fixed";
-> +		regulator-name = "usb_otg_vbus";
-> +		regulator-min-microvolt = <5000000>;
-> +		regulator-max-microvolt = <5000000>;
-> +		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-> +		enable-active-high;
-> +	};
-> +
-> +	sound {
-> +		compatible = "simple-audio-card";
-> +		simple-audio-card,name = "dt6-customboard-audio";
-> +		simple-audio-card,format = "i2s";
-> +		simple-audio-card,bitclock-master = <&sound_codec>;
-> +		simple-audio-card,frame-master = <&sound_codec>;
-> +		simple-audio-card,widgets = "Headphone", "Headphone Jack",
-> +					    "Line", "Line In";
-> +		simple-audio-card,routing = "Headphone Jack", "HPLOUT",
-> +					    "Headphone Jack", "HPROUT",
-> +					    "LINE1L", "Line In",
-> +					    "LINE1R", "Line In";
-> +
-> +		sound_cpu: simple-audio-card,cpu {
-> +			sound-dai = <&ssi2>;
-> +		};
-> +
-> +		sound_codec: simple-audio-card,codec {
-> +			sound-dai = <&codec>;
-> +			clocks = <&clks IMX6QDL_CLK_CKO>;
-> +		};
-> +	};
-> +};
-> +
-> +&can1 {
-> +	status = "okay";
-> +};
-> +
-> +&ecspi1 {
-> +	cs-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>,
-> +		   <&gpio4 10 GPIO_ACTIVE_HIGH>;
-> +	status = "okay";
-> +};
-> +
-> +&fec {
-> +	status = "okay";
-> +	phy-mode = "rgmii";
-> +	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
-> +};
-> +
-> +&hdmi {
-> +	status = "okay";
-> +};
-> +
-> +&i2c1 {
-> +	clock-frequency = <100000>;
-> +	status = "okay";
-> +};
-> +
-> +&i2c3 {
-> +	clock-frequency = <100000>;
-> +	status = "okay";
-> +
-> +	touchscreen at 38 {
-> +		compatible = "edt,edt-ft5x06";
-> +		reg = <0x38>;
-> +		interrupt-parent = <&gpio1>;
-> +		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-> +		touchscreen-size-x = <800>;
-> +		touchscreen-size-y = <480>;
-> +		touchscreen-inverted-x;
-> +		touchscreen-inverted-y;
-> +	};
-> +
-> +	rtc at 68 {
-> +		compatible = "isil,isl12057";
-> +		reg = <0x68>;
-> +	};
-> +};
-> +
-> +&ldb {
-> +	status = "okay";
-> +
-> +	lvds-channel at 1 {
-> +		status = "okay";
-> +
-> +		port at 4 {
-> +			reg = <4>;
-> +
-> +			lvds1_out: endpoint {
-> +				remote-endpoint = <&panel_in>;
-> +			};
-> +		};
-> +	};
-> +};
-> +
-> +&pwm2 {
-> +	status = "okay";
-> +};
-> +
-> +&uart1 {
-> +	status = "okay";
-> +};
-> +
-> +&uart3 {
-> +	status = "okay";
-> +};
-> +
-> +&usbh1 {
-> +	vbus-supply = <&reg_usb_h1_vbus>;
-> +	status = "okay";
-> +};
-> +
-> +&usbotg {
-> +	vbus-supply = <&reg_usb_otg_vbus>;
-> +	dr_mode = "otg";
-> +	srp-disable;
-> +	hnp-disable;
-> +	adp-disable;
-> +	status = "okay";
-> +};
-> +
-> +&usdhc2 {
-> +	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-> +	status = "okay";
-> +};
-> -- 
-> 2.7.4
-> 
+diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
+index 8745162ec05d..06345b85f27c 100644
+--- a/arch/arm/mach-ep93xx/ts72xx.c
++++ b/arch/arm/mach-ep93xx/ts72xx.c
+@@ -187,16 +187,8 @@ static struct platform_device ts72xx_rtc_device = {
+ };
+ 
+ static struct resource ts72xx_wdt_resources[] = {
+-	{
+-		.start	= TS72XX_WDT_CONTROL_PHYS_BASE,
+-		.end	= TS72XX_WDT_CONTROL_PHYS_BASE + SZ_4K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
+-	{
+-		.start	= TS72XX_WDT_FEED_PHYS_BASE,
+-		.end	= TS72XX_WDT_FEED_PHYS_BASE + SZ_4K - 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
++	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
+ };
+ 
+ static struct platform_device ts72xx_wdt_device = {
+@@ -216,11 +208,7 @@ static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
+ #define TS73XX_FPGA_LOADER_BASE		0x03c00000
+ 
+ static struct resource ts73xx_fpga_resources[] = {
+-	{
+-		.start	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE,
+-		.end	= EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE + 1,
+-		.flags	= IORESOURCE_MEM,
+-	},
++	DEFINE_RES_MEM(EP93XX_CS1_PHYS_BASE + TS73XX_FPGA_LOADER_BASE, 0x01),
+ };
+ 
+ static struct platform_device ts73xx_fpga_device = {
+-- 
+2.11.0
