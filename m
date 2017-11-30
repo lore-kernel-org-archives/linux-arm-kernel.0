@@ -1,185 +1,312 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Nov 2017 14:40:28 +0100
-Subject: [PATCH 2/3] clk: mvebu: armada-37xx-periph: prepare cpu clk to be
- used with DVFS
+Date: Thu, 30 Nov 2017 14:40:29 +0100
+Subject: [PATCH 3/3] clk: mvebu: armada-37xx-periph: add DVFS support for cpu
+ clocks
 In-Reply-To: <20171130134029.20751-1-gregory.clement@free-electrons.com>
 References: <20171130134029.20751-1-gregory.clement@free-electrons.com>
-Message-ID: <20171130134029.20751-3-gregory.clement@free-electrons.com>
+Message-ID: <20171130134029.20751-4-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When DVFS will be enabled then the cpu clk will use a different set of
-register at run time. That means that we won't be able to use the common
-callback and need to use our own ones.
+When DVFS is enabled the CPU clock setting is done using an other set of
+registers.
 
-This patch prepares this change by switching on our own set of callbacks
-without modifying the behavior of the clocks.
+These Power Management registers are exposed through a syscon as they
+will also be used by other drivers such as the cpufreq.
+
+This patch add the possibility to modify the CPU frequency using the
+associate load level matching the target frequency. Then all the
+frequency switch is handle by the hardware.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/mvebu/armada-37xx-periph.c | 82 ++++++++++++++++++++++++++++++----
- 1 file changed, 73 insertions(+), 9 deletions(-)
+ drivers/clk/mvebu/armada-37xx-periph.c | 219 ++++++++++++++++++++++++++++++++-
+ 1 file changed, 215 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
-index 6dae21ced18a..ef725ec73c93 100644
+index ef725ec73c93..0fd7a671a76d 100644
 --- a/drivers/clk/mvebu/armada-37xx-periph.c
 +++ b/drivers/clk/mvebu/armada-37xx-periph.c
-@@ -46,7 +46,17 @@ struct clk_double_div {
- 	u8 shift2;
+@@ -21,9 +21,11 @@
+  */
+ 
+ #include <linux/clk-provider.h>
++#include <linux/mfd/syscon.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
+ #include <linux/platform_device.h>
++#include <linux/regmap.h>
+ #include <linux/slab.h>
+ 
+ #define TBG_SEL		0x0
+@@ -33,6 +35,26 @@
+ #define CLK_SEL		0x10
+ #define CLK_DIS		0x14
+ 
++#define LOAD_LEVEL_NR	4
++
++#define ARMADA_37XX_NB_L0L1	0x18
++#define ARMADA_37XX_NB_L2L3	0x1C
++#define		ARMADA_37XX_NB_TBG_DIV_OFF	13
++#define		ARMADA_37XX_NB_TBG_DIV_MASK	0x7
++#define		ARMADA_37XX_NB_CLK_SEL_OFF	11
++#define		ARMADA_37XX_NB_CLK_SEL_MASK	0x1
++#define		ARMADA_37XX_NB_TBG_SEL_OFF	9
++#define		ARMADA_37XX_NB_TBG_SEL_MASK	0x3
++#define		ARMADA_37XX_NB_CONFIG_SHIFT	16
++#define ARMADA_37XX_NB_DYN_MOD	0x24
++#define		ARMADA_37XX_NB_DFS_EN	31
++#define ARMADA_37XX_NB_CPU_LOAD	0x30
++#define		ARMADA_37XX_NB_CPU_LOAD_MASK	0x3
++#define		ARMADA_37XX_DVFS_LOAD_0		0
++#define		ARMADA_37XX_DVFS_LOAD_1		1
++#define		ARMADA_37XX_DVFS_LOAD_2		2
++#define		ARMADA_37XX_DVFS_LOAD_3		3
++
+ struct clk_periph_driver_data {
+ 	struct clk_hw_onecell_data *hw_data;
+ 	spinlock_t lock;
+@@ -53,6 +75,7 @@ struct clk_pm_cpu {
+ 	u32 mask_mux;
+ 	void __iomem *reg_div;
+ 	u8 shift_div;
++	struct regmap *nb_pm_base;
  };
  
-+struct clk_pm_cpu {
-+	struct clk_hw hw;
-+	void __iomem *reg_mux;
-+	u8 shift_mux;
-+	u32 mask_mux;
-+	void __iomem *reg_div;
-+	u8 shift_div;
-+};
-+
  #define to_clk_double_div(_hw) container_of(_hw, struct clk_double_div, hw)
-+#define to_clk_pm_cpu(_hw) container_of(_hw, struct clk_pm_cpu, hw)
- 
- struct clk_periph_data {
- 	const char *name;
-@@ -55,6 +65,7 @@ struct clk_periph_data {
- 	struct clk_hw *mux_hw;
- 	struct clk_hw *rate_hw;
- 	struct clk_hw *gate_hw;
-+	struct clk_hw *muxrate_hw;
- 	bool is_double_div;
- };
- 
-@@ -81,6 +92,7 @@ static const struct clk_div_table clk_table2[] = {
- };
- 
- static const struct clk_ops clk_double_div_ops;
-+static const struct clk_ops clk_pm_cpu_ops;
- 
- #define PERIPH_GATE(_name, _bit)		\
- struct clk_gate gate_##_name = {		\
-@@ -122,6 +134,18 @@ struct clk_divider rate_##_name = {		\
- 	}					\
- };
- 
-+#define PERIPH_PM_CPU(_name, _shift1, _reg, _shift2)	\
-+struct clk_pm_cpu muxrate_##_name = {		\
-+	.reg_mux = (void *)TBG_SEL,		\
-+	.mask_mux = 3,				\
-+	.shift_mux = _shift1,			\
-+	.reg_div = (void *)_reg,		\
-+	.shift_div = _shift2,			\
-+	.hw.init = &(struct clk_init_data){	\
-+		.ops =  &clk_pm_cpu_ops,	\
-+	}					\
-+};
-+
- #define PERIPH_CLK_FULL_DD(_name, _bit, _shift, _reg1, _reg2, _shift1, _shift2)\
- static PERIPH_GATE(_name, _bit);			    \
- static PERIPH_MUX(_name, _shift);			    \
-@@ -136,10 +160,6 @@ static PERIPH_DIV(_name, _reg, _shift1, _table);
- static PERIPH_GATE(_name, _bit);			\
- static PERIPH_DIV(_name, _reg, _shift, _table);
- 
--#define PERIPH_CLK_MUX_DIV(_name, _shift,  _reg, _shift_div, _table)	\
--static PERIPH_MUX(_name, _shift);			    \
--static PERIPH_DIV(_name, _reg, _shift_div, _table);
--
- #define PERIPH_CLK_MUX_DD(_name, _shift, _reg1, _reg2, _shift1, _shift2)\
- static PERIPH_MUX(_name, _shift);			    \
- static PERIPH_DOUBLEDIV(_name, _reg1, _reg2, _shift1, _shift2);
-@@ -180,13 +200,12 @@ static PERIPH_DOUBLEDIV(_name, _reg1, _reg2, _shift1, _shift2);
- 	  .rate_hw = &rate_##_name.hw,				\
- 	}
- 
--#define REF_CLK_MUX_DIV(_name)				\
-+#define REF_CLK_PM_CPU(_name)				\
- 	{ .name = #_name,				\
- 	  .parent_names = (const char *[]){ "TBG-A-P",	\
- 	      "TBG-B-P", "TBG-A-S", "TBG-B-S"},		\
- 	  .num_parents = 4,				\
--	  .mux_hw = &mux_##_name.hw,			\
--	  .rate_hw = &rate_##_name.hw,			\
-+	  .muxrate_hw = &muxrate_##_name.hw,		\
- 	}
- 
- #define REF_CLK_MUX_DD(_name)				\
-@@ -216,7 +235,7 @@ PERIPH_CLK_FULL_DD(ddr_fclk, 21, 16, DIV_SEL0, DIV_SEL0, 15, 12);
- PERIPH_CLK_FULL(trace, 22, 18, DIV_SEL0, 20, clk_table6);
- PERIPH_CLK_FULL(counter, 23, 20, DIV_SEL0, 23, clk_table6);
- PERIPH_CLK_FULL_DD(eip97, 24, 24, DIV_SEL2, DIV_SEL2, 22, 19);
--PERIPH_CLK_MUX_DIV(cpu, 22, DIV_SEL0, 28, clk_table6);
-+static PERIPH_PM_CPU(cpu, 22, DIV_SEL0, 28);
- 
- static struct clk_periph_data data_nb[] = {
- 	REF_CLK_FULL_DD(mmc),
-@@ -235,7 +254,7 @@ static struct clk_periph_data data_nb[] = {
- 	REF_CLK_FULL(trace),
- 	REF_CLK_FULL(counter),
- 	REF_CLK_FULL_DD(eip97),
--	REF_CLK_MUX_DIV(cpu),
-+	REF_CLK_PM_CPU(cpu),
- 	{ },
- };
- 
-@@ -297,6 +316,37 @@ static const struct clk_ops clk_double_div_ops = {
+@@ -316,14 +339,94 @@ static const struct clk_ops clk_double_div_ops = {
  	.recalc_rate = clk_double_div_recalc_rate,
  };
  
-+static u8 clk_pm_cpu_get_parent(struct clk_hw *hw)
++static void armada_3700_pm_dvfs_update_regs(unsigned int load_level,
++					    unsigned int *reg,
++					    unsigned int *offset)
++{
++	if (load_level <= ARMADA_37XX_DVFS_LOAD_1)
++		*reg = ARMADA_37XX_NB_L0L1;
++	else
++		*reg = ARMADA_37XX_NB_L2L3;
++
++	if (load_level == ARMADA_37XX_DVFS_LOAD_0 ||
++	    load_level ==  ARMADA_37XX_DVFS_LOAD_2)
++		*offset += ARMADA_37XX_NB_CONFIG_SHIFT;
++}
++
++static bool armada_3700_pm_dvfs_is_enabled(struct regmap *base)
++{
++	unsigned int val, reg = ARMADA_37XX_NB_DYN_MOD;
++
++	if (IS_ERR(base))
++		return false;
++
++	regmap_read(base, reg, &val);
++
++	return !!(val & BIT(ARMADA_37XX_NB_DFS_EN));
++}
++
++static unsigned int armada_3700_pm_dvfs_get_cpu_div(struct regmap *base)
++{
++	unsigned int reg = ARMADA_37XX_NB_CPU_LOAD;
++	unsigned int offset = ARMADA_37XX_NB_TBG_DIV_OFF;
++	unsigned int load_level, div;
++
++	/*
++	 * This function is always called after the function
++	 * armada_3700_pm_dvfs_is_enabled, so no need to check again
++	 * if the base is valid.
++	 */
++	regmap_read(base, reg, &load_level);
++
++	/*
++	 * The register and the offset inside this register accessed to
++	 * read the current divider depend on the load level
++	 */
++	load_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
++	armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
++
++	regmap_read(base, reg, &div);
++
++	return (div >> offset) & ARMADA_37XX_NB_TBG_DIV_MASK;
++}
++
++static unsigned int armada_3700_pm_dvfs_get_cpu_parent(struct regmap *base)
++{
++	unsigned int reg = ARMADA_37XX_NB_CPU_LOAD;
++	unsigned int offset = ARMADA_37XX_NB_TBG_SEL_OFF;
++	unsigned int load_level, sel;
++
++	/*
++	 * This function is always called after the function
++	 * armada_3700_pm_dvfs_is_enabled, so no need to check again
++	 * if the base is valid
++	 */
++	regmap_read(base, reg, &load_level);
++
++	/*
++	 * The register and the offset inside this register accessed to
++	 * read the current divider depend on the load level
++	 */
++	load_level &= ARMADA_37XX_NB_CPU_LOAD_MASK;
++	armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
++
++	regmap_read(base, reg, &sel);
++
++	return (sel >> offset) & ARMADA_37XX_NB_TBG_SEL_MASK;
++}
++
+ static u8 clk_pm_cpu_get_parent(struct clk_hw *hw)
+ {
+ 	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
+ 	int num_parents = clk_hw_get_num_parents(hw);
+ 	u32 val;
+ 
+-	val = readl(pm_cpu->reg_mux) >> pm_cpu->shift_mux;
+-	val &= pm_cpu->mask_mux;
++	if (armada_3700_pm_dvfs_is_enabled(pm_cpu->nb_pm_base)) {
++		val = armada_3700_pm_dvfs_get_cpu_parent(pm_cpu->nb_pm_base);
++	} else {
++		val = readl(pm_cpu->reg_mux) >> pm_cpu->shift_mux;
++		val &= pm_cpu->mask_mux;
++	}
+ 
+ 	if (val >= num_parents)
+ 		return -EINVAL;
+@@ -331,19 +434,124 @@ static u8 clk_pm_cpu_get_parent(struct clk_hw *hw)
+ 	return val;
+ }
+ 
++static int clk_pm_cpu_set_parent(struct clk_hw *hw, u8 index)
 +{
 +	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
-+	int num_parents = clk_hw_get_num_parents(hw);
-+	u32 val;
++	struct regmap *base = pm_cpu->nb_pm_base;
++	int load_level;
 +
-+	val = readl(pm_cpu->reg_mux) >> pm_cpu->shift_mux;
-+	val &= pm_cpu->mask_mux;
-+
-+	if (val >= num_parents)
++	/*
++	 * We set the clock parent only if the DVFS is available but
++	 * not enabled.
++	 */
++	if (IS_ERR(base) || armada_3700_pm_dvfs_is_enabled(base))
 +		return -EINVAL;
 +
-+	return val;
++	/* Set the parent clock for all the load level */
++	for (load_level = 0; load_level < LOAD_LEVEL_NR; load_level++) {
++		unsigned int reg, mask,  val,
++			offset = ARMADA_37XX_NB_TBG_SEL_OFF;
++
++		armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
++
++		val = index << offset;
++		mask = ARMADA_37XX_NB_TBG_SEL_MASK << offset;
++		regmap_update_bits(base, reg, mask, val);
++	}
++	return 0;
 +}
 +
-+static unsigned long clk_pm_cpu_recalc_rate(struct clk_hw *hw,
-+					    unsigned long parent_rate)
+ static unsigned long clk_pm_cpu_recalc_rate(struct clk_hw *hw,
+ 					    unsigned long parent_rate)
+ {
+ 	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
+ 	unsigned int div;
+ 
+-	div = get_div(pm_cpu->reg_div, pm_cpu->shift_div);
+-
++	if (armada_3700_pm_dvfs_is_enabled(pm_cpu->nb_pm_base))
++		div = armada_3700_pm_dvfs_get_cpu_div(pm_cpu->nb_pm_base);
++	else
++		div = get_div(pm_cpu->reg_div, pm_cpu->shift_div);
+ 	return DIV_ROUND_UP_ULL((u64)parent_rate, div);
+ }
+ 
++static long clk_pm_cpu_round_rate(struct clk_hw *hw, unsigned long rate,
++				  unsigned long *parent_rate)
 +{
 +	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
-+	unsigned int div;
++	struct regmap *base = pm_cpu->nb_pm_base;
++	unsigned int div = *parent_rate / rate;
++	unsigned int load_level;
++	/* only available when DVFS is enabled */
++	if (!armada_3700_pm_dvfs_is_enabled(base))
++		return -EINVAL;
 +
-+	div = get_div(pm_cpu->reg_div, pm_cpu->shift_div);
++	for (load_level = 0; load_level < LOAD_LEVEL_NR; load_level++) {
++		unsigned int reg, val, offset = ARMADA_37XX_NB_TBG_DIV_OFF;
 +
-+	return DIV_ROUND_UP_ULL((u64)parent_rate, div);
-+}
++		armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
 +
-+static const struct clk_ops clk_pm_cpu_ops = {
-+	.get_parent = clk_pm_cpu_get_parent,
-+	.recalc_rate = clk_pm_cpu_recalc_rate,
-+};
++		regmap_read(base, reg, &val);
 +
- static const struct of_device_id armada_3700_periph_clock_of_match[] = {
- 	{ .compatible = "marvell,armada-3700-periph-clock-nb",
- 	  .data = data_nb, },
-@@ -356,6 +406,20 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
- 		}
- 	}
- 
-+	if (data->muxrate_hw) {
-+		struct clk_pm_cpu *pmcpu_clk;
-+		struct clk_hw *muxrate_hw = data->muxrate_hw;
-+
-+		pmcpu_clk =  to_clk_pm_cpu(muxrate_hw);
-+		pmcpu_clk->reg_mux = reg + (u64)pmcpu_clk->reg_mux;
-+		pmcpu_clk->reg_div = reg + (u64)pmcpu_clk->reg_div;
-+
-+		mux_hw = muxrate_hw;
-+		rate_hw = muxrate_hw;
-+		mux_ops = muxrate_hw->init->ops;
-+		rate_ops = muxrate_hw->init->ops;
++		val >>= offset;
++		val &= ARMADA_37XX_NB_TBG_DIV_MASK;
++		if (val == div)
++			/*
++			 * We found a load level matching the target
++			 * divider, switch to this load level and
++			 * return.
++			 */
++			return *parent_rate / div;
 +	}
 +
++	/* We didn't find any valid divider */
++	return -EINVAL;
++}
++
++static int clk_pm_cpu_set_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long parent_rate)
++{
++	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
++	struct regmap *base = pm_cpu->nb_pm_base;
++	unsigned int div = parent_rate / rate;
++	unsigned int load_level;
++
++	/* only available when DVFS is enabled */
++	if (!armada_3700_pm_dvfs_is_enabled(base))
++		return -EINVAL;
++
++	for (load_level = 0; load_level < LOAD_LEVEL_NR; load_level++) {
++		unsigned int reg, mask, val,
++			offset = ARMADA_37XX_NB_TBG_DIV_OFF;
++
++		armada_3700_pm_dvfs_update_regs(load_level, &reg, &offset);
++
++		regmap_read(base, reg, &val);
++		val >>= offset;
++		val &= ARMADA_37XX_NB_TBG_DIV_MASK;
++
++		if (val == div) {
++			/*
++			 * We found a load level matching the target
++			 * divider, switch to this load level and
++			 * return.
++			 */
++			reg = ARMADA_37XX_NB_CPU_LOAD;
++			mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
++			regmap_update_bits(base, reg, mask, load_level);
++
++			return rate;
++		}
++	}
++
++	/* We didn't find any valid divider */
++	return -EINVAL;
++}
++
+ static const struct clk_ops clk_pm_cpu_ops = {
+ 	.get_parent = clk_pm_cpu_get_parent,
++	.set_parent = clk_pm_cpu_set_parent,
++	.round_rate = clk_pm_cpu_round_rate,
++	.set_rate = clk_pm_cpu_set_rate,
+ 	.recalc_rate = clk_pm_cpu_recalc_rate,
+ };
+ 
+@@ -418,6 +626,9 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
+ 		rate_hw = muxrate_hw;
+ 		mux_ops = muxrate_hw->init->ops;
+ 		rate_ops = muxrate_hw->init->ops;
++
++		pmcpu_clk->nb_pm_base =
++			syscon_regmap_lookup_by_compatible("marvell,armada-3700-nb-pm");
+ 	}
+ 
  	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
- 					data->num_parents, mux_hw,
- 					mux_ops, rate_hw, rate_ops,
 -- 
 2.15.0
