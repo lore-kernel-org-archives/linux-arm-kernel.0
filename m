@@ -1,34 +1,64 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Thu, 30 Nov 2017 17:07:55 +0000
-Subject: [PATCH v3 3/6] ARM: ep93xx: ts72xx: Rewrite
- ts72xx_register_flash() to accept parameters
-In-Reply-To: <20171130004510.23887-4-lukma@denx.de>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171130004510.23887-1-lukma@denx.de> <20171130004510.23887-4-lukma@denx.de>
-Message-ID: <BLUPR0101MB15543BEDECA1A09D483AA5CDD0380@BLUPR0101MB1554.prod.exchangelabs.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Thu, 30 Nov 2017 09:16:38 -0800
+Subject: [PATCH v2 2/2] ARM: dts: at91: disable the nxp,se97b SMBUS
+ timeout on the TSE-850
+In-Reply-To: <20171129205629.GO21126@piout.net>
+References: <20171127163101.27859-1-peda@axentia.se>
+ <20171127163101.27859-3-peda@axentia.se>
+ <20171129205311.GA20551@roeck-us.net>
+ <20171129205629.GO21126@piout.net>
+Message-ID: <20171130171638.GA17788@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 29, 2017 5:45 PM, Lukasz Majewski wrote:
-> This commit extend the ts72xx_register_flash() to accept passed parameters, which makes it more reusable.
->
-> Now it is possible to accept ep93xx flash start address and partitions.
+On Wed, Nov 29, 2017 at 09:56:29PM +0100, Alexandre Belloni wrote:
+> On 29/11/2017 at 12:53:11 -0800, Guenter Roeck wrote:
+> > On Mon, Nov 27, 2017 at 05:31:01PM +0100, Peter Rosin wrote:
+> > > The I2C adapter driver is sometimes slow, causing the SCL line to
+> > > be stuck low for more than the stipulated SMBUS timeout of 25-35 ms.
+> > > This causes the client device to give up which in turn causes silent
+> > > corruption of data. So, disable the SMBUS timeout in the client device.
+> > > 
+> > > Signed-off-by: Peter Rosin <peda@axentia.se>
+> > 
+> > Acked-by: Guenter Roeck <linux@roeck-us.net>
+> > 
+> > I assume this will be sent upstream through an arm tree.
+> > 
+> 
+> Yes, I'm applying it right now.
+> 
+Are you going to apply the patch for 4.15, or queue it up for 4.16 ?
+I have been arguing with myself if this is a feature or a bug fix.
+So far I queued the driver change up for 4.16, but I am open to
+applying it to 4.15. Any thoughts ?
 
-<snip>
+Guenter
 
-@@ -223,7 +217,9 @@ static struct platform_device ts73xx_fpga_device = {  static void __init ts72xx_init_machine(void)  {
-
-Lukasz,
-
-The line above is corrupted in the patch and will not apply. Not sure what happened...
-
->  	ep93xx_init_devices();
-> -	ts72xx_register_flash();
-> +	ts72xx_register_flash(ts72xx_nand_parts, ARRAY_SIZE(ts72xx_nand_parts),
-> +			      is_ts9420_installed() ?
-> +			      EP93XX_CS7_PHYS_BASE : EP93XX_CS6_PHYS_BASE);
->  	platform_device_register(&ts72xx_rtc_device);
->  	platform_device_register(&ts72xx_wdt_device);
-
-Regards,
-Hartley
+> > Thanks,
+> > Guenter
+> > 
+> > > ---
+> > >  arch/arm/boot/dts/at91-tse850-3.dts | 1 +
+> > >  1 file changed, 1 insertion(+)
+> > > 
+> > > diff --git a/arch/arm/boot/dts/at91-tse850-3.dts b/arch/arm/boot/dts/at91-tse850-3.dts
+> > > index 5f29010cdbd8..9b82cc8843e1 100644
+> > > --- a/arch/arm/boot/dts/at91-tse850-3.dts
+> > > +++ b/arch/arm/boot/dts/at91-tse850-3.dts
+> > > @@ -221,6 +221,7 @@
+> > >  	jc42 at 18 {
+> > >  		compatible = "nxp,se97b", "jedec,jc-42.4-temp";
+> > >  		reg = <0x18>;
+> > > +		smbus-timeout-disable;
+> > >  	};
+> > >  
+> > >  	dpot: mcp4651-104 at 28 {
+> > > -- 
+> > > 2.11.0
+> > > 
+> 
+> -- 
+> Alexandre Belloni, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
