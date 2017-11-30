@@ -1,65 +1,43 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Thu, 30 Nov 2017 13:56:28 +0100
-Subject: [PATCH v2] clk: stm32-h7: fix copyright
-In-Reply-To: <CA+M3ks41cBBqDrEGFZm5yGO0j8funfTAaTf_u2cJoD1p3XpQUQ@mail.gmail.com>
-References: <20171130084108.23083-1-benjamin.gaignard@st.com>
- <CAOFm3uG_7kChnvxW0SbHSMP5q_KSZeaNxjkKb774ZmcwukJ_Mw@mail.gmail.com>
- <CA+M3ks41cBBqDrEGFZm5yGO0j8funfTAaTf_u2cJoD1p3XpQUQ@mail.gmail.com>
-Message-ID: <CAOFm3uGMHrNyov=BkrXbJQeHnMgZCHK7ogTru8Bj9An7aTz9DQ@mail.gmail.com>
+From: geert+renesas@glider.be (Geert Uytterhoeven)
+Date: Thu, 30 Nov 2017 13:57:24 +0100
+Subject: [PATCH v2 2/4] ARM: dts: lager: Convert to named i2c-gpio bindings
+In-Reply-To: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
+References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <1512046646-15253-3-git-send-email-geert+renesas@glider.be>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 1:47 PM, Benjamin Gaignard
-<benjamin.gaignard@linaro.org> wrote:
-> 2017-11-30 12:28 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
->> On Thu, Nov 30, 2017 at 9:41 AM, Benjamin Gaignard
->> <benjamin.gaignard@linaro.org> wrote:
->>> Uniformize STMicroelectronics copyrights header
->>> Add SPDX identifier
->>>
->>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>> CC: Gabriel Fernandez <gabriel.fernandez@st.com>
->>> ---
->>>  drivers/clk/clk-stm32h7.c | 19 +++----------------
->>>  1 file changed, 3 insertions(+), 16 deletions(-)
->>>
->>> diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
->>> index 61c3e40507d3..db2b162c0d4c 100644
->>> --- a/drivers/clk/clk-stm32h7.c
->>> +++ b/drivers/clk/clk-stm32h7.c
->>> @@ -1,20 +1,7 @@
->>> +// SPDX-License-Identifier: GPL-2.0
->>>  /*
->>> - * Copyright (C) Gabriel Fernandez 2017
->>> - * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
->>> - *
->>> - * License terms: GPL V2.0.
->>> - *
->>> - * This program is free software; you can redistribute it and/or modify it
->>> - * under the terms and conditions of the GNU General Public License,
->>> - * version 2, as published by the Free Software Foundation.
->>> - *
->>> - * This program is distributed in the hope it will be useful, but WITHOUT
->>> - * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->>> - * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->>> - * more details.
->>> - *
->>> - * You should have received a copy of the GNU General Public License along with
->>> - * this program.  If not, see <http://www.gnu.org/licenses/>.
->>> + * Copyright (C) STMicroelectronics 2017
->>> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
->>>   */
->>>
->>>  #include <linux/clk.h>
->>
->> Awesome! Don't you like it when you remove this type of things?
->
-> Yes but is also means that many other STM files need to be updated...
+Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
+named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
+gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
+more error-prone unnamed variant.
 
-Sure thing. I have a FLOSS tool to help with this FWIW. I would be
-glad to help as needed.
+Switch to the new bindings, and add the missing GPIO_OPEN_DRAIN I/O
+flags, which were implicitly assumed before.
 
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+---
+v2:
+  - New.
+---
+ arch/arm/boot/dts/r8a7790-lager.dts | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
+index e3d27783b6b56b42..f2ea632381e7d1af 100644
+--- a/arch/arm/boot/dts/r8a7790-lager.dts
++++ b/arch/arm/boot/dts/r8a7790-lager.dts
+@@ -272,9 +272,8 @@
+ 		#size-cells = <0>;
+ 		compatible = "i2c-gpio";
+ 		status = "disabled";
+-		gpios = <&gpio1 17 GPIO_ACTIVE_HIGH /* sda */
+-			 &gpio1 16 GPIO_ACTIVE_HIGH /* scl */
+-			>;
++		sda-gpios = <&gpio1 17 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		scl-gpios = <&gpio1 16 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+ 		i2c-gpio,delay-us = <5>;
+ 	};
+ 
 -- 
-Cordially
-Philippe Ombredanne
+2.7.4
