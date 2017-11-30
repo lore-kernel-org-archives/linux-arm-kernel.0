@@ -1,45 +1,19 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 30 Nov 2017 17:36:04 +0000
-Subject: [PATCH v2 03/18] arm64: mm: Move ASID from TTBR0 to TTBR1
-In-Reply-To: <1512059986-21325-4-git-send-email-will.deacon@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <1512059986-21325-4-git-send-email-will.deacon@arm.com>
-Message-ID: <20171130173604.yjbbhnjvxgavaacz@lakrids.cambridge.arm.com>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Thu, 30 Nov 2017 09:38:59 -0800
+Subject: [PATCH 1/7] kbuild: add ld-name macro and support for GNU gold
+In-Reply-To: <CAKwvOdme29UPfaV1CCbMXRM=LzZJ-asytEjGm_F7ARN0WrMsEg@mail.gmail.com>
+References: <20171129234442.655-1-samitolvanen@google.com>
+ <20171129234442.655-2-samitolvanen@google.com>
+ <CAKwvOdme29UPfaV1CCbMXRM=LzZJ-asytEjGm_F7ARN0WrMsEg@mail.gmail.com>
+Message-ID: <20171130173859.GB90451@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On Wed, Nov 29, 2017 at 04:32:52PM -0800, Nick Desaulniers wrote:
+> Right, but you're still only ever using one linker per build, correct?
 
-On Thu, Nov 30, 2017 at 04:39:31PM +0000, Will Deacon wrote:
-> In preparation for mapping kernelspace and userspace with different
-> ASIDs, move the ASID to TTBR1 and update switch_mm to context-switch
-> TTBR0 via an invalid mapping (the zero page).
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+Correct. LDFLAGS_GOLD makes it move convenient to add gold specific flags
+without explicit $(ld-name) checks everywhere, but I'm fine with removing
+it in v2.
 
-[...]
-
-> +#define cpu_switch_mm(pgd,mm)				\
-> +do {							\
-> +	BUG_ON(pgd == swapper_pg_dir);			\
-> +	cpu_set_reserved_ttbr0();			\
-> +	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
-> +} while (0)
-
-A minor thing, but could we please fix the spacing for the
-cpu_do_switch_mm() arguments while we move this?
-
-AFAICT, there's no reason this needs to be a macro, and the following
-works with v4.15-rc1 defconfig:
-
-static inline void cpu_switch_mm(pgd_t *pgd, struct mm_struct *mm)
-{
-	BUG_ON(pgd == swapper_pg_dir);
-	cpu_set_reserved_ttbr0();
-	cpu_do_switch_mm(virt_to_phys(pgd), mm);
-}
-
-Otherwise, the patch looks good to me.
-
-Thanks,
-Mark.
+Sami
