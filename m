@@ -1,53 +1,53 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Nov 2017 16:20:52 +0100
-Subject: [RFC PATCH 0/3] pinctrl: sunxi: Add DT-based generic pinctrl
- driver
-In-Reply-To: <54ecfdf7-cf4a-3eae-2661-47fa668a6066@arm.com>
-References: <20171113012523.2328-1-andre.przywara@arm.com>
- <CACRpkdYFoUmGJYdKz0t9gsrkK=u8-oJjaRBXtNYHaUt9kSa3_g@mail.gmail.com>
- <54ecfdf7-cf4a-3eae-2661-47fa668a6066@arm.com>
-Message-ID: <CACRpkdZQPspH79_nS-WgiSg6d2meXUztgocYbxO07vTgP1HehA@mail.gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Thu, 30 Nov 2017 07:24:30 -0800
+Subject: [PATCH v3 4/4] DTS: Pandora: fix panel compatibility string
+In-Reply-To: <4EE1E298-6461-48FF-977C-958DD16AD83A@goldelico.com>
+References: <cover.1511884135.git.hns@goldelico.com>
+ <b6001c7b7fb98e7a3ad4c712084fea9dae9e6b27.1511884135.git.hns@goldelico.com>
+ <20171128160437.GD28152@atomide.com>
+ <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
+ <20171128161834.GE28152@atomide.com>
+ <4EE1E298-6461-48FF-977C-958DD16AD83A@goldelico.com>
+Message-ID: <20171130152430.GM28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 1:05 PM, Andre Przywara <andre.przywara@arm.com> wrote:
-> On 24/11/17 10:28, Linus Walleij wrote:
+* H. Nikolaus Schaller <hns@goldelico.com> [171128 18:35]:
+> Hi,
+> 
+> > Am 28.11.2017 um 17:18 schrieb Tony Lindgren <tony@atomide.com>:
+> > 
+> > * H. Nikolaus Schaller <hns@goldelico.com> [171128 16:17]:
+> >> Hi Tony,
+> >> 
+> >>> Am 28.11.2017 um 17:04 schrieb Tony Lindgren <tony@atomide.com>:
+> >>> 
+> >>> * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:52]:
+> >>>> We can remove the unnecessary "omapdss," prefix because
+> >>>> the omapdrm driver takes care of it when matching with
+> >>>> the driver table.
+> >>> 
+> >>> So is this needed as a fix or is this another clean-up?
+> >>> 
+> >>> So is this is really needed as a fix?
+> >> 
+> >> Hm. How do you differentiate between "fix" and "cleanup"?
+> >> Maybe it is more a wording than a content issue...
+> >> 
+> >> For me it is a "fix" because it is semantically wrong to have
+> >> a prefix where it is not needed. And "fixing" it changes the
+> >> compiler output by 8 bytes.
+> > 
+> > How about let's call it a "typo fix" then? :)
+> 
+> Well, it is not really a typo.
 
->> The DT maintainers have been pretty clear on that they don't like
->> using the the DT as a generic fit-all information dump. They
->> prefer to look up hardware data from per-soc compatible strings.
-(...)
-> I am just a bit worried that with Allwinner recently playing the SKU
-> game we end up with tons of tables for only slightly different SoCs (see
-> the H3 and H5, for instance). And with single image kernels we pile up
-> quite some *data* in each kernel, which is of little interest for
-> everyone else.
+Well what if the stable people pick it into earlier stable series
+based on the word fix in the subject? That has happened before.
 
-So what you are saying is that you want to use the DTS for
-data dumping and what I'm saying is that the DT maintainers
-do not like that stance.
+I suggest you update the dts patches to use wording like
+"update compatible to use new naming" or something similar.
 
-They will have to speak on the issue directly before we continue
-I think.
+Regards,
 
-I have been getting a *LOT* of pushback to putting large amounts
-of data and configuration in the DTS recently, so IIUC that is something
-they simply don't like, probably for good reasons.
-
-C.f:
-https://www.spinics.net/lists/dri-devel/msg150321.html
-
-> Also my understanding is that the actual Allwinner pin controller IP
-> (register map) is very much the same across all SoCs. Mostly the only
-> difference is the mapping between pins and mux functions, which we
-> express in the DT already anyway (in the subnodes). And this is really a
-> poster book example of what DT should be doing: express the specific
-> mappings of a particular implementation. I don't see why this would need
-> to be per-board only, if we can pull this up to the SoC level.
-
-It's not me you need to sell this point.
-
-You need to sell it to the DT maintainers.
-
-Yours,
-Linus Walleij
+Tony
