@@ -1,56 +1,95 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 30 Nov 2017 16:30:38 +0000
-Subject: [PATCH] arm64: fpsimd: Fix failure to restore FPSIMD state after
- signals
-In-Reply-To: <87374venpy.fsf@linaro.org>
-References: <1512042997-25945-1-git-send-email-Dave.Martin@arm.com>
- <87374venpy.fsf@linaro.org>
-Message-ID: <20171130163038.GP22781@e103592.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Nov 2017 16:39:29 +0000
+Subject: [PATCH v2 01/18] arm64: mm: Use non-global mappings for kernel space
+In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
+References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 04:27:21PM +0000, Alex Benn?e wrote:
-> 
-> Dave Martin <Dave.Martin@arm.com> writes:
-> 
-> > The fpsimd_update_current_state() function is responsible for
-> > loading the FPSIMD state from the user signal frame into the
-> > current task during sigreturn.  When implementing support for SVE,
-> > conditional code was added to this function in order to handle the
-> > case where SVE state need to be loaded for the task and merged with
-> > the FPSIMD data from the signal frame; however, the FPSIMD-only
-> > case was unintentionally dropped.
-> >
-> > As a result of this, sigreturn does not currently restore the
-> > FPSIMD state of the task, except in the case where the system
-> > supports SVE and the signal frame contains SVE state in addition to
-> > FPSIMD state.
-> >
-> > This patch fixes this bug by making the copy-in of the FPSIMD data
-> > from the signal frame to thread_struct unconditional.
-> >
-> > This remains a performance regression from v4.14, since the FPSIMD
-> > state is now copied into thread_struct and then loaded back,
-> > instead of _only_ being loaded into the CPU FPSIMD registers.
-> > However, it is essential to call task_fpsimd_load() here anyway in
-> > order to ensure that the SVE enable bit in CPACR_EL1 is set
-> > correctly before returning to userspace.  This could use some
-> > refactoring, but since sigreturn is not a fast path I have kept
-> > this patch as a pure fix and left the refactoring for later.
-> >
-> > Fixes: 8cd969d28fd2 ("arm64/sve: Signal handling support")
-> > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > Reported-by: Alex Benn?e <alex.bennee@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> 
-> Tested-by: Alex Benn?e <alex.bennee@linaro.org>
-> Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
+In preparation for unmapping the kernel whilst running in userspace,
+make the kernel mappings non-global so we can avoid expensive TLB
+invalidation on kernel exit to userspace.
 
-Awesome, thanks for the quick turn-around.
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kernel-pgtable.h | 12 ++++++++++--
+ arch/arm64/include/asm/pgtable-prot.h   | 21 +++++++++++++++------
+ 2 files changed, 25 insertions(+), 8 deletions(-)
 
-Will, will you pick with these tags or do you want me to repost?
-
-Cheers
----Dave
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+index 7803343e5881..77a27af01371 100644
+--- a/arch/arm64/include/asm/kernel-pgtable.h
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -78,8 +78,16 @@
+ /*
+  * Initial memory map attributes.
+  */
+-#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+-#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++#define _SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define _SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define SWAPPER_PTE_FLAGS	(_SWAPPER_PTE_FLAGS | PTE_NG)
++#define SWAPPER_PMD_FLAGS	(_SWAPPER_PMD_FLAGS | PMD_SECT_NG)
++#else
++#define SWAPPER_PTE_FLAGS	_SWAPPER_PTE_FLAGS
++#define SWAPPER_PMD_FLAGS	_SWAPPER_PMD_FLAGS
++#endif
+ 
+ #if ARM64_SWAPPER_USES_SECTION_MAPS
+ #define SWAPPER_MM_MMUFLAGS	(PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
+diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+index 0a5635fb0ef9..22a926825e3f 100644
+--- a/arch/arm64/include/asm/pgtable-prot.h
++++ b/arch/arm64/include/asm/pgtable-prot.h
+@@ -34,8 +34,16 @@
+ 
+ #include <asm/pgtable-types.h>
+ 
+-#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+-#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++#define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_NG)
++#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_SECT_NG)
++#else
++#define PROT_DEFAULT		_PROT_DEFAULT
++#define PROT_SECT_DEFAULT	_PROT_SECT_DEFAULT
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ #define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+ #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+@@ -48,6 +56,7 @@
+ #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+ 
+ #define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
++#define _HYP_PAGE_DEFAULT	(_PAGE_DEFAULT & ~PTE_NG)
+ 
+ #define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ #define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+@@ -55,15 +64,15 @@
+ #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+ 
+-#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+-#define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+-#define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
++#define PAGE_HYP		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
++#define PAGE_HYP_EXEC		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
++#define PAGE_HYP_RO		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+ 
+ #define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+ #define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+ 
+-#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
++#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
+ #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+ #define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+ #define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
+-- 
+2.1.4
