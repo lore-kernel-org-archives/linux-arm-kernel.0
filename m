@@ -1,70 +1,58 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Thu, 30 Nov 2017 14:05:54 +0100
-Subject: [PATCH v2] clk: stm32-h7: fix copyright
-In-Reply-To: <CAOFm3uGMHrNyov=BkrXbJQeHnMgZCHK7ogTru8Bj9An7aTz9DQ@mail.gmail.com>
-References: <20171130084108.23083-1-benjamin.gaignard@st.com>
- <CAOFm3uG_7kChnvxW0SbHSMP5q_KSZeaNxjkKb774ZmcwukJ_Mw@mail.gmail.com>
- <CA+M3ks41cBBqDrEGFZm5yGO0j8funfTAaTf_u2cJoD1p3XpQUQ@mail.gmail.com>
- <CAOFm3uGMHrNyov=BkrXbJQeHnMgZCHK7ogTru8Bj9An7aTz9DQ@mail.gmail.com>
-Message-ID: <CA+M3ks4pva9Kg+gj44KeUrDcKf9tn5O-0VkTv5uUebJ=812E3Q@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 30 Nov 2017 14:09:56 +0100
+Subject: [PATCH] mmc: sdhci-of-arasan: Add sdhci_arasan_set_power
+In-Reply-To: <1511827377-2021-1-git-send-email-milan.o.stevanovic@gmail.com>
+References: <1511827377-2021-1-git-send-email-milan.o.stevanovic@gmail.com>
+Message-ID: <CAPDyKFqnUE4R=VU9Y9LhahUc3vbx14wE-XuGeTog0vHPrp59rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-11-30 13:56 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
-> On Thu, Nov 30, 2017 at 1:47 PM, Benjamin Gaignard
-> <benjamin.gaignard@linaro.org> wrote:
->> 2017-11-30 12:28 GMT+01:00 Philippe Ombredanne <pombredanne@nexb.com>:
->>> On Thu, Nov 30, 2017 at 9:41 AM, Benjamin Gaignard
->>> <benjamin.gaignard@linaro.org> wrote:
->>>> Uniformize STMicroelectronics copyrights header
->>>> Add SPDX identifier
->>>>
->>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->>>> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
->>>> CC: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>> ---
->>>>  drivers/clk/clk-stm32h7.c | 19 +++----------------
->>>>  1 file changed, 3 insertions(+), 16 deletions(-)
->>>>
->>>> diff --git a/drivers/clk/clk-stm32h7.c b/drivers/clk/clk-stm32h7.c
->>>> index 61c3e40507d3..db2b162c0d4c 100644
->>>> --- a/drivers/clk/clk-stm32h7.c
->>>> +++ b/drivers/clk/clk-stm32h7.c
->>>> @@ -1,20 +1,7 @@
->>>> +// SPDX-License-Identifier: GPL-2.0
->>>>  /*
->>>> - * Copyright (C) Gabriel Fernandez 2017
->>>> - * Author: Gabriel Fernandez <gabriel.fernandez@st.com>
->>>> - *
->>>> - * License terms: GPL V2.0.
->>>> - *
->>>> - * This program is free software; you can redistribute it and/or modify it
->>>> - * under the terms and conditions of the GNU General Public License,
->>>> - * version 2, as published by the Free Software Foundation.
->>>> - *
->>>> - * This program is distributed in the hope it will be useful, but WITHOUT
->>>> - * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
->>>> - * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
->>>> - * more details.
->>>> - *
->>>> - * You should have received a copy of the GNU General Public License along with
->>>> - * this program.  If not, see <http://www.gnu.org/licenses/>.
->>>> + * Copyright (C) STMicroelectronics 2017
->>>> + * Author: Gabriel Fernandez <gabriel.fernandez@st.com> for STMicroelectronics.
->>>>   */
->>>>
->>>>  #include <linux/clk.h>
->>>
->>> Awesome! Don't you like it when you remove this type of things?
->>
->> Yes but is also means that many other STM files need to be updated...
+On 28 November 2017 at 01:02, Milan Stevanovic
+<milan.o.stevanovic@gmail.com> wrote:
+> The power register needs to have a valid voltage set
+> even when the power supply is managed by  an external regulator.
 >
-> Sure thing. I have a FLOSS tool to help with this FWIW. I would be
-> glad to help as needed.
+> Signed-off-by: Milan Stevanovic <milan.o.stevanovic@gmail.com>
 
-Do you have a link to this tool ?
+Thanks, applied for next!
 
+Kind regards
+Uffe
+
+> ---
+>  drivers/mmc/host/sdhci-of-arasan.c | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 >
+> diff --git a/drivers/mmc/host/sdhci-of-arasan.c b/drivers/mmc/host/sdhci-of-arasan.c
+> index 0720ea7..fb57206 100644
+> --- a/drivers/mmc/host/sdhci-of-arasan.c
+> +++ b/drivers/mmc/host/sdhci-of-arasan.c
+> @@ -262,6 +262,17 @@ static int sdhci_arasan_voltage_switch(struct mmc_host *mmc,
+>         return -EINVAL;
+>  }
+>
+> +static void sdhci_arasan_set_power(struct sdhci_host *host, unsigned char mode,
+> +                    unsigned short vdd)
+> +{
+> +       if (!IS_ERR(host->mmc->supply.vmmc)) {
+> +               struct mmc_host *mmc = host->mmc;
+> +
+> +               mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+> +       }
+> +       sdhci_set_power_noreg(host, mode, vdd);
+> +}
+> +
+>  static const struct sdhci_ops sdhci_arasan_ops = {
+>         .set_clock = sdhci_arasan_set_clock,
+>         .get_max_clock = sdhci_pltfm_clk_get_max_clock,
+> @@ -269,6 +280,7 @@ static const struct sdhci_ops sdhci_arasan_ops = {
+>         .set_bus_width = sdhci_set_bus_width,
+>         .reset = sdhci_arasan_reset,
+>         .set_uhs_signaling = sdhci_set_uhs_signaling,
+> +       .set_power = sdhci_arasan_set_power,
+>  };
+>
+>  static const struct sdhci_pltfm_data sdhci_arasan_pdata = {
 > --
-> Cordially
-> Philippe Ombredanne
+> 2.7.4
+>
