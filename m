@@ -1,55 +1,104 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:36 +0000
-Subject: [PATCH v2 08/18] arm64: mm: Add arm64_kernel_unmapped_at_el0 helper
+Date: Thu, 30 Nov 2017 16:39:41 +0000
+Subject: [PATCH v2 13/18] arm64: entry: Hook up entry trampoline to exception
+ vectors
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-9-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-14-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order for code such as TLB invalidation to operate efficiently when
-the decision to map the kernel at EL0 is determined at runtime, this
-patch introduces a helper function, arm64_kernel_unmapped_at_el0, to
-determine whether or not the kernel is mapped whilst running in userspace.
-
-Currently, this just reports the value of CONFIG_UNMAP_KERNEL_AT_EL0,
-but will later be hooked up to a fake CPU capability using a static key.
+Hook up the entry trampoline to our exception vectors so that all
+exceptions from and returns to EL0 go via the trampoline, which swizzles
+the vector base register accordingly. Transitioning to and from the
+kernel clobbers x30, so we use tpidrro_el0 and far_el1 as scratch
+registers for native tasks.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu.h | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm64/kernel/entry.S | 39 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 01bfb184f2a8..c07954638658 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -19,6 +19,8 @@
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
- #define USER_ASID_FLAG	(UL(1) << 48)
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 688e52f65a8d..99d105048663 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -73,6 +73,17 @@
  
-+#ifndef __ASSEMBLY__
+ 	.macro kernel_ventry, el, label, regsize = 64
+ 	.align 7
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	.if	\el == 0
++	.if	\regsize == 64
++	mrs	x30, tpidrro_el0
++	msr	tpidrro_el0, xzr
++	.else
++	mov	x30, xzr
++	.endif
++	.endif
++#endif
 +
- typedef struct {
- 	atomic64_t	id;
- 	void		*vdso;
-@@ -32,6 +34,11 @@ typedef struct {
-  */
- #define ASID(mm)	((mm)->context.id.counter & 0xffff)
+ 	sub	sp, sp, #S_FRAME_SIZE
+ #ifdef CONFIG_VMAP_STACK
+ 	/*
+@@ -119,6 +130,11 @@
+ 	b	el\()\el\()_\label
+ 	.endm
  
-+static inline bool arm64_kernel_unmapped_at_el0(void)
-+{
-+	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0);
-+}
++	.macro tramp_alias, dst, sym
++	mov_q	\dst, TRAMP_VALIAS
++	add	\dst, \dst, #(\sym - .entry.tramp.text)
++	.endm
 +
- extern void paging_init(void);
- extern void bootmem_init(void);
- extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
-@@ -42,4 +49,5 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
- extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
- extern void mark_linear_text_alias_ro(void);
- 
-+#endif	/* !__ASSEMBLY__ */
+ 	.macro	kernel_entry, el, regsize = 64
+ 	.if	\regsize == 32
+ 	mov	w0, w0				// zero upper 32 bits of x0
+@@ -271,18 +287,20 @@ alternative_else_nop_endif
+ 	.if	\el == 0
+ 	ldr	x23, [sp, #S_SP]		// load return stack pointer
+ 	msr	sp_el0, x23
++	tst	x22, #PSR_MODE32_BIT		// native task?
++	b.eq	3f
++
+ #ifdef CONFIG_ARM64_ERRATUM_845719
+ alternative_if ARM64_WORKAROUND_845719
+-	tbz	x22, #4, 1f
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+ 	mrs	x29, contextidr_el1
+ 	msr	contextidr_el1, x29
+ #else
+ 	msr contextidr_el1, xzr
  #endif
+-1:
+ alternative_else_nop_endif
+ #endif
++3:
+ 	.endif
+ 
+ 	msr	elr_el1, x21			// set up the return data
+@@ -304,7 +322,22 @@ alternative_else_nop_endif
+ 	ldp	x28, x29, [sp, #16 * 14]
+ 	ldr	lr, [sp, #S_LR]
+ 	add	sp, sp, #S_FRAME_SIZE		// restore sp
+-	eret					// return to kernel
++
++#ifndef CONFIG_UNMAP_KERNEL_AT_EL0
++	eret
++#else
++	.if	\el == 0
++	bne	4f
++	msr	far_el1, x30
++	tramp_alias	x30, tramp_exit_native
++	br	x30
++4:
++	tramp_alias	x30, tramp_exit_compat
++	br	x30
++	.else
++	eret
++	.endif
++#endif
+ 	.endm
+ 
+ 	.macro	irq_stack_entry
 -- 
 2.1.4
