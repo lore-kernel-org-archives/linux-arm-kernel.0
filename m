@@ -1,62 +1,55 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 30 Nov 2017 14:01:32 +0800
-Subject: [PATCH v3 3/3] arm64: dts: meson-axg: add clock DT info for Meson
- AXG SoC
-In-Reply-To: <20171129193536.GB19419@codeaurora.org>
-References: <20171128125330.363-1-yixun.lan@amlogic.com>
- <20171128125330.363-4-yixun.lan@amlogic.com>
- <20171129193536.GB19419@codeaurora.org>
-Message-ID: <8353c264-3253-0268-91fc-8d42fbe82611@amlogic.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Thu, 30 Nov 2017 08:07:52 +0100
+Subject: [PATCH v2 6/6] ARM: ep93xx: ts72xx: Add support for BK3 board -
+ ts72xx derivative
+In-Reply-To: <20171129230704.68b5ec42@jawa>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171121143204.1839-1-lukma@denx.de>
+ <20171121143204.1839-7-lukma@denx.de>
+ <86943b7f-be3a-2f41-1ffe-c4d7abfee148@gmail.com>
+ <20171129230704.68b5ec42@jawa>
+Message-ID: <20171130080752.f805cbf32704649bf8735385@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stephen
+Hello Lukasz,
 
-On 11/30/17 03:35, Stephen Boyd wrote:
-> On 11/28, Yixun Lan wrote:
->> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> index b932a784b02a..36a2e98338a8 100644
->> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
->> @@ -7,6 +7,7 @@
->>  #include <dt-bindings/gpio/gpio.h>
->>  #include <dt-bindings/interrupt-controller/irq.h>
->>  #include <dt-bindings/interrupt-controller/arm-gic.h>
->> +#include <dt-bindings/clock/axg-clkc.h>
->>  
->>  / {
->>  	compatible = "amlogic,meson-axg";
->> @@ -148,6 +149,20 @@
->>  			#address-cells = <0>;
->>  		};
->>  
->> +		hiubus: hiubus at ff63c000 {
-> 
-> Maybe just call the node "bus at ff63c000"?
-> 
-isn't this just a name? what's the benefits to change?
-personally, I tend to keep it this way, because it's better map to the
-data sheet
+On Wed, 29 Nov 2017 23:07:04 +0100
+Lukasz Majewski <lukma@denx.de> wrote:
 
-we also has 'aobus', 'cbus' scattered there..
-
->> +			compatible = "simple-bus";
->> +			reg = <0x0 0xff63c000 0x0 0x1c00>;
->> +			#address-cells = <2>;
->> +			#size-cells = <2>;
->> +			ranges = <0x0 0x0 0x0 0xff63c000 0x0 0x1c00>;
->> +
->> +			clkc: clock-controller at 0 {
->> +				compatible = "amlogic,axg-clkc";
->> +				#clock-cells = <1>;
->> +				reg = <0x0 0x0 0x0 0x320>;
->> +			};
->> +		};
->> +
->>  		mailbox: mailbox at ff63dc00 {
->>  			compatible = "amlogic,meson-gx-mhu", "amlogic,meson-gxbb-mhu";
->>  			reg = <0 0xff63dc00 0 0x400>;
->> -- 
->> 2.15.0
->>
+> > > +/*************************************************************************
+> > > + * BK3 support code
+> > > +
+> > > *************************************************************************/
+> > > +static struct mtd_partition bk3_nand_parts[] = {
+> > > +	{
+> > > +		.name		= "System",
+> > > +		.offset	= 0x00000000,  
+> > 
+> > I see the above and below lines as unaligned
 > 
+> This is strange.... I'm using emacs with extension to have coding style
+> for kernel.
+> 
+> Probably tabs get unaligned...
+
+Yes, seems that they are.
+
+[...]
+
+> > 
+> > > +	.atag_offset	= 0x100,
+> > > +	.map_io	= bk3_map_io,  
+> > 
+> > again, inconsistent alignment...
+> 
+> Even more..... checkpatch.pl did not complained....
+
+checkpatch.pl wouldn't complain, as there are basically two styles,
+some people do not align the individual assignments in the structures at all.
+But I was quite confident in the beginning and now even applied your v3 to
+the code. And indeed it's unaligned... I even checked with emacs. Still
+unaligned.
+
+-- 
+Alexander Sverdlin.
