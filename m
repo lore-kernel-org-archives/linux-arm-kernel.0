@@ -1,32 +1,37 @@
-From: samitolvanen@google.com (Sami Tolvanen)
-Date: Thu, 30 Nov 2017 09:50:21 -0800
-Subject: [PATCH 6/7] arm64: explicitly pass --no-fix-cortex-a53-843419 to
- GNU gold
-In-Reply-To: <CAKwvOdnhdHKvkLsG+3D5KDJ+jzXeWFPd9X+eDphA4xf5NZoDnQ@mail.gmail.com>
-References: <20171129234442.655-1-samitolvanen@google.com>
- <20171129234442.655-7-samitolvanen@google.com>
- <CAKwvOdnhdHKvkLsG+3D5KDJ+jzXeWFPd9X+eDphA4xf5NZoDnQ@mail.gmail.com>
-Message-ID: <20171130175021.GD90451@samitolvanen.mtv.corp.google.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Thu, 30 Nov 2017 12:52:46 -0500
+Subject: [PATCH v2] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <ffa34aa3-0a1f-ba85-e7ba-356bdffa4e5a@linux.intel.com>
+References: <1511970775-11103-1-git-send-email-awallis@codeaurora.org>
+ <20171129174619.GB22267@kroah.com>
+ <ffa34aa3-0a1f-ba85-e7ba-356bdffa4e5a@linux.intel.com>
+Message-ID: <efe543b5-fbb1-7438-d20e-bf5ba190c761@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 04:30:33PM -0800, Nick Desaulniers wrote:
-> Rather than:
+On 11/30/2017 3:41 AM, Mathias Nyman wrote:
+[..]
+> I do however mind that I don't get any default imod interval value for my
+> pci based xhci host after this patch.
+> That needs to be fixed
 > 
-> if CONFIG_ARM64_ERRATUM_843419 == y:
->   ...
-> if CONFIG_ARM64_ERRATUM_843419 == '':
->   ...
-> 
-> could this be:
-> 
-> if CONFIG_ARM64_ERRATUM_843419 == y:
->   ...
-> else
->   ...
-> 
-> ?
 
-Sure. I'll clean this up in v2.
+Thanks Mathias, good catch. Where do you think I should initialize imod default
+in PCI subsytem? I was thinking about in xhci_pci_setup but would like to hear
+your thoughts since I deal much less often with USB PCI.
 
-Sami
+> Thanks
+> -Mathias
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+Adam
+
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
