@@ -1,35 +1,31 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 30 Nov 2017 12:34:16 -0500 (EST)
-Subject: [PATCH 1/1] phy: Add 2.5G SGMII interface mode
-In-Reply-To: <AM3PR04MB4494050122E413E2445BD348C380@AM3PR04MB449.eurprd04.prod.outlook.com>
-References: <1512016235-15909-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20171130155050.GD7483@lunn.ch>
- <AM3PR04MB4494050122E413E2445BD348C380@AM3PR04MB449.eurprd04.prod.outlook.com>
-Message-ID: <20171130.123416.1757131037056449558.davem@davemloft.net>
+From: samitolvanen@google.com (Sami Tolvanen)
+Date: Thu, 30 Nov 2017 09:34:43 -0800
+Subject: [PATCH 2/3] kbuild: add cc-if-name-version and compiler-specific
+ variants
+In-Reply-To: <CAK7LNAQg4+eyR-mggswxvkBSxrdwFTQ3A733cSs4965UzO0qgQ@mail.gmail.com>
+References: <20171129000011.55235-1-samitolvanen@google.com>
+ <20171129000011.55235-3-samitolvanen@google.com>
+ <CAK7LNAQg4+eyR-mggswxvkBSxrdwFTQ3A733cSs4965UzO0qgQ@mail.gmail.com>
+Message-ID: <20171130173443.GA90451@samitolvanen.mtv.corp.google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bhaskar Upadhaya <bhaskar.upadhaya@nxp.com>
-Date: Thu, 30 Nov 2017 17:16:48 +0000
+On Thu, Nov 30, 2017 at 09:21:49PM +0900, Masahiro Yamada wrote:
+> BTW, did this patch work in your test?
 
-> Hi Andrew,
-> 	Please find answer in lined.
-...
-> Is auto negotiation not supported in 2.5G SGMII in general, or just in the system you are using? Is it the PHY or the MAC which does not support it.
-> [bhaskar] 2.5G in general needs to operate with auto negotiation in disabled mode. Its 2.5G requirement and not specific to our system.
->  Are we going to get into trouble if we find an 2.5G SGMII link which does negotiate?
+Yes, but it looks like /bin/sh is symlinked to bash on my system. I can
+reproduce the issue with dash.
 
-This is completely unreadable.  Please do not respond to quoted
-material this way, you are making more work for the people trying to
-help you.
+> As for the macro names, maybe
+> 
+> __cc-ifversion, __cc-if-fullversion for consistency?
 
-Proper quoting looks like this:
+> I think you can do like follows to avoid code duplication.
+> 
+> # backward compatibility
+> cc-ifversion = $(gcc-ifversion)
+> cc-if-fullversion = $(gcc-if-fullversion)
 
-====================
-> Quoted material.
-> More quoted material.
+Sure, both changes sound good to me. I'll fix these in v2.
 
-Things you are saying in response.
-====================
-
-Thank you.
+Sami
