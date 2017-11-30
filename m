@@ -1,90 +1,127 @@
-From: m.szyprowski@samsung.com (Marek Szyprowski)
-Date: Thu, 30 Nov 2017 13:14:51 +0100
-Subject: [PATCH] clk: Manage proper runtime PM state in clk_change_rate()
-References: <CGME20171130121511eucas1p1832c1f6e5bc9e263860e40478efca132@eucas1p1.samsung.com>
-Message-ID: <20171130121451.6710-1-m.szyprowski@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 30 Nov 2017 21:21:49 +0900
+Subject: [PATCH 2/3] kbuild: add cc-if-name-version and compiler-specific
+ variants
+In-Reply-To: <20171129000011.55235-3-samitolvanen@google.com>
+References: <20171129000011.55235-1-samitolvanen@google.com>
+ <20171129000011.55235-3-samitolvanen@google.com>
+Message-ID: <CAK7LNAQg4+eyR-mggswxvkBSxrdwFTQ3A733cSs4965UzO0qgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-clk_change_rate() propagates rate change down to all its children. Such
-operation requires managing proper runtime PM state of each child, what
-was missing. Add needed calls to clk_pm_runtime*() to ensure that
-set_rate() clock callback is called on runtime active clock.
+2017-11-29 9:00 GMT+09:00 Sami Tolvanen <samitolvanen@google.com>:
+> This change adds macros for testing both compiler name and
+> version. Current cc-version, cc-ifversion etc. macros that test
+> gcc version are left unchanged to prevent compatibility issues
+> with existing tests.
+>
+> Signed-off-by: Sami Tolvanen <samitolvanen@google.com>
+> ---
+>  scripts/Kbuild.include | 31 +++++++++++++++++++++++++++++++
+>  1 file changed, 31 insertions(+)
+>
+> diff --git a/scripts/Kbuild.include b/scripts/Kbuild.include
+> index 065324a8046f..b6d7d347b203 100644
+> --- a/scripts/Kbuild.include
+> +++ b/scripts/Kbuild.include
+> @@ -215,6 +215,37 @@ cc-disable-warning = $(call try-run-cached,\
+>  # Expands to either gcc or clang
+>  cc-name = $(call shell-cached,$(CC) -v 2>&1 | grep -q "clang version" && echo clang || echo gcc)
+>
+> +# __cc-version
+> +# Returns compiler version
+> +__cc-version = $(shell $(CONFIG_SHELL) $(srctree)/scripts/$(cc-name)-version.sh $(CC))
+> +
+> +# __cc-fullversion
+> +# Returns full compiler version
+> +__cc-fullversion = $(shell $(CONFIG_SHELL) \
+> +       $(srctree)/scripts/$(cc-name)-version.sh -p $(CC))
+> +
+> +# cc-if-name-version
+> +# Matches compiler name and version
+> +# Usage:  EXTRA_CFLAGS += $(call cc-if-name-version, gcc, -lt, 0402, -O1)
+> +cc-if-name-version = $(shell [ $(cc-name) == $(1) ] && [ $(__cc-version) $(2) $(3) ] && echo $(4) || echo $(5))
 
-This fixes following issue found on Exynos5433 TM2 board with devfreq
-enabled:
 
-Synchronous External Abort: synchronous external abort (0x96000210) at 0xffffff80093f5600
-Internal error: : 96000210 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 5 Comm: kworker/u16:0 Not tainted 4.15.0-rc1-next-20171129+ #4
-Hardware name: Samsung TM2 board (DT)
-Workqueue: devfreq_wq devfreq_monitor
-task: ffffffc0ca96b600 task.stack: ffffff80093a8000
-pstate: a0000085 (NzCv daIf -PAN -UAO)
-pc : clk_divider_set_rate+0x54/0x118
-lr : clk_divider_set_rate+0x44/0x118
-...
-Process kworker/u16:0 (pid: 5, stack limit = 0xffffff80093a8000)
-Call trace:
- clk_divider_set_rate+0x54/0x118
- clk_change_rate+0xfc/0x4e0
- clk_change_rate+0x1f0/0x4e0
- clk_change_rate+0x1f0/0x4e0
- clk_change_rate+0x1f0/0x4e0
- clk_core_set_rate_nolock+0x138/0x148
- clk_set_rate+0x28/0x50
- exynos_bus_passive_target+0x6c/0x11c
- update_devfreq_passive+0x58/0xb4
- devfreq_passive_notifier_call+0x50/0x5c
- notifier_call_chain+0x4c/0x88
- __srcu_notifier_call_chain+0x54/0x80
- srcu_notifier_call_chain+0x14/0x1c
- update_devfreq+0x100/0x1b4
- devfreq_monitor+0x2c/0x88
- process_one_work+0x148/0x3d8
- worker_thread+0x13c/0x3f8
- kthread+0x100/0x12c
- ret_from_fork+0x10/0x18
+BTW, did this patch work in your test?
 
-Reported-by: Chanwoo Choi <cw00.choi@samsung.com>
-Fixes: 9a34b45397e5 ("clk: Add support for runtime PM")
-Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
----
-For some unknown reason handling of this case was missing in the initial
-patch, which added runtime PM support for clock core. Even tests in
-linux-next did not revealed this issue. This patch finaly fixes it,
-as it is now easy to trigger it with v4.15-rc1.
+After applying this series, I saw "/bin/sh: 1: [: gcc: unexpected operator"
 
-Best regards
-Marek Szyprowski
-Samsung R&D Institute Poland
----
- drivers/clk/clk.c | 5 +++++
- 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/clk/clk.c b/drivers/clk/clk.c
-index 647d056df88c..8a1860a36c77 100644
---- a/drivers/clk/clk.c
-+++ b/drivers/clk/clk.c
-@@ -1564,6 +1564,9 @@ static void clk_change_rate(struct clk_core *core)
- 		best_parent_rate = core->parent->rate;
- 	}
- 
-+	if (clk_pm_runtime_get(core))
-+		return;
-+
- 	if (core->flags & CLK_SET_RATE_UNGATE) {
- 		unsigned long flags;
- 
-@@ -1634,6 +1637,8 @@ static void clk_change_rate(struct clk_core *core)
- 	/* handle the new child who might not be in core->children yet */
- 	if (core->new_child)
- 		clk_change_rate(core->new_child);
-+
-+	clk_pm_runtime_put(core);
- }
- 
- static int clk_core_set_rate_nolock(struct clk_core *core,
+$ make ARCH=arm64  CROSS_COMPILE=aarch64-linux-gnu-   defconfig
+/bin/sh: 1: [: gcc: unexpected operator
+*** Default configuration is based on 'defconfig'
+#
+# configuration written to .config
+#
+
+
+I needed to change
+
+[ $(cc-name) == $(1) ]
+
+into
+
+[ $(cc-name) = $(1) ]
+
+to make it work.
+
+
+
+> +# cc-if-name-fullversion
+> +# Matches compiler name and full version
+> +# Usage:  EXTRA_CFLAGS += $(call cc-if-name-fullversion, gcc, -lt, 040502, -O1)
+> +cc-if-name-fullversion = $(shell [ $(cc-name) == $(1) ] && [ $(__cc-fullversion) $(2) $(3) ] && echo $(4) || echo $(5))
+
+Ditto.
+
+I fixed '==' into '=' to make this work as expected.
+
+
+
+
+As for the macro names, maybe
+
+__cc-ifversion, __cc-if-fullversion for consistency?
+
+
+
+
+> +# gcc-ifversion
+> +gcc-ifversion = $(call cc-if-name-version, gcc, $(1), $(2), $(3), $(4))
+> +
+> +# gcc-if-fullversion
+> +gcc-if-fullversion = (call cc-if-name-fullversion, gcc, $(1), $(2), $(3), $(4))
+> +
+> +# clang-ifversion
+> +clang-ifversion =  $(call cc-if-name-version, clang, $(1), $(2), $(3), $(4))
+> +
+> +# clang-if-fullversion
+> +clang-if-fullversion = (call cc-if-name-fullversion, clang, $(1), $(2), $(3), $(4))
+> +
+
+I think you can do like follows to avoid code duplication.
+
+# backward compatibility
+cc-ifversion = $(gcc-ifversion)
+cc-if-fullversion = $(gcc-if-fullversion)
+
+
+
+
+>  # cc-version
+>  cc-version = $(call shell-cached,$(CONFIG_SHELL) $(srctree)/scripts/gcc-version.sh $(CC))
+>
+> --
+> 2.15.0.417.g466bffb3ac-goog
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kbuild" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
 -- 
-2.15.0
+Best Regards
+Masahiro Yamada
