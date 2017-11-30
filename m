@@ -1,70 +1,87 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 30 Nov 2017 13:17:40 -0800
-Subject: [PATCH v2 2/2] ARM: dts: at91: disable the nxp,se97b SMBUS
- timeout on the TSE-850
-In-Reply-To: <acaea4f3-d273-444a-4df4-e6d1b35c876d@axentia.se>
-References: <20171127163101.27859-1-peda@axentia.se>
- <20171127163101.27859-3-peda@axentia.se>
- <20171129205311.GA20551@roeck-us.net>
- <20171129205629.GO21126@piout.net>
- <20171130171638.GA17788@roeck-us.net>
- <20171130172606.GZ21126@piout.net>
- <acaea4f3-d273-444a-4df4-e6d1b35c876d@axentia.se>
-Message-ID: <20171130211740.GA26784@roeck-us.net>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 30 Nov 2017 22:36:55 +0100
+Subject: [PATCH RFC 2/2] arm64: allwinner: a64: Add Brava Keller initial
+ support
+In-Reply-To: <1512067334-12761-2-git-send-email-jagan@amarulasolutions.com>
+References: <1512067334-12761-1-git-send-email-jagan@amarulasolutions.com>
+ <1512067334-12761-2-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <CAOFm3uEdsj=qxUf3O0S0vDqgXgosvBYG6BGbf6cYn3aNreTPaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 07:46:09PM +0100, Peter Rosin wrote:
-> On 2017-11-30 18:26, Alexandre Belloni wrote:
-> > On 30/11/2017 at 09:16:38 -0800, Guenter Roeck wrote:
-> >> On Wed, Nov 29, 2017 at 09:56:29PM +0100, Alexandre Belloni wrote:
-> >>> On 29/11/2017 at 12:53:11 -0800, Guenter Roeck wrote:
-> >>>> On Mon, Nov 27, 2017 at 05:31:01PM +0100, Peter Rosin wrote:
-> >>>>> The I2C adapter driver is sometimes slow, causing the SCL line to
-> >>>>> be stuck low for more than the stipulated SMBUS timeout of 25-35 ms.
-> >>>>> This causes the client device to give up which in turn causes silent
-> >>>>> corruption of data. So, disable the SMBUS timeout in the client device.
-> >>>>>
-> >>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
-> >>>>
-> >>>> Acked-by: Guenter Roeck <linux@roeck-us.net>
-> >>>>
-> >>>> I assume this will be sent upstream through an arm tree.
-> >>>>
-> >>>
-> >>> Yes, I'm applying it right now.
-> >>>
-> >> Are you going to apply the patch for 4.15, or queue it up for 4.16 ?
-> >> I have been arguing with myself if this is a feature or a bug fix.
-> >> So far I queued the driver change up for 4.16, but I am open to
-> >> applying it to 4.15. Any thoughts ?
-> >>
-> > 
-> > I was wondering that myself. I'm open to have it as a fix in 4.15. Or
-> > maybe Peter can send the series to stable if he needs it in 4.14.
-> > 
-> > Peter, what do you think/want?
-> 
-> TL;DR Either way is fine.
-> 
-> I think it's a bugfix; it fixes real problems where the application
-> misbehave due to faulty content when reading from an eeprom. I'm
-> expecting to make a new release for the hw in question RSN and these
-> are the only local patches. So, it would be nice if they made it to
-> 4.14.x before my release happens. However, it's not like it's difficult
-> to rebase the patches should that backport not happen or take too long.
-> 
-Good enough for me. I'll send it as a fix for v4.15, with Cc: stable.
+Jagan,
 
-Guenter
+On Thu, Nov 30, 2017 at 7:42 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
+[]
+> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-brava-keller.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-brava-keller.dts
+> new file mode 100644
+> index 0000000..f5303a3
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-brava-keller.dts
+> @@ -0,0 +1,244 @@
+> +/*
+> + * Copyright (C) 2017 Jagan Teki <jagan@amarulasolutions.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This library is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This library is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
 
-> The badness started to happen much more frequently due to some timing
-> difference affecting the i2c bus driver, but in theory it's a problem
-> that has been there from the start. I have just not noticed it before...
-> 
-> Cheers,
-> Peter
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-hwmon" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Rather than this long boilerplate, you might want to use the SPDX ids,
+as started by Greg and documented by Thomas.
+Noe that Linus wants the // comment style for the license line, and
+since there is only two line left here I suggest using it for both
+lines.
+You can check also the recent doc patch posted by Thomas (tglx) and
+comments from Linus and Greg.
+
+So I guess you could use this:
+
+> +// Copyright (C) 2017 Jagan Teki <jagan@amarulasolutions.com>
+> +// SPDX-License-Indentifier: (GPL-2.0+ OR MIT)
+
+NB: what you call X11 is has the MIT license id in the SPDX license list.
+
+So you could replace 32 lines by only two lines :) it'[s neat right?
+
+And this would also help as we have tagged already ~15K files, so it
+would help to use this for new files so the amount of cleanup work
+still left does not increase. Thank you for your kind consideration!
+
+-- 
+Cordially
+Philippe Ombredanne
