@@ -1,77 +1,77 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 30 Nov 2017 13:57:09 -0600
-Subject: [PATCH v2 01/18] dt-bindings: panel: lvds: Document power-supply
- property
-In-Reply-To: <20171130153002.3vuqenr72dippg27@flea.lan>
-References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
- <583a46dd967456aac07fb29529f74d91a10bdfeb.1511797218.git-series.maxime.ripard@free-electrons.com>
- <CAL_Jsq+PHzDGE_RreBmVZV+sg3dh5OG2vWZU+eobxF514Fpo_w@mail.gmail.com>
- <20171130153002.3vuqenr72dippg27@flea.lan>
-Message-ID: <CAL_JsqLNxTGuu7FmOOgN3e2+CbV=DTeb=kJf7RqUdtGU=yuueA@mail.gmail.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 30 Nov 2017 22:57:52 +0300
+Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Enable NFS root
+In-Reply-To: <CAMuHMdVKA5YmRPcTTGafKciMF-cKtKTx+PdNJtrDRb20jCxtAA@mail.gmail.com>
+References: <1493717048-10740-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXbvC90k1QYZsjWx=f7QVQyWOzi_v3u8ShDoDsSAmZsjw@mail.gmail.com>
+ <20171130094354.6pktdlcuc3gettji@verge.net.au>
+ <20171130125217.GE22365@bigcity.dyn.berto.se>
+ <CAMuHMdVKA5YmRPcTTGafKciMF-cKtKTx+PdNJtrDRb20jCxtAA@mail.gmail.com>
+Message-ID: <1d0ad706-81ee-5e0f-6f8f-696c8428af73@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 9:30 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Rob,
->
-> On Tue, Nov 28, 2017 at 11:48:47AM -0600, Rob Herring wrote:
->> Please CC DT list.
->>
->> On Mon, Nov 27, 2017 at 9:41 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > The power-supply property is used by a vast majority of panels, including
->> > panel-simple. Let's document it as a common property
->> >
->> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> > ---
->> >  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
->> >  Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
->> >  2 files changed, 7 insertions(+)
->> >
->> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
->> > index ec52c472c845..125ea68052af 100644
->> > --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
->> > +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
->> > @@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
->> >    while active. Active high reset signals can be supported by inverting the
->> >    GPIO specifier polarity flag.
->> >
->> > +Power
->> > +-----
->> > +
->> > +- power-supply: many display panels need an additional power supply in
->> > +  order to be fully powered-up. For such panels, power-supply contains
->> > +  a phandle to the regulator powering the panel.
->> >
->> >  Backlight
->> >  ---------
->> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
->> > index b938269f841e..250850a2150b 100644
->> > --- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
->> > +++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
->> > @@ -32,6 +32,7 @@ Optional properties:
->> >  - label: See panel-common.txt.
->> >  - gpios: See panel-common.txt.
->> >  - backlight: See panel-common.txt.
->> > +- power-supply: See panel-common.txt.
->>
->> simple-panel.txt should do the same.
->
-> I'll make simple-panel do that then
->
->> Really, I'd like to see panel-common.txt and simple-panel.txt merged
->> and simple-panel.txt removed altogether. But there are a lot of
->> references back to simple-panel.txt. A given panel still needs to say
->> what common properties it uses or doesn't use. Omitting a property
->> like power-supply is ambiguous and can either mean "I only have 1
->> supply" or "I haven't thought about supplies yet there are more than
->> 1".
->
-> While I agree with you here, and in general, power-supply should be
-> mandatory, do you expect me to fix all the panel bindings as part of
-> this serie?
+On 11/30/2017 04:45 PM, Geert Uytterhoeven wrote:
 
-No, certainly not.
+>>>>> Enable NFS root on the r8a7795/h3ulcb and r8a7796/m3ulcb
+>>>>> as per:
+>>>>> * commit b2407c566ba29215 ("arm64: dts: r8a7795: enable nfs root on Salvator-X board").
+>>>>> * commit 742a9dfb90f0 ("arm64: dts: r8a7796: salvator-x: Enable NFS root")
+>>>>>
+>>>>> Also set ignore_loglevel rw as boot args as is the case for the boards
+>>>>> for the boards for other Renesas ARM/ARM64 based SoCs.
+>>>>
+>>>> s/for the boards//
+>>>>
+>>>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>>>
+>>>> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>>>>
+>>>> Gr{oetje,eeting}s,
+>>>
+>>> Sergei has pointed out that bootargs has seems to have effect on ARM64
+>>> kernels. So I think this patch should be withdrawn and we should consider
+>>> removing bootargs from those ARM64 boards where it is present.
+>>>
+>>
+>> I don't think this is true.
+>>
+>> I just added a argument to bootargs to salvator-common.dtsi for some
+>> hack testing and it took effect. Tested on-top of latest renesas-drivers
+>> and H3 ES2.0.
+>>
+>>>>> DIFF <<<
+>> diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+>> index 7b30044a55367d35..4cb4b44f8be42cb4 100644
+>> --- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+>> +++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+>> @@ -42,7 +42,7 @@
+>>          };
+>>
+>>          chosen {
+>> -               bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
+>> +               bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp adv748x.txbvc=1";
+>>                  stdout-path = "serial0:115200n8";
+>>          };
+>>>>> END DIFF <<<
+>>
+>> # cat /sys/firmware/devicetree/base/chosen/bootargs
+>> ignore_loglevel rw root=/dev/nfs ip=dhcp adv748x.txbvc=1
+>>
+>> And the module parameter had the expected effect on the adv7482x driver.
+>> Is there another issue here which I'm missing?
+> 
+> 1. It may depend on the U-Boot version
 
-Rob
+    It probably does! My U-Boot clearly copies its "bootargs" env. variable 
+into DT's "/chosen/bootargs" prop.
+
+> 2. Anyone playing with CONFIG_CMDLINE and CONFIG_CMDLINE_FORCE?
+
+    Not me (before now). Tried it now and it works as expected.
+
+> Gr{oetje,eeting}s,
+> 
+>                          Geert
+
+MBR, Sergei
