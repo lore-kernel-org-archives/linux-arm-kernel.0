@@ -1,136 +1,85 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 30 Nov 2017 08:19:27 -0800
-Subject: [GIT PULL] fixes for omaps for v4.15-rc cycle
-Message-ID: <pull-1512056553-465925@atomide.com>
+From: alex.bennee@linaro.org (Alex =?utf-8?Q?Benn=C3=A9e?=)
+Date: Thu, 30 Nov 2017 16:27:21 +0000
+Subject: [PATCH] arm64: fpsimd: Fix failure to restore FPSIMD state after
+ signals
+In-Reply-To: <1512042997-25945-1-git-send-email-Dave.Martin@arm.com>
+References: <1512042997-25945-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <87374venpy.fsf@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+Dave Martin <Dave.Martin@arm.com> writes:
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> The fpsimd_update_current_state() function is responsible for
+> loading the FPSIMD state from the user signal frame into the
+> current task during sigreturn.  When implementing support for SVE,
+> conditional code was added to this function in order to handle the
+> case where SVE state need to be loaded for the task and merged with
+> the FPSIMD data from the signal frame; however, the FPSIMD-only
+> case was unintentionally dropped.
+>
+> As a result of this, sigreturn does not currently restore the
+> FPSIMD state of the task, except in the case where the system
+> supports SVE and the signal frame contains SVE state in addition to
+> FPSIMD state.
+>
+> This patch fixes this bug by making the copy-in of the FPSIMD data
+> from the signal frame to thread_struct unconditional.
+>
+> This remains a performance regression from v4.14, since the FPSIMD
+> state is now copied into thread_struct and then loaded back,
+> instead of _only_ being loaded into the CPU FPSIMD registers.
+> However, it is essential to call task_fpsimd_load() here anyway in
+> order to ensure that the SVE enable bit in CPACR_EL1 is set
+> correctly before returning to userspace.  This could use some
+> refactoring, but since sigreturn is not a fast path I have kept
+> this patch as a pure fix and left the refactoring for later.
+>
+> Fixes: 8cd969d28fd2 ("arm64/sve: Signal handling support")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Reported-by: Alex Benn?e <alex.bennee@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
 
-are available in the Git repository at:
+Tested-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Alex Benn?e <alex.bennee@linaro.org>
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.15/fixes-v2-signed
 
-for you to fetch changes up to 7cd4a5eb64b638a71564f62175f6c7ad3f27044e:
+> ---
+>
+> Initial testing of this patch looks OK, but I will continue to bash it.
+>
+> While debugging this issue, I also hit another possible register
+> corruption issue that I don't have an explanation for, but I wanted to
+> get this patch out first since this issue at least is fairly
+> straightforward and fixing it is required anyway.
+>
+> I will continue to investigate.
+>
+>  arch/arm64/kernel/fpsimd.c | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+> index 143b3e7..5084e69 100644
+> --- a/arch/arm64/kernel/fpsimd.c
+> +++ b/arch/arm64/kernel/fpsimd.c
+> @@ -1026,10 +1026,10 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+>
+>  	local_bh_disable();
+>
+> -	if (system_supports_sve() && test_thread_flag(TIF_SVE)) {
+> -		current->thread.fpsimd_state = *state;
+> +	current->thread.fpsimd_state = *state;
+> +	if (system_supports_sve() && test_thread_flag(TIF_SVE))
+>  		fpsimd_to_sve(current);
+> -	}
+> +
+>  	task_fpsimd_load();
+>
+>  	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
 
-  Merge branch 'omap-for-v4.15/fixes-dt' into omap-for-v4.15/fixes-v2 (2017-11-28 08:23:05 -0800)
 
-----------------------------------------------------------------
-Fixes for omaps for v4.15-rc cycle with two fixes for hangs with the
-rest being compiler warning fixes and fixes for power states and devices
-on various boards:
-
-- Fix smatch issue introduced by recent omap device changes for legacy
-  resources
-
-- Fix SRAM virt to phys related boot hang affecting n900 and other omap3 hs
-  devices found by pending CMA changes. While it seems that we have not hit
-  this in other use cases, let's fix it to avoid a nasty and hard to find
-  suprise as right now there is just luck keeping the SRAM virtual address
-  to physical address translation working with the 0xffff high_mask.
-
-- Fix am335x reading of domain state registers that only exist for the
-  PM_CEFUSE domain and produce wrong results for other domains
-
-- Fix missing setting for error code for omap device if allocation fails
-
-- Fix missing modules_offs for omap3 MMC3 affecting n9/n950
-
-- Fix cm_split_idlest() reading reserved registers showing wrong
-  idlestatus
-
-- Fixes to correct #phy-cells property for compiler warnings that
-  recently started happening
-
-- Add a missing OHCI remote-wakeup-connected property that I was supposed
-  to merge after the ohci-omap3 to ohci-platform changes but somehow managed
-  to drop. I only noticed this was missing while debugging the OHCI/EHCI GPS
-  and modem hang
-
-- Fix a system hang with GPS or modem connected to the OHCI/EHCI bus that
-  typically happened within 20 - 40 minutes on an idle system. This turned
-  out to be an issue caused by using the parent interrupt controller directly
-  with the WUGEN + GIC stacked interrupt controller domains
-
-- Fixes for logicpd-somlv GPMC for Ethernet and NAND that clearly
-  have been broken since we changed GPMC to use the interrupt controller
-  binding for some pins. And fix the wrong pin muxing for WLAN while at it
-
-- Fixes for am437x interrupt and dma properties to fix compiler warnings
-  that recently started happening
-
-----------------------------------------------------------------
-Adam Ford (2):
-      ARM: dts: logicpd-som-lv: Fix gpmc addresses for NAND and enet
-      ARM: dts: logicpd-somlv: Fix wl127x pinmux
-
-Dan Carpenter (1):
-      ARM: OMAP2+: Missing error code in omap_device_build()
-
-Keerthy (1):
-      ARM: AM33xx: PRM: Remove am33xx_pwrdm_read_prev_pwrst function
-
-Peter Ujfalusi (2):
-      ARM: dts: am4372: Correct the interrupts_properties of McASP
-      ARM: dts: am437x-cm-t43: Correct the dmas property of spi0
-
-Rob Herring (2):
-      ARM: dts: omap: Add missing #phy-cells to usb-nop-xceiv
-      ARM: dts: am33xx: Add missing #phy-cells to ti,am335x-usb-phy
-
-Tero Kristo (2):
-      ARM: OMAP3: hwmod_data: add missing module_offs for MMC3
-      ARM: OMAP2/3: CM: fix cm_split_idlest functionality
-
-Tony Lindgren (8):
-      ARM: OMAP2+: Fix smatch found issue for omap_device
-      ARM: dts: Add remote-wakeup-connected for omap OHCI
-      ARM: OMAP2+: Fix SRAM virt to phys translation for save_secure_ram_context
-      ARM: dts: Fix omap4 hang with GPS connected to USB by using wakeupgen
-      Merge branch 'soc-fixes' into omap-for-v4.15/fixes
-      Merge branch 'dts-fixes' into omap-for-v4.15/fixes-dt
-      Merge branch 'omap-for-v4.14/fixes' into omap-for-v4.15/fixes-v2
-      Merge branch 'omap-for-v4.15/fixes-dt' into omap-for-v4.15/fixes-v2
-
- .../devicetree/bindings/usb/am33xx-usb.txt         |  2 ++
- arch/arm/boot/dts/am33xx.dtsi                      |  2 ++
- arch/arm/boot/dts/am4372.dtsi                      |  6 +++--
- arch/arm/boot/dts/am437x-cm-t43.dts                |  4 ++--
- arch/arm/boot/dts/dm814x.dtsi                      |  1 +
- arch/arm/boot/dts/logicpd-som-lv-37xx-devkit.dts   |  3 ++-
- arch/arm/boot/dts/logicpd-som-lv.dtsi              | 17 +++++++++-----
- arch/arm/boot/dts/omap3-beagle-xm.dts              |  1 +
- arch/arm/boot/dts/omap3-beagle.dts                 |  1 +
- arch/arm/boot/dts/omap3-cm-t3x.dtsi                |  2 ++
- arch/arm/boot/dts/omap3-evm-common.dtsi            |  1 +
- arch/arm/boot/dts/omap3-gta04.dtsi                 |  1 +
- arch/arm/boot/dts/omap3-igep0020-common.dtsi       |  1 +
- arch/arm/boot/dts/omap3-igep0030-common.dtsi       |  1 +
- arch/arm/boot/dts/omap3-lilly-a83x.dtsi            |  1 +
- arch/arm/boot/dts/omap3-overo-base.dtsi            |  1 +
- arch/arm/boot/dts/omap3-pandora-common.dtsi        |  1 +
- arch/arm/boot/dts/omap3-tao3530.dtsi               |  1 +
- arch/arm/boot/dts/omap3.dtsi                       |  1 +
- arch/arm/boot/dts/omap4-droid4-xt894.dts           |  1 +
- arch/arm/boot/dts/omap4-duovero.dtsi               |  1 +
- arch/arm/boot/dts/omap4-panda-common.dtsi          |  1 +
- arch/arm/boot/dts/omap4-var-som-om44.dtsi          |  1 +
- arch/arm/boot/dts/omap4.dtsi                       |  3 +--
- arch/arm/boot/dts/omap5-board-common.dtsi          |  2 ++
- arch/arm/boot/dts/omap5-cm-t54.dts                 |  2 ++
- arch/arm/boot/dts/omap5.dtsi                       |  1 +
- arch/arm/mach-omap2/cm_common.c                    |  6 ++++-
- arch/arm/mach-omap2/omap-secure.c                  | 19 ++++++++++++++++
- arch/arm/mach-omap2/omap-secure.h                  |  4 ++++
- arch/arm/mach-omap2/omap_device.c                  | 10 ++++-----
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  1 +
- arch/arm/mach-omap2/pm.h                           |  4 ----
- arch/arm/mach-omap2/pm34xx.c                       | 13 ++++-------
- arch/arm/mach-omap2/prcm-common.h                  |  1 +
- arch/arm/mach-omap2/prm33xx.c                      | 12 ----------
- arch/arm/mach-omap2/sleep34xx.S                    | 26 ++++------------------
- 37 files changed, 90 insertions(+), 66 deletions(-)
+--
+Alex Benn?e
