@@ -1,75 +1,53 @@
 From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 30 Nov 2017 08:46:30 +0800
-Subject: [PATCH v4 6/6] ARM: configs: Add missing config for DART-MX6 SoM
-In-Reply-To: <1511950857-19292-7-git-send-email-narmstrong@baylibre.com>
-References: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
- <1511950857-19292-7-git-send-email-narmstrong@baylibre.com>
-Message-ID: <20171130004629.GD22908@dragon>
+Date: Thu, 30 Nov 2017 08:51:09 +0800
+Subject: [PATCH][RESEND] Documentation: binding: Update endianness usage
+In-Reply-To: <1511955071-8770-1-git-send-email-prabhakar.kushwaha@nxp.com>
+References: <1511955071-8770-1-git-send-email-prabhakar.kushwaha@nxp.com>
+Message-ID: <20171130005108.GE22908@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:20:57AM +0100, Neil Armstrong wrote:
-> This patch adds the missing configs for the DART-MX6 SoM support :
-> - SERDEV bluetooth driver + SERIAL_DEV_BUS configs
-> - WL18XX driver
-> - DEFAULT_ON Led Trigger
+On Wed, Nov 29, 2017 at 05:01:11PM +0530, Prabhakar Kushwaha wrote:
+> IFC controller version < 2.0 support IFC register access as
+> big endian. These controller version also require IFC NOR signals to
+> be connected in reverse order with NOR flash.
 > 
-> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> IFC >= 2.0 is other way around.
+> 
+> So updating IFC binding to take care of both using endianness field.
+> 
+> Signed-off-by: Prabhakar Kushwaha <prabhakar.kushwaha@nxp.com>
 
-'ARM: imx_v6_v7_defconfig: ...' or 'ARM: imx: defconfig: ...' please.
+I would suggest something like 'dt-bindings: ifc: ...' to be the prefix.
 
 Shawn
 
 > ---
->  arch/arm/configs/imx_v6_v7_defconfig | 6 ++++++
->  1 file changed, 6 insertions(+)
+>  Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-> index 0d44949..abd06c3 100644
-> --- a/arch/arm/configs/imx_v6_v7_defconfig
-> +++ b/arch/arm/configs/imx_v6_v7_defconfig
-> @@ -80,6 +80,7 @@ CONFIG_CAN=y
->  CONFIG_CAN_FLEXCAN=y
->  CONFIG_BT=y
->  CONFIG_BT_HCIUART=y
-> +CONFIG_BT_HCIUART_SERDEV=y
->  CONFIG_BT_HCIUART_H4=y
->  CONFIG_BT_HCIUART_LL=y
->  CONFIG_CFG80211=y
-> @@ -155,6 +156,7 @@ CONFIG_USB_USBNET=y
->  CONFIG_USB_NET_CDC_EEM=m
->  CONFIG_BRCMFMAC=m
->  CONFIG_WL12XX=m
-> +CONFIG_WL18XX=m
->  CONFIG_WLCORE_SDIO=m
->  # CONFIG_WILINK_PLATFORM_DATA is not set
->  CONFIG_INPUT_EVDEV=y
-> @@ -185,6 +187,8 @@ CONFIG_SERIAL_IMX=y
->  CONFIG_SERIAL_IMX_CONSOLE=y
->  CONFIG_SERIAL_FSL_LPUART=y
->  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
-> +CONFIG_SERIAL_DEV_BUS=y
-> +CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
->  # CONFIG_I2C_COMPAT is not set
->  CONFIG_I2C_CHARDEV=y
->  CONFIG_I2C_MUX=y
-> @@ -248,6 +252,7 @@ CONFIG_VIDEO_OV5640=m
->  CONFIG_SOC_CAMERA_OV2640=y
->  CONFIG_IMX_IPUV3_CORE=y
->  CONFIG_DRM=y
-> +CONFIG_DRM_PANEL_LVDS=y
->  CONFIG_DRM_PANEL_SIMPLE=y
->  CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
->  CONFIG_DRM_DW_HDMI_CEC=y
-> @@ -340,6 +345,7 @@ CONFIG_LEDS_TRIGGER_ONESHOT=y
->  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->  CONFIG_LEDS_TRIGGER_BACKLIGHT=y
->  CONFIG_LEDS_TRIGGER_GPIO=y
-> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
->  CONFIG_RTC_CLASS=y
->  CONFIG_RTC_INTF_DEV_UIE_EMUL=y
->  CONFIG_RTC_DRV_DS1307=y
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt b/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
+> index 89427b0..824a2ca 100644
+> --- a/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
+> +++ b/Documentation/devicetree/bindings/memory-controllers/fsl/ifc.txt
+> @@ -18,8 +18,10 @@ Properties:
+>                interrupt (NAND_EVTER_STAT).  If there is only one,
+>                that interrupt reports both types of event.
+>  
+> -- little-endian : If this property is absent, the big-endian mode will
+> -                  be in use as default for registers.
+> +- little-endian or big-endin : It represents how IFC registers  to be accessed.
+> +			It also represents connection between controller and
+> +			NOR flash. If this property is absent, the big-endian
+> +			mode will be in use as default.
+>  
+>  - ranges : Each range corresponds to a single chipselect, and covers
+>             the entire access window as configured.
 > -- 
-> 2.7.4
+> 1.9.1
 > 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
