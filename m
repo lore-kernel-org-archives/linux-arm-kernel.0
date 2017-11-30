@@ -1,123 +1,77 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Nov 2017 20:43:33 +0100
-Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
- ntp
-In-Reply-To: <20171130193959.GC21126@piout.net>
-References: <20171013175433.GA22062@obsidianresearch.com>
- <20171123095456.lkc4nkuzsd2q26mm@piout.net>
- <CALAqxLUBWd-mv_3iiFrXLf0ka685t0an89jjduHpT-2jjv5O2Q@mail.gmail.com>
- <20171127175254.GL31757@n2100.armlinux.org.uk>
- <20171127184411.GA19577@piout.net>
- <20171127185352.GN31757@n2100.armlinux.org.uk>
- <20171127193135.GA21126@piout.net>
- <20171128102025.GT31757@n2100.armlinux.org.uk>
- <20171130193959.GC21126@piout.net>
-Message-ID: <20171130194333.GD21126@piout.net>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Thu, 30 Nov 2017 13:57:09 -0600
+Subject: [PATCH v2 01/18] dt-bindings: panel: lvds: Document power-supply
+ property
+In-Reply-To: <20171130153002.3vuqenr72dippg27@flea.lan>
+References: <cover.d89f3ea4e1698f9343aef4852977c80edc75f21a.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <583a46dd967456aac07fb29529f74d91a10bdfeb.1511797218.git-series.maxime.ripard@free-electrons.com>
+ <CAL_Jsq+PHzDGE_RreBmVZV+sg3dh5OG2vWZU+eobxF514Fpo_w@mail.gmail.com>
+ <20171130153002.3vuqenr72dippg27@flea.lan>
+Message-ID: <CAL_JsqLNxTGuu7FmOOgN3e2+CbV=DTeb=kJf7RqUdtGU=yuueA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please disregard this email, this was a draft that should not have been
-sent, written while I was still too annoyed about the whole situation.
+On Thu, Nov 30, 2017 at 9:30 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Rob,
+>
+> On Tue, Nov 28, 2017 at 11:48:47AM -0600, Rob Herring wrote:
+>> Please CC DT list.
+>>
+>> On Mon, Nov 27, 2017 at 9:41 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > The power-supply property is used by a vast majority of panels, including
+>> > panel-simple. Let's document it as a common property
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
+>> >  Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
+>> >  2 files changed, 7 insertions(+)
+>> >
+>> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+>> > index ec52c472c845..125ea68052af 100644
+>> > --- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
+>> > +++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+>> > @@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
+>> >    while active. Active high reset signals can be supported by inverting the
+>> >    GPIO specifier polarity flag.
+>> >
+>> > +Power
+>> > +-----
+>> > +
+>> > +- power-supply: many display panels need an additional power supply in
+>> > +  order to be fully powered-up. For such panels, power-supply contains
+>> > +  a phandle to the regulator powering the panel.
+>> >
+>> >  Backlight
+>> >  ---------
+>> > diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+>> > index b938269f841e..250850a2150b 100644
+>> > --- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+>> > +++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+>> > @@ -32,6 +32,7 @@ Optional properties:
+>> >  - label: See panel-common.txt.
+>> >  - gpios: See panel-common.txt.
+>> >  - backlight: See panel-common.txt.
+>> > +- power-supply: See panel-common.txt.
+>>
+>> simple-panel.txt should do the same.
+>
+> I'll make simple-panel do that then
+>
+>> Really, I'd like to see panel-common.txt and simple-panel.txt merged
+>> and simple-panel.txt removed altogether. But there are a lot of
+>> references back to simple-panel.txt. A given panel still needs to say
+>> what common properties it uses or doesn't use. Omitting a property
+>> like power-supply is ambiguous and can either mean "I only have 1
+>> supply" or "I haven't thought about supplies yet there are more than
+>> 1".
+>
+> While I agree with you here, and in general, power-supply should be
+> mandatory, do you expect me to fix all the panel bindings as part of
+> this serie?
 
-On 30/11/2017 at 20:39:59 +0100, Alexandre Belloni wrote:
-> On 28/11/2017 at 10:20:25 +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 27, 2017 at 08:31:35PM +0100, Alexandre Belloni wrote:
-> > > On 27/11/2017 at 18:53:52 +0000, Russell King - ARM Linux wrote:
-> > > > You are, yet again, wrong.
-> > > > 
-> > > > I am in a position to make the comment because it was me who identified
-> > > > the problem, put in the hours to work on, develop and extensively test
-> > > > Jason's patch.  So, it's partly my time that you seem to be wasting,
-> > > > and that gives me every right to complain at this point.
-> > > > 
-> > > > You, on the other hand, were copied with every single email, and did
-> > > > nothing to discuss the issue except for the "easy" bits when I posted
-> > > > a relatively smaller patch - but you ignored the bigger issue.
-> > > 
-> > > And this is exactly what you do with other people patches/time when you
-> > > don't like their changes.
-> > > You simply ignore the patch series until they go away.
-> > 
-> > That is not intentional.
-> > 
-> 
-> But that is exactly what you are currently reproaching me right now. I
-> didn't have the time to have a good look a it so I didn't reply it
-> wasn't intentional either.
-> 
-> You sometimes don't reply to patch series, I sometimes take time to
-> reply, I don't see how this is different then.
-> 
-> > > I would really expect people merging code in any subsystem to wait for
-> > > the ack of the maintainer of that subsystem.
-> > > 
-> > > I didn't complain about any missing email addresses, I said the RTC ML
-> > > was not copied but that is didn't matter.
-> > 
-> > A mailing list is an email address.
-> > 
-> 
-> Yes and I said that it didn't matter it was not copied (the patch didn't
-> make it in patchwork though).
-> 
-> > > What I don't get is that it has been broken for almost 5 years and now
-> > > you seem to think it has to be fixed urgently.
-> > 
-> > Now you're making crap up.  I've not made any comment about this being
-> > something that needs fixing urgently.  In fact, as I've said several
-> > times already, I really don't care what you do with the mainline kernel,
-> > because I have a fix here locally that I intend to use and maintain
-> > into the future.  For me, the issue is fixed and resolved, and I intend
-> > to spend no further time developing any fixes for it.
-> > 
-> 
-> Oh great, that's really the way to go to make progress.
-> 
-> > My comments are about the _two months_ its taken to get to the stage of
-> > finding out that you don't like the approach.
-> > 
-> 
-> While I can understand some of the frustration, I don't get why you are
-> giving up so easily.
-> 
-> > The result of this is, most likely, one of:
-> > 1. you'll revert the patch (which, incidentally, has no real effect until
-> >    my other patches get merged) and everyone will either be stuck with a
-> >    kernel that sets their RTC time wrong when they have NTP installed
-> > 
-> 
-> Or when using hwclock from util-linux
-> 
-> > 2. you'll remove the systohc code, people won't realise that their kernel
-> >    no longer sync's the RTC time, and systems that are on the Internet
-> >    (eg, providing stratum 1 NTP servers) will be unreliable if they are
-> >    rebooted even more so than they are today.
-> > 
-> > > On my side, I want to take the opportunity to think about systohc before
-> > > adding an ABI that we will maybe regret later.
-> > 
-> > Fine, but bear in mind that I don't care anymore, because I have
-> > perfectly good fixes locally, and I'm not wasting any further time
-> > in this issue.
-> > 
-> > While you think about it, I would encourage anyone who wishing to run
-> > or running a public NTP server using rtclib to ditch Linux and use
-> > FreeBSD instead to avoid their NTP server supplying false time, even
-> > when synchronised to a reference clock.  A reboot of such a server
-> > will supply false time for a period of a few hours depending on how
-> > far the time is out (which can be up to a couple of seconds) after
-> > such an event.  In such a scenario, NTP will not step-correct the
-> > time but will gradually slew it instead.
-> > 
-> > This goes for systems that some ISPs deploy as stratum 1 NTP servers,
-> > which today tend to be Raspberry Pis.
-> 
-> -- 
-> Alexandre Belloni, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+No, certainly not.
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Rob
