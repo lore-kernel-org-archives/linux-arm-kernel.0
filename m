@@ -1,61 +1,71 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 18:28:33 +0000
-Subject: [PATCH] arm64: context: Fix comments and remove pointless smp_wmb()
-Message-ID: <1512066513-16024-1-git-send-email-will.deacon@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 30 Nov 2017 18:29:56 +0000
+Subject: [PATCH v2 11/18] arm64: mm: Map entry trampoline into trampoline
+ and kernel page tables
+In-Reply-To: <1512059986-21325-12-git-send-email-will.deacon@arm.com>
+References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
+ <1512059986-21325-12-git-send-email-will.deacon@arm.com>
+Message-ID: <20171130182956.uwc63g6i6yobxcqy@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The comments in the ASID allocator incorrectly hint at an MP-style idiom
-using the asid_generation and the active_asids array. In fact, the
-synchronisation is achieved using a combination of an xchg operation
-and a spinlock, so update the comments and remove the pointless smp_wmb().
+Hi Will,
 
-Cc: James Morse <james.morse@arm.com>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/mm/context.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
+On Thu, Nov 30, 2017 at 04:39:39PM +0000, Will Deacon wrote:
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 4052ec39e8db..8119b49be98d 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -58,6 +58,10 @@ enum fixed_addresses {
+>  	FIX_APEI_GHES_NMI,
+>  #endif /* CONFIG_ACPI_APEI_GHES */
+>  
+> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> +	FIX_ENTRY_TRAMP_TEXT,
+> +#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
+> +#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+>  	__end_of_permanent_fixed_addresses,
 
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index ab9f5f0fb2c7..98fcecae0827 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -96,12 +96,6 @@ static void flush_context(unsigned int cpu)
- 
- 	set_reserved_asid_bits();
- 
--	/*
--	 * Ensure the generation bump is observed before we xchg the
--	 * active_asids.
--	 */
--	smp_wmb();
--
- 	for_each_possible_cpu(i) {
- 		asid = atomic64_xchg_relaxed(&per_cpu(active_asids, i), 0);
- 		/*
-@@ -202,11 +196,18 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
- 	asid = atomic64_read(&mm->context.id);
- 
- 	/*
--	 * The memory ordering here is subtle. We rely on the control
--	 * dependency between the generation read and the update of
--	 * active_asids to ensure that we are synchronised with a
--	 * parallel rollover (i.e. this pairs with the smp_wmb() in
--	 * flush_context).
-+	 * The memory ordering here is subtle.
-+	 * If our ASID matches the current generation, then we update
-+	 * our active_asids entry with a relaxed xchg. Racing with a
-+	 * concurrent rollover means that either:
-+	 *
-+	 * - We get a zero back from the xchg and end up waiting on the
-+	 *   lock. Taking the lock synchronises with the rollover and so
-+	 *   we are forced to see the updated generation.
-+	 *
-+	 * - We get a valid ASID back from the xchg, which means the
-+	 *   relaxed xchg in flush_context will treat us as reserved
-+	 *   because atomic RmWs are totally ordered for a given location.
- 	 */
- 	if (!((asid ^ atomic64_read(&asid_generation)) >> asid_bits)
- 	    && atomic64_xchg_relaxed(&per_cpu(active_asids, cpu), asid))
--- 
-2.1.4
+Defining TRAMP_VALIAS here is a little surprising, especially given we
+reuse the name in asm-offsets:
+
+> +  DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
+
+Can't we have asm-offsets do:
+
+  DEFINE(TRAMP_VALIAS, __fix_to_virt(FIX_ENTRY_TRAMP_TEXT));
+
+... and rely on the asm-offsets TRAMP_VALIAS definition everywhere?
+
+[...]
+
+> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> +static int __init map_entry_trampoline(void)
+> +{
+> +	extern char __entry_tramp_text_start[];
+> +
+> +	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
+> +	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
+> +
+> +	/* The trampoline is always mapped and can therefore be global */
+> +	pgprot_val(prot) &= ~PTE_NG;
+> +
+> +	/* Map only the text into the trampoline page table */
+> +	memset((char *)tramp_pg_dir, 0, PGD_SIZE);
+
+The (char *) cast can go; memset() takes a void pointer and we don't do
+similar casts for other memset instances.
+
+> +	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+> +			     prot, pgd_pgtable_alloc, 0);
+> +
+> +	/* ...as well as the kernel page table */
+
+This might be clearer as:
+
+	/* map the text in the kernel page table, too */
+
+Otherwise, this looks good to me.
+
+Thanks,
+Mark.
