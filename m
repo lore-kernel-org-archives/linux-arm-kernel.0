@@ -1,21 +1,17 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 30 Nov 2017 16:48:29 +0100
-Subject: [PATCH] pinctrl: sunxi: Fix A80 interrupt pin bank
-In-Reply-To: <20171125121948.24012-1-andre.przywara@arm.com>
-References: <20171125121948.24012-1-andre.przywara@arm.com>
-Message-ID: <CACRpkdaYpObvUdzXgVi84P_uQt8tWWEvYgovwN9jn07OFrVgMw@mail.gmail.com>
+Date: Thu, 30 Nov 2017 16:49:42 +0100
+Subject: [PATCH] pinctrl: sunxi: Fix A64 UART mux value
+In-Reply-To: <20171125121230.23555-1-andre.przywara@arm.com>
+References: <20171125121230.23555-1-andre.przywara@arm.com>
+Message-ID: <CACRpkdZHdPuWa5sR72cpb6cjRmrYRt6VzA3YQ2jbc-+1DbdAdQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 25, 2017 at 1:19 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+On Sat, Nov 25, 2017 at 1:12 PM, Andre Przywara <andre.przywara@arm.com> wrote:
 
-> On the A80 the pins on port B can trigger interrupts, and those are
-> assigned to the second interrupt bank.
-> Having two pins assigned to the same interrupt bank/pin combination does
-> not look healthy (instead more like a copy&paste bug from pins PA14-PA16),
-> so fix the interrupt bank for pins PB14-PB16, which is actually 1.
->
-> I don't have any A80 board, so could not test this.
+> To use pin PF4 as the RX signal of UART0, we have to write 0b011 into
+> the respective pin controller register.
+> Fix the wrong value we had in our table so far.
 >
 > Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 
