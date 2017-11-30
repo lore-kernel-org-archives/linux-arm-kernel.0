@@ -1,75 +1,97 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Thu, 30 Nov 2017 18:53:00 +0000
-Subject: [PATCH 1/1] phy: Add 2.5G SGMII interface mode
-In-Reply-To: <20171130182621.GC28828@lunn.ch>
-References: <1512016235-15909-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20171130155050.GD7483@lunn.ch>
- <AM3PR04MB4494050122E413E2445BD348C380@AM3PR04MB449.eurprd04.prod.outlook.com>
- <20171130174127.GA28828@lunn.ch>
- <20171130181520.GF10595@n2100.armlinux.org.uk>
- <20171130182621.GC28828@lunn.ch>
-Message-ID: <20171130185300.GG10595@n2100.armlinux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 30 Nov 2017 19:07:36 +0000
+Subject: [PATCH 08/37] KVM: arm64: Defer restoring host VFP state to
+ vcpu_put
+In-Reply-To: <20171126185852.bjte7raycorctft2@yury-thinkpad>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-9-christoffer.dall@linaro.org>
+ <20171125075221.oj5euwo7hnktxxsj@yury-thinkpad> <20171126161716.GK28855@cbox>
+ <20171126185852.bjte7raycorctft2@yury-thinkpad>
+Message-ID: <9c050311-16dc-7459-6c87-76400c6997e4@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 07:26:21PM +0100, Andrew Lunn wrote:
-> On Thu, Nov 30, 2017 at 06:15:20PM +0000, Russell King - ARM Linux wrote:
-> > On Thu, Nov 30, 2017 at 06:41:27PM +0100, Andrew Lunn wrote:
-> > > SGMII supports passing auto-negotiation results from the PHY to the
-> > > MAC. 1000BASE-X does not.
-> > > 
-> > > SGMII supports the PHY running at 10, 100, and 1000 Mbps. But to
-> > > support this, the MAC needs to replicate the bits 100, or 10 times
-> > > when the PHY is running in 10 or 100Mbps mode.
-> > > 
-> > > So with your 2.5G SGMII, you need to replicate the bits 250, 25, or
-> > > 2.5 times if they PHY is running at lower speeds. This last one is
-> > > interesting.
-> > 
-> > That's not what I've read so far - but I don't know about the PHY
-> > in this exact case because the docs are only available under NDA
-> > (which makes it incredibly difficult to have this discussion.)
-> > 
-> > However, from what I can ascertain from a Xilinx document, 2.5G is
-> > 1G SGMII clocked 2.5x faster.  When in 2.5G mode, the other modes
-> > are unavailable.
+On 26/11/17 18:58, Yury Norov wrote:
+> On Sun, Nov 26, 2017 at 05:17:16PM +0100, Christoffer Dall wrote:
+>> Hi Yury,
+>>
+>> On Sat, Nov 25, 2017 at 10:52:21AM +0300, Yury Norov wrote:
+>>>
+>>> On Thu, Oct 12, 2017 at 12:41:12PM +0200, Christoffer Dall wrote:
+>>>> Avoid saving the guest VFP registers and restoring the host VFP
+>>>> registers on every exit from the VM.  Only when we're about to run
+>>>> userspace or other threads in the kernel do we really have to switch the
+>>>> state back to the host state.
+>>>>
+>>>> We still initially configure the VFP registers to trap when entering the
+>>>> VM, but the difference is that we now leave the guest state in the
+>>>> hardware registers while running the VM.
+>>>>
+>>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>>> ---
+>>>>  arch/arm64/include/asm/kvm_emulate.h |  5 ++++
+>>>>  arch/arm64/include/asm/kvm_host.h    |  3 +++
+>>>>  arch/arm64/kernel/asm-offsets.c      |  1 +
+>>>>  arch/arm64/kvm/hyp/entry.S           |  3 +++
+>>>>  arch/arm64/kvm/hyp/switch.c          | 47 +++++++++++-------------------------
+>>>>  arch/arm64/kvm/hyp/sysreg-sr.c       | 21 +++++++++++++---
+>>>>  6 files changed, 44 insertions(+), 36 deletions(-)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+>>>> index 1fbfe96..630dd60 100644
+>>>> --- a/arch/arm64/include/asm/kvm_emulate.h
+>>>> +++ b/arch/arm64/include/asm/kvm_emulate.h
+>>>> @@ -56,6 +56,11 @@ static inline unsigned long *vcpu_hcr(struct kvm_vcpu *vcpu)
+>>>>  	return (unsigned long *)&vcpu->arch.hcr_el2;
+>>>>  }
+>>>>  
+>>>> +static inline bool vcpu_el1_is_32bit(struct kvm_vcpu *vcpu)
+>>>> +{
+>>>> +	return (!(vcpu->arch.hcr_el2 & HCR_RW));
+>>>> +}
+>>>> +
+>>>>  static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
+>>>>  {
+>>>>  	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
+>>>> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+>>>> index 7d3bfa7..5e09eb9 100644
+>>>> --- a/arch/arm64/include/asm/kvm_host.h
+>>>> +++ b/arch/arm64/include/asm/kvm_host.h
+>>>> @@ -210,6 +210,9 @@ struct kvm_vcpu_arch {
+>>>>  	/* Guest debug state */
+>>>>  	u64 debug_flags;
+>>>>  
+>>>> +	/* 1 if the guest VFP state is loaded into the hardware */
+>>>> +	u64 guest_vfp_loaded;
+>>>
+>>> May it be just u8/bool?
+>>>
+>> This particular field is accessed from assembly code, and I'm not sure
+>> what guarantees the compiler makes in terms of how a u8/bool is
+>> allocated with respect to padding and alignment, and I think that's why
+>> we've been using u64 fields in the past.
+>>
+>> I don't actually remember the details, but I'd rather err on the side of
+>> caution than trying to save a few bytes.  However, if someone can
+>> convince me there's a completely safe way to do this, then I'm happy to
+>> change it.
 > 
-> Hi Russell
+> 'strb     w0, [x3, #VCPU_GUEST_VFP_LOADED]' would work. See
+> C6.6.181 STRB (register) in ARM64 ARM.
 > 
-> Thanks for looking into the details.
-> 
-> So you need the PHY driver to see what it has negotiated, and when it
-> calls the adjust_link callback, the MAC needs look at the
-> phydev->interface and set the MAC to 2.5G SGMII or SGMII.
+> The only thing I would recommend is to reorder fields in kvm_vcpu_arch
+> to avoid unneeded holes in the structure. It already spend 10 bytes for
+> nothing in 3 holes.
 
-Yes, it /looks/ that way from what I've read so far.  I'd like to do
-a more comprehensive look around at what various manufacturers are
-doing before saying that definitively.  Even better would be to find
-a specification for 2.5G SGMII!
+Terrifying. How many vcpu are you going to run before this becomes a
+real bottleneck? KVM on a 6502? ;-)
 
-> Same as the Marvell 10G PHY driver flips between
-> PHY_INTERFACE_MODE_10GKR and PHY_INTERFACE_MODE_SGMII depending on
-> what it has negotiated.
+Now, when it comes to reordering fields, please keep in mind that the
+order of the fields in the structure does matter. We want the hottest
+fields grouped together so that they are fetched in the same cache line.
 
-Having played extensively with the Marvell 88x3310 and thoroughly
-inspected its registers and analysed its behaviour, I'd be hessitant
-to compare other PHYs with it.  The 3310 PHY seems to be multiple PHY
-blocks (from two vendors) in a single package, and it dynamically
-switches in the appropriate hardware blocks according to the negotiated
-link modes.
+Thanks,
 
-However, given that 1G SGMII is clocked at a different rate from 2.5G
-SGMII, both ends would need to be configured the same.
-
-For example, both mvneta and mvpp2.2 support 2.5G modes merely by
-reconfiguring the comphy block, and all that does is increase the
-serdes clock.  That's used for 2500BASE-X (which I have had working
-locally through a devmem2 pokes on Clearfog and the older Marvell
-pp2x driver on Macchiatobin) but it's more difficult to find 2.5G
-copper SFP modules to test with - which would presumably talk 2.5G
-SGMII.
-
+	M.
 -- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+Jazz is not dead. It just smells funny...
