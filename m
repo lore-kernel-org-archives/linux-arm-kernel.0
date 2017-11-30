@@ -1,71 +1,130 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 30 Nov 2017 18:29:56 +0000
-Subject: [PATCH v2 11/18] arm64: mm: Map entry trampoline into trampoline
- and kernel page tables
-In-Reply-To: <1512059986-21325-12-git-send-email-will.deacon@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <1512059986-21325-12-git-send-email-will.deacon@arm.com>
-Message-ID: <20171130182956.uwc63g6i6yobxcqy@lakrids.cambridge.arm.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Thu, 30 Nov 2017 21:33:30 +0300
+Subject: [PATCH 37/37] KVM: arm/arm64: Avoid VGICv3 save/restore on VHE
+ with no IRQs
+In-Reply-To: <20171012104141.26902-38-christoffer.dall@linaro.org>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-38-christoffer.dall@linaro.org>
+Message-ID: <20171130183330.x7jc6m2yffcxcvkz@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Thu, Nov 30, 2017 at 04:39:39PM +0000, Will Deacon wrote:
-> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-> index 4052ec39e8db..8119b49be98d 100644
-> --- a/arch/arm64/include/asm/fixmap.h
-> +++ b/arch/arm64/include/asm/fixmap.h
-> @@ -58,6 +58,10 @@ enum fixed_addresses {
->  	FIX_APEI_GHES_NMI,
->  #endif /* CONFIG_ACPI_APEI_GHES */
->  
-> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-> +	FIX_ENTRY_TRAMP_TEXT,
-> +#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
-> +#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
->  	__end_of_permanent_fixed_addresses,
-
-Defining TRAMP_VALIAS here is a little surprising, especially given we
-reuse the name in asm-offsets:
-
-> +  DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
-
-Can't we have asm-offsets do:
-
-  DEFINE(TRAMP_VALIAS, __fix_to_virt(FIX_ENTRY_TRAMP_TEXT));
-
-... and rely on the asm-offsets TRAMP_VALIAS definition everywhere?
+On Thu, Oct 12, 2017 at 12:41:41PM +0200, Christoffer Dall wrote:
+> We can finally get completely rid of any calls to the VGICv3
+> save/restore functions when the AP lists are empty on VHE systems.  This
+> requires carefully factoring out trap configuration from saving and
+> restoring state, and carefully choosing what to do on the VHE and
+> non-VHE path.
+> 
+> One of the challenges is that we cannot save/restore the VMCR lazily
+> because we can only write the VMCR when ICC_SRE_EL1.SRE is cleared when
+> emulating a GICv2-on-GICv3, since otherwise all Group-0 interrupts end
+> up being delivered as FIQ.
+> 
+> To solve this problem, and still provide fast performance in the fast
+> path of exiting a VM when no interrupts are pending (which also
+> optimized the latency for actually delivering virtual interrupts coming
+> from physical interrupts), we orchestrate a dance of only doing the
+> activate/deactivate traps in vgic load/put for VHE systems (which can
+> have ICC_SRE_EL1.SRE cleared when running in the host), and doing the
+> configuration on every round-trip on non-VHE systems.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  arch/arm/include/asm/kvm_hyp.h   |   2 +
+>  arch/arm/kvm/hyp/switch.c        |   8 ++-
+>  arch/arm64/include/asm/kvm_hyp.h |   2 +
+>  arch/arm64/kvm/hyp/switch.c      |   8 ++-
+>  virt/kvm/arm/hyp/vgic-v3-sr.c    | 116 +++++++++++++++++++++++++--------------
+>  virt/kvm/arm/vgic/vgic-v3.c      |   6 ++
+>  virt/kvm/arm/vgic/vgic.c         |   7 +--
+>  7 files changed, 101 insertions(+), 48 deletions(-)
 
 [...]
 
-> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-> +static int __init map_entry_trampoline(void)
-> +{
-> +	extern char __entry_tramp_text_start[];
+> diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> index ed5da75..34d71d2 100644
+> --- a/virt/kvm/arm/hyp/vgic-v3-sr.c
+> +++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+> @@ -208,15 +208,15 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  {
+>  	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+>  	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+> -	u64 val;
+>  
+>  	/*
+>  	 * Make sure stores to the GIC via the memory mapped interface
+> -	 * are now visible to the system register interface.
+> +	 * are now visible to the system register interface when reading the
+> +	 * LRs, and when reading back the VMCR on non-VHE systems.
+>  	 */
+> -	if (!cpu_if->vgic_sre) {
+> -		dsb(st);
+> -		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
+> +	if (used_lrs || !has_vhe()) {
+> +		if (!cpu_if->vgic_sre)
+> +			dsb(st);
+>  	}
+
+Nit:
+	if ((used_lrs || !has_vhe()) && !cpu_if->vgic_sre)
+		dsb(st);
+
+>  
+>  	if (used_lrs) {
+> @@ -225,7 +225,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  
+>  		elrsr = read_gicreg(ICH_ELSR_EL2);
+>  
+> -		write_gicreg(0, ICH_HCR_EL2);
+> +		write_gicreg(cpu_if->vgic_hcr & ~ICH_HCR_EN, ICH_HCR_EL2);
+>  
+>  		for (i = 0; i < used_lrs; i++) {
+>  			if (elrsr & (1 << i))
+> @@ -235,18 +235,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+>  
+>  			__gic_v3_set_lr(0, i);
+>  		}
+> -	} else {
+> -		if (static_branch_unlikely(&vgic_v3_cpuif_trap))
+> -			write_gicreg(0, ICH_HCR_EL2);
+> -	}
+> -
+> -	val = read_gicreg(ICC_SRE_EL2);
+> -	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
+> -
+> -	if (!cpu_if->vgic_sre) {
+> -		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+> -		isb();
+> -		write_gicreg(1, ICC_SRE_EL1);
+>  	}
+>  }
+>  
+> @@ -256,6 +244,31 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+>  	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+>  	int i;
+>  
+> +	if (used_lrs) {
+> +		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
 > +
-> +	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
-> +	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
+> +		for (i = 0; i < used_lrs; i++)
+> +			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+> +	}
 > +
-> +	/* The trampoline is always mapped and can therefore be global */
-> +	pgprot_val(prot) &= ~PTE_NG;
+> +	/*
+> +	 * Ensure that writes to the LRs, and on non-VHE systems ensure that
+> +	 * the write to the VMCR in __vgic_v3_activate_traps(), will have
+> +	 * reached the (re)distributors. This ensure the guest will read the
+> +	 * correct values from the memory-mapped interface.
+> +	 */
+> +	if (used_lrs || !has_vhe()) {
+> +		if (!cpu_if->vgic_sre) {
+> +			isb();
+> +			dsb(sy);
+> +		}
+> +	}
+
+And here
+
+> +}
 > +
-> +	/* Map only the text into the trampoline page table */
-> +	memset((char *)tramp_pg_dir, 0, PGD_SIZE);
-
-The (char *) cast can go; memset() takes a void pointer and we don't do
-similar casts for other memset instances.
-
-> +	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
-> +			     prot, pgd_pgtable_alloc, 0);
-> +
-> +	/* ...as well as the kernel page table */
-
-This might be clearer as:
-
-	/* map the text in the kernel page table, too */
-
-Otherwise, this looks good to me.
-
-Thanks,
-Mark.
