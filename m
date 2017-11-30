@@ -1,153 +1,34 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Thu, 30 Nov 2017 15:06:27 +0530
-Subject: [PATCH v3 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
- dmtimer pdata ops
-In-Reply-To: <2c5e3e04-9940-43c3-62b1-8cef7d22c5e1@ti.com>
-References: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
- <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
- <2c5e3e04-9940-43c3-62b1-8cef7d22c5e1@ti.com>
-Message-ID: <e632a727-1067-7767-1646-f49ec0f8c2ec@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 30 Nov 2017 10:43:55 +0100
+Subject: [PATCH/RFT renesas-devel] arm64: dts: ulcb: Enable NFS root
+In-Reply-To: <CAMuHMdXbvC90k1QYZsjWx=f7QVQyWOzi_v3u8ShDoDsSAmZsjw@mail.gmail.com>
+References: <1493717048-10740-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdXbvC90k1QYZsjWx=f7QVQyWOzi_v3u8ShDoDsSAmZsjw@mail.gmail.com>
+Message-ID: <20171130094354.6pktdlcuc3gettji@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On Tuesday 28 November 2017 11:57 PM, Strashko, Grygorii wrote:
+On Tue, May 02, 2017 at 11:27:58AM +0200, Geert Uytterhoeven wrote:
+> Hi Simon,
 > 
+> On Tue, May 2, 2017 at 11:24 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > Enable NFS root on the r8a7795/h3ulcb and r8a7796/m3ulcb
+> > as per:
+> > * commit b2407c566ba29215 ("arm64: dts: r8a7795: enable nfs root on Salvator-X board").
+> > * commit 742a9dfb90f0 ("arm64: dts: r8a7796: salvator-x: Enable NFS root")
+> >
+> > Also set ignore_loglevel rw as boot args as is the case for the boards
+> > for the boards for other Renesas ARM/ARM64 based SoCs.
 > 
-> On 11/15/2017 10:23 PM, Keerthy wrote:
->> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
->>
->> Signed-off-by: Keerthy <j-keerthy@ti.com>
->> ---
->>
->> Changes in v3:
->>
->>    * Used of_find_platdata_by_node function to fetch platform
->>      data for timer node.
->>
->>   drivers/pwm/pwm-omap-dmtimer.c | 39 ++++++++++++++++++++++-----------------
->>   1 file changed, 22 insertions(+), 17 deletions(-)
->>
->> diff --git a/drivers/pwm/pwm-omap-dmtimer.c b/drivers/pwm/pwm-omap-dmtimer.c
->> index 5ad42f3..2caf46b 100644
->> --- a/drivers/pwm/pwm-omap-dmtimer.c
->> +++ b/drivers/pwm/pwm-omap-dmtimer.c
->> @@ -23,6 +23,7 @@
->>   #include <linux/mutex.h>
->>   #include <linux/of.h>
->>   #include <linux/of_platform.h>
->> +#include <linux/platform_data/dmtimer-omap.h>
->>   #include <linux/platform_data/pwm_omap_dmtimer.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/pm_runtime.h>
->> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
->>   	struct pwm_chip chip;
->>   	struct mutex mutex;
->>   	pwm_omap_dmtimer *dm_timer;
->> -	struct pwm_omap_dmtimer_pdata *pdata;
->> +	struct omap_dm_timer_ops *pdata;
->>   	struct platform_device *dm_timer_pdev;
->>   };
->>   
->> @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->>   {
->>   	struct device_node *np = pdev->dev.of_node;
->>   	struct device_node *timer;
->> +	struct platform_device *timer_pdev;
->>   	struct pwm_omap_dmtimer_chip *omap;
->> -	struct pwm_omap_dmtimer_pdata *pdata;
->> +	struct dmtimer_platform_data *timer_pdata;
->> +	struct omap_dm_timer_ops *pdata;
->>   	pwm_omap_dmtimer *dm_timer;
->>   	u32 v;
->>   	int status;
->>   
->> -	pdata = dev_get_platdata(&pdev->dev);
->> -	if (!pdata) {
->> -		dev_err(&pdev->dev, "Missing dmtimer platform data\n");
->> +	timer = of_parse_phandle(np, "ti,timers", 0);
->> +	if (!timer)
->> +		return -ENODEV;
->> +
->> +	timer_pdev = of_find_device_by_node(timer);
->> +	if (!timer_pdev) {
->> +		dev_err(&pdev->dev, "Unable to find Timer pdev\n");
->> +		return -ENODEV;
->> +	}
->> +
->> +	timer_pdata = of_find_platdata_by_node(timer);
->> +	if (!timer_pdata) {
->> +		dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
->>   		return -EINVAL;
->>   	}
+> s/for the boards//
 > 
-> Huh. I think It might be better if you add smth. like
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> struct omap_dm_timer *dm_timer = of_omap_dm_timer_get(parent_np, "ti,timers", idx);
+> Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > 
-> struct omap_dm_timer_ops *pdata = omap_dm_timer_get_ops(dm_timer);
-> 
-> so all DT and platdata implementation details will be hidden.
+> Gr{oetje,eeting}s,
 
-Grygorii,
-
-This driver is already fetching:
-
-omap->dm_timer_pdev = of_find_device_by_node(timer);
-
-It stores dm_timer_pdev in struct pwm_omap_dmtimer_chip.
-So we already need:
-timer = of_parse_phandle(np, "ti,timers", 0);
-and
-omap->dm_timer_pdev = of_find_device_by_node(timer);
-
-So why not just do:
-
-struct omap_dm_timer_ops *pdata =
-omap_dm_timer_get_ops(omap->dm_timer_pdev);
-
-Regards,
-Keerthy
-
-> 
-> 
->>   
->> -	if (!pdata->request_by_node ||
->> +	pdata = timer_pdata->timer_ops;
->> +
->> +	if (!pdata || !pdata->request_by_node ||
->>   	    !pdata->free ||
->>   	    !pdata->enable ||
->>   	    !pdata->disable ||
->> @@ -270,10 +285,6 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->>   		return -EINVAL;
->>   	}
->>   
->> -	timer = of_parse_phandle(np, "ti,timers", 0);
->> -	if (!timer)
->> -		return -ENODEV;
->> -
->>   	if (!of_get_property(timer, "ti,timer-pwm", NULL)) {
->>   		dev_err(&pdev->dev, "Missing ti,timer-pwm capability\n");
->>   		return -ENODEV;
->> @@ -291,13 +302,7 @@ static int pwm_omap_dmtimer_probe(struct platform_device *pdev)
->>   
->>   	omap->pdata = pdata;
->>   	omap->dm_timer = dm_timer;
->> -
->> -	omap->dm_timer_pdev = of_find_device_by_node(timer);
->> -	if (!omap->dm_timer_pdev) {
->> -		dev_err(&pdev->dev, "Unable to find timer pdev\n");
->> -		omap->pdata->free(dm_timer);
->> -		return -EINVAL;
->> -	}
->> +	omap->dm_timer_pdev = timer_pdev;
-
-Here we need timer_pdev anyways.
-
->>   
->>   	/*
->>   	 * Ensure that the timer is stopped before we allow PWM core to call
->>
-> 
+Sergei has pointed out that bootargs has seems to have effect on ARM64
+kernels. So I think this patch should be withdrawn and we should consider
+removing bootargs from those ARM64 boards where it is present.
