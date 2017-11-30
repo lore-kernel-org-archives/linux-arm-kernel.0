@@ -1,46 +1,58 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Thu, 30 Nov 2017 10:38:09 -0800
-Subject: [PATCH v2] watchdog: stm32: Fix copyright
-In-Reply-To: <20171130084804.23693-1-benjamin.gaignard@st.com>
-References: <20171130084804.23693-1-benjamin.gaignard@st.com>
-Message-ID: <20171130183809.GB20343@roeck-us.net>
+From: peda@axentia.se (Peter Rosin)
+Date: Thu, 30 Nov 2017 19:46:09 +0100
+Subject: [PATCH v2 2/2] ARM: dts: at91: disable the nxp,se97b SMBUS
+ timeout on the TSE-850
+In-Reply-To: <20171130172606.GZ21126@piout.net>
+References: <20171127163101.27859-1-peda@axentia.se>
+ <20171127163101.27859-3-peda@axentia.se>
+ <20171129205311.GA20551@roeck-us.net> <20171129205629.GO21126@piout.net>
+ <20171130171638.GA17788@roeck-us.net> <20171130172606.GZ21126@piout.net>
+Message-ID: <acaea4f3-d273-444a-4df4-e6d1b35c876d@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 09:48:04AM +0100, Benjamin Gaignard wrote:
-> Uniformize STMicroelectronics copyrights header
-> Add SPDX identifier
+On 2017-11-30 18:26, Alexandre Belloni wrote:
+> On 30/11/2017 at 09:16:38 -0800, Guenter Roeck wrote:
+>> On Wed, Nov 29, 2017 at 09:56:29PM +0100, Alexandre Belloni wrote:
+>>> On 29/11/2017 at 12:53:11 -0800, Guenter Roeck wrote:
+>>>> On Mon, Nov 27, 2017 at 05:31:01PM +0100, Peter Rosin wrote:
+>>>>> The I2C adapter driver is sometimes slow, causing the SCL line to
+>>>>> be stuck low for more than the stipulated SMBUS timeout of 25-35 ms.
+>>>>> This causes the client device to give up which in turn causes silent
+>>>>> corruption of data. So, disable the SMBUS timeout in the client device.
+>>>>>
+>>>>> Signed-off-by: Peter Rosin <peda@axentia.se>
+>>>>
+>>>> Acked-by: Guenter Roeck <linux@roeck-us.net>
+>>>>
+>>>> I assume this will be sent upstream through an arm tree.
+>>>>
+>>>
+>>> Yes, I'm applying it right now.
+>>>
+>> Are you going to apply the patch for 4.15, or queue it up for 4.16 ?
+>> I have been arguing with myself if this is a feature or a bug fix.
+>> So far I queued the driver change up for 4.16, but I am open to
+>> applying it to 4.15. Any thoughts ?
+>>
 > 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
-> CC: Yannick Fertre <yannick.fertre@st.com>
+> I was wondering that myself. I'm open to have it as a fix in 4.15. Or
+> maybe Peter can send the series to stable if he needs it in 4.14.
+> 
+> Peter, what do you think/want?
 
-Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+TL;DR Either way is fine.
 
-> ---
->  drivers/watchdog/stm32_iwdg.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/watchdog/stm32_iwdg.c b/drivers/watchdog/stm32_iwdg.c
-> index be64a8699de3..c97ad5619cb0 100644
-> --- a/drivers/watchdog/stm32_iwdg.c
-> +++ b/drivers/watchdog/stm32_iwdg.c
-> @@ -1,12 +1,12 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * Driver for STM32 Independent Watchdog
->   *
-> - * Copyright (C) Yannick Fertre 2017
-> - * Author: Yannick Fertre <yannick.fertre@st.com>
-> + * Copyright (C) STMicroelectronics 2017
-> + * Author: Yannick Fertre <yannick.fertre@st.com> for STMicroelectronics.
->   *
->   * This driver is based on tegra_wdt.c
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
->   */
->  
->  #include <linux/clk.h>
-> -- 
-> 2.15.0
-> 
+I think it's a bugfix; it fixes real problems where the application
+misbehave due to faulty content when reading from an eeprom. I'm
+expecting to make a new release for the hw in question RSN and these
+are the only local patches. So, it would be nice if they made it to
+4.14.x before my release happens. However, it's not like it's difficult
+to rebase the patches should that backport not happen or take too long.
+
+The badness started to happen much more frequently due to some timing
+difference affecting the i2c bus driver, but in theory it's a problem
+that has been there from the start. I have just not noticed it before...
+
+Cheers,
+Peter
