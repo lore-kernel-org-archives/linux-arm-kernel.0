@@ -1,28 +1,35 @@
-From: hayashibara.keiji@socionext.com (Keiji Hayashibara)
-Date: Thu, 30 Nov 2017 10:26:55 +0900
-Subject: [PATCH] arm64: defconfig: enable CONFIG_UNIPHIER_EFUSE
-Message-ID: <1512005215-6323-1-git-send-email-hayashibara.keiji@socionext.com>
+From: shawnguo@kernel.org (Shawn Guo)
+Date: Thu, 30 Nov 2017 09:34:40 +0800
+Subject: [GIT PULL] i.MX fixes for 4.15
+Message-ID: <20171130013439.GH22908@dragon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the efuse driver for UniPhier SoC
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 
-Signed-off-by: Keiji Hayashibara <hayashibara.keiji@socionext.com>
----
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 6356c6d..41e1b56 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -558,6 +558,7 @@ CONFIG_PHY_XGENE=y
- CONFIG_PHY_TEGRA_XUSB=y
- CONFIG_QCOM_L2_PMU=y
- CONFIG_QCOM_L3_PMU=y
-+CONFIG_UNIPHIER_EFUSE=y
- CONFIG_TEE=y
- CONFIG_OPTEE=y
- CONFIG_ARM_SCPI_PROTOCOL=y
--- 
-2.7.4
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.15
+
+for you to fetch changes up to e501506d3ea00eefa64463ebd9e5c13ee70990bd:
+
+  Revert "ARM: dts: imx53: add srtc node" (2017-11-29 10:34:45 +0800)
+
+----------------------------------------------------------------
+i.MX fixes for 4.15:
+ - A fix for vf610-zii-dev-rev-c board which correct the unit-address
+   of I2C EEPROM node to match the 'reg' property.
+ - We thought the RTC block on i.MX53 is compatible with the one found
+   on i.MX25, and added the device for i.MX53 device tree.  But it turns
+   out that's not the case, and we have to revert the change.
+
+----------------------------------------------------------------
+Fabio Estevam (2):
+      ARM: dts: vf610-zii-dev-rev-c: Fix the I2C EEPROM address
+      Revert "ARM: dts: imx53: add srtc node"
+
+ arch/arm/boot/dts/imx53.dtsi              | 9 ---------
+ arch/arm/boot/dts/vf610-zii-dev-rev-c.dts | 2 +-
+ 2 files changed, 1 insertion(+), 10 deletions(-)
