@@ -1,55 +1,24 @@
-From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
-Date: Thu, 30 Nov 2017 08:07:52 +0100
-Subject: [PATCH v2 6/6] ARM: ep93xx: ts72xx: Add support for BK3 board -
- ts72xx derivative
-In-Reply-To: <20171129230704.68b5ec42@jawa>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171121143204.1839-1-lukma@denx.de>
- <20171121143204.1839-7-lukma@denx.de>
- <86943b7f-be3a-2f41-1ffe-c4d7abfee148@gmail.com>
- <20171129230704.68b5ec42@jawa>
-Message-ID: <20171130080752.f805cbf32704649bf8735385@gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Thu, 30 Nov 2017 18:14:37 +1100
+Subject: [v2,01/12] hwrng: bcm2835 - Obtain base register via resource
+In-Reply-To: <ac49deb2-6f81-1daf-596d-16fd6bd6af32@gmail.com>
+References: <20171108004449.32730-2-f.fainelli@gmail.com>
+ <20171129063028.GB21594@gondor.apana.org.au>
+ <ac49deb2-6f81-1daf-596d-16fd6bd6af32@gmail.com>
+Message-ID: <20171130071437.GA30622@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lukasz,
+On Wed, Nov 29, 2017 at 09:38:52AM -0800, Florian Fainelli wrote:
+>
+> Hu, okay, I actually had a v3 prepared that I was going to post
+> addressing some of the comments. Should I send an incremental set of
+> changes now?
 
-On Wed, 29 Nov 2017 23:07:04 +0100
-Lukasz Majewski <lukma@denx.de> wrote:
+Please send it as an incremental set.
 
-> > > +/*************************************************************************
-> > > + * BK3 support code
-> > > +
-> > > *************************************************************************/
-> > > +static struct mtd_partition bk3_nand_parts[] = {
-> > > +	{
-> > > +		.name		= "System",
-> > > +		.offset	= 0x00000000,  
-> > 
-> > I see the above and below lines as unaligned
-> 
-> This is strange.... I'm using emacs with extension to have coding style
-> for kernel.
-> 
-> Probably tabs get unaligned...
-
-Yes, seems that they are.
-
-[...]
-
-> > 
-> > > +	.atag_offset	= 0x100,
-> > > +	.map_io	= bk3_map_io,  
-> > 
-> > again, inconsistent alignment...
-> 
-> Even more..... checkpatch.pl did not complained....
-
-checkpatch.pl wouldn't complain, as there are basically two styles,
-some people do not align the individual assignments in the structures at all.
-But I was quite confident in the beginning and now even applied your v3 to
-the code. And indeed it's unaligned... I even checked with emacs. Still
-unaligned.
-
+Thanks,
 -- 
-Alexander Sverdlin.
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
