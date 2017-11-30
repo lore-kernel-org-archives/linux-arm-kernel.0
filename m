@@ -1,47 +1,61 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 30 Nov 2017 19:26:21 +0100
-Subject: [PATCH 1/1] phy: Add 2.5G SGMII interface mode
-In-Reply-To: <20171130181520.GF10595@n2100.armlinux.org.uk>
-References: <1512016235-15909-1-git-send-email-Bhaskar.Upadhaya@nxp.com>
- <20171130155050.GD7483@lunn.ch>
- <AM3PR04MB4494050122E413E2445BD348C380@AM3PR04MB449.eurprd04.prod.outlook.com>
- <20171130174127.GA28828@lunn.ch>
- <20171130181520.GF10595@n2100.armlinux.org.uk>
-Message-ID: <20171130182621.GC28828@lunn.ch>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 30 Nov 2017 18:28:33 +0000
+Subject: [PATCH] arm64: context: Fix comments and remove pointless smp_wmb()
+Message-ID: <1512066513-16024-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 06:15:20PM +0000, Russell King - ARM Linux wrote:
-> On Thu, Nov 30, 2017 at 06:41:27PM +0100, Andrew Lunn wrote:
-> > SGMII supports passing auto-negotiation results from the PHY to the
-> > MAC. 1000BASE-X does not.
-> > 
-> > SGMII supports the PHY running at 10, 100, and 1000 Mbps. But to
-> > support this, the MAC needs to replicate the bits 100, or 10 times
-> > when the PHY is running in 10 or 100Mbps mode.
-> > 
-> > So with your 2.5G SGMII, you need to replicate the bits 250, 25, or
-> > 2.5 times if they PHY is running at lower speeds. This last one is
-> > interesting.
-> 
-> That's not what I've read so far - but I don't know about the PHY
-> in this exact case because the docs are only available under NDA
-> (which makes it incredibly difficult to have this discussion.)
-> 
-> However, from what I can ascertain from a Xilinx document, 2.5G is
-> 1G SGMII clocked 2.5x faster.  When in 2.5G mode, the other modes
-> are unavailable.
+The comments in the ASID allocator incorrectly hint at an MP-style idiom
+using the asid_generation and the active_asids array. In fact, the
+synchronisation is achieved using a combination of an xchg operation
+and a spinlock, so update the comments and remove the pointless smp_wmb().
 
-Hi Russell
+Cc: James Morse <james.morse@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/mm/context.c | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
-Thanks for looking into the details.
-
-So you need the PHY driver to see what it has negotiated, and when it
-calls the adjust_link callback, the MAC needs look at the
-phydev->interface and set the MAC to 2.5G SGMII or SGMII.
-
-Same as the Marvell 10G PHY driver flips between
-PHY_INTERFACE_MODE_10GKR and PHY_INTERFACE_MODE_SGMII depending on
-what it has negotiated.
-
-     Andrew
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index ab9f5f0fb2c7..98fcecae0827 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -96,12 +96,6 @@ static void flush_context(unsigned int cpu)
+ 
+ 	set_reserved_asid_bits();
+ 
+-	/*
+-	 * Ensure the generation bump is observed before we xchg the
+-	 * active_asids.
+-	 */
+-	smp_wmb();
+-
+ 	for_each_possible_cpu(i) {
+ 		asid = atomic64_xchg_relaxed(&per_cpu(active_asids, i), 0);
+ 		/*
+@@ -202,11 +196,18 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
+ 	asid = atomic64_read(&mm->context.id);
+ 
+ 	/*
+-	 * The memory ordering here is subtle. We rely on the control
+-	 * dependency between the generation read and the update of
+-	 * active_asids to ensure that we are synchronised with a
+-	 * parallel rollover (i.e. this pairs with the smp_wmb() in
+-	 * flush_context).
++	 * The memory ordering here is subtle.
++	 * If our ASID matches the current generation, then we update
++	 * our active_asids entry with a relaxed xchg. Racing with a
++	 * concurrent rollover means that either:
++	 *
++	 * - We get a zero back from the xchg and end up waiting on the
++	 *   lock. Taking the lock synchronises with the rollover and so
++	 *   we are forced to see the updated generation.
++	 *
++	 * - We get a valid ASID back from the xchg, which means the
++	 *   relaxed xchg in flush_context will treat us as reserved
++	 *   because atomic RmWs are totally ordered for a given location.
+ 	 */
+ 	if (!((asid ^ atomic64_read(&asid_generation)) >> asid_bits)
+ 	    && atomic64_xchg_relaxed(&per_cpu(active_asids, cpu), asid))
+-- 
+2.1.4
