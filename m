@@ -1,51 +1,78 @@
-From: tyler@opensourcefoundries.com (tyler at opensourcefoundries.com)
-Date: Thu, 30 Nov 2017 12:14:30 -0800
-Subject: [PATCH 4/8] ARM: dts: imx7s: add dma support
-In-Reply-To: <20171130201434.14122-1-tyler@opensourcefoundries.com>
-References: <20171130201434.14122-1-tyler@opensourcefoundries.com>
-Message-ID: <20171130201434.14122-5-tyler@opensourcefoundries.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 30 Nov 2017 14:24:15 -0600
+Subject: [PATCH] dt-bindings: pinctrl: uniphier: add UniPhier pinctrl
+ binding
+In-Reply-To: <CAK7LNAQYBe=x8sOBTrz8zE+5JEhOu+3eQKd8fbSAxi9Zuy18jQ@mail.gmail.com>
+References: <1511855386-10421-1-git-send-email-yamada.masahiro@socionext.com>
+ <20171128152706.pg3tndrrne3nhduy@rob-hp-laptop>
+ <CAK7LNAQYBe=x8sOBTrz8zE+5JEhOu+3eQKd8fbSAxi9Zuy18jQ@mail.gmail.com>
+Message-ID: <CAL_JsqJ=ocVCQig4cQKrF3nrYWg+ou9yu+USs201vHUS-O8GFQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tyler Baker <tyler@opensourcefoundries.com>
+On Tue, Nov 28, 2017 at 9:44 PM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> Hi Rob,
+>
+>
+> 2017-11-29 0:27 GMT+09:00 Rob Herring <robh@kernel.org>:
+>> On Tue, Nov 28, 2017 at 04:49:45PM +0900, Masahiro Yamada wrote:
+>>> The driver has been in the tree for a while, but its binding document
+>>> is missing.  Hence, here it is.
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>> ---
+>>>
+>>>  .../pinctrl/socionext,uniphier-pinctrl.txt         | 27 ++++++++++++++++++++++
+>>>  MAINTAINERS                                        |  1 +
+>>>  2 files changed, 28 insertions(+)
+>>>  create mode 100644 Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
+>>> new file mode 100644
+>>> index 0000000..8173b12
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/pinctrl/socionext,uniphier-pinctrl.txt
+>>> @@ -0,0 +1,27 @@
+>>> +UniPhier SoCs pin controller
+>>> +
+>>> +Required properties:
+>>> +- compatible: should be one of the following:
+>>> +    "socionext,uniphier-ld4-pinctrl"  - for LD4 SoC
+>>> +    "socionext,uniphier-pro4-pinctrl" - for Pro4 SoC
+>>> +    "socionext,uniphier-sld8-pinctrl" - for sLD8 SoC
+>>> +    "socionext,uniphier-pro5-pinctrl" - for Pro5 SoC
+>>> +    "socionext,uniphier-pxs2-pinctrl" - for PXs2 SoC
+>>> +    "socionext,uniphier-ld6b-pinctrl" - for LD6b SoC
+>>> +    "socionext,uniphier-ld11-pinctrl" - for LD11 SoC
+>>> +    "socionext,uniphier-ld20-pinctrl" - for LD20 SoC
+>>> +    "socionext,uniphier-pxs3-pinctrl" - for PXs3 SoC
+>>> +
+>>> +Note:
+>>> +The UniPhier pinctrl should be a subnode of a "syscon" compatible node.
+>>> +
+>>> +Example:
+>>> +     soc-glue at 5f800000 {
+>>> +             compatible = "socionext,uniphier-pro4-soc-glue",
+>>> +                          "simple-mfd", "syscon";
+>>> +             reg = <0x5f800000 0x2000>;
+>>> +
+>>> +             pinctrl: pinctrl {
+>>> +                     compatible = "socionext,uniphier-pro4-pinctrl";
+>>
+>> There's not a contiguous register range that can be put here?
+>
+>
+> Right.
+>
+> I saw SATA PHY registers are inserted among the pinctrl registers.
 
-Enable dma on all SPI and UART interfaces.
+Okay,
 
-Signed-off-by: Tyler Baker <tyler@opensourcefoundries.com>
----
- arch/arm/boot/dts/imx7s.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
+Acked-by: Rob Herring <robh@kernel.org>
 
-diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
-index 82ad26e..7b85659 100644
---- a/arch/arm/boot/dts/imx7s.dtsi
-+++ b/arch/arm/boot/dts/imx7s.dtsi
-@@ -700,6 +700,8 @@
- 				clocks = <&clks IMX7D_ECSPI1_ROOT_CLK>,
- 					<&clks IMX7D_ECSPI1_ROOT_CLK>;
- 				clock-names = "ipg", "per";
-+				dmas = <&sdma 0 7 1>, <&sdma 1 7 2>;
-+				dma-names = "rx", "tx";
- 				status = "disabled";
- 			};
- 
-@@ -712,6 +714,8 @@
- 				clocks = <&clks IMX7D_ECSPI2_ROOT_CLK>,
- 					<&clks IMX7D_ECSPI2_ROOT_CLK>;
- 				clock-names = "ipg", "per";
-+				dmas = <&sdma 2 7 1>, <&sdma 3 7 2>;
-+				dma-names = "rx", "tx";
- 				status = "disabled";
- 			};
- 
-@@ -724,6 +728,8 @@
- 				clocks = <&clks IMX7D_ECSPI3_ROOT_CLK>,
- 					<&clks IMX7D_ECSPI3_ROOT_CLK>;
- 				clock-names = "ipg", "per";
-+				dmas = <&sdma 4 7 1>, <&sdma 5 7 2>;
-+				dma-names = "rx", "tx";
- 				status = "disabled";
- 			};
- 
--- 
-2.9.3
+> Hardware engineers often make crazy design.
+
+If there's 2 ways to do things, they will find a 3rd way.
+
+Rob
