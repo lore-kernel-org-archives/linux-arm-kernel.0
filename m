@@ -1,5 +1,5 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 30 Nov 2017 20:39:21 +0100
+Date: Thu, 30 Nov 2017 20:39:59 +0100
 Subject: [PATCH] rtc: Allow rtc drivers to specify the tv_nsec value for
  ntp
 In-Reply-To: <20171128102025.GT31757@n2100.armlinux.org.uk>
@@ -11,7 +11,7 @@ References: <20171013175433.GA22062@obsidianresearch.com>
  <20171127185352.GN31757@n2100.armlinux.org.uk>
  <20171127193135.GA21126@piout.net>
  <20171128102025.GT31757@n2100.armlinux.org.uk>
-Message-ID: <20171130193921.GB21126@piout.net>
+Message-ID: <20171130193959.GC21126@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -36,7 +36,12 @@ On 28/11/2017 at 10:20:25 +0000, Russell King - ARM Linux wrote:
 > That is not intentional.
 > 
 
-So please, don't assume that I replied late intentionally.
+But that is exactly what you are currently reproaching me right now. I
+didn't have the time to have a good look a it so I didn't reply it
+wasn't intentional either.
+
+You sometimes don't reply to patch series, I sometimes take time to
+reply, I don't see how this is different then.
 
 > > I would really expect people merging code in any subsystem to wait for
 > > the ack of the maintainer of that subsystem.
@@ -47,9 +52,12 @@ So please, don't assume that I replied late intentionally.
 > A mailing list is an email address.
 > 
 
-Yes and again, this was a non issue, simply that the patch was not in
-the RTC patchwork but that is completely irrelevant to the matter.
+Yes and I said that it didn't matter it was not copied (the patch didn't
+make it in patchwork though).
 
+> > What I don't get is that it has been broken for almost 5 years and now
+> > you seem to think it has to be fixed urgently.
+> 
 > Now you're making crap up.  I've not made any comment about this being
 > something that needs fixing urgently.  In fact, as I've said several
 > times already, I really don't care what you do with the mainline kernel,
@@ -57,11 +65,15 @@ the RTC patchwork but that is completely irrelevant to the matter.
 > into the future.  For me, the issue is fixed and resolved, and I intend
 > to spend no further time developing any fixes for it.
 > 
+
+Oh great, that's really the way to go to make progress.
+
 > My comments are about the _two months_ its taken to get to the stage of
 > finding out that you don't like the approach.
 > 
 
-Again, sorry, this was not intentional.
+While I can understand some of the frustration, I don't get why you are
+giving up so easily.
 
 > The result of this is, most likely, one of:
 > 1. you'll revert the patch (which, incidentally, has no real effect until
@@ -69,12 +81,31 @@ Again, sorry, this was not intentional.
 >    kernel that sets their RTC time wrong when they have NTP installed
 > 
 
-Ok, let's not waste everything. I think the main issue is that I still
-don't get how this can actually improve the situation with regards to
-userspace. Can you share your series so I could maybe understand? I'm
-especially interested in how you will handle the pcf8523 (if you did
-that of course).
+Or when using hwclock from util-linux
 
+> 2. you'll remove the systohc code, people won't realise that their kernel
+>    no longer sync's the RTC time, and systems that are on the Internet
+>    (eg, providing stratum 1 NTP servers) will be unreliable if they are
+>    rebooted even more so than they are today.
+> 
+> > On my side, I want to take the opportunity to think about systohc before
+> > adding an ABI that we will maybe regret later.
+> 
+> Fine, but bear in mind that I don't care anymore, because I have
+> perfectly good fixes locally, and I'm not wasting any further time
+> in this issue.
+> 
+> While you think about it, I would encourage anyone who wishing to run
+> or running a public NTP server using rtclib to ditch Linux and use
+> FreeBSD instead to avoid their NTP server supplying false time, even
+> when synchronised to a reference clock.  A reboot of such a server
+> will supply false time for a period of a few hours depending on how
+> far the time is out (which can be up to a couple of seconds) after
+> such an event.  In such a scenario, NTP will not step-correct the
+> time but will gradually slew it instead.
+> 
+> This goes for systems that some ISPs deploy as stratum 1 NTP servers,
+> which today tend to be Raspberry Pis.
 
 -- 
 Alexandre Belloni, Free Electrons
