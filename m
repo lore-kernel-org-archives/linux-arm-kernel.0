@@ -1,64 +1,71 @@
 From: lukma@denx.de (Lukasz Majewski)
-Date: Thu, 30 Nov 2017 01:45:09 +0100
-Subject: [PATCH v3 5/6] ARM: ep93xx: ts72xx: cosmetic: Add some description to
- ts72xx code
+Date: Thu, 30 Nov 2017 01:45:08 +0100
+Subject: [PATCH v3 4/6] ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
 In-Reply-To: <20171130004510.23887-1-lukma@denx.de>
 References: <20171116232239.16823-1-lukma@denx.de>
  <20171130004510.23887-1-lukma@denx.de>
-Message-ID: <20171130004510.23887-6-lukma@denx.de>
+Message-ID: <20171130004510.23887-5-lukma@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends readability of ts72xx.c code.
+The map IO common code has been excluded to be reused by other ts72xx
+clones.
 
 Signed-off-by: Lukasz Majewski <lukma@denx.de>
+Acked-by: Alexander Sverdlin <alexander.sverdlin@gmail.com>
 ---
 Changes for v2:
 - New patch
+Changes for v3:
+- None
 ---
- arch/arm/mach-ep93xx/ts72xx.c | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/mach-ep93xx/ts72xx.c | 23 ++++++++++++++++-------
+ 1 file changed, 16 insertions(+), 7 deletions(-)
 
 diff --git a/arch/arm/mach-ep93xx/ts72xx.c b/arch/arm/mach-ep93xx/ts72xx.c
-index a6e473b3dcf6..2e8fcc6e87b6 100644
+index 00e0e5b8babf..a6e473b3dcf6 100644
 --- a/arch/arm/mach-ep93xx/ts72xx.c
 +++ b/arch/arm/mach-ep93xx/ts72xx.c
-@@ -28,6 +28,9 @@
- #include "soc.h"
- #include "ts72xx.h"
+@@ -30,11 +30,6 @@
  
-+/*************************************************************************
-+ * IO map
-+ *************************************************************************/
  static struct map_desc ts72xx_io_desc[] __initdata = {
  	{
+-		.virtual	= (unsigned long)TS72XX_MODEL_VIRT_BASE,
+-		.pfn		= __phys_to_pfn(TS72XX_MODEL_PHYS_BASE),
+-		.length		= TS72XX_MODEL_SIZE,
+-		.type		= MT_DEVICE,
+-	}, {
  		.virtual	= (unsigned long)TS72XX_OPTIONS_VIRT_BASE,
-@@ -189,6 +192,9 @@ static struct platform_device ts72xx_rtc_device = {
- 	.num_resources 	= ARRAY_SIZE(ts72xx_rtc_resources),
+ 		.pfn		= __phys_to_pfn(TS72XX_OPTIONS_PHYS_BASE),
+ 		.length		= TS72XX_OPTIONS_SIZE,
+@@ -47,12 +42,26 @@ static struct map_desc ts72xx_io_desc[] __initdata = {
+ 	}
  };
  
-+/*************************************************************************
-+ * WATCHDOG
-+ *************************************************************************/
- static struct resource ts72xx_wdt_resources[] = {
- 	DEFINE_RES_MEM(TS72XX_WDT_CONTROL_PHYS_BASE, SZ_4K),
- 	DEFINE_RES_MEM(TS72XX_WDT_FEED_PHYS_BASE, SZ_4K),
-@@ -201,10 +207,16 @@ static struct platform_device ts72xx_wdt_device = {
- 	.resource	= ts72xx_wdt_resources,
- };
+-static void __init ts72xx_map_io(void)
++static struct map_desc ts72xx_common_io_desc[] __initdata = {
++	{
++		.virtual	= (unsigned long)TS72XX_MODEL_VIRT_BASE,
++		.pfn		= __phys_to_pfn(TS72XX_MODEL_PHYS_BASE),
++		.length		= TS72XX_MODEL_SIZE,
++		.type		= MT_DEVICE,
++	}
++};
++
++void __init ts72xx_common_map_io(void)
+ {
+ 	ep93xx_map_io();
+-	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
++	iotable_init(ts72xx_common_io_desc, ARRAY_SIZE(ts72xx_common_io_desc));
+ }
  
-+/*************************************************************************
-+ * ETH
-+ *************************************************************************/
- static struct ep93xx_eth_data __initdata ts72xx_eth_data = {
- 	.phy_id		= 1,
- };
++static void __init ts72xx_map_io(void)
++{
++	ts72xx_common_map_io();
++	iotable_init(ts72xx_io_desc, ARRAY_SIZE(ts72xx_io_desc));
++}
  
-+/*************************************************************************
-+ * TS72XX support code
-+ *************************************************************************/
- #if IS_ENABLED(CONFIG_FPGA_MGR_TS73XX)
- 
- /* Relative to EP93XX_CS1_PHYS_BASE */
+ /*************************************************************************
+  * NAND flash
 -- 
 2.11.0
