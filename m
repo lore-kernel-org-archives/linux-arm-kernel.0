@@ -1,118 +1,55 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:39 +0000
-Subject: [PATCH v2 11/18] arm64: mm: Map entry trampoline into trampoline and
- kernel page tables
+Date: Thu, 30 Nov 2017 16:39:36 +0000
+Subject: [PATCH v2 08/18] arm64: mm: Add arm64_kernel_unmapped_at_el0 helper
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-12-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-9-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The exception entry trampoline needs to be mapped at the same virtual
-address in both the trampoline page table (which maps nothing else)
-and also the kernel page table, so that we can swizzle TTBR1_EL1 on
-exceptions from and return to EL0.
+In order for code such as TLB invalidation to operate efficiently when
+the decision to map the kernel at EL0 is determined at runtime, this
+patch introduces a helper function, arm64_kernel_unmapped_at_el0, to
+determine whether or not the kernel is mapped whilst running in userspace.
 
-This patch maps the trampoline at a fixed virtual address in the fixmap
-area of the kernel virtual address space, which allows the kernel proper
-to be randomized with respect to the trampoline when KASLR is enabled.
+Currently, this just reports the value of CONFIG_UNMAP_KERNEL_AT_EL0,
+but will later be hooked up to a fake CPU capability using a static key.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/fixmap.h  |  4 ++++
- arch/arm64/include/asm/pgtable.h |  1 +
- arch/arm64/kernel/asm-offsets.c  |  6 +++++-
- arch/arm64/mm/mmu.c              | 23 +++++++++++++++++++++++
- 4 files changed, 33 insertions(+), 1 deletion(-)
+ arch/arm64/include/asm/mmu.h | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-index 4052ec39e8db..8119b49be98d 100644
---- a/arch/arm64/include/asm/fixmap.h
-+++ b/arch/arm64/include/asm/fixmap.h
-@@ -58,6 +58,10 @@ enum fixed_addresses {
- 	FIX_APEI_GHES_NMI,
- #endif /* CONFIG_ACPI_APEI_GHES */
+diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
+index 01bfb184f2a8..c07954638658 100644
+--- a/arch/arm64/include/asm/mmu.h
++++ b/arch/arm64/include/asm/mmu.h
+@@ -19,6 +19,8 @@
+ #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
+ #define USER_ASID_FLAG	(UL(1) << 48)
  
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	FIX_ENTRY_TRAMP_TEXT,
-+#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
-+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 	__end_of_permanent_fixed_addresses,
- 
- 	/*
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index c9530b5b5ca8..c8f56b2ca414 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -681,6 +681,7 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
- 
- extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
- extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
-+extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
- 
- /*
-  * Encode and decode a swap entry:
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 71bf088f1e4b..af247d10252f 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -24,6 +24,7 @@
- #include <linux/kvm_host.h>
- #include <linux/suspend.h>
- #include <asm/cpufeature.h>
-+#include <asm/fixmap.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
- #include <asm/smp_plat.h>
-@@ -148,11 +149,14 @@ int main(void)
-   DEFINE(ARM_SMCCC_RES_X2_OFFS,		offsetof(struct arm_smccc_res, a2));
-   DEFINE(ARM_SMCCC_QUIRK_ID_OFFS,	offsetof(struct arm_smccc_quirk, id));
-   DEFINE(ARM_SMCCC_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_quirk, state));
--
-   BLANK();
-   DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
-   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
-   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
-+  BLANK();
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+  DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
-+#endif
-   return 0;
- }
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 267d2b79d52d..c2622525c4d6 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -525,6 +525,29 @@ static int __init parse_rodata(char *arg)
- }
- early_param("rodata", parse_rodata);
- 
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+static int __init map_entry_trampoline(void)
-+{
-+	extern char __entry_tramp_text_start[];
++#ifndef __ASSEMBLY__
 +
-+	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
-+	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
-+
-+	/* The trampoline is always mapped and can therefore be global */
-+	pgprot_val(prot) &= ~PTE_NG;
-+
-+	/* Map only the text into the trampoline page table */
-+	memset((char *)tramp_pg_dir, 0, PGD_SIZE);
-+	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
-+			     prot, pgd_pgtable_alloc, 0);
-+
-+	/* ...as well as the kernel page table */
-+	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
-+	return 0;
-+}
-+core_initcall(map_entry_trampoline);
-+#endif
-+
- /*
-  * Create fine-grained mappings for the kernel.
+ typedef struct {
+ 	atomic64_t	id;
+ 	void		*vdso;
+@@ -32,6 +34,11 @@ typedef struct {
   */
+ #define ASID(mm)	((mm)->context.id.counter & 0xffff)
+ 
++static inline bool arm64_kernel_unmapped_at_el0(void)
++{
++	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0);
++}
++
+ extern void paging_init(void);
+ extern void bootmem_init(void);
+ extern void __iomem *early_io_map(phys_addr_t phys, unsigned long virt);
+@@ -42,4 +49,5 @@ extern void create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ extern void *fixmap_remap_fdt(phys_addr_t dt_phys);
+ extern void mark_linear_text_alias_ro(void);
+ 
++#endif	/* !__ASSEMBLY__ */
+ #endif
 -- 
 2.1.4
