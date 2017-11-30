@@ -1,34 +1,44 @@
-From: ji.zhang@mediatek.com (Ji Zhang)
-Date: Thu, 30 Nov 2017 16:17:22 +0800
-Subject: [PATCH] fbdev: arm64 use __raw I/O memory api
-Message-ID: <1512029842-10939-1-git-send-email-ji.zhang@mediatek.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 30 Nov 2017 09:18:11 +0100
+Subject: [PATCH] rtc: add mxc driver for i.MX53
+In-Reply-To: <20171129221114.GV21126@piout.net>
+References: <20171128073927.12035-1-linux-kernel-dev@beckhoff.com>
+ <20171129221114.GV21126@piout.net>
+Message-ID: <CAOFm3uFb8Jo9detD2CziuYt_DH_ohYD9P=uvqHugKDxpN+xvAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since arm64 also has __raw I/O accessors, add __aarch64__ in fb.h.
-This is a supplement for commmit
-981409b25e2a99409b26daa67293ca1cfd5ea0a0
+On Wed, Nov 29, 2017 at 11:11 PM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 28/11/2017 at 08:39:27 +0100, linux-kernel-dev at beckhoff.com wrote:
+>> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+[]
+>> diff --git a/drivers/rtc/rtc-mxc_v2.c b/drivers/rtc/rtc-mxc_v2.c
+>> new file mode 100644
+>> index 000000000000..5049b521b38e
+>> --- /dev/null
+>> +++ b/drivers/rtc/rtc-mxc_v2.c
+>> @@ -0,0 +1,531 @@
+>
+> I think SPDX identifier will soon be required on new files, please add
+> one.
+>
+>> +/*
+>> + * Copyright (C) 2004-2011 Freescale Semiconductor, Inc. All Rights Reserved.
+>> + */
+>> +
+>> +/*
+>> + * The code contained herein is licensed under the GNU General Public
+>> + * License. You may obtain a copy of the GNU General Public License
+>> + * Version 2 or later at the following locations:
+>> + *
+>> + * http://www.opensource.org/licenses/gpl-license.html
+>> + * http://www.gnu.org/copyleft/gpl.html
+>> + */
 
-Signed-off-by: Ji Zhang <ji.zhang@mediatek.com>
----
- include/linux/fb.h | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/include/linux/fb.h b/include/linux/fb.h
-index bc24e48..cea8a2c 100644
---- a/include/linux/fb.h
-+++ b/include/linux/fb.h
-@@ -564,7 +564,10 @@ static inline struct apertures_struct *alloc_apertures(unsigned int max_num) {
- #define fb_memcpy_fromfb sbus_memcpy_fromio
- #define fb_memcpy_tofb sbus_memcpy_toio
- 
--#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) || defined(__hppa__) || defined(__sh__) || defined(__powerpc__) || defined(__avr32__) || defined(__bfin__) || defined(__arm__)
-+#elif defined(__i386__) || defined(__alpha__) || defined(__x86_64__) ||	\
-+	defined(__hppa__) || defined(__sh__) || defined(__powerpc__) ||	\
-+	defined(__avr32__) || defined(__bfin__) || defined(__arm__) ||	\
-+	defined(__aarch64__)
- 
- #define fb_readb __raw_readb
- #define fb_readw __raw_readw
+Exactly!
+And while you are it , you could replace the boilerplate license text
+with the SPDX id.
 -- 
-1.9.1
+Cordially
+Philippe Ombredanne
