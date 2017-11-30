@@ -1,85 +1,185 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 30 Nov 2017 14:40:27 +0100
-Subject: [PATCH 1/3] clk: mvebu: armada-37xx-periph: cosmetic changes
+Date: Thu, 30 Nov 2017 14:40:28 +0100
+Subject: [PATCH 2/3] clk: mvebu: armada-37xx-periph: prepare cpu clk to be
+ used with DVFS
 In-Reply-To: <20171130134029.20751-1-gregory.clement@free-electrons.com>
 References: <20171130134029.20751-1-gregory.clement@free-electrons.com>
-Message-ID: <20171130134029.20751-2-gregory.clement@free-electrons.com>
+Message-ID: <20171130134029.20751-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patches fixes few cosmetic issues such as alignment, blank lines
-and required space.
+When DVFS will be enabled then the cpu clk will use a different set of
+register at run time. That means that we won't be able to use the common
+callback and need to use our own ones.
+
+This patch prepares this change by switching on our own set of callbacks
+without modifying the behavior of the clocks.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- drivers/clk/mvebu/armada-37xx-periph.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+ drivers/clk/mvebu/armada-37xx-periph.c | 82 ++++++++++++++++++++++++++++++----
+ 1 file changed, 73 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/clk/mvebu/armada-37xx-periph.c b/drivers/clk/mvebu/armada-37xx-periph.c
-index cecb0fdfaef6..6dae21ced18a 100644
+index 6dae21ced18a..ef725ec73c93 100644
 --- a/drivers/clk/mvebu/armada-37xx-periph.c
 +++ b/drivers/clk/mvebu/armada-37xx-periph.c
-@@ -79,6 +79,7 @@ static const struct clk_div_table clk_table2[] = {
- 	{ .val = 1, .div = 4, },
- 	{ .val = 0, .div = 0, }, /* last entry */
+@@ -46,7 +46,17 @@ struct clk_double_div {
+ 	u8 shift2;
  };
+ 
++struct clk_pm_cpu {
++	struct clk_hw hw;
++	void __iomem *reg_mux;
++	u8 shift_mux;
++	u32 mask_mux;
++	void __iomem *reg_div;
++	u8 shift_div;
++};
 +
+ #define to_clk_double_div(_hw) container_of(_hw, struct clk_double_div, hw)
++#define to_clk_pm_cpu(_hw) container_of(_hw, struct clk_pm_cpu, hw)
+ 
+ struct clk_periph_data {
+ 	const char *name;
+@@ -55,6 +65,7 @@ struct clk_periph_data {
+ 	struct clk_hw *mux_hw;
+ 	struct clk_hw *rate_hw;
+ 	struct clk_hw *gate_hw;
++	struct clk_hw *muxrate_hw;
+ 	bool is_double_div;
+ };
+ 
+@@ -81,6 +92,7 @@ static const struct clk_div_table clk_table2[] = {
+ };
+ 
  static const struct clk_ops clk_double_div_ops;
++static const struct clk_ops clk_pm_cpu_ops;
  
  #define PERIPH_GATE(_name, _bit)		\
-@@ -217,7 +218,7 @@ PERIPH_CLK_FULL(counter, 23, 20, DIV_SEL0, 23, clk_table6);
- PERIPH_CLK_FULL_DD(eip97, 24, 24, DIV_SEL2, DIV_SEL2, 22, 19);
- PERIPH_CLK_MUX_DIV(cpu, 22, DIV_SEL0, 28, clk_table6);
- 
--static struct clk_periph_data data_nb[] ={
-+static struct clk_periph_data data_nb[] = {
- 	REF_CLK_FULL_DD(mmc),
- 	REF_CLK_FULL_DD(sata_host),
- 	REF_CLK_FULL_DD(sec_at),
-@@ -281,7 +282,7 @@ static unsigned int get_div(void __iomem *reg, int shift)
- }
- 
- static unsigned long clk_double_div_recalc_rate(struct clk_hw *hw,
--		unsigned long parent_rate)
-+						unsigned long parent_rate)
- {
- 	struct clk_double_div *double_div = to_clk_double_div(hw);
- 	unsigned int div;
-@@ -303,6 +304,7 @@ static const struct of_device_id armada_3700_periph_clock_of_match[] = {
- 	.data = data_sb, },
- 	{ }
+ struct clk_gate gate_##_name = {		\
+@@ -122,6 +134,18 @@ struct clk_divider rate_##_name = {		\
+ 	}					\
  };
+ 
++#define PERIPH_PM_CPU(_name, _shift1, _reg, _shift2)	\
++struct clk_pm_cpu muxrate_##_name = {		\
++	.reg_mux = (void *)TBG_SEL,		\
++	.mask_mux = 3,				\
++	.shift_mux = _shift1,			\
++	.reg_div = (void *)_reg,		\
++	.shift_div = _shift2,			\
++	.hw.init = &(struct clk_init_data){	\
++		.ops =  &clk_pm_cpu_ops,	\
++	}					\
++};
 +
- static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
- 					 void __iomem *reg, spinlock_t *lock,
- 					 struct device *dev, struct clk_hw **hw)
-@@ -355,9 +357,9 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
- 	}
+ #define PERIPH_CLK_FULL_DD(_name, _bit, _shift, _reg1, _reg2, _shift1, _shift2)\
+ static PERIPH_GATE(_name, _bit);			    \
+ static PERIPH_MUX(_name, _shift);			    \
+@@ -136,10 +160,6 @@ static PERIPH_DIV(_name, _reg, _shift1, _table);
+ static PERIPH_GATE(_name, _bit);			\
+ static PERIPH_DIV(_name, _reg, _shift, _table);
  
- 	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
--				       data->num_parents, mux_hw,
--				       mux_ops, rate_hw, rate_ops,
--				       gate_hw, gate_ops, CLK_IGNORE_UNUSED);
-+					data->num_parents, mux_hw,
-+					mux_ops, rate_hw, rate_ops,
-+					gate_hw, gate_ops, CLK_IGNORE_UNUSED);
- 
- 	if (IS_ERR(*hw))
- 		return PTR_ERR(*hw);
-@@ -406,12 +408,11 @@ static int armada_3700_periph_clock_probe(struct platform_device *pdev)
- 		if (armada_3700_add_composite_clk(&data[i], reg,
- 						  &driver_data->lock, dev, hw))
- 			dev_err(dev, "Can't register periph clock %s\n",
--			       data[i].name);
+-#define PERIPH_CLK_MUX_DIV(_name, _shift,  _reg, _shift_div, _table)	\
+-static PERIPH_MUX(_name, _shift);			    \
+-static PERIPH_DIV(_name, _reg, _shift_div, _table);
 -
-+				data[i].name);
+ #define PERIPH_CLK_MUX_DD(_name, _shift, _reg1, _reg2, _shift1, _shift2)\
+ static PERIPH_MUX(_name, _shift);			    \
+ static PERIPH_DOUBLEDIV(_name, _reg1, _reg2, _shift1, _shift2);
+@@ -180,13 +200,12 @@ static PERIPH_DOUBLEDIV(_name, _reg1, _reg2, _shift1, _shift2);
+ 	  .rate_hw = &rate_##_name.hw,				\
  	}
  
- 	ret = of_clk_add_hw_provider(np, of_clk_hw_onecell_get,
--				  driver_data->hw_data);
-+				     driver_data->hw_data);
- 	if (ret) {
- 		for (i = 0; i < num_periph; i++)
- 			clk_hw_unregister(driver_data->hw_data->hws[i]);
+-#define REF_CLK_MUX_DIV(_name)				\
++#define REF_CLK_PM_CPU(_name)				\
+ 	{ .name = #_name,				\
+ 	  .parent_names = (const char *[]){ "TBG-A-P",	\
+ 	      "TBG-B-P", "TBG-A-S", "TBG-B-S"},		\
+ 	  .num_parents = 4,				\
+-	  .mux_hw = &mux_##_name.hw,			\
+-	  .rate_hw = &rate_##_name.hw,			\
++	  .muxrate_hw = &muxrate_##_name.hw,		\
+ 	}
+ 
+ #define REF_CLK_MUX_DD(_name)				\
+@@ -216,7 +235,7 @@ PERIPH_CLK_FULL_DD(ddr_fclk, 21, 16, DIV_SEL0, DIV_SEL0, 15, 12);
+ PERIPH_CLK_FULL(trace, 22, 18, DIV_SEL0, 20, clk_table6);
+ PERIPH_CLK_FULL(counter, 23, 20, DIV_SEL0, 23, clk_table6);
+ PERIPH_CLK_FULL_DD(eip97, 24, 24, DIV_SEL2, DIV_SEL2, 22, 19);
+-PERIPH_CLK_MUX_DIV(cpu, 22, DIV_SEL0, 28, clk_table6);
++static PERIPH_PM_CPU(cpu, 22, DIV_SEL0, 28);
+ 
+ static struct clk_periph_data data_nb[] = {
+ 	REF_CLK_FULL_DD(mmc),
+@@ -235,7 +254,7 @@ static struct clk_periph_data data_nb[] = {
+ 	REF_CLK_FULL(trace),
+ 	REF_CLK_FULL(counter),
+ 	REF_CLK_FULL_DD(eip97),
+-	REF_CLK_MUX_DIV(cpu),
++	REF_CLK_PM_CPU(cpu),
+ 	{ },
+ };
+ 
+@@ -297,6 +316,37 @@ static const struct clk_ops clk_double_div_ops = {
+ 	.recalc_rate = clk_double_div_recalc_rate,
+ };
+ 
++static u8 clk_pm_cpu_get_parent(struct clk_hw *hw)
++{
++	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
++	int num_parents = clk_hw_get_num_parents(hw);
++	u32 val;
++
++	val = readl(pm_cpu->reg_mux) >> pm_cpu->shift_mux;
++	val &= pm_cpu->mask_mux;
++
++	if (val >= num_parents)
++		return -EINVAL;
++
++	return val;
++}
++
++static unsigned long clk_pm_cpu_recalc_rate(struct clk_hw *hw,
++					    unsigned long parent_rate)
++{
++	struct clk_pm_cpu *pm_cpu = to_clk_pm_cpu(hw);
++	unsigned int div;
++
++	div = get_div(pm_cpu->reg_div, pm_cpu->shift_div);
++
++	return DIV_ROUND_UP_ULL((u64)parent_rate, div);
++}
++
++static const struct clk_ops clk_pm_cpu_ops = {
++	.get_parent = clk_pm_cpu_get_parent,
++	.recalc_rate = clk_pm_cpu_recalc_rate,
++};
++
+ static const struct of_device_id armada_3700_periph_clock_of_match[] = {
+ 	{ .compatible = "marvell,armada-3700-periph-clock-nb",
+ 	  .data = data_nb, },
+@@ -356,6 +406,20 @@ static int armada_3700_add_composite_clk(const struct clk_periph_data *data,
+ 		}
+ 	}
+ 
++	if (data->muxrate_hw) {
++		struct clk_pm_cpu *pmcpu_clk;
++		struct clk_hw *muxrate_hw = data->muxrate_hw;
++
++		pmcpu_clk =  to_clk_pm_cpu(muxrate_hw);
++		pmcpu_clk->reg_mux = reg + (u64)pmcpu_clk->reg_mux;
++		pmcpu_clk->reg_div = reg + (u64)pmcpu_clk->reg_div;
++
++		mux_hw = muxrate_hw;
++		rate_hw = muxrate_hw;
++		mux_ops = muxrate_hw->init->ops;
++		rate_ops = muxrate_hw->init->ops;
++	}
++
+ 	*hw = clk_hw_register_composite(dev, data->name, data->parent_names,
+ 					data->num_parents, mux_hw,
+ 					mux_ops, rate_hw, rate_ops,
 -- 
 2.15.0
