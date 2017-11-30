@@ -1,35 +1,41 @@
-From: shawnguo@kernel.org (Shawn Guo)
-Date: Thu, 30 Nov 2017 09:34:40 +0800
-Subject: [GIT PULL] i.MX fixes for 4.15
-Message-ID: <20171130013439.GH22908@dragon>
+From: npiggin@gmail.com (Nicholas Piggin)
+Date: Thu, 30 Nov 2017 11:58:27 +1000
+Subject: [PATCH 5/7] arm64: keep .altinstructions and .altinstr_replacement
+In-Reply-To: <CAKwvOd=PcTVZaMCtY7Wy-OEi7Dd1M4hVz8mpJCQR3M+dVROdmg@mail.gmail.com>
+References: <20171129234442.655-1-samitolvanen@google.com>
+ <20171129234442.655-6-samitolvanen@google.com>
+ <CAKwvOd=PcTVZaMCtY7Wy-OEi7Dd1M4hVz8mpJCQR3M+dVROdmg@mail.gmail.com>
+Message-ID: <20171130115827.709f1818@roar.ozlabs.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+On Wed, 29 Nov 2017 15:57:53 -0800
+Nick Desaulniers <ndesaulniers@google.com> wrote:
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> On Wed, Nov 29, 2017 at 3:44 PM, Sami Tolvanen <samitolvanen@google.com> wrote:
+> > Make sure the linker doesn't remove .altinstructions or
+> > .altinstr_replacement when CONFIG_LD_DEAD_CODE_DATA_ELIMINATION is
+> > enabled.  
+> 
+> This sounds like a bug in the original implementation of
+> CONFIG_LD_DEAD_CODE_DATA_ELIMINATION? If so, this can likely get
+> merged regardless of the rest of the patchset, ie. gold support.
 
-are available in the git repository at:
+Yes, also patch 3/7 probably (thanks for doing these, btw). The
+LD_DCDE option is actually been broken upstream thanks to lack
+of time (which is a known issue, this is why no arch enables it).
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.15
+Basically it just needs a bit more effort to go through and
+ensure nothing is discarded incorrectly, and all new sections
+are placed into output sections, before each arch is enabled.
 
-for you to fetch changes up to e501506d3ea00eefa64463ebd9e5c13ee70990bd:
+(Comparing `readelf -S` before/after is a way to spot bugs.)
 
-  Revert "ARM: dts: imx53: add srtc node" (2017-11-29 10:34:45 +0800)
+So yes please if it's not too much trouble, could you remove
+the "gold" name from the generic patch and put it at the front
+of the series with this arm64 patch. Possibly then you could
+also do a 3rd patch to allow arm64 to select it if it's working
+with gcc?
 
-----------------------------------------------------------------
-i.MX fixes for 4.15:
- - A fix for vf610-zii-dev-rev-c board which correct the unit-address
-   of I2C EEPROM node to match the 'reg' property.
- - We thought the RTC block on i.MX53 is compatible with the one found
-   on i.MX25, and added the device for i.MX53 device tree.  But it turns
-   out that's not the case, and we have to revert the change.
-
-----------------------------------------------------------------
-Fabio Estevam (2):
-      ARM: dts: vf610-zii-dev-rev-c: Fix the I2C EEPROM address
-      Revert "ARM: dts: imx53: add srtc node"
-
- arch/arm/boot/dts/imx53.dtsi              | 9 ---------
- arch/arm/boot/dts/vf610-zii-dev-rev-c.dts | 2 +-
- 2 files changed, 1 insertion(+), 10 deletions(-)
+Thanks,
+Nick
