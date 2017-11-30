@@ -1,65 +1,77 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 30 Nov 2017 16:39:33 +0000
-Subject: [PATCH v2 05/18] arm64: mm: Rename post_ttbr0_update_workaround
+Date: Thu, 30 Nov 2017 16:39:42 +0000
+Subject: [PATCH v2 14/18] arm64: erratum: Work around Falkor erratum #E1003 in
+ trampoline code
 In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512059986-21325-6-git-send-email-will.deacon@arm.com>
+Message-ID: <1512059986-21325-15-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The post_ttbr0_update_workaround hook applies to any change to TTBRx_EL1.
-Since we're using TTBR1 for the ASID, rename the hook to make it clearer
-as to what it's doing.
+We rely on an atomic swizzling of TTBR1 when transitioning from the entry
+trampoline to the kernel proper on an exception. We can't rely on this
+atomicity in the face of Falkor erratum #E1003, so on affected cores we
+can issue a TLB invalidation to invalidate the walk cache prior to
+jumping into the kernel. There is still the possibility of a TLB conflict
+here due to conflicting walk cache entries prior to the invalidation, but
+this doesn't appear to be the case on these CPUs in practice.
 
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/assembler.h | 5 ++---
- arch/arm64/kernel/entry.S          | 2 +-
- arch/arm64/mm/proc.S               | 2 +-
- 3 files changed, 4 insertions(+), 5 deletions(-)
+ arch/arm64/Kconfig        | 17 +++++------------
+ arch/arm64/kernel/entry.S | 10 ++++++++++
+ 2 files changed, 15 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-index e1fa5db858b7..c45bc94f15d0 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -477,10 +477,9 @@ alternative_endif
- 	.endm
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a93339f5178f..fdcc7b9bb15d 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -522,20 +522,13 @@ config CAVIUM_ERRATUM_30115
+ config QCOM_FALKOR_ERRATUM_1003
+ 	bool "Falkor E1003: Incorrect translation due to ASID change"
+ 	default y
+-	select ARM64_PAN if ARM64_SW_TTBR0_PAN
+ 	help
+ 	  On Falkor v1, an incorrect ASID may be cached in the TLB when ASID
+-	  and BADDR are changed together in TTBRx_EL1. The workaround for this
+-	  issue is to use a reserved ASID in cpu_do_switch_mm() before
+-	  switching to the new ASID. Saying Y here selects ARM64_PAN if
+-	  ARM64_SW_TTBR0_PAN is selected. This is done because implementing and
+-	  maintaining the E1003 workaround in the software PAN emulation code
+-	  would be an unnecessary complication. The affected Falkor v1 CPU
+-	  implements ARMv8.1 hardware PAN support and using hardware PAN
+-	  support versus software PAN emulation is mutually exclusive at
+-	  runtime.
+-
+-	  If unsure, say Y.
++	  and BADDR are changed together in TTBRx_EL1. Since we keep the ASID
++	  in TTBR1_EL1, this situation only occurs in the entry trampoline and
++	  then only for entries in the walk cache, since the leaf translation
++	  is unchanged. Work around the erratum by invalidating the walk cache
++	  entries for the trampoline before entering the kernel proper.
  
- /*
--/*
-- * Errata workaround post TTBR0_EL1 update.
-+ * Errata workaround post TTBRx_EL1 update.
-  */
--	.macro	post_ttbr0_update_workaround
-+	.macro	post_ttbr_update_workaround
- #ifdef CONFIG_CAVIUM_ERRATUM_27456
- alternative_if ARM64_WORKAROUND_CAVIUM_27456
- 	ic	iallu
+ config QCOM_FALKOR_ERRATUM_1009
+ 	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 6d14b8f29b5f..804e43c9cb0b 100644
+index 99d105048663..a5ec6ab5c711 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -257,7 +257,7 @@ alternative_else_nop_endif
- 	 * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
- 	 * corruption).
- 	 */
--	post_ttbr0_update_workaround
-+	post_ttbr_update_workaround
- 	.endif
- 1:
- 	.if	\el != 0
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index f2ff0837577c..3146dc96f05b 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -145,7 +145,7 @@ ENTRY(cpu_do_switch_mm)
- 	isb
- 	msr	ttbr0_el1, x0			// now update TTBR0
- 	isb
--	post_ttbr0_update_workaround
-+	post_ttbr_update_workaround
- 	ret
- ENDPROC(cpu_do_switch_mm)
+@@ -989,6 +989,16 @@ __ni_sys_trace:
+ 	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
+ 	bic	\tmp, \tmp, #USER_ASID_FLAG
+ 	msr	ttbr1_el1, \tmp
++#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
++alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
++	movk	\tmp, #:abs_g2_nc:(TRAMP_VALIAS >> 12)
++	movk	\tmp, #:abs_g1_nc:(TRAMP_VALIAS >> 12)
++	movk	\tmp, #:abs_g0_nc:((TRAMP_VALIAS & (SZ_2M - 1)) >> 12)
++	isb
++	tlbi	vae1, \tmp
++	dsb	nsh
++alternative_else_nop_endif
++#endif /* CONFIG_QCOM_FALKOR_ERRATUM_1003 */
+ 	.endm
  
+ 	.macro tramp_unmap_kernel, tmp
 -- 
 2.1.4
