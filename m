@@ -1,35 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 30 Nov 2017 17:56:59 +0800
-Subject: why platform bus is called as virtual bus.
-In-Reply-To: <CAA2oCOm8QwS8jm51NtNpcM=BRtJGgX4eNaKEqjsdkyQmRrpAnQ@mail.gmail.com>
-References: <CAA2oCOm8QwS8jm51NtNpcM=BRtJGgX4eNaKEqjsdkyQmRrpAnQ@mail.gmail.com>
-Message-ID: <CAGb2v66YmYbmPetJHWKgG+Ai29SVd7FyJWNC4YLJ2h0NFuHAoQ@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 30 Nov 2017 11:09:11 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77970: use CPG core clock
+ macros
+In-Reply-To: <d904863e-e8c9-76ad-9d12-fd36ed68c3b4@cogentembedded.com>
+References: <20171128202105.552196002@cogentembedded.com>
+ <20171129095558.wvvcvfctwfmtrkq4@verge.net.au>
+ <d904863e-e8c9-76ad-9d12-fd36ed68c3b4@cogentembedded.com>
+Message-ID: <20171130100911.rdymtxswidey4bol@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 5:53 PM, Madhu K <madhu.sk89@gmail.com> wrote:
-> Hi All,
->
-> I have couple of doubts regarding platform bus.
->
-> 1) In arm architecture, which bus we call it as platform bus?
-> 2) Why platform bus is called as virtual bus?
+On Wed, Nov 29, 2017 at 08:00:52PM +0300, Sergei Shtylyov wrote:
+> On 11/29/2017 12:55 PM, Simon Horman wrote:
+> 
+> > > Now that the commit ecadea00f588 ("dt-bindings: clock: Add R8A77970 CPG
+> > > core clock definitions") has hit Linus' tree, we  can replace the bare
+> > > numbers (we had to use to avoid a cross tree dependency) with these macro
+> > > definitions...
+> > > 
+> > > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> > 
+> > Thanks, applied.
+> 
+>    Not seeing these 2 patches in the today's devel branch tho...
 
-The platform bus is a catch-all for devices that don't have a
-real bus type, like PCI, I2C, SPI, etc., associated with it.
-
-It is a construct within Linux, and unlike PCI which is a real
-hardware bus, hence being called a "virtual" bus.
-
-ChenYu
-
->
-> can anybody please explain the above things.
->
-> Thanks,
-> Madhu
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Strange, I don't see them either.
+I have queued them up (again?).
