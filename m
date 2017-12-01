@@ -1,106 +1,54 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Fri,  1 Dec 2017 17:22:14 +0000
-Subject: [PATCH] arm64: mm: Fix pte_mkclean, pte_mkdirty semantics
-Message-ID: <20171201172214.6834-1-steve.capper@arm.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Fri, 1 Dec 2017 17:31:20 +0000
+Subject: [PATCH RT] arm*: disable NEON in kernel mode
+In-Reply-To: <20171201171458.3a2acsltiq54gvuu@hirez.programming.kicks-ass.net>
+References: <20171130142216.GB12606@linutronix.de>
+ <20171130143028.GA1351@linutronix.de>
+ <20171201104331.GB1612@linutronix.de>
+ <20171201134506.GF1612@linutronix.de>
+ <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
+ <20171201143648.GK1612@linutronix.de>
+ <20171201171458.3a2acsltiq54gvuu@hirez.programming.kicks-ass.net>
+Message-ID: <20171201173120.GL10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On systems with hardware dirty bit management, the ltp madvise09 unit
-test fails due to dirty bit information being lost and pages being
-incorrectly freed.
+On Fri, Dec 01, 2017 at 06:14:58PM +0100, Peter Zijlstra wrote:
+> On Fri, Dec 01, 2017 at 03:36:48PM +0100, Sebastian Andrzej Siewior wrote:
+> > On 2017-12-01 14:18:28 [+0000], Mark Rutland wrote:
+> > > [Adding Ard, who wrote the NEON crypto code]
+> > > 
+> > > On Fri, Dec 01, 2017 at 02:45:06PM +0100, Sebastian Andrzej Siewior wrote:
+> > > > +arm folks, to let you know
+> > > > 
+> > > > On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
+> > > > > NEON in kernel mode is used by the crypto algorithms and raid6 code.
+> > > > > While the raid6 code looks okay, the crypto algorithms do not: NEON
+> > > > > is enabled on first invocation and may allocate/free/map memory before
+> > > > > the NEON mode is disabled again.
+> > > 
+> > > Could you elaborate on why this is a problem?
+> > > 
+> > > I guess this is because kernel_neon_{begin,end}() disable preemption?
+> > > 
+> > > ... is this specific to RT?
+> > 
+> > It is RT specific, yes. One thing are the unbounded latencies since
+> > everything in this preempt_disable section can take time depending on
+> > the size of the request.
+> 
+> Well, PREEMPT cares about that too.
 
-This was bisected to:
-	arm64: Ignore hardware dirty bit updates in ptep_set_wrprotect()
+Preempt may care, but it's the hit you take to use neon in the kernel.
+The neon register set shares with the FPU, so preempting during that
+path means that the normal FPU register saving would corrupt the
+already saved user FPU context - and even worse would result in the
+kernel's crypto function register contents being leaked to userspace.
 
-Reverting this commit leads to a separate problem, that the unit test
-retains pages that should have been dropped due to the function
-madvise_free_pte_range(.) not cleaning pte's properly.
+If you care about preempt deeply, the only solution is to avoid using
+kernel mode neon.
 
-Currently pte_mkclean only clears the software dirty bit, thus the
-following code sequence can appear:
-
-	pte = pte_mkclean(pte);
-	if (pte_dirty(pte))
-		// this condition can return true with HW DBM!
-
-This patch also adjusts pte_mkclean to set PTE_RDONLY thus effectively
-clearing both the SW and HW dirty information.
-
-In order for this to function on systems without HW DBM, we need to
-also adjust pte_mkdirty to remove the read only bit from writable pte's
-to avoid infinite fault loops.
-
-Reported-by: Bhupinder Thakur <bhupinder.thakur@linaro.org>
-Fixes: 64c26841b349 ("arm64: Ignore hardware dirty bit updates in
-ptep_set_wrprotect()")
-Signed-off-by: Steve Capper <steve.capper@arm.com>
----
- arch/arm64/include/asm/pgtable.h | 33 ++++++++++++++++++---------------
- 1 file changed, 18 insertions(+), 15 deletions(-)
-
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index b46e54c2399b..0fa7305765ab 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -135,12 +135,20 @@ static inline pte_t pte_mkwrite(pte_t pte)
- 
- static inline pte_t pte_mkclean(pte_t pte)
- {
--	return clear_pte_bit(pte, __pgprot(PTE_DIRTY));
-+	pte = clear_pte_bit(pte, __pgprot(PTE_DIRTY));
-+	pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
-+
-+	return pte;
- }
- 
- static inline pte_t pte_mkdirty(pte_t pte)
- {
--	return set_pte_bit(pte, __pgprot(PTE_DIRTY));
-+	pte = set_pte_bit(pte, __pgprot(PTE_DIRTY));
-+
-+	if (pte_write(pte))
-+		pte = clear_pte_bit(pte, __pgprot(PTE_RDONLY));
-+
-+	return pte;
- }
- 
- static inline pte_t pte_mkold(pte_t pte)
-@@ -628,28 +636,23 @@ static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm,
- #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
- 
- /*
-- * ptep_set_wrprotect - mark read-only while preserving the hardware update of
-- * the Access Flag.
-+ * ptep_set_wrprotect - mark read-only while trasferring potential hardware
-+ * dirty status (PTE_DBM && !PTE_RDONLY) to the software PTE_DIRTY bit.
-  */
- #define __HAVE_ARCH_PTEP_SET_WRPROTECT
- static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long address, pte_t *ptep)
- {
- 	pte_t old_pte, pte;
- 
--	/*
--	 * ptep_set_wrprotect() is only called on CoW mappings which are
--	 * private (!VM_SHARED) with the pte either read-only (!PTE_WRITE &&
--	 * PTE_RDONLY) or writable and software-dirty (PTE_WRITE &&
--	 * !PTE_RDONLY && PTE_DIRTY); see is_cow_mapping() and
--	 * protection_map[]. There is no race with the hardware update of the
--	 * dirty state: clearing of PTE_RDONLY when PTE_WRITE (a.k.a. PTE_DBM)
--	 * is set.
--	 */
--	VM_WARN_ONCE(pte_write(*ptep) && !pte_dirty(*ptep),
--		     "%s: potential race with hardware DBM", __func__);
- 	pte = READ_ONCE(*ptep);
- 	do {
- 		old_pte = pte;
-+		/*
-+		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
-+		 * clear), set the PTE_DIRTY bit.
-+		 */
-+		if (pte_hw_dirty(pte))
-+			pte = pte_mkdirty(pte);
- 		pte = pte_wrprotect(pte);
- 		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
- 					       pte_val(old_pte), pte_val(pte));
 -- 
-2.11.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
