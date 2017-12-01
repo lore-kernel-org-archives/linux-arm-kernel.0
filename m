@@ -1,103 +1,112 @@
 From: brueckner@linux.vnet.ibm.com (Hendrik Brueckner)
-Date: Fri,  1 Dec 2017 15:19:08 +0100
-Subject: [PATCH 5/5] perf s390: add regs_query_register_offset()
+Date: Fri,  1 Dec 2017 15:19:05 +0100
+Subject: [PATCH 2/5] s390/bpf: correct broken uapi for
+ BPF_PROG_TYPE_PERF_EVENT program type
 In-Reply-To: <1512137948-31729-1-git-send-email-brueckner@linux.vnet.ibm.com>
 References: <1512137948-31729-1-git-send-email-brueckner@linux.vnet.ibm.com>
-Message-ID: <1512137948-31729-6-git-send-email-brueckner@linux.vnet.ibm.com>
+Message-ID: <1512137948-31729-3-git-send-email-brueckner@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The regs_query_register_offset() helper function converts
-register name like "%r0" to an offset of a register in user_pt_regs
-It is required by the BPF prologue generator.
+To mitigate and correct the broken uapi for the BPF_PROG_TYPE_PERF_EVENT
+program type, introduce a user_pt_regs structure (similar to arm64) that
+exports parts from the beginnig of the pt_regs structure.
 
-The user_pt_regs structure was recently added to "asm/ptrace.h".
-Hence, update tools/perf/check-headers.sh to keep the header file
-in sync with kernel changes.
+The export must start with the beginning of the pt_regs structure because
+to correctly calculate BPF prologues for perf (regs_query_register_offset()).
 
-Suggested-by: Thomas Richter <tmricht@linux.vnet.ibm.com>
+For BPF_PROG_TYPE_PERF_EVENT program types, the BPF program is then passed
+a user_pt_regs structure.
+
+Note: Depending on future changes to the s390 pt_regs structure, consider
+the user_pt_regs structure to be stable for a particular kernel version
+only. (Of course, s390 tries to ensure keep it stable as much as possible.)
+
 Signed-off-by: Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
 Reviewed-and-tested-by: Thomas Richter <tmricht@linux.vnet.ibm.com>
-Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
-Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Martin Schwidefsky <schwidefsky@de.ibm.com>
 Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
+Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Alexei Starovoitov <ast@kernel.org>
+Cc: Daniel Borkmann <daniel@iogearbox.net>
 ---
- tools/perf/arch/s390/Makefile          |  1 +
- tools/perf/arch/s390/util/dwarf-regs.c | 32 +++++++++++++++++++++++++++++---
- tools/perf/check-headers.sh            |  1 +
- 3 files changed, 31 insertions(+), 3 deletions(-)
+ arch/s390/include/asm/perf_event.h          |  1 +
+ arch/s390/include/asm/ptrace.h              | 11 ++++++++---
+ arch/s390/include/uapi/asm/bpf_perf_event.h |  9 +++++++++
+ arch/s390/include/uapi/asm/ptrace.h         | 11 +++++++++++
+ 4 files changed, 29 insertions(+), 3 deletions(-)
+ create mode 100644 arch/s390/include/uapi/asm/bpf_perf_event.h
 
-diff --git a/tools/perf/arch/s390/Makefile b/tools/perf/arch/s390/Makefile
-index 21322e0..09ba923 100644
---- a/tools/perf/arch/s390/Makefile
-+++ b/tools/perf/arch/s390/Makefile
-@@ -2,3 +2,4 @@ ifndef NO_DWARF
- PERF_HAVE_DWARF_REGS := 1
- endif
- HAVE_KVM_STAT_SUPPORT := 1
-+PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
-diff --git a/tools/perf/arch/s390/util/dwarf-regs.c b/tools/perf/arch/s390/util/dwarf-regs.c
-index f47576c..a8ace5c 100644
---- a/tools/perf/arch/s390/util/dwarf-regs.c
-+++ b/tools/perf/arch/s390/util/dwarf-regs.c
-@@ -2,17 +2,43 @@
- /*
-  * Mapping of DWARF debug register numbers into register names.
-  *
-- *    Copyright IBM Corp. 2010
-- *    Author(s): Heiko Carstens <heiko.carstens@de.ibm.com>,
-+ * Copyright IBM Corp. 2010, 2017
-+ * Author(s): Heiko Carstens <heiko.carstens@de.ibm.com>,
-+ *	      Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
-  *
+diff --git a/arch/s390/include/asm/perf_event.h b/arch/s390/include/asm/perf_event.h
+index d6c9d1e..b9c0e36 100644
+--- a/arch/s390/include/asm/perf_event.h
++++ b/arch/s390/include/asm/perf_event.h
+@@ -40,6 +40,7 @@ extern ssize_t cpumf_events_sysfs_show(struct device *dev,
+ extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
+ extern unsigned long perf_misc_flags(struct pt_regs *regs);
+ #define perf_misc_flags(regs) perf_misc_flags(regs)
++#define perf_arch_bpf_user_pt_regs(regs) &regs->user_regs
+ 
+ /* Perf pt_regs extension for sample-data-entry indicators */
+ struct perf_sf_sde_regs {
+diff --git a/arch/s390/include/asm/ptrace.h b/arch/s390/include/asm/ptrace.h
+index a3788da..6f70d81 100644
+--- a/arch/s390/include/asm/ptrace.h
++++ b/arch/s390/include/asm/ptrace.h
+@@ -74,9 +74,14 @@ enum {
   */
- 
-+#include <errno.h>
- #include <stddef.h>
--#include <dwarf-regs.h>
-+#include <stdlib.h>
- #include <linux/kernel.h>
-+#include <asm/ptrace.h>
-+#include <string.h>
-+#include <dwarf-regs.h>
- #include "dwarf-regs-table.h"
- 
- const char *get_arch_regstr(unsigned int n)
+ struct pt_regs 
  {
- 	return (n >= ARRAY_SIZE(s390_dwarf_regs)) ? NULL : s390_dwarf_regs[n];
- }
+-	unsigned long args[1];
+-	psw_t psw;
+-	unsigned long gprs[NUM_GPRS];
++	union {
++		user_pt_regs user_regs;
++		struct {
++			unsigned long args[1];
++			psw_t psw;
++			unsigned long gprs[NUM_GPRS];
++		};
++	};
+ 	unsigned long orig_gpr2;
+ 	unsigned int int_code;
+ 	unsigned int int_parm;
+diff --git a/arch/s390/include/uapi/asm/bpf_perf_event.h b/arch/s390/include/uapi/asm/bpf_perf_event.h
+new file mode 100644
+index 0000000..cefe7c7
+--- /dev/null
++++ b/arch/s390/include/uapi/asm/bpf_perf_event.h
+@@ -0,0 +1,9 @@
++/* SPDX-License-Identifier: GPL-2.0 */
++#ifndef _UAPI__ASM_BPF_PERF_EVENT_H__
++#define _UAPI__ASM_BPF_PERF_EVENT_H__
++
++#include <asm/ptrace.h>
++
++typedef user_pt_regs bpf_user_pt_regs_t;
++
++#endif /* _UAPI__ASM_BPF_PERF_EVENT_H__ */
+diff --git a/arch/s390/include/uapi/asm/ptrace.h b/arch/s390/include/uapi/asm/ptrace.h
+index 0d23c8f..70f7cb2 100644
+--- a/arch/s390/include/uapi/asm/ptrace.h
++++ b/arch/s390/include/uapi/asm/ptrace.h
+@@ -291,6 +291,17 @@
+ } s390_regs;
+ 
+ /*
++ * The user_pt_regs structure exports the beginning of
++ * the in-kernel pt_regs structure to user space.
++ */
++typedef struct
++{
++	unsigned long args[1];
++	psw_t psw;
++	unsigned long gprs[NUM_GPRS];
++} user_pt_regs;
 +
 +/*
-+ * Convert the register name into an offset to struct pt_regs (kernel).
-+ * This is required by the BPF prologue generator.  The BPF
-+ * program is called in the BPF overflow handler in the perf
-+ * core.
-+ */
-+int regs_query_register_offset(const char *name)
-+{
-+	unsigned long gpr;
-+
-+	if (!name || strncmp(name, "%r", 2))
-+		return -EINVAL;
-+
-+	errno = 0;
-+	gpr = strtoul(name + 2, NULL, 10);
-+	if (errno || gpr >= 16)
-+		return -EINVAL;
-+
-+	return offsetof(user_pt_regs, gprs) + 8 * gpr;
-+}
-diff --git a/tools/perf/check-headers.sh b/tools/perf/check-headers.sh
-index 77406d2..6db9d80 100755
---- a/tools/perf/check-headers.sh
-+++ b/tools/perf/check-headers.sh
-@@ -30,6 +30,7 @@ arch/x86/include/uapi/asm/vmx.h
- arch/powerpc/include/uapi/asm/kvm.h
- arch/s390/include/uapi/asm/kvm.h
- arch/s390/include/uapi/asm/kvm_perf.h
-+arch/s390/include/uapi/asm/ptrace.h
- arch/s390/include/uapi/asm/sie.h
- arch/arm/include/uapi/asm/kvm.h
- arch/arm64/include/uapi/asm/kvm.h
+  * Now for the user space program event recording (trace) definitions.
+  * The following structures are used only for the ptrace interface, don't
+  * touch or even look at it if you don't want to modify the user-space
 -- 
 1.8.3.1
