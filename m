@@ -1,59 +1,60 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Dec 2017 16:49:44 +0000
-Subject: [PATCH v2 18/18] perf: arm_spe: Disallow userspace profiling
- when arm_kernel_unmapped_at_el0()
-In-Reply-To: <20171201121505.5k2rif5hxsh4nu7f@lakrids.cambridge.arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <1512059986-21325-19-git-send-email-will.deacon@arm.com>
- <20171201121505.5k2rif5hxsh4nu7f@lakrids.cambridge.arm.com>
-Message-ID: <20171201164943.GJ14823@arm.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 01 Dec 2017 17:59:43 +0100
+Subject: [PATCH v3 3/3] arm64: dts: meson-axg: add clock DT info for
+ Meson AXG SoC
+In-Reply-To: <20171201163437.GE19419@codeaurora.org>
+References: <20171128125330.363-1-yixun.lan@amlogic.com>
+ <20171128125330.363-4-yixun.lan@amlogic.com>
+ <20171129193536.GB19419@codeaurora.org>
+ <8353c264-3253-0268-91fc-8d42fbe82611@amlogic.com>
+ <20171201163437.GE19419@codeaurora.org>
+Message-ID: <1512147583.12869.10.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 12:15:06PM +0000, Mark Rutland wrote:
-> On Thu, Nov 30, 2017 at 04:39:46PM +0000, Will Deacon wrote:
-> > When running with the kernel unmapped whilst at EL0, the virtually-addressed
-> > SPE buffer is also unmapped, which can lead to buffer faults if userspace
-> > profiling is enabled.
+On Fri, 2017-12-01 at 08:34 -0800, Stephen Boyd wrote:
+> On 11/30, Yixun Lan wrote:
+> > Hi Stephen
 > > 
-> > This patch prohibits SPE profiling of userspace when
-> > arm_kernel_unmapped_at_el0().
+> > On 11/30/17 03:35, Stephen Boyd wrote:
+> > > On 11/28, Yixun Lan wrote:
+> > > > diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > > > b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > > > index b932a784b02a..36a2e98338a8 100644
+> > > > --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > > > +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > > > @@ -7,6 +7,7 @@
+> > > >  #include <dt-bindings/gpio/gpio.h>
+> > > >  #include <dt-bindings/interrupt-controller/irq.h>
+> > > >  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> > > > +#include <dt-bindings/clock/axg-clkc.h>
+> > > >  
+> > > >  / {
+> > > >  	compatible = "amlogic,meson-axg";
+> > > > @@ -148,6 +149,20 @@
+> > > >  			#address-cells = <0>;
+> > > >  		};
+> > > >  
+> > > > +		hiubus: hiubus at ff63c000 {
+> > > 
+> > > Maybe just call the node "bus at ff63c000"?
+> > > 
 > > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  drivers/perf/arm_spe_pmu.c | 7 +++++++
-> >  1 file changed, 7 insertions(+)
+> > isn't this just a name? what's the benefits to change?
+> > personally, I tend to keep it this way, because it's better map to the
+> > data sheet
 > > 
-> > diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-> > index 8ce262fc2561..c028db8973a4 100644
-> > --- a/drivers/perf/arm_spe_pmu.c
-> > +++ b/drivers/perf/arm_spe_pmu.c
-> > @@ -675,6 +675,13 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
-> >  		return -EOPNOTSUPP;
-> >  
-> >  	/*
-> > +	 * If kernelspace is unmapped when running at EL0, then the SPE
-> > +	 * buffer will fault and prematurely terminate the AUX session.
-> > +	 */
-> > +	if (arm64_kernel_unmapped_at_el0() && !attr->exclude_user)
-> > +		dev_warn_once(&spe_pmu->pdev->dev, "unable to write to profiling buffer from EL0. Try passing \"kaiser=off\" on the kernel command line");
+> > we also has 'aobus', 'cbus' scattered there..
 > 
-> The commit messages sats this prohibits profiling, but we simply log a
-> message.
+> Per the ePAPR node names are supposed to be generic, like disk,
+> cpu, display-controller, gpu, etc. I've never heard of a hiubus,
+> so probably it's some vendor specific thing? We have the phandle
+> anyway so it's not like we're losing much information here.
+
+Stephen, there is a lot of busses on platform. We can't just call them all
+'bus'.
+I don't get the problem with this name.
+We are re-using the name from the datasheet here, no fancy invention. It seems
+to be quite common. 
+
 > 
-> I take it you meant to return an error code, too?
-
-To be honest with you, I've been changing my mind a lot about what to do
-here and the code has ended up being a bit of a mess after I've butchered
-it repeatedly.
-
-The fact remains that there aren't any SPE-capable CPUs shipping at the
-moment, so I'm inclined just to fail the probe for now and we can look
-at whether or not we can do better when we've got some hardware to play
-with.
-
-And I'll add the missing newline.
-
-Thanks,
-
-Will
