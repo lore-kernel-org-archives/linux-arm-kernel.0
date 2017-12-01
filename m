@@ -1,33 +1,34 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 01 Dec 2017 14:05:20 +0100
-Subject: [PATCH v2 04/11] ARM: dts: imx6dl: Pass the reg properties for
- mipi nodes
-In-Reply-To: <1511981684-13433-4-git-send-email-festevam@gmail.com>
-References: <1511981684-13433-1-git-send-email-festevam@gmail.com>
- <1511981684-13433-4-git-send-email-festevam@gmail.com>
-Message-ID: <1512133520.5918.14.camel@pengutronix.de>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Dec 2017 13:31:59 +0000
+Subject: [PATCH v2 10/18] arm64: entry: Add exception trampoline page for
+ exceptions from EL0
+In-Reply-To: <1512059986-21325-11-git-send-email-will.deacon@arm.com>
+References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
+ <1512059986-21325-11-git-send-email-will.deacon@arm.com>
+Message-ID: <20171201133159.qphu3mc3uybm46js@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2017-11-29 at 16:54 -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Pass the reg properties for mipi nodes in order to fix the
-> following build warnings with W=1:
-> 
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 1/endpoint at 0 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 1/endpoint at 1 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 2/endpoint at 0 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 2/endpoint at 1 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 3/endpoint at 0 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 3/endpoint at 1 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 4/endpoint at 0 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6dl-apf6dev.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 4/endpoint at 1 has a unit name, but no reg property
-> 
-> Cc: Philipp Zabel <p.zabel@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+On Thu, Nov 30, 2017 at 04:39:38PM +0000, Will Deacon wrote:
+> +	.macro tramp_ventry, regsize = 64
+> +	.align	7
+> +1:
+> +	.if	\regsize == 64
+> +	msr	tpidrro_el0, x30
+> +	.endif
+> +	tramp_map_kernel	x30
+> +	ldr	x30, =vectors
+> +	prfm	plil1strm, [x30, #(1b - tramp_vectors)]
+> +	msr	vbar_el1, x30
+> +	add	x30, x30, #(1b - tramp_vectors)
+> +	isb
+> +	br	x30
+> +	.endm
 
-Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
+It might be worth a comment that the real vectors will restore x30 from
+tpiddro_el0, since as-is, it looks like we're corrupting the value.
 
-regards
-Philipp
+Otherwise, this looks good to me.
+
+Thanks,
+Mark.
