@@ -1,64 +1,67 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 30 Nov 2017 21:52:54 -0500
-Subject: [PATCH V4 3/5] device property: Introduce a common API to fetch
- device match data
+Date: Thu, 30 Nov 2017 21:52:53 -0500
+Subject: [PATCH V4 2/5] ACPI / bus: Introduce acpi_get_match_data() function
 In-Reply-To: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
 References: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1512096776-22883-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512096776-22883-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an OF/ACPI function to obtain the driver data. We want to hide
-OF/ACPI details from the device drivers and abstract following the device
-family of functions.
+OF has of_device_get_match_data() function to extract driver specific data
+structure. Add a similar function for ACPI.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/base/property.c  | 14 ++++++++++++++
- include/linux/property.h |  2 ++
- 2 files changed, 16 insertions(+)
+ drivers/acpi/bus.c   | 12 ++++++++++++
+ include/linux/acpi.h |  6 ++++++
+ 2 files changed, 18 insertions(+)
 
-diff --git a/drivers/base/property.c b/drivers/base/property.c
-index 7ed99c1..6adec89 100644
---- a/drivers/base/property.c
-+++ b/drivers/base/property.c
-@@ -15,6 +15,7 @@
- #include <linux/kernel.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_device.h>
- #include <linux/of_graph.h>
- #include <linux/property.h>
- #include <linux/etherdevice.h>
-@@ -1335,3 +1336,16 @@ int fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
- 	return fwnode_call_int_op(fwnode, graph_parse_endpoint, endpoint);
+diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+index 4d0979e..b271eb1 100644
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -785,6 +785,18 @@ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
  }
- EXPORT_SYMBOL(fwnode_graph_parse_endpoint);
-+
-+void *device_get_match_data(struct device *dev)
+ EXPORT_SYMBOL_GPL(acpi_match_device);
+ 
++void *acpi_get_match_data(const struct device *dev)
 +{
-+	void *ret;
++	const struct acpi_device_id *match;
 +
-+	if (IS_ENABLED(CONFIG_OF) && dev->of_node)
-+		ret = (void *)of_device_get_match_data(dev);
-+	else
-+		ret = acpi_get_match_data(dev);
++	match = acpi_match_device(dev->driver->acpi_match_table, dev);
++	if (!match)
++		return NULL;
 +
-+	return ret;
++	return (void *)match->driver_data;
 +}
-+EXPORT_SYMBOL_GPL(device_get_match_data);
-diff --git a/include/linux/property.h b/include/linux/property.h
-index 6bebee1..01fa55b 100644
---- a/include/linux/property.h
-+++ b/include/linux/property.h
-@@ -275,6 +275,8 @@ int device_add_properties(struct device *dev,
- 
- enum dev_dma_attr device_get_dma_attr(struct device *dev);
- 
-+void *device_get_match_data(struct device *dev);
++EXPORT_SYMBOL_GPL(acpi_get_match_data);
 +
- int device_get_phy_mode(struct device *dev);
+ int acpi_match_device_ids(struct acpi_device *device,
+ 			  const struct acpi_device_id *ids)
+ {
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 502af53..a927260 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -584,6 +584,7 @@ extern int acpi_nvs_for_each_region(int (*func)(__u64, __u64, void *),
+ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
+ 					       const struct device *dev);
  
- void *device_get_mac_address(struct device *dev, char *addr, int alen);
++void *acpi_get_match_data(const struct device *dev);
+ extern bool acpi_driver_match_device(struct device *dev,
+ 				     const struct device_driver *drv);
+ int acpi_device_uevent_modalias(struct device *, struct kobj_uevent_env *);
+@@ -755,6 +756,11 @@ static inline const struct acpi_device_id *acpi_match_device(
+ 	return NULL;
+ }
+ 
++static inline void *acpi_get_match_data(const struct device *dev)
++{
++	return NULL;
++}
++
+ static inline bool acpi_driver_match_device(struct device *dev,
+ 					    const struct device_driver *drv)
+ {
 -- 
 1.9.1
