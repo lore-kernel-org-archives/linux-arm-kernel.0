@@ -1,52 +1,33 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Dec 2017 08:34:37 -0800
-Subject: [PATCH v3 3/3] arm64: dts: meson-axg: add clock DT info for
- Meson AXG SoC
-In-Reply-To: <8353c264-3253-0268-91fc-8d42fbe82611@amlogic.com>
-References: <20171128125330.363-1-yixun.lan@amlogic.com>
- <20171128125330.363-4-yixun.lan@amlogic.com>
- <20171129193536.GB19419@codeaurora.org>
- <8353c264-3253-0268-91fc-8d42fbe82611@amlogic.com>
-Message-ID: <20171201163437.GE19419@codeaurora.org>
+From: ludovic.Barre@st.com (Ludovic Barre)
+Date: Fri, 1 Dec 2017 17:36:50 +0100
+Subject: [PATCH  1/2] serial: stm32: add default console
+In-Reply-To: <1512146211-29086-1-git-send-email-ludovic.Barre@st.com>
+References: <1512146211-29086-1-git-send-email-ludovic.Barre@st.com>
+Message-ID: <1512146211-29086-2-git-send-email-ludovic.Barre@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30, Yixun Lan wrote:
-> Hi Stephen
-> 
-> On 11/30/17 03:35, Stephen Boyd wrote:
-> > On 11/28, Yixun Lan wrote:
-> >> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> >> index b932a784b02a..36a2e98338a8 100644
-> >> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> >> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> >> @@ -7,6 +7,7 @@
-> >>  #include <dt-bindings/gpio/gpio.h>
-> >>  #include <dt-bindings/interrupt-controller/irq.h>
-> >>  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >> +#include <dt-bindings/clock/axg-clkc.h>
-> >>  
-> >>  / {
-> >>  	compatible = "amlogic,meson-axg";
-> >> @@ -148,6 +149,20 @@
-> >>  			#address-cells = <0>;
-> >>  		};
-> >>  
-> >> +		hiubus: hiubus at ff63c000 {
-> > 
-> > Maybe just call the node "bus at ff63c000"?
-> > 
-> isn't this just a name? what's the benefits to change?
-> personally, I tend to keep it this way, because it's better map to the
-> data sheet
-> 
-> we also has 'aobus', 'cbus' scattered there..
+From: Ludovic Barre <ludovic.barre@st.com>
 
-Per the ePAPR node names are supposed to be generic, like disk,
-cpu, display-controller, gpu, etc. I've never heard of a hiubus,
-so probably it's some vendor specific thing? We have the phandle
-anyway so it's not like we're losing much information here.
+This patch adds by default the console support
+on stm32.
 
+Signed-off-by: Ludovic Barre <ludovic.barre@st.com>
+---
+ drivers/tty/serial/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+index b788fee..969e598 100644
+--- a/drivers/tty/serial/Kconfig
++++ b/drivers/tty/serial/Kconfig
+@@ -1664,6 +1664,7 @@ config SERIAL_STM32_CONSOLE
+ 	bool "Support for console on STM32"
+ 	depends on SERIAL_STM32=y
+ 	select SERIAL_CORE_CONSOLE
++	default y
+ 
+ config SERIAL_MVEBU_UART
+ 	bool "Marvell EBU serial port support"
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
