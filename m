@@ -1,10 +1,10 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Dec 2017 17:24:45 -0200
-Subject: [PATCH 12/12] ARM: dts: imx6ul-14x14-evk: Move regulators out of
+Date: Fri,  1 Dec 2017 17:24:39 -0200
+Subject: [PATCH 06/12] ARM: dts: imx6qdl-aristainetos: Move regulators out of
  simple-bus
 In-Reply-To: <1512156285-18451-1-git-send-email-festevam@gmail.com>
 References: <1512156285-18451-1-git-send-email-festevam@gmail.com>
-Message-ID: <1512156285-18451-12-git-send-email-festevam@gmail.com>
+Message-ID: <1512156285-18451-6-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,43 +13,192 @@ From: Fabio Estevam <fabio.estevam@nxp.com>
 It is not recommended to place regulator nodes inside simple-bus, so
 move them out in order to fix the following build warnings with W=1:
 
-arch/arm/boot/dts/imx6ul-14x14-evk.dtb: Warning (simple_bus_reg): Node /regulators/sd1_regulator missing or empty reg/ranges property
+arch/arm/boot/dts/imx6dl-aristainetos_4.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+arch/arm/boot/dts/imx6dl-aristainetos_4.dtb: Warning (unit_address_vs_reg): Node /regulators/regulator at 0 has a unit name, but no reg property
+arch/arm/boot/dts/imx6dl-aristainetos_4.dtb: Warning (unit_address_vs_reg): Node /regulators/regulator at 1 has a unit name, but no reg property
+arch/arm/boot/dts/imx6dl-aristainetos_4.dtb: Warning (unit_address_vs_reg): Node /regulators/regulator at 2 has a unit name, but no reg property
+arch/arm/boot/dts/imx6dl-aristainetos_4.dtb: Warning (unit_address_vs_reg): Node /regulators/regulator at 3 has a unit name, but no reg property
 
+Cc: Heiko Schocher <hs@denx.de>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6ul-14x14-evk.dts | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
+ arch/arm/boot/dts/imx6qdl-aristainetos.dtsi  | 73 +++++++++++++-------------
+ arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi | 76 +++++++++++++---------------
+ 2 files changed, 70 insertions(+), 79 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6ul-14x14-evk.dts b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-index e5d3ef8..18fdb08 100644
---- a/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-+++ b/arch/arm/boot/dts/imx6ul-14x14-evk.dts
-@@ -30,19 +30,14 @@
- 		status = "okay";
- 	};
+diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
+index 7d64075..ee4d0f8 100644
+--- a/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-aristainetos.dtsi
+@@ -12,48 +12,43 @@
+ #include <dt-bindings/gpio/gpio.h>
  
+ / {
 -	regulators {
 -		compatible = "simple-bus";
 -		#address-cells = <1>;
 -		#size-cells = <0>;
- 
--		reg_sd1_vmmc: sd1_regulator {
+-
+-		reg_2p5v: regulator at 0 {
 -			compatible = "regulator-fixed";
--			regulator-name = "VSD_3V3";
+-			regulator-name = "2P5V";
+-			regulator-min-microvolt = <2500000>;
+-			regulator-max-microvolt = <2500000>;
+-			regulator-always-on;
+-		};
+ 
+-		reg_3p3v: regulator at 1 {
+-			compatible = "regulator-fixed";
+-			regulator-name = "3P3V";
 -			regulator-min-microvolt = <3300000>;
 -			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
--			enable-active-high;
+-			regulator-always-on;
 -		};
-+	reg_sd1_vmmc: regulator-sd1-vmmc {
++	reg_2p5v: regulator-2p5v {
 +		compatible = "regulator-fixed";
-+		regulator-name = "VSD_3V3";
++		regulator-name = "2P5V";
++		regulator-min-microvolt = <2500000>;
++		regulator-max-microvolt = <2500000>;
++		regulator-always-on;
++	};
+ 
+-		reg_usbh1_vbus: regulator at 2 {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio3 31 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_aristainetos_usbh1_vbus>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
 +		regulator-min-microvolt = <3300000>;
 +		regulator-max-microvolt = <3300000>;
-+		gpio = <&gpio1 9 GPIO_ACTIVE_HIGH>;
++		regulator-always-on;
++	};
+ 
+-		reg_usbotg_vbus: regulator at 3 {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_aristainetos_usbotg_vbus>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_usbh1_vbus: regulator-usbh1-vbus {
++		compatible = "regulator-fixed";
 +		enable-active-high;
++		gpio = <&gpio3 31 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_aristainetos_usbh1_vbus>;
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	reg_usbotg_vbus: regulator-usbotg-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_aristainetos_usbotg_vbus>;
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
+ 	};
+ };
+ 
+diff --git a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+index 1b18728..3767508 100644
+--- a/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-aristainetos2.dtsi
+@@ -52,46 +52,42 @@
+ 		enable-gpios = <&gpio6 31 GPIO_ACTIVE_HIGH>;
  	};
  
- 	sound {
+-	regulators {
+-		compatible = "simple-bus";
+-
+-		reg_2p5v: 2p5v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "2P5V";
+-			regulator-min-microvolt = <2500000>;
+-			regulator-max-microvolt = <2500000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_3p3v: 3p3v {
+-			compatible = "regulator-fixed";
+-			regulator-name = "3P3V";
+-			regulator-min-microvolt = <3300000>;
+-			regulator-max-microvolt = <3300000>;
+-			regulator-always-on;
+-		};
+-
+-		reg_usbh1_vbus: usb-h1-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_aristainetos2_usbh1_vbus>;
+-			regulator-name = "usb_h1_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
+-
+-		reg_usbotg_vbus: usb-otg-vbus {
+-			compatible = "regulator-fixed";
+-			enable-active-high;
+-			gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
+-			pinctrl-names = "default";
+-			pinctrl-0 = <&pinctrl_aristainetos2_usbotg_vbus>;
+-			regulator-name = "usb_otg_vbus";
+-			regulator-min-microvolt = <5000000>;
+-			regulator-max-microvolt = <5000000>;
+-		};
++	reg_2p5v: regulator-2p5v {
++		compatible = "regulator-fixed";
++		regulator-name = "2P5V";
++		regulator-min-microvolt = <2500000>;
++		regulator-max-microvolt = <2500000>;
++		regulator-always-on;
++	};
++
++	reg_3p3v: regulator-3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++	};
++
++	reg_usbh1_vbus: regulator-usbh1-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio1 0 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_aristainetos2_usbh1_vbus>;
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	reg_usbotg_vbus: regulator-usbotg-vbus {
++		compatible = "regulator-fixed";
++		enable-active-high;
++		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_aristainetos2_usbotg_vbus>;
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
+ 	};
+ };
+ 
 -- 
 2.7.4
