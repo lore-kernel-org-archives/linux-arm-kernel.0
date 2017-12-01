@@ -1,68 +1,51 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Dec 2017 11:24:58 +0000
-Subject: [PATCH v4 2/2] arm64: Add software workaround for Falkor erratum
- 1041
-In-Reply-To: <1511824680-16397-3-git-send-email-shankerd@codeaurora.org>
-References: <1511824680-16397-1-git-send-email-shankerd@codeaurora.org>
- <1511824680-16397-3-git-send-email-shankerd@codeaurora.org>
-Message-ID: <20171201112457.GE18083@arm.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 1 Dec 2017 12:09:08 +0100
+Subject: [PATCH v2 0/4] ARM: dts: renesas: Convert to named i2c-gpio
+ bindings
+In-Reply-To: <20171201081850.4tqbnlvxdax7phfs@verge.net.au>
+References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
+ <20171201081850.4tqbnlvxdax7phfs@verge.net.au>
+Message-ID: <20171201110908.u7xjrt7xmlqgigvy@ninjato>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 27, 2017 at 05:18:00PM -0600, Shanker Donthineni wrote:
-> The ARM architecture defines the memory locations that are permitted
-> to be accessed as the result of a speculative instruction fetch from
-> an exception level for which all stages of translation are disabled.
-> Specifically, the core is permitted to speculatively fetch from the
-> 4KB region containing the current program counter 4K and next 4K.
+On Fri, Dec 01, 2017 at 09:18:55AM +0100, Simon Horman wrote:
+> On Thu, Nov 30, 2017 at 01:57:22PM +0100, Geert Uytterhoeven wrote:
+> > 	Hi Simon, Magnus,
+> > 
+> > Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
+> > named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
+> > gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
+> > more error-prone unnamed variant.
+> > 
+> > This patch series switches all Renesas boards to the new bindings, and
+> > adds the missing GPIO_OPEN_DRAIN I/O flags, which were implicitly
+> > assumed before.  The latter gets rid of messages like:
+> > 
+> >     gpio-208 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
+> >     gpio-91 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
+> > 
+> > Patch 1 was extracted from series "[PATCH/RFC 0/3] i2c: gpio: Add
+> > support for named gpios in DT", hence the v2.  All other patches are
+> > new.
+> > 
+> > Note that after this series is applied, the i2c-gpio buses are no longer
+> > detected when booting new DTBs on old (v4.14 and older) kernels, which
+> > should not be an issue.  Booting old DTBs on new kernels is not
+> > affected.
+> > 
+> > Thanks for applying!
 > 
-> When translation is changed from enabled to disabled for the running
-> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
-> Falkor core may errantly speculatively access memory locations outside
-> of the 4KB region permitted by the architecture. The errant memory
-> access may lead to one of the following unexpected behaviors.
-> 
-> 1) A System Error Interrupt (SEI) being raised by the Falkor core due
->    to the errant memory access attempting to access a region of memory
->    that is protected by a slave-side memory protection unit.
-> 2) Unpredictable device behavior due to a speculative read from device
->    memory. This behavior may only occur if the instruction cache is
->    disabled prior to or coincident with translation being changed from
->    enabled to disabled.
-> 
-> The conditions leading to this erratum will not occur when either of the
-> following occur:
->  1) A higher exception level disables translation of a lower exception level
->    (e.g. EL2 changing SCTLR_EL1[M] from a value of 1 to 0).
->  2) An exception level disabling its stage-1 translation if its stage-2
->     translation is enabled (e.g. EL1 changing SCTLR_EL1[M] from a value of 1
->     to 0 when HCR_EL2[VM] has a value of 1).
-> 
-> To avoid the errant behavior, software must execute an ISB immediately
-> prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
-> Changes since v3:
->   Rebased to kernel v4.15-rc1.
-> Changes since v2:
->   Repost the corrected patches.
-> Changes since v1:
->   Apply the workaround where it's required.
-> 
->  Documentation/arm64/silicon-errata.txt |  1 +
->  arch/arm64/Kconfig                     | 12 +++++++++++-
->  arch/arm64/include/asm/assembler.h     | 19 +++++++++++++++++++
->  arch/arm64/include/asm/cpucaps.h       |  3 ++-
->  arch/arm64/kernel/cpu-reset.S          |  1 +
->  arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
->  arch/arm64/kernel/efi-entry.S          |  2 ++
->  arch/arm64/kernel/head.S               |  1 +
->  arch/arm64/kernel/relocate_kernel.S    |  1 +
->  arch/arm64/kvm/hyp-init.S              |  1 +
+> Thanks, applied.
 
-This is an awful lot of code just to add an ISB instruction prior to
-disabling the MMU. Why do you need to go through the alternatives framework
-for this? Just do it with an #ifdef; this isn't a fastpath.
+Phew, you guys are fast. For the record:
 
-Will
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171201/85d3a398/attachment.sig>
