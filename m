@@ -1,48 +1,22 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Nov 2017 20:06:04 -0600
-Subject: [PATCH 1/3] mmc: dt-bindings: add mmc support to MT7623 SoC
-In-Reply-To: <3e2c72d18bbe6d7c762fd820195f0fa0b5a45bbf.1511949769.git.sean.wang@mediatek.com>
-References: <cover.1511949769.git.sean.wang@mediatek.com>
- <3e2c72d18bbe6d7c762fd820195f0fa0b5a45bbf.1511949769.git.sean.wang@mediatek.com>
-Message-ID: <20171201020604.etfzccuwomxgcwmg@rob-hp-laptop>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 30 Nov 2017 21:15:01 -0500
+Subject: [PATCH V3 00/29] PCI: deprecate pci_get_bus_and_slot()
+In-Reply-To: <20171129170947.GE6469@bhelgaas-glaptop.roam.corp.google.com>
+References: <1511801886-6753-1-git-send-email-okaya@codeaurora.org>
+ <20171129170947.GE6469@bhelgaas-glaptop.roam.corp.google.com>
+Message-ID: <fb492aa1-ef35-3c5d-e07f-98393c78d377@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 06:10:35PM +0800, sean.wang at mediatek.com wrote:
-> From: Sean Wang <sean.wang@mediatek.com>
-> 
-> Add the devicetree binding for MT7623 SoC using MT2701 as the fallback.
-> 
-> Cc: devicetree at vger.kernel.org
-> Signed-off-by: Sean Wang <sean.wang@mediatek.com>
-> ---
->  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> index 72d2a73..1732588 100644
-> --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
-> @@ -12,6 +12,8 @@ Required properties:
->  	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
->  	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
->  	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
-> +	"mediatek,mt7623-mmc",
-> +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt7623
+On 11/29/2017 12:09 PM, Bjorn Helgaas wrote:
+> I see other maintainers are picking up some of these.  I'll wait until
+> later in the cycle and pick up any remaining ones and the PCI core
+> parts.
 
-Those should be on 1 line ideally.
+I'm also waiting for ACKs from maintainers at this moment. I'll pay attention
+to the rules. Sorry about that.
 
-BTW, I find "for mmc host ip compatible with mt7623" to be mostly 
-redundant.
-
-Either way,
-
-Acked-by: Rob Herring <robh@kernel.org>
-
-
->  - reg: physical base address of the controller and length
->  - interrupts: Should contain MSDC interrupt number
->  - clocks: Should contain phandle for the clock feeding the MMC controller
-> -- 
-> 2.7.4
-> 
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
