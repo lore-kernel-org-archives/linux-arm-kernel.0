@@ -1,164 +1,116 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 1 Dec 2017 19:10:00 +0100
-Subject: [PATCH 13/37] KVM: arm64: Introduce VHE-specific kvm_vcpu_run
-In-Reply-To: <20171107152529.taszxq37f35yw3ga@kamzik.brq.redhat.com>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-14-christoffer.dall@linaro.org>
- <20171107152529.taszxq37f35yw3ga@kamzik.brq.redhat.com>
-Message-ID: <20171201181000.GE6615@lvm>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 1 Dec 2017 18:04:32 +0000
+Subject: [PATCH v5 2/8] KVM: arm/arm64: Factor out functionality to get
+ vgic mmio requester_vcpu
+In-Reply-To: <20171120191649.17290-3-christoffer.dall@linaro.org>
+References: <20171120191649.17290-1-christoffer.dall@linaro.org>
+ <20171120191649.17290-3-christoffer.dall@linaro.org>
+Message-ID: <aab23eee-aa3b-9349-6e78-473beeb46969@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 07, 2017 at 04:25:29PM +0100, Andrew Jones wrote:
-> On Thu, Oct 12, 2017 at 12:41:17PM +0200, Christoffer Dall wrote:
-> > So far this is just a copy of the legacy non-VHE switch function, where
-> > we only change the existing calls to has_vhe() in both the original and
-> > new functions.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  arch/arm/include/asm/kvm_asm.h   |  4 +++
-> >  arch/arm64/include/asm/kvm_asm.h |  2 ++
-> >  arch/arm64/kvm/hyp/switch.c      | 57 ++++++++++++++++++++++++++++++++++++++++
-> >  virt/kvm/arm/arm.c               |  5 +++-
-> >  4 files changed, 67 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/include/asm/kvm_asm.h b/arch/arm/include/asm/kvm_asm.h
-> > index 36dd296..1a7bc5f 100644
-> > --- a/arch/arm/include/asm/kvm_asm.h
-> > +++ b/arch/arm/include/asm/kvm_asm.h
-> > @@ -70,8 +70,12 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
-> >  
-> >  extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
-> >  
-> > +/* no VHE on 32-bit :( */
-> > +static inline int kvm_vcpu_run(struct kvm_vcpu *vcpu) { return 0; }
-> > +
-> >  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> >  
-> > +
-> 
-> stray new blank line
-> 
-> >  extern void __init_stage2_translation(void);
-> >  
-> >  extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> > diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-> > index 7e48a39..2eb5b23 100644
-> > --- a/arch/arm64/include/asm/kvm_asm.h
-> > +++ b/arch/arm64/include/asm/kvm_asm.h
-> > @@ -57,6 +57,8 @@ extern void __kvm_tlb_flush_local_vmid(struct kvm_vcpu *vcpu);
-> >  
-> >  extern void __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high);
-> >  
-> > +extern int kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> > +
-> >  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
-> >  
-> >  extern u64 __vgic_v3_get_ich_vtr_el2(void);
-> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > index ed30af5..8a0f38f 100644
-> > --- a/arch/arm64/kvm/hyp/switch.c
-> > +++ b/arch/arm64/kvm/hyp/switch.c
-> > @@ -319,6 +319,63 @@ static bool __hyp_text fixup_guest_exit(struct kvm_vcpu *vcpu, u64 *exit_code)
-> >  	return false;
-> >  }
-> >  
-> > +/* Switch to the guest for VHE systems running in EL2 */
-> > +int kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> > +{
-> > +	struct kvm_cpu_context *host_ctxt;
-> > +	struct kvm_cpu_context *guest_ctxt;
-> > +	u64 exit_code;
-> > +
-> > +	vcpu = kern_hyp_va(vcpu);
-> > +
-> > +	host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> > +	host_ctxt->__hyp_running_vcpu = vcpu;
-> > +	guest_ctxt = &vcpu->arch.ctxt;
-> > +
-> > +	__sysreg_save_host_state(host_ctxt);
-> > +
-> > +	__activate_traps(vcpu);
-> > +	__activate_vm(vcpu);
-> > +
-> > +	__vgic_restore_state(vcpu);
-> > +	__timer_enable_traps(vcpu);
-> > +
-> > +	/*
-> > +	 * We must restore the 32-bit state before the sysregs, thanks
-> > +	 * to erratum #852523 (Cortex-A57) or #853709 (Cortex-A72).
-> > +	 */
-> > +	__sysreg32_restore_state(vcpu);
-> > +	__sysreg_restore_guest_state(guest_ctxt);
-> > +	__debug_switch_to_guest(vcpu);
-> > +
-> > +	/* Jump in the fire! */
-> > +again:
-> > +	exit_code = __guest_enter(vcpu, host_ctxt);
-> > +	/* And we're baaack! */
-> > +
-> > +	if (fixup_guest_exit(vcpu, &exit_code))
-> > +		goto again;
-> > +
-> > +	__sysreg_save_guest_state(guest_ctxt);
-> > +	__sysreg32_save_state(vcpu);
-> > +	__timer_disable_traps(vcpu);
-> > +	__vgic_save_state(vcpu);
-> > +
-> > +	__deactivate_traps(vcpu);
-> > +	__deactivate_vm(vcpu);
-> > +
-> > +	__sysreg_restore_host_state(host_ctxt);
-> > +
-> > +	/*
-> > +	 * This must come after restoring the host sysregs, since a non-VHE
-> > +	 * system may enable SPE here and make use of the TTBRs.
-> > +	 */
-> > +	__debug_switch_to_host(vcpu);
-> > +
-> > +	return exit_code;
-> > +}
-> > +
-> > +/* Switch to the guest for legacy non-VHE systems */
-> >  int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> >  {
-> >  	struct kvm_cpu_context *host_ctxt;
-> > diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-> > index cf121b2..b11647a 100644
-> > --- a/virt/kvm/arm/arm.c
-> > +++ b/virt/kvm/arm/arm.c
-> > @@ -706,7 +706,10 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
-> >  		trace_kvm_entry(*vcpu_pc(vcpu));
-> >  		guest_enter_irqoff();
-> >  
-> > -		ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> > +		if (has_vhe())
-> > +			ret = kvm_vcpu_run(vcpu);
-> > +		else
-> > +			ret = kvm_call_hyp(__kvm_vcpu_run, vcpu);
-> 
-> So kvm_vcpu_run() is going to be VHE only, but the only way for people
-> stepping through the code to know that is by seeing this callsite or by
-> reading the comment above it. Everywhere else we make it much more clear
-> with the _vhe and _nvhe suffixes. I wonder if we should keep that pattern
-> by adding
-> 
->  static int kvm_vcpu_run(struct kvm_vcpu *vcpu)
->  {
->     if (has_vhe())
->         ret = kvm_vcpu_run_vhe(vcpu);
->     else
->         ret = kvm_call_hyp(__kvm_vcpu_run_nvhe, vcpu);
->  }
-> 
-> to virt/kvm/arm/arm.c and then calling that from here.
-> 
-> I'm afraid the __ prefix is too ambiguous in the kernel to interpret
-> __foo() as the hyp mode non-VHE version of foo(), the hyp mode VHE
-> version.
-> 
-Sure.
+Hi,
 
-Thanks,
--Christoffer
+On 20/11/17 19:16, Christoffer Dall wrote:
+> We are about to distinguish between userspace accesses and mmio traps
+> for a number of the mmio handlers.  When the requester vcpu is NULL, it
+> mens we are handling a userspace acccess.
+> 
+> Factor out the functionality to get the request vcpu into its own
+> function, mostly so we have a common place to document the semantics of
+> the return value.
+> 
+> Also take the chance to move the functionality outside of holding a
+> spinlock and instead explicitly disable and enable preemption.  This
+> supports PREEMPT_RT kernels as well.
+> 
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  virt/kvm/arm/vgic/vgic-mmio.c | 43 +++++++++++++++++++++++++++----------------
+>  1 file changed, 27 insertions(+), 16 deletions(-)
+> 
+> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> index deb51ee16a3d..6113cf850f47 100644
+> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> @@ -122,6 +122,26 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+>  	return value;
+>  }
+>  
+> +/*
+> + * This function will return the VCPU that performed the MMIO access and
+> + * trapped from twithin the VM, and will return NULL if this is a userspace
+> + * access.
+> + *
+> + * We can disable preemption locally around accessing the per-CPU variable
+> + * because even if the current thread is migrated to another CPU, reading the
+> + * per-CPU value later will give us the same value as we update the per-CPU
+> + * variable in the preempt notifier handlers.
+
+This comment left me scratching my head a bit. Maybe you could change it
+to point out that ... it's safe to *enable* preemption after the call
+again, because of said reasons? Because disabling preemption before
+accessing a per-CPU variable is not really an issue.
+
+Apart from that it's fine.
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+Cheers,
+Andre.
+
+> + */
+> +static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
+> +{
+> +	struct kvm_vcpu *vcpu;
+> +
+> +	preempt_disable();
+> +	vcpu = kvm_arm_get_running_vcpu();
+> +	preempt_enable();
+> +	return vcpu;
+> +}
+> +
+>  void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
+>  			      gpa_t addr, unsigned int len,
+>  			      unsigned long val)
+> @@ -184,24 +204,10 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
+>  static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+>  				    bool new_active_state)
+>  {
+> -	struct kvm_vcpu *requester_vcpu;
+>  	unsigned long flags;
+> -	spin_lock_irqsave(&irq->irq_lock, flags);
+> +	struct kvm_vcpu *requester_vcpu = vgic_get_mmio_requester_vcpu();
+>  
+> -	/*
+> -	 * The vcpu parameter here can mean multiple things depending on how
+> -	 * this function is called; when handling a trap from the kernel it
+> -	 * depends on the GIC version, and these functions are also called as
+> -	 * part of save/restore from userspace.
+> -	 *
+> -	 * Therefore, we have to figure out the requester in a reliable way.
+> -	 *
+> -	 * When accessing VGIC state from user space, the requester_vcpu is
+> -	 * NULL, which is fine, because we guarantee that no VCPUs are running
+> -	 * when accessing VGIC state from user space so irq->vcpu->cpu is
+> -	 * always -1.
+> -	 */
+> -	requester_vcpu = kvm_arm_get_running_vcpu();
+> +	spin_lock_irqsave(&irq->irq_lock, flags);
+>  
+>  	/*
+>  	 * If this virtual IRQ was written into a list register, we
+> @@ -213,6 +219,11 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+>  	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
+>  	 * so we release and re-acquire the spin_lock to let the other thread
+>  	 * sync back the IRQ.
+> +	 *
+> +	 * When accessing VGIC state from user space, requester_vcpu is
+> +	 * NULL, which is fine, because we guarantee that no VCPUs are running
+> +	 * when accessing VGIC state from user space so irq->vcpu->cpu is
+> +	 * always -1.
+>  	 */
+>  	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
+>  	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
+> 
