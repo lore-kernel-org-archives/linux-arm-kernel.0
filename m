@@ -1,28 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Dec 2017 09:45:59 -0800
-Subject: [RFC PATCH 2/3] pinctrl: sunxi: introduce DT-based generic driver
-In-Reply-To: <20171113012523.2328-3-andre.przywara@arm.com>
-References: <20171113012523.2328-1-andre.przywara@arm.com>
- <20171113012523.2328-3-andre.przywara@arm.com>
-Message-ID: <20171201174559.GR28152@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 1 Dec 2017 17:44:29 +0000
+Subject: [PATCH] arm64: mm: Fix pte_mkclean, pte_mkdirty semantics
+In-Reply-To: <20171201172214.6834-1-steve.capper@arm.com>
+References: <20171201172214.6834-1-steve.capper@arm.com>
+Message-ID: <20171201174429.6azrpma5ypltlgcs@armageddon.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Andre Przywara <andre.przywara@arm.com> [171113 01:28]:
-> This driver (shim) allows to fully describe an Allwinner pin controller
-> and its GPIO ports in device tree nodes.
-> It will read some newly introduced properties to build a table
-> describing the pins and their routing. This table matches those that we
-> have hardcoded for various SoCs in the kernel so far.
-> After this table has been created, it will be handed over to the actual
-> pinctrl driver, which registers it with the pinctrl subsystem.
+On Fri, Dec 01, 2017 at 05:22:14PM +0000, Steve Capper wrote:
+> On systems with hardware dirty bit management, the ltp madvise09 unit
+> test fails due to dirty bit information being lost and pages being
+> incorrectly freed.
+> 
+> This was bisected to:
+> 	arm64: Ignore hardware dirty bit updates in ptep_set_wrprotect()
+> 
+> Reverting this commit leads to a separate problem, that the unit test
+> retains pages that should have been dropped due to the function
+> madvise_free_pte_range(.) not cleaning pte's properly.
+> 
+> Currently pte_mkclean only clears the software dirty bit, thus the
+> following code sequence can appear:
+> 
+> 	pte = pte_mkclean(pte);
+> 	if (pte_dirty(pte))
+> 		// this condition can return true with HW DBM!
+> 
+> This patch also adjusts pte_mkclean to set PTE_RDONLY thus effectively
+> clearing both the SW and HW dirty information.
+> 
+> In order for this to function on systems without HW DBM, we need to
+> also adjust pte_mkdirty to remove the read only bit from writable pte's
+> to avoid infinite fault loops.
+> 
+> Reported-by: Bhupinder Thakur <bhupinder.thakur@linaro.org>
+> Fixes: 64c26841b349 ("arm64: Ignore hardware dirty bit updates in
+> ptep_set_wrprotect()")
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
 
-Hmm so how come you're not using GENERIC_PINCTRL_GROUPS and
-GENERIC_PINMUX_FUNCTIONS that we now have?
-
-These together with the #pinctrl-cells property should make things
-quite easy and should also simplify your binding hopefully.
-
-Regards,
-
-Tony
+Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
