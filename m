@@ -1,143 +1,124 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 1 Dec 2017 18:40:13 +0100
-Subject: [PATCH v6 06/13] IIO: ADC: add sigma delta modulator support
+Date: Fri, 1 Dec 2017 18:40:11 +0100
+Subject: [PATCH v6 04/13] IIO: inkern: API for manipulating channel attributes
 In-Reply-To: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
 References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1512150020-20335-7-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1512150020-20335-5-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add generic driver to support sigma delta modulators.
-Typically, this device is hardware connected to
-an IIO device in charge of the conversion. Devices are
-bonded through the hardware consumer API.
+Extend the inkern API with functions for reading and writing
+attribute of iio channels.
 
 Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 ---
- drivers/iio/adc/Kconfig            | 12 ++++++
- drivers/iio/adc/Makefile           |  1 +
- drivers/iio/adc/sd_adc_modulator.c | 81 ++++++++++++++++++++++++++++++++++++++
- 3 files changed, 94 insertions(+)
- create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+V5 to V6 update:
+ Replace include type.h with iio.h to fix build warning
 
-diff --git a/drivers/iio/adc/Kconfig b/drivers/iio/adc/Kconfig
-index 5762565..c5db62f 100644
---- a/drivers/iio/adc/Kconfig
-+++ b/drivers/iio/adc/Kconfig
-@@ -626,6 +626,18 @@ config SPEAR_ADC
- 	  To compile this driver as a module, choose M here: the
- 	  module will be called spear_adc.
+ drivers/iio/inkern.c         | 18 +++++++++++++-----
+ include/linux/iio/consumer.h | 28 +++++++++++++++++++++++++++-
+ 2 files changed, 40 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+index 069defc..f2e7824 100644
+--- a/drivers/iio/inkern.c
++++ b/drivers/iio/inkern.c
+@@ -664,9 +664,8 @@ int iio_convert_raw_to_processed(struct iio_channel *chan, int raw,
+ }
+ EXPORT_SYMBOL_GPL(iio_convert_raw_to_processed);
  
-+config SD_ADC_MODULATOR
-+	tristate "Generic sigma delta modulator"
-+	depends on OF
-+	select IIO_BUFFER
-+	select IIO_TRIGGERED_BUFFER
-+	help
-+	  Select this option to enables sigma delta modulator. This driver can
-+	  support generic sigma delta modulators.
+-static int iio_read_channel_attribute(struct iio_channel *chan,
+-				      int *val, int *val2,
+-				      enum iio_chan_info_enum attribute)
++int iio_read_channel_attribute(struct iio_channel *chan, int *val, int *val2,
++			       enum iio_chan_info_enum attribute)
+ {
+ 	int ret;
+ 
+@@ -682,6 +681,8 @@ static int iio_read_channel_attribute(struct iio_channel *chan,
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(iio_read_channel_attribute);
 +
-+	  This driver can also be built as a module.  If so, the module
-+	  will be called sd_adc_modulator.
+ 
+ int iio_read_channel_offset(struct iio_channel *chan, int *val, int *val2)
+ {
+@@ -850,7 +851,8 @@ static int iio_channel_write(struct iio_channel *chan, int val, int val2,
+ 						chan->channel, val, val2, info);
+ }
+ 
+-int iio_write_channel_raw(struct iio_channel *chan, int val)
++int iio_write_channel_attribute(struct iio_channel *chan, int val, int val2,
++				enum iio_chan_info_enum attribute)
+ {
+ 	int ret;
+ 
+@@ -860,12 +862,18 @@ int iio_write_channel_raw(struct iio_channel *chan, int val)
+ 		goto err_unlock;
+ 	}
+ 
+-	ret = iio_channel_write(chan, val, 0, IIO_CHAN_INFO_RAW);
++	ret = iio_channel_write(chan, val, val2, attribute);
+ err_unlock:
+ 	mutex_unlock(&chan->indio_dev->info_exist_lock);
+ 
+ 	return ret;
+ }
++EXPORT_SYMBOL_GPL(iio_write_channel_attribute);
 +
- config STM32_ADC_CORE
- 	tristate "STMicroelectronics STM32 adc core"
- 	depends on ARCH_STM32 || COMPILE_TEST
-diff --git a/drivers/iio/adc/Makefile b/drivers/iio/adc/Makefile
-index 9874e05..d800325 100644
---- a/drivers/iio/adc/Makefile
-+++ b/drivers/iio/adc/Makefile
-@@ -81,3 +81,4 @@ obj-$(CONFIG_VF610_ADC) += vf610_adc.o
- obj-$(CONFIG_VIPERBOARD_ADC) += viperboard_adc.o
- xilinx-xadc-y := xilinx-xadc-core.o xilinx-xadc-events.o
- obj-$(CONFIG_XILINX_XADC) += xilinx-xadc.o
-+obj-$(CONFIG_SD_ADC_MODULATOR) += sd_adc_modulator.o
-diff --git a/drivers/iio/adc/sd_adc_modulator.c b/drivers/iio/adc/sd_adc_modulator.c
-new file mode 100644
-index 0000000..08bd7b6
---- /dev/null
-+++ b/drivers/iio/adc/sd_adc_modulator.c
-@@ -0,0 +1,81 @@
-+/*
-+ * Generic sigma delta modulator driver
-+ *
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author: Arnaud Pouliquen <arnaud.pouliquen@st.com>.
-+ *
-+ * License type: GPLv2
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms of the GNU General Public License version 2 as published by
-+ * the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful, but
-+ * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-+ * or FITNESS FOR A PARTICULAR PURPOSE.
-+ * See the GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program. If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/iio/iio.h>
-+#include <linux/iio/triggered_buffer.h>
-+#include <linux/module.h>
-+#include <linux/of_device.h>
-+
-+static const struct iio_info iio_sd_mod_iio_info;
-+
-+static const struct iio_chan_spec iio_sd_mod_ch = {
-+	.type = IIO_VOLTAGE,
-+	.indexed = 1,
-+	.scan_type = {
-+		.sign = 'u',
-+		.realbits = 1,
-+		.shift = 0,
-+	},
-+};
-+
-+static int iio_sd_mod_probe(struct platform_device *pdev)
++int iio_write_channel_raw(struct iio_channel *chan, int val)
 +{
-+	struct device *dev = &pdev->dev;
-+	struct iio_dev *iio;
-+
-+	iio = devm_iio_device_alloc(dev, 0);
-+	if (!iio)
-+		return -ENOMEM;
-+
-+	iio->dev.parent = dev;
-+	iio->dev.of_node = dev->of_node;
-+	iio->name = dev_name(dev);
-+	iio->info = &iio_sd_mod_iio_info;
-+	iio->modes = INDIO_BUFFER_HARDWARE;
-+
-+	iio->num_channels = 1;
-+	iio->channels = &iio_sd_mod_ch;
-+
-+	platform_set_drvdata(pdev, iio);
-+
-+	return devm_iio_device_register(&pdev->dev, iio);
++	return iio_write_channel_attribute(chan, val, 0, IIO_CHAN_INFO_RAW);
 +}
+ EXPORT_SYMBOL_GPL(iio_write_channel_raw);
+ 
+ unsigned int iio_get_channel_ext_info_count(struct iio_channel *chan)
+diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+index 5e347a9..70658b1 100644
+--- a/include/linux/iio/consumer.h
++++ b/include/linux/iio/consumer.h
+@@ -11,7 +11,7 @@
+ #define _IIO_INKERN_CONSUMER_H_
+ 
+ #include <linux/types.h>
+-#include <linux/iio/types.h>
++#include <linux/iio/iio.h>
+ 
+ struct iio_dev;
+ struct iio_chan_spec;
+@@ -216,6 +216,32 @@ int iio_read_channel_average_raw(struct iio_channel *chan, int *val);
+ int iio_read_channel_processed(struct iio_channel *chan, int *val);
+ 
+ /**
++ * iio_write_channel_attribute() - Write values to the device attribute.
++ * @chan:	The channel being queried.
++ * @val:	Value being written.
++ * @val2:	Value being written.val2 use depends on attribute type.
++ * @attribute:	info attribute to be read.
++ *
++ * Returns an error code or 0.
++ */
++int iio_write_channel_attribute(struct iio_channel *chan, int val,
++				int val2, enum iio_chan_info_enum attribute);
 +
-+static const struct of_device_id sd_adc_of_match[] = {
-+	{ .compatible = "sd-modulator" },
-+	{ .compatible = "ads1201" },
-+	{ }
-+};
-+MODULE_DEVICE_TABLE(of, sd_adc_of_match);
++/**
++ * iio_read_channel_attribute() - Read values from the device attribute.
++ * @chan:	The channel being queried.
++ * @val:	Value being written.
++ * @val2:	Value being written.Val2 use depends on attribute type.
++ * @attribute:	info attribute to be written.
++ *
++ * Returns an error code if failed. Else returns a description of what is in val
++ * and val2, such as IIO_VAL_INT_PLUS_MICRO telling us we have a value of val
++ * + val2/1e6
++ */
++int iio_read_channel_attribute(struct iio_channel *chan, int *val,
++			       int *val2, enum iio_chan_info_enum attribute);
 +
-+static struct platform_driver iio_sd_mod_adc = {
-+	.driver = {
-+		.name = "iio_sd_adc_mod",
-+		.of_match_table = of_match_ptr(sd_adc_of_match),
-+	},
-+	.probe = iio_sd_mod_probe,
-+};
-+
-+module_platform_driver(iio_sd_mod_adc);
-+
-+MODULE_DESCRIPTION("Basic sigma delta modulator");
-+MODULE_AUTHOR("Arnaud Pouliquen <arnaud.pouliquen@st.com>");
-+MODULE_LICENSE("GPL v2");
++/**
+  * iio_write_channel_raw() - write to a given channel
+  * @chan:		The channel being queried.
+  * @val:		Value being written.
 -- 
 2.7.4
