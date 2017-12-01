@@ -1,35 +1,58 @@
-From: dave.hansen@linux.intel.com (Dave Hansen)
-Date: Fri, 1 Dec 2017 10:02:43 -0800
-Subject: [PATCH v2 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <20171201175812.n6ht7h52j3z4pgw2@lakrids.cambridge.arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Dec 2017 18:00:49 +0000
+Subject: [PATCH v2 12/18] arm64: entry: Explicitly pass exception level
+ to kernel_ventry macro
+In-Reply-To: <20171201175144.GD8826@arm.com>
 References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <20171201140406.oanuaz6zvyrhp4ml@lakrids.cambridge.arm.com>
- <20171201175026.GB8826@arm.com>
- <20171201175812.n6ht7h52j3z4pgw2@lakrids.cambridge.arm.com>
-Message-ID: <f86ac529-d763-9f90-1ced-b8a28f545582@linux.intel.com>
+ <1512059986-21325-13-git-send-email-will.deacon@arm.com>
+ <20171201115836.jaxzbjsnpnuau56s@lakrids.cambridge.arm.com>
+ <20171201175144.GD8826@arm.com>
+Message-ID: <20171201180049.ojgu56r5jo4ezupv@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2017 09:58 AM, Mark Rutland wrote:
-> On Fri, Dec 01, 2017 at 05:50:26PM +0000, Will Deacon wrote:
->> On Fri, Dec 01, 2017 at 02:04:06PM +0000, Mark Rutland wrote:
->>> On Thu, Nov 30, 2017 at 04:39:28PM +0000, Will Deacon wrote:
->> Thanks for going through this. Do you have any ideas about what we could
->> rename the command-line option to? I'll get us started:
->>
->>   - kaiser=
->>   - hidekernel=
->>   - unmapkernel=
->>   - hardenkaslr=
->>   - swuan=
-> Off all of these, I think "unmapkernel" is the clear winner, since it
-> says what it does in the tin (even if it misses the when).
+On Fri, Dec 01, 2017 at 05:51:44PM +0000, Will Deacon wrote:
+> On Fri, Dec 01, 2017 at 11:58:36AM +0000, Mark Rutland wrote:
+> > On Thu, Nov 30, 2017 at 04:39:40PM +0000, Will Deacon wrote:
+
+> > > +	.macro kernel_ventry, el, label, regsize = 64
+
+> > > +	b	el\()\el\()_\label
+
+> > > -	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
+
+> > > +	kernel_ventry	1, sync_invalid			// Synchronous EL1t
+
+> > Using the el paramter to build the branch name has the unfortunate
+> > property of obscuring the branch name. For example, that makes it
+> > difficult to jump around the entry asm with ctags, which is somewhat
+> > painful.
+> > 
+> > Could we leave the full branch name in place, e.g.
+> > 
+> > 	kernel_ventry	1, el1_sync_invalid		// Synchronous EL1t
+> > 	kernel_ventry	1, el1_irq_invalid		// IRQ EL1t
+> > 	kernel_ventry	1, el1_fiq_invalid		// FIQ EL1t
+> > 	kernel_ventry	1, el1_error_invalid		// Error EL1t
+> > 
+> > ... or have separate kernel_ventry and user_ventry macros that
+> > implicitly encoded the source EL, also leaving the label name as-is.
 > 
-> I'll have a think over the weekend.
+> The downside of doing that is that it makes it possible to say things like:
+> 
+> 	kernel_ventry	0, el1_sync
+> 
+> which I don't want to be expressible.
+> 
+> Given that ctags already chokes on lots of entry.S (for example, any macro
+> that is defined outside of the file) *and* that you can easily search for
+> things like el1_sync_invalid within the file, I'm inclined to leave this
+> patch as-is, but I'll note your objection and buy you a pint.
 
-On the x86 side we've been leaning toward renaming kaiser to something
-like "user pagetable isolation", so the boot parameter is something like
-"noupti".
+I guess I'll live with it, then. ;)
 
-But I think the consensus is definitely to get rid of "kaiser".
+Assuming I can't twist your arm, feel free to take my Reviewed-by here
+too.
+
+Thanks,
+Mark.
