@@ -1,57 +1,182 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:43 +0100
-Subject: [PATCH v2 20/27] drm/sun4i: Add scaler configuration to DE2 mixers
+Date: Fri,  1 Dec 2017 07:05:46 +0100
+Subject: [PATCH v2 23/27] drm/sun4i: Add DE2 CSC library
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-21-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-24-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-No all SoCs support scaling on all channels. For example, V3s support
-scaling only on VI channels. Because of that, add additional
-configuration bitmask which tells which channel support scaler.
+DE2 have many CSC units - channel input CSC, channel output CSC and
+mixer output CSC and maybe more.
+
+Fortunately, they have all same register layout, only base offsets
+differs.
+
+Add support only for channel output CSC for now.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c |  1 +
- drivers/gpu/drm/sun4i/sun8i_mixer.h | 10 ++++++++++
- 2 files changed, 11 insertions(+)
+ drivers/gpu/drm/sun4i/Makefile    |  2 +-
+ drivers/gpu/drm/sun4i/sun8i_csc.c | 93 +++++++++++++++++++++++++++++++++++++++
+ drivers/gpu/drm/sun4i/sun8i_csc.h | 36 +++++++++++++++
+ 3 files changed, 130 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.c
+ create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.h
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 888620b1d3f1..e3296a060352 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -336,6 +336,7 @@ static int sun8i_mixer_remove(struct platform_device *pdev)
- static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.vi_num = 2,
- 	.ui_num = 1,
-+	.scaler_mask = 0x3,
- };
+diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
+index a458ddbf4a8e..82a6ac57fbe3 100644
+--- a/drivers/gpu/drm/sun4i/Makefile
++++ b/drivers/gpu/drm/sun4i/Makefile
+@@ -11,7 +11,7 @@ sun4i-drm-hdmi-y		+= sun4i_hdmi_tmds_clk.o
  
- static const struct of_device_id sun8i_mixer_of_table[] = {
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index bad0969ac105..a6270b307ae5 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -94,9 +94,19 @@ struct de2_fmt_info {
- 	u32 de2_fmt;
- };
+ sun8i-mixer-y			+= sun8i_mixer.o sun8i_ui_layer.o \
+ 				   sun8i_vi_layer.o sun8i_ui_scaler.o \
+-				   sun8i_vi_scaler.o
++				   sun8i_vi_scaler.o sun8i_csc.o
  
-+/**
-+ * struct sun8i_mixer_cfg - mixer HW configuration
-+ * @vi_num: number of VI channels
-+ * @ui_num: number of UI channels
-+ * @scaler_mask: bitmask which tells which channel supports scaling
-+ *	First, scaler supports for VI channels is defined and after that, scaler
-+ *	support for UI channels. For example, if mixer has 2 VI channels without
-+ *	scaler and 2 UI channels with scaler, bitmask would be 0xC.
+ sun4i-tcon-y			+= sun4i_crtc.o
+ sun4i-tcon-y			+= sun4i_dotclock.o
+diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.c b/drivers/gpu/drm/sun4i/sun8i_csc.c
+new file mode 100644
+index 000000000000..b14925b40ccf
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun8i_csc.c
+@@ -0,0 +1,93 @@
++/*
++ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
 + */
- struct sun8i_mixer_cfg {
- 	int		vi_num;
- 	int		ui_num;
-+	int		scaler_mask;
- };
- 
- struct sun8i_mixer {
++
++#include <drm/drmP.h>
++
++#include "sun8i_csc.h"
++#include "sun8i_mixer.h"
++
++static const u32 ccsc_base[2][2] = {
++	{CCSC00_OFFSET, CCSC01_OFFSET},
++	{CCSC10_OFFSET, CCSC11_OFFSET},
++};
++
++/*
++ * Factors are in two's complement format, 10 bits for fractinal part.
++ * First tree values in each line are multiplication factor and last
++ * value is constant, which is added at the end.
++ */
++static const u32 yuv2rgb[] = {
++	0x000004A8, 0x00000000, 0x00000662, 0xFFFC845A,
++	0x000004A8, 0xFFFFFE6F, 0xFFFFFCBF, 0x00021DF4,
++	0x000004A8, 0x00000813, 0x00000000, 0xFFFBAC4A,
++};
++
++static const u32 yvu2rgb[] = {
++	0x000004A8, 0x00000662, 0x00000000, 0xFFFC845A,
++	0x000004A8, 0xFFFFFCBF, 0xFFFFFE6F, 0x00021DF4,
++	0x000004A8, 0x00000000, 0x00000813, 0xFFFBAC4A,
++};
++
++static void sun8i_csc_set_coefficients(struct regmap *map, u32 base,
++				       enum sun8i_csc_mode mode)
++{
++	const u32 *table;
++	int i, data;
++
++	switch (mode) {
++	case SUN8I_CSC_MODE_YUV2RGB:
++		table = yuv2rgb;
++		break;
++	case SUN8I_CSC_MODE_YVU2RGB:
++		table = yvu2rgb;
++		break;
++	default:
++		DRM_WARN("Wrong CSC mode specified.\n");
++		return;
++	}
++
++	for (i = 0; i < 12; i++) {
++		data = table[i];
++		/* For some reason, 0x200 must be added to constant parts */
++		if (((i + 1) & 3) == 0)
++			data += 0x200;
++		regmap_write(map, SUN8I_CSC_COEFF(base, i), data);
++	}
++}
++
++static void sun8i_csc_enable(struct regmap *map, u32 base, bool enable)
++{
++	u32 val;
++
++	if (enable)
++		val = SUN8I_CSC_CTRL_EN;
++	else
++		val = 0;
++
++	regmap_update_bits(map, SUN8I_CSC_CTRL(base), SUN8I_CSC_CTRL_EN, val);
++}
++
++void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
++				     enum sun8i_csc_mode mode)
++{
++	u32 base;
++
++	base = ccsc_base[mixer->cfg->ccsc][layer];
++
++	sun8i_csc_set_coefficients(mixer->engine.regs, base, mode);
++}
++
++void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable)
++{
++	u32 base;
++
++	base = ccsc_base[mixer->cfg->ccsc][layer];
++
++	sun8i_csc_enable(mixer->engine.regs, base, enable);
++}
+diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.h b/drivers/gpu/drm/sun4i/sun8i_csc.h
+new file mode 100644
+index 000000000000..880e8fbb0855
+--- /dev/null
++++ b/drivers/gpu/drm/sun4i/sun8i_csc.h
+@@ -0,0 +1,36 @@
++/*
++ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
++ *
++ * This program is free software; you can redistribute it and/or
++ * modify it under the terms of the GNU General Public License as
++ * published by the Free Software Foundation; either version 2 of
++ * the License, or (at your option) any later version.
++ */
++
++#ifndef _SUN8I_CSC_H_
++#define _SUN8I_CSC_H_
++
++struct sun8i_mixer;
++
++/* VI channel CSC units offsets */
++#define CCSC00_OFFSET 0xAA050
++#define CCSC01_OFFSET 0xFA000
++#define CCSC10_OFFSET 0xA0000
++#define CCSC11_OFFSET 0xF0000
++
++#define SUN8I_CSC_CTRL(base)		(base + 0x0)
++#define SUN8I_CSC_COEFF(base, i)	(base + 0x10 + 4 * i)
++
++#define SUN8I_CSC_CTRL_EN		BIT(0)
++
++enum sun8i_csc_mode {
++	SUN8I_CSC_MODE_OFF,
++	SUN8I_CSC_MODE_YUV2RGB,
++	SUN8I_CSC_MODE_YVU2RGB,
++};
++
++void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
++				     enum sun8i_csc_mode mode);
++void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable);
++
++#endif
 -- 
 2.15.1
