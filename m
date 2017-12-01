@@ -1,96 +1,145 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Fri, 1 Dec 2017 20:34:05 +0900
-Subject: [kernel-hardening][PATCH v2 2/3] arm: mm: dump: make the page table
- dumping seq_file optional
-Message-ID: <20171201113405.GA5205@pjb1027-Latitude-E5410>
+From: architt@codeaurora.org (Archit Taneja)
+Date: Fri, 1 Dec 2017 17:08:17 +0530
+Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
+In-Reply-To: <1510096056-13765-3-git-send-email-timur@codeaurora.org>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+ <1510096056-13765-3-git-send-email-timur@codeaurora.org>
+Message-ID: <68a11ee4-d0c6-0f4e-3631-125cc4e7a1bd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the page table dumping seq_file optional.
-It makes the page table dumping code usable for other cases.
+Hi,
 
-This patch refers below commit of arm64.
-(ae5d1cf358a5
-("arm64: dump: Make the page table dumping seq_file optional"))
+On 11/08/2017 04:37 AM, Timur Tabi wrote:
+> Add support for specifying that some GPIOs within a range are unavailable.
+> Some systems have a sparse list of GPIOs, where a range of GPIOs is
+> specified (usually 0 to n-1), but some subset within that range is
+> absent or unavailable for whatever reason.
+> 
+> To support this, allow drivers to specify a bitmask of GPIOs that
+> are present or absent.  Gpiolib will then block access to those that
+> are absent.
+> 
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> ---
+>   drivers/gpio/gpiolib.c      | 43 +++++++++++++++++++++++++++++++++++--------
+>   include/linux/gpio/driver.h |  2 ++
+>   2 files changed, 37 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
+> index 60553af4c004..c32387936cdd 100644
+> --- a/drivers/gpio/gpiolib.c
+> +++ b/drivers/gpio/gpiolib.c
+> @@ -1481,22 +1481,36 @@ static struct gpio_chip *find_chip_by_name(const char *name)
+>   
+>   static int gpiochip_irqchip_init_valid_mask(struct gpio_chip *gpiochip)
+>   {
+> -	if (!gpiochip->irq_need_valid_mask)
+> -		return 0;
+> +	if (gpiochip->irq_need_valid_mask) {
+> +		gpiochip->irq_valid_mask =
+> +			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
+> +				sizeof(long), GFP_KERNEL);
+> +		if (!gpiochip->irq_valid_mask)
+> +			return -ENOMEM;
+>   
+> -	gpiochip->irq_valid_mask = kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
+> -					   sizeof(long), GFP_KERNEL);
+> -	if (!gpiochip->irq_valid_mask)
+> -		return -ENOMEM;
+> +		/* Assume by default all GPIOs are valid */
+> +		bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
+> +	}
+>   
+> -	/* Assume by default all GPIOs are valid */
+> -	bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
+> +	if (gpiochip->line_need_valid_mask) {
+> +		gpiochip->line_valid_mask =
+> +			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
+> +				sizeof(long), GFP_KERNEL);
+> +		if (!gpiochip->line_valid_mask)
+> +			return -ENOMEM;
+> +
+> +		/* Assume by default all GPIOs are valid */
+> +		bitmap_fill(gpiochip->line_valid_mask, gpiochip->ngpio);
+> +	}
+>   
+>   	return 0;
+>   }
+>   
+>   static void gpiochip_irqchip_free_valid_mask(struct gpio_chip *gpiochip)
+>   {
+> +	kfree(gpiochip->line_valid_mask);
+> +	gpiochip->line_valid_mask = NULL;
+> +
+>   	kfree(gpiochip->irq_valid_mask);
+>   	gpiochip->irq_valid_mask = NULL;
+>   }
+> @@ -1510,6 +1524,15 @@ static bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
+>   	return test_bit(offset, gpiochip->irq_valid_mask);
+>   }
+>   
+> +static bool gpiochip_irqchip_line_valid(const struct gpio_chip *gpiochip,
+> +					unsigned int offset)
+> +{
+> +	/* No mask means all valid */
+> +	if (likely(!gpiochip->line_valid_mask))
+> +		return true;
+> +	return test_bit(offset, gpiochip->line_valid_mask);
+> +}
+> +
+>   /**
+>    * gpiochip_set_cascaded_irqchip() - connects a cascaded irqchip to a gpiochip
+>    * @gpiochip: the gpiochip to set the irqchip chain to
+> @@ -3320,6 +3343,10 @@ struct gpio_desc *__must_check gpiod_get_index(struct device *dev,
+>   		return desc;
+>   	}
+>   
+> +	/* Make sure the GPIO is valid before we request it. */
+> +	if (!gpiochip_irqchip_line_valid(desc->gdev->chip, idx))
+> +		return ERR_PTR(-EACCES);
 
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
----
- arch/arm/mm/dump.c | 28 +++++++++++++++++++++-------
- 1 file changed, 21 insertions(+), 7 deletions(-)
+We're hitting an issue here ^ when a consumer calls the devm_gpiod_get() API. This API
+internally sets idx in gpiod_get_index to always 0. For example, in the call sequence
+below, the idx argument to gpiochip_irqchip_line_valid is always 0:
 
-diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index 8dfe7c3..43a2bee 100644
---- a/arch/arm/mm/dump.c
-+++ b/arch/arm/mm/dump.c
-@@ -34,6 +34,18 @@
- 	{ -1,			NULL },
- };
- 
-+#define pt_dump_seq_printf(m, fmt, args...) \
-+({                      \
-+	if (m)					\
-+		seq_printf(m, fmt, ##args);	\
-+})
-+
-+#define pt_dump_seq_puts(m, fmt)    \
-+({						\
-+	if (m)					\
-+		seq_printf(m, fmt);	\
-+})
-+
- struct pg_state {
- 	struct seq_file *seq;
- 	const struct addr_marker *marker;
-@@ -210,7 +222,7 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t
- 			s = bits->clear;
- 
- 		if (s)
--			seq_printf(st->seq, " %s", s);
-+			pt_dump_seq_printf(st->seq, " %s", s);
- 	}
- }
- 
-@@ -224,7 +236,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 		st->level = level;
- 		st->current_prot = prot;
- 		st->current_domain = domain;
--		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-+		pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
- 	} else if (prot != st->current_prot || level != st->level ||
- 		   domain != st->current_domain ||
- 		   addr >= st->marker[1].start_address) {
-@@ -232,7 +244,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 		unsigned long delta;
- 
- 		if (st->current_prot) {
--			seq_printf(st->seq, "0x%08lx-0x%08lx   ",
-+			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
- 				   st->start_address, addr);
- 
- 			delta = (addr - st->start_address) >> 10;
-@@ -240,17 +252,19 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 				delta >>= 10;
- 				unit++;
- 			}
--			seq_printf(st->seq, "%9lu%c", delta, *unit);
-+			pt_dump_seq_printf(st->seq, "%9lu%c", delta, *unit);
- 			if (st->current_domain)
--				seq_printf(st->seq, " %s", st->current_domain);
-+				pt_dump_seq_printf(st->seq, " %s",
-+							st->current_domain);
- 			if (pg_level[st->level].bits)
- 				dump_prot(st, pg_level[st->level].bits, pg_level[st->level].num);
--			seq_printf(st->seq, "\n");
-+			pt_dump_seq_printf(st->seq, "\n");
- 		}
- 
- 		if (addr >= st->marker[1].start_address) {
- 			st->marker++;
--			seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-+			pt_dump_seq_printf(st->seq, "---[ %s ]---\n",
-+							st->marker->name);
- 		}
- 		st->start_address = addr;
- 		st->current_prot = prot;
+devm_gpiod_get(dev, con_id, flags)
+    devm_gpiod_get_index(dev, con_id, 0, flags)
+       gpiod_get_index(dev, con_id, 0, flags)
+          if (!gpiochip_irqchip_line_valid(desc->gdev->chip, 0))
+              return ERR_PTR(-EACCES);
+
+Therefore, with these patches, if we create a sparse gpio map, and the
+0th gpio is set to "not accessible", all gpio requests end up failing with EACCESS
+because idx is always passed as 0.
+
+In gpiochip_irqchip_line_valid, shouldn't we test the nth bit (that corresponds to
+this gpio_desc) in chip->line_valid_mask instead of idx passed above, which is always
+0?
+
+Thanks,
+Archit
+
+
+> +
+>   	status = gpiod_request(desc, con_id);
+>   	if (status < 0)
+>   		return ERR_PTR(status);
+> diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
+> index 424e5139ff10..853828ccabc8 100644
+> --- a/include/linux/gpio/driver.h
+> +++ b/include/linux/gpio/driver.h
+> @@ -173,6 +173,8 @@ struct gpio_chip {
+>   	bool			irq_nested;
+>   	bool			irq_need_valid_mask;
+>   	unsigned long		*irq_valid_mask;
+> +	bool			line_need_valid_mask;
+> +	unsigned long		*line_valid_mask;
+>   	struct lock_class_key	*lock_key;
+>   #endif
+>   
+> 
+
 -- 
-1.9.1
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
