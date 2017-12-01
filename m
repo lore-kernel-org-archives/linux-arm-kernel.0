@@ -1,332 +1,86 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 1 Dec 2017 09:56:59 +0100
-Subject: [PATCH v4 5/6] ARM: dts: imx6q: Add Variscite DART-MX6
- Carrier-board support
-In-Reply-To: <20171130004342.GC22908@dragon>
+Date: Fri, 1 Dec 2017 09:57:26 +0100
+Subject: [PATCH v4 6/6] ARM: configs: Add missing config for DART-MX6 SoM
+In-Reply-To: <20171130004629.GD22908@dragon>
 References: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
- <1511950857-19292-6-git-send-email-narmstrong@baylibre.com>
- <20171130004342.GC22908@dragon>
-Message-ID: <8b32e8bd-87d6-111c-9590-98c80a6119aa@baylibre.com>
+ <1511950857-19292-7-git-send-email-narmstrong@baylibre.com>
+ <20171130004629.GD22908@dragon>
+Message-ID: <54651ce0-545b-a61b-f8b1-5d03789ede1e@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Shawn,
 
-On 30/11/2017 01:43, Shawn Guo wrote:
-> On Wed, Nov 29, 2017 at 11:20:56AM +0100, Neil Armstrong wrote:
->> This patch adds support for the i.MX6 Quad variant of the Variscite DART-MX6
->> SoM Carrier-Board.
->>
->> This Carrier-Board has the following :
->> - LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
->> - HDMI Connector
->> - USB Host + USB OTG Connector
->> - 10/100/1000 Mbps Ethernet
->> - miniPCI-Express slot
->> - SD Card connector
->> - Audio Headphone/Line In jack connectors
->> - On-board DMIC
->> - CAN bus header
->> - SPI header
->> - Camera Interfaces header
->> - 4xButtons, 2xLeds
->> - OnBoard RTC with Coin Backup battery socket
->> - RS232 Header + USB-Serial debug port
->>
->> Product Page : http://www.variscite.com/products/evaluation-kits/dart-mx6-kits
->>
->> The board support is done with all on-board and header interfaces enabled.
->> 7" LVDS Touchscreen is enabled by default along HDMI output.
->> Audio interface is supported with the "simple-card" bindings.
->>
->> PCIe slot, On-Board DMIC and Camera Interfaces are not handled yet.
+On 30/11/2017 01:46, Shawn Guo wrote:
+> On Wed, Nov 29, 2017 at 11:20:57AM +0100, Neil Armstrong wrote:
+>> This patch adds the missing configs for the DART-MX6 SoM support :
+>> - SERDEV bluetooth driver + SERIAL_DEV_BUS configs
+>> - WL18XX driver
+>> - DEFAULT_ON Led Trigger
 >>
 >> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  arch/arm/boot/dts/Makefile                     |   1 +
->>  arch/arm/boot/dts/imx6q-var-dt6customboard.dts | 239 +++++++++++++++++++++++++
->>  2 files changed, 240 insertions(+)
->>  create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
->>
->> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
->> index d0381e9..148ff15 100644
->> --- a/arch/arm/boot/dts/Makefile
->> +++ b/arch/arm/boot/dts/Makefile
->> @@ -470,6 +470,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
->>  	imx6q-tx6q-11x0-mb7.dtb \
->>  	imx6q-udoo.dtb \
->>  	imx6q-utilite-pro.dtb \
->> +	imx6q-var-dt6customboard.dtb \
->>  	imx6q-wandboard.dtb \
->>  	imx6q-wandboard-revb1.dtb \
->>  	imx6q-wandboard-revd1.dtb \
->> diff --git a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
->> new file mode 100644
->> index 0000000..76faaff
->> --- /dev/null
->> +++ b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
->> @@ -0,0 +1,239 @@
->> +/*
->> + * Support for Variscite DART-MX6 Carrier-board
->> + *
->> + * Copyright 2017 BayLibre, SAS
->> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->> + *
->> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->> + */
->> +
->> +/dts-v1/;
->> +
->> +#include "imx6q.dtsi"
->> +#include "imx6qdl-var-dart.dtsi"
->> +#include <dt-bindings/input/linux-event-codes.h>
->> +
->> +/ {
->> +	model = "Variscite DART-MX6 Carrier-board";
->> +	compatible = "variscite,dt6customboard", "fsl,imx6q";
->> +
->> +	backlight_lvds: backlight {
->> +		compatible = "pwm-backlight";
->> +		pwms = <&pwm2 0 50000>;
->> +		brightness-levels = <0 4 8 16 32 64 128 248>;
->> +		default-brightness-level = <7>;
->> +		status = "okay";
->> +	};
->> +
->> +	gpio-keys {
->> +		compatible = "gpio-keys";
->> +		#address-cells = <1>;
->> +		#size-cells = <0>;
->> +		autorepeat;
->> +
->> +		back {
->> +			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
->> +			linux,code = <KEY_BACK>;
->> +			label = "Key Back";
->> +			linux,input-type = <1>;
->> +			debounce-interval = <100>;
->> +			gpio-key,wakeup;
 > 
-> The gpio-key,wakeup is legacy one.  Use wakeup-source instead.
-
-Fixed
-
+> 'ARM: imx_v6_v7_defconfig: ...' or 'ARM: imx: defconfig: ...' please.
 > 
->> +		};
->> +
->> +		home {
->> +			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
->> +			linux,code = <KEY_HOME>;
->> +			label = "Key Home";
->> +			linux,input-type = <1>;
->> +			debounce-interval = <100>;
->> +			gpio-key,wakeup;
->> +		};
->> +
->> +		menu {
->> +			gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
->> +			linux,code = <KEY_MENU>;
->> +			label = "Key Menu";
->> +			linux,input-type = <1>;
->> +			debounce-interval = <100>;
->> +			gpio-key,wakeup;
->> +		};
->> +	};
->> +
->> +	gpio-leds {
->> +		compatible = "gpio-leds";
->> +
->> +		led1 {
->> +			gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>;
->> +			linux,default-trigger = "heartbeat";
->> +		};
->> +
->> +		led2 {
->> +			gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
->> +			linux,default-trigger = "default-on";
->> +		};
->> +	};
->> +
->> +	panel1: lvds-panel {
->> +		compatible = "sgd,gktw70sdae4se", "panel-lvds";
->> +		backlight = <&backlight_lvds>;
->> +
->> +		width-mm = <153>;
->> +		height-mm = <86>;
->> +
->> +		label = "gktw70sdae4se";
->> +
-> 
-> Nit: these lines in middle of property list is not really necessary.
-> Can we drop them?
 
-Dropped
+Ok done.
 
-Thanks,
+Thanks for the review,
+
 Neil
 
-> 
 > Shawn
 > 
->> +		data-mapping = "jeida-18";
->> +
->> +		panel-timing {
->> +			clock-frequency = <32000000>;
->> +			hactive = <800>;
->> +			vactive = <480>;
->> +			hback-porch = <39>;
->> +			hfront-porch = <39>;
->> +			vback-porch = <29>;
->> +			vfront-porch = <13>;
->> +			hsync-len = <47>;
->> +			vsync-len = <2>;
->> +		};
->> +
->> +		port {
->> +			panel_in: endpoint {
->> +				remote-endpoint = <&lvds1_out>;
->> +			};
->> +		};
->> +	};
->> +
->> +	reg_usb_h1_vbus: regulator-usbh1vbus {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "usb_h1_vbus";
->> +		regulator-min-microvolt = <5000000>;
->> +		regulator-max-microvolt = <5000000>;
->> +		gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
->> +		enable-active-high;
->> +	};
->> +
->> +	reg_usb_otg_vbus: regulator-usbotgvbus {
->> +		compatible = "regulator-fixed";
->> +		regulator-name = "usb_otg_vbus";
->> +		regulator-min-microvolt = <5000000>;
->> +		regulator-max-microvolt = <5000000>;
->> +		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
->> +		enable-active-high;
->> +	};
->> +
->> +	sound {
->> +		compatible = "simple-audio-card";
->> +		simple-audio-card,name = "dt6-customboard-audio";
->> +		simple-audio-card,format = "i2s";
->> +		simple-audio-card,bitclock-master = <&sound_codec>;
->> +		simple-audio-card,frame-master = <&sound_codec>;
->> +		simple-audio-card,widgets = "Headphone", "Headphone Jack",
->> +					    "Line", "Line In";
->> +		simple-audio-card,routing = "Headphone Jack", "HPLOUT",
->> +					    "Headphone Jack", "HPROUT",
->> +					    "LINE1L", "Line In",
->> +					    "LINE1R", "Line In";
->> +
->> +		sound_cpu: simple-audio-card,cpu {
->> +			sound-dai = <&ssi2>;
->> +		};
->> +
->> +		sound_codec: simple-audio-card,codec {
->> +			sound-dai = <&codec>;
-
-Changed with <&tlv320aic3106> here.
-
->> +			clocks = <&clks IMX6QDL_CLK_CKO>;
->> +		};
->> +	};
->> +};
->> +
->> +&can1 {
->> +	status = "okay";
->> +};
->> +
->> +&ecspi1 {
->> +	cs-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>,
->> +		   <&gpio4 10 GPIO_ACTIVE_HIGH>;
->> +	status = "okay";
->> +};
->> +
->> +&fec {
->> +	status = "okay";
->> +	phy-mode = "rgmii";
->> +	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
->> +};
->> +
->> +&hdmi {
->> +	status = "okay";
->> +};
->> +
->> +&i2c1 {
->> +	clock-frequency = <100000>;
->> +	status = "okay";
->> +};
->> +
->> +&i2c3 {
->> +	clock-frequency = <100000>;
->> +	status = "okay";
->> +
->> +	touchscreen at 38 {
->> +		compatible = "edt,edt-ft5x06";
->> +		reg = <0x38>;
->> +		interrupt-parent = <&gpio1>;
->> +		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
->> +		touchscreen-size-x = <800>;
->> +		touchscreen-size-y = <480>;
->> +		touchscreen-inverted-x;
->> +		touchscreen-inverted-y;
->> +	};
->> +
->> +	rtc at 68 {
->> +		compatible = "isil,isl12057";
->> +		reg = <0x68>;
->> +	};
->> +};
->> +
->> +&ldb {
->> +	status = "okay";
->> +
->> +	lvds-channel at 1 {
->> +		status = "okay";
->> +
->> +		port at 4 {
->> +			reg = <4>;
->> +
->> +			lvds1_out: endpoint {
->> +				remote-endpoint = <&panel_in>;
->> +			};
->> +		};
->> +	};
->> +};
->> +
->> +&pwm2 {
->> +	status = "okay";
->> +};
->> +
->> +&uart1 {
->> +	status = "okay";
->> +};
->> +
->> +&uart3 {
->> +	status = "okay";
->> +};
->> +
->> +&usbh1 {
->> +	vbus-supply = <&reg_usb_h1_vbus>;
->> +	status = "okay";
->> +};
->> +
->> +&usbotg {
->> +	vbus-supply = <&reg_usb_otg_vbus>;
->> +	dr_mode = "otg";
->> +	srp-disable;
->> +	hnp-disable;
->> +	adp-disable;
->> +	status = "okay";
->> +};
->> +
->> +&usdhc2 {
->> +	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
->> +	status = "okay";
->> +};
+>> ---
+>>  arch/arm/configs/imx_v6_v7_defconfig | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+>> index 0d44949..abd06c3 100644
+>> --- a/arch/arm/configs/imx_v6_v7_defconfig
+>> +++ b/arch/arm/configs/imx_v6_v7_defconfig
+>> @@ -80,6 +80,7 @@ CONFIG_CAN=y
+>>  CONFIG_CAN_FLEXCAN=y
+>>  CONFIG_BT=y
+>>  CONFIG_BT_HCIUART=y
+>> +CONFIG_BT_HCIUART_SERDEV=y
+>>  CONFIG_BT_HCIUART_H4=y
+>>  CONFIG_BT_HCIUART_LL=y
+>>  CONFIG_CFG80211=y
+>> @@ -155,6 +156,7 @@ CONFIG_USB_USBNET=y
+>>  CONFIG_USB_NET_CDC_EEM=m
+>>  CONFIG_BRCMFMAC=m
+>>  CONFIG_WL12XX=m
+>> +CONFIG_WL18XX=m
+>>  CONFIG_WLCORE_SDIO=m
+>>  # CONFIG_WILINK_PLATFORM_DATA is not set
+>>  CONFIG_INPUT_EVDEV=y
+>> @@ -185,6 +187,8 @@ CONFIG_SERIAL_IMX=y
+>>  CONFIG_SERIAL_IMX_CONSOLE=y
+>>  CONFIG_SERIAL_FSL_LPUART=y
+>>  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
+>> +CONFIG_SERIAL_DEV_BUS=y
+>> +CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
+>>  # CONFIG_I2C_COMPAT is not set
+>>  CONFIG_I2C_CHARDEV=y
+>>  CONFIG_I2C_MUX=y
+>> @@ -248,6 +252,7 @@ CONFIG_VIDEO_OV5640=m
+>>  CONFIG_SOC_CAMERA_OV2640=y
+>>  CONFIG_IMX_IPUV3_CORE=y
+>>  CONFIG_DRM=y
+>> +CONFIG_DRM_PANEL_LVDS=y
+>>  CONFIG_DRM_PANEL_SIMPLE=y
+>>  CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
+>>  CONFIG_DRM_DW_HDMI_CEC=y
+>> @@ -340,6 +345,7 @@ CONFIG_LEDS_TRIGGER_ONESHOT=y
+>>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+>>  CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+>>  CONFIG_LEDS_TRIGGER_GPIO=y
+>> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+>>  CONFIG_RTC_CLASS=y
+>>  CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+>>  CONFIG_RTC_DRV_DS1307=y
 >> -- 
 >> 2.7.4
 >>
