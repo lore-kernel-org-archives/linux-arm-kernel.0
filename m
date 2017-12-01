@@ -1,82 +1,108 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:38 +0100
-Subject: [PATCH v2 15/27] drm/sun4i: Move interlace related code in DE2
+Date: Fri,  1 Dec 2017 07:05:39 +0100
+Subject: [PATCH v2 16/27] drm/sun4i: Add multi plane support to DE2 driver
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-16-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-17-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no point having code which sets interlace mode of mixer in
-channel related function. Interlace mode will only change when CRTC
-state will change, so let's move it to the block which is executed only
-when primary plane state is changed.
+Support for multiple UI planes can now be easily enabled just by adding
+more planes with different index.
+
+For now, add immutable zpos property.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 33 ++++++++++++++++++++-------------
- 1 file changed, 20 insertions(+), 13 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_layer.c | 38 +++++++++++++++++--------------------
+ 1 file changed, 17 insertions(+), 21 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 00c0cc6440e2..f35a08dc260b 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -104,6 +104,9 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
- 	size = SUN8I_MIXER_SIZE(width, height);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
+index 1eced63f365d..65d6eb7d5cbf 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
+@@ -22,12 +22,6 @@
+ #include "sun8i_layer.h"
+ #include "sun8i_mixer.h"
  
- 	if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
-+		bool interlaced = false;
-+		u32 val;
-+
- 		DRM_DEBUG_DRIVER("Primary layer, updating global size W: %u H: %u\n",
- 				 width, height);
- 		regmap_write(mixer->engine.regs,
-@@ -111,6 +114,23 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
- 			     size);
- 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTSIZE,
- 			     size);
-+
-+		if (state->crtc)
-+			interlaced = state->crtc->state->adjusted_mode.flags
-+				& DRM_MODE_FLAG_INTERLACE;
-+
-+		if (interlaced)
-+			val = SUN8I_MIXER_BLEND_OUTCTL_INTERLACED;
-+		else
-+			val = 0;
-+
-+		regmap_update_bits(mixer->engine.regs,
-+				   SUN8I_MIXER_BLEND_OUTCTL,
-+				   SUN8I_MIXER_BLEND_OUTCTL_INTERLACED,
-+				   val);
-+
-+		DRM_DEBUG_DRIVER("Switching display mixer interlaced mode %s\n",
-+				 interlaced ? "on" : "off");
- 	}
- 
- 	/* Set height and width */
-@@ -140,22 +160,9 @@ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer, int channel,
+-struct sun8i_plane_desc {
+-	       enum drm_plane_type     type;
+-	       const uint32_t          *formats;
+-	       uint32_t                nformats;
+-};
+-
+ static int sun8i_mixer_layer_atomic_check(struct drm_plane *plane,
+ 					  struct drm_plane_state *state)
  {
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
--	bool interlaced = false;
- 	u32 val;
+@@ -106,35 +100,38 @@ static const uint32_t sun8i_mixer_layer_formats[] = {
+ 	DRM_FORMAT_XRGB8888,
+ };
+ 
+-static const struct sun8i_plane_desc sun8i_mixer_planes[] = {
+-	{
+-		.type = DRM_PLANE_TYPE_PRIMARY,
+-		.formats = sun8i_mixer_layer_formats,
+-		.nformats = ARRAY_SIZE(sun8i_mixer_layer_formats),
+-	},
+-};
+-
+ static struct sun8i_layer *sun8i_layer_init_one(struct drm_device *drm,
+ 						struct sun8i_mixer *mixer,
+-						const struct sun8i_plane_desc *plane)
++						int index)
+ {
+ 	struct sun8i_layer *layer;
++	enum drm_plane_type type;
  	int ret;
  
--	if (plane->state->crtc)
--		interlaced = plane->state->crtc->state->adjusted_mode.flags
--			& DRM_MODE_FLAG_INTERLACE;
--
--	regmap_update_bits(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTCTL,
--			   SUN8I_MIXER_BLEND_OUTCTL_INTERLACED,
--			   interlaced ?
--			   SUN8I_MIXER_BLEND_OUTCTL_INTERLACED : 0);
--
--	DRM_DEBUG_DRIVER("Switching display mixer interlaced mode %s\n",
--			 interlaced ? "on" : "off");
--
- 	ret = sun8i_mixer_drm_format_to_layer(plane, fb->format->format,
- 						&val);
+ 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
+ 	if (!layer)
+ 		return ERR_PTR(-ENOMEM);
+ 
++	type = index == 0 ? DRM_PLANE_TYPE_PRIMARY : DRM_PLANE_TYPE_OVERLAY;
++
+ 	/* possible crtcs are set later */
+ 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
+ 				       &sun8i_mixer_layer_funcs,
+-				       plane->formats, plane->nformats,
+-				       NULL, plane->type, NULL);
++				       sun8i_mixer_layer_formats,
++				       ARRAY_SIZE(sun8i_mixer_layer_formats),
++				       NULL, type, NULL);
  	if (ret) {
+ 		dev_err(drm->dev, "Couldn't initialize layer\n");
+ 		return ERR_PTR(ret);
+ 	}
+ 
++	/* fixed zpos for now */
++	ret = drm_plane_create_zpos_immutable_property(&layer->plane, index);
++	if (ret) {
++		dev_err(drm->dev, "Couldn't add zpos property\n");
++		return ERR_PTR(ret);
++	}
++
+ 	drm_plane_helper_add(&layer->plane,
+ 			     &sun8i_mixer_layer_helper_funcs);
+ 	layer->mixer = mixer;
+@@ -149,16 +146,15 @@ struct drm_plane **sun8i_layers_init(struct drm_device *drm,
+ 	struct sun8i_mixer *mixer = engine_to_sun8i_mixer(engine);
+ 	int i;
+ 
+-	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun8i_mixer_planes) + 1,
++	planes = devm_kcalloc(drm->dev, mixer->cfg->ui_num + 1,
+ 			      sizeof(*planes), GFP_KERNEL);
+ 	if (!planes)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	for (i = 0; i < ARRAY_SIZE(sun8i_mixer_planes); i++) {
+-		const struct sun8i_plane_desc *plane = &sun8i_mixer_planes[i];
++	for (i = 0; i < mixer->cfg->ui_num; i++) {
+ 		struct sun8i_layer *layer;
+ 
+-		layer = sun8i_layer_init_one(drm, mixer, plane);
++		layer = sun8i_layer_init_one(drm, mixer, i);
+ 		if (IS_ERR(layer)) {
+ 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
+ 				i ? "overlay" : "primary");
 -- 
 2.15.1
