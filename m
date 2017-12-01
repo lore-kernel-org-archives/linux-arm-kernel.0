@@ -1,62 +1,37 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 30 Nov 2017 21:52:56 -0500
-Subject: [PATCH V4 5/5] dmaengine: qcom_hidma: Add identity register support
-In-Reply-To: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
-References: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1512096776-22883-6-git-send-email-okaya@codeaurora.org>
+From: bjorn.andersson@linaro.org (Bjorn Andersson)
+Date: Thu, 30 Nov 2017 21:27:32 -0800
+Subject: [PATCH] arm64: dts: msm8916: Correct ipc references for smsm
+Message-ID: <20171201052732.31996-1-bjorn.andersson@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The location for destination event channel register has been relocated from
-offset 0x28 to 0x40. Update the code accordingly.
+SMSM is not symmetrical, the incoming bits from WCNSS are available at
+index 6, but the outgoing host id for WCNSS is 3. Further more, upstream
+references the base of APCS (in contrast to downstream), so the register
+offset of 8 must be included.
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Fixes: 1fb47e0a9ba4 ("arm64: dts: qcom: msm8916: Add smsm and smp2p nodes")
+Cc: stable at vger.kernel.org
+Reported-by: Ramon Fried <rfried@codeaurora.org>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- drivers/dma/qcom/hidma.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
-index c146c6d..963cc52 100644
---- a/drivers/dma/qcom/hidma.c
-+++ b/drivers/dma/qcom/hidma.c
-@@ -107,6 +107,7 @@ static void hidma_free(struct hidma_dev *dmadev)
+diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+index 9fb317853a5c..a8e1e3b4562c 100644
+--- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
+@@ -1437,8 +1437,8 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
  
- enum hidma_cap {
- 	HIDMA_MSI_CAP = 1,
-+	HIDMA_IDENTITY_CAP,
- };
+-		qcom,ipc-1 = <&apcs 0 13>;
+-		qcom,ipc-6 = <&apcs 0 19>;
++		qcom,ipc-1 = <&apcs 8 13>;
++		qcom,ipc-3 = <&apcs 8 19>;
  
- /* process completed descriptors */
-@@ -838,7 +839,10 @@ static int hidma_probe(struct platform_device *pdev)
- 	if (!dmadev->nr_descriptors)
- 		dmadev->nr_descriptors = HIDMA_NR_DEFAULT_DESC;
- 
--	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
-+	if (hidma_test_capability(&pdev->dev, HIDMA_IDENTITY_CAP))
-+		dmadev->chidx = readl(dmadev->dev_trca + 0x40);
-+	else
-+		dmadev->chidx = readl(dmadev->dev_trca + 0x28);
- 
- 	/* Set DMA mask to 64 bits. */
- 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
-@@ -944,7 +948,7 @@ static int hidma_remove(struct platform_device *pdev)
- static const struct acpi_device_id hidma_acpi_ids[] = {
- 	{"QCOM8061"},
- 	{"QCOM8062", HIDMA_MSI_CAP},
--	{"QCOM8063", HIDMA_MSI_CAP},
-+	{"QCOM8063", (HIDMA_MSI_CAP | HIDMA_IDENTITY_CAP)},
- 	{},
- };
- MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
-@@ -953,7 +957,8 @@ static int hidma_remove(struct platform_device *pdev)
- static const struct of_device_id hidma_match[] = {
- 	{.compatible = "qcom,hidma-1.0",},
- 	{.compatible = "qcom,hidma-1.1", .data = (void *)(HIDMA_MSI_CAP),},
--	{.compatible = "qcom,hidma-1.2", .data = (void *)(HIDMA_MSI_CAP),},
-+	{.compatible = "qcom,hidma-1.2",
-+	 .data = (void *)(HIDMA_MSI_CAP | HIDMA_IDENTITY_CAP),},
- 	{},
- };
- MODULE_DEVICE_TABLE(of, hidma_match);
+ 		apps_smsm: apps at 0 {
+ 			reg = <0>;
 -- 
-1.9.1
+2.15.0
