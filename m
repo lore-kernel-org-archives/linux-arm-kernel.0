@@ -1,247 +1,62 @@
-From: venkataravi.e@techveda.org (venkataravi.e at techveda.org)
-Date: Fri,  1 Dec 2017 12:08:30 +0530
-Subject: [PATCH 3/4] arm: dts: imx28: Rearrange nodes for better readability
-In-Reply-To: <1512110311-15788-1-git-send-email-venkataravi.e@techveda.org>
-References: <1512110311-15788-1-git-send-email-venkataravi.e@techveda.org>
-Message-ID: <1512110311-15788-4-git-send-email-venkataravi.e@techveda.org>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 1 Dec 2017 08:02:33 +0100
+Subject: [PATCH] bus: simple-pm-bus: convert bool SIMPLE_PM_BUS to tristate
+In-Reply-To: <1512043020-23452-1-git-send-email-geert+renesas@glider.be>
+References: <1512043020-23452-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20171201070232.v4uilgo5cydaoyqa@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ravi Eluri <venkataravi.e@techveda.org>
+On Thu, Nov 30, 2017 at 12:57:00PM +0100, Geert Uytterhoeven wrote:
+> From: Paul Gortmaker <paul.gortmaker@windriver.com>
+> 
+> The Kconfig currently controlling compilation of this code is:
+> 
+> config SIMPLE_PM_BUS
+>         bool "Simple Power-Managed Bus Driver"
+> 
+> ...meaning that it currently is not being built as a module by anyone.
+> 
+> In removing the orphaned modular support in a previous patch set,
+> Geert indicated he'd rather see this code converted to tristate.
+> 
+> I normally don't do that because it extends functionality that I
+> can't easily run time test or even know if the use case makes sense,
+> but since in this case the author has nominated it as such, we do
+> the conversion here.
+> 
+> Note that doesn't change the lack of run time testing ; this change
+> is only tested for sucessful compile and modpost.
+> 
+> [geert: Ethernet is probed successfully on sh73a0/kzm9g after
+>         insmodding simple-pm-bus.ko]
+> 
+> Cc: Kevin Hilman <khilman@linaro.org>
+> Cc: Simon Horman <horms+renesas@verge.net.au>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Signed-off-by: Paul Gortmaker <paul.gortmaker@windriver.com>
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Moved regulator, sound, leds, backlight nodes to the top of the
-device tree, cleaned up for better readability.
+Acked-by: Simon Horman <horms+renesas@verge.net.au>
 
-Signed-off-by: Ravi Eluri <venkataravi.e@techveda.org>
-Signed-off-by: Suniel Mahesh <sunil.m@techveda.org>
----
-Note:
-- This is the third patch of the four patch series.
-- Patch was compile tested and built(ARCH=arm, imx28) on linux-next
-  (latest).
-- No build issues reported.
-- Please discard this changeset, if this is not making any better.
----
- arch/arm/boot/dts/imx28-evk.dts | 203 ++++++++++++++++++++--------------------
- 1 file changed, 101 insertions(+), 102 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx28-evk.dts b/arch/arm/boot/dts/imx28-evk.dts
-index 28564864..9d74486 100644
---- a/arch/arm/boot/dts/imx28-evk.dts
-+++ b/arch/arm/boot/dts/imx28-evk.dts
-@@ -20,6 +20,107 @@
- 		reg = <0x40000000 0x08000000>;
- 	};
- 
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		reg_3p3v: regulator at 0 {
-+			compatible = "regulator-fixed";
-+			reg = <0>;
-+			regulator-name = "3P3V";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			regulator-always-on;
-+		};
-+
-+		reg_vddio_sd0: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "vddio-sd0";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio3 28 0>;
-+		};
-+
-+		reg_fec_3v3: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "fec-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio2 15 0>;
-+		};
-+
-+		reg_usb0_vbus: regulator at 3 {
-+			compatible = "regulator-fixed";
-+			reg = <3>;
-+			regulator-name = "usb0_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 9 0>;
-+			enable-active-high;
-+		};
-+
-+		reg_usb1_vbus: regulator at 4 {
-+			compatible = "regulator-fixed";
-+			reg = <4>;
-+			regulator-name = "usb1_vbus";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			gpio = <&gpio3 8 0>;
-+			enable-active-high;
-+		};
-+
-+		reg_lcd_3v3: regulator at 5 {
-+			compatible = "regulator-fixed";
-+			reg = <5>;
-+			regulator-name = "lcd-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio3 30 0>;
-+			enable-active-high;
-+		};
-+
-+		reg_can_3v3: regulator at 6 {
-+			compatible = "regulator-fixed";
-+			reg = <6>;
-+			regulator-name = "can-3v3";
-+			regulator-min-microvolt = <3300000>;
-+			regulator-max-microvolt = <3300000>;
-+			gpio = <&gpio2 13 0>;
-+			enable-active-high;
-+		};
-+	};
-+
-+	sound {
-+		compatible = "fsl,imx28-evk-sgtl5000",
-+			     "fsl,mxs-audio-sgtl5000";
-+		model = "imx28-evk-sgtl5000";
-+		saif-controllers = <&saif0 &saif1>;
-+		audio-codec = <&sgtl5000>;
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&led_pin_gpio3_5>;
-+
-+		user {
-+			label = "Heartbeat";
-+			gpios = <&gpio3 5 0>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+
-+	backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm 2 5000000>;
-+		brightness-levels = <0 4 8 16 32 64 128 255>;
-+		default-brightness-level = <6>;
-+	};
-+};
-+
- 			&gpmi {
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&gpmi_pins_a &gpmi_status_cfg
-@@ -266,105 +367,3 @@
- 			pinctrl-0 = <&mac1_pins_a>;
- 			status = "okay";
- 		};
--
--	regulators {
--		compatible = "simple-bus";
--		#address-cells = <1>;
--		#size-cells = <0>;
--
--		reg_3p3v: regulator at 0 {
--			compatible = "regulator-fixed";
--			reg = <0>;
--			regulator-name = "3P3V";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			regulator-always-on;
--		};
--
--		reg_vddio_sd0: regulator at 1 {
--			compatible = "regulator-fixed";
--			reg = <1>;
--			regulator-name = "vddio-sd0";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio3 28 0>;
--		};
--
--		reg_fec_3v3: regulator at 2 {
--			compatible = "regulator-fixed";
--			reg = <2>;
--			regulator-name = "fec-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio2 15 0>;
--		};
--
--		reg_usb0_vbus: regulator at 3 {
--			compatible = "regulator-fixed";
--			reg = <3>;
--			regulator-name = "usb0_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 9 0>;
--			enable-active-high;
--		};
--
--		reg_usb1_vbus: regulator at 4 {
--			compatible = "regulator-fixed";
--			reg = <4>;
--			regulator-name = "usb1_vbus";
--			regulator-min-microvolt = <5000000>;
--			regulator-max-microvolt = <5000000>;
--			gpio = <&gpio3 8 0>;
--			enable-active-high;
--		};
--
--		reg_lcd_3v3: regulator at 5 {
--			compatible = "regulator-fixed";
--			reg = <5>;
--			regulator-name = "lcd-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio3 30 0>;
--			enable-active-high;
--		};
--
--		reg_can_3v3: regulator at 6 {
--			compatible = "regulator-fixed";
--			reg = <6>;
--			regulator-name = "can-3v3";
--			regulator-min-microvolt = <3300000>;
--			regulator-max-microvolt = <3300000>;
--			gpio = <&gpio2 13 0>;
--			enable-active-high;
--		};
--
--	};
--
--	sound {
--		compatible = "fsl,imx28-evk-sgtl5000",
--			     "fsl,mxs-audio-sgtl5000";
--		model = "imx28-evk-sgtl5000";
--		saif-controllers = <&saif0 &saif1>;
--		audio-codec = <&sgtl5000>;
--	};
--
--	leds {
--		compatible = "gpio-leds";
--		pinctrl-names = "default";
--		pinctrl-0 = <&led_pin_gpio3_5>;
--
--		user {
--			label = "Heartbeat";
--			gpios = <&gpio3 5 0>;
--			linux,default-trigger = "heartbeat";
--		};
--	};
--
--	backlight {
--		compatible = "pwm-backlight";
--		pwms = <&pwm 2 5000000>;
--		brightness-levels = <0 4 8 16 32 64 128 255>;
--		default-brightness-level = <6>;
--	};
--};
--- 
-1.9.1
+> ---
+>  drivers/bus/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
+> index dc7b3c7b7d42fd09..57e011d36a79fce3 100644
+> --- a/drivers/bus/Kconfig
+> +++ b/drivers/bus/Kconfig
+> @@ -120,7 +120,7 @@ config QCOM_EBI2
+>  	  SRAM, ethernet adapters, FPGAs and LCD displays.
+>  
+>  config SIMPLE_PM_BUS
+> -	bool "Simple Power-Managed Bus Driver"
+> +	tristate "Simple Power-Managed Bus Driver"
+>  	depends on OF && PM
+>  	help
+>  	  Driver for transparent busses that don't need a real driver, but
+> -- 
+> 2.7.4
+> 
