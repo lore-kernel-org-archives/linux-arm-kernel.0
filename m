@@ -1,88 +1,108 @@
 From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 1 Dec 2017 18:40:09 +0100
-Subject: [PATCH v6 02/13] docs: driver-api: add iio hw consumer section
-In-Reply-To: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
-References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1512150020-20335-3-git-send-email-arnaud.pouliquen@st.com>
+Date: Fri, 1 Dec 2017 18:40:07 +0100
+Subject: [PATCH v6 00/13] Add STM32 DFSDM support
+Message-ID: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds a section about the Hardware consumer
-API of the IIO subsystem to the driver API
-documentation.
+Hello,
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
----
- Documentation/driver-api/iio/hw-consumer.rst | 51 ++++++++++++++++++++++++++++
- Documentation/driver-api/iio/index.rst       |  1 +
- 2 files changed, 52 insertions(+)
+Here is a new version to fix kbuild test warnings
+
+Main deltas V6 vs V5:
+- Fix warning reported by kbuild test in :
+   include/linux/iio/consumer.h
+   sound/soc/stm/stm32_adfsdm.c
+
+Main deltas V5 vs V4:
+- Integrate ASOC DAI as a subnode of the DFSDM.
+- Add in kernel consumer interface to allow to manipulate attribute.
+
+Context reminder:
+-----------------
+
+DFSDM peripheral is a peripheral that allows to connect some sigma delta ADCs
+or PDM microphones via a SPI or Manchester bus.
+DFSDM integrates digital filters to offer up to 24 bits final resolution.
+
+In term of SW architecture. 2 use-cases have to be supported:
+
+1) Sigma delta ADC conversion through IIO framework.
+Sigma delta ADC is handled by generic sigma delta modulator driver. 
+DFSDM peripheral is binded to a SD modulator ADC using the IIO HW consumer interface. 
+Please notice that IIO HW consumer interface has be proposed by Lars, but is
+part of this patchset with Lars's agreement.
+User interface is IIO one.
+Notice that this patch-set propose only a raw conversion, to simplify review.
+Buffer and trigger management will be added in next patch-sets.
+
+2) PDM microphone record through ALSA framework.
+PDM microphone is handled by ASOC Generic DMIC codec driver.
+ADFSDM ASOC DAI driver is binded to IIO driver using the IIO consumer interface
+ADFSDM ASOC DAI driver is binded to a PDM microphone ASOC component using ASOC Of_graph.
+User interface is ALSA one.
+As IIO DMA management is not adapted to an audio realtime stream. A specific DMA 
+management has been implemented in IIO driver for audio purposes.
+
+Regards,
+Arnaud
+
+
+
+Arnaud Pouliquen (12):
+  docs: driver-api: add iio hw consumer section
+  IIO: hw_consumer: add devm_iio_hw_consumer_alloc
+  IIO: inkern: API for manipulating channel attributes
+  IIO: Add DT bindings for sigma delta adc modulator
+  IIO: ADC: add sigma delta modulator support
+  IIO: add DT bindings for stm32 DFSDM filter
+  IIO: ADC: add stm32 DFSDM core support
+  IIO: ADC: add STM32 DFSDM sigma delta ADC support
+  IIO: ADC: add stm32 DFSDM support for PDM microphone
+  IIO: consumer: allow to set buffer sizes
+  ASoC: add bindings for stm32 DFSDM filter
+  ASoC: stm32: add DFSDM DAI support
+
+Lars-Peter Clausen (1):
+  iio: Add hardware consumer buffer support
+
+ .../ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32      |   16 +
+ .../bindings/iio/adc/sigma-delta-modulator.txt     |   13 +
+ .../bindings/iio/adc/st,stm32-dfsdm-adc.txt        |  127 ++
+ .../devicetree/bindings/sound/st,stm32-adfsdm.txt  |   62 +
+ Documentation/driver-api/iio/hw-consumer.rst       |   51 +
+ Documentation/driver-api/iio/index.rst             |    1 +
+ drivers/iio/adc/Kconfig                            |   37 +
+ drivers/iio/adc/Makefile                           |    3 +
+ drivers/iio/adc/sd_adc_modulator.c                 |   81 ++
+ drivers/iio/adc/stm32-dfsdm-adc.c                  | 1232 ++++++++++++++++++++
+ drivers/iio/adc/stm32-dfsdm-core.c                 |  318 +++++
+ drivers/iio/adc/stm32-dfsdm.h                      |  319 +++++
+ drivers/iio/buffer/Kconfig                         |   10 +
+ drivers/iio/buffer/Makefile                        |    1 +
+ drivers/iio/buffer/industrialio-buffer-cb.c        |   11 +
+ drivers/iio/buffer/industrialio-hw-consumer.c      |  248 ++++
+ drivers/iio/inkern.c                               |   18 +-
+ include/linux/iio/adc/stm32-dfsdm-adc.h            |   28 +
+ include/linux/iio/consumer.h                       |   39 +-
+ include/linux/iio/hw-consumer.h                    |   22 +
+ sound/soc/stm/Kconfig                              |   11 +
+ sound/soc/stm/Makefile                             |    3 +
+ sound/soc/stm/stm32_adfsdm.c                       |  386 ++++++
+ 23 files changed, 3031 insertions(+), 6 deletions(-)
+ create mode 100644 Documentation/ABI/testing/sysfs-bus-iio-dfsdm-adc-stm32
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/st,stm32-dfsdm-adc.txt
+ create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
  create mode 100644 Documentation/driver-api/iio/hw-consumer.rst
+ create mode 100644 drivers/iio/adc/sd_adc_modulator.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-adc.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm-core.c
+ create mode 100644 drivers/iio/adc/stm32-dfsdm.h
+ create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
+ create mode 100644 include/linux/iio/adc/stm32-dfsdm-adc.h
+ create mode 100644 include/linux/iio/hw-consumer.h
+ create mode 100644 sound/soc/stm/stm32_adfsdm.c
 
-diff --git a/Documentation/driver-api/iio/hw-consumer.rst b/Documentation/driver-api/iio/hw-consumer.rst
-new file mode 100644
-index 0000000..8facce6
---- /dev/null
-+++ b/Documentation/driver-api/iio/hw-consumer.rst
-@@ -0,0 +1,51 @@
-+===========
-+HW consumer
-+===========
-+An IIO device can be directly connected to another device in hardware. in this
-+case the buffers between IIO provider and IIO consumer are handled by hardware.
-+The Industrial I/O HW consumer offers a way to bond these IIO devices without
-+software buffer for data. The implementation can be found under
-+:file:`drivers/iio/buffer/hw-consumer.c`
-+
-+
-+* struct :c:type:`iio_hw_consumer` ? Hardware consumer structure
-+* :c:func:`iio_hw_consumer_alloc` ? Allocate IIO hardware consumer
-+* :c:func:`iio_hw_consumer_free` ? Free IIO hardware consumer
-+* :c:func:`iio_hw_consumer_enable` ? Enable IIO hardware consumer
-+* :c:func:`iio_hw_consumer_disable` ? Disable IIO hardware consumer
-+
-+
-+HW consumer setup
-+=================
-+
-+As standard IIO device the implementation is based on IIO provider/consumer.
-+A typical IIO HW consumer setup looks like this::
-+
-+	static struct iio_hw_consumer *hwc;
-+
-+	static const struct iio_info adc_info = {
-+		.read_raw = adc_read_raw,
-+	};
-+
-+	static int adc_read_raw(struct iio_dev *indio_dev,
-+				struct iio_chan_spec const *chan, int *val,
-+				int *val2, long mask)
-+	{
-+		ret = iio_hw_consumer_enable(hwc);
-+
-+		/* Acquire data */
-+
-+		ret = iio_hw_consumer_disable(hwc);
-+	}
-+
-+	static int adc_probe(struct platform_device *pdev)
-+	{
-+		hwc = devm_iio_hw_consumer_alloc(&iio->dev);
-+	}
-+
-+More details
-+============
-+.. kernel-doc:: include/linux/iio/hw-consumer.h
-+.. kernel-doc:: drivers/iio/buffer/industrialio-hw-consumer.c
-+   :export:
-+
-diff --git a/Documentation/driver-api/iio/index.rst b/Documentation/driver-api/iio/index.rst
-index e5c3922..7fba341 100644
---- a/Documentation/driver-api/iio/index.rst
-+++ b/Documentation/driver-api/iio/index.rst
-@@ -15,3 +15,4 @@ Contents:
-    buffers
-    triggers
-    triggered-buffers
-+   hw-consumer
 -- 
 2.7.4
