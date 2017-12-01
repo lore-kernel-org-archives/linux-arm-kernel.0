@@ -1,35 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 1 Dec 2017 09:54:18 -0800
-Subject: [PATCH v6 0/2] memory: Introduce ti-emif-sram driver
-In-Reply-To: <1512082568-5012-1-git-send-email-d-gerlach@ti.com>
-References: <1512082568-5012-1-git-send-email-d-gerlach@ti.com>
-Message-ID: <20171201175418.GS28152@atomide.com>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Fri, 1 Dec 2017 18:40:18 +0100
+Subject: [PATCH v6 11/13] IIO: consumer: allow to set buffer sizes
+In-Reply-To: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1512150020-20335-12-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Dave Gerlach <d-gerlach@ti.com> [171130 22:58]:
-> This is a resend of v5 of this series found here [1]. It introduces
-> relocatable PM handlers for the emif that are copied to sram and
-> run from there during low power mode entry.
-> 
-> The patches still have the previous ACKs but have a small change to
-> accomodate a change made by Tony in commit cd57dc5a2099 ("ARM: dts:
-> Add missing hwmod related nodes for am33xx"). If there are objections
-> to this let me know ASAP.
+Add iio consumer API to set buffer size and watermark according
+to sysfs API.
 
-Still looks good to me thanks.
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+---
+ drivers/iio/buffer/industrialio-buffer-cb.c | 11 +++++++++++
+ include/linux/iio/consumer.h                | 11 +++++++++++
+ 2 files changed, 22 insertions(+)
 
-> Now that a hwmod is present for the am335x EMIF, on probe fail the call to
-> pm_runtime_put_sync causes the board to hang. In fact, this emif driver should
-> never alter the PM state of the hardware at all through normal kernel calls, it
-> is the job of the suspend handlers that are added, that is the whole point of
-> this driver. Because of this, I have dropped all runtime pm calls, as any
-> change to the PM state while the kernel is running is dangerous as we may shut
-> of the memory controller. It makes the most sense just to drop runtime PM from
-> the driver entirely. Besides that patch is unchanged.
-
-OK makes sense to me.
-
-Regards,
-
-Tony
+diff --git a/drivers/iio/buffer/industrialio-buffer-cb.c b/drivers/iio/buffer/industrialio-buffer-cb.c
+index 4847534..ea63c83 100644
+--- a/drivers/iio/buffer/industrialio-buffer-cb.c
++++ b/drivers/iio/buffer/industrialio-buffer-cb.c
+@@ -104,6 +104,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ }
+ EXPORT_SYMBOL_GPL(iio_channel_get_all_cb);
+ 
++int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buff,
++					size_t watermark)
++{
++	if (!watermark)
++		return -EINVAL;
++	cb_buff->buffer.watermark = watermark;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(iio_channel_cb_set_buffer_watermark);
++
+ int iio_channel_start_all_cb(struct iio_cb_buffer *cb_buff)
+ {
+ 	return iio_update_buffers(cb_buff->indio_dev, &cb_buff->buffer,
+diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+index 70658b1..33202f8 100644
+--- a/include/linux/iio/consumer.h
++++ b/include/linux/iio/consumer.h
+@@ -134,6 +134,17 @@ struct iio_cb_buffer *iio_channel_get_all_cb(struct device *dev,
+ 						       void *private),
+ 					     void *private);
+ /**
++ * iio_channel_cb_set_buffer_watermark() - set the buffer watermark.
++ * @cb_buffer:		The callback buffer from whom we want the channel
++ *			information.
++ * @watermark: buffer watermark in bytes.
++ *
++ * This function allows to configure the buffer watermark.
++ */
++int iio_channel_cb_set_buffer_watermark(struct iio_cb_buffer *cb_buffer,
++					size_t watermark);
++
++/**
+  * iio_channel_release_all_cb() - release and unregister the callback.
+  * @cb_buffer:		The callback buffer that was allocated.
+  */
+-- 
+2.7.4
