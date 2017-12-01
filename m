@@ -1,85 +1,68 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Dec 2017 18:23:35 +0000
-Subject: [GIT PULL] arm64: fixes for -rc2
-Message-ID: <20171201182335.GF8826@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 1 Dec 2017 18:24:10 +0000
+Subject: [PATCH RT] arm*: disable NEON in kernel mode
+In-Reply-To: <20171201180828.GN10595@n2100.armlinux.org.uk>
+References: <20171130142216.GB12606@linutronix.de>
+ <20171130143028.GA1351@linutronix.de>
+ <20171201104331.GB1612@linutronix.de>
+ <20171201134506.GF1612@linutronix.de>
+ <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
+ <20171201143648.GK1612@linutronix.de>
+ <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
+ <20171201175844.GT22781@e103592.cambridge.arm.com>
+ <20171201180828.GN10595@n2100.armlinux.org.uk>
+Message-ID: <20171201182410.GU22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On Fri, Dec 01, 2017 at 06:08:28PM +0000, Russell King - ARM Linux wrote:
+> On Fri, Dec 01, 2017 at 05:58:45PM +0000, Dave Martin wrote:
+> > +1, at least for arm64.  I don't see a really compelling reason for
+> > holding kernel-mode NEON around memory management now that we have a
+> > strict save-once-restore-lazily model.
+> > 
+> > This may not work so well for arm though -- I haven't looked at that
+> > code for a while.
+> > 
+> > 
+> > If there is memory manamement in any core loop, you already lost
+> > the performance battle, and an extra
+> > kernel_neon_end()+kernel_neon_begin() may not be that catastrophic.
+> 
+> Remember that we don't permit context switches while kernel neon is
+> in use on ARM - if there's any possibility of scheduling to occur,
+> the get_cpu() in kernel_neon_begin() should trigger a schedule-while-
+> atomic warning.
 
-Please pull the following arm64 fixes for 4.15-rc2. The critical one here
-is a fix for fpsimd register corruption across signals which was introduced
-by the SVE support code (the register files overlap), but the others are
-worth having as well.
+Agreed, and an arm64 the same is true.  (Actually softirq is disabled
+too, for tortuous reasons involving SVE.)
 
-Summary in the tag.
+On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
+> NEON in kernel mode is used by the crypto algorithms and raid6 code.
+> While the raid6 code looks okay, the crypto algorithms do not: NEON
+> is enabled on first invocation and may allocate/free/map memory before
+> the NEON mode is disabled again.
+> This needs to be changed until it can be enabled.
+> On ARM NEON in kernel mode can be simply disabled. on ARM64 it needs to
+> stay on due to possible EFI callbacks so here I disable each algorithm.
 
-Cheers,
+[...]
 
-Will
+> diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+> index 70c517aa4501..2a5f05b5a19a 100644
+> --- a/arch/arm64/crypto/Kconfig
+> +++ b/arch/arm64/crypto/Kconfig
+> @@ -19,19 +19,19 @@ config CRYPTO_SHA512_ARM64
+>
+>  config CRYPTO_SHA1_ARM64_CE
+>     tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
+> -   depends on KERNEL_MODE_NEON
+> +   depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>     select CRYPTO_HASH
+>     select CRYPTO_SHA1
 
---->8
+Sebastian, can you piont to where sha1 (say) hits this issue?
+I wonder whether this is really a sign that some refactoring is needed.
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 3a33c7605750fb6a87613044d16b1455e482414d:
-
-  arm64: context: Fix comments and remove pointless smp_wmb() (2017-12-01 13:05:08 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Fix FP register corruption when SVE is not available or in use
-
-- Fix out-of-tree module build failure when CONFIG_ARM64_MODULE_PLTS=y
-
-- Missing 'const' generating errors with LTO builds
-
-- Remove unsupported events from Cortex-A73 PMU description
-
-- Removal of stale and incorrect comments
-
-----------------------------------------------------------------
-Ard Biesheuvel (2):
-      arm64: module-plts: factor out PLT generation code for ftrace
-      arm64: ftrace: emit ftrace-mod.o contents through code
-
-Dave Martin (1):
-      arm64: fpsimd: Fix failure to restore FPSIMD state after signals
-
-Jinbum Park (1):
-      arm64: pgd: Mark pgd_cache as __ro_after_init
-
-Mark Rutland (1):
-      arm64: mm: cleanup stale AIVIVT references
-
-Will Deacon (1):
-      arm64: context: Fix comments and remove pointless smp_wmb()
-
-Xu YiPing (1):
-      arm64: perf: remove unsupported events for Cortex-A73
-
-Yury Norov (1):
-      arm64: cpu_ops: Add missing 'const' qualifiers
-
- arch/arm64/Makefile                 |  3 ---
- arch/arm64/include/asm/cacheflush.h |  2 +-
- arch/arm64/include/asm/module.h     | 46 +++++++++++++++++++++++++++++++++-
- arch/arm64/kernel/Makefile          |  3 ---
- arch/arm64/kernel/cpu_ops.c         |  6 ++---
- arch/arm64/kernel/fpsimd.c          |  6 ++---
- arch/arm64/kernel/ftrace-mod.S      | 18 -------------
- arch/arm64/kernel/ftrace.c          | 14 ++++++-----
- arch/arm64/kernel/module-plts.c     | 50 +++++++++++--------------------------
- arch/arm64/kernel/module.lds        |  1 +
- arch/arm64/kernel/perf_event.c      |  6 -----
- arch/arm64/mm/context.c             | 28 ++++++++++++---------
- arch/arm64/mm/pgd.c                 |  2 +-
- 13 files changed, 92 insertions(+), 93 deletions(-)
- delete mode 100644 arch/arm64/kernel/ftrace-mod.S
+Cheers
+---Dave
