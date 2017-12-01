@@ -1,75 +1,73 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 2 Dec 2017 03:16:39 +0800
-Subject: [alsa-devel] [PATCH v5 13/13] ASoC: stm32: add DFSDM DAI support
-In-Reply-To: <1511881557-28596-14-git-send-email-arnaud.pouliquen@st.com>
-References: <1511881557-28596-14-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <201712020302.G9eOX3vL%fengguang.wu@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 1 Dec 2017 19:20:18 +0000
+Subject: [PATCH RT] arm*: disable NEON in kernel mode
+In-Reply-To: <20171201182410.GU22781@e103592.cambridge.arm.com>
+References: <20171130142216.GB12606@linutronix.de>
+ <20171130143028.GA1351@linutronix.de>
+ <20171201104331.GB1612@linutronix.de> <20171201134506.GF1612@linutronix.de>
+ <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
+ <20171201143648.GK1612@linutronix.de>
+ <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
+ <20171201175844.GT22781@e103592.cambridge.arm.com>
+ <20171201180828.GN10595@n2100.armlinux.org.uk>
+ <20171201182410.GU22781@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu9Ljw5fuvxZVFVY+rpBnh_cbUijF76H7Ve54hpENsq9ZA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnaud,
+On 1 December 2017 at 18:24, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Fri, Dec 01, 2017 at 06:08:28PM +0000, Russell King - ARM Linux wrote:
+>> On Fri, Dec 01, 2017 at 05:58:45PM +0000, Dave Martin wrote:
+>> > +1, at least for arm64.  I don't see a really compelling reason for
+>> > holding kernel-mode NEON around memory management now that we have a
+>> > strict save-once-restore-lazily model.
+>> >
+>> > This may not work so well for arm though -- I haven't looked at that
+>> > code for a while.
+>> >
+>> >
+>> > If there is memory manamement in any core loop, you already lost
+>> > the performance battle, and an extra
+>> > kernel_neon_end()+kernel_neon_begin() may not be that catastrophic.
+>>
+>> Remember that we don't permit context switches while kernel neon is
+>> in use on ARM - if there's any possibility of scheduling to occur,
+>> the get_cpu() in kernel_neon_begin() should trigger a schedule-while-
+>> atomic warning.
+>
+> Agreed, and an arm64 the same is true.  (Actually softirq is disabled
+> too, for tortuous reasons involving SVE.)
+>
+> On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
+>> NEON in kernel mode is used by the crypto algorithms and raid6 code.
+>> While the raid6 code looks okay, the crypto algorithms do not: NEON
+>> is enabled on first invocation and may allocate/free/map memory before
+>> the NEON mode is disabled again.
+>> This needs to be changed until it can be enabled.
+>> On ARM NEON in kernel mode can be simply disabled. on ARM64 it needs to
+>> stay on due to possible EFI callbacks so here I disable each algorithm.
+>
+> [...]
+>
+>> diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+>> index 70c517aa4501..2a5f05b5a19a 100644
+>> --- a/arch/arm64/crypto/Kconfig
+>> +++ b/arch/arm64/crypto/Kconfig
+>> @@ -19,19 +19,19 @@ config CRYPTO_SHA512_ARM64
+>>
+>>  config CRYPTO_SHA1_ARM64_CE
+>>     tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
+>> -   depends on KERNEL_MODE_NEON
+>> +   depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>>     select CRYPTO_HASH
+>>     select CRYPTO_SHA1
+>
+> Sebastian, can you piont to where sha1 (say) hits this issue?
+> I wonder whether this is really a sign that some refactoring is needed.
+>
 
-Thank you for the patch! Perhaps something to improve:
-
-[auto build test WARNING on iio/togreg]
-[also build test WARNING on v4.15-rc1 next-20171201]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Arnaud-Pouliquen/Add-STM32-DFSDM-support/20171201-215409
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/jic23/iio.git togreg
-config: tile-allyesconfig (attached as .config)
-compiler: tilegx-linux-gcc (GCC) 4.6.2
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=tile 
-
-All warnings (new ones prefixed by >>):
-
-   sound/soc/stm/stm32_adfsdm.c: In function 'stm32_afsdm_pcm_cb':
->> sound/soc/stm/stm32_adfsdm.c:173:2: warning: format '%d' expects argument of type 'int', but argument 7 has type 'size_t' [-Wformat]
-
-vim +173 sound/soc/stm/stm32_adfsdm.c
-
-   161	
-   162	static int stm32_afsdm_pcm_cb(const void *data, size_t size, void *private)
-   163	{
-   164		struct stm32_adfsdm_priv *priv = private;
-   165		struct snd_soc_pcm_runtime *rtd = priv->substream->private_data;
-   166		u8 *pcm_buff = priv->pcm_buff;
-   167		u8 *src_buff = (u8 *)data;
-   168		unsigned int buff_size = snd_pcm_lib_buffer_bytes(priv->substream);
-   169		unsigned int period_size = snd_pcm_lib_period_bytes(priv->substream);
-   170		unsigned int old_pos = priv->pos;
-   171		unsigned int cur_size = size;
-   172	
- > 173		dev_dbg(rtd->dev, "%s: buff_add :%p, pos = %d, size = %d\n",
-   174			__func__, &pcm_buff[priv->pos], priv->pos, size);
-   175	
-   176		if ((priv->pos + size) > buff_size) {
-   177			memcpy(&pcm_buff[priv->pos], src_buff, buff_size - priv->pos);
-   178			cur_size -= buff_size - priv->pos;
-   179			priv->pos = 0;
-   180		}
-   181	
-   182		memcpy(&pcm_buff[priv->pos], &src_buff[size - cur_size], cur_size);
-   183		priv->pos = (priv->pos + cur_size) % buff_size;
-   184	
-   185		if (cur_size != size || (old_pos && (old_pos % period_size < size)))
-   186			snd_pcm_period_elapsed(priv->substream);
-   187	
-   188		return 0;
-   189	}
-   190	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 50547 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171202/a7485b14/attachment-0001.gz>
+I don't think the SHA code is affected. It is primarily the block
+ciphers, where the scatterwalk API offers some guarantees to the API
+client (the NEON crypto driver) that data is presented in suitable
+blocks. This may involve copying data from the scatterlist to a temp
+buffer if any of the chunks are not blocksize aligned.
