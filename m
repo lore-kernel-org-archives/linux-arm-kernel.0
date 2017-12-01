@@ -1,66 +1,80 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:29 +0100
-Subject: [PATCH v2 06/27] drm/sun4i: Explain color macro in DE2 driver
+Date: Fri,  1 Dec 2017 07:05:32 +0100
+Subject: [PATCH v2 09/27] drm/sun4i: Rework enabling plane in DE2 driver
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-7-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-10-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Color attribute have same format troughout the whole driver.
+If we want to support multiple planes in the future, code which enables
+pipe has to be moved to appropriate place and it must depend on channel
+id instead of being hardcoded.
 
-Rename macro, add comment with simple explanation and remove redundant
-definitions.
+Side effect of that rework is definition of default Z position. For now,
+put first channel at the bottom, second above it and so on.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 8 +++++---
- drivers/gpu/drm/sun4i/sun8i_mixer.h | 4 ++--
- 2 files changed, 7 insertions(+), 5 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 28 +++++++++++++++++-----------
+ 1 file changed, 17 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index f4a7fa0ba7ad..5144e6d0ac56 100644
+index c7d4ccd605e0..015943c0ed5a 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -317,17 +317,19 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_GLOBAL_CTL,
- 		     SUN8I_MIXER_GLOBAL_CTL_RT_EN);
- 
-+	/* Set background color to black */
-+	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
-+		     SUN8I_MIXER_BLEND_COLOR_BLACK);
+@@ -55,6 +55,15 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+ 	regmap_update_bits(mixer->engine.regs,
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
 +
- 	/* Initialize blender */
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_FCOLOR_CTL,
- 		     SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF);
--	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
--		     SUN8I_MIXER_BLEND_BKCOLOR_DEF);
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(0),
- 		     SUN8I_MIXER_BLEND_MODE_DEF);
++	if (enable)
++		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(chan);
++	else
++		val = 0;
++
++	regmap_update_bits(mixer->engine.regs,
++			   SUN8I_MIXER_BLEND_PIPE_CTL,
++			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(chan), val);
+ }
  
- 	regmap_write(mixer->engine.regs,
- 		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
--		     SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF);
-+		     SUN8I_MIXER_BLEND_COLOR_BLACK);
+ static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
+@@ -98,7 +107,7 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
+ 					      state->crtc_h));
+ 		DRM_DEBUG_DRIVER("Updating blender size\n");
+ 		regmap_write(mixer->engine.regs,
+-			     SUN8I_MIXER_BLEND_ATTR_INSIZE(0),
++			     SUN8I_MIXER_BLEND_ATTR_INSIZE(chan),
+ 			     SUN8I_MIXER_SIZE(state->crtc_w,
+ 					      state->crtc_h));
+ 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTSIZE,
+@@ -322,20 +331,17 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
+ 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
  
- 	/* Select the first UI channel */
- 	DRM_DEBUG_DRIVER("Selecting channel %d (first UI channel)\n",
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index db005a4bca43..9b50733298b8 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -45,10 +45,10 @@
- #define SUN8I_MIXER_BLEND_CK_MIN(x)		(0x10e0 + 0x04 * (x))
- #define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
+-	/* Initialize blender */
++	/*
++	 * Set fill color of bottom plane to black. Generally not needed
++	 * except when VI plane is at bottom (zpos = 0) and enabled.
++	 */
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PIPE_CTL,
+-		     SUN8I_MIXER_BLEND_PIPE_CTL_EN(0) |
+ 		     SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(0));
+-
+-	regmap_write(mixer->engine.regs,
+-		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
++	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
+ 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
  
-+/* colors are always in AARRGGBB format */
-+#define SUN8I_MIXER_BLEND_COLOR_BLACK		0xff000000
- /* The following numbers are some still unknown magic numbers */
--#define SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF	0xff000000
- #define SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF	0x00000101
--#define SUN8I_MIXER_BLEND_BKCOLOR_DEF		0xff000000
- #define SUN8I_MIXER_BLEND_MODE_DEF		0x03010301
+-	/* Select the first UI channel */
+-	DRM_DEBUG_DRIVER("Selecting channel %d (first UI channel)\n",
+-			 mixer->cfg->vi_num);
+-	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE,
+-		     mixer->cfg->vi_num);
++	/* Fixed zpos for now */
++	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE, 0x43210);
  
- #define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
+ 	plane_cnt = mixer->cfg->vi_num + mixer->cfg->ui_num;
+ 	for (i = 0; i < plane_cnt; i++)
 -- 
 2.15.1
