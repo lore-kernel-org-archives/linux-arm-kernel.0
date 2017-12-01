@@ -1,108 +1,247 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:39 +0100
-Subject: [PATCH v2 16/27] drm/sun4i: Add multi plane support to DE2 driver
+Date: Fri,  1 Dec 2017 07:05:40 +0100
+Subject: [PATCH v2 17/27] drm/sun4i: Add support for all HW supported DE2 RGB
+ formats
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-17-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-18-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Support for multiple UI planes can now be easily enabled just by adding
-more planes with different index.
-
-For now, add immutable zpos property.
+Currently only a few RGB formats are supported by the DE2 driver. Add
+support for all formats supported by the HW.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_layer.c | 38 +++++++++++++++++--------------------
- 1 file changed, 17 insertions(+), 21 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_layer.c |  19 ++++-
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 134 ++++++++++++++++++++++++++++--------
+ drivers/gpu/drm/sun4i/sun8i_mixer.h |  17 +++++
+ 3 files changed, 139 insertions(+), 31 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
-index 1eced63f365d..65d6eb7d5cbf 100644
+index 65d6eb7d5cbf..cdeda083c60e 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_layer.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
-@@ -22,12 +22,6 @@
- #include "sun8i_layer.h"
- #include "sun8i_mixer.h"
+@@ -95,8 +95,25 @@ static const struct drm_plane_funcs sun8i_mixer_layer_funcs = {
+ };
  
--struct sun8i_plane_desc {
--	       enum drm_plane_type     type;
--	       const uint32_t          *formats;
--	       uint32_t                nformats;
--};
--
- static int sun8i_mixer_layer_atomic_check(struct drm_plane *plane,
- 					  struct drm_plane_state *state)
- {
-@@ -106,35 +100,38 @@ static const uint32_t sun8i_mixer_layer_formats[] = {
+ static const uint32_t sun8i_mixer_layer_formats[] = {
+-	DRM_FORMAT_RGB888,
++	DRM_FORMAT_ABGR1555,
++	DRM_FORMAT_ABGR4444,
++	DRM_FORMAT_ABGR8888,
++	DRM_FORMAT_ARGB1555,
++	DRM_FORMAT_ARGB4444,
+ 	DRM_FORMAT_ARGB8888,
++	DRM_FORMAT_BGR565,
++	DRM_FORMAT_BGR888,
++	DRM_FORMAT_BGRA5551,
++	DRM_FORMAT_BGRA4444,
++	DRM_FORMAT_BGRA8888,
++	DRM_FORMAT_BGRX8888,
++	DRM_FORMAT_RGB565,
++	DRM_FORMAT_RGB888,
++	DRM_FORMAT_RGBA4444,
++	DRM_FORMAT_RGBA5551,
++	DRM_FORMAT_RGBA8888,
++	DRM_FORMAT_RGBX8888,
++	DRM_FORMAT_XBGR8888,
  	DRM_FORMAT_XRGB8888,
  };
  
--static const struct sun8i_plane_desc sun8i_mixer_planes[] = {
--	{
--		.type = DRM_PLANE_TYPE_PRIMARY,
--		.formats = sun8i_mixer_layer_formats,
--		.nformats = ARRAY_SIZE(sun8i_mixer_layer_formats),
--	},
--};
--
- static struct sun8i_layer *sun8i_layer_init_one(struct drm_device *drm,
- 						struct sun8i_mixer *mixer,
--						const struct sun8i_plane_desc *plane)
-+						int index)
- {
- 	struct sun8i_layer *layer;
-+	enum drm_plane_type type;
- 	int ret;
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index f35a08dc260b..d49eed97b452 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -29,6 +29,105 @@
+ #include "sun8i_layer.h"
+ #include "sunxi_engine.h"
  
- 	layer = devm_kzalloc(drm->dev, sizeof(*layer), GFP_KERNEL);
- 	if (!layer)
- 		return ERR_PTR(-ENOMEM);
- 
-+	type = index == 0 ? DRM_PLANE_TYPE_PRIMARY : DRM_PLANE_TYPE_OVERLAY;
++struct de2_fmt_info {
++	u32 drm_fmt;
++	u32 de2_fmt;
++};
 +
- 	/* possible crtcs are set later */
- 	ret = drm_universal_plane_init(drm, &layer->plane, 0,
- 				       &sun8i_mixer_layer_funcs,
--				       plane->formats, plane->nformats,
--				       NULL, plane->type, NULL);
-+				       sun8i_mixer_layer_formats,
-+				       ARRAY_SIZE(sun8i_mixer_layer_formats),
-+				       NULL, type, NULL);
- 	if (ret) {
- 		dev_err(drm->dev, "Couldn't initialize layer\n");
- 		return ERR_PTR(ret);
++static const struct de2_fmt_info de2_formats[] = {
++	{
++		.drm_fmt = DRM_FORMAT_ARGB8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_ARGB8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_ABGR8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_ABGR8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_RGBA8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGBA8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_BGRA8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_BGRA8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_XRGB8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_XRGB8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_XBGR8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_XBGR8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_RGBX8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGBX8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_BGRX8888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_BGRX8888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_RGB888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGB888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_BGR888,
++		.de2_fmt = SUN8I_MIXER_FBFMT_BGR888,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_RGB565,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGB565,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_BGR565,
++		.de2_fmt = SUN8I_MIXER_FBFMT_BGR565,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_ARGB4444,
++		.de2_fmt = SUN8I_MIXER_FBFMT_ARGB4444,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_ABGR4444,
++		.de2_fmt = SUN8I_MIXER_FBFMT_ABGR4444,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_RGBA4444,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGBA4444,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_BGRA4444,
++		.de2_fmt = SUN8I_MIXER_FBFMT_BGRA4444,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_ARGB1555,
++		.de2_fmt = SUN8I_MIXER_FBFMT_ARGB1555,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_ABGR1555,
++		.de2_fmt = SUN8I_MIXER_FBFMT_ABGR1555,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_RGBA5551,
++		.de2_fmt = SUN8I_MIXER_FBFMT_RGBA5551,
++	},
++	{
++		.drm_fmt = DRM_FORMAT_BGRA5551,
++		.de2_fmt = SUN8I_MIXER_FBFMT_BGRA5551,
++	},
++};
++
++static const struct de2_fmt_info *sun8i_mixer_format_info(u32 format)
++{
++	unsigned int i;
++
++	for (i = 0; i < ARRAY_SIZE(de2_formats); ++i)
++		if (de2_formats[i].drm_fmt == format)
++			return &de2_formats[i];
++
++	return NULL;
++}
++
+ static void sun8i_mixer_commit(struct sunxi_engine *engine)
+ {
+ 	DRM_DEBUG_DRIVER("Committing changes\n");
+@@ -64,29 +163,6 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer, int channel,
+ 			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(channel), val);
+ }
+ 
+-static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
+-					     u32 format, u32 *mode)
+-{
+-	switch (format) {
+-	case DRM_FORMAT_ARGB8888:
+-		*mode = SUN8I_MIXER_FBFMT_ARGB8888;
+-		break;
+-
+-	case DRM_FORMAT_XRGB8888:
+-		*mode = SUN8I_MIXER_FBFMT_XRGB8888;
+-		break;
+-
+-	case DRM_FORMAT_RGB888:
+-		*mode = SUN8I_MIXER_FBFMT_RGB888;
+-		break;
+-
+-	default:
+-		return -EINVAL;
+-	}
+-
+-	return 0;
+-}
+-
+ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
+ 				   int overlay, struct drm_plane *plane)
+ {
+@@ -159,18 +235,16 @@ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer, int channel,
+ 				     int overlay, struct drm_plane *plane)
+ {
+ 	struct drm_plane_state *state = plane->state;
+-	struct drm_framebuffer *fb = state->fb;
++	const struct de2_fmt_info *fmt_info;
+ 	u32 val;
+-	int ret;
+ 
+-	ret = sun8i_mixer_drm_format_to_layer(plane, fb->format->format,
+-						&val);
+-	if (ret) {
++	fmt_info = sun8i_mixer_format_info(state->fb->format->format);
++	if (!fmt_info) {
+ 		DRM_DEBUG_DRIVER("Invalid format\n");
+-		return ret;
++		return -EINVAL;
  	}
  
-+	/* fixed zpos for now */
-+	ret = drm_plane_create_zpos_immutable_property(&layer->plane, index);
-+	if (ret) {
-+		dev_err(drm->dev, "Couldn't add zpos property\n");
-+		return ERR_PTR(ret);
-+	}
-+
- 	drm_plane_helper_add(&layer->plane,
- 			     &sun8i_mixer_layer_helper_funcs);
- 	layer->mixer = mixer;
-@@ -149,16 +146,15 @@ struct drm_plane **sun8i_layers_init(struct drm_device *drm,
- 	struct sun8i_mixer *mixer = engine_to_sun8i_mixer(engine);
- 	int i;
+-	val <<= SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET;
++	val = fmt_info->de2_fmt << SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET;
+ 	regmap_update_bits(mixer->engine.regs,
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(channel, overlay),
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_MASK, val);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index 70113c9ea2d1..e23525b9cf6d 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -82,8 +82,25 @@
+ #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK	GENMASK(31, 24)
  
--	planes = devm_kcalloc(drm->dev, ARRAY_SIZE(sun8i_mixer_planes) + 1,
-+	planes = devm_kcalloc(drm->dev, mixer->cfg->ui_num + 1,
- 			      sizeof(*planes), GFP_KERNEL);
- 	if (!planes)
- 		return ERR_PTR(-ENOMEM);
+ #define SUN8I_MIXER_FBFMT_ARGB8888	0
++#define SUN8I_MIXER_FBFMT_ABGR8888	1
++#define SUN8I_MIXER_FBFMT_RGBA8888	2
++#define SUN8I_MIXER_FBFMT_BGRA8888	3
+ #define SUN8I_MIXER_FBFMT_XRGB8888	4
++#define SUN8I_MIXER_FBFMT_XBGR8888	5
++#define SUN8I_MIXER_FBFMT_RGBX8888	6
++#define SUN8I_MIXER_FBFMT_BGRX8888	7
+ #define SUN8I_MIXER_FBFMT_RGB888	8
++#define SUN8I_MIXER_FBFMT_BGR888	9
++#define SUN8I_MIXER_FBFMT_RGB565	10
++#define SUN8I_MIXER_FBFMT_BGR565	11
++#define SUN8I_MIXER_FBFMT_ARGB4444	12
++#define SUN8I_MIXER_FBFMT_ABGR4444	13
++#define SUN8I_MIXER_FBFMT_RGBA4444	14
++#define SUN8I_MIXER_FBFMT_BGRA4444	15
++#define SUN8I_MIXER_FBFMT_ARGB1555	16
++#define SUN8I_MIXER_FBFMT_ABGR1555	17
++#define SUN8I_MIXER_FBFMT_RGBA5551	18
++#define SUN8I_MIXER_FBFMT_BGRA5551	19
  
--	for (i = 0; i < ARRAY_SIZE(sun8i_mixer_planes); i++) {
--		const struct sun8i_plane_desc *plane = &sun8i_mixer_planes[i];
-+	for (i = 0; i < mixer->cfg->ui_num; i++) {
- 		struct sun8i_layer *layer;
- 
--		layer = sun8i_layer_init_one(drm, mixer, plane);
-+		layer = sun8i_layer_init_one(drm, mixer, i);
- 		if (IS_ERR(layer)) {
- 			dev_err(drm->dev, "Couldn't initialize %s plane\n",
- 				i ? "overlay" : "primary");
+ /*
+  * These sub-engines are still unknown now, the EN registers are here only to
 -- 
 2.15.1
