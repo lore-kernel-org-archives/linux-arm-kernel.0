@@ -1,74 +1,64 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:25 +0100
-Subject: [PATCH v2 02/27] drm/sun4i: Rename DE2 RGB format macros
+Date: Fri,  1 Dec 2017 07:05:26 +0100
+Subject: [PATCH v2 03/27] drm/sun4i: Remove setting alpha mode in DE2 driver
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-3-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-4-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current RGB formats macros are actually not specific to UI planes.
-Rename it to something more universal and introduce shift macro.
+Current code sets alpha mode to global alpha mode and global alpha
+value to 0xff which is totaly opaque. That is not needed for two
+reasons:
+
+- only one plane is active and thus it can be blended only with
+background, which is black,
+- it will hinder proper blending when more than one plane is supported
+
+Default mode (0) considers pixel alpha value or 0xff if pixel has
+no alpha information. Global alpha value is ignored in this case.
+
+Because of that, just remove the code.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 7 ++++---
- drivers/gpu/drm/sun4i/sun8i_mixer.h | 8 +++++---
- 2 files changed, 9 insertions(+), 6 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 10 ----------
+ drivers/gpu/drm/sun4i/sun8i_mixer.h |  2 --
+ 2 files changed, 12 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index cb193c5f1686..b9c48c60131f 100644
+index b9c48c60131f..d3dee6131209 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -71,15 +71,15 @@ static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
- {
- 	switch (format) {
- 	case DRM_FORMAT_ARGB8888:
--		*mode = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_ARGB8888;
-+		*mode = SUN8I_MIXER_FBFMT_ARGB8888;
- 		break;
- 
- 	case DRM_FORMAT_XRGB8888:
--		*mode = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_XRGB8888;
-+		*mode = SUN8I_MIXER_FBFMT_XRGB8888;
- 		break;
- 
- 	case DRM_FORMAT_RGB888:
--		*mode = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888;
-+		*mode = SUN8I_MIXER_FBFMT_RGB888;
- 		break;
- 
- 	default:
-@@ -173,6 +173,7 @@ int sun8i_mixer_update_layer_formats(struct sun8i_mixer *mixer,
- 		return ret;
- 	}
- 
-+	val <<= SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET;
+@@ -54,16 +54,6 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
  	regmap_update_bits(mixer->engine.regs,
  			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
- 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_MASK, val);
+ 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
+-
+-	/* Set the alpha configuration */
+-	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_MASK,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF);
+-	regmap_update_bits(mixer->engine.regs,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK,
+-			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF);
+ }
+ 
+ static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index c142fbb8661e..82c3416fbf3a 100644
+index 82c3416fbf3a..a7fe013c1d4a 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -81,13 +81,15 @@
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN		BIT(0)
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_MASK	GENMASK(2, 1)
+@@ -83,8 +83,6 @@
  #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_MASK	GENMASK(12, 8)
-+#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET	8
+ #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_OFFSET	8
  #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MASK	GENMASK(31, 24)
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF	(1 << 1)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_ARGB8888	(0 << 8)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_XRGB8888	(4 << 8)
--#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_FBFMT_RGB888	(8 << 8)
- #define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
+-#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_MODE_DEF	(1 << 1)
+-#define SUN8I_MIXER_CHAN_UI_LAYER_ATTR_ALPHA_DEF	(0xff << 24)
  
-+#define SUN8I_MIXER_FBFMT_ARGB8888	0
-+#define SUN8I_MIXER_FBFMT_XRGB8888	4
-+#define SUN8I_MIXER_FBFMT_RGB888	8
-+
- /*
-  * These sub-engines are still unknown now, the EN registers are here only to
-  * be used to disable these sub-engines.
+ #define SUN8I_MIXER_FBFMT_ARGB8888	0
+ #define SUN8I_MIXER_FBFMT_XRGB8888	4
 -- 
 2.15.1
