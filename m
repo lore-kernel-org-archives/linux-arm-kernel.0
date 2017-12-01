@@ -1,35 +1,101 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 30 Nov 2017 21:52:52 -0500
-Subject: [PATCH V4 1/5] Documentation: DT: qcom_hidma: Bump HW revision for
- the bugfixed HW
+Date: Thu, 30 Nov 2017 21:52:55 -0500
+Subject: [PATCH V4 4/5] dmaengine: qcom_hidma: Add support for the new revision
 In-Reply-To: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
 References: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1512096776-22883-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512096776-22883-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new version of the HIDMA IP has been released with bug fixes. Bumping the
-hardware version to differentiate from others.
+Add support for probing the newer HW and also organize MSI capable hardware
+into an array for maintenance reasons.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ drivers/dma/qcom/hidma.c | 34 +++++++++++++---------------------
+ 1 file changed, 13 insertions(+), 21 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-index 55492c2..5d93d6d 100644
---- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-+++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-@@ -47,8 +47,8 @@ When the OS is not in control of the management interface (i.e. it's a guest),
- the channel nodes appear on their own, not under a management node.
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index e366985..c146c6d 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -50,6 +50,7 @@
+ #include <linux/slab.h>
+ #include <linux/spinlock.h>
+ #include <linux/of_dma.h>
++#include <linux/of_device.h>
+ #include <linux/property.h>
+ #include <linux/delay.h>
+ #include <linux/acpi.h>
+@@ -104,6 +105,9 @@ static void hidma_free(struct hidma_dev *dmadev)
+ module_param(nr_desc_prm, uint, 0644);
+ MODULE_PARM_DESC(nr_desc_prm, "number of descriptors (default: 0)");
  
- Required properties:
--- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
--for MSI capable HW.
-+- compatible: must contain "qcom,hidma-1.0" for initial HW or
-+  "qcom,hidma-1.1"/"qcom,hidma-1.2" for MSI capable HW.
- - reg: Addresses for the transfer and event channel
- - interrupts: Should contain the event interrupt
- - desc-count: Number of asynchronous requests this channel can handle
++enum hidma_cap {
++	HIDMA_MSI_CAP = 1,
++};
+ 
+ /* process completed descriptors */
+ static void hidma_process_completed(struct hidma_chan *mchan)
+@@ -736,25 +740,12 @@ static int hidma_request_msi(struct hidma_dev *dmadev,
+ #endif
+ }
+ 
+-static bool hidma_msi_capable(struct device *dev)
++static bool hidma_test_capability(struct device *dev, enum hidma_cap test_cap)
+ {
+-	struct acpi_device *adev = ACPI_COMPANION(dev);
+-	const char *of_compat;
+-	int ret = -EINVAL;
+-
+-	if (!adev || acpi_disabled) {
+-		ret = device_property_read_string(dev, "compatible",
+-						  &of_compat);
+-		if (ret)
+-			return false;
++	enum hidma_cap cap;
+ 
+-		ret = strcmp(of_compat, "qcom,hidma-1.1");
+-	} else {
+-#ifdef CONFIG_ACPI
+-		ret = strcmp(acpi_device_hid(adev), "QCOM8062");
+-#endif
+-	}
+-	return ret == 0;
++	cap = (enum hidma_cap) device_get_match_data(dev);
++	return cap ? ((cap & test_cap) > 0) : 0;
+ }
+ 
+ static int hidma_probe(struct platform_device *pdev)
+@@ -834,8 +825,7 @@ static int hidma_probe(struct platform_device *pdev)
+ 	 * Determine the MSI capability of the platform. Old HW doesn't
+ 	 * support MSI.
+ 	 */
+-	msi = hidma_msi_capable(&pdev->dev);
+-
++	msi = hidma_test_capability(&pdev->dev, HIDMA_MSI_CAP);
+ 	device_property_read_u32(&pdev->dev, "desc-count",
+ 				 &dmadev->nr_descriptors);
+ 
+@@ -953,7 +943,8 @@ static int hidma_remove(struct platform_device *pdev)
+ #if IS_ENABLED(CONFIG_ACPI)
+ static const struct acpi_device_id hidma_acpi_ids[] = {
+ 	{"QCOM8061"},
+-	{"QCOM8062"},
++	{"QCOM8062", HIDMA_MSI_CAP},
++	{"QCOM8063", HIDMA_MSI_CAP},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
+@@ -961,7 +952,8 @@ static int hidma_remove(struct platform_device *pdev)
+ 
+ static const struct of_device_id hidma_match[] = {
+ 	{.compatible = "qcom,hidma-1.0",},
+-	{.compatible = "qcom,hidma-1.1",},
++	{.compatible = "qcom,hidma-1.1", .data = (void *)(HIDMA_MSI_CAP),},
++	{.compatible = "qcom,hidma-1.2", .data = (void *)(HIDMA_MSI_CAP),},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, hidma_match);
 -- 
 1.9.1
