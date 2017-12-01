@@ -1,91 +1,66 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri,  1 Dec 2017 21:19:27 +0000
-Subject: [PATCH 5/5] crypto: arm64/ghash - move kernel mode neon en/disable
- into loop
-In-Reply-To: <20171201211927.24653-1-ard.biesheuvel@linaro.org>
-References: <20171201211927.24653-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171201211927.24653-6-ard.biesheuvel@linaro.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 1 Dec 2017 13:42:46 -0800
+Subject: [PATCH 0/4] Move DP phy switch to PHY driver
+In-Reply-To: <c6fb4d29-6c6d-7f39-3cdd-3bc42c4519a2@rock-chips.com>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+ <CAD=FV=VdUhfL+_MShYynoXKQW1-KpAOsW=x+hAxGZO78rJEyeQ@mail.gmail.com>
+ <c6fb4d29-6c6d-7f39-3cdd-3bc42c4519a2@rock-chips.com>
+Message-ID: <CAD=FV=Vk0fOfYXc2gGDpvoVuT8m9WGT-eJ4hOM=G5MY_Bzzpwg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kernel mode NEON was first introduced on arm64, the preserve and
-restore of the userland NEON state was completely unoptimized, and
-involved saving all registers on each call to kernel_neon_begin(),
-and restoring them on each call to kernel_neon_end(). For this reason,
-the NEON crypto code that was introduced at the time keeps the NEON
-enabled throughout the execution of the crypto API methods, which may
-include calls back into the crypto API that could result in memory
-allocation or other actions that we should avoid when running with
-preemption disabled.
+Hi,
 
-Since then, we have optimized the kernel mode NEON handling, which now
-restores lazily (upon return to userland), and so the preserve action
-is only costly the first time it is called after entering the kernel.
+On Wed, Nov 29, 2017 at 6:27 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+> Hi Doug
+>
+> Thank you for mentioning this patch.
+>
+> I think the focus of the discussion is: can we put the grf control bit to
+> dts.
+>
+> The RK3399 has 2 Type-C phy, but only one DP controller, this "uphy_dp_sel"
+>
+> can help to switch these 2 phy. So I think this bit can be considered as a
+> part of
+>
+> Type-C phy, these 2 phy have different bits, just similar to other bits
+> (such as "pipe-status").
+>
+> Put them to DTS file might be a accepted practice.
 
-So let's put the kernel_neon_begin() and kernel_neon_end() calls around
-the actual invocations of the NEON crypto code, and run the remainder of
-the code with kernel mode NEON disabled (and preemption enabled)
+I guess the first step would be finding the person to make a decision.
+Is that Heiko?  Olof?  Kishon?  Rob?.  As I see it there are a few
+options:
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/ghash-ce-glue.c | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+1. Land this series as-is.  This makes the new bit work just like all
+the other ones next to it.  If anyone happens to try to use an old
+device tree on a new kernel they'll break.  Seems rather unlikely
+given that the whole type C PHY is not really fully functional
+upstream, but technically this is a no-no from a device tree
+perspective.
 
-diff --git a/arch/arm64/crypto/ghash-ce-glue.c b/arch/arm64/crypto/ghash-ce-glue.c
-index cfc9c92814fd..ddd9b565d775 100644
---- a/arch/arm64/crypto/ghash-ce-glue.c
-+++ b/arch/arm64/crypto/ghash-ce-glue.c
-@@ -368,20 +368,22 @@ static int gcm_encrypt(struct aead_request *req)
- 		pmull_gcm_encrypt_block(ks, iv, NULL,
- 					num_rounds(&ctx->aes_key));
- 		put_unaligned_be32(3, iv + GCM_IV_SIZE);
-+		kernel_neon_end();
- 
- 		err = skcipher_walk_aead_encrypt(&walk, req, true);
- 
- 		while (walk.nbytes >= AES_BLOCK_SIZE) {
- 			int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
-+			kernel_neon_begin();
- 			pmull_gcm_encrypt(blocks, dg, walk.dst.virt.addr,
- 					  walk.src.virt.addr, &ctx->ghash_key,
- 					  iv, num_rounds(&ctx->aes_key), ks);
-+			kernel_neon_end();
- 
- 			err = skcipher_walk_done(&walk,
- 						 walk.nbytes % AES_BLOCK_SIZE);
- 		}
--		kernel_neon_end();
- 	} else {
- 		__aes_arm64_encrypt(ctx->aes_key.key_enc, tag, iv,
- 				    num_rounds(&ctx->aes_key));
-@@ -467,15 +469,18 @@ static int gcm_decrypt(struct aead_request *req)
- 		pmull_gcm_encrypt_block(tag, iv, ctx->aes_key.key_enc,
- 					num_rounds(&ctx->aes_key));
- 		put_unaligned_be32(2, iv + GCM_IV_SIZE);
-+		kernel_neon_end();
- 
- 		err = skcipher_walk_aead_decrypt(&walk, req, true);
- 
- 		while (walk.nbytes >= AES_BLOCK_SIZE) {
- 			int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
-+			kernel_neon_begin();
- 			pmull_gcm_decrypt(blocks, dg, walk.dst.virt.addr,
- 					  walk.src.virt.addr, &ctx->ghash_key,
- 					  iv, num_rounds(&ctx->aes_key));
-+			kernel_neon_end();
- 
- 			err = skcipher_walk_done(&walk,
- 						 walk.nbytes % AES_BLOCK_SIZE);
-@@ -483,8 +488,6 @@ static int gcm_decrypt(struct aead_request *req)
- 		if (walk.nbytes)
- 			pmull_gcm_encrypt_block(iv, iv, NULL,
- 						num_rounds(&ctx->aes_key));
--
--		kernel_neon_end();
- 	} else {
- 		__aes_arm64_encrypt(ctx->aes_key.key_enc, tag, iv,
- 				    num_rounds(&ctx->aes_key));
--- 
-2.11.0
+2. Change the series to make this property optional.  If it's not
+there then the code behaves like it always did.  This would address
+the "compatibility" problem but likely wouldn't actually help any real
+people, and it would be extra work.
+
+3. Redo the driver to deprecate all the old offsets / bits and just
+put the table in the driver, keyed off the compatible string and base
+address if the IO memory.
+
+
+I can't make this decision.  It's up to those folks who would be
+landing the patch and I'd be happy with any of them.  What I'm less
+happy with, however, is the indecision preventing forward progress.
+We should pick one of the above things and land it.  My own personal
+bias is #1: just land the series.  No real people will be hurt and
+it's just adding another property that matches the ones next to it.
+
+>From a long term perspective (AKA how I'd write the next driver like
+this) I personally lean towards to "tables in the driver, not in the
+device tree" but quite honestly I'm happy to take whatever direction
+the maintainers give.
+
+
+-Doug
