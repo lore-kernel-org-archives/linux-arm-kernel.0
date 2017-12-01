@@ -1,63 +1,36 @@
-From: j-keerthy@ti.com (Keerthy)
-Date: Fri, 1 Dec 2017 10:46:29 +0530
-Subject: [PATCH v4 0/8] omap: dmtimer: Move driver out of plat-omap
-Message-ID: <1512105397-2544-1-git-send-email-j-keerthy@ti.com>
+From: jernej.skrabec@siol.net (Jernej Skrabec)
+Date: Fri,  1 Dec 2017 07:05:27 +0100
+Subject: [PATCH v2 04/27] drm/sun4i: Fix debug message in DE2
+In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
+References: <20171201060550.10392-1-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-5-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The series moves dmtimer out of plat-omap to drivers/clocksource.
-The series also does a bunch of changes to pwm-omap-dmtimer code
-to adapt to the driver migration and clean up plat specific
-pdata-quirks and use the dmtimer platform data.
+Debug message would print "Enabling" even when disabling plane.
 
-Boot tested on DRA7-EVM and AM437X-GP-EVM.
-Compile tested omap1_defconfig.
+Fix it.
 
-This is based on top of linux-next branch.
+Fixes: 9d75b8c0b999 (drm/sun4i: add support for Allwinner DE2 mixers)
 
-Changes from v3:
+Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+---
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-  * Reverted to v2 approach of using dev_get_platdata to fetch dmtimer ops.
-
-Changes from V2:
-
-  * Wrapped the inline functions in header file under OMAP2PLUS
-  * Added a new of helper function to fetch plat_data from of node. 
-
-Keerthy (8):
-  clocksource: dmtimer: Remove all the exports
-  arm: omap: timer: Wrap the inline functions under OMAP2PLUS define
-  arm: omap: Move dmtimer.h out of plat-omap
-  arm: OMAP: Move dmtimer driver out of plat-omap to drivers under
-    clocksource
-  dmtimer: Add timer ops to the platform data structure
-  clocksource: dmtimer: Populate the timer ops to the pdata
-  pwm: pwm-omap-dmtimer: Adapt driver to utilize dmtimer pdata ops
-  arm: omap: pdata-quirks: Remove unused timer pdata
-
- arch/arm/mach-omap1/pm.c                           |  2 +-
- arch/arm/mach-omap1/timer.c                        |  2 +-
- arch/arm/mach-omap2/omap_hwmod_2420_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_2430_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_2xxx_ipblock_data.c |  2 +-
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  2 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c          |  2 +-
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c         |  2 +-
- arch/arm/mach-omap2/pdata-quirks.c                 | 32 -------------
- arch/arm/mach-omap2/timer.c                        |  2 +-
- arch/arm/plat-omap/Kconfig                         |  6 ---
- arch/arm/plat-omap/Makefile                        |  1 -
- drivers/clocksource/Kconfig                        |  6 +++
- drivers/clocksource/Makefile                       |  1 +
- .../plat-omap => drivers/clocksource}/dmtimer.c    | 54 +++++++++++-----------
- drivers/pwm/pwm-omap-dmtimer.c                     | 39 +++++++++-------
- .../include/plat => include/clocksource}/dmtimer.h |  8 +++-
- include/linux/platform_data/dmtimer-omap.h         | 38 +++++++++++++++
- 20 files changed, 111 insertions(+), 96 deletions(-)
- rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (95%)
- rename {arch/arm/plat-omap/include/plat => include/clocksource}/dmtimer.h (97%)
-
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index d3dee6131209..b947ee2e4fe4 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -44,7 +44,8 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
+ 	/* Currently the first UI channel is used */
+ 	int chan = mixer->cfg->vi_num;
+ 
+-	DRM_DEBUG_DRIVER("Enabling layer %d in channel %d\n", layer, chan);
++	DRM_DEBUG_DRIVER("%sabling layer %d in channel %d\n",
++			 enable ? "En" : "Dis", layer, chan);
+ 
+ 	if (enable)
+ 		val = SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN;
 -- 
-1.9.1
+2.15.1
