@@ -1,43 +1,86 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Dec 2017 08:26:39 -0800
-Subject: [PATCH v2 18/18] perf: arm_spe: Disallow userspace profiling
- when arm_kernel_unmapped_at_el0()
-In-Reply-To: <1512059986-21325-19-git-send-email-will.deacon@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <1512059986-21325-19-git-send-email-will.deacon@arm.com>
-Message-ID: <20171201162639.GD19419@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat,  2 Dec 2017 00:27:33 +0800
+Subject: [PATCH] arm64: dts: allwinner: a64: bananapi-m64: Add LED device node
+Message-ID: <20171201162733.23156-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30, Will Deacon wrote:
-> When running with the kernel unmapped whilst at EL0, the virtually-addressed
-> SPE buffer is also unmapped, which can lead to buffer faults if userspace
-> profiling is enabled.
-> 
-> This patch prohibits SPE profiling of userspace when
-> arm_kernel_unmapped_at_el0().
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/perf/arm_spe_pmu.c | 7 +++++++
->  1 file changed, 7 insertions(+)
-> 
-> diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-> index 8ce262fc2561..c028db8973a4 100644
-> --- a/drivers/perf/arm_spe_pmu.c
-> +++ b/drivers/perf/arm_spe_pmu.c
-> @@ -675,6 +675,13 @@ static int arm_spe_pmu_event_init(struct perf_event *event)
->  		return -EOPNOTSUPP;
->  
->  	/*
-> +	 * If kernelspace is unmapped when running at EL0, then the SPE
-> +	 * buffer will fault and prematurely terminate the AUX session.
-> +	 */
-> +	if (arm64_kernel_unmapped_at_el0() && !attr->exclude_user)
-> +		dev_warn_once(&spe_pmu->pdev->dev, "unable to write to profiling buffer from EL0. Try passing \"kaiser=off\" on the kernel command line");
+The Bananapi-M64 has 3 LEDS in red, green, and blue. These are toggled
+via GPIO lines, which drive transistors that control current across the
+LEDS. The red LED is by default on, via an additional pull-up on the
+control line. We consider this means that it is a power indicator.
+So we set the "default-on" property for it.
 
-Missing newline on that print?
+The pingroups the GPIO lines belong to require external regulators be
+enabled to be able to drive the GPIO high. These regulators also have
+other purposes. However the pin controller does not have bindings for
+regulators. Here we just set them to always-on.
 
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 36 ++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+index 4a8d3f83a36e..a6975670cd1c 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
+@@ -60,6 +60,26 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	leds {
++		compatible = "gpio-leds";
++
++		pwr-led {
++			label = "bananapi-m64:red:pwr";
++			gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
++			default-state = "on";
++		};
++
++		green {
++			label = "bananapi-m64:green:user";
++			gpios = <&pio 4 14 GPIO_ACTIVE_HIGH>; /* PE14 */
++		};
++
++		blue {
++			label = "bananapi-m64:blue:user";
++			gpios = <&pio 4 15 GPIO_ACTIVE_HIGH>; /* PE15 */
++		};
++	};
++
+ 	wifi_pwrseq: wifi_pwrseq {
+ 		compatible = "mmc-pwrseq-simple";
+ 		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
+@@ -153,6 +173,17 @@
+ 
+ #include "axp803.dtsi"
+ 
++&reg_aldo1 {
++	/*
++	 * This regulator also drives the PE pingroup GPIOs,
++	 * which also controls two LEDs.
++	 */
++	regulator-always-on;
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "afvcc-csi";
++};
++
+ &reg_aldo2 {
+ 	regulator-always-on;
+ 	regulator-min-microvolt = <1800000>;
+@@ -168,6 +199,11 @@
+ };
+ 
+ &reg_dc1sw {
++	/*
++	 * This regulator also indirectly drives the PD pingroup GPIOs,
++	 * which also controls the power LED.
++	 */
++	regulator-always-on;
+ 	regulator-name = "vcc-phy";
+ };
+ 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.15.0
