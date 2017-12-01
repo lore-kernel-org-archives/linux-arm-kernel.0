@@ -1,76 +1,97 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 01 Dec 2017 10:25:38 +0100
-Subject: [PATCH] ARM64: dts: meson-axg: enable IR controller
-In-Reply-To: <20171201013612.13927-1-yixun.lan@amlogic.com>
-References: <20171201013612.13927-1-yixun.lan@amlogic.com>
-Message-ID: <1512120338.4667.4.camel@baylibre.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Fri, 1 Dec 2017 10:37:48 +0100
+Subject: [PATCH 0/5] Introduce the new NAND core interface: ->exec_op()
+In-Reply-To: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
+References: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
+Message-ID: <20171201103748.5bbd8ccc@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2017-12-01 at 09:36 +0800, Yixun Lan wrote:
-> Enable IR remote controller which find in Amlogic's Meson-AXG SoC.
-> 
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
-> ---
->  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  6 ++++++
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 14 ++++++++++++++
->  2 files changed, 20 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> index 0864d1ff2d9b..ca676cafdbb3 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
-> @@ -34,3 +34,9 @@
->  	pinctrl-0 = <&i2c1_z_pins>;
->  	pinctrl-names = "default";
->  };
-> +
-> +&ir {
-> +	status = "okay";
-> +	pinctrl-0 = <&remote_input_ao_pins>;
-> +	pinctrl-names = "default";
-> +};
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index 9bb85893c1b7..80d5b8c13fac 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -616,6 +616,13 @@
->  					#gpio-cells = <2>;
->  					gpio-ranges = <&pinctrl_aobus 0 0
-> 15>;
->  				};
-> +
-> +				remote_input_ao_pins: remote_input_ao {
-> +					mux {
-> +						groups = "remote_input_ao";
-> +						function = "remote_input_ao";
-> +					};
-> +				};
->  			};
->  
->  			i2c_AO: i2c at 5000 {
-> @@ -664,6 +671,13 @@
->  				clock-names = "xtal", "pclk", "baud";
->  				status = "disabled";
->  			};
-> +
-> +			ir: ir at 8000 {
-> +				compatible = "amlogic,meson-gx-
-> ir","amlogic,meson-gxbb-ir";
+Hi all,
 
-The order is bad here (Yes the same mistake is present a *LOT* in the gx family
-- I'm preparing a patch for that). In addition, "amlogic,meson-gx-ir" is
-unmatched, undocumented and unlikely to be ever used since every compatible SoC
-will use the gxbb compatible string. You may as well drop it and just keep the
-gxbb one
+On Thu, 30 Nov 2017 18:01:27 +0100
+Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
 
-> +				reg = <0x0 0x8000 0x0 0x20>;
-> +				interrupts = <GIC_SPI 196
-> IRQ_TYPE_EDGE_RISING>;
-> +				status = "disabled";
-> +			};
->  		};
->  	};
->  };
+> Hi,
+> 
+> This series adds the implementation of the NAND framework ->exec_op()
+> interface with all the related hooks and helpers. The reasons for adding
+> it are explained in details in the commit log:
+> 
+>         "mtd: nand: add ->exec_op() implementation"
+> 
+> Long story short: it will ease later expansion of the framework, as well
+> as the implementation of new vendor specific commands, and should also
+> ease driver development.
+> 
+> A lot of comments are written to explain how to use the new API. Several
+> NAND controller drivers are already/almost converted to ->exec_op(), in
+> particular a rework of the Marvell NAND controller driver, and will
+> follow. One can have a look at them as examples to understand how to
+> implement or rework NAND controller drivers. A proper external
+> documentation is being written and will later be submitted.
+> 
+> Thank you,
+> Miqu?l
+> 
+> 
+> Boris Brezillon (2):
+>   mtd: nand: provide several helpers to do common NAND operations
+>   mtd: nand: force drivers to explicitly send READ/PROG commands
+> 
+> Miquel Raynal (3):
+>   mtd: nand: use usual return values for the ->erase() hook
+>   mtd: nand: use a static data_interface in the nand_chip structure
+>   mtd: nand: add ->exec_op() implementation
+
+Applied patches 1 to 4 (with a rewording of patch 4 commit message and
+a fix in patch 1 to make single_erase() compliant with the new
+->erase() semantic).
+
+Note that I was prompt to apply those patches because I want them to
+spend as much time as possible in linux-next so that we can detect and
+fix regressions before the merge window. So please test linux-next on
+your hardware.
+
+This being said, nothing is set in stone, and if the series appears to
+break existing setups and we can't fix the problems before -rc6, I'll
+drop it.
+
+Thanks,
+
+Boris
+
+> 
+>  drivers/mtd/nand/atmel/nand-controller.c      |    9 +-
+>  drivers/mtd/nand/bf5xx_nand.c                 |    6 +-
+>  drivers/mtd/nand/brcmnand/brcmnand.c          |   20 +-
+>  drivers/mtd/nand/cafe_nand.c                  |   20 +-
+>  drivers/mtd/nand/denali.c                     |   40 +-
+>  drivers/mtd/nand/diskonchip.c                 |    4 +-
+>  drivers/mtd/nand/docg4.c                      |   21 +-
+>  drivers/mtd/nand/fsl_elbc_nand.c              |   10 +-
+>  drivers/mtd/nand/fsl_ifc_nand.c               |    6 +-
+>  drivers/mtd/nand/fsmc_nand.c                  |    5 +-
+>  drivers/mtd/nand/gpmi-nand/gpmi-nand.c        |   77 +-
+>  drivers/mtd/nand/hisi504_nand.c               |    9 +-
+>  drivers/mtd/nand/jz4740_nand.c                |   16 +-
+>  drivers/mtd/nand/lpc32xx_mlc.c                |    7 +-
+>  drivers/mtd/nand/lpc32xx_slc.c                |   33 +-
+>  drivers/mtd/nand/mtk_nand.c                   |   25 +-
+>  drivers/mtd/nand/nand_base.c                  | 2161 ++++++++++++++++++++++---
+>  drivers/mtd/nand/nand_hynix.c                 |  124 +-
+>  drivers/mtd/nand/nand_micron.c                |   83 +-
+>  drivers/mtd/nand/nand_timings.c               |   21 +-
+>  drivers/mtd/nand/omap2.c                      |   18 +-
+>  drivers/mtd/nand/pxa3xx_nand.c                |   14 +-
+>  drivers/mtd/nand/qcom_nandc.c                 |   27 +-
+>  drivers/mtd/nand/r852.c                       |   11 +-
+>  drivers/mtd/nand/sh_flctl.c                   |    6 +-
+>  drivers/mtd/nand/sunxi_nand.c                 |   97 +-
+>  drivers/mtd/nand/tango_nand.c                 |   27 +-
+>  drivers/mtd/nand/tmio_nand.c                  |    5 +-
+>  drivers/mtd/nand/vf610_nfc.c                  |    6 +-
+>  drivers/staging/mt29f_spinand/mt29f_spinand.c |    5 +-
+>  include/linux/mtd/rawnand.h                   |  414 ++++-
+>  31 files changed, 2673 insertions(+), 654 deletions(-)
+> 
