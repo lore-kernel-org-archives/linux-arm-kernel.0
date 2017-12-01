@@ -1,74 +1,32 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 30 Nov 2017 20:21:34 -0600
-Subject: [PATCH 2/9] dt-bindings: arm: brcmstb: Correct BIUCTRL node
- documentation
-In-Reply-To: <20171129201849.17522-3-f.fainelli@gmail.com>
-References: <20171129201849.17522-1-f.fainelli@gmail.com>
- <20171129201849.17522-3-f.fainelli@gmail.com>
-Message-ID: <20171201022134.ua2a7jc5n44m4qb2@rob-hp-laptop>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 30 Nov 2017 21:52:51 -0500
+Subject: [PATCH V4 0/5] dmaengine: qcom_hidma: add support for bugfixed HW
+Message-ID: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 12:18:42PM -0800, Florian Fainelli wrote:
-> Correct the Device Tree bindings for the HIF_CPUBIUCTRL node whose
-> compatible string is actually brcm,bcm<chip-id>-cpu-biu-ctrl. Also
-> document in the binding the fallback property
-> ("brcm,brcmstb-cpu-biu-ctrl") and update the example accordingly.
-> 
-> Signed-off-by: Florian Fainelli <f.fainelli@gmail.com>
-> ---
->  .../devicetree/bindings/arm/bcm/brcm,brcmstb.txt   | 22 ++++++++++++----------
->  1 file changed, 12 insertions(+), 10 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-> index 790e6b0b8306..05be8d1f7be6 100644
-> --- a/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,brcmstb.txt
-> @@ -17,21 +17,23 @@ Further, syscon nodes that map platform-specific registers used for general
->  system control is required:
->  
->      - compatible: "brcm,bcm<chip_id>-sun-top-ctrl", "syscon"
-> -    - compatible: "brcm,bcm<chip_id>-hif-cpubiuctrl", "syscon"
-> +    - compatible: "brcm,bcm<chip_id>-cpu-biu-ctrl",
-> +		  "brcm,brcmstb-cpu-biu-ctrl",
-> +		  "syscon"
->      - compatible: "brcm,bcm<chip_id>-hif-continuation", "syscon"
->  
-> -hif-cpubiuctrl node
-> +cpu-biu-ctrl node
->  -------------------
-> -SoCs with Broadcom Brahma15 ARM-based CPUs have a specific Bus Interface Unit
-> -(BIU) block which controls and interfaces the CPU complex to the different
-> -Memory Controller Ports (MCP), one per memory controller (MEMC). This BIU block
-> -offers a feature called Write Pairing which consists in collapsing two adjacent
-> -cache lines into a single (bursted) write transaction towards the memory
-> -controller (MEMC) to maximize write bandwidth.
-> +SoCs with Broadcom Brahma15 ARM-based and Brahma53 ARM64-based CPUs have a
-> +specific Bus Interface Unit (BIU) block which controls and interfaces the CPU
-> +complex to the different Memory Controller Ports (MCP), one per memory
-> +controller (MEMC). This BIU block offers a feature called Write Pairing which
-> +consists in collapsing two adjacent cache lines into a single (bursted) write
-> +transaction towards the memory controller (MEMC) to maximize write bandwidth.
->  
->  Required properties:
->  
-> -    - compatible: must be "brcm,bcm7445-hif-cpubiuctrl", "syscon"
-> +    - compatible: must be "brcm,bcm7445-cpu-biu-ctrl", "syscon"
+Introduce new ACPI and OF device ids for thw HW along with the helper
+functions.
 
-Doesn't this need "brcm,brcmstb-cpu-biu-ctrl" too?
+Changes from v3:
+* introduce device_get_match_data() to read driver data
+* remove ACPI/OF specific calls from qcom_hidma and replace it with the
+new API.
 
->  
->  Optional properties:
->  
-> @@ -52,7 +54,7 @@ example:
->          };
->  
->          hif_cpubiuctrl: syscon at 3e2400 {
-> -            compatible = "brcm,bcm7445-hif-cpubiuctrl", "syscon";
-> +            compatible = "brcm,bcm7445-cpu-biu-ctrl", "brcm,brcmstb-cpu-biu-ctrl", "syscon";
->              reg = <0x3e2400 0x5b4>;
->              brcm,write-pairing;
->          };
-> -- 
-> 2.9.3
-> 
+Sinan Kaya (5):
+  Documentation: DT: qcom_hidma: Bump HW revision for the bugfixed HW
+  ACPI / bus: Introduce acpi_get_match_data() function
+  device property: Introduce a common API to fetch device match data
+  dmaengine: qcom_hidma: Add support for the new revision
+  dmaengine: qcom_hidma: Add identity register support
+
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  4 +--
+ drivers/acpi/bus.c                                 | 12 +++++++
+ drivers/base/property.c                            | 14 ++++++++
+ drivers/dma/qcom/hidma.c                           | 41 ++++++++++------------
+ include/linux/acpi.h                               |  6 ++++
+ include/linux/property.h                           |  2 ++
+ 6 files changed, 55 insertions(+), 24 deletions(-)
+
+-- 
+1.9.1
