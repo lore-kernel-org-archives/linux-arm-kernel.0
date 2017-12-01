@@ -1,31 +1,42 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 1 Dec 2017 11:43:07 +0530
-Subject: [PATCH 0/4] pci-dra7xx: Fix legacy IRQ handling and errata handling
-Message-ID: <20171201061311.16691-1-vigneshr@ti.com>
+From: venkataravi.e@techveda.org (venkataravi.e at techveda.org)
+Date: Fri,  1 Dec 2017 12:08:27 +0530
+Subject: [PATCH 0/4] arm: dts: imx28: imx28-evk device tree cleanup
+Message-ID: <1512110311-15788-1-git-send-email-venkataravi.e@techveda.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series contains two fixes:
-1. Make workaround for errata i870 applicable in Host mode as
-well(previously it was enabled only for EP mode) as per errata
-documentation: http://www.ti.com/lit/er/sprz429k/sprz429k.pdf
-2. Fix problem with handling of legacy INTD interrupts.
+From: Ravi Eluri <venkataravi.e@techveda.org>
 
-Tested on 66AK2G EVM and ICE boards
+Removed lot of redundant device tree syntax from imx28-evk device tree
+to make it more robust and readable.
 
+Total four changesets and are described as follows:
 
-Vignesh R (4):
-  pci: dwc: pci-dra7xx: Enable errata i870 for both EP and RC mode
-  dt-bindings: PCI: dra7xx: Add bindings for unaligned access in host
-    mode
-  ARM: dts: dra7: Add DT property to allow unaligned mem access to PCIe
-    RC
-  PCI: dwc: pci-dra7xx: Fix legacy IRQ handling
+Changeset 1 removes unit addresses for all peripherals of imx28 in
+imx28-evk DT as they are already defined in the corresponding dtsi file.
+Make use of phandles reference peripheral nodes in dts files.
 
- Documentation/devicetree/bindings/pci/ti-pci.txt |  5 +++++
- arch/arm/boot/dts/dra7.dtsi                      |  2 ++
- drivers/pci/dwc/pci-dra7xx.c                     | 23 ++++++++++++++---------
- 3 files changed, 21 insertions(+), 9 deletions(-)
+Changeset 2 removes unit addresses for the system buses of imx28 as they
+are already defined in the corresponding dtsi file.
+
+Changeset 3 rearranges nodes for better readability.
+
+Changeset 4 does DT cleanup (whitespaces, tabs ...)
+
+Note:
+- Changesets were compile tested and built(ARCH=arm, imx28) on linux-next 
+  (latest).
+- No build issues reported.
+- Please discard this changesets, if this is not making any better."
+
+Ravi Eluri (4):
+  arm: dts: imx28: Use phandles instead of unit addresses
+  arm: dts: imx28: Remove system bus unit addresses
+  arm: dts: imx28: Rearrange nodes for better readability
+  arm: dts: imx28: Device tree cleanup
+
+ arch/arm/boot/dts/imx28-evk.dts | 503 ++++++++++++++++++++--------------------
+ 1 file changed, 247 insertions(+), 256 deletions(-)
 
 -- 
-2.15.0
+1.9.1
