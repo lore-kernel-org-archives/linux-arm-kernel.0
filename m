@@ -1,100 +1,153 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 1 Dec 2017 10:56:45 +0100
-Subject: [RFC PATCH 1/3] dt-bindings: pinctrl: sunxi: document new generic
- binding
-In-Reply-To: <0c8051e6-5d8c-32d6-97e4-11c2283da5b4@arm.com>
-References: <20171113012523.2328-1-andre.przywara@arm.com>
- <20171113012523.2328-2-andre.przywara@arm.com>
- <CACRpkdbpfkM4odz425+4qyUCF5vqPWBQ=F5Yk7AtJL5SqXghpg@mail.gmail.com>
- <20171124105240.GB3792@ulmo> <20efcf8f-85a5-3cad-a84b-434ee5cad68e@arm.com>
- <20171124133123.GA15999@ulmo> <0c8051e6-5d8c-32d6-97e4-11c2283da5b4@arm.com>
-Message-ID: <CACRpkdZ70a7Vk1QPFhkms6ucWmSH6rOUD9_J0h=NjhK+vfXNAA@mail.gmail.com>
+From: miquel.raynal@free-electrons.com (Miquel RAYNAL)
+Date: Fri, 1 Dec 2017 10:57:37 +0100
+Subject: [PATCH 5/5] mtd: nand: add ->exec_op() implementation
+In-Reply-To: <20171201105053.25af2267@bbrezillon>
+References: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
+ <20171130170132.27522-6-miquel.raynal@free-electrons.com>
+ <20171130215025.67f74437@bbrezillon>
+ <20171130232538.140f17b1@xps13>
+ <20171201105053.25af2267@bbrezillon>
+Message-ID: <20171201105737.4cea4ed9@xps13>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 24, 2017 at 6:19 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+Hi Boris,
 
-> Conceptually I consider the DT being
-> part of the firmware,
+On Fri, 1 Dec 2017 10:50:53 +0100
+Boris Brezillon <boris.brezillon@free-electrons.com> wrote:
 
-As it is a subset of open firmware it is obviously firmware.
+> Hi Miquel,
+> 
+> On Thu, 30 Nov 2017 23:25:38 +0100
+> Miquel RAYNAL <miquel.raynal@free-electrons.com> wrote:
+> 
+> > > > diff --git a/drivers/mtd/nand/nand_base.c
+> > > > b/drivers/mtd/nand/nand_base.c index 52965a8aeb2c..46bf31aff909
+> > > > 100644 --- a/drivers/mtd/nand/nand_base.c
+> > > > +++ b/drivers/mtd/nand/nand_base.c
+> > > > @@ -689,6 +689,59 @@ static void nand_wait_status_ready(struct
+> > > > mtd_info *mtd, unsigned long timeo) };
+> > > >  
+> > > >  /**
+> > > > + * nand_soft_waitrdy - Read the status waiting for it to be
+> > > > ready
+> > > > + * @chip: NAND chip structure
+> > > > + * @timeout_ms: Timeout in ms
+> > > > + *
+> > > > + * Poll the status using ->exec_op() until it is ready unless
+> > > > it takes too
+> > > > + * much time.
+> > > > + *
+> > > > + * This helper is intended to be used by drivers without R/B
+> > > > pin available to
+> > > > + * poll for the chip status until ready and may be called at
+> > > > any time in the
+> > > > + * middle of any set of instruction. The READ_STATUS just need
+> > > > to ask a single
+> > > > + * time for it and then any read will return the status. Once
+> > > > the READ_STATUS
+> > > > + * cycles are done, the function will send a READ0 command to
+> > > > cancel the
+> > > > + * "READ_STATUS state" and let the normal flow of operation to
+> > > > continue.
+> > > > + *
+> > > > + * This helper *cannot* send a WAITRDY command or ->exec_op()
+> > > > implementations      
+> > > 
+> > > 					  ^ instruction
+> > >     
+> > > > + * using it will enter an infinite loop.      
+> > > 
+> > > Hm, not sure why this would be the case, but okay. Maybe you
+> > > should move this comment outside the kernel doc header, since
+> > > this is an implementation detail, not something the caller/user
+> > > should be aware of.    
+> > 
+> > Right.
+> >   
+> > > 
+> > > There's another important aspect to mention here: this function
+> > > can only be called from an ->exec_op() implementation if this
+> > > implementation is re-entrant.    
+> > 
+> > I do not agree with this statement: this function can be called
+> > from an ->exec_op() implementation even if it is not reentrant as
+> > long as it does not send a WAITRDY instruction itself. No?  
+> 
+> If the ->exec_op() implementation is not re-entrant, no,
+> nand_soft_waitrdy() can't be called from ->exec_op(), because then
+> you will re-enter ->exec_op() to execute the read_status_op(), and
+> BOOM!
+> 
+> > 
+> > Or maybe you wanted to point that the entire ->exec_op()
+> > implementation must be reentrant in order to use this function in
+> > it?  
+> 
+> Yes, what did you understand?
 
-> so one trust level above the kernel.
+Ok, I think I misunderstood the "if this implementation is re-entrant".
+The implementation you were referring to was ->exec_op()'s
+implementation, not nand_soft_waitrdy()'s.
 
-We are several kernel developers who don't trust firmware one
-bit. Several disasters in ACPI has made me ever more convinced
-that firmware should be trusted less than kernel code.
+> 
+> >   
+> > >     
+> > > > + *
+> > > > + * Return 0 if the NAND chip is ready, a negative error
+> > > > otherwise.
+> > > > + */
+> > > > +int nand_soft_waitrdy(struct nand_chip *chip, unsigned long
+> > > > timeout_ms) +{
+> > > > +	u8 status = 0;
+> > > > +	int ret;
+> > > > +
+> > > > +	if (!chip->exec_op)
+> > > > +		return -ENOTSUPP;
+> > > > +
+> > > > +	ret = nand_status_op(chip, NULL);
+> > > > +	if (ret)
+> > > > +		return ret;
+> > > > +
+> > > > +	timeout_ms = jiffies + msecs_to_jiffies(timeout_ms);
+> > > > +	do {
+> > > > +		ret = nand_read_data_op(chip, &status,
+> > > > sizeof(status), true);
+> > > > +		if (ret)
+> > > > +			break;
+> > > > +
+> > > > +		if (status & NAND_STATUS_READY)
+> > > > +			break;
+> > > > +
+> > > > +		udelay(100);      
+> > > 
+> > > Sounds a bit high, especially for a read page which takes around
+> > > 20us.    
+> > 
+> > Well, this value is arbitrary but greping for NAND_OP_WAIT_RDY
+> > tells us the different timeouts with which this function is usually
+> > called, to get an idea of the possible wait periods: tR, tBERS,
+> > tFEAT, tPROG, tRST.
+> > 
+> > While a tR_max is 200us, a tRST_max is 250000us. That is why I
+> > choose 100us as period, which I found somehow well tuned for every
+> > timeout.  
+> 
+> A timeout is different from a typical execution time. The timeout is
+> here as a boundary to detect when the device/controller is not
+> responding, so if you poll the status at the periodicity of the
+> timeout, you're likely to wait much more than you should have.
+> 
+> > But
+> > if you think most of the time the delay will be smaller, I will
+> > update the value to repeat the operation every 20us.  
+> 
+> Well, either you do something smart that calculates a polling period
+> based on the timeout val (timeout / ratio), or you pick something
+> close to the lowest typical value. So, in our case, something like
+> 10us, which should not be far from the typical tR value on most NANDs.
 
-But this is all very academic.
+For the sake of simplicity, I will then use 10us polling period here.
 
->> Also, device tree bindings are not documentation for how to write a
->> driver. They are not a replacement for hardware documentation. Nobody
->> should be expected to be able to write an OS driver solely based on a
->> device tree binding. Device tree bindings are more of a configuration
->> interface specification for OS drivers.
->
-> Yes, but together with the hardware docs you should be able to write a
-> driver. And here you can't, because you are missing the strings. So a
-> BSD developer has to look at Linux code.
-
-This is a fair point. It appears in several drivers.
-
-BSD or even Windows (would they use DT) would have to sit in the
-back seat just like Linux has been doing for years when it comes
-to the hopeless Windowsisms in the x86 BIOSes. I suspect some
-Windows on ARM is already experiencing this, but in the ACPI world,
-where, incidentally, the servers were being deployed for Linux first
-and Windows had to follow their example. I bet they have been
-swearing a lot in Redmond about that.
-
-In general it's one of these areas where we can not be utopian about the
-hardware descriptions, just fail gracefully in different ways.
-
-I usually try to keep the IETF motto "rough consensus and running
-code" in mind. I don't know if it helps in this discussion though.
-
->> So that's about 40% of the kernel image. Code really is no good without
->> data to process.
->
-> But how much of this is SoC specific configuration data? How much is it
-> in x86? Yes, historically we had and have a lot of configuration data in
-> ARM kernels. But that doesn't mean that we have to continue with this or
-> even increase the share.
-
-What people have been doing is trying to have better Kconfig setups
-and compile it out by doing kernel modules. It is a bit hopeless with
-pin controllers: almost all of them have to be built in. And if they come
-with a lot of data, yeah there you have a real good point.
-
-It would be sad if the ARMv7 multiboot or Aarch64 kernel just grows
-so that we can't use it but have to go back to shipping board-specific
-kernels with a huge bunch of stuff compiled out.
-
-I was hoping Moore's law would save us here :/
-
-An option that has been discussed is better used of  __initdata
-and similar tags, especially with built-in drivers. Sadly, this is
-hurt by another snag: the compiler or linker file or whatever it is,
-is preventing us from discarding any strings from the kernel.
-And pin controllers tend to stack up a lot of these.
-
-This is really sucky and something we should solve in general.
-I'm not smart enough to tackle any of these problems myself, just
-to see them and "Oh that's bad. Very bad."
-
->> The majority of the improvements over the years have been achieved by
->> moving drivers out of arch/arm and moving board files to DT. The goal
->> was never to get rid of all data.
->
-> Sure, not all data. But if we have the relatively easy opportunity to
-> avoid further addition of data, we should do it, I believe.
-> This significantly reduces the amount of kernel code we need to add to
-> support new SoCs.
-
-This is the core of your argument as I perceive it: get rid of data
-from the kernel, because it is growing wild. It is a valid cause. Just
-has to be weighed with other stuff, like maintainability, debuggability,
-maintainers viewpoint. ...
-
-Yours,
-Linus Walleij
+Thanks,
+Miqu?l
