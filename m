@@ -1,62 +1,103 @@
 From: brueckner@linux.vnet.ibm.com (Hendrik Brueckner)
-Date: Fri,  1 Dec 2017 15:19:06 +0100
-Subject: [PATCH 3/5] arm64/bpf: correct broken uapi for
- BPF_PROG_TYPE_PERF_EVENT program type
+Date: Fri,  1 Dec 2017 15:19:08 +0100
+Subject: [PATCH 5/5] perf s390: add regs_query_register_offset()
 In-Reply-To: <1512137948-31729-1-git-send-email-brueckner@linux.vnet.ibm.com>
 References: <1512137948-31729-1-git-send-email-brueckner@linux.vnet.ibm.com>
-Message-ID: <1512137948-31729-4-git-send-email-brueckner@linux.vnet.ibm.com>
+Message-ID: <1512137948-31729-6-git-send-email-brueckner@linux.vnet.ibm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Correct the broken uapi for the BPF_PROG_TYPE_PERF_EVENT program type
-by exporting the user_pt_regs structure instead of the pt_regs structure
-that is in-kernel only.
+The regs_query_register_offset() helper function converts
+register name like "%r0" to an offset of a register in user_pt_regs
+It is required by the BPF prologue generator.
 
+The user_pt_regs structure was recently added to "asm/ptrace.h".
+Hence, update tools/perf/check-headers.sh to keep the header file
+in sync with kernel changes.
+
+Suggested-by: Thomas Richter <tmricht@linux.vnet.ibm.com>
 Signed-off-by: Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
-Reviewed-by: Thomas Richter <tmricht@linux.vnet.ibm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
+Reviewed-and-tested-by: Thomas Richter <tmricht@linux.vnet.ibm.com>
 Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+Cc: Jiri Olsa <jolsa@redhat.com>
+Cc: Heiko Carstens <heiko.carstens@de.ibm.com>
 ---
- arch/arm64/include/asm/perf_event.h          | 2 ++
- arch/arm64/include/uapi/asm/bpf_perf_event.h | 9 +++++++++
- 2 files changed, 11 insertions(+)
- create mode 100644 arch/arm64/include/uapi/asm/bpf_perf_event.h
+ tools/perf/arch/s390/Makefile          |  1 +
+ tools/perf/arch/s390/util/dwarf-regs.c | 32 +++++++++++++++++++++++++++++---
+ tools/perf/check-headers.sh            |  1 +
+ 3 files changed, 31 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/perf_event.h b/arch/arm64/include/asm/perf_event.h
-index 8d5cbec..f9ccc36 100644
---- a/arch/arm64/include/asm/perf_event.h
-+++ b/arch/arm64/include/asm/perf_event.h
-@@ -18,6 +18,7 @@
- #define __ASM_PERF_EVENT_H
+diff --git a/tools/perf/arch/s390/Makefile b/tools/perf/arch/s390/Makefile
+index 21322e0..09ba923 100644
+--- a/tools/perf/arch/s390/Makefile
++++ b/tools/perf/arch/s390/Makefile
+@@ -2,3 +2,4 @@ ifndef NO_DWARF
+ PERF_HAVE_DWARF_REGS := 1
+ endif
+ HAVE_KVM_STAT_SUPPORT := 1
++PERF_HAVE_ARCH_REGS_QUERY_REGISTER_OFFSET := 1
+diff --git a/tools/perf/arch/s390/util/dwarf-regs.c b/tools/perf/arch/s390/util/dwarf-regs.c
+index f47576c..a8ace5c 100644
+--- a/tools/perf/arch/s390/util/dwarf-regs.c
++++ b/tools/perf/arch/s390/util/dwarf-regs.c
+@@ -2,17 +2,43 @@
+ /*
+  * Mapping of DWARF debug register numbers into register names.
+  *
+- *    Copyright IBM Corp. 2010
+- *    Author(s): Heiko Carstens <heiko.carstens@de.ibm.com>,
++ * Copyright IBM Corp. 2010, 2017
++ * Author(s): Heiko Carstens <heiko.carstens@de.ibm.com>,
++ *	      Hendrik Brueckner <brueckner@linux.vnet.ibm.com>
+  *
+  */
  
- #include <asm/stack_pointer.h>
++#include <errno.h>
+ #include <stddef.h>
+-#include <dwarf-regs.h>
++#include <stdlib.h>
+ #include <linux/kernel.h>
 +#include <asm/ptrace.h>
++#include <string.h>
++#include <dwarf-regs.h>
+ #include "dwarf-regs-table.h"
  
- #define	ARMV8_PMU_MAX_COUNTERS	32
- #define	ARMV8_PMU_COUNTER_MASK	(ARMV8_PMU_MAX_COUNTERS - 1)
-@@ -79,6 +80,7 @@
- extern unsigned long perf_instruction_pointer(struct pt_regs *regs);
- extern unsigned long perf_misc_flags(struct pt_regs *regs);
- #define perf_misc_flags(regs)	perf_misc_flags(regs)
-+#define perf_arch_bpf_user_pt_regs(regs) &regs->user_regs
- #endif
- 
- #define perf_arch_fetch_caller_regs(regs, __ip) { \
-diff --git a/arch/arm64/include/uapi/asm/bpf_perf_event.h b/arch/arm64/include/uapi/asm/bpf_perf_event.h
-new file mode 100644
-index 0000000..b551b74
---- /dev/null
-+++ b/arch/arm64/include/uapi/asm/bpf_perf_event.h
-@@ -0,0 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef _UAPI__ASM_BPF_PERF_EVENT_H__
-+#define _UAPI__ASM_BPF_PERF_EVENT_H__
+ const char *get_arch_regstr(unsigned int n)
+ {
+ 	return (n >= ARRAY_SIZE(s390_dwarf_regs)) ? NULL : s390_dwarf_regs[n];
+ }
 +
-+#include <asm/ptrace.h>
++/*
++ * Convert the register name into an offset to struct pt_regs (kernel).
++ * This is required by the BPF prologue generator.  The BPF
++ * program is called in the BPF overflow handler in the perf
++ * core.
++ */
++int regs_query_register_offset(const char *name)
++{
++	unsigned long gpr;
 +
-+typedef struct user_pt_regs bpf_user_pt_regs_t;
++	if (!name || strncmp(name, "%r", 2))
++		return -EINVAL;
 +
-+#endif /* _UAPI__ASM_BPF_PERF_EVENT_H__ */
++	errno = 0;
++	gpr = strtoul(name + 2, NULL, 10);
++	if (errno || gpr >= 16)
++		return -EINVAL;
++
++	return offsetof(user_pt_regs, gprs) + 8 * gpr;
++}
+diff --git a/tools/perf/check-headers.sh b/tools/perf/check-headers.sh
+index 77406d2..6db9d80 100755
+--- a/tools/perf/check-headers.sh
++++ b/tools/perf/check-headers.sh
+@@ -30,6 +30,7 @@ arch/x86/include/uapi/asm/vmx.h
+ arch/powerpc/include/uapi/asm/kvm.h
+ arch/s390/include/uapi/asm/kvm.h
+ arch/s390/include/uapi/asm/kvm_perf.h
++arch/s390/include/uapi/asm/ptrace.h
+ arch/s390/include/uapi/asm/sie.h
+ arch/arm/include/uapi/asm/kvm.h
+ arch/arm64/include/uapi/asm/kvm.h
 -- 
 1.8.3.1
