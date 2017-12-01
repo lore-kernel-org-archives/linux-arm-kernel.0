@@ -1,405 +1,164 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  1 Dec 2017 14:44:45 +0100
-Subject: [PATCH v4 04/10] pinctrl: axp209: rename everything from gpio to pctl
-In-Reply-To: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
-References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <8ec986b24e2ae4af183e0753f5258a304de9a121.1512135804.git-series.quentin.schulz@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 1 Dec 2017 14:18:28 +0000
+Subject: [PATCH RT] arm*: disable NEON in kernel mode
+In-Reply-To: <20171201134506.GF1612@linutronix.de>
+References: <20171130142216.GB12606@linutronix.de>
+ <20171130143028.GA1351@linutronix.de>
+ <20171201104331.GB1612@linutronix.de>
+ <20171201134506.GF1612@linutronix.de>
+Message-ID: <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This driver used to do only GPIO features of the GPIOs in X-Powers
-AXP20X. Now that we have migrated everything to the pinctrl subsystem
-and added pinctrl features, rename everything related to pinctrl from
-gpio to pctl to ease the understanding of differences between GPIO
-and pinctrl features.
+[Adding Ard, who wrote the NEON crypto code]
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
- drivers/pinctrl/pinctrl-axp209.c | 180 ++++++++++++++++----------------
- 1 file changed, 90 insertions(+), 90 deletions(-)
+On Fri, Dec 01, 2017 at 02:45:06PM +0100, Sebastian Andrzej Siewior wrote:
+> +arm folks, to let you know
+> 
+> On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
+> > NEON in kernel mode is used by the crypto algorithms and raid6 code.
+> > While the raid6 code looks okay, the crypto algorithms do not: NEON
+> > is enabled on first invocation and may allocate/free/map memory before
+> > the NEON mode is disabled again.
 
-diff --git a/drivers/pinctrl/pinctrl-axp209.c b/drivers/pinctrl/pinctrl-axp209.c
-index 2dc286f..6201d2b 100644
---- a/drivers/pinctrl/pinctrl-axp209.c
-+++ b/drivers/pinctrl/pinctrl-axp209.c
-@@ -57,7 +57,7 @@ struct axp20x_pinctrl_function {
- 	unsigned int	ngroups;
- };
- 
--struct axp20x_gpio {
-+struct axp20x_pctl {
- 	struct gpio_chip	chip;
- 	struct regmap		*regmap;
- 	struct pinctrl_dev			*pctl_dev;
-@@ -100,11 +100,11 @@ static int axp20x_gpio_input(struct gpio_chip *chip, unsigned offset)
- 
- static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
- {
--	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
-+	struct axp20x_pctl *pctl = gpiochip_get_data(chip);
- 	unsigned int val;
- 	int ret;
- 
--	ret = regmap_read(gpio->regmap, AXP20X_GPIO20_SS, &val);
-+	ret = regmap_read(pctl->regmap, AXP20X_GPIO20_SS, &val);
- 	if (ret)
- 		return ret;
- 
-@@ -113,7 +113,7 @@ static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
- 
- static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
- {
--	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
-+	struct axp20x_pctl *pctl = gpiochip_get_data(chip);
- 	unsigned int val;
- 	int reg, ret;
- 
-@@ -121,7 +121,7 @@ static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
- 	if (reg < 0)
- 		return reg;
- 
--	ret = regmap_read(gpio->regmap, reg, &val);
-+	ret = regmap_read(pctl->regmap, reg, &val);
- 	if (ret)
- 		return ret;
- 
-@@ -151,14 +151,14 @@ static int axp20x_gpio_output(struct gpio_chip *chip, unsigned offset,
- static void axp20x_gpio_set(struct gpio_chip *chip, unsigned offset,
- 			    int value)
- {
--	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
-+	struct axp20x_pctl *pctl = gpiochip_get_data(chip);
- 	int reg;
- 
- 	reg = axp20x_gpio_get_reg(offset);
- 	if (reg < 0)
- 		return;
- 
--	regmap_update_bits(gpio->regmap, reg,
-+	regmap_update_bits(pctl->regmap, reg,
- 			   AXP20X_GPIO_FUNCTIONS,
- 			   value ? AXP20X_GPIO_FUNCTION_OUT_HIGH :
- 			   AXP20X_GPIO_FUNCTION_OUT_LOW);
-@@ -167,30 +167,30 @@ static void axp20x_gpio_set(struct gpio_chip *chip, unsigned offset,
- static int axp20x_pmx_set(struct pinctrl_dev *pctldev, unsigned int offset,
- 			  u8 config)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 	int reg;
- 
- 	reg = axp20x_gpio_get_reg(offset);
- 	if (reg < 0)
- 		return reg;
- 
--	return regmap_update_bits(gpio->regmap, reg, AXP20X_GPIO_FUNCTIONS,
-+	return regmap_update_bits(pctl->regmap, reg, AXP20X_GPIO_FUNCTIONS,
- 				  config);
- }
- 
- static int axp20x_pmx_func_cnt(struct pinctrl_dev *pctldev)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 
--	return ARRAY_SIZE(gpio->funcs);
-+	return ARRAY_SIZE(pctl->funcs);
- }
- 
- static const char *axp20x_pmx_func_name(struct pinctrl_dev *pctldev,
- 					unsigned int selector)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 
--	return gpio->funcs[selector].name;
-+	return pctl->funcs[selector].name;
- }
- 
- static int axp20x_pmx_func_groups(struct pinctrl_dev *pctldev,
-@@ -198,10 +198,10 @@ static int axp20x_pmx_func_groups(struct pinctrl_dev *pctldev,
- 				  const char * const **groups,
- 				  unsigned int *num_groups)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 
--	*groups = gpio->funcs[selector].groups;
--	*num_groups = gpio->funcs[selector].ngroups;
-+	*groups = pctl->funcs[selector].groups;
-+	*num_groups = pctl->funcs[selector].ngroups;
- 
- 	return 0;
- }
-@@ -209,18 +209,18 @@ static int axp20x_pmx_func_groups(struct pinctrl_dev *pctldev,
- static int axp20x_pmx_set_mux(struct pinctrl_dev *pctldev,
- 			      unsigned int function, unsigned int group)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 	unsigned int mask;
- 
- 	/* Every pin supports GPIO_OUT and GPIO_IN functions */
- 	if (function <= AXP20X_FUNC_GPIO_IN)
- 		return axp20x_pmx_set(pctldev, group,
--				      gpio->funcs[function].muxval);
-+				      pctl->funcs[function].muxval);
- 
- 	if (function == AXP20X_FUNC_LDO)
--		mask = gpio->desc->ldo_mask;
-+		mask = pctl->desc->ldo_mask;
- 	else
--		mask = gpio->desc->adc_mask;
-+		mask = pctl->desc->adc_mask;
- 
- 	if (!(BIT(group) & mask))
- 		return -EINVAL;
-@@ -234,21 +234,21 @@ static int axp20x_pmx_set_mux(struct pinctrl_dev *pctldev,
- 	if (function == AXP20X_FUNC_LDO)
- 		return 0;
- 
--	return axp20x_pmx_set(pctldev, group, gpio->funcs[function].muxval);
-+	return axp20x_pmx_set(pctldev, group, pctl->funcs[function].muxval);
- }
- 
- static int axp20x_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
- 					 struct pinctrl_gpio_range *range,
- 					 unsigned int offset, bool input)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 
- 	if (input)
- 		return axp20x_pmx_set(pctldev, offset,
--				      gpio->funcs[AXP20X_FUNC_GPIO_IN].muxval);
-+				      pctl->funcs[AXP20X_FUNC_GPIO_IN].muxval);
- 
- 	return axp20x_pmx_set(pctldev, offset,
--			      gpio->funcs[AXP20X_FUNC_GPIO_OUT].muxval);
-+			      pctl->funcs[AXP20X_FUNC_GPIO_OUT].muxval);
- }
- 
- static const struct pinmux_ops axp20x_pmx_ops = {
-@@ -262,17 +262,17 @@ static const struct pinmux_ops axp20x_pmx_ops = {
- 
- static int axp20x_groups_cnt(struct pinctrl_dev *pctldev)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 
--	return gpio->desc->npins;
-+	return pctl->desc->npins;
- }
- 
- static int axp20x_group_pins(struct pinctrl_dev *pctldev, unsigned int selector,
- 			     const unsigned int **pins, unsigned int *num_pins)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 
--	*pins = (unsigned int *)&gpio->desc->pins[selector];
-+	*pins = (unsigned int *)&pctl->desc->pins[selector];
- 	*num_pins = 1;
- 
- 	return 0;
-@@ -281,9 +281,9 @@ static int axp20x_group_pins(struct pinctrl_dev *pctldev, unsigned int selector,
- static const char *axp20x_group_name(struct pinctrl_dev *pctldev,
- 				     unsigned int selector)
- {
--	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	struct axp20x_pctl *pctl = pinctrl_dev_get_drvdata(pctldev);
- 
--	return gpio->desc->pins[selector].name;
-+	return pctl->desc->pins[selector].name;
- }
- 
- static const struct pinctrl_ops axp20x_pctrl_ops = {
-@@ -318,46 +318,46 @@ static void axp20x_funcs_groups_from_mask(struct device *dev, unsigned int mask,
- 
- static void axp20x_build_funcs_groups(struct platform_device *pdev)
- {
--	struct axp20x_gpio *gpio = platform_get_drvdata(pdev);
-+	struct axp20x_pctl *pctl = platform_get_drvdata(pdev);
- 	int i, pin;
- 
--	gpio->funcs[AXP20X_FUNC_GPIO_OUT].name = "gpio_out";
--	gpio->funcs[AXP20X_FUNC_GPIO_OUT].muxval = AXP20X_MUX_GPIO_OUT;
--	gpio->funcs[AXP20X_FUNC_GPIO_IN].name = "gpio_in";
--	gpio->funcs[AXP20X_FUNC_GPIO_IN].muxval = AXP20X_MUX_GPIO_IN;
--	gpio->funcs[AXP20X_FUNC_LDO].name = "ldo";
-+	pctl->funcs[AXP20X_FUNC_GPIO_OUT].name = "gpio_out";
-+	pctl->funcs[AXP20X_FUNC_GPIO_OUT].muxval = AXP20X_MUX_GPIO_OUT;
-+	pctl->funcs[AXP20X_FUNC_GPIO_IN].name = "gpio_in";
-+	pctl->funcs[AXP20X_FUNC_GPIO_IN].muxval = AXP20X_MUX_GPIO_IN;
-+	pctl->funcs[AXP20X_FUNC_LDO].name = "ldo";
- 	/*
- 	 * Muxval for LDO is useless as we won't use it.
- 	 * See comment in axp20x_pmx_set_mux.
- 	 */
--	gpio->funcs[AXP20X_FUNC_ADC].name = "adc";
--	gpio->funcs[AXP20X_FUNC_ADC].muxval = AXP20X_MUX_ADC;
-+	pctl->funcs[AXP20X_FUNC_ADC].name = "adc";
-+	pctl->funcs[AXP20X_FUNC_ADC].muxval = AXP20X_MUX_ADC;
- 
- 	/* Every pin supports GPIO_OUT and GPIO_IN functions */
- 	for (i = 0; i <= AXP20X_FUNC_GPIO_IN; i++) {
--		gpio->funcs[i].ngroups = gpio->desc->npins;
--		gpio->funcs[i].groups = devm_kzalloc(&pdev->dev,
--						     gpio->desc->npins * sizeof(const char *),
-+		pctl->funcs[i].ngroups = pctl->desc->npins;
-+		pctl->funcs[i].groups = devm_kzalloc(&pdev->dev,
-+						     pctl->desc->npins * sizeof(const char *),
- 						     GFP_KERNEL);
--		for (pin = 0; pin < gpio->desc->npins; pin++)
--			gpio->funcs[i].groups[pin] = gpio->desc->pins[pin].name;
-+		for (pin = 0; pin < pctl->desc->npins; pin++)
-+			pctl->funcs[i].groups[pin] = pctl->desc->pins[pin].name;
- 	}
- 
--	axp20x_funcs_groups_from_mask(&pdev->dev, gpio->desc->ldo_mask,
--				      gpio->desc->npins,
--				      &gpio->funcs[AXP20X_FUNC_LDO],
--				      gpio->desc->pins);
-+	axp20x_funcs_groups_from_mask(&pdev->dev, pctl->desc->ldo_mask,
-+				      pctl->desc->npins,
-+				      &pctl->funcs[AXP20X_FUNC_LDO],
-+				      pctl->desc->pins);
- 
--	axp20x_funcs_groups_from_mask(&pdev->dev, gpio->desc->adc_mask,
--				      gpio->desc->npins,
--				      &gpio->funcs[AXP20X_FUNC_ADC],
--				      gpio->desc->pins);
-+	axp20x_funcs_groups_from_mask(&pdev->dev, pctl->desc->adc_mask,
-+				      pctl->desc->npins,
-+				      &pctl->funcs[AXP20X_FUNC_ADC],
-+				      pctl->desc->pins);
- }
- 
--static int axp20x_gpio_probe(struct platform_device *pdev)
-+static int axp20x_pctl_probe(struct platform_device *pdev)
- {
- 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
--	struct axp20x_gpio *gpio;
-+	struct axp20x_pctl *pctl;
- 	struct pinctrl_desc *pctrl_desc;
- 	int ret;
- 
-@@ -369,29 +369,29 @@ static int axp20x_gpio_probe(struct platform_device *pdev)
- 		return -EINVAL;
- 	}
- 
--	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
--	if (!gpio)
-+	pctl = devm_kzalloc(&pdev->dev, sizeof(*pctl), GFP_KERNEL);
-+	if (!pctl)
- 		return -ENOMEM;
- 
--	gpio->chip.base			= -1;
--	gpio->chip.can_sleep		= true;
--	gpio->chip.request		= gpiochip_generic_request;
--	gpio->chip.free			= gpiochip_generic_free;
--	gpio->chip.parent		= &pdev->dev;
--	gpio->chip.label		= dev_name(&pdev->dev);
--	gpio->chip.owner		= THIS_MODULE;
--	gpio->chip.get			= axp20x_gpio_get;
--	gpio->chip.get_direction	= axp20x_gpio_get_direction;
--	gpio->chip.set			= axp20x_gpio_set;
--	gpio->chip.direction_input	= axp20x_gpio_input;
--	gpio->chip.direction_output	= axp20x_gpio_output;
--	gpio->chip.ngpio		= 3;
--
--	gpio->desc = &axp20x_data;
--	gpio->regmap = axp20x->regmap;
--	gpio->dev = &pdev->dev;
--
--	platform_set_drvdata(pdev, gpio);
-+	pctl->chip.base			= -1;
-+	pctl->chip.can_sleep		= true;
-+	pctl->chip.request		= gpiochip_generic_request;
-+	pctl->chip.free			= gpiochip_generic_free;
-+	pctl->chip.parent		= &pdev->dev;
-+	pctl->chip.label		= dev_name(&pdev->dev);
-+	pctl->chip.owner		= THIS_MODULE;
-+	pctl->chip.get			= axp20x_gpio_get;
-+	pctl->chip.get_direction	= axp20x_gpio_get_direction;
-+	pctl->chip.set			= axp20x_gpio_set;
-+	pctl->chip.direction_input	= axp20x_gpio_input;
-+	pctl->chip.direction_output	= axp20x_gpio_output;
-+	pctl->chip.ngpio		= 3;
-+
-+	pctl->desc = &axp20x_data;
-+	pctl->regmap = axp20x->regmap;
-+	pctl->dev = &pdev->dev;
-+
-+	platform_set_drvdata(pdev, pctl);
- 
- 	axp20x_build_funcs_groups(pdev);
- 
-@@ -401,27 +401,27 @@ static int axp20x_gpio_probe(struct platform_device *pdev)
- 
- 	pctrl_desc->name = dev_name(&pdev->dev);
- 	pctrl_desc->owner = THIS_MODULE;
--	pctrl_desc->pins = gpio->desc->pins;
--	pctrl_desc->npins = gpio->desc->npins;
-+	pctrl_desc->pins = pctl->desc->pins;
-+	pctrl_desc->npins = pctl->desc->npins;
- 	pctrl_desc->pctlops = &axp20x_pctrl_ops;
- 	pctrl_desc->pmxops = &axp20x_pmx_ops;
- 
--	gpio->pctl_dev = devm_pinctrl_register(&pdev->dev, pctrl_desc, gpio);
--	if (IS_ERR(gpio->pctl_dev)) {
-+	pctl->pctl_dev = devm_pinctrl_register(&pdev->dev, pctrl_desc, pctl);
-+	if (IS_ERR(pctl->pctl_dev)) {
- 		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
--		return PTR_ERR(gpio->pctl_dev);
-+		return PTR_ERR(pctl->pctl_dev);
- 	}
- 
--	ret = devm_gpiochip_add_data(&pdev->dev, &gpio->chip, gpio);
-+	ret = devm_gpiochip_add_data(&pdev->dev, &pctl->chip, pctl);
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to register GPIO chip\n");
- 		return ret;
- 	}
- 
--	ret = gpiochip_add_pin_range(&gpio->chip, dev_name(&pdev->dev),
--				     gpio->desc->pins->number,
--				     gpio->desc->pins->number,
--				     gpio->desc->npins);
-+	ret = gpiochip_add_pin_range(&pctl->chip, dev_name(&pdev->dev),
-+				     pctl->desc->pins->number,
-+				     pctl->desc->pins->number,
-+				     pctl->desc->npins);
- 	if (ret) {
- 		dev_err(&pdev->dev, "failed to add pin range\n");
- 		return ret;
-@@ -432,21 +432,21 @@ static int axp20x_gpio_probe(struct platform_device *pdev)
- 	return 0;
- }
- 
--static const struct of_device_id axp20x_gpio_match[] = {
-+static const struct of_device_id axp20x_pctl_match[] = {
- 	{ .compatible = "x-powers,axp209-gpio" },
- 	{ }
- };
--MODULE_DEVICE_TABLE(of, axp20x_gpio_match);
-+MODULE_DEVICE_TABLE(of, axp20x_pctl_match);
- 
--static struct platform_driver axp20x_gpio_driver = {
--	.probe		= axp20x_gpio_probe,
-+static struct platform_driver axp20x_pctl_driver = {
-+	.probe		= axp20x_pctl_probe,
- 	.driver = {
- 		.name		= "axp20x-gpio",
--		.of_match_table	= axp20x_gpio_match,
-+		.of_match_table	= axp20x_pctl_match,
- 	},
- };
- 
--module_platform_driver(axp20x_gpio_driver);
-+module_platform_driver(axp20x_pctl_driver);
- 
- MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
- MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
--- 
-git-series 0.9.1
+Could you elaborate on why this is a problem?
+
+I guess this is because kernel_neon_{begin,end}() disable preemption?
+
+... is this specific to RT?
+
+Thanks,
+Mark.
+
+> > This needs to be changed until it can be enabled.
+> > On ARM NEON in kernel mode can be simply disabled. on ARM64 it needs to
+> > stay on due to possible EFI callbacks so here I disable each algorithm.
+> > 
+> > Cc: stable-rt at vger.kernel.org
+> > Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> > ---
+> >  arch/arm/Kconfig                  |  2 +-
+> >  arch/arm64/crypto/Kconfig         | 20 ++++++++++----------
+> >  arch/arm64/crypto/crc32-ce-glue.c |  3 ++-
+> >  3 files changed, 13 insertions(+), 12 deletions(-)
+> > 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index d1346a160760..914fecb088a8 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -2164,7 +2164,7 @@ config NEON
+> >  
+> >  config KERNEL_MODE_NEON
+> >  	bool "Support for NEON in kernel mode"
+> > -	depends on NEON && AEABI
+> > +	depends on NEON && AEABI && !PREEMPT_RT_BASE
+> >  	help
+> >  	  Say Y to include support for NEON in kernel mode.
+> >  
+> > diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+> > index 70c517aa4501..2a5f05b5a19a 100644
+> > --- a/arch/arm64/crypto/Kconfig
+> > +++ b/arch/arm64/crypto/Kconfig
+> > @@ -19,19 +19,19 @@ config CRYPTO_SHA512_ARM64
+> >  
+> >  config CRYPTO_SHA1_ARM64_CE
+> >  	tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
+> > -	depends on KERNEL_MODE_NEON
+> > +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_HASH
+> >  	select CRYPTO_SHA1
+> >  
+> >  config CRYPTO_SHA2_ARM64_CE
+> >  	tristate "SHA-224/SHA-256 digest algorithm (ARMv8 Crypto Extensions)"
+> > -	depends on KERNEL_MODE_NEON
+> > +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_HASH
+> >  	select CRYPTO_SHA256_ARM64
+> >  
+> >  config CRYPTO_GHASH_ARM64_CE
+> >  	tristate "GHASH/AES-GCM using ARMv8 Crypto Extensions"
+> > -	depends on KERNEL_MODE_NEON
+> > +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_HASH
+> >  	select CRYPTO_GF128MUL
+> >  	select CRYPTO_AES
+> > @@ -39,7 +39,7 @@ config CRYPTO_GHASH_ARM64_CE
+> >  
+> >  config CRYPTO_CRCT10DIF_ARM64_CE
+> >  	tristate "CRCT10DIF digest algorithm using PMULL instructions"
+> > -	depends on KERNEL_MODE_NEON && CRC_T10DIF
+> > +	depends on KERNEL_MODE_NEON && CRC_T10DIF && !PREEMPT_RT_BASE
+> >  	select CRYPTO_HASH
+> >  
+> >  config CRYPTO_CRC32_ARM64_CE
+> > @@ -53,13 +53,13 @@ config CRYPTO_AES_ARM64
+> >  
+> >  config CRYPTO_AES_ARM64_CE
+> >  	tristate "AES core cipher using ARMv8 Crypto Extensions"
+> > -	depends on ARM64 && KERNEL_MODE_NEON
+> > +	depends on ARM64 && KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_ALGAPI
+> >  	select CRYPTO_AES_ARM64
+> >  
+> >  config CRYPTO_AES_ARM64_CE_CCM
+> >  	tristate "AES in CCM mode using ARMv8 Crypto Extensions"
+> > -	depends on ARM64 && KERNEL_MODE_NEON
+> > +	depends on ARM64 && KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_ALGAPI
+> >  	select CRYPTO_AES_ARM64_CE
+> >  	select CRYPTO_AES_ARM64
+> > @@ -67,7 +67,7 @@ config CRYPTO_AES_ARM64_CE_CCM
+> >  
+> >  config CRYPTO_AES_ARM64_CE_BLK
+> >  	tristate "AES in ECB/CBC/CTR/XTS modes using ARMv8 Crypto Extensions"
+> > -	depends on KERNEL_MODE_NEON
+> > +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_BLKCIPHER
+> >  	select CRYPTO_AES_ARM64_CE
+> >  	select CRYPTO_AES_ARM64
+> > @@ -75,7 +75,7 @@ config CRYPTO_AES_ARM64_CE_BLK
+> >  
+> >  config CRYPTO_AES_ARM64_NEON_BLK
+> >  	tristate "AES in ECB/CBC/CTR/XTS modes using NEON instructions"
+> > -	depends on KERNEL_MODE_NEON
+> > +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_BLKCIPHER
+> >  	select CRYPTO_AES_ARM64
+> >  	select CRYPTO_AES
+> > @@ -83,13 +83,13 @@ config CRYPTO_AES_ARM64_NEON_BLK
+> >  
+> >  config CRYPTO_CHACHA20_NEON
+> >  	tristate "NEON accelerated ChaCha20 symmetric cipher"
+> > -	depends on KERNEL_MODE_NEON
+> > +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_BLKCIPHER
+> >  	select CRYPTO_CHACHA20
+> >  
+> >  config CRYPTO_AES_ARM64_BS
+> >  	tristate "AES in ECB/CBC/CTR/XTS modes using bit-sliced NEON algorithm"
+> > -	depends on KERNEL_MODE_NEON
+> > +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+> >  	select CRYPTO_BLKCIPHER
+> >  	select CRYPTO_AES_ARM64_NEON_BLK
+> >  	select CRYPTO_AES_ARM64
+> > diff --git a/arch/arm64/crypto/crc32-ce-glue.c b/arch/arm64/crypto/crc32-ce-glue.c
+> > index 624f4137918c..599de95cd86d 100644
+> > --- a/arch/arm64/crypto/crc32-ce-glue.c
+> > +++ b/arch/arm64/crypto/crc32-ce-glue.c
+> > @@ -206,7 +206,8 @@ static struct shash_alg crc32_pmull_algs[] = { {
+> >  
+> >  static int __init crc32_pmull_mod_init(void)
+> >  {
+> > -	if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON) && (elf_hwcap & HWCAP_PMULL)) {
+> > +	if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON) &&
+> > +	    !IS_ENABLED(CONFIG_PREEMPT_RT_BASE) && (elf_hwcap & HWCAP_PMULL)) {
+> >  		crc32_pmull_algs[0].update = crc32_pmull_update;
+> >  		crc32_pmull_algs[1].update = crc32c_pmull_update;
+> >  
+> > -- 
+> > 2.15.0
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
