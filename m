@@ -1,94 +1,70 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Dec 2017 17:51:44 +0000
-Subject: [PATCH v2 12/18] arm64: entry: Explicitly pass exception level
- to kernel_ventry macro
-In-Reply-To: <20171201115836.jaxzbjsnpnuau56s@lakrids.cambridge.arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <1512059986-21325-13-git-send-email-will.deacon@arm.com>
- <20171201115836.jaxzbjsnpnuau56s@lakrids.cambridge.arm.com>
-Message-ID: <20171201175144.GD8826@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 1 Dec 2017 18:25:46 +0100
+Subject: [PATCH 09/37] KVM: arm64: Move debug dirty flag calculation out
+ of world switch
+In-Reply-To: <20171107140919.p6act55ubmzlv66b@kamzik.brq.redhat.com>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-10-christoffer.dall@linaro.org>
+ <20171107140919.p6act55ubmzlv66b@kamzik.brq.redhat.com>
+Message-ID: <20171201172546.GB6615@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 11:58:36AM +0000, Mark Rutland wrote:
-> On Thu, Nov 30, 2017 at 04:39:40PM +0000, Will Deacon wrote:
-> > We will need to treat exceptions from EL0 differently in kernel_ventry,
-> > so rework the macro to take the exception level as an argument and
-> > construct the branch target using that.
+On Tue, Nov 07, 2017 at 03:09:19PM +0100, Andrew Jones wrote:
+> On Thu, Oct 12, 2017 at 12:41:13PM +0200, Christoffer Dall wrote:
+> > There is no need to figure out inside the world-switch if we should
+> > save/restore the debug registers or not, we can might as well do that in
+> > the higher level debug setup code, making it easier to optimize down the
+> > line.
 > > 
-> > Signed-off-by: Will Deacon <will.deacon@arm.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 > > ---
-> >  arch/arm64/kernel/entry.S | 46 +++++++++++++++++++++++-----------------------
-> >  1 file changed, 23 insertions(+), 23 deletions(-)
+> >  arch/arm64/kvm/debug.c        | 9 +++++++++
+> >  arch/arm64/kvm/hyp/debug-sr.c | 6 ------
+> >  2 files changed, 9 insertions(+), 6 deletions(-)
 > > 
-> > diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> > index dea196f287a0..688e52f65a8d 100644
-> > --- a/arch/arm64/kernel/entry.S
-> > +++ b/arch/arm64/kernel/entry.S
-> > @@ -71,7 +71,7 @@
-> >  #define BAD_FIQ		2
-> >  #define BAD_ERROR	3
+> > diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+> > index dbadfaf..62550de19 100644
+> > --- a/arch/arm64/kvm/debug.c
+> > +++ b/arch/arm64/kvm/debug.c
+> > @@ -193,6 +193,15 @@ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu)
+> >  	if (trap_debug)
+> >  		vcpu->arch.mdcr_el2 |= MDCR_EL2_TDA;
 > >  
-> > -	.macro kernel_ventry	label
-> > +	.macro kernel_ventry, el, label, regsize = 64
-> >  	.align 7
-> >  	sub	sp, sp, #S_FRAME_SIZE
-> >  #ifdef CONFIG_VMAP_STACK
-> > @@ -84,7 +84,7 @@
-> >  	tbnz	x0, #THREAD_SHIFT, 0f
-> >  	sub	x0, sp, x0			// x0'' = sp' - x0' = (sp + x0) - sp = x0
-> >  	sub	sp, sp, x0			// sp'' = sp' - x0 = (sp + x0) - x0 = sp
-> > -	b	\label
-> > +	b	el\()\el\()_\label
-> >  
-> >  0:
-> >  	/*
-> > @@ -116,7 +116,7 @@
-> >  	sub	sp, sp, x0
-> >  	mrs	x0, tpidrro_el0
-> >  #endif
-> > -	b	\label
-> > +	b	el\()\el\()_\label
-> >  	.endm
-> >  
-> >  	.macro	kernel_entry, el, regsize = 64
-> > @@ -369,31 +369,31 @@ tsk	.req	x28		// current thread_info
-> >  
-> >  	.align	11
-> >  ENTRY(vectors)
-> > -	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
-> > -	kernel_ventry	el1_irq_invalid			// IRQ EL1t
-> > -	kernel_ventry	el1_fiq_invalid			// FIQ EL1t
-> > -	kernel_ventry	el1_error_invalid		// Error EL1t
-> > +	kernel_ventry	1, sync_invalid			// Synchronous EL1t
-> > +	kernel_ventry	1, irq_invalid			// IRQ EL1t
-> > +	kernel_ventry	1, fiq_invalid			// FIQ EL1t
-> > +	kernel_ventry	1, error_invalid		// Error EL1t
+> > +	/*
+> > +	 * If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY is set, perform
+> > +	 * a full save/restore cycle.
 > 
-> Using the el paramter to build the branch name has the unfortunate
-> property of obscuring the branch name. For example, that makes it
-> difficult to jump around the entry asm with ctags, which is somewhat
-> painful.
+> The commit message implies testing KVM_ARM64_DEBUG_DIRTY, but it only
+> tests KDE and MDE.
 > 
-> Could we leave the full branch name in place, e.g.
+
+You meant the comment, right?
+
+> > +	 */
+> > +	if ((vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_KDE) ||
+> > +	    (vcpu_sys_reg(vcpu, MDSCR_EL1) & DBG_MDSCR_MDE))
 > 
-> 	kernel_ventry	1, el1_sync_invalid		// Synchronous EL1t
-> 	kernel_ventry	1, el1_irq_invalid		// IRQ EL1t
-> 	kernel_ventry	1, el1_fiq_invalid		// FIQ EL1t
-> 	kernel_ventry	1, el1_error_invalid		// Error EL1t
+> nit: could also write as
 > 
-> ... or have separate kernel_ventry and user_ventry macros that
-> implicitly encoded the source EL, also leaving the label name as-is.
+>  if (vcpu_sys_reg(vcpu, MDSCR_EL1) & (DBG_MDSCR_KDE | DBG_MDSCR_MDE))
+> 
 
-The downside of doing that is that it makes it possible to say things like:
+I actually prefer it the other way, and I think the compiler will figure
+out what to do in terms of efficiency.
 
-	kernel_ventry	0, el1_sync
+> > +		vcpu->arch.debug_flags |= KVM_ARM64_DEBUG_DIRTY;
+> > +
+> 
+> It looks like there's only one flag for debug_flags - this dirty flag,
+> which I guess is also used to trigger trapping. So maybe this could be a
+> second flag of a "lazy state" field, as I suggested earlier?
+> 
 
-which I don't want to be expressible.
+I'm going to leave this one for now, but we can improve that later on if
+we want to save a little space in the vcpu struct, or rather if we want
+to rearrange things to make frequently accessed fields fit in the same
+cache line.
 
-Given that ctags already chokes on lots of entry.S (for example, any macro
-that is defined outside of the file) *and* that you can easily search for
-things like el1_sync_invalid within the file, I'm inclined to leave this
-patch as-is, but I'll note your objection and buy you a pint.
-
-Will
+Thanks,
+-Christoffer
