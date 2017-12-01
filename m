@@ -1,96 +1,68 @@
-From: oleksandrs@mellanox.com (Oleksandr Shamray)
-Date: Fri, 1 Dec 2017 11:11:03 +0000
-Subject: [patch v12 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
- families JTAG master driver
-In-Reply-To: <CAGMNF6XRwU5QEJhkg-mVwE5zpPigtcGJtRUupZHtcWRdedcsxg@mail.gmail.com>
-References: <1510675867-24276-1-git-send-email-oleksandrs@mellanox.com>
- <1510675867-24276-3-git-send-email-oleksandrs@mellanox.com>
- <CAGMNF6XRwU5QEJhkg-mVwE5zpPigtcGJtRUupZHtcWRdedcsxg@mail.gmail.com>
-Message-ID: <AM4PR0501MB21946528385296CCEEBFEB1AB1390@AM4PR0501MB2194.eurprd05.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Dec 2017 11:24:58 +0000
+Subject: [PATCH v4 2/2] arm64: Add software workaround for Falkor erratum
+ 1041
+In-Reply-To: <1511824680-16397-3-git-send-email-shankerd@codeaurora.org>
+References: <1511824680-16397-1-git-send-email-shankerd@codeaurora.org>
+ <1511824680-16397-3-git-send-email-shankerd@codeaurora.org>
+Message-ID: <20171201112457.GE18083@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Kun Yi [mailto:kunyi at google.com]
-> Sent: Thursday, November 30, 2017 12:51 AM
-> To: Oleksandr Shamray <oleksandrs@mellanox.com>
-> Cc: gregkh at linuxfoundation.org; arnd at arndb.de; system-sw-low-level
-> <system-sw-low-level@mellanox.com>; devicetree at vger.kernel.org;
-> jiri at resnulli.us; Vadim Pasternak <vadimp@mellanox.com>; linux-
-> api at vger.kernel.org; OpenBMC Maillist <openbmc@lists.ozlabs.org>; linux-
-> kernel at vger.kernel.org; openocd-devel-owner at lists.sourceforge.net;
-> mec at shout.net; Jiri Pirko <jiri@mellanox.com>; robh+dt at kernel.org; linux-
-> serial at vger.kernel.org; tklauser at distanz.ch; mchehab at kernel.org;
-> davem at davemloft.net; linux-arm-kernel at lists.infradead.org
-> Subject: Re: [patch v12 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
-> families JTAG master driver
+On Mon, Nov 27, 2017 at 05:18:00PM -0600, Shanker Donthineni wrote:
+> The ARM architecture defines the memory locations that are permitted
+> to be accessed as the result of a speculative instruction fetch from
+> an exception level for which all stages of translation are disabled.
+> Specifically, the core is permitted to speculatively fetch from the
+> 4KB region containing the current program counter 4K and next 4K.
 > 
-> Thanks for working on the driver, Oleksandr. I gave this a try on a board with
-> Aspeed 2520. One question below:
+> When translation is changed from enabled to disabled for the running
+> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
+> Falkor core may errantly speculatively access memory locations outside
+> of the 4KB region permitted by the architecture. The errant memory
+> access may lead to one of the following unexpected behaviors.
 > 
-> On Tue, Nov 14, 2017 at 8:11 AM, Oleksandr Shamray
-> <oleksandrs@mellanox.com> wrote:
-> > Driver adds support of Aspeed 2500/2400 series SOC JTAG master controller.
-> >
-> > Driver implements the following jtag ops:
-> > - freq_get;
-> > - freq_set;
-> > - status_get;
-> > - idle;
-> > - xfer;
-> >
-
-[..]
-
-> > +
-> > +static const struct jtag_ops aspeed_jtag_ops = {
-> > +       .freq_get = aspeed_jtag_freq_get,
-> > +       .freq_set = aspeed_jtag_freq_set,
-> > +       .status_get = aspeed_jtag_status_get,
-> > +       .idle = aspeed_jtag_idle,
-> > +       .xfer = aspeed_jtag_xfer,
-> > +       .mode_set = aspeed_jtag_mode_set };
-> > +
-> > +static int aspeed_jtag_probe(struct platform_device *pdev) {
-> > +       struct aspeed_jtag *aspeed_jtag;
-> > +       struct jtag *jtag;
-> > +       int err;
-> > +
-> > +       if (!of_device_is_compatible(pdev->dev.of_node,
-> > + "aspeed,aspeed-jtag"))
+> 1) A System Error Interrupt (SEI) being raised by the Falkor core due
+>    to the errant memory access attempting to access a region of memory
+>    that is protected by a slave-side memory protection unit.
+> 2) Unpredictable device behavior due to a speculative read from device
+>    memory. This behavior may only occur if the instruction cache is
+>    disabled prior to or coincident with translation being changed from
+>    enabled to disabled.
 > 
-> Should this be "aspeed,ast2400-jtag"/"aspeed,ast2500-jtag" as specified in the
-> compatible string below?
+> The conditions leading to this erratum will not occur when either of the
+> following occur:
+>  1) A higher exception level disables translation of a lower exception level
+>    (e.g. EL2 changing SCTLR_EL1[M] from a value of 1 to 0).
+>  2) An exception level disabling its stage-1 translation if its stage-2
+>     translation is enabled (e.g. EL1 changing SCTLR_EL1[M] from a value of 1
+>     to 0 when HCR_EL2[VM] has a value of 1).
 > 
+> To avoid the errant behavior, software must execute an ISB immediately
+> prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
+> 
+> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+> ---
+> Changes since v3:
+>   Rebased to kernel v4.15-rc1.
+> Changes since v2:
+>   Repost the corrected patches.
+> Changes since v1:
+>   Apply the workaround where it's required.
+> 
+>  Documentation/arm64/silicon-errata.txt |  1 +
+>  arch/arm64/Kconfig                     | 12 +++++++++++-
+>  arch/arm64/include/asm/assembler.h     | 19 +++++++++++++++++++
+>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
+>  arch/arm64/kernel/cpu-reset.S          |  1 +
+>  arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
+>  arch/arm64/kernel/efi-entry.S          |  2 ++
+>  arch/arm64/kernel/head.S               |  1 +
+>  arch/arm64/kernel/relocate_kernel.S    |  1 +
+>  arch/arm64/kvm/hyp-init.S              |  1 +
 
-Yes
+This is an awful lot of code just to add an ISB instruction prior to
+disabling the MMU. Why do you need to go through the alternatives framework
+for this? Just do it with an #ifdef; this isn't a fastpath.
 
-
-> > +               return -ENOMEM;
-> > +
-> > +       jtag = jtag_alloc(sizeof(*aspeed_jtag), &aspeed_jtag_ops);
-> > +       if (!jtag)
-> > +               return -ENODEV;
-> > +
-> > +       platform_set_drvdata(pdev, jtag);
-> > +       aspeed_jtag = jtag_priv(jtag);
-> > +       aspeed_jtag->dev = &pdev->dev;
-> > +
- 
-[..]
-
-> > +
-> > +MODULE_AUTHOR("Oleksandr Shamray <oleksandrs@mellanox.com>");
-> > +MODULE_DESCRIPTION("ASPEED JTAG driver"); MODULE_LICENSE("GPL
-> v2");
-> > --
-> > 1.7.1
-> >
-> --
-> Regards,
-> Kun
-
-Thanks.
-
-BR
-Oleksandr Shamray
+Will
