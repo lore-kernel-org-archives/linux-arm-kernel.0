@@ -1,92 +1,76 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 1 Dec 2017 10:19:06 +0100
-Subject: [PATCH v4 4/6] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM
- support
-In-Reply-To: <CAOFm3uEY8+B8mhdcSLexdF8U8rq9kU2dM+ix=A_f+5kU_iR=nQ@mail.gmail.com>
-References: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
- <1511950857-19292-5-git-send-email-narmstrong@baylibre.com>
- <20171130003912.GB22908@dragon>
- <d30a3015-afbb-cd88-ee01-4222339a2807@baylibre.com>
- <CAOFm3uEY8+B8mhdcSLexdF8U8rq9kU2dM+ix=A_f+5kU_iR=nQ@mail.gmail.com>
-Message-ID: <118caa5c-6782-f4ca-443e-19d483171e01@baylibre.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Fri, 01 Dec 2017 10:25:38 +0100
+Subject: [PATCH] ARM64: dts: meson-axg: enable IR controller
+In-Reply-To: <20171201013612.13927-1-yixun.lan@amlogic.com>
+References: <20171201013612.13927-1-yixun.lan@amlogic.com>
+Message-ID: <1512120338.4667.4.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Philippe,
+On Fri, 2017-12-01 at 09:36 +0800, Yixun Lan wrote:
+> Enable IR remote controller which find in Amlogic's Meson-AXG SoC.
+> 
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  6 ++++++
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 14 ++++++++++++++
+>  2 files changed, 20 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> index 0864d1ff2d9b..ca676cafdbb3 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> @@ -34,3 +34,9 @@
+>  	pinctrl-0 = <&i2c1_z_pins>;
+>  	pinctrl-names = "default";
+>  };
+> +
+> +&ir {
+> +	status = "okay";
+> +	pinctrl-0 = <&remote_input_ao_pins>;
+> +	pinctrl-names = "default";
+> +};
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index 9bb85893c1b7..80d5b8c13fac 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -616,6 +616,13 @@
+>  					#gpio-cells = <2>;
+>  					gpio-ranges = <&pinctrl_aobus 0 0
+> 15>;
+>  				};
+> +
+> +				remote_input_ao_pins: remote_input_ao {
+> +					mux {
+> +						groups = "remote_input_ao";
+> +						function = "remote_input_ao";
+> +					};
+> +				};
+>  			};
+>  
+>  			i2c_AO: i2c at 5000 {
+> @@ -664,6 +671,13 @@
+>  				clock-names = "xtal", "pclk", "baud";
+>  				status = "disabled";
+>  			};
+> +
+> +			ir: ir at 8000 {
+> +				compatible = "amlogic,meson-gx-
+> ir","amlogic,meson-gxbb-ir";
 
-On 01/12/2017 10:02, Philippe Ombredanne wrote:
-> On Fri, Dec 1, 2017 at 9:54 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
->> On 30/11/2017 01:39, Shawn Guo wrote:
->>> On Wed, Nov 29, 2017 at 11:20:55AM +0100, Neil Armstrong wrote:
->>>> This patch adds support for the Variscite DART-MX6 SoM with :
->>>> - i.MX6 Quad or Dual Lite SoC
->>>> - 1Gb/2Gb LPDDR2
->>>> - 4-64 GB eMMC
->>>> - Camera Interface
->>>> - HDMI+CEC interface
->>>> - LVDS / DSI / Parallel RGB interfaces
->>>> - Ethernet RGMII interface
->>>> - On-SoM Wi-Fi/Bluetooth with WiLink wl1835 SDIO Module
->>>> - SD/MMC/SDIO interface
->>>> - USB Host + USB OTG interface
->>>> - I2C interfaces
->>>> - SPI interfaces
->>>> - PCI-Express 2.0 interface
->>>> - on-SoM Audio Codec with HP/Line-In interfaces + DMIC interface
->>>> - Digital Audio interface
->>>> - S/PDIF interface
->>>>
->>>> Product website : http://www.variscite.com/products/system-on-module-som/cortex-a9/dart-mx6-cpu-freescale-imx6
->>>>
->>>> Support is handled with a SoM-centric dtsi exporting the default interfaces
->>>> along the default pinmuxing to be enabled by the board dts file.
->>>>
->>>> Only board-independent devices like WiFi, eMMC or PMIC are enabled in the dtsi.
->>>>
->>>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
->>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>>
->>> Looks pretty good.  Only a couple of minor comments.
->>>
->>>> ---
->>>>  arch/arm/boot/dts/imx6qdl-var-dart.dtsi | 504 ++++++++++++++++++++++++++++++++
->>>>  1 file changed, 504 insertions(+)
->>>>  create mode 100644 arch/arm/boot/dts/imx6qdl-var-dart.dtsi
->>>>
->>>> diff --git a/arch/arm/boot/dts/imx6qdl-var-dart.dtsi b/arch/arm/boot/dts/imx6qdl-var-dart.dtsi
->>>> new file mode 100644
->>>> index 0000000..fd2520b
->>>> --- /dev/null
->>>> +++ b/arch/arm/boot/dts/imx6qdl-var-dart.dtsi
->>>> @@ -0,0 +1,504 @@
->>>> +/*
->>>> + * Support for Variscite DART-MX6 Module
->>>> + *
->>>> + * Copyright 2017 BayLibre, SAS
->>>> + * Author: Neil Armstrong <narmstrong@baylibre.com>
->>>> + *
->>>> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
->>>> + */
-> 
-> Should this be instead on the first line with a // comment style if
-> possible, right?
+The order is bad here (Yes the same mistake is present a *LOT* in the gx family
+- I'm preparing a patch for that). In addition, "amlogic,meson-gx-ir" is
+unmatched, undocumented and unlikely to be ever used since every compatible SoC
+will use the gxbb compatible string. You may as well drop it and just keep the
+gxbb one
 
-I just saw this right now.
-
-Damn, I just sent a v5...
-
-> 
->>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-> 
-> Thomas has sent a first doc patch [1] set and is working on an updated
-> version.  Jonathan also wrote a nice background article on the topic
-> at LWN [2].
-> 
-> Linus explained why he wants the // comment style and a first line
-> location on the list too.
-> 
-> [1] https://marc.info/?l=linux-kernel&m=151051532322831&w=2
-> [2] https://lwn.net/SubscriberLink/739183/262749cbe307ddc7/
-> 
-
-Neil
+> +				reg = <0x0 0x8000 0x0 0x20>;
+> +				interrupts = <GIC_SPI 196
+> IRQ_TYPE_EDGE_RISING>;
+> +				status = "disabled";
+> +			};
+>  		};
+>  	};
+>  };
