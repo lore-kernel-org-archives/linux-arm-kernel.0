@@ -1,49 +1,63 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  1 Dec 2017 14:44:47 +0100
-Subject: [PATCH v4 06/10] pinctrl: axp209: add programmable ADC muxing value
+Date: Fri,  1 Dec 2017 14:44:44 +0100
+Subject: [PATCH v4 03/10] dt-bindings: gpio: gpio-axp209: add pinctrl features
 In-Reply-To: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
 References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <a4f348914450705f1f784a2148559e19caf9e9fd.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <7fdc42fd2d3572069292ebe1376bb446beb4d8a9.1512135804.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare for patches that will add support for a new PMIC that has a
-different GPIO adc muxing value, add an adc_mux within axp20x_pctl
-structure and use it.
+The X-Powers AXP209 has 3 GPIOs. GPIO0/1 can each act either as a GPIO,
+an ADC or a LDO regulator. GPIO2 can only act as a GPIO.
+
+This adds the pinctrl features to the driver so GPIO0/1 can be used as
+ADC or LDO regulator.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
- drivers/pinctrl/pinctrl-axp209.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/gpio/gpio-axp209.txt | 28 ++++++++++-
+ 1 file changed, 27 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/pinctrl/pinctrl-axp209.c b/drivers/pinctrl/pinctrl-axp209.c
-index 3fae81f..504e96c 100644
---- a/drivers/pinctrl/pinctrl-axp209.c
-+++ b/drivers/pinctrl/pinctrl-axp209.c
-@@ -49,6 +49,7 @@ struct axp20x_pctrl_desc {
- 	/* Stores the pins supporting ADC function. Bit offset is pin number. */
- 	u8				adc_mask;
- 	u8				gpio_status_offset;
-+	u8				adc_mux;
+diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+index a661130..4705020 100644
+--- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
++++ b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
+@@ -1,4 +1,4 @@
+-AXP209 GPIO controller
++AXP209 GPIO & pinctrl controller
+ 
+ This driver follows the usual GPIO bindings found in
+ Documentation/devicetree/bindings/gpio/gpio.txt
+@@ -28,3 +28,29 @@ axp209: pmic at 34 {
+ 		#gpio-cells = <2>;
+ 	};
  };
- 
- struct axp20x_pinctrl_function {
-@@ -79,6 +80,7 @@ static const struct axp20x_pctrl_desc axp20x_data = {
- 	.ldo_mask = BIT(0) | BIT(1),
- 	.adc_mask = BIT(0) | BIT(1),
- 	.gpio_status_offset = 4,
-+	.adc_mux = AXP20X_MUX_ADC,
- };
- 
- static int axp20x_gpio_get_reg(unsigned offset)
-@@ -333,7 +335,7 @@ static void axp20x_build_funcs_groups(struct platform_device *pdev)
- 	 * See comment in axp20x_pmx_set_mux.
- 	 */
- 	pctl->funcs[AXP20X_FUNC_ADC].name = "adc";
--	pctl->funcs[AXP20X_FUNC_ADC].muxval = AXP20X_MUX_ADC;
-+	pctl->funcs[AXP20X_FUNC_ADC].muxval = pctl->desc->adc_mux;
- 
- 	/* Every pin supports GPIO_OUT and GPIO_IN functions */
- 	for (i = 0; i <= AXP20X_FUNC_GPIO_IN; i++) {
++
++The GPIOs can be muxed to other functions and therefore, must be a subnode of
++axp_gpio.
++
++Example:
++
++&axp_gpio {
++	gpio0_adc: gpio0-adc {
++		pins = "GPIO0";
++		function = "adc";
++	};
++};
++
++&example_node {
++	pinctrl-names = "default";
++	pinctrl-0 = <&gpio0_adc>;
++};
++
++GPIOs and their functions
++-------------------------
++
++GPIO	|	Functions
++------------------------
++GPIO0	|	gpio_in, gpio_out, ldo, adc
++GPIO1	|	gpio_in, gpio_out, ldo, adc
++GPIO2	|	gpio_in, gpio_out
 -- 
 git-series 0.9.1
