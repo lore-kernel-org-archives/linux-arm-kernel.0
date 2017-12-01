@@ -1,61 +1,106 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Fri, 01 Dec 2017 18:22:11 +0100
-Subject: [PATCH v3 0/4] Fixes for omapdrm on OpenPandora and GTA04
-In-Reply-To: <27b12bc8-2c3a-6caa-c800-158b75f80d3f@ti.com>
-References: <cover.1511884135.git.hns@goldelico.com>
- <CGME20171130105533epcas3p1839ccb7df2896e613f739e7f07a31f03@epcas3p1.samsung.com>
- <27b12bc8-2c3a-6caa-c800-158b75f80d3f@ti.com>
-Message-ID: <8663745.l6RXqWc6WO@amdc3058>
+From: steve.capper@arm.com (Steve Capper)
+Date: Fri,  1 Dec 2017 17:22:14 +0000
+Subject: [PATCH] arm64: mm: Fix pte_mkclean, pte_mkdirty semantics
+Message-ID: <20171201172214.6834-1-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 30, 2017 12:54:07 PM Tomi Valkeinen wrote:
-> On 28/11/17 17:48, H. Nikolaus Schaller wrote:
-> > Changes V3:
-> > * stay compatible with old DTB files which still use "toppoly" (suggested by Tomi Valkeinen)
-> > * replaced MODULE_ALIAS entries by MODULE_DEVICE_TABLE (suggested by Andrew F. Davis)
-> > * removed DSI VDDS patch as it has already been accepted
-> > 
-> > 2017-11-16 09:50:22: Changes V2:
-> > * replaced patch to fix DSI VDDS for OMAP3 by equivalent patch from Laurent Pinchart
-> > * keep previous compatibility option in panel driver to handle older device tree binaries
-> > 
-> > 2017-11-08 22:09:36:
-> > This patch set fixes vendor names of the panels
-> > and fixes a problem on omapdrm with enabling
-> > VDD_DSI for OMAP3 which is needed for displaying
-> > the Red and Green channel on OMAP3530 (Pandora).
-> > 
-> > H. Nikolaus Schaller (4):
-> >   omapdrm: panel: fix compatible vendor string for td028ttec1
-> >   omapdrm: panel: td028ttec1: replace MODULE_ALIAS by
-> >     MODULE_DEVICE_TABLE
-> >   DTS: GTA04: fix panel compatibility string
-> >   DTS: Pandora: fix panel compatibility string
-> > 
-> >  .../panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt}    |  4 ++--
-> >  arch/arm/boot/dts/omap3-gta04.dtsi                          |  2 +-
-> >  arch/arm/boot/dts/omap3-pandora-common.dtsi                 |  2 +-
-> >  drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c     | 13 ++++++++++++-
-> >  .../fbdev/omap2/omapfb/displays/panel-tpo-td028ttec1.c      | 12 +++++++++++-
-> >  5 files changed, 27 insertions(+), 6 deletions(-)
-> >  rename Documentation/devicetree/bindings/display/panel/{toppoly,td028ttec1.txt => tpo,td028ttec1.txt} (84%)
-> > 
-> 
-> Thanks. I have picked up patches 1 and 2.
+On systems with hardware dirty bit management, the ltp madvise09 unit
+test fails due to dirty bit information being lost and pages being
+incorrectly freed.
 
-Thanks for taking care of them (they both look fine to me).
+This was bisected to:
+	arm64: Ignore hardware dirty bit updates in ptep_set_wrprotect()
 
-> 3 can be applied when 1 & 2 are in. The change in 4 could be applied
-> independently, but it conflicts with 3.
-> 
-> Tony, how do you want to handle 3 and 4? I will push 1 and 2 to v4.16. I
-> don't think they are real issues, so I don't see a reason to push them
-> as fixes to v4.15. I think they are mostly just cleanups, and we might
-> as well wait until v4.17, but that's quite far away...
+Reverting this commit leads to a separate problem, that the unit test
+retains pages that should have been dropped due to the function
+madvise_free_pte_range(.) not cleaning pte's properly.
 
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Currently pte_mkclean only clears the software dirty bit, thus the
+following code sequence can appear:
+
+	pte = pte_mkclean(pte);
+	if (pte_dirty(pte))
+		// this condition can return true with HW DBM!
+
+This patch also adjusts pte_mkclean to set PTE_RDONLY thus effectively
+clearing both the SW and HW dirty information.
+
+In order for this to function on systems without HW DBM, we need to
+also adjust pte_mkdirty to remove the read only bit from writable pte's
+to avoid infinite fault loops.
+
+Reported-by: Bhupinder Thakur <bhupinder.thakur@linaro.org>
+Fixes: 64c26841b349 ("arm64: Ignore hardware dirty bit updates in
+ptep_set_wrprotect()")
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+---
+ arch/arm64/include/asm/pgtable.h | 33 ++++++++++++++++++---------------
+ 1 file changed, 18 insertions(+), 15 deletions(-)
+
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index b46e54c2399b..0fa7305765ab 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -135,12 +135,20 @@ static inline pte_t pte_mkwrite(pte_t pte)
+ 
+ static inline pte_t pte_mkclean(pte_t pte)
+ {
+-	return clear_pte_bit(pte, __pgprot(PTE_DIRTY));
++	pte = clear_pte_bit(pte, __pgprot(PTE_DIRTY));
++	pte = set_pte_bit(pte, __pgprot(PTE_RDONLY));
++
++	return pte;
+ }
+ 
+ static inline pte_t pte_mkdirty(pte_t pte)
+ {
+-	return set_pte_bit(pte, __pgprot(PTE_DIRTY));
++	pte = set_pte_bit(pte, __pgprot(PTE_DIRTY));
++
++	if (pte_write(pte))
++		pte = clear_pte_bit(pte, __pgprot(PTE_RDONLY));
++
++	return pte;
+ }
+ 
+ static inline pte_t pte_mkold(pte_t pte)
+@@ -628,28 +636,23 @@ static inline pmd_t pmdp_huge_get_and_clear(struct mm_struct *mm,
+ #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
+ 
+ /*
+- * ptep_set_wrprotect - mark read-only while preserving the hardware update of
+- * the Access Flag.
++ * ptep_set_wrprotect - mark read-only while trasferring potential hardware
++ * dirty status (PTE_DBM && !PTE_RDONLY) to the software PTE_DIRTY bit.
+  */
+ #define __HAVE_ARCH_PTEP_SET_WRPROTECT
+ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long address, pte_t *ptep)
+ {
+ 	pte_t old_pte, pte;
+ 
+-	/*
+-	 * ptep_set_wrprotect() is only called on CoW mappings which are
+-	 * private (!VM_SHARED) with the pte either read-only (!PTE_WRITE &&
+-	 * PTE_RDONLY) or writable and software-dirty (PTE_WRITE &&
+-	 * !PTE_RDONLY && PTE_DIRTY); see is_cow_mapping() and
+-	 * protection_map[]. There is no race with the hardware update of the
+-	 * dirty state: clearing of PTE_RDONLY when PTE_WRITE (a.k.a. PTE_DBM)
+-	 * is set.
+-	 */
+-	VM_WARN_ONCE(pte_write(*ptep) && !pte_dirty(*ptep),
+-		     "%s: potential race with hardware DBM", __func__);
+ 	pte = READ_ONCE(*ptep);
+ 	do {
+ 		old_pte = pte;
++		/*
++		 * If hardware-dirty (PTE_WRITE/DBM bit set and PTE_RDONLY
++		 * clear), set the PTE_DIRTY bit.
++		 */
++		if (pte_hw_dirty(pte))
++			pte = pte_mkdirty(pte);
+ 		pte = pte_wrprotect(pte);
+ 		pte_val(pte) = cmpxchg_relaxed(&pte_val(*ptep),
+ 					       pte_val(old_pte), pte_val(pte));
+-- 
+2.11.0
