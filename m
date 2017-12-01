@@ -1,88 +1,32 @@
-From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
-Date: Fri, 1 Dec 2017 18:40:19 +0100
-Subject: [PATCH v6 12/13] ASoC: add bindings for stm32 DFSDM filter
-In-Reply-To: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
-References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <1512150020-20335-13-git-send-email-arnaud.pouliquen@st.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 1 Dec 2017 17:40:03 +0000
+Subject: [PATCH v2 13/18] arm64: entry: Hook up entry trampoline to
+ exception vectors
+In-Reply-To: <20171201135300.novwsr5yxveeeq7m@lakrids.cambridge.arm.com>
+References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
+ <1512059986-21325-14-git-send-email-will.deacon@arm.com>
+ <20171201135300.novwsr5yxveeeq7m@lakrids.cambridge.arm.com>
+Message-ID: <20171201174002.GA8826@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings that describes audio settings to support
-Digital Filter for pulse density modulation(PDM) microphone.
+On Fri, Dec 01, 2017 at 01:53:01PM +0000, Mark Rutland wrote:
+> On Thu, Nov 30, 2017 at 04:39:41PM +0000, Will Deacon wrote:
+> >  	.macro kernel_ventry, el, label, regsize = 64
+> >  	.align 7
+> > +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> > +	.if	\el == 0
+> > +	.if	\regsize == 64
+> > +	mrs	x30, tpidrro_el0
+> > +	msr	tpidrro_el0, xzr
+> > +	.else
+> > +	mov	x30, xzr
+> 
+> I guess that's just to prevent acccidental leaks if we dump registers
+> somewhere, since we used x30 as a scratch register?
 
-Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
----
- .../devicetree/bindings/sound/st,stm32-adfsdm.txt  | 62 ++++++++++++++++++++++
- 1 file changed, 62 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
+Indeed. I don't have a concrete example, but I was worried about things
+like perf and ptrace, which might allow you to get at the AArch64 register
+state for a compat task so it felt like a good idea to zero this.
 
-diff --git a/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
-new file mode 100644
-index 0000000..2782cda
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
-@@ -0,0 +1,62 @@
-+STMicroelectronics Audio Digital Filter Sigma Delta modulators(DFSDM)
-+
-+The DFSDM allows PDM microphones capture through SPI interface. The Audio
-+interface is seems as a sub block of the DFSDM device.
-+For details on DFSDM bindings refer to ../iio/adc/st,stm32-dfsdm-adc.txt
-+
-+Required properties:
-+  - compatible: "st,stm32h7-dfsdm-dai".
-+
-+  - #sound-dai-cells : Must be equal to 0
-+
-+  - io-channels : phandle to iio dfsdm instance node.
-+
-+Example of a sound card using audio DFSDM node.
-+
-+	sound_card {
-+		compatible = "audio-graph-card";
-+
-+		dais = <&cpu_port>;
-+	};
-+
-+	dfsdm: dfsdm at 40017000 {
-+		compatible = "st,stm32h7-dfsdm";
-+		reg = <0x40017000 0x400>;
-+		clocks = <&rcc DFSDM1_CK>;
-+		clock-names = "dfsdm";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+
-+		dfsdm_adc0: dfsdm-adc at 0 {
-+			compatible = "st,stm32-dfsdm-dmic";
-+			reg = <0>;
-+			interrupts = <110>;
-+			dmas = <&dmamux1 101 0x400 0x00>;
-+			dma-names = "rx";
-+			st,adc-channels = <1>;
-+			st,adc-channel-names = "dmic0";
-+			st,adc-channel-types = "SPI_R";
-+			st,adc-channel-clk-src = "CLKOUT";
-+			st,filter-order = <5>;
-+
-+			dfsdm_dai0: dfsdm-dai {
-+				compatible = "st,stm32h7-dfsdm-dai";
-+				#sound-dai-cells = <0>;
-+				io-channels = <&dfsdm_adc0 0>;
-+				cpu_port: port {
-+				dfsdm_endpoint: endpoint {
-+					remote-endpoint = <&dmic0_endpoint>;
-+				};
-+			};
-+		};
-+	};
-+
-+	dmic0: dmic at 0 {
-+		compatible = "dmic-codec";
-+		#sound-dai-cells = <0>;
-+		port {
-+			dmic0_endpoint: endpoint {
-+				remote-endpoint = <&dfsdm_endpoint>;
-+			};
-+		};
-+	};
--- 
-2.7.4
+Will
