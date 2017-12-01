@@ -1,66 +1,38 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 1 Dec 2017 13:42:46 -0800
-Subject: [PATCH 0/4] Move DP phy switch to PHY driver
-In-Reply-To: <c6fb4d29-6c6d-7f39-3cdd-3bc42c4519a2@rock-chips.com>
-References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
- <CAD=FV=VdUhfL+_MShYynoXKQW1-KpAOsW=x+hAxGZO78rJEyeQ@mail.gmail.com>
- <c6fb4d29-6c6d-7f39-3cdd-3bc42c4519a2@rock-chips.com>
-Message-ID: <CAD=FV=Vk0fOfYXc2gGDpvoVuT8m9WGT-eJ4hOM=G5MY_Bzzpwg@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Fri, 1 Dec 2017 13:58:27 -0800
+Subject: [PATCH v6 0/2] memory: Introduce ti-emif-sram driver
+In-Reply-To: <20171201175418.GS28152@atomide.com>
+References: <1512082568-5012-1-git-send-email-d-gerlach@ti.com>
+ <20171201175418.GS28152@atomide.com>
+Message-ID: <3c3066a8-d8cf-3e5f-f7ed-43ebd7578bd1@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 12/1/2017 9:54 AM, Tony Lindgren wrote:
+> * Dave Gerlach <d-gerlach@ti.com> [171130 22:58]:
+>> This is a resend of v5 of this series found here [1]. It introduces
+>> relocatable PM handlers for the emif that are copied to sram and
+>> run from there during low power mode entry.
+>>
+>> The patches still have the previous ACKs but have a small change to
+>> accomodate a change made by Tony in commit cd57dc5a2099 ("ARM: dts:
+>> Add missing hwmod related nodes for am33xx"). If there are objections
+>> to this let me know ASAP.
+> 
+> Still looks good to me thanks.
+> 
+>> Now that a hwmod is present for the am335x EMIF, on probe fail the call to
+>> pm_runtime_put_sync causes the board to hang. In fact, this emif driver should
+>> never alter the PM state of the hardware at all through normal kernel calls, it
+>> is the job of the suspend handlers that are added, that is the whole point of
+>> this driver. Because of this, I have dropped all runtime pm calls, as any
+>> change to the PM state while the kernel is running is dangerous as we may shut
+>> of the memory controller. It makes the most sense just to drop runtime PM from
+>> the driver entirely. Besides that patch is unchanged.
+> 
+> OK makes sense to me.
+> 
+Thanks Tony. Will queue this version once rc1 is tagged.
 
-On Wed, Nov 29, 2017 at 6:27 PM, Chris Zhong <zyw@rock-chips.com> wrote:
-> Hi Doug
->
-> Thank you for mentioning this patch.
->
-> I think the focus of the discussion is: can we put the grf control bit to
-> dts.
->
-> The RK3399 has 2 Type-C phy, but only one DP controller, this "uphy_dp_sel"
->
-> can help to switch these 2 phy. So I think this bit can be considered as a
-> part of
->
-> Type-C phy, these 2 phy have different bits, just similar to other bits
-> (such as "pipe-status").
->
-> Put them to DTS file might be a accepted practice.
-
-I guess the first step would be finding the person to make a decision.
-Is that Heiko?  Olof?  Kishon?  Rob?.  As I see it there are a few
-options:
-
-1. Land this series as-is.  This makes the new bit work just like all
-the other ones next to it.  If anyone happens to try to use an old
-device tree on a new kernel they'll break.  Seems rather unlikely
-given that the whole type C PHY is not really fully functional
-upstream, but technically this is a no-no from a device tree
-perspective.
-
-2. Change the series to make this property optional.  If it's not
-there then the code behaves like it always did.  This would address
-the "compatibility" problem but likely wouldn't actually help any real
-people, and it would be extra work.
-
-3. Redo the driver to deprecate all the old offsets / bits and just
-put the table in the driver, keyed off the compatible string and base
-address if the IO memory.
-
-
-I can't make this decision.  It's up to those folks who would be
-landing the patch and I'd be happy with any of them.  What I'm less
-happy with, however, is the indecision preventing forward progress.
-We should pick one of the above things and land it.  My own personal
-bias is #1: just land the series.  No real people will be hurt and
-it's just adding another property that matches the ones next to it.
-
->From a long term perspective (AKA how I'd write the next driver like
-this) I personally lean towards to "tables in the driver, not in the
-device tree" but quite honestly I'm happy to take whatever direction
-the maintainers give.
-
-
--Doug
+Regards,
+Santosh
