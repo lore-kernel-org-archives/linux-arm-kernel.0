@@ -1,137 +1,85 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:35 +0100
-Subject: [PATCH v2 12/27] drm/sun4i: Use values calculated by atomic check
+Date: Fri,  1 Dec 2017 07:05:31 +0100
+Subject: [PATCH v2 08/27] drm/sun4i: Rename some macros in DE2 driver
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-13-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-9-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have properly clipped coordinates in plane state structure,
-use them.
+Now that some knowledge of DE2 is gained, rename or add some macros to
+make code more readable.
 
-This also fixes bug where source x and y were adjusted for negative
-value, but width and height weren't. It wasn't discovered because
-primary plane usually doesn't have negative coordinates.
+Max channel macro is removed, since it is not used and it is not clear
+if it has right value. Structures in BSP driver shows possibility of 5
+channels maximum although there is no SoC with such configuration.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_layer.c |  6 +++++
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 52 ++++++++++++++++---------------------
- 2 files changed, 28 insertions(+), 30 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c |  5 +++--
+ drivers/gpu/drm/sun4i/sun8i_mixer.h | 13 ++++++-------
+ 2 files changed, 9 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
-index 40e6b83aef3b..1eced63f365d 100644
---- a/drivers/gpu/drm/sun4i/sun8i_layer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
-@@ -69,6 +69,12 @@ static void sun8i_mixer_layer_atomic_update(struct drm_plane *plane,
- 	struct sun8i_layer *layer = plane_to_sun8i_layer(plane);
- 	struct sun8i_mixer *mixer = layer->mixer;
- 
-+	if (!plane->state->visible) {
-+		sun8i_mixer_layer_enable(mixer, layer->channel,
-+					 layer->overlay, false);
-+		return;
-+	}
-+
- 	sun8i_mixer_update_layer_coord(mixer, layer->channel,
- 				       layer->overlay, plane);
- 	sun8i_mixer_update_layer_formats(mixer, layer->channel,
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 2bf7ba1e5ba7..37fcc5ed18c5 100644
+index 23659ce1cf27..c7d4ccd605e0 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -92,28 +92,34 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
- {
- 	struct drm_plane_state *state = plane->state;
- 	struct drm_framebuffer *fb = state->fb;
-+	u32 width, height, size;
+@@ -323,8 +323,9 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
  
- 	DRM_DEBUG_DRIVER("Updating channel %d overlay %d\n", channel, overlay);
+ 	/* Initialize blender */
+-	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_FCOLOR_CTL,
+-		     SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF);
++	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PIPE_CTL,
++		     SUN8I_MIXER_BLEND_PIPE_CTL_EN(0) |
++		     SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(0));
  
-+	/*
-+	 * Same source and destination width and height are guaranteed
-+	 * by atomic check function.
-+	 */
-+	width = drm_rect_width(&state->dst);
-+	height = drm_rect_height(&state->dst);
-+	size = SUN8I_MIXER_SIZE(width, height);
-+
- 	if (plane->type == DRM_PLANE_TYPE_PRIMARY) {
- 		DRM_DEBUG_DRIVER("Primary layer, updating global size W: %u H: %u\n",
--				 state->crtc_w, state->crtc_h);
--		regmap_write(mixer->engine.regs, SUN8I_MIXER_GLOBAL_SIZE,
--			     SUN8I_MIXER_SIZE(state->crtc_w,
--					      state->crtc_h));
-+				 width, height);
-+		regmap_write(mixer->engine.regs,
-+			     SUN8I_MIXER_GLOBAL_SIZE,
-+			     size);
- 		DRM_DEBUG_DRIVER("Updating blender size\n");
- 		regmap_write(mixer->engine.regs,
- 			     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
--			     SUN8I_MIXER_SIZE(state->crtc_w,
--					      state->crtc_h));
-+			     size);
- 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTSIZE,
--			     SUN8I_MIXER_SIZE(state->crtc_w,
--					      state->crtc_h));
-+			     size);
- 		DRM_DEBUG_DRIVER("Updating channel size\n");
- 		regmap_write(mixer->engine.regs,
- 			     SUN8I_MIXER_CHAN_UI_OVL_SIZE(channel),
--			     SUN8I_MIXER_SIZE(state->crtc_w,
--					      state->crtc_h));
-+			     size);
- 	}
- 
- 	/* Set the line width */
-@@ -123,18 +129,17 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
- 		     fb->pitches[0]);
- 
- 	/* Set height and width */
--	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n",
--			 state->crtc_w, state->crtc_h);
-+	DRM_DEBUG_DRIVER("Layer size W: %u H: %u\n", width, height);
  	regmap_write(mixer->engine.regs,
- 		     SUN8I_MIXER_CHAN_UI_LAYER_SIZE(channel, overlay),
--		     SUN8I_MIXER_SIZE(state->crtc_w, state->crtc_h));
-+		     size);
+ 		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index 9b50733298b8..76f0b2bd91e2 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -16,8 +16,6 @@
  
- 	/* Set base coordinates */
- 	DRM_DEBUG_DRIVER("Layer coordinates X: %d Y: %d\n",
--			 state->crtc_x, state->crtc_y);
-+			 state->dst.x1, state->dst.y1);
- 	regmap_write(mixer->engine.regs,
- 		     SUN8I_MIXER_BLEND_ATTR_COORD(channel),
--		     SUN8I_MIXER_COORD(state->crtc_x, state->crtc_y));
-+		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
+ #include "sunxi_engine.h"
  
- 	return 0;
- }
-@@ -194,21 +199,8 @@ int sun8i_mixer_update_layer_buffer(struct sun8i_mixer *mixer, int channel,
- 	paddr = gem->paddr + fb->offsets[0];
- 
- 	/* Fixup framebuffer address for src coordinates */
--	paddr += (state->src_x >> 16) * bpp;
--	paddr += (state->src_y >> 16) * fb->pitches[0];
+-#define SUN8I_MIXER_MAX_CHAN_COUNT		4
 -
--	/*
--	 * The hardware cannot correctly deal with negative crtc
--	 * coordinates, the display is cropped to the requested size,
--	 * but the display content is not moved.
--	 * Manually move the display content by fixup the framebuffer
--	 * address when crtc_x or crtc_y is negative, like what we
--	 * have did for src_x and src_y.
--	 */
--	if (state->crtc_x < 0)
--		paddr += -state->crtc_x * bpp;
--	if (state->crtc_y < 0)
--		paddr += -state->crtc_y * fb->pitches[0];
-+	paddr += (state->src.x1 >> 16) * bpp;
-+	paddr += (state->src.y1 >> 16) * fb->pitches[0];
+ #define SUN8I_MIXER_SIZE(w, h)			(((h) - 1) << 16 | ((w) - 1))
+ #define SUN8I_MIXER_COORD(x, y)			((y) << 16 | (x))
  
- 	DRM_DEBUG_DRIVER("Setting buffer address to %pad\n", &paddr);
+@@ -26,14 +24,14 @@
+ #define SUN8I_MIXER_GLOBAL_DBUFF		0x8
+ #define SUN8I_MIXER_GLOBAL_SIZE			0xc
  
+-#define SUN8I_MIXER_GLOBAL_CTL_RT_EN		0x1
++#define SUN8I_MIXER_GLOBAL_CTL_RT_EN		BIT(0)
+ 
+-#define SUN8I_MIXER_GLOBAL_DBUFF_ENABLE		0x1
++#define SUN8I_MIXER_GLOBAL_DBUFF_ENABLE		BIT(0)
+ 
+-#define SUN8I_MIXER_BLEND_FCOLOR_CTL		0x1000
++#define SUN8I_MIXER_BLEND_PIPE_CTL		0x1000
+ #define SUN8I_MIXER_BLEND_ATTR_FCOLOR(x)	(0x1004 + 0x10 * (x) + 0x0)
+ #define SUN8I_MIXER_BLEND_ATTR_INSIZE(x)	(0x1004 + 0x10 * (x) + 0x4)
+-#define SUN8I_MIXER_BLEND_ATTR_OFFSET(x)	(0x1004 + 0x10 * (x) + 0x8)
++#define SUN8I_MIXER_BLEND_ATTR_COORD(x)		(0x1004 + 0x10 * (x) + 0x8)
+ #define SUN8I_MIXER_BLEND_ROUTE			0x1080
+ #define SUN8I_MIXER_BLEND_PREMULTIPLY		0x1084
+ #define SUN8I_MIXER_BLEND_BKCOLOR		0x1088
+@@ -45,10 +43,11 @@
+ #define SUN8I_MIXER_BLEND_CK_MIN(x)		(0x10e0 + 0x04 * (x))
+ #define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
+ 
++#define SUN8I_MIXER_BLEND_PIPE_CTL_EN(pipe)	BIT(8 + pipe)
++#define SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(pipe)	BIT(pipe)
+ /* colors are always in AARRGGBB format */
+ #define SUN8I_MIXER_BLEND_COLOR_BLACK		0xff000000
+ /* The following numbers are some still unknown magic numbers */
+-#define SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF	0x00000101
+ #define SUN8I_MIXER_BLEND_MODE_DEF		0x03010301
+ 
+ #define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
 -- 
 2.15.1
