@@ -1,57 +1,110 @@
-From: krzk@kernel.org (Krzysztof Kozlowski)
-Date: Fri, 1 Dec 2017 13:26:13 +0100
-Subject: [PATCH v2] PM / Domains: Remove obsolete "samsung,
- power-domain" check
-In-Reply-To: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
-References: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <CAJKOXPf1ta1NkC7cUi9uDaXibaZrUPRYWyaB5G_JikYsnMAQ=g@mail.gmail.com>
+From: eballetbo@gmail.com (Enric Balletbo Serra)
+Date: Fri, 1 Dec 2017 13:28:06 +0100
+Subject: [PATCH v6 01/10] arm64: dts: rockchip: Enable edp disaplay on
+ kevin
+In-Reply-To: <20171019034812.13768-2-jeffy.chen@rock-chips.com>
+References: <20171019034812.13768-1-jeffy.chen@rock-chips.com>
+ <20171019034812.13768-2-jeffy.chen@rock-chips.com>
+Message-ID: <CAFqH_52_Wkm5uY35Y+Ngh8+uVP03nDYaMgNq1rn2EDkNuaiXHg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 12:54 PM, Geert Uytterhoeven
-<geert+renesas@glider.be> wrote:
-> Currently the generic PM Domain code code checks for the presence of
-> both (generic) "power-domains" and (Samsung Exynos legacy)
-> "samsung,power-domain" properties in all device tree nodes representing
-> devices.
+Hi all,
+
+2017-10-19 5:48 GMT+02:00 Jeffy Chen <jeffy.chen@rock-chips.com>:
+> Add edp panel and enable related nodes on kevin.
 >
-> There are two issues with this:
->   1. This imposes a small boot-time penalty on all platforms using DT,
->   2. Platform-specific checks do not really belong in core framework
->      code.
+> Signed-off-by: Jeffy Chen <jeffy.chen@rock-chips.com>
+> Reviewed-by: Mark Yao <mark.yao@rock-chips.com>
 >
-> Remove the platform-specific check, as the last user of
-> "samsung,power-domain" was removed in commit 46dcf0ff0de35da8 ("ARM:
-> dts: exynos: Remove exynos4415.dtsi").  All other users were converted
-> before in commit 0da6587041363033 ("ARM: dts: convert to generic power
-> domain bindings for exynos DT").
->
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 > ---
-> This is v2 of 'PM / Domains: Restrict "samsung,power-domain" checks to
-> ARCH_EXYNOS'.
 >
-> "samsung,power-domain" was only ever used in:
->   - arch/arm/boot/dts/exynos4415.dtsi: Removed
->   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
->   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
->   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
->   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
->   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
+> Changes in v6: None
+> Changes in v5: None
 >
-> v2:
->   - Remove the check completely instead of restricting it to
->     ARCH_EXYNOS, as suggested Javier Martinez Canillas one year ago
->     ("Removing the support for the deprecated property sound sensible to me",
->     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462868.html).
-> ---
->  drivers/base/power/domain.c | 16 ++--------------
->  1 file changed, 2 insertions(+), 14 deletions(-)
+>  arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts | 29 +++++++++++++++++++++++
+>  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi      | 16 +++++++++++++
+>  2 files changed, 45 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> index a3d3cea7dc4f..bc67b19f0af5 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru-kevin.dts
+> @@ -93,6 +93,18 @@
+>                 pwm-delay-us = <10000>;
+>         };
+>
+> +       edp_panel: edp-panel {
+> +               compatible = "sharp,lq123p1jx31", "simple-panel";
+> +               backlight = <&backlight>;
+> +               power-supply = <&pp3300_disp>;
+> +
+> +               ports {
+> +                       panel_in_edp: endpoint {
+> +                               remote-endpoint = <&edp_out_panel>;
+> +                       };
+> +               };
+> +       };
+> +
+>         thermistor_ppvar_bigcpu: thermistor-ppvar-bigcpu {
+>                 compatible = "murata,ncp15wb473";
+>                 pullup-uv = <1800000>;
+> @@ -264,6 +276,23 @@ ap_i2c_dig: &i2c2 {
+>         };
+>  };
+>
+> +&edp {
+> +       status = "okay";
+> +
+> +       ports {
+> +               edp_out: port at 1 {
+> +                       reg = <1>;
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +
+> +                       edp_out_panel: endpoint at 0 {
+> +                               reg = <0>;
+> +                               remote-endpoint = <&panel_in_edp>;
+> +                       };
+> +               };
+> +       };
+> +};
+> +
+>  &ppvar_bigcpu_pwm {
+>         regulator-min-microvolt = <798674>;
+>         regulator-max-microvolt = <1302172>;
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> index 5772c52fbfd3..470105d651c2 100644
+> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
+> @@ -927,6 +927,22 @@ ap_i2c_audio: &i2c8 {
+>         dr_mode = "host";
+>  };
+>
+> +&vopb {
+> +       status = "okay";
+> +};
+> +
+> +&vopb_mmu {
+> +       status = "okay";
+> +};
+> +
+> +&vopl {
+> +       status = "okay";
+> +};
+> +
+> +&vopl_mmu {
+> +       status = "okay";
+> +};
+> +
+>  #include <arm/cros-ec-keyboard.dtsi>
+>  #include <arm/cros-ec-sbs.dtsi>
+>
+> --
+> 2.11.0
+>
 >
 
-The property was deprecated long enough and we anyway always ship DTB
-+ kernel together thus:
-Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
+I just tested this patch on top of current mainline (4.15-rc1+) and works so,
 
-Best regards,
-Krzysztof
+Tested-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
