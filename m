@@ -1,41 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 1 Dec 2017 14:04:06 +0000
-Subject: [PATCH v2 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
-Message-ID: <20171201140406.oanuaz6zvyrhp4ml@lakrids.cambridge.arm.com>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Fri,  1 Dec 2017 14:44:51 +0100
+Subject: [PATCH v4 10/10] ARM: dtsi: axp81x: set pinmux for GPIO0/1 when used
+ as LDOs
+In-Reply-To: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
+References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <afc22693e34c11231fc85a0dc6af3ffb340ba9b2.1512135804.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
+ldo_io0 and ldo_io1.
 
-On Thu, Nov 30, 2017 at 04:39:28PM +0000, Will Deacon wrote:
-> Hi again,
-> 
-> This is version two of the patches previously posted here:
-> 
->   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/542751.html
-> 
-> Changes since v1 include:
-> 
->   * Based on v4.15-rc1
->   * Trampoline moved into FIXMAP area
->   * Explicit static key replaced by cpu cap
->   * Disable SPE for userspace profiling if kernel unmapped at EL0
->   * Changed polarity of cpu feature to match config option
->   * Changed command-line option so we can force on in future if necessary
->   * Changed Falkor workaround to invalidate different page within 2MB region
->   * Reworked alternative sequences in entry.S, since the NOP slides with
->     kaiser=off were measurable
+Let's add the pinctrl properties to the said regulators.
 
-This generally looks good to me.
+Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+---
+ arch/arm/boot/dts/axp81x.dtsi | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-For patches patches 1-10, 13-15, and 17, feel free to add:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-(assuming you fix up the issue Robin spotted on patch 14).
-
-Thanks,
-Mark.
+diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+index 0ef959d..fd55b89 100644
+--- a/arch/arm/boot/dts/axp81x.dtsi
++++ b/arch/arm/boot/dts/axp81x.dtsi
+@@ -52,6 +52,16 @@
+ 		compatible = "x-powers,axp813-gpio";
+ 		gpio-controller;
+ 		#gpio-cells = <2>;
++
++		gpio0_ldo: gpio0-ldo {
++			pins = "GPIO0";
++			function = "ldo";
++		};
++
++		gpio1_ldo: gpio1-ldo {
++			pins = "GPIO1";
++			function = "ldo";
++		};
+ 	};
+ 
+ 	regulators {
+@@ -119,11 +129,15 @@
+ 		};
+ 
+ 		reg_ldo_io0: ldo-io0 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gpio0_ldo>;
+ 			/* Disable by default to avoid conflicts with GPIO */
+ 			status = "disabled";
+ 		};
+ 
+ 		reg_ldo_io1: ldo-io1 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&gpio1_ldo>;
+ 			/* Disable by default to avoid conflicts with GPIO */
+ 			status = "disabled";
+ 		};
+-- 
+git-series 0.9.1
