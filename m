@@ -1,59 +1,23 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Fri, 01 Dec 2017 17:03:54 +0100
-Subject: SCPI regressions in v4.15-rc1 on Amlogic SoCs.
-In-Reply-To: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
-References: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
-Message-ID: <1512144234.12869.4.camel@baylibre.com>
+From: w@1wt.eu (Willy Tarreau)
+Date: Fri, 1 Dec 2017 17:17:12 +0100
+Subject: Essential get_user fix missing from 3.10 aarch64
+In-Reply-To: <CAHmME9qtH1ywCS+4ebg8myxWsAUbcqG6Rcus+Nt0DBLLaMu4wQ@mail.gmail.com>
+References: <CAHmME9qtH1ywCS+4ebg8myxWsAUbcqG6Rcus+Nt0DBLLaMu4wQ@mail.gmail.com>
+Message-ID: <20171201161712.GB8949@1wt.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-11-30 at 16:21 -0800, Kevin Hilman wrote:
-> Hi Sudeep,
-> 
-> There's been a pretty major regression in v4.15-rc1 compared to v4.15
-> in SCPI causing warning splats on amlogic SoCs when cpufreq starts up
-> and tries to set the OPP for the first time[1].
-> 
-> I ran out of time to narrow it down further since there have been
-> quite a few changes since v4.14, but simply reverting
-> drivers/firmware/arm_scpi.c to its v4.14 state gets things working
-> again.
+Hi Jason,
 
-Same thing for me. One of my early libretech-cc gets completely stuck during
-boot with v4.15-rc1
+On Fri, Dec 01, 2017 at 04:57:26PM +0100, Jason A. Donenfeld wrote:
+> Not sure if there's ever going to be another stable 3.10 release, but
+> if so, this would be an important one to backport.
 
-reverting drivers/firmware/arm_scpi.c to v4.14 fixes the problem.
+Thanks for the heads up but unfortunately there's not going to be any
+more 3.10, it's been announced as EOL soon since last January or so,
+and definitely so with 3.10.108.
 
-On the u-art, we see traces that appear to be coming from the FW:
-> domain-0 init dvfs: 4 
+Your finding may interest distros still maintaining their own 3.10 though.
 
-My platform gets stuck on one of these traces with v4.15-rc1
-
-> 
-> This has been happening for awhile, and we should've caught it sooner
-> in kernelCI.org, however this warning splat still allows the kernel to
-> finish booting, so it still resulted in a PASS for the boot test.
-> That combined with the fact that we've been tracking some other
-> regressions, we didn't notice it until now.
-> 
-> Also, is this the expected result for the pre-1.0 firmware:
-> 
->     scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
-> 
-> Kevin
-> 
-> [1] Here are a few boot logs from v4.15-rc1 with the splat:
-> 
-> https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-bay
-> libre-seattle/boot-meson-gxl-s905x-khadas-vim.html
-> 
-> https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-bay
-> libre-seattle/boot-meson-gxbb-p200.html
-> 
-> https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-bay
-> libre-seattle/boot-meson-gxl-s905d-p230.html
-> 
-> _______________________________________________
-> linux-amlogic mailing list
-> linux-amlogic at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-amlogic
+Thanks,
+Willy
