@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Fri, 01 Dec 2017 13:44:03 +0000
-Subject: Applied "ASoC: nuc900: Fix platform_get_irq's error checking" to the
- asoc tree
-In-Reply-To: <0703b0d6d8ba826a42f244eec6bce71514edd563.1511970158.git.arvind.yadav.cs@gmail.com>
-Message-ID: <E1eKlbn-0001Ip-40@debutante>
+Date: Fri, 01 Dec 2017 13:43:57 +0000
+Subject: Applied "ASoC: intel: mfld: Handle return value of platform_get_irq"
+ to the asoc tree
+In-Reply-To: <3c83856bd9f1f23d1e0f5e8753d3998ae4785e37.1511970158.git.arvind.yadav.cs@gmail.com>
+Message-ID: <E1eKlbh-0001GI-3V@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   ASoC: nuc900: Fix platform_get_irq's error checking
+   ASoC: intel: mfld: Handle return value of platform_get_irq
 
 has been applied to the asoc tree at
 
@@ -34,35 +34,31 @@ to this mail.
 Thanks,
 Mark
 
->From fa8cc38165c2f6f73bf947087b3cdc5dd9b9b560 Mon Sep 17 00:00:00 2001
+>From 00a5cc096774fbc9ac979765fa820e7c8d9121c4 Mon Sep 17 00:00:00 2001
 From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Wed, 29 Nov 2017 21:47:12 +0530
-Subject: [PATCH] ASoC: nuc900: Fix platform_get_irq's error checking
+Date: Wed, 29 Nov 2017 21:47:14 +0530
+Subject: [PATCH] ASoC: intel: mfld: Handle return value of platform_get_irq
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- sound/soc/nuc900/nuc900-ac97.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ sound/soc/intel/boards/mfld_machine.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/sound/soc/nuc900/nuc900-ac97.c b/sound/soc/nuc900/nuc900-ac97.c
-index b6615affe571..5e4fbd2d3479 100644
---- a/sound/soc/nuc900/nuc900-ac97.c
-+++ b/sound/soc/nuc900/nuc900-ac97.c
-@@ -346,8 +346,8 @@ static int nuc900_ac97_drvprobe(struct platform_device *pdev)
- 	}
+diff --git a/sound/soc/intel/boards/mfld_machine.c b/sound/soc/intel/boards/mfld_machine.c
+index 6f44acfb4aae..7cb44fdde1ee 100644
+--- a/sound/soc/intel/boards/mfld_machine.c
++++ b/sound/soc/intel/boards/mfld_machine.c
+@@ -372,6 +372,8 @@ static int snd_mfld_mc_probe(struct platform_device *pdev)
  
- 	nuc900_audio->irq_num = platform_get_irq(pdev, 0);
--	if (!nuc900_audio->irq_num) {
--		ret = -EBUSY;
-+	if (nuc900_audio->irq_num <= 0) {
-+		ret = nuc900_audio->irq_num < 0 ? nuc900_audio->irq_num : -EBUSY;
- 		goto out;
- 	}
+ 	/* retrive the irq number */
+ 	irq = platform_get_irq(pdev, 0);
++	if (irq <= 0)
++		return irq < 0 ? irq : -ENODEV;
  
+ 	/* audio interrupt base of SRAM location where
+ 	 * interrupts are stored by System FW */
 -- 
 2.15.0
