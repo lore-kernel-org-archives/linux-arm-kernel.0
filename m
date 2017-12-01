@@ -1,39 +1,57 @@
-From: romain.izard.pro@gmail.com (Romain Izard)
-Date: Fri,  1 Dec 2017 13:22:33 +0100
-Subject: [PATCH v2] clocksource: tcb_clksrc: Fix clock speed message
-Message-ID: <20171201122233.21828-1-romain.izard.pro@gmail.com>
+From: krzk@kernel.org (Krzysztof Kozlowski)
+Date: Fri, 1 Dec 2017 13:26:13 +0100
+Subject: [PATCH v2] PM / Domains: Remove obsolete "samsung,
+ power-domain" check
+In-Reply-To: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
+References: <1512042868-23017-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <CAJKOXPf1ta1NkC7cUi9uDaXibaZrUPRYWyaB5G_JikYsnMAQ=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clock speed displayed at boot in an information message was 500 kHz
-too high compared to its real value. As the value is not used anywhere,
-there is no functional impact.
+On Thu, Nov 30, 2017 at 12:54 PM, Geert Uytterhoeven
+<geert+renesas@glider.be> wrote:
+> Currently the generic PM Domain code code checks for the presence of
+> both (generic) "power-domains" and (Samsung Exynos legacy)
+> "samsung,power-domain" properties in all device tree nodes representing
+> devices.
+>
+> There are two issues with this:
+>   1. This imposes a small boot-time penalty on all platforms using DT,
+>   2. Platform-specific checks do not really belong in core framework
+>      code.
+>
+> Remove the platform-specific check, as the last user of
+> "samsung,power-domain" was removed in commit 46dcf0ff0de35da8 ("ARM:
+> dts: exynos: Remove exynos4415.dtsi").  All other users were converted
+> before in commit 0da6587041363033 ("ARM: dts: convert to generic power
+> domain bindings for exynos DT").
+>
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+> ---
+> This is v2 of 'PM / Domains: Restrict "samsung,power-domain" checks to
+> ARCH_EXYNOS'.
+>
+> "samsung,power-domain" was only ever used in:
+>   - arch/arm/boot/dts/exynos4415.dtsi: Removed
+>   - arch/arm/boot/dts/exynos3250.dtsi: CONFIG_ARCH_EXYNOS3
+>   - arch/arm/boot/dts/exynos4.dtsi:    CONFIG_ARCH_EXYNOS4
+>   - arch/arm/boot/dts/exynos4x12.dtsi: CONFIG_ARCH_EXYNOS4
+>   - arch/arm/boot/dts/exynos5250.dtsi: CONFIG_ARCH_EXYNOS5
+>   - arch/arm/boot/dts/exynos5420.dtsi: CONFIG_ARCH_EXYNOS5
+>
+> v2:
+>   - Remove the check completely instead of restricting it to
+>     ARCH_EXYNOS, as suggested Javier Martinez Canillas one year ago
+>     ("Removing the support for the deprecated property sound sensible to me",
+>     http://lists.infradead.org/pipermail/linux-arm-kernel/2016-October/462868.html).
+> ---
+>  drivers/base/power/domain.c | 16 ++--------------
+>  1 file changed, 2 insertions(+), 14 deletions(-)
+>
 
-Fix the rounding formula to display the correct value.
+The property was deprecated long enough and we anyway always ship DTB
++ kernel together thus:
+Acked-by: Krzysztof Kozlowski <krzk@kernel.org>
 
-Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
----
-v2: rebase over v4.15-rc1
-
-There is no specified maintainer for this file, only supporters.
-Nicolas, could you pick this through the at91 tree as the TCB block
-is an AT91 peripheral ?
-
- drivers/clocksource/tcb_clksrc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/clocksource/tcb_clksrc.c b/drivers/clocksource/tcb_clksrc.c
-index 9de47d4d2d9e..43f4d5c4d6fa 100644
---- a/drivers/clocksource/tcb_clksrc.c
-+++ b/drivers/clocksource/tcb_clksrc.c
-@@ -384,7 +384,7 @@ static int __init tcb_clksrc_init(void)
- 
- 	printk(bootinfo, clksrc.name, CONFIG_ATMEL_TCB_CLKSRC_BLOCK,
- 			divided_rate / 1000000,
--			((divided_rate + 500000) % 1000000) / 1000);
-+			((divided_rate % 1000000) + 500) / 1000);
- 
- 	if (tc->tcb_config && tc->tcb_config->counter_width == 32) {
- 		/* use apropriate function to read 32 bit counter */
--- 
-2.14.1
+Best regards,
+Krzysztof
