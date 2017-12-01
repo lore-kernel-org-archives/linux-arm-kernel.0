@@ -1,32 +1,158 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Fri,  1 Dec 2017 08:49:34 +0100
-Subject: [PATCH v5 1/5] dt-bindings: define vendor prefix for Wi2Wi, Inc.
+Date: Fri,  1 Dec 2017 08:49:38 +0100
+Subject: [PATCH v5 5/5] misc serdev: w2sg0004: add debugging code and Kconfig
 In-Reply-To: <cover.1512114576.git.hns@goldelico.com>
 References: <cover.1512114576.git.hns@goldelico.com>
-Message-ID: <876647948fceb763a0b584b70c3805dec562072e.1512114576.git.hns@goldelico.com>
+Message-ID: <5816bfb9e7cab68591c133e20696d6188ebe70de.1512114577.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce vendor prefix for Wi2Wi, Inc. for W2SG00x4 GPS modules
-and W2CBW003 Bluetooth/WiFi combo (CSR/Marvell).
+This allows to set CONFIG_W2SG0004_DEBUG which will
+make the driver report more activities and it will turn on the
+GPS module during boot while the driver assumes that it
+is off. This can be used to debug the correct functioning of
+the hardware. Therefore we add it as an option to the driver
+because we think it is of general use (and a little tricky to
+add by system testers).
+
+Normally it should be off.
 
 Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
-Acked-by: Rob Herring <robh@kernel.org>
 ---
- Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/misc/Kconfig    |  8 ++++++++
+ drivers/misc/w2sg0004.c | 37 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 45 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 0994bdd82cd3..879f1d9291cd 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -382,6 +382,7 @@ voipac	Voipac Technologies s.r.o.
- wd	Western Digital Corp.
- wetek	WeTek Electronics, limited.
- wexler	Wexler
-+wi2wi	Wi2Wi, Inc.
- winbond Winbond Electronics corp.
- winstar	Winstar Display Corp.
- wlf	Wolfson Microelectronics
+diff --git a/drivers/misc/Kconfig b/drivers/misc/Kconfig
+index a3b11016ed2b..ad6e60f0cc8c 100644
+--- a/drivers/misc/Kconfig
++++ b/drivers/misc/Kconfig
+@@ -518,4 +518,12 @@ config W2SG0004
+ 	  is opened/closed.
+ 	  It also provides a rfkill gps name to control the LNA power.
+ 
++config W2SG0004_DEBUG
++	bool "W2SG0004 on/off debugging"
++	depends on W2SG0004
++	help
++	  Enable driver debugging mode of W2SG0004 GPS. If you say y here
++	  this will turn on the module and you can check if it is turned
++	  off by the driver.
++
+ endmenu
+diff --git a/drivers/misc/w2sg0004.c b/drivers/misc/w2sg0004.c
+index 6bfd12eb8e02..82c708fce510 100644
+--- a/drivers/misc/w2sg0004.c
++++ b/drivers/misc/w2sg0004.c
+@@ -26,6 +26,10 @@
+  *
+  */
+ 
++#ifdef CONFIG_W2SG0004_DEBUG
++#define DEBUG 1
++#endif
++
+ #include <linux/delay.h>
+ #include <linux/err.h>
+ #include <linux/interrupt.h>
+@@ -256,6 +260,7 @@ static int w2sg_tty_install(struct tty_driver *driver, struct tty_struct *tty)
+ 	pr_debug("%s() tty = %p\n", __func__, tty);
+ 
+ 	data = w2sg_get_by_minor(tty->index);
++	pr_debug("%s() data = %p\n", __func__, data);
+ 
+ 	if (!data)
+ 		return -ENODEV;
+@@ -342,6 +347,8 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 	if (data == NULL)
+ 		return -ENOMEM;
+ 
++	pr_debug("w2sg serdev_device_set_drvdata\n");
++
+ 	serdev_device_set_drvdata(serdev, data);
+ 
+ 	data->on_off_gpio = of_get_named_gpio_flags(serdev->dev.of_node,
+@@ -375,6 +382,8 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 
+ 	INIT_DELAYED_WORK(&data->work, toggle_work);
+ 
++	pr_debug("w2sg devm_gpio_request\n");
++
+ 	err = devm_gpio_request(&serdev->dev, data->on_off_gpio,
+ 				"w2sg0004-on-off");
+ 	if (err < 0)
+@@ -388,6 +397,8 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 	serdev_device_set_baudrate(data->uart, 9600);
+ 	serdev_device_set_flow_control(data->uart, false);
+ 
++	pr_debug("w2sg rfkill_alloc\n");
++
+ 	rf_kill = rfkill_alloc("GPS", &serdev->dev, RFKILL_TYPE_GPS,
+ 				&w2sg0004_rfkill_ops, data);
+ 	if (rf_kill == NULL) {
+@@ -395,6 +406,8 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 		goto err_rfkill;
+ 	}
+ 
++	pr_debug("w2sg register rfkill\n");
++
+ 	err = rfkill_register(rf_kill);
+ 	if (err) {
+ 		dev_err(&serdev->dev, "Cannot register rfkill device\n");
+@@ -403,6 +416,8 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 
+ 	data->rf_kill = rf_kill;
+ 
++	pr_debug("w2sg alloc_tty_driver\n");
++
+ 	/* allocate the tty driver */
+ 	data->tty_drv = alloc_tty_driver(1);
+ 	if (!data->tty_drv)
+@@ -428,6 +443,8 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 	 */
+ 	tty_set_operations(data->tty_drv, &w2sg_serial_ops);
+ 
++	pr_debug("w2sg tty_register_driver\n");
++
+ 	/* register the tty driver */
+ 	err = tty_register_driver(data->tty_drv);
+ 	if (err) {
+@@ -443,9 +460,27 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 	tty_port_init(&data->port);
+ 	data->port.ops = &w2sg_port_ops;
+ 
++	pr_debug("w2sg call tty_port_register_device\n");
++
+ 	data->dev = tty_port_register_device(&data->port,
+ 			data->tty_drv, minor, &serdev->dev);
+ 
++	pr_debug("w2sg tty_port_register_device -> %p\n", data->dev);
++	pr_debug("w2sg port.tty = %p\n", data->port.tty);
++
++	pr_debug("w2sg probed\n");
++
++#ifdef CONFIG_W2SG0004_DEBUG
++	pr_debug("w2sg DEBUGGING MODE enabled\n");
++	/* turn on for debugging rx notifications */
++	pr_debug("w2sg power gpio ON\n");
++	gpio_set_value_cansleep(data->on_off_gpio, 1);
++	mdelay(100);
++	pr_debug("w2sg power gpio OFF\n");
++	gpio_set_value_cansleep(data->on_off_gpio, 0);
++	mdelay(300);
++#endif
++
+ 	/* keep off until user space requests the device */
+ 	w2sg_set_power(data, false);
+ 
+@@ -455,6 +490,8 @@ static int w2sg_probe(struct serdev_device *serdev)
+ 	rfkill_destroy(rf_kill);
+ 	serdev_device_close(data->uart);
+ out:
++	pr_debug("w2sg error %d\n", err);
++
+ 	return err;
+ }
+ 
 -- 
 2.12.2
