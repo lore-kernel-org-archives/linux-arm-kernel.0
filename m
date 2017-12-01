@@ -1,42 +1,85 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 1 Dec 2017 18:14:56 +0000
-Subject: [PATCH v2 00/18] arm64: Unmap the kernel whilst running in
- userspace (KAISER)
-In-Reply-To: <f86ac529-d763-9f90-1ced-b8a28f545582@linux.intel.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <20171201140406.oanuaz6zvyrhp4ml@lakrids.cambridge.arm.com>
- <20171201175026.GB8826@arm.com>
- <20171201175812.n6ht7h52j3z4pgw2@lakrids.cambridge.arm.com>
- <f86ac529-d763-9f90-1ced-b8a28f545582@linux.intel.com>
-Message-ID: <20171201181456.GE8826@arm.com>
+Date: Fri, 1 Dec 2017 18:23:35 +0000
+Subject: [GIT PULL] arm64: fixes for -rc2
+Message-ID: <20171201182335.GF8826@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 10:02:43AM -0800, Dave Hansen wrote:
-> On 12/01/2017 09:58 AM, Mark Rutland wrote:
-> > On Fri, Dec 01, 2017 at 05:50:26PM +0000, Will Deacon wrote:
-> >> On Fri, Dec 01, 2017 at 02:04:06PM +0000, Mark Rutland wrote:
-> >>> On Thu, Nov 30, 2017 at 04:39:28PM +0000, Will Deacon wrote:
-> >> Thanks for going through this. Do you have any ideas about what we could
-> >> rename the command-line option to? I'll get us started:
-> >>
-> >>   - kaiser=
-> >>   - hidekernel=
-> >>   - unmapkernel=
-> >>   - hardenkaslr=
-> >>   - swuan=
-> > Off all of these, I think "unmapkernel" is the clear winner, since it
-> > says what it does in the tin (even if it misses the when).
-> > 
-> > I'll have a think over the weekend.
-> 
-> On the x86 side we've been leaning toward renaming kaiser to something
-> like "user pagetable isolation", so the boot parameter is something like
-> "noupti".
-> 
-> But I think the consensus is definitely to get rid of "kaiser".
+Hi Linus,
 
-Ok, good. I'm happy to follow your lead on the name if it's likely to be
-resolved in the next week or so.
+Please pull the following arm64 fixes for 4.15-rc2. The critical one here
+is a fix for fpsimd register corruption across signals which was introduced
+by the SVE support code (the register files overlap), but the others are
+worth having as well.
+
+Summary in the tag.
+
+Cheers,
 
 Will
+
+--->8
+
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to 3a33c7605750fb6a87613044d16b1455e482414d:
+
+  arm64: context: Fix comments and remove pointless smp_wmb() (2017-12-01 13:05:08 +0000)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Fix FP register corruption when SVE is not available or in use
+
+- Fix out-of-tree module build failure when CONFIG_ARM64_MODULE_PLTS=y
+
+- Missing 'const' generating errors with LTO builds
+
+- Remove unsupported events from Cortex-A73 PMU description
+
+- Removal of stale and incorrect comments
+
+----------------------------------------------------------------
+Ard Biesheuvel (2):
+      arm64: module-plts: factor out PLT generation code for ftrace
+      arm64: ftrace: emit ftrace-mod.o contents through code
+
+Dave Martin (1):
+      arm64: fpsimd: Fix failure to restore FPSIMD state after signals
+
+Jinbum Park (1):
+      arm64: pgd: Mark pgd_cache as __ro_after_init
+
+Mark Rutland (1):
+      arm64: mm: cleanup stale AIVIVT references
+
+Will Deacon (1):
+      arm64: context: Fix comments and remove pointless smp_wmb()
+
+Xu YiPing (1):
+      arm64: perf: remove unsupported events for Cortex-A73
+
+Yury Norov (1):
+      arm64: cpu_ops: Add missing 'const' qualifiers
+
+ arch/arm64/Makefile                 |  3 ---
+ arch/arm64/include/asm/cacheflush.h |  2 +-
+ arch/arm64/include/asm/module.h     | 46 +++++++++++++++++++++++++++++++++-
+ arch/arm64/kernel/Makefile          |  3 ---
+ arch/arm64/kernel/cpu_ops.c         |  6 ++---
+ arch/arm64/kernel/fpsimd.c          |  6 ++---
+ arch/arm64/kernel/ftrace-mod.S      | 18 -------------
+ arch/arm64/kernel/ftrace.c          | 14 ++++++-----
+ arch/arm64/kernel/module-plts.c     | 50 +++++++++++--------------------------
+ arch/arm64/kernel/module.lds        |  1 +
+ arch/arm64/kernel/perf_event.c      |  6 -----
+ arch/arm64/mm/context.c             | 28 ++++++++++++---------
+ arch/arm64/mm/pgd.c                 |  2 +-
+ 13 files changed, 92 insertions(+), 93 deletions(-)
+ delete mode 100644 arch/arm64/kernel/ftrace-mod.S
