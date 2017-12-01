@@ -1,156 +1,47 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Dec 2017 17:24:40 -0200
-Subject: [PATCH 07/12] ARM: dts: imx6qdl-aristainetos: Move display node out
- of 'soc'
+Date: Fri,  1 Dec 2017 17:24:43 -0200
+Subject: [PATCH 10/12] ARM: dts: imx6q-h100: Remove unneeded unit address
 In-Reply-To: <1512156285-18451-1-git-send-email-festevam@gmail.com>
 References: <1512156285-18451-1-git-send-email-festevam@gmail.com>
-Message-ID: <1512156285-18451-7-git-send-email-festevam@gmail.com>
+Message-ID: <1512156285-18451-10-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-Move disp0 node from soc node to root node.
+Remove the unneeded unit address for the port nodes in order to fix
+the following build warnings with W=1:
 
-disp0 node does not have any register properties and thus
-shouldn't be placed on the bus.
+arch/arm/boot/dts/imx6q-h100.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/i2c at 21a0000/tc358743 at f/port at 0 has a unit name, but no reg property
+arch/arm/boot/dts/imx6q-h100.dtb: Warning (unit_address_vs_reg): Node /soc/aips-bus at 2100000/mipi at 21dc000/port at 0 has a unit name, but no reg property
 
-This fixes the following build warnings with W=1:
-
-arch/arm/boot/dts/imx6dl-aristainetos_4.dtb: Warning (simple_bus_reg): Node /soc/disp0 missing or empty reg/ranges property
-
-Cc: Heiko Schocher <hs@denx.de>
+Cc: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx6dl-aristainetos_4.dts | 50 ++++++++++++++---------------
- arch/arm/boot/dts/imx6dl-aristainetos_7.dts | 48 +++++++++++++--------------
- 2 files changed, 47 insertions(+), 51 deletions(-)
+ arch/arm/boot/dts/imx6q-h100.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx6dl-aristainetos_4.dts b/arch/arm/boot/dts/imx6dl-aristainetos_4.dts
-index cc418ce..3c9f4af 100644
---- a/arch/arm/boot/dts/imx6dl-aristainetos_4.dts
-+++ b/arch/arm/boot/dts/imx6dl-aristainetos_4.dts
-@@ -31,35 +31,33 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
+diff --git a/arch/arm/boot/dts/imx6q-h100.dts b/arch/arm/boot/dts/imx6q-h100.dts
+index 743c11f..cc1ce46 100644
+--- a/arch/arm/boot/dts/imx6q-h100.dts
++++ b/arch/arm/boot/dts/imx6q-h100.dts
+@@ -205,7 +205,7 @@
+ 		reset-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
+ 		/* IRQ has a wrong pull resistor which renders it useless  */
  
--	soc {
--		display0: disp0 {
--			compatible = "fsl,imx-parallel-display";
--			interface-pix-fmt = "rgb24";
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_ipu_disp>;
--			status = "okay";
-+	display0: disp0 {
-+		compatible = "fsl,imx-parallel-display";
-+		interface-pix-fmt = "rgb24";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp>;
-+		status = "okay";
- 
--			display-timings {
--				480x800p60 {
--					native-mode;
--					clock-frequency = <30000000>;
--					hactive = <480>;
--					vactive = <800>;
--					hfront-porch = <59>;
--					hback-porch = <10>;
--					hsync-len = <10>;
--					vback-porch = <15>;
--					vfront-porch = <15>;
--					vsync-len = <15>;
--					hsync-active = <1>;
--					vsync-active = <1>;
--				};
-+		display-timings {
-+			480x800p60 {
-+				native-mode;
-+				clock-frequency = <30000000>;
-+				hactive = <480>;
-+				vactive = <800>;
-+				hfront-porch = <59>;
-+				hback-porch = <10>;
-+				hsync-len = <10>;
-+				vback-porch = <15>;
-+				vfront-porch = <15>;
-+				vsync-len = <15>;
-+				hsync-active = <1>;
-+				vsync-active = <1>;
- 			};
-+		};
- 
--			port {
--				display0_in: endpoint {
--					remote-endpoint = <&ipu1_di0_disp0>;
--				};
+-		port at 0 {
 +		port {
-+			display0_in: endpoint {
-+				remote-endpoint = <&ipu1_di0_disp0>;
- 			};
- 		};
- 	};
-diff --git a/arch/arm/boot/dts/imx6dl-aristainetos_7.dts b/arch/arm/boot/dts/imx6dl-aristainetos_7.dts
-index 126ff96..96cd835 100644
---- a/arch/arm/boot/dts/imx6dl-aristainetos_7.dts
-+++ b/arch/arm/boot/dts/imx6dl-aristainetos_7.dts
-@@ -20,34 +20,32 @@
- 		reg = <0x10000000 0x40000000>;
- 	};
+ 			tc358743_out: endpoint {
+ 				remote-endpoint = <&mipi_csi2_in>;
+ 				data-lanes = <1 2 3 4>;
+@@ -348,7 +348,7 @@
+ &mipi_csi {
+ 	status = "okay";
  
--	soc {
--		display0: disp0 {
--			compatible = "fsl,imx-parallel-display";
--			interface-pix-fmt = "rgb24";
--			pinctrl-names = "default";
--			pinctrl-0 = <&pinctrl_ipu_disp>;
--			status = "okay";
-+	display0: disp0 {
-+		compatible = "fsl,imx-parallel-display";
-+		interface-pix-fmt = "rgb24";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_ipu_disp>;
-+		status = "okay";
- 
--			display-timings {
--				800x480p60 {
--					native-mode;
--					clock-frequency = <33246000>;
--					hactive = <800>;
--					vactive = <480>;
--					hfront-porch = <88>;
--					hback-porch = <88>;
--					hsync-len = <80>;
--					vback-porch = <10>;
--					vfront-porch = <10>;
--					vsync-len = <25>;
--					vsync-active = <1>;
--				};
-+		display-timings {
-+			800x480p60 {
-+				native-mode;
-+				clock-frequency = <33246000>;
-+				hactive = <800>;
-+				vactive = <480>;
-+				hfront-porch = <88>;
-+				hback-porch = <88>;
-+				hsync-len = <80>;
-+				vback-porch = <10>;
-+				vfront-porch = <10>;
-+				vsync-len = <25>;
-+				vsync-active = <1>;
- 			};
-+		};
- 
--			port {
--				display0_in: endpoint {
--					remote-endpoint = <&ipu1_di0_disp0>;
--				};
-+		port {
-+			display0_in: endpoint {
-+				remote-endpoint = <&ipu1_di0_disp0>;
- 			};
- 		};
- 	};
+-	port at 0 {
++	port {
+ 		mipi_csi2_in: endpoint {
+ 			remote-endpoint = <&tc358743_out>;
+ 			data-lanes = <1 2 3 4>;
 -- 
 2.7.4
