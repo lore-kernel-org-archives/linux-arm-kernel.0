@@ -1,36 +1,34 @@
 From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Fri,  1 Dec 2017 08:41:21 +0100
-Subject: [PATCH v4 0/2] Fixes for omapdrm on OpenPandora and GTA04
-Message-ID: <cover.1512114082.git.hns@goldelico.com>
+Date: Fri,  1 Dec 2017 08:41:22 +0100
+Subject: [PATCH v4 1/2] DTS: GTA04: improve panel compatibility string
+In-Reply-To: <cover.1512114082.git.hns@goldelico.com>
+References: <cover.1512114082.git.hns@goldelico.com>
+Message-ID: <280160905017f67c91b96bf38ea9b6094ec277c3.1512114082.git.hns@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Changes V4:
-* removed already accepted panel driver patches
-* reworded commit subject to clarify
+Official vendor string is now "tpo" and not "toppoly".
 
-2017-11-28 16:49:00: Changes V3:
-* stay compatible with old DTB files which still use "toppoly" (suggested by Tomi Valkeinen)
-* replaced MODULE_ALIAS entries by MODULE_DEVICE_TABLE (suggested by Andrew F. Davis)
-* removed DSI VDDS patch as it has already been accepted
+Requires patch "omapdrm: panel: fix compatible vendor string for td028ttec1"
+so that the driver understands both.
 
-2017-11-16 09:50:22: Changes V2:
-* replaced patch to fix DSI VDDS for OMAP3 by equivalent patch from Laurent Pinchart
-* keep previous compatibility option in panel driver to handle older device tree binaries
+Signed-off-by: H. Nikolaus Schaller <hns@goldelico.com>
+---
+ arch/arm/boot/dts/omap3-gta04.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-2017-11-08 22:09:36:
-This patch set fixes vendor names of the panels
-and fixes a problem on omapdrm with enabling
-VDD_DSI for OMAP3 which is needed for displaying
-the Red and Green channel on OMAP3530 (Pandora).
-
-H. Nikolaus Schaller (2):
-  DTS: GTA04: improve panel compatibility string
-  DTS: Pandora: fix panel compatibility string
-
- arch/arm/boot/dts/omap3-gta04.dtsi          | 2 +-
- arch/arm/boot/dts/omap3-pandora-common.dtsi | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
+diff --git a/arch/arm/boot/dts/omap3-gta04.dtsi b/arch/arm/boot/dts/omap3-gta04.dtsi
+index 4504908c23fe..ec27ed67a22a 100644
+--- a/arch/arm/boot/dts/omap3-gta04.dtsi
++++ b/arch/arm/boot/dts/omap3-gta04.dtsi
+@@ -86,7 +86,7 @@
+ 
+ 		/* lcd panel */
+ 		lcd: td028ttec1 at 0 {
+-			compatible = "toppoly,td028ttec1";
++			compatible = "tpo,td028ttec1";
+ 			reg = <0>;
+ 			spi-max-frequency = <100000>;
+ 			spi-cpol;
 -- 
 2.12.2
