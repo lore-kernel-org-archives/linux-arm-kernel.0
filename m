@@ -1,182 +1,68 @@
-From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:46 +0100
-Subject: [PATCH v2 23/27] drm/sun4i: Add DE2 CSC library
-In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
-References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-24-jernej.skrabec@siol.net>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 1 Dec 2017 11:43:11 +0530
+Subject: [PATCH 4/4] PCI: dwc: pci-dra7xx: Fix legacy IRQ handling
+In-Reply-To: <20171201061311.16691-1-vigneshr@ti.com>
+References: <20171201061311.16691-1-vigneshr@ti.com>
+Message-ID: <20171201061311.16691-5-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-DE2 have many CSC units - channel input CSC, channel output CSC and
-mixer output CSC and maybe more.
+Legacy INTD IRQ handling is broken on dra7xx due to fact that driver
+uses hwirq in range of 1-4 for INTA, INTD whereas IRQ domain is of size
+4 which is numbered 0-3. Therefore when INTD IRQ line is used with
+pci-dra7xx driver following warning is seen:
 
-Fortunately, they have all same register layout, only base offsets
-differs.
+       WARNING: CPU: 0 PID: 1 at kernel/irq/irqdomain.c:342 irq_domain_associate+0x12c/0x1c4
+       error: hwirq 0x4 is too large for dummy
 
-Add support only for channel output CSC for now.
+Fix this by using pci_irqd_intx_xlate() helper to translate the INTx 1-4
+range into the 0-3 as done in other PCIe drivers.
 
-Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
+Also, iterate over all the INTx bits and call their respective IRQ
+handlers before clearing the status register.
+
+Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
+Reported-by: Chris Welch <Chris.Welch@viavisolutions.com>
+Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- drivers/gpu/drm/sun4i/Makefile    |  2 +-
- drivers/gpu/drm/sun4i/sun8i_csc.c | 93 +++++++++++++++++++++++++++++++++++++++
- drivers/gpu/drm/sun4i/sun8i_csc.h | 36 +++++++++++++++
- 3 files changed, 130 insertions(+), 1 deletion(-)
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.c
- create mode 100644 drivers/gpu/drm/sun4i/sun8i_csc.h
+ drivers/pci/dwc/pci-dra7xx.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-index a458ddbf4a8e..82a6ac57fbe3 100644
---- a/drivers/gpu/drm/sun4i/Makefile
-+++ b/drivers/gpu/drm/sun4i/Makefile
-@@ -11,7 +11,7 @@ sun4i-drm-hdmi-y		+= sun4i_hdmi_tmds_clk.o
+diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
+index 53f721d1cc40..59e8de34cec6 100644
+--- a/drivers/pci/dwc/pci-dra7xx.c
++++ b/drivers/pci/dwc/pci-dra7xx.c
+@@ -226,6 +226,7 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
  
- sun8i-mixer-y			+= sun8i_mixer.o sun8i_ui_layer.o \
- 				   sun8i_vi_layer.o sun8i_ui_scaler.o \
--				   sun8i_vi_scaler.o
-+				   sun8i_vi_scaler.o sun8i_csc.o
+ static const struct irq_domain_ops intx_domain_ops = {
+ 	.map = dra7xx_pcie_intx_map,
++	.xlate = pci_irqd_intx_xlate,
+ };
  
- sun4i-tcon-y			+= sun4i_crtc.o
- sun4i-tcon-y			+= sun4i_dotclock.o
-diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.c b/drivers/gpu/drm/sun4i/sun8i_csc.c
-new file mode 100644
-index 000000000000..b14925b40ccf
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun8i_csc.c
-@@ -0,0 +1,93 @@
-+/*
-+ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#include <drm/drmP.h>
-+
-+#include "sun8i_csc.h"
-+#include "sun8i_mixer.h"
-+
-+static const u32 ccsc_base[2][2] = {
-+	{CCSC00_OFFSET, CCSC01_OFFSET},
-+	{CCSC10_OFFSET, CCSC11_OFFSET},
-+};
-+
-+/*
-+ * Factors are in two's complement format, 10 bits for fractinal part.
-+ * First tree values in each line are multiplication factor and last
-+ * value is constant, which is added at the end.
-+ */
-+static const u32 yuv2rgb[] = {
-+	0x000004A8, 0x00000000, 0x00000662, 0xFFFC845A,
-+	0x000004A8, 0xFFFFFE6F, 0xFFFFFCBF, 0x00021DF4,
-+	0x000004A8, 0x00000813, 0x00000000, 0xFFFBAC4A,
-+};
-+
-+static const u32 yvu2rgb[] = {
-+	0x000004A8, 0x00000662, 0x00000000, 0xFFFC845A,
-+	0x000004A8, 0xFFFFFCBF, 0xFFFFFE6F, 0x00021DF4,
-+	0x000004A8, 0x00000000, 0x00000813, 0xFFFBAC4A,
-+};
-+
-+static void sun8i_csc_set_coefficients(struct regmap *map, u32 base,
-+				       enum sun8i_csc_mode mode)
-+{
-+	const u32 *table;
-+	int i, data;
-+
-+	switch (mode) {
-+	case SUN8I_CSC_MODE_YUV2RGB:
-+		table = yuv2rgb;
-+		break;
-+	case SUN8I_CSC_MODE_YVU2RGB:
-+		table = yvu2rgb;
-+		break;
-+	default:
-+		DRM_WARN("Wrong CSC mode specified.\n");
-+		return;
-+	}
-+
-+	for (i = 0; i < 12; i++) {
-+		data = table[i];
-+		/* For some reason, 0x200 must be added to constant parts */
-+		if (((i + 1) & 3) == 0)
-+			data += 0x200;
-+		regmap_write(map, SUN8I_CSC_COEFF(base, i), data);
-+	}
-+}
-+
-+static void sun8i_csc_enable(struct regmap *map, u32 base, bool enable)
-+{
-+	u32 val;
-+
-+	if (enable)
-+		val = SUN8I_CSC_CTRL_EN;
-+	else
-+		val = 0;
-+
-+	regmap_update_bits(map, SUN8I_CSC_CTRL(base), SUN8I_CSC_CTRL_EN, val);
-+}
-+
-+void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
-+				     enum sun8i_csc_mode mode)
-+{
-+	u32 base;
-+
-+	base = ccsc_base[mixer->cfg->ccsc][layer];
-+
-+	sun8i_csc_set_coefficients(mixer->engine.regs, base, mode);
-+}
-+
-+void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable)
-+{
-+	u32 base;
-+
-+	base = ccsc_base[mixer->cfg->ccsc][layer];
-+
-+	sun8i_csc_enable(mixer->engine.regs, base, enable);
-+}
-diff --git a/drivers/gpu/drm/sun4i/sun8i_csc.h b/drivers/gpu/drm/sun4i/sun8i_csc.h
-new file mode 100644
-index 000000000000..880e8fbb0855
---- /dev/null
-+++ b/drivers/gpu/drm/sun4i/sun8i_csc.h
-@@ -0,0 +1,36 @@
-+/*
-+ * Copyright (C) Jernej Skrabec <jernej.skrabec@siol.net>
-+ *
-+ * This program is free software; you can redistribute it and/or
-+ * modify it under the terms of the GNU General Public License as
-+ * published by the Free Software Foundation; either version 2 of
-+ * the License, or (at your option) any later version.
-+ */
-+
-+#ifndef _SUN8I_CSC_H_
-+#define _SUN8I_CSC_H_
-+
-+struct sun8i_mixer;
-+
-+/* VI channel CSC units offsets */
-+#define CCSC00_OFFSET 0xAA050
-+#define CCSC01_OFFSET 0xFA000
-+#define CCSC10_OFFSET 0xA0000
-+#define CCSC11_OFFSET 0xF0000
-+
-+#define SUN8I_CSC_CTRL(base)		(base + 0x0)
-+#define SUN8I_CSC_COEFF(base, i)	(base + 0x10 + 4 * i)
-+
-+#define SUN8I_CSC_CTRL_EN		BIT(0)
-+
-+enum sun8i_csc_mode {
-+	SUN8I_CSC_MODE_OFF,
-+	SUN8I_CSC_MODE_YUV2RGB,
-+	SUN8I_CSC_MODE_YVU2RGB,
-+};
-+
-+void sun8i_csc_set_ccsc_coefficients(struct sun8i_mixer *mixer, int layer,
-+				     enum sun8i_csc_mode mode);
-+void sun8i_csc_enable_ccsc(struct sun8i_mixer *mixer, int layer, bool enable);
-+
-+#endif
+ static int dra7xx_pcie_init_irq_domain(struct pcie_port *pp)
+@@ -256,7 +257,8 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
+ 	struct dra7xx_pcie *dra7xx = arg;
+ 	struct dw_pcie *pci = dra7xx->pci;
+ 	struct pcie_port *pp = &pci->pp;
+-	u32 reg;
++	unsigned long reg;
++	u32 virq, bit;
+ 
+ 	reg = dra7xx_pcie_readl(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI);
+ 
+@@ -268,8 +270,11 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
+ 	case INTB:
+ 	case INTC:
+ 	case INTD:
+-		generic_handle_irq(irq_find_mapping(dra7xx->irq_domain,
+-						    ffs(reg)));
++		for_each_set_bit(bit, &reg, PCI_NUM_INTX) {
++			virq = irq_find_mapping(dra7xx->irq_domain, bit);
++			if (virq)
++				generic_handle_irq(virq);
++		}
+ 		break;
+ 	}
+ 
 -- 
-2.15.1
+2.15.0
