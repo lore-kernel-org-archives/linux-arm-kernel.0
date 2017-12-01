@@ -1,37 +1,33 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Thu, 30 Nov 2017 16:21:13 -0800
-Subject: SCPI regressions in v4.15-rc1 on Amlogic SoCs.
-Message-ID: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
+Date: Thu, 30 Nov 2017 16:22:21 -0800
+Subject: [PATCH v2 0/4] ARM64: dts: meson-gx: fix VPU init for non-vendor
+ u-boot
+In-Reply-To: <1511187597-18248-1-git-send-email-narmstrong@baylibre.com> (Neil
+ Armstrong's message of "Mon, 20 Nov 2017 15:19:53 +0100")
+References: <1511187597-18248-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <7hmv33uwjm.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sudeep,
+Neil Armstrong <narmstrong@baylibre.com> writes:
 
-There's been a pretty major regression in v4.15-rc1 compared to v4.15
-in SCPI causing warning splats on amlogic SoCs when cpufreq starts up
-and tries to set the OPP for the first time[1].
+> On the Amlogic Gx SoCs (GXBB, GXL & GXM), the VPU power domain is initialized
+> by the vendor U-Boot code, but running mainline U-boot has been possible
+> on these SoCs. But lacking such init made the system lock at kernel boot.
+>
+> A PM Power Domain driver has been pushed at [1] to solve the main issue.
+>
+> This patchset depends on the the following patchsets :
+> - [1] soc: amlogic: add support for Meson GX VPU Domains
+> - [2] reset: meson: add level reset support for GX SoC family
+> - [3] clk: meson: gxbb: Add VPU and VAPB clocks
+>
+> Changes since v1 at [4] :
+>  - Dropped hdmi-supply in hdmi node until 4.16
+>  - set 5v regulator always-on for now
 
-I ran out of time to narrow it down further since there have been
-quite a few changes since v4.14, but simply reverting
-drivers/firmware/arm_scpi.c to its v4.14 state gets things working
-again.
+v2 applied to v4.15/fixes,
 
-This has been happening for awhile, and we should've caught it sooner
-in kernelCI.org, however this warning splat still allows the kernel to
-finish booting, so it still resulted in a PASS for the boot test.
-That combined with the fact that we've been tracking some other
-regressions, we didn't notice it until now.
-
-Also, is this the expected result for the pre-1.0 firmware:
-
-    scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
+Thanks,
 
 Kevin
-
-[1] Here are a few boot logs from v4.15-rc1 with the splat:
-
-https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-baylibre-seattle/boot-meson-gxl-s905x-khadas-vim.html
-
-https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-baylibre-seattle/boot-meson-gxbb-p200.html
-
-https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-baylibre-seattle/boot-meson-gxl-s905d-p230.html
