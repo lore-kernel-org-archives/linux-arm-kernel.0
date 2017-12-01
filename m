@@ -1,78 +1,128 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri,  1 Dec 2017 15:19:40 +0000
-Subject: [PATCH 1/3] arm64: KVM: Move CPU ID reg trap setup off the world
- switch path
-In-Reply-To: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
-References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1512141582-17474-2-git-send-email-Dave.Martin@arm.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Fri, 1 Dec 2017 16:19:38 +0100
+Subject: [PATCH 10/37] KVM: arm64: Slightly improve debug save/restore
+ functions
+In-Reply-To: <e9b8d6b8-6dfa-3e6d-6e8f-c16a1882651f@arm.com>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-11-christoffer.dall@linaro.org>
+ <e9b8d6b8-6dfa-3e6d-6e8f-c16a1882651f@arm.com>
+Message-ID: <20171201151938.GA6615@lvm>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The HCR_EL2.TID3 flag needs to be set when trapping guest access to
-the CPU ID registers is required.  However, the decision about
-whether to set this bit does not need to be repeated at every
-switch to the guest.
+Hi Julien,
 
-Instead, it's sufficient to make this decision once and record the
-outcome.
+On Tue, Nov 14, 2017 at 04:42:13PM +0000, Julien Thierry wrote:
+> On 12/10/17 11:41, Christoffer Dall wrote:
+> >The debug save/restore functions can be improved by using the has_vhe()
+> >static key instead of the instruction alternative.  Using the static key
+> >uses the same paradigm as we're going to use elsewhere, it makes the
+> >code more readable, and it generates slightly better code (no
+> >stack setups and function calls unless necessary).
+> >
+> >We also use a static key on the restore path, because it will be
+> >marginally faster than loading a value from memory.
+> >
+> >Finally, we don't have to conditionally clear the debug dirty flag if
+> >it's set, we can just clear it.
+> >
+> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> >---
+> >  arch/arm64/kvm/hyp/debug-sr.c | 22 +++++++++-------------
+> >  1 file changed, 9 insertions(+), 13 deletions(-)
+> >
+> >diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> >index 0fc0758..a2291b6 100644
+> >--- a/arch/arm64/kvm/hyp/debug-sr.c
+> >+++ b/arch/arm64/kvm/hyp/debug-sr.c
+> >@@ -75,11 +75,6 @@
+> >  #define psb_csync()		asm volatile("hint #17")
+> >-static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
+> >-{
+> >-	/* The vcpu can run. but it can't hide. */
+> >-}
+> >-
+> >  static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+> >  {
+> >  	u64 reg;
+> >@@ -109,10 +104,6 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+> >  	dsb(nsh);
+> >  }
+> >-static hyp_alternate_select(__debug_save_spe,
+> >-			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
+> >-			    ARM64_HAS_VIRT_HOST_EXTN);
+> >-
+> >  static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
+> >  {
+> >  	if (!pmscr_el1)
+> >@@ -174,17 +165,22 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+> >  {
+> >  	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+> >  			   kern_hyp_va(vcpu->arch.host_cpu_context));
+> >-	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
+> >+
+> >+	/* Non-VHE: Disable and flush SPE data generation
+> >+	 * VHE: The vcpu can run. but it can't hide. */
+> >+	if (!has_vhe())
+> >+		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
+> >  }
+> >  void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+> >  {
+> >-	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+> >+	if (!has_vhe())
+> >+		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+> 
+> For consistency, would it be worth naming that function
+> '__debug_restore_spe_nvhe' ?
 
-This patch moves the decision to vcpu_reset_hcr() and records the
-choice made in vcpu->arch.hcr_el2.  The world switch code can then
-load this directly when switching to the guest without the need for
-conditional logic on the critical path.
+Yes.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
+> 
+> Also, looking at __debug_save_spe_nvhe, I'm not sure how we guarantee that
+> we might not end up using stale data during the restore_spe (though, if this
+> is an issue, it existed before this change).
+> The save function might exit without setting a value to saved pmscr_el1.
+> 
+> Basically I'm wondering if the following scenario (in non VHE) is possible
+> and/or whether it is problematic:
+> 
+> - save spe
+> - restore spe
+> - host starts using spi -> !(PMBLIMITR_EL1 & PMBLIMITR_EL1_E)
 
----
+spi ?
 
-Note to maintainers: this was discussed on-list [1] prior to the merge
-window, but this patch implementing the agreed decision hasn't been
-posted previously.
+> - save spe -> returns early without setting pmscr_el1
+> - restore spe with old save instead of doing nothing
+> 
 
-This should be considered a fix for v4.15.
+I think I see what you mean.  Basically you're asking if we need this:
 
-[1] [PATCH v3 02/28] arm64: KVM: Hide unsupported AArch64 CPU features from guests
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-October/537420.html
----
- arch/arm64/include/asm/kvm_emulate.h | 8 ++++++++
- arch/arm64/kvm/hyp/switch.c          | 4 ----
- 2 files changed, 8 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 5f28dfa..8ff5aef 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -52,6 +52,14 @@ static inline void vcpu_reset_hcr(struct kvm_vcpu *vcpu)
- 		vcpu->arch.hcr_el2 |= HCR_E2H;
- 	if (test_bit(KVM_ARM_VCPU_EL1_32BIT, vcpu->arch.features))
- 		vcpu->arch.hcr_el2 &= ~HCR_RW;
-+
-+	/*
-+	 * TID3: trap feature register accesses that we virtualise.
-+	 * For now this is conditional, since no AArch32 feature regs
-+	 * are currently virtualised.
-+	 */
-+	if (vcpu->arch.hcr_el2 & HCR_RW)
-+		vcpu->arch.hcr_el2 |= HCR_TID3;
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 4112160..8ab3510 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -106,7 +106,7 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+ 
+ static void __hyp_text __debug_restore_spe_nvhe(u64 &pmscr_el1)
+ {
+-	if (!pmscr_el1)
++	if (*pmscr_el1 != 0)
+ 		return;
+ 
+ 	/* The host page table is installed, but not yet synchronised */
+@@ -114,6 +114,7 @@ static void __hyp_text __debug_restore_spe_nvhe(u64 &pmscr_el1)
+ 
+ 	/* Re-enable data generation */
+ 	write_sysreg_s(pmscr_el1, PMSCR_EL1);
++	*pmscr_el1 = 0;
  }
  
- static inline unsigned long vcpu_get_hcr(struct kvm_vcpu *vcpu)
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 525c01f..87fd590 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -86,10 +86,6 @@ static void __hyp_text __activate_traps(struct kvm_vcpu *vcpu)
- 		write_sysreg(1 << 30, fpexc32_el2);
- 		isb();
- 	}
--
--	if (val & HCR_RW) /* for AArch64 only: */
--		val |= HCR_TID3; /* TID3: trap feature register accesses */
--
- 	write_sysreg(val, hcr_el2);
- 
- 	/* Trap on AArch32 cp15 c15 accesses (EL1 or EL0) */
--- 
-2.1.4
+ void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
+
+I think we do, and I think this is a separate fix.  Would you like to
+write a patch and cc Will and Marc (original author and committer) to
+fix this?  Probably worth a cc stable as well.
+
+Thanks,
+-Christoffer
