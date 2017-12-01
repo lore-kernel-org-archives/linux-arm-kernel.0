@@ -1,68 +1,37 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 1 Dec 2017 11:43:08 +0530
-Subject: [PATCH 1/4] pci: dwc: pci-dra7xx: Enable errata i870 for both EP and
- RC mode
+Date: Fri, 1 Dec 2017 11:43:09 +0530
+Subject: [PATCH 2/4] dt-bindings: PCI: dra7xx: Add bindings for unaligned
+ access in host mode
 In-Reply-To: <20171201061311.16691-1-vigneshr@ti.com>
 References: <20171201061311.16691-1-vigneshr@ti.com>
-Message-ID: <20171201061311.16691-2-vigneshr@ti.com>
+Message-ID: <20171201061311.16691-3-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Errata i870 is applicable in both EP and RC mode. Therefore rename
-function dra7xx_pcie_ep_unaligned_memaccess(), that implements errata
-workaround, to dra7xx_pcie_unaligned_memaccess() and call it from a
-common place. So, that errata workaround is applied for both modes of
-operation.
+Update device tree binding documentation of TI's dra7xx PCI controller
+for enabling unaligned mem access as applicable not just in EP mode but
+in host mode as well.
 
-Reported-by: Chris Welch <Chris.Welch@viavisolutions.com>
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- drivers/pci/dwc/pci-dra7xx.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ Documentation/devicetree/bindings/pci/ti-pci.txt | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-index e77a4ceed74c..53f721d1cc40 100644
---- a/drivers/pci/dwc/pci-dra7xx.c
-+++ b/drivers/pci/dwc/pci-dra7xx.c
-@@ -546,7 +546,7 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
- };
+diff --git a/Documentation/devicetree/bindings/pci/ti-pci.txt b/Documentation/devicetree/bindings/pci/ti-pci.txt
+index 7f7af3044016..452fe48c4fdd 100644
+--- a/Documentation/devicetree/bindings/pci/ti-pci.txt
++++ b/Documentation/devicetree/bindings/pci/ti-pci.txt
+@@ -26,6 +26,11 @@ HOST MODE
+    ranges,
+    interrupt-map-mask,
+    interrupt-map : as specified in ../designware-pcie.txt
++ - ti,syscon-unaligned-access: phandle to the syscon DT node. The 1st argument
++			       should contain the register offset within syscon
++			       and the 2nd argument should contain the bit field
++			       for setting the bit to enable unaligned
++			       access.
  
- /*
-- * dra7xx_pcie_ep_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
-+ * dra7xx_pcie_unaligned_memaccess: workaround for AM572x/AM571x Errata i870
-  * @dra7xx: the dra7xx device where the workaround should be applied
-  *
-  * Access to the PCIe slave port that are not 32-bit aligned will result
-@@ -556,7 +556,7 @@ static const struct of_device_id of_dra7xx_pcie_match[] = {
-  *
-  * To avoid this issue set PCIE_SS1_AXI2OCP_LEGACY_MODE_ENABLE to 1.
-  */
--static int dra7xx_pcie_ep_unaligned_memaccess(struct device *dev)
-+static int dra7xx_pcie_unaligned_memaccess(struct device *dev)
- {
- 	int ret;
- 	struct device_node *np = dev->of_node;
-@@ -703,6 +703,10 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 	if (dra7xx->link_gen < 0 || dra7xx->link_gen > 2)
- 		dra7xx->link_gen = 2;
- 
-+	ret = dra7xx_pcie_unaligned_memaccess(dev);
-+	if (ret)
-+		goto err_gpio;
-+
- 	switch (mode) {
- 	case DW_PCIE_RC_TYPE:
- 		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
-@@ -715,10 +719,6 @@ static int __init dra7xx_pcie_probe(struct platform_device *pdev)
- 		dra7xx_pcie_writel(dra7xx, PCIECTRL_TI_CONF_DEVICE_TYPE,
- 				   DEVICE_TYPE_EP);
- 
--		ret = dra7xx_pcie_ep_unaligned_memaccess(dev);
--		if (ret)
--			goto err_gpio;
--
- 		ret = dra7xx_add_pcie_ep(dra7xx, pdev);
- 		if (ret < 0)
- 			goto err_gpio;
+ DEVICE MODE
+ ===========
 -- 
 2.15.0
