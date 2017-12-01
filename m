@@ -1,95 +1,82 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 1 Dec 2017 08:39:03 -0800
-Subject: [PATCH v3 2/3] clk: meson-axg: add clock controller drivers
-In-Reply-To: <d2b58c06-93dc-4368-501e-4b8bdc9a4c34@amlogic.com>
-References: <20171128125330.363-1-yixun.lan@amlogic.com>
- <20171128125330.363-3-yixun.lan@amlogic.com>
- <20171129193433.GA19419@codeaurora.org>
- <d2b58c06-93dc-4368-501e-4b8bdc9a4c34@amlogic.com>
-Message-ID: <20171201163903.GF19419@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 1 Dec 2017 11:16:37 -0600
+Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
+In-Reply-To: <68a11ee4-d0c6-0f4e-3631-125cc4e7a1bd@codeaurora.org>
+References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
+ <1510096056-13765-3-git-send-email-timur@codeaurora.org>
+ <68a11ee4-d0c6-0f4e-3631-125cc4e7a1bd@codeaurora.org>
+Message-ID: <d86c1bc1-1d97-339b-4585-ad796f635638@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30, Yixun Lan wrote:
-> Hi Stephen
+On 12/01/2017 05:38 AM, Archit Taneja wrote:
 > 
-> On 11/30/17 03:34, Stephen Boyd wrote:
-> > On 11/28, Yixun Lan wrote:
-> >> diff --git a/drivers/clk/meson/axg.c b/drivers/clk/meson/axg.c
-> >> new file mode 100644
-> >> index 000000000000..51c5b4062715
-> >> --- /dev/null
-> >> +++ b/drivers/clk/meson/axg.c
-> >> @@ -0,0 +1,948 @@
-> >> +/*
-> >> + * AmLogic Meson-AXG Clock Controller Driver
-> >> + *
-> >> + * Copyright (c) 2016 Baylibre SAS.
-> >> + * Author: Michael Turquette <mturquette@baylibre.com>
-> >> + *
-> >> + * Copyright (c) 2017 Amlogic, inc.
-> >> + * Author: Qiufang Dai <qiufang.dai@amlogic.com>
-> >> + *
-> >> + * SPDX-License-Identifier: GPL-2.0+
-> >> + */
-> >> +
-> >> +#include <linux/clk.h>
-> >> +#include <linux/clk-provider.h>
-> >> +#include <linux/of_address.h>
-> >> +#include <linux/of_device.h>
-> >> +#include <linux/platform_device.h>
-> >> +#include <linux/init.h>
-> >> +
-> >> +#include "clkc.h"
-> >> +#include "axg.h"
-> >> +
-> >> +static DEFINE_SPINLOCK(clk_lock);
-> > 
-> > meson_axg_clk_lock?
-> > 
-> em... I'd leave it unchanged
+> We're hitting an issue here ^ when a consumer calls the devm_gpiod_get() 
+> API. This API
+> internally sets idx in gpiod_get_index to always 0. For example, in the 
+> call sequence
+> below, the idx argument to gpiochip_irqchip_line_valid is always 0:
 > 
-> because the spinlock will be used at macro MESON_GATE() [1] which
-> defined at drivers/clk/meson/clkc.h, and it assume using the generic
-> name 'clk_lock', change name will break the code..
+> devm_gpiod_get(dev, con_id, flags)
+>  ?? devm_gpiod_get_index(dev, con_id, 0, flags)
+>  ????? gpiod_get_index(dev, con_id, 0, flags)
+>  ???????? if (!gpiochip_irqchip_line_valid(desc->gdev->chip, 0))
+>  ???????????? return ERR_PTR(-EACCES);
 > 
-> and besides it's already defined as static, so I see no problem here
+> Therefore, with these patches, if we create a sparse gpio map, and the
+> 0th gpio is set to "not accessible", all gpio requests end up failing 
+> with EACCESS
+> because idx is always passed as 0.
 
-The problem is lockdep debugging and ctags/grep on the source
-code. clk_lock is very generic when it should be more specific so
-we can find this lock later on from a lockdep report with a
-simple search of the code.
+Ok, I can see the problem, but I don't know how to fix it.
 
-Maybe make another patch to rename it to meson_clk_lock so the
-macro doesn't have to change too much, and we get it slightly
-more unique. Looks like v4l2 also has a clk_lock.
+struct gpio_desc *__must_check devm_gpiod_get(struct device *dev,
+					      const char *con_id,
+					      enum gpiod_flags flags)
+{
+	return devm_gpiod_get_index(dev, con_id, 0, flags);
+}
 
-> 
-> >> +};
-> >> +
-> >> +static int axg_clkc_probe(struct platform_device *pdev)
-> >> +{
-> >> +	const struct clkc_data *clkc_data;
-> >> +	void __iomem *clk_base;
-> >> +	int ret, clkid, i;
-> >> +	struct device *dev = &pdev->dev;
-> >> +
-> >> +	clkc_data = of_device_get_match_data(&pdev->dev);
-> >> +	if (!clkc_data)
-> >> +		return -EINVAL;
-> >> +
-> >> +	/*  Generic clocks and PLLs */
-> >> +	clk_base = of_iomap(dev->of_node, 0);
-> > 
-> > Use platform device APIs for ioremapping?
-> > 
-> I assume you are referring to 'platform_get_resource +
-> devm_ioremap_resource' ?
-> 
-> the idea sounds good to me.
+I thought that by putting the check for "availability" inside of the 
+GPIO request, it would handle all situations where a client (whether 
+kernel or user-space) tries to access a specific GPIO.
 
-Yes.
+However, this doesn't work with [devm_]gpiod_get.  This function 
+attempts to claim the entire GPIO block by claiming only the first GPIO.
+
+This is straining my understanding of gpiolib.  Maybe we need to do 
+something like this:
+
+struct gpio_desc *__must_check gpiod_get(struct device *dev, const char 
+*con_id,
+					 enum gpiod_flags flags)
+{
+	return gpiod_get_index(dev, con_id, -1, flags);
+}
+
+Where idx == -1 is a special-case for gpiod_get_index() where it returns 
+the gpio_desc without actually requesting it?
+
+> In gpiochip_irqchip_line_valid, shouldn't we test the nth bit (that 
+> corresponds to
+> this gpio_desc) in chip->line_valid_mask instead of idx passed above, 
+> which is always
+> 0?
+
+The code has changed upstream, so I need to refactor that function.  But 
+I think it's already testing the nth bit:
+
+static bool gpiochip_irqchip_line_valid(const struct gpio_chip gpiochip,
+					unsigned int offset)
+{
+	/* No mask means all valid */
+	if (likely(!gpiochip->line_valid_mask))
+		return true;
+	return test_bit(offset, gpiochip->line_valid_mask);
+
+'offset' is the nth bit.
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
