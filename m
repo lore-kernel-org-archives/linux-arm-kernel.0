@@ -1,69 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Fri, 1 Dec 2017 18:27:14 -0200
-Subject: [PATCH] ARM: dts: imx6sx-sdb: Add DRM panel, power-enable and
- backlight support
-In-Reply-To: <1512046929-18597-1-git-send-email-marco.franchi@nxp.com>
-References: <1512046929-18597-1-git-send-email-marco.franchi@nxp.com>
-Message-ID: <CAOMZO5D4FMcLuGoh8JPRpdXaqPTOGgvWd39OV7qkZqVzptr87A@mail.gmail.com>
+From: martin.blumenstingl@googlemail.com (Martin Blumenstingl)
+Date: Fri, 1 Dec 2017 22:24:07 +0100
+Subject: [PATCH] nvmem: meson-mx-efuse: fix reading from an offset other
+ than 0
+In-Reply-To: <20171112183412.12806-1-martin.blumenstingl@googlemail.com>
+References: <20171112183412.12806-1-martin.blumenstingl@googlemail.com>
+Message-ID: <CAFBinCBRs-enwX_-uRBOo0dXYPY3q0keD_-RZ_G=ZgsqhM1ARQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Subject could be improved to something like: Convert from fbdev to
-drm bindings
+Hi Srinivas, Hi Greg,
 
-On Thu, Nov 30, 2017 at 11:02 AM, Marco Franchi <marco.franchi@nxp.com> wrote:
-> It is preferred to use the panel compatible string rather than passing
-> the LCD timming in the device tree.
-
-Typo: timing
-
+On Sun, Nov 12, 2017 at 7:34 PM, Martin Blumenstingl
+<martin.blumenstingl@googlemail.com> wrote:
+> meson_mx_efuse_read calculates the address internal to the eFuse based
+> on the offset and the word size. This works fine with any given offset.
+> However, the offset is also included when writing to the output buffer.
+> This means that reading 4 bytes at offset 500 tries to write beyond the
+> array allocated by the nvmem core as it wants to write the 4 bytes to
+> "buffer address + offset (500)".
+> This issue did not show up in the previous tests since no driver uses
+> any value from the eFuse yet and reading the eFuse via sysfs simply
+> reads the whole eFuse, starting at offset 0.
 >
-> So pass the "sii,43wvf1g" compatible string, a new driver for the Seiko
-> Panel, which describes the parallel LCD.
-
-Please remove the "a new driver for the Seiko Panel".
-
+> Fix this by only including the offset in the internal address
+> calculation.
 >
-> This new driver needs two power supply, so pass 'dvdd-supply' and
-> 'avdd-supply', which makes the kernel to turn on the LCD on is own.
+> Fixes: 8caef1fa9176 ("nvmem: add a driver for the Amlogic Meson6/Meson8/Meson8b SoCs")
+if you don't have any comments on this patch: could you please queue
+it as a fix for 4.15 (which is where above commit landed)?
 
-I would remove this too.
 
->
-> Also, pass the 'backlight' property as described in
-> Documentation/devicetree/bindings/display/panel/simple-panel.txt
->
-> Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
-> ---
->  arch/arm/boot/dts/imx6sx-sdb.dtsi | 49 ++++++++++++++++++++-------------------
->  1 file changed, 25 insertions(+), 24 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-> index da81552..3a597a4 100644
-> --- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
-> +++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
-> @@ -24,7 +24,7 @@
->                 reg = <0x80000000 0x40000000>;
->         };
->
-> -       backlight {
-> +       backlight_display: backlight-display {
->                 compatible = "pwm-backlight";
->                 pwms = <&pwm3 0 5000000>;
->                 brightness-levels = <0 4 8 16 32 64 128 255>;
-> @@ -129,6 +129,14 @@
->                         regulator-max-microvolt = <3300000>;
->                         gpios = <&gpio2 6 GPIO_ACTIVE_LOW>;
->                 };
-> +
-> +               reg_lcd_5v: regulator at 7 {
-> +                       compatible = "regulator-fixed";
-> +                       reg = <7>;
-> +                       regulator-name = "lcd-5v0";
-> +                       regulator-min-microvolt = <5000000>;
-> +                       regulator-max-microvolt = <5000000>;
-> +               };
-
-I have sent a patch that removes the regulators from simple-panel.
-
-Please use linux-next when you send a v2.
+thank you!
+Regards
+Martin
