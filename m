@@ -1,86 +1,84 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 1 Dec 2017 09:57:26 +0100
-Subject: [PATCH v4 6/6] ARM: configs: Add missing config for DART-MX6 SoM
-In-Reply-To: <20171130004629.GD22908@dragon>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Fri, 1 Dec 2017 10:02:37 +0100
+Subject: [PATCH v4 4/6] ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM
+ support
+In-Reply-To: <d30a3015-afbb-cd88-ee01-4222339a2807@baylibre.com>
 References: <1511950857-19292-1-git-send-email-narmstrong@baylibre.com>
- <1511950857-19292-7-git-send-email-narmstrong@baylibre.com>
- <20171130004629.GD22908@dragon>
-Message-ID: <54651ce0-545b-a61b-f8b1-5d03789ede1e@baylibre.com>
+ <1511950857-19292-5-git-send-email-narmstrong@baylibre.com>
+ <20171130003912.GB22908@dragon>
+ <d30a3015-afbb-cd88-ee01-4222339a2807@baylibre.com>
+Message-ID: <CAOFm3uEY8+B8mhdcSLexdF8U8rq9kU2dM+ix=A_f+5kU_iR=nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shawn,
-
-On 30/11/2017 01:46, Shawn Guo wrote:
-> On Wed, Nov 29, 2017 at 11:20:57AM +0100, Neil Armstrong wrote:
->> This patch adds the missing configs for the DART-MX6 SoM support :
->> - SERDEV bluetooth driver + SERIAL_DEV_BUS configs
->> - WL18XX driver
->> - DEFAULT_ON Led Trigger
+On Fri, Dec 1, 2017 at 9:54 AM, Neil Armstrong <narmstrong@baylibre.com> wrote:
+> On 30/11/2017 01:39, Shawn Guo wrote:
+>> On Wed, Nov 29, 2017 at 11:20:55AM +0100, Neil Armstrong wrote:
+>>> This patch adds support for the Variscite DART-MX6 SoM with :
+>>> - i.MX6 Quad or Dual Lite SoC
+>>> - 1Gb/2Gb LPDDR2
+>>> - 4-64 GB eMMC
+>>> - Camera Interface
+>>> - HDMI+CEC interface
+>>> - LVDS / DSI / Parallel RGB interfaces
+>>> - Ethernet RGMII interface
+>>> - On-SoM Wi-Fi/Bluetooth with WiLink wl1835 SDIO Module
+>>> - SD/MMC/SDIO interface
+>>> - USB Host + USB OTG interface
+>>> - I2C interfaces
+>>> - SPI interfaces
+>>> - PCI-Express 2.0 interface
+>>> - on-SoM Audio Codec with HP/Line-In interfaces + DMIC interface
+>>> - Digital Audio interface
+>>> - S/PDIF interface
+>>>
+>>> Product website : http://www.variscite.com/products/system-on-module-som/cortex-a9/dart-mx6-cpu-freescale-imx6
+>>>
+>>> Support is handled with a SoM-centric dtsi exporting the default interfaces
+>>> along the default pinmuxing to be enabled by the board dts file.
+>>>
+>>> Only board-independent devices like WiFi, eMMC or PMIC are enabled in the dtsi.
+>>>
+>>> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
+>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 >>
->> Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> 
-> 'ARM: imx_v6_v7_defconfig: ...' or 'ARM: imx: defconfig: ...' please.
-> 
-
-Ok done.
-
-Thanks for the review,
-
-Neil
-
-> Shawn
-> 
->> ---
->>  arch/arm/configs/imx_v6_v7_defconfig | 6 ++++++
->>  1 file changed, 6 insertions(+)
+>> Looks pretty good.  Only a couple of minor comments.
 >>
->> diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
->> index 0d44949..abd06c3 100644
->> --- a/arch/arm/configs/imx_v6_v7_defconfig
->> +++ b/arch/arm/configs/imx_v6_v7_defconfig
->> @@ -80,6 +80,7 @@ CONFIG_CAN=y
->>  CONFIG_CAN_FLEXCAN=y
->>  CONFIG_BT=y
->>  CONFIG_BT_HCIUART=y
->> +CONFIG_BT_HCIUART_SERDEV=y
->>  CONFIG_BT_HCIUART_H4=y
->>  CONFIG_BT_HCIUART_LL=y
->>  CONFIG_CFG80211=y
->> @@ -155,6 +156,7 @@ CONFIG_USB_USBNET=y
->>  CONFIG_USB_NET_CDC_EEM=m
->>  CONFIG_BRCMFMAC=m
->>  CONFIG_WL12XX=m
->> +CONFIG_WL18XX=m
->>  CONFIG_WLCORE_SDIO=m
->>  # CONFIG_WILINK_PLATFORM_DATA is not set
->>  CONFIG_INPUT_EVDEV=y
->> @@ -185,6 +187,8 @@ CONFIG_SERIAL_IMX=y
->>  CONFIG_SERIAL_IMX_CONSOLE=y
->>  CONFIG_SERIAL_FSL_LPUART=y
->>  CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
->> +CONFIG_SERIAL_DEV_BUS=y
->> +CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
->>  # CONFIG_I2C_COMPAT is not set
->>  CONFIG_I2C_CHARDEV=y
->>  CONFIG_I2C_MUX=y
->> @@ -248,6 +252,7 @@ CONFIG_VIDEO_OV5640=m
->>  CONFIG_SOC_CAMERA_OV2640=y
->>  CONFIG_IMX_IPUV3_CORE=y
->>  CONFIG_DRM=y
->> +CONFIG_DRM_PANEL_LVDS=y
->>  CONFIG_DRM_PANEL_SIMPLE=y
->>  CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
->>  CONFIG_DRM_DW_HDMI_CEC=y
->> @@ -340,6 +345,7 @@ CONFIG_LEDS_TRIGGER_ONESHOT=y
->>  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
->>  CONFIG_LEDS_TRIGGER_BACKLIGHT=y
->>  CONFIG_LEDS_TRIGGER_GPIO=y
->> +CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
->>  CONFIG_RTC_CLASS=y
->>  CONFIG_RTC_INTF_DEV_UIE_EMUL=y
->>  CONFIG_RTC_DRV_DS1307=y
->> -- 
->> 2.7.4
->>
+>>> ---
+>>>  arch/arm/boot/dts/imx6qdl-var-dart.dtsi | 504 ++++++++++++++++++++++++++++++++
+>>>  1 file changed, 504 insertions(+)
+>>>  create mode 100644 arch/arm/boot/dts/imx6qdl-var-dart.dtsi
+>>>
+>>> diff --git a/arch/arm/boot/dts/imx6qdl-var-dart.dtsi b/arch/arm/boot/dts/imx6qdl-var-dart.dtsi
+>>> new file mode 100644
+>>> index 0000000..fd2520b
+>>> --- /dev/null
+>>> +++ b/arch/arm/boot/dts/imx6qdl-var-dart.dtsi
+>>> @@ -0,0 +1,504 @@
+>>> +/*
+>>> + * Support for Variscite DART-MX6 Module
+>>> + *
+>>> + * Copyright 2017 BayLibre, SAS
+>>> + * Author: Neil Armstrong <narmstrong@baylibre.com>
+>>> + *
+>>> + * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+>>> + */
+
+Should this be instead on the first line with a // comment style if
+possible, right?
+
+>> +// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
+
+Thomas has sent a first doc patch [1] set and is working on an updated
+version.  Jonathan also wrote a nice background article on the topic
+at LWN [2].
+
+Linus explained why he wants the // comment style and a first line
+location on the list too.
+
+[1] https://marc.info/?l=linux-kernel&m=151051532322831&w=2
+[2] https://lwn.net/SubscriberLink/739183/262749cbe307ddc7/
+
+-- 
+Cordially
+Philippe Ombredanne
