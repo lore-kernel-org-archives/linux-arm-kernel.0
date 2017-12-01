@@ -1,54 +1,286 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Fri, 1 Dec 2017 17:31:20 +0000
-Subject: [PATCH RT] arm*: disable NEON in kernel mode
-In-Reply-To: <20171201171458.3a2acsltiq54gvuu@hirez.programming.kicks-ass.net>
-References: <20171130142216.GB12606@linutronix.de>
- <20171130143028.GA1351@linutronix.de>
- <20171201104331.GB1612@linutronix.de>
- <20171201134506.GF1612@linutronix.de>
- <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
- <20171201143648.GK1612@linutronix.de>
- <20171201171458.3a2acsltiq54gvuu@hirez.programming.kicks-ass.net>
-Message-ID: <20171201173120.GL10595@n2100.armlinux.org.uk>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Sat, 2 Dec 2017 01:37:36 +0800
+Subject: [clk:clk-next 9/11] include/linux/clk.h:637:1: error: expected
+ identifier or '(' before '{' token
+Message-ID: <201712020115.S9MTjUlq%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 06:14:58PM +0100, Peter Zijlstra wrote:
-> On Fri, Dec 01, 2017 at 03:36:48PM +0100, Sebastian Andrzej Siewior wrote:
-> > On 2017-12-01 14:18:28 [+0000], Mark Rutland wrote:
-> > > [Adding Ard, who wrote the NEON crypto code]
-> > > 
-> > > On Fri, Dec 01, 2017 at 02:45:06PM +0100, Sebastian Andrzej Siewior wrote:
-> > > > +arm folks, to let you know
-> > > > 
-> > > > On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
-> > > > > NEON in kernel mode is used by the crypto algorithms and raid6 code.
-> > > > > While the raid6 code looks okay, the crypto algorithms do not: NEON
-> > > > > is enabled on first invocation and may allocate/free/map memory before
-> > > > > the NEON mode is disabled again.
-> > > 
-> > > Could you elaborate on why this is a problem?
-> > > 
-> > > I guess this is because kernel_neon_{begin,end}() disable preemption?
-> > > 
-> > > ... is this specific to RT?
-> > 
-> > It is RT specific, yes. One thing are the unbounded latencies since
-> > everything in this preempt_disable section can take time depending on
-> > the size of the request.
-> 
-> Well, PREEMPT cares about that too.
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/clk/linux.git clk-next
+head:   20697052ae1dc0aad45f72eaed791edb7579ee4f
+commit: b833533133b209e89f4d652e0c7f001adda81f96 [9/11] clk: add clk_rate_exclusive api
+config: blackfin-allmodconfig (attached as .config)
+compiler: bfin-uclinux-gcc (GCC) 6.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout b833533133b209e89f4d652e0c7f001adda81f96
+        # save the attached .config to linux build tree
+        make.cross ARCH=blackfin 
 
-Preempt may care, but it's the hit you take to use neon in the kernel.
-The neon register set shares with the FPU, so preempting during that
-path means that the normal FPU register saving would corrupt the
-already saved user FPU context - and even worse would result in the
-kernel's crypto function register contents being leaked to userspace.
+All error/warnings (new ones prefixed by >>):
 
-If you care about preempt deeply, the only solution is to avoid using
-kernel mode neon.
+   In file included from drivers/media/platform/qcom/camss-8x16/camss.c:18:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+--
+   In file included from drivers//net/ethernet/hisilicon/hix5hd2_gmac.c:18:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   drivers//net/ethernet/hisilicon/hix5hd2_gmac.c:26:0: warning: "PORT_EN" redefined
+    #define PORT_EN    0x0044
+    
+   In file included from arch/blackfin/mach-bf533/include/mach/blackfin.h:16:0,
+                    from arch/blackfin/include/asm/irqflags.h:11,
+                    from include/linux/irqflags.h:16,
+                    from arch/blackfin/include/asm/bitops.h:33,
+                    from include/linux/bitops.h:38,
+                    from include/linux/kernel.h:11,
+                    from include/linux/list.h:9,
+                    from include/linux/module.h:9,
+                    from drivers//net/ethernet/hisilicon/hix5hd2_gmac.c:10:
+   arch/blackfin/mach-bf533/include/mach/defBF532.h:431:0: note: this is the location of the previous definition
+    #define PORT_EN              0x00000001 /* PPI Port Enable  */
+    
+--
+   In file included from drivers/usb/musb/ux500.c:11:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   In file included from drivers/usb/musb/musb_core.h:439:0,
+                    from drivers/usb/musb/ux500.c:18:
+   drivers/usb/musb/ux500.c: In function 'ux500_musb_set_vbus':
+   drivers/usb/musb/musb_regs.h:443:33: error: 'USB_OTG_DEV_CTL' undeclared (first use in this function)
+    #define MUSB_DEVCTL  USB_OFFSET(USB_OTG_DEV_CTL) /* 8 bit */
+                                    ^
+   drivers/usb/musb/musb_regs.h:422:27: note: in definition of macro 'USB_OFFSET'
+    #define USB_OFFSET(reg)  (reg - USB_BASE)
+                              ^~~
+   drivers/usb/musb/ux500.c:43:35: note: in expansion of macro 'MUSB_DEVCTL'
+     devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+                                      ^~~~~~~~~~~
+   drivers/usb/musb/musb_regs.h:443:33: note: each undeclared identifier is reported only once for each function it appears in
+    #define MUSB_DEVCTL  USB_OFFSET(USB_OTG_DEV_CTL) /* 8 bit */
+                                    ^
+   drivers/usb/musb/musb_regs.h:422:27: note: in definition of macro 'USB_OFFSET'
+    #define USB_OFFSET(reg)  (reg - USB_BASE)
+                              ^~~
+   drivers/usb/musb/ux500.c:43:35: note: in expansion of macro 'MUSB_DEVCTL'
+     devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+                                      ^~~~~~~~~~~
+   drivers/usb/musb/musb_regs.h:421:19: error: 'USB_FADDR' undeclared (first use in this function)
+    #define USB_BASE  USB_FADDR
+                      ^
+   drivers/usb/musb/musb_regs.h:422:33: note: in expansion of macro 'USB_BASE'
+    #define USB_OFFSET(reg)  (reg - USB_BASE)
+                                    ^~~~~~~~
+   drivers/usb/musb/musb_regs.h:443:22: note: in expansion of macro 'USB_OFFSET'
+    #define MUSB_DEVCTL  USB_OFFSET(USB_OTG_DEV_CTL) /* 8 bit */
+                         ^~~~~~~~~~
+   drivers/usb/musb/ux500.c:43:35: note: in expansion of macro 'MUSB_DEVCTL'
+     devctl = musb_readb(musb->mregs, MUSB_DEVCTL);
+                                      ^~~~~~~~~~~
+   drivers/usb/musb/ux500.c: In function 'ux500_musb_interrupt':
+   drivers/usb/musb/musb_regs.h:433:34: error: 'USB_INTRUSB' undeclared (first use in this function)
+    #define MUSB_INTRUSB  USB_OFFSET(USB_INTRUSB) /* 8 bit */
+                                     ^
+   drivers/usb/musb/musb_regs.h:422:27: note: in definition of macro 'USB_OFFSET'
+    #define USB_OFFSET(reg)  (reg - USB_BASE)
+                              ^~~
+   drivers/usb/musb/ux500.c:134:42: note: in expansion of macro 'MUSB_INTRUSB'
+     musb->int_usb = musb_readb(musb->mregs, MUSB_INTRUSB);
+                                             ^~~~~~~~~~~~
+   drivers/usb/musb/musb_regs.h:421:19: error: 'USB_FADDR' undeclared (first use in this function)
+    #define USB_BASE  USB_FADDR
+                      ^
+   drivers/usb/musb/musb_regs.h:422:33: note: in expansion of macro 'USB_BASE'
+    #define USB_OFFSET(reg)  (reg - USB_BASE)
+                                    ^~~~~~~~
+   drivers/usb/musb/musb_regs.h:433:23: note: in expansion of macro 'USB_OFFSET'
+    #define MUSB_INTRUSB  USB_OFFSET(USB_INTRUSB) /* 8 bit */
+                          ^~~~~~~~~~
+   drivers/usb/musb/ux500.c:134:42: note: in expansion of macro 'MUSB_INTRUSB'
+     musb->int_usb = musb_readb(musb->mregs, MUSB_INTRUSB);
+                                             ^~~~~~~~~~~~
+   drivers/usb/musb/musb_regs.h:429:33: error: 'USB_INTRTX' undeclared (first use in this function)
+    #define MUSB_INTRTX  USB_OFFSET(USB_INTRTX) /* 16-bit */
+                                    ^
+   drivers/usb/musb/musb_regs.h:422:27: note: in definition of macro 'USB_OFFSET'
+    #define USB_OFFSET(reg)  (reg - USB_BASE)
+                              ^~~
+   drivers/usb/musb/ux500.c:135:41: note: in expansion of macro 'MUSB_INTRTX'
+     musb->int_tx = musb_readw(musb->mregs, MUSB_INTRTX);
+                                            ^~~~~~~~~~~
+   drivers/usb/musb/musb_regs.h:430:33: error: 'USB_INTRRX' undeclared (first use in this function)
+    #define MUSB_INTRRX  USB_OFFSET(USB_INTRRX)
+                                    ^
+   drivers/usb/musb/musb_regs.h:422:27: note: in definition of macro 'USB_OFFSET'
+    #define USB_OFFSET(reg)  (reg - USB_BASE)
+                              ^~~
+   drivers/usb/musb/ux500.c:136:41: note: in expansion of macro 'MUSB_INTRRX'
+     musb->int_rx = musb_readw(musb->mregs, MUSB_INTRRX);
+                                            ^~~~~~~~~~~
+--
+   In file included from drivers/net/ethernet/hisilicon/hix5hd2_gmac.c:18:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   drivers/net/ethernet/hisilicon/hix5hd2_gmac.c:26:0: warning: "PORT_EN" redefined
+    #define PORT_EN    0x0044
+    
+   In file included from arch/blackfin/mach-bf533/include/mach/blackfin.h:16:0,
+                    from arch/blackfin/include/asm/irqflags.h:11,
+                    from include/linux/irqflags.h:16,
+                    from arch/blackfin/include/asm/bitops.h:33,
+                    from include/linux/bitops.h:38,
+                    from include/linux/kernel.h:11,
+                    from include/linux/list.h:9,
+                    from include/linux/module.h:9,
+                    from drivers/net/ethernet/hisilicon/hix5hd2_gmac.c:10:
+   arch/blackfin/mach-bf533/include/mach/defBF532.h:431:0: note: this is the location of the previous definition
+    #define PORT_EN              0x00000001 /* PPI Port Enable  */
+    
+--
+   In file included from drivers/clocksource/timer-oxnas-rps.c:26:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   drivers/clocksource/timer-oxnas-rps.c:50:0: warning: "TIMER_ENABLE" redefined
+    #define TIMER_ENABLE  BIT(7)
+    
+   In file included from arch/blackfin/mach-bf533/include/mach/blackfin.h:16:0,
+                    from arch/blackfin/include/asm/irqflags.h:11,
+                    from include/linux/irqflags.h:16,
+                    from arch/blackfin/include/asm/bitops.h:33,
+                    from include/linux/bitops.h:38,
+                    from include/linux/kernel.h:11,
+                    from include/linux/list.h:9,
+                    from include/linux/smp.h:12,
+                    from include/linux/irq.h:13,
+                    from drivers/clocksource/timer-oxnas-rps.c:24:
+   arch/blackfin/mach-bf533/include/mach/defBF532.h:97:0: note: this is the location of the previous definition
+    #define TIMER_ENABLE   0xFFC00640 /* Timer Enable Register */
+    
+--
+   In file included from drivers//clocksource/timer-oxnas-rps.c:26:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   drivers//clocksource/timer-oxnas-rps.c:50:0: warning: "TIMER_ENABLE" redefined
+    #define TIMER_ENABLE  BIT(7)
+    
+   In file included from arch/blackfin/mach-bf533/include/mach/blackfin.h:16:0,
+                    from arch/blackfin/include/asm/irqflags.h:11,
+                    from include/linux/irqflags.h:16,
+                    from arch/blackfin/include/asm/bitops.h:33,
+                    from include/linux/bitops.h:38,
+                    from include/linux/kernel.h:11,
+                    from include/linux/list.h:9,
+                    from include/linux/smp.h:12,
+                    from include/linux/irq.h:13,
+                    from drivers//clocksource/timer-oxnas-rps.c:24:
+   arch/blackfin/mach-bf533/include/mach/defBF532.h:97:0: note: this is the location of the previous definition
+    #define TIMER_ENABLE   0xFFC00640 /* Timer Enable Register */
+    
+--
+   In file included from drivers/media/i2c/tc358743.c:32:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   In file included from drivers/media/i2c/tc358743.c:50:0:
+   drivers/media/i2c/tc358743_regs.h:32:0: warning: "CHIPID" redefined
+    #define CHIPID                                0x0000
+    
+   In file included from arch/blackfin/mach-bf533/include/mach/blackfin.h:16:0,
+                    from arch/blackfin/include/asm/irqflags.h:11,
+                    from include/linux/irqflags.h:16,
+                    from arch/blackfin/include/asm/bitops.h:33,
+                    from include/linux/bitops.h:38,
+                    from include/linux/kernel.h:11,
+                    from drivers/media/i2c/tc358743.c:28:
+   arch/blackfin/mach-bf533/include/mach/defBF532.h:22:0: note: this is the location of the previous definition
+    #define CHIPID                 0xFFC00014       /* Chip ID Register */
+    
+--
+   In file included from drivers/rtc/rtc-xgene.c:29:0:
+   include/linux/clk.h: In function 'clk_exclusive_get':
+>> include/linux/clk.h:636:44: warning: no return statement in function returning non-void [-Wreturn-type]
+    static inline int clk_exclusive_get(struct clk *clk) {}
+                                               ^~~
+   include/linux/clk.h: At top level:
+>> include/linux/clk.h:637:1: error: expected identifier or '(' before '{' token
+    {
+    ^
+   drivers/rtc/rtc-xgene.c:42:0: warning: "RTC_STAT" redefined
+    #define RTC_STAT  0x10
+    
+   In file included from arch/blackfin/mach-bf533/include/mach/blackfin.h:16:0,
+                    from arch/blackfin/include/asm/irqflags.h:11,
+                    from include/linux/irqflags.h:16,
+                    from arch/blackfin/include/asm/bitops.h:33,
+                    from include/linux/bitops.h:38,
+                    from include/linux/kernel.h:11,
+                    from include/linux/list.h:9,
+                    from include/linux/module.h:9,
+                    from drivers/rtc/rtc-xgene.c:24:
+   arch/blackfin/mach-bf533/include/mach/defBF532.h:41:0: note: this is the location of the previous definition
+    #define RTC_STAT                 0xFFC00300 /* RTC Status Register */
+    
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+vim +637 include/linux/clk.h
+
+   634	
+   635	
+ > 636	static inline int clk_exclusive_get(struct clk *clk) {}
+ > 637	{
+   638		return 0;
+   639	}
+   640	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 46936 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171202/ddc81e38/attachment-0001.gz>
