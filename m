@@ -1,128 +1,164 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Fri, 1 Dec 2017 16:19:38 +0100
-Subject: [PATCH 10/37] KVM: arm64: Slightly improve debug save/restore
- functions
-In-Reply-To: <e9b8d6b8-6dfa-3e6d-6e8f-c16a1882651f@arm.com>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-11-christoffer.dall@linaro.org>
- <e9b8d6b8-6dfa-3e6d-6e8f-c16a1882651f@arm.com>
-Message-ID: <20171201151938.GA6615@lvm>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Fri,  1 Dec 2017 10:44:19 -0500
+Subject: [PATCH v3] usb: xhci: allow imod-interval to be configurable
+Message-ID: <1512143059-25674-1-git-send-email-awallis@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+The xHCI driver currently has the IMOD set to 160, which
+translates to an IMOD interval of 40,000ns (160 * 250)ns
 
-On Tue, Nov 14, 2017 at 04:42:13PM +0000, Julien Thierry wrote:
-> On 12/10/17 11:41, Christoffer Dall wrote:
-> >The debug save/restore functions can be improved by using the has_vhe()
-> >static key instead of the instruction alternative.  Using the static key
-> >uses the same paradigm as we're going to use elsewhere, it makes the
-> >code more readable, and it generates slightly better code (no
-> >stack setups and function calls unless necessary).
-> >
-> >We also use a static key on the restore path, because it will be
-> >marginally faster than loading a value from memory.
-> >
-> >Finally, we don't have to conditionally clear the debug dirty flag if
-> >it's set, we can just clear it.
-> >
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >---
-> >  arch/arm64/kvm/hyp/debug-sr.c | 22 +++++++++-------------
-> >  1 file changed, 9 insertions(+), 13 deletions(-)
-> >
-> >diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> >index 0fc0758..a2291b6 100644
-> >--- a/arch/arm64/kvm/hyp/debug-sr.c
-> >+++ b/arch/arm64/kvm/hyp/debug-sr.c
-> >@@ -75,11 +75,6 @@
-> >  #define psb_csync()		asm volatile("hint #17")
-> >-static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
-> >-{
-> >-	/* The vcpu can run. but it can't hide. */
-> >-}
-> >-
-> >  static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
-> >  {
-> >  	u64 reg;
-> >@@ -109,10 +104,6 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
-> >  	dsb(nsh);
-> >  }
-> >-static hyp_alternate_select(__debug_save_spe,
-> >-			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
-> >-			    ARM64_HAS_VIRT_HOST_EXTN);
-> >-
-> >  static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
-> >  {
-> >  	if (!pmscr_el1)
-> >@@ -174,17 +165,22 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
-> >  {
-> >  	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
-> >  			   kern_hyp_va(vcpu->arch.host_cpu_context));
-> >-	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
-> >+
-> >+	/* Non-VHE: Disable and flush SPE data generation
-> >+	 * VHE: The vcpu can run. but it can't hide. */
-> >+	if (!has_vhe())
-> >+		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
-> >  }
-> >  void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
-> >  {
-> >-	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
-> >+	if (!has_vhe())
-> >+		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
-> 
-> For consistency, would it be worth naming that function
-> '__debug_restore_spe_nvhe' ?
+Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
+introduced a QUIRK for the MTK platform to adjust this interval to 20,
+which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
+due to the fact that the MTK controller IMOD interval is 8 times
+as much as defined in xHCI spec.
 
-Yes.
+Instead of adding more quirk bits for additional platforms, this patch
+introduces the ability for vendors to set the IMOD_INTERVAL as is
+optimal for their platform. By using device_property_read_u32() on
+"imod-interval", the IMOD INTERVAL can be specified in nano seconds. If
+no interval is specified, the default of 40,000ns (IMOD=160) will be
+used.
 
-> 
-> Also, looking at __debug_save_spe_nvhe, I'm not sure how we guarantee that
-> we might not end up using stale data during the restore_spe (though, if this
-> is an issue, it existed before this change).
-> The save function might exit without setting a value to saved pmscr_el1.
-> 
-> Basically I'm wondering if the following scenario (in non VHE) is possible
-> and/or whether it is problematic:
-> 
-> - save spe
-> - restore spe
-> - host starts using spi -> !(PMBLIMITR_EL1 & PMBLIMITR_EL1_E)
+No bounds checking has been implemented due to the fact that a vendor
+may have violated the spec and would need to specify a value outside of
+the max 8,000 IRQs/second limit specified in the xHCI spec.
 
-spi ?
+Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+---
+changes from v2:
+  * Added PCI default value [Mathias]
+  * Removed xhci-mtk.h from xhci-plat.c [Chunfeng Yun]
+  * Removed MTK quirk from xhci-plat and moved logic to xhci-mtk [Chunfeng]
+  * Updated bindings Documentation to use proper units [Rob Herring]
+  * Added imod-interval description and example to MTK binding documentation
+changes from v1:
+  * Removed device_property_read_u32() per suggestion from greg k-h
+  * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
 
-> - save spe -> returns early without setting pmscr_el1
-> - restore spe with old save instead of doing nothing
-> 
+ Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 2 ++
+ Documentation/devicetree/bindings/usb/usb-xhci.txt          | 1 +
+ drivers/usb/host/xhci-mtk.c                                 | 9 +++++++++
+ drivers/usb/host/xhci-pci.c                                 | 3 +++
+ drivers/usb/host/xhci-plat.c                                | 4 ++++
+ drivers/usb/host/xhci.c                                     | 7 ++-----
+ drivers/usb/host/xhci.h                                     | 2 ++
+ 7 files changed, 23 insertions(+), 5 deletions(-)
 
-I think I see what you mean.  Basically you're asking if we need this:
-
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 4112160..8ab3510 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -106,7 +106,7 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+index 3059596..45bbf18 100644
+--- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+@@ -46,6 +46,7 @@ Optional properties:
+  - pinctrl-names : a pinctrl state named "default" must be defined
+  - pinctrl-0 : pin control group
+ 	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
++ - imod-interval: Default interval is 5000ns
  
- static void __hyp_text __debug_restore_spe_nvhe(u64 &pmscr_el1)
- {
--	if (!pmscr_el1)
-+	if (*pmscr_el1 != 0)
- 		return;
+ Example:
+ usb30: usb at 11270000 {
+@@ -66,6 +67,7 @@ usb30: usb at 11270000 {
+ 	usb3-lpm-capable;
+ 	mediatek,syscon-wakeup = <&pericfg>;
+ 	mediatek,wakeup-src = <1>;
++	imod-interval = <10000>;
+ };
  
- 	/* The host page table is installed, but not yet synchronised */
-@@ -114,6 +114,7 @@ static void __hyp_text __debug_restore_spe_nvhe(u64 &pmscr_el1)
+ 2nd: dual-role mode with xHCI driver
+diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+index ae6e484..89b68f1 100644
+--- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
++++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+@@ -29,6 +29,7 @@ Optional properties:
+   - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+   - usb3-lpm-capable: determines if platform is USB3 LPM capable
+   - quirk-broken-port-ped: set if the controller has broken port disable mechanism
++  - imod-interval: Default interval is 40000ns
  
- 	/* Re-enable data generation */
- 	write_sysreg_s(pmscr_el1, PMSCR_EL1);
-+	*pmscr_el1 = 0;
- }
+ Example:
+ 	usb at f0931000 {
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index b62a1d2..278ea3b 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -674,6 +674,15 @@ static int xhci_mtk_probe(struct platform_device *pdev)
  
- void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
-
-I think we do, and I think this is a separate fix.  Would you like to
-write a patch and cc Will and Marc (original author and committer) to
-fix this?  Probably worth a cc stable as well.
-
-Thanks,
--Christoffer
+ 	xhci = hcd_to_xhci(hcd);
+ 	xhci->main_hcd = hcd;
++
++	/*
++	 * imod_interval is the interrupt modulation value in nanoseconds.
++	 * The increment interval is 8 times as much as that defined in
++	 * the xHCI spec on MTK's controller.
++	 */
++	xhci->imod_interval = 5000;
++	device_property_read_u32(dev, "imod-interval", &xhci->imod_interval);
++
+ 	xhci->shared_hcd = usb_create_shared_hcd(driver, dev,
+ 			dev_name(dev), hcd);
+ 	if (!xhci->shared_hcd) {
+diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
+index 7ef1274..efbe57b 100644
+--- a/drivers/usb/host/xhci-pci.c
++++ b/drivers/usb/host/xhci-pci.c
+@@ -234,6 +234,9 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
+ 	if (!xhci->sbrn)
+ 		pci_read_config_byte(pdev, XHCI_SBRN_OFFSET, &xhci->sbrn);
+ 
++	/* imod_interval is the interrupt modulation value in nanoseconds. */
++	xhci->imod_interval = 40000;
++
+ 	retval = xhci_gen_setup(hcd, xhci_pci_quirks);
+ 	if (retval)
+ 		return retval;
+diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+index 09f164f..b78be87 100644
+--- a/drivers/usb/host/xhci-plat.c
++++ b/drivers/usb/host/xhci-plat.c
+@@ -269,6 +269,10 @@ static int xhci_plat_probe(struct platform_device *pdev)
+ 	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+ 		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+ 
++	/* imod_interval is the interrupt modulation value in nanoseconds. */
++	xhci->imod_interval = 40000;
++	device_property_read_u32(sysdev, "imod-interval", &xhci->imod_interval);
++
+ 	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
+ 	if (IS_ERR(hcd->usb_phy)) {
+ 		ret = PTR_ERR(hcd->usb_phy);
+diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+index 2424d30..0b7755b 100644
+--- a/drivers/usb/host/xhci.c
++++ b/drivers/usb/host/xhci.c
+@@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
+ 			"// Set the interrupt modulation register");
+ 	temp = readl(&xhci->ir_set->irq_control);
+ 	temp &= ~ER_IRQ_INTERVAL_MASK;
+-	/*
+-	 * the increment interval is 8 times as much as that defined
+-	 * in xHCI spec on MTK's controller
+-	 */
+-	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
++	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
++
+ 	writel(temp, &xhci->ir_set->irq_control);
+ 
+ 	/* Set the HCD state before we enable the irqs */
+diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+index 99a014a..2a4177b 100644
+--- a/drivers/usb/host/xhci.h
++++ b/drivers/usb/host/xhci.h
+@@ -1717,6 +1717,8 @@ struct xhci_hcd {
+ 	u8		max_interrupters;
+ 	u8		max_ports;
+ 	u8		isoc_threshold;
++	/* imod_interval in ns (I * 250ns) */
++	u32		imod_interval;
+ 	int		event_ring_max;
+ 	/* 4KB min, 128MB max */
+ 	int		page_size;
+-- 
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
