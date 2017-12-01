@@ -1,100 +1,66 @@
-From: fkan@apm.com (Feng Kan)
-Date: Thu, 30 Nov 2017 16:43:00 -0800
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <CAL85gmAmAO+RH7KN8C4zokgTHe7nsCtotdjacSLEunK_4778cw@mail.gmail.com>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
- <CAL85gmAmAO+RH7KN8C4zokgTHe7nsCtotdjacSLEunK_4778cw@mail.gmail.com>
-Message-ID: <CAL85gmDkrwuYPTyUn_cw1bQL2y9D65z2zJe3e79qjifN5Q_7-g@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 30 Nov 2017 16:46:19 -0800
+Subject: [GIT PULL] Amlogic fixes for v4.15-rc (redo)
+Message-ID: <7h7eu7p95w.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:28 PM, Feng Kan <fkan@apm.com> wrote:
-> On Thu, Aug 3, 2017 at 5:32 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
->> This patch series is v3 of a previous posting:
->>
->> v2->v3:
->>         - Fixed DMA masks computation
->>         - Fixed size computation overflow in acpi_dma_get_range()
->>
->> v1->v2:
->>         - Reworked acpi_dma_get_range() flow and logs
->>         - Added IORT named component address limits
->>         - Renamed acpi_dev_get_resources() helper function
->>         - Rebased against v4.13-rc3
->>
->> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
->> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
->>
->> -- Original cover letter --
->>
->> As reported in:
->>
->> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
->>
->> the bus connecting devices to an IOMMU bus can be smaller in size than
->> the IOMMU input address bits which results in devices DMA HW bugs in
->> particular related to IOVA allocation (ie chopping of higher address
->> bits owing to system bus HW capabilities mismatch with the IOMMU).
->>
->> Fortunately this problem can be solved through an already present but never
->> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
->> window for a specific bus in ACPI and therefore all upstream devices
->> connected to it.
->>
->> This small patch series enables _DMA parsing in ACPI core code and
->> use it in ACPI IORT code in order to detect DMA ranges for devices and
->> update their data structures to make them work with their related DMA
->> addressing restrictions.
->>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Hanjun Guo <hanjun.guo@linaro.org>
->> Cc: Feng Kan <fkan@apm.com>
->> Cc: Jon Masters <jcm@redhat.com>
->> Cc: Robert Moore <robert.moore@intel.com>
->> Cc: Robin Murphy <robin.murphy@arm.com>
->> Cc: Zhang Rui <rui.zhang@intel.com>
->> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
->>
->> Lorenzo Pieralisi (5):
->>   ACPICA: resource_mgr: Allow _DMA method in walk resources
->>   ACPI: Make acpi_dev_get_resources() method agnostic
->>   ACPI: Introduce DMA ranges parsing
->>   ACPI: Make acpi_dma_configure() DMA regions aware
->>   ACPI/IORT: Add IORT named component memory address limits
->>
->>  drivers/acpi/acpica/rsxface.c |  7 ++--
->>  drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
->>  drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
->>  drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
->>  include/acpi/acnames.h        |  1 +
->>  include/acpi/acpi_bus.h       |  2 +
->>  include/linux/acpi.h          |  8 ++++
->>  include/linux/acpi_iort.h     |  5 ++-
->>  8 files changed, 219 insertions(+), 34 deletions(-)
->>
->> --
->> 2.10.0
->>
-> Lorenzo:
->
-> A network driver can use pci_set_dma_mask or its like to override what
-> is done with this patch here.
-> Which would result in iova allocation greater than the original _DMA
-> aperture. Should we force
-> the dma_set_mask to not change if an existing mask is already set?
+Arnd, Olof,
 
-Let me clarify the question some more, in our system the IOMMU supports only
-42 bits of address. With your _DMA aperture patch, the initial dma_mask and
-coherent_mask are correctly set by the code. However, the device driver can
-set the dma_mask and coherent mask at a later point which over writes the
-initial setting by your code. In which case, once the iova is exhausted with the
-32 bit address, it will start seeking more iova address via the
-dma_limit. In this
-case it would fail my system since the iommu.aperture_end is that of 48 bits
-as derived from ias field in  the SMMU.
+A handful of minor v4.15 fixes for Amlogic family SoCs.  They're mostly
+DT, but some trivial non-DT stuff mixed in.  Let me know if you prefer
+those in separate pulls, and I will do so.
 
-Should the dma_limit be the smallest of driver->dma_mask, iommu.aperture_end and
-your _DMA aperture size via ACPI table? Rather than just the
-driver->dma_mask and
-iommu.aperture_end. This will ensure the smallest/correct aperture is used.
+Thanks,
+
+Kevin
+
+
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git amlogic-fixes
+
+for you to fetch changes up to 9f8e06ca1d0e3ef1167a2f43a8b1e63763b283b8:
+
+  ARM64: dts: odroid-c2: Add HDMI and CEC Nodes (2017-11-30 15:30:09 -0800)
+
+----------------------------------------------------------------
+Amlogic fixes for v4.15-rc
+- GPIO interrupt fixes
+- new nodes for drivers merged late (VPU domains)
+- socinfo fix for GX series
+- fix typo
+
+----------------------------------------------------------------
+Arnaud Patard (1):
+      meson-gx-socinfo: Fix package id parsing
+
+Colin Ian King (1):
+      ARM: meson: fix spelling mistake: "Couln't" -> "Couldn't"
+
+Martin Blumenstingl (2):
+      ARM: dts: meson: correct the sort order for the the gpio_intc node
+      ARM: dts: meson: fix the memory region of the GPIO interrupt controller
+
+Neil Armstrong (4):
+      ARM64: dts: meson-gx: add VPU power domain
+      ARM64: dts: meson-gx: Add HDMI_5V regulator on selected boards
+      ARM64: dts: meson-gx: grow reset controller memory zone
+      ARM64: dts: odroid-c2: Add HDMI and CEC Nodes
+
+ arch/arm/boot/dts/meson.dtsi                                 | 18 +++++++++---------
+ arch/arm/mach-meson/platsmp.c                                |  2 +-
+ arch/arm64/boot/dts/amlogic/meson-gx-p23x-q20x.dtsi          | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gx.dtsi                    | 13 ++++++++++++-
+ arch/arm64/boot/dts/amlogic/meson-gxbb-odroidc2.dts          | 30 ++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi                  | 43 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-libretech-cc.dts | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl-s905x-p212.dtsi        | 12 ++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi                   | 43 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/amlogic/meson-gxm-khadas-vim2.dts        | 12 ++++++++++++
+ drivers/soc/amlogic/meson-gx-socinfo.c                       |  4 ++--
+ 11 files changed, 188 insertions(+), 13 deletions(-)
