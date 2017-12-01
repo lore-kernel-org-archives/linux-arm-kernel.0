@@ -1,110 +1,261 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 1 Dec 2017 10:39:43 +0000
-Subject: [PATCH v3 0/5] ACPI: DMA ranges management
-In-Reply-To: <CAL85gmDkrwuYPTyUn_cw1bQL2y9D65z2zJe3e79qjifN5Q_7-g@mail.gmail.com>
-References: <20170803123239.11359-1-lorenzo.pieralisi@arm.com>
- <CAL85gmAmAO+RH7KN8C4zokgTHe7nsCtotdjacSLEunK_4778cw@mail.gmail.com>
- <CAL85gmDkrwuYPTyUn_cw1bQL2y9D65z2zJe3e79qjifN5Q_7-g@mail.gmail.com>
-Message-ID: <20171201103943.GA25066@red-moon>
+From: jinb.park7@gmail.com (jinb.park)
+Date: Fri, 1 Dec 2017 19:39:41 +0900
+Subject: [kernel-hardening][PATCH 1/3] arm: mm: dump: make page table dumping
+ reusable
+Message-ID: <20171201103941.GA3926@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 04:43:00PM -0800, Feng Kan wrote:
-> On Wed, Nov 29, 2017 at 11:28 PM, Feng Kan <fkan@apm.com> wrote:
-> > On Thu, Aug 3, 2017 at 5:32 AM, Lorenzo Pieralisi
-> > <lorenzo.pieralisi@arm.com> wrote:
-> >> This patch series is v3 of a previous posting:
-> >>
-> >> v2->v3:
-> >>         - Fixed DMA masks computation
-> >>         - Fixed size computation overflow in acpi_dma_get_range()
-> >>
-> >> v1->v2:
-> >>         - Reworked acpi_dma_get_range() flow and logs
-> >>         - Added IORT named component address limits
-> >>         - Renamed acpi_dev_get_resources() helper function
-> >>         - Rebased against v4.13-rc3
-> >>
-> >> v2: http://lkml.kernel.org/r/20170731152323.32488-1-lorenzo.pieralisi at arm.com
-> >> v1: http://lkml.kernel.org/r/20170720144517.32529-1-lorenzo.pieralisi at arm.com
-> >>
-> >> -- Original cover letter --
-> >>
-> >> As reported in:
-> >>
-> >> http://lkml.kernel.org/r/CAL85gmA_SSCwM80TKdkZqEe+S1beWzDEvdki1kpkmUTDRmSP7g at mail.gmail.com
-> >>
-> >> the bus connecting devices to an IOMMU bus can be smaller in size than
-> >> the IOMMU input address bits which results in devices DMA HW bugs in
-> >> particular related to IOVA allocation (ie chopping of higher address
-> >> bits owing to system bus HW capabilities mismatch with the IOMMU).
-> >>
-> >> Fortunately this problem can be solved through an already present but never
-> >> used ACPI 6.2 firmware bindings (ie _DMA object) allowing to define the DMA
-> >> window for a specific bus in ACPI and therefore all upstream devices
-> >> connected to it.
-> >>
-> >> This small patch series enables _DMA parsing in ACPI core code and
-> >> use it in ACPI IORT code in order to detect DMA ranges for devices and
-> >> update their data structures to make them work with their related DMA
-> >> addressing restrictions.
-> >>
-> >> Cc: Will Deacon <will.deacon@arm.com>
-> >> Cc: Hanjun Guo <hanjun.guo@linaro.org>
-> >> Cc: Feng Kan <fkan@apm.com>
-> >> Cc: Jon Masters <jcm@redhat.com>
-> >> Cc: Robert Moore <robert.moore@intel.com>
-> >> Cc: Robin Murphy <robin.murphy@arm.com>
-> >> Cc: Zhang Rui <rui.zhang@intel.com>
-> >> Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
-> >>
-> >> Lorenzo Pieralisi (5):
-> >>   ACPICA: resource_mgr: Allow _DMA method in walk resources
-> >>   ACPI: Make acpi_dev_get_resources() method agnostic
-> >>   ACPI: Introduce DMA ranges parsing
-> >>   ACPI: Make acpi_dma_configure() DMA regions aware
-> >>   ACPI/IORT: Add IORT named component memory address limits
-> >>
-> >>  drivers/acpi/acpica/rsxface.c |  7 ++--
-> >>  drivers/acpi/arm64/iort.c     | 57 ++++++++++++++++++++++++++-
-> >>  drivers/acpi/resource.c       | 82 +++++++++++++++++++++++++++++---------
-> >>  drivers/acpi/scan.c           | 91 +++++++++++++++++++++++++++++++++++++++----
-> >>  include/acpi/acnames.h        |  1 +
-> >>  include/acpi/acpi_bus.h       |  2 +
-> >>  include/linux/acpi.h          |  8 ++++
-> >>  include/linux/acpi_iort.h     |  5 ++-
-> >>  8 files changed, 219 insertions(+), 34 deletions(-)
-> >>
-> >> --
-> >> 2.10.0
-> >>
-> > Lorenzo:
-> >
-> > A network driver can use pci_set_dma_mask or its like to override what
-> > is done with this patch here.
-> > Which would result in iova allocation greater than the original _DMA
-> > aperture. Should we force
-> > the dma_set_mask to not change if an existing mask is already set?
-> 
-> Let me clarify the question some more, in our system the IOMMU supports only
-> 42 bits of address. With your _DMA aperture patch, the initial dma_mask and
-> coherent_mask are correctly set by the code. However, the device driver can
-> set the dma_mask and coherent mask at a later point which over writes the
-> initial setting by your code. In which case, once the iova is exhausted with the
-> 32 bit address, it will start seeking more iova address via the
-> dma_limit. In this
-> case it would fail my system since the iommu.aperture_end is that of 48 bits
-> as derived from ias field in  the SMMU.
-> 
-> Should the dma_limit be the smallest of driver->dma_mask, iommu.aperture_end and
-> your _DMA aperture size via ACPI table? Rather than just the
-> driver->dma_mask and
-> iommu.aperture_end. This will ensure the smallest/correct aperture is used.
+This patch refactors the arm page table dumping code,
+so multiple tables may be registered with the framework.
 
-IIUC Nate already reported this issue - I will sync with Robin to
-check the status of this thread:
+This patch refers below commits of arm64.
+(4674fdb9f149 ("arm64: mm: dump: make page table dumping reusable"))
+(4ddb9bf83349 ("arm64: dump: Make ptdump debugfs a separate option"))
 
-https://marc.info/?l=linux-acpi&m=150108156230455&w=2
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+ arch/arm/Kconfig.debug        |  6 +++-
+ arch/arm/include/asm/ptdump.h | 48 ++++++++++++++++++++++++++++++++
+ arch/arm/mm/Makefile          |  3 +-
+ arch/arm/mm/dump.c            | 65 +++++++++++++++++++------------------------
+ arch/arm/mm/ptdump_debugfs.c  | 34 ++++++++++++++++++++++
+ 5 files changed, 117 insertions(+), 39 deletions(-)
+ create mode 100644 arch/arm/include/asm/ptdump.h
+ create mode 100644 arch/arm/mm/ptdump_debugfs.c
 
-Thanks,
-Lorenzo
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 17685e1..e7b94db 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -3,10 +3,14 @@ menu "Kernel hacking"
+ 
+ source "lib/Kconfig.debug"
+ 
+-config ARM_PTDUMP
++config ARM_PTDUMP_CORE
++	def_bool n
++
++config ARM_PTDUMP_DEBUGFS
+ 	bool "Export kernel pagetable layout to userspace via debugfs"
+ 	depends on DEBUG_KERNEL
+ 	depends on MMU
++	select ARM_PTDUMP_CORE
+ 	select DEBUG_FS
+ 	---help---
+ 	  Say Y here if you want to show the kernel pagetable layout in a
+diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
+new file mode 100644
+index 0000000..3a6c0b7
+--- /dev/null
++++ b/arch/arm/include/asm/ptdump.h
+@@ -0,0 +1,48 @@
++/*
++ * Copyright (C) 2014 ARM Ltd.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#ifndef __ASM_PTDUMP_H
++#define __ASM_PTDUMP_H
++
++#ifdef CONFIG_ARM_PTDUMP_CORE
++
++#include <linux/mm_types.h>
++#include <linux/seq_file.h>
++
++struct addr_marker {
++	unsigned long start_address;
++	char *name;
++};
++
++struct ptdump_info {
++	struct mm_struct		*mm;
++	const struct addr_marker	*markers;
++	unsigned long			base_addr;
++};
++
++void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
++#ifdef CONFIG_ARM_PTDUMP_DEBUGFS
++int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
++#else
++static inline int ptdump_debugfs_register(struct ptdump_info *info,
++					const char *name)
++{
++	return 0;
++}
++#endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
++
++#endif /* CONFIG_ARM_PTDUMP_CORE */
++
++#endif /* __ASM_PTDUMP_H */
+diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+index 01bcc33..28be5f4 100644
+--- a/arch/arm/mm/Makefile
++++ b/arch/arm/mm/Makefile
+@@ -13,7 +13,8 @@ obj-y				+= nommu.o
+ obj-$(CONFIG_ARM_MPU)		+= pmsa-v7.o
+ endif
+ 
+-obj-$(CONFIG_ARM_PTDUMP)	+= dump.o
++obj-$(CONFIG_ARM_PTDUMP_CORE)	+= dump.o
++obj-$(CONFIG_ARM_PTDUMP_DEBUGFS)	+= ptdump_debugfs.o
+ obj-$(CONFIG_MODULES)		+= proc-syms.o
+ obj-$(CONFIG_DEBUG_VIRTUAL)	+= physaddr.o
+ 
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index fc3b440..8dfe7c3 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -21,11 +21,7 @@
+ #include <asm/fixmap.h>
+ #include <asm/memory.h>
+ #include <asm/pgtable.h>
+-
+-struct addr_marker {
+-	unsigned long start_address;
+-	const char *name;
+-};
++#include <asm/ptdump.h>
+ 
+ static struct addr_marker address_markers[] = {
+ 	{ MODULES_VADDR,	"Modules" },
+@@ -335,50 +331,36 @@ static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
+ 	}
+ }
+ 
+-static void walk_pgd(struct seq_file *m)
++static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
++			unsigned long start)
+ {
+-	pgd_t *pgd = swapper_pg_dir;
+-	struct pg_state st;
+-	unsigned long addr;
++	pgd_t *pgd = pgd_offset(mm, 0UL);
+ 	unsigned i;
+-
+-	memset(&st, 0, sizeof(st));
+-	st.seq = m;
+-	st.marker = address_markers;
++	unsigned long addr;
+ 
+ 	for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
+-		addr = i * PGDIR_SIZE;
++		addr = start + i * PGDIR_SIZE;
+ 		if (!pgd_none(*pgd)) {
+-			walk_pud(&st, pgd, addr);
++			walk_pud(st, pgd, addr);
+ 		} else {
+-			note_page(&st, addr, 1, pgd_val(*pgd), NULL);
++			note_page(st, addr, 1, pgd_val(*pgd), NULL);
+ 		}
+ 	}
+-
+-	note_page(&st, 0, 0, 0, NULL);
+ }
+ 
+-static int ptdump_show(struct seq_file *m, void *v)
++void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
+ {
+-	walk_pgd(m);
+-	return 0;
+-}
++	struct pg_state st = {
++		.seq = m,
++		.marker = info->markers,
++	};
+ 
+-static int ptdump_open(struct inode *inode, struct file *file)
+-{
+-	return single_open(file, ptdump_show, NULL);
++	walk_pgd(&st, info->mm, info->base_addr);
++	note_page(&st, 0, 0, 0, NULL);
+ }
+ 
+-static const struct file_operations ptdump_fops = {
+-	.open		= ptdump_open,
+-	.read		= seq_read,
+-	.llseek		= seq_lseek,
+-	.release	= single_release,
+-};
+-
+-static int ptdump_init(void)
++static void ptdump_initialize(void)
+ {
+-	struct dentry *pe;
+ 	unsigned i, j;
+ 
+ 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
+@@ -387,9 +369,18 @@ static int ptdump_init(void)
+ 				pg_level[i].mask |= pg_level[i].bits[j].mask;
+ 
+ 	address_markers[2].start_address = VMALLOC_START;
++}
+ 
+-	pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
+-				 &ptdump_fops);
+-	return pe ? 0 : -ENOMEM;
++static struct ptdump_info kernel_ptdump_info = {
++	.mm = &init_mm,
++	.markers = address_markers,
++	.base_addr = 0,
++};
++
++static int ptdump_init(void)
++{
++	ptdump_initialize();
++	return ptdump_debugfs_register(&kernel_ptdump_info,
++					"kernel_page_tables");
+ }
+ __initcall(ptdump_init);
+diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
+new file mode 100644
+index 0000000..be8d87b
+--- /dev/null
++++ b/arch/arm/mm/ptdump_debugfs.c
+@@ -0,0 +1,34 @@
++// SPDX-License-Identifier: GPL-2.0
++#include <linux/debugfs.h>
++#include <linux/seq_file.h>
++
++#include <asm/ptdump.h>
++
++static int ptdump_show(struct seq_file *m, void *v)
++{
++	struct ptdump_info *info = m->private;
++
++	ptdump_walk_pgd(m, info);
++	return 0;
++}
++
++static int ptdump_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, ptdump_show, inode->i_private);
++}
++
++static const struct file_operations ptdump_fops = {
++	.open		= ptdump_open,
++	.read		= seq_read,
++	.llseek		= seq_lseek,
++	.release	= single_release,
++};
++
++int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
++{
++	struct dentry *pe;
++
++	pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
++	return pe ? 0 : -ENOMEM;
++
++}
+-- 
+1.9.1
