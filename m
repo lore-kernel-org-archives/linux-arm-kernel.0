@@ -1,43 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 1 Dec 2017 10:39:20 +0100
-Subject: [PATCH 1/5] mtd: nand: use usual return values for the
- ->erase() hook
-In-Reply-To: <20171130230246.61a9ed19@xps13>
-References: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
- <20171130170132.27522-2-miquel.raynal@free-electrons.com>
- <20171130215113.458d616f@bbrezillon>
- <20171130230246.61a9ed19@xps13>
-Message-ID: <20171201103920.1ed36f99@bbrezillon>
+From: jinb.park7@gmail.com (jinb.park)
+Date: Fri, 1 Dec 2017 19:38:49 +0900
+Subject: [kernel-hardening][PATCH 0/3] arm: Makes ptdump resuable and add WX
+ page checking
+Message-ID: <20171201103849.GA3817@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 30 Nov 2017 23:02:46 +0100
-Miquel RAYNAL <miquel.raynal@free-electrons.com> wrote:
+Hi,
 
-> > > diff --git a/drivers/mtd/nand/nand_base.c
-> > > b/drivers/mtd/nand/nand_base.c index 630048f5abdc..4d1f2bda6095
-> > > 100644 --- a/drivers/mtd/nand/nand_base.c
-> > > +++ b/drivers/mtd/nand/nand_base.c
-> > > @@ -3077,7 +3077,7 @@ int nand_erase_nand(struct mtd_info *mtd,
-> > > struct erase_info *instr, status = chip->erase(mtd, page &
-> > > chip->pagemask); 
-> > >  		/* See if block erase succeeded */
-> > > -		if (status & NAND_STATUS_FAIL) {
-> > > +		if (status) {
-> > >  			pr_debug("%s: failed erase, page 0x%08x\n",
-> > >  					__func__, page);
-> > >  			instr->state = MTD_ERASE_FAILED;    
-> > 
-> > You forgot to patch single_erase() accordingly.  
-> 
-> Right, sorry about that, I will fix that.
+Page table dumping code for arm64-x86 is reusable,
+and they have function for WX page checking.
+But arm doesn't have that.
 
-If fixed it when applying, no need to resend.
+This path series are to makes ptdump reusable,
+and add WX page checking for arm.
+This is heavily based on arm64 version.
 
-Thanks,
+Jinbum Park (3):
+  arm: mm: dump: make page table dumping reusable
+  arm: mm: dump: make the page table dumping seq_file optional
+  arm: mm: dump: add checking for writable and executable pages
 
-Boris
+ arch/arm/Kconfig.debug        |  33 +++++++-
+ arch/arm/include/asm/ptdump.h |  56 ++++++++++++++
+ arch/arm/mm/Makefile          |   3 +-
+ arch/arm/mm/dump.c            | 171 +++++++++++++++++++++++++++++++-----------
+ arch/arm/mm/init.c            |   2 +
+ arch/arm/mm/ptdump_debugfs.c  |  34 +++++++++
+ 6 files changed, 253 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm/include/asm/ptdump.h
+ create mode 100644 arch/arm/mm/ptdump_debugfs.c
 
-> 
-> Thanks,
-> Miqu?l
+-- 
+1.9.1
