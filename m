@@ -1,47 +1,60 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 1 Dec 2017 11:12:08 +0900
-Subject: [PATCH 1/5] mtd: nand: use usual return values for the ->erase()
- hook
-In-Reply-To: <20171130230246.61a9ed19@xps13>
-References: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
- <20171130170132.27522-2-miquel.raynal@free-electrons.com>
- <20171130215113.458d616f@bbrezillon>
- <20171130230246.61a9ed19@xps13>
-Message-ID: <CAK7LNASxa4GCnutU4LZhVjV4sK3YLZ+RkewvyY0P4rZENpoOwQ@mail.gmail.com>
+From: sean.wang@mediatek.com (Sean Wang)
+Date: Fri, 1 Dec 2017 10:23:11 +0800
+Subject: [PATCH 1/3] mmc: dt-bindings: add mmc support to MT7623 SoC
+In-Reply-To: <20171201020604.etfzccuwomxgcwmg@rob-hp-laptop>
+References: <cover.1511949769.git.sean.wang@mediatek.com>
+ <3e2c72d18bbe6d7c762fd820195f0fa0b5a45bbf.1511949769.git.sean.wang@mediatek.com>
+ <20171201020604.etfzccuwomxgcwmg@rob-hp-laptop>
+Message-ID: <1512094991.28444.11.camel@mtkswgap22>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2017-12-01 7:02 GMT+09:00 Miquel RAYNAL <miquel.raynal@free-electrons.com>:
->> > diff --git a/drivers/mtd/nand/nand_base.c
->> > b/drivers/mtd/nand/nand_base.c index 630048f5abdc..4d1f2bda6095
->> > 100644 --- a/drivers/mtd/nand/nand_base.c
->> > +++ b/drivers/mtd/nand/nand_base.c
->> > @@ -3077,7 +3077,7 @@ int nand_erase_nand(struct mtd_info *mtd,
->> > struct erase_info *instr, status = chip->erase(mtd, page &
->> > chip->pagemask);
->> >             /* See if block erase succeeded */
->> > -           if (status & NAND_STATUS_FAIL) {
->> > +           if (status) {
->> >                     pr_debug("%s: failed erase, page 0x%08x\n",
->> >                                     __func__, page);
->> >                     instr->state = MTD_ERASE_FAILED;
->>
->> You forgot to patch single_erase() accordingly.
->
-> Right, sorry about that, I will fix that.
->
+On Thu, 2017-11-30 at 20:06 -0600, Rob Herring wrote:
+> On Wed, Nov 29, 2017 at 06:10:35PM +0800, sean.wang at mediatek.com wrote:
+> > From: Sean Wang <sean.wang@mediatek.com>
+> > 
+> > Add the devicetree binding for MT7623 SoC using MT2701 as the fallback.
+> > 
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+> > ---
+> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt | 2 ++
+> >  1 file changed, 2 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mmc/mtk-sd.txt b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > index 72d2a73..1732588 100644
+> > --- a/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > +++ b/Documentation/devicetree/bindings/mmc/mtk-sd.txt
+> > @@ -12,6 +12,8 @@ Required properties:
+> >  	"mediatek,mt8173-mmc": for mmc host ip compatible with mt8173
+> >  	"mediatek,mt2701-mmc": for mmc host ip compatible with mt2701
+> >  	"mediatek,mt2712-mmc": for mmc host ip compatible with mt2712
+> > +	"mediatek,mt7623-mmc",
+> > +	"mediatek,mt2701-mmc": for mmc host ip compatible with mt7623
+> 
+> Those should be on 1 line ideally.
+> 
+> BTW, I find "for mmc host ip compatible with mt7623" to be mostly 
+> redundant.
+> Either way,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> 
+> 
 
-Assuming single_erase() will be fixed,
+okay, thanks for your careful guide
+
+These will be fixed with 
+"mediatek,mt7623-mmc", "mediatek,mt2701-mmc": for MT7623 SoC 
+in the next version
+
+	Sean
 
 
-For denali.c
-
-Acked-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+> >  - reg: physical base address of the controller and length
+> >  - interrupts: Should contain MSDC interrupt number
+> >  - clocks: Should contain phandle for the clock feeding the MMC controller
+> > -- 
+> > 2.7.4
+> > 
+> 
