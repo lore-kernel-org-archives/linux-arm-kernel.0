@@ -1,61 +1,66 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:37 +0100
-Subject: [PATCH v2 14/27] drm/sun4i: Move channel size related code in DE2
+Date: Fri,  1 Dec 2017 07:05:29 +0100
+Subject: [PATCH v2 06/27] drm/sun4i: Explain color macro in DE2 driver
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-15-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-7-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Channel size should be set every time plane is changed, not only when
-primary plane changes. Current code works only because only one
-(primary) plane is supported at the moment.
+Color attribute have same format troughout the whole driver.
+
+Rename macro, add comment with simple explanation and remove redundant
+definitions.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 14 ++++++--------
- 1 file changed, 6 insertions(+), 8 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 8 +++++---
+ drivers/gpu/drm/sun4i/sun8i_mixer.h | 4 ++--
+ 2 files changed, 7 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 9635c30651d6..00c0cc6440e2 100644
+index f4a7fa0ba7ad..5144e6d0ac56 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -109,16 +109,8 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
- 		regmap_write(mixer->engine.regs,
- 			     SUN8I_MIXER_GLOBAL_SIZE,
- 			     size);
--		DRM_DEBUG_DRIVER("Updating blender size\n");
--		regmap_write(mixer->engine.regs,
--			     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
--			     size);
- 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTSIZE,
- 			     size);
--		DRM_DEBUG_DRIVER("Updating channel size\n");
--		regmap_write(mixer->engine.regs,
--			     SUN8I_MIXER_CHAN_UI_OVL_SIZE(channel),
--			     size);
- 	}
+@@ -317,17 +317,19 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_GLOBAL_CTL,
+ 		     SUN8I_MIXER_GLOBAL_CTL_RT_EN);
  
- 	/* Set height and width */
-@@ -126,6 +118,9 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
++	/* Set background color to black */
++	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
++		     SUN8I_MIXER_BLEND_COLOR_BLACK);
++
+ 	/* Initialize blender */
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_FCOLOR_CTL,
+ 		     SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF);
+-	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
+-		     SUN8I_MIXER_BLEND_BKCOLOR_DEF);
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(0),
+ 		     SUN8I_MIXER_BLEND_MODE_DEF);
+ 
  	regmap_write(mixer->engine.regs,
- 		     SUN8I_MIXER_CHAN_UI_LAYER_SIZE(channel, overlay),
- 		     size);
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_CHAN_UI_OVL_SIZE(channel),
-+		     size);
+ 		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
+-		     SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF);
++		     SUN8I_MIXER_BLEND_COLOR_BLACK);
  
- 	/* Set base coordinates */
- 	DRM_DEBUG_DRIVER("Layer coordinates X: %d Y: %d\n",
-@@ -133,6 +128,9 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer, int channel,
- 	regmap_write(mixer->engine.regs,
- 		     SUN8I_MIXER_BLEND_ATTR_COORD(channel),
- 		     SUN8I_MIXER_COORD(state->dst.x1, state->dst.y1));
-+	regmap_write(mixer->engine.regs,
-+		     SUN8I_MIXER_BLEND_ATTR_INSIZE(channel),
-+		     size);
+ 	/* Select the first UI channel */
+ 	DRM_DEBUG_DRIVER("Selecting channel %d (first UI channel)\n",
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+index db005a4bca43..9b50733298b8 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
+@@ -45,10 +45,10 @@
+ #define SUN8I_MIXER_BLEND_CK_MIN(x)		(0x10e0 + 0x04 * (x))
+ #define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
  
- 	return 0;
- }
++/* colors are always in AARRGGBB format */
++#define SUN8I_MIXER_BLEND_COLOR_BLACK		0xff000000
+ /* The following numbers are some still unknown magic numbers */
+-#define SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF	0xff000000
+ #define SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF	0x00000101
+-#define SUN8I_MIXER_BLEND_BKCOLOR_DEF		0xff000000
+ #define SUN8I_MIXER_BLEND_MODE_DEF		0x03010301
+ 
+ #define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
 -- 
 2.15.1
