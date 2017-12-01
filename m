@@ -1,80 +1,76 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Fri, 1 Dec 2017 08:08:25 +0100
-Subject: SCPI regressions in v4.15-rc1 on Amlogic SoCs.
-In-Reply-To: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
-References: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
-Message-ID: <9754d389-1dd4-e189-6c8f-c725d049dea8@gmail.com>
+From: hns@goldelico.com (H. Nikolaus Schaller)
+Date: Fri, 1 Dec 2017 08:41:00 +0100
+Subject: [PATCH v3 4/4] DTS: Pandora: fix panel compatibility string
+In-Reply-To: <20171130152430.GM28152@atomide.com>
+References: <cover.1511884135.git.hns@goldelico.com>
+ <b6001c7b7fb98e7a3ad4c712084fea9dae9e6b27.1511884135.git.hns@goldelico.com>
+ <20171128160437.GD28152@atomide.com>
+ <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
+ <20171128161834.GE28152@atomide.com>
+ <4EE1E298-6461-48FF-977C-958DD16AD83A@goldelico.com>
+ <20171130152430.GM28152@atomide.com>
+Message-ID: <029CB0A8-2D63-4F84-96EE-6C37167E1297@goldelico.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 01.12.2017 um 01:21 schrieb Kevin Hilman:
-> Hi Sudeep,
-> 
-> There's been a pretty major regression in v4.15-rc1 compared to v4.15
-> in SCPI causing warning splats on amlogic SoCs when cpufreq starts up
-> and tries to set the OPP for the first time[1].
-> 
-Thanks for the report. Strange enough, it works perfectly fine on my
-Odroid-C2, see below log part from latest next kernel.
 
-Your log seems to indicate that due to deferred probing something is
-not done in the right order.
-Can you bisect the issue? I'd assume that it's commit 931cf0c53e69
-("firmware: arm_scpi: pre-populate dvfs info in scpi_probe").
+> Am 30.11.2017 um 16:24 schrieb Tony Lindgren <tony@atomide.com>:
+> 
+> * H. Nikolaus Schaller <hns@goldelico.com> [171128 18:35]:
+>> Hi,
+>> 
+>>> Am 28.11.2017 um 17:18 schrieb Tony Lindgren <tony@atomide.com>:
+>>> 
+>>> * H. Nikolaus Schaller <hns@goldelico.com> [171128 16:17]:
+>>>> Hi Tony,
+>>>> 
+>>>>> Am 28.11.2017 um 17:04 schrieb Tony Lindgren <tony@atomide.com>:
+>>>>> 
+>>>>> * H. Nikolaus Schaller <hns@goldelico.com> [171128 15:52]:
+>>>>>> We can remove the unnecessary "omapdss," prefix because
+>>>>>> the omapdrm driver takes care of it when matching with
+>>>>>> the driver table.
+>>>>> 
+>>>>> So is this needed as a fix or is this another clean-up?
+>>>>> 
+>>>>> So is this is really needed as a fix?
+>>>> 
+>>>> Hm. How do you differentiate between "fix" and "cleanup"?
+>>>> Maybe it is more a wording than a content issue...
+>>>> 
+>>>> For me it is a "fix" because it is semantically wrong to have
+>>>> a prefix where it is not needed. And "fixing" it changes the
+>>>> compiler output by 8 bytes.
+>>> 
+>>> How about let's call it a "typo fix" then? :)
+>> 
+>> Well, it is not really a typo.
+> 
+> Well what if the stable people pick it into earlier stable series
+> based on the word fix in the subject? That has happened before.
 
-Rgds, Heiner
+Well, that may happen but IMHO *every* such backport must be checked
+for reasonability and compatibility and sometimes even modified to apply.
 
-[    0.034293] soc soc0: Amlogic Meson GXBB (S905) Revision 1f:0 (c:1) Detected
-[    0.036666] c81004c0.serial: ttyAML0 at MMIO 0xc81004c0 (irq = 13, base_baud = 1500000) is a meson_uart
-[    0.606914] console [ttyAML0] enabled
-[    0.615031] loop: module loaded
-[    0.616117] meson-gx-mmc d0074000.mmc: allocated mmc-pwrseq
-[    0.643406] ledtrig-cpu: registered to indicate activity on CPUs
-[    0.644047] meson-sm: secure-monitor enabled
-[    0.648156] hidraw: raw HID events driver (C) Jiri Kosina
-[    0.653572] platform-mhu c883c404.mailbox: Platform MHU Mailbox registered
-[    0.660439] NET: Registered protocol family 17
-[    0.665031] registered taskstats version 1
-[    0.668689] Loading compiled-in X.509 certificates
-[    0.678049] meson-gx-mmc d0072000.mmc: Got CD GPIO
-[    0.712946] scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
-[    0.715600] cpu cpu0: bL_cpufreq_init: CPU 0 initialized
-[    0.719245] arm_big_little: bL_cpufreq_register: Registered platform driver: scpi
-[    0.727344] mmc0: new HS400 MMC card at address 0001
-[    0.729179] hctosys: unable to open rtc device (rtc0)
-[    0.729355] USB_OTG_PWR: disabling
-[    0.729358] TFLASH_VDD: disabling
-[    0.729361] TF_IO: disabling
-[    0.747230] mmcblk0: mmc0:0001 DJNB4R 116 GiB
-[    0.752588] mmcblk0boot0: mmc0:0001 DJNB4R partition 1 4.00 MiB
-[    0.757220] mmcblk0boot1: mmc0:0001 DJNB4R partition 2 4.00 MiB
-[    0.762274] mmcblk0rpmb: mmc0:0001 DJNB4R partition 3 4.00 MiB, chardev (249:0)
-[    0.770243]  mmcblk0: p1
-[    0.781732] EXT4-fs (mmcblk0p1): mounted filesystem with ordered data mode. Opts: (null)
+And I think the author of the original patch receives a notification
+from the stable maintainers and can then veto.
 
+For Example I received "[PATCH 4.7 118/186] w1:omap_hdq: fix regression"
+"4.7-stable review patch.  If anyone has any objections, please let me know."
 
-> I ran out of time to narrow it down further since there have been
-> quite a few changes since v4.14, but simply reverting
-> drivers/firmware/arm_scpi.c to its v4.14 state gets things working
-> again.
+If that process still fails, we simply have to revert it... Has also
+happened before. So it will not be end of mankind :)
+
 > 
-> This has been happening for awhile, and we should've caught it sooner
-> in kernelCI.org, however this warning splat still allows the kernel to
-> finish booting, so it still resulted in a PASS for the boot test.
-> That combined with the fact that we've been tracking some other
-> regressions, we didn't notice it until now.
-> 
-> Also, is this the expected result for the pre-1.0 firmware:
-> 
->     scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
-> 
-> Kevin
-> 
-> [1] Here are a few boot logs from v4.15-rc1 with the splat:
-> 
-> https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-baylibre-seattle/boot-meson-gxl-s905x-khadas-vim.html
-> 
-> https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-baylibre-seattle/boot-meson-gxbb-p200.html
-> 
-> https://storage.kernelci.org/mainline/master/v4.15-rc1/arm64/defconfig/lab-baylibre-seattle/boot-meson-gxl-s905d-p230.html
-> 
+> I suggest you update the dts patches to use wording like
+> "update compatible to use new naming" or something similar.
+
+I have applied s/fix/improve/ for patch 3/4 and left 4/4 as
+suggested by Sebastian since it is really a strongly suggested
+correction.
+
+Since Tomi has already accepted the underlaying driver patch,
+[PATCH v4] will only have the remaining DTS patches.
+
+BR and thanks,
+Nikolaus
