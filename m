@@ -1,104 +1,114 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  1 Dec 2017 14:44:43 +0100
-Subject: [PATCH v4 02/10] pinctrl: axp209: add pinctrl features
+Date: Fri,  1 Dec 2017 14:44:42 +0100
+Subject: [PATCH v4 01/10] pinctrl: move gpio-axp209 to pinctrl
 In-Reply-To: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
 References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <71c9da94df2a5938cb8c092e40f8e36eec0b01c3.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <cd2cb8f13fb359da0e300aa349bf48ca80451a69.1512135804.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP209 has 3 GPIOs. GPIO0/1 can each act either as a GPIO,
-an ADC or a LDO regulator. GPIO2 can only act as a GPIO.
-
-This adds the pinctrl features to the driver so GPIO0/1 can be used as
-ADC or LDO regulator.
+To prepare the driver for the upcoming pinctrl features, move the GPIO
+driver AXP209 from GPIO to pinctrl subsystem.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/pinctrl/pinctrl-axp209.c | 306 +++++++++++++++++++++++++++++---
- 1 file changed, 286 insertions(+), 20 deletions(-)
+ drivers/gpio/Kconfig             |   6 +-
+ drivers/gpio/Makefile            |   1 +-
+ drivers/gpio/gpio-axp209.c       | 188 +--------------------------------
+ drivers/pinctrl/Kconfig          |   6 +-
+ drivers/pinctrl/Makefile         |   1 +-
+ drivers/pinctrl/pinctrl-axp209.c | 188 ++++++++++++++++++++++++++++++++-
+ 6 files changed, 195 insertions(+), 195 deletions(-)
+ delete mode 100644 drivers/gpio/gpio-axp209.c
+ create mode 100644 drivers/pinctrl/pinctrl-axp209.c
 
-diff --git a/drivers/pinctrl/pinctrl-axp209.c b/drivers/pinctrl/pinctrl-axp209.c
-index 4a346b7..2dc286f 100644
---- a/drivers/pinctrl/pinctrl-axp209.c
-+++ b/drivers/pinctrl/pinctrl-axp209.c
-@@ -1,7 +1,8 @@
- /*
+diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
+index d6a8e85..395669b 100644
+--- a/drivers/gpio/Kconfig
++++ b/drivers/gpio/Kconfig
+@@ -122,12 +122,6 @@ config GPIO_ATH79
+ 	  Select this option to enable GPIO driver for
+ 	  Atheros AR71XX/AR724X/AR913X SoC devices.
+ 
+-config GPIO_AXP209
+-	tristate "X-Powers AXP209 PMIC GPIO Support"
+-	depends on MFD_AXP20X
+-	help
+-	  Say yes to enable GPIO support for the AXP209 PMIC
+-
+ config GPIO_BCM_KONA
+ 	bool "Broadcom Kona GPIO"
+ 	depends on OF_GPIO && (ARCH_BCM_MOBILE || COMPILE_TEST)
+diff --git a/drivers/gpio/Makefile b/drivers/gpio/Makefile
+index 4bc24fe..bc5dd67 100644
+--- a/drivers/gpio/Makefile
++++ b/drivers/gpio/Makefile
+@@ -32,7 +32,6 @@ obj-$(CONFIG_GPIO_AMDPT)	+= gpio-amdpt.o
+ obj-$(CONFIG_GPIO_ARIZONA)	+= gpio-arizona.o
+ obj-$(CONFIG_GPIO_ATH79)	+= gpio-ath79.o
+ obj-$(CONFIG_GPIO_ASPEED)	+= gpio-aspeed.o
+-obj-$(CONFIG_GPIO_AXP209)	+= gpio-axp209.o
+ obj-$(CONFIG_GPIO_BCM_KONA)	+= gpio-bcm-kona.o
+ obj-$(CONFIG_GPIO_BD9571MWV)	+= gpio-bd9571mwv.o
+ obj-$(CONFIG_GPIO_BRCMSTB)	+= gpio-brcmstb.o
+diff --git a/drivers/gpio/gpio-axp209.c b/drivers/gpio/gpio-axp209.c
+deleted file mode 100644
+index 4a346b7..0000000
+--- a/drivers/gpio/gpio-axp209.c
++++ /dev/null
+@@ -1,188 +0,0 @@
+-/*
 - * AXP20x GPIO driver
-+ * AXP20x pinctrl and GPIO driver
-  *
-  * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ * Copyright (C) 2017 Quentin Schulz <quentin.schulz@free-electrons.com>
-  *
-  * This program is free software; you can redistribute it and/or modify it
-  * under  the terms of the GNU General  Public License as published by the
-@@ -18,6 +19,9 @@
- #include <linux/mfd/axp20x.h>
- #include <linux/module.h>
- #include <linux/of.h>
-+#include <linux/pinctrl/pinconf-generic.h>
-+#include <linux/pinctrl/pinctrl.h>
-+#include <linux/pinctrl/pinmux.h>
- #include <linux/platform_device.h>
- #include <linux/regmap.h>
- #include <linux/slab.h>
-@@ -27,9 +31,52 @@
- #define AXP20X_GPIO_FUNCTION_OUT_HIGH	1
- #define AXP20X_GPIO_FUNCTION_INPUT	2
- 
-+#define AXP20X_FUNC_GPIO_OUT		0
-+#define AXP20X_FUNC_GPIO_IN		1
-+#define AXP20X_FUNC_LDO			2
-+#define AXP20X_FUNC_ADC			3
-+#define AXP20X_FUNCS_NB			4
-+
-+#define AXP20X_MUX_GPIO_OUT		0
-+#define AXP20X_MUX_GPIO_IN		BIT(1)
-+#define AXP20X_MUX_ADC			BIT(2)
-+
-+struct axp20x_pctrl_desc {
-+	const struct pinctrl_pin_desc	*pins;
-+	unsigned int			npins;
-+	/* Stores the pins supporting LDO function. Bit offset is pin number. */
-+	u8				ldo_mask;
-+	/* Stores the pins supporting ADC function. Bit offset is pin number. */
-+	u8				adc_mask;
-+};
-+
-+struct axp20x_pinctrl_function {
-+	const char	*name;
-+	unsigned int	muxval;
-+	const char	**groups;
-+	unsigned int	ngroups;
-+};
-+
- struct axp20x_gpio {
- 	struct gpio_chip	chip;
- 	struct regmap		*regmap;
-+	struct pinctrl_dev			*pctl_dev;
-+	struct device				*dev;
-+	const struct axp20x_pctrl_desc		*desc;
-+	struct axp20x_pinctrl_function		funcs[AXP20X_FUNCS_NB];
-+};
-+
-+static const struct pinctrl_pin_desc axp209_pins[] = {
-+	PINCTRL_PIN(0, "GPIO0"),
-+	PINCTRL_PIN(1, "GPIO1"),
-+	PINCTRL_PIN(2, "GPIO2"),
-+};
-+
-+static const struct axp20x_pctrl_desc axp20x_data = {
-+	.pins	= axp209_pins,
-+	.npins	= ARRAY_SIZE(axp209_pins),
-+	.ldo_mask = BIT(0) | BIT(1),
-+	.adc_mask = BIT(0) | BIT(1),
- };
- 
- static int axp20x_gpio_get_reg(unsigned offset)
-@@ -48,16 +95,7 @@ static int axp20x_gpio_get_reg(unsigned offset)
- 
- static int axp20x_gpio_input(struct gpio_chip *chip, unsigned offset)
- {
+- *
+- * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
+- *
+- * This program is free software; you can redistribute it and/or modify it
+- * under  the terms of the GNU General  Public License as published by the
+- * Free Software Foundation;  either version 2 of the License, or (at your
+- * option) any later version.
+- */
+-
+-#include <linux/bitops.h>
+-#include <linux/device.h>
+-#include <linux/gpio/driver.h>
+-#include <linux/init.h>
+-#include <linux/interrupt.h>
+-#include <linux/kernel.h>
+-#include <linux/mfd/axp20x.h>
+-#include <linux/module.h>
+-#include <linux/of.h>
+-#include <linux/platform_device.h>
+-#include <linux/regmap.h>
+-#include <linux/slab.h>
+-
+-#define AXP20X_GPIO_FUNCTIONS		0x7
+-#define AXP20X_GPIO_FUNCTION_OUT_LOW	0
+-#define AXP20X_GPIO_FUNCTION_OUT_HIGH	1
+-#define AXP20X_GPIO_FUNCTION_INPUT	2
+-
+-struct axp20x_gpio {
+-	struct gpio_chip	chip;
+-	struct regmap		*regmap;
+-};
+-
+-static int axp20x_gpio_get_reg(unsigned offset)
+-{
+-	switch (offset) {
+-	case 0:
+-		return AXP20X_GPIO0_CTRL;
+-	case 1:
+-		return AXP20X_GPIO1_CTRL;
+-	case 2:
+-		return AXP20X_GPIO2_CTRL;
+-	}
+-
+-	return -EINVAL;
+-}
+-
+-static int axp20x_gpio_input(struct gpio_chip *chip, unsigned offset)
+-{
 -	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
 -	int reg;
 -
@@ -109,305 +119,356 @@ index 4a346b7..2dc286f 100644
 -	return regmap_update_bits(gpio->regmap, reg,
 -				  AXP20X_GPIO_FUNCTIONS,
 -				  AXP20X_GPIO_FUNCTION_INPUT);
-+	return pinctrl_gpio_direction_input(chip->base + offset);
- }
+-}
+-
+-static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+-	unsigned int val;
+-	int ret;
+-
+-	ret = regmap_read(gpio->regmap, AXP20X_GPIO20_SS, &val);
+-	if (ret)
+-		return ret;
+-
+-	return !!(val & BIT(offset + 4));
+-}
+-
+-static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
+-{
+-	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+-	unsigned int val;
+-	int reg, ret;
+-
+-	reg = axp20x_gpio_get_reg(offset);
+-	if (reg < 0)
+-		return reg;
+-
+-	ret = regmap_read(gpio->regmap, reg, &val);
+-	if (ret)
+-		return ret;
+-
+-	/*
+-	 * This shouldn't really happen if the pin is in use already,
+-	 * or if it's not in use yet, it doesn't matter since we're
+-	 * going to change the value soon anyway. Default to output.
+-	 */
+-	if ((val & AXP20X_GPIO_FUNCTIONS) > 2)
+-		return 0;
+-
+-	/*
+-	 * The GPIO directions are the three lowest values.
+-	 * 2 is input, 0 and 1 are output
+-	 */
+-	return val & 2;
+-}
+-
+-static int axp20x_gpio_output(struct gpio_chip *chip, unsigned offset,
+-			      int value)
+-{
+-	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+-	int reg;
+-
+-	reg = axp20x_gpio_get_reg(offset);
+-	if (reg < 0)
+-		return reg;
+-
+-	return regmap_update_bits(gpio->regmap, reg,
+-				  AXP20X_GPIO_FUNCTIONS,
+-				  value ? AXP20X_GPIO_FUNCTION_OUT_HIGH
+-				  : AXP20X_GPIO_FUNCTION_OUT_LOW);
+-}
+-
+-static void axp20x_gpio_set(struct gpio_chip *chip, unsigned offset,
+-			    int value)
+-{
+-	axp20x_gpio_output(chip, offset, value);
+-}
+-
+-static int axp20x_gpio_probe(struct platform_device *pdev)
+-{
+-	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
+-	struct axp20x_gpio *gpio;
+-	int ret;
+-
+-	if (!of_device_is_available(pdev->dev.of_node))
+-		return -ENODEV;
+-
+-	if (!axp20x) {
+-		dev_err(&pdev->dev, "Parent drvdata not set\n");
+-		return -EINVAL;
+-	}
+-
+-	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
+-	if (!gpio)
+-		return -ENOMEM;
+-
+-	gpio->chip.base			= -1;
+-	gpio->chip.can_sleep		= true;
+-	gpio->chip.parent		= &pdev->dev;
+-	gpio->chip.label		= dev_name(&pdev->dev);
+-	gpio->chip.owner		= THIS_MODULE;
+-	gpio->chip.get			= axp20x_gpio_get;
+-	gpio->chip.get_direction	= axp20x_gpio_get_direction;
+-	gpio->chip.set			= axp20x_gpio_set;
+-	gpio->chip.direction_input	= axp20x_gpio_input;
+-	gpio->chip.direction_output	= axp20x_gpio_output;
+-	gpio->chip.ngpio		= 3;
+-
+-	gpio->regmap = axp20x->regmap;
+-
+-	ret = devm_gpiochip_add_data(&pdev->dev, &gpio->chip, gpio);
+-	if (ret) {
+-		dev_err(&pdev->dev, "Failed to register GPIO chip\n");
+-		return ret;
+-	}
+-
+-	dev_info(&pdev->dev, "AXP209 GPIO driver loaded\n");
+-
+-	return 0;
+-}
+-
+-static const struct of_device_id axp20x_gpio_match[] = {
+-	{ .compatible = "x-powers,axp209-gpio" },
+-	{ }
+-};
+-MODULE_DEVICE_TABLE(of, axp20x_gpio_match);
+-
+-static struct platform_driver axp20x_gpio_driver = {
+-	.probe		= axp20x_gpio_probe,
+-	.driver = {
+-		.name		= "axp20x-gpio",
+-		.of_match_table	= axp20x_gpio_match,
+-	},
+-};
+-
+-module_platform_driver(axp20x_gpio_driver);
+-
+-MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
+-MODULE_DESCRIPTION("AXP20x PMIC GPIO driver");
+-MODULE_LICENSE("GPL");
+diff --git a/drivers/pinctrl/Kconfig b/drivers/pinctrl/Kconfig
+index 4571cc0..58e8cc8 100644
+--- a/drivers/pinctrl/Kconfig
++++ b/drivers/pinctrl/Kconfig
+@@ -63,6 +63,12 @@ config PINCTRL_AS3722
+ 	  open drain configuration for the GPIO pins of AS3722 devices. It also
+ 	  supports the GPIO functionality through gpiolib.
  
- static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
-@@ -105,29 +143,222 @@ static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
- static int axp20x_gpio_output(struct gpio_chip *chip, unsigned offset,
- 			      int value)
- {
-+	chip->set(chip, offset, value);
++config PINCTRL_AXP209
++	tristate "X-Powers AXP209 PMIC pinctrl and GPIO Support"
++	depends on MFD_AXP20X
++	help
++	  Say yes to enable pinctrl and GPIO support for the AXP209 PMIC
 +
-+	return 0;
+ config PINCTRL_BF54x
+ 	def_bool y if BF54x
+ 	select PINCTRL_ADI2
+diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
+index d0d4844..4777f15 100644
+--- a/drivers/pinctrl/Makefile
++++ b/drivers/pinctrl/Makefile
+@@ -11,6 +11,7 @@ obj-$(CONFIG_GENERIC_PINCONF)	+= pinconf-generic.o
+ obj-$(CONFIG_PINCTRL_ADI2)	+= pinctrl-adi2.o
+ obj-$(CONFIG_PINCTRL_ARTPEC6)	+= pinctrl-artpec6.o
+ obj-$(CONFIG_PINCTRL_AS3722)	+= pinctrl-as3722.o
++obj-$(CONFIG_PINCTRL_AXP209)	+= pinctrl-axp209.o
+ obj-$(CONFIG_PINCTRL_BF54x)	+= pinctrl-adi2-bf54x.o
+ obj-$(CONFIG_PINCTRL_BF60x)	+= pinctrl-adi2-bf60x.o
+ obj-$(CONFIG_PINCTRL_AT91)	+= pinctrl-at91.o
+diff --git a/drivers/pinctrl/pinctrl-axp209.c b/drivers/pinctrl/pinctrl-axp209.c
+new file mode 100644
+index 0000000..4a346b7
+--- /dev/null
++++ b/drivers/pinctrl/pinctrl-axp209.c
+@@ -0,0 +1,188 @@
++/*
++ * AXP20x GPIO driver
++ *
++ * Copyright (C) 2016 Maxime Ripard <maxime.ripard@free-electrons.com>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under  the terms of the GNU General  Public License as published by the
++ * Free Software Foundation;  either version 2 of the License, or (at your
++ * option) any later version.
++ */
++
++#include <linux/bitops.h>
++#include <linux/device.h>
++#include <linux/gpio/driver.h>
++#include <linux/init.h>
++#include <linux/interrupt.h>
++#include <linux/kernel.h>
++#include <linux/mfd/axp20x.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/regmap.h>
++#include <linux/slab.h>
++
++#define AXP20X_GPIO_FUNCTIONS		0x7
++#define AXP20X_GPIO_FUNCTION_OUT_LOW	0
++#define AXP20X_GPIO_FUNCTION_OUT_HIGH	1
++#define AXP20X_GPIO_FUNCTION_INPUT	2
++
++struct axp20x_gpio {
++	struct gpio_chip	chip;
++	struct regmap		*regmap;
++};
++
++static int axp20x_gpio_get_reg(unsigned offset)
++{
++	switch (offset) {
++	case 0:
++		return AXP20X_GPIO0_CTRL;
++	case 1:
++		return AXP20X_GPIO1_CTRL;
++	case 2:
++		return AXP20X_GPIO2_CTRL;
++	}
++
++	return -EINVAL;
++}
++
++static int axp20x_gpio_input(struct gpio_chip *chip, unsigned offset)
++{
++	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
++	int reg;
++
++	reg = axp20x_gpio_get_reg(offset);
++	if (reg < 0)
++		return reg;
++
++	return regmap_update_bits(gpio->regmap, reg,
++				  AXP20X_GPIO_FUNCTIONS,
++				  AXP20X_GPIO_FUNCTION_INPUT);
++}
++
++static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
++{
++	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
++	unsigned int val;
++	int ret;
++
++	ret = regmap_read(gpio->regmap, AXP20X_GPIO20_SS, &val);
++	if (ret)
++		return ret;
++
++	return !!(val & BIT(offset + 4));
++}
++
++static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
++{
++	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
++	unsigned int val;
++	int reg, ret;
++
++	reg = axp20x_gpio_get_reg(offset);
++	if (reg < 0)
++		return reg;
++
++	ret = regmap_read(gpio->regmap, reg, &val);
++	if (ret)
++		return ret;
++
++	/*
++	 * This shouldn't really happen if the pin is in use already,
++	 * or if it's not in use yet, it doesn't matter since we're
++	 * going to change the value soon anyway. Default to output.
++	 */
++	if ((val & AXP20X_GPIO_FUNCTIONS) > 2)
++		return 0;
++
++	/*
++	 * The GPIO directions are the three lowest values.
++	 * 2 is input, 0 and 1 are output
++	 */
++	return val & 2;
++}
++
++static int axp20x_gpio_output(struct gpio_chip *chip, unsigned offset,
++			      int value)
++{
++	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
++	int reg;
++
++	reg = axp20x_gpio_get_reg(offset);
++	if (reg < 0)
++		return reg;
++
++	return regmap_update_bits(gpio->regmap, reg,
++				  AXP20X_GPIO_FUNCTIONS,
++				  value ? AXP20X_GPIO_FUNCTION_OUT_HIGH
++				  : AXP20X_GPIO_FUNCTION_OUT_LOW);
 +}
 +
 +static void axp20x_gpio_set(struct gpio_chip *chip, unsigned offset,
 +			    int value)
 +{
- 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
- 	int reg;
- 
- 	reg = axp20x_gpio_get_reg(offset);
- 	if (reg < 0)
-+		return;
-+
-+	regmap_update_bits(gpio->regmap, reg,
-+			   AXP20X_GPIO_FUNCTIONS,
-+			   value ? AXP20X_GPIO_FUNCTION_OUT_HIGH :
-+			   AXP20X_GPIO_FUNCTION_OUT_LOW);
++	axp20x_gpio_output(chip, offset, value);
 +}
 +
-+static int axp20x_pmx_set(struct pinctrl_dev *pctldev, unsigned int offset,
-+			  u8 config)
++static int axp20x_gpio_probe(struct platform_device *pdev)
 +{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	int reg;
++	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
++	struct axp20x_gpio *gpio;
++	int ret;
 +
-+	reg = axp20x_gpio_get_reg(offset);
-+	if (reg < 0)
- 		return reg;
- 
--	return regmap_update_bits(gpio->regmap, reg,
--				  AXP20X_GPIO_FUNCTIONS,
--				  value ? AXP20X_GPIO_FUNCTION_OUT_HIGH
--				  : AXP20X_GPIO_FUNCTION_OUT_LOW);
-+	return regmap_update_bits(gpio->regmap, reg, AXP20X_GPIO_FUNCTIONS,
-+				  config);
- }
- 
--static void axp20x_gpio_set(struct gpio_chip *chip, unsigned offset,
--			    int value)
-+static int axp20x_pmx_func_cnt(struct pinctrl_dev *pctldev)
-+{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
++	if (!of_device_is_available(pdev->dev.of_node))
++		return -ENODEV;
 +
-+	return ARRAY_SIZE(gpio->funcs);
-+}
-+
-+static const char *axp20x_pmx_func_name(struct pinctrl_dev *pctldev,
-+					unsigned int selector)
-+{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return gpio->funcs[selector].name;
-+}
-+
-+static int axp20x_pmx_func_groups(struct pinctrl_dev *pctldev,
-+				  unsigned int selector,
-+				  const char * const **groups,
-+				  unsigned int *num_groups)
-+{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+
-+	*groups = gpio->funcs[selector].groups;
-+	*num_groups = gpio->funcs[selector].ngroups;
-+
-+	return 0;
-+}
-+
-+static int axp20x_pmx_set_mux(struct pinctrl_dev *pctldev,
-+			      unsigned int function, unsigned int group)
-+{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+	unsigned int mask;
-+
-+	/* Every pin supports GPIO_OUT and GPIO_IN functions */
-+	if (function <= AXP20X_FUNC_GPIO_IN)
-+		return axp20x_pmx_set(pctldev, group,
-+				      gpio->funcs[function].muxval);
-+
-+	if (function == AXP20X_FUNC_LDO)
-+		mask = gpio->desc->ldo_mask;
-+	else
-+		mask = gpio->desc->adc_mask;
-+
-+	if (!(BIT(group) & mask))
++	if (!axp20x) {
++		dev_err(&pdev->dev, "Parent drvdata not set\n");
 +		return -EINVAL;
-+
-+	/*
-+	 * We let the regulator framework handle the LDO muxing as muxing bits
-+	 * are basically also regulators on/off bits. It's better not to enforce
-+	 * any state of the regulator when selecting LDO mux so that we don't
-+	 * interfere with the regulator driver.
-+	 */
-+	if (function == AXP20X_FUNC_LDO)
-+		return 0;
-+
-+	return axp20x_pmx_set(pctldev, group, gpio->funcs[function].muxval);
-+}
-+
-+static int axp20x_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
-+					 struct pinctrl_gpio_range *range,
-+					 unsigned int offset, bool input)
-+{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+
-+	if (input)
-+		return axp20x_pmx_set(pctldev, offset,
-+				      gpio->funcs[AXP20X_FUNC_GPIO_IN].muxval);
-+
-+	return axp20x_pmx_set(pctldev, offset,
-+			      gpio->funcs[AXP20X_FUNC_GPIO_OUT].muxval);
-+}
-+
-+static const struct pinmux_ops axp20x_pmx_ops = {
-+	.get_functions_count	= axp20x_pmx_func_cnt,
-+	.get_function_name	= axp20x_pmx_func_name,
-+	.get_function_groups	= axp20x_pmx_func_groups,
-+	.set_mux		= axp20x_pmx_set_mux,
-+	.gpio_set_direction	= axp20x_pmx_gpio_set_direction,
-+	.strict			= true,
-+};
-+
-+static int axp20x_groups_cnt(struct pinctrl_dev *pctldev)
-+{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return gpio->desc->npins;
-+}
-+
-+static int axp20x_group_pins(struct pinctrl_dev *pctldev, unsigned int selector,
-+			     const unsigned int **pins, unsigned int *num_pins)
-+{
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+
-+	*pins = (unsigned int *)&gpio->desc->pins[selector];
-+	*num_pins = 1;
-+
-+	return 0;
-+}
-+
-+static const char *axp20x_group_name(struct pinctrl_dev *pctldev,
-+				     unsigned int selector)
- {
--	axp20x_gpio_output(chip, offset, value);
-+	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-+
-+	return gpio->desc->pins[selector].name;
-+}
-+
-+static const struct pinctrl_ops axp20x_pctrl_ops = {
-+	.dt_node_to_map		= pinconf_generic_dt_node_to_map_group,
-+	.dt_free_map		= pinconf_generic_dt_free_map,
-+	.get_groups_count	= axp20x_groups_cnt,
-+	.get_group_name		= axp20x_group_name,
-+	.get_group_pins		= axp20x_group_pins,
-+};
-+
-+static void axp20x_funcs_groups_from_mask(struct device *dev, unsigned int mask,
-+					  unsigned int mask_len,
-+					  struct axp20x_pinctrl_function *func,
-+					  const struct pinctrl_pin_desc *pins)
-+{
-+	unsigned long int mask_cpy = mask;
-+	const char **group;
-+	unsigned int ngroups = hweight8(mask);
-+	int bit;
-+
-+	func->ngroups = ngroups;
-+	if (func->ngroups > 0) {
-+		func->groups = devm_kzalloc(dev, ngroups * sizeof(const char *),
-+					    GFP_KERNEL);
-+		group = func->groups;
-+		for_each_set_bit(bit, &mask_cpy, mask_len) {
-+			*group = pins[bit].name;
-+			group++;
-+		}
-+	}
-+}
-+
-+static void axp20x_build_funcs_groups(struct platform_device *pdev)
-+{
-+	struct axp20x_gpio *gpio = platform_get_drvdata(pdev);
-+	int i, pin;
-+
-+	gpio->funcs[AXP20X_FUNC_GPIO_OUT].name = "gpio_out";
-+	gpio->funcs[AXP20X_FUNC_GPIO_OUT].muxval = AXP20X_MUX_GPIO_OUT;
-+	gpio->funcs[AXP20X_FUNC_GPIO_IN].name = "gpio_in";
-+	gpio->funcs[AXP20X_FUNC_GPIO_IN].muxval = AXP20X_MUX_GPIO_IN;
-+	gpio->funcs[AXP20X_FUNC_LDO].name = "ldo";
-+	/*
-+	 * Muxval for LDO is useless as we won't use it.
-+	 * See comment in axp20x_pmx_set_mux.
-+	 */
-+	gpio->funcs[AXP20X_FUNC_ADC].name = "adc";
-+	gpio->funcs[AXP20X_FUNC_ADC].muxval = AXP20X_MUX_ADC;
-+
-+	/* Every pin supports GPIO_OUT and GPIO_IN functions */
-+	for (i = 0; i <= AXP20X_FUNC_GPIO_IN; i++) {
-+		gpio->funcs[i].ngroups = gpio->desc->npins;
-+		gpio->funcs[i].groups = devm_kzalloc(&pdev->dev,
-+						     gpio->desc->npins * sizeof(const char *),
-+						     GFP_KERNEL);
-+		for (pin = 0; pin < gpio->desc->npins; pin++)
-+			gpio->funcs[i].groups[pin] = gpio->desc->pins[pin].name;
 +	}
 +
-+	axp20x_funcs_groups_from_mask(&pdev->dev, gpio->desc->ldo_mask,
-+				      gpio->desc->npins,
-+				      &gpio->funcs[AXP20X_FUNC_LDO],
-+				      gpio->desc->pins);
-+
-+	axp20x_funcs_groups_from_mask(&pdev->dev, gpio->desc->adc_mask,
-+				      gpio->desc->npins,
-+				      &gpio->funcs[AXP20X_FUNC_ADC],
-+				      gpio->desc->pins);
- }
- 
- static int axp20x_gpio_probe(struct platform_device *pdev)
- {
- 	struct axp20x_dev *axp20x = dev_get_drvdata(pdev->dev.parent);
- 	struct axp20x_gpio *gpio;
-+	struct pinctrl_desc *pctrl_desc;
- 	int ret;
- 
- 	if (!of_device_is_available(pdev->dev.of_node))
-@@ -144,6 +375,8 @@ static int axp20x_gpio_probe(struct platform_device *pdev)
- 
- 	gpio->chip.base			= -1;
- 	gpio->chip.can_sleep		= true;
-+	gpio->chip.request		= gpiochip_generic_request;
-+	gpio->chip.free			= gpiochip_generic_free;
- 	gpio->chip.parent		= &pdev->dev;
- 	gpio->chip.label		= dev_name(&pdev->dev);
- 	gpio->chip.owner		= THIS_MODULE;
-@@ -154,7 +387,30 @@ static int axp20x_gpio_probe(struct platform_device *pdev)
- 	gpio->chip.direction_output	= axp20x_gpio_output;
- 	gpio->chip.ngpio		= 3;
- 
-+	gpio->desc = &axp20x_data;
- 	gpio->regmap = axp20x->regmap;
-+	gpio->dev = &pdev->dev;
-+
-+	platform_set_drvdata(pdev, gpio);
-+
-+	axp20x_build_funcs_groups(pdev);
-+
-+	pctrl_desc = devm_kzalloc(&pdev->dev, sizeof(*pctrl_desc), GFP_KERNEL);
-+	if (!pctrl_desc)
++	gpio = devm_kzalloc(&pdev->dev, sizeof(*gpio), GFP_KERNEL);
++	if (!gpio)
 +		return -ENOMEM;
 +
-+	pctrl_desc->name = dev_name(&pdev->dev);
-+	pctrl_desc->owner = THIS_MODULE;
-+	pctrl_desc->pins = gpio->desc->pins;
-+	pctrl_desc->npins = gpio->desc->npins;
-+	pctrl_desc->pctlops = &axp20x_pctrl_ops;
-+	pctrl_desc->pmxops = &axp20x_pmx_ops;
++	gpio->chip.base			= -1;
++	gpio->chip.can_sleep		= true;
++	gpio->chip.parent		= &pdev->dev;
++	gpio->chip.label		= dev_name(&pdev->dev);
++	gpio->chip.owner		= THIS_MODULE;
++	gpio->chip.get			= axp20x_gpio_get;
++	gpio->chip.get_direction	= axp20x_gpio_get_direction;
++	gpio->chip.set			= axp20x_gpio_set;
++	gpio->chip.direction_input	= axp20x_gpio_input;
++	gpio->chip.direction_output	= axp20x_gpio_output;
++	gpio->chip.ngpio		= 3;
 +
-+	gpio->pctl_dev = devm_pinctrl_register(&pdev->dev, pctrl_desc, gpio);
-+	if (IS_ERR(gpio->pctl_dev)) {
-+		dev_err(&pdev->dev, "couldn't register pinctrl driver\n");
-+		return PTR_ERR(gpio->pctl_dev);
-+	}
- 
- 	ret = devm_gpiochip_add_data(&pdev->dev, &gpio->chip, gpio);
- 	if (ret) {
-@@ -162,7 +418,16 @@ static int axp20x_gpio_probe(struct platform_device *pdev)
- 		return ret;
- 	}
- 
--	dev_info(&pdev->dev, "AXP209 GPIO driver loaded\n");
-+	ret = gpiochip_add_pin_range(&gpio->chip, dev_name(&pdev->dev),
-+				     gpio->desc->pins->number,
-+				     gpio->desc->pins->number,
-+				     gpio->desc->npins);
++	gpio->regmap = axp20x->regmap;
++
++	ret = devm_gpiochip_add_data(&pdev->dev, &gpio->chip, gpio);
 +	if (ret) {
-+		dev_err(&pdev->dev, "failed to add pin range\n");
++		dev_err(&pdev->dev, "Failed to register GPIO chip\n");
 +		return ret;
 +	}
 +
-+	dev_info(&pdev->dev, "AXP209 pinctrl and GPIO driver loaded\n");
- 
- 	return 0;
- }
-@@ -184,5 +449,6 @@ static struct platform_driver axp20x_gpio_driver = {
- module_platform_driver(axp20x_gpio_driver);
- 
- MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
--MODULE_DESCRIPTION("AXP20x PMIC GPIO driver");
-+MODULE_AUTHOR("Quentin Schulz <quentin.schulz@free-electrons.com>");
-+MODULE_DESCRIPTION("AXP20x PMIC pinctrl and GPIO driver");
- MODULE_LICENSE("GPL");
++	dev_info(&pdev->dev, "AXP209 GPIO driver loaded\n");
++
++	return 0;
++}
++
++static const struct of_device_id axp20x_gpio_match[] = {
++	{ .compatible = "x-powers,axp209-gpio" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, axp20x_gpio_match);
++
++static struct platform_driver axp20x_gpio_driver = {
++	.probe		= axp20x_gpio_probe,
++	.driver = {
++		.name		= "axp20x-gpio",
++		.of_match_table	= axp20x_gpio_match,
++	},
++};
++
++module_platform_driver(axp20x_gpio_driver);
++
++MODULE_AUTHOR("Maxime Ripard <maxime.ripard@free-electrons.com>");
++MODULE_DESCRIPTION("AXP20x PMIC GPIO driver");
++MODULE_LICENSE("GPL");
 -- 
 git-series 0.9.1
