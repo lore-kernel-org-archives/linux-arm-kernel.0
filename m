@@ -1,36 +1,30 @@
 From: peda@axentia.se (Peter Rosin)
-Date: Fri,  1 Dec 2017 23:44:23 +0100
-Subject: [PATCH 0/2] Add devicetree for Axentia Nattis
-Message-ID: <20171201224425.5477-1-peda@axentia.se>
+Date: Fri,  1 Dec 2017 23:44:24 +0100
+Subject: [PATCH 1/2] dt-bindings: trivial: add tfa9879 device
+In-Reply-To: <20171201224425.5477-1-peda@axentia.se>
+References: <20171201224425.5477-1-peda@axentia.se>
+Message-ID: <20171201224425.5477-2-peda@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Add record for NXP TFA9879 Mono BTL Class D audio amplifier.
 
-I'd like to add a devicetree for our Nattis to the kernel. The
-Nattis is a device for showing departures for public transportation
-(optionally including a text-to-speech module for the visually
-impaired).
+Signed-off-by: Peter Rosin <peda@axentia.se>
+---
+ Documentation/devicetree/bindings/trivial-devices.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-I'm a bit unsure if the tfa9879 sound codec binding is needed,
-but I suppose it belongs in trivial-devices?
-
-Cheers,
-Peter
-
-Peter Rosin (2):
-  dt-bindings: trivial: add tfa9879 device
-  ARM: dts: at91: add devicetree for the Axentia Nattis with Natte power
-
- Documentation/devicetree/bindings/arm/axentia.txt  |   9 +
- .../devicetree/bindings/trivial-devices.txt        |   1 +
- MAINTAINERS                                        |   2 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/at91-natte.dtsi                  | 245 +++++++++++++++++++
- arch/arm/boot/dts/at91-nattis-2-natte-2.dts        | 258 +++++++++++++++++++++
- 6 files changed, 516 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-natte.dtsi
- create mode 100644 arch/arm/boot/dts/at91-nattis-2-natte-2.dts
-
+diff --git a/Documentation/devicetree/bindings/trivial-devices.txt b/Documentation/devicetree/bindings/trivial-devices.txt
+index af284fbd4d23..4cf30ce4e71f 100644
+--- a/Documentation/devicetree/bindings/trivial-devices.txt
++++ b/Documentation/devicetree/bindings/trivial-devices.txt
+@@ -157,6 +157,7 @@ nxp,pcf2127		Real-time clock
+ nxp,pcf2129		Real-time clock
+ nxp,pcf8563		Real-time clock/calendar
+ nxp,pcf85063		Tiny Real-Time Clock
++nxp,tfa9879		Mono BTL Class D audio amplifier
+ oki,ml86v7667		OKI ML86V7667 video decoder
+ ovti,ov5642		OV5642: Color CMOS QSXGA (5-megapixel) Image Sensor with OmniBSI and Embedded TrueFocus
+ pericom,pt7c4338	Real-time Clock Module
 -- 
 2.11.0
