@@ -1,68 +1,40 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 1 Dec 2017 11:43:11 +0530
-Subject: [PATCH 4/4] PCI: dwc: pci-dra7xx: Fix legacy IRQ handling
+Date: Fri, 1 Dec 2017 11:43:10 +0530
+Subject: [PATCH 3/4] ARM: dts: dra7: Add DT property to allow unaligned mem
+ access to PCIe RC
 In-Reply-To: <20171201061311.16691-1-vigneshr@ti.com>
 References: <20171201061311.16691-1-vigneshr@ti.com>
-Message-ID: <20171201061311.16691-5-vigneshr@ti.com>
+Message-ID: <20171201061311.16691-4-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Legacy INTD IRQ handling is broken on dra7xx due to fact that driver
-uses hwirq in range of 1-4 for INTA, INTD whereas IRQ domain is of size
-4 which is numbered 0-3. Therefore when INTD IRQ line is used with
-pci-dra7xx driver following warning is seen:
+Add ti,syscon-unaligned-access property to PCIe RC nodes in order to
+enable workaround for errata i870 in PCIe RC mode as well.
 
-       WARNING: CPU: 0 PID: 1 at kernel/irq/irqdomain.c:342 irq_domain_associate+0x12c/0x1c4
-       error: hwirq 0x4 is too large for dummy
-
-Fix this by using pci_irqd_intx_xlate() helper to translate the INTx 1-4
-range into the 0-3 as done in other PCIe drivers.
-
-Also, iterate over all the INTx bits and call their respective IRQ
-handlers before clearing the status register.
-
-Suggested-by: Bjorn Helgaas <bhelgaas@google.com>
-Reported-by: Chris Welch <Chris.Welch@viavisolutions.com>
 Signed-off-by: Vignesh R <vigneshr@ti.com>
 ---
- drivers/pci/dwc/pci-dra7xx.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/drivers/pci/dwc/pci-dra7xx.c b/drivers/pci/dwc/pci-dra7xx.c
-index 53f721d1cc40..59e8de34cec6 100644
---- a/drivers/pci/dwc/pci-dra7xx.c
-+++ b/drivers/pci/dwc/pci-dra7xx.c
-@@ -226,6 +226,7 @@ static int dra7xx_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
- 
- static const struct irq_domain_ops intx_domain_ops = {
- 	.map = dra7xx_pcie_intx_map,
-+	.xlate = pci_irqd_intx_xlate,
- };
- 
- static int dra7xx_pcie_init_irq_domain(struct pcie_port *pp)
-@@ -256,7 +257,8 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
- 	struct dra7xx_pcie *dra7xx = arg;
- 	struct dw_pcie *pci = dra7xx->pci;
- 	struct pcie_port *pp = &pci->pp;
--	u32 reg;
-+	unsigned long reg;
-+	u32 virq, bit;
- 
- 	reg = dra7xx_pcie_readl(dra7xx, PCIECTRL_DRA7XX_CONF_IRQSTATUS_MSI);
- 
-@@ -268,8 +270,11 @@ static irqreturn_t dra7xx_pcie_msi_irq_handler(int irq, void *arg)
- 	case INTB:
- 	case INTC:
- 	case INTD:
--		generic_handle_irq(irq_find_mapping(dra7xx->irq_domain,
--						    ffs(reg)));
-+		for_each_set_bit(bit, &reg, PCI_NUM_INTX) {
-+			virq = irq_find_mapping(dra7xx->irq_domain, bit);
-+			if (virq)
-+				generic_handle_irq(virq);
-+		}
- 		break;
- 	}
- 
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index ac9216293b7c..e4182f4cc36d 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -314,6 +314,7 @@
+ 						<0 0 0 2 &pcie1_intc 2>,
+ 						<0 0 0 3 &pcie1_intc 3>,
+ 						<0 0 0 4 &pcie1_intc 4>;
++				ti,syscon-unaligned-access = <&scm_conf1 0x14 2>;
+ 				status = "disabled";
+ 				pcie1_intc: interrupt-controller {
+ 					interrupt-controller;
+@@ -367,6 +368,7 @@
+ 						<0 0 0 2 &pcie2_intc 2>,
+ 						<0 0 0 3 &pcie2_intc 3>,
+ 						<0 0 0 4 &pcie2_intc 4>;
++				ti,syscon-unaligned-access = <&scm_conf1 0x14 1>;
+ 				pcie2_intc: interrupt-controller {
+ 					interrupt-controller;
+ 					#address-cells = <0>;
 -- 
 2.15.0
