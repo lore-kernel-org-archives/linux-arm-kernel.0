@@ -1,145 +1,220 @@
-From: architt@codeaurora.org (Archit Taneja)
-Date: Fri, 1 Dec 2017 17:08:17 +0530
-Subject: [PATCH 2/4] gpiolib: add bitmask for valid GPIO lines
-In-Reply-To: <1510096056-13765-3-git-send-email-timur@codeaurora.org>
-References: <1510096056-13765-1-git-send-email-timur@codeaurora.org>
- <1510096056-13765-3-git-send-email-timur@codeaurora.org>
-Message-ID: <68a11ee4-d0c6-0f4e-3631-125cc4e7a1bd@codeaurora.org>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Fri, 1 Dec 2017 20:34:47 +0900
+Subject: [kernel-hardening][PATCH v2 3/3] arm: mm: dump: add checking for
+ writable and executable pages
+Message-ID: <20171201113447.GA5234@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Page mappings with full RWX permissions are a security risk.
+x86, arm64 has an option to walk the page tables
+and dump any bad pages.
 
-On 11/08/2017 04:37 AM, Timur Tabi wrote:
-> Add support for specifying that some GPIOs within a range are unavailable.
-> Some systems have a sparse list of GPIOs, where a range of GPIOs is
-> specified (usually 0 to n-1), but some subset within that range is
-> absent or unavailable for whatever reason.
-> 
-> To support this, allow drivers to specify a bitmask of GPIOs that
-> are present or absent.  Gpiolib will then block access to those that
-> are absent.
-> 
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->   drivers/gpio/gpiolib.c      | 43 +++++++++++++++++++++++++++++++++++--------
->   include/linux/gpio/driver.h |  2 ++
->   2 files changed, 37 insertions(+), 8 deletions(-)
-> 
-> diff --git a/drivers/gpio/gpiolib.c b/drivers/gpio/gpiolib.c
-> index 60553af4c004..c32387936cdd 100644
-> --- a/drivers/gpio/gpiolib.c
-> +++ b/drivers/gpio/gpiolib.c
-> @@ -1481,22 +1481,36 @@ static struct gpio_chip *find_chip_by_name(const char *name)
->   
->   static int gpiochip_irqchip_init_valid_mask(struct gpio_chip *gpiochip)
->   {
-> -	if (!gpiochip->irq_need_valid_mask)
-> -		return 0;
-> +	if (gpiochip->irq_need_valid_mask) {
-> +		gpiochip->irq_valid_mask =
-> +			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
-> +				sizeof(long), GFP_KERNEL);
-> +		if (!gpiochip->irq_valid_mask)
-> +			return -ENOMEM;
->   
-> -	gpiochip->irq_valid_mask = kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
-> -					   sizeof(long), GFP_KERNEL);
-> -	if (!gpiochip->irq_valid_mask)
-> -		return -ENOMEM;
-> +		/* Assume by default all GPIOs are valid */
-> +		bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
-> +	}
->   
-> -	/* Assume by default all GPIOs are valid */
-> -	bitmap_fill(gpiochip->irq_valid_mask, gpiochip->ngpio);
-> +	if (gpiochip->line_need_valid_mask) {
-> +		gpiochip->line_valid_mask =
-> +			kcalloc(BITS_TO_LONGS(gpiochip->ngpio),
-> +				sizeof(long), GFP_KERNEL);
-> +		if (!gpiochip->line_valid_mask)
-> +			return -ENOMEM;
-> +
-> +		/* Assume by default all GPIOs are valid */
-> +		bitmap_fill(gpiochip->line_valid_mask, gpiochip->ngpio);
-> +	}
->   
->   	return 0;
->   }
->   
->   static void gpiochip_irqchip_free_valid_mask(struct gpio_chip *gpiochip)
->   {
-> +	kfree(gpiochip->line_valid_mask);
-> +	gpiochip->line_valid_mask = NULL;
-> +
->   	kfree(gpiochip->irq_valid_mask);
->   	gpiochip->irq_valid_mask = NULL;
->   }
-> @@ -1510,6 +1524,15 @@ static bool gpiochip_irqchip_irq_valid(const struct gpio_chip *gpiochip,
->   	return test_bit(offset, gpiochip->irq_valid_mask);
->   }
->   
-> +static bool gpiochip_irqchip_line_valid(const struct gpio_chip *gpiochip,
-> +					unsigned int offset)
-> +{
-> +	/* No mask means all valid */
-> +	if (likely(!gpiochip->line_valid_mask))
-> +		return true;
-> +	return test_bit(offset, gpiochip->line_valid_mask);
-> +}
-> +
->   /**
->    * gpiochip_set_cascaded_irqchip() - connects a cascaded irqchip to a gpiochip
->    * @gpiochip: the gpiochip to set the irqchip chain to
-> @@ -3320,6 +3343,10 @@ struct gpio_desc *__must_check gpiod_get_index(struct device *dev,
->   		return desc;
->   	}
->   
-> +	/* Make sure the GPIO is valid before we request it. */
-> +	if (!gpiochip_irqchip_line_valid(desc->gdev->chip, idx))
-> +		return ERR_PTR(-EACCES);
+(1404d6f13e47
+("arm64: dump: Add checking for writable and exectuable pages"))
+Add a similar implementation for arm.
 
-We're hitting an issue here ^ when a consumer calls the devm_gpiod_get() API. This API
-internally sets idx in gpiod_get_index to always 0. For example, in the call sequence
-below, the idx argument to gpiochip_irqchip_line_valid is always 0:
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+---
+ arch/arm/Kconfig.debug        | 27 +++++++++++++++
+ arch/arm/include/asm/ptdump.h |  8 +++++
+ arch/arm/mm/dump.c            | 78 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mm/init.c            |  2 ++
+ 4 files changed, 115 insertions(+)
 
-devm_gpiod_get(dev, con_id, flags)
-    devm_gpiod_get_index(dev, con_id, 0, flags)
-       gpiod_get_index(dev, con_id, 0, flags)
-          if (!gpiochip_irqchip_line_valid(desc->gdev->chip, 0))
-              return ERR_PTR(-EACCES);
-
-Therefore, with these patches, if we create a sparse gpio map, and the
-0th gpio is set to "not accessible", all gpio requests end up failing with EACCESS
-because idx is always passed as 0.
-
-In gpiochip_irqchip_line_valid, shouldn't we test the nth bit (that corresponds to
-this gpio_desc) in chip->line_valid_mask instead of idx passed above, which is always
-0?
-
-Thanks,
-Archit
-
-
-> +
->   	status = gpiod_request(desc, con_id);
->   	if (status < 0)
->   		return ERR_PTR(status);
-> diff --git a/include/linux/gpio/driver.h b/include/linux/gpio/driver.h
-> index 424e5139ff10..853828ccabc8 100644
-> --- a/include/linux/gpio/driver.h
-> +++ b/include/linux/gpio/driver.h
-> @@ -173,6 +173,8 @@ struct gpio_chip {
->   	bool			irq_nested;
->   	bool			irq_need_valid_mask;
->   	unsigned long		*irq_valid_mask;
-> +	bool			line_need_valid_mask;
-> +	unsigned long		*line_valid_mask;
->   	struct lock_class_key	*lock_key;
->   #endif
->   
-> 
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index e7b94db..78a6470 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -20,6 +20,33 @@ config ARM_PTDUMP_DEBUGFS
+ 	  kernel.
+ 	  If in doubt, say "N"
+ 
++config DEBUG_WX
++	bool "Warn on W+X mappings at boot"
++	select ARM_PTDUMP_CORE
++	---help---
++		Generate a warning if any W+X mappings are found at boot.
++
++		This is useful for discovering cases where the kernel is leaving
++		W+X mappings after applying NX, as such mappings are a security risk.
++
++		Look for a message in dmesg output like this:
++
++			arm/mm: Checked W+X mappings: passed, no W+X pages found.
++
++		or like this, if the check failed:
++
++			arm/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
++
++		Note that even if the check fails, your kernel is possibly
++		still fine, as W+X mappings are not a security hole in
++		themselves, what they do is that they make the exploitation
++		of other unfixed kernel bugs easier.
++
++		There is no runtime or memory usage effect of this option
++		once the kernel has booted up - it's a one time check.
++
++		If in doubt, say "Y".
++
+ # RMK wants arm kernels compiled with frame pointers or stack unwinding.
+ # If you know what you are doing and are willing to live without stack
+ # traces, you can get a slightly smaller kernel by setting this option to
+diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
+index 3a6c0b7..b6a0162 100644
+--- a/arch/arm/include/asm/ptdump.h
++++ b/arch/arm/include/asm/ptdump.h
+@@ -43,6 +43,14 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
+ }
+ #endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
+ 
++void ptdump_check_wx(void);
++
+ #endif /* CONFIG_ARM_PTDUMP_CORE */
+ 
++#ifdef CONFIG_DEBUG_WX
++#define debug_checkwx() ptdump_check_wx()
++#else
++#define debug_checkwx() do { } while (0)
++#endif
++
+ #endif /* __ASM_PTDUMP_H */
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index 43a2bee..a0a4b30 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -52,6 +52,8 @@ struct pg_state {
+ 	unsigned long start_address;
+ 	unsigned level;
+ 	u64 current_prot;
++	bool check_wx;
++	unsigned long wx_pages;
+ 	const char *current_domain;
+ };
+ 
+@@ -226,6 +228,60 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t
+ 	}
+ }
+ 
++static inline bool is_prot_ro(struct pg_state *st)
++{
++	if (st->level < 4) {
++	#ifdef CONFIG_ARM_LPAE
++		if ((st->current_prot &
++		(L_PMD_SECT_RDONLY | PMD_SECT_AP2)) ==
++		(L_PMD_SECT_RDONLY | PMD_SECT_AP2))
++			return true;
++	#elif __LINUX_ARM_ARCH__ >= 6
++		if ((st->current_prot &
++		(PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) ==
++		(PMD_SECT_APX | PMD_SECT_AP_WRITE))
++			return true;
++	#else
++		if ((st->current_prot &
++		(PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) == 0)
++			return true;
++	#endif
++	} else {
++		if ((st->current_prot & L_PTE_RDONLY) == L_PTE_RDONLY)
++			return true;
++	}
++
++	return false;
++}
++
++static inline bool is_prot_nx(struct pg_state *st)
++{
++	if (st->level < 4) {
++		if ((st->current_prot & PMD_SECT_XN) == PMD_SECT_XN)
++			return true;
++	} else {
++		if ((st->current_prot & L_PTE_XN) == L_PTE_XN)
++			return true;
++	}
++
++	return false;
++}
++
++static void note_prot_wx(struct pg_state *st, unsigned long addr)
++{
++	if (!st->check_wx)
++		return;
++	if (is_prot_ro(st))
++		return;
++	if (is_prot_nx(st))
++		return;
++
++	WARN_ONCE(1, "arm/mm: Found insecure W+X mapping at address %p/%pS\n",
++		(void *)st->start_address, (void *)st->start_address);
++
++	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
++}
++
+ static void note_page(struct pg_state *st, unsigned long addr,
+ 		      unsigned int level, u64 val, const char *domain)
+ {
+@@ -244,6 +300,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
+ 		unsigned long delta;
+ 
+ 		if (st->current_prot) {
++			note_prot_wx(st, addr);
+ 			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
+ 				   st->start_address, addr);
+ 
+@@ -367,6 +424,7 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
+ 	struct pg_state st = {
+ 		.seq = m,
+ 		.marker = info->markers,
++		.check_wx = false,
+ 	};
+ 
+ 	walk_pgd(&st, info->mm, info->base_addr);
+@@ -391,6 +449,26 @@ static void ptdump_initialize(void)
+ 	.base_addr = 0,
+ };
+ 
++void ptdump_check_wx(void)
++{
++	struct pg_state st = {
++		.seq = NULL,
++		.marker = (struct addr_marker[]) {
++			{ 0, NULL},
++			{ -1, NULL},
++		},
++		.check_wx = true,
++	};
++
++	walk_pgd(&st, &init_mm, 0);
++	note_page(&st, 0, 0, 0, NULL);
++	if (st.wx_pages)
++		pr_warn("Checked W+X mappings: FAILED, %lu W+X pages found\n",
++			st.wx_pages);
++	else
++		pr_info("Checked W+X mappings: passed, no W+X pages found\n");
++}
++
+ static int ptdump_init(void)
+ {
+ 	ptdump_initialize();
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index a1f11a7..bd6f451 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -36,6 +36,7 @@
+ #include <asm/system_info.h>
+ #include <asm/tlb.h>
+ #include <asm/fixmap.h>
++#include <asm/ptdump.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -738,6 +739,7 @@ static int __mark_rodata_ro(void *unused)
+ void mark_rodata_ro(void)
+ {
+ 	stop_machine(__mark_rodata_ro, NULL, NULL);
++	debug_checkwx();
+ }
+ 
+ void set_kernel_text_rw(void)
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+1.9.1
