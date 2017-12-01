@@ -1,301 +1,63 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  1 Dec 2017 10:03:43 +0100
-Subject: [PATCH v5 5/6] ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board
- support
-In-Reply-To: <1512119024-521-1-git-send-email-narmstrong@baylibre.com>
-References: <1512119024-521-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1512119024-521-6-git-send-email-narmstrong@baylibre.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri,  1 Dec 2017 14:36:04 +0530
+Subject: [PATCH 1/2] arm64: dts: a64-olinuxino: Enable RTL8723BS WiFi
+Message-ID: <1512119165-15290-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the i.MX6 Quad variant of the Variscite DART-MX6
-SoM Carrier-Board.
+Enable RTL8723BS WiFi chip on a64-olinuxino board:
+- WiFi SDIO interface is connected to MMC1
+- WiFi REG_ON pin connected to gpio PL2: attach to mmc-pwrseq
+- WiFi HOST_WAKE pin connected to gpio PL3
 
-This Carrier-Board has the following :
-- LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
-- HDMI Connector
-- USB Host + USB OTG Connector
-- 10/100/1000 Mbps Ethernet
-- miniPCI-Express slot
-- SD Card connector
-- Audio Headphone/Line In jack connectors
-- On-board DMIC
-- CAN bus header
-- SPI header
-- Camera Interfaces header
-- 4xButtons, 2xLeds
-- OnBoard RTC with Coin Backup battery socket
-- RS232 Header + USB-Serial debug port
+To make rtl8723bs chip to work build it as module to and run
+CONFIG_RTL8723BS=m
 
-Product Page : http://www.variscite.com/products/evaluation-kits/dart-mx6-kits
-
-The board support is done with all on-board and header interfaces enabled.
-7" LVDS Touchscreen is enabled by default along HDMI output.
-Audio interface is supported with the "simple-card" bindings.
-
-PCIe slot, On-Board DMIC and Camera Interfaces are not handled yet.
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 ---
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/imx6q-var-dt6customboard.dts | 236 +++++++++++++++++++++++++
- 2 files changed, 237 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..148ff15 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -470,6 +470,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-tx6q-11x0-mb7.dtb \
- 	imx6q-udoo.dtb \
- 	imx6q-utilite-pro.dtb \
-+	imx6q-var-dt6customboard.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6q-wandboard-revb1.dtb \
- 	imx6q-wandboard-revd1.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-new file mode 100644
-index 0000000..48f1ee5
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-@@ -0,0 +1,236 @@
-+/*
-+ * Support for Variscite DART-MX6 Carrier-board
-+ *
-+ * Copyright 2017 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ *
-+ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+ */
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+index 338e7861..8807664 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+@@ -57,6 +57,11 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
 +
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+#include "imx6qdl-var-dart.dtsi"
-+#include <dt-bindings/input/linux-event-codes.h>
-+
-+/ {
-+	model = "Variscite DART-MX6 Carrier-board";
-+	compatible = "variscite,dt6customboard", "fsl,imx6q";
-+
-+	backlight_lvds: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm2 0 50000>;
-+		brightness-levels = <0 4 8 16 32 64 128 248>;
-+		default-brightness-level = <7>;
-+		status = "okay";
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
 +	};
+ };
+ 
+ &mmc0 {
+@@ -70,6 +75,24 @@
+ 	status = "okay";
+ };
+ 
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&reg_aldo2>;
++	vqmmc-supply = <&reg_dldo4>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
 +
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		back {
-+			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_BACK>;
-+			label = "Key Back";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			wakeup-source;
-+		};
-+
-+		home {
-+			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_HOME>;
-+			label = "Key Home";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			wakeup-source;
-+		};
-+
-+		menu {
-+			gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_MENU>;
-+			label = "Key Menu";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			wakeup-source;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		led1 {
-+			gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		led2 {
-+			gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	panel1: lvds-panel {
-+		compatible = "sgd,gktw70sdae4se", "panel-lvds";
-+		backlight = <&backlight_lvds>;
-+		width-mm = <153>;
-+		height-mm = <86>;
-+		label = "gktw70sdae4se";
-+		data-mapping = "jeida-18";
-+
-+		panel-timing {
-+			clock-frequency = <32000000>;
-+			hactive = <800>;
-+			vactive = <480>;
-+			hback-porch = <39>;
-+			hfront-porch = <39>;
-+			vback-porch = <29>;
-+			vfront-porch = <13>;
-+			hsync-len = <47>;
-+			vsync-len = <2>;
-+		};
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds1_out>;
-+			};
-+		};
-+	};
-+
-+	reg_usb_h1_vbus: regulator-usbh1vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usbotgvbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "dt6-customboard-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&sound_codec>;
-+		simple-audio-card,frame-master = <&sound_codec>;
-+		simple-audio-card,widgets = "Headphone", "Headphone Jack",
-+					    "Line", "Line In";
-+		simple-audio-card,routing = "Headphone Jack", "HPLOUT",
-+					    "Headphone Jack", "HPROUT",
-+					    "LINE1L", "Line In",
-+					    "LINE1R", "Line In";
-+
-+		sound_cpu: simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
-+		};
-+
-+		sound_codec: simple-audio-card,codec {
-+			sound-dai = <&tlv320aic3106>;
-+			clocks = <&clks IMX6QDL_CLK_CKO>;
-+		};
++	rtl8723bs: wifi at 1 {
++		reg = <1>;
++		interrupt-parent = <&r_pio>;
++		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
++		interrupt-names = "host-wake";
 +	};
 +};
 +
-+&can1 {
-+	status = "okay";
-+};
-+
-+&ecspi1 {
-+	cs-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>,
-+		   <&gpio4 10 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+
-+	touchscreen at 38 {
-+		compatible = "edt,edt-ft5x06";
-+		reg = <0x38>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <480>;
-+		touchscreen-inverted-x;
-+		touchscreen-inverted-y;
-+	};
-+
-+	rtc at 68 {
-+		compatible = "isil,isl12057";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 1 {
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds1_out: endpoint {
-+				remote-endpoint = <&panel_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	dr_mode = "otg";
-+	srp-disable;
-+	hnp-disable;
-+	adp-disable;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
+ &r_rsb {
+ 	status = "okay";
+ 
 -- 
 2.7.4
