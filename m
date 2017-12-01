@@ -1,58 +1,74 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 1 Dec 2017 18:00:49 +0000
-Subject: [PATCH v2 12/18] arm64: entry: Explicitly pass exception level
- to kernel_ventry macro
-In-Reply-To: <20171201175144.GD8826@arm.com>
-References: <1512059986-21325-1-git-send-email-will.deacon@arm.com>
- <1512059986-21325-13-git-send-email-will.deacon@arm.com>
- <20171201115836.jaxzbjsnpnuau56s@lakrids.cambridge.arm.com>
- <20171201175144.GD8826@arm.com>
-Message-ID: <20171201180049.ojgu56r5jo4ezupv@lakrids.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 1 Dec 2017 17:58:45 +0000
+Subject: [PATCH RT] arm*: disable NEON in kernel mode
+In-Reply-To: <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
+References: <20171130142216.GB12606@linutronix.de>
+ <20171130143028.GA1351@linutronix.de>
+ <20171201104331.GB1612@linutronix.de>
+ <20171201134506.GF1612@linutronix.de>
+ <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
+ <20171201143648.GK1612@linutronix.de>
+ <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
+Message-ID: <20171201175844.GT22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 05:51:44PM +0000, Will Deacon wrote:
-> On Fri, Dec 01, 2017 at 11:58:36AM +0000, Mark Rutland wrote:
-> > On Thu, Nov 30, 2017 at 04:39:40PM +0000, Will Deacon wrote:
-
-> > > +	.macro kernel_ventry, el, label, regsize = 64
-
-> > > +	b	el\()\el\()_\label
-
-> > > -	kernel_ventry	el1_sync_invalid		// Synchronous EL1t
-
-> > > +	kernel_ventry	1, sync_invalid			// Synchronous EL1t
-
-> > Using the el paramter to build the branch name has the unfortunate
-> > property of obscuring the branch name. For example, that makes it
-> > difficult to jump around the entry asm with ctags, which is somewhat
-> > painful.
+On Fri, Dec 01, 2017 at 03:03:35PM +0000, Ard Biesheuvel wrote:
+> 
+> l
+> > On 1 Dec 2017, at 14:36, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
 > > 
-> > Could we leave the full branch name in place, e.g.
+> >> On 2017-12-01 14:18:28 [+0000], Mark Rutland wrote:
+> >> [Adding Ard, who wrote the NEON crypto code]
+> >> 
+> >>> On Fri, Dec 01, 2017 at 02:45:06PM +0100, Sebastian Andrzej Siewior wrote:
+> >>> +arm folks, to let you know
+> >>> 
+> >>>> On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
+> >>>> NEON in kernel mode is used by the crypto algorithms and raid6 code.
+> >>>> While the raid6 code looks okay, the crypto algorithms do not: NEON
+> >>>> is enabled on first invocation and may allocate/free/map memory before
+> >>>> the NEON mode is disabled again.
+> >> 
+> >> Could you elaborate on why this is a problem?
+> >> 
+> >> I guess this is because kernel_neon_{begin,end}() disable preemption?
+> >> 
+> >> ... is this specific to RT?
 > > 
-> > 	kernel_ventry	1, el1_sync_invalid		// Synchronous EL1t
-> > 	kernel_ventry	1, el1_irq_invalid		// IRQ EL1t
-> > 	kernel_ventry	1, el1_fiq_invalid		// FIQ EL1t
-> > 	kernel_ventry	1, el1_error_invalid		// Error EL1t
+> > It is RT specific, yes. One thing are the unbounded latencies since
+> > everything in this preempt_disable section can take time depending on
+> > the size of the request.
+> > The other thing is code like in
+> >  arch/arm64/crypto/aes-ce-ccm-glue.c:ccm_encrypt()
 > > 
-> > ... or have separate kernel_ventry and user_ventry macros that
-> > implicitly encoded the source EL, also leaving the label name as-is.
+> > where within this preempt_disable() section skcipher_walk_done() is
+> > invoked. That function can allocate/free/map memory which is okay for
+> > !RT but is not for RT. I tried to break those loops for x86 [0] and I
+> > simply didn't had the time to do the same for ARM. I am aware that
+> > store/restore of the NEON registers (as SSE and AVX) is expensive and
+> > doing a lot of operations in one go is desired.
 > 
-> The downside of doing that is that it makes it possible to say things like:
-> 
-> 	kernel_ventry	0, el1_sync
-> 
-> which I don't want to be expressible.
-> 
-> Given that ctags already chokes on lots of entry.S (for example, any macro
-> that is defined outside of the file) *and* that you can easily search for
-> things like el1_sync_invalid within the file, I'm inclined to leave this
-> patch as-is, but I'll note your objection and buy you a pint.
+> I wouldn?t mind fixing the code instead. We never disable the neon,
+> but only stack the contents of the registers the first time, and
+> unstack them only before returning to userland (with the exception of
+> nested neon use in softirq context). When this code was introduced,
+> we always stacked/unstacked the whole register file eagerly every
+> time.
 
-I guess I'll live with it, then. ;)
++1, at least for arm64.  I don't see a really compelling reason for
+holding kernel-mode NEON around memory management now that we have a
+strict save-once-restore-lazily model.
 
-Assuming I can't twist your arm, feel free to take my Reviewed-by here
-too.
+This may not work so well for arm though -- I haven't looked at that
+code for a while.
 
-Thanks,
-Mark.
+
+If there is memory manamement in any core loop, you already lost
+the performance battle, and an extra
+kernel_neon_end()+kernel_neon_begin() may not be that catastrophic.
+
+[...]
+
+Cheers
+---Dave
