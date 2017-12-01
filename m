@@ -1,22 +1,34 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 2 Dec 2017 16:32:30 +0100
-Subject: [PATCH] dt-bindings: pinctrl: uniphier: add UniPhier pinctrl
- binding
-In-Reply-To: <1511855386-10421-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1511855386-10421-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdaYrTrCDxok4rjSt_s8D1RBTPtiWD7MKBs6RusJsGm9EQ@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 1 Dec 2017 16:58:08 +0100
+Subject: [PATCH v4 10/10] ARM: dtsi: axp81x: set pinmux for GPIO0/1 when
+ used as LDOs
+In-Reply-To: <afc22693e34c11231fc85a0dc6af3ffb340ba9b2.1512135804.git-series.quentin.schulz@free-electrons.com>
+References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
+ <afc22693e34c11231fc85a0dc6af3ffb340ba9b2.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20171201155808.rxgp7pz7nmr6tab7@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 8:49 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Fri, Dec 01, 2017 at 02:44:51PM +0100, Quentin Schulz wrote:
+> On AXP813/818, GPIO0 and GPIO1 can be used as LDO as (respectively)
+> ldo_io0 and ldo_io1.
+> 
+> Let's add the pinctrl properties to the said regulators.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 
-> The driver has been in the tree for a while, but its binding document
-> is missing.  Hence, here it is.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Patch applied with Rob's ACK.
+Maxime
 
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171201/44cb2b61/attachment.sig>
