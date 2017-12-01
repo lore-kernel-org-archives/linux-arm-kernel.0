@@ -1,73 +1,55 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 1 Dec 2017 19:20:18 +0000
-Subject: [PATCH RT] arm*: disable NEON in kernel mode
-In-Reply-To: <20171201182410.GU22781@e103592.cambridge.arm.com>
-References: <20171130142216.GB12606@linutronix.de>
- <20171130143028.GA1351@linutronix.de>
- <20171201104331.GB1612@linutronix.de> <20171201134506.GF1612@linutronix.de>
- <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
- <20171201143648.GK1612@linutronix.de>
- <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
- <20171201175844.GT22781@e103592.cambridge.arm.com>
- <20171201180828.GN10595@n2100.armlinux.org.uk>
- <20171201182410.GU22781@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu9Ljw5fuvxZVFVY+rpBnh_cbUijF76H7Ve54hpENsq9ZA@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Fri,  1 Dec 2017 17:24:34 -0200
+Subject: [PATCH 01/12] ARM: dts: imx51-ts4800: Fix syscon and touschscreen
+ nodes
+Message-ID: <1512156285-18451-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2017 at 18:24, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Fri, Dec 01, 2017 at 06:08:28PM +0000, Russell King - ARM Linux wrote:
->> On Fri, Dec 01, 2017 at 05:58:45PM +0000, Dave Martin wrote:
->> > +1, at least for arm64.  I don't see a really compelling reason for
->> > holding kernel-mode NEON around memory management now that we have a
->> > strict save-once-restore-lazily model.
->> >
->> > This may not work so well for arm though -- I haven't looked at that
->> > code for a while.
->> >
->> >
->> > If there is memory manamement in any core loop, you already lost
->> > the performance battle, and an extra
->> > kernel_neon_end()+kernel_neon_begin() may not be that catastrophic.
->>
->> Remember that we don't permit context switches while kernel neon is
->> in use on ARM - if there's any possibility of scheduling to occur,
->> the get_cpu() in kernel_neon_begin() should trigger a schedule-while-
->> atomic warning.
->
-> Agreed, and an arm64 the same is true.  (Actually softirq is disabled
-> too, for tortuous reasons involving SVE.)
->
-> On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
->> NEON in kernel mode is used by the crypto algorithms and raid6 code.
->> While the raid6 code looks okay, the crypto algorithms do not: NEON
->> is enabled on first invocation and may allocate/free/map memory before
->> the NEON mode is disabled again.
->> This needs to be changed until it can be enabled.
->> On ARM NEON in kernel mode can be simply disabled. on ARM64 it needs to
->> stay on due to possible EFI callbacks so here I disable each algorithm.
->
-> [...]
->
->> diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
->> index 70c517aa4501..2a5f05b5a19a 100644
->> --- a/arch/arm64/crypto/Kconfig
->> +++ b/arch/arm64/crypto/Kconfig
->> @@ -19,19 +19,19 @@ config CRYPTO_SHA512_ARM64
->>
->>  config CRYPTO_SHA1_ARM64_CE
->>     tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
->> -   depends on KERNEL_MODE_NEON
->> +   depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
->>     select CRYPTO_HASH
->>     select CRYPTO_SHA1
->
-> Sebastian, can you piont to where sha1 (say) hits this issue?
-> I wonder whether this is really a sign that some refactoring is needed.
->
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-I don't think the SHA code is affected. It is primarily the block
-ciphers, where the scatterwalk API offers some guarantees to the API
-client (the NEON crypto driver) that data is presented in suitable
-blocks. This may involve copying data from the scatterlist to a temp
-buffer if any of the chunks are not blocksize aligned.
+The syscon node has an incorrect notation for its unit address and the
+wdt node has an unneeded unit address.
+
+Fix them so that the following build warnings with W=1 are gone:
+
+arch/arm/boot/dts/imx51-ts4800.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+arch/arm/boot/dts/imx51-ts4800.dtb: Warning (unit_address_vs_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/syscon at b0010000/wdt at e has a unit name, but no reg property
+arch/arm/boot/dts/imx51-ts4800.dtb: Warning (unit_address_vs_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/touchscreen has a reg or ranges property, but no unit name
+arch/arm/boot/dts/imx51-ts4800.dtb: Warning (simple_bus_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/syscon at b0010000 simple-bus unit address format error, expected "10000"
+arch/arm/boot/dts/imx51-ts4800.dtb: Warning (simple_bus_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/touchscreen simple-bus unit address format error, expected "12000"
+
+Cc: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx51-ts4800.dts | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
+index 564233e..f59b02b 100644
+--- a/arch/arm/boot/dts/imx51-ts4800.dts
++++ b/arch/arm/boot/dts/imx51-ts4800.dts
+@@ -149,18 +149,18 @@
+ 		#size-cells = <1>;
+ 		ranges = <0 0 0 0x1d000>;
+ 
+-		syscon: syscon at b0010000 {
++		syscon: syscon at 10000 {
+ 			compatible = "syscon", "simple-mfd";
+ 			reg = <0x10000 0x3d>;
+ 			reg-io-width = <2>;
+ 
+-			wdt at e {
++			wdt {
+ 				compatible = "technologic,ts4800-wdt";
+ 				syscon = <&syscon 0xe>;
+ 			};
+ 		};
+ 
+-		touchscreen {
++		touchscreen at 12000 {
+ 			compatible = "technologic,ts4800-ts";
+ 			reg = <0x12000 0x1000>;
+ 			syscon = <&syscon 0x10 6>;
+-- 
+2.7.4
