@@ -1,58 +1,154 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Fri, 1 Dec 2017 13:59:48 -0800
-Subject: [kernel-hardening][PATCH v2 3/3] arm: mm: dump: add checking for
- writable and executable pages
-In-Reply-To: <20171201113447.GA5234@pjb1027-Latitude-E5410>
-References: <20171201113447.GA5234@pjb1027-Latitude-E5410>
-Message-ID: <23def981-3f61-8421-b46d-94f75b293003@redhat.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 1 Dec 2017 16:23:24 -0600
+Subject: [RFC 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+In-Reply-To: <1511999947-8274-3-git-send-email-jliang@xilinx.com>
+References: <1511999947-8274-1-git-send-email-jliang@xilinx.com>
+ <1511999947-8274-3-git-send-email-jliang@xilinx.com>
+Message-ID: <20171201222324.afnws7ddew7tyzxc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01/2017 03:34 AM, Jinbum Park wrote:
-> +static inline bool is_prot_ro(struct pg_state *st)
-> +{
-> +	if (st->level < 4) {
-> +	#ifdef CONFIG_ARM_LPAE
-> +		if ((st->current_prot &
-> +		(L_PMD_SECT_RDONLY | PMD_SECT_AP2)) ==
-> +		(L_PMD_SECT_RDONLY | PMD_SECT_AP2))
-> +			return true;
-> +	#elif __LINUX_ARM_ARCH__ >= 6
-> +		if ((st->current_prot &
-> +		(PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) ==
-> +		(PMD_SECT_APX | PMD_SECT_AP_WRITE))
-> +			return true;
-> +	#else
-> +		if ((st->current_prot &
-> +		(PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) == 0)
-> +			return true;
-> +	#endif
-> +	} else {
-> +		if ((st->current_prot & L_PTE_RDONLY) == L_PTE_RDONLY)
-> +			return true;
-> +	}
+On Wed, Nov 29, 2017 at 03:59:07PM -0800, Wendy Liang wrote:
+> Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block
+> in ZynqMP SoC used for the communication between various processor
+> systems.
+> 
+> Signed-off-by: Wendy Liang <jliang@xilinx.com>
+> ---
+>  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 113 +++++++++++++++++++++
+>  1 file changed, 113 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> new file mode 100644
+> index 0000000..a118d00
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
+> @@ -0,0 +1,113 @@
+> +Xilinx IPI Mailbox Controller
+> +========================================
 > +
-> +	return false;
-> +}
+> +The Xilinx IPI(Inter Processor Interrupt) mailbox controller is to manage
+> +messaging between two Xilinx Zynq UltraScale+ MPSoC IPI agents. Each IPI
+> +agent owns registers used for notification and buffers for message.
 > +
-> +static inline bool is_prot_nx(struct pg_state *st)
-> +{
-> +	if (st->level < 4) {
-> +		if ((st->current_prot & PMD_SECT_XN) == PMD_SECT_XN)
-> +			return true;
-> +	} else {
-> +		if ((st->current_prot & L_PTE_XN) == L_PTE_XN)
-> +			return true;
-> +	}
+> +               +-------------------------------------+
+> +               | Xilinx ZynqMP IPI Controller        |
+> +               +-------------------------------------+
+> +    +--------------------------------------------------+
+> +ATF                    |                     |
+> +                       |                     |
+> +                       |                     |
+> +    +--------------------------+             |
+> +                       |                     |
+> +                       |                     |
+> +    +--------------------------------------------------+
+> +            +------------------------------------------+
+> +            |  +----------------+   +----------------+ |
+> +Hardware    |  |  IPI Agent     |   |  IPI Buffers   | |
+> +            |  |  Registers     |   |                | |
+> +            |  |                |   |                | |
+> +            |  +----------------+   +----------------+ |
+> +            |                                          |
+> +            | Xilinx IPI Agent Block                   |
+> +            +------------------------------------------+
 > +
-> +	return false;
-> +}
+> +
+> +Controller Device Node:
+> +===========================
+> +Required properties:
+> +--------------------
+> +- compatible:		Shall be: "xlnx,zynqmp-ipi-mailbox"
+> +- reg:			IPI buffers address ranges
+> +- reg-names:		Names of the reg resources. It should have:
+> +			* local_request_region
+> +			  - IPI request msg buffer written by local and read
+> +			    by remote
+> +			* local_response_region
+> +			  - IPI response msg buffer written by local and read
+> +			    by remote
+> +			* remote_request_region
+> +			  - IPI request msg buffer written by remote and read
+> +			    by local
+> +			* remote_response_region
+> +			  - IPI response msg buffer written by remote and read
+> +			    by local
+> +- #mbox-cells:		Shall be 1. It contains:
+> +			* tx(0) or rx(1) channel
+> +- xlnx-ipi-ids:		Xilinx IPI agent IDs of the two peers of the
+> +			Xilinx IPI communication channel.
 
-I know arm64 checks the bits directly, but the arm32 code is a bit
-more fiddly and I have mixed feelings about copying and pasting
-the checks. It would be cleaner if we could take advantage of
-the existing pg_level and bits arrays. I also don't have my heart
-set on this so if nobody else objects, the code can stay as is.
+xlnx,ipi-ids
 
-Thanks,
-Laura
+> +- interrupt-parent:	Phandle for the interrupt controller
+> +- interrupts:		Interrupt information corresponding to the
+> +			interrupt-names property.
+> +
+> +Optional properties:
+> +--------------------
+> +- method:              The method of accessing the IPI agent registers.
+> +                       Permitted values are: "smc" and "hvc". Default is
+> +                       "smc".
+> +
+
+> +Client Device Node:
+> +===========================
+> +Required properties:
+> +--------------------
+> +- mboxes:		Standard property to specify a mailbox
+> +			(See ./mailbox.txt)
+> +- mbox-names:		List of identifier  strings for each mailbox
+> +			channel.
+
+This part is a standard part of the binding and doesn't need to be here.
+
+> +
+> +Example:
+> +===========================
+> +	/* APU<->RPU0 IPI mailbox controller */
+> +	ipi_mailbox_rpu0: mailbox at ff90400 {
+> +		compatible = "xlnx,zynqmp-ipi-mailbox";
+> +		reg = <0x0 0xff990400 0x0 0x20>,
+> +		      <0x0 0xff990420 0x0 0x20>,
+> +		      <0x0 0xff990080 0x0 0x20>,
+> +		      <0x0 0xff9900a0 0x0 0x20>;
+> +		reg-names = "local_request_region", "local_response_region",
+> +			    "remote_request_region", "remote_response_region";
+> +		#mbox-cells = <1>;
+> +		xlnx-ipi-ids = <0 1>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 29 4>;
+> +	};
+> +	/* APU<->RPU1 IPI mailbox controller */
+> +	ipi_mailbox_rpu1: mailbox at ff990440 {
+> +		compatible = "xlnx,zynqmp-ipi-mailbox";
+> +		reg = <0x0 0xff990440 0x0 0x20>,
+> +		      <0x0 0xff990460 0x0 0x20>,
+> +		      <0x0 0xff990280 0x0 0x20>,
+> +		      <0x0 0xff9902a0 0x0 0x20>;
+> +		reg-names = "local_request_region", "local_response_region",
+> +			    "remote_request_region", "remote_response_region";
+> +		#mbox-cells = <1>;
+> +		xlnx-ipi-ids = <0 2>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <0 29 4>;
+> +	};
+> +	rpu0 {
+> +		...
+> +		mboxes = <&ipi_mailbox_rpu0 0>,
+> +			 <&ipi_mailbox_rpu0 1>;
+> +		mbox-names = "tx", "rx";
+> +	};
+> +	rpu1 {
+> +		...
+> +		mboxes = <&ipi_mailbox_rpu1 0>,
+> +			 <&ipi_mailbox_rpu1 1>;
+> +		mbox-names = "tx", "rx";
+> +	};
+> -- 
+> 2.7.4
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
