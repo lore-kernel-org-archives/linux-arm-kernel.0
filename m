@@ -1,80 +1,77 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:32 +0100
-Subject: [PATCH v2 09/27] drm/sun4i: Rework enabling plane in DE2 driver
+Date: Fri,  1 Dec 2017 07:05:34 +0100
+Subject: [PATCH v2 11/27] drm/sun4i: Add constraints checking to DE2 driver
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-10-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-12-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we want to support multiple planes in the future, code which enables
-pipe has to be moved to appropriate place and it must depend on channel
-id instead of being hardcoded.
+Since current DE2 driver doesn't know how to scale yet, add atomic check
+function which checks that.
 
-Side effect of that rework is definition of default Z position. For now,
-put first channel at the bottom, second above it and so on.
+Nice side effect of that function is that populates clipped coordinates
+and checks visibility of the plane. That data will be used in the
+future.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c | 28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_layer.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index c7d4ccd605e0..015943c0ed5a 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -55,6 +55,15 @@ void sun8i_mixer_layer_enable(struct sun8i_mixer *mixer,
- 	regmap_update_bits(mixer->engine.regs,
- 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR(chan, layer),
- 			   SUN8I_MIXER_CHAN_UI_LAYER_ATTR_EN, val);
+diff --git a/drivers/gpu/drm/sun4i/sun8i_layer.c b/drivers/gpu/drm/sun4i/sun8i_layer.c
+index 5aa6e2c9728e..40e6b83aef3b 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_layer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_layer.c
+@@ -13,7 +13,9 @@
+  * the License, or (at your option) any later version.
+  */
+ 
++#include <drm/drm_atomic.h>
+ #include <drm/drm_atomic_helper.h>
++#include <drm/drm_crtc.h>
+ #include <drm/drm_plane_helper.h>
+ #include <drm/drmP.h>
+ 
+@@ -26,6 +28,31 @@ struct sun8i_plane_desc {
+ 	       uint32_t                nformats;
+ };
+ 
++static int sun8i_mixer_layer_atomic_check(struct drm_plane *plane,
++					  struct drm_plane_state *state)
++{
++	struct drm_crtc *crtc = state->crtc;
++	struct drm_crtc_state *crtc_state;
++	struct drm_rect clip;
 +
-+	if (enable)
-+		val = SUN8I_MIXER_BLEND_PIPE_CTL_EN(chan);
-+	else
-+		val = 0;
++	if (!crtc)
++		return 0;
 +
-+	regmap_update_bits(mixer->engine.regs,
-+			   SUN8I_MIXER_BLEND_PIPE_CTL,
-+			   SUN8I_MIXER_BLEND_PIPE_CTL_EN(chan), val);
++	crtc_state = drm_atomic_get_existing_crtc_state(state->state, crtc);
++	if (WARN_ON(!crtc_state))
++		return -EINVAL;
++
++	clip.x1 = 0;
++	clip.y1 = 0;
++	clip.x2 = crtc_state->adjusted_mode.hdisplay;
++	clip.y2 = crtc_state->adjusted_mode.vdisplay;
++
++	return drm_plane_helper_check_state(state, &clip,
++					    DRM_PLANE_HELPER_NO_SCALING,
++					    DRM_PLANE_HELPER_NO_SCALING,
++					    true, true);
++}
++
+ static void sun8i_mixer_layer_atomic_disable(struct drm_plane *plane,
+ 					       struct drm_plane_state *old_state)
+ {
+@@ -53,6 +80,7 @@ static void sun8i_mixer_layer_atomic_update(struct drm_plane *plane,
  }
  
- static int sun8i_mixer_drm_format_to_layer(struct drm_plane *plane,
-@@ -98,7 +107,7 @@ int sun8i_mixer_update_layer_coord(struct sun8i_mixer *mixer,
- 					      state->crtc_h));
- 		DRM_DEBUG_DRIVER("Updating blender size\n");
- 		regmap_write(mixer->engine.regs,
--			     SUN8I_MIXER_BLEND_ATTR_INSIZE(0),
-+			     SUN8I_MIXER_BLEND_ATTR_INSIZE(chan),
- 			     SUN8I_MIXER_SIZE(state->crtc_w,
- 					      state->crtc_h));
- 		regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_OUTSIZE,
-@@ -322,20 +331,17 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
- 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
- 
--	/* Initialize blender */
-+	/*
-+	 * Set fill color of bottom plane to black. Generally not needed
-+	 * except when VI plane is at bottom (zpos = 0) and enabled.
-+	 */
- 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PIPE_CTL,
--		     SUN8I_MIXER_BLEND_PIPE_CTL_EN(0) |
- 		     SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(0));
--
--	regmap_write(mixer->engine.regs,
--		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
-+	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
- 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
- 
--	/* Select the first UI channel */
--	DRM_DEBUG_DRIVER("Selecting channel %d (first UI channel)\n",
--			 mixer->cfg->vi_num);
--	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE,
--		     mixer->cfg->vi_num);
-+	/* Fixed zpos for now */
-+	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_ROUTE, 0x43210);
- 
- 	plane_cnt = mixer->cfg->vi_num + mixer->cfg->ui_num;
- 	for (i = 0; i < plane_cnt; i++)
+ static struct drm_plane_helper_funcs sun8i_mixer_layer_helper_funcs = {
++	.atomic_check	= sun8i_mixer_layer_atomic_check,
+ 	.atomic_disable	= sun8i_mixer_layer_atomic_disable,
+ 	.atomic_update	= sun8i_mixer_layer_atomic_update,
+ };
 -- 
 2.15.1
