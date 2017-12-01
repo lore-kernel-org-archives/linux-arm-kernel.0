@@ -1,51 +1,33 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Fri,  1 Dec 2017 14:44:46 +0100
-Subject: [PATCH v4 05/10] pinctrl: axp209: add programmable gpio_status_offset
+Date: Fri,  1 Dec 2017 14:44:49 +0100
+Subject: [PATCH v4 08/10] mfd: axp20x: add pinctrl cell for AXP813
 In-Reply-To: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
 References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <ada605a2efe507c33b0b3620cc3e4f40c7e4c5fc.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <e0b4ce746c052b78f08dff54d0ad7ce7ebc611ab.1512135804.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare for patches that will add support for a new PMIC that has a
-different GPIO input status register, add a gpio_status_offset within
-axp20x_pctl structure and use it.
+As GPIO/pinctrl driver now supports AXP813, add a cell for it.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-Acked-by: Chen-Yu Tsai <wens@csie.org>
 ---
- drivers/pinctrl/pinctrl-axp209.c | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+ drivers/mfd/axp20x.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/pinctrl/pinctrl-axp209.c b/drivers/pinctrl/pinctrl-axp209.c
-index 6201d2b..3fae81f 100644
---- a/drivers/pinctrl/pinctrl-axp209.c
-+++ b/drivers/pinctrl/pinctrl-axp209.c
-@@ -48,6 +48,7 @@ struct axp20x_pctrl_desc {
- 	u8				ldo_mask;
- 	/* Stores the pins supporting ADC function. Bit offset is pin number. */
- 	u8				adc_mask;
-+	u8				gpio_status_offset;
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 2468b43..d8c92fb 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -878,6 +878,9 @@ static struct mfd_cell axp813_cells[] = {
+ 		.resources		= axp803_pek_resources,
+ 	}, {
+ 		.name			= "axp20x-regulator",
++	}, {
++		.name			= "axp20x-gpio",
++		.of_compatible		= "x-powers,axp813-gpio",
+ 	}
  };
  
- struct axp20x_pinctrl_function {
-@@ -77,6 +78,7 @@ static const struct axp20x_pctrl_desc axp20x_data = {
- 	.npins	= ARRAY_SIZE(axp209_pins),
- 	.ldo_mask = BIT(0) | BIT(1),
- 	.adc_mask = BIT(0) | BIT(1),
-+	.gpio_status_offset = 4,
- };
- 
- static int axp20x_gpio_get_reg(unsigned offset)
-@@ -108,7 +110,7 @@ static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	if (ret)
- 		return ret;
- 
--	return !!(val & BIT(offset + 4));
-+	return !!(val & BIT(offset + pctl->desc->gpio_status_offset));
- }
- 
- static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
 -- 
 git-series 0.9.1
