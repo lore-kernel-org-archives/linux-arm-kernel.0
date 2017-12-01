@@ -1,20 +1,47 @@
-From: richardcochran@gmail.com (Richard Cochran)
-Date: Fri, 1 Dec 2017 07:56:05 -0800
-Subject: [PATCH 1/1] timecounter: Make cyclecounter struct part of
- timecounter struct
-In-Reply-To: <1512114454-26958-1-git-send-email-sagar.a.kamble@intel.com>
-References: <1512114454-26958-1-git-send-email-sagar.a.kamble@intel.com>
-Message-ID: <20171201155605.7c7oiq5we4n7wdum@localhost>
+From: Jason@zx2c4.com (Jason A. Donenfeld)
+Date: Fri, 1 Dec 2017 16:57:26 +0100
+Subject: Essential get_user fix missing from 3.10 aarch64
+Message-ID: <CAHmME9qtH1ywCS+4ebg8myxWsAUbcqG6Rcus+Nt0DBLLaMu4wQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 01:17:34PM +0530, Sagar Arun Kamble wrote:
-> There is no real need for the users of timecounters to define cyclecounter
-> and timecounter variables separately. Since timecounter will always be
-> based on cyclecounter, have cyclecounter struct as member of timecounter
-> struct.
+Hi stable/arm/Willy,
 
-Could you please put the PTP maintainer onto CC?
+1f65c13efef69b6dc908e588f91a133641d8475c is an important commit,
+because it involves evaluation of pointers from userspace. I'm running
+into issues with RNDADDTOENTCNT reading bogus values, because p is
+incremented twice as much as it should in this random.c block:
 
-Thanks,
-Richard
+        case RNDADDENTROPY:
+               if (!capable(CAP_SYS_ADMIN))
+                       return -EPERM;
+               if (get_user(ent_count, p++))
+                       return -EFAULT;
+               if (ent_count < 0)
+                       return -EINVAL;
+               if (get_user(size, p++))
+                       return -EFAULT;
+               retval = write_pool(&input_pool, (const char __user *)p,
+                                   size);
+
+That seems reasonable, but on aarch64, get_user is defined as:
+
+#define get_user(x, ptr)                                                \
+({                                                                      \
+       might_sleep();                                                  \
+       access_ok(VERIFY_READ, (ptr), sizeof(*(ptr))) ?                 \
+               __get_user((x), (ptr)) :                                \
+               ((x) = 0, -EFAULT);                                     \
+})
+
+Notice the multiple use of ptr.
+
+I thought I had found something breathtakingly bad, until I realized
+that it was already fixed in 2013 by Takahiro. It just wasn't marked
+for stable.
+
+Not sure if there's ever going to be another stable 3.10 release, but
+if so, this would be an important one to backport.
+
+Regards,
+Jason
