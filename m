@@ -1,32 +1,35 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 30 Nov 2017 21:52:51 -0500
-Subject: [PATCH V4 0/5] dmaengine: qcom_hidma: add support for bugfixed HW
-Message-ID: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
+Date: Thu, 30 Nov 2017 21:52:52 -0500
+Subject: [PATCH V4 1/5] Documentation: DT: qcom_hidma: Bump HW revision for
+ the bugfixed HW
+In-Reply-To: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
+References: <1512096776-22883-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512096776-22883-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce new ACPI and OF device ids for thw HW along with the helper
-functions.
+A new version of the HIDMA IP has been released with bug fixes. Bumping the
+hardware version to differentiate from others.
 
-Changes from v3:
-* introduce device_get_match_data() to read driver data
-* remove ACPI/OF specific calls from qcom_hidma and replace it with the
-new API.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-Sinan Kaya (5):
-  Documentation: DT: qcom_hidma: Bump HW revision for the bugfixed HW
-  ACPI / bus: Introduce acpi_get_match_data() function
-  device property: Introduce a common API to fetch device match data
-  dmaengine: qcom_hidma: Add support for the new revision
-  dmaengine: qcom_hidma: Add identity register support
-
- .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  4 +--
- drivers/acpi/bus.c                                 | 12 +++++++
- drivers/base/property.c                            | 14 ++++++++
- drivers/dma/qcom/hidma.c                           | 41 ++++++++++------------
- include/linux/acpi.h                               |  6 ++++
- include/linux/property.h                           |  2 ++
- 6 files changed, 55 insertions(+), 24 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+index 55492c2..5d93d6d 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -47,8 +47,8 @@ When the OS is not in control of the management interface (i.e. it's a guest),
+ the channel nodes appear on their own, not under a management node.
+ 
+ Required properties:
+-- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
+-for MSI capable HW.
++- compatible: must contain "qcom,hidma-1.0" for initial HW or
++  "qcom,hidma-1.1"/"qcom,hidma-1.2" for MSI capable HW.
+ - reg: Addresses for the transfer and event channel
+ - interrupts: Should contain the event interrupt
+ - desc-count: Number of asynchronous requests this channel can handle
 -- 
 1.9.1
