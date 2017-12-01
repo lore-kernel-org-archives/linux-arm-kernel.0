@@ -1,36 +1,40 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Fri, 1 Dec 2017 18:39:43 +0100
-Subject: [PATCH RT] arm*: disable NEON in kernel mode
-In-Reply-To: <20171201173120.GL10595@n2100.armlinux.org.uk>
-References: <20171130142216.GB12606@linutronix.de>
- <20171130143028.GA1351@linutronix.de>
- <20171201104331.GB1612@linutronix.de>
- <20171201134506.GF1612@linutronix.de>
- <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
- <20171201143648.GK1612@linutronix.de>
- <20171201171458.3a2acsltiq54gvuu@hirez.programming.kicks-ass.net>
- <20171201173120.GL10595@n2100.armlinux.org.uk>
-Message-ID: <20171201173943.5mnr7zkr4axxgpfx@hirez.programming.kicks-ass.net>
+From: arnaud.pouliquen@st.com (Arnaud Pouliquen)
+Date: Fri, 1 Dec 2017 18:40:12 +0100
+Subject: [PATCH v6 05/13] IIO: Add DT bindings for sigma delta adc modulator
+In-Reply-To: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
+References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <1512150020-20335-6-git-send-email-arnaud.pouliquen@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 05:31:20PM +0000, Russell King - ARM Linux wrote:
-> On Fri, Dec 01, 2017 at 06:14:58PM +0100, Peter Zijlstra wrote:
-> > Well, PREEMPT cares about that too.
-> 
-> Preempt may care, but it's the hit you take to use neon in the kernel.
-> The neon register set shares with the FPU, so preempting during that
-> path means that the normal FPU register saving would corrupt the
-> already saved user FPU context - and even worse would result in the
-> kernel's crypto function register contents being leaked to userspace.
+Add documentation of device tree bindings to support
+sigma delta modulator in IIO framework.
 
-Same thing on x86.
+Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ .../devicetree/bindings/iio/adc/sigma-delta-modulator.txt   | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
 
-> If you care about preempt deeply, the only solution is to avoid using
-> kernel mode neon.
-
-Not quite, you can write the code such that it drops out of neon mode
-regularly to allow preemption.
-
-So setup a crypto block, enter neon, transform the block, drop out of
-neon, rinse repeat.
+diff --git a/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+new file mode 100644
+index 0000000..e9ebb8a
+--- /dev/null
++++ b/Documentation/devicetree/bindings/iio/adc/sigma-delta-modulator.txt
+@@ -0,0 +1,13 @@
++Device-Tree bindings for sigma delta modulator
++
++Required properties:
++- compatible: should be "ads1201", "sd-modulator". "sd-modulator" can be use
++	as a generic SD modulator if modulator not specified in compatible list.
++- #io-channel-cells = <1>: See the IIO bindings section "IIO consumers".
++
++Example node:
++
++	ads1202: adc at 0 {
++		compatible = "sd-modulator";
++		#io-channel-cells = <1>;
++	};
+-- 
+2.7.4
