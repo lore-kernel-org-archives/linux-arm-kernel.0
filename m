@@ -1,52 +1,135 @@
-From: alison.wang@nxp.com (Alison Wang)
-Date: Fri, 1 Dec 2017 03:33:49 +0000
-Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
-In-Reply-To: <alpine.DEB.2.11.1601051039320.3689@nanos>
-References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
- <20151027081834.GB1425@svinekod>
- <DB3PR04MB07407D83CC5F8F5F19A7207F4FB0@DB3PR04MB074.eurprd04.prod.outlook.com>
- <4875455.lvoc6XpkZc@wuerfel> <alpine.DEB.2.11.1512291449380.28591@nanos>
- <20160102102955.GP8644@n2100.arm.linux.org.uk>
- <alpine.DEB.2.11.1601051039320.3689@nanos>
-Message-ID: <VI1PR04MB3039EB80F5468E55263ABECBF4390@VI1PR04MB3039.eurprd04.prod.outlook.com>
+From: j-keerthy@ti.com (Keerthy)
+Date: Fri, 1 Dec 2017 10:02:15 +0530
+Subject: [PATCH v3 8/9] pwm: pwm-omap-dmtimer: Adapt driver to utilize
+ dmtimer pdata ops
+In-Reply-To: <7bfa0a0d-27f6-3797-f96b-eeb975158f78@ti.com>
+References: <1510806222-22096-1-git-send-email-j-keerthy@ti.com>
+ <1510806222-22096-9-git-send-email-j-keerthy@ti.com>
+ <2c5e3e04-9940-43c3-62b1-8cef7d22c5e1@ti.com>
+ <e632a727-1067-7767-1646-f49ec0f8c2ec@ti.com>
+ <7bfa0a0d-27f6-3797-f96b-eeb975158f78@ti.com>
+Message-ID: <46717199-3db8-923c-0c66-0d25f5fd871e@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Russell,
 
-> On Sat, 2 Jan 2016, Russell King - ARM Linux wrote:
-> > On Tue, Dec 29, 2015 at 02:54:10PM +0100, Thomas Gleixner wrote:
-> > > I have no real opinion about that patch. It does no harm to
-> > > unconditionally setup the hrtimer based broadcast even if it's never
-> used.
-> > >
-> > > Up to the arch maintainer to decide.
-> >
-> > That's really not fair to keep shovelling these kinds of decisions
-> > onto architecture maintainers without any kind of explanation about
-> > how an architecture maintainer should make such a decision.
-> >
-> > Do I roll a 6-face dice, and if it gives an odd number, I apply this
-> > patch, otherwise I reject it?
-> >
-> > Is there a technical basis for making the decision?  If so, please
-> > explain what the technical arguments are against having or not having
-> > this change.
-> 
-> The hrtimer based broadcast device is used when you have per cpu timers
-> which stop in deeper power states, but you have no other timer hardware on
-> the chip which can backup the per cpu timer in deep power states. The
-> trick is that it emulates a timer hardware via a hrtimer and then tells
-> the cpu idle code not to go into deep power states on the cpu which owns
-> that hrtimer. All other cpus can go as deep as they want and still get
-> woken up.
-> 
-> The only downside of adding this unconditionally is extra code in case
-> that it is not needed on a particular platform.
-> 
-> Hope that helps.
-> 
-[Alison Wang] What's your opinion about this explanation? Is this patch acceptable?
 
-Best Regards,
-Alison Wang
+On Friday 01 December 2017 04:49 AM, Grygorii Strashko wrote:
+> 
+> 
+> On 11/30/2017 03:36 AM, Keerthy wrote:
+>>
+>>
+>> On Tuesday 28 November 2017 11:57 PM, Strashko, Grygorii wrote:
+>>>
+>>>
+>>> On 11/15/2017 10:23 PM, Keerthy wrote:
+>>>> Adapt driver to utilize dmtimer pdata ops instead of pdata-quirks.
+>>>>
+>>>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>>>> ---
+>>>>
+>>>> Changes in v3:
+>>>>
+>>>> ??? * Used of_find_platdata_by_node function to fetch platform
+>>>> ????? data for timer node.
+>>>>
+>>>> ?? drivers/pwm/pwm-omap-dmtimer.c | 39
+>>>> ++++++++++++++++++++++-----------------
+>>>> ?? 1 file changed, 22 insertions(+), 17 deletions(-)
+>>>>
+>>>> diff --git a/drivers/pwm/pwm-omap-dmtimer.c
+>>>> b/drivers/pwm/pwm-omap-dmtimer.c
+>>>> index 5ad42f3..2caf46b 100644
+>>>> --- a/drivers/pwm/pwm-omap-dmtimer.c
+>>>> +++ b/drivers/pwm/pwm-omap-dmtimer.c
+>>>> @@ -23,6 +23,7 @@
+>>>> ?? #include <linux/mutex.h>
+>>>> ?? #include <linux/of.h>
+>>>> ?? #include <linux/of_platform.h>
+>>>> +#include <linux/platform_data/dmtimer-omap.h>
+>>>> ?? #include <linux/platform_data/pwm_omap_dmtimer.h>
+>>>> ?? #include <linux/platform_device.h>
+>>>> ?? #include <linux/pm_runtime.h>
+>>>> @@ -37,7 +38,7 @@ struct pwm_omap_dmtimer_chip {
+>>>> ?????? struct pwm_chip chip;
+>>>> ?????? struct mutex mutex;
+>>>> ?????? pwm_omap_dmtimer *dm_timer;
+>>>> -??? struct pwm_omap_dmtimer_pdata *pdata;
+>>>> +??? struct omap_dm_timer_ops *pdata;
+>>>> ?????? struct platform_device *dm_timer_pdev;
+>>>> ?? };
+>>>> ?? @@ -242,19 +243,33 @@ static int pwm_omap_dmtimer_probe(struct
+>>>> platform_device *pdev)
+>>>> ?? {
+>>>> ?????? struct device_node *np = pdev->dev.of_node;
+>>>> ?????? struct device_node *timer;
+>>>> +??? struct platform_device *timer_pdev;
+>>>> ?????? struct pwm_omap_dmtimer_chip *omap;
+>>>> -??? struct pwm_omap_dmtimer_pdata *pdata;
+>>>> +??? struct dmtimer_platform_data *timer_pdata;
+>>>> +??? struct omap_dm_timer_ops *pdata;
+>>>> ?????? pwm_omap_dmtimer *dm_timer;
+>>>> ?????? u32 v;
+>>>> ?????? int status;
+>>>> ?? -??? pdata = dev_get_platdata(&pdev->dev);
+>>>> -??? if (!pdata) {
+>>>> -??????? dev_err(&pdev->dev, "Missing dmtimer platform data\n");
+>>>> +??? timer = of_parse_phandle(np, "ti,timers", 0);
+>>>> +??? if (!timer)
+>>>> +??????? return -ENODEV;
+>>>> +
+>>>> +??? timer_pdev = of_find_device_by_node(timer);
+>>>> +??? if (!timer_pdev) {
+>>>> +??????? dev_err(&pdev->dev, "Unable to find Timer pdev\n");
+>>>> +??????? return -ENODEV;
+>>>> +??? }
+>>>> +
+>>>> +??? timer_pdata = of_find_platdata_by_node(timer);
+>>>> +??? if (!timer_pdata) {
+>>>> +??????? dev_err(&pdev->dev, "dmtimer pdata structure NULL\n");
+>>>> ?????????? return -EINVAL;
+>>>> ?????? }
+>>>
+>>> Huh. I think It might be better if you add smth. like
+>>>
+>>> struct omap_dm_timer *dm_timer = of_omap_dm_timer_get(parent_np,
+>>> "ti,timers", idx);
+>>>
+>>> struct omap_dm_timer_ops *pdata = omap_dm_timer_get_ops(dm_timer);
+>>>
+>>> so all DT and platdata implementation details will be hidden.
+>>
+>> Grygorii,
+>>
+>> This driver is already fetching:
+>>
+>> omap->dm_timer_pdev = of_find_device_by_node(timer);
+>>
+>> It stores dm_timer_pdev in struct pwm_omap_dmtimer_chip.
+>> So we already need:
+>> timer = of_parse_phandle(np, "ti,timers", 0);
+>> and
+>> omap->dm_timer_pdev = of_find_device_by_node(timer);
+>>
+>> So why not just do:
+>>
+>> struct omap_dm_timer_ops *pdata =
+>> omap_dm_timer_get_ops(omap->dm_timer_pdev);
+> 
+> if you dont want to do additional optimizations as part of migration
+> might be
+> dev_get_platdata(&omap->dm_timer_pdev->dev);
+> 
+> would be enough.
+
+That is pretty much what i want to do with the migration series.
+
+> 
+> But, again, PWM driver don't need to know so many details about
+> DM timer implementation and internal structure as consumer.
+
+Totally understand that. I will follow up with more clean ups once the
+code is migrated. Hope that is a reasonable approach.
+
+> 
