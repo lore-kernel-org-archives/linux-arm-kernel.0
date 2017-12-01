@@ -1,46 +1,68 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  1 Dec 2017 10:03:39 +0100
-Subject: [PATCH v5 1/6] ARM: dts: imx6qdl-pinfunc: Add missing
- MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT
+Date: Fri,  1 Dec 2017 10:03:44 +0100
+Subject: [PATCH v5 6/6] ARM: imx_v6_v7_defconfig: Add missing config for
+ DART-MX6 SoM
 In-Reply-To: <1512119024-521-1-git-send-email-narmstrong@baylibre.com>
 References: <1512119024-521-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1512119024-521-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1512119024-521-7-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add missing pinmux entry for OSC32K_32K_OUT on pad ENET_RXD0 used by the
-Variscite DART-MX6 SoM.
+This patch adds the missing configs for the DART-MX6 SoM support :
+- SERDEV bluetooth driver + SERIAL_DEV_BUS configs
+- WL18XX driver
+- DEFAULT_ON Led Trigger
 
 Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/boot/dts/imx6dl-pinfunc.h | 1 +
- arch/arm/boot/dts/imx6q-pinfunc.h  | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6dl-pinfunc.h b/arch/arm/boot/dts/imx6dl-pinfunc.h
-index 0ead323..37e430a 100644
---- a/arch/arm/boot/dts/imx6dl-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6dl-pinfunc.h
-@@ -668,6 +668,7 @@
- #define MX6QDL_PAD_ENET_RX_ER__SPDIF_IN             0x1f4 0x5c4 0x8f0 0x3 0x1
- #define MX6QDL_PAD_ENET_RX_ER__ENET_1588_EVENT2_OUT 0x1f4 0x5c4 0x000 0x4 0x0
- #define MX6QDL_PAD_ENET_RX_ER__GPIO1_IO24           0x1f4 0x5c4 0x000 0x5 0x0
-+#define MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT        0x1f8 0x5c8 0x000 0x0 0x0
- #define MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0         0x1f8 0x5c8 0x818 0x1 0x0
- #define MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK        0x1f8 0x5c8 0x838 0x2 0x0
- #define MX6QDL_PAD_ENET_RXD0__SPDIF_OUT             0x1f8 0x5c8 0x000 0x3 0x0
-diff --git a/arch/arm/boot/dts/imx6q-pinfunc.h b/arch/arm/boot/dts/imx6q-pinfunc.h
-index 9fc6120..cfb11d3 100644
---- a/arch/arm/boot/dts/imx6q-pinfunc.h
-+++ b/arch/arm/boot/dts/imx6q-pinfunc.h
-@@ -551,6 +551,7 @@
- #define MX6QDL_PAD_ENET_RXD1__ESAI_TX_FS            0x1e0 0x4f4 0x860 0x2 0x0
- #define MX6QDL_PAD_ENET_RXD1__ENET_1588_EVENT3_OUT  0x1e0 0x4f4 0x000 0x4 0x0
- #define MX6QDL_PAD_ENET_RXD1__GPIO1_IO26            0x1e0 0x4f4 0x000 0x5 0x0
-+#define MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT        0x1e4 0x4f8 0x000 0x0 0x0
- #define MX6QDL_PAD_ENET_RXD0__ENET_RX_DATA0         0x1e4 0x4f8 0x848 0x1 0x1
- #define MX6QDL_PAD_ENET_RXD0__ESAI_TX_HF_CLK        0x1e4 0x4f8 0x868 0x2 0x0
- #define MX6QDL_PAD_ENET_RXD0__SPDIF_OUT             0x1e4 0x4f8 0x000 0x3 0x0
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 0d44949..abd06c3 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -80,6 +80,7 @@ CONFIG_CAN=y
+ CONFIG_CAN_FLEXCAN=y
+ CONFIG_BT=y
+ CONFIG_BT_HCIUART=y
++CONFIG_BT_HCIUART_SERDEV=y
+ CONFIG_BT_HCIUART_H4=y
+ CONFIG_BT_HCIUART_LL=y
+ CONFIG_CFG80211=y
+@@ -155,6 +156,7 @@ CONFIG_USB_USBNET=y
+ CONFIG_USB_NET_CDC_EEM=m
+ CONFIG_BRCMFMAC=m
+ CONFIG_WL12XX=m
++CONFIG_WL18XX=m
+ CONFIG_WLCORE_SDIO=m
+ # CONFIG_WILINK_PLATFORM_DATA is not set
+ CONFIG_INPUT_EVDEV=y
+@@ -185,6 +187,8 @@ CONFIG_SERIAL_IMX=y
+ CONFIG_SERIAL_IMX_CONSOLE=y
+ CONFIG_SERIAL_FSL_LPUART=y
+ CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_SERIAL_DEV_BUS=y
++CONFIG_SERIAL_DEV_CTRL_TTYPORT=y
+ # CONFIG_I2C_COMPAT is not set
+ CONFIG_I2C_CHARDEV=y
+ CONFIG_I2C_MUX=y
+@@ -248,6 +252,7 @@ CONFIG_VIDEO_OV5640=m
+ CONFIG_SOC_CAMERA_OV2640=y
+ CONFIG_IMX_IPUV3_CORE=y
+ CONFIG_DRM=y
++CONFIG_DRM_PANEL_LVDS=y
+ CONFIG_DRM_PANEL_SIMPLE=y
+ CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
+ CONFIG_DRM_DW_HDMI_CEC=y
+@@ -340,6 +345,7 @@ CONFIG_LEDS_TRIGGER_ONESHOT=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_BACKLIGHT=y
+ CONFIG_LEDS_TRIGGER_GPIO=y
++CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
+ CONFIG_RTC_CLASS=y
+ CONFIG_RTC_INTF_DEV_UIE_EMUL=y
+ CONFIG_RTC_DRV_DS1307=y
 -- 
 2.7.4
