@@ -1,64 +1,145 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 01 Dec 2017 13:43:57 +0000
-Subject: Applied "ASoC: intel: mfld: Handle return value of platform_get_irq"
- to the asoc tree
-In-Reply-To: <3c83856bd9f1f23d1e0f5e8753d3998ae4785e37.1511970158.git.arvind.yadav.cs@gmail.com>
-Message-ID: <E1eKlbh-0001GI-3V@debutante>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Fri, 1 Dec 2017 14:45:06 +0100
+Subject: [PATCH RT] arm*: disable NEON in kernel mode
+In-Reply-To: <20171201104331.GB1612@linutronix.de>
+References: <20171130142216.GB12606@linutronix.de>
+ <20171130143028.GA1351@linutronix.de>
+ <20171201104331.GB1612@linutronix.de>
+Message-ID: <20171201134506.GF1612@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
++arm folks, to let you know
 
-   ASoC: intel: mfld: Handle return value of platform_get_irq
-
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
-Thanks,
-Mark
-
->From 00a5cc096774fbc9ac979765fa820e7c8d9121c4 Mon Sep 17 00:00:00 2001
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Wed, 29 Nov 2017 21:47:14 +0530
-Subject: [PATCH] ASoC: intel: mfld: Handle return value of platform_get_irq
-
-platform_get_irq() can fail here and we must check its return value.
-
-Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/intel/boards/mfld_machine.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/sound/soc/intel/boards/mfld_machine.c b/sound/soc/intel/boards/mfld_machine.c
-index 6f44acfb4aae..7cb44fdde1ee 100644
---- a/sound/soc/intel/boards/mfld_machine.c
-+++ b/sound/soc/intel/boards/mfld_machine.c
-@@ -372,6 +372,8 @@ static int snd_mfld_mc_probe(struct platform_device *pdev)
- 
- 	/* retrive the irq number */
- 	irq = platform_get_irq(pdev, 0);
-+	if (irq <= 0)
-+		return irq < 0 ? irq : -ENODEV;
- 
- 	/* audio interrupt base of SRAM location where
- 	 * interrupts are stored by System FW */
--- 
-2.15.0
+On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
+> NEON in kernel mode is used by the crypto algorithms and raid6 code.
+> While the raid6 code looks okay, the crypto algorithms do not: NEON
+> is enabled on first invocation and may allocate/free/map memory before
+> the NEON mode is disabled again.
+> This needs to be changed until it can be enabled.
+> On ARM NEON in kernel mode can be simply disabled. on ARM64 it needs to
+> stay on due to possible EFI callbacks so here I disable each algorithm.
+> 
+> Cc: stable-rt at vger.kernel.org
+> Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
+> ---
+>  arch/arm/Kconfig                  |  2 +-
+>  arch/arm64/crypto/Kconfig         | 20 ++++++++++----------
+>  arch/arm64/crypto/crc32-ce-glue.c |  3 ++-
+>  3 files changed, 13 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index d1346a160760..914fecb088a8 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -2164,7 +2164,7 @@ config NEON
+>  
+>  config KERNEL_MODE_NEON
+>  	bool "Support for NEON in kernel mode"
+> -	depends on NEON && AEABI
+> +	depends on NEON && AEABI && !PREEMPT_RT_BASE
+>  	help
+>  	  Say Y to include support for NEON in kernel mode.
+>  
+> diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
+> index 70c517aa4501..2a5f05b5a19a 100644
+> --- a/arch/arm64/crypto/Kconfig
+> +++ b/arch/arm64/crypto/Kconfig
+> @@ -19,19 +19,19 @@ config CRYPTO_SHA512_ARM64
+>  
+>  config CRYPTO_SHA1_ARM64_CE
+>  	tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
+> -	depends on KERNEL_MODE_NEON
+> +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_HASH
+>  	select CRYPTO_SHA1
+>  
+>  config CRYPTO_SHA2_ARM64_CE
+>  	tristate "SHA-224/SHA-256 digest algorithm (ARMv8 Crypto Extensions)"
+> -	depends on KERNEL_MODE_NEON
+> +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_HASH
+>  	select CRYPTO_SHA256_ARM64
+>  
+>  config CRYPTO_GHASH_ARM64_CE
+>  	tristate "GHASH/AES-GCM using ARMv8 Crypto Extensions"
+> -	depends on KERNEL_MODE_NEON
+> +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_HASH
+>  	select CRYPTO_GF128MUL
+>  	select CRYPTO_AES
+> @@ -39,7 +39,7 @@ config CRYPTO_GHASH_ARM64_CE
+>  
+>  config CRYPTO_CRCT10DIF_ARM64_CE
+>  	tristate "CRCT10DIF digest algorithm using PMULL instructions"
+> -	depends on KERNEL_MODE_NEON && CRC_T10DIF
+> +	depends on KERNEL_MODE_NEON && CRC_T10DIF && !PREEMPT_RT_BASE
+>  	select CRYPTO_HASH
+>  
+>  config CRYPTO_CRC32_ARM64_CE
+> @@ -53,13 +53,13 @@ config CRYPTO_AES_ARM64
+>  
+>  config CRYPTO_AES_ARM64_CE
+>  	tristate "AES core cipher using ARMv8 Crypto Extensions"
+> -	depends on ARM64 && KERNEL_MODE_NEON
+> +	depends on ARM64 && KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_ALGAPI
+>  	select CRYPTO_AES_ARM64
+>  
+>  config CRYPTO_AES_ARM64_CE_CCM
+>  	tristate "AES in CCM mode using ARMv8 Crypto Extensions"
+> -	depends on ARM64 && KERNEL_MODE_NEON
+> +	depends on ARM64 && KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_ALGAPI
+>  	select CRYPTO_AES_ARM64_CE
+>  	select CRYPTO_AES_ARM64
+> @@ -67,7 +67,7 @@ config CRYPTO_AES_ARM64_CE_CCM
+>  
+>  config CRYPTO_AES_ARM64_CE_BLK
+>  	tristate "AES in ECB/CBC/CTR/XTS modes using ARMv8 Crypto Extensions"
+> -	depends on KERNEL_MODE_NEON
+> +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_BLKCIPHER
+>  	select CRYPTO_AES_ARM64_CE
+>  	select CRYPTO_AES_ARM64
+> @@ -75,7 +75,7 @@ config CRYPTO_AES_ARM64_CE_BLK
+>  
+>  config CRYPTO_AES_ARM64_NEON_BLK
+>  	tristate "AES in ECB/CBC/CTR/XTS modes using NEON instructions"
+> -	depends on KERNEL_MODE_NEON
+> +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_BLKCIPHER
+>  	select CRYPTO_AES_ARM64
+>  	select CRYPTO_AES
+> @@ -83,13 +83,13 @@ config CRYPTO_AES_ARM64_NEON_BLK
+>  
+>  config CRYPTO_CHACHA20_NEON
+>  	tristate "NEON accelerated ChaCha20 symmetric cipher"
+> -	depends on KERNEL_MODE_NEON
+> +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_BLKCIPHER
+>  	select CRYPTO_CHACHA20
+>  
+>  config CRYPTO_AES_ARM64_BS
+>  	tristate "AES in ECB/CBC/CTR/XTS modes using bit-sliced NEON algorithm"
+> -	depends on KERNEL_MODE_NEON
+> +	depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
+>  	select CRYPTO_BLKCIPHER
+>  	select CRYPTO_AES_ARM64_NEON_BLK
+>  	select CRYPTO_AES_ARM64
+> diff --git a/arch/arm64/crypto/crc32-ce-glue.c b/arch/arm64/crypto/crc32-ce-glue.c
+> index 624f4137918c..599de95cd86d 100644
+> --- a/arch/arm64/crypto/crc32-ce-glue.c
+> +++ b/arch/arm64/crypto/crc32-ce-glue.c
+> @@ -206,7 +206,8 @@ static struct shash_alg crc32_pmull_algs[] = { {
+>  
+>  static int __init crc32_pmull_mod_init(void)
+>  {
+> -	if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON) && (elf_hwcap & HWCAP_PMULL)) {
+> +	if (IS_ENABLED(CONFIG_KERNEL_MODE_NEON) &&
+> +	    !IS_ENABLED(CONFIG_PREEMPT_RT_BASE) && (elf_hwcap & HWCAP_PMULL)) {
+>  		crc32_pmull_algs[0].update = crc32_pmull_update;
+>  		crc32_pmull_algs[1].update = crc32c_pmull_update;
+>  
+> -- 
+> 2.15.0
