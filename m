@@ -1,51 +1,58 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 1 Dec 2017 12:09:08 +0100
-Subject: [PATCH v2 0/4] ARM: dts: renesas: Convert to named i2c-gpio
- bindings
-In-Reply-To: <20171201081850.4tqbnlvxdax7phfs@verge.net.au>
-References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
- <20171201081850.4tqbnlvxdax7phfs@verge.net.au>
-Message-ID: <20171201110908.u7xjrt7xmlqgigvy@ninjato>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri,  1 Dec 2017 12:25:05 +0100
+Subject: [PATCH 3/6] cpufreq: sort the drivers in ARM part
+In-Reply-To: <20171201112508.14121-1-gregory.clement@free-electrons.com>
+References: <20171201112508.14121-1-gregory.clement@free-electrons.com>
+Message-ID: <20171201112508.14121-4-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 09:18:55AM +0100, Simon Horman wrote:
-> On Thu, Nov 30, 2017 at 01:57:22PM +0100, Geert Uytterhoeven wrote:
-> > 	Hi Simon, Magnus,
-> > 
-> > Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
-> > named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
-> > gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
-> > more error-prone unnamed variant.
-> > 
-> > This patch series switches all Renesas boards to the new bindings, and
-> > adds the missing GPIO_OPEN_DRAIN I/O flags, which were implicitly
-> > assumed before.  The latter gets rid of messages like:
-> > 
-> >     gpio-208 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
-> >     gpio-91 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
-> > 
-> > Patch 1 was extracted from series "[PATCH/RFC 0/3] i2c: gpio: Add
-> > support for named gpios in DT", hence the v2.  All other patches are
-> > new.
-> > 
-> > Note that after this series is applied, the i2c-gpio buses are no longer
-> > detected when booting new DTBs on old (v4.14 and older) kernels, which
-> > should not be an issue.  Booting old DTBs on new kernels is not
-> > affected.
-> > 
-> > Thanks for applying!
-> 
-> Thanks, applied.
+Keep the driver files alphabetically sorted.
 
-Phew, you guys are fast. For the record:
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/cpufreq/Makefile | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171201/85d3a398/attachment.sig>
+diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+index 812f9e0d01a3..d762e76887e7 100644
+--- a/drivers/cpufreq/Makefile
++++ b/drivers/cpufreq/Makefile
+@@ -53,22 +53,24 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
+ obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
+ 
+ obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
++obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
+ obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
+ obj-$(CONFIG_ARM_EXYNOS5440_CPUFREQ)	+= exynos5440-cpufreq.o
+ obj-$(CONFIG_ARM_HIGHBANK_CPUFREQ)	+= highbank-cpufreq.o
+ obj-$(CONFIG_ARM_IMX6Q_CPUFREQ)		+= imx6q-cpufreq.o
+ obj-$(CONFIG_ARM_KIRKWOOD_CPUFREQ)	+= kirkwood-cpufreq.o
+ obj-$(CONFIG_ARM_MEDIATEK_CPUFREQ)	+= mediatek-cpufreq.o
++obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
+ obj-$(CONFIG_ARM_OMAP2PLUS_CPUFREQ)	+= omap-cpufreq.o
+ obj-$(CONFIG_ARM_PXA2xx_CPUFREQ)	+= pxa2xx-cpufreq.o
+ obj-$(CONFIG_PXA3xx)			+= pxa3xx-cpufreq.o
+-obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
+-obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
+ obj-$(CONFIG_ARM_S3C2410_CPUFREQ)	+= s3c2410-cpufreq.o
+ obj-$(CONFIG_ARM_S3C2412_CPUFREQ)	+= s3c2412-cpufreq.o
+ obj-$(CONFIG_ARM_S3C2416_CPUFREQ)	+= s3c2416-cpufreq.o
+ obj-$(CONFIG_ARM_S3C2440_CPUFREQ)	+= s3c2440-cpufreq.o
+ obj-$(CONFIG_ARM_S3C64XX_CPUFREQ)	+= s3c64xx-cpufreq.o
++obj-$(CONFIG_ARM_S3C24XX_CPUFREQ)	+= s3c24xx-cpufreq.o
++obj-$(CONFIG_ARM_S3C24XX_CPUFREQ_DEBUGFS) += s3c24xx-cpufreq-debugfs.o
+ obj-$(CONFIG_ARM_S5PV210_CPUFREQ)	+= s5pv210-cpufreq.o
+ obj-$(CONFIG_ARM_SA1100_CPUFREQ)	+= sa1100-cpufreq.o
+ obj-$(CONFIG_ARM_SA1110_CPUFREQ)	+= sa1110-cpufreq.o
+@@ -81,8 +83,6 @@ obj-$(CONFIG_ARM_TEGRA124_CPUFREQ)	+= tegra124-cpufreq.o
+ obj-$(CONFIG_ARM_TEGRA186_CPUFREQ)	+= tegra186-cpufreq.o
+ obj-$(CONFIG_ARM_TI_CPUFREQ)		+= ti-cpufreq.o
+ obj-$(CONFIG_ARM_VEXPRESS_SPC_CPUFREQ)	+= vexpress-spc-cpufreq.o
+-obj-$(CONFIG_ACPI_CPPC_CPUFREQ) += cppc_cpufreq.o
+-obj-$(CONFIG_MACH_MVEBU_V7)		+= mvebu-cpufreq.o
+ 
+ 
+ ##################################################################################
+-- 
+2.15.0
