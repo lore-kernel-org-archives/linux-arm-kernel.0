@@ -1,27 +1,31 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Fri,  1 Dec 2017 13:07:06 +0100
-Subject: [PATCH 1/3] dt-bindings: ARM: Mediatek: Fix ethsys documentation
-Message-ID: <20171201120708.30129-1-matthias.bgg@gmail.com>
+Date: Fri,  1 Dec 2017 13:07:07 +0100
+Subject: [PATCH 2/3] arm: dts: mt7623: Update ethsys binding
+In-Reply-To: <20171201120708.30129-1-matthias.bgg@gmail.com>
+References: <20171201120708.30129-1-matthias.bgg@gmail.com>
+Message-ID: <20171201120708.30129-2-matthias.bgg@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ethsys registers a reset controller, so we need to specify a
-reset cell. This patch fixes the documentation.
+The ethsys binding misses the reset-cells, this patch
+adds this property.
 
 Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
 ---
- Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
+ arch/arm/boot/dts/mt7623.dtsi | 1 +
  1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-index 7aa3fa167668..6cc7840ff37a 100644
---- a/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-+++ b/Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt
-@@ -20,4 +20,5 @@ ethsys: clock-controller at 1b000000 {
- 	compatible = "mediatek,mt2701-ethsys", "syscon";
- 	reg = <0 0x1b000000 0 0x1000>;
- 	#clock-cells = <1>;
-+	#reset-cells = <1>;
- };
+diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
+index 343d3b1a4448..b750da5362f7 100644
+--- a/arch/arm/boot/dts/mt7623.dtsi
++++ b/arch/arm/boot/dts/mt7623.dtsi
+@@ -758,6 +758,7 @@
+ 			     "syscon";
+ 		reg = <0 0x1b000000 0 0x1000>;
+ 		#clock-cells = <1>;
++		#reset-cells = <1>;
+ 	};
+ 
+ 	eth: ethernet at 1b100000 {
 -- 
 2.12.3
