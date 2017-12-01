@@ -1,37 +1,42 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 1 Dec 2017 09:18:55 +0100
-Subject: [PATCH v2 0/4] ARM: dts: renesas: Convert to named i2c-gpio
- bindings
-In-Reply-To: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
-References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
-Message-ID: <20171201081850.4tqbnlvxdax7phfs@verge.net.au>
+From: tomi.valkeinen@ti.com (Tomi Valkeinen)
+Date: Fri, 1 Dec 2017 10:18:18 +0200
+Subject: [PATCH v3 1/4] omapdrm: panel: fix compatible vendor string for
+ td028ttec1
+In-Reply-To: <20171201015730.nvw6sblxn566dhhb@rob-hp-laptop>
+References: <cover.1511884135.git.hns@goldelico.com>
+ <6ae8f4b7d794c536650cc99025e5b026089cea30.1511884135.git.hns@goldelico.com>
+ <20171201015730.nvw6sblxn566dhhb@rob-hp-laptop>
+Message-ID: <da3ce573-1593-3377-1243-ff500e9522b3@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 01:57:22PM +0100, Geert Uytterhoeven wrote:
-> 	Hi Simon, Magnus,
-> 
-> Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
-> named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
-> gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
-> more error-prone unnamed variant.
-> 
-> This patch series switches all Renesas boards to the new bindings, and
-> adds the missing GPIO_OPEN_DRAIN I/O flags, which were implicitly
-> assumed before.  The latter gets rid of messages like:
-> 
->     gpio-208 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
->     gpio-91 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
-> 
-> Patch 1 was extracted from series "[PATCH/RFC 0/3] i2c: gpio: Add
-> support for named gpios in DT", hence the v2.  All other patches are
-> new.
-> 
-> Note that after this series is applied, the i2c-gpio buses are no longer
-> detected when booting new DTBs on old (v4.14 and older) kernels, which
-> should not be an issue.  Booting old DTBs on new kernels is not
-> affected.
-> 
-> Thanks for applying!
+On 01/12/17 03:57, Rob Herring wrote:
 
-Thanks, applied.
+>> diff --git a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+>> index 0a38a0e8c925..a0dfa14f4fab 100644
+>> --- a/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+>> +++ b/drivers/gpu/drm/omapdrm/displays/panel-tpo-td028ttec1.c
+>> @@ -452,6 +452,8 @@ static int td028ttec1_panel_remove(struct spi_device *spi)
+>>  }
+>>  
+>>  static const struct of_device_id td028ttec1_of_match[] = {
+>> +	{ .compatible = "omapdss,tpo,td028ttec1", },
+> 
+> Why the omapdss part?
+
+This driver is omapdrm specific. But I don't want the dts file to have
+omapdrm specific compatible strings, so that the dts files do not have
+to be changed when in the future we move to common DRM panel drivers
+
+So:
+
+- In the .dts, we have compatible = "tpo,td028ttec1"
+- At early boot time, we append "omapdss," to compatible strings for
+panels connected to the DSS node.
+- The omapdrm specific drivers match to "omapdss,tpo,td028ttec1"
+
+ Tomi
+
+-- 
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
