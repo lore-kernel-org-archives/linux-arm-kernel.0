@@ -1,105 +1,33 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri,  1 Dec 2017 10:03:38 +0100
-Subject: [PATCH v5 0/6] ARM: Add Variscite DART-MX6 SoM and Carrier-board
- support
-Message-ID: <1512119024-521-1-git-send-email-narmstrong@baylibre.com>
+Date: Fri,  1 Dec 2017 10:03:40 +0100
+Subject: [PATCH v5 2/6] dt-bindings: Add vendor prefix for Solomon Goldentek
+ Display Corporation
+In-Reply-To: <1512119024-521-1-git-send-email-narmstrong@baylibre.com>
+References: <1512119024-521-1-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1512119024-521-3-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds support for the Variscite DART-MX6 SoM with :
-- i.MX6 Quad or Dual Lite SoC
-- 1Gb/2Gb LPDDR2
-- 4-64 GB eMMC
-- Camera Interface
-- HDMI+CEC interface
-- LVDS / DSI / Parallel RGB interfaces
-- Ethernet RGMII interface
-- On-SoM Wi-Fi/Bluetooth with WiLink wl1835 SDIO Module
-- SD/MMC/SDIO interface
-- USB Host + USB OTG interface
-- I2C interfaces
-- SPI interfaces
-- PCI-Express 2.0 interface
-- on-SoM Audio Codec with HP/Line-In interfaces + DMIC interface
-- Digital Audio interface
-- S/PDIF interface
+Solomon Goldentek Display Corporation is a Taiwanese LCD/LCM manufacturer.
+Company Site: http://www.goldentek.com.tw
 
-And the Carrier-Board with the following :
-- LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
-- HDMI Connector
-- USB Host + USB OTG Connector
-- 10/100/1000 Mbps Ethernet
-- miniPCI-Express slot
-- SD Card connector
-- Audio Headphone/Line In jack connectors
-- On-board DMIC
-- CAN bus header
-- SPI header
-- Camera Interfaces header
-- 4xButtons, 2xLeds
-- OnBoard RTC with Coin Backup battery socket
-- RS232 Header + USB-Serial debug port
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-First patch contains a missing pinmux define used by the SoM.
-Last patch contains configs used by the SoM DT like SERDEV or WL18XX support.
-
-PCIe, On-Board DMIC and Camera Interfaces are not handled yet.
-
-Changes since v4 at [4]:
-- Renamed coded label
-- Updated gpio wakeup properties
-- Removed useless panel blank lines
-- Removed leading 0 in pmic node name address
-- Changed last patch title to match imx defconfig name
-- Fixed dtsi alphabetical ordering
-
-Changes since v3 at [3]:
-- minor pcie dt fix
-- added tags
-
-Changes since v2 at [2]:
-- Added bindings acks
-- fixed enable-active-high regulators property
-- moved hdmi dd-i2c-bus to son dtsi
-- fixed pinmux IOMUX value
-- add pcie reset-gpio
-
-Changes since v1 at [1]:
-- Add lvds display vendor prefix and bindings
-- fix all gpio phandle arguments with correct ACTIVE_XXX define
-- drop pcie support
-- drop custom operating points
-- fix arm/pu/soc vin-supply instead of &cpu node override
-- fix can pinmux value
-- changed button node name
-- add revied-by tags on first and last patches
-
-[1] http://lkml.kernel.org/r/1511281705-30849-1-git-send-email-narmstrong at baylibre.com
-[2] http://lkml.kernel.org/r/1511348560-28505-1-git-send-email-narmstrong at baylibre.com
-[3] http://lkml.kernel.org/r/1511785716-23492-1-git-send-email-narmstrong at baylibre.com
-
-Neil Armstrong (6):
-  ARM: dts: imx6qdl-pinfunc: Add missing
-    MX6QDL_PAD_ENET_RXD0__OSC32K_32K_OUT
-  dt-bindings: Add vendor prefix for Solomon Goldentek Display
-    Corporation
-  dt-bindings: display: Add bindings for SGD GKTW70SDAE4SE Panel
-  ARM: dts: imx6qdl: Add Variscite DART-MX6 SoM support
-  ARM: dts: imx6q: Add Variscite DART-MX6 Carrier-board support
-  ARM: imx_v6_v7_defconfig: Add missing config for DART-MX6 SoM
-
- .../bindings/display/panel/sgd,gktw70sdae4se.txt   |  41 ++
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/imx6dl-pinfunc.h                 |   1 +
- arch/arm/boot/dts/imx6q-pinfunc.h                  |   1 +
- arch/arm/boot/dts/imx6q-var-dt6customboard.dts     | 236 ++++++++++
- arch/arm/boot/dts/imx6qdl-var-dart.dtsi            | 504 +++++++++++++++++++++
- arch/arm/configs/imx_v6_v7_defconfig               |   6 +
- 8 files changed, 791 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/panel/sgd,gktw70sdae4se.txt
- create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
- create mode 100644 arch/arm/boot/dts/imx6qdl-var-dart.dtsi
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 0994bdd..b0d3bef 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -305,6 +305,7 @@ seagate	Seagate Technology PLC
+ semtech	Semtech Corporation
+ sensirion	Sensirion AG
+ sff	Small Form Factor Committee
++sgd	Solomon Goldentek Display Corporation
+ sgx	SGX Sensortech
+ sharp	Sharp Corporation
+ shimafuji	Shimafuji Electric, Inc.
 -- 
 2.7.4
