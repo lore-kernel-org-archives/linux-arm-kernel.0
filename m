@@ -1,55 +1,48 @@
 From: festevam@gmail.com (Fabio Estevam)
-Date: Fri,  1 Dec 2017 17:24:34 -0200
-Subject: [PATCH 01/12] ARM: dts: imx51-ts4800: Fix syscon and touschscreen
- nodes
-Message-ID: <1512156285-18451-1-git-send-email-festevam@gmail.com>
+Date: Fri,  1 Dec 2017 17:24:35 -0200
+Subject: [PATCH 02/12] ARM: dts: imx51-zii-rdu1: Add the unit addresses in
+ sysled
+In-Reply-To: <1512156285-18451-1-git-send-email-festevam@gmail.com>
+References: <1512156285-18451-1-git-send-email-festevam@gmail.com>
+Message-ID: <1512156285-18451-2-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabio Estevam <fabio.estevam@nxp.com>
 
-The syscon node has an incorrect notation for its unit address and the
-wdt node has an unneeded unit address.
+As described at Documentation/devicetree/bindings/mfd/mc13xxx.txt the
+reg property is mandatory, so add the corresponding unit address in
+order to fix the following build warnings with W=1:
 
-Fix them so that the following build warnings with W=1 are gone:
+arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
+arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg): Node /soc/aips at 70000000/spba at 70000000/ecspi at 70010000/pmic at 0/leds/sysled0 has a reg or ranges property, but no unit name
+arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg): Node /soc/aips at 70000000/spba at 70000000/ecspi at 70010000/pmic at 0/leds/sysled1 has a reg or ranges property, but no unit name
 
-arch/arm/boot/dts/imx51-ts4800.dtb: Warning (unit_address_vs_reg): Node /memory has a reg or ranges property, but no unit name
-arch/arm/boot/dts/imx51-ts4800.dtb: Warning (unit_address_vs_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/syscon at b0010000/wdt at e has a unit name, but no reg property
-arch/arm/boot/dts/imx51-ts4800.dtb: Warning (unit_address_vs_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/touchscreen has a reg or ranges property, but no unit name
-arch/arm/boot/dts/imx51-ts4800.dtb: Warning (simple_bus_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/syscon at b0010000 simple-bus unit address format error, expected "10000"
-arch/arm/boot/dts/imx51-ts4800.dtb: Warning (simple_bus_reg): Node /soc/aips at 80000000/weim at 83fda000/fpga at 0/touchscreen simple-bus unit address format error, expected "12000"
-
-Cc: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Cc: Lucas Stach <l.stach@pengutronix.de>
 Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 ---
- arch/arm/boot/dts/imx51-ts4800.dts | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/imx51-zii-rdu1.dts | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx51-ts4800.dts b/arch/arm/boot/dts/imx51-ts4800.dts
-index 564233e..f59b02b 100644
---- a/arch/arm/boot/dts/imx51-ts4800.dts
-+++ b/arch/arm/boot/dts/imx51-ts4800.dts
-@@ -149,18 +149,18 @@
- 		#size-cells = <1>;
- 		ranges = <0 0 0 0x1d000>;
+diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+index f9fdb7c..70fdcdd 100644
+--- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
++++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+@@ -428,13 +428,13 @@
+ 			#size-cells = <0>;
+ 			led-control = <0x0 0x0 0x3f83f8 0x0>;
  
--		syscon: syscon at b0010000 {
-+		syscon: syscon at 10000 {
- 			compatible = "syscon", "simple-mfd";
- 			reg = <0x10000 0x3d>;
- 			reg-io-width = <2>;
- 
--			wdt at e {
-+			wdt {
- 				compatible = "technologic,ts4800-wdt";
- 				syscon = <&syscon 0xe>;
+-			sysled0 {
++			sysled0 at 3 {
+ 				reg = <3>;
+ 				label = "system:green:status";
+ 				linux,default-trigger = "default-on";
  			};
- 		};
  
--		touchscreen {
-+		touchscreen at 12000 {
- 			compatible = "technologic,ts4800-ts";
- 			reg = <0x12000 0x1000>;
- 			syscon = <&syscon 0x10 6>;
+-			sysled1 {
++			sysled1 at 4 {
+ 				reg = <4>;
+ 				label = "system:green:act";
+ 				linux,default-trigger = "heartbeat";
 -- 
 2.7.4
