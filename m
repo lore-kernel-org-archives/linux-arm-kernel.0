@@ -1,85 +1,59 @@
 From: jernej.skrabec@siol.net (Jernej Skrabec)
-Date: Fri,  1 Dec 2017 07:05:31 +0100
-Subject: [PATCH v2 08/27] drm/sun4i: Rename some macros in DE2 driver
+Date: Fri,  1 Dec 2017 07:05:28 +0100
+Subject: [PATCH v2 05/27] drm/sun4i: Remove setting default values in DE2
+ driver
 In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
 References: <20171201060550.10392-1-jernej.skrabec@siol.net>
-Message-ID: <20171201060550.10392-9-jernej.skrabec@siol.net>
+Message-ID: <20171201060550.10392-6-jernej.skrabec@siol.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that some knowledge of DE2 is gained, rename or add some macros to
-make code more readable.
+Premultiply and color key control registers are already set to zero by
+initialization code few lines above. Furthermore, it seems that
+colorkeying doesn't really work. It's not used in BSP driver and
+experiments with it all failed.
 
-Max channel macro is removed, since it is not used and it is not clear
-if it has right value. Structures in BSP driver shows possibility of 5
-channels maximum although there is no SoC with such configuration.
+Just remove the code.
 
 Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c |  5 +++--
- drivers/gpu/drm/sun4i/sun8i_mixer.h | 13 ++++++-------
- 2 files changed, 9 insertions(+), 9 deletions(-)
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 4 ----
+ drivers/gpu/drm/sun4i/sun8i_mixer.h | 2 --
+ 2 files changed, 6 deletions(-)
 
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 23659ce1cf27..c7d4ccd605e0 100644
+index b947ee2e4fe4..f4a7fa0ba7ad 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -323,8 +323,9 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
- 		     SUN8I_MIXER_BLEND_COLOR_BLACK);
- 
+@@ -320,14 +320,10 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
  	/* Initialize blender */
--	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_FCOLOR_CTL,
--		     SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF);
-+	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PIPE_CTL,
-+		     SUN8I_MIXER_BLEND_PIPE_CTL_EN(0) |
-+		     SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(0));
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_FCOLOR_CTL,
+ 		     SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF);
+-	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_PREMULTIPLY,
+-		     SUN8I_MIXER_BLEND_PREMULTIPLY_DEF);
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_BKCOLOR,
+ 		     SUN8I_MIXER_BLEND_BKCOLOR_DEF);
+ 	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_MODE(0),
+ 		     SUN8I_MIXER_BLEND_MODE_DEF);
+-	regmap_write(mixer->engine.regs, SUN8I_MIXER_BLEND_CK_CTL,
+-		     SUN8I_MIXER_BLEND_CK_CTL_DEF);
  
  	regmap_write(mixer->engine.regs,
  		     SUN8I_MIXER_BLEND_ATTR_FCOLOR(0),
 diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index 9b50733298b8..76f0b2bd91e2 100644
+index a7fe013c1d4a..db005a4bca43 100644
 --- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
 +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -16,8 +16,6 @@
- 
- #include "sunxi_engine.h"
- 
--#define SUN8I_MIXER_MAX_CHAN_COUNT		4
--
- #define SUN8I_MIXER_SIZE(w, h)			(((h) - 1) << 16 | ((w) - 1))
- #define SUN8I_MIXER_COORD(x, y)			((y) << 16 | (x))
- 
-@@ -26,14 +24,14 @@
- #define SUN8I_MIXER_GLOBAL_DBUFF		0x8
- #define SUN8I_MIXER_GLOBAL_SIZE			0xc
- 
--#define SUN8I_MIXER_GLOBAL_CTL_RT_EN		0x1
-+#define SUN8I_MIXER_GLOBAL_CTL_RT_EN		BIT(0)
- 
--#define SUN8I_MIXER_GLOBAL_DBUFF_ENABLE		0x1
-+#define SUN8I_MIXER_GLOBAL_DBUFF_ENABLE		BIT(0)
- 
--#define SUN8I_MIXER_BLEND_FCOLOR_CTL		0x1000
-+#define SUN8I_MIXER_BLEND_PIPE_CTL		0x1000
- #define SUN8I_MIXER_BLEND_ATTR_FCOLOR(x)	(0x1004 + 0x10 * (x) + 0x0)
- #define SUN8I_MIXER_BLEND_ATTR_INSIZE(x)	(0x1004 + 0x10 * (x) + 0x4)
--#define SUN8I_MIXER_BLEND_ATTR_OFFSET(x)	(0x1004 + 0x10 * (x) + 0x8)
-+#define SUN8I_MIXER_BLEND_ATTR_COORD(x)		(0x1004 + 0x10 * (x) + 0x8)
- #define SUN8I_MIXER_BLEND_ROUTE			0x1080
- #define SUN8I_MIXER_BLEND_PREMULTIPLY		0x1084
- #define SUN8I_MIXER_BLEND_BKCOLOR		0x1088
-@@ -45,10 +43,11 @@
- #define SUN8I_MIXER_BLEND_CK_MIN(x)		(0x10e0 + 0x04 * (x))
- #define SUN8I_MIXER_BLEND_OUTCTL		0x10fc
- 
-+#define SUN8I_MIXER_BLEND_PIPE_CTL_EN(pipe)	BIT(8 + pipe)
-+#define SUN8I_MIXER_BLEND_PIPE_CTL_FC_EN(pipe)	BIT(pipe)
- /* colors are always in AARRGGBB format */
- #define SUN8I_MIXER_BLEND_COLOR_BLACK		0xff000000
+@@ -48,10 +48,8 @@
  /* The following numbers are some still unknown magic numbers */
--#define SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF	0x00000101
+ #define SUN8I_MIXER_BLEND_ATTR_FCOLOR_DEF	0xff000000
+ #define SUN8I_MIXER_BLEND_FCOLOR_CTL_DEF	0x00000101
+-#define SUN8I_MIXER_BLEND_PREMULTIPLY_DEF	0x0
+ #define SUN8I_MIXER_BLEND_BKCOLOR_DEF		0xff000000
  #define SUN8I_MIXER_BLEND_MODE_DEF		0x03010301
+-#define SUN8I_MIXER_BLEND_CK_CTL_DEF		0x0
  
  #define SUN8I_MIXER_BLEND_OUTCTL_INTERLACED	BIT(1)
+ 
 -- 
 2.15.1
