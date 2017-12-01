@@ -1,47 +1,37 @@
-From: tomi.valkeinen@ti.com (Tomi Valkeinen)
-Date: Fri, 1 Dec 2017 10:13:24 +0200
-Subject: [PATCH v3 4/4] DTS: Pandora: fix panel compatibility string
-In-Reply-To: <20171130220633.imkfyeiqtftnw4j4@earth>
-References: <cover.1511884135.git.hns@goldelico.com>
- <b6001c7b7fb98e7a3ad4c712084fea9dae9e6b27.1511884135.git.hns@goldelico.com>
- <20171128160437.GD28152@atomide.com>
- <ADAFBBA4-6AC4-4EC4-AB0E-98B59718E12E@goldelico.com>
- <20171128161834.GE28152@atomide.com>
- <4EE1E298-6461-48FF-977C-958DD16AD83A@goldelico.com>
- <20171130152430.GM28152@atomide.com> <20171130220633.imkfyeiqtftnw4j4@earth>
-Message-ID: <6ca5f2ea-e725-9a9e-ac02-e16beca4a1a0@ti.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 1 Dec 2017 09:18:55 +0100
+Subject: [PATCH v2 0/4] ARM: dts: renesas: Convert to named i2c-gpio
+ bindings
+In-Reply-To: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
+References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
+Message-ID: <20171201081850.4tqbnlvxdax7phfs@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01/12/17 00:06, Sebastian Reichel wrote:
-
->>>> How about let's call it a "typo fix" then? :)
->>>
->>> Well, it is not really a typo.
->>
->> Well what if the stable people pick it into earlier stable series
->> based on the word fix in the subject? That has happened before.
->>
->> I suggest you update the dts patches to use wording like
->> "update compatible to use new naming" or something similar.
+On Thu, Nov 30, 2017 at 01:57:22PM +0100, Geert Uytterhoeven wrote:
+> 	Hi Simon, Magnus,
 > 
-> Patch 4/4 is a Fix and should be applied to stable trees. "omapdss,"
-> prefix was never supposed to be in the DTS files, is not supposed to
-> be in there now and will break some time in the future.
+> Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
+> named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
+> gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
+> more error-prone unnamed variant.
 > 
-> Explanation: The early init of omapdss adds the prefix at runtime,
-> so that the binding can use generic properties and the kernel can
-> use omapdss specific drivers until the generic ones can be used
+> This patch series switches all Renesas boards to the new bindings, and
+> adds the missing GPIO_OPEN_DRAIN I/O flags, which were implicitly
+> assumed before.  The latter gets rid of messages like:
+> 
+>     gpio-208 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
+>     gpio-91 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
+> 
+> Patch 1 was extracted from series "[PATCH/RFC 0/3] i2c: gpio: Add
+> support for named gpios in DT", hence the v2.  All other patches are
+> new.
+> 
+> Note that after this series is applied, the i2c-gpio buses are no longer
+> detected when booting new DTBs on old (v4.14 and older) kernels, which
+> should not be an issue.  Booting old DTBs on new kernels is not
+> affected.
+> 
+> Thanks for applying!
 
-This is true, but the extra "omapdss" does not cause any issues at the
-moment, and the time when it causes issues is still many kernel versions
-in the future.
-
-But, yes, thinking about this, I agree, it's better to pick this one
-separately as a fix (after rebasing it on top of current maineline so
-that it doesn't depend on the toppoly name change), and leaving the
-toppoly->tpo change as a cleanup.
-
--- 
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
-Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+Thanks, applied.
