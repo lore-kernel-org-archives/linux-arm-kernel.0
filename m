@@ -1,74 +1,50 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 1 Dec 2017 17:58:45 +0000
-Subject: [PATCH RT] arm*: disable NEON in kernel mode
-In-Reply-To: <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
-References: <20171130142216.GB12606@linutronix.de>
- <20171130143028.GA1351@linutronix.de>
- <20171201104331.GB1612@linutronix.de>
- <20171201134506.GF1612@linutronix.de>
- <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
- <20171201143648.GK1612@linutronix.de>
- <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
-Message-ID: <20171201175844.GT22781@e103592.cambridge.arm.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 1 Dec 2017 18:04:00 +0000
+Subject: [PATCH v5 1/8] KVM: arm/arm64: Remove redundant preemptible checks
+In-Reply-To: <20171120191649.17290-2-christoffer.dall@linaro.org>
+References: <20171120191649.17290-1-christoffer.dall@linaro.org>
+ <20171120191649.17290-2-christoffer.dall@linaro.org>
+Message-ID: <f51b02a1-1319-3f69-c17f-4ed4c78acd38@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 03:03:35PM +0000, Ard Biesheuvel wrote:
+Hi,
+
+On 20/11/17 19:16, Christoffer Dall wrote:
+> The __this_cpu_read() and __this_cpu_write() functions already implement
+> checks for the required preemption levels when using
+> CONFIG_DEBUG_PREEMPT which gives you nice error messages and such.
+> Therefore there is no need to explicitly check this using a BUG_ON() in
+> the code (which we don't do for other uses of per cpu variables either).
 > 
-> l
-> > On 1 Dec 2017, at 14:36, Sebastian Andrzej Siewior <bigeasy@linutronix.de> wrote:
-> > 
-> >> On 2017-12-01 14:18:28 [+0000], Mark Rutland wrote:
-> >> [Adding Ard, who wrote the NEON crypto code]
-> >> 
-> >>> On Fri, Dec 01, 2017 at 02:45:06PM +0100, Sebastian Andrzej Siewior wrote:
-> >>> +arm folks, to let you know
-> >>> 
-> >>>> On 2017-12-01 11:43:32 [+0100], To linux-rt-users at vger.kernel.org wrote:
-> >>>> NEON in kernel mode is used by the crypto algorithms and raid6 code.
-> >>>> While the raid6 code looks okay, the crypto algorithms do not: NEON
-> >>>> is enabled on first invocation and may allocate/free/map memory before
-> >>>> the NEON mode is disabled again.
-> >> 
-> >> Could you elaborate on why this is a problem?
-> >> 
-> >> I guess this is because kernel_neon_{begin,end}() disable preemption?
-> >> 
-> >> ... is this specific to RT?
-> > 
-> > It is RT specific, yes. One thing are the unbounded latencies since
-> > everything in this preempt_disable section can take time depending on
-> > the size of the request.
-> > The other thing is code like in
-> >  arch/arm64/crypto/aes-ce-ccm-glue.c:ccm_encrypt()
-> > 
-> > where within this preempt_disable() section skcipher_walk_done() is
-> > invoked. That function can allocate/free/map memory which is okay for
-> > !RT but is not for RT. I tried to break those loops for x86 [0] and I
-> > simply didn't had the time to do the same for ARM. I am aware that
-> > store/restore of the NEON registers (as SSE and AVX) is expensive and
-> > doing a lot of operations in one go is desired.
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+
+Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+
+
+> ---
+>  virt/kvm/arm/arm.c | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> I wouldn?t mind fixing the code instead. We never disable the neon,
-> but only stack the contents of the registers the first time, and
-> unstack them only before returning to userland (with the exception of
-> nested neon use in softirq context). When this code was introduced,
-> we always stacked/unstacked the whole register file eagerly every
-> time.
-
-+1, at least for arm64.  I don't see a really compelling reason for
-holding kernel-mode NEON around memory management now that we have a
-strict save-once-restore-lazily model.
-
-This may not work so well for arm though -- I haven't looked at that
-code for a while.
-
-
-If there is memory manamement in any core loop, you already lost
-the performance battle, and an extra
-kernel_neon_end()+kernel_neon_begin() may not be that catastrophic.
-
-[...]
-
-Cheers
----Dave
+> diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
+> index c13d74c083fe..28548aeaf164 100644
+> --- a/virt/kvm/arm/arm.c
+> +++ b/virt/kvm/arm/arm.c
+> @@ -71,7 +71,6 @@ static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
+>  
+>  static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+>  {
+> -	BUG_ON(preemptible());
+>  	__this_cpu_write(kvm_arm_running_vcpu, vcpu);
+>  }
+>  
+> @@ -81,7 +80,6 @@ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+>   */
+>  struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
+>  {
+> -	BUG_ON(preemptible());
+>  	return __this_cpu_read(kvm_arm_running_vcpu);
+>  }
+>  
+> 
