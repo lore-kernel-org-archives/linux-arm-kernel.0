@@ -1,97 +1,60 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Fri, 1 Dec 2017 10:37:48 +0100
-Subject: [PATCH 0/5] Introduce the new NAND core interface: ->exec_op()
-In-Reply-To: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
-References: <20171130170132.27522-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171201103748.5bbd8ccc@bbrezillon>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 1 Dec 2017 10:38:58 +0100
+Subject: [RFC PATCH 1/3] dt-bindings: pinctrl: sunxi: document new generic
+ binding
+In-Reply-To: <0c8051e6-5d8c-32d6-97e4-11c2283da5b4@arm.com>
+References: <20171113012523.2328-1-andre.przywara@arm.com>
+ <20171113012523.2328-2-andre.przywara@arm.com>
+ <CACRpkdbpfkM4odz425+4qyUCF5vqPWBQ=F5Yk7AtJL5SqXghpg@mail.gmail.com>
+ <20171124105240.GB3792@ulmo> <20efcf8f-85a5-3cad-a84b-434ee5cad68e@arm.com>
+ <20171124133123.GA15999@ulmo> <0c8051e6-5d8c-32d6-97e4-11c2283da5b4@arm.com>
+Message-ID: <CACRpkdZccQ98Qbw9BvAQZESc9X4UcY9DPz4LngzrhAHT78nSxA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Nov 24, 2017 at 6:19 PM, Andre Przywara <andre.przywara@arm.com> wrote:
+> On 24/11/17 13:31, Thierry Reding wrote:
 
-On Thu, 30 Nov 2017 18:01:27 +0100
-Miquel Raynal <miquel.raynal@free-electrons.com> wrote:
+>> Register values don't belong in a device tree.
+>
+> I don't think that's true in a general way. This "pinmux" is already an
+> accepted property and used for exactly that purpose in other pinctrl
+> drivers:
+> $ git grep -l '[^,]pinmux = ' arch/arm{,64}/boot/dts
+> Plus the fsl,pinmux-ids property, which seems to serve the same purpose.
 
-> Hi,
-> 
-> This series adds the implementation of the NAND framework ->exec_op()
-> interface with all the related hooks and helpers. The reasons for adding
-> it are explained in details in the commit log:
-> 
->         "mtd: nand: add ->exec_op() implementation"
-> 
-> Long story short: it will ease later expansion of the framework, as well
-> as the implementation of new vendor specific commands, and should also
-> ease driver development.
-> 
-> A lot of comments are written to explain how to use the new API. Several
-> NAND controller drivers are already/almost converted to ->exec_op(), in
-> particular a rework of the Marvell NAND controller driver, and will
-> follow. One can have a look at them as examples to understand how to
-> implement or rework NAND controller drivers. A proper external
-> documentation is being written and will later be submitted.
-> 
-> Thank you,
-> Miqu?l
-> 
-> 
-> Boris Brezillon (2):
->   mtd: nand: provide several helpers to do common NAND operations
->   mtd: nand: force drivers to explicitly send READ/PROG commands
-> 
-> Miquel Raynal (3):
->   mtd: nand: use usual return values for the ->erase() hook
->   mtd: nand: use a static data_interface in the nand_chip structure
->   mtd: nand: add ->exec_op() implementation
+There are several examples of register values (and register
+numbers even!) being encoded in the kernel.
 
-Applied patches 1 to 4 (with a rewording of patch 4 commit message and
-a fix in patch 1 to make single_erase() compliant with the new
-->erase() semantic).
+What we need to ask is whether that is good in the general case
+or bad. I don't even think that has a clear answer, it's a grey area.
 
-Note that I was prompt to apply those patches because I want them to
-spend as much time as possible in linux-next so that we can detect and
-fix regressions before the merge window. So please test linux-next on
-your hardware.
+So we need to avoid "arguments from consistency" which reads
+something like "you allowed this thing A so now you must allow
+this thing B which is similar". It is not a helpful approach to the
+problem.
 
-This being said, nothing is set in stone, and if the series appears to
-break existing setups and we can't fix the problems before -rc6, I'll
-drop it.
+Some drivers encode a bunch of data into the device tree,
+pinctrl-single is the most extreme. This conflict between in-DT
+and in-driver data storage has been there since pinctrl was created
+and was the result of a compromise between OMAPs needs
+and everyone else, especially Tegra.
 
-Thanks,
+The opinions on this - and it is really opinions, not facts - differ
+between people and over time.
 
-Boris
+Resolving the conflicts is more about classical diplomacy than
+science unfortunately. I used to think the christian trinity was
+amusing and inconsistent, but nowadays I understand exactly how
+the people who came up with the Nicean creed were reasoning.
 
-> 
->  drivers/mtd/nand/atmel/nand-controller.c      |    9 +-
->  drivers/mtd/nand/bf5xx_nand.c                 |    6 +-
->  drivers/mtd/nand/brcmnand/brcmnand.c          |   20 +-
->  drivers/mtd/nand/cafe_nand.c                  |   20 +-
->  drivers/mtd/nand/denali.c                     |   40 +-
->  drivers/mtd/nand/diskonchip.c                 |    4 +-
->  drivers/mtd/nand/docg4.c                      |   21 +-
->  drivers/mtd/nand/fsl_elbc_nand.c              |   10 +-
->  drivers/mtd/nand/fsl_ifc_nand.c               |    6 +-
->  drivers/mtd/nand/fsmc_nand.c                  |    5 +-
->  drivers/mtd/nand/gpmi-nand/gpmi-nand.c        |   77 +-
->  drivers/mtd/nand/hisi504_nand.c               |    9 +-
->  drivers/mtd/nand/jz4740_nand.c                |   16 +-
->  drivers/mtd/nand/lpc32xx_mlc.c                |    7 +-
->  drivers/mtd/nand/lpc32xx_slc.c                |   33 +-
->  drivers/mtd/nand/mtk_nand.c                   |   25 +-
->  drivers/mtd/nand/nand_base.c                  | 2161 ++++++++++++++++++++++---
->  drivers/mtd/nand/nand_hynix.c                 |  124 +-
->  drivers/mtd/nand/nand_micron.c                |   83 +-
->  drivers/mtd/nand/nand_timings.c               |   21 +-
->  drivers/mtd/nand/omap2.c                      |   18 +-
->  drivers/mtd/nand/pxa3xx_nand.c                |   14 +-
->  drivers/mtd/nand/qcom_nandc.c                 |   27 +-
->  drivers/mtd/nand/r852.c                       |   11 +-
->  drivers/mtd/nand/sh_flctl.c                   |    6 +-
->  drivers/mtd/nand/sunxi_nand.c                 |   97 +-
->  drivers/mtd/nand/tango_nand.c                 |   27 +-
->  drivers/mtd/nand/tmio_nand.c                  |    5 +-
->  drivers/mtd/nand/vf610_nfc.c                  |    6 +-
->  drivers/staging/mt29f_spinand/mt29f_spinand.c |    5 +-
->  include/linux/mtd/rawnand.h                   |  414 ++++-
->  31 files changed, 2673 insertions(+), 654 deletions(-)
-> 
+What is paramount for me as subsystem maintainer is the fact
+that this driver has an active maintainer. And maintainers
+is what makes things manageable for me. It would be much easier
+for you to have your way if you were submitting an entirely
+new driver. Like this pinmux property, it was submitted by the
+mediatek people because it fits their usecase/hardware especially
+well.
+
+Yours,
+Linus Walleij
