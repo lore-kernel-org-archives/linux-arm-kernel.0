@@ -1,130 +1,146 @@
-From: liwei213@huawei.com (liwei (CM))
-Date: Fri, 1 Dec 2017 03:17:11 +0000
-Subject: =?utf-8?B?562U5aSNOiDnrZTlpI06IFtQQVRDSCB2NSAyLzVdIGR0LWJpbmRpbmdzOiBz?=
- =?utf-8?Q?csi:_ufs:_add_document_for_hisi-ufs?=
-References: <20171020085259.8093-1-liwei213@huawei.com>
- <20171020085259.8093-3-liwei213@huawei.com>
- <CAK8P3a0z_q-GNc-vSPbovu8yrEQyCGDccoDe16rycW+uOwO4Dw@mail.gmail.com>
- <1699CE87DE933F49876AD744B5DC140FA321D1@DGGEMM506-MBX.china.huawei.com>
- <CAK8P3a37yYDQZpZxmunCdSO83qkqywTME5Xo0k56nWEs2k+=dg@mail.gmail.com>
-Message-ID: <1699CE87DE933F49876AD744B5DC140FA4637F@DGGEMM506-MBS.china.huawei.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Fri, 1 Dec 2017 11:32:04 +0800
+Subject: [PATCH v2] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <1511970775-11103-1-git-send-email-awallis@codeaurora.org>
+References: <1511970775-11103-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <1512099124.17567.156.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Arnd
-Sorry to bother you, some questions about this patch will trouble you to give some advice:
-+	ufs: ufs at ff3b0000 {
-+		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-+		/* 0: HCI standard */
-+		/* 1: UFS SYS CTRL */
-+		reg = <0x0 0xff3b0000 0x0 0x1000>,
-+			<0x0 0xff3b1000 0x0 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-+			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-+		clock-names = "clk_ref", "clk_phy";
-+		freq-table-hz = <0 0>, <0 0>;
-+		/* offset: 0x84; bit: 12 */
-+		/* offset: 0x84; bit: 7  */
-+		resets = <&crg_rst 0x84 12>,
-+			<&crg_rst 0x84 7>;
-+		reset-names = "rst", "assert";
-+	};
+Hi,
+On Wed, 2017-11-29 at 10:52 -0500, Adam Wallis wrote:
+> The xHCI driver currently has the IMOD set to 160, which
+> translates to an IMOD interval of 40,000ns (160 * 250)ns
+> 
+> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
+> introduced a QUIRK for the MTK platform to adjust this interval to 20,
+> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
+> due to the fact that the MTK controller IMOD interval is 8 times
+> as much as defined in xHCI spec.
+> 
+> Instead of adding more quirk bits for additional platforms, this patch
+> introduces the ability for vendors to set the IMOD_INTERVAL as is
+> optimal for their platform. By using device_property_read_u32() on
+> "imod-interval", the IMOD INTERVAL can be specified in nano seconds. If
+> no interval is specified, the default of 40,000ns (IMOD=160) will be
+> used.
+> 
+> No bounds checking has been implemented due to the fact that a vendor
+> may have violated the spec and would need to specify a value outside of
+> the max 8,000 IRQs/second limit specified in the xHCI spec.
+> 
+> Backwards compatibility is maintained for MTK_HOSTS through the quirk
+> bit, however, imod_interval should be pushed into device tree at a
+> future point and this quirk should be removed from xhci_plat_probe
+> 
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
+> changes from v1:
+>   * Removed device_property_read_u32() per suggestion from greg k-h
+>   * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
+> 
+>  Documentation/devicetree/bindings/usb/usb-xhci.txt |  1 +
+>  drivers/usb/host/xhci-plat.c                       | 13 +++++++++++++
+>  drivers/usb/host/xhci.c                            |  7 ++-----
+>  drivers/usb/host/xhci.h                            |  2 ++
+>  4 files changed, 18 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> index ae6e484..3998459 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> @@ -29,6 +29,7 @@ Optional properties:
+>    - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+>    - usb3-lpm-capable: determines if platform is USB3 LPM capable
+>    - quirk-broken-port-ped: set if the controller has broken port disable mechanism
+> +  - imod-interval: IMOD_INTERVAL in nano-seconds. Default is 40000
+>  
+>  Example:
+>  	usb at f0931000 {
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 09f164f..3c63de1 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -23,6 +23,7 @@
+>  #include "xhci-plat.h"
+>  #include "xhci-mvebu.h"
+>  #include "xhci-rcar.h"
+> +#include "xhci-mtk.h"
+Needn't it, MTK makes use of xhci-mtk.c but not xhci-plat.c
 
-1. our UFS host soc implementation can be divided into two parts: UFS controller and related peripheral circuit, that "HCI standard"<-> UFS controller,  "UFS SYS CTRL"<-> related peripheral circuit, and PHY is part of the peripheral circuit. So the "UFS SYS CTRL" area does not correspond completely to what Qualcomm have described as their PHY implementation. In fact, we do not have an independent register space to control the PHY. 
+>  
+>  static struct hc_driver __read_mostly xhci_plat_hc_driver;
+>  
+> @@ -269,6 +270,18 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+>  
+> +	/*
+> +	 * imod_interval is the interrupt modulation value in nanoseconds.
+> +	 * The increment interval is 8 times as much as that defined in
+> +	 * the xHCI spec on MTK's controller. This quirk check exists to provide
+> +	 * backwards compatibility, however, this should be pushed into
+> +	 * the device tree files at some point in the future and
+> +	 * checking the quirk should be removed from xhci_plat_probe.
+> +	 */
+> +	xhci->imod_interval = xhci->quirks & XHCI_MTK_HOST ? 5000 : 40000;
+Can be moved into xhci-mtk.c for MTK quirk, like as following:
 
-2. From our soc chip colleague, "rst", "assert" is not generic and related with our soc implementation. In fact?it is not just a rst and assert of the UFS controller, but for the entire UFS IP ,so I don't think it's very helpful for others.
+diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+index 2d473e0..a03451b 100644
+--- a/drivers/usb/host/xhci-mtk.c
++++ b/drivers/usb/host/xhci-mtk.c
+@@ -699,6 +699,13 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+                goto power_off_phys;
+        }
 
-I think the above places will be reserved, do you have any better advices.
++       /*
++        * the increment interval is 8 times as much as that defined
++        * in xHCI spec on MTK's controller
++        */
++ 	xhci->imod_interval = 5000;
++       device_property_read_u32(dev, "imod-interval", &xhci->imod_interval);
++
+        ret = usb_add_hcd(hcd, irq, IRQF_SHARED);
+        if (ret)
+                goto put_usb3_hcd;
 
-Thank you very much.
+Thanks
 
-
------????-----
-???: liwei (CM) 
-????: 2017?10?31? 20:35
-???: 'Arnd Bergmann'
-??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; Vinayak Holikatti; James E.J. Bottomley; Martin K. Petersen; Kevin Hilman; Gregory CLEMENT; Thomas Petazzoni; Masahiro Yamada; Riku Voipio; Thierry Reding; Krzysztof Kozlowski; Eric Anholt; DTML; Linux Kernel Mailing List; Linux ARM; linux-scsi; Guodong Xu; Fengbaopeng (kevin, Kirin Solution Dept); lihuan (Z); wangyupeng (A); zangleigang
-??: ??: ??: [PATCH v5 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-
-Hi, Arnd
-Thank you for your reply.
------????-----
-???: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] ?? Arnd Bergmann
-????: 2017?10?30? 23:22
-???: liwei (CM)
-??: Rob Herring; Mark Rutland; xuwei (O); Catalin Marinas; Will Deacon; Vinayak Holikatti; James E.J. Bottomley; Martin K. Petersen; Kevin Hilman; Gregory CLEMENT; Thomas Petazzoni; Masahiro Yamada; Riku Voipio; Thierry Reding; Krzysztof Kozlowski; Eric Anholt; DTML; Linux Kernel Mailing List; Linux ARM; linux-scsi; Guodong Xu; Fengbaopeng (kevin, Kirin Solution Dept); lihuan (Z); wangyupeng (A)
-??: Re: ??: [PATCH v5 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-
-On Tue, Oct 24, 2017 at 11:06 AM, liwei (CM) <liwei213@huawei.com> wrote:
-> what's your opinion about my explanation and revision method?
-> I am looking forward to your reply, thanks!
-
-Sorry for the delay, I was travelling last week.
-> ???: arndbergmann at gmail.com [mailto:arndbergmann at gmail.com] ?? Arnd 
-> Bergmann On Fri, Oct 20, 2017 at 10:52 AM, Li Wei <liwei213@huawei.com> wrote:
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
->> @@ -0,0 +1,46 @@
->> +* Hisilicon Universal Flash Storage (UFS) Host Controller
->> +
->> +UFS nodes are defined to describe on-chip UFS hardware macro.
->> +Each UFS Host Controller should have its own node.
->> +
->> +Required properties:
->> +- compatible        : compatible list, contains one of the following -
->> +                       "hisilicon,hi3660-ufs" for hisi ufs host controller
->> +                        present on Hi3660 chipset.
-
-One more thing I just noticed: you don't describe the device as compatible with the ufshcd spec as defined in the generic binding. Shouldn't we have both compatible strings listed here?
-
-Ok, I will fix it in patch v6;
-
-> In particular, I wonder if what you describe as the "UFS SYS CTRL"
-> area corresponds to what Qualcomm have described as their PHY implementation. It certainly seems to driver some of the properties that would normally be associated with a PHY.
->
-> Liwei:Yes, a part of "UFS SYS CTRL" is associated with a PHY, but from our chip colleague that we assure "UFS SYS CTRL" is associated with clk/reset/power on/power off and so on.
-> In fact, in addition to the controller itself, the controller related periphery are all in this area. So it's not appropriate to put this into a separate phy node.
-
-I'm not sure I understand here. Do you mean the reset handle is for resetting the PHY rather than the UFS HCD?
-
-Maybe my description is not clear enough, our UFS host soc implementation can be divided into two parts: UFS controller and related peripheral circuit, that "HCI standard"<-> UFS controller,  "UFS SYS CTRL"<-> related peripheral circuit, and PHY is part of the peripheral circuit. So the "UFS SYS CTRL" area does not correspond completely to what Qualcomm have described as their PHY implementation.
-The root reason is that our UFS host had not divided into UFS controller and PHY?
-
-
-> > For the "clock-names" property, you specify "clk_ref", which I assume is the same as what Qualcomm call "ref_clk". I'd suggest you use the existing name and add that as the default name in the ufshcd-pltfrm.txt binding document.
->
-> Liwei:" ref_clk " is already in the ufshcd-pltfrm.txt binding 
-> document, and parse in ufshcd.c, so we will replace "clk_ref" with 
-> "ref_clk". I will fix it in patch v6;
-
-ok
-
-> > The "clk_phy" property appears to be related to the PHY, so it might be better to have a separate phy node with either just the clk, or with the clk plus the "UFS SYS CTRL" register area, whichever matches your hardware better, and then use teh "phys/phy-names" property to refer to that.
->
-> Liwei: OK, I will add a separate phy node and fix it in patch v6;
-
-Thanks.
-
->> The reset handling you describe here (both resets and reset-gpios) appears to be completely generic, so I'd suggest adding those to ufshcd-pltfrm.txt instead of your own binding, to ensure that future drivers use the same identifiers.
->
-> Liwei: From our soc chip colleague, reset include "rst", "assert" is 
-> not generic and related with our soc implementation, you can see
-> ufs_hisi_soc_init() in drivers/scsi/ufs/ufs-hisi.c, the position of 
-> rst and assert is very special, it's hard to put it in a generic 
-> process;
-
-It seems odd that the ability to reset a device is specific to your implementation. What I meant is that other implementations may also require a reset, so describing the way you refer to this into the generic binding would be helpful, to prevent others from adding another incompatible way to do the same thing.
-
-A lot of generic bindings have a reference to a reset controller that if present needs to be used before first accessing the device itself.
-
-I mean our reset process is really special, but there is no parse of this "reset" in generic driver code like ufshcd.c or ufshcd-pltfrm.c; Even if I add those to ufshcd-pltfrm.txt and implement the common parsing code, but our special requirements are difficult to satisfy; What do you think about if I put all the implementations of reset in our driver code, and remove "reset" property here?
-
-> reset-gpios is used to solve a defect of the SOC chip reset function 
-> and it is not generic , but our chip has been updated, so this is no 
-> longer needed, and I will remove it in the patch v6;
-
-Ok.
-
-      Arnd
+> +
+> +	device_property_read_u32(sysdev, "imod-interval", &xhci->imod_interval);
+> +
+>  	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
+>  	if (IS_ERR(hcd->usb_phy)) {
+>  		ret = PTR_ERR(hcd->usb_phy);
+> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+> index 2424d30..0b7755b 100644
+> --- a/drivers/usb/host/xhci.c
+> +++ b/drivers/usb/host/xhci.c
+> @@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
+>  			"// Set the interrupt modulation register");
+>  	temp = readl(&xhci->ir_set->irq_control);
+>  	temp &= ~ER_IRQ_INTERVAL_MASK;
+> -	/*
+> -	 * the increment interval is 8 times as much as that defined
+> -	 * in xHCI spec on MTK's controller
+> -	 */
+> -	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
+> +	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
+> +
+>  	writel(temp, &xhci->ir_set->irq_control);
+>  
+>  	/* Set the HCD state before we enable the irqs */
+> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+> index 99a014a..2a4177b 100644
+> --- a/drivers/usb/host/xhci.h
+> +++ b/drivers/usb/host/xhci.h
+> @@ -1717,6 +1717,8 @@ struct xhci_hcd {
+>  	u8		max_interrupters;
+>  	u8		max_ports;
+>  	u8		isoc_threshold;
+> +	/* imod_interval in ns (I * 250ns) */
+> +	u32		imod_interval;
+>  	int		event_ring_max;
+>  	/* 4KB min, 128MB max */
+>  	int		page_size;
