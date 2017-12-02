@@ -1,29 +1,30 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Sat,  2 Dec 2017 20:40:15 +1100
-Subject: [PATCH] pinctrl: pxa2xx: add MODULE_LICENSE
-Message-ID: <20171202094015.11696-1-dja@axtens.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 2 Dec 2017 11:14:56 +0100
+Subject: linux-next on Nokia N900: hang on boot
+Message-ID: <20171202101456.GA1810@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the following warning on an allmodconfig build:
-WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
+Hi!
 
-This matches the license in the header.
+next from 2017-12-01 was tested.
 
-Signed-off-by: Daniel Axtens <dja@axtens.net>
----
- drivers/pinctrl/pxa/pinctrl-pxa2xx.c | 2 ++
- 1 file changed, 2 insertions(+)
+MMC is detected, but then I see wtl4030_bci: .. battery temperature
+out of range, and machine halts. This is just before userspace would
+be started.
 
-diff --git a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
-index 866aa3ce1ac9..3d67fca5ae21 100644
---- a/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
-+++ b/drivers/pinctrl/pxa/pinctrl-pxa2xx.c
-@@ -436,3 +436,5 @@ int pxa2xx_pinctrl_exit(struct platform_device *pdev)
- 	return 0;
- }
- EXPORT_SYMBOL_GPL(pxa2xx_pinctrl_exit);
-+
-+MODULE_LICENSE("GPL v2");
+4.15-rc1 seems to work ok on the box.
+
+Any ideas?
+
+									Pavel
 -- 
-2.11.0
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171202/ae9b369f/attachment.sig>
