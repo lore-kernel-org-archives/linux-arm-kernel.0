@@ -1,135 +1,64 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sat,  2 Dec 2017 18:26:05 -0200
-Subject: [PATCH 2/2] ARM: dts: imx51-babbage: Fix the 26MHz clock modelling
-In-Reply-To: <1512246365-3657-1-git-send-email-festevam@gmail.com>
-References: <1512246365-3657-1-git-send-email-festevam@gmail.com>
-Message-ID: <1512246365-3657-2-git-send-email-festevam@gmail.com>
+From: arvind.yadav.cs@gmail.com (arvindY)
+Date: Sun, 3 Dec 2017 01:56:38 +0530
+Subject: [PATCH 08/10] net: fjes: Handle return value of platform_get_irq
+ and platform_get_resource
+In-Reply-To: <1bbebd1a-4cca-0ef0-bdc1-ae50a4218f30@cogentembedded.com>
+References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1512242782-7134-9-git-send-email-arvind.yadav.cs@gmail.com>
+ <1bbebd1a-4cca-0ef0-bdc1-ae50a4218f30@cogentembedded.com>
+Message-ID: <5A230C7E.4050705@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabio Estevam <fabio.estevam@nxp.com>
+Hi Sergei,
 
-On imx51-babbage there is a 26MHz oscillator that is gated by GPIO3_1.
-
-The output of this clock feeds audio codec clock and USB PHY clocks,
-which are gated by GPIO4_26 and GPIO2_1 respectively.
-
-Fix the clock representation by properly using gpio-gate-clock.
-
-The clock nodes can be moved out of the 'clocks' node.
-
-Based on a commit from Lucas Stach for imx51-zii-rdu1 board.
-
-This also fixes the following build warning with W=1:
-
-arch/arm/boot/dts/imx51-babbage.dtb: Warning (unit_address_vs_reg): Node /clocks/codec_clock has a reg or ranges property, but no unit name
-
-Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
----
- arch/arm/boot/dts/imx51-babbage.dts | 67 +++++++++++++++++++++++++++----------
- 1 file changed, 50 insertions(+), 17 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
-index c432de7..663a3cd 100644
---- a/arch/arm/boot/dts/imx51-babbage.dts
-+++ b/arch/arm/boot/dts/imx51-babbage.dts
-@@ -25,18 +25,41 @@
- 		reg = <0x90000000 0x20000000>;
- 	};
- 
--	clocks {
--		ckih1 {
--			clock-frequency = <22579200>;
--		};
-+	ckih1 {
-+		clock-frequency = <22579200>;
-+	};
- 
--		clk_26M: codec_clock {
--			compatible = "fixed-clock";
--			reg=<0>;
--			#clock-cells = <0>;
--			clock-frequency = <26000000>;
--			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
--		};
-+	clk_26M_osc: 26M_osc {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <26000000>;
-+	};
-+
-+	clk_26M_osc_gate: 26M_gate {
-+		compatible = "gpio-gate-clock";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_clk26mhz_osc>;
-+		clocks = <&clk_26M_osc>;
-+		#clock-cells = <0>;
-+		enable-gpios = <&gpio3 1 GPIO_ACTIVE_HIGH>;
-+	};
-+
-+	clk_26M_audio: audio_gate {
-+		compatible = "gpio-gate-clock";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_clk26mhz_audio>;
-+		clocks = <&clk_26M_osc_gate>;
-+		#clock-cells = <0>;
-+		enable-gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-+	};
-+
-+	clk_26M_usb: usbhost_gate {
-+		compatible = "gpio-gate-clock";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_clk26mhz_usb>;
-+		clocks = <&clk_26M_osc_gate>;
-+		#clock-cells = <0>;
-+		enable-gpios = <&gpio2 1 GPIO_ACTIVE_LOW>;
- 	};
- 
- 	display1: disp1 {
-@@ -162,7 +185,7 @@
- 		usbh1phy: usbh1phy at 0 {
- 			compatible = "usb-nop-xceiv";
- 			reg = <0>;
--			clocks = <&clks IMX5_CLK_DUMMY>;
-+			clocks = <&clk_26M_usb>;
- 			clock-names = "main_clk";
- 			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
- 			vcc-supply = <&vusb_reg>;
-@@ -345,10 +368,8 @@
- 
- 	sgtl5000: codec at a {
- 		compatible = "fsl,sgtl5000";
--		pinctrl-names = "default";
--		pinctrl-0 = <&pinctrl_clkcodec>;
- 		reg = <0x0a>;
--		clocks = <&clk_26M>;
-+		clocks = <&clk_26M_audio>;
- 		VDDA-supply = <&vdig_reg>;
- 		VDDIO-supply = <&vvideo_reg>;
- 	};
-@@ -441,9 +462,21 @@
- 			>;
- 		};
- 
--		pinctrl_clkcodec: clkcodecgrp {
-+		pinctrl_clk26mhz_audio: clk26mhzaudiocgrp {
-+			fsl,pins = <
-+				MX51_PAD_CSPI1_RDY__GPIO4_26		0x85
-+			>;
-+		};
-+
-+		pinctrl_clk26mhz_osc: clk26mhzoscgrp {
-+			fsl,pins = <
-+				MX51_PAD_DI1_PIN12__GPIO3_1		0x85
-+			>;
-+		};
-+
-+		pinctrl_clk26mhz_usb: clk26mhzusbgrp {
- 			fsl,pins = <
--				MX51_PAD_CSPI1_RDY__GPIO4_26		0x80000000
-+				MX51_PAD_EIM_D17__GPIO2_1		0x85
- 			>;
- 		};
- 
--- 
-2.7.4
+On Sunday 03 December 2017 01:36 AM, Sergei Shtylyov wrote:
+> Hello!
+>
+> On 12/02/2017 10:26 PM, Arvind Yadav wrote:
+>
+>> platform_get_irq() and platform_get_resource() can fail here and
+>> we must check its return value.
+>>
+>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>> ---
+>>   drivers/net/fjes/fjes_main.c | 10 ++++++++++
+>>   1 file changed, 10 insertions(+)
+>>
+>> diff --git a/drivers/net/fjes/fjes_main.c b/drivers/net/fjes/fjes_main.c
+>> index 750954b..540dd51 100644
+>> --- a/drivers/net/fjes/fjes_main.c
+>> +++ b/drivers/net/fjes/fjes_main.c
+>> @@ -1265,9 +1265,19 @@ static int fjes_probe(struct platform_device 
+>> *plat_dev)
+>>       adapter->interrupt_watch_enable = false;
+>>         res = platform_get_resource(plat_dev, IORESOURCE_MEM, 0);
+>> +    if (!res) {
+>> +        err = -EINVAL;
+>> +        goto err_free_netdev;
+>> +    }
+>> +
+>>       hw->hw_res.start = res->start;
+>>       hw->hw_res.size = resource_size(res);
+>>       hw->hw_res.irq = platform_get_irq(plat_dev, 0);
+>> +    if (hw->hw_res.irq <= 0) {
+>
+>    This function no longer returns 0 on error, no need to check for <= 0.
+>
+>> +        err = hw->hw_res.irq ? hw->hw_res.irq : -ENODEV;
+>> +        goto err_free_netdev;
+>
+>    gcc allows a shorter way to write that.
+>
+>         err = hw->hw_res.irq ?: -ENODEV;
+Yes, you are right, But first is more readable. That's why I have used.
+>
+>> +    }
+>> +
+>>       err = fjes_hw_init(&adapter->hw);
+>>       if (err)
+>>           goto err_free_netdev;
+>
+> MBR, Sergei
+Thanks,
+~arvind
