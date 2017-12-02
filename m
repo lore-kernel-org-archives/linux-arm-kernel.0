@@ -1,80 +1,49 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Fri,  1 Dec 2017 23:27:40 -0500
-Subject: [PATCH V5 3/7] device property: Introduce a common API to fetch
- device match data
+Date: Fri,  1 Dec 2017 23:27:42 -0500
+Subject: [PATCH V5 5/7] ACPI: properties: Implement get_match_data() callback
 In-Reply-To: <1512188864-773-1-git-send-email-okaya@codeaurora.org>
 References: <1512188864-773-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1512188864-773-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512188864-773-6-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an OF/ACPI function to obtain the driver data. We want to hide
-OF/ACPI details from the device drivers and abstract following the device
-family of functions.
+Now that we have a get_match_data() callback as part of the firmware node,
+implement the ACPI specific piece for it.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/base/property.c  | 7 +++++++
- include/linux/fwnode.h   | 4 ++++
- include/linux/property.h | 2 ++
- 3 files changed, 13 insertions(+)
+ drivers/acpi/property.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/drivers/base/property.c b/drivers/base/property.c
-index 7ed99c1..dfc53af 100644
---- a/drivers/base/property.c
-+++ b/drivers/base/property.c
-@@ -1335,3 +1335,10 @@ int fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
- 	return fwnode_call_int_op(fwnode, graph_parse_endpoint, endpoint);
+diff --git a/drivers/acpi/property.c b/drivers/acpi/property.c
+index e26ea20..49dd50b 100644
+--- a/drivers/acpi/property.c
++++ b/drivers/acpi/property.c
+@@ -1271,6 +1271,17 @@ static int acpi_fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+ 	return 0;
  }
- EXPORT_SYMBOL(fwnode_graph_parse_endpoint);
-+
-+void *device_get_match_data(struct device *dev)
+ 
++static void *acpi_fwnode_get_match_data(const struct fwnode_handle *fwnode,
++					const struct device_driver *drv)
 +{
-+	return fwnode_call_ptr_op(dev_fwnode(dev), get_match_data,
-+				  dev->driver);
-+}
-+EXPORT_SYMBOL_GPL(device_get_match_data);
-diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-index 0c35b6c..6e5e1dd 100644
---- a/include/linux/fwnode.h
-+++ b/include/linux/fwnode.h
-@@ -15,6 +15,7 @@
- #include <linux/types.h>
- 
- struct fwnode_operations;
-+struct device_driver;
- 
- struct fwnode_handle {
- 	struct fwnode_handle *secondary;
-@@ -66,6 +67,7 @@ struct fwnode_reference_args {
-  *			       endpoint node.
-  * @graph_get_port_parent: Return the parent node of a port node.
-  * @graph_parse_endpoint: Parse endpoint for port and endpoint id.
-+ * @get_match_data: Return the driver match data.
-  */
- struct fwnode_operations {
- 	void (*get)(struct fwnode_handle *fwnode);
-@@ -101,6 +103,8 @@ struct fwnode_operations {
- 	(*graph_get_port_parent)(struct fwnode_handle *fwnode);
- 	int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
- 				    struct fwnode_endpoint *endpoint);
-+	void *(*get_match_data)(const struct fwnode_handle *fwnode,
-+				const struct device_driver *drv);
- };
- 
- #define fwnode_has_op(fwnode, op)				\
-diff --git a/include/linux/property.h b/include/linux/property.h
-index 6bebee1..01fa55b 100644
---- a/include/linux/property.h
-+++ b/include/linux/property.h
-@@ -275,6 +275,8 @@ int device_add_properties(struct device *dev,
- 
- enum dev_dma_attr device_get_dma_attr(struct device *dev);
- 
-+void *device_get_match_data(struct device *dev);
++	struct acpi_device *adev = to_acpi_device_node(fwnode);
 +
- int device_get_phy_mode(struct device *dev);
++	if (!adev)
++		return NULL;
++
++	return acpi_get_match_data(adev, drv->acpi_match_table);
++}
++
+ #define DECLARE_ACPI_FWNODE_OPS(ops) \
+ 	const struct fwnode_operations ops = {				\
+ 		.device_is_available = acpi_fwnode_device_is_available, \
+@@ -1289,6 +1300,7 @@ static int acpi_fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+ 			acpi_fwnode_graph_get_remote_endpoint,		\
+ 		.graph_get_port_parent = acpi_fwnode_get_parent,	\
+ 		.graph_parse_endpoint = acpi_fwnode_graph_parse_endpoint, \
++		.get_match_data = acpi_fwnode_get_match_data,		\
+ 	};								\
+ 	EXPORT_SYMBOL_GPL(ops)
  
- void *device_get_mac_address(struct device *dev, char *addr, int alen);
 -- 
 1.9.1
