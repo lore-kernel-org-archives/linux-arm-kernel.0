@@ -1,33 +1,33 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sun,  3 Dec 2017 00:56:13 +0530
-Subject: [PATCH 01/10] net: bcmgenet: Fix platform_get_irq's error checking
+Date: Sun,  3 Dec 2017 00:56:16 +0530
+Subject: [PATCH 04/10] can: xilinx: Handle return value of platform_get_irq
 In-Reply-To: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1512242782-7134-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1512242782-7134-5-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The platform_get_irq() function returns negative if an error occurs.
-zero or positive number on success. platform_get_irq() error checking
-for zero is not correct.
+platform_get_irq() can fail here and we must check its return value.
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/net/ethernet/broadcom/genet/bcmgenet.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/net/can/xilinx_can.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/net/ethernet/broadcom/genet/bcmgenet.c b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-index 24b4f4c..e2f1268 100644
---- a/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-+++ b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-@@ -3371,7 +3371,7 @@ static int bcmgenet_probe(struct platform_device *pdev)
- 	priv->irq0 = platform_get_irq(pdev, 0);
- 	priv->irq1 = platform_get_irq(pdev, 1);
- 	priv->wol_irq = platform_get_irq(pdev, 2);
--	if (!priv->irq0 || !priv->irq1) {
-+	if (priv->irq0 <= 0 || priv->irq1 <= 0 || priv->wol_irq <= 0) {
- 		dev_err(&pdev->dev, "can't find IRQs\n");
- 		err = -EINVAL;
- 		goto err;
+diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
+index 89aec07..e36e2a2 100644
+--- a/drivers/net/can/xilinx_can.c
++++ b/drivers/net/can/xilinx_can.c
+@@ -1111,6 +1111,10 @@ static int xcan_probe(struct platform_device *pdev)
+ 
+ 	/* Get IRQ for the device */
+ 	ndev->irq = platform_get_irq(pdev, 0);
++	if (ndev->irq <= 0) {
++		ret = ndev->irq ? ndev->irq : -ENODEV;
++		goto err_free;
++	}
+ 	ndev->flags |= IFF_ECHO;	/* We support local echo */
+ 
+ 	platform_set_drvdata(pdev, ndev);
 -- 
 2.7.4
