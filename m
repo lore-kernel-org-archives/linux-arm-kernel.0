@@ -1,154 +1,282 @@
 From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 2 Dec 2017 14:46:23 +0000
-Subject: [PATCH v6 04/13] IIO: inkern: API for manipulating channel
- attributes
-In-Reply-To: <1512150020-20335-5-git-send-email-arnaud.pouliquen@st.com>
+Date: Sat, 2 Dec 2017 14:50:56 +0000
+Subject: [PATCH v6 01/13] iio: Add hardware consumer buffer support
+In-Reply-To: <1512150020-20335-2-git-send-email-arnaud.pouliquen@st.com>
 References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
- <1512150020-20335-5-git-send-email-arnaud.pouliquen@st.com>
-Message-ID: <20171202144623.27438bb2@archlinux>
+ <1512150020-20335-2-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20171202145056.67ba7a04@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 1 Dec 2017 18:40:11 +0100
+On Fri, 1 Dec 2017 18:40:08 +0100
 Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
-> Extend the inkern API with functions for reading and writing
-> attribute of iio channels.
+> From: Lars-Peter Clausen <lars@metafoo.de>
 > 
+> Hardware consumer interface can be used when one IIO device has
+> a direct connection to another device in hardware.
+
+Given I'm not totally sure who will do the immutable branch I'm going
+to starting adding tags to make it clear what I'm happy with.
+(might rip them off again if I end up handling the final merge)
+> 
+> Signed-off-by: Lars-Peter Clausen <lars@metafoo.de>
 > Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+
+Reviewed-by: Jonathan Cameron <Jonathan.Cameron@huawei.com>
+
 > ---
-> V5 to V6 update:
->  Replace include type.h with iio.h to fix build warning
-
-Except don't do that.   Consumers should not be able to see the internals
-of iio devices..  Hence instead, move the required enum to types.h please.
-
-One other passing comment inline (not one I'm expecting you to do anything
-about!).  Otherwise this is fine with me.
-
-Thanks,
-
-Jonathan
-
+>  drivers/iio/buffer/Kconfig                    |  10 ++
+>  drivers/iio/buffer/Makefile                   |   1 +
+>  drivers/iio/buffer/industrialio-hw-consumer.c | 182 ++++++++++++++++++++++++++
+>  include/linux/iio/hw-consumer.h               |  20 +++
+>  4 files changed, 213 insertions(+)
+>  create mode 100644 drivers/iio/buffer/industrialio-hw-consumer.c
+>  create mode 100644 include/linux/iio/hw-consumer.h
 > 
->  drivers/iio/inkern.c         | 18 +++++++++++++-----
->  include/linux/iio/consumer.h | 28 +++++++++++++++++++++++++++-
->  2 files changed, 40 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
-> index 069defc..f2e7824 100644
-> --- a/drivers/iio/inkern.c
-> +++ b/drivers/iio/inkern.c
-> @@ -664,9 +664,8 @@ int iio_convert_raw_to_processed(struct iio_channel *chan, int raw,
->  }
->  EXPORT_SYMBOL_GPL(iio_convert_raw_to_processed);
+> diff --git a/drivers/iio/buffer/Kconfig b/drivers/iio/buffer/Kconfig
+> index 4ffd3db..338774c 100644
+> --- a/drivers/iio/buffer/Kconfig
+> +++ b/drivers/iio/buffer/Kconfig
+> @@ -29,6 +29,16 @@ config IIO_BUFFER_DMAENGINE
 >  
-> -static int iio_read_channel_attribute(struct iio_channel *chan,
-> -				      int *val, int *val2,
-> -				      enum iio_chan_info_enum attribute)
-> +int iio_read_channel_attribute(struct iio_channel *chan, int *val, int *val2,
-> +			       enum iio_chan_info_enum attribute)
->  {
->  	int ret;
+>  	  Should be selected by drivers that want to use this functionality.
 >  
-> @@ -682,6 +681,8 @@ static int iio_read_channel_attribute(struct iio_channel *chan,
->  
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(iio_read_channel_attribute);
+> +config IIO_BUFFER_HW_CONSUMER
+> +	tristate "Industrial I/O HW buffering"
+> +	help
+> +	  Provides a way to bonding when an IIO device has a direct connection
+> +	  to another device in hardware. In this case buffers for data transfers
+> +	  are handled by hardware.
 > +
->  
->  int iio_read_channel_offset(struct iio_channel *chan, int *val, int *val2)
->  {
-> @@ -850,7 +851,8 @@ static int iio_channel_write(struct iio_channel *chan, int val, int val2,
->  						chan->channel, val, val2, info);
->  }
->  
-> -int iio_write_channel_raw(struct iio_channel *chan, int val)
-> +int iio_write_channel_attribute(struct iio_channel *chan, int val, int val2,
-> +				enum iio_chan_info_enum attribute)
->  {
->  	int ret;
->  
-> @@ -860,12 +862,18 @@ int iio_write_channel_raw(struct iio_channel *chan, int val)
->  		goto err_unlock;
->  	}
->  
-> -	ret = iio_channel_write(chan, val, 0, IIO_CHAN_INFO_RAW);
-> +	ret = iio_channel_write(chan, val, val2, attribute);
->  err_unlock:
->  	mutex_unlock(&chan->indio_dev->info_exist_lock);
->  
->  	return ret;
->  }
-> +EXPORT_SYMBOL_GPL(iio_write_channel_attribute);
+> +	  Should be selected by drivers that want to use the generic Hw consumer
+> +	  interface.
 > +
-> +int iio_write_channel_raw(struct iio_channel *chan, int val)
-> +{
-> +	return iio_write_channel_attribute(chan, val, 0, IIO_CHAN_INFO_RAW);
-> +}
->  EXPORT_SYMBOL_GPL(iio_write_channel_raw);
->  
->  unsigned int iio_get_channel_ext_info_count(struct iio_channel *chan)
-> diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
-> index 5e347a9..70658b1 100644
-> --- a/include/linux/iio/consumer.h
-> +++ b/include/linux/iio/consumer.h
-> @@ -11,7 +11,7 @@
->  #define _IIO_INKERN_CONSUMER_H_
->  
->  #include <linux/types.h>
-> -#include <linux/iio/types.h>
+>  config IIO_KFIFO_BUF
+>  	tristate "Industrial I/O buffering based on kfifo"
+>  	help
+> diff --git a/drivers/iio/buffer/Makefile b/drivers/iio/buffer/Makefile
+> index 85beaae..324a36b 100644
+> --- a/drivers/iio/buffer/Makefile
+> +++ b/drivers/iio/buffer/Makefile
+> @@ -6,5 +6,6 @@
+>  obj-$(CONFIG_IIO_BUFFER_CB) += industrialio-buffer-cb.o
+>  obj-$(CONFIG_IIO_BUFFER_DMA) += industrialio-buffer-dma.o
+>  obj-$(CONFIG_IIO_BUFFER_DMAENGINE) += industrialio-buffer-dmaengine.o
+> +obj-$(CONFIG_IIO_BUFFER_HW_CONSUMER) += industrialio-hw-consumer.o
+>  obj-$(CONFIG_IIO_TRIGGERED_BUFFER) += industrialio-triggered-buffer.o
+>  obj-$(CONFIG_IIO_KFIFO_BUF) += kfifo_buf.o
+> diff --git a/drivers/iio/buffer/industrialio-hw-consumer.c b/drivers/iio/buffer/industrialio-hw-consumer.c
+> new file mode 100644
+> index 0000000..0253be1
+> --- /dev/null
+> +++ b/drivers/iio/buffer/industrialio-hw-consumer.c
+> @@ -0,0 +1,182 @@
+> +/*
+> + * Copyright 2017 Analog Devices Inc.
+> + *  Author: Lars-Peter Clausen <lars@metafoo.de>
+> + *
+> + * Licensed under the GPL-2 or later.
+> + */
+> +
+> +#include <linux/err.h>
+> +#include <linux/export.h>
+> +#include <linux/slab.h>
+> +#include <linux/module.h>
+> +
 > +#include <linux/iio/iio.h>
-
-Hmm. Not keen on this include as it just exposed the internals
-to IIO consumers which we really don't want to do.
-
-This is to allow access to the enum iio_chan_info_enum?
-Move it to types.h please.
-
->  
->  struct iio_dev;
->  struct iio_chan_spec;
-> @@ -216,6 +216,32 @@ int iio_read_channel_average_raw(struct iio_channel *chan, int *val);
->  int iio_read_channel_processed(struct iio_channel *chan, int *val);
->  
->  /**
-> + * iio_write_channel_attribute() - Write values to the device attribute.
-> + * @chan:	The channel being queried.
-> + * @val:	Value being written.
-> + * @val2:	Value being written.val2 use depends on attribute type.
-> + * @attribute:	info attribute to be read.
-> + *
-> + * Returns an error code or 0.
-> + */
-> +int iio_write_channel_attribute(struct iio_channel *chan, int val,
-> +				int val2, enum iio_chan_info_enum attribute);
+> +#include <linux/iio/consumer.h>
+> +#include <linux/iio/hw-consumer.h>
+> +#include <linux/iio/buffer_impl.h>
 > +
 > +/**
-> + * iio_read_channel_attribute() - Read values from the device attribute.
-> + * @chan:	The channel being queried.
-> + * @val:	Value being written.
-> + * @val2:	Value being written.Val2 use depends on attribute type.
-
-This pretty much highlights that we are still missing a function to allow us
-to query what form write data should be presented in...
-
-Here we have tightly coupled hardware so we know the answer, but in general
-we don't.
-
-Still can be a follow up patch when someone needs it.
-
-> + * @attribute:	info attribute to be written.
-> + *
-> + * Returns an error code if failed. Else returns a description of what is in val
-> + * and val2, such as IIO_VAL_INT_PLUS_MICRO telling us we have a value of val
-> + * + val2/1e6
+> + * struct iio_hw_consumer - IIO hw consumer block
+> + * @buffers: hardware buffers list head.
+> + * @channels: IIO provider channels.
 > + */
-> +int iio_read_channel_attribute(struct iio_channel *chan, int *val,
-> +			       int *val2, enum iio_chan_info_enum attribute);
+> +struct iio_hw_consumer {
+> +	struct list_head buffers;
+> +	struct iio_channel *channels;
+> +};
+> +
+> +struct hw_consumer_buffer {
+> +	struct list_head head;
+> +	struct iio_dev *indio_dev;
+> +	struct iio_buffer buffer;
+> +	long scan_mask[];
+> +};
+> +
+> +static struct hw_consumer_buffer *iio_buffer_to_hw_consumer_buffer(
+> +	struct iio_buffer *buffer)
+> +{
+> +	return container_of(buffer, struct hw_consumer_buffer, buffer);
+> +}
+> +
+> +static void iio_hw_buf_release(struct iio_buffer *buffer)
+> +{
+> +	struct hw_consumer_buffer *hw_buf =
+> +		iio_buffer_to_hw_consumer_buffer(buffer);
+> +	kfree(hw_buf);
+> +}
+> +
+> +static const struct iio_buffer_access_funcs iio_hw_buf_access = {
+> +	.release = &iio_hw_buf_release,
+> +	.modes = INDIO_BUFFER_HARDWARE,
+> +};
+> +
+> +static struct hw_consumer_buffer *iio_hw_consumer_get_buffer(
+> +	struct iio_hw_consumer *hwc, struct iio_dev *indio_dev)
+> +{
+> +	size_t mask_size = BITS_TO_LONGS(indio_dev->masklength) * sizeof(long);
+> +	struct hw_consumer_buffer *buf;
+> +
+> +	list_for_each_entry(buf, &hwc->buffers, head) {
+> +		if (buf->indio_dev == indio_dev)
+> +			return buf;
+> +	}
+> +
+> +	buf = kzalloc(sizeof(*buf) + mask_size, GFP_KERNEL);
+> +	if (!buf)
+> +		return NULL;
+> +
+> +	buf->buffer.access = &iio_hw_buf_access;
+> +	buf->indio_dev = indio_dev;
+> +	buf->buffer.scan_mask = buf->scan_mask;
+> +
+> +	iio_buffer_init(&buf->buffer);
+> +	list_add_tail(&buf->head, &hwc->buffers);
+> +
+> +	return buf;
+> +}
 > +
 > +/**
->   * iio_write_channel_raw() - write to a given channel
->   * @chan:		The channel being queried.
->   * @val:		Value being written.
+> + * iio_hw_consumer_alloc() - Allocate IIO hardware consumer
+> + * @dev: Pointer to consumer device.
+> + *
+> + * Returns a valid iio_hw_consumer on success or a ERR_PTR() on failure.
+> + */
+> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +	struct iio_hw_consumer *hwc;
+> +	struct iio_channel *chan;
+> +	int ret;
+> +
+> +	hwc = kzalloc(sizeof(*hwc), GFP_KERNEL);
+> +	if (!hwc)
+> +		return ERR_PTR(-ENOMEM);
+> +
+> +	INIT_LIST_HEAD(&hwc->buffers);
+> +
+> +	hwc->channels = iio_channel_get_all(dev);
+> +	if (IS_ERR(hwc->channels)) {
+> +		ret = PTR_ERR(hwc->channels);
+> +		goto err_free_hwc;
+> +	}
+> +
+> +	chan = &hwc->channels[0];
+> +	while (chan->indio_dev) {
+> +		buf = iio_hw_consumer_get_buffer(hwc, chan->indio_dev);
+> +		if (!buf) {
+> +			ret = -ENOMEM;
+> +			goto err_put_buffers;
+> +		}
+> +		set_bit(chan->channel->scan_index, buf->buffer.scan_mask);
+> +		chan++;
+> +	}
+> +
+> +	return hwc;
+> +
+> +err_put_buffers:
+> +	list_for_each_entry(buf, &hwc->buffers, head)
+> +		iio_buffer_put(&buf->buffer);
+> +	iio_channel_release_all(hwc->channels);
+> +err_free_hwc:
+> +	kfree(hwc);
+> +	return ERR_PTR(ret);
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_alloc);
+> +
+> +/**
+> + * iio_hw_consumer_free() - Free IIO hardware consumer
+> + * @hwc: hw consumer to free.
+> + */
+> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc)
+> +{
+> +	struct hw_consumer_buffer *buf, *n;
+> +
+> +	iio_channel_release_all(hwc->channels);
+> +	list_for_each_entry_safe(buf, n, &hwc->buffers, head)
+> +		iio_buffer_put(&buf->buffer);
+> +	kfree(hwc);
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_free);
+> +
+> +/**
+> + * iio_hw_consumer_enable() - Enable IIO hardware consumer
+> + * @hwc: iio_hw_consumer to enable.
+> + *
+> + * Returns 0 on success.
+> + */
+> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +	int ret;
+> +
+> +	list_for_each_entry(buf, &hwc->buffers, head) {
+> +		ret = iio_update_buffers(buf->indio_dev, &buf->buffer, NULL);
+> +		if (ret)
+> +			goto err_disable_buffers;
+> +	}
+> +
+> +	return 0;
+> +
+> +err_disable_buffers:
+> +	list_for_each_entry_continue_reverse(buf, &hwc->buffers, head)
+> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
+> +	return ret;
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_enable);
+> +
+> +/**
+> + * iio_hw_consumer_disable() - Disable IIO hardware consumer
+> + * @hwc: iio_hw_consumer to disable.
+> + */
+> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc)
+> +{
+> +	struct hw_consumer_buffer *buf;
+> +
+> +	list_for_each_entry(buf, &hwc->buffers, head)
+> +		iio_update_buffers(buf->indio_dev, NULL, &buf->buffer);
+> +}
+> +EXPORT_SYMBOL_GPL(iio_hw_consumer_disable);
+> +
+> +MODULE_AUTHOR("Lars-Peter Clausen <lars@metafoo.de>");
+> +MODULE_DESCRIPTION("Hardware consumer buffer the IIO framework");
+> +MODULE_LICENSE("GPL v2");
+> diff --git a/include/linux/iio/hw-consumer.h b/include/linux/iio/hw-consumer.h
+> new file mode 100644
+> index 0000000..f16791b
+> --- /dev/null
+> +++ b/include/linux/iio/hw-consumer.h
+> @@ -0,0 +1,20 @@
+> +/*
+> + * Industrial I/O in kernel hardware consumer interface
+> + *
+> + * Copyright 2017 Analog Devices Inc.
+> + *  Author: Lars-Peter Clausen <lars@metafoo.de>
+> + *
+> + * Licensed under the GPL-2 or later.
+> + */
+> +
+> +#ifndef LINUX_IIO_HW_CONSUMER_H
+> +#define LINUX_IIO_HW_CONSUMER_H
+> +
+> +struct iio_hw_consumer;
+> +
+> +struct iio_hw_consumer *iio_hw_consumer_alloc(struct device *dev);
+> +void iio_hw_consumer_free(struct iio_hw_consumer *hwc);
+> +int iio_hw_consumer_enable(struct iio_hw_consumer *hwc);
+> +void iio_hw_consumer_disable(struct iio_hw_consumer *hwc);
+> +
+> +#endif
