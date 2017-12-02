@@ -1,41 +1,44 @@
 From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Sat, 2 Dec 2017 23:06:56 +0300
-Subject: [PATCH 07/10] net: ethernet: smsc: Handle return value of
- platform_get_irq
-In-Reply-To: <1512242782-7134-8-git-send-email-arvind.yadav.cs@gmail.com>
+Date: Sat, 2 Dec 2017 23:08:47 +0300
+Subject: [PATCH 05/10] net: ethernet: i825xx: Fix platform_get_irq's error
+ checking
+In-Reply-To: <1512242782-7134-6-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1512242782-7134-8-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <94e0d184-2d35-b6f0-687a-8df8ae67e37a@cogentembedded.com>
+ <1512242782-7134-6-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <2b23637d-0d19-4a6a-4e67-e64968f85415@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hello.
+
 On 12/02/2017 10:26 PM, Arvind Yadav wrote:
 
-> platform_get_irq() can fail here and we must check its return value.
-> 
+> The platform_get_irq() function returns negative if an error occurs.
+> zero or positive number on success. platform_get_irq() error checking
+> for zero is not correct.
+
+    The why you consider returning 0 a sign of failure?
+
 > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
->   drivers/net/ethernet/smsc/smc911x.c | 5 +++++
->   1 file changed, 5 insertions(+)
+>   drivers/net/ethernet/i825xx/sni_82596.c | 3 ++-
+>   1 file changed, 2 insertions(+), 1 deletion(-)
 > 
-> diff --git a/drivers/net/ethernet/smsc/smc911x.c b/drivers/net/ethernet/smsc/smc911x.c
-> index 0515744..a1cf18c 100644
-> --- a/drivers/net/ethernet/smsc/smc911x.c
-> +++ b/drivers/net/ethernet/smsc/smc911x.c
-> @@ -2088,6 +2088,11 @@ static int smc911x_drv_probe(struct platform_device *pdev)
+> diff --git a/drivers/net/ethernet/i825xx/sni_82596.c b/drivers/net/ethernet/i825xx/sni_82596.c
+> index b2c04a7..a6d56f5 100644
+> --- a/drivers/net/ethernet/i825xx/sni_82596.c
+> +++ b/drivers/net/ethernet/i825xx/sni_82596.c
+> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct platform_device *dev)
+>   	netdevice->dev_addr[5] = readb(eth_addr + 0x06);
+>   	iounmap(eth_addr);
 >   
->   	ndev->dma = (unsigned char)-1;
->   	ndev->irq = platform_get_irq(pdev, 0);
-> +	if (ndev->irq <= 0) {
-> +		ret = ndev->irq ? ndev->irq : -ENODEV;
-
-    Same comments as the next patch...
-
-> +		goto release_both;
-> +	}
-> +
->   	lp = netdev_priv(ndev);
->   	lp->netdev = ndev;
->   #ifdef SMC_DYNAMIC_BUS_CONFIG
+> -	if (!netdevice->irq) {
+> +	if (netdevice->irq <= 0) {
+>   		printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
+>   			__FILE__, netdevice->base_addr);
+> +		retval = netdevice->irq ? netdevice->irq : -ENODEV;
+>   		goto probe_failed;
+>   	}
+>   
 
 MBR, Sergei
