@@ -1,114 +1,28 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 2 Dec 2017 11:15:14 +0000
-Subject: [PATCH 0/5] crypto: arm64 - disable NEON across scatterwalk API
- calls
-In-Reply-To: <CAKv+Gu-dG0Zc35NZZ85U36K2TXCpN+wJTYOyjkhxRjXbdiJTAQ@mail.gmail.com>
-References: <20171201211927.24653-1-ard.biesheuvel@linaro.org>
- <20171202090107.GT3326@worktop>
- <CAKv+Gu-dG0Zc35NZZ85U36K2TXCpN+wJTYOyjkhxRjXbdiJTAQ@mail.gmail.com>
-Message-ID: <CAKv+Gu_DMVYX8y-8JJwyxy2rF0+6ofSWyjwpvwuF042ievBb7w@mail.gmail.com>
+From: pali.rohar@gmail.com (Pali =?utf-8?B?Um9ow6Fy?=)
+Date: Sat, 2 Dec 2017 12:19:54 +0100
+Subject: linux-next on Nokia N900: hang on boot
+In-Reply-To: <20171202101456.GA1810@amd>
+References: <20171202101456.GA1810@amd>
+Message-ID: <20171202111954.4gg43xkb2wf5ebmn@pali>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 December 2017 at 09:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 2 December 2017 at 09:01, Peter Zijlstra <peterz@infradead.org> wrote:
->> On Fri, Dec 01, 2017 at 09:19:22PM +0000, Ard Biesheuvel wrote:
->>> Note that the remaining crypto drivers simply operate on fixed buffers, so
->>> while the RT crowd may still feel the need to disable those (and the ones
->>> below as well, perhaps), they don't call back into the crypto layer like
->>> the ones updated by this series, and so there's no room for improvement
->>> there AFAICT.
->>
->> Do these other drivers process all the blocks fed to them in one go
->> under a single NEON section, or do they do a single fixed block per
->> NEON invocation?
->
-> They consume the entire input in a single go, yes. But making it more
-> granular than that is going to hurt performance, unless we introduce
-> some kind of kernel_neon_yield(), which does a end+begin but only if
-> the task is being scheduled out.
->
-> For example, the SHA256 keeps 256 bytes of round constants in NEON
-> registers, and reloading those from memory for each 64 byte block of
-> input is going to be noticeable. The same applies to the AES code
-> (although the numbers are slightly different)
+On Saturday 02 December 2017 11:14:56 Pavel Machek wrote:
+> Hi!
+> 
+> next from 2017-12-01 was tested.
+> 
+> MMC is detected, but then I see wtl4030_bci: .. battery temperature
+> out of range, and machine halts. This is just before userspace would
+> be started.
+> 
+> 4.15-rc1 seems to work ok on the box.
+> 
+> Any ideas?
 
-Something like below should do the trick I think (apologies for the
-patch soup). I.e., check TIF_NEED_RESCHED at a point where only very
-few NEON registers are live, and preserve/restore the live registers
-across calls to kernel_neon_end + kernel_neon_begin. Would that work
-for RT?
+twl4030_bci is not available on Nokia N900, so we should not try to read
+its registers.
 
-
-diff --git a/arch/arm64/crypto/sha2-ce-core.S b/arch/arm64/crypto/sha2-ce-core.S
-index 679c6c002f4f..4f12038574f3 100644
---- a/arch/arm64/crypto/sha2-ce-core.S
-+++ b/arch/arm64/crypto/sha2-ce-core.S
-@@ -77,6 +77,10 @@
-  *   int blocks)
-  */
- ENTRY(sha2_ce_transform)
-+ stp x29, x30, [sp, #-48]!
-+ mov x29, sp
-+
-+restart:
-  /* load round constants */
-  adr x8, .Lsha2_rcon
-  ld1 { v0.4s- v3.4s}, [x8], #64
-@@ -129,14 +133,17 @@ CPU_LE( rev32 v19.16b, v19.16b )
-  add dgbv.4s, dgbv.4s, dg1v.4s
-
-  /* handled all input blocks? */
-- cbnz w2, 0b
-+ cbz w2, 2f
-+
-+ tif_need_resched 4f, 5
-+ b 0b
-
-  /*
-  * Final block: add padding and total bit count.
-  * Skip if the input size was not a round multiple of the block size,
-  * the padding is handled by the C code in that case.
-  */
-- cbz x4, 3f
-+2: cbz x4, 3f
-  ldr_l w4, sha256_ce_offsetof_count, x4
-  ldr x4, [x0, x4]
-  movi v17.2d, #0
-@@ -151,5 +158,15 @@ CPU_LE( rev32 v19.16b, v19.16b )
-
-  /* store new state */
- 3: st1 {dgav.4s, dgbv.4s}, [x0]
-+ ldp x29, x30, [sp], #48
-  ret
-+
-+4: st1 {dgav.4s, dgbv.4s}, [x0]
-+ stp x0, x1, [sp, #16]
-+ stp x2, x4, [sp, #32]
-+ bl kernel_neon_end
-+ bl kernel_neon_begin
-+ ldp x0, x1, [sp, #16]
-+ ldp x2, x4, [sp, #32]
-+ b restart
- ENDPROC(sha2_ce_transform)
-diff --git a/arch/arm64/include/asm/assembler.h
-b/arch/arm64/include/asm/assembler.h
-index aef72d886677..e3e7e15ebefd 100644
---- a/arch/arm64/include/asm/assembler.h
-+++ b/arch/arm64/include/asm/assembler.h
-@@ -512,4 +512,15 @@ alternative_else_nop_endif
- #endif
-  .endm
-
-+/*
-+ * Check TIF_NEED_RESCHED flag from assembler (for kernel mode NEON)
-+ */
-+ .macro tif_need_resched, lbl:req, regnum:req
-+#ifdef CONFIG_PREEMPT
-+ get_thread_info x\regnum
-+ ldr w\regnum, [x\regnum, #TSK_TI_FLAGS] // get flags
-+ tbnz w\regnum, #TIF_NEED_RESCHED, \lbl // needs rescheduling?
-+#endif
-+ .endm
-+
- #endif /* __ASM_ASSEMBLER_H */
+-- 
+Pali Roh?r
+pali.rohar at gmail.com
