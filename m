@@ -1,20 +1,30 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 2 Dec 2017 13:14:16 +0100
-Subject: [PATCH] pinctrl: stm32: Fix copyright
-In-Reply-To: <20171129142532.23468-1-benjamin.gaignard@st.com>
-References: <20171129142532.23468-1-benjamin.gaignard@st.com>
-Message-ID: <CACRpkdYo9io447Ds_XYNAviKOGHSg-df8nQJUZgubwHGOLZjqg@mail.gmail.com>
+From: dja@axtens.net (Daniel Axtens)
+Date: Sat,  2 Dec 2017 23:53:37 +1100
+Subject: [PATCH] [media] vcodec: mediatek: Add MODULE_LICENSE to
+ mtk_vcodec_util.c
+Message-ID: <20171202125337.31222-1-dja@axtens.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 3:25 PM, Benjamin Gaignard
-<benjamin.gaignard@linaro.org> wrote:
+This fixes the following warning in an allmodconfig build:
+WARNING: modpost: missing MODULE_LICENSE() in drivers/media/platform/mtk-vcodec/mtk-vcodec-common.o
 
-> Uniformize STMicroelectronics copyrights header
->
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+This matches the license at the top of the file.
 
-Patch applied.
+Signed-off-by: Daniel Axtens <dja@axtens.net>
+---
+ drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Yours,
-Linus Walleij
+diff --git a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
+index 46768c056193..572efbbce7a9 100644
+--- a/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
++++ b/drivers/media/platform/mtk-vcodec/mtk_vcodec_util.c
+@@ -115,3 +115,5 @@ struct mtk_vcodec_ctx *mtk_vcodec_get_curr_ctx(struct mtk_vcodec_dev *dev)
+ 	return ctx;
+ }
+ EXPORT_SYMBOL(mtk_vcodec_get_curr_ctx);
++
++MODULE_LICENSE("GPL v2");
+-- 
+2.11.0
