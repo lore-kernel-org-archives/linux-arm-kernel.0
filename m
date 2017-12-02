@@ -1,38 +1,154 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Sat, 2 Dec 2017 14:59:52 +0100
-Subject: [PATCH 0/5] crypto: arm64 - disable NEON across scatterwalk API
- calls
-In-Reply-To: <CAKv+Gu_DMVYX8y-8JJwyxy2rF0+6ofSWyjwpvwuF042ievBb7w@mail.gmail.com>
-References: <20171201211927.24653-1-ard.biesheuvel@linaro.org>
- <20171202090107.GT3326@worktop>
- <CAKv+Gu-dG0Zc35NZZ85U36K2TXCpN+wJTYOyjkhxRjXbdiJTAQ@mail.gmail.com>
- <CAKv+Gu_DMVYX8y-8JJwyxy2rF0+6ofSWyjwpvwuF042ievBb7w@mail.gmail.com>
-Message-ID: <20171202135952.GX3326@worktop>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sat, 2 Dec 2017 14:46:23 +0000
+Subject: [PATCH v6 04/13] IIO: inkern: API for manipulating channel
+ attributes
+In-Reply-To: <1512150020-20335-5-git-send-email-arnaud.pouliquen@st.com>
+References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
+ <1512150020-20335-5-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20171202144623.27438bb2@archlinux>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Dec 02, 2017 at 11:15:14AM +0000, Ard Biesheuvel wrote:
-> On 2 December 2017 at 09:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On Fri, 1 Dec 2017 18:40:11 +0100
+Arnaud Pouliquen <arnaud.pouliquen@st.com> wrote:
 
-> > They consume the entire input in a single go, yes. But making it more
-> > granular than that is going to hurt performance, unless we introduce
-> > some kind of kernel_neon_yield(), which does a end+begin but only if
-> > the task is being scheduled out.
-> >
-> > For example, the SHA256 keeps 256 bytes of round constants in NEON
-> > registers, and reloading those from memory for each 64 byte block of
-> > input is going to be noticeable. The same applies to the AES code
-> > (although the numbers are slightly different)
+> Extend the inkern API with functions for reading and writing
+> attribute of iio channels.
 > 
-> Something like below should do the trick I think (apologies for the
-> patch soup). I.e., check TIF_NEED_RESCHED at a point where only very
-> few NEON registers are live, and preserve/restore the live registers
-> across calls to kernel_neon_end + kernel_neon_begin. Would that work
-> for RT?
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
+> ---
+> V5 to V6 update:
+>  Replace include type.h with iio.h to fix build warning
 
-Probably yes. The important point is that preempt latencies (and thus by
-extension NEON regions) are bounded and preferably small.
+Except don't do that.   Consumers should not be able to see the internals
+of iio devices..  Hence instead, move the required enum to types.h please.
 
-Unbounded stuff (like depends on the amount of data fed) are a complete
-no-no for RT since then you cannot make predictions on how long things
-will take.
+One other passing comment inline (not one I'm expecting you to do anything
+about!).  Otherwise this is fine with me.
+
+Thanks,
+
+Jonathan
+
+> 
+>  drivers/iio/inkern.c         | 18 +++++++++++++-----
+>  include/linux/iio/consumer.h | 28 +++++++++++++++++++++++++++-
+>  2 files changed, 40 insertions(+), 6 deletions(-)
+> 
+> diff --git a/drivers/iio/inkern.c b/drivers/iio/inkern.c
+> index 069defc..f2e7824 100644
+> --- a/drivers/iio/inkern.c
+> +++ b/drivers/iio/inkern.c
+> @@ -664,9 +664,8 @@ int iio_convert_raw_to_processed(struct iio_channel *chan, int raw,
+>  }
+>  EXPORT_SYMBOL_GPL(iio_convert_raw_to_processed);
+>  
+> -static int iio_read_channel_attribute(struct iio_channel *chan,
+> -				      int *val, int *val2,
+> -				      enum iio_chan_info_enum attribute)
+> +int iio_read_channel_attribute(struct iio_channel *chan, int *val, int *val2,
+> +			       enum iio_chan_info_enum attribute)
+>  {
+>  	int ret;
+>  
+> @@ -682,6 +681,8 @@ static int iio_read_channel_attribute(struct iio_channel *chan,
+>  
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(iio_read_channel_attribute);
+> +
+>  
+>  int iio_read_channel_offset(struct iio_channel *chan, int *val, int *val2)
+>  {
+> @@ -850,7 +851,8 @@ static int iio_channel_write(struct iio_channel *chan, int val, int val2,
+>  						chan->channel, val, val2, info);
+>  }
+>  
+> -int iio_write_channel_raw(struct iio_channel *chan, int val)
+> +int iio_write_channel_attribute(struct iio_channel *chan, int val, int val2,
+> +				enum iio_chan_info_enum attribute)
+>  {
+>  	int ret;
+>  
+> @@ -860,12 +862,18 @@ int iio_write_channel_raw(struct iio_channel *chan, int val)
+>  		goto err_unlock;
+>  	}
+>  
+> -	ret = iio_channel_write(chan, val, 0, IIO_CHAN_INFO_RAW);
+> +	ret = iio_channel_write(chan, val, val2, attribute);
+>  err_unlock:
+>  	mutex_unlock(&chan->indio_dev->info_exist_lock);
+>  
+>  	return ret;
+>  }
+> +EXPORT_SYMBOL_GPL(iio_write_channel_attribute);
+> +
+> +int iio_write_channel_raw(struct iio_channel *chan, int val)
+> +{
+> +	return iio_write_channel_attribute(chan, val, 0, IIO_CHAN_INFO_RAW);
+> +}
+>  EXPORT_SYMBOL_GPL(iio_write_channel_raw);
+>  
+>  unsigned int iio_get_channel_ext_info_count(struct iio_channel *chan)
+> diff --git a/include/linux/iio/consumer.h b/include/linux/iio/consumer.h
+> index 5e347a9..70658b1 100644
+> --- a/include/linux/iio/consumer.h
+> +++ b/include/linux/iio/consumer.h
+> @@ -11,7 +11,7 @@
+>  #define _IIO_INKERN_CONSUMER_H_
+>  
+>  #include <linux/types.h>
+> -#include <linux/iio/types.h>
+> +#include <linux/iio/iio.h>
+
+Hmm. Not keen on this include as it just exposed the internals
+to IIO consumers which we really don't want to do.
+
+This is to allow access to the enum iio_chan_info_enum?
+Move it to types.h please.
+
+>  
+>  struct iio_dev;
+>  struct iio_chan_spec;
+> @@ -216,6 +216,32 @@ int iio_read_channel_average_raw(struct iio_channel *chan, int *val);
+>  int iio_read_channel_processed(struct iio_channel *chan, int *val);
+>  
+>  /**
+> + * iio_write_channel_attribute() - Write values to the device attribute.
+> + * @chan:	The channel being queried.
+> + * @val:	Value being written.
+> + * @val2:	Value being written.val2 use depends on attribute type.
+> + * @attribute:	info attribute to be read.
+> + *
+> + * Returns an error code or 0.
+> + */
+> +int iio_write_channel_attribute(struct iio_channel *chan, int val,
+> +				int val2, enum iio_chan_info_enum attribute);
+> +
+> +/**
+> + * iio_read_channel_attribute() - Read values from the device attribute.
+> + * @chan:	The channel being queried.
+> + * @val:	Value being written.
+> + * @val2:	Value being written.Val2 use depends on attribute type.
+
+This pretty much highlights that we are still missing a function to allow us
+to query what form write data should be presented in...
+
+Here we have tightly coupled hardware so we know the answer, but in general
+we don't.
+
+Still can be a follow up patch when someone needs it.
+
+> + * @attribute:	info attribute to be written.
+> + *
+> + * Returns an error code if failed. Else returns a description of what is in val
+> + * and val2, such as IIO_VAL_INT_PLUS_MICRO telling us we have a value of val
+> + * + val2/1e6
+> + */
+> +int iio_read_channel_attribute(struct iio_channel *chan, int *val,
+> +			       int *val2, enum iio_chan_info_enum attribute);
+> +
+> +/**
+>   * iio_write_channel_raw() - write to a given channel
+>   * @chan:		The channel being queried.
+>   * @val:		Value being written.
