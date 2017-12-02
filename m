@@ -1,44 +1,25 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 2 Dec 2017 16:55:48 +0100
-Subject: [PATCH v4 03/10] dt-bindings: gpio: gpio-axp209: add pinctrl
- features
-In-Reply-To: <7fdc42fd2d3572069292ebe1376bb446beb4d8a9.1512135804.git-series.quentin.schulz@free-electrons.com>
+Date: Sat, 2 Dec 2017 16:57:56 +0100
+Subject: [PATCH v4 08/10] mfd: axp20x: add pinctrl cell for AXP813
+In-Reply-To: <e0b4ce746c052b78f08dff54d0ad7ce7ebc611ab.1512135804.git-series.quentin.schulz@free-electrons.com>
 References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
- <7fdc42fd2d3572069292ebe1376bb446beb4d8a9.1512135804.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <CACRpkdZ4P2U1tk3G8JD5a8X+hNzigTHzJFBBumzf2Rgp8ojB_Q@mail.gmail.com>
+ <e0b4ce746c052b78f08dff54d0ad7ce7ebc611ab.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <CACRpkdZJ3gDqnLVW0NZMJiF7qRJSu-0Usys0tKfT-aep4bRxjg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Fri, Dec 1, 2017 at 2:44 PM, Quentin Schulz
 <quentin.schulz@free-electrons.com> wrote:
 
-> The X-Powers AXP209 has 3 GPIOs. GPIO0/1 can each act either as a GPIO,
-> an ADC or a LDO regulator. GPIO2 can only act as a GPIO.
->
-> This adds the pinctrl features to the driver so GPIO0/1 can be used as
-> ADC or LDO regulator.
+> As GPIO/pinctrl driver now supports AXP813, add a cell for it.
 >
 > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Rob Herring <robh@kernel.org>
+> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Please add a reference to the generic pinctrl bindings and state that you
-use them and how.
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-pinctrl/pinctrl-bindings.txt
-
-> +The GPIOs can be muxed to other functions and therefore, must be a subnode of
-> +axp_gpio.
-> +
-> +Example:
-> +
-> +&axp_gpio {
-> +       gpio0_adc: gpio0-adc {
-> +               pins = "GPIO0";
-> +               function = "adc";
-> +       };
-> +};
-
-So write explicitly that this driver employs the per-pin muxing pattern.
+It doesn't seem to have any dependencies so I guess Lee can simply
+apply this separately.
 
 Yours,
 Linus Walleij
