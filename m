@@ -1,36 +1,44 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 1 Dec 2017 17:02:26 +0100
-Subject: [PATCH 1/2] arm64: dts: a64-olinuxino: Enable RTL8723BS WiFi
-In-Reply-To: <1512119165-15290-1-git-send-email-jagan@amarulasolutions.com>
-References: <1512119165-15290-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <20171201160225.mosqfugg5tq763vg@flea.lan>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 2 Dec 2017 16:55:48 +0100
+Subject: [PATCH v4 03/10] dt-bindings: gpio: gpio-axp209: add pinctrl
+ features
+In-Reply-To: <7fdc42fd2d3572069292ebe1376bb446beb4d8a9.1512135804.git-series.quentin.schulz@free-electrons.com>
+References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
+ <7fdc42fd2d3572069292ebe1376bb446beb4d8a9.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <CACRpkdZ4P2U1tk3G8JD5a8X+hNzigTHzJFBBumzf2Rgp8ojB_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 02:36:04PM +0530, Jagan Teki wrote:
-> Enable RTL8723BS WiFi chip on a64-olinuxino board:
-> - WiFi SDIO interface is connected to MMC1
-> - WiFi REG_ON pin connected to gpio PL2: attach to mmc-pwrseq
-> - WiFi HOST_WAKE pin connected to gpio PL3
-> 
-> To make rtl8723bs chip to work build it as module to and run
-> CONFIG_RTL8723BS=m
+On Fri, Dec 1, 2017 at 2:44 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
 
-You can definitely use that driver without building it as a module.
+> The X-Powers AXP209 has 3 GPIOs. GPIO0/1 can each act either as a GPIO,
+> an ADC or a LDO regulator. GPIO2 can only act as a GPIO.
+>
+> This adds the pinctrl features to the driver so GPIO0/1 can be used as
+> ADC or LDO regulator.
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Once that part of the commit log has been removed,
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Please add a reference to the generic pinctrl bindings and state that you
+use them and how.
 
-Maxime
+pinctrl/pinctrl-bindings.txt
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171201/5fa06d0d/attachment.sig>
+> +The GPIOs can be muxed to other functions and therefore, must be a subnode of
+> +axp_gpio.
+> +
+> +Example:
+> +
+> +&axp_gpio {
+> +       gpio0_adc: gpio0-adc {
+> +               pins = "GPIO0";
+> +               function = "adc";
+> +       };
+> +};
+
+So write explicitly that this driver employs the per-pin muxing pattern.
+
+Yours,
+Linus Walleij
