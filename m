@@ -1,163 +1,208 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 2 Dec 2017 11:22:44 +0000
-Subject: [PATCH] iio: stm32: fix adc/trigger link error
-In-Reply-To: <da83af87-6c70-8b00-b602-342a9274f81f@st.com>
-References: <20170906125722.2522781-1-arnd@arndb.de>
- <50ec54e0-85f7-8c32-475c-9b27a4e6ebd3@st.com>
- <20170910170040.7eb1f768@archlinux>
- <6b5ff28a-859d-973c-2da5-60a8bf50c378@st.com>
- <20170925111604.00000c02@huawei.com>
- <20170925182617.18bf5ce8@archlinux>
- <da83af87-6c70-8b00-b602-342a9274f81f@st.com>
-Message-ID: <20171202112244.61eeedf6@archlinux>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat,  2 Dec 2017 12:23:09 +0100
+Subject: [PATCH] pinctrl: gemini: Support drive strength setting
+Message-ID: <20171202112309.5726-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 27 Nov 2017 10:09:47 +0100
-Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
+The Gemini pin controller can set drive strength for a few
+select groups of pins (not individually). Implement this
+for GMAC0 and 1 (ethernet ports), IDE and PCI.
 
-> On 09/25/2017 07:26 PM, Jonathan Cameron wrote:
-> > On Mon, 25 Sep 2017 11:16:04 +0100
-> > Jonathan Cameron <Jonathan.Cameron@huawei.com> wrote:
-> >   
-> >> On Mon, 25 Sep 2017 11:54:06 +0200
-> >> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> >>  
-> >>> On 09/10/2017 06:00 PM, Jonathan Cameron wrote:    
-> >>>> On Wed, 6 Sep 2017 18:16:33 +0200
-> >>>> Fabrice Gasnier <fabrice.gasnier@st.com> wrote:
-> >>>>       
-> >>>>> On 09/06/2017 02:56 PM, Arnd Bergmann wrote:      
-> >>>>>> The ADC driver can trigger on either the timer or the lptim
-> >>>>>> trigger, but it only uses a Kconfig 'select' statement
-> >>>>>> to ensure that the first of the two is present. When the lptim
-> >>>>>> trigger is enabled as a loadable module, and the adc driver
-> >>>>>> is built-in, we now get a link error:
-> >>>>>>
-> >>>>>> drivers/iio/adc/stm32-adc.o: In function `stm32_adc_get_trig_extsel':
-> >>>>>> stm32-adc.c:(.text+0x4e0): undefined reference to `is_stm32_lptim_trigger'
-> >>>>>>
-> >>>>>> We could use a second 'select' statement and always have both
-> >>>>>> trigger drivers enabled when the adc driver is, but it seems that
-> >>>>>> the lptimer trigger was intentionally left optional, so it seems
-> >>>>>> better to keep it that way.        
-> >>>>> Hi Arnd,
-> >>>>>
-> >>>>> This is correct, not all stm32 have this hardware.      
-> >>>>>>
-> >>>>>> This adds a hack to use 'IS_REACHABLE()' rather than 'IS_ENABLED()',
-> >>>>>> which avoids the link error, but instead leads to the lptimer trigger
-> >>>>>> not being used in the broken configuration. I've added a runtime
-> >>>>>> warning for this case to help users figure out what they did wrong
-> >>>>>> if this should ever be done by accident.
-> >>>>>>
-> >>>>>> Fixes: f0b638a7f6db ("iio: adc: stm32: add support for lptimer triggers")
-> >>>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>        
-> >>>>> Tested-by: Fabrice Gasnier <fabrice.gasnier@st.com>      
-> >>>>
-> >>>> This may take me a few weeks to pick up.  I don't want to
-> >>>> pull the mfd immutable branch in just to have this fix, so this will
-> >>>> get sorted after rc1 is out.
-> >>>>
-> >>>> As ever, poke me if it looks like I've forgotten about it.      
-> >>>
-> >>> Hi Jonathan,
-> >>>
-> >>> Di you apply this one?    
-> >>
-> >> I think I still need to rebase my branch. Greg took my fixes pull this morning
-> >> so I can fast forward that branch next time I'm on the right PC and then pick
-> >> this up.
-> >>
-> >> Thanks for the reminder.  
-> > 
-> > Applied to the fixes-togreg branch of iio.git.  
-> 
-> Hi Jonathan,
-> 
-> Sorry to raise this again. Maybe I missed something, but I can't find
-> this fix on recent tag (4.15-rc1). Do you know if this patch from Arnd
-> is on its way in ?
+Cc: devicetree at vger.kernel.org
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+The DT binding part is just using generic bindings, so should be
+pretty uncontroversial.
+---
+ .../bindings/pinctrl/cortina,gemini-pinctrl.txt    |  3 +
+ drivers/pinctrl/pinctrl-gemini.c                   | 81 ++++++++++++++++++++++
+ 2 files changed, 84 insertions(+)
 
-Hi Fabrice,
-
-You are absolutely correct to raise this (and please do so if similar
-seems to have happened in the future).
-
-I dropped this one somehow - now applied to my fixes-togreg branch of iio.git
-and definitely pushed out.
-
-Sorry about that.  Will hopefully get a pull request out in the next
-day or so.
-
-Thanks,
-
-Jonathan
-> 
-> Please kindly let me know.
-> BR,
-> Fabrice
-> > 
-> > Thanks,
-> > 
-> > Jonathan  
-> >>
-> >> Jonathan
-> >>  
-> >>>
-> >>> Thanks,
-> >>> Best Regards,
-> >>> Fabrice    
-> >>>> Sorry for the delay!
-> >>>>
-> >>>> Jonathan
-> >>>>       
-> >>>>>
-> >>>>> Many thanks for the fix,
-> >>>>> Best Regards,
-> >>>>> Fabrice      
-> >>>>>> ---
-> >>>>>>  include/linux/iio/timer/stm32-lptim-trigger.h | 5 ++++-
-> >>>>>>  1 file changed, 4 insertions(+), 1 deletion(-)
-> >>>>>>
-> >>>>>> diff --git a/include/linux/iio/timer/stm32-lptim-trigger.h b/include/linux/iio/timer/stm32-lptim-trigger.h
-> >>>>>> index 34d59bfdce2d..464458d20b16 100644
-> >>>>>> --- a/include/linux/iio/timer/stm32-lptim-trigger.h
-> >>>>>> +++ b/include/linux/iio/timer/stm32-lptim-trigger.h
-> >>>>>> @@ -16,11 +16,14 @@
-> >>>>>>  #define LPTIM2_OUT	"lptim2_out"
-> >>>>>>  #define LPTIM3_OUT	"lptim3_out"
-> >>>>>>  
-> >>>>>> -#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> >>>>>> +#if IS_REACHABLE(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> >>>>>>  bool is_stm32_lptim_trigger(struct iio_trigger *trig);
-> >>>>>>  #else
-> >>>>>>  static inline bool is_stm32_lptim_trigger(struct iio_trigger *trig)
-> >>>>>>  {
-> >>>>>> +#if IS_ENABLED(CONFIG_IIO_STM32_LPTIMER_TRIGGER)
-> >>>>>> +	pr_warn_once("stm32 lptim_trigger not linked in\n");
-> >>>>>> +#endif
-> >>>>>>  	return false;
-> >>>>>>  }
-> >>>>>>  #endif
-> >>>>>>         
-> >>>>> --
-> >>>>> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> >>>>> the body of a message to majordomo at vger.kernel.org
-> >>>>> More majordomo info at  http://vger.kernel.org/majordomo-info.html      
-> >>>>       
-> >>>
-> >>> _______________________________________________
-> >>> linux-arm-kernel mailing list
-> >>> linux-arm-kernel at lists.infradead.org
-> >>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel    
-> >>
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html  
-> >   
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+index d857b67fab72..4346ff2dd8e6 100644
+--- a/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
++++ b/Documentation/devicetree/bindings/pinctrl/cortina,gemini-pinctrl.txt
+@@ -17,6 +17,9 @@ and generic pin config nodes.
+ 
+ Supported configurations:
+ - skew-delay is supported on the Ethernet pins
++- drive-strength with 4, 8, 12 or 16 mA as argument is supported for
++  entire groups on the groups "idegrp", "gmii_gmac0_grp", "gmii_gmac1_grp"
++  and "pcigrp".
+ 
+ Example:
+ 
+diff --git a/drivers/pinctrl/pinctrl-gemini.c b/drivers/pinctrl/pinctrl-gemini.c
+index c11b8f14d841..56db4e77b220 100644
+--- a/drivers/pinctrl/pinctrl-gemini.c
++++ b/drivers/pinctrl/pinctrl-gemini.c
+@@ -67,6 +67,9 @@ struct gemini_pmx {
+  *	elements in .pins so we can iterate over that array
+  * @mask: bits to clear to enable this when doing pin muxing
+  * @value: bits to set to enable this when doing pin muxing
++ * @driving_mask: bitmask for the IO Pad driving register for this
++ *	group, if it supports altering the driving strength of
++ *	its lines.
+  */
+ struct gemini_pin_group {
+ 	const char *name;
+@@ -74,12 +77,14 @@ struct gemini_pin_group {
+ 	const unsigned int num_pins;
+ 	u32 mask;
+ 	u32 value;
++	u32 driving_mask;
+ };
+ 
+ /* Some straight-forward control registers */
+ #define GLOBAL_WORD_ID		0x00
+ #define GLOBAL_STATUS		0x04
+ #define GLOBAL_STATUS_FLPIN	BIT(20)
++#define GLOBAL_IODRIVE		0x10
+ #define GLOBAL_GMAC_CTRL_SKEW	0x1c
+ #define GLOBAL_GMAC0_DATA_SKEW	0x20
+ #define GLOBAL_GMAC1_DATA_SKEW	0x24
+@@ -738,6 +743,7 @@ static const struct gemini_pin_group gemini_3512_pin_groups[] = {
+ 		/* Conflict with all flash usage */
+ 		.value = IDE_PADS_ENABLE | NAND_PADS_DISABLE |
+ 			PFLASH_PADS_DISABLE | SFLASH_PADS_DISABLE,
++		.driving_mask = GENMASK(21, 20),
+ 	},
+ 	{
+ 		.name = "satagrp",
+@@ -753,6 +759,7 @@ static const struct gemini_pin_group gemini_3512_pin_groups[] = {
+ 		.name = "gmii_gmac0_grp",
+ 		.pins = gmii_gmac0_3512_pins,
+ 		.num_pins = ARRAY_SIZE(gmii_gmac0_3512_pins),
++		.driving_mask = GENMASK(17, 16),
+ 	},
+ 	{
+ 		.name = "gmii_gmac1_grp",
+@@ -760,6 +767,7 @@ static const struct gemini_pin_group gemini_3512_pin_groups[] = {
+ 		.num_pins = ARRAY_SIZE(gmii_gmac1_3512_pins),
+ 		/* Bring out RGMII on the GMAC1 pins */
+ 		.value = GEMINI_GMAC_IOSEL_GMAC0_GMAC1_RGMII,
++		.driving_mask = GENMASK(19, 18),
+ 	},
+ 	{
+ 		.name = "pcigrp",
+@@ -767,6 +775,7 @@ static const struct gemini_pin_group gemini_3512_pin_groups[] = {
+ 		.num_pins = ARRAY_SIZE(pci_3512_pins),
+ 		/* Conflict only with GPIO2 */
+ 		.value = PCI_PADS_ENABLE | PCI_CLK_PAD_ENABLE,
++		.driving_mask = GENMASK(23, 22),
+ 	},
+ 	{
+ 		.name = "lpcgrp",
+@@ -1671,6 +1680,7 @@ static const struct gemini_pin_group gemini_3516_pin_groups[] = {
+ 		/* Conflict with all flash usage */
+ 		.value = IDE_PADS_ENABLE | NAND_PADS_DISABLE |
+ 			PFLASH_PADS_DISABLE | SFLASH_PADS_DISABLE,
++		.driving_mask = GENMASK(21, 20),
+ 	},
+ 	{
+ 		.name = "satagrp",
+@@ -1686,6 +1696,7 @@ static const struct gemini_pin_group gemini_3516_pin_groups[] = {
+ 		.name = "gmii_gmac0_grp",
+ 		.pins = gmii_gmac0_3516_pins,
+ 		.num_pins = ARRAY_SIZE(gmii_gmac0_3516_pins),
++		.driving_mask = GENMASK(17, 16),
+ 	},
+ 	{
+ 		.name = "gmii_gmac1_grp",
+@@ -1693,6 +1704,7 @@ static const struct gemini_pin_group gemini_3516_pin_groups[] = {
+ 		.num_pins = ARRAY_SIZE(gmii_gmac1_3516_pins),
+ 		/* Bring out RGMII on the GMAC1 pins */
+ 		.value = GEMINI_GMAC_IOSEL_GMAC0_GMAC1_RGMII,
++		.driving_mask = GENMASK(19, 18),
+ 	},
+ 	{
+ 		.name = "pcigrp",
+@@ -1700,6 +1712,7 @@ static const struct gemini_pin_group gemini_3516_pin_groups[] = {
+ 		.num_pins = ARRAY_SIZE(pci_3516_pins),
+ 		/* Conflict only with GPIO2 */
+ 		.value = PCI_PADS_ENABLE | PCI_CLK_PAD_ENABLE,
++		.driving_mask = GENMASK(23, 22),
+ 	},
+ 	{
+ 		.name = "lpcgrp",
+@@ -2393,9 +2406,77 @@ static int gemini_pinconf_set(struct pinctrl_dev *pctldev, unsigned int pin,
+ 	return ret;
+ }
+ 
++static int gemini_pinconf_group_set(struct pinctrl_dev *pctldev,
++				    unsigned selector,
++				    unsigned long *configs,
++				    unsigned num_configs)
++{
++	struct gemini_pmx *pmx = pinctrl_dev_get_drvdata(pctldev);
++	const struct gemini_pin_group *grp = NULL;
++	enum pin_config_param param;
++	u32 arg;
++	u32 val;
++	int i;
++
++	if (pmx->is_3512)
++		grp = &gemini_3512_pin_groups[selector];
++	if (pmx->is_3516)
++		grp = &gemini_3516_pin_groups[selector];
++
++	/* First figure out if this group supports configs */
++	if (!grp->driving_mask) {
++		dev_err(pmx->dev, "pin config group \"%s\" does "
++			"not support drive strength setting\n",
++			grp->name);
++		return -EINVAL;
++	}
++
++	for (i = 0; i < num_configs; i++) {
++		param = pinconf_to_config_param(configs[i]);
++		arg = pinconf_to_config_argument(configs[i]);
++
++		switch (param) {
++		case PIN_CONFIG_DRIVE_STRENGTH:
++			switch (arg) {
++			case 4:
++				val = 0;
++				break;
++			case 8:
++				val = 1;
++				break;
++			case 12:
++				val = 2;
++				break;
++			case 16:
++				val = 3;
++				break;
++			default:
++				dev_err(pmx->dev,
++					"invalid drive strength %d mA\n",
++					arg);
++				return -ENOTSUPP;
++			}
++			val <<= (ffs(grp->driving_mask) - 1);
++			regmap_update_bits(pmx->map, GLOBAL_IODRIVE,
++					   grp->driving_mask,
++					   val);
++			dev_info(pmx->dev,
++				 "set group %s to %d mA drive strength mask %08x val %08x\n",
++				 grp->name, arg, grp->driving_mask, val);
++			break;
++		default:
++			dev_err(pmx->dev, "invalid config param %04x\n", param);
++			return -ENOTSUPP;
++		}
++	}
++
++	return 0;
++}
++
+ static const struct pinconf_ops gemini_pinconf_ops = {
+ 	.pin_config_get = gemini_pinconf_get,
+ 	.pin_config_set = gemini_pinconf_set,
++	.pin_config_group_set = gemini_pinconf_group_set,
+ 	.is_generic = true,
+ };
+ 
+-- 
+2.14.3
