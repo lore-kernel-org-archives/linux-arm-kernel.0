@@ -1,122 +1,114 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat,  2 Dec 2017 12:06:39 +0100
-Subject: [PATCH net-next 1/2 v6] net: ethernet: Add DT bindings for the Gemini
- ethernet
-Message-ID: <20171202110640.5284-1-linus.walleij@linaro.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 2 Dec 2017 11:15:14 +0000
+Subject: [PATCH 0/5] crypto: arm64 - disable NEON across scatterwalk API
+ calls
+In-Reply-To: <CAKv+Gu-dG0Zc35NZZ85U36K2TXCpN+wJTYOyjkhxRjXbdiJTAQ@mail.gmail.com>
+References: <20171201211927.24653-1-ard.biesheuvel@linaro.org>
+ <20171202090107.GT3326@worktop>
+ <CAKv+Gu-dG0Zc35NZZ85U36K2TXCpN+wJTYOyjkhxRjXbdiJTAQ@mail.gmail.com>
+Message-ID: <CAKv+Gu_DMVYX8y-8JJwyxy2rF0+6ofSWyjwpvwuF042ievBb7w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the device tree bindings for the Gemini ethernet
-controller. It is pretty straight-forward, using standard
-bindings and modelling the two child ports as child devices
-under the parent ethernet controller device.
+On 2 December 2017 at 09:11, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 2 December 2017 at 09:01, Peter Zijlstra <peterz@infradead.org> wrote:
+>> On Fri, Dec 01, 2017 at 09:19:22PM +0000, Ard Biesheuvel wrote:
+>>> Note that the remaining crypto drivers simply operate on fixed buffers, so
+>>> while the RT crowd may still feel the need to disable those (and the ones
+>>> below as well, perhaps), they don't call back into the crypto layer like
+>>> the ones updated by this series, and so there's no room for improvement
+>>> there AFAICT.
+>>
+>> Do these other drivers process all the blocks fed to them in one go
+>> under a single NEON section, or do they do a single fixed block per
+>> NEON invocation?
+>
+> They consume the entire input in a single go, yes. But making it more
+> granular than that is going to hurt performance, unless we introduce
+> some kind of kernel_neon_yield(), which does a end+begin but only if
+> the task is being scheduled out.
+>
+> For example, the SHA256 keeps 256 bytes of round constants in NEON
+> registers, and reloading those from memory for each 64 byte block of
+> input is going to be noticeable. The same applies to the AES code
+> (although the numbers are slightly different)
 
-Cc: devicetree at vger.kernel.org
-Cc: Tobias Waldvogel <tobias.waldvogel@gmail.com>
-Cc: Micha? Miros?aw <mirq-linux@rere.qmqm.pl>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- .../bindings/net/cortina,gemini-ethernet.txt       | 92 ++++++++++++++++++++++
- 1 file changed, 92 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt
+Something like below should do the trick I think (apologies for the
+patch soup). I.e., check TIF_NEED_RESCHED at a point where only very
+few NEON registers are live, and preserve/restore the live registers
+across calls to kernel_neon_end + kernel_neon_begin. Would that work
+for RT?
 
-diff --git a/Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt b/Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt
-new file mode 100644
-index 000000000000..35fa3abd1c73
---- /dev/null
-+++ b/Documentation/devicetree/bindings/net/cortina,gemini-ethernet.txt
-@@ -0,0 +1,92 @@
-+Cortina Systems Gemini Ethernet Controller
-+==========================================
+
+diff --git a/arch/arm64/crypto/sha2-ce-core.S b/arch/arm64/crypto/sha2-ce-core.S
+index 679c6c002f4f..4f12038574f3 100644
+--- a/arch/arm64/crypto/sha2-ce-core.S
++++ b/arch/arm64/crypto/sha2-ce-core.S
+@@ -77,6 +77,10 @@
+  *   int blocks)
+  */
+ ENTRY(sha2_ce_transform)
++ stp x29, x30, [sp, #-48]!
++ mov x29, sp
 +
-+This ethernet controller is found in the Gemini SoC family:
-+StorLink SL3512 and SL3516, also known as Cortina Systems
-+CS3512 and CS3516.
++restart:
+  /* load round constants */
+  adr x8, .Lsha2_rcon
+  ld1 { v0.4s- v3.4s}, [x8], #64
+@@ -129,14 +133,17 @@ CPU_LE( rev32 v19.16b, v19.16b )
+  add dgbv.4s, dgbv.4s, dg1v.4s
+
+  /* handled all input blocks? */
+- cbnz w2, 0b
++ cbz w2, 2f
 +
-+Required properties:
-+- compatible: must be "cortina,gemini-ethernet"
-+- reg: must contain the global registers and the V-bit and A-bit
-+  memory areas, in total three register sets.
-+- syscon: a phandle to the system controller
-+- #address-cells: must be specified, must be <1>
-+- #size-cells: must be specified, must be <1>
-+- ranges: should be state like this giving a 1:1 address translation
-+  for the subnodes
++ tif_need_resched 4f, 5
++ b 0b
+
+  /*
+  * Final block: add padding and total bit count.
+  * Skip if the input size was not a round multiple of the block size,
+  * the padding is handled by the C code in that case.
+  */
+- cbz x4, 3f
++2: cbz x4, 3f
+  ldr_l w4, sha256_ce_offsetof_count, x4
+  ldr x4, [x0, x4]
+  movi v17.2d, #0
+@@ -151,5 +158,15 @@ CPU_LE( rev32 v19.16b, v19.16b )
+
+  /* store new state */
+ 3: st1 {dgav.4s, dgbv.4s}, [x0]
++ ldp x29, x30, [sp], #48
+  ret
 +
-+The subnodes represents the two ethernet ports in this device.
-+They are not independent of each other since they share resources
-+in the parent node, and are thus children.
++4: st1 {dgav.4s, dgbv.4s}, [x0]
++ stp x0, x1, [sp, #16]
++ stp x2, x4, [sp, #32]
++ bl kernel_neon_end
++ bl kernel_neon_begin
++ ldp x0, x1, [sp, #16]
++ ldp x2, x4, [sp, #32]
++ b restart
+ ENDPROC(sha2_ce_transform)
+diff --git a/arch/arm64/include/asm/assembler.h
+b/arch/arm64/include/asm/assembler.h
+index aef72d886677..e3e7e15ebefd 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -512,4 +512,15 @@ alternative_else_nop_endif
+ #endif
+  .endm
+
++/*
++ * Check TIF_NEED_RESCHED flag from assembler (for kernel mode NEON)
++ */
++ .macro tif_need_resched, lbl:req, regnum:req
++#ifdef CONFIG_PREEMPT
++ get_thread_info x\regnum
++ ldr w\regnum, [x\regnum, #TSK_TI_FLAGS] // get flags
++ tbnz w\regnum, #TIF_NEED_RESCHED, \lbl // needs rescheduling?
++#endif
++ .endm
 +
-+Required subnodes:
-+- port0: contains the resources for ethernet port 0
-+- port1: contains the resources for ethernet port 1
-+
-+Required subnode properties:
-+- compatible: must be "cortina,gemini-ethernet-port"
-+- reg: must contain two register areas: the DMA/TOE memory and
-+  the GMAC memory area of the port
-+- interrupts: should contain the interrupt line of the port.
-+  this is nominally a level interrupt active high.
-+- resets: this must provide an SoC-integrated reset line for
-+  the port.
-+- clocks: this should contain a handle to the PCLK clock for
-+  clocking the silicon in this port
-+- clock-names: must be "PCLK"
-+
-+Optional subnode properties:
-+- phy-mode: see ethernet.txt
-+- phy-handle: see ethernet.txt
-+
-+Example:
-+
-+mdio-bus {
-+	(...)
-+	phy0: ethernet-phy at 1 {
-+		reg = <1>;
-+		device_type = "ethernet-phy";
-+	};
-+	phy1: ethernet-phy at 3 {
-+		reg = <3>;
-+		device_type = "ethernet-phy";
-+	};
-+};
-+
-+
-+ethernet at 60000000 {
-+	compatible = "cortina,gemini-ethernet";
-+	reg = <0x60000000 0x4000>, /* Global registers, queue */
-+	      <0x60004000 0x2000>, /* V-bit */
-+	      <0x60006000 0x2000>; /* A-bit */
-+	syscon = <&syscon>;
-+	#address-cells = <1>;
-+	#size-cells = <1>;
-+	ranges;
-+
-+	gmac0: port0 {
-+		compatible = "cortina,gemini-ethernet-port";
-+		reg = <0x60008000 0x2000>, /* Port 0 DMA/TOE */
-+		      <0x6000a000 0x2000>; /* Port 0 GMAC */
-+		interrupt-parent = <&intcon>;
-+		interrupts = <1 IRQ_TYPE_LEVEL_HIGH>;
-+		resets = <&syscon GEMINI_RESET_GMAC0>;
-+		clocks = <&syscon GEMINI_CLK_GATE_GMAC0>;
-+		clock-names = "PCLK";
-+		phy-mode = "rgmii";
-+		phy-handle = <&phy0>;
-+	};
-+
-+	gmac1: port1 {
-+		compatible = "cortina,gemini-ethernet-port";
-+		reg = <0x6000c000 0x2000>, /* Port 1 DMA/TOE */
-+		      <0x6000e000 0x2000>; /* Port 1 GMAC */
-+		interrupt-parent = <&intcon>;
-+		interrupts = <2 IRQ_TYPE_LEVEL_HIGH>;
-+		resets = <&syscon GEMINI_RESET_GMAC1>;
-+		clocks = <&syscon GEMINI_CLK_GATE_GMAC1>;
-+		clock-names = "PCLK";
-+		phy-mode = "rgmii";
-+		phy-handle = <&phy1>;
-+	};
-+};
--- 
-2.14.3
+ #endif /* __ASM_ASSEMBLER_H */
