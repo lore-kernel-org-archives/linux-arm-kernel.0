@@ -1,10 +1,11 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 2 Dec 2017 16:25:36 +0100
-Subject: [PATCH v2 4/4] ARM: dts: alt: Convert to named i2c-gpio bindings
-In-Reply-To: <1512046646-15253-5-git-send-email-geert+renesas@glider.be>
+Date: Sat, 2 Dec 2017 16:26:19 +0100
+Subject: [PATCH v2 1/4] ARM: dts: armadillo800eva: Convert to named
+ i2c-gpio bindings
+In-Reply-To: <1512046646-15253-2-git-send-email-geert+renesas@glider.be>
 References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
- <1512046646-15253-5-git-send-email-geert+renesas@glider.be>
-Message-ID: <CACRpkdbRnjcE==krPo5U3wA9hwA0y_umB=-j9zn_wuJvoON3GQ@mail.gmail.com>
+ <1512046646-15253-2-git-send-email-geert+renesas@glider.be>
+Message-ID: <CACRpkdbY=zAw-8LrqmMcGGf7cHmAaC=YvpovxqTTPwcsXPUYAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,6 +19,11 @@ On Thu, Nov 30, 2017 at 1:57 PM, Geert Uytterhoeven
 >
 > Switch to the new bindings, and add the missing GPIO_OPEN_DRAIN I/O
 > flags, which were implicitly assumed before.
+>
+> The latter gets rid of the message:
+>
+>     gpio-208 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
+>     gpio-91 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
 >
 > Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
