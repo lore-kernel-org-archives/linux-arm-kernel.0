@@ -1,52 +1,53 @@
-From: arvind.yadav.cs@gmail.com (arvindY)
-Date: Sun, 3 Dec 2017 01:52:54 +0530
-Subject: [PATCH 05/10] net: ethernet: i825xx: Fix platform_get_irq's error
- checking
-In-Reply-To: <2b23637d-0d19-4a6a-4e67-e64968f85415@cogentembedded.com>
-References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1512242782-7134-6-git-send-email-arvind.yadav.cs@gmail.com>
- <2b23637d-0d19-4a6a-4e67-e64968f85415@cogentembedded.com>
-Message-ID: <5A230B9E.1080006@gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Sat,  2 Dec 2017 18:26:04 -0200
+Subject: [PATCH 1/2] ARM: dts: imx51-babbage: Pass the USB PHY regulator
+Message-ID: <1512246365-3657-1-git-send-email-festevam@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sergei,
+From: Fabio Estevam <fabio.estevam@nxp.com>
 
-On Sunday 03 December 2017 01:38 AM, Sergei Shtylyov wrote:
-> Hello.
->
-> On 12/02/2017 10:26 PM, Arvind Yadav wrote:
->
->> The platform_get_irq() function returns negative if an error occurs.
->> zero or positive number on success. platform_get_irq() error checking
->> for zero is not correct.
->
->    The why you consider returning 0 a sign of failure?
-Here, Returning 0 is a problem. Because IRQ0 is always a problem.
-This function is for getting an IRQ for a device. So we should check for
-0 also.
->
->> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->> ---
->>   drivers/net/ethernet/i825xx/sni_82596.c | 3 ++-
->>   1 file changed, 2 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/net/ethernet/i825xx/sni_82596.c 
->> b/drivers/net/ethernet/i825xx/sni_82596.c
->> index b2c04a7..a6d56f5 100644
->> --- a/drivers/net/ethernet/i825xx/sni_82596.c
->> +++ b/drivers/net/ethernet/i825xx/sni_82596.c
->> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct 
->> platform_device *dev)
->>       netdevice->dev_addr[5] = readb(eth_addr + 0x06);
->>       iounmap(eth_addr);
->>   -    if (!netdevice->irq) {
->> +    if (netdevice->irq <= 0) {
->>           printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
->>               __FILE__, netdevice->base_addr);
->> +        retval = netdevice->irq ? netdevice->irq : -ENODEV;
->>           goto probe_failed;
->>       }
->
-> MBR, Sergei
-~arvind
+The USB PHYs are supplied via MC13892 VUSB regulator rail,
+so properly describe this in the device tree.
+
+Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+---
+ arch/arm/boot/dts/imx51-babbage.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
+
+diff --git a/arch/arm/boot/dts/imx51-babbage.dts b/arch/arm/boot/dts/imx51-babbage.dts
+index c4aa53c..c432de7 100644
+--- a/arch/arm/boot/dts/imx51-babbage.dts
++++ b/arch/arm/boot/dts/imx51-babbage.dts
+@@ -165,6 +165,7 @@
+ 			clocks = <&clks IMX5_CLK_DUMMY>;
+ 			clock-names = "main_clk";
+ 			reset-gpios = <&gpio2 5 GPIO_ACTIVE_LOW>;
++			vcc-supply = <&vusb_reg>;
+ 			#phy-cells = <0>;
+ 		};
+ 	};
+@@ -241,6 +242,10 @@
+ 				regulator-max-microvolt = <3150000>;
+ 			};
+ 
++			vusb_reg: vusb {
++				regulator-boot-on;
++			};
++
+ 			vusb2_reg: vusb2 {
+ 				regulator-min-microvolt = <2400000>;
+ 				regulator-max-microvolt = <2775000>;
+@@ -414,6 +419,10 @@
+ 	status = "okay";
+ };
+ 
++&usbphy0 {
++	vcc-supply = <&vusb_reg>;
++};
++
+ &usbotg {
+ 	dr_mode = "otg";
+ 	disable-over-current;
+-- 
+2.7.4
