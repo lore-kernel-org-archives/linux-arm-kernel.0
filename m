@@ -1,111 +1,20 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 2 Dec 2017 11:38:32 +0000
-Subject: [PATCH v4 0/4] fix the clock setting for SAR ADC
-In-Reply-To: <15745fd0-1af9-c7c0-8769-063f218a3d28@amlogic.com>
-References: <20171107140942.29243-1-yixun.lan@amlogic.com>
- <CAFBinCB=2pb9dZkpSqdVAiumkSCzgaW0oejftjZNP7aYbiQJuw@mail.gmail.com>
- <20171111003737.000038f0@huawei.com>
- <15745fd0-1af9-c7c0-8769-063f218a3d28@amlogic.com>
-Message-ID: <20171202113832.6b3eda46@archlinux>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 2 Dec 2017 13:14:16 +0100
+Subject: [PATCH] pinctrl: stm32: Fix copyright
+In-Reply-To: <20171129142532.23468-1-benjamin.gaignard@st.com>
+References: <20171129142532.23468-1-benjamin.gaignard@st.com>
+Message-ID: <CACRpkdYo9io447Ds_XYNAviKOGHSg-df8nQJUZgubwHGOLZjqg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 28 Nov 2017 21:11:29 +0800
-Yixun Lan <yixun.lan@amlogic.com> wrote:
+On Wed, Nov 29, 2017 at 3:25 PM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
 
-> On 11/11/17 08:37, Jonathan Cameron wrote:
-> > On Tue, 7 Nov 2017 22:36:00 +0100
-> > Martin Blumenstingl <martin.blumenstingl@googlemail.com> wrote:
-> >   
-> >> Hi Yixun,
-> >>
-> >> On Tue, Nov 7, 2017 at 3:09 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:  
-> >>> patch [1/4]:
-> >>>   Fix wrong SARADC/SANA clock gate bit in Meson-GXBB/GXL,
-> >>> the published datasheets[4] also has wrong description about this.
-> >>>   This patch should be explicitly merged *before* other patches.
-> >>>
-> >>> patch [2-4/4]:
-> >>>   Drop the "sana" clock from SAR ADC module,    
-> >> I agree with Jerome that patch 2/4 should be applied last.  
-> > 
-> > Let me know when I should take this.
-> > 
-> > Thanks,
-> > 
-> > Jonathan
-> >   
-> >> when I wrote the driver I couldn't get it to work on my GXBB board
-> >> (which unfortunately has died since then) because the clocks were
-> >> disabled (they weren't enabled by the bootloader). people who are
-> >> using an old .dtb would get the same problem again until the clock
-> >> driver is merged
-> >>  
-> >>>   From the hardware perspective, the SAR ADC module doesn't
-> >>> require "sana" clock to wrok. This should apply to all SoC,
-> >>> including meson6,8, GXBB, GXL..    
-> >> thank you for clarifying this!
-> >>  
-> >>> Note: the whole patchset series has been tested at GXL-P212 board,
-> >>> we haven't got any meson6,8 board to test, so I would appreciate
-> >>> if someone (Martin?) could help to confirm it works there.    
-> >> I can test this on a Meson8b and a Meson8m2 board on the weekend -
-> >> I'll let you know about the results
-> >>
-> >>
-> >> Regards
-> >> Martin
-> >> --
-> >> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
-> >> the body of a message to majordomo at vger.kernel.org
-> >> More majordomo info at  http://vger.kernel.org/majordomo-info.html  
-> > 
-> > 
-> > _______________________________________________
-> > linux-amlogic mailing list
-> > linux-amlogic at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-amlogic
-> > 
-> > .
-> >   
-> 
-> Hi Jonathan Cameron & Kevin Hilman:
-> 
->  since the clk part patch has been applied[1], can we proceed with others?
-> 
-> to Jonathan:
-> I think the iio part(patch [2/4]) should be merged via your iio tree?
-> see [2]
-I've applied to the togreg branch of iio.git and pushed out as testing
-for the autobuilders to play with it.  It also makes sense for me to
-take the dts binding update as it goes with the driver change. 
+> Uniformize STMicroelectronics copyrights header
+>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 
-Hence I've just left patch 4 for Kevin.  Doesn't matter if this crosses
-with Kevin also taking patch 3 though as it'll get sorted out automatically
-by git later anyway.
+Patch applied.
 
-Thanks
-
-Jonathan
-> 
-> to Kevin:
-> could you take the DTS part? see [3], and the patch [4/4] has a rework
-> version, see [4], to separate dt64 vs dt32 device tree.
-> 
-> 
-> [1]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005472.html
-> 
-> [2]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005264.html
-> 
-> [3]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005265.html
-> 
-> [4]
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005304.html
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005305.html
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005306.html
-> 
-> Yixun
-> 
+Yours,
+Linus Walleij
