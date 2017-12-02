@@ -1,10 +1,10 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Sat, 2 Dec 2017 16:25:00 +0100
-Subject: [PATCH v2 2/4] ARM: dts: lager: Convert to named i2c-gpio bindings
-In-Reply-To: <1512046646-15253-3-git-send-email-geert+renesas@glider.be>
+Date: Sat, 2 Dec 2017 16:25:36 +0100
+Subject: [PATCH v2 4/4] ARM: dts: alt: Convert to named i2c-gpio bindings
+In-Reply-To: <1512046646-15253-5-git-send-email-geert+renesas@glider.be>
 References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
- <1512046646-15253-3-git-send-email-geert+renesas@glider.be>
-Message-ID: <CACRpkdb_g3UHvOA=3LcTiNWrDE44US=3Z_KEXMD=_UXba48A1g@mail.gmail.com>
+ <1512046646-15253-5-git-send-email-geert+renesas@glider.be>
+Message-ID: <CACRpkdbRnjcE==krPo5U3wA9hwA0y_umB=-j9zn_wuJvoON3GQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
