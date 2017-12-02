@@ -1,41 +1,35 @@
 From: arvind.yadav.cs@gmail.com (Arvind Yadav)
-Date: Sun,  3 Dec 2017 00:56:21 +0530
-Subject: [PATCH 09/10] net: ethernet: korina: Handle return value of
+Date: Sun,  3 Dec 2017 00:56:22 +0530
+Subject: [PATCH 10/10] net: ethernet: cpmac: Handle return value of
  platform_get_irq_byname
 In-Reply-To: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
 References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <1512242782-7134-10-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <1512242782-7134-11-git-send-email-arvind.yadav.cs@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 platform_get_irq_byname() can fail here and we must check its return
-value.
+value
 
 Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 ---
- drivers/net/ethernet/korina.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ drivers/net/ethernet/ti/cpmac.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/net/ethernet/korina.c b/drivers/net/ethernet/korina.c
-index ae195f8..e778504 100644
---- a/drivers/net/ethernet/korina.c
-+++ b/drivers/net/ethernet/korina.c
-@@ -1039,7 +1039,16 @@ static int korina_probe(struct platform_device *pdev)
- 	memcpy(dev->dev_addr, bif->mac, ETH_ALEN);
+diff --git a/drivers/net/ethernet/ti/cpmac.c b/drivers/net/ethernet/ti/cpmac.c
+index 9b8a30b..f3acfc0 100644
+--- a/drivers/net/ethernet/ti/cpmac.c
++++ b/drivers/net/ethernet/ti/cpmac.c
+@@ -1124,6 +1124,10 @@ static int cpmac_probe(struct platform_device *pdev)
+ 	}
  
- 	lp->rx_irq = platform_get_irq_byname(pdev, "korina_rx");
-+	if (lp->rx_irq < 0) {
-+		rc = lp->rx_irq;
-+		goto probe_err_out;
-+	}
-+
- 	lp->tx_irq = platform_get_irq_byname(pdev, "korina_tx");
-+	if (lp->tx_irq < 0) {
-+		rc = lp->tx_irq;
-+		goto probe_err_out;
+ 	dev->irq = platform_get_irq_byname(pdev, "irq");
++	if (dev->irq < 0) {
++		rc = dev->irq;
++		goto fail;
 +	}
  
- 	r = platform_get_resource_byname(pdev, IORESOURCE_MEM, "korina_regs");
- 	dev->base_addr = r->start;
+ 	dev->netdev_ops = &cpmac_netdev_ops;
+ 	dev->ethtool_ops = &cpmac_ethtool_ops;
 -- 
 2.7.4
