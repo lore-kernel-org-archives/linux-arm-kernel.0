@@ -1,46 +1,94 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 4 Dec 2017 07:13:05 +0800
-Subject: [PATCH 1/4] arm: dts: imx28: Use phandles instead of unit
- addresses
-In-Reply-To: <1512110311-15788-2-git-send-email-venkataravi.e@techveda.org>
-References: <1512110311-15788-2-git-send-email-venkataravi.e@techveda.org>
-Message-ID: <201712040750.oAKvTih2%fengguang.wu@intel.com>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Sun,  3 Dec 2017 17:21:09 -0600
+Subject: [PATCH] irqchip/gic-v3: Fix the driver probe() fail due to disabled
+ GICC entry
+Message-ID: <1512343269-19327-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ravi,
+As per MADT specification, it's perfectly valid firmware can pass
+MADT table to OS with disabled GICC entries. ARM64-SMP code skips
+those cpu cores to bring online. However the current GICv3 driver
+probe bails out in this case on systems where redistributor regions
+are not in the always-on power domain.
 
-Thank you for the patch! Yet something to improve:
+This patch does the two things to fix the panic.
+  - Don't return an error in gic_acpi_match_gicc() for disabled GICC.
+  - No need to keep GICR region information for disabled GICC.
 
-[auto build test ERROR on shawnguo/for-next]
-[also build test ERROR on v4.15-rc2 next-20171201]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+Kernel crash traces:
+  Kernel panic - not syncing: No interrupt controller found.
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.13.5 #26
+  [<ffff000008087770>] dump_backtrace+0x0/0x218
+  [<ffff0000080879dc>] show_stack+0x14/0x20
+  [<ffff00000883b078>] dump_stack+0x98/0xb8
+  [<ffff0000080c5c14>] panic+0x118/0x26c
+  [<ffff000008b62348>] init_IRQ+0x24/0x2c
+  [<ffff000008b609fc>] start_kernel+0x230/0x394
+  [<ffff000008b601e4>] __primary_switched+0x64/0x6c
+  ---[ end Kernel panic - not syncing: No interrupt controller found.
 
-url:    https://github.com/0day-ci/linux/commits/venkataravi-e-techveda-org/arm-dts-imx28-Use-phandles-instead-of-unit-addresses/20171204-023409
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
-config: arm-at91_dt_defconfig (attached as .config)
-compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+Disabled GICC subtable example:
+                   Subtable Type : 0B [Generic Interrupt Controller]
+                          Length : 50
+                        Reserved : 0000
+            CPU Interface Number : 0000003D
+                   Processor UID : 0000003D
+           Flags (decoded below) : 00000000
+               Processor Enabled : 0
+ Performance Interrupt Trig Mode : 0
+ Virtual GIC Interrupt Trig Mode : 0
+        Parking Protocol Version : 00000000
+           Performance Interrupt : 00000017
+                  Parked Address : 0000000000000000
+                    Base Address : 0000000000000000
+        Virtual GIC Base Address : 0000000000000000
+     Hypervisor GIC Base Address : 0000000000000000
+           Virtual GIC Interrupt : 00000019
+      Redistributor Base Address : 0000FFFF88F40000
+                       ARM MPIDR : 000000000000000D
+                Efficiency Class : 00
+                        Reserved : 000000
 
-Note: the linux-review/venkataravi-e-techveda-org/arm-dts-imx28-Use-phandles-instead-of-unit-addresses/20171204-023409 HEAD c17ed56cb053430c58e4b6748774a1f195df2627 builds fine.
-      It only hurts bisectibility.
-
-All errors (new ones prefixed by >>):
-
->> Error: arch/arm/boot/dts/imx28-evk.dts:25.4-9 syntax error
->> FATAL ERROR: Unable to parse input tree
-
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 23569 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171204/60da5c70/attachment-0001.gz>
+ drivers/irqchip/irq-gic-v3.c | 14 +++++++++-----
+ 1 file changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index b56c3e2..a30fbac 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1331,6 +1331,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 	u32 size = reg == GIC_PIDR2_ARCH_GICv4 ? SZ_64K * 4 : SZ_64K * 2;
+ 	void __iomem *redist_base;
+ 
++	/* GICC entry which has !ACPI_MADT_ENABLED is not unusable so skip */
++	if (!(gicc->flags & ACPI_MADT_ENABLED))
++		return 0;
++
+ 	redist_base = ioremap(gicc->gicr_base_address, size);
+ 	if (!redist_base)
+ 		return -ENOMEM;
+@@ -1374,13 +1378,13 @@ static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
+ 				(struct acpi_madt_generic_interrupt *)header;
+ 
+ 	/*
+-	 * If GICC is enabled and has valid gicr base address, then it means
+-	 * GICR base is presented via GICC
++	 * If GICC is enabled and has not valid gicr base address, then it means
++	 * GICR base is not presented via GICC
+ 	 */
+-	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
+-		return 0;
++	if ((gicc->flags & ACPI_MADT_ENABLED) && (!gicc->gicr_base_address))
++		return -ENODEV;
+ 
+-	return -ENODEV;
++	return 0;
+ }
+ 
+ static int __init gic_acpi_count_gicr_regions(void)
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
