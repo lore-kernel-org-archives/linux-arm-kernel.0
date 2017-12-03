@@ -1,49 +1,22 @@
-From: cdall@linaro.org (Christoffer Dall)
-Date: Sun, 3 Dec 2017 20:51:45 +0100
-Subject: [PATCH 24/37] KVM: arm64: Prepare to handle traps on deferred
- EL0 sysregs
-In-Reply-To: <ff71a471-4a16-806c-c355-15bf778c7d98@arm.com>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-25-christoffer.dall@linaro.org>
- <ff71a471-4a16-806c-c355-15bf778c7d98@arm.com>
-Message-ID: <20171203195145.GJ4218@cbox>
+From: david@lechnology.com (David Lechner)
+Date: Sun, 3 Dec 2017 13:56:38 -0600
+Subject: [PATCH] ARM: da850: Fix LEGO EV3 battery voltage gpio
+In-Reply-To: <1512329373-17321-1-git-send-email-david@lechnology.com>
+References: <1512329373-17321-1-git-send-email-david@lechnology.com>
+Message-ID: <5c3524e9-a104-001c-b65f-4885337396a7@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 15, 2017 at 09:25:08AM +0000, Julien Thierry wrote:
-> 
-> 
-> On 12/10/17 11:41, Christoffer Dall wrote:
-> >We can trap access to ACTLR_EL1 which we can later defer to only
-> >save/restore during vcpu_load and vcpu_put, so let's read the value
-> >directly from the CPU when necessary.
-> >
-> >Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> >---
-> >  arch/arm64/kvm/sys_regs_generic_v8.c | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> >
-> >diff --git a/arch/arm64/kvm/sys_regs_generic_v8.c b/arch/arm64/kvm/sys_regs_generic_v8.c
-> >index 969ade1..348f227 100644
-> >--- a/arch/arm64/kvm/sys_regs_generic_v8.c
-> >+++ b/arch/arm64/kvm/sys_regs_generic_v8.c
-> >@@ -38,7 +38,10 @@ static bool access_actlr(struct kvm_vcpu *vcpu,
-> >  	if (p->is_write)
-> >  		return ignore_write(vcpu, p);
-> >-	p->regval = vcpu_sys_reg(vcpu, ACTLR_EL1);
-> >+	if (vcpu->arch.sysregs_loaded_on_cpu)
-> >+		read_sysreg(actlr_el1);
-> 
-> Did you mean "p->regval = read_sysreg(actlr_el1);" ?
-> 
-> >+	else
-> >+		p->regval = vcpu_sys_reg(vcpu, ACTLR_EL1);
-> >  	return true;
-> >  }
-> >
-> 
 
-Yes, most certainly.  Nice catch.
+On 12/03/2017 01:29 PM, David Lechner wrote:
+> This fixes the battery voltage monitoring gpio-hog settings.
+> 
+> When the gpio is low, it turns off the battery voltage to the ADC chip.
+> However, this needs to be on all of the time so that we can monitor
+> battery voltage.
+> 
+> Signed-off-by: David Lechner <david@lechnology.com>
+> ---
 
-Thanks,
--Christoffer
+Please disregard this patch. Apparently, pinmuxing on platform devices 
+is broken in the linux-davinci master branch, which led me astray.
