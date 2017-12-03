@@ -1,49 +1,34 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Dec 2017 17:08:37 -0800
-Subject: [GIT PULL] Amlogic fixes for v4.15-rc (redo)
-In-Reply-To: <7h7eu7p95w.fsf@baylibre.com>
-References: <7h7eu7p95w.fsf@baylibre.com>
-Message-ID: <20171203010837.chbvhkrhayfbnmsz@localhost>
+Date: Sat, 2 Dec 2017 17:01:57 -0800
+Subject: [GIT PULL] i.MX fixes for 4.15
+In-Reply-To: <20171130013439.GH22908@dragon>
+References: <20171130013439.GH22908@dragon>
+Message-ID: <20171203010157.pu7xrx7i3tiuake7@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 30, 2017 at 04:46:19PM -0800, Kevin Hilman wrote:
-> Arnd, Olof,
-> 
-> A handful of minor v4.15 fixes for Amlogic family SoCs.  They're mostly
-> DT, but some trivial non-DT stuff mixed in.  Let me know if you prefer
-> those in separate pulls, and I will do so.
-> 
-> Thanks,
-> 
-> Kevin
-> 
-> 
+On Thu, Nov 30, 2017 at 09:34:40AM +0800, Shawn Guo wrote:
 > The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
 >   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git amlogic-fixes
+>   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.15
 > 
-> for you to fetch changes up to 9f8e06ca1d0e3ef1167a2f43a8b1e63763b283b8:
+> for you to fetch changes up to e501506d3ea00eefa64463ebd9e5c13ee70990bd:
 > 
->   ARM64: dts: odroid-c2: Add HDMI and CEC Nodes (2017-11-30 15:30:09 -0800)
+>   Revert "ARM: dts: imx53: add srtc node" (2017-11-29 10:34:45 +0800)
 > 
 > ----------------------------------------------------------------
-> Amlogic fixes for v4.15-rc
-> - GPIO interrupt fixes
-> - new nodes for drivers merged late (VPU domains)
+> i.MX fixes for 4.15:
+>  - A fix for vf610-zii-dev-rev-c board which correct the unit-address
+>    of I2C EEPROM node to match the 'reg' property.
+>  - We thought the RTC block on i.MX53 is compatible with the one found
+>    on i.MX25, and added the device for i.MX53 device tree.  But it turns
+>    out that's not the case, and we have to revert the change.
 
-The VPU power domain and HDMI regulator changes look more like new hardware
-support than bugfixes to me, is that a correct assessment? I.e. is something
-breaking by not having these new DT nodes in the tree one existing hardware?
-
-If it isn't a bugfix, I think I'd rather see it queued up for next merge
-window
+Great tag description. Merged, thanks.
 
 
 -Olof
