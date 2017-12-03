@@ -1,34 +1,44 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Dec 2017 17:01:57 -0800
-Subject: [GIT PULL] i.MX fixes for 4.15
-In-Reply-To: <20171130013439.GH22908@dragon>
-References: <20171130013439.GH22908@dragon>
-Message-ID: <20171203010157.pu7xrx7i3tiuake7@localhost>
+Date: Sat, 2 Dec 2017 17:01:15 -0800
+Subject: [GIT PULL] ARM: uniphier: fixes for v4.15
+In-Reply-To: <CAK7LNARMXg-3Xfz2Mxq47Suys4kPSWuPYKY1o8HkVRBd4fHfSA@mail.gmail.com>
+References: <CAK7LNARMXg-3Xfz2Mxq47Suys4kPSWuPYKY1o8HkVRBd4fHfSA@mail.gmail.com>
+Message-ID: <20171203010115.d2ozvhkrnuwqngpo@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 09:34:40AM +0800, Shawn Guo wrote:
+On Wed, Nov 29, 2017 at 11:01:57PM +0900, Masahiro Yamada wrote:
+> Hi Arnd, Olof,
+> 
+> Here are some fixes of ARM UniPhier SoC family.
+> There is a mistake in the IRQ number.  Otherwise, I wouldn't have done
+> this early pull request.  One more trivial patch to avoid conflict.
+> Also, MAINTAINERS update, which is always safe.
+> Please pull!
+> 
+> 
 > The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
 > 
 >   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-fixes-4.15
+>   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
+> tags/uniphier-fixes-v4.15
 > 
-> for you to fetch changes up to e501506d3ea00eefa64463ebd9e5c13ee70990bd:
+> for you to fetch changes up to 0308cadcec379e510f498c48c34aafe582f1af88:
 > 
->   Revert "ARM: dts: imx53: add srtc node" (2017-11-29 10:34:45 +0800)
+>   MAINTAINERS: exclude other Socionext SoC DT files from ARM/UNIPHIER
+> entry (2017-11-29 22:22:10 +0900)
 > 
 > ----------------------------------------------------------------
-> i.MX fixes for 4.15:
->  - A fix for vf610-zii-dev-rev-c board which correct the unit-address
->    of I2C EEPROM node to match the 'reg' property.
->  - We thought the RTC block on i.MX53 is compatible with the one found
->    on i.MX25, and added the device for i.MX53 device tree.  But it turns
->    out that's not the case, and we have to revert the change.
+> UniPhier ARM SoC fixes for v4.15
+> 
+> - Fix IRQ number of PXs3 SoC
+> - Remove redundant interrupt-parent properties
+> - Fix arm64 DT path in MAINTAINERS
 
-Great tag description. Merged, thanks.
+Merged, thanks.
 
 
 -Olof
