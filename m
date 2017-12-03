@@ -1,44 +1,39 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Dec 2017 17:01:15 -0800
-Subject: [GIT PULL] ARM: uniphier: fixes for v4.15
-In-Reply-To: <CAK7LNARMXg-3Xfz2Mxq47Suys4kPSWuPYKY1o8HkVRBd4fHfSA@mail.gmail.com>
-References: <CAK7LNARMXg-3Xfz2Mxq47Suys4kPSWuPYKY1o8HkVRBd4fHfSA@mail.gmail.com>
-Message-ID: <20171203010115.d2ozvhkrnuwqngpo@localhost>
+Date: Sat, 2 Dec 2017 17:04:35 -0800
+Subject: [GIT PULL] revert ARM SCPI changes for v4.15-rc1
+In-Reply-To: <7hlgimns2m.fsf@baylibre.com>
+References: <7hlgimns2m.fsf@baylibre.com>
+Message-ID: <20171203010435.6ycn75rxss5yiixe@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 11:01:57PM +0900, Masahiro Yamada wrote:
-> Hi Arnd, Olof,
+On Fri, Dec 01, 2017 at 11:53:05AM -0800, Kevin Hilman wrote:
+> Arnd, Olof,
 > 
-> Here are some fixes of ARM UniPhier SoC family.
-> There is a mistake in the IRQ number.  Otherwise, I wouldn't have done
-> this early pull request.  One more trivial patch to avoid conflict.
-> Also, MAINTAINERS update, which is always safe.
-> Please pull!
+> These ARM SCPI changes caused SCPI regressions resulting in CPUfreq
+> failures on most Amlogic SoCs (found by kernelci.org.)
 > 
+> Unfortunately, this was not caught in linux-next due to other
+> bugs/panics on these platforms masking this problem so we've only found
+> it since we've fixed the other issues.
 > 
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+> Since we're already in the -rc cycle, I'd prefer to revert to a known
+> working state (that of v4.14) rather than finding/reverting a subset,
+> which would just lead to another untested state.
 > 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> These changes can then have some time to be better reviewed and tested
+> and resubmitted for v4.16.
 > 
-> are available in the git repository at:
+> I've tested this revert on the affect Amlogic SoCs and verified that
+> we're back to the previous (working) condition.
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/masahiroy/linux-uniphier.git
-> tags/uniphier-fixes-v4.15
+> Also, I'm sending the pull directly to arm-soc instead of Sudeeep
+> because I understand that Sudeep is currently out-of-office and unlikely
+> to be able to address this himself during the -rc cycle.
 > 
-> for you to fetch changes up to 0308cadcec379e510f498c48c34aafe582f1af88:
-> 
->   MAINTAINERS: exclude other Socionext SoC DT files from ARM/UNIPHIER
-> entry (2017-11-29 22:22:10 +0900)
-> 
-> ----------------------------------------------------------------
-> UniPhier ARM SoC fixes for v4.15
-> 
-> - Fix IRQ number of PXs3 SoC
-> - Remove redundant interrupt-parent properties
-> - Fix arm64 DT path in MAINTAINERS
 
-Merged, thanks.
+Sounds like the right approach here. I've merged this and added the above text
+to the merge commit as well.
 
 
 -Olof
