@@ -1,111 +1,129 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Sun, 3 Dec 2017 15:15:34 +0100
-Subject: [PATCH v5.1 1/2] ARM64: dts: meson-gx: use stable UART bindings
- with correct gate clock
-In-Reply-To: <1498056132-18508-2-git-send-email-narmstrong@baylibre.com>
-References: <1498056132-18508-1-git-send-email-narmstrong@baylibre.com>
- <1498056132-18508-2-git-send-email-narmstrong@baylibre.com>
-Message-ID: <4e0d1db1-6382-a4b7-d112-3e45e0c1af2d@suse.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sun,  3 Dec 2017 16:04:57 +0100
+Subject: [PATCH v2] ARM: dts: Add ethernet PHYs to the a bunch of Geminis
+Message-ID: <20171203150457.21774-1-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+These Gemini boards have Ethernet PHY on GPIO bit-banged
+MDIO, clearly defined in the corresponding OpenWRT
+ethernet patches since ages. Add them in accordance with
+the OpenWRT patch so we can use them when we add ethernet
+support.
 
-Am 21.06.2017 um 16:42 schrieb Neil Armstrong:
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> index 17d3efd..ea53cc2 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
-> @@ -682,6 +682,31 @@
->  	clocks = <&clkc CLKID_SPI>;
->  };
->  
-> +&uart_A {
-> +	clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
-> +	clock-names = "xtal", "pclk", "baud";
-> +};
-> +
-> +&uart_AO {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-> +	clock-names = "xtal", "pclk", "baud";
-> +};
-> +
-> +&uart_AO_B {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-> +	clock-names = "xtal", "pclk", "baud";
-> +};
-> +
-> +&uart_B {
-> +	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
+Cc: Andrew Lunn <andrew@lunn.ch>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ChangeLog v1->v2:
+- Fix the unit names on all PHYs to correspond to the
+  actual reg.
+---
+ arch/arm/boot/dts/gemini-nas4220b.dts | 13 +++++++++++++
+ arch/arm/boot/dts/gemini-rut1xx.dts   | 13 +++++++++++++
+ arch/arm/boot/dts/gemini-wbd111.dts   | 13 +++++++++++++
+ arch/arm/boot/dts/gemini-wbd222.dts   | 18 ++++++++++++++++++
+ 4 files changed, 57 insertions(+)
 
-Looking at the meson_uart driver, it only looks for a "pclk" clock,
-never for "core", and the only unnamed clock used should be the first.
-
-There is no bindings documentation for "core", so I assume this was an
-oversight and should be "pclk" everywhere?
-
-> +};
-> +
-> +&uart_C {
-> +	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-
-The issue I'm facing is that uart_C on NanoPi K2 is not working in
-4.14.1. To my surprise it appears to be probing okay though.
-
-Sadly just overwriting the clock-names property via overlay does not fix
-my issue. Any ideas?
-
-> +
->  &vpu {
->  	compatible = "amlogic,meson-gxbb-vpu", "amlogic,meson-gx-vpu";
->  };
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> index 8d4f316..9e67444 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
-> @@ -623,6 +623,31 @@
->  	clocks = <&clkc CLKID_SPI>;
->  };
->  
-> +&uart_A {
-> +	clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-
-Same issue spotted here and below.
-
-> +};
-> +
-> +&uart_AO {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-> +	clock-names = "xtal", "pclk", "baud";
-> +};
-> +
-> +&uart_AO_B {
-> +	clocks = <&xtal>, <&clkc CLKID_CLK81>, <&xtal>;
-> +	clock-names = "xtal", "pclk", "baud";
-> +};
-> +
-> +&uart_B {
-> +	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-> +
-> +&uart_C {
-> +	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
-> +	clock-names = "xtal", "core", "baud";
-> +};
-> +
->  &vpu {
->  	compatible = "amlogic,meson-gxl-vpu", "amlogic,meson-gx-vpu";
->  };
-
-Regards,
-Andreas
-
+diff --git a/arch/arm/boot/dts/gemini-nas4220b.dts b/arch/arm/boot/dts/gemini-nas4220b.dts
+index d6a22e677c7a..943d2d07fac7 100644
+--- a/arch/arm/boot/dts/gemini-nas4220b.dts
++++ b/arch/arm/boot/dts/gemini-nas4220b.dts
+@@ -64,6 +64,19 @@
+ 		};
+ 	};
+ 
++	mdio0: ethernet-phy {
++		compatible = "virtual,mdio-gpio";
++		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
++			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy0: ethernet-phy at 1 {
++			reg = <1>;
++			device_type = "ethernet-phy";
++		};
++	};
++
+ 	soc {
+ 		flash at 30000000 {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/gemini-rut1xx.dts b/arch/arm/boot/dts/gemini-rut1xx.dts
+index 500057b6570e..fd55528bba56 100644
+--- a/arch/arm/boot/dts/gemini-rut1xx.dts
++++ b/arch/arm/boot/dts/gemini-rut1xx.dts
+@@ -58,6 +58,19 @@
+ 		};
+ 	};
+ 
++	mdio0: ethernet-phy {
++		compatible = "virtual,mdio-gpio";
++		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
++			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy0: ethernet-phy at 1 {
++			reg = <1>;
++			device_type = "ethernet-phy";
++		};
++	};
++
+ 	soc {
+ 		flash at 30000000 {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/gemini-wbd111.dts b/arch/arm/boot/dts/gemini-wbd111.dts
+index b413fd12c5ba..f36e1b65497d 100644
+--- a/arch/arm/boot/dts/gemini-wbd111.dts
++++ b/arch/arm/boot/dts/gemini-wbd111.dts
+@@ -69,6 +69,19 @@
+ 		};
+ 	};
+ 
++	mdio0: ethernet-phy {
++		compatible = "virtual,mdio-gpio";
++		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
++			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy0: ethernet-phy at 1 {
++			reg = <1>;
++			device_type = "ethernet-phy";
++		};
++	};
++
+ 	soc {
+ 		flash at 30000000 {
+ 			status = "okay";
+diff --git a/arch/arm/boot/dts/gemini-wbd222.dts b/arch/arm/boot/dts/gemini-wbd222.dts
+index 3ba710538662..669bd8b5f92f 100644
+--- a/arch/arm/boot/dts/gemini-wbd222.dts
++++ b/arch/arm/boot/dts/gemini-wbd222.dts
+@@ -69,6 +69,24 @@
+ 		};
+ 	};
+ 
++	mdio0: ethernet-phy {
++		compatible = "virtual,mdio-gpio";
++		gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>, /* MDC */
++			<&gpio0 21 GPIO_ACTIVE_HIGH>; /* MDIO */
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy0: ethernet-phy at 1 {
++			reg = <1>;
++			device_type = "ethernet-phy";
++		};
++
++		phy1: ethernet-phy at 3 {
++			reg = <3>;
++			device_type = "ethernet-phy";
++		};
++	};
++
+ 	soc {
+ 		flash at 30000000 {
+ 			status = "okay";
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+2.14.3
