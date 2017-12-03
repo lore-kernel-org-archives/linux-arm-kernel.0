@@ -1,400 +1,140 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun,  3 Dec 2017 12:41:55 -0800
-Subject: [PATCH 7/9] ASoC: sun8i-codec-analog: Add support for A64 SoC
+Date: Sun,  3 Dec 2017 12:41:53 -0800
+Subject: [PATCH 5/9] ASoC: sun8i-codec-analog: Use callbacks to add headphones
+ and lineout outputs
 In-Reply-To: <20171203204157.20829-1-anarsoul@gmail.com>
 References: <20171203204157.20829-1-anarsoul@gmail.com>
-Message-ID: <20171203204157.20829-8-anarsoul@gmail.com>
+Message-ID: <20171203204157.20829-6-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marcus Cooper <codekipper@gmail.com>
 
-Analog part of audiocodec is very similar to other codecs supports by
-this driver, but has different registers
+Widgets for headphones and lineout outputs on A64 are different enough
+and use different regs, so move addition of these outputs into callback to
+simplify upcoming A64 support.
 
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- .../bindings/sound/sun8i-codec-analog.txt          |   1 +
- sound/soc/sunxi/Kconfig                            |   2 +-
- sound/soc/sunxi/sun8i-codec-analog.c               | 227 +++++++++++++++++++++
- 3 files changed, 229 insertions(+), 1 deletion(-)
+ sound/soc/sunxi/sun8i-codec-analog.c | 29 +++++++++++++++++++----------
+ 1 file changed, 19 insertions(+), 10 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-index 07356758bd91..f38896850e4d 100644
---- a/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-+++ b/Documentation/devicetree/bindings/sound/sun8i-codec-analog.txt
-@@ -5,6 +5,7 @@ Required properties:
- 		- "allwinner,sun8i-a23-codec-analog"
- 		- "allwinner,sun8i-h3-codec-analog"
- 		- "allwinner,sun8i-v3s-codec-analog"
-+		- "allwinner,sun50i-a64-codec-analog"
- 
- Required properties if not a sub-node of the PRCM node:
- - reg: must contain the registers location and length
-diff --git a/sound/soc/sunxi/Kconfig b/sound/soc/sunxi/Kconfig
-index 22408bc2d6ec..26072b74e47f 100644
---- a/sound/soc/sunxi/Kconfig
-+++ b/sound/soc/sunxi/Kconfig
-@@ -12,7 +12,7 @@ config SND_SUN4I_CODEC
- config SND_SUN8I_CODEC
- 	tristate "Allwinner SUN8I audio codec"
- 	depends on OF
--	depends on MACH_SUN8I || COMPILE_TEST
-+	depends on MACH_SUN8I || (ARM64 && ARCH_SUNXI) || COMPILE_TEST
- 	select REGMAP_MMIO
- 	help
- 	  This option enables the digital part of the internal audio codec for
 diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
-index 4e39d2668286..adb7fe087c73 100644
+index 485e79f292c4..384f582b6f69 100644
 --- a/sound/soc/sunxi/sun8i-codec-analog.c
 +++ b/sound/soc/sunxi/sun8i-codec-analog.c
-@@ -30,6 +30,7 @@
- /* Codec analog control register offsets and bit fields */
- #define SUN8I_ADDA_HP_VOLC		0x00
- #define SUN8I_ADDA_HP_VOLC_PA_CLK_GATE		7
-+#define SUN50I_ADDA_HP_VOLC_HPPAEN		6
- #define SUN8I_ADDA_HP_VOLC_HP_VOL		0
- #define SUN8I_ADDA_LOMIXSC		0x01
- #define SUN8I_ADDA_LOMIXSC_MIC1			6
-@@ -48,6 +49,7 @@
- #define SUN8I_ADDA_ROMIXSC_DACR			1
- #define SUN8I_ADDA_ROMIXSC_DACL			0
- #define SUN8I_ADDA_DAC_PA_SRC		0x03
-+#define SUN50I_ADDA_DAC_PA_SRC		0x0a
- #define SUN8I_ADDA_DAC_PA_SRC_DACAREN		7
- #define SUN8I_ADDA_DAC_PA_SRC_DACALEN		6
- #define SUN8I_ADDA_DAC_PA_SRC_RMIXEN		5
-@@ -62,9 +64,16 @@
- #define SUN8I_ADDA_LINEIN_GCTRL		0x05
- #define SUN8I_ADDA_LINEIN_GCTRL_LINEING		4
- #define SUN8I_ADDA_LINEIN_GCTRL_PHONEG		0
-+#define SUN50I_ADDA_LINEOUT_CTRL0	0x05
-+#define SUN50I_ADDA_LINEOUT_CTRL0_LEN		7
-+#define SUN50I_ADDA_LINEOUT_CTRL0_REN		6
-+#define SUN50I_ADDA_LINEOUT_CTRL0_LSRC_SEL	5
-+#define SUN50I_ADDA_LINEOUT_CTRL0_RSRC_SEL	4
- #define SUN8I_ADDA_MICIN_GCTRL		0x06
- #define SUN8I_ADDA_MICIN_GCTRL_MIC1G		4
- #define SUN8I_ADDA_MICIN_GCTRL_MIC2G		0
-+#define SUN50I_ADDA_LINEOUT_CTRL1	0x06
-+#define SUN50I_ADDA_LINEOUT_CTRL1_VOL		0
- #define SUN8I_ADDA_PAEN_HP_CTRL		0x07
- #define SUN8I_ADDA_PAEN_HP_CTRL_HPPAEN		7
- #define SUN8I_ADDA_PAEN_HP_CTRL_LINEOUTEN	7	/* H3 specific */
-@@ -364,6 +373,61 @@ static const struct snd_soc_dapm_widget sun8i_v3s_codec_mixer_widgets[] = {
- 			   ARRAY_SIZE(sun8i_v3s_codec_adc_mixer_controls)),
- };
+@@ -397,7 +397,7 @@ static const struct snd_soc_dapm_route sun8i_codec_mixer_routes[] = {
  
-+static const struct snd_soc_dapm_widget sun50i_codec_common_widgets[] = {
-+	/* ADC */
-+	SND_SOC_DAPM_ADC("Left ADC", NULL, SUN8I_ADDA_ADC_AP_EN,
-+			 SUN8I_ADDA_ADC_AP_EN_ADCLEN, 0),
-+	SND_SOC_DAPM_ADC("Right ADC", NULL, SUN8I_ADDA_ADC_AP_EN,
-+			 SUN8I_ADDA_ADC_AP_EN_ADCREN, 0),
-+
-+	/* DAC */
-+	SND_SOC_DAPM_DAC("Left DAC", NULL, SUN50I_ADDA_DAC_PA_SRC,
-+			 SUN8I_ADDA_DAC_PA_SRC_DACALEN, 0),
-+	SND_SOC_DAPM_DAC("Right DAC", NULL, SUN50I_ADDA_DAC_PA_SRC,
-+			 SUN8I_ADDA_DAC_PA_SRC_DACAREN, 0),
-+	/*
-+	 * Due to this component and the codec belonging to separate DAPM
-+	 * contexts, we need to manually link the above widgets to their
-+	 * stream widgets at the card level.
-+	 */
-+
-+	/* Line In */
-+	SND_SOC_DAPM_INPUT("LINEIN"),
-+
-+	/* Microphone inputs */
-+	SND_SOC_DAPM_INPUT("MIC1"),
-+	SND_SOC_DAPM_INPUT("MIC2"),
-+
-+	/* Microphone Bias */
-+	SND_SOC_DAPM_SUPPLY("MBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
-+			    SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MMICBIASEN,
-+			    0, NULL, 0),
-+
-+	/* Mic input path */
-+	SND_SOC_DAPM_PGA("Mic1 Amplifier", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
-+			 SUN8I_ADDA_MIC1G_MICBIAS_CTRL_MIC1AMPEN, 0, NULL, 0),
-+	SND_SOC_DAPM_PGA("Mic2 Amplifier", SUN8I_ADDA_MIC2G_CTRL,
-+			 SUN8I_ADDA_MIC2G_CTRL_MIC2AMPEN, 0, NULL, 0),
-+
-+	/* Mixers */
-+	SND_SOC_DAPM_MIXER("Left Mixer", SUN50I_ADDA_DAC_PA_SRC,
-+			   SUN8I_ADDA_DAC_PA_SRC_LMIXEN, 0,
-+			   sun8i_codec_mixer_controls,
-+			   ARRAY_SIZE(sun8i_codec_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Right Mixer", SUN50I_ADDA_DAC_PA_SRC,
-+			   SUN8I_ADDA_DAC_PA_SRC_RMIXEN, 0,
-+			   sun8i_codec_mixer_controls,
-+			   ARRAY_SIZE(sun8i_codec_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Left ADC Mixer", SUN8I_ADDA_ADC_AP_EN,
-+			   SUN8I_ADDA_ADC_AP_EN_ADCLEN, 0,
-+			   sun8i_codec_adc_mixer_controls,
-+			   ARRAY_SIZE(sun8i_codec_adc_mixer_controls)),
-+	SND_SOC_DAPM_MIXER("Right ADC Mixer", SUN8I_ADDA_ADC_AP_EN,
-+			   SUN8I_ADDA_ADC_AP_EN_ADCREN, 0,
-+			   sun8i_codec_adc_mixer_controls,
-+			   ARRAY_SIZE(sun8i_codec_adc_mixer_controls)),
-+};
-+
- static const struct snd_soc_dapm_route sun8i_codec_common_routes[] = {
- 	/* Microphone Routes */
- 	{ "Mic1 Amplifier", NULL, "MIC1"},
-@@ -408,6 +472,17 @@ static const struct snd_kcontrol_new sun8i_a23_codec_hp_ctrls[] = {
- 		   SUN8I_ADDA_DAC_PA_SRC_RHPPAMUTE, 1, 0),
- };
- 
-+static const struct snd_kcontrol_new sun50i_a64_codec_hp_ctrls[] = {
-+	SOC_SINGLE_TLV("Headphone Playback Volume",
-+		       SUN8I_ADDA_HP_VOLC,
-+		       SUN8I_ADDA_HP_VOLC_HP_VOL, 0x3f, 0,
-+		       sun8i_codec_hp_vol_scale),
-+	SOC_DOUBLE("Headphone Playback Switch",
-+		   SUN50I_ADDA_DAC_PA_SRC,
-+		   SUN8I_ADDA_DAC_PA_SRC_LHPPAMUTE,
-+		   SUN8I_ADDA_DAC_PA_SRC_RHPPAMUTE, 1, 0),
-+};
-+
- static const char * const sun8i_codec_hp_src_enum_text[] = {
- 	"DAC", "Mixer",
- };
-@@ -461,6 +536,14 @@ static const struct snd_soc_dapm_widget sun8i_a23_codec_hp_widgets[] = {
- 	SND_SOC_DAPM_OUTPUT("HP"),
- };
- 
-+static const struct snd_soc_dapm_widget sun50i_a64_codec_hp_widgets[] = {
-+	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
-+			 SND_SOC_NOPM, 0, 0, sun8i_codec_hp_src),
-+	SND_SOC_DAPM_OUT_DRV("Headphone Amp", SUN8I_ADDA_HP_VOLC,
-+			     SUN50I_ADDA_HP_VOLC_HPPAEN, 0, NULL, 0),
-+	SND_SOC_DAPM_OUTPUT("HP"),
-+};
-+
- static const struct snd_soc_dapm_route sun8i_codec_headphone_routes[] = {
- 	{ "Headphone Source Playback Route", "DAC", "Left DAC" },
- 	{ "Headphone Source Playback Route", "DAC", "Right DAC" },
-@@ -471,6 +554,15 @@ static const struct snd_soc_dapm_route sun8i_codec_headphone_routes[] = {
- 	{ "HP", NULL, "Headphone Amp" },
- };
- 
-+static const struct snd_soc_dapm_route sun50i_codec_headphone_routes[] = {
-+	{ "Headphone Source Playback Route", "DAC", "Left DAC" },
-+	{ "Headphone Source Playback Route", "DAC", "Right DAC" },
-+	{ "Headphone Source Playback Route", "Mixer", "Left Mixer" },
-+	{ "Headphone Source Playback Route", "Mixer", "Right Mixer" },
-+	{ "Headphone Amp", NULL, "Headphone Source Playback Route" },
-+	{ "HP", NULL, "Headphone Amp" },
-+};
-+
- static int sun8i_a23_codec_add_headphone(struct snd_soc_component *cmpnt)
- {
- 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
-@@ -525,6 +617,41 @@ static int sun8i_codec_add_mbias(struct snd_soc_component *cmpnt)
- 	return ret;
- }
- 
-+static int sun50i_a64_codec_add_headphone(struct snd_soc_component *cmpnt)
-+{
-+	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
-+	struct device *dev = cmpnt->dev;
-+	int ret;
-+
-+	ret = snd_soc_add_component_controls(cmpnt,
-+					     sun50i_a64_codec_hp_ctrls,
-+					     ARRAY_SIZE(
-+						sun50i_a64_codec_hp_ctrls));
-+	if (ret) {
-+		dev_err(dev, "Failed to add Headphone controls: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_dapm_new_controls(dapm,
-+					sun50i_a64_codec_hp_widgets,
-+					ARRAY_SIZE(
-+						sun50i_a64_codec_hp_widgets));
-+	if (ret) {
-+		dev_err(dev, "Failed to add Headphone DAPM widgets: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_dapm_add_routes(dapm, sun50i_codec_headphone_routes,
-+				      ARRAY_SIZE(
-+					sun50i_codec_headphone_routes));
-+	if (ret) {
-+		dev_err(dev, "Failed to add Headphone DAPM routes: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- /* hmic specific widget */
- static const struct snd_soc_dapm_widget sun8i_codec_hmic_widgets[] = {
- 	SND_SOC_DAPM_SUPPLY("HBIAS", SUN8I_ADDA_MIC1G_MICBIAS_CTRL,
-@@ -618,6 +745,17 @@ static const struct snd_kcontrol_new sun8i_codec_lineout_controls[] = {
- 		   SUN8I_ADDA_MIC2G_CTRL_LINEOUTREN, 1, 0),
- };
- 
-+static const struct snd_kcontrol_new sun50i_codec_lineout_ctrls[] = {
-+	SOC_SINGLE_TLV("Line Out Playback Volume",
-+		       SUN50I_ADDA_LINEOUT_CTRL1,
-+		       SUN50I_ADDA_LINEOUT_CTRL1_VOL, 0x1f, 0,
-+		       sun8i_codec_lineout_vol_scale),
-+	SOC_DOUBLE("Line Out Playback Switch",
-+		   SUN50I_ADDA_LINEOUT_CTRL0,
-+		   SUN50I_ADDA_LINEOUT_CTRL0_REN,
-+		   SUN50I_ADDA_LINEOUT_CTRL0_REN, 1, 0),
-+};
-+
- static const char * const sun8i_codec_lineout_src_enum_text[] = {
- 	"Stereo", "Mono Differential",
- };
-@@ -628,11 +766,22 @@ static SOC_ENUM_DOUBLE_DECL(sun8i_codec_lineout_src_enum,
- 			    SUN8I_ADDA_MIC2G_CTRL_LINEOUTRSRC,
- 			    sun8i_codec_lineout_src_enum_text);
- 
-+static SOC_ENUM_DOUBLE_DECL(sun50i_codec_lineout_src_enum,
-+			    SUN50I_ADDA_LINEOUT_CTRL0,
-+			    SUN50I_ADDA_LINEOUT_CTRL0_LSRC_SEL,
-+			    SUN50I_ADDA_LINEOUT_CTRL0_RSRC_SEL,
-+			    sun8i_codec_lineout_src_enum_text);
-+
- static const struct snd_kcontrol_new sun8i_codec_lineout_src[] = {
- 	SOC_DAPM_ENUM("Line Out Source Playback Route",
- 		      sun8i_codec_lineout_src_enum),
- };
- 
-+static const struct snd_kcontrol_new sun50i_codec_lineout_src[] = {
-+	SOC_DAPM_ENUM("Line Out Source Playback Route",
-+		      sun50i_codec_lineout_src_enum),
-+};
-+
- static const struct snd_soc_dapm_widget sun8i_codec_lineout_widgets[] = {
- 	SND_SOC_DAPM_MUX("Line Out Source Playback Route",
- 			 SND_SOC_NOPM, 0, 0, sun8i_codec_lineout_src),
-@@ -642,6 +791,17 @@ static const struct snd_soc_dapm_widget sun8i_codec_lineout_widgets[] = {
- 	SND_SOC_DAPM_OUTPUT("LINEOUT"),
- };
- 
-+static const struct snd_soc_dapm_widget sun50i_codec_lineout_widgets[] = {
-+	SND_SOC_DAPM_MUX("Line Out Source Playback Route",
-+			 SND_SOC_NOPM, 0, 0, sun50i_codec_lineout_src),
-+	/* It is unclear if this is a buffer or gate, model it as a supply */
-+	SND_SOC_DAPM_SUPPLY("Left Line Out Enable", SUN50I_ADDA_LINEOUT_CTRL0,
-+			    SUN50I_ADDA_LINEOUT_CTRL0_LEN, 0, NULL, 0),
-+	SND_SOC_DAPM_SUPPLY("Right Line Out Enable", SUN50I_ADDA_LINEOUT_CTRL0,
-+			    SUN50I_ADDA_LINEOUT_CTRL0_REN, 0, NULL, 0),
-+	SND_SOC_DAPM_OUTPUT("LINEOUT"),
-+};
-+
- static const struct snd_soc_dapm_route sun8i_codec_lineout_routes[] = {
- 	{ "Line Out Source Playback Route", "Stereo", "Left Mixer" },
- 	{ "Line Out Source Playback Route", "Stereo", "Right Mixer" },
-@@ -651,6 +811,17 @@ static const struct snd_soc_dapm_route sun8i_codec_lineout_routes[] = {
- 	{ "LINEOUT", NULL, "Line Out Enable", },
- };
- 
-+static const struct snd_soc_dapm_route sun50i_codec_lineout_routes[] = {
-+	{ "Line Out Source Playback Route", "Stereo", "Left Mixer" },
-+	{ "Line Out Source Playback Route", "Stereo", "Right Mixer" },
-+	{ "Line Out Source Playback Route", "Mono Differential", "Left Mixer" },
-+	{ "Line Out Source Playback Route", "Mono Differential",
-+		"Right Mixer" },
-+	{ "LINEOUT", NULL, "Line Out Source Playback Route" },
-+	{ "LINEOUT", NULL, "Left Line Out Enable", },
-+	{ "LINEOUT", NULL, "Right Line Out Enable", },
-+};
-+
- static int sun8i_h3_codec_add_lineout(struct snd_soc_component *cmpnt)
- {
- 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
-@@ -747,6 +918,39 @@ static int sun8i_codec_add_mic2(struct snd_soc_component *cmpnt)
+ /* headphone specific controls, widgets, and routes */
+ static const DECLARE_TLV_DB_SCALE(sun8i_codec_hp_vol_scale, -6300, 100, 1);
+-static const struct snd_kcontrol_new sun8i_codec_headphone_controls[] = {
++static const struct snd_kcontrol_new sun8i_a23_codec_hp_ctrls[] = {
+ 	SOC_SINGLE_TLV("Headphone Playback Volume",
+ 		       SUN8I_ADDA_HP_VOLC,
+ 		       SUN8I_ADDA_HP_VOLC_HP_VOL, 0x3f, 0,
+@@ -447,7 +447,7 @@ static int sun8i_headphone_amp_event(struct snd_soc_dapm_widget *w,
  	return 0;
  }
  
-+static int sun50i_a64_codec_add_lineout(struct snd_soc_component *cmpnt)
-+{
-+	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
-+	struct device *dev = cmpnt->dev;
-+	int ret;
-+
-+	ret = snd_soc_add_component_controls(cmpnt,
-+					     sun50i_codec_lineout_ctrls,
+-static const struct snd_soc_dapm_widget sun8i_codec_headphone_widgets[] = {
++static const struct snd_soc_dapm_widget sun8i_a23_codec_hp_widgets[] = {
+ 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
+ 			 SND_SOC_NOPM, 0, 0, sun8i_codec_hp_src),
+ 	SND_SOC_DAPM_OUT_DRV_E("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
+@@ -471,22 +471,24 @@ static const struct snd_soc_dapm_route sun8i_codec_headphone_routes[] = {
+ 	{ "HP", NULL, "Headphone Amp" },
+ };
+ 
+-static int sun8i_codec_add_headphone(struct snd_soc_component *cmpnt)
++static int sun8i_a23_codec_add_headphone(struct snd_soc_component *cmpnt)
+ {
+ 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
+ 	struct device *dev = cmpnt->dev;
+ 	int ret;
+ 
+ 	ret = snd_soc_add_component_controls(cmpnt,
+-					     sun8i_codec_headphone_controls,
+-					     ARRAY_SIZE(sun8i_codec_headphone_controls));
++					     sun8i_a23_codec_hp_ctrls,
 +					     ARRAY_SIZE(
-+						sun50i_codec_lineout_ctrls));
-+	if (ret) {
-+		dev_err(dev, "Failed to add Line Out controls: %d\n", ret);
-+		return ret;
-+	}
++						sun8i_a23_codec_hp_ctrls));
+ 	if (ret) {
+ 		dev_err(dev, "Failed to add Headphone controls: %d\n", ret);
+ 		return ret;
+ 	}
+ 
+-	ret = snd_soc_dapm_new_controls(dapm, sun8i_codec_headphone_widgets,
+-					ARRAY_SIZE(sun8i_codec_headphone_widgets));
++	ret = snd_soc_dapm_new_controls(dapm,
++					sun8i_a23_codec_hp_widgets,
++					ARRAY_SIZE(sun8i_a23_codec_hp_widgets));
+ 	if (ret) {
+ 		dev_err(dev, "Failed to add Headphone DAPM widgets: %d\n", ret);
+ 		return ret;
+@@ -604,6 +606,7 @@ static const DECLARE_TLV_DB_RANGE(sun8i_codec_lineout_vol_scale,
+ 	0, 1, TLV_DB_SCALE_ITEM(TLV_DB_GAIN_MUTE, 0, 1),
+ 	2, 31, TLV_DB_SCALE_ITEM(-4350, 150, 0),
+ );
 +
-+	ret = snd_soc_dapm_new_controls(dapm, sun50i_codec_lineout_widgets,
-+					ARRAY_SIZE(
-+						sun50i_codec_lineout_widgets));
-+	if (ret) {
-+		dev_err(dev, "Failed to add Line Out DAPM widgets: %d\n", ret);
-+		return ret;
-+	}
-+
-+	ret = snd_soc_dapm_add_routes(dapm, sun50i_codec_lineout_routes,
-+				      ARRAY_SIZE(sun50i_codec_lineout_routes));
-+	if (ret) {
-+		dev_err(dev, "Failed to add Line Out DAPM routes: %d\n", ret);
-+		return ret;
-+	}
-+
-+	return 0;
-+}
-+
- struct sun8i_codec_analog_quirks {
- 	bool has_headphone;
- 	bool has_hmic;
-@@ -868,6 +1072,16 @@ static const struct snd_soc_component_driver sun8i_codec_analog_cmpnt_drv = {
- 	.probe			= sun8i_codec_analog_cmpnt_probe,
+ static const struct snd_kcontrol_new sun8i_codec_lineout_controls[] = {
+ 	SOC_SINGLE_TLV("Line Out Playback Volume",
+ 		       SUN8I_ADDA_PHONE_GAIN_CTRL,
+@@ -648,7 +651,7 @@ static const struct snd_soc_dapm_route sun8i_codec_lineout_routes[] = {
+ 	{ "LINEOUT", NULL, "Line Out Enable", },
  };
  
-+static const struct snd_soc_component_driver sun50i_codec_analog_cmpnt_drv = {
-+	.controls		= sun8i_codec_common_controls,
-+	.num_controls		= ARRAY_SIZE(sun8i_codec_common_controls),
-+	.dapm_widgets		= sun50i_codec_common_widgets,
-+	.num_dapm_widgets	= ARRAY_SIZE(sun50i_codec_common_widgets),
-+	.dapm_routes		= sun8i_codec_common_routes,
-+	.num_dapm_routes	= ARRAY_SIZE(sun8i_codec_common_routes),
-+	.probe			= sun8i_codec_analog_cmpnt_probe,
-+};
-+
+-static int sun8i_codec_add_lineout(struct snd_soc_component *cmpnt)
++static int sun8i_h3_codec_add_lineout(struct snd_soc_component *cmpnt)
+ {
+ 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
+ 	struct device *dev = cmpnt->dev;
+@@ -751,6 +754,9 @@ struct sun8i_codec_analog_quirks {
+ 	bool has_lineout;
+ 	bool has_mbias;
+ 	bool has_mic2;
++	const struct snd_soc_component_driver *cmpnt_drv;
++	int (*add_headphone)(struct snd_soc_component *cmpnt);
++	int (*add_lineout)(struct snd_soc_component *cmpnt);
+ };
+ 
  static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
- 	.has_headphone	= true,
- 	.has_hmic	= true,
-@@ -893,6 +1107,15 @@ static const struct sun8i_codec_analog_quirks sun8i_v3s_quirks = {
- 	.cmpnt_drv	= &sun8i_codec_analog_cmpnt_drv,
+@@ -759,6 +765,7 @@ static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
+ 	.has_linein	= true,
+ 	.has_mbias	= true,
+ 	.has_mic2	= true,
++	.add_headphone	= sun8i_a23_codec_add_headphone,
  };
  
-+static const struct sun8i_codec_analog_quirks sun50i_a64_quirks = {
-+	.has_headphone	= true,
-+	.has_hmic	= false,
-+	.has_lineout	= true,
-+	.add_headphone	= sun50i_a64_codec_add_headphone,
-+	.add_lineout	= sun50i_a64_codec_add_lineout,
-+	.cmpnt_drv	= &sun50i_codec_analog_cmpnt_drv,
-+};
-+
- static const struct of_device_id sun8i_codec_analog_of_match[] = {
- 	{
- 		.compatible = "allwinner,sun8i-a23-codec-analog",
-@@ -906,6 +1129,10 @@ static const struct of_device_id sun8i_codec_analog_of_match[] = {
- 		.compatible = "allwinner,sun8i-v3s-codec-analog",
- 		.data = &sun8i_v3s_quirks,
- 	},
-+	{
-+		.compatible = "allwinner,sun50i-a64-codec-analog",
-+		.data = &sun50i_a64_quirks,
-+	},
- 	{}
+ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
+@@ -766,8 +773,10 @@ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
+ 	.has_lineout	= true,
+ 	.has_mbias	= true,
+ 	.has_mic2	= true,
++	.add_lineout	= sun8i_h3_codec_add_lineout,
  };
- MODULE_DEVICE_TABLE(of, sun8i_codec_analog_of_match);
+ 
++
+ static int sun8i_codec_analog_add_mixer(struct snd_soc_component *cmpnt,
+ 					const struct sun8i_codec_analog_quirks *quirks)
+ {
+@@ -834,7 +843,7 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+ 		return ret;
+ 
+ 	if (quirks->has_headphone) {
+-		ret = sun8i_codec_add_headphone(cmpnt);
++		ret = quirks->add_headphone(cmpnt);
+ 		if (ret)
+ 			return ret;
+ 	}
+@@ -852,7 +861,7 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
+ 	}
+ 
+ 	if (quirks->has_lineout) {
+-		ret = sun8i_codec_add_lineout(cmpnt);
++		ret = quirks->add_lineout(cmpnt);
+ 		if (ret)
+ 			return ret;
+ 	}
 -- 
 2.15.0
