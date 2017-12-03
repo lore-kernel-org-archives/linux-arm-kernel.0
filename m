@@ -1,25 +1,26 @@
 From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Sat, 2 Dec 2017 20:00:09 -0800
-Subject: [PATCH 6/6] ARM: configs: keystone_defconfig: Enable few
- peripheral drivers
-In-Reply-To: <20171123075154.3938-7-vigneshr@ti.com>
-References: <20171123075154.3938-1-vigneshr@ti.com>
- <20171123075154.3938-7-vigneshr@ti.com>
-Message-ID: <fb0c662b-d462-c663-7cf0-443ace3565ba@oracle.com>
+Date: Sat, 2 Dec 2017 20:00:26 -0800
+Subject: [PATCH] ARM: dts: keystone-k2l: Add the second gpio bank node
+In-Reply-To: <61c80992-92bd-a401-457c-267c64a3400d@oracle.com>
+References: <1510227778-20491-1-git-send-email-j-keerthy@ti.com>
+ <61c80992-92bd-a401-457c-267c64a3400d@oracle.com>
+Message-ID: <0075084d-5b1a-b0c1-1c23-41aef3ff0fd5@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/22/17 11:51 PM, Vignesh R wrote:
-> Enable drivers for QSPI, LEDS, gpio-decoder that are present on 66AK2G EVM
-> and 66AK2G ICE boards.
+
+
+On 11/13/17 9:12 AM, Santosh Shilimkar wrote:
+> On 11/9/2017 3:42 AM, Keerthy wrote:
+>> In case of k2l there are 2 more banks with 16 pins each.
+>> Adding the node as the da-vinci driver now supports multiple
+>> banks.
+>>
+>> Signed-off-by: Keerthy <j-keerthy@ti.com>
+>> ---
+>>
+>> This is based on linux-next branch. Boot tested on keystone-k2l-evm.
+>>
+> Will pick this up Keerthy !!
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
-> ---
-Please submit a patch also to enable all these peripherals
-in multi-v7 config. Just enable all remainder
-options enabled in keystone config also in multi-v7.
-
-Am pushing this series to next now.
-
-Regards,
-Santosh
+Applied
