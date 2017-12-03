@@ -1,140 +1,89 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun,  3 Dec 2017 12:41:53 -0800
-Subject: [PATCH 5/9] ASoC: sun8i-codec-analog: Use callbacks to add headphones
- and lineout outputs
+Date: Sun,  3 Dec 2017 12:41:57 -0800
+Subject: [PATCH 9/9] arm64: dts: allwinner: a64: Enable sound on Pine64 and
+ SoPine
 In-Reply-To: <20171203204157.20829-1-anarsoul@gmail.com>
 References: <20171203204157.20829-1-anarsoul@gmail.com>
-Message-ID: <20171203204157.20829-6-anarsoul@gmail.com>
+Message-ID: <20171203204157.20829-10-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
-
-Widgets for headphones and lineout outputs on A64 are different enough
-and use different regs, so move addition of these outputs into callback to
-simplify upcoming A64 support.
+This commit enables I2S, digital and analog parts of audiocodec on
+Pine64 and SoPine boards.
 
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 ---
- sound/soc/sunxi/sun8i-codec-analog.c | 29 +++++++++++++++++++----------
- 1 file changed, 19 insertions(+), 10 deletions(-)
+ arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts      | 16 ++++++++++++++++
+ .../boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts   | 16 ++++++++++++++++
+ 2 files changed, 32 insertions(+)
 
-diff --git a/sound/soc/sunxi/sun8i-codec-analog.c b/sound/soc/sunxi/sun8i-codec-analog.c
-index 485e79f292c4..384f582b6f69 100644
---- a/sound/soc/sunxi/sun8i-codec-analog.c
-+++ b/sound/soc/sunxi/sun8i-codec-analog.c
-@@ -397,7 +397,7 @@ static const struct snd_soc_dapm_route sun8i_codec_mixer_routes[] = {
- 
- /* headphone specific controls, widgets, and routes */
- static const DECLARE_TLV_DB_SCALE(sun8i_codec_hp_vol_scale, -6300, 100, 1);
--static const struct snd_kcontrol_new sun8i_codec_headphone_controls[] = {
-+static const struct snd_kcontrol_new sun8i_a23_codec_hp_ctrls[] = {
- 	SOC_SINGLE_TLV("Headphone Playback Volume",
- 		       SUN8I_ADDA_HP_VOLC,
- 		       SUN8I_ADDA_HP_VOLC_HP_VOL, 0x3f, 0,
-@@ -447,7 +447,7 @@ static int sun8i_headphone_amp_event(struct snd_soc_dapm_widget *w,
- 	return 0;
- }
- 
--static const struct snd_soc_dapm_widget sun8i_codec_headphone_widgets[] = {
-+static const struct snd_soc_dapm_widget sun8i_a23_codec_hp_widgets[] = {
- 	SND_SOC_DAPM_MUX("Headphone Source Playback Route",
- 			 SND_SOC_NOPM, 0, 0, sun8i_codec_hp_src),
- 	SND_SOC_DAPM_OUT_DRV_E("Headphone Amp", SUN8I_ADDA_PAEN_HP_CTRL,
-@@ -471,22 +471,24 @@ static const struct snd_soc_dapm_route sun8i_codec_headphone_routes[] = {
- 	{ "HP", NULL, "Headphone Amp" },
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+index 806442d3e846..369d9b749521 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-pine64.dts
+@@ -64,6 +64,18 @@
+ 	};
  };
  
--static int sun8i_codec_add_headphone(struct snd_soc_component *cmpnt)
-+static int sun8i_a23_codec_add_headphone(struct snd_soc_component *cmpnt)
- {
- 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
- 	struct device *dev = cmpnt->dev;
- 	int ret;
- 
- 	ret = snd_soc_add_component_controls(cmpnt,
--					     sun8i_codec_headphone_controls,
--					     ARRAY_SIZE(sun8i_codec_headphone_controls));
-+					     sun8i_a23_codec_hp_ctrls,
-+					     ARRAY_SIZE(
-+						sun8i_a23_codec_hp_ctrls));
- 	if (ret) {
- 		dev_err(dev, "Failed to add Headphone controls: %d\n", ret);
- 		return ret;
- 	}
- 
--	ret = snd_soc_dapm_new_controls(dapm, sun8i_codec_headphone_widgets,
--					ARRAY_SIZE(sun8i_codec_headphone_widgets));
-+	ret = snd_soc_dapm_new_controls(dapm,
-+					sun8i_a23_codec_hp_widgets,
-+					ARRAY_SIZE(sun8i_a23_codec_hp_widgets));
- 	if (ret) {
- 		dev_err(dev, "Failed to add Headphone DAPM widgets: %d\n", ret);
- 		return ret;
-@@ -604,6 +606,7 @@ static const DECLARE_TLV_DB_RANGE(sun8i_codec_lineout_vol_scale,
- 	0, 1, TLV_DB_SCALE_ITEM(TLV_DB_GAIN_MUTE, 0, 1),
- 	2, 31, TLV_DB_SCALE_ITEM(-4350, 150, 0),
- );
++&codec {
++	status = "okay";
++};
 +
- static const struct snd_kcontrol_new sun8i_codec_lineout_controls[] = {
- 	SOC_SINGLE_TLV("Line Out Playback Volume",
- 		       SUN8I_ADDA_PHONE_GAIN_CTRL,
-@@ -648,7 +651,7 @@ static const struct snd_soc_dapm_route sun8i_codec_lineout_routes[] = {
- 	{ "LINEOUT", NULL, "Line Out Enable", },
- };
- 
--static int sun8i_codec_add_lineout(struct snd_soc_component *cmpnt)
-+static int sun8i_h3_codec_add_lineout(struct snd_soc_component *cmpnt)
- {
- 	struct snd_soc_dapm_context *dapm = snd_soc_component_get_dapm(cmpnt);
- 	struct device *dev = cmpnt->dev;
-@@ -751,6 +754,9 @@ struct sun8i_codec_analog_quirks {
- 	bool has_lineout;
- 	bool has_mbias;
- 	bool has_mic2;
-+	const struct snd_soc_component_driver *cmpnt_drv;
-+	int (*add_headphone)(struct snd_soc_component *cmpnt);
-+	int (*add_lineout)(struct snd_soc_component *cmpnt);
- };
- 
- static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
-@@ -759,6 +765,7 @@ static const struct sun8i_codec_analog_quirks sun8i_a23_quirks = {
- 	.has_linein	= true,
- 	.has_mbias	= true,
- 	.has_mic2	= true,
-+	.add_headphone	= sun8i_a23_codec_add_headphone,
- };
- 
- static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
-@@ -766,8 +773,10 @@ static const struct sun8i_codec_analog_quirks sun8i_h3_quirks = {
- 	.has_lineout	= true,
- 	.has_mbias	= true,
- 	.has_mic2	= true,
-+	.add_lineout	= sun8i_h3_codec_add_lineout,
- };
- 
++&codec_analog {
++	status = "okay";
++};
 +
- static int sun8i_codec_analog_add_mixer(struct snd_soc_component *cmpnt,
- 					const struct sun8i_codec_analog_quirks *quirks)
- {
-@@ -834,7 +843,7 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
- 		return ret;
++&dai {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -229,6 +241,10 @@
+ 	regulator-name = "vcc-rtc";
+ };
  
- 	if (quirks->has_headphone) {
--		ret = sun8i_codec_add_headphone(cmpnt);
-+		ret = quirks->add_headphone(cmpnt);
- 		if (ret)
- 			return ret;
- 	}
-@@ -852,7 +861,7 @@ static int sun8i_codec_analog_cmpnt_probe(struct snd_soc_component *cmpnt)
- 	}
++&sound {
++	status = "okay";
++};
++
+ /* On Exp and Euler connectors */
+ &uart0 {
+ 	pinctrl-names = "default";
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+index 0eb2acedf8c3..9de5ddcc3656 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
+@@ -69,6 +69,18 @@
+ 	};
+ };
  
- 	if (quirks->has_lineout) {
--		ret = sun8i_codec_add_lineout(cmpnt);
-+		ret = quirks->add_lineout(cmpnt);
- 		if (ret)
- 			return ret;
- 	}
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	status = "okay";
++};
++
++&dai {
++	status = "okay";
++};
++
+ &ehci0 {
+ 	status = "okay";
+ };
+@@ -133,6 +145,10 @@
+ 	regulator-name = "vcc-wifi";
+ };
+ 
++&sound {
++	status = "okay";
++};
++
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
 -- 
 2.15.0
