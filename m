@@ -1,46 +1,136 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Sun, 3 Dec 2017 08:36:32 -0800
-Subject: [PATCH v6 0/2] memory: Introduce ti-emif-sram driver
-In-Reply-To: <179c7668-05eb-09cf-9857-7b6fd2308c3a@oracle.com>
-References: <1512082568-5012-1-git-send-email-d-gerlach@ti.com>
- <179c7668-05eb-09cf-9857-7b6fd2308c3a@oracle.com>
-Message-ID: <20171203163632.GU28152@atomide.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Sun,  3 Dec 2017 17:36:18 +0100
+Subject: [PATCH V2] ARM: dts: bcm283x: Use GPIO polarity defines consistently
+Message-ID: <1512318978-3174-1-git-send-email-stefan.wahren@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* santosh.shilimkar at oracle.com <santosh.shilimkar@oracle.com> [171203 04:03]:
-> 
-> 
-> On 11/30/17 2:56 PM, Dave Gerlach wrote:
-> > This is a resend of v5 of this series found here [1]. It introduces
-> > relocatable PM handlers for the emif that are copied to sram and
-> > run from there during low power mode entry.
-> > 
-> > The patches still have the previous ACKs but have a small change to
-> > accomodate a change made by Tony in commit cd57dc5a2099 ("ARM: dts:
-> > Add missing hwmod related nodes for am33xx"). If there are objections
-> > to this let me know ASAP.
-> > 
-> > Now that a hwmod is present for the am335x EMIF, on probe fail the call to
-> > pm_runtime_put_sync causes the board to hang. In fact, this emif driver should
-> > never alter the PM state of the hardware at all through normal kernel calls, it
-> > is the job of the suspend handlers that are added, that is the whole point of
-> > this driver. Because of this, I have dropped all runtime pm calls, as any
-> > change to the PM state while the kernel is running is dangerous as we may shut
-> > of the memory controller. It makes the most sense just to drop runtime PM from
-> > the driver entirely. Besides that patch is unchanged.
-> > 
-> > This code is required for low-power modes to work on AM335x and AM437x and a
-> > forthcoming PM series for those platforms will depend on this series. After
-> > both this and the PM series are reviewed I will send the necessary device tree
-> > changes for both, but in the meantime all remaining patches for am335x and
-> > am437x PM can be found here [2].
-> > 
-> Applied
+Currently most of the Raspberry Pi DTS have a mixture of magic
+numbers and the proper GPIO polarity defines. So use the latter
+one consistently.
 
-OK, do you have some immutable commit for these I can pull in too for
-the related SoC changes?
+Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+---
+ arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-a.dts      | 2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 4 ++--
+ arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 2 +-
+ arch/arm/boot/dts/bcm2835-rpi-b.dts      | 2 +-
+ arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 4 ++--
+ arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 2 +-
+ 7 files changed, 10 insertions(+), 10 deletions(-)
 
-Regards,
+Changes in V2:
+* fix wording in commit log
 
-Tony
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+index f81ae0a..aa1fc7b 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
+@@ -10,12 +10,12 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 47 0>;
++			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
+ 		};
+ 
+ 		pwr {
+ 			label = "PWR";
+-			gpios = <&gpio 35 0>;
++			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
+ 			default-state = "keep";
+ 			linux,default-trigger = "default-on";
+ 		};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+index 7a960a0..425f6b0 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
+@@ -10,7 +10,7 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 16 1>;
++			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+index 0161a84..effa195 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
+@@ -11,12 +11,12 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 47 0>;
++			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
+ 		};
+ 
+ 		pwr {
+ 			label = "PWR";
+-			gpios = <&gpio 35 0>;
++			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
+ 			default-state = "keep";
+ 			linux,default-trigger = "default-on";
+ 		};
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+index 4bc70ef..772ec3b 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
+@@ -11,7 +11,7 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 16 1>;
++			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+index cca4a75..434483d 100644
+--- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
++++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
+@@ -11,7 +11,7 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 16 1>;
++			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+index 6669355..5c339ad 100644
+--- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
++++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
+@@ -15,12 +15,12 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 47 0>;
++			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
+ 		};
+ 
+ 		pwr {
+ 			label = "PWR";
+-			gpios = <&gpio 35 0>;
++			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
+ 			default-state = "keep";
+ 			linux,default-trigger = "default-on";
+ 		};
+diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+index a8844d0..3e4ed7c 100644
+--- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
++++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
+@@ -20,7 +20,7 @@
+ 
+ 	leds {
+ 		act {
+-			gpios = <&gpio 47 0>;
++			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
+ 		};
+ 	};
+ };
+-- 
+2.7.4
