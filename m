@@ -1,7 +1,7 @@
 From: david@lechnology.com (David Lechner)
-Date: Sun,  3 Dec 2017 15:58:15 -0600
-Subject: [PATCH v2] ARM: da850: Fix LEGO EV3 battery voltage gpio
-Message-ID: <1512338295-10633-1-git-send-email-david@lechnology.com>
+Date: Sun,  3 Dec 2017 16:04:53 -0600
+Subject: [PATCH v3] ARM: da850: Fix LEGO EV3 battery voltage gpio
+Message-ID: <1512338693-16781-1-git-send-email-david@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -15,11 +15,18 @@ Also, there was a typo that prevented pinmuxing from working correctly.
 
 Signed-off-by: David Lechner <david@lechnology.com>
 ---
+
+v3 changes:
+* Rebased patch so that it applies cleanly to mainline
+
+v2 changes:
+* Fixed pinctrl typo
+
  arch/arm/boot/dts/da850-lego-ev3.dts | 4 ++--
  1 file changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
-index 65ceaa3..a4ee12f 100644
+index 413dbd5..81942ae 100644
 --- a/arch/arm/boot/dts/da850-lego-ev3.dts
 +++ b/arch/arm/boot/dts/da850-lego-ev3.dts
 @@ -178,7 +178,7 @@
@@ -31,14 +38,14 @@ index 65ceaa3..a4ee12f 100644
  		compatible = "lego,ev3-battery";
  		io-channels = <&adc 4>, <&adc 3>;
  		io-channel-names = "voltage", "current";
-@@ -465,7 +465,7 @@
+@@ -392,7 +392,7 @@
  	batt_volt_en {
  		gpio-hog;
  		gpios = <6 GPIO_ACTIVE_HIGH>;
 -		output-low;
 +		output-high;
  	};
+ };
  
- 	/* Don't impede Bluetooth clock signal */
 -- 
 2.7.4
