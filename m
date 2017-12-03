@@ -1,136 +1,92 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Sun,  3 Dec 2017 17:36:18 +0100
-Subject: [PATCH V2] ARM: dts: bcm283x: Use GPIO polarity defines consistently
-Message-ID: <1512318978-3174-1-git-send-email-stefan.wahren@i2se.com>
+From: cdall@linaro.org (Christoffer Dall)
+Date: Sun, 3 Dec 2017 20:27:18 +0100
+Subject: [PATCH 16/37] KVM: arm64: Remove noop calls to timer
+ save/restore from VHE switch
+In-Reply-To: <20171107162528.q3rdlih5fpn7fnhd@kamzik.brq.redhat.com>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-17-christoffer.dall@linaro.org>
+ <20171107162528.q3rdlih5fpn7fnhd@kamzik.brq.redhat.com>
+Message-ID: <20171203192718.GD4218@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently most of the Raspberry Pi DTS have a mixture of magic
-numbers and the proper GPIO polarity defines. So use the latter
-one consistently.
+On Tue, Nov 07, 2017 at 05:25:28PM +0100, Andrew Jones wrote:
+> On Thu, Oct 12, 2017 at 12:41:20PM +0200, Christoffer Dall wrote:
+> > The VHE switch function calls __timer_enable_traps and
+> > __timer_disable_traps which don't do anything on VHE systems.
+> > Therefore, simply remove these calls from the VHE switch function and
+> > make the functions non-conditional as they are now only called from the
+> > non-VHE switch path.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  arch/arm64/kvm/hyp/switch.c |  2 --
+> >  virt/kvm/arm/hyp/timer-sr.c | 10 ++--------
+> >  2 files changed, 2 insertions(+), 10 deletions(-)
+> > 
+> > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> > index 2cedf12..b98b73b 100644
+> > --- a/arch/arm64/kvm/hyp/switch.c
+> > +++ b/arch/arm64/kvm/hyp/switch.c
+> > @@ -336,7 +336,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> >  	__activate_vm(vcpu);
+> >  
+> >  	__vgic_restore_state(vcpu);
+> > -	__timer_enable_traps(vcpu);
+> >  
+> >  	/*
+> >  	 * We must restore the 32-bit state before the sysregs, thanks
+> > @@ -356,7 +355,6 @@ int kvm_vcpu_run(struct kvm_vcpu *vcpu)
+> >  
+> >  	__sysreg_save_guest_state(guest_ctxt);
+> >  	__sysreg32_save_state(vcpu);
+> > -	__timer_disable_traps(vcpu);
+> >  	__vgic_save_state(vcpu);
+> >  
+> >  	__deactivate_traps(vcpu);
+> > diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
+> > index f398616..82c217e 100644
+> > --- a/virt/kvm/arm/hyp/timer-sr.c
+> > +++ b/virt/kvm/arm/hyp/timer-sr.c
+> > @@ -53,16 +53,10 @@ void __hyp_text disable_el1_phys_timer_access(void)
+> >  
+> >  void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
+> >  {
+> > -	/*
+> > -	 * We don't need to do this for VHE since the host kernel runs in EL2
+> > -	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
+> > -	 */
+> 
+> I was about to suggest that we should move this comment, instead of remove
+> it, but it seems misleading anyway. We do call
+> enable/disable_el1_phys_timer_access on VHE, but at VCPU load/put time
+> instead of VM enter/exit time. So I guess removing it is best.
+> 
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/boot/dts/bcm2835-rpi-a-plus.dts | 4 ++--
- arch/arm/boot/dts/bcm2835-rpi-a.dts      | 2 +-
- arch/arm/boot/dts/bcm2835-rpi-b-plus.dts | 4 ++--
- arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts | 2 +-
- arch/arm/boot/dts/bcm2835-rpi-b.dts      | 2 +-
- arch/arm/boot/dts/bcm2836-rpi-2-b.dts    | 4 ++--
- arch/arm/boot/dts/bcm2837-rpi-3-b.dts    | 2 +-
- 7 files changed, 10 insertions(+), 10 deletions(-)
+That was actually a bug in the timer series, which has now been fixed.
+In any case, I don't think the comment is necessary as it's already
+explained in kvm_timer_init_vhe() in arch_timer.c.
 
-Changes in V2:
-* fix wording in commit log
+> > -	if (!has_vhe())
+> > -		enable_el1_phys_timer_access();
+> > +	enable_el1_phys_timer_access();
+> >  }
+> >  
+> >  void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
+> >  {
+> > -	if (!has_vhe())
+> > -		disable_el1_phys_timer_access();
+> > +	disable_el1_phys_timer_access();
+> >  }
+> > -- 
+> > 2.9.0
+> > 
+> 
+> Should we just call enable/disable_el1_phys_timer_access directly from
+> __kvm_vcpu_run for non-VHE and drop this extra function level?
+> 
+I don't think there's a problem with this indirection and we could
+imagine having more traps in the future.
 
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-index f81ae0a..aa1fc7b 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a-plus.dts
-@@ -10,12 +10,12 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		pwr {
- 			label = "PWR";
--			gpios = <&gpio 35 0>;
-+			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
- 			default-state = "keep";
- 			linux,default-trigger = "default-on";
- 		};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-a.dts b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-index 7a960a0..425f6b0 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-a.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-a.dts
-@@ -10,7 +10,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 16 1>;
-+			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-index 0161a84..effa195 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-plus.dts
-@@ -11,12 +11,12 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		pwr {
- 			label = "PWR";
--			gpios = <&gpio 35 0>;
-+			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
- 			default-state = "keep";
- 			linux,default-trigger = "default-on";
- 		};
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-index 4bc70ef..772ec3b 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b-rev2.dts
-@@ -11,7 +11,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 16 1>;
-+			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm2835-rpi-b.dts b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-index cca4a75..434483d 100644
---- a/arch/arm/boot/dts/bcm2835-rpi-b.dts
-+++ b/arch/arm/boot/dts/bcm2835-rpi-b.dts
-@@ -11,7 +11,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 16 1>;
-+			gpios = <&gpio 16 GPIO_ACTIVE_LOW>;
- 		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-index 6669355..5c339ad 100644
---- a/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-+++ b/arch/arm/boot/dts/bcm2836-rpi-2-b.dts
-@@ -15,12 +15,12 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 
- 		pwr {
- 			label = "PWR";
--			gpios = <&gpio 35 0>;
-+			gpios = <&gpio 35 GPIO_ACTIVE_HIGH>;
- 			default-state = "keep";
- 			linux,default-trigger = "default-on";
- 		};
-diff --git a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-index a8844d0..3e4ed7c 100644
---- a/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-+++ b/arch/arm/boot/dts/bcm2837-rpi-3-b.dts
-@@ -20,7 +20,7 @@
- 
- 	leds {
- 		act {
--			gpios = <&gpio 47 0>;
-+			gpios = <&gpio 47 GPIO_ACTIVE_HIGH>;
- 		};
- 	};
- };
--- 
-2.7.4
+Thanks,
+-Christoffer
