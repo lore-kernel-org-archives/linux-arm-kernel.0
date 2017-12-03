@@ -1,62 +1,46 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Sun, 3 Dec 2017 17:26:11 +0100
-Subject: [GIT PULL] revert ARM SCPI changes for v4.15-rc1
-In-Reply-To: <20171203010435.6ycn75rxss5yiixe@localhost>
-References: <7hlgimns2m.fsf@baylibre.com>
- <20171203010435.6ycn75rxss5yiixe@localhost>
-Message-ID: <19697169-9209-ba59-781f-e79e15961fca@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Sun, 3 Dec 2017 08:36:32 -0800
+Subject: [PATCH v6 0/2] memory: Introduce ti-emif-sram driver
+In-Reply-To: <179c7668-05eb-09cf-9857-7b6fd2308c3a@oracle.com>
+References: <1512082568-5012-1-git-send-email-d-gerlach@ti.com>
+ <179c7668-05eb-09cf-9857-7b6fd2308c3a@oracle.com>
+Message-ID: <20171203163632.GU28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 03.12.2017 um 02:04 schrieb Olof Johansson:
-> On Fri, Dec 01, 2017 at 11:53:05AM -0800, Kevin Hilman wrote:
->> Arnd, Olof,
->>
->> These ARM SCPI changes caused SCPI regressions resulting in CPUfreq
->> failures on most Amlogic SoCs (found by kernelci.org.)
->>
->> Unfortunately, this was not caught in linux-next due to other
->> bugs/panics on these platforms masking this problem so we've only found
->> it since we've fixed the other issues.
->>
->> Since we're already in the -rc cycle, I'd prefer to revert to a known
->> working state (that of v4.14) rather than finding/reverting a subset,
->> which would just lead to another untested state.
->>
->> These changes can then have some time to be better reviewed and tested
->> and resubmitted for v4.16.
->>
->> I've tested this revert on the affect Amlogic SoCs and verified that
->> we're back to the previous (working) condition.
->>
->> Also, I'm sending the pull directly to arm-soc instead of Sudeeep
->> because I understand that Sudeep is currently out-of-office and unlikely
->> to be able to address this himself during the -rc cycle.
->>
+* santosh.shilimkar at oracle.com <santosh.shilimkar@oracle.com> [171203 04:03]:
 > 
-> Sounds like the right approach here. I've merged this and added the above text
-> to the merge commit as well.
 > 
-I can't reproduce the issue on my systems, however I'm quite sure that commit
-931cf0c53e69 "firmware: arm_scpi: pre-populate dvfs info in scpi_probe" causes
-the problem.
-I could re-submit the series w/o this patch, the other patches then need some
-re-basing.
+> On 11/30/17 2:56 PM, Dave Gerlach wrote:
+> > This is a resend of v5 of this series found here [1]. It introduces
+> > relocatable PM handlers for the emif that are copied to sram and
+> > run from there during low power mode entry.
+> > 
+> > The patches still have the previous ACKs but have a small change to
+> > accomodate a change made by Tony in commit cd57dc5a2099 ("ARM: dts:
+> > Add missing hwmod related nodes for am33xx"). If there are objections
+> > to this let me know ASAP.
+> > 
+> > Now that a hwmod is present for the am335x EMIF, on probe fail the call to
+> > pm_runtime_put_sync causes the board to hang. In fact, this emif driver should
+> > never alter the PM state of the hardware at all through normal kernel calls, it
+> > is the job of the suspend handlers that are added, that is the whole point of
+> > this driver. Because of this, I have dropped all runtime pm calls, as any
+> > change to the PM state while the kernel is running is dangerous as we may shut
+> > of the memory controller. It makes the most sense just to drop runtime PM from
+> > the driver entirely. Besides that patch is unchanged.
+> > 
+> > This code is required for low-power modes to work on AM335x and AM437x and a
+> > forthcoming PM series for those platforms will depend on this series. After
+> > both this and the PM series are reviewed I will send the necessary device tree
+> > changes for both, but in the meantime all remaining patches for am335x and
+> > am437x PM can be found here [2].
+> > 
+> Applied
 
-I'd include a patch addressing the following question from Kevin because I was
-asking myself the same thing too:
-"Also, is this the expected result for the pre-1.0 firmware:
-scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version"
+OK, do you have some immutable commit for these I can pull in too for
+the related SoC changes?
 
-In case a legacy firmware doesn't provide version information I propose to
-print the following message instead:
-scpi_protocol scpi: SCP Protocol legacy pre-1.0 firmware
+Regards,
 
-The series could be applied to a devel branch first to give the Baylibre
-Amlogic team some time for testing.
-
-Rgds, Heiner
-
-> 
-> -Olof
-> 
+Tony
