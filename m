@@ -1,249 +1,61 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Sun, 3 Dec 2017 21:47:57 +0100
-Subject: [PATCH 11/37] KVM: arm64: Improve debug register save/restore flow
-In-Reply-To: <20171203134958.b5zfdv2mbu6lr6gj@hawk.localdomain>
-References: <20171012104141.26902-1-christoffer.dall@linaro.org>
- <20171012104141.26902-12-christoffer.dall@linaro.org>
- <20171107144857.hmgwxshk6eiorm4i@kamzik.brq.redhat.com>
- <20171201175203.GD6615@lvm>
- <20171203134958.b5zfdv2mbu6lr6gj@hawk.localdomain>
-Message-ID: <20171203204757.GD32397@cbox>
+From: peda@axentia.se (Peter Rosin)
+Date: Sun, 3 Dec 2017 21:53:58 +0100
+Subject: [PATCH 1/2] dt-bindings: trivial: add tfa9879 device
+In-Reply-To: <CAOMZO5AE++an6MnagrWoL4qwkDJaqtg_qJ5UKX3PB7sw1cTeiA@mail.gmail.com>
+References: <20171201224425.5477-1-peda@axentia.se>
+ <20171201224425.5477-2-peda@axentia.se>
+ <CAOMZO5BA2ZbBnPVORALkEGV21j7H9GJW_2uVvtEEU=8qM599-w@mail.gmail.com>
+ <8e295c61-089e-170d-bca2-42ded2021c99@axentia.se>
+ <CAOMZO5AE++an6MnagrWoL4qwkDJaqtg_qJ5UKX3PB7sw1cTeiA@mail.gmail.com>
+Message-ID: <5ec7ae30-eeac-3cf8-15ad-f6c3a110c5d7@axentia.se>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Dec 03, 2017 at 02:49:58PM +0100, Andrew Jones wrote:
-> On Fri, Dec 01, 2017 at 06:52:03PM +0100, Christoffer Dall wrote:
-> > On Tue, Nov 07, 2017 at 03:48:57PM +0100, Andrew Jones wrote:
-> > > On Thu, Oct 12, 2017 at 12:41:15PM +0200, Christoffer Dall wrote:
-> > > > Instead of having multiple calls from the world switch path to the debug
-> > > > logic, each figuring out if the dirty bit is set and if we should
-> > > > save/restore the debug registes, let's just provide two hooks to the
-> > > > debug save/restore functionality, one for switching to the guest
-> > > > context, and one for switching to the host context, and we get the
-> > > > benefit of only having to evaluate the dirty flag once on each path,
-> > > > plus we give the compiler some more room to inline some of this
-> > > > functionality.
-> > > > 
-> > > > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > > > ---
-> > > >  arch/arm64/include/asm/kvm_hyp.h | 10 ++-----
-> > > >  arch/arm64/kvm/hyp/debug-sr.c    | 56 +++++++++++++++++++++++++++-------------
-> > > >  arch/arm64/kvm/hyp/switch.c      |  6 ++---
-> > > >  3 files changed, 42 insertions(+), 30 deletions(-)
-> > > > 
-> > > > diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-> > > > index 08d3bb6..a0e5a70 100644
-> > > > --- a/arch/arm64/include/asm/kvm_hyp.h
-> > > > +++ b/arch/arm64/include/asm/kvm_hyp.h
-> > > > @@ -139,14 +139,8 @@ void __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt);
-> > > >  void __sysreg32_save_state(struct kvm_vcpu *vcpu);
-> > > >  void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
-> > > >  
-> > > > -void __debug_save_state(struct kvm_vcpu *vcpu,
-> > > > -			struct kvm_guest_debug_arch *dbg,
-> > > > -			struct kvm_cpu_context *ctxt);
-> > > > -void __debug_restore_state(struct kvm_vcpu *vcpu,
-> > > > -			   struct kvm_guest_debug_arch *dbg,
-> > > > -			   struct kvm_cpu_context *ctxt);
-> > > > -void __debug_cond_save_host_state(struct kvm_vcpu *vcpu);
-> > > > -void __debug_cond_restore_host_state(struct kvm_vcpu *vcpu);
-> > > > +void __debug_switch_to_guest(struct kvm_vcpu *vcpu);
-> > > > +void __debug_switch_to_host(struct kvm_vcpu *vcpu);
-> > > >  
-> > > >  void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
-> > > >  void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
-> > > > diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-> > > > index a2291b6..b4cd8e0 100644
-> > > > --- a/arch/arm64/kvm/hyp/debug-sr.c
-> > > > +++ b/arch/arm64/kvm/hyp/debug-sr.c
-> > > > @@ -116,16 +116,13 @@ static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
-> > > >  	write_sysreg_s(pmscr_el1, PMSCR_EL1);
-> > > >  }
-> > > >  
-> > > > -void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
-> > > > -				   struct kvm_guest_debug_arch *dbg,
-> > > > -				   struct kvm_cpu_context *ctxt)
-> > > > +static void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
-> > > > +					  struct kvm_guest_debug_arch *dbg,
-> > > > +					  struct kvm_cpu_context *ctxt)
-> > > >  {
-> > > >  	u64 aa64dfr0;
-> > > >  	int brps, wrps;
-> > > >  
-> > > > -	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-> > > > -		return;
-> > > > -
-> > > >  	aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
-> > > >  	brps = (aa64dfr0 >> 12) & 0xf;
-> > > >  	wrps = (aa64dfr0 >> 20) & 0xf;
-> > > > @@ -138,16 +135,13 @@ void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
-> > > >  	ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
-> > > >  }
-> > > >  
-> > > > -void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
-> > > > -				      struct kvm_guest_debug_arch *dbg,
-> > > > -				      struct kvm_cpu_context *ctxt)
-> > > > +static void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
-> > > > +					     struct kvm_guest_debug_arch *dbg,
-> > > > +					     struct kvm_cpu_context *ctxt)
-> > > >  {
-> > > >  	u64 aa64dfr0;
-> > > >  	int brps, wrps;
-> > > >  
-> > > > -	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-> > > > -		return;
-> > > > -
-> > > >  	aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
-> > > >  
-> > > >  	brps = (aa64dfr0 >> 12) & 0xf;
-> > > > @@ -161,24 +155,50 @@ void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
-> > > >  	write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
-> > > >  }
-> > > >  
-> > > > -void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
-> > > > +void __hyp_text __debug_switch_to_guest(struct kvm_vcpu *vcpu)
-> > > >  {
-> > > > -	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
-> > > > -			   kern_hyp_va(vcpu->arch.host_cpu_context));
-> > > > +	struct kvm_cpu_context *__host_ctxt;
-> > > > +	struct kvm_cpu_context *__guest_ctxt;
-> > > > +	struct kvm_guest_debug_arch *__host_dbg;
-> > > > +	struct kvm_guest_debug_arch *__guest_dbg;
-> > > 
-> > > I caught in your reply to Marc that the __ prefix here is for hyp mode
-> > > accessible code and data, but do we also need to use it for stack data?
-> > > No big deal, but it's not very pretty.
-> > > 
-> > 
-> > sure.
-> > 
-> > > >  
-> > > >  	/* Non-VHE: Disable and flush SPE data generation
-> > > >  	 * VHE: The vcpu can run. but it can't hide. */
-> > > >  	if (!has_vhe())
-> > > >  		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
-> > > > +
-> > > > +	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-> > > > +		return;
-> > > > +
-> > > > +	__host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> > > > +	__guest_ctxt = &vcpu->arch.ctxt;
-> > > > +	__host_dbg = &vcpu->arch.host_debug_state.regs;
-> > > > +	__guest_dbg = kern_hyp_va(vcpu->arch.debug_ptr);
-> > > > +
-> > > > +	__debug_save_state(vcpu, __host_dbg, __host_ctxt);
-> > > > +	__debug_restore_state(vcpu, __guest_dbg, __guest_ctxt);
-> > > >  }
-> > > >  
-> > > > -void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
-> > > > +void __hyp_text __debug_switch_to_host(struct kvm_vcpu *vcpu)
-> > > >  {
-> > > > +	struct kvm_cpu_context *__host_ctxt;
-> > > > +	struct kvm_cpu_context *__guest_ctxt;
-> > > > +	struct kvm_guest_debug_arch *__host_dbg;
-> > > > +	struct kvm_guest_debug_arch *__guest_dbg;
-> > > > +
-> > > >  	if (!has_vhe())
-> > > >  		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
-> > > >  
-> > > > -	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
-> > > > -			      kern_hyp_va(vcpu->arch.host_cpu_context));
-> > > > +	if (!(vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY))
-> > > > +		return;
-> > > > +
-> > > > +	__host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> > > > +	__guest_ctxt = &vcpu->arch.ctxt;
-> > > > +	__host_dbg = &vcpu->arch.host_debug_state.regs;
-> > > > +	__guest_dbg = kern_hyp_va(vcpu->arch.debug_ptr);
-> > > > +
-> > > > +	__debug_save_state(vcpu, __guest_dbg, __guest_ctxt);
-> > > > +	__debug_restore_state(vcpu, __host_dbg, __host_ctxt);
-> > > >  
-> > > >  	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
-> > > >  }
-> > > > diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> > > > index ef05c59..e270cba 100644
-> > > > --- a/arch/arm64/kvm/hyp/switch.c
-> > > > +++ b/arch/arm64/kvm/hyp/switch.c
-> > > > @@ -271,7 +271,6 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> > > >  	guest_ctxt = &vcpu->arch.ctxt;
-> > > >  
-> > > >  	__sysreg_save_host_state(host_ctxt);
-> > > > -	__debug_cond_save_host_state(vcpu);
-> > > >  
-> > > >  	__activate_traps(vcpu);
-> > > >  	__activate_vm(vcpu);
-> > > > @@ -285,7 +284,7 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> > > >  	 */
-> > > >  	__sysreg32_restore_state(vcpu);
-> > > >  	__sysreg_restore_guest_state(guest_ctxt);
-> > > > -	__debug_restore_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
-> > > > +	__debug_switch_to_guest(vcpu);
-> > > >  
-> > > >  	/* Jump in the fire! */
-> > > >  again:
-> > > > @@ -353,12 +352,11 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-> > > >  
-> > > >  	__sysreg_restore_host_state(host_ctxt);
-> > > >  
-> > > > -	__debug_save_state(vcpu, kern_hyp_va(vcpu->arch.debug_ptr), guest_ctxt);
-> > > >  	/*
-> > > >  	 * This must come after restoring the host sysregs, since a non-VHE
-> > > >  	 * system may enable SPE here and make use of the TTBRs.
-> > > >  	 */
-> > > > -	__debug_cond_restore_host_state(vcpu);
-> > > > +	__debug_switch_to_host(vcpu);
-> > > >  
-> > > >  	return exit_code;
-> > > >  }
-> > > > -- 
-> > > > 2.9.0
-> > > >
-> > > 
-> > > This looks like a nice cleanup, but can you please add a note to the
-> > > commit message about why we don't need to use the
-> > > 
-> > >  save-host-state
-> > >  activate-traps-and-vm
-> > >  restore-guest-state
-> > > 
-> > > and the reverse, patterns for the debug registers? 
-> > 
-> > I think the current commit message motivates the change fine.
-> >
+On 2017-12-03 12:12, Fabio Estevam wrote:
+> Hi Peter,
 > 
-> The motivation is obvious, the justification for an additional change
-> is not. How does it justify changing the sequence
+> On Sun, Dec 3, 2017 at 4:59 AM, Peter Rosin <peda@axentia.se> wrote:
 > 
->  save-debug-host-state
->  activate-debug-traps 		/* and other stuff in between */
->  restore-debug-guest-state
+>> Right. However, the patch adding that should have been sent to me, the
+>> maintainer of the driver. That is carefully recorded in MAINTAINERS. So,
+>> forgive me for assuming that nothing had changed in the driver behind my
+>> back.
+>>
+>> Had that patch been sent my way as it should have been, I would have
+>> insisted that maintenance of the bindings had been kept together with
+>> the maintenance of the driver.
 > 
-> to
->  
->  activate-debug-traps		/* and other stuff in between */
->  save-debug-host-state
->  restore-debug-guest-state
+> When I sent this patch ./scripts/get_maintainer.pl did lot list your
+> name, so that's why I did not put you on Cc, sorry.
 > 
+> 4.15-rc1 still does not list you, but linux-next does.
 
-It doesn't, and I don't think it has to.  The code is there, and I can't
-argue all possible interdependencies between all code lines in English
-and explain why it's safe, that requires looking at the code.  The
-commit message should motivate the change, not explain code which
-requires understanding the software and the architecture.
+That's funny, because I get the below on both 4.14 and 4.15-rc1. And I
+expect the same ever since the driver was added some 3 years ago.
 
-If there was a clear rule that we do 'save, activate, restore' for
-everything, it would make sense to explain why we can break that, but
-that is not how I see the implementation.   For example, there is no
-particular reason why we restore the vgic before the timer, or the vgic
-after we activate the stage 2 translation.  The key here is
-understanding the flexibility the architecture gives you.
+$ scripts/get_maintainer.pl your-patch-from[1].diff | grep Peter
+Peter Rosin <peda@axentia.se> (maintainer:NXP TFA9879 DRIVER)
 
-You can then argue that since this bothers you, I should just add
-something in the commit message, but I think that can be just as
-misleading, because it would imply a total order, which doesn't exist.
-Also, since you clearly understood the flow and what is going on, we're
-probably fine as it is.
+[1] https://patchwork.ozlabs.org/patch/815930/
 
-Thanks,
--Christoffer
+By the way, scripts/checkpatch.pl on that patch reports
+WARNING: added, moved or deleted file(s), does MAINTAINERS need updating?
+
+> Would you like me to send the following patch so that new binding
+> updates go to you?
+
+Naahh, I'll claim it myself, that way I can clean up some nits in the
+actual file while at it...
+
+Cheers,
+Peter
+
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -9808,6 +9808,7 @@ NXP TFA9879 DRIVER
+>  M:     Peter Rosin <peda@axentia.se>
+>  L:     alsa-devel at alsa-project.org (moderated for non-subscribers)
+>  S:     Maintained
+> +F:     Documentation/devicetree/bindings/sound/tfa9879.txt
+>  F:     sound/soc/codecs/tfa9879*
+> 
