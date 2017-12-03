@@ -1,39 +1,35 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Dec 2017 17:04:35 -0800
-Subject: [GIT PULL] revert ARM SCPI changes for v4.15-rc1
-In-Reply-To: <7hlgimns2m.fsf@baylibre.com>
-References: <7hlgimns2m.fsf@baylibre.com>
-Message-ID: <20171203010435.6ycn75rxss5yiixe@localhost>
+Date: Sat, 2 Dec 2017 17:17:47 -0800
+Subject: [GIT PULL] fixes for omaps for v4.15-rc cycle
+In-Reply-To: <pull-1512056553-465925@atomide.com>
+References: <pull-1512056553-465925@atomide.com>
+Message-ID: <20171203011747.j7vpez5wrbbfcx7g@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 11:53:05AM -0800, Kevin Hilman wrote:
-> Arnd, Olof,
-> 
-> These ARM SCPI changes caused SCPI regressions resulting in CPUfreq
-> failures on most Amlogic SoCs (found by kernelci.org.)
-> 
-> Unfortunately, this was not caught in linux-next due to other
-> bugs/panics on these platforms masking this problem so we've only found
-> it since we've fixed the other issues.
-> 
-> Since we're already in the -rc cycle, I'd prefer to revert to a known
-> working state (that of v4.14) rather than finding/reverting a subset,
-> which would just lead to another untested state.
-> 
-> These changes can then have some time to be better reviewed and tested
-> and resubmitted for v4.16.
-> 
-> I've tested this revert on the affect Amlogic SoCs and verified that
-> we're back to the previous (working) condition.
-> 
-> Also, I'm sending the pull directly to arm-soc instead of Sudeeep
-> because I understand that Sudeep is currently out-of-office and unlikely
-> to be able to address this himself during the -rc cycle.
-> 
+Hi,
 
-Sounds like the right approach here. I've merged this and added the above text
-to the merge commit as well.
+On Thu, Nov 30, 2017 at 08:19:27AM -0800, Tony Lindgren wrote:
+> From: "Tony Lindgren" <tony@atomide.com>
+> 
+> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+> 
+>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+> 
+> are available in the Git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.15/fixes-v2-signed
+> 
+> for you to fetch changes up to 7cd4a5eb64b638a71564f62175f6c7ad3f27044e:
+> 
+>   Merge branch 'omap-for-v4.15/fixes-dt' into omap-for-v4.15/fixes-v2 (2017-11-28 08:23:05 -0800)
+> 
+> ----------------------------------------------------------------
+> Fixes for omaps for v4.15-rc cycle with two fixes for hangs with the
+> rest being compiler warning fixes and fixes for power states and devices
+> on various boards:
+
+Merged, thanks.
 
 
 -Olof
