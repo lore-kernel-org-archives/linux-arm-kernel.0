@@ -1,51 +1,47 @@
-From: david@lechnology.com (David Lechner)
-Date: Sun,  3 Dec 2017 16:04:53 -0600
-Subject: [PATCH v3] ARM: da850: Fix LEGO EV3 battery voltage gpio
-Message-ID: <1512338693-16781-1-git-send-email-david@lechnology.com>
+From: marcel.ziswiler@toradex.com (Marcel Ziswiler)
+Date: Sun, 3 Dec 2017 22:48:22 +0000
+Subject: [PATCH 08/12] ARM: dts: imx6qdl-apalis: Remove unneeded reg
+ property
+In-Reply-To: <1512156285-18451-8-git-send-email-festevam@gmail.com>
+References: <1512156285-18451-1-git-send-email-festevam@gmail.com>
+ <1512156285-18451-8-git-send-email-festevam@gmail.com>
+Message-ID: <1512341301.21715.1.camel@toradex.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This fixes the battery voltage monitoring gpio-hog settings.
+Thanks Fabio for catching that one!
 
-When the gpio is low, it turns off the battery voltage to the ADC chip.
-However, this needs to be on all of the time so that we can monitor
-battery voltage.
+On Fri, 2017-12-01 at 17:24 -0200, Fabio Estevam wrote:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
+> 
+> As described in
+> Documentation/devicetree/bindings/input/touchscreen/stmpe.txt
+> there is no 'reg' property under stmpe_touchscreen, so remove it
+> to fix the following build warning with W=1:
+> 
+> arch/arm/boot/dts/imx6q-apalis-eval.dtb: Warning
+> (unit_address_vs_reg): Node /soc/aips-bus at 2100000/i2c at 21a4000/stmpe81
+> 1 at 41/stmpe_touchscreen has a reg or ranges property, but no unit name
+> 
+> Cc: Marcel Ziswiler <marcel.ziswiler@toradex.com>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Also, there was a typo that prevented pinmuxing from working correctly.
+Acked-by: Marcel Ziswiler <marcel.ziswiler@toradex.com>
 
-Signed-off-by: David Lechner <david@lechnology.com>
----
-
-v3 changes:
-* Rebased patch so that it applies cleanly to mainline
-
-v2 changes:
-* Fixed pinctrl typo
-
- arch/arm/boot/dts/da850-lego-ev3.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm/boot/dts/da850-lego-ev3.dts b/arch/arm/boot/dts/da850-lego-ev3.dts
-index 413dbd5..81942ae 100644
---- a/arch/arm/boot/dts/da850-lego-ev3.dts
-+++ b/arch/arm/boot/dts/da850-lego-ev3.dts
-@@ -178,7 +178,7 @@
- 	 */
- 	battery {
- 		pinctrl-names = "default";
--		pintctrl-0 = <&battery_pins>;
-+		pinctrl-0 = <&battery_pins>;
- 		compatible = "lego,ev3-battery";
- 		io-channels = <&adc 4>, <&adc 3>;
- 		io-channel-names = "voltage", "current";
-@@ -392,7 +392,7 @@
- 	batt_volt_en {
- 		gpio-hog;
- 		gpios = <6 GPIO_ACTIVE_HIGH>;
--		output-low;
-+		output-high;
- 	};
- };
- 
--- 
-2.7.4
+> ---
+>  arch/arm/boot/dts/imx6qdl-apalis.dtsi | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> index e80fdca..4e776e0 100644
+> --- a/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-apalis.dtsi
+> @@ -338,7 +338,6 @@
+>  
+>  		stmpe_touchscreen {
+>  			compatible = "st,stmpe-ts";
+> -			reg = <0>;
+>  			/* 3.25 MHz ADC clock speed */
+>  			st,adc-freq = <1>;
+>  			/* 8 sample average control */
