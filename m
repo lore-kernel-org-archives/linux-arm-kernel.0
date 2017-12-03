@@ -1,27 +1,25 @@
 From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Sat, 2 Dec 2017 19:57:57 -0800
-Subject: [RESEND PATCH 2/4] ARM: dts: keystone: Add generic compatible
- string for I2C EEPROM
-In-Reply-To: <20171124162750.18756-2-javierm@redhat.com>
-References: <20171124162750.18756-1-javierm@redhat.com>
- <20171124162750.18756-2-javierm@redhat.com>
-Message-ID: <b98fb17b-289c-4756-cfca-85e633b55354@oracle.com>
+Date: Sat, 2 Dec 2017 20:00:09 -0800
+Subject: [PATCH 6/6] ARM: configs: keystone_defconfig: Enable few
+ peripheral drivers
+In-Reply-To: <20171123075154.3938-7-vigneshr@ti.com>
+References: <20171123075154.3938-1-vigneshr@ti.com>
+ <20171123075154.3938-7-vigneshr@ti.com>
+Message-ID: <fb0c662b-d462-c663-7cf0-443ace3565ba@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24/17 8:27 AM, Javier Martinez Canillas wrote:
-> The at24 driver allows to register I2C EEPROM chips using different vendor
-> and devices, but the I2C subsystem does not take the vendor into account
-> when matching using the I2C table since it only has device entries.
+On 11/22/17 11:51 PM, Vignesh R wrote:
+> Enable drivers for QSPI, LEDS, gpio-decoder that are present on 66AK2G EVM
+> and 66AK2G ICE boards.
 > 
-> But when matching using an OF table, both the vendor and device has to be
-> taken into account so the driver defines only a set of compatible strings
-> using the "atmel" vendor as a generic fallback for compatible I2C devices.
-> 
-> So add this generic fallback to the device node compatible string to make
-> the device to match the driver using the OF device ID table.
-> 
-> Signed-off-by: Javier Martinez Canillas <javierm@redhat.com>
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
 > ---
-> 
-Applied
+Please submit a patch also to enable all these peripherals
+in multi-v7 config. Just enable all remainder
+options enabled in keystone config also in multi-v7.
+
+Am pushing this series to next now.
+
+Regards,
+Santosh
