@@ -1,131 +1,160 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Sun,  3 Dec 2017 13:11:22 +0200
-Subject: [PATCH v2 2/4] thermal: armada: add support for AP806
-In-Reply-To: <f8c589337a4fb78852eadf15058e8f8d132d4dc0.1512299484.git.baruch@tkos.co.il>
-References: <f8c589337a4fb78852eadf15058e8f8d132d4dc0.1512299484.git.baruch@tkos.co.il>
-Message-ID: <0aa7ef4c48974f5973ff637ab37aee620d35b8fe.1512299484.git.baruch@tkos.co.il>
+From: peng.fan@nxp.com (Peng Fan)
+Date: Sun, 3 Dec 2017 11:20:48 +0000
+Subject: [PATCH] arm: l2c: unlock ways when in non-secure mode
+In-Reply-To: <DB6PR04MB3221EDB9EEF8F2606FC292B5883A0@DB6PR04MB3221.eurprd04.prod.outlook.com>
+References: <20171126122530.857-1-peng.fan@nxp.com>
+ <20171126131812.GZ31757@n2100.armlinux.org.uk>
+ <DB6PR04MB3221D60D0EC8D5B31869AA6588240@DB6PR04MB3221.eurprd04.prod.outlook.com>
+ <20171127091937.GA31757@n2100.armlinux.org.uk>
+ <DB6PR04MB322104DB1B2FCBD535AAA49488250@DB6PR04MB3221.eurprd04.prod.outlook.com>
+ <20171127101911.GC31757@n2100.armlinux.org.uk>
+ <DB6PR04MB3221EDB9EEF8F2606FC292B5883A0@DB6PR04MB3221.eurprd04.prod.outlook.com>
+Message-ID: <DB6PR04MB32211AC670BCAD49CB9F2F38883F0@DB6PR04MB3221.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AP806 component is integrated in the Armada 8k and 7k lines of processors.
+Hi Russell,
 
-The thermal sensor sample field on the status register is a signed
-value. Extend armada_get_temp() to handle signed values.
+> > > > > >
+> > > > > > On Sun, Nov 26, 2017 at 08:25:30PM +0800, Peng Fan wrote:
+> > > > > > > To boot Linux in Non-secure mode with l2x0, the l2x0
+> > > > > > > controller is enabled in secure mode and ways locked to make
+> > > > > > > it seems L2 cache disabled during linux boot process. So
+> > > > > > > during l2x0 initialization, need to unlock the ways to make
+> > > > > > > l2x0 could
+> > cache data/inst.
+> > > > > >
+> > > > > > Why was this chosen instead of doing what everyone else does?
+> > > > >
+> > > > > I am not aware of how other platform handles the l2x0 unlock in
+> > > > > non secure mode. Could you please share with me what others choose?
+> > > >
+> > > > That's not what I was asking.
+> > > >
+> > > > Everyone else provides a way for the l2x0 controller to be enabled
+> > > > and disabled from non-secure mode.
+> > >
+> > > Thanks for the information. I see that some platforms implements
+> > l2c_write_sec.
+> > >
+> > > >
+> > > > Why have you decided to enable the l2x0 controller and leave it
+> > > > enabled, and then lock down all the cache ways - which means you
+> > > > need the kernel to do something entirely different for your platform.
+> > >
+> > > Currently we are running OP-TEE on i.MX6/7 with Linux in non-secure
+> > > mode. See In
+> > > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fg
+> > > it
+> > > hub.com%2FOP-
+> > TEE%2Foptee_os%2Fblob%2Fmaster%2Fcore%2Farch%2Farm%2Fkern
+> > >
+> > el%2Fgeneric_entry_a32.S%23L428&data=02%7C01%7Cpeng.fan%40nxp.com%
+> > 7C32
+> > >
+> >
+> e10e1e643f4def0d9508d535805486%7C686ea1d3bc2b4c6fa92cd99c5c301635%7
+> > C0%
+> > >
+> >
+> 7C0%7C636473747645673295&sdata=ZGaxxhs8mPNcqk5l2aSiStkPRFNxLzFFj45w
+> > kj%
+> > > 2Ff%2Fu4%3D&reserved=0
+> > > Pl310 is enabled. And In
+> > > https://emea01.safelinks.protection.outlook.com/?url=https%3A%2F%2Fg
+> > > it
+> > > hub.com%2FOP-
+> > TEE%2Foptee_os%2Fblob%2Fmaster%2Fcore%2Farch%2Farm%2Fkern
+> > >
+> > el%2Fgeneric_entry_a32.S%23L461&data=02%7C01%7Cpeng.fan%40nxp.com%
+> > 7C32
+> > >
+> >
+> e10e1e643f4def0d9508d535805486%7C686ea1d3bc2b4c6fa92cd99c5c301635%7
+> > C0%
+> > >
+> >
+> 7C0%7C636473747645673295&sdata=rO1LG3639lfclvtgzZRTTPcSAGDQNG0Clqb
+> > D1wC
+> > > 4wGk%3D&reserved=0
+> > > pl310 locked before returning back to Linux.
+> > >
+> > > I see ti platform not enabled pl310 in OP-TEE, leaving Linux to
+> > > enable it. platform-sam/stm/ zynq7k/imx Have pl310 enabled in OP-TEE.
+> > >
+> > > I could switch to use l2c_write_sec dedicated for i.MX. But I think
+> > > this patch is
+> > also a valid point.
+> > > What do you suggest?
+> >
+> > What I'm concerned about is that there's a valid scenario where the L2
+> > cache would be enabled and left enabled by the secure mode code - that
+> > is if the secure mode wishes to take advantage of the L2 cache, and
+> > has locked down some ways for its own use.
+> >
+> > In this scenario, the secure world would have set the L2 cache up to
+> > prevent the non-secure side unlocking those ways.  This would mean
+> > that the NS_LOCKDOWN bit in the auxiliary control register would be
+> > clear.  The PL310 TRM has this to say:
+> >
+> > "On reset the Non-Secure Lockdown Enable bit is set to 0 and Lockdown
+> > Registers are not permitted to be modified by non-secure accesses. In
+> > that configuration, if a non-secure access tries to write to those
+> > registers, the write response returns a DECERR response."
+> >
+> > which means that if we blindly try and unlock the ways, we will end up
+> > triggering an exception, and that will crash the kernel.
 
-Signed-off-by: Baruch Siach <baruch@tkos.co.il>
----
-v2:
-  Use msleep instead of mdelay (RMK).
-  Fix temperature calculation formula according to recent documentation
-  and vendor code. Update the commit log.
----
- drivers/thermal/armada_thermal.c | 44 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 42 insertions(+), 2 deletions(-)
+Just have a follow up question. If implementing l2c_write_sec, the kernel image
+could not  only running in non-secure world. If we want the image to support
+running in secure and non-secure world, do you have any suggestions about
+the l2c things?
 
-diff --git a/drivers/thermal/armada_thermal.c b/drivers/thermal/armada_thermal.c
-index 706d74798cbe..0eb82097571f 100644
---- a/drivers/thermal/armada_thermal.c
-+++ b/drivers/thermal/armada_thermal.c
-@@ -41,6 +41,10 @@
- #define A375_HW_RESETn			BIT(8)
- #define A380_HW_RESET			BIT(8)
- 
-+#define AP806_START			BIT(0)
-+#define AP806_RESET			BIT(1)
-+#define AP806_ENABLE			BIT(2)
-+
- struct armada_thermal_data;
- 
- /* Marvell EBU Thermal Sensor Dev Structure */
-@@ -63,6 +67,7 @@ struct armada_thermal_data {
- 	unsigned long coef_m;
- 	unsigned long coef_div;
- 	bool inverted;
-+	bool signed_sample;
- 
- 	/* Register shift and mask to access the sensor temperature */
- 	unsigned int temp_shift;
-@@ -147,6 +152,18 @@ static void armada380_init_sensor(struct platform_device *pdev,
- 	}
- }
- 
-+static void armada_ap806_init_sensor(struct platform_device *pdev,
-+				     struct armada_thermal_priv *priv)
-+{
-+	u32 reg = readl_relaxed(priv->control);
-+
-+	reg &= ~AP806_RESET;
-+	reg |= AP806_START;
-+	reg |= AP806_ENABLE;
-+	writel(reg, priv->control);
-+	msleep(10);
-+}
-+
- static bool armada_is_valid(struct armada_thermal_priv *priv)
- {
- 	unsigned long reg = readl_relaxed(priv->sensor);
-@@ -160,6 +177,7 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 	struct armada_thermal_priv *priv = thermal->devdata;
- 	unsigned long reg;
- 	unsigned long m, b, div;
-+	int sample;
- 
- 	/* Valid check */
- 	if (priv->data->is_valid && !priv->data->is_valid(priv)) {
-@@ -170,6 +188,11 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 
- 	reg = readl_relaxed(priv->sensor);
- 	reg = (reg >> priv->data->temp_shift) & priv->data->temp_mask;
-+	if (priv->data->signed_sample)
-+		/* The most significant bit is the sign bit */
-+		sample = sign_extend32(reg, fls(priv->data->temp_mask) - 1);
-+	else
-+		sample = reg;
- 
- 	/* Get formula coeficients */
- 	b = priv->data->coef_b;
-@@ -177,9 +200,9 @@ static int armada_get_temp(struct thermal_zone_device *thermal,
- 	div = priv->data->coef_div;
- 
- 	if (priv->data->inverted)
--		*temp = ((m * reg) - b) / div;
-+		*temp = ((m * sample) - b) / div;
- 	else
--		*temp = (b - (m * reg)) / div;
-+		*temp = (b - (m * sample)) / div;
- 	return 0;
- }
- 
-@@ -230,6 +253,19 @@ static const struct armada_thermal_data armada380_data = {
- 	.inverted = true,
- };
- 
-+static const struct armada_thermal_data armada_ap806_data = {
-+	.is_valid = armada_is_valid,
-+	.init_sensor = armada_ap806_init_sensor,
-+	.is_valid_shift = 16,
-+	.temp_shift = 0,
-+	.temp_mask = 0x3ff,
-+	.coef_b = -150000,
-+	.coef_m = 423UL,
-+	.coef_div = 1,
-+	.inverted = true,
-+	.signed_sample = true,
-+};
-+
- static const struct of_device_id armada_thermal_id_table[] = {
- 	{
- 		.compatible = "marvell,armadaxp-thermal",
-@@ -247,6 +283,10 @@ static const struct of_device_id armada_thermal_id_table[] = {
- 		.compatible = "marvell,armada380-thermal",
- 		.data       = &armada380_data,
- 	},
-+	{
-+		.compatible = "marvell,armada-ap806-thermal",
-+		.data       = &armada_ap806_data,
-+	},
- 	{
- 		/* sentinel */
- 	},
--- 
-2.15.0
+Thanks,
+Peng.
+
+> 
+> Currently, we set auxiliary control register to let NS could unlock. BIT26 set to 1.
+> But you bring a valid point is if TEE would like to lock down some ways for its
+> own use, l2c_write_sec should be used, to avoid Linux to directly unlock.
+> 
+> >
+> > Given that the kernel does _not_ handle this scenario today, I fail to
+> > see why OP-TEE would decide that, on ARM by default, it will enable
+> > the L2 cache and lock all ways.
+> >
+> > As you have already found, at least OMAP has decided to do things
+> > sensibly.  I fail to see why everyone else can't also decide to do the sensible
+> thing.
+> 
+> Most platforms just set BIT26 to allow non-secure unlock ways without
+> considering reserving ways dedicated to TEE.
+> 
+> i.MX also has BIT26 set, so if l2c_init is not a good place, do you think moving
+> unlock to imx_init_l2cache is ok? But this means "enabling(unlock)" L2C earlier
+> which is before l2c_init
+> 
+> >
+> > Please talk to the OP-TEE folk to see whether the OP-TEE behaviour can
+> > be changed first.
+> 
+> +OP-TEE maintainers Etienne, Jens
+> Do you have comments on this?
+> 
+> Thanks,
+> Peng.
+> 
+> >
+> > --
+> > RMK's Patch system:
+> >
+> https://emea01.safelinks.protection.outlook.com/?url=http%3A%2F%2Fwww.
+> >
+> armlinux.org.uk%2Fdeveloper%2Fpatches%2F&data=02%7C01%7Cpeng.fan%4
+> >
+> 0nxp.com%7C32e10e1e643f4def0d9508d535805486%7C686ea1d3bc2b4c6fa92c
+> >
+> d99c5c301635%7C0%7C0%7C636473747645673295&sdata=4i8a6dYNkHlMXiYQZ
+> > N9Ej4b68q%2FZfMCZvIUfJtFy0Jc%3D&reserved=0
+> > FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down
+> > 630kbps up According to speedtest.net: 8.21Mbps down 510kbps up
