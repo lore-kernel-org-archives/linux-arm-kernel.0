@@ -1,31 +1,19 @@
-From: dja@axtens.net (Daniel Axtens)
-Date: Sun, 03 Dec 2017 12:03:17 +1100
-Subject: [PATCH] pinctrl: pxa2xx: add MODULE_LICENSE
-In-Reply-To: <CACRpkdYWTNEJZ3TUCsgEdDMRytGiOiMV6YhRKgciO1Qwgbeorg@mail.gmail.com>
-References: <20171202094015.11696-1-dja@axtens.net>
- <CACRpkdYWTNEJZ3TUCsgEdDMRytGiOiMV6YhRKgciO1Qwgbeorg@mail.gmail.com>
-Message-ID: <87mv30fwru.fsf@linkitivity.dja.id.au>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 2 Dec 2017 16:28:00 -0800
+Subject: [PATCH] arm64: dts: sort vendor subdirectories in Makefile
+ alphabetically
+In-Reply-To: <1510974603-7463-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1510974603-7463-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20171203002800.g7fpyhkcm4gfxncc@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Linus Walleij <linus.walleij@linaro.org> writes:
+On Sat, Nov 18, 2017 at 12:10:03PM +0900, Masahiro Yamada wrote:
+> The list is almost sorted.  Move "lg" up to complete it.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-> On Sat, Dec 2, 2017 at 10:40 AM, Daniel Axtens <dja@axtens.net> wrote:
->
->> This fixes the following warning on an allmodconfig build:
->> WARNING: modpost: missing MODULE_LICENSE() in drivers/pinctrl/pxa/pinctrl-pxa2xx.o
->>
->> This matches the license in the header.
->>
->> Signed-off-by: Daniel Axtens <dja@axtens.net>
->
-> Somebody patches this too. Sorry!
-No worries, apologies for the noise!
+Applied to fixes, thanks.
 
-Regards,
-Daniel
->
-> Thanks anyway!
->
-> Yours,
-> Linus Walleij
+
+-Olof
