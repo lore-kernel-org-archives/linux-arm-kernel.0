@@ -1,90 +1,83 @@
 From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Sun,  3 Dec 2017 12:41:50 -0800
-Subject: [PATCH 2/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+Date: Sun,  3 Dec 2017 12:41:52 -0800
+Subject: [PATCH 4/9] ASoC: sun8i-codec: Add support for A64 SoC
 In-Reply-To: <20171203204157.20829-1-anarsoul@gmail.com>
 References: <20171203204157.20829-1-anarsoul@gmail.com>
-Message-ID: <20171203204157.20829-3-anarsoul@gmail.com>
+Message-ID: <20171203204157.20829-5-anarsoul@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Marcus Cooper <codekipper@gmail.com>
+Digital part of audio codec block in the A64 is very similar to what
+is used by the A33(sun8i) devices. However, it uses different LRCK
+divider.
 
-The I2S block used for the audio codec in the A64 is very similar
-to what is used by the A10(sun4i) devices. However, its TX FIFO is
-located at a different address.
-
-[vasilykh: - added fixed_wss and wss_value to A64 quirks,
-	   - changed compatible to 'allwinner,sun50i-a64-acodec-i2s,
-	     since A64 has 3 more I2S blocks that are not compatible
-	     with audio codec I2S]
-
-Signed-off-by: Marcus Cooper <codekipper@gmail.com>
 Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 ---
- .../devicetree/bindings/sound/sun4i-i2s.txt        |  2 ++
- sound/soc/sunxi/sun4i-i2s.c                        | 23 ++++++++++++++++++++++
- 2 files changed, 25 insertions(+)
+ .../bindings/sound/{sun8i-a33-codec.txt => sun8i-codec.txt}      | 6 ++++--
+ sound/soc/sunxi/sun8i-codec.c                                    | 9 +++++++++
+ 2 files changed, 13 insertions(+), 2 deletions(-)
+ rename Documentation/devicetree/bindings/sound/{sun8i-a33-codec.txt => sun8i-codec.txt} (91%)
 
-diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-index 05d7135a8d2f..ab86f266962a 100644
---- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-+++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
-@@ -9,6 +9,7 @@ Required properties:
-    - "allwinner,sun4i-a10-i2s"
-    - "allwinner,sun6i-a31-i2s"
-    - "allwinner,sun8i-h3-i2s"
-+   - "allwinner,sun50i-a64-acodec-i2s"
- - reg: physical base address of the controller and length of memory mapped
-   region.
- - interrupts: should contain the I2S interrupt.
-@@ -24,6 +25,7 @@ Required properties:
- Required properties for the following compatibles:
- 	- "allwinner,sun6i-a31-i2s"
- 	- "allwinner,sun8i-h3-i2s"
-+	- "allwinner,sun50i-a64-acodec-i2s"
- - resets: phandle to the reset line for this codec
+diff --git a/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt b/Documentation/devicetree/bindings/sound/sun8i-codec.txt
+similarity index 91%
+rename from Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
+rename to Documentation/devicetree/bindings/sound/sun8i-codec.txt
+index 2ca3d138528e..ffcf9079a67c 100644
+--- a/Documentation/devicetree/bindings/sound/sun8i-a33-codec.txt
++++ b/Documentation/devicetree/bindings/sound/sun8i-codec.txt
+@@ -1,7 +1,7 @@
+ Allwinner SUN8I audio codec
+ ------------------------------------
  
- Example:
-diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
-index 54c16eb64713..2c060e015725 100644
---- a/sound/soc/sunxi/sun4i-i2s.c
-+++ b/sound/soc/sunxi/sun4i-i2s.c
-@@ -942,6 +942,25 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
- 	.field_rxchansel	= REG_FIELD(SUN8I_I2S_RX_CHAN_SEL_REG, 0, 2),
+-On Sun8i-A33 SoCs, the audio is separated in different parts:
++On Sun8i-A33 and Sun50i-A64 SoCs, the audio is separated in different parts:
+ 	  - A DAI driver. It uses the "sun4i-i2s" driver which is
+ 	  documented here:
+ 	  Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+@@ -16,7 +16,9 @@ On Sun8i-A33 SoCs, the audio is separated in different parts:
+ This bindings documentation exposes Sun8i codec (digital part).
+ 
+ Required properties:
+-- compatible: must be "allwinner,sun8i-a33-codec"
++- compatible: should be one of the following:
++   - "allwinner,sun8i-a33-codec"
++   - "allwinner,sun50i-a64-codec"
+ - reg: must contain the registers location and length
+ - interrupts: must contain the codec interrupt
+ - clocks: a list of phandle + clock-specifer pairs, one for each entry
+diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+index 054201d1de03..0e2a5adcfb96 100644
+--- a/sound/soc/sunxi/sun8i-codec.c
++++ b/sound/soc/sunxi/sun8i-codec.c
+@@ -52,6 +52,7 @@
+ #define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV		9
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV		6
+ #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16		(1 << 6)
++#define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_64		(2 << 6)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ		4
+ #define SUN8I_AIF1CLK_CTRL_AIF1_WORD_SIZ_16		(1 << 4)
+ #define SUN8I_AIF1CLK_CTRL_AIF1_DATA_FMT		2
+@@ -456,6 +457,10 @@ static const struct sun8i_codec_quirks sun8i_a33_codec_quirks = {
+ 	.aif1_lrck_div	= SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16,
  };
  
-+static const struct sun4i_i2s_quirks sun50i_a64_acodec_i2s_quirks = {
-+	.has_reset		= true,
-+	.reg_offset_txdata	= SUN8I_I2S_FIFO_TX_REG,
-+	.sun4i_i2s_regmap	= &sun4i_i2s_regmap_config,
-+	.has_slave_select_bit	= true,
-+	.fixed_wss		= true,
-+	.wss_value		= 3,
-+	.field_clkdiv_mclk_en	= REG_FIELD(SUN4I_I2S_CLK_DIV_REG, 7, 7),
-+	.field_fmt_wss		= REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
-+	.field_fmt_sr		= REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
-+	.field_fmt_bclk		= REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
-+	.field_fmt_lrclk	= REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
-+	.field_fmt_mode		= REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
-+	.field_txchanmap	= REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
-+	.field_rxchanmap	= REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
-+	.field_txchansel	= REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
-+	.field_rxchansel	= REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
++static const struct sun8i_codec_quirks sun50i_a64_codec_quirks = {
++	.aif1_lrck_div	= SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_64,
 +};
 +
- static int sun4i_i2s_init_regmap_fields(struct device *dev,
- 					struct sun4i_i2s *i2s)
+ static int sun8i_codec_probe(struct platform_device *pdev)
  {
-@@ -1146,6 +1165,10 @@ static const struct of_device_id sun4i_i2s_match[] = {
- 		.compatible = "allwinner,sun8i-h3-i2s",
- 		.data = &sun8i_h3_i2s_quirks,
+ 	struct resource *res_base;
+@@ -551,6 +556,10 @@ static const struct of_device_id sun8i_codec_of_match[] = {
+ 		.compatible = "allwinner,sun8i-a33-codec",
+ 		.data = &sun8i_a33_codec_quirks,
  	},
 +	{
-+		.compatible = "allwinner,sun50i-a64-acodec-i2s",
-+		.data = &sun50i_a64_acodec_i2s_quirks,
++		.compatible = "allwinner,sun50i-a64-codec",
++		.data = &sun50i_a64_codec_quirks,
 +	},
  	{}
  };
- MODULE_DEVICE_TABLE(of, sun4i_i2s_match);
+ MODULE_DEVICE_TABLE(of, sun8i_codec_of_match);
 -- 
 2.15.0
