@@ -1,39 +1,46 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 00:04:34 +0100
-Subject: [PATCH] KVM: arm/arm64: Fix broken GICH_ELRSR big endian conversion
-Message-ID: <20171203230435.22021-1-cdall@kernel.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 4 Dec 2017 07:13:05 +0800
+Subject: [PATCH 1/4] arm: dts: imx28: Use phandles instead of unit
+ addresses
+In-Reply-To: <1512110311-15788-2-git-send-email-venkataravi.e@techveda.org>
+References: <1512110311-15788-2-git-send-email-venkataravi.e@techveda.org>
+Message-ID: <201712040750.oAKvTih2%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Hi Ravi,
 
-We are incorrectly rearranging 32-bit words inside a 64-bit typed value
-for big endian systems, which would result in never marking a virtual
-interrupt as inactive on big endian systems (assuming 32 or fewer LRs on
-the hardware).  Fix this by not doing any word order manipulation for
-the typed values.
+Thank you for the patch! Yet something to improve:
 
-Cc: <stable@vger.kernel.org>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+[auto build test ERROR on shawnguo/for-next]
+[also build test ERROR on v4.15-rc2 next-20171201]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
+
+url:    https://github.com/0day-ci/linux/commits/venkataravi-e-techveda-org/arm-dts-imx28-Use-phandles-instead-of-unit-addresses/20171204-023409
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git for-next
+config: arm-at91_dt_defconfig (attached as .config)
+compiler: arm-linux-gnueabi-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
+
+Note: the linux-review/venkataravi-e-techveda-org/arm-dts-imx28-Use-phandles-instead-of-unit-addresses/20171204-023409 HEAD c17ed56cb053430c58e4b6748774a1f195df2627 builds fine.
+      It only hurts bisectibility.
+
+All errors (new ones prefixed by >>):
+
+>> Error: arch/arm/boot/dts/imx28-evk.dts:25.4-9 syntax error
+>> FATAL ERROR: Unable to parse input tree
+
 ---
- virt/kvm/arm/hyp/vgic-v2-sr.c | 4 ----
- 1 file changed, 4 deletions(-)
-
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index a3f18d362366..d7fd46fe9efb 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -34,11 +34,7 @@ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
- 	else
- 		elrsr1 = 0;
- 
--#ifdef CONFIG_CPU_BIG_ENDIAN
--	cpu_if->vgic_elrsr = ((u64)elrsr0 << 32) | elrsr1;
--#else
- 	cpu_if->vgic_elrsr = ((u64)elrsr1 << 32) | elrsr0;
--#endif
- }
- 
- static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
--- 
-2.14.2
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 23569 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171204/60da5c70/attachment-0001.gz>
