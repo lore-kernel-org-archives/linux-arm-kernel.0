@@ -1,35 +1,69 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 2 Dec 2017 17:17:47 -0800
-Subject: [GIT PULL] fixes for omaps for v4.15-rc cycle
-In-Reply-To: <pull-1512056553-465925@atomide.com>
-References: <pull-1512056553-465925@atomide.com>
-Message-ID: <20171203011747.j7vpez5wrbbfcx7g@localhost>
+From: jinb.park7@gmail.com (park jinbum)
+Date: Sun, 3 Dec 2017 11:32:24 +0900
+Subject: [kernel-hardening][PATCH v2 3/3] arm: mm: dump: add checking for
+ writable and executable pages
+In-Reply-To: <23def981-3f61-8421-b46d-94f75b293003@redhat.com>
+References: <20171201113447.GA5234@pjb1027-Latitude-E5410>
+ <23def981-3f61-8421-b46d-94f75b293003@redhat.com>
+Message-ID: <CAErMHp9ZvUiCO4RUSin3jCBghBFNg=xPaLGyB+3vOPjD0zTBgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+I agree with your opinion, Laura.
+I'll make a new version to take advantage of the existing pg_level and
+bits arrays.
 
-On Thu, Nov 30, 2017 at 08:19:27AM -0800, Tony Lindgren wrote:
-> From: "Tony Lindgren" <tony@atomide.com>
-> 
-> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-> 
->   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-> 
-> are available in the Git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.15/fixes-v2-signed
-> 
-> for you to fetch changes up to 7cd4a5eb64b638a71564f62175f6c7ad3f27044e:
-> 
->   Merge branch 'omap-for-v4.15/fixes-dt' into omap-for-v4.15/fixes-v2 (2017-11-28 08:23:05 -0800)
-> 
-> ----------------------------------------------------------------
-> Fixes for omaps for v4.15-rc cycle with two fixes for hangs with the
-> rest being compiler warning fixes and fixes for power states and devices
-> on various boards:
+Thanks,
+Jinbum Park.
 
-Merged, thanks.
-
-
--Olof
+2017-12-02 6:59 GMT+09:00 Laura Abbott <labbott@redhat.com>:
+> On 12/01/2017 03:34 AM, Jinbum Park wrote:
+>>
+>> +static inline bool is_prot_ro(struct pg_state *st)
+>> +{
+>> +       if (st->level < 4) {
+>> +       #ifdef CONFIG_ARM_LPAE
+>> +               if ((st->current_prot &
+>> +               (L_PMD_SECT_RDONLY | PMD_SECT_AP2)) ==
+>> +               (L_PMD_SECT_RDONLY | PMD_SECT_AP2))
+>> +                       return true;
+>> +       #elif __LINUX_ARM_ARCH__ >= 6
+>> +               if ((st->current_prot &
+>> +               (PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) ==
+>> +               (PMD_SECT_APX | PMD_SECT_AP_WRITE))
+>> +                       return true;
+>> +       #else
+>> +               if ((st->current_prot &
+>> +               (PMD_SECT_AP_READ | PMD_SECT_AP_WRITE)) == 0)
+>> +                       return true;
+>> +       #endif
+>> +       } else {
+>> +               if ((st->current_prot & L_PTE_RDONLY) == L_PTE_RDONLY)
+>> +                       return true;
+>> +       }
+>> +
+>> +       return false;
+>> +}
+>> +
+>> +static inline bool is_prot_nx(struct pg_state *st)
+>> +{
+>> +       if (st->level < 4) {
+>> +               if ((st->current_prot & PMD_SECT_XN) == PMD_SECT_XN)
+>> +                       return true;
+>> +       } else {
+>> +               if ((st->current_prot & L_PTE_XN) == L_PTE_XN)
+>> +                       return true;
+>> +       }
+>> +
+>> +       return false;
+>> +}
+>
+>
+> I know arm64 checks the bits directly, but the arm32 code is a bit
+> more fiddly and I have mixed feelings about copying and pasting
+> the checks. It would be cleaner if we could take advantage of
+> the existing pg_level and bits arrays. I also don't have my heart
+> set on this so if nobody else objects, the code can stay as is.
+>
+> Thanks,
+> Laura
