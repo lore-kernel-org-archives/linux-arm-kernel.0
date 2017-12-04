@@ -1,111 +1,41 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 15:03:43 +0100
-Subject: [PULL 14/19] kvm: arm64: handle single-step of hyp emulated mmio
- instructions
+Date: Mon,  4 Dec 2017 15:03:44 +0100
+Subject: [PULL 15/19] KVM: arm/arm64: Avoid attempting to load timer vgic
+ state without a vgic
 In-Reply-To: <20171204135637.21620-1-cdall@kernel.org>
 References: <20171204135637.21620-1-cdall@kernel.org>
-Message-ID: <20171204140348.21965-12-cdall@kernel.org>
+Message-ID: <20171204140348.21965-13-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Benn?e <alex.bennee@linaro.org>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-There is a fast-path of MMIO emulation inside hyp mode. The handling
-of single-step is broadly the same as kvm_arm_handle_step_debug()
-except we just setup ESR/HSR so handle_exit() does the correct thing
-as we exit.
+The timer optimization patches inadvertendly changed the logic to always
+load the timer state as if we have a vgic, even if we don't have a vgic.
 
-For the case of an emulated illegal access causing an SError we will
-exit via the ARM_EXCEPTION_EL1_SERROR path in handle_exit(). We behave
-as we would during a real SError and clear the DBG_SPSR_SS bit for the
-emulated instruction.
+Fix this by doing the usual irqchip_in_kernel() check and call the
+appropriate load function.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/switch.c | 37 ++++++++++++++++++++++++++++++-------
- 1 file changed, 30 insertions(+), 7 deletions(-)
+ virt/kvm/arm/arch_timer.c | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 525c01f48867..f7c651f3a8c0 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -22,6 +22,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
- #include <asm/fpsimd.h>
-+#include <asm/debug-monitors.h>
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 190c99ed1b73..f9555b1e7f15 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -835,7 +835,10 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ no_vgic:
+ 	preempt_disable();
+ 	timer->enabled = 1;
+-	kvm_timer_vcpu_load_vgic(vcpu);
++	if (!irqchip_in_kernel(vcpu->kvm))
++		kvm_timer_vcpu_load_user(vcpu);
++	else
++		kvm_timer_vcpu_load_vgic(vcpu);
+ 	preempt_enable();
  
- static bool __hyp_text __fpsimd_enabled_nvhe(void)
- {
-@@ -269,7 +270,11 @@ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
- 	return true;
- }
- 
--static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
-+/* Skip an instruction which has been emulated. Returns true if
-+ * execution can continue or false if we need to exit hyp mode because
-+ * single-step was in effect.
-+ */
-+static bool __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- {
- 	*vcpu_pc(vcpu) = read_sysreg_el2(elr);
- 
-@@ -282,6 +287,14 @@ static void __hyp_text __skip_instr(struct kvm_vcpu *vcpu)
- 	}
- 
- 	write_sysreg_el2(*vcpu_pc(vcpu), elr);
-+
-+	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
-+		vcpu->arch.fault.esr_el2 =
-+			(ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT) | 0x22;
-+		return false;
-+	} else {
-+		return true;
-+	}
- }
- 
- int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
-@@ -342,13 +355,21 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 			int ret = __vgic_v2_perform_cpuif_access(vcpu);
- 
- 			if (ret == 1) {
--				__skip_instr(vcpu);
--				goto again;
-+				if (__skip_instr(vcpu))
-+					goto again;
-+				else
-+					exit_code = ARM_EXCEPTION_TRAP;
- 			}
- 
- 			if (ret == -1) {
--				/* Promote an illegal access to an SError */
--				__skip_instr(vcpu);
-+				/* Promote an illegal access to an
-+				 * SError. If we would be returning
-+				 * due to single-step clear the SS
-+				 * bit so handle_exit knows what to
-+				 * do after dealing with the error.
-+				 */
-+				if (!__skip_instr(vcpu))
-+					*vcpu_cpsr(vcpu) &= ~DBG_SPSR_SS;
- 				exit_code = ARM_EXCEPTION_EL1_SERROR;
- 			}
- 
-@@ -363,8 +384,10 @@ int __hyp_text __kvm_vcpu_run(struct kvm_vcpu *vcpu)
- 		int ret = __vgic_v3_perform_cpuif_access(vcpu);
- 
- 		if (ret == 1) {
--			__skip_instr(vcpu);
--			goto again;
-+			if (__skip_instr(vcpu))
-+				goto again;
-+			else
-+				exit_code = ARM_EXCEPTION_TRAP;
- 		}
- 
- 		/* 0 falls through to be handled out of EL2 */
+ 	return 0;
 -- 
 2.14.2
