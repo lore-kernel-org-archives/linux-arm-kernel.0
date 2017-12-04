@@ -1,59 +1,110 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 4 Dec 2017 13:32:44 +0100
-Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
- removed vmemmap mem
-In-Reply-To: <20171204114908.GC6373@samekh>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
- <20171130145134.el3qq7pr3q4xqglz@dhcp22.suse.cz>
- <20171204114908.GC6373@samekh>
-Message-ID: <20171204123244.vfm6znonfqt6fien@dhcp22.suse.cz>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon,  4 Dec 2017 12:26:39 +0000
+Subject: [PATCH v2 13/19] crypto: arm64/sha2-ce - yield every 8 blocks of input
+In-Reply-To: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
+References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
+Message-ID: <20171204122645.31535-14-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 04-12-17 11:49:09, Andrea Reale wrote:
-> On Thu 30 Nov 2017, 15:51, Michal Hocko wrote:
-> > On Thu 23-11-17 11:14:38, Andrea Reale wrote:
-> > > When hot-removing memory we need to free vmemmap memory.
-> > > However, depending on the memory is being removed, it might
-> > > not be always possible to free a full vmemmap page / huge-page
-> > > because part of it might still be used.
-> > > 
-> > > Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
-> > > hot-remove") introduced a workaround for x86
-> > > hot-remove, by which partially unused areas are filled with
-> > > the 0xFD constant. Full pages are only removed when fully
-> > > filled by 0xFDs.
-> > > 
-> > > This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
-> > > the goal of using it in place of 0xFDs. For now, this will be used for
-> > > the arm64 port of memory hot remove, but the idea is to eventually use
-> > > the same mechanism for x86 as well.
-> > 
-> > Why cannot you use the same approach as x86 have? Have a look at the
-> > vmemmap_free at al.
-> > 
-> 
-> This arm64 hot-remove version (including vmemmap_free) is indeed an
-> almost 1-to-1 port of the x86 approach. 
-> 
-> If you look at the first version of the patchset we submitted a while 
-> ago (https://lkml.org/lkml/2017/4/11/540), we were initially using the
-> x86 approach of filling unsued page structs with 0xFDs. Commenting on
-> that, Mark suggested (and, indeed, I agree with him) that relying on a
-> magic constant for marking some portions of physical memory was quite
-> ugly. That is why we have used memblock for the purpose in this revised
-> patchset.
-> 
-> If you have a different view and any concrete suggestion on how to
-> improve this, it is definitely very well welcome. 
+Avoid excessive scheduling delays under a preemptible kernel by
+yielding the NEON every 8 blocks of input.
 
-I would really prefer if those archictectues shared the code (and
-concept) as much as possible. It is really a PITA to wrap your head
-around each architectures for reasons which are not inherent to that
-specific architecture. If you find the way how x86 is implemented ugly,
-then all right, but making arm64 special just for the matter of taste is
-far from ideal IMHO.
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/crypto/sha2-ce-core.S | 40 ++++++++++++++------
+ 1 file changed, 29 insertions(+), 11 deletions(-)
+
+diff --git a/arch/arm64/crypto/sha2-ce-core.S b/arch/arm64/crypto/sha2-ce-core.S
+index 679c6c002f4f..d156b3ae967c 100644
+--- a/arch/arm64/crypto/sha2-ce-core.S
++++ b/arch/arm64/crypto/sha2-ce-core.S
+@@ -77,30 +77,39 @@
+ 	 *			  int blocks)
+ 	 */
+ ENTRY(sha2_ce_transform)
++	stp		x29, x30, [sp, #-48]!
++	mov		x29, sp
++	stp		x19, x20, [sp, #16]
++	str		x21, [sp, #32]
++
++	mov		x19, x0
++	mov		x20, x1
++	mov		x21, x2
++
+ 	/* load round constants */
+-	adr		x8, .Lsha2_rcon
++0:	adr		x8, .Lsha2_rcon
+ 	ld1		{ v0.4s- v3.4s}, [x8], #64
+ 	ld1		{ v4.4s- v7.4s}, [x8], #64
+ 	ld1		{ v8.4s-v11.4s}, [x8], #64
+ 	ld1		{v12.4s-v15.4s}, [x8]
+ 
+ 	/* load state */
+-	ld1		{dgav.4s, dgbv.4s}, [x0]
++	ld1		{dgav.4s, dgbv.4s}, [x19]
+ 
+ 	/* load sha256_ce_state::finalize */
+ 	ldr_l		w4, sha256_ce_offsetof_finalize, x4
+-	ldr		w4, [x0, x4]
++	ldr		w4, [x19, x4]
+ 
+ 	/* load input */
+-0:	ld1		{v16.4s-v19.4s}, [x1], #64
+-	sub		w2, w2, #1
++1:	ld1		{v16.4s-v19.4s}, [x20], #64
++	sub		w21, w21, #1
+ 
+ CPU_LE(	rev32		v16.16b, v16.16b	)
+ CPU_LE(	rev32		v17.16b, v17.16b	)
+ CPU_LE(	rev32		v18.16b, v18.16b	)
+ CPU_LE(	rev32		v19.16b, v19.16b	)
+ 
+-1:	add		t0.4s, v16.4s, v0.4s
++2:	add		t0.4s, v16.4s, v0.4s
+ 	mov		dg0v.16b, dgav.16b
+ 	mov		dg1v.16b, dgbv.16b
+ 
+@@ -129,16 +138,22 @@ CPU_LE(	rev32		v19.16b, v19.16b	)
+ 	add		dgbv.4s, dgbv.4s, dg1v.4s
+ 
+ 	/* handled all input blocks? */
+-	cbnz		w2, 0b
++	cbz		w21, 3f
++
++	yield_neon_pre	w21, 3, 1, 1b			// yield every 8 blocks
++	st1		{dgav.4s, dgbv.4s}, [x19]
++	yield_neon_post	0b
++
++	b		1b
+ 
+ 	/*
+ 	 * Final block: add padding and total bit count.
+ 	 * Skip if the input size was not a round multiple of the block size,
+ 	 * the padding is handled by the C code in that case.
+ 	 */
+-	cbz		x4, 3f
++3:	cbz		x4, 4f
+ 	ldr_l		w4, sha256_ce_offsetof_count, x4
+-	ldr		x4, [x0, x4]
++	ldr		x4, [x19, x4]
+ 	movi		v17.2d, #0
+ 	mov		x8, #0x80000000
+ 	movi		v18.2d, #0
+@@ -147,9 +162,12 @@ CPU_LE(	rev32		v19.16b, v19.16b	)
+ 	mov		x4, #0
+ 	mov		v19.d[0], xzr
+ 	mov		v19.d[1], x7
+-	b		1b
++	b		2b
+ 
+ 	/* store new state */
+-3:	st1		{dgav.4s, dgbv.4s}, [x0]
++4:	st1		{dgav.4s, dgbv.4s}, [x19]
++	ldp		x19, x20, [sp, #16]
++	ldr		x21, [sp, #32]
++	ldp		x29, x30, [sp], #48
+ 	ret
+ ENDPROC(sha2_ce_transform)
 -- 
-Michal Hocko
-SUSE Labs
+2.11.0
