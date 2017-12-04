@@ -1,29 +1,51 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 4 Dec 2017 08:43:33 +0800
-Subject: [PATCH 1/9] ASoC: sun4i-i2s: Add quirk to handle fixed WSS
-In-Reply-To: <20171203204157.20829-2-anarsoul@gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-2-anarsoul@gmail.com>
-Message-ID: <CAGb2v64BpqPzj0WOeiY0mQkX9QXqKctUJyfD9DOVfaE_K6k39g@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Mon, 4 Dec 2017 02:24:06 +0000
+Subject: SCPI regressions in v4.15-rc1 on Amlogic SoCs.
+In-Reply-To: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
+References: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
+Message-ID: <20171204022406.GA6870@e107533-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Nov 30, 2017 at 04:21:13PM -0800, Kevin Hilman wrote:
+> Hi Sudeep,
+> 
+> There's been a pretty major regression in v4.15-rc1 compared to v4.15
+> in SCPI causing warning splats on amlogic SoCs when cpufreq starts up
+> and tries to set the OPP for the first time[1].
+>
 
-On Mon, Dec 4, 2017 at 4:41 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> I2S for audio codec on sun50i-A64 always uses fixed word select size value,
-> no matter what is sample width. Add quirk to support that.
+Looks like some issue with firmware we are hitting. I assume CPUFreq was
+never initialised on this platform before(i.e. v4.14) and these changes
+are changing the probe path, so it could be that change causing the
+regression.
 
-Please clarify on this. Does this mean the WSS bitfield is useless and it
-always sends out the same sample sizes regardless of the setting? Or it's
-the codec that can only use a fixed sample width?
+> I ran out of time to narrow it down further since there have been
+> quite a few changes since v4.14, but simply reverting
+> drivers/firmware/arm_scpi.c to its v4.14 state gets things working
+> again.
+>
 
-As far as I can tell, the code you added in this patch points to the latter.
-In that case. this is the wrong way to go about it. The limitation is a
-property of the codec, not the I2S controller. If the codec assumes 32 bits
-per sample, then that is what you should setup in the code driver. See
-sun8i_codec_dai in sound/soc/sunxi/sun8i-codec.c where you can set the
-format. You'll likely need to make a copy of the data structure for A64,
-and tie it to the compatible.
+Makes sense.
 
-ChenYu
+> This has been happening for awhile, and we should've caught it sooner
+> in kernelCI.org, however this warning splat still allows the kernel to
+> finish booting, so it still resulted in a PASS for the boot test.
+> That combined with the fact that we've been tracking some other
+> regressions, we didn't notice it until now.
+>
+
+It's unfortunate that it didn't get tested in linux-next as it was pulled
+a while a ago.
+
+> Also, is this the expected result for the pre-1.0 firmware:
+>
+>     scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
+>
+
+I think so, since Amlogic has unreleased/draft version of the specification
+implemented, we did discuss to print something similar in the past.
+
+--
+Regards,
+Sudeep
