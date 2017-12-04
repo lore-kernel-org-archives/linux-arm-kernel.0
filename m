@@ -1,27 +1,26 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 04 Dec 2017 13:54:06 +0100
-Subject: [PATCH v2 02/12] ARM: dts: imx51-zii-rdu1: Add the unit
- addresses in sysled
-In-Reply-To: <1512390016-703-2-git-send-email-festevam@gmail.com>
+Date: Mon, 04 Dec 2017 13:54:27 +0100
+Subject: [PATCH v2 10/12] ARM: dts: imx6q-h100: Remove unneeded unit
+ address
+In-Reply-To: <1512390016-703-10-git-send-email-festevam@gmail.com>
 References: <1512390016-703-1-git-send-email-festevam@gmail.com>
- <1512390016-703-2-git-send-email-festevam@gmail.com>
-Message-ID: <1512392046.6394.5.camel@pengutronix.de>
+ <1512390016-703-10-git-send-email-festevam@gmail.com>
+Message-ID: <1512392067.6394.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Am Montag, den 04.12.2017, 10:20 -0200 schrieb Fabio Estevam:
 > From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> As described at Documentation/devicetree/bindings/mfd/mc13xxx.txt the
-> reg property is mandatory, so add the corresponding unit address in
-> order to fix the following build warnings with W=1:
+> Remove the unneeded unit address for the port nodes in order to fix
+> the following build warnings with W=1:
 > 
-> arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg):
-> Node /soc/aips at 70000000/spba at 70000000/ecspi at 70010000/pmic at 0/leds/sysl
-> ed0 has a reg or ranges property, but no unit name
-> arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg):
-> Node /soc/aips at 70000000/spba at 70000000/ecspi at 70010000/pmic at 0/leds/sysl
-> ed1 has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/imx6q-h100.dtb: Warning (unit_address_vs_reg): Node
+> /soc/aips-bus at 2100000/i2c at 21a0000/tc358743 at f/port at 0 has a unit name,
+> but no reg property
+> arch/arm/boot/dts/imx6q-h100.dtb: Warning (unit_address_vs_reg): Node
+> /soc/aips-bus at 2100000/mipi at 21dc000/port at 0 has a unit name, but no reg
+> property
 > 
 > Cc: Lucas Stach <l.stach@pengutronix.de>
 > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
@@ -30,31 +29,32 @@ Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
 > Changes since v1:
-> - Removed 'Node /memory has a reg or ranges property, but no unit
-> name' error
+> - None
 > 
-> ?arch/arm/boot/dts/imx51-zii-rdu1.dts | 4 ++--
+> ?arch/arm/boot/dts/imx6q-h100.dts | 4 ++--
 > ?1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> index f9fdb7c..70fdcdd 100644
-> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
-> @@ -428,13 +428,13 @@
-> ?			#size-cells = <0>;
-> ?			led-control = <0x0 0x0 0x3f83f8 0x0>;
+> diff --git a/arch/arm/boot/dts/imx6q-h100.dts
+> b/arch/arm/boot/dts/imx6q-h100.dts
+> index 743c11f..cc1ce46 100644
+> --- a/arch/arm/boot/dts/imx6q-h100.dts
+> +++ b/arch/arm/boot/dts/imx6q-h100.dts
+> @@ -205,7 +205,7 @@
+> ?		reset-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
+> ?		/* IRQ has a wrong pull resistor which renders it
+> useless??*/
 > ?
-> -			sysled0 {
-> +			sysled0 at 3 {
-> ?				reg = <3>;
-> ?				label = "system:green:status";
-> ?				linux,default-trigger = "default-
-> on";
-> ?			};
+> -		port at 0 {
+> +		port {
+> ?			tc358743_out: endpoint {
+> ?				remote-endpoint = <&mipi_csi2_in>;
+> ?				data-lanes = <1 2 3 4>;
+> @@ -348,7 +348,7 @@
+> ?&mipi_csi {
+> ?	status = "okay";
 > ?
-> -			sysled1 {
-> +			sysled1 at 4 {
-> ?				reg = <4>;
-> ?				label = "system:green:act";
-> ?				linux,default-trigger = "heartbeat";
+> -	port at 0 {
+> +	port {
+> ?		mipi_csi2_in: endpoint {
+> ?			remote-endpoint = <&tc358743_out>;
+> ?			data-lanes = <1 2 3 4>;
