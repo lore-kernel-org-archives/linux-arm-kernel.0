@@ -1,32 +1,70 @@
-From: gary.bisson@boundarydevices.com (Gary Bisson)
-Date: Mon, 4 Dec 2017 16:25:06 +0100
-Subject: [PATCH v2 11/12] ARM: dts: imx6qdl-nitrogen6_max: Remove
- unneeded unit address
-In-Reply-To: <1512390016-703-11-git-send-email-festevam@gmail.com>
-References: <1512390016-703-1-git-send-email-festevam@gmail.com>
- <1512390016-703-11-git-send-email-festevam@gmail.com>
-Message-ID: <20171204152506.cmcxtcuowz3hsarx@t450s.lan>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Mon, 4 Dec 2017 15:36:50 +0000
+Subject: [PATCH 3/3] arm64/sve: KVM: Avoid dereference of dead task
+ during guest entry
+In-Reply-To: <CAKv+Gu_e3SKsreYHrZEBUMEME-pYtxTXW1P6xLUR6YMQfj0cZw@mail.gmail.com>
+References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
+ <1512141582-17474-4-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu_e3SKsreYHrZEBUMEME-pYtxTXW1P6xLUR6YMQfj0cZw@mail.gmail.com>
+Message-ID: <20171204153648.GV22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Fabio,
+On Mon, Dec 04, 2017 at 01:53:21PM +0000, Ard Biesheuvel wrote:
+> On 1 December 2017 at 15:19, Dave Martin <Dave.Martin@arm.com> wrote:
+> > When deciding whether to invalidate FPSIMD state cached in the cpu,
+> > the backend function sve_flush_cpu_state() attempts to dereference
+> > __this_cpu_read(fpsimd_last_state).  However, this is not safe:
+> > there is no guarantee that the pointer is still valid, because the
+> > task could have exited in the meantime.  For this reason, this
+> > percpu pointer should only be assigned or compared, never
+> > dereferenced.
+> >
+> 
+> Doesn't that mean the pointer could also be pointing to the
+> fpsimd_state of a newly created task that is completely unrelated?
+> IOW, are you sure comparison is safe?
 
-On Mon, Dec 04, 2017 at 10:20:15AM -0200, Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Remove the unneeded unit address for the i2cmux nodes in order to fix
-> the following build warnings with W=1:
-> 
-> arch/arm/boot/dts/imx6q-nitrogen6_max.dtb: Warning (unit_address_vs_reg): Node /i2cmux at 2 has a unit name, but no reg property
-> arch/arm/boot/dts/imx6q-nitrogen6_max.dtb: Warning (unit_address_vs_reg): Node /i2cmux at 3 has a unit name, but no reg property
-> 
-> While at it, rename the i2cmux nodes and subnodes to make it clearer to which
-> i2c controller the mux belongs to.
-> 
-> Cc: Gary Bisson <gary.bisson@boundarydevices.com>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
+There are more conditions: the only place the determination is
+made is for next, in fpsimd_thread_switch(next).
 
-Reviewed-by: Gary Bisson <gary.bisson@boundarydevices.com>
 
-Regards,
-Gary
+However, I can see your concern and I'm not sure how/if it is
+resolved.
+
+For the worst case, let's assume that some child forks off but
+doesn't enter userspace yet, while another task round-robins
+across all CPUs, interspersed with tasks that don't enter userspace.
+
+So, we end up with
+
+All cpu < NR_CPUS . per_cpu(fpsimd_last_state, cpu) == T.
+
+Now, if T dies and a new task is allocated the same task_struct pointer,
+then the _new_ T is guaranteed to get scheduled in on a CPU whose
+per_cpu(fpsmid_last_state) == T.
+
+Thus, new T can pick up old T's regs _unless_ new T's fpsimd_state.cpu
+is invalid (i.e., NR_CPUS).
+
+This is a separate bug from the one addressed by this patch though.
+We can't go and harvest the bad pointers when old T exits, because
+this might race new T being scheduled for real -- in any case it
+would involve iterating over all CPUs which sounds racy and
+inefficient.
+
+
+So, I'd say we _must_ call fpsimd_flush_task_state() for every new
+task.  This may result in a redundant reload of the state, but this
+is what would happen anyway if the pointers did not alias.
+
+Does this sound real to you?  If so, I'll try to write something.
+
+And does this patch look reasonable to fix what it's trying to fix?
+
+
+I wonder whether arch/arm has the same bug actually, since the kernel-
+mode NEON logic was modelled from there IIUC (?)
+
+Cheers
+---Dave
