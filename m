@@ -1,79 +1,30 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Dec 2017 13:46:57 +0000
-Subject: [PATCH 2/3] arm64: fpsimd: Abstract out binding of task's fpsimd
- context to the cpu.
-In-Reply-To: <1512141582-17474-3-git-send-email-Dave.Martin@arm.com>
-References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
- <1512141582-17474-3-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAKv+Gu8BzFrc1U7r7iURfZqGKRqpwHJVFM6hvHOX5xghrXojtA@mail.gmail.com>
+From: amery@hanoverdisplays.com (Alejandro Mery)
+Date: Mon, 4 Dec 2017 13:33:59 +0000
+Subject: [PATCH 2/2] ARM: davinci: Add dma_mask to dm365's eDMA device
+In-Reply-To: <20171204133359.45625-1-amery@hanoverdisplays.com>
+References: <20171204133359.45625-1-amery@hanoverdisplays.com>
+Message-ID: <20171204133359.45625-3-amery@hanoverdisplays.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2017 at 15:19, Dave Martin <Dave.Martin@arm.com> wrote:
-> There is currently some duplicate logic to associate current's
-> FPSIMD context with the cpu when loading FPSIMD state into the cpu
-> regs.
->
-> Subsequent patches will update that logic, so in order to ensure it
-> only needs to be done in one place, this patch factors the relevant
-> code out into a new function fpsimd_bind_to_cpu().
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/kernel/fpsimd.c | 25 +++++++++++++++----------
->  1 file changed, 15 insertions(+), 10 deletions(-)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 143b3e7..007140b 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -992,6 +992,18 @@ void fpsimd_signal_preserve_current_state(void)
->  }
->
->  /*
-> + * Associate current's FPSIMD context with this cpu
-> + * Preemption must be disabled when calling this function.
-> + */
-> +static void fpsimd_bind_to_cpu(void)
-> +{
-> +       struct fpsimd_state *st = &current->thread.fpsimd_state;
-> +
-> +       __this_cpu_write(fpsimd_last_state, st);
-> +       st->cpu = smp_processor_id();
-> +}
-> +
-> +/*
->   * Load the userland FPSIMD state of 'current' from memory, but only if the
->   * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
->   * state of 'current'
-> @@ -1004,11 +1016,8 @@ void fpsimd_restore_current_state(void)
->         local_bh_disable();
->
->         if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> -               struct fpsimd_state *st = &current->thread.fpsimd_state;
-> -
->                 task_fpsimd_load();
-> -               __this_cpu_write(fpsimd_last_state, st);
-> -               st->cpu = smp_processor_id();
-> +               fpsimd_bind_to_cpu();
->         }
->
->         local_bh_enable();
-> @@ -1032,12 +1041,8 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
->         }
->         task_fpsimd_load();
->
-> -       if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
-> -               struct fpsimd_state *st = &current->thread.fpsimd_state;
-> -
-> -               __this_cpu_write(fpsimd_last_state, st);
-> -               st->cpu = smp_processor_id();
-> -       }
-> +       if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
-> +               fpsimd_bind_to_cpu();
->
->         local_bh_enable();
->  }
+as previously done by cef5b0da4019358cb03c9b0a964d4d63cd7deaf6 for other davinci SoCs
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
+---
+ arch/arm/mach-davinci/dm365.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 855e0a57b219..90858bc9dd18 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -928,6 +928,7 @@ static struct resource edma_resources[] = {
+ static const struct platform_device_info dm365_edma_device __initconst = {
+ 	.name		= "edma",
+ 	.id		= 0,
++	.dma_mask	= DMA_BIT_MASK(32),
+ 	.res		= edma_resources,
+ 	.num_res	= ARRAY_SIZE(edma_resources),
+ 	.data		= &dm365_edma_pdata,
+-- 
+2.15.0
