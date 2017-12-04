@@ -1,41 +1,56 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 15:03:41 +0100
-Subject: [PULL 12/19] kvm: arm64: handle single-step of userspace mmio
- instructions
+Date: Mon,  4 Dec 2017 15:03:42 +0100
+Subject: [PULL 13/19] kvm: arm64: handle single-step during SError exceptions
 In-Reply-To: <20171204135637.21620-1-cdall@kernel.org>
 References: <20171204135637.21620-1-cdall@kernel.org>
-Message-ID: <20171204140348.21965-10-cdall@kernel.org>
+Message-ID: <20171204140348.21965-11-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alex Benn?e <alex.bennee@linaro.org>
 
-The system state of KVM when using userspace emulation is not complete
-until we return into KVM_RUN. To handle mmio related updates we wait
-until they have been committed and then schedule our KVM_EXIT_DEBUG.
+When an SError arrives during single-step both the SError and debug
+exceptions may be pending when the step is completed, and the
+architecture doesn't define the ordering of the two.  This means that we
+can observe en SError even though we've just completed a step, without
+receiving a debug exception.  In that case the DBG_SPSR_SS bit will have
+flipped as the instruction executed. After handling the abort in
+handle_exit() we test to see if the bit is clear and we were
+single-stepping before deciding if we need to exit to user space.
 
-The kvm_arm_handle_step_debug() helper tells us if we need to return
-and sets up the exit_reason for us.
-
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arm.c | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/kvm/handle_exit.c | 8 +++++++-
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a6524ff27de4..322c570d211e 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -628,6 +628,9 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
- 		if (ret)
- 			return ret;
-+		if (kvm_arm_handle_step_debug(vcpu, vcpu->run))
-+			return 0;
-+
- 	}
+diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
+index 029c28dd25e9..304203fa9e33 100644
+--- a/arch/arm64/kvm/handle_exit.c
++++ b/arch/arm64/kvm/handle_exit.c
+@@ -28,6 +28,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_psci.h>
++#include <asm/debug-monitors.h>
  
- 	if (run->immediate_exit)
+ #define CREATE_TRACE_POINTS
+ #include "trace.h"
+@@ -252,7 +253,12 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
+ 		return 1;
+ 	case ARM_EXCEPTION_EL1_SERROR:
+ 		kvm_inject_vabt(vcpu);
+-		return 1;
++		/* We may still need to return for single-step */
++		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
++			&& kvm_arm_handle_step_debug(vcpu, run))
++			return 0;
++		else
++			return 1;
+ 	case ARM_EXCEPTION_TRAP:
+ 		return handle_trap_exceptions(vcpu, run);
+ 	case ARM_EXCEPTION_HYP_GONE:
 -- 
 2.14.2
