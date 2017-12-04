@@ -1,120 +1,99 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Dec 2017 13:53:21 +0000
-Subject: [PATCH 3/3] arm64/sve: KVM: Avoid dereference of dead task during
- guest entry
-In-Reply-To: <1512141582-17474-4-git-send-email-Dave.Martin@arm.com>
-References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
- <1512141582-17474-4-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAKv+Gu_e3SKsreYHrZEBUMEME-pYtxTXW1P6xLUR6YMQfj0cZw@mail.gmail.com>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Mon,  4 Dec 2017 14:56:03 +0100
+Subject: [PULL 00/19] KVM/ARM Fixes for v4.15
+Message-ID: <20171204135622.21568-1-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 1 December 2017 at 15:19, Dave Martin <Dave.Martin@arm.com> wrote:
-> When deciding whether to invalidate FPSIMD state cached in the cpu,
-> the backend function sve_flush_cpu_state() attempts to dereference
-> __this_cpu_read(fpsimd_last_state).  However, this is not safe:
-> there is no guarantee that the pointer is still valid, because the
-> task could have exited in the meantime.  For this reason, this
-> percpu pointer should only be assigned or compared, never
-> dereferenced.
->
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Doesn't that mean the pointer could also be pointing to the
-fpsimd_state of a newly created task that is completely unrelated?
-IOW, are you sure comparison is safe?
+Hi Paolo and Radim,
 
-> This means that we need another means to get the appropriate value
-> of TIF_SVE for the associated task.
->
-> This patch solves this issue by adding a cached copy of the TIF_SVE
-> flag in fpsimd_last_state, which we can check without dereferencing
-> the task pointer.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/kernel/fpsimd.c | 28 ++++++++++++++++------------
->  1 file changed, 16 insertions(+), 12 deletions(-)
->
-> diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-> index 007140b..3dc8058 100644
-> --- a/arch/arm64/kernel/fpsimd.c
-> +++ b/arch/arm64/kernel/fpsimd.c
-> @@ -114,7 +114,12 @@
->   *   returned from the 2nd syscall yet, TIF_FOREIGN_FPSTATE is still set so
->   *   whatever is in the FPSIMD registers is not saved to memory, but discarded.
->   */
-> -static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
-> +struct fpsimd_last_state_struct {
-> +       struct fpsimd_state *st;
-> +       bool sve_in_use;
-> +};
-> +
-> +static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
->
->  /* Default VL for tasks that don't set it explicitly: */
->  static int sve_default_vl = -1;
-> @@ -905,7 +910,7 @@ void fpsimd_thread_switch(struct task_struct *next)
->                  */
->                 struct fpsimd_state *st = &next->thread.fpsimd_state;
->
-> -               if (__this_cpu_read(fpsimd_last_state) == st
-> +               if (__this_cpu_read(fpsimd_last_state.st) == st
->                     && st->cpu == smp_processor_id())
->                         clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
->                 else
-> @@ -997,9 +1002,12 @@ void fpsimd_signal_preserve_current_state(void)
->   */
->  static void fpsimd_bind_to_cpu(void)
->  {
-> +       struct fpsimd_last_state_struct *last =
-> +               this_cpu_ptr(&fpsimd_last_state);
->         struct fpsimd_state *st = &current->thread.fpsimd_state;
->
-> -       __this_cpu_write(fpsimd_last_state, st);
-> +       last->st = st;
-> +       last->sve_in_use = test_thread_flag(TIF_SVE);
->         st->cpu = smp_processor_id();
->  }
->
-> @@ -1057,7 +1065,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
->
->  static inline void fpsimd_flush_cpu_state(void)
->  {
-> -       __this_cpu_write(fpsimd_last_state, NULL);
-> +       __this_cpu_write(fpsimd_last_state.st, NULL);
->  }
->
->  /*
-> @@ -1070,14 +1078,10 @@ static inline void fpsimd_flush_cpu_state(void)
->  #ifdef CONFIG_ARM64_SVE
->  void sve_flush_cpu_state(void)
->  {
-> -       struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
-> -       struct task_struct *tsk;
-> -
-> -       if (!fpstate)
-> -               return;
-> +       struct fpsimd_last_state_struct const *last =
-> +               this_cpu_ptr(&fpsimd_last_state);
->
-> -       tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
-> -       if (test_tsk_thread_flag(tsk, TIF_SVE))
-> +       if (last->st && last->sve_in_use)
->                 fpsimd_flush_cpu_state();
->  }
->  #endif /* CONFIG_ARM64_SVE */
-> @@ -1272,7 +1276,7 @@ static inline void fpsimd_pm_init(void) { }
->  #ifdef CONFIG_HOTPLUG_CPU
->  static int fpsimd_cpu_dead(unsigned int cpu)
->  {
-> -       per_cpu(fpsimd_last_state, cpu) = NULL;
-> +       per_cpu(fpsimd_last_state.st, cpu) = NULL;
->         return 0;
->  }
->
-> --
-> 2.1.4
->
+Here's the first round of fixes for KVM/ARM for v4.15.  This is a fairly large
+set of fixes, partially because we spotted a handful of issues from running the
+SMATCH static analysis on the code (thanks to AKASHI Takahiro).
+
+In more details, this pull request fixes:
+ - A number of issues in the vgic discovered using SMATCH
+ - A bit one-off calculation in out stage base address mask (32-bit and
+   64-bit)
+ - Fixes to single-step debugging instructions that trap for other
+   reasons such as MMMIO aborts
+ - Printing unavailable hyp mode as error
+ - Potential spinlock deadlock in the vgic
+ - Avoid calling vgic vcpu free more than once
+ - Broken bit calculation for big endian systems
+
+
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+
+  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.15-1
+
+for you to fetch changes up to fc396e066318c0a02208c1d3f0b62950a7714999:
+
+  KVM: arm/arm64: Fix broken GICH_ELRSR big endian conversion (2017-12-04 14:25:33 +0100)
+
+
+Thanks,
+-Christoffer
+
+Alex Benn?e (5):
+  KVM: arm/arm64: debug: Introduce helper for single-step
+  kvm: arm64: handle single-stepping trapped instructions
+  kvm: arm64: handle single-step of userspace mmio instructions
+  kvm: arm64: handle single-step during SError exceptions
+  kvm: arm64: handle single-step of hyp emulated mmio instructions
+
+Andre Przywara (1):
+  KVM: arm/arm64: VGIC: extend !vgic_is_initialized guard
+
+Andrew Jones (1):
+  KVM: arm/arm64: kvm_arch_destroy_vm cleanups
+
+Ard Biesheuvel (1):
+  kvm: arm: don't treat unavailable HYP mode as an error
+
+Christoffer Dall (3):
+  KVM: arm/arm64: Don't enable/disable physical timer access on VHE
+  KVM: arm/arm64: Avoid attempting to load timer vgic state without a
+    vgic
+  KVM: arm/arm64: Fix broken GICH_ELRSR big endian conversion
+
+Kristina Martsenko (1):
+  arm64: KVM: fix VTTBR_BADDR_MASK BUG_ON off-by-one
+
+Marc Zyngier (7):
+  KVM: arm/arm64: vgic-irqfd: Fix MSI entry allocation
+  KVM: arm/arm64: vgic: Preserve the revious read from the pending table
+  KVM: arm/arm64: vgic-its: Preserve the revious read from the pending
+    table
+  KVM: arm/arm64: vgic-its: Check result of allocation before use
+  KVM: arm/arm64: vgic-v4: Only perform an unmap for valid vLPIs
+  arm: KVM: Fix VTTBR_BADDR_MASK BUG_ON off-by-one
+  KVM: arm/arm64: Fix spinlock acquisition in vgic_set_owner
+
+ arch/arm/include/asm/kvm_arm.h    |  3 +--
+ arch/arm/include/asm/kvm_host.h   |  5 ++++
+ arch/arm64/include/asm/kvm_arm.h  |  3 +--
+ arch/arm64/include/asm/kvm_host.h |  1 +
+ arch/arm64/kvm/debug.c            | 21 +++++++++++++++
+ arch/arm64/kvm/handle_exit.c      | 57 ++++++++++++++++++++++++++++-----------
+ arch/arm64/kvm/hyp/switch.c       | 37 ++++++++++++++++++++-----
+ include/kvm/arm_arch_timer.h      |  3 ---
+ virt/kvm/arm/arch_timer.c         | 11 +++-----
+ virt/kvm/arm/arm.c                |  7 +++--
+ virt/kvm/arm/hyp/timer-sr.c       | 48 ++++++++++++++-------------------
+ virt/kvm/arm/hyp/vgic-v2-sr.c     |  4 ---
+ virt/kvm/arm/vgic/vgic-irqfd.c    |  3 +--
+ virt/kvm/arm/vgic/vgic-its.c      |  4 ++-
+ virt/kvm/arm/vgic/vgic-v3.c       |  2 +-
+ virt/kvm/arm/vgic/vgic-v4.c       |  6 +++--
+ virt/kvm/arm/vgic/vgic.c          |  8 +++---
+ 17 files changed, 144 insertions(+), 79 deletions(-)
+
+-- 
+2.14.2
