@@ -1,184 +1,104 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 21:05:05 +0100
-Subject: [PATCH v6 7/8] KVM: arm/arm64: Provide a get_input_level for the arch
- timer
-In-Reply-To: <20171204200506.3224-1-cdall@kernel.org>
-References: <20171204200506.3224-1-cdall@kernel.org>
-Message-ID: <20171204200506.3224-8-cdall@kernel.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Mon, 4 Dec 2017 14:09:50 -0600
+Subject: [PATCH v4 2/2] arm64: Add software workaround for Falkor erratum
+ 1041
+In-Reply-To: <12cb0f4a-577b-ffd5-21b7-26ce0e46505a@codeaurora.org>
+References: <1511824680-16397-1-git-send-email-shankerd@codeaurora.org>
+ <1511824680-16397-3-git-send-email-shankerd@codeaurora.org>
+ <20171201112457.GE18083@arm.com>
+ <12cb0f4a-577b-ffd5-21b7-26ce0e46505a@codeaurora.org>
+Message-ID: <07aa6edb-9634-a6b4-589e-8d58cf982f6d@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+Hi Will,
 
-The VGIC can now support the life-cycle of mapped level-triggered
-interrupts, and we no longer have to read back the timer state on every
-exit from the VM if we had an asserted timer interrupt signal, because
-the VGIC already knows if we hit the unlikely case where the guest
-disables the timer without ACKing the virtual timer interrupt.
+On 12/03/2017 07:35 AM, Shanker Donthineni wrote:
+> Hi Will, thanks for your review comments.
+> 
+> On 12/01/2017 05:24 AM, Will Deacon wrote:
+>> On Mon, Nov 27, 2017 at 05:18:00PM -0600, Shanker Donthineni wrote:
+>>> The ARM architecture defines the memory locations that are permitted
+>>> to be accessed as the result of a speculative instruction fetch from
+>>> an exception level for which all stages of translation are disabled.
+>>> Specifically, the core is permitted to speculatively fetch from the
+>>> 4KB region containing the current program counter 4K and next 4K.
+>>>
+>>> When translation is changed from enabled to disabled for the running
+>>> exception level (SCTLR_ELn[M] changed from a value of 1 to 0), the
+>>> Falkor core may errantly speculatively access memory locations outside
+>>> of the 4KB region permitted by the architecture. The errant memory
+>>> access may lead to one of the following unexpected behaviors.
+>>>
+>>> 1) A System Error Interrupt (SEI) being raised by the Falkor core due
+>>>    to the errant memory access attempting to access a region of memory
+>>>    that is protected by a slave-side memory protection unit.
+>>> 2) Unpredictable device behavior due to a speculative read from device
+>>>    memory. This behavior may only occur if the instruction cache is
+>>>    disabled prior to or coincident with translation being changed from
+>>>    enabled to disabled.
+>>>
+>>> The conditions leading to this erratum will not occur when either of the
+>>> following occur:
+>>>  1) A higher exception level disables translation of a lower exception level
+>>>    (e.g. EL2 changing SCTLR_EL1[M] from a value of 1 to 0).
+>>>  2) An exception level disabling its stage-1 translation if its stage-2
+>>>     translation is enabled (e.g. EL1 changing SCTLR_EL1[M] from a value of 1
+>>>     to 0 when HCR_EL2[VM] has a value of 1).
+>>>
+>>> To avoid the errant behavior, software must execute an ISB immediately
+>>> prior to executing the MSR that will change SCTLR_ELn[M] from 1 to 0.
+>>>
+>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+>>> ---
+>>> Changes since v3:
+>>>   Rebased to kernel v4.15-rc1.
+>>> Changes since v2:
+>>>   Repost the corrected patches.
+>>> Changes since v1:
+>>>   Apply the workaround where it's required.
+>>>
+>>>  Documentation/arm64/silicon-errata.txt |  1 +
+>>>  arch/arm64/Kconfig                     | 12 +++++++++++-
+>>>  arch/arm64/include/asm/assembler.h     | 19 +++++++++++++++++++
+>>>  arch/arm64/include/asm/cpucaps.h       |  3 ++-
+>>>  arch/arm64/kernel/cpu-reset.S          |  1 +
+>>>  arch/arm64/kernel/cpu_errata.c         | 16 ++++++++++++++++
+>>>  arch/arm64/kernel/efi-entry.S          |  2 ++
+>>>  arch/arm64/kernel/head.S               |  1 +
+>>>  arch/arm64/kernel/relocate_kernel.S    |  1 +
+>>>  arch/arm64/kvm/hyp-init.S              |  1 +
+>>
+>> This is an awful lot of code just to add an ISB instruction prior to
+>> disabling the MMU. Why do you need to go through the alternatives framework
+>> for this? Just do it with an #ifdef; this isn't a fastpath.
+>>
+> 
+> We can avoid changes to only two files cpu_errata.c and cpucaps.h without using
+> the alternatives framework. Even though it's in slow path, cpu-errata.c changes 
+> provides a nice debug message which indicates the erratum E1041 is applied. 
+> 
+> Erratum log information would be very useful to conform our customers using the
+> right kernel with E1014 patch by looking at dmesg. Other than that I don't have
+> any other strong opinion to avoid alternatives and handle using #idef.
+> 
+> Should I go ahead and post v5 patch without alternatives?
+> 
 
-This means we rework a bit of the code to factor out the functionality
-to snapshot the timer state from vtimer_save_state(), and we can reuse
-this functionality in the sync path when we have an irqchip in
-userspace, and also to support our implementation of the
-get_input_level() function for the timer.
 
-This change also means that we can no longer rely on the timer's view of
-the interrupt line to set the active state, because we no longer
-maintain this state for mapped interrupts when exiting from the guest.
-Instead, we only set the active state if the virtual interrupt is
-active, and otherwise we simply let the timer fire again and raise the
-virtual interrupt from the ISR.
+Please provide your thoughts on next step. We would like to merge this erratum
+to v4.15 kernel.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- include/kvm/arm_arch_timer.h |  2 ++
- virt/kvm/arm/arch_timer.c    | 75 +++++++++++++++++++++-----------------------
- 2 files changed, 38 insertions(+), 39 deletions(-)
+>> Will
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+> 
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 01ee473517e2..f57f795d704c 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -90,6 +90,8 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
- 
- void kvm_timer_init_vhe(void);
- 
-+bool kvm_arch_timer_get_input_level(int vintid);
-+
- #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
- #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index e78ba5e20f74..82d4963f63b8 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -343,6 +343,12 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	phys_timer_emulate(vcpu);
- }
- 
-+static void __timer_snapshot_state(struct arch_timer_context *timer)
-+{
-+	timer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-+	timer->cnt_cval = read_sysreg_el0(cntv_cval);
-+}
-+
- static void vtimer_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -354,10 +360,8 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
- 	if (!vtimer->loaded)
- 		goto out;
- 
--	if (timer->enabled) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
--		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
--	}
-+	if (timer->enabled)
-+		__timer_snapshot_state(vtimer);
- 
- 	/* Disable the virtual timer */
- 	write_sysreg_el0(0, cntv_ctl);
-@@ -454,8 +458,7 @@ static void kvm_timer_vcpu_load_vgic(struct kvm_vcpu *vcpu)
- 	bool phys_active;
- 	int ret;
- 
--	phys_active = vtimer->irq.level ||
--		      kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
-+	phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
- 
- 	ret = irq_set_irqchip_state(host_vtimer_irq,
- 				    IRQCHIP_STATE_ACTIVE,
-@@ -541,27 +544,19 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	set_cntvoff(0);
- }
- 
--static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
-+/*
-+ * With a userspace irqchip we have to check if the guest de-asserted the
-+ * timer and if so, unmask the timer irq signal on the host interrupt
-+ * controller to ensure that we see future timer signals.
-+ */
-+static void unmask_vtimer_irq_user(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 
- 	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
--		kvm_vtimer_update_mask_user(vcpu);
--		return;
--	}
--
--	/*
--	 * If the guest disabled the timer without acking the interrupt, then
--	 * we must make sure the physical and virtual active states are in
--	 * sync by deactivating the physical interrupt, because otherwise we
--	 * wouldn't see the next timer interrupt in the host.
--	 */
--	if (!kvm_vgic_map_is_active(vcpu, vtimer->irq.irq)) {
--		int ret;
--		ret = irq_set_irqchip_state(host_vtimer_irq,
--					    IRQCHIP_STATE_ACTIVE,
--					    false);
--		WARN_ON(ret);
-+		__timer_snapshot_state(vtimer);
-+		if (!kvm_timer_should_fire(vtimer))
-+			kvm_vtimer_update_mask_user(vcpu);
- 	}
- }
- 
-@@ -574,21 +569,7 @@ static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
-  */
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- {
--	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
--
--	/*
--	 * If we entered the guest with the vtimer output asserted we have to
--	 * check if the guest has modified the timer so that we should lower
--	 * the line at this point.
--	 */
--	if (vtimer->irq.level) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
--		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
--		if (!kvm_timer_should_fire(vtimer)) {
--			kvm_timer_update_irq(vcpu, false, vtimer);
--			unmask_vtimer_irq(vcpu);
--		}
--	}
-+	unmask_vtimer_irq_user(vcpu);
- }
- 
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
-@@ -819,6 +800,22 @@ static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
- 	return true;
- }
- 
-+bool kvm_arch_timer_get_input_level(int vintid)
-+{
-+	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-+	struct arch_timer_context *timer;
-+
-+	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
-+		timer = vcpu_vtimer(vcpu);
-+	else
-+		BUG(); /* We only map the vtimer so far */
-+
-+	if (timer->loaded)
-+		__timer_snapshot_state(timer);
-+
-+	return kvm_timer_should_fire(timer);
-+}
-+
- int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -841,7 +838,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 	}
- 
- 	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
--				    NULL);
-+				    kvm_arch_timer_get_input_level);
- 	if (ret)
- 		return ret;
- 
 -- 
-2.14.2
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
