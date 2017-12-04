@@ -1,48 +1,39 @@
 From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 4 Dec 2017 09:35:21 -0800
-Subject: [PATCH v6 0/2] memory: Introduce ti-emif-sram driver
-In-Reply-To: <20171203163632.GU28152@atomide.com>
-References: <1512082568-5012-1-git-send-email-d-gerlach@ti.com>
- <179c7668-05eb-09cf-9857-7b6fd2308c3a@oracle.com>
- <20171203163632.GU28152@atomide.com>
-Message-ID: <7f5fa64a-9c4e-cad6-df46-70cc02cba319@oracle.com>
+Date: Mon, 4 Dec 2017 09:36:25 -0800
+Subject: [PATCH 6/6] ARM: configs: keystone_defconfig: Enable few
+ peripheral drivers
+In-Reply-To: <76a88f69-dd0b-8823-ae31-bd39b1abae87@ti.com>
+References: <20171123075154.3938-1-vigneshr@ti.com>
+ <20171123075154.3938-7-vigneshr@ti.com>
+ <fb0c662b-d462-c663-7cf0-443ace3565ba@oracle.com>
+ <76a88f69-dd0b-8823-ae31-bd39b1abae87@ti.com>
+Message-ID: <9e96c65b-17aa-c49f-eef7-a4373241d231@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/3/2017 8:36 AM, Tony Lindgren wrote:
-> * santosh.shilimkar at oracle.com <santosh.shilimkar@oracle.com> [171203 04:03]:
->>
->>
->> On 11/30/17 2:56 PM, Dave Gerlach wrote:
->>> This is a resend of v5 of this series found here [1]. It introduces
->>> relocatable PM handlers for the emif that are copied to sram and
->>> run from there during low power mode entry.
->>>
->>> The patches still have the previous ACKs but have a small change to
->>> accomodate a change made by Tony in commit cd57dc5a2099 ("ARM: dts:
->>> Add missing hwmod related nodes for am33xx"). If there are objections
->>> to this let me know ASAP.
->>>
->>> Now that a hwmod is present for the am335x EMIF, on probe fail the call to
->>> pm_runtime_put_sync causes the board to hang. In fact, this emif driver should
->>> never alter the PM state of the hardware at all through normal kernel calls, it
->>> is the job of the suspend handlers that are added, that is the whole point of
->>> this driver. Because of this, I have dropped all runtime pm calls, as any
->>> change to the PM state while the kernel is running is dangerous as we may shut
->>> of the memory controller. It makes the most sense just to drop runtime PM from
->>> the driver entirely. Besides that patch is unchanged.
->>>
->>> This code is required for low-power modes to work on AM335x and AM437x and a
->>> forthcoming PM series for those platforms will depend on this series. After
->>> both this and the PM series are reviewed I will send the necessary device tree
->>> changes for both, but in the meantime all remaining patches for am335x and
->>> am437x PM can be found here [2].
->>>
->> Applied
+On 12/4/2017 1:00 AM, Vignesh R wrote:
+> Hi,
 > 
-> OK, do you have some immutable commit for these I can pull in too for
-> the related SoC changes?
+> On Sunday 03 December 2017 09:30 AM, santosh.shilimkar at oracle.com wrote:
+>> On 11/22/17 11:51 PM, Vignesh R wrote:
+>>> Enable drivers for QSPI, LEDS, gpio-decoder that are present on 66AK2G
+>>> EVM
+>>> and 66AK2G ICE boards.
+>>>
+>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>> ---
+>> Please submit a patch also to enable all these peripherals
+>> in multi-v7 config. Just enable all remainder
+>> options enabled in keystone config also in multi-v7.
 > 
-Hopefully I don't have do any changes to below branch.
-git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
-for_4.16/drivers-soc
+> K2 Platforms don't boot out of multi_v7_defconfig by default, because K2
+> platforms require CONFIG_ARM_LPAE(which is disabled in multi-v7).
+> 
+> If the intention is to just have all drivers enabled in
+> keystone_defconfig to be added to multi_v7, I can prepare a patch for
+> that and test with local patch to enable LPAE.
+> 
+Yes. Please send a patch for it.
+
+Regards,
+Santosh
