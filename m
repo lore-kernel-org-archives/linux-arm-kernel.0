@@ -1,208 +1,105 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Mon,  4 Dec 2017 14:13:12 +0000
-Subject: [PATCH 11/12] arm64: KVM: Add support for an alternative VA space
+Date: Mon,  4 Dec 2017 14:13:10 +0000
+Subject: [PATCH 09/12] arm64: dump: Make kernel page table dumper dynamic again
 In-Reply-To: <20171204141313.31604-1-steve.capper@arm.com>
 References: <20171204141313.31604-1-steve.capper@arm.com>
-Message-ID: <20171204141313.31604-12-steve.capper@arm.com>
+Message-ID: <20171204141313.31604-10-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adjusts the alternative patching logic for kern_hyp_va to
-take into account a change in virtual address space size on boot.
+The kernel page table dumper assumes that the placement of VA regions is
+constant and determined at compile time. As we are about to introduce
+variable VA logic, we need to be able to determine certain regions at
+boot time.
 
-Because the instructions in the alternatives regions have to be fixed at
-compile time, in order to make the logic depend on a dynamic VA size
-the predicates have to be adjusted.
-
-The predicates used, follow the corresponding logic:
- - ARM64_HAS_VIRT_HOST_EXTN, true if running with VHE
- - ARM64_HYP_MAP_FLIP, true if !VHE and idmap is high and VA size is small.
- - ARM64_HYP_RUNNING_ALT_VA, true if !VHE and VA size is big.
- - ARM64_HYP_MAP_FLIP_ALT, true if !VHE and idmap is high and VA size is big.
-
-Using the above predicates means we have to add two instructions to
-kern_hyp_va.
+This patch adds logic to the kernel page table dumper s.t. these regions
+can be computed at boot time.
 
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 ---
- arch/arm64/Kconfig               |  4 ++++
- arch/arm64/include/asm/cpucaps.h |  4 +++-
- arch/arm64/include/asm/kvm_mmu.h | 47 ++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpufeature.c   | 39 ++++++++++++++++++++++++++++++++-
- 4 files changed, 92 insertions(+), 2 deletions(-)
+ arch/arm64/mm/dump.c | 51 +++++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 43 insertions(+), 8 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 0fa430326825..143c453b06f1 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -656,6 +656,10 @@ config ARM64_VA_BITS
- 	default 47 if ARM64_VA_BITS_47
- 	default 48 if ARM64_VA_BITS_48
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index e5d1b5f432fe..c50af666c407 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -29,18 +29,42 @@
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptdump.h>
  
-+config ARM64_VA_BITS_ALT
-+	bool
-+	default n
+-static const struct addr_marker address_markers[] = {
+-	{ PAGE_OFFSET,			"Linear Mapping start" },
+-	{ VA_START,			"Linear Mapping end" },
 +
- config CPU_BIG_ENDIAN
-        bool "Build big-endian kernel"
-        help
-diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
-index 3de31a1010ee..955936adcf7a 100644
---- a/arch/arm64/include/asm/cpucaps.h
-+++ b/arch/arm64/include/asm/cpucaps.h
-@@ -41,7 +41,9 @@
- #define ARM64_WORKAROUND_CAVIUM_30115		20
- #define ARM64_HAS_DCPOP				21
- #define ARM64_SVE				22
-+#define ARM64_HYP_RUNNING_ALT_VA		23
-+#define ARM64_HYP_MAP_FLIP_ALT			24
- 
--#define ARM64_NCAPS				23
-+#define ARM64_NCAPS				25
- 
- #endif /* __ASM_CPUCAPS_H */
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index 5174fd7e5196..8de396764a11 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -73,6 +73,11 @@
- #define _HYP_MAP_HIGH_BIT(va)		(UL(1) << ((va) - 1))
- #define HYP_MAP_KERNEL_BITS	_HYP_MAP_KERNEL_BITS(VA_BITS_MIN)
- #define HYP_MAP_HIGH_BIT	_HYP_MAP_HIGH_BIT(VA_BITS_MIN)
-+#ifdef CONFIG_ARM64_VA_BITS_ALT
-+#define HYP_MAP_KERNEL_BITS_ALT	(_HYP_MAP_KERNEL_BITS(VA_BITS_ALT) \
-+				 ^ _HYP_MAP_KERNEL_BITS(VA_BITS_MIN))
-+#define HYP_MAP_HIGH_BIT_ALT	_HYP_MAP_HIGH_BIT(VA_BITS_ALT)
++enum address_markers_idx {
++	PAGE_OFFSET_NR = 0,
++	VA_START_NR,
+ #ifdef CONFIG_KASAN
+-	{ KASAN_SHADOW_START,		"Kasan shadow start" },
++	KASAN_START_NR,
++	KASAN_END_NR,
 +#endif
- 
- #ifdef __ASSEMBLY__
- 
-@@ -95,6 +100,27 @@
-  * - VHE:
-  *		nop
-  *		nop
-+ *
-+ * For cases where we are running with a variable address space size,
-+ * two extra instructions are added, and the logic changes thusly:
-+ *
-+ * - Flip the kernel bits for the new VA:
-+ *		eor x0, x0, #HYP_MAP_KERNEL_BITS
-+ *		nop
-+ *		eor x0, x0, #HYP_MAP_KERNEL_BITS_ALT
-+ *		eor
-+ *
-+ * - Flip the kernel bits and upper HYP bit for new VA:
-+ *		eor x0, x0, #HYP_MAP_KERNEL_BITS
-+ *		nop
-+ *		eor x0, x0, #HYP_MAP_KERNEL_BITS_ALT
-+ *		eor x0, x0, #HYP_MAP_HIGH_BIT_ALT
-+ *
-+ * - VHE:
-+ *		nop
-+ *		nop
-+ *		nop
-+ *		nop
-  */
- .macro kern_hyp_va	reg
- alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
-@@ -103,6 +129,14 @@ alternative_else_nop_endif
- alternative_if ARM64_HYP_MAP_FLIP
- 	eor     \reg, \reg, #HYP_MAP_HIGH_BIT
- alternative_else_nop_endif
-+#ifdef CONFIG_ARM64_VA_BITS_ALT
-+alternative_if ARM64_HYP_RUNNING_ALT_VA
-+	eor	\reg, \reg, #HYP_MAP_KERNEL_BITS_ALT
-+alternative_else_nop_endif
-+alternative_if ARM64_HYP_MAP_FLIP_ALT
-+	eor     \reg, \reg, #HYP_MAP_HIGH_BIT_ALT
-+alternative_else_nop_endif
++	VMALLOC_START_NR,
++	VMALLOC_END_NR,
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++	VMEMMAP_START_NR,
++	VMEMMAP_END_NR,
 +#endif
- .endm
- 
- #else
-@@ -125,6 +159,19 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- 				 ARM64_HYP_MAP_FLIP)
- 		     : "+r" (v)
- 		     : "i" (HYP_MAP_HIGH_BIT));
-+#ifdef CONFIG_ARM64_VA_BITS_ALT
-+	asm volatile(ALTERNATIVE("nop",
-+				 "eor %0, %0, %1",
-+				 ARM64_HYP_RUNNING_ALT_VA)
-+		     : "+r" (v)
-+		     : "i" (HYP_MAP_KERNEL_BITS_ALT));
-+	asm volatile(ALTERNATIVE("nop",
-+				 "eor %0, %0, %1",
-+				 ARM64_HYP_MAP_FLIP_ALT)
-+		     : "+r" (v)
-+		     : "i" (HYP_MAP_HIGH_BIT_ALT));
-+#endif
++	FIXADDR_START_NR,
++	FIXADDR_END_NR,
++	PCI_START_NR,
++	PCI_END_NR,
++	MODULES_START_NR,
++	MODULES_END_NR,
++	KIMAGE_NR,
++	END_NR
++};
 +
- 	return v;
++static struct addr_marker address_markers[] = {
++	{ 0 /* PAGE_OFFSET */,		"Linear Mapping start" },
++	{ 0 /* VA_START */,		"Linear Mapping end" },
++#ifdef CONFIG_KASAN
++	{ 0 /* KASAN_SHADOW_START */,	"Kasan shadow start" },
+ 	{ KASAN_SHADOW_END,		"Kasan shadow end" },
+ #endif
+-	{ VMALLOC_START,		"vmalloc() Area" },
++	{ 0 /* VMALLOC_START */,	"vmalloc() Area" },
+ 	{ VMALLOC_END,			"vmalloc() End" },
+ #ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	{ VMEMMAP_START,		"vmemmap start" },
+-	{ VMEMMAP_START + VMEMMAP_SIZE,	"vmemmap end"},
++	{ 0 /* VMEMMAP_START */,		"vmemmap start" },
++	{ 0 /*VMEMMAP_START + VMEMMAP_SIZE */,	"vmemmap end"},
+ #endif
+ 	{ FIXADDR_START,		"Fixmap start" },
+ 	{ FIXADDR_TOP,			"Fixmap end" },
+@@ -377,7 +401,6 @@ static void ptdump_initialize(void)
+ static struct ptdump_info kernel_ptdump_info = {
+ 	.mm		= &init_mm,
+ 	.markers	= address_markers,
+-	.base_addr	= PAGE_OFFSET,
+ };
+ 
+ void ptdump_check_wx(void)
+@@ -403,6 +426,18 @@ void ptdump_check_wx(void)
+ static int ptdump_init(void)
+ {
+ 	ptdump_initialize();
++	kernel_ptdump_info.base_addr = PAGE_OFFSET;
++	address_markers[PAGE_OFFSET_NR].start_address = PAGE_OFFSET;
++	address_markers[VA_START_NR].start_address = VA_START;
++#ifdef CONFIG_KASAN
++	address_markers[KASAN_START_NR].start_address = KASAN_SHADOW_START;
++#endif
++	address_markers[VMALLOC_START_NR].start_address = VMALLOC_START;
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++	address_markers[VMEMMAP_START_NR].start_address = VMEMMAP_START;
++	address_markers[VMEMMAP_END_NR].start_address = VMEMMAP_START
++							+ VMEMMAP_SIZE;
++#endif
+ 	return ptdump_debugfs_register(&kernel_ptdump_info,
+ 					"kernel_page_tables");
  }
- 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 31cfffa79fee..cd4bcd2d0942 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -834,7 +834,8 @@ static bool hyp_flip_space(const struct arm64_cpu_capabilities *entry,
- 	 * - the idmap doesn't clash with it,
- 	 * - the kernel is not running@EL2.
- 	 */
--	return idmap_addr <= GENMASK(VA_BITS_MIN - 2, 0) && !is_kernel_in_hyp_mode();
-+	return (VA_BITS == VA_BITS_MIN) &&
-+		idmap_addr <= GENMASK(VA_BITS_MIN - 2, 0) && !is_kernel_in_hyp_mode();
- }
- 
- static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unused)
-@@ -845,6 +846,28 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
- 					ID_AA64PFR0_FP_SHIFT) < 0;
- }
- 
-+#ifdef CONFIG_ARM64_VA_BITS_ALT
-+static bool hyp_using_large_va(const struct arm64_cpu_capabilities *entry,
-+				int __unused)
-+{
-+	return (VA_BITS > VA_BITS_MIN) && !is_kernel_in_hyp_mode();
-+}
-+
-+static bool hyp_flip_space_alt(const struct arm64_cpu_capabilities *entry,
-+			   int __unused)
-+{
-+	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
-+
-+	/*
-+	 * Activate the lower HYP offset only if:
-+	 * - the idmap doesn't clash with it,
-+	 * - the kernel is not running at EL2.
-+	 */
-+	return (VA_BITS > VA_BITS_MIN) &&
-+		idmap_addr <= GENMASK(VA_BITS - 2, 0) && !is_kernel_in_hyp_mode();
-+}
-+#endif
-+
- static const struct arm64_cpu_capabilities arm64_features[] = {
- 	{
- 		.desc = "GIC system register CPU interface",
-@@ -931,6 +954,20 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
- 		.def_scope = SCOPE_SYSTEM,
- 		.matches = hyp_flip_space,
- 	},
-+#ifdef CONFIG_ARM64_VA_BITS_ALT
-+	{
-+		.desc = "HYP mapping using larger VA space",
-+		.capability = ARM64_HYP_RUNNING_ALT_VA,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = hyp_using_large_va,
-+	},
-+	{
-+		.desc = "HYP mapping using flipped, larger VA space",
-+		.capability = ARM64_HYP_MAP_FLIP_ALT,
-+		.def_scope = SCOPE_SYSTEM,
-+		.matches = hyp_flip_space_alt,
-+	},
-+#endif
- 	{
- 		/* FP/SIMD is not implemented */
- 		.capability = ARM64_HAS_NO_FPSIMD,
 -- 
 2.11.0
