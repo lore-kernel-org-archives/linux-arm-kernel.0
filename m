@@ -1,19 +1,31 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 04 Dec 2017 10:58:10 +0100
-Subject: [PATCH] arm64: dts: rockchip: add rk3399 DSI0 reset
-In-Reply-To: <20171129233541.51337-1-briannorris@chromium.org>
-References: <20171129233541.51337-1-briannorris@chromium.org>
-Message-ID: <2635553.o4ICGACqOz@phil>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 4 Dec 2017 11:00:48 +0100
+Subject: [PATCH 1/2] arm64: dts: renesas: r8a77970: use CPG core clock
+ macros
+In-Reply-To: <20171128202105.552196002@cogentembedded.com>
+References: <20171128202105.552196002@cogentembedded.com>
+Message-ID: <CAMuHMdW9arTM-JKimPgo3jJ3pQdGG2a1k1wpm2wRKYPGP=aJNw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 29. November 2017, 15:35:41 CET schrieb Brian Norris:
-> We've documented this one already, but we didn't add it to the DTSI yet.
-> 
-> Suggested-by: Nickey Yang <nickey.yang@rock-chips.com>
-> Signed-off-by: Brian Norris <briannorris@chromium.org>
+On Tue, Nov 28, 2017 at 9:15 PM, Sergei Shtylyov
+<sergei.shtylyov@cogentembedded.com> wrote:
+> Now that the commit ecadea00f588 ("dt-bindings: clock: Add R8A77970 CPG
+> core clock definitions") has hit Linus' tree, we  can replace the bare
+> numbers (we had to use to avoid a cross tree dependency) with these macro
+> definitions...
+>
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-applied for 4.16
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Thanks
-Heiko
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
