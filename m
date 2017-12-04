@@ -1,59 +1,44 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon,  4 Dec 2017 15:12:46 +0100
-Subject: [PATCH 0/8] add support for AXP813 ADC and battery power supply
-Message-ID: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Mon, 4 Dec 2017 23:24:58 +0900
+Subject: [kernel-hardening][PATCH v3 0/3] arm: Makes ptdump resuable and add
+ WX page checking
+Message-ID: <20171204142458.GA3325@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP813 PMIC is relatively close to the already supported AXP20X and
-AXP22X. It provides three different power outputs: battery, AC and USB, and
-measures a few different things: temperature, power supply status, current
-current and voltage supplied, maximum current limit, battery capacity, min
-and max voltage limits.
+Hi,
 
-One of its two GPIOs can be used as an ADC.
+Page table dumping code for arm64-x86 is reusable,
+and they have function for WX page checking.
+But arm doesn't have that.
 
-There are a few differences with AXP20X/AXP22X PMICs though:
-  - a different constant charge current formula,
-  - battery temperature, GPIO0 and battery voltages are the only voltages
-  measurable,
-  - all data are stored on 12 bits (AXP20X/AXP22X had one type of data that
-  was stored on 13 bits),
-  - different scales and offsets,
-  - a different ADC rate formula and register,
+This path series are to makes ptdump reusable,
+and add WX page checking for arm.
+This is heavily based on arm64 version.
 
-This patch series adds support for the PMIC's ADC and battery power supply
-in the existing drivers.
+v2 :
+Fix a sender name of mail header, there was an mistake.
+(from "jinb.park" to Jinbum Park)
+Contents of patch-set are perfectly same.
 
-Make the axp20x MFD automatically probe the ADC driver, add the battery
-power supply node in axp81x node and enable it for the TBS A711 since it
-has a soldered battery.
+v3 :
+Take advantage of the existing pg_level and bits arrays
+to check ro, nx prot.
 
-Q: The BananaPi M3 has two solder balls for battery, should the battery
-power supply node be enabled for this board as well?
+jinb.park (3):
+  arm: mm: dump: make page table dumping reusable
+  arm: mm: dump: make the page table dumping seq_file optional
+  arm: mm: dump: add checking for writable and executable pages
 
-Thanks,
-Quentin
+ arch/arm/Kconfig.debug        |  33 +++++++++-
+ arch/arm/include/asm/ptdump.h |  56 ++++++++++++++++
+ arch/arm/mm/Makefile          |   3 +-
+ arch/arm/mm/dump.c            | 144 +++++++++++++++++++++++++++++-------------
+ arch/arm/mm/init.c            |   2 +
+ arch/arm/mm/ptdump_debugfs.c  |  34 ++++++++++
+ 6 files changed, 226 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm/include/asm/ptdump.h
+ create mode 100644 arch/arm/mm/ptdump_debugfs.c
 
-Quentin Schulz (8):
-  iio: adc: axp20x_adc: put ADC rate setting in a per-variant function
-  iio: adc: axp20x_adc: add support for AXP813 ADC
-  mfd: axp20x: probe axp20x_adc driver for AXP813
-  dt-bindings: power: supply: axp20x: add AXP813 battery DT binding
-  power: supply: axp20x_battery: add support for AXP813
-  mfd: axp20x: add battery power supply cell for AXP813
-  ARM: dtsi: axp81x: add battery power supply subnode
-  ARM: dtsi: sun8i: a711: enable battery power supply subnode
-
- Documentation/devicetree/bindings/power/supply/axp20x_battery.txt |   8 ++--
- arch/arm/boot/dts/axp81x.dtsi                                     |   5 +++-
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts                         |   4 ++-
- drivers/iio/adc/axp20x_adc.c                                      | 139 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----
- drivers/mfd/axp20x.c                                              |   7 +++-
- drivers/power/supply/axp20x_battery.c                             |  44 ++++++++++++++++++++++-
- include/linux/mfd/axp20x.h                                        |   2 +-
- 7 files changed, 196 insertions(+), 13 deletions(-)
-
-base-commit: 7cc61a0a562c7005d2a34f97e94cf26689a2f57c
 -- 
-git-series 0.9.1
+1.9.1
