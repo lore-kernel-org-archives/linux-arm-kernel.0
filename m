@@ -1,102 +1,53 @@
-From: drjones@redhat.com (Andrew Jones)
-Date: Mon, 4 Dec 2017 13:49:31 +0100
-Subject: [PATCHv2 12/12] arm64: docs: document pointer authentication
-In-Reply-To: <20171204123932.pru4lw753xm7qlwb@lakrids.cambridge.arm.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-13-mark.rutland@arm.com>
- <20171128150726.xui5i23uigvfo52w@kamzik.brq.redhat.com>
- <20171204123932.pru4lw753xm7qlwb@lakrids.cambridge.arm.com>
-Message-ID: <20171204124931.wg3wmgvzedayprql@kamzik.brq.redhat.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 04 Dec 2017 13:53:36 +0100
+Subject: [PATCH] ARM: dts: imx6qdl-zii-rdu2: Remove device_type from PCI
+ subnode
+In-Reply-To: <1512234488-8760-1-git-send-email-festevam@gmail.com>
+References: <1512234488-8760-1-git-send-email-festevam@gmail.com>
+Message-ID: <1512392016.6394.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 04, 2017 at 12:39:33PM +0000, Mark Rutland wrote:
-> On Tue, Nov 28, 2017 at 04:07:26PM +0100, Andrew Jones wrote:
-> > Hi Mark,
+Am Samstag, den 02.12.2017, 15:08 -0200 schrieb Fabio Estevam:
+> From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> Hi Drew,
+> device_type = "pci" should be used for the SoC level PCI controller
+> and
+> it is already present at imx6qdl.dtsi.
 > 
-> > On Mon, Nov 27, 2017 at 04:38:06PM +0000, Mark Rutland wrote:
-> > > +Architecture overview
-> > > +---------------------
-> > > +
-> > > +The ARMv8.3 Pointer Authentication extension adds primitives that can be
-> > > +used to mitigate certain classes of attack where an attacker can corrupt
-> > > +the contents of some memory (e.g. the stack).
-> > > +
-> > > +The extension uses a Pointer Authentication Code (PAC) to determine
-> > > +whether pointers have been modified unexpectedly. A PAC is derived from
-> > > +a pointer, another value (such as the stack pointer), and a secret key
-> > > +held in system registers.
-> > > +
-> > > +The extension adds instructions to insert a valid PAC into a pointer,
-> > > +and to verify/remove the PAC from a pointer. The PAC occupies a number
-> > > +of high-order bits of the pointer, which varies dependent on the
-> > > +configured virtual address size and whether pointer tagging is in use.
-> > > +
-> > > +A subset of these instructions have been allocated from the HINT
-> > > +encoding space. In the absence of the extension (or when disabled),
-> > > +these instructions behave as NOPs. Applications and libraries using
-> > > +these instructions operate correctly regardless of the presence of the
-> > > +extension.
-> > 
-> > Correctly, but obviously without the additional security. So I assume
-> > it's expected that applications that demand this security to probe for
-> > it themselves, presumably by the checking the HWCAP. Is that correct?
+> Remove it from the subnode in order to fix the following build
+> warnings with W=1:
 > 
-> Yes. Applications which wish to mandate pointer authentication
-> (presumably using instructions outside of the HINT space) must check the
-> relevant HWCAP first.
+> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_bridge): Node /soc
+> /pcie at 1ffc000/pci at 0 missing ranges for PCI bridge (or not a bridge)
+> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_bridge): Node /soc
+> /pcie at 1ffc000/pci at 0 missing bus-range for PCI bridge
+> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (unit_address_format):
+> Failed prerequisite 'pci_bridge'
+> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_device_reg):
+> Failed prerequisite 'pci_bridge'
+> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_device_bus_num):
+> Failed prerequisite 'pci_bridge'
 > 
-> [...]
-> 
-> > > +Virtualization
-> > > +--------------
-> > > +
-> > > +When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and uniform HW
-> > > +support is present, KVM will context switch all keys used by vCPUs.
-> > > +Otherwise, the feature is disabled. When disabled, accesses to keys, or
-> > > +use of instructions enabled within the guest will trap to EL2, and an
-> > > +UNDEFINED exception will be injected into the guest.
-> > 
-> > If host applications will just run, with the instructions behaving like
-> > NOPs, when the extension is either not present or not enabled, then
-> > shouldn't guest applications also just run?
-> 
-> The enabled/disabled wording is probably the confusing bit here.
-> 
-> At EL1 we have conditional enables for instructions using
-> AP{I,D}{A,B}Key, which behave as NOPs when disabled.
-> 
-> At EL2 we have a single conditional trap for all instructions using
-> pointer authentication, that traps to EL2 when instructions are not
-> NOP'd by EL1.
-> 
-> So "disabled by EL2" is actually "trapped by EL2", and "disabled by EL1"
-> is "NOP'd by EL1".
-> 
-> > I.e. instead of injecting UNDEF, just treat the instructions as NOPs.
-> > Or did I misunderstand the trapping?
-> 
-> I think the documentation explained it poorly. Did the above help?
+> Cc: Lucas Stach <l.stach@pengutronix.de>
+> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Yes, both the above and the below have helped me understand. Thanks for
-the clarification!
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-drew
-
+> ---
+> ?arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 1 -
+> ?1 file changed, 1 deletion(-)
 > 
-> > Does use of the instructions at EL0 trap to EL1 or EL2?
-> 
-> If disabled by EL1, the instructions behave as NOPs (regardless of the
-> EL2 traps).
-> 
-> If enabled by EL1, but trapped by EL2, the instructions trap to EL2.
-> 
-> If enabled by EL1, and not trapped by EL2, the instructions work as
-> usual.
-> 
-> I'll see if I can document this better.
-> 
-> Thanks,
-> Mark.
+> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> index 5ea9949..72f52fc 100644
+> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> @@ -584,7 +584,6 @@
+> ?
+> ?	host at 0 {
+> ?		reg = <0 0 0 0 0>;
+> -		device_type = "pci";
+> ?
+> ?		#address-cells = <3>;
+> ?		#size-cells = <2>;
