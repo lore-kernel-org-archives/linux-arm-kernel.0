@@ -1,129 +1,66 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 4 Dec 2017 18:39:34 +0000
-Subject: [PATCH 5/8] ASoC: uniphier: add support for UniPhier AIO driver
-In-Reply-To: <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
-References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
- <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
-Message-ID: <20171204183934.rd4vin22ktukwpip@sirena.org.uk>
+Date: Mon, 04 Dec 2017 18:48:24 +0000
+Subject: Applied "MAINTAINERS: add entries for UniPhier ASoC sound drivers" to
+ the asoc tree
+In-Reply-To: <20171122114321.29196-8-suzuki.katsuhiro@socionext.com>
+Message-ID: <E1eLvmy-0000Gd-N2@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 22, 2017 at 08:43:18PM +0900, Katsuhiro Suzuki wrote:
+The patch
 
->  sound/soc/uniphier/Makefile      |   4 +
->  sound/soc/uniphier/aio-core.c    | 368 +++++++++++++++++++++
->  sound/soc/uniphier/aio-dma.c     | 266 +++++++++++++++
->  sound/soc/uniphier/aio-regctrl.c | 699 +++++++++++++++++++++++++++++++++++++++
->  sound/soc/uniphier/aio-regctrl.h | 495 +++++++++++++++++++++++++++
->  sound/soc/uniphier/aio.h         | 261 +++++++++++++++
+   MAINTAINERS: add entries for UniPhier ASoC sound drivers
 
-Please split this up more, it looks like there's at least two or three
-drivers in here and it winds up being quite large.  There's at least a
-DMA and a DAI driver.  Looking through this my overall impression is
-that this is a fairly large and complex audio subsystem with some DSP
-and routing capacity which is being handled in a board specific fashion
-rather than generically but it's kind of hard to tell as there's not
-much description of what's going on so I'm needing to reverse engineer
-things from the driver.
+has been applied to the asoc tree at
 
-The code itself looks fairly clean, it's mainly a case of trying to
-figure out if it's doing what it's supposed to with the limited
-documentation.
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
 
-> +int uniphier_aio_hw_params(struct snd_pcm_substream *substream,
-> +			   struct snd_pcm_hw_params *params,
-> +			   struct snd_soc_dai *dai)
-> +{
-> +	struct uniphier_aio *aio = uniphier_priv(dai);
-> +	struct uniphier_aio_sub *sub = &aio->sub[substream->stream];
-> +
-> +	sub->params = *params;
-> +	sub->setting = 1;
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
 
-So we don't validate the params at all?
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
 
-> +	uniphier_aio_port_reset(sub);
-> +	uniphier_aio_srcport_reset(sub);
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
 
-Is there a mux in the SoC here?
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
 
-> +static const struct of_device_id uniphier_aio_of_match[] = {
-> +#ifdef CONFIG_SND_SOC_UNIPHIER_LD11
-> +	{
-> +		.compatible = "socionext,uniphier-ld11-aio",
-> +		.data = &uniphier_aio_ld11_spec,
-> +	},
-> +	{
-> +		.compatible = "socionext,uniphier-ld20-aio",
-> +		.data = &uniphier_aio_ld20_spec,
-> +	},
-> +#endif /* CONFIG_SND_SOC_UNIPHIER_LD11 */
+Thanks,
+Mark
 
-Why is there an ifdef here?  There's no other conditional code in here,
-it seems pointless.
+>From 576f8f46e7c923f830dfa61924ad547447399b05 Mon Sep 17 00:00:00 2001
+From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Date: Wed, 22 Nov 2017 20:43:20 +0900
+Subject: [PATCH] MAINTAINERS: add entries for UniPhier ASoC sound drivers
 
-> +		for (j = 0; j < ARRAY_SIZE(aio->sub); j++) {
-> +			struct uniphier_aio_sub *sub = &aio->sub[j];
-> +
-> +			if (!sub->running)
-> +				continue;
-> +
-> +			spin_lock(&sub->spin);
-> +			uniphier_aio_rb_sync(sub);
-> +			uniphier_aio_rb_clear_int(sub);
-> +			spin_unlock(&sub->spin);
+Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ MAINTAINERS | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-It's not 100% obvious what this does...  a comment might help.
-
-> +int uniphier_aio_chip_init(struct uniphier_aio_chip *chip)
-> +{
-> +	struct regmap *r = chip->regmap;
-> +
-> +	regmap_update_bits(r, A2APLLCTR0,
-> +			   A2APLLCTR0_APLLXPOW_MASK,
-> +			   A2APLLCTR0_APLLXPOW_PWON);
-> +
-> +	regmap_update_bits(r, A2APLLCTR1, A2APLLCTR1_APLL_MASK,
-> +			   A2APLLCTR1_APLLF2_33MHZ | A2APLLCTR1_APLLA2_33MHZ |
-> +			   A2APLLCTR1_APLLF1_36MHZ | A2APLLCTR1_APLLA1_36MHZ);
-> +
-> +	regmap_update_bits(r, A2EXMCLKSEL0,
-> +			   A2EXMCLKSEL0_EXMCLK_MASK,
-> +			   A2EXMCLKSEL0_EXMCLK_OUTPUT);
-> +
-> +	regmap_update_bits(r, A2AIOINPUTSEL, A2AIOINPUTSEL_RXSEL_MASK,
-> +			   A2AIOINPUTSEL_RXSEL_PCMI1_HDMIRX1 |
-> +			   A2AIOINPUTSEL_RXSEL_PCMI2_SIF |
-> +			   A2AIOINPUTSEL_RXSEL_PCMI3_EVEA |
-> +			   A2AIOINPUTSEL_RXSEL_IECI1_HDMIRX1);
-
-This definitely looks like there's some clocking and audio routing
-within the SoC which should be exposed to userspace, or at the very
-least machine driver configuration rather than being hard coded.
-
-> +	switch (pc) {
-> +	case IEC61937_PC_AC3:
-> +		repet = OPORTMXREPET_STRLENGTH_AC3 |
-> +			OPORTMXREPET_PMLENGTH_AC3;
-> +		pause |= OPORTMXPAUDAT_PAUSEPD_AC3;
-> +		break;
-> +	case IEC61937_PC_MPA:
-> +		repet = OPORTMXREPET_STRLENGTH_MPA |
-> +			OPORTMXREPET_PMLENGTH_MPA;
-> +		pause |= OPORTMXPAUDAT_PAUSEPD_MPA;
-> +		break;
-> +	case IEC61937_PC_MP3:
-> +		repet = OPORTMXREPET_STRLENGTH_MP3 |
-> +			OPORTMXREPET_PMLENGTH_MP3;
-> +		pause |= OPORTMXPAUDAT_PAUSEPD_MP3;
-> +		break;
-
-This looks awfully like compressed audio support...  should there be
-integration with the compressed audio API/
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171204/802f78d4/attachment-0001.sig>
+diff --git a/MAINTAINERS b/MAINTAINERS
+index aa71ab52fd76..55ae8ea8722a 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -12581,6 +12581,12 @@ F:	include/media/soc*
+ F:	drivers/media/i2c/soc_camera/
+ F:	drivers/media/platform/soc_camera/
+ 
++SOCIONEXT UNIPHIER SOUND DRIVER
++M:	Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
++L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
++S:	Maintained
++F:	sound/soc/uniphier/
++
+ SOEKRIS NET48XX LED SUPPORT
+ M:	Chris Boot <bootc@bootc.net>
+ S:	Maintained
+-- 
+2.15.0
