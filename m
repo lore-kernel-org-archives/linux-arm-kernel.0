@@ -1,97 +1,181 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Mon,  4 Dec 2017 14:13:02 +0000
-Subject: [PATCH 01/12] KVM: arm/arm64: vgic: Remove spurious call to
- kern_hyp_va
+Date: Mon,  4 Dec 2017 14:13:03 +0000
+Subject: [PATCH 02/12] arm64: KVM: Enforce injective kern_hyp_va mappings
 In-Reply-To: <20171204141313.31604-1-steve.capper@arm.com>
 References: <20171204141313.31604-1-steve.capper@arm.com>
-Message-ID: <20171204141313.31604-2-steve.capper@arm.com>
+Message-ID: <20171204141313.31604-3-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In save_elrsr(.), we use the following technique to ascertain the
-address of the vgic global state:
-	(kern_hyp_va(&kvm_vgic_global_state))->nr_lr
+For systems that are not executing with VHE, we need to create page
+tables for HYP/EL2 mode in order to access data from the kernel running
+at EL1.
 
-For arm, kern_hyp_va(va) == va, and this call effectively compiles out.
+In addition to parts of the kernel address space being mapped to EL2, we
+also need to make space for an identity mapping of the __hyp_idmap_text
+area (as this code is responsible for activating the EL2 MMU).
 
-For arm64, this call can be spurious as the address of kvm_vgic_global_state
-will usually be determined by relative page/absolute page offset relocation
-at link time. As the function is idempotent, having the call for arm64 does
-not cause any problems.
+In order to create these pagetables, we need a mechanism to map from the
+address space pointed to by TTBR1_EL1 (addresses preceded by 0xFF...)
+to the one addressed by TTBR0_EL2 (addresses preceded by 0x00...).
 
-Unfortunately, this is about to change for arm64 as we need to change
-the logic of kern_hyp_va to allow for kernel addresses that are outside
-the direct linear map.
+There are two ways of performing this mapping depending upon the
+physical address of __hyp_idmap_text_start.
 
-This patch removes the call to kern_hyp_va, and ensures that correct
-HYP addresses are computed via relative page offset addressing on arm64.
-This is achieved by a custom accessor, hyp_address(.), which on arm is a
-simple reference operator.
+If PA[VA_BITS - 2] == 0b:
+1) HYP_VA = KERN_VA & GENMASK(VA_BITS - 2, 0) - so we mask in the lower
+bits of the kernel address. This is a bijective mapping.
 
-Cc: James Morse <james.morese@arm.com>
-Suggested-by: Marc Zyngier <marc.zyngier@arm.com>
+If PA[VA_BITS - 2] == 1b:
+2) HYP_VA = KERN_VA & GENMASK(VA_BITS - 3, 0) - so the top bit of our HYP
+VA will always be zero. This mapping is no longer injective, each HYP VA
+can be obtained from two different kernel VAs.
+
+These mappings guarantee that kernel addresses in the direct linear
+mapping will not give a HYP VA that collides with the identity mapping
+for __hyp_idmap_text.
+
+Unfortunately, with the second mapping we run the risk of hyp VAs
+derived from kernel addresses in the direct linear map colliding with
+those derived from kernel addresses from ioremap.
+
+This patch addresses this issue by switching to the following logic:
+If PA[VA_BITS - 2] == 0b:
+3) HYP_VA = KERN_VA XOR GENMASK(63, VA_BITS - 1) - we toggle off the top
+bits from the kernel address rather than and in the bottom bits.
+
+If PA[VA_BITS - 2] == 1b:
+4) HYP_VA = KERN_VA XOR GENMASK(63, VA_BITS - 2) - no longer maps to a
+reduced address space, we have a bijective mapping.
+
+Now there is no possibility of collision between HYP VAs obtained from
+kernel addresses.
+
+Note that the new mappings are no longer idempotent, so the following
+code sequence will behave differently after this patch is applied:
+	testva = kern_hyp_va(kern_hyp_va(sourceva));
+
+Cc: James Morse <james.morse@arm.com>
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 ---
- arch/arm/include/asm/kvm_hyp.h   |  2 ++
- arch/arm64/include/asm/kvm_hyp.h | 10 ++++++++++
- virt/kvm/arm/hyp/vgic-v2-sr.c    |  4 ++--
- 3 files changed, 14 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/cpucaps.h |  2 +-
+ arch/arm64/include/asm/kvm_mmu.h | 36 +++++++++++++++++-------------------
+ arch/arm64/kernel/cpufeature.c   |  8 ++++----
+ 3 files changed, 22 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index ab20ffa8b9e7..1864a9bdd160 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -26,6 +26,8 @@
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 2ff7c5e8efab..3de31a1010ee 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -32,7 +32,7 @@
+ #define ARM64_HAS_VIRT_HOST_EXTN		11
+ #define ARM64_WORKAROUND_CAVIUM_27456		12
+ #define ARM64_HAS_32BIT_EL0			13
+-#define ARM64_HYP_OFFSET_LOW			14
++#define ARM64_HYP_MAP_FLIP			14
+ #define ARM64_MISMATCHED_CACHE_LINE_SIZE	15
+ #define ARM64_HAS_NO_FPSIMD			16
+ #define ARM64_WORKAROUND_REPEAT_TLBI		17
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 672c8684d5c2..d74d5236c26c 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -69,8 +69,8 @@
+  * mappings, and none of this applies in that case.
+  */
  
- #define __hyp_text __section(.hyp.text) notrace
+-#define HYP_PAGE_OFFSET_HIGH_MASK	((UL(1) << VA_BITS) - 1)
+-#define HYP_PAGE_OFFSET_LOW_MASK	((UL(1) << (VA_BITS - 1)) - 1)
++#define HYP_MAP_KERNEL_BITS	(UL(0xffffffffffffffff) << VA_BITS)
++#define HYP_MAP_HIGH_BIT	(UL(1) << (VA_BITS - 1))
  
-+#define hyp_address(symbol)	(&(symbol))
-+
- #define __ACCESS_VFP(CRn)			\
- 	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
+ #ifdef __ASSEMBLY__
  
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 08d3bb66c8b7..34a4ae906a97 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -25,6 +25,16 @@
+@@ -82,26 +82,24 @@
+  * reg: VA to be converted.
+  *
+  * This generates the following sequences:
+- * - High mask:
+- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
++ *
++ * - Flip the kernel bits:
++ *		eor x0, x0, #HYP_MAP_KERNEL_BITS
+  *		nop
+- * - Low mask:
+- *		and x0, x0, #HYP_PAGE_OFFSET_HIGH_MASK
+- *		and x0, x0, #HYP_PAGE_OFFSET_LOW_MASK
++ *
++ * - Flip the kernel bits and upper HYP bit:
++ *		eor x0, x0, #HYP_MAP_KERNEL_BITS
++ *		eor x0, x0, #HYP_MAP_HIGH_BIT
+  * - VHE:
+  *		nop
+  *		nop
+- *
+- * The "low mask" version works because the mask is a strict subset of
+- * the "high mask", hence performing the first mask for nothing.
+- * Should be completely invisible on any viable CPU.
+  */
+ .macro kern_hyp_va	reg
+ alternative_if_not ARM64_HAS_VIRT_HOST_EXTN
+-	and     \reg, \reg, #HYP_PAGE_OFFSET_HIGH_MASK
++	eor     \reg, \reg, #HYP_MAP_KERNEL_BITS
+ alternative_else_nop_endif
+-alternative_if ARM64_HYP_OFFSET_LOW
+-	and     \reg, \reg, #HYP_PAGE_OFFSET_LOW_MASK
++alternative_if ARM64_HYP_MAP_FLIP
++	eor     \reg, \reg, #HYP_MAP_HIGH_BIT
+ alternative_else_nop_endif
+ .endm
  
- #define __hyp_text __section(.hyp.text) notrace
+@@ -115,16 +113,16 @@ alternative_else_nop_endif
  
-+#define hyp_address(symbol)				\
-+({							\
-+	typeof(&symbol) __ret;				\
-+	asm volatile(					\
-+	"adrp %[ptr], " #symbol	"\n"			\
-+	"add %[ptr], %[ptr], :lo12:" #symbol "\n"	\
-+	: [ptr] "=r"(__ret));				\
-+	__ret;						\
-+})
-+
- #define read_sysreg_elx(r,nvh,vh)					\
- 	({								\
- 		u64 reg;						\
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index a3f18d362366..330fd4637708 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -25,7 +25,7 @@
- static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
+ static inline unsigned long __kern_hyp_va(unsigned long v)
  {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
-+	int nr_lr = hyp_address(kvm_vgic_global_state)->nr_lr;
- 	u32 elrsr0, elrsr1;
+-	asm volatile(ALTERNATIVE("and %0, %0, %1",
++	asm volatile(ALTERNATIVE("eor %0, %0, %1",
+ 				 "nop",
+ 				 ARM64_HAS_VIRT_HOST_EXTN)
+ 		     : "+r" (v)
+-		     : "i" (HYP_PAGE_OFFSET_HIGH_MASK));
++		     : "i" (HYP_MAP_KERNEL_BITS));
+ 	asm volatile(ALTERNATIVE("nop",
+-				 "and %0, %0, %1",
+-				 ARM64_HYP_OFFSET_LOW)
++				 "eor %0, %0, %1",
++				 ARM64_HYP_MAP_FLIP)
+ 		     : "+r" (v)
+-		     : "i" (HYP_PAGE_OFFSET_LOW_MASK));
++		     : "i" (HYP_MAP_HIGH_BIT));
+ 	return v;
+ }
  
- 	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-@@ -143,7 +143,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		return -1;
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index c5ba0097887f..5a6e1f3611eb 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -824,7 +824,7 @@ static bool runs_at_el2(const struct arm64_cpu_capabilities *entry, int __unused
+ 	return is_kernel_in_hyp_mode();
+ }
  
- 	rd = kvm_vcpu_dabt_get_rd(vcpu);
--	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
-+	addr  = kern_hyp_va(hyp_address(kvm_vgic_global_state)->vcpu_base_va);
- 	addr += fault_ipa - vgic->vgic_cpu_base;
- 
- 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
+-static bool hyp_offset_low(const struct arm64_cpu_capabilities *entry,
++static bool hyp_flip_space(const struct arm64_cpu_capabilities *entry,
+ 			   int __unused)
+ {
+ 	phys_addr_t idmap_addr = __pa_symbol(__hyp_idmap_text_start);
+@@ -926,10 +926,10 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.min_field_value = ID_AA64PFR0_EL0_32BIT_64BIT,
+ 	},
+ 	{
+-		.desc = "Reduced HYP mapping offset",
+-		.capability = ARM64_HYP_OFFSET_LOW,
++		.desc = "HYP mapping flipped",
++		.capability = ARM64_HYP_MAP_FLIP,
+ 		.def_scope = SCOPE_SYSTEM,
+-		.matches = hyp_offset_low,
++		.matches = hyp_flip_space,
+ 	},
+ 	{
+ 		/* FP/SIMD is not implemented */
 -- 
 2.11.0
