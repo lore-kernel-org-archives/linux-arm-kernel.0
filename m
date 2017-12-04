@@ -1,39 +1,32 @@
-From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
-Date: Mon, 4 Dec 2017 09:36:25 -0800
-Subject: [PATCH 6/6] ARM: configs: keystone_defconfig: Enable few
- peripheral drivers
-In-Reply-To: <76a88f69-dd0b-8823-ae31-bd39b1abae87@ti.com>
-References: <20171123075154.3938-1-vigneshr@ti.com>
- <20171123075154.3938-7-vigneshr@ti.com>
- <fb0c662b-d462-c663-7cf0-443ace3565ba@oracle.com>
- <76a88f69-dd0b-8823-ae31-bd39b1abae87@ti.com>
-Message-ID: <9e96c65b-17aa-c49f-eef7-a4373241d231@oracle.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon,  4 Dec 2017 18:38:50 +0100
+Subject: [PATCH] arm64: dts: rockchip: fix trailing 0 in rk3328 tsadc
+ interrupts
+Message-ID: <20171204173850.9976-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/4/2017 1:00 AM, Vignesh R wrote:
-> Hi,
-> 
-> On Sunday 03 December 2017 09:30 AM, santosh.shilimkar at oracle.com wrote:
->> On 11/22/17 11:51 PM, Vignesh R wrote:
->>> Enable drivers for QSPI, LEDS, gpio-decoder that are present on 66AK2G
->>> EVM
->>> and 66AK2G ICE boards.
->>>
->>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>> ---
->> Please submit a patch also to enable all these peripherals
->> in multi-v7 config. Just enable all remainder
->> options enabled in keystone config also in multi-v7.
-> 
-> K2 Platforms don't boot out of multi_v7_defconfig by default, because K2
-> platforms require CONFIG_ARM_LPAE(which is disabled in multi-v7).
-> 
-> If the intention is to just have all drivers enabled in
-> keystone_defconfig to be added to multi_v7, I can prepare a patch for
-> that and test with local patch to enable LPAE.
-> 
-Yes. Please send a patch for it.
+Probably due to some copy-paste mistake, the tsadc of rk3328 ended up
+with a 0 as 4th element that shouldn't be there, as interrupts on the
+rk3328 only have multiples of 3, making dtc complain. So remove it.
 
-Regards,
-Santosh
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index 41d61840fb99..2426da631938 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -514,7 +514,7 @@
+ 	tsadc: tsadc at ff250000 {
+ 		compatible = "rockchip,rk3328-tsadc";
+ 		reg = <0x0 0xff250000 0x0 0x100>;
+-		interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH 0>;
++		interrupts = <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>;
+ 		assigned-clocks = <&cru SCLK_TSADC>;
+ 		assigned-clock-rates = <50000>;
+ 		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
+-- 
+2.14.2
