@@ -1,70 +1,166 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Mon, 4 Dec 2017 09:28:08 -0200
-Subject: [PATCH 11/12] ARM: dts: imx6qdl-nitrogen6_max: Remove unneeded
- unit address
-In-Reply-To: <20171204111954.v7jexbtkjyaa6mhe@t450s.lan>
-References: <1512156285-18451-1-git-send-email-festevam@gmail.com>
- <1512156285-18451-11-git-send-email-festevam@gmail.com>
- <20171204111954.v7jexbtkjyaa6mhe@t450s.lan>
-Message-ID: <CAOMZO5C77f9mQQWJ5GJH3J+cj4Fxu3H-3yQYeFNDxm3xfpe8Gw@mail.gmail.com>
+From: ar@linux.vnet.ibm.com (Andrea Reale)
+Date: Mon, 4 Dec 2017 11:28:55 +0000
+Subject: [PATCH v2 2/5] mm: memory_hotplug: Remove assumption on memory
+ state before hotremove
+In-Reply-To: <20171129015229.GD1469@linux-l9pv.suse>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <4e21a27570f665793debf167c8567c6752116d0a.1511433386.git.ar@linux.vnet.ibm.com>
+ <20171129004913.GB1469@linux-l9pv.suse>
+ <20171129015229.GD1469@linux-l9pv.suse>
+Message-ID: <20171204112855.GA6373@samekh>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gary,
+Hi Joey,
 
-On Mon, Dec 4, 2017 at 9:19 AM, Gary Bisson
-<gary.bisson@boundarydevices.com> wrote:
+and thanks for your comments. Response inline:
 
-> What about naming it i2c2mux and i2c3mux so it is clearer those mux
-> happen respectively for i2c2 and i2c3?
->
-> Then I'd rename the sub-nodes i2cXmux at Y instead of i2cX at Y currently.
->
-> Let me know your thoughts.
+On Wed 29 Nov 2017, 09:52, joeyli wrote:
+> On Wed, Nov 29, 2017 at 08:49:13AM +0800, joeyli wrote:
+> > Hi Andrea, 
+> > 
+> > On Fri, Nov 24, 2017 at 10:22:35AM +0000, Andrea Reale wrote:
+> > > Resending the patch adding linux-acpi in CC, as suggested by Rafael.
+> > > Everyone else: apologies for the noise.
+> > > 
+> > > Commit 242831eb15a0 ("Memory hotplug / ACPI: Simplify memory removal")
+> > > introduced an assumption whereas when control
+> > > reaches remove_memory the corresponding memory has been already
+> > > offlined. In that case, the acpi_memhotplug was making sure that
+> > > the assumption held.
+> > > This assumption, however, is not necessarily true if offlining
+> > > and removal are not done by the same "controller" (for example,
+> > > when first offlining via sysfs).
+> > > 
+> > > Removing this assumption for the generic remove_memory code
+> > > and moving it in the specific acpi_memhotplug code. This is
+> > > a dependency for the software-aided arm64 offlining and removal
+> > > process.
+> > > 
+> > > Signed-off-by: Andrea Reale <ar@linux.vnet.ibm.com>
+> > > Signed-off-by: Maciej Bielski <m.bielski@linux.vnet.ibm.com>
+> > > ---
+> > >  drivers/acpi/acpi_memhotplug.c |  2 +-
+> > >  include/linux/memory_hotplug.h |  9 ++++++---
+> > >  mm/memory_hotplug.c            | 13 +++++++++----
+> > >  3 files changed, 16 insertions(+), 8 deletions(-)
+> > > 
+> > > diff --git a/drivers/acpi/acpi_memhotplug.c b/drivers/acpi/acpi_memhotplug.c
+> > > index 6b0d3ef..b0126a0 100644
+> > > --- a/drivers/acpi/acpi_memhotplug.c
+> > > +++ b/drivers/acpi/acpi_memhotplug.c
+> > > @@ -282,7 +282,7 @@ static void acpi_memory_remove_memory(struct acpi_memory_device *mem_device)
+> > >  			nid = memory_add_physaddr_to_nid(info->start_addr);
+> > >  
+> > >  		acpi_unbind_memory_blocks(info);
+> > > -		remove_memory(nid, info->start_addr, info->length);
+> > > +		BUG_ON(remove_memory(nid, info->start_addr, info->length));
+> > >  		list_del(&info->list);
+> > >  		kfree(info);
+> > >  	}
+> > > diff --git a/include/linux/memory_hotplug.h b/include/linux/memory_hotplug.h
+> > > index 58e110a..1a9c7b2 100644
+> > > --- a/include/linux/memory_hotplug.h
+> > > +++ b/include/linux/memory_hotplug.h
+> > > @@ -295,7 +295,7 @@ static inline bool movable_node_is_enabled(void)
+> > >  extern bool is_mem_section_removable(unsigned long pfn, unsigned long nr_pages);
+> > >  extern void try_offline_node(int nid);
+> > >  extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
+> > > -extern void remove_memory(int nid, u64 start, u64 size);
+> > > +extern int remove_memory(int nid, u64 start, u64 size);
+> > >  
+> > >  #else
+> > >  static inline bool is_mem_section_removable(unsigned long pfn,
+> > > @@ -311,7 +311,10 @@ static inline int offline_pages(unsigned long start_pfn, unsigned long nr_pages)
+> > >  	return -EINVAL;
+> > >  }
+> > >  
+> > > -static inline void remove_memory(int nid, u64 start, u64 size) {}
+> > > +static inline int remove_memory(int nid, u64 start, u64 size)
+> > > +{
+> > > +	return -EINVAL;
+> > > +}
+> > >  #endif /* CONFIG_MEMORY_HOTREMOVE */
+> > >  
+> > >  extern int walk_memory_range(unsigned long start_pfn, unsigned long end_pfn,
+> > > @@ -323,7 +326,7 @@ extern void move_pfn_range_to_zone(struct zone *zone, unsigned long start_pfn,
+> > >  		unsigned long nr_pages);
+> > >  extern int offline_pages(unsigned long start_pfn, unsigned long nr_pages);
+> > >  extern bool is_memblock_offlined(struct memory_block *mem);
+> > > -extern void remove_memory(int nid, u64 start, u64 size);
+> > > +extern int remove_memory(int nid, u64 start, u64 size);
+> > >  extern int sparse_add_one_section(struct pglist_data *pgdat, unsigned long start_pfn);
+> > >  extern void sparse_remove_one_section(struct zone *zone, struct mem_section *ms,
+> > >  		unsigned long map_offset);
+> > > diff --git a/mm/memory_hotplug.c b/mm/memory_hotplug.c
+> > > index d4b5f29..d5f15af 100644
+> > > --- a/mm/memory_hotplug.c
+> > > +++ b/mm/memory_hotplug.c
+> > > @@ -1892,7 +1892,7 @@ EXPORT_SYMBOL(try_offline_node);
+> > >   * and online/offline operations before this call, as required by
+> > >   * try_offline_node().
+> > >   */
+> > > -void __ref remove_memory(int nid, u64 start, u64 size)
+> > > +int __ref remove_memory(int nid, u64 start, u64 size)
+> > >  {
+> > >  	int ret;
+> > >  
+> > > @@ -1908,18 +1908,23 @@ void __ref remove_memory(int nid, u64 start, u64 size)
+> > >  	ret = walk_memory_range(PFN_DOWN(start), PFN_UP(start + size - 1), NULL,
+> > >  				check_memblock_offlined_cb);
+> > >  	if (ret)
+> > > -		BUG();
+> > > +		goto end_remove;
+> > > +
+> > > +	ret = arch_remove_memory(start, size);
+> 
+> Should not include arch_remove_memory() to BUG().
 
-Is this what you suggest?
+arch_remove_memory might also fail in some cases. In the arm64
+implementation of this patchset, for example, it might fail in the
+(very rare) case when we would have to split a P[UM]D mapped section for
+removal (and we do not support that - see email thread here:
+https://lkml.org/lkml/2017/11/23/456).
 
---- a/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-nitrogen6_max.dtsi
-@@ -172,7 +172,7 @@
-                };
-        };
 
--       i2cmux at 2 {
-+       i2c2mux {
-                compatible = "i2c-mux-gpio";
-                pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_i2c2mux>;
-@@ -183,20 +183,20 @@
-                i2c-parent = <&i2c2>;
-                idle-state = <0>;
+> > > +
+> > > +	if (ret)
+> > > +		goto end_remove;
+> > 
+> > The original code triggers BUG() when any memblock is not offlined. Why
+> > the new logic includes the result of arch_remove_memory()?
+> > 
+> > But I agreed the we don't need BUG(). Returning a error is better.
+> 
+> Actually, I lost one thing.
+> 
+> The BUG() have caught a issue about the offline state doesn't sync between
+> memory_block and device object. like:
+>         mem->dev.offline != (mem->state == MEM_OFFLINE)
+> 
+> So, the BUG() is useful to capture state issue in memory subsystem. But, I
+> understood your concern about the two steps offline/remove from userland. 
+> 
+> Maybe we should move the BUG() to somewhere but not just remove it. Or if
+> we think that the BUG() is too intense, at least we should print out a error
+> message, and ACPI should checks the return value from subsystem to
+> interrupt memory-hotplug process.
 
--               i2c2 at 1 {
-+               i2c2mux at 1 {
-                        reg = <1>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                };
+In this patchset, BUG() is moved to acpi_memory_remove_memory(),
+the caller of arch_remove_memory(). However, I agree with Michal, that
+we should not BUG() here but rather halt the hotremove process and print
+some errors. 
+Is there any state in ACPI that should be undone in case of hotremove
+errors or we can just stop the process "halfway"?
 
--               i2c2 at 2 {
-+               i2c2mux at 2 {
-                        reg = <2>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
-                };
-        };
+> Thanks a lot!
+> Joey Lee 
 
--       i2cmux at 3 {
-+       i2c3mux {
-                compatible = "i2c-mux-gpio";
-                pinctrl-names = "default";
-                pinctrl-0 = <&pinctrl_i2c3mux>;
-@@ -206,7 +206,7 @@
-                i2c-parent = <&i2c3>;
-                idle-state = <0>;
+Thanks,
+Andrea
 
--               i2c3 at 1 {
-+               i2c3mux at 1 {
-                        reg = <1>;
-                        #address-cells = <1>;
-                        #size-cells = <0>;
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
