@@ -1,169 +1,64 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Mon,  4 Dec 2017 09:27:51 -0500
-Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
-Message-ID: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
+From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
+Date: Mon, 4 Dec 2017 14:30:28 +0000
+Subject: [PATCH 01/12] KVM: arm/arm64: vgic: Remove spurious call to
+ kern_hyp_va
+In-Reply-To: <20171204141313.31604-2-steve.capper@arm.com>
+References: <20171204141313.31604-1-steve.capper@arm.com>
+ <20171204141313.31604-2-steve.capper@arm.com>
+Message-ID: <d8a26134-52e2-0800-542f-603c6e8347c7@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The xHCI driver currently has the IMOD set to 160, which
-translates to an IMOD interval of 40,000ns (160 * 250)ns
+On 04/12/17 14:13, Steve Capper wrote:
+> In save_elrsr(.), we use the following technique to ascertain the
+> address of the vgic global state:
+> 	(kern_hyp_va(&kvm_vgic_global_state))->nr_lr
+> 
+> For arm, kern_hyp_va(va) == va, and this call effectively compiles out.
+> 
+> For arm64, this call can be spurious as the address of kvm_vgic_global_state
+> will usually be determined by relative page/absolute page offset relocation
+> at link time. As the function is idempotent, having the call for arm64 does
+> not cause any problems.
+> 
+> Unfortunately, this is about to change for arm64 as we need to change
+> the logic of kern_hyp_va to allow for kernel addresses that are outside
+> the direct linear map.
+> 
+> This patch removes the call to kern_hyp_va, and ensures that correct
+> HYP addresses are computed via relative page offset addressing on arm64.
+> This is achieved by a custom accessor, hyp_address(.), which on arm is a
+> simple reference operator.
 
-Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
-introduced a QUIRK for the MTK platform to adjust this interval to 20,
-which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
-due to the fact that the MTK controller IMOD interval is 8 times
-as much as defined in xHCI spec.
+minor nit: I somehow feel that there word "symbol" should be part of the name of
+the macro, to make it implicit that it can only be used on a symbol and not any
+generic variable.
 
-Instead of adding more quirk bits for additional platforms, this patch
-introduces the ability for vendors to set the IMOD_INTERVAL as is
-optimal for their platform. By using device_property_read_u32() on
-"imod-interval-ns", the IMOD INTERVAL can be specified in nano seconds.
-If no interval is specified, the default of 40,000ns (IMOD=160) will be
-used.
+> diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+> index 08d3bb66c8b7..34a4ae906a97 100644
+> --- a/arch/arm64/include/asm/kvm_hyp.h
+> +++ b/arch/arm64/include/asm/kvm_hyp.h
+> @@ -25,6 +25,16 @@
+>   
+>   #define __hyp_text __section(.hyp.text) notrace
+>   
+> +#define hyp_address(symbol)				\
+> +({							\
+> +	typeof(&symbol) __ret;				\
+> +	asm volatile(					\
+> +	"adrp %[ptr], " #symbol	"\n"			\
+> +	"add %[ptr], %[ptr], :lo12:" #symbol "\n"	\
+> +	: [ptr] "=r"(__ret));				\
+> +	__ret;						\
+> +})
+> +
 
-No bounds checking has been implemented due to the fact that a vendor
-may have violated the spec and would need to specify a value outside of
-the max 8,000 IRQs/second limit specified in the xHCI spec.
+> -	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
+> +	addr  = kern_hyp_va(hyp_address(kvm_vgic_global_state)->vcpu_base_va);
 
-Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-Signed-off-by: Adam Wallis <awallis@codeaurora.org>
----
-changes from v3:
-  * Changed imod-interval to imod-interval-ns [Rob Herring/Chunfeng]
-  * Changed "modulation" to "moderation" throughout patch [Mathias]
-changes from v2:
-  * Added PCI default value [Mathias]
-  * Removed xhci-mtk.h from xhci-plat.c [Chunfeng Yun]
-  * Removed MTK quirk from xhci-plat and moved logic to xhci-mtk [Chunfeng]
-  * Updated bindings Documentation to use proper units [Rob Herring]
-  * Added imod-interval description and example to MTK binding documentation
-changes from v1:
-  * Removed device_property_read_u32() per suggestion from greg k-h
-  * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
+e.g, Like here, why do we use hyp_address only for the kvm_vgic_global_state and not
+the dereferenced value. Having a name, say, hyp_symbol_address() makes it clear.
 
- Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 2 ++
- Documentation/devicetree/bindings/usb/usb-xhci.txt          | 1 +
- drivers/usb/host/xhci-mtk.c                                 | 9 +++++++++
- drivers/usb/host/xhci-pci.c                                 | 3 +++
- drivers/usb/host/xhci-plat.c                                | 5 +++++
- drivers/usb/host/xhci.c                                     | 7 ++-----
- drivers/usb/host/xhci.h                                     | 2 ++
- 7 files changed, 24 insertions(+), 5 deletions(-)
+Otherwise, looks good to me.
 
-diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-index 3059596..9ff5602 100644
---- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
-@@ -46,6 +46,7 @@ Optional properties:
-  - pinctrl-names : a pinctrl state named "default" must be defined
-  - pinctrl-0 : pin control group
- 	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+ - imod-interval-ns: default interrupt moderation interval is 5000ns
- 
- Example:
- usb30: usb at 11270000 {
-@@ -66,6 +67,7 @@ usb30: usb at 11270000 {
- 	usb3-lpm-capable;
- 	mediatek,syscon-wakeup = <&pericfg>;
- 	mediatek,wakeup-src = <1>;
-+	imod-interval-ns = <10000>;
- };
- 
- 2nd: dual-role mode with xHCI driver
-diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-index ae6e484..969908d 100644
---- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
-+++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
-@@ -29,6 +29,7 @@ Optional properties:
-   - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
-   - usb3-lpm-capable: determines if platform is USB3 LPM capable
-   - quirk-broken-port-ped: set if the controller has broken port disable mechanism
-+  - imod-interval-ns: default interrupt moderation interval is 5000ns
- 
- Example:
- 	usb at f0931000 {
-diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
-index b62a1d2..1cb2a8b 100644
---- a/drivers/usb/host/xhci-mtk.c
-+++ b/drivers/usb/host/xhci-mtk.c
-@@ -674,6 +674,15 @@ static int xhci_mtk_probe(struct platform_device *pdev)
- 
- 	xhci = hcd_to_xhci(hcd);
- 	xhci->main_hcd = hcd;
-+
-+	/*
-+	 * imod_interval is the interrupt moderation value in nanoseconds.
-+	 * The increment interval is 8 times as much as that defined in
-+	 * the xHCI spec on MTK's controller.
-+	 */
-+	xhci->imod_interval = 5000;
-+	device_property_read_u32(dev, "imod-interval-ns", &xhci->imod_interval);
-+
- 	xhci->shared_hcd = usb_create_shared_hcd(driver, dev,
- 			dev_name(dev), hcd);
- 	if (!xhci->shared_hcd) {
-diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
-index 7ef1274..4bcddd4 100644
---- a/drivers/usb/host/xhci-pci.c
-+++ b/drivers/usb/host/xhci-pci.c
-@@ -234,6 +234,9 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
- 	if (!xhci->sbrn)
- 		pci_read_config_byte(pdev, XHCI_SBRN_OFFSET, &xhci->sbrn);
- 
-+	/* imod_interval is the interrupt moderation value in nanoseconds. */
-+	xhci->imod_interval = 40000;
-+
- 	retval = xhci_gen_setup(hcd, xhci_pci_quirks);
- 	if (retval)
- 		return retval;
-diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
-index 09f164f..6f03830 100644
---- a/drivers/usb/host/xhci-plat.c
-+++ b/drivers/usb/host/xhci-plat.c
-@@ -269,6 +269,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
- 	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
- 		xhci->quirks |= XHCI_BROKEN_PORT_PED;
- 
-+	/* imod_interval is the interrupt moderation value in nanoseconds. */
-+	xhci->imod_interval = 40000;
-+	device_property_read_u32(sysdev, "imod-interval-ns",
-+				 &xhci->imod_interval);
-+
- 	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
- 	if (IS_ERR(hcd->usb_phy)) {
- 		ret = PTR_ERR(hcd->usb_phy);
-diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
-index 2424d30..0b7755b 100644
---- a/drivers/usb/host/xhci.c
-+++ b/drivers/usb/host/xhci.c
-@@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
- 			"// Set the interrupt modulation register");
- 	temp = readl(&xhci->ir_set->irq_control);
- 	temp &= ~ER_IRQ_INTERVAL_MASK;
--	/*
--	 * the increment interval is 8 times as much as that defined
--	 * in xHCI spec on MTK's controller
--	 */
--	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
-+	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
-+
- 	writel(temp, &xhci->ir_set->irq_control);
- 
- 	/* Set the HCD state before we enable the irqs */
-diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
-index 99a014a..2a4177b 100644
---- a/drivers/usb/host/xhci.h
-+++ b/drivers/usb/host/xhci.h
-@@ -1717,6 +1717,8 @@ struct xhci_hcd {
- 	u8		max_interrupters;
- 	u8		max_ports;
- 	u8		isoc_threshold;
-+	/* imod_interval in ns (I * 250ns) */
-+	u32		imod_interval;
- 	int		event_ring_max;
- 	/* 4KB min, 128MB max */
- 	int		page_size;
--- 
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Suzuki
