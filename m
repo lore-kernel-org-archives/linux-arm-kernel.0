@@ -1,53 +1,73 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Mon, 4 Dec 2017 18:12:13 +0000
-Subject: [PATCH 07/12] arm64: mm: Place kImage at bottom of VA space
-In-Reply-To: <CAKv+Gu9Mjd7f57ZZdv+1p70Vs-YD8p6-1P=pb4-KAUsxNVppGw@mail.gmail.com>
-References: <20171204141313.31604-1-steve.capper@arm.com>
- <20171204141313.31604-8-steve.capper@arm.com>
- <CAKv+Gu_A-fAMpheWbKZ+prEVKHR58er7sXz0L93Af1XhJrGZeQ@mail.gmail.com>
- <20171204171809.wvrqfd435bh7i5r4@capper-debian.cambridge.arm.com>
- <CAKv+Gu9Mjd7f57ZZdv+1p70Vs-YD8p6-1P=pb4-KAUsxNVppGw@mail.gmail.com>
-Message-ID: <20171204181213.or2t24rdh6uwj3iu@capper-debian.cambridge.arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 04 Dec 2017 10:14:00 -0800
+Subject: SCPI regressions in v4.15-rc1 on Amlogic SoCs.
+In-Reply-To: <20171204022441.GB6870@e107533-lin> (Sudeep Holla's message of
+ "Mon, 4 Dec 2017 02:24:41 +0000")
+References: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
+ <9754d389-1dd4-e189-6c8f-c725d049dea8@gmail.com>
+ <20171204022441.GB6870@e107533-lin>
+Message-ID: <7hindmtl7b.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 04, 2017 at 05:27:10PM +0000, Ard Biesheuvel wrote:
-> On 4 December 2017 at 17:18, Steve Capper <steve.capper@arm.com> wrote:
-> > Hi Ard,
-> >
-> > On Mon, Dec 04, 2017 at 04:25:18PM +0000, Ard Biesheuvel wrote:
-> >> On 4 December 2017 at 14:13, Steve Capper <steve.capper@arm.com> wrote:
-> >> > Re-arrange the kernel memory map s.t. the kernel image resides in the
-> >> > bottom 514MB of memory.
-> >>
-> >> I guess this breaks KASLR entirely, no? Given that it adds an offset
-> >> in the range [0 ... sizeof(VMALLOC_SPACE) /4 ].
-> >
-> > Yes, yes it does. Sorry about this. I had very carefully tested KASLR
-> > with custom offsets... on my early page table code. I will have a think
-> > about this.
-> >
-> > From a KASLR side, my (renewed) understanding is that a virtual address
-> > as low as possible is desired for the kimage start as that affords the
-> > most wiggle room?
-> >
-> 
-> Well, the nice thing about the current arrangement is that the default
-> is adjacent to the vmalloc space so any non-zero [bounded] offset
-> produces a valid placement. Addition with subtraction is easy, so
-> which side the default placement happens to be at does not really
-> matter. Having to implement additional bounds checking in the early
-> KASLR init code to stay clear of the PCI I/O or fixmap regions sounds
-> a bit more cumbersome.
-> 
+Sudeep Holla <sudeep.holla@arm.com> writes:
 
-I *think* I can fix KASAN_SHADOW_END to be 0xFFFF200000000000 on both 48-bit
-and 52-bit VA configurations. Thus I may be able to enable 52-bit VA with
-minimal disruption to the layout of the VA space (i.e. no need to change
-the layout) if I also depend on CONFIG_RELOCATABLE.
+> On Fri, Dec 01, 2017 at 08:08:25AM +0100, Heiner Kallweit wrote:
+>> Am 01.12.2017 um 01:21 schrieb Kevin Hilman:
+>> > Hi Sudeep,
+>> > 
+>> > There's been a pretty major regression in v4.15-rc1 compared to v4.15
+>> > in SCPI causing warning splats on amlogic SoCs when cpufreq starts up
+>> > and tries to set the OPP for the first time[1].
+>> > 
+>> Thanks for the report. Strange enough, it works perfectly fine on my
+>> Odroid-C2, see below log part from latest next kernel.
+>>
+>
+> OK, I would like to understand/get the list of AmLogic SoC using SCPI,
+> so that I get any changes tested on all of them next time.
 
-I'll investigate...
+You can start here: https://kernelci.org/soc/amlogic/
 
-Cheers,
---
-Steve
+The "Available boards" section lists 8 boards we have fully automated
+that are representative (enough) to catch problems.  We have a bunch
+more that are not (yet) fully automated in kernelCI.
+
+Anything that is meson-gx* will use SCPI, and it's entirely possible
+that they've changed SCPI firmware since the GXBB SoCs (which Heiner is
+testing) and the GXL SoCs which seem to be the ones failing.  I don't
+have much visibiliy into the firmware, but as you mentioned this is
+starting to look like it could be related to a firmware change.
+
+The failing logs are showing some new messages on the console that are
+not coming from the kernel.  I'm guessing they're from the firmware
+(still using the serial console!) but I have not fully verified that.
+
+Kevin
+
+> As Kevin mentioned, it's always safer to just cc the amlogic mailing
+> list. I have done that in past and failed to observe that this time.
+>
+>> Your log seems to indicate that due to deferred probing something is
+>> not done in the right order.
+>> Can you bisect the issue? I'd assume that it's commit 931cf0c53e69
+>> ("firmware: arm_scpi: pre-populate dvfs info in scpi_probe").
+>> 
+>
+> Yes, even I suspect the same change. But I don't fully understand the issue.
+>
+> I remember asking you to make some changes in probe path. I think I
+> wanted you to continue with SCPI probe even if DVFS fails as that causes
+> issues on platforms that have partial DVFS implemented but other protocols
+> like clock and sensors working fine.
+>
+> I guess all platforms with broken SCPI implementation should have it
+> disabled in the DT instead of taking special care for that in DT.
+>
+> I assume that's the case even with the platform under regression now.
+> The correct way to fix it would be to disable DVFS node but it may need
+> some investigation to narrow down to this comment.
+>
+> --
+> Regards,
+> Sudeep
