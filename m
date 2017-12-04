@@ -1,113 +1,124 @@
-From: sagar.a.kamble@intel.com (Sagar Arun Kamble)
-Date: Mon, 4 Dec 2017 10:43:05 +0530
-Subject: [PATCH 1/1] timecounter: Make cyclecounter struct part of
- timecounter struct
-In-Reply-To: <20171202180458.winwznbstsi355ed@localhost>
-References: <1512189095-28654-1-git-send-email-sagar.a.kamble@intel.com>
- <20171202180458.winwznbstsi355ed@localhost>
-Message-ID: <8cfdbb16-7053-1d8f-adae-4ce2487fe4ea@intel.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon,  4 Dec 2017 13:19:11 +0800
+Subject: [PATCH 1/2] clk: sunxi-ng: Support fixed post-dividers on MP style
+ clocks
+In-Reply-To: <20171204051912.7485-1-wens@csie.org>
+References: <20171204051912.7485-1-wens@csie.org>
+Message-ID: <20171204051912.7485-2-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On the A64, the MMC module clocks are fixed in the new timing mode,
+i.e. they do not have a bit to select the mode. These clocks have
+a 2x divider somewhere between the clock and the MMC module.
 
+To be consistent with other SoCs supporting the new timing mode,
+we model the 2x divider as a fixed post-divider on the MMC module
+clocks.
 
-On 12/2/2017 11:34 PM, Richard Cochran wrote:
-> On Sat, Dec 02, 2017 at 10:01:35AM +0530, Sagar Arun Kamble wrote:
->> There is no real need for the users of timecounters to define cyclecounter
->> and timecounter variables separately. Since timecounter will always be
->> based on cyclecounter, have cyclecounter struct as member of timecounter
->> struct.
-> Overall, this is a welcome change.  However, it doesn't go far enough,
-> IMHO, and I'll explain that more below.
->
->> diff --git a/drivers/net/ethernet/mellanox/mlx4/en_clock.c b/drivers/net/ethernet/mellanox/mlx4/en_clock.c
->> index 0247885..35987b5 100644
->> --- a/drivers/net/ethernet/mellanox/mlx4/en_clock.c
->> +++ b/drivers/net/ethernet/mellanox/mlx4/en_clock.c
-> ...
->
-> As it stands now, timecounter_init() is used for two totally different
-> reasons.  Some callers only want to set the time, ...
->
->> @@ -207,7 +207,7 @@ static int mlx4_en_phc_settime(struct ptp_clock_info *ptp,
->>   
->>   	/* reset the timecounter */
->>   	write_seqlock_irqsave(&mdev->clock_lock, flags);
->> -	timecounter_init(&mdev->clock, &mdev->cycles, ns);
->> +	timecounter_init(&mdev->clock, ns);
->>   	write_sequnlock_irqrestore(&mdev->clock_lock, flags);
->>   
->>   	return 0;
-> ... while others initialize the data structure the first time:
->
->> @@ -274,17 +274,17 @@ void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev)
->>   
->>   	seqlock_init(&mdev->clock_lock);
->>   
->> -	memset(&mdev->cycles, 0, sizeof(mdev->cycles));
->> -	mdev->cycles.read = mlx4_en_read_clock;
->> -	mdev->cycles.mask = CLOCKSOURCE_MASK(48);
->> -	mdev->cycles.shift = freq_to_shift(dev->caps.hca_core_clock);
->> -	mdev->cycles.mult =
->> -		clocksource_khz2mult(1000 * dev->caps.hca_core_clock, mdev->cycles.shift);
->> -	mdev->nominal_c_mult = mdev->cycles.mult;
->> +	memset(&mdev->clock.cc, 0, sizeof(mdev->clock.cc));
->> +	mdev->clock.cc.read = mlx4_en_read_clock;
->> +	mdev->clock.cc.mask = CLOCKSOURCE_MASK(48);
->> +	mdev->clock.cc.shift = freq_to_shift(dev->caps.hca_core_clock);
->> +	mdev->clock.cc.mult =
->> +		clocksource_khz2mult(1000 * dev->caps.hca_core_clock,
->> +				     mdev->clock.cc.shift);
->> +	mdev->nominal_c_mult = mdev->clock.cc.mult;
->>   
->>   	write_seqlock_irqsave(&mdev->clock_lock, flags);
->> -	timecounter_init(&mdev->clock, &mdev->cycles,
->> -			 ktime_to_ns(ktime_get_real()));
->> +	timecounter_init(&mdev->clock, ktime_to_ns(ktime_get_real()));
-> I'd like to see two followup patches to this one:
->
-> 1. Convert timecounter_init() callers to a new timecounter_reset()
->     function where the intent is to reset the time.
->
-> 2. Change timecounter_init() to take the cyclecounter fields as
->     arguments.
->
-> 	void timecounter_init(struct timecounter *tc,
-> 			      u64 (*read)(const struct cyclecounter *cc),
-> 			      u64 mask,
-> 			      u32 mult,
-> 			      u32 shift,
-> 			      u64 start_tstamp);
->
-> Then we can clean up all this stuff:
->
-> 	mdev->clock.cc.read = mlx4_en_read_clock;
-> 	mdev->clock.cc.mask = CLOCKSOURCE_MASK(48);
-> 	mdev->clock.cc.shift = freq_to_shift(dev->caps.hca_core_clock);
-> 	mdev->clock.cc.mult = clocksource_khz2mult(...);
->
-> This second step can be phased in by calling the new function
-> timecounter_initialize() and converting the drivers one by one.
+To do this, we first add fixed post-divider to the MP style clocks,
+which the MMC module clocks are.
 
-Yes. Will make these changes and share new patchset.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ drivers/clk/sunxi-ng/ccu_mp.c | 20 ++++++++++++++++++--
+ drivers/clk/sunxi-ng/ccu_mp.h | 24 ++++++++++++++++++++++++
+ 2 files changed, 42 insertions(+), 2 deletions(-)
 
-Thank you for the review Richard.
-
-Regards,
-Sagar
-
->> diff --git a/include/linux/timecounter.h b/include/linux/timecounter.h
->> index 2496ad4..6daca06 100644
->> --- a/include/linux/timecounter.h
->> +++ b/include/linux/timecounter.h
-> ...
->> @@ -98,7 +98,6 @@ static inline void timecounter_adjtime(struct timecounter *tc, s64 delta)
->>   /**
->>    * timecounter_init - initialize a time counter
->>    * @tc:			Pointer to time counter which is to be initialized/reset
->> - * @cc:			A cycle counter, ready to be used.
-> This "ready to used" requirement should go.  The init() function
-> should make the instance ready to be used all at once.
->
-> Thanks,
-> Richard
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+index 688855e7dc8c..5d0af4051737 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.c
++++ b/drivers/clk/sunxi-ng/ccu_mp.c
+@@ -50,12 +50,19 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+ 	unsigned int max_m, max_p;
+ 	unsigned int m, p;
+ 
++	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate *= cmp->fixed_post_div;
++
+ 	max_m = cmp->m.max ?: 1 << cmp->m.width;
+ 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ 
+ 	ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
++	rate = *parent_rate / p / m;
++
++	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate /= cmp->fixed_post_div;
+ 
+-	return *parent_rate / p / m;
++	return rate;
+ }
+ 
+ static void ccu_mp_disable(struct clk_hw *hw)
+@@ -83,6 +90,7 @@ static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
+ 					unsigned long parent_rate)
+ {
+ 	struct ccu_mp *cmp = hw_to_ccu_mp(hw);
++	unsigned long rate;
+ 	unsigned int m, p;
+ 	u32 reg;
+ 
+@@ -101,7 +109,11 @@ static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
+ 	p = reg >> cmp->p.shift;
+ 	p &= (1 << cmp->p.width) - 1;
+ 
+-	return (parent_rate >> p) / m;
++	rate = (parent_rate >> p) / m;
++	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate /= cmp->fixed_post_div;
++
++	return rate;
+ }
+ 
+ static int ccu_mp_determine_rate(struct clk_hw *hw,
+@@ -129,6 +141,10 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+ 	max_m = cmp->m.max ?: 1 << cmp->m.width;
+ 	max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+ 
++	/* Adjust target rate according to post-dividers */
++	if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
++		rate = rate * cmp->fixed_post_div;
++
+ 	ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
+ 
+ 	spin_lock_irqsave(cmp->common.lock, flags);
+diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
+index aaef11d747ea..5107635e61de 100644
+--- a/drivers/clk/sunxi-ng/ccu_mp.h
++++ b/drivers/clk/sunxi-ng/ccu_mp.h
+@@ -33,9 +33,33 @@ struct ccu_mp {
+ 	struct ccu_div_internal		m;
+ 	struct ccu_div_internal		p;
+ 	struct ccu_mux_internal	mux;
++
++	unsigned int		fixed_post_div;
++
+ 	struct ccu_common	common;
+ };
+ 
++#define SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(_struct, _name, _parents, _reg, \
++					   _mshift, _mwidth,		\
++					   _pshift, _pwidth,		\
++					   _muxshift, _muxwidth,	\
++					   _gate, _postdiv, _flags)	\
++	struct ccu_mp _struct = {					\
++		.enable	= _gate,					\
++		.m	= _SUNXI_CCU_DIV(_mshift, _mwidth),		\
++		.p	= _SUNXI_CCU_DIV(_pshift, _pwidth),		\
++		.mux	= _SUNXI_CCU_MUX(_muxshift, _muxwidth),		\
++		.fixed_post_div	= _postdiv,				\
++		.common	= {						\
++			.reg		= _reg,				\
++			.features	= CCU_FEATURE_FIXED_POSTDIV,	\
++			.hw.init	= CLK_HW_INIT_PARENTS(_name,	\
++							      _parents, \
++							      &ccu_mp_ops, \
++							      _flags),	\
++		}							\
++	}
++
+ #define SUNXI_CCU_MP_WITH_MUX_GATE(_struct, _name, _parents, _reg,	\
+ 				   _mshift, _mwidth,			\
+ 				   _pshift, _pwidth,			\
+-- 
+2.15.0
