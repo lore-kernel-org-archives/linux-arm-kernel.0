@@ -1,73 +1,102 @@
-From: mhocko@kernel.org (Michal Hocko)
-Date: Mon, 4 Dec 2017 13:48:31 +0100
-Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
- removed vmemmap mem
-In-Reply-To: <20171204124230.GA10599@samekh>
-References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
- <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
- <20171130145134.el3qq7pr3q4xqglz@dhcp22.suse.cz>
- <20171204114908.GC6373@samekh>
- <20171204123244.vfm6znonfqt6fien@dhcp22.suse.cz>
- <20171204124230.GA10599@samekh>
-Message-ID: <20171204124831.mkrg32vverjkqsx7@dhcp22.suse.cz>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 4 Dec 2017 13:49:31 +0100
+Subject: [PATCHv2 12/12] arm64: docs: document pointer authentication
+In-Reply-To: <20171204123932.pru4lw753xm7qlwb@lakrids.cambridge.arm.com>
+References: <20171127163806.31435-1-mark.rutland@arm.com>
+ <20171127163806.31435-13-mark.rutland@arm.com>
+ <20171128150726.xui5i23uigvfo52w@kamzik.brq.redhat.com>
+ <20171204123932.pru4lw753xm7qlwb@lakrids.cambridge.arm.com>
+Message-ID: <20171204124931.wg3wmgvzedayprql@kamzik.brq.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 04-12-17 12:42:31, Andrea Reale wrote:
-> On Mon  4 Dec 2017, 13:32, Michal Hocko wrote:
-> > On Mon 04-12-17 11:49:09, Andrea Reale wrote:
-> > > On Thu 30 Nov 2017, 15:51, Michal Hocko wrote:
-> > > > On Thu 23-11-17 11:14:38, Andrea Reale wrote:
-> > > > > When hot-removing memory we need to free vmemmap memory.
-> > > > > However, depending on the memory is being removed, it might
-> > > > > not be always possible to free a full vmemmap page / huge-page
-> > > > > because part of it might still be used.
-> > > > > 
-> > > > > Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
-> > > > > hot-remove") introduced a workaround for x86
-> > > > > hot-remove, by which partially unused areas are filled with
-> > > > > the 0xFD constant. Full pages are only removed when fully
-> > > > > filled by 0xFDs.
-> > > > > 
-> > > > > This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
-> > > > > the goal of using it in place of 0xFDs. For now, this will be used for
-> > > > > the arm64 port of memory hot remove, but the idea is to eventually use
-> > > > > the same mechanism for x86 as well.
-> > > > 
-> > > > Why cannot you use the same approach as x86 have? Have a look at the
-> > > > vmemmap_free at al.
-> > > > 
-> > > 
-> > > This arm64 hot-remove version (including vmemmap_free) is indeed an
-> > > almost 1-to-1 port of the x86 approach. 
-> > > 
-> > > If you look at the first version of the patchset we submitted a while 
-> > > ago (https://lkml.org/lkml/2017/4/11/540), we were initially using the
-> > > x86 approach of filling unsued page structs with 0xFDs. Commenting on
-> > > that, Mark suggested (and, indeed, I agree with him) that relying on a
-> > > magic constant for marking some portions of physical memory was quite
-> > > ugly. That is why we have used memblock for the purpose in this revised
-> > > patchset.
-> > > 
-> > > If you have a different view and any concrete suggestion on how to
-> > > improve this, it is definitely very well welcome. 
+On Mon, Dec 04, 2017 at 12:39:33PM +0000, Mark Rutland wrote:
+> On Tue, Nov 28, 2017 at 04:07:26PM +0100, Andrew Jones wrote:
+> > Hi Mark,
+> 
+> Hi Drew,
+> 
+> > On Mon, Nov 27, 2017 at 04:38:06PM +0000, Mark Rutland wrote:
+> > > +Architecture overview
+> > > +---------------------
+> > > +
+> > > +The ARMv8.3 Pointer Authentication extension adds primitives that can be
+> > > +used to mitigate certain classes of attack where an attacker can corrupt
+> > > +the contents of some memory (e.g. the stack).
+> > > +
+> > > +The extension uses a Pointer Authentication Code (PAC) to determine
+> > > +whether pointers have been modified unexpectedly. A PAC is derived from
+> > > +a pointer, another value (such as the stack pointer), and a secret key
+> > > +held in system registers.
+> > > +
+> > > +The extension adds instructions to insert a valid PAC into a pointer,
+> > > +and to verify/remove the PAC from a pointer. The PAC occupies a number
+> > > +of high-order bits of the pointer, which varies dependent on the
+> > > +configured virtual address size and whether pointer tagging is in use.
+> > > +
+> > > +A subset of these instructions have been allocated from the HINT
+> > > +encoding space. In the absence of the extension (or when disabled),
+> > > +these instructions behave as NOPs. Applications and libraries using
+> > > +these instructions operate correctly regardless of the presence of the
+> > > +extension.
 > > 
-> > I would really prefer if those archictectues shared the code (and
-> > concept) as much as possible. It is really a PITA to wrap your head
-> > around each architectures for reasons which are not inherent to that
-> > specific architecture. If you find the way how x86 is implemented ugly,
-> > then all right, but making arm64 special just for the matter of taste is
-> > far from ideal IMHO.
+> > Correctly, but obviously without the additional security. So I assume
+> > it's expected that applications that demand this security to probe for
+> > it themselves, presumably by the checking the HWCAP. Is that correct?
 > 
-> The plan is indeed to use this memblock flag in x86 hot remove as well,
-> in place of the 0xFDs. The change is quite straightforward and we could
-> push it in a next patchset release. Our rationale was to first use it in
-> the new architecture and then, once proven stable, back port it to x86.
+> Yes. Applications which wish to mandate pointer authentication
+> (presumably using instructions outside of the HINT space) must check the
+> relevant HWCAP first.
 > 
-> However, I am not in principle against of pushing it right now.
+> [...]
+> 
+> > > +Virtualization
+> > > +--------------
+> > > +
+> > > +When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and uniform HW
+> > > +support is present, KVM will context switch all keys used by vCPUs.
+> > > +Otherwise, the feature is disabled. When disabled, accesses to keys, or
+> > > +use of instructions enabled within the guest will trap to EL2, and an
+> > > +UNDEFINED exception will be injected into the guest.
+> > 
+> > If host applications will just run, with the instructions behaving like
+> > NOPs, when the extension is either not present or not enabled, then
+> > shouldn't guest applications also just run?
+> 
+> The enabled/disabled wording is probably the confusing bit here.
+> 
+> At EL1 we have conditional enables for instructions using
+> AP{I,D}{A,B}Key, which behave as NOPs when disabled.
+> 
+> At EL2 we have a single conditional trap for all instructions using
+> pointer authentication, that traps to EL2 when instructions are not
+> NOP'd by EL1.
+> 
+> So "disabled by EL2" is actually "trapped by EL2", and "disabled by EL1"
+> is "NOP'd by EL1".
+> 
+> > I.e. instead of injecting UNDEF, just treat the instructions as NOPs.
+> > Or did I misunderstand the trapping?
+> 
+> I think the documentation explained it poorly. Did the above help?
 
-So please start with a simpler (cleanup) patch for x86. It will make the
-life so much easier.
--- 
-Michal Hocko
-SUSE Labs
+Yes, both the above and the below have helped me understand. Thanks for
+the clarification!
+
+drew
+
+> 
+> > Does use of the instructions at EL0 trap to EL1 or EL2?
+> 
+> If disabled by EL1, the instructions behave as NOPs (regardless of the
+> EL2 traps).
+> 
+> If enabled by EL1, but trapped by EL2, the instructions trap to EL2.
+> 
+> If enabled by EL1, and not trapped by EL2, the instructions work as
+> usual.
+> 
+> I'll see if I can document this better.
+> 
+> Thanks,
+> Mark.
