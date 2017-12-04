@@ -1,34 +1,67 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 4 Dec 2017 14:00:16 +0800
-Subject: [PATCH 1/3] dt-bindings: pwm: update bindings for the Meson-AXG
+Date: Mon, 4 Dec 2017 14:00:17 +0800
+Subject: [PATCH 2/3] pwm: meson: add clock source configuratin for Meson-AXG
 In-Reply-To: <20171204060018.8856-1-yixun.lan@amlogic.com>
 References: <20171204060018.8856-1-yixun.lan@amlogic.com>
-Message-ID: <20171204060018.8856-2-yixun.lan@amlogic.com>
+Message-ID: <20171204060018.8856-3-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Jian Hu <jian.hu@amlogic.com>
 
-Update the doc to explicitly support Meson-AXG
+For PWM controller in the Meson-AXG SoC, the EE domain and
+AO domain have different clock source. This patch try to describe
+them in the DT compatible data.
 
 Signed-off-by: Jian Hu <jian.hu@amlogic.com>
 Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
 ---
- Documentation/devicetree/bindings/pwm/pwm-meson.txt | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/pwm/pwm-meson.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-meson.txt b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
-index 1ee81321c35e..1fa3f7182133 100644
---- a/Documentation/devicetree/bindings/pwm/pwm-meson.txt
-+++ b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
-@@ -5,6 +5,8 @@ Required properties:
- - compatible: Shall contain "amlogic,meson8b-pwm"
-                          or "amlogic,meson-gxbb-pwm"
-                          or "amlogic,meson-gxbb-ao-pwm"
-+                         or "amlogic,meson-axg-ee-pwm"
-+                         or "amlogic,meson-axg-ao-pwm"
- - #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
-   the cells format.
+diff --git a/drivers/pwm/pwm-meson.c b/drivers/pwm/pwm-meson.c
+index 1f44b288af57..dcacc5c6ac1e 100644
+--- a/drivers/pwm/pwm-meson.c
++++ b/drivers/pwm/pwm-meson.c
+@@ -421,6 +421,24 @@ static const struct meson_pwm_data pwm_gxbb_ao_data = {
+ 	.num_parents = ARRAY_SIZE(pwm_gxbb_ao_parent_names),
+ };
  
++static const char * const pwm_axg_ee_parent_names[] = {
++	"xtal", "fclk_div5", "fclk_div4", "fclk_div3"
++};
++
++static const struct meson_pwm_data pwm_axg_ee_data = {
++	.parent_names = pwm_axg_ee_parent_names,
++	.num_parents = ARRAY_SIZE(pwm_axg_ee_parent_names),
++};
++
++static const char * const pwm_axg_ao_parent_names[] = {
++	"aoclk81", "xtal", "fclk_div4", "fclk_div5"
++};
++
++static const struct meson_pwm_data pwm_axg_ao_data = {
++	.parent_names = pwm_axg_ao_parent_names,
++	.num_parents = ARRAY_SIZE(pwm_axg_ao_parent_names),
++};
++
+ static const struct of_device_id meson_pwm_matches[] = {
+ 	{
+ 		.compatible = "amlogic,meson8b-pwm",
+@@ -434,6 +452,14 @@ static const struct of_device_id meson_pwm_matches[] = {
+ 		.compatible = "amlogic,meson-gxbb-ao-pwm",
+ 		.data = &pwm_gxbb_ao_data
+ 	},
++	{
++		.compatible = "amlogic,meson-axg-ee-pwm",
++		.data = &pwm_axg_ee_data
++	},
++	{
++		.compatible = "amlogic,meson-axg-ao-pwm",
++		.data = &pwm_axg_ao_data
++	},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, meson_pwm_matches);
 -- 
 2.15.0
