@@ -1,46 +1,39 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  4 Dec 2017 10:40:38 +0100
-Subject: [PATCH v2 1/4] dt-bindings: usb: add DT binding for RK3328 dwc3
- controller
-Message-ID: <20171204094041.25439-1-heiko@sntech.de>
+Date: Mon,  4 Dec 2017 10:40:41 +0100
+Subject: [PATCH v2 4/4] arm64: dts: rockchip: enable usb3 nodes on
+ rk3328-rock64
+In-Reply-To: <20171204094041.25439-1-heiko@sntech.de>
+References: <20171204094041.25439-1-heiko@sntech.de>
+Message-ID: <20171204094041.25439-4-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: William Wu <william.wu@rock-chips.com>
+Enable the nodes to make the usb3 port usable on that board.
 
-Adds the device tree bindings description for RK3328 and
-compatible USB DWC3 controller.
-
-Signed-off-by: William Wu <william.wu@rock-chips.com>
-Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
 changes in v2:
-- add Rob's Ack
+- new patch
 
-Ideally usb maintainers would pick up this patch to the binding
-document and I'll take the devicetree changes after that.
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 9 +++++++++
+ 1 file changed, 9 insertions(+)
 
-But if so desired, I can also pick up the binding change myself
-but would need an Ack for that.
-
- Documentation/devicetree/bindings/usb/rockchip,dwc3.txt | 4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-index 50a31536e975..2c3f6a467fda 100644
---- a/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-+++ b/Documentation/devicetree/bindings/usb/rockchip,dwc3.txt
-@@ -1,7 +1,9 @@
- Rockchip SuperSpeed DWC3 USB SoC controller
- 
- Required properties:
--- compatible:	should contain "rockchip,rk3399-dwc3" for rk3399 SoC
-+- compatible:	should be one of the following:
-+  - "rockchip,rk3399-dwc3": for rk3399 SoC
-+  - "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3": for rk3328 SoC
- - clocks:	A list of phandle + clock-specifier pairs for the
- 		clocks listed in clock-names
- - clock-names:	Should contain the following:
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+index d4f80786e7c2..e393c3586c11 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+@@ -331,3 +331,12 @@
+ &usb_host0_ohci {
+ 	status = "okay";
+ };
++
++&usbdrd3 {
++	status = "okay";
++};
++
++&usbdrd_dwc3 {
++	dr_mode = "host";
++	status = "okay";
++};
 -- 
 2.14.2
