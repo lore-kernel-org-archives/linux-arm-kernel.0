@@ -1,43 +1,66 @@
-From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
-Date: Mon, 4 Dec 2017 10:21:46 +0100
-Subject: [PATCH RT] arm*: disable NEON in kernel mode
-In-Reply-To: <20171201182410.GU22781@e103592.cambridge.arm.com>
-References: <20171130142216.GB12606@linutronix.de>
- <20171130143028.GA1351@linutronix.de>
- <20171201104331.GB1612@linutronix.de>
- <20171201134506.GF1612@linutronix.de>
- <20171201141827.yip6pl3tt7kxzek7@lakrids.cambridge.arm.com>
- <20171201143648.GK1612@linutronix.de>
- <24FDBFF1-8351-46FC-885A-6B6F972F4C6C@linaro.org>
- <20171201175844.GT22781@e103592.cambridge.arm.com>
- <20171201180828.GN10595@n2100.armlinux.org.uk>
- <20171201182410.GU22781@e103592.cambridge.arm.com>
-Message-ID: <20171204092145.GE2255@linutronix.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon,  4 Dec 2017 10:40:39 +0100
+Subject: [PATCH v2 2/4] arm64: dts: rockchip: add usb3 controller node for
+ RK3328 SoCs
+In-Reply-To: <20171204094041.25439-1-heiko@sntech.de>
+References: <20171204094041.25439-1-heiko@sntech.de>
+Message-ID: <20171204094041.25439-2-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-12-01 18:24:10 [+0000], Dave Martin wrote:
-> > diff --git a/arch/arm64/crypto/Kconfig b/arch/arm64/crypto/Kconfig
-> > index 70c517aa4501..2a5f05b5a19a 100644
-> > --- a/arch/arm64/crypto/Kconfig
-> > +++ b/arch/arm64/crypto/Kconfig
-> > @@ -19,19 +19,19 @@ config CRYPTO_SHA512_ARM64
-> >
-> >  config CRYPTO_SHA1_ARM64_CE
-> >     tristate "SHA-1 digest algorithm (ARMv8 Crypto Extensions)"
-> > -   depends on KERNEL_MODE_NEON
-> > +   depends on KERNEL_MODE_NEON && !PREEMPT_RT_BASE
-> >     select CRYPTO_HASH
-> >     select CRYPTO_SHA1
-> 
-> Sebastian, can you piont to where sha1 (say) hits this issue?
-> I wonder whether this is really a sign that some refactoring is needed.
+From: William Wu <william.wu@rock-chips.com>
 
-I disabled all NEON in one go. Looking at this, it shouldn't be a issue
-with the block-walk. The only thing that might be a problem is that it
-can do multiple blocks in one go.
+RK3328 has one USB 3.0 OTG controller which uses DWC_USB3
+core's general architecture. It can act as static xHCI host
+controller, static device controller, USB 3.0/2.0 OTG basing
+on ID of USB3.0 PHY.
 
-> Cheers
-> ---Dave
+Signed-off-by: William Wu <william.wu@rock-chips.com>
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+changes in v2:
+none
 
-Sebastian
+ arch/arm64/boot/dts/rockchip/rk3328.dtsi | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328.dtsi b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+index 41d61840fb99..cafc572a68e0 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3328.dtsi
+@@ -805,6 +805,33 @@
+ 		status = "disabled";
+ 	};
+ 
++	usbdrd3: usb at ff600000 {
++		compatible = "rockchip,rk3328-dwc3", "rockchip,rk3399-dwc3";
++		clocks = <&cru SCLK_USB3OTG_REF>, <&cru SCLK_USB3OTG_SUSPEND>,
++			 <&cru ACLK_USB3OTG>;
++		clock-names = "ref_clk", "suspend_clk",
++			      "bus_clk";
++		#address-cells = <2>;
++		#size-cells = <2>;
++		ranges;
++		status = "disabled";
++
++		usbdrd_dwc3: dwc3 at ff600000 {
++			compatible = "snps,dwc3";
++			reg = <0x0 0xff600000 0x0 0x100000>;
++			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
++			dr_mode = "otg";
++			phy_type = "utmi_wide";
++			snps,dis_enblslpm_quirk;
++			snps,dis-u2-freeclk-exists-quirk;
++			snps,dis_u2_susphy_quirk;
++			snps,dis_u3_susphy_quirk;
++			snps,dis-del-phy-power-chg-quirk;
++			snps,dis-tx-ipgap-linecheck-quirk;
++			status = "disabled";
++		};
++	};
++
+ 	gic: interrupt-controller at ff811000 {
+ 		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
+-- 
+2.14.2
