@@ -1,44 +1,33 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon,  4 Dec 2017 10:40:40 +0100
-Subject: [PATCH v2 3/4] arm64: dts: rockchip: enable usb3 for RK3328
- evaluation board
+Date: Mon, 04 Dec 2017 10:42:58 +0100
+Subject: [PATCH v2 1/4] dt-bindings: usb: add DT binding for RK3328 dwc3
+ controller
 In-Reply-To: <20171204094041.25439-1-heiko@sntech.de>
 References: <20171204094041.25439-1-heiko@sntech.de>
-Message-ID: <20171204094041.25439-3-heiko@sntech.de>
+Message-ID: <6302328.XfYIm7dKZI@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: William Wu <william.wu@rock-chips.com>
+Am Montag, 4. Dezember 2017, 10:40:38 CET schrieb Heiko Stuebner:
+> From: William Wu <william.wu@rock-chips.com>
+> 
+> Adds the device tree bindings description for RK3328 and
+> compatible USB DWC3 controller.
+> 
+> Signed-off-by: William Wu <william.wu@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> changes in v2:
+> - add Rob's Ack
+> 
+> Ideally usb maintainers would pick up this patch to the binding
+> document and I'll take the devicetree changes after that.
+> 
+> But if so desired, I can also pick up the binding change myself
+> but would need an Ack for that.
 
-Rockchip's RK3328 evaluation board has one USB 3.0 OTG controller,
-we enable it and set it act as static xHCI host controller to
-support USB 3.0 HOST on RK3328 evaluation board.
+just realized, the last version from august was actually v3, so this
+should be v4, not v2 ... sorry about that.
 
-Signed-off-by: William Wu <william.wu@rock-chips.com>
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-changes in v2:
-none
-
- arch/arm64/boot/dts/rockchip/rk3328-evb.dts | 9 +++++++++
- 1 file changed, 9 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-index 3d551e3e6c23..95fba84239a7 100644
---- a/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3328-evb.dts
-@@ -306,3 +306,12 @@
- &usb_host0_ohci {
- 	status = "okay";
- };
-+
-+&usbdrd3 {
-+	status = "okay";
-+};
-+
-+&usbdrd_dwc3 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
--- 
-2.14.2
+Heiko
