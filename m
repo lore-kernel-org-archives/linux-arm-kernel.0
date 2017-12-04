@@ -1,81 +1,109 @@
-From: wenyou.yang@microchip.com (Wenyou Yang)
-Date: Mon, 4 Dec 2017 14:58:57 +0800
-Subject: [PATCH v6 1/2] media: ov7740: Document device tree bindings
-In-Reply-To: <20171204065858.3138-1-wenyou.yang@microchip.com>
-References: <20171204065858.3138-1-wenyou.yang@microchip.com>
-Message-ID: <20171204065858.3138-2-wenyou.yang@microchip.com>
+From: codekipper@gmail.com (Code Kipper)
+Date: Mon, 4 Dec 2017 08:23:43 +0100
+Subject: [PATCH 3/9] ASoC: sun8i-codec: Add quirk to specify aif1_lrck_div
+ value
+In-Reply-To: <20171203204157.20829-4-anarsoul@gmail.com>
+References: <20171203204157.20829-1-anarsoul@gmail.com>
+ <20171203204157.20829-4-anarsoul@gmail.com>
+Message-ID: <CAEKpxB=AmHqZwX+QhCTdNofsVdfVaXHy7fSYRMmDCp5CgBjXVQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the device tree binding documentation for the ov7740 sensor driver.
-
-Signed-off-by: Wenyou Yang <wenyou.yang@microchip.com>
----
-
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
- - Explicitly document the "remote-endpoint" property.
-
-Changes in v2: None
-
- .../devicetree/bindings/media/i2c/ov7740.txt       | 47 ++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/media/i2c/ov7740.txt
-
-diff --git a/Documentation/devicetree/bindings/media/i2c/ov7740.txt b/Documentation/devicetree/bindings/media/i2c/ov7740.txt
-new file mode 100644
-index 000000000000..af781c3a5f0e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/media/i2c/ov7740.txt
-@@ -0,0 +1,47 @@
-+* Omnivision OV7740 CMOS image sensor
-+
-+The Omnivision OV7740 image sensor supports multiple output image
-+size, such as VGA, and QVGA, CIF and any size smaller. It also
-+supports the RAW RGB and YUV output formats.
-+
-+The common video interfaces bindings (see video-interfaces.txt) should
-+be used to specify link to the image data receiver. The OV7740 device
-+node should contain one 'port' child node with an 'endpoint' subnode.
-+
-+Required Properties:
-+- compatible:	"ovti,ov7740".
-+- reg:		I2C slave address of the sensor.
-+- clocks:	Reference to the xvclk input clock.
-+- clock-names:	"xvclk".
-+
-+Optional Properties:
-+- reset-gpios: Rreference to the GPIO connected to the reset_b pin,
-+  if any. Active low with pull-ip resistor.
-+- powerdown-gpios: Reference to the GPIO connected to the pwdn pin,
-+  if any. Active high with pull-down resistor.
-+
-+Endpoint node mandatory properties:
-+- remote-endpoint: A phandle to the bus receiver's endpoint node.
-+
-+Example:
-+
-+	i2c1: i2c at fc028000 {
-+		ov7740: camera at 21 {
-+			compatible = "ovti,ov7740";
-+			reg = <0x21>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sensor_power &pinctrl_sensor_reset>;
-+			clocks = <&isc>;
-+			clock-names = "xvclk";
-+			assigned-clocks = <&isc>;
-+			assigned-clock-rates = <24000000>;
-+			reset-gpios = <&pioA 43 GPIO_ACTIVE_LOW>;
-+			powerdown-gpios = <&pioA 44 GPIO_ACTIVE_HIGH>;
-+
-+			port {
-+				ov7740_0: endpoint {
-+					remote-endpoint = <&isc_0>;
-+				};
-+			};
-+		};
-+	};
--- 
-2.15.0
+On 3 December 2017 at 21:41, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+> LRCK divider for A64 differs from A33, so add a quirk to support that.
+>
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+> ---
+>  sound/soc/sunxi/sun8i-codec.c | 38 ++++++++++++++++++++++++++++++++------
+>  1 file changed, 32 insertions(+), 6 deletions(-)
+>
+> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
+> index 3dd183be08a4..054201d1de03 100644
+> --- a/sound/soc/sunxi/sun8i-codec.c
+> +++ b/sound/soc/sunxi/sun8i-codec.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/io.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+> +#include <linux/of_device.h>
+>
+>  #include <sound/pcm_params.h>
+>  #include <sound/soc.h>
+> @@ -75,11 +76,22 @@
+>  #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK  GENMASK(8, 6)
+>  #define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK  GENMASK(12, 9)
+>
+> +/*
+> + * struct sun8i_codec_quirks - Differences between SoC variants.
+> + *
+> + * @aif1_lrck_div: LRCK divider
+> + */
+> +struct sun8i_codec_quirks {
+> +       unsigned int    aif1_lrck_div;
+> +};
+> +
+> +
+Extra line
+>  struct sun8i_codec {
+> -       struct device   *dev;
+> -       struct regmap   *regmap;
+> -       struct clk      *clk_module;
+> -       struct clk      *clk_bus;
+> +       struct device                   *dev;
+> +       struct regmap                   *regmap;
+> +       struct clk                      *clk_module;
+> +       struct clk                      *clk_bus;
+> +       const struct sun8i_codec_quirks *variant;
+>  };
+>
+>  static int sun8i_codec_runtime_resume(struct device *dev)
+> @@ -305,7 +317,7 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
+>
+>         regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
+>                            SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
+> -                          SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
+> +                          scodec->variant->aif1_lrck_div);
+>
+>         sample_rate = sun8i_codec_get_hw_rate(params);
+>         if (sample_rate < 0)
+> @@ -440,6 +452,10 @@ static const struct regmap_config sun8i_codec_regmap_config = {
+>         .cache_type     = REGCACHE_FLAT,
+>  };
+>
+> +static const struct sun8i_codec_quirks sun8i_a33_codec_quirks = {
+> +       .aif1_lrck_div  = SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16,
+> +};
+> +
+>  static int sun8i_codec_probe(struct platform_device *pdev)
+>  {
+>         struct resource *res_base;
+> @@ -453,6 +469,13 @@ static int sun8i_codec_probe(struct platform_device *pdev)
+>
+>         scodec->dev = &pdev->dev;
+>
+> +       scodec->variant = of_device_get_match_data(&pdev->dev);
+> +       if (!scodec->variant) {
+> +               dev_err(&pdev->dev, "Failed to determine the quirks to use\n");
+> +               return -ENODEV;
+> +       }
+> +
+> +
+ditto
+>         scodec->clk_module = devm_clk_get(&pdev->dev, "mod");
+>         if (IS_ERR(scodec->clk_module)) {
+>                 dev_err(&pdev->dev, "Failed to get the module clock\n");
+> @@ -524,7 +547,10 @@ static int sun8i_codec_remove(struct platform_device *pdev)
+>  }
+>
+>  static const struct of_device_id sun8i_codec_of_match[] = {
+> -       { .compatible = "allwinner,sun8i-a33-codec" },
+> +       {
+> +               .compatible = "allwinner,sun8i-a33-codec",
+> +               .data = &sun8i_a33_codec_quirks,
+> +       },
+>         {}
+>  };
+>  MODULE_DEVICE_TABLE(of, sun8i_codec_of_match);
+> --
+> 2.15.0
+>
