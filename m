@@ -1,99 +1,47 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 14:56:03 +0100
-Subject: [PULL 00/19] KVM/ARM Fixes for v4.15
-Message-ID: <20171204135622.21568-1-cdall@kernel.org>
+Date: Mon,  4 Dec 2017 14:56:20 +0100
+Subject: [PULL 02/19] KVM: arm/arm64: VGIC: extend !vgic_is_initialized guard
+In-Reply-To: <20171204135637.21620-1-cdall@kernel.org>
+References: <20171204135637.21620-1-cdall@kernel.org>
+Message-ID: <20171204135637.21620-3-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Andre Przywara <andre.przywara@arm.com>
 
-Hi Paolo and Radim,
+Commit f39d16cbabf9 ("KVM: arm/arm64: Guard kvm_vgic_map_is_active against
+!vgic_initialized") introduced a check whether the VGIC has been
+initialized before accessing the spinlock and the VGIC data structure.
+However the vgic_get_irq() call in the variable declaration sneaked
+through the net, so lets make sure that this also gets called only after
+we actually allocated the arrays this function accesses.
 
-Here's the first round of fixes for KVM/ARM for v4.15.  This is a fairly large
-set of fixes, partially because we spotted a handful of issues from running the
-SMATCH static analysis on the code (thanks to AKASHI Takahiro).
+Reviewed-by: Eric Auger <eric.auger@redhat.com>
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ virt/kvm/arm/vgic/vgic.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-In more details, this pull request fixes:
- - A number of issues in the vgic discovered using SMATCH
- - A bit one-off calculation in out stage base address mask (32-bit and
-   64-bit)
- - Fixes to single-step debugging instructions that trap for other
-   reasons such as MMMIO aborts
- - Printing unavailable hyp mode as error
- - Potential spinlock deadlock in the vgic
- - Avoid calling vgic vcpu free more than once
- - Broken bit calculation for big endian systems
-
-
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/kvmarm/kvmarm.git tags/kvm-arm-fixes-for-v4.15-1
-
-for you to fetch changes up to fc396e066318c0a02208c1d3f0b62950a7714999:
-
-  KVM: arm/arm64: Fix broken GICH_ELRSR big endian conversion (2017-12-04 14:25:33 +0100)
-
-
-Thanks,
--Christoffer
-
-Alex Benn?e (5):
-  KVM: arm/arm64: debug: Introduce helper for single-step
-  kvm: arm64: handle single-stepping trapped instructions
-  kvm: arm64: handle single-step of userspace mmio instructions
-  kvm: arm64: handle single-step during SError exceptions
-  kvm: arm64: handle single-step of hyp emulated mmio instructions
-
-Andre Przywara (1):
-  KVM: arm/arm64: VGIC: extend !vgic_is_initialized guard
-
-Andrew Jones (1):
-  KVM: arm/arm64: kvm_arch_destroy_vm cleanups
-
-Ard Biesheuvel (1):
-  kvm: arm: don't treat unavailable HYP mode as an error
-
-Christoffer Dall (3):
-  KVM: arm/arm64: Don't enable/disable physical timer access on VHE
-  KVM: arm/arm64: Avoid attempting to load timer vgic state without a
-    vgic
-  KVM: arm/arm64: Fix broken GICH_ELRSR big endian conversion
-
-Kristina Martsenko (1):
-  arm64: KVM: fix VTTBR_BADDR_MASK BUG_ON off-by-one
-
-Marc Zyngier (7):
-  KVM: arm/arm64: vgic-irqfd: Fix MSI entry allocation
-  KVM: arm/arm64: vgic: Preserve the revious read from the pending table
-  KVM: arm/arm64: vgic-its: Preserve the revious read from the pending
-    table
-  KVM: arm/arm64: vgic-its: Check result of allocation before use
-  KVM: arm/arm64: vgic-v4: Only perform an unmap for valid vLPIs
-  arm: KVM: Fix VTTBR_BADDR_MASK BUG_ON off-by-one
-  KVM: arm/arm64: Fix spinlock acquisition in vgic_set_owner
-
- arch/arm/include/asm/kvm_arm.h    |  3 +--
- arch/arm/include/asm/kvm_host.h   |  5 ++++
- arch/arm64/include/asm/kvm_arm.h  |  3 +--
- arch/arm64/include/asm/kvm_host.h |  1 +
- arch/arm64/kvm/debug.c            | 21 +++++++++++++++
- arch/arm64/kvm/handle_exit.c      | 57 ++++++++++++++++++++++++++++-----------
- arch/arm64/kvm/hyp/switch.c       | 37 ++++++++++++++++++++-----
- include/kvm/arm_arch_timer.h      |  3 ---
- virt/kvm/arm/arch_timer.c         | 11 +++-----
- virt/kvm/arm/arm.c                |  7 +++--
- virt/kvm/arm/hyp/timer-sr.c       | 48 ++++++++++++++-------------------
- virt/kvm/arm/hyp/vgic-v2-sr.c     |  4 ---
- virt/kvm/arm/vgic/vgic-irqfd.c    |  3 +--
- virt/kvm/arm/vgic/vgic-its.c      |  4 ++-
- virt/kvm/arm/vgic/vgic-v3.c       |  2 +-
- virt/kvm/arm/vgic/vgic-v4.c       |  6 +++--
- virt/kvm/arm/vgic/vgic.c          |  8 +++---
- 17 files changed, 144 insertions(+), 79 deletions(-)
-
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index b168a328a9e0..786cce7bd2ec 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -823,13 +823,14 @@ void vgic_kick_vcpus(struct kvm *kvm)
+ 
+ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid)
+ {
+-	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
++	struct vgic_irq *irq;
+ 	bool map_is_active;
+ 	unsigned long flags;
+ 
+ 	if (!vgic_initialized(vcpu->kvm))
+ 		return false;
+ 
++	irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	spin_lock_irqsave(&irq->irq_lock, flags);
+ 	map_is_active = irq->hw && irq->active;
+ 	spin_unlock_irqrestore(&irq->irq_lock, flags);
 -- 
 2.14.2
