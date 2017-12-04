@@ -1,96 +1,94 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 21:35:38 +0100
-Subject: [PATCH v3 16/16] KVM: arm/arm64: Move vcpu_load call after
- kvm_vcpu_first_run_init
-In-Reply-To: <20171204203538.8370-1-cdall@kernel.org>
-References: <20171204203538.8370-1-cdall@kernel.org>
-Message-ID: <20171204203538.8370-17-cdall@kernel.org>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 4 Dec 2017 15:35:45 -0600
+Subject: [PATCH RFC 2/2] arm64: allwinner: a64: Add Brava Keller initial
+ support
+In-Reply-To: <CAOFm3uEdsj=qxUf3O0S0vDqgXgosvBYG6BGbf6cYn3aNreTPaQ@mail.gmail.com>
+References: <1512067334-12761-1-git-send-email-jagan@amarulasolutions.com>
+ <1512067334-12761-2-git-send-email-jagan@amarulasolutions.com>
+ <CAOFm3uEdsj=qxUf3O0S0vDqgXgosvBYG6BGbf6cYn3aNreTPaQ@mail.gmail.com>
+Message-ID: <20171204213545.lvi4ay6lu7ohchru@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+On Thu, Nov 30, 2017 at 10:36:55PM +0100, Philippe Ombredanne wrote:
+> Jagan,
+> 
+> On Thu, Nov 30, 2017 at 7:42 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
+> []
+> > diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-brava-keller.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-brava-keller.dts
+> > new file mode 100644
+> > index 0000000..f5303a3
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-brava-keller.dts
+> > @@ -0,0 +1,244 @@
+> > +/*
+> > + * Copyright (C) 2017 Jagan Teki <jagan@amarulasolutions.com>
+> > + *
+> > + * This file is dual-licensed: you can use it either under the terms
+> > + * of the GPL or the X11 license, at your option. Note that this dual
+> > + * licensing only applies to this file, and not this project as a
+> > + * whole.
+> > + *
+> > + *  a) This library is free software; you can redistribute it and/or
+> > + *     modify it under the terms of the GNU General Public License as
+> > + *     published by the Free Software Foundation; either version 2 of the
+> > + *     License, or (at your option) any later version.
+> > + *
+> > + *     This library is distributed in the hope that it will be useful,
+> > + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + *     GNU General Public License for more details.
+> > + *
+> > + * Or, alternatively,
+> > + *
+> > + *  b) Permission is hereby granted, free of charge, to any person
+> > + *     obtaining a copy of this software and associated documentation
+> > + *     files (the "Software"), to deal in the Software without
+> > + *     restriction, including without limitation the rights to use,
+> > + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> > + *     sell copies of the Software, and to permit persons to whom the
+> > + *     Software is furnished to do so, subject to the following
+> > + *     conditions:
+> > + *
+> > + *     The above copyright notice and this permission notice shall be
+> > + *     included in all copies or substantial portions of the Software.
+> > + *
+> > + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> > + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> > + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> > + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> > + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> > + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> > + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> > + *     OTHER DEALINGS IN THE SOFTWARE.
+> > + */
+> 
+> Rather than this long boilerplate, you might want to use the SPDX ids,
+> as started by Greg and documented by Thomas.
+> Noe that Linus wants the // comment style for the license line, and
+> since there is only two line left here I suggest using it for both
+> lines.
+> You can check also the recent doc patch posted by Thomas (tglx) and
+> comments from Linus and Greg.
+> 
+> So I guess you could use this:
+> 
+> > +// Copyright (C) 2017 Jagan Teki <jagan@amarulasolutions.com>
+> > +// SPDX-License-Indentifier: (GPL-2.0+ OR MIT)
 
-Moving the call to vcpu_load() in kvm_arch_vcpu_ioctl_run() to after
-we've called kvm_vcpu_first_run_init() simplifies some of the vgic and
-there is also no need to do vcpu_load() for things such as handling the
-immediate_exit flag.
+Other way around. Make SPDX-License-Indentifier the first line.
 
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- virt/kvm/arm/arch_timer.c     |  4 ----
- virt/kvm/arm/arm.c            | 12 +++++-------
- virt/kvm/arm/vgic/vgic-init.c | 11 -----------
- 3 files changed, 5 insertions(+), 22 deletions(-)
+> NB: what you call X11 is has the MIT license id in the SPDX license list.
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 4151250ce8da..801fecfee299 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -839,11 +839,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return ret;
- 
- no_vgic:
--	preempt_disable();
- 	timer->enabled = 1;
--	kvm_timer_vcpu_load_vgic(vcpu);
--	preempt_enable();
--
- 	return 0;
- }
- 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a760ef1803be..991f1aa70fb9 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -622,8 +622,6 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	if (unlikely(!kvm_vcpu_initialized(vcpu)))
- 		return -ENOEXEC;
- 
--	vcpu_load(vcpu);
--
- 	ret = kvm_vcpu_first_run_init(vcpu);
- 	if (ret)
- 		goto out;
-@@ -631,13 +629,13 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *run)
- 	if (run->exit_reason == KVM_EXIT_MMIO) {
- 		ret = kvm_handle_mmio_return(vcpu, vcpu->run);
- 		if (ret)
--			goto out;
-+			return ret;
- 	}
- 
--	if (run->immediate_exit) {
--		ret = -EINTR;
--		goto out;
--	}
-+	if (run->immediate_exit)
-+		return -EINTR;
-+
-+	vcpu_load(vcpu);
- 
- 	if (vcpu->sigset_active)
- 		sigprocmask(SIG_SETMASK, &vcpu->sigset, &sigsaved);
-diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
-index 62310122ee78..a0688ef52ad7 100644
---- a/virt/kvm/arm/vgic/vgic-init.c
-+++ b/virt/kvm/arm/vgic/vgic-init.c
-@@ -300,17 +300,6 @@ int vgic_init(struct kvm *kvm)
- 
- 	dist->initialized = true;
- 
--	/*
--	 * If we're initializing GICv2 on-demand when first running the VCPU
--	 * then we need to load the VGIC state onto the CPU.  We can detect
--	 * this easily by checking if we are in between vcpu_load and vcpu_put
--	 * when we just initialized the VGIC.
--	 */
--	preempt_disable();
--	vcpu = kvm_arm_get_running_vcpu();
--	if (vcpu)
--		kvm_vgic_load(vcpu);
--	preempt_enable();
- out:
- 	return ret;
- }
--- 
-2.14.2
+Right. That was a common mistake or abiguity in the dts files. 
+
+> So you could replace 32 lines by only two lines :) it'[s neat right?
+> 
+> And this would also help as we have tagged already ~15K files, so it
+> would help to use this for new files so the amount of cleanup work
+> still left does not increase. Thank you for your kind consideration!
+
+I've been nuging folks to do that for a while now. Of course, now we 
+need to go move the ids to the first line at some point.
+
+Rob
