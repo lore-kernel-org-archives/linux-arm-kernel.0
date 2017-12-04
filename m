@@ -1,89 +1,59 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Dec 2017 12:26:44 +0000
-Subject: [PATCH v2 18/19] crypto: arm64/crct10dif-ce - yield NEON every 8
- blocks of input
-In-Reply-To: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
-References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171204122645.31535-19-ard.biesheuvel@linaro.org>
+From: mhocko@kernel.org (Michal Hocko)
+Date: Mon, 4 Dec 2017 13:32:44 +0100
+Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
+ removed vmemmap mem
+In-Reply-To: <20171204114908.GC6373@samekh>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
+ <20171130145134.el3qq7pr3q4xqglz@dhcp22.suse.cz>
+ <20171204114908.GC6373@samekh>
+Message-ID: <20171204123244.vfm6znonfqt6fien@dhcp22.suse.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid excessive scheduling delays under a preemptible kernel by
-yielding the NEON every 8 blocks of input.
+On Mon 04-12-17 11:49:09, Andrea Reale wrote:
+> On Thu 30 Nov 2017, 15:51, Michal Hocko wrote:
+> > On Thu 23-11-17 11:14:38, Andrea Reale wrote:
+> > > When hot-removing memory we need to free vmemmap memory.
+> > > However, depending on the memory is being removed, it might
+> > > not be always possible to free a full vmemmap page / huge-page
+> > > because part of it might still be used.
+> > > 
+> > > Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
+> > > hot-remove") introduced a workaround for x86
+> > > hot-remove, by which partially unused areas are filled with
+> > > the 0xFD constant. Full pages are only removed when fully
+> > > filled by 0xFDs.
+> > > 
+> > > This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
+> > > the goal of using it in place of 0xFDs. For now, this will be used for
+> > > the arm64 port of memory hot remove, but the idea is to eventually use
+> > > the same mechanism for x86 as well.
+> > 
+> > Why cannot you use the same approach as x86 have? Have a look at the
+> > vmemmap_free at al.
+> > 
+> 
+> This arm64 hot-remove version (including vmemmap_free) is indeed an
+> almost 1-to-1 port of the x86 approach. 
+> 
+> If you look at the first version of the patchset we submitted a while 
+> ago (https://lkml.org/lkml/2017/4/11/540), we were initially using the
+> x86 approach of filling unsued page structs with 0xFDs. Commenting on
+> that, Mark suggested (and, indeed, I agree with him) that relying on a
+> magic constant for marking some portions of physical memory was quite
+> ugly. That is why we have used memblock for the purpose in this revised
+> patchset.
+> 
+> If you have a different view and any concrete suggestion on how to
+> improve this, it is definitely very well welcome. 
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/crypto/crct10dif-ce-core.S | 39 ++++++++++++++++++--
- 1 file changed, 35 insertions(+), 4 deletions(-)
-
-diff --git a/arch/arm64/crypto/crct10dif-ce-core.S b/arch/arm64/crypto/crct10dif-ce-core.S
-index d5b5a8c038c8..d57067e80bae 100644
---- a/arch/arm64/crypto/crct10dif-ce-core.S
-+++ b/arch/arm64/crypto/crct10dif-ce-core.S
-@@ -74,13 +74,22 @@
- 	.text
- 	.cpu		generic+crypto
- 
--	arg1_low32	.req	w0
--	arg2		.req	x1
--	arg3		.req	x2
-+	arg1_low32	.req	w19
-+	arg2		.req	x20
-+	arg3		.req	x21
- 
- 	vzr		.req	v13
- 
- ENTRY(crc_t10dif_pmull)
-+	stp		x29, x30, [sp, #-176]!
-+	mov		x29, sp
-+	stp		x19, x20, [sp, #16]
-+	stp		x21, x22, [sp, #32]
-+
-+	mov		arg1_low32, w0
-+	mov		arg2, x1
-+	mov		arg3, x2
-+
- 	movi		vzr.16b, #0		// init zero register
- 
- 	// adjust the 16-bit initial_crc value, scale it to 32 bits
-@@ -175,8 +184,27 @@ CPU_LE(	ext		v12.16b, v12.16b, v12.16b, #8	)
- 	subs		arg3, arg3, #128
- 
- 	// check if there is another 64B in the buffer to be able to fold
--	b.ge		_fold_64_B_loop
-+	b.lt		_fold_64_B_end
-+
-+	yield_neon_pre	arg3, 3, 128, _fold_64_B_loop	// yield every 8 blocks
-+	stp		q0, q1, [sp, #48]
-+	stp		q2, q3, [sp, #80]
-+	stp		q4, q5, [sp, #112]
-+	stp		q6, q7, [sp, #144]
-+	yield_neon_post	2f
-+	b		_fold_64_B_loop
-+
-+	.subsection	1
-+2:	ldp		q0, q1, [sp, #48]
-+	ldp		q2, q3, [sp, #80]
-+	ldp		q4, q5, [sp, #112]
-+	ldp		q6, q7, [sp, #144]
-+	ldr		q10, rk3
-+	movi		vzr.16b, #0		// init zero register
-+	b		_fold_64_B_loop
-+	.previous
- 
-+_fold_64_B_end:
- 	// at this point, the buffer pointer is pointing at the last y Bytes
- 	// of the buffer the 64B of folded data is in 4 of the vector
- 	// registers: v0, v1, v2, v3
-@@ -304,6 +332,9 @@ _barrett:
- _cleanup:
- 	// scale the result back to 16 bits
- 	lsr		x0, x0, #16
-+	ldp		x19, x20, [sp, #16]
-+	ldp		x21, x22, [sp, #32]
-+	ldp		x29, x30, [sp], #176
- 	ret
- 
- _less_than_128:
+I would really prefer if those archictectues shared the code (and
+concept) as much as possible. It is really a PITA to wrap your head
+around each architectures for reasons which are not inherent to that
+specific architecture. If you find the way how x86 is implemented ugly,
+then all right, but making arm64 special just for the matter of taste is
+far from ideal IMHO.
 -- 
-2.11.0
+Michal Hocko
+SUSE Labs
