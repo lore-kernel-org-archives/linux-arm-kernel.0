@@ -1,86 +1,146 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Dec 2017 14:13:38 +0000
-Subject: [PATCH V2 1/2] arm64: Re-order reserved_ttbr0 in linker script
-In-Reply-To: <20171123164040.31551-2-steve.capper@arm.com>
-References: <20171123164040.31551-1-steve.capper@arm.com>
- <20171123164040.31551-2-steve.capper@arm.com>
-Message-ID: <CAKv+Gu-urwMWX-Tj+WPt=GaqXd09O1zrLYYLf1Jf__Lod7VLtg@mail.gmail.com>
+From: steve.capper@arm.com (Steve Capper)
+Date: Mon,  4 Dec 2017 14:13:13 +0000
+Subject: [PATCH 12/12] arm64: mm: Add 48/52-bit kernel VA support
+In-Reply-To: <20171204141313.31604-1-steve.capper@arm.com>
+References: <20171204141313.31604-1-steve.capper@arm.com>
+Message-ID: <20171204141313.31604-13-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23 November 2017 at 16:40, Steve Capper <steve.capper@arm.com> wrote:
-> Currently one resolves the location of the reserved_ttbr0 for PAN by
-> taking a positive offset from swapper_pg_dir. In a future patch we wish
-> to extend the swapper s.t. its size is determined at link time rather
-> than compile time, rendering SWAPPER_DIR_SIZE unsuitable for such a low
-> level calculation.
->
-> In this patch we re-arrange the order of the linker script s.t. instead
-> one computes reserved_ttbr0 by subtracting RESERVED_TTBR0_SIZE from
-> swapper_pg_dir.
->
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> ---
->  arch/arm64/include/asm/asm-uaccess.h | 6 +++---
->  arch/arm64/include/asm/uaccess.h     | 2 +-
->  arch/arm64/kernel/vmlinux.lds.S      | 5 ++---
->  3 files changed, 6 insertions(+), 7 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-> index b3da6c886835..e09f02cd3e7a 100644
-> --- a/arch/arm64/include/asm/asm-uaccess.h
-> +++ b/arch/arm64/include/asm/asm-uaccess.h
-> @@ -12,9 +12,9 @@
->   */
->  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
->         .macro  __uaccess_ttbr0_disable, tmp1
-> -       mrs     \tmp1, ttbr1_el1                // swapper_pg_dir
-> -       add     \tmp1, \tmp1, #SWAPPER_DIR_SIZE // reserved_ttbr0 at the end of swapper_pg_dir
-> -       msr     ttbr0_el1, \tmp1                // set reserved TTBR0_EL1
-> +       mrs     \tmp1, ttbr1_el1                        // swapper_pg_dir
-> +       sub     \tmp1, \tmp1, #RESERVED_TTBR0_SIZE      // reserved_ttbr0 just before swapper_pg_dir
-> +       msr     ttbr0_el1, \tmp1                        // set reserved TTBR0_EL1
->         isb
->         .endm
->
-> diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-> index fc0f9eb66039..66170fd4b58f 100644
-> --- a/arch/arm64/include/asm/uaccess.h
-> +++ b/arch/arm64/include/asm/uaccess.h
-> @@ -108,7 +108,7 @@ static inline void __uaccess_ttbr0_disable(void)
->         unsigned long ttbr;
->
->         /* reserved_ttbr0 placed at the end of swapper_pg_dir */
+Add the option to use 52-bit VA support upon availability at boot. We
+use the same KASAN_SHADOW_OFFSET for both 48 and 52 bit VA spaces as in
+both cases the start and end of the KASAN shadow region are PGD aligned.
 
-You missed a comment here ^^^
+>From ID_AA64MMFR2, we check the LVA field on very early boot and set the
+VA size, PGDIR_SHIFT and TCR.T[01]SZ values which then influence how the
+rest of the memory system behaves.
 
-> -       ttbr = read_sysreg(ttbr1_el1) + SWAPPER_DIR_SIZE;
-> +       ttbr = read_sysreg(ttbr1_el1) - RESERVED_TTBR0_SIZE;
->         write_sysreg(ttbr, ttbr0_el1);
->         isb();
->  }
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 7da3e5c366a0..2a9475733e84 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -206,13 +206,12 @@ SECTIONS
->         . = ALIGN(PAGE_SIZE);
->         idmap_pg_dir = .;
->         . += IDMAP_DIR_SIZE;
-> -       swapper_pg_dir = .;
-> -       . += SWAPPER_DIR_SIZE;
-> -
->  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
->         reserved_ttbr0 = .;
->         . += RESERVED_TTBR0_SIZE;
->  #endif
-> +       swapper_pg_dir = .;
-> +       . += SWAPPER_DIR_SIZE;
->
->         __pecoff_data_size = ABSOLUTE(. - __initdata_begin);
->         _end = .;
+Note that userspace addresses will still be capped out at 48-bit. More
+patches are needed to deal with scenarios where the user provides
+MMAP_FIXED hint and a high address to mmap.
 
-With that fixed,
+Signed-off-by: Steve Capper <steve.capper@arm.com>
+---
+ arch/arm64/Kconfig              |  8 ++++++++
+ arch/arm64/include/asm/memory.h |  5 +++++
+ arch/arm64/mm/kasan_init.c      |  3 +++
+ arch/arm64/mm/proc.S            | 21 +++++++++++++++++++++
+ 4 files changed, 37 insertions(+)
 
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 143c453b06f1..be65dd4bb109 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -262,6 +262,7 @@ config PGTABLE_LEVELS
+ 	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
+ 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
+ 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
++	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48_52
+ 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
+ 	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
+ 	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
+@@ -275,6 +276,7 @@ config ARCH_PROC_KCORE_TEXT
+ config KASAN_SHADOW_OFFSET
+ 	hex
+ 	depends on KASAN
++	default 0xdfffa00000000000 if ARM64_VA_BITS_48_52
+ 	default 0xdfffa00000000000 if ARM64_VA_BITS_48
+ 	default 0xdfffd00000000000 if ARM64_VA_BITS_47
+ 	default 0xdffffe8000000000 if ARM64_VA_BITS_42
+@@ -646,6 +648,10 @@ config ARM64_VA_BITS_47
+ config ARM64_VA_BITS_48
+ 	bool "48-bit"
+ 
++config ARM64_VA_BITS_48_52
++	bool "48 or 52-bit (decided at boot time)"
++	depends on ARM64_64K_PAGES
++
+ endchoice
+ 
+ config ARM64_VA_BITS
+@@ -655,9 +661,11 @@ config ARM64_VA_BITS
+ 	default 42 if ARM64_VA_BITS_42
+ 	default 47 if ARM64_VA_BITS_47
+ 	default 48 if ARM64_VA_BITS_48
++	default 48 if ARM64_VA_BITS_48_52
+ 
+ config ARM64_VA_BITS_ALT
+ 	bool
++	default y if ARM64_VA_BITS_48_52
+ 	default n
+ 
+ config CPU_BIG_ENDIAN
+diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+index 652ae83468b6..8530f8eb77da 100644
+--- a/arch/arm64/include/asm/memory.h
++++ b/arch/arm64/include/asm/memory.h
+@@ -72,6 +72,11 @@
+ #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
+ #define FIXADDR_TOP		(PCI_IO_START - PGDIR_SIZE)
+ #define VMEMMAP_START		(FIXADDR_START - VMEMMAP_SIZE)
++#define VA_BITS_MIN		(CONFIG_ARM64_VA_BITS)
++
++#ifdef CONFIG_ARM64_VA_BITS_48_52
++#define VA_BITS_ALT		(52)
++#endif
+ 
+ #define KERNEL_START      _text
+ #define KERNEL_END        _end
+diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
+index 33f99e18e4ff..38c933c17f82 100644
+--- a/arch/arm64/mm/kasan_init.c
++++ b/arch/arm64/mm/kasan_init.c
+@@ -135,6 +135,9 @@ static void __init kasan_pgd_populate(unsigned long addr, unsigned long end,
+ /* The early shadow maps everything to a single page of zeroes */
+ asmlinkage void __init kasan_early_init(void)
+ {
++#ifdef CONFIG_ARM64_VA_BITS_ALT
++	BUILD_BUG_ON(!IS_ALIGNED(_KASAN_SHADOW_START(VA_BITS_ALT), PGDIR_SIZE));
++#endif
+ 	BUILD_BUG_ON(!IS_ALIGNED(_KASAN_SHADOW_START(VA_BITS_MIN), PGDIR_SIZE));
+ 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
+ 	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index 607a6ff0e205..42a91a4a1126 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -225,6 +225,14 @@ ENTRY(__cpu_setup)
+ 	 */
+ 	ldr	x10, =TCR_TxSZ(VA_BITS_MIN) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
+ 			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
++#ifdef CONFIG_ARM64_VA_BITS_ALT
++	ldr_l	x9, vabits_actual
++	cmp	x9, #VA_BITS_ALT
++	b.ne	1f
++	ldr	x10, =TCR_TxSZ(VA_BITS_ALT) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
++			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
++1:
++#endif
+ 	tcr_set_idmap_t0sz	x10, x9
+ 
+ 	/*
+@@ -251,9 +259,22 @@ ENTRY(__cpu_setup)
+ ENDPROC(__cpu_setup)
+ 
+ ENTRY(__setup_va_constants)
++#ifdef CONFIG_ARM64_VA_BITS_48_52
++	mrs_s	x5, SYS_ID_AA64MMFR2_EL1
++	and	x5, x5, #0xf << ID_AA64MMFR2_LVA_SHIFT
++	cmp	x5, #1 << ID_AA64MMFR2_LVA_SHIFT
++	b.ne	1f
++	mov	x0, #VA_BITS_ALT
++	mov	x1, TCR_T0SZ(VA_BITS_ALT)
++	mov	x2, #1 << (VA_BITS_ALT - PGDIR_SHIFT)
++	b	2f
++#endif
++
++1:
+ 	mov	x0, #VA_BITS_MIN
+ 	mov	x1, TCR_T0SZ(VA_BITS_MIN)
+ 	mov	x2, #1 << (VA_BITS_MIN - PGDIR_SHIFT)
++2:
+ 	str_l	x0, vabits_actual, x5
+ 	str_l	x1, idmap_t0sz, x5
+ 	str_l	x2, ptrs_per_pgd, x5
+-- 
+2.11.0
