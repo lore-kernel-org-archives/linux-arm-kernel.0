@@ -1,107 +1,46 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon, 4 Dec 2017 20:31:51 +0100
-Subject: [PATCH v5 6/8] KVM: arm/arm64: Support VGIC dist pend/active
- changes for mapped IRQs
-In-Reply-To: <20171129151314.el7ndd2czsglw7lh@kamzik.brq.redhat.com>
-References: <20171120191649.17290-1-christoffer.dall@linaro.org>
- <20171120191649.17290-7-christoffer.dall@linaro.org>
- <20171129151314.el7ndd2czsglw7lh@kamzik.brq.redhat.com>
-Message-ID: <20171204193151.GG32397@cbox>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Mon, 4 Dec 2017 20:38:02 +0100
+Subject: [PATCH v2] ARM: dts: at91: add devicetree for the Axentia Nattis
+ with Natte power
+In-Reply-To: <20171204135708.8234-1-peda@axentia.se>
+References: <20171204135708.8234-1-peda@axentia.se>
+Message-ID: <20171204193802.GG21780@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 04:13:14PM +0100, Andrew Jones wrote:
-> On Mon, Nov 20, 2017 at 08:16:47PM +0100, Christoffer Dall wrote:
-> > For mapped IRQs (with the HW bit set in the LR) we have to follow some
-> > rules of the architecture.  One of these rules is that VM must not be
-> > allowed to deactivate a virtual interrupt with the HW bit set unless the
-> > physical interrupt is also active.
-> > 
-> > This works fine when injecting mapped interrupts, because we leave it up
-> > to the injector to either set EOImode==1 or manually set the active
-> > state of the physical interrupt.
-> > 
-> > However, the guest can set virtual interrupt to be pending or active by
-> > writing to the virtual distributor, which could lead to deactivating a
-> > virtual interrupt with the HW bit set without the physical interrupt
-> > being active.
-> > 
-> > We could set the physical interrupt to active whenever we are about to
-> > enter the VM with a HW interrupt either pending or active, but that
-> > would be really slow, especially on GICv2.  So we take the long way
-> > around and do the hard work when needed, which is expected to be
-> > extremely rare.
-> > 
-> > When the VM sets the pending state for a HW interrupt on the virtual
-> > distributor we set the active state on the physical distributor, because
-> > the virtual interrupt can become active and then the guest can
-> > deactivate it.
-> > 
-> > When the VM clears the pending state we also clear it on the physical
-> > side, because the injector might otherwise raise the interrupt.  We also
-> > clear the physical active state when the virtual interrupt is not
-> > active, since otherwise a SPEND/CPEND sequence from the guest would
-> > prevent signaling of future interrupts.
-> > 
-> > Changing the state of mapped interrupts from userspace is not supported,
-> > and it's expected that userspace unmaps devices from VFIO before
-> > attempting to set the interrupt state, because the interrupt state is
-> > driven by hardware.
-> > 
-> > Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  virt/kvm/arm/vgic/vgic-mmio.c | 71 +++++++++++++++++++++++++++++++++++++++----
-> >  virt/kvm/arm/vgic/vgic.c      |  7 +++++
-> >  virt/kvm/arm/vgic/vgic.h      |  1 +
-> >  3 files changed, 73 insertions(+), 6 deletions(-)
-> > 
-> > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> > index 6113cf850f47..294e949ece24 100644
-> > --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> > @@ -16,6 +16,7 @@
-> >  #include <linux/kvm.h>
-> >  #include <linux/kvm_host.h>
-> >  #include <kvm/iodev.h>
-> > +#include <kvm/arm_arch_timer.h>
-> >  #include <kvm/arm_vgic.h>
-> >  
-> >  #include "vgic.h"
-> > @@ -142,10 +143,22 @@ static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
-> >  	return vcpu;
-> >  }
-> >  
-> > +/* Must be called with irq->irq_lock held */
-> > +static void vgic_hw_irq_spending(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-> > +				 bool is_uaccess)
-> > +{
-> > +	if (!is_uaccess)
-> > +		irq->pending_latch = true;
-> > +
-> > +	if (!is_uaccess)
-> > +		vgic_irq_set_phys_active(irq, true);
+On 04/12/2017 at 14:57:08 +0100, Peter Rosin wrote:
+> The Axentia Nattis is a device designed for presenting departures for
+> public transport systems. The Natte helper board provides power and
+> features a battery of battery chargers.
 > 
-> I see this whole patch has this two 'if (!is_uaccess)' checks pattern.
-> Is that meant to convey something? 
-
-Yeah, that I'm a fool.
-
-> Or is the first condition not supposed
-> to have the '!'? (I'm lost with regards to the state tracking differences
-> between the guest and userspace and just reviewing superficially...)
+> Signed-off-by: Peter Rosin <peda@axentia.se>
+> ---
 > 
+> This was part of a two-patch series, but the first patch in that
+> series was redundant, so I dropped it (there was a dt binding
+> recently added for the tfa9879 amplifier that I had not noticed).
+> 
+> Changes since v1:    https://lkml.org/lkml/2017/12/1/844
+> - removed chip-ids from before the @-sign instead naming the nodes
+>   for the function, e.g sx1502q at 20 -> ioexp at 20
+> - added #sound-dai-cells to the amplifier node
+> - switch to SPDX license tags
+> 
+> Cheers,
+> Peter
+> 
+> Documentation/devicetree/bindings/arm/axentia.txt |   9 +
+>  MAINTAINERS                                       |   2 +
+>  arch/arm/boot/dts/Makefile                        |   1 +
+>  arch/arm/boot/dts/at91-natte.dtsi                 | 244 ++++++++++++++++++++
+>  arch/arm/boot/dts/at91-nattis-2-natte-2.dts       | 258 ++++++++++++++++++++++
+>  5 files changed, 514 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/at91-natte.dtsi
+>  create mode 100644 arch/arm/boot/dts/at91-nattis-2-natte-2.dts
+> 
+Applied, thanks.
 
-This became weird becaus the first clause used to be "if (!is_uaccess ||
-is_timer)", but now when the timer is interrupt driven (the timer
-optimization series), we don't have that concept anymore, and I just
-blindly removes the "|| is_timer" part.
-
-I reworked this so that the functions now have
-
-	if (is_uaccess)
-		return;
-
-
-Thanks,
--Christoffer
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
