@@ -1,37 +1,68 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 4 Dec 2017 09:02:56 +0000
-Subject: [PATCH v4 08/10] mfd: axp20x: add pinctrl cell for AXP813
-In-Reply-To: <CACRpkdZJ3gDqnLVW0NZMJiF7qRJSu-0Usys0tKfT-aep4bRxjg@mail.gmail.com>
-References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
- <e0b4ce746c052b78f08dff54d0ad7ce7ebc611ab.1512135804.git-series.quentin.schulz@free-electrons.com>
- <CACRpkdZJ3gDqnLVW0NZMJiF7qRJSu-0Usys0tKfT-aep4bRxjg@mail.gmail.com>
-Message-ID: <20171204090256.qgl6cdbwi65xv475@dell>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon,  4 Dec 2017 10:04:53 +0100
+Subject: [PATCH] ARM64: dts: meson-gx: fix UART pclk clock name
+Message-ID: <1512378293-22198-1-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, 02 Dec 2017, Linus Walleij wrote:
+The clock-names for pclk was wrongly set to "core", but the bindings
+specifies "pclk".
+This was not cathed until the legacy non-documented bindings were removed.
 
-> On Fri, Dec 1, 2017 at 2:44 PM, Quentin Schulz
-> <quentin.schulz@free-electrons.com> wrote:
-> 
-> > As GPIO/pinctrl driver now supports AXP813, add a cell for it.
-> >
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> 
-> It doesn't seem to have any dependencies so I guess Lee can simply
-> apply this separately.
+Reported-by: Andreas F?rber <afaerber@suse.de>
+Fixes: f72d6f6037b7 ("ARM64: dts: meson-gx: use stable UART bindings with correct gate clock")
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi | 4 ++--
+ arch/arm64/boot/dts/amlogic/meson-gxl.dtsi  | 6 +++---
+ 2 files changed, 5 insertions(+), 5 deletions(-)
 
-Yup!  Although, I'd prefer to wait for the other patches in the set to
-be applied.  In the mean time:
-
-For my own reference:
-  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
-
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+index ead895a..1fb8b9d 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxbb.dtsi
+@@ -753,12 +753,12 @@
+ 
+ &uart_B {
+ 	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
+-	clock-names = "xtal", "core", "baud";
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_C {
+ 	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
+-	clock-names = "xtal", "core", "baud";
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &vpu {
+diff --git a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+index 8ed981f..6524b89 100644
+--- a/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
++++ b/arch/arm64/boot/dts/amlogic/meson-gxl.dtsi
+@@ -688,7 +688,7 @@
+ 
+ &uart_A {
+ 	clocks = <&xtal>, <&clkc CLKID_UART0>, <&xtal>;
+-	clock-names = "xtal", "core", "baud";
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_AO {
+@@ -703,12 +703,12 @@
+ 
+ &uart_B {
+ 	clocks = <&xtal>, <&clkc CLKID_UART1>, <&xtal>;
+-	clock-names = "xtal", "core", "baud";
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &uart_C {
+ 	clocks = <&xtal>, <&clkc CLKID_UART2>, <&xtal>;
+-	clock-names = "xtal", "core", "baud";
++	clock-names = "xtal", "pclk", "baud";
+ };
+ 
+ &vpu {
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
