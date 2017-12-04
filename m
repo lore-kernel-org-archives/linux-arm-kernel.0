@@ -1,100 +1,33 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 4 Dec 2017 10:28:52 +0000
-Subject: [PATCH] irqchip/gic-v3: Fix the driver probe() fail due to
- disabled GICC entry
-In-Reply-To: <1512343269-19327-1-git-send-email-shankerd@codeaurora.org>
-References: <1512343269-19327-1-git-send-email-shankerd@codeaurora.org>
-Message-ID: <8a926bff-f8aa-220c-85f0-9d39ec5bef4b@arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon,  4 Dec 2017 11:45:20 +0100
+Subject: [PATCH] ARM: dts: rockchip: add cpu0-regulator on rk3066a-marsboard
+Message-ID: <20171204104520.29385-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03/12/17 23:21, Shanker Donthineni wrote:
-> As per MADT specification, it's perfectly valid firmware can pass
-> MADT table to OS with disabled GICC entries. ARM64-SMP code skips
-> those cpu cores to bring online. However the current GICv3 driver
-> probe bails out in this case on systems where redistributor regions
-> are not in the always-on power domain.
-> 
-> This patch does the two things to fix the panic.
->   - Don't return an error in gic_acpi_match_gicc() for disabled GICC.
->   - No need to keep GICR region information for disabled GICC.
-> 
-> Kernel crash traces:
->   Kernel panic - not syncing: No interrupt controller found.
->   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.13.5 #26
->   [<ffff000008087770>] dump_backtrace+0x0/0x218
->   [<ffff0000080879dc>] show_stack+0x14/0x20
->   [<ffff00000883b078>] dump_stack+0x98/0xb8
->   [<ffff0000080c5c14>] panic+0x118/0x26c
->   [<ffff000008b62348>] init_IRQ+0x24/0x2c
->   [<ffff000008b609fc>] start_kernel+0x230/0x394
->   [<ffff000008b601e4>] __primary_switched+0x64/0x6c
->   ---[ end Kernel panic - not syncing: No interrupt controller found.
-> 
-> Disabled GICC subtable example:
->                    Subtable Type : 0B [Generic Interrupt Controller]
->                           Length : 50
->                         Reserved : 0000
->             CPU Interface Number : 0000003D
->                    Processor UID : 0000003D
->            Flags (decoded below) : 00000000
->                Processor Enabled : 0
->  Performance Interrupt Trig Mode : 0
->  Virtual GIC Interrupt Trig Mode : 0
->         Parking Protocol Version : 00000000
->            Performance Interrupt : 00000017
->                   Parked Address : 0000000000000000
->                     Base Address : 0000000000000000
->         Virtual GIC Base Address : 0000000000000000
->      Hypervisor GIC Base Address : 0000000000000000
->            Virtual GIC Interrupt : 00000019
->       Redistributor Base Address : 0000FFFF88F40000
->                        ARM MPIDR : 000000000000000D
->                 Efficiency Class : 00
->                         Reserved : 000000
-> 
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> ---
->  drivers/irqchip/irq-gic-v3.c | 14 +++++++++-----
->  1 file changed, 9 insertions(+), 5 deletions(-)
-> 
-> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-> index b56c3e2..a30fbac 100644
-> --- a/drivers/irqchip/irq-gic-v3.c
-> +++ b/drivers/irqchip/irq-gic-v3.c
-> @@ -1331,6 +1331,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
->  	u32 size = reg == GIC_PIDR2_ARCH_GICv4 ? SZ_64K * 4 : SZ_64K * 2;
->  	void __iomem *redist_base;
->  
-> +	/* GICC entry which has !ACPI_MADT_ENABLED is not unusable so skip */
-> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
-> +		return 0;
-> +
->  	redist_base = ioremap(gicc->gicr_base_address, size);
->  	if (!redist_base)
->  		return -ENOMEM;
-> @@ -1374,13 +1378,13 @@ static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
->  				(struct acpi_madt_generic_interrupt *)header;
->  
->  	/*
-> -	 * If GICC is enabled and has valid gicr base address, then it means
-> -	 * GICR base is presented via GICC
-> +	 * If GICC is enabled and has not valid gicr base address, then it means
-> +	 * GICR base is not presented via GICC
->  	 */
-> -	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
-> -		return 0;
-> +	if ((gicc->flags & ACPI_MADT_ENABLED) && (!gicc->gicr_base_address))
-> +		return -ENODEV;
+The rk3066 also has operating points now, but without adjusting
+the cpu-regulator will break once higher voltages are needed for
+a specific frequency, so add the needed cpu0-regulator.
 
-This doesn't feel quite right. It would mean that having the ENABLED
-flag cleared and potentially no address would make it valid? It looks to
-me that the original code is "less wrong".
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3066a-marsboard.dts | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-What am I missing?
-
-Thanks,
-
-	M.
+diff --git a/arch/arm/boot/dts/rk3066a-marsboard.dts b/arch/arm/boot/dts/rk3066a-marsboard.dts
+index c6d92c25df42..d23ee6d911ac 100644
+--- a/arch/arm/boot/dts/rk3066a-marsboard.dts
++++ b/arch/arm/boot/dts/rk3066a-marsboard.dts
+@@ -83,6 +83,10 @@
+ 	};
+ };
+ 
++&cpu0 {
++	cpu0-supply = <&vdd_arm>;
++};
++
+ &i2c1 {
+ 	status = "okay";
+ 	clock-frequency = <400000>;
 -- 
-Jazz is not dead. It just smells funny...
+2.14.2
