@@ -1,84 +1,115 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Dec 2017 12:26:36 +0000
-Subject: [PATCH v2 10/19] crypto: arm64/sha256-neon - play nice with
- CONFIG_PREEMPT kernels
+Date: Mon,  4 Dec 2017 12:26:38 +0000
+Subject: [PATCH v2 12/19] crypto: arm64/sha1-ce - yield every 8 blocks of input
 In-Reply-To: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
 References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171204122645.31535-11-ard.biesheuvel@linaro.org>
+Message-ID: <20171204122645.31535-13-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tweak the SHA256 update routines to invoke the SHA256 block transform
-block by block, to avoid excessive scheduling delays caused by the
-NEON algorithm running with preemption disabled.
-
-Also, remove a stale comment which no longer applies now that kernel
-mode NEON is actually disallowed in some contexts.
+Avoid excessive scheduling delays under a preemptible kernel by
+yielding the NEON every 8 blocks of input.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/sha256-glue.c | 36 +++++++++++++-------
- 1 file changed, 23 insertions(+), 13 deletions(-)
+ arch/arm64/crypto/sha1-ce-core.S | 45 ++++++++++++++------
+ 1 file changed, 32 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/crypto/sha256-glue.c b/arch/arm64/crypto/sha256-glue.c
-index b064d925fe2a..e8880ccdc71f 100644
---- a/arch/arm64/crypto/sha256-glue.c
-+++ b/arch/arm64/crypto/sha256-glue.c
-@@ -89,21 +89,32 @@ static struct shash_alg algs[] = { {
- static int sha256_update_neon(struct shash_desc *desc, const u8 *data,
- 			      unsigned int len)
- {
--	/*
--	 * Stacking and unstacking a substantial slice of the NEON register
--	 * file may significantly affect performance for small updates when
--	 * executing in interrupt context, so fall back to the scalar code
--	 * in that case.
--	 */
-+	struct sha256_state *sctx = shash_desc_ctx(desc);
+diff --git a/arch/arm64/crypto/sha1-ce-core.S b/arch/arm64/crypto/sha1-ce-core.S
+index 8550408735a0..7ae0dd369e0a 100644
+--- a/arch/arm64/crypto/sha1-ce-core.S
++++ b/arch/arm64/crypto/sha1-ce-core.S
+@@ -70,31 +70,40 @@
+ 	 *			  int blocks)
+ 	 */
+ ENTRY(sha1_ce_transform)
++	stp		x29, x30, [sp, #-48]!
++	mov		x29, sp
++	stp		x19, x20, [sp, #16]
++	str		x21, [sp, #32]
 +
- 	if (!may_use_simd())
- 		return sha256_base_do_update(desc, data, len,
- 				(sha256_block_fn *)sha256_block_data_order);
- 
--	kernel_neon_begin();
--	sha256_base_do_update(desc, data, len,
--				(sha256_block_fn *)sha256_block_neon);
--	kernel_neon_end();
-+	while (len > 0) {
-+		unsigned int chunk = len;
++	mov		x19, x0
++	mov		x20, x1
++	mov		x21, x2
 +
-+		/*
-+		 * Don't hog the CPU for the entire time it takes to process all
-+		 * input when running on a preemptible kernel, but process the
-+		 * data block by block instead.
-+		 */
-+		if (IS_ENABLED(CONFIG_PREEMPT) &&
-+		    chunk + sctx->count % SHA256_BLOCK_SIZE > SHA256_BLOCK_SIZE)
-+			chunk = SHA256_BLOCK_SIZE -
-+				sctx->count % SHA256_BLOCK_SIZE;
+ 	/* load round constants */
+-	adr		x6, .Lsha1_rcon
++0:	adr		x6, .Lsha1_rcon
+ 	ld1r		{k0.4s}, [x6], #4
+ 	ld1r		{k1.4s}, [x6], #4
+ 	ld1r		{k2.4s}, [x6], #4
+ 	ld1r		{k3.4s}, [x6]
  
-+		kernel_neon_begin();
-+		sha256_base_do_update(desc, data, chunk,
-+				      (sha256_block_fn *)sha256_block_neon);
-+		kernel_neon_end();
-+		data += chunk;
-+		len -= chunk;
-+	}
- 	return 0;
- }
+ 	/* load state */
+-	ld1		{dgav.4s}, [x0]
+-	ldr		dgb, [x0, #16]
++	ld1		{dgav.4s}, [x19]
++	ldr		dgb, [x19, #16]
  
-@@ -117,10 +128,9 @@ static int sha256_finup_neon(struct shash_desc *desc, const u8 *data,
- 		sha256_base_do_finalize(desc,
- 				(sha256_block_fn *)sha256_block_data_order);
- 	} else {
--		kernel_neon_begin();
- 		if (len)
--			sha256_base_do_update(desc, data, len,
--				(sha256_block_fn *)sha256_block_neon);
-+			sha256_update_neon(desc, data, len);
-+		kernel_neon_begin();
- 		sha256_base_do_finalize(desc,
- 				(sha256_block_fn *)sha256_block_neon);
- 		kernel_neon_end();
+ 	/* load sha1_ce_state::finalize */
+ 	ldr_l		w4, sha1_ce_offsetof_finalize, x4
+-	ldr		w4, [x0, x4]
++	ldr		w4, [x19, x4]
+ 
+ 	/* load input */
+-0:	ld1		{v8.4s-v11.4s}, [x1], #64
+-	sub		w2, w2, #1
++1:	ld1		{v8.4s-v11.4s}, [x20], #64
++	sub		w21, w21, #1
+ 
+ CPU_LE(	rev32		v8.16b, v8.16b		)
+ CPU_LE(	rev32		v9.16b, v9.16b		)
+ CPU_LE(	rev32		v10.16b, v10.16b	)
+ CPU_LE(	rev32		v11.16b, v11.16b	)
+ 
+-1:	add		t0.4s, v8.4s, k0.4s
++2:	add		t0.4s, v8.4s, k0.4s
+ 	mov		dg0v.16b, dgav.16b
+ 
+ 	add_update	c, ev, k0,  8,  9, 10, 11, dgb
+@@ -125,16 +134,23 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
+ 	add		dgbv.2s, dgbv.2s, dg1v.2s
+ 	add		dgav.4s, dgav.4s, dg0v.4s
+ 
+-	cbnz		w2, 0b
++	cbz		w21, 3f
++
++	yield_neon_pre	w21, 3, 1, 1b			// yield every 8 blocks
++	st1		{dgav.4s}, [x19]
++	str		dgb, [x19, #16]
++	yield_neon_post	0b
++
++	b		1b
+ 
+ 	/*
+ 	 * Final block: add padding and total bit count.
+ 	 * Skip if the input size was not a round multiple of the block size,
+ 	 * the padding is handled by the C code in that case.
+ 	 */
+-	cbz		x4, 3f
++3:	cbz		x4, 4f
+ 	ldr_l		w4, sha1_ce_offsetof_count, x4
+-	ldr		x4, [x0, x4]
++	ldr		x4, [x19, x4]
+ 	movi		v9.2d, #0
+ 	mov		x8, #0x80000000
+ 	movi		v10.2d, #0
+@@ -143,10 +159,13 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
+ 	mov		x4, #0
+ 	mov		v11.d[0], xzr
+ 	mov		v11.d[1], x7
+-	b		1b
++	b		2b
+ 
+ 	/* store new state */
+-3:	st1		{dgav.4s}, [x0]
+-	str		dgb, [x0, #16]
++4:	st1		{dgav.4s}, [x19]
++	str		dgb, [x19, #16]
++	ldp		x19, x20, [sp, #16]
++	ldr		x21, [sp, #32]
++	ldp		x29, x30, [sp], #48
+ 	ret
+ ENDPROC(sha1_ce_transform)
 -- 
 2.11.0
