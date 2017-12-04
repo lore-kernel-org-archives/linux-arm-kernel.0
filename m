@@ -1,287 +1,71 @@
-From: LW@KARO-electronics.de (Lothar =?UTF-8?B?V2HDn21hbm4=?=)
-Date: Mon, 4 Dec 2017 12:10:19 +0100
-Subject: [PATCH 04/12] ARM: dts: imx53-tx53-x03x: Move display node out
- of 'soc'
-In-Reply-To: <1512156285-18451-4-git-send-email-festevam@gmail.com>
-References: <1512156285-18451-1-git-send-email-festevam@gmail.com>
- <1512156285-18451-4-git-send-email-festevam@gmail.com>
-Message-ID: <20171204121019.486b4160@karo-electronics.de>
+From: gomonovych@gmail.com (Gomonovych, Vasyl)
+Date: Mon, 4 Dec 2017 12:11:22 +0100
+Subject: [PATCH] KVM: arm: Use PTR_ERR_OR_ZERO()
+In-Reply-To: <20171201080049.GB4218@cbox>
+References: <1511909297-8585-1-git-send-email-gomonovych@gmail.com>
+ <20171201080049.GB4218@cbox>
+Message-ID: <CAHYXAnL3DVkDMF03QRV62RCFzmViDGYR2rQHBS44jyCo2FRgqw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Christoffer
 
-On Fri,  1 Dec 2017 17:24:37 -0200 Fabio Estevam wrote:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
-> 
-> Move disp0 node from soc node to root node.
-> 
-> disp0 node does not have any register properties and thus
-> shouldn't be placed on the bus.
-> 
-> This fixes the following build warnings with W=1:
-> 
-> arch/arm/boot/dts/imx53-tx53-x03x.dtb: Warning (simple_bus_reg): Node /soc/disp0 missing or empty reg/ranges property
-> 
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
-> ---
->  arch/arm/boot/dts/imx53-tx53-x03x.dts | 232 +++++++++++++++++-----------------
->  1 file changed, 115 insertions(+), 117 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx53-tx53-x03x.dts b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> index 7eb53e4..fe15c95 100644
-> --- a/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> +++ b/arch/arm/boot/dts/imx53-tx53-x03x.dts
-> @@ -53,132 +53,130 @@
->  		display = &display;
->  	};
->  
-> -	soc {
-> -		display: disp0 {
-> -			compatible = "fsl,imx-parallel-display";
-> -			interface-pix-fmt = "rgb24";
-> -			pinctrl-names = "default";
-> -			pinctrl-0 = <&pinctrl_rgb24_vga1>;
-> -			status = "okay";
-> +	display: disp0 {
-> +		compatible = "fsl,imx-parallel-display";
-> +		interface-pix-fmt = "rgb24";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_rgb24_vga1>;
-> +		status = "okay";
->  
-> -			port {
-> -				display0_in: endpoint {
-> -					remote-endpoint = <&ipu_di0_disp0>;
-> -				};
-> +		port {
-> +			display0_in: endpoint {
-> +				remote-endpoint = <&ipu_di0_disp0>;
->  			};
-> +		};
->  
-> -			display-timings {
-> -				VGA {
-> -					clock-frequency = <25200000>;
-> -					hactive = <640>;
-> -					vactive = <480>;
-> -					hback-porch = <48>;
-> -					hsync-len = <96>;
-> -					hfront-porch = <16>;
-> -					vback-porch = <31>;
-> -					vsync-len = <2>;
-> -					vfront-porch = <12>;
-> -					hsync-active = <0>;
-> -					vsync-active = <0>;
-> -					de-active = <1>;
-> -					pixelclk-active = <0>;
-> -				};
-> +		display-timings {
-> +			VGA {
-> +				clock-frequency = <25200000>;
-> +				hactive = <640>;
-> +				vactive = <480>;
-> +				hback-porch = <48>;
-> +				hsync-len = <96>;
-> +				hfront-porch = <16>;
-> +				vback-porch = <31>;
-> +				vsync-len = <2>;
-> +				vfront-porch = <12>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
-> +			};
->  
-> -				ETV570 {
-> -					clock-frequency = <25200000>;
-> -					hactive = <640>;
-> -					vactive = <480>;
-> -					hback-porch = <114>;
-> -					hsync-len = <30>;
-> -					hfront-porch = <16>;
-> -					vback-porch = <32>;
-> -					vsync-len = <3>;
-> -					vfront-porch = <10>;
-> -					hsync-active = <0>;
-> -					vsync-active = <0>;
-> -					de-active = <1>;
-> -					pixelclk-active = <0>;
-> -				};
-> +			ETV570 {
-> +				clock-frequency = <25200000>;
-> +				hactive = <640>;
-> +				vactive = <480>;
-> +				hback-porch = <114>;
-> +				hsync-len = <30>;
-> +				hfront-porch = <16>;
-> +				vback-porch = <32>;
-> +				vsync-len = <3>;
-> +				vfront-porch = <10>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
-> +			};
->  
-> -				ET0350 {
-> -					clock-frequency = <6413760>;
-> -					hactive = <320>;
-> -					vactive = <240>;
-> -					hback-porch = <34>;
-> -					hsync-len = <34>;
-> -					hfront-porch = <20>;
-> -					vback-porch = <15>;
-> -					vsync-len = <3>;
-> -					vfront-porch = <4>;
-> -					hsync-active = <0>;
-> -					vsync-active = <0>;
-> -					de-active = <1>;
-> -					pixelclk-active = <0>;
-> -				};
-> +			ET0350 {
-> +				clock-frequency = <6413760>;
-> +				hactive = <320>;
-> +				vactive = <240>;
-> +				hback-porch = <34>;
-> +				hsync-len = <34>;
-> +				hfront-porch = <20>;
-> +				vback-porch = <15>;
-> +				vsync-len = <3>;
-> +				vfront-porch = <4>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
-> +			};
->  
-> -				ET0430 {
-> -					clock-frequency = <9009000>;
-> -					hactive = <480>;
-> -					vactive = <272>;
-> -					hback-porch = <2>;
-> -					hsync-len = <41>;
-> -					hfront-porch = <2>;
-> -					vback-porch = <2>;
-> -					vsync-len = <10>;
-> -					vfront-porch = <2>;
-> -					hsync-active = <0>;
-> -					vsync-active = <0>;
-> -					de-active = <1>;
-> -					pixelclk-active = <1>;
-> -				};
-> +			ET0430 {
-> +				clock-frequency = <9009000>;
-> +				hactive = <480>;
-> +				vactive = <272>;
-> +				hback-porch = <2>;
-> +				hsync-len = <41>;
-> +				hfront-porch = <2>;
-> +				vback-porch = <2>;
-> +				vsync-len = <10>;
-> +				vfront-porch = <2>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <1>;
-> +			};
->  
-> -				ET0500 {
-> -					clock-frequency = <33264000>;
-> -					hactive = <800>;
-> -					vactive = <480>;
-> -					hback-porch = <88>;
-> -					hsync-len = <128>;
-> -					hfront-porch = <40>;
-> -					vback-porch = <33>;
-> -					vsync-len = <2>;
-> -					vfront-porch = <10>;
-> -					hsync-active = <0>;
-> -					vsync-active = <0>;
-> -					de-active = <1>;
-> -					pixelclk-active = <0>;
-> -				};
-> +			ET0500 {
-> +				clock-frequency = <33264000>;
-> +				hactive = <800>;
-> +				vactive = <480>;
-> +				hback-porch = <88>;
-> +				hsync-len = <128>;
-> +				hfront-porch = <40>;
-> +				vback-porch = <33>;
-> +				vsync-len = <2>;
-> +				vfront-porch = <10>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
-> +			};
->  
-> -				ET0700 { /* same as ET0500 */
-> -					clock-frequency = <33264000>;
-> -					hactive = <800>;
-> -					vactive = <480>;
-> -					hback-porch = <88>;
-> -					hsync-len = <128>;
-> -					hfront-porch = <40>;
-> -					vback-porch = <33>;
-> -					vsync-len = <2>;
-> -					vfront-porch = <10>;
-> -					hsync-active = <0>;
-> -					vsync-active = <0>;
-> -					de-active = <1>;
-> -					pixelclk-active = <0>;
-> -				};
-> +			ET0700 { /* same as ET0500 */
-> +				clock-frequency = <33264000>;
-> +				hactive = <800>;
-> +				vactive = <480>;
-> +				hback-porch = <88>;
-> +				hsync-len = <128>;
-> +				hfront-porch = <40>;
-> +				vback-porch = <33>;
-> +				vsync-len = <2>;
-> +				vfront-porch = <10>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
-> +			};
->  
-> -				ETQ570 {
-> -					clock-frequency = <6596040>;
-> -					hactive = <320>;
-> -					vactive = <240>;
-> -					hback-porch = <38>;
-> -					hsync-len = <30>;
-> -					hfront-porch = <30>;
-> -					vback-porch = <16>;
-> -					vsync-len = <3>;
-> -					vfront-porch = <4>;
-> -					hsync-active = <0>;
-> -					vsync-active = <0>;
-> -					de-active = <1>;
-> -					pixelclk-active = <0>;
-> -				};
-> +			ETQ570 {
-> +				clock-frequency = <6596040>;
-> +				hactive = <320>;
-> +				vactive = <240>;
-> +				hback-porch = <38>;
-> +				hsync-len = <30>;
-> +				hfront-porch = <30>;
-> +				vback-porch = <16>;
-> +				vsync-len = <3>;
-> +				vfront-porch = <4>;
-> +				hsync-active = <0>;
-> +				vsync-active = <0>;
-> +				de-active = <1>;
-> +				pixelclk-active = <0>;
->  			};
->  		};
->  	};
-Acked-by: Lothar Wa?mann <LW@KARO-electronics.de>
+It is just syntax sugar of course
+and in mentioned function context it looks harmonically because it is
+in the end of function return statement.
+But in context of around source files it is looks not so harmonically because
+existing code uses old approach.
+And this old approach is only in one place here.
+So it is just a try to fix the warning and may be force to use it in a
+future changes.
+
+Regards Vasyl
+
+On Fri, Dec 1, 2017 at 9:00 AM, Christoffer Dall <cdall@linaro.org> wrote:
+> Hi Vasyl,
+>
+> On Tue, Nov 28, 2017 at 11:48:17PM +0100, Vasyl Gomonovych wrote:
+>> Fix ptr_ret.cocci warnings:
+>> virt/kvm/arm/vgic/vgic-its.c:971:1-3: WARNING: PTR_ERR_OR_ZERO can be used
+>>
+>> Use PTR_ERR_OR_ZERO rather than if(IS_ERR(...)) + PTR_ERR
+>>
+>> Generated by: scripts/coccinelle/api/ptr_ret.cocci
+>
+> For new code, sure it would make sense to use this.
+>
+> But why is it worth changing existing code to use PTR_ERR_OR_ZERO?
+>
+> Thanks,
+> -Christoffer
+>
+>>
+>> Signed-off-by: Vasyl Gomonovych <gomonovych@gmail.com>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-its.c | 4 +---
+>>  1 file changed, 1 insertion(+), 3 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+>> index 1f761a9991e7..28d85754320b 100644
+>> --- a/virt/kvm/arm/vgic/vgic-its.c
+>> +++ b/virt/kvm/arm/vgic/vgic-its.c
+>> @@ -1032,10 +1032,8 @@ static int vgic_its_cmd_handle_mapd(struct kvm *kvm, struct vgic_its *its,
+>>
+>>       device = vgic_its_alloc_device(its, device_id, itt_addr,
+>>                                      num_eventid_bits);
+>> -     if (IS_ERR(device))
+>> -             return PTR_ERR(device);
+>>
+>> -     return 0;
+>> +     return PTR_ERR_OR_ZERO(device);
+>>  }
+>>
+>>  /*
+>> --
+>> 1.9.1
+>>
 
 
-Lothar Wa?mann
+
+-- 
+?????? ??? ???? ???.
