@@ -1,40 +1,54 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sun, 3 Dec 2017 19:41:30 -0800
-Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
-In-Reply-To: <20171204083256.262c4b7c@canb.auug.org.au>
-References: <20171204083256.262c4b7c@canb.auug.org.au>
-Message-ID: <CAOesGMh_YT1TH_c0xs614HoK8iAOoaxPofxQtmSuPa8h7HpHKQ@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Mon, 4 Dec 2017 12:00:40 +0800
+Subject: [PATCH 1/5] bpf: correct broken uapi for
+ BPF_PROG_TYPE_PERF_EVENT program type
+In-Reply-To: <1512137948-31729-2-git-send-email-brueckner@linux.vnet.ibm.com>
+References: <1512137948-31729-2-git-send-email-brueckner@linux.vnet.ibm.com>
+Message-ID: <201712041117.BmtvHi0J%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks, Stephen. I need to get a similar script going to catch these
-things in our own tree.
+Hi Hendrik,
 
-Since this was a clean revert, I've redone it myself, carrying over
-descriptions from the pull request and keeping attribution to Kevin.
+Thank you for the patch! Yet something to improve:
 
-Kevin; hope this is alright with you. We can revisit if not.
+[auto build test ERROR on linus/master]
+[also build test ERROR on v4.15-rc2]
+[cannot apply to tip/perf/core]
+[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
+url:    https://github.com/0day-ci/linux/commits/Hendrik-Brueckner/bpf-correct-broken-uapi-for-BPF_PROG_TYPE_PERF_EVENT-program-type/20171204-092027
+config: x86_64-randconfig-g0-12040613 (attached as .config)
+compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
--Olof
+All errors (new ones prefixed by >>):
 
+   In file included from include/linux/perf_event.h:18:0,
+                    from include/linux/trace_events.h:10,
+                    from include/trace/syscall.h:7,
+                    from include/linux/syscalls.h:82,
+                    from net/socket.c:83:
+>> include/uapi/linux/bpf_perf_event.h:11:32: fatal error: asm/bpf_perf_event.h: No such file or directory
+    #include <asm/bpf_perf_event.h>
+                                   ^
+   compilation terminated.
 
-On Sun, Dec 3, 2017 at 1:32 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
-> Hi all,
->
-> Commit
->
->   5f56b7f4854a ("Revert "Merge tag 'scpi-updates-4.15' of git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux into next/drivers"")
->
-> is missing a Signed-off-by from its author or committer.
->
-> Reverts are commits as well and so need an explanation of why they
-> are done and Signed-off-by tags.
->
-> --
-> Cheers,
-> Stephen Rothwell
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-next" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+vim +11 include/uapi/linux/bpf_perf_event.h
+
+    10	
+  > 11	#include <asm/bpf_perf_event.h>
+    12	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 29403 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171204/539c9978/attachment-0001.gz>
