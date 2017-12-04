@@ -1,65 +1,113 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Mon,  4 Dec 2017 10:23:07 +0530
-Subject: [PATCH v2 2/2] arm64: allwinner: a64-sopine: Fix to use dcdc1
- regulator instead of vcc3v3
-In-Reply-To: <1512363187-8353-1-git-send-email-jagan@amarulasolutions.com>
-References: <1512363187-8353-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1512363187-8353-2-git-send-email-jagan@amarulasolutions.com>
+From: sagar.a.kamble@intel.com (Sagar Arun Kamble)
+Date: Mon, 4 Dec 2017 10:43:05 +0530
+Subject: [PATCH 1/1] timecounter: Make cyclecounter struct part of
+ timecounter struct
+In-Reply-To: <20171202180458.winwznbstsi355ed@localhost>
+References: <1512189095-28654-1-git-send-email-sagar.a.kamble@intel.com>
+ <20171202180458.winwznbstsi355ed@localhost>
+Message-ID: <8cfdbb16-7053-1d8f-adae-4ce2487fe4ea@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since current tree support AXP803 regulators,
-replace fixed regulator vcc3v3 with AXP803 dcdc1 regulator where ever
-it need to replace.
 
-Tested mmc0 on sopine baseboard.
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-- Commit message edited as fix since it has issue with sdcard detect.
+On 12/2/2017 11:34 PM, Richard Cochran wrote:
+> On Sat, Dec 02, 2017 at 10:01:35AM +0530, Sagar Arun Kamble wrote:
+>> There is no real need for the users of timecounters to define cyclecounter
+>> and timecounter variables separately. Since timecounter will always be
+>> based on cyclecounter, have cyclecounter struct as member of timecounter
+>> struct.
+> Overall, this is a welcome change.  However, it doesn't go far enough,
+> IMHO, and I'll explain that more below.
+>
+>> diff --git a/drivers/net/ethernet/mellanox/mlx4/en_clock.c b/drivers/net/ethernet/mellanox/mlx4/en_clock.c
+>> index 0247885..35987b5 100644
+>> --- a/drivers/net/ethernet/mellanox/mlx4/en_clock.c
+>> +++ b/drivers/net/ethernet/mellanox/mlx4/en_clock.c
+> ...
+>
+> As it stands now, timecounter_init() is used for two totally different
+> reasons.  Some callers only want to set the time, ...
+>
+>> @@ -207,7 +207,7 @@ static int mlx4_en_phc_settime(struct ptp_clock_info *ptp,
+>>   
+>>   	/* reset the timecounter */
+>>   	write_seqlock_irqsave(&mdev->clock_lock, flags);
+>> -	timecounter_init(&mdev->clock, &mdev->cycles, ns);
+>> +	timecounter_init(&mdev->clock, ns);
+>>   	write_sequnlock_irqrestore(&mdev->clock_lock, flags);
+>>   
+>>   	return 0;
+> ... while others initialize the data structure the first time:
+>
+>> @@ -274,17 +274,17 @@ void mlx4_en_init_timestamp(struct mlx4_en_dev *mdev)
+>>   
+>>   	seqlock_init(&mdev->clock_lock);
+>>   
+>> -	memset(&mdev->cycles, 0, sizeof(mdev->cycles));
+>> -	mdev->cycles.read = mlx4_en_read_clock;
+>> -	mdev->cycles.mask = CLOCKSOURCE_MASK(48);
+>> -	mdev->cycles.shift = freq_to_shift(dev->caps.hca_core_clock);
+>> -	mdev->cycles.mult =
+>> -		clocksource_khz2mult(1000 * dev->caps.hca_core_clock, mdev->cycles.shift);
+>> -	mdev->nominal_c_mult = mdev->cycles.mult;
+>> +	memset(&mdev->clock.cc, 0, sizeof(mdev->clock.cc));
+>> +	mdev->clock.cc.read = mlx4_en_read_clock;
+>> +	mdev->clock.cc.mask = CLOCKSOURCE_MASK(48);
+>> +	mdev->clock.cc.shift = freq_to_shift(dev->caps.hca_core_clock);
+>> +	mdev->clock.cc.mult =
+>> +		clocksource_khz2mult(1000 * dev->caps.hca_core_clock,
+>> +				     mdev->clock.cc.shift);
+>> +	mdev->nominal_c_mult = mdev->clock.cc.mult;
+>>   
+>>   	write_seqlock_irqsave(&mdev->clock_lock, flags);
+>> -	timecounter_init(&mdev->clock, &mdev->cycles,
+>> -			 ktime_to_ns(ktime_get_real()));
+>> +	timecounter_init(&mdev->clock, ktime_to_ns(ktime_get_real()));
+> I'd like to see two followup patches to this one:
+>
+> 1. Convert timecounter_init() callers to a new timecounter_reset()
+>     function where the intent is to reset the time.
+>
+> 2. Change timecounter_init() to take the cyclecounter fields as
+>     arguments.
+>
+> 	void timecounter_init(struct timecounter *tc,
+> 			      u64 (*read)(const struct cyclecounter *cc),
+> 			      u64 mask,
+> 			      u32 mult,
+> 			      u32 shift,
+> 			      u64 start_tstamp);
+>
+> Then we can clean up all this stuff:
+>
+> 	mdev->clock.cc.read = mlx4_en_read_clock;
+> 	mdev->clock.cc.mask = CLOCKSOURCE_MASK(48);
+> 	mdev->clock.cc.shift = freq_to_shift(dev->caps.hca_core_clock);
+> 	mdev->clock.cc.mult = clocksource_khz2mult(...);
+>
+> This second step can be phased in by calling the new function
+> timecounter_initialize() and converting the drivers one by one.
 
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts |  2 +-
- arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi          | 11 +----------
- 2 files changed, 2 insertions(+), 11 deletions(-)
+Yes. Will make these changes and share new patchset.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-index a053a6a..abe179d 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine-baseboard.dts
-@@ -96,7 +96,7 @@
- &mmc2 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc2_pins>;
--	vmmc-supply = <&reg_vcc3v3>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	vqmmc-supply = <&reg_vcc1v8>;
- 	bus-width = <8>;
- 	non-removable;
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-index a5da18a..43418bd 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-sopine.dtsi
-@@ -45,19 +45,10 @@
- 
- #include "sun50i-a64.dtsi"
- 
--/ {
--	reg_vcc3v3: vcc3v3 {
--		compatible = "regulator-fixed";
--		regulator-name = "vcc3v3";
--		regulator-min-microvolt = <3300000>;
--		regulator-max-microvolt = <3300000>;
--	};
--};
--
- &mmc0 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&mmc0_pins>;
--	vmmc-supply = <&reg_vcc3v3>;
-+	vmmc-supply = <&reg_dcdc1>;
- 	non-removable;
- 	disable-wp;
- 	bus-width = <4>;
--- 
-2.7.4
+Thank you for the review Richard.
+
+Regards,
+Sagar
+
+>> diff --git a/include/linux/timecounter.h b/include/linux/timecounter.h
+>> index 2496ad4..6daca06 100644
+>> --- a/include/linux/timecounter.h
+>> +++ b/include/linux/timecounter.h
+> ...
+>> @@ -98,7 +98,6 @@ static inline void timecounter_adjtime(struct timecounter *tc, s64 delta)
+>>   /**
+>>    * timecounter_init - initialize a time counter
+>>    * @tc:			Pointer to time counter which is to be initialized/reset
+>> - * @cc:			A cycle counter, ready to be used.
+> This "ready to used" requirement should go.  The init() function
+> should make the instance ready to be used all at once.
+>
+> Thanks,
+> Richard
