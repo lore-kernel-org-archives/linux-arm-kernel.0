@@ -1,67 +1,129 @@
-From: guillaume.tucker@collabora.com (Guillaume Tucker)
-Date: Mon,  4 Dec 2017 18:37:59 +0000
-Subject: [PATCH 2/2] drm/tegra: sor: Fix hang on tegra124 due to NULL clk_out
-In-Reply-To: <be610a7596ad8fee7da092161888c532c2eb2908.1512411775.git.guillaume.tucker@collabora.com>
-References: <be610a7596ad8fee7da092161888c532c2eb2908.1512411775.git.guillaume.tucker@collabora.com>
-Message-ID: <79b4a60f1d624b16eaef06258318861d4407fecd.1512411775.git.guillaume.tucker@collabora.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 4 Dec 2017 18:39:34 +0000
+Subject: [PATCH 5/8] ASoC: uniphier: add support for UniPhier AIO driver
+In-Reply-To: <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
+References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
+ <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
+Message-ID: <20171204183934.rd4vin22ktukwpip@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When neither HDMI nor DP is supported such as on the tegra124, the
-sor->clk_out is not initialised and remains NULL.  In this case, the
-parent clock can't be assigned to it so revert to the previous
-behaviour of assigning it to the main sor->clock instead.
+On Wed, Nov 22, 2017 at 08:43:18PM +0900, Katsuhiro Suzuki wrote:
 
-This fixes a kernel hang on tegra124.
+>  sound/soc/uniphier/Makefile      |   4 +
+>  sound/soc/uniphier/aio-core.c    | 368 +++++++++++++++++++++
+>  sound/soc/uniphier/aio-dma.c     | 266 +++++++++++++++
+>  sound/soc/uniphier/aio-regctrl.c | 699 +++++++++++++++++++++++++++++++++++++++
+>  sound/soc/uniphier/aio-regctrl.h | 495 +++++++++++++++++++++++++++
+>  sound/soc/uniphier/aio.h         | 261 +++++++++++++++
 
-Fixes: e1335e2f0cfc ("drm/tegra: sor: Reimplement pad clock")
-Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
-CC: Thierry Reding <treding@nvidia.com>
----
- drivers/gpu/drm/tegra/sor.c | 24 ++++++++++++++----------
- 1 file changed, 14 insertions(+), 10 deletions(-)
+Please split this up more, it looks like there's at least two or three
+drivers in here and it winds up being quite large.  There's at least a
+DMA and a DAI driver.  Looking through this my overall impression is
+that this is a fairly large and complex audio subsystem with some DSP
+and routing capacity which is being handled in a board specific fashion
+rather than generically but it's kind of hard to tell as there's not
+much description of what's going on so I'm needing to reverse engineer
+things from the driver.
 
-diff --git a/drivers/gpu/drm/tegra/sor.c b/drivers/gpu/drm/tegra/sor.c
-index b0a1dedac802..8d2e29c9ab2b 100644
---- a/drivers/gpu/drm/tegra/sor.c
-+++ b/drivers/gpu/drm/tegra/sor.c
-@@ -255,7 +255,7 @@ static int tegra_sor_set_parent_clock(struct tegra_sor *sor, struct clk *parent)
- 
- 	clk_disable_unprepare(sor->clk);
- 
--	err = clk_set_parent(sor->clk_out, parent);
-+	err = clk_set_parent(sor->clk_out ? sor->clk_out : sor->clk, parent);
- 	if (err < 0)
- 		return err;
- 
-@@ -2698,15 +2698,19 @@ static int tegra_sor_probe(struct platform_device *pdev)
- 		sor->clk_pad = NULL;
- 	}
- 
--	/*
--	 * The bootloader may have set up the SOR such that it's module clock
--	 * is sourced by one of the display PLLs. However, that doesn't work
--	 * without properly having set up other bits of the SOR.
--	 */
--	err = clk_set_parent(sor->clk_out, sor->clk_safe);
--	if (err < 0) {
--		dev_err(&pdev->dev, "failed to use safe clock: %d\n", err);
--		goto remove;
-+	if (sor->clk_out) {
-+		/*
-+		 * The bootloader may have set up the SOR such that its module
-+		 * clock is sourced by one of the display PLLs. However, that
-+		 * doesn't work without properly having set up other bits of
-+		 * the SOR.
-+		 */
-+		err = clk_set_parent(sor->clk_out, sor->clk_safe);
-+		if (err < 0) {
-+			dev_err(&pdev->dev, "failed to use safe clock: %d\n",
-+				err);
-+			goto remove;
-+		}
- 	}
- 
- 	platform_set_drvdata(pdev, sor);
--- 
-2.11.0
+The code itself looks fairly clean, it's mainly a case of trying to
+figure out if it's doing what it's supposed to with the limited
+documentation.
+
+> +int uniphier_aio_hw_params(struct snd_pcm_substream *substream,
+> +			   struct snd_pcm_hw_params *params,
+> +			   struct snd_soc_dai *dai)
+> +{
+> +	struct uniphier_aio *aio = uniphier_priv(dai);
+> +	struct uniphier_aio_sub *sub = &aio->sub[substream->stream];
+> +
+> +	sub->params = *params;
+> +	sub->setting = 1;
+
+So we don't validate the params at all?
+
+> +	uniphier_aio_port_reset(sub);
+> +	uniphier_aio_srcport_reset(sub);
+
+Is there a mux in the SoC here?
+
+> +static const struct of_device_id uniphier_aio_of_match[] = {
+> +#ifdef CONFIG_SND_SOC_UNIPHIER_LD11
+> +	{
+> +		.compatible = "socionext,uniphier-ld11-aio",
+> +		.data = &uniphier_aio_ld11_spec,
+> +	},
+> +	{
+> +		.compatible = "socionext,uniphier-ld20-aio",
+> +		.data = &uniphier_aio_ld20_spec,
+> +	},
+> +#endif /* CONFIG_SND_SOC_UNIPHIER_LD11 */
+
+Why is there an ifdef here?  There's no other conditional code in here,
+it seems pointless.
+
+> +		for (j = 0; j < ARRAY_SIZE(aio->sub); j++) {
+> +			struct uniphier_aio_sub *sub = &aio->sub[j];
+> +
+> +			if (!sub->running)
+> +				continue;
+> +
+> +			spin_lock(&sub->spin);
+> +			uniphier_aio_rb_sync(sub);
+> +			uniphier_aio_rb_clear_int(sub);
+> +			spin_unlock(&sub->spin);
+
+It's not 100% obvious what this does...  a comment might help.
+
+> +int uniphier_aio_chip_init(struct uniphier_aio_chip *chip)
+> +{
+> +	struct regmap *r = chip->regmap;
+> +
+> +	regmap_update_bits(r, A2APLLCTR0,
+> +			   A2APLLCTR0_APLLXPOW_MASK,
+> +			   A2APLLCTR0_APLLXPOW_PWON);
+> +
+> +	regmap_update_bits(r, A2APLLCTR1, A2APLLCTR1_APLL_MASK,
+> +			   A2APLLCTR1_APLLF2_33MHZ | A2APLLCTR1_APLLA2_33MHZ |
+> +			   A2APLLCTR1_APLLF1_36MHZ | A2APLLCTR1_APLLA1_36MHZ);
+> +
+> +	regmap_update_bits(r, A2EXMCLKSEL0,
+> +			   A2EXMCLKSEL0_EXMCLK_MASK,
+> +			   A2EXMCLKSEL0_EXMCLK_OUTPUT);
+> +
+> +	regmap_update_bits(r, A2AIOINPUTSEL, A2AIOINPUTSEL_RXSEL_MASK,
+> +			   A2AIOINPUTSEL_RXSEL_PCMI1_HDMIRX1 |
+> +			   A2AIOINPUTSEL_RXSEL_PCMI2_SIF |
+> +			   A2AIOINPUTSEL_RXSEL_PCMI3_EVEA |
+> +			   A2AIOINPUTSEL_RXSEL_IECI1_HDMIRX1);
+
+This definitely looks like there's some clocking and audio routing
+within the SoC which should be exposed to userspace, or at the very
+least machine driver configuration rather than being hard coded.
+
+> +	switch (pc) {
+> +	case IEC61937_PC_AC3:
+> +		repet = OPORTMXREPET_STRLENGTH_AC3 |
+> +			OPORTMXREPET_PMLENGTH_AC3;
+> +		pause |= OPORTMXPAUDAT_PAUSEPD_AC3;
+> +		break;
+> +	case IEC61937_PC_MPA:
+> +		repet = OPORTMXREPET_STRLENGTH_MPA |
+> +			OPORTMXREPET_PMLENGTH_MPA;
+> +		pause |= OPORTMXPAUDAT_PAUSEPD_MPA;
+> +		break;
+> +	case IEC61937_PC_MP3:
+> +		repet = OPORTMXREPET_STRLENGTH_MP3 |
+> +			OPORTMXREPET_PMLENGTH_MP3;
+> +		pause |= OPORTMXPAUDAT_PAUSEPD_MP3;
+> +		break;
+
+This looks awfully like compressed audio support...  should there be
+integration with the compressed audio API/
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171204/802f78d4/attachment-0001.sig>
