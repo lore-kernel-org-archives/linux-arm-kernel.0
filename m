@@ -1,130 +1,100 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 4 Dec 2017 15:38:46 +0800
-Subject: [PATCH 3/9] ASoC: sun8i-codec: Add quirk to specify aif1_lrck_div
- value
-In-Reply-To: <20171203204157.20829-4-anarsoul@gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-4-anarsoul@gmail.com>
-Message-ID: <CAGb2v65KMosNgkCa5Ddmf_T--8-BeLLjdqrdX3wb4H+kbudLjA@mail.gmail.com>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 04 Dec 2017 08:46:18 +0100
+Subject: [PATCH 0/4] Move DP phy switch to PHY driver
+In-Reply-To: <8042d73f-c1de-da41-9066-2377de1f521c@rock-chips.com>
+References: <1486712654-15431-1-git-send-email-zyw@rock-chips.com>
+ <1941891.vosvJnn3h1@phil>
+ <8042d73f-c1de-da41-9066-2377de1f521c@rock-chips.com>
+Message-ID: <4091462.xo23GTqF41@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 4, 2017 at 4:41 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
-> LRCK divider for A64 differs from A33, so add a quirk to support that.
->
-> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> ---
->  sound/soc/sunxi/sun8i-codec.c | 38 ++++++++++++++++++++++++++++++++------
->  1 file changed, 32 insertions(+), 6 deletions(-)
->
-> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
-> index 3dd183be08a4..054201d1de03 100644
-> --- a/sound/soc/sunxi/sun8i-codec.c
-> +++ b/sound/soc/sunxi/sun8i-codec.c
-> @@ -24,6 +24,7 @@
->  #include <linux/io.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/regmap.h>
-> +#include <linux/of_device.h>
+Hi Chris,
 
-Please keep them sorted in alphabetical order.
+Am Montag, 4. Dezember 2017, 10:47:08 CET schrieb Chris Zhong:
+> On 2017?12?02? 05:58, Heiko Stuebner wrote:
+> > Am Freitag, 1. Dezember 2017, 13:42:46 CET schrieb Doug Anderson:
+> >> Hi,
+> >> 
+> >> On Wed, Nov 29, 2017 at 6:27 PM, Chris Zhong <zyw@rock-chips.com> wrote:
+> >>> Hi Doug
+> >>> 
+> >>> Thank you for mentioning this patch.
+> >>> 
+> >>> I think the focus of the discussion is: can we put the grf control bit
+> >>> to
+> >>> dts.
+> >>> 
+> >>> The RK3399 has 2 Type-C phy, but only one DP controller, this
+> >>> "uphy_dp_sel"
+> >>> 
+> >>> can help to switch these 2 phy. So I think this bit can be considered as
+> >>> a
+> >>> part of
+> >>> 
+> >>> Type-C phy, these 2 phy have different bits, just similar to other bits
+> >>> (such as "pipe-status").
+> >>> 
+> >>> Put them to DTS file might be a accepted practice.
+> >> 
+> >> I guess the first step would be finding the person to make a decision.
+> >> Is that Heiko?  Olof?  Kishon?  Rob?.  As I see it there are a few
+> >> options:
+> >> 
+> >> 1. Land this series as-is.  This makes the new bit work just like all
+> >> the other ones next to it.  If anyone happens to try to use an old
+> >> device tree on a new kernel they'll break.  Seems rather unlikely
+> >> given that the whole type C PHY is not really fully functional
+> >> upstream, but technically this is a no-no from a device tree
+> >> perspective.
+> >> 
+> >> 2. Change the series to make this property optional.  If it's not
+> >> there then the code behaves like it always did.  This would address
+> >> the "compatibility" problem but likely wouldn't actually help any real
+> >> people, and it would be extra work.
+> >> 
+> >> 3. Redo the driver to deprecate all the old offsets / bits and just
+> >> put the table in the driver, keyed off the compatible string and base
+> >> address if the IO memory.
+> >> 
+> >> 
+> >> I can't make this decision.  It's up to those folks who would be
+> >> landing the patch and I'd be happy with any of them.  What I'm less
+> >> happy with, however, is the indecision preventing forward progress.
+> >> We should pick one of the above things and land it.  My own personal
+> >> bias is #1: just land the series.  No real people will be hurt and
+> >> it's just adding another property that matches the ones next to it.
+> > 
+> > I'd second that #1 . That whole type-c phy thingy never fully worked in
+> > the past (some for the never used dp output), so personally I don't have
+> > issues with going that route.
+> > 
+> >>  From a long term perspective (AKA how I'd write the next driver like
+> >> 
+> >> this) I personally lean towards to "tables in the driver, not in the
+> >> device tree" but quite honestly I'm happy to take whatever direction
+> >> the maintainers give.
+> > 
+> > It looks like we're in agreement here :-) . GRF stuff should not leak into
+> > the devicetree, as it causes endless headaches later. But I guess we'll
+> > need to live with the ones that happened so far.
+> 
+> So, the first step is: move all the private property of tcphy to
+> drivers/phy/rockchip/phy-rockchip-typec.c.
+> Second step: new a member: uphy-dp-sel.
+> In my mind, we should have discussed these properties before, and then I
+> moved them all into DTS.
 
->
->  #include <sound/pcm_params.h>
->  #include <sound/soc.h>
-> @@ -75,11 +76,22 @@
->  #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK  GENMASK(8, 6)
->  #define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK  GENMASK(12, 9)
->
-> +/*
-> + * struct sun8i_codec_quirks - Differences between SoC variants.
-> + *
-> + * @aif1_lrck_div: LRCK divider
-> + */
-> +struct sun8i_codec_quirks {
-> +       unsigned int    aif1_lrck_div;
-> +};
-> +
-> +
->  struct sun8i_codec {
-> -       struct device   *dev;
-> -       struct regmap   *regmap;
-> -       struct clk      *clk_module;
-> -       struct clk      *clk_bus;
-> +       struct device                   *dev;
-> +       struct regmap                   *regmap;
-> +       struct clk                      *clk_module;
-> +       struct clk                      *clk_bus;
-> +       const struct sun8i_codec_quirks *variant;
->  };
->
->  static int sun8i_codec_runtime_resume(struct device *dev)
-> @@ -305,7 +317,7 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
->
->         regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
->                            SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
-> -                          SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
-> +                          scodec->variant->aif1_lrck_div);
+Actually, I was agreeing with Doug, that we probably don't need to rework the 
+type-c phy driver. As most properties for it are in the devicetree right now
+we'll need to support them for backwards-compatiblity anyway.
 
-Hard coding a fixed divider is generally a bad idea.
-You adding another fixed value for this is evidence of this.
+And yes, there probably was discussion over dts vs. driver-table when the
+type-c driver was introduced, but I either missed it or wasn't firm enough
+back then ;-) .
 
-The BCK:LRCK divider is equal to sample width * 2. You should
-have that instead.
+Hence the "we'll need to live with it" for the type-c phy, but should not
+do similar things in future drivers.
 
-Also I see no evidence that either the I2S controller (see my
-comment on patch 1) or the codec is limited to a certain sample
-width in hardware, other than your claims, which are vague at
-best.
 
-The user manual for both the A33 and A64 list many possible
-widths and dividers. If the user manual is wrong, please provide
-solid evidence proving it wrong.
-
-Either way this series will not be accepted in its current form.
-
-ChenYu
-
->
->         sample_rate = sun8i_codec_get_hw_rate(params);
->         if (sample_rate < 0)
-> @@ -440,6 +452,10 @@ static const struct regmap_config sun8i_codec_regmap_config = {
->         .cache_type     = REGCACHE_FLAT,
->  };
->
-> +static const struct sun8i_codec_quirks sun8i_a33_codec_quirks = {
-> +       .aif1_lrck_div  = SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16,
-> +};
-> +
->  static int sun8i_codec_probe(struct platform_device *pdev)
->  {
->         struct resource *res_base;
-> @@ -453,6 +469,13 @@ static int sun8i_codec_probe(struct platform_device *pdev)
->
->         scodec->dev = &pdev->dev;
->
-> +       scodec->variant = of_device_get_match_data(&pdev->dev);
-> +       if (!scodec->variant) {
-> +               dev_err(&pdev->dev, "Failed to determine the quirks to use\n");
-> +               return -ENODEV;
-> +       }
-> +
-> +
->         scodec->clk_module = devm_clk_get(&pdev->dev, "mod");
->         if (IS_ERR(scodec->clk_module)) {
->                 dev_err(&pdev->dev, "Failed to get the module clock\n");
-> @@ -524,7 +547,10 @@ static int sun8i_codec_remove(struct platform_device *pdev)
->  }
->
->  static const struct of_device_id sun8i_codec_of_match[] = {
-> -       { .compatible = "allwinner,sun8i-a33-codec" },
-> +       {
-> +               .compatible = "allwinner,sun8i-a33-codec",
-> +               .data = &sun8i_a33_codec_quirks,
-> +       },
->         {}
->  };
->  MODULE_DEVICE_TABLE(of, sun8i_codec_of_match);
-> --
-> 2.15.0
->
+Heiko
