@@ -1,105 +1,47 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Mon,  4 Dec 2017 14:13:10 +0000
-Subject: [PATCH 09/12] arm64: dump: Make kernel page table dumper dynamic again
+Date: Mon,  4 Dec 2017 14:13:06 +0000
+Subject: [PATCH 05/12] arm64: mm: Remove VMALLOC checks from
+ update_mapping_prot(.)
 In-Reply-To: <20171204141313.31604-1-steve.capper@arm.com>
 References: <20171204141313.31604-1-steve.capper@arm.com>
-Message-ID: <20171204141313.31604-10-steve.capper@arm.com>
+Message-ID: <20171204141313.31604-6-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The kernel page table dumper assumes that the placement of VA regions is
-constant and determined at compile time. As we are about to introduce
-variable VA logic, we need to be able to determine certain regions at
-boot time.
+update_mapping_prot assumes that it will be used on the VA for the
+kernel .text section. (Via the check virt >= VMALLOC_START)
 
-This patch adds logic to the kernel page table dumper s.t. these regions
-can be computed at boot time.
+Recent kdump patches employ this function to modify the protection of
+the direct linear mapping (which is strictly speaking outside of this
+area), via mark_linear_text_alias_ro(.).
+
+We "get away" with this as the direct linear mapping currently follows
+the VA for the kernel text, so the check passes.
+
+This patch removes the check in update_mapping_prot allowing us to move
+the kernel VA layout without spuriously firing the warning.
 
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 ---
- arch/arm64/mm/dump.c | 51 +++++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 43 insertions(+), 8 deletions(-)
+ arch/arm64/mm/mmu.c | 6 ------
+ 1 file changed, 6 deletions(-)
 
-diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-index e5d1b5f432fe..c50af666c407 100644
---- a/arch/arm64/mm/dump.c
-+++ b/arch/arm64/mm/dump.c
-@@ -29,18 +29,42 @@
- #include <asm/pgtable-hwdef.h>
- #include <asm/ptdump.h>
- 
--static const struct addr_marker address_markers[] = {
--	{ PAGE_OFFSET,			"Linear Mapping start" },
--	{ VA_START,			"Linear Mapping end" },
-+
-+enum address_markers_idx {
-+	PAGE_OFFSET_NR = 0,
-+	VA_START_NR,
- #ifdef CONFIG_KASAN
--	{ KASAN_SHADOW_START,		"Kasan shadow start" },
-+	KASAN_START_NR,
-+	KASAN_END_NR,
-+#endif
-+	VMALLOC_START_NR,
-+	VMALLOC_END_NR,
-+#ifdef CONFIG_SPARSEMEM_VMEMMAP
-+	VMEMMAP_START_NR,
-+	VMEMMAP_END_NR,
-+#endif
-+	FIXADDR_START_NR,
-+	FIXADDR_END_NR,
-+	PCI_START_NR,
-+	PCI_END_NR,
-+	MODULES_START_NR,
-+	MODULES_END_NR,
-+	KIMAGE_NR,
-+	END_NR
-+};
-+
-+static struct addr_marker address_markers[] = {
-+	{ 0 /* PAGE_OFFSET */,		"Linear Mapping start" },
-+	{ 0 /* VA_START */,		"Linear Mapping end" },
-+#ifdef CONFIG_KASAN
-+	{ 0 /* KASAN_SHADOW_START */,	"Kasan shadow start" },
- 	{ KASAN_SHADOW_END,		"Kasan shadow end" },
- #endif
--	{ VMALLOC_START,		"vmalloc() Area" },
-+	{ 0 /* VMALLOC_START */,	"vmalloc() Area" },
- 	{ VMALLOC_END,			"vmalloc() End" },
- #ifdef CONFIG_SPARSEMEM_VMEMMAP
--	{ VMEMMAP_START,		"vmemmap start" },
--	{ VMEMMAP_START + VMEMMAP_SIZE,	"vmemmap end"},
-+	{ 0 /* VMEMMAP_START */,		"vmemmap start" },
-+	{ 0 /*VMEMMAP_START + VMEMMAP_SIZE */,	"vmemmap end"},
- #endif
- 	{ FIXADDR_START,		"Fixmap start" },
- 	{ FIXADDR_TOP,			"Fixmap end" },
-@@ -377,7 +401,6 @@ static void ptdump_initialize(void)
- static struct ptdump_info kernel_ptdump_info = {
- 	.mm		= &init_mm,
- 	.markers	= address_markers,
--	.base_addr	= PAGE_OFFSET,
- };
- 
- void ptdump_check_wx(void)
-@@ -403,6 +426,18 @@ void ptdump_check_wx(void)
- static int ptdump_init(void)
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 58b1ed6fd7ec..c8f486384fe3 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -383,12 +383,6 @@ void __init create_pgd_mapping(struct mm_struct *mm, phys_addr_t phys,
+ static void update_mapping_prot(phys_addr_t phys, unsigned long virt,
+ 				phys_addr_t size, pgprot_t prot)
  {
- 	ptdump_initialize();
-+	kernel_ptdump_info.base_addr = PAGE_OFFSET;
-+	address_markers[PAGE_OFFSET_NR].start_address = PAGE_OFFSET;
-+	address_markers[VA_START_NR].start_address = VA_START;
-+#ifdef CONFIG_KASAN
-+	address_markers[KASAN_START_NR].start_address = KASAN_SHADOW_START;
-+#endif
-+	address_markers[VMALLOC_START_NR].start_address = VMALLOC_START;
-+#ifdef CONFIG_SPARSEMEM_VMEMMAP
-+	address_markers[VMEMMAP_START_NR].start_address = VMEMMAP_START;
-+	address_markers[VMEMMAP_END_NR].start_address = VMEMMAP_START
-+							+ VMEMMAP_SIZE;
-+#endif
- 	return ptdump_debugfs_register(&kernel_ptdump_info,
- 					"kernel_page_tables");
- }
+-	if (virt < VMALLOC_START) {
+-		pr_warn("BUG: not updating mapping for %pa@0x%016lx - outside kernel range\n",
+-			&phys, virt);
+-		return;
+-	}
+-
+ 	__create_pgd_mapping(init_mm.pgd, phys, virt, size, prot, NULL,
+ 			     NO_CONT_MAPPINGS);
+ 
 -- 
 2.11.0
