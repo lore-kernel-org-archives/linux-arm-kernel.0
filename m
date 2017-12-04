@@ -1,146 +1,112 @@
 From: steve.capper@arm.com (Steve Capper)
-Date: Mon,  4 Dec 2017 14:13:13 +0000
-Subject: [PATCH 12/12] arm64: mm: Add 48/52-bit kernel VA support
+Date: Mon,  4 Dec 2017 14:13:08 +0000
+Subject: [PATCH 07/12] arm64: mm: Place kImage at bottom of VA space
 In-Reply-To: <20171204141313.31604-1-steve.capper@arm.com>
 References: <20171204141313.31604-1-steve.capper@arm.com>
-Message-ID: <20171204141313.31604-13-steve.capper@arm.com>
+Message-ID: <20171204141313.31604-8-steve.capper@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the option to use 52-bit VA support upon availability at boot. We
-use the same KASAN_SHADOW_OFFSET for both 48 and 52 bit VA spaces as in
-both cases the start and end of the KASAN shadow region are PGD aligned.
+Re-arrange the kernel memory map s.t. the kernel image resides in the
+bottom 514MB of memory. With the modules, fixed map, PCI IO space placed
+above it. At the very bottom of the memory map we set aside a 2MB guard
+region to prevent ambiguity with PTR_ERR/ERR_PTR.
 
->From ID_AA64MMFR2, we check the LVA field on very early boot and set the
-VA size, PGDIR_SHIFT and TCR.T[01]SZ values which then influence how the
-rest of the memory system behaves.
+Dynamically resizable objects such as KASAN shadow and sparsemem map
+are placed above the fixed size objects.
 
-Note that userspace addresses will still be capped out at 48-bit. More
-patches are needed to deal with scenarios where the user provides
-MMAP_FIXED hint and a high address to mmap.
+This means that kernel addresses are now no longer directly dependent on
+VA space size.
 
 Signed-off-by: Steve Capper <steve.capper@arm.com>
 ---
- arch/arm64/Kconfig              |  8 ++++++++
- arch/arm64/include/asm/memory.h |  5 +++++
- arch/arm64/mm/kasan_init.c      |  3 +++
- arch/arm64/mm/proc.S            | 21 +++++++++++++++++++++
- 4 files changed, 37 insertions(+)
+ arch/arm64/include/asm/memory.h  | 17 +++++++++--------
+ arch/arm64/include/asm/pgtable.h |  4 ++--
+ arch/arm64/mm/dump.c             | 12 +++++++-----
+ 3 files changed, 18 insertions(+), 15 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 143c453b06f1..be65dd4bb109 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -262,6 +262,7 @@ config PGTABLE_LEVELS
- 	default 2 if ARM64_16K_PAGES && ARM64_VA_BITS_36
- 	default 2 if ARM64_64K_PAGES && ARM64_VA_BITS_42
- 	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48
-+	default 3 if ARM64_64K_PAGES && ARM64_VA_BITS_48_52
- 	default 3 if ARM64_4K_PAGES && ARM64_VA_BITS_39
- 	default 3 if ARM64_16K_PAGES && ARM64_VA_BITS_47
- 	default 4 if !ARM64_64K_PAGES && ARM64_VA_BITS_48
-@@ -275,6 +276,7 @@ config ARCH_PROC_KCORE_TEXT
- config KASAN_SHADOW_OFFSET
- 	hex
- 	depends on KASAN
-+	default 0xdfffa00000000000 if ARM64_VA_BITS_48_52
- 	default 0xdfffa00000000000 if ARM64_VA_BITS_48
- 	default 0xdfffd00000000000 if ARM64_VA_BITS_47
- 	default 0xdffffe8000000000 if ARM64_VA_BITS_42
-@@ -646,6 +648,10 @@ config ARM64_VA_BITS_47
- config ARM64_VA_BITS_48
- 	bool "48-bit"
- 
-+config ARM64_VA_BITS_48_52
-+	bool "48 or 52-bit (decided at boot time)"
-+	depends on ARM64_64K_PAGES
-+
- endchoice
- 
- config ARM64_VA_BITS
-@@ -655,9 +661,11 @@ config ARM64_VA_BITS
- 	default 42 if ARM64_VA_BITS_42
- 	default 47 if ARM64_VA_BITS_47
- 	default 48 if ARM64_VA_BITS_48
-+	default 48 if ARM64_VA_BITS_48_52
- 
- config ARM64_VA_BITS_ALT
- 	bool
-+	default y if ARM64_VA_BITS_48_52
- 	default n
- 
- config CPU_BIG_ENDIAN
 diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 652ae83468b6..8530f8eb77da 100644
+index 0a912eb3d74f..ba80561c6ed8 100644
 --- a/arch/arm64/include/asm/memory.h
 +++ b/arch/arm64/include/asm/memory.h
-@@ -72,6 +72,11 @@
+@@ -68,14 +68,15 @@
+ #define PAGE_OFFSET		(UL(0xffffffffffffffff) - \
+ 	(UL(1) << VA_BITS) + 1)
+ #define PAGE_OFFSET_END		(VA_START)
+-#define KIMAGE_VADDR		(MODULES_END)
+-#define MODULES_END		(MODULES_VADDR + MODULES_VSIZE)
+-#define MODULES_VADDR		(VA_START + KASAN_SHADOW_SIZE)
++#define KIMAGE_VSIZE		(SZ_512M)
++#define KIMAGE_VADDR		(UL(0) - SZ_2M - KIMAGE_VSIZE)
+ #define MODULES_VSIZE		(SZ_128M)
+-#define VMEMMAP_START		(-VMEMMAP_SIZE)
+-#define PCI_IO_END		(VMEMMAP_START - SZ_2M)
++#define MODULES_END		(KIMAGE_VADDR)
++#define MODULES_VADDR		(MODULES_END - MODULES_VSIZE)
++#define PCI_IO_END		(MODULES_VADDR - SZ_2M)
  #define PCI_IO_START		(PCI_IO_END - PCI_IO_SIZE)
- #define FIXADDR_TOP		(PCI_IO_START - PGDIR_SIZE)
- #define VMEMMAP_START		(FIXADDR_START - VMEMMAP_SIZE)
-+#define VA_BITS_MIN		(CONFIG_ARM64_VA_BITS)
-+
-+#ifdef CONFIG_ARM64_VA_BITS_48_52
-+#define VA_BITS_ALT		(52)
-+#endif
+-#define FIXADDR_TOP		(PCI_IO_START - SZ_2M)
++#define FIXADDR_TOP		(PCI_IO_START - PGDIR_SIZE)
++#define VMEMMAP_START		(FIXADDR_START - VMEMMAP_SIZE)
  
  #define KERNEL_START      _text
  #define KERNEL_END        _end
-diff --git a/arch/arm64/mm/kasan_init.c b/arch/arm64/mm/kasan_init.c
-index 33f99e18e4ff..38c933c17f82 100644
---- a/arch/arm64/mm/kasan_init.c
-+++ b/arch/arm64/mm/kasan_init.c
-@@ -135,6 +135,9 @@ static void __init kasan_pgd_populate(unsigned long addr, unsigned long end,
- /* The early shadow maps everything to a single page of zeroes */
- asmlinkage void __init kasan_early_init(void)
- {
-+#ifdef CONFIG_ARM64_VA_BITS_ALT
-+	BUILD_BUG_ON(!IS_ALIGNED(_KASAN_SHADOW_START(VA_BITS_ALT), PGDIR_SIZE));
-+#endif
- 	BUILD_BUG_ON(!IS_ALIGNED(_KASAN_SHADOW_START(VA_BITS_MIN), PGDIR_SIZE));
- 	BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
- 	kasan_pgd_populate(KASAN_SHADOW_START, KASAN_SHADOW_END, NUMA_NO_NODE,
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 607a6ff0e205..42a91a4a1126 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -225,6 +225,14 @@ ENTRY(__cpu_setup)
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS_MIN) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
- 			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
-+#ifdef CONFIG_ARM64_VA_BITS_ALT
-+	ldr_l	x9, vabits_actual
-+	cmp	x9, #VA_BITS_ALT
-+	b.ne	1f
-+	ldr	x10, =TCR_TxSZ(VA_BITS_ALT) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
-+			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
-+1:
-+#endif
- 	tcr_set_idmap_t0sz	x10, x9
+@@ -292,10 +293,10 @@ static inline void *phys_to_virt(phys_addr_t x)
+ #define _virt_addr_valid(kaddr)	pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+ #else
+ #define __virt_to_pgoff(kaddr)	(((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+-#define __page_to_voff(kaddr)	(((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
++#define __page_to_voff(kaddr)	(((u64)(kaddr) - VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
  
- 	/*
-@@ -251,9 +259,22 @@ ENTRY(__cpu_setup)
- ENDPROC(__cpu_setup)
+ #define page_to_virt(page)	((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+-#define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
++#define virt_to_page(vaddr)	((struct page *)((__virt_to_pgoff(vaddr)) + VMEMMAP_START))
  
- ENTRY(__setup_va_constants)
-+#ifdef CONFIG_ARM64_VA_BITS_48_52
-+	mrs_s	x5, SYS_ID_AA64MMFR2_EL1
-+	and	x5, x5, #0xf << ID_AA64MMFR2_LVA_SHIFT
-+	cmp	x5, #1 << ID_AA64MMFR2_LVA_SHIFT
-+	b.ne	1f
-+	mov	x0, #VA_BITS_ALT
-+	mov	x1, TCR_T0SZ(VA_BITS_ALT)
-+	mov	x2, #1 << (VA_BITS_ALT - PGDIR_SHIFT)
-+	b	2f
+ #define _virt_addr_valid(kaddr)	pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
+ 					   + PHYS_OFFSET) >> PAGE_SHIFT)
+diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+index 054b37143a50..e8b4dcc11fed 100644
+--- a/arch/arm64/include/asm/pgtable.h
++++ b/arch/arm64/include/asm/pgtable.h
+@@ -30,8 +30,8 @@
+  * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space
+  *	and fixed mappings
+  */
+-#define VMALLOC_START		(MODULES_END)
+-#define VMALLOC_END		(- PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
++#define VMALLOC_START		(VA_START + KASAN_SHADOW_SIZE)
++#define VMALLOC_END		(FIXADDR_TOP - PUD_SIZE)
+ 
+ #define vmemmap			((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
+ 
+diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+index b7b09c0fc50d..e5d1b5f432fe 100644
+--- a/arch/arm64/mm/dump.c
++++ b/arch/arm64/mm/dump.c
+@@ -36,17 +36,19 @@ static const struct addr_marker address_markers[] = {
+ 	{ KASAN_SHADOW_START,		"Kasan shadow start" },
+ 	{ KASAN_SHADOW_END,		"Kasan shadow end" },
+ #endif
+-	{ MODULES_VADDR,		"Modules start" },
+-	{ MODULES_END,			"Modules end" },
+ 	{ VMALLOC_START,		"vmalloc() Area" },
+ 	{ VMALLOC_END,			"vmalloc() End" },
++#ifdef CONFIG_SPARSEMEM_VMEMMAP
++	{ VMEMMAP_START,		"vmemmap start" },
++	{ VMEMMAP_START + VMEMMAP_SIZE,	"vmemmap end"},
 +#endif
-+
-+1:
- 	mov	x0, #VA_BITS_MIN
- 	mov	x1, TCR_T0SZ(VA_BITS_MIN)
- 	mov	x2, #1 << (VA_BITS_MIN - PGDIR_SHIFT)
-+2:
- 	str_l	x0, vabits_actual, x5
- 	str_l	x1, idmap_t0sz, x5
- 	str_l	x2, ptrs_per_pgd, x5
+ 	{ FIXADDR_START,		"Fixmap start" },
+ 	{ FIXADDR_TOP,			"Fixmap end" },
+ 	{ PCI_IO_START,			"PCI I/O start" },
+ 	{ PCI_IO_END,			"PCI I/O end" },
+-#ifdef CONFIG_SPARSEMEM_VMEMMAP
+-	{ VMEMMAP_START,		"vmemmap" },
+-#endif
++	{ MODULES_VADDR,		"Modules start" },
++	{ MODULES_END,			"Modules end" },
++	{ KIMAGE_VADDR,			"kImage start"},
+ 	{ -1,				NULL },
+ };
+ 
 -- 
 2.11.0
