@@ -1,43 +1,46 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon,  4 Dec 2017 11:58:00 +0900
-Subject: [PATCH v7 10/11] include: pe.h: remove message[] from mz header
- definition
+Date: Mon,  4 Dec 2017 11:57:58 +0900
+Subject: [PATCH v7 08/11] arm64: kexec_file: enable KEXEC_FILE config
 In-Reply-To: <20171204025801.12161-1-takahiro.akashi@linaro.org>
 References: <20171204025801.12161-1-takahiro.akashi@linaro.org>
-Message-ID: <20171204025801.12161-11-takahiro.akashi@linaro.org>
+Message-ID: <20171204025801.12161-9-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-message[] field won't be part of the definition of mz header.
-
-This change is crucial for enabling kexec_file_load on arm64 because
-arm64's "Image" binary, as in PE format, doesn't have any data for it and
-accordingly the following check in pefile_parse_binary() will fail:
-
-	chkaddr(cursor, mz->peaddr, sizeof(*pe));
+Modify arm64/Kconfig and Makefile to enable kexec_file_load support.
+File-format specific hook functions to load a kernel image will
+follow this patch.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: David Howells <dhowells@redhat.com>
-Cc: Vivek Goyal <vgoyal@redhat.com>
-Cc: Herbert Xu <herbert@gondor.apana.org.au>
-Cc: David S. Miller <davem@davemloft.net>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
 ---
- include/linux/pe.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm64/Kconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/include/linux/pe.h b/include/linux/pe.h
-index 143ce75be5f0..3482b18a48b5 100644
---- a/include/linux/pe.h
-+++ b/include/linux/pe.h
-@@ -166,7 +166,7 @@ struct mz_hdr {
- 	uint16_t oem_info;	/* oem specific */
- 	uint16_t reserved1[10];	/* reserved */
- 	uint32_t peaddr;	/* address of pe header */
--	char     message[64];	/* message to print */
-+	char     message[];	/* message to print */
- };
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a93339f5178f..865d110809f9 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -794,6 +794,19 @@ config KEXEC
+ 	  but it is independent of the system firmware.   And like a reboot
+ 	  you can start any kernel with it, not just Linux.
  
- struct mz_reloc {
++config KEXEC_FILE
++	bool "kexec file based system call"
++	select KEXEC_CORE
++	select BUILD_BIN2C
++	---help---
++	  This is new version of kexec system call. This system call is
++	  file based and takes file descriptors as system call argument
++	  for kernel and initramfs as opposed to list of segments as
++	  accepted by previous system call.
++
++	  In addition to this option, you need to enable a specific type
++	  of image support.
++
+ config CRASH_DUMP
+ 	bool "Build kdump crash kernel"
+ 	help
 -- 
 2.14.1
