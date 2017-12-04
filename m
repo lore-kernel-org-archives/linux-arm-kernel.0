@@ -1,94 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 4 Dec 2017 12:39:33 +0000
-Subject: [PATCHv2 12/12] arm64: docs: document pointer authentication
-In-Reply-To: <20171128150726.xui5i23uigvfo52w@kamzik.brq.redhat.com>
-References: <20171127163806.31435-1-mark.rutland@arm.com>
- <20171127163806.31435-13-mark.rutland@arm.com>
- <20171128150726.xui5i23uigvfo52w@kamzik.brq.redhat.com>
-Message-ID: <20171204123932.pru4lw753xm7qlwb@lakrids.cambridge.arm.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Mon, 4 Dec 2017 13:41:08 +0100
+Subject: [patch v13 2/4] drivers: jtag: Add Aspeed SoC 24xx and 25xx
+ families JTAG master driver
+In-Reply-To: <1512382405-14774-3-git-send-email-oleksandrs@mellanox.com>
+References: <1512382405-14774-1-git-send-email-oleksandrs@mellanox.com>
+ <1512382405-14774-3-git-send-email-oleksandrs@mellanox.com>
+Message-ID: <CAOFm3uGYCssRV4D+Ht6NQLxFSijWt0dgsQEucJmVThjLqiD-oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 04:07:26PM +0100, Andrew Jones wrote:
-> Hi Mark,
+Oleksandr,
 
-Hi Drew,
-
-> On Mon, Nov 27, 2017 at 04:38:06PM +0000, Mark Rutland wrote:
-> > +Architecture overview
-> > +---------------------
-> > +
-> > +The ARMv8.3 Pointer Authentication extension adds primitives that can be
-> > +used to mitigate certain classes of attack where an attacker can corrupt
-> > +the contents of some memory (e.g. the stack).
-> > +
-> > +The extension uses a Pointer Authentication Code (PAC) to determine
-> > +whether pointers have been modified unexpectedly. A PAC is derived from
-> > +a pointer, another value (such as the stack pointer), and a secret key
-> > +held in system registers.
-> > +
-> > +The extension adds instructions to insert a valid PAC into a pointer,
-> > +and to verify/remove the PAC from a pointer. The PAC occupies a number
-> > +of high-order bits of the pointer, which varies dependent on the
-> > +configured virtual address size and whether pointer tagging is in use.
-> > +
-> > +A subset of these instructions have been allocated from the HINT
-> > +encoding space. In the absence of the extension (or when disabled),
-> > +these instructions behave as NOPs. Applications and libraries using
-> > +these instructions operate correctly regardless of the presence of the
-> > +extension.
-> 
-> Correctly, but obviously without the additional security. So I assume
-> it's expected that applications that demand this security to probe for
-> it themselves, presumably by the checking the HWCAP. Is that correct?
-
-Yes. Applications which wish to mandate pointer authentication
-(presumably using instructions outside of the HINT space) must check the
-relevant HWCAP first.
-
+On Mon, Dec 4, 2017 at 11:13 AM, Oleksandr Shamray
+<oleksandrs@mellanox.com> wrote:
 [...]
+> v12->v13
+> Comments pointed by Philippe Ombredanne <pombredanne@nexb.com>
+> - Change jtag-aspeed.c licence type to
+>   SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note
+>   and reorder line with license in description
+[...]
+> diff --git a/drivers/jtag/jtag-aspeed.c b/drivers/jtag/jtag-aspeed.c
+> new file mode 100644
+> index 0000000..2ff46b0
+> --- /dev/null
+> +++ b/drivers/jtag/jtag-aspeed.c
+> @@ -0,0 +1,784 @@
+> +/* SPDX-License-Identifier: GPL-2.0
 
-> > +Virtualization
-> > +--------------
-> > +
-> > +When CONFIG_ARM64_POINTER_AUTHENTICATION is selected, and uniform HW
-> > +support is present, KVM will context switch all keys used by vCPUs.
-> > +Otherwise, the feature is disabled. When disabled, accesses to keys, or
-> > +use of instructions enabled within the guest will trap to EL2, and an
-> > +UNDEFINED exception will be injected into the guest.
-> 
-> If host applications will just run, with the instructions behaving like
-> NOPs, when the extension is either not present or not enabled, then
-> shouldn't guest applications also just run?
+Sorry to nit pick on this but the comment style should be // here IMHO
+This is what Linus requested, e.g.:
 
-The enabled/disabled wording is probably the confusing bit here.
+> +// SPDX-License-Identifier: GPL-2.0
 
-At EL1 we have conditional enables for instructions using
-AP{I,D}{A,B}Key, which behave as NOPs when disabled.
+For reference, the doc is being written:Thomas (tglx) has already
+submitted a first series of doc patches a few weeks ago. And AFAIK he
+might be working on posting the updates soon, whenever his real time
+clock yields a few cycles away from real time coding work ;)
 
-At EL2 we have a single conditional trap for all instructions using
-pointer authentication, that traps to EL2 when instructions are not
-NOP'd by EL1.
+See also these discussions with Linus [1][2][3], Thomas[4] and Greg[5]
+on this and mostly related topics, where you will see Linus rationale
+for the C++ comment stylle
 
-So "disabled by EL2" is actually "trapped by EL2", and "disabled by EL1"
-is "NOP'd by EL1".
+[1] https://lkml.org/lkml/2017/11/2/715
+[2] https://lkml.org/lkml/2017/11/25/125
+[3] https://lkml.org/lkml/2017/11/25/133
+[4] https://lkml.org/lkml/2017/11/2/805
+[5] https://lkml.org/lkml/2017/10/19/165
 
-> I.e. instead of injecting UNDEF, just treat the instructions as NOPs.
-> Or did I misunderstand the trapping?
 
-I think the documentation explained it poorly. Did the above help?
-
-> Does use of the instructions at EL0 trap to EL1 or EL2?
-
-If disabled by EL1, the instructions behave as NOPs (regardless of the
-EL2 traps).
-
-If enabled by EL1, but trapped by EL2, the instructions trap to EL2.
-
-If enabled by EL1, and not trapped by EL2, the instructions work as
-usual.
-
-I'll see if I can document this better.
-
-Thanks,
-Mark.
+-- 
+Cordially
+Philippe Ombredanne
