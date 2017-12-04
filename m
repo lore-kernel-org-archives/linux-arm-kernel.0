@@ -1,54 +1,69 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 4 Dec 2017 12:00:40 +0800
-Subject: [PATCH 1/5] bpf: correct broken uapi for
- BPF_PROG_TYPE_PERF_EVENT program type
-In-Reply-To: <1512137948-31729-2-git-send-email-brueckner@linux.vnet.ibm.com>
-References: <1512137948-31729-2-git-send-email-brueckner@linux.vnet.ibm.com>
-Message-ID: <201712041117.BmtvHi0J%fengguang.wu@intel.com>
+From: gklkml16@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 4 Dec 2017 10:11:01 +0530
+Subject: [PATCH v9 0/5] Add support for ThunderX2 pmu events using json
+ files
+In-Reply-To: <f01a7071-7db9-973c-1ac1-c37e4559c5cf@huawei.com>
+References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
+ <20171107012355.GC13514@arm.com>
+ <f01a7071-7db9-973c-1ac1-c37e4559c5cf@huawei.com>
+Message-ID: <CAKTKpr6kyfbmOcy3JNzQkefN+yhQrvu_2McZU=q=tK3_1G6tyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hendrik,
+Hi perf maintainers,
 
-Thank you for the patch! Yet something to improve:
+can this be queued to -next??
+please let me know, if have to rebase to any specific branch and send
+next version?
 
-[auto build test ERROR on linus/master]
-[also build test ERROR on v4.15-rc2]
-[cannot apply to tip/perf/core]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
 
-url:    https://github.com/0day-ci/linux/commits/Hendrik-Brueckner/bpf-correct-broken-uapi-for-BPF_PROG_TYPE_PERF_EVENT-program-type/20171204-092027
-config: x86_64-randconfig-g0-12040613 (attached as .config)
-compiler: gcc-4.9 (Debian 4.9.4-2) 4.9.4
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+On Mon, Nov 27, 2017 at 3:34 PM, John Garry <john.garry@huawei.com> wrote:
+> On 07/11/2017 01:23, Will Deacon wrote:
+>>
+>> Hi Arnaldo,
+>>
+>> On Tue, Oct 17, 2017 at 12:02:17AM +0530, Ganapatrao Kulkarni wrote:
+>>>
+>>> Extending json/jevent framework for parsing arm64 event files.
+>>> Adding jevents for ThunderX2 implementation defined PMU events.
+>>>
+>>> v9:
+>>>    - Rebased to [3] and resolved conficts in PATCH 1/5 and reworked PATCH
+>>> 3/5.
+>>>    - Added PATCH 5 to fix segmentation fault in perf_pmu__find_map
+>>>
+>>> [3]
+>>> https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
+>>
+>>
+>> I'm happy with this version of the series (it's all Acked now), so would
+>> you
+>> be able to pick it up for mainline, please?
+>>
+>> Cheers,
+>>
+>
+> So this patchset has not been merged.
+>
+> We have a patchset waiting for HiSilicon hip08 support, which includes the
+> requested feature for the ARM64 IMP DEFINED recommended events
+> refactoring-out.
+>
+> We can send our hip08 patchset now as an RFC, based in this patchset.
+> Depending on the comments and general acceptance of the approaches, it may
+> be appropriate to merge the patchsets (or at least merge the refactoring
+> part).
+>
+> Thanks,
+> John
+>
+>
+>> Will
+>>
+>> .
+>>
+>
+>
 
-All errors (new ones prefixed by >>):
-
-   In file included from include/linux/perf_event.h:18:0,
-                    from include/linux/trace_events.h:10,
-                    from include/trace/syscall.h:7,
-                    from include/linux/syscalls.h:82,
-                    from net/socket.c:83:
->> include/uapi/linux/bpf_perf_event.h:11:32: fatal error: asm/bpf_perf_event.h: No such file or directory
-    #include <asm/bpf_perf_event.h>
-                                   ^
-   compilation terminated.
-
-vim +11 include/uapi/linux/bpf_perf_event.h
-
-    10	
-  > 11	#include <asm/bpf_perf_event.h>
-    12	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 29403 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171204/539c9978/attachment-0001.gz>
+thanks
+Ganapat
