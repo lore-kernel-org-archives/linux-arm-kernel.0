@@ -1,69 +1,64 @@
-From: gklkml16@gmail.com (Ganapatrao Kulkarni)
-Date: Mon, 4 Dec 2017 10:11:01 +0530
-Subject: [PATCH v9 0/5] Add support for ThunderX2 pmu events using json
- files
-In-Reply-To: <f01a7071-7db9-973c-1ac1-c37e4559c5cf@huawei.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171107012355.GC13514@arm.com>
- <f01a7071-7db9-973c-1ac1-c37e4559c5cf@huawei.com>
-Message-ID: <CAKTKpr6kyfbmOcy3JNzQkefN+yhQrvu_2McZU=q=tK3_1G6tyg@mail.gmail.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Mon,  4 Dec 2017 10:23:06 +0530
+Subject: [PATCH v2 1/2] arm64: dts: a64-olinuxino: Enable RTL8723BS WiFi
+Message-ID: <1512363187-8353-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi perf maintainers,
+Enable RTL8723BS WiFi chip on a64-olinuxino board:
+- WiFi SDIO interface is connected to MMC1
+- WiFi REG_ON pin connected to gpio PL2: attach to mmc-pwrseq
+- WiFi HOST_WAKE pin connected to gpio PL3
 
-can this be queued to -next??
-please let me know, if have to rebase to any specific branch and send
-next version?
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+---
+Changes for v2:
+- Remove wrong commit message
 
+ .../boot/dts/allwinner/sun50i-a64-olinuxino.dts    | 23 ++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-On Mon, Nov 27, 2017 at 3:34 PM, John Garry <john.garry@huawei.com> wrote:
-> On 07/11/2017 01:23, Will Deacon wrote:
->>
->> Hi Arnaldo,
->>
->> On Tue, Oct 17, 2017 at 12:02:17AM +0530, Ganapatrao Kulkarni wrote:
->>>
->>> Extending json/jevent framework for parsing arm64 event files.
->>> Adding jevents for ThunderX2 implementation defined PMU events.
->>>
->>> v9:
->>>    - Rebased to [3] and resolved conficts in PATCH 1/5 and reworked PATCH
->>> 3/5.
->>>    - Added PATCH 5 to fix segmentation fault in perf_pmu__find_map
->>>
->>> [3]
->>> https://git.kernel.org/pub/scm/linux/kernel/git/acme/linux.git/log/?h=perf/core
->>
->>
->> I'm happy with this version of the series (it's all Acked now), so would
->> you
->> be able to pick it up for mainline, please?
->>
->> Cheers,
->>
->
-> So this patchset has not been merged.
->
-> We have a patchset waiting for HiSilicon hip08 support, which includes the
-> requested feature for the ARM64 IMP DEFINED recommended events
-> refactoring-out.
->
-> We can send our hip08 patchset now as an RFC, based in this patchset.
-> Depending on the comments and general acceptance of the approaches, it may
-> be appropriate to merge the patchsets (or at least merge the refactoring
-> part).
->
-> Thanks,
-> John
->
->
->> Will
->>
->> .
->>
->
->
-
-thanks
-Ganapat
+diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+index 338e7861..8807664 100644
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-olinuxino.dts
+@@ -57,6 +57,11 @@
+ 	chosen {
+ 		stdout-path = "serial0:115200n8";
+ 	};
++
++	wifi_pwrseq: wifi_pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
++	};
+ };
+ 
+ &mmc0 {
+@@ -70,6 +75,24 @@
+ 	status = "okay";
+ };
+ 
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&reg_aldo2>;
++	vqmmc-supply = <&reg_dldo4>;
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	rtl8723bs: wifi at 1 {
++		reg = <1>;
++		interrupt-parent = <&r_pio>;
++		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 */
++		interrupt-names = "host-wake";
++	};
++};
++
+ &r_rsb {
+ 	status = "okay";
+ 
+-- 
+2.7.4
