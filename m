@@ -1,300 +1,74 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon,  4 Dec 2017 10:21:09 +0100
-Subject: [RESEND PATCH v5 5/6] ARM: dts: imx6q: Add Variscite DART-MX6
- Carrier-board support
-In-Reply-To: <1512379270-27436-1-git-send-email-narmstrong@baylibre.com>
-References: <1512379270-27436-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1512379270-27436-6-git-send-email-narmstrong@baylibre.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Mon, 04 Dec 2017 10:29:30 +0100
+Subject: [PATCH 3/3] ARM64: dts: meson-axg: add PWM DT info for
+ Meson-Axg SoC
+In-Reply-To: <1512379059.2574.17.camel@baylibre.com>
+References: <20171204060018.8856-1-yixun.lan@amlogic.com>
+ <20171204060018.8856-4-yixun.lan@amlogic.com>
+ <1512379059.2574.17.camel@baylibre.com>
+Message-ID: <1512379770.2574.34.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for the i.MX6 Quad variant of the Variscite DART-MX6
-SoM Carrier-Board.
+On Mon, 2017-12-04 at 10:17 +0100, Jerome Brunet wrote:
+> On Mon, 2017-12-04 at 14:00 +0800, Yixun Lan wrote:
+> > From: Jian Hu <jian.hu@amlogic.com>
+> > 
+> > Add PWM DT info for the Amlogic's Meson-Axg SoC.
+> > 
+> > Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+> > Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> > ---
+> >  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 120
+> > +++++++++++++++++++++++++++++
+> >  1 file changed, 120 insertions(+)
+> > 
+> > diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > index 92f65eec3e18..f7f228701df1 100644
+> > --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> > @@ -177,6 +177,24 @@
+> > 
+> 
+> [...]
+> 
+> > 
+> > @@ -435,6 +537,24 @@
+> >  				clock-names = "clk_i2c";
+> >  			};
+> >  
+> > +			pwm_AO_ab: pwm at 7000 {
+> > +				compatible = "amlogic,meson-axg-ao-pwm";
+> > +				reg = <0x0 0x07000 0x0 0x20>;
+> > +				#pwm-cells = <3>;
+> > +				clocks = <&xtal>, <&xtal>;
+> > +				clock-names = "clkin0", "clkin1";
+> 
+> like gxbb, "amlogic,meson-axg-ao-pwm" does not have such clock bindings,
+> Later on, if we want to "correctly" get the clock from DT, it will have to
+> gothrough a new compatible, I guess. 
 
-This Carrier-Board has the following :
-- LVDS interface for the VLCD-CAP-GLD-LVDS 7" LCD 800 x 480 touch display
-- HDMI Connector
-- USB Host + USB OTG Connector
-- 10/100/1000 Mbps Ethernet
-- miniPCI-Express slot
-- SD Card connector
-- Audio Headphone/Line In jack connectors
-- On-board DMIC
-- CAN bus header
-- SPI header
-- Camera Interfaces header
-- 4xButtons, 2xLeds
-- OnBoard RTC with Coin Backup battery socket
-- RS232 Header + USB-Serial debug port
+Please ignore this comment (monday morning...)
+However clock bindings for this should be defined in the board dts, not the soc
+one 
 
-Product Page : http://www.variscite.com/products/evaluation-kits/dart-mx6-kits
-
-The board support is done with all on-board and header interfaces enabled.
-7" LVDS Touchscreen is enabled by default along HDMI output.
-Audio interface is supported with the "simple-card" bindings.
-
-PCIe slot, On-Board DMIC and Camera Interfaces are not handled yet.
-
-Reviewed-by: Fabio Estevam <fabio.estevam@nxp.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/boot/dts/Makefile                     |   1 +
- arch/arm/boot/dts/imx6q-var-dt6customboard.dts | 235 +++++++++++++++++++++++++
- 2 files changed, 236 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index d0381e9..148ff15 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -470,6 +470,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6q-tx6q-11x0-mb7.dtb \
- 	imx6q-udoo.dtb \
- 	imx6q-utilite-pro.dtb \
-+	imx6q-var-dt6customboard.dtb \
- 	imx6q-wandboard.dtb \
- 	imx6q-wandboard-revb1.dtb \
- 	imx6q-wandboard-revd1.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-var-dt6customboard.dts b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-new file mode 100644
-index 0000000..e0728d4
---- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-var-dt6customboard.dts
-@@ -0,0 +1,235 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
-+/*
-+ * Support for Variscite DART-MX6 Carrier-board
-+ *
-+ * Copyright 2017 BayLibre, SAS
-+ * Author: Neil Armstrong <narmstrong@baylibre.com>
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q.dtsi"
-+#include "imx6qdl-var-dart.dtsi"
-+#include <dt-bindings/input/linux-event-codes.h>
-+
-+/ {
-+	model = "Variscite DART-MX6 Carrier-board";
-+	compatible = "variscite,dt6customboard", "fsl,imx6q";
-+
-+	backlight_lvds: backlight {
-+		compatible = "pwm-backlight";
-+		pwms = <&pwm2 0 50000>;
-+		brightness-levels = <0 4 8 16 32 64 128 248>;
-+		default-brightness-level = <7>;
-+		status = "okay";
-+	};
-+
-+	gpio-keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		autorepeat;
-+
-+		back {
-+			gpios = <&gpio4 26 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_BACK>;
-+			label = "Key Back";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			wakeup-source;
-+		};
-+
-+		home {
-+			gpios = <&gpio5 11 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_HOME>;
-+			label = "Key Home";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			wakeup-source;
-+		};
-+
-+		menu {
-+			gpios = <&gpio4 25 GPIO_ACTIVE_LOW>;
-+			linux,code = <KEY_MENU>;
-+			label = "Key Menu";
-+			linux,input-type = <1>;
-+			debounce-interval = <100>;
-+			wakeup-source;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+
-+		led1 {
-+			gpios = <&gpio4 27 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+
-+		led2 {
-+			gpios = <&gpio4 28 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "default-on";
-+		};
-+	};
-+
-+	panel1: lvds-panel {
-+		compatible = "sgd,gktw70sdae4se", "panel-lvds";
-+		backlight = <&backlight_lvds>;
-+		width-mm = <153>;
-+		height-mm = <86>;
-+		label = "gktw70sdae4se";
-+		data-mapping = "jeida-18";
-+
-+		panel-timing {
-+			clock-frequency = <32000000>;
-+			hactive = <800>;
-+			vactive = <480>;
-+			hback-porch = <39>;
-+			hfront-porch = <39>;
-+			vback-porch = <29>;
-+			vfront-porch = <13>;
-+			hsync-len = <47>;
-+			vsync-len = <2>;
-+		};
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&lvds1_out>;
-+			};
-+		};
-+	};
-+
-+	reg_usb_h1_vbus: regulator-usbh1vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_h1_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio1 28 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	reg_usb_otg_vbus: regulator-usbotgvbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_otg_vbus";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+		gpio = <&gpio4 15 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+	};
-+
-+	sound {
-+		compatible = "simple-audio-card";
-+		simple-audio-card,name = "dt6-customboard-audio";
-+		simple-audio-card,format = "i2s";
-+		simple-audio-card,bitclock-master = <&sound_codec>;
-+		simple-audio-card,frame-master = <&sound_codec>;
-+		simple-audio-card,widgets = "Headphone", "Headphone Jack",
-+					    "Line", "Line In";
-+		simple-audio-card,routing = "Headphone Jack", "HPLOUT",
-+					    "Headphone Jack", "HPROUT",
-+					    "LINE1L", "Line In",
-+					    "LINE1R", "Line In";
-+
-+		sound_cpu: simple-audio-card,cpu {
-+			sound-dai = <&ssi2>;
-+		};
-+
-+		sound_codec: simple-audio-card,codec {
-+			sound-dai = <&tlv320aic3106>;
-+			clocks = <&clks IMX6QDL_CLK_CKO>;
-+		};
-+	};
-+};
-+
-+&can1 {
-+	status = "okay";
-+};
-+
-+&ecspi1 {
-+	cs-gpios = <&gpio4 9 GPIO_ACTIVE_HIGH>,
-+		   <&gpio4 10 GPIO_ACTIVE_HIGH>;
-+	status = "okay";
-+};
-+
-+&fec {
-+	status = "okay";
-+	phy-mode = "rgmii";
-+	phy-reset-gpios = <&gpio1 25 GPIO_ACTIVE_LOW>;
-+};
-+
-+&hdmi {
-+	status = "okay";
-+};
-+
-+&i2c1 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+};
-+
-+&i2c3 {
-+	clock-frequency = <100000>;
-+	status = "okay";
-+
-+	touchscreen at 38 {
-+		compatible = "edt,edt-ft5x06";
-+		reg = <0x38>;
-+		interrupt-parent = <&gpio1>;
-+		interrupts = <4 IRQ_TYPE_EDGE_FALLING>;
-+		touchscreen-size-x = <800>;
-+		touchscreen-size-y = <480>;
-+		touchscreen-inverted-x;
-+		touchscreen-inverted-y;
-+	};
-+
-+	rtc at 68 {
-+		compatible = "isil,isl12057";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ldb {
-+	status = "okay";
-+
-+	lvds-channel at 1 {
-+		status = "okay";
-+
-+		port at 4 {
-+			reg = <4>;
-+
-+			lvds1_out: endpoint {
-+				remote-endpoint = <&panel_in>;
-+			};
-+		};
-+	};
-+};
-+
-+&pwm2 {
-+	status = "okay";
-+};
-+
-+&uart1 {
-+	status = "okay";
-+};
-+
-+&uart3 {
-+	status = "okay";
-+};
-+
-+&usbh1 {
-+	vbus-supply = <&reg_usb_h1_vbus>;
-+	status = "okay";
-+};
-+
-+&usbotg {
-+	vbus-supply = <&reg_usb_otg_vbus>;
-+	dr_mode = "otg";
-+	srp-disable;
-+	hnp-disable;
-+	adp-disable;
-+	status = "okay";
-+};
-+
-+&usdhc2 {
-+	cd-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
-+	status = "okay";
-+};
--- 
-2.7.4
+> 
+> > +				status = "disabled";
+> > +			};
+> > +
+> > +			pwm_AO_cd: pwm at 2000 {
+> > +				compatible = "amlogic,axg-ao-pwm";
+> > +				reg = <0x0 0x02000  0x0 0x20>;
+> > +				#pwm-cells = <3>;
+> > +				clocks = <&xtal>, <&xtal>;
+> > +				clock-names = "clkin0", "clkin1";
+> > +				status = "disabled";
+> > +			};
+> > +
+> >  			uart_AO: serial at 3000 {
+> >  				compatible = "amlogic,meson-gx-uart",
+> > "amlogic,meson-ao-uart";
+> >  				reg = <0x0 0x3000 0x0 0x18>;
+> 
+> 
