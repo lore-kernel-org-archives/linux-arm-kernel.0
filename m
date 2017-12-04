@@ -1,47 +1,51 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 04 Dec 2017 11:20:49 -0500 (EST)
-Subject: [PATCH 03/10] net: ezchip: nps_enet: Fix platform_get_irq's
- error checking
-In-Reply-To: <1512242782-7134-4-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1512242782-7134-4-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <20171204.112049.2189145622743900344.davem@davemloft.net>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Mon, 4 Dec 2017 10:23:14 -0600
+Subject: [PATCH V5 4/7] OF: properties: Implement get_match_data() callback
+In-Reply-To: <1512188864-773-5-git-send-email-okaya@codeaurora.org>
+References: <1512188864-773-1-git-send-email-okaya@codeaurora.org>
+ <1512188864-773-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAL_JsqJ+fMqrt6Tk8h6v1fSkrBg+GcMxSXK9XCcz3nmYgyguuQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Sun,  3 Dec 2017 00:56:15 +0530
-
-> The platform_get_irq() function returns negative if an error occurs.
-> zero or positive number on success. platform_get_irq() error checking
-> for zero is not correct. And remove unnecessary check for free_netdev().
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+On Fri, Dec 1, 2017 at 10:27 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> Now that we have a get_match_data() callback as part of the firmware node,
+> implement the OF specific piece for it.
+>
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 > ---
->  drivers/net/ethernet/ezchip/nps_enet.c | 7 +++----
->  1 file changed, 3 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/net/ethernet/ezchip/nps_enet.c b/drivers/net/ethernet/ezchip/nps_enet.c
-> index 659f1ad..82dc6d0 100644
-> --- a/drivers/net/ethernet/ezchip/nps_enet.c
-> +++ b/drivers/net/ethernet/ezchip/nps_enet.c
-> @@ -623,9 +623,9 @@ static s32 nps_enet_probe(struct platform_device *pdev)
->  
->  	/* Get IRQ number */
->  	priv->irq = platform_get_irq(pdev, 0);
-> -	if (!priv->irq) {
-> +	if (priv->irq <= 0) {
->  		dev_err(dev, "failed to retrieve <irq Rx-Tx> value from device tree\n");
-> -		err = -ENODEV;
-> +		err = priv->irq ? priv->irq : -ENODEV;
+>  drivers/of/property.c | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>
+> diff --git a/drivers/of/property.c b/drivers/of/property.c
+> index 264c355..adcde1a 100644
+> --- a/drivers/of/property.c
+> +++ b/drivers/of/property.c
+> @@ -981,6 +981,22 @@ static int of_fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+>         return 0;
+>  }
+>
+> +void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
+> +                              const struct device_driver *drv)
+> +{
+> +       const struct device_node *node = to_of_node(fwnode);
+> +       const struct of_device_id *match;
+> +
+> +       if (!node)
+> +               return NULL;
 
-If platform_get_irq() returns "zero or positive number on success" then this
-test is wrong and should be "if (priv->irq < 0)"
+of_match_node checks this.
 
-Also, this series is a mix of different kinds of changes.
+> +
+> +       match = of_match_node(drv->of_match_table, node);
+> +       if (!match)
+> +               return NULL;
+> +
+> +       return (void *)match->data;
 
-Please separate out the platform IRQ error checking and just submit exactly
-those changes as a patch series.
+Don't need a cast here.
 
-The other bug fixes should be submitted outside of those changes since they
-are unrelated.
+of_device_get_match_data() already does most of this, but getting a
+device ptr from fwnode_handle may not be possible?
+
+Rob
