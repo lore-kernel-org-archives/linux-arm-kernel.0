@@ -1,51 +1,48 @@
-From: ndesaulniers@google.com (Nick Desaulniers)
-Date: Mon, 4 Dec 2017 09:34:02 -0800
-Subject: [PATCH v2 11/18] arm64: make mrs_s and msr_s macros work with LTO
-In-Reply-To: <20171116225434.691af6cf@delmar.localdomain>
-References: <20171115213428.22559-1-samitolvanen@google.com>
- <20171115213428.22559-12-samitolvanen@google.com>
- <20171116115433.GG9361@arm.com>
- <20171116130742.wijnukjetoupi4hc@yury-thinkpad>
- <c0c19191-e090-4768-3c46-b813713d2908@arm.com>
- <20171116212920.wixsxoccznyef4aq@yury-thinkpad>
- <20171116225434.691af6cf@delmar.localdomain>
-Message-ID: <CAKwvOd=c1cWS+2Lq27DXhy3hs1WvXLcSF3zMRszoGamXTtsnfA@mail.gmail.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Mon, 4 Dec 2017 09:35:21 -0800
+Subject: [PATCH v6 0/2] memory: Introduce ti-emif-sram driver
+In-Reply-To: <20171203163632.GU28152@atomide.com>
+References: <1512082568-5012-1-git-send-email-d-gerlach@ti.com>
+ <179c7668-05eb-09cf-9857-7b6fd2308c3a@oracle.com>
+ <20171203163632.GU28152@atomide.com>
+Message-ID: <7f5fa64a-9c4e-cad6-df46-70cc02cba319@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 16, 2017 at 2:54 PM, Alex Matveev <alxmtvv@gmail.com> wrote:
-> On Fri, 17 Nov 2017 00:29:20 +0300
-> Yury Norov <ynorov@caviumnetworks.com> wrote:
->
->> On Thu, Nov 16, 2017 at 01:55:31PM +0000, Robin Murphy wrote:
->> > Given that this whole mrs_s infrastructure is a workaround for older
->> > assemblers which don't support the "S<op0>_<op1>_<Cn>_<Cm>_<op2>"
->> > syntax for arbitrary unnamed system registers (which IIRC was a
->> > fairly late addition to the architecture), the only way it could be
->> > "fixed" on the toolchain side is by removing all those older
->> > toolchains from existence. Good luck with that ;)
-> commit 72c583951526
-> Author: Catalin Marinas <catalin.marinas@arm.com>
-> Date:   Thu Jul 24 14:14:42 2014 +0100
->
->     arm64: gicv3: Allow GICv3 compilation with older binutils
->
->     GICv3 introduces new system registers accessible with the full
->     msr/mrs syntax (e.g. mrs x0, Sop0_op1_CRm_CRn_op2). However, only
->     recent binutils understand the new syntax. This patch introduces
->     msr_s/mrs_s assembly macros which generate the equivalent
->     instructions above and converts the existing GICv3 code (both
->     drivers/irqchip/ and arch/arm64/kernel/).
->
-> The question is - is it OK to drop compatibility with old versions of
-> binutils (which were already "older" back in 2014)? It's not my call to
-> make. If yes, then it should be possible to make this change more
-> aesthetic by reverting to "S<op>" (however, it will affect more places
-> as now some users of register definitions expect them to be numbers, not
-> "S<op>" strings).
-
-I don't think we found a resolution to the compatibility question
-posed.  Given that the affected file is only in use for arm64, I think
-the arm64 maintainers should make the call.  I encourage them to drop
-support for old toolchains; the use of ld-version macros can help warn
-users using old toolchains on newer kernel versions.
+On 12/3/2017 8:36 AM, Tony Lindgren wrote:
+> * santosh.shilimkar at oracle.com <santosh.shilimkar@oracle.com> [171203 04:03]:
+>>
+>>
+>> On 11/30/17 2:56 PM, Dave Gerlach wrote:
+>>> This is a resend of v5 of this series found here [1]. It introduces
+>>> relocatable PM handlers for the emif that are copied to sram and
+>>> run from there during low power mode entry.
+>>>
+>>> The patches still have the previous ACKs but have a small change to
+>>> accomodate a change made by Tony in commit cd57dc5a2099 ("ARM: dts:
+>>> Add missing hwmod related nodes for am33xx"). If there are objections
+>>> to this let me know ASAP.
+>>>
+>>> Now that a hwmod is present for the am335x EMIF, on probe fail the call to
+>>> pm_runtime_put_sync causes the board to hang. In fact, this emif driver should
+>>> never alter the PM state of the hardware at all through normal kernel calls, it
+>>> is the job of the suspend handlers that are added, that is the whole point of
+>>> this driver. Because of this, I have dropped all runtime pm calls, as any
+>>> change to the PM state while the kernel is running is dangerous as we may shut
+>>> of the memory controller. It makes the most sense just to drop runtime PM from
+>>> the driver entirely. Besides that patch is unchanged.
+>>>
+>>> This code is required for low-power modes to work on AM335x and AM437x and a
+>>> forthcoming PM series for those platforms will depend on this series. After
+>>> both this and the PM series are reviewed I will send the necessary device tree
+>>> changes for both, but in the meantime all remaining patches for am335x and
+>>> am437x PM can be found here [2].
+>>>
+>> Applied
+> 
+> OK, do you have some immutable commit for these I can pull in too for
+> the related SoC changes?
+> 
+Hopefully I don't have do any changes to below branch.
+git://git.kernel.org/pub/scm/linux/kernel/git/ssantosh/linux-keystone.git
+for_4.16/drivers-soc
