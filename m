@@ -1,119 +1,73 @@
-From: ludovic.Barre@st.com (Ludovic Barre)
-Date: Mon, 4 Dec 2017 14:32:56 +0100
-Subject: [PATCH] ARM: debug: add stm32 low-level debug support
-Message-ID: <1512394376-25962-1-git-send-email-ludovic.Barre@st.com>
+From: ar@linux.vnet.ibm.com (Andrea Reale)
+Date: Mon, 4 Dec 2017 12:42:31 +0000
+Subject: [PATCH v2 3/5] mm: memory_hotplug: memblock to track partially
+ removed vmemmap mem
+In-Reply-To: <20171204123244.vfm6znonfqt6fien@dhcp22.suse.cz>
+References: <cover.1511433386.git.ar@linux.vnet.ibm.com>
+ <e17d447381b3f13d4d7d314916ca273b6f60d287.1511433386.git.ar@linux.vnet.ibm.com>
+ <20171130145134.el3qq7pr3q4xqglz@dhcp22.suse.cz>
+ <20171204114908.GC6373@samekh>
+ <20171204123244.vfm6znonfqt6fien@dhcp22.suse.cz>
+Message-ID: <20171204124230.GA10599@samekh>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ludovic Barre <ludovic.barre@st.com>
+On Mon  4 Dec 2017, 13:32, Michal Hocko wrote:
+> On Mon 04-12-17 11:49:09, Andrea Reale wrote:
+> > On Thu 30 Nov 2017, 15:51, Michal Hocko wrote:
+> > > On Thu 23-11-17 11:14:38, Andrea Reale wrote:
+> > > > When hot-removing memory we need to free vmemmap memory.
+> > > > However, depending on the memory is being removed, it might
+> > > > not be always possible to free a full vmemmap page / huge-page
+> > > > because part of it might still be used.
+> > > > 
+> > > > Commit ae9aae9eda2d ("memory-hotplug: common APIs to support page tables
+> > > > hot-remove") introduced a workaround for x86
+> > > > hot-remove, by which partially unused areas are filled with
+> > > > the 0xFD constant. Full pages are only removed when fully
+> > > > filled by 0xFDs.
+> > > > 
+> > > > This commit introduces a MEMBLOCK_UNUSED_VMEMMAP memblock flag, with
+> > > > the goal of using it in place of 0xFDs. For now, this will be used for
+> > > > the arm64 port of memory hot remove, but the idea is to eventually use
+> > > > the same mechanism for x86 as well.
+> > > 
+> > > Why cannot you use the same approach as x86 have? Have a look at the
+> > > vmemmap_free at al.
+> > > 
+> > 
+> > This arm64 hot-remove version (including vmemmap_free) is indeed an
+> > almost 1-to-1 port of the x86 approach. 
+> > 
+> > If you look at the first version of the patchset we submitted a while 
+> > ago (https://lkml.org/lkml/2017/4/11/540), we were initially using the
+> > x86 approach of filling unsued page structs with 0xFDs. Commenting on
+> > that, Mark suggested (and, indeed, I agree with him) that relying on a
+> > magic constant for marking some portions of physical memory was quite
+> > ugly. That is why we have used memblock for the purpose in this revised
+> > patchset.
+> > 
+> > If you have a different view and any concrete suggestion on how to
+> > improve this, it is definitely very well welcome. 
+> 
+> I would really prefer if those archictectues shared the code (and
+> concept) as much as possible. It is really a PITA to wrap your head
+> around each architectures for reasons which are not inherent to that
+> specific architecture. If you find the way how x86 is implemented ugly,
+> then all right, but making arm64 special just for the matter of taste is
+> far from ideal IMHO.
 
-This adds low-level debug support on USART1 for STM32F4
-and STM32F7. Compiled via 'CONFIG_DEBUG_LL' and 'CONFIG_EARLY_PRINTK'.
-Enabled via 'earlyprintk' in bootargs.
+The plan is indeed to use this memblock flag in x86 hot remove as well,
+in place of the 0xFDs. The change is quite straightforward and we could
+push it in a next patchset release. Our rationale was to first use it in
+the new architecture and then, once proven stable, back port it to x86.
 
-Signed-off-by: Gerald Baeza <gerald.baeza@st.com>
----
- arch/arm/Kconfig.debug         | 25 +++++++++++++++++++++++++
- arch/arm/include/debug/stm32.S | 41 +++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 arch/arm/include/debug/stm32.S
+However, I am not in principle against of pushing it right now.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 17685e1..9469c58 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1140,6 +1140,26 @@ choice
- 
- 		  If unsure, say N.
- 
-+	config STM32F4_DEBUG_UART
-+		bool "Use STM32F4 UART for low-level debug"
-+		depends on ARCH_STM32
-+		select DEBUG_STM32_UART
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on STM32 based platforms.
-+
-+		  If unsure, say N.
-+
-+	config STM32F7_DEBUG_UART
-+		bool "Use STM32F7 UART for low-level debug"
-+		depends on ARCH_STM32
-+		select DEBUG_STM32_UART
-+		help
-+		  Say Y here if you want kernel low-level debugging support
-+		  on STM32 based platforms.
-+
-+		  If unsure, say N.
-+
- 	config TEGRA_DEBUG_UART_AUTO_ODMDATA
- 		bool "Kernel low-level debugging messages via Tegra UART via ODMDATA"
- 		depends on ARCH_TEGRA
-@@ -1424,6 +1444,10 @@ config DEBUG_STI_UART
- 	bool
- 	depends on ARCH_STI
- 
-+config DEBUG_STM32_UART
-+	bool
-+	depends on ARCH_STM32
-+
- config DEBUG_SIRFSOC_UART
- 	bool
- 	depends on ARCH_SIRF
-@@ -1472,6 +1496,7 @@ config DEBUG_LL_INCLUDE
- 	default "debug/s5pv210.S" if DEBUG_S5PV210_UART
- 	default "debug/sirf.S" if DEBUG_SIRFSOC_UART
- 	default "debug/sti.S" if DEBUG_STI_UART
-+	default "debug/stm32.S" if DEBUG_STM32_UART
- 	default "debug/tegra.S" if DEBUG_TEGRA_UART
- 	default "debug/ux500.S" if DEBUG_UX500_UART
- 	default "debug/vexpress.S" if DEBUG_VEXPRESS_UART0_DETECT
-diff --git a/arch/arm/include/debug/stm32.S b/arch/arm/include/debug/stm32.S
-new file mode 100644
-index 0000000..4015257
---- /dev/null
-+++ b/arch/arm/include/debug/stm32.S
-@@ -0,0 +1,41 @@
-+/*
-+ * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-+ * Author: Gerald Baeza <gerald_baeza@st.com>
-+ * License terms:  GNU General Public License (GPL), version 2
-+ */
-+
-+#define STM32_UART_BASE			0x40011000	/* USART1 */
-+
-+#ifdef CONFIG_STM32F4_DEBUG_UART
-+#define STM32_USART_SR_OFF		0x00
-+#define STM32_USART_TDR_OFF		0x04
-+#endif
-+
-+#ifdef CONFIG_STM32F7_DEBUG_UART
-+#define STM32_USART_SR_OFF		0x1C
-+#define STM32_USART_TDR_OFF		0x28
-+#endif
-+
-+#define STM32_USART_TC			(1 << 6)	/* Tx complete       */
-+#define STM32_USART_TXE			(1 << 7)	/* Tx data reg empty */
-+
-+		.macro	addruart, rp, rv, tmp
-+		ldr	\rp,      =STM32_UART_BASE	@ physical base
-+		ldr	\rv,      =STM32_UART_BASE      @ virt base /* NoMMU */
-+		.endm
-+
-+                .macro  senduart,rd,rx
-+                strb    \rd, [\rx, #STM32_USART_TDR_OFF]
-+                .endm
-+
-+                .macro  waituart,rd,rx
-+1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
-+	tst	\rd, #STM32_USART_TXE			@ TXE = 1 = tx empty
-+	beq	1001b
-+                .endm
-+
-+                .macro  busyuart,rd,rx
-+1001:	ldr	\rd, [\rx, #(STM32_USART_SR_OFF)]	@ Read Status Register
-+	tst	\rd, #STM32_USART_TC			@ TC = 1 = tx complete
-+	beq	1001b
-+                .endm
--- 
-2.7.4
+Thanks,
+Andrea
+
+> -- 
+> Michal Hocko
+> SUSE Labs
+> 
