@@ -1,46 +1,40 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon,  4 Dec 2017 11:57:58 +0900
-Subject: [PATCH v7 08/11] arm64: kexec_file: enable KEXEC_FILE config
-In-Reply-To: <20171204025801.12161-1-takahiro.akashi@linaro.org>
-References: <20171204025801.12161-1-takahiro.akashi@linaro.org>
-Message-ID: <20171204025801.12161-9-takahiro.akashi@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Sun, 3 Dec 2017 19:41:30 -0800
+Subject: linux-next: Signed-off-by missing for commit in the arm-soc tree
+In-Reply-To: <20171204083256.262c4b7c@canb.auug.org.au>
+References: <20171204083256.262c4b7c@canb.auug.org.au>
+Message-ID: <CAOesGMh_YT1TH_c0xs614HoK8iAOoaxPofxQtmSuPa8h7HpHKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Modify arm64/Kconfig and Makefile to enable kexec_file_load support.
-File-format specific hook functions to load a kernel image will
-follow this patch.
+Thanks, Stephen. I need to get a similar script going to catch these
+things in our own tree.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/Kconfig | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+Since this was a clean revert, I've redone it myself, carrying over
+descriptions from the pull request and keeping attribution to Kevin.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a93339f5178f..865d110809f9 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -794,6 +794,19 @@ config KEXEC
- 	  but it is independent of the system firmware.   And like a reboot
- 	  you can start any kernel with it, not just Linux.
- 
-+config KEXEC_FILE
-+	bool "kexec file based system call"
-+	select KEXEC_CORE
-+	select BUILD_BIN2C
-+	---help---
-+	  This is new version of kexec system call. This system call is
-+	  file based and takes file descriptors as system call argument
-+	  for kernel and initramfs as opposed to list of segments as
-+	  accepted by previous system call.
-+
-+	  In addition to this option, you need to enable a specific type
-+	  of image support.
-+
- config CRASH_DUMP
- 	bool "Build kdump crash kernel"
- 	help
--- 
-2.14.1
+Kevin; hope this is alright with you. We can revisit if not.
+
+
+-Olof
+
+
+On Sun, Dec 3, 2017 at 1:32 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
+> Hi all,
+>
+> Commit
+>
+>   5f56b7f4854a ("Revert "Merge tag 'scpi-updates-4.15' of git://git.kernel.org/pub/scm/linux/kernel/git/sudeep.holla/linux into next/drivers"")
+>
+> is missing a Signed-off-by from its author or committer.
+>
+> Reverts are commits as well and so need an explanation of why they
+> are done and Signed-off-by tags.
+>
+> --
+> Cheers,
+> Stephen Rothwell
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-next" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
