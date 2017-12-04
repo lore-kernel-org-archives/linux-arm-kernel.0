@@ -1,134 +1,128 @@
-From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 14:56:19 +0100
-Subject: [PULL 01/19] KVM: arm/arm64: Don't enable/disable physical timer
- access on VHE
-In-Reply-To: <20171204135637.21620-1-cdall@kernel.org>
-References: <20171204135637.21620-1-cdall@kernel.org>
-Message-ID: <20171204135637.21620-2-cdall@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 4 Dec 2017 14:02:31 +0000
+Subject: arm64 crashkernel fails to boot on acpi-only machines due to ACPI
+ regions being no longer mapped as NOMAP
+In-Reply-To: <CAFTCetQHmpprAVu6uYO+rc5Xi4EUVhmovbmSaU6nM1n1mAH62w@mail.gmail.com>
+References: <CACi5LpM_95ebYFguPTyjWk+qHT5rDJVXiYDkNWbszo6Zw41zRA@mail.gmail.com>
+ <CACi5LpNV_E9pvhTwLcy6vtEj9qbL1ZEHe-5sv=iiW0k9JxPD1Q@mail.gmail.com>
+ <20171113092730.GA29552@linaro.org>
+ <CAKv+Gu_eQ-s0J22tKeHKJme4qXcvxvDkS7vKrNW+o_XtMTkMhQ@mail.gmail.com>
+ <3df4c6c5-0abe-01ee-730d-2edaa5f497d2@redhat.com>
+ <20171116070005.GI29552@linaro.org>
+ <CAFTCetQHmpprAVu6uYO+rc5Xi4EUVhmovbmSaU6nM1n1mAH62w@mail.gmail.com>
+Message-ID: <CAKv+Gu9oda1Ee8AoXsCEw+Bjn-XF3wZA_CsxvqhjtT6_bmJ7uA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+On 26 November 2017 at 08:29, Bhupesh SHARMA <bhupesh.linux@gmail.com> wrote:
+> Hi Akashi,
+>
+> On Thu, Nov 16, 2017 at 12:30 PM, AKASHI Takahiro
+> <takahiro.akashi@linaro.org> wrote:
+>> Bhupesh,
+>>
+>> On Wed, Nov 15, 2017 at 04:28:55PM +0530, Bhupesh Sharma wrote:
+>>>
+>>   (snip)
+>>
+>>> # dmesg | grep -B 2 -i "ACPI reclaim"
+>>> [    0.000000] efi:   0x000039670000-0x0000396bffff [Runtime Code |RUN|  |
+>>> |  |  |  |  |   |WB|WT|WC|UC]
+>>> [    0.000000] efi:   0x0000396c0000-0x00003970ffff [Boot Code |   |  |  |
+>>> |  |  |  |   |WB|WT|WC|UC]
+>>> [    0.000000] efi:   0x000039710000-0x00003975ffff [ACPI Reclaim Memory|
+>>> |  |  |  |  |  |  |   |WB|WT|WC|UC]
+>>>
+>>> 2. Now, I am not sure which kernel layer does the following changes (I am
+>>> still trying to dig it out more), but I see that the 'Boot Code' and ACPI
+>>> DSDT table regions are somehow merged into one memblock_region and appear as
+>>> range '396c0000-3975ffff' in the '/proc/iomem' interface:
+>>>
+>>> # cat /proc/iomem | grep -A 2 -B 2 39
+>>> 00000000-3961ffff : System RAM
+>>>   00080000-00b6ffff : Kernel code
+>>>   00cb0000-0167ffff : Kernel data
+>>>   0e800000-2e7fffff : Crash kernel
+>>> 39620000-396bffff : reserved
+>>> 396c0000-3975ffff : System RAM
+>>> 39760000-3976ffff : reserved
+>>> 39770000-397affff : reserved
+>>> 397b0000-3989ffff : reserved
+>>> 398a0000-398bffff : reserved
+>>> 398c0000-39d3ffff : reserved
+>>> 39d40000-3ed2ffff : System RAM
+>>>
+>>   (snip)
+>>>
+>>> So, I am looking at what could be causing the 'Boot Code' and 'ACPI DSDT
+>>> table' ranges to be merged into a single region at
+>>> '0x0000396c0000-0x00003970ffff' which cannot be marked as RESERVED using
+>>> 'memblock_is_reserved'.
+>>
+>> Simple:) The short answer is that memblock_add() does.
+>>
+>> The long answer:
+>> First, please note that memblock maintains two type of regions list,
+>> "memory" and "reserved".
+>>
+>> efi_init()
+>>     reserve_regions()
+>>         early_init_dt_add_memory_arch()
+>>             memblock_add()
+>>                 memblock_add_range(memblock.memory)
+>>
+>> The memory regions described in efi.memmap are added to "memory" list
+>> with all the neighboring regions being merged into ones,
+>> in this case, "Runtime Code", "Boot Code", "ACPI Reclaim Memory" and others.
+>>
+>> The secret here is that "Runtime Code" is also marked with "NOMAP" flag in
+>> reserve_regions(), which creates an isolated region since it now has
+>> a different attribute.
+>> Consequently only "Boot Code" and "ACPI Reclaim Memory" are
+>> unified.
+>>
+>> Look at request_standard_resources(). It handles only "memory" list,
+>> and doesn't care about whether any arbitrary part of memory is in
+>> "reserved" list or not.
+>
+> Thanks for the pointers. Now I did some experiments and traversed the
+> whole memblock path and I see
+> how these two regions get merged into a single region which is later
+> on recognized by
+> 'request_standard_resources()' as a System RAM region rather than a
+> RESERVED region.
+>
+> I recently reproduced this on a APM mustang with latest kernel as well
+> when acpi is used to boot the machine, which makes me believe that
+> this is a generic issue for arm64 machines with the 4.14 kernel and if
+> they use acpi=force as the boot method.
+>
+> I am not sure, if a fix/or hack would be suitable for all underlying
+> arm64 machines, but I am trying one on the arm64 machines I have to
+> see if it fixes the issue.
+>
+> @Ard:
+>
+> Hi Ard,
+>
+> I think to create and test a clean solution for all arm64 boards it
+> will take some time, in the meantime should we consider reverting the
+> commit [1] to make sure that acpi enabled arm64 machines can boot with
+> 4.14?
+>
+> Please let me know your opinion.
+>
+> [1] f56ab9a5b73ca2aee777ccdf2d355ae2dd31db5a (efi/arm: Don't mark
+> ACPI reclaim memory as MEMBLOCK_NOMAP)
+>
 
-After the timer optimization rework we accidentally end up calling
-physical timer enable/disable functions on VHE systems, which is neither
-needed nor correct, since the CNTHCTL_EL2 register format is
-different when HCR_EL2.E2H is set.
+I don't think that is really going to help tbh.
 
-The CNTHCTL_EL2 is initialized when CPUs become online in
-kvm_timer_init_vhe() and we don't have to call these functions on VHE
-systems, which also allows us to inline the non-VHE functionality.
+ACPI reclaim regions are not the only regions that are
+memblock_reserve()d and need to be reserved by the incoming kernel as
+well. So as far as I can tell, this is a symptom of an underlying
+issue that we will need to solve, and reverting the code that exposed
+it will not make the bug go away.
 
-Reported-by: Jintack Lim <jintack@cs.columbia.edu>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- include/kvm/arm_arch_timer.h |  3 ---
- virt/kvm/arm/arch_timer.c    |  6 ------
- virt/kvm/arm/hyp/timer-sr.c  | 48 ++++++++++++++++++--------------------------
- 3 files changed, 20 insertions(+), 37 deletions(-)
-
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 01ee473517e2..6e45608b2399 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -93,7 +93,4 @@ void kvm_timer_init_vhe(void);
- #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
- #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
- 
--void enable_el1_phys_timer_access(void);
--void disable_el1_phys_timer_access(void);
--
- #endif
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 4151250ce8da..190c99ed1b73 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -479,9 +479,6 @@ void kvm_timer_vcpu_load(struct kvm_vcpu *vcpu)
- 
- 	vtimer_restore_state(vcpu);
- 
--	if (has_vhe())
--		disable_el1_phys_timer_access();
--
- 	/* Set the background timer for the physical timer emulation. */
- 	phys_timer_emulate(vcpu);
- }
-@@ -510,9 +507,6 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	if (unlikely(!timer->enabled))
- 		return;
- 
--	if (has_vhe())
--		enable_el1_phys_timer_access();
--
- 	vtimer_save_state(vcpu);
- 
- 	/*
-diff --git a/virt/kvm/arm/hyp/timer-sr.c b/virt/kvm/arm/hyp/timer-sr.c
-index f39861639f08..f24404b3c8df 100644
---- a/virt/kvm/arm/hyp/timer-sr.c
-+++ b/virt/kvm/arm/hyp/timer-sr.c
-@@ -27,42 +27,34 @@ void __hyp_text __kvm_timer_set_cntvoff(u32 cntvoff_low, u32 cntvoff_high)
- 	write_sysreg(cntvoff, cntvoff_el2);
- }
- 
--void __hyp_text enable_el1_phys_timer_access(void)
--{
--	u64 val;
--
--	/* Allow physical timer/counter access for the host */
--	val = read_sysreg(cnthctl_el2);
--	val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
--	write_sysreg(val, cnthctl_el2);
--}
--
--void __hyp_text disable_el1_phys_timer_access(void)
--{
--	u64 val;
--
--	/*
--	 * Disallow physical timer access for the guest
--	 * Physical counter access is allowed
--	 */
--	val = read_sysreg(cnthctl_el2);
--	val &= ~CNTHCTL_EL1PCEN;
--	val |= CNTHCTL_EL1PCTEN;
--	write_sysreg(val, cnthctl_el2);
--}
--
- void __hyp_text __timer_disable_traps(struct kvm_vcpu *vcpu)
- {
- 	/*
- 	 * We don't need to do this for VHE since the host kernel runs in EL2
- 	 * with HCR_EL2.TGE ==1, which makes those bits have no impact.
- 	 */
--	if (!has_vhe())
--		enable_el1_phys_timer_access();
-+	if (!has_vhe()) {
-+		u64 val;
-+
-+		/* Allow physical timer/counter access for the host */
-+		val = read_sysreg(cnthctl_el2);
-+		val |= CNTHCTL_EL1PCTEN | CNTHCTL_EL1PCEN;
-+		write_sysreg(val, cnthctl_el2);
-+	}
- }
- 
- void __hyp_text __timer_enable_traps(struct kvm_vcpu *vcpu)
- {
--	if (!has_vhe())
--		disable_el1_phys_timer_access();
-+	if (!has_vhe()) {
-+		u64 val;
-+
-+		/*
-+		 * Disallow physical timer access for the guest
-+		 * Physical counter access is allowed
-+		 */
-+		val = read_sysreg(cnthctl_el2);
-+		val &= ~CNTHCTL_EL1PCEN;
-+		val |= CNTHCTL_EL1PCTEN;
-+		write_sysreg(val, cnthctl_el2);
-+	}
- }
 -- 
-2.14.2
+Ard.
