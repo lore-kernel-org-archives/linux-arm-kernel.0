@@ -1,70 +1,51 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Mon, 4 Dec 2017 15:36:50 +0000
-Subject: [PATCH 3/3] arm64/sve: KVM: Avoid dereference of dead task
- during guest entry
-In-Reply-To: <CAKv+Gu_e3SKsreYHrZEBUMEME-pYtxTXW1P6xLUR6YMQfj0cZw@mail.gmail.com>
-References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
- <1512141582-17474-4-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu_e3SKsreYHrZEBUMEME-pYtxTXW1P6xLUR6YMQfj0cZw@mail.gmail.com>
-Message-ID: <20171204153648.GV22781@e103592.cambridge.arm.com>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Mon, 4 Dec 2017 10:48:45 -0500
+Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <9cb2e5fc-1bec-c19c-c04e-fe56e5c1bc16@codeaurora.org>
+References: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
+ <9cb2e5fc-1bec-c19c-c04e-fe56e5c1bc16@codeaurora.org>
+Message-ID: <2b252975-bf1f-7468-071e-f4a4aa2430a0@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 04, 2017 at 01:53:21PM +0000, Ard Biesheuvel wrote:
-> On 1 December 2017 at 15:19, Dave Martin <Dave.Martin@arm.com> wrote:
-> > When deciding whether to invalidate FPSIMD state cached in the cpu,
-> > the backend function sve_flush_cpu_state() attempts to dereference
-> > __this_cpu_read(fpsimd_last_state).  However, this is not safe:
-> > there is no guarantee that the pointer is still valid, because the
-> > task could have exited in the meantime.  For this reason, this
-> > percpu pointer should only be assigned or compared, never
-> > dereferenced.
-> >
+Timur
+
+On 12/4/2017 9:58 AM, Timur Tabi wrote:
+> On 12/4/17 8:27 AM, Adam Wallis wrote:
+>> If no interval is specified, the default of 40,000ns (IMOD=160) will be
+>> used.
 > 
-> Doesn't that mean the pointer could also be pointing to the
-> fpsimd_state of a newly created task that is completely unrelated?
-> IOW, are you sure comparison is safe?
+> ...
+> 
+>> + - imod-interval-ns: default interrupt moderation interval is 5000ns
+> 
+> ...
+> 
+>> +? - imod-interval-ns: default interrupt moderation interval is 5000ns
+> 
+> ...
+> 
+>> +??? xhci->imod_interval = 5000;
+> 
+> ...
+> 
+>> +??? xhci->imod_interval = 40000;
+> 
+> ...
+> 
+>> +??? xhci->imod_interval = 40000;
+> 
+> Is the default 5,000 or 40,000?? I can't tell.
+> 
+As noted in the patch description, xhci-plat devices will use a default of
+40,000, while MTK devices will use a default of 5,000. This is also documented
+in the probe for each relevant driver. This is further confirmed in the
+description for each driver's binding TXT file.
 
-There are more conditions: the only place the determination is
-made is for next, in fpsimd_thread_switch(next).
+Adam
 
-
-However, I can see your concern and I'm not sure how/if it is
-resolved.
-
-For the worst case, let's assume that some child forks off but
-doesn't enter userspace yet, while another task round-robins
-across all CPUs, interspersed with tasks that don't enter userspace.
-
-So, we end up with
-
-All cpu < NR_CPUS . per_cpu(fpsimd_last_state, cpu) == T.
-
-Now, if T dies and a new task is allocated the same task_struct pointer,
-then the _new_ T is guaranteed to get scheduled in on a CPU whose
-per_cpu(fpsmid_last_state) == T.
-
-Thus, new T can pick up old T's regs _unless_ new T's fpsimd_state.cpu
-is invalid (i.e., NR_CPUS).
-
-This is a separate bug from the one addressed by this patch though.
-We can't go and harvest the bad pointers when old T exits, because
-this might race new T being scheduled for real -- in any case it
-would involve iterating over all CPUs which sounds racy and
-inefficient.
-
-
-So, I'd say we _must_ call fpsimd_flush_task_state() for every new
-task.  This may result in a redundant reload of the state, but this
-is what would happen anyway if the pointers did not alias.
-
-Does this sound real to you?  If so, I'll try to write something.
-
-And does this patch look reasonable to fix what it's trying to fix?
-
-
-I wonder whether arch/arm has the same bug actually, since the kernel-
-mode NEON logic was modelled from there IIUC (?)
-
-Cheers
----Dave
+-- 
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
