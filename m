@@ -1,33 +1,27 @@
 From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 04 Dec 2017 13:53:36 +0100
-Subject: [PATCH] ARM: dts: imx6qdl-zii-rdu2: Remove device_type from PCI
- subnode
-In-Reply-To: <1512234488-8760-1-git-send-email-festevam@gmail.com>
-References: <1512234488-8760-1-git-send-email-festevam@gmail.com>
-Message-ID: <1512392016.6394.4.camel@pengutronix.de>
+Date: Mon, 04 Dec 2017 13:54:06 +0100
+Subject: [PATCH v2 02/12] ARM: dts: imx51-zii-rdu1: Add the unit
+ addresses in sysled
+In-Reply-To: <1512390016-703-2-git-send-email-festevam@gmail.com>
+References: <1512390016-703-1-git-send-email-festevam@gmail.com>
+ <1512390016-703-2-git-send-email-festevam@gmail.com>
+Message-ID: <1512392046.6394.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, den 02.12.2017, 15:08 -0200 schrieb Fabio Estevam:
+Am Montag, den 04.12.2017, 10:20 -0200 schrieb Fabio Estevam:
 > From: Fabio Estevam <fabio.estevam@nxp.com>
 > 
-> device_type = "pci" should be used for the SoC level PCI controller
-> and
-> it is already present at imx6qdl.dtsi.
+> As described at Documentation/devicetree/bindings/mfd/mc13xxx.txt the
+> reg property is mandatory, so add the corresponding unit address in
+> order to fix the following build warnings with W=1:
 > 
-> Remove it from the subnode in order to fix the following build
-> warnings with W=1:
-> 
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_bridge): Node /soc
-> /pcie at 1ffc000/pci at 0 missing ranges for PCI bridge (or not a bridge)
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_bridge): Node /soc
-> /pcie at 1ffc000/pci at 0 missing bus-range for PCI bridge
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (unit_address_format):
-> Failed prerequisite 'pci_bridge'
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_device_reg):
-> Failed prerequisite 'pci_bridge'
-> arch/arm/boot/dts/imx6q-zii-rdu2.dtb: Warning (pci_device_bus_num):
-> Failed prerequisite 'pci_bridge'
+> arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg):
+> Node /soc/aips at 70000000/spba at 70000000/ecspi at 70010000/pmic at 0/leds/sysl
+> ed0 has a reg or ranges property, but no unit name
+> arch/arm/boot/dts/imx51-zii-rdu1.dtb: Warning (unit_address_vs_reg):
+> Node /soc/aips at 70000000/spba at 70000000/ecspi at 70010000/pmic at 0/leds/sysl
+> ed1 has a reg or ranges property, but no unit name
 > 
 > Cc: Lucas Stach <l.stach@pengutronix.de>
 > Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
@@ -35,19 +29,32 @@ Am Samstag, den 02.12.2017, 15:08 -0200 schrieb Fabio Estevam:
 Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
 > ---
-> ?arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 1 -
-> ?1 file changed, 1 deletion(-)
+> Changes since v1:
+> - Removed 'Node /memory has a reg or ranges property, but no unit
+> name' error
 > 
-> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> index 5ea9949..72f52fc 100644
-> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> @@ -584,7 +584,6 @@
+> ?arch/arm/boot/dts/imx51-zii-rdu1.dts | 4 ++--
+> ?1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> index f9fdb7c..70fdcdd 100644
+> --- a/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> +++ b/arch/arm/boot/dts/imx51-zii-rdu1.dts
+> @@ -428,13 +428,13 @@
+> ?			#size-cells = <0>;
+> ?			led-control = <0x0 0x0 0x3f83f8 0x0>;
 > ?
-> ?	host at 0 {
-> ?		reg = <0 0 0 0 0>;
-> -		device_type = "pci";
+> -			sysled0 {
+> +			sysled0 at 3 {
+> ?				reg = <3>;
+> ?				label = "system:green:status";
+> ?				linux,default-trigger = "default-
+> on";
+> ?			};
 > ?
-> ?		#address-cells = <3>;
-> ?		#size-cells = <2>;
+> -			sysled1 {
+> +			sysled1 at 4 {
+> ?				reg = <4>;
+> ?				label = "system:green:act";
+> ?				linux,default-trigger = "heartbeat";
