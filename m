@@ -1,66 +1,59 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 4 Dec 2017 13:05:51 -0500
-Subject: [PATCH V5 4/7] OF: properties: Implement get_match_data() callback
-In-Reply-To: <CAL_JsqJ+fMqrt6Tk8h6v1fSkrBg+GcMxSXK9XCcz3nmYgyguuQ@mail.gmail.com>
-References: <1512188864-773-1-git-send-email-okaya@codeaurora.org>
- <1512188864-773-5-git-send-email-okaya@codeaurora.org>
- <CAL_JsqJ+fMqrt6Tk8h6v1fSkrBg+GcMxSXK9XCcz3nmYgyguuQ@mail.gmail.com>
-Message-ID: <590f0536-b73d-ee32-a284-32e564af2f57@codeaurora.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Mon, 04 Dec 2017 10:05:57 -0800
+Subject: [GIT PULL] Amlogic fixes for v4.15-rc (redo)
+In-Reply-To: <20171203010837.chbvhkrhayfbnmsz@localhost> (Olof Johansson's
+ message of "Sat, 2 Dec 2017 17:08:37 -0800")
+References: <7h7eu7p95w.fsf@baylibre.com>
+ <20171203010837.chbvhkrhayfbnmsz@localhost>
+Message-ID: <7htvx6tlkq.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/4/2017 11:23 AM, Rob Herring wrote:
-> On Fri, Dec 1, 2017 at 10:27 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> Now that we have a get_match_data() callback as part of the firmware node,
->> implement the OF specific piece for it.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/of/property.c | 17 +++++++++++++++++
->>  1 file changed, 17 insertions(+)
->>
-..
+Olof Johansson <olof@lixom.net> writes:
 
->>
->> +void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
->> +                              const struct device_driver *drv)
->> +{
->> +       const struct device_node *node = to_of_node(fwnode);
->> +       const struct of_device_id *match;
->> +
->> +       if (!node)
->> +               return NULL;
-> 
-> of_match_node checks this.
+> Hi,
+>
+> On Thu, Nov 30, 2017 at 04:46:19PM -0800, Kevin Hilman wrote:
+>> Arnd, Olof,
+>> 
+>> A handful of minor v4.15 fixes for Amlogic family SoCs.  They're mostly
+>> DT, but some trivial non-DT stuff mixed in.  Let me know if you prefer
+>> those in separate pulls, and I will do so.
+>> 
+>> Thanks,
+>> 
+>> Kevin
+>> 
+>> 
+>> The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+>> 
+>>   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+>> 
+>> are available in the git repository at:
+>> 
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git amlogic-fixes
+>> 
+>> for you to fetch changes up to 9f8e06ca1d0e3ef1167a2f43a8b1e63763b283b8:
+>> 
+>>   ARM64: dts: odroid-c2: Add HDMI and CEC Nodes (2017-11-30 15:30:09 -0800)
+>> 
+>> ----------------------------------------------------------------
+>> Amlogic fixes for v4.15-rc
+>> - GPIO interrupt fixes
+>> - new nodes for drivers merged late (VPU domains)
+>
+> The VPU power domain and HDMI regulator changes look more like new hardware
+> support than bugfixes to me, is that a correct assessment? I.e. is something
+> breaking by not having these new DT nodes in the tree one existing hardware?
+>
+> If it isn't a bugfix, I think I'd rather see it queued up for next merge
+> window
 
-I see a check for the matches argument but not for the node argument.
-Am I missing something?
+You're right, it's new hardware support that was supposed to be
+submitted for the late branch (since the drivers were queued up late.)
+But I was late for late :) so was hoping since they are DT only and
+platform specific, they could go in for -rc1.
 
-> 
->> +
->> +       match = of_match_node(drv->of_match_table, node);
->> +       if (!match)
->> +               return NULL;
->> +
->> +       return (void *)match->data;
-> 
-> Don't need a cast here.
+If they need to wait for the next merge window, we'll survive.
 
-I can fix this.
-
-> 
-> of_device_get_match_data() already does most of this, but getting a
-> device ptr from fwnode_handle may not be possible?
-
-I couldn't figure out how to do that. Do you have a suggestion?
-I have been looking for examples with no luck.
-
-> 
-> Rob
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Kevin
