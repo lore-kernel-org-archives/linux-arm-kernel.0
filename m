@@ -1,107 +1,74 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  4 Dec 2017 12:26:32 +0000
-Subject: [PATCH v2 06/19] crypto: arm64/ghash - move kernel mode neon
- en/disable into loop
+Date: Mon,  4 Dec 2017 12:26:34 +0000
+Subject: [PATCH v2 08/19] crypto: arm64/aes-blk - add 4 way interleave to CBC
+ encrypt path
 In-Reply-To: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
 References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171204122645.31535-7-ard.biesheuvel@linaro.org>
+Message-ID: <20171204122645.31535-9-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kernel mode NEON was first introduced on arm64, the preserve and
-restore of the userland NEON state was completely unoptimized, and
-involved saving all registers on each call to kernel_neon_begin(),
-and restoring them on each call to kernel_neon_end(). For this reason,
-the NEON crypto code that was introduced at the time keeps the NEON
-enabled throughout the execution of the crypto API methods, which may
-include calls back into the crypto API that could result in memory
-allocation or other actions that we should avoid when running with
-preemption disabled.
+CBC encryption is strictly sequential, and so the current AES code
+simply processes the input one block at a time. However, we are
+about to add yield support, which adds a bit of overhead, and which
+we prefer to align with other modes in terms of granularity (i.e.,
+it is better to have all routines yield every 64 bytes and not have
+an exception for CBC encrypt which yields every 16 bytes)
 
-Since then, we have optimized the kernel mode NEON handling, which now
-restores lazily (upon return to userland), and so the preserve action
-is only costly the first time it is called after entering the kernel.
-
-So let's put the kernel_neon_begin() and kernel_neon_end() calls around
-the actual invocations of the NEON crypto code, and run the remainder of
-the code with kernel mode NEON disabled (and preemption enabled)
+So unroll the loop by 4. We still cannot perform the AES algorithm in
+parallel, but we can at least merge the loads and stores.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/ghash-ce-glue.c | 17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
+ arch/arm64/crypto/aes-modes.S | 31 ++++++++++++++++----
+ 1 file changed, 25 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/crypto/ghash-ce-glue.c b/arch/arm64/crypto/ghash-ce-glue.c
-index cfc9c92814fd..cb39503673d4 100644
---- a/arch/arm64/crypto/ghash-ce-glue.c
-+++ b/arch/arm64/crypto/ghash-ce-glue.c
-@@ -368,26 +368,28 @@ static int gcm_encrypt(struct aead_request *req)
- 		pmull_gcm_encrypt_block(ks, iv, NULL,
- 					num_rounds(&ctx->aes_key));
- 		put_unaligned_be32(3, iv + GCM_IV_SIZE);
-+		kernel_neon_end();
+diff --git a/arch/arm64/crypto/aes-modes.S b/arch/arm64/crypto/aes-modes.S
+index 27a235b2ddee..e86535a1329d 100644
+--- a/arch/arm64/crypto/aes-modes.S
++++ b/arch/arm64/crypto/aes-modes.S
+@@ -94,17 +94,36 @@ AES_ENDPROC(aes_ecb_decrypt)
+ 	 */
  
--		err = skcipher_walk_aead_encrypt(&walk, req, true);
-+		err = skcipher_walk_aead_encrypt(&walk, req, false);
+ AES_ENTRY(aes_cbc_encrypt)
+-	ld1		{v0.16b}, [x5]			/* get iv */
++	ld1		{v4.16b}, [x5]			/* get iv */
+ 	enc_prepare	w3, x2, x6
  
- 		while (walk.nbytes >= AES_BLOCK_SIZE) {
- 			int blocks = walk.nbytes / AES_BLOCK_SIZE;
+-.Lcbcencloop:
+-	ld1		{v1.16b}, [x1], #16		/* get next pt block */
+-	eor		v0.16b, v0.16b, v1.16b		/* ..and xor with iv */
++.Lcbcencloop4x:
++	subs		w4, w4, #4
++	bmi		.Lcbcenc1x
++	ld1		{v0.16b-v3.16b}, [x1], #64	/* get 4 pt blocks */
++	eor		v0.16b, v0.16b, v4.16b		/* ..and xor with iv */
+ 	encrypt_block	v0, w3, x2, x6, w7
+-	st1		{v0.16b}, [x0], #16
++	eor		v1.16b, v1.16b, v0.16b
++	encrypt_block	v1, w3, x2, x6, w7
++	eor		v2.16b, v2.16b, v1.16b
++	encrypt_block	v2, w3, x2, x6, w7
++	eor		v3.16b, v3.16b, v2.16b
++	encrypt_block	v3, w3, x2, x6, w7
++	st1		{v0.16b-v3.16b}, [x0], #64
++	mov		v4.16b, v3.16b
++	b		.Lcbcencloop4x
++.Lcbcenc1x:
++	adds		w4, w4, #4
++	beq		.Lcbcencout
++.Lcbcencloop:
++	ld1		{v0.16b}, [x1], #16		/* get next pt block */
++	eor		v4.16b, v4.16b, v0.16b		/* ..and xor with iv */
++	encrypt_block	v4, w3, x2, x6, w7
++	st1		{v4.16b}, [x0], #16
+ 	subs		w4, w4, #1
+ 	bne		.Lcbcencloop
+-	st1		{v0.16b}, [x5]			/* return iv */
++.Lcbcencout:
++	st1		{v4.16b}, [x5]			/* return iv */
+ 	ret
+ AES_ENDPROC(aes_cbc_encrypt)
  
-+			kernel_neon_begin();
- 			pmull_gcm_encrypt(blocks, dg, walk.dst.virt.addr,
- 					  walk.src.virt.addr, &ctx->ghash_key,
- 					  iv, num_rounds(&ctx->aes_key), ks);
-+			kernel_neon_end();
- 
- 			err = skcipher_walk_done(&walk,
- 						 walk.nbytes % AES_BLOCK_SIZE);
- 		}
--		kernel_neon_end();
- 	} else {
- 		__aes_arm64_encrypt(ctx->aes_key.key_enc, tag, iv,
- 				    num_rounds(&ctx->aes_key));
- 		put_unaligned_be32(2, iv + GCM_IV_SIZE);
- 
--		err = skcipher_walk_aead_encrypt(&walk, req, true);
-+		err = skcipher_walk_aead_encrypt(&walk, req, false);
- 
- 		while (walk.nbytes >= AES_BLOCK_SIZE) {
- 			int blocks = walk.nbytes / AES_BLOCK_SIZE;
-@@ -467,15 +469,18 @@ static int gcm_decrypt(struct aead_request *req)
- 		pmull_gcm_encrypt_block(tag, iv, ctx->aes_key.key_enc,
- 					num_rounds(&ctx->aes_key));
- 		put_unaligned_be32(2, iv + GCM_IV_SIZE);
-+		kernel_neon_end();
- 
--		err = skcipher_walk_aead_decrypt(&walk, req, true);
-+		err = skcipher_walk_aead_decrypt(&walk, req, false);
- 
- 		while (walk.nbytes >= AES_BLOCK_SIZE) {
- 			int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
-+			kernel_neon_begin();
- 			pmull_gcm_decrypt(blocks, dg, walk.dst.virt.addr,
- 					  walk.src.virt.addr, &ctx->ghash_key,
- 					  iv, num_rounds(&ctx->aes_key));
-+			kernel_neon_end();
- 
- 			err = skcipher_walk_done(&walk,
- 						 walk.nbytes % AES_BLOCK_SIZE);
-@@ -483,14 +488,12 @@ static int gcm_decrypt(struct aead_request *req)
- 		if (walk.nbytes)
- 			pmull_gcm_encrypt_block(iv, iv, NULL,
- 						num_rounds(&ctx->aes_key));
--
--		kernel_neon_end();
- 	} else {
- 		__aes_arm64_encrypt(ctx->aes_key.key_enc, tag, iv,
- 				    num_rounds(&ctx->aes_key));
- 		put_unaligned_be32(2, iv + GCM_IV_SIZE);
- 
--		err = skcipher_walk_aead_decrypt(&walk, req, true);
-+		err = skcipher_walk_aead_decrypt(&walk, req, false);
- 
- 		while (walk.nbytes >= AES_BLOCK_SIZE) {
- 			int blocks = walk.nbytes / AES_BLOCK_SIZE;
 -- 
 2.11.0
