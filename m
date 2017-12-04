@@ -1,41 +1,59 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon,  4 Dec 2017 15:12:50 +0100
-Subject: [PATCH 4/8] dt-bindings: power: supply: axp20x: add AXP813 battery DT
- binding
-In-Reply-To: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
-References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <bf3682e87c75532884881d7b08840c61678cbce1.1512396054.git-series.quentin.schulz@free-electrons.com>
+Date: Mon,  4 Dec 2017 15:12:46 +0100
+Subject: [PATCH 0/8] add support for AXP813 ADC and battery power supply
+Message-ID: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP813 can have a battery as power supply, so let's add it to the
-list of compatibles.
+The AXP813 PMIC is relatively close to the already supported AXP20X and
+AXP22X. It provides three different power outputs: battery, AC and USB, and
+measures a few different things: temperature, power supply status, current
+current and voltage supplied, maximum current limit, battery capacity, min
+and max voltage limits.
 
-Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
----
- Documentation/devicetree/bindings/power/supply/axp20x_battery.txt | 8 +++----
- 1 file changed, 4 insertions(+), 4 deletions(-)
+One of its two GPIOs can be used as an ADC.
 
-diff --git a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-index c248866..4614c8e 100644
---- a/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-+++ b/Documentation/devicetree/bindings/power/supply/axp20x_battery.txt
-@@ -4,12 +4,12 @@ Required Properties:
-  - compatible, one of:
- 			"x-powers,axp209-battery-power-supply"
- 			"x-powers,axp221-battery-power-supply"
-+			"x-powers,axp813-battery-power-supply"
- 
--This node is a subnode of the axp20x/axp22x PMIC.
-+This node is a subnode of the axp20x/axp22x/axp81x PMIC.
- 
--The AXP20X and AXP22X can read the battery voltage, charge and discharge
--currents of the battery by reading ADC channels from the AXP20X/AXP22X
--ADC.
-+The AXP20X, AXP22X and AXP81X can read the battery voltage, charge and
-+discharge currents of the battery by reading ADC channels from the ADC.
- 
- Example:
- 
+There are a few differences with AXP20X/AXP22X PMICs though:
+  - a different constant charge current formula,
+  - battery temperature, GPIO0 and battery voltages are the only voltages
+  measurable,
+  - all data are stored on 12 bits (AXP20X/AXP22X had one type of data that
+  was stored on 13 bits),
+  - different scales and offsets,
+  - a different ADC rate formula and register,
+
+This patch series adds support for the PMIC's ADC and battery power supply
+in the existing drivers.
+
+Make the axp20x MFD automatically probe the ADC driver, add the battery
+power supply node in axp81x node and enable it for the TBS A711 since it
+has a soldered battery.
+
+Q: The BananaPi M3 has two solder balls for battery, should the battery
+power supply node be enabled for this board as well?
+
+Thanks,
+Quentin
+
+Quentin Schulz (8):
+  iio: adc: axp20x_adc: put ADC rate setting in a per-variant function
+  iio: adc: axp20x_adc: add support for AXP813 ADC
+  mfd: axp20x: probe axp20x_adc driver for AXP813
+  dt-bindings: power: supply: axp20x: add AXP813 battery DT binding
+  power: supply: axp20x_battery: add support for AXP813
+  mfd: axp20x: add battery power supply cell for AXP813
+  ARM: dtsi: axp81x: add battery power supply subnode
+  ARM: dtsi: sun8i: a711: enable battery power supply subnode
+
+ Documentation/devicetree/bindings/power/supply/axp20x_battery.txt |   8 ++--
+ arch/arm/boot/dts/axp81x.dtsi                                     |   5 +++-
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts                         |   4 ++-
+ drivers/iio/adc/axp20x_adc.c                                      | 139 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++----
+ drivers/mfd/axp20x.c                                              |   7 +++-
+ drivers/power/supply/axp20x_battery.c                             |  44 ++++++++++++++++++++++-
+ include/linux/mfd/axp20x.h                                        |   2 +-
+ 7 files changed, 196 insertions(+), 13 deletions(-)
+
+base-commit: 7cc61a0a562c7005d2a34f97e94cf26689a2f57c
 -- 
 git-series 0.9.1
