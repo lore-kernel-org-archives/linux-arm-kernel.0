@@ -1,166 +1,111 @@
-From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 4 Dec 2017 14:00:18 +0800
-Subject: [PATCH 3/3] ARM64: dts: meson-axg: add PWM DT info for Meson-Axg SoC
-In-Reply-To: <20171204060018.8856-1-yixun.lan@amlogic.com>
-References: <20171204060018.8856-1-yixun.lan@amlogic.com>
-Message-ID: <20171204060018.8856-4-yixun.lan@amlogic.com>
+From: sky@genki.is (Genki Sky)
+Date: Mon, 04 Dec 2017 01:17:36 -0500
+Subject: [PATCH] staging: vc04_services: Fix trivial style issues
+Message-ID: <30cc7b48def470f1bec8d8d255044f4f220531ee.1512368114.git.sky@genki.is>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jian Hu <jian.hu@amlogic.com>
+In bcm2835-camera, handle the following checkpatch.pl types:
+  - EMBEDDED_FUNCTION_NAME
+  - MULTILINE_DEREFERENCE
+  - SPLIT_STRING
 
-Add PWM DT info for the Amlogic's Meson-Axg SoC.
+[ note: this is for Task 10 of http://eudyptula-challenge.org/ ]
 
-Signed-off-by: Jian Hu <jian.hu@amlogic.com>
-Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+Signed-off-by: Genki Sky <sky@genki.is>
 ---
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 120 +++++++++++++++++++++++++++++
- 1 file changed, 120 insertions(+)
+ .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 23 +++++++++-------------
+ .../vc04_services/bcm2835-camera/mmal-vchiq.c      |  7 +++----
+ 2 files changed, 12 insertions(+), 18 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-index 92f65eec3e18..f7f228701df1 100644
---- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-+++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-@@ -177,6 +177,24 @@
- 				clock-names = "clk_i2c";
- 			};
- 
-+			pwm_ab: pwm at 1b000 {
-+				compatible = "amlogic,meson-axg-ee-pwm";
-+				reg = <0x0 0x1b000 0x0 0x20>;
-+				#pwm-cells = <3>;
-+				clocks = <&xtal>, <&xtal>;
-+				clock-names = "clkin0", "clkin1";
-+				status = "disabled";
-+			};
-+
-+			pwm_cd: pwm at 1a000 {
-+				compatible = "amlogic,meson-axg-ee-pwm";
-+				reg = <0x0 0x1a000 0x0 0x20>;
-+				#pwm-cells = <3>;
-+				clocks = <&xtal>, <&xtal>;
-+				clock-names = "clkin0", "clkin1";
-+				status = "disabled";
-+			};
-+
- 			uart_A: serial at 24000 {
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-uart";
- 				reg = <0x0 0x24000 0x0 0x14>;
-@@ -368,6 +386,90 @@
- 						function = "i2c3";
- 					};
- 				};
-+
-+				pwm_a_a_pins: pwm_a_a {
-+					mux {
-+						groups = "pwm_a_a";
-+						function = "pwm_a";
-+					};
-+				};
-+
-+				pwm_a_x18_pins: pwm_a_x18 {
-+					mux {
-+						groups = "pwm_a_x18";
-+						function = "pwm_a";
-+					};
-+				};
-+
-+				pwm_a_x20_pins: pwm_a_x20 {
-+					mux {
-+						groups = "pwm_a_x20";
-+						function = "pwm_a";
-+					};
-+				};
-+
-+				pwm_a_z_pins: pwm_a_z {
-+					mux {
-+						groups = "pwm_a_z";
-+						function = "pwm_a";
-+					};
-+				};
-+
-+				pwm_b_a_pins: pwm_b_a {
-+					mux {
-+						groups = "pwm_b_a";
-+						function = "pwm_b";
-+					};
-+				};
-+
-+				pwm_b_x_pins: pwm_b_x {
-+					mux {
-+						groups = "pwm_b_x";
-+						function = "pwm_b";
-+					};
-+				};
-+
-+				pwm_b_z_pins: pwm_b_z {
-+					mux {
-+						groups = "pwm_b_z";
-+						function = "pwm_b";
-+					};
-+				};
-+
-+				pwm_c_a_pins: pwm_c_a {
-+					mux {
-+						groups = "pwm_c_a";
-+						function = "pwm_c";
-+					};
-+				};
-+
-+				pwm_c_x10_pins: pwm_c_x10 {
-+					mux {
-+						groups = "pwm_c_x10";
-+						function = "pwm_c";
-+					};
-+				};
-+
-+				pwm_c_x17_pins: pwm_c_x17 {
-+					mux {
-+						groups = "pwm_c_x17";
-+						function = "pwm_c";
-+					};
-+				};
-+
-+				pwm_d_x11_pins: pwm_d_x11 {
-+					mux {
-+						groups = "pwm_d_x11";
-+						function = "pwm_d";
-+					};
-+				};
-+
-+				pwm_d_x16_pins: pwm_d_x16 {
-+					mux {
-+						groups = "pwm_d_x16";
-+						function = "pwm_d";
-+					};
-+				};
- 			};
- 		};
- 
-@@ -435,6 +537,24 @@
- 				clock-names = "clk_i2c";
- 			};
- 
-+			pwm_AO_ab: pwm at 7000 {
-+				compatible = "amlogic,meson-axg-ao-pwm";
-+				reg = <0x0 0x07000 0x0 0x20>;
-+				#pwm-cells = <3>;
-+				clocks = <&xtal>, <&xtal>;
-+				clock-names = "clkin0", "clkin1";
-+				status = "disabled";
-+			};
-+
-+			pwm_AO_cd: pwm at 2000 {
-+				compatible = "amlogic,axg-ao-pwm";
-+				reg = <0x0 0x02000  0x0 0x20>;
-+				#pwm-cells = <3>;
-+				clocks = <&xtal>, <&xtal>;
-+				clock-names = "clkin0", "clkin1";
-+				status = "disabled";
-+			};
-+
- 			uart_AO: serial at 3000 {
- 				compatible = "amlogic,meson-gx-uart", "amlogic,meson-ao-uart";
- 				reg = <0x0 0x3000 0x0 0x18>;
--- 
-2.15.0
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+index d8766b166675..e26895dc052e 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
+@@ -328,11 +328,9 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
+ 				pr_debug("Grab another frame");
+ 				vchiq_mmal_port_parameter_set(
+ 					instance,
+-					dev->capture.
+-					camera_port,
++					dev->capture.camera_port,
+ 					MMAL_PARAMETER_CAPTURE,
+-					&dev->capture.
+-					frame_count,
++					&dev->capture.frame_count,
+ 					sizeof(dev->capture.frame_count));
+ 			}
+ 		} else {
+@@ -349,8 +347,7 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
+ 				timestamp = ktime_add_us(dev->capture.kernel_start_ts,
+ 							 runtime_us);
+ 				v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
+-					 "Convert start time %llu and %llu "
+-					 "with offset %llu to %llu\n",
++					 "Convert start time %llu and %llu with offset %llu to %llu\n",
+ 					 ktime_to_ns(dev->capture.kernel_start_ts),
+ 					 dev->capture.vc_start_timestamp, pts,
+ 					 ktime_to_ns(timestamp));
+@@ -368,11 +365,9 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
+ 					 "Grab another frame as buffer has EOS");
+ 				vchiq_mmal_port_parameter_set(
+ 					instance,
+-					dev->capture.
+-					camera_port,
++					dev->capture.camera_port,
+ 					MMAL_PARAMETER_CAPTURE,
+-					&dev->capture.
+-					frame_count,
++					&dev->capture.frame_count,
+ 					sizeof(dev->capture.frame_count));
+ 			}
+ 		} else {
+@@ -536,8 +531,8 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
+ 	    vchiq_mmal_port_enable(dev->instance, dev->capture.port, buffer_cb);
+ 	if (ret) {
+ 		v4l2_err(&dev->v4l2_dev,
+-			"Failed to enable capture port - error %d. "
+-			"Disabling camera port again\n", ret);
++			"Failed to enable capture port - error %d. Disabling camera port again\n",
++			ret);
+
+ 		vchiq_mmal_port_disable(dev->instance,
+ 					dev->capture.camera_port);
+@@ -1194,8 +1189,8 @@ static int mmal_setup_components(struct bm2835_mmal_dev *dev,
+ 					port->current_buffer.size =
+ 					    (f->fmt.pix.sizeimage <
+ 					     (100 << 10))
+-					    ? (100 << 10) : f->fmt.pix.
+-					    sizeimage;
++					    ? (100 << 10)
++					    : f->fmt.pix.sizeimage;
+ 				}
+ 				v4l2_dbg(1, bcm2835_v4l2_debug,
+ 					 &dev->v4l2_dev,
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+index 6ea7fb0ea50e..6c4d8b4c7cd9 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+@@ -618,8 +618,8 @@ static void buffer_to_host_cb(struct vchiq_mmal_instance *instance,
+ 	struct mmal_msg_context *msg_context;
+ 	u32 handle;
+
+-	pr_debug("buffer_to_host_cb: instance:%p msg:%p msg_len:%d\n",
+-		 instance, msg, msg_len);
++	pr_debug("%s: instance:%p msg:%p msg_len:%d\n",
++		 __func__, instance, msg, msg_len);
+
+ 	if (msg->u.buffer_from_host.drvbuf.magic == MMAL_MAGIC) {
+ 		handle = msg->u.buffer_from_host.drvbuf.client_context;
+@@ -1360,8 +1360,7 @@ static int port_action_handle(struct vchiq_mmal_instance *instance,
+
+ 	ret = -rmsg->u.port_action_reply.status;
+
+-	pr_debug("%s:result:%d component:0x%x port:%d action:%s(%d)" \
+-		 " connect component:0x%x connect port:%d\n",
++	pr_debug("%s:result:%d component:0x%x port:%d action:%s(%d) connect component:0x%x connect port:%d\n",
+ 		 __func__,
+ 		 ret, port->component->handle, port->handle,
+ 		 port_action_type_names[action_type],
+--
+2.15.1
