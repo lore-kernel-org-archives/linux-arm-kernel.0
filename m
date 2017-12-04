@@ -1,56 +1,84 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 15:03:42 +0100
-Subject: [PULL 13/19] kvm: arm64: handle single-step during SError exceptions
+Date: Mon,  4 Dec 2017 15:03:39 +0100
+Subject: [PULL 10/19] KVM: arm/arm64: debug: Introduce helper for single-step
 In-Reply-To: <20171204135637.21620-1-cdall@kernel.org>
 References: <20171204135637.21620-1-cdall@kernel.org>
-Message-ID: <20171204140348.21965-11-cdall@kernel.org>
+Message-ID: <20171204140348.21965-8-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alex Benn?e <alex.bennee@linaro.org>
 
-When an SError arrives during single-step both the SError and debug
-exceptions may be pending when the step is completed, and the
-architecture doesn't define the ordering of the two.  This means that we
-can observe en SError even though we've just completed a step, without
-receiving a debug exception.  In that case the DBG_SPSR_SS bit will have
-flipped as the instruction executed. After handling the abort in
-handle_exit() we test to see if the bit is clear and we were
-single-stepping before deciding if we need to exit to user space.
+After emulating instructions we may want return to user-space to handle
+single-step debugging. Introduce a helper function, which, if
+single-step is enabled, sets the run structure for return and returns
+true.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Reviewed-by: Julien Thierry <julien.thierry@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/handle_exit.c | 8 +++++++-
- 1 file changed, 7 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/kvm_host.h   |  5 +++++
+ arch/arm64/include/asm/kvm_host.h |  1 +
+ arch/arm64/kvm/debug.c            | 21 +++++++++++++++++++++
+ 3 files changed, 27 insertions(+)
 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 029c28dd25e9..304203fa9e33 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -28,6 +28,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_mmu.h>
- #include <asm/kvm_psci.h>
-+#include <asm/debug-monitors.h>
+diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
+index 242151ea6908..a9f7d3f47134 100644
+--- a/arch/arm/include/asm/kvm_host.h
++++ b/arch/arm/include/asm/kvm_host.h
+@@ -285,6 +285,11 @@ static inline void kvm_arm_init_debug(void) {}
+ static inline void kvm_arm_setup_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_clear_debug(struct kvm_vcpu *vcpu) {}
+ static inline void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu) {}
++static inline bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu,
++					     struct kvm_run *run)
++{
++	return false;
++}
  
- #define CREATE_TRACE_POINTS
- #include "trace.h"
-@@ -252,7 +253,12 @@ int handle_exit(struct kvm_vcpu *vcpu, struct kvm_run *run,
- 		return 1;
- 	case ARM_EXCEPTION_EL1_SERROR:
- 		kvm_inject_vabt(vcpu);
--		return 1;
-+		/* We may still need to return for single-step */
-+		if (!(*vcpu_cpsr(vcpu) & DBG_SPSR_SS)
-+			&& kvm_arm_handle_step_debug(vcpu, run))
-+			return 0;
-+		else
-+			return 1;
- 	case ARM_EXCEPTION_TRAP:
- 		return handle_trap_exceptions(vcpu, run);
- 	case ARM_EXCEPTION_HYP_GONE:
+ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+ 			       struct kvm_device_attr *attr);
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index 674912d7a571..ea6cb5b24258 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -370,6 +370,7 @@ void kvm_arm_init_debug(void);
+ void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
+ void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
++bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run);
+ int kvm_arm_vcpu_arch_set_attr(struct kvm_vcpu *vcpu,
+ 			       struct kvm_device_attr *attr);
+ int kvm_arm_vcpu_arch_get_attr(struct kvm_vcpu *vcpu,
+diff --git a/arch/arm64/kvm/debug.c b/arch/arm64/kvm/debug.c
+index dbadfaf850a7..fa63b28c65e0 100644
+--- a/arch/arm64/kvm/debug.c
++++ b/arch/arm64/kvm/debug.c
+@@ -221,3 +221,24 @@ void kvm_arm_clear_debug(struct kvm_vcpu *vcpu)
+ 		}
+ 	}
+ }
++
++
++/*
++ * After successfully emulating an instruction, we might want to
++ * return to user space with a KVM_EXIT_DEBUG. We can only do this
++ * once the emulation is complete, though, so for userspace emulations
++ * we have to wait until we have re-entered KVM before calling this
++ * helper.
++ *
++ * Return true (and set exit_reason) to return to userspace or false
++ * if no further action is required.
++ */
++bool kvm_arm_handle_step_debug(struct kvm_vcpu *vcpu, struct kvm_run *run)
++{
++	if (vcpu->guest_debug & KVM_GUESTDBG_SINGLESTEP) {
++		run->exit_reason = KVM_EXIT_DEBUG;
++		run->debug.arch.hsr = ESR_ELx_EC_SOFTSTP_LOW << ESR_ELx_EC_SHIFT;
++		return true;
++	}
++	return false;
++}
 -- 
 2.14.2
