@@ -1,41 +1,57 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 15:03:44 +0100
-Subject: [PULL 15/19] KVM: arm/arm64: Avoid attempting to load timer vgic
- state without a vgic
+Date: Mon,  4 Dec 2017 15:03:46 +0100
+Subject: [PULL 17/19] KVM: arm/arm64: Fix spinlock acquisition in
+ vgic_set_owner
 In-Reply-To: <20171204135637.21620-1-cdall@kernel.org>
 References: <20171204135637.21620-1-cdall@kernel.org>
-Message-ID: <20171204140348.21965-13-cdall@kernel.org>
+Message-ID: <20171204140348.21965-15-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Christoffer Dall <christoffer.dall@linaro.org>
+From: Marc Zyngier <marc.zyngier@arm.com>
 
-The timer optimization patches inadvertendly changed the logic to always
-load the timer state as if we have a vgic, even if we don't have a vgic.
+vgic_set_owner acquires the irq lock without disabling interrupts,
+resulting in a lockdep splat (an interrupt could fire and result
+in the same lock being taken if the same virtual irq is to be
+injected).
 
-Fix this by doing the usual irqchip_in_kernel() check and call the
-appropriate load function.
+In practice, it is almost impossible to trigger this bug, but
+better safe than sorry. Convert the lock acquisition to a
+spin_lock_irqsave() and keep lockdep happy.
 
+Reported-by: James Morse <james.morse@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arch_timer.c | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+ virt/kvm/arm/vgic/vgic.c | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 190c99ed1b73..f9555b1e7f15 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -835,7 +835,10 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- no_vgic:
- 	preempt_disable();
- 	timer->enabled = 1;
--	kvm_timer_vcpu_load_vgic(vcpu);
-+	if (!irqchip_in_kernel(vcpu->kvm))
-+		kvm_timer_vcpu_load_user(vcpu);
-+	else
-+		kvm_timer_vcpu_load_vgic(vcpu);
- 	preempt_enable();
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 786cce7bd2ec..ecb8e25f5fe5 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -492,6 +492,7 @@ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid)
+ int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner)
+ {
+ 	struct vgic_irq *irq;
++	unsigned long flags;
+ 	int ret = 0;
  
- 	return 0;
+ 	if (!vgic_initialized(vcpu->kvm))
+@@ -502,12 +503,12 @@ int kvm_vgic_set_owner(struct kvm_vcpu *vcpu, unsigned int intid, void *owner)
+ 		return -EINVAL;
+ 
+ 	irq = vgic_get_irq(vcpu->kvm, vcpu, intid);
+-	spin_lock(&irq->irq_lock);
++	spin_lock_irqsave(&irq->irq_lock, flags);
+ 	if (irq->owner && irq->owner != owner)
+ 		ret = -EEXIST;
+ 	else
+ 		irq->owner = owner;
+-	spin_unlock(&irq->irq_lock);
++	spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 
+ 	return ret;
+ }
 -- 
 2.14.2
