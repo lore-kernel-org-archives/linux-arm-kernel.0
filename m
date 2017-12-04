@@ -1,46 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Dec 2017 16:14:14 -0600
-Subject: [PATCH V5 1/7] Documentation: DT: qcom_hidma: Bump HW revision
- for the bugfixed HW
-In-Reply-To: <1512188864-773-2-git-send-email-okaya@codeaurora.org>
+Date: Mon, 4 Dec 2017 16:25:28 -0600
+Subject: [PATCH V5 4/7] OF: properties: Implement get_match_data() callback
+In-Reply-To: <590f0536-b73d-ee32-a284-32e564af2f57@codeaurora.org>
 References: <1512188864-773-1-git-send-email-okaya@codeaurora.org>
- <1512188864-773-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171204221414.f5tphhn7gvlle3li@rob-hp-laptop>
+ <1512188864-773-5-git-send-email-okaya@codeaurora.org>
+ <CAL_JsqJ+fMqrt6Tk8h6v1fSkrBg+GcMxSXK9XCcz3nmYgyguuQ@mail.gmail.com>
+ <590f0536-b73d-ee32-a284-32e564af2f57@codeaurora.org>
+Message-ID: <20171204222528.wf6xpozisxu5udx5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 11:27:38PM -0500, Sinan Kaya wrote:
-> A new version of the HIDMA IP has been released with bug fixes. Bumping the
-> hardware version to differentiate from others.
+On Mon, Dec 04, 2017 at 01:05:51PM -0500, Sinan Kaya wrote:
+> On 12/4/2017 11:23 AM, Rob Herring wrote:
+> > On Fri, Dec 1, 2017 at 10:27 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> >> Now that we have a get_match_data() callback as part of the firmware node,
+> >> implement the OF specific piece for it.
+> >>
+> >> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> >> ---
+> >>  drivers/of/property.c | 17 +++++++++++++++++
+> >>  1 file changed, 17 insertions(+)
+> >>
+> ..
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
+> >>
+> >> +void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
+> >> +                              const struct device_driver *drv)
+> >> +{
+> >> +       const struct device_node *node = to_of_node(fwnode);
+> >> +       const struct of_device_id *match;
+> >> +
+> >> +       if (!node)
+> >> +               return NULL;
+> > 
+> > of_match_node checks this.
 > 
-> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> index 55492c2..5d93d6d 100644
-> --- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
-> @@ -47,8 +47,8 @@ When the OS is not in control of the management interface (i.e. it's a guest),
->  the channel nodes appear on their own, not under a management node.
->  
->  Required properties:
-> -- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
-> -for MSI capable HW.
-> +- compatible: must contain "qcom,hidma-1.0" for initial HW or
-> +  "qcom,hidma-1.1"/"qcom,hidma-1.2" for MSI capable HW.
+> I see a check for the matches argument but not for the node argument.
+> Am I missing something?
 
-Hopefully 1.2 corresponds to some actual version numbering and not just 
-something you made up. I'd really rather have SoC based compatible 
-strings unless you have dozens of SoCs for each version. I'll probably 
-just say the same thing again when 1.3 or 2.0 gets added...
+Ah yes, you are right.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
-
->  - reg: Addresses for the transfer and event channel
->  - interrupts: Should contain the event interrupt
->  - desc-count: Number of asynchronous requests this channel can handle
-> -- 
-> 1.9.1
 > 
+> > 
+> >> +
+> >> +       match = of_match_node(drv->of_match_table, node);
+> >> +       if (!match)
+> >> +               return NULL;
+> >> +
+> >> +       return (void *)match->data;
+> > 
+> > Don't need a cast here.
+> 
+> I can fix this.
+> 
+> > 
+> > of_device_get_match_data() already does most of this, but getting a
+> > device ptr from fwnode_handle may not be possible?
+> 
+> I couldn't figure out how to do that. Do you have a suggestion?
+> I have been looking for examples with no luck.
+
+Change the property API to pass struct device instead. That's maybe not 
+worth it.
+
+Rob
