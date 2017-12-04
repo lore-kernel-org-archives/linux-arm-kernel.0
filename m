@@ -1,31 +1,63 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 4 Dec 2017 11:02:42 +0100
-Subject: [PATCH 2/2] arm64: dts: renesas: r8a77970: use SYSC power domain
- macros
-In-Reply-To: <20171128202109.031715810@cogentembedded.com>
-References: <20171128202109.031715810@cogentembedded.com>
-Message-ID: <CAMuHMdWAXwf2RLma7EN3c0oGVrRnV_XARFY51e-ebObC3-5Gig@mail.gmail.com>
+From: drjones@redhat.com (Andrew Jones)
+Date: Mon, 4 Dec 2017 11:05:47 +0100
+Subject: [PATCH 23/37] KVM: arm64: Prepare to handle traps on deferred VM
+ sysregs
+In-Reply-To: <20171203195026.GI4218@cbox>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-24-christoffer.dall@linaro.org>
+ <20171113175402.rw3on4vps2o24q4d@hawk.localdomain>
+ <20171203195026.GI4218@cbox>
+Message-ID: <20171204100547.xe6yetr73luw356z@hawk.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 9:15 PM, Sergei Shtylyov
-<sergei.shtylyov@cogentembedded.com> wrote:
-> Now that the commit 833bdb47c826 ("dt-bindings: power: add R8A77970 SYSC
-> power domain definitions") has hit Linus' tree, we can replace the  bare
-> numbers  (we had to use to avoid a cross tree dependency) with these macro
-> definitions...
->
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+On Sun, Dec 03, 2017 at 08:50:26PM +0100, Christoffer Dall wrote:
+> On Mon, Nov 13, 2017 at 06:54:02PM +0100, Andrew Jones wrote:
+...
+> > > +	}
+> > > +
+> > > +	vcpu_sys_reg(vcpu, reg) = val;
+> > > +}
+> > > +
+> > >  /*
+> > >   * Generic accessor for VM registers. Only called as long as HCR_TVM
+> > > + *
 
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+just noticed this stray blank line added here
 
-Gr{oetje,eeting}s,
+> > >   * is set. If the guest enables the MMU, we stop trapping the VM
+> > >   * sys_regs and leave it in complete control of the caches.
+> > >   */
+> > > @@ -132,14 +182,14 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+> > >  	if (!p->is_aarch32 || !p->is_32bit) {
+> > >  		val = p->regval;
+> > >  	} else {
+> > > -		val = vcpu_sys_reg(vcpu, reg);
+> > > +		val = read_deferrable_vm_reg(vcpu, reg);
+> > >  		if (r->reg % 2)
+> > >  			val = (p->regval << 32) | (u64)lower_32_bits(val);
+> > >  		else
+> > >  			val = ((u64)upper_32_bits(val) << 32) |
+> > >  				(u64)lower_32_bits(p->regval);
+> > >  	}
+> > > -	vcpu_sys_reg(vcpu, reg) = val;
+> > > +	write_deferrable_vm_reg(vcpu, reg, val);
+> > >  
+> > >  	kvm_toggle_cache(vcpu, was_enabled);
+> > >  	return true;
+> > > -- 
+> > > 2.9.0
+> > >
+> > 
+> > I read ahead and see other wrappers that check sysregs_loaded_on_cpu are
+> > added, but only write_deferrable_vm_reg() has 'deferrable' in its name.
+> > Should it just be named read/write_vm_reg?
+> > 
+> 
+> I chose this name to avoid implying that this function was universally
+> supported for all (current and future) VM registers.
 
-                        Geert
+OK
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+drew
