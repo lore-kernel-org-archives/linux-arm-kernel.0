@@ -1,22 +1,34 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Mon, 4 Dec 2017 14:00:15 +0800
-Subject: [PATCH 0/3] pwm: meson-axg: add pwm controller driver
-Message-ID: <20171204060018.8856-1-yixun.lan@amlogic.com>
+Date: Mon, 4 Dec 2017 14:00:16 +0800
+Subject: [PATCH 1/3] dt-bindings: pwm: update bindings for the Meson-AXG
+In-Reply-To: <20171204060018.8856-1-yixun.lan@amlogic.com>
+References: <20171204060018.8856-1-yixun.lan@amlogic.com>
+Message-ID: <20171204060018.8856-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch series try to add PWM controller driver for the 
-Amlogic's Meson-AXG SoC. Update the Clock sources, pin DT.
+From: Jian Hu <jian.hu@amlogic.com>
 
-Jian Hu (3):
-  dt-bindings: pwm: update bindings for the Meson-AXG
-  pwm: meson: add clock source configuratin for Meson-AXG
-  ARM64: dts: meson-axg: add PWM DT info for Meson-Axg SoC
+Update the doc to explicitly support Meson-AXG
 
- .../devicetree/bindings/pwm/pwm-meson.txt          |   2 +
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi         | 120 +++++++++++++++++++++
- drivers/pwm/pwm-meson.c                            |  26 +++++
- 3 files changed, 148 insertions(+)
+Signed-off-by: Jian Hu <jian.hu@amlogic.com>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ Documentation/devicetree/bindings/pwm/pwm-meson.txt | 2 ++
+ 1 file changed, 2 insertions(+)
 
+diff --git a/Documentation/devicetree/bindings/pwm/pwm-meson.txt b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
+index 1ee81321c35e..1fa3f7182133 100644
+--- a/Documentation/devicetree/bindings/pwm/pwm-meson.txt
++++ b/Documentation/devicetree/bindings/pwm/pwm-meson.txt
+@@ -5,6 +5,8 @@ Required properties:
+ - compatible: Shall contain "amlogic,meson8b-pwm"
+                          or "amlogic,meson-gxbb-pwm"
+                          or "amlogic,meson-gxbb-ao-pwm"
++                         or "amlogic,meson-axg-ee-pwm"
++                         or "amlogic,meson-axg-ao-pwm"
+ - #pwm-cells: Should be 3. See pwm.txt in this directory for a description of
+   the cells format.
+ 
 -- 
 2.15.0
