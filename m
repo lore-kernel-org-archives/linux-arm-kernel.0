@@ -1,45 +1,39 @@
 From: cdall@kernel.org (Christoffer Dall)
-Date: Mon,  4 Dec 2017 15:03:38 +0100
-Subject: [PULL 09/19] arm: KVM: Fix VTTBR_BADDR_MASK BUG_ON off-by-one
+Date: Mon,  4 Dec 2017 15:03:35 +0100
+Subject: [PULL 06/19] KVM: arm/arm64: vgic-its: Check result of allocation
+ before use
 In-Reply-To: <20171204135637.21620-1-cdall@kernel.org>
 References: <20171204135637.21620-1-cdall@kernel.org>
-Message-ID: <20171204140348.21965-7-cdall@kernel.org>
+Message-ID: <20171204140348.21965-4-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Marc Zyngier <marc.zyngier@arm.com>
 
-VTTBR_BADDR_MASK is used to sanity check the size and alignment of the
-VTTBR address. It seems to currently be off by one, thereby only
-allowing up to 39-bit addresses (instead of 40-bit) and also
-insufficiently checking the alignment. This patch fixes it.
+We miss a test against NULL after allocation.
 
-This patch is the 32bit pendent of Kristina's arm64 fix, and
-she deserves the actual kudos for pinpointing that one.
-
-Fixes: f7ed45be3ba52 ("KVM: ARM: World-switch implementation")
-Cc: <stable@vger.kernel.org> # 3.9
-Reported-by: Kristina Martsenko <kristina.martsenko@arm.com>
-Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+Fixes: 6d03a68f8054 ("KVM: arm64: vgic-its: Turn device_id validation into generic ID validation")
+Cc: <stable@vger.kernel.org> # 4.8
+Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_arm.h | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ virt/kvm/arm/vgic/vgic-its.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/include/asm/kvm_arm.h b/arch/arm/include/asm/kvm_arm.h
-index c8781450905b..3ab8b3781bfe 100644
---- a/arch/arm/include/asm/kvm_arm.h
-+++ b/arch/arm/include/asm/kvm_arm.h
-@@ -161,8 +161,7 @@
- #else
- #define VTTBR_X		(5 - KVM_T0SZ)
- #endif
--#define VTTBR_BADDR_SHIFT (VTTBR_X - 1)
--#define VTTBR_BADDR_MASK  (((_AC(1, ULL) << (40 - VTTBR_X)) - 1) << VTTBR_BADDR_SHIFT)
-+#define VTTBR_BADDR_MASK  (((_AC(1, ULL) << (40 - VTTBR_X)) - 1) << VTTBR_X)
- #define VTTBR_VMID_SHIFT  _AC(48, ULL)
- #define VTTBR_VMID_MASK(size)	(_AT(u64, (1 << size) - 1) << VTTBR_VMID_SHIFT)
+diff --git a/virt/kvm/arm/vgic/vgic-its.c b/virt/kvm/arm/vgic/vgic-its.c
+index cb2d0a2dbe5a..8e633bd9cc1e 100644
+--- a/virt/kvm/arm/vgic/vgic-its.c
++++ b/virt/kvm/arm/vgic/vgic-its.c
+@@ -821,6 +821,8 @@ static int vgic_its_alloc_collection(struct vgic_its *its,
+ 		return E_ITS_MAPC_COLLECTION_OOR;
  
+ 	collection = kzalloc(sizeof(*collection), GFP_KERNEL);
++	if (!collection)
++		return -ENOMEM;
+ 
+ 	collection->collection_id = coll_id;
+ 	collection->target_addr = COLLECTION_NOT_MAPPED;
 -- 
 2.14.2
