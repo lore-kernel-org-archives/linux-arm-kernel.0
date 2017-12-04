@@ -1,99 +1,66 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Mon, 04 Dec 2017 18:48:48 +0000
-Subject: Applied "ASoC: spdif: Add S32_LE support for S/PDIF dummy codec
- drivers" to the asoc tree
-In-Reply-To: <20171122114321.29196-2-suzuki.katsuhiro@socionext.com>
-Message-ID: <E1eLvnM-0000KS-BR@debutante>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Mon, 4 Dec 2017 20:21:01 +0100
+Subject: [PATCH v5 2/8] KVM: arm/arm64: Factor out functionality to get
+ vgic mmio requester_vcpu
+In-Reply-To: <aab23eee-aa3b-9349-6e78-473beeb46969@arm.com>
+References: <20171120191649.17290-1-christoffer.dall@linaro.org>
+ <20171120191649.17290-3-christoffer.dall@linaro.org>
+ <aab23eee-aa3b-9349-6e78-473beeb46969@arm.com>
+Message-ID: <20171204192101.GF32397@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patch
+On Fri, Dec 01, 2017 at 06:04:32PM +0000, Andre Przywara wrote:
+> Hi,
+> 
+> On 20/11/17 19:16, Christoffer Dall wrote:
+> > We are about to distinguish between userspace accesses and mmio traps
+> > for a number of the mmio handlers.  When the requester vcpu is NULL, it
+> > mens we are handling a userspace acccess.
+> > 
+> > Factor out the functionality to get the request vcpu into its own
+> > function, mostly so we have a common place to document the semantics of
+> > the return value.
+> > 
+> > Also take the chance to move the functionality outside of holding a
+> > spinlock and instead explicitly disable and enable preemption.  This
+> > supports PREEMPT_RT kernels as well.
+> > 
+> > Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  virt/kvm/arm/vgic/vgic-mmio.c | 43 +++++++++++++++++++++++++++----------------
+> >  1 file changed, 27 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+> > index deb51ee16a3d..6113cf850f47 100644
+> > --- a/virt/kvm/arm/vgic/vgic-mmio.c
+> > +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+> > @@ -122,6 +122,26 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
+> >  	return value;
+> >  }
+> >  
+> > +/*
+> > + * This function will return the VCPU that performed the MMIO access and
+> > + * trapped from twithin the VM, and will return NULL if this is a userspace
+> > + * access.
+> > + *
+> > + * We can disable preemption locally around accessing the per-CPU variable
+> > + * because even if the current thread is migrated to another CPU, reading the
+> > + * per-CPU value later will give us the same value as we update the per-CPU
+> > + * variable in the preempt notifier handlers.
+> 
+> This comment left me scratching my head a bit. Maybe you could change it
+> to point out that ... it's safe to *enable* preemption after the call
+> again, because of said reasons? Because disabling preemption before
+> accessing a per-CPU variable is not really an issue.
 
-   ASoC: spdif: Add S32_LE support for S/PDIF dummy codec drivers
+I'll try to clarify.
 
-has been applied to the asoc tree at
-
-   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/sound.git 
-
-All being well this means that it will be integrated into the linux-next
-tree (usually sometime in the next 24 hours) and sent to Linus during
-the next merge window (or sooner if it is a bug fix), however if
-problems are discovered then the patch may be dropped or reverted.  
-
-You may get further e-mails resulting from automated or manual testing
-and review of the tree, please engage with people reporting problems and
-send followup patches addressing any issues that are reported if needed.
-
-If any updates are required or you are submitting further changes they
-should be sent as incremental updates against current git, existing
-patches will not be replaced.
-
-Please add any relevant lists and maintainers to the CCs when replying
-to this mail.
-
+> 
+> Apart from that it's fine.
+> 
+> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+> 
 Thanks,
-Mark
-
->From eb733366f5f7f416a7d9215a40e00d57aa193361 Mon Sep 17 00:00:00 2001
-From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Wed, 22 Nov 2017 20:43:14 +0900
-Subject: [PATCH] ASoC: spdif: Add S32_LE support for S/PDIF dummy codec
- drivers
-
-AIO on UniPhier can output S/PDIF where no codec is needed.
-This patch adds S32_LE support for dummy codec drivers.
-
-If one S/PDIF controller has its own limitation, its CPU DAI driver should
-set the supported format by its own circumstance, since the soc-pcm driver
-will use the intersection of cpu_dai's formats and codec_dai's formats.
-
-Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Signed-off-by: Mark Brown <broonie@kernel.org>
----
- sound/soc/codecs/spdif_receiver.c    | 5 +++--
- sound/soc/codecs/spdif_transmitter.c | 5 +++--
- 2 files changed, 6 insertions(+), 4 deletions(-)
-
-diff --git a/sound/soc/codecs/spdif_receiver.c b/sound/soc/codecs/spdif_receiver.c
-index 7acd05140a81..c8fd6367f6c0 100644
---- a/sound/soc/codecs/spdif_receiver.c
-+++ b/sound/soc/codecs/spdif_receiver.c
-@@ -34,10 +34,11 @@ static const struct snd_soc_dapm_route dir_routes[] = {
- #define STUB_RATES	SNDRV_PCM_RATE_8000_192000
- #define STUB_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | \
- 			SNDRV_PCM_FMTBIT_S20_3LE | \
--			SNDRV_PCM_FMTBIT_S24_LE | \
-+			SNDRV_PCM_FMTBIT_S24_LE  | \
-+			SNDRV_PCM_FMTBIT_S32_LE | \
- 			SNDRV_PCM_FMTBIT_IEC958_SUBFRAME_LE)
- 
--static const struct snd_soc_codec_driver soc_codec_spdif_dir = {
-+static struct snd_soc_codec_driver soc_codec_spdif_dir = {
- 	.component_driver = {
- 		.dapm_widgets		= dir_widgets,
- 		.num_dapm_widgets	= ARRAY_SIZE(dir_widgets),
-diff --git a/sound/soc/codecs/spdif_transmitter.c b/sound/soc/codecs/spdif_transmitter.c
-index 063a64ff82d3..037aa1d45559 100644
---- a/sound/soc/codecs/spdif_transmitter.c
-+++ b/sound/soc/codecs/spdif_transmitter.c
-@@ -27,7 +27,8 @@
- #define STUB_RATES	SNDRV_PCM_RATE_8000_192000
- #define STUB_FORMATS	(SNDRV_PCM_FMTBIT_S16_LE | \
- 			SNDRV_PCM_FMTBIT_S20_3LE | \
--			SNDRV_PCM_FMTBIT_S24_LE)
-+			SNDRV_PCM_FMTBIT_S24_LE  | \
-+			SNDRV_PCM_FMTBIT_S32_LE)
- 
- static const struct snd_soc_dapm_widget dit_widgets[] = {
- 	SND_SOC_DAPM_OUTPUT("spdif-out"),
-@@ -37,7 +38,7 @@ static const struct snd_soc_dapm_route dit_routes[] = {
- 	{ "spdif-out", NULL, "Playback" },
- };
- 
--static const struct snd_soc_codec_driver soc_codec_spdif_dit = {
-+static struct snd_soc_codec_driver soc_codec_spdif_dit = {
- 	.component_driver = {
- 		.dapm_widgets		= dit_widgets,
- 		.num_dapm_widgets	= ARRAY_SIZE(dit_widgets),
--- 
-2.15.0
+-Christoffer
