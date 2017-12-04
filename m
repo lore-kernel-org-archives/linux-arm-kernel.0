@@ -1,160 +1,47 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 4 Dec 2017 16:26:30 +0800
-Subject: [PATCH 3/9] ASoC: sun8i-codec: Add quirk to specify aif1_lrck_div
- value
-In-Reply-To: <CAGb2v65KMosNgkCa5Ddmf_T--8-BeLLjdqrdX3wb4H+kbudLjA@mail.gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-4-anarsoul@gmail.com>
- <CAGb2v65KMosNgkCa5Ddmf_T--8-BeLLjdqrdX3wb4H+kbudLjA@mail.gmail.com>
-Message-ID: <CAGb2v65BCkF9Tf1uBMAybtmn_zZhU4pH7+bsZVUwrbZDgciaGg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 4 Dec 2017 09:35:15 +0100
+Subject: [PATCH v2 0/4] ARM: dts: renesas: Convert to named i2c-gpio
+ bindings
+In-Reply-To: <20171201110908.u7xjrt7xmlqgigvy@ninjato>
+References: <1512046646-15253-1-git-send-email-geert+renesas@glider.be>
+ <20171201081850.4tqbnlvxdax7phfs@verge.net.au>
+ <20171201110908.u7xjrt7xmlqgigvy@ninjato>
+Message-ID: <20171204083515.sdrba5tq5z2qymap@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 4, 2017 at 3:38 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Mon, Dec 4, 2017 at 4:41 AM, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->> LRCK divider for A64 differs from A33, so add a quirk to support that.
->>
->> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->> ---
->>  sound/soc/sunxi/sun8i-codec.c | 38 ++++++++++++++++++++++++++++++++------
->>  1 file changed, 32 insertions(+), 6 deletions(-)
->>
->> diff --git a/sound/soc/sunxi/sun8i-codec.c b/sound/soc/sunxi/sun8i-codec.c
->> index 3dd183be08a4..054201d1de03 100644
->> --- a/sound/soc/sunxi/sun8i-codec.c
->> +++ b/sound/soc/sunxi/sun8i-codec.c
->> @@ -24,6 +24,7 @@
->>  #include <linux/io.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/regmap.h>
->> +#include <linux/of_device.h>
->
-> Please keep them sorted in alphabetical order.
->
->>
->>  #include <sound/pcm_params.h>
->>  #include <sound/soc.h>
->> @@ -75,11 +76,22 @@
->>  #define SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK  GENMASK(8, 6)
->>  #define SUN8I_AIF1CLK_CTRL_AIF1_BCLK_DIV_MASK  GENMASK(12, 9)
->>
->> +/*
->> + * struct sun8i_codec_quirks - Differences between SoC variants.
->> + *
->> + * @aif1_lrck_div: LRCK divider
->> + */
->> +struct sun8i_codec_quirks {
->> +       unsigned int    aif1_lrck_div;
->> +};
->> +
->> +
->>  struct sun8i_codec {
->> -       struct device   *dev;
->> -       struct regmap   *regmap;
->> -       struct clk      *clk_module;
->> -       struct clk      *clk_bus;
->> +       struct device                   *dev;
->> +       struct regmap                   *regmap;
->> +       struct clk                      *clk_module;
->> +       struct clk                      *clk_bus;
->> +       const struct sun8i_codec_quirks *variant;
->>  };
->>
->>  static int sun8i_codec_runtime_resume(struct device *dev)
->> @@ -305,7 +317,7 @@ static int sun8i_codec_hw_params(struct snd_pcm_substream *substream,
->>
->>         regmap_update_bits(scodec->regmap, SUN8I_AIF1CLK_CTRL,
->>                            SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_MASK,
->> -                          SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16);
->> +                          scodec->variant->aif1_lrck_div);
->
-> Hard coding a fixed divider is generally a bad idea.
-> You adding another fixed value for this is evidence of this.
->
-> The BCK:LRCK divider is equal to sample width * 2. You should
-> have that instead.
->
-> Also I see no evidence that either the I2S controller (see my
-> comment on patch 1) or the codec is limited to a certain sample
-> width in hardware, other than your claims, which are vague at
-> best.
->
-> The user manual for both the A33 and A64 list many possible
-> widths and dividers. If the user manual is wrong, please provide
-> solid evidence proving it wrong.
->
-> Either way this series will not be accepted in its current form.
+On Fri, Dec 01, 2017 at 12:09:08PM +0100, Wolfram Sang wrote:
+> On Fri, Dec 01, 2017 at 09:18:55AM +0100, Simon Horman wrote:
+> > On Thu, Nov 30, 2017 at 01:57:22PM +0100, Geert Uytterhoeven wrote:
+> > > 	Hi Simon, Magnus,
+> > > 
+> > > Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
+> > > named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
+> > > gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
+> > > more error-prone unnamed variant.
+> > > 
+> > > This patch series switches all Renesas boards to the new bindings, and
+> > > adds the missing GPIO_OPEN_DRAIN I/O flags, which were implicitly
+> > > assumed before.  The latter gets rid of messages like:
+> > > 
+> > >     gpio-208 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
+> > >     gpio-91 (?): enforced open drain please flag it properly in DT/ACPI DSDT/board file
+> > > 
+> > > Patch 1 was extracted from series "[PATCH/RFC 0/3] i2c: gpio: Add
+> > > support for named gpios in DT", hence the v2.  All other patches are
+> > > new.
+> > > 
+> > > Note that after this series is applied, the i2c-gpio buses are no longer
+> > > detected when booting new DTBs on old (v4.14 and older) kernels, which
+> > > should not be an issue.  Booting old DTBs on new kernels is not
+> > > affected.
+> > > 
+> > > Thanks for applying!
+> > 
+> > Thanks, applied.
+> 
+> Phew, you guys are fast. For the record:
+> 
+> Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 
-So following up on the discussion on IRC, please add the relevant
-information to the commit messages:
-
-  - Why is this hard-coded value needed? i.e. does it not work with
-    standard values generated by the framework from the format value?
-
-    This is the most important part. This might also include:
-
-    * What you have done to test the non-working values
-
-Other things worth mentioning:
-
-  - Where the hard-coded values came from?
-
-  - Why a special quirk is needed, instead of say, limiting the
-    supported format to SNDRV_PCM_FMTBIT_S32_LE, which produces
-    the correct wss and lrck_div values
-
-  - Anything else you think is relevant to the patch or hardware
-
-You should also leave a comment explaining why the quirk is needed
-just before the code where you handle the quirks. Otherwise it makes
-little sense to people that don't have the context about this.
-
-Regards
-ChenYu
-
->
-> ChenYu
->
->>
->>         sample_rate = sun8i_codec_get_hw_rate(params);
->>         if (sample_rate < 0)
->> @@ -440,6 +452,10 @@ static const struct regmap_config sun8i_codec_regmap_config = {
->>         .cache_type     = REGCACHE_FLAT,
->>  };
->>
->> +static const struct sun8i_codec_quirks sun8i_a33_codec_quirks = {
->> +       .aif1_lrck_div  = SUN8I_AIF1CLK_CTRL_AIF1_LRCK_DIV_16,
->> +};
->> +
->>  static int sun8i_codec_probe(struct platform_device *pdev)
->>  {
->>         struct resource *res_base;
->> @@ -453,6 +469,13 @@ static int sun8i_codec_probe(struct platform_device *pdev)
->>
->>         scodec->dev = &pdev->dev;
->>
->> +       scodec->variant = of_device_get_match_data(&pdev->dev);
->> +       if (!scodec->variant) {
->> +               dev_err(&pdev->dev, "Failed to determine the quirks to use\n");
->> +               return -ENODEV;
->> +       }
->> +
->> +
->>         scodec->clk_module = devm_clk_get(&pdev->dev, "mod");
->>         if (IS_ERR(scodec->clk_module)) {
->>                 dev_err(&pdev->dev, "Failed to get the module clock\n");
->> @@ -524,7 +547,10 @@ static int sun8i_codec_remove(struct platform_device *pdev)
->>  }
->>
->>  static const struct of_device_id sun8i_codec_of_match[] = {
->> -       { .compatible = "allwinner,sun8i-a33-codec" },
->> +       {
->> +               .compatible = "allwinner,sun8i-a33-codec",
->> +               .data = &sun8i_a33_codec_quirks,
->> +       },
->>         {}
->>  };
->>  MODULE_DEVICE_TABLE(of, sun8i_codec_of_match);
->> --
->> 2.15.0
->>
+Thanks, I'll see about adding your tag.
