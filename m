@@ -1,50 +1,49 @@
 From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Mon, 4 Dec 2017 02:24:06 +0000
+Date: Mon, 4 Dec 2017 02:24:41 +0000
 Subject: SCPI regressions in v4.15-rc1 on Amlogic SoCs.
-In-Reply-To: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
+In-Reply-To: <9754d389-1dd4-e189-6c8f-c725d049dea8@gmail.com>
 References: <CAOi56cXCBAJO6iOONTENqGdm9kE+t4fGYgTENupzkRgHjJfykw@mail.gmail.com>
-Message-ID: <20171204022406.GA6870@e107533-lin>
+ <9754d389-1dd4-e189-6c8f-c725d049dea8@gmail.com>
+Message-ID: <20171204022441.GB6870@e107533-lin>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 30, 2017 at 04:21:13PM -0800, Kevin Hilman wrote:
-> Hi Sudeep,
+On Fri, Dec 01, 2017 at 08:08:25AM +0100, Heiner Kallweit wrote:
+> Am 01.12.2017 um 01:21 schrieb Kevin Hilman:
+> > Hi Sudeep,
+> > 
+> > There's been a pretty major regression in v4.15-rc1 compared to v4.15
+> > in SCPI causing warning splats on amlogic SoCs when cpufreq starts up
+> > and tries to set the OPP for the first time[1].
+> > 
+> Thanks for the report. Strange enough, it works perfectly fine on my
+> Odroid-C2, see below log part from latest next kernel.
+>
+
+OK, I would like to understand/get the list of AmLogic SoC using SCPI,
+so that I get any changes tested on all of them next time. As Kevin
+mentioned, it's always safer to just cc the amlogic mailing list. I have
+done that in past and failed to observe that this time.
+
+> Your log seems to indicate that due to deferred probing something is
+> not done in the right order.
+> Can you bisect the issue? I'd assume that it's commit 931cf0c53e69
+> ("firmware: arm_scpi: pre-populate dvfs info in scpi_probe").
 > 
-> There's been a pretty major regression in v4.15-rc1 compared to v4.15
-> in SCPI causing warning splats on amlogic SoCs when cpufreq starts up
-> and tries to set the OPP for the first time[1].
->
 
-Looks like some issue with firmware we are hitting. I assume CPUFreq was
-never initialised on this platform before(i.e. v4.14) and these changes
-are changing the probe path, so it could be that change causing the
-regression.
+Yes, even I suspect the same change. But I don't fully understand the issue.
 
-> I ran out of time to narrow it down further since there have been
-> quite a few changes since v4.14, but simply reverting
-> drivers/firmware/arm_scpi.c to its v4.14 state gets things working
-> again.
->
+I remember asking you to make some changes in probe path. I think I
+wanted you to continue with SCPI probe even if DVFS fails as that causes
+issues on platforms that have partial DVFS implemented but other protocols
+like clock and sensors working fine.
 
-Makes sense.
+I guess all platforms with broken SCPI implementation should have it
+disabled in the DT instead of taking special care for that in DT.
 
-> This has been happening for awhile, and we should've caught it sooner
-> in kernelCI.org, however this warning splat still allows the kernel to
-> finish booting, so it still resulted in a PASS for the boot test.
-> That combined with the fact that we've been tracking some other
-> regressions, we didn't notice it until now.
->
-
-It's unfortunate that it didn't get tested in linux-next as it was pulled
-a while a ago.
-
-> Also, is this the expected result for the pre-1.0 firmware:
->
->     scpi_protocol scpi: SCP Protocol 0.0 Firmware 0.0.0 version
->
-
-I think so, since Amlogic has unreleased/draft version of the specification
-implemented, we did discuss to print something similar in the past.
+I assume that's the case even with the platform under regression now.
+The correct way to fix it would be to disable DVFS node but it may need
+some investigation to narrow down to this comment.
 
 --
 Regards,
