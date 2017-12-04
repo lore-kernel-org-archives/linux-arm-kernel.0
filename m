@@ -1,21 +1,21 @@
 From: robh@kernel.org (Rob Herring)
-Date: Mon, 4 Dec 2017 15:48:41 -0600
-Subject: [PATCH 1/3] dt-bindings: ARM: Mediatek: Fix ethsys documentation
-In-Reply-To: <20171201120708.30129-1-matthias.bgg@gmail.com>
-References: <20171201120708.30129-1-matthias.bgg@gmail.com>
-Message-ID: <20171204214841.mkkrms5fya4pnnwz@rob-hp-laptop>
+Date: Mon, 4 Dec 2017 15:51:12 -0600
+Subject: [PATCH v6 12/13] ASoC: add bindings for stm32 DFSDM filter
+In-Reply-To: <1512150020-20335-13-git-send-email-arnaud.pouliquen@st.com>
+References: <1512150020-20335-1-git-send-email-arnaud.pouliquen@st.com>
+ <1512150020-20335-13-git-send-email-arnaud.pouliquen@st.com>
+Message-ID: <20171204215112.upkujy6grec6urae@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 01:07:06PM +0100, Matthias Brugger wrote:
-> The ethsys registers a reset controller, so we need to specify a
-> reset cell. This patch fixes the documentation.
+On Fri, Dec 01, 2017 at 06:40:19PM +0100, Arnaud Pouliquen wrote:
+> Add bindings that describes audio settings to support
+> Digital Filter for pulse density modulation(PDM) microphone.
 > 
-> Signed-off-by: Matthias Brugger <matthias.bgg@gmail.com>
+> Signed-off-by: Arnaud Pouliquen <arnaud.pouliquen@st.com>
 > ---
->  Documentation/devicetree/bindings/arm/mediatek/mediatek,ethsys.txt | 1 +
->  1 file changed, 1 insertion(+)
+>  .../devicetree/bindings/sound/st,stm32-adfsdm.txt  | 62 ++++++++++++++++++++++
+>  1 file changed, 62 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/st,stm32-adfsdm.txt
 
-For all 3,
-
-Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Rob Herring <robh@kernel.org>
