@@ -1,42 +1,37 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Mon, 4 Dec 2017 14:30:53 +0530
-Subject: [PATCH 6/6] ARM: configs: keystone_defconfig: Enable few
- peripheral drivers
-In-Reply-To: <fb0c662b-d462-c663-7cf0-443ace3565ba@oracle.com>
-References: <20171123075154.3938-1-vigneshr@ti.com>
- <20171123075154.3938-7-vigneshr@ti.com>
- <fb0c662b-d462-c663-7cf0-443ace3565ba@oracle.com>
-Message-ID: <76a88f69-dd0b-8823-ae31-bd39b1abae87@ti.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 4 Dec 2017 09:02:56 +0000
+Subject: [PATCH v4 08/10] mfd: axp20x: add pinctrl cell for AXP813
+In-Reply-To: <CACRpkdZJ3gDqnLVW0NZMJiF7qRJSu-0Usys0tKfT-aep4bRxjg@mail.gmail.com>
+References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
+ <e0b4ce746c052b78f08dff54d0ad7ce7ebc611ab.1512135804.git-series.quentin.schulz@free-electrons.com>
+ <CACRpkdZJ3gDqnLVW0NZMJiF7qRJSu-0Usys0tKfT-aep4bRxjg@mail.gmail.com>
+Message-ID: <20171204090256.qgl6cdbwi65xv475@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, 02 Dec 2017, Linus Walleij wrote:
 
-On Sunday 03 December 2017 09:30 AM, santosh.shilimkar at oracle.com wrote:
-> On 11/22/17 11:51 PM, Vignesh R wrote:
->> Enable drivers for QSPI, LEDS, gpio-decoder that are present on 66AK2G
->> EVM
->> and 66AK2G ICE boards.
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
-> Please submit a patch also to enable all these peripherals
-> in multi-v7 config. Just enable all remainder
-> options enabled in keystone config also in multi-v7.
-
-K2 Platforms don't boot out of multi_v7_defconfig by default, because K2
-platforms require CONFIG_ARM_LPAE(which is disabled in multi-v7).
-
-If the intention is to just have all drivers enabled in
-keystone_defconfig to be added to multi_v7, I can prepare a patch for
-that and test with local patch to enable LPAE.
-
+> On Fri, Dec 1, 2017 at 2:44 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
 > 
-> Am pushing this series to next now.
+> > As GPIO/pinctrl driver now supports AXP813, add a cell for it.
+> >
+> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> > Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+> 
+> It doesn't seem to have any dependencies so I guess Lee can simply
+> apply this separately.
 
-Thanks!
+Yup!  Although, I'd prefer to wait for the other patches in the set to
+be applied.  In the mean time:
 
---
-Regards
-Vignesh
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
