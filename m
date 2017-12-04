@@ -1,75 +1,135 @@
-From: vinmenon@codeaurora.org (Vinayak Menon)
-Date: Mon,  4 Dec 2017 21:53:26 +0530
-Subject: [RFC PATCH] arm64: deactivate saved ttbr when mm is deactivated
-Message-ID: <1512404606-26498-1-git-send-email-vinmenon@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 4 Dec 2017 16:25:18 +0000
+Subject: [PATCH 07/12] arm64: mm: Place kImage at bottom of VA space
+In-Reply-To: <20171204141313.31604-8-steve.capper@arm.com>
+References: <20171204141313.31604-1-steve.capper@arm.com>
+ <20171204141313.31604-8-steve.capper@arm.com>
+Message-ID: <CAKv+Gu_A-fAMpheWbKZ+prEVKHR58er7sXz0L93Af1XhJrGZeQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A case is observed where a wrong physical address is read,
-resulting in a bus error and that happens soon after TTBR0 is
-set to the saved ttbr by uaccess_ttbr0_enable. This is always
-seen to happen in the exit path of the task.
+On 4 December 2017 at 14:13, Steve Capper <steve.capper@arm.com> wrote:
+> Re-arrange the kernel memory map s.t. the kernel image resides in the
+> bottom 514MB of memory.
 
-exception
-__arch_copy_from_user
-__copy_from_user
-probe_kernel_read
-get_freepointer_safe
-slab_alloc_node
-slab_alloc
-kmem_cache_alloc
-kmem_cache_zalloc
-fill_pool
-__debug_object_init
-debug_object_init
-rcuhead_fixup_activate
-debug_object_fixup
-debug_object_activate
-debug_rcu_head_queue
-__call_rcu
-ep_remove
-eventpoll_release_file
-__fput
-____fput
-task_work_run
-do_exit
+I guess this breaks KASLR entirely, no? Given that it adds an offset
+in the range [0 ... sizeof(VMALLOC_SPACE) /4 ].
 
-The mm has been released and the pgd is freed, but probe_kernel_read
-invoked from slub results in call to __arch_copy_from_user. At the
-entry to __arch_copy_from_user, when SW PAN is enabled, this results
-in stale value being set to ttbr0. May be a speculative fetch aftwerwards
-is resulting in invalid physical address access.
+In any case, it makes sense to keep the kernel VA space adjacent to
+the VMALLOC space, rather than put stuff like PCI I/O and the fixmap
+in between.
 
-Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
----
+> With the modules, fixed map, PCI IO space placed
+> above it. At the very bottom of the memory map we set aside a 2MB guard
+> region to prevent ambiguity with PTR_ERR/ERR_PTR.
+>
 
-I have not tested this patch to see if it fixes the problem.
-Sending it early for comments.
+Interesting. In another thread, we discussed whether it is necessary
+to prevent the linear map randomization code from allocating at the
+very top [bottom in Steve-speak] of the kernel virtual address space,
+and this is a thing I did not consider.
 
- arch/arm64/include/asm/mmu_context.h | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> Dynamically resizable objects such as KASAN shadow and sparsemem map
+> are placed above the fixed size objects.
+>
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a..48a3f04 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -221,7 +221,16 @@ static inline void __switch_mm(struct mm_struct *next)
- 		update_saved_ttbr0(tsk, next);
- }
- 
-+#ifdef CONFIG_ARM64_SW_TTBR0_PAN
-+static inline void deactivate_mm(struct task_struct *tsk, struct mm_struct *mm)
-+{
-+	if (system_uses_ttbr0_pan())
-+		task_thread_info(tsk)->ttbr0 = __pa_symbol(empty_zero_page);
-+}
-+#else
- #define deactivate_mm(tsk,mm)	do { } while (0)
-+#endif
-+
- #define activate_mm(prev,next)	switch_mm(prev, next, current)
- 
- void verify_cpu_asid_bits(void);
--- 
-QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a
-member of the Code Aurora Forum, hosted by The Linux Foundation
+The current placement of the sparsemem map was carefully chosen so
+that virt_to_page/page_to_virt translations are extremely cheap. Is
+that still the case?
+
+> This means that kernel addresses are now no longer directly dependent on
+> VA space size.
+>
+> Signed-off-by: Steve Capper <steve.capper@arm.com>
+> ---
+>  arch/arm64/include/asm/memory.h  | 17 +++++++++--------
+>  arch/arm64/include/asm/pgtable.h |  4 ++--
+>  arch/arm64/mm/dump.c             | 12 +++++++-----
+>  3 files changed, 18 insertions(+), 15 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
+> index 0a912eb3d74f..ba80561c6ed8 100644
+> --- a/arch/arm64/include/asm/memory.h
+> +++ b/arch/arm64/include/asm/memory.h
+> @@ -68,14 +68,15 @@
+>  #define PAGE_OFFSET            (UL(0xffffffffffffffff) - \
+>         (UL(1) << VA_BITS) + 1)
+>  #define PAGE_OFFSET_END                (VA_START)
+> -#define KIMAGE_VADDR           (MODULES_END)
+> -#define MODULES_END            (MODULES_VADDR + MODULES_VSIZE)
+> -#define MODULES_VADDR          (VA_START + KASAN_SHADOW_SIZE)
+> +#define KIMAGE_VSIZE           (SZ_512M)
+> +#define KIMAGE_VADDR           (UL(0) - SZ_2M - KIMAGE_VSIZE)
+>  #define MODULES_VSIZE          (SZ_128M)
+> -#define VMEMMAP_START          (-VMEMMAP_SIZE)
+> -#define PCI_IO_END             (VMEMMAP_START - SZ_2M)
+> +#define MODULES_END            (KIMAGE_VADDR)
+> +#define MODULES_VADDR          (MODULES_END - MODULES_VSIZE)
+> +#define PCI_IO_END             (MODULES_VADDR - SZ_2M)
+>  #define PCI_IO_START           (PCI_IO_END - PCI_IO_SIZE)
+> -#define FIXADDR_TOP            (PCI_IO_START - SZ_2M)
+> +#define FIXADDR_TOP            (PCI_IO_START - PGDIR_SIZE)
+> +#define VMEMMAP_START          (FIXADDR_START - VMEMMAP_SIZE)
+>
+>  #define KERNEL_START      _text
+>  #define KERNEL_END        _end
+> @@ -292,10 +293,10 @@ static inline void *phys_to_virt(phys_addr_t x)
+>  #define _virt_addr_valid(kaddr)        pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
+>  #else
+>  #define __virt_to_pgoff(kaddr) (((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
+> -#define __page_to_voff(kaddr)  (((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+> +#define __page_to_voff(kaddr)  (((u64)(kaddr) - VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
+>
+>  #define page_to_virt(page)     ((void *)((__page_to_voff(page)) | PAGE_OFFSET))
+> -#define virt_to_page(vaddr)    ((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
+> +#define virt_to_page(vaddr)    ((struct page *)((__virt_to_pgoff(vaddr)) + VMEMMAP_START))
+>
+>  #define _virt_addr_valid(kaddr)        pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
+>                                            + PHYS_OFFSET) >> PAGE_SHIFT)
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 054b37143a50..e8b4dcc11fed 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -30,8 +30,8 @@
+>   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space
+>   *     and fixed mappings
+>   */
+> -#define VMALLOC_START          (MODULES_END)
+> -#define VMALLOC_END            (- PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
+> +#define VMALLOC_START          (VA_START + KASAN_SHADOW_SIZE)
+> +#define VMALLOC_END            (FIXADDR_TOP - PUD_SIZE)
+>
+>  #define vmemmap                        ((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
+>
+> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
+> index b7b09c0fc50d..e5d1b5f432fe 100644
+> --- a/arch/arm64/mm/dump.c
+> +++ b/arch/arm64/mm/dump.c
+> @@ -36,17 +36,19 @@ static const struct addr_marker address_markers[] = {
+>         { KASAN_SHADOW_START,           "Kasan shadow start" },
+>         { KASAN_SHADOW_END,             "Kasan shadow end" },
+>  #endif
+> -       { MODULES_VADDR,                "Modules start" },
+> -       { MODULES_END,                  "Modules end" },
+>         { VMALLOC_START,                "vmalloc() Area" },
+>         { VMALLOC_END,                  "vmalloc() End" },
+> +#ifdef CONFIG_SPARSEMEM_VMEMMAP
+> +       { VMEMMAP_START,                "vmemmap start" },
+> +       { VMEMMAP_START + VMEMMAP_SIZE, "vmemmap end"},
+> +#endif
+>         { FIXADDR_START,                "Fixmap start" },
+>         { FIXADDR_TOP,                  "Fixmap end" },
+>         { PCI_IO_START,                 "PCI I/O start" },
+>         { PCI_IO_END,                   "PCI I/O end" },
+> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
+> -       { VMEMMAP_START,                "vmemmap" },
+> -#endif
+> +       { MODULES_VADDR,                "Modules start" },
+> +       { MODULES_END,                  "Modules end" },
+> +       { KIMAGE_VADDR,                 "kImage start"},
+>         { -1,                           NULL },
+>  };
+>
+> --
+> 2.11.0
+>
