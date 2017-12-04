@@ -1,64 +1,33 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Mon, 04 Dec 2017 10:17:39 +0100
-Subject: [PATCH 3/3] ARM64: dts: meson-axg: add PWM DT info for
- Meson-Axg SoC
-In-Reply-To: <20171204060018.8856-4-yixun.lan@amlogic.com>
-References: <20171204060018.8856-1-yixun.lan@amlogic.com>
- <20171204060018.8856-4-yixun.lan@amlogic.com>
-Message-ID: <1512379059.2574.17.camel@baylibre.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 4 Dec 2017 14:48:50 +0530
+Subject: [PATCH 3/6] cpufreq: sort the drivers in ARM part
+In-Reply-To: <20171201112508.14121-4-gregory.clement@free-electrons.com>
+References: <20171201112508.14121-1-gregory.clement@free-electrons.com>
+ <20171201112508.14121-4-gregory.clement@free-electrons.com>
+Message-ID: <20171204091850.iamq5uslv3hv6bez@vireshk-mac-ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2017-12-04 at 14:00 +0800, Yixun Lan wrote:
-> From: Jian Hu <jian.hu@amlogic.com>
+On 01-12-17, 12:25, Gregory CLEMENT wrote:
+> Keep the driver files alphabetically sorted.
 > 
-> Add PWM DT info for the Amlogic's Meson-Axg SoC.
-> 
-> Signed-off-by: Jian Hu <jian.hu@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 > ---
->  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 120
-> +++++++++++++++++++++++++++++
->  1 file changed, 120 insertions(+)
+>  drivers/cpufreq/Makefile | 8 ++++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> index 92f65eec3e18..f7f228701df1 100644
-> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
-> @@ -177,6 +177,24 @@
-> 
-
-[...]
-
-> 
-> @@ -435,6 +537,24 @@
->  				clock-names = "clk_i2c";
->  			};
+> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+> index 812f9e0d01a3..d762e76887e7 100644
+> --- a/drivers/cpufreq/Makefile
+> +++ b/drivers/cpufreq/Makefile
+> @@ -53,22 +53,24 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
+>  obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
 >  
-> +			pwm_AO_ab: pwm at 7000 {
-> +				compatible = "amlogic,meson-axg-ao-pwm";
-> +				reg = <0x0 0x07000 0x0 0x20>;
-> +				#pwm-cells = <3>;
-> +				clocks = <&xtal>, <&xtal>;
-> +				clock-names = "clkin0", "clkin1";
+>  obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
+> +obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
 
-like gxbb, "amlogic,meson-axg-ao-pwm" does not have such clock bindings,
-Later on, if we want to "correctly" get the clock from DT, it will have to gothrough a new compatible, I guess. 
+Shouldn't we add them in ascending order of the whole config name and not just
+CPPC_CPUFREQ ?
 
-> +				status = "disabled";
-> +			};
-> +
-> +			pwm_AO_cd: pwm at 2000 {
-> +				compatible = "amlogic,axg-ao-pwm";
-> +				reg = <0x0 0x02000  0x0 0x20>;
-> +				#pwm-cells = <3>;
-> +				clocks = <&xtal>, <&xtal>;
-> +				clock-names = "clkin0", "clkin1";
-> +				status = "disabled";
-> +			};
-> +
->  			uart_AO: serial at 3000 {
->  				compatible = "amlogic,meson-gx-uart",
-> "amlogic,meson-ao-uart";
->  				reg = <0x0 0x3000 0x0 0x18>;
+-- 
+viresh
