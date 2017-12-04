@@ -1,135 +1,58 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 4 Dec 2017 16:25:18 +0000
-Subject: [PATCH 07/12] arm64: mm: Place kImage at bottom of VA space
-In-Reply-To: <20171204141313.31604-8-steve.capper@arm.com>
-References: <20171204141313.31604-1-steve.capper@arm.com>
- <20171204141313.31604-8-steve.capper@arm.com>
-Message-ID: <CAKv+Gu_A-fAMpheWbKZ+prEVKHR58er7sXz0L93Af1XhJrGZeQ@mail.gmail.com>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Mon, 4 Dec 2017 16:24:47 +0000
+Subject: [PATCH 03/10] net: ezchip: nps_enet: Fix platform_get_irq's
+ error checking
+In-Reply-To: <20171204.112049.2189145622743900344.davem@davemloft.net>
+References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1512242782-7134-4-git-send-email-arvind.yadav.cs@gmail.com>
+ <20171204.112049.2189145622743900344.davem@davemloft.net>
+Message-ID: <20171204162447.GT10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 4 December 2017 at 14:13, Steve Capper <steve.capper@arm.com> wrote:
-> Re-arrange the kernel memory map s.t. the kernel image resides in the
-> bottom 514MB of memory.
+On Mon, Dec 04, 2017 at 11:20:49AM -0500, David Miller wrote:
+> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> Date: Sun,  3 Dec 2017 00:56:15 +0530
+> 
+> > The platform_get_irq() function returns negative if an error occurs.
+> > zero or positive number on success. platform_get_irq() error checking
+> > for zero is not correct. And remove unnecessary check for free_netdev().
+> > 
+> > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> > ---
+> >  drivers/net/ethernet/ezchip/nps_enet.c | 7 +++----
+> >  1 file changed, 3 insertions(+), 4 deletions(-)
+> > 
+> > diff --git a/drivers/net/ethernet/ezchip/nps_enet.c b/drivers/net/ethernet/ezchip/nps_enet.c
+> > index 659f1ad..82dc6d0 100644
+> > --- a/drivers/net/ethernet/ezchip/nps_enet.c
+> > +++ b/drivers/net/ethernet/ezchip/nps_enet.c
+> > @@ -623,9 +623,9 @@ static s32 nps_enet_probe(struct platform_device *pdev)
+> >  
+> >  	/* Get IRQ number */
+> >  	priv->irq = platform_get_irq(pdev, 0);
+> > -	if (!priv->irq) {
+> > +	if (priv->irq <= 0) {
+> >  		dev_err(dev, "failed to retrieve <irq Rx-Tx> value from device tree\n");
+> > -		err = -ENODEV;
+> > +		err = priv->irq ? priv->irq : -ENODEV;
+> 
+> If platform_get_irq() returns "zero or positive number on success" then this
+> test is wrong and should be "if (priv->irq < 0)"
+> 
+> Also, this series is a mix of different kinds of changes.
+> 
+> Please separate out the platform IRQ error checking and just submit exactly
+> those changes as a patch series.
+> 
+> The other bug fixes should be submitted outside of those changes since they
+> are unrelated.
 
-I guess this breaks KASLR entirely, no? Given that it adds an offset
-in the range [0 ... sizeof(VMALLOC_SPACE) /4 ].
+The issue of whether IRQ 0 is valid or not has been covered several times
+by Linus, and the result is that it is deemed by Linus that IRQ 0 is not
+a valid interrupt.
 
-In any case, it makes sense to keep the kernel VA space adjacent to
-the VMALLOC space, rather than put stuff like PCI I/O and the fixmap
-in between.
-
-> With the modules, fixed map, PCI IO space placed
-> above it. At the very bottom of the memory map we set aside a 2MB guard
-> region to prevent ambiguity with PTR_ERR/ERR_PTR.
->
-
-Interesting. In another thread, we discussed whether it is necessary
-to prevent the linear map randomization code from allocating at the
-very top [bottom in Steve-speak] of the kernel virtual address space,
-and this is a thing I did not consider.
-
-> Dynamically resizable objects such as KASAN shadow and sparsemem map
-> are placed above the fixed size objects.
->
-
-The current placement of the sparsemem map was carefully chosen so
-that virt_to_page/page_to_virt translations are extremely cheap. Is
-that still the case?
-
-> This means that kernel addresses are now no longer directly dependent on
-> VA space size.
->
-> Signed-off-by: Steve Capper <steve.capper@arm.com>
-> ---
->  arch/arm64/include/asm/memory.h  | 17 +++++++++--------
->  arch/arm64/include/asm/pgtable.h |  4 ++--
->  arch/arm64/mm/dump.c             | 12 +++++++-----
->  3 files changed, 18 insertions(+), 15 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-> index 0a912eb3d74f..ba80561c6ed8 100644
-> --- a/arch/arm64/include/asm/memory.h
-> +++ b/arch/arm64/include/asm/memory.h
-> @@ -68,14 +68,15 @@
->  #define PAGE_OFFSET            (UL(0xffffffffffffffff) - \
->         (UL(1) << VA_BITS) + 1)
->  #define PAGE_OFFSET_END                (VA_START)
-> -#define KIMAGE_VADDR           (MODULES_END)
-> -#define MODULES_END            (MODULES_VADDR + MODULES_VSIZE)
-> -#define MODULES_VADDR          (VA_START + KASAN_SHADOW_SIZE)
-> +#define KIMAGE_VSIZE           (SZ_512M)
-> +#define KIMAGE_VADDR           (UL(0) - SZ_2M - KIMAGE_VSIZE)
->  #define MODULES_VSIZE          (SZ_128M)
-> -#define VMEMMAP_START          (-VMEMMAP_SIZE)
-> -#define PCI_IO_END             (VMEMMAP_START - SZ_2M)
-> +#define MODULES_END            (KIMAGE_VADDR)
-> +#define MODULES_VADDR          (MODULES_END - MODULES_VSIZE)
-> +#define PCI_IO_END             (MODULES_VADDR - SZ_2M)
->  #define PCI_IO_START           (PCI_IO_END - PCI_IO_SIZE)
-> -#define FIXADDR_TOP            (PCI_IO_START - SZ_2M)
-> +#define FIXADDR_TOP            (PCI_IO_START - PGDIR_SIZE)
-> +#define VMEMMAP_START          (FIXADDR_START - VMEMMAP_SIZE)
->
->  #define KERNEL_START      _text
->  #define KERNEL_END        _end
-> @@ -292,10 +293,10 @@ static inline void *phys_to_virt(phys_addr_t x)
->  #define _virt_addr_valid(kaddr)        pfn_valid(__pa(kaddr) >> PAGE_SHIFT)
->  #else
->  #define __virt_to_pgoff(kaddr) (((u64)(kaddr) & ~PAGE_OFFSET) / PAGE_SIZE * sizeof(struct page))
-> -#define __page_to_voff(kaddr)  (((u64)(kaddr) & ~VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
-> +#define __page_to_voff(kaddr)  (((u64)(kaddr) - VMEMMAP_START) * PAGE_SIZE / sizeof(struct page))
->
->  #define page_to_virt(page)     ((void *)((__page_to_voff(page)) | PAGE_OFFSET))
-> -#define virt_to_page(vaddr)    ((struct page *)((__virt_to_pgoff(vaddr)) | VMEMMAP_START))
-> +#define virt_to_page(vaddr)    ((struct page *)((__virt_to_pgoff(vaddr)) + VMEMMAP_START))
->
->  #define _virt_addr_valid(kaddr)        pfn_valid((((u64)(kaddr) & ~PAGE_OFFSET) \
->                                            + PHYS_OFFSET) >> PAGE_SHIFT)
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 054b37143a50..e8b4dcc11fed 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -30,8 +30,8 @@
->   * VMALLOC_END: extends to the available space below vmmemmap, PCI I/O space
->   *     and fixed mappings
->   */
-> -#define VMALLOC_START          (MODULES_END)
-> -#define VMALLOC_END            (- PUD_SIZE - VMEMMAP_SIZE - SZ_64K)
-> +#define VMALLOC_START          (VA_START + KASAN_SHADOW_SIZE)
-> +#define VMALLOC_END            (FIXADDR_TOP - PUD_SIZE)
->
->  #define vmemmap                        ((struct page *)VMEMMAP_START - (memstart_addr >> PAGE_SHIFT))
->
-> diff --git a/arch/arm64/mm/dump.c b/arch/arm64/mm/dump.c
-> index b7b09c0fc50d..e5d1b5f432fe 100644
-> --- a/arch/arm64/mm/dump.c
-> +++ b/arch/arm64/mm/dump.c
-> @@ -36,17 +36,19 @@ static const struct addr_marker address_markers[] = {
->         { KASAN_SHADOW_START,           "Kasan shadow start" },
->         { KASAN_SHADOW_END,             "Kasan shadow end" },
->  #endif
-> -       { MODULES_VADDR,                "Modules start" },
-> -       { MODULES_END,                  "Modules end" },
->         { VMALLOC_START,                "vmalloc() Area" },
->         { VMALLOC_END,                  "vmalloc() End" },
-> +#ifdef CONFIG_SPARSEMEM_VMEMMAP
-> +       { VMEMMAP_START,                "vmemmap start" },
-> +       { VMEMMAP_START + VMEMMAP_SIZE, "vmemmap end"},
-> +#endif
->         { FIXADDR_START,                "Fixmap start" },
->         { FIXADDR_TOP,                  "Fixmap end" },
->         { PCI_IO_START,                 "PCI I/O start" },
->         { PCI_IO_END,                   "PCI I/O end" },
-> -#ifdef CONFIG_SPARSEMEM_VMEMMAP
-> -       { VMEMMAP_START,                "vmemmap" },
-> -#endif
-> +       { MODULES_VADDR,                "Modules start" },
-> +       { MODULES_END,                  "Modules end" },
-> +       { KIMAGE_VADDR,                 "kImage start"},
->         { -1,                           NULL },
->  };
->
-> --
-> 2.11.0
->
+-- 
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
