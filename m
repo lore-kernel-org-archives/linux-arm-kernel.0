@@ -1,70 +1,56 @@
-From: arvind.yadav.cs@gmail.com (arvindY)
-Date: Mon, 4 Dec 2017 22:14:51 +0530
-Subject: [PATCH 03/10] net: ezchip: nps_enet: Fix platform_get_irq's error
- checking
-In-Reply-To: <20171204164224.GU10595@n2100.armlinux.org.uk>
-References: <1512242782-7134-4-git-send-email-arvind.yadav.cs@gmail.com>
- <20171204.112049.2189145622743900344.davem@davemloft.net>
- <20171204162447.GT10595@n2100.armlinux.org.uk>
- <20171204.113448.651799079717687661.davem@davemloft.net>
- <20171204164224.GU10595@n2100.armlinux.org.uk>
-Message-ID: <5A257B83.7000803@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 4 Dec 2017 16:55:33 +0000
+Subject: [RFC PATCH] arm64: deactivate saved ttbr when mm is deactivated
+In-Reply-To: <1512404606-26498-1-git-send-email-vinmenon@codeaurora.org>
+References: <1512404606-26498-1-git-send-email-vinmenon@codeaurora.org>
+Message-ID: <20171204165533.GI29619@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Dec 04, 2017 at 09:53:26PM +0530, Vinayak Menon wrote:
+> A case is observed where a wrong physical address is read,
+> resulting in a bus error and that happens soon after TTBR0 is
+> set to the saved ttbr by uaccess_ttbr0_enable. This is always
+> seen to happen in the exit path of the task.
+> 
+> exception
+> __arch_copy_from_user
+> __copy_from_user
+> probe_kernel_read
+> get_freepointer_safe
+> slab_alloc_node
+> slab_alloc
+> kmem_cache_alloc
+> kmem_cache_zalloc
+> fill_pool
+> __debug_object_init
+> debug_object_init
+> rcuhead_fixup_activate
+> debug_object_fixup
+> debug_object_activate
+> debug_rcu_head_queue
+> __call_rcu
+> ep_remove
+> eventpoll_release_file
+> __fput
+> ____fput
+> task_work_run
+> do_exit
+> 
+> The mm has been released and the pgd is freed, but probe_kernel_read
+> invoked from slub results in call to __arch_copy_from_user. At the
+> entry to __arch_copy_from_user, when SW PAN is enabled, this results
+> in stale value being set to ttbr0. May be a speculative fetch aftwerwards
+> is resulting in invalid physical address access.
+> 
+> Signed-off-by: Vinayak Menon <vinmenon@codeaurora.org>
+> ---
+> 
+> I have not tested this patch to see if it fixes the problem.
+> Sending it early for comments.
 
+I wonder whether it would be better to avoid restoring the user TTBR0 if
+KERNEL_DS is set. We could do the same thing for PAN. Do we ever access
+user addresses under KERNEL_DS?
 
-On Monday 04 December 2017 10:12 PM, Russell King - ARM Linux wrote:
-> On Mon, Dec 04, 2017 at 11:34:48AM -0500, David Miller wrote:
->> From: Russell King - ARM Linux <linux@armlinux.org.uk>
->> Date: Mon, 4 Dec 2017 16:24:47 +0000
->>
->>> On Mon, Dec 04, 2017 at 11:20:49AM -0500, David Miller wrote:
->>>> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>>> Date: Sun,  3 Dec 2017 00:56:15 +0530
->>>>
->>>>> The platform_get_irq() function returns negative if an error occurs.
->>>>> zero or positive number on success. platform_get_irq() error checking
->>>>> for zero is not correct. And remove unnecessary check for free_netdev().
->>>>>
->>>>> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>>>> ---
->>>>>   drivers/net/ethernet/ezchip/nps_enet.c | 7 +++----
->>>>>   1 file changed, 3 insertions(+), 4 deletions(-)
->>>>>
->>>>> diff --git a/drivers/net/ethernet/ezchip/nps_enet.c b/drivers/net/ethernet/ezchip/nps_enet.c
->>>>> index 659f1ad..82dc6d0 100644
->>>>> --- a/drivers/net/ethernet/ezchip/nps_enet.c
->>>>> +++ b/drivers/net/ethernet/ezchip/nps_enet.c
->>>>> @@ -623,9 +623,9 @@ static s32 nps_enet_probe(struct platform_device *pdev)
->>>>>   
->>>>>   	/* Get IRQ number */
->>>>>   	priv->irq = platform_get_irq(pdev, 0);
->>>>> -	if (!priv->irq) {
->>>>> +	if (priv->irq <= 0) {
->>>>>   		dev_err(dev, "failed to retrieve <irq Rx-Tx> value from device tree\n");
->>>>> -		err = -ENODEV;
->>>>> +		err = priv->irq ? priv->irq : -ENODEV;
->>>> If platform_get_irq() returns "zero or positive number on success" then this
->>>> test is wrong and should be "if (priv->irq < 0)"
->>>>
->>>> Also, this series is a mix of different kinds of changes.
->>>>
->>>> Please separate out the platform IRQ error checking and just submit exactly
->>>> those changes as a patch series.
->>>>
->>>> The other bug fixes should be submitted outside of those changes since they
->>>> are unrelated.
->>> The issue of whether IRQ 0 is valid or not has been covered several times
->>> by Linus, and the result is that it is deemed by Linus that IRQ 0 is not
->>> a valid interrupt.
->> Then either platform_get_irq() as defined or this commit message (or both)
->> are wrong.
-> Indeed, the commit message is wrong, and that's already been pointed out
-> in previous patch sets.
->
-I will change commit message.  Commit message will be
-  " The platform_get_irq() function returns negative if an
-error occurs, Zero if No irq found and positive number
-on get irq successful. platform_get_irq() error checking for
-only zero is not correct."
+Will
