@@ -1,15 +1,15 @@
 From: broonie@kernel.org (Mark Brown)
-Date: Mon, 04 Dec 2017 18:48:24 +0000
-Subject: Applied "MAINTAINERS: add entries for UniPhier ASoC sound drivers" to
- the asoc tree
-In-Reply-To: <20171122114321.29196-8-suzuki.katsuhiro@socionext.com>
-Message-ID: <E1eLvmy-0000Gd-N2@debutante>
+Date: Mon, 04 Dec 2017 18:48:45 +0000
+Subject: Applied "ASoC: uniphier: add DT bindings documentation for UniPhier
+ EVEA" to the asoc tree
+In-Reply-To: <20171122114321.29196-3-suzuki.katsuhiro@socionext.com>
+Message-ID: <E1eLvnJ-0000JQ-6S@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 The patch
 
-   MAINTAINERS: add entries for UniPhier ASoC sound drivers
+   ASoC: uniphier: add DT bindings documentation for UniPhier EVEA
 
 has been applied to the asoc tree at
 
@@ -34,33 +34,54 @@ to this mail.
 Thanks,
 Mark
 
->From 576f8f46e7c923f830dfa61924ad547447399b05 Mon Sep 17 00:00:00 2001
+>From e85c8d3e25c09fd9b21ba74e14078ab4c1d977ef Mon Sep 17 00:00:00 2001
 From: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-Date: Wed, 22 Nov 2017 20:43:20 +0900
-Subject: [PATCH] MAINTAINERS: add entries for UniPhier ASoC sound drivers
+Date: Wed, 22 Nov 2017 20:43:15 +0900
+Subject: [PATCH] ASoC: uniphier: add DT bindings documentation for UniPhier
+ EVEA
+
+This patch adds DT binding documentation for UniPhier EVEA
+that is SoC inner sound codec of UniPhier series.
 
 Signed-off-by: Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
+Acked-by: Rob Herring <robh@kernel.org>
 Signed-off-by: Mark Brown <broonie@kernel.org>
 ---
- MAINTAINERS | 6 ++++++
- 1 file changed, 6 insertions(+)
+ .../devicetree/bindings/sound/uniphier,evea.txt    | 26 ++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/uniphier,evea.txt
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aa71ab52fd76..55ae8ea8722a 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -12581,6 +12581,12 @@ F:	include/media/soc*
- F:	drivers/media/i2c/soc_camera/
- F:	drivers/media/platform/soc_camera/
- 
-+SOCIONEXT UNIPHIER SOUND DRIVER
-+M:	Katsuhiro Suzuki <suzuki.katsuhiro@socionext.com>
-+L:	alsa-devel at alsa-project.org (moderated for non-subscribers)
-+S:	Maintained
-+F:	sound/soc/uniphier/
+diff --git a/Documentation/devicetree/bindings/sound/uniphier,evea.txt b/Documentation/devicetree/bindings/sound/uniphier,evea.txt
+new file mode 100644
+index 000000000000..3f31b235f18b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/sound/uniphier,evea.txt
+@@ -0,0 +1,26 @@
++Socionext EVEA - UniPhier SoC internal codec driver
 +
- SOEKRIS NET48XX LED SUPPORT
- M:	Chris Boot <bootc@bootc.net>
- S:	Maintained
++Required properties:
++- compatible      : should be "socionext,uniphier-evea".
++- reg             : offset and length of the register set for the device.
++- clock-names     : should include following entries:
++                    "evea", "exiv"
++- clocks          : a list of phandle, should contain an entry for each
++                    entries in clock-names.
++- reset-names     : should include following entries:
++                    "evea", "exiv", "adamv"
++- resets          : a list of phandle, should contain reset entries of
++                    reset-names.
++- #sound-dai-cells: should be 1.
++
++Example:
++
++	codec {
++		compatible = "socionext,uniphier-evea";
++		reg = <0x57900000 0x1000>;
++		clock-names = "evea", "exiv";
++		clocks = <&sys_clk 41>, <&sys_clk 42>;
++		reset-names = "evea", "exiv", "adamv";
++		resets = <&sys_rst 41>, <&sys_rst 42>, <&adamv_rst 0>;
++		#sound-dai-cells = <1>;
++	};
 -- 
 2.15.0
