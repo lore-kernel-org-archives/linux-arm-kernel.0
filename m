@@ -1,24 +1,139 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Mon, 4 Dec 2017 12:35:52 -0800
-Subject: [PATCH 2/2] ahci: mtk: Change driver name to ahci-mtk
-In-Reply-To: <20171201104722.17353-1-matthias.bgg@gmail.com>
-References: <20171201104722.17353-1-matthias.bgg@gmail.com>
-Message-ID: <20171204203552.GI2421075@devbig577.frc2.facebook.com>
+From: cdall@kernel.org (Christoffer Dall)
+Date: Mon,  4 Dec 2017 21:35:26 +0100
+Subject: [PATCH v3 04/16] KVM: Move vcpu_load to arch-specific
+ kvm_arch_vcpu_ioctl_get_regs
+In-Reply-To: <20171204203538.8370-1-cdall@kernel.org>
+References: <20171204203538.8370-1-cdall@kernel.org>
+Message-ID: <20171204203538.8370-5-cdall@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 01, 2017 at 11:47:22AM +0100, Matthias Brugger wrote:
-> The driver name "ahci" is already used by the ahci platform driver.
-> This leads to the following error:
-> Error: Driver 'ahci' is already registered, aborting...
-> 
-> Change the name to ahci-mtk to fix this.
-> 
-> Signed-off-by: Matthias Brugger <mbrugger@suse.com>
+From: Christoffer Dall <christoffer.dall@linaro.org>
 
-Applied to libata/for-4.15-fixes.
+Move vcpu_load() and vcpu_put() into the architecture specific
+implementations of kvm_arch_vcpu_ioctl_get_regs().
 
-Thanks.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/mips/kvm/mips.c      | 3 +++
+ arch/powerpc/kvm/book3s.c | 3 +++
+ arch/powerpc/kvm/booke.c  | 3 +++
+ arch/s390/kvm/kvm-s390.c  | 2 ++
+ arch/x86/kvm/x86.c        | 3 +++
+ virt/kvm/kvm_main.c       | 2 --
+ 6 files changed, 14 insertions(+), 2 deletions(-)
 
+diff --git a/arch/mips/kvm/mips.c b/arch/mips/kvm/mips.c
+index b5c28f0730f8..adfca57420d1 100644
+--- a/arch/mips/kvm/mips.c
++++ b/arch/mips/kvm/mips.c
+@@ -1165,6 +1165,8 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ {
+ 	int i;
+ 
++	vcpu_load(vcpu);
++
+ 	for (i = 0; i < ARRAY_SIZE(vcpu->arch.gprs); i++)
+ 		regs->gpr[i] = vcpu->arch.gprs[i];
+ 
+@@ -1172,6 +1174,7 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ 	regs->lo = vcpu->arch.lo;
+ 	regs->pc = vcpu->arch.pc;
+ 
++	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+diff --git a/arch/powerpc/kvm/book3s.c b/arch/powerpc/kvm/book3s.c
+index 72d977e30952..d85bfd733ccd 100644
+--- a/arch/powerpc/kvm/book3s.c
++++ b/arch/powerpc/kvm/book3s.c
+@@ -497,6 +497,8 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ {
+ 	int i;
+ 
++	vcpu_load(vcpu);
++
+ 	regs->pc = kvmppc_get_pc(vcpu);
+ 	regs->cr = kvmppc_get_cr(vcpu);
+ 	regs->ctr = kvmppc_get_ctr(vcpu);
+@@ -518,6 +520,7 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ 	for (i = 0; i < ARRAY_SIZE(regs->gpr); i++)
+ 		regs->gpr[i] = kvmppc_get_gpr(vcpu, i);
+ 
++	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+diff --git a/arch/powerpc/kvm/booke.c b/arch/powerpc/kvm/booke.c
+index 83b485810aea..e0e4f04c5535 100644
+--- a/arch/powerpc/kvm/booke.c
++++ b/arch/powerpc/kvm/booke.c
+@@ -1431,6 +1431,8 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ {
+ 	int i;
+ 
++	vcpu_load(vcpu);
++
+ 	regs->pc = vcpu->arch.pc;
+ 	regs->cr = kvmppc_get_cr(vcpu);
+ 	regs->ctr = vcpu->arch.ctr;
+@@ -1452,6 +1454,7 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ 	for (i = 0; i < ARRAY_SIZE(regs->gpr); i++)
+ 		regs->gpr[i] = kvmppc_get_gpr(vcpu, i);
+ 
++	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+diff --git a/arch/s390/kvm/kvm-s390.c b/arch/s390/kvm/kvm-s390.c
+index 2b3e874ea76c..37b7caae2484 100644
+--- a/arch/s390/kvm/kvm-s390.c
++++ b/arch/s390/kvm/kvm-s390.c
+@@ -2718,7 +2718,9 @@ int kvm_arch_vcpu_ioctl_set_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ 
+ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ {
++	vcpu_load(vcpu);
+ 	memcpy(&regs->gprs, &vcpu->run->s.regs.gprs, sizeof(regs->gprs));
++	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+diff --git a/arch/x86/kvm/x86.c b/arch/x86/kvm/x86.c
+index d9deb6222055..597e1f8fc8da 100644
+--- a/arch/x86/kvm/x86.c
++++ b/arch/x86/kvm/x86.c
+@@ -7309,6 +7309,8 @@ int kvm_arch_vcpu_ioctl_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
+ 
+ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ {
++	vcpu_load(vcpu);
++
+ 	if (vcpu->arch.emulate_regs_need_sync_to_vcpu) {
+ 		/*
+ 		 * We are here if userspace calls get_regs() in the middle of
+@@ -7342,6 +7344,7 @@ int kvm_arch_vcpu_ioctl_get_regs(struct kvm_vcpu *vcpu, struct kvm_regs *regs)
+ 	regs->rip = kvm_rip_read(vcpu);
+ 	regs->rflags = kvm_get_rflags(vcpu);
+ 
++	vcpu_put(vcpu);
+ 	return 0;
+ }
+ 
+diff --git a/virt/kvm/kvm_main.c b/virt/kvm/kvm_main.c
+index 198f2f9edcaf..843d481f58cb 100644
+--- a/virt/kvm/kvm_main.c
++++ b/virt/kvm/kvm_main.c
+@@ -2552,9 +2552,7 @@ static long kvm_vcpu_ioctl(struct file *filp,
+ 		kvm_regs = kzalloc(sizeof(struct kvm_regs), GFP_KERNEL);
+ 		if (!kvm_regs)
+ 			goto out;
+-		vcpu_load(vcpu);
+ 		r = kvm_arch_vcpu_ioctl_get_regs(vcpu, kvm_regs);
+-		vcpu_put(vcpu);
+ 		if (r)
+ 			goto out_free1;
+ 		r = -EFAULT;
 -- 
-tejun
+2.14.2
