@@ -1,60 +1,37 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 04 Dec 2017 13:54:27 +0100
-Subject: [PATCH v2 10/12] ARM: dts: imx6q-h100: Remove unneeded unit
- address
-In-Reply-To: <1512390016-703-10-git-send-email-festevam@gmail.com>
-References: <1512390016-703-1-git-send-email-festevam@gmail.com>
- <1512390016-703-10-git-send-email-festevam@gmail.com>
-Message-ID: <1512392067.6394.6.camel@pengutronix.de>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 4 Dec 2017 08:17:20 -0500
+Subject: [PATCH V2 3/7] PCI: make pci_flr_wait() generic and rename to
+ pci_dev_wait()
+In-Reply-To: <20171129173801.GD27742@infradead.org>
+References: <1511763628-11856-1-git-send-email-okaya@codeaurora.org>
+ <1511763628-11856-4-git-send-email-okaya@codeaurora.org>
+ <20171129173801.GD27742@infradead.org>
+Message-ID: <0248af7b-0459-2b77-e439-bfcdfebcd7f6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, den 04.12.2017, 10:20 -0200 schrieb Fabio Estevam:
-> From: Fabio Estevam <fabio.estevam@nxp.com>
+On 11/29/2017 12:38 PM, Christoph Hellwig wrote:
+> On Mon, Nov 27, 2017 at 01:20:24AM -0500, Sinan Kaya wrote:
+>> Rev 3.1 Sec 2.3.1 Request Handling Rules:
+>> Valid reset conditions after which a device is permitted to return CRS
+>> are:
+>> * Cold, Warm, and Hot Resets,
+>> * FLR
+>> * A reset initiated in response to a D3hot to D0 uninitialized
+>>
+>> Try to reuse FLR implementation towards other reset types.
 > 
-> Remove the unneeded unit address for the port nodes in order to fix
-> the following build warnings with W=1:
+> Should we keep a helper for the FLR wait?  If not I guess the reference
+> for AF_FLR should be the PCI spec, not the PCIE spec.
 > 
-> arch/arm/boot/dts/imx6q-h100.dtb: Warning (unit_address_vs_reg): Node
-> /soc/aips-bus at 2100000/i2c at 21a0000/tc358743 at f/port at 0 has a unit name,
-> but no reg property
-> arch/arm/boot/dts/imx6q-h100.dtb: Warning (unit_address_vs_reg): Node
-> /soc/aips-bus at 2100000/mipi at 21dc000/port at 0 has a unit name, but no reg
-> property
-> 
-> Cc: Lucas Stach <l.stach@pengutronix.de>
-> Signed-off-by: Fabio Estevam <fabio.estevam@nxp.com>
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Bjorn,
 
-> ---
-> Changes since v1:
-> - None
-> 
-> ?arch/arm/boot/dts/imx6q-h100.dts | 4 ++--
-> ?1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx6q-h100.dts
-> b/arch/arm/boot/dts/imx6q-h100.dts
-> index 743c11f..cc1ce46 100644
-> --- a/arch/arm/boot/dts/imx6q-h100.dts
-> +++ b/arch/arm/boot/dts/imx6q-h100.dts
-> @@ -205,7 +205,7 @@
-> ?		reset-gpios = <&gpio6 15 GPIO_ACTIVE_LOW>;
-> ?		/* IRQ has a wrong pull resistor which renders it
-> useless??*/
-> ?
-> -		port at 0 {
-> +		port {
-> ?			tc358743_out: endpoint {
-> ?				remote-endpoint = <&mipi_csi2_in>;
-> ?				data-lanes = <1 2 3 4>;
-> @@ -348,7 +348,7 @@
-> ?&mipi_csi {
-> ?	status = "okay";
-> ?
-> -	port at 0 {
-> +	port {
-> ?		mipi_csi2_in: endpoint {
-> ?			remote-endpoint = <&tc358743_out>;
-> ?			data-lanes = <1 2 3 4>;
+what is your opinion?
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
