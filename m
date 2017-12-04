@@ -1,35 +1,32 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Mon,  4 Dec 2017 15:12:54 +0100
-Subject: [PATCH 8/8] ARM: dtsi: sun8i: a711: enable battery power supply
- subnode
+Date: Mon,  4 Dec 2017 15:12:52 +0100
+Subject: [PATCH 6/8] mfd: axp20x: add battery power supply cell for AXP813
 In-Reply-To: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
 References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <2af471ef9bee675a2cf411b9d2dd602eb4aa448b.1512396054.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <9b5e9ed623165d0586f086343a7c67bc5c18bbb5.1512396054.git-series.quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The TBS A711 has an AXP813 PMIC and a soldered battery, thus, we enable
-the battery power supply subnode in its Device Tree.
+As axp20x-battery-power-supply now supports AXP813, add a cell for it.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/mfd/axp20x.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-index 9871553..806cb17 100644
---- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-+++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
-@@ -181,6 +181,10 @@
+diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+index 42e54d1..7566358 100644
+--- a/drivers/mfd/axp20x.c
++++ b/drivers/mfd/axp20x.c
+@@ -880,6 +880,9 @@ static struct mfd_cell axp813_cells[] = {
+ 		.name			= "axp20x-regulator",
+ 	}, {
+ 		.name			= "axp813-adc",
++	}, {
++		.name			= "axp20x-battery-power-supply",
++		.of_compatible		= "x-powers,axp813-battery-power-supply",
+ 	},
+ };
  
- #include "axp81x.dtsi"
- 
-+&battery_power_supply {
-+	status = "okay";
-+};
-+
- &reg_aldo1 {
- 	regulator-min-microvolt = <1800000>;
- 	regulator-max-microvolt = <1800000>;
 -- 
 git-series 0.9.1
