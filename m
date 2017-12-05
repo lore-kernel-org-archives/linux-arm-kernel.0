@@ -1,34 +1,40 @@
-From: borntraeger@de.ibm.com (Christian Borntraeger)
-Date: Tue, 5 Dec 2017 15:32:30 +0100
-Subject: [PATCH v3 01/16] KVM: Take vcpu->mutex outside vcpu_load
-In-Reply-To: <20171204203538.8370-2-cdall@kernel.org>
-References: <20171204203538.8370-1-cdall@kernel.org>
- <20171204203538.8370-2-cdall@kernel.org>
-Message-ID: <241fe130-bc3f-533e-4bef-604b04b9818d@de.ibm.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Tue, 5 Dec 2017 14:38:58 +0000
+Subject: Tegra baseline test results for v4.15-rc2
+In-Reply-To: <027eb309-4c8c-088a-8f12-da51269c1dc2@collabora.com>
+References: <acc93fae-7fb0-71c1-c839-8c7b0e6cfb5e@nvidia.com>
+ <027eb309-4c8c-088a-8f12-da51269c1dc2@collabora.com>
+Message-ID: <a31d99c2-74b6-2c02-ffc5-4fbe0dae7ec6@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 12/04/2017 09:35 PM, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
+On 05/12/17 14:23, Guillaume Tucker wrote:
+> On 05/12/17 14:05, Jon Hunter wrote:
+>> Here are some basic Tegra test results for Linux v4.15-rc2.
+>> Logs and other details at:
+>>
+>> ??? https://nvtb.github.io//linux/test_v4.15-rc2/20171204140104/
+> [...]
+>> Boot to userspace: multi_v7_defconfig:
+>> ??? FAIL: ( 1/ 5): tegra124-nyan-big
 > 
-> As we're about to call vcpu_load() from architecture-specific
-> implementations of the KVM vcpu ioctls, but yet we access data
-> structures protected by the vcpu->mutex in the generic code, factor
-> this logic out from vcpu_load().
+> Thanks for the report.? Following up on the automated bisection
+> runs, I've found 2 independent issues that both cause a kernel
+> hang on tegra124-nyan-big and sent some patches to address them
+> yesterday:
 > 
-> x86 is the only architecture which calls vcpu_load() outside of the main
-> vcpu ioctl function, and these calls will no longer take the vcpu mutex
-> following this patch.  However, with the exception of
-> kvm_arch_vcpu_postcreate (see below), the callers are either in the
-> creation or destruction path of the VCPU, which means there cannot be
-> any concurrent access to the data structure, because the file descriptor
-> is not yet accessible, or is already gone.
-> 
-> kvm_arch_vcpu_postcreate makes the newly created vcpu potentially
-> accessible by other in-kernel threads through the kvm->vcpus array, and
-> we therefore take the vcpu mutex in this case directly.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ?
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545681.html
 
-Looks good to me.
+Yes, I have seen those and thanks for sending. The above failure is
+caused by the CROS EC bug [0]. Lee Jones has picked up the fix which are
+now in -next and hopefully, will appear in the mainline soon.
+
+Cheers
+Jon
+
+[0] https://patchwork.kernel.org/patch/9974835/
+
+-- 
+nvpublic
