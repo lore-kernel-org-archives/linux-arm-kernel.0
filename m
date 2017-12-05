@@ -1,90 +1,48 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 5 Dec 2017 16:47:46 +0000
-Subject: [PATCH v6 6/8] KVM: arm/arm64: Support VGIC dist pend/active
- changes for mapped IRQs
-In-Reply-To: <20171205150328.gcwnt5jzmoarvetd@yury-thinkpad>
-References: <20171204200506.3224-1-cdall@kernel.org>
- <20171204200506.3224-7-cdall@kernel.org>
- <20171205150328.gcwnt5jzmoarvetd@yury-thinkpad>
-Message-ID: <3cd51419-cd43-998d-f801-407b805eb9a2@arm.com>
+From: santosh.shilimkar@oracle.com (Santosh Shilimkar)
+Date: Tue, 5 Dec 2017 08:49:51 -0800
+Subject: [PATCH] ARM: multi_v7_defconfig: Add configs for peripherals on
+ Keystone2 SoCs
+In-Reply-To: <20171205091940.22957-1-vigneshr@ti.com>
+References: <20171205091940.22957-1-vigneshr@ti.com>
+Message-ID: <fffba75f-6674-f293-d2c5-53eb477c0e76@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/17 15:03, Yury Norov wrote:
-> On Mon, Dec 04, 2017 at 09:05:04PM +0100, Christoffer Dall wrote:
->> From: Christoffer Dall <christoffer.dall@linaro.org>
->>
->> For mapped IRQs (with the HW bit set in the LR) we have to follow some
->> rules of the architecture.  One of these rules is that VM must not be
->> allowed to deactivate a virtual interrupt with the HW bit set unless the
->> physical interrupt is also active.
->>
->> This works fine when injecting mapped interrupts, because we leave it up
->> to the injector to either set EOImode==1 or manually set the active
->> state of the physical interrupt.
->>
->> However, the guest can set virtual interrupt to be pending or active by
->> writing to the virtual distributor, which could lead to deactivating a
->> virtual interrupt with the HW bit set without the physical interrupt
->> being active.
->>
->> We could set the physical interrupt to active whenever we are about to
->> enter the VM with a HW interrupt either pending or active, but that
->> would be really slow, especially on GICv2.  So we take the long way
->> around and do the hard work when needed, which is expected to be
->> extremely rare.
->>
->> When the VM sets the pending state for a HW interrupt on the virtual
->> distributor we set the active state on the physical distributor, because
->> the virtual interrupt can become active and then the guest can
->> deactivate it.
->>
->> When the VM clears the pending state we also clear it on the physical
->> side, because the injector might otherwise raise the interrupt.  We also
->> clear the physical active state when the virtual interrupt is not
->> active, since otherwise a SPEND/CPEND sequence from the guest would
->> prevent signaling of future interrupts.
->>
->> Changing the state of mapped interrupts from userspace is not supported,
->> and it's expected that userspace unmaps devices from VFIO before
->> attempting to set the interrupt state, because the interrupt state is
->> driven by hardware.
->>
->> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
->> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
->> ---
->>  virt/kvm/arm/vgic/vgic-mmio.c | 71 +++++++++++++++++++++++++++++++++++++++----
->>  virt/kvm/arm/vgic/vgic.c      |  7 +++++
->>  virt/kvm/arm/vgic/vgic.h      |  1 +
->>  3 files changed, 73 insertions(+), 6 deletions(-)
->>
->> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
->> index 747b0a3b4784..8d173d99a7a4 100644
->> --- a/virt/kvm/arm/vgic/vgic-mmio.c
->> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
->> @@ -16,6 +16,7 @@
->>  #include <linux/kvm.h>
->>  #include <linux/kvm_host.h>
->>  #include <kvm/iodev.h>
->> +#include <kvm/arm_arch_timer.h>
->>  #include <kvm/arm_vgic.h>
->>  
->>  #include "vgic.h"
->> @@ -143,10 +144,22 @@ static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
->>  	return vcpu;
->>  }
->>  
->> +/* Must be called with irq->irq_lock held */
+On 12/5/2017 1:19 AM, Vignesh R wrote:
+> Enable Cadence QSPI present on 66AK2G SoC and Keystone USB PHY driver
+> for K2E.
 > 
-> Instead of enforcing this rule in comment, you can enforce it in code:
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> ---
+>   arch/arm/configs/multi_v7_defconfig | 2 ++
+>   1 file changed, 2 insertions(+)
 > 
-> BUG_ON(!spin_is_locked(irq->irq_lock))
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 992a8a5da065..c4f4f6682ea5 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -185,6 +185,7 @@ CONFIG_MTD_NAND_BRCMNAND=y
+>   CONFIG_MTD_NAND_VF610_NFC=y
+>   CONFIG_MTD_NAND_DAVINCI=y
+>   CONFIG_MTD_SPI_NOR=y
+> +CONFIG_SPI_CADENCE_QUADSPI=m
+>   CONFIG_SPI_FSL_QUADSPI=m
+>   CONFIG_MTD_UBI=y
+>   CONFIG_BLK_DEV_LOOP=y
+> @@ -675,6 +676,7 @@ CONFIG_USB_CHIPIDEA_HOST=y
+>   CONFIG_USB_ISP1760=y
+>   CONFIG_USB_HSIC_USB3503=y
+>   CONFIG_AB8500_USB=y
+> +CONFIG_KEYSTONE_USB_PHY=m
+>   CONFIG_NOP_USB_XCEIV=m
+>   CONFIG_USB_GPIO_VBUS=y
+>   CONFIG_USB_ISP1301=y
+> 
+There are more peripherals/drivers which are enabled
+in keystone config.
 
-Are we going to litter the kernel with such assertions? I don't think
-that's a valuable thing to do.
+PWM_TIECAP, CAN_C_CAN, RESET_TI_SYSCON, TI_SCI_PROTOCOL,
+TI_MESSAGE_MANAGER, NOP_USB_XCEIV, GPIO_PCA953X etc etc
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Could please check the complete config and update the
+patch please ?
