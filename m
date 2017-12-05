@@ -1,175 +1,136 @@
-From: mathias.nyman@linux.intel.com (Mathias Nyman)
-Date: Tue, 5 Dec 2017 10:48:49 +0200
-Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
-In-Reply-To: <99ea0ee4-1fff-73df-d9b5-0f756dfc5635@codeaurora.org>
-References: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
- <1512440100.17567.172.camel@mhfsdcap03>
- <99ea0ee4-1fff-73df-d9b5-0f756dfc5635@codeaurora.org>
-Message-ID: <f5ca26d2-9432-2ae3-7501-5b3dcf1e1486@linux.intel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 5 Dec 2017 08:59:33 +0000
+Subject: [PATCH] irqchip/gic-v3: Fix the driver probe() fail due to
+ disabled GICC entry
+In-Reply-To: <383ff5f3-44e9-e654-f421-2ac5bac2419a@codeaurora.org>
+References: <1512343269-19327-1-git-send-email-shankerd@codeaurora.org>
+ <8a926bff-f8aa-220c-85f0-9d39ec5bef4b@arm.com>
+ <383ff5f3-44e9-e654-f421-2ac5bac2419a@codeaurora.org>
+Message-ID: <a854553a-f751-842d-c813-1871b18aae75@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.12.2017 04:54, Adam Wallis wrote:
-> On 12/4/2017 9:15 PM, Chunfeng Yun wrote:
->> On Mon, 2017-12-04 at 09:27 -0500, Adam Wallis wrote:
->>> The xHCI driver currently has the IMOD set to 160, which
->>> translates to an IMOD interval of 40,000ns (160 * 250)ns
+On 04/12/17 14:04, Shanker Donthineni wrote:
+> Hi Thanks,
+> 
+> On 12/04/2017 04:28 AM, Marc Zyngier wrote:
+>> On 03/12/17 23:21, Shanker Donthineni wrote:
+>>> As per MADT specification, it's perfectly valid firmware can pass
+>>> MADT table to OS with disabled GICC entries. ARM64-SMP code skips
+>>> those cpu cores to bring online. However the current GICv3 driver
+>>> probe bails out in this case on systems where redistributor regions
+>>> are not in the always-on power domain.
 >>>
->>> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
->>> introduced a QUIRK for the MTK platform to adjust this interval to 20,
->>> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
->>> due to the fact that the MTK controller IMOD interval is 8 times
->>> as much as defined in xHCI spec.
+>>> This patch does the two things to fix the panic.
+>>>   - Don't return an error in gic_acpi_match_gicc() for disabled GICC.
+>>>   - No need to keep GICR region information for disabled GICC.
 >>>
->>> Instead of adding more quirk bits for additional platforms, this patch
->>> introduces the ability for vendors to set the IMOD_INTERVAL as is
->>> optimal for their platform. By using device_property_read_u32() on
->>> "imod-interval-ns", the IMOD INTERVAL can be specified in nano seconds.
->>> If no interval is specified, the default of 40,000ns (IMOD=160) will be
->>> used.
+>>> Kernel crash traces:
+>>>   Kernel panic - not syncing: No interrupt controller found.
+>>>   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.13.5 #26
+>>>   [<ffff000008087770>] dump_backtrace+0x0/0x218
+>>>   [<ffff0000080879dc>] show_stack+0x14/0x20
+>>>   [<ffff00000883b078>] dump_stack+0x98/0xb8
+>>>   [<ffff0000080c5c14>] panic+0x118/0x26c
+>>>   [<ffff000008b62348>] init_IRQ+0x24/0x2c
+>>>   [<ffff000008b609fc>] start_kernel+0x230/0x394
+>>>   [<ffff000008b601e4>] __primary_switched+0x64/0x6c
+>>>   ---[ end Kernel panic - not syncing: No interrupt controller found.
 >>>
->>> No bounds checking has been implemented due to the fact that a vendor
->>> may have violated the spec and would need to specify a value outside of
->>> the max 8,000 IRQs/second limit specified in the xHCI spec.
+>>> Disabled GICC subtable example:
+>>>                    Subtable Type : 0B [Generic Interrupt Controller]
+>>>                           Length : 50
+>>>                         Reserved : 0000
+>>>             CPU Interface Number : 0000003D
+>>>                    Processor UID : 0000003D
+>>>            Flags (decoded below) : 00000000
+>>>                Processor Enabled : 0
+>>>  Performance Interrupt Trig Mode : 0
+>>>  Virtual GIC Interrupt Trig Mode : 0
+>>>         Parking Protocol Version : 00000000
+>>>            Performance Interrupt : 00000017
+>>>                   Parked Address : 0000000000000000
+>>>                     Base Address : 0000000000000000
+>>>         Virtual GIC Base Address : 0000000000000000
+>>>      Hypervisor GIC Base Address : 0000000000000000
+>>>            Virtual GIC Interrupt : 00000019
+>>>       Redistributor Base Address : 0000FFFF88F40000
+>>>                        ARM MPIDR : 000000000000000D
+>>>                 Efficiency Class : 00
+>>>                         Reserved : 000000
 >>>
->>> Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
->>> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+>>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 >>> ---
->>> changes from v3:
->>>    * Changed imod-interval to imod-interval-ns [Rob Herring/Chunfeng]
->>>    * Changed "modulation" to "moderation" throughout patch [Mathias]
->>> changes from v2:
->>>    * Added PCI default value [Mathias]
->>>    * Removed xhci-mtk.h from xhci-plat.c [Chunfeng Yun]
->>>    * Removed MTK quirk from xhci-plat and moved logic to xhci-mtk [Chunfeng]
->>>    * Updated bindings Documentation to use proper units [Rob Herring]
->>>    * Added imod-interval description and example to MTK binding documentation
->>> changes from v1:
->>>    * Removed device_property_read_u32() per suggestion from greg k-h
->>>    * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
+>>>  drivers/irqchip/irq-gic-v3.c | 14 +++++++++-----
+>>>  1 file changed, 9 insertions(+), 5 deletions(-)
 >>>
->>>   Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 2 ++
->>>   Documentation/devicetree/bindings/usb/usb-xhci.txt          | 1 +
->>>   drivers/usb/host/xhci-mtk.c                                 | 9 +++++++++
->>>   drivers/usb/host/xhci-pci.c                                 | 3 +++
->>>   drivers/usb/host/xhci-plat.c                                | 5 +++++
->>>   drivers/usb/host/xhci.c                                     | 7 ++-----
->>>   drivers/usb/host/xhci.h                                     | 2 ++
->>>   7 files changed, 24 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
->>> index 3059596..9ff5602 100644
->>> --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
->>> +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
->>> @@ -46,6 +46,7 @@ Optional properties:
->>>    - pinctrl-names : a pinctrl state named "default" must be defined
->>>    - pinctrl-0 : pin control group
->>>   	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->>> + - imod-interval-ns: default interrupt moderation interval is 5000ns
->>>   
->>>   Example:
->>>   usb30: usb at 11270000 {
->>> @@ -66,6 +67,7 @@ usb30: usb at 11270000 {
->>>   	usb3-lpm-capable;
->>>   	mediatek,syscon-wakeup = <&pericfg>;
->>>   	mediatek,wakeup-src = <1>;
->>> +	imod-interval-ns = <10000>;
->>>   };
->>>   
->>>   2nd: dual-role mode with xHCI driver
->>> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
->>> index ae6e484..969908d 100644
->>> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
->>> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
->>> @@ -29,6 +29,7 @@ Optional properties:
->>>     - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
->>>     - usb3-lpm-capable: determines if platform is USB3 LPM capable
->>>     - quirk-broken-port-ped: set if the controller has broken port disable mechanism
->>> +  - imod-interval-ns: default interrupt moderation interval is 5000ns
->>>   
->>>   Example:
->>>   	usb at f0931000 {
->>> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
->>> index b62a1d2..1cb2a8b 100644
->>> --- a/drivers/usb/host/xhci-mtk.c
->>> +++ b/drivers/usb/host/xhci-mtk.c
->>> @@ -674,6 +674,15 @@ static int xhci_mtk_probe(struct platform_device *pdev)
->>>   
->>>   	xhci = hcd_to_xhci(hcd);
->>>   	xhci->main_hcd = hcd;
+>>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+>>> index b56c3e2..a30fbac 100644
+>>> --- a/drivers/irqchip/irq-gic-v3.c
+>>> +++ b/drivers/irqchip/irq-gic-v3.c
+>>> @@ -1331,6 +1331,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+>>>  	u32 size = reg == GIC_PIDR2_ARCH_GICv4 ? SZ_64K * 4 : SZ_64K * 2;
+>>>  	void __iomem *redist_base;
+>>>  
+>>> +	/* GICC entry which has !ACPI_MADT_ENABLED is not unusable so skip */
+>>> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
+>>> +		return 0;
 >>> +
->>> +	/*
->>> +	 * imod_interval is the interrupt moderation value in nanoseconds.
->>> +	 * The increment interval is 8 times as much as that defined in
->>> +	 * the xHCI spec on MTK's controller.
->>> +	 */
->>> +	xhci->imod_interval = 5000;
->>> +	device_property_read_u32(dev, "imod-interval-ns", &xhci->imod_interval);
->>> +
->>>   	xhci->shared_hcd = usb_create_shared_hcd(driver, dev,
->>>   			dev_name(dev), hcd);
->>>   	if (!xhci->shared_hcd) {
->>> diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
->>> index 7ef1274..4bcddd4 100644
->>> --- a/drivers/usb/host/xhci-pci.c
->>> +++ b/drivers/usb/host/xhci-pci.c
->>> @@ -234,6 +234,9 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
->>>   	if (!xhci->sbrn)
->>>   		pci_read_config_byte(pdev, XHCI_SBRN_OFFSET, &xhci->sbrn);
->>>   
->>> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
->>> +	xhci->imod_interval = 40000;
->>> +
->>>   	retval = xhci_gen_setup(hcd, xhci_pci_quirks);
->>>   	if (retval)
->>>   		return retval;
->>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->>> index 09f164f..6f03830 100644
->>> --- a/drivers/usb/host/xhci-plat.c
->>> +++ b/drivers/usb/host/xhci-plat.c
->>> @@ -269,6 +269,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
->>>   	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
->>>   		xhci->quirks |= XHCI_BROKEN_PORT_PED;
->>>   
->>> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
->>> +	xhci->imod_interval = 40000;
->>> +	device_property_read_u32(sysdev, "imod-interval-ns",
->>> +				 &xhci->imod_interval);
->>> +
->>>   	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
->>>   	if (IS_ERR(hcd->usb_phy)) {
->>>   		ret = PTR_ERR(hcd->usb_phy);
->>> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
->>> index 2424d30..0b7755b 100644
->>> --- a/drivers/usb/host/xhci.c
->>> +++ b/drivers/usb/host/xhci.c
->>> @@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
->>>   			"// Set the interrupt modulation register");
->> s/modulation/moderation
-> 
-> Mathias said there was no need to change the existing modulation strings - only
-> the ones that I had added.
-
-Baolu is working on a cleanup patch that removes debug messages that became
-useless with debugfs and proper tracing support, including this line.
-
-Less conflicts to resolve for me if we don't change this.
-
-> 
+>>>  	redist_base = ioremap(gicc->gicr_base_address, size);
+>>>  	if (!redist_base)
+>>>  		return -ENOMEM;
+>>> @@ -1374,13 +1378,13 @@ static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
+>>>  				(struct acpi_madt_generic_interrupt *)header;
+>>>  
+>>>  	/*
+>>> -	 * If GICC is enabled and has valid gicr base address, then it means
+>>> -	 * GICR base is presented via GICC
+>>> +	 * If GICC is enabled and has not valid gicr base address, then it means
+>>> +	 * GICR base is not presented via GICC
+>>>  	 */
+>>> -	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
+>>> -		return 0;
+>>> +	if ((gicc->flags & ACPI_MADT_ENABLED) && (!gicc->gicr_base_address))
+>>> +		return -ENODEV;
 >>
->>>   	temp = readl(&xhci->ir_set->irq_control);
->>>   	temp &= ~ER_IRQ_INTERVAL_MASK;
->>> -	/*
->>> -	 * the increment interval is 8 times as much as that defined
->>> -	 * in xHCI spec on MTK's controller
->>> -	 */
->>> -	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
->>> +	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
->>> +
->> No need a blank line
+>> This doesn't feel quite right. It would mean that having the ENABLED
+>> flag cleared and potentially no address would make it valid? It looks to
+>> me that the original code is "less wrong".
+>>
+>> What am I missing?
+>>
 > 
-> If this patch goes through another version, I will remove this line
+> Original definition of the function gic_acpi_match_gicc().
+>  {
+>   if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
+>     return 0;
+> 
+>   return -ENODEV;
+>  }
+> 
+> Above code triggers the driver probe fail for the two reasons.
+>   1) GICC with ACPI_MADT_ENABLED=0, it's a bug according to ACPI spec.
+>   2) GICC with ACPI_MADT_ENABLED=1 and invalid GICR address, expected.
+> 
+> 
+> This patch fix the first failed case and keep the second case intact.
+>   if ((gicc->flags & ACPI_MADT_ENABLED) && (!gicc->gicr_base_address))
+>     return -ENODEV;
+> 
+>   return 0;
+If (1) is a firmware bug, then why is it handled in the SMP code? You're
+even saying that this is the right thing to do?
 
-If Rob Acks this version I'll apply it and remove that blank line.
+As for (2), you seem to imply that only the address matter. So why isn't
+it just:
 
--Mathias
+	if (gicc->gicr_base_address)
+		return 0;
+
+?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
