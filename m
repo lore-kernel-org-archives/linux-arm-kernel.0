@@ -1,85 +1,63 @@
 From: tyler@opensourcefoundries.com (tyler at opensourcefoundries.com)
-Date: Tue,  5 Dec 2017 14:27:03 -0800
-Subject: [PATCH v1 2/6] ARM: dts: imx7d-cl-som: add nodes for usbh, and usbotg2
+Date: Tue,  5 Dec 2017 14:27:05 -0800
+Subject: [PATCH v1 4/6] ARM: dts: imx7s: add node and supplies for vdd1p2
 In-Reply-To: <20171205222707.11302-1-tyler@opensourcefoundries.com>
 References: <20171205222707.11302-1-tyler@opensourcefoundries.com>
-Message-ID: <20171205222707.11302-3-tyler@opensourcefoundries.com>
+Message-ID: <20171205222707.11302-5-tyler@opensourcefoundries.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tyler Baker <tyler@opensourcefoundries.com>
 
-Add device tree nodes for the USB hub, and USB OTG. i2c2 on this
-platform supports low state retention power state so lets use it.
+Add the regulator nodes and supplies for vdd1p2. This regulator is
+used to power the GPC and USB HSIC PHY.
 
 Signed-off-by: Tyler Baker <tyler@opensourcefoundries.com>
 ---
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts | 34 ++++++++++++++++++++++++++-------
- 1 file changed, 27 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/imx7s.dtsi | 17 ++++++++++++++++-
+ 1 file changed, 16 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-index ae45af1..49bd371 100644
---- a/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-+++ b/arch/arm/boot/dts/imx7d-cl-som-imx7.dts
-@@ -30,6 +30,16 @@
- 		gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
- 		enable-active-high;
- 	};
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 7b85659..151ab34 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -522,6 +522,20 @@
+ 					anatop-max-voltage = <1200000>;
+ 					anatop-enable-bit = <0>;
+ 				};
 +
-+	reg_usbh_nreset: regulator-vbus {
-+		compatible = "regulator-fixed";
-+		regulator-name = "usb_host_nreset";
-+		regulator-min-microvolt = <3300000>;
-+		regulator-max-microvolt = <3300000>;
-+		gpio = <&pca9555 6 GPIO_ACTIVE_HIGH>;
-+		enable-active-high;
-+		regulator-always-on;
-+	};
- };
++				reg_1p2: regulator-vdd1p2 at 220 {
++					compatible = "fsl,anatop-regulator";
++					regulator-name = "vdd1p2";
++					regulator-min-microvolt = <1100000>;
++					regulator-max-microvolt = <1300000>;
++					anatop-reg-offset = <0x220>;
++					anatop-vol-bit-shift = <8>;
++					anatop-vol-bit-width = <5>;
++					anatop-min-bit-val = <8>;
++					anatop-min-voltage = <1100000>;
++					anatop-max-voltage = <1300000>;
++					anatop-enable-bit = <0>;
++				};
+ 			};
  
- &cpu0 {
-@@ -199,6 +209,16 @@
- 	status = "okay";
- };
- 
-+&usbotg2 {
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbh {
-+	vbus-supply = <&reg_usbh_nreset>;
-+	status = "okay";
-+};
-+
- &usdhc3 {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_usdhc3>;
-@@ -247,13 +267,6 @@
- 		>;
- 	};
- 
--	pinctrl_i2c2: i2c2grp {
--		fsl,pins = <
--			MX7D_PAD_I2C2_SDA__I2C2_SDA		0x4000007f
--			MX7D_PAD_I2C2_SCL__I2C2_SCL		0x4000007f
--		>;
--	};
+ 			snvs: snvs at 30370000 {
+@@ -578,7 +592,7 @@
+ 				#interrupt-cells = <3>;
+ 				interrupt-parent = <&intc>;
+ 				#power-domain-cells = <1>;
 -
- 	pinctrl_uart1: uart1grp {
- 		fsl,pins = <
- 			MX7D_PAD_UART1_TX_DATA__UART1_DCE_TX	0x79
-@@ -284,4 +297,11 @@
- 			MX7D_PAD_LPSR_GPIO1_IO05__GPIO1_IO5	0x14 /* OTG PWREN */
- 		>;
- 	};
-+
-+	pinctrl_i2c2: i2c2grp {
-+		fsl,pins = <
-+			MX7D_PAD_LPSR_GPIO1_IO07__I2C2_SDA		0x4000000f
-+			MX7D_PAD_LPSR_GPIO1_IO06__I2C2_SCL		0x4000000f
-+		>;
-+	};
- };
++				vcc-supply = <&reg_1p2>;
+ 				pgc {
+ 					#address-cells = <1>;
+ 					#size-cells = <0>;
+@@ -961,6 +975,7 @@
+ 				compatible = "usb-nop-xceiv";
+ 				clocks = <&clks IMX7D_USB_HSIC_ROOT_CLK>;
+ 				clock-names = "main_clk";
++				vcc-supply = <&reg_1p2>;
+ 			};
+ 
+ 			usdhc1: usdhc at 30b40000 {
 -- 
 2.9.3
