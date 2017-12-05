@@ -1,147 +1,82 @@
-From: steve.capper@arm.com (Steve Capper)
-Date: Tue, 5 Dec 2017 13:24:26 +0000
-Subject: [PATCH] arm64: dirty memory check, enable soft dirty for arm64
-In-Reply-To: <1512029649-61312-1-git-send-email-bin.lu@arm.com>
-References: <1512029649-61312-1-git-send-email-bin.lu@arm.com>
-Message-ID: <20171205132425.tyjllga72k6gfdrc@capper-debian.cambridge.arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 5 Dec 2017 14:24:54 +0100
+Subject: [PATCH] [v2] ASoC: atmel-classd: improve Kconfig dependencies
+In-Reply-To: <20171205131022.2082003-1-arnd@arndb.de>
+References: <20171205131022.2082003-1-arnd@arndb.de>
+Message-ID: <20171205132454.GK21780@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bin,
-
-On Thu, Nov 30, 2017 at 12:14:09AM -0800, Bin Lu wrote:
->     arch/arm64/Kconfig: enable CONFIG_HAVE_ARCH_SOFT_DIRTY
->     arch/arm64/include/asm/pgtable.h: enable functions for soft dirty
+On 05/12/2017 at 14:10:11 +0100, Arnd Bergmann wrote:
+> Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
+> changed the way that the dependencies are handled, but then the
+> Class D amplifier support got merged, which used the old method.
 > 
->     Checkpoint/Restore In Userspace(CRIU) needs the page's change
->     to be soft tracked. This allows to do a pre checkpoint and then dump
->     only touched pages.
+> This seems to have triggered a very rare randconfig condition for me
+> now, leading to a link error:
 > 
->     This is done by using a PTE bit (PTE_DIRTY) when
->     the page is backed in memory, and a new _PAGE_SWP_SOFT_DIRTY bit when
->     the page is swapped out.
+> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+> atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
+> atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
+> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+> atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
+> atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
 > 
->     The bit of PTE_DIRTY is already defined in pgtable-prot.h.
+> This changes the SND_ATMEL_SOC_DMA option so it gets built whenever
+> one of the two users (SND_ATMEL_SOC_SSC_DMA and SND_ATMEL_SOC_CLASSD)
+> is enabled, with the twist that we make it built-in when SND_ATMEL_SOC_SSC
+> is built-in, even if one of the other two is a module.
 > 
->     The _PAGE_SWP_SOFT_DIRTY bit is set as 59 in the swap pte.
+> I think this captures best what the real dependency in the hardware
+> is, and it simplifies the logic a bit.
 > 
->     pmd_dirty and pmd_mkclean for THP page MADV_FREE also were
->     supported in this patch.
-> 
->     This patch has been tested with ZDTM test suite in CRIU.
->     Such as: ./zdtm.py run -t zdtm/static/env00 --pre 10
-> Signed-off-by: Bin Lu <bin.lu@arm.com>
+> Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > ---
->  arch/arm64/Kconfig               |  1 +
->  arch/arm64/include/asm/pgtable.h | 46 ++++++++++++++++++++++++++++++++++++++++
->  2 files changed, 47 insertions(+)
+> v2: rewrite the change completely, after running into a new regression.
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index dfd9086..933f5be 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -73,6 +73,7 @@ config ARM64
->  	select HAVE_ARCH_MMAP_RND_BITS
->  	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
->  	select HAVE_ARCH_SECCOMP_FILTER
-> +	select HAVE_ARCH_SOFT_DIRTY
->  	select HAVE_ARCH_TRACEHOOK
->  	select HAVE_ARCH_TRANSPARENT_HUGEPAGE
->  	select HAVE_ARM_SMCCC
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 6eae342..8ab251e 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -306,6 +306,28 @@ static inline pgprot_t mk_sect_prot(pgprot_t prot)
->  	return __pgprot(pgprot_val(prot) & ~PTE_TABLE_BIT);
->  }
+> I'm putting it out on the list so we can review the change together,
+> but I'm still doing more testing at the same time. If I don't reply
+> by Dec 6, nothing new has come up.
+> ---
+>  sound/soc/atmel/Kconfig | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
+> 
+> diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+> index 4a56f3dfba51..af9a9096d50b 100644
+> --- a/sound/soc/atmel/Kconfig
+> +++ b/sound/soc/atmel/Kconfig
+> @@ -20,8 +20,8 @@ config SND_ATMEL_SOC_SSC_PDC
+>  config SND_ATMEL_SOC_DMA
+>  	tristate
+>  	select SND_SOC_GENERIC_DMAENGINE_PCM
+> -	default m if SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=m
+> -	default y if SND_ATMEL_SOC_SSC_DMA=y || (SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=y)
+> +	default y if SND_ATMEL_SOC_SSC=y && (SND_ATMEL_SOC_SSC_DMA=m || SND_ATMEL_SOC_CLASSD=m)
+> +	default SND_ATMEL_SOC_CLASSD || SND_ATMEL_SOC_SSC_DMA
 >  
-> +#ifdef CONFIG_HAVE_ARCH_SOFT_DIRTY
-> +static inline bool pte_soft_dirty(pte_t pte)
-> +{
-> +        return pte_sw_dirty(pte);
-> +}
-> +
-> +static inline pte_t pte_mksoft_dirty(pte_t pte)
-> +{
-> +        return pte_mkdirty(pte);
-> +}
-> +
-> +static inline pte_t pte_clear_soft_dirty(pte_t pte)
-> +{
-> +        return pte_mkclean(pte);
-> +}
-> +
-> +#define pmd_soft_dirty(pmd)    pte_soft_dirty(pmd_pte(pmd))
-> +#define pmd_mksoft_dirty(pmd)  pte_pmd(pte_mksoft_dirty(pmd_pte(pmd)))
-> +#define pmd_clear_soft_dirty(pmd) pte_pmd(pte_clear_soft_dirty(pmd_pte(pmd)))
-> +
-> +#endif /* CONFIG_HAVE_ARCH_SOFT_DIRTY */
-> +
->  #ifdef CONFIG_NUMA_BALANCING
->  /*
->   * See the comment in include/asm-generic/pgtable.h
-> @@ -695,10 +717,12 @@ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
->   *	bits 2-7:	swap type
->   *	bits 8-57:	swap offset
->   *	bit  58:	PTE_PROT_NONE (must be zero)
-> + *	bit  59:	swap software dirty tracking
->   */
->  #define __SWP_TYPE_SHIFT	2
->  #define __SWP_TYPE_BITS		6
->  #define __SWP_OFFSET_BITS	50
-> +#define __SWP_PROT_NONE_BITS	1
->  #define __SWP_TYPE_MASK		((1 << __SWP_TYPE_BITS) - 1)
->  #define __SWP_OFFSET_SHIFT	(__SWP_TYPE_BITS + __SWP_TYPE_SHIFT)
->  #define __SWP_OFFSET_MASK	((1UL << __SWP_OFFSET_BITS) - 1)
-> @@ -710,6 +734,28 @@ extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
->  #define __pte_to_swp_entry(pte)	((swp_entry_t) { pte_val(pte) })
->  #define __swp_entry_to_pte(swp)	((pte_t) { (swp).val })
->  
-> +#ifdef CONFIG_MEM_SOFT_DIRTY
-> +#define _PAGE_SWP_SOFT_DIRTY   (1UL << (__SWP_OFFSET_SHIFT + __SWP_OFFSET_BITS + __SWP_PROT_NONE_BITS))
-> +#else
-> +#define _PAGE_SWP_SOFT_DIRTY    0UL
-> +#endif /* CONFIG_MEM_SOFT_DIRTY */
-> +
-> +#ifdef CONFIG_HAVE_ARCH_SOFT_DIRTY
-> +static inline bool pte_swp_soft_dirty(pte_t pte)
-> +{
-> +        return !!(pte_val(pte) & _PAGE_SWP_SOFT_DIRTY);
-> +}
-> +
-> +static inline pte_t pte_swp_mksoft_dirty(pte_t pte)
-> +{
-> +        return __pte(pte_val(pte) | _PAGE_SWP_SOFT_DIRTY);
-> +}
-> +
-> +static inline pte_t pte_swp_clear_soft_dirty(pte_t pte)
-> +{
-> +        return __pte(pte_val(pte) & ~_PAGE_SWP_SOFT_DIRTY);
-> +}
-> +#endif /* CONFIG_HAVE_ARCH_SOFT_DIRTY */
->  /*
->   * Ensure that there are not more swap files than can be encoded in the kernel
->   * PTEs.
-> --
 
-This looks good to me. Soft dirty pte's are created by both pte_mkdirty
-and pte_mksoft_dirty. If a soft-dirty bit is cleared by
-clear_soft_dirty(.), then the pte is also made read-only. Meaning
-hardware DBM won't set the pte as dirty on write, a fault will take place
-and then the pte will be made both writable and soft dirty.
+I really think the only required dependency for SND_ATMEL_SOC_CLASSD is
+SND_SOC_GENERIC_DMAENGINE_PCM. It comes with SND_ATMEL_SOC_DMA but it
+doesn't actually use anything provided specifically by atmel-pcm-dma.c
 
-Some changes to ptep_set_wrprotect(.) to preserve the dirty bit may
-cause more soft dirty pte's to appear:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545151.html
+Basically, it handles all of its DMA operations itself.
 
-I *think* that shouldn't affect the use case I understand for the
-patch - to identify whether or not a page has been written to since
-last cleaned. 
+>  config SND_ATMEL_SOC_SSC_DMA
+>  	tristate
+> @@ -64,7 +64,6 @@ config SND_AT91_SOC_SAM9X5_WM8731
+>  config SND_ATMEL_SOC_CLASSD
+>  	tristate "Atmel ASoC driver for boards using CLASSD"
+>  	depends on ARCH_AT91 || COMPILE_TEST
+> -	select SND_ATMEL_SOC_DMA
+>  	select REGMAP_MMIO
+>  	help
+>  	  Say Y if you want to add support for Atmel ASoC driver for boards using
+> -- 
+> 2.9.0
+> 
 
-FWIW:
-Reviewed-by: Steve Capper <steve.capper@arm.com>
-
-Cheers,
 -- 
-Steve
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
