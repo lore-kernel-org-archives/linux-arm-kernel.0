@@ -1,59 +1,73 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Tue, 5 Dec 2017 12:14:46 -0800
-Subject: [PATCH] Arm: mm: ftrace: Only set text back to ro after kernel
- has been marked ro
-In-Reply-To: <20171205200935.GY10595@n2100.armlinux.org.uk>
-References: <20170823135836.52fb44fc@gandalf.local.home>
- <CAGXu5jLaQozk-TuZd8o=CK2kBcj3EFqD+VQtGX-DehU=c_TAkg@mail.gmail.com>
- <20170823150351.606ba09f@gandalf.local.home>
- <20171205114709.f6aj6i426keq2cn5@camel2.lan>
- <20171205131416.GW10595@n2100.armlinux.org.uk>
- <20171205132339.behn34z6b7ci2m4j@camel2.lan>
- <5b9b86cf-4b62-c984-fe52-a22df8fce33c@raspberrypi.org>
- <20171205133601.GX10595@n2100.armlinux.org.uk>
- <CAGXu5jJb0PCSuC4DuOkh5-901iVLcmmPpn1G7UBq3-r9DaeMvw@mail.gmail.com>
- <20171205200935.GY10595@n2100.armlinux.org.uk>
-Message-ID: <CAGXu5jKvVpyLs0+zP34mG=XyGSkzeKFj6WtW+tTfKv7tLKsD2g@mail.gmail.com>
+From: tyler@opensourcefoundries.com (Tyler Baker)
+Date: Tue, 5 Dec 2017 12:58:32 -0800
+Subject: [PATCH 8/8] PCIe: imx6: imx7d: add support for phy refclk source
+In-Reply-To: <CAOMZO5Cxavb+iXdxH=JiWzP4VVo-ue0PU-LjBE6kD1VBPgW_0g@mail.gmail.com>
+References: <20171130201434.14122-1-tyler@opensourcefoundries.com>
+ <20171130201434.14122-9-tyler@opensourcefoundries.com>
+ <CAOMZO5Cxavb+iXdxH=JiWzP4VVo-ue0PU-LjBE6kD1VBPgW_0g@mail.gmail.com>
+Message-ID: <CAH=dhFSE6rAzpg30X0RhxWKnmLObqsj5FEPaCtXwYtoMuVWfwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 12:09 PM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Dec 05, 2017 at 11:35:59AM -0800, Kees Cook wrote:
->> We don't _need_ to, but they're all contiguous, so the ro_perms array
->> used by set_kernel_text_*() is actually only a single entry:
+On Fri, Dec 1, 2017 at 12:21 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Thu, Nov 30, 2017 at 6:14 PM,  <tyler@opensourcefoundries.com> wrote:
+>> From: Tyler Baker <tyler@opensourcefoundries.com>
 >>
->> static struct section_perm ro_perms[] = {
->>         /* Make kernel code and rodata RX (set RO). */
->>         {
->>                 .name   = "text/rodata RO",
->>                 .start  = (unsigned long)_stext,
->>                 .end    = (unsigned long)__init_begin,
->> ...
+>> In the i.MX7D the PCIe PHY can use either externel oscillator or
+>> internal PLL as a reference clock source.
+>> Add support for the PHY Reference Clock source including
+>> device tree property phy-ref-clk.
+>> External oscillator is used as a default reference clock source.
+>>
+>> Signed-off-by: Tyler Baker <tyler@opensourcefoundries.com>
+>> Signed-off-by: Ilya Ledvich <ilya@compulab.co.il>
 >
-> Well, they may not be contiguous - it depends on DEBUG_ALIGN_RODATA.
+> Please submit this one to the PCI list and PCI maintainers.
 
-Maybe I'm picking a slightly wrong word. I guess I meant adjacent. The
-range _stext to __init_begin is all read-only, though there may be
-padding (controlled by DEBUG_ALIGN_RODATA), to allow a split for NX
-markings on rodata.
+Ack. Will do.
 
-> Either way, we have __start_rodata_section_aligned, which is either
-> the start of the read-only data section, or the start of the first
-> section beyond __start_rodata if DEBUG_ALIGN_RODATA is not set.
 >
-> Given that __start_rodata_section_aligned will always be less than
-> __init_begin, is there any reason not to make the above end at
-> __start_rodata_section_aligned, thereby allowing more of the read-only
-> data (in the case of DEBUG_ALIGN_RODATA=n) or all of the read-only
-> data (in the case of DEBUG_ALIGN_RODATA=y) to remain write-protected?
+> As you are adding a new property you should update
+> Documentation/devicetree/bindings/pci/fsl,imx6q-pcie.txt.
 
-Sure, there's no reason not to split this into two entries. It'll
-require some reworking of the function calls to get it right,
-obviously.
+I'll add this when I resubmit to the PCI list.
 
--Kees
+>
+>> ---
+>>  drivers/pci/dwc/pci-imx6.c | 8 +++++++-
+>>  1 file changed, 7 insertions(+), 1 deletion(-)
+>>
+>> diff --git adrivers/pci/dwc/pci-imx6.c b/drivers/pci/dwc/pci-imx6.c
+>> index b734835..e935db4 100644
+>> --- a/drivers/pci/dwc/pci-imx6.c
+>> +++ b/drivers/pci/dwc/pci-imx6.c
+>> @@ -45,6 +45,7 @@ enum imx6_pcie_variants {
+>>  struct imx6_pcie {
+>>         struct dw_pcie          *pci;
+>>         int                     reset_gpio;
+>> +       u32                     phy_refclk;
+>
+> Could this be bool instead?
+>
+>>         bool                    gpio_active_high;
+>>         struct clk              *pcie_bus;
+>>         struct clk              *pcie_phy;
+>> @@ -474,7 +475,7 @@ static void imx6_pcie_init_phy(struct imx6_pcie *imx6_pcie)
+>>         switch (imx6_pcie->variant) {
+>>         case IMX7D:
+>>                 regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>> -                                  IMX7D_GPR12_PCIE_PHY_REFCLK_SEL, 0);
+>> +                                  BIT(5), imx6_pcie->phy_refclk ? BIT(5) : 0);
+>>                 break;
+>>         case IMX6SX:
+>>                 regmap_update_bits(imx6_pcie->iomuxc_gpr, IOMUXC_GPR12,
+>> @@ -733,6 +734,11 @@ static int imx6_pcie_probe(struct platform_device *pdev)
+>>         if (IS_ERR(pci->dbi_base))
+>>                 return PTR_ERR(pci->dbi_base);
+>>
+>> +       /* Fetch PHY Reference Clock */
+>> +       if (of_property_read_u32(node, "phy-ref-clk", &imx6_pcie->phy_refclk))
+>
+> You could use of_property_read_bool instead.
 
--- 
-Kees Cook
-Pixel Security
+Thanks for the review, I'll switch to to use a bool instead.
