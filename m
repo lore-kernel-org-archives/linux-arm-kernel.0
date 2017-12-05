@@ -1,21 +1,42 @@
-From: ak@linux.intel.com (Andi Kleen)
-Date: Tue, 5 Dec 2017 09:27:48 -0800
-Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
- events
-In-Reply-To: <1512490399-94107-3-git-send-email-john.garry@huawei.com>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
- <1512490399-94107-3-git-send-email-john.garry@huawei.com>
-Message-ID: <20171205172748.GI3070@tassilo.jf.intel.com>
+From: greg@kroah.com (Greg KH)
+Date: Tue, 5 Dec 2017 18:28:11 +0100
+Subject: [v2] mfd: stm32: Adopt SPDX identifier
+In-Reply-To: <20171205172337.GA24480@roeck-us.net>
+References: <20171205152418.28104-1-benjamin.gaignard@st.com>
+ <20171205172337.GA24480@roeck-us.net>
+Message-ID: <20171205172811.GA5534@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
-> For some architectures (like arm64), there are architecture-
-> defined recommended events. Vendors may not be obliged to
-> follow the recommendation and may implement their own pmu
-> event for a specific event cod
+On Tue, Dec 05, 2017 at 09:23:37AM -0800, Guenter Roeck wrote:
+> On Tue, Dec 05, 2017 at 04:24:18PM +0100, benjamin.gaignard at linaro.org wrote:
+> > Add SPDX identifier
+> > 
+> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> > ---
+> >  drivers/mfd/stm32-lptimer.c       | 6 +-----
+> >  drivers/mfd/stm32-timers.c        | 4 +---
+> >  include/linux/mfd/stm32-lptimer.h | 6 +-----
+> >  include/linux/mfd/stm32-timers.h  | 4 +---
+> >  4 files changed, 4 insertions(+), 16 deletions(-)
+> > 
+> > diff --git a/drivers/mfd/stm32-lptimer.c b/drivers/mfd/stm32-lptimer.c
+> > index 075330a25f61..a00f99f36559 100644
+> > --- a/drivers/mfd/stm32-lptimer.c
+> > +++ b/drivers/mfd/stm32-lptimer.c
+> > @@ -1,13 +1,9 @@
+> > +// SPDX-License-Identifier: GPL-2.0
+> >  /*
+> 
+> I have been wondering - why is the SPDX identifier for the most part added
+> as separate C++ comment at the beginning of the file, and not inline with
+> the rest of the top comments ?  SPDX doesn't mandate this - the examples
+> I can find on the SPDX web site all show it inline. Is there a special
+> Linux kernel convention ?
 
-I would just duplicate the architected events into the different 
-vendor files.  Then you wouldn't need all this mess.
+See the patch series from Thomas that answers this question for you by
+adding documentation to the kernel explaining it all :)
 
--Andi
+thanks,
+
+greg k-h
