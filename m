@@ -1,244 +1,85 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue,  5 Dec 2017 15:55:59 +0100
-Subject: [PATCH] iio: stm32: Adopt SPDX identifier
-Message-ID: <20171205145559.20294-1-benjamin.gaignard@st.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue,  5 Dec 2017 14:56:42 +0000
+Subject: [PATCH] arm64: fpsimd: Prevent registers leaking from dead tasks
+Message-ID: <1512485802-29489-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPDX identifier in stm32's files in IIO directory
+Currently, loading of a task's fpsimd state into the CPU registers
+is skipped if that task's state is already present in the registers
+of that CPU.
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+However, the code relies on the struct fpsimd_state * (and by
+extension struct task_struct *) to unambiguously identify a task.
+
+There is a particular case in which this doesn't work reliably:
+when a task exits, its task_struct may be recycled to describe a
+new task.
+
+Consider the following scenario:
+
+ 1) Task P loads its fpsimd state onto cpu C.
+        per_cpu(fpsimd_last_state, C) := P;
+        P->thread.fpsimd_state.cpu := C;
+
+ 2) Task X is scheduled onto C and loads its fpsimd state on C.
+        per_cpu(fpsimd_last_state, C) := X;
+        X->thread.fpsimd_state.cpu := C;
+
+ 3) X exits, causing X's task_struct to be freed.
+
+ 4) P forks a new child T, which obtains X's recycled task_struct.
+	T == X.
+	T->thread.fpsimd_state.cpu == C (inherited from P).
+
+ 5) T is scheduled on C.
+	T's fpsimd state is not loaded, because
+	per_cpu(fpsimd_last_state, C) == T (== X) &&
+	T->thread.fpsimd_state.cpu == C.
+
+        (This is the check performed by fpsimd_thread_switch().)
+
+So, T gets X's registers because the last registers loaded onto C
+were those of X, in (2).
+
+This patch fixes the problem by ensuring that the sched-in check
+fails in (5): fpsimd_flush_task_state(T) is called when T is
+forked, so that T->thread.fpsimd_state.cpu == C cannot be true.
+This relies on the fact that T is not schedulable until after
+copy_thread() completes.
+
+Once T's fpsimd state has been loaded on some CPU C there may still
+be other cpus D for which per_cpu(fpsimd_last_state, D) ==
+&X->thread.fpsimd_state.  But D is necessarily != C in this case,
+and the check in (5) must fail.
+
+An alternative fix would be to do refcounting on task_struct.  This
+would result in each CPU holding a reference to the last task whose
+fpsimd state was loaded there.  It's not clear whether this is
+preferable, and it involves higher overhead than the fix proposed
+in this patch.  It would also moves all the task_struct freeing
+work into the context switch critical section, or otherwise some
+deferred cleanup mechanism would need to be introduced, neither of
+which seems obviously justified.
+
+Fixes: 005f78cd8849 ("arm64: defer reloading a task's FPSIMD state to userland resume")
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- drivers/iio/adc/stm32-adc-core.c            | 14 +-------------
- drivers/iio/adc/stm32-adc-core.h            | 14 +-------------
- drivers/iio/adc/stm32-adc.c                 | 15 +--------------
- drivers/iio/counter/stm32-lptimer-cnt.c     |  2 +-
- drivers/iio/dac/stm32-dac-core.c            | 14 +-------------
- drivers/iio/dac/stm32-dac-core.h            | 15 +--------------
- drivers/iio/dac/stm32-dac.c                 | 15 +--------------
- drivers/iio/trigger/stm32-lptimer-trigger.c |  3 +--
- drivers/iio/trigger/stm32-timer-trigger.c   |  2 +-
- 9 files changed, 9 insertions(+), 85 deletions(-)
+ arch/arm64/kernel/process.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-index 6aefef99f935..40be7d9fadbf 100644
---- a/drivers/iio/adc/stm32-adc-core.c
-+++ b/drivers/iio/adc/stm32-adc-core.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file is part of STM32 ADC driver
-  *
-@@ -6,19 +7,6 @@
-  *
-  * Inspired from: fsl-imx25-tsadc
-  *
-- * License type: GPLv2
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-- * or FITNESS FOR A PARTICULAR PURPOSE.
-- * See the GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index b2adcce..5387d15 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -313,6 +313,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+ 	 */
+ 	clear_tsk_thread_flag(p, TIF_SVE);
+ 	p->thread.sve_state = NULL;
++	fpsimd_flush_task_state(p);
  
- #include <linux/clk.h>
-diff --git a/drivers/iio/adc/stm32-adc-core.h b/drivers/iio/adc/stm32-adc-core.h
-index 250ee958a669..8af507b3f32d 100644
---- a/drivers/iio/adc/stm32-adc-core.h
-+++ b/drivers/iio/adc/stm32-adc-core.h
-@@ -1,22 +1,10 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * This file is part of STM32 ADC driver
-  *
-  * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
-  * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-  *
-- * License type: GPLv2
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-- * or FITNESS FOR A PARTICULAR PURPOSE.
-- * See the GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef __STM32_ADC_H
-diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-index c9d96f935dba..f9ccd705bcbb 100644
---- a/drivers/iio/adc/stm32-adc.c
-+++ b/drivers/iio/adc/stm32-adc.c
-@@ -1,22 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file is part of STM32 ADC driver
-  *
-  * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
-  * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-- *
-- * License type: GPLv2
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-- * or FITNESS FOR A PARTICULAR PURPOSE.
-- * See the GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <linux/clk.h>
-diff --git a/drivers/iio/counter/stm32-lptimer-cnt.c b/drivers/iio/counter/stm32-lptimer-cnt.c
-index 81ae5f74216d..42fb8ba67090 100644
---- a/drivers/iio/counter/stm32-lptimer-cnt.c
-+++ b/drivers/iio/counter/stm32-lptimer-cnt.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * STM32 Low-Power Timer Encoder and Counter driver
-  *
-@@ -7,7 +8,6 @@
-  *
-  * Inspired by 104-quad-8 and stm32-timer-trigger drivers.
-  *
-- * License terms:  GNU General Public License (GPL), version 2
-  */
- 
- #include <linux/bitfield.h>
-diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
-index 55026fe1c610..d0fb3124de07 100644
---- a/drivers/iio/dac/stm32-dac-core.c
-+++ b/drivers/iio/dac/stm32-dac-core.c
-@@ -1,22 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file is part of STM32 DAC driver
-  *
-  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-  * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-  *
-- * License type: GPLv2
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-- * or FITNESS FOR A PARTICULAR PURPOSE.
-- * See the GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <linux/clk.h>
-diff --git a/drivers/iio/dac/stm32-dac-core.h b/drivers/iio/dac/stm32-dac-core.h
-index daf09931857c..d3b415fb9575 100644
---- a/drivers/iio/dac/stm32-dac-core.h
-+++ b/drivers/iio/dac/stm32-dac-core.h
-@@ -1,22 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * This file is part of STM32 DAC driver
-  *
-  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-  * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-- *
-- * License type: GPLv2
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-- * or FITNESS FOR A PARTICULAR PURPOSE.
-- * See the GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #ifndef __STM32_DAC_CORE_H
-diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
-index 9ffab02bf9f9..cce26a3a6627 100644
---- a/drivers/iio/dac/stm32-dac.c
-+++ b/drivers/iio/dac/stm32-dac.c
-@@ -1,23 +1,10 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * This file is part of STM32 DAC driver
-  *
-  * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
-  * Authors: Amelie Delaunay <amelie.delaunay@st.com>
-  *	    Fabrice Gasnier <fabrice.gasnier@st.com>
-- *
-- * License type: GPLv2
-- *
-- * This program is free software; you can redistribute it and/or modify it
-- * under the terms of the GNU General Public License version 2 as published by
-- * the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful, but
-- * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-- * or FITNESS FOR A PARTICULAR PURPOSE.
-- * See the GNU General Public License for more details.
-- *
-- * You should have received a copy of the GNU General Public License along with
-- * this program. If not, see <http://www.gnu.org/licenses/>.
-  */
- 
- #include <linux/bitfield.h>
-diff --git a/drivers/iio/trigger/stm32-lptimer-trigger.c b/drivers/iio/trigger/stm32-lptimer-trigger.c
-index de361d879929..98cdc7e47f3d 100644
---- a/drivers/iio/trigger/stm32-lptimer-trigger.c
-+++ b/drivers/iio/trigger/stm32-lptimer-trigger.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * STM32 Low-Power Timer Trigger driver
-  *
-@@ -5,8 +6,6 @@
-  *
-  * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-  *
-- * License terms:  GNU General Public License (GPL), version 2
-- *
-  * Inspired by Benjamin Gaignard's stm32-timer-trigger driver
-  */
- 
-diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-index b542dc484969..ccf1ce653b25 100644
---- a/drivers/iio/trigger/stm32-timer-trigger.c
-+++ b/drivers/iio/trigger/stm32-timer-trigger.c
-@@ -1,9 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (C) STMicroelectronics 2016
-  *
-  * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-  *
-- * License terms:  GNU General Public License (GPL), version 2
-  */
- 
- #include <linux/iio/iio.h>
+ 	if (likely(!(p->flags & PF_KTHREAD))) {
+ 		*childregs = *current_pt_regs();
 -- 
-2.15.0
+2.1.4
