@@ -1,83 +1,56 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 05 Dec 2017 19:33:25 +0000
-Subject: [PATCH] arm64/mm: Do not write ASID generation to ttbr0
-In-Reply-To: <1512495507-23259-1-git-send-email-julien.thierry@arm.com>
-References: <1512495507-23259-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <5A26F485.10402@arm.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 5 Dec 2017 11:35:59 -0800
+Subject: [PATCH] Arm: mm: ftrace: Only set text back to ro after kernel
+ has been marked ro
+In-Reply-To: <20171205133601.GX10595@n2100.armlinux.org.uk>
+References: <20170823135836.52fb44fc@gandalf.local.home>
+ <CAGXu5jLaQozk-TuZd8o=CK2kBcj3EFqD+VQtGX-DehU=c_TAkg@mail.gmail.com>
+ <20170823150351.606ba09f@gandalf.local.home>
+ <20171205114709.f6aj6i426keq2cn5@camel2.lan>
+ <20171205131416.GW10595@n2100.armlinux.org.uk>
+ <20171205132339.behn34z6b7ci2m4j@camel2.lan>
+ <5b9b86cf-4b62-c984-fe52-a22df8fce33c@raspberrypi.org>
+ <20171205133601.GX10595@n2100.armlinux.org.uk>
+Message-ID: <CAGXu5jJb0PCSuC4DuOkh5-901iVLcmmPpn1G7UBq3-r9DaeMvw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
+On Tue, Dec 5, 2017 at 5:36 AM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Dec 05, 2017 at 01:30:11PM +0000, Phil Elwell wrote:
+>> This was my initial explanation:
+>>
+>> 1. Data which is marked __ro_after_init is initially writeable.
+>>
+>> 2. The ro_perms data covers kernel text, read-only data and __ro_after_init data.
+>>
+>> 3. set_kernel_text_rw marks everything in ro_perms as writeable.
+>>
+>> 4. set_kernel_text_ro marks everything in ro_perms as read-only, including the __ro_after_init data.
+>>
+>> 5. Using the function tracing code involves code modification, resulting in calls to
+>>    __ftrace_modify_code and set_kernel_text_ro.
+>>
+>> 6. Therefore if function tracing is enabled before kernel_init has completed then the __ro_after_init
+>>    data is made read-only prematurely.
+>
+> My question still stands, but let me rephrase.  Do we need
+> set_kernel_text_*() to touch the read-only data?
 
-On 05/12/17 17:38, Julien Thierry wrote:
-> When writing the user ASID to ttbr0, 16bit get copied to ttbr0, potentially
-> including part of the ASID generation in the ttbr0.ASID. If the kernel is
-> using less than 16bits ASIDs and the other ttbr0 bits aren't RES0, two
-> tasks using the same mm context might end up running with different
-> ttbr0.ASID values.
-> This would be triggered by one of the threads being scheduled before a
-> roll-over and the second one scheduled after a roll-over.
-> 
-> Pad the generation out of the 16bits of the mm id that are written to
-> ttbr0. Thus, what the hardware sees is what the kernel considers ASID.
+We don't _need_ to, but they're all contiguous, so the ro_perms array
+used by set_kernel_text_*() is actually only a single entry:
 
-Is this to fix a system with a mix of 8/16 asid bits? Or someone being clever
-and reducing asid_bits to stress rollover?
-
-(I think we should do something like this so we can test rollover.)
-
-
-> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-> index 6f40170..a7c72d4 100644
-> --- a/arch/arm64/mm/context.c
-> +++ b/arch/arm64/mm/context.c
-> @@ -180,6 +190,13 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
->  	/* We're out of ASIDs, so increment the global generation count */
->  	generation = atomic64_add_return_relaxed(ASID_FIRST_VERSION,
->  						 &asid_generation);
-> +
-> +	/*
-> +	 * It is unlikely the generation will ever overflow, but if this
-> +	 * happens, let it be known strange things can occur.
-> +	 */
-> +	WARN_ON(generation == ASID_FIRST_VERSION);
-
-Won't generation wrap to zero, not '1<<16'?
-
-asid_generation-is-never-zero is one of the nasty things in this code.
-
-In check_and_switch_context() we switch to the 'fast path' where the current
-asid is usable if: the generation matches and the active_asid isn't 0 (which
-indicates a rollover has occurred).
-
-from mm/context.c::check_and_switch_context():
-> 	if (!((asid ^ atomic64_read(&asid_generation)) >> asid_bits)
->	    && atomic64_xchg_relaxed(&per_cpu(active_asids, cpu), asid))
->		goto switch_mm_fastpath;
+static struct section_perm ro_perms[] = {
+        /* Make kernel code and rodata RX (set RO). */
+        {
+                .name   = "text/rodata RO",
+                .start  = (unsigned long)_stext,
+                .end    = (unsigned long)__init_begin,
+...
 
 
-If asid_generation is ever zero, (even briefly) multiple new tasks with
-different pages-tables will pass the generation test, and run with asid=0.
+-Kees
 
-Short of xchg(ASID_MAX_VERSION, ASID_FIRST_VERSION), every time, just in case, I
-don't think this is something we can handle.
-
-But, this thing is layers on layers of subtle behaviour, so I may have missed
-something...
-
-
-Instead, do you think we can duplicate just the asid bits (asid & ASID_MASK)
-into a new 16bit field in mm_context_t, which we then use instead of the ASID()
-and mmid macros? (We only set a new asid in one place as returned by new_context()).
-
-This would let context.c's asid_bits be arbitrary, as the hardware only uses the
-masked value it exposes in the new field.
-
-This doesn't solve the mixed 8/16 bit case. I think we should force those
-systems to use 8bit asids via cpufeature to preserve as much of the generation
-counter as possible.
-
-
-Thanks,
-
-James
+-- 
+Kees Cook
+Pixel Security
