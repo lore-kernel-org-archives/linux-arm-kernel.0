@@ -1,53 +1,283 @@
 From: keescook@chromium.org (Kees Cook)
-Date: Tue, 5 Dec 2017 11:35:59 -0800
-Subject: [PATCH] Arm: mm: ftrace: Only set text back to ro after kernel
- has been marked ro
-In-Reply-To: <20171205133601.GX10595@n2100.armlinux.org.uk>
-References: <20170823135836.52fb44fc@gandalf.local.home>
- <CAGXu5jLaQozk-TuZd8o=CK2kBcj3EFqD+VQtGX-DehU=c_TAkg@mail.gmail.com>
- <20170823150351.606ba09f@gandalf.local.home>
- <20171205114709.f6aj6i426keq2cn5@camel2.lan>
- <20171205131416.GW10595@n2100.armlinux.org.uk>
- <20171205132339.behn34z6b7ci2m4j@camel2.lan>
- <5b9b86cf-4b62-c984-fe52-a22df8fce33c@raspberrypi.org>
- <20171205133601.GX10595@n2100.armlinux.org.uk>
-Message-ID: <CAGXu5jJb0PCSuC4DuOkh5-901iVLcmmPpn1G7UBq3-r9DaeMvw@mail.gmail.com>
+Date: Tue, 5 Dec 2017 11:53:11 -0800
+Subject: [kernel-hardening][PATCH v3 1/3] arm: mm: dump: make page table
+ dumping reusable
+In-Reply-To: <20171204142553.GA3344@pjb1027-Latitude-E5410>
+References: <20171204142553.GA3344@pjb1027-Latitude-E5410>
+Message-ID: <CAGXu5j+UHqJcxygGXk0jXYkK7AHzi1rU5SqvowfYT-OVKc6r5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 5:36 AM, Russell King - ARM Linux
-<linux@armlinux.org.uk> wrote:
-> On Tue, Dec 05, 2017 at 01:30:11PM +0000, Phil Elwell wrote:
->> This was my initial explanation:
->>
->> 1. Data which is marked __ro_after_init is initially writeable.
->>
->> 2. The ro_perms data covers kernel text, read-only data and __ro_after_init data.
->>
->> 3. set_kernel_text_rw marks everything in ro_perms as writeable.
->>
->> 4. set_kernel_text_ro marks everything in ro_perms as read-only, including the __ro_after_init data.
->>
->> 5. Using the function tracing code involves code modification, resulting in calls to
->>    __ftrace_modify_code and set_kernel_text_ro.
->>
->> 6. Therefore if function tracing is enabled before kernel_init has completed then the __ro_after_init
->>    data is made read-only prematurely.
+On Mon, Dec 4, 2017 at 6:25 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
+> This patch refactors the arm page table dumping code,
+> so multiple tables may be registered with the framework.
 >
-> My question still stands, but let me rephrase.  Do we need
-> set_kernel_text_*() to touch the read-only data?
+> This patch refers below commits of arm64.
+> (4674fdb9f149 ("arm64: mm: dump: make page table dumping reusable"))
+> (4ddb9bf83349 ("arm64: dump: Make ptdump debugfs a separate option"))
+>
+> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+> ---
+> v3: No changes
+>
+>  arch/arm/Kconfig.debug        |  6 +++-
+>  arch/arm/include/asm/ptdump.h | 48 ++++++++++++++++++++++++++++++++
+>  arch/arm/mm/Makefile          |  3 +-
+>  arch/arm/mm/dump.c            | 65 +++++++++++++++++++------------------------
+>  arch/arm/mm/ptdump_debugfs.c  | 34 ++++++++++++++++++++++
+>  5 files changed, 117 insertions(+), 39 deletions(-)
+>  create mode 100644 arch/arm/include/asm/ptdump.h
+>  create mode 100644 arch/arm/mm/ptdump_debugfs.c
+>
+> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+> index 17685e1..e7b94db 100644
+> --- a/arch/arm/Kconfig.debug
+> +++ b/arch/arm/Kconfig.debug
+> @@ -3,10 +3,14 @@ menu "Kernel hacking"
+>
+>  source "lib/Kconfig.debug"
+>
+> -config ARM_PTDUMP
+> +config ARM_PTDUMP_CORE
+> +       def_bool n
+> +
+> +config ARM_PTDUMP_DEBUGFS
+>         bool "Export kernel pagetable layout to userspace via debugfs"
+>         depends on DEBUG_KERNEL
+>         depends on MMU
+> +       select ARM_PTDUMP_CORE
+>         select DEBUG_FS
+>         ---help---
+>           Say Y here if you want to show the kernel pagetable layout in a
+> diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
+> new file mode 100644
+> index 0000000..3a6c0b7
+> --- /dev/null
+> +++ b/arch/arm/include/asm/ptdump.h
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright (C) 2014 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
+> +#ifndef __ASM_PTDUMP_H
+> +#define __ASM_PTDUMP_H
+> +
+> +#ifdef CONFIG_ARM_PTDUMP_CORE
 
-We don't _need_ to, but they're all contiguous, so the ro_perms array
-used by set_kernel_text_*() is actually only a single entry:
+Is this #ifdef needed? I think this file is only included in dump.c
+and ptdump_debugfs.c, both of which are only built when
+CONFIG_ARM_PTDUMP_CORE is defined.
 
-static struct section_perm ro_perms[] = {
-        /* Make kernel code and rodata RX (set RO). */
-        {
-                .name   = "text/rodata RO",
-                .start  = (unsigned long)_stext,
-                .end    = (unsigned long)__init_begin,
-...
+> +
+> +#include <linux/mm_types.h>
+> +#include <linux/seq_file.h>
+> +
+> +struct addr_marker {
+> +       unsigned long start_address;
+> +       char *name;
+> +};
+> +
+> +struct ptdump_info {
+> +       struct mm_struct                *mm;
+> +       const struct addr_marker        *markers;
+> +       unsigned long                   base_addr;
+> +};
+> +
+> +void ptdump_walk_pgd(struct seq_file *s, struct ptdump_info *info);
+> +#ifdef CONFIG_ARM_PTDUMP_DEBUGFS
+> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name);
+> +#else
+> +static inline int ptdump_debugfs_register(struct ptdump_info *info,
+> +                                       const char *name)
+> +{
+> +       return 0;
+> +}
+> +#endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
+> +
+> +#endif /* CONFIG_ARM_PTDUMP_CORE */
+> +
+> +#endif /* __ASM_PTDUMP_H */
+> diff --git a/arch/arm/mm/Makefile b/arch/arm/mm/Makefile
+> index 01bcc33..28be5f4 100644
+> --- a/arch/arm/mm/Makefile
+> +++ b/arch/arm/mm/Makefile
+> @@ -13,7 +13,8 @@ obj-y                         += nommu.o
+>  obj-$(CONFIG_ARM_MPU)          += pmsa-v7.o
+>  endif
+>
+> -obj-$(CONFIG_ARM_PTDUMP)       += dump.o
+> +obj-$(CONFIG_ARM_PTDUMP_CORE)  += dump.o
+> +obj-$(CONFIG_ARM_PTDUMP_DEBUGFS)       += ptdump_debugfs.o
+>  obj-$(CONFIG_MODULES)          += proc-syms.o
+>  obj-$(CONFIG_DEBUG_VIRTUAL)    += physaddr.o
+>
+> diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+> index fc3b440..8dfe7c3 100644
+> --- a/arch/arm/mm/dump.c
+> +++ b/arch/arm/mm/dump.c
+> @@ -21,11 +21,7 @@
+>  #include <asm/fixmap.h>
+>  #include <asm/memory.h>
+>  #include <asm/pgtable.h>
+> -
+> -struct addr_marker {
+> -       unsigned long start_address;
+> -       const char *name;
+> -};
+> +#include <asm/ptdump.h>
+>
+>  static struct addr_marker address_markers[] = {
+>         { MODULES_VADDR,        "Modules" },
+> @@ -335,50 +331,36 @@ static void walk_pud(struct pg_state *st, pgd_t *pgd, unsigned long start)
+>         }
+>  }
+>
+> -static void walk_pgd(struct seq_file *m)
+> +static void walk_pgd(struct pg_state *st, struct mm_struct *mm,
+> +                       unsigned long start)
+>  {
+> -       pgd_t *pgd = swapper_pg_dir;
+> -       struct pg_state st;
+> -       unsigned long addr;
+> +       pgd_t *pgd = pgd_offset(mm, 0UL);
+>         unsigned i;
+> -
+> -       memset(&st, 0, sizeof(st));
+> -       st.seq = m;
+> -       st.marker = address_markers;
+> +       unsigned long addr;
+>
+>         for (i = 0; i < PTRS_PER_PGD; i++, pgd++) {
+> -               addr = i * PGDIR_SIZE;
+> +               addr = start + i * PGDIR_SIZE;
+>                 if (!pgd_none(*pgd)) {
+> -                       walk_pud(&st, pgd, addr);
+> +                       walk_pud(st, pgd, addr);
+>                 } else {
+> -                       note_page(&st, addr, 1, pgd_val(*pgd), NULL);
+> +                       note_page(st, addr, 1, pgd_val(*pgd), NULL);
+>                 }
+>         }
+> -
+> -       note_page(&st, 0, 0, 0, NULL);
+>  }
+>
+> -static int ptdump_show(struct seq_file *m, void *v)
+> +void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
+>  {
+> -       walk_pgd(m);
+> -       return 0;
+> -}
+> +       struct pg_state st = {
+> +               .seq = m,
+> +               .marker = info->markers,
+> +       };
+>
+> -static int ptdump_open(struct inode *inode, struct file *file)
+> -{
+> -       return single_open(file, ptdump_show, NULL);
+> +       walk_pgd(&st, info->mm, info->base_addr);
+> +       note_page(&st, 0, 0, 0, NULL);
+>  }
+>
+> -static const struct file_operations ptdump_fops = {
+> -       .open           = ptdump_open,
+> -       .read           = seq_read,
+> -       .llseek         = seq_lseek,
+> -       .release        = single_release,
+> -};
+> -
+> -static int ptdump_init(void)
+> +static void ptdump_initialize(void)
+>  {
+> -       struct dentry *pe;
+>         unsigned i, j;
+>
+>         for (i = 0; i < ARRAY_SIZE(pg_level); i++)
+> @@ -387,9 +369,18 @@ static int ptdump_init(void)
+>                                 pg_level[i].mask |= pg_level[i].bits[j].mask;
+>
+>         address_markers[2].start_address = VMALLOC_START;
+> +}
+>
+> -       pe = debugfs_create_file("kernel_page_tables", 0400, NULL, NULL,
+> -                                &ptdump_fops);
+> -       return pe ? 0 : -ENOMEM;
+> +static struct ptdump_info kernel_ptdump_info = {
+> +       .mm = &init_mm,
+> +       .markers = address_markers,
+> +       .base_addr = 0,
+> +};
+> +
+> +static int ptdump_init(void)
+> +{
+> +       ptdump_initialize();
+> +       return ptdump_debugfs_register(&kernel_ptdump_info,
+> +                                       "kernel_page_tables");
 
+This changes the return value of ptdump_init. This should do similar
+to what was done before:
+
+return ptdump_debugfs_register(&kernel_ptdump_info,
+"kernel_page_tables") ? 0 : -ENOMEM;
+
+
+>  }
+>  __initcall(ptdump_init);
+> diff --git a/arch/arm/mm/ptdump_debugfs.c b/arch/arm/mm/ptdump_debugfs.c
+> new file mode 100644
+> index 0000000..be8d87b
+> --- /dev/null
+> +++ b/arch/arm/mm/ptdump_debugfs.c
+> @@ -0,0 +1,34 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +#include <linux/debugfs.h>
+> +#include <linux/seq_file.h>
+> +
+> +#include <asm/ptdump.h>
+> +
+> +static int ptdump_show(struct seq_file *m, void *v)
+> +{
+> +       struct ptdump_info *info = m->private;
+> +
+> +       ptdump_walk_pgd(m, info);
+> +       return 0;
+> +}
+> +
+> +static int ptdump_open(struct inode *inode, struct file *file)
+> +{
+> +       return single_open(file, ptdump_show, inode->i_private);
+> +}
+> +
+> +static const struct file_operations ptdump_fops = {
+> +       .open           = ptdump_open,
+> +       .read           = seq_read,
+> +       .llseek         = seq_lseek,
+> +       .release        = single_release,
+> +};
+> +
+> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
+> +{
+> +       struct dentry *pe;
+> +
+> +       pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
+> +       return pe ? 0 : -ENOMEM;
+> +
+> +}
+> --
+> 1.9.1
+>
 
 -Kees
 
