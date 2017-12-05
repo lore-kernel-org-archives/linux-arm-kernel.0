@@ -1,116 +1,35 @@
 From: tyler@opensourcefoundries.com (Tyler Baker)
-Date: Tue, 5 Dec 2017 12:58:44 -0800
-Subject: [PATCH 1/8] ARM: dts: imx7d-sbc-iot: add initial iot gateway dts
-In-Reply-To: <CAOMZO5DAEMCnEoD_k8d787wk392zYMoKkiMM-TOcRco9UJL2Lw@mail.gmail.com>
+Date: Tue, 5 Dec 2017 12:58:52 -0800
+Subject: [PATCH 2/8] ARM: dts: imx7: build imx7d-sbc-iot-imx7 dtb
+In-Reply-To: <CAOMZO5AKyYR+AYMpbOokKbkgAbaGAucHtdHrosPOh3wbEHY1sA@mail.gmail.com>
 References: <20171130201434.14122-1-tyler@opensourcefoundries.com>
- <20171130201434.14122-2-tyler@opensourcefoundries.com>
- <CAOMZO5DAEMCnEoD_k8d787wk392zYMoKkiMM-TOcRco9UJL2Lw@mail.gmail.com>
-Message-ID: <CAH=dhFTsaQMgxSdbLEjTpmE9Q8ugYUFpt1P8eK782e9dyw7bWQ@mail.gmail.com>
+ <20171130201434.14122-3-tyler@opensourcefoundries.com>
+ <CAOMZO5AKyYR+AYMpbOokKbkgAbaGAucHtdHrosPOh3wbEHY1sA@mail.gmail.com>
+Message-ID: <CAH=dhFQ1F1Dwd-Kx9XXo9_A83J4hzUOue9=LeH+JdbOe_04s8w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 1, 2017 at 12:10 PM, Fabio Estevam <festevam@gmail.com> wrote:
+On Fri, Dec 1, 2017 at 12:11 PM, Fabio Estevam <festevam@gmail.com> wrote:
 > On Thu, Nov 30, 2017 at 6:14 PM,  <tyler@opensourcefoundries.com> wrote:
+>> From: Tyler Baker <tyler@opensourcefoundries.com>
+>>
+>> Build the imx7d-sbc-iot-imx7 device tree blob.
+>>
+>> Signed-off-by: Tyler Baker <tyler@opensourcefoundries.com>
+>> ---
+>>  arch/arm/boot/dts/Makefile | 1 +
+>>  1 file changed, 1 insertion(+)
+>>
+>> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+>> index d0381e9..0334137 100644
+>> --- a/arch/arm/boot/dts/Makefile
+>> +++ b/arch/arm/boot/dts/Makefile
+>> @@ -515,6 +515,7 @@ dtb-$(CONFIG_SOC_IMX7D) += \
+>>         imx7d-nitrogen7.dtb \
+>>         imx7d-pico.dtb \
+>>         imx7d-sbc-imx7.dtb \
+>> +       imx7d-sbc-iot-imx7.dtb \
 >
->> +&ecspi3 {
->> +       fsl,spi-num-chipselects = <1>;
->
-> Please remove this property. It is no longer used.
+> This could be part of the previous patch that introduces the dts.
 
-Ack.
-
->
->
->> +       dvicape at 39 {
->> +               compatible = "sil164_simple";
->
-> This compatible string does not exist.
-
-I'm going to drop this, and address the display hardware it in a later series.
-
->
->
->
->> +&lcdif {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_lcdif_dat
->> +                    &pinctrl_lcdif_ctrl>;
->> +       display = <&display0>;
->> +       status = "okay";
->> +
->> +       display0: display {
->> +               bits-per-pixel = <24>;
->> +               bus-width = <24>;
->> +
->> +               display-timings {
->> +                       native-mode = <&timing0>;
->> +                       timing0: dvi {
->> +                               /* 1024x768p60 */
->> +                               clock-frequency = <65000000>;
->> +                               hactive = <1024>;
->> +                               hfront-porch = <40>;
->> +                               hback-porch = <220>;
->> +                               hsync-len = <60>;
->> +                               vactive = <768>;
->> +                               vfront-porch = <7>;
->> +                               vback-porch = <21>;
->> +                               vsync-len = <10>;
->> +
->> +                               hsync-active = <0>;
->> +                               vsync-active = <0>;
->> +                               de-active = <1>;
->> +                               pixelclk-active = <0>;
->
-> Which panel is this? Could you use a simple panel driver compatible
-> string instead?
-
-I'll switch to a simple panel driver and do some more testing. Will
-submit a follow up series to address the LCD panel and dvi cape.
-
->
->
->> +                       };
->> +               };
->> +       };
->> +};
->> +
->> +&uart2 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_uart2>;
->> +       assigned-clocks = <&clks IMX7D_UART2_ROOT_SRC>;
->> +       assigned-clock-parents = <&clks IMX7D_OSC_24M_CLK>;
->> +       fsl,uart-has-rtscts;
->
-> Please use 'uart-has-rtscts' instead.
-
-Ack.
-
->
->> +       status = "okay";
->> +};
->> +
->> +&uart5 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_uart5>;
->> +       assigned-clocks = <&clks IMX7D_UART5_ROOT_SRC>;
->> +       assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
->> +       fsl,uart-has-rtscts;
->
-> Ditto.
-
-Ack.
-
->
->> +       status = "okay";
->> +};
->> +
->> +&uart7 {
->> +       pinctrl-names = "default";
->> +       pinctrl-0 = <&pinctrl_uart7>;
->> +       assigned-clocks = <&clks IMX7D_UART7_ROOT_SRC>;
->> +       assigned-clock-parents = <&clks IMX7D_PLL_SYS_MAIN_240M_CLK>;
->> +       fsl,uart-has-rtscts;
->
-> Ditto
-
-Ack.
+Ok will do.
