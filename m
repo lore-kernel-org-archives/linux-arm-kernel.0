@@ -1,33 +1,54 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Tue, 5 Dec 2017 23:05:52 +0100
-Subject: [PATCH V6 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
-In-Reply-To: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAJZ5v0gq-Xv1V90GEcfxdnrADQn2Gern=LBnsbSzmrU9M0+FEQ@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 5 Dec 2017 23:07:59 +0100
+Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
+In-Reply-To: <CAK8P3a2R+jLw3T6G_bPFeJrEQwOJu2Mu5DGXPZHRMr4LECFSsA@mail.gmail.com>
+References: <20171205101000.968887-1-arnd@arndb.de>
+ <20171205105750.GI21780@piout.net>
+ <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
+ <20171205124707.GJ21780@piout.net>
+ <CAK8P3a2R+jLw3T6G_bPFeJrEQwOJu2Mu5DGXPZHRMr4LECFSsA@mail.gmail.com>
+Message-ID: <20171205220759.GL21780@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 6:04 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> Introduce new ACPI and OF device ids for thw HW along with the helper
-> functions.
->
-> Changes from v5:
-> * use struct device as a calling parameter to get_match_data() callback
-> so that we can reuse the existing OF API.
-> * revert the change on acpi_get_match_data() to V4.
->
-> Sinan Kaya (7):
->   Documentation: DT: qcom_hidma: Bump HW revision for the bugfixed HW
->   ACPI / bus: Introduce acpi_get_match_data() function
->   device property: Introduce a common API to fetch device match data
->   OF: properties: Implement get_match_data() callback
->   ACPI: properties: Implement get_match_data() callback
->   dmaengine: qcom_hidma: Add support for the new revision
->   dmaengine: qcom_hidma: Add identity register support
+On 05/12/2017 at 14:28:28 +0100, Arnd Bergmann wrote:
+> On Tue, Dec 5, 2017 at 1:47 PM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > On 05/12/2017 at 12:13:41 +0100, Arnd Bergmann wrote:
+> >
+> > Ok, does that solve both randconfigs?
+> >
+> > diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+> > index 4a56f3dfba51..dcee145dd179 100644
+> > --- a/sound/soc/atmel/Kconfig
+> > +++ b/sound/soc/atmel/Kconfig
+> > @@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
+> >  config SND_ATMEL_SOC_CLASSD
+> >         tristate "Atmel ASoC driver for boards using CLASSD"
+> >         depends on ARCH_AT91 || COMPILE_TEST
+> > -       select SND_ATMEL_SOC_DMA
+> > +       select SND_SOC_GENERIC_DMAENGINE_PCM
+> >         select REGMAP_MMIO
+> >         help
+> >           Say Y if you want to add support for Atmel ASoC driver for boards using
+> 
+> Yes, that works as well and looks reliable. I've sent another
+> follow-up now, working on the
+> assumption that we actually need SND_ATMEL_SOC_DMA.
+> 
+> Both patches make it build, but obviously only one of the two is
+> actually correct. I assume you know what you are doing, so if
+> you want to send your patch with a proper changelog, please add
+> my
+> 
+> Tested-by: Arnd Bergmann <arnd@arndb.de>
+> 
 
-Sakari, can you please have a look at this series?
+Ok, I'll test on a real board before the end of the week (I need to find
+a speaker) and I'll send a proper patch.
 
-I'm particularly interested in your opinion on patches [2-3/7] and [5/7].
 
-Thanks,
-Rafael
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
