@@ -1,8 +1,8 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue,  5 Dec 2017 13:07:29 -0600
-Subject: [PATCH v3] irqchip/gic-v3: Fix the driver probe() fail due to
+Date: Tue,  5 Dec 2017 13:16:21 -0600
+Subject: [PATCH v4] irqchip/gic-v3: Fix the driver probe() fail due to
  disabled GICC entry
-Message-ID: <1512500849-20304-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <1512501381-21712-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -12,7 +12,7 @@ skips the disabled GICC entries but not causing any issue. However the
 current GICv3 driver probe bails out causing kernel panic() instead of
 skipping the disabled GICC interfaces. This issue happens on systems
 where redistributor regions are not in the always-on power domain and
-one of GICC interface is marked with ACPI_MADT_ENABLED=0.
+one of GICC interface marked with ACPI_MADT_ENABLED=0.
 
 This patch does the two things to fix the panic.
   - Don't return an error in gic_acpi_match_gicc() for disabled GICC entry.
@@ -54,7 +54,9 @@ Disabled GICC subtable example:
                         Reserved : 000000
 Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
 ---
-changes since v1:
+changes since v3:
+  Fix typo. 
+changes since v2:
   Edited commit text.
 changes since v1:
   Added a new "if condition" to skip disabled GICC entry and edited commit.
@@ -63,7 +65,7 @@ changes since v1:
  1 file changed, 11 insertions(+)
 
 diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b56c3e2..606d4d2 100644
+index b56c3e2..a874777 100644
 --- a/drivers/irqchip/irq-gic-v3.c
 +++ b/drivers/irqchip/irq-gic-v3.c
 @@ -1331,6 +1331,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
@@ -83,7 +85,7 @@ index b56c3e2..606d4d2 100644
  
 +	/*
 +	 * It's perfectly valid firmware can pass disabled GICC entry, driver
-+	 * should treat an errors, skip the entry.
++	 * should not treat as errors, skip the entry instead of probe fail.
 +	 */
 +	if (!(gicc->flags & ACPI_MADT_ENABLED))
 +		return 0;
