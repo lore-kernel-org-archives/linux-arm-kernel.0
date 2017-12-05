@@ -1,71 +1,115 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 5 Dec 2017 14:59:26 -0600
-Subject: [PATCH v3 1/8] SOC: brcmstb: add memory API
-In-Reply-To: <1510697532-32828-2-git-send-email-jim2101024@gmail.com>
-References: <1510697532-32828-1-git-send-email-jim2101024@gmail.com>
- <1510697532-32828-2-git-send-email-jim2101024@gmail.com>
-Message-ID: <20171205205926.GJ23510@bhelgaas-glaptop.roam.corp.google.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue,  5 Dec 2017 16:01:45 -0500
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+Message-ID: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 14, 2017 at 05:12:05PM -0500, Jim Quinlan wrote:
-> From: Florian Fainelli <f.fainelli@gmail.com>
-> 
-> This commit adds a memory API suitable for ascertaining the sizes of
-> each of the N memory controllers in a Broadcom STB chip.  Its first
-> user will be the Broadcom STB PCIe root complex driver, which needs
-> to know these sizes to properly set up DMA mappings for inbound
-> regions.
-> 
-> We cannot use memblock here or anything like what Linux provides
-> because it collapses adjacent regions within a larger block, and here
-> we actually need per-memory controller addresses and sizes, which is
-> why we resort to manual DT parsing.
-> 
-> Signed-off-by: Jim Quinlan <jim2101024@gmail.com>
-> ---
->  drivers/soc/bcm/brcmstb/Makefile |   2 +-
->  drivers/soc/bcm/brcmstb/memory.c | 172 +++++++++++++++++++++++++++++++++++++++
->  include/soc/brcmstb/memory_api.h |  25 ++++++
->  3 files changed, 198 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/soc/bcm/brcmstb/memory.c
->  create mode 100644 include/soc/brcmstb/memory_api.h
-> 
-> diff --git a/drivers/soc/bcm/brcmstb/Makefile b/drivers/soc/bcm/brcmstb/Makefile
-> index 9120b27..4cea7b6 100644
-> --- a/drivers/soc/bcm/brcmstb/Makefile
-> +++ b/drivers/soc/bcm/brcmstb/Makefile
-> @@ -1 +1 @@
-> -obj-y				+= common.o biuctrl.o
-> +obj-y				+= common.o biuctrl.o memory.o
-> diff --git a/drivers/soc/bcm/brcmstb/memory.c b/drivers/soc/bcm/brcmstb/memory.c
-> new file mode 100644
-> index 0000000..eb647ad9
-> --- /dev/null
-> +++ b/drivers/soc/bcm/brcmstb/memory.c
+Some GED interrupts could be pending by the time we are doing a reboot.
 
-I sort of assume based on [1] that every new file should have an SPDX
-identifier ("The Linux kernel requires the precise SPDX identifier in
-all source files") and that the actual text of the GPL can be omitted.
+Even though GED driver uses devm_request_irq() to register the interrupt
+handler, the handler is not being freed on time during a shutdown since
+the driver is missing a shutdown callback.
 
-Only a few files in drivers/pci currently have an SPDX identifier.  I
-don't know if that's oversight or work-in-progress or what.
+If the ACPI handler is no longer available, this causes an interrupt
+storm and delays shutdown.
 
-[1] https://lkml.kernel.org/r/20171204212120.484179273 at linutronix.de
+Register a shutdown callback and manually free the interrupts.
 
-> @@ -0,0 +1,172 @@
-> +/*
-> + * Copyright ? 2015-2017 Broadcom
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-> + * GNU General Public License for more details.
-> + *
-> + * A copy of the GPL is available at
-> + * http://www.broadcom.com/licenses/GPLv2.php or from the Free Software
-> + * Foundation at https://www.gnu.org/licenses/ .
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/acpi/evged.c | 36 +++++++++++++++++++++++++++++++++---
+ 1 file changed, 33 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
+index 46f0603..dde50ea 100644
+--- a/drivers/acpi/evged.c
++++ b/drivers/acpi/evged.c
+@@ -1,7 +1,7 @@
+ /*
+  * Generic Event Device for ACPI.
+  *
+- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
++ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 and
+@@ -49,6 +49,11 @@
+ 
+ #define MODULE_NAME	"acpi-ged"
+ 
++struct acpi_ged_device {
++	struct device *dev;
++	struct list_head event_list;
++};
++
+ struct acpi_ged_event {
+ 	struct list_head node;
+ 	struct device *dev;
+@@ -76,7 +81,8 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+ 	unsigned int irq;
+ 	unsigned int gsi;
+ 	unsigned int irqflags = IRQF_ONESHOT;
+-	struct device *dev = context;
++	struct acpi_ged_device *geddev = context;
++	struct device *dev = geddev->dev;
+ 	acpi_handle handle = ACPI_HANDLE(dev);
+ 	acpi_handle evt_handle;
+ 	struct resource r;
+@@ -122,29 +128,53 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+ 		return AE_ERROR;
+ 	}
+ 
++	dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
++	list_add_tail(&event->node, &geddev->event_list);
+ 	return AE_OK;
+ }
+ 
+ static int ged_probe(struct platform_device *pdev)
+ {
++	struct acpi_ged_device *geddev;
+ 	acpi_status acpi_ret;
+ 
++	geddev = devm_kzalloc(&pdev->dev, sizeof(*geddev), GFP_KERNEL);
++	if (!geddev)
++		return -ENOMEM;
++
++	geddev->dev = &pdev->dev;
++	INIT_LIST_HEAD(&geddev->event_list);
+ 	acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
+-				       acpi_ged_request_interrupt, &pdev->dev);
++				       acpi_ged_request_interrupt, geddev);
+ 	if (ACPI_FAILURE(acpi_ret)) {
+ 		dev_err(&pdev->dev, "unable to parse the _CRS record\n");
+ 		return -EINVAL;
+ 	}
++	platform_set_drvdata(pdev, geddev);
+ 
+ 	return 0;
+ }
+ 
++static void ged_remove(struct platform_device *pdev)
++{
++	struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
++	struct acpi_ged_event *event, *next;
++
++	list_for_each_entry_safe(event, next, &geddev->event_list, node) {
++		devm_free_irq(geddev->dev, event->irq, event);
++		list_del(&event->node);
++		dev_info(geddev->dev, "GED releasing GSI %u @ IRQ %u\n",
++			 event->gsi, event->irq);
++	}
++}
++
+ static const struct acpi_device_id ged_acpi_ids[] = {
+ 	{"ACPI0013"},
+ 	{},
+ };
+ 
+ static struct platform_driver ged_driver = {
++	.shutdown = ged_remove,
+ 	.probe = ged_probe,
+ 	.driver = {
+ 		.name = MODULE_NAME,
+-- 
+1.9.1
