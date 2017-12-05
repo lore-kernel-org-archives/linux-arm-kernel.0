@@ -1,48 +1,108 @@
-From: HartleyS@visionengravers.com (Hartley Sweeten)
-Date: Tue, 5 Dec 2017 18:14:03 +0000
-Subject: [PATCH v4 0/5] ARM: ep93xx: ts72xx: Add support for BK3 board
-In-Reply-To: <20171130235140.12243-1-lukma@denx.de>
-References: <20171116232239.16823-1-lukma@denx.de>
- <20171130235140.12243-1-lukma@denx.de>
-Message-ID: <SN1PR0101MB15656E4944DE6CAC67D18B07D03D0@SN1PR0101MB1565.prod.exchangelabs.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 5 Dec 2017 15:42:42 -0300
+Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
+ UNCORE devices
+In-Reply-To: <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
+References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
+ <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
+ <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
+ <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
+ <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
+ <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
+Message-ID: <20171205184242.GA19952@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 30, 2017 4:52 PM, Lukasz Majewski wrote:
->
-> This patch series adds support for Liebherr's BK3 board, being a derivative of TS72XX design.
->
-> This patchset consists of following patches:
->
-> - ts72xx.[c|h] cosmetic cleanup/improvement
-> - Rewrite ts72xx.c to be reusable by bk3
-> - The Liebherr's BK3 board has been added with re-using code of
->   ts72xx.c (detalied list of changes can be found in patch 6/6)
->
-> This series applies on top of linux-next/master (next-20171130)
->
-> Lukasz Majewski (5):
->   ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
->   ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
->     parameters
->   ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
->   ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
->   ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
->
->  MAINTAINERS                   |   6 ++
->  arch/arm/mach-ep93xx/Kconfig  |   7 ++
->  arch/arm/mach-ep93xx/ts72xx.c | 198 ++++++++++++++++++++++++++++++++++++++----
->  arch/arm/mach-ep93xx/ts72xx.h |   9 ++
->  arch/arm/tools/mach-types     |   1 +
->  5 files changed, 202 insertions(+), 19 deletions(-)
+Em Tue, Dec 05, 2017 at 08:35:22PM +0800, Jin, Yao escreveu:
+> A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
 
-Looks good.
-
-Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
-
-Linus,
-
-Would you mind picking this series up?
-
-Thanks,
-Hartley
+I'll take this as a Tested-by: you, ok?
+ 
+> See the log:
+> 
+> root at skl:/tmp# perf stat --per-thread -p 10322 -M CPI,IPC
+> ^C
+>  Performance counter stats for process id '10322':
+> 
+>           vmstat-10322             1,879,654      inst_retired.any #
+> 0.8 CPI
+>           vmstat-10322             1,565,807      cycles
+>           vmstat-10322             1,879,654      inst_retired.any #
+> 1.2 IPC
+>           vmstat-10322             1,565,807      cpu_clk_unhalted.thread
+> 
+>        2.850291804 seconds time elapsed
+> 
+> Thanks for fixing it quickly.
+> 
+> Thanks
+> Jin Yao
+> 
+> On 12/5/2017 3:23 PM, Jin, Yao wrote:
+> > Hi,
+> > 
+> > I applied the diff but it's failed.
+> > 
+> > jinyao at skl:~/skl-ws/perf-dev/lck-4594/src$ patch -p1 < 1.pat
+> > patching file tools/perf/util/pmu.c
+> > patch: **** malformed patch at line 41: *head, struct perf_pmu *pmu)
+> > 
+> > Could you send the patch as attachment to me in another mail thread?
+> > 
+> > to yao.jin at linux.intel.com
+> > cc yao.jin at intel.com
+> > 
+> > Thanks
+> > Jin Yao
+> > 
+> > On 12/5/2017 3:12 PM, Ganapatrao Kulkarni wrote:
+> > > diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+> > > index 5ad8a18..57e38fd 100644
+> > > --- a/tools/perf/util/pmu.c
+> > > +++ b/tools/perf/util/pmu.c
+> > > @@ -538,6 +538,34 @@ static bool pmu_is_uncore(const char *name)
+> > > ? }
+> > > 
+> > > ? /*
+> > > + *? PMU CORE devices have different name other than cpu in sysfs on some
+> > > + *? platforms. looking for possible sysfs files to identify as core
+> > > device.
+> > > + */
+> > > +static int is_pmu_core(const char *name)
+> > > +{
+> > > + struct stat st;
+> > > + char path[PATH_MAX];
+> > > + const char *sysfs = sysfs__mountpoint();
+> > > +
+> > > + if (!sysfs)
+> > > + return 0;
+> > > +
+> > > + /* Look for cpu sysfs (x86 and others) */
+> > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
+> > > + if ((stat(path, &st) == 0) &&
+> > > + (strncmp(name, "cpu", strlen("cpu")) == 0))
+> > > + return 1;
+> > > +
+> > > + /* Look for cpu sysfs (specific to arm) */
+> > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/%s/cpus",
+> > > + sysfs, name);
+> > > + if (stat(path, &st) == 0)
+> > > + return 1;
+> > > +
+> > > + return 0;
+> > > +}
+> > > +
+> > > +/*
+> > > ?? * Return the CPU id as a raw string.
+> > > ?? *
+> > > ?? * Each architecture should provide a more precise id string that
+> > > @@ -641,7 +669,7 @@ static void pmu_add_cpu_aliases(struct list_head
+> > > *head, struct perf_pmu *pmu)
+> > > ?? break;
+> > > ?? }
+> > > 
+> > > - if (pmu->is_uncore) {
+> > > + if (!is_pmu_core(name)) {
+> > > ?? /* check for uncore devices */
+> > > ?? if (pe->pmu == NULL)
+> > > ?? continue;
