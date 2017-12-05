@@ -1,51 +1,41 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue,  5 Dec 2017 15:51:07 +0100
-Subject: [PATCH] media: platform: stm32: Adopt SPDX identifier
-Message-ID: <20171205145107.17785-1-benjamin.gaignard@st.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue,  5 Dec 2017 16:10:15 +0100
+Subject: [PATCH v3 03/15] dt-bindings: display: sun4i-drm: Add LVDS properties
+In-Reply-To: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
+References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <17851ba6277b69aa9cd81de5eead62bfed271661.1512486553.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPDX identifiers to files under stm32 directory
+Some clocks and resets supposed to drive the LVDS logic in the display
+engine have been overlooked when the driver was first introduced.
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+Add those additional resources to the binding, and we'll deal with the ABI
+stability in the code.
+
+Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/media/platform/stm32/stm32-cec.c  | 5 +----
- drivers/media/platform/stm32/stm32-dcmi.c | 2 +-
- 2 files changed, 2 insertions(+), 5 deletions(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 8 +++++++-
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/media/platform/stm32/stm32-cec.c b/drivers/media/platform/stm32/stm32-cec.c
-index 0e5aa17bdd40..7c496bc1cf38 100644
---- a/drivers/media/platform/stm32/stm32-cec.c
-+++ b/drivers/media/platform/stm32/stm32-cec.c
-@@ -1,11 +1,8 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * STM32 CEC driver
-  * Copyright (C) STMicroelectronics SA 2017
-  *
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License as published by
-- * the Free Software Foundation; either version 2 of the License, or
-- * (at your option) any later version.
-  */
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 50cc72ee1168..d4259a4f5171 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -121,6 +121,14 @@ Required properties:
+ On SoCs other than the A33 and V3s, there is one more clock required:
+    - 'tcon-ch1': The clock driving the TCON channel 1
  
- #include <linux/clk.h>
-diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
-index ac4c450a6c7d..519952bec6d5 100644
---- a/drivers/media/platform/stm32/stm32-dcmi.c
-+++ b/drivers/media/platform/stm32/stm32-dcmi.c
-@@ -1,3 +1,4 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Driver for STM32 Digital Camera Memory Interface
-  *
-@@ -5,7 +6,6 @@
-  * Authors: Yannick Fertre <yannick.fertre@st.com>
-  *          Hugues Fruchet <hugues.fruchet@st.com>
-  *          for STMicroelectronics.
-- * License terms:  GNU General Public License (GPL), version 2
-  *
-  * This driver is based on atmel_isi.c
-  *
++On SoCs that support LVDS (all SoCs but the A13, H3, H5 and V3s), you
++need one more reset line:
++   - 'lvds': The reset line driving the LVDS logic
++
++And on the SoCs newer than the A31 (sun6i and sun8i families), you
++need one more clock line:
++   - 'lvds-pll': The PLL that can be used to drive the LVDS clock
++
+ DRC
+ ---
+ 
 -- 
-2.15.0
+git-series 0.9.1
