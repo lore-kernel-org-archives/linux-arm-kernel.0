@@ -1,15 +1,15 @@
 From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Tue, 5 Dec 2017 15:06:43 +0100
-Subject: [PATCH v2 2/5] ARM: dts: imx53: add srtc node
+Date: Tue, 5 Dec 2017 15:06:45 +0100
+Subject: [PATCH v2 4/5] ARM: imx_v4_v5_defconfig: enable RTC_DRV_MXC_V2
 In-Reply-To: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
 References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171205140646.30367-3-linux-kernel-dev@beckhoff.com>
+Message-ID: <20171205140646.30367-5-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-rtc-mxc_v2 driver will add support for the i.MX53 SRTC
+Enable SRTC driver for i.MX53 in default config
 
 Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
 
@@ -34,26 +34,20 @@ Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / 
 Cc: Philippe Ombredanne <pombredanne@nexb.com>
 Cc: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/boot/dts/imx53.dtsi | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+ arch/arm/configs/imx_v4_v5_defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/boot/dts/imx53.dtsi b/arch/arm/boot/dts/imx53.dtsi
-index 589a67c5f796..e4ca9d9ba2fe 100644
---- a/arch/arm/boot/dts/imx53.dtsi
-+++ b/arch/arm/boot/dts/imx53.dtsi
-@@ -434,12 +434,10 @@
- 			};
- 
- 			srtc: srtc at 53fa4000 {
--				compatible = "fsl,imx53-rtc", "fsl,imx25-rtc";
-+				compatible = "fsl,imx53-rtc";
- 				reg = <0x53fa4000 0x4000>;
- 				interrupts = <24>;
--				interrupt-parent = <&tzic>;
- 				clocks = <&clks IMX5_CLK_SRTC_GATE>;
--				clock-names = "ipg";
- 			};
- 
- 			iomuxc: iomuxc at 53fa8000 {
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index ca0f13cafe38..b48efd5ff8a7 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -167,6 +167,7 @@ CONFIG_RTC_DRV_PCF8563=y
+ CONFIG_RTC_DRV_IMXDI=y
+ CONFIG_RTC_DRV_MC13XXX=y
+ CONFIG_RTC_DRV_MXC=y
++CONFIG_RTC_DRV_MXC_V2=y
+ CONFIG_DMADEVICES=y
+ CONFIG_IMX_DMA=y
+ CONFIG_IMX_SDMA=y
 -- 
 2.11.0
