@@ -1,62 +1,44 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 5 Dec 2017 15:26:46 -0800
-Subject: [PATCH] clk: Manage proper runtime PM state in clk_change_rate()
-In-Reply-To: <20171130121451.6710-1-m.szyprowski@samsung.com>
-References: <CGME20171130121511eucas1p1832c1f6e5bc9e263860e40478efca132@eucas1p1.samsung.com>
- <20171130121451.6710-1-m.szyprowski@samsung.com>
-Message-ID: <20171205232646.GA4283@codeaurora.org>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Tue, 5 Dec 2017 18:50:01 -0500
+Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <f5ca26d2-9432-2ae3-7501-5b3dcf1e1486@linux.intel.com>
+References: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
+ <1512440100.17567.172.camel@mhfsdcap03>
+ <99ea0ee4-1fff-73df-d9b5-0f756dfc5635@codeaurora.org>
+ <f5ca26d2-9432-2ae3-7501-5b3dcf1e1486@linux.intel.com>
+Message-ID: <7df62698-d27f-a7fc-f61e-60586c16f14b@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/30, Marek Szyprowski wrote:
-> clk_change_rate() propagates rate change down to all its children. Such
-> operation requires managing proper runtime PM state of each child, what
-> was missing. Add needed calls to clk_pm_runtime*() to ensure that
-> set_rate() clock callback is called on runtime active clock.
-> 
-> This fixes following issue found on Exynos5433 TM2 board with devfreq
-> enabled:
-> 
-> Synchronous External Abort: synchronous external abort (0x96000210) at 0xffffff80093f5600
-> Internal error: : 96000210 [#1] PREEMPT SMP
-> Modules linked in:
-> CPU: 0 PID: 5 Comm: kworker/u16:0 Not tainted 4.15.0-rc1-next-20171129+ #4
-> Hardware name: Samsung TM2 board (DT)
-> Workqueue: devfreq_wq devfreq_monitor
-> task: ffffffc0ca96b600 task.stack: ffffff80093a8000
-> pstate: a0000085 (NzCv daIf -PAN -UAO)
-> pc : clk_divider_set_rate+0x54/0x118
-> lr : clk_divider_set_rate+0x44/0x118
-> ...
-> Process kworker/u16:0 (pid: 5, stack limit = 0xffffff80093a8000)
-> Call trace:
->  clk_divider_set_rate+0x54/0x118
->  clk_change_rate+0xfc/0x4e0
->  clk_change_rate+0x1f0/0x4e0
->  clk_change_rate+0x1f0/0x4e0
->  clk_change_rate+0x1f0/0x4e0
->  clk_core_set_rate_nolock+0x138/0x148
->  clk_set_rate+0x28/0x50
->  exynos_bus_passive_target+0x6c/0x11c
->  update_devfreq_passive+0x58/0xb4
->  devfreq_passive_notifier_call+0x50/0x5c
->  notifier_call_chain+0x4c/0x88
->  __srcu_notifier_call_chain+0x54/0x80
->  srcu_notifier_call_chain+0x14/0x1c
->  update_devfreq+0x100/0x1b4
->  devfreq_monitor+0x2c/0x88
->  process_one_work+0x148/0x3d8
->  worker_thread+0x13c/0x3f8
->  kthread+0x100/0x12c
->  ret_from_fork+0x10/0x18
-> 
-> Reported-by: Chanwoo Choi <cw00.choi@samsung.com>
-> Fixes: 9a34b45397e5 ("clk: Add support for runtime PM")
-> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
-> ---
+Rob,
 
-Applied to clk-fixes
+On 12/5/2017 3:48 AM, Mathias Nyman wrote:
+> On 05.12.2017 04:54, Adam Wallis wrote:
+>> On 12/4/2017 9:15 PM, Chunfeng Yun wrote:
+>>> On Mon, 2017-12-04 at 09:27 -0500, Adam Wallis wrote:
+>>>> The xHCI driver currently has the IMOD set to 160, which
+[..]
+> 
+> If Rob Acks this version I'll apply it and remove that blank line.
+> 
+> -Mathias
+> 
+
+Let me know if you have any other issues with this patch, otherwise with your
+ACK, we are done.
+
+Thanks
+
+Adam
+
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
