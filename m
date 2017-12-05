@@ -1,98 +1,22 @@
 From: shankerd@codeaurora.org (Shanker Donthineni)
-Date: Tue,  5 Dec 2017 13:16:21 -0600
-Subject: [PATCH v4] irqchip/gic-v3: Fix the driver probe() fail due to
+Date: Tue, 5 Dec 2017 13:23:25 -0600
+Subject: [PATCH v2] irqchip/gic-v3: Fix the driver probe() fail due to
  disabled GICC entry
-Message-ID: <1512501381-21712-1-git-send-email-shankerd@codeaurora.org>
+In-Reply-To: <1512500607-20160-1-git-send-email-shankerd@codeaurora.org>
+References: <1512500607-20160-1-git-send-email-shankerd@codeaurora.org>
+Message-ID: <8fa89710-de49-4c35-7727-95dd2058702a@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI specification says OS shouldn't attempt to use GICC configuration
-parameters if the flag ACPI_MADT_ENABLED is cleared. The ARM64-SMP code
-skips the disabled GICC entries but not causing any issue. However the
-current GICv3 driver probe bails out causing kernel panic() instead of
-skipping the disabled GICC interfaces. This issue happens on systems
-where redistributor regions are not in the always-on power domain and
-one of GICC interface marked with ACPI_MADT_ENABLED=0.
+Hi Marc,
 
-This patch does the two things to fix the panic.
-  - Don't return an error in gic_acpi_match_gicc() for disabled GICC entry.
-  - No need to keep GICR region information for disabled GICC entry.
+I messed-up patch contents please disregard this one and review v4 patch.
 
-Observed kernel crash on QDF2400 platform GICC entry is disabled.
-Kernel crash traces:
-  Kernel panic - not syncing: No interrupt controller found.
-  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.13.5 #26
-  [<ffff000008087770>] dump_backtrace+0x0/0x218
-  [<ffff0000080879dc>] show_stack+0x14/0x20
-  [<ffff00000883b078>] dump_stack+0x98/0xb8
-  [<ffff0000080c5c14>] panic+0x118/0x26c
-  [<ffff000008b62348>] init_IRQ+0x24/0x2c
-  [<ffff000008b609fc>] start_kernel+0x230/0x394
-  [<ffff000008b601e4>] __primary_switched+0x64/0x6c
-  ---[ end Kernel panic - not syncing: No interrupt controller found.
+[v4] irqchip/gic-v3: Fix the driver probe() fail due to disabled GICC entry
 
-Disabled GICC subtable example:
-                   Subtable Type : 0B [Generic Interrupt Controller]
-                          Length : 50
-                        Reserved : 0000
-            CPU Interface Number : 0000003D
-                   Processor UID : 0000003D
-           Flags (decoded below) : 00000000
-               Processor Enabled : 0
- Performance Interrupt Trig Mode : 0
- Virtual GIC Interrupt Trig Mode : 0
-        Parking Protocol Version : 00000000
-           Performance Interrupt : 00000017
-                  Parked Address : 0000000000000000
-                    Base Address : 0000000000000000
-        Virtual GIC Base Address : 0000000000000000
-     Hypervisor GIC Base Address : 0000000000000000
-           Virtual GIC Interrupt : 00000019
-      Redistributor Base Address : 0000FFFF88F40000
-                       ARM MPIDR : 000000000000000D
-                Efficiency Class : 00
-                        Reserved : 000000
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
----
-changes since v3:
-  Fix typo. 
-changes since v2:
-  Edited commit text.
-changes since v1:
-  Added a new "if condition" to skip disabled GICC entry and edited commit.
+https://patchwork.kernel.org/patch/10093653/
 
- drivers/irqchip/irq-gic-v3.c | 11 +++++++++++
- 1 file changed, 11 insertions(+)
-
-diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
-index b56c3e2..a874777 100644
---- a/drivers/irqchip/irq-gic-v3.c
-+++ b/drivers/irqchip/irq-gic-v3.c
-@@ -1331,6 +1331,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
- 	u32 size = reg == GIC_PIDR2_ARCH_GICv4 ? SZ_64K * 4 : SZ_64K * 2;
- 	void __iomem *redist_base;
- 
-+	/* GICC entry which has !ACPI_MADT_ENABLED is not unusable so skip */
-+	if (!(gicc->flags & ACPI_MADT_ENABLED))
-+		return 0;
-+
- 	redist_base = ioremap(gicc->gicr_base_address, size);
- 	if (!redist_base)
- 		return -ENOMEM;
-@@ -1380,6 +1384,13 @@ static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
- 	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
- 		return 0;
- 
-+	/*
-+	 * It's perfectly valid firmware can pass disabled GICC entry, driver
-+	 * should not treat as errors, skip the entry instead of probe fail.
-+	 */
-+	if (!(gicc->flags & ACPI_MADT_ENABLED))
-+		return 0;
-+
- 	return -ENODEV;
- }
- 
 -- 
-Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Shanker Donthineni
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
 Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
