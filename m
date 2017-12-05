@@ -1,45 +1,59 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 5 Dec 2017 21:00:37 +0800
-Subject: [PATCH] arm64: dts: allwinner: a64: bananapi-m64: Add LED device
- node
-In-Reply-To: <20171205100511.ohxcqlrozxfgq6id@flea.lan>
-References: <20171201162733.23156-1-wens@csie.org>
- <20171205100511.ohxcqlrozxfgq6id@flea.lan>
-Message-ID: <CAGb2v64HrvHZ-o7dRb2shUBUnwziV9ZVFVEA25+nyBrN+LffpA@mail.gmail.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Tue, 5 Dec 2017 15:02:43 +0200
+Subject: [GIT PULL] OMAP2+: clkctrl fixes/enhancements for OMAP SoCs for 4.16
+ merge
+Message-ID: <26d92d81-5922-1755-e59c-964e09a7f3c2@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 6:05 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Sat, Dec 02, 2017 at 12:27:33AM +0800, Chen-Yu Tsai wrote:
->> The Bananapi-M64 has 3 LEDS in red, green, and blue. These are toggled
->> via GPIO lines, which drive transistors that control current across the
->> LEDS. The red LED is by default on, via an additional pull-up on the
->> control line. We consider this means that it is a power indicator.
->> So we set the "default-on" property for it.
->>
->> The pingroups the GPIO lines belong to require external regulators be
->> enabled to be able to drive the GPIO high. These regulators also have
->> other purposes. However the pin controller does not have bindings for
->> regulators. Here we just set them to always-on.
->
-> I guess we should take the opportunity to do just that.
->
-> We have been deferring this for quite some time now, this is a perfect
-> occasion to do it once and for all :)
+Hi Tony,
 
-True. But right now I don't see an elegant solution. What is the purpose
-of having the regulator tied to pinctrl / GPIO? You can't have the pinctrl
-driver asking for the regulator at probe time, as it might not be available
-or even have a cyclic dependency (because the PMIC is I2C driven, which
-needs an I2C controller, which needs the pinctrl). If you defer fetching
-the regulator to a later point, you might end up with an inconsistent state.
-Again with the I2C driven regulator example, what happens if the regulator
-core decides to turn the regulator off before the pinctrl side has a chance
-to take a reference and enable it?
+This pull contains the series posted here [1], it has only been rebased 
+on top of 4.15-rc1. Can be applied separately from the clkctrl driver 
+series. The part missing after this is the DTS series, which I will post 
+later this week (I don't think I have time to post them today, but they 
+are available also under branch 4.15-rc1-clkctrl-dts in my public repo.)
 
+-Tero
 
-Regards
-ChenYu
+[1] http://www.spinics.net/lists/linux-omap/msg139902.html
+
+===
+
+The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+
+   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+
+are available in the git repository at:
+
+   https://github.com/t-kristo/linux-pm.git 4.15-rc1-clkctrl-mach-omap2
+
+for you to fetch changes up to 71d50393ab0186b40860d31468a1b701c97339f6:
+
+   ARM: DM816x: hwmod_data: fix clockdomain name for sata hwmod 
+(2017-12-04 11:35:21 +0200)
+
+----------------------------------------------------------------
+Tero Kristo (7):
+       ARM: OMAP2+: CM: add support for getting phys address for a 
+clkctrl register
+       ARM: OMAP4: CMINST: add support for translating clkctrl addresses
+       ARM: OMAP2+: hwmod: fix clkctrl address translation logic
+       ARM: OMAP2+: clockdomain: remove the obsolete clkdm_xlate_address API
+       ARM: AM33xx: CM: add support for getting physical address for a 
+register
+       ARM: OMAP2+: hwmod: calculate physical register address on am33xx
+       ARM: DM816x: hwmod_data: fix clockdomain name for sata hwmod
+
+  arch/arm/mach-omap2/clockdomain.c          |  8 ----
+  arch/arm/mach-omap2/clockdomain.h          |  2 -
+  arch/arm/mach-omap2/cm.h                   |  3 ++
+  arch/arm/mach-omap2/cm33xx.c               |  6 +++
+  arch/arm/mach-omap2/cm_common.c            | 10 ++++
+  arch/arm/mach-omap2/cminst44xx.c           | 10 ++--
+  arch/arm/mach-omap2/omap_hwmod.c           | 73 
++++++++++++++++---------------
+  arch/arm/mach-omap2/omap_hwmod_81xx_data.c |  2 +-
+  8 files changed, 59 insertions(+), 55 deletions(-)
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
