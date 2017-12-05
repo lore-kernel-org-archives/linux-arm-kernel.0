@@ -1,60 +1,272 @@
-From: nicolas.ferre@microchip.com (Nicolas Ferre)
-Date: Tue, 5 Dec 2017 12:27:06 +0100
-Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
-In-Reply-To: <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
-References: <20171205101000.968887-1-arnd@arndb.de>
- <20171205105750.GI21780@piout.net>
- <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
-Message-ID: <8268ff41-576b-4438-ad10-ec90f66b6e9f@microchip.com>
+From: ilialin@codeaurora.org (ilialin at codeaurora.org)
+Date: Tue, 5 Dec 2017 13:37:47 +0200
+Subject: [PATCH] soc: qcom: Separate kryo l2 accessors from PMU driver
+In-Reply-To: <20171205103516.bczf43vvpcin24zl@lakrids.cambridge.arm.com>
+References: <1512455630-25119-1-git-send-email-ilialin@codeaurora.org>
+ <20171205103516.bczf43vvpcin24zl@lakrids.cambridge.arm.com>
+Message-ID: <011801d36dbd$7ae34e80$70a9eb80$@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2017 at 12:13, Arnd Bergmann wrote:
-> On Tue, Dec 5, 2017 at 11:57 AM, Alexandre Belloni
-> <alexandre.belloni@free-electrons.com> wrote:
->> On 05/12/2017 at 11:09:38 +0100, Arnd Bergmann wrote:
->>> Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
->>> changed the way that the dependencies are handled, but then the
->>> Class D amplifier support got merged, which used the old method.
->>>
->>> This seems to have triggered a very rare randconfig condition for me
->>> now, leading to a link error:
->>>
->>> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
->>> atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
->>> atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
->>> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
->>> atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
->>> atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
->>>
->>> Changing it to select SND_ATMEL_SOC_SSC_DMA as intended rather than
->>> SND_ATMEL_SOC_DMA directly makes it work again.
->>>
->>> Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Unfortunately, my testing just found a new problem with this patch
-> applied, I had
-> not run enough randconfig tests on top of it:
-> 
-> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
-> atmel_ssc_dai.c:(.text+0x73c): undefined reference to `ssc_request'
-> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
-> atmel_ssc_dai.c:(.text+0x7be): undefined reference to `ssc_free'
-> 
-> This is for a configuration with SND_ATMEL_SOC_CLASSD=y
-> and CONFIG_ATMEL_SSC=n. Could you tell me whether that is a
-> sensible configuration that should work, or whether we need a dependency
-> on ATMEL_SSC in SND_ATMEL_SOC_CLASSD? I can't really tell
-> from the source code, but you probably know the answer.
+Hello Mark,
 
-Actually, they are two different interfaces which can be enabled at the
-same time or not and CLASSD doesn't use the SSC.
-So no dependency between them.
+> -----Original Message-----
+> From: Mark Rutland [mailto:mark.rutland at arm.com]
+> Sent: Tuesday, December 5, 2017 12:35 PM
+> To: Ilia Lin <ilialin@codeaurora.org>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH] soc: qcom: Separate kryo l2 accessors from PMU driver
+> 
+> Hi,
+> 
+> On Tue, Dec 05, 2017 at 08:33:50AM +0200, Ilia Lin wrote:
+> > The driver provides kernel level API for other drivers to access the
+> > MSM8996 L2 cache registers.
+> > Separating the L2 access code from the PMU driver and making it public
+> > to allow other drivers use it.
+> > The accesses must be separated with a single spinlock, maintained in
+> > this driver.
+> >
+> > Change-Id: I2865e888491e85d678e298279400c371427e30ea
+> > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+> 
+> What other driver is going to use this?
+> 
+> Until there is another driver, I don't see much point in factoring this
+out.
 
-It might be an issue with SND_ATMEL_SOC_DMA not selecting the proper code...
+The other driver currently is the CPU clock driver, which needs configuring
+the L2 registers. The clock driver will be submitted through the linux-clk
+list and will depend on the kryo-l2-accessors driver then.
 
-Regards,
--- 
-Nicolas Ferre
+Thanks,
+Ilia
+
+> 
+> Thanks,
+> Mark.
+> 
+> > ---
+> >  arch/arm64/Kconfig.platforms         |  7 ++++
+> >  drivers/perf/qcom_l2_pmu.c           | 48 +--------------------------
+> >  drivers/soc/qcom/Makefile            |  1 +
+> >  drivers/soc/qcom/kryo-l2-accessors.c | 64
+> > ++++++++++++++++++++++++++++++++++++
+> >  include/soc/qcom/kryo-l2-accessors.h | 27 +++++++++++++++
+> >  5 files changed, 100 insertions(+), 47 deletions(-)  create mode
+> > 100644 drivers/soc/qcom/kryo-l2-accessors.c
+> >  create mode 100644 include/soc/qcom/kryo-l2-accessors.h
+> >
+> > diff --git a/arch/arm64/Kconfig.platforms
+> > b/arch/arm64/Kconfig.platforms index 2401373..1cfed45 100644
+> > --- a/arch/arm64/Kconfig.platforms
+> > +++ b/arch/arm64/Kconfig.platforms
+> > @@ -138,6 +138,13 @@ config ARCH_QCOM
+> >  	help
+> >  	  This enables support for the ARMv8 based Qualcomm chipsets.
+> >
+> > +config ARCH_MSM8996
+> > +    bool "Enable Support for Qualcomm Technologies, Inc. MSM8996"
+> > +	depends on ARCH_QCOM
+> > +	help
+> > +	This enables support for the MSM8996 chipset. If you do not
+> > +	wish to build a kernel that runs on this chipset, say 'N' here.
+> > +
+> >  config ARCH_REALTEK
+> >  	bool "Realtek Platforms"
+> >  	help
+> > diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
+> > index 4fdc848..ba5f241 100644
+> > --- a/drivers/perf/qcom_l2_pmu.c
+> > +++ b/drivers/perf/qcom_l2_pmu.c
+> > @@ -30,7 +30,7 @@
+> >
+> >  #include <asm/barrier.h>
+> >  #include <asm/local64.h>
+> > -#include <asm/sysreg.h>
+> > +#include <soc/qcom/kryo-l2-accessors.h>
+> >
+> >  #define MAX_L2_CTRS             9
+> >
+> > @@ -87,9 +87,6 @@
+> >  #define L2_COUNTER_RELOAD       BIT_ULL(31)
+> >  #define L2_CYCLE_COUNTER_RELOAD BIT_ULL(63)
+> >
+> > -#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
+> > -#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
+> > -
+> >  #define reg_idx(reg, i)         (((i) * IA_L2_REG_OFFSET) + reg##_BASE)
+> >
+> >  /*
+> > @@ -107,49 +104,6 @@
+> >  #define L2_EVENT_STREX                     0x421
+> >  #define L2_EVENT_CLREX                     0x422
+> >
+> > -static DEFINE_RAW_SPINLOCK(l2_access_lock);
+> > -
+> > -/**
+> > - * set_l2_indirect_reg: write value to an L2 register
+> > - * @reg: Address of L2 register.
+> > - * @value: Value to be written to register.
+> > - *
+> > - * Use architecturally required barriers for ordering between system
+> > register
+> > - * accesses
+> > - */
+> > -static void set_l2_indirect_reg(u64 reg, u64 val) -{
+> > -	unsigned long flags;
+> > -
+> > -	raw_spin_lock_irqsave(&l2_access_lock, flags);
+> > -	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+> > -	isb();
+> > -	write_sysreg_s(val, L2CPUSRDR_EL1);
+> > -	isb();
+> > -	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+> > -}
+> > -
+> > -/**
+> > - * get_l2_indirect_reg: read an L2 register value
+> > - * @reg: Address of L2 register.
+> > - *
+> > - * Use architecturally required barriers for ordering between system
+> > register
+> > - * accesses
+> > - */
+> > -static u64 get_l2_indirect_reg(u64 reg) -{
+> > -	u64 val;
+> > -	unsigned long flags;
+> > -
+> > -	raw_spin_lock_irqsave(&l2_access_lock, flags);
+> > -	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+> > -	isb();
+> > -	val = read_sysreg_s(L2CPUSRDR_EL1);
+> > -	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+> > -
+> > -	return val;
+> > -}
+> > -
+> >  struct cluster_pmu;
+> >
+> >  /*
+> > diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+> > index 40c56f6..2bf8d93 100644
+> > --- a/drivers/soc/qcom/Makefile
+> > +++ b/drivers/soc/qcom/Makefile
+> > @@ -10,3 +10,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) +=
+> smem_state.o
+> >  obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
+> >  obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
+> >  obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
+> > +obj-$(CONFIG_ARCH_MSM8996) +=	kryo-l2-accessors.o
+> > diff --git a/drivers/soc/qcom/kryo-l2-accessors.c
+> > b/drivers/soc/qcom/kryo-l2-accessors.c
+> > new file mode 100644
+> > index 0000000..6be57e6
+> > --- /dev/null
+> > +++ b/drivers/soc/qcom/kryo-l2-accessors.c
+> > @@ -0,0 +1,64 @@
+> > +/*
+> > + * Copyright (c) 2014-2015, 2017, The Linux Foundation. All rights
+reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > +modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/spinlock.h>
+> > +#include <asm/sysreg.h>
+> > +#include <soc/qcom/kryo-l2-accessors.h>
+> > +
+> > +#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
+> > +#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
+> > +
+> > +static DEFINE_RAW_SPINLOCK(l2_access_lock);
+> > +
+> > +/**
+> > + * set_l2_indirect_reg: write value to an L2 register
+> > + * @reg: Address of L2 register.
+> > + * @value: Value to be written to register.
+> > + *
+> > + * Use architecturally required barriers for ordering between system
+> > +register
+> > + * accesses, and system registers with respect to device memory  */
+> > +void set_l2_indirect_reg(u64 reg, u64 val) {
+> > +	unsigned long flags;
+> > +	mb();
+> > +	raw_spin_lock_irqsave(&l2_access_lock, flags);
+> > +	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+> > +	isb();
+> > +	write_sysreg_s(val, L2CPUSRDR_EL1);
+> > +	isb();
+> > +	raw_spin_unlock_irqrestore(&l2_access_lock, flags); }
+> > +EXPORT_SYMBOL(set_l2_indirect_reg);
+> > +
+> > +/**
+> > + * get_l2_indirect_reg: read an L2 register value
+> > + * @reg: Address of L2 register.
+> > + *
+> > + * Use architecturally required barriers for ordering between system
+> > +register
+> > + * accesses, and system registers with respect to device memory  */
+> > +u64 get_l2_indirect_reg(u64 reg)
+> > +{
+> > +	u64 val;
+> > +	unsigned long flags;
+> > +
+> > +	raw_spin_lock_irqsave(&l2_access_lock, flags);
+> > +	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+> > +	isb();
+> > +	val = read_sysreg_s(L2CPUSRDR_EL1);
+> > +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+> > +
+> > +	return val;
+> > +}
+> > +EXPORT_SYMBOL(get_l2_indirect_reg);
+> > diff --git a/include/soc/qcom/kryo-l2-accessors.h
+> > b/include/soc/qcom/kryo-l2-accessors.h
+> > new file mode 100644
+> > index 0000000..2bebce1
+> > --- /dev/null
+> > +++ b/include/soc/qcom/kryo-l2-accessors.h
+> > @@ -0,0 +1,27 @@
+> > +/*
+> > + * Copyright (c) 2017, The Linux Foundation. All rights reserved.
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > +modify
+> > + * it under the terms of the GNU General Public License version 2 and
+> > + * only version 2 as published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#ifndef __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
+> > +#define __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
+> > +
+> > +#ifdef CONFIG_ARCH_QCOM
+> > +void set_l2_indirect_reg(u64 reg_addr, u64 val);
+> > +u64 get_l2_indirect_reg(u64 reg_addr); #else static inline void
+> > +set_l2_indirect_reg(u32 reg_addr, u32 val) {} static inline u32
+> > +get_l2_indirect_reg(u32 reg_addr) {
+> > +	return 0;
+> > +}
+> > +#endif
+> > +#endif
+> > --
+> > 1.9.1
+> >
+> >
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
