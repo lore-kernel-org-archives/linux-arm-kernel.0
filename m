@@ -1,59 +1,66 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Tue, 5 Dec 2017 15:02:43 +0200
-Subject: [GIT PULL] OMAP2+: clkctrl fixes/enhancements for OMAP SoCs for 4.16
- merge
-Message-ID: <26d92d81-5922-1755-e59c-964e09a7f3c2@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  5 Dec 2017 14:10:11 +0100
+Subject: [PATCH] [v2] ASoC: atmel-classd: improve Kconfig dependencies
+Message-ID: <20171205131022.2082003-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Tony,
+Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
+changed the way that the dependencies are handled, but then the
+Class D amplifier support got merged, which used the old method.
 
-This pull contains the series posted here [1], it has only been rebased 
-on top of 4.15-rc1. Can be applied separately from the clkctrl driver 
-series. The part missing after this is the DTS series, which I will post 
-later this week (I don't think I have time to post them today, but they 
-are available also under branch 4.15-rc1-clkctrl-dts in my public repo.)
+This seems to have triggered a very rare randconfig condition for me
+now, leading to a link error:
 
--Tero
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
+atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
+atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
 
-[1] http://www.spinics.net/lists/linux-omap/msg139902.html
+This changes the SND_ATMEL_SOC_DMA option so it gets built whenever
+one of the two users (SND_ATMEL_SOC_SSC_DMA and SND_ATMEL_SOC_CLASSD)
+is enabled, with the twist that we make it built-in when SND_ATMEL_SOC_SSC
+is built-in, even if one of the other two is a module.
 
-===
+I think this captures best what the real dependency in the hardware
+is, and it simplifies the logic a bit.
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: rewrite the change completely, after running into a new regression.
 
-   Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+I'm putting it out on the list so we can review the change together,
+but I'm still doing more testing at the same time. If I don't reply
+by Dec 6, nothing new has come up.
+---
+ sound/soc/atmel/Kconfig | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
-are available in the git repository at:
-
-   https://github.com/t-kristo/linux-pm.git 4.15-rc1-clkctrl-mach-omap2
-
-for you to fetch changes up to 71d50393ab0186b40860d31468a1b701c97339f6:
-
-   ARM: DM816x: hwmod_data: fix clockdomain name for sata hwmod 
-(2017-12-04 11:35:21 +0200)
-
-----------------------------------------------------------------
-Tero Kristo (7):
-       ARM: OMAP2+: CM: add support for getting phys address for a 
-clkctrl register
-       ARM: OMAP4: CMINST: add support for translating clkctrl addresses
-       ARM: OMAP2+: hwmod: fix clkctrl address translation logic
-       ARM: OMAP2+: clockdomain: remove the obsolete clkdm_xlate_address API
-       ARM: AM33xx: CM: add support for getting physical address for a 
-register
-       ARM: OMAP2+: hwmod: calculate physical register address on am33xx
-       ARM: DM816x: hwmod_data: fix clockdomain name for sata hwmod
-
-  arch/arm/mach-omap2/clockdomain.c          |  8 ----
-  arch/arm/mach-omap2/clockdomain.h          |  2 -
-  arch/arm/mach-omap2/cm.h                   |  3 ++
-  arch/arm/mach-omap2/cm33xx.c               |  6 +++
-  arch/arm/mach-omap2/cm_common.c            | 10 ++++
-  arch/arm/mach-omap2/cminst44xx.c           | 10 ++--
-  arch/arm/mach-omap2/omap_hwmod.c           | 73 
-+++++++++++++++---------------
-  arch/arm/mach-omap2/omap_hwmod_81xx_data.c |  2 +-
-  8 files changed, 59 insertions(+), 55 deletions(-)
---
-Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index 4a56f3dfba51..af9a9096d50b 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -20,8 +20,8 @@ config SND_ATMEL_SOC_SSC_PDC
+ config SND_ATMEL_SOC_DMA
+ 	tristate
+ 	select SND_SOC_GENERIC_DMAENGINE_PCM
+-	default m if SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=m
+-	default y if SND_ATMEL_SOC_SSC_DMA=y || (SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=y)
++	default y if SND_ATMEL_SOC_SSC=y && (SND_ATMEL_SOC_SSC_DMA=m || SND_ATMEL_SOC_CLASSD=m)
++	default SND_ATMEL_SOC_CLASSD || SND_ATMEL_SOC_SSC_DMA
+ 
+ config SND_ATMEL_SOC_SSC_DMA
+ 	tristate
+@@ -64,7 +64,6 @@ config SND_AT91_SOC_SAM9X5_WM8731
+ config SND_ATMEL_SOC_CLASSD
+ 	tristate "Atmel ASoC driver for boards using CLASSD"
+ 	depends on ARCH_AT91 || COMPILE_TEST
+-	select SND_ATMEL_SOC_DMA
+ 	select REGMAP_MMIO
+ 	help
+ 	  Say Y if you want to add support for Atmel ASoC driver for boards using
+-- 
+2.9.0
