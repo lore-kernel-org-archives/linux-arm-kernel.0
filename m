@@ -1,35 +1,90 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Tue, 5 Dec 2017 08:39:16 -0800
-Subject: [PATCH 1/2] mm: make faultaround produce old ptes
-In-Reply-To: <20171205121614.ek45btdgrpbmvf45@armageddon.cambridge.arm.com>
-References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
- <CAADWXX8FmAs1qB9=fsWZjt8xTEnGOAMS=eCHnuDLJrZiX6x=7w@mail.gmail.com>
- <20171205121614.ek45btdgrpbmvf45@armageddon.cambridge.arm.com>
-Message-ID: <CA+55aFyFc-+pAx80zx0xsYpCiU25KUFVzUEL=z-gj+iRDzUgbQ@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 5 Dec 2017 16:47:46 +0000
+Subject: [PATCH v6 6/8] KVM: arm/arm64: Support VGIC dist pend/active
+ changes for mapped IRQs
+In-Reply-To: <20171205150328.gcwnt5jzmoarvetd@yury-thinkpad>
+References: <20171204200506.3224-1-cdall@kernel.org>
+ <20171204200506.3224-7-cdall@kernel.org>
+ <20171205150328.gcwnt5jzmoarvetd@yury-thinkpad>
+Message-ID: <3cd51419-cd43-998d-f801-407b805eb9a2@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 4:16 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
->
-> I would be more in favour of some heuristics to dynamically reduce the
-> fault-around bytes based on the memory pressure rather than choosing
-> between young or old ptes. Or, if we are to go with old vs young ptes,
-> make this choice dependent on the memory pressure regardless of whether
-> the CPU supports hardware accessed bit.
+On 05/12/17 15:03, Yury Norov wrote:
+> On Mon, Dec 04, 2017 at 09:05:04PM +0100, Christoffer Dall wrote:
+>> From: Christoffer Dall <christoffer.dall@linaro.org>
+>>
+>> For mapped IRQs (with the HW bit set in the LR) we have to follow some
+>> rules of the architecture.  One of these rules is that VM must not be
+>> allowed to deactivate a virtual interrupt with the HW bit set unless the
+>> physical interrupt is also active.
+>>
+>> This works fine when injecting mapped interrupts, because we leave it up
+>> to the injector to either set EOImode==1 or manually set the active
+>> state of the physical interrupt.
+>>
+>> However, the guest can set virtual interrupt to be pending or active by
+>> writing to the virtual distributor, which could lead to deactivating a
+>> virtual interrupt with the HW bit set without the physical interrupt
+>> being active.
+>>
+>> We could set the physical interrupt to active whenever we are about to
+>> enter the VM with a HW interrupt either pending or active, but that
+>> would be really slow, especially on GICv2.  So we take the long way
+>> around and do the hard work when needed, which is expected to be
+>> extremely rare.
+>>
+>> When the VM sets the pending state for a HW interrupt on the virtual
+>> distributor we set the active state on the physical distributor, because
+>> the virtual interrupt can become active and then the guest can
+>> deactivate it.
+>>
+>> When the VM clears the pending state we also clear it on the physical
+>> side, because the injector might otherwise raise the interrupt.  We also
+>> clear the physical active state when the virtual interrupt is not
+>> active, since otherwise a SPEND/CPEND sequence from the guest would
+>> prevent signaling of future interrupts.
+>>
+>> Changing the state of mapped interrupts from userspace is not supported,
+>> and it's expected that userspace unmaps devices from VFIO before
+>> attempting to set the interrupt state, because the interrupt state is
+>> driven by hardware.
+>>
+>> Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
+>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> ---
+>>  virt/kvm/arm/vgic/vgic-mmio.c | 71 +++++++++++++++++++++++++++++++++++++++----
+>>  virt/kvm/arm/vgic/vgic.c      |  7 +++++
+>>  virt/kvm/arm/vgic/vgic.h      |  1 +
+>>  3 files changed, 73 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
+>> index 747b0a3b4784..8d173d99a7a4 100644
+>> --- a/virt/kvm/arm/vgic/vgic-mmio.c
+>> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
+>> @@ -16,6 +16,7 @@
+>>  #include <linux/kvm.h>
+>>  #include <linux/kvm_host.h>
+>>  #include <kvm/iodev.h>
+>> +#include <kvm/arm_arch_timer.h>
+>>  #include <kvm/arm_vgic.h>
+>>  
+>>  #include "vgic.h"
+>> @@ -143,10 +144,22 @@ static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
+>>  	return vcpu;
+>>  }
+>>  
+>> +/* Must be called with irq->irq_lock held */
+> 
+> Instead of enforcing this rule in comment, you can enforce it in code:
+> 
+> BUG_ON(!spin_is_locked(irq->irq_lock))
 
-That sounds like a good idea, but possibly a bit _too_ smart for
-something that likely isn't a big deal.
+Are we going to litter the kernel with such assertions? I don't think
+that's a valuable thing to do.
 
-The current behavior definitely is based on a "swapping is not a big
-deal" mindset, and that getting the best LRU isn't worth it. That's
-probably true in most circumstances, but if you really do have low
-memory, and you really do have fairly random access behavior that
-where the actual working set size is close to the actual memory size,
-then a "get rid of faultaround pages earlier" mode would be a good
-thing.
+Thanks,
 
-So I'm not at all against your idea - it sounds like the
-RightThing(tm) to do - I just wonder how painful it is to generate a
-sane heuristic that actually works in practice..
-
-                  Linus
+	M.
+-- 
+Jazz is not dead. It just smells funny...
