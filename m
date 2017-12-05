@@ -1,115 +1,94 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue,  5 Dec 2017 16:01:45 -0500
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-Message-ID: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+From: jwboyer@fedoraproject.org (Josh Boyer)
+Date: Tue, 5 Dec 2017 16:14:26 -0500
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <20171205100148.5757-1-glin@suse.com>
+References: <20171205100148.5757-1-glin@suse.com>
+Message-ID: <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GED interrupts could be pending by the time we are doing a reboot.
+On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
+> The series of patches introduce Security Version to EFI stub.
+>
+> Security Version is a monotonically increasing number and designed to
+> prevent the user from loading an insecure kernel accidentally. The
+> bootloader maintains a list of security versions corresponding to
+> different distributions. After fixing a critical vulnerability, the
+> distribution kernel maintainer bumps the "version", and the bootloader
+> updates the list automatically. When the user tries to load a kernel
+> with a lower security version, the bootloader shows a warning prompt
+> to notify the user the potential risk.
 
-Even though GED driver uses devm_request_irq() to register the interrupt
-handler, the handler is not being freed on time during a shutdown since
-the driver is missing a shutdown callback.
+If a distribution releases a kernel with a higher security version and
+that it automatically updated on boot, what happens if that kernel
+contains a different bug that causes it to fail to boot or break
+critical functionality?  At that point, the user's machine would be in
+a state where the higher security version is enforced but the only
+kernel that provides that is broken.  Wouldn't that make a bad
+situation even worse by now requiring manual acceptance of the older
+SV kernel boot physically at the machine?
 
-If the ACPI handler is no longer available, this causes an interrupt
-storm and delays shutdown.
+I feel like I'm missing a detail here or something.
 
-Register a shutdown callback and manually free the interrupts.
+josh
 
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/acpi/evged.c | 36 +++++++++++++++++++++++++++++++++---
- 1 file changed, 33 insertions(+), 3 deletions(-)
-
-diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
-index 46f0603..dde50ea 100644
---- a/drivers/acpi/evged.c
-+++ b/drivers/acpi/evged.c
-@@ -1,7 +1,7 @@
- /*
-  * Generic Event Device for ACPI.
-  *
-- * Copyright (c) 2016, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -49,6 +49,11 @@
- 
- #define MODULE_NAME	"acpi-ged"
- 
-+struct acpi_ged_device {
-+	struct device *dev;
-+	struct list_head event_list;
-+};
-+
- struct acpi_ged_event {
- 	struct list_head node;
- 	struct device *dev;
-@@ -76,7 +81,8 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
- 	unsigned int irq;
- 	unsigned int gsi;
- 	unsigned int irqflags = IRQF_ONESHOT;
--	struct device *dev = context;
-+	struct acpi_ged_device *geddev = context;
-+	struct device *dev = geddev->dev;
- 	acpi_handle handle = ACPI_HANDLE(dev);
- 	acpi_handle evt_handle;
- 	struct resource r;
-@@ -122,29 +128,53 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
- 		return AE_ERROR;
- 	}
- 
-+	dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
-+	list_add_tail(&event->node, &geddev->event_list);
- 	return AE_OK;
- }
- 
- static int ged_probe(struct platform_device *pdev)
- {
-+	struct acpi_ged_device *geddev;
- 	acpi_status acpi_ret;
- 
-+	geddev = devm_kzalloc(&pdev->dev, sizeof(*geddev), GFP_KERNEL);
-+	if (!geddev)
-+		return -ENOMEM;
-+
-+	geddev->dev = &pdev->dev;
-+	INIT_LIST_HEAD(&geddev->event_list);
- 	acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
--				       acpi_ged_request_interrupt, &pdev->dev);
-+				       acpi_ged_request_interrupt, geddev);
- 	if (ACPI_FAILURE(acpi_ret)) {
- 		dev_err(&pdev->dev, "unable to parse the _CRS record\n");
- 		return -EINVAL;
- 	}
-+	platform_set_drvdata(pdev, geddev);
- 
- 	return 0;
- }
- 
-+static void ged_remove(struct platform_device *pdev)
-+{
-+	struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
-+	struct acpi_ged_event *event, *next;
-+
-+	list_for_each_entry_safe(event, next, &geddev->event_list, node) {
-+		devm_free_irq(geddev->dev, event->irq, event);
-+		list_del(&event->node);
-+		dev_info(geddev->dev, "GED releasing GSI %u @ IRQ %u\n",
-+			 event->gsi, event->irq);
-+	}
-+}
-+
- static const struct acpi_device_id ged_acpi_ids[] = {
- 	{"ACPI0013"},
- 	{},
- };
- 
- static struct platform_driver ged_driver = {
-+	.shutdown = ged_remove,
- 	.probe = ged_probe,
- 	.driver = {
- 		.name = MODULE_NAME,
--- 
-1.9.1
+> For more details: https://github.com/lcp/shim/wiki/Security-Version
+>
+> The original idea is to add a new PE/COFF section to store the data.
+> However, there are some restrictions.
+>
+> 1. For x86, the size limit of the EFI header is 0x200, and a section entry
+>    in the section table takes 40 bytes. Currently, the EFI header already
+>    occupies the first 0x1da bytes, so there is no room for a new section
+>    entry.
+>
+> 2. The MemoryAttributes table sets the attributes of memory pages according
+>    to the section flags. For ARM64, the minimal granularity is 4KB, but
+>    Security Version only needs a few bytes, and it's pointless to allocate
+>    4KB for it.
+>
+> Fortunately, there is a special section defined in PE/COFF: resource
+> section. The only known user of the resource section in UEFI is the HII
+> protocol which fetches data from "HII" directory. For Security Version, a
+> new directory called "LinuxSV" is created and it contains the file offset
+> to the struct of Security Version. The bootloader just follows the
+> resource table to fetch the "version" from the image file.
+>
+> v3:
+>     - Move everything to the resource section to be compatible with both
+>       x86 and ARM64
+> v2:
+>     - Decrease the size of secdata_offset to 2 bytes since the setup header
+>       is limited to around 32KB.
+>     - Restructure the secdata section. The signer is now a null-terminated
+>       string. The type of distro_version changes to u32 in case the distro
+>       uses a long version.
+>     - Modify the Kconfig names and add help.
+>     - Remove the signer name hack in build.c.
+>
+> Cc: "H. Peter Anvin" <hpa@zytor.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Ingo Molnar <mingo@redhat.com>
+> Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Joey Lee <jlee@suse.com>
+> Signed-off-by: Gary Lin <glin@suse.com>
+>
+> Gary Lin (2):
+>   x86/efi: Introduce Security Version to x86
+>   arm64/efi: Introduce Security Version to ARM64
+>
+>  arch/arm64/kernel/efi-header.S | 57 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/x86/boot/header.S         | 55 ++++++++++++++++++++++++++++++++++++++++
+>  drivers/firmware/efi/Kconfig   | 40 +++++++++++++++++++++++++++++
+>  3 files changed, 152 insertions(+)
+>
+> --
+> 2.15.0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
