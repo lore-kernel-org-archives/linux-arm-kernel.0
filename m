@@ -1,32 +1,33 @@
 From: sky@genki.is (Genki Sky)
-Date: Mon, 04 Dec 2017 21:39:07 -0500
-Subject: [PATCH v2 3/3] staging: vc04_services: Use __func__
-In-Reply-To: <cover.1512441073.git.sky@genki.is>
+Date: Mon, 04 Dec 2017 21:39:04 -0500
+Subject: [PATCH v2 0/3] staging: vc04_services: Fix trivial style issues
+In-Reply-To: <20171204105235.2nhmalxsd4uslesi@mwanda>
 References: <20171204105235.2nhmalxsd4uslesi@mwanda>
- <cover.1512441073.git.sky@genki.is>
-Message-ID: <69dc7f6f0078bd381aed97981ed3a7c6f0abef0c.1512441073.git.sky@genki.is>
+Message-ID: <cover.1512441073.git.sky@genki.is>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Genki Sky <sky@genki.is>
----
- drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Hi,
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-index 5ddea4f54bf7..6c4d8b4c7cd9 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-@@ -618,8 +618,8 @@ static void buffer_to_host_cb(struct vchiq_mmal_instance *instance,
- 	struct mmal_msg_context *msg_context;
- 	u32 handle;
- 
--	pr_debug("buffer_to_host_cb: instance:%p msg:%p msg_len:%d\n",
--		 instance, msg, msg_len);
-+	pr_debug("%s: instance:%p msg:%p msg_len:%d\n",
-+		 __func__, instance, msg, msg_len);
- 
- 	if (msg->u.buffer_from_host.drvbuf.magic == MMAL_MAGIC) {
- 		handle = msg->u.buffer_from_host.drvbuf.client_context;
--- 
+This is v2 of a patch series to fix some checkpatch.pl warnings in
+drivers/staging/vc04_services/bcm2835-camera/*
+
+Changes from v1 [1]:
+- Split single patch into multiple patches
+- Remove reference to eudyptula in commit message
+
+[1]: https://lkml.kernel.org/r/<30cc7b48def470f1bec8d8d255044f4f220531ee.1512368114.git.sky@genki.is>
+
+[ aside: this is for task-10 of http://eudyptula-challenge.org/ ]
+
+Genki Sky (3):
+  staging: vc04_services: Join multiline dereferences
+  staging: vc04_services: Unsplit user-visible strings
+  staging: vc04_services: Use __func__
+
+ .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 23 +++++++++-------------
+ .../vc04_services/bcm2835-camera/mmal-vchiq.c      |  7 +++----
+ 2 files changed, 12 insertions(+), 18 deletions(-)
+
+--
 2.15.1
