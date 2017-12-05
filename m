@@ -1,111 +1,174 @@
-From: yao.jin@linux.intel.com (Jin, Yao)
-Date: Tue, 5 Dec 2017 10:12:11 +0800
-Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
- UNCORE devices
-In-Reply-To: <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
-Message-ID: <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 5 Dec 2017 10:15:00 +0800
+Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
+References: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
+Message-ID: <1512440100.17567.172.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kulkarni, Arnaldo,
+On Mon, 2017-12-04 at 09:27 -0500, Adam Wallis wrote:
+> The xHCI driver currently has the IMOD set to 160, which
+> translates to an IMOD interval of 40,000ns (160 * 250)ns
+> 
+> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
+> introduced a QUIRK for the MTK platform to adjust this interval to 20,
+> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
+> due to the fact that the MTK controller IMOD interval is 8 times
+> as much as defined in xHCI spec.
+> 
+> Instead of adding more quirk bits for additional platforms, this patch
+> introduces the ability for vendors to set the IMOD_INTERVAL as is
+> optimal for their platform. By using device_property_read_u32() on
+> "imod-interval-ns", the IMOD INTERVAL can be specified in nano seconds.
+> If no interval is specified, the default of 40,000ns (IMOD=160) will be
+> used.
+> 
+> No bounds checking has been implemented due to the fact that a vendor
+> may have violated the spec and would need to specify a value outside of
+> the max 8,000 IRQs/second limit specified in the xHCI spec.
+> 
+> Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+> ---
+> changes from v3:
+>   * Changed imod-interval to imod-interval-ns [Rob Herring/Chunfeng]
+>   * Changed "modulation" to "moderation" throughout patch [Mathias]
+> changes from v2:
+>   * Added PCI default value [Mathias]
+>   * Removed xhci-mtk.h from xhci-plat.c [Chunfeng Yun]
+>   * Removed MTK quirk from xhci-plat and moved logic to xhci-mtk [Chunfeng]
+>   * Updated bindings Documentation to use proper units [Rob Herring]
+>   * Added imod-interval description and example to MTK binding documentation
+> changes from v1:
+>   * Removed device_property_read_u32() per suggestion from greg k-h
+>   * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
+> 
+>  Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 2 ++
+>  Documentation/devicetree/bindings/usb/usb-xhci.txt          | 1 +
+>  drivers/usb/host/xhci-mtk.c                                 | 9 +++++++++
+>  drivers/usb/host/xhci-pci.c                                 | 3 +++
+>  drivers/usb/host/xhci-plat.c                                | 5 +++++
+>  drivers/usb/host/xhci.c                                     | 7 ++-----
+>  drivers/usb/host/xhci.h                                     | 2 ++
+>  7 files changed, 24 insertions(+), 5 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> index 3059596..9ff5602 100644
+> --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+> @@ -46,6 +46,7 @@ Optional properties:
+>   - pinctrl-names : a pinctrl state named "default" must be defined
+>   - pinctrl-0 : pin control group
+>  	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+> + - imod-interval-ns: default interrupt moderation interval is 5000ns
+>  
+>  Example:
+>  usb30: usb at 11270000 {
+> @@ -66,6 +67,7 @@ usb30: usb at 11270000 {
+>  	usb3-lpm-capable;
+>  	mediatek,syscon-wakeup = <&pericfg>;
+>  	mediatek,wakeup-src = <1>;
+> +	imod-interval-ns = <10000>;
+>  };
+>  
+>  2nd: dual-role mode with xHCI driver
+> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> index ae6e484..969908d 100644
+> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+> @@ -29,6 +29,7 @@ Optional properties:
+>    - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+>    - usb3-lpm-capable: determines if platform is USB3 LPM capable
+>    - quirk-broken-port-ped: set if the controller has broken port disable mechanism
+> +  - imod-interval-ns: default interrupt moderation interval is 5000ns
+>  
+>  Example:
+>  	usb at f0931000 {
+> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+> index b62a1d2..1cb2a8b 100644
+> --- a/drivers/usb/host/xhci-mtk.c
+> +++ b/drivers/usb/host/xhci-mtk.c
+> @@ -674,6 +674,15 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>  
+>  	xhci = hcd_to_xhci(hcd);
+>  	xhci->main_hcd = hcd;
+> +
+> +	/*
+> +	 * imod_interval is the interrupt moderation value in nanoseconds.
+> +	 * The increment interval is 8 times as much as that defined in
+> +	 * the xHCI spec on MTK's controller.
+> +	 */
+> +	xhci->imod_interval = 5000;
+> +	device_property_read_u32(dev, "imod-interval-ns", &xhci->imod_interval);
+> +
+>  	xhci->shared_hcd = usb_create_shared_hcd(driver, dev,
+>  			dev_name(dev), hcd);
+>  	if (!xhci->shared_hcd) {
+> diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
+> index 7ef1274..4bcddd4 100644
+> --- a/drivers/usb/host/xhci-pci.c
+> +++ b/drivers/usb/host/xhci-pci.c
+> @@ -234,6 +234,9 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
+>  	if (!xhci->sbrn)
+>  		pci_read_config_byte(pdev, XHCI_SBRN_OFFSET, &xhci->sbrn);
+>  
+> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
+> +	xhci->imod_interval = 40000;
+> +
+>  	retval = xhci_gen_setup(hcd, xhci_pci_quirks);
+>  	if (retval)
+>  		return retval;
+> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+> index 09f164f..6f03830 100644
+> --- a/drivers/usb/host/xhci-plat.c
+> +++ b/drivers/usb/host/xhci-plat.c
+> @@ -269,6 +269,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+>  
+> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
+> +	xhci->imod_interval = 40000;
+> +	device_property_read_u32(sysdev, "imod-interval-ns",
+> +				 &xhci->imod_interval);
+> +
+>  	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
+>  	if (IS_ERR(hcd->usb_phy)) {
+>  		ret = PTR_ERR(hcd->usb_phy);
+> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+> index 2424d30..0b7755b 100644
+> --- a/drivers/usb/host/xhci.c
+> +++ b/drivers/usb/host/xhci.c
+> @@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
+>  			"// Set the interrupt modulation register");
+s/modulation/moderation
 
-This patch has been merged in perf/core branch today.
+>  	temp = readl(&xhci->ir_set->irq_control);
+>  	temp &= ~ER_IRQ_INTERVAL_MASK;
+> -	/*
+> -	 * the increment interval is 8 times as much as that defined
+> -	 * in xHCI spec on MTK's controller
+> -	 */
+> -	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
+> +	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
+> +
+No need a blank line
 
-But I see a regression issue when I run the 'perf stat'.
-
-With bisect checking, I locate to this patch.
-
-commit ad8737a08973f5dca632bdd63cf2abc99670e540
-Author: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-Date:   Tue Oct 17 00:02:20 2017 +0530
-
-     perf pmu: Use pmu->is_uncore to detect UNCORE devices
-
-For example (on Intel skylake desktop),
-
-1. The correct output should be (without this patch):
-
-root at skl:/tmp# perf stat --per-thread -p 1754 -M CPI,IPC
-^C
-  Performance counter stats for process id '1754':
-
-           vmstat-1754              1,882,798      inst_retired.any 
-     #      0.8 CPI
-           vmstat-1754              1,589,720      cycles
-           vmstat-1754              1,882,798      inst_retired.any 
-     #      1.2 IPC
-           vmstat-1754              1,589,720      cpu_clk_unhalted.thread
-
-        2.647443167 seconds time elapsed
-
-2. With this patch, the output will be:
-
-root at skl:/tmp# perf stat --per-thread -p 1754 -M CPI,IPC
-^C
-  Performance counter stats for process id '1754':
-
-           vmstat-1754              1,945,589      inst_retired.any
-           vmstat-1754        <not supported>      inst_retired.any
-           vmstat-1754              1,609,892      cycles
-           vmstat-1754              1,945,589      inst_retired.any
-           vmstat-1754        <not supported>      inst_retired.any
-           vmstat-1754              1,609,892      cpu_clk_unhalted.thread
-           vmstat-1754        <not supported>      cpu_clk_unhalted.thread
-
-        3.051274166 seconds time elapsed
-
-Could you please help to take a look?
+>  	writel(temp, &xhci->ir_set->irq_control);
+>  
+>  	/* Set the HCD state before we enable the irqs */
+> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+> index 99a014a..2a4177b 100644
+> --- a/drivers/usb/host/xhci.h
+> +++ b/drivers/usb/host/xhci.h
+> @@ -1717,6 +1717,8 @@ struct xhci_hcd {
+>  	u8		max_interrupters;
+>  	u8		max_ports;
+>  	u8		isoc_threshold;
+> +	/* imod_interval in ns (I * 250ns) */
+> +	u32		imod_interval;
+>  	int		event_ring_max;
+>  	/* 4KB min, 128MB max */
+>  	int		page_size;
 
 Thanks
-Jin Yao
-
-On 10/17/2017 2:32 AM, Ganapatrao Kulkarni wrote:
-> PMU CORE devices are identified using sysfs filename cpu, however
-> on some platforms(like arm/arm64), PMU CORE sysfs name is not cpu.
-> Hence cpu cannot be used to differentiate PMU CORE/UNCORE devices.
-> 
-> commit:
->   66ec1191 ("perf pmu: Unbreak perf record for arm/arm64 with events with explicit PMU")
-> 
-> has introduced pmu->is_uncore, which is set to PMU UNCORE devices only.
-> Adding changes to use pmu->is_uncore to identify UNCORE devices.
-> 
-> Acked-by: Will Deacon <will.deacon@arm.com>
-> Tested-by: Shaokun Zhang <zhangshaokun@hisilicon.com>
-> Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-> ---
->   tools/perf/util/pmu.c | 11 +++++++----
->   1 file changed, 7 insertions(+), 4 deletions(-)
-> 
-> diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
-> index 8b17db5..9110718 100644
-> --- a/tools/perf/util/pmu.c
-> +++ b/tools/perf/util/pmu.c
-> @@ -603,7 +603,6 @@ static void pmu_add_cpu_aliases(struct list_head *head, struct perf_pmu *pmu)
->   	 */
->   	i = 0;
->   	while (1) {
-> -		const char *pname;
->   
->   		pe = &map->table[i++];
->   		if (!pe->name) {
-> @@ -612,9 +611,13 @@ static void pmu_add_cpu_aliases(struct list_head *head, struct perf_pmu *pmu)
->   			break;
->   		}
->   
-> -		pname = pe->pmu ? pe->pmu : "cpu";
-> -		if (strncmp(pname, name, strlen(pname)))
-> -			continue;
-> +		if (pmu->is_uncore) {
-> +			/* check for uncore devices */
-> +			if (pe->pmu == NULL)
-> +				continue;
-> +			if (strncmp(pe->pmu, name, strlen(pe->pmu)))
-> +				continue;
-> +		}
->   
->   		/* need type casts to override 'const' */
->   		__perf_pmu__new_alias(head, NULL, (char *)pe->name,
-> 
