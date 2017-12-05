@@ -1,50 +1,84 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Dec 2017 11:51:19 +0000
-Subject: [PATCH] soc: qcom: Separate kryo l2 accessors from PMU driver
-In-Reply-To: <011801d36dbd$7ae34e80$70a9eb80$@codeaurora.org>
-References: <1512455630-25119-1-git-send-email-ilialin@codeaurora.org>
- <20171205103516.bczf43vvpcin24zl@lakrids.cambridge.arm.com>
- <011801d36dbd$7ae34e80$70a9eb80$@codeaurora.org>
-Message-ID: <20171205115118.ekilgrzsp47fz5ua@lakrids.cambridge.arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 5 Dec 2017 12:57:11 +0100
+Subject: [PATCH v2 3/3] mtd: nand: squash struct nand_buffers into
+ struct nand_chip
+In-Reply-To: <CAK7LNATKBO=eNHdL_P2MOh7+uRcCjkq+v8+O3DXC5UF3-NGh2Q@mail.gmail.com>
+References: <1512463636-28934-1-git-send-email-yamada.masahiro@socionext.com>
+ <1512463636-28934-3-git-send-email-yamada.masahiro@socionext.com>
+ <CAK7LNATKBO=eNHdL_P2MOh7+uRcCjkq+v8+O3DXC5UF3-NGh2Q@mail.gmail.com>
+Message-ID: <20171205125711.74158b3b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 01:37:47PM +0200, ilialin at codeaurora.org wrote:
-> Hello Mark,
+On Tue, 5 Dec 2017 20:49:28 +0900
+Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+
+> 2017-12-05 17:47 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> > struct nand_buffers is malloc'ed in nand_scan_tail() just for
+> > containing three pointers.  Squash this struct into nand_chip.
+> >
+> > Move and rename as follows:
+> >
+> >   chip->buffers->ecccalc   ->  chip->ecc.calc_buf
+> >   chip->buffers->ecccode   ->  chip->ecc.code_buf
+> >   chip->buffers->databuf   ->  chip->data_buf
+> >
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> > ---
+> >  
 > 
-> > -----Original Message-----
-> > From: Mark Rutland [mailto:mark.rutland at arm.com]
-> > Sent: Tuesday, December 5, 2017 12:35 PM
-> > To: Ilia Lin <ilialin@codeaurora.org>
-> > Cc: linux-arm-kernel at lists.infradead.org
-> > Subject: Re: [PATCH] soc: qcom: Separate kryo l2 accessors from PMU driver
-> > 
-> > Hi,
-> > 
-> > On Tue, Dec 05, 2017 at 08:33:50AM +0200, Ilia Lin wrote:
-> > > The driver provides kernel level API for other drivers to access the
-> > > MSM8996 L2 cache registers.
-> > > Separating the L2 access code from the PMU driver and making it public
-> > > to allow other drivers use it.
-> > > The accesses must be separated with a single spinlock, maintained in
-> > > this driver.
-> > >
-> > > Change-Id: I2865e888491e85d678e298279400c371427e30ea
-> > > Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-> > 
-> > What other driver is going to use this?
-> > 
-> > Until there is another driver, I don't see much point in factoring this
-> out.
 > 
-> The other driver currently is the CPU clock driver, which needs configuring
-> the L2 registers. The clock driver will be submitted through the linux-clk
-> list and will depend on the kryo-l2-accessors driver then.
+> 
+> 
+> > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
+> > index dad438c..7870cb1 100644
+> > --- a/drivers/mtd/nand/omap2.c
+> > +++ b/drivers/mtd/nand/omap2.c
+> > @@ -1530,7 +1530,7 @@ static int omap_write_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
+> >                                const uint8_t *buf, int oob_required, int page)
+> >  {
+> >         int ret;
+> > -       uint8_t *ecc_calc = chip->buffers->ecccalc;
+> > +       uint8_t *ecc_calc = chip->ecccalc;
+> >
+> >         /* Enable GPMC ecc engine */
+> >         chip->ecc.hwctl(mtd, NAND_ECC_WRITE);
+> > @@ -1568,7 +1568,7 @@ static int omap_write_subpage_bch(struct mtd_info *mtd,
+> >                                   u32 data_len, const u8 *buf,
+> >                                   int oob_required, int page)
+> >  {
+> > -       u8 *ecc_calc = chip->buffers->ecccalc;
+> > +       u8 *ecc_calc = chip->ecccalc;
+> >         int ecc_size      = chip->ecc.size;
+> >         int ecc_bytes     = chip->ecc.bytes;
+> >         int ecc_steps     = chip->ecc.steps;
+> > @@ -1605,7 +1605,7 @@ static int omap_write_subpage_bch(struct mtd_info *mtd,
+> >
+> >         /* copy calculated ECC for whole page to chip->buffer->oob */
+> >         /* this include masked-value(0xFF) for unwritten subpages */
+> > -       ecc_calc = chip->buffers->ecccalc;
+> > +       ecc_calc = chip->ecccalc;
+> >         ret = mtd_ooblayout_set_eccbytes(mtd, ecc_calc, chip->oob_poi, 0,
+> >                                          chip->ecc.total);
+> >         if (ret)
+> > @@ -1635,8 +1635,8 @@ static int omap_write_subpage_bch(struct mtd_info *mtd,
+> >  static int omap_read_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
+> >                                 uint8_t *buf, int oob_required, int page)
+> >  {
+> > -       uint8_t *ecc_calc = chip->buffers->ecccalc;
+> > -       uint8_t *ecc_code = chip->buffers->ecccode;
+> > +       uint8_t *ecc_calc = chip->ecccalc;
+> > +       uint8_t *ecc_code = chip->ecccode;
+> >         int stat, ret;
+> >         unsigned int max_bitflips = 0;
+> >  
+> 
+> 
+> 
+> Sorry, I missed to update omap2.c
+> 
+> I will send v3.
 
-Ok,
+No need to send a v3, I already fixed it when applying [1].
 
-Please put the two in a series, and keep me (and Will Deacon) on Cc, so
-that we can review both together.
-
-Thanks,
-Mark.
+[1]https://github.com/bbrezillon/linux-0day/commit/59a7bfff7103d48713b2125c3844400301a3d028
