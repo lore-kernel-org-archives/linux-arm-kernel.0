@@ -1,104 +1,68 @@
-From: yao.jin@linux.intel.com (Jin, Yao)
-Date: Tue, 5 Dec 2017 20:35:22 +0800
-Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
- UNCORE devices
-In-Reply-To: <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
- <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
- <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
- <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
-Message-ID: <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
+From: amery@hanoverdisplays.com (Alejandro Mery)
+Date: Tue, 5 Dec 2017 12:34:56 +0000
+Subject: [PATCH v2 1/3] ARM: davinci: Use platform_device_register_full() to
+ create pdev for dm365's eDMA
+In-Reply-To: <20171205123458.97837-1-amery@hanoverdisplays.com>
+References: <2298378f-37d0-0c04-dfe3-4503c58e5456@ti.com>,
+ <20171204133359.45625-1-amery@hanoverdisplays.com>
+ <20171205123458.97837-1-amery@hanoverdisplays.com>
+Message-ID: <20171205123458.97837-2-amery@hanoverdisplays.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
+as it was done by 7ab388e85faa97a35d520720269e7c8e00ad54a0 for other davinci SoCs
 
-See the log:
+changes since v1:
+* fix typo
 
-root at skl:/tmp# perf stat --per-thread -p 10322 -M CPI,IPC
-^C
-  Performance counter stats for process id '10322':
+Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
+---
+ arch/arm/mach-davinci/dm365.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-           vmstat-10322             1,879,654      inst_retired.any 
-#      0.8 CPI
-           vmstat-10322             1,565,807      cycles
-           vmstat-10322             1,879,654      inst_retired.any 
-#      1.2 IPC
-           vmstat-10322             1,565,807      cpu_clk_unhalted.thread
-
-        2.850291804 seconds time elapsed
-
-Thanks for fixing it quickly.
-
-Thanks
-Jin Yao
-
-On 12/5/2017 3:23 PM, Jin, Yao wrote:
-> Hi,
-> 
-> I applied the diff but it's failed.
-> 
-> jinyao at skl:~/skl-ws/perf-dev/lck-4594/src$ patch -p1 < 1.pat
-> patching file tools/perf/util/pmu.c
-> patch: **** malformed patch at line 41: *head, struct perf_pmu *pmu)
-> 
-> Could you send the patch as attachment to me in another mail thread?
-> 
-> to yao.jin at linux.intel.com
-> cc yao.jin at intel.com
-> 
-> Thanks
-> Jin Yao
-> 
-> On 12/5/2017 3:12 PM, Ganapatrao Kulkarni wrote:
->> diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
->> index 5ad8a18..57e38fd 100644
->> --- a/tools/perf/util/pmu.c
->> +++ b/tools/perf/util/pmu.c
->> @@ -538,6 +538,34 @@ static bool pmu_is_uncore(const char *name)
->> ? }
->>
->> ? /*
->> + *? PMU CORE devices have different name other than cpu in sysfs on some
->> + *? platforms. looking for possible sysfs files to identify as core 
->> device.
->> + */
->> +static int is_pmu_core(const char *name)
->> +{
->> + struct stat st;
->> + char path[PATH_MAX];
->> + const char *sysfs = sysfs__mountpoint();
->> +
->> + if (!sysfs)
->> + return 0;
->> +
->> + /* Look for cpu sysfs (x86 and others) */
->> + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
->> + if ((stat(path, &st) == 0) &&
->> + (strncmp(name, "cpu", strlen("cpu")) == 0))
->> + return 1;
->> +
->> + /* Look for cpu sysfs (specific to arm) */
->> + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/%s/cpus",
->> + sysfs, name);
->> + if (stat(path, &st) == 0)
->> + return 1;
->> +
->> + return 0;
->> +}
->> +
->> +/*
->> ?? * Return the CPU id as a raw string.
->> ?? *
->> ?? * Each architecture should provide a more precise id string that
->> @@ -641,7 +669,7 @@ static void pmu_add_cpu_aliases(struct list_head
->> *head, struct perf_pmu *pmu)
->> ?? break;
->> ?? }
->>
->> - if (pmu->is_uncore) {
->> + if (!is_pmu_core(name)) {
->> ?? /* check for uncore devices */
->> ?? if (pe->pmu == NULL)
->> ?? continue;
+diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+index 8be04ec95adf..9bd17bc77b5c 100644
+--- a/arch/arm/mach-davinci/dm365.c
++++ b/arch/arm/mach-davinci/dm365.c
+@@ -925,12 +925,13 @@ static struct resource edma_resources[] = {
+ 	/* not using TC*_ERR */
+ };
+ 
+-static struct platform_device dm365_edma_device = {
+-	.name			= "edma",
+-	.id			= 0,
+-	.dev.platform_data	= &dm365_edma_pdata,
+-	.num_resources		= ARRAY_SIZE(edma_resources),
+-	.resource		= edma_resources,
++static const struct platform_device_info dm365_edma_device __initconst = {
++	.name		= "edma",
++	.id		= 0,
++	.res		= edma_resources,
++	.num_res	= ARRAY_SIZE(edma_resources),
++	.data		= &dm365_edma_pdata,
++	.size_data	= sizeof(dm365_edma_pdata),
+ };
+ 
+ static struct resource dm365_asp_resources[] = {
+@@ -1428,13 +1429,18 @@ int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
+ 
+ static int __init dm365_init_devices(void)
+ {
++	struct platform_device *edma_pdev;
+ 	int ret = 0;
+ 
+ 	if (!cpu_is_davinci_dm365())
+ 		return 0;
+ 
+ 	davinci_cfg_reg(DM365_INT_EDMA_CC);
+-	platform_device_register(&dm365_edma_device);
++	edma_pdev = platform_device_register_full(&dm365_edma_device);
++	if (IS_ERR(edma_pdev)) {
++		pr_warn("%s: Failed to register eDMA\n", __func__);
++		return PTR_ERR(edma_pdev);
++	}
+ 
+ 	platform_device_register(&dm365_mdio_device);
+ 	platform_device_register(&dm365_emac_device);
+-- 
+2.15.0
