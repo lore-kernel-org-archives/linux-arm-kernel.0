@@ -1,66 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue,  5 Dec 2017 14:10:11 +0100
-Subject: [PATCH] [v2] ASoC: atmel-classd: improve Kconfig dependencies
-Message-ID: <20171205131022.2082003-1-arnd@arndb.de>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Dec 2017 13:14:17 +0000
+Subject: [PATCH] Arm: mm: ftrace: Only set text back to ro after kernel
+ has been marked ro
+In-Reply-To: <20171205114709.f6aj6i426keq2cn5@camel2.lan>
+References: <20170823135836.52fb44fc@gandalf.local.home>
+ <CAGXu5jLaQozk-TuZd8o=CK2kBcj3EFqD+VQtGX-DehU=c_TAkg@mail.gmail.com>
+ <20170823150351.606ba09f@gandalf.local.home>
+ <20171205114709.f6aj6i426keq2cn5@camel2.lan>
+Message-ID: <20171205131416.GW10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
-changed the way that the dependencies are handled, but then the
-Class D amplifier support got merged, which used the old method.
+On Tue, Dec 05, 2017 at 12:47:09PM +0100, Matthias Reichl wrote:
+> On Wed, Aug 23, 2017 at 03:03:51PM -0400, Steven Rostedt wrote:
+> > On Wed, 23 Aug 2017 11:48:13 -0700
+> > Kees Cook <keescook@chromium.org> wrote:
+> > 
+> > > > diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+> > > > index ad80548..fd75f38 100644
+> > > > --- a/arch/arm/mm/init.c
+> > > > +++ b/arch/arm/mm/init.c
+> > > > @@ -745,19 +745,29 @@ static int __mark_rodata_ro(void *unused)
+> > > >         return 0;
+> > > >  }
+> > > >
+> > > > +static int kernel_set_to_readonly;  
+> > > 
+> > > Adding a comment here might be a good idea, something like:
+> > > 
+> > > /* Has system boot-up reached mark_rodata_ro() yet? */
+> > 
+> > I don't mind adding a comment, but the above is rather self explanatory
+> > (one can easily see that it is set in mark_rodata_ro() with a simple
+> > search).
+> > 
+> > If a comment is to be added, something a bit more descriptive of the
+> > functionality of the variable would be appropriate:
+> > 
+> > /*
+> >  * Ignore modifying kernel text permissions until the kernel core calls
+> >  * make_rodata_ro() at system start up.
+> >  */
+> > 
+> > I can resend with the comment, or whoever takes this could add it
+> > themselves.
+> 
+> Gentle ping: this patch doesn't seem to have landed in upstream
+> trees yet. Is any more work required?
+> 
+> It would be nice to have this fix added. Just tested next-20171205
+> on RPi B+, it oopses when the function tracer is enabled during boot.
+> next-20171205 plus this patch boots up fine.
 
-This seems to have triggered a very rare randconfig condition for me
-now, leading to a link error:
+When does it oops?
 
-sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
-atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
-atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
-sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
-atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
-atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
+Reading through this code, I'm left wondering why we switch the rodata
+section to be writable here - if we're poking at kernel text, then
+surely we shouldn't be the read-only data read-write?
 
-This changes the SND_ATMEL_SOC_DMA option so it gets built whenever
-one of the two users (SND_ATMEL_SOC_SSC_DMA and SND_ATMEL_SOC_CLASSD)
-is enabled, with the twist that we make it built-in when SND_ATMEL_SOC_SSC
-is built-in, even if one of the other two is a module.
+Should kernel_set_to_readonly also be a rodata-after-init variable?
 
-I think this captures best what the real dependency in the hardware
-is, and it simplifies the logic a bit.
-
-Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: rewrite the change completely, after running into a new regression.
-
-I'm putting it out on the list so we can review the change together,
-but I'm still doing more testing at the same time. If I don't reply
-by Dec 6, nothing new has come up.
----
- sound/soc/atmel/Kconfig | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
-
-diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-index 4a56f3dfba51..af9a9096d50b 100644
---- a/sound/soc/atmel/Kconfig
-+++ b/sound/soc/atmel/Kconfig
-@@ -20,8 +20,8 @@ config SND_ATMEL_SOC_SSC_PDC
- config SND_ATMEL_SOC_DMA
- 	tristate
- 	select SND_SOC_GENERIC_DMAENGINE_PCM
--	default m if SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=m
--	default y if SND_ATMEL_SOC_SSC_DMA=y || (SND_ATMEL_SOC_SSC_DMA=m && SND_ATMEL_SOC_SSC=y)
-+	default y if SND_ATMEL_SOC_SSC=y && (SND_ATMEL_SOC_SSC_DMA=m || SND_ATMEL_SOC_CLASSD=m)
-+	default SND_ATMEL_SOC_CLASSD || SND_ATMEL_SOC_SSC_DMA
- 
- config SND_ATMEL_SOC_SSC_DMA
- 	tristate
-@@ -64,7 +64,6 @@ config SND_AT91_SOC_SAM9X5_WM8731
- config SND_ATMEL_SOC_CLASSD
- 	tristate "Atmel ASoC driver for boards using CLASSD"
- 	depends on ARCH_AT91 || COMPILE_TEST
--	select SND_ATMEL_SOC_DMA
- 	select REGMAP_MMIO
- 	help
- 	  Say Y if you want to add support for Atmel ASoC driver for boards using
 -- 
-2.9.0
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
