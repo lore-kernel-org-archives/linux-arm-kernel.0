@@ -1,102 +1,143 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 5 Dec 2017 18:24:46 +0300
-Subject: [PATCH v6 7/8] KVM: arm/arm64: Provide a get_input_level for the
- arch timer
-In-Reply-To: <20171204200506.3224-8-cdall@kernel.org>
-References: <20171204200506.3224-1-cdall@kernel.org>
- <20171204200506.3224-8-cdall@kernel.org>
-Message-ID: <20171205152446.rcmkowdnuhkqbrdb@yury-thinkpad>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 6 Dec 2017 00:13:18 +0800
+Subject: [RFC PATCH 4/5] perf vendor events arm64: relocate thunderx2 JSON
+In-Reply-To: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+Message-ID: <1512490399-94107-5-git-send-email-john.garry@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 04, 2017 at 09:05:05PM +0100, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> The VGIC can now support the life-cycle of mapped level-triggered
-> interrupts, and we no longer have to read back the timer state on every
-> exit from the VM if we had an asserted timer interrupt signal, because
-> the VGIC already knows if we hit the unlikely case where the guest
-> disables the timer without ACKing the virtual timer interrupt.
-> 
-> This means we rework a bit of the code to factor out the functionality
-> to snapshot the timer state from vtimer_save_state(), and we can reuse
-> this functionality in the sync path when we have an irqchip in
-> userspace, and also to support our implementation of the
-> get_input_level() function for the timer.
-> 
-> This change also means that we can no longer rely on the timer's view of
-> the interrupt line to set the active state, because we no longer
-> maintain this state for mapped interrupts when exiting from the guest.
-> Instead, we only set the active state if the virtual interrupt is
-> active, and otherwise we simply let the timer fire again and raise the
-> virtual interrupt from the ISR.
-> 
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  include/kvm/arm_arch_timer.h |  2 ++
->  virt/kvm/arm/arch_timer.c    | 75 +++++++++++++++++++++-----------------------
->  2 files changed, 38 insertions(+), 39 deletions(-)
-> 
-> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> index 01ee473517e2..f57f795d704c 100644
-> --- a/include/kvm/arm_arch_timer.h
-> +++ b/include/kvm/arm_arch_timer.h
-> @@ -90,6 +90,8 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
->  
->  void kvm_timer_init_vhe(void);
->  
-> +bool kvm_arch_timer_get_input_level(int vintid);
-> +
->  #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
->  #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
->  
+Since the pmu events architecture folder structure supports
+arch/vendor/platform structure, relocate the ThunderX2 JSON.
 
-[...]
+Also since Cavium ThunderX2 has implemented its events
+according to ARM recommendation, remove the fields apart from
+"EventCode".
 
-> +bool kvm_arch_timer_get_input_level(int vintid)
-> +{
-> +	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-> +	struct arch_timer_context *timer;
-> +
-> +	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
-> +		timer = vcpu_vtimer(vcpu);
-> +	else
-> +		BUG(); /* We only map the vtimer so far */
-> +
-> +	if (timer->loaded)
-> +		__timer_snapshot_state(timer);
-> +
-> +	return kvm_timer_should_fire(timer);
-> +}
+Signed-off-by: John Garry <john.garry@huawei.com>
+---
+ .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 ----------------------
+ .../arch/arm64/cavium/thunderx2/core-imp-def.json  | 32 +++++++++++
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       |  2 +-
+ 3 files changed, 33 insertions(+), 63 deletions(-)
+ delete mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+ create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
 
-I think it worth to reword to highlight your intention about BUG,
-and save 1 call to vcpu_vtimer()
-
-bool kvm_arch_timer_get_input_level(int vintid)
-{
-	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-	struct arch_timer_context *timer = vcpu_vtimer(vcpu);
-
-        /* We only map the vtimer so far */
-	BUG_ON(vintid != timer->irq.irq)
-
-	if (timer->loaded)
-		__timer_snapshot_state(timer);
-
-	return kvm_timer_should_fire(timer);
-}
-
->  int kvm_timer_enable(struct kvm_vcpu *vcpu)
->  {
->  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-> @@ -841,7 +838,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
->  	}
->  
->  	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
-> -				    NULL);
-> +				    kvm_arch_timer_get_input_level);
->  	if (ret)
->  		return ret;
->  
-> -- 
-> 2.14.2
+diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+deleted file mode 100644
+index 2db45c4..0000000
+--- a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
++++ /dev/null
+@@ -1,62 +0,0 @@
+-[
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache access, read",
+-        "EventCode": "0x40",
+-        "EventName": "l1d_cache_rd",
+-        "BriefDescription": "L1D cache read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache access, write ",
+-        "EventCode": "0x41",
+-        "EventName": "l1d_cache_wr",
+-        "BriefDescription": "L1D cache write",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache refill, read",
+-        "EventCode": "0x42",
+-        "EventName": "l1d_cache_refill_rd",
+-        "BriefDescription": "L1D cache refill read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data cache refill, write",
+-        "EventCode": "0x43",
+-        "EventName": "l1d_cache_refill_wr",
+-        "BriefDescription": "L1D refill write",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data TLB refill, read",
+-        "EventCode": "0x4C",
+-        "EventName": "l1d_tlb_refill_rd",
+-        "BriefDescription": "L1D tlb refill read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data TLB refill, write",
+-        "EventCode": "0x4D",
+-        "EventName": "l1d_tlb_refill_wr",
+-        "BriefDescription": "L1D tlb refill write",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
+-        "EventCode": "0x4E",
+-        "EventName": "l1d_tlb_rd",
+-        "BriefDescription": "L1D tlb read",
+-    },
+-    {
+-        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
+-        "EventCode": "0x4F",
+-        "EventName": "l1d_tlb_wr",
+-        "BriefDescription": "L1D tlb write",
+-    },
+-    {
+-        "PublicDescription": "Bus access read",
+-        "EventCode": "0x60",
+-        "EventName": "bus_access_rd",
+-        "BriefDescription": "Bus access read",
+-   },
+-   {
+-        "PublicDescription": "Bus access write",
+-        "EventCode": "0x61",
+-        "EventName": "bus_access_wr",
+-        "BriefDescription": "Bus access write",
+-   }
+-]
+diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+new file mode 100644
+index 0000000..99313eb
+--- /dev/null
++++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+@@ -0,0 +1,32 @@
++[
++    {
++        "EventCode": "0x40",
++    },
++    {
++        "EventCode": "0x41",
++    },
++    {
++        "EventCode": "0x42",
++    },
++    {
++        "EventCode": "0x43",
++    },
++    {
++        "EventCode": "0x4C",
++    },
++    {
++        "EventCode": "0x4D",
++    },
++    {
++        "EventCode": "0x4E",
++    },
++    {
++        "EventCode": "0x4F",
++    },
++    {
++        "EventCode": "0x60",
++   },
++   {
++        "EventCode": "0x61",
++   }
++]
+diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+index 219d675..32fa0d1 100644
+--- a/tools/perf/pmu-events/arch/arm64/mapfile.csv
++++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+@@ -12,4 +12,4 @@
+ #
+ #
+ #Family-model,Version,Filename,EventType
+-0x00000000420f5160,v1,cavium,core
++0x00000000420f5160,v1,cavium/thunderx2,core
+-- 
+1.9.1
