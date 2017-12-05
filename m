@@ -1,69 +1,154 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 5 Dec 2017 22:40:50 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: Add configs for peripherals on
- Keystone2 SoCs
-In-Reply-To: <fffba75f-6674-f293-d2c5-53eb477c0e76@oracle.com>
-References: <20171205091940.22957-1-vigneshr@ti.com>
- <fffba75f-6674-f293-d2c5-53eb477c0e76@oracle.com>
-Message-ID: <c2383f7c-a537-166a-de88-c6c8593beb83@ti.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue,  5 Dec 2017 17:11:46 +0000
+Subject: [PATCH 0/6] arm64: provide pseudo NMI with GICv3
+Message-ID: <1512493912-37478-1-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
+This series is a continuation of the work started by Daniel [1]. The goal is
+to use GICv3 interrupt priorities to simulate an NMI.
+
+To achieve this, set two priorities, one for standard interrupts and
+another, higher priority, for NMIs. Whenever we want to disable interrupts,
+we mask the standard priority instead so NMIs can still be raised. Some
+corner cases though still require to actually mask all interrupts
+effectively disabling the NMI.
+
+Of course, using priority masking instead of PSR.I comes at some cost. On
+hackbench, I notice a ~6-0% drop of performance. When I submitted the RFC,
+the drop seemed always present, now things seem more variable. On a kernel
+build, there still isn't any significan drop of performance.
+KVM Guests do not seem to be affected preformance-wise by the host using
+PMR to mask interrupts or not.
+
+Results when using this NMI for the arm_pmu interrupt are rather positive
+(at least for _raw_spin_unlock_irq_restore).
+Perf record on hackbench without NMI:
+
+# Overhead  Command          Symbol
+# ........  ...............  ...........................................
+#
+    12.45%  hackbench        [k] _raw_spin_unlock_irqrestore
+     6.26%  hackbench        [k] el0_svc_naked
+     5.35%  hackbench        [k] unix_stream_read_generic
+     4.42%  hackbench        [k] __arch_copy_to_user
+     3.87%  hackbench        [k] refcount_inc_not_zero
+     3.70%  hackbench        [k] __slab_free
+     3.66%  hackbench        [k] _raw_spin_unlock_irq
+     3.53%  hackbench        [k] skb_release_data
+     3.10%  hackbench        [k] kmem_cache_free
+     2.90%  hackbench        [k] __lock_text_start
+
+Perf record on hackbench with PseudoNMI:
+
+# Overhead  Command          Symbol
+# ........  ...............  .................................
+#
+     8.00%  hackbench        [k] _raw_spin_unlock_irqrestore
+     6.27%  hackbench        [k] el0_svc_naked
+     5.53%  hackbench        [k] unix_stream_read_generic
+     4.40%  hackbench        [k] __arch_copy_to_user
+     3.94%  hackbench        [k] refcount_inc_not_zero
+     3.47%  hackbench        [k] __slab_free
+     3.19%  hackbench        [k] kfree
+     3.11%  hackbench        [k] __lock_text_start
+     2.92%  hackbench        [k] kmem_cache_free
+     2.73%  hackbench        [.] 0x0000000000005258
 
 
-On 05-Dec-17 10:19 PM, Santosh Shilimkar wrote:
-> On 12/5/2017 1:19 AM, Vignesh R wrote:
->> Enable Cadence QSPI present on 66AK2G SoC and Keystone USB PHY driver
->> for K2E.
->>
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->> ---
->>   arch/arm/configs/multi_v7_defconfig | 2 ++
->>   1 file changed, 2 insertions(+)
->>
->> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->> index 992a8a5da065..c4f4f6682ea5 100644
->> --- a/arch/arm/configs/multi_v7_defconfig
->> +++ b/arch/arm/configs/multi_v7_defconfig
->> @@ -185,6 +185,7 @@ CONFIG_MTD_NAND_BRCMNAND=y
->>   CONFIG_MTD_NAND_VF610_NFC=y
->>   CONFIG_MTD_NAND_DAVINCI=y
->>   CONFIG_MTD_SPI_NOR=y
->> +CONFIG_SPI_CADENCE_QUADSPI=m
->>   CONFIG_SPI_FSL_QUADSPI=m
->>   CONFIG_MTD_UBI=y
->>   CONFIG_BLK_DEV_LOOP=y
->> @@ -675,6 +676,7 @@ CONFIG_USB_CHIPIDEA_HOST=y
->>   CONFIG_USB_ISP1760=y
->>   CONFIG_USB_HSIC_USB3503=y
->>   CONFIG_AB8500_USB=y
->> +CONFIG_KEYSTONE_USB_PHY=m
->>   CONFIG_NOP_USB_XCEIV=m
->>   CONFIG_USB_GPIO_VBUS=y
->>   CONFIG_USB_ISP1301=y
->>
-> There are more peripherals/drivers which are enabled
-> in keystone config.
-> 
-> PWM_TIECAP, CAN_C_CAN, RESET_TI_SYSCON, TI_SCI_PROTOCOL,
-> TI_MESSAGE_MANAGER, NOP_USB_XCEIV, GPIO_PCA953X etc etc
-> 
-> Could please check the complete config and update the
-> patch please ?
-> 
+Currently, only PPIs and SPIs can be set as NMIs. IPIs being currently
+hardcoded IRQ numbers, there isn't a generic interface to set SGIs as NMI
+for now. I don't think there is any reason LPIs should be allowed to be set
+as NMI as they do not have an active state.
+When an NMI is active on a CPU, no other NMI can be triggered on the CPU.
 
-On linux-next(on which this patch is based on) I see commit:
-commit f15187dcdbcd8e649948a525153a356b35993655
-Author: Santosh Shilimkar <santosh.shilimkar@oracle.com>
-Date:   Sat Dec 2 19:53:29 2017 -0800
+Requirements to use this:
+- Have GICv3
+- SCR_EL3.FIQ is set to 1 when linux runs
+- Select Kernel Feature -> Use ICC system registers for IRQ masking
 
-    ARM: config: sync multi-v7 config with keystone peripherals
-
-    Signed-off-by: Santosh Shilimkar <santosh.shilimkar@oracle.com>
+* Patches 1 and 2 allows to detect and enable the use of GICv3 system
+  registers during boot time.
+* Patch 3 introduces the masking of IRQs using priorities replacing irq
+  disabling.
+* Patch 4 adds some utility functions
+* Patch 5 add detection of the view linux has on GICv3 priorities, without
+  this we cannot easily mask specific priorities in an accurate manner
+* Patch 6 adds the support for NMIs
 
 
-This commit enables all drivers for K2 platforms including the ones you
-mentioned. I added the two missing ones in this patch.
-There are some configs related to net which I am not sure whether to
-enable or not and how it affects other platforms. But AFAICS, there are
-no drivers left to be enabled.
+Changes since RFC[2]:
+* The series was rebased to v4.15-rc2 which implied some changes mainly
+  related to the work on exception entries and daif flags by James Morse.
+
+  - The first patch in the previous series was dropped because no longer
+    applicable.
+
+  - With the semantics James introduced of "inheriting" daif flags,
+    handling of PMR on exception entry is simplified as PMR is not altered
+    by taking an exception and already inherited from previous state.
+
+  - James pointed out that taking a PseudoNMI before reading the FAR_EL1
+    register should not be allowed as per the TRM (D10.2.29):
+    "FAR_EL1 is made UNKNOWN on an exception return from EL1."
+    So in this submission PSR.I bit is cleared only after FAR_EL1 is read.
+
+* For KVM, only deal with PMR unmasking/restoring in common code, and VHE
+  specific code makes sure PSR.I bit is set when necessary.
+
+* When detecting the GIC priority view (patch 5), wait for an actual
+  interrupt instead of trying only once.
+
+[1] http://www.spinics.net/lists/arm-kernel/msg525077.html
+[2] https://www.spinics.net/lists/arm-kernel/msg610736.html
+
+Cheers,
+
+Julien
+
+--->
+
+Daniel Thompson (3):
+  arm64: cpufeature: Allow early detect of specific features
+  arm64: alternative: Apply alternatives early in boot process
+  arm64: irqflags: Use ICC sysregs to implement IRQ masking
+
+Julien Thierry (3):
+  irqchip/gic: Add functions to access irq priorities
+  arm64: Detect current view of GIC priorities
+  arm64: Add support for pseudo-NMIs
+
+ Documentation/arm64/booting.txt        |   5 +
+ arch/arm64/Kconfig                     |  15 ++
+ arch/arm64/include/asm/alternative.h   |   1 +
+ arch/arm64/include/asm/arch_gicv3.h    |  42 +++++
+ arch/arm64/include/asm/assembler.h     |  25 ++-
+ arch/arm64/include/asm/daifflags.h     |  36 ++--
+ arch/arm64/include/asm/efi.h           |   5 +
+ arch/arm64/include/asm/irqflags.h      | 131 ++++++++++++++
+ arch/arm64/include/asm/processor.h     |   4 +
+ arch/arm64/include/asm/ptrace.h        |  14 +-
+ arch/arm64/include/asm/sysreg.h        |   1 +
+ arch/arm64/kernel/alternative.c        |  39 ++++-
+ arch/arm64/kernel/asm-offsets.c        |   1 +
+ arch/arm64/kernel/cpufeature.c         |  68 +++++---
+ arch/arm64/kernel/entry.S              |  84 ++++++++-
+ arch/arm64/kernel/head.S               |  38 ++++
+ arch/arm64/kernel/process.c            |   6 +
+ arch/arm64/kernel/smp.c                |  14 ++
+ arch/arm64/kvm/hyp/hyp-entry.S         |  20 +++
+ arch/arm64/kvm/hyp/switch.c            |  21 +++
+ arch/arm64/mm/proc.S                   |  23 +++
+ drivers/irqchip/irq-gic-common.c       |  10 ++
+ drivers/irqchip/irq-gic-common.h       |   2 +
+ drivers/irqchip/irq-gic-v3-its.c       |   2 +-
+ drivers/irqchip/irq-gic-v3.c           | 307 +++++++++++++++++++++++++++++----
+ include/linux/interrupt.h              |   1 +
+ include/linux/irqchip/arm-gic-common.h |   6 +
+ include/linux/irqchip/arm-gic.h        |   5 -
+ 28 files changed, 841 insertions(+), 85 deletions(-)
+
+--
+1.9.1
