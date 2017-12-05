@@ -1,192 +1,163 @@
-From: awallis@codeaurora.org (Adam Wallis)
-Date: Mon, 4 Dec 2017 21:54:06 -0500
-Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
-In-Reply-To: <1512440100.17567.172.camel@mhfsdcap03>
-References: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
- <1512440100.17567.172.camel@mhfsdcap03>
-Message-ID: <99ea0ee4-1fff-73df-d9b5-0f756dfc5635@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 5 Dec 2017 11:01:11 +0800
+Subject: [linux-sunxi] [PATCH 1/2] clk: sunxi-ng: Support fixed
+ post-dividers on MP style clocks
+In-Reply-To: <b961a1b6-f0e4-68e3-ab77-b0010dab63ff@arm.com>
+References: <20171204051912.7485-1-wens@csie.org>
+ <20171204051912.7485-2-wens@csie.org>
+ <b961a1b6-f0e4-68e3-ab77-b0010dab63ff@arm.com>
+Message-ID: <CAGb2v64w7EEYbJug+PQQwM8zXcyoOo8B+zk9MzU8cAW=K=gvEw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/4/2017 9:15 PM, Chunfeng Yun wrote:
-> On Mon, 2017-12-04 at 09:27 -0500, Adam Wallis wrote:
->> The xHCI driver currently has the IMOD set to 160, which
->> translates to an IMOD interval of 40,000ns (160 * 250)ns
+On Tue, Dec 5, 2017 at 7:18 AM, Andr? Przywara <andre.przywara@arm.com> wrote:
+> Hi Chen-Yu,
+>
+> On 04/12/17 05:19, Chen-Yu Tsai wrote:
+>> On the A64, the MMC module clocks are fixed in the new timing mode,
+>> i.e. they do not have a bit to select the mode. These clocks have
+>> a 2x divider somewhere between the clock and the MMC module.
 >>
->> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
->> introduced a QUIRK for the MTK platform to adjust this interval to 20,
->> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
->> due to the fact that the MTK controller IMOD interval is 8 times
->> as much as defined in xHCI spec.
+>> To be consistent with other SoCs supporting the new timing mode,
+>> we model the 2x divider as a fixed post-divider on the MMC module
+>> clocks.
 >>
->> Instead of adding more quirk bits for additional platforms, this patch
->> introduces the ability for vendors to set the IMOD_INTERVAL as is
->> optimal for their platform. By using device_property_read_u32() on
->> "imod-interval-ns", the IMOD INTERVAL can be specified in nano seconds.
->> If no interval is specified, the default of 40,000ns (IMOD=160) will be
->> used.
+>> To do this, we first add fixed post-divider to the MP style clocks,
+>> which the MMC module clocks are.
 >>
->> No bounds checking has been implemented due to the fact that a vendor
->> may have violated the spec and would need to specify a value outside of
->> the max 8,000 IRQs/second limit specified in the xHCI spec.
->>
->> Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
->> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+>> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 >> ---
->> changes from v3:
->>   * Changed imod-interval to imod-interval-ns [Rob Herring/Chunfeng]
->>   * Changed "modulation" to "moderation" throughout patch [Mathias]
->> changes from v2:
->>   * Added PCI default value [Mathias]
->>   * Removed xhci-mtk.h from xhci-plat.c [Chunfeng Yun]
->>   * Removed MTK quirk from xhci-plat and moved logic to xhci-mtk [Chunfeng]
->>   * Updated bindings Documentation to use proper units [Rob Herring]
->>   * Added imod-interval description and example to MTK binding documentation
->> changes from v1:
->>   * Removed device_property_read_u32() per suggestion from greg k-h
->>   * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
+>>  drivers/clk/sunxi-ng/ccu_mp.c | 20 ++++++++++++++++++--
+>>  drivers/clk/sunxi-ng/ccu_mp.h | 24 ++++++++++++++++++++++++
+>>  2 files changed, 42 insertions(+), 2 deletions(-)
 >>
->>  Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 2 ++
->>  Documentation/devicetree/bindings/usb/usb-xhci.txt          | 1 +
->>  drivers/usb/host/xhci-mtk.c                                 | 9 +++++++++
->>  drivers/usb/host/xhci-pci.c                                 | 3 +++
->>  drivers/usb/host/xhci-plat.c                                | 5 +++++
->>  drivers/usb/host/xhci.c                                     | 7 ++-----
->>  drivers/usb/host/xhci.h                                     | 2 ++
->>  7 files changed, 24 insertions(+), 5 deletions(-)
+>> diff --git a/drivers/clk/sunxi-ng/ccu_mp.c b/drivers/clk/sunxi-ng/ccu_mp.c
+>> index 688855e7dc8c..5d0af4051737 100644
+>> --- a/drivers/clk/sunxi-ng/ccu_mp.c
+>> +++ b/drivers/clk/sunxi-ng/ccu_mp.c
+>> @@ -50,12 +50,19 @@ static unsigned long ccu_mp_round_rate(struct ccu_mux_internal *mux,
+>>       unsigned int max_m, max_p;
+>>       unsigned int m, p;
 >>
->> diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
->> index 3059596..9ff5602 100644
->> --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
->> +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
->> @@ -46,6 +46,7 @@ Optional properties:
->>   - pinctrl-names : a pinctrl state named "default" must be defined
->>   - pinctrl-0 : pin control group
->>  	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
->> + - imod-interval-ns: default interrupt moderation interval is 5000ns
->>  
->>  Example:
->>  usb30: usb at 11270000 {
->> @@ -66,6 +67,7 @@ usb30: usb at 11270000 {
->>  	usb3-lpm-capable;
->>  	mediatek,syscon-wakeup = <&pericfg>;
->>  	mediatek,wakeup-src = <1>;
->> +	imod-interval-ns = <10000>;
+>> +     if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>> +             rate *= cmp->fixed_post_div;
+>
+> Can't you just initialise fixed_post_div to 1 normally and save the
+> CCU_FEATURE_FIXED_POSTDIV?
+
+I'll refer to Maxime about this. The feature flag was there from day
+one. We only started to implement support for it later on. I'm not
+sure if there was a reason to add them as feature flags, instead of
+a field that defaults to something (0 even).
+
+Otherwise it's a reasonable change. And we probably don't have to
+do a wholesale change for the other clocks in one go. Incidentally
+I have a A83T audio series that also adds post-dividers for another
+clock type. I'll wait for a conclusion on this end before posting
+it.
+
+>
+>> +
+>>       max_m = cmp->m.max ?: 1 << cmp->m.width;
+>>       max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+>>
+>>       ccu_mp_find_best(*parent_rate, rate, max_m, max_p, &m, &p);
+>> +     rate = *parent_rate / p / m;
+>> +
+>> +     if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>> +             rate /= cmp->fixed_post_div;
+>>
+>> -     return *parent_rate / p / m;
+>> +     return rate;
+>>  }
+>>
+>>  static void ccu_mp_disable(struct clk_hw *hw)
+>> @@ -83,6 +90,7 @@ static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
+>>                                       unsigned long parent_rate)
+>>  {
+>>       struct ccu_mp *cmp = hw_to_ccu_mp(hw);
+>> +     unsigned long rate;
+>>       unsigned int m, p;
+>>       u32 reg;
+>>
+>> @@ -101,7 +109,11 @@ static unsigned long ccu_mp_recalc_rate(struct clk_hw *hw,
+>>       p = reg >> cmp->p.shift;
+>>       p &= (1 << cmp->p.width) - 1;
+>>
+>> -     return (parent_rate >> p) / m;
+>> +     rate = (parent_rate >> p) / m;
+>> +     if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>> +             rate /= cmp->fixed_post_div;
+>> +
+>> +     return rate;
+>>  }
+>>
+>>  static int ccu_mp_determine_rate(struct clk_hw *hw,
+>> @@ -129,6 +141,10 @@ static int ccu_mp_set_rate(struct clk_hw *hw, unsigned long rate,
+>>       max_m = cmp->m.max ?: 1 << cmp->m.width;
+>>       max_p = cmp->p.max ?: 1 << ((1 << cmp->p.width) - 1);
+>>
+>> +     /* Adjust target rate according to post-dividers */
+>> +     if (cmp->common.features & CCU_FEATURE_FIXED_POSTDIV)
+>> +             rate = rate * cmp->fixed_post_div;
+>> +
+>>       ccu_mp_find_best(parent_rate, rate, max_m, max_p, &m, &p);
+>>
+>>       spin_lock_irqsave(cmp->common.lock, flags);
+>> diff --git a/drivers/clk/sunxi-ng/ccu_mp.h b/drivers/clk/sunxi-ng/ccu_mp.h
+>> index aaef11d747ea..5107635e61de 100644
+>> --- a/drivers/clk/sunxi-ng/ccu_mp.h
+>> +++ b/drivers/clk/sunxi-ng/ccu_mp.h
+>> @@ -33,9 +33,33 @@ struct ccu_mp {
+>>       struct ccu_div_internal         m;
+>>       struct ccu_div_internal         p;
+>>       struct ccu_mux_internal mux;
+>> +
+>> +     unsigned int            fixed_post_div;
+>> +
+>>       struct ccu_common       common;
 >>  };
->>  
->>  2nd: dual-role mode with xHCI driver
->> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
->> index ae6e484..969908d 100644
->> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
->> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
->> @@ -29,6 +29,7 @@ Optional properties:
->>    - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
->>    - usb3-lpm-capable: determines if platform is USB3 LPM capable
->>    - quirk-broken-port-ped: set if the controller has broken port disable mechanism
->> +  - imod-interval-ns: default interrupt moderation interval is 5000ns
->>  
->>  Example:
->>  	usb at f0931000 {
->> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
->> index b62a1d2..1cb2a8b 100644
->> --- a/drivers/usb/host/xhci-mtk.c
->> +++ b/drivers/usb/host/xhci-mtk.c
->> @@ -674,6 +674,15 @@ static int xhci_mtk_probe(struct platform_device *pdev)
->>  
->>  	xhci = hcd_to_xhci(hcd);
->>  	xhci->main_hcd = hcd;
+>>
+>> +#define SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(_struct, _name, _parents, _reg, \
+>> +                                        _mshift, _mwidth,            \
+>> +                                        _pshift, _pwidth,            \
+>> +                                        _muxshift, _muxwidth,        \
+>> +                                        _gate, _postdiv, _flags)     \
+>> +     struct ccu_mp _struct = {                                       \
+>> +             .enable = _gate,                                        \
+>> +             .m      = _SUNXI_CCU_DIV(_mshift, _mwidth),             \
+>> +             .p      = _SUNXI_CCU_DIV(_pshift, _pwidth),             \
+>> +             .mux    = _SUNXI_CCU_MUX(_muxshift, _muxwidth),         \
+>> +             .fixed_post_div = _postdiv,                             \
+>> +             .common = {                                             \
+>> +                     .reg            = _reg,                         \
+>> +                     .features       = CCU_FEATURE_FIXED_POSTDIV,    \
+>> +                     .hw.init        = CLK_HW_INIT_PARENTS(_name,    \
+>> +                                                           _parents, \
+>> +                                                           &ccu_mp_ops, \
+>> +                                                           _flags),  \
+>> +             }                                                       \
+>> +     }
 >> +
->> +	/*
->> +	 * imod_interval is the interrupt moderation value in nanoseconds.
->> +	 * The increment interval is 8 times as much as that defined in
->> +	 * the xHCI spec on MTK's controller.
->> +	 */
->> +	xhci->imod_interval = 5000;
->> +	device_property_read_u32(dev, "imod-interval-ns", &xhci->imod_interval);
->> +
->>  	xhci->shared_hcd = usb_create_shared_hcd(driver, dev,
->>  			dev_name(dev), hcd);
->>  	if (!xhci->shared_hcd) {
->> diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
->> index 7ef1274..4bcddd4 100644
->> --- a/drivers/usb/host/xhci-pci.c
->> +++ b/drivers/usb/host/xhci-pci.c
->> @@ -234,6 +234,9 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
->>  	if (!xhci->sbrn)
->>  		pci_read_config_byte(pdev, XHCI_SBRN_OFFSET, &xhci->sbrn);
->>  
->> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
->> +	xhci->imod_interval = 40000;
->> +
->>  	retval = xhci_gen_setup(hcd, xhci_pci_quirks);
->>  	if (retval)
->>  		return retval;
->> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
->> index 09f164f..6f03830 100644
->> --- a/drivers/usb/host/xhci-plat.c
->> +++ b/drivers/usb/host/xhci-plat.c
->> @@ -269,6 +269,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
->>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
->>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
->>  
->> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
->> +	xhci->imod_interval = 40000;
->> +	device_property_read_u32(sysdev, "imod-interval-ns",
->> +				 &xhci->imod_interval);
->> +
->>  	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
->>  	if (IS_ERR(hcd->usb_phy)) {
->>  		ret = PTR_ERR(hcd->usb_phy);
->> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
->> index 2424d30..0b7755b 100644
->> --- a/drivers/usb/host/xhci.c
->> +++ b/drivers/usb/host/xhci.c
->> @@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
->>  			"// Set the interrupt modulation register");
-> s/modulation/moderation
+>
+> This looks suspiciously like a copy of the macro below. What about you
+> define the one below as a special case of this new one above?
 
-Mathias said there was no need to change the existing modulation strings - only
-the ones that I had added.
+Correct. But you can't unset the feature flag. So a copy is needed.
 
-> 
->>  	temp = readl(&xhci->ir_set->irq_control);
->>  	temp &= ~ER_IRQ_INTERVAL_MASK;
->> -	/*
->> -	 * the increment interval is 8 times as much as that defined
->> -	 * in xHCI spec on MTK's controller
->> -	 */
->> -	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
->> +	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
->> +
-> No need a blank line
+> Should be even more straightforward with defaulting postdiv to 1 and
+> loosing the feature flags.
 
-If this patch goes through another version, I will remove this line
+See above about the feature flag.
 
-> 
->>  	writel(temp, &xhci->ir_set->irq_control);
->>  
->>  	/* Set the HCD state before we enable the irqs */
->> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
->> index 99a014a..2a4177b 100644
->> --- a/drivers/usb/host/xhci.h
->> +++ b/drivers/usb/host/xhci.h
->> @@ -1717,6 +1717,8 @@ struct xhci_hcd {
->>  	u8		max_interrupters;
->>  	u8		max_ports;
->>  	u8		isoc_threshold;
->> +	/* imod_interval in ns (I * 250ns) */
->> +	u32		imod_interval;
->>  	int		event_ring_max;
->>  	/* 4KB min, 128MB max */
->>  	int		page_size;
-> 
-> Thanks
-> 
-> 
+ChenYu
 
-
--- 
-Adam Wallis
-Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+>
+> Cheers,
+> Andre.
+>
+>>  #define SUNXI_CCU_MP_WITH_MUX_GATE(_struct, _name, _parents, _reg,   \
+>>                                  _mshift, _mwidth,                    \
+>>                                  _pshift, _pwidth,                    \
+>>
+>
