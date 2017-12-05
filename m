@@ -1,52 +1,71 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 5 Dec 2017 13:12:23 +0300
-Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
- error checking
-In-Reply-To: <20171204.132556.1601454745789376393.davem@davemloft.net>
-References: <1512409703-20881-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
- <20171204.132556.1601454745789376393.davem@davemloft.net>
-Message-ID: <791fdb7d-e0ec-eefb-c703-205c039eddc3@cogentembedded.com>
+From: alexandre.torgue@st.com (Alexandre Torgue)
+Date: Tue, 5 Dec 2017 11:12:09 +0100
+Subject: [PATCH v8 0/6] stm32 clocksource driver rework
+In-Reply-To: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
+References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
+Message-ID: <dcff2fd0-58ca-51bb-ea2d-dfd1c5ca0cc3@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/4/2017 9:25 PM, David Miller wrote:
+Hi
 
->> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct platform_device *dev)
->>   	netdevice->dev_addr[5] = readb(eth_addr + 0x06);
->>   	iounmap(eth_addr);
->>   
->> -	if (!netdevice->irq) {
->> +	if (netdevice->irq <= 0) {
->>   		printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
->>   			__FILE__, netdevice->base_addr);
->> +		retval = netdevice->irq ? netdevice->irq : -ENODEV;
->>   		goto probe_failed;
->>   	}
+On 11/14/2017 09:52 AM, Benjamin Gaignard wrote:
+> version 8:
+>   - rebased on timers/core
+>   - change timer_of_exit() name to timer_of_cleanup()
+>   - update stm32 clocksource driver to use this function
 > 
-> Ok, thinking about this some more...
+> version 7:
+>   - reword "clocksource: stm32: only use 32 bits timers" commit message
+>     to give more details about why 16 bits are problematics.
 > 
-> It is impossible to use platform_get_irq() without every single call
-> site having this funny:
+> version 6:
+>   - add dedicated patch min delta change
+>   - rework commit messages, I hope it will be better now
+>   - change new function name from timer_of_deinit to timer_of_exit
+>   - make stm32_clock_event_set_next_event() safer like done in other
+>     drivers
 > 
-> 	ret = val ? val : -ENODEV;
+> version 6:
+> - add timer_of_deinit function in core
+> - rework failure cases in probe function
 > 
-> sequence.
+> version 5:
+> - rebase on top of timer/core branch
+> - rework commit message of the first patch
 > 
-> This is unnecessary duplication and it is also error prone, so I
-> really think this logic belongs in platform_get_irq() itself.  It can
-> convert '0' to -ENODEV and that way we need no special logic in the
-> callers at all.
+> version 4:
+> - split patch in 3 parts
+>    - convert code to timer_of
+>    - only use 32 bits timers
+>    - add clocksource support
+> 
+> version 3:
+> - fix comments done by Daniel
+> - use timer_of helper functions
+> 
+> version 2:
+> - fix uninitialized variable
+> 
+> Benjamin Gaignard (6):
+>    clocksource: timer_of: rename timer_of_exit to timer_of_cleanup
+>    clocksource: stm32: convert driver to timer_of
+>    clocksource: stm32: increase min delta value
+>    clocksource: stm32: only use 32 bits timers
+>    clocksource: stm32: add clocksource support
+>    arm: dts: stm32: remove useless clocksource nodes
+> 
+>   arch/arm/boot/dts/stm32f429.dtsi  |  32 -----
+>   arch/arm/boot/dts/stm32f746.dtsi  |  32 -----
+>   drivers/clocksource/Kconfig       |   1 +
+>   drivers/clocksource/timer-of.c    |   9 +-
+>   drivers/clocksource/timer-of.h    |   2 +-
+>   drivers/clocksource/timer-stm32.c | 242 ++++++++++++++++++++------------------
+>   6 files changed, 138 insertions(+), 180 deletions(-)
+> 
 
-    Well, we can have:
+What is the status of this patch-set ? Is there a chance to have it for 
+v4.16 ?
 
-	return r && r->start ? r->start : -ENXIO;
-
-instead of:
-
-	return r ? r->start : -ENXIO;
-
-at the end of platform_get_irq(). But I don't really think it's worth doing -- 
-request_irq() doesn't filter out IRQ0 anyway, IIRC...
-
-MBR, Sergei
+Thanks
+Alex
