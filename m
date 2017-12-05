@@ -1,77 +1,46 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Dec 2017 09:53:40 +0100
-Subject: [PATCH v4 02/10] pinctrl: axp209: add pinctrl features
-In-Reply-To: <2207ddcb-21fc-e3e1-1a1c-11e11690a02e@free-electrons.com>
+Date: Tue, 5 Dec 2017 09:55:58 +0100
+Subject: [PATCH v4 00/10] add pinmuxing support for pins in AXP209 and
+ AXP813 PMICs
+In-Reply-To: <CACRpkdaMxaLjsDETm6_56tyGDu6=W0L4SQCAA2mmSR4mkR-jAA@mail.gmail.com>
 References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
- <71c9da94df2a5938cb8c092e40f8e36eec0b01c3.1512135804.git-series.quentin.schulz@free-electrons.com>
- <20171201155702.irfox7vf3kfjvpjx@flea.lan>
- <2207ddcb-21fc-e3e1-1a1c-11e11690a02e@free-electrons.com>
-Message-ID: <20171205085340.z2mb4uujencw7bct@flea.lan>
+ <CACRpkdaMxaLjsDETm6_56tyGDu6=W0L4SQCAA2mmSR4mkR-jAA@mail.gmail.com>
+Message-ID: <20171205085558.ernawgdgybd4lzxx@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sat, Dec 02, 2017 at 05:00:03PM +0100, Linus Walleij wrote:
+> On Fri, Dec 1, 2017 at 2:44 PM, Quentin Schulz
+> <quentin.schulz@free-electrons.com> wrote:
+> 
+> > The AXP209 and AXP813 PMICs have several pins (respectively 3 and 2) that can
+> > be used either as GPIOs or for other purposes (ADC or LDO here).
+> >
+> > We already have a GPIO driver for the GPIO use of those pins on the AXP209.
+> > Let's "upgrade" this driver to support all the functions these pins can have.
+> >
+> > Then we add support to this driver for the AXP813 which is slighlty different
+> > (basically a different offset in two registers and one less pin).
+> >
+> > I suggest patches 1 to 8 go through Linus's tree and 9 and 10 via Maxime or
+> > Chen-Yu's tree.
+> >
+> > v4:
+> 
+> Looks overall good. As soon as Maxime is happy with everything I will
+> happily apply 1-8 to the pinctrl tree and then pull it to GPIO as well to
+> avoid clashes.
+> 
+> I think there were some minor comments but it seems almost finished.
 
-On Mon, Dec 04, 2017 at 09:07:52AM +0100, Quentin Schulz wrote:
-> >> +static int axp20x_pmx_set_mux(struct pinctrl_dev *pctldev,
-> >> +			      unsigned int function, unsigned int group)
-> >> +{
-> >> +	struct axp20x_gpio *gpio = pinctrl_dev_get_drvdata(pctldev);
-> >> +	unsigned int mask;
-> >> +
-> >> +	/* Every pin supports GPIO_OUT and GPIO_IN functions */
-> >> +	if (function <= AXP20X_FUNC_GPIO_IN)
-> >> +		return axp20x_pmx_set(pctldev, group,
-> >> +				      gpio->funcs[function].muxval);
-> >> +
-> >> +	if (function == AXP20X_FUNC_LDO)
-> >> +		mask = gpio->desc->ldo_mask;
-> >> +	else
-> >> +		mask = gpio->desc->adc_mask;
-> > 
-> > What is the point of this test...
-> > 
-> >> +	if (!(BIT(group) & mask))
-> >> +		return -EINVAL;
-> >> +
-> >> +	/*
-> >> +	 * We let the regulator framework handle the LDO muxing as muxing bits
-> >> +	 * are basically also regulators on/off bits. It's better not to enforce
-> >> +	 * any state of the regulator when selecting LDO mux so that we don't
-> >> +	 * interfere with the regulator driver.
-> >> +	 */
-> >> +	if (function == AXP20X_FUNC_LDO)
-> >> +		return 0;
-> > 
-> > ... if you know that you're not going to do anything with one of the
-> > outcomes. It would be better to just move that part above, instead of
-> > doing the same test twice.
-> > 
-> 
-> Return value is different. In one case, it is an error to request "ldo"
-> for a pin that does not support it. In the other case, the ldo request
-> is valid but nothing's done on driver side.
-> 
-> Both cases are handled differently by the core:
-> http://elixir.free-electrons.com/linux/latest/source/drivers/pinctrl/pinmux.c#L439
-> 
-> I think that's the behavior we're expecting from this driver.
+You can apply everything with my
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-Ah, right.
+The only comment left is the checkpatch warning, but there's multiple
+occurences of that issue in the driver, so it can definitely be done
+in a separate patch.
 
-> Or maybe you're asking to do:
-> 
-> +	if (function == AXP20X_FUNC_LDO) {
-> +		if (!(BIT(group) & gpio->desc->ldo_mask))
-> +			return -EINVAL;
-> +		return 0;
-> +	} else if (!(BIT(group) & gpio->desc->adc_mask)) {
-> +		return -EINVAL;
-> +	}
-> 
-> ?
-
-No, it's definitely better the way you did it.
+(But please do it Quentin ;))
 
 Maxime
 
@@ -85,4 +54,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/c59bd573/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/f8fc76b8/attachment.sig>
