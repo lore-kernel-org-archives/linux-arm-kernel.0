@@ -1,42 +1,45 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Dec 2017 11:05:11 +0100
-Subject: [PATCH] arm64: dts: allwinner: a64: bananapi-m64: Add LED device
- node
-In-Reply-To: <20171201162733.23156-1-wens@csie.org>
-References: <20171201162733.23156-1-wens@csie.org>
-Message-ID: <20171205100511.ohxcqlrozxfgq6id@flea.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue,  5 Dec 2017 11:09:38 +0100
+Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
+Message-ID: <20171205101000.968887-1-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
+changed the way that the dependencies are handled, but then the
+Class D amplifier support got merged, which used the old method.
 
-On Sat, Dec 02, 2017 at 12:27:33AM +0800, Chen-Yu Tsai wrote:
-> The Bananapi-M64 has 3 LEDS in red, green, and blue. These are toggled
-> via GPIO lines, which drive transistors that control current across the
-> LEDS. The red LED is by default on, via an additional pull-up on the
-> control line. We consider this means that it is a power indicator.
-> So we set the "default-on" property for it.
-> 
-> The pingroups the GPIO lines belong to require external regulators be
-> enabled to be able to drive the GPIO high. These regulators also have
-> other purposes. However the pin controller does not have bindings for
-> regulators. Here we just set them to always-on.
+This seems to have triggered a very rare randconfig condition for me
+now, leading to a link error:
 
-I guess we should take the opportunity to do just that.
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
+atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
+atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
 
-We have been deferring this for quite some time now, this is a perfect
-occasion to do it once and for all :)
+Changing it to select SND_ATMEL_SOC_SSC_DMA as intended rather than
+SND_ATMEL_SOC_DMA directly makes it work again.
 
-Maxime
+Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ sound/soc/atmel/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index 4a56f3dfba51..2d998e5c4fb5 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
+ config SND_ATMEL_SOC_CLASSD
+ 	tristate "Atmel ASoC driver for boards using CLASSD"
+ 	depends on ARCH_AT91 || COMPILE_TEST
+-	select SND_ATMEL_SOC_DMA
++	select SND_ATMEL_SOC_SSC_DMA
+ 	select REGMAP_MMIO
+ 	help
+ 	  Say Y if you want to add support for Atmel ASoC driver for boards using
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/67860803/attachment.sig>
+2.9.0
