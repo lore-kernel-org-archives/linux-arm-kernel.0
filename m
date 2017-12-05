@@ -1,85 +1,51 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Tue,  5 Dec 2017 14:56:42 +0000
-Subject: [PATCH] arm64: fpsimd: Prevent registers leaking from dead tasks
-Message-ID: <1512485802-29489-1-git-send-email-Dave.Martin@arm.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Tue,  5 Dec 2017 15:57:21 +0100
+Subject: [PATCH] pwn: stm32: Adopt SPDX identifier
+Message-ID: <20171205145721.20403-1-benjamin.gaignard@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, loading of a task's fpsimd state into the CPU registers
-is skipped if that task's state is already present in the registers
-of that CPU.
+Add SPDX identifer
 
-However, the code relies on the struct fpsimd_state * (and by
-extension struct task_struct *) to unambiguously identify a task.
-
-There is a particular case in which this doesn't work reliably:
-when a task exits, its task_struct may be recycled to describe a
-new task.
-
-Consider the following scenario:
-
- 1) Task P loads its fpsimd state onto cpu C.
-        per_cpu(fpsimd_last_state, C) := P;
-        P->thread.fpsimd_state.cpu := C;
-
- 2) Task X is scheduled onto C and loads its fpsimd state on C.
-        per_cpu(fpsimd_last_state, C) := X;
-        X->thread.fpsimd_state.cpu := C;
-
- 3) X exits, causing X's task_struct to be freed.
-
- 4) P forks a new child T, which obtains X's recycled task_struct.
-	T == X.
-	T->thread.fpsimd_state.cpu == C (inherited from P).
-
- 5) T is scheduled on C.
-	T's fpsimd state is not loaded, because
-	per_cpu(fpsimd_last_state, C) == T (== X) &&
-	T->thread.fpsimd_state.cpu == C.
-
-        (This is the check performed by fpsimd_thread_switch().)
-
-So, T gets X's registers because the last registers loaded onto C
-were those of X, in (2).
-
-This patch fixes the problem by ensuring that the sched-in check
-fails in (5): fpsimd_flush_task_state(T) is called when T is
-forked, so that T->thread.fpsimd_state.cpu == C cannot be true.
-This relies on the fact that T is not schedulable until after
-copy_thread() completes.
-
-Once T's fpsimd state has been loaded on some CPU C there may still
-be other cpus D for which per_cpu(fpsimd_last_state, D) ==
-&X->thread.fpsimd_state.  But D is necessarily != C in this case,
-and the check in (5) must fail.
-
-An alternative fix would be to do refcounting on task_struct.  This
-would result in each CPU holding a reference to the last task whose
-fpsimd state was loaded there.  It's not clear whether this is
-preferable, and it involves higher overhead than the fix proposed
-in this patch.  It would also moves all the task_struct freeing
-work into the context switch critical section, or otherwise some
-deferred cleanup mechanism would need to be introduced, neither of
-which seems obviously justified.
-
-Fixes: 005f78cd8849 ("arm64: defer reloading a task's FPSIMD state to userland resume")
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 ---
- arch/arm64/kernel/process.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/pwm/pwm-stm32-lp.c | 3 +--
+ drivers/pwm/pwm-stm32.c    | 3 +--
+ 2 files changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index b2adcce..5387d15 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -313,6 +313,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 	 */
- 	clear_tsk_thread_flag(p, TIF_SVE);
- 	p->thread.sve_state = NULL;
-+	fpsimd_flush_task_state(p);
+diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
+index 1ac9e4384142..cbd271e80c3c 100644
+--- a/drivers/pwm/pwm-stm32-lp.c
++++ b/drivers/pwm/pwm-stm32-lp.c
+@@ -1,3 +1,4 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * STM32 Low-Power Timer PWM driver
+  *
+@@ -5,8 +6,6 @@
+  *
+  * Author: Gerald Baeza <gerald.baeza@st.com>
+  *
+- * License terms: GNU General Public License (GPL), version 2
+- *
+  * Inspired by Gerald Baeza's pwm-stm32 driver
+  */
  
- 	if (likely(!(p->flags & PF_KTHREAD))) {
- 		*childregs = *current_pt_regs();
+diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+index 6139512aab7b..be56d7af89c9 100644
+--- a/drivers/pwm/pwm-stm32.c
++++ b/drivers/pwm/pwm-stm32.c
+@@ -1,10 +1,9 @@
++// SPDX-License-Identifier: GPL-2.0
+ /*
+  * Copyright (C) STMicroelectronics 2016
+  *
+  * Author: Gerald Baeza <gerald.baeza@st.com>
+  *
+- * License terms: GNU General Public License (GPL), version 2
+- *
+  * Inspired by timer-stm32.c from Maxime Coquelin
+  *             pwm-atmel.c from Bo Shen
+  */
 -- 
-2.1.4
+2.15.0
