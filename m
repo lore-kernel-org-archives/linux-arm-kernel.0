@@ -1,69 +1,50 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Dec 2017 11:06:20 +0000
-Subject: [RFC PATCH] arm64: deactivate saved ttbr when mm is deactivated
-In-Reply-To: <72abe8f2-4d82-1375-956c-5e8b7869864c@codeaurora.org>
-References: <1512404606-26498-1-git-send-email-vinmenon@codeaurora.org>
- <20171204165533.GI29619@arm.com>
- <20171204180001.7gsub3wt6h5nl3v3@lakrids.cambridge.arm.com>
- <72abe8f2-4d82-1375-956c-5e8b7869864c@codeaurora.org>
-Message-ID: <20171205110619.et5nhkkprv7tmshu@lakrids.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 5 Dec 2017 12:13:41 +0100
+Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
+In-Reply-To: <20171205105750.GI21780@piout.net>
+References: <20171205101000.968887-1-arnd@arndb.de>
+ <20171205105750.GI21780@piout.net>
+Message-ID: <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 10:30:40AM +0530, Vinayak Menon wrote:
-> On 12/4/2017 11:30 PM, Mark Rutland wrote:
-> > On Mon, Dec 04, 2017 at 04:55:33PM +0000, Will Deacon wrote:
-> >> On Mon, Dec 04, 2017 at 09:53:26PM +0530, Vinayak Menon wrote:
-> >>> A case is observed where a wrong physical address is read,
-> >>> resulting in a bus error and that happens soon after TTBR0 is
-> >>> set to the saved ttbr by uaccess_ttbr0_enable. This is always
-> >>> seen to happen in the exit path of the task.
-> >>>
-> >>> exception
-> >>> __arch_copy_from_user
-> >>> __copy_from_user
-> >>> probe_kernel_read
-> >>> get_freepointer_safe
-> >>> slab_alloc_node
-> >>> slab_alloc
-> >>> kmem_cache_alloc
-> >>> kmem_cache_zalloc
-> >>> fill_pool
-> >>> __debug_object_init
-> >>> debug_object_init
-> >>> rcuhead_fixup_activate
-> >>> debug_object_fixup
-> >>> debug_object_activate
-> >>> debug_rcu_head_queue
-> >>> __call_rcu
-> >>> ep_remove
-> >>> eventpoll_release_file
-> >>> __fput
-> >>> ____fput
-> >>> task_work_run
-> >>> do_exit
-> >>>
-> >>> The mm has been released and the pgd is freed, but probe_kernel_read
-> >>> invoked from slub results in call to __arch_copy_from_user. At the
-> >>> entry to __arch_copy_from_user, when SW PAN is enabled, this results
-> >>> in stale value being set to ttbr0. May be a speculative fetch aftwerwards
-> >>> is resulting in invalid physical address access.
+On Tue, Dec 5, 2017 at 11:57 AM, Alexandre Belloni
+<alexandre.belloni@free-electrons.com> wrote:
+> On 05/12/2017 at 11:09:38 +0100, Arnd Bergmann wrote:
+>> Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
+>> changed the way that the dependencies are handled, but then the
+>> Class D amplifier support got merged, which used the old method.
+>>
+>> This seems to have triggered a very rare randconfig condition for me
+>> now, leading to a link error:
+>>
+>> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+>> atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
+>> atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
+>> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+>> atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
+>> atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
+>>
+>> Changing it to select SND_ATMEL_SOC_SSC_DMA as intended rather than
+>> SND_ATMEL_SOC_DMA directly makes it work again.
+>>
+>> Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-> > I think the problem here is that switch_mm() avoids updating the saved ttbr
-> > value when the next mm is init_mm.
+Unfortunately, my testing just found a new problem with this patch
+applied, I had
+not run enough randconfig tests on top of it:
 
-> For this switch to happen, the schedule() in do_task_dead at the end
-> of do_exit() need to be called, right ?  The issue is happening soon
-> after exit_mm (probably from exit_files).
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+atmel_ssc_dai.c:(.text+0x73c): undefined reference to `ssc_request'
+sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+atmel_ssc_dai.c:(.text+0x7be): undefined reference to `ssc_free'
 
-I'd assumed that we'd switch_mm() away from the task's mm prior to the
-final mmput(). Otherwise, I can't see why we don't have issues in the
-non SW PAN case (as that would leave the HW TTBR0 stale).
+This is for a configuration with SND_ATMEL_SOC_CLASSD=y
+and CONFIG_ATMEL_SSC=n. Could you tell me whether that is a
+sensible configuration that should work, or whether we need a dependency
+on ATMEL_SSC in SND_ATMEL_SOC_CLASSD? I can't really tell
+from the source code, but you probably know the answer.
 
-However, I can't see exactly where we do that, so I'll go diggging.
-Something doesn't seem quite right.
-
-Do you have a reproducer for the issue?
-
-Thanks,
-Mark.
+       Arnd
