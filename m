@@ -1,33 +1,31 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 5 Dec 2017 21:28:55 +0900
-Subject: [PATCH v2 3/3] mtd: nand: squash struct nand_buffers into struct
- nand_chip
-In-Reply-To: <20171205125711.74158b3b@bbrezillon>
-References: <1512463636-28934-1-git-send-email-yamada.masahiro@socionext.com>
- <1512463636-28934-3-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNATKBO=eNHdL_P2MOh7+uRcCjkq+v8+O3DXC5UF3-NGh2Q@mail.gmail.com>
- <20171205125711.74158b3b@bbrezillon>
-Message-ID: <CAK7LNAQken7cQEPJEyL107pLbVJ9rPc+zZoPh4CA8D+CiKZz4g@mail.gmail.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 5 Dec 2017 14:31:29 +0200
+Subject: [PATCH 0/2] ARM: davinci: fix eDMA probing for dm365
+In-Reply-To: <20171204133359.45625-1-amery@hanoverdisplays.com>
+References: <20171204133359.45625-1-amery@hanoverdisplays.com>
+Message-ID: <2298378f-37d0-0c04-dfe3-4503c58e5456@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris,
+Hi,
 
-2017-12-05 20:57 GMT+09:00 Boris Brezillon <boris.brezillon@free-electrons.com>:
->>
->>
->> Sorry, I missed to update omap2.c
->>
->> I will send v3.
->
-> No need to send a v3, I already fixed it when applying [1].
->
-> [1]https://github.com/bbrezillon/linux-0day/commit/59a7bfff7103d48713b2125c3844400301a3d028
->
+On 2017-12-04 15:33, Alejandro Mery wrote:
+> Hi, as an intermediate step toward migrating a davinci dm365 based product from 2.6.32.71
+> to 4.14(.3+) I'm trying to get the dm365 evm (evaluation board) to work
+> 
+> The very first problem is `edma: probe of edma.0 failed with error -5` caused by dm365 not
+> been included on some refactoring done by Peter Ujfalusi in 2015 which got solved by the
+> cherry-picking the following changes into dm365.c
+> 
+> * cef5b0da4019 2015-10-14 Peter Ujfalusi ARM: davinci: Add dma_mask to eDMA devices
+> * 7ab388e85faa 2015-10-14 Peter Ujfalusi ARM: davinci: Use platform_device_register_full() to create pdev for eDMA
 
-Thank you for your kind help!
+Oh, how did I missed them???
 
+Thanks for taking care of dm365!
 
--- 
-Best Regards
-Masahiro Yamada
+To both:
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki.
+Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
