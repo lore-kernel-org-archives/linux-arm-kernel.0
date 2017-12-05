@@ -1,108 +1,73 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Tue, 5 Dec 2017 15:42:42 -0300
-Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
- UNCORE devices
-In-Reply-To: <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
- <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
- <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
- <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
- <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
-Message-ID: <20171205184242.GA19952@kernel.org>
+From: shankerd@codeaurora.org (Shanker Donthineni)
+Date: Tue,  5 Dec 2017 13:03:27 -0600
+Subject: [PATCH v2] irqchip/gic-v3: Fix the driver probe() fail due to
+ disabled GICC entry
+Message-ID: <1512500607-20160-1-git-send-email-shankerd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, Dec 05, 2017 at 08:35:22PM +0800, Jin, Yao escreveu:
-> A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
+The ACPI specification says OS shouldn't attempt to use GICC configuration
+parameters if the flag ACPI_MADT_ENABLED is cleared. The ARM64-SMP code
+skips the disabled GICC entries but not causing any issue. However the
+current GICv3 driver probe bails out causing kernel panic() instead of
+skipping the disabled GICC interfaces. This issues on happens on systems
+where redistributor regions are not in the always-on power domain and
+one of GICC interface marked with ACPI_MADT_ENABLED=0.
 
-I'll take this as a Tested-by: you, ok?
+This patch does the two things to fix the panic.
+  - Don't return an error in gic_acpi_match_gicc() for disabled GICC entry.
+  - No need to keep GICR region information for disabled GICC entry.
+
+Observed kernel crash on QDF2400 platform GICC entry is disabled.
+Kernel crash traces:
+  Kernel panic - not syncing: No interrupt controller found.
+  CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.13.5 #26
+  [<ffff000008087770>] dump_backtrace+0x0/0x218
+  [<ffff0000080879dc>] show_stack+0x14/0x20
+  [<ffff00000883b078>] dump_stack+0x98/0xb8
+  [<ffff0000080c5c14>] panic+0x118/0x26c
+  [<ffff000008b62348>] init_IRQ+0x24/0x2c
+  [<ffff000008b609fc>] start_kernel+0x230/0x394
+  [<ffff000008b601e4>] __primary_switched+0x64/0x6c
+  ---[ end Kernel panic - not syncing: No interrupt controller found.
+
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+---
+changes since v1:
+  Added a new "if condition" to skip disabled GICC entry and edited commit.
+
+ drivers/irqchip/irq-gic-v3.c | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
+
+diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
+index b56c3e2..606d4d2 100644
+--- a/drivers/irqchip/irq-gic-v3.c
++++ b/drivers/irqchip/irq-gic-v3.c
+@@ -1331,6 +1331,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
+ 	u32 size = reg == GIC_PIDR2_ARCH_GICv4 ? SZ_64K * 4 : SZ_64K * 2;
+ 	void __iomem *redist_base;
  
-> See the log:
-> 
-> root at skl:/tmp# perf stat --per-thread -p 10322 -M CPI,IPC
-> ^C
->  Performance counter stats for process id '10322':
-> 
->           vmstat-10322             1,879,654      inst_retired.any #
-> 0.8 CPI
->           vmstat-10322             1,565,807      cycles
->           vmstat-10322             1,879,654      inst_retired.any #
-> 1.2 IPC
->           vmstat-10322             1,565,807      cpu_clk_unhalted.thread
-> 
->        2.850291804 seconds time elapsed
-> 
-> Thanks for fixing it quickly.
-> 
-> Thanks
-> Jin Yao
-> 
-> On 12/5/2017 3:23 PM, Jin, Yao wrote:
-> > Hi,
-> > 
-> > I applied the diff but it's failed.
-> > 
-> > jinyao at skl:~/skl-ws/perf-dev/lck-4594/src$ patch -p1 < 1.pat
-> > patching file tools/perf/util/pmu.c
-> > patch: **** malformed patch at line 41: *head, struct perf_pmu *pmu)
-> > 
-> > Could you send the patch as attachment to me in another mail thread?
-> > 
-> > to yao.jin at linux.intel.com
-> > cc yao.jin at intel.com
-> > 
-> > Thanks
-> > Jin Yao
-> > 
-> > On 12/5/2017 3:12 PM, Ganapatrao Kulkarni wrote:
-> > > diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
-> > > index 5ad8a18..57e38fd 100644
-> > > --- a/tools/perf/util/pmu.c
-> > > +++ b/tools/perf/util/pmu.c
-> > > @@ -538,6 +538,34 @@ static bool pmu_is_uncore(const char *name)
-> > > ? }
-> > > 
-> > > ? /*
-> > > + *? PMU CORE devices have different name other than cpu in sysfs on some
-> > > + *? platforms. looking for possible sysfs files to identify as core
-> > > device.
-> > > + */
-> > > +static int is_pmu_core(const char *name)
-> > > +{
-> > > + struct stat st;
-> > > + char path[PATH_MAX];
-> > > + const char *sysfs = sysfs__mountpoint();
-> > > +
-> > > + if (!sysfs)
-> > > + return 0;
-> > > +
-> > > + /* Look for cpu sysfs (x86 and others) */
-> > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
-> > > + if ((stat(path, &st) == 0) &&
-> > > + (strncmp(name, "cpu", strlen("cpu")) == 0))
-> > > + return 1;
-> > > +
-> > > + /* Look for cpu sysfs (specific to arm) */
-> > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/%s/cpus",
-> > > + sysfs, name);
-> > > + if (stat(path, &st) == 0)
-> > > + return 1;
-> > > +
-> > > + return 0;
-> > > +}
-> > > +
-> > > +/*
-> > > ?? * Return the CPU id as a raw string.
-> > > ?? *
-> > > ?? * Each architecture should provide a more precise id string that
-> > > @@ -641,7 +669,7 @@ static void pmu_add_cpu_aliases(struct list_head
-> > > *head, struct perf_pmu *pmu)
-> > > ?? break;
-> > > ?? }
-> > > 
-> > > - if (pmu->is_uncore) {
-> > > + if (!is_pmu_core(name)) {
-> > > ?? /* check for uncore devices */
-> > > ?? if (pe->pmu == NULL)
-> > > ?? continue;
++	/* GICC entry which has !ACPI_MADT_ENABLED is not unusable so skip */
++	if (!(gicc->flags & ACPI_MADT_ENABLED))
++		return 0;
++
+ 	redist_base = ioremap(gicc->gicr_base_address, size);
+ 	if (!redist_base)
+ 		return -ENOMEM;
+@@ -1380,6 +1384,13 @@ static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
+ 	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
+ 		return 0;
+ 
++	/*
++	 * It's perfectly valid firmware can pass disabled GICC entry, driver
++	 * should treat an errors, skip the entry.
++	 */
++	if (!(gicc->flags & ACPI_MADT_ENABLED))
++		return 0;
++
+ 	return -ENODEV;
+ }
+ 
+-- 
+Qualcomm Datacenter Technologies, Inc. on behalf of the Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
