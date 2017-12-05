@@ -1,35 +1,27 @@
-From: P.Bruenn@beckhoff.com (=?utf-8?B?UGF0cmljayBCcsO8bm4=?=)
-Date: Tue, 5 Dec 2017 14:20:39 +0000
-Subject: [PATCH v2 2/5] ARM: dts: imx53: add srtc node
-In-Reply-To: <CAOMZO5DiRa1aLFHiFv_-_3J9LLuq-J06FHLQ4o7=r8hrftEpqQ@mail.gmail.com>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-3-linux-kernel-dev@beckhoff.com>
- <CAOMZO5DiRa1aLFHiFv_-_3J9LLuq-J06FHLQ4o7=r8hrftEpqQ@mail.gmail.com>
-Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB531C1F@NT-Mail07.beckhoff.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Tue, 5 Dec 2017 14:23:32 +0000
+Subject: Tegra baseline test results for v4.15-rc2
+In-Reply-To: <acc93fae-7fb0-71c1-c839-8c7b0e6cfb5e@nvidia.com>
+References: <acc93fae-7fb0-71c1-c839-8c7b0e6cfb5e@nvidia.com>
+Message-ID: <027eb309-4c8c-088a-8f12-da51269c1dc2@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Fabio Estevam [mailto:festevam at gmail.com]
->Sent: Dienstag, 5. Dezember 2017 15:14
->On Tue, Dec 5, 2017 at 12:06 PM,  <linux-kernel-dev@beckhoff.com> wrote:
+On 05/12/17 14:05, Jon Hunter wrote:
+> Here are some basic Tegra test results for Linux v4.15-rc2.
+> Logs and other details at:
 >
->>                         srtc: srtc at 53fa4000 {
->> -                               compatible = "fsl,imx53-rtc", "fsl,imx25-rtc";
->> +                               compatible = "fsl,imx53-rtc";
->>                                 reg = <0x53fa4000 0x4000>;
->>                                 interrupts = <24>;
->> -                               interrupt-parent = <&tzic>;
->>                                 clocks = <&clks IMX5_CLK_SRTC_GATE>;
->> -                               clock-names = "ipg";
->
->srtc node has been removed in linux-next.
->
->You need to re-add it.
-Thanks for this super-fast responses!
-I will wait a few days for more reviewers and then integrate your comments in a v3. If nothing major show up I will wait until the imx53.dtsi revert landed in Linus tree.
+>     https://nvtb.github.io//linux/test_v4.15-rc2/20171204140104/
+[...]
+> Boot to userspace: multi_v7_defconfig:
+>     FAIL: ( 1/ 5): tegra124-nyan-big
 
-Best regards,
-Patrick
+Thanks for the report.  Following up on the automated bisection
+runs, I've found 2 independent issues that both cause a kernel
+hang on tegra124-nyan-big and sent some patches to address them
+yesterday:
 
-Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
-Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
+   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545681.html
+
+Best wishes,
+Guillaume
