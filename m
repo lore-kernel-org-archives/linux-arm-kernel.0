@@ -1,136 +1,64 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  5 Dec 2017 16:10:22 +0100
-Subject: [PATCH v3 10/15] ARM: dts: sun8i: a83t: Add display pipeline
+Date: Tue,  5 Dec 2017 16:10:13 +0100
+Subject: [PATCH v3 01/15] dt-bindings: panel: lvds: Document power-supply
+ property
 In-Reply-To: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
 References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <97d3cee9d0d7a92893f646d72643bac520de5f05.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <97ebf0615821d79e8d7718594fe3a542a743a05f.1512486553.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display pipeline on the A83T is mainly composed of the mixers and
-TCONs, plus various encoders.
-
-Let's add the first mixer and TCON to the DTSI since the only board I have
-can use only the LVDS output on the first TCON. The other parts will be
-added eventually.
+The power-supply property is used by a vast majority of panels, including
+panel-simple. Let's document it as a common property
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 79 ++++++++++++++++++++++++++++++++-
- 1 file changed, 79 insertions(+)
+ Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
+ Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
+ Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +-
+ 3 files changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 19acae1b4089..e4db38c717d9 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -45,8 +45,10 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+index ec52c472c845..125ea68052af 100644
+--- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
++++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
+@@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
+   while active. Active high reset signals can be supported by inverting the
+   GPIO specifier polarity flag.
  
- #include <dt-bindings/clock/sun8i-a83t-ccu.h>
-+#include <dt-bindings/clock/sun8i-de2.h>
- #include <dt-bindings/clock/sun8i-r-ccu.h>
- #include <dt-bindings/reset/sun8i-a83t-ccu.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
- #include <dt-bindings/reset/sun8i-r-ccu.h>
++Power
++-----
++
++- power-supply: many display panels need an additional power supply in
++  order to be fully powered-up. For such panels, power-supply contains
++  a phandle to the regulator powering the panel.
  
- / {
-@@ -151,6 +153,12 @@
- 		};
- 	};
+ Backlight
+ ---------
+diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+index b938269f841e..250850a2150b 100644
+--- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
++++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
+@@ -32,6 +32,7 @@ Optional properties:
+ - label: See panel-common.txt.
+ - gpios: See panel-common.txt.
+ - backlight: See panel-common.txt.
++- power-supply: See panel-common.txt.
+ - data-mirror: If set, reverse the bit order described in the data mappings
+   below on all data lanes, transmitting bits for slots 6 to 0 instead of
+   0 to 6.
+diff --git a/Documentation/devicetree/bindings/display/panel/simple-panel.txt b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
+index 1341bbf4aa3d..16d8ff088b7d 100644
+--- a/Documentation/devicetree/bindings/display/panel/simple-panel.txt
++++ b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
+@@ -1,7 +1,7 @@
+ Simple display panel
  
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-a83t-display-engine";
-+		allwinner,pipelines = <&mixer0>;
-+		status = "disabled";
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 		device_type = "memory";
-@@ -162,6 +170,44 @@
- 		#size-cells = <1>;
- 		ranges;
+ Required properties:
+-- power-supply: regulator to provide the supply voltage
++- power-supply: See panel-common.txt
  
-+		display_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun8i-a83t-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_PLL_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
-+
-+		mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-a83t-de2-mixer-0";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&display_clocks CLK_BUS_MIXER0>,
-+				 <&display_clocks CLK_MIXER0>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&display_clocks RST_MIXER0>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun8i-a83t-system-controller",
- 				"syscon";
-@@ -177,6 +223,39 @@
- 			#dma-cells = <1>;
- 		};
- 
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-a83t-tcon-lcd";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-+			clock-names = "ahb", "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_TCON0>, <&ccu RST_BUS_LVDS>;
-+			reset-names = "lcd", "lvds";
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
-+
-+					tcon0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun8i-a83t-mmc",
- 				     "allwinner,sun7i-a20-mmc";
+ Optional properties:
+ - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
 -- 
 git-series 0.9.1
