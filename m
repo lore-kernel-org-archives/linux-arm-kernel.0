@@ -1,69 +1,116 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 5 Dec 2017 12:16:14 +0000
-Subject: [PATCH 1/2] mm: make faultaround produce old ptes
-In-Reply-To: <CAADWXX8FmAs1qB9=fsWZjt8xTEnGOAMS=eCHnuDLJrZiX6x=7w@mail.gmail.com>
-References: <1511845670-12133-1-git-send-email-vinmenon@codeaurora.org>
- <CAADWXX8FmAs1qB9=fsWZjt8xTEnGOAMS=eCHnuDLJrZiX6x=7w@mail.gmail.com>
-Message-ID: <20171205121614.ek45btdgrpbmvf45@armageddon.cambridge.arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Tue, 5 Dec 2017 12:28:01 +0000
+Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <20171204122645.31535-12-ard.biesheuvel@linaro.org>
+References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
+ <20171204122645.31535-12-ard.biesheuvel@linaro.org>
+Message-ID: <20171205122757.GW22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 28, 2017 at 11:45:27AM -0800, Linus Torvalds wrote:
-> On Mon, Nov 27, 2017 at 9:07 PM, Vinayak Menon <vinmenon@codeaurora.org> wrote:
-> > Making the faultaround ptes old results in a unixbench regression for some
-> > architectures [3][4]. But on some architectures it is not found to cause
-> > any regression. So by default produce young ptes and provide an option for
-> > architectures to make the ptes old.
+On Mon, Dec 04, 2017 at 12:26:37PM +0000, Ard Biesheuvel wrote:
+> Add a support macro to conditionally yield the NEON (and thus the CPU)
+> that may be called from the assembler code. Given that especially the
+> instruction based accelerated crypto code may use very tight loops, add
+> some parametrization so that the TIF_NEED_RESCHED flag test is only
+> executed every so many loop iterations.
 > 
-> Ugh. This hidden random behavior difference annoys me.
+> In some cases, yielding the NEON involves saving and restoring a non
+> trivial amount of context (especially in the CRC folding algorithms),
+> and so the macro is split into two, and the code in between is only
+> executed when the yield path is taken, allowing the contex to be preserved.
+> The second macro takes a label argument that marks the resume-from-yield
+> path, which should restore the preserved context again.
 > 
-> It should also be better documented in the code if we end up doing it.
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/assembler.h | 50 ++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
 > 
-> The reason x86 seems to prefer young pte's is simply that a TLB lookup
-> of an old entry basically causes a micro-fault that then sets the
-> accessed bit (using a locked cycle) and then a restart.
-> 
-> Those microfaults are not visible to software, but they are pretty
-> expensive in hardware, probably because they basically serialize
-> execution as if a real page fault had happened.
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index aef72d886677..917b026d3e00 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -512,4 +512,54 @@ alternative_else_nop_endif
+>  #endif
+>  	.endm
+>  
+> +/*
+> + * yield_neon - check whether to yield to another runnable task from
+> + *		kernel mode NEON code (running with preemption disabled)
+> + *
+> + * - Check whether the preempt count is exactly 1, in which case disabling
+> + *   preemption once will make the task preemptible. If this is not the case,
+> + *   yielding is pointless.
+> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
+> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
+> + *   yield fixup code at @lbl.
+> + */
+> +	.macro		yield_neon, lbl:req, ctr, order, stride, loop
+> +	yield_neon_pre	\ctr, \order, \stride, \loop
+> +	yield_neon_post	\lbl
+> +	.endm
+> +
+> +	.macro		yield_neon_pre, ctr, order=0, stride, loop=4444f
+> +#ifdef CONFIG_PREEMPT
+> +	/*
+> +	 * With some algorithms, it makes little sense to poll the
+> +	 * TIF_NEED_RESCHED flag after every iteration, so only perform
+> +	 * the check every 2^order strides.
+> +	 */
+> +	.if		\order > 1
+> +	.if		(\stride & (\stride - 1)) != 0
+> +	.error		"stride should be a power of 2"
+> +	.endif
+> +	tst		\ctr, #((1 << \order) * \stride - 1) & ~(\stride - 1)
+> +	b.ne		\loop
+> +	.endif
 
-In principle it's not that different for ARMv8.1+ but it highly depends
-on the microarchitecture details (and we have a lot of variation on
-ARM). From a programmer's perspective, old ptes (access flag cleared)
-are not allowed to be cached in the TLB, otherwise ptep_clear_flush()
-would break. Marking fault-around ptes as young allows the hardware to
-speculatively populate the TLB but, again, it's highly microarchitecture
-specific and I'm not sure we have a general answer covering the ARM
-architecture. Of course, faulting on old ptes is much slower without
-hardware AF.
+I'm not sure what baking in this check gives us, and this seems to
+conflate two rather different things: yielding and defining a
+"heartbeat" frequency for the calling code.
 
-> HOWEVER - and this is the part that annoys me most about the hidden
-> behavior - I suspect it ends up being very dependent on
-> microarchitectural details in addition to the actual load. So it might
-> be more true on some cores than others, and it might be very
-> load-dependent. So hiding it as some architectural helper function
-> really feels wrong to me. It would likely be better off as a real
-> flag, and then maybe we could make the default behavior be set by
-> architecture (or even dynamically by the architecture bootup code if
-> it turns out to be enough of an issue).
+Can we separate out the crypto-loop-helper semantics from the yield-
+neon stuff?
 
-It looks to me like we are trying to work around a vmscan behaviour
-visible under memory pressure [1]. The original report doesn't state
-whether hardware AF is available (it seems to be tested on a 3.18
-Android kernel; hardware AF on arm64 went in 4.6).
+If we had
 
-In this case there is a trade-off between swapping out potentially hot
-pages vs page table walk (either in hardware or via software fault) for
-fault-around ptes. This trade-off further depends on whether the
-architecture can do hardware access flag or not.
+	if_cond_yield_neon
+	// patchup code
+	endif_yield_neon
 
-I would be more in favour of some heuristics to dynamically reduce the
-fault-around bytes based on the memory pressure rather than choosing
-between young or old ptes. Or, if we are to go with old vs young ptes,
-make this choice dependent on the memory pressure regardless of whether
-the CPU supports hardware accessed bit.
+then the caller is free to conditionally branch over that as appropriate
+like
 
-[1] https://lkml.kernel.org/r/1460992636-711-1-git-send-email-vinmenon at codeaurora.org
+loop:
+	// crypto stuff
+	tst x0, #0xf
+	b.ne 	loop
 
--- 
-Catalin
+	if_cond_yield_neon
+	// patchup code
+	endif_cond_yield_neon
+
+	b	loop
+
+I think this is clearer than burying checks and branches in a macro that
+is trying to be generic.
+
+Label arguments can be added to elide some branches of course, at a
+corresponding cost to clarity...  in the common case the cache will
+be hot and the branches won't be mispredicted though.  Is it really
+worth it?
+
+> +
+> +	get_thread_info	x0
+> +	ldr		w1, [x0, #TSK_TI_PREEMPT]
+> +	ldr		x0, [x0, #TSK_TI_FLAGS]
+> +	cmp		w1, #1 // == PREEMPT_OFFSET
+
+asm-offsets?
+
+[...]
+
+Cheers
+---Dave
