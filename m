@@ -1,46 +1,72 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  5 Dec 2017 16:10:17 +0100
-Subject: [PATCH v3 05/15] drm/sun4i: Fix error path handling
+Date: Tue,  5 Dec 2017 16:10:16 +0100
+Subject: [PATCH v3 04/15] dt-bindings: display: sun4i-drm: Add A83T pipeline
 In-Reply-To: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
 References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1f2443c41082fc6e086570da38d20744c52fe636.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <3762a8428aaf207e80ae86d4db2e50473576bb6d.1512486553.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The commit 4c7f16d14a33 ("drm/sun4i: Fix TCON clock and regmap
-initialization sequence") moved a bunch of logic around, but forgot to
-update the gotos after the introduction of the err_free_dotclock label.
+The A83T has two video pipelines in parallel that looks quite similar to
+the other SoCs.
 
-It means that if we fail later that the one introduced in that commit,
-we'll just to the old label which isn't free the clock we created. This
-will result in a breakage as soon as someone tries to do something with
-that clock, since its resources will have been long reclaimed.
+The video planes are handled through a controller called the mixer, and the
+video signal is then passed to the timing controller (TCON).
 
-Cc: <stable@vger.kernel.org>
-Fixes: 4c7f16d14a33 ("drm/sun4i: Fix TCON clock and regmap initialization sequence")
+And while there is two instances of the mixers and TCONs, they have a
+significant number of differences. The TCONs are quite easy to deal with,
+one is supposed to generate TV (in the broader term, so including things
+like HDMI) signals, the other one LCD (so RGB, LVDS, DSI) signals. And
+while they are called TCON0 and TCON1 in the A83t datasheet, newer SoCs
+call them TCON-TV and TCON-LCD, which seems more appropriate.
+
+However, the mixers differ mostly by their capabilities, with some features
+being available only in the first one, or the number of planes they expose,
+but also through their register layout. And while the capabilities could be
+represented as properties, the register layout differences would need to
+express all the registers offsets as properties, which is usually quite
+bad. Especially since documentation on that hardware block is close to
+non-existant and we don't even have the list of all those registers in the
+first place.
+
+So let's call them mixer 0 and 1 in our compatibles, even though the name
+is pretty bad...
+
+At the moment, we only have tested the code on a board that has a single
+display output, so we're leaving the tcon-tv and mixer1 out.
+
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index a1ed462c2430..ea056a3d2131 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -724,12 +724,12 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
- 	if (IS_ERR(tcon->crtc)) {
- 		dev_err(dev, "Couldn't create our CRTC\n");
- 		ret = PTR_ERR(tcon->crtc);
--		goto err_free_clocks;
-+		goto err_free_dotclock;
- 	}
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index d4259a4f5171..338cb6bbf25c 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -93,6 +93,7 @@ Required properties:
+    * allwinner,sun6i-a31s-tcon
+    * allwinner,sun7i-a20-tcon
+    * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-a83t-tcon-lcd
+    * allwinner,sun8i-v3s-tcon
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+@@ -224,6 +225,7 @@ supported.
  
- 	ret = sun4i_rgb_init(drm, tcon);
- 	if (ret < 0)
--		goto err_free_clocks;
-+		goto err_free_dotclock;
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun8i-a83t-de2-mixer-0
+     * allwinner,sun8i-v3s-de2-mixer
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+@@ -253,6 +255,7 @@ Required properties:
+     * allwinner,sun6i-a31s-display-engine
+     * allwinner,sun7i-a20-display-engine
+     * allwinner,sun8i-a33-display-engine
++    * allwinner,sun8i-a83t-display-engine
+     * allwinner,sun8i-v3s-display-engine
  
- 	if (tcon->quirks->needs_de_be_mux) {
- 		/*
+   - allwinner,pipelines: list of phandle to the display engine
 -- 
 git-series 0.9.1
