@@ -1,48 +1,42 @@
 From: opendmb@gmail.com (Doug Berger)
-Date: Mon, 4 Dec 2017 17:01:57 -0800
-Subject: [PATCH 1/7 v2] net: bcmgenet: Fix platform_get_irq's error
- checking
-In-Reply-To: <1512409703-20881-2-git-send-email-arvind.yadav.cs@gmail.com>
-References: <1512409703-20881-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1512409703-20881-2-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <7fd6f043-3e66-a03a-e2fa-c71cffe5019e@gmail.com>
+Date: Mon, 4 Dec 2017 17:05:27 -0800
+Subject: [PATCH 02/10] net: bcmgenet: free netdev on of_match_node() error
+In-Reply-To: <1512242782-7134-3-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1512242782-7134-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1512242782-7134-3-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <6c661895-0587-26fb-cfd9-cf24dee2e002@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/04/2017 09:48 AM, Arvind Yadav wrote:
-> The platform_get_irq() function returns negative number if an error occurs,
-> Zero if No irq is found and positive number if irq gets successful.
-> platform_get_irq() error checking only for zero is not correct.
+On 12/02/2017 11:26 AM, Arvind Yadav wrote:
+> The change is to call free_netdev(), If of_match_node() will fail.
 > 
 > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 > ---
-> changes in v2:
->              commit message was not correct.
-> 
->  drivers/net/ethernet/broadcom/genet/bcmgenet.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
+>  drivers/net/ethernet/broadcom/genet/bcmgenet.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
 > 
 > diff --git a/drivers/net/ethernet/broadcom/genet/bcmgenet.c b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-> index 24b4f4c..e2f1268 100644
+> index e2f1268..e0a8f79 100644
 > --- a/drivers/net/ethernet/broadcom/genet/bcmgenet.c
 > +++ b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
-> @@ -3371,7 +3371,7 @@ static int bcmgenet_probe(struct platform_device *pdev)
->  	priv->irq0 = platform_get_irq(pdev, 0);
->  	priv->irq1 = platform_get_irq(pdev, 1);
->  	priv->wol_irq = platform_get_irq(pdev, 2);
-> -	if (!priv->irq0 || !priv->irq1) {
-> +	if (priv->irq0 <= 0 || priv->irq1 <= 0 || priv->wol_irq <= 0) {
->  		dev_err(&pdev->dev, "can't find IRQs\n");
->  		err = -EINVAL;
->  		goto err;
+> @@ -3363,8 +3363,10 @@ static int bcmgenet_probe(struct platform_device *pdev)
+>  
+>  	if (dn) {
+>  		of_id = of_match_node(bcmgenet_match, dn);
+> -		if (!of_id)
+> -			return -EINVAL;
+> +		if (!of_id) {
+> +			err = -EINVAL;
+> +			goto err;
+> +		}
+>  	}
+>  
+>  	priv = netdev_priv(dev);
 > 
 
-The absence of a Wake-on-LAN interrupt (wol_irq <= 0) is not a terminal
-error for the driver so it should not be included in this check.
-
-The error checking for irq0 and irq1 is appropriate to add, but it
-sounds like David Miller is proposing changing platform_get_irq() so
-I'll let that dust settle before saying whether <= or < is appropriate.
+I agree with the fix if you want to resubmit separate from this series
+and please include a "fixes" tag.
 
 Thanks,
     Doug
