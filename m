@@ -1,14 +1,14 @@
 From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 5 Dec 2017 14:03:58 +0000
-Subject: Tegra baseline test results for v4.15-rc1
-Message-ID: <42c00023-110c-9c88-c15d-deacc95ecfb3@nvidia.com>
+Date: Tue, 5 Dec 2017 14:05:52 +0000
+Subject: Tegra baseline test results for v4.15-rc2
+Message-ID: <acc93fae-7fb0-71c1-c839-8c7b0e6cfb5e@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.15-rc1.
+Here are some basic Tegra test results for Linux v4.15-rc2.
 Logs and other details at:
 
-    https://nvtb.github.io//linux/test_v4.15-rc1/20171204133126/
+    https://nvtb.github.io//linux/test_v4.15-rc2/20171204140104/
 
 
 Test summary - 84% Success
@@ -62,29 +62,34 @@ PM: System suspend: tegra_defconfig%tegra-fw:
 
 
 vmlinux object size
-(delta in bytes from test_v4.14 (bebc6082da0a9f5d47a1ea2edc099bf671058bd4)):
+(delta in bytes from test_v4.15-rc1 (4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323)):
    text     data      bss    total  kernel
-+178037  -144968    -8488   +24581  defconfig
-+111965  -295324    -1816  -185175  multi_v7_defconfig
- +79872  -300436    -1808  -222372  tegra_defconfig
+  +1919    +1464        0    +3383  defconfig
+  +3004     -376        0    +2628  multi_v7_defconfig
+  +3116     -320        0    +2796  tegra_defconfig
 
 
 Boot-time memory difference
-(delta in bytes from test_v4.14 (bebc6082da0a9f5d47a1ea2edc099bf671058bd4))
+(delta in bytes from test_v4.15-rc1 (4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323))
     avail    rsrvd     high    freed                board              kconfig                  dtb
-      20k     -20k        .     -64k      qemu-vexpress64            defconfig           __internal
-    -928k     928k        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-    1108k   -1108k        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-    -916k     916k        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-    1120k   -1120k        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-    -916k     916k        .   -2048k    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
-    1124k   -1124k        .   -1024k    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
-   -2088k    2088k        .     -64k      tegra132-norrin            defconfig      tegra132-norrin
-    -932k     932k        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-    1104k   -1104k        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-      56k     -56k        .     -64k  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
-   -2064k    2064k        .     -64k       tegra210-smaug            defconfig       tegra210-smaug
-    -920k     920k        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-    1116k   -1116k        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+        .        .        .        .      qemu-vexpress64            defconfig           __internal
+        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
+        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
+        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1 tegra_defconfig%tegr  tegra124-jetson-tk1
+        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
+        .        .        .        .    tegra124-nyan-big   multi_v7_defconfig    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big tegra_defconfig%tegr    tegra124-nyan-big
+        .        .        .        .    tegra124-nyan-big      tegra_defconfig    tegra124-nyan-big
+        .        .        .        .      tegra132-norrin            defconfig      tegra132-norrin
+        .        .        .        .  tegra186-p2771-0000 defconfig%jetson-tx2  tegra186-p2771-0000
+        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
+        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
+        .        .        .        .  tegra210-p2371-0000 defconfig%jetson-tx1  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-0000            defconfig  tegra210-p2371-0000
+        .        .        .        .  tegra210-p2371-2180 defconfig%jetson-tx1  tegra210-p2371-2180
+        .        .        .        .       tegra210-smaug            defconfig       tegra210-smaug
+        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
+        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
 --
 nvpublic
