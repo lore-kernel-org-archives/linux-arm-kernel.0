@@ -1,321 +1,294 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Tue, 5 Dec 2017 11:24:14 +0530
-Subject: [PATCH 5/6] cpufreq: Add DVFS support for Armada 37xx
-In-Reply-To: <20171201112508.14121-6-gregory.clement@free-electrons.com>
-References: <20171201112508.14121-1-gregory.clement@free-electrons.com>
- <20171201112508.14121-6-gregory.clement@free-electrons.com>
-Message-ID: <20171205055414.yghqdxg2but34n4i@vireshk-mac-ubuntu>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue,  5 Dec 2017 14:06:15 +0800
+Subject: [PATCH v2] ARM: dts: sun8i: h3: Add dts file for Libre Computer Board
+ ALL-H3-CC H3 ver.
+Message-ID: <20171205060615.14349-1-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 01-12-17, 12:25, Gregory CLEMENT wrote:
-> This patch adds DVFS support for the Armada 37xx SoCs
-> 
-> There are up to four CPU frequency loads for Armada 37xx controlled by
-> the hardware.
-> 
-> This driver associates the CPU load level to a frequency, then the
-> hardware will switch while selecting a load level.
-> 
-> The hardware also can associate a voltage for each level (AVS support)
-> but it is not yet supported
-> 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
-> ---
->  drivers/cpufreq/Kconfig.arm           |   7 +
->  drivers/cpufreq/Makefile              |   1 +
->  drivers/cpufreq/armada-37xx-cpufreq.c | 241 ++++++++++++++++++++++++++++++++++
->  3 files changed, 249 insertions(+)
->  create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 17625115c67f..3018ff0d068f 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -19,6 +19,13 @@ config ACPI_CPPC_CPUFREQ
->  
->  	  If in doubt, say N.
->  
-> +config ARM_ARMADA_37XX_CPUFREQ
-> +	tristate "Armada 37xx CPUFreq support"
-> +	depends on ARCH_MVEBU
-> +	help
-> +	  This adds the CPUFreq driver support for Marvell Armada 37xx SoCs.
-> +	  The Armada 37xx PMU supports 4 frequency and VDD levels.
-> +
->  # big LITTLE core layer and glue drivers
->  config ARM_BIG_LITTLE_CPUFREQ
->  	tristate "Generic ARM big LITTLE CPUfreq driver"
-> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
-> index d762e76887e7..e07715ce8844 100644
-> --- a/drivers/cpufreq/Makefile
-> +++ b/drivers/cpufreq/Makefile
-> @@ -52,6 +52,7 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
->  # LITTLE drivers, so that it is probed last.
->  obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
->  
-> +obj-$(CONFIG_ARM_ARMADA_37XX_CPUFREQ)	+= armada-37xx-cpufreq.o
->  obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
->  obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
->  obj-$(CONFIG_ARCH_DAVINCI)		+= davinci-cpufreq.o
-> diff --git a/drivers/cpufreq/armada-37xx-cpufreq.c b/drivers/cpufreq/armada-37xx-cpufreq.c
-> new file mode 100644
-> index 000000000000..40c9a744cc6e
-> --- /dev/null
-> +++ b/drivers/cpufreq/armada-37xx-cpufreq.c
-> @@ -0,0 +1,241 @@
-> +// SPDX-License-Identifier: GPL-2.0+
-> +/*
-> + * CPU frequency scaling support for Armada 37xx platform.
-> + *
-> + * Copyright (C) 2017 Marvell
-> + *
-> + * Gregory CLEMENT <gregory.clement@free-electrons.com>
-> + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/cpu.h>
-> +#include <linux/cpufreq.h>
-> +#include <linux/err.h>
-> +#include <linux/interrupt.h>
-> +#include <linux/io.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of_address.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_irq.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/pm_opp.h>
-> +#include <linux/regmap.h>
-> +#include <linux/slab.h>
-> +
-> +/* Power management in North Bridge register set */
-> +#define ARMADA_37XX_NB_L0L1	0x18
-> +#define ARMADA_37XX_NB_L2L3	0x1C
-> +#define		ARMADA_37XX_NB_TBG_DIV_OFF	13
-> +#define		ARMADA_37XX_NB_TBG_DIV_MASK	0x7
-> +#define		ARMADA_37XX_NB_CLK_SEL_OFF	11
-> +#define		ARMADA_37XX_NB_CLK_SEL_MASK	0x1
-> +#define		ARMADA_37XX_NB_CLK_SEL_TBG      0x1
-> +#define		ARMADA_37XX_NB_TBG_SEL_OFF	9
-> +#define		ARMADA_37XX_NB_TBG_SEL_MASK	0x3
-> +#define		ARMADA_37XX_NB_VDD_SEL_OFF	6
-> +#define		ARMADA_37XX_NB_VDD_SEL_MASK	0x3
-> +#define		ARMADA_37XX_NB_CONFIG_SHIFT	16
+The Libre Computer Board ALL-H3-CC from Libre Technology is a Raspberry
+Pi B+ form factor single board computer based on the Allwinner H3 SoC.
+The board has 1GB DDR3 SDRAM, provided by 4 2Gb chips. The mounting holes
+and connectors are in the exact same position as on the Raspberry Pi B+.
 
-Looks like you have added tabs after #define as well? Perhaps a space
-is good enough there.
+Raspberry Pi B+ like peripherals supported on this board include:
 
-> +#define ARMADA_37XX_NB_DYN_MOD	0x24
-> +#define		ARMADA_37XX_NB_CLK_SEL_EN	BIT(26)
-> +#define		ARMADA_37XX_NB_TBG_EN		BIT(28)
-> +#define		ARMADA_37XX_NB_DIV_EN		BIT(29)
-> +#define		ARMADA_37XX_NB_VDD_EN		BIT(30)
-> +#define		ARMADA_37XX_NB_DFS_EN		BIT(31)
-> +#define ARMADA_37XX_NB_CPU_LOAD	0x30
-> +#define		ARMADA_37XX_NB_CPU_LOAD_MASK	0x3
-> +#define		ARMADA_37XX_DVFS_LOAD_0		0
-> +#define		ARMADA_37XX_DVFS_LOAD_1		1
-> +#define		ARMADA_37XX_DVFS_LOAD_2		2
-> +#define		ARMADA_37XX_DVFS_LOAD_3		3
-> +
-> +/*
-> + * On Armada 37xx the Power management manages 4 level of CPU load,
-> + * each level can be associated with a CPU clock source, a CPU
-> + * divider, a VDD level, etc...
-> + */
-> +#define LOAD_LEVEL_NR	4
-> +
-> +struct armada_37xx_dvfs {
-> +	u32 cpu_freq_max;
-> +	u8 divider[LOAD_LEVEL_NR];
-> +};
-> +
-> +static struct armada_37xx_dvfs armada_37xx_dvfs[] = {
-> +	{.cpu_freq_max = 1200*1000*1000, .divider = {1, 2, 4, 6} },
-> +	{.cpu_freq_max = 1000*1000*1000, .divider = {1, 2, 4, 5} },
-> +	{.cpu_freq_max = 800*1000*1000,  .divider = {1, 2, 3, 4} },
-> +	{.cpu_freq_max = 600*1000*1000,  .divider = {2, 4, 5, 6} },
-> +};
-> +
-> +static struct armada_37xx_dvfs *armada_37xx_cpu_freq_info_get(u32 freq)
-> +{
-> +	int i;
-> +
-> +	for (i = 0; i < ARRAY_SIZE(armada_37xx_dvfs); i++) {
-> +		if (freq == armada_37xx_dvfs[i].cpu_freq_max)
-> +			return &armada_37xx_dvfs[i];
-> +	}
-> +
-> +	pr_err("Unsupported CPU frequency %d MHz\n", freq/1000000);
-> +	return NULL;
-> +}
-> +
-> +/*
-> + * Setup the four level managed by the hardware. Once the four level
-> + * will be configured then the DVFS will be enabled.
-> + */
-> +static void __init armada37xx_cpufreq_dvfs_setup(struct regmap *base,
-> +						 struct clk *clk, u8 *divider)
-> +{
-> +	int load_level;
-> +	struct clk *parent;
-> +
-> +	for (load_level = 0; load_level < LOAD_LEVEL_NR; load_level++) {
-> +		unsigned int reg, mask,  val, offset = 0;
-> +
-> +		if (load_level <= ARMADA_37XX_DVFS_LOAD_1)
-> +			reg = ARMADA_37XX_NB_L0L1;
-> +		else
-> +			reg = ARMADA_37XX_NB_L2L3;
-> +
-> +		if (load_level ==  ARMADA_37XX_DVFS_LOAD_0 ||
-> +		    load_level ==  ARMADA_37XX_DVFS_LOAD_2)
-> +			offset += ARMADA_37XX_NB_CONFIG_SHIFT;
-> +
-> +		/* Set cpu clock source, for all the level we use TBG */
-> +		val = ARMADA_37XX_NB_CLK_SEL_TBG << ARMADA_37XX_NB_CLK_SEL_OFF;
-> +		mask = (ARMADA_37XX_NB_CLK_SEL_MASK
-> +			<< ARMADA_37XX_NB_CLK_SEL_OFF);
-> +
-> +		/*
-> +		 * Set cpu divider based on the pre-computed array in
-> +		 * order to have balanced step.
-> +		 */
-> +		val |= divider[load_level] << ARMADA_37XX_NB_TBG_DIV_OFF;
-> +		mask |= (ARMADA_37XX_NB_TBG_DIV_MASK
-> +			<< ARMADA_37XX_NB_TBG_DIV_OFF);
-> +
-> +		/* Set VDD divider which is actually the load level. */
-> +		val |= load_level << ARMADA_37XX_NB_VDD_SEL_OFF;
-> +		mask |= (ARMADA_37XX_NB_VDD_SEL_MASK
-> +			<< ARMADA_37XX_NB_VDD_SEL_OFF);
-> +
-> +		val <<= offset;
-> +		mask <<= offset;
-> +
-> +		regmap_update_bits(base, reg, mask, val);
-> +	}
-> +
-> +	/*
-> +	 * Set cpu clock source, for all the level we keep the same
-> +	 * clock source that the one already configured. For this one
-> +	 * we need to use the clock framework
-> +	 */
-> +	parent = clk_get_parent(clk);
-> +	clk_set_parent(clk, parent);
-> +}
-> +
-> +static void __init armada37xx_cpufreq_disable_dvfs(struct regmap *base)
-> +{
-> +	unsigned int reg = ARMADA_37XX_NB_DYN_MOD,
-> +		mask = ARMADA_37XX_NB_DFS_EN;
-> +
-> +	regmap_update_bits(base, reg, mask, 0);
-> +}
-> +
-> +static void __init armada37xx_cpufreq_enable_dvfs(struct regmap *base)
-> +{
-> +	unsigned int val, reg = ARMADA_37XX_NB_CPU_LOAD,
-> +		mask = ARMADA_37XX_NB_CPU_LOAD_MASK;
-> +
-> +	/* Start with the highest load (0) */
-> +	val = ARMADA_37XX_DVFS_LOAD_0;
-> +	regmap_update_bits(base, reg, mask, val);
-> +
-> +	/* Now enable DVFS for the CPUs */
-> +	reg = ARMADA_37XX_NB_DYN_MOD;
-> +	mask =	ARMADA_37XX_NB_CLK_SEL_EN | ARMADA_37XX_NB_TBG_EN |
-> +		ARMADA_37XX_NB_DIV_EN | ARMADA_37XX_NB_VDD_EN |
-> +		ARMADA_37XX_NB_DFS_EN;
-> +
-> +	regmap_update_bits(base, reg, mask, mask);
-> +}
-> +
-> +static int __init armada37xx_cpufreq_driver_init(void)
-> +{
-> +	struct armada_37xx_dvfs *dvfs;
-> +	struct platform_device *pdev;
-> +	unsigned int cur_frequency;
-> +	struct regmap *nb_pm_base;
-> +	struct device *cpu_dev;
-> +	int load_level, ret;
-> +	struct clk *clk;
-> +
-> +	nb_pm_base =
-> +		syscon_regmap_lookup_by_compatible("marvell,armada-3700-nb-pm");
-> +
-> +	if (IS_ERR(nb_pm_base))
-> +		return -ENODEV;
-> +
-> +	/* Before doing any configuration on the DVFS first, disable it */
-> +	armada37xx_cpufreq_disable_dvfs(nb_pm_base);
-> +
-> +	/*
-> +	 * On CPU 0 register the operating points supported (which are
-> +	 * the nominal CPU frequency and full integer divisions of
-> +	 * it).
-> +	 */
-> +	cpu_dev = get_cpu_device(0);
-> +	if (!cpu_dev) {
-> +		dev_err(cpu_dev, "Cannot get CPU\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	clk = clk_get(cpu_dev, 0);
-> +	if (IS_ERR(clk)) {
-> +		dev_err(cpu_dev, "Cannot get clock for CPU0\n");
-> +		return PTR_ERR(clk);
-> +	}
-> +
-> +	/* Get nominal (current) CPU frequency */
-> +	cur_frequency = clk_get_rate(clk);
-> +	if (!cur_frequency) {
-> +		dev_err(cpu_dev, "Failed to get clock rate for CPU\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	dvfs = armada_37xx_cpu_freq_info_get(cur_frequency);
-> +	if (!dvfs)
-> +		return -EINVAL;
-> +
-> +	armada37xx_cpufreq_dvfs_setup(nb_pm_base, clk, dvfs->divider);
-> +
-> +	/*
-> +	 * In case of a failure of dev_pm_opp_add(), we don't bother
-> +	 * with cleaning up the registered OPP (there's no function to
-> +	 * do so),
+  - Power input through micro-USB connector (without USB OTG)
+  - Native 100 Mbps ethernet using the internal PHY, as opposed to
+    USB-based on the RPi
+  - 4x USB 2.0 host ports, directly connected to the SoC, as opposed to
+    being connected through a USB 2.0 hub on the RPi
+  - TV and audio output on a 3.5mm TRRS jack
+  - HDMI output
+  - Micro-SD card slot
+  - Standard RPi B+ GPIO header, with the standard peripherals routed to
+    the same pins.
 
-What do you mean by the comment within ()? We do have
-dev_pm_opp_remove() helper.
+    * 5V, 3.3V power, and ground
+    * I2C0 on the H3 is routed to I2C1 pins on the RPi header
+    * I2C1 on the H3 is routed to I2C0 pins on the RPi header
+    * UART1 on the H3 is routed to UART0 pins on the RPi header
+    * SPI0 on the H3 is routed to SPI0 pins on the RPi header,
+      with GPIO pin PA17 replacing the missing Chip Select 1
+    * I2S1 on the H3 is routed to PCM pins on the RPi header
 
-> and simply cancel the registration of the cpufreq
-> +	 * device.
-> +	 */
-> +	for (load_level = ARMADA_37XX_DVFS_LOAD_0; load_level < LOAD_LEVEL_NR;
-> +	     load_level++) {
-> +		unsigned long freq = dvfs->divider[load_level];
-> +
-> +		ret = dev_pm_opp_add(cpu_dev, freq, 0);
-> +		if (ret)
-> +			return ret;
-> +	}
-> +
-> +	/* Now that everything is setup, enable the DVFS at hardware level */
-> +	armada37xx_cpufreq_enable_dvfs(nb_pm_base);
-> +
-> +	pdev = platform_device_register_simple("cpufreq-dt", -1, NULL, 0);
-> +
-> +	return PTR_ERR_OR_ZERO(pdev);
-> +}
-> +/* late_initcall, to guarantee the driver is loaded after A37xx clock driver */
-> +late_initcall(armada37xx_cpufreq_driver_init);
-> +
-> +MODULE_AUTHOR("Gregory CLEMENT <gregory.clement@free-electrons.com>");
-> +MODULE_DESCRIPTION("Armada 37xx cpufreq driver");
-> +MODULE_LICENSE("GPL");
-> -- 
-> 2.15.0
+  - Additional peripherals from the H3 are available on different pins.
+    These include I2S0, JTAG, PWM1, SPDIF, SPI1, and UART3
 
+In addition, there are a number of new features:
+
+  - Console UART header
+  - Consumer IR receiver
+  - Camera interface (not compatible with RPi)
+  - Onboard microphone
+  - eMMC expansion module port
+  - Heatsink mounting holes
+  - Power button
+
+The power button requires corresponding software for the embedded
+coprocessor to properly function.
+
+This patch adds a dts file for this board that enables all "onboard"
+peripherals currently supported. This means no display or camera
+support.
+
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+
+Changes since v1:
+
+  - Changed board compatible string
+  - Added LED color to LED labels
+  - Changed button label and key event to power button
+  - Added description of power button to commit message
+
+There are two other variants [1] of this board, with different SoCs and
+DRAM configuration. But the board remains the same, thanks to the SoCs
+being pin compatible.
+
+The EMAC/EPHY LED polarity driver issue has been fixed in v4.15-rc2. But
+there was discussion to move this property under the PHY node instead.
+
+[1] https://www.kickstarter.com/projects/librecomputer/libre-computer-board-tritium-sbc-linux-android-7-n
+---
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts | 196 +++++++++++++++++++++
+ 2 files changed, 197 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 3c139c63098f..aa68f719692f 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -953,6 +953,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-h2-plus-orangepi-zero.dtb \
+ 	sun8i-h3-bananapi-m2-plus.dtb \
+ 	sun8i-h3-beelink-x2.dtb \
++	sun8i-h3-libretech-all-h3-cc.dtb \
+ 	sun8i-h3-nanopi-m1.dtb	\
+ 	sun8i-h3-nanopi-m1-plus.dtb \
+ 	sun8i-h3-nanopi-neo.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+new file mode 100644
+index 000000000000..d406571a0dd6
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h3-libretech-all-h3-cc.dts
+@@ -0,0 +1,196 @@
++/*
++ * Copyright (C) 2017 Chen-Yu Tsai <wens@csie.org>
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++
++/ {
++	model = "Libre Computer Board ALL-H3-CC H3";
++	compatible = "libretech,all-h3-cc-h3", "allwinner,sun8i-h3";
++
++	aliases {
++		ethernet0 = &emac;
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++
++		pwr_led {
++			label = "librecomputer:green:pwr";
++			gpios = <&r_pio 0 10 GPIO_ACTIVE_HIGH>; /* PL10 */
++			default-state = "on";
++		};
++
++		status_led {
++			label = "librecomputer:blue:status";
++			gpios = <&pio 0 7 GPIO_ACTIVE_HIGH>; /* PA7 */
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		power {
++			label = "power";
++			linux,code = <KEY_POWER>;
++			gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
++		};
++	};
++
++	reg_vcc1v2: vcc1v2 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc1v2";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&reg_vcc5v0>;
++		gpio = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
++		enable-active-high;
++	};
++
++	reg_vcc3v3: vcc3v3 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc3v3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&reg_vcc5v0>;
++	};
++
++	/* This represents the board's 5V input */
++	reg_vcc5v0: vcc5v0 {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc5v0";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
++	reg_vcc_dram: vcc-dram {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc-dram";
++		regulator-min-microvolt = <1500000>;
++		regulator-max-microvolt = <1500000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&reg_vcc5v0>;
++		gpio = <&r_pio 0 9 GPIO_ACTIVE_HIGH>; /* PL9 */
++		enable-active-high;
++	};
++
++	reg_vcc_io: vcc-io {
++		compatible = "regulator-fixed";
++		regulator-name = "vcc-io";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&reg_vcc3v3>;
++		gpio = <&r_pio 0 5 GPIO_ACTIVE_LOW>; /* PL5 */
++	};
++
++	reg_vdd_cpux: vdd-cpux {
++		compatible = "regulator-fixed";
++		regulator-name = "vdd-cpux";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-always-on;
++		regulator-boot-on;
++		vin-supply = <&reg_vcc5v0>;
++		gpio = <&r_pio 0 8 GPIO_ACTIVE_HIGH>; /* PL8 */
++		enable-active-high;
++	};
++};
++
++&codec {
++	allwinner,audio-routing =
++		"Line Out", "LINEOUT",
++		"MIC1", "Mic",
++		"Mic",  "MBIAS";
++	status = "okay";
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&emac {
++	phy-handle = <&int_mii_phy>;
++	phy-mode = "mii";
++	allwinner,leds-active-low;
++	status = "okay";
++};
++
++&ir {
++	pinctrl-names = "default";
++	pinctrl-0 = <&ir_pins_a>;
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>;
++	vmmc-supply = <&reg_vcc_io>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usb_otg {
++	dr_mode = "host";
++	status = "okay";
++};
++
++&usbphy {
++	/* VBUS on USB ports are always on */
++	usb0_vbus-supply = <&reg_vcc5v0>;
++	usb1_vbus-supply = <&reg_vcc5v0>;
++	usb2_vbus-supply = <&reg_vcc5v0>;
++	usb3_vbus-supply = <&reg_vcc5v0>;
++	status = "okay";
++};
 -- 
-viresh
+2.15.0
