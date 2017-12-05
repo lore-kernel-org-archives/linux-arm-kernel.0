@@ -1,76 +1,80 @@
 From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Tue,  5 Dec 2017 15:46:42 +0100
-Subject: [PATCH v5 4/9] dt-bindings: gpio: gpio-axp209: add pinctrl features
+Date: Tue,  5 Dec 2017 15:46:39 +0100
+Subject: [PATCH v5 1/9] gpio: axp209: switch unsigned variables to unsigned int
 In-Reply-To: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
 References: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
-Message-ID: <20171205144647.17594-5-quentin.schulz@free-electrons.com>
+Message-ID: <20171205144647.17594-2-quentin.schulz@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The X-Powers AXP209 has 3 GPIOs. GPIO0/1 can each act either as a GPIO,
-an ADC or a LDO regulator. GPIO2 can only act as a GPIO.
+Checkpatch complains with the following message:
+WARNING: Prefer 'unsigned int' to bare use of 'unsigned'
 
-This adds the pinctrl features to the driver so GPIO0/1 can be used as
-ADC or LDO regulator.
+Let's make it happy by switching over to unsigned int.
 
 Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-Acked-by: Rob Herring <robh@kernel.org>
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/gpio/gpio-axp209.txt       | 36 +++++++++++++++++++++-
- 1 file changed, 35 insertions(+), 1 deletion(-)
+ drivers/gpio/gpio-axp209.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-index a6611304dd3c..0d77597c3f92 100644
---- a/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-+++ b/Documentation/devicetree/bindings/gpio/gpio-axp209.txt
-@@ -1,8 +1,13 @@
--AXP209 GPIO controller
-+AXP209 GPIO & pinctrl controller
- 
- This driver follows the usual GPIO bindings found in
- Documentation/devicetree/bindings/gpio/gpio.txt
- 
-+This driver follows the usual pinctrl bindings found in
-+Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
-+
-+This driver employs the per-pin muxing pattern.
-+
- Required properties:
- - compatible: Should be "x-powers,axp209-gpio"
- - #gpio-cells: Should be two. The first cell is the pin number and the
-@@ -28,3 +33,32 @@ axp209: pmic at 34 {
- 		#gpio-cells = <2>;
- 	};
+diff --git a/drivers/gpio/gpio-axp209.c b/drivers/gpio/gpio-axp209.c
+index 4a346b7b4172..6ee7dc1418fa 100644
+--- a/drivers/gpio/gpio-axp209.c
++++ b/drivers/gpio/gpio-axp209.c
+@@ -32,7 +32,7 @@ struct axp20x_gpio {
+ 	struct regmap		*regmap;
  };
-+
-+The GPIOs can be muxed to other functions and therefore, must be a subnode of
-+axp_gpio.
-+
-+Example:
-+
-+&axp_gpio {
-+	gpio0_adc: gpio0-adc {
-+		pins = "GPIO0";
-+		function = "adc";
-+	};
-+};
-+
-+&example_node {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&gpio0_adc>;
-+};
-+
-+GPIOs and their functions
-+-------------------------
-+
-+Each GPIO is independent from the other (i.e. GPIO0 in gpio_in function does
-+not force GPIO1 and GPIO2 to be in gpio_in function as well).
-+
-+GPIO	|	Functions
-+------------------------
-+GPIO0	|	gpio_in, gpio_out, ldo, adc
-+GPIO1	|	gpio_in, gpio_out, ldo, adc
-+GPIO2	|	gpio_in, gpio_out
+ 
+-static int axp20x_gpio_get_reg(unsigned offset)
++static int axp20x_gpio_get_reg(unsigned int offset)
+ {
+ 	switch (offset) {
+ 	case 0:
+@@ -46,7 +46,7 @@ static int axp20x_gpio_get_reg(unsigned offset)
+ 	return -EINVAL;
+ }
+ 
+-static int axp20x_gpio_input(struct gpio_chip *chip, unsigned offset)
++static int axp20x_gpio_input(struct gpio_chip *chip, unsigned int offset)
+ {
+ 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+ 	int reg;
+@@ -60,7 +60,7 @@ static int axp20x_gpio_input(struct gpio_chip *chip, unsigned offset)
+ 				  AXP20X_GPIO_FUNCTION_INPUT);
+ }
+ 
+-static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
++static int axp20x_gpio_get(struct gpio_chip *chip, unsigned int offset)
+ {
+ 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+ 	unsigned int val;
+@@ -73,7 +73,8 @@ static int axp20x_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	return !!(val & BIT(offset + 4));
+ }
+ 
+-static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
++static int axp20x_gpio_get_direction(struct gpio_chip *chip,
++				     unsigned int offset)
+ {
+ 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+ 	unsigned int val;
+@@ -102,7 +103,7 @@ static int axp20x_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
+ 	return val & 2;
+ }
+ 
+-static int axp20x_gpio_output(struct gpio_chip *chip, unsigned offset,
++static int axp20x_gpio_output(struct gpio_chip *chip, unsigned int offset,
+ 			      int value)
+ {
+ 	struct axp20x_gpio *gpio = gpiochip_get_data(chip);
+@@ -118,7 +119,7 @@ static int axp20x_gpio_output(struct gpio_chip *chip, unsigned offset,
+ 				  : AXP20X_GPIO_FUNCTION_OUT_LOW);
+ }
+ 
+-static void axp20x_gpio_set(struct gpio_chip *chip, unsigned offset,
++static void axp20x_gpio_set(struct gpio_chip *chip, unsigned int offset,
+ 			    int value)
+ {
+ 	axp20x_gpio_output(chip, offset, value);
 -- 
 2.14.1
