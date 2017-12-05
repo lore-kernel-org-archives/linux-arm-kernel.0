@@ -1,60 +1,57 @@
 From: sky@genki.is (Genki Sky)
-Date: Mon, 04 Dec 2017 21:39:05 -0500
-Subject: [PATCH v2 1/3] staging: vc04_services: Join multiline dereferences
+Date: Mon, 04 Dec 2017 21:39:06 -0500
+Subject: [PATCH v2 2/3] staging: vc04_services: Unsplit user-visible strings
 In-Reply-To: <cover.1512441073.git.sky@genki.is>
 References: <20171204105235.2nhmalxsd4uslesi@mwanda>
  <cover.1512441073.git.sky@genki.is>
-Message-ID: <c48f337e4d1e58161432664a8731fb50cc6025cb.1512441073.git.sky@genki.is>
+Message-ID: <30baaaf1f55a18f8ddc5eacb1f3a8193e553ea5b.1512441073.git.sky@genki.is>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Genki Sky <sky@genki.is>
 ---
- .../vc04_services/bcm2835-camera/bcm2835-camera.c        | 16 ++++++----------
- 1 file changed, 6 insertions(+), 10 deletions(-)
+ drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c | 7 +++----
+ drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c     | 3 +--
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-index d8766b166675..4ed3b449f97f 100644
+index 4ed3b449f97f..e26895dc052e 100644
 --- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
 +++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-@@ -328,11 +328,9 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
- 				pr_debug("Grab another frame");
- 				vchiq_mmal_port_parameter_set(
- 					instance,
--					dev->capture.
--					camera_port,
-+					dev->capture.camera_port,
- 					MMAL_PARAMETER_CAPTURE,
--					&dev->capture.
--					frame_count,
-+					&dev->capture.frame_count,
- 					sizeof(dev->capture.frame_count));
- 			}
- 		} else {
-@@ -368,11 +366,9 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
- 					 "Grab another frame as buffer has EOS");
- 				vchiq_mmal_port_parameter_set(
- 					instance,
--					dev->capture.
--					camera_port,
-+					dev->capture.camera_port,
- 					MMAL_PARAMETER_CAPTURE,
--					&dev->capture.
--					frame_count,
-+					&dev->capture.frame_count,
- 					sizeof(dev->capture.frame_count));
- 			}
- 		} else {
-@@ -1194,8 +1190,8 @@ static int mmal_setup_components(struct bm2835_mmal_dev *dev,
- 					port->current_buffer.size =
- 					    (f->fmt.pix.sizeimage <
- 					     (100 << 10))
--					    ? (100 << 10) : f->fmt.pix.
--					    sizeimage;
-+					    ? (100 << 10)
-+					    : f->fmt.pix.sizeimage;
- 				}
- 				v4l2_dbg(1, bcm2835_v4l2_debug,
- 					 &dev->v4l2_dev,
+@@ -347,8 +347,7 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
+ 				timestamp = ktime_add_us(dev->capture.kernel_start_ts,
+ 							 runtime_us);
+ 				v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
+-					 "Convert start time %llu and %llu "
+-					 "with offset %llu to %llu\n",
++					 "Convert start time %llu and %llu with offset %llu to %llu\n",
+ 					 ktime_to_ns(dev->capture.kernel_start_ts),
+ 					 dev->capture.vc_start_timestamp, pts,
+ 					 ktime_to_ns(timestamp));
+@@ -532,8 +531,8 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
+ 	    vchiq_mmal_port_enable(dev->instance, dev->capture.port, buffer_cb);
+ 	if (ret) {
+ 		v4l2_err(&dev->v4l2_dev,
+-			"Failed to enable capture port - error %d. "
+-			"Disabling camera port again\n", ret);
++			"Failed to enable capture port - error %d. Disabling camera port again\n",
++			ret);
+ 
+ 		vchiq_mmal_port_disable(dev->instance,
+ 					dev->capture.camera_port);
+diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+index 6ea7fb0ea50e..5ddea4f54bf7 100644
+--- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
++++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
+@@ -1360,8 +1360,7 @@ static int port_action_handle(struct vchiq_mmal_instance *instance,
+ 
+ 	ret = -rmsg->u.port_action_reply.status;
+ 
+-	pr_debug("%s:result:%d component:0x%x port:%d action:%s(%d)" \
+-		 " connect component:0x%x connect port:%d\n",
++	pr_debug("%s:result:%d component:0x%x port:%d action:%s(%d) connect component:0x%x connect port:%d\n",
+ 		 __func__,
+ 		 ret, port->component->handle, port->handle,
+ 		 port_action_type_names[action_type],
 -- 
 2.15.1
