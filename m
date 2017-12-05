@@ -1,136 +1,132 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 5 Dec 2017 08:59:33 +0000
-Subject: [PATCH] irqchip/gic-v3: Fix the driver probe() fail due to
- disabled GICC entry
-In-Reply-To: <383ff5f3-44e9-e654-f421-2ac5bac2419a@codeaurora.org>
-References: <1512343269-19327-1-git-send-email-shankerd@codeaurora.org>
- <8a926bff-f8aa-220c-85f0-9d39ec5bef4b@arm.com>
- <383ff5f3-44e9-e654-f421-2ac5bac2419a@codeaurora.org>
-Message-ID: <a854553a-f751-842d-c813-1871b18aae75@arm.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 5 Dec 2017 10:06:28 +0100
+Subject: [PATCH] drivers: pwm: pwm-atmel: implement suspend/resume
+ functions
+In-Reply-To: <20170411115311.70a7239b@bbrezillon>
+References: <1491834020-3194-1-git-send-email-claudiu.beznea@microchip.com>
+ <20170410163558.494cf9be@bbrezillon>
+ <ba255c5b-ff6e-a6fd-0546-9dde04026f4c@microchip.com>
+ <20170411105605.5ea65f75@bbrezillon>
+ <012f1ab5-0de4-a392-7b43-41077bf251a5@microchip.com>
+ <20170411115311.70a7239b@bbrezillon>
+Message-ID: <20171205090628.GA28700@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/12/17 14:04, Shanker Donthineni wrote:
-> Hi Thanks,
+On Tue, Apr 11, 2017 at 11:53:11AM +0200, Boris Brezillon wrote:
+> On Tue, 11 Apr 2017 12:41:59 +0300
+> m18063 <Claudiu.Beznea@microchip.com> wrote:
 > 
-> On 12/04/2017 04:28 AM, Marc Zyngier wrote:
->> On 03/12/17 23:21, Shanker Donthineni wrote:
->>> As per MADT specification, it's perfectly valid firmware can pass
->>> MADT table to OS with disabled GICC entries. ARM64-SMP code skips
->>> those cpu cores to bring online. However the current GICv3 driver
->>> probe bails out in this case on systems where redistributor regions
->>> are not in the always-on power domain.
->>>
->>> This patch does the two things to fix the panic.
->>>   - Don't return an error in gic_acpi_match_gicc() for disabled GICC.
->>>   - No need to keep GICR region information for disabled GICC.
->>>
->>> Kernel crash traces:
->>>   Kernel panic - not syncing: No interrupt controller found.
->>>   CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.13.5 #26
->>>   [<ffff000008087770>] dump_backtrace+0x0/0x218
->>>   [<ffff0000080879dc>] show_stack+0x14/0x20
->>>   [<ffff00000883b078>] dump_stack+0x98/0xb8
->>>   [<ffff0000080c5c14>] panic+0x118/0x26c
->>>   [<ffff000008b62348>] init_IRQ+0x24/0x2c
->>>   [<ffff000008b609fc>] start_kernel+0x230/0x394
->>>   [<ffff000008b601e4>] __primary_switched+0x64/0x6c
->>>   ---[ end Kernel panic - not syncing: No interrupt controller found.
->>>
->>> Disabled GICC subtable example:
->>>                    Subtable Type : 0B [Generic Interrupt Controller]
->>>                           Length : 50
->>>                         Reserved : 0000
->>>             CPU Interface Number : 0000003D
->>>                    Processor UID : 0000003D
->>>            Flags (decoded below) : 00000000
->>>                Processor Enabled : 0
->>>  Performance Interrupt Trig Mode : 0
->>>  Virtual GIC Interrupt Trig Mode : 0
->>>         Parking Protocol Version : 00000000
->>>            Performance Interrupt : 00000017
->>>                   Parked Address : 0000000000000000
->>>                     Base Address : 0000000000000000
->>>         Virtual GIC Base Address : 0000000000000000
->>>      Hypervisor GIC Base Address : 0000000000000000
->>>            Virtual GIC Interrupt : 00000019
->>>       Redistributor Base Address : 0000FFFF88F40000
->>>                        ARM MPIDR : 000000000000000D
->>>                 Efficiency Class : 00
->>>                         Reserved : 000000
->>>
->>> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
->>> ---
->>>  drivers/irqchip/irq-gic-v3.c | 14 +++++++++-----
->>>  1 file changed, 9 insertions(+), 5 deletions(-)
->>>
->>> diff --git a/drivers/irqchip/irq-gic-v3.c b/drivers/irqchip/irq-gic-v3.c
->>> index b56c3e2..a30fbac 100644
->>> --- a/drivers/irqchip/irq-gic-v3.c
->>> +++ b/drivers/irqchip/irq-gic-v3.c
->>> @@ -1331,6 +1331,10 @@ static int __init gic_of_init(struct device_node *node, struct device_node *pare
->>>  	u32 size = reg == GIC_PIDR2_ARCH_GICv4 ? SZ_64K * 4 : SZ_64K * 2;
->>>  	void __iomem *redist_base;
->>>  
->>> +	/* GICC entry which has !ACPI_MADT_ENABLED is not unusable so skip */
->>> +	if (!(gicc->flags & ACPI_MADT_ENABLED))
->>> +		return 0;
->>> +
->>>  	redist_base = ioremap(gicc->gicr_base_address, size);
->>>  	if (!redist_base)
->>>  		return -ENOMEM;
->>> @@ -1374,13 +1378,13 @@ static int __init gic_acpi_match_gicc(struct acpi_subtable_header *header,
->>>  				(struct acpi_madt_generic_interrupt *)header;
->>>  
->>>  	/*
->>> -	 * If GICC is enabled and has valid gicr base address, then it means
->>> -	 * GICR base is presented via GICC
->>> +	 * If GICC is enabled and has not valid gicr base address, then it means
->>> +	 * GICR base is not presented via GICC
->>>  	 */
->>> -	if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
->>> -		return 0;
->>> +	if ((gicc->flags & ACPI_MADT_ENABLED) && (!gicc->gicr_base_address))
->>> +		return -ENODEV;
->>
->> This doesn't feel quite right. It would mean that having the ENABLED
->> flag cleared and potentially no address would make it valid? It looks to
->> me that the original code is "less wrong".
->>
->> What am I missing?
->>
+> > On 11.04.2017 11:56, Boris Brezillon wrote:
+> > > On Tue, 11 Apr 2017 11:22:39 +0300
+> > > m18063 <Claudiu.Beznea@microchip.com> wrote:
+> > >   
+> > >> Hi Boris,
+> > >>
+> > >> On 10.04.2017 17:35, Boris Brezillon wrote:  
+> > >>> On Mon, 10 Apr 2017 17:20:20 +0300
+> > >>> Claudiu Beznea <claudiu.beznea@microchip.com> wrote:
+> > >>>     
+> > >>>> Implement suspend and resume power management specific
+> > >>>> function to allow PWM controller to correctly suspend
+> > >>>> and resume.
+> > >>>>
+> > >>>> Signed-off-by: Claudiu Beznea <claudiu.beznea@microchip.com>
+> > >>>> ---
+> > >>>>  drivers/pwm/pwm-atmel.c | 81 +++++++++++++++++++++++++++++++++++++++++++++++++
+> > >>>>  1 file changed, 81 insertions(+)
+> > >>>>
+> > >>>> diff --git a/drivers/pwm/pwm-atmel.c b/drivers/pwm/pwm-atmel.c
+> > >>>> index 530d7dc..75177c6 100644
+> > >>>> --- a/drivers/pwm/pwm-atmel.c
+> > >>>> +++ b/drivers/pwm/pwm-atmel.c
+> > >>>> @@ -58,6 +58,8 @@
+> > >>>>  #define PWM_MAX_PRD		0xFFFF
+> > >>>>  #define PRD_MAX_PRES		10
+> > >>>>  
+> > >>>> +#define PWM_MAX_CH_NUM		(4)
+> > >>>> +
+> > >>>>  struct atmel_pwm_registers {
+> > >>>>  	u8 period;
+> > >>>>  	u8 period_upd;
+> > >>>> @@ -65,11 +67,18 @@ struct atmel_pwm_registers {
+> > >>>>  	u8 duty_upd;
+> > >>>>  };
+> > >>>>  
+> > >>>> +struct atmel_pwm_pm_ctx {
+> > >>>> +	u32 cmr;
+> > >>>> +	u32 cdty;
+> > >>>> +	u32 cprd;
+> > >>>> +};
+> > >>>> +
+> > >>>>  struct atmel_pwm_chip {
+> > >>>>  	struct pwm_chip chip;
+> > >>>>  	struct clk *clk;
+> > >>>>  	void __iomem *base;
+> > >>>>  	const struct atmel_pwm_registers *regs;
+> > >>>> +	struct atmel_pwm_pm_ctx ctx[PWM_MAX_CH_NUM];    
+> > >>>
+> > >>> Hm, I'm pretty sure you can rely on the current PWM state and call
+> > >>> atmel_pwm_apply() at resume time instead of doing that. See what I did
+> > >>> here [1].    
+> > >>
+> > >> I agree with the approach you propose but the thing is the atmel_pwm_apply()
+> > >> take care of both, current PWM state and the new state received as argument
+> > >> in order to change only duty factor without disabling the PWM channel (if
+> > >> channel is enabled) and then returns. Changing PWM duty and period and polarity
+> > >> in the same step without disabling + enabling the PWM channel (with atomic
+> > >> approach) may lead to intermediary unwanted output waveforms (the IP doesn't
+> > >> support this for ordinary PWM channels). To take advantage of atmel_pwm_apply()
+> > >> (in the formit is today) in resume() hook might need to first call it to disable
+> > >> channel and then to enable it. Or atmel_pwm_apply() should be changed to also
+> > >> disable + enable the channel when user changes the duty factor at runtime.  
+> > > 
+> > > Nope. Just save the state at suspend time, implement ->get_state() and
+> > > use it to retrieve the real PWM state when resuming before restoring
+> > > the state you saved during suspend.  
+> > Ok.
+> > > But anyway, as Thierry explained, I'm not sure we should take the
+> > > 're-apply PWM state' action here. It's probably better to leave this
+> > > decision to the PWM user.   
+> > Do you thinks we should proceed with restoring the registers behind
+> > the re-apply as other drivers does at this moment?
 > 
-> Original definition of the function gic_acpi_match_gicc().
->  {
->   if ((gicc->flags & ACPI_MADT_ENABLED) && gicc->gicr_base_address)
->     return 0;
+> Nope. IMO we'd better start patching PWM users to restore the states
+> rather than supporting suspend/resume in all PWM drivers.
 > 
->   return -ENODEV;
->  }
-> 
-> Above code triggers the driver probe fail for the two reasons.
->   1) GICC with ACPI_MADT_ENABLED=0, it's a bug according to ACPI spec.
->   2) GICC with ACPI_MADT_ENABLED=1 and invalid GICR address, expected.
-> 
-> 
-> This patch fix the first failed case and keep the second case intact.
->   if ((gicc->flags & ACPI_MADT_ENABLED) && (!gicc->gicr_base_address))
->     return -ENODEV;
-> 
->   return 0;
-If (1) is a firmware bug, then why is it handled in the SMP code? You're
-even saying that this is the right thing to do?
+> Thierry, what's your opinion?
 
-As for (2), you seem to imply that only the address matter. So why isn't
-it just:
+I just noticed this thread while cleaning up patchwork. I think I had
+already mentioned in an earlier reply that in my opinion we should leave
+PWM suspend/resume to users.
 
-	if (gicc->gicr_base_address)
-		return 0;
+I'm totally fine if we add helpers to the PWM core to help with that
+task. Maybe something like this would work:
 
-?
+	void pwm_suspend(struct pwm_device *pwm)
+	{
+		pwm_get_state(pwm, &pwm->suspend);
+		pwm_disable(pwm);
+	}
 
-Thanks,
+	void pwm_resume(struct pwm_device *pwm)
+	{
+		pwm_apply_state(pwm, &pwm->suspend);
+	}
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Though, quite frankly, this is so trivial that drivers could just do
+that themselves. Also, the helpers above aren't flexible at all with
+respect to any special sequences the PWM might need to go through on
+suspend. I suspect that this doesn't matter at all in most cases but
+given how trivial they are we might as well just make drivers do it.
+Also we don't burden users that don't care about suspend/resume with
+the extra suspend state in struct pwm_device.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/4db88999/attachment.sig>
