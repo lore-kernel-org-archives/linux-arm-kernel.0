@@ -1,37 +1,43 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue,  5 Dec 2017 12:04:45 -0500
-Subject: [PATCH V6 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
-Message-ID: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+Date: Tue,  5 Dec 2017 12:04:49 -0500
+Subject: [PATCH V6 4/7] OF: properties: Implement get_match_data() callback
+In-Reply-To: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512493493-6464-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce new ACPI and OF device ids for thw HW along with the helper
-functions.
+Now that we have a get_match_data() callback as part of the firmware node,
+implement the OF specific piece for it.
 
-Changes from v5:
-* use struct device as a calling parameter to get_match_data() callback
-so that we can reuse the existing OF API.
-* revert the change on acpi_get_match_data() to V4.
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+---
+ drivers/of/property.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-Sinan Kaya (7):
-  Documentation: DT: qcom_hidma: Bump HW revision for the bugfixed HW
-  ACPI / bus: Introduce acpi_get_match_data() function
-  device property: Introduce a common API to fetch device match data
-  OF: properties: Implement get_match_data() callback
-  ACPI: properties: Implement get_match_data() callback
-  dmaengine: qcom_hidma: Add support for the new revision
-  dmaengine: qcom_hidma: Add identity register support
-
- .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  4 +--
- drivers/acpi/bus.c                                 | 12 +++++++
- drivers/acpi/property.c                            |  7 ++++
- drivers/base/property.c                            |  6 ++++
- drivers/dma/qcom/hidma.c                           | 41 ++++++++++------------
- drivers/of/property.c                              |  7 ++++
- include/linux/acpi.h                               |  6 ++++
- include/linux/fwnode.h                             |  4 +++
- include/linux/property.h                           |  2 ++
- 9 files changed, 65 insertions(+), 24 deletions(-)
-
+diff --git a/drivers/of/property.c b/drivers/of/property.c
+index 264c355..9964169 100644
+--- a/drivers/of/property.c
++++ b/drivers/of/property.c
+@@ -981,6 +981,12 @@ static int of_fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+ 	return 0;
+ }
+ 
++void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
++			       struct device *dev)
++{
++	return (void *)of_device_get_match_data(dev);
++}
++
+ const struct fwnode_operations of_fwnode_ops = {
+ 	.get = of_fwnode_get,
+ 	.put = of_fwnode_put,
+@@ -996,5 +1002,6 @@ static int of_fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+ 	.graph_get_remote_endpoint = of_fwnode_graph_get_remote_endpoint,
+ 	.graph_get_port_parent = of_fwnode_graph_get_port_parent,
+ 	.graph_parse_endpoint = of_fwnode_graph_parse_endpoint,
++	.get_match_data = of_fwnode_get_match_data,
+ };
+ EXPORT_SYMBOL_GPL(of_fwnode_ops);
 -- 
 1.9.1
