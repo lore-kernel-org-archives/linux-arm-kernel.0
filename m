@@ -1,34 +1,36 @@
-From: baruch@tkos.co.il (Baruch Siach)
-Date: Tue, 5 Dec 2017 19:01:41 +0200
-Subject: [PATCH] ARM: dts: introduce the sama5d2 ptc ek board
-In-Reply-To: <20171205142312.21506-1-ludovic.desroches@microchip.com>
-References: <20171205142312.21506-1-ludovic.desroches@microchip.com>
-Message-ID: <20171205170141.qleqh6rou2ow54je@tarshish.tkos.co.il>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue,  5 Dec 2017 12:04:46 -0500
+Subject: [PATCH V6 1/7] Documentation: DT: qcom_hidma: Bump HW revision for
+ the bugfixed HW
+In-Reply-To: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512493493-6464-2-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ludovic,
+A new version of the HIDMA IP has been released with bug fixes. Bumping the
+hardware version to differentiate from others.
 
-On Tue, Dec 05, 2017 at 03:23:12PM +0100, Ludovic Desroches wrote:
-> Add the official SAMA5D2 Peripheral Touch Controller Evaluation
-> Kit board.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
-> ---
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-[...]
-
-> +	memory {
-> +		reg = <0x20000000 0x80000>;
-> +	};
-
-The size value is clearly wrong; you surely don't run on 512KB RAM. You most 
-likely rely on the bootloader to fix the size value. Since sama5d2.dtsi has a 
-memory node already with the same address, you can just drop it from here.
-
-baruch
-
+diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+index 55492c2..5d93d6d 100644
+--- a/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
++++ b/Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+@@ -47,8 +47,8 @@ When the OS is not in control of the management interface (i.e. it's a guest),
+ the channel nodes appear on their own, not under a management node.
+ 
+ Required properties:
+-- compatible: must contain "qcom,hidma-1.0" for initial HW or "qcom,hidma-1.1"
+-for MSI capable HW.
++- compatible: must contain "qcom,hidma-1.0" for initial HW or
++  "qcom,hidma-1.1"/"qcom,hidma-1.2" for MSI capable HW.
+ - reg: Addresses for the transfer and event channel
+ - interrupts: Should contain the event interrupt
+ - desc-count: Number of asynchronous requests this channel can handle
 -- 
-     http://baruch.siach.name/blog/                  ~. .~   Tk Open Systems
-=}------------------------------------------------ooO--U--Ooo------------{=
-   - baruch at tkos.co.il - tel: +972.52.368.4656, http://www.tkos.co.il -
+1.9.1
