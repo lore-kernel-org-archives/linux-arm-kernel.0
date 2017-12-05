@@ -1,39 +1,27 @@
-From: rasmus.villemoes@prevas.dk (Rasmus Villemoes)
-Date: Tue, 5 Dec 2017 09:22:25 +0100
-Subject: [PATCH resend] arm: dts: ls1021a: Specify interrupt-affinity for pmu
- node
-In-Reply-To: <1510672189-13306-1-git-send-email-rasmus.villemoes@prevas.dk>
-References: <1510672189-13306-1-git-send-email-rasmus.villemoes@prevas.dk>
-Message-ID: <1512462145-12664-1-git-send-email-rasmus.villemoes@prevas.dk>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 5 Dec 2017 08:24:14 +0000
+Subject: [PATCH 6/8] mfd: axp20x: add battery power supply cell for AXP813
+In-Reply-To: <9b5e9ed623165d0586f086343a7c67bc5c18bbb5.1512396054.git-series.quentin.schulz@free-electrons.com>
+References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <9b5e9ed623165d0586f086343a7c67bc5c18bbb5.1512396054.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20171205082414.ayv5s4ehafwy5xfa@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Esben Haabendal <eha@deif.com>
+On Mon, 04 Dec 2017, Quentin Schulz wrote:
 
-From: Esben Haabendal <eha@deif.com>
+> As axp20x-battery-power-supply now supports AXP813, add a cell for it.
+> 
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  drivers/mfd/axp20x.c | 3 +++
+>  1 file changed, 3 insertions(+)
 
-This avoids the warning
+For my own reference:
+  Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
 
-  hw perfevents: no interrupt-affinity property for /pmu, guessing.
-
-Signed-off-by: Esben Haabendal <eha@deif.com>
-[RV: adapt commit log to the warning emitted in current mainline]
-Signed-off-by: Rasmus Villemoes <rasmus.villemoes@prevas.dk>
----
- arch/arm/boot/dts/ls1021a.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 02a266faec9b..96dc1a29fc64 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -106,6 +106,7 @@
- 		compatible = "arm,cortex-a7-pmu";
- 		interrupts = <GIC_SPI 138 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 139 IRQ_TYPE_LEVEL_HIGH>;
-+		interrupt-affinity = <&cpu0>, <&cpu1>;
- 	};
- 
- 	reboot {
 -- 
-2.7.4
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
