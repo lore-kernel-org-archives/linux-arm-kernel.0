@@ -1,44 +1,73 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 5 Dec 2017 11:28:40 +0100
-Subject: [RFC PATCH 1/6] drm: Add Content Protection property
-In-Reply-To: <20171130030907.26848-2-seanpaul@chromium.org>
-References: <20171130030907.26848-1-seanpaul@chromium.org>
- <20171130030907.26848-2-seanpaul@chromium.org>
-Message-ID: <20171205102840.GB12982@amd>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 5 Dec 2017 11:03:50 +0100
+Subject: [PATCH v2] ARM: dts: sun8i: h3: Add dts file for Libre Computer
+ Board ALL-H3-CC H3 ver.
+In-Reply-To: <20171205060615.14349-1-wens@csie.org>
+References: <20171205060615.14349-1-wens@csie.org>
+Message-ID: <20171205100350.2v3cxcwb7lde3ykw@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 2017-11-29 22:08:56, Sean Paul wrote:
-> This patch adds a new optional connector property to allow userspace to enable
-> protection over the content it is displaying. This will typically be implemented
-> by the driver using HDCP.
+On Tue, Dec 05, 2017 at 02:06:15PM +0800, Chen-Yu Tsai wrote:
+> The Libre Computer Board ALL-H3-CC from Libre Technology is a Raspberry
+> Pi B+ form factor single board computer based on the Allwinner H3 SoC.
+> The board has 1GB DDR3 SDRAM, provided by 4 2Gb chips. The mounting holes
+> and connectors are in the exact same position as on the Raspberry Pi B+.
 > 
-> The property is a tri-state with the following values:
-> - OFF: Self explanatory, no content protection
-> - DESIRED: Userspace requests that the driver enable protection
-> - ENABLED: Once the driver has authenticated the link, it sets this value
+> Raspberry Pi B+ like peripherals supported on this board include:
 > 
-> The driver is responsible for downgrading ENABLED to DESIRED if the link becomes
-> unprotected. The driver should also maintain the desiredness of protection
-> across hotplug/dpms/suspend.
+>   - Power input through micro-USB connector (without USB OTG)
+>   - Native 100 Mbps ethernet using the internal PHY, as opposed to
+>     USB-based on the RPi
+>   - 4x USB 2.0 host ports, directly connected to the SoC, as opposed to
+>     being connected through a USB 2.0 hub on the RPi
+>   - TV and audio output on a 3.5mm TRRS jack
+>   - HDMI output
+>   - Micro-SD card slot
+>   - Standard RPi B+ GPIO header, with the standard peripherals routed to
+>     the same pins.
+> 
+>     * 5V, 3.3V power, and ground
+>     * I2C0 on the H3 is routed to I2C1 pins on the RPi header
+>     * I2C1 on the H3 is routed to I2C0 pins on the RPi header
+>     * UART1 on the H3 is routed to UART0 pins on the RPi header
+>     * SPI0 on the H3 is routed to SPI0 pins on the RPi header,
+>       with GPIO pin PA17 replacing the missing Chip Select 1
+>     * I2S1 on the H3 is routed to PCM pins on the RPi header
+> 
+>   - Additional peripherals from the H3 are available on different pins.
+>     These include I2S0, JTAG, PWM1, SPDIF, SPI1, and UART3
+> 
+> In addition, there are a number of new features:
+> 
+>   - Console UART header
+>   - Consumer IR receiver
+>   - Camera interface (not compatible with RPi)
+>   - Onboard microphone
+>   - eMMC expansion module port
+>   - Heatsink mounting holes
+>   - Power button
+> 
+> The power button requires corresponding software for the embedded
+> coprocessor to properly function.
+> 
+> This patch adds a dts file for this board that enables all "onboard"
+> peripherals currently supported. This means no display or camera
+> support.
+> 
+> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 
-Why would user of the machine want this to be something else than
-'OFF'?
+Applied, thanks!
+Maxime
 
-If kernel implements this, will it mean hardware vendors will have to
-prevent user from updating kernel on machines they own?
-
-If this is merged, does it open kernel developers to DMCA threats if
-they try to change it?
-
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/db10c986/attachment.sig>
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/01552a93/attachment.sig>
