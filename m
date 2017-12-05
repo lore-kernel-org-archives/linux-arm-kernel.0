@@ -1,82 +1,53 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Tue, 5 Dec 2017 10:43:50 +0100
-Subject: [PATCH 3/3] arm64/sve: KVM: Avoid dereference of dead task
- during guest entry
-In-Reply-To: <20171204153648.GV22781@e103592.cambridge.arm.com>
-References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
- <1512141582-17474-4-git-send-email-Dave.Martin@arm.com>
- <CAKv+Gu_e3SKsreYHrZEBUMEME-pYtxTXW1P6xLUR6YMQfj0cZw@mail.gmail.com>
- <20171204153648.GV22781@e103592.cambridge.arm.com>
-Message-ID: <20171205094350.GJ32397@cbox>
+From: vladimir.murzin@arm.com (Vladimir Murzin)
+Date: Tue,  5 Dec 2017 09:53:34 +0000
+Subject: [PATCH] ARM: Disable CONFIG_DEBUG_VIRTUAL for NOMMU
+Message-ID: <1512467614-38194-1-git-send-email-vladimir.murzin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dave,
+While running MPS2 platform (NOMMU) with DTB placed below PHYS_OFFSET
+following warning poped up:
 
-On Mon, Dec 04, 2017 at 03:36:50PM +0000, Dave Martin wrote:
-> On Mon, Dec 04, 2017 at 01:53:21PM +0000, Ard Biesheuvel wrote:
-> > On 1 December 2017 at 15:19, Dave Martin <Dave.Martin@arm.com> wrote:
-> > > When deciding whether to invalidate FPSIMD state cached in the cpu,
-> > > the backend function sve_flush_cpu_state() attempts to dereference
-> > > __this_cpu_read(fpsimd_last_state).  However, this is not safe:
-> > > there is no guarantee that the pointer is still valid, because the
-> > > task could have exited in the meantime.  For this reason, this
-> > > percpu pointer should only be assigned or compared, never
-> > > dereferenced.
-> > >
-> > 
-> > Doesn't that mean the pointer could also be pointing to the
-> > fpsimd_state of a newly created task that is completely unrelated?
-> > IOW, are you sure comparison is safe?
-> 
-> There are more conditions: the only place the determination is
-> made is for next, in fpsimd_thread_switch(next).
-> 
-> 
-> However, I can see your concern and I'm not sure how/if it is
-> resolved.
-> 
-> For the worst case, let's assume that some child forks off but
-> doesn't enter userspace yet, while another task round-robins
-> across all CPUs, interspersed with tasks that don't enter userspace.
-> 
-> So, we end up with
-> 
-> All cpu < NR_CPUS . per_cpu(fpsimd_last_state, cpu) == T.
-> 
-> Now, if T dies and a new task is allocated the same task_struct pointer,
-> then the _new_ T is guaranteed to get scheduled in on a CPU whose
-> per_cpu(fpsmid_last_state) == T.
-> 
-> Thus, new T can pick up old T's regs _unless_ new T's fpsimd_state.cpu
-> is invalid (i.e., NR_CPUS).
-> 
-> This is a separate bug from the one addressed by this patch though.
-> We can't go and harvest the bad pointers when old T exits, because
-> this might race new T being scheduled for real -- in any case it
-> would involve iterating over all CPUs which sounds racy and
-> inefficient.
-> 
-> 
-> So, I'd say we _must_ call fpsimd_flush_task_state() for every new
-> task.  This may result in a redundant reload of the state, but this
-> is what would happen anyway if the pointers did not alias.
-> 
-> Does this sound real to you?  If so, I'll try to write something.
-> 
-> And does this patch look reasonable to fix what it's trying to fix?
-> 
-> 
-> I wonder whether arch/arm has the same bug actually, since the kernel-
-> mode NEON logic was modelled from there IIUC (?)
-> 
-Isn't this the common kernel problem of pid reuse?
+------------[ cut here ]------------
+WARNING: CPU: 0 PID: 0 at arch/arm/mm/physaddr.c:42 __virt_to_phys+0x2f/0x40
+virt_to_phys used for non-linear address: 00004000 (0x4000)
+CPU: 0 PID: 0 Comm: swapper Not tainted 4.15.0-rc1-5a31bf2-clean+ #2767
+Hardware name: MPS2 (Device Tree Support)
+[<2100bf39>] (unwind_backtrace) from [<2100b3ff>] (show_stack+0xb/0xc)
+[<2100b3ff>] (show_stack) from [<2100e697>] (__warn+0x87/0xac)
+[<2100e697>] (__warn) from [<2100e6db>] (warn_slowpath_fmt+0x1f/0x28)
+[<2100e6db>] (warn_slowpath_fmt) from [<2100c603>] (__virt_to_phys+0x2f/0x40)
+[<2100c603>] (__virt_to_phys) from [<2116a499>] (early_init_fdt_reserve_self+0xd/0x24)
+[<2116a499>] (early_init_fdt_reserve_self) from [<2116222d>] (arm_memblock_init+0xb5/0xf8)
+[<2116222d>] (arm_memblock_init) from [<21161cad>] (setup_arch+0x38b/0x50e)
+[<21161cad>] (setup_arch) from [<21160455>] (start_kernel+0x31/0x280)
+[<21160455>] (start_kernel) from [<00000000>] (  (null))
+random: get_random_bytes called from init_oops_id+0x17/0x2c with crng_init=0
+---[ end trace 0000000000000000 ]---
 
-It seems holding a reference to a struct pid would solve your problems.
-See include/linux/pid.h.
+Platforms without MMU support run with 1:1 (i.e. linear) memory
+mapping, so disable CONFIG_DEBUG_VIRTUAL.
 
-That might also make the code more intuitive and prevent future attempts
-of dereferencing potentially dead data structures.
+Fixes: e377cd8221eb ("ARM: 8640/1: Add support for CONFIG_DEBUG_VIRTUAL")
+Signed-off-by: Vladimir Murzin <vladimir.murzin@arm.com>
+---
+KernelVersion: 4.15-rc1
 
-Thanks,
--Christoffer
+arch/arm/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 18c1e7d..6cd616b 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -4,7 +4,7 @@ config ARM
+ 	default y
+ 	select ARCH_CLOCKSOURCE_DATA
+ 	select ARCH_DISCARD_MEMBLOCK if !HAVE_ARCH_PFN_VALID
+-	select ARCH_HAS_DEBUG_VIRTUAL
++	select ARCH_HAS_DEBUG_VIRTUAL if MMU
+ 	select ARCH_HAS_DEVMEM_IS_ALLOWED
+ 	select ARCH_HAS_ELF_RANDOMIZE
+ 	select ARCH_HAS_SET_MEMORY
+-- 
+2.0.0
