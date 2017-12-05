@@ -1,59 +1,65 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 05 Dec 2017 10:49:47 -0500 (EST)
-Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
- error checking
-In-Reply-To: <39363858-995c-eea4-070e-b21a7ac49bec@gmail.com>
-References: <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
- <20171204.132556.1601454745789376393.davem@davemloft.net>
- <39363858-995c-eea4-070e-b21a7ac49bec@gmail.com>
-Message-ID: <20171205.104947.121188625730183933.davem@davemloft.net>
+From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
+Date: Tue, 05 Dec 2017 16:52:57 +0100
+Subject: [PATCH v2 00/27] Improve DE2 support
+In-Reply-To: <20171205103618.ps64m57xemsbo44r@flea.lan>
+References: <20171201060550.10392-1-jernej.skrabec@siol.net>
+ <20171205103618.ps64m57xemsbo44r@flea.lan>
+Message-ID: <23633465.uxSxGdCvtg@jernej-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arvind Yadav <arvind.yadav.cs@gmail.com>
-Date: Tue, 5 Dec 2017 11:04:55 +0530
+Hi Maxime,
 
-> Hi David,
+Dne torek, 05. december 2017 ob 11:36:18 CET je Maxime Ripard napisal(a):
+> Hi,
 > 
+> On Fri, Dec 01, 2017 at 07:05:23AM +0100, Jernej Skrabec wrote:
+> > Current DE2 driver is very basic and uses a lot of magic constants since
+> > there is no documentation and knowledge about it was limited at the time.
+> > 
+> > With studying BSP source code, deeper knowledge was gained which allows
+> > to improve mainline driver considerably.
+> > 
+> > At the beginning of this series, some code refactoring is done as well
+> > as adding some checks (patches 1-15).
+> > 
+> > Further patches add multi-plane support with HW scaling and all possible
+> > RGB formats (patches 16-21).
+> > 
+> > At last, support for YUV formats is added (patches 22-26).
+> > 
+> > At the end, I included patch which puts lowest plane before second lowest.
+> > This should help testing VI planes when mixer has configuration 1 VI plane
+> > and 1 or more UI planes (most SoCs except V3s).
+> > 
+> > This code was developed on H3, but it should work on every SoC if correct
+> > configuration structure is provided.
+> > 
+> > H3 code can be found here:
+> > https://github.com/jernejsk/linux-1/commits/de2_impr_for_next
 > 
-> On Monday 04 December 2017 11:55 PM, David Miller wrote:
->> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
->> Date: Mon,  4 Dec 2017 23:18:20 +0530
->>
->>> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct platform_device
->>> *dev)
->>>   	netdevice->dev_addr[5] = readb(eth_addr + 0x06);
->>>   	iounmap(eth_addr);
->>>   -	if (!netdevice->irq) {
->>> +	if (netdevice->irq <= 0) {
->>>   		printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
->>>   			__FILE__, netdevice->base_addr);
->>> +		retval = netdevice->irq ? netdevice->irq : -ENODEV;
->>>   		goto probe_failed;
->>>   	}
->> Ok, thinking about this some more...
->>
->> It is impossible to use platform_get_irq() without every single call
->> site having this funny:
->>
->> 	ret = val ? val : -ENODEV;
->>
->> sequence.
->>
->> This is unnecessary duplication and it is also error prone, so I
->> really think this logic belongs in platform_get_irq() itself.  It can
->> convert '0' to -ENODEV and that way we need no special logic in the
->> callers at all.
-> platform_get_irq() will return 0 only for sparc, If sparc initialize
-> platform
-> data irq[PROMINTR_MAX] as zero. Otherwise platform_get_irq() will
-> never return
-> 0. It will return either IRQ number or error (as negative number). But
-> I am getting
-> review comment by reviewer/maintainer in other subsystem to add check
-> for
-> zero. So I have done same changes here. Please correct me if i am
-> wrong.
+> Thanks a lot for that huge rework.
+> 
+> I've applied the patches 1 to 26, and will push them to drm-misc once
+> the compilations are done.
+> 
+> In the future, if you happen to do such a huge rework again (which
+> hopefully won't be needed :)), please use the -M option of
+> format-patch. It will reduce a lot the verbosity of files renaming and
+> will help the review.
 
-If you make the change that I suggest, you instead can check for
-'-ENODEV' to mean no IRQ.
+Noted.
+
+I think I missed initialization of min_scaler and max_scaler in 
+sun8i_vi_layer_atomic_check() in sun8i_vi_layer.c when I was reworking 
+patches.
+
+Will you fix patch with those two lines
+min_scale = DRM_PLANE_HELPER_NO_SCALING;
+max_scale = DRM_PLANE_HELPER_NO_SCALING;
+
+or should I send new patch which fixes that or should I send new version of 
+original patch?
+
+Best regards,
+Jernej
