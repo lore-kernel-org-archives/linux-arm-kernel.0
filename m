@@ -1,100 +1,231 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 5 Dec 2017 14:19:06 +0800
-Subject: [PATCH] arm64: dts: allwinner: a64: bananapi-m64: Add LED device
- node
-In-Reply-To: <CAMty3ZC2-sVbCgzKV3nZQfG4CtNXJdntuPhjyr_Wbn1xXJc=Dw@mail.gmail.com>
-References: <20171201162733.23156-1-wens@csie.org>
- <CAMty3ZC2-sVbCgzKV3nZQfG4CtNXJdntuPhjyr_Wbn1xXJc=Dw@mail.gmail.com>
-Message-ID: <CAGb2v67LwV6Qn0DRMbDyou=VQ_AGYW70R7=DcUNaBFxG81OpkQ@mail.gmail.com>
+From: ilialin@codeaurora.org (Ilia Lin)
+Date: Tue,  5 Dec 2017 08:33:50 +0200
+Subject: [PATCH] soc: qcom: Separate kryo l2 accessors from PMU driver
+Message-ID: <1512455630-25119-1-git-send-email-ilialin@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 2:15 PM, Jagan Teki <jagan@amarulasolutions.com> wrote:
-> On Fri, Dec 1, 2017 at 9:57 PM, Chen-Yu Tsai <wens@csie.org> wrote:
->> The Bananapi-M64 has 3 LEDS in red, green, and blue. These are toggled
->> via GPIO lines, which drive transistors that control current across the
->> LEDS. The red LED is by default on, via an additional pull-up on the
->> control line. We consider this means that it is a power indicator.
->> So we set the "default-on" property for it.
->>
->> The pingroups the GPIO lines belong to require external regulators be
->> enabled to be able to drive the GPIO high. These regulators also have
->> other purposes. However the pin controller does not have bindings for
->> regulators. Here we just set them to always-on.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> ---
->>  .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts | 36 ++++++++++++++++++++++
->>  1 file changed, 36 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->> index 4a8d3f83a36e..a6975670cd1c 100644
->> --- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->> +++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
->> @@ -60,6 +60,26 @@
->>                 stdout-path = "serial0:115200n8";
->>         };
->>
->> +       leds {
->> +               compatible = "gpio-leds";
->> +
->> +               pwr-led {
->> +                       label = "bananapi-m64:red:pwr";
->> +                       gpios = <&pio 3 24 GPIO_ACTIVE_HIGH>; /* PD24 */
->> +                       default-state = "on";
->> +               };
->> +
->> +               green {
->> +                       label = "bananapi-m64:green:user";
->> +                       gpios = <&pio 4 14 GPIO_ACTIVE_HIGH>; /* PE14 */
->> +               };
->> +
->> +               blue {
->> +                       label = "bananapi-m64:blue:user";
->> +                       gpios = <&pio 4 15 GPIO_ACTIVE_HIGH>; /* PE15 */
->> +               };
->> +       };
->> +
->>         wifi_pwrseq: wifi_pwrseq {
->>                 compatible = "mmc-pwrseq-simple";
->>                 reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 */
->> @@ -153,6 +173,17 @@
->>
->>  #include "axp803.dtsi"
->>
->> +&reg_aldo1 {
->> +       /*
->> +        * This regulator also drives the PE pingroup GPIOs,
->> +        * which also controls two LEDs.
->> +        */
->> +       regulator-always-on;
->> +       regulator-min-microvolt = <2800000>;
->> +       regulator-max-microvolt = <2800000>;
->
-> why 2.8v?
+The driver provides kernel level API for other drivers
+to access the MSM8996 L2 cache registers.
+Separating the L2 access code from the PMU driver and
+making it public to allow other drivers use it.
+The accesses must be separated with a single spinlock,
+maintained in this driver.
 
-That is what is written on the schematics. Plus it seems camera
-modules are meant to use 2.8v.
+Change-Id: I2865e888491e85d678e298279400c371427e30ea
+Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
+---
+ arch/arm64/Kconfig.platforms         |  7 ++++
+ drivers/perf/qcom_l2_pmu.c           | 48 +--------------------------
+ drivers/soc/qcom/Makefile            |  1 +
+ drivers/soc/qcom/kryo-l2-accessors.c | 64 ++++++++++++++++++++++++++++++++++++
+ include/soc/qcom/kryo-l2-accessors.h | 27 +++++++++++++++
+ 5 files changed, 100 insertions(+), 47 deletions(-)
+ create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
+ create mode 100644 include/soc/qcom/kryo-l2-accessors.h
 
->
->> +       regulator-name = "afvcc-csi";
->> +};
->> +
->>  &reg_aldo2 {
->>         regulator-always-on;
->>         regulator-min-microvolt = <1800000>;
->> @@ -168,6 +199,11 @@
->>  };
->>
->>  &reg_dc1sw {
->> +       /*
->> +        * This regulator also indirectly drives the PD pingroup GPIOs,
->> +        * which also controls the power LED.
->> +        */
->> +       regulator-always-on;
->
-> This make rgmii phy always on, does this make emac power-drop?
-
-emac power-drop? Please elaborate.
-
-ChenYu
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 2401373..1cfed45 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -138,6 +138,13 @@ config ARCH_QCOM
+ 	help
+ 	  This enables support for the ARMv8 based Qualcomm chipsets.
+ 
++config ARCH_MSM8996
++    bool "Enable Support for Qualcomm Technologies, Inc. MSM8996"
++	depends on ARCH_QCOM
++	help
++	This enables support for the MSM8996 chipset. If you do not
++	wish to build a kernel that runs on this chipset, say 'N' here.
++
+ config ARCH_REALTEK
+ 	bool "Realtek Platforms"
+ 	help
+diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
+index 4fdc848..ba5f241 100644
+--- a/drivers/perf/qcom_l2_pmu.c
++++ b/drivers/perf/qcom_l2_pmu.c
+@@ -30,7 +30,7 @@
+ 
+ #include <asm/barrier.h>
+ #include <asm/local64.h>
+-#include <asm/sysreg.h>
++#include <soc/qcom/kryo-l2-accessors.h>
+ 
+ #define MAX_L2_CTRS             9
+ 
+@@ -87,9 +87,6 @@
+ #define L2_COUNTER_RELOAD       BIT_ULL(31)
+ #define L2_CYCLE_COUNTER_RELOAD BIT_ULL(63)
+ 
+-#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
+-#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
+-
+ #define reg_idx(reg, i)         (((i) * IA_L2_REG_OFFSET) + reg##_BASE)
+ 
+ /*
+@@ -107,49 +104,6 @@
+ #define L2_EVENT_STREX                     0x421
+ #define L2_EVENT_CLREX                     0x422
+ 
+-static DEFINE_RAW_SPINLOCK(l2_access_lock);
+-
+-/**
+- * set_l2_indirect_reg: write value to an L2 register
+- * @reg: Address of L2 register.
+- * @value: Value to be written to register.
+- *
+- * Use architecturally required barriers for ordering between system register
+- * accesses
+- */
+-static void set_l2_indirect_reg(u64 reg, u64 val)
+-{
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2_access_lock, flags);
+-	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+-	isb();
+-	write_sysreg_s(val, L2CPUSRDR_EL1);
+-	isb();
+-	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+-}
+-
+-/**
+- * get_l2_indirect_reg: read an L2 register value
+- * @reg: Address of L2 register.
+- *
+- * Use architecturally required barriers for ordering between system register
+- * accesses
+- */
+-static u64 get_l2_indirect_reg(u64 reg)
+-{
+-	u64 val;
+-	unsigned long flags;
+-
+-	raw_spin_lock_irqsave(&l2_access_lock, flags);
+-	write_sysreg_s(reg, L2CPUSRSELR_EL1);
+-	isb();
+-	val = read_sysreg_s(L2CPUSRDR_EL1);
+-	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
+-
+-	return val;
+-}
+-
+ struct cluster_pmu;
+ 
+ /*
+diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
+index 40c56f6..2bf8d93 100644
+--- a/drivers/soc/qcom/Makefile
++++ b/drivers/soc/qcom/Makefile
+@@ -10,3 +10,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
+ obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
+ obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
+ obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
++obj-$(CONFIG_ARCH_MSM8996) +=	kryo-l2-accessors.o
+diff --git a/drivers/soc/qcom/kryo-l2-accessors.c b/drivers/soc/qcom/kryo-l2-accessors.c
+new file mode 100644
+index 0000000..6be57e6
+--- /dev/null
++++ b/drivers/soc/qcom/kryo-l2-accessors.c
+@@ -0,0 +1,64 @@
++/*
++ * Copyright (c) 2014-2015, 2017, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/spinlock.h>
++#include <asm/sysreg.h>
++#include <soc/qcom/kryo-l2-accessors.h>
++
++#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
++#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
++
++static DEFINE_RAW_SPINLOCK(l2_access_lock);
++
++/**
++ * set_l2_indirect_reg: write value to an L2 register
++ * @reg: Address of L2 register.
++ * @value: Value to be written to register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses, and system registers with respect to device memory
++ */
++void set_l2_indirect_reg(u64 reg, u64 val)
++{
++	unsigned long flags;
++	mb();
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg_s(reg, L2CPUSRSELR_EL1);
++	isb();
++	write_sysreg_s(val, L2CPUSRDR_EL1);
++	isb();
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
++}
++EXPORT_SYMBOL(set_l2_indirect_reg);
++
++/**
++ * get_l2_indirect_reg: read an L2 register value
++ * @reg: Address of L2 register.
++ *
++ * Use architecturally required barriers for ordering between system register
++ * accesses, and system registers with respect to device memory
++ */
++u64 get_l2_indirect_reg(u64 reg)
++{
++	u64 val;
++	unsigned long flags;
++
++	raw_spin_lock_irqsave(&l2_access_lock, flags);
++	write_sysreg_s(reg, L2CPUSRSELR_EL1);
++	isb();
++	val = read_sysreg_s(L2CPUSRDR_EL1);
++	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
++
++	return val;
++}
++EXPORT_SYMBOL(get_l2_indirect_reg);
+diff --git a/include/soc/qcom/kryo-l2-accessors.h b/include/soc/qcom/kryo-l2-accessors.h
+new file mode 100644
+index 0000000..2bebce1
+--- /dev/null
++++ b/include/soc/qcom/kryo-l2-accessors.h
+@@ -0,0 +1,27 @@
++/*
++ * Copyright (c) 2017, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
++#define __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
++
++#ifdef CONFIG_ARCH_QCOM
++void set_l2_indirect_reg(u64 reg_addr, u64 val);
++u64 get_l2_indirect_reg(u64 reg_addr);
++#else
++static inline void set_l2_indirect_reg(u32 reg_addr, u32 val) {}
++static inline u32 get_l2_indirect_reg(u32 reg_addr)
++{
++	return 0;
++}
++#endif
++#endif
+-- 
+1.9.1
