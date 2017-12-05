@@ -1,56 +1,62 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 6 Dec 2017 07:21:59 +0800
-Subject: [PATCH v4 02/10] pinctrl: axp209: add pinctrl features
-In-Reply-To: <71c9da94df2a5938cb8c092e40f8e36eec0b01c3.1512135804.git-series.quentin.schulz@free-electrons.com>
-References: <71c9da94df2a5938cb8c092e40f8e36eec0b01c3.1512135804.git-series.quentin.schulz@free-electrons.com>
-Message-ID: <201712060620.7QzKhd9b%fengguang.wu@intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 5 Dec 2017 15:26:46 -0800
+Subject: [PATCH] clk: Manage proper runtime PM state in clk_change_rate()
+In-Reply-To: <20171130121451.6710-1-m.szyprowski@samsung.com>
+References: <CGME20171130121511eucas1p1832c1f6e5bc9e263860e40478efca132@eucas1p1.samsung.com>
+ <20171130121451.6710-1-m.szyprowski@samsung.com>
+Message-ID: <20171205232646.GA4283@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Quentin,
+On 11/30, Marek Szyprowski wrote:
+> clk_change_rate() propagates rate change down to all its children. Such
+> operation requires managing proper runtime PM state of each child, what
+> was missing. Add needed calls to clk_pm_runtime*() to ensure that
+> set_rate() clock callback is called on runtime active clock.
+> 
+> This fixes following issue found on Exynos5433 TM2 board with devfreq
+> enabled:
+> 
+> Synchronous External Abort: synchronous external abort (0x96000210) at 0xffffff80093f5600
+> Internal error: : 96000210 [#1] PREEMPT SMP
+> Modules linked in:
+> CPU: 0 PID: 5 Comm: kworker/u16:0 Not tainted 4.15.0-rc1-next-20171129+ #4
+> Hardware name: Samsung TM2 board (DT)
+> Workqueue: devfreq_wq devfreq_monitor
+> task: ffffffc0ca96b600 task.stack: ffffff80093a8000
+> pstate: a0000085 (NzCv daIf -PAN -UAO)
+> pc : clk_divider_set_rate+0x54/0x118
+> lr : clk_divider_set_rate+0x44/0x118
+> ...
+> Process kworker/u16:0 (pid: 5, stack limit = 0xffffff80093a8000)
+> Call trace:
+>  clk_divider_set_rate+0x54/0x118
+>  clk_change_rate+0xfc/0x4e0
+>  clk_change_rate+0x1f0/0x4e0
+>  clk_change_rate+0x1f0/0x4e0
+>  clk_change_rate+0x1f0/0x4e0
+>  clk_core_set_rate_nolock+0x138/0x148
+>  clk_set_rate+0x28/0x50
+>  exynos_bus_passive_target+0x6c/0x11c
+>  update_devfreq_passive+0x58/0xb4
+>  devfreq_passive_notifier_call+0x50/0x5c
+>  notifier_call_chain+0x4c/0x88
+>  __srcu_notifier_call_chain+0x54/0x80
+>  srcu_notifier_call_chain+0x14/0x1c
+>  update_devfreq+0x100/0x1b4
+>  devfreq_monitor+0x2c/0x88
+>  process_one_work+0x148/0x3d8
+>  worker_thread+0x13c/0x3f8
+>  kthread+0x100/0x12c
+>  ret_from_fork+0x10/0x18
+> 
+> Reported-by: Chanwoo Choi <cw00.choi@samsung.com>
+> Fixes: 9a34b45397e5 ("clk: Add support for runtime PM")
+> Signed-off-by: Marek Szyprowski <m.szyprowski@samsung.com>
+> ---
 
-Thank you for the patch! Yet something to improve:
+Applied to clk-fixes
 
-[auto build test ERROR on pinctrl/devel]
-[also build test ERROR on v4.15-rc2 next-20171205]
-[if your patch is applied to the wrong git tree, please drop us a note to help improve the system]
-
-url:    https://github.com/0day-ci/linux/commits/Quentin-Schulz/pinctrl-move-gpio-axp209-to-pinctrl/20171204-050707
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-pinctrl.git devel
-config: i386-randconfig-h1-12060258 (attached as .config)
-compiler: gcc-6 (Debian 6.4.0-9) 6.4.0 20171026
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=i386 
-
-All errors (new ones prefixed by >>):
-
->> drivers//pinctrl/pinctrl-axp209.c:290:21: error: 'pinconf_generic_dt_node_to_map_group' undeclared here (not in a function)
-     .dt_node_to_map  = pinconf_generic_dt_node_to_map_group,
-                        ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
->> drivers//pinctrl/pinctrl-axp209.c:291:18: error: 'pinconf_generic_dt_free_map' undeclared here (not in a function)
-     .dt_free_map  = pinconf_generic_dt_free_map,
-                     ^~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-vim +/pinconf_generic_dt_node_to_map_group +290 drivers//pinctrl/pinctrl-axp209.c
-
-   288	
-   289	static const struct pinctrl_ops axp20x_pctrl_ops = {
- > 290		.dt_node_to_map		= pinconf_generic_dt_node_to_map_group,
- > 291		.dt_free_map		= pinconf_generic_dt_free_map,
-   292		.get_groups_count	= axp20x_groups_cnt,
-   293		.get_group_name		= axp20x_group_name,
-   294		.get_group_pins		= axp20x_group_pins,
-   295	};
-   296	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 28831 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/d4447d00/attachment-0001.gz>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
