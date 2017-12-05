@@ -1,56 +1,33 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 5 Dec 2017 11:57:50 +0100
-Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
-In-Reply-To: <20171205101000.968887-1-arnd@arndb.de>
-References: <20171205101000.968887-1-arnd@arndb.de>
-Message-ID: <20171205105750.GI21780@piout.net>
+From: linux@armlinux.org.uk (Russell King - ARM Linux)
+Date: Tue, 5 Dec 2017 10:58:01 +0000
+Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
+ error checking
+In-Reply-To: <791fdb7d-e0ec-eefb-c703-205c039eddc3@cogentembedded.com>
+References: <1512409703-20881-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
+ <20171204.132556.1601454745789376393.davem@davemloft.net>
+ <791fdb7d-e0ec-eefb-c703-205c039eddc3@cogentembedded.com>
+Message-ID: <20171205105801.GV10595@n2100.armlinux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2017 at 11:09:38 +0100, Arnd Bergmann wrote:
-> Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
-> changed the way that the dependencies are handled, but then the
-> Class D amplifier support got merged, which used the old method.
+On Tue, Dec 05, 2017 at 01:12:23PM +0300, Sergei Shtylyov wrote:
+>    Well, we can have:
 > 
-> This seems to have triggered a very rare randconfig condition for me
-> now, leading to a link error:
+> 	return r && r->start ? r->start : -ENXIO;
 > 
-> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
-> atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
-> atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
-> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
-> atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
-> atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
+> instead of:
 > 
-> Changing it to select SND_ATMEL_SOC_SSC_DMA as intended rather than
-> SND_ATMEL_SOC_DMA directly makes it work again.
+> 	return r ? r->start : -ENXIO;
 > 
-> Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> at the end of platform_get_irq(). But I don't really think it's worth doing
+> -- request_irq() doesn't filter out IRQ0 anyway, IIRC...
 
-> ---
->  sound/soc/atmel/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
-> index 4a56f3dfba51..2d998e5c4fb5 100644
-> --- a/sound/soc/atmel/Kconfig
-> +++ b/sound/soc/atmel/Kconfig
-> @@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
->  config SND_ATMEL_SOC_CLASSD
->  	tristate "Atmel ASoC driver for boards using CLASSD"
->  	depends on ARCH_AT91 || COMPILE_TEST
-> -	select SND_ATMEL_SOC_DMA
-> +	select SND_ATMEL_SOC_SSC_DMA
->  	select REGMAP_MMIO
->  	help
->  	  Say Y if you want to add support for Atmel ASoC driver for boards using
-> -- 
-> 2.9.0
-> 
+There's a bunch of platforms in the kernel that still use IRQ0, and
+have done prior to Linus' comments on the subject.  Such a change
+would regress them.
 
 -- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
+FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
+According to speedtest.net: 8.21Mbps down 510kbps up
