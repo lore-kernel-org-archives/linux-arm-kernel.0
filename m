@@ -1,24 +1,104 @@
-From: amery@hanoverdisplays.com (Alejandro Mery)
-Date: Tue, 5 Dec 2017 12:34:55 +0000
-Subject: [PATCH v2 0/3] ARM: davinci: fix eDMA for DM365
-In-Reply-To: <2298378f-37d0-0c04-dfe3-4503c58e5456@ti.com>,
- <20171204133359.45625-1-amery@hanoverdisplays.com>
-References: <2298378f-37d0-0c04-dfe3-4503c58e5456@ti.com>,
- <20171204133359.45625-1-amery@hanoverdisplays.com>
-Message-ID: <20171205123458.97837-1-amery@hanoverdisplays.com>
+From: yao.jin@linux.intel.com (Jin, Yao)
+Date: Tue, 5 Dec 2017 20:35:22 +0800
+Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
+ UNCORE devices
+In-Reply-To: <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
+References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
+ <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
+ <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
+ <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
+ <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
+Message-ID: <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, as an intermediate step toward migrating a davinci dm365 based product from 2.6.32.71
-to 4.14(.3+) I'm trying to get the dm365 evm (evaluation board) to work
+A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
 
-The very first problem is `edma: probe of edma.0 failed with error -5` caused by dm365 not
-been included on some refactoring done by Peter Ujfalusi in 2015 which got solved by the
-cherry-picking the following changes into dm365.c
+See the log:
 
-* cef5b0da4019 2015-10-14 Peter Ujfalusi ARM: davinci: Add dma_mask to eDMA devices
-* 7ab388e85faa 2015-10-14 Peter Ujfalusi ARM: davinci: Use platform_device_register_full() to create pdev for eDMA
+root at skl:/tmp# perf stat --per-thread -p 10322 -M CPI,IPC
+^C
+  Performance counter stats for process id '10322':
 
-Changes since v1:
-* fix dumb typo on 1/2
-* add extra change (3/3) correcting the name of mmc devices
+           vmstat-10322             1,879,654      inst_retired.any 
+#      0.8 CPI
+           vmstat-10322             1,565,807      cycles
+           vmstat-10322             1,879,654      inst_retired.any 
+#      1.2 IPC
+           vmstat-10322             1,565,807      cpu_clk_unhalted.thread
+
+        2.850291804 seconds time elapsed
+
+Thanks for fixing it quickly.
+
+Thanks
+Jin Yao
+
+On 12/5/2017 3:23 PM, Jin, Yao wrote:
+> Hi,
+> 
+> I applied the diff but it's failed.
+> 
+> jinyao at skl:~/skl-ws/perf-dev/lck-4594/src$ patch -p1 < 1.pat
+> patching file tools/perf/util/pmu.c
+> patch: **** malformed patch at line 41: *head, struct perf_pmu *pmu)
+> 
+> Could you send the patch as attachment to me in another mail thread?
+> 
+> to yao.jin at linux.intel.com
+> cc yao.jin at intel.com
+> 
+> Thanks
+> Jin Yao
+> 
+> On 12/5/2017 3:12 PM, Ganapatrao Kulkarni wrote:
+>> diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+>> index 5ad8a18..57e38fd 100644
+>> --- a/tools/perf/util/pmu.c
+>> +++ b/tools/perf/util/pmu.c
+>> @@ -538,6 +538,34 @@ static bool pmu_is_uncore(const char *name)
+>> ? }
+>>
+>> ? /*
+>> + *? PMU CORE devices have different name other than cpu in sysfs on some
+>> + *? platforms. looking for possible sysfs files to identify as core 
+>> device.
+>> + */
+>> +static int is_pmu_core(const char *name)
+>> +{
+>> + struct stat st;
+>> + char path[PATH_MAX];
+>> + const char *sysfs = sysfs__mountpoint();
+>> +
+>> + if (!sysfs)
+>> + return 0;
+>> +
+>> + /* Look for cpu sysfs (x86 and others) */
+>> + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
+>> + if ((stat(path, &st) == 0) &&
+>> + (strncmp(name, "cpu", strlen("cpu")) == 0))
+>> + return 1;
+>> +
+>> + /* Look for cpu sysfs (specific to arm) */
+>> + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/%s/cpus",
+>> + sysfs, name);
+>> + if (stat(path, &st) == 0)
+>> + return 1;
+>> +
+>> + return 0;
+>> +}
+>> +
+>> +/*
+>> ?? * Return the CPU id as a raw string.
+>> ?? *
+>> ?? * Each architecture should provide a more precise id string that
+>> @@ -641,7 +669,7 @@ static void pmu_add_cpu_aliases(struct list_head
+>> *head, struct perf_pmu *pmu)
+>> ?? break;
+>> ?? }
+>>
+>> - if (pmu->is_uncore) {
+>> + if (!is_pmu_core(name)) {
+>> ?? /* check for uncore devices */
+>> ?? if (pe->pmu == NULL)
+>> ?? continue;
