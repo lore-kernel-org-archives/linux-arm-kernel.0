@@ -1,57 +1,192 @@
-From: sky@genki.is (Genki Sky)
-Date: Mon, 04 Dec 2017 21:39:06 -0500
-Subject: [PATCH v2 2/3] staging: vc04_services: Unsplit user-visible strings
-In-Reply-To: <cover.1512441073.git.sky@genki.is>
-References: <20171204105235.2nhmalxsd4uslesi@mwanda>
- <cover.1512441073.git.sky@genki.is>
-Message-ID: <30baaaf1f55a18f8ddc5eacb1f3a8193e553ea5b.1512441073.git.sky@genki.is>
+From: awallis@codeaurora.org (Adam Wallis)
+Date: Mon, 4 Dec 2017 21:54:06 -0500
+Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
+In-Reply-To: <1512440100.17567.172.camel@mhfsdcap03>
+References: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
+ <1512440100.17567.172.camel@mhfsdcap03>
+Message-ID: <99ea0ee4-1fff-73df-d9b5-0f756dfc5635@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Genki Sky <sky@genki.is>
----
- drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c | 7 +++----
- drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c     | 3 +--
- 2 files changed, 4 insertions(+), 6 deletions(-)
+On 12/4/2017 9:15 PM, Chunfeng Yun wrote:
+> On Mon, 2017-12-04 at 09:27 -0500, Adam Wallis wrote:
+>> The xHCI driver currently has the IMOD set to 160, which
+>> translates to an IMOD interval of 40,000ns (160 * 250)ns
+>>
+>> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
+>> introduced a QUIRK for the MTK platform to adjust this interval to 20,
+>> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
+>> due to the fact that the MTK controller IMOD interval is 8 times
+>> as much as defined in xHCI spec.
+>>
+>> Instead of adding more quirk bits for additional platforms, this patch
+>> introduces the ability for vendors to set the IMOD_INTERVAL as is
+>> optimal for their platform. By using device_property_read_u32() on
+>> "imod-interval-ns", the IMOD INTERVAL can be specified in nano seconds.
+>> If no interval is specified, the default of 40,000ns (IMOD=160) will be
+>> used.
+>>
+>> No bounds checking has been implemented due to the fact that a vendor
+>> may have violated the spec and would need to specify a value outside of
+>> the max 8,000 IRQs/second limit specified in the xHCI spec.
+>>
+>> Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+>> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
+>> ---
+>> changes from v3:
+>>   * Changed imod-interval to imod-interval-ns [Rob Herring/Chunfeng]
+>>   * Changed "modulation" to "moderation" throughout patch [Mathias]
+>> changes from v2:
+>>   * Added PCI default value [Mathias]
+>>   * Removed xhci-mtk.h from xhci-plat.c [Chunfeng Yun]
+>>   * Removed MTK quirk from xhci-plat and moved logic to xhci-mtk [Chunfeng]
+>>   * Updated bindings Documentation to use proper units [Rob Herring]
+>>   * Added imod-interval description and example to MTK binding documentation
+>> changes from v1:
+>>   * Removed device_property_read_u32() per suggestion from greg k-h
+>>   * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
+>>
+>>  Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 2 ++
+>>  Documentation/devicetree/bindings/usb/usb-xhci.txt          | 1 +
+>>  drivers/usb/host/xhci-mtk.c                                 | 9 +++++++++
+>>  drivers/usb/host/xhci-pci.c                                 | 3 +++
+>>  drivers/usb/host/xhci-plat.c                                | 5 +++++
+>>  drivers/usb/host/xhci.c                                     | 7 ++-----
+>>  drivers/usb/host/xhci.h                                     | 2 ++
+>>  7 files changed, 24 insertions(+), 5 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+>> index 3059596..9ff5602 100644
+>> --- a/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt
+>> @@ -46,6 +46,7 @@ Optional properties:
+>>   - pinctrl-names : a pinctrl state named "default" must be defined
+>>   - pinctrl-0 : pin control group
+>>  	See: Documentation/devicetree/bindings/pinctrl/pinctrl-bindings.txt
+>> + - imod-interval-ns: default interrupt moderation interval is 5000ns
+>>  
+>>  Example:
+>>  usb30: usb at 11270000 {
+>> @@ -66,6 +67,7 @@ usb30: usb at 11270000 {
+>>  	usb3-lpm-capable;
+>>  	mediatek,syscon-wakeup = <&pericfg>;
+>>  	mediatek,wakeup-src = <1>;
+>> +	imod-interval-ns = <10000>;
+>>  };
+>>  
+>>  2nd: dual-role mode with xHCI driver
+>> diff --git a/Documentation/devicetree/bindings/usb/usb-xhci.txt b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> index ae6e484..969908d 100644
+>> --- a/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> +++ b/Documentation/devicetree/bindings/usb/usb-xhci.txt
+>> @@ -29,6 +29,7 @@ Optional properties:
+>>    - usb2-lpm-disable: indicate if we don't want to enable USB2 HW LPM
+>>    - usb3-lpm-capable: determines if platform is USB3 LPM capable
+>>    - quirk-broken-port-ped: set if the controller has broken port disable mechanism
+>> +  - imod-interval-ns: default interrupt moderation interval is 5000ns
+>>  
+>>  Example:
+>>  	usb at f0931000 {
+>> diff --git a/drivers/usb/host/xhci-mtk.c b/drivers/usb/host/xhci-mtk.c
+>> index b62a1d2..1cb2a8b 100644
+>> --- a/drivers/usb/host/xhci-mtk.c
+>> +++ b/drivers/usb/host/xhci-mtk.c
+>> @@ -674,6 +674,15 @@ static int xhci_mtk_probe(struct platform_device *pdev)
+>>  
+>>  	xhci = hcd_to_xhci(hcd);
+>>  	xhci->main_hcd = hcd;
+>> +
+>> +	/*
+>> +	 * imod_interval is the interrupt moderation value in nanoseconds.
+>> +	 * The increment interval is 8 times as much as that defined in
+>> +	 * the xHCI spec on MTK's controller.
+>> +	 */
+>> +	xhci->imod_interval = 5000;
+>> +	device_property_read_u32(dev, "imod-interval-ns", &xhci->imod_interval);
+>> +
+>>  	xhci->shared_hcd = usb_create_shared_hcd(driver, dev,
+>>  			dev_name(dev), hcd);
+>>  	if (!xhci->shared_hcd) {
+>> diff --git a/drivers/usb/host/xhci-pci.c b/drivers/usb/host/xhci-pci.c
+>> index 7ef1274..4bcddd4 100644
+>> --- a/drivers/usb/host/xhci-pci.c
+>> +++ b/drivers/usb/host/xhci-pci.c
+>> @@ -234,6 +234,9 @@ static int xhci_pci_setup(struct usb_hcd *hcd)
+>>  	if (!xhci->sbrn)
+>>  		pci_read_config_byte(pdev, XHCI_SBRN_OFFSET, &xhci->sbrn);
+>>  
+>> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
+>> +	xhci->imod_interval = 40000;
+>> +
+>>  	retval = xhci_gen_setup(hcd, xhci_pci_quirks);
+>>  	if (retval)
+>>  		return retval;
+>> diff --git a/drivers/usb/host/xhci-plat.c b/drivers/usb/host/xhci-plat.c
+>> index 09f164f..6f03830 100644
+>> --- a/drivers/usb/host/xhci-plat.c
+>> +++ b/drivers/usb/host/xhci-plat.c
+>> @@ -269,6 +269,11 @@ static int xhci_plat_probe(struct platform_device *pdev)
+>>  	if (device_property_read_bool(&pdev->dev, "quirk-broken-port-ped"))
+>>  		xhci->quirks |= XHCI_BROKEN_PORT_PED;
+>>  
+>> +	/* imod_interval is the interrupt moderation value in nanoseconds. */
+>> +	xhci->imod_interval = 40000;
+>> +	device_property_read_u32(sysdev, "imod-interval-ns",
+>> +				 &xhci->imod_interval);
+>> +
+>>  	hcd->usb_phy = devm_usb_get_phy_by_phandle(sysdev, "usb-phy", 0);
+>>  	if (IS_ERR(hcd->usb_phy)) {
+>>  		ret = PTR_ERR(hcd->usb_phy);
+>> diff --git a/drivers/usb/host/xhci.c b/drivers/usb/host/xhci.c
+>> index 2424d30..0b7755b 100644
+>> --- a/drivers/usb/host/xhci.c
+>> +++ b/drivers/usb/host/xhci.c
+>> @@ -586,11 +586,8 @@ int xhci_run(struct usb_hcd *hcd)
+>>  			"// Set the interrupt modulation register");
+> s/modulation/moderation
 
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-index 4ed3b449f97f..e26895dc052e 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/bcm2835-camera.c
-@@ -347,8 +347,7 @@ static void buffer_cb(struct vchiq_mmal_instance *instance,
- 				timestamp = ktime_add_us(dev->capture.kernel_start_ts,
- 							 runtime_us);
- 				v4l2_dbg(1, bcm2835_v4l2_debug, &dev->v4l2_dev,
--					 "Convert start time %llu and %llu "
--					 "with offset %llu to %llu\n",
-+					 "Convert start time %llu and %llu with offset %llu to %llu\n",
- 					 ktime_to_ns(dev->capture.kernel_start_ts),
- 					 dev->capture.vc_start_timestamp, pts,
- 					 ktime_to_ns(timestamp));
-@@ -532,8 +531,8 @@ static int start_streaming(struct vb2_queue *vq, unsigned int count)
- 	    vchiq_mmal_port_enable(dev->instance, dev->capture.port, buffer_cb);
- 	if (ret) {
- 		v4l2_err(&dev->v4l2_dev,
--			"Failed to enable capture port - error %d. "
--			"Disabling camera port again\n", ret);
-+			"Failed to enable capture port - error %d. Disabling camera port again\n",
-+			ret);
- 
- 		vchiq_mmal_port_disable(dev->instance,
- 					dev->capture.camera_port);
-diff --git a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-index 6ea7fb0ea50e..5ddea4f54bf7 100644
---- a/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-+++ b/drivers/staging/vc04_services/bcm2835-camera/mmal-vchiq.c
-@@ -1360,8 +1360,7 @@ static int port_action_handle(struct vchiq_mmal_instance *instance,
- 
- 	ret = -rmsg->u.port_action_reply.status;
- 
--	pr_debug("%s:result:%d component:0x%x port:%d action:%s(%d)" \
--		 " connect component:0x%x connect port:%d\n",
-+	pr_debug("%s:result:%d component:0x%x port:%d action:%s(%d) connect component:0x%x connect port:%d\n",
- 		 __func__,
- 		 ret, port->component->handle, port->handle,
- 		 port_action_type_names[action_type],
+Mathias said there was no need to change the existing modulation strings - only
+the ones that I had added.
+
+> 
+>>  	temp = readl(&xhci->ir_set->irq_control);
+>>  	temp &= ~ER_IRQ_INTERVAL_MASK;
+>> -	/*
+>> -	 * the increment interval is 8 times as much as that defined
+>> -	 * in xHCI spec on MTK's controller
+>> -	 */
+>> -	temp |= (u32) ((xhci->quirks & XHCI_MTK_HOST) ? 20 : 160);
+>> +	temp |= (xhci->imod_interval / 250) & ER_IRQ_INTERVAL_MASK;
+>> +
+> No need a blank line
+
+If this patch goes through another version, I will remove this line
+
+> 
+>>  	writel(temp, &xhci->ir_set->irq_control);
+>>  
+>>  	/* Set the HCD state before we enable the irqs */
+>> diff --git a/drivers/usb/host/xhci.h b/drivers/usb/host/xhci.h
+>> index 99a014a..2a4177b 100644
+>> --- a/drivers/usb/host/xhci.h
+>> +++ b/drivers/usb/host/xhci.h
+>> @@ -1717,6 +1717,8 @@ struct xhci_hcd {
+>>  	u8		max_interrupters;
+>>  	u8		max_ports;
+>>  	u8		isoc_threshold;
+>> +	/* imod_interval in ns (I * 250ns) */
+>> +	u32		imod_interval;
+>>  	int		event_ring_max;
+>>  	/* 4KB min, 128MB max */
+>>  	int		page_size;
+> 
+> Thanks
+> 
+> 
+
+
 -- 
-2.15.1
+Adam Wallis
+Qualcomm Datacenter Technologies as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
