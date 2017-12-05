@@ -1,134 +1,72 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 5 Dec 2017 12:45:01 +0000
-Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <20171205122757.GW22781@e103592.cambridge.arm.com>
-References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
- <20171204122645.31535-12-ard.biesheuvel@linaro.org>
- <20171205122757.GW22781@e103592.cambridge.arm.com>
-Message-ID: <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 5 Dec 2017 13:47:07 +0100
+Subject: [PATCH] ASoC: atmel-classd: select correct Kconfig symbol
+In-Reply-To: <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
+References: <20171205101000.968887-1-arnd@arndb.de>
+ <20171205105750.GI21780@piout.net>
+ <CAK8P3a29G4T1DbkjwhEqa6cSVQL77z0jW0znMX47tqd5vM-P9Q@mail.gmail.com>
+Message-ID: <20171205124707.GJ21780@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On 5 Dec 2017, at 12:28, Dave Martin <Dave.Martin@arm.com> wrote:
+On 05/12/2017 at 12:13:41 +0100, Arnd Bergmann wrote:
+> On Tue, Dec 5, 2017 at 11:57 AM, Alexandre Belloni
+> <alexandre.belloni@free-electrons.com> wrote:
+> > On 05/12/2017 at 11:09:38 +0100, Arnd Bergmann wrote:
+> >> Commit 061981ff8cc8 ("ASoC: atmel: properly select dma driver state")
+> >> changed the way that the dependencies are handled, but then the
+> >> Class D amplifier support got merged, which used the old method.
+> >>
+> >> This seems to have triggered a very rare randconfig condition for me
+> >> now, leading to a link error:
+> >>
+> >> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+> >> atmel_ssc_dai.c:(.text+0x79c): undefined reference to `atmel_pcm_dma_platform_register'
+> >> atmel_ssc_dai.c:(.text+0x79c): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_register'
+> >> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+> >> atmel_ssc_dai.c:(.text+0xf24): undefined reference to `atmel_pcm_dma_platform_unregister'
+> >> atmel_ssc_dai.c:(.text+0xf24): relocation truncated to fit: R_AARCH64_CALL26 against undefined symbol `atmel_pcm_dma_platform_unregister'
+> >>
+> >> Changing it to select SND_ATMEL_SOC_SSC_DMA as intended rather than
+> >> SND_ATMEL_SOC_DMA directly makes it work again.
+> >>
+> >> Fixes: e0a25b6d1862 ("ASoC: atmel-classd: add the Audio Class D Amplifier")
+> >> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Acked-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 > 
->> On Mon, Dec 04, 2017 at 12:26:37PM +0000, Ard Biesheuvel wrote:
->> Add a support macro to conditionally yield the NEON (and thus the CPU)
->> that may be called from the assembler code. Given that especially the
->> instruction based accelerated crypto code may use very tight loops, add
->> some parametrization so that the TIF_NEED_RESCHED flag test is only
->> executed every so many loop iterations.
->> 
->> In some cases, yielding the NEON involves saving and restoring a non
->> trivial amount of context (especially in the CRC folding algorithms),
->> and so the macro is split into two, and the code in between is only
->> executed when the yield path is taken, allowing the contex to be preserved.
->> The second macro takes a label argument that marks the resume-from-yield
->> path, which should restore the preserved context again.
->> 
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->> arch/arm64/include/asm/assembler.h | 50 ++++++++++++++++++++
->> 1 file changed, 50 insertions(+)
->> 
->> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->> index aef72d886677..917b026d3e00 100644
->> --- a/arch/arm64/include/asm/assembler.h
->> +++ b/arch/arm64/include/asm/assembler.h
->> @@ -512,4 +512,54 @@ alternative_else_nop_endif
->> #endif
->>    .endm
->> 
->> +/*
->> + * yield_neon - check whether to yield to another runnable task from
->> + *        kernel mode NEON code (running with preemption disabled)
->> + *
->> + * - Check whether the preempt count is exactly 1, in which case disabling
->> + *   preemption once will make the task preemptible. If this is not the case,
->> + *   yielding is pointless.
->> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
->> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
->> + *   yield fixup code at @lbl.
->> + */
->> +    .macro        yield_neon, lbl:req, ctr, order, stride, loop
->> +    yield_neon_pre    \ctr, \order, \stride, \loop
->> +    yield_neon_post    \lbl
->> +    .endm
->> +
->> +    .macro        yield_neon_pre, ctr, order=0, stride, loop=4444f
->> +#ifdef CONFIG_PREEMPT
->> +    /*
->> +     * With some algorithms, it makes little sense to poll the
->> +     * TIF_NEED_RESCHED flag after every iteration, so only perform
->> +     * the check every 2^order strides.
->> +     */
->> +    .if        \order > 1
->> +    .if        (\stride & (\stride - 1)) != 0
->> +    .error        "stride should be a power of 2"
->> +    .endif
->> +    tst        \ctr, #((1 << \order) * \stride - 1) & ~(\stride - 1)
->> +    b.ne        \loop
->> +    .endif
+> Unfortunately, my testing just found a new problem with this patch
+> applied, I had
+> not run enough randconfig tests on top of it:
 > 
-> I'm not sure what baking in this check gives us, and this seems to
-> conflate two rather different things: yielding and defining a
-> "heartbeat" frequency for the calling code.
+> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_set_audio':
+> atmel_ssc_dai.c:(.text+0x73c): undefined reference to `ssc_request'
+> sound/soc/atmel/atmel_ssc_dai.o: In function `atmel_ssc_put_audio':
+> atmel_ssc_dai.c:(.text+0x7be): undefined reference to `ssc_free'
 > 
-> Can we separate out the crypto-loop-helper semantics from the yield-
-> neon stuff?
+> This is for a configuration with SND_ATMEL_SOC_CLASSD=y
+> and CONFIG_ATMEL_SSC=n. Could you tell me whether that is a
+> sensible configuration that should work, or whether we need a dependency
+> on ATMEL_SSC in SND_ATMEL_SOC_CLASSD? I can't really tell
+> from the source code, but you probably know the answer.
 > 
 
-Fair enough. I incorporated the check here so it disappears from the code entirely when !CONFIG_PREEMPT, because otherwise, you end up with a sequence that is mispredicted every # iterations without any benefit.
-I guess i could macroise that separately though.
+Ok, does that solve both randconfigs?
 
-> If we had
-> 
->    if_cond_yield_neon
->    // patchup code
->    endif_yield_neon
-> 
-> then the caller is free to conditionally branch over that as appropriate
-> like
-> 
-> loop:
->    // crypto stuff
->    tst x0, #0xf
->    b.ne    loop
-> 
->    if_cond_yield_neon
->    // patchup code
->    endif_cond_yield_neon
-> 
->    b    loop
-> 
-> I think this is clearer than burying checks and branches in a macro that
-> is trying to be generic.
-> 
+diff --git a/sound/soc/atmel/Kconfig b/sound/soc/atmel/Kconfig
+index 4a56f3dfba51..dcee145dd179 100644
+--- a/sound/soc/atmel/Kconfig
++++ b/sound/soc/atmel/Kconfig
+@@ -64,7 +64,7 @@ config SND_AT91_SOC_SAM9X5_WM8731
+ config SND_ATMEL_SOC_CLASSD
+        tristate "Atmel ASoC driver for boards using CLASSD"
+        depends on ARCH_AT91 || COMPILE_TEST
+-       select SND_ATMEL_SOC_DMA
++       select SND_SOC_GENERIC_DMAENGINE_PCM
+        select REGMAP_MMIO
+        help
+          Say Y if you want to add support for Atmel ASoC driver for boards using
 
-Agreed.
-
-> Label arguments can be added to elide some branches of course, at a
-> corresponding cost to clarity...  in the common case the cache will
-> be hot and the branches won't be mispredicted though.  Is it really
-> worth it?
-> 
-
-Perhaps not. And i have not made any attempts yet to benchmark at great detail, given that i need some feedback from the rt crowd first whether this is likely to work as desired.
-
->> +
->> +    get_thread_info    x0
->> +    ldr        w1, [x0, #TSK_TI_PREEMPT]
->> +    ldr        x0, [x0, #TSK_TI_FLAGS]
->> +    cmp        w1, #1 // == PREEMPT_OFFSET
-> 
-> asm-offsets?
-> 
-
-This is not an offset in that regard, but the header that defines it is not asm safe
-
-> [...]
-> 
-> Cheers
-> ---Dave
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
