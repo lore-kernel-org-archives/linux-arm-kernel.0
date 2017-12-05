@@ -1,13 +1,13 @@
 From: gengdongjiu@huawei.com (Dongjiu Geng)
-Date: Tue, 5 Dec 2017 22:50:15 +0800
-Subject: [PATCH] arm64: avoid send SIGBUS two times
-Message-ID: <20171205145015.46020-1-gengdongjiu@huawei.com>
+Date: Tue, 5 Dec 2017 23:02:35 +0800
+Subject: [PATCH RESEND] arm64: fault: avoid send SIGBUS two times
+Message-ID: <20171205150235.46325-1-gengdongjiu@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If APEI handling the memory error is failed,
-the SIGBUS will be sent twice. In fact, send
-one time can be enough, so correct it.
+If APEI handling the memory error is failed, the do_mem_abort()
+and do_sea() will all deliver SIGBUS. In fact, sending one time
+can be enough, so correct it.
 
 Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 ---
