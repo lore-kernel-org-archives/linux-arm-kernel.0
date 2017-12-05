@@ -1,36 +1,39 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Dec 2017 09:27:21 +0100
-Subject: [PATCH] ARM: dts: sunxi: Convert to CCU index macros for HDMI
- controller
-In-Reply-To: <20171204084401.2646-1-wens@csie.org>
-References: <20171204084401.2646-1-wens@csie.org>
-Message-ID: <20171205082721.imghrej2lt5tured@flea.lan>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 5 Dec 2017 09:27:42 +0100
+Subject: [RESEND][PATCH] pwm: Set class for exported channels in sysfs
+In-Reply-To: <1496397921-1713-1-git-send-email-gottfried.haider@gmail.com>
+References: <1496397921-1713-1-git-send-email-gottfried.haider@gmail.com>
+Message-ID: <20171205082742.GA7174@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Mon, Dec 04, 2017 at 04:44:01PM +0800, Chen-Yu Tsai wrote:
-> When the HDMI controller device node was added, the needed PLL clock
-> macros were not exported. A separate patch addresses that, but it is
-> merged through a different tree.
+On Fri, Jun 02, 2017 at 10:05:21AM +0000, Gottfried Haider wrote:
+> Notifications for devices without bus or class set get dropped by
+> dev_uevent_filter. Adding the class to the exported child matches
+> what the gpio subsystem is doing.
 > 
-> Now that both patches are in mainline proper, we can convert the raw
-> numbers to proper macros.
+> With this change exporting a channel triggers a udev event, which
+> gives userspace a chance to fixup permissions and makes it possible
+> for non-root users to make use of the pwm subsystem.
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: Gottfried Haider <gottfried.haider@gmail.com>
+> CC: Thierry Reding <thierry.reding@gmail.com>
+> CC: H Hartley Sweeten <hsweeten@visionengravers.com>
+> CC: linux-pwm at vger.kernel.org
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-rpi-kernel at lists.infradead.org
+> ---
+>  drivers/pwm/sysfs.c | 1 +
+>  1 file changed, 1 insertion(+)
 
-Applied, thanks!
-Maxime
+Sorry for the long delay, applied to for-next now.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Thanks,
+Thierry
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/5353fceb/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/5ba41b60/attachment-0001.sig>
