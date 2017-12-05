@@ -1,99 +1,59 @@
-From: jernej.skrabec@siol.net (Jernej =?utf-8?B?xaBrcmFiZWM=?=)
-Date: Tue, 05 Dec 2017 16:42:55 +0100
-Subject: [PATCH v3 09/15] drm/sun4i: Add A83T support
-In-Reply-To: <0f8137abb37de936db82c1251556ee84fb23c7fe.1512486553.git-series.maxime.ripard@free-electrons.com>
-References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <0f8137abb37de936db82c1251556ee84fb23c7fe.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <1823097.lykhZvJrH4@jernej-laptop>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 05 Dec 2017 10:49:47 -0500 (EST)
+Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
+ error checking
+In-Reply-To: <39363858-995c-eea4-070e-b21a7ac49bec@gmail.com>
+References: <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
+ <20171204.132556.1601454745789376393.davem@davemloft.net>
+ <39363858-995c-eea4-070e-b21a7ac49bec@gmail.com>
+Message-ID: <20171205.104947.121188625730183933.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+From: Arvind Yadav <arvind.yadav.cs@gmail.com>
+Date: Tue, 5 Dec 2017 11:04:55 +0530
 
-Dne torek, 05. december 2017 ob 16:10:21 CET je Maxime Ripard napisal(a):
-> Add support for the A83T display pipeline.
+> Hi David,
 > 
-> Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/sun4i_drv.c   |  1 +
->  drivers/gpu/drm/sun4i/sun4i_tcon.c  |  5 +++++
->  drivers/gpu/drm/sun4i/sun8i_mixer.c |  9 +++++++++
->  3 files changed, 15 insertions(+)
 > 
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> b/drivers/gpu/drm/sun4i/sun4i_drv.c index 49215d91c853..6f5e721b545e 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> @@ -347,6 +347,7 @@ static const struct of_device_id sun4i_drv_of_table[] =
-> { { .compatible = "allwinner,sun6i-a31s-display-engine" },
->  	{ .compatible = "allwinner,sun7i-a20-display-engine" },
->  	{ .compatible = "allwinner,sun8i-a33-display-engine" },
-> +	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
->  	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
->  	{ }
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 92f4738101e6..9b757450555f
-> 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> @@ -1132,6 +1132,10 @@ static const struct sun4i_tcon_quirks
-> sun8i_a33_quirks = { .has_lvds_pll		= true,
->  };
-> 
-> +static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
-> +	/* nothing is supported */
-> +};
-> +
->  static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
->  	/* nothing is supported */
->  };
-> @@ -1144,6 +1148,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
->  	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
-> { .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks }, {
-> .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks }, +	{
-> .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data =
-> &sun8i_a83t_lcd_quirks }, { .compatible = "allwinner,sun8i-v3s-tcon", .data
-> = &sun8i_v3s_quirks }, { }
->  };
-> diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> b/drivers/gpu/drm/sun4i/sun8i_mixer.c index ff235e3228ce..6829bec4ba68
-> 100644
-> --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> @@ -477,6 +477,11 @@ static int sun8i_mixer_remove(struct platform_device
-> *pdev) return 0;
->  }
-> 
-> +static const struct sun8i_mixer_cfg sun8i_a83t_mixer_cfg = {
-> +	.vi_num = 1,
-> +	.ui_num = 3,
-> +};
-> +
+> On Monday 04 December 2017 11:55 PM, David Miller wrote:
+>> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>> Date: Mon,  4 Dec 2017 23:18:20 +0530
+>>
+>>> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct platform_device
+>>> *dev)
+>>>   	netdevice->dev_addr[5] = readb(eth_addr + 0x06);
+>>>   	iounmap(eth_addr);
+>>>   -	if (!netdevice->irq) {
+>>> +	if (netdevice->irq <= 0) {
+>>>   		printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
+>>>   			__FILE__, netdevice->base_addr);
+>>> +		retval = netdevice->irq ? netdevice->irq : -ENODEV;
+>>>   		goto probe_failed;
+>>>   	}
+>> Ok, thinking about this some more...
+>>
+>> It is impossible to use platform_get_irq() without every single call
+>> site having this funny:
+>>
+>> 	ret = val ? val : -ENODEV;
+>>
+>> sequence.
+>>
+>> This is unnecessary duplication and it is also error prone, so I
+>> really think this logic belongs in platform_get_irq() itself.  It can
+>> convert '0' to -ENODEV and that way we need no special logic in the
+>> callers at all.
+> platform_get_irq() will return 0 only for sparc, If sparc initialize
+> platform
+> data irq[PROMINTR_MAX] as zero. Otherwise platform_get_irq() will
+> never return
+> 0. It will return either IRQ number or error (as negative number). But
+> I am getting
+> review comment by reviewer/maintainer in other subsystem to add check
+> for
+> zero. So I have done same changes here. Please correct me if i am
+> wrong.
 
-I think you should expand that structure with:
-.ccsc = 0,
-.scaler_mask = 0xf,
-.mod_rate = 150000000,
-
-Best regards,
-Jernej
-
->  static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
->  	.vi_num = 2,
->  	.ui_num = 1,
-> @@ -487,6 +492,10 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg
-> = {
-> 
->  static const struct of_device_id sun8i_mixer_of_table[] = {
->  	{
-> +		.compatible = "allwinner,sun8i-a83t-de2-mixer-0",
-> +		.data = &sun8i_a83t_mixer_cfg,
-> +	},
-> +	{
->  		.compatible = "allwinner,sun8i-v3s-de2-mixer",
->  		.data = &sun8i_v3s_mixer_cfg,
->  	},
-> --
-> git-series 0.9.1
+If you make the change that I suggest, you instead can check for
+'-ENODEV' to mean no IRQ.
