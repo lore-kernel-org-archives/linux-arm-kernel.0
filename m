@@ -1,33 +1,69 @@
-From: linux@armlinux.org.uk (Russell King - ARM Linux)
-Date: Tue, 5 Dec 2017 10:58:01 +0000
-Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
- error checking
-In-Reply-To: <791fdb7d-e0ec-eefb-c703-205c039eddc3@cogentembedded.com>
-References: <1512409703-20881-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
- <20171204.132556.1601454745789376393.davem@davemloft.net>
- <791fdb7d-e0ec-eefb-c703-205c039eddc3@cogentembedded.com>
-Message-ID: <20171205105801.GV10595@n2100.armlinux.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 5 Dec 2017 11:06:20 +0000
+Subject: [RFC PATCH] arm64: deactivate saved ttbr when mm is deactivated
+In-Reply-To: <72abe8f2-4d82-1375-956c-5e8b7869864c@codeaurora.org>
+References: <1512404606-26498-1-git-send-email-vinmenon@codeaurora.org>
+ <20171204165533.GI29619@arm.com>
+ <20171204180001.7gsub3wt6h5nl3v3@lakrids.cambridge.arm.com>
+ <72abe8f2-4d82-1375-956c-5e8b7869864c@codeaurora.org>
+Message-ID: <20171205110619.et5nhkkprv7tmshu@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 01:12:23PM +0300, Sergei Shtylyov wrote:
->    Well, we can have:
-> 
-> 	return r && r->start ? r->start : -ENXIO;
-> 
-> instead of:
-> 
-> 	return r ? r->start : -ENXIO;
-> 
-> at the end of platform_get_irq(). But I don't really think it's worth doing
-> -- request_irq() doesn't filter out IRQ0 anyway, IIRC...
+On Tue, Dec 05, 2017 at 10:30:40AM +0530, Vinayak Menon wrote:
+> On 12/4/2017 11:30 PM, Mark Rutland wrote:
+> > On Mon, Dec 04, 2017 at 04:55:33PM +0000, Will Deacon wrote:
+> >> On Mon, Dec 04, 2017 at 09:53:26PM +0530, Vinayak Menon wrote:
+> >>> A case is observed where a wrong physical address is read,
+> >>> resulting in a bus error and that happens soon after TTBR0 is
+> >>> set to the saved ttbr by uaccess_ttbr0_enable. This is always
+> >>> seen to happen in the exit path of the task.
+> >>>
+> >>> exception
+> >>> __arch_copy_from_user
+> >>> __copy_from_user
+> >>> probe_kernel_read
+> >>> get_freepointer_safe
+> >>> slab_alloc_node
+> >>> slab_alloc
+> >>> kmem_cache_alloc
+> >>> kmem_cache_zalloc
+> >>> fill_pool
+> >>> __debug_object_init
+> >>> debug_object_init
+> >>> rcuhead_fixup_activate
+> >>> debug_object_fixup
+> >>> debug_object_activate
+> >>> debug_rcu_head_queue
+> >>> __call_rcu
+> >>> ep_remove
+> >>> eventpoll_release_file
+> >>> __fput
+> >>> ____fput
+> >>> task_work_run
+> >>> do_exit
+> >>>
+> >>> The mm has been released and the pgd is freed, but probe_kernel_read
+> >>> invoked from slub results in call to __arch_copy_from_user. At the
+> >>> entry to __arch_copy_from_user, when SW PAN is enabled, this results
+> >>> in stale value being set to ttbr0. May be a speculative fetch aftwerwards
+> >>> is resulting in invalid physical address access.
 
-There's a bunch of platforms in the kernel that still use IRQ0, and
-have done prior to Linus' comments on the subject.  Such a change
-would regress them.
+> > I think the problem here is that switch_mm() avoids updating the saved ttbr
+> > value when the next mm is init_mm.
 
--- 
-RMK's Patch system: http://www.armlinux.org.uk/developer/patches/
-FTTC broadband for 0.8mile line in suburbia: sync at 8.8Mbps down 630kbps up
-According to speedtest.net: 8.21Mbps down 510kbps up
+> For this switch to happen, the schedule() in do_task_dead at the end
+> of do_exit() need to be called, right ?  The issue is happening soon
+> after exit_mm (probably from exit_files).
+
+I'd assumed that we'd switch_mm() away from the task's mm prior to the
+final mmput(). Otherwise, I can't see why we don't have issues in the
+non SW PAN case (as that would leave the HW TTBR0 stale).
+
+However, I can't see exactly where we do that, so I'll go diggging.
+Something doesn't seem quite right.
+
+Do you have a reproducer for the issue?
+
+Thanks,
+Mark.
