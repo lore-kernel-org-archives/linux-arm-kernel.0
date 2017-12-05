@@ -1,38 +1,51 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 5 Dec 2017 14:49:40 +0530
-Subject: [PATCH] ARM: multi_v7_defconfig: Add configs for peripherals on
- Keystone2 SoCs
-Message-ID: <20171205091940.22957-1-vigneshr@ti.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 5 Dec 2017 17:24:47 +0800
+Subject: [linux-sunxi] [PATCH v4 09/10] ARM: dtsi: axp81x: add GPIO DT node
+In-Reply-To: <af90c57ebf97c8f5504a4b5b1dad3638bedadfef.1512135804.git-series.quentin.schulz@free-electrons.com>
+References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
+ <af90c57ebf97c8f5504a4b5b1dad3638bedadfef.1512135804.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <CAGb2v65mOwNBdit=gKOq0=iv94FNuH__4yvCw4v0NHYiCKccBw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable Cadence QSPI present on 66AK2G SoC and Keystone USB PHY driver
-for K2E.
+On Fri, Dec 1, 2017 at 9:44 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> This adds DT node for the GPIO/pinctrl part present in AXP813/AXP818.
+>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/axp81x.dtsi | 6 ++++++
+>  1 file changed, 6 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
+> index 73b761f..0ef959d 100644
+> --- a/arch/arm/boot/dts/axp81x.dtsi
+> +++ b/arch/arm/boot/dts/axp81x.dtsi
+> @@ -48,6 +48,12 @@
+>         interrupt-controller;
+>         #interrupt-cells = <1>;
+>
+> +       axp_gpio: axp-gpio {
+> +               compatible = "x-powers,axp813-gpio";
+> +               gpio-controller;
+> +               #gpio-cells = <2>;
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+What about interrupt-controller for directly referenced interrupts from
+the GPIO pins?
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 992a8a5da065..c4f4f6682ea5 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -185,6 +185,7 @@ CONFIG_MTD_NAND_BRCMNAND=y
- CONFIG_MTD_NAND_VF610_NFC=y
- CONFIG_MTD_NAND_DAVINCI=y
- CONFIG_MTD_SPI_NOR=y
-+CONFIG_SPI_CADENCE_QUADSPI=m
- CONFIG_SPI_FSL_QUADSPI=m
- CONFIG_MTD_UBI=y
- CONFIG_BLK_DEV_LOOP=y
-@@ -675,6 +676,7 @@ CONFIG_USB_CHIPIDEA_HOST=y
- CONFIG_USB_ISP1760=y
- CONFIG_USB_HSIC_USB3503=y
- CONFIG_AB8500_USB=y
-+CONFIG_KEYSTONE_USB_PHY=m
- CONFIG_NOP_USB_XCEIV=m
- CONFIG_USB_GPIO_VBUS=y
- CONFIG_USB_ISP1301=y
--- 
-2.15.1
+Otherwise,
+
+Acked-by: Chen-Yu Tsai <wens@csie.org>
+
+> +       };
+> +
+>         regulators {
+>                 /* Default work frequency for buck regulators */
+>                 x-powers,dcdc-freq = <3000>;
+> --
+> git-series 0.9.1
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
