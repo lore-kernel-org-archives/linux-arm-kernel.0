@@ -1,80 +1,118 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Tue, 5 Dec 2017 23:17:11 +0100
-Subject: [PATCH 09/12] firmware: arm_scpi: silence sparse warnings
+Date: Tue, 5 Dec 2017 23:16:42 +0100
+Subject: [PATCH 02/12] firmware: arm_scpi: make freeing mbox channels
+ device-managed
 In-Reply-To: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
 References: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
-Message-ID: <c9c7ff77-23f7-5536-4275-76f6ffd090da@gmail.com>
+Message-ID: <407a99ae-3e47-913c-b1e1-5548864a4ae5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-At several positions in the code sparse complains about incorrect access
-to __iomem annotated memory. Fix this and make sparse happy. 
+Make freeing the mbox channels device-managed, thus further simplifying
+scpi_remove and and one further step to get rid of scpi_remove.
 
 Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 ---
- drivers/firmware/arm_scpi.c | 17 +++++++++--------
- 1 file changed, 9 insertions(+), 8 deletions(-)
+ drivers/firmware/arm_scpi.c | 37 ++++++++++++++++---------------------
+ 1 file changed, 16 insertions(+), 21 deletions(-)
 
 diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 3a722e5a..b653ada4 100644
+index 2a30d255..4447738d 100644
 --- a/drivers/firmware/arm_scpi.c
 +++ b/drivers/firmware/arm_scpi.c
-@@ -405,19 +405,20 @@ static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
- 		unsigned int len;
+@@ -889,16 +889,13 @@ static struct attribute *versions_attrs[] = {
+ };
+ ATTRIBUTE_GROUPS(versions);
  
- 		if (scpi_info->is_legacy) {
--			struct legacy_scpi_shared_mem *mem = ch->rx_payload;
-+			struct legacy_scpi_shared_mem __iomem *mem =
-+							ch->rx_payload;
- 
- 			/* RX Length is not replied by the legacy Firmware */
- 			len = match->rx_len;
- 
--			match->status = le32_to_cpu(mem->status);
-+			match->status = ioread32(&mem->status);
- 			memcpy_fromio(match->rx_buf, mem->payload, len);
- 		} else {
--			struct scpi_shared_mem *mem = ch->rx_payload;
-+			struct scpi_shared_mem __iomem *mem = ch->rx_payload;
- 
- 			len = min(match->rx_len, CMD_SIZE(cmd));
- 
--			match->status = le32_to_cpu(mem->status);
-+			match->status = ioread32(&mem->status);
- 			memcpy_fromio(match->rx_buf, mem->payload, len);
- 		}
- 
-@@ -431,11 +432,11 @@ static void scpi_process_cmd(struct scpi_chan *ch, u32 cmd)
- static void scpi_handle_remote_msg(struct mbox_client *c, void *msg)
+-static void
+-scpi_free_channels(struct device *dev, struct scpi_chan *pchan, int count)
++static void scpi_free_channels(void *data)
  {
- 	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
--	struct scpi_shared_mem *mem = ch->rx_payload;
-+	struct scpi_shared_mem __iomem *mem = ch->rx_payload;
- 	u32 cmd = 0;
++	struct scpi_drvinfo *info = data;
+ 	int i;
  
- 	if (!scpi_info->is_legacy)
--		cmd = le32_to_cpu(mem->command);
-+		cmd = ioread32(&mem->command);
- 
- 	scpi_process_cmd(ch, cmd);
+-	for (i = 0; i < count && pchan->chan; i++, pchan++) {
+-		mbox_free_channel(pchan->chan);
+-		devm_kfree(dev, pchan->xfers);
+-		devm_iounmap(dev, pchan->rx_payload);
+-	}
++	for (i = 0; i < info->num_chans; i++)
++		mbox_free_channel(info->channels[i].chan);
  }
-@@ -445,7 +446,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
- 	unsigned long flags;
- 	struct scpi_xfer *t = msg;
- 	struct scpi_chan *ch = container_of(c, struct scpi_chan, cl);
--	struct scpi_shared_mem *mem = ch->tx_payload;
-+	struct scpi_shared_mem __iomem *mem = ch->tx_payload;
  
- 	if (t->tx_buf) {
- 		if (scpi_info->is_legacy)
-@@ -464,7 +465,7 @@ static void scpi_tx_prepare(struct mbox_client *c, void *msg)
+ static int scpi_remove(struct platform_device *pdev)
+@@ -911,7 +908,6 @@ static int scpi_remove(struct platform_device *pdev)
+ 
+ 	of_platform_depopulate(dev);
+ 	sysfs_remove_groups(&dev->kobj, versions_groups);
+-	scpi_free_channels(dev, info->channels, info->num_chans);
+ 	platform_set_drvdata(pdev, NULL);
+ 
+ 	for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
+@@ -950,7 +946,6 @@ static int scpi_probe(struct platform_device *pdev)
+ {
+ 	int count, idx, ret;
+ 	struct resource res;
+-	struct scpi_chan *scpi_chan;
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+ 
+@@ -967,13 +962,19 @@ static int scpi_probe(struct platform_device *pdev)
+ 		return -ENODEV;
  	}
  
- 	if (!scpi_info->is_legacy)
--		mem->command = cpu_to_le32(t->cmd);
-+		iowrite32(t->cmd, &mem->command);
- }
+-	scpi_chan = devm_kcalloc(dev, count, sizeof(*scpi_chan), GFP_KERNEL);
+-	if (!scpi_chan)
++	scpi_info->channels = devm_kcalloc(dev, count, sizeof(struct scpi_chan),
++					   GFP_KERNEL);
++	if (!scpi_info->channels)
+ 		return -ENOMEM;
  
- static struct scpi_xfer *get_scpi_xfer(struct scpi_chan *ch)
+-	for (idx = 0; idx < count; idx++) {
++	ret = devm_add_action(dev, scpi_free_channels, scpi_info);
++	if (ret)
++		return ret;
++
++	for (; scpi_info->num_chans < count; scpi_info->num_chans++) {
+ 		resource_size_t size;
+-		struct scpi_chan *pchan = scpi_chan + idx;
++		int idx = scpi_info->num_chans;
++		struct scpi_chan *pchan = scpi_info->channels + idx;
+ 		struct mbox_client *cl = &pchan->cl;
+ 		struct device_node *shmem = of_parse_phandle(np, "shmem", idx);
+ 
+@@ -981,15 +982,14 @@ static int scpi_probe(struct platform_device *pdev)
+ 		of_node_put(shmem);
+ 		if (ret) {
+ 			dev_err(dev, "failed to get SCPI payload mem resource\n");
+-			goto err;
++			return ret;
+ 		}
+ 
+ 		size = resource_size(&res);
+ 		pchan->rx_payload = devm_ioremap(dev, res.start, size);
+ 		if (!pchan->rx_payload) {
+ 			dev_err(dev, "failed to ioremap SCPI payload\n");
+-			ret = -EADDRNOTAVAIL;
+-			goto err;
++			return -EADDRNOTAVAIL;
+ 		}
+ 		pchan->tx_payload = pchan->rx_payload + (size >> 1);
+ 
+@@ -1015,14 +1015,9 @@ static int scpi_probe(struct platform_device *pdev)
+ 				dev_err(dev, "failed to get channel%d err %d\n",
+ 					idx, ret);
+ 		}
+-err:
+-		scpi_free_channels(dev, scpi_chan, idx);
+-		scpi_info = NULL;
+ 		return ret;
+ 	}
+ 
+-	scpi_info->channels = scpi_chan;
+-	scpi_info->num_chans = count;
+ 	scpi_info->commands = scpi_std_commands;
+ 
+ 	platform_set_drvdata(pdev, scpi_info);
 -- 
 2.15.1
