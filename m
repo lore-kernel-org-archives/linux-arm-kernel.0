@@ -1,48 +1,48 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 5 Dec 2017 09:58:54 +0900
-Subject: [PATCH 4/8] ASoC: uniphier: add support for UniPhier EVEA codec
-In-Reply-To: <20171204182027.2k5uw5og65h6ac7w@sirena.org.uk>
-References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
- <20171122114321.29196-5-suzuki.katsuhiro@socionext.com>
- <20171204182027.2k5uw5og65h6ac7w@sirena.org.uk>
-Message-ID: <CAK7LNAR=-vHN5k6irpaDcAUYcH2kjCXLJpf10RMuq=GZB3huog@mail.gmail.com>
+From: opendmb@gmail.com (Doug Berger)
+Date: Mon, 4 Dec 2017 17:01:57 -0800
+Subject: [PATCH 1/7 v2] net: bcmgenet: Fix platform_get_irq's error
+ checking
+In-Reply-To: <1512409703-20881-2-git-send-email-arvind.yadav.cs@gmail.com>
+References: <1512409703-20881-1-git-send-email-arvind.yadav.cs@gmail.com>
+ <1512409703-20881-2-git-send-email-arvind.yadav.cs@gmail.com>
+Message-ID: <7fd6f043-3e66-a03a-e2fa-c71cffe5019e@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+CC Greg-KH
-+CC Thomas Gleixner
+On 12/04/2017 09:48 AM, Arvind Yadav wrote:
+> The platform_get_irq() function returns negative number if an error occurs,
+> Zero if No irq is found and positive number if irq gets successful.
+> platform_get_irq() error checking only for zero is not correct.
+> 
+> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
+> ---
+> changes in v2:
+>              commit message was not correct.
+> 
+>  drivers/net/ethernet/broadcom/genet/bcmgenet.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/net/ethernet/broadcom/genet/bcmgenet.c b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+> index 24b4f4c..e2f1268 100644
+> --- a/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+> +++ b/drivers/net/ethernet/broadcom/genet/bcmgenet.c
+> @@ -3371,7 +3371,7 @@ static int bcmgenet_probe(struct platform_device *pdev)
+>  	priv->irq0 = platform_get_irq(pdev, 0);
+>  	priv->irq1 = platform_get_irq(pdev, 1);
+>  	priv->wol_irq = platform_get_irq(pdev, 2);
+> -	if (!priv->irq0 || !priv->irq1) {
+> +	if (priv->irq0 <= 0 || priv->irq1 <= 0 || priv->wol_irq <= 0) {
+>  		dev_err(&pdev->dev, "can't find IRQs\n");
+>  		err = -EINVAL;
+>  		goto err;
+> 
 
-2017-12-05 3:20 GMT+09:00 Mark Brown <broonie@kernel.org>:
-> On Wed, Nov 22, 2017 at 08:43:17PM +0900, Katsuhiro Suzuki wrote:
->
->> +++ b/sound/soc/uniphier/evea.c
->> @@ -0,0 +1,567 @@
->> +// SPDX-License-Identifier: GPL-2.0
->> +/*
->> + * Socionext UniPhier EVEA ADC/DAC codec driver.
->> + *
->> + * Copyright (c) 2016-2017 Socionext Inc.
->
-> Make the entire comment a C++ comment, don't mix and match like this -
-> it's ugly.  Otherwise this looks good so I'll apply it, please send a
-> followup patch fixing this (and I guess the same thing will apply to
-> other files).
+The absence of a Wake-on-LAN interrupt (wol_irq <= 0) is not a terminal
+error for the driver so it should not be included in this check.
 
+The error checking for irq0 and irq1 is appropriate to add, but it
+sounds like David Miller is proposing changing platform_get_irq() so
+I'll let that dust settle before saying whether <= or < is appropriate.
 
-Indeed ugly,
-but I think this is intentional to make the SPDX line stand out.
-
-
-Linus suggested this as far as I understood from the following:
-https://patchwork.kernel.org/patch/10016201/
-
-
-If you use C++ comment style for the entire block,
-it will not stand out.
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Thanks,
+    Doug
