@@ -1,72 +1,88 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  5 Dec 2017 16:10:16 +0100
-Subject: [PATCH v3 04/15] dt-bindings: display: sun4i-drm: Add A83T pipeline
+Date: Tue,  5 Dec 2017 16:10:19 +0100
+Subject: [PATCH v3 07/15] drm/sun4i: Create minimal multipliers and dividers
 In-Reply-To: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
 References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <3762a8428aaf207e80ae86d4db2e50473576bb6d.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <42424895bd242dceeeeacf3f83e1c24aa03fb60f.1512486553.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T has two video pipelines in parallel that looks quite similar to
-the other SoCs.
+The various outputs the TCON can provide have different constraints on the
+dotclock divider. Let's make them configurable by the various mode_set
+functions.
 
-The video planes are handled through a controller called the mixer, and the
-video signal is then passed to the timing controller (TCON).
-
-And while there is two instances of the mixers and TCONs, they have a
-significant number of differences. The TCONs are quite easy to deal with,
-one is supposed to generate TV (in the broader term, so including things
-like HDMI) signals, the other one LCD (so RGB, LVDS, DSI) signals. And
-while they are called TCON0 and TCON1 in the A83t datasheet, newer SoCs
-call them TCON-TV and TCON-LCD, which seems more appropriate.
-
-However, the mixers differ mostly by their capabilities, with some features
-being available only in the first one, or the number of planes they expose,
-but also through their register layout. And while the capabilities could be
-represented as properties, the register layout differences would need to
-express all the registers offsets as properties, which is usually quite
-bad. Especially since documentation on that hardware block is close to
-non-existant and we don't even have the list of all those registers in the
-first place.
-
-So let's call them mixer 0 and 1 in our compatibles, even though the name
-is pretty bad...
-
-At the moment, we only have tested the code on a board that has a single
-display output, so we're leaving the tcon-tv and mixer1 out.
-
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
- 1 file changed, 3 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_dotclock.c | 10 +++++++---
+ drivers/gpu/drm/sun4i/sun4i_tcon.c     |  2 ++
+ drivers/gpu/drm/sun4i/sun4i_tcon.h     |  2 ++
+ 3 files changed, 11 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index d4259a4f5171..338cb6bbf25c 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -93,6 +93,7 @@ Required properties:
-    * allwinner,sun6i-a31s-tcon
-    * allwinner,sun7i-a20-tcon
-    * allwinner,sun8i-a33-tcon
-+   * allwinner,sun8i-a83t-tcon-lcd
-    * allwinner,sun8i-v3s-tcon
-  - reg: base address and size of memory-mapped region
-  - interrupts: interrupt associated to this IP
-@@ -224,6 +225,7 @@ supported.
+diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+index d401156490f3..023f39bda633 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
++++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
+@@ -17,8 +17,9 @@
+ #include "sun4i_dotclock.h"
  
- Required properties:
-   - compatible: value must be one of:
-+    * allwinner,sun8i-a83t-de2-mixer-0
-     * allwinner,sun8i-v3s-de2-mixer
-   - reg: base address and size of the memory-mapped region.
-   - clocks: phandles to the clocks feeding the mixer
-@@ -253,6 +255,7 @@ Required properties:
-     * allwinner,sun6i-a31s-display-engine
-     * allwinner,sun7i-a20-display-engine
-     * allwinner,sun8i-a33-display-engine
-+    * allwinner,sun8i-a83t-display-engine
-     * allwinner,sun8i-v3s-display-engine
+ struct sun4i_dclk {
+-	struct clk_hw	hw;
+-	struct regmap	*regmap;
++	struct clk_hw		hw;
++	struct regmap		*regmap;
++	struct sun4i_tcon	*tcon;
+ };
  
-   - allwinner,pipelines: list of phandle to the display engine
+ static inline struct sun4i_dclk *hw_to_dclk(struct clk_hw *hw)
+@@ -73,11 +74,13 @@ static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
+ static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
+ 				  unsigned long *parent_rate)
+ {
++	struct sun4i_dclk *dclk = hw_to_dclk(hw);
++	struct sun4i_tcon *tcon = dclk->tcon;
+ 	unsigned long best_parent = 0;
+ 	u8 best_div = 1;
+ 	int i;
+ 
+-	for (i = 6; i <= 127; i++) {
++	for (i = tcon->dclk_min_div; i <= tcon->dclk_max_div; i++) {
+ 		unsigned long ideal = rate * i;
+ 		unsigned long rounded;
+ 
+@@ -167,6 +170,7 @@ int sun4i_dclk_create(struct device *dev, struct sun4i_tcon *tcon)
+ 	dclk = devm_kzalloc(dev, sizeof(*dclk), GFP_KERNEL);
+ 	if (!dclk)
+ 		return -ENOMEM;
++	dclk->tcon = tcon;
+ 
+ 	init.name = clk_name;
+ 	init.ops = &sun4i_dclk_ops;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index ea056a3d2131..46e28ca1f676 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -177,6 +177,8 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
+ 	u8 clk_delay;
+ 	u32 val = 0;
+ 
++	tcon->dclk_min_div = 6;
++	tcon->dclk_max_div = 127;
+ 	sun4i_tcon0_mode_set_common(tcon, mode);
+ 
+ 	/* Adjust clock delay */
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+index 839266a38505..bd3ad7684870 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
+@@ -169,6 +169,8 @@ struct sun4i_tcon {
+ 
+ 	/* Pixel clock */
+ 	struct clk			*dclk;
++	u8				dclk_max_div;
++	u8				dclk_min_div;
+ 
+ 	/* Reset control */
+ 	struct reset_control		*lcd_rst;
 -- 
 git-series 0.9.1
