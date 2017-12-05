@@ -1,25 +1,23 @@
 From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Tue, 5 Dec 2017 15:06:45 +0100
-Subject: [PATCH v2 4/5] ARM: imx_v4_v5_defconfig: enable RTC_DRV_MXC_V2
+Date: Tue, 5 Dec 2017 15:06:42 +0100
+Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
 In-Reply-To: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
 References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171205140646.30367-5-linux-kernel-dev@beckhoff.com>
+Message-ID: <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-Enable SRTC driver for i.MX53 in default config
+Document the binding for i.MX53 SRTC implemented by rtc-mxc_v2
 
-Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
+Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com><Paste>
 
 ---
 
-To: Shawn Guo <shawnguo@kernel.org>
-To: Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
+To: Alessandro Zummo <a.zummo@towertech.it>
+To: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-Cc: Alessandro Zummo <a.zummo@towertech.it>
-Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Cc: Rob Herring <robh+dt@kernel.org>
 Cc: Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
 Cc: linux-rtc at vger.kernel.org (open list:REAL TIME CLOCK (RTC) SUBSYSTEM)
@@ -28,26 +26,40 @@ Cc: linux-kernel at vger.kernel.org (open list)
 Cc: Fabio Estevam <fabio.estevam@nxp.com>
 Cc: Juergen Borleis <jbe@pengutronix.de>
 Cc: Noel Vellemans <Noel.Vellemans@visionbms.com>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
 Cc: Russell King <linux@armlinux.org.uk> (maintainer:ARM PORT)
 Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
 
 Cc: Philippe Ombredanne <pombredanne@nexb.com>
 Cc: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- arch/arm/configs/imx_v4_v5_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index ca0f13cafe38..b48efd5ff8a7 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -167,6 +167,7 @@ CONFIG_RTC_DRV_PCF8563=y
- CONFIG_RTC_DRV_IMXDI=y
- CONFIG_RTC_DRV_MC13XXX=y
- CONFIG_RTC_DRV_MXC=y
-+CONFIG_RTC_DRV_MXC_V2=y
- CONFIG_DMADEVICES=y
- CONFIG_IMX_DMA=y
- CONFIG_IMX_SDMA=y
+diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
+new file mode 100644
+index 000000000000..796e7f4995db
+--- /dev/null
++++ b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
+@@ -0,0 +1,17 @@
++* i.MX53 Real Time Clock controller
++
++Required properties:
++- compatible: should be: "fsl,imx53-rtc"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- clocks: should contain the phandle for the rtc clock
++- interrupts: rtc alarm interrupt
++
++Example:
++
++srtc at 53fa4000 {
++	compatible = "fsl,imx53-rtc";
++	reg = <0x53fa4000 0x4000>;
++	interrupts = <24>;
++	clocks = <&clks IMX5_CLK_SRTC_GATE>;
++};
 -- 
 2.11.0
