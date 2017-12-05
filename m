@@ -1,79 +1,62 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue,  5 Dec 2017 12:04:48 -0500
-Subject: [PATCH V6 3/7] device property: Introduce a common API to fetch
- device match data
+Date: Tue,  5 Dec 2017 12:04:52 -0500
+Subject: [PATCH V6 7/7] dmaengine: qcom_hidma: Add identity register support
 In-Reply-To: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
 References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512493493-6464-8-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an OF/ACPI function to obtain the driver data. We want to hide
-OF/ACPI details from the device drivers and abstract following the device
-family of functions.
+The location for destination event channel register has been relocated from
+offset 0x28 to 0x40. Update the code accordingly.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/base/property.c  | 6 ++++++
- include/linux/fwnode.h   | 4 ++++
- include/linux/property.h | 2 ++
- 3 files changed, 12 insertions(+)
+ drivers/dma/qcom/hidma.c | 11 ++++++++---
+ 1 file changed, 8 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/property.c b/drivers/base/property.c
-index 7ed99c1..65bf6f2 100644
---- a/drivers/base/property.c
-+++ b/drivers/base/property.c
-@@ -1335,3 +1335,9 @@ int fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
- 	return fwnode_call_int_op(fwnode, graph_parse_endpoint, endpoint);
- }
- EXPORT_SYMBOL(fwnode_graph_parse_endpoint);
-+
-+void *device_get_match_data(struct device *dev)
-+{
-+	return fwnode_call_ptr_op(dev_fwnode(dev), get_match_data, dev);
-+}
-+EXPORT_SYMBOL_GPL(device_get_match_data);
-diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-index 0c35b6c..ab9aab5 100644
---- a/include/linux/fwnode.h
-+++ b/include/linux/fwnode.h
-@@ -15,6 +15,7 @@
- #include <linux/types.h>
+diff --git a/drivers/dma/qcom/hidma.c b/drivers/dma/qcom/hidma.c
+index c146c6d..963cc52 100644
+--- a/drivers/dma/qcom/hidma.c
++++ b/drivers/dma/qcom/hidma.c
+@@ -107,6 +107,7 @@ static void hidma_free(struct hidma_dev *dmadev)
  
- struct fwnode_operations;
-+struct device;
- 
- struct fwnode_handle {
- 	struct fwnode_handle *secondary;
-@@ -66,6 +67,7 @@ struct fwnode_reference_args {
-  *			       endpoint node.
-  * @graph_get_port_parent: Return the parent node of a port node.
-  * @graph_parse_endpoint: Parse endpoint for port and endpoint id.
-+ * @get_match_data: Return the driver match data.
-  */
- struct fwnode_operations {
- 	void (*get)(struct fwnode_handle *fwnode);
-@@ -101,6 +103,8 @@ struct fwnode_operations {
- 	(*graph_get_port_parent)(struct fwnode_handle *fwnode);
- 	int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
- 				    struct fwnode_endpoint *endpoint);
-+	void *(*get_match_data)(const struct fwnode_handle *fwnode,
-+				struct device *dev);
+ enum hidma_cap {
+ 	HIDMA_MSI_CAP = 1,
++	HIDMA_IDENTITY_CAP,
  };
  
- #define fwnode_has_op(fwnode, op)				\
-diff --git a/include/linux/property.h b/include/linux/property.h
-index 6bebee1..01fa55b 100644
---- a/include/linux/property.h
-+++ b/include/linux/property.h
-@@ -275,6 +275,8 @@ int device_add_properties(struct device *dev,
+ /* process completed descriptors */
+@@ -838,7 +839,10 @@ static int hidma_probe(struct platform_device *pdev)
+ 	if (!dmadev->nr_descriptors)
+ 		dmadev->nr_descriptors = HIDMA_NR_DEFAULT_DESC;
  
- enum dev_dma_attr device_get_dma_attr(struct device *dev);
+-	dmadev->chidx = readl(dmadev->dev_trca + 0x28);
++	if (hidma_test_capability(&pdev->dev, HIDMA_IDENTITY_CAP))
++		dmadev->chidx = readl(dmadev->dev_trca + 0x40);
++	else
++		dmadev->chidx = readl(dmadev->dev_trca + 0x28);
  
-+void *device_get_match_data(struct device *dev);
-+
- int device_get_phy_mode(struct device *dev);
- 
- void *device_get_mac_address(struct device *dev, char *addr, int alen);
+ 	/* Set DMA mask to 64 bits. */
+ 	rc = dma_set_mask_and_coherent(&pdev->dev, DMA_BIT_MASK(64));
+@@ -944,7 +948,7 @@ static int hidma_remove(struct platform_device *pdev)
+ static const struct acpi_device_id hidma_acpi_ids[] = {
+ 	{"QCOM8061"},
+ 	{"QCOM8062", HIDMA_MSI_CAP},
+-	{"QCOM8063", HIDMA_MSI_CAP},
++	{"QCOM8063", (HIDMA_MSI_CAP | HIDMA_IDENTITY_CAP)},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(acpi, hidma_acpi_ids);
+@@ -953,7 +957,8 @@ static int hidma_remove(struct platform_device *pdev)
+ static const struct of_device_id hidma_match[] = {
+ 	{.compatible = "qcom,hidma-1.0",},
+ 	{.compatible = "qcom,hidma-1.1", .data = (void *)(HIDMA_MSI_CAP),},
+-	{.compatible = "qcom,hidma-1.2", .data = (void *)(HIDMA_MSI_CAP),},
++	{.compatible = "qcom,hidma-1.2",
++	 .data = (void *)(HIDMA_MSI_CAP | HIDMA_IDENTITY_CAP),},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, hidma_match);
 -- 
 1.9.1
