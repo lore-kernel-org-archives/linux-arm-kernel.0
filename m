@@ -1,47 +1,51 @@
 From: tyler@opensourcefoundries.com (tyler at opensourcefoundries.com)
-Date: Tue,  5 Dec 2017 14:27:01 -0800
-Subject: [PATCH v1 0/6] ARM: dts: introduce Compulab IoT Gateway
-Message-ID: <20171205222707.11302-1-tyler@opensourcefoundries.com>
+Date: Tue,  5 Dec 2017 14:27:04 -0800
+Subject: [PATCH v1 3/6] ARM: dts: imx7s: add dma support
+In-Reply-To: <20171205222707.11302-1-tyler@opensourcefoundries.com>
+References: <20171205222707.11302-1-tyler@opensourcefoundries.com>
+Message-ID: <20171205222707.11302-4-tyler@opensourcefoundries.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Tyler Baker <tyler@opensourcefoundries.com>
 
-The Compulab IoT Gateway is based on an NXP i.MX7D, dual core
-Cortex-A7 clocking at 1GHz. It supports up to 2GB of DDR3,
-and 32GB of eMMC flash. Onboard, there are two gigabit
-ethernet controllers, 4 x USB2, RS485, and CAN.
+Enable dma on all SPI interfaces.
 
-It uses the same SoM as the cl-som-imx7, but includes a baseboard 
-with additional I/O.
+Signed-off-by: Tyler Baker <tyler@opensourcefoundries.com>
+---
+ arch/arm/boot/dts/imx7s.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Compulab has provided patches for this platform based on v4.1. 
-I've used these patches as reference to get things working on tip.
-
-Changes for v1 (Requested by Fabio)
-  * Squashed the dts build into the initial patch
-  * Dropped the phy refclk patch from this series, submitting to PCI list
-  * Removed fsl,spi-num-chipselects property
-  * Removed LCD and DVI nodes, will follow up with a later series
-  * s/fsl,uart-has-rtscts/uart-has-rtscts/g
-  * Fixed regulator usage inside of simple-bus
-
-The entire series is based on v4.15-rc2.
-
-Tyler Baker (6):
-  ARM: dts: imx7d-sbc-iot: add initial iot gateway dts
-  ARM: dts: imx7d-cl-som: add nodes for usbh, and usbotg2
-  ARM: dts: imx7s: add dma support
-  ARM: dts: imx7s: add node and supplies for vdd1p2
-  ARM: dts: imx7d-sbc-iot: enable PCIe peripheral
-  ARM: dts: imx7s: add usb hsic phy domain
-
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/imx7d-cl-som-imx7.dts  |  34 +++++--
- arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts | 169 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/imx7s.dtsi             |  29 +++++-
- 4 files changed, 225 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm/boot/dts/imx7d-sbc-iot-imx7.dts
-
+diff --git a/arch/arm/boot/dts/imx7s.dtsi b/arch/arm/boot/dts/imx7s.dtsi
+index 82ad26e..7b85659 100644
+--- a/arch/arm/boot/dts/imx7s.dtsi
++++ b/arch/arm/boot/dts/imx7s.dtsi
+@@ -700,6 +700,8 @@
+ 				clocks = <&clks IMX7D_ECSPI1_ROOT_CLK>,
+ 					<&clks IMX7D_ECSPI1_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 0 7 1>, <&sdma 1 7 2>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -712,6 +714,8 @@
+ 				clocks = <&clks IMX7D_ECSPI2_ROOT_CLK>,
+ 					<&clks IMX7D_ECSPI2_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 2 7 1>, <&sdma 3 7 2>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
+@@ -724,6 +728,8 @@
+ 				clocks = <&clks IMX7D_ECSPI3_ROOT_CLK>,
+ 					<&clks IMX7D_ECSPI3_ROOT_CLK>;
+ 				clock-names = "ipg", "per";
++				dmas = <&sdma 4 7 1>, <&sdma 5 7 2>;
++				dma-names = "rx", "tx";
+ 				status = "disabled";
+ 			};
+ 
 -- 
 2.9.3
