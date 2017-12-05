@@ -1,56 +1,44 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 5 Dec 2017 11:28:15 +0100
-Subject: [PATCH] mtd: nand: squash struct nand_buffers into struct
- nand_chip
-In-Reply-To: <CAK7LNATtk9=i3HkPrW=F1YtnM1vvEM3NtMZcPNi_0C5s_X1X1A@mail.gmail.com>
-References: <1512366470-16772-1-git-send-email-yamada.masahiro@socionext.com>
- <20171204101043.602ff213@bbrezillon>
- <CAK7LNATtk9=i3HkPrW=F1YtnM1vvEM3NtMZcPNi_0C5s_X1X1A@mail.gmail.com>
-Message-ID: <20171205112815.0b59ab2d@bbrezillon>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 5 Dec 2017 11:28:40 +0100
+Subject: [RFC PATCH 1/6] drm: Add Content Protection property
+In-Reply-To: <20171130030907.26848-2-seanpaul@chromium.org>
+References: <20171130030907.26848-1-seanpaul@chromium.org>
+ <20171130030907.26848-2-seanpaul@chromium.org>
+Message-ID: <20171205102840.GB12982@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Dec 2017 19:02:26 +0900
-Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
-
-> Hi Boris,
+On Wed 2017-11-29 22:08:56, Sean Paul wrote:
+> This patch adds a new optional connector property to allow userspace to enable
+> protection over the content it is displaying. This will typically be implemented
+> by the driver using HDCP.
 > 
-> 2017-12-04 18:10 GMT+09:00 Boris Brezillon
-> <boris.brezillon@free-electrons.com>:
+> The property is a tri-state with the following values:
+> - OFF: Self explanatory, no content protection
+> - DESIRED: Userspace requests that the driver enable protection
+> - ENABLED: Once the driver has authenticated the link, it sets this value
 > 
-> >>       }
-> >>
-> >>       if (!(chip->options & NAND_OWN_BUFFERS)) {
-> >> -             nbuf = kzalloc(sizeof(*nbuf), GFP_KERNEL);
-> >> -             if (!nbuf)
-> >> +             chip->ecccalc = kmalloc(mtd->oobsize, GFP_KERNEL);
-> >> +             if (!chip->ecccalc)
-> >>                       return -ENOMEM;
-> >>
-> >> -             nbuf->ecccalc = kmalloc(mtd->oobsize, GFP_KERNEL);
-> >> -             if (!nbuf->ecccalc) {
-> >> +             chip->ecccode = kmalloc(mtd->oobsize, GFP_KERNEL);
-> >> +             if (!chip->ecccode) {
-> >>                       ret = -ENOMEM;
-> >>                       goto err_free_nbuf;
-> >>               }  
-> >
-> > Hm, again not directly related to this patch, but I wonder if we
-> > couldn't allocate those buffers only when they are really needed.
-> > For example, most NAND controllers do the ECC calculation/correct
-> > in HW and simply don't need those buffers.  
-> 
-> 
-> The only idea I came up with is to add a new flag,
-> but I am not sure if you are happy with it
-> because we are removing NAND_OWN_BUFFERS.
+> The driver is responsible for downgrading ENABLED to DESIRED if the link becomes
+> unprotected. The driver should also maintain the desiredness of protection
+> across hotplug/dpms/suspend.
 
-All drivers using ->calc/code_buf are providing a ->correct() and/or
-->calculate() method, so I thought we could make the allocation
-dependent on the presence of one of these hooks [1].
+Why would user of the machine want this to be something else than
+'OFF'?
 
-The only exception is the denali driver, but I think we can patch it
-to not use the ->code_buf buffer [2].
+If kernel implements this, will it mean hardware vendors will have to
+prevent user from updating kernel on machines they own?
 
-[1]http://code.bulix.org/2ks7yp-236649
-[2]http://code.bulix.org/sxqx7o-236650
+If this is merged, does it open kernel developers to DMCA threats if
+they try to change it?
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/db10c986/attachment.sig>
