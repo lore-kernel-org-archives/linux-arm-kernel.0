@@ -1,251 +1,60 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 5 Dec 2017 10:35:16 +0000
-Subject: [PATCH] soc: qcom: Separate kryo l2 accessors from PMU driver
-In-Reply-To: <1512455630-25119-1-git-send-email-ilialin@codeaurora.org>
-References: <1512455630-25119-1-git-send-email-ilialin@codeaurora.org>
-Message-ID: <20171205103516.bczf43vvpcin24zl@lakrids.cambridge.arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Tue, 5 Dec 2017 11:36:18 +0100
+Subject: [PATCH v2 00/27] Improve DE2 support
+In-Reply-To: <20171201060550.10392-1-jernej.skrabec@siol.net>
+References: <20171201060550.10392-1-jernej.skrabec@siol.net>
+Message-ID: <20171205103618.ps64m57xemsbo44r@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Tue, Dec 05, 2017 at 08:33:50AM +0200, Ilia Lin wrote:
-> The driver provides kernel level API for other drivers
-> to access the MSM8996 L2 cache registers.
-> Separating the L2 access code from the PMU driver and
-> making it public to allow other drivers use it.
-> The accesses must be separated with a single spinlock,
-> maintained in this driver.
+On Fri, Dec 01, 2017 at 07:05:23AM +0100, Jernej Skrabec wrote:
+> Current DE2 driver is very basic and uses a lot of magic constants since
+> there is no documentation and knowledge about it was limited at the time.
 > 
-> Change-Id: I2865e888491e85d678e298279400c371427e30ea
-> Signed-off-by: Ilia Lin <ilialin@codeaurora.org>
-
-What other driver is going to use this?
-
-Until there is another driver, I don't see much point in factoring this
-out.
-
-Thanks,
-Mark.
-
-> ---
->  arch/arm64/Kconfig.platforms         |  7 ++++
->  drivers/perf/qcom_l2_pmu.c           | 48 +--------------------------
->  drivers/soc/qcom/Makefile            |  1 +
->  drivers/soc/qcom/kryo-l2-accessors.c | 64 ++++++++++++++++++++++++++++++++++++
->  include/soc/qcom/kryo-l2-accessors.h | 27 +++++++++++++++
->  5 files changed, 100 insertions(+), 47 deletions(-)
->  create mode 100644 drivers/soc/qcom/kryo-l2-accessors.c
->  create mode 100644 include/soc/qcom/kryo-l2-accessors.h
+> With studying BSP source code, deeper knowledge was gained which allows
+> to improve mainline driver considerably.
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 2401373..1cfed45 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -138,6 +138,13 @@ config ARCH_QCOM
->  	help
->  	  This enables support for the ARMv8 based Qualcomm chipsets.
->  
-> +config ARCH_MSM8996
-> +    bool "Enable Support for Qualcomm Technologies, Inc. MSM8996"
-> +	depends on ARCH_QCOM
-> +	help
-> +	This enables support for the MSM8996 chipset. If you do not
-> +	wish to build a kernel that runs on this chipset, say 'N' here.
-> +
->  config ARCH_REALTEK
->  	bool "Realtek Platforms"
->  	help
-> diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
-> index 4fdc848..ba5f241 100644
-> --- a/drivers/perf/qcom_l2_pmu.c
-> +++ b/drivers/perf/qcom_l2_pmu.c
-> @@ -30,7 +30,7 @@
->  
->  #include <asm/barrier.h>
->  #include <asm/local64.h>
-> -#include <asm/sysreg.h>
-> +#include <soc/qcom/kryo-l2-accessors.h>
->  
->  #define MAX_L2_CTRS             9
->  
-> @@ -87,9 +87,6 @@
->  #define L2_COUNTER_RELOAD       BIT_ULL(31)
->  #define L2_CYCLE_COUNTER_RELOAD BIT_ULL(63)
->  
-> -#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
-> -#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
-> -
->  #define reg_idx(reg, i)         (((i) * IA_L2_REG_OFFSET) + reg##_BASE)
->  
->  /*
-> @@ -107,49 +104,6 @@
->  #define L2_EVENT_STREX                     0x421
->  #define L2_EVENT_CLREX                     0x422
->  
-> -static DEFINE_RAW_SPINLOCK(l2_access_lock);
-> -
-> -/**
-> - * set_l2_indirect_reg: write value to an L2 register
-> - * @reg: Address of L2 register.
-> - * @value: Value to be written to register.
-> - *
-> - * Use architecturally required barriers for ordering between system register
-> - * accesses
-> - */
-> -static void set_l2_indirect_reg(u64 reg, u64 val)
-> -{
-> -	unsigned long flags;
-> -
-> -	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> -	write_sysreg_s(reg, L2CPUSRSELR_EL1);
-> -	isb();
-> -	write_sysreg_s(val, L2CPUSRDR_EL1);
-> -	isb();
-> -	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> -}
-> -
-> -/**
-> - * get_l2_indirect_reg: read an L2 register value
-> - * @reg: Address of L2 register.
-> - *
-> - * Use architecturally required barriers for ordering between system register
-> - * accesses
-> - */
-> -static u64 get_l2_indirect_reg(u64 reg)
-> -{
-> -	u64 val;
-> -	unsigned long flags;
-> -
-> -	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> -	write_sysreg_s(reg, L2CPUSRSELR_EL1);
-> -	isb();
-> -	val = read_sysreg_s(L2CPUSRDR_EL1);
-> -	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> -
-> -	return val;
-> -}
-> -
->  struct cluster_pmu;
->  
->  /*
-> diff --git a/drivers/soc/qcom/Makefile b/drivers/soc/qcom/Makefile
-> index 40c56f6..2bf8d93 100644
-> --- a/drivers/soc/qcom/Makefile
-> +++ b/drivers/soc/qcom/Makefile
-> @@ -10,3 +10,4 @@ obj-$(CONFIG_QCOM_SMEM_STATE) += smem_state.o
->  obj-$(CONFIG_QCOM_SMP2P)	+= smp2p.o
->  obj-$(CONFIG_QCOM_SMSM)	+= smsm.o
->  obj-$(CONFIG_QCOM_WCNSS_CTRL) += wcnss_ctrl.o
-> +obj-$(CONFIG_ARCH_MSM8996) +=	kryo-l2-accessors.o
-> diff --git a/drivers/soc/qcom/kryo-l2-accessors.c b/drivers/soc/qcom/kryo-l2-accessors.c
-> new file mode 100644
-> index 0000000..6be57e6
-> --- /dev/null
-> +++ b/drivers/soc/qcom/kryo-l2-accessors.c
-> @@ -0,0 +1,64 @@
-> +/*
-> + * Copyright (c) 2014-2015, 2017, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/spinlock.h>
-> +#include <asm/sysreg.h>
-> +#include <soc/qcom/kryo-l2-accessors.h>
-> +
-> +#define L2CPUSRSELR_EL1         sys_reg(3, 3, 15, 0, 6)
-> +#define L2CPUSRDR_EL1           sys_reg(3, 3, 15, 0, 7)
-> +
-> +static DEFINE_RAW_SPINLOCK(l2_access_lock);
-> +
-> +/**
-> + * set_l2_indirect_reg: write value to an L2 register
-> + * @reg: Address of L2 register.
-> + * @value: Value to be written to register.
-> + *
-> + * Use architecturally required barriers for ordering between system register
-> + * accesses, and system registers with respect to device memory
-> + */
-> +void set_l2_indirect_reg(u64 reg, u64 val)
-> +{
-> +	unsigned long flags;
-> +	mb();
-> +	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> +	write_sysreg_s(reg, L2CPUSRSELR_EL1);
-> +	isb();
-> +	write_sysreg_s(val, L2CPUSRDR_EL1);
-> +	isb();
-> +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> +}
-> +EXPORT_SYMBOL(set_l2_indirect_reg);
-> +
-> +/**
-> + * get_l2_indirect_reg: read an L2 register value
-> + * @reg: Address of L2 register.
-> + *
-> + * Use architecturally required barriers for ordering between system register
-> + * accesses, and system registers with respect to device memory
-> + */
-> +u64 get_l2_indirect_reg(u64 reg)
-> +{
-> +	u64 val;
-> +	unsigned long flags;
-> +
-> +	raw_spin_lock_irqsave(&l2_access_lock, flags);
-> +	write_sysreg_s(reg, L2CPUSRSELR_EL1);
-> +	isb();
-> +	val = read_sysreg_s(L2CPUSRDR_EL1);
-> +	raw_spin_unlock_irqrestore(&l2_access_lock, flags);
-> +
-> +	return val;
-> +}
-> +EXPORT_SYMBOL(get_l2_indirect_reg);
-> diff --git a/include/soc/qcom/kryo-l2-accessors.h b/include/soc/qcom/kryo-l2-accessors.h
-> new file mode 100644
-> index 0000000..2bebce1
-> --- /dev/null
-> +++ b/include/soc/qcom/kryo-l2-accessors.h
-> @@ -0,0 +1,27 @@
-> +/*
-> + * Copyright (c) 2017, The Linux Foundation. All rights reserved.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 and
-> + * only version 2 as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#ifndef __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
-> +#define __ASM_ARCH_MSM_MSM_KRYO_L2_ACCESSORS_H
-> +
-> +#ifdef CONFIG_ARCH_QCOM
-> +void set_l2_indirect_reg(u64 reg_addr, u64 val);
-> +u64 get_l2_indirect_reg(u64 reg_addr);
-> +#else
-> +static inline void set_l2_indirect_reg(u32 reg_addr, u32 val) {}
-> +static inline u32 get_l2_indirect_reg(u32 reg_addr)
-> +{
-> +	return 0;
-> +}
-> +#endif
-> +#endif
-> -- 
-> 1.9.1
+> At the beginning of this series, some code refactoring is done as well
+> as adding some checks (patches 1-15).
 > 
+> Further patches add multi-plane support with HW scaling and all possible
+> RGB formats (patches 16-21).
 > 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> At last, support for YUV formats is added (patches 22-26).
+> 
+> At the end, I included patch which puts lowest plane before second lowest.
+> This should help testing VI planes when mixer has configuration 1 VI plane
+> and 1 or more UI planes (most SoCs except V3s).
+> 
+> This code was developed on H3, but it should work on every SoC if correct
+> configuration structure is provided.
+> 
+> H3 code can be found here:
+> https://github.com/jernejsk/linux-1/commits/de2_impr_for_next
+
+Thanks a lot for that huge rework.
+
+I've applied the patches 1 to 26, and will push them to drm-misc once
+the compilations are done.
+
+In the future, if you happen to do such a huge rework again (which
+hopefully won't be needed :)), please use the -M option of
+format-patch. It will reduce a lot the verbosity of files renaming and
+will help the review.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/45d8e03c/attachment.sig>
