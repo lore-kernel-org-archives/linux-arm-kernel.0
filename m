@@ -1,78 +1,31 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Tue, 5 Dec 2017 09:15:57 -0800
-Subject: [PATCH] ARM: multi_v7_defconfig: Add configs for peripherals on
- Keystone2 SoCs
-In-Reply-To: <c2383f7c-a537-166a-de88-c6c8593beb83@ti.com>
-References: <20171205091940.22957-1-vigneshr@ti.com>
- <fffba75f-6674-f293-d2c5-53eb477c0e76@oracle.com>
- <c2383f7c-a537-166a-de88-c6c8593beb83@ti.com>
-Message-ID: <d96a1561-926f-dec1-a4a3-91cd53b319e9@oracle.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 5 Dec 2017 12:13:06 -0500
+Subject: [PATCH V5 1/7] Documentation: DT: qcom_hidma: Bump HW revision
+ for the bugfixed HW
+In-Reply-To: <20171204221414.f5tphhn7gvlle3li@rob-hp-laptop>
+References: <1512188864-773-1-git-send-email-okaya@codeaurora.org>
+ <1512188864-773-2-git-send-email-okaya@codeaurora.org>
+ <20171204221414.f5tphhn7gvlle3li@rob-hp-laptop>
+Message-ID: <61d54e4c-5ec9-441e-07bf-598204d772c6@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/5/17 9:10 AM, Vignesh R wrote:
+On 12/4/2017 5:14 PM, Rob Herring wrote:
+> Hopefully 1.2 corresponds to some actual version numbering and not just 
+> something you made up. I'd really rather have SoC based compatible 
+> strings unless you have dozens of SoCs for each version. I'll probably 
+> just say the same thing again when 1.3 or 2.0 gets added...
 > 
-> 
-> On 05-Dec-17 10:19 PM, Santosh Shilimkar wrote:
->> On 12/5/2017 1:19 AM, Vignesh R wrote:
->>> Enable Cadence QSPI present on 66AK2G SoC and Keystone USB PHY driver
->>> for K2E.
->>>
->>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>> ---
->>>    arch/arm/configs/multi_v7_defconfig | 2 ++
->>>    1 file changed, 2 insertions(+)
->>>
->>> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
->>> index 992a8a5da065..c4f4f6682ea5 100644
->>> --- a/arch/arm/configs/multi_v7_defconfig
->>> +++ b/arch/arm/configs/multi_v7_defconfig
->>> @@ -185,6 +185,7 @@ CONFIG_MTD_NAND_BRCMNAND=y
->>>    CONFIG_MTD_NAND_VF610_NFC=y
->>>    CONFIG_MTD_NAND_DAVINCI=y
->>>    CONFIG_MTD_SPI_NOR=y
->>> +CONFIG_SPI_CADENCE_QUADSPI=m
->>>    CONFIG_SPI_FSL_QUADSPI=m
->>>    CONFIG_MTD_UBI=y
->>>    CONFIG_BLK_DEV_LOOP=y
->>> @@ -675,6 +676,7 @@ CONFIG_USB_CHIPIDEA_HOST=y
->>>    CONFIG_USB_ISP1760=y
->>>    CONFIG_USB_HSIC_USB3503=y
->>>    CONFIG_AB8500_USB=y
->>> +CONFIG_KEYSTONE_USB_PHY=m
->>>    CONFIG_NOP_USB_XCEIV=m
->>>    CONFIG_USB_GPIO_VBUS=y
->>>    CONFIG_USB_ISP1301=y
->>>
->> There are more peripherals/drivers which are enabled
->> in keystone config.
->>
->> PWM_TIECAP, CAN_C_CAN, RESET_TI_SYSCON, TI_SCI_PROTOCOL,
->> TI_MESSAGE_MANAGER, NOP_USB_XCEIV, GPIO_PCA953X etc etc
->>
->> Could please check the complete config and update the
->> patch please ?
->>
-> 
-> On linux-next(on which this patch is based on) I see commit:
-> commit f15187dcdbcd8e649948a525153a356b35993655
-> Author: Santosh Shilimkar <santosh.shilimkar@oracle.com>
-> Date:   Sat Dec 2 19:53:29 2017 -0800
-> 
->      ARM: config: sync multi-v7 config with keystone peripherals
-> 
->      Signed-off-by: Santosh Shilimkar <santosh.shilimkar@oracle.com>
-> 
-> 
-> This commit enables all drivers for K2 platforms including the ones you
-> mentioned. I added the two missing ones in this patch.
-> There are some configs related to net which I am not sure whether to
-> enable or not and how it affects other platforms. But AFAICS, there are
-> no drivers left to be enabled.
-> 
-I didn't realized pf pushing that change out. It was not complete but
-since you already verified it, I will add your patch on to of it.
-Thanks for checking Vignesh !!
 
-Regards,
-Santosh
+No, these are coming from the HW. They are user visible. 
+
+[  107.167207] hidma-mgmt QCOM8060:00: HW rev: 1.2 @ 0x0000ffff8b800000 with 6 physical channels
+
+> Reviewed-by: Rob Herring <robh@kernel.org>
+
+Thanks
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
