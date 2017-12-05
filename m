@@ -1,62 +1,82 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Dec 2017 10:39:45 +0100
-Subject: [linux-sunxi] [PATCH v4 09/10] ARM: dtsi: axp81x: add GPIO DT node
-In-Reply-To: <CAGb2v65mOwNBdit=gKOq0=iv94FNuH__4yvCw4v0NHYiCKccBw@mail.gmail.com>
-References: <cover.3ff63fdf302c6bda02ea7d160ad2aa5afee0899d.1512135804.git-series.quentin.schulz@free-electrons.com>
- <af90c57ebf97c8f5504a4b5b1dad3638bedadfef.1512135804.git-series.quentin.schulz@free-electrons.com>
- <CAGb2v65mOwNBdit=gKOq0=iv94FNuH__4yvCw4v0NHYiCKccBw@mail.gmail.com>
-Message-ID: <20171205093945.5sudt23fag7q3ric@flea.lan>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Tue, 5 Dec 2017 10:43:50 +0100
+Subject: [PATCH 3/3] arm64/sve: KVM: Avoid dereference of dead task
+ during guest entry
+In-Reply-To: <20171204153648.GV22781@e103592.cambridge.arm.com>
+References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
+ <1512141582-17474-4-git-send-email-Dave.Martin@arm.com>
+ <CAKv+Gu_e3SKsreYHrZEBUMEME-pYtxTXW1P6xLUR6YMQfj0cZw@mail.gmail.com>
+ <20171204153648.GV22781@e103592.cambridge.arm.com>
+Message-ID: <20171205094350.GJ32397@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Dave,
 
-On Tue, Dec 05, 2017 at 05:24:47PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Dec 1, 2017 at 9:44 PM, Quentin Schulz
-> <quentin.schulz@free-electrons.com> wrote:
-> > This adds DT node for the GPIO/pinctrl part present in AXP813/AXP818.
-> >
-> > Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> > ---
-> >  arch/arm/boot/dts/axp81x.dtsi | 6 ++++++
-> >  1 file changed, 6 insertions(+)
-> >
-> > diff --git a/arch/arm/boot/dts/axp81x.dtsi b/arch/arm/boot/dts/axp81x.dtsi
-> > index 73b761f..0ef959d 100644
-> > --- a/arch/arm/boot/dts/axp81x.dtsi
-> > +++ b/arch/arm/boot/dts/axp81x.dtsi
-> > @@ -48,6 +48,12 @@
-> >         interrupt-controller;
-> >         #interrupt-cells = <1>;
-> >
-> > +       axp_gpio: axp-gpio {
-> > +               compatible = "x-powers,axp813-gpio";
-> > +               gpio-controller;
-> > +               #gpio-cells = <2>;
+On Mon, Dec 04, 2017 at 03:36:50PM +0000, Dave Martin wrote:
+> On Mon, Dec 04, 2017 at 01:53:21PM +0000, Ard Biesheuvel wrote:
+> > On 1 December 2017 at 15:19, Dave Martin <Dave.Martin@arm.com> wrote:
+> > > When deciding whether to invalidate FPSIMD state cached in the cpu,
+> > > the backend function sve_flush_cpu_state() attempts to dereference
+> > > __this_cpu_read(fpsimd_last_state).  However, this is not safe:
+> > > there is no guarantee that the pointer is still valid, because the
+> > > task could have exited in the meantime.  For this reason, this
+> > > percpu pointer should only be assigned or compared, never
+> > > dereferenced.
+> > >
+> > 
+> > Doesn't that mean the pointer could also be pointing to the
+> > fpsimd_state of a newly created task that is completely unrelated?
+> > IOW, are you sure comparison is safe?
 > 
-> What about interrupt-controller for directly referenced interrupts from
-> the GPIO pins?
-
-There's a bit more to it to enable interrupts. You would probably need
-to set up a chained interrupt controller in the GPIO driver, and in
-the DTS with a interrupt-parent and interrupts properties pointing to
-the AXP device itself.
-
-> Otherwise,
+> There are more conditions: the only place the determination is
+> made is for next, in fpsimd_thread_switch(next).
 > 
-> Acked-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> However, I can see your concern and I'm not sure how/if it is
+> resolved.
+> 
+> For the worst case, let's assume that some child forks off but
+> doesn't enter userspace yet, while another task round-robins
+> across all CPUs, interspersed with tasks that don't enter userspace.
+> 
+> So, we end up with
+> 
+> All cpu < NR_CPUS . per_cpu(fpsimd_last_state, cpu) == T.
+> 
+> Now, if T dies and a new task is allocated the same task_struct pointer,
+> then the _new_ T is guaranteed to get scheduled in on a CPU whose
+> per_cpu(fpsmid_last_state) == T.
+> 
+> Thus, new T can pick up old T's regs _unless_ new T's fpsimd_state.cpu
+> is invalid (i.e., NR_CPUS).
+> 
+> This is a separate bug from the one addressed by this patch though.
+> We can't go and harvest the bad pointers when old T exits, because
+> this might race new T being scheduled for real -- in any case it
+> would involve iterating over all CPUs which sounds racy and
+> inefficient.
+> 
+> 
+> So, I'd say we _must_ call fpsimd_flush_task_state() for every new
+> task.  This may result in a redundant reload of the state, but this
+> is what would happen anyway if the pointers did not alias.
+> 
+> Does this sound real to you?  If so, I'll try to write something.
+> 
+> And does this patch look reasonable to fix what it's trying to fix?
+> 
+> 
+> I wonder whether arch/arm has the same bug actually, since the kernel-
+> mode NEON logic was modelled from there IIUC (?)
+> 
+Isn't this the common kernel problem of pid reuse?
 
-Applied 9 and 10, thanks!
-Maxime
+It seems holding a reference to a struct pid would solve your problems.
+See include/linux/pid.h.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/19eb2779/attachment.sig>
+That might also make the code more intuitive and prevent future attempts
+of dereferencing potentially dead data structures.
+
+Thanks,
+-Christoffer
