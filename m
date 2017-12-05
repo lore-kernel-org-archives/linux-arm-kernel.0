@@ -1,64 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue,  5 Dec 2017 16:10:13 +0100
-Subject: [PATCH v3 01/15] dt-bindings: panel: lvds: Document power-supply
- property
+Date: Tue,  5 Dec 2017 16:10:24 +0100
+Subject: [PATCH v3 12/15] ARM: dts: sun8i: a83t: Add LVDS pins group
 In-Reply-To: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
 References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <97ebf0615821d79e8d7718594fe3a542a743a05f.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <2fc5348028da2eeb0d878796593f39265569e929.1512486553.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power-supply property is used by a vast majority of panels, including
-panel-simple. Let's document it as a common property
+The A83T has an LVDS bus that can be connected to a panel or a bridge. Add
+the pinctrl group for it.
 
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
- Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
- Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +-
- 3 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a83t.dtsi | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-index ec52c472c845..125ea68052af 100644
---- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-+++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-@@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
-   while active. Active high reset signals can be supported by inverting the
-   GPIO specifier polarity flag.
+diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
+index 7a49b9f085eb..e200df5a9058 100644
+--- a/arch/arm/boot/dts/sun8i-a83t.dtsi
++++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
+@@ -415,6 +415,12 @@
+ 			#interrupt-cells = <3>;
+ 			#gpio-cells = <3>;
  
-+Power
-+-----
++			lcd_lvds_pins: lcd-lvds-pins {
++				pins = "PD18", "PD19", "PD20", "PD21", "PD22",
++				       "PD23", "PD24", "PD25", "PD26", "PD27";
++				function = "lvds0";
++			};
 +
-+- power-supply: many display panels need an additional power supply in
-+  order to be fully powered-up. For such panels, power-supply contains
-+  a phandle to the regulator powering the panel.
- 
- Backlight
- ---------
-diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-index b938269f841e..250850a2150b 100644
---- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-+++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-@@ -32,6 +32,7 @@ Optional properties:
- - label: See panel-common.txt.
- - gpios: See panel-common.txt.
- - backlight: See panel-common.txt.
-+- power-supply: See panel-common.txt.
- - data-mirror: If set, reverse the bit order described in the data mappings
-   below on all data lanes, transmitting bits for slots 6 to 0 instead of
-   0 to 6.
-diff --git a/Documentation/devicetree/bindings/display/panel/simple-panel.txt b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-index 1341bbf4aa3d..16d8ff088b7d 100644
---- a/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-+++ b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-@@ -1,7 +1,7 @@
- Simple display panel
- 
- Required properties:
--- power-supply: regulator to provide the supply voltage
-+- power-supply: See panel-common.txt
- 
- Optional properties:
- - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+ 			mmc0_pins: mmc0-pins {
+ 				pins = "PF0", "PF1", "PF2",
+ 				       "PF3", "PF4", "PF5";
 -- 
 git-series 0.9.1
