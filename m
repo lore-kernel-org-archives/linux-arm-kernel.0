@@ -1,118 +1,103 @@
 From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Tue, 5 Dec 2017 23:16:42 +0100
-Subject: [PATCH 02/12] firmware: arm_scpi: make freeing mbox channels
- device-managed
+Date: Tue, 5 Dec 2017 23:16:55 +0100
+Subject: [PATCH 05/12] firmware: arm_scpi: improve handling of protocol and
+ firmware version subfields
 In-Reply-To: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
 References: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
-Message-ID: <407a99ae-3e47-913c-b1e1-5548864a4ae5@gmail.com>
+Message-ID: <ddf6ec17-c592-7b6a-16a3-13c7bc2e595c@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make freeing the mbox channels device-managed, thus further simplifying
-scpi_remove and and one further step to get rid of scpi_remove.
+By using FIELD_GET and proper masks we can avoid quite some shifting
+and masking macro magic and make the code better readable.
 
 Signed-off-by: Heiner Kallweit <hkallweit1@gmail.com>
 ---
- drivers/firmware/arm_scpi.c | 37 ++++++++++++++++---------------------
- 1 file changed, 16 insertions(+), 21 deletions(-)
+ drivers/firmware/arm_scpi.c | 43 +++++++++++++++++++------------------------
+ 1 file changed, 19 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/firmware/arm_scpi.c b/drivers/firmware/arm_scpi.c
-index 2a30d255..4447738d 100644
+index 9eeb53b7..63441e40 100644
 --- a/drivers/firmware/arm_scpi.c
 +++ b/drivers/firmware/arm_scpi.c
-@@ -889,16 +889,13 @@ static struct attribute *versions_attrs[] = {
- };
- ATTRIBUTE_GROUPS(versions);
+@@ -28,6 +28,7 @@
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
  
--static void
--scpi_free_channels(struct device *dev, struct scpi_chan *pchan, int count)
-+static void scpi_free_channels(void *data)
+ #include <linux/bitmap.h>
++#include <linux/bitfield.h>
+ #include <linux/device.h>
+ #include <linux/err.h>
+ #include <linux/export.h>
+@@ -73,18 +74,12 @@
+ #define MAX_DVFS_DOMAINS	8
+ #define MAX_DVFS_OPPS		16
+ 
+-#define PROTOCOL_REV_MINOR_BITS	16
+-#define PROTOCOL_REV_MINOR_MASK	((1U << PROTOCOL_REV_MINOR_BITS) - 1)
+-#define PROTOCOL_REV_MAJOR(x)	((x) >> PROTOCOL_REV_MINOR_BITS)
+-#define PROTOCOL_REV_MINOR(x)	((x) & PROTOCOL_REV_MINOR_MASK)
++#define PROTO_REV_MAJOR_MASK	GENMASK(31, 16)
++#define PROTO_REV_MINOR_MASK	GENMASK(15, 0)
+ 
+-#define FW_REV_MAJOR_BITS	24
+-#define FW_REV_MINOR_BITS	16
+-#define FW_REV_PATCH_MASK	((1U << FW_REV_MINOR_BITS) - 1)
+-#define FW_REV_MINOR_MASK	((1U << FW_REV_MAJOR_BITS) - 1)
+-#define FW_REV_MAJOR(x)		((x) >> FW_REV_MAJOR_BITS)
+-#define FW_REV_MINOR(x)		(((x) & FW_REV_MINOR_MASK) >> FW_REV_MINOR_BITS)
+-#define FW_REV_PATCH(x)		((x) & FW_REV_PATCH_MASK)
++#define FW_REV_MAJOR_MASK	GENMASK(31, 24)
++#define FW_REV_MINOR_MASK	GENMASK(23, 16)
++#define FW_REV_PATCH_MASK	GENMASK(15, 0)
+ 
+ #define MAX_RX_TIMEOUT		(msecs_to_jiffies(30))
+ 
+@@ -861,9 +856,9 @@ static ssize_t protocol_version_show(struct device *dev,
  {
-+	struct scpi_drvinfo *info = data;
- 	int i;
+ 	struct scpi_drvinfo *scpi_info = dev_get_drvdata(dev);
  
--	for (i = 0; i < count && pchan->chan; i++, pchan++) {
--		mbox_free_channel(pchan->chan);
--		devm_kfree(dev, pchan->xfers);
--		devm_iounmap(dev, pchan->rx_payload);
--	}
-+	for (i = 0; i < info->num_chans; i++)
-+		mbox_free_channel(info->channels[i].chan);
+-	return sprintf(buf, "%d.%d\n",
+-		       PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
+-		       PROTOCOL_REV_MINOR(scpi_info->protocol_version));
++	return sprintf(buf, "%lu.%lu\n",
++		FIELD_GET(PROTO_REV_MAJOR_MASK, scpi_info->protocol_version),
++		FIELD_GET(PROTO_REV_MINOR_MASK, scpi_info->protocol_version));
  }
+ static DEVICE_ATTR_RO(protocol_version);
  
- static int scpi_remove(struct platform_device *pdev)
-@@ -911,7 +908,6 @@ static int scpi_remove(struct platform_device *pdev)
- 
- 	of_platform_depopulate(dev);
- 	sysfs_remove_groups(&dev->kobj, versions_groups);
--	scpi_free_channels(dev, info->channels, info->num_chans);
- 	platform_set_drvdata(pdev, NULL);
- 
- 	for (i = 0; i < MAX_DVFS_DOMAINS && info->dvfs[i]; i++) {
-@@ -950,7 +946,6 @@ static int scpi_probe(struct platform_device *pdev)
+@@ -872,10 +867,10 @@ static ssize_t firmware_version_show(struct device *dev,
  {
- 	int count, idx, ret;
- 	struct resource res;
--	struct scpi_chan *scpi_chan;
- 	struct device *dev = &pdev->dev;
- 	struct device_node *np = dev->of_node;
+ 	struct scpi_drvinfo *scpi_info = dev_get_drvdata(dev);
  
-@@ -967,13 +962,19 @@ static int scpi_probe(struct platform_device *pdev)
- 		return -ENODEV;
- 	}
+-	return sprintf(buf, "%d.%d.%d\n",
+-		       FW_REV_MAJOR(scpi_info->firmware_version),
+-		       FW_REV_MINOR(scpi_info->firmware_version),
+-		       FW_REV_PATCH(scpi_info->firmware_version));
++	return sprintf(buf, "%lu.%lu.%lu\n",
++		FIELD_GET(FW_REV_MAJOR_MASK, scpi_info->firmware_version),
++		FIELD_GET(FW_REV_MINOR_MASK, scpi_info->firmware_version),
++		FIELD_GET(FW_REV_PATCH_MASK, scpi_info->firmware_version));
+ }
+ static DEVICE_ATTR_RO(firmware_version);
  
--	scpi_chan = devm_kcalloc(dev, count, sizeof(*scpi_chan), GFP_KERNEL);
--	if (!scpi_chan)
-+	scpi_info->channels = devm_kcalloc(dev, count, sizeof(struct scpi_chan),
-+					   GFP_KERNEL);
-+	if (!scpi_info->channels)
- 		return -ENOMEM;
- 
--	for (idx = 0; idx < count; idx++) {
-+	ret = devm_add_action(dev, scpi_free_channels, scpi_info);
-+	if (ret)
-+		return ret;
-+
-+	for (; scpi_info->num_chans < count; scpi_info->num_chans++) {
- 		resource_size_t size;
--		struct scpi_chan *pchan = scpi_chan + idx;
-+		int idx = scpi_info->num_chans;
-+		struct scpi_chan *pchan = scpi_info->channels + idx;
- 		struct mbox_client *cl = &pchan->cl;
- 		struct device_node *shmem = of_parse_phandle(np, "shmem", idx);
- 
-@@ -981,15 +982,14 @@ static int scpi_probe(struct platform_device *pdev)
- 		of_node_put(shmem);
- 		if (ret) {
- 			dev_err(dev, "failed to get SCPI payload mem resource\n");
--			goto err;
-+			return ret;
- 		}
- 
- 		size = resource_size(&res);
- 		pchan->rx_payload = devm_ioremap(dev, res.start, size);
- 		if (!pchan->rx_payload) {
- 			dev_err(dev, "failed to ioremap SCPI payload\n");
--			ret = -EADDRNOTAVAIL;
--			goto err;
-+			return -EADDRNOTAVAIL;
- 		}
- 		pchan->tx_payload = pchan->rx_payload + (size >> 1);
- 
-@@ -1015,14 +1015,9 @@ static int scpi_probe(struct platform_device *pdev)
- 				dev_err(dev, "failed to get channel%d err %d\n",
- 					idx, ret);
- 		}
--err:
--		scpi_free_channels(dev, scpi_chan, idx);
--		scpi_info = NULL;
+@@ -1031,12 +1026,12 @@ static int scpi_probe(struct platform_device *pdev)
  		return ret;
  	}
  
--	scpi_info->channels = scpi_chan;
--	scpi_info->num_chans = count;
- 	scpi_info->commands = scpi_std_commands;
+-	_dev_info(dev, "SCP Protocol %d.%d Firmware %d.%d.%d version\n",
+-		  PROTOCOL_REV_MAJOR(scpi_info->protocol_version),
+-		  PROTOCOL_REV_MINOR(scpi_info->protocol_version),
+-		  FW_REV_MAJOR(scpi_info->firmware_version),
+-		  FW_REV_MINOR(scpi_info->firmware_version),
+-		  FW_REV_PATCH(scpi_info->firmware_version));
++	dev_info(dev, "SCP Protocol %lu.%lu Firmware %lu.%lu.%lu version\n",
++		 FIELD_GET(PROTO_REV_MAJOR_MASK, scpi_info->protocol_version),
++		 FIELD_GET(PROTO_REV_MINOR_MASK, scpi_info->protocol_version),
++		 FIELD_GET(FW_REV_MAJOR_MASK, scpi_info->firmware_version),
++		 FIELD_GET(FW_REV_MINOR_MASK, scpi_info->firmware_version),
++		 FIELD_GET(FW_REV_PATCH_MASK, scpi_info->firmware_version));
+ 	scpi_info->scpi_ops = &scpi_ops;
  
- 	platform_set_drvdata(pdev, scpi_info);
+ 	ret = devm_device_add_groups(dev, versions_groups);
 -- 
 2.15.1
