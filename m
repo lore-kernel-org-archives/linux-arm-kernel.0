@@ -1,42 +1,144 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 5 Dec 2017 18:28:11 +0100
-Subject: [v2] mfd: stm32: Adopt SPDX identifier
-In-Reply-To: <20171205172337.GA24480@roeck-us.net>
-References: <20171205152418.28104-1-benjamin.gaignard@st.com>
- <20171205172337.GA24480@roeck-us.net>
-Message-ID: <20171205172811.GA5534@kroah.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Tue,  5 Dec 2017 17:11:48 +0000
+Subject: [PATCH 2/6] arm64: alternative: Apply alternatives early in boot
+ process
+In-Reply-To: <1512493912-37478-1-git-send-email-julien.thierry@arm.com>
+References: <1512493912-37478-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <1512493912-37478-3-git-send-email-julien.thierry@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 09:23:37AM -0800, Guenter Roeck wrote:
-> On Tue, Dec 05, 2017 at 04:24:18PM +0100, benjamin.gaignard at linaro.org wrote:
-> > Add SPDX identifier
-> > 
-> > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> > ---
-> >  drivers/mfd/stm32-lptimer.c       | 6 +-----
-> >  drivers/mfd/stm32-timers.c        | 4 +---
-> >  include/linux/mfd/stm32-lptimer.h | 6 +-----
-> >  include/linux/mfd/stm32-timers.h  | 4 +---
-> >  4 files changed, 4 insertions(+), 16 deletions(-)
-> > 
-> > diff --git a/drivers/mfd/stm32-lptimer.c b/drivers/mfd/stm32-lptimer.c
-> > index 075330a25f61..a00f99f36559 100644
-> > --- a/drivers/mfd/stm32-lptimer.c
-> > +++ b/drivers/mfd/stm32-lptimer.c
-> > @@ -1,13 +1,9 @@
-> > +// SPDX-License-Identifier: GPL-2.0
-> >  /*
-> 
-> I have been wondering - why is the SPDX identifier for the most part added
-> as separate C++ comment at the beginning of the file, and not inline with
-> the rest of the top comments ?  SPDX doesn't mandate this - the examples
-> I can find on the SPDX web site all show it inline. Is there a special
-> Linux kernel convention ?
+From: Daniel Thompson <daniel.thompson@linaro.org>
 
-See the patch series from Thomas that answers this question for you by
-adding documentation to the kernel explaining it all :)
+Currently alternatives are applied very late in the boot process (and
+a long time after we enable scheduling). Some alternative sequences,
+such as those that alter the way CPU context is stored, must be applied
+much earlier in the boot sequence.
 
-thanks,
+Introduce apply_alternatives_early() to allow some alternatives to be
+applied immediately after we detect the CPU features of the boot CPU.
 
-greg k-h
+Signed-off-by: Daniel Thompson <daniel.thompson@linaro.org>
+Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/alternative.h |  1 +
+ arch/arm64/kernel/alternative.c      | 39 +++++++++++++++++++++++++++++++++---
+ arch/arm64/kernel/smp.c              |  6 ++++++
+ 3 files changed, 43 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
+index 4a85c69..1fc1cdb 100644
+--- a/arch/arm64/include/asm/alternative.h
++++ b/arch/arm64/include/asm/alternative.h
+@@ -20,6 +20,7 @@ struct alt_instr {
+ 	u8  alt_len;		/* size of new instruction(s), <= orig_len */
+ };
+
++void __init apply_alternatives_early(void);
+ void __init apply_alternatives_all(void);
+ void apply_alternatives(void *start, size_t length);
+
+diff --git a/arch/arm64/kernel/alternative.c b/arch/arm64/kernel/alternative.c
+index 6dd0a3a3..78051d4 100644
+--- a/arch/arm64/kernel/alternative.c
++++ b/arch/arm64/kernel/alternative.c
+@@ -28,6 +28,18 @@
+ #include <asm/sections.h>
+ #include <linux/stop_machine.h>
+
++/*
++ * early-apply features are detected using only the boot CPU and checked on
++ * secondary CPUs startup, even then,
++ * These early-apply features should only include features where we must
++ * patch the kernel very early in the boot process.
++ *
++ * Note that the cpufeature logic *must* be made aware of early-apply
++ * features to ensure they are reported as enabled without waiting
++ * for other CPUs to boot.
++ */
++#define EARLY_APPLY_FEATURE_MASK BIT(ARM64_HAS_SYSREG_GIC_CPUIF)
++
+ #define __ALT_PTR(a,f)		((void *)&(a)->f + (a)->f)
+ #define ALT_ORIG_PTR(a)		__ALT_PTR(a, orig_offset)
+ #define ALT_REPL_PTR(a)		__ALT_PTR(a, alt_offset)
+@@ -105,7 +117,8 @@ static u32 get_alt_insn(struct alt_instr *alt, __le32 *insnptr, __le32 *altinsnp
+ 	return insn;
+ }
+
+-static void __apply_alternatives(void *alt_region, bool use_linear_alias)
++static void __apply_alternatives(void *alt_region,  bool use_linear_alias,
++				 unsigned long feature_mask)
+ {
+ 	struct alt_instr *alt;
+ 	struct alt_region *region = alt_region;
+@@ -115,6 +128,9 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ 		u32 insn;
+ 		int i, nr_inst;
+
++		if ((BIT(alt->cpufeature) & feature_mask) == 0)
++			continue;
++
+ 		if (!cpus_have_cap(alt->cpufeature))
+ 			continue;
+
+@@ -138,6 +154,21 @@ static void __apply_alternatives(void *alt_region, bool use_linear_alias)
+ }
+
+ /*
++ * This is called very early in the boot process (directly after we run
++ * a feature detect on the boot CPU). No need to worry about other CPUs
++ * here.
++ */
++void apply_alternatives_early(void)
++{
++	struct alt_region region = {
++		.begin	= (struct alt_instr *)__alt_instructions,
++		.end	= (struct alt_instr *)__alt_instructions_end,
++	};
++
++	__apply_alternatives(&region, true, EARLY_APPLY_FEATURE_MASK);
++}
++
++/*
+  * We might be patching the stop_machine state machine, so implement a
+  * really simple polling protocol here.
+  */
+@@ -156,7 +187,9 @@ static int __apply_alternatives_multi_stop(void *unused)
+ 		isb();
+ 	} else {
+ 		BUG_ON(patched);
+-		__apply_alternatives(&region, true);
++
++		__apply_alternatives(&region, true, ~EARLY_APPLY_FEATURE_MASK);
++
+ 		/* Barriers provided by the cache flushing */
+ 		WRITE_ONCE(patched, 1);
+ 	}
+@@ -177,5 +210,5 @@ void apply_alternatives(void *start, size_t length)
+ 		.end	= start + length,
+ 	};
+
+-	__apply_alternatives(&region, false);
++	__apply_alternatives(&region, false, -1);
+ }
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index 551eb07..37361b5 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -453,6 +453,12 @@ void __init smp_prepare_boot_cpu(void)
+ 	 * cpuinfo_store_boot_cpu() above.
+ 	 */
+ 	update_cpu_errata_workarounds();
++	/*
++	 * We now know enough about the boot CPU to apply the
++	 * alternatives that cannot wait until interrupt handling
++	 * and/or scheduling is enabled.
++	 */
++	apply_alternatives_early();
+ }
+
+ static u64 __init of_get_cpu_mpidr(struct device_node *dn)
+--
+1.9.1
