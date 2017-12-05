@@ -1,34 +1,59 @@
-From: daniel@fooishbar.org (Daniel Stone)
-Date: Tue, 5 Dec 2017 20:14:03 +0000
-Subject: [RFC PATCH 1/6] drm: Add Content Protection property
-In-Reply-To: <20171205173408.GA18425@amd>
-References: <20171130030907.26848-1-seanpaul@chromium.org>
- <20171130030907.26848-2-seanpaul@chromium.org>
- <20171205102840.GB12982@amd>
- <20171205104538.b4fxdjad3c46koas@phenom.ffwll.local>
- <20171205173408.GA18425@amd>
-Message-ID: <CAPj87rOiUM93c_-ZYK6pf-56bs_=hjK8Kkn8fz1ZH_wQTvV_xg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 5 Dec 2017 12:14:46 -0800
+Subject: [PATCH] Arm: mm: ftrace: Only set text back to ro after kernel
+ has been marked ro
+In-Reply-To: <20171205200935.GY10595@n2100.armlinux.org.uk>
+References: <20170823135836.52fb44fc@gandalf.local.home>
+ <CAGXu5jLaQozk-TuZd8o=CK2kBcj3EFqD+VQtGX-DehU=c_TAkg@mail.gmail.com>
+ <20170823150351.606ba09f@gandalf.local.home>
+ <20171205114709.f6aj6i426keq2cn5@camel2.lan>
+ <20171205131416.GW10595@n2100.armlinux.org.uk>
+ <20171205132339.behn34z6b7ci2m4j@camel2.lan>
+ <5b9b86cf-4b62-c984-fe52-a22df8fce33c@raspberrypi.org>
+ <20171205133601.GX10595@n2100.armlinux.org.uk>
+ <CAGXu5jJb0PCSuC4DuOkh5-901iVLcmmPpn1G7UBq3-r9DaeMvw@mail.gmail.com>
+ <20171205200935.GY10595@n2100.armlinux.org.uk>
+Message-ID: <CAGXu5jKvVpyLs0+zP34mG=XyGSkzeKFj6WtW+tTfKv7tLKsD2g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
-
-On 5 December 2017 at 17:34, Pavel Machek <pavel@ucw.cz> wrote:
-> Yes, so... This patch makes it more likely to see machines with locked
-> down kernels, preventing developers from working with systems their
-> own, running hardware. That is evil, and direct threat to Free
-> software movement.
+On Tue, Dec 5, 2017 at 12:09 PM, Russell King - ARM Linux
+<linux@armlinux.org.uk> wrote:
+> On Tue, Dec 05, 2017 at 11:35:59AM -0800, Kees Cook wrote:
+>> We don't _need_ to, but they're all contiguous, so the ro_perms array
+>> used by set_kernel_text_*() is actually only a single entry:
+>>
+>> static struct section_perm ro_perms[] = {
+>>         /* Make kernel code and rodata RX (set RO). */
+>>         {
+>>                 .name   = "text/rodata RO",
+>>                 .start  = (unsigned long)_stext,
+>>                 .end    = (unsigned long)__init_begin,
+>> ...
 >
-> Users compiling their own kernels get no benefit from it. Actually it
-> looks like this only benefits Intel and Disney. We don't want that.
+> Well, they may not be contiguous - it depends on DEBUG_ALIGN_RODATA.
 
-With all due respect, you can't claim to speak for the entire kernel
-and FLOSS community of users and developers.
+Maybe I'm picking a slightly wrong word. I guess I meant adjacent. The
+range _stext to __init_begin is all read-only, though there may be
+padding (controlled by DEBUG_ALIGN_RODATA), to allow a split for NX
+markings on rodata.
 
-The feature is optional: it does not enforce additional constraints on
-users, but exposes additional functionality already present in
-hardware, for those who wish to opt in to it. Those who wish to avoid
-it can do so, by simply not making active use of it.
+> Either way, we have __start_rodata_section_aligned, which is either
+> the start of the read-only data section, or the start of the first
+> section beyond __start_rodata if DEBUG_ALIGN_RODATA is not set.
+>
+> Given that __start_rodata_section_aligned will always be less than
+> __init_begin, is there any reason not to make the above end at
+> __start_rodata_section_aligned, thereby allowing more of the read-only
+> data (in the case of DEBUG_ALIGN_RODATA=n) or all of the read-only
+> data (in the case of DEBUG_ALIGN_RODATA=y) to remain write-protected?
 
-Cheers,
-Daniel
+Sure, there's no reason not to split this into two entries. It'll
+require some reworking of the function calls to get it right,
+obviously.
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
