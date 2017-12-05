@@ -1,17 +1,17 @@
 From: linux-kernel-dev@beckhoff.com (linux-kernel-dev at beckhoff.com)
-Date: Tue, 5 Dec 2017 15:06:42 +0100
-Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
+Date: Tue, 5 Dec 2017 15:06:44 +0100
+Subject: [PATCH v2 3/5] rtc: mxc_v2: add driver for i.MX53 SRTC
 In-Reply-To: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
 References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
+Message-ID: <20171205140646.30367-4-linux-kernel-dev@beckhoff.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Patrick Bruenn <p.bruenn@beckhoff.com>
 
-Document the binding for i.MX53 SRTC implemented by rtc-mxc_v2
+Add RTC_DRV_MXC_V2 config option
 
-Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com><Paste>
+Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com>
 
 ---
 
@@ -34,32 +34,29 @@ Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / 
 Cc: Philippe Ombredanne <pombredanne@nexb.com>
 Cc: Lothar Wa?mann <LW@KARO-electronics.de>
 ---
- Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
+ drivers/rtc/Kconfig | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
-new file mode 100644
-index 000000000000..796e7f4995db
---- /dev/null
-+++ b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
-@@ -0,0 +1,17 @@
-+* i.MX53 Real Time Clock controller
+diff --git a/drivers/rtc/Kconfig b/drivers/rtc/Kconfig
+index b59a31b079a5..440edebf5c71 100644
+--- a/drivers/rtc/Kconfig
++++ b/drivers/rtc/Kconfig
+@@ -1689,6 +1689,16 @@ config RTC_DRV_MXC
+ 	   This driver can also be built as a module, if so, the module
+ 	   will be called "rtc-mxc".
+ 
++config RTC_DRV_MXC_V2
++	tristate "Freescale MXC Real Time Clock for i.MX53"
++	depends on ARCH_MXC
++	help
++	   If you say yes here you get support for the Freescale MXC
++	   SRTC module in i.MX53 processor.
 +
-+Required properties:
-+- compatible: should be: "fsl,imx53-rtc"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- clocks: should contain the phandle for the rtc clock
-+- interrupts: rtc alarm interrupt
++	   This driver can also be built as a module, if so, the module
++	   will be called "rtc-mxc_v2".
 +
-+Example:
-+
-+srtc at 53fa4000 {
-+	compatible = "fsl,imx53-rtc";
-+	reg = <0x53fa4000 0x4000>;
-+	interrupts = <24>;
-+	clocks = <&clks IMX5_CLK_SRTC_GATE>;
-+};
+ config RTC_DRV_SNVS
+ 	tristate "Freescale SNVS RTC support"
+ 	select REGMAP_MMIO
 -- 
 2.11.0
