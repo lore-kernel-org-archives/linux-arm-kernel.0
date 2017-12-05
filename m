@@ -1,68 +1,144 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 5 Dec 2017 19:01:07 +0100
-Subject: [RFC PATCH 1/6] drm: Add Content Protection property
-In-Reply-To: <CADnq5_PcbBeGL+3CxOpNgRiih4czU9SnmjNbRyyRHOn-OZvy5Q@mail.gmail.com>
-References: <20171130030907.26848-1-seanpaul@chromium.org>
- <20171130030907.26848-2-seanpaul@chromium.org>
- <20171205102840.GB12982@amd>
- <20171205104538.b4fxdjad3c46koas@phenom.ffwll.local>
- <20171205173408.GA18425@amd>
- <CADnq5_PcbBeGL+3CxOpNgRiih4czU9SnmjNbRyyRHOn-OZvy5Q@mail.gmail.com>
-Message-ID: <20171205180107.GA22672@amd>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 5 Dec 2017 18:04:34 +0000
+Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
+References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
+ <20171204122645.31535-12-ard.biesheuvel@linaro.org>
+ <20171205122757.GW22781@e103592.cambridge.arm.com>
+ <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
+Message-ID: <CAKv+Gu88Ym4NxoLxVd07Z07PD454_ONV4D=pqvxezPvAPnd5og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 5 December 2017 at 12:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>
+>
+>> On 5 Dec 2017, at 12:28, Dave Martin <Dave.Martin@arm.com> wrote:
+>>
+>>> On Mon, Dec 04, 2017 at 12:26:37PM +0000, Ard Biesheuvel wrote:
+>>> Add a support macro to conditionally yield the NEON (and thus the CPU)
+>>> that may be called from the assembler code. Given that especially the
+>>> instruction based accelerated crypto code may use very tight loops, add
+>>> some parametrization so that the TIF_NEED_RESCHED flag test is only
+>>> executed every so many loop iterations.
+>>>
+>>> In some cases, yielding the NEON involves saving and restoring a non
+>>> trivial amount of context (especially in the CRC folding algorithms),
+>>> and so the macro is split into two, and the code in between is only
+>>> executed when the yield path is taken, allowing the contex to be preserved.
+>>> The second macro takes a label argument that marks the resume-from-yield
+>>> path, which should restore the preserved context again.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>> ---
+>>> arch/arm64/include/asm/assembler.h | 50 ++++++++++++++++++++
+>>> 1 file changed, 50 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+>>> index aef72d886677..917b026d3e00 100644
+>>> --- a/arch/arm64/include/asm/assembler.h
+>>> +++ b/arch/arm64/include/asm/assembler.h
+>>> @@ -512,4 +512,54 @@ alternative_else_nop_endif
+>>> #endif
+>>>    .endm
+>>>
+>>> +/*
+>>> + * yield_neon - check whether to yield to another runnable task from
+>>> + *        kernel mode NEON code (running with preemption disabled)
+>>> + *
+>>> + * - Check whether the preempt count is exactly 1, in which case disabling
+>>> + *   preemption once will make the task preemptible. If this is not the case,
+>>> + *   yielding is pointless.
+>>> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
+>>> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
+>>> + *   yield fixup code at @lbl.
+>>> + */
+>>> +    .macro        yield_neon, lbl:req, ctr, order, stride, loop
+>>> +    yield_neon_pre    \ctr, \order, \stride, \loop
+>>> +    yield_neon_post    \lbl
+>>> +    .endm
+>>> +
+>>> +    .macro        yield_neon_pre, ctr, order=0, stride, loop=4444f
+>>> +#ifdef CONFIG_PREEMPT
+>>> +    /*
+>>> +     * With some algorithms, it makes little sense to poll the
+>>> +     * TIF_NEED_RESCHED flag after every iteration, so only perform
+>>> +     * the check every 2^order strides.
+>>> +     */
+>>> +    .if        \order > 1
+>>> +    .if        (\stride & (\stride - 1)) != 0
+>>> +    .error        "stride should be a power of 2"
+>>> +    .endif
+>>> +    tst        \ctr, #((1 << \order) * \stride - 1) & ~(\stride - 1)
+>>> +    b.ne        \loop
+>>> +    .endif
+>>
+>> I'm not sure what baking in this check gives us, and this seems to
+>> conflate two rather different things: yielding and defining a
+>> "heartbeat" frequency for the calling code.
+>>
+>> Can we separate out the crypto-loop-helper semantics from the yield-
+>> neon stuff?
+>>
+>
+> Fair enough. I incorporated the check here so it disappears from the code entirely when !CONFIG_PREEMPT, because otherwise, you end up with a sequence that is mispredicted every # iterations without any benefit.
+> I guess i could macroise that separately though.
+>
+>> If we had
+>>
+>>    if_cond_yield_neon
+>>    // patchup code
+>>    endif_yield_neon
+>>
 
-> >> > Why would user of the machine want this to be something else than
-> >> > 'OFF'?
-> >> >
-> >> > If kernel implements this, will it mean hardware vendors will have to
-> >> > prevent user from updating kernel on machines they own?
-> >> >
-> >> > If this is merged, does it open kernel developers to DMCA threats if
-> >> > they try to change it?
-> >>
-> >> Because this just implements one part of the content protection scheme.
-> >> This only gives you an option to enable HDCP (aka encryption, it's really
-> >> nothing else) on the cable. Just because it has Content Protection in the
-> >> name does _not_ mean it is (stand-alone) an effective nor complete content
-> >> protection scheme. It's simply encrypting data, that's all.
-> >
-> > Yep. So my first question was: why would user of the machine ever want
-> > encryption "ENABLED" or "DESIRED"? Could you answer it?
-> 
-> How about for sensitive video streams in government offices where you
-> want to avoid a spy potentially tapping the cable to see the video
-> stream?
+I like this, but ...
 
-Except that spies already have the keys, as every monitor
-manufacturer has them?
+>> then the caller is free to conditionally branch over that as appropriate
+>> like
+>>
+>> loop:
+>>    // crypto stuff
+>>    tst x0, #0xf
+>>    b.ne    loop
+>>
+>>    if_cond_yield_neon
+>>    // patchup code
+>>    endif_cond_yield_neon
+>>
 
-> >> kernels and be able to exercise their software freedoms already know to
-> >> avoid such locked down systems.
-> >>
-> >> So yeah it would be better to call this the "HDMI/DP cable encryption
-> >> support", but well, it's not what it's called really.
-> >
-> > Well, it does not belong in kernel, no matter what is the name.
-> 
-> Should we remove support for encrypted file systems and encrypted
-> virtual machines?  Just like them the option is there is you want to
-> use it.  If you don't want to, you don't have to.
+I need to put the post patchup code somewhere too. Please refer to the
+CRC patches for the best examples of this.
 
-Encrypted file systems benefit users. Encrypted video is designed to
-work against users. In particular, users don't have encryption keys
-for video they generate. I'd have nothing against feature that would
-let users encrypt video with keys they control.
-								Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/179f88b1/attachment.sig>
+
+>>    b    loop
+>>
+>> I think this is clearer than burying checks and branches in a macro that
+>> is trying to be generic.
+>>
+>
+> Agreed.
+>
+>> Label arguments can be added to elide some branches of course, at a
+>> corresponding cost to clarity...  in the common case the cache will
+>> be hot and the branches won't be mispredicted though.  Is it really
+>> worth it?
+>>
+>
+> Perhaps not. And i have not made any attempts yet to benchmark at great detail, given that i need some feedback from the rt crowd first whether this is likely to work as desired.
+>
+>>> +
+>>> +    get_thread_info    x0
+>>> +    ldr        w1, [x0, #TSK_TI_PREEMPT]
+>>> +    ldr        x0, [x0, #TSK_TI_FLAGS]
+>>> +    cmp        w1, #1 // == PREEMPT_OFFSET
+>>
+>> asm-offsets?
+>>
+>
+> This is not an offset in that regard, but the header that defines it is not asm safe
+>
+>> [...]
+>>
+>> Cheers
+>> ---Dave
