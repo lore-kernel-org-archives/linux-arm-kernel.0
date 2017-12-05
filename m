@@ -1,87 +1,102 @@
-From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
-Date: Tue,  5 Dec 2017 16:24:18 +0100
-Subject: [PATCH v2] mfd: stm32: Adopt SPDX identifier
-Message-ID: <20171205152418.28104-1-benjamin.gaignard@st.com>
+From: ynorov@caviumnetworks.com (Yury Norov)
+Date: Tue, 5 Dec 2017 18:24:46 +0300
+Subject: [PATCH v6 7/8] KVM: arm/arm64: Provide a get_input_level for the
+ arch timer
+In-Reply-To: <20171204200506.3224-8-cdall@kernel.org>
+References: <20171204200506.3224-1-cdall@kernel.org>
+ <20171204200506.3224-8-cdall@kernel.org>
+Message-ID: <20171205152446.rcmkowdnuhkqbrdb@yury-thinkpad>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add SPDX identifier
+On Mon, Dec 04, 2017 at 09:05:05PM +0100, Christoffer Dall wrote:
+> From: Christoffer Dall <christoffer.dall@linaro.org>
+> 
+> The VGIC can now support the life-cycle of mapped level-triggered
+> interrupts, and we no longer have to read back the timer state on every
+> exit from the VM if we had an asserted timer interrupt signal, because
+> the VGIC already knows if we hit the unlikely case where the guest
+> disables the timer without ACKing the virtual timer interrupt.
+> 
+> This means we rework a bit of the code to factor out the functionality
+> to snapshot the timer state from vtimer_save_state(), and we can reuse
+> this functionality in the sync path when we have an irqchip in
+> userspace, and also to support our implementation of the
+> get_input_level() function for the timer.
+> 
+> This change also means that we can no longer rely on the timer's view of
+> the interrupt line to set the active state, because we no longer
+> maintain this state for mapped interrupts when exiting from the guest.
+> Instead, we only set the active state if the virtual interrupt is
+> active, and otherwise we simply let the timer fire again and raise the
+> virtual interrupt from the ISR.
+> 
+> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> ---
+>  include/kvm/arm_arch_timer.h |  2 ++
+>  virt/kvm/arm/arch_timer.c    | 75 +++++++++++++++++++++-----------------------
+>  2 files changed, 38 insertions(+), 39 deletions(-)
+> 
+> diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> index 01ee473517e2..f57f795d704c 100644
+> --- a/include/kvm/arm_arch_timer.h
+> +++ b/include/kvm/arm_arch_timer.h
+> @@ -90,6 +90,8 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
+>  
+>  void kvm_timer_init_vhe(void);
+>  
+> +bool kvm_arch_timer_get_input_level(int vintid);
+> +
+>  #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
+>  #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
+>  
 
-Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
----
- drivers/mfd/stm32-lptimer.c       | 6 +-----
- drivers/mfd/stm32-timers.c        | 4 +---
- include/linux/mfd/stm32-lptimer.h | 6 +-----
- include/linux/mfd/stm32-timers.h  | 4 +---
- 4 files changed, 4 insertions(+), 16 deletions(-)
+[...]
 
-diff --git a/drivers/mfd/stm32-lptimer.c b/drivers/mfd/stm32-lptimer.c
-index 075330a25f61..a00f99f36559 100644
---- a/drivers/mfd/stm32-lptimer.c
-+++ b/drivers/mfd/stm32-lptimer.c
-@@ -1,13 +1,9 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * STM32 Low-Power Timer parent driver.
-- *
-  * Copyright (C) STMicroelectronics 2017
-- *
-  * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
-- *
-  * Inspired by Benjamin Gaignard's stm32-timers driver
-- *
-- * License terms:  GNU General Public License (GPL), version 2
-  */
- 
- #include <linux/mfd/stm32-lptimer.h>
-diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
-index a6675a449409..1d347e5dfa79 100644
---- a/drivers/mfd/stm32-timers.c
-+++ b/drivers/mfd/stm32-timers.c
-@@ -1,9 +1,7 @@
-+// SPDX-License-Identifier: GPL-2.0
- /*
-  * Copyright (C) STMicroelectronics 2016
-- *
-  * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-- *
-- * License terms:  GNU General Public License (GPL), version 2
-  */
- 
- #include <linux/mfd/stm32-timers.h>
-diff --git a/include/linux/mfd/stm32-lptimer.h b/include/linux/mfd/stm32-lptimer.h
-index 77c7cf40d9b4..605f62264825 100644
---- a/include/linux/mfd/stm32-lptimer.h
-+++ b/include/linux/mfd/stm32-lptimer.h
-@@ -1,13 +1,9 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * STM32 Low-Power Timer parent driver.
-- *
-  * Copyright (C) STMicroelectronics 2017
-- *
-  * Author: Fabrice Gasnier <fabrice.gasnier@st.com>
-- *
-  * Inspired by Benjamin Gaignard's stm32-timers driver
-- *
-- * License terms:  GNU General Public License (GPL), version 2
-  */
- 
- #ifndef _LINUX_STM32_LPTIMER_H_
-diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
-index ce7346e7f77a..2aadab6f34a1 100644
---- a/include/linux/mfd/stm32-timers.h
-+++ b/include/linux/mfd/stm32-timers.h
-@@ -1,9 +1,7 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
- /*
-  * Copyright (C) STMicroelectronics 2016
-- *
-  * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
-- *
-- * License terms:  GNU General Public License (GPL), version 2
-  */
- 
- #ifndef _LINUX_STM32_GPTIMER_H_
--- 
-2.15.0
+> +bool kvm_arch_timer_get_input_level(int vintid)
+> +{
+> +	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
+> +	struct arch_timer_context *timer;
+> +
+> +	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
+> +		timer = vcpu_vtimer(vcpu);
+> +	else
+> +		BUG(); /* We only map the vtimer so far */
+> +
+> +	if (timer->loaded)
+> +		__timer_snapshot_state(timer);
+> +
+> +	return kvm_timer_should_fire(timer);
+> +}
+
+I think it worth to reword to highlight your intention about BUG,
+and save 1 call to vcpu_vtimer()
+
+bool kvm_arch_timer_get_input_level(int vintid)
+{
+	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
+	struct arch_timer_context *timer = vcpu_vtimer(vcpu);
+
+        /* We only map the vtimer so far */
+	BUG_ON(vintid != timer->irq.irq)
+
+	if (timer->loaded)
+		__timer_snapshot_state(timer);
+
+	return kvm_timer_should_fire(timer);
+}
+
+>  int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  {
+>  	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
+> @@ -841,7 +838,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+>  	}
+>  
+>  	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
+> -				    NULL);
+> +				    kvm_arch_timer_get_input_level);
+>  	if (ret)
+>  		return ret;
+>  
+> -- 
+> 2.14.2
