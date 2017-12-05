@@ -1,24 +1,25 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 5 Dec 2017 09:01:49 +0100
-Subject: [PATCH 2/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
-In-Reply-To: <CA+E=qVd+uM0Aq_=sf+fomQ-m+3Oy0MdG7OPjF5tVagG1UgKYzg@mail.gmail.com>
+Date: Tue, 5 Dec 2017 09:04:44 +0100
+Subject: [PATCH 4/9] ASoC: sun8i-codec: Add support for A64 SoC
+In-Reply-To: <20171203204157.20829-5-anarsoul@gmail.com>
 References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-3-anarsoul@gmail.com>
- <CAEKpxBmHhZ+2WNXJEPbQFS6KeKsqRrZeNodRnu1M5yLc15DerA@mail.gmail.com>
- <CA+E=qVd+uM0Aq_=sf+fomQ-m+3Oy0MdG7OPjF5tVagG1UgKYzg@mail.gmail.com>
-Message-ID: <20171205080149.2siofhpynfrvnoiq@flea.lan>
+ <20171203204157.20829-5-anarsoul@gmail.com>
+Message-ID: <20171205080444.zo2rlusqpjyraqcw@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Sun, Dec 03, 2017 at 12:41:52PM -0800, Vasily Khoruzhick wrote:
+> Digital part of audio codec block in the A64 is very similar to what
+> is used by the A33(sun8i) devices. However, it uses different LRCK
+> divider.
+> 
+> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
 
-On Sun, Dec 03, 2017 at 11:34:06PM -0800, Vasily Khoruzhick wrote:
-> I'd keep it sun50i_a64_acodec_i2s, since other 3 I2S modules aren't
-> compatible with this one, but similar to H3.
+What makes it impossible to derive from the sample rate and number of
+channels?
 
-Please don't top-post.
+Have you tried other sampling rates?
 
-What are those differences?
 Maxime
 
 -- 
@@ -31,4 +32,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 833 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/bf8638a9/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/f4ae3140/attachment.sig>
