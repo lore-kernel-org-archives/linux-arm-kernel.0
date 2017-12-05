@@ -1,36 +1,29 @@
-From: hayashi.kunihiko@socionext.com (Kunihiko Hayashi)
-Date: Tue, 05 Dec 2017 10:42:00 +0900
-Subject: [PATCH net-next v4 2/2] net: ethernet: socionext: add AVE
- ethernet driver
-In-Reply-To: <20171201134900.GE22599@lunn.ch>
-References: <1512090230-27594-3-git-send-email-hayashi.kunihiko@socionext.com>
- <20171201134900.GE22599@lunn.ch>
-Message-ID: <20171205104159.E1A7.4A936039@socionext.com>
+From: pravin.shedge4linux@gmail.com (Pravin Shedge)
+Date: Tue,  5 Dec 2017 07:28:24 +0530
+Subject: [PATCH 03/45] drivers: gpio: remove duplicate includes
+Message-ID: <1512439104-15507-1-git-send-email-pravin.shedge4linux@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Andrew,
+These duplicate includes have been found with scripts/checkincludes.pl but
+they have been removed manually to avoid removing false positives.
 
-On Fri, 1 Dec 2017 14:49:00 +0100 Andrew Lunn <andrew@lunn.ch> wrote:
-
-> On Fri, Dec 01, 2017 at 10:03:50AM +0900, Kunihiko Hayashi wrote:
-> > The UniPhier platform from Socionext provides the AVE ethernet
-> > controller that includes MAC and MDIO bus supporting RGMII/RMII
-> > modes. The controller is named AVE.
-> > 
-> > Signed-off-by: Kunihiko Hayashi <hayashi.kunihiko@socionext.com>
-> > Signed-off-by: Jassi Brar <jaswinder.singh@linaro.org>
-> 
-> Hi Kunihiko
-> 
-> I reviewed the PHY and MDIO code. It all looks good. I cannot say much
-> about the rest of it though.
-> 
-> Reviewed-by: Andrew Lunn <andrew@lunn.ch>
-
-Thanks! I'll remove warning from kbuild test, and repost the series for
-reviewing other part.
-
+Signed-off-by: Pravin Shedge <pravin.shedge4linux@gmail.com>
 ---
-Best Regards,
-Kunihiko Hayashi
+ drivers/gpio/gpio-brcmstb.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
+index 545d43a..f40ec39 100644
+--- a/drivers/gpio/gpio-brcmstb.c
++++ b/drivers/gpio/gpio-brcmstb.c
+@@ -11,7 +11,6 @@
+  * GNU General Public License for more details.
+  */
+ 
+-#include <linux/bitops.h>
+ #include <linux/gpio/driver.h>
+ #include <linux/of_device.h>
+ #include <linux/of_irq.h>
+-- 
+2.7.4
