@@ -1,111 +1,111 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 5 Dec 2017 16:46:08 +0300
-Subject: [PATCH v6 2/8] KVM: arm/arm64: Factor out functionality to get
- vgic mmio requester_vcpu
-In-Reply-To: <20171204200506.3224-3-cdall@kernel.org>
-References: <20171204200506.3224-1-cdall@kernel.org>
- <20171204200506.3224-3-cdall@kernel.org>
-Message-ID: <20171205134608.msg6wvh7px273mud@yury-thinkpad>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Tue, 5 Dec 2017 10:56:48 -0300
+Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
+ UNCORE devices
+In-Reply-To: <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
+References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
+ <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
+ <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
+ <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
+ <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
+ <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
+Message-ID: <20171205135648.GC28405@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 04, 2017 at 09:05:00PM +0100, Christoffer Dall wrote:
-> From: Christoffer Dall <christoffer.dall@linaro.org>
-> 
-> We are about to distinguish between userspace accesses and mmio traps
-> for a number of the mmio handlers.  When the requester vcpu is NULL, it
-> mens we are handling a userspace acccess.
+Em Tue, Dec 05, 2017 at 08:35:22PM +0800, Jin, Yao escreveu:
+> A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
 
-Typo: means?
+Where is this fix_json_v9_2.patch file? I want to fold it with the patch
+introducing the problem.
 
-> Factor out the functionality to get the request vcpu into its own
-> function, mostly so we have a common place to document the semantics of
-> the return value.
+- Arnaldo
+ 
+> See the log:
 > 
-> Also take the chance to move the functionality outside of holding a
-> spinlock and instead explicitly disable and enable preemption.  This
-> supports PREEMPT_RT kernels as well.
+> root at skl:/tmp# perf stat --per-thread -p 10322 -M CPI,IPC
+> ^C
+>  Performance counter stats for process id '10322':
 > 
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> Reviewed-by: Andre Przywara <andre.przywara@arm.com>
-> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> ---
->  virt/kvm/arm/vgic/vgic-mmio.c | 44 +++++++++++++++++++++++++++----------------
->  1 file changed, 28 insertions(+), 16 deletions(-)
+>           vmstat-10322             1,879,654      inst_retired.any #
+> 0.8 CPI
+>           vmstat-10322             1,565,807      cycles
+>           vmstat-10322             1,879,654      inst_retired.any #
+> 1.2 IPC
+>           vmstat-10322             1,565,807      cpu_clk_unhalted.thread
 > 
-> diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-> index deb51ee16a3d..747b0a3b4784 100644
-> --- a/virt/kvm/arm/vgic/vgic-mmio.c
-> +++ b/virt/kvm/arm/vgic/vgic-mmio.c
-> @@ -122,6 +122,27 @@ unsigned long vgic_mmio_read_pending(struct kvm_vcpu *vcpu,
->  	return value;
->  }
->  
-> +/*
-> + * This function will return the VCPU that performed the MMIO access and
-> + * trapped from twithin the VM, and will return NULL if this is a userspace
-
-Typo: from within?
-
-> + * access.
-> + *
-> + * We can disable preemption locally around accessing the per-CPU variable,
-> + * and use the resolved vcpu pointer after enabling preemption again, because
-> + * even if the current thread is migrated to another CPU, reading the per-CPU
-> + * value later will give us the same value as we update the per-CPU variable
-> + * in the preempt notifier handlers.
-> + */
-> +static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
-> +{
-> +	struct kvm_vcpu *vcpu;
-> +
-> +	preempt_disable();
-> +	vcpu = kvm_arm_get_running_vcpu();
-> +	preempt_enable();
-> +	return vcpu;
-> +}
-> +
->  void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
->  			      gpa_t addr, unsigned int len,
->  			      unsigned long val)
-> @@ -184,24 +205,10 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
->  static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->  				    bool new_active_state)
->  {
-> -	struct kvm_vcpu *requester_vcpu;
->  	unsigned long flags;
-> -	spin_lock_irqsave(&irq->irq_lock, flags);
-> +	struct kvm_vcpu *requester_vcpu = vgic_get_mmio_requester_vcpu();
->  
-> -	/*
-> -	 * The vcpu parameter here can mean multiple things depending on how
-> -	 * this function is called; when handling a trap from the kernel it
-> -	 * depends on the GIC version, and these functions are also called as
-> -	 * part of save/restore from userspace.
-> -	 *
-> -	 * Therefore, we have to figure out the requester in a reliable way.
-> -	 *
-> -	 * When accessing VGIC state from user space, the requester_vcpu is
-> -	 * NULL, which is fine, because we guarantee that no VCPUs are running
-> -	 * when accessing VGIC state from user space so irq->vcpu->cpu is
-> -	 * always -1.
-> -	 */
-> -	requester_vcpu = kvm_arm_get_running_vcpu();
-> +	spin_lock_irqsave(&irq->irq_lock, flags);
->  
->  	/*
->  	 * If this virtual IRQ was written into a list register, we
-> @@ -213,6 +220,11 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
->  	 * vgic_change_active_prepare)  and still has to sync back this IRQ,
->  	 * so we release and re-acquire the spin_lock to let the other thread
->  	 * sync back the IRQ.
-> +	 *
-> +	 * When accessing VGIC state from user space, requester_vcpu is
-> +	 * NULL, which is fine, because we guarantee that no VCPUs are running
-> +	 * when accessing VGIC state from user space so irq->vcpu->cpu is
-> +	 * always -1.
->  	 */
->  	while (irq->vcpu && /* IRQ may have state in an LR somewhere */
->  	       irq->vcpu != requester_vcpu && /* Current thread is not the VCPU thread */
-> -- 
-> 2.14.2
+>        2.850291804 seconds time elapsed
+> 
+> Thanks for fixing it quickly.
+> 
+> Thanks
+> Jin Yao
+> 
+> On 12/5/2017 3:23 PM, Jin, Yao wrote:
+> > Hi,
+> > 
+> > I applied the diff but it's failed.
+> > 
+> > jinyao at skl:~/skl-ws/perf-dev/lck-4594/src$ patch -p1 < 1.pat
+> > patching file tools/perf/util/pmu.c
+> > patch: **** malformed patch at line 41: *head, struct perf_pmu *pmu)
+> > 
+> > Could you send the patch as attachment to me in another mail thread?
+> > 
+> > to yao.jin at linux.intel.com
+> > cc yao.jin at intel.com
+> > 
+> > Thanks
+> > Jin Yao
+> > 
+> > On 12/5/2017 3:12 PM, Ganapatrao Kulkarni wrote:
+> > > diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+> > > index 5ad8a18..57e38fd 100644
+> > > --- a/tools/perf/util/pmu.c
+> > > +++ b/tools/perf/util/pmu.c
+> > > @@ -538,6 +538,34 @@ static bool pmu_is_uncore(const char *name)
+> > > ? }
+> > > 
+> > > ? /*
+> > > + *? PMU CORE devices have different name other than cpu in sysfs on some
+> > > + *? platforms. looking for possible sysfs files to identify as core
+> > > device.
+> > > + */
+> > > +static int is_pmu_core(const char *name)
+> > > +{
+> > > + struct stat st;
+> > > + char path[PATH_MAX];
+> > > + const char *sysfs = sysfs__mountpoint();
+> > > +
+> > > + if (!sysfs)
+> > > + return 0;
+> > > +
+> > > + /* Look for cpu sysfs (x86 and others) */
+> > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
+> > > + if ((stat(path, &st) == 0) &&
+> > > + (strncmp(name, "cpu", strlen("cpu")) == 0))
+> > > + return 1;
+> > > +
+> > > + /* Look for cpu sysfs (specific to arm) */
+> > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/%s/cpus",
+> > > + sysfs, name);
+> > > + if (stat(path, &st) == 0)
+> > > + return 1;
+> > > +
+> > > + return 0;
+> > > +}
+> > > +
+> > > +/*
+> > > ?? * Return the CPU id as a raw string.
+> > > ?? *
+> > > ?? * Each architecture should provide a more precise id string that
+> > > @@ -641,7 +669,7 @@ static void pmu_add_cpu_aliases(struct list_head
+> > > *head, struct perf_pmu *pmu)
+> > > ?? break;
+> > > ?? }
+> > > 
+> > > - if (pmu->is_uncore) {
+> > > + if (!is_pmu_core(name)) {
+> > > ?? /* check for uncore devices */
+> > > ?? if (pe->pmu == NULL)
+> > > ?? continue;
