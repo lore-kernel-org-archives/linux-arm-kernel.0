@@ -1,84 +1,34 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 5 Dec 2017 12:57:11 +0100
-Subject: [PATCH v2 3/3] mtd: nand: squash struct nand_buffers into
- struct nand_chip
-In-Reply-To: <CAK7LNATKBO=eNHdL_P2MOh7+uRcCjkq+v8+O3DXC5UF3-NGh2Q@mail.gmail.com>
-References: <1512463636-28934-1-git-send-email-yamada.masahiro@socionext.com>
- <1512463636-28934-3-git-send-email-yamada.masahiro@socionext.com>
- <CAK7LNATKBO=eNHdL_P2MOh7+uRcCjkq+v8+O3DXC5UF3-NGh2Q@mail.gmail.com>
-Message-ID: <20171205125711.74158b3b@bbrezillon>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 5 Dec 2017 11:59:15 +0000
+Subject: [PATCH 4/8] ASoC: uniphier: add support for UniPhier EVEA codec
+In-Reply-To: <CAK7LNAR=-vHN5k6irpaDcAUYcH2kjCXLJpf10RMuq=GZB3huog@mail.gmail.com>
+References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
+ <20171122114321.29196-5-suzuki.katsuhiro@socionext.com>
+ <20171204182027.2k5uw5og65h6ac7w@sirena.org.uk>
+ <CAK7LNAR=-vHN5k6irpaDcAUYcH2kjCXLJpf10RMuq=GZB3huog@mail.gmail.com>
+Message-ID: <20171205115915.GB11658@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 5 Dec 2017 20:49:28 +0900
-Masahiro Yamada <yamada.masahiro@socionext.com> wrote:
+On Tue, Dec 05, 2017 at 09:58:54AM +0900, Masahiro Yamada wrote:
 
-> 2017-12-05 17:47 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
-> > struct nand_buffers is malloc'ed in nand_scan_tail() just for
-> > containing three pointers.  Squash this struct into nand_chip.
-> >
-> > Move and rename as follows:
-> >
-> >   chip->buffers->ecccalc   ->  chip->ecc.calc_buf
-> >   chip->buffers->ecccode   ->  chip->ecc.code_buf
-> >   chip->buffers->databuf   ->  chip->data_buf
-> >
-> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> > ---
-> >  
-> 
-> 
-> 
-> 
-> > diff --git a/drivers/mtd/nand/omap2.c b/drivers/mtd/nand/omap2.c
-> > index dad438c..7870cb1 100644
-> > --- a/drivers/mtd/nand/omap2.c
-> > +++ b/drivers/mtd/nand/omap2.c
-> > @@ -1530,7 +1530,7 @@ static int omap_write_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
-> >                                const uint8_t *buf, int oob_required, int page)
-> >  {
-> >         int ret;
-> > -       uint8_t *ecc_calc = chip->buffers->ecccalc;
-> > +       uint8_t *ecc_calc = chip->ecccalc;
-> >
-> >         /* Enable GPMC ecc engine */
-> >         chip->ecc.hwctl(mtd, NAND_ECC_WRITE);
-> > @@ -1568,7 +1568,7 @@ static int omap_write_subpage_bch(struct mtd_info *mtd,
-> >                                   u32 data_len, const u8 *buf,
-> >                                   int oob_required, int page)
-> >  {
-> > -       u8 *ecc_calc = chip->buffers->ecccalc;
-> > +       u8 *ecc_calc = chip->ecccalc;
-> >         int ecc_size      = chip->ecc.size;
-> >         int ecc_bytes     = chip->ecc.bytes;
-> >         int ecc_steps     = chip->ecc.steps;
-> > @@ -1605,7 +1605,7 @@ static int omap_write_subpage_bch(struct mtd_info *mtd,
-> >
-> >         /* copy calculated ECC for whole page to chip->buffer->oob */
-> >         /* this include masked-value(0xFF) for unwritten subpages */
-> > -       ecc_calc = chip->buffers->ecccalc;
-> > +       ecc_calc = chip->ecccalc;
-> >         ret = mtd_ooblayout_set_eccbytes(mtd, ecc_calc, chip->oob_poi, 0,
-> >                                          chip->ecc.total);
-> >         if (ret)
-> > @@ -1635,8 +1635,8 @@ static int omap_write_subpage_bch(struct mtd_info *mtd,
-> >  static int omap_read_page_bch(struct mtd_info *mtd, struct nand_chip *chip,
-> >                                 uint8_t *buf, int oob_required, int page)
-> >  {
-> > -       uint8_t *ecc_calc = chip->buffers->ecccalc;
-> > -       uint8_t *ecc_code = chip->buffers->ecccode;
-> > +       uint8_t *ecc_calc = chip->ecccalc;
-> > +       uint8_t *ecc_code = chip->ecccode;
-> >         int stat, ret;
-> >         unsigned int max_bitflips = 0;
-> >  
-> 
-> 
-> 
-> Sorry, I missed to update omap2.c
-> 
-> I will send v3.
+> Indeed ugly,
+> but I think this is intentional to make the SPDX line stand out.
 
-No need to send a v3, I already fixed it when applying [1].
+> 
+> Linus suggested this as far as I understood from the following:
+> https://patchwork.kernel.org/patch/10016201/
 
-[1]https://github.com/bbrezillon/linux-0day/commit/59a7bfff7103d48713b2125c3844400301a3d028
+> If you use C++ comment style for the entire block,
+> it will not stand out.
+
+It's the first line of the file to make it stand out, if you google
+around you can find some other conversation about how C++ comments are
+a good idea in general and this might encourage them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171205/8dab3739/attachment.sig>
