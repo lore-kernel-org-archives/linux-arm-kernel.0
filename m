@@ -1,38 +1,61 @@
-From: hkallweit1@gmail.com (Heiner Kallweit)
-Date: Tue, 5 Dec 2017 22:54:30 +0100
-Subject: [PATCH 00/12] firmware: arm_scpi: series with smaller improvements
-Message-ID: <99220c79-8b35-2978-11d1-6d101ccb6772@gmail.com>
+From: k@japko.eu (Krzysztof Adamski)
+Date: Tue, 5 Dec 2017 23:03:58 +0100
+Subject: [PATCH v2] ARM: dts: sun8i: h3: enable USB OTG for NanoPi Neo board
+In-Reply-To: <20171205090706.et5a7dizkhn6auje@flea.lan>
+References: <20171205090706.et5a7dizkhn6auje@flea.lan>
+Message-ID: <20171205220358.GA28161@t440.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After recent revert of all changes since 4.14 this is a resubmit of
-the patch series, reduced to patches which should not cause any
-regression.
-Based on a remark from Kevin I added one patch for improving the
-version info for pre-1.0 firmware that doesn't provide version
-information.
+Similarly to Orange Pi Zero, NanoPi Neo board has an USB OTG port with
+an ID pin but with unpowered VBUS. This patch enables this port in
+forced peripheral mode.
 
-Best should be to apply it to a devel branch first so that the
-Baylibre Amlogic team can test before mainlining.
+ohci/ehci nodes are still enabled since the host mode may work if
+external power source is used. In that case, the mode can be switched
+for example via sysfs. The same strategy is used for Orange Pi Zero
+board DTS.
 
-Heiner Kallweit (10):
-  firmware: arm_scpi: remove two unneeded devm_kfree's in scpi_remove
-  firmware: arm_scpi: make freeing mbox channels device-managed
-  firmware: arm_scpi: make scpi_probe completely device-managed
-  firmware: arm_scpi: improve struct dvfs_info to make code better readable
-  firmware: arm_scpi: improve handling of protocol and firmware version subfields
-  firmware: arm_scpi: improve struct sensor_value
-  firmware: arm_scpi: silence sparse warnings
-  firmware: arm_scpi: remove struct sensor_capabilities
-  firmware: arm_scpi: use FIELD_GET/_PREP to simplify macro definitions
-  firmware: arm_scpi: improve info message for pre-1.0 firmware
+Signed-off-by: Krzysztof Adamski <k@japko.eu>
+---
 
-Sudeep Holla (2):
-  firmware: arm_scpi: drop unnecessary type cast to scpi_shared_mem
-  firmware: arm_scpi: remove all single element structures
+Changes since version 1:
+- nodes sorted alphabetically
+- added explanation why enabling ohci/ehci still makes sense
 
- drivers/firmware/arm_scpi.c | 211 +++++++++++++++++++-------------------------
- 1 file changed, 89 insertions(+), 122 deletions(-)
+ arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
+diff --git a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+index 78f6c24952dd..9f33f6fae595 100644
+--- a/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
++++ b/arch/arm/boot/dts/sun8i-h3-nanopi-neo.dts
+@@ -47,9 +47,26 @@
+ 	compatible = "friendlyarm,nanopi-neo", "allwinner,sun8i-h3";
+ };
+ 
++&ehci0 {
++	status = "okay";
++};
++
+ &emac {
+ 	phy-handle = <&int_mii_phy>;
+ 	phy-mode = "mii";
+ 	allwinner,leds-active-low;
+ 	status = "okay";
+ };
++
++&ohci0 {
++	status = "okay";
++};
++
++&usb_otg {
++	status = "okay";
++	dr_mode = "peripheral";
++};
++
++&usbphy {
++	usb0_id_det-gpios = <&pio 6 12 GPIO_ACTIVE_HIGH>; /* PG12 */
++};
 -- 
-2.15.1
+2.13.6
