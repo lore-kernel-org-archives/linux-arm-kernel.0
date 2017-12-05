@@ -1,46 +1,48 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 5 Dec 2017 10:07:13 -0800
-Subject: [v2] mfd: stm32: Adopt SPDX identifier
-In-Reply-To: <20171205172811.GA5534@kroah.com>
-References: <20171205152418.28104-1-benjamin.gaignard@st.com>
- <20171205172337.GA24480@roeck-us.net>
- <20171205172811.GA5534@kroah.com>
-Message-ID: <20171205180713.GA25739@roeck-us.net>
+From: HartleyS@visionengravers.com (Hartley Sweeten)
+Date: Tue, 5 Dec 2017 18:14:03 +0000
+Subject: [PATCH v4 0/5] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <20171130235140.12243-1-lukma@denx.de>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171130235140.12243-1-lukma@denx.de>
+Message-ID: <SN1PR0101MB15656E4944DE6CAC67D18B07D03D0@SN1PR0101MB1565.prod.exchangelabs.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 06:28:11PM +0100, Greg KH wrote:
-> On Tue, Dec 05, 2017 at 09:23:37AM -0800, Guenter Roeck wrote:
-> > On Tue, Dec 05, 2017 at 04:24:18PM +0100, benjamin.gaignard at linaro.org wrote:
-> > > Add SPDX identifier
-> > > 
-> > > Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> > > ---
-> > >  drivers/mfd/stm32-lptimer.c       | 6 +-----
-> > >  drivers/mfd/stm32-timers.c        | 4 +---
-> > >  include/linux/mfd/stm32-lptimer.h | 6 +-----
-> > >  include/linux/mfd/stm32-timers.h  | 4 +---
-> > >  4 files changed, 4 insertions(+), 16 deletions(-)
-> > > 
-> > > diff --git a/drivers/mfd/stm32-lptimer.c b/drivers/mfd/stm32-lptimer.c
-> > > index 075330a25f61..a00f99f36559 100644
-> > > --- a/drivers/mfd/stm32-lptimer.c
-> > > +++ b/drivers/mfd/stm32-lptimer.c
-> > > @@ -1,13 +1,9 @@
-> > > +// SPDX-License-Identifier: GPL-2.0
-> > >  /*
-> > 
-> > I have been wondering - why is the SPDX identifier for the most part added
-> > as separate C++ comment at the beginning of the file, and not inline with
-> > the rest of the top comments ?  SPDX doesn't mandate this - the examples
-> > I can find on the SPDX web site all show it inline. Is there a special
-> > Linux kernel convention ?
-> 
-> See the patch series from Thomas that answers this question for you by
-> adding documentation to the kernel explaining it all :)
-> 
+On Thursday, November 30, 2017 4:52 PM, Lukasz Majewski wrote:
+>
+> This patch series adds support for Liebherr's BK3 board, being a derivative of TS72XX design.
+>
+> This patchset consists of following patches:
+>
+> - ts72xx.[c|h] cosmetic cleanup/improvement
+> - Rewrite ts72xx.c to be reusable by bk3
+> - The Liebherr's BK3 board has been added with re-using code of
+>   ts72xx.c (detalied list of changes can be found in patch 6/6)
+>
+> This series applies on top of linux-next/master (next-20171130)
+>
+> Lukasz Majewski (5):
+>   ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
+>   ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
+>     parameters
+>   ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
+>   ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
+>   ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
+>
+>  MAINTAINERS                   |   6 ++
+>  arch/arm/mach-ep93xx/Kconfig  |   7 ++
+>  arch/arm/mach-ep93xx/ts72xx.c | 198 ++++++++++++++++++++++++++++++++++++++----
+>  arch/arm/mach-ep93xx/ts72xx.h |   9 ++
+>  arch/arm/tools/mach-types     |   1 +
+>  5 files changed, 202 insertions(+), 19 deletions(-)
 
-So it is a special Linux kernel convention. Interesting (and brrr ... :-)
-Thanks for the clarification.
+Looks good.
 
-Guenter
+Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
+
+Linus,
+
+Would you mind picking this series up?
+
+Thanks,
+Hartley
