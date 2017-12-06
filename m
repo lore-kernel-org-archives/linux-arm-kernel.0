@@ -1,38 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:39 +0100
-Subject: [PATCH 44/61] ARM: dts: genmai: Correct primary compatible value for
- eeprom
+Date: Wed,  6 Dec 2017 11:22:29 +0100
+Subject: [PATCH 34/61] ARM: dts: iwg22d-sodimm-dbhd-ca: Add can1 support to
+ HDMI DB
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <8edeee392f5971054bfbad43715d0c0d077e13bf.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <d6033e7c6589c74299635eb3d84c56ccac8db5e4.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-The Renesas part number of the two-wire serial interface EEPROM is not
-24C128, but R1EX24128ASA00A.
+CAN1 interface is exposed via connector J1 found on the HDMI daughter
+board. This patch enables can1 DT node from within the daughter board
+specific device tree.
 
-Hence change its primary compatible value to "renesas,r1ex24128".
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r7s72100-genmai.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r7s72100-genmai.dts b/arch/arm/boot/dts/r7s72100-genmai.dts
-index cd4d5ff7749e..5af2a0116ff2 100644
---- a/arch/arm/boot/dts/r7s72100-genmai.dts
-+++ b/arch/arm/boot/dts/r7s72100-genmai.dts
-@@ -123,7 +123,7 @@
- 	pinctrl-0 = <&i2c2_pins>;
- 
- 	eeprom at 50 {
--		compatible = "renesas,24c128", "atmel,24c128";
-+		compatible = "renesas,r1ex24128", "atmel,24c128";
- 		reg = <0x50>;
- 		pagesize = <64>;
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
+index a8a4ec87378d..d34de8266ccd 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm-dbhd-ca.dts
+@@ -54,6 +54,13 @@
  	};
+ };
+ 
++&can1 {
++	pinctrl-0 = <&can1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
+ &hscif2 {
+ 	pinctrl-0 = <&hscif2_pins>;
+ 	pinctrl-names = "default";
+@@ -105,6 +112,11 @@
+ };
+ 
+ &pfc {
++	can1_pins: can1 {
++		groups = "can1_data_b";
++		function = "can1";
++	};
++
+ 	du0_pins: du0 {
+ 		groups = "du0_rgb888", "du0_sync", "du0_disp", "du0_clk0_out";
+ 		function = "du0";
 -- 
 2.11.0
