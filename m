@@ -1,108 +1,112 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 6 Dec 2017 10:30:26 +0800
-Subject: [PATCH 2/2] clk: sunxi-ng: sun50i: a64: Add 2x fixed post-divider
- to MMC module clocks
-In-Reply-To: <20171205195956.xdil2dsbtfwx35jj@flea.lan>
-References: <20171204051912.7485-1-wens@csie.org>
- <20171204051912.7485-3-wens@csie.org>
- <20171205195956.xdil2dsbtfwx35jj@flea.lan>
-Message-ID: <CAGb2v67=2BbOGWpRyujaR-pn6ZEfb1rSRtmzP-kUzXRn_y+iNg@mail.gmail.com>
+From: marcofrk@gmail.com (Marco Franchi)
+Date: Wed,  6 Dec 2017 00:53:02 -0200
+Subject: [PATCH v2 1/3] ARM: dts: imx6sx-sdb: Convert from fbdev to drm
+ bindings
+Message-ID: <1512528784-29288-1-git-send-email-marcofrk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 6, 2017 at 3:59 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Mon, Dec 04, 2017 at 01:19:12PM +0800, Chen-Yu Tsai wrote:
->> On the A64, the MMC module clocks are fixed in the new timing mode,
->> i.e. they do not have a bit to select the mode. These clocks have
->> a 2x divider somewhere between the clock and the MMC module.
->>
->> To be consistent with other SoCs supporting the new timing mode,
->> we model the 2x divider as a fixed post-divider on the MMC module
->> clocks.
->>
->> This patch adds the post-dividers to the MMC clocks.
->>
->> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->
-> I had a doubt applying that one... sorry.
->
->> ---
->>  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 57 +++++++++++++++++++++++------------
->>  1 file changed, 37 insertions(+), 20 deletions(-)
->>
->> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
->> index 2bb4cabf802f..ee9c12cf3f08 100644
->> --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
->> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
->> @@ -400,28 +400,45 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(nand_clk, "nand", mod0_default_parents, 0x080,
->>                                 BIT(31),      /* gate */
->>                                 0);
->>
->> +/*
->> + * MMC clocks are the new timing mode (see A83T & H3) variety, but without
->> + * the mode switch. This means they have a 2x post divider between the clock
->> + * and the MMC module. This is not documented in the manual, but is taken
->> + * into consideration when setting the mmc module clocks in the BSP kernel.
->> + * Without it, MMC performance is degraded.
->> + *
->> + * We model it here to be consistent with other SoCs supporting this mode.
->> + * The alternative would be to add the 2x multiplier when setting the MMC
->> + * module clock in the MMC driver, just for the A64.
->> + */
->>  static const char * const mmc_default_parents[] = { "osc24M", "pll-periph0-2x",
->>                                                   "pll-periph1-2x" };
->> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_default_parents, 0x088,
->> -                               0, 4,         /* M */
->> -                               16, 2,        /* P */
->> -                               24, 2,        /* mux */
->> -                               BIT(31),      /* gate */
->> -                               0);
->> -
->> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_default_parents, 0x08c,
->> -                               0, 4,         /* M */
->> -                               16, 2,        /* P */
->> -                               24, 2,        /* mux */
->> -                               BIT(31),      /* gate */
->> -                               0);
->> -
->> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_default_parents, 0x090,
->> -                               0, 4,         /* M */
->> -                               16, 2,        /* P */
->> -                               24, 2,        /* mux */
->> -                               BIT(31),      /* gate */
->> -                               0);
->> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0",
->> +                                       mmc_default_parents, 0x088,
->> +                                       0, 4,         /* M */
->> +                                       16, 2,        /* P */
->> +                                       24, 2,        /* mux */
->> +                                       BIT(31),      /* gate */
->> +                                       2,            /* post-div */
->> +                                       0);
->> +
->> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1",
->> +                                       mmc_default_parents, 0x08c,
->> +                                       0, 4,         /* M */
->> +                                       16, 2,        /* P */
->> +                                       24, 2,        /* mux */
->> +                                       BIT(31),      /* gate */
->> +                                       2,            /* post-div */
->> +                                       0);
->> +
->
-> Are you sure that the divider there for the non-eMMC clocks? Usually,
-> the new mode is only here for the eMMC, so we would divide the rate by
-> two in the non-eMMC case.
+It is preferred to use the panel compatible string rather than passing
+the LCD timing in the device tree.
 
-The new mode is there for all MMC controllers. The other two MMC
-controllers even have the old/new timing mode switch. In case you
-forgot we have ".need_new_timings" set for the A64 compatible.
+So pass the "sii,43wvf1g" compatible string, which describes the parallel 
+LCD.
 
-But to eliminate any doubts or concerns, I've rerun tests for the
-micro SD card, instead of the eMMC. And yes the results are the same,
-2x improvement (12 MB/s vs 23.7 MB/s).
+Also pass the 'backlight' property as described in
+Documentation/devicetree/bindings/display/panel/simple-panel.txt
 
-ChenYu
+Signed-off-by: Marco Franchi <marcofrk@gmail.com>
+---
+Changes since v1:
+-change subject
+-change message log
+-includes into a set of patches
+-rebase to linux-next
+-fix regulator name and properties
+ arch/arm/boot/dts/imx6sx-sdb.dtsi | 48 +++++++++++++++++++--------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
+
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index d57a41c..d35aa85 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -24,7 +24,7 @@
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+ 
+-	backlight {
++	backlight_display: backlight-display {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm3 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+@@ -129,6 +129,13 @@
+ 		enable-active-high;
+ 	};
+ 
++	reg_lcd_5v: regulator-lcd-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "lcd-5v0";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
+ 	sound {
+ 		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
+ 		model = "wm8962-audio";
+@@ -144,6 +151,19 @@
+ 		mux-int-port = <2>;
+ 		mux-ext-port = <6>;
+ 	};
++
++	panel {
++		compatible = "sii,43wvf1g";
++		backlight = <&backlight_display>;
++		dvdd-supply = <&reg_lcd_3v3>;
++		avdd-supply = <&reg_lcd_5v>;
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
+ 
+ &audmux {
+@@ -221,31 +241,11 @@
+ &lcdif1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcd>;
+-	lcd-supply = <&reg_lcd_3v3>;
+-	display = <&display0>;
+ 	status = "okay";
+ 
+-	display0: display0 {
+-		bits-per-pixel = <16>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: timing0 {
+-				clock-frequency = <33500000>;
+-				hactive = <800>;
+-				vactive = <480>;
+-				hback-porch = <89>;
+-				hfront-porch = <164>;
+-				vback-porch = <23>;
+-				vfront-porch = <10>;
+-				hsync-len = <10>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port {
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
+-- 
+2.7.4
