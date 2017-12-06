@@ -1,47 +1,43 @@
 From: jacob-chen@iotwrt.com (Jacob Chen)
-Date: Wed,  6 Dec 2017 19:19:37 +0800
-Subject: [PATCH v3 10/12] arm64: dts: rockchip: add isp0 node for rk3399
+Date: Wed,  6 Dec 2017 19:19:38 +0800
+Subject: [PATCH v3 11/12] arm64: dts: rockchip: add rx0 mipi-phy for rk3399
 In-Reply-To: <20171206111939.1153-1-jacob-chen@iotwrt.com>
 References: <20171206111939.1153-1-jacob-chen@iotwrt.com>
-Message-ID: <20171206111939.1153-11-jacob-chen@iotwrt.com>
+Message-ID: <20171206111939.1153-12-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shunqian Zheng <zhengsq@rock-chips.com>
 
-rk3399 have two ISP, but we havn't test isp1, so just add isp0 at present.
+It's a Designware MIPI D-PHY, used for ISP0 in rk3399.
 
 Signed-off-by: Shunqian Zheng <zhengsq@rock-chips.com>
 Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index d340b58ab184..66a912fab5dd 100644
+index 66a912fab5dd..a65b110afaf3 100644
 --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
 +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -1588,6 +1588,21 @@
- 		status = "disabled";
- 	};
+@@ -1292,6 +1292,17 @@
+ 			status = "disabled";
+ 		};
  
-+	isp0: isp0 at ff910000 {
-+		compatible = "rockchip,rk3399-cif-isp";
-+		reg = <0x0 0xff910000 0x0 0x4000>;
-+		interrupts = <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH 0>;
-+		clocks = <&cru SCLK_ISP0>,
-+			 <&cru ACLK_ISP0>, <&cru ACLK_ISP0_WRAPPER>,
-+			 <&cru HCLK_ISP0>, <&cru HCLK_ISP0_WRAPPER>;
-+		clock-names = "clk_isp",
-+			      "aclk_isp", "aclk_isp_wrap",
-+			      "hclk_isp", "hclk_isp_wrap";
-+		power-domains = <&power RK3399_PD_ISP0>;
-+		iommus = <&isp0_mmu>;
-+		status = "disabled";
-+	};
++		mipi_dphy_rx0: mipi-dphy-rx0 {
++			compatible = "rockchip,rk3399-mipi-dphy";
++			clocks = <&cru SCLK_MIPIDPHY_REF>,
++				<&cru SCLK_DPHY_RX0_CFG>,
++				<&cru PCLK_VIO_GRF>;
++			clock-names = "dphy-ref", "dphy-cfg", "grf";
++			power-domains = <&power RK3399_PD_VIO>;
++			bus-width = <4>;
++			status = "disabled";
++		};
 +
- 	isp0_mmu: iommu at ff914000 {
- 		compatible = "rockchip,iommu";
- 		reg = <0x0 0xff914000 0x0 0x100>, <0x0 0xff915000 0x0 0x100>;
+ 		u2phy0: usb2-phy at e450 {
+ 			compatible = "rockchip,rk3399-usb2phy";
+ 			reg = <0xe450 0x10>;
 -- 
 2.15.0
