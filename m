@@ -1,24 +1,21 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 06 Dec 2017 15:46:22 -0500 (EST)
-Subject: [PATCH] net: ethernet: arc: fix error handling in
- emac_rockchip_probe
-In-Reply-To: <20171206172433.3457-1-branislav@radocaj.org>
-References: <20171206172433.3457-1-branislav@radocaj.org>
-Message-ID: <20171206.154622.1837920620671638254.davem@davemloft.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 6 Dec 2017 15:16:59 -0600
+Subject: [PATCH 4/8] dt-bindings: power: supply: axp20x: add AXP813
+ battery DT binding
+In-Reply-To: <bf3682e87c75532884881d7b08840c61678cbce1.1512396054.git-series.quentin.schulz@free-electrons.com>
+References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <bf3682e87c75532884881d7b08840c61678cbce1.1512396054.git-series.quentin.schulz@free-electrons.com>
+Message-ID: <20171206211659.epe65eetp6gr4b7f@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Branislav Radocaj <branislav@radocaj.org>
-Date: Wed,  6 Dec 2017 18:24:33 +0100
-
->     If clk_set_rate() fails, we should disable clk
->     before return.
+On Mon, Dec 04, 2017 at 03:12:50PM +0100, Quentin Schulz wrote:
+> The AXP813 can have a battery as power supply, so let's add it to the
+> list of compatibles.
 > 
->     Found by Linux Driver Verification project (linuxtesting.org).
-> 
->     Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
+> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/power/supply/axp20x_battery.txt | 8 +++----
+>  1 file changed, 4 insertions(+), 4 deletions(-)
 
-Please eliminate this indentation of your commit message and
-resubmit.
-
-Thank you.
+Reviewed-by: Rob Herring <robh@kernel.org>
