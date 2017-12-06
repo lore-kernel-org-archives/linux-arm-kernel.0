@@ -1,66 +1,65 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 7 Dec 2017 00:19:25 +0100
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <CAJZ5v0iaursWFP_KRoJqT6-QoGkvpTot0oMvs6qdjkaP12p9jQ@mail.gmail.com>
-References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
- <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
- <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
- <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
- <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
- <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
- <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
- <CAJZ5v0iaursWFP_KRoJqT6-QoGkvpTot0oMvs6qdjkaP12p9jQ@mail.gmail.com>
-Message-ID: <CAJZ5v0hEdK_vJcHeoz=Z2H6od=bktspPpTo37Y6qiOT2qptnaA@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 6 Dec 2017 15:26:22 -0800
+Subject: [kernel-hardening][PATCH v3 1/3] arm: mm: dump: make page table
+ dumping reusable
+In-Reply-To: <CAErMHp9BBaJ8iNyjOS3nU+LUWNijL6FSOKSmVAYY_20nfB9nAQ@mail.gmail.com>
+References: <20171204142553.GA3344@pjb1027-Latitude-E5410>
+ <CAGXu5j+UHqJcxygGXk0jXYkK7AHzi1rU5SqvowfYT-OVKc6r5Q@mail.gmail.com>
+ <CAErMHp9BBaJ8iNyjOS3nU+LUWNijL6FSOKSmVAYY_20nfB9nAQ@mail.gmail.com>
+Message-ID: <CAGXu5jJ+BbTwoM1DvwAJGRh=4EiMU1SOoPDPX2VmOC5w2cNHSw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Greg,
-
-On Wed, Dec 6, 2017 at 6:16 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> On Wed, Dec 6, 2017 at 5:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> On 12/6/2017 11:41 AM, Rafael J. Wysocki wrote:
->>> On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->>>> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
->>>>>> Yes, it should, so I'm not sure why you need the list in the first place.
->>>>>>
->>>>>> Also it looks like something along the lines of devres_release_all()
->>>>>> should be sufficient.
->>>>> Good suggestion, let me test this.
->>>>>
->>>>
->>>> I tried to pull the code into GED but the API is not public. I also looked
->>>> at how it is used. I was afraid to mess up with the internals of base.c by
->>>> calling devres_release_all() externally first and by the driver framework
->>>> next. I moved away from this approach.
->>>
->>> Are you sure it is called by the core in the shutdown path?
+On Wed, Dec 6, 2017 at 1:45 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
+>>> +#ifndef __ASM_PTDUMP_H
+>>> +#define __ASM_PTDUMP_H
+>>> +
+>>> +#ifdef CONFIG_ARM_PTDUMP_CORE
 >>
->> Sorry, I was thinking about a general case not the shutdown path. If we open
->> this API and have device drivers call it from arbitrary places; then we could
->> be opening a new can of worms that show up during device driver removal.
-
-[cut]
-
+>> Is this #ifdef needed? I think this file is only included in dump.c
+>> and ptdump_debugfs.c, both of which are only built when
+>> CONFIG_ARM_PTDUMP_CORE is defined.
 >
-> OK
+> Looking at next patch in this patch-set series ([PATCH v3 3/3] arm:
+> mm: dump: add checking for writable and executable pages),
+> Not only dump.c and ptdump_debugfs.c but also arch/arm/mm/init.c
+> include this file (ptdump.h) to call debug_checkwx().
+> mm/init.c is not built only when CONFIG_ARM_PTDUMP_CORE is defined.
+> So, This #ifdef seems not be needed for this patch, but is needed for
+> this patch-set series.
 >
-> Anyway, it looks like something is missing in the core.
 >
-> You shouldn't really need to do all that dance in a driver.
+>>> +static int ptdump_init(void)
+>>> +{
+>>> +       ptdump_initialize();
+>>> +       return ptdump_debugfs_register(&kernel_ptdump_info,
+>>> +                                       "kernel_page_tables");
+>>
+>> This changes the return value of ptdump_init. This should do similar
+>> to what was done before:
+>>
+>> return ptdump_debugfs_register(&kernel_ptdump_info,
+>> "kernel_page_tables") ? 0 : -ENOMEM;
+>
+>
+> ptdump_debugfs_register() already returns what you think.
+>
+>>> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
+>>> +{
+>>> +       struct dentry *pe;
+>>> +
+>>> +       pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
+>>> +       return pe ? 0 : -ENOMEM;
+>>> +
+>>> +}
+>
+> So "return ptdump_debugfs_register(~~)" is fine.
 
-We have a problem with the ACPI GED driver which essentially is a
-platform driver requesting a number of interrupts and handling them by
-dispatching a specific AML method.
+Ah! Yes, I totally missed the change from create_file to
+debugfs_register. Sorry for the noise!
 
-It uses devm_request_threaded_irq() to request the interrupts, so it
-doesn't need a ->remove() callback, but it turns out to need a
-->shutdown() one to free all of these interrupts at the shutdown time.
+-Kees
 
-While we can add a ->shutdown() callback to it, that essentially needs
-to duplicate devres_release_all() somewhat.
-
-Any suggestions what to do with that?
-
-Thanks,
-Rafael
+-- 
+Kees Cook
+Pixel Security
