@@ -1,40 +1,45 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  6 Dec 2017 16:30:00 +0100
-Subject: [PATCH 4/9] ARM: dts: imx7-colibri: use NAND_CE1 as GPIO
+Date: Wed,  6 Dec 2017 16:30:02 +0100
+Subject: [PATCH 6/9] ARM: dts: imx7-colibri: specify usdhc1 supplies
 In-Reply-To: <20171206153005.6144-1-stefan@agner.ch>
 References: <20171206153005.6144-1-stefan@agner.ch>
-Message-ID: <20171206153005.6144-4-stefan@agner.ch>
+Message-ID: <20171206153005.6144-6-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-All Colibri iMX7 SKUs use either single-die NAND or eMMC, hence
-NAND_CE1 is not used on the module and can be used as a GPIO by
-carrier boards.
+The usdhc1 controller instance is used to provide the default
+SD/MMC capabilities of the Colibri standard. The IO pins are
+supplied to the SoC on the module whereas the SD-card is powered
+by the Carrier Board supply.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx7-colibri.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 1 +
+ arch/arm/boot/dts/imx7-colibri.dtsi         | 1 +
+ 2 files changed, 2 insertions(+)
 
+diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+index 5ecb3a858c5a..87c23b769a08 100644
+--- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
++++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
+@@ -158,5 +158,6 @@
+ &usdhc1 {
+ 	keep-power-in-suspend;
+ 	wakeup-source;
++	vmmc-supply = <&reg_3v3>;
+ 	status = "okay";
+ };
 diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index e4e32aa786f4..f61041af026a 100644
+index 6498c1136ef1..d623ef0f6e3e 100644
 --- a/arch/arm/boot/dts/imx7-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -329,6 +329,7 @@
- 			MX7D_PAD_EPDC_SDCE2__GPIO2_IO22		0x14 /* SODIMM 127 */
- 			MX7D_PAD_UART3_RTS_B__GPIO4_IO6		0x14 /* SODIMM 131 */
- 			MX7D_PAD_EPDC_GDRL__GPIO2_IO26		0x14 /* SODIMM 133 */
-+			MX7D_PAD_SAI1_RX_DATA__GPIO6_IO12	0x14 /* SODIMM 169 */
- 			MX7D_PAD_SAI1_RX_BCLK__GPIO6_IO17	0x14 /* SODIMM 24 */
- 			MX7D_PAD_SD2_DATA2__GPIO5_IO16		0x14 /* SODIMM 100 */
- 			MX7D_PAD_SD2_DATA3__GPIO5_IO17		0x14 /* SODIMM 102 */
-@@ -439,7 +440,6 @@
- 			MX7D_PAD_SD3_CLK__NAND_CLE		0x71
- 			MX7D_PAD_SD3_CMD__NAND_ALE		0x71
- 			MX7D_PAD_SAI1_TX_BCLK__NAND_CE0_B	0x71
--			MX7D_PAD_SAI1_RX_DATA__NAND_CE1_B	0x71
- 			MX7D_PAD_SAI1_TX_DATA__NAND_READY_B	0x74
- 			MX7D_PAD_SD3_STROBE__NAND_RE_B		0x71
- 			MX7D_PAD_SD3_RESET_B__NAND_WE_B		0x71
+@@ -299,6 +299,7 @@
+ 	no-1-8-v;
+ 	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
+ 	disable-wp;
++	vqmmc-supply = <&reg_LDO2>;
+ };
+ 
+ &iomuxc {
 -- 
 2.15.1
