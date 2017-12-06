@@ -1,99 +1,105 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:22 +0000
-Subject: [PATCH v3 03/20] arm64: mm: Move ASID from TTBR0 to TTBR1
+Date: Wed,  6 Dec 2017 12:35:32 +0000
+Subject: [PATCH v3 13/20] arm64: entry: Hook up entry trampoline to exception
+ vectors
 In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
 References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512563739-25239-4-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-14-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for mapping kernelspace and userspace with different
-ASIDs, move the ASID to TTBR1 and update switch_mm to context-switch
-TTBR0 via an invalid mapping (the zero page).
+Hook up the entry trampoline to our exception vectors so that all
+exceptions from and returns to EL0 go via the trampoline, which swizzles
+the vector base register accordingly. Transitioning to and from the
+kernel clobbers x30, so we use tpidrro_el0 and far_el1 as scratch
+registers for native tasks.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu_context.h   | 7 +++++++
- arch/arm64/include/asm/pgtable-hwdef.h | 1 +
- arch/arm64/include/asm/proc-fns.h      | 6 ------
- arch/arm64/mm/proc.S                   | 9 ++++++---
- 4 files changed, 14 insertions(+), 9 deletions(-)
+ arch/arm64/kernel/entry.S | 39 ++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 36 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a9b5e..2d63611e4311 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -57,6 +57,13 @@ static inline void cpu_set_reserved_ttbr0(void)
- 	isb();
- }
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index b99fc928119c..39e3873b8d5a 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -73,6 +73,17 @@
  
-+static inline void cpu_switch_mm(pgd_t *pgd, struct mm_struct *mm)
-+{
-+	BUG_ON(pgd == swapper_pg_dir);
-+	cpu_set_reserved_ttbr0();
-+	cpu_do_switch_mm(virt_to_phys(pgd),mm);
-+}
+ 	.macro kernel_ventry, el, label, regsize = 64
+ 	.align 7
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	.if	\el == 0
++	.if	\regsize == 64
++	mrs	x30, tpidrro_el0
++	msr	tpidrro_el0, xzr
++	.else
++	mov	x30, xzr
++	.endif
++	.endif
++#endif
 +
- /*
-  * TCR.T0SZ value to use when the ID map is active. Usually equals
-  * TCR_T0SZ(VA_BITS), unless system RAM is positioned very high in
-diff --git a/arch/arm64/include/asm/pgtable-hwdef.h b/arch/arm64/include/asm/pgtable-hwdef.h
-index eb0c2bd90de9..8df4cb6ac6f7 100644
---- a/arch/arm64/include/asm/pgtable-hwdef.h
-+++ b/arch/arm64/include/asm/pgtable-hwdef.h
-@@ -272,6 +272,7 @@
- #define TCR_TG1_4K		(UL(2) << TCR_TG1_SHIFT)
- #define TCR_TG1_64K		(UL(3) << TCR_TG1_SHIFT)
- 
-+#define TCR_A1			(UL(1) << 22)
- #define TCR_ASID16		(UL(1) << 36)
- #define TCR_TBI0		(UL(1) << 37)
- #define TCR_HA			(UL(1) << 39)
-diff --git a/arch/arm64/include/asm/proc-fns.h b/arch/arm64/include/asm/proc-fns.h
-index 14ad6e4e87d1..16cef2e8449e 100644
---- a/arch/arm64/include/asm/proc-fns.h
-+++ b/arch/arm64/include/asm/proc-fns.h
-@@ -35,12 +35,6 @@ extern u64 cpu_do_resume(phys_addr_t ptr, u64 idmap_ttbr);
- 
- #include <asm/memory.h>
- 
--#define cpu_switch_mm(pgd,mm)				\
--do {							\
--	BUG_ON(pgd == swapper_pg_dir);			\
--	cpu_do_switch_mm(virt_to_phys(pgd),mm);		\
--} while (0)
--
- #endif /* __ASSEMBLY__ */
- #endif /* __KERNEL__ */
- #endif /* __ASM_PROCFNS_H */
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 95233dfc4c39..a8a64898a2aa 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -139,9 +139,12 @@ ENDPROC(cpu_do_resume)
-  */
- ENTRY(cpu_do_switch_mm)
- 	pre_ttbr0_update_workaround x0, x2, x3
-+	mrs	x2, ttbr1_el1
- 	mmid	x1, x1				// get mm->context.id
--	bfi	x0, x1, #48, #16		// set the ASID
--	msr	ttbr0_el1, x0			// set TTBR0
-+	bfi	x2, x1, #48, #16		// set the ASID
-+	msr	ttbr1_el1, x2			// in TTBR1 (since TCR.A1 is set)
-+	isb
-+	msr	ttbr0_el1, x0			// now update TTBR0
- 	isb
- 	post_ttbr0_update_workaround
- 	ret
-@@ -224,7 +227,7 @@ ENTRY(__cpu_setup)
- 	 * both user and kernel.
- 	 */
- 	ldr	x10, =TCR_TxSZ(VA_BITS) | TCR_CACHE_FLAGS | TCR_SMP_FLAGS | \
--			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0
-+			TCR_TG_FLAGS | TCR_ASID16 | TCR_TBI0 | TCR_A1
- 	tcr_set_idmap_t0sz	x10, x9
- 
+ 	sub	sp, sp, #S_FRAME_SIZE
+ #ifdef CONFIG_VMAP_STACK
  	/*
+@@ -119,6 +130,11 @@
+ 	b	el\()\el\()_\label
+ 	.endm
+ 
++	.macro tramp_alias, dst, sym
++	mov_q	\dst, TRAMP_VALIAS
++	add	\dst, \dst, #(\sym - .entry.tramp.text)
++	.endm
++
+ 	.macro	kernel_entry, el, regsize = 64
+ 	.if	\regsize == 32
+ 	mov	w0, w0				// zero upper 32 bits of x0
+@@ -271,18 +287,20 @@ alternative_else_nop_endif
+ 	.if	\el == 0
+ 	ldr	x23, [sp, #S_SP]		// load return stack pointer
+ 	msr	sp_el0, x23
++	tst	x22, #PSR_MODE32_BIT		// native task?
++	b.eq	3f
++
+ #ifdef CONFIG_ARM64_ERRATUM_845719
+ alternative_if ARM64_WORKAROUND_845719
+-	tbz	x22, #4, 1f
+ #ifdef CONFIG_PID_IN_CONTEXTIDR
+ 	mrs	x29, contextidr_el1
+ 	msr	contextidr_el1, x29
+ #else
+ 	msr contextidr_el1, xzr
+ #endif
+-1:
+ alternative_else_nop_endif
+ #endif
++3:
+ 	.endif
+ 
+ 	msr	elr_el1, x21			// set up the return data
+@@ -304,7 +322,22 @@ alternative_else_nop_endif
+ 	ldp	x28, x29, [sp, #16 * 14]
+ 	ldr	lr, [sp, #S_LR]
+ 	add	sp, sp, #S_FRAME_SIZE		// restore sp
+-	eret					// return to kernel
++
++#ifndef CONFIG_UNMAP_KERNEL_AT_EL0
++	eret
++#else
++	.if	\el == 0
++	bne	4f
++	msr	far_el1, x30
++	tramp_alias	x30, tramp_exit_native
++	br	x30
++4:
++	tramp_alias	x30, tramp_exit_compat
++	br	x30
++	.else
++	eret
++	.endif
++#endif
+ 	.endm
+ 
+ 	.macro	irq_stack_entry
 -- 
 2.1.4
