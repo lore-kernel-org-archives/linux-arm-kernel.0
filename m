@@ -1,268 +1,140 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  6 Dec 2017 16:30:05 +0100
-Subject: [PATCH 9/9] ARM: dts: imx7: add Toradex Colibri iMX7D 1GB (eMMC)
- support
-In-Reply-To: <20171206153005.6144-1-stefan@agner.ch>
-References: <20171206153005.6144-1-stefan@agner.ch>
-Message-ID: <20171206153005.6144-9-stefan@agner.ch>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 6 Dec 2017 15:38:09 +0000
+Subject: [PATCH 10/37] KVM: arm64: Slightly improve debug save/restore
+ functions
+In-Reply-To: <20171201151938.GA6615@lvm>
+References: <20171012104141.26902-1-christoffer.dall@linaro.org>
+ <20171012104141.26902-11-christoffer.dall@linaro.org>
+ <e9b8d6b8-6dfa-3e6d-6e8f-c16a1882651f@arm.com> <20171201151938.GA6615@lvm>
+Message-ID: <f6bf597c-5b21-ce31-969c-c2bd0629db79@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Computer on Module Colibri iMX7D 1GB along
-with the Colibri Evaluation Board device trees. Follow the usual
-hierarchic include model, maintaining shared configuration in
-imx7-colibri.dtsi and imx7-colibri-eval-v3.dtsi respectively.
 
-Signed-off-by: Stefan Agner <stefan@agner.ch>
----
- arch/arm/boot/dts/Makefile                       |  1 +
- arch/arm/boot/dts/imx7-colibri.dtsi              | 64 +++++++++++++++++++++++-
- arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts | 55 ++++++++++++++++++++
- arch/arm/boot/dts/imx7d-colibri-emmc.dtsi        | 57 +++++++++++++++++++++
- arch/arm/boot/dts/imx7d-colibri.dtsi             |  4 ++
- 5 files changed, 180 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
- create mode 100644 arch/arm/boot/dts/imx7d-colibri-emmc.dtsi
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b5ba7ad6ae30..9e4b4ecae572 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -519,6 +519,7 @@ dtb-$(CONFIG_SOC_IMX6UL) += \
- 	imx6ull-14x14-evk.dtb
- dtb-$(CONFIG_SOC_IMX7D) += \
- 	imx7d-cl-som-imx7.dtb \
-+	imx7d-colibri-emmc-eval-v3.dtb \
- 	imx7d-colibri-eval-v3.dtb \
- 	imx7d-nitrogen7.dtb \
- 	imx7d-pico.dtb \
-diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index e1c6da0a65e4..4ea654a206e4 100644
---- a/arch/arm/boot/dts/imx7-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -122,7 +122,6 @@
- 	fsl,use-minimum-ecc;
- 	nand-on-flash-bbt;
- 	nand-ecc-mode = "hw";
--	status = "okay";
- };
- 
- &i2c1 {
-@@ -312,6 +311,21 @@
- 	vqmmc-supply = <&reg_LDO2>;
- };
- 
-+&usdhc3 {
-+	pinctrl-names = "default", "state_100mhz", "state_200mhz";
-+	pinctrl-0 = <&pinctrl_usdhc3>;
-+	pinctrl-1 = <&pinctrl_usdhc3_100mhz>;
-+	pinctrl-2 = <&pinctrl_usdhc3_200mhz>;
-+	assigned-clocks = <&clks IMX7D_USDHC3_ROOT_CLK>;
-+	assigned-clock-rates = <400000000>;
-+	bus-width = <8>;
-+	fsl,tuning-step = <2>;
-+	max-frequency = <100000000>;
-+	vmmc-supply = <&reg_module_3v3>;
-+	vqmmc-supply = <&reg_DCDC3>;
-+	non-removable;
-+};
-+
- &iomuxc {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_gpio1 &pinctrl_gpio2 &pinctrl_gpio3 &pinctrl_gpio4>;
-@@ -599,6 +613,54 @@
- 		>;
- 	};
- 
-+	pinctrl_usdhc3: usdhc3grp {
-+		fsl,pins = <
-+			MX7D_PAD_SD3_CMD__SD3_CMD		0x59
-+			MX7D_PAD_SD3_CLK__SD3_CLK		0x19
-+			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x59
-+			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x59
-+			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x59
-+			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x59
-+			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x59
-+			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x59
-+			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x59
-+			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x59
-+			MX7D_PAD_SD3_STROBE__SD3_STROBE         0x19
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_100mhz: usdhc3grp_100mhz {
-+		fsl,pins = <
-+			MX7D_PAD_SD3_CMD__SD3_CMD		0x5a
-+			MX7D_PAD_SD3_CLK__SD3_CLK		0x1a
-+			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5a
-+			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5a
-+			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5a
-+			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5a
-+			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5a
-+			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5a
-+			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5a
-+			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5a
-+			MX7D_PAD_SD3_STROBE__SD3_STROBE         0x1a
-+		>;
-+	};
-+
-+	pinctrl_usdhc3_200mhz: usdhc3grp_200mhz {
-+		fsl,pins = <
-+			MX7D_PAD_SD3_CMD__SD3_CMD		0x5b
-+			MX7D_PAD_SD3_CLK__SD3_CLK		0x1b
-+			MX7D_PAD_SD3_DATA0__SD3_DATA0		0x5b
-+			MX7D_PAD_SD3_DATA1__SD3_DATA1		0x5b
-+			MX7D_PAD_SD3_DATA2__SD3_DATA2		0x5b
-+			MX7D_PAD_SD3_DATA3__SD3_DATA3		0x5b
-+			MX7D_PAD_SD3_DATA4__SD3_DATA4		0x5b
-+			MX7D_PAD_SD3_DATA5__SD3_DATA5		0x5b
-+			MX7D_PAD_SD3_DATA6__SD3_DATA6		0x5b
-+			MX7D_PAD_SD3_DATA7__SD3_DATA7		0x5b
-+			MX7D_PAD_SD3_STROBE__SD3_STROBE         0x1b
-+		>;
-+	};
-+
- 	pinctrl_sai1: sai1-grp {
- 		fsl,pins = <
- 			MX7D_PAD_ENET1_RX_CLK__SAI1_TX_BCLK     0x1f
-diff --git a/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts b/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
-new file mode 100644
-index 000000000000..5d5bb4c2843f
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7d-colibri-emmc-eval-v3.dts
-@@ -0,0 +1,55 @@
-+/*
-+ * Copyright 2017 Toradex AG
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license,@your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "imx7d-colibri-emmc.dtsi"
-+#include "imx7-colibri-eval-v3.dtsi"
-+
-+/ {
-+	model = "Toradex Colibri iMX7D 1GB (eMMC) on Colibri Evaluation Board V3";
-+	compatible = "toradex,colibri-imx7d-emmc-eval-v3",
-+		     "toradex,colibri-imx7d-emmc", "fsl,imx7d";
-+};
-+
-+&usbotg2 {
-+	vbus-supply = <&reg_usbh_vbus>;
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx7d-colibri-emmc.dtsi b/arch/arm/boot/dts/imx7d-colibri-emmc.dtsi
-new file mode 100644
-index 000000000000..fce826895abb
---- /dev/null
-+++ b/arch/arm/boot/dts/imx7d-colibri-emmc.dtsi
-@@ -0,0 +1,57 @@
-+/*
-+ * Copyright 2017 Toradex AG
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License
-+ *     version 2 as published by the Free Software Foundation.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+#include "imx7d.dtsi"
-+#include "imx7-colibri.dtsi"
-+
-+/ {
-+	memory {
-+		reg = <0x80000000 0x40000000>;
-+	};
-+};
-+
-+&usbotg2 {
-+	dr_mode = "host";
-+};
-+
-+&usdhc3 {
-+	status = "okay";
-+};
-diff --git a/arch/arm/boot/dts/imx7d-colibri.dtsi b/arch/arm/boot/dts/imx7d-colibri.dtsi
-index 3c2cb502b388..6f2bb70c1fbd 100644
---- a/arch/arm/boot/dts/imx7d-colibri.dtsi
-+++ b/arch/arm/boot/dts/imx7d-colibri.dtsi
-@@ -49,6 +49,10 @@
- 	};
- };
- 
-+&gpmi {
-+	status = "okay";
-+};
-+
- &usbotg2 {
- 	dr_mode = "host";
- };
+On 01/12/17 15:19, Christoffer Dall wrote:
+> Hi Julien,
+> 
+> On Tue, Nov 14, 2017 at 04:42:13PM +0000, Julien Thierry wrote:
+>> On 12/10/17 11:41, Christoffer Dall wrote:
+>>> The debug save/restore functions can be improved by using the has_vhe()
+>>> static key instead of the instruction alternative.  Using the static key
+>>> uses the same paradigm as we're going to use elsewhere, it makes the
+>>> code more readable, and it generates slightly better code (no
+>>> stack setups and function calls unless necessary).
+>>>
+>>> We also use a static key on the restore path, because it will be
+>>> marginally faster than loading a value from memory.
+>>>
+>>> Finally, we don't have to conditionally clear the debug dirty flag if
+>>> it's set, we can just clear it.
+>>>
+>>> Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+>>> ---
+>>>   arch/arm64/kvm/hyp/debug-sr.c | 22 +++++++++-------------
+>>>   1 file changed, 9 insertions(+), 13 deletions(-)
+>>>
+>>> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+>>> index 0fc0758..a2291b6 100644
+>>> --- a/arch/arm64/kvm/hyp/debug-sr.c
+>>> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+>>> @@ -75,11 +75,6 @@
+>>>   #define psb_csync()		asm volatile("hint #17")
+>>> -static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
+>>> -{
+>>> -	/* The vcpu can run. but it can't hide. */
+>>> -}
+>>> -
+>>>   static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+>>>   {
+>>>   	u64 reg;
+>>> @@ -109,10 +104,6 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+>>>   	dsb(nsh);
+>>>   }
+>>> -static hyp_alternate_select(__debug_save_spe,
+>>> -			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
+>>> -			    ARM64_HAS_VIRT_HOST_EXTN);
+>>> -
+>>>   static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
+>>>   {
+>>>   	if (!pmscr_el1)
+>>> @@ -174,17 +165,22 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+>>>   {
+>>>   	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+>>>   			   kern_hyp_va(vcpu->arch.host_cpu_context));
+>>> -	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
+>>> +
+>>> +	/* Non-VHE: Disable and flush SPE data generation
+>>> +	 * VHE: The vcpu can run. but it can't hide. */
+>>> +	if (!has_vhe())
+>>> +		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
+>>>   }
+>>>   void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+>>>   {
+>>> -	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+>>> +	if (!has_vhe())
+>>> +		__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
+>>
+>> For consistency, would it be worth naming that function
+>> '__debug_restore_spe_nvhe' ?
+> 
+> Yes.
+> 
+>>
+>> Also, looking at __debug_save_spe_nvhe, I'm not sure how we guarantee that
+>> we might not end up using stale data during the restore_spe (though, if this
+>> is an issue, it existed before this change).
+>> The save function might exit without setting a value to saved pmscr_el1.
+>>
+>> Basically I'm wondering if the following scenario (in non VHE) is possible
+>> and/or whether it is problematic:
+>>
+>> - save spe
+>> - restore spe
+>> - host starts using spi -> !(PMBLIMITR_EL1 & PMBLIMITR_EL1_E)
+> 
+> spi ?
+
+spe*
+
+> 
+>> - save spe -> returns early without setting pmscr_el1
+>> - restore spe with old save instead of doing nothing
+>>
+> 
+> I think I see what you mean.  Basically you're asking if we need this:
+> 
+> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> index 4112160..8ab3510 100644
+> --- a/arch/arm64/kvm/hyp/debug-sr.c
+> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> @@ -106,7 +106,7 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+>   
+>   static void __hyp_text __debug_restore_spe_nvhe(u64 &pmscr_el1)
+>   {
+> -	if (!pmscr_el1)
+> +	if (*pmscr_el1 != 0)
+>   		return;
+>   
+>   	/* The host page table is installed, but not yet synchronised */
+> @@ -114,6 +114,7 @@ static void __hyp_text __debug_restore_spe_nvhe(u64 &pmscr_el1)
+>   
+>   	/* Re-enable data generation */
+>   	write_sysreg_s(pmscr_el1, PMSCR_EL1);
+> +	*pmscr_el1 = 0;
+>   }
+>   
+>   void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
+> 
+> I think we do, and I think this is a separate fix.  Would you like to
+> write a patch and cc Will and Marc (original author and committer) to
+> fix this?  Probably worth a cc stable as well.
+> 
+
+Yes, this is what I was referring to. I agree it is a separate fix. I'll 
+make a patch for this.
+
+Thanks,
+
 -- 
-2.15.1
+Julien Thierry
