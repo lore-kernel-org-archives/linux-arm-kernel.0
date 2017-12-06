@@ -1,245 +1,410 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed,  6 Dec 2017 19:01:42 +0000
-Subject: [PATCH v5 16/16] arm64: sdei: Add trampoline code for remapping the
- kernel
+Date: Wed,  6 Dec 2017 19:01:37 +0000
+Subject: [PATCH v5 11/16] firmware: arm_sdei: Add support for CPU and system
+ power states
 In-Reply-To: <20171206190142.9246-1-james.morse@arm.com>
 References: <20171206190142.9246-1-james.morse@arm.com>
-Message-ID: <20171206190142.9246-17-james.morse@arm.com>
+Message-ID: <20171206190142.9246-12-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When CONFIG_UNMAP_KERNEL_AT_EL0 is set the SDEI entry point and the rest
-of the kernel may be unmapped when we take an event. If this may be the
-case, use an entry trampoline that can switch to the kernel page tables.
+When a CPU enters an idle lower-power state or is powering off, we
+need to mask SDE events so that no events can be delivered while we
+are messing with the MMU as the registered entry points won't be valid.
 
-We can't use the provided PSTATE to determine whether to switch page
-tables as we may have interrupted the kernel's entry trampoline, (or a
-normal-priority event that interrupted the kernel's entry trampoline).
-Instead test for a user ASID in ttbr1_el1.
+If the system reboots, we want to unregister all events and mask the CPUs.
+For kexec this allows us to hand a clean slate to the next kernel
+instead of relying on it to call sdei_{private,system}_data_reset().
 
-Save a value in regs->addr_limit to indicate whether we need to restore
-the original ASID when returning from this event. This value is only used
-by do_page_fault(), which we don't call with the SDEI regs.
+For hibernate we unregister all events and re-register them on restore,
+in case we restored with the SDE code loaded at a different address.
+(e.g. KASLR).
+
+Add all the notifiers necessary to do this. We only support shared events
+so all events are left registered and enabled over CPU hotplug.
 
 Signed-off-by: James Morse <james.morse@arm.com>
 ---
- arch/arm64/include/asm/mmu.h  |  3 +-
- arch/arm64/include/asm/sdei.h |  6 +++
- arch/arm64/kernel/entry.S     | 98 ++++++++++++++++++++++++++++++++++++++-----
- arch/arm64/kernel/sdei.c      | 20 ++++++++-
- 4 files changed, 113 insertions(+), 14 deletions(-)
+Changes since v4:
+ * Moved cpuhotplug callbacks later to prevent it pre-empting sdei_probe()
+   before we are ready to unmask CPUs.
+ * Changed cpuhotplug callbacks to make the in-memory state true, instead of
+   save/restoring firmware state. This makes private events simpler.
+ * Change unregister_all()/reregister_events() to only operate on shared
+   events and remove the cpuhotplug state in the freeze/thaw callbacks.
+ * Moved the was_enabled into the event:{reregister,reenable}
+ * Dropped Catalin's ack.
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 6f7bdb89817f..20130a948845 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -17,7 +17,8 @@
- #define __ASM_MMU_H
+Changes since v3:
+ * Renamed CPUHP enum entry to have an ARM_ prefix.
+
+ drivers/firmware/arm_sdei.c | 255 +++++++++++++++++++++++++++++++++++++++++++-
+ include/linux/cpuhotplug.h  |   1 +
+ 2 files changed, 255 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/firmware/arm_sdei.c b/drivers/firmware/arm_sdei.c
+index 8da173cc7e43..0a4c75320840 100644
+--- a/drivers/firmware/arm_sdei.c
++++ b/drivers/firmware/arm_sdei.c
+@@ -7,6 +7,8 @@
+ #include <linux/arm-smccc.h>
+ #include <linux/bitops.h>
+ #include <linux/compiler.h>
++#include <linux/cpuhotplug.h>
++#include <linux/cpu_pm.h>
+ #include <linux/errno.h>
+ #include <linux/hardirq.h>
+ #include <linux/kernel.h>
+@@ -14,12 +16,15 @@
+ #include <linux/kvm_host.h>
+ #include <linux/list.h>
+ #include <linux/mutex.h>
++#include <linux/notifier.h>
+ #include <linux/of.h>
+ #include <linux/of_platform.h>
+ #include <linux/percpu.h>
+ #include <linux/platform_device.h>
++#include <linux/pm.h>
+ #include <linux/ptrace.h>
+ #include <linux/preempt.h>
++#include <linux/reboot.h>
+ #include <linux/slab.h>
+ #include <linux/smp.h>
+ #include <linux/spinlock.h>
+@@ -37,7 +42,11 @@ static asmlinkage void (*sdei_firmware_call)(unsigned long function_id,
+ static unsigned long sdei_entry_point;
  
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
--#define USER_ASID_FLAG	(UL(1) << 48)
-+#define USER_ASID_BIT	48
-+#define USER_ASID_FLAG	(UL(1) << USER_ASID_BIT)
- #define TTBR_ASID_MASK	(UL(0xffff) << 48)
- 
- #ifndef __ASSEMBLY__
-diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
-index d58a31ab525a..e073e6886685 100644
---- a/arch/arm64/include/asm/sdei.h
-+++ b/arch/arm64/include/asm/sdei.h
-@@ -23,6 +23,12 @@ extern unsigned long sdei_exit_mode;
- asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
- 				   unsigned long pc, unsigned long pstate);
- 
-+/* and its CONFIG_UNMAP_KERNEL_AT_EL0 trampoline */
-+asmlinkage void __sdei_asm_entry_trampoline(unsigned long event_num,
-+						   unsigned long arg,
-+						   unsigned long pc,
-+						   unsigned long pstate);
+ struct sdei_event {
++	/* These three are protected by the sdei_list_lock */
+ 	struct list_head	list;
++	bool			reregister;
++	bool			reenable;
 +
- /*
-  * The above entry point does the minimum to call C code. This function does
-  * anything else, before calling the driver.
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 38eb02ce320e..2396752adc76 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1148,6 +1148,78 @@ NOKPROBE(ret_from_fork)
- #include <asm/sdei.h>
- #include <uapi/linux/arm_sdei.h>
- 
-+.macro sdei_handler_exit exit_mode
-+	/* On success, this call never returns... */
-+	cmp	\exit_mode, #SDEI_EXIT_SMC
-+	b.ne	99f
-+	smc	#0
-+	b	.
-+99:	hvc	#0
-+	b	.
-+.endm
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+/*
-+ * The regular SDEI entry point may have been unmapped along with the rest of
-+ * the kernel. This trampoline restores the kernel mapping to make the x1 memory
-+ * argument accessible.
-+ *
-+ * This clobbers x4, __sdei_handler() will restore this from firmware's
-+ * copy.
-+ */
-+.ltorg
-+.pushsection ".entry.tramp.text", "ax"
-+ENTRY(__sdei_asm_entry_trampoline)
-+	mrs	x4, ttbr1_el1
-+	tbz	x4, #USER_ASID_BIT, 1f
-+
-+	tramp_map_kernel tmp=x4
-+	isb
-+	mov	x4, xzr
-+
-+	/*
-+	 * Use reg->interrupted_regs.addr_limit to remember whether to unmap
-+	 * the kernel on exit.
-+	 */
-+1:	str	x4, [x1, #(SDEI_EVENT_INTREGS + S_ORIG_ADDR_LIMIT)]
-+
-+#ifdef CONFIG_RANDOMIZE_BASE
-+	adr	x4, tramp_vectors + PAGE_SIZE
-+	add	x4, x4, #:lo12:__sdei_asm_trampoline_next_handler
-+	ldr	x4, [x4]
-+#else
-+	ldr	x4, =__sdei_asm_handler
-+#endif
-+	br	x4
-+ENDPROC(__sdei_asm_entry_trampoline)
-+NOKPROBE(__sdei_asm_entry_trampoline)
-+
-+/*
-+ * Make the exit call and restore the original ttbr1_el1
-+ *
-+ * x0 & x1: setup for the exit API call
-+ * x2: exit_mode
-+ * x4: struct sdei_registered_event argument from registration time.
-+ */
-+ENTRY(__sdei_asm_exit_trampoline)
-+	ldr	x4, [x4, #(SDEI_EVENT_INTREGS + S_ORIG_ADDR_LIMIT)]
-+	cbnz	x4, 1f
-+
-+	tramp_unmap_kernel	tmp=x4
-+
-+1:	sdei_handler_exit exit_mode=x2
-+ENDPROC(__sdei_asm_exit_trampoline)
-+NOKPROBE(__sdei_asm_exit_trampoline)
-+	.ltorg
-+.popsection		// .entry.tramp.text
-+#ifdef CONFIG_RANDOMIZE_BASE
-+.pushsection ".rodata", "a"
-+__sdei_asm_trampoline_next_handler:
-+	.quad	__sdei_asm_handler
-+.popsection		// .rodata
-+#endif /* CONFIG_RANDOMIZE_BASE */
-+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
-+
- /*
-  * Software Delegated Exception entry point.
-  *
-@@ -1155,6 +1227,7 @@ NOKPROBE(ret_from_fork)
-  * x1: struct sdei_registered_event argument from registration time.
-  * x2: interrupted PC
-  * x3: interrupted PSTATE
-+ * x4: maybe clobbered by the trampoline
-  *
-  * Firmware has preserved x0->x17 for us, we must save/restore the rest to
-  * follow SMC-CC. We save (or retrieve) all the registers as the handler may
-@@ -1220,10 +1293,11 @@ ENTRY(__sdei_asm_handler)
- 
- 	msr	sp_el0, x28
- 	/* restore regs >x17 that we clobbered */
--	ldp     x28, x29, [x19, #SDEI_EVENT_INTREGS + 16 * 14]
--	ldp     lr, x4, [x19, #SDEI_EVENT_INTREGS + S_LR]
--	mov	sp, x4
--	ldp     x18, x19, [x19, #SDEI_EVENT_INTREGS + 16 * 9]
-+	mov	x4, x19         // keep x4 for __sdei_asm_exit_trampoline
-+	ldp	x28, x29, [x4, #SDEI_EVENT_INTREGS + 16 * 14]
-+	ldp	x18, x19, [x4, #SDEI_EVENT_INTREGS + 16 * 9]
-+	ldp	lr, x1, [x4, #SDEI_EVENT_INTREGS + S_LR]
-+	mov	sp, x1
- 
- 	mov	x1, x0			// address to complete_and_resume
- 	/* x0 = (x0 <= 1) ? EVENT_COMPLETE:EVENT_COMPLETE_AND_RESUME */
-@@ -1232,14 +1306,16 @@ ENTRY(__sdei_asm_handler)
- 	mov_q	x3, SDEI_1_0_FN_SDEI_EVENT_COMPLETE_AND_RESUME
- 	csel	x0, x2, x3, ls
- 
--	/* On success, this call never returns... */
- 	ldr_l	x2, sdei_exit_mode
--	cmp	x2, #SDEI_EXIT_SMC
--	b.ne	1f
--	smc	#0
--	b	.
--1:	hvc	#0
--	b	.
-+
-+alternative_if_not ARM64_UNMAP_KERNEL_AT_EL0
-+	sdei_handler_exit exit_mode=x2
-+alternative_else_nop_endif
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	tramp_alias	dst=x5, sym=__sdei_asm_exit_trampoline
-+	br	x5
-+#endif
- ENDPROC(__sdei_asm_handler)
- NOKPROBE(__sdei_asm_handler)
- #endif /* CONFIG_ARM_SDE_INTERFACE */
-diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
-index f9dffacaa5d6..6b8d90d5ceae 100644
---- a/arch/arm64/kernel/sdei.c
-+++ b/arch/arm64/kernel/sdei.c
-@@ -10,7 +10,9 @@
- 
- #include <asm/alternative.h>
- #include <asm/kprobes.h>
-+#include <asm/mmu.h>
- #include <asm/ptrace.h>
-+#include <asm/sections.h>
- #include <asm/sysreg.h>
- #include <asm/vmap_stack.h>
- 
-@@ -124,7 +126,18 @@ unsigned long sdei_arch_get_entry_point(int conduit)
- 	}
- 
- 	sdei_exit_mode = (conduit == CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
--	return (unsigned long)__sdei_asm_handler;
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+	if (arm64_kernel_unmapped_at_el0()) {
-+		unsigned long offset;
-+
-+		offset = (unsigned long)__sdei_asm_entry_trampoline -
-+			 (unsigned long)__entry_tramp_text_start;
-+		return TRAMP_VALIAS + offset;
-+	} else
-+#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
-+		return (unsigned long)__sdei_asm_handler;
-+
+ 	u32			event_num;
+ 	u8			type;
+ 	u8			priority;
+@@ -253,6 +262,11 @@ static void _ipi_mask_cpu(void *ignored)
+ 	sdei_mask_local_cpu();
  }
  
- /*
-@@ -138,11 +151,14 @@ static __kprobes unsigned long _sdei_handler(struct pt_regs *regs,
- {
- 	u32 mode;
- 	int i, err = 0;
--	const int clobbered_registers = 4;
-+	int clobbered_registers = 4;
- 	u64 elr = read_sysreg(elr_el1);
- 	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
- 	unsigned long vbar = read_sysreg(vbar_el1);
- 
-+	if (arm64_kernel_unmapped_at_el0())
-+		clobbered_registers++;
++static int sdei_cpuhp_down(unsigned int ignored)
++{
++	return sdei_mask_local_cpu();
++}
 +
- 	/* Retrieve the missing registers values */
- 	for (i = 0; i < clobbered_registers; i++) {
- 		/* from within the handler, this call always succeeds */
+ int sdei_unmask_local_cpu(void)
+ {
+ 	int err;
+@@ -274,6 +288,11 @@ static void _ipi_unmask_cpu(void *ignored)
+ 	sdei_unmask_local_cpu();
+ }
+ 
++static int sdei_cpuhp_up(unsigned int ignored)
++{
++	return sdei_unmask_local_cpu();
++}
++
+ static void _ipi_private_reset(void *ignored)
+ {
+ 	int err;
+@@ -330,6 +349,10 @@ int sdei_event_enable(u32 event_num)
+ 		return -ENOENT;
+ 	}
+ 
++	spin_lock(&sdei_list_lock);
++	event->reenable = true;
++	spin_unlock(&sdei_list_lock);
++
+ 	if (event->type == SDEI_EVENT_TYPE_SHARED)
+ 		err = sdei_api_event_enable(event->event_num);
+ 	mutex_unlock(&sdei_events_lock);
+@@ -356,6 +379,10 @@ int sdei_event_disable(u32 event_num)
+ 		return -ENOENT;
+ 	}
+ 
++	spin_lock(&sdei_list_lock);
++	event->reenable = false;
++	spin_unlock(&sdei_list_lock);
++
+ 	if (event->type == SDEI_EVENT_TYPE_SHARED)
+ 		err = sdei_api_event_disable(event->event_num);
+ 	mutex_unlock(&sdei_events_lock);
+@@ -374,6 +401,11 @@ static int _sdei_event_unregister(struct sdei_event *event)
+ {
+ 	lockdep_assert_held(&sdei_events_lock);
+ 
++	spin_lock(&sdei_list_lock);
++	event->reregister = false;
++	event->reenable = false;
++	spin_unlock(&sdei_list_lock);
++
+ 	if (event->type == SDEI_EVENT_TYPE_SHARED)
+ 		return sdei_api_event_unregister(event->event_num);
+ 
+@@ -408,6 +440,31 @@ int sdei_event_unregister(u32 event_num)
+ }
+ EXPORT_SYMBOL(sdei_event_unregister);
+ 
++/*
++ * unregister events, but don't destroy them as they are re-registered by
++ * sdei_reregister_shared().
++ */
++static int sdei_unregister_shared(void)
++{
++	int err = 0;
++	struct sdei_event *event;
++
++	mutex_lock(&sdei_events_lock);
++	spin_lock(&sdei_list_lock);
++	list_for_each_entry(event, &sdei_list, list) {
++		if (event->type != SDEI_EVENT_TYPE_SHARED)
++			continue;
++
++		err = _sdei_event_unregister(event);
++		if (err)
++			break;
++	}
++	spin_unlock(&sdei_list_lock);
++	mutex_unlock(&sdei_events_lock);
++
++	return err;
++}
++
+ static int sdei_api_event_register(u32 event_num, unsigned long entry_point,
+ 				   void *arg, u64 flags, u64 affinity)
+ {
+@@ -465,6 +522,174 @@ int sdei_event_register(u32 event_num, sdei_event_callback *cb, void *arg)
+ }
+ EXPORT_SYMBOL(sdei_event_register);
+ 
++static int sdei_reregister_event(struct sdei_event *event)
++{
++	int err;
++
++	lockdep_assert_held(&sdei_events_lock);
++
++	err = _sdei_event_register(event);
++	if (err) {
++		pr_err("Failed to re-register event %u\n", event->event_num);
++		sdei_event_destroy(event);
++		return err;
++	}
++
++	if (event->reenable) {
++		if (event->type == SDEI_EVENT_TYPE_SHARED)
++			err = sdei_api_event_enable(event->event_num);
++	}
++
++	if (err)
++		pr_err("Failed to re-enable event %u\n", event->event_num);
++
++	return err;
++}
++
++static int sdei_reregister_shared(void)
++{
++	int err = 0;
++	struct sdei_event *event;
++
++	mutex_lock(&sdei_events_lock);
++	spin_lock(&sdei_list_lock);
++	list_for_each_entry(event, &sdei_list, list) {
++		if (event->type != SDEI_EVENT_TYPE_SHARED)
++			continue;
++
++		if (event->reregister) {
++			err = sdei_reregister_event(event);
++			if (err)
++				break;
++		}
++	}
++	spin_unlock(&sdei_list_lock);
++	mutex_unlock(&sdei_events_lock);
++
++	return err;
++}
++
++/* When entering idle, mask/unmask events for this cpu */
++static int sdei_pm_notifier(struct notifier_block *nb, unsigned long action,
++			    void *data)
++{
++	int rv;
++
++	switch (action) {
++	case CPU_PM_ENTER:
++		rv = sdei_mask_local_cpu();
++		break;
++	case CPU_PM_EXIT:
++		rv = sdei_unmask_local_cpu();
++		break;
++	default:
++		return NOTIFY_DONE;
++	}
++
++	if (rv)
++		return notifier_from_errno(rv);
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block sdei_pm_nb = {
++	.notifier_call = sdei_pm_notifier,
++};
++
++static int sdei_device_suspend(struct device *dev)
++{
++	on_each_cpu(_ipi_mask_cpu, NULL, true);
++
++	return 0;
++}
++
++static int sdei_device_resume(struct device *dev)
++{
++	on_each_cpu(_ipi_unmask_cpu, NULL, true);
++
++	return 0;
++}
++
++/*
++ * We need all events to be reregistered when we resume from hibernate.
++ *
++ * The sequence is freeze->thaw. Reboot. freeze->restore. We unregister
++ * events during freeze, then re-register and re-enable them during thaw
++ * and restore.
++ */
++static int sdei_device_freeze(struct device *dev)
++{
++	int err;
++
++	cpuhp_remove_state(CPUHP_AP_ARM_SDEI_STARTING);
++
++	err = sdei_unregister_shared();
++	if (err)
++		return err;
++
++	return 0;
++}
++
++static int sdei_device_thaw(struct device *dev)
++{
++	int err;
++
++	/* re-register shared events */
++	err = sdei_reregister_shared();
++	if (err) {
++		pr_warn("Failed to re-register shared events...\n");
++		sdei_mark_interface_broken();
++		return err;
++	}
++
++	err = cpuhp_setup_state(CPUHP_AP_ARM_SDEI_STARTING, "SDEI",
++				&sdei_cpuhp_up, &sdei_cpuhp_down);
++	if (err)
++		pr_warn("Failed to re-register CPU hotplug notifier...\n");
++
++	return err;
++}
++
++static int sdei_device_restore(struct device *dev)
++{
++	int err;
++
++	err = sdei_platform_reset();
++	if (err)
++		return err;
++
++	return sdei_device_thaw(dev);
++}
++
++static const struct dev_pm_ops sdei_pm_ops = {
++	.suspend = sdei_device_suspend,
++	.resume = sdei_device_resume,
++	.freeze = sdei_device_freeze,
++	.thaw = sdei_device_thaw,
++	.restore = sdei_device_restore,
++};
++
++/*
++ * Mask all CPUs and unregister all events on panic, reboot or kexec.
++ */
++static int sdei_reboot_notifier(struct notifier_block *nb, unsigned long action,
++				void *data)
++{
++	/*
++	 * We are going to reset the interface, after this there is no point
++	 * doing work when we take CPUs offline.
++	 */
++	cpuhp_remove_state(CPUHP_AP_ARM_SDEI_STARTING);
++
++	sdei_platform_reset();
++
++	return NOTIFY_OK;
++}
++
++static struct notifier_block sdei_reboot_nb = {
++	.notifier_call = sdei_reboot_notifier,
++};
++
+ static void sdei_smccc_smc(unsigned long function_id,
+ 			   unsigned long arg0, unsigned long arg1,
+ 			   unsigned long arg2, unsigned long arg3,
+@@ -547,9 +772,36 @@ static int sdei_probe(struct platform_device *pdev)
+ 		return 0;
+ 	}
+ 
+-	on_each_cpu(&_ipi_unmask_cpu, NULL, false);
++	err = cpu_pm_register_notifier(&sdei_pm_nb);
++	if (err) {
++		pr_warn("Failed to register CPU PM notifier...\n");
++		goto error;
++	}
++
++	err = register_reboot_notifier(&sdei_reboot_nb);
++	if (err) {
++		pr_warn("Failed to register reboot notifier...\n");
++		goto remove_cpupm;
++	}
++
++	err = cpuhp_setup_state(CPUHP_AP_ARM_SDEI_STARTING, "SDEI",
++				&sdei_cpuhp_up, &sdei_cpuhp_down);
++	if (err) {
++		pr_warn("Failed to register CPU hotplug notifier...\n");
++		goto remove_reboot;
++	}
+ 
+ 	return 0;
++
++remove_reboot:
++	unregister_reboot_notifier(&sdei_reboot_nb);
++
++remove_cpupm:
++	cpu_pm_unregister_notifier(&sdei_pm_nb);
++
++error:
++	sdei_mark_interface_broken();
++	return err;
+ }
+ 
+ static const struct of_device_id sdei_of_match[] = {
+@@ -560,6 +812,7 @@ static const struct of_device_id sdei_of_match[] = {
+ static struct platform_driver sdei_driver = {
+ 	.driver		= {
+ 		.name			= "sdei",
++		.pm			= &sdei_pm_ops,
+ 		.of_match_table		= sdei_of_match,
+ 	},
+ 	.probe		= sdei_probe,
+diff --git a/include/linux/cpuhotplug.h b/include/linux/cpuhotplug.h
+index 201ab7267986..87b505a48a94 100644
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -109,6 +109,7 @@ enum cpuhp_state {
+ 	CPUHP_AP_PERF_XTENSA_STARTING,
+ 	CPUHP_AP_PERF_METAG_STARTING,
+ 	CPUHP_AP_MIPS_OP_LOONGSON3_STARTING,
++	CPUHP_AP_ARM_SDEI_STARTING,
+ 	CPUHP_AP_ARM_VFP_STARTING,
+ 	CPUHP_AP_ARM64_DEBUG_MONITORS_STARTING,
+ 	CPUHP_AP_PERF_ARM_HW_BREAKPOINT_STARTING,
 -- 
 2.15.0
