@@ -1,49 +1,76 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Wed, 6 Dec 2017 19:23:15 +0900
-Subject: [kernel-hardening][PATCH v4 0/3] arm: Makes ptdump resuable and add
- WX page checking
-Message-ID: <20171206102315.GA7012@pjb1027-Latitude-E5410>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  6 Dec 2017 11:22:27 +0100
+Subject: [PATCH 32/61] ARM: dts: r8a7745: Add CAN[01] SoC support
+In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
+References: <cover.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <85d3122659be310c632ef1908532157ce82900ee.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Page table dumping code for arm64-x86 is reusable,
-and they have function for WX page checking.
-But arm doesn't have that.
+Add the definitions for can0 and can1 to the SoC .dtsi.
 
-This path series are to makes ptdump reusable,
-and add WX page checking for arm.
-This is heavily based on arm64 version.
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm/boot/dts/r8a7745.dtsi | 36 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-v2 :
-Fix a sender name of mail header, there was an mistake.
-(from "jinb.park" to Jinbum Park)
-Contents of patch-set are perfectly same.
-
-v3 :
-Take advantage of the existing pg_level and bits arrays
-to check ro, nx prot.
-
-v4 :
-Add boolean for ro_bit, nx_bit into prot_bits
-to point ro_bit, nx_bit in pg_level.
-This change is suggested by Laura Abbott.
-
-jinb.park (3):
-  arm: mm: dump: make page table dumping reusable
-  arm: mm: dump: make the page table dumping seq_file optional
-  arm: mm: dump: add checking for writable and executable pages
-
- arch/arm/Kconfig.debug        |  33 ++++++++-
- arch/arm/include/asm/ptdump.h |  56 ++++++++++++++++
- arch/arm/mm/Makefile          |   3 +-
- arch/arm/mm/dump.c            | 151 +++++++++++++++++++++++++++++-------------
- arch/arm/mm/init.c            |   2 +
- arch/arm/mm/ptdump_debugfs.c  |  34 ++++++++++
- 6 files changed, 232 insertions(+), 47 deletions(-)
- create mode 100644 arch/arm/include/asm/ptdump.h
- create mode 100644 arch/arm/mm/ptdump_debugfs.c
-
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 53eb1ce446a4..52f13246fc8a 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -1049,6 +1049,34 @@
+ 				#phy-cells = <1>;
+ 			};
+ 		};
++
++		can0: can at e6e80000 {
++			compatible = "renesas,can-r8a7745",
++				     "renesas,rcar-gen2-can";
++			reg = <0 0xe6e80000 0 0x1000>;
++			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 916>,
++				 <&cpg CPG_CORE R8A7745_CLK_RCAN>,
++				 <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 916>;
++			status = "disabled";
++		};
++
++		can1: can at e6e88000 {
++			compatible = "renesas,can-r8a7745",
++				     "renesas,rcar-gen2-can";
++			reg = <0 0xe6e88000 0 0x1000>;
++			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 915>,
++				 <&cpg CPG_CORE R8A7745_CLK_RCAN>,
++				 <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 915>;
++			status = "disabled";
++		};
+ 	};
+ 
+ 	/* External root clock */
+@@ -1066,6 +1094,14 @@
+ 		clock-frequency = <48000000>;
+ 	};
+ 
++	/* External CAN clock */
++	can_clk: can {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		/* This value must be overridden by the board. */
++		clock-frequency = <0>;
++	};
++
+ 	/* External SCIF clock */
+ 	scif_clk: scif {
+ 		compatible = "fixed-clock";
 -- 
-1.9.1
+2.11.0
