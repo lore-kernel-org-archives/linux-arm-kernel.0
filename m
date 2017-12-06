@@ -1,111 +1,59 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Dec 2017 12:09:41 +0000
-Subject: [PATCH 1/2] arm64: SW PAN: Point saved ttbr0 at the zero page
- when switching to init_mm
-In-Reply-To: <1512558968-28980-2-git-send-email-will.deacon@arm.com>
-References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
- <1512558968-28980-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20171206120940.upy7apeb3v67ypzz@lakrids.cambridge.arm.com>
+From: chris@chris-wilson.co.uk (Chris Wilson)
+Date: Wed, 06 Dec 2017 12:09:42 +0000
+Subject: [RESEND PATCH 4/4] drm/meson: Add missing VPU init
+In-Reply-To: <50101688-72c0-565e-bc15-9c229fd1a167@baylibre.com>
+References: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
+ <1512561268-29806-5-git-send-email-narmstrong@baylibre.com>
+ <151256172859.3497.16672223686685414318@mail.alporthouse.com>
+ <50101688-72c0-565e-bc15-9c229fd1a167@baylibre.com>
+Message-ID: <151256218243.3497.3915689507960580831@mail.alporthouse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
-
-On Wed, Dec 06, 2017 at 11:16:07AM +0000, Will Deacon wrote:
-> update_saved_ttbr0 mandates that mm->pgd is not swapper, since swapper
-> contains kernel mappings and should never be installed into ttbr0. However,
-> this means that callers must avoid passing the init_mm to update_saved_ttbr0
-> which in turn can cause the saved ttbr0 value to be out-of-date in the context
-> of the idle thread. For example, EFI runtime services may leave the saved ttbr0
-> pointing at the EFI page table, and kernel threads may end up with stale
-> references to freed page tables.
-
-I think we should s/the idle thread/a kernel thread/ here, since IIUC
-this could happen in the context of any kernel thread, and there are
-multiple idle threads.
-
-> This patch changes update_saved_ttbr0 so that the init_mm points the saved
-> ttbr0 value to the empty zero page, which always exists and never contains
-> valid translations. EFI and switch can then call into update_saved_ttbr0
-> unconditionally.
+Quoting Neil Armstrong (2017-12-06 12:03:59)
+> On 06/12/2017 13:02, Chris Wilson wrote:
+> > Quoting Neil Armstrong (2017-12-06 11:54:28)
+> >> The VPU init misses these configurations values.
+> >>
+> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> >> ---
+> >>  drivers/gpu/drm/meson/meson_drv.c       | 9 +++++++++
+> >>  drivers/gpu/drm/meson/meson_registers.h | 4 ++++
+> >>  2 files changed, 13 insertions(+)
+> >>
+> >> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> >> index 3b804fd..f9ad0e9 100644
+> >> --- a/drivers/gpu/drm/meson/meson_drv.c
+> >> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> >> @@ -151,6 +151,14 @@ static struct regmap_config meson_regmap_config = {
+> >>         .max_register   = 0x1000,
+> >>  };
+> >>  
+> >> +static void meson_vpu_init(struct meson_drm *priv)
+> >> +{
+> >> +       writel_relaxed(0x210000, priv->io_base + _REG(VPU_RDARB_MODE_L1C1));
+> >> +       writel_relaxed(0x10000, priv->io_base + _REG(VPU_RDARB_MODE_L1C2));
+> >> +       writel_relaxed(0x900000, priv->io_base + _REG(VPU_RDARB_MODE_L2C1));
+> >> +       writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
+> >> +}
+> > 
+> >> diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
+> >> index 2847381..bca8714 100644
+> >> --- a/drivers/gpu/drm/meson/meson_registers.h
+> >> +++ b/drivers/gpu/drm/meson/meson_registers.h
+> >> @@ -1363,6 +1363,10 @@
+> >>  #define VPU_PROT3_STAT_1 0x277a
+> >>  #define VPU_PROT3_STAT_2 0x277b
+> >>  #define VPU_PROT3_REQ_ONOFF 0x277c
+> >> +#define VPU_RDARB_MODE_L1C1 0x2790
+> >> +#define VPU_RDARB_MODE_L1C2 0x2799
+> > 
+> > Hmm, not naturally aligned for writel. Is the register width correct,
+> > address correct, or this really is an unaligned iowrite?
 > 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Vinayak Menon <vinmenon@codeaurora.org>
-> Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> The registers are aligned with the documentation, then are used with the _REG() macro
+> to align them with the bus (on top of the file).
 
-I guess this should have:
-
-Fixes: 39bc88e5e38e9b21 ("arm64: Disable TTBR0_EL1 during normal kernel execution")
-
-Otherwise, looks good to me.
-
-Mark.
-
-> ---
->  arch/arm64/include/asm/efi.h         |  4 +---
->  arch/arm64/include/asm/mmu_context.h | 22 +++++++++++++---------
->  2 files changed, 14 insertions(+), 12 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-> index 650344d01124..c4cd5081d78b 100644
-> --- a/arch/arm64/include/asm/efi.h
-> +++ b/arch/arm64/include/asm/efi.h
-> @@ -132,11 +132,9 @@ static inline void efi_set_pgd(struct mm_struct *mm)
->  			 * Defer the switch to the current thread's TTBR0_EL1
->  			 * until uaccess_enable(). Restore the current
->  			 * thread's saved ttbr0 corresponding to its active_mm
-> -			 * (if different from init_mm).
->  			 */
->  			cpu_set_reserved_ttbr0();
-> -			if (current->active_mm != &init_mm)
-> -				update_saved_ttbr0(current, current->active_mm);
-> +			update_saved_ttbr0(current, current->active_mm);
->  		}
->  	}
->  }
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index 3257895a9b5e..f7773f90546e 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -174,11 +174,17 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
->  static inline void update_saved_ttbr0(struct task_struct *tsk,
->  				      struct mm_struct *mm)
->  {
-> -	if (system_uses_ttbr0_pan()) {
-> -		BUG_ON(mm->pgd == swapper_pg_dir);
-> -		task_thread_info(tsk)->ttbr0 =
-> -			virt_to_phys(mm->pgd) | ASID(mm) << 48;
-> -	}
-> +	u64 ttbr;
-> +
-> +	if (!system_uses_ttbr0_pan())
-> +		return;
-> +
-> +	if (mm == &init_mm)
-> +		ttbr = __pa_symbol(empty_zero_page);
-> +	else
-> +		ttbr = virt_to_phys(mm->pgd) | ASID(mm) << 48;
-> +
-> +	task_thread_info(tsk)->ttbr0 = ttbr;
->  }
->  #else
->  static inline void update_saved_ttbr0(struct task_struct *tsk,
-> @@ -214,11 +220,9 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
->  	 * Update the saved TTBR0_EL1 of the scheduled-in task as the previous
->  	 * value may have not been initialised yet (activate_mm caller) or the
->  	 * ASID has changed since the last run (following the context switch
-> -	 * of another thread of the same process). Avoid setting the reserved
-> -	 * TTBR0_EL1 to swapper_pg_dir (init_mm; e.g. via idle_task_exit).
-> +	 * of another thread of the same process).
->  	 */
-> -	if (next != &init_mm)
-> -		update_saved_ttbr0(tsk, next);
-> +	update_saved_ttbr0(tsk, next);
->  }
->  
->  #define deactivate_mm(tsk,mm)	do { } while (0)
-> -- 
-> 2.1.4
-> 
+Oh, that surprised me.
+Acked-by: Chris Wilson <chris@chris-wilson.co.uk>
+-Chris
