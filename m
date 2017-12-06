@@ -1,45 +1,105 @@
 From: stefan@agner.ch (Stefan Agner)
-Date: Wed,  6 Dec 2017 16:30:02 +0100
-Subject: [PATCH 6/9] ARM: dts: imx7-colibri: specify usdhc1 supplies
+Date: Wed,  6 Dec 2017 16:30:04 +0100
+Subject: [PATCH 8/9] ARM: dts: imx7-colibri: add MCP2515 CAN controller
 In-Reply-To: <20171206153005.6144-1-stefan@agner.ch>
 References: <20171206153005.6144-1-stefan@agner.ch>
-Message-ID: <20171206153005.6144-6-stefan@agner.ch>
+Message-ID: <20171206153005.6144-8-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The usdhc1 controller instance is used to provide the default
-SD/MMC capabilities of the Colibri standard. The IO pins are
-supplied to the SoC on the module whereas the SD-card is powered
-by the Carrier Board supply.
+The Colibri Evaluation Carrier Board provides a MCP2515 CAN
+controller connected via SPI. Note that the i.MX 7 provides
+an internal CAN controller which is much better suited for CAN
+operations. Using the MCP2515 with a Colibri iMX7 module is
+mainly useful to test the SPI interface.
 
 Signed-off-by: Stefan Agner <stefan@agner.ch>
 ---
- arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 1 +
- arch/arm/boot/dts/imx7-colibri.dtsi         | 1 +
- 2 files changed, 2 insertions(+)
+ arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 25 +++++++++++++++++++++++++
+ arch/arm/boot/dts/imx7-colibri.dtsi         | 14 +++++++++++++-
+ 2 files changed, 38 insertions(+), 1 deletion(-)
 
 diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-index 5ecb3a858c5a..87c23b769a08 100644
+index 87c23b769a08..3d6c282dd258 100644
 --- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
 +++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-@@ -158,5 +158,6 @@
- &usdhc1 {
- 	keep-power-in-suspend;
- 	wakeup-source;
-+	vmmc-supply = <&reg_3v3>;
+@@ -45,6 +45,13 @@
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
++	/* fixed crystal dedicated to mpc258x */
++	clk16m: clk16m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <16000000>;
++	};
++
+ 	panel: panel {
+ 		compatible = "edt,et057090dhu";
+ 		backlight = <&bl>;
+@@ -99,6 +106,24 @@
+ 	status = "okay";
+ };
+ 
++&ecspi3 {
++	status = "okay";
++
++	mcp258x0: mcp258x at 0 {
++		compatible = "microchip,mcp2515";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_can_int>;
++		reg = <0>;
++		clocks = <&clk16m>;
++		interrupt-parent = <&gpio5>;
++		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
++		spi-max-frequency = <10000000>;
++		vdd-supply = <&reg_3v3>;
++		xceiver-supply = <&reg_5v0>;
++		status = "okay";
++	};
++};
++
+ &fec1 {
  	status = "okay";
  };
 diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
-index 6498c1136ef1..d623ef0f6e3e 100644
+index 689ff6822634..e1c6da0a65e4 100644
 --- a/arch/arm/boot/dts/imx7-colibri.dtsi
 +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-@@ -299,6 +299,7 @@
- 	no-1-8-v;
- 	cd-gpios = <&gpio1 0 GPIO_ACTIVE_LOW>;
- 	disable-wp;
-+	vqmmc-supply = <&reg_LDO2>;
+@@ -92,6 +92,13 @@
+ 	cpu-supply = <&reg_DCDC2>;
  };
  
- &iomuxc {
++&ecspi3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_ecspi3 &pinctrl_ecspi3_cs>;
++	num-cs = <1>;
++	cs-gpios = <&gpio4 11 GPIO_ACTIVE_HIGH>;
++};
++
+ &fec1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_enet1>;
+@@ -313,7 +320,6 @@
+ 		fsl,pins = <
+ 			MX7D_PAD_ENET1_RGMII_RD3__GPIO7_IO3	0x74 /* SODIMM 55 */
+ 			MX7D_PAD_ENET1_RGMII_RD2__GPIO7_IO2	0x74 /* SODIMM 63 */
+-			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
+ 			MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16	0x14 /* SODIMM 77 */
+ 			MX7D_PAD_EPDC_DATA09__GPIO2_IO9		0x14 /* SODIMM 89 */
+ 			MX7D_PAD_EPDC_DATA08__GPIO2_IO8		0x74 /* SODIMM 91 */
+@@ -400,6 +406,12 @@
+ 		>;
+ 	};
+ 
++	pinctrl_can_int: can-int-grp {
++		fsl,pins = <
++			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
++		>;
++	};
++
+ 	pinctrl_enet1: enet1grp {
+ 		fsl,pins = <
+ 			MX7D_PAD_ENET1_CRS__GPIO7_IO14			0x14
 -- 
 2.15.1
