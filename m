@@ -1,36 +1,70 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 6 Dec 2017 17:41:32 +0100
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
-References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
- <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
- <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
- <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
- <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
-Message-ID: <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 6 Dec 2017 11:41:33 -0500
+Subject: [PATCH V6 2/7] ACPI / bus: Introduce acpi_get_match_data()
+ function
+In-Reply-To: <CAJZ5v0iJ_47z25GrQryQFVyXiXitYNHy8mQtTCf2rtdyhnn2eQ@mail.gmail.com>
+References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+ <1512493493-6464-3-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0iJ_47z25GrQryQFVyXiXitYNHy8mQtTCf2rtdyhnn2eQ@mail.gmail.com>
+Message-ID: <218a717f-7fac-41a1-86e2-19f4d99a7f52@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
->>> Yes, it should, so I'm not sure why you need the list in the first place.
->>>
->>> Also it looks like something along the lines of devres_release_all()
->>> should be sufficient.
->> Good suggestion, let me test this.
+On 12/5/2017 5:04 PM, Rafael J. Wysocki wrote:
+> On Tue, Dec 5, 2017 at 6:04 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> OF has of_device_get_match_data() function to extract driver specific data
+>> structure. Add a similar function for ACPI.
 >>
->
-> I tried to pull the code into GED but the API is not public. I also looked
-> at how it is used. I was afraid to mess up with the internals of base.c by
-> calling devres_release_all() externally first and by the driver framework
-> next. I moved away from this approach.
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+>> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> 
+> Not sure yet, sorry.
 
-Are you sure it is called by the core in the shutdown path?
+OK. no problem.
 
-> I just fixed the function rename and changed the dev_info() to dev_dbg().
+> 
+>> ---
+>>  drivers/acpi/bus.c   | 12 ++++++++++++
+>>  include/linux/acpi.h |  6 ++++++
+>>  2 files changed, 18 insertions(+)
+>>
+>> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
+>> index 4d0979e..b271eb1 100644
+>> --- a/drivers/acpi/bus.c
+>> +++ b/drivers/acpi/bus.c
+>> @@ -785,6 +785,18 @@ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
+>>  }
+>>  EXPORT_SYMBOL_GPL(acpi_match_device);
+>>
+>> +void *acpi_get_match_data(const struct device *dev)
+>> +{
+>> +       const struct acpi_device_id *match;
+>> +
+>> +       match = acpi_match_device(dev->driver->acpi_match_table, dev);
+> 
+> Shouldn't this check dev->driver against NULL before dereferencing it?
 
-And why do you need the list?
+I'm adding these checks. I realized that acpi_match_device() is not validating
+the ids either.
 
-ged_shutdown() will be called for every device for which ged_probe()
-has been called.
+--- a/drivers/acpi/bus.c
++++ b/drivers/acpi/bus.c
+@@ -789,6 +789,12 @@ void *acpi_get_match_data(const struct device *dev)
+ {
+        const struct acpi_device_id *match;
+
++       if (!dev->driver)
++               return NULL;
++
++       if (!dev->driver->acpi_match_table)
++               return NULL;
++
+
+I'll hold onto posting this until I hear back from Sakari.
+
+Sinan
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
