@@ -1,55 +1,54 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:32 +0100
-Subject: [PATCH 37/61] ARM: dts: iwg20d-q7-dbcm-ca: Add can1 support to camera
- DB
+Date: Wed,  6 Dec 2017 11:22:31 +0100
+Subject: [PATCH 36/61] ARM: dts: iwg20d-q7-common: Add can0 support to carrier
+ board
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <04e31b155f628e572d4ee2eeda5d6ee20ba86038.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <47f3c7b66b6d316f86b0ce957c99958da0268e36.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-CAN1 interface is exposed via connector J3 found on the camera daughter
-board. This patch enables can1 DT node from within the daughter board
-specific dtsi.
+This patch enables CAN0 interface exposed through connector J20 on the
+carrier board.
 
 Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi | 12 ++++++++++++
+ arch/arm/boot/dts/iwg20d-q7-common.dtsi | 12 ++++++++++++
  1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-index 4db18f2ef303..476273b3f994 100644
---- a/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-+++ b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
-@@ -32,6 +32,13 @@
+diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+index c865499ad2a1..3e4bc4d6b9d3 100644
+--- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
++++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
+@@ -59,6 +59,13 @@
  	};
  };
  
-+&can1 {
-+	pinctrl-0 = <&can1_pins>;
++&can0 {
++	pinctrl-0 = <&can0_pins>;
 +	pinctrl-names = "default";
 +
 +	status = "okay";
 +};
 +
- &du {
- 	pinctrl-0 = <&du_pins>;
- 	pinctrl-names = "default";
-@@ -94,6 +101,11 @@
+ &hsusb {
+ 	status = "okay";
+ 	pinctrl-0 = <&usb0_pins>;
+@@ -90,6 +97,11 @@
  };
  
  &pfc {
-+	can1_pins: can1 {
-+		groups = "can1_data_d";
-+		function = "can1";
++	can0_pins: can0 {
++		groups = "can0_data_d";
++		function = "can0";
 +	};
 +
- 	du_pins: du {
- 		groups = "du_rgb888", "du_sync", "du_oddf", "du_clk_out_0";
- 		function = "du";
+ 	avb_pins: avb {
+ 		groups = "avb_mdio", "avb_gmii";
+ 		function = "avb";
 -- 
 2.11.0
