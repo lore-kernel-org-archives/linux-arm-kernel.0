@@ -1,58 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 6 Dec 2017 11:55:01 +0000
-Subject: [PATCH 1/3] arm64: KVM: Move CPU ID reg trap setup off the world
- switch path
-In-Reply-To: <20171206105300.GK32397@cbox>
-References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
- <1512141582-17474-2-git-send-email-Dave.Martin@arm.com>
- <20171205090915.GI32397@cbox>
- <20171205123150.GX22781@e103592.cambridge.arm.com>
- <20171206105300.GK32397@cbox>
-Message-ID: <20171206115501.GB22781@e103592.cambridge.arm.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 6 Dec 2017 11:59:48 +0000
+Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
+In-Reply-To: <TY1PR06MB089533C44E4B42D647C2CC25C0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
+ <20170915074551.GF3924@verge.net.au>
+ <CAMuHMdWrMiHQz_Tadh3R00n+zeSnGOW-o=skbK-R-yD6Z-x2+A@mail.gmail.com>
+ <TY1PR06MB0895763DA6DE79A64B9981ECC06C0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <20170915110609.GL3924@verge.net.au>
+ <CAMuHMdUuF4kwUiUYCbSew3W0Pa2CfRdCijefbOO1ZYAbnyG3KA@mail.gmail.com>
+ <TY1PR06MB089533C44E4B42D647C2CC25C0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
+Message-ID: <TY1PR06MB0895C5C14B9BD6CDE867832CC0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 11:53:00AM +0100, Christoffer Dall wrote:
-> On Tue, Dec 05, 2017 at 12:31:51PM +0000, Dave Martin wrote:
-> > On Tue, Dec 05, 2017 at 10:09:15AM +0100, Christoffer Dall wrote:
-> > > On Fri, Dec 01, 2017 at 03:19:40PM +0000, Dave Martin wrote:
-> > > > The HCR_EL2.TID3 flag needs to be set when trapping guest access to
-> > > > the CPU ID registers is required.  However, the decision about
-> > > > whether to set this bit does not need to be repeated at every
-> > > > switch to the guest.
-> > > > 
-> > > > Instead, it's sufficient to make this decision once and record the
-> > > > outcome.
-> > > > 
-> > > > This patch moves the decision to vcpu_reset_hcr() and records the
-> > > > choice made in vcpu->arch.hcr_el2.  The world switch code can then
-> > > > load this directly when switching to the guest without the need for
-> > > > conditional logic on the critical path.
-> > > > 
-> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> > > > Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > 
-> > > Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > > 
-> > > > 
-> > > > ---
-> > > > 
-> > > > Note to maintainers: this was discussed on-list [1] prior to the merge
-> > > > window, but this patch implementing the agreed decision hasn't been
-> > > > posted previously.
-> > > > 
-> > > > This should be considered a fix for v4.15.
-> > > 
-> > > It's actually easier for me to apply this for v4.16 and base my VHE
-> > > optimization patches on it.
-> > 
-> > If you're happy for this optimisation to be missing for v4.15, I'm fine
-> > with that.
-> > 
-> > Can I leave it you to pick this up then?
-> 
-> Yes, I applied it to our queue already.
+Hello Geert, Simon,
 
-OK, great, thanks
----Dave
+the problems I am seeing are not related to APMU/SMP, I'll send a v2 shortly.
+
+Thanks,
+Fab
+
+>
+> Hello Geert, Simon,
+>
+> >
+> > As the dependency is in v4.15-rc1, it can be applied now.
+> >
+>
+> we thought exactly the same thing, therefore we rebased and we re-ran our tests, to discover that something broke in between
+> versions.
+> I'll be in touch once I have more information, but it's a no go for now.
+>
+> Thanks,
+> Fab
+>
+>
+> [https://www2.renesas.eu/media/email/unicef_2017.jpg]
+>
+> This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further
+> details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
+> We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
+>
+>
+>
+> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England &
+> Wales under Registered No. 04586709.
+
+
+[https://www2.renesas.eu/media/email/unicef_2017.jpg]
+
+This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
+We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
