@@ -1,63 +1,72 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed, 6 Dec 2017 13:03:59 +0100
-Subject: [RESEND PATCH 4/4] drm/meson: Add missing VPU init
-In-Reply-To: <151256172859.3497.16672223686685414318@mail.alporthouse.com>
-References: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
- <1512561268-29806-5-git-send-email-narmstrong@baylibre.com>
- <151256172859.3497.16672223686685414318@mail.alporthouse.com>
-Message-ID: <50101688-72c0-565e-bc15-9c229fd1a167@baylibre.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed,  6 Dec 2017 12:05:29 +0000
+Subject: [PATCH v2] ARM: dts: r8a7745: Add APMU node and second CPU core
+Message-ID: <1512561929-16540-1-git-send-email-fabrizio.castro@bp.renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2017 13:02, Chris Wilson wrote:
-> Quoting Neil Armstrong (2017-12-06 11:54:28)
->> The VPU init misses these configurations values.
->>
->> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->> ---
->>  drivers/gpu/drm/meson/meson_drv.c       | 9 +++++++++
->>  drivers/gpu/drm/meson/meson_registers.h | 4 ++++
->>  2 files changed, 13 insertions(+)
->>
->> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
->> index 3b804fd..f9ad0e9 100644
->> --- a/drivers/gpu/drm/meson/meson_drv.c
->> +++ b/drivers/gpu/drm/meson/meson_drv.c
->> @@ -151,6 +151,14 @@ static struct regmap_config meson_regmap_config = {
->>         .max_register   = 0x1000,
->>  };
->>  
->> +static void meson_vpu_init(struct meson_drm *priv)
->> +{
->> +       writel_relaxed(0x210000, priv->io_base + _REG(VPU_RDARB_MODE_L1C1));
->> +       writel_relaxed(0x10000, priv->io_base + _REG(VPU_RDARB_MODE_L1C2));
->> +       writel_relaxed(0x900000, priv->io_base + _REG(VPU_RDARB_MODE_L2C1));
->> +       writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
->> +}
-> 
->> diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
->> index 2847381..bca8714 100644
->> --- a/drivers/gpu/drm/meson/meson_registers.h
->> +++ b/drivers/gpu/drm/meson/meson_registers.h
->> @@ -1363,6 +1363,10 @@
->>  #define VPU_PROT3_STAT_1 0x277a
->>  #define VPU_PROT3_STAT_2 0x277b
->>  #define VPU_PROT3_REQ_ONOFF 0x277c
->> +#define VPU_RDARB_MODE_L1C1 0x2790
->> +#define VPU_RDARB_MODE_L1C2 0x2799
-> 
-> Hmm, not naturally aligned for writel. Is the register width correct,
-> address correct, or this really is an unaligned iowrite?
 
-The registers are aligned with the documentation, then are used with the _REG() macro
-to align them with the bus (on top of the file).
+Add DT node for the Advanced Power Management Unit (APMU), add the
+second CPU core, and use "renesas,apmu" as "enable-method".
 
-Neil
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+---
+Dear All,
 
-> 
->> +#define VPU_RDARB_MODE_L2C1 0x279d
->> +#define VPU_WRARB_MODE_L2C1 0x27a2
-> 
-> Similarly,
-> -Chris
-> 
+I am reposting this patch now that its dependecy ("ARM: shmobile: rcar-gen2:
+Make sure CNTVOFF is initialized on CA7/15") is part of v4.15-rc1, similarly
+to patch "ARM: dts: r8a7794: Add SMP support".
+
+v2:
+- rebased against renesas-devel-20171205-v4.15-rc2
+
+Thanks
+
+ arch/arm/boot/dts/r8a7745.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
+
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index de13e15..0fa7861 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -38,6 +38,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
++		enable-method = "renesas,apmu";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -49,6 +50,15 @@
+ 			next-level-cache = <&L2_CA7>;
+ 		};
+ 
++		cpu1: cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <1>;
++			clock-frequency = <1000000000>;
++			power-domains = <&sysc R8A7745_PD_CA7_CPU1>;
++			next-level-cache = <&L2_CA7>;
++		};
++
+ 		L2_CA7: cache-controller-0 {
+ 			compatible = "cache";
+ 			cache-unified;
+@@ -65,6 +75,12 @@
+ 		#size-cells = <2>;
+ 		ranges;
+ 
++		apmu at e6151000 {
++			compatible = "renesas,r8a7745-apmu", "renesas,apmu";
++			reg = <0 0xe6151000 0 0x188>;
++			cpus = <&cpu0 &cpu1>;
++		};
++
+ 		gic: interrupt-controller at f1001000 {
+ 			compatible = "arm,gic-400";
+ 			#interrupt-cells = <3>;
+-- 
+2.7.4
