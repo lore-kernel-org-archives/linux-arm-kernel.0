@@ -1,56 +1,137 @@
-From: Suzuki.Poulose@arm.com (Suzuki K Poulose)
-Date: Wed, 6 Dec 2017 14:35:31 +0000
-Subject: [PATCH] arm64/mm: Do not write ASID generation to ttbr0
-In-Reply-To: <c08f7a93-17bc-e763-2c8e-fb46c20154ed@arm.com>
-References: <1512495507-23259-1-git-send-email-julien.thierry@arm.com>
- <5A26F485.10402@arm.com> <4f4572cf-9ae1-24b9-ec46-d8bbc6179426@arm.com>
- <5A27CCDF.1050305@arm.com> <c08f7a93-17bc-e763-2c8e-fb46c20154ed@arm.com>
-Message-ID: <49bbe78b-1b74-6998-37f8-f3ef8d2ce642@arm.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 6 Dec 2017 14:37:57 +0000
+Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <CAKv+Gu-MBUt4C4ZrjUD1veQSZ8xX8Q3hNS+E3kAWBVtZ7Um-FQ@mail.gmail.com>
+References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
+ <20171204122645.31535-12-ard.biesheuvel@linaro.org>
+ <20171205122757.GW22781@e103592.cambridge.arm.com>
+ <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
+ <CAKv+Gu88Ym4NxoLxVd07Z07PD454_ONV4D=pqvxezPvAPnd5og@mail.gmail.com>
+ <20171206115134.GZ22781@e103592.cambridge.arm.com>
+ <CAKv+Gu83CR=KGawz5WRQygULcqX+DjhVjAeR-+QOGYx=2oPTzA@mail.gmail.com>
+ <20171206121251.GM12608@e103592.cambridge.arm.com>
+ <CAKv+Gu-MBUt4C4ZrjUD1veQSZ8xX8Q3hNS+E3kAWBVtZ7Um-FQ@mail.gmail.com>
+Message-ID: <20171206143756.GC22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/17 11:33, Julien Thierry wrote:
-> 
-> 
-> On 06/12/17 10:56, James Morse wrote:
->> Hi Julien,
->>
->> On 06/12/17 10:17, Julien Thierry wrote:
->>> On 05/12/17 19:33, James Morse wrote:
->>>> On 05/12/17 17:38, Julien Thierry wrote:
+On Wed, Dec 06, 2017 at 12:25:44PM +0000, Ard Biesheuvel wrote:
+> On 6 December 2017 at 12:12, Dave P Martin <Dave.Martin@arm.com> wrote:
+> > On Wed, Dec 06, 2017 at 11:57:12AM +0000, Ard Biesheuvel wrote:
+> >> On 6 December 2017 at 11:51, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> > On Tue, Dec 05, 2017 at 06:04:34PM +0000, Ard Biesheuvel wrote:
+> >> >> On 5 December 2017 at 12:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> >> >> >
+> >> >> >
+> >> >> >> On 5 Dec 2017, at 12:28, Dave Martin <Dave.Martin@arm.com> wrote:
 
->>
->>>> This would let context.c's asid_bits be arbitrary, as the hardware only uses the
->>>> masked value it exposes in the new field.
->>>>
->>>> This doesn't solve the mixed 8/16 bit case. I think we should force those
->>>> systems to use 8bit asids via cpufeature to preserve as much of the generation
->>>> counter as possible.
->>
->>> Hmmm right, I see that today we just panic the kernel when we have a smaller
->>> asid size than the boot cpu...
->>> So if we boot on a 8bit asid cpu it should work but not the other way around...
->>> I agree we probably should find a way to reduce the size of software asids
->>> system wide when we find a cpu has less bits available.
->>
->> cpufeature has some stuff for 'LOWER_SAFE' that might help here..
->>
+[...]
+
+> >> >> >> If we had
+> >> >> >>
+> >> >> >>    if_cond_yield_neon
+> >> >> >>    // patchup code
+> >> >> >>    endif_yield_neon
+> >> >> >>
+> >> >>
+> >> >> I like this, but ...
+> >> >>
+> >> >> >> then the caller is free to conditionally branch over that as appropriate
+> >> >> >> like
+> >> >> >>
+> >> >> >> loop:
+> >> >> >>    // crypto stuff
+> >> >> >>    tst x0, #0xf
+> >> >> >>    b.ne    loop
+> >> >> >>
+> >> >> >>    if_cond_yield_neon
+> >> >> >>    // patchup code
+> >> >> >>    endif_cond_yield_neon
+> >> >> >>
+> >> >>
+> >> >> I need to put the post patchup code somewhere too. Please refer to the
+> >> >> CRC patches for the best examples of this.
+> >> >
+> >> > I'm not sure I follow.  If you need to do something different after
+> >> > patchup, can't you either pull that code into the if...endif too, or
+> >> > otherwise put a branch before the endif?
+> >> >
+> >>
+> >> No, not really.
+> >>
+> >> What I currently have is
+> >>
+> >> >    if_cond_yield_neon
+> >> >    // patchup code
+> >> >    endif_cond_yield_neon
+> >>
+> >> which is being turned into
+> >>
+> >>     get_thread_info x0
+> >>     ldr w1, [x0, #TSK_TI_PREEMPT]
+> >>     ldr x0, [x0, #TSK_TI_FLAGS]
+> >>     cmp w1, #1 // == PREEMPT_OFFSET
+> >>     csel x0, x0, xzr, eq
+> >>     tbnz x0, #TIF_NEED_RESCHED, 5555f // needs rescheduling?
+> >> 4444:
+> >>
+> >>     .subsection 1
+> >> 5555:
+> >>     // patchup code
+> >>     bl kernel_neon_end
+> >>     bl kernel_neon_begin
+> >>     // post patchup code goes here
+> >>     b 4444b
+> >>     .subsection
+> >>
+> >> so what I basically need is a place to put the post patchup code,
+> >> unless I open code it and branch to a different label right after
+> >> kernel_neon_begin
+> >
+> > Ah, I get you.  I had convinced myself that there was only post-
+> > patchup code.
+> >
+> > So you conceptually want something like
+> >
+> > if_will_cond_yield_neon
+> >         // pre-yield patchup code
+> > do_cond_yield_neon
+> >         // post-yield patchup code
+> > endif_yield_neon
+> >
+> > .macro if_will_cond_yield_neon
+> >         // do preempt_count == 1 && TIF_NEED_RESCHED check
+> >         b.wont_yield 3432f
+> > .endm
+> >
+> > .macro do_cond_yield_neon
+> >         bl      kernel_neon_end
+> >         bl      kernel_neon_begin
+> > .endm
+> >
+> > .macro endif_yield_neon
+> > 3432:
+> > .endm
+> >
+> > The main difference I see is that this doesn't get the slow-case
+> > code out of line.
+> >
+> > Or have I still missed something?
+> >
 > 
-> I'll have a look.
+> No, that seems accurate. I think the idiom looks much better, but I'd
+> still like to get the code out of line, so that everything disappears
+> completely for !CONFIG_PREEMPT.
 
-The problem with ASIDs is that you have to allocate the ASID map early in the
-init, before any of the secondaries are brought up. So this is something that
-has to be decided based on the boot CPU and hence is treated as an "early" feature
-(without really a CAP bit). So all new CPUs should have minimum of the ASID size
-as the boot CPU, failing which we panic the system, via verfiy_cpu_asid_bits().
+Sure, out-of-lining should still be possible by spilling into another
+section or subsection similarly to what you were already doing -- and
+it may still make sense to have (optional?) label arguments to allow
+some branch elision.  I didn't want to complicate things initially.
 
-I am not sure if you can really delay the asid_map allocation. You could probably
-start there.
+> I'll try to rework my stuff using this as a starting point.
+
+Cool, let me know.
 
 Cheers
-Suzuki
-
-
-> 
-> Cheers,
-> 
+---Dave
