@@ -1,94 +1,88 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  6 Dec 2017 14:38:39 +0000
-Subject: [PATCH 18/18] KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
+Date: Wed,  6 Dec 2017 14:38:35 +0000
+Subject: [PATCH 14/18] KVM: arm/arm64: Do not use kern_hyp_va() with
+ kvm_vgic_global_state
 In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
 References: <20171206143839.29223-1-marc.zyngier@arm.com>
-Message-ID: <20171206143839.29223-19-marc.zyngier@arm.com>
+Message-ID: <20171206143839.29223-15-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We so far mapped our HYP IO (which is essencially the GICv2 control
-registers) using the same method as for memory. It recently appeared
-that is a bit unsafe:
+kvm_vgic_global_state is part of the read-only section, and is
+usually accessed using a PC-relative address generation (adrp + add).
 
-we compute the HYP VA using the kern_hyp_va helper, but that helper
-is only designed to deal with kernel VAs coming from the linear map,
-and not from the vmalloc region... This could in turn cause some bad
-aliasing between the two, amplified by the new VA randomisation.
+It is thus useless to use kern_hyp_va() on it, and actively problematic
+if kern_hyp_va() becomes non-idempotent. On the other hand, there is
+no way that the compiler is going to guarantee that such access is
+always be PC relative.
 
-A solution is to come up with our very own basic VA allocator for
-MMIO. Since half of the HYP address space only contains a single
-page (the idmap), we have plenty to borrow from. Let's use the idmap
-as a base, and allocate downwards from it. GICv2 now lives on the
-other side of the great VA barrier.
+So let's bite the bullet and provide our own accessor.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- virt/kvm/arm/mmu.c | 22 +++++++++++++++++-----
- 1 file changed, 17 insertions(+), 5 deletions(-)
+ arch/arm/include/asm/kvm_hyp.h   | 6 ++++++
+ arch/arm64/include/asm/kvm_hyp.h | 9 +++++++++
+ virt/kvm/arm/hyp/vgic-v2-sr.c    | 4 ++--
+ 3 files changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 9f73a8a17147..d843548abd3d 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -43,6 +43,9 @@ static unsigned long hyp_idmap_start;
- static unsigned long hyp_idmap_end;
- static phys_addr_t hyp_idmap_vector;
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index ab20ffa8b9e7..1d42d0aa2feb 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -26,6 +26,12 @@
  
-+static DEFINE_MUTEX(io_map_lock);
-+static unsigned long io_map_base;
+ #define __hyp_text __section(.hyp.text) notrace
+ 
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr = &(s);					\
++		addr;							\
++	})
 +
- #define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
- #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ #define __ACCESS_VFP(CRn)			\
+ 	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
  
-@@ -723,7 +726,8 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 			   void __iomem **kaddr,
- 			   void __iomem **haddr)
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 08d3bb66c8b7..a2d98c539023 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -25,6 +25,15 @@
+ 
+ #define __hyp_text __section(.hyp.text) notrace
+ 
++#define hyp_symbol_addr(s)						\
++	({								\
++		typeof(s) *addr;					\
++		asm volatile("adrp	%0, %1\n"			\
++			     "add	%0, %0, :lo12:%1\n"		\
++			     : "=r" (addr) : "S" (&s));			\
++		addr;							\
++	})
++
+ #define read_sysreg_elx(r,nvh,vh)					\
+ 	({								\
+ 		u64 reg;						\
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index a3f18d362366..19f63fbf3682 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -25,7 +25,7 @@
+ static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
  {
--	unsigned long start, end;
-+	pgd_t *pgd = hyp_pgd;
-+	unsigned long base;
- 	int ret;
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
++	int nr_lr = hyp_symbol_addr(kvm_vgic_global_state)->nr_lr;
+ 	u32 elrsr0, elrsr1;
  
- 	*kaddr = ioremap(phys_addr, size);
-@@ -735,19 +739,26 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
- 		return 0;
- 	}
+ 	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
+@@ -143,7 +143,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		return -1;
  
-+	mutex_lock(&io_map_lock);
-+
-+	base = io_map_base - size;
-+	base &= ~(size - 1);
-+
-+	if (__kvm_cpu_uses_extended_idmap())
-+		pgd = boot_hyp_pgd;
+ 	rd = kvm_vcpu_dabt_get_rd(vcpu);
+-	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
++	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
+ 	addr += fault_ipa - vgic->vgic_cpu_base;
  
--	start = kern_hyp_va((unsigned long)*kaddr);
--	end = kern_hyp_va((unsigned long)*kaddr + size);
--	ret = __create_hyp_mappings(hyp_pgd, start, end,
-+	ret = __create_hyp_mappings(pgd, base, base + size,
- 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
- 
- 	if (ret) {
- 		iounmap(*kaddr);
- 		*kaddr = NULL;
- 	} else {
--		*haddr = (void __iomem *)start;
-+		*haddr = (void __iomem *)base;
-+		io_map_base = base;
- 	}
- 
-+	mutex_unlock(&io_map_lock);
- 	return ret;
- }
- 
-@@ -1828,6 +1839,7 @@ int kvm_mmu_init(void)
- 			goto out;
- 	}
- 
-+	io_map_base = hyp_idmap_start;
- 	return 0;
- out:
- 	free_hyp_pgds();
+ 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
 -- 
 2.14.2
