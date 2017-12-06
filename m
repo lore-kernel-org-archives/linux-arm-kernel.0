@@ -1,46 +1,103 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 6 Dec 2017 19:53:08 +0100
-Subject: [PATCH 4/9] ASoC: sun8i-codec: Add support for A64 SoC
-In-Reply-To: <20171206154810.eb2czpb4kusxv5kj@sirena.org.uk>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-5-anarsoul@gmail.com>
- <20171205080444.zo2rlusqpjyraqcw@flea.lan>
- <CA+E=qVdZME2fiMw09NUP4DNCYhk58dqSapCdfBjLrdMq5HFwyg@mail.gmail.com>
- <20171206153205.k3l5sofdco3t75mi@flea.lan>
- <20171206154810.eb2czpb4kusxv5kj@sirena.org.uk>
-Message-ID: <20171206185308.ijt76lodwgkz2pm3@flea.lan>
+From: james.morse@arm.com (James Morse)
+Date: Wed,  6 Dec 2017 19:01:27 +0000
+Subject: [PATCH v5 01/16] KVM: arm64: Store vcpu on the stack during
+ __guest_enter()
+In-Reply-To: <20171206190142.9246-1-james.morse@arm.com>
+References: <20171206190142.9246-1-james.morse@arm.com>
+Message-ID: <20171206190142.9246-2-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 03:48:10PM +0000, Mark Brown wrote:
-> On Wed, Dec 06, 2017 at 04:32:05PM +0100, Maxime Ripard wrote:
-> 
-> > BCLK is sample rate * sample size * channels, and LRCK is running at
-> > the sample rate. So the ratio is the sample size * channels.
-> 
-> > Anything deviating from those standard i2s concepts should at least be
-> > documented, with arguments to back them off.
-> 
-> BCLK can be higher than the minimum there in most formats, though some
-> hardware is more restrictive so we tend to go for the minimum clock rate.
+KVM uses tpidr_el2 as its private vcpu register, which makes sense for
+non-vhe world switch as only KVM can access this register. This means
+vhe Linux has to use tpidr_el1, which KVM has to save/restore as part
+of the host context.
 
-How does that work in such a case? Is LRCK faster as well, and we're
-keeping the same ratio, or will the codec buffer the current sample
-until the next word?
+If the SDEI handler code runs behind KVMs back, it mustn't access any
+per-cpu variables. To allow this on systems with vhe we need to make
+the host use tpidr_el2, saving KVM from save/restoring it.
 
-Is it usually a property of the codec or the DAI?
+__guest_enter() stores the host_ctxt on the stack, do the same with
+the vcpu.
 
-Thanks!
-Maxime
+Signed-off-by: James Morse <james.morse@arm.com>
+Reviewed-by: Christoffer Dall <cdall@linaro.org>
+---
+Changes since v2:
+ * Added middle paragraph of commit message.
 
+ arch/arm64/kvm/hyp/entry.S     | 10 +++++++---
+ arch/arm64/kvm/hyp/hyp-entry.S |  6 +++---
+ 2 files changed, 10 insertions(+), 6 deletions(-)
+
+diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+index 12ee62d6d410..9a8ab5dddd9e 100644
+--- a/arch/arm64/kvm/hyp/entry.S
++++ b/arch/arm64/kvm/hyp/entry.S
+@@ -62,8 +62,8 @@ ENTRY(__guest_enter)
+ 	// Store the host regs
+ 	save_callee_saved_regs x1
+ 
+-	// Store the host_ctxt for use at exit time
+-	str	x1, [sp, #-16]!
++	// Store host_ctxt and vcpu for use at exit time
++	stp	x1, x0, [sp, #-16]!
+ 
+ 	add	x18, x0, #VCPU_CONTEXT
+ 
+@@ -159,6 +159,10 @@ abort_guest_exit_end:
+ ENDPROC(__guest_exit)
+ 
+ ENTRY(__fpsimd_guest_restore)
++	// x0: esr
++	// x1: vcpu
++	// x2-x29,lr: vcpu regs
++	// vcpu x0-x1 on the stack
+ 	stp	x2, x3, [sp, #-16]!
+ 	stp	x4, lr, [sp, #-16]!
+ 
+@@ -173,7 +177,7 @@ alternative_else
+ alternative_endif
+ 	isb
+ 
+-	mrs	x3, tpidr_el2
++	mov	x3, x1
+ 
+ 	ldr	x0, [x3, #VCPU_HOST_CONTEXT]
+ 	kern_hyp_va x0
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index 5170ce1021da..fce7cc507e0a 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -104,6 +104,7 @@ el1_trap:
+ 	/*
+ 	 * x0: ESR_EC
+ 	 */
++	ldr	x1, [sp, #16 + 8]	// vcpu stored by __guest_enter
+ 
+ 	/*
+ 	 * We trap the first access to the FP/SIMD to save the host context
+@@ -116,19 +117,18 @@ alternative_if_not ARM64_HAS_NO_FPSIMD
+ 	b.eq	__fpsimd_guest_restore
+ alternative_else_nop_endif
+ 
+-	mrs	x1, tpidr_el2
+ 	mov	x0, #ARM_EXCEPTION_TRAP
+ 	b	__guest_exit
+ 
+ el1_irq:
+ 	stp     x0, x1, [sp, #-16]!
+-	mrs	x1, tpidr_el2
++	ldr	x1, [sp, #16 + 8]
+ 	mov	x0, #ARM_EXCEPTION_IRQ
+ 	b	__guest_exit
+ 
+ el1_error:
+ 	stp     x0, x1, [sp, #-16]!
+-	mrs	x1, tpidr_el2
++	ldr	x1, [sp, #16 + 8]
+ 	mov	x0, #ARM_EXCEPTION_EL1_SERROR
+ 	b	__guest_exit
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/74219ba6/attachment-0001.sig>
+2.15.0
