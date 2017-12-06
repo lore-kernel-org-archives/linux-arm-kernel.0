@@ -1,98 +1,96 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:19 +0000
-Subject: [PATCH v3 00/20] arm64: Unmap the kernel whilst running in userspace
- (KPTI)
-Message-ID: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+Date: Wed,  6 Dec 2017 12:35:20 +0000
+Subject: [PATCH v3 01/20] arm64: mm: Use non-global mappings for kernel space
+In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everybody,
+In preparation for unmapping the kernel whilst running in userspace,
+make the kernel mappings non-global so we can avoid expensive TLB
+invalidation on kernel exit to userspace.
 
-This is version three of the patches formerly known as KAISER (?).
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/kernel-pgtable.h | 12 ++++++++++--
+ arch/arm64/include/asm/pgtable-prot.h   | 21 +++++++++++++++------
+ 2 files changed, 25 insertions(+), 8 deletions(-)
 
-  v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/542751.html
-  v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2017-November/544817.html
-
-Changes since v2 include:
-
-  * Rename command-line option from "kaiser=" to "kpti=" for parity with x86
-  * Fixed Falkor erratum workaround (missing '~')
-  * Moved vectors base from literal pool into separate data page
-  * Added TTBR_ASID_MASK instead of open-coded constants
-  * Added missing newline to error message
-  * Fail to probe SPE if KPTI is enabled
-  * Addressed minor review comments
-  * Added tags
-  * Based on -rc2
-
-Patches are also pushed here:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/will/linux.git kpti
-
-Feedback and testing welcome. At this point, I'd like to start thinking
-about getting this merged for 4.16.
-
-Cheers,
-
-Will
-
---->8
-
-Will Deacon (20):
-  arm64: mm: Use non-global mappings for kernel space
-  arm64: mm: Temporarily disable ARM64_SW_TTBR0_PAN
-  arm64: mm: Move ASID from TTBR0 to TTBR1
-  arm64: mm: Remove pre_ttbr0_update_workaround for Falkor erratum
-    #E1003
-  arm64: mm: Rename post_ttbr0_update_workaround
-  arm64: mm: Fix and re-enable ARM64_SW_TTBR0_PAN
-  arm64: mm: Allocate ASIDs in pairs
-  arm64: mm: Add arm64_kernel_unmapped_at_el0 helper
-  arm64: mm: Invalidate both kernel and user ASIDs when performing TLBI
-  arm64: entry: Add exception trampoline page for exceptions from EL0
-  arm64: mm: Map entry trampoline into trampoline and kernel page tables
-  arm64: entry: Explicitly pass exception level to kernel_ventry macro
-  arm64: entry: Hook up entry trampoline to exception vectors
-  arm64: erratum: Work around Falkor erratum #E1003 in trampoline code
-  arm64: tls: Avoid unconditional zeroing of tpidrro_el0 for native
-    tasks
-  arm64: entry: Add fake CPU feature for unmapping the kernel at EL0
-  arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
-  perf: arm_spe: Fail device probe when arm64_kernel_unmapped_at_el0()
-  arm64: mm: Introduce TTBR_ASID_MASK for getting at the ASID in the
-    TTBR
-  arm64: kaslr: Put kernel vectors address in separate data page
-
- arch/arm64/Kconfig                      |  30 +++--
- arch/arm64/include/asm/asm-uaccess.h    |  26 ++--
- arch/arm64/include/asm/assembler.h      |  27 +----
- arch/arm64/include/asm/cpucaps.h        |   3 +-
- arch/arm64/include/asm/fixmap.h         |   5 +
- arch/arm64/include/asm/kernel-pgtable.h |  12 +-
- arch/arm64/include/asm/mmu.h            |  11 ++
- arch/arm64/include/asm/mmu_context.h    |   9 +-
- arch/arm64/include/asm/pgtable-hwdef.h  |   1 +
- arch/arm64/include/asm/pgtable-prot.h   |  21 +++-
- arch/arm64/include/asm/pgtable.h        |   1 +
- arch/arm64/include/asm/proc-fns.h       |   6 -
- arch/arm64/include/asm/tlbflush.h       |  16 ++-
- arch/arm64/include/asm/uaccess.h        |  21 +++-
- arch/arm64/kernel/asm-offsets.c         |   6 +-
- arch/arm64/kernel/cpufeature.c          |  41 +++++++
- arch/arm64/kernel/entry.S               | 203 +++++++++++++++++++++++++++-----
- arch/arm64/kernel/process.c             |  12 +-
- arch/arm64/kernel/vmlinux.lds.S         |  40 ++++++-
- arch/arm64/lib/clear_user.S             |   2 +-
- arch/arm64/lib/copy_from_user.S         |   2 +-
- arch/arm64/lib/copy_in_user.S           |   2 +-
- arch/arm64/lib/copy_to_user.S           |   2 +-
- arch/arm64/mm/cache.S                   |   2 +-
- arch/arm64/mm/context.c                 |  36 +++---
- arch/arm64/mm/mmu.c                     |  31 +++++
- arch/arm64/mm/proc.S                    |  12 +-
- arch/arm64/xen/hypercall.S              |   2 +-
- drivers/perf/arm_spe_pmu.c              |   9 ++
- 29 files changed, 454 insertions(+), 137 deletions(-)
-
+diff --git a/arch/arm64/include/asm/kernel-pgtable.h b/arch/arm64/include/asm/kernel-pgtable.h
+index 7803343e5881..77a27af01371 100644
+--- a/arch/arm64/include/asm/kernel-pgtable.h
++++ b/arch/arm64/include/asm/kernel-pgtable.h
+@@ -78,8 +78,16 @@
+ /*
+  * Initial memory map attributes.
+  */
+-#define SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+-#define SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++#define _SWAPPER_PTE_FLAGS	(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define _SWAPPER_PMD_FLAGS	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define SWAPPER_PTE_FLAGS	(_SWAPPER_PTE_FLAGS | PTE_NG)
++#define SWAPPER_PMD_FLAGS	(_SWAPPER_PMD_FLAGS | PMD_SECT_NG)
++#else
++#define SWAPPER_PTE_FLAGS	_SWAPPER_PTE_FLAGS
++#define SWAPPER_PMD_FLAGS	_SWAPPER_PMD_FLAGS
++#endif
+ 
+ #if ARM64_SWAPPER_USES_SECTION_MAPS
+ #define SWAPPER_MM_MMUFLAGS	(PMD_ATTRINDX(MT_NORMAL) | SWAPPER_PMD_FLAGS)
+diff --git a/arch/arm64/include/asm/pgtable-prot.h b/arch/arm64/include/asm/pgtable-prot.h
+index 0a5635fb0ef9..22a926825e3f 100644
+--- a/arch/arm64/include/asm/pgtable-prot.h
++++ b/arch/arm64/include/asm/pgtable-prot.h
+@@ -34,8 +34,16 @@
+ 
+ #include <asm/pgtable-types.h>
+ 
+-#define PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
+-#define PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++#define _PROT_DEFAULT		(PTE_TYPE_PAGE | PTE_AF | PTE_SHARED)
++#define _PROT_SECT_DEFAULT	(PMD_TYPE_SECT | PMD_SECT_AF | PMD_SECT_S)
++
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define PROT_DEFAULT		(_PROT_DEFAULT | PTE_NG)
++#define PROT_SECT_DEFAULT	(_PROT_SECT_DEFAULT | PMD_SECT_NG)
++#else
++#define PROT_DEFAULT		_PROT_DEFAULT
++#define PROT_SECT_DEFAULT	_PROT_SECT_DEFAULT
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ #define PROT_DEVICE_nGnRnE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRnE))
+ #define PROT_DEVICE_nGnRE	(PROT_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_ATTRINDX(MT_DEVICE_nGnRE))
+@@ -48,6 +56,7 @@
+ #define PROT_SECT_NORMAL_EXEC	(PROT_SECT_DEFAULT | PMD_SECT_UXN | PMD_ATTRINDX(MT_NORMAL))
+ 
+ #define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
++#define _HYP_PAGE_DEFAULT	(_PAGE_DEFAULT & ~PTE_NG)
+ 
+ #define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ #define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
+@@ -55,15 +64,15 @@
+ #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
+ #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
+ 
+-#define PAGE_HYP		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
+-#define PAGE_HYP_EXEC		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
+-#define PAGE_HYP_RO		__pgprot(_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
++#define PAGE_HYP		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_HYP_XN)
++#define PAGE_HYP_EXEC		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY)
++#define PAGE_HYP_RO		__pgprot(_HYP_PAGE_DEFAULT | PTE_HYP | PTE_RDONLY | PTE_HYP_XN)
+ #define PAGE_HYP_DEVICE		__pgprot(PROT_DEVICE_nGnRE | PTE_HYP)
+ 
+ #define PAGE_S2			__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_NORMAL) | PTE_S2_RDONLY)
+ #define PAGE_S2_DEVICE		__pgprot(PROT_DEFAULT | PTE_S2_MEMATTR(MT_S2_DEVICE_nGnRE) | PTE_S2_RDONLY | PTE_UXN)
+ 
+-#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_PXN | PTE_UXN)
++#define PAGE_NONE		__pgprot(((_PAGE_DEFAULT) & ~PTE_VALID) | PTE_PROT_NONE | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
+ #define PAGE_SHARED		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_UXN | PTE_WRITE)
+ #define PAGE_SHARED_EXEC	__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_NG | PTE_PXN | PTE_WRITE)
+ #define PAGE_READONLY		__pgprot(_PAGE_DEFAULT | PTE_USER | PTE_RDONLY | PTE_NG | PTE_PXN | PTE_UXN)
 -- 
 2.1.4
