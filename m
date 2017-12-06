@@ -1,95 +1,50 @@
-From: briannorris@chromium.org (Brian Norris)
-Date: Wed, 6 Dec 2017 09:29:20 -0800
-Subject: [PATCH 3/3] arm64: dts: rockchip: add extcon nodes and enable
- tcphy.
-In-Reply-To: <20171206111008.3079-3-enric.balletbo@collabora.com>
-References: <20171206111008.3079-1-enric.balletbo@collabora.com>
- <20171206111008.3079-3-enric.balletbo@collabora.com>
-Message-ID: <20171206172919.GA87458@google.com>
+From: vinmenon@codeaurora.org (Vinayak Menon)
+Date: Wed, 6 Dec 2017 23:01:46 +0530
+Subject: [PATCH 0/2] Fixes for SW PAN
+In-Reply-To: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+Message-ID: <5ee0b1f1-c7fc-af92-2b34-4555e59d7a20@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Alex, Jeffy, Frank Wang
+On 12/6/2017 4:46 PM, Will Deacon wrote:
+> Hi all,
+>
+> After lots of collective head scratching in response to Vinayak's mail
+> here:
+>
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545641.html
+>
+> It turns out that we have a problem with SW PAN and kernel threads, where
+> the saved ttbr0 value for a kernel thread can be stale and subsequently
+> inherited by other kernel threads over a fork.
+>
+> These two patches attempt to fix that. We've not be able to reproduce
+> the exact failure reported above, but I added some assertions to the
+> uaccess routines to check for discrepancies between the active_mm pgd
+> and the saved ttbr0 value (ignoring the zero page) and these no longer
+> fire with these changes, but do fire without them if EFI runtime services
+> are enabled on my Seattle board.
 
-Hi,
-
-On Wed, Dec 06, 2017 at 12:10:08PM +0100, Enric Balletbo i Serra wrote:
-> Enable tcphy and create the cros-ec's extcon node for the USB Type-C port.
-> 
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
->  arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> index 470105d..03f1950 100644
-> --- a/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> +++ b/arch/arm64/boot/dts/rockchip/rk3399-gru.dtsi
-> @@ -855,6 +855,20 @@ ap_i2c_audio: &i2c8 {
->  			compatible = "google,cros-ec-pwm";
->  			#pwm-cells = <1>;
->  		};
-> +
-> +		usbc_extcon0: extcon at 0 {
-> +			compatible = "google,extcon-usbc-cros-ec";
-> +			google,usb-port-id = <0>;
-> +
-> +			#extcon-cells = <0>;
-> +		};
-> +
-> +		usbc_extcon1: extcon at 1 {
-> +			compatible = "google,extcon-usbc-cros-ec";
-> +			google,usb-port-id = <1>;
-> +
-> +			#extcon-cells = <0>;
-> +		};
->  	};
->  };
->  
-> @@ -865,6 +879,16 @@ ap_i2c_audio: &i2c8 {
->  	rockchip,hw-tshut-polarity = <1>; /* tshut polarity 0:LOW 1:HIGH */
->  };
->  
-> +&tcphy0 {
-> +	status = "okay";
-> +	extcon = <&usbc_extcon0>;
-> +};
-> +
-> +&tcphy1 {
-> +	status = "okay";
-> +	extcon = <&usbc_extcon1>;
-> +};
-> +
->  &u2phy0 {
->  	status = "okay";
->  };
-> @@ -911,6 +935,7 @@ ap_i2c_audio: &i2c8 {
->  
->  &usbdrd3_0 {
->  	status = "okay";
-> +	extcon = <&usbc_extcon0>;
->  };
->  
->  &usbdrd_dwc3_0 {
-> @@ -920,6 +945,7 @@ ap_i2c_audio: &i2c8 {
->  
->  &usbdrd3_1 {
->  	status = "okay";
-> +	extcon = <&usbc_extcon1>;
->  };
->  
->  &usbdrd_dwc3_1 {
-
-Seems OK.
-
-Also, IIUC, I think if we ever want to support dual-role/OTG, we need an
-extcon reference in the USB2/OTG PHY that serves these ports too. i.e.,
-u2phy0 and u2phy1? Notably, the PHY driver supports the extcon
-properties, but it's not documented in
-Documentation/devicetree/bindings/phy/phy-rockchip-inno-usb2.txt yet (we
-should probably get that fixed).
-
-So, anyway, maybe the above isn't a blocker for this patch. Just noticed
-it while reading. Assuming the driver stuff falls into place:
-
-Reviewed-by: Brian Norris <briannorris@chromium.org>
+Thanks Will. So these 2 patches fix the case of kthreads having a stale saved ttbr0. The callstack I had shared
+in the original issue description was not of a kthread (its user task with PF_KTHREAD not set. The tsk->mm was
+set to NULL by exit_mm I think). So do you think this could be a different problem ?
+I had a look at the dumps again and what I see is that, the PA part of the saved ttbr0
+(from thread_info) is not the same as the pa(tsk->active_mm->pgd). The PA derived from saved ttbr0 actually
+points to a page which is "now" owned by slab.
+>
+> Cheers,
+>
+> Will
+>
+> --->8
+>
+> Will Deacon (2):
+>   arm64: SW PAN: Point saved ttbr0 at the zero page when switching to
+>     init_mm
+>   arm64: SW PAN: Update saved ttbr0 value on enter_lazy_tlb
+>
+>  arch/arm64/include/asm/efi.h         |  4 +---
+>  arch/arm64/include/asm/mmu_context.h | 46 ++++++++++++++++++------------------
+>  2 files changed, 24 insertions(+), 26 deletions(-)
+>
