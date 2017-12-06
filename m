@@ -1,44 +1,14 @@
-From: branislav@radocaj.org (Branislav Radocaj)
-Date: Thu,  7 Dec 2017 00:07:38 +0100
-Subject: [PATCH] net: ethernet: arc: fix error handling in emac_rockchip_probe
-Message-ID: <20171206230738.2560-1-branislav@radocaj.org>
+From: hch@infradead.org (Christoph Hellwig)
+Date: Wed, 6 Dec 2017 15:11:30 -0800
+Subject: [PATCH v6 3/6] kernel/reboot.c: export pm_power_off_prepare
+In-Reply-To: <20171206072402.11694-4-o.rempel@pengutronix.de>
+References: <20171206072402.11694-1-o.rempel@pengutronix.de>
+ <20171206072402.11694-4-o.rempel@pengutronix.de>
+Message-ID: <20171206231130.GA6235@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If clk_set_rate() fails, we should disable clk before return.
-Found by Linux Driver Verification project (linuxtesting.org).
+>  void (*pm_power_off_prepare)(void);
+> +EXPORT_SYMBOL(pm_power_off_prepare);
 
-Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
----
- drivers/net/ethernet/arc/emac_rockchip.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
-index e278e3d96ee0..c6163874e4e7 100644
---- a/drivers/net/ethernet/arc/emac_rockchip.c
-+++ b/drivers/net/ethernet/arc/emac_rockchip.c
-@@ -220,9 +220,11 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 
- 		/* RMII TX/RX needs always a rate of 25MHz */
- 		err = clk_set_rate(priv->macclk, 25000000);
--		if (err)
-+		if (err) {
- 			dev_err(dev,
- 				"failed to change mac clock rate (%d)\n", err);
-+			goto out_clk_disable_macclk;
-+		}
- 	}
- 
- 	err = arc_emac_probe(ndev, interface);
-@@ -232,7 +234,8 @@ static int emac_rockchip_probe(struct platform_device *pdev)
- 	}
- 
- 	return 0;
--
-+out_clk_disable_macclk:
-+	clk_disable_unprepare(priv->macclk);
- out_regulator_disable:
- 	if (priv->regulator)
- 		regulator_disable(priv->regulator);
--- 
-2.11.0
+EXPORT_SYMBOL_GPL for something this deeply internal, please.
