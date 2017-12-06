@@ -1,60 +1,52 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Dec 2017 13:37:36 +0000
-Subject: [PATCH 0/2] Fixes for SW PAN
-In-Reply-To: <20171206121941.vcxgcjb5pzr7dlpn@lakrids.cambridge.arm.com>
-References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
- <20171206121941.vcxgcjb5pzr7dlpn@lakrids.cambridge.arm.com>
-Message-ID: <20171206133736.GB31186@arm.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 6 Dec 2017 14:37:52 +0100
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+Message-ID: <20171206133752.GB12508@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 12:19:41PM +0000, Mark Rutland wrote:
-> On Wed, Dec 06, 2017 at 11:16:06AM +0000, Will Deacon wrote:
-> > After lots of collective head scratching in response to Vinayak's mail
-> > here:
-> > 
-> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545641.html
-> > 
-> > It turns out that we have a problem with SW PAN and kernel threads, where
-> > the saved ttbr0 value for a kernel thread can be stale and subsequently
-> > inherited by other kernel threads over a fork.
-> > 
-> > These two patches attempt to fix that. We've not be able to reproduce
-> > the exact failure reported above, but I added some assertions to the
-> > uaccess routines to check for discrepancies between the active_mm pgd
-> > and the saved ttbr0 value (ignoring the zero page) and these no longer
-> > fire with these changes, but do fire without them if EFI runtime services
-> > are enabled on my Seattle board.
-> 
-> Both patches look good to me, per my understanding of the problem, so
-> FWIW, for the series:
-> 
-> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> However, I think we have another issue in this area. We have sequences
-> where we update the HW TTBR0 before the shadow, e.g. in efi_set_pgd(),
-> where we do:
-> 
-> 	cpu_set_reserved_ttbr0();
-> 	update_saved_ttbr0(current, current->active_mm);
-> 
-> ... so if an exception comes in between after HW TTBR0 update but before
-> the shadow update, the stale shadow value will be restored upon the
-> exception return, leaving the HW TTBR0 stale.
+On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
 
-I don't see how that can happen. The entry code checks the ttbr0 ASID value
-and if it's zero (as it will be above), it sets the PAN bit in the saved PSR
-and we avoid doing any uaccess toggling (including on exception return).
+SNIP
 
-> That's easy enough to fix in the efi code, e.g.
+> ---
+>  tools/perf/pmu-events/jevents.c | 215 ++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 198 insertions(+), 17 deletions(-)
 > 
-> 	update_saved_ttbr0(current, current->active_mm);
-> 	barrier();
-> 	cpu_set_reserved_ttbr0();
-> 
-> ... but I haven't yet figured out a nice way to sort out switch_mm(),
-> __switch_mm(), and check_and_switch_context().
+> diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
+> index a0d489e..a820ed4 100644
+> --- a/tools/perf/pmu-events/jevents.c
+> +++ b/tools/perf/pmu-events/jevents.c
+> @@ -42,6 +42,7 @@
+>  #include <dirent.h>
+>  #include <sys/time.h>			/* getrlimit */
+>  #include <sys/resource.h>		/* getrlimit */
+> +#include <sys/queue.h>
+>  #include <ftw.h>
+>  #include <sys/stat.h>
+>  #include "jsmn.h"
+> @@ -366,6 +367,94 @@ static int print_events_table_entry(void *data, char *name, char *event,
+>  	return 0;
+>  }
+>  
+> +struct event_struct {
+> +	char *name;
+> +	char *event;
+> +	char *desc;
+> +	char *long_desc;
+> +	char *pmu;
+> +	char *unit;
+> +	char *perpkg;
+> +	char *metric_expr;
+> +	char *metric_name;
+> +	char *metric_group;
+> +	LIST_ENTRY(event_struct) list;
 
-I don't see the problem there either. Can you elaborate please?
+is there any reason you don't use the 'struct list_head' ?
+I dont think we want another thingie involved for lists
 
-Will
+jirka
