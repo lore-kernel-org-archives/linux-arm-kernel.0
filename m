@@ -1,87 +1,74 @@
-From: P.Bruenn@beckhoff.com (=?iso-8859-1?Q?Patrick_Br=FCnn?=)
-Date: Wed, 6 Dec 2017 09:28:09 +0000
-Subject: [PATCH v2 5/5] rtc: add mxc driver for i.MX53 SRTC
-In-Reply-To: <20171206085825.GM21780@piout.net>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-6-linux-kernel-dev@beckhoff.com>
- <20171206083618.eea63zqmpgaaazwl@pengutronix.de>
- <20171206085825.GM21780@piout.net>
-Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB531D7C@NT-Mail07.beckhoff.com>
+From: guillaume.tucker@collabora.com (Guillaume Tucker)
+Date: Wed, 6 Dec 2017 09:22:04 +0000
+Subject: [PATCH 1/2] drm/nouveau/bar/gf100: fix hang when calling ->fini()
+ before ->init()
+In-Reply-To: <CABDvA=krahNw3q+qpEPbbv8Y9fvX4jXc_B54qafwtgFyWpqKWg@mail.gmail.com>
+References: <be610a7596ad8fee7da092161888c532c2eb2908.1512411775.git.guillaume.tucker@collabora.com>
+ <6db622ac-319d-c640-91ab-9248e528b69b@nvidia.com>
+ <CABDvA=krahNw3q+qpEPbbv8Y9fvX4jXc_B54qafwtgFyWpqKWg@mail.gmail.com>
+Message-ID: <d5b6a012-52c4-dce3-1cc6-3041558e808b@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Alexandre Belloni [mailto:alexandre.belloni at free-electrons.com]
->Sent: Mittwoch, 6. Dezember 2017 09:58
->On 06/12/2017 at 09:36:18 +0100, Sascha Hauer wrote:
->> > +/*
->> > + * This function updates the RTC alarm registers and then clears all the
->> > + * interrupt status bits.
->> > + * The caller should hold the pdata->lock
->> > + *
->> > + * @param  alrm         the new alarm value to be updated in the RTC
->> > + *
->> > + * @return  0 if successful; non-zero otherwise.
->> > + */
->> > +static int mxc_rtc_write_alarm_locked(struct mxc_rtc_data *const pdata,
->> > +                                struct rtc_time *alarm_tm)
->> > +{
->> > +  void __iomem *const ioaddr = pdata->ioaddr;
->> > +  unsigned long time;
->> > +
->> > +  rtc_tm_to_time(alarm_tm, &time);
->> > +
->> > +  if (time > U32_MAX) {
->> > +          pr_err("Hopefully I am out of service by then :-(\n");
->> > +          return -EINVAL;
->> > +  }
+On 05/12/17 18:32, Ben Skeggs wrote:
+> On Wed, Dec 6, 2017 at 12:30 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
+>
 >>
->> This will never happen as on your target hardware unsigned long is a
->> 32bit type. Not sure what is best to do here. Maybe you should test
->> the return value of rtc_tm_to_time. ATM it returns 0 unconditionally,
->> but rtc_tm_to_time could detect when the input time doesn't fit into
->> its return type and return an error in this case.
->> Also I just realized that it's unsigned and only overflows in the year
->> 2106. I'm most likely dead then so I don't care that much ;)
+>> On 04/12/17 18:37, Guillaume Tucker wrote:
+>>> If the firmware fails to load then ->fini() will be called before the
+>>> device has been initialised, causing the kernel to hang while trying
+>>> to write to a register.  Add a test in ->fini() to avoid this issue.
+>>>
+>>> This fixes a kernel hang on tegra124.
+>>>
+>>> Fixes: b17de35a2ebbe ("drm/nouveau/bar: implement bar1 teardown")
+>>> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+>>> CC: Ben Skeggs <bskeggs@redhat.com>
+>>> ---
+>>>  drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c | 7 +++++--
+>>>  1 file changed, 5 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>> b/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>>> index a3ba7f50198b..95e2aba64aad 100644
+>>> --- a/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>>> +++ b/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>>> @@ -43,9 +43,12 @@ gf100_bar_bar1_wait(struct nvkm_bar *base)
+>>>  }
+>>>
+>>>  void
+>>> -gf100_bar_bar1_fini(struct nvkm_bar *bar)
+>>> +gf100_bar_bar1_fini(struct nvkm_bar *base)
+>>>  {
+>>> -     nvkm_mask(bar->subdev.device, 0x001704, 0x80000000, 0x00000000);
+>>> +     struct nvkm_device *device = base->subdev.device;
+>>> +
+>>> +     if (base->subdev.oneinit)
+>>> +             nvkm_mask(device, 0x001704, 0x80000000, 0x00000000);
+>>>  }
+>>>
+>>>  void
 >>
->
->One solution is to use the 64bit version instead so it doesn't overflow.
->This makes the time > U32_MAX work.
->Also, I'll send (hopefully soon) a series adding proper range checking
->for the whole RTC subsystem. And yes, it not urgent as I don't think I
->will care so much in 2106 too ;)
->
-I just noticed that in mxc_rtc_set_time() I am using the 64bit version.
-After thinking a while about this issue, I think the 64bit version is better
-suited for my use case. It makes explicitly clear that I need to push the
-time into a 32bit hw register and "unsigned long" is just by accident the
-correct size for me.
+>> I have tested this and it works for me. Thanks for fixing this! Would be
+>> good to get Ben's ACK, but you can have my ...
+>>
+> I'd love to get a good explanation as to why it hangs without this change,
+> as, on the surface, it's not immediately obvious as to why it's hanging.
 
->> > +/*
->> > + * This function reads the current RTC time into tm in Gregorian date.
->> > + *
->> > + * @param  tm           contains the RTC time value upon return
->> > + *
->> > + * @return  0 if successful; non-zero otherwise.
->> > + */
->> > +static int mxc_rtc_read_time(struct device *dev, struct rtc_time *tm)
->> > +{
->> > +  struct mxc_rtc_data *pdata = dev_get_drvdata(dev);
->> > +  time_t now;
->> > +  int ret = mxc_rtc_lock(pdata);
->> > +
->> > +  if (ret)
->> > +          return ret;
->> > +
->> > +  now = readl(pdata->ioaddr + SRTC_LPSCMR);
->> > +  rtc_time_to_tm(now, tm);
->> > +  ret = rtc_valid_tm(tm);
->
->This check is useless for two reasons: you know that rtc_time_to_tm will
->generate a valid tm and the core always checks the tm anyway.
-I will remove this with the next version
+To be fair I'm not entirely sure either why this causes a hang, I
+haven't read the TRM...  The iomem has been mapped at this point,
+so accessing the register should work.  One clue is when you look
+at _bar1_init(), the 0x1704 register is initialised with
+some (device instance?) memory address.  So it's possible that
+the hardware does something special when you set this to 0 as in
+_bar1_fini(), which may fail in particular if it was previously
+not initialised with a valid address.
 
-Thanks for your time and help,
-Patrick
+This is merely guesswork, would be interested to find out the
+real explanation though.
 
-Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
-Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
+>> Tested-by: Jon Hunter <jonathanh@nvidia.com>
+
+Thanks!
+
+Guillaume
