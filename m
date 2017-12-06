@@ -1,36 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Dec 2017 17:25:51 +0000
-Subject: [PATCH] arm64: kvm: Prevent restoring stale PMSCR_EL1 for vcpu
-In-Reply-To: <1512580189-5921-1-git-send-email-julien.thierry@arm.com>
-References: <1512580189-5921-1-git-send-email-julien.thierry@arm.com>
-Message-ID: <20171206172551.GD25408@arm.com>
+From: branislav@radocaj.org (Branislav Radocaj)
+Date: Wed,  6 Dec 2017 18:24:33 +0100
+Subject: [PATCH] net: ethernet: arc: fix error handling in emac_rockchip_probe
+Message-ID: <20171206172433.3457-1-branislav@radocaj.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 05:09:49PM +0000, Julien Thierry wrote:
-> When VHE is not present, KVM needs to save and restores PMSCR_EL1 when
-> possible. If SPE is used by the host, value of PMSCR_EL1 cannot be saved
-> for the guest.
-> If the host starts using SPE between two save+restore on the same vcpu,
-> restore will write the value of PMSCR_EL1 read during the first save.
-> 
-> Make sure __debug_save_spe_nvhe clears the value of the saved PMSCR_EL1
-> when the guest cannot use SPE.
+    If clk_set_rate() fails, we should disable clk
+    before return.
 
-Ok, so the problem is that we have a stale (non-zero) saved pmscr_el1,
-and therefore the restore code unconditionally restores that even though
-SPE is no longer in use by the host. Well spotted!
+    Found by Linux Driver Verification project (linuxtesting.org).
 
-> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-> Cc: Christoffer Dall <christoffer.dall@linaro.org>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: <stable@vger.kernel.org>
-> ---
->  arch/arm64/kvm/hyp/debug-sr.c | 3 +++
->  1 file changed, 3 insertions(+)
+    Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
+---
+ drivers/net/ethernet/arc/emac_rockchip.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Reviewed-by: Will Deacon <will.deacon@arm.com>
-
-Will
+diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
+index e278e3d96ee0..c6163874e4e7 100644
+--- a/drivers/net/ethernet/arc/emac_rockchip.c
++++ b/drivers/net/ethernet/arc/emac_rockchip.c
+@@ -220,9 +220,11 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 
+ 		/* RMII TX/RX needs always a rate of 25MHz */
+ 		err = clk_set_rate(priv->macclk, 25000000);
+-		if (err)
++		if (err) {
+ 			dev_err(dev,
+ 				"failed to change mac clock rate (%d)\n", err);
++			goto out_clk_disable_macclk;
++		}
+ 	}
+ 
+ 	err = arc_emac_probe(ndev, interface);
+@@ -232,7 +234,8 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	return 0;
+-
++out_clk_disable_macclk:
++	clk_disable_unprepare(priv->macclk);
+ out_regulator_disable:
+ 	if (priv->regulator)
+ 		regulator_disable(priv->regulator);
+-- 
+2.11.0
