@@ -1,61 +1,43 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed, 6 Dec 2017 12:05:03 +0100
-Subject: [PATCH v2 5/5] rtc: add mxc driver for i.MX53 SRTC
-In-Reply-To: <20171205140646.30367-6-linux-kernel-dev@beckhoff.com>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-6-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171206110503.GO21780@piout.net>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 6 Dec 2017 09:20:04 -0200
+Subject: [PATCH 2/3] ARM: dts: imx6sl-evk: Rearrange the regulators node
+In-Reply-To: <1512528784-29288-2-git-send-email-marcofrk@gmail.com>
+References: <1512528784-29288-1-git-send-email-marcofrk@gmail.com>
+ <1512528784-29288-2-git-send-email-marcofrk@gmail.com>
+Message-ID: <CAOMZO5DcOeGG6KaHptMD0fO1K9RE9jHXBirUdRXG-SHd1ZFfmw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/12/2017 at 15:06:46 +0100, linux-kernel-dev at beckhoff.com wrote:
-> +/* This function is the RTC interrupt service routine. */
-> +static irqreturn_t mxc_rtc_interrupt(int irq, void *dev_id)
-> +{
-> +	struct platform_device *pdev = dev_id;
-> +	struct mxc_rtc_data *pdata = platform_get_drvdata(pdev);
-> +	void __iomem *ioaddr = pdata->ioaddr;
-> +	unsigned long flags;
-> +	u32 events = 0;
-> +	u32 lp_status;
-> +	u32 lp_cr;
-> +
-> +	spin_lock_irqsave(&pdata->lock, flags);
-> +	if (clk_prepare_enable(pdata->clk)) {
-> +		spin_unlock_irqrestore(&pdata->lock, flags);
-> +		return IRQ_NONE;
-> +	}
-> +
-> +	lp_status = readl(ioaddr + SRTC_LPSR);
-> +	lp_cr = readl(ioaddr + SRTC_LPCR);
-> +
-> +	/* update irq data & counter */
-> +	if (lp_status & SRTC_LPSR_ALP) {
-> +		if (lp_cr & SRTC_LPCR_ALP)
-> +			events = (RTC_AF | RTC_IRQF);
+Hi Marco,
 
-I would just call rtc_update_irq here...
+You missed to pass the v2 notation for this patch in the Subject.
 
-> +
-> +		/* disable further lp alarm interrupts */
-> +		lp_cr &= ~(SRTC_LPCR_ALP | SRTC_LPCR_WAE);
-> +	}
-> +
-> +	/* Update interrupt enables */
-> +	writel(lp_cr, ioaddr + SRTC_LPCR);
-> +
-> +	/* clear interrupt status */
-> +	writel(lp_status, ioaddr + SRTC_LPSR);
-> +
-> +	mxc_rtc_sync_lp_locked(ioaddr);
-> +	rtc_update_irq(pdata->rtc, 1, events);
+On Wed, Dec 6, 2017 at 12:53 AM, Marco Franchi <marcofrk@gmail.com> wrote:
 
-... because calling it here with events == 0 will result in a lot of
-work for nothing (the core will walk through the timers and set the
-alarm again).
+> +       reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "usb_otg1_vbus";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gpio4 0 0>;
 
+gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
 
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+would easier to read.
+
+> +       reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "usb_otg2_vbus";
+> +               regulator-min-microvolt = <5000000>;
+> +               regulator-max-microvolt = <5000000>;
+> +               gpio = <&gpio4 2 0>;
+
+Ditto.
+
+> -               };
+> +       reg_lcd_3v3: regulator-lcd-3v3 {
+> +               compatible = "regulator-fixed";
+> +               regulator-name = "lcd-3v3";
+> +               gpio = <&gpio4 3 0>;
+
+Ditto.
