@@ -1,60 +1,82 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Wed, 6 Dec 2017 18:16:04 +0100
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
-References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
- <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
- <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
- <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
- <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
- <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
- <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
-Message-ID: <CAJZ5v0iaursWFP_KRoJqT6-QoGkvpTot0oMvs6qdjkaP12p9jQ@mail.gmail.com>
+From: jonathanh@nvidia.com (Jon Hunter)
+Date: Wed, 6 Dec 2017 17:18:02 +0000
+Subject: [PATCH 1/2] drm/nouveau/bar/gf100: fix hang when calling ->fini()
+ before ->init()
+In-Reply-To: <d5b6a012-52c4-dce3-1cc6-3041558e808b@collabora.com>
+References: <be610a7596ad8fee7da092161888c532c2eb2908.1512411775.git.guillaume.tucker@collabora.com>
+ <6db622ac-319d-c640-91ab-9248e528b69b@nvidia.com>
+ <CABDvA=krahNw3q+qpEPbbv8Y9fvX4jXc_B54qafwtgFyWpqKWg@mail.gmail.com>
+ <d5b6a012-52c4-dce3-1cc6-3041558e808b@collabora.com>
+Message-ID: <b6618306-8de5-9b08-f2ee-9939df62aedc@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 6, 2017 at 5:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> On 12/6/2017 11:41 AM, Rafael J. Wysocki wrote:
->> On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->>> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
->>>>> Yes, it should, so I'm not sure why you need the list in the first place.
->>>>>
->>>>> Also it looks like something along the lines of devres_release_all()
->>>>> should be sufficient.
->>>> Good suggestion, let me test this.
->>>>
+
+On 06/12/17 09:22, Guillaume Tucker wrote:
+> On 05/12/17 18:32, Ben Skeggs wrote:
+>> On Wed, Dec 6, 2017 at 12:30 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
+>>
 >>>
->>> I tried to pull the code into GED but the API is not public. I also looked
->>> at how it is used. I was afraid to mess up with the internals of base.c by
->>> calling devres_release_all() externally first and by the driver framework
->>> next. I moved away from this approach.
->>
->> Are you sure it is called by the core in the shutdown path?
->
-> Sorry, I was thinking about a general case not the shutdown path. If we open
-> this API and have device drivers call it from arbitrary places; then we could
-> be opening a new can of worms that show up during device driver removal.
->
-> If you feel confident (I'm not), I can pursue this approach too.
->
->>
->>> I just fixed the function rename and changed the dev_info() to dev_dbg().
->>
->> And why do you need the list?
->>
->> ged_shutdown() will be called for every device for which ged_probe()
->> has been called.
->
-> The problem I had here is that =the last argument is the context pointer when I
-> call devm_free_irq().
->
-> If I don't pass the same context I used during IRQ registration, then the IRQ
-> free API fails. That's why, I needed to keep the event pointer around until the
-> IRQ free is called.
+>>> On 04/12/17 18:37, Guillaume Tucker wrote:
+>>>> If the firmware fails to load then ->fini() will be called before the
+>>>> device has been initialised, causing the kernel to hang while trying
+>>>> to write to a register.? Add a test in ->fini() to avoid this issue.
+>>>>
+>>>> This fixes a kernel hang on tegra124.
+>>>>
+>>>> Fixes: b17de35a2ebbe ("drm/nouveau/bar: implement bar1 teardown")
+>>>> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
+>>>> CC: Ben Skeggs <bskeggs@redhat.com>
+>>>> ---
+>>>> ?drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c | 7 +++++--
+>>>> ?1 file changed, 5 insertions(+), 2 deletions(-)
+>>>>
+>>>> diff --git a/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>>> b/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>>>> index a3ba7f50198b..95e2aba64aad 100644
+>>>> --- a/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>>>> +++ b/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
+>>>> @@ -43,9 +43,12 @@ gf100_bar_bar1_wait(struct nvkm_bar *base)
+>>>> ?}
+>>>>
+>>>> ?void
+>>>> -gf100_bar_bar1_fini(struct nvkm_bar *bar)
+>>>> +gf100_bar_bar1_fini(struct nvkm_bar *base)
+>>>> ?{
+>>>> -???? nvkm_mask(bar->subdev.device, 0x001704, 0x80000000, 0x00000000);
+>>>> +???? struct nvkm_device *device = base->subdev.device;
+>>>> +
+>>>> +???? if (base->subdev.oneinit)
+>>>> +???????????? nvkm_mask(device, 0x001704, 0x80000000, 0x00000000);
+>>>> ?}
+>>>>
+>>>> ?void
+>>>
+>>> I have tested this and it works for me. Thanks for fixing this! Would be
+>>> good to get Ben's ACK, but you can have my ...
+>>>
+>> I'd love to get a good explanation as to why it hangs without this
+>> change,
+>> as, on the surface, it's not immediately obvious as to why it's hanging.
+> 
+> To be fair I'm not entirely sure either why this causes a hang, I
+> haven't read the TRM...? The iomem has been mapped at this point,
+> so accessing the register should work.? One clue is when you look
+> at _bar1_init(), the 0x1704 register is initialised with
+> some (device instance?) memory address.? So it's possible that
+> the hardware does something special when you set this to 0 as in
+> _bar1_fini(), which may fail in particular if it was previously
+> not initialised with a valid address.
+> 
+> This is merely guesswork, would be interested to find out the
+> real explanation though.
 
-OK
+OK, well that's no good. It's a good pointer, but we need to make sure
+we understand the root of this hang. I will see if I have sometime to
+dig into this further, maybe next week.
 
-Anyway, it looks like something is missing in the core.
+Cheers
+Jon
 
-You shouldn't really need to do all that dance in a driver.
+-- 
+nvpublic
