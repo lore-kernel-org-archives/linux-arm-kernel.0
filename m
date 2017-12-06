@@ -1,42 +1,73 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 11:16:06 +0000
-Subject: [PATCH 0/2] Fixes for SW PAN
-Message-ID: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+Date: Wed,  6 Dec 2017 11:16:08 +0000
+Subject: [PATCH 2/2] arm64: SW PAN: Update saved ttbr0 value on enter_lazy_tlb
+In-Reply-To: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1512558968-28980-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+enter_lazy_tlb is called when a kernel thread rides on the back of
+another mm, due to a context switch or an explicit call to unuse_mm
+where a call to switch_mm is elided.
 
-After lots of collective head scratching in response to Vinayak's mail
-here:
+In these cases, it's important to keep the saved ttbr value up to date
+with the active mm, otherwise we can end up with a stale value which
+points to a potentially freed page table.
 
-  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545641.html
+This patch implements enter_lazy_tlb for arm64, so that the saved ttbr0
+is kept up-to-date with the active mm for kernel threads.
 
-It turns out that we have a problem with SW PAN and kernel threads, where
-the saved ttbr0 value for a kernel thread can be stale and subsequently
-inherited by other kernel threads over a fork.
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Vinayak Menon <vinmenon@codeaurora.org>
+Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/include/asm/mmu_context.h | 24 ++++++++++--------------
+ 1 file changed, 10 insertions(+), 14 deletions(-)
 
-These two patches attempt to fix that. We've not be able to reproduce
-the exact failure reported above, but I added some assertions to the
-uaccess routines to check for discrepancies between the active_mm pgd
-and the saved ttbr0 value (ignoring the zero page) and these no longer
-fire with these changes, but do fire without them if EFI runtime services
-are enabled on my Seattle board.
-
-Cheers,
-
-Will
-
---->8
-
-Will Deacon (2):
-  arm64: SW PAN: Point saved ttbr0 at the zero page when switching to
-    init_mm
-  arm64: SW PAN: Update saved ttbr0 value on enter_lazy_tlb
-
- arch/arm64/include/asm/efi.h         |  4 +---
- arch/arm64/include/asm/mmu_context.h | 46 ++++++++++++++++++------------------
- 2 files changed, 24 insertions(+), 26 deletions(-)
-
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index f7773f90546e..9d155fa9a507 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -156,20 +156,6 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
+ 
+ #define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
+ 
+-/*
+- * This is called when "tsk" is about to enter lazy TLB mode.
+- *
+- * mm:  describes the currently active mm context
+- * tsk: task which is entering lazy tlb
+- * cpu: cpu number which is entering lazy tlb
+- *
+- * tsk->mm will be NULL
+- */
+-static inline void
+-enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+-{
+-}
+-
+ #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+ static inline void update_saved_ttbr0(struct task_struct *tsk,
+ 				      struct mm_struct *mm)
+@@ -193,6 +179,16 @@ static inline void update_saved_ttbr0(struct task_struct *tsk,
+ }
+ #endif
+ 
++static inline void
++enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
++{
++	/*
++	 * We don't actually care about the ttbr0 mapping, so point it at the
++	 * zero page.
++	 */
++	update_saved_ttbr0(tsk, &init_mm);
++}
++
+ static inline void __switch_mm(struct mm_struct *next)
+ {
+ 	unsigned int cpu = smp_processor_id();
 -- 
 2.1.4
