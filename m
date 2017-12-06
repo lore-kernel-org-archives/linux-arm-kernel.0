@@ -1,121 +1,152 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Wed, 6 Dec 2017 12:27:34 +0100
-Subject: [PATCH 2/3] arm64: dts: rockchip: add usb3-phy phandle for dwc3.
-In-Reply-To: <1756641.7q7fHBPi13@diego>
-References: <20171206111008.3079-1-enric.balletbo@collabora.com>
- <20171206111008.3079-2-enric.balletbo@collabora.com>
- <1756641.7q7fHBPi13@diego>
-Message-ID: <1c672b68-5f7f-e8ec-e5a9-901d4b53e2ad@collabora.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 6 Dec 2017 11:33:30 +0000
+Subject: [PATCH] arm64/mm: Do not write ASID generation to ttbr0
+In-Reply-To: <5A27CCDF.1050305@arm.com>
+References: <1512495507-23259-1-git-send-email-julien.thierry@arm.com>
+ <5A26F485.10402@arm.com> <4f4572cf-9ae1-24b9-ec46-d8bbc6179426@arm.com>
+ <5A27CCDF.1050305@arm.com>
+Message-ID: <c08f7a93-17bc-e763-2c8e-fb46c20154ed@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
 
-On 06/12/17 12:20, Heiko St?bner wrote:
-> Am Mittwoch, 6. Dezember 2017, 12:10:07 CET schrieb Enric Balletbo i Serra:
->> This patch adds the usb3-phy for both of the two dwc3 controllers on
->> rk3399.
+
+On 06/12/17 10:56, James Morse wrote:
+> Hi Julien,
 > 
-> This patch adds quite a bit more than the phy phandles though.
+> On 06/12/17 10:17, Julien Thierry wrote:
+>> On 05/12/17 19:33, James Morse wrote:
+>>> On 05/12/17 17:38, Julien Thierry wrote:
+>>>> When writing the user ASID to ttbr0, 16bit get copied to ttbr0, potentially
+>>>> including part of the ASID generation in the ttbr0.ASID. If the kernel is
+>>>> using less than 16bits ASIDs and the other ttbr0 bits aren't RES0, two
+>>>> tasks using the same mm context might end up running with different
+>>>> ttbr0.ASID values.
+>>>> This would be triggered by one of the threads being scheduled before a
+>>>> roll-over and the second one scheduled after a roll-over.
+>>>>
+>>>> Pad the generation out of the 16bits of the mm id that are written to
+>>>> ttbr0. Thus, what the hardware sees is what the kernel considers ASID.
+>>>
+>>> Is this to fix a system with a mix of 8/16 asid bits? Or someone being clever
+>>> and reducing asid_bits to stress rollover?
 > 
-> The powerdomain addition should definitly be a separate patch
-> and the usb3-grf clock as well.
+>> So it was motivated by the later. But hopefully the fix, pushing the generation
+>> always over 16bits is also suitable for hardware that mixes 8/16bits asids. If
+>> it is not, do call it out.
+> 
+> (okay, wasn't clear from the commit message!)
 > 
 
-Ok, I'll split these parts and send in a separate patch in v2. Thanks for the
-feedback.
-
-Enric
+Fair point, I'll mention the mixed size hardware asids in the next version.
 
 > 
-> Heiko
-> 
-> 
->> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
->> ---
->>  arch/arm64/boot/dts/rockchip/rk3399.dtsi | 28 ++++++++++++++++++++--------
->>  1 file changed, 20 insertions(+), 8 deletions(-)
+>>>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+>>>> index 6f40170..a7c72d4 100644
+>>>> --- a/arch/arm64/mm/context.c
+>>>> +++ b/arch/arm64/mm/context.c
+>>>> @@ -180,6 +190,13 @@ static u64 new_context(struct mm_struct *mm, unsigned
+>>>> int cpu)
+>>>>        /* We're out of ASIDs, so increment the global generation count */
+>>>>        generation = atomic64_add_return_relaxed(ASID_FIRST_VERSION,
+>>>>                             &asid_generation);
+>>>> +
+>>>> +    /*
+>>>> +     * It is unlikely the generation will ever overflow, but if this
+>>>> +     * happens, let it be known strange things can occur.
+>>>> +     */
+>>>> +    WARN_ON(generation == ASID_FIRST_VERSION);
+>>>
+>>> Won't generation wrap to zero, not '1<<16'?
 >>
->> diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> b/arch/arm64/boot/dts/rockchip/rk3399.dtsi index 17e5e1a..c18ff88 100644
->> --- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> +++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
->> @@ -397,9 +397,11 @@
->>  		#size-cells = <2>;
->>  		ranges;
->>  		clocks = <&cru SCLK_USB3OTG0_REF>, <&cru SCLK_USB3OTG0_SUSPEND>,
->> -			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_GRF>;
->> +			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
->> +			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
->>  		clock-names = "ref_clk", "suspend_clk",
->> -			      "bus_clk", "grf_clk";
->> +			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
->> +			      "aclk_usb3", "grf_clk";
->>  		status = "disabled";
+>> Yes it will! Silly me...
 >>
->>  		usbdrd_dwc3_0: dwc3 {
->> @@ -407,14 +409,15 @@
->>  			reg = <0x0 0xfe800000 0x0 0x100000>;
->>  			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH 0>;
->>  			dr_mode = "otg";
->> -			phys = <&u2phy0_otg>;
->> -			phy-names = "usb2-phy";
->> +			phys = <&u2phy0_otg>, <&tcphy0_usb3>;
->> +			phy-names = "usb2-phy", "usb3-phy";
->>  			phy_type = "utmi_wide";
->>  			snps,dis_enblslpm_quirk;
->>  			snps,dis-u2-freeclk-exists-quirk;
->>  			snps,dis_u2_susphy_quirk;
->>  			snps,dis-del-phy-power-chg-quirk;
->>  			snps,dis-tx-ipgap-linecheck-quirk;
->> +			power-domains = <&power RK3399_PD_USB3>;
->>  			status = "disabled";
->>  		};
->>  	};
->> @@ -425,9 +428,11 @@
->>  		#size-cells = <2>;
->>  		ranges;
->>  		clocks = <&cru SCLK_USB3OTG1_REF>, <&cru SCLK_USB3OTG1_SUSPEND>,
->> -			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_GRF>;
->> +			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
->> +			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
->>  		clock-names = "ref_clk", "suspend_clk",
->> -			      "bus_clk", "grf_clk";
->> +			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
->> +			      "aclk_usb3", "grf_clk";
->>  		status = "disabled";
->>
->>  		usbdrd_dwc3_1: dwc3 {
->> @@ -435,14 +440,15 @@
->>  			reg = <0x0 0xfe900000 0x0 0x100000>;
->>  			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH 0>;
->>  			dr_mode = "otg";
->> -			phys = <&u2phy1_otg>;
->> -			phy-names = "usb2-phy";
->> +			phys = <&u2phy1_otg>, <&tcphy1_usb3>;
->> +			phy-names = "usb2-phy", "usb3-phy";
->>  			phy_type = "utmi_wide";
->>  			snps,dis_enblslpm_quirk;
->>  			snps,dis-u2-freeclk-exists-quirk;
->>  			snps,dis_u2_susphy_quirk;
->>  			snps,dis-del-phy-power-chg-quirk;
->>  			snps,dis-tx-ipgap-linecheck-quirk;
->> +			power-domains = <&power RK3399_PD_USB3>;
->>  			status = "disabled";
->>  		};
->>  	};
->> @@ -991,6 +997,12 @@
->>  				clocks = <&cru HCLK_SDIO>;
->>  				pm_qos = <&qos_sdioaudio>;
->>  			};
->> +			pd_usb3 at RK3399_PD_USB3 {
->> +				reg = <RK3399_PD_USB3>;
->> +				clocks = <&cru ACLK_USB3>;
->> +				pm_qos = <&qos_usb_otg0>,
->> +					 <&qos_usb_otg1>;
->> +			};
->>  			pd_vio at RK3399_PD_VIO {
->>  				reg = <RK3399_PD_VIO>;
->>  				#address-cells = <1>;
+>>>
+>>> asid_generation-is-never-zero is one of the nasty things in this code.
+>>>
+>>> In check_and_switch_context() we switch to the 'fast path' where the current
+>>> asid is usable if: the generation matches and the active_asid isn't 0 (which
+>>> indicates a rollover has occurred).
+>>>
+>>> from mm/context.c::check_and_switch_context():
+>>>>      if (!((asid ^ atomic64_read(&asid_generation)) >> asid_bits)
+>>>>          && atomic64_xchg_relaxed(&per_cpu(active_asids, cpu), asid))
+>>>>          goto switch_mm_fastpath;
+>>>
+>>>
+>>> If asid_generation is ever zero, (even briefly) multiple new tasks with
+>>> different pages-tables will pass the generation test, and run with asid=0.
+>>>
+>>> Short of xchg(ASID_MAX_VERSION, ASID_FIRST_VERSION), every time, just in case, I
+>>> don't think this is something we can handle.
+>>>
+>>> But, this thing is layers on layers of subtle behaviour, so I may have missed
+>>> something...
+> 
+>> I had not thought of that. However I believe we checked with 48bits and the case
+>> of the generation overflowing would take a human life span (or something on that
+>> scale) of a system running and spawning continuous processes before reaching
+> 
+> This scales with the number of CPUs, and how quickly they can fork().
+> (Not using all the counter bits makes me nervous.)
 > 
 > 
+>> this. Which is why we decided on having a WARN_ON for now. So I don't know if we
+>> want to change things for this corner case which really means "things are going
+>> bad" more than anything else.
+> 
+> But it fires the generation after the chaos started, so if we ever do see this
+> it gives us false-confidence that generation-overflow wasn't the issue.
+> WARN_ON(generation == ASID_MAX_VERSION) ?
+> 
+
+Yes that seems fair.
+
+> 
+>>> Instead, do you think we can duplicate just the asid bits (asid & ASID_MASK)
+>>> into a new 16bit field in mm_context_t, which we then use instead of the ASID()
+>>> and mmid macros? (We only set a new asid in one place as returned by
+>>> new_context()).
+>>>
+>>
+>> I'm not sure I understand why this prevents running with asid = 0 when
+>> generation is 0.
+> 
+> Sorry, I was talking about two things. It doesn't, I don't think we can do
+> anything about that.
+> 
+> This was a suggestion for an alternative way of stopping generation bits getting
+> into the TTBR, which still lets use use all the counter bits. (and lets us mess
+> with asid_bits to stress rollover without re-inventing this bug).
+> 
+
+I see. Only thing that worries me is people being tempted to use this 
+duplicated field (only ASID) wrongfully.
+
+I'm not very familiar with ASIDs and mem contexts so I'd like to know 
+how this suggestion sounds to others. If people agree, I'm happy to add 
+this for the next version.
+
+> 
+>>> This would let context.c's asid_bits be arbitrary, as the hardware only uses the
+>>> masked value it exposes in the new field.
+>>>
+>>> This doesn't solve the mixed 8/16 bit case. I think we should force those
+>>> systems to use 8bit asids via cpufeature to preserve as much of the generation
+>>> counter as possible.
+> 
+>> Hmmm right, I see that today we just panic the kernel when we have a smaller
+>> asid size than the boot cpu...
+>> So if we boot on a 8bit asid cpu it should work but not the other way around...
+>> I agree we probably should find a way to reduce the size of software asids
+>> system wide when we find a cpu has less bits available.
+> 
+> cpufeature has some stuff for 'LOWER_SAFE' that might help here..
+> 
+
+I'll have a look.
+
+Cheers,
+
+-- 
+Julien Thierry
