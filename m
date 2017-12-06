@@ -1,99 +1,39 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Wed, 6 Dec 2017 19:25:25 +0900
-Subject: [kernel-hardening][PATCH v4 2/3] arm: mm: dump: make the page table
- dumping seq_file optional
-Message-ID: <20171206102525.GA7054@pjb1027-Latitude-E5410>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  6 Dec 2017 11:22:38 +0100
+Subject: [PATCH 43/61] ARM: dts: koelsch: Correct primary compatible value for
+ eeprom
+In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
+References: <cover.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <8834d8667b8509e5968e5689790c4ac5410b47db.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch makes the page table dumping seq_file optional.
-It makes the page table dumping code usable for other cases.
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-This patch refers below commit of arm64.
-(ae5d1cf358a5
-("arm64: dump: Make the page table dumping seq_file optional"))
+The Renesas part number of the two-wire serial interface EEPROM is not
+24C02, but R1EX24002ATAS0G.
 
-Acked-by: Kees Cook <keescook@chromium.org>
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+Hence change its primary compatible value to "renesas,r1ex24002", like
+on Gose.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-v4: Add Acked-by from Kees Cook
----
- arch/arm/mm/dump.c | 28 +++++++++++++++++++++-------
- 1 file changed, 21 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index 8dfe7c3..43a2bee 100644
---- a/arch/arm/mm/dump.c
-+++ b/arch/arm/mm/dump.c
-@@ -34,6 +34,18 @@
- 	{ -1,			NULL },
- };
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index 4126de417922..fac9cdea4965 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -708,7 +708,7 @@
+ 	};
  
-+#define pt_dump_seq_printf(m, fmt, args...) \
-+({                      \
-+	if (m)					\
-+		seq_printf(m, fmt, ##args);	\
-+})
-+
-+#define pt_dump_seq_puts(m, fmt)    \
-+({						\
-+	if (m)					\
-+		seq_printf(m, fmt);	\
-+})
-+
- struct pg_state {
- 	struct seq_file *seq;
- 	const struct addr_marker *marker;
-@@ -210,7 +222,7 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t
- 			s = bits->clear;
- 
- 		if (s)
--			seq_printf(st->seq, " %s", s);
-+			pt_dump_seq_printf(st->seq, " %s", s);
- 	}
- }
- 
-@@ -224,7 +236,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 		st->level = level;
- 		st->current_prot = prot;
- 		st->current_domain = domain;
--		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-+		pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
- 	} else if (prot != st->current_prot || level != st->level ||
- 		   domain != st->current_domain ||
- 		   addr >= st->marker[1].start_address) {
-@@ -232,7 +244,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 		unsigned long delta;
- 
- 		if (st->current_prot) {
--			seq_printf(st->seq, "0x%08lx-0x%08lx   ",
-+			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
- 				   st->start_address, addr);
- 
- 			delta = (addr - st->start_address) >> 10;
-@@ -240,17 +252,19 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 				delta >>= 10;
- 				unit++;
- 			}
--			seq_printf(st->seq, "%9lu%c", delta, *unit);
-+			pt_dump_seq_printf(st->seq, "%9lu%c", delta, *unit);
- 			if (st->current_domain)
--				seq_printf(st->seq, " %s", st->current_domain);
-+				pt_dump_seq_printf(st->seq, " %s",
-+							st->current_domain);
- 			if (pg_level[st->level].bits)
- 				dump_prot(st, pg_level[st->level].bits, pg_level[st->level].num);
--			seq_printf(st->seq, "\n");
-+			pt_dump_seq_printf(st->seq, "\n");
- 		}
- 
- 		if (addr >= st->marker[1].start_address) {
- 			st->marker++;
--			seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
-+			pt_dump_seq_printf(st->seq, "---[ %s ]---\n",
-+							st->marker->name);
- 		}
- 		st->start_address = addr;
- 		st->current_prot = prot;
+ 	eeprom at 50 {
+-		compatible = "renesas,24c02", "atmel,24c02";
++		compatible = "renesas,r1ex24002", "atmel,24c02";
+ 		reg = <0x50>;
+ 		pagesize = <16>;
+ 	};
 -- 
-1.9.1
+2.11.0
