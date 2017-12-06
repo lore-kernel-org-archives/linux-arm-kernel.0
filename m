@@ -1,56 +1,47 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 6 Dec 2017 15:21:02 -0600
-Subject: [PATCH v4] usb: xhci: allow imod-interval to be configurable
-In-Reply-To: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
-References: <1512397671-28733-1-git-send-email-awallis@codeaurora.org>
-Message-ID: <20171206212102.w7joyecp25v6nw5v@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 6 Dec 2017 22:49:01 +0100
+Subject: [PATCH] ARM: omap2: hide omap3_save_secure_ram on non-OMAP3 builds
+In-Reply-To: <a055eca0-fa24-a04a-7278-f633a12e6bae@ti.com>
+References: <20171206141517.670032-1-arnd@arndb.de>
+ <20171206155714.GY28152@atomide.com>
+ <a055eca0-fa24-a04a-7278-f633a12e6bae@ti.com>
+Message-ID: <CAK8P3a13Or8OvttqiKo8Qg2q6UJwQPg0E5TGb02LUb+p8nB3kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 04, 2017 at 09:27:51AM -0500, Adam Wallis wrote:
-> The xHCI driver currently has the IMOD set to 160, which
-> translates to an IMOD interval of 40,000ns (160 * 250)ns
-> 
-> Commit 0cbd4b34cda9 ("xhci: mediatek: support MTK xHCI host controller")
-> introduced a QUIRK for the MTK platform to adjust this interval to 20,
-> which translates to an IMOD interval of 5,000ns (20 * 250)ns. This is
-> due to the fact that the MTK controller IMOD interval is 8 times
-> as much as defined in xHCI spec.
-> 
-> Instead of adding more quirk bits for additional platforms, this patch
-> introduces the ability for vendors to set the IMOD_INTERVAL as is
-> optimal for their platform. By using device_property_read_u32() on
-> "imod-interval-ns", the IMOD INTERVAL can be specified in nano seconds.
-> If no interval is specified, the default of 40,000ns (IMOD=160) will be
-> used.
-> 
-> No bounds checking has been implemented due to the fact that a vendor
-> may have violated the spec and would need to specify a value outside of
-> the max 8,000 IRQs/second limit specified in the xHCI spec.
-> 
-> Tested-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> Signed-off-by: Adam Wallis <awallis@codeaurora.org>
-> ---
-> changes from v3:
->   * Changed imod-interval to imod-interval-ns [Rob Herring/Chunfeng]
->   * Changed "modulation" to "moderation" throughout patch [Mathias]
-> changes from v2:
->   * Added PCI default value [Mathias]
->   * Removed xhci-mtk.h from xhci-plat.c [Chunfeng Yun]
->   * Removed MTK quirk from xhci-plat and moved logic to xhci-mtk [Chunfeng]
->   * Updated bindings Documentation to use proper units [Rob Herring]
->   * Added imod-interval description and example to MTK binding documentation
-> changes from v1:
->   * Removed device_property_read_u32() per suggestion from greg k-h
->   * Used ER_IRQ_INTERVAL_MASK in place of (u16) cast
-> 
->  Documentation/devicetree/bindings/usb/mediatek,mtk-xhci.txt | 2 ++
->  Documentation/devicetree/bindings/usb/usb-xhci.txt          | 1 +
->  drivers/usb/host/xhci-mtk.c                                 | 9 +++++++++
->  drivers/usb/host/xhci-pci.c                                 | 3 +++
->  drivers/usb/host/xhci-plat.c                                | 5 +++++
->  drivers/usb/host/xhci.c                                     | 7 ++-----
->  drivers/usb/host/xhci.h                                     | 2 ++
->  7 files changed, 24 insertions(+), 5 deletions(-)
+On Wed, Dec 6, 2017 at 5:29 PM, Dan Murphy <dmurphy@ti.com> wrote:
+> Arnd
+>
+> On 12/06/2017 09:57 AM, Tony Lindgren wrote:
+>> * Arnd Bergmann <arnd@arndb.de> [171206 14:18]:
+>>> In configurations without CONFIG_OMAP3 but with secure RAM support,
+>>> we now run into a link failure:
+>>>
+>>> arch/arm/mach-omap2/omap-secure.o: In function `omap3_save_secure_ram':
+>>> omap-secure.c:(.text+0x130): undefined reference to `save_secure_ram_context'
+>>>
+>>> The omap3_save_secure_ram() function is only called from the OMAP34xx
+>>> power management code, so we can simply hide that function in the
+>>> appropriate #ifdef.
+>>>
+>>> Fixes: d09220a887f7 ("ARM: OMAP2+: Fix SRAM virt to phys translation for save_secure_ram_context")
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>> Thanks for fixing it, want to apply directly to ARM SoC fixes
+>> where d09220a887f7 is now? If so:
+>>
+>> Acked-by: Tony Lindgren <tony@atomide.com>
+>
+> Found the same issue in our builds.
+> Compile tested the patch against different TI defconfig configurations.
+>
+> Tested-by: Dan Murphy <dmurphy@ti.com>
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Thanks!
+
+Unfortunately, I found another build problem with CONFIG_PM=n,
+sent an updated patch now, and will apply it to the fixes branch
+tomorrow keeping both of your Acked-by/Tested-by tags, unless
+I hear any objections or run into a third problem.
+
+       Arnd
