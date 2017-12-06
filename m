@@ -1,71 +1,57 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 6 Dec 2017 17:35:11 +0000
-Subject: [RFC PATCH 0/5] perf events patches for improved ARM64 support
-In-Reply-To: <12034446-ccc9-9a88-6b2c-3318216f4817@redhat.com>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
- <12034446-ccc9-9a88-6b2c-3318216f4817@redhat.com>
-Message-ID: <827ed425-0d82-1fd8-b66a-962fa994e054@huawei.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Thu, 7 Dec 2017 01:44:04 +0800
+Subject: [arm-platforms:kvm-arm64/haslr 10/20]
+ arch/arm64/include/asm/kvm_mmu.h:104:27: error: macro "ALTERNATIVE_CB"
+ requires 3 arguments, but only 1 given
+Message-ID: <201712070158.kdh6efdr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2017 16:42, William Cohen wrote:
-> On 12/05/2017 11:13 AM, John Garry wrote:
->> This patchset adds support for some perf events features,
->> targeted at ARM64, implemented in a generic fashion.
->>
->> The two main features are as follows:
->> - support for arch/vendor/platform pmu events directory structure
->> - support for parsing architecture recommended pmu events
->>
->> On the back of these, the Cavium ThunderX2 and HiSilicon hip08
->> JSONs are relocated/added.
->>
->> TODO:
->> 	- Documentation needs to be updated for recommended
->> 	events format in the JSON
->> 	- tidy up patches a bit
->>
->> John Garry (5):
->>   perf jevents: add support for pmu events vendor subdirectory
->>   perf jevents: add support for arch recommended events
->>   perf vendor events arm64: add armv8 recommended events JSON
->>   perf vendor events arm64: relocate thunderx2 JSON
->>   perf vendor events arm64: add HiSilicon hip08 JSON
->>
->>  .../pmu-events/arch/arm64/armv8-recommended.json   | 452 +++++++++++++++++++++
->>  .../arch/arm64/cavium/thunderx2-imp-def.json       |  62 ---
->>  .../arch/arm64/cavium/thunderx2/core-imp-def.json  |  32 ++
->>  .../arch/arm64/hisilicon/hip08/core-imp-def.json   | 122 ++++++
->>  tools/perf/pmu-events/arch/arm64/mapfile.csv       |   3 +-
->>  tools/perf/pmu-events/jevents.c                    | 272 ++++++++++++-
->>  6 files changed, 859 insertions(+), 84 deletions(-)
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/armv8-recommended.json
->>  delete mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
->>  create mode 100644 tools/perf/pmu-events/arch/arm64/hisilicon/hip08/core-imp-def.json
->>
->
->
-> Hi,
->
-> How is this code dealing with the possible different configurations within the aach64 architecture?  For example the Cortex-A53 implementations may exclude the L2 cache and not have L2 cache events implemented?  Is there some way that perf could make use of the PMCEID0 and PMCEID1 register information to accurately get the subset of events the processor supports?  Using this information could eliminate a lot of busy work adding implementation specific descriptions due to slight implementation differences.
->
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/haslr
+head:   983da603415991b6e7e7cd9b53cfa922bf052393
+commit: e7f8236b93aede2dfe4c043ea6b8b149e17c30f8 [10/20] arm64: KVM: Dynamically patch the kernel/hyp VA mask
+config: arm64-defconfig (attached as .config)
+compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
+reproduce:
+        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout e7f8236b93aede2dfe4c043ea6b8b149e17c30f8
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Hi Will,
+Note: the arm-platforms/kvm-arm64/haslr HEAD 983da603415991b6e7e7cd9b53cfa922bf052393 builds fine.
+      It only hurts bisectibility.
 
-Thanks for the input.
+All errors (new ones prefixed by >>):
 
-So today the PMCEID registers are used in the kernel to detect whether 
-common architectural/microarchitectual events are implemented.
+   In file included from arch/arm64/kvm/haslr.c:22:0:
+   arch/arm64/include/asm/kvm_mmu.h: In function '__kern_hyp_va':
+>> arch/arm64/include/asm/kvm_mmu.h:104:27: error: macro "ALTERNATIVE_CB" requires 3 arguments, but only 1 given
+            kvm_update_va_mask)
+                              ^
+>> arch/arm64/include/asm/kvm_mmu.h:103:15: error: expected string literal before 'ALTERNATIVE_CB'
+     asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n"
+                  ^~~~~~~~~~~~~~
 
-Here, in this patchset (specifically 2/5 onwards), we are trying to deal 
-with the Recommended (IMPLEMENTATION DEFINED) 
-architectural/microarchitectual events.
+vim +/ALTERNATIVE_CB +104 arch/arm64/include/asm/kvm_mmu.h
 
-Cheers,
-John
+   100	
+   101	static inline unsigned long __kern_hyp_va(unsigned long v)
+   102	{
+ > 103		asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n"
+ > 104					    kvm_update_va_mask)
+   105			     : "+r" (v));
+   106		return v;
+   107	}
+   108	
 
-> -Will Cohen
->
-> .
->
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/gzip
+Size: 37460 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/e5e2c2f1/attachment-0001.gz>
