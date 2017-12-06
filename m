@@ -1,65 +1,61 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 6 Dec 2017 12:06:01 -0800
-Subject: [PATCH v2] firmware: qcom: scm: Fix incorrect of_node_put call
- in scm_init
-In-Reply-To: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
-References: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
-Message-ID: <20171206200601.GH4283@codeaurora.org>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 06 Dec 2017 12:07:13 -0800
+Subject: [PATCH] ARM64: dts: meson-axg: add ethernet mac controller
+In-Reply-To: <20171113080155.2463-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Mon, 13 Nov 2017 16:01:55 +0800")
+References: <20171113080155.2463-1-yixun.lan@amlogic.com>
+Message-ID: <7hy3mfr572.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06, Loys Ollivier wrote:
-> When using other platform architectures, in the init of the qcom_scm
-> driver, of_node_put is called on /firmware if no qcom dt is found.
-> This results in a kernel error: Bad of_node_put() on /firmware.
-> 
-> The call to of_node_put from the qcom_scm init is unnecessary as
-> of_find_matching_node is calling it automatically.
-> 
-> Remove this of_node_put().
-> 
-> Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
-> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+Yixun Lan <yixun.lan@amlogic.com> writes:
+
+> Add DT info for the stmmac ethernet MAC which found in
+> the Amlogic's Meson-AXG SoC, also describe the ethernet
+> pinctrl & clock information here.
+>
+> This is tested in the S400 dev board which use a RTL8211F PHY,
+> and the pins connect to the 'eth_rgmii_y_pins' group.
+>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+
+This doesn't apply cleanly to mainline.  Are there some dependencies
+here that I'm not aware of?
+
+Also...
+
 > ---
+>  arch/arm64/boot/dts/amlogic/meson-axg-s400.dts |  7 ++++
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi     | 53 ++++++++++++++++++++++++++
+>  2 files changed, 60 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> index 9eb6aaee155d..7b39a9fe2b0f 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg-s400.dts
+> @@ -21,3 +21,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&ethmac {
+> +	status = "okay";
+> +	phy-mode = "rgmii";
+> +
+> +	pinctrl-0 = <&eth_rgmii_y_pins>;
+> +	pinctrl-names = "default";
+> +};
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index 65945c6c8b65..57faaa9d8013 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -157,6 +157,19 @@
+>  			#address-cells = <0>;
+>  		};
+>  
+> +		ethmac: ethernet at ff3f0000 {
+> +			compatible = "amlogic,meson-axg-dwmac", "amlogic,meson-gxbb-dwmac", "snps,dwmac";
 
-This still looks wrong. Especially if of_find_matching_node() is
-going to look for siblings of the /firmware node for the
-compatible string for scm device. Why do we check at all? Can't
-we just delete this and let of_platform_populate() take care of
-it? BTW, OP-TEE driver seems to have a similar problem.
+The new "meson-axg-dwmac" is not documented in the binding.  Can you add
+that?
 
----8<----
-
-diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
-index af4c75217ea6..440d8f796faa 100644
---- a/drivers/firmware/qcom_scm.c
-+++ b/drivers/firmware/qcom_scm.c
-@@ -626,23 +626,11 @@ static int __init qcom_scm_init(void)
- 	int ret;
- 
- 	fw_np = of_find_node_by_name(NULL, "firmware");
--
- 	if (!fw_np)
--		return -ENODEV;
--
--	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
--
--	if (!np) {
--		of_node_put(fw_np);
--		return -ENODEV;
--	}
--
--	of_node_put(np);
-+		return 0;
- 
- 	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
--
- 	of_node_put(fw_np);
--
- 	if (ret)
- 		return ret;
- 
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Kevin
