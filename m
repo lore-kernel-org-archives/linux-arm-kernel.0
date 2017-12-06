@@ -1,46 +1,51 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 6 Dec 2017 15:59:22 -0600
-Subject: [PATCH v3 04/15] dt-bindings: display: sun4i-drm: Add A83T
- pipeline
-In-Reply-To: <3762a8428aaf207e80ae86d4db2e50473576bb6d.1512486553.git-series.maxime.ripard@free-electrons.com>
-References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <3762a8428aaf207e80ae86d4db2e50473576bb6d.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20171206215922.vtsa4xqa2e5xz7cp@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 6 Dec 2017 14:04:05 -0800
+Subject: [PATCH] ARM: omap2: hide omap3_save_secure_ram on non-OMAP3 builds
+In-Reply-To: <CAK8P3a13Or8OvttqiKo8Qg2q6UJwQPg0E5TGb02LUb+p8nB3kw@mail.gmail.com>
+References: <20171206141517.670032-1-arnd@arndb.de>
+ <20171206155714.GY28152@atomide.com>
+ <a055eca0-fa24-a04a-7278-f633a12e6bae@ti.com>
+ <CAK8P3a13Or8OvttqiKo8Qg2q6UJwQPg0E5TGb02LUb+p8nB3kw@mail.gmail.com>
+Message-ID: <20171206220405.GZ28152@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 04:10:16PM +0100, Maxime Ripard wrote:
-> The A83T has two video pipelines in parallel that looks quite similar to
-> the other SoCs.
+* Arnd Bergmann <arnd@arndb.de> [171206 21:51]:
+> On Wed, Dec 6, 2017 at 5:29 PM, Dan Murphy <dmurphy@ti.com> wrote:
+> > Arnd
+> >
+> > On 12/06/2017 09:57 AM, Tony Lindgren wrote:
+> >> * Arnd Bergmann <arnd@arndb.de> [171206 14:18]:
+> >>> In configurations without CONFIG_OMAP3 but with secure RAM support,
+> >>> we now run into a link failure:
+> >>>
+> >>> arch/arm/mach-omap2/omap-secure.o: In function `omap3_save_secure_ram':
+> >>> omap-secure.c:(.text+0x130): undefined reference to `save_secure_ram_context'
+> >>>
+> >>> The omap3_save_secure_ram() function is only called from the OMAP34xx
+> >>> power management code, so we can simply hide that function in the
+> >>> appropriate #ifdef.
+> >>>
+> >>> Fixes: d09220a887f7 ("ARM: OMAP2+: Fix SRAM virt to phys translation for save_secure_ram_context")
+> >>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> >>
+> >> Thanks for fixing it, want to apply directly to ARM SoC fixes
+> >> where d09220a887f7 is now? If so:
+> >>
+> >> Acked-by: Tony Lindgren <tony@atomide.com>
+> >
+> > Found the same issue in our builds.
+> > Compile tested the patch against different TI defconfig configurations.
+> >
+> > Tested-by: Dan Murphy <dmurphy@ti.com>
 > 
-> The video planes are handled through a controller called the mixer, and the
-> video signal is then passed to the timing controller (TCON).
+> Thanks!
 > 
-> And while there is two instances of the mixers and TCONs, they have a
-> significant number of differences. The TCONs are quite easy to deal with,
-> one is supposed to generate TV (in the broader term, so including things
-> like HDMI) signals, the other one LCD (so RGB, LVDS, DSI) signals. And
-> while they are called TCON0 and TCON1 in the A83t datasheet, newer SoCs
-> call them TCON-TV and TCON-LCD, which seems more appropriate.
-> 
-> However, the mixers differ mostly by their capabilities, with some features
-> being available only in the first one, or the number of planes they expose,
-> but also through their register layout. And while the capabilities could be
-> represented as properties, the register layout differences would need to
-> express all the registers offsets as properties, which is usually quite
-> bad. Especially since documentation on that hardware block is close to
-> non-existant and we don't even have the list of all those registers in the
-> first place.
-> 
-> So let's call them mixer 0 and 1 in our compatibles, even though the name
-> is pretty bad...
-> 
-> At the moment, we only have tested the code on a board that has a single
-> display output, so we're leaving the tcon-tv and mixer1 out.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->  1 file changed, 3 insertions(+)
+> Unfortunately, I found another build problem with CONFIG_PM=n,
+> sent an updated patch now, and will apply it to the fixes branch
+> tomorrow keeping both of your Acked-by/Tested-by tags, unless
+> I hear any objections or run into a third problem.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+OK thanks works for me.
+
+Tony
