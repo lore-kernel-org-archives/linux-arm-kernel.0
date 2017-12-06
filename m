@@ -1,19 +1,21 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed,  6 Dec 2017 11:41:01 -0300
-Subject: [PATCH 22/36] perf vendor events arm64: Add ThunderX2 implementation
- defined pmu core events
+Date: Wed,  6 Dec 2017 11:41:02 -0300
+Subject: [PATCH 23/36] perf pmu: Add check for valid cpuid in
+ perf_pmu__find_map()
 In-Reply-To: <20171206144115.15097-1-acme@kernel.org>
 References: <20171206144115.15097-1-acme@kernel.org>
-Message-ID: <20171206144115.15097-23-acme@kernel.org>
+Message-ID: <20171206144115.15097-24-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-This is not a full event list, but a short list of useful events.
+On some platforms(arm/arm64) which uses cpus map to get corresponding
+cpuid string, cpuid can be NULL for PMUs other than CORE PMUs.  Adding
+check for NULL cpuid in function perf_pmu__find_map to avoid
+segmentation fault.
 
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-Acked-by: Will Deacon <will.deacon@arm.com>
 Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
 Cc: Catalin Marinas <catalin.marinas@arm.com>
 Cc: Ganapatrao Kulkarni <gklkml16@gmail.com>
@@ -23,104 +25,30 @@ Cc: Mark Rutland <mark.rutland@arm.com>
 Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Robert Richter <robert.richter@cavium.com>
 Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>
+Cc: Will Deacon <will.deacon@arm.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/20171016183222.25750-5-ganapatrao.kulkarni at cavium.com
+Link: http://lkml.kernel.org/r/20171016183222.25750-6-ganapatrao.kulkarni at cavium.com
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 ++++++++++++++++++++++
- tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
- 2 files changed, 77 insertions(+)
- create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
- create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
+ tools/perf/util/pmu.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
-new file mode 100644
-index 000000000000..2db45c40ebc7
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
-@@ -0,0 +1,62 @@
-+[
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, read",
-+        "EventCode": "0x40",
-+        "EventName": "l1d_cache_rd",
-+        "BriefDescription": "L1D cache read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache access, write ",
-+        "EventCode": "0x41",
-+        "EventName": "l1d_cache_wr",
-+        "BriefDescription": "L1D cache write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, read",
-+        "EventCode": "0x42",
-+        "EventName": "l1d_cache_refill_rd",
-+        "BriefDescription": "L1D cache refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data cache refill, write",
-+        "EventCode": "0x43",
-+        "EventName": "l1d_cache_refill_wr",
-+        "BriefDescription": "L1D refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, read",
-+        "EventCode": "0x4C",
-+        "EventName": "l1d_tlb_refill_rd",
-+        "BriefDescription": "L1D tlb refill read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data TLB refill, write",
-+        "EventCode": "0x4D",
-+        "EventName": "l1d_tlb_refill_wr",
-+        "BriefDescription": "L1D tlb refill write",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
-+        "EventCode": "0x4E",
-+        "EventName": "l1d_tlb_rd",
-+        "BriefDescription": "L1D tlb read",
-+    },
-+    {
-+        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
-+        "EventCode": "0x4F",
-+        "EventName": "l1d_tlb_wr",
-+        "BriefDescription": "L1D tlb write",
-+    },
-+    {
-+        "PublicDescription": "Bus access read",
-+        "EventCode": "0x60",
-+        "EventName": "bus_access_rd",
-+        "BriefDescription": "Bus access read",
-+   },
-+   {
-+        "PublicDescription": "Bus access write",
-+        "EventCode": "0x61",
-+        "EventName": "bus_access_wr",
-+        "BriefDescription": "Bus access write",
-+   }
-+]
-diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-new file mode 100644
-index 000000000000..219d6756134e
---- /dev/null
-+++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
-@@ -0,0 +1,15 @@
-+# Format:
-+#	MIDR,Version,JSON/file/pathname,Type
-+#
-+# where
-+#	MIDR	Processor version
-+#		Variant[23:20] and Revision [3:0] should be zero.
-+#	Version could be used to track version of of JSON file
-+#		but currently unused.
-+#	JSON/file/pathname is the path to JSON file, relative
-+#		to tools/perf/pmu-events/arch/arm64/.
-+#	Type is core, uncore etc
-+#
-+#
-+#Family-model,Version,Filename,EventType
-+0x00000000420f5160,v1,cavium,core
+diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
+index 732ff579ec65..8b7c151579c0 100644
+--- a/tools/perf/util/pmu.c
++++ b/tools/perf/util/pmu.c
+@@ -601,6 +601,12 @@ struct pmu_events_map *perf_pmu__find_map(struct perf_pmu *pmu)
+ 	char *cpuid = perf_pmu__getcpuid(pmu);
+ 	int i;
+ 
++	/* on some platforms which uses cpus map, cpuid can be NULL for
++	 * PMUs other than CORE PMUs.
++	 */
++	if (!cpuid)
++		return NULL;
++
+ 	i = 0;
+ 	for (;;) {
+ 		map = &pmu_events_map[i++];
 -- 
 2.13.6
