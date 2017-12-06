@@ -1,58 +1,94 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Wed, 6 Dec 2017 18:45:13 +0900
-Subject: [kernel-hardening][PATCH v3 1/3] arm: mm: dump: make page table
- dumping reusable
-In-Reply-To: <CAGXu5j+UHqJcxygGXk0jXYkK7AHzi1rU5SqvowfYT-OVKc6r5Q@mail.gmail.com>
-References: <20171204142553.GA3344@pjb1027-Latitude-E5410>
- <CAGXu5j+UHqJcxygGXk0jXYkK7AHzi1rU5SqvowfYT-OVKc6r5Q@mail.gmail.com>
-Message-ID: <CAErMHp9BBaJ8iNyjOS3nU+LUWNijL6FSOKSmVAYY_20nfB9nAQ@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 6 Dec 2017 09:57:15 +0000
+Subject: [PATCH] arm64: fpsimd: Prevent registers leaking from dead tasks
+In-Reply-To: <1512485802-29489-1-git-send-email-Dave.Martin@arm.com>
+References: <1512485802-29489-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <CAKv+Gu9i_XXxN08BMzV7LRFnMpsqA5TGdNTgwrihNGA3J2r7hQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> +#ifndef __ASM_PTDUMP_H
->> +#define __ASM_PTDUMP_H
->> +
->> +#ifdef CONFIG_ARM_PTDUMP_CORE
+On 5 December 2017 at 14:56, Dave Martin <Dave.Martin@arm.com> wrote:
+> Currently, loading of a task's fpsimd state into the CPU registers
+> is skipped if that task's state is already present in the registers
+> of that CPU.
 >
-> Is this #ifdef needed? I think this file is only included in dump.c
-> and ptdump_debugfs.c, both of which are only built when
-> CONFIG_ARM_PTDUMP_CORE is defined.
-
-Looking at next patch in this patch-set series ([PATCH v3 3/3] arm:
-mm: dump: add checking for writable and executable pages),
-Not only dump.c and ptdump_debugfs.c but also arch/arm/mm/init.c
-include this file (ptdump.h) to call debug_checkwx().
-mm/init.c is not built only when CONFIG_ARM_PTDUMP_CORE is defined.
-So, This #ifdef seems not be needed for this patch, but is needed for
-this patch-set series.
-
-
->> +static int ptdump_init(void)
->> +{
->> +       ptdump_initialize();
->> +       return ptdump_debugfs_register(&kernel_ptdump_info,
->> +                                       "kernel_page_tables");
+> However, the code relies on the struct fpsimd_state * (and by
+> extension struct task_struct *) to unambiguously identify a task.
 >
-> This changes the return value of ptdump_init. This should do similar
-> to what was done before:
+> There is a particular case in which this doesn't work reliably:
+> when a task exits, its task_struct may be recycled to describe a
+> new task.
 >
-> return ptdump_debugfs_register(&kernel_ptdump_info,
-> "kernel_page_tables") ? 0 : -ENOMEM;
+> Consider the following scenario:
+>
+>  1) Task P loads its fpsimd state onto cpu C.
+>         per_cpu(fpsimd_last_state, C) := P;
+>         P->thread.fpsimd_state.cpu := C;
+>
+>  2) Task X is scheduled onto C and loads its fpsimd state on C.
+>         per_cpu(fpsimd_last_state, C) := X;
+>         X->thread.fpsimd_state.cpu := C;
+>
+>  3) X exits, causing X's task_struct to be freed.
+>
+>  4) P forks a new child T, which obtains X's recycled task_struct.
+>         T == X.
+>         T->thread.fpsimd_state.cpu == C (inherited from P).
+>
+>  5) T is scheduled on C.
+>         T's fpsimd state is not loaded, because
+>         per_cpu(fpsimd_last_state, C) == T (== X) &&
+>         T->thread.fpsimd_state.cpu == C.
+>
+>         (This is the check performed by fpsimd_thread_switch().)
+>
+> So, T gets X's registers because the last registers loaded onto C
+> were those of X, in (2).
+>
+> This patch fixes the problem by ensuring that the sched-in check
+> fails in (5): fpsimd_flush_task_state(T) is called when T is
+> forked, so that T->thread.fpsimd_state.cpu == C cannot be true.
+> This relies on the fact that T is not schedulable until after
+> copy_thread() completes.
+>
+> Once T's fpsimd state has been loaded on some CPU C there may still
+> be other cpus D for which per_cpu(fpsimd_last_state, D) ==
+> &X->thread.fpsimd_state.  But D is necessarily != C in this case,
+> and the check in (5) must fail.
+>
+> An alternative fix would be to do refcounting on task_struct.  This
+> would result in each CPU holding a reference to the last task whose
+> fpsimd state was loaded there.  It's not clear whether this is
+> preferable, and it involves higher overhead than the fix proposed
+> in this patch.  It would also moves all the task_struct freeing
 
+move
 
-ptdump_debugfs_register() already returns what you think.
+> work into the context switch critical section, or otherwise some
+> deferred cleanup mechanism would need to be introduced, neither of
+> which seems obviously justified.
+>
+> Fixes: 005f78cd8849 ("arm64: defer reloading a task's FPSIMD state to userland resume")
+> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/kernel/process.c | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+> index b2adcce..5387d15 100644
+> --- a/arch/arm64/kernel/process.c
+> +++ b/arch/arm64/kernel/process.c
+> @@ -313,6 +313,7 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
+>          */
+>         clear_tsk_thread_flag(p, TIF_SVE);
+>         p->thread.sve_state = NULL;
+> +       fpsimd_flush_task_state(p);
+>
+>         if (likely(!(p->flags & PF_KTHREAD))) {
+>                 *childregs = *current_pt_regs();
+> --
+> 2.1.4
+>
 
->> +int ptdump_debugfs_register(struct ptdump_info *info, const char *name)
->> +{
->> +       struct dentry *pe;
->> +
->> +       pe = debugfs_create_file(name, 0400, NULL, info, &ptdump_fops);
->> +       return pe ? 0 : -ENOMEM;
->> +
->> +}
-
-So "return ptdump_debugfs_register(~~)" is fine.
-
-
-Thanks.
-Jinbum Park.
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
