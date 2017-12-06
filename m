@@ -1,75 +1,44 @@
-From: joel@jms.id.au (Joel Stanley)
-Date: Wed, 6 Dec 2017 18:26:29 +1030
-Subject: [PATCH v6 0/5] clk: Add Aspeed clock driver
-In-Reply-To: <20171128071908.12279-1-joel@jms.id.au>
-References: <20171128071908.12279-1-joel@jms.id.au>
-Message-ID: <CACPK8XcQ_ZcgPK1PwEwCuWHQ_j5qS+PejRVhr2rYuH_Nn_nPLQ@mail.gmail.com>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 6 Dec 2017 08:34:59 +0000
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <20171205172748.GI3070@tassilo.jf.intel.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+ <20171205172748.GI3070@tassilo.jf.intel.com>
+Message-ID: <7e209e42-362e-7767-2b94-62239c62e70d@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello clk maintainers,
+On 05/12/2017 17:27, Andi Kleen wrote:
+> On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
+>> For some architectures (like arm64), there are architecture-
+>> defined recommended events. Vendors may not be obliged to
+>> follow the recommendation and may implement their own pmu
+>> event for a specific event cod
+>
+> I would just duplicate the architected events into the different
+> vendor files.  Then you wouldn't need all this mess.
+>
 
-Has anyone had a chance to review these patches?
+This is what we were originally doing:
+https://patchwork.kernel.org/patch/10010859/
 
-On Tue, Nov 28, 2017 at 5:49 PM, Joel Stanley <joel@jms.id.au> wrote:
-> This driver supports the ast2500, ast2400 (and derivative) BMC SoCs from
-> Aspeed.
+But then we thought that we could avoid duplicating all these events for 
+every platform from every vendor. Most, if not all, vendors will 
+implement the events as recommended for any platform, so much 
+unnecessary duplication.
+
+cheers,
+John
+
+
+> -Andi
 >
-> This is v6. See patches for detailed changelogs.
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
 >
-> v6: Added reviewed-bys
-> v5: Address review from Andrew
-> v4: Address review from Andrew and Stephen.
-> v3: Address review from Andrew and has seen more testing on hardware
-> v2: split the driver out into a series of patches to make them easier to
-> review.
->
-> All of the important clocks are supported, with most non-essential ones
-> also implemented where information is available. I am working with
-> Aspeed to clear up some of the missing information, including the
-> missing parent-sibling relationships.
->
-> We need to know the rate of the apb clock in order to correctly program
-> the clocksource driver, so the apb and it's parents are created in the
-> CLK_OF_DECLARE_DRIVER callback.
->
-> The rest of the clocks are created at normal driver probe time. I
-> followed the Gemini driver's lead with using the regmap where I could,
-> but also having a pointer to the base address for use with the common
-> clock callbacks.
->
-> The driver borrows from the clk_gate common clock infrastructure, but modifies
-> it in order to support the clock gate and reset pair that most of the clocks
-> have. This pair must be reset-ungated-released, with appropriate delays,
-> according to the datasheet.
->
-> The first patch introduces the core clock registration parts, and describes
-> the clocks. The second creates the core clocks, giving the system enough to
-> boot (but without uart). Next come the non-core clocks, and finally the reset
-> controller that is used for the few cocks that don't have a gate to go with their
-> reset pair.
->
-> Please review!
->
-> Cheers,
->
-> Joel
->
-> Joel Stanley (5):
->   clk: Add clock driver for ASPEED BMC SoCs
->   clk: aspeed: Register core clocks
->   clk: aspeed: Add platform driver and register PLLs
->   clk: aspeed: Register gated clocks
->   clk: aspeed: Add reset controller
->
->  drivers/clk/Kconfig                      |  12 +
->  drivers/clk/Makefile                     |   1 +
->  drivers/clk/clk-aspeed.c                 | 657 +++++++++++++++++++++++++++++++
->  include/dt-bindings/clock/aspeed-clock.h |  54 +++
->  4 files changed, 724 insertions(+)
->  create mode 100644 drivers/clk/clk-aspeed.c
->  create mode 100644 include/dt-bindings/clock/aspeed-clock.h
->
-> --
-> 2.14.1
+> .
 >
