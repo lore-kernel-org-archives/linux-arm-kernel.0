@@ -1,51 +1,77 @@
-From: wcohen@redhat.com (William Cohen)
-Date: Wed, 6 Dec 2017 11:42:38 -0500
-Subject: [RFC PATCH 0/5] perf events patches for improved ARM64 support
-In-Reply-To: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
-Message-ID: <12034446-ccc9-9a88-6b2c-3318216f4817@redhat.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed,  6 Dec 2017 16:45:46 +0000
+Subject: [PATCH 2/3] arm64: fpsimd: Abstract out binding of task's fpsimd
+ context to the cpu.
+In-Reply-To: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
+References: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1512578747-4554-3-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2017 11:13 AM, John Garry wrote:
-> This patchset adds support for some perf events features,
-> targeted at ARM64, implemented in a generic fashion.
-> 
-> The two main features are as follows:
-> - support for arch/vendor/platform pmu events directory structure
-> - support for parsing architecture recommended pmu events
-> 
-> On the back of these, the Cavium ThunderX2 and HiSilicon hip08
-> JSONs are relocated/added.
-> 
-> TODO: 
-> 	- Documentation needs to be updated for recommended
-> 	events format in the JSON
-> 	- tidy up patches a bit
-> 
-> John Garry (5):
->   perf jevents: add support for pmu events vendor subdirectory
->   perf jevents: add support for arch recommended events
->   perf vendor events arm64: add armv8 recommended events JSON
->   perf vendor events arm64: relocate thunderx2 JSON
->   perf vendor events arm64: add HiSilicon hip08 JSON
-> 
->  .../pmu-events/arch/arm64/armv8-recommended.json   | 452 +++++++++++++++++++++
->  .../arch/arm64/cavium/thunderx2-imp-def.json       |  62 ---
->  .../arch/arm64/cavium/thunderx2/core-imp-def.json  |  32 ++
->  .../arch/arm64/hisilicon/hip08/core-imp-def.json   | 122 ++++++
->  tools/perf/pmu-events/arch/arm64/mapfile.csv       |   3 +-
->  tools/perf/pmu-events/jevents.c                    | 272 ++++++++++++-
->  6 files changed, 859 insertions(+), 84 deletions(-)
->  create mode 100644 tools/perf/pmu-events/arch/arm64/armv8-recommended.json
->  delete mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
->  create mode 100644 tools/perf/pmu-events/arch/arm64/hisilicon/hip08/core-imp-def.json
-> 
+There is currently some duplicate logic to associate current's
+FPSIMD context with the cpu when loading FPSIMD state into the cpu
+regs.
 
+Subsequent patches will update that logic, so in order to ensure it
+only needs to be done in one place, this patch factors the relevant
+code out into a new function fpsimd_bind_to_cpu().
 
-Hi,
+Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm64/kernel/fpsimd.c | 25 +++++++++++++++----------
+ 1 file changed, 15 insertions(+), 10 deletions(-)
 
-How is this code dealing with the possible different configurations within the aach64 architecture?  For example the Cortex-A53 implementations may exclude the L2 cache and not have L2 cache events implemented?  Is there some way that perf could make use of the PMCEID0 and PMCEID1 register information to accurately get the subset of events the processor supports?  Using this information could eliminate a lot of busy work adding implementation specific descriptions due to slight implementation differences.
-
--Will Cohen
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 143b3e7..007140b 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -992,6 +992,18 @@ void fpsimd_signal_preserve_current_state(void)
+ }
+ 
+ /*
++ * Associate current's FPSIMD context with this cpu
++ * Preemption must be disabled when calling this function.
++ */
++static void fpsimd_bind_to_cpu(void)
++{
++	struct fpsimd_state *st = &current->thread.fpsimd_state;
++
++	__this_cpu_write(fpsimd_last_state, st);
++	st->cpu = smp_processor_id();
++}
++
++/*
+  * Load the userland FPSIMD state of 'current' from memory, but only if the
+  * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
+  * state of 'current'
+@@ -1004,11 +1016,8 @@ void fpsimd_restore_current_state(void)
+ 	local_bh_disable();
+ 
+ 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+-		struct fpsimd_state *st = &current->thread.fpsimd_state;
+-
+ 		task_fpsimd_load();
+-		__this_cpu_write(fpsimd_last_state, st);
+-		st->cpu = smp_processor_id();
++		fpsimd_bind_to_cpu();
+ 	}
+ 
+ 	local_bh_enable();
+@@ -1032,12 +1041,8 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
+ 	}
+ 	task_fpsimd_load();
+ 
+-	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
+-		struct fpsimd_state *st = &current->thread.fpsimd_state;
+-
+-		__this_cpu_write(fpsimd_last_state, st);
+-		st->cpu = smp_processor_id();
+-	}
++	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
++		fpsimd_bind_to_cpu();
+ 
+ 	local_bh_enable();
+ }
+-- 
+2.1.4
