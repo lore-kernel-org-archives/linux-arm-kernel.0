@@ -1,35 +1,37 @@
-From: sky@genki.is (Genki Sky)
-Date: Tue, 05 Dec 2017 19:09:53 -0500
-Subject: [PATCH v3 0/3] staging: vc04_services: Fix small style issues
-Message-ID: <cover.1512518762.git.sky@genki.is>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed,  6 Dec 2017 01:14:46 +0100
+Subject: [PATCH] arm64: dts: rockchip: limit rk3328-rock64 gmac speed to
+ 100MBit for now
+Message-ID: <20171206001446.26810-1-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+It looks like either the current kernel or the hardware has reliability
+issues when the gmac is actually running at 1GBit. In my test-case
+it is not able to boot on a nfsroot at this speed, as the system
+will always lose the connection to the nfs-server during boot, before
+reaching any login prompt and not recover from this.
 
-This is v3 of a patch series to fix some checkpatch.pl warnings in
-drivers/staging/vc04_services/bcm2835-camera/*
+So until this is solved, limit the speed to 100MBit as with this the
+nfsroot survives stress tests like an apt-get upgrade without problems.
 
-Changes from v2 [2]:
-- Provide more detailed description in commit messages
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm64/boot/dts/rockchip/rk3328-rock64.dts | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Changes from v1 [1]:
-- Split single patch into multiple patches
-- Remove reference to eudyptula in commit message
-
-[1]: https://lkml.kernel.org/r/30cc7b48def470f1bec8d8d255044f4f220531ee.1512368114.git.sky at genki.is
-[2]: https://lkml.kernel.org/r/cover.1512441073.git.sky at genki.is
-
-[ aside: this is for task-10 of http://eudyptula-challenge.org/ ]
-
-Genki Sky (3):
-  staging: vc04_services: Join multiline dereferences
-  staging: vc04_services: Unsplit user-visible strings
-  staging: vc04_services: Use __func__
-
- .../vc04_services/bcm2835-camera/bcm2835-camera.c  | 23 +++++++++-------------
- .../vc04_services/bcm2835-camera/mmal-vchiq.c      |  7 +++----
- 2 files changed, 12 insertions(+), 18 deletions(-)
-
---
-2.15.1
+diff --git a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+index d4f80786e7c2..3890468678ce 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
++++ b/arch/arm64/boot/dts/rockchip/rk3328-rock64.dts
+@@ -132,6 +132,8 @@
+ 	assigned-clocks = <&cru SCLK_MAC2IO>, <&cru SCLK_MAC2IO_EXT>;
+ 	assigned-clock-parents = <&gmac_clkin>, <&gmac_clkin>;
+ 	clock_in_out = "input";
++	/* shows instability at 1GBit right now */
++	max-speed = <100>;
+ 	phy-supply = <&vcc_io>;
+ 	phy-mode = "rgmii";
+ 	pinctrl-names = "default";
+-- 
+2.14.2
