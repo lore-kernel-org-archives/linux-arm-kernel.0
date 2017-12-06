@@ -1,80 +1,172 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:33 +0000
-Subject: [PATCH v3 14/20] arm64: erratum: Work around Falkor erratum #E1003 in
- trampoline code
+Date: Wed,  6 Dec 2017 12:35:29 +0000
+Subject: [PATCH v3 10/20] arm64: entry: Add exception trampoline page for
+ exceptions from EL0
 In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
 References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512563739-25239-15-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-11-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We rely on an atomic swizzling of TTBR1 when transitioning from the entry
-trampoline to the kernel proper on an exception. We can't rely on this
-atomicity in the face of Falkor erratum #E1003, so on affected cores we
-can issue a TLB invalidation to invalidate the walk cache prior to
-jumping into the kernel. There is still the possibility of a TLB conflict
-here due to conflicting walk cache entries prior to the invalidation, but
-this doesn't appear to be the case on these CPUs in practice.
+To allow unmapping of the kernel whilst running at EL0, we need to
+point the exception vectors at an entry trampoline that can map/unmap
+the kernel on entry/exit respectively.
+
+This patch adds the trampoline page, although it is not yet plugged
+into the vector table and is therefore unused.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig        | 17 +++++------------
- arch/arm64/kernel/entry.S | 12 ++++++++++++
- 2 files changed, 17 insertions(+), 12 deletions(-)
+ arch/arm64/kernel/entry.S       | 86 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/vmlinux.lds.S | 17 ++++++++
+ 2 files changed, 103 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a93339f5178f..fdcc7b9bb15d 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -522,20 +522,13 @@ config CAVIUM_ERRATUM_30115
- config QCOM_FALKOR_ERRATUM_1003
- 	bool "Falkor E1003: Incorrect translation due to ASID change"
- 	default y
--	select ARM64_PAN if ARM64_SW_TTBR0_PAN
- 	help
- 	  On Falkor v1, an incorrect ASID may be cached in the TLB when ASID
--	  and BADDR are changed together in TTBRx_EL1. The workaround for this
--	  issue is to use a reserved ASID in cpu_do_switch_mm() before
--	  switching to the new ASID. Saying Y here selects ARM64_PAN if
--	  ARM64_SW_TTBR0_PAN is selected. This is done because implementing and
--	  maintaining the E1003 workaround in the software PAN emulation code
--	  would be an unnecessary complication. The affected Falkor v1 CPU
--	  implements ARMv8.1 hardware PAN support and using hardware PAN
--	  support versus software PAN emulation is mutually exclusive at
--	  runtime.
--
--	  If unsure, say Y.
-+	  and BADDR are changed together in TTBRx_EL1. Since we keep the ASID
-+	  in TTBR1_EL1, this situation only occurs in the entry trampoline and
-+	  then only for entries in the walk cache, since the leaf translation
-+	  is unchanged. Work around the erratum by invalidating the walk cache
-+	  entries for the trampoline before entering the kernel proper.
- 
- config QCOM_FALKOR_ERRATUM_1009
- 	bool "Falkor E1009: Prematurely complete a DSB after a TLBI"
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 39e3873b8d5a..ce56592b5f70 100644
+index d454d8ed45e4..716b5ef42e29 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -989,6 +989,18 @@ __ni_sys_trace:
- 	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
- 	bic	\tmp, \tmp, #USER_ASID_FLAG
- 	msr	ttbr1_el1, \tmp
-+#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
-+alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
-+	/* ASID already in \tmp[63:48] */
-+	movk	\tmp, #:abs_g2_nc:(TRAMP_VALIAS >> 12)
-+	movk	\tmp, #:abs_g1_nc:(TRAMP_VALIAS >> 12)
-+	/* 2MB boundary containing the vectors, so we nobble the walk cache */
-+	movk	\tmp, #:abs_g0_nc:((TRAMP_VALIAS & ~(SZ_2M - 1)) >> 12)
-+	isb
-+	tlbi	vae1, \tmp
-+	dsb	nsh
-+alternative_else_nop_endif
-+#endif /* CONFIG_QCOM_FALKOR_ERRATUM_1003 */
- 	.endm
+@@ -28,6 +28,8 @@
+ #include <asm/errno.h>
+ #include <asm/esr.h>
+ #include <asm/irq.h>
++#include <asm/memory.h>
++#include <asm/mmu.h>
+ #include <asm/processor.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+@@ -943,6 +945,90 @@ __ni_sys_trace:
  
- 	.macro tramp_unmap_kernel, tmp
+ 	.popsection				// .entry.text
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++/*
++ * Exception vectors trampoline.
++ */
++	.pushsection ".entry.tramp.text", "ax"
++
++	.macro tramp_map_kernel, tmp
++	mrs	\tmp, ttbr1_el1
++	sub	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	bic	\tmp, \tmp, #USER_ASID_FLAG
++	msr	ttbr1_el1, \tmp
++	.endm
++
++	.macro tramp_unmap_kernel, tmp
++	mrs	\tmp, ttbr1_el1
++	add	\tmp, \tmp, #(SWAPPER_DIR_SIZE + RESERVED_TTBR0_SIZE)
++	orr	\tmp, \tmp, #USER_ASID_FLAG
++	msr	ttbr1_el1, \tmp
++	/*
++	 * We avoid running the post_ttbr_update_workaround here because the
++	 * user and kernel ASIDs don't have conflicting mappings, so any
++	 * "blessing" as described in:
++	 *
++	 *   http://lkml.kernel.org/r/56BB848A.6060603 at caviumnetworks.com
++	 *
++	 * will not hurt correctness. Whilst this may partially defeat the
++	 * point of using split ASIDs in the first place, it avoids
++	 * the hit of invalidating the entire I-cache on every return to
++	 * userspace.
++	 */
++	.endm
++
++	.macro tramp_ventry, regsize = 64
++	.align	7
++1:
++	.if	\regsize == 64
++	msr	tpidrro_el0, x30	// Restored in kernel_ventry
++	.endif
++	tramp_map_kernel	x30
++	ldr	x30, =vectors
++	prfm	plil1strm, [x30, #(1b - tramp_vectors)]
++	msr	vbar_el1, x30
++	add	x30, x30, #(1b - tramp_vectors)
++	isb
++	br	x30
++	.endm
++
++	.macro tramp_exit, regsize = 64
++	adr	x30, tramp_vectors
++	msr	vbar_el1, x30
++	tramp_unmap_kernel	x30
++	.if	\regsize == 64
++	mrs	x30, far_el1
++	.endif
++	eret
++	.endm
++
++	.align	11
++ENTRY(tramp_vectors)
++	.space	0x400
++
++	tramp_ventry
++	tramp_ventry
++	tramp_ventry
++	tramp_ventry
++
++	tramp_ventry	32
++	tramp_ventry	32
++	tramp_ventry	32
++	tramp_ventry	32
++END(tramp_vectors)
++
++ENTRY(tramp_exit_native)
++	tramp_exit
++END(tramp_exit_native)
++
++ENTRY(tramp_exit_compat)
++	tramp_exit	32
++END(tramp_exit_compat)
++
++	.ltorg
++	.popsection				// .entry.tramp.text
++#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
++
+ /*
+  * Special system call wrappers.
+  */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 7da3e5c366a0..6b4260f22aab 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -57,6 +57,17 @@ jiffies = jiffies_64;
+ #define HIBERNATE_TEXT
+ #endif
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++#define TRAMP_TEXT					\
++	. = ALIGN(PAGE_SIZE);				\
++	VMLINUX_SYMBOL(__entry_tramp_text_start) = .;	\
++	*(.entry.tramp.text)				\
++	. = ALIGN(PAGE_SIZE);				\
++	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
++#else
++#define TRAMP_TEXT
++#endif
++
+ /*
+  * The size of the PE/COFF section that covers the kernel image, which
+  * runs from stext to _edata, must be a round multiple of the PE/COFF
+@@ -113,6 +124,7 @@ SECTIONS
+ 			HYPERVISOR_TEXT
+ 			IDMAP_TEXT
+ 			HIBERNATE_TEXT
++			TRAMP_TEXT
+ 			*(.fixup)
+ 			*(.gnu.warning)
+ 		. = ALIGN(16);
+@@ -214,6 +226,11 @@ SECTIONS
+ 	. += RESERVED_TTBR0_SIZE;
+ #endif
+ 
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	tramp_pg_dir = .;
++	. += PAGE_SIZE;
++#endif
++
+ 	__pecoff_data_size = ABSOLUTE(. - __initdata_begin);
+ 	_end = .;
+ 
 -- 
 2.1.4
