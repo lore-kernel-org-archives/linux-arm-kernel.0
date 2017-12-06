@@ -1,264 +1,65 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Wed, 6 Dec 2017 19:26:22 +0900
-Subject: [kernel-hardening][PATCH v4 3/3] arm: mm: dump: add checking for
- writable and executable pages
-Message-ID: <20171206102622.GA7069@pjb1027-Latitude-E5410>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed,  6 Dec 2017 11:22:03 +0100
+Subject: [PATCH 08/61] ARM: dts: r8a7743: Add DU support
+In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
+References: <cover.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <0d975e29a51011c244d41e16a59a26fddf6ea281.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Page mappings with full RWX permissions are a security risk.
-x86, arm64 has an option to walk the page tables
-and dump any bad pages.
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-(1404d6f13e47
-("arm64: dump: Add checking for writable and exectuable pages"))
-Add a similar implementation for arm.
+Add du node to r8a7743 SoC DT. Boards that want to enable the DU
+need to specify the output topology.
 
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
-v4: Add boolean for ro_bit, nx_bit into prot_bits
-	to point ro_bit, nx_bit in pg_level.
-	Remove unnecessary %p in WARN_ONCE().
----
- arch/arm/Kconfig.debug        | 27 ++++++++++++++++++++
- arch/arm/include/asm/ptdump.h |  8 ++++++
- arch/arm/mm/dump.c            | 58 ++++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mm/init.c            |  2 ++
- 4 files changed, 94 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7743.dtsi | 30 ++++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e7b94db..78a6470 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -20,6 +20,33 @@ config ARM_PTDUMP_DEBUGFS
- 	  kernel.
- 	  If in doubt, say "N"
+diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
+index f647b86c0205..112a72baa7a4 100644
+--- a/arch/arm/boot/dts/r8a7743.dtsi
++++ b/arch/arm/boot/dts/r8a7743.dtsi
+@@ -1034,6 +1034,36 @@
+ 			};
+ 		};
  
-+config DEBUG_WX
-+	bool "Warn on W+X mappings at boot"
-+	select ARM_PTDUMP_CORE
-+	---help---
-+		Generate a warning if any W+X mappings are found at boot.
++		du: display at feb00000 {
++			compatible = "renesas,du-r8a7743";
++			reg = <0 0xfeb00000 0 0x40000>,
++			      <0 0xfeb90000 0 0x1c>;
++			reg-names = "du", "lvds.0";
++			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 268 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 724>,
++				 <&cpg CPG_MOD 723>,
++				 <&cpg CPG_MOD 726>;
++			clock-names = "du.0", "du.1", "lvds.0";
++			status = "disabled";
 +
-+		This is useful for discovering cases where the kernel is leaving
-+		W+X mappings after applying NX, as such mappings are a security risk.
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
 +
-+		Look for a message in dmesg output like this:
++				port at 0 {
++					reg = <0>;
++					du_out_rgb: endpoint {
++					};
++				};
++				port at 1 {
++					reg = <1>;
++					du_out_lvds0: endpoint {
++					};
++				};
++			};
++		};
 +
-+			arm/mm: Checked W+X mappings: passed, no W+X pages found.
-+
-+		or like this, if the check failed:
-+
-+			arm/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
-+
-+		Note that even if the check fails, your kernel is possibly
-+		still fine, as W+X mappings are not a security hole in
-+		themselves, what they do is that they make the exploitation
-+		of other unfixed kernel bugs easier.
-+
-+		There is no runtime or memory usage effect of this option
-+		once the kernel has booted up - it's a one time check.
-+
-+		If in doubt, say "Y".
-+
- # RMK wants arm kernels compiled with frame pointers or stack unwinding.
- # If you know what you are doing and are willing to live without stack
- # traces, you can get a slightly smaller kernel by setting this option to
-diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
-index 3a6c0b7..b6a0162 100644
---- a/arch/arm/include/asm/ptdump.h
-+++ b/arch/arm/include/asm/ptdump.h
-@@ -43,6 +43,14 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
- }
- #endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
- 
-+void ptdump_check_wx(void);
-+
- #endif /* CONFIG_ARM_PTDUMP_CORE */
- 
-+#ifdef CONFIG_DEBUG_WX
-+#define debug_checkwx() ptdump_check_wx()
-+#else
-+#define debug_checkwx() do { } while (0)
-+#endif
-+
- #endif /* __ASM_PTDUMP_H */
-diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index 43a2bee..084779c 100644
---- a/arch/arm/mm/dump.c
-+++ b/arch/arm/mm/dump.c
-@@ -52,6 +52,8 @@ struct pg_state {
- 	unsigned long start_address;
- 	unsigned level;
- 	u64 current_prot;
-+	bool check_wx;
-+	unsigned long wx_pages;
- 	const char *current_domain;
- };
- 
-@@ -60,6 +62,8 @@ struct prot_bits {
- 	u64		val;
- 	const char	*set;
- 	const char	*clear;
-+	bool		ro_bit;
-+	bool		nx_bit;
- };
- 
- static const struct prot_bits pte_bits[] = {
-@@ -73,11 +77,13 @@ struct prot_bits {
- 		.val	= L_PTE_RDONLY,
- 		.set	= "ro",
- 		.clear	= "RW",
-+		.ro_bit	= true,
- 	}, {
- 		.mask	= L_PTE_XN,
- 		.val	= L_PTE_XN,
- 		.set	= "NX",
- 		.clear	= "x ",
-+		.nx_bit	= true,
- 	}, {
- 		.mask	= L_PTE_SHARED,
- 		.val	= L_PTE_SHARED,
-@@ -141,11 +147,13 @@ struct prot_bits {
- 		.val	= L_PMD_SECT_RDONLY | PMD_SECT_AP2,
- 		.set	= "ro",
- 		.clear	= "RW",
-+		.ro_bit	= true,
- #elif __LINUX_ARM_ARCH__ >= 6
- 	{
- 		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val	= PMD_SECT_APX | PMD_SECT_AP_WRITE,
- 		.set	= "    ro",
-+		.ro_bit	= true,
- 	}, {
- 		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val	= PMD_SECT_AP_WRITE,
-@@ -164,6 +172,7 @@ struct prot_bits {
- 		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val    = 0,
- 		.set    = "    ro",
-+		.ro_bit	= true,
- 	}, {
- 		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val    = PMD_SECT_AP_WRITE,
-@@ -182,6 +191,7 @@ struct prot_bits {
- 		.val	= PMD_SECT_XN,
- 		.set	= "NX",
- 		.clear	= "x ",
-+		.nx_bit	= true,
- 	}, {
- 		.mask	= PMD_SECT_S,
- 		.val	= PMD_SECT_S,
-@@ -194,6 +204,8 @@ struct pg_level {
- 	const struct prot_bits *bits;
- 	size_t num;
- 	u64 mask;
-+	const struct prot_bits *ro_bit;
-+	const struct prot_bits *nx_bit;
- };
- 
- static struct pg_level pg_level[] = {
-@@ -226,6 +238,23 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t
- 	}
- }
- 
-+static void note_prot_wx(struct pg_state *st, unsigned long addr)
-+{
-+	if (!st->check_wx)
-+		return;
-+	if ((st->current_prot & pg_level[st->level].ro_bit->mask) ==
-+				pg_level[st->level].ro_bit->val)
-+		return;
-+	if ((st->current_prot & pg_level[st->level].nx_bit->mask) ==
-+				pg_level[st->level].nx_bit->val)
-+		return;
-+
-+	WARN_ONCE(1, "arm/mm: Found insecure W+X mapping at address %pS\n",
-+			(void *)st->start_address);
-+
-+	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
-+}
-+
- static void note_page(struct pg_state *st, unsigned long addr,
- 		      unsigned int level, u64 val, const char *domain)
- {
-@@ -244,6 +273,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 		unsigned long delta;
- 
- 		if (st->current_prot) {
-+			note_prot_wx(st, addr);
- 			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
- 				   st->start_address, addr);
- 
-@@ -367,6 +397,7 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
- 	struct pg_state st = {
- 		.seq = m,
- 		.marker = info->markers,
-+		.check_wx = false,
- 	};
- 
- 	walk_pgd(&st, info->mm, info->base_addr);
-@@ -379,8 +410,13 @@ static void ptdump_initialize(void)
- 
- 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
- 		if (pg_level[i].bits)
--			for (j = 0; j < pg_level[i].num; j++)
-+			for (j = 0; j < pg_level[i].num; j++) {
- 				pg_level[i].mask |= pg_level[i].bits[j].mask;
-+				if (pg_level[i].bits[j].ro_bit)
-+					pg_level[i].ro_bit = &pg_level[i].bits[j];
-+				if (pg_level[i].bits[j].nx_bit)
-+					pg_level[i].nx_bit = &pg_level[i].bits[j];
-+			}
- 
- 	address_markers[2].start_address = VMALLOC_START;
- }
-@@ -391,6 +427,26 @@ static void ptdump_initialize(void)
- 	.base_addr = 0,
- };
- 
-+void ptdump_check_wx(void)
-+{
-+	struct pg_state st = {
-+		.seq = NULL,
-+		.marker = (struct addr_marker[]) {
-+			{ 0, NULL},
-+			{ -1, NULL},
-+		},
-+		.check_wx = true,
-+	};
-+
-+	walk_pgd(&st, &init_mm, 0);
-+	note_page(&st, 0, 0, 0, NULL);
-+	if (st.wx_pages)
-+		pr_warn("Checked W+X mappings: FAILED, %lu W+X pages found\n",
-+			st.wx_pages);
-+	else
-+		pr_info("Checked W+X mappings: passed, no W+X pages found\n");
-+}
-+
- static int ptdump_init(void)
- {
- 	ptdump_initialize();
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index a1f11a7..bd6f451 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -36,6 +36,7 @@
- #include <asm/system_info.h>
- #include <asm/tlb.h>
- #include <asm/fixmap.h>
-+#include <asm/ptdump.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -738,6 +739,7 @@ static int __mark_rodata_ro(void *unused)
- void mark_rodata_ro(void)
- {
- 	stop_machine(__mark_rodata_ro, NULL, NULL);
-+	debug_checkwx();
- }
- 
- void set_kernel_text_rw(void)
+ 		pci0: pci at ee090000 {
+ 			compatible = "renesas,pci-r8a7743",
+ 				     "renesas,pci-rcar-gen2";
 -- 
-1.9.1
+2.11.0
