@@ -1,105 +1,64 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 06 Dec 2017 19:04:06 +0000
-Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
- categorization
-In-Reply-To: <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
-References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
- <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
- <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
-Message-ID: <5A283F26.3020507@arm.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 06 Dec 2017 11:11:59 -0800
+Subject: [PATCH v3 3/3] arm64: dts: meson-axg: add clock DT info for Meson
+ AXG SoC
+In-Reply-To: <20171206010055.GE4283@codeaurora.org> (Stephen Boyd's message of
+ "Tue, 5 Dec 2017 17:00:55 -0800")
+References: <20171128125330.363-1-yixun.lan@amlogic.com>
+ <20171128125330.363-4-yixun.lan@amlogic.com>
+ <20171129193536.GB19419@codeaurora.org>
+ <8353c264-3253-0268-91fc-8d42fbe82611@amlogic.com>
+ <20171201163437.GE19419@codeaurora.org>
+ <1512147583.12869.10.camel@baylibre.com>
+ <20171206010055.GE4283@codeaurora.org>
+Message-ID: <7htvx3smbk.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi gengdongjiu,
+Stephen Boyd <sboyd@codeaurora.org> writes:
 
-On 06/12/17 10:26, gengdongjiu wrote:
-> On 2017/11/15 0:00, James Morse wrote:
->>> +		 * error has not been propagated
->>> +		 */
->>> +		run->exit_reason = KVM_EXIT_EXCEPTION;
->>> +		run->ex.exception = ESR_ELx_EC_SERROR;
->>> +		run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
->>> +		return 0;
->> We should not pass RAS notifications to user space. The kernel either handles
->> them, or it panics(). User space shouldn't even know if the kernel supports RAS
->> until it gets an MCEERR signal.
->>
->> You're making your firmware-first notification an EL3->EL0 signal, bypassing the OS.
->>
->> If we get a RAS SError and there are no CPER records or values in the ERR nodes,
->> we should panic as it looks like the CPU/firmware is broken. (spurious RAS errors)
+> On 12/01, Jerome Brunet wrote:
+>> On Fri, 2017-12-01 at 08:34 -0800, Stephen Boyd wrote:
+>> > On 11/30, Yixun Lan wrote:
+>> > > Hi Stephen
+>> > > 
+>> > > On 11/30/17 03:35, Stephen Boyd wrote:
+>> > > > 
+>> > > > Maybe just call the node "bus at ff63c000"?
+>> > > > 
+>> > > 
+>> > > isn't this just a name? what's the benefits to change?
+>> > > personally, I tend to keep it this way, because it's better map to the
+>> > > data sheet
+>> > > 
+>> > > we also has 'aobus', 'cbus' scattered there..
+>> > 
+>> > Per the ePAPR node names are supposed to be generic, like disk,
+>> > cpu, display-controller, gpu, etc. I've never heard of a hiubus,
+>> > so probably it's some vendor specific thing? We have the phandle
+>> > anyway so it's not like we're losing much information here.
+>> 
+>> Stephen, there is a lot of busses on platform. We can't just call them all
+>> 'bus'.
+>> I don't get the problem with this name.
+>> We are re-using the name from the datasheet here, no fancy invention. It seems
+>> to be quite common. 
+>> 
+>
+> Ok. I'm not the maintainer of the DTS so no worries from me. I'm
+> just pointing out that the ePAPR says that node names should be
+> generic, and 'hiubus' doesn't sound generic to me. If it matches
+> some datasheet then I suppose that's good, but probably that sort
+> of distinction should have gone into the compatible string
+> instead of the node name.
 
-> do you think whether we need to set the guest ESR by user space?  if need, I need to
-> notify user space that there is a SError happen and need to set ESR for guest in some place of
-> KVM.
+Stephen is right, the node-name should be generic (e.g. "bus") but the
+label can (should) be more SoC-specific, so it should look like:
 
-I think you are still coming from a world where user-space gets raw RAS
-notifications via KVM. This should not happen because the notification method is
-private to firmware and the kernel. KVM is just in the way when a guest is running.
+		hiubus: bus at ff63c000 {
 
-Notifications reaching KVM should be plumbed into the APEI-firmware-first-code
-or eventually, a kernel-first mechanism if APEI doesn't 'claim' them.
+Note that we weren't strict about this for all the rest of the amlogic
+SoCs (mostly because I didn't notice ) but we should start doing it
+correctly now.  I'll also clean up the existing DTs.
 
-The kernel RAS code may signal user-space with the symptoms of the error, and
-user-space may decided to generate a new RAS notification for the guest.
-
-This should function in exactly the same way, regardless of which notification
-method is in use between the kernel and firmware. (its the only way to make this
-future-proof).
-
-Which notification user-space chooses to use entirely depends on what (if
-anything) it advertised to the guest in the HEST. User-space has to be in
-control of triggering any SError, not just overriding the ESR when KVM has
-decided it wants to kill the guest.
-
-
-> so here I return a error code to user space. you mean we should not pass RAS notifications
-> to user space, so could you give some suggestion how to notify user space to set guest ESR.
-
-KVM shouldn't give the guest an SError when it takes a RAS notification, it
-should pass the notification to the kernel RAS code. It only needs to 'fall
-through' to some default cause if both APEI and kernel-first deny-all-knowledge
-of this notification.
-
-
-The end-to-end flow is then (assuming no-VHE):
-(1)An error occurs, taking the CPU to EL3.
-EL3: triage the error, generate CPER, notify the OS
-EL2: KVM takes the notification, exits the guest, returns to host EL1.
-EL1: KVM handle_exit() calls APEI to handle the error.
-This is the end of KVMs involvement in RAS - its just plumbing.
-
-(2)APEI processes the CPER records and signals affected processes.
-If KVM's user-space is affected, KVM will spot the pending signal when it goes
-to re-enter the guest, and exit to user-space instead.
-Qemu takes the SIGBUS_MCEERR_A{O,R}.
-
-(3) Qemu decides it wants to hand the guest a RAS error, it populates the CPER
-records (in memory only Qemu knows about), then drives the KVM API to make the
-appropriate notification appear.
-
-
-(1) only happens if the guest was running when the error arrived. GHES has ~4
-flavours of IRQ which may be used to describe corruption in guest memory. Steps
-(2) and (3) are exactly the same in this case.
-
-Qemu may decide to trigger RAS errors all by itself, (probably for testing and
-debugging), in which case (1) and (2) don't happen, but (3), is exactly the same.
-
-
-This way platform-firmware/host-kernel can use kernel-first or firmware-first
-with any of the notifications, independently from Qemu/guest-kernel making a
-different kernel-first or firmware-first with different notifications.
-
-Passing information out of KVM breaks this, forcing Qemu to know about the
-mechanism platform-firmware is using.
-
-
-We need to tackle (1) and (3) separately. For (3) we need some API that lets
-Qemu _trigger_ an SError in the guest, with a specified ESR. But, we don't have
-a way of migrating pending SError yet... which is where I got stuck last time I
-was looking at this.
-
-
-
-James
+Kevin
