@@ -1,36 +1,35 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 6 Dec 2017 11:21:37 +0000
-Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
-In-Reply-To: <CAMuHMdUuF4kwUiUYCbSew3W0Pa2CfRdCijefbOO1ZYAbnyG3KA@mail.gmail.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
- <20170915074551.GF3924@verge.net.au>
- <CAMuHMdWrMiHQz_Tadh3R00n+zeSnGOW-o=skbK-R-yD6Z-x2+A@mail.gmail.com>
- <TY1PR06MB0895763DA6DE79A64B9981ECC06C0@TY1PR06MB0895.apcprd06.prod.outlook.com>
- <20170915110609.GL3924@verge.net.au>
- <CAMuHMdUuF4kwUiUYCbSew3W0Pa2CfRdCijefbOO1ZYAbnyG3KA@mail.gmail.com>
-Message-ID: <TY1PR06MB089533C44E4B42D647C2CC25C0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  6 Dec 2017 12:35:21 +0000
+Subject: [PATCH v3 02/20] arm64: mm: Temporarily disable ARM64_SW_TTBR0_PAN
+In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-3-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert, Simon,
+We're about to rework the way ASIDs are allocated, switch_mm is
+implemented and low-level kernel entry/exit is handled, so keep the
+ARM64_SW_TTBR0_PAN code out of the way whilst we do the heavy lifting.
 
->
-> As the dependency is in v4.15-rc1, it can be applied now.
->
+It will be re-enabled in a subsequent patch.
 
-we thought exactly the same thing, therefore we rebased and we re-ran our tests, to discover that something broke in between versions.
-I'll be in touch once I have more information, but it's a no go for now.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks,
-Fab
-
-
-[https://www2.renesas.eu/media/email/unicef_2017.jpg]
-
-This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
-We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index a93339f5178f..7e7d7fd152c4 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -910,6 +910,7 @@ endif
+ 
+ config ARM64_SW_TTBR0_PAN
+ 	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
++	depends on BROKEN       # Temporary while switch_mm is reworked
+ 	help
+ 	  Enabling this option prevents the kernel from accessing
+ 	  user-space memory directly by pointing TTBR0_EL1 to a reserved
+-- 
+2.1.4
