@@ -1,30 +1,64 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 6 Dec 2017 12:17:16 +0000
-Subject: [PATCH 2/2] arm64: SW PAN: Update saved ttbr0 value on
- enter_lazy_tlb
-In-Reply-To: <1512558968-28980-3-git-send-email-will.deacon@arm.com>
-References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
- <1512558968-28980-3-git-send-email-will.deacon@arm.com>
-Message-ID: <20171206121715.tnsp7ycrc7idksoj@armageddon.cambridge.arm.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 6 Dec 2017 15:19:24 +0300
+Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
+ error checking
+In-Reply-To: <20171205.104947.121188625730183933.davem@davemloft.net>
+References: <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
+ <20171204.132556.1601454745789376393.davem@davemloft.net>
+ <39363858-995c-eea4-070e-b21a7ac49bec@gmail.com>
+ <20171205.104947.121188625730183933.davem@davemloft.net>
+Message-ID: <d0b7e1cc-4190-437a-6461-35cee6edc203@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 11:16:08AM +0000, Will Deacon wrote:
-> enter_lazy_tlb is called when a kernel thread rides on the back of
-> another mm, due to a context switch or an explicit call to unuse_mm
-> where a call to switch_mm is elided.
-> 
-> In these cases, it's important to keep the saved ttbr value up to date
-> with the active mm, otherwise we can end up with a stale value which
-> points to a potentially freed page table.
-> 
-> This patch implements enter_lazy_tlb for arm64, so that the saved ttbr0
-> is kept up-to-date with the active mm for kernel threads.
-> 
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Vinayak Menon <vinmenon@codeaurora.org>
-> Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On 12/05/2017 06:49 PM, David Miller wrote:
 
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+>>> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
+>>> Date: Mon,  4 Dec 2017 23:18:20 +0530
+>>>
+>>>> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct platform_device
+>>>> *dev)
+>>>>    	netdevice->dev_addr[5] = readb(eth_addr + 0x06);
+>>>>    	iounmap(eth_addr);
+>>>>    -	if (!netdevice->irq) {
+>>>> +	if (netdevice->irq <= 0) {
+>>>>    		printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
+>>>>    			__FILE__, netdevice->base_addr);
+>>>> +		retval = netdevice->irq ? netdevice->irq : -ENODEV;
+>>>>    		goto probe_failed;
+>>>>    	}
+>>> Ok, thinking about this some more...
+>>>
+>>> It is impossible to use platform_get_irq() without every single call
+>>> site having this funny:
+>>>
+>>> 	ret = val ? val : -ENODEV;
+>>>
+>>> sequence.
+>>>
+>>> This is unnecessary duplication and it is also error prone, so I
+>>> really think this logic belongs in platform_get_irq() itself.  It can
+>>> convert '0' to -ENODEV and that way we need no special logic in the
+>>> callers at all.
+>> platform_get_irq() will return 0 only for sparc, If sparc initialize
+>> platform
+>> data irq[PROMINTR_MAX] as zero. Otherwise platform_get_irq() will
+>> never return
+>> 0. It will return either IRQ number or error (as negative number). But
+>> I am getting
+>> review comment by reviewer/maintainer in other subsystem to add check
+>> for
+>> zero. So I have done same changes here. Please correct me if i am
+>> wrong.
+> 
+> If you make the change that I suggest, you instead can check for
+
+    I assume such change is needed only for the SPARC-specific section of 
+platform_get_irq()?
+
+> '-ENODEV' to mean no IRQ.
+
+    No specific error check is needed, just irq < 0 check should be enough...
+Also, looking@platform_get_irq(), -ENXIO should be returned in this case.
+
+MBR, Sergei
