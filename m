@@ -1,49 +1,87 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 6 Dec 2017 16:32:05 +0100
-Subject: [PATCH 4/9] ASoC: sun8i-codec: Add support for A64 SoC
-In-Reply-To: <CA+E=qVdZME2fiMw09NUP4DNCYhk58dqSapCdfBjLrdMq5HFwyg@mail.gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-5-anarsoul@gmail.com>
- <20171205080444.zo2rlusqpjyraqcw@flea.lan>
- <CA+E=qVdZME2fiMw09NUP4DNCYhk58dqSapCdfBjLrdMq5HFwyg@mail.gmail.com>
-Message-ID: <20171206153205.k3l5sofdco3t75mi@flea.lan>
+From: dmurphy@ti.com (Dan Murphy)
+Date: Wed, 6 Dec 2017 10:29:59 -0600
+Subject: [PATCH] ARM: omap2: hide omap3_save_secure_ram on non-OMAP3 builds
+In-Reply-To: <20171206155714.GY28152@atomide.com>
+References: <20171206141517.670032-1-arnd@arndb.de>
+ <20171206155714.GY28152@atomide.com>
+Message-ID: <a055eca0-fa24-a04a-7278-f633a12e6bae@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 03:17:39PM -0800, Vasily Khoruzhick wrote:
-> On Tue, Dec 5, 2017 at 12:04 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Sun, Dec 03, 2017 at 12:41:52PM -0800, Vasily Khoruzhick wrote:
-> >> Digital part of audio codec block in the A64 is very similar to what
-> >> is used by the A33(sun8i) devices. However, it uses different LRCK
-> >> divider.
-> >>
-> >> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
-> >
-> > What makes it impossible to derive from the sample rate and number of
-> > channels?
+Arnd
+
+On 12/06/2017 09:57 AM, Tony Lindgren wrote:
+> * Arnd Bergmann <arnd@arndb.de> [171206 14:18]:
+>> In configurations without CONFIG_OMAP3 but with secure RAM support,
+>> we now run into a link failure:
+>>
+>> arch/arm/mach-omap2/omap-secure.o: In function `omap3_save_secure_ram':
+>> omap-secure.c:(.text+0x130): undefined reference to `save_secure_ram_context'
+>>
+>> The omap3_save_secure_ram() function is only called from the OMAP34xx
+>> power management code, so we can simply hide that function in the
+>> appropriate #ifdef.
+>>
+>> Fixes: d09220a887f7 ("ARM: OMAP2+: Fix SRAM virt to phys translation for save_secure_ram_context")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> It's BCLK / LRCK ratio as per A64 user manual, so it doesn't depend on
-> sample rate. BSP driver always uses a fixed value of 64 here.
+> Thanks for fixing it, want to apply directly to ARM SoC fixes
+> where d09220a887f7 is now? If so:
+> 
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-Well, it kind of does.
+Found the same issue in our builds.  
+Compile tested the patch against different TI defconfig configurations.
 
-BCLK is sample rate * sample size * channels, and LRCK is running at
-the sample rate. So the ratio is the sample size * channels.
+Tested-by: Dan Murphy <dmurphy@ti.com>
 
-Anything deviating from those standard i2s concepts should at least be
-documented, with arguments to back them off.
+Dan
 
-Maxime
+> 
+> Regards,
+> 
+> Tony
+> 
+> 
+>> ---
+>>  arch/arm/mach-omap2/omap-secure.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
+>> index f9303dc631e4..7be95cd8136d 100644
+>> --- a/arch/arm/mach-omap2/omap-secure.c
+>> +++ b/arch/arm/mach-omap2/omap-secure.c
+>> @@ -72,6 +72,7 @@ phys_addr_t omap_secure_ram_mempool_base(void)
+>>  	return omap_secure_memblock_base;
+>>  }
+>>  
+>> +#ifdef CONFIG_ARCH_OMAP3
+>>  u32 omap3_save_secure_ram(void __iomem *addr, int size)
+>>  {
+>>  	u32 ret;
+>> @@ -90,6 +91,7 @@ u32 omap3_save_secure_ram(void __iomem *addr, int size)
+>>  
+>>  	return ret;
+>>  }
+>> +#endif
+>>  
+>>  /**
+>>   * rx51_secure_dispatcher: Routine to dispatch secure PPA API calls
+>> -- 
+>> 2.9.0
+>>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-omap" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/20e46530/attachment.sig>
+------------------
+Dan Murphy
