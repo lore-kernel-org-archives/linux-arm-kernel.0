@@ -1,37 +1,58 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  6 Dec 2017 12:54:26 +0100
-Subject: [RESEND PATCH 2/4] dt-bindings: display: amlogic,
- meson-dw-hdmi: Add optional HDMI 5V regulator
-In-Reply-To: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
-References: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1512561268-29806-3-git-send-email-narmstrong@baylibre.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Wed, 6 Dec 2017 11:55:01 +0000
+Subject: [PATCH 1/3] arm64: KVM: Move CPU ID reg trap setup off the world
+ switch path
+In-Reply-To: <20171206105300.GK32397@cbox>
+References: <1512141582-17474-1-git-send-email-Dave.Martin@arm.com>
+ <1512141582-17474-2-git-send-email-Dave.Martin@arm.com>
+ <20171205090915.GI32397@cbox>
+ <20171205123150.GX22781@e103592.cambridge.arm.com>
+ <20171206105300.GK32397@cbox>
+Message-ID: <20171206115501.GB22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On reference boards and derivatives, the HDMI Logic is powered by an external
-5V regulator.
-This regulator was set by the Vendor U-Boot, add optional support for it.
+On Wed, Dec 06, 2017 at 11:53:00AM +0100, Christoffer Dall wrote:
+> On Tue, Dec 05, 2017 at 12:31:51PM +0000, Dave Martin wrote:
+> > On Tue, Dec 05, 2017 at 10:09:15AM +0100, Christoffer Dall wrote:
+> > > On Fri, Dec 01, 2017 at 03:19:40PM +0000, Dave Martin wrote:
+> > > > The HCR_EL2.TID3 flag needs to be set when trapping guest access to
+> > > > the CPU ID registers is required.  However, the decision about
+> > > > whether to set this bit does not need to be repeated at every
+> > > > switch to the guest.
+> > > > 
+> > > > Instead, it's sufficient to make this decision once and record the
+> > > > outcome.
+> > > > 
+> > > > This patch moves the decision to vcpu_reset_hcr() and records the
+> > > > choice made in vcpu->arch.hcr_el2.  The world switch code can then
+> > > > load this directly when switching to the guest without the need for
+> > > > conditional logic on the critical path.
+> > > > 
+> > > > Signed-off-by: Dave Martin <Dave.Martin@arm.com>
+> > > > Suggested-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
+> > > 
+> > > Reviewed-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > > 
+> > > > 
+> > > > ---
+> > > > 
+> > > > Note to maintainers: this was discussed on-list [1] prior to the merge
+> > > > window, but this patch implementing the agreed decision hasn't been
+> > > > posted previously.
+> > > > 
+> > > > This should be considered a fix for v4.15.
+> > > 
+> > > It's actually easier for me to apply this for v4.16 and base my VHE
+> > > optimization patches on it.
+> > 
+> > If you're happy for this optimisation to be missing for v4.15, I'm fine
+> > with that.
+> > 
+> > Can I leave it you to pick this up then?
+> 
+> Yes, I applied it to our queue already.
 
-Acked-by: Rob Herring <robh@kernel.org>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt | 4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-index 7f040ed..bf4a180 100644
---- a/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-+++ b/Documentation/devicetree/bindings/display/amlogic,meson-dw-hdmi.txt
-@@ -48,6 +48,10 @@ Required properties:
-   Documentation/devicetree/bindings/reset/reset.txt,
-   the reset-names should be "hdmitx_apb", "hdmitx", "hdmitx_phy"
- 
-+Optional properties:
-+- hdmi-supply: Optional phandle to an external 5V regulator to power the HDMI
-+  logic, as described in the file ../regulator/regulator.txt
-+
- Required nodes:
- 
- The connections to the HDMI ports are modeled using the OF graph
--- 
-2.7.4
+OK, great, thanks
+---Dave
