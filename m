@@ -1,35 +1,133 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:21 +0000
-Subject: [PATCH v3 02/20] arm64: mm: Temporarily disable ARM64_SW_TTBR0_PAN
+Date: Wed,  6 Dec 2017 12:35:23 +0000
+Subject: [PATCH v3 04/20] arm64: mm: Remove pre_ttbr0_update_workaround for
+ Falkor erratum #E1003
 In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
 References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512563739-25239-3-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-5-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're about to rework the way ASIDs are allocated, switch_mm is
-implemented and low-level kernel entry/exit is handled, so keep the
-ARM64_SW_TTBR0_PAN code out of the way whilst we do the heavy lifting.
+The pre_ttbr0_update_workaround hook is called prior to context-switching
+TTBR0 because Falkor erratum E1003 can cause TLB allocation with the wrong
+ASID if both the ASID and the base address of the TTBR are updated at
+the same time.
 
-It will be re-enabled in a subsequent patch.
+With the ASID sitting safely in TTBR1, we no longer update things
+atomically, so we can remove the pre_ttbr0_update_workaround macro as
+it's no longer required. The erratum infrastructure and documentation
+is left around for #E1003, as it will be required by the entry
+trampoline code in a future patch.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/include/asm/assembler.h   | 22 ----------------------
+ arch/arm64/include/asm/mmu_context.h |  2 --
+ arch/arm64/mm/context.c              | 11 -----------
+ arch/arm64/mm/proc.S                 |  1 -
+ 4 files changed, 36 deletions(-)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index a93339f5178f..7e7d7fd152c4 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -910,6 +910,7 @@ endif
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index aef72d886677..e1fa5db858b7 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -26,7 +26,6 @@
+ #include <asm/asm-offsets.h>
+ #include <asm/cpufeature.h>
+ #include <asm/debug-monitors.h>
+-#include <asm/mmu_context.h>
+ #include <asm/page.h>
+ #include <asm/pgtable-hwdef.h>
+ #include <asm/ptrace.h>
+@@ -478,27 +477,6 @@ alternative_endif
+ 	.endm
  
- config ARM64_SW_TTBR0_PAN
- 	bool "Emulate Privileged Access Never using TTBR0_EL1 switching"
-+	depends on BROKEN       # Temporary while switch_mm is reworked
- 	help
- 	  Enabling this option prevents the kernel from accessing
- 	  user-space memory directly by pointing TTBR0_EL1 to a reserved
+ /*
+- * Errata workaround prior to TTBR0_EL1 update
+- *
+- * 	val:	TTBR value with new BADDR, preserved
+- * 	tmp0:	temporary register, clobbered
+- * 	tmp1:	other temporary register, clobbered
+- */
+-	.macro	pre_ttbr0_update_workaround, val, tmp0, tmp1
+-#ifdef CONFIG_QCOM_FALKOR_ERRATUM_1003
+-alternative_if ARM64_WORKAROUND_QCOM_FALKOR_E1003
+-	mrs	\tmp0, ttbr0_el1
+-	mov	\tmp1, #FALKOR_RESERVED_ASID
+-	bfi	\tmp0, \tmp1, #48, #16		// reserved ASID + old BADDR
+-	msr	ttbr0_el1, \tmp0
+-	isb
+-	bfi	\tmp0, \val, #0, #48		// reserved ASID + new BADDR
+-	msr	ttbr0_el1, \tmp0
+-	isb
+-alternative_else_nop_endif
+-#endif
+-	.endm
+-
+ /*
+  * Errata workaround post TTBR0_EL1 update.
+  */
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 2d63611e4311..f9744944cf12 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -19,8 +19,6 @@
+ #ifndef __ASM_MMU_CONTEXT_H
+ #define __ASM_MMU_CONTEXT_H
+ 
+-#define FALKOR_RESERVED_ASID	1
+-
+ #ifndef __ASSEMBLY__
+ 
+ #include <linux/compiler.h>
+diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+index 6f4017046323..78a2dc596fee 100644
+--- a/arch/arm64/mm/context.c
++++ b/arch/arm64/mm/context.c
+@@ -79,13 +79,6 @@ void verify_cpu_asid_bits(void)
+ 	}
+ }
+ 
+-static void set_reserved_asid_bits(void)
+-{
+-	if (IS_ENABLED(CONFIG_QCOM_FALKOR_ERRATUM_1003) &&
+-	    cpus_have_const_cap(ARM64_WORKAROUND_QCOM_FALKOR_E1003))
+-		__set_bit(FALKOR_RESERVED_ASID, asid_map);
+-}
+-
+ static void flush_context(unsigned int cpu)
+ {
+ 	int i;
+@@ -94,8 +87,6 @@ static void flush_context(unsigned int cpu)
+ 	/* Update the list of reserved ASIDs and the ASID bitmap. */
+ 	bitmap_clear(asid_map, 0, NUM_USER_ASIDS);
+ 
+-	set_reserved_asid_bits();
+-
+ 	for_each_possible_cpu(i) {
+ 		asid = atomic64_xchg_relaxed(&per_cpu(active_asids, i), 0);
+ 		/*
+@@ -254,8 +245,6 @@ static int asids_init(void)
+ 		panic("Failed to allocate bitmap for %lu ASIDs\n",
+ 		      NUM_USER_ASIDS);
+ 
+-	set_reserved_asid_bits();
+-
+ 	pr_info("ASID allocator initialised with %lu entries\n", NUM_USER_ASIDS);
+ 	return 0;
+ }
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index a8a64898a2aa..f2ff0837577c 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -138,7 +138,6 @@ ENDPROC(cpu_do_resume)
+  *	- pgd_phys - physical address of new TTB
+  */
+ ENTRY(cpu_do_switch_mm)
+-	pre_ttbr0_update_workaround x0, x2, x3
+ 	mrs	x2, ttbr1_el1
+ 	mmid	x1, x1				// get mm->context.id
+ 	bfi	x2, x1, #48, #16		// set the ASID
 -- 
 2.1.4
