@@ -1,131 +1,32 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 7 Dec 2017 00:10:39 +0800
-Subject: [PATCH 2/2] clk: sunxi-ng: sun50i: a64: Add 2x fixed post-divider
- to MMC module clocks
-In-Reply-To: <20171206155608.tuw73ht6gq7hyrho@flea.lan>
-References: <20171204051912.7485-1-wens@csie.org>
- <20171204051912.7485-3-wens@csie.org>
- <20171205195956.xdil2dsbtfwx35jj@flea.lan>
- <CAGb2v67=2BbOGWpRyujaR-pn6ZEfb1rSRtmzP-kUzXRn_y+iNg@mail.gmail.com>
- <20171206155608.tuw73ht6gq7hyrho@flea.lan>
-Message-ID: <CAGb2v64sxLK5fQ7Rmyy355diqq=0OYk8wRvOqjVJkdMWURwRUQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 6 Dec 2017 11:11:40 -0500
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
+References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+ <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+ <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
+ <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
+Message-ID: <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 6, 2017 at 11:56 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Wed, Dec 06, 2017 at 10:30:26AM +0800, Chen-Yu Tsai wrote:
->> On Wed, Dec 6, 2017 at 3:59 AM, Maxime Ripard
->> <maxime.ripard@free-electrons.com> wrote:
->> > Hi,
->> >
->> > On Mon, Dec 04, 2017 at 01:19:12PM +0800, Chen-Yu Tsai wrote:
->> >> On the A64, the MMC module clocks are fixed in the new timing mode,
->> >> i.e. they do not have a bit to select the mode. These clocks have
->> >> a 2x divider somewhere between the clock and the MMC module.
->> >>
->> >> To be consistent with other SoCs supporting the new timing mode,
->> >> we model the 2x divider as a fixed post-divider on the MMC module
->> >> clocks.
->> >>
->> >> This patch adds the post-dividers to the MMC clocks.
->> >>
->> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
->> >
->> > I had a doubt applying that one... sorry.
->> >
->> >> ---
->> >>  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 57 +++++++++++++++++++++++------------
->> >>  1 file changed, 37 insertions(+), 20 deletions(-)
->> >>
->> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
->> >> index 2bb4cabf802f..ee9c12cf3f08 100644
->> >> --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
->> >> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
->> >> @@ -400,28 +400,45 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(nand_clk, "nand", mod0_default_parents, 0x080,
->> >>                                 BIT(31),      /* gate */
->> >>                                 0);
->> >>
->> >> +/*
->> >> + * MMC clocks are the new timing mode (see A83T & H3) variety, but without
->> >> + * the mode switch. This means they have a 2x post divider between the clock
->> >> + * and the MMC module. This is not documented in the manual, but is taken
->> >> + * into consideration when setting the mmc module clocks in the BSP kernel.
->> >> + * Without it, MMC performance is degraded.
->> >> + *
->> >> + * We model it here to be consistent with other SoCs supporting this mode.
->> >> + * The alternative would be to add the 2x multiplier when setting the MMC
->> >> + * module clock in the MMC driver, just for the A64.
->> >> + */
->> >>  static const char * const mmc_default_parents[] = { "osc24M", "pll-periph0-2x",
->> >>                                                   "pll-periph1-2x" };
->> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_default_parents, 0x088,
->> >> -                               0, 4,         /* M */
->> >> -                               16, 2,        /* P */
->> >> -                               24, 2,        /* mux */
->> >> -                               BIT(31),      /* gate */
->> >> -                               0);
->> >> -
->> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_default_parents, 0x08c,
->> >> -                               0, 4,         /* M */
->> >> -                               16, 2,        /* P */
->> >> -                               24, 2,        /* mux */
->> >> -                               BIT(31),      /* gate */
->> >> -                               0);
->> >> -
->> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_default_parents, 0x090,
->> >> -                               0, 4,         /* M */
->> >> -                               16, 2,        /* P */
->> >> -                               24, 2,        /* mux */
->> >> -                               BIT(31),      /* gate */
->> >> -                               0);
->> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0",
->> >> +                                       mmc_default_parents, 0x088,
->> >> +                                       0, 4,         /* M */
->> >> +                                       16, 2,        /* P */
->> >> +                                       24, 2,        /* mux */
->> >> +                                       BIT(31),      /* gate */
->> >> +                                       2,            /* post-div */
->> >> +                                       0);
->> >> +
->> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1",
->> >> +                                       mmc_default_parents, 0x08c,
->> >> +                                       0, 4,         /* M */
->> >> +                                       16, 2,        /* P */
->> >> +                                       24, 2,        /* mux */
->> >> +                                       BIT(31),      /* gate */
->> >> +                                       2,            /* post-div */
->> >> +                                       0);
->> >> +
->> >
->> > Are you sure that the divider there for the non-eMMC clocks? Usually,
->> > the new mode is only here for the eMMC, so we would divide the rate by
->> > two in the non-eMMC case.
+On 12/6/2017 9:57 AM, Sinan Kaya wrote:
+>> Yes, it should, so I'm not sure why you need the list in the first place.
 >>
->> The new mode is there for all MMC controllers. The other two MMC
->> controllers even have the old/new timing mode switch. In case you
->> forgot we have ".need_new_timings" set for the A64 compatible.
->
-> But then, shouldn't we model them as such, using the work you did on
-> the A83t clocks?
+>> Also it looks like something along the lines of devres_release_all()
+>> should be sufficient.
+> Good suggestion, let me test this.
+> 
 
-On the A64, the clocks don't have the switch. Only the MMC controller
-does. On the A83T, both do.
+I tried to pull the code into GED but the API is not public. I also looked
+at how it is used. I was afraid to mess up with the internals of base.c by
+calling devres_release_all() externally first and by the driver framework
+next. I moved away from this approach.
 
-ChenYu
+I just fixed the function rename and changed the dev_info() to dev_dbg().
 
->> But to eliminate any doubts or concerns, I've rerun tests for the
->> micro SD card, instead of the eMMC. And yes the results are the same,
->> 2x improvement (12 MB/s vs 23.7 MB/s).
->
-> Ok, good.
->
-> Thanks!
-> Maxime
->
-> --
-> Maxime Ripard, Free Electrons
-> Embedded Linux and Kernel engineering
-> http://free-electrons.com
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
