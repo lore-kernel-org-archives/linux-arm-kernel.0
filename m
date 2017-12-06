@@ -1,58 +1,54 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed, 6 Dec 2017 11:59:48 +0000
-Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
-In-Reply-To: <TY1PR06MB089533C44E4B42D647C2CC25C0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
-References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
- <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
- <20170915074551.GF3924@verge.net.au>
- <CAMuHMdWrMiHQz_Tadh3R00n+zeSnGOW-o=skbK-R-yD6Z-x2+A@mail.gmail.com>
- <TY1PR06MB0895763DA6DE79A64B9981ECC06C0@TY1PR06MB0895.apcprd06.prod.outlook.com>
- <20170915110609.GL3924@verge.net.au>
- <CAMuHMdUuF4kwUiUYCbSew3W0Pa2CfRdCijefbOO1ZYAbnyG3KA@mail.gmail.com>
- <TY1PR06MB089533C44E4B42D647C2CC25C0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
-Message-ID: <TY1PR06MB0895C5C14B9BD6CDE867832CC0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
+From: chris@chris-wilson.co.uk (Chris Wilson)
+Date: Wed, 06 Dec 2017 12:02:08 +0000
+Subject: [RESEND PATCH 4/4] drm/meson: Add missing VPU init
+In-Reply-To: <1512561268-29806-5-git-send-email-narmstrong@baylibre.com>
+References: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
+ <1512561268-29806-5-git-send-email-narmstrong@baylibre.com>
+Message-ID: <151256172859.3497.16672223686685414318@mail.alporthouse.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Geert, Simon,
+Quoting Neil Armstrong (2017-12-06 11:54:28)
+> The VPU init misses these configurations values.
+> 
+> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> ---
+>  drivers/gpu/drm/meson/meson_drv.c       | 9 +++++++++
+>  drivers/gpu/drm/meson/meson_registers.h | 4 ++++
+>  2 files changed, 13 insertions(+)
+> 
+> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+> index 3b804fd..f9ad0e9 100644
+> --- a/drivers/gpu/drm/meson/meson_drv.c
+> +++ b/drivers/gpu/drm/meson/meson_drv.c
+> @@ -151,6 +151,14 @@ static struct regmap_config meson_regmap_config = {
+>         .max_register   = 0x1000,
+>  };
+>  
+> +static void meson_vpu_init(struct meson_drm *priv)
+> +{
+> +       writel_relaxed(0x210000, priv->io_base + _REG(VPU_RDARB_MODE_L1C1));
+> +       writel_relaxed(0x10000, priv->io_base + _REG(VPU_RDARB_MODE_L1C2));
+> +       writel_relaxed(0x900000, priv->io_base + _REG(VPU_RDARB_MODE_L2C1));
+> +       writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
+> +}
 
-the problems I am seeing are not related to APMU/SMP, I'll send a v2 shortly.
+> diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
+> index 2847381..bca8714 100644
+> --- a/drivers/gpu/drm/meson/meson_registers.h
+> +++ b/drivers/gpu/drm/meson/meson_registers.h
+> @@ -1363,6 +1363,10 @@
+>  #define VPU_PROT3_STAT_1 0x277a
+>  #define VPU_PROT3_STAT_2 0x277b
+>  #define VPU_PROT3_REQ_ONOFF 0x277c
+> +#define VPU_RDARB_MODE_L1C1 0x2790
+> +#define VPU_RDARB_MODE_L1C2 0x2799
 
-Thanks,
-Fab
+Hmm, not naturally aligned for writel. Is the register width correct,
+address correct, or this really is an unaligned iowrite?
 
->
-> Hello Geert, Simon,
->
-> >
-> > As the dependency is in v4.15-rc1, it can be applied now.
-> >
->
-> we thought exactly the same thing, therefore we rebased and we re-ran our tests, to discover that something broke in between
-> versions.
-> I'll be in touch once I have more information, but it's a no go for now.
->
-> Thanks,
-> Fab
->
->
-> [https://www2.renesas.eu/media/email/unicef_2017.jpg]
->
-> This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further
-> details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
-> We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
->
->
->
-> Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England &
-> Wales under Registered No. 04586709.
+> +#define VPU_RDARB_MODE_L2C1 0x279d
+> +#define VPU_WRARB_MODE_L2C1 0x27a2
 
-
-[https://www2.renesas.eu/media/email/unicef_2017.jpg]
-
-This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
-We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
-
-
-
-Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
+Similarly,
+-Chris
