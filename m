@@ -1,581 +1,105 @@
 From: james.morse@arm.com (James Morse)
-Date: Wed,  6 Dec 2017 19:01:36 +0000
-Subject: [PATCH v5 10/16] arm64: kernel: Add arch-specific SDEI entry code and
- CPU masking
-In-Reply-To: <20171206190142.9246-1-james.morse@arm.com>
-References: <20171206190142.9246-1-james.morse@arm.com>
-Message-ID: <20171206190142.9246-11-james.morse@arm.com>
+Date: Wed, 06 Dec 2017 19:04:06 +0000
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
+ categorization
+In-Reply-To: <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
+References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
+ <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
+ <5A0B1334.7060500@arm.com> <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
+Message-ID: <5A283F26.3020507@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Software Delegated Exception Interface (SDEI) is an ARM standard
-for registering callbacks from the platform firmware into the OS.
-This is typically used to implement RAS notifications.
+Hi gengdongjiu,
 
-Such notifications enter the kernel at the registered entry-point
-with the register values of the interrupted CPU context. Because this
-is not a CPU exception, it cannot reuse the existing entry code.
-(crucially we don't implicitly know which exception level we interrupted),
+On 06/12/17 10:26, gengdongjiu wrote:
+> On 2017/11/15 0:00, James Morse wrote:
+>>> +		 * error has not been propagated
+>>> +		 */
+>>> +		run->exit_reason = KVM_EXIT_EXCEPTION;
+>>> +		run->ex.exception = ESR_ELx_EC_SERROR;
+>>> +		run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
+>>> +		return 0;
+>> We should not pass RAS notifications to user space. The kernel either handles
+>> them, or it panics(). User space shouldn't even know if the kernel supports RAS
+>> until it gets an MCEERR signal.
+>>
+>> You're making your firmware-first notification an EL3->EL0 signal, bypassing the OS.
+>>
+>> If we get a RAS SError and there are no CPER records or values in the ERR nodes,
+>> we should panic as it looks like the CPU/firmware is broken. (spurious RAS errors)
 
-Add the entry point to entry.S to set us up for calling into C code. If
-the event interrupted code that had interrupts masked, we always return
-to that location. Otherwise we pretend this was an IRQ, and use SDEI's
-complete_and_resume call to return to vbar_el1 + offset.
+> do you think whether we need to set the guest ESR by user space?  if need, I need to
+> notify user space that there is a SError happen and need to set ESR for guest in some place of
+> KVM.
 
-This allows the kernel to deliver signals to user space processes. For
-KVM this triggers the world switch, a quick spin round vcpu_run, then
-back into the guest, unless there are pending signals.
+I think you are still coming from a world where user-space gets raw RAS
+notifications via KVM. This should not happen because the notification method is
+private to firmware and the kernel. KVM is just in the way when a guest is running.
 
-Add sdei_mask_local_cpu() calls to the smp_send_stop() code, this covers
-the panic() code-path, which doesn't invoke cpuhotplug notifiers.
+Notifications reaching KVM should be plumbed into the APEI-firmware-first-code
+or eventually, a kernel-first mechanism if APEI doesn't 'claim' them.
 
-Because we can interrupt entry-from/exit-to another EL, we can't trust the
-value in sp_el0 or x29, even if we interrupted the kernel, in this case
-the code in entry.S will save/restore sp_el0 and use the value in
-__entry_task.
+The kernel RAS code may signal user-space with the symptoms of the error, and
+user-space may decided to generate a new RAS notification for the guest.
 
-When we have VMAP stacks we can interrupt the stack-overflow test, which
-stirs x0 into sp, meaning we have to have our own VMAP stacks. For now
-these are allocated when we probe the interface. Future patches will add
-refcounting hooks to allow the arch code to allocate them lazily.
+This should function in exactly the same way, regardless of which notification
+method is in use between the kernel and firmware. (its the only way to make this
+future-proof).
 
-Signed-off-by: James Morse <james.morse@arm.com>
-Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
----
-Changes since v4:
- * Moved asm code into kernel/entry.S to make the kaiser interaction smaller
- * Added preempt.h for in_nmi() declaration
- * Made use of __uaccess_enable_hw_pan()
- * Forced GFP_KERNEL means we can lazily allocate stacks, fixed comments saying
-   we can't do this, patches to follow...
+Which notification user-space chooses to use entirely depends on what (if
+anything) it advertised to the guest in the HEST. User-space has to be in
+control of triggering any SError, not just overriding the ESR when KVM has
+decided it wants to kill the guest.
 
-Changes since v3:
- * Added const to clobbered_registers,
- * Removed extern from C function declarations.
- * Header file names changed
 
-Changes since v2:
- * Added PAN-setting as we didn't take an exception to get here.
- * Added VMAP stack allocation and switching.
- * overwrite x29 on entry from not-the-kernel.
- * Added a pe-mask to crash_smp_send_stop()s 'no secondaries' path (oops).
- * Added ELR-hasn't-changed test. Any exception in the handler will panic KVM
-   as its switched VBAR_EL1, but go silently undetected otherwise. Generate a
-   warning.
+> so here I return a error code to user space. you mean we should not pass RAS notifications
+> to user space, so could you give some suggestion how to notify user space to set guest ESR.
 
- arch/arm64/include/asm/sdei.h       |  47 +++++++-
- arch/arm64/include/asm/stacktrace.h |   3 +
- arch/arm64/kernel/Makefile          |   1 +
- arch/arm64/kernel/asm-offsets.c     |   5 +
- arch/arm64/kernel/entry.S           | 101 +++++++++++++++++
- arch/arm64/kernel/sdei.c            | 219 ++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c             |  11 +-
- 7 files changed, 384 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm64/kernel/sdei.c
+KVM shouldn't give the guest an SError when it takes a RAS notification, it
+should pass the notification to the kernel RAS code. It only needs to 'fall
+through' to some default cause if both APEI and kernel-first deny-all-knowledge
+of this notification.
 
-diff --git a/arch/arm64/include/asm/sdei.h b/arch/arm64/include/asm/sdei.h
-index 59f26b6e673d..d58a31ab525a 100644
---- a/arch/arm64/include/asm/sdei.h
-+++ b/arch/arm64/include/asm/sdei.h
-@@ -3,6 +3,49 @@
- #ifndef __ASM_SDEI_H
- #define __ASM_SDEI_H
- 
--/* Later patches add the arch specific bits */
-+/* Values for sdei_exit_mode */
-+#define SDEI_EXIT_HVC  0
-+#define SDEI_EXIT_SMC  1
- 
--#endif /* __ASM_SDEI_H */
-+#define SDEI_STACK_SIZE		IRQ_STACK_SIZE
-+
-+#ifndef __ASSEMBLY__
-+
-+#include <linux/linkage.h>
-+#include <linux/preempt.h>
-+#include <linux/types.h>
-+
-+#include <asm/virt.h>
-+
-+extern unsigned long sdei_exit_mode;
-+
-+/* Software Delegated Exception entry point from firmware*/
-+asmlinkage void __sdei_asm_handler(unsigned long event_num, unsigned long arg,
-+				   unsigned long pc, unsigned long pstate);
-+
-+/*
-+ * The above entry point does the minimum to call C code. This function does
-+ * anything else, before calling the driver.
-+ */
-+struct sdei_registered_event;
-+asmlinkage unsigned long __sdei_handler(struct pt_regs *regs,
-+					struct sdei_registered_event *arg);
-+
-+unsigned long sdei_arch_get_entry_point(int conduit);
-+#define sdei_arch_get_entry_point(x)	sdei_arch_get_entry_point(x)
-+
-+bool _on_sdei_stack(unsigned long sp);
-+static inline bool on_sdei_stack(unsigned long sp)
-+{
-+	if (!IS_ENABLED(CONFIG_VMAP_STACK))
-+		return false;
-+	if (!IS_ENABLED(CONFIG_ARM_SDE_INTERFACE))
-+		return false;
-+	if (in_nmi())
-+		return _on_sdei_stack(sp);
-+
-+	return false;
-+}
-+
-+#endif /* __ASSEMBLY__ */
-+#endif	/* __ASM_SDEI_H */
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 6ad30776e984..472ef944e932 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -22,6 +22,7 @@
- 
- #include <asm/memory.h>
- #include <asm/ptrace.h>
-+#include <asm/sdei.h>
- 
- struct stackframe {
- 	unsigned long fp;
-@@ -85,6 +86,8 @@ static inline bool on_accessible_stack(struct task_struct *tsk, unsigned long sp
- 		return true;
- 	if (on_overflow_stack(sp))
- 		return true;
-+	if (on_sdei_stack(sp))
-+		return true;
- 
- 	return false;
- }
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 067baace74a0..8d5b3c255162 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -52,6 +52,7 @@ arm64-obj-$(CONFIG_KEXEC)		+= machine_kexec.o relocate_kernel.o	\
- arm64-obj-$(CONFIG_ARM64_RELOC_TEST)	+= arm64-reloc-test.o
- arm64-reloc-test-y := reloc_test_core.o reloc_test_syms.o
- arm64-obj-$(CONFIG_CRASH_DUMP)		+= crash_dump.o
-+arm64-obj-$(CONFIG_ARM_SDE_INTERFACE)	+= sdei.o
- 
- obj-y					+= $(arm64-obj-y) vdso/ probes/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index af247d10252f..1dcc493f5765 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -18,6 +18,7 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
- 
-+#include <linux/arm_sdei.h>
- #include <linux/sched.h>
- #include <linux/mm.h>
- #include <linux/dma-mapping.h>
-@@ -157,6 +158,10 @@ int main(void)
-   BLANK();
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-   DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
-+#endif
-+#ifdef CONFIG_ARM_SDE_INTERFACE
-+  DEFINE(SDEI_EVENT_INTREGS,	offsetof(struct sdei_registered_event, interrupted_regs));
-+  DEFINE(SDEI_EVENT_PRIORITY,	offsetof(struct sdei_registered_event, priority));
- #endif
-   return 0;
- }
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 031392ee5f47..38eb02ce320e 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1142,3 +1142,104 @@ ENTRY(ret_from_fork)
- 	b	ret_to_user
- ENDPROC(ret_from_fork)
- NOKPROBE(ret_from_fork)
-+
-+#ifdef CONFIG_ARM_SDE_INTERFACE
-+
-+#include <asm/sdei.h>
-+#include <uapi/linux/arm_sdei.h>
-+
-+/*
-+ * Software Delegated Exception entry point.
-+ *
-+ * x0: Event number
-+ * x1: struct sdei_registered_event argument from registration time.
-+ * x2: interrupted PC
-+ * x3: interrupted PSTATE
-+ *
-+ * Firmware has preserved x0->x17 for us, we must save/restore the rest to
-+ * follow SMC-CC. We save (or retrieve) all the registers as the handler may
-+ * want them.
-+ */
-+ENTRY(__sdei_asm_handler)
-+	stp     x2, x3, [x1, #SDEI_EVENT_INTREGS + S_PC]
-+	stp     x4, x5, [x1, #SDEI_EVENT_INTREGS + 16 * 2]
-+	stp     x6, x7, [x1, #SDEI_EVENT_INTREGS + 16 * 3]
-+	stp     x8, x9, [x1, #SDEI_EVENT_INTREGS + 16 * 4]
-+	stp     x10, x11, [x1, #SDEI_EVENT_INTREGS + 16 * 5]
-+	stp     x12, x13, [x1, #SDEI_EVENT_INTREGS + 16 * 6]
-+	stp     x14, x15, [x1, #SDEI_EVENT_INTREGS + 16 * 7]
-+	stp     x16, x17, [x1, #SDEI_EVENT_INTREGS + 16 * 8]
-+	stp     x18, x19, [x1, #SDEI_EVENT_INTREGS + 16 * 9]
-+	stp     x20, x21, [x1, #SDEI_EVENT_INTREGS + 16 * 10]
-+	stp     x22, x23, [x1, #SDEI_EVENT_INTREGS + 16 * 11]
-+	stp     x24, x25, [x1, #SDEI_EVENT_INTREGS + 16 * 12]
-+	stp     x26, x27, [x1, #SDEI_EVENT_INTREGS + 16 * 13]
-+	stp     x28, x29, [x1, #SDEI_EVENT_INTREGS + 16 * 14]
-+	mov	x4, sp
-+	stp     lr, x4, [x1, #SDEI_EVENT_INTREGS + S_LR]
-+
-+	mov	x19, x1
-+
-+#ifdef CONFIG_VMAP_STACK
-+	/*
-+	 * entry.S may have been using sp as a scratch register, find whether
-+	 * this is a normal or critical event and switch to the appropriate
-+	 * stack for this CPU.
-+	 */
-+	ldrb	w4, [x19, #SDEI_EVENT_PRIORITY]
-+	cbnz	w4, 1f
-+	ldr_this_cpu dst=x5, sym=sdei_stack_normal_ptr, tmp=x6
-+	b	2f
-+1:	ldr_this_cpu dst=x5, sym=sdei_stack_critical_ptr, tmp=x6
-+2:	mov	x6, #SDEI_STACK_SIZE
-+	add	x5, x5, x6
-+	mov	sp, x5
-+#endif
-+
-+	/*
-+	 * We may have interrupted userspace, or a guest, or exit-from or
-+	 * return-to either of these. We can't trust sp_el0, restore it.
-+	 */
-+	mrs	x28, sp_el0
-+	ldr_this_cpu	dst=x0, sym=__entry_task, tmp=x1
-+	msr	sp_el0, x0
-+
-+	/* If we interrupted the kernel point to the previous stack/frame. */
-+	and     x0, x3, #0xc
-+	mrs     x1, CurrentEL
-+	cmp     x0, x1
-+	csel	x29, x29, xzr, eq	// fp, or zero
-+	csel	x4, x2, xzr, eq		// elr, or zero
-+
-+	stp	x29, x4, [sp, #-16]!
-+	mov	x29, sp
-+
-+	add	x0, x19, #SDEI_EVENT_INTREGS
-+	mov	x1, x19
-+	bl	__sdei_handler
-+
-+	msr	sp_el0, x28
-+	/* restore regs >x17 that we clobbered */
-+	ldp     x28, x29, [x19, #SDEI_EVENT_INTREGS + 16 * 14]
-+	ldp     lr, x4, [x19, #SDEI_EVENT_INTREGS + S_LR]
-+	mov	sp, x4
-+	ldp     x18, x19, [x19, #SDEI_EVENT_INTREGS + 16 * 9]
-+
-+	mov	x1, x0			// address to complete_and_resume
-+	/* x0 = (x0 <= 1) ? EVENT_COMPLETE:EVENT_COMPLETE_AND_RESUME */
-+	cmp	x0, #1
-+	mov_q	x2, SDEI_1_0_FN_SDEI_EVENT_COMPLETE
-+	mov_q	x3, SDEI_1_0_FN_SDEI_EVENT_COMPLETE_AND_RESUME
-+	csel	x0, x2, x3, ls
-+
-+	/* On success, this call never returns... */
-+	ldr_l	x2, sdei_exit_mode
-+	cmp	x2, #SDEI_EXIT_SMC
-+	b.ne	1f
-+	smc	#0
-+	b	.
-+1:	hvc	#0
-+	b	.
-+ENDPROC(__sdei_asm_handler)
-+NOKPROBE(__sdei_asm_handler)
-+#endif /* CONFIG_ARM_SDE_INTERFACE */
-diff --git a/arch/arm64/kernel/sdei.c b/arch/arm64/kernel/sdei.c
-new file mode 100644
-index 000000000000..f9dffacaa5d6
---- /dev/null
-+++ b/arch/arm64/kernel/sdei.c
-@@ -0,0 +1,219 @@
-+// SPDX-License-Identifier: GPL-2.0
-+// Copyright (C) 2017 Arm Ltd.
-+#define pr_fmt(fmt) "sdei: " fmt
-+
-+#include <linux/arm_sdei.h>
-+#include <linux/hardirq.h>
-+#include <linux/irqflags.h>
-+#include <linux/sched/task_stack.h>
-+#include <linux/uaccess.h>
-+
-+#include <asm/alternative.h>
-+#include <asm/kprobes.h>
-+#include <asm/ptrace.h>
-+#include <asm/sysreg.h>
-+#include <asm/vmap_stack.h>
-+
-+unsigned long sdei_exit_mode;
-+
-+/*
-+ * VMAP'd stacks checking for stack overflow on exception using sp as a scratch
-+ * register, meaning SDEI has to switch to its own stack. We need two stacks as
-+ * a critical event may interrupt a normal event that has just taken a
-+ * synchronous exception, and is using sp as scratch register. For a critical
-+ * event interrupting a normal event, we can't reliably tell if we were on the
-+ * sdei stack.
-+ * For now, we allocate stacks when the driver is probed.
-+ */
-+DECLARE_PER_CPU(unsigned long *, sdei_stack_normal_ptr);
-+DECLARE_PER_CPU(unsigned long *, sdei_stack_critical_ptr);
-+
-+#ifdef CONFIG_VMAP_STACK
-+DEFINE_PER_CPU(unsigned long *, sdei_stack_normal_ptr);
-+DEFINE_PER_CPU(unsigned long *, sdei_stack_critical_ptr);
-+#endif
-+
-+static void _free_sdei_stack(unsigned long * __percpu *ptr, int cpu)
-+{
-+	unsigned long *p;
-+
-+	p = per_cpu(*ptr, cpu);
-+	if (p) {
-+		per_cpu(*ptr, cpu) = NULL;
-+		vfree(p);
-+	}
-+}
-+
-+static void free_sdei_stacks(void)
-+{
-+	int cpu;
-+
-+	for_each_possible_cpu(cpu) {
-+		_free_sdei_stack(&sdei_stack_normal_ptr, cpu);
-+		_free_sdei_stack(&sdei_stack_critical_ptr, cpu);
-+	}
-+}
-+
-+static int _init_sdei_stack(unsigned long * __percpu *ptr, int cpu)
-+{
-+	unsigned long *p;
-+
-+	p = arch_alloc_vmap_stack(SDEI_STACK_SIZE, cpu_to_node(cpu));
-+	if (!p)
-+		return -ENOMEM;
-+	per_cpu(*ptr, cpu) = p;
-+
-+	return 0;
-+}
-+
-+static int init_sdei_stacks(void)
-+{
-+	int cpu;
-+	int err = 0;
-+
-+	for_each_possible_cpu(cpu) {
-+		err = _init_sdei_stack(&sdei_stack_normal_ptr, cpu);
-+		if (err)
-+			break;
-+		err = _init_sdei_stack(&sdei_stack_critical_ptr, cpu);
-+		if (err)
-+			break;
-+	}
-+
-+	if (err)
-+		free_sdei_stacks();
-+
-+	return err;
-+}
-+
-+bool _on_sdei_stack(unsigned long sp)
-+{
-+	unsigned long low, high;
-+
-+	if (!IS_ENABLED(CONFIG_VMAP_STACK))
-+		return false;
-+
-+	low = (unsigned long)raw_cpu_read(sdei_stack_critical_ptr);
-+	high = low + SDEI_STACK_SIZE;
-+
-+	if (low <= sp && sp < high)
-+		return true;
-+
-+	low = (unsigned long)raw_cpu_read(sdei_stack_normal_ptr);
-+	high = low + SDEI_STACK_SIZE;
-+
-+	return (low <= sp && sp < high);
-+}
-+
-+unsigned long sdei_arch_get_entry_point(int conduit)
-+{
-+	/*
-+	 * SDEI works between adjacent exception levels. If we booted at EL1 we
-+	 * assume a hypervisor is marshalling events. If we booted@EL2 and
-+	 * dropped to EL1 because we don't support VHE, then we can't support
-+	 * SDEI.
-+	 */
-+	if (is_hyp_mode_available() && !is_kernel_in_hyp_mode()) {
-+		pr_err("Not supported on this hardware/boot configuration\n");
-+		return 0;
-+	}
-+
-+	if (IS_ENABLED(CONFIG_VMAP_STACK)) {
-+		if (init_sdei_stacks())
-+			return 0;
-+	}
-+
-+	sdei_exit_mode = (conduit == CONDUIT_HVC) ? SDEI_EXIT_HVC : SDEI_EXIT_SMC;
-+	return (unsigned long)__sdei_asm_handler;
-+}
-+
-+/*
-+ * __sdei_handler() returns one of:
-+ *  SDEI_EV_HANDLED -  success, return to the interrupted context.
-+ *  SDEI_EV_FAILED  -  failure, return this error code to firmare.
-+ *  virtual-address -  success, return to this address.
-+ */
-+static __kprobes unsigned long _sdei_handler(struct pt_regs *regs,
-+					     struct sdei_registered_event *arg)
-+{
-+	u32 mode;
-+	int i, err = 0;
-+	const int clobbered_registers = 4;
-+	u64 elr = read_sysreg(elr_el1);
-+	u32 kernel_mode = read_sysreg(CurrentEL) | 1;	/* +SPSel */
-+	unsigned long vbar = read_sysreg(vbar_el1);
-+
-+	/* Retrieve the missing registers values */
-+	for (i = 0; i < clobbered_registers; i++) {
-+		/* from within the handler, this call always succeeds */
-+		sdei_api_event_context(i, &regs->regs[i]);
-+	}
-+
-+	/*
-+	 * We didn't take an exception to get here, set PAN. UAO will be cleared
-+	 * by sdei_event_handler()s set_fs(USER_DS) call.
-+	 */
-+	__uaccess_enable_hw_pan();
-+
-+	err = sdei_event_handler(regs, arg);
-+	if (err)
-+		return SDEI_EV_FAILED;
-+
-+	if (elr != read_sysreg(elr_el1)) {
-+		/*
-+		 * We took a synchronous exception from the SDEI handler.
-+		 * This could deadlock, and if you interrupt KVM it will
-+		 * hyp-panic instead.
-+		 */
-+		pr_warn("unsafe: exception during handler\n");
-+	}
-+
-+	mode = regs->pstate & (PSR_MODE32_BIT | PSR_MODE_MASK);
-+
-+	/*
-+	 * If we interrupted the kernel with interrupts masked, we always go
-+	 * back to wherever we came from.
-+	 */
-+	if (mode == kernel_mode && !interrupts_enabled(regs))
-+		return SDEI_EV_HANDLED;
-+
-+	/*
-+	 * Otherwise, we pretend this was an IRQ. This lets user space tasks
-+	 * receive signals before we return to them, and KVM to invoke it's
-+	 * world switch to do the same.
-+	 *
-+	 * See DDI0487B.a Table D1-7 'Vector offsets from vector table base
-+	 * address'.
-+	 */
-+	if (mode == kernel_mode)
-+		return vbar + 0x280;
-+	else if (mode & PSR_MODE32_BIT)
-+		return vbar + 0x680;
-+
-+	return vbar + 0x480;
-+}
-+
-+
-+asmlinkage __kprobes notrace unsigned long
-+__sdei_handler(struct pt_regs *regs, struct sdei_registered_event *arg)
-+{
-+	unsigned long ret;
-+	bool do_nmi_exit = false;
-+
-+	/*
-+	 * nmi_enter() deals with printk() re-entrance and use of RCU when
-+	 * RCU believed this CPU was idle. Because critical events can
-+	 * interrupt normal events, we may already be in_nmi().
-+	 */
-+	if (!in_nmi()) {
-+		nmi_enter();
-+		do_nmi_exit = true;
-+	}
-+
-+	ret = _sdei_handler(regs, arg);
-+
-+	if (do_nmi_exit)
-+		nmi_exit();
-+
-+	return ret;
-+}
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index 551eb07c53b6..3b8ad7be9c33 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/acpi.h>
-+#include <linux/arm_sdei.h>
- #include <linux/delay.h>
- #include <linux/init.h>
- #include <linux/spinlock.h>
-@@ -836,6 +837,7 @@ static void ipi_cpu_stop(unsigned int cpu)
- 	set_cpu_online(cpu, false);
- 
- 	local_daif_mask();
-+	sdei_mask_local_cpu();
- 
- 	while (1)
- 		cpu_relax();
-@@ -853,6 +855,7 @@ static void ipi_cpu_crash_stop(unsigned int cpu, struct pt_regs *regs)
- 	atomic_dec(&waiting_for_crash_ipi);
- 
- 	local_irq_disable();
-+	sdei_mask_local_cpu();
- 
- #ifdef CONFIG_HOTPLUG_CPU
- 	if (cpu_ops[cpu]->cpu_die)
-@@ -972,6 +975,8 @@ void smp_send_stop(void)
- 	if (num_online_cpus() > 1)
- 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
- 			   cpumask_pr_args(cpu_online_mask));
-+
-+	sdei_mask_local_cpu();
- }
- 
- #ifdef CONFIG_KEXEC_CORE
-@@ -990,8 +995,10 @@ void crash_smp_send_stop(void)
- 
- 	cpus_stopped = 1;
- 
--	if (num_online_cpus() == 1)
-+	if (num_online_cpus() == 1) {
-+		sdei_mask_local_cpu();
- 		return;
-+	}
- 
- 	cpumask_copy(&mask, cpu_online_mask);
- 	cpumask_clear_cpu(smp_processor_id(), &mask);
-@@ -1009,6 +1016,8 @@ void crash_smp_send_stop(void)
- 	if (atomic_read(&waiting_for_crash_ipi) > 0)
- 		pr_warning("SMP: failed to stop secondary CPUs %*pbl\n",
- 			   cpumask_pr_args(&mask));
-+
-+	sdei_mask_local_cpu();
- }
- 
- bool smp_crash_stop_failed(void)
--- 
-2.15.0
+
+The end-to-end flow is then (assuming no-VHE):
+(1)An error occurs, taking the CPU to EL3.
+EL3: triage the error, generate CPER, notify the OS
+EL2: KVM takes the notification, exits the guest, returns to host EL1.
+EL1: KVM handle_exit() calls APEI to handle the error.
+This is the end of KVMs involvement in RAS - its just plumbing.
+
+(2)APEI processes the CPER records and signals affected processes.
+If KVM's user-space is affected, KVM will spot the pending signal when it goes
+to re-enter the guest, and exit to user-space instead.
+Qemu takes the SIGBUS_MCEERR_A{O,R}.
+
+(3) Qemu decides it wants to hand the guest a RAS error, it populates the CPER
+records (in memory only Qemu knows about), then drives the KVM API to make the
+appropriate notification appear.
+
+
+(1) only happens if the guest was running when the error arrived. GHES has ~4
+flavours of IRQ which may be used to describe corruption in guest memory. Steps
+(2) and (3) are exactly the same in this case.
+
+Qemu may decide to trigger RAS errors all by itself, (probably for testing and
+debugging), in which case (1) and (2) don't happen, but (3), is exactly the same.
+
+
+This way platform-firmware/host-kernel can use kernel-first or firmware-first
+with any of the notifications, independently from Qemu/guest-kernel making a
+different kernel-first or firmware-first with different notifications.
+
+Passing information out of KVM breaks this, forcing Qemu to know about the
+mechanism platform-firmware is using.
+
+
+We need to tackle (1) and (3) separately. For (3) we need some API that lets
+Qemu _trigger_ an SError in the guest, with a specified ESR. But, we don't have
+a way of migrating pending SError yet... which is where I got stuck last time I
+was looking at this.
+
+
+
+James
