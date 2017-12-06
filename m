@@ -1,52 +1,52 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Dec 2017 13:34:51 +0000
-Subject: [PATCH v3 18/20] perf: arm_spe: Fail device probe when
- arm64_kernel_unmapped_at_el0()
-In-Reply-To: <1512563739-25239-19-git-send-email-will.deacon@arm.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
- <1512563739-25239-19-git-send-email-will.deacon@arm.com>
-Message-ID: <20171206133450.7bcbyxnlyei3qgvl@lakrids.cambridge.arm.com>
+From: jolsa@redhat.com (Jiri Olsa)
+Date: Wed, 6 Dec 2017 14:36:07 +0100
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+Message-ID: <20171206133607.GA12508@krava>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 12:35:37PM +0000, Will Deacon wrote:
-> When running with the kernel unmapped whilst at EL0, the virtually-addressed
-> SPE buffer is also unmapped, which can lead to buffer faults if userspace
-> profiling is enabled and potentially also when writing back kernel samples
-> unless an expensive drain operation is performed on exception return.
+On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
+> For some architectures (like arm64), there are architecture-
+> defined recommended events. Vendors may not be obliged to
+> follow the recommendation and may implement their own pmu
+> event for a specific event code.
 > 
-> For now, fail the SPE driver probe when arm64_kernel_unmapped_at_el0().
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> This patch adds support for parsing events from arch-defined
+> recommended JSONs, and then fixing up vendor events when
+> they have implemented these events as recommended.
 
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+in the previous patch you added the vendor support, so
+you have arch|vendor|platform key for the event list
+and perf have the most current/local event list
 
-Mark.
+why would you need to fix it? if there's new event list,
+the table gets updated, perf is rebuilt.. I'm clearly
+missing something ;-)
 
-> ---
->  drivers/perf/arm_spe_pmu.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+> In the vendor JSON, to specify that the event is supported
+> according to the recommendation, only the event code is
+> added to the JSON entry - no other event elements need be
+> added, like below:
+> [
+>     {
+>         "EventCode": "0x40",
+>     },
 > 
-> diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-> index 8ce262fc2561..51b40aecb776 100644
-> --- a/drivers/perf/arm_spe_pmu.c
-> +++ b/drivers/perf/arm_spe_pmu.c
-> @@ -1164,6 +1164,15 @@ static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
->  	struct arm_spe_pmu *spe_pmu;
->  	struct device *dev = &pdev->dev;
->  
-> +	/*
-> +	 * If kernelspace is unmapped when running at EL0, then the SPE
-> +	 * buffer will fault and prematurely terminate the AUX session.
-> +	 */
-> +	if (arm64_kernel_unmapped_at_el0()) {
-> +		dev_warn_once(dev, "profiling buffer inaccessible. Try passing \"kpti=off\" on the kernel command line\n");
-> +		return -EPERM;
-> +	}
-> +
->  	spe_pmu = devm_kzalloc(dev, sizeof(*spe_pmu), GFP_KERNEL);
->  	if (!spe_pmu) {
->  		dev_err(dev, "failed to allocate spe_pmu\n");
-> -- 
-> 2.1.4
+> ]
 > 
+> The pmu event parsing will check for "BriefDescription"
+> field presence only for this.
+> 
+> If "BriefDescription" is present, then it is implied
+> that the vendor has implemented their own custom event,
+> and there is no fixup. Other fields are ignored.
+
+if we are going this way, please use some new token,
+this list is supposed to be human readable
+
+thanks,
+jirka
