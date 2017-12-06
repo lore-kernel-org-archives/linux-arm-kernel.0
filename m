@@ -1,42 +1,66 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 6 Dec 2017 14:57:29 +0000
-Subject: [PATCH 04/18] arm64: alternatives: Enforce alignment of struct
- alt_instr
-In-Reply-To: <20171206144847.GA28074@char.us.oracle.com>
-References: <20171206143839.29223-1-marc.zyngier@arm.com>
- <20171206143839.29223-5-marc.zyngier@arm.com>
- <20171206144847.GA28074@char.us.oracle.com>
-Message-ID: <dd8995ce-3065-3aba-2d93-9ed91de5cd50@arm.com>
+From: john.garry@huawei.com (John Garry)
+Date: Wed, 6 Dec 2017 14:40:10 +0000
+Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
+ events
+In-Reply-To: <20171206133752.GB12508@krava>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+ <1512490399-94107-3-git-send-email-john.garry@huawei.com>
+ <20171206133752.GB12508@krava>
+Message-ID: <f58001e9-86fa-c6e6-b9c7-fb748d340da1@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/17 14:48, Konrad Rzeszutek Wilk wrote:
-> On Wed, Dec 06, 2017 at 02:38:25PM +0000, Marc Zyngier wrote:
->> We're playing a dangerous game with struct alt_instr, as we produce
->> it using assembly tricks, but parse them using the C structure.
->> We just assume that the respective alignments of the two will
->> be the same.
+On 06/12/2017 13:37, Jiri Olsa wrote:
+> On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
+>
+> SNIP
+>
+>> ---
+>>  tools/perf/pmu-events/jevents.c | 215 ++++++++++++++++++++++++++++++++++++----
+>>  1 file changed, 198 insertions(+), 17 deletions(-)
 >>
->> But as we add more fields to this structure, the alignment requirements
->> of the structure may change, and lead to all kind of funky bugs.
+>> diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
+>> index a0d489e..a820ed4 100644
+>> --- a/tools/perf/pmu-events/jevents.c
+>> +++ b/tools/perf/pmu-events/jevents.c
+>> @@ -42,6 +42,7 @@
+>>  #include <dirent.h>
+>>  #include <sys/time.h>			/* getrlimit */
+>>  #include <sys/resource.h>		/* getrlimit */
+>> +#include <sys/queue.h>
+>>  #include <ftw.h>
+>>  #include <sys/stat.h>
+>>  #include "jsmn.h"
+>> @@ -366,6 +367,94 @@ static int print_events_table_entry(void *data, char *name, char *event,
+>>  	return 0;
+>>  }
 >>
->> TO solve this, let's move the definition of struct alt_instr to its
->> own file, and use this to generate the alignment constraint from
->> asm-offsets.c. The various macros are then patched to take the
->> alignment into account.
-> 
-> Would it be better to use .p2align as on 32-bit ARM you must
-> have it 4-byte aligned. Or at least have and BUILD_BUG_ON
-> to make sure the size can be divided by four??
-> 
-> Oh wait. You are not even touching ARM-32, how come? The alternative
-> code can run on ARM-32 ...
+>> +struct event_struct {
+>> +	char *name;
+>> +	char *event;
+>> +	char *desc;
+>> +	char *long_desc;
+>> +	char *pmu;
+>> +	char *unit;
+>> +	char *perpkg;
+>> +	char *metric_expr;
+>> +	char *metric_name;
+>> +	char *metric_group;
+>> +	LIST_ENTRY(event_struct) list;
+>
+> is there any reason you don't use the 'struct list_head' ?
+> I dont think we want another thingie involved for lists
 
-How? Given that I haven't written yet, I'd be grateful if you could
-share your time machine...
+Hi jirka,
+
+The linux kernel headers are not used for jevents tool. I would rather 
+use them if possible...
 
 Thanks,
+John
 
-	M.
--- 
-Jazz is not dead. It just smells funny...
+>
+> jirka
+>
+> .
+>
