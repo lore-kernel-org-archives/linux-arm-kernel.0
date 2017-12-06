@@ -1,70 +1,51 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 6 Dec 2017 11:41:33 -0500
-Subject: [PATCH V6 2/7] ACPI / bus: Introduce acpi_get_match_data()
- function
-In-Reply-To: <CAJZ5v0iJ_47z25GrQryQFVyXiXitYNHy8mQtTCf2rtdyhnn2eQ@mail.gmail.com>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-3-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0iJ_47z25GrQryQFVyXiXitYNHy8mQtTCf2rtdyhnn2eQ@mail.gmail.com>
-Message-ID: <218a717f-7fac-41a1-86e2-19f4d99a7f52@codeaurora.org>
+From: wcohen@redhat.com (William Cohen)
+Date: Wed, 6 Dec 2017 11:42:38 -0500
+Subject: [RFC PATCH 0/5] perf events patches for improved ARM64 support
+In-Reply-To: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
+Message-ID: <12034446-ccc9-9a88-6b2c-3318216f4817@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/5/2017 5:04 PM, Rafael J. Wysocki wrote:
-> On Tue, Dec 5, 2017 at 6:04 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> OF has of_device_get_match_data() function to extract driver specific data
->> structure. Add a similar function for ACPI.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> Acked-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+On 12/05/2017 11:13 AM, John Garry wrote:
+> This patchset adds support for some perf events features,
+> targeted at ARM64, implemented in a generic fashion.
 > 
-> Not sure yet, sorry.
-
-OK. no problem.
-
+> The two main features are as follows:
+> - support for arch/vendor/platform pmu events directory structure
+> - support for parsing architecture recommended pmu events
 > 
->> ---
->>  drivers/acpi/bus.c   | 12 ++++++++++++
->>  include/linux/acpi.h |  6 ++++++
->>  2 files changed, 18 insertions(+)
->>
->> diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
->> index 4d0979e..b271eb1 100644
->> --- a/drivers/acpi/bus.c
->> +++ b/drivers/acpi/bus.c
->> @@ -785,6 +785,18 @@ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
->>  }
->>  EXPORT_SYMBOL_GPL(acpi_match_device);
->>
->> +void *acpi_get_match_data(const struct device *dev)
->> +{
->> +       const struct acpi_device_id *match;
->> +
->> +       match = acpi_match_device(dev->driver->acpi_match_table, dev);
+> On the back of these, the Cavium ThunderX2 and HiSilicon hip08
+> JSONs are relocated/added.
 > 
-> Shouldn't this check dev->driver against NULL before dereferencing it?
+> TODO: 
+> 	- Documentation needs to be updated for recommended
+> 	events format in the JSON
+> 	- tidy up patches a bit
+> 
+> John Garry (5):
+>   perf jevents: add support for pmu events vendor subdirectory
+>   perf jevents: add support for arch recommended events
+>   perf vendor events arm64: add armv8 recommended events JSON
+>   perf vendor events arm64: relocate thunderx2 JSON
+>   perf vendor events arm64: add HiSilicon hip08 JSON
+> 
+>  .../pmu-events/arch/arm64/armv8-recommended.json   | 452 +++++++++++++++++++++
+>  .../arch/arm64/cavium/thunderx2-imp-def.json       |  62 ---
+>  .../arch/arm64/cavium/thunderx2/core-imp-def.json  |  32 ++
+>  .../arch/arm64/hisilicon/hip08/core-imp-def.json   | 122 ++++++
+>  tools/perf/pmu-events/arch/arm64/mapfile.csv       |   3 +-
+>  tools/perf/pmu-events/jevents.c                    | 272 ++++++++++++-
+>  6 files changed, 859 insertions(+), 84 deletions(-)
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/armv8-recommended.json
+>  delete mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2/core-imp-def.json
+>  create mode 100644 tools/perf/pmu-events/arch/arm64/hisilicon/hip08/core-imp-def.json
+> 
 
-I'm adding these checks. I realized that acpi_match_device() is not validating
-the ids either.
 
---- a/drivers/acpi/bus.c
-+++ b/drivers/acpi/bus.c
-@@ -789,6 +789,12 @@ void *acpi_get_match_data(const struct device *dev)
- {
-        const struct acpi_device_id *match;
+Hi,
 
-+       if (!dev->driver)
-+               return NULL;
-+
-+       if (!dev->driver->acpi_match_table)
-+               return NULL;
-+
+How is this code dealing with the possible different configurations within the aach64 architecture?  For example the Cortex-A53 implementations may exclude the L2 cache and not have L2 cache events implemented?  Is there some way that perf could make use of the PMCEID0 and PMCEID1 register information to accurately get the subset of events the processor supports?  Using this information could eliminate a lot of busy work adding implementation specific descriptions due to slight implementation differences.
 
-I'll hold onto posting this until I hear back from Sakari.
-
-Sinan
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+-Will Cohen
