@@ -1,192 +1,36 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Dec 2017 12:25:44 +0000
-Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <20171206121251.GM12608@e103592.cambridge.arm.com>
-References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
- <20171204122645.31535-12-ard.biesheuvel@linaro.org>
- <20171205122757.GW22781@e103592.cambridge.arm.com>
- <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
- <CAKv+Gu88Ym4NxoLxVd07Z07PD454_ONV4D=pqvxezPvAPnd5og@mail.gmail.com>
- <20171206115134.GZ22781@e103592.cambridge.arm.com>
- <CAKv+Gu83CR=KGawz5WRQygULcqX+DjhVjAeR-+QOGYx=2oPTzA@mail.gmail.com>
- <20171206121251.GM12608@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu-MBUt4C4ZrjUD1veQSZ8xX8Q3hNS+E3kAWBVtZ7Um-FQ@mail.gmail.com>
+From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
+Date: Wed, 6 Dec 2017 11:21:37 +0000
+Subject: [PATCH 1/8] ARM: dts: r8a7745: Add APMU node and second CPU core
+In-Reply-To: <CAMuHMdUuF4kwUiUYCbSew3W0Pa2CfRdCijefbOO1ZYAbnyG3KA@mail.gmail.com>
+References: <1505322341-9480-1-git-send-email-chris.paterson2@renesas.com>
+ <1505322341-9480-2-git-send-email-chris.paterson2@renesas.com>
+ <20170915074551.GF3924@verge.net.au>
+ <CAMuHMdWrMiHQz_Tadh3R00n+zeSnGOW-o=skbK-R-yD6Z-x2+A@mail.gmail.com>
+ <TY1PR06MB0895763DA6DE79A64B9981ECC06C0@TY1PR06MB0895.apcprd06.prod.outlook.com>
+ <20170915110609.GL3924@verge.net.au>
+ <CAMuHMdUuF4kwUiUYCbSew3W0Pa2CfRdCijefbOO1ZYAbnyG3KA@mail.gmail.com>
+Message-ID: <TY1PR06MB089533C44E4B42D647C2CC25C0320@TY1PR06MB0895.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 December 2017 at 12:12, Dave P Martin <Dave.Martin@arm.com> wrote:
-> On Wed, Dec 06, 2017 at 11:57:12AM +0000, Ard Biesheuvel wrote:
->> On 6 December 2017 at 11:51, Dave Martin <Dave.Martin@arm.com> wrote:
->> > On Tue, Dec 05, 2017 at 06:04:34PM +0000, Ard Biesheuvel wrote:
->> >> On 5 December 2017 at 12:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> >> >
->> >> >
->> >> >> On 5 Dec 2017, at 12:28, Dave Martin <Dave.Martin@arm.com> wrote:
->> >> >>
->> >> >>> On Mon, Dec 04, 2017 at 12:26:37PM +0000, Ard Biesheuvel wrote:
->> >> >>> Add a support macro to conditionally yield the NEON (and thus the CPU)
->> >> >>> that may be called from the assembler code. Given that especially the
->> >> >>> instruction based accelerated crypto code may use very tight loops, add
->> >> >>> some parametrization so that the TIF_NEED_RESCHED flag test is only
->> >> >>> executed every so many loop iterations.
->> >> >>>
->> >> >>> In some cases, yielding the NEON involves saving and restoring a non
->> >> >>> trivial amount of context (especially in the CRC folding algorithms),
->> >> >>> and so the macro is split into two, and the code in between is only
->> >> >>> executed when the yield path is taken, allowing the contex to be preserved.
->> >> >>> The second macro takes a label argument that marks the resume-from-yield
->> >> >>> path, which should restore the preserved context again.
->> >> >>>
->> >> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> >>> ---
->> >> >>> arch/arm64/include/asm/assembler.h | 50 ++++++++++++++++++++
->> >> >>> 1 file changed, 50 insertions(+)
->> >> >>>
->> >> >>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->> >> >>> index aef72d886677..917b026d3e00 100644
->> >> >>> --- a/arch/arm64/include/asm/assembler.h
->> >> >>> +++ b/arch/arm64/include/asm/assembler.h
->> >> >>> @@ -512,4 +512,54 @@ alternative_else_nop_endif
->> >> >>> #endif
->> >> >>>    .endm
->> >> >>>
->> >> >>> +/*
->> >> >>> + * yield_neon - check whether to yield to another runnable task from
->> >> >>> + *        kernel mode NEON code (running with preemption disabled)
->> >> >>> + *
->> >> >>> + * - Check whether the preempt count is exactly 1, in which case disabling
->> >> >>> + *   preemption once will make the task preemptible. If this is not the case,
->> >> >>> + *   yielding is pointless.
->> >> >>> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
->> >> >>> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
->> >> >>> + *   yield fixup code at @lbl.
->> >> >>> + */
->> >> >>> +    .macro        yield_neon, lbl:req, ctr, order, stride, loop
->> >> >>> +    yield_neon_pre    \ctr, \order, \stride, \loop
->> >> >>> +    yield_neon_post    \lbl
->> >> >>> +    .endm
->> >> >>> +
->> >> >>> +    .macro        yield_neon_pre, ctr, order=0, stride, loop=4444f
->> >> >>> +#ifdef CONFIG_PREEMPT
->> >> >>> +    /*
->> >> >>> +     * With some algorithms, it makes little sense to poll the
->> >> >>> +     * TIF_NEED_RESCHED flag after every iteration, so only perform
->> >> >>> +     * the check every 2^order strides.
->> >> >>> +     */
->> >> >>> +    .if        \order > 1
->> >> >>> +    .if        (\stride & (\stride - 1)) != 0
->> >> >>> +    .error        "stride should be a power of 2"
->> >> >>> +    .endif
->> >> >>> +    tst        \ctr, #((1 << \order) * \stride - 1) & ~(\stride - 1)
->> >> >>> +    b.ne        \loop
->> >> >>> +    .endif
->> >> >>
->> >> >> I'm not sure what baking in this check gives us, and this seems to
->> >> >> conflate two rather different things: yielding and defining a
->> >> >> "heartbeat" frequency for the calling code.
->> >> >>
->> >> >> Can we separate out the crypto-loop-helper semantics from the yield-
->> >> >> neon stuff?
->> >> >>
->> >> >
->> >> > Fair enough. I incorporated the check here so it disappears from the code entirely when !CONFIG_PREEMPT, because otherwise, you end up with a sequence that is mispredicted every # iterations without any benefit.
->> >> > I guess i could macroise that separately though.
->> >> >
->> >> >> If we had
->> >> >>
->> >> >>    if_cond_yield_neon
->> >> >>    // patchup code
->> >> >>    endif_yield_neon
->> >> >>
->> >>
->> >> I like this, but ...
->> >>
->> >> >> then the caller is free to conditionally branch over that as appropriate
->> >> >> like
->> >> >>
->> >> >> loop:
->> >> >>    // crypto stuff
->> >> >>    tst x0, #0xf
->> >> >>    b.ne    loop
->> >> >>
->> >> >>    if_cond_yield_neon
->> >> >>    // patchup code
->> >> >>    endif_cond_yield_neon
->> >> >>
->> >>
->> >> I need to put the post patchup code somewhere too. Please refer to the
->> >> CRC patches for the best examples of this.
->> >
->> > I'm not sure I follow.  If you need to do something different after
->> > patchup, can't you either pull that code into the if...endif too, or
->> > otherwise put a branch before the endif?
->> >
->>
->> No, not really.
->>
->> What I currently have is
->>
->> >    if_cond_yield_neon
->> >    // patchup code
->> >    endif_cond_yield_neon
->>
->> which is being turned into
->>
->>     get_thread_info x0
->>     ldr w1, [x0, #TSK_TI_PREEMPT]
->>     ldr x0, [x0, #TSK_TI_FLAGS]
->>     cmp w1, #1 // == PREEMPT_OFFSET
->>     csel x0, x0, xzr, eq
->>     tbnz x0, #TIF_NEED_RESCHED, 5555f // needs rescheduling?
->> 4444:
->>
->>     .subsection 1
->> 5555:
->>     // patchup code
->>     bl kernel_neon_end
->>     bl kernel_neon_begin
->>     // post patchup code goes here
->>     b 4444b
->>     .subsection
->>
->> so what I basically need is a place to put the post patchup code,
->> unless I open code it and branch to a different label right after
->> kernel_neon_begin
+Hello Geert, Simon,
+
 >
-> Ah, I get you.  I had convinced myself that there was only post-
-> patchup code.
->
-> So you conceptually want something like
->
-> if_will_cond_yield_neon
->         // pre-yield patchup code
-> do_cond_yield_neon
->         // post-yield patchup code
-> endif_yield_neon
->
-> .macro if_will_cond_yield_neon
->         // do preempt_count == 1 && TIF_NEED_RESCHED check
->         b.wont_yield 3432f
-> .endm
->
-> .macro do_cond_yield_neon
->         bl      kernel_neon_end
->         bl      kernel_neon_begin
-> .endm
->
-> .macro endif_yield_neon
-> 3432:
-> .endm
->
-> The main difference I see is that this doesn't get the slow-case
-> code out of line.
->
-> Or have I still missed something?
+> As the dependency is in v4.15-rc1, it can be applied now.
 >
 
-No, that seems accurate. I think the idiom looks much better, but I'd
-still like to get the code out of line, so that everything disappears
-completely for !CONFIG_PREEMPT.
+we thought exactly the same thing, therefore we rebased and we re-ran our tests, to discover that something broke in between versions.
+I'll be in touch once I have more information, but it's a no go for now.
 
-I'll try to rework my stuff using this as a starting point.
+Thanks,
+Fab
+
+
+[https://www2.renesas.eu/media/email/unicef_2017.jpg]
+
+This Christmas, instead of sending out cards, Renesas Electronics Europe have decided to support Unicef with a donation. For further details click here<https://www.unicef.org/> to find out about the valuable work they do, helping children all over the world.
+We would like to take this opportunity to wish you a Merry Christmas and a prosperous New Year.
+
+
+
+Renesas Electronics Europe Ltd, Dukes Meadow, Millboard Road, Bourne End, Buckinghamshire, SL8 5FH, UK. Registered in England & Wales under Registered No. 04586709.
