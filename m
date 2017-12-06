@@ -1,35 +1,74 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Wed, 06 Dec 2017 13:53:42 -0800
-Subject: [PATCH V2] ARM: dts: bcm283x: Fix probing of bcm2835-i2s
-In-Reply-To: <1511717111-6055-1-git-send-email-stefan.wahren@i2se.com>
-References: <1511717111-6055-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <87po7rr09l.fsf@anholt.net>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 6 Dec 2017 15:54:36 -0600
+Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
+In-Reply-To: <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
+References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
+ <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
+Message-ID: <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stefan Wahren <stefan.wahren@i2se.com> writes:
+On Tue, Dec 05, 2017 at 03:06:42PM +0100, linux-kernel-dev at beckhoff.com wrote:
+> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+> 
+> Document the binding for i.MX53 SRTC implemented by rtc-mxc_v2
+> 
+> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com><Paste>
+> 
+> ---
+> 
+> To: Alessandro Zummo <a.zummo@towertech.it>
+> To: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> 
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+> Cc: linux-rtc at vger.kernel.org (open list:REAL TIME CLOCK (RTC) SUBSYSTEM)
+> Cc: devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+> Cc: linux-kernel at vger.kernel.org (open list)
+> Cc: Fabio Estevam <fabio.estevam@nxp.com>
+> Cc: Juergen Borleis <jbe@pengutronix.de>
+> Cc: Noel Vellemans <Noel.Vellemans@visionbms.com>
+> Cc: Shawn Guo <shawnguo@kernel.org>
+> Cc: Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
+> Cc: Russell King <linux@armlinux.org.uk> (maintainer:ARM PORT)
+> Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
+> 
+> Cc: Philippe Ombredanne <pombredanne@nexb.com>
+> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
+> ---
+>  Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt | 17 +++++++++++++++++
+>  1 file changed, 17 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
+> new file mode 100644
+> index 000000000000..796e7f4995db
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
+> @@ -0,0 +1,17 @@
+> +* i.MX53 Real Time Clock controller
+> +
+> +Required properties:
+> +- compatible: should be: "fsl,imx53-rtc"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- clocks: should contain the phandle for the rtc clock
 
-> Since 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
-> the bcm2835-i2s requires a clock as DT property. Unfortunately
-> the necessary DT change has never been applied. While we are at it
-> also fix the first PCM register range to cover the PCM_GRAY register.
->
-> This patch also fixes the dt-bindings accordlingly.
->
-> Fixes: 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
-> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
-> Reviewed-by: Eric Anholt <eric@anholt.net>
-> Tested-by: Matthias Reichl <hias@horus.com>
+Shouldn't there be more than 1 here. From what I remember, the ipg clock 
+and the 32k clock?
 
-DT folks, are you happy with the binding change here?  It fixes having
-the i2s node also map a very separate hardware block (clocks) which has
-its own DT node.
+> +- interrupts: rtc alarm interrupt
+> +
+> +Example:
+> +
+> +srtc at 53fa4000 {
 
-The I2S node is disabled in the upstream DT files.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 832 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/e6d75109/attachment.sig>
+rtc at ...
+
+> +	compatible = "fsl,imx53-rtc";
+> +	reg = <0x53fa4000 0x4000>;
+> +	interrupts = <24>;
+> +	clocks = <&clks IMX5_CLK_SRTC_GATE>;
+> +};
+> --
+> 2.11.0
