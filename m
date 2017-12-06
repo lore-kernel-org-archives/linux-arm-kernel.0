@@ -1,38 +1,51 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 6 Dec 2017 14:02:49 +0100
-Subject: [PATCH net-next 2/2 v6] net: ethernet: Add a driver for Gemini
- gigabit ethernet
-In-Reply-To: <20171203.182149.1898604535140297695.davem@davemloft.net>
-References: <20171202110640.5284-1-linus.walleij@linaro.org>
- <20171202110640.5284-2-linus.walleij@linaro.org>
- <20171203.182149.1898604535140297695.davem@davemloft.net>
-Message-ID: <CACRpkdbbcG8E6OCPb0Hgmp3owZqn2ab3hWEp1auwj-W_hMVbWw@mail.gmail.com>
+From: eugen.hristev@microchip.com (Eugen Hristev)
+Date: Wed, 6 Dec 2017 15:18:43 +0200
+Subject: [PATCH v3 2/4] ARM: dts: at91: sama5d2: added dma property for
+ ADC device
+In-Reply-To: <20171129210507.GQ21126@piout.net>
+References: <1510750608-8697-1-git-send-email-eugen.hristev@microchip.com>
+ <1510750608-8697-3-git-send-email-eugen.hristev@microchip.com>
+ <20171129210507.GQ21126@piout.net>
+Message-ID: <d3024017-0802-92ea-8c28-70c2edfb4669@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Dec 4, 2017 at 12:21 AM, David Miller <davem@davemloft.net> wrote:
 
->> +static irqreturn_t gemini_port_irq_thread(int irq, void *data)
->> +{
->> +     struct gemini_ethernet_port *port = data;
->> +     struct gemini_ethernet *geth = port->geth;
->> +     unsigned long irqmask = SWFQ_EMPTY_INT_BIT;
->> +     unsigned long flags;
->
-> Always order local variables in reverse-christmas-tree format,
-> which is longest to shortest line.
 
-It's hard to do in cases like this where I use the variable
-when defining another variable:
+On 29.11.2017 23:05, Alexandre Belloni wrote:
+> Hi,
+> 
+> On 15/11/2017 at 14:56:46 +0200, Eugen Hristev wrote:
+>> Added DMA property for ADC device
+>>
+>> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>> ---
+>>   arch/arm/boot/dts/sama5d2.dtsi | 2 ++
+>>   1 file changed, 2 insertions(+)
+>>
+> 
+> This didn't apply cleanly, please check
+> https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=0ae80c039ef2407c08842ddde892af0c9128711b
+Hi,
 
-struct gemini_ethernet_port *port = netdev_priv(netdev);
-void __iomem *status_reg = port->gmac_base + GMAC_STATUS;
+I tested on your tree and looked over the file, and it's all good.
+Thanks.
 
-But I understand the aesthetic, so I fix it as well as I can.
-
-If you want me to even rewrite the above using more lines of code
-to keep the aestetic (moving assignment out of the variable
-definitions), tell me and I can fix that too, whatever you like.
-
-Yours,
-Linus Walleij
+> 
+>> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+>> index 38d2216..ca8bf13 100644
+>> --- a/arch/arm/boot/dts/sama5d2.dtsi
+>> +++ b/arch/arm/boot/dts/sama5d2.dtsi
+>> @@ -1430,6 +1430,8 @@
+>>   				atmel,min-sample-rate-hz = <200000>;
+>>   				atmel,max-sample-rate-hz = <20000000>;
+>>   				atmel,startup-time-ms = <4>;
+>> +				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
+>> +				dma-names = "rx";
+>>   				status = "disabled";
+>>   			};
+>>   
+>> -- 
+>> 2.7.4
+>>
+> 
