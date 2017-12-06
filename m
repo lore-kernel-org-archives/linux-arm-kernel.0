@@ -1,47 +1,35 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed,  6 Dec 2017 22:48:04 +0100
-Subject: [PATCH v2] ARM: omap2: hide omap3_save_secure_ram on non-OMAP3 builds
-Message-ID: <20171206214916.2856657-1-arnd@arndb.de>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 06 Dec 2017 13:53:42 -0800
+Subject: [PATCH V2] ARM: dts: bcm283x: Fix probing of bcm2835-i2s
+In-Reply-To: <1511717111-6055-1-git-send-email-stefan.wahren@i2se.com>
+References: <1511717111-6055-1-git-send-email-stefan.wahren@i2se.com>
+Message-ID: <87po7rr09l.fsf@anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In configurations without CONFIG_OMAP3 but with secure RAM support,
-we now run into a link failure:
+Stefan Wahren <stefan.wahren@i2se.com> writes:
 
-arch/arm/mach-omap2/omap-secure.o: In function `omap3_save_secure_ram':
-omap-secure.c:(.text+0x130): undefined reference to `save_secure_ram_context'
+> Since 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
+> the bcm2835-i2s requires a clock as DT property. Unfortunately
+> the necessary DT change has never been applied. While we are at it
+> also fix the first PCM register range to cover the PCM_GRAY register.
+>
+> This patch also fixes the dt-bindings accordlingly.
+>
+> Fixes: 517e7a1537a ("ASoC: bcm2835: move to use the clock framework")
+> Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
+> Reviewed-by: Eric Anholt <eric@anholt.net>
+> Tested-by: Matthias Reichl <hias@horus.com>
 
-The omap3_save_secure_ram() function is only called from the OMAP34xx
-power management code, so we can simply hide that function in the
-appropriate #ifdef.
+DT folks, are you happy with the binding change here?  It fixes having
+the i2s node also map a very separate hardware block (clocks) which has
+its own DT node.
 
-Fixes: d09220a887f7 ("ARM: OMAP2+: Fix SRAM virt to phys translation for save_secure_ram_context")
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: also check for CONFIG_PM
-
- arch/arm/mach-omap2/omap-secure.c | 2 ++
- 1 file changed, 2 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/omap-secure.c b/arch/arm/mach-omap2/omap-secure.c
-index f9303dc631e4..55b967758bb3 100644
---- a/arch/arm/mach-omap2/omap-secure.c
-+++ b/arch/arm/mach-omap2/omap-secure.c
-@@ -72,6 +72,7 @@ phys_addr_t omap_secure_ram_mempool_base(void)
- 	return omap_secure_memblock_base;
- }
- 
-+#if defined(CONFIG_ARCH_OMAP3) && defined(CONFIG_PM)
- u32 omap3_save_secure_ram(void __iomem *addr, int size)
- {
- 	u32 ret;
-@@ -90,6 +91,7 @@ u32 omap3_save_secure_ram(void __iomem *addr, int size)
- 
- 	return ret;
- }
-+#endif
- 
- /**
-  * rx51_secure_dispatcher: Routine to dispatch secure PPA API calls
--- 
-2.9.0
+The I2S node is disabled in the upstream DT files.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 832 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/e6d75109/attachment.sig>
