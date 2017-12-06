@@ -1,53 +1,111 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Wed, 06 Dec 2017 13:09:17 +0100
-Subject: [PATCH 3/6] cpufreq: sort the drivers in ARM part
-In-Reply-To: <20171204091850.iamq5uslv3hv6bez@vireshk-mac-ubuntu> (Viresh
- Kumar's message of "Mon, 4 Dec 2017 14:48:50 +0530")
-References: <20171201112508.14121-1-gregory.clement@free-electrons.com>
- <20171201112508.14121-4-gregory.clement@free-electrons.com>
- <20171204091850.iamq5uslv3hv6bez@vireshk-mac-ubuntu>
-Message-ID: <87o9nct5w2.fsf@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 Dec 2017 12:09:41 +0000
+Subject: [PATCH 1/2] arm64: SW PAN: Point saved ttbr0 at the zero page
+ when switching to init_mm
+In-Reply-To: <1512558968-28980-2-git-send-email-will.deacon@arm.com>
+References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+ <1512558968-28980-2-git-send-email-will.deacon@arm.com>
+Message-ID: <20171206120940.upy7apeb3v67ypzz@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Viresh,
- 
- On lun., d?c. 04 2017, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+Hi Will,
 
-> On 01-12-17, 12:25, Gregory CLEMENT wrote:
->> Keep the driver files alphabetically sorted.
->> 
->> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
->> ---
->>  drivers/cpufreq/Makefile | 8 ++++----
->>  1 file changed, 4 insertions(+), 4 deletions(-)
->> 
->> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
->> index 812f9e0d01a3..d762e76887e7 100644
->> --- a/drivers/cpufreq/Makefile
->> +++ b/drivers/cpufreq/Makefile
->> @@ -53,22 +53,24 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
->>  obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
->>  
->>  obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
->> +obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
->
-> Shouldn't we add them in ascending order of the whole config name and not just
-> CPPC_CPUFREQ ?
+On Wed, Dec 06, 2017 at 11:16:07AM +0000, Will Deacon wrote:
+> update_saved_ttbr0 mandates that mm->pgd is not swapper, since swapper
+> contains kernel mappings and should never be installed into ttbr0. However,
+> this means that callers must avoid passing the init_mm to update_saved_ttbr0
+> which in turn can cause the saved ttbr0 value to be out-of-date in the context
+> of the idle thread. For example, EFI runtime services may leave the saved ttbr0
+> pointing at the EFI page table, and kernel threads may end up with stale
+> references to freed page tables.
 
-Here it is the object name that are sorted not the CONFIG_ name. So
-cppc_cpufreq comes after brcmstb-avs-cpufreq.
+I think we should s/the idle thread/a kernel thread/ here, since IIUC
+this could happen in the context of any kernel thread, and there are
+multiple idle threads.
 
-Thanks,
+> This patch changes update_saved_ttbr0 so that the init_mm points the saved
+> ttbr0 value to the empty zero page, which always exists and never contains
+> valid translations. EFI and switch can then call into update_saved_ttbr0
+> unconditionally.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Vinayak Menon <vinmenon@codeaurora.org>
+> Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Gregory
+I guess this should have:
 
->
+Fixes: 39bc88e5e38e9b21 ("arm64: Disable TTBR0_EL1 during normal kernel execution")
+
+Otherwise, looks good to me.
+
+Mark.
+
+> ---
+>  arch/arm64/include/asm/efi.h         |  4 +---
+>  arch/arm64/include/asm/mmu_context.h | 22 +++++++++++++---------
+>  2 files changed, 14 insertions(+), 12 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+> index 650344d01124..c4cd5081d78b 100644
+> --- a/arch/arm64/include/asm/efi.h
+> +++ b/arch/arm64/include/asm/efi.h
+> @@ -132,11 +132,9 @@ static inline void efi_set_pgd(struct mm_struct *mm)
+>  			 * Defer the switch to the current thread's TTBR0_EL1
+>  			 * until uaccess_enable(). Restore the current
+>  			 * thread's saved ttbr0 corresponding to its active_mm
+> -			 * (if different from init_mm).
+>  			 */
+>  			cpu_set_reserved_ttbr0();
+> -			if (current->active_mm != &init_mm)
+> -				update_saved_ttbr0(current, current->active_mm);
+> +			update_saved_ttbr0(current, current->active_mm);
+>  		}
+>  	}
+>  }
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index 3257895a9b5e..f7773f90546e 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -174,11 +174,17 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+>  static inline void update_saved_ttbr0(struct task_struct *tsk,
+>  				      struct mm_struct *mm)
+>  {
+> -	if (system_uses_ttbr0_pan()) {
+> -		BUG_ON(mm->pgd == swapper_pg_dir);
+> -		task_thread_info(tsk)->ttbr0 =
+> -			virt_to_phys(mm->pgd) | ASID(mm) << 48;
+> -	}
+> +	u64 ttbr;
+> +
+> +	if (!system_uses_ttbr0_pan())
+> +		return;
+> +
+> +	if (mm == &init_mm)
+> +		ttbr = __pa_symbol(empty_zero_page);
+> +	else
+> +		ttbr = virt_to_phys(mm->pgd) | ASID(mm) << 48;
+> +
+> +	task_thread_info(tsk)->ttbr0 = ttbr;
+>  }
+>  #else
+>  static inline void update_saved_ttbr0(struct task_struct *tsk,
+> @@ -214,11 +220,9 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+>  	 * Update the saved TTBR0_EL1 of the scheduled-in task as the previous
+>  	 * value may have not been initialised yet (activate_mm caller) or the
+>  	 * ASID has changed since the last run (following the context switch
+> -	 * of another thread of the same process). Avoid setting the reserved
+> -	 * TTBR0_EL1 to swapper_pg_dir (init_mm; e.g. via idle_task_exit).
+> +	 * of another thread of the same process).
+>  	 */
+> -	if (next != &init_mm)
+> -		update_saved_ttbr0(tsk, next);
+> +	update_saved_ttbr0(tsk, next);
+>  }
+>  
+>  #define deactivate_mm(tsk,mm)	do { } while (0)
 > -- 
-> viresh
-
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+> 2.1.4
+> 
