@@ -1,57 +1,68 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 6 Dec 2017 15:39:23 +0000
-Subject: [PATCH 04/18] arm64: alternatives: Enforce alignment of struct
- alt_instr
-In-Reply-To: <20171206151856.GH28074@char.us.oracle.com>
-References: <20171206143839.29223-1-marc.zyngier@arm.com>
- <20171206143839.29223-5-marc.zyngier@arm.com>
- <20171206144847.GA28074@char.us.oracle.com>
- <dd8995ce-3065-3aba-2d93-9ed91de5cd50@arm.com>
- <20171206151856.GH28074@char.us.oracle.com>
-Message-ID: <280c1267-500c-fccd-bd33-50e27a01061b@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 6 Dec 2017 15:43:40 +0000
+Subject: [PATCH 1/3] extcon: usbc-cros-ec: add support to notify USB type
+ cables.
+In-Reply-To: <20171206111008.3079-1-enric.balletbo@collabora.com>
+References: <20171206111008.3079-1-enric.balletbo@collabora.com>
+Message-ID: <20171206154340.nzvk4svwliqxjk5u@dell>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/17 15:18, Konrad Rzeszutek Wilk wrote:
-> On Wed, Dec 06, 2017 at 02:57:29PM +0000, Marc Zyngier wrote:
->> On 06/12/17 14:48, Konrad Rzeszutek Wilk wrote:
->>> On Wed, Dec 06, 2017 at 02:38:25PM +0000, Marc Zyngier wrote:
->>>> We're playing a dangerous game with struct alt_instr, as we produce
->>>> it using assembly tricks, but parse them using the C structure.
->>>> We just assume that the respective alignments of the two will
->>>> be the same.
->>>>
->>>> But as we add more fields to this structure, the alignment requirements
->>>> of the structure may change, and lead to all kind of funky bugs.
->>>>
->>>> TO solve this, let's move the definition of struct alt_instr to its
->>>> own file, and use this to generate the alignment constraint from
->>>> asm-offsets.c. The various macros are then patched to take the
->>>> alignment into account.
->>>
->>> Would it be better to use .p2align as on 32-bit ARM you must
->>> have it 4-byte aligned. Or at least have and BUILD_BUG_ON
->>> to make sure the size can be divided by four??
->>>
->>> Oh wait. You are not even touching ARM-32, how come? The alternative
->>> code can run on ARM-32 ...
->>
->> How? Given that I haven't written yet, I'd be grateful if you could
->> share your time machine...
+On Wed, 06 Dec 2017, Enric Balletbo i Serra wrote:
+
+> From: Benson Leung <bleung@chromium.org>
 > 
-> Oh! I assumed it would be there as the Xen variant runs on ARM-32 and
-> it borrowed a bunch of code from Linux. 
+> Extend the driver to notify host and device type cables and the presence
+> of power.
+> 
+> Signed-off-by: Benson Leung <bleung@chromium.org>
+> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+> ---
+>  drivers/extcon/extcon-usbc-cros-ec.c | 142 ++++++++++++++++++++++++++++++++++-
+>  include/linux/mfd/cros_ec_commands.h |  17 +++++
+>  2 files changed, 155 insertions(+), 4 deletions(-)
 
-KVM definitely runs on 32bit, but doesn't have any alternative facility,
-at least not in the way arm64 does.
+[...]
 
-> Please disregard my comment. I will go back to tweaking the time machine.
+> diff --git a/include/linux/mfd/cros_ec_commands.h b/include/linux/mfd/cros_ec_commands.h
+> index 2b16e95..c907353 100644
+> --- a/include/linux/mfd/cros_ec_commands.h
+> +++ b/include/linux/mfd/cros_ec_commands.h
+> @@ -2904,16 +2904,33 @@ enum usb_pd_control_mux {
+>  	USB_PD_CTRL_MUX_AUTO = 5,
+>  };
+>  
+> +enum usb_pd_control_swap {
+> +	USB_PD_CTRL_SWAP_NONE = 0,
+> +	USB_PD_CTRL_SWAP_DATA = 1,
+> +	USB_PD_CTRL_SWAP_POWER = 2,
+> +	USB_PD_CTRL_SWAP_VCONN = 3,
+> +	USB_PD_CTRL_SWAP_COUNT
+> +};
+> +
+>  struct ec_params_usb_pd_control {
+>  	uint8_t port;
+>  	uint8_t role;
+>  	uint8_t mux;
+> +	uint8_t swap;
+>  } __packed;
+>  
+>  #define PD_CTRL_RESP_ENABLED_COMMS      (1 << 0) /* Communication enabled */
+>  #define PD_CTRL_RESP_ENABLED_CONNECTED  (1 << 1) /* Device connected */
+>  #define PD_CTRL_RESP_ENABLED_PD_CAPABLE (1 << 2) /* Partner is PD capable */
+>  
+> +#define PD_CTRL_RESP_ROLE_POWER         (1 << 0) /* 0=SNK/1=SRC */
+> +#define PD_CTRL_RESP_ROLE_DATA          (1 << 1) /* 0=UFP/1=DFP */
+> +#define PD_CTRL_RESP_ROLE_VCONN         (1 << 2) /* Vconn status */
+> +#define PD_CTRL_RESP_ROLE_DR_POWER      (1 << 3) /* Partner is dualrole power */
+> +#define PD_CTRL_RESP_ROLE_DR_DATA       (1 << 4) /* Partner is dualrole data */
+> +#define PD_CTRL_RESP_ROLE_USB_COMM      (1 << 5) /* Partner USB comm capable */
+> +#define PD_CTRL_RESP_ROLE_EXT_POWERED   (1 << 6) /* Partner externally powerd */
 
-Let me know once you've debugged it, I have a couple of issues to
-address in the past...
+Looks like the BIT() macro would serve you well here.
 
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny...
+Lee Jones
+Linaro Services Technical Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
