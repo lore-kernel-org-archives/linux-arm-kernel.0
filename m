@@ -1,47 +1,75 @@
-From: o.rempel@pengutronix.de (Oleksij Rempel)
-Date: Wed,  6 Dec 2017 08:24:02 +0100
-Subject: [PATCH v6 6/6] ARM: dts: imx6: RIoTboard provide standby on power off
- option
-In-Reply-To: <20171206072402.11694-1-o.rempel@pengutronix.de>
-References: <20171206072402.11694-1-o.rempel@pengutronix.de>
-Message-ID: <20171206072402.11694-7-o.rempel@pengutronix.de>
+From: joel@jms.id.au (Joel Stanley)
+Date: Wed, 6 Dec 2017 18:26:29 +1030
+Subject: [PATCH v6 0/5] clk: Add Aspeed clock driver
+In-Reply-To: <20171128071908.12279-1-joel@jms.id.au>
+References: <20171128071908.12279-1-joel@jms.id.au>
+Message-ID: <CACPK8XcQ_ZcgPK1PwEwCuWHQ_j5qS+PejRVhr2rYuH_Nn_nPLQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This board, as well as some other boards with i.MX6 and a PMIC, uses a
-"PMIC_STBY_REQ" line to notify the PMIC about a state change.
-The PMIC is programmed for a specific state change before triggering the
-line.
-In this case, PMIC_STBY_REQ can be used for stand by, sleep
-and power off modes.
+Hello clk maintainers,
 
-Signed-off-by: Oleksij Rempel <o.rempel@pengutronix.de>
----
- arch/arm/boot/dts/imx6dl-riotboard.dts | 5 +++++
- 1 file changed, 5 insertions(+)
+Has anyone had a chance to review these patches?
 
-diff --git a/arch/arm/boot/dts/imx6dl-riotboard.dts b/arch/arm/boot/dts/imx6dl-riotboard.dts
-index 275c6c05219d..574f6b261ecd 100644
---- a/arch/arm/boot/dts/imx6dl-riotboard.dts
-+++ b/arch/arm/boot/dts/imx6dl-riotboard.dts
-@@ -90,6 +90,10 @@
- 	status = "okay";
- };
- 
-+&clks {
-+	fsl,pmic-stby-poweroff;
-+};
-+
- &fec {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_enet>;
-@@ -170,6 +174,7 @@
- 		reg = <0x08>;
- 		interrupt-parent = <&gpio5>;
- 		interrupts = <16 8>;
-+		fsl,pmic-stby-poweroff;
- 
- 		regulators {
- 			reg_vddcore: sw1ab {				/* VDDARM_IN */
--- 
-2.11.0
+On Tue, Nov 28, 2017 at 5:49 PM, Joel Stanley <joel@jms.id.au> wrote:
+> This driver supports the ast2500, ast2400 (and derivative) BMC SoCs from
+> Aspeed.
+>
+> This is v6. See patches for detailed changelogs.
+>
+> v6: Added reviewed-bys
+> v5: Address review from Andrew
+> v4: Address review from Andrew and Stephen.
+> v3: Address review from Andrew and has seen more testing on hardware
+> v2: split the driver out into a series of patches to make them easier to
+> review.
+>
+> All of the important clocks are supported, with most non-essential ones
+> also implemented where information is available. I am working with
+> Aspeed to clear up some of the missing information, including the
+> missing parent-sibling relationships.
+>
+> We need to know the rate of the apb clock in order to correctly program
+> the clocksource driver, so the apb and it's parents are created in the
+> CLK_OF_DECLARE_DRIVER callback.
+>
+> The rest of the clocks are created at normal driver probe time. I
+> followed the Gemini driver's lead with using the regmap where I could,
+> but also having a pointer to the base address for use with the common
+> clock callbacks.
+>
+> The driver borrows from the clk_gate common clock infrastructure, but modifies
+> it in order to support the clock gate and reset pair that most of the clocks
+> have. This pair must be reset-ungated-released, with appropriate delays,
+> according to the datasheet.
+>
+> The first patch introduces the core clock registration parts, and describes
+> the clocks. The second creates the core clocks, giving the system enough to
+> boot (but without uart). Next come the non-core clocks, and finally the reset
+> controller that is used for the few cocks that don't have a gate to go with their
+> reset pair.
+>
+> Please review!
+>
+> Cheers,
+>
+> Joel
+>
+> Joel Stanley (5):
+>   clk: Add clock driver for ASPEED BMC SoCs
+>   clk: aspeed: Register core clocks
+>   clk: aspeed: Add platform driver and register PLLs
+>   clk: aspeed: Register gated clocks
+>   clk: aspeed: Add reset controller
+>
+>  drivers/clk/Kconfig                      |  12 +
+>  drivers/clk/Makefile                     |   1 +
+>  drivers/clk/clk-aspeed.c                 | 657 +++++++++++++++++++++++++++++++
+>  include/dt-bindings/clock/aspeed-clock.h |  54 +++
+>  4 files changed, 724 insertions(+)
+>  create mode 100644 drivers/clk/clk-aspeed.c
+>  create mode 100644 include/dt-bindings/clock/aspeed-clock.h
+>
+> --
+> 2.14.1
+>
