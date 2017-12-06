@@ -1,125 +1,159 @@
-From: yao.jin@linux.intel.com (Jin, Yao)
-Date: Wed, 6 Dec 2017 08:30:37 +0800
-Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
- UNCORE devices
-In-Reply-To: <20171205184242.GA19952@kernel.org>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
- <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
- <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
- <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
- <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
- <20171205184242.GA19952@kernel.org>
-Message-ID: <71db0255-af9b-968a-7baa-238d7146f069@linux.intel.com>
+From: andre.przywara@arm.com (=?UTF-8?Q?Andr=c3=a9_Przywara?=)
+Date: Wed, 6 Dec 2017 00:55:46 +0000
+Subject: [RFC PATCH 1/3] dt-bindings: pinctrl: sunxi: document new generic
+ binding
+In-Reply-To: <CACRpkdZ70a7Vk1QPFhkms6ucWmSH6rOUD9_J0h=NjhK+vfXNAA@mail.gmail.com>
+References: <20171113012523.2328-1-andre.przywara@arm.com>
+ <20171113012523.2328-2-andre.przywara@arm.com>
+ <CACRpkdbpfkM4odz425+4qyUCF5vqPWBQ=F5Yk7AtJL5SqXghpg@mail.gmail.com>
+ <20171124105240.GB3792@ulmo> <20efcf8f-85a5-3cad-a84b-434ee5cad68e@arm.com>
+ <20171124133123.GA15999@ulmo> <0c8051e6-5d8c-32d6-97e4-11c2283da5b4@arm.com>
+ <CACRpkdZ70a7Vk1QPFhkms6ucWmSH6rOUD9_J0h=NjhK+vfXNAA@mail.gmail.com>
+Message-ID: <be52417d-9509-f638-65b6-f455fade0c39@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+thanks for the reply!
 
-On 12/6/2017 2:42 AM, Arnaldo Carvalho de Melo wrote:
-> Em Tue, Dec 05, 2017 at 08:35:22PM +0800, Jin, Yao escreveu:
->> A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
+On 01/12/17 09:56, Linus Walleij wrote:
+> On Fri, Nov 24, 2017 at 6:19 PM, Andre Przywara <andre.przywara@arm.com> wrote:
 > 
-> I'll take this as a Tested-by: you, ok?
->   
+>> Conceptually I consider the DT being
+>> part of the firmware,
+> 
+> As it is a subset of open firmware it is obviously firmware.
+> 
+>> so one trust level above the kernel.
+> 
+> We are several kernel developers who don't trust firmware one
+> bit. Several disasters in ACPI has made me ever more convinced
+> that firmware should be trusted less than kernel code.
 
-Hi Arnaldo,
+I know what you mean, check commit acd316248205 ;-)
 
-I didn't do a full test for this patch and for the whole patch series.
+But in the Allwinner case all the firmware is open source, and even
+controlled by the community (ATF & U-Boot). This is even more true for
+the DT. Allwinner came up with their own DT, but since it uses
+completely non-standard bindings, we don't use it at all.
 
-I just do a quick test and it shows that the regression issue which was 
-found in 'perf stat --per-thread' test case is disappear.
+So I don't consider firmware this dark, evil and unhackable blob that
+many people see in it. Instead it is a good opportunity to separate very
+tedious machine-specific parts from the kernel (think of PSCI).
 
-If you think it's enough for adding Tested-by, that's fine for me. :)
+> But this is all very academic.
 
-Thanks
-Jin Yao
+I agree!
 
->> See the log:
+>>> Also, device tree bindings are not documentation for how to write a
+>>> driver. They are not a replacement for hardware documentation. Nobody
+>>> should be expected to be able to write an OS driver solely based on a
+>>> device tree binding. Device tree bindings are more of a configuration
+>>> interface specification for OS drivers.
 >>
->> root at skl:/tmp# perf stat --per-thread -p 10322 -M CPI,IPC
->> ^C
->>   Performance counter stats for process id '10322':
+>> Yes, but together with the hardware docs you should be able to write a
+>> driver. And here you can't, because you are missing the strings. So a
+>> BSD developer has to look at Linux code.
+> 
+> This is a fair point. It appears in several drivers.
+> 
+> BSD or even Windows (would they use DT) would have to sit in the
+> back seat just like Linux has been doing for years when it comes
+> to the hopeless Windowsisms in the x86 BIOSes. I suspect some
+> Windows on ARM is already experiencing this, but in the ACPI world,
+> where, incidentally, the servers were being deployed for Linux first
+> and Windows had to follow their example. I bet they have been
+> swearing a lot in Redmond about that.
+
+On the other hand a lot of the ACPI tables have been either taken from
+x86 or designed also with Windows in mind. And frankly, my sympathy for
+MS is quite limited in this respect ;-)
+
+> In general it's one of these areas where we can not be utopian about the
+> hardware descriptions, just fail gracefully in different ways.
+> 
+> I usually try to keep the IETF motto "rough consensus and running
+> code" in mind. I don't know if it helps in this discussion though.
+> 
+>>> So that's about 40% of the kernel image. Code really is no good without
+>>> data to process.
 >>
->>            vmstat-10322             1,879,654      inst_retired.any #
->> 0.8 CPI
->>            vmstat-10322             1,565,807      cycles
->>            vmstat-10322             1,879,654      inst_retired.any #
->> 1.2 IPC
->>            vmstat-10322             1,565,807      cpu_clk_unhalted.thread
+>> But how much of this is SoC specific configuration data? How much is it
+>> in x86? Yes, historically we had and have a lot of configuration data in
+>> ARM kernels. But that doesn't mean that we have to continue with this or
+>> even increase the share.
+> 
+> What people have been doing is trying to have better Kconfig setups
+> and compile it out by doing kernel modules. It is a bit hopeless with
+> pin controllers: almost all of them have to be built in. And if they come
+> with a lot of data, yeah there you have a real good point.
+> 
+> It would be sad if the ARMv7 multiboot or Aarch64 kernel just grows
+> so that we can't use it but have to go back to shipping board-specific
+> kernels with a huge bunch of stuff compiled out.
+> 
+> I was hoping Moore's law would save us here :/
+> 
+> An option that has been discussed is better used of  __initdata
+> and similar tags, especially with built-in drivers. Sadly, this is
+> hurt by another snag: the compiler or linker file or whatever it is,
+> is preventing us from discarding any strings from the kernel.
+> And pin controllers tend to stack up a lot of these.
+> 
+> This is really sucky and something we should solve in general.
+> I'm not smart enough to tackle any of these problems myself, just
+> to see them and "Oh that's bad. Very bad."
+
+I am sure one can find clever hac^Wsolutions for this problem, but I was
+wondering if a new approach - like putting the per machine data actually
+in DT - isn't the smarter way.
+Hence my suggestion with this driver: we *need* the DT anyway to assign
+pins to devices, so why not just add the few bytes *there*, which allows
+us to have a more or less "data-less" DT driver?
+
+>From what I learned the pinctrl subsystem seems to predates the ARM DT
+endeavor, so many design decisions probably didn't consider DT as a
+possible solution in the first way. And this is fine, because this is
+how it was back then. But it doesn't mean it has to stay this way. And I
+carefully thought of solving this problem without alienating existing
+users and developers - by keeping the driver and staying compatible with
+the existing binding and the DTs.
+
+>>> The majority of the improvements over the years have been achieved by
+>>> moving drivers out of arch/arm and moving board files to DT. The goal
+>>> was never to get rid of all data.
 >>
->>         2.850291804 seconds time elapsed
->>
->> Thanks for fixing it quickly.
->>
->> Thanks
->> Jin Yao
->>
->> On 12/5/2017 3:23 PM, Jin, Yao wrote:
->>> Hi,
->>>
->>> I applied the diff but it's failed.
->>>
->>> jinyao at skl:~/skl-ws/perf-dev/lck-4594/src$ patch -p1 < 1.pat
->>> patching file tools/perf/util/pmu.c
->>> patch: **** malformed patch at line 41: *head, struct perf_pmu *pmu)
->>>
->>> Could you send the patch as attachment to me in another mail thread?
->>>
->>> to yao.jin at linux.intel.com
->>> cc yao.jin at intel.com
->>>
->>> Thanks
->>> Jin Yao
->>>
->>> On 12/5/2017 3:12 PM, Ganapatrao Kulkarni wrote:
->>>> diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
->>>> index 5ad8a18..57e38fd 100644
->>>> --- a/tools/perf/util/pmu.c
->>>> +++ b/tools/perf/util/pmu.c
->>>> @@ -538,6 +538,34 @@ static bool pmu_is_uncore(const char *name)
->>>>  ? }
->>>>
->>>>  ? /*
->>>> + *? PMU CORE devices have different name other than cpu in sysfs on some
->>>> + *? platforms. looking for possible sysfs files to identify as core
->>>> device.
->>>> + */
->>>> +static int is_pmu_core(const char *name)
->>>> +{
->>>> + struct stat st;
->>>> + char path[PATH_MAX];
->>>> + const char *sysfs = sysfs__mountpoint();
->>>> +
->>>> + if (!sysfs)
->>>> + return 0;
->>>> +
->>>> + /* Look for cpu sysfs (x86 and others) */
->>>> + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
->>>> + if ((stat(path, &st) == 0) &&
->>>> + (strncmp(name, "cpu", strlen("cpu")) == 0))
->>>> + return 1;
->>>> +
->>>> + /* Look for cpu sysfs (specific to arm) */
->>>> + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/%s/cpus",
->>>> + sysfs, name);
->>>> + if (stat(path, &st) == 0)
->>>> + return 1;
->>>> +
->>>> + return 0;
->>>> +}
->>>> +
->>>> +/*
->>>>  ?? * Return the CPU id as a raw string.
->>>>  ?? *
->>>>  ?? * Each architecture should provide a more precise id string that
->>>> @@ -641,7 +669,7 @@ static void pmu_add_cpu_aliases(struct list_head
->>>> *head, struct perf_pmu *pmu)
->>>>  ?? break;
->>>>  ?? }
->>>>
->>>> - if (pmu->is_uncore) {
->>>> + if (!is_pmu_core(name)) {
->>>>  ?? /* check for uncore devices */
->>>>  ?? if (pe->pmu == NULL)
->>>>  ?? continue;
+>> Sure, not all data. But if we have the relatively easy opportunity to
+>> avoid further addition of data, we should do it, I believe.
+>> This significantly reduces the amount of kernel code we need to add to
+>> support new SoCs.
+> 
+> This is the core of your argument as I perceive it: get rid of data
+> from the kernel, because it is growing wild.
+
+Yes, this, but also to avoid replicating data in other DT consumers. I
+very much like the idea of the DT describing the hardware, but I am a
+bit afraid we loose many good opportunities by treating the DT more like
+a "Linux config file" or an external Linux board file.
+So I wanted to propose a way where we simplify DT usage in other
+systems, while still keeping the Linux driver intact.
+
+> It is a valid cause. Just
+> has to be weighed with other stuff, like maintainability, debuggability,
+> maintainers viewpoint. ...
+
+So to keep Maxime happy I actually designed this "driver" more like a
+shim: to generate the table the current driver expects from the DT, and
+actually not touching the existing driver at all.
+So maintainability should actually be less of a concern: the driver will
+just work with whatever one throws at it from the DT side, without
+requiring frequent changes or additions.
+In the moment we still need to write, review and merge *data* files for
+each new SoC. And as I mentioned before, Allwinner decided to push for
+new, slightly different chips every few months, so there will be more to
+come. With at least the pinctrl driver out of the way we have one
+problem less to worry about.
+
+Cheers,
+Andre.
