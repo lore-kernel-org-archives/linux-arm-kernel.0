@@ -1,73 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 11:16:08 +0000
-Subject: [PATCH 2/2] arm64: SW PAN: Update saved ttbr0 value on enter_lazy_tlb
-In-Reply-To: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
-References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512558968-28980-3-git-send-email-will.deacon@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed, 6 Dec 2017 12:05:03 +0100
+Subject: [PATCH v2 5/5] rtc: add mxc driver for i.MX53 SRTC
+In-Reply-To: <20171205140646.30367-6-linux-kernel-dev@beckhoff.com>
+References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
+ <20171205140646.30367-6-linux-kernel-dev@beckhoff.com>
+Message-ID: <20171206110503.GO21780@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enter_lazy_tlb is called when a kernel thread rides on the back of
-another mm, due to a context switch or an explicit call to unuse_mm
-where a call to switch_mm is elided.
+On 05/12/2017 at 15:06:46 +0100, linux-kernel-dev at beckhoff.com wrote:
+> +/* This function is the RTC interrupt service routine. */
+> +static irqreturn_t mxc_rtc_interrupt(int irq, void *dev_id)
+> +{
+> +	struct platform_device *pdev = dev_id;
+> +	struct mxc_rtc_data *pdata = platform_get_drvdata(pdev);
+> +	void __iomem *ioaddr = pdata->ioaddr;
+> +	unsigned long flags;
+> +	u32 events = 0;
+> +	u32 lp_status;
+> +	u32 lp_cr;
+> +
+> +	spin_lock_irqsave(&pdata->lock, flags);
+> +	if (clk_prepare_enable(pdata->clk)) {
+> +		spin_unlock_irqrestore(&pdata->lock, flags);
+> +		return IRQ_NONE;
+> +	}
+> +
+> +	lp_status = readl(ioaddr + SRTC_LPSR);
+> +	lp_cr = readl(ioaddr + SRTC_LPCR);
+> +
+> +	/* update irq data & counter */
+> +	if (lp_status & SRTC_LPSR_ALP) {
+> +		if (lp_cr & SRTC_LPCR_ALP)
+> +			events = (RTC_AF | RTC_IRQF);
 
-In these cases, it's important to keep the saved ttbr value up to date
-with the active mm, otherwise we can end up with a stale value which
-points to a potentially freed page table.
+I would just call rtc_update_irq here...
 
-This patch implements enter_lazy_tlb for arm64, so that the saved ttbr0
-is kept up-to-date with the active mm for kernel threads.
+> +
+> +		/* disable further lp alarm interrupts */
+> +		lp_cr &= ~(SRTC_LPCR_ALP | SRTC_LPCR_WAE);
+> +	}
+> +
+> +	/* Update interrupt enables */
+> +	writel(lp_cr, ioaddr + SRTC_LPCR);
+> +
+> +	/* clear interrupt status */
+> +	writel(lp_status, ioaddr + SRTC_LPSR);
+> +
+> +	mxc_rtc_sync_lp_locked(ioaddr);
+> +	rtc_update_irq(pdata->rtc, 1, events);
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Vinayak Menon <vinmenon@codeaurora.org>
-Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/include/asm/mmu_context.h | 24 ++++++++++--------------
- 1 file changed, 10 insertions(+), 14 deletions(-)
+... because calling it here with events == 0 will result in a lot of
+work for nothing (the core will walk through the timers and set the
+alarm again).
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index f7773f90546e..9d155fa9a507 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -156,20 +156,6 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
- 
- #define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
- 
--/*
-- * This is called when "tsk" is about to enter lazy TLB mode.
-- *
-- * mm:  describes the currently active mm context
-- * tsk: task which is entering lazy tlb
-- * cpu: cpu number which is entering lazy tlb
-- *
-- * tsk->mm will be NULL
-- */
--static inline void
--enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
--{
--}
--
- #ifdef CONFIG_ARM64_SW_TTBR0_PAN
- static inline void update_saved_ttbr0(struct task_struct *tsk,
- 				      struct mm_struct *mm)
-@@ -193,6 +179,16 @@ static inline void update_saved_ttbr0(struct task_struct *tsk,
- }
- #endif
- 
-+static inline void
-+enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
-+{
-+	/*
-+	 * We don't actually care about the ttbr0 mapping, so point it at the
-+	 * zero page.
-+	 */
-+	update_saved_ttbr0(tsk, &init_mm);
-+}
-+
- static inline void __switch_mm(struct mm_struct *next)
- {
- 	unsigned int cpu = smp_processor_id();
+
 -- 
-2.1.4
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
