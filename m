@@ -1,43 +1,42 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:05 +0100
-Subject: [PATCH 10/61] ARM: dts: iwg22d: Use /dev/ttySC3 as debug console
-In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
-References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <4c1d14ce4a03af24c2bac21c4a19f17d20b4a763.1512555546.git.horms+renesas@verge.net.au>
+From: gengdongjiu@huawei.com (gengdongjiu)
+Date: Wed, 6 Dec 2017 18:26:14 +0800
+Subject: [PATCH v8 7/7] arm64: kvm: handle SError Interrupt by
+ categorization
+In-Reply-To: <5A0B1334.7060500@arm.com>
+References: <1510343650-23659-1-git-send-email-gengdongjiu@huawei.com>
+ <1510343650-23659-8-git-send-email-gengdongjiu@huawei.com>
+ <5A0B1334.7060500@arm.com>
+Message-ID: <4af78739-99da-4056-4db1-f80bfe11081a@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-The BSP release from iWave uses /dev/ttySC3 as debug console, this patch
-renames the alias accordingly for compatibility.
+On 2017/11/15 0:00, James Morse wrote:
+>> +		 * error has not been propagated
+>> +		 */
+>> +		run->exit_reason = KVM_EXIT_EXCEPTION;
+>> +		run->ex.exception = ESR_ELx_EC_SERROR;
+>> +		run->ex.error_code = KVM_SEI_SEV_RECOVERABLE;
+>> +		return 0;
+> We should not pass RAS notifications to user space. The kernel either handles
+> them, or it panics(). User space shouldn't even know if the kernel supports RAS
+> until it gets an MCEERR signal.
+> 
+> You're making your firmware-first notification an EL3->EL0 signal, bypassing the OS.
+> 
+> If we get a RAS SError and there are no CPER records or values in the ERR nodes,
+> we should panic as it looks like the CPU/firmware is broken. (spurious RAS errors)
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Hi james,
+  sorry to disturb you!
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-index 52153ec3638c..edadeee8f1ec 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-+++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-@@ -16,13 +16,13 @@
- 	compatible = "iwave,g22d", "iwave,g22m", "renesas,r8a7745";
- 
- 	aliases {
--		serial0 = &scif4;
-+		serial3 = &scif4;
- 		ethernet0 = &avb;
- 	};
- 
- 	chosen {
- 		bootargs = "ignore_loglevel rw root=/dev/nfs ip=dhcp";
--		stdout-path = "serial0:115200n8";
-+		stdout-path = "serial3:115200n8";
- 	};
- 
- 	vccq_sdhi0: regulator-vccq-sdhi0 {
--- 
-2.11.0
+  do you think whether we need to set the guest ESR by user space?  if need, I need to
+notify user space that there is a SError happen and need to set ESR for guest in some place of
+KVM. so here I return a error code to user space. you mean we should not pass RAS notifications
+to user space, so could you give some suggestion how to notify user space to set guest ESR.
+
+Thanks a lot in advance.
+
+
+> 
+> 
