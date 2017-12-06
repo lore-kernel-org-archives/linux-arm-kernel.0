@@ -1,36 +1,61 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Wed,  6 Dec 2017 12:54:25 +0100
-Subject: [RESEND PATCH 1/4] dt-bindings: display: amlogic,
- meson-vpu: Add optional power domain property
+Date: Wed,  6 Dec 2017 12:54:28 +0100
+Subject: [RESEND PATCH 4/4] drm/meson: Add missing VPU init
 In-Reply-To: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
 References: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
-Message-ID: <1512561268-29806-2-git-send-email-narmstrong@baylibre.com>
+Message-ID: <1512561268-29806-5-git-send-email-narmstrong@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Video Processing Unit power domain was setup by the Vendor U-Boot,
-add support for an optional Power Domain phandle to setup it from the kernel.
+The VPU init misses these configurations values.
 
-Acked-by: Rob Herring <robh@kernel.org> 
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/gpu/drm/meson/meson_drv.c       | 9 +++++++++
+ drivers/gpu/drm/meson/meson_registers.h | 4 ++++
+ 2 files changed, 13 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-index 00f74ba..057b813 100644
---- a/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-+++ b/Documentation/devicetree/bindings/display/amlogic,meson-vpu.txt
-@@ -64,6 +64,10 @@ Required properties:
- - reg-names: should contain the names of the previous memory regions
- - interrupts: should contain the VENC Vsync interrupt number
+diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
+index 3b804fd..f9ad0e9 100644
+--- a/drivers/gpu/drm/meson/meson_drv.c
++++ b/drivers/gpu/drm/meson/meson_drv.c
+@@ -151,6 +151,14 @@ static struct regmap_config meson_regmap_config = {
+ 	.max_register   = 0x1000,
+ };
  
-+Optional properties:
-+- power-domains: Optional phandle to associated power domain as described in
-+	the file ../power/power_domain.txt
++static void meson_vpu_init(struct meson_drm *priv)
++{
++	writel_relaxed(0x210000, priv->io_base + _REG(VPU_RDARB_MODE_L1C1));
++	writel_relaxed(0x10000, priv->io_base + _REG(VPU_RDARB_MODE_L1C2));
++	writel_relaxed(0x900000, priv->io_base + _REG(VPU_RDARB_MODE_L2C1));
++	writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
++}
 +
- Required nodes:
+ static int meson_drv_bind_master(struct device *dev, bool has_components)
+ {
+ 	struct platform_device *pdev = to_platform_device(dev);
+@@ -222,6 +230,7 @@ static int meson_drv_bind_master(struct device *dev, bool has_components)
  
- The connections to the VPU output video ports are modeled using the OF graph
+ 	/* Hardware Initialization */
+ 
++	meson_vpu_init(priv);
+ 	meson_venc_init(priv);
+ 	meson_vpp_init(priv);
+ 	meson_viu_init(priv);
+diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
+index 2847381..bca8714 100644
+--- a/drivers/gpu/drm/meson/meson_registers.h
++++ b/drivers/gpu/drm/meson/meson_registers.h
+@@ -1363,6 +1363,10 @@
+ #define VPU_PROT3_STAT_1 0x277a
+ #define VPU_PROT3_STAT_2 0x277b
+ #define VPU_PROT3_REQ_ONOFF 0x277c
++#define VPU_RDARB_MODE_L1C1 0x2790
++#define VPU_RDARB_MODE_L1C2 0x2799
++#define VPU_RDARB_MODE_L2C1 0x279d
++#define VPU_WRARB_MODE_L2C1 0x27a2
+ 
+ /* osd super scale */
+ #define OSDSR_HV_SIZEIN 0x3130
 -- 
 2.7.4
