@@ -1,151 +1,53 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Dec 2017 11:57:12 +0000
-Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <20171206115134.GZ22781@e103592.cambridge.arm.com>
-References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
- <20171204122645.31535-12-ard.biesheuvel@linaro.org>
- <20171205122757.GW22781@e103592.cambridge.arm.com>
- <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
- <CAKv+Gu88Ym4NxoLxVd07Z07PD454_ONV4D=pqvxezPvAPnd5og@mail.gmail.com>
- <20171206115134.GZ22781@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu83CR=KGawz5WRQygULcqX+DjhVjAeR-+QOGYx=2oPTzA@mail.gmail.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Wed, 06 Dec 2017 13:09:17 +0100
+Subject: [PATCH 3/6] cpufreq: sort the drivers in ARM part
+In-Reply-To: <20171204091850.iamq5uslv3hv6bez@vireshk-mac-ubuntu> (Viresh
+ Kumar's message of "Mon, 4 Dec 2017 14:48:50 +0530")
+References: <20171201112508.14121-1-gregory.clement@free-electrons.com>
+ <20171201112508.14121-4-gregory.clement@free-electrons.com>
+ <20171204091850.iamq5uslv3hv6bez@vireshk-mac-ubuntu>
+Message-ID: <87o9nct5w2.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 December 2017 at 11:51, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Tue, Dec 05, 2017 at 06:04:34PM +0000, Ard Biesheuvel wrote:
->> On 5 December 2017 at 12:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> >
->> >
->> >> On 5 Dec 2017, at 12:28, Dave Martin <Dave.Martin@arm.com> wrote:
->> >>
->> >>> On Mon, Dec 04, 2017 at 12:26:37PM +0000, Ard Biesheuvel wrote:
->> >>> Add a support macro to conditionally yield the NEON (and thus the CPU)
->> >>> that may be called from the assembler code. Given that especially the
->> >>> instruction based accelerated crypto code may use very tight loops, add
->> >>> some parametrization so that the TIF_NEED_RESCHED flag test is only
->> >>> executed every so many loop iterations.
->> >>>
->> >>> In some cases, yielding the NEON involves saving and restoring a non
->> >>> trivial amount of context (especially in the CRC folding algorithms),
->> >>> and so the macro is split into two, and the code in between is only
->> >>> executed when the yield path is taken, allowing the contex to be preserved.
->> >>> The second macro takes a label argument that marks the resume-from-yield
->> >>> path, which should restore the preserved context again.
->> >>>
->> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >>> ---
->> >>> arch/arm64/include/asm/assembler.h | 50 ++++++++++++++++++++
->> >>> 1 file changed, 50 insertions(+)
->> >>>
->> >>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->> >>> index aef72d886677..917b026d3e00 100644
->> >>> --- a/arch/arm64/include/asm/assembler.h
->> >>> +++ b/arch/arm64/include/asm/assembler.h
->> >>> @@ -512,4 +512,54 @@ alternative_else_nop_endif
->> >>> #endif
->> >>>    .endm
->> >>>
->> >>> +/*
->> >>> + * yield_neon - check whether to yield to another runnable task from
->> >>> + *        kernel mode NEON code (running with preemption disabled)
->> >>> + *
->> >>> + * - Check whether the preempt count is exactly 1, in which case disabling
->> >>> + *   preemption once will make the task preemptible. If this is not the case,
->> >>> + *   yielding is pointless.
->> >>> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
->> >>> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
->> >>> + *   yield fixup code at @lbl.
->> >>> + */
->> >>> +    .macro        yield_neon, lbl:req, ctr, order, stride, loop
->> >>> +    yield_neon_pre    \ctr, \order, \stride, \loop
->> >>> +    yield_neon_post    \lbl
->> >>> +    .endm
->> >>> +
->> >>> +    .macro        yield_neon_pre, ctr, order=0, stride, loop=4444f
->> >>> +#ifdef CONFIG_PREEMPT
->> >>> +    /*
->> >>> +     * With some algorithms, it makes little sense to poll the
->> >>> +     * TIF_NEED_RESCHED flag after every iteration, so only perform
->> >>> +     * the check every 2^order strides.
->> >>> +     */
->> >>> +    .if        \order > 1
->> >>> +    .if        (\stride & (\stride - 1)) != 0
->> >>> +    .error        "stride should be a power of 2"
->> >>> +    .endif
->> >>> +    tst        \ctr, #((1 << \order) * \stride - 1) & ~(\stride - 1)
->> >>> +    b.ne        \loop
->> >>> +    .endif
->> >>
->> >> I'm not sure what baking in this check gives us, and this seems to
->> >> conflate two rather different things: yielding and defining a
->> >> "heartbeat" frequency for the calling code.
->> >>
->> >> Can we separate out the crypto-loop-helper semantics from the yield-
->> >> neon stuff?
->> >>
->> >
->> > Fair enough. I incorporated the check here so it disappears from the code entirely when !CONFIG_PREEMPT, because otherwise, you end up with a sequence that is mispredicted every # iterations without any benefit.
->> > I guess i could macroise that separately though.
->> >
->> >> If we had
->> >>
->> >>    if_cond_yield_neon
->> >>    // patchup code
->> >>    endif_yield_neon
->> >>
->>
->> I like this, but ...
->>
->> >> then the caller is free to conditionally branch over that as appropriate
->> >> like
->> >>
->> >> loop:
->> >>    // crypto stuff
->> >>    tst x0, #0xf
->> >>    b.ne    loop
->> >>
->> >>    if_cond_yield_neon
->> >>    // patchup code
->> >>    endif_cond_yield_neon
->> >>
->>
->> I need to put the post patchup code somewhere too. Please refer to the
->> CRC patches for the best examples of this.
+Hi Viresh,
+ 
+ On lun., d?c. 04 2017, Viresh Kumar <viresh.kumar@linaro.org> wrote:
+
+> On 01-12-17, 12:25, Gregory CLEMENT wrote:
+>> Keep the driver files alphabetically sorted.
+>> 
+>> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+>> ---
+>>  drivers/cpufreq/Makefile | 8 ++++----
+>>  1 file changed, 4 insertions(+), 4 deletions(-)
+>> 
+>> diff --git a/drivers/cpufreq/Makefile b/drivers/cpufreq/Makefile
+>> index 812f9e0d01a3..d762e76887e7 100644
+>> --- a/drivers/cpufreq/Makefile
+>> +++ b/drivers/cpufreq/Makefile
+>> @@ -53,22 +53,24 @@ obj-$(CONFIG_ARM_BIG_LITTLE_CPUFREQ)	+= arm_big_little.o
+>>  obj-$(CONFIG_ARM_DT_BL_CPUFREQ)		+= arm_big_little_dt.o
+>>  
+>>  obj-$(CONFIG_ARM_BRCMSTB_AVS_CPUFREQ)	+= brcmstb-avs-cpufreq.o
+>> +obj-$(CONFIG_ACPI_CPPC_CPUFREQ)		+= cppc_cpufreq.o
 >
-> I'm not sure I follow.  If you need to do something different after
-> patchup, can't you either pull that code into the if...endif too, or
-> otherwise put a branch before the endif?
+> Shouldn't we add them in ascending order of the whole config name and not just
+> CPPC_CPUFREQ ?
+
+Here it is the object name that are sorted not the CONFIG_ name. So
+cppc_cpufreq comes after brcmstb-avs-cpufreq.
+
+Thanks,
+
+Gregory
+
 >
+> -- 
+> viresh
 
-No, not really.
-
-What I currently have is
-
->    if_cond_yield_neon
->    // patchup code
->    endif_cond_yield_neon
-
-which is being turned into
-
-    get_thread_info x0
-    ldr w1, [x0, #TSK_TI_PREEMPT]
-    ldr x0, [x0, #TSK_TI_FLAGS]
-    cmp w1, #1 // == PREEMPT_OFFSET
-    csel x0, x0, xzr, eq
-    tbnz x0, #TIF_NEED_RESCHED, 5555f // needs rescheduling?
-4444:
-
-    .subsection 1
-5555:
-    // patchup code
-    bl kernel_neon_end
-    bl kernel_neon_begin
-    // post patchup code goes here
-    b 4444b
-    .subsection
-
-so what I basically need is a place to put the post patchup code,
-unless I open code it and branch to a different label right after
-kernel_neon_begin
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
