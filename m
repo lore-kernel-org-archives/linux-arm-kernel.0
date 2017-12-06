@@ -1,41 +1,36 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:21:52 +0100
-Subject: [GIT PULL] Renesas ARM Based SoC Updates for v4.16
-Message-ID: <cover.1512553442.git.horms+renesas@verge.net.au>
+Date: Wed,  6 Dec 2017 11:21:54 +0100
+Subject: [PATCH 1/1] soc: renesas: Identify R-Car M3-W ES1.1
+In-Reply-To: <cover.1512553442.git.horms+renesas@verge.net.au>
+References: <cover.1512553442.git.horms+renesas@verge.net.au>
+Message-ID: <90f0d2b344313a8a4c366ef60d0df33008d2be84.1512553442.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof, Hi Kevin, Hi Arnd,
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Please consider these Renesas ARM based SoC updates for v4.16.
+The Product Register of R-Car M3-W ES1.1 incorrectly identifies the SoC
+revision as ES2.0.  Add a workaround to fix this.
 
-
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
-
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
-
-are available in the git repository at:
-
-  https://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-soc-for-v4.16
-
-for you to fetch changes up to 90f0d2b344313a8a4c366ef60d0df33008d2be84:
-
-  soc: renesas: Identify R-Car M3-W ES1.1 (2017-11-27 11:40:57 +0100)
-
-----------------------------------------------------------------
-Renesas ARM Based SoC Updates for v4.16
-
-* Identify R-Car M3-W ES1.1
-
-  Geert Uytterhoeven says "The Product Register of R-Car M3-W ES1.1
-  incorrectly identifies the SoC revision as ES2.0.  Add a workaround to
-  fix this."
-
-  It is my understanding that this is likely to be forwards-compatibile.
-
-----------------------------------------------------------------
-Geert Uytterhoeven (1):
-      soc: renesas: Identify R-Car M3-W ES1.1
-
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  drivers/soc/renesas/renesas-soc.c | 3 +++
  1 file changed, 3 insertions(+)
+
+diff --git a/drivers/soc/renesas/renesas-soc.c b/drivers/soc/renesas/renesas-soc.c
+index 9f4ee2567c72..926b7fd6db2d 100644
+--- a/drivers/soc/renesas/renesas-soc.c
++++ b/drivers/soc/renesas/renesas-soc.c
+@@ -250,6 +250,9 @@ static int __init renesas_soc_init(void)
+ 	if (chipid) {
+ 		product = readl(chipid);
+ 		iounmap(chipid);
++		/* R-Car M3-W ES1.1 incorrectly identifies as ES2.0 */
++		if ((product & 0x7fff) == 0x5210)
++			product ^= 0x11;
+ 		if (soc->id && ((product >> 8) & 0xff) != soc->id) {
+ 			pr_warn("SoC mismatch (product = 0x%x)\n", product);
+ 			return -ENODEV;
+-- 
+2.11.0
