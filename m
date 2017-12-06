@@ -1,101 +1,445 @@
-From: zhangshaokun@hisilicon.com (Zhangshaokun)
-Date: Wed, 6 Dec 2017 14:54:26 +0800
-Subject: [PATCH 2/5] arm_pmu: have armpmu_alloc() take GFP flags
-In-Reply-To: <20171101141239.45340-3-mark.rutland@arm.com>
-References: <20171101141239.45340-1-mark.rutland@arm.com>
- <20171101141239.45340-3-mark.rutland@arm.com>
-Message-ID: <241a7659-b764-6cd1-f8ca-169a928f509c@hisilicon.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Wed, 6 Dec 2017 07:58:44 +0100
+Subject: [PATCH V2] ARM: dts: introduce the sama5d2 ptc ek board
+Message-ID: <20171206065844.27689-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Add the official SAMA5D2 Peripheral Touch Controller Evaluation
+Kit board.
 
-We (HiSilicon) also met this issue and it works happily with this patch,
-but it is still not in 4.15 version, any special reasons?
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
 
-Thanks,
-Shaokun
+Changes:
+- v2:
+  - remove memory node
+  - use SPDX-License-Identifier
 
-On 2017/11/1 22:12, Mark Rutland wrote:
-> In ACPI systems, we don't know the makeup of CPUs until we hotplug them
-> on, and thus have to allocate the PMU datastrcutures at hotplug time.
-> Thus, we must use GFP_ATOMIC allocations.
-> 
-> Reorganise the PMU allocators to take a GFP argument so that we can
-> permit this.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> ---
->  drivers/perf/arm_pmu.c          | 6 +++---
->  drivers/perf/arm_pmu_acpi.c     | 2 +-
->  drivers/perf/arm_pmu_platform.c | 2 +-
->  include/linux/perf/arm_pmu.h    | 2 +-
->  4 files changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index 57df8dce8e19..3d6d4c5f2356 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -779,18 +779,18 @@ static void cpu_pmu_destroy(struct arm_pmu *cpu_pmu)
->  					    &cpu_pmu->node);
->  }
->  
-> -struct arm_pmu *armpmu_alloc(void)
-> +struct arm_pmu *armpmu_alloc(gfp_t flags)
->  {
->  	struct arm_pmu *pmu;
->  	int cpu;
->  
-> -	pmu = kzalloc(sizeof(*pmu), GFP_KERNEL);
-> +	pmu = kzalloc(sizeof(*pmu), flags);
->  	if (!pmu) {
->  		pr_info("failed to allocate PMU device!\n");
->  		goto out;
->  	}
->  
-> -	pmu->hw_events = alloc_percpu(struct pmu_hw_events);
-> +	pmu->hw_events = alloc_percpu_gfp(struct pmu_hw_events, flags);
->  	if (!pmu->hw_events) {
->  		pr_info("failed to allocate per-cpu PMU data.\n");
->  		goto out_free_pmu;
-> diff --git a/drivers/perf/arm_pmu_acpi.c b/drivers/perf/arm_pmu_acpi.c
-> index 705f1a390e31..a52f5b673a15 100644
-> --- a/drivers/perf/arm_pmu_acpi.c
-> +++ b/drivers/perf/arm_pmu_acpi.c
-> @@ -127,7 +127,7 @@ static struct arm_pmu *arm_pmu_acpi_find_alloc_pmu(void)
->  		return pmu;
->  	}
->  
-> -	pmu = armpmu_alloc();
-> +	pmu = armpmu_alloc(GFP_ATOMIC);
->  	if (!pmu) {
->  		pr_warn("Unable to allocate PMU for CPU%d\n",
->  			smp_processor_id());
-> diff --git a/drivers/perf/arm_pmu_platform.c b/drivers/perf/arm_pmu_platform.c
-> index db863f14c406..686b3f28c5d1 100644
-> --- a/drivers/perf/arm_pmu_platform.c
-> +++ b/drivers/perf/arm_pmu_platform.c
-> @@ -203,7 +203,7 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  	struct arm_pmu *pmu;
->  	int ret = -ENODEV;
->  
-> -	pmu = armpmu_alloc();
-> +	pmu = armpmu_alloc(GFP_KERNEL);
->  	if (!pmu)
->  		return -ENOMEM;
->  
-> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-> index 97426407904d..52e6d56a6a4e 100644
-> --- a/include/linux/perf/arm_pmu.h
-> +++ b/include/linux/perf/arm_pmu.h
-> @@ -173,7 +173,7 @@ static inline int arm_pmu_acpi_probe(armpmu_init_fn init_fn) { return 0; }
->  #endif
->  
->  /* Internal functions only for core arm_pmu code */
-> -struct arm_pmu *armpmu_alloc(void);
-> +struct arm_pmu *armpmu_alloc(gfp_t flags);
->  void armpmu_free(struct arm_pmu *pmu);
->  int armpmu_register(struct arm_pmu *pmu);
->  int armpmu_request_irq(struct arm_pmu *armpmu, int cpu);
-> 
+arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 402 ++++++++++++++++++++++++++++++
+ 2 files changed, 403 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 043d7c720d0c..ed60582eb1da 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -48,6 +48,7 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
+ dtb-$(CONFIG_SOC_SAM_V7) += \
+ 	at91-kizbox2.dtb \
+ 	at91-sama5d27_som1_ek.dtb \
++	at91-sama5d2_ptc_ek.dtb \
+ 	at91-sama5d2_xplained.dtb \
+ 	at91-sama5d3_xplained.dtb \
+ 	at91-tse850-3.dtb \
+diff --git a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+new file mode 100644
+index 000000000000..89ad23a7f92d
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+@@ -0,0 +1,402 @@
++/*
++ * at91-sama5d2_ptc_ek.dts - Device Tree file for SAMA5D2 PTC EK board
++ *
++ *  Copyright (C) 2017 Microchip/Atmel,
++ *		  2017 Wenyou Yang <wenyou.yang@microchip.com>
++ *		  2017 Ludovic Desroches <ludovic.desroches@microchip.com>
++ *
++ * SPDX-License-Identifier: (GPL-2.0+ OR X11)
++ */
++/dts-v1/;
++#include "sama5d2.dtsi"
++#include "sama5d2-pinfunc.h"
++#include <dt-bindings/mfd/atmel-flexcom.h>
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Atmel SAMA5D2 PTC EK";
++	compatible = "atmel,sama5d2-ptc_ek", "atmel,sama5d2", "atmel,sama5";
++
++	aliases {
++		serial0 = &uart0;
++		i2c0	= &i2c0;
++		i2c1	= &i2c1;
++		i2c2	= &i2c2;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	clocks {
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <24000000>;
++		};
++	};
++
++	ahb {
++		usb0: gadget at 300000 {
++			atmel,vbus-gpio = <&pioA PIN_PA27 GPIO_ACTIVE_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usba_vbus>;
++			status = "okay";
++		};
++
++		usb1: ohci at 400000 {
++			num-ports = <3>;
++			atmel,vbus-gpio = <0
++					   &pioA PIN_PB12 GPIO_ACTIVE_HIGH
++					   0
++					  >;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb_default>;
++			status = "okay";
++		};
++
++		usb2: ehci at 500000 {
++			status = "okay";
++		};
++
++		ebi: ebi at 10000000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand_default>;
++			status = "okay"; /* conflicts with sdmmc1 and qspi0 */
++
++			nand_controller: nand-controller {
++				status = "okay";
++
++				nand at 3 {
++					reg = <0x3 0x0 0x2>;
++					atmel,rb = <0>;
++					nand-bus-width = <8>;
++					nand-ecc-mode = "hw";
++					nand-on-flash-bbt;
++					label = "atmel_nand";
++
++					partitions {
++						compatible = "fixed-partitions";
++						#address-cells = <1>;
++						#size-cells = <1>;
++
++						at91bootstrap at 0 {
++							label = "bootstrap";
++							reg = <0x0 0x40000>;
++						};
++
++						bootloader at 40000 {
++							label = "bootloader";
++							reg = <0x40000 0xc0000>;
++						};
++
++						bootloaderenv at 0x100000 {
++							label = "bootloader env";
++							reg = <0x100000 0x40000>;
++						};
++
++						bootloaderenvred at 0x140000 {
++							label = "bootloader env redundant";
++							reg = <0x140000 0x40000>;
++						};
++
++						dtb at 180000 {
++							label = "device tree";
++							reg = <0x180000 0x80000>;
++						};
++
++						kernel at 200000 {
++							label = "kernel";
++							reg = <0x200000 0x600000>;
++						};
++
++						rootfs at 800000 {
++							label = "rootfs";
++							reg = <0x800000 0x1f800000>;
++						};
++					};
++				};
++			};
++		};
++
++		sdmmc0: sdio-host at a0000000 {
++			bus-width = <8>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_sdmmc0_default>;
++			non-removable;
++			mmc-ddr-1_8v;
++			status = "okay";
++		};
++
++		apb {
++			spi0: spi at f8000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0_default>;
++				status = "okay";
++			};
++
++			macb0: ethernet at f8008000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_macb0_default &pinctrl_macb0_phy_irq>;
++				phy-mode = "rmii";
++				status = "okay";
++
++				ethernet-phy at 1 {
++					reg = <0x1>;
++					interrupt-parent = <&pioA>;
++					interrupts = <56 IRQ_TYPE_LEVEL_LOW>;
++				};
++			};
++
++			uart0: serial at f801c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0_default>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "okay";
++			};
++
++			uart2: serial at f8024000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2_default>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "okay";
++			};
++
++			i2c0: i2c at f8028000 {
++				dmas = <0>, <0>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c0_default>;
++				status = "okay";
++			};
++
++			flx0: flexcom at f8034000 {
++				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
++				status = "okay";
++
++				i2c2: i2c at 600 {
++					compatible = "atmel,sama5d2-i2c";
++					reg = <0x600 0x200>;
++					interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
++					dmas = <0>, <0>;
++					dma-names = "tx", "rx";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					clocks = <&flx0_clk>;
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_flx0_default>;
++					atmel,fifo-size = <16>;
++					status = "okay";
++				};
++			};
++
++			shdwc at f8048010 {
++				atmel,shdwc-debouncer = <976>;
++
++				input at 0 {
++					reg = <0>;
++					atmel,wakeup-type = "low";
++				};
++			};
++
++			watchdog at f8048040 {
++				status = "okay";
++			};
++
++			spi1: spi at fc000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi1_default>;
++				status = "okay";
++			};
++
++			i2c1: i2c at fc028000 {
++				dmas = <0>, <0>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c1_default>;
++				status = "okay";
++
++				at24 at 50 {
++					compatible = "24c02";
++					reg = <0x50>;
++					pagesize = <8>;
++				};
++			};
++
++			pinctrl at fc038000 {
++				pinctrl_flx0_default: flx0_default {
++					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
++						 <PIN_PB29__FLEXCOM0_IO1>;
++					bias-disable;
++				};
++
++				pinctrl_i2c0_default: i2c0_default {
++					pinmux = <PIN_PD21__TWD0>,
++						 <PIN_PD22__TWCK0>;
++					bias-disable;
++				};
++
++				pinctrl_i2c1_default: i2c1_default {
++					pinmux = <PIN_PC6__TWD1>,
++						 <PIN_PC7__TWCK1>;
++					bias-disable;
++				};
++
++				pinctrl_key_gpio_default: key_gpio_default {
++					pinmux = <PIN_PA10__GPIO>;
++					bias-pull-up;
++				};
++
++				pinctrl_led_gpio_default: led_gpio_default {
++					pinmux = <PIN_PB6__GPIO>,
++						 <PIN_PB8__GPIO>,
++						 <PIN_PB10__GPIO>;
++					bias-pull-up;
++				};
++
++				pinctrl_macb0_default: macb0_default {
++					pinmux = <PIN_PB14__GTXCK>,
++						 <PIN_PB15__GTXEN>,
++						 <PIN_PB16__GRXDV>,
++						 <PIN_PB17__GRXER>,
++						 <PIN_PB18__GRX0>,
++						 <PIN_PB19__GRX1>,
++						 <PIN_PB20__GTX0>,
++						 <PIN_PB21__GTX1>,
++						 <PIN_PB22__GMDC>,
++						 <PIN_PB23__GMDIO>;
++					bias-disable;
++				};
++
++				pinctrl_macb0_phy_irq: macb0_phy_irq {
++					pinmux = <PIN_PB24__GPIO>;
++					bias-disable;
++				};
++
++				pinctrl_nand_default: nand_default {
++					re_we_data {
++						pinmux = <PIN_PA22__D0>,
++							 <PIN_PA23__D1>,
++							 <PIN_PA24__D2>,
++							 <PIN_PA25__D3>,
++							 <PIN_PA26__D4>,
++							 <PIN_PA27__D5>,
++							 <PIN_PA28__D6>,
++							 <PIN_PA29__D7>,
++							 <PIN_PA30__NWE_NANDWE>,
++							 <PIN_PB2__NRD_NANDOE>;
++						bias-pull-up;
++					};
++
++					ale_cle_rdy_cs {
++						pinmux = <PIN_PB0__A21_NANDALE>,
++							 <PIN_PB1__A22_NANDCLE>,
++							 <PIN_PC8__NANDRDY>,
++							 <PIN_PA31__NCS3>;
++						bias-pull-up;
++					};
++				};
++
++				pinctrl_sdmmc0_default: sdmmc0_default {
++					cmd_data {
++						pinmux = <PIN_PA1__SDMMC0_CMD>,
++							 <PIN_PA2__SDMMC0_DAT0>,
++							 <PIN_PA3__SDMMC0_DAT1>,
++							 <PIN_PA4__SDMMC0_DAT2>,
++							 <PIN_PA5__SDMMC0_DAT3>,
++							 <PIN_PA6__SDMMC0_DAT4>,
++							 <PIN_PA7__SDMMC0_DAT5>,
++							 <PIN_PA8__SDMMC0_DAT6>,
++							 <PIN_PA9__SDMMC0_DAT7>;
++						bias-pull-up;
++					};
++
++					ck_cd_vddsel {
++						pinmux = <PIN_PA0__SDMMC0_CK>,
++							 <PIN_PA11__SDMMC0_VDDSEL>,
++							 <PIN_PA13__SDMMC0_CD>;
++						bias-disable;
++					};
++				};
++
++				pinctrl_spi0_default: spi0_default {
++					pinmux = <PIN_PA14__SPI0_SPCK>,
++						 <PIN_PA15__SPI0_MOSI>,
++						 <PIN_PA16__SPI0_MISO>,
++						 <PIN_PA17__SPI0_NPCS0>;
++					bias-disable;
++				};
++
++				pinctrl_spi1_default: spi1_default {
++					pinmux = <PIN_PC1__SPI1_SPCK>,
++						 <PIN_PC2__SPI1_MOSI>,
++						 <PIN_PC3__SPI1_MISO>,
++						 <PIN_PC4__SPI1_NPCS0>;
++					bias-disable;
++				};
++
++				pinctrl_uart0_default: uart0_default {
++					pinmux = <PIN_PB26__URXD0>,
++						 <PIN_PB27__UTXD0>;
++					bias-disable;
++				};
++
++				pinctrl_uart2_default: uart2_default {
++					pinmux = <PIN_PD23__URXD2>,
++						 <PIN_PD24__UTXD2>;
++					bias-disable;
++				};
++
++				pinctrl_usb_default: usb_default {
++					pinmux = <PIN_PB12__GPIO>;
++					bias-disable;
++				};
++
++				pinctrl_usba_vbus: usba_vbus {
++					pinmux = <PIN_PB11__GPIO>;
++					bias-disable;
++				};
++
++			};
++
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_key_gpio_default>;
++
++		bp1 {
++			label = "PB_USER";
++			gpios = <&pioA PIN_PA10 GPIO_ACTIVE_LOW>;
++			linux,code = <0x104>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_led_gpio_default>;
++		status = "okay";
++
++		red {
++			label = "red";
++			gpios = <&pioA PIN_PB10 GPIO_ACTIVE_HIGH>;
++		};
++
++		green {
++			label = "green";
++			gpios = <&pioA PIN_PB8 GPIO_ACTIVE_HIGH>;
++		};
++
++		blue {
++			label = "blue";
++			gpios = <&pioA PIN_PB6 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
+-- 
+2.12.2
