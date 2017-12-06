@@ -1,48 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:45 +0100
-Subject: [PATCH 50/61] ARM: dts: r8a7794: Update CMT compat strings
+Date: Wed,  6 Dec 2017 11:22:49 +0100
+Subject: [PATCH 54/61] ARM: dts: r8a7791: Remove CMT renesas,channels-mask
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <98b6b8b493a99d828e6665e6e67d6ca077c1aee0.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <d3fb90537855bb7f27d6256446197675ffb4a1bd.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Use recently updated R-Car Gen2 CMT0 and CMT1 compat strings.
+Update the DTS to remove the now deprecated "renesas,channels-mask"
+property.
 
-With this change in place we can keep device-specific configuration in
-the driver and the driver can be able to support CMT1 specific features.
+The channel information is now kept in the device driver and can easily
+be determined based on the compat string.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 90050565114c..67aa409b32bf 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -188,7 +188,7 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index a69d6f883b34..dfc1c406179f 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -266,8 +266,6 @@
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+ 		resets = <&cpg 124>;
+ 
+-		renesas,channels-mask = <0x60>;
+-
+ 		status = "disabled";
  	};
  
- 	cmt0: timer at ffca0000 {
--		compatible = "renesas,cmt-48-gen2";
-+		compatible = "renesas,r8a7794-cmt0", "renesas,rcar-gen2-cmt0";
- 		reg = <0 0xffca0000 0 0x1004>;
- 		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
-@@ -203,7 +203,7 @@
+@@ -287,8 +285,6 @@
+ 		power-domains = <&sysc R8A7791_PD_ALWAYS_ON>;
+ 		resets = <&cpg 329>;
+ 
+-		renesas,channels-mask = <0xff>;
+-
+ 		status = "disabled";
  	};
  
- 	cmt1: timer at e6130000 {
--		compatible = "renesas,cmt-48-gen2";
-+		compatible = "renesas,r8a7794-cmt1", "renesas,rcar-gen2-cmt1";
- 		reg = <0 0xe6130000 0 0x1004>;
- 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
- 			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 2.11.0
