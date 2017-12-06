@@ -1,131 +1,103 @@
-From: james.morse@arm.com (James Morse)
-Date: Wed, 06 Dec 2017 10:56:31 +0000
-Subject: [PATCH] arm64/mm: Do not write ASID generation to ttbr0
-In-Reply-To: <4f4572cf-9ae1-24b9-ec46-d8bbc6179426@arm.com>
-References: <1512495507-23259-1-git-send-email-julien.thierry@arm.com>
- <5A26F485.10402@arm.com> <4f4572cf-9ae1-24b9-ec46-d8bbc6179426@arm.com>
-Message-ID: <5A27CCDF.1050305@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 6 Dec 2017 11:59:04 +0100
+Subject: [PATCH v6 7/8] KVM: arm/arm64: Provide a get_input_level for the
+ arch timer
+In-Reply-To: <20171205152446.rcmkowdnuhkqbrdb@yury-thinkpad>
+References: <20171204200506.3224-1-cdall@kernel.org>
+ <20171204200506.3224-8-cdall@kernel.org>
+ <20171205152446.rcmkowdnuhkqbrdb@yury-thinkpad>
+Message-ID: <20171206105904.GM32397@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julien,
-
-On 06/12/17 10:17, Julien Thierry wrote:
-> On 05/12/17 19:33, James Morse wrote:
->> On 05/12/17 17:38, Julien Thierry wrote:
->>> When writing the user ASID to ttbr0, 16bit get copied to ttbr0, potentially
->>> including part of the ASID generation in the ttbr0.ASID. If the kernel is
->>> using less than 16bits ASIDs and the other ttbr0 bits aren't RES0, two
->>> tasks using the same mm context might end up running with different
->>> ttbr0.ASID values.
->>> This would be triggered by one of the threads being scheduled before a
->>> roll-over and the second one scheduled after a roll-over.
->>>
->>> Pad the generation out of the 16bits of the mm id that are written to
->>> ttbr0. Thus, what the hardware sees is what the kernel considers ASID.
->>
->> Is this to fix a system with a mix of 8/16 asid bits? Or someone being clever
->> and reducing asid_bits to stress rollover?
-
-> So it was motivated by the later. But hopefully the fix, pushing the generation
-> always over 16bits is also suitable for hardware that mixes 8/16bits asids. If
-> it is not, do call it out.
-
-(okay, wasn't clear from the commit message!)
-
-
->>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
->>> index 6f40170..a7c72d4 100644
->>> --- a/arch/arm64/mm/context.c
->>> +++ b/arch/arm64/mm/context.c
->>> @@ -180,6 +190,13 @@ static u64 new_context(struct mm_struct *mm, unsigned
->>> int cpu)
->>>       /* We're out of ASIDs, so increment the global generation count */
->>>       generation = atomic64_add_return_relaxed(ASID_FIRST_VERSION,
->>>                            &asid_generation);
->>> +
->>> +    /*
->>> +     * It is unlikely the generation will ever overflow, but if this
->>> +     * happens, let it be known strange things can occur.
->>> +     */
->>> +    WARN_ON(generation == ASID_FIRST_VERSION);
->>
->> Won't generation wrap to zero, not '1<<16'?
+On Tue, Dec 05, 2017 at 06:24:46PM +0300, Yury Norov wrote:
+> On Mon, Dec 04, 2017 at 09:05:05PM +0100, Christoffer Dall wrote:
+> > From: Christoffer Dall <christoffer.dall@linaro.org>
+> > 
+> > The VGIC can now support the life-cycle of mapped level-triggered
+> > interrupts, and we no longer have to read back the timer state on every
+> > exit from the VM if we had an asserted timer interrupt signal, because
+> > the VGIC already knows if we hit the unlikely case where the guest
+> > disables the timer without ACKing the virtual timer interrupt.
+> > 
+> > This means we rework a bit of the code to factor out the functionality
+> > to snapshot the timer state from vtimer_save_state(), and we can reuse
+> > this functionality in the sync path when we have an irqchip in
+> > userspace, and also to support our implementation of the
+> > get_input_level() function for the timer.
+> > 
+> > This change also means that we can no longer rely on the timer's view of
+> > the interrupt line to set the active state, because we no longer
+> > maintain this state for mapped interrupts when exiting from the guest.
+> > Instead, we only set the active state if the virtual interrupt is
+> > active, and otherwise we simply let the timer fire again and raise the
+> > virtual interrupt from the ISR.
+> > 
+> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+> > ---
+> >  include/kvm/arm_arch_timer.h |  2 ++
+> >  virt/kvm/arm/arch_timer.c    | 75 +++++++++++++++++++++-----------------------
+> >  2 files changed, 38 insertions(+), 39 deletions(-)
+> > 
+> > diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
+> > index 01ee473517e2..f57f795d704c 100644
+> > --- a/include/kvm/arm_arch_timer.h
+> > +++ b/include/kvm/arm_arch_timer.h
+> > @@ -90,6 +90,8 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
+> >  
+> >  void kvm_timer_init_vhe(void);
+> >  
+> > +bool kvm_arch_timer_get_input_level(int vintid);
+> > +
+> >  #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
+> >  #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
+> >  
 > 
-> Yes it will! Silly me...
+> [...]
 > 
->>
->> asid_generation-is-never-zero is one of the nasty things in this code.
->>
->> In check_and_switch_context() we switch to the 'fast path' where the current
->> asid is usable if: the generation matches and the active_asid isn't 0 (which
->> indicates a rollover has occurred).
->>
->> from mm/context.c::check_and_switch_context():
->>>     if (!((asid ^ atomic64_read(&asid_generation)) >> asid_bits)
->>>         && atomic64_xchg_relaxed(&per_cpu(active_asids, cpu), asid))
->>>         goto switch_mm_fastpath;
->>
->>
->> If asid_generation is ever zero, (even briefly) multiple new tasks with
->> different pages-tables will pass the generation test, and run with asid=0.
->>
->> Short of xchg(ASID_MAX_VERSION, ASID_FIRST_VERSION), every time, just in case, I
->> don't think this is something we can handle.
->>
->> But, this thing is layers on layers of subtle behaviour, so I may have missed
->> something...
-
-> I had not thought of that. However I believe we checked with 48bits and the case
-> of the generation overflowing would take a human life span (or something on that
-> scale) of a system running and spawning continuous processes before reaching
-
-This scales with the number of CPUs, and how quickly they can fork().
-(Not using all the counter bits makes me nervous.)
-
-
-> this. Which is why we decided on having a WARN_ON for now. So I don't know if we
-> want to change things for this corner case which really means "things are going
-> bad" more than anything else.
-
-But it fires the generation after the chaos started, so if we ever do see this
-it gives us false-confidence that generation-overflow wasn't the issue.
-WARN_ON(generation == ASID_MAX_VERSION) ?
-
-
->> Instead, do you think we can duplicate just the asid bits (asid & ASID_MASK)
->> into a new 16bit field in mm_context_t, which we then use instead of the ASID()
->> and mmid macros? (We only set a new asid in one place as returned by
->> new_context()).
->>
+> > +bool kvm_arch_timer_get_input_level(int vintid)
+> > +{
+> > +	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
+> > +	struct arch_timer_context *timer;
+> > +
+> > +	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
+> > +		timer = vcpu_vtimer(vcpu);
+> > +	else
+> > +		BUG(); /* We only map the vtimer so far */
+> > +
+> > +	if (timer->loaded)
+> > +		__timer_snapshot_state(timer);
+> > +
+> > +	return kvm_timer_should_fire(timer);
+> > +}
 > 
-> I'm not sure I understand why this prevents running with asid = 0 when
-> generation is 0.
+> I think it worth to reword to highlight your intention about BUG,
+> and save 1 call to vcpu_vtimer()
+> 
+> bool kvm_arch_timer_get_input_level(int vintid)
+> {
+> 	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
+> 	struct arch_timer_context *timer = vcpu_vtimer(vcpu);
+> 
+>         /* We only map the vtimer so far */
+> 	BUG_ON(vintid != timer->irq.irq)
+> 
+> 	if (timer->loaded)
+> 		__timer_snapshot_state(timer);
+> 
+> 	return kvm_timer_should_fire(timer);
+> }
+> 
 
-Sorry, I was talking about two things. It doesn't, I don't think we can do
-anything about that.
+Besides the incredible bikesheding nature of your comments, I disagree.
+The current code suggests where to add functionality once we move to
+using the physical timer hardware to drive an EL1 physical timer on VHE
+systems, and is purposely written this way.
 
-This was a suggestion for an alternative way of stopping generation bits getting
-into the TTBR, which still lets use use all the counter bits. (and lets us mess
-with asid_bits to stress rollover without re-inventing this bug).
-
-
->> This would let context.c's asid_bits be arbitrary, as the hardware only uses the
->> masked value it exposes in the new field.
->>
->> This doesn't solve the mixed 8/16 bit case. I think we should force those
->> systems to use 8bit asids via cpufeature to preserve as much of the generation
->> counter as possible.
-
-> Hmmm right, I see that today we just panic the kernel when we have a smaller
-> asid size than the boot cpu...
-> So if we boot on a 8bit asid cpu it should work but not the other way around...
-> I agree we probably should find a way to reduce the size of software asids
-> system wide when we find a cpu has less bits available.
-
-cpufeature has some stuff for 'LOWER_SAFE' that might help here..
-
+I'm sure we have real bugs and real issues in the code, perhaps you
+could spend your energy looking for those, and if you cannot find any,
+then provide a reviewed-by instead of these pointless cosmetic
+adjustments.
 
 Thanks,
-
-James
+-Christoffer
