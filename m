@@ -1,54 +1,35 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed,  6 Dec 2017 11:41:02 -0300
-Subject: [PATCH 23/36] perf pmu: Add check for valid cpuid in
- perf_pmu__find_map()
-In-Reply-To: <20171206144115.15097-1-acme@kernel.org>
-References: <20171206144115.15097-1-acme@kernel.org>
-Message-ID: <20171206144115.15097-24-acme@kernel.org>
+From: takuo.koguchi@gmail.com (Takuo Koguchi)
+Date: Thu,  7 Dec 2017 00:22:13 +0900
+Subject: [PATCH] spi: sun4i: disable clocks in the remove function
+Message-ID: <1512573752-13091-1-git-send-email-takuo.koguchi.sw@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+mclk and hclk need to be disabled explicitly since pm_runtime_disable does
+not disable the clocks.
 
-On some platforms(arm/arm64) which uses cpus map to get corresponding
-cpuid string, cpuid can be NULL for PMUs other than CORE PMUs.  Adding
-check for NULL cpuid in function perf_pmu__find_map to avoid
-segmentation fault.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
-Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Ganapatrao Kulkarni <gklkml16@gmail.com>
-Cc: Jayachandran C <jnair@caviumnetworks.com>
-Cc: Jonathan Cameron <jonathan.cameron@huawei.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Peter Zijlstra <peterz@infradead.org>
-Cc: Robert Richter <robert.richter@cavium.com>
-Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/20171016183222.25750-6-ganapatrao.kulkarni at cavium.com
-Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
+Signed-off-by: Takuo Koguchi <takuo.koguchi.sw@hitachi.com>
 ---
- tools/perf/util/pmu.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/spi/spi-sun4i.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
-index 732ff579ec65..8b7c151579c0 100644
---- a/tools/perf/util/pmu.c
-+++ b/tools/perf/util/pmu.c
-@@ -601,6 +601,12 @@ struct pmu_events_map *perf_pmu__find_map(struct perf_pmu *pmu)
- 	char *cpuid = perf_pmu__getcpuid(pmu);
- 	int i;
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index c5cd635..9011c09 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -525,6 +525,11 @@ static int sun4i_spi_probe(struct platform_device *pdev)
  
-+	/* on some platforms which uses cpus map, cpuid can be NULL for
-+	 * PMUs other than CORE PMUs.
-+	 */
-+	if (!cpuid)
-+		return NULL;
+ static int sun4i_spi_remove(struct platform_device *pdev)
+ {
++	struct spi_master *master = dev_get_drvdata(&pdev->dev);
++	struct sun4i_spi *sspi = spi_master_get_devdata(master);
 +
- 	i = 0;
- 	for (;;) {
- 		map = &pmu_events_map[i++];
++	clk_disable_unprepare(sspi->mclk);
++	clk_disable_unprepare(sspi->hclk);
+ 	pm_runtime_disable(&pdev->dev);
+ 
+ 	return 0;
 -- 
-2.13.6
+2.7.4
