@@ -1,57 +1,48 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Thu, 7 Dec 2017 01:44:04 +0800
-Subject: [arm-platforms:kvm-arm64/haslr 10/20]
- arch/arm64/include/asm/kvm_mmu.h:104:27: error: macro "ALTERNATIVE_CB"
- requires 3 arguments, but only 1 given
-Message-ID: <201712070158.kdh6efdr%fengguang.wu@intel.com>
+From: alexander.sverdlin@gmail.com (Alexander Sverdlin)
+Date: Wed, 6 Dec 2017 18:46:19 +0100
+Subject: [PATCH v4 0/5] ARM: ep93xx: ts72xx: Add support for BK3 board
+In-Reply-To: <SN1PR0101MB15656E4944DE6CAC67D18B07D03D0@SN1PR0101MB1565.prod.exchangelabs.com>
+References: <20171116232239.16823-1-lukma@denx.de>
+ <20171130235140.12243-1-lukma@denx.de>
+ <SN1PR0101MB15656E4944DE6CAC67D18B07D03D0@SN1PR0101MB1565.prod.exchangelabs.com>
+Message-ID: <3c3d9bdd-ea95-9fcd-a444-7cf2db3804a7@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/haslr
-head:   983da603415991b6e7e7cd9b53cfa922bf052393
-commit: e7f8236b93aede2dfe4c043ea6b8b149e17c30f8 [10/20] arm64: KVM: Dynamically patch the kernel/hyp VA mask
-config: arm64-defconfig (attached as .config)
-compiler: aarch64-linux-gnu-gcc (Debian 7.2.0-11) 7.2.0
-reproduce:
-        wget https://raw.githubusercontent.com/intel/lkp-tests/master/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout e7f8236b93aede2dfe4c043ea6b8b149e17c30f8
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm64 
+Hello Hartley,
 
-Note: the arm-platforms/kvm-arm64/haslr HEAD 983da603415991b6e7e7cd9b53cfa922bf052393 builds fine.
-      It only hurts bisectibility.
+On 05/12/17 19:14, Hartley Sweeten wrote:
+>> This patch series adds support for Liebherr's BK3 board, being a derivative of TS72XX design.
+>>
+>> This patchset consists of following patches:
+>>
+>> - ts72xx.[c|h] cosmetic cleanup/improvement
+>> - Rewrite ts72xx.c to be reusable by bk3
+>> - The Liebherr's BK3 board has been added with re-using code of
+>>   ts72xx.c (detalied list of changes can be found in patch 6/6)
+>>
+>> This series applies on top of linux-next/master (next-20171130)
+>>
+>> Lukasz Majewski (5):
+>>   ARM: ep93xx: ts72xx: Provide include guards for ts72xx.h file
+>>   ARM: ep93xx: ts72xx: Rewrite ts72xx_register_flash() to accept
+>>     parameters
+>>   ARM: ep93xx: ts72xx: Rewrite map IO code to be reusable
+>>   ARM: ep93xx: ts72xx: cosmetic: Add some description to ts72xx code
+>>   ARM: ep93xx: ts72xx: Add support for BK3 board - ts72xx derivative
+>>
+>>  MAINTAINERS                   |   6 ++
+>>  arch/arm/mach-ep93xx/Kconfig  |   7 ++
+>>  arch/arm/mach-ep93xx/ts72xx.c | 198 ++++++++++++++++++++++++++++++++++++++----
+>>  arch/arm/mach-ep93xx/ts72xx.h |   9 ++
+>>  arch/arm/tools/mach-types     |   1 +
+>>  5 files changed, 202 insertions(+), 19 deletions(-)
+> Looks good.
+> 
+> Acked-by: H Hartley Sweeten <hsweeten@visionengravers.com>
 
-All errors (new ones prefixed by >>):
+I can prepare pull request to Arnd, as we discussed previously, just
+waited for your review.
 
-   In file included from arch/arm64/kvm/haslr.c:22:0:
-   arch/arm64/include/asm/kvm_mmu.h: In function '__kern_hyp_va':
->> arch/arm64/include/asm/kvm_mmu.h:104:27: error: macro "ALTERNATIVE_CB" requires 3 arguments, but only 1 given
-            kvm_update_va_mask)
-                              ^
->> arch/arm64/include/asm/kvm_mmu.h:103:15: error: expected string literal before 'ALTERNATIVE_CB'
-     asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n"
-                  ^~~~~~~~~~~~~~
-
-vim +/ALTERNATIVE_CB +104 arch/arm64/include/asm/kvm_mmu.h
-
-   100	
-   101	static inline unsigned long __kern_hyp_va(unsigned long v)
-   102	{
- > 103		asm volatile(ALTERNATIVE_CB("and %0, %0, #1\n"
- > 104					    kvm_update_va_mask)
-   105			     : "+r" (v));
-   106		return v;
-   107	}
-   108	
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/gzip
-Size: 37460 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/e5e2c2f1/attachment-0001.gz>
+Regards,
+Alexander.
