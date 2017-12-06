@@ -1,41 +1,25 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 6 Dec 2017 19:13:11 +0000
-Subject: [PATCH 4/9] ASoC: sun8i-codec: Add support for A64 SoC
-In-Reply-To: <20171206185308.ijt76lodwgkz2pm3@flea.lan>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-5-anarsoul@gmail.com>
- <20171205080444.zo2rlusqpjyraqcw@flea.lan>
- <CA+E=qVdZME2fiMw09NUP4DNCYhk58dqSapCdfBjLrdMq5HFwyg@mail.gmail.com>
- <20171206153205.k3l5sofdco3t75mi@flea.lan>
- <20171206154810.eb2czpb4kusxv5kj@sirena.org.uk>
- <20171206185308.ijt76lodwgkz2pm3@flea.lan>
-Message-ID: <20171206191311.7wlvqiolpho4zvxh@sirena.org.uk>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 06 Dec 2017 11:13:59 -0800
+Subject: [PATCH v4 0/4] add clk controller driver for Meson-AXG SoC
+In-Reply-To: <20171201012452.27086-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Fri, 1 Dec 2017 09:24:48 +0800")
+References: <20171201012452.27086-1-yixun.lan@amlogic.com>
+Message-ID: <7hmv2vsm88.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 07:53:08PM +0100, Maxime Ripard wrote:
-> On Wed, Dec 06, 2017 at 03:48:10PM +0000, Mark Brown wrote:
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-> > BCLK can be higher than the minimum there in most formats, though some
-> > hardware is more restrictive so we tend to go for the minimum clock rate.
+> Add driver for the clk controller which found in Meson AXG SoC
+>
+>   Note, we deliberately create a seperate source file for the Meson AXG
+> series, instead of sharing code with previous GXBB/GXL - the file axg.c
+> It would help us maintaining the code more easily.
 
-> How does that work in such a case? Is LRCK faster as well, and we're
-> keeping the same ratio, or will the codec buffer the current sample
-> until the next word?
+In addition to the DT node-name fixup (c.f. reply on v3 series), I think
+this series should also include a patch that switches the UART over to
+the new clock provider (it's currently using the xtal fixed clock.)
 
-No, the extra clock cycles just get ignored - most of the formats define
-the location of the data in terms of LRCLK edges, any extra BCLK edges
-shouldn't do anything.
+This will also provide a simple way to validate/test the series.
 
-> Is it usually a property of the codec or the DAI?
-
-Things that require extra cycles for some reason tend to be CODECs, but
-this can also be done just because whatever the clock master is doesn't
-have very flexible dividers.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/62f7abdd/attachment.sig>
+Kevin
