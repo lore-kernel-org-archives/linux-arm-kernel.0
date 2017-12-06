@@ -1,77 +1,55 @@
-From: john.garry@huawei.com (John Garry)
-Date: Wed, 6 Dec 2017 14:41:57 +0000
-Subject: [RFC PATCH 1/5] perf jevents: add support for pmu events vendor
- subdirectory
-In-Reply-To: <20171206133829.GC12508@krava>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
- <1512490399-94107-2-git-send-email-john.garry@huawei.com>
- <20171206133829.GC12508@krava>
-Message-ID: <5aaa3863-f90e-cd0e-37ee-58a8f17f6e63@huawei.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 6 Dec 2017 14:41:55 +0000
+Subject: 4.15-rc1 crash on Midway in teardown_hyp_mode()
+In-Reply-To: <10746458-42bd-c50f-3075-49811018099a@arm.com>
+References: <45e72322-52dd-4fdb-2e51-176524fb56a8@arm.com>
+ <10746458-42bd-c50f-3075-49811018099a@arm.com>
+Message-ID: <2b9f0477-49bb-37e9-200c-0f2c477d559c@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/2017 13:38, Jiri Olsa wrote:
-> On Wed, Dec 06, 2017 at 12:13:15AM +0800, John Garry wrote:
->
-> SNIP
->
->> diff --git a/tools/perf/pmu-events/jevents.c b/tools/perf/pmu-events/jevents.c
->> index b578aa2..a0d489e 100644
->> --- a/tools/perf/pmu-events/jevents.c
->> +++ b/tools/perf/pmu-events/jevents.c
->> @@ -588,7 +588,7 @@ static char *file_name_to_table_name(char *fname)
->>  	 * Derive rest of table name from basename of the JSON file,
->>  	 * replacing hyphens and stripping out .json suffix.
->>  	 */
->> -	n = asprintf(&tblname, "pme_%s", basename(fname));
->> +	n = asprintf(&tblname, "pme_%s", fname);
->>  	if (n < 0) {
->>  		pr_info("%s: asprintf() error %s for file %s\n", prog,
->>  				strerror(errno), fname);
->> @@ -598,7 +598,7 @@ static char *file_name_to_table_name(char *fname)
->>  	for (i = 0; i < strlen(tblname); i++) {
->>  		c = tblname[i];
+On 06/12/17 14:17, Andre Przywara wrote:
+> Hi,
+> 
+> On 06/12/17 14:11, Andre Przywara wrote:
+>> Hi,
 >>
->> -		if (c == '-')
->> +		if (c == '-' || c == '/')
->>  			tblname[i] = '_';
->>  		else if (c == '.') {
->>  			tblname[i] = '\0';
->> @@ -755,15 +755,52 @@ static int get_maxfds(void)
->>  static FILE *eventsfp;
->>  static char *mapfile;
+>> while trying to boot 4.15-rc1 on my Calxeda Midway I observed a crash
+>> (see below). I can't look further into this today, but wanted to report
+>> this anyway.
 >>
->> +static int isLeafDir(const char *fpath)
->
-> we use _ to separate words in functions names
->
+>> Digging around a bit this is due to the VGIC not initializing properly
+>> due to GICC being advertised as just 4K, not 8K.
+>> This can be worked around by adjusting the DT or using
+>> irqchip.gicv2_force_probe. However this still raises some questions:
+>> 1) Even if the VGIC fails to register, we should certainly not crash.
+>> The chain of events seems to be:
+>> virt/kvm/arm/arm.c:init_subsystems():
+>>   - kvm_vgic_hyp_init() returns -ENODEV, this leads to vgic_present
+>>     being set to false, but "err" being reset to 0 (meaning: carry on).
+>>     However this seems now to miss some initialization.
+>>   - kvm_timer_hyp_init() now fails on calling irq_set_vcpu_affinity(),
+>>     because this returns -ENOSYS. This leads to it returning this error,
+>>     init_subsystems() failing and subsequently tearing down KVM.
+>>   - This seems to have some bug and leads to the kernel crash.
+>>
+>> Even with the VGIC not being usable, we should be able to cleanly tear
+>> down KVM (or HYP?).
+> 
+> Just checked: If I let kvm_timer_hyp_init() deliberately fail in 4.14, I
+> get the same splat (4.14 works fine, otherwise). So this particular
+> issue existed already before. You should be able to reproduce it on any
+> box by forcing "err = -ENOSYS;" after the call to kvm_timer_hyp_init()
+> in virt/kvm/arm/arm.c:init_subsystems().
 
-Ok (I will also check functions added elsewhere)
+I wonder if the bigger hammer-type solution is not to expose that the
+GIC is not capable of EOImode==1, and not enable the vgic in that
+particular case...
 
->> +{
->> +	DIR 		  *d;
->> +	struct dirent *dir;
->> +	int res = 1;
->> +	d = opendir(fpath);
->> +	if (!d)
->> +		return 0;
->> +
->> +	while ((dir = readdir(d)) != NULL) {
->> +		if (dir-> d_type == DT_DIR && dir->d_name[0] != '.') {
->> +			res = 0;
->> +			break;
->
-> just recently got into a issue on xfs when d_type is DT_UNKNOWN
-> for directory.. you need to handle it
->
+I'll cook an RFC patch set for you to test.
 
-Sure
+Thanks,
 
-Cheers,
-John
-
-> thanks,
-> jirka
->
-> .
->
+	M.
+-- 
+Jazz is not dead. It just smells funny...
