@@ -1,100 +1,93 @@
-From: enric.balletbo@collabora.com (Enric Balletbo i Serra)
-Date: Wed,  6 Dec 2017 12:10:07 +0100
-Subject: [PATCH 2/3] arm64: dts: rockchip: add usb3-phy phandle for dwc3.
-In-Reply-To: <20171206111008.3079-1-enric.balletbo@collabora.com>
-References: <20171206111008.3079-1-enric.balletbo@collabora.com>
-Message-ID: <20171206111008.3079-2-enric.balletbo@collabora.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  6 Dec 2017 11:16:07 +0000
+Subject: [PATCH 1/2] arm64: SW PAN: Point saved ttbr0 at the zero page when
+ switching to init_mm
+In-Reply-To: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1512558968-28980-2-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the usb3-phy for both of the two dwc3 controllers on
-rk3399.
+update_saved_ttbr0 mandates that mm->pgd is not swapper, since swapper
+contains kernel mappings and should never be installed into ttbr0. However,
+this means that callers must avoid passing the init_mm to update_saved_ttbr0
+which in turn can cause the saved ttbr0 value to be out-of-date in the context
+of the idle thread. For example, EFI runtime services may leave the saved ttbr0
+pointing at the EFI page table, and kernel threads may end up with stale
+references to freed page tables.
 
-Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
+This patch changes update_saved_ttbr0 so that the init_mm points the saved
+ttbr0 value to the empty zero page, which always exists and never contains
+valid translations. EFI and switch can then call into update_saved_ttbr0
+unconditionally.
+
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Vinayak Menon <vinmenon@codeaurora.org>
+Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/boot/dts/rockchip/rk3399.dtsi | 28 ++++++++++++++++++++--------
- 1 file changed, 20 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/efi.h         |  4 +---
+ arch/arm64/include/asm/mmu_context.h | 22 +++++++++++++---------
+ 2 files changed, 14 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3399.dtsi b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-index 17e5e1a..c18ff88 100644
---- a/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3399.dtsi
-@@ -397,9 +397,11 @@
- 		#size-cells = <2>;
- 		ranges;
- 		clocks = <&cru SCLK_USB3OTG0_REF>, <&cru SCLK_USB3OTG0_SUSPEND>,
--			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_GRF>;
-+			 <&cru ACLK_USB3OTG0>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
-+			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
- 		clock-names = "ref_clk", "suspend_clk",
--			      "bus_clk", "grf_clk";
-+			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
-+			      "aclk_usb3", "grf_clk";
- 		status = "disabled";
+diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
+index 650344d01124..c4cd5081d78b 100644
+--- a/arch/arm64/include/asm/efi.h
++++ b/arch/arm64/include/asm/efi.h
+@@ -132,11 +132,9 @@ static inline void efi_set_pgd(struct mm_struct *mm)
+ 			 * Defer the switch to the current thread's TTBR0_EL1
+ 			 * until uaccess_enable(). Restore the current
+ 			 * thread's saved ttbr0 corresponding to its active_mm
+-			 * (if different from init_mm).
+ 			 */
+ 			cpu_set_reserved_ttbr0();
+-			if (current->active_mm != &init_mm)
+-				update_saved_ttbr0(current, current->active_mm);
++			update_saved_ttbr0(current, current->active_mm);
+ 		}
+ 	}
+ }
+diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+index 3257895a9b5e..f7773f90546e 100644
+--- a/arch/arm64/include/asm/mmu_context.h
++++ b/arch/arm64/include/asm/mmu_context.h
+@@ -174,11 +174,17 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+ static inline void update_saved_ttbr0(struct task_struct *tsk,
+ 				      struct mm_struct *mm)
+ {
+-	if (system_uses_ttbr0_pan()) {
+-		BUG_ON(mm->pgd == swapper_pg_dir);
+-		task_thread_info(tsk)->ttbr0 =
+-			virt_to_phys(mm->pgd) | ASID(mm) << 48;
+-	}
++	u64 ttbr;
++
++	if (!system_uses_ttbr0_pan())
++		return;
++
++	if (mm == &init_mm)
++		ttbr = __pa_symbol(empty_zero_page);
++	else
++		ttbr = virt_to_phys(mm->pgd) | ASID(mm) << 48;
++
++	task_thread_info(tsk)->ttbr0 = ttbr;
+ }
+ #else
+ static inline void update_saved_ttbr0(struct task_struct *tsk,
+@@ -214,11 +220,9 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
+ 	 * Update the saved TTBR0_EL1 of the scheduled-in task as the previous
+ 	 * value may have not been initialised yet (activate_mm caller) or the
+ 	 * ASID has changed since the last run (following the context switch
+-	 * of another thread of the same process). Avoid setting the reserved
+-	 * TTBR0_EL1 to swapper_pg_dir (init_mm; e.g. via idle_task_exit).
++	 * of another thread of the same process).
+ 	 */
+-	if (next != &init_mm)
+-		update_saved_ttbr0(tsk, next);
++	update_saved_ttbr0(tsk, next);
+ }
  
- 		usbdrd_dwc3_0: dwc3 {
-@@ -407,14 +409,15 @@
- 			reg = <0x0 0xfe800000 0x0 0x100000>;
- 			interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH 0>;
- 			dr_mode = "otg";
--			phys = <&u2phy0_otg>;
--			phy-names = "usb2-phy";
-+			phys = <&u2phy0_otg>, <&tcphy0_usb3>;
-+			phy-names = "usb2-phy", "usb3-phy";
- 			phy_type = "utmi_wide";
- 			snps,dis_enblslpm_quirk;
- 			snps,dis-u2-freeclk-exists-quirk;
- 			snps,dis_u2_susphy_quirk;
- 			snps,dis-del-phy-power-chg-quirk;
- 			snps,dis-tx-ipgap-linecheck-quirk;
-+			power-domains = <&power RK3399_PD_USB3>;
- 			status = "disabled";
- 		};
- 	};
-@@ -425,9 +428,11 @@
- 		#size-cells = <2>;
- 		ranges;
- 		clocks = <&cru SCLK_USB3OTG1_REF>, <&cru SCLK_USB3OTG1_SUSPEND>,
--			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_GRF>;
-+			 <&cru ACLK_USB3OTG1>, <&cru ACLK_USB3_RKSOC_AXI_PERF>,
-+			 <&cru ACLK_USB3>, <&cru ACLK_USB3_GRF>;
- 		clock-names = "ref_clk", "suspend_clk",
--			      "bus_clk", "grf_clk";
-+			      "bus_clk", "aclk_usb3_rksoc_axi_perf",
-+			      "aclk_usb3", "grf_clk";
- 		status = "disabled";
- 
- 		usbdrd_dwc3_1: dwc3 {
-@@ -435,14 +440,15 @@
- 			reg = <0x0 0xfe900000 0x0 0x100000>;
- 			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH 0>;
- 			dr_mode = "otg";
--			phys = <&u2phy1_otg>;
--			phy-names = "usb2-phy";
-+			phys = <&u2phy1_otg>, <&tcphy1_usb3>;
-+			phy-names = "usb2-phy", "usb3-phy";
- 			phy_type = "utmi_wide";
- 			snps,dis_enblslpm_quirk;
- 			snps,dis-u2-freeclk-exists-quirk;
- 			snps,dis_u2_susphy_quirk;
- 			snps,dis-del-phy-power-chg-quirk;
- 			snps,dis-tx-ipgap-linecheck-quirk;
-+			power-domains = <&power RK3399_PD_USB3>;
- 			status = "disabled";
- 		};
- 	};
-@@ -991,6 +997,12 @@
- 				clocks = <&cru HCLK_SDIO>;
- 				pm_qos = <&qos_sdioaudio>;
- 			};
-+			pd_usb3 at RK3399_PD_USB3 {
-+				reg = <RK3399_PD_USB3>;
-+				clocks = <&cru ACLK_USB3>;
-+				pm_qos = <&qos_usb_otg0>,
-+					 <&qos_usb_otg1>;
-+			};
- 			pd_vio at RK3399_PD_VIO {
- 				reg = <RK3399_PD_VIO>;
- 				#address-cells = <1>;
+ #define deactivate_mm(tsk,mm)	do { } while (0)
 -- 
-2.9.3
+2.1.4
