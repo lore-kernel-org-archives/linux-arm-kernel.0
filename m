@@ -1,92 +1,158 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:38 +0000
-Subject: [PATCH v3 19/20] arm64: mm: Introduce TTBR_ASID_MASK for getting at
- the ASID in the TTBR
+Date: Wed,  6 Dec 2017 12:35:35 +0000
+Subject: [PATCH v3 16/20] arm64: entry: Add fake CPU feature for unmapping the
+ kernel at EL0
 In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
 References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512563739-25239-20-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-17-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are now a handful of open-coded masks to extract the ASID from a
-TTBR value, so introduce a TTBR_ASID_MASK and use that instead.
+Allow explicit disabling of the entry trampoline on the kernel command
+line (kpti=off) by adding a fake CPU feature (ARM64_UNMAP_KERNEL_AT_EL0)
+that can be used to toggle the alternative sequences in our entry code and
+avoid use of the trampoline altogether if desired. This also allows us to
+make use of a static key in arm64_kernel_unmapped_at_el0().
 
-Suggested-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/asm-uaccess.h | 3 ++-
- arch/arm64/include/asm/mmu.h         | 1 +
- arch/arm64/include/asm/uaccess.h     | 4 ++--
- arch/arm64/kernel/entry.S            | 2 +-
- 4 files changed, 6 insertions(+), 4 deletions(-)
+ arch/arm64/include/asm/cpucaps.h |  3 ++-
+ arch/arm64/include/asm/mmu.h     |  3 ++-
+ arch/arm64/kernel/cpufeature.c   | 41 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry.S        |  9 +++++----
+ 4 files changed, 50 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm64/include/asm/asm-uaccess.h b/arch/arm64/include/asm/asm-uaccess.h
-index 21b8cf304028..f4f234b6155e 100644
---- a/arch/arm64/include/asm/asm-uaccess.h
-+++ b/arch/arm64/include/asm/asm-uaccess.h
-@@ -4,6 +4,7 @@
+diff --git a/arch/arm64/include/asm/cpucaps.h b/arch/arm64/include/asm/cpucaps.h
+index 2ff7c5e8efab..b4537ffd1018 100644
+--- a/arch/arm64/include/asm/cpucaps.h
++++ b/arch/arm64/include/asm/cpucaps.h
+@@ -41,7 +41,8 @@
+ #define ARM64_WORKAROUND_CAVIUM_30115		20
+ #define ARM64_HAS_DCPOP				21
+ #define ARM64_SVE				22
++#define ARM64_UNMAP_KERNEL_AT_EL0		23
  
- #include <asm/alternative.h>
- #include <asm/kernel-pgtable.h>
-+#include <asm/mmu.h>
- #include <asm/sysreg.h>
- #include <asm/assembler.h>
+-#define ARM64_NCAPS				23
++#define ARM64_NCAPS				24
  
-@@ -17,7 +18,7 @@
- 	msr	ttbr0_el1, \tmp1		// set reserved TTBR0_EL1
- 	isb
- 	sub	\tmp1, \tmp1, #SWAPPER_DIR_SIZE
--	bic	\tmp1, \tmp1, #(0xffff << 48)
-+	bic	\tmp1, \tmp1, #TTBR_ASID_MASK
- 	msr	ttbr1_el1, \tmp1		// set reserved ASID
- 	isb
- 	.endm
+ #endif /* __ASM_CPUCAPS_H */
 diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index da6f12e40714..6f7bdb89817f 100644
+index c07954638658..da6f12e40714 100644
 --- a/arch/arm64/include/asm/mmu.h
 +++ b/arch/arm64/include/asm/mmu.h
-@@ -18,6 +18,7 @@
+@@ -36,7 +36,8 @@ typedef struct {
  
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
- #define USER_ASID_FLAG	(UL(1) << 48)
-+#define TTBR_ASID_MASK	(UL(0xffff) << 48)
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/include/asm/uaccess.h b/arch/arm64/include/asm/uaccess.h
-index 750a3b76a01c..6eadf55ebaf0 100644
---- a/arch/arm64/include/asm/uaccess.h
-+++ b/arch/arm64/include/asm/uaccess.h
-@@ -112,7 +112,7 @@ static inline void __uaccess_ttbr0_disable(void)
- 	write_sysreg(ttbr + SWAPPER_DIR_SIZE, ttbr0_el1);
- 	isb();
- 	/* Set reserved ASID */
--	ttbr &= ~(0xffffUL << 48);
-+	ttbr &= ~TTBR_ASID_MASK;
- 	write_sysreg(ttbr, ttbr1_el1);
- 	isb();
+ static inline bool arm64_kernel_unmapped_at_el0(void)
+ {
+-	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0);
++	return IS_ENABLED(CONFIG_UNMAP_KERNEL_AT_EL0) &&
++	       cpus_have_const_cap(ARM64_UNMAP_KERNEL_AT_EL0);
  }
-@@ -131,7 +131,7 @@ static inline void __uaccess_ttbr0_enable(void)
  
- 	/* Restore active ASID */
- 	ttbr1 = read_sysreg(ttbr1_el1);
--	ttbr1 |= ttbr0 & (0xffffUL << 48);
-+	ttbr1 |= ttbr0 & TTBR_ASID_MASK;
- 	write_sysreg(ttbr1, ttbr1_el1);
- 	isb();
+ extern void paging_init(void);
+diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
+index c5ba0097887f..98e6563015a4 100644
+--- a/arch/arm64/kernel/cpufeature.c
++++ b/arch/arm64/kernel/cpufeature.c
+@@ -845,6 +845,40 @@ static bool has_no_fpsimd(const struct arm64_cpu_capabilities *entry, int __unus
+ 					ID_AA64PFR0_FP_SHIFT) < 0;
+ }
  
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++static int __kpti_forced; /* 0: not forced, >0: forced on, <0: forced off */
++
++static bool unmap_kernel_at_el0(const struct arm64_cpu_capabilities *entry,
++				int __unused)
++{
++	/* Forced on command line? */
++	if (__kpti_forced) {
++		pr_info("kernel page table isolation forced %s by command line option\n",
++			__kpti_forced > 0 ? "ON" : "OFF");
++		return __kpti_forced > 0;
++	}
++
++	/* Useful for KASLR robustness */
++	if (IS_ENABLED(CONFIG_RANDOMIZE_BASE))
++		return true;
++
++	return false;
++}
++
++static int __init parse_kpti(char *str)
++{
++	bool enabled;
++	int ret = strtobool(str, &enabled);
++
++	if (ret)
++		return ret;
++
++	__kpti_forced = enabled ? 1 : -1;
++	return 0;
++}
++__setup("kpti=", parse_kpti);
++#endif	/* CONFIG_UNMAP_KERNEL_AT_EL0 */
++
+ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 	{
+ 		.desc = "GIC system register CPU interface",
+@@ -931,6 +965,13 @@ static const struct arm64_cpu_capabilities arm64_features[] = {
+ 		.def_scope = SCOPE_SYSTEM,
+ 		.matches = hyp_offset_low,
+ 	},
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++	{
++		.capability = ARM64_UNMAP_KERNEL_AT_EL0,
++		.def_scope = SCOPE_SYSTEM,
++		.matches = unmap_kernel_at_el0,
++	},
++#endif
+ 	{
+ 		/* FP/SIMD is not implemented */
+ 		.capability = ARM64_HAS_NO_FPSIMD,
 diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index 5d51bdbb2131..3eabcb194c87 100644
+index ce56592b5f70..5d51bdbb2131 100644
 --- a/arch/arm64/kernel/entry.S
 +++ b/arch/arm64/kernel/entry.S
-@@ -205,7 +205,7 @@ alternative_else_nop_endif
+@@ -74,6 +74,7 @@
+ 	.macro kernel_ventry, el, label, regsize = 64
+ 	.align 7
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
++alternative_if ARM64_UNMAP_KERNEL_AT_EL0
+ 	.if	\el == 0
+ 	.if	\regsize == 64
+ 	mrs	x30, tpidrro_el0
+@@ -82,6 +83,7 @@
+ 	mov	x30, xzr
+ 	.endif
+ 	.endif
++alternative_else_nop_endif
+ #endif
  
- 	.if	\el != 0
- 	mrs	x21, ttbr1_el1
--	tst	x21, #0xffff << 48		// Check for the reserved ASID
-+	tst	x21, #TTBR_ASID_MASK		// Check for the reserved ASID
- 	orr	x23, x23, #PSR_PAN_BIT		// Set the emulated PAN in the saved SPSR
- 	b.eq	1f				// TTBR0 access already disabled
- 	and	x23, x23, #~PSR_PAN_BIT		// Clear the emulated PAN in the saved SPSR
+ 	sub	sp, sp, #S_FRAME_SIZE
+@@ -323,10 +325,9 @@ alternative_else_nop_endif
+ 	ldr	lr, [sp, #S_LR]
+ 	add	sp, sp, #S_FRAME_SIZE		// restore sp
+ 
+-#ifndef CONFIG_UNMAP_KERNEL_AT_EL0
+-	eret
+-#else
+ 	.if	\el == 0
++alternative_insn eret, nop, ARM64_UNMAP_KERNEL_AT_EL0
++#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ 	bne	4f
+ 	msr	far_el1, x30
+ 	tramp_alias	x30, tramp_exit_native
+@@ -334,10 +335,10 @@ alternative_else_nop_endif
+ 4:
+ 	tramp_alias	x30, tramp_exit_compat
+ 	br	x30
++#endif
+ 	.else
+ 	eret
+ 	.endif
+-#endif
+ 	.endm
+ 
+ 	.macro	irq_stack_entry
 -- 
 2.1.4
