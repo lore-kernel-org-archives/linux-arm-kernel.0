@@ -1,86 +1,45 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:28 +0000
-Subject: [PATCH v3 09/20] arm64: mm: Invalidate both kernel and user ASIDs
- when performing TLBI
+Date: Wed,  6 Dec 2017 12:35:36 +0000
+Subject: [PATCH v3 17/20] arm64: Kconfig: Add CONFIG_UNMAP_KERNEL_AT_EL0
 In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
 References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512563739-25239-10-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-18-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since an mm has both a kernel and a user ASID, we need to ensure that
-broadcast TLB maintenance targets both address spaces so that things
-like CoW continue to work with the uaccess primitives in the kernel.
+Add a Kconfig entry to control use of the entry trampoline, which allows
+us to unmap the kernel whilst running in userspace and improve the
+robustness of KASLR.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/tlbflush.h | 16 ++++++++++++++--
- 1 file changed, 14 insertions(+), 2 deletions(-)
+ arch/arm64/Kconfig | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
 
-diff --git a/arch/arm64/include/asm/tlbflush.h b/arch/arm64/include/asm/tlbflush.h
-index af1c76981911..9e82dd79c7db 100644
---- a/arch/arm64/include/asm/tlbflush.h
-+++ b/arch/arm64/include/asm/tlbflush.h
-@@ -23,6 +23,7 @@
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index fdcc7b9bb15d..3af1657fcac3 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -833,6 +833,19 @@ config FORCE_MAX_ZONEORDER
+ 	  However for 4K, we choose a higher default value, 11 as opposed to 10, giving us
+ 	  4M allocations matching the default size used by generic code.
  
- #include <linux/sched.h>
- #include <asm/cputype.h>
-+#include <asm/mmu.h>
- 
- /*
-  * Raw TLBI operations.
-@@ -54,6 +55,11 @@
- 
- #define __tlbi(op, ...)		__TLBI_N(op, ##__VA_ARGS__, 1, 0)
- 
-+#define __tlbi_user(op, arg) do {						\
-+	if (arm64_kernel_unmapped_at_el0())					\
-+		__tlbi(op, (arg) | USER_ASID_FLAG);				\
-+} while (0)
++config UNMAP_KERNEL_AT_EL0
++	bool "Unmap kernel when running in userspace (aka \"KAISER\")"
++	default y
++	help
++	  Some attacks against KASLR make use of the timing difference between
++	  a permission fault which could arise from a page table entry that is
++	  present in the TLB, and a translation fault which always requires a
++	  page table walk. This option defends against these attacks by unmapping
++	  the kernel whilst running in userspace, therefore forcing translation
++	  faults for all of kernel space.
 +
- /*
-  *	TLB Management
-  *	==============
-@@ -115,6 +121,7 @@ static inline void flush_tlb_mm(struct mm_struct *mm)
- 
- 	dsb(ishst);
- 	__tlbi(aside1is, asid);
-+	__tlbi_user(aside1is, asid);
- 	dsb(ish);
- }
- 
-@@ -125,6 +132,7 @@ static inline void flush_tlb_page(struct vm_area_struct *vma,
- 
- 	dsb(ishst);
- 	__tlbi(vale1is, addr);
-+	__tlbi_user(vale1is, addr);
- 	dsb(ish);
- }
- 
-@@ -151,10 +159,13 @@ static inline void __flush_tlb_range(struct vm_area_struct *vma,
- 
- 	dsb(ishst);
- 	for (addr = start; addr < end; addr += 1 << (PAGE_SHIFT - 12)) {
--		if (last_level)
-+		if (last_level) {
- 			__tlbi(vale1is, addr);
--		else
-+			__tlbi_user(vale1is, addr);
-+		} else {
- 			__tlbi(vae1is, addr);
-+			__tlbi_user(vae1is, addr);
-+		}
- 	}
- 	dsb(ish);
- }
-@@ -194,6 +205,7 @@ static inline void __flush_tlb_pgtable(struct mm_struct *mm,
- 	unsigned long addr = uaddr >> 12 | (ASID(mm) << 48);
- 
- 	__tlbi(vae1is, addr);
-+	__tlbi_user(vae1is, addr);
- 	dsb(ish);
- }
- 
++	  If unsure, say Y.
++
+ menuconfig ARMV8_DEPRECATED
+ 	bool "Emulate deprecated/obsolete ARMv8 instructions"
+ 	depends on COMPAT
 -- 
 2.1.4
