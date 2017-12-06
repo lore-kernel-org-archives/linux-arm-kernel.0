@@ -1,53 +1,67 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 5 Dec 2017 17:00:55 -0800
-Subject: [PATCH v3 3/3] arm64: dts: meson-axg: add clock DT info for
- Meson AXG SoC
-In-Reply-To: <1512147583.12869.10.camel@baylibre.com>
-References: <20171128125330.363-1-yixun.lan@amlogic.com>
- <20171128125330.363-4-yixun.lan@amlogic.com>
- <20171129193536.GB19419@codeaurora.org>
- <8353c264-3253-0268-91fc-8d42fbe82611@amlogic.com>
- <20171201163437.GE19419@codeaurora.org>
- <1512147583.12869.10.camel@baylibre.com>
-Message-ID: <20171206010055.GE4283@codeaurora.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Wed, 06 Dec 2017 02:02:59 +0100
+Subject: [PATCH] PM: Provide a config snippet for disabling PM
+In-Reply-To: <20171129111227.26798-1-broonie@kernel.org>
+References: <20171129111227.26798-1-broonie@kernel.org>
+Message-ID: <12112348.rAAmml0d5N@aspire.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/01, Jerome Brunet wrote:
-> On Fri, 2017-12-01 at 08:34 -0800, Stephen Boyd wrote:
-> > On 11/30, Yixun Lan wrote:
-> > > Hi Stephen
-> > > 
-> > > On 11/30/17 03:35, Stephen Boyd wrote:
-> > > > 
-> > > > Maybe just call the node "bus at ff63c000"?
-> > > > 
-> > > 
-> > > isn't this just a name? what's the benefits to change?
-> > > personally, I tend to keep it this way, because it's better map to the
-> > > data sheet
-> > > 
-> > > we also has 'aobus', 'cbus' scattered there..
-> > 
-> > Per the ePAPR node names are supposed to be generic, like disk,
-> > cpu, display-controller, gpu, etc. I've never heard of a hiubus,
-> > so probably it's some vendor specific thing? We have the phandle
-> > anyway so it's not like we're losing much information here.
+On Wednesday, November 29, 2017 12:12:27 PM CET Mark Brown wrote:
+> A frequent source of build problems is poor handling of optional PM
+> support, almost all development is done with the PM options enabled
+> but they can be turned off.  Currently few if any of the build test
+> services do this as standard as there is no standard config for it and
+> the use of selects and def_bool means that simply setting CONFIG_PM=n
+> doesn't do what is expected.  To make this easier provide a fragement
+> that can be used with KCONFIG_ALLCONFIG to force PM off.
 > 
-> Stephen, there is a lot of busses on platform. We can't just call them all
-> 'bus'.
-> I don't get the problem with this name.
-> We are re-using the name from the datasheet here, no fancy invention. It seems
-> to be quite common. 
+> CONFIG_XEN is disabled as Xen uses hibernation callbacks which end up
+> turning on power management on architectures with Xen.  Some cpuidle
+> implementations on ARM select PM so CONFIG_CPU_IDLE is disabled, and
+> some ARM architectures unconditionally enable PM so they are also
+> disabled.
+> 
+> Signed-off-by: Mark Brown <broonie@kernel.org>
+> ---
+>  MAINTAINERS                |  1 +
+>  kernel/configs/nopm.config | 15 +++++++++++++++
+>  2 files changed, 16 insertions(+)
+>  create mode 100644 kernel/configs/nopm.config
+> 
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 07d9067f68fd..539808dc7928 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -10895,6 +10895,7 @@ F:	include/linux/pm.h
+>  F:	include/linux/pm_*
+>  F:	include/linux/powercap.h
+>  F:	drivers/powercap/
+> +F:	kernel/configs/nopm.config
+>  
+>  POWER STATE COORDINATION INTERFACE (PSCI)
+>  M:	Mark Rutland <mark.rutland@arm.com>
+> diff --git a/kernel/configs/nopm.config b/kernel/configs/nopm.config
+> new file mode 100644
+> index 000000000000..81ff07863576
+> --- /dev/null
+> +++ b/kernel/configs/nopm.config
+> @@ -0,0 +1,15 @@
+> +CONFIG_PM=n
+> +CONFIG_SUSPEND=n
+> +CONFIG_HIBERNATION=n
+> +
+> +# Triggers PM on OMAP
+> +CONFIG_CPU_IDLE=n
+> +
+> +# Triggers enablement via hibernate callbacks
+> +CONFIG_XEN=n
+> +
+> +# ARM/ARM64 architectures that select PM unconditionally
+> +CONFIG_ARCH_OMAP2PLUS_TYPICAL=n
+> +CONFIG_ARCH_RENESAS=n
+> +CONFIG_ARCH_TEGRA=n
+> +CONFIG_ARCH_VEXPRESS=n
 > 
 
-Ok. I'm not the maintainer of the DTS so no worries from me. I'm
-just pointing out that the ePAPR says that node names should be
-generic, and 'hiubus' doesn't sound generic to me. If it matches
-some datasheet then I suppose that's good, but probably that sort
-of distinction should have gone into the compatible string
-instead of the node name.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Applied, thanks!
