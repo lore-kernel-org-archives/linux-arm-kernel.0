@@ -1,82 +1,35 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 6 Dec 2017 17:18:02 +0000
-Subject: [PATCH 1/2] drm/nouveau/bar/gf100: fix hang when calling ->fini()
- before ->init()
-In-Reply-To: <d5b6a012-52c4-dce3-1cc6-3041558e808b@collabora.com>
-References: <be610a7596ad8fee7da092161888c532c2eb2908.1512411775.git.guillaume.tucker@collabora.com>
- <6db622ac-319d-c640-91ab-9248e528b69b@nvidia.com>
- <CABDvA=krahNw3q+qpEPbbv8Y9fvX4jXc_B54qafwtgFyWpqKWg@mail.gmail.com>
- <d5b6a012-52c4-dce3-1cc6-3041558e808b@collabora.com>
-Message-ID: <b6618306-8de5-9b08-f2ee-9939df62aedc@nvidia.com>
+From: takuo.koguchi@gmail.com (Takuo Koguchi)
+Date: Thu,  7 Dec 2017 03:00:00 +0900
+Subject: [PATCH] spi: sun4i: disable clocks in the remove function
+In-Reply-To: <20171206152005.yfbyylu6tbe5gnnv@flea.lan>
+Message-ID: <1512583209-19398-1-git-send-email-takuo.koguchi.sw@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+mclk and hclk need to be disabled since pm_runtime_disable does
+not disable the clocks.
 
-On 06/12/17 09:22, Guillaume Tucker wrote:
-> On 05/12/17 18:32, Ben Skeggs wrote:
->> On Wed, Dec 6, 2017 at 12:30 AM, Jon Hunter <jonathanh@nvidia.com> wrote:
->>
->>>
->>> On 04/12/17 18:37, Guillaume Tucker wrote:
->>>> If the firmware fails to load then ->fini() will be called before the
->>>> device has been initialised, causing the kernel to hang while trying
->>>> to write to a register.? Add a test in ->fini() to avoid this issue.
->>>>
->>>> This fixes a kernel hang on tegra124.
->>>>
->>>> Fixes: b17de35a2ebbe ("drm/nouveau/bar: implement bar1 teardown")
->>>> Signed-off-by: Guillaume Tucker <guillaume.tucker@collabora.com>
->>>> CC: Ben Skeggs <bskeggs@redhat.com>
->>>> ---
->>>> ?drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c | 7 +++++--
->>>> ?1 file changed, 5 insertions(+), 2 deletions(-)
->>>>
->>>> diff --git a/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
->>> b/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
->>>> index a3ba7f50198b..95e2aba64aad 100644
->>>> --- a/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
->>>> +++ b/drivers/gpu/drm/nouveau/nvkm/subdev/bar/gf100.c
->>>> @@ -43,9 +43,12 @@ gf100_bar_bar1_wait(struct nvkm_bar *base)
->>>> ?}
->>>>
->>>> ?void
->>>> -gf100_bar_bar1_fini(struct nvkm_bar *bar)
->>>> +gf100_bar_bar1_fini(struct nvkm_bar *base)
->>>> ?{
->>>> -???? nvkm_mask(bar->subdev.device, 0x001704, 0x80000000, 0x00000000);
->>>> +???? struct nvkm_device *device = base->subdev.device;
->>>> +
->>>> +???? if (base->subdev.oneinit)
->>>> +???????????? nvkm_mask(device, 0x001704, 0x80000000, 0x00000000);
->>>> ?}
->>>>
->>>> ?void
->>>
->>> I have tested this and it works for me. Thanks for fixing this! Would be
->>> good to get Ben's ACK, but you can have my ...
->>>
->> I'd love to get a good explanation as to why it hangs without this
->> change,
->> as, on the surface, it's not immediately obvious as to why it's hanging.
-> 
-> To be fair I'm not entirely sure either why this causes a hang, I
-> haven't read the TRM...? The iomem has been mapped at this point,
-> so accessing the register should work.? One clue is when you look
-> at _bar1_init(), the 0x1704 register is initialised with
-> some (device instance?) memory address.? So it's possible that
-> the hardware does something special when you set this to 0 as in
-> _bar1_fini(), which may fail in particular if it was previously
-> not initialised with a valid address.
-> 
-> This is merely guesswork, would be interested to find out the
-> real explanation though.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-OK, well that's no good. It's a good pointer, but we need to make sure
-we understand the root of this hang. I will see if I have sometime to
-dig into this further, maybe next week.
+Signed-off-by: Takuo Koguchi <takuo.koguchi.sw@hitachi.com>
+---
+ V2: use pm_runtime_force_suspend to avoid unbalance disable
+     call.
+     Compile test only, no runtime test.
+ drivers/spi/spi-sun4i.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-Cheers
-Jon
-
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index c5cd635..ca733b2 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -525,6 +525,7 @@ static int sun4i_spi_probe(struct platform_device *pdev)
+ 
+ static int sun4i_spi_remove(struct platform_device *pdev)
+ {
++	pm_runtime_force_suspend(&pdev->dev);
+ 	pm_runtime_disable(&pdev->dev);
+ 
+ 	return 0;
 -- 
-nvpublic
+2.7.4
