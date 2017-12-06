@@ -1,77 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Dec 2017 18:26:57 +0000
-Subject: [PATCH 0/2] Fixes for SW PAN
-In-Reply-To: <20171206181801.igg5i6qepm4da56g@armageddon.cambridge.arm.com>
-References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
- <5ee0b1f1-c7fc-af92-2b34-4555e59d7a20@codeaurora.org>
- <20171206175641.GA26554@arm.com>
- <20171206180135.5zorlmaij45grg25@armageddon.cambridge.arm.com>
- <20171206180706.GB26554@arm.com>
- <20171206181801.igg5i6qepm4da56g@armageddon.cambridge.arm.com>
-Message-ID: <20171206182657.GA27883@arm.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Wed, 6 Dec 2017 19:37:34 +0100
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
+References: <20171205100148.5757-1-glin@suse.com>
+ <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
+ <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
+Message-ID: <20171206183734.xmgecyrd5suiurm6@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 06:18:01PM +0000, Catalin Marinas wrote:
-> On Wed, Dec 06, 2017 at 06:07:07PM +0000, Will Deacon wrote:
-> > On Wed, Dec 06, 2017 at 06:01:35PM +0000, Catalin Marinas wrote:
-> > > On Wed, Dec 06, 2017 at 05:56:42PM +0000, Will Deacon wrote:
-> > > > On Wed, Dec 06, 2017 at 11:01:46PM +0530, Vinayak Menon wrote:
-> > > > > On 12/6/2017 4:46 PM, Will Deacon wrote:
-> > > > > > After lots of collective head scratching in response to Vinayak's mail
-> > > > > > here:
-> > > > > >
-> > > > > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545641.html
-> > > > > >
-> > > > > > It turns out that we have a problem with SW PAN and kernel threads, where
-> > > > > > the saved ttbr0 value for a kernel thread can be stale and subsequently
-> > > > > > inherited by other kernel threads over a fork.
-> > > > > >
-> > > > > > These two patches attempt to fix that. We've not be able to reproduce
-> > > > > > the exact failure reported above, but I added some assertions to the
-> > > > > > uaccess routines to check for discrepancies between the active_mm pgd
-> > > > > > and the saved ttbr0 value (ignoring the zero page) and these no longer
-> > > > > > fire with these changes, but do fire without them if EFI runtime services
-> > > > > > are enabled on my Seattle board.
-> > > > > 
-> > > > > Thanks Will. So these 2 patches fix the case of kthreads having a stale saved ttbr0. The callstack I had shared
-> > > > > in the original issue description was not of a kthread (its user task with PF_KTHREAD not set. The tsk->mm was
-> > > > > set to NULL by exit_mm I think). So do you think this could be a different problem ?
-> > > > > I had a look at the dumps again and what I see is that, the PA part of the saved ttbr0
-> > > > > (from thread_info) is not the same as the pa(tsk->active_mm->pgd). The PA derived from saved ttbr0 actually
-> > > > > points to a page which is "now" owned by slab.
-> > > > 
-> > > > Having not been able to reproduce the failure you described, I can't give
-> > > > you a good answer to this.
 
-Looking at the code (again), if we context switch in do_exit after exit_mm,
-then the thread behaves an awful lot like a kernel thread: current->mm is
-NULL and we're in lazy TLB mode. Furthermore, that context switch will drop
-the last reference to the old mm and the pgd will finally be freed.
+* Gary Lin <glin@suse.com> wrote:
 
-So I think my patches will solve your case too because we'll call
-enter_lazy_tlb again when getting scheduled back in. If you have any way
-to test them, that would be great.
-
-> > > While these fixes make sense for a stable backport, I could go back to
-> > > per-cpu saved_ttbr0 as in the first version of this patchset:
-> > > 
-> > > http://lkml.kernel.org/r/1471015666-23125-4-git-send-email-catalin.marinas at arm.com
-> > > 
-> > > (changed in v2 for some marginally shorter asm code)
+> On Tue, Dec 05, 2017 at 04:14:26PM -0500, Josh Boyer wrote:
+> > On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
+> > > The series of patches introduce Security Version to EFI stub.
+> > >
+> > > Security Version is a monotonically increasing number and designed to
+> > > prevent the user from loading an insecure kernel accidentally. The
+> > > bootloader maintains a list of security versions corresponding to
+> > > different distributions. After fixing a critical vulnerability, the
+> > > distribution kernel maintainer bumps the "version", and the bootloader
+> > > updates the list automatically. When the user tries to load a kernel
+> > > with a lower security version, the bootloader shows a warning prompt
+> > > to notify the user the potential risk.
 > > 
-> > To be honest, if we're going to consider changes as fundamental as that, I'd
-> > much prefer for us to use the active_mm->pgd directly, setting the zero page
-> > if it's either NULL or init_mm. This would need some hacking for EFI...
-> 
-> The problem is the __pa(active_mm->pgd) and doing it in assembly may be
-> pretty unreadable.
+> > If a distribution releases a kernel with a higher security version and
+> > that it automatically updated on boot, what happens if that kernel
+> > contains a different bug that causes it to fail to boot or break
+> > critical functionality?  At that point, the user's machine would be in
+> > a state where the higher security version is enforced but the only
+> > kernel that provides that is broken.  Wouldn't that make a bad
+> > situation even worse by now requiring manual acceptance of the older
+> > SV kernel boot physically at the machine?
+> > 
+> > I feel like I'm missing a detail here or something.
+> > 
+> If the new kernel fails to boot, then the user has to choose the kernel
+> manually anyway, and there will be an option in the warning prompt to
+> lower SV.
 
-I don't think it would be *that* bad if you can get hold of memstart_addr.
+And what if the firmware does not support a lowering of the SV?
 
-> Yet another option is to move save_ttbr0 in mm_context_t.
+Thanks,
 
-Perhaps, but I don't dislike the current code as much as I did now that,
-we understand it better ;)
-
-Will
+	Ingo
