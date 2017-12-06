@@ -1,36 +1,65 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 06 Dec 2017 11:52:44 -0800
-Subject: [PATCH v5 0/2] meson: saradc: drop the sana clock
-In-Reply-To: <20171116090115.29915-1-yixun.lan@amlogic.com> (Yixun Lan's
- message of "Thu, 16 Nov 2017 17:01:13 +0800")
-References: <20171116090115.29915-1-yixun.lan@amlogic.com>
-Message-ID: <7h609jskfn.fsf@baylibre.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 6 Dec 2017 12:06:01 -0800
+Subject: [PATCH v2] firmware: qcom: scm: Fix incorrect of_node_put call
+ in scm_init
+In-Reply-To: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
+References: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
+Message-ID: <20171206200601.GH4283@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yixun Lan <yixun.lan@amlogic.com> writes:
+On 12/06, Loys Ollivier wrote:
+> When using other platform architectures, in the init of the qcom_scm
+> driver, of_node_put is called on /firmware if no qcom dt is found.
+> This results in a kernel error: Bad of_node_put() on /firmware.
+> 
+> The call to of_node_put from the qcom_scm init is unnecessary as
+> of_find_matching_node is calling it automatically.
+> 
+> Remove this of_node_put().
+> 
+> Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
+> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+> ---
 
-> This is a rework for the patch [v4 4/4] of previous series,
-> which mean this will make the patch [1] obsolete.
->
-> Changes since v4:
->  * separate DTS for ARM(32bit) vs ARM64
->  * add ACK from Martin
+This still looks wrong. Especially if of_find_matching_node() is
+going to look for siblings of the /firmware node for the
+compatible string for scm device. Why do we check at all? Can't
+we just delete this and let of_platform_populate() take care of
+it? BTW, OP-TEE driver seems to have a similar problem.
 
-Thanks for splitting it up.
+---8<----
 
-> [1] [PATCH v4 4/4] ARM64: dts: meson: drop "sana" clock from SAR ADC
-> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005266.html
->
-> Xingyu Chen (2):
->   ARM64: dts: meson: drop "sana" clock from SAR ADC
+diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+index af4c75217ea6..440d8f796faa 100644
+--- a/drivers/firmware/qcom_scm.c
++++ b/drivers/firmware/qcom_scm.c
+@@ -626,23 +626,11 @@ static int __init qcom_scm_init(void)
+ 	int ret;
+ 
+ 	fw_np = of_find_node_by_name(NULL, "firmware");
+-
+ 	if (!fw_np)
+-		return -ENODEV;
+-
+-	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
+-
+-	if (!np) {
+-		of_node_put(fw_np);
+-		return -ENODEV;
+-	}
+-
+-	of_node_put(np);
++		return 0;
+ 
+ 	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
+-
+ 	of_node_put(fw_np);
+-
+ 	if (ret)
+ 		return ret;
+ 
 
-Applied to v4.16/dt64
-
->   ARM: dts: meson: drop "sana" clock from SAR ADC
-
-Applied to v4.16/dt
-
-Thanks,
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
