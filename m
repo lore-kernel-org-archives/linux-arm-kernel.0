@@ -1,37 +1,38 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:20 +0100
-Subject: [PATCH 25/61] ARM: dts: r8a7792: Use R-Car SDHI Gen2 fallback compat
- string
+Date: Wed,  6 Dec 2017 11:22:11 +0100
+Subject: [PATCH 16/61] ARM: dts: r8a7745: Enable DMA for HSUSB
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <40fcacbe2f6c7a7efea9be683e62bde34afe7c13.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <d4595f040881976d5a232922d8592a0d576ce3a5.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car SDHI Gen2 fallback compat string
-in the DT of the r8a7792 SoC.
+From: Biju Das <biju.das@bp.renesas.com>
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before considering the fallback compat string.
+From: Biju Das <biju.das@bp.renesas.com>
 
+This patch adds DMA properties to the HSUSB node.
+
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7792.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7745.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7792.dtsi b/arch/arm/boot/dts/r8a7792.dtsi
-index 131f65b0426e..7b394273031e 100644
---- a/arch/arm/boot/dts/r8a7792.dtsi
-+++ b/arch/arm/boot/dts/r8a7792.dtsi
-@@ -507,7 +507,8 @@
- 		};
- 
- 		sdhi0: sd at ee100000 {
--			compatible = "renesas,sdhi-r8a7792";
-+			compatible = "renesas,sdhi-r8a7792",
-+				     "renesas,rcar-gen2-sdhi";
- 			reg = <0 0xee100000 0 0x328>;
- 			interrupts = <0 165 IRQ_TYPE_LEVEL_HIGH>;
- 			dmas = <&dmac0 0xcd>, <&dmac0 0xce>,
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 6e0c69bb375d..948dd1fc2d9c 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -951,6 +951,9 @@
+ 			reg = <0 0xe6590000 0 0x100>;
+ 			interrupts = <GIC_SPI 107 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 704>;
++			dmas = <&usb_dmac0 0>, <&usb_dmac0 1>,
++			       <&usb_dmac1 0>, <&usb_dmac1 1>;
++			dma-names = "ch0", "ch1", "ch2", "ch3";
+ 			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
+ 			resets = <&cpg 704>;
+ 			renesas,buswait = <4>;
 -- 
 2.11.0
