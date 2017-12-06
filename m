@@ -1,178 +1,95 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  6 Dec 2017 19:43:30 +0000
-Subject: [PATCH v3 04/20] crypto: arm64/aes-bs - move kernel mode neon
- en/disable into loop
+Date: Wed,  6 Dec 2017 19:43:36 +0000
+Subject: [PATCH v3 10/20] arm64: assembler: add utility macros to push/pop
+ stack frames
 In-Reply-To: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
 References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171206194346.24393-5-ard.biesheuvel@linaro.org>
+Message-ID: <20171206194346.24393-11-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When kernel mode NEON was first introduced on arm64, the preserve and
-restore of the userland NEON state was completely unoptimized, and
-involved saving all registers on each call to kernel_neon_begin(),
-and restoring them on each call to kernel_neon_end(). For this reason,
-the NEON crypto code that was introduced at the time keeps the NEON
-enabled throughout the execution of the crypto API methods, which may
-include calls back into the crypto API that could result in memory
-allocation or other actions that we should avoid when running with
-preemption disabled.
-
-Since then, we have optimized the kernel mode NEON handling, which now
-restores lazily (upon return to userland), and so the preserve action
-is only costly the first time it is called after entering the kernel.
-
-So let's put the kernel_neon_begin() and kernel_neon_end() calls around
-the actual invocations of the NEON crypto code, and run the remainder of
-the code with kernel mode NEON disabled (and preemption enabled)
+We are going to add code to all the NEON crypto routines that will
+turn them into non-leaf functions, so we need to manage the stack
+frames. To make this less tedious and error prone, add some macros
+that take the number of callee saved registers to preserve and the
+extra size to allocate in the stack frame (for locals) and emit
+the ldp/stp sequences.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/aes-neonbs-glue.c | 36 +++++++++-----------
- 1 file changed, 17 insertions(+), 19 deletions(-)
+ arch/arm64/include/asm/assembler.h | 60 ++++++++++++++++++++
+ 1 file changed, 60 insertions(+)
 
-diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
-index 9d823c77ec84..e7a95a566462 100644
---- a/arch/arm64/crypto/aes-neonbs-glue.c
-+++ b/arch/arm64/crypto/aes-neonbs-glue.c
-@@ -99,9 +99,8 @@ static int __ecb_crypt(struct skcipher_request *req,
- 	struct skcipher_walk walk;
- 	int err;
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index aef72d886677..5f61487e9f93 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -499,6 +499,66 @@ alternative_else_nop_endif
+ #endif
+ 	.endm
  
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
--	kernel_neon_begin();
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
-@@ -109,12 +108,13 @@ static int __ecb_crypt(struct skcipher_request *req,
- 			blocks = round_down(blocks,
- 					    walk.stride / AES_BLOCK_SIZE);
- 
-+		kernel_neon_begin();
- 		fn(walk.dst.virt.addr, walk.src.virt.addr, ctx->rk,
- 		   ctx->rounds, blocks);
-+		kernel_neon_end();
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
- 
- 	return err;
- }
-@@ -158,19 +158,19 @@ static int cbc_encrypt(struct skcipher_request *req)
- 	struct skcipher_walk walk;
- 	int err;
- 
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
--	kernel_neon_begin();
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
- 		/* fall back to the non-bitsliced NEON implementation */
-+		kernel_neon_begin();
- 		neon_aes_cbc_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
- 				     ctx->enc, ctx->key.rounds, blocks,
- 				     walk.iv);
-+		kernel_neon_end();
- 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
- 	return err;
- }
- 
-@@ -181,9 +181,8 @@ static int cbc_decrypt(struct skcipher_request *req)
- 	struct skcipher_walk walk;
- 	int err;
- 
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
--	kernel_neon_begin();
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 
-@@ -191,13 +190,14 @@ static int cbc_decrypt(struct skcipher_request *req)
- 			blocks = round_down(blocks,
- 					    walk.stride / AES_BLOCK_SIZE);
- 
-+		kernel_neon_begin();
- 		aesbs_cbc_decrypt(walk.dst.virt.addr, walk.src.virt.addr,
- 				  ctx->key.rk, ctx->key.rounds, blocks,
- 				  walk.iv);
-+		kernel_neon_end();
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
- 
- 	return err;
- }
-@@ -229,9 +229,8 @@ static int ctr_encrypt(struct skcipher_request *req)
- 	u8 buf[AES_BLOCK_SIZE];
- 	int err;
- 
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
--	kernel_neon_begin();
- 	while (walk.nbytes > 0) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
- 		u8 *final = (walk.total % AES_BLOCK_SIZE) ? buf : NULL;
-@@ -242,8 +241,10 @@ static int ctr_encrypt(struct skcipher_request *req)
- 			final = NULL;
- 		}
- 
-+		kernel_neon_begin();
- 		aesbs_ctr_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
- 				  ctx->rk, ctx->rounds, blocks, walk.iv, final);
-+		kernel_neon_end();
- 
- 		if (final) {
- 			u8 *dst = walk.dst.virt.addr + blocks * AES_BLOCK_SIZE;
-@@ -258,8 +259,6 @@ static int ctr_encrypt(struct skcipher_request *req)
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
--
- 	return err;
- }
- 
-@@ -304,12 +303,11 @@ static int __xts_crypt(struct skcipher_request *req,
- 	struct skcipher_walk walk;
- 	int err;
- 
--	err = skcipher_walk_virt(&walk, req, true);
-+	err = skcipher_walk_virt(&walk, req, false);
- 
- 	kernel_neon_begin();
--
--	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey,
--			     ctx->key.rounds, 1);
-+	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey, ctx->key.rounds, 1);
-+	kernel_neon_end();
- 
- 	while (walk.nbytes >= AES_BLOCK_SIZE) {
- 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
-@@ -318,13 +316,13 @@ static int __xts_crypt(struct skcipher_request *req,
- 			blocks = round_down(blocks,
- 					    walk.stride / AES_BLOCK_SIZE);
- 
-+		kernel_neon_begin();
- 		fn(walk.dst.virt.addr, walk.src.virt.addr, ctx->key.rk,
- 		   ctx->key.rounds, blocks, walk.iv);
-+		kernel_neon_end();
- 		err = skcipher_walk_done(&walk,
- 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
- 	}
--	kernel_neon_end();
--
- 	return err;
- }
- 
++	/*
++	 * frame_push - Push @regcount callee saved registers to the stack,
++	 *              starting at x19, as well as x29/x30, and set x29 to
++	 *              the new value of sp. Add @extra bytes of stack space
++	 *              for locals.
++	 */
++	.macro		frame_push, regcount:req, extra
++	__frame		st, \regcount, \extra
++	.endm
++
++	/*
++	 * frame_pop  - Pop @regcount callee saved registers from the stack,
++	 *              starting at x19, as well as x29/x30. Also pop @extra
++	 *              bytes of stack space for locals.
++	 */
++	.macro		frame_pop, regcount:req, extra
++	__frame		ld, \regcount, \extra
++	.endm
++
++	.macro		__frame, op, regcount:req, extra=0
++	.ifc		\op, st
++	stp		x29, x30, [sp, #-((\regcount + 3) / 2) * 16 - \extra]!
++	mov		x29, sp
++	.endif
++	.if		\regcount < 0 || \regcount > 10
++	.error		"regcount should be in the range [0 ... 10]"
++	.endif
++	.if		(\extra % 16) != 0
++	.error		"extra should be a multiple of 16 bytes"
++	.endif
++	.if		\regcount > 1
++	\op\()p		x19, x20, [sp, #16]
++	.if		\regcount > 3
++	\op\()p		x21, x22, [sp, #32]
++	.if		\regcount > 5
++	\op\()p		x23, x24, [sp, #48]
++	.if		\regcount > 7
++	\op\()p		x25, x26, [sp, #64]
++	.if		\regcount > 9
++	\op\()p		x27, x28, [sp, #80]
++	.elseif		\regcount == 9
++	\op\()r		x27, [sp, #80]
++	.endif
++	.elseif		\regcount == 7
++	\op\()r		x25, [sp, #64]
++	.endif
++	.elseif		\regcount == 5
++	\op\()r		x23, [sp, #48]
++	.endif
++	.elseif		\regcount == 3
++	\op\()r		x21, [sp, #32]
++	.endif
++	.elseif		\regcount == 1
++	\op\()r		x19, [sp, #16]
++	.endif
++	.ifc		\op, ld
++	ldp		x29, x30, [sp], #((\regcount + 3) / 2) * 16 + \extra
++	.endif
++	.endm
++
+ /*
+  * Errata workaround post TTBR0_EL1 update.
+  */
 -- 
 2.11.0
