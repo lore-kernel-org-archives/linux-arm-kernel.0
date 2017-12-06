@@ -1,88 +1,54 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  6 Dec 2017 14:38:35 +0000
-Subject: [PATCH 14/18] KVM: arm/arm64: Do not use kern_hyp_va() with
- kvm_vgic_global_state
-In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
-References: <20171206143839.29223-1-marc.zyngier@arm.com>
-Message-ID: <20171206143839.29223-15-marc.zyngier@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 6 Dec 2017 09:57:03 -0500
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
+References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+ <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+ <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
+Message-ID: <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-kvm_vgic_global_state is part of the read-only section, and is
-usually accessed using a PC-relative address generation (adrp + add).
+On 12/6/2017 8:37 AM, Rafael J. Wysocki wrote:
+> On Wed, Dec 6, 2017 at 2:24 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> On 12/5/2017 5:18 PM, Rafael J. Wysocki wrote:
+>>> On Tue, Dec 5, 2017 at 10:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>>> Some GED interrupts could be pending by the time we are doing a reboot.
+> 
+> [cut]
+> 
+>>
+>>>
+>>>>         .probe = ged_probe,
+>>>>         .driver = {
+>>>>                 .name = MODULE_NAME,
+>>>> --
+>>>
+>>> Overall, it looks like we should just unbind the driver from all
+>>> devices on shutdown.
+>>
+>> I see that shutdown is getting called on all GED instances. That should
+>> take care of it, right?
+> 
+> Yes, it should, so I'm not sure why you need the list in the first place.
+> 
+> Also it looks like something along the lines of devres_release_all()
+> should be sufficient.
 
-It is thus useless to use kern_hyp_va() on it, and actively problematic
-if kern_hyp_va() becomes non-idempotent. On the other hand, there is
-no way that the compiler is going to guarantee that such access is
-always be PC relative.
+Good suggestion, let me test this.
 
-So let's bite the bullet and provide our own accessor.
+> 
+> Thanks,
+> Rafael
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm/include/asm/kvm_hyp.h   | 6 ++++++
- arch/arm64/include/asm/kvm_hyp.h | 9 +++++++++
- virt/kvm/arm/hyp/vgic-v2-sr.c    | 4 ++--
- 3 files changed, 17 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
-index ab20ffa8b9e7..1d42d0aa2feb 100644
---- a/arch/arm/include/asm/kvm_hyp.h
-+++ b/arch/arm/include/asm/kvm_hyp.h
-@@ -26,6 +26,12 @@
- 
- #define __hyp_text __section(.hyp.text) notrace
- 
-+#define hyp_symbol_addr(s)						\
-+	({								\
-+		typeof(s) *addr = &(s);					\
-+		addr;							\
-+	})
-+
- #define __ACCESS_VFP(CRn)			\
- 	"mrc", "mcr", __stringify(p10, 7, %0, CRn, cr0, 0), u32
- 
-diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
-index 08d3bb66c8b7..a2d98c539023 100644
---- a/arch/arm64/include/asm/kvm_hyp.h
-+++ b/arch/arm64/include/asm/kvm_hyp.h
-@@ -25,6 +25,15 @@
- 
- #define __hyp_text __section(.hyp.text) notrace
- 
-+#define hyp_symbol_addr(s)						\
-+	({								\
-+		typeof(s) *addr;					\
-+		asm volatile("adrp	%0, %1\n"			\
-+			     "add	%0, %0, :lo12:%1\n"		\
-+			     : "=r" (addr) : "S" (&s));			\
-+		addr;							\
-+	})
-+
- #define read_sysreg_elx(r,nvh,vh)					\
- 	({								\
- 		u64 reg;						\
-diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
-index a3f18d362366..19f63fbf3682 100644
---- a/virt/kvm/arm/hyp/vgic-v2-sr.c
-+++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
-@@ -25,7 +25,7 @@
- static void __hyp_text save_elrsr(struct kvm_vcpu *vcpu, void __iomem *base)
- {
- 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
--	int nr_lr = (kern_hyp_va(&kvm_vgic_global_state))->nr_lr;
-+	int nr_lr = hyp_symbol_addr(kvm_vgic_global_state)->nr_lr;
- 	u32 elrsr0, elrsr1;
- 
- 	elrsr0 = readl_relaxed(base + GICH_ELRSR0);
-@@ -143,7 +143,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
- 		return -1;
- 
- 	rd = kvm_vcpu_dabt_get_rd(vcpu);
--	addr  = kern_hyp_va((kern_hyp_va(&kvm_vgic_global_state))->vcpu_base_va);
-+	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
- 	addr += fault_ipa - vgic->vgic_cpu_base;
- 
- 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
 -- 
-2.14.2
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
