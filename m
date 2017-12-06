@@ -1,95 +1,114 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  6 Dec 2017 16:45:45 +0000
-Subject: [PATCH 1/3] arm64: fpsimd: Prevent registers leaking from dead tasks
+Date: Wed,  6 Dec 2017 16:45:47 +0000
+Subject: [PATCH 3/3] arm64/sve: Avoid dereference of dead task_struct in KVM
+ guest entry
 In-Reply-To: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
 References: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1512578747-4554-2-git-send-email-Dave.Martin@arm.com>
+Message-ID: <1512578747-4554-4-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, loading of a task's fpsimd state into the CPU registers
-is skipped if that task's state is already present in the registers
-of that CPU.
+When deciding whether to invalidate FPSIMD state cached in the cpu,
+the backend function sve_flush_cpu_state() attempts to dereference
+__this_cpu_read(fpsimd_last_state).  However, this is not safe:
+there is no guarantee that this task_struct pointer is still valid,
+because the task could have exited in the meantime.
 
-However, the code relies on the struct fpsimd_state * (and by
-extension struct task_struct *) to unambiguously identify a task.
+This means that we need another means to get the appropriate value
+of TIF_SVE for the associated task.
 
-There is a particular case in which this doesn't work reliably:
-when a task exits, its task_struct may be recycled to describe a
-new task.
+This patch solves this issue by adding a cached copy of the TIF_SVE
+flag in fpsimd_last_state, which we can check without dereferencing
+the task pointer.
 
-Consider the following scenario:
+In particular, although this patch is not a KVM fix per se, this
+means that this check is now done safely in the KVM world switch
+path (which is currently the only user of this code).
 
- 1) Task P loads its fpsimd state onto cpu C.
-        per_cpu(fpsimd_last_state, C) := P;
-        P->thread.fpsimd_state.cpu := C;
-
- 2) Task X is scheduled onto C and loads its fpsimd state on C.
-        per_cpu(fpsimd_last_state, C) := X;
-        X->thread.fpsimd_state.cpu := C;
-
- 3) X exits, causing X's task_struct to be freed.
-
- 4) P forks a new child T, which obtains X's recycled task_struct.
-	T == X.
-	T->thread.fpsimd_state.cpu == C (inherited from P).
-
- 5) T is scheduled on C.
-	T's fpsimd state is not loaded, because
-	per_cpu(fpsimd_last_state, C) == T (== X) &&
-	T->thread.fpsimd_state.cpu == C.
-
-        (This is the check performed by fpsimd_thread_switch().)
-
-So, T gets X's registers because the last registers loaded onto C
-were those of X, in (2).
-
-This patch fixes the problem by ensuring that the sched-in check
-fails in (5): fpsimd_flush_task_state(T) is called when T is
-forked, so that T->thread.fpsimd_state.cpu == C cannot be true.
-This relies on the fact that T is not schedulable until after
-copy_thread() completes.
-
-Once T's fpsimd state has been loaded on some CPU C there may still
-be other cpus D for which per_cpu(fpsimd_last_state, D) ==
-&X->thread.fpsimd_state.  But D is necessarily != C in this case,
-and the check in (5) must fail.
-
-An alternative fix would be to do refcounting on task_struct.  This
-would result in each CPU holding a reference to the last task whose
-fpsimd state was loaded there.  It's not clear whether this is
-preferable, and it involves higher overhead than the fix proposed
-in this patch.  It would also move all the task_struct freeing work
-into the context switch critical section, or otherwise some
-deferred cleanup mechanism would need to be introduced, neither of
-which seems obviously justified.
-
-Fixes: 005f78cd8849 ("arm64: defer reloading a task's FPSIMD state to userland resume")
 Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kernel/process.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/kernel/fpsimd.c | 28 ++++++++++++++++------------
+ 1 file changed, 16 insertions(+), 12 deletions(-)
 
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index b2adcce..1ecf5cc 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -314,6 +314,15 @@ int copy_thread(unsigned long clone_flags, unsigned long stack_start,
- 	clear_tsk_thread_flag(p, TIF_SVE);
- 	p->thread.sve_state = NULL;
- 
-+	/*
-+	 * In case p was allocated the same task_struct pointer as some
-+	 * other recently-exited task, make sure p is disassociated from
-+	 * any cpu that may have run that such a task recently.
-+	 * Otherwise we could erroneously skip reloading the FPSIMD
-+	 * registers p.
-+	 */
-+	fpsimd_flush_task_state(p);
+diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
+index 007140b..3dc8058 100644
+--- a/arch/arm64/kernel/fpsimd.c
++++ b/arch/arm64/kernel/fpsimd.c
+@@ -114,7 +114,12 @@
+  *   returned from the 2nd syscall yet, TIF_FOREIGN_FPSTATE is still set so
+  *   whatever is in the FPSIMD registers is not saved to memory, but discarded.
+  */
+-static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
++struct fpsimd_last_state_struct {
++	struct fpsimd_state *st;
++	bool sve_in_use;
++};
 +
- 	if (likely(!(p->flags & PF_KTHREAD))) {
- 		*childregs = *current_pt_regs();
- 		childregs->regs[0] = 0;
++static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
+ 
+ /* Default VL for tasks that don't set it explicitly: */
+ static int sve_default_vl = -1;
+@@ -905,7 +910,7 @@ void fpsimd_thread_switch(struct task_struct *next)
+ 		 */
+ 		struct fpsimd_state *st = &next->thread.fpsimd_state;
+ 
+-		if (__this_cpu_read(fpsimd_last_state) == st
++		if (__this_cpu_read(fpsimd_last_state.st) == st
+ 		    && st->cpu == smp_processor_id())
+ 			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
+ 		else
+@@ -997,9 +1002,12 @@ void fpsimd_signal_preserve_current_state(void)
+  */
+ static void fpsimd_bind_to_cpu(void)
+ {
++	struct fpsimd_last_state_struct *last =
++		this_cpu_ptr(&fpsimd_last_state);
+ 	struct fpsimd_state *st = &current->thread.fpsimd_state;
+ 
+-	__this_cpu_write(fpsimd_last_state, st);
++	last->st = st;
++	last->sve_in_use = test_thread_flag(TIF_SVE);
+ 	st->cpu = smp_processor_id();
+ }
+ 
+@@ -1057,7 +1065,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
+ 
+ static inline void fpsimd_flush_cpu_state(void)
+ {
+-	__this_cpu_write(fpsimd_last_state, NULL);
++	__this_cpu_write(fpsimd_last_state.st, NULL);
+ }
+ 
+ /*
+@@ -1070,14 +1078,10 @@ static inline void fpsimd_flush_cpu_state(void)
+ #ifdef CONFIG_ARM64_SVE
+ void sve_flush_cpu_state(void)
+ {
+-	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
+-	struct task_struct *tsk;
+-
+-	if (!fpstate)
+-		return;
++	struct fpsimd_last_state_struct const *last =
++		this_cpu_ptr(&fpsimd_last_state);
+ 
+-	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
+-	if (test_tsk_thread_flag(tsk, TIF_SVE))
++	if (last->st && last->sve_in_use)
+ 		fpsimd_flush_cpu_state();
+ }
+ #endif /* CONFIG_ARM64_SVE */
+@@ -1272,7 +1276,7 @@ static inline void fpsimd_pm_init(void) { }
+ #ifdef CONFIG_HOTPLUG_CPU
+ static int fpsimd_cpu_dead(unsigned int cpu)
+ {
+-	per_cpu(fpsimd_last_state, cpu) = NULL;
++	per_cpu(fpsimd_last_state.st, cpu) = NULL;
+ 	return 0;
+ }
+ 
 -- 
 2.1.4
