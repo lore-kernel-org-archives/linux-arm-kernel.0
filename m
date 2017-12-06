@@ -1,49 +1,54 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 6 Dec 2017 16:11:50 +0000
-Subject: [PATCH] perf: qcom_l2_pmu: don't allow guest access
-In-Reply-To: <1512575733-923-1-git-send-email-nleeder@codeaurora.org>
-References: <1512575733-923-1-git-send-email-nleeder@codeaurora.org>
-Message-ID: <20171206161149.ezlzzcuvxbot5tio@lakrids.cambridge.arm.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Dec 2017 16:15:41 +0000
+Subject: [PATCH RESEND] arm64: fault: avoid send SIGBUS two times
+In-Reply-To: <20171205150235.46325-1-gengdongjiu@huawei.com>
+References: <20171205150235.46325-1-gengdongjiu@huawei.com>
+Message-ID: <20171206161540.GB25408@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 10:55:33AM -0500, Neil Leeder wrote:
-> Guests cannot access IMPDEF system registers, which are used
-> by this driver. Disable the driver if it's running in a guest VM.
+On Tue, Dec 05, 2017 at 11:02:35PM +0800, Dongjiu Geng wrote:
+> If APEI handling the memory error is failed, the do_mem_abort()
+> and do_sea() will all deliver SIGBUS. In fact, sending one time
+> can be enough, so correct it.
 > 
-> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+> Signed-off-by: Dongjiu Geng <gengdongjiu@huawei.com>
 > ---
->  drivers/perf/qcom_l2_pmu.c | 4 ++++
->  1 file changed, 4 insertions(+)
-
-Hi Neil,
-
-I'm a little confused by this. Why is this hypervisor providing a
-QCOM8130 device to the guest that it cannot use?
-
-Could you elaborate on what's going on?
-
-Thanks,
-Mark.
-
+>  arch/arm64/mm/fault.c | 5 ++---
+>  1 file changed, 2 insertions(+), 3 deletions(-)
 > 
-> diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
-> index 4fdc848..49dc954 100644
-> --- a/drivers/perf/qcom_l2_pmu.c
-> +++ b/drivers/perf/qcom_l2_pmu.c
-> @@ -1057,6 +1057,10 @@ static int __init register_l2_cache_pmu_driver(void)
+> diff --git a/arch/arm64/mm/fault.c b/arch/arm64/mm/fault.c
+> index fcf2ede3..9e3f7ca 100644
+> --- a/arch/arm64/mm/fault.c
+> +++ b/arch/arm64/mm/fault.c
+> @@ -570,7 +570,6 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
 >  {
->  	int err;
+>  	struct siginfo info;
+>  	const struct fault_info *inf;
+> -	int ret = 0;
 >  
-> +	/* Don't enable driver if running as guest */
-> +	if (!is_hyp_mode_available())
-> +		return 0;
-> +
->  	err = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
->  				      "AP_PERF_ARM_QCOM_L2_ONLINE",
->  				      l2cache_pmu_online_cpu,
-> -- 
-> Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
-> Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project.
-> 
+>  	inf = esr_to_fault_info(esr);
+>  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
+> @@ -585,7 +584,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  		if (interrupts_enabled(regs))
+>  			nmi_enter();
+>  
+> -		ret = ghes_notify_sea();
+> +		ghes_notify_sea();
+>  
+>  		if (interrupts_enabled(regs))
+>  			nmi_exit();
+> @@ -600,7 +599,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
+>  		info.si_addr  = (void __user *)addr;
+>  	arm64_notify_die("", regs, &info, esr);
+>  
+> -	return ret;
+> +	return 0;
+
+Hmm, so this code is a bit of mess.
+
+Wouldn't it be better to have the signal dispatching code in do_mem_abort
+check ESR.ESR_ELx_FnV, so then do_sea wouldn't have to, and we could just
+return an error instead?
+
+Will
