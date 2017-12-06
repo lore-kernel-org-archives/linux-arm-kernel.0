@@ -1,51 +1,166 @@
-From: eugen.hristev@microchip.com (Eugen Hristev)
-Date: Wed, 6 Dec 2017 15:18:43 +0200
-Subject: [PATCH v3 2/4] ARM: dts: at91: sama5d2: added dma property for
- ADC device
-In-Reply-To: <20171129210507.GQ21126@piout.net>
-References: <1510750608-8697-1-git-send-email-eugen.hristev@microchip.com>
- <1510750608-8697-3-git-send-email-eugen.hristev@microchip.com>
- <20171129210507.GQ21126@piout.net>
-Message-ID: <d3024017-0802-92ea-8c28-70c2edfb4669@microchip.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 6 Dec 2017 08:24:09 -0500
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+Message-ID: <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 29.11.2017 23:05, Alexandre Belloni wrote:
-> Hi,
-> 
-> On 15/11/2017 at 14:56:46 +0200, Eugen Hristev wrote:
->> Added DMA property for ADC device
+On 12/5/2017 5:18 PM, Rafael J. Wysocki wrote:
+> On Tue, Dec 5, 2017 at 10:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> Some GED interrupts could be pending by the time we are doing a reboot.
 >>
->> Signed-off-by: Eugen Hristev <eugen.hristev@microchip.com>
+>> Even though GED driver uses devm_request_irq() to register the interrupt
+>> handler, the handler is not being freed on time during a shutdown since
+>> the driver is missing a shutdown callback.
+>>
+>> If the ACPI handler is no longer available, this causes an interrupt
+>> storm and delays shutdown.
+>>
+>> Register a shutdown callback and manually free the interrupts.
+>>
+>> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 >> ---
->>   arch/arm/boot/dts/sama5d2.dtsi | 2 ++
->>   1 file changed, 2 insertions(+)
+>>  drivers/acpi/evged.c | 36 +++++++++++++++++++++++++++++++++---
+>>  1 file changed, 33 insertions(+), 3 deletions(-)
 >>
+>> diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
+>> index 46f0603..dde50ea 100644
+>> --- a/drivers/acpi/evged.c
+>> +++ b/drivers/acpi/evged.c
+>> @@ -1,7 +1,7 @@
+>>  /*
+>>   * Generic Event Device for ACPI.
+>>   *
+>> - * Copyright (c) 2016, The Linux Foundation. All rights reserved.
+>> + * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
 > 
-> This didn't apply cleanly, please check
-> https://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git/commit/?h=at91-dt&id=0ae80c039ef2407c08842ddde892af0c9128711b
-Hi,
+> Why are you changing this?
 
-I tested on your tree and looked over the file, and it's all good.
-Thanks.
+Some legal BS that we are trying to figure out internally. This slipped through
+the cracks. I was going to remove it before posting.
 
 > 
->> diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
->> index 38d2216..ca8bf13 100644
->> --- a/arch/arm/boot/dts/sama5d2.dtsi
->> +++ b/arch/arm/boot/dts/sama5d2.dtsi
->> @@ -1430,6 +1430,8 @@
->>   				atmel,min-sample-rate-hz = <200000>;
->>   				atmel,max-sample-rate-hz = <20000000>;
->>   				atmel,startup-time-ms = <4>;
->> +				dmas = <&dma0 (AT91_XDMAC_DT_MEM_IF(0) | AT91_XDMAC_DT_PER_IF(1) | AT91_XDMAC_DT_PERID(25))>;
->> +				dma-names = "rx";
->>   				status = "disabled";
->>   			};
->>   
->> -- 
->> 2.7.4
+>>   *
+>>   * This program is free software; you can redistribute it and/or modify
+>>   * it under the terms of the GNU General Public License version 2 and
+>> @@ -49,6 +49,11 @@
 >>
+>>  #define MODULE_NAME    "acpi-ged"
+>>
+>> +struct acpi_ged_device {
+>> +       struct device *dev;
+>> +       struct list_head event_list;
+>> +};
+>> +
+>>  struct acpi_ged_event {
+>>         struct list_head node;
+>>         struct device *dev;
+>> @@ -76,7 +81,8 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+>>         unsigned int irq;
+>>         unsigned int gsi;
+>>         unsigned int irqflags = IRQF_ONESHOT;
+>> -       struct device *dev = context;
+>> +       struct acpi_ged_device *geddev = context;
+>> +       struct device *dev = geddev->dev;
+>>         acpi_handle handle = ACPI_HANDLE(dev);
+>>         acpi_handle evt_handle;
+>>         struct resource r;
+>> @@ -122,29 +128,53 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
+>>                 return AE_ERROR;
+>>         }
+>>
+>> +       dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
 > 
+> Why dev_info()?
+
+I can change it to dev_dbg.
+
+> 
+>> +       list_add_tail(&event->node, &geddev->event_list);
+>>         return AE_OK;
+>>  }
+>>
+>>  static int ged_probe(struct platform_device *pdev)
+>>  {
+>> +       struct acpi_ged_device *geddev;
+>>         acpi_status acpi_ret;
+>>
+>> +       geddev = devm_kzalloc(&pdev->dev, sizeof(*geddev), GFP_KERNEL);
+>> +       if (!geddev)
+>> +               return -ENOMEM;
+>> +
+>> +       geddev->dev = &pdev->dev;
+>> +       INIT_LIST_HEAD(&geddev->event_list);
+>>         acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
+>> -                                      acpi_ged_request_interrupt, &pdev->dev);
+>> +                                      acpi_ged_request_interrupt, geddev);
+>>         if (ACPI_FAILURE(acpi_ret)) {
+>>                 dev_err(&pdev->dev, "unable to parse the _CRS record\n");
+>>                 return -EINVAL;
+>>         }
+>> +       platform_set_drvdata(pdev, geddev);
+>>
+>>         return 0;
+>>  }
+>>
+>> +static void ged_remove(struct platform_device *pdev)
+>> +{
+>> +       struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
+>> +       struct acpi_ged_event *event, *next;
+>> +
+>> +       list_for_each_entry_safe(event, next, &geddev->event_list, node) {
+>> +               devm_free_irq(geddev->dev, event->irq, event);
+>> +               list_del(&event->node);
+>> +               dev_info(geddev->dev, "GED releasing GSI %u @ IRQ %u\n",
+>> +                        event->gsi, event->irq);
+> 
+> dev_dbg() and that if you really need it.
+
+will change to dev_dbg
+
+> 
+>> +       }
+>> +}
+>> +
+>>  static const struct acpi_device_id ged_acpi_ids[] = {
+>>         {"ACPI0013"},
+>>         {},
+>>  };
+>>
+>>  static struct platform_driver ged_driver = {
+>> +       .shutdown = ged_remove,
+> 
+> That ged_remove really should be called ged_shutdown.  It is confusing
+> as is, because there is a ->remove callback in the structure too.
+
+I'll rename as shutdown.
+
+> 
+>>         .probe = ged_probe,
+>>         .driver = {
+>>                 .name = MODULE_NAME,
+>> --
+> 
+> Overall, it looks like we should just unbind the driver from all
+> devices on shutdown.
+
+I see that shutdown is getting called on all GED instances. That should
+take care of it, right?
+
+> 
+> Thanks,
+> Rafael
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+
+-- 
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
