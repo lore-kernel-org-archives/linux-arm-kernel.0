@@ -1,103 +1,85 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 6 Dec 2017 11:59:04 +0100
-Subject: [PATCH v6 7/8] KVM: arm/arm64: Provide a get_input_level for the
- arch timer
-In-Reply-To: <20171205152446.rcmkowdnuhkqbrdb@yury-thinkpad>
-References: <20171204200506.3224-1-cdall@kernel.org>
- <20171204200506.3224-8-cdall@kernel.org>
- <20171205152446.rcmkowdnuhkqbrdb@yury-thinkpad>
-Message-ID: <20171206105904.GM32397@cbox>
+From: fabien.dessenne@st.com (Fabien DESSENNE)
+Date: Wed, 6 Dec 2017 10:59:47 +0000
+Subject: [PATCH RFC 0/4] crypto: engine - Permit to enqueue all async
+ requests
+In-Reply-To: <20171129084121.9385-1-clabbe.montjoie@gmail.com>
+References: <20171129084121.9385-1-clabbe.montjoie@gmail.com>
+Message-ID: <4d58a1fc-8577-3fdb-ae6b-e1fade7c6582@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 06:24:46PM +0300, Yury Norov wrote:
-> On Mon, Dec 04, 2017 at 09:05:05PM +0100, Christoffer Dall wrote:
-> > From: Christoffer Dall <christoffer.dall@linaro.org>
-> > 
-> > The VGIC can now support the life-cycle of mapped level-triggered
-> > interrupts, and we no longer have to read back the timer state on every
-> > exit from the VM if we had an asserted timer interrupt signal, because
-> > the VGIC already knows if we hit the unlikely case where the guest
-> > disables the timer without ACKing the virtual timer interrupt.
-> > 
-> > This means we rework a bit of the code to factor out the functionality
-> > to snapshot the timer state from vtimer_save_state(), and we can reuse
-> > this functionality in the sync path when we have an irqchip in
-> > userspace, and also to support our implementation of the
-> > get_input_level() function for the timer.
-> > 
-> > This change also means that we can no longer rely on the timer's view of
-> > the interrupt line to set the active state, because we no longer
-> > maintain this state for mapped interrupts when exiting from the guest.
-> > Instead, we only set the active state if the virtual interrupt is
-> > active, and otherwise we simply let the timer fire again and raise the
-> > virtual interrupt from the ISR.
-> > 
-> > Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
-> > ---
-> >  include/kvm/arm_arch_timer.h |  2 ++
-> >  virt/kvm/arm/arch_timer.c    | 75 +++++++++++++++++++++-----------------------
-> >  2 files changed, 38 insertions(+), 39 deletions(-)
-> > 
-> > diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-> > index 01ee473517e2..f57f795d704c 100644
-> > --- a/include/kvm/arm_arch_timer.h
-> > +++ b/include/kvm/arm_arch_timer.h
-> > @@ -90,6 +90,8 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
-> >  
-> >  void kvm_timer_init_vhe(void);
-> >  
-> > +bool kvm_arch_timer_get_input_level(int vintid);
-> > +
-> >  #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
-> >  #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
-> >  
-> 
-> [...]
-> 
-> > +bool kvm_arch_timer_get_input_level(int vintid)
-> > +{
-> > +	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-> > +	struct arch_timer_context *timer;
-> > +
-> > +	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
-> > +		timer = vcpu_vtimer(vcpu);
-> > +	else
-> > +		BUG(); /* We only map the vtimer so far */
-> > +
-> > +	if (timer->loaded)
-> > +		__timer_snapshot_state(timer);
-> > +
-> > +	return kvm_timer_should_fire(timer);
-> > +}
-> 
-> I think it worth to reword to highlight your intention about BUG,
-> and save 1 call to vcpu_vtimer()
-> 
-> bool kvm_arch_timer_get_input_level(int vintid)
-> {
-> 	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-> 	struct arch_timer_context *timer = vcpu_vtimer(vcpu);
-> 
->         /* We only map the vtimer so far */
-> 	BUG_ON(vintid != timer->irq.irq)
-> 
-> 	if (timer->loaded)
-> 		__timer_snapshot_state(timer);
-> 
-> 	return kvm_timer_should_fire(timer);
-> }
-> 
+Hi Corentin,
 
-Besides the incredible bikesheding nature of your comments, I disagree.
-The current code suggests where to add functionality once we move to
-using the physical timer hardware to drive an EL1 physical timer on VHE
-systems, and is purposely written this way.
 
-I'm sure we have real bugs and real issues in the code, perhaps you
-could spend your energy looking for those, and if you cannot find any,
-then provide a reviewed-by instead of these pointless cosmetic
-adjustments.
+I am fine with this proposal: it is generic enough and I have been able 
+to test and run the crypto engine with aead_request without changing any 
+single line of code.
 
-Thanks,
--Christoffer
+This is what I need to be able to send the AEAD extension of the 
+stm32-cryp driver (successfully tested with your engine upgrade proposal).
+
+
+I have also tested the stm32-hash patch.
+
+Note that stm32-cryp (new driver applied by Herbert recently 
+[https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git/commit/?id=9e054ec21ef8344345b28603fb272fe999f735db]) 
+would also need to be converted to the new crypto engine API : this is a 
+trivial patch.
+
+Thank you for your proposal, I hope that this proposal is fine for 
+Herbert too.
+
+BR
+
+
+Fabien
+
+
+On 29/11/17 09:41, Corentin Labbe wrote:
+> Hello
+>
+> The current crypto_engine support only ahash and ablkcipher.
+> My first patch which try to add skcipher was Nacked, it will add too many functions
+> and adding other algs(aead, asymetric_key) will make the situation worst.
+>
+> This patchset remove all algs specific stuff and now only process generic crypto_async_request.
+>
+> The requests handler function pointer are now moved out of struct engine and
+> are now stored directly in a crypto_engine_reqctx.
+>
+> The original proposal of Herbert [1] cannot be done completly since the crypto_engine
+> could only dequeue crypto_async_request and it is impossible to access any request_ctx
+> without knowing the underlying request type.
+>
+> So I do something near that was requested: adding crypto_engine_reqctx in TFM context.
+> Note that the current implementation expect that crypto_engine_reqctx
+> is the first member of the context.
+>
+> The first patch convert the crypto engine with the new way,
+> while the following patchs convert the 3 existing users of crypto_engine.
+> Note that this split break bisection, so probably the final commit will be all merged.
+>
+> The 3 latest patch were compile tested only, but the first is tested successfully
+> with my new sun8i-ce driver.
+>
+> Regards
+>
+> [1] https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1474434.html
+>
+> Corentin Labbe (4):
+>    crypto: engine - Permit to enqueue all async requests
+>    crypto: omap: convert to new crypto engine API
+>    crypto: virtio: convert to new crypto engine API
+>    crypto: stm32: convert to the new crypto engine API
+>
+>   crypto/crypto_engine.c                       | 188 ++++++---------------------
+>   drivers/crypto/omap-aes.c                    |  21 ++-
+>   drivers/crypto/omap-aes.h                    |   3 +
+>   drivers/crypto/omap-des.c                    |  24 +++-
+>   drivers/crypto/stm32/stm32-hash.c            |  22 +++-
+>   drivers/crypto/virtio/virtio_crypto_algs.c   |  15 ++-
+>   drivers/crypto/virtio/virtio_crypto_common.h |   2 +-
+>   drivers/crypto/virtio/virtio_crypto_core.c   |   3 -
+>   include/crypto/engine.h                      |  46 +++----
+>   9 files changed, 122 insertions(+), 202 deletions(-)
+>
