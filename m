@@ -1,53 +1,134 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:12 +0100
-Subject: [PATCH 17/61] ARM: dts: iwg22d-sodimm: Enable HS-USB
+Date: Wed,  6 Dec 2017 11:22:08 +0100
+Subject: [PATCH 13/61] ARM: dts: iwg22d-sodimm: sort dt nodes
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <b73ae2bdd83af78e5057d20ab2884cfd004c8543.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <738a368d558f24d2c34ef420fc0d8ab8499b0ebe.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-From: Biju Das <biju.das@bp.renesas.com>
+Improve the layout of r8a7745-iwg22d-sodimm.dts by sorting the
+nodes alphabetically.
 
-Enable HS-USB on iWave RZ/G1E carrier board.
-
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 62 ++++++++++++++---------------
+ 1 file changed, 31 insertions(+), 31 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-index 3eb4f83297d4..80c82aa94c06 100644
+index 82587d7b2056..3eb4f83297d4 100644
 --- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
 +++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-@@ -67,6 +67,12 @@
+@@ -16,9 +16,9 @@
+ 	compatible = "iwave,g22d", "iwave,g22m", "renesas,r8a7745";
+ 
+ 	aliases {
++		ethernet0 = &avb;
+ 		serial3 = &scif4;
+ 		serial5 = &hscif1;
+-		ethernet0 = &avb;
+ 	};
+ 
+ 	chosen {
+@@ -40,6 +40,25 @@
+ 	};
+ };
+ 
++&avb {
++	pinctrl-0 = <&avb_pins>;
++	pinctrl-names = "default";
++
++	phy-handle = <&phy3>;
++	phy-mode = "gmii";
++	renesas,no-ether-link;
++	status = "okay";
++
++	phy3: ethernet-phy at 3 {
++	/*
++	 * On some older versions of the platform (before R4.0) the phy address
++	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
++	 */
++		reg = <3>;
++		micrel,led-mode = <1>;
++	};
++};
++
+ &hscif1 {
+ 	pinctrl-0 = <&hscif1_pins>;
+ 	pinctrl-names = "default";
+@@ -48,7 +67,18 @@
  	status = "okay";
  };
  
-+&hsusb {
++&pci1 {
 +	status = "okay";
-+	pinctrl-0 = <&usb0_pins>;
++	pinctrl-0 = <&usb1_pins>;
 +	pinctrl-names = "default";
 +};
 +
- &pci1 {
- 	status = "okay";
- 	pinctrl-0 = <&usb1_pins>;
-@@ -95,6 +101,11 @@
- 		power-source = <3300>;
- 	};
- 
-+	usb0_pins: usb0 {
-+		groups = "usb0";
-+		function = "usb0";
+ &pfc {
++	avb_pins: avb {
++		groups = "avb_mdio", "avb_gmii";
++		function = "avb";
 +	};
 +
- 	usb1_pins: usb1 {
- 		groups = "usb1";
- 		function = "usb1";
+ 	hscif1_pins: hscif1 {
+ 		groups = "hscif1_data", "hscif1_ctrl";
+ 		function = "hscif1";
+@@ -59,11 +89,6 @@
+ 		function = "scif4";
+ 	};
+ 
+-	avb_pins: avb {
+-		groups = "avb_mdio", "avb_gmii";
+-		function = "avb";
+-	};
+-
+ 	sdhi0_pins: sd0 {
+ 		groups = "sdhi0_data4", "sdhi0_ctrl";
+ 		function = "sdhi0";
+@@ -83,25 +108,6 @@
+ 	status = "okay";
+ };
+ 
+-&avb {
+-	pinctrl-0 = <&avb_pins>;
+-	pinctrl-names = "default";
+-
+-	phy-handle = <&phy3>;
+-	phy-mode = "gmii";
+-	renesas,no-ether-link;
+-	status = "okay";
+-
+-	phy3: ethernet-phy at 3 {
+-	/*
+-	 * On some older versions of the platform (before R4.0) the phy address
+-	 * may be 1 or 3. The address is fixed to 3 for R4.0 onwards.
+-	 */
+-		reg = <3>;
+-		micrel,led-mode = <1>;
+-	};
+-};
+-
+ &sdhi0 {
+ 	pinctrl-0 = <&sdhi0_pins>;
+ 	pinctrl-names = "default";
+@@ -112,12 +118,6 @@
+ 	status = "okay";
+ };
+ 
+-&pci1 {
+-	status = "okay";
+-	pinctrl-0 = <&usb1_pins>;
+-	pinctrl-names = "default";
+-};
+-
+ &usbphy {
+ 	status = "okay";
+ };
 -- 
 2.11.0
