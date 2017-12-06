@@ -1,48 +1,61 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:51 +0100
-Subject: [PATCH 56/61] ARM: dts: r8a7794: Remove CMT renesas,channels-mask
+Date: Wed,  6 Dec 2017 11:22:10 +0100
+Subject: [PATCH 15/61] ARM: dts: r8a7745: Add USB-DMAC device nodes
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <bc28e52b4d5ec51d9bde87838a1ab1673807536c.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <fbdf17b307dae407b2e673806386f84660d01b63.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Biju Das <biju.das@bp.renesas.com>
 
-Update the DTS to remove the now deprecated "renesas,channels-mask"
-property.
+From: Biju Das <biju.das@bp.renesas.com>
 
-The channel information is now kept in the device driver and can easily
-be determined based on the compat string.
-
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Biju Das <biju.das@bp.renesas.com>
+Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794.dtsi | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm/boot/dts/r8a7745.dtsi | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
-index 67aa409b32bf..96e405e70d9a 100644
---- a/arch/arm/boot/dts/r8a7794.dtsi
-+++ b/arch/arm/boot/dts/r8a7794.dtsi
-@@ -197,8 +197,6 @@
- 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
- 		resets = <&cpg 124>;
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 432aa48ea395..6e0c69bb375d 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -312,6 +312,34 @@
+ 			dma-channels = <15>;
+ 		};
  
--		renesas,channels-mask = <0x60>;
--
- 		status = "disabled";
- 	};
- 
-@@ -218,8 +216,6 @@
- 		power-domains = <&sysc R8A7794_PD_ALWAYS_ON>;
- 		resets = <&cpg 329>;
- 
--		renesas,channels-mask = <0xff>;
--
- 		status = "disabled";
- 	};
- 
++		usb_dmac0: dma-controller at e65a0000 {
++			compatible = "renesas,r8a7745-usb-dmac",
++				     "renesas,usb-dmac";
++			reg = <0 0xe65a0000 0 0x100>;
++			interrupts = <GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 109 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "ch0", "ch1";
++			clocks = <&cpg CPG_MOD 330>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 330>;
++			#dma-cells = <1>;
++			dma-channels = <2>;
++		};
++
++		usb_dmac1: dma-controller at e65b0000 {
++			compatible = "renesas,r8a7745-usb-dmac",
++				     "renesas,usb-dmac";
++			reg = <0 0xe65b0000 0 0x100>;
++			interrupts = <GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH
++				      GIC_SPI 110 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "ch0", "ch1";
++			clocks = <&cpg CPG_MOD 331>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 331>;
++			#dma-cells = <1>;
++			dma-channels = <2>;
++		};
++
+ 		scifa0: serial at e6c40000 {
+ 			compatible = "renesas,scifa-r8a7745",
+ 				     "renesas,rcar-gen2-scifa", "renesas,scifa";
 -- 
 2.11.0
