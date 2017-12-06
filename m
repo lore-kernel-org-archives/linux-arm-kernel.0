@@ -1,76 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:36 +0100
-Subject: [PATCH 41/61] ARM: dts: r8a7743: add VIN dt support
+Date: Wed,  6 Dec 2017 11:22:14 +0100
+Subject: [PATCH 19/61] ARM: dts: r8a7743: Use R-Car SDHI Gen2 fallback compat
+ string
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <001b32ae64dbf780d89fbc258c3f1007ee7b34e8.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <67eee4eeb3cd4df684a18f3824ea8030ea37d442.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Use newly added R-Car SDHI Gen2 fallback compat string
+in the DT of the r8a7743 SoC.
 
-Add VIN[012] support to SoC dt. Also, add aliases.
+This should have no run-time effect as the driver matches against
+the per-SoC compat string before considering the fallback compat string.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7743.dtsi | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ arch/arm/boot/dts/r8a7743.dtsi | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7743.dtsi b/arch/arm/boot/dts/r8a7743.dtsi
-index 9e26c40976ff..c09c6672ca37 100644
+index 112a72baa7a4..6aa86b75b80c 100644
 --- a/arch/arm/boot/dts/r8a7743.dtsi
 +++ b/arch/arm/boot/dts/r8a7743.dtsi
-@@ -32,6 +32,9 @@
- 		spi1 = &msiof0;
- 		spi2 = &msiof1;
- 		spi3 = &msiof2;
-+		vin0 = &vin0;
-+		vin1 = &vin1;
-+		vin2 = &vin2;
- 	};
- 
- 	cpus {
-@@ -1037,6 +1040,39 @@
- 			};
+@@ -954,7 +954,8 @@
  		};
  
-+		vin0: video at e6ef0000 {
-+			compatible = "renesas,vin-r8a7743",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef0000 0 0x1000>;
-+			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 811>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 811>;
-+			status = "disabled";
-+		};
-+
-+		vin1: video at e6ef1000 {
-+			compatible = "renesas,vin-r8a7743",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef1000 0 0x1000>;
-+			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 810>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 810>;
-+			status = "disabled";
-+		};
-+
-+		vin2: video at e6ef2000 {
-+			compatible = "renesas,vin-r8a7743",
-+				     "renesas,rcar-gen2-vin";
-+			reg = <0 0xe6ef2000 0 0x1000>;
-+			interrupts = <GIC_SPI 190 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 809>;
-+			power-domains = <&sysc R8A7743_PD_ALWAYS_ON>;
-+			resets = <&cpg 809>;
-+			status = "disabled";
-+		};
-+
- 		du: display at feb00000 {
- 			compatible = "renesas,du-r8a7743";
- 			reg = <0 0xfeb00000 0 0x40000>,
+ 		sdhi0: sd at ee100000 {
+-			compatible = "renesas,sdhi-r8a7743";
++			compatible = "renesas,sdhi-r8a7743",
++				     "renesas,rcar-gen2-sdhi";
+ 			reg = <0 0xee100000 0 0x328>;
+ 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 314>;
+@@ -968,7 +969,8 @@
+ 		};
+ 
+ 		sdhi1: sd at ee140000 {
+-			compatible = "renesas,sdhi-r8a7743";
++			compatible = "renesas,sdhi-r8a7743",
++				     "renesas,rcar-gen2-sdhi";
+ 			reg = <0 0xee140000 0 0x100>;
+ 			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 312>;
+@@ -982,7 +984,8 @@
+ 		};
+ 
+ 		sdhi2: sd at ee160000 {
+-			compatible = "renesas,sdhi-r8a7743";
++			compatible = "renesas,sdhi-r8a7743",
++				     "renesas,rcar-gen2-sdhi";
+ 			reg = <0 0xee160000 0 0x100>;
+ 			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 311>;
 -- 
 2.11.0
