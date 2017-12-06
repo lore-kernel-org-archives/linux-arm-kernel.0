@@ -1,113 +1,107 @@
-From: marcofrk@gmail.com (Marco Franchi)
-Date: Wed,  6 Dec 2017 00:53:04 -0200
-Subject: [PATCH v2 3/3] ARM: dts: imx6sl-evk: Convert from fbdev to drm
- bindings
-In-Reply-To: <1512528784-29288-1-git-send-email-marcofrk@gmail.com>
-References: <1512528784-29288-1-git-send-email-marcofrk@gmail.com>
-Message-ID: <1512528784-29288-3-git-send-email-marcofrk@gmail.com>
+From: glin@suse.com (Gary Lin)
+Date: Wed, 6 Dec 2017 11:24:37 +0800
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
+References: <20171205100148.5757-1-glin@suse.com>
+ <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
+Message-ID: <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It is preferred to use the panel compatible string rather than passing 
-the LCD timing in the device tree.
+On Tue, Dec 05, 2017 at 04:14:26PM -0500, Josh Boyer wrote:
+> On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
+> > The series of patches introduce Security Version to EFI stub.
+> >
+> > Security Version is a monotonically increasing number and designed to
+> > prevent the user from loading an insecure kernel accidentally. The
+> > bootloader maintains a list of security versions corresponding to
+> > different distributions. After fixing a critical vulnerability, the
+> > distribution kernel maintainer bumps the "version", and the bootloader
+> > updates the list automatically. When the user tries to load a kernel
+> > with a lower security version, the bootloader shows a warning prompt
+> > to notify the user the potential risk.
+> 
+> If a distribution releases a kernel with a higher security version and
+> that it automatically updated on boot, what happens if that kernel
+> contains a different bug that causes it to fail to boot or break
+> critical functionality?  At that point, the user's machine would be in
+> a state where the higher security version is enforced but the only
+> kernel that provides that is broken.  Wouldn't that make a bad
+> situation even worse by now requiring manual acceptance of the older
+> SV kernel boot physically at the machine?
+> 
+> I feel like I'm missing a detail here or something.
+> 
+If the new kernel fails to boot, then the user has to choose the kernel
+manually anyway, and there will be an option in the warning prompt to
+lower SV.
 
-So pass the "sii,43wvf1g" compatible string which describes the parallel 
-LCD.
+Since Security Version is meant to be a warning, not a hard block, we
+can introduce a timeout to the warning prompt if necessary. The system
+still boots, but with a longer boot time.
 
-Also, pass the 'backlight' property as described in 
-Documentation/devicetree/bindings/display/panel/simple-panel.txt
+Gary Lin
 
-Signed-off-by: Marco Franchi <marco.franchi@nxp.com>
----
-Changes since v1:
--change subject
--change message log
--includes into a set of patches
--fix regulator name and properties
- arch/arm/boot/dts/imx6sl-evk.dts | 48 ++++++++++++++++++++--------------------
- 1 file changed, 24 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/boot/dts/imx6sl-evk.dts b/arch/arm/boot/dts/imx6sl-evk.dts
-index 645a460..a395de4 100644
---- a/arch/arm/boot/dts/imx6sl-evk.dts
-+++ b/arch/arm/boot/dts/imx6sl-evk.dts
-@@ -20,7 +20,7 @@
- 		reg = <0x80000000 0x40000000>;
- 	};
- 
--	backlight {
-+	backlight_display: backlight_display {
- 		compatible = "pwm-backlight";
- 		pwms = <&pwm1 0 5000000>;
- 		brightness-levels = <0 4 8 16 32 64 128 255>;
-@@ -82,6 +82,13 @@
- 		enable-active-high;
- 	};
- 
-+	reg_lcd_5v: regulator-lcd-5v {
-+		compatible = "regulator-fixed";
-+		regulator-name = "lcd-5v0";
-+		regulator-min-microvolt = <5000000>;
-+		regulator-max-microvolt = <5000000>;
-+	};
-+
- 	sound {
- 		compatible = "fsl,imx6sl-evk-wm8962", "fsl,imx-audio-wm8962";
- 		model = "wm8962-audio";
-@@ -97,6 +104,19 @@
- 		mux-int-port = <2>;
- 		mux-ext-port = <3>;
- 	};
-+
-+	panel {
-+		compatible = "sii,43wvf1g";
-+		backlight = <&backlight_display>;
-+		dvdd-supply = <&reg_lcd_3v3>;
-+		avdd-supply = <&reg_lcd_5v>;
-+
-+		port {
-+			panel_in: endpoint {
-+				remote-endpoint = <&display_out>;
-+			};
-+		};
-+	};
- };
- 
- &audmux {
-@@ -535,31 +555,11 @@
- &lcdif {
- 	pinctrl-names = "default";
- 	pinctrl-0 = <&pinctrl_lcd>;
--	lcd-supply = <&reg_lcd_3v3>;
--	display = <&display0>;
- 	status = "okay";
- 
--	display0: display0 {
--		bits-per-pixel = <32>;
--		bus-width = <24>;
--
--		display-timings {
--			native-mode = <&timing0>;
--			timing0: timing0 {
--				clock-frequency = <33500000>;
--				hactive = <800>;
--				vactive = <480>;
--				hback-porch = <89>;
--				hfront-porch = <164>;
--				vback-porch = <23>;
--				vfront-porch = <10>;
--				hsync-len = <10>;
--				vsync-len = <10>;
--				hsync-active = <0>;
--				vsync-active = <0>;
--				de-active = <1>;
--				pixelclk-active = <0>;
--			};
-+	port {
-+		display_out: endpoint {
-+			remote-endpoint = <&panel_in>;
- 		};
- 	};
- };
--- 
-2.7.4
+> josh
+> 
+> > For more details: https://github.com/lcp/shim/wiki/Security-Version
+> >
+> > The original idea is to add a new PE/COFF section to store the data.
+> > However, there are some restrictions.
+> >
+> > 1. For x86, the size limit of the EFI header is 0x200, and a section entry
+> >    in the section table takes 40 bytes. Currently, the EFI header already
+> >    occupies the first 0x1da bytes, so there is no room for a new section
+> >    entry.
+> >
+> > 2. The MemoryAttributes table sets the attributes of memory pages according
+> >    to the section flags. For ARM64, the minimal granularity is 4KB, but
+> >    Security Version only needs a few bytes, and it's pointless to allocate
+> >    4KB for it.
+> >
+> > Fortunately, there is a special section defined in PE/COFF: resource
+> > section. The only known user of the resource section in UEFI is the HII
+> > protocol which fetches data from "HII" directory. For Security Version, a
+> > new directory called "LinuxSV" is created and it contains the file offset
+> > to the struct of Security Version. The bootloader just follows the
+> > resource table to fetch the "version" from the image file.
+> >
+> > v3:
+> >     - Move everything to the resource section to be compatible with both
+> >       x86 and ARM64
+> > v2:
+> >     - Decrease the size of secdata_offset to 2 bytes since the setup header
+> >       is limited to around 32KB.
+> >     - Restructure the secdata section. The signer is now a null-terminated
+> >       string. The type of distro_version changes to u32 in case the distro
+> >       uses a long version.
+> >     - Modify the Kconfig names and add help.
+> >     - Remove the signer name hack in build.c.
+> >
+> > Cc: "H. Peter Anvin" <hpa@zytor.com>
+> > Cc: Thomas Gleixner <tglx@linutronix.de>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Ingo Molnar <mingo@redhat.com>
+> > Cc: Matt Fleming <matt@codeblueprint.co.uk>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Joey Lee <jlee@suse.com>
+> > Signed-off-by: Gary Lin <glin@suse.com>
+> >
+> > Gary Lin (2):
+> >   x86/efi: Introduce Security Version to x86
+> >   arm64/efi: Introduce Security Version to ARM64
+> >
+> >  arch/arm64/kernel/efi-header.S | 57 ++++++++++++++++++++++++++++++++++++++++++
+> >  arch/x86/boot/header.S         | 55 ++++++++++++++++++++++++++++++++++++++++
+> >  drivers/firmware/efi/Kconfig   | 40 +++++++++++++++++++++++++++++
+> >  3 files changed, 152 insertions(+)
+> >
+> > --
+> > 2.15.0
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe linux-efi" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
