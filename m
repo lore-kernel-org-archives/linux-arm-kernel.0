@@ -1,54 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:28 +0100
-Subject: [PATCH 33/61] ARM: dts: iwg22d-sodimm: Add can0 support to carrier
- board
+Date: Wed,  6 Dec 2017 11:22:50 +0100
+Subject: [PATCH 55/61] ARM: dts: r8a7793: Remove CMT renesas,channels-mask
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <805a5263f4212e431a44c4a04738022a2498f652.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <5fdbea7147da1ad43b97c43d685b30d0e6b92d0a.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-This patch enables CAN0 interface exposed through connector J15 on the
-carrier board.
+Update the DTS to remove the now deprecated "renesas,channels-mask"
+property.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
+The channel information is now kept in the device driver and can easily
+be determined based on the compat string.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm/boot/dts/r8a7793.dtsi | 4 ----
+ 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-index 80c82aa94c06..39ce7e7101c7 100644
---- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-+++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
-@@ -59,6 +59,13 @@
- 	};
- };
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index 4a79da3ddbef..a83c2e9c5723 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -257,8 +257,6 @@
+ 		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
+ 		resets = <&cpg 124>;
  
-+&can0 {
-+	pinctrl-0 = <&can0_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
- &hscif1 {
- 	pinctrl-0 = <&hscif1_pins>;
- 	pinctrl-names = "default";
-@@ -85,6 +92,11 @@
- 		function = "avb";
+-		renesas,channels-mask = <0x60>;
+-
+ 		status = "disabled";
  	};
  
-+	can0_pins: can0 {
-+		groups = "can0_data";
-+		function = "can0";
-+	};
-+
- 	hscif1_pins: hscif1 {
- 		groups = "hscif1_data", "hscif1_ctrl";
- 		function = "hscif1";
+@@ -278,8 +276,6 @@
+ 		power-domains = <&sysc R8A7793_PD_ALWAYS_ON>;
+ 		resets = <&cpg 329>;
+ 
+-		renesas,channels-mask = <0xff>;
+-
+ 		status = "disabled";
+ 	};
+ 
 -- 
 2.11.0
