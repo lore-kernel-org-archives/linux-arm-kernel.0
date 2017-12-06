@@ -1,39 +1,117 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  6 Dec 2017 14:38:36 +0000
-Subject: [PATCH 15/18] KVM: arm/arm64: Demote HYP VA range display to being a
- debug feature
-In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
-References: <20171206143839.29223-1-marc.zyngier@arm.com>
-Message-ID: <20171206143839.29223-16-marc.zyngier@arm.com>
+From: acme@kernel.org (Arnaldo Carvalho de Melo)
+Date: Wed,  6 Dec 2017 11:40:59 -0300
+Subject: [PATCH 20/36] perf tools arm64: Add support for get_cpuid_str
+ function.
+In-Reply-To: <20171206144115.15097-1-acme@kernel.org>
+References: <20171206144115.15097-1-acme@kernel.org>
+Message-ID: <20171206144115.15097-21-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Displaying the HYP VA information is slightly counterproductive when
-using VA randomization. Turn it into a debug feature only, and adjust
-the last displayed value to reflect the top of RAM instead of ~0.
+From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+The get_cpuid_str function returns the MIDR string of the first online
+cpu from the range of cpus associated with the PMU CORE device.
+
+Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+Cc: Alexander Shishkin <alexander.shishkin@linux.intel.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Ganapatrao Kulkarni <gklkml16@gmail.com>
+Cc: Jayachandran C <jnair@caviumnetworks.com>
+Cc: Jonathan Cameron <jonathan.cameron@huawei.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Cc: Peter Zijlstra <peterz@infradead.org>
+Cc: Robert Richter <robert.richter@cavium.com>
+Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>
+Cc: linux-arm-kernel at lists.infradead.org
+Link: http://lkml.kernel.org/r/20171016183222.25750-3-ganapatrao.kulkarni at cavium.com
+Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- virt/kvm/arm/mmu.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ tools/perf/arch/arm64/util/Build    |  1 +
+ tools/perf/arch/arm64/util/header.c | 65 +++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
+ create mode 100644 tools/perf/arch/arm64/util/header.c
 
-diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index e60605c3603e..326f257d6008 100644
---- a/virt/kvm/arm/mmu.c
-+++ b/virt/kvm/arm/mmu.c
-@@ -1762,9 +1762,10 @@ int kvm_mmu_init(void)
- 	 */
- 	BUG_ON((hyp_idmap_start ^ (hyp_idmap_end - 1)) & PAGE_MASK);
+diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
+index cef6fb38d17e..b1ab72d2a42e 100644
+--- a/tools/perf/arch/arm64/util/Build
++++ b/tools/perf/arch/arm64/util/Build
+@@ -1,3 +1,4 @@
++libperf-y += header.o
+ libperf-$(CONFIG_DWARF)     += dwarf-regs.o
+ libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
  
--	kvm_info("IDMAP page: %lx\n", hyp_idmap_start);
--	kvm_info("HYP VA range: %lx:%lx\n",
--		 kern_hyp_va(PAGE_OFFSET), kern_hyp_va(~0UL));
-+	kvm_debug("IDMAP page: %lx\n", hyp_idmap_start);
-+	kvm_debug("HYP VA range: %lx:%lx\n",
-+		  kern_hyp_va(PAGE_OFFSET),
-+		  kern_hyp_va((unsigned long)high_memory - 1));
- 
- 	if (hyp_idmap_start >= kern_hyp_va(PAGE_OFFSET) &&
- 	    hyp_idmap_start <  kern_hyp_va((unsigned long)high_memory - 1) &&
+diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
+new file mode 100644
+index 000000000000..534cd2507d83
+--- /dev/null
++++ b/tools/perf/arch/arm64/util/header.c
+@@ -0,0 +1,65 @@
++#include <stdio.h>
++#include <stdlib.h>
++#include <api/fs/fs.h>
++#include "header.h"
++
++#define MIDR "/regs/identification/midr_el1"
++#define MIDR_SIZE 19
++#define MIDR_REVISION_MASK      0xf
++#define MIDR_VARIANT_SHIFT      20
++#define MIDR_VARIANT_MASK       (0xf << MIDR_VARIANT_SHIFT)
++
++char *get_cpuid_str(struct perf_pmu *pmu)
++{
++	char *buf = NULL;
++	char path[PATH_MAX];
++	const char *sysfs = sysfs__mountpoint();
++	int cpu;
++	u64 midr = 0;
++	struct cpu_map *cpus;
++	FILE *file;
++
++	if (!sysfs || !pmu || !pmu->cpus)
++		return NULL;
++
++	buf = malloc(MIDR_SIZE);
++	if (!buf)
++		return NULL;
++
++	/* read midr from list of cpus mapped to this pmu */
++	cpus = cpu_map__get(pmu->cpus);
++	for (cpu = 0; cpu < cpus->nr; cpu++) {
++		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
++				sysfs, cpus->map[cpu]);
++
++		file = fopen(path, "r");
++		if (!file) {
++			pr_debug("fopen failed for file %s\n", path);
++			continue;
++		}
++
++		if (!fgets(buf, MIDR_SIZE, file)) {
++			fclose(file);
++			continue;
++		}
++		fclose(file);
++
++		/* Ignore/clear Variant[23:20] and
++		 * Revision[3:0] of MIDR
++		 */
++		midr = strtoul(buf, NULL, 16);
++		midr &= (~(MIDR_VARIANT_MASK | MIDR_REVISION_MASK));
++		scnprintf(buf, MIDR_SIZE, "0x%016lx", midr);
++		/* got midr break loop */
++		break;
++	}
++
++	if (!midr) {
++		pr_err("failed to get cpuid string for PMU %s\n", pmu->name);
++		free(buf);
++		buf = NULL;
++	}
++
++	cpu_map__put(cpus);
++	return buf;
++}
 -- 
-2.14.2
+2.13.6
