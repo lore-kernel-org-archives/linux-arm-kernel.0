@@ -1,57 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:15 +0100
-Subject: [PATCH 20/61] ARM: dts: r8a7745: Use R-Car SDHI Gen2 fallback compat
- string
+Date: Wed,  6 Dec 2017 11:22:43 +0100
+Subject: [PATCH 48/61] ARM: dts: r8a7791: Update CMT compat strings
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <35098dd2e37d51cdab26637479fb892c254c2555.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <bf50e0ab4f5062bb9d4bb5dcb81a6673ea7e2473.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car SDHI Gen2 fallback compat string
-in the DT of the r8a7745 SoC.
+From: Magnus Damm <damm+renesas@opensource.se>
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before considering the fallback compat string.
+Use recently updated R-Car Gen2 CMT0 and CMT1 compat strings.
 
+With this change in place we can keep device-specific configuration in
+the driver and the driver can be able to support CMT1 specific features.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 16dc4895b455..846c27a00c54 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -870,7 +870,8 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index e888b5b0e135..a69d6f883b34 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -257,7 +257,7 @@
+ 	};
  
- 		sdhi0: sd at ee100000 {
--			compatible = "renesas,sdhi-r8a7745";
-+			compatible = "renesas,sdhi-r8a7745",
-+				     "renesas,rcar-gen2-sdhi";
- 			reg = <0 0xee100000 0 0x328>;
- 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 314>;
-@@ -884,7 +885,8 @@
- 		};
+ 	cmt0: timer at ffca0000 {
+-		compatible = "renesas,cmt-48-r8a7791", "renesas,cmt-48-gen2";
++		compatible = "renesas,r8a7791-cmt0", "renesas,rcar-gen2-cmt0";
+ 		reg = <0 0xffca0000 0 0x1004>;
+ 		interrupts = <GIC_SPI 142 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+@@ -272,7 +272,7 @@
+ 	};
  
- 		sdhi1: sd at ee140000 {
--			compatible = "renesas,sdhi-r8a7745";
-+			compatible = "renesas,sdhi-r8a7745",
-+				     "renesas,rcar-gen2-sdhi";
- 			reg = <0 0xee140000 0 0x100>;
- 			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 312>;
-@@ -898,7 +900,8 @@
- 		};
- 
- 		sdhi2: sd at ee160000 {
--			compatible = "renesas,sdhi-r8a7745";
-+			compatible = "renesas,sdhi-r8a7745",
-+				     "renesas,rcar-gen2-sdhi";
- 			reg = <0 0xee160000 0 0x100>;
- 			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 311>;
+ 	cmt1: timer at e6130000 {
+-		compatible = "renesas,cmt-48-r8a7791", "renesas,cmt-48-gen2";
++		compatible = "renesas,r8a7791-cmt1", "renesas,rcar-gen2-cmt1";
+ 		reg = <0 0xe6130000 0 0x1004>;
+ 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>,
+ 			     <GIC_SPI 121 IRQ_TYPE_LEVEL_HIGH>,
 -- 
 2.11.0
