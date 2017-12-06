@@ -1,44 +1,50 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:56 +0100
-Subject: [PATCH 61/61] ARM: dts: alt: Convert to named i2c-gpio bindings
+Date: Wed,  6 Dec 2017 11:22:40 +0100
+Subject: [PATCH 45/61] ARM: dts: r8a7794: Add SMP support
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <7f32eddb81ecc06131a643babe2d0f961fbd7f08.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <655b9ff016149fd3a438f4205187c9de8a9c5b48.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
-named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
-gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
-more error-prone unnamed variant.
+Add the device tree node for the Advanced Power Management Unit (APMU).
+Use the "enable-method" prop to  point out that the APMU should be used
+for the SMP support.
 
-Switch to the new bindings, and add the missing GPIO_OPEN_DRAIN I/O
-flags, which were implicitly assumed before.
-
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
+Tested-by: Simon Horman <horms+renesas@verge.net.au>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7794-alt.dts | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/r8a7794.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index bd98790d964e..60c6515c4996 100644
---- a/arch/arm/boot/dts/r8a7794-alt.dts
-+++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -143,9 +143,8 @@
+diff --git a/arch/arm/boot/dts/r8a7794.dtsi b/arch/arm/boot/dts/r8a7794.dtsi
+index 95206c25e6a1..90050565114c 100644
+--- a/arch/arm/boot/dts/r8a7794.dtsi
++++ b/arch/arm/boot/dts/r8a7794.dtsi
+@@ -37,6 +37,7 @@
+ 	cpus {
+ 		#address-cells = <1>;
  		#size-cells = <0>;
- 		compatible = "i2c-gpio";
- 		status = "disabled";
--		gpios = <&gpio4 9 GPIO_ACTIVE_HIGH /* sda */
--			 &gpio4 8 GPIO_ACTIVE_HIGH /* scl */
--			>;
-+		sda-gpios = <&gpio4 9 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+		scl-gpios = <&gpio4 8 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
- 		i2c-gpio,delay-us = <5>;
++		enable-method = "renesas,apmu";
+ 
+ 		cpu0: cpu at 0 {
+ 			device_type = "cpu";
+@@ -66,6 +67,12 @@
+ 		};
  	};
  
++	apmu at e6151000 {
++		compatible = "renesas,r8a7794-apmu", "renesas,apmu";
++		reg = <0 0xe6151000 0 0x188>;
++		cpus = <&cpu0 &cpu1>;
++	};
++
+ 	gic: interrupt-controller at f1001000 {
+ 		compatible = "arm,gic-400";
+ 		#interrupt-cells = <3>;
 -- 
 2.11.0
