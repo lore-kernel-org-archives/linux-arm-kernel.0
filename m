@@ -1,251 +1,38 @@
-From: fabrice.gasnier@st.com (Fabrice Gasnier)
-Date: Wed, 6 Dec 2017 14:02:12 +0100
-Subject: [PATCH] iio: stm32: Adopt SPDX identifier
-In-Reply-To: <20171205145559.20294-1-benjamin.gaignard@st.com>
-References: <20171205145559.20294-1-benjamin.gaignard@st.com>
-Message-ID: <83055563-ba06-6d40-86d4-a52c0d2ff893@st.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 6 Dec 2017 14:02:49 +0100
+Subject: [PATCH net-next 2/2 v6] net: ethernet: Add a driver for Gemini
+ gigabit ethernet
+In-Reply-To: <20171203.182149.1898604535140297695.davem@davemloft.net>
+References: <20171202110640.5284-1-linus.walleij@linaro.org>
+ <20171202110640.5284-2-linus.walleij@linaro.org>
+ <20171203.182149.1898604535140297695.davem@davemloft.net>
+Message-ID: <CACRpkdbbcG8E6OCPb0Hgmp3owZqn2ab3hWEp1auwj-W_hMVbWw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2017 03:55 PM, Benjamin Gaignard wrote:
-> Add SPDX identifier in stm32's files in IIO directory
-> 
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/iio/adc/stm32-adc-core.c            | 14 +-------------
->  drivers/iio/adc/stm32-adc-core.h            | 14 +-------------
->  drivers/iio/adc/stm32-adc.c                 | 15 +--------------
->  drivers/iio/counter/stm32-lptimer-cnt.c     |  2 +-
->  drivers/iio/dac/stm32-dac-core.c            | 14 +-------------
->  drivers/iio/dac/stm32-dac-core.h            | 15 +--------------
->  drivers/iio/dac/stm32-dac.c                 | 15 +--------------
->  drivers/iio/trigger/stm32-lptimer-trigger.c |  3 +--
->  drivers/iio/trigger/stm32-timer-trigger.c   |  2 +-
->  9 files changed, 9 insertions(+), 85 deletions(-)
+On Mon, Dec 4, 2017 at 12:21 AM, David Miller <davem@davemloft.net> wrote:
 
-Acked-by: Fabrice Gasnier <fabrice.gasnier@st.com>
+>> +static irqreturn_t gemini_port_irq_thread(int irq, void *data)
+>> +{
+>> +     struct gemini_ethernet_port *port = data;
+>> +     struct gemini_ethernet *geth = port->geth;
+>> +     unsigned long irqmask = SWFQ_EMPTY_INT_BIT;
+>> +     unsigned long flags;
+>
+> Always order local variables in reverse-christmas-tree format,
+> which is longest to shortest line.
 
-Fabrice
+It's hard to do in cases like this where I use the variable
+when defining another variable:
 
-> 
-> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
-> index 6aefef99f935..40be7d9fadbf 100644
-> --- a/drivers/iio/adc/stm32-adc-core.c
-> +++ b/drivers/iio/adc/stm32-adc-core.c
-> @@ -1,3 +1,4 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * This file is part of STM32 ADC driver
->   *
-> @@ -6,19 +7,6 @@
->   *
->   * Inspired from: fsl-imx25-tsadc
->   *
-> - * License type: GPLv2
-> - *
-> - * This program is free software; you can redistribute it and/or modify it
-> - * under the terms of the GNU General Public License version 2 as published by
-> - * the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-> - * or FITNESS FOR A PARTICULAR PURPOSE.
-> - * See the GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License along with
-> - * this program. If not, see <http://www.gnu.org/licenses/>.
->   */
->  
->  #include <linux/clk.h>
-> diff --git a/drivers/iio/adc/stm32-adc-core.h b/drivers/iio/adc/stm32-adc-core.h
-> index 250ee958a669..8af507b3f32d 100644
-> --- a/drivers/iio/adc/stm32-adc-core.h
-> +++ b/drivers/iio/adc/stm32-adc-core.h
-> @@ -1,22 +1,10 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
->  /*
->   * This file is part of STM32 ADC driver
->   *
->   * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
->   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
->   *
-> - * License type: GPLv2
-> - *
-> - * This program is free software; you can redistribute it and/or modify it
-> - * under the terms of the GNU General Public License version 2 as published by
-> - * the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-> - * or FITNESS FOR A PARTICULAR PURPOSE.
-> - * See the GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License along with
-> - * this program. If not, see <http://www.gnu.org/licenses/>.
->   */
->  
->  #ifndef __STM32_ADC_H
-> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
-> index c9d96f935dba..f9ccd705bcbb 100644
-> --- a/drivers/iio/adc/stm32-adc.c
-> +++ b/drivers/iio/adc/stm32-adc.c
-> @@ -1,22 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * This file is part of STM32 ADC driver
->   *
->   * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
->   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-> - *
-> - * License type: GPLv2
-> - *
-> - * This program is free software; you can redistribute it and/or modify it
-> - * under the terms of the GNU General Public License version 2 as published by
-> - * the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-> - * or FITNESS FOR A PARTICULAR PURPOSE.
-> - * See the GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License along with
-> - * this program. If not, see <http://www.gnu.org/licenses/>.
->   */
->  
->  #include <linux/clk.h>
-> diff --git a/drivers/iio/counter/stm32-lptimer-cnt.c b/drivers/iio/counter/stm32-lptimer-cnt.c
-> index 81ae5f74216d..42fb8ba67090 100644
-> --- a/drivers/iio/counter/stm32-lptimer-cnt.c
-> +++ b/drivers/iio/counter/stm32-lptimer-cnt.c
-> @@ -1,3 +1,4 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * STM32 Low-Power Timer Encoder and Counter driver
->   *
-> @@ -7,7 +8,6 @@
->   *
->   * Inspired by 104-quad-8 and stm32-timer-trigger drivers.
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
->   */
->  
->  #include <linux/bitfield.h>
-> diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
-> index 55026fe1c610..d0fb3124de07 100644
-> --- a/drivers/iio/dac/stm32-dac-core.c
-> +++ b/drivers/iio/dac/stm32-dac-core.c
-> @@ -1,22 +1,10 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * This file is part of STM32 DAC driver
->   *
->   * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
->   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
->   *
-> - * License type: GPLv2
-> - *
-> - * This program is free software; you can redistribute it and/or modify it
-> - * under the terms of the GNU General Public License version 2 as published by
-> - * the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-> - * or FITNESS FOR A PARTICULAR PURPOSE.
-> - * See the GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License along with
-> - * this program. If not, see <http://www.gnu.org/licenses/>.
->   */
->  
->  #include <linux/clk.h>
-> diff --git a/drivers/iio/dac/stm32-dac-core.h b/drivers/iio/dac/stm32-dac-core.h
-> index daf09931857c..d3b415fb9575 100644
-> --- a/drivers/iio/dac/stm32-dac-core.h
-> +++ b/drivers/iio/dac/stm32-dac-core.h
-> @@ -1,22 +1,9 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
->  /*
->   * This file is part of STM32 DAC driver
->   *
->   * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
->   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
-> - *
-> - * License type: GPLv2
-> - *
-> - * This program is free software; you can redistribute it and/or modify it
-> - * under the terms of the GNU General Public License version 2 as published by
-> - * the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-> - * or FITNESS FOR A PARTICULAR PURPOSE.
-> - * See the GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License along with
-> - * this program. If not, see <http://www.gnu.org/licenses/>.
->   */
->  
->  #ifndef __STM32_DAC_CORE_H
-> diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
-> index 9ffab02bf9f9..cce26a3a6627 100644
-> --- a/drivers/iio/dac/stm32-dac.c
-> +++ b/drivers/iio/dac/stm32-dac.c
-> @@ -1,23 +1,10 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * This file is part of STM32 DAC driver
->   *
->   * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
->   * Authors: Amelie Delaunay <amelie.delaunay@st.com>
->   *	    Fabrice Gasnier <fabrice.gasnier@st.com>
-> - *
-> - * License type: GPLv2
-> - *
-> - * This program is free software; you can redistribute it and/or modify it
-> - * under the terms of the GNU General Public License version 2 as published by
-> - * the Free Software Foundation.
-> - *
-> - * This program is distributed in the hope that it will be useful, but
-> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
-> - * or FITNESS FOR A PARTICULAR PURPOSE.
-> - * See the GNU General Public License for more details.
-> - *
-> - * You should have received a copy of the GNU General Public License along with
-> - * this program. If not, see <http://www.gnu.org/licenses/>.
->   */
->  
->  #include <linux/bitfield.h>
-> diff --git a/drivers/iio/trigger/stm32-lptimer-trigger.c b/drivers/iio/trigger/stm32-lptimer-trigger.c
-> index de361d879929..98cdc7e47f3d 100644
-> --- a/drivers/iio/trigger/stm32-lptimer-trigger.c
-> +++ b/drivers/iio/trigger/stm32-lptimer-trigger.c
-> @@ -1,3 +1,4 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * STM32 Low-Power Timer Trigger driver
->   *
-> @@ -5,8 +6,6 @@
->   *
->   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
-> - *
->   * Inspired by Benjamin Gaignard's stm32-timer-trigger driver
->   */
->  
-> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
-> index b542dc484969..ccf1ce653b25 100644
-> --- a/drivers/iio/trigger/stm32-timer-trigger.c
-> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
-> @@ -1,9 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * Copyright (C) STMicroelectronics 2016
->   *
->   * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
->   */
->  
->  #include <linux/iio/iio.h>
-> 
+struct gemini_ethernet_port *port = netdev_priv(netdev);
+void __iomem *status_reg = port->gmac_base + GMAC_STATUS;
+
+But I understand the aesthetic, so I fix it as well as I can.
+
+If you want me to even rewrite the above using more lines of code
+to keep the aestetic (moving assignment out of the variable
+definitions), tell me and I can fix that too, whatever you like.
+
+Yours,
+Linus Walleij
