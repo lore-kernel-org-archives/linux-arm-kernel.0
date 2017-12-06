@@ -1,118 +1,71 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  6 Dec 2017 14:38:25 +0000
-Subject: [PATCH 04/18] arm64: alternatives: Enforce alignment of struct
- alt_instr
-In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
-References: <20171206143839.29223-1-marc.zyngier@arm.com>
-Message-ID: <20171206143839.29223-5-marc.zyngier@arm.com>
+From: Stefan.Potyra@elektrobit.com (Stefan Potyra)
+Date: Wed, 6 Dec 2017 16:03:24 +0100
+Subject: [PATCH] SoC: rockchip: disable clock on error
+Message-ID: <20171206150324.va4ph66ohjt3v7r3@agrajag.zerfleddert.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We're playing a dangerous game with struct alt_instr, as we produce
-it using assembly tricks, but parse them using the C structure.
-We just assume that the respective alignments of the two will
-be the same.
+Disable the clocks in  rk_spdif_probe when an error occurs after one
+of the clocks has been enabled previously.
 
-But as we add more fields to this structure, the alignment requirements
-of the structure may change, and lead to all kind of funky bugs.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-TO solve this, let's move the definition of struct alt_instr to its
-own file, and use this to generate the alignment constraint from
-asm-offsets.c. The various macros are then patched to take the
-alignment into account.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Fixes: f874b80e1571 ASoC: rockchip: Add rockchip SPDIF transceiver driver
+Signed-off-by: Stefan Potyra <Stefan.Potyra@elektrobit.com>
 ---
- arch/arm64/include/asm/alternative.h       | 13 +++++--------
- arch/arm64/include/asm/alternative_types.h | 13 +++++++++++++
- arch/arm64/kernel/asm-offsets.c            |  4 ++++
- 3 files changed, 22 insertions(+), 8 deletions(-)
- create mode 100644 arch/arm64/include/asm/alternative_types.h
+ sound/soc/rockchip/rockchip_spdif.c | 18 +++++++++++++-----
+ 1 file changed, 13 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/alternative.h b/arch/arm64/include/asm/alternative.h
-index 4a85c6952a22..395befde7595 100644
---- a/arch/arm64/include/asm/alternative.h
-+++ b/arch/arm64/include/asm/alternative.h
-@@ -2,28 +2,24 @@
- #ifndef __ASM_ALTERNATIVE_H
- #define __ASM_ALTERNATIVE_H
+diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
+index ee5055d47d13..a89fe9b6463b 100644
+--- a/sound/soc/rockchip/rockchip_spdif.c
++++ b/sound/soc/rockchip/rockchip_spdif.c
+@@ -322,26 +322,30 @@ static int rk_spdif_probe(struct platform_device *pdev)
+ 	spdif->mclk = devm_clk_get(&pdev->dev, "mclk");
+ 	if (IS_ERR(spdif->mclk)) {
+ 		dev_err(&pdev->dev, "Can't retrieve rk_spdif master clock\n");
+-		return PTR_ERR(spdif->mclk);
++		ret = PTR_ERR(spdif->mclk);
++		goto err_disable_hclk;
+ 	}
  
-+#include <asm/asm-offsets.h>
- #include <asm/cpucaps.h>
- #include <asm/insn.h>
+ 	ret = clk_prepare_enable(spdif->mclk);
+ 	if (ret) {
+ 		dev_err(spdif->dev, "clock enable failed %d\n", ret);
+-		return ret;
++		goto err_disable_clocks;
+ 	}
  
- #ifndef __ASSEMBLY__
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	regs = devm_ioremap_resource(&pdev->dev, res);
+-	if (IS_ERR(regs))
+-		return PTR_ERR(regs);
++	if (IS_ERR(regs)) {
++		ret = PTR_ERR(regs);
++		goto err_disable_clocks;
++	}
  
-+#include <asm/alternative_types.h>
-+
- #include <linux/init.h>
- #include <linux/types.h>
- #include <linux/stddef.h>
- #include <linux/stringify.h>
+ 	spdif->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "hclk", regs,
+ 						  &rk_spdif_regmap_config);
+ 	if (IS_ERR(spdif->regmap)) {
+ 		dev_err(&pdev->dev,
+ 			"Failed to initialise managed register map\n");
+-		return PTR_ERR(spdif->regmap);
++		ret = PTR_ERR(spdif->regmap);
++		goto err_disable_clocks;
+ 	}
  
--struct alt_instr {
--	s32 orig_offset;	/* offset to original instruction */
--	s32 alt_offset;		/* offset to replacement instruction */
--	u16 cpufeature;		/* cpufeature bit set for replacement */
--	u8  orig_len;		/* size of original instruction(s) */
--	u8  alt_len;		/* size of new instruction(s), <= orig_len */
--};
--
- void __init apply_alternatives_all(void);
- void apply_alternatives(void *start, size_t length);
+ 	spdif->playback_dma_data.addr = res->start + SPDIF_SMPDR;
+@@ -373,6 +377,10 @@ static int rk_spdif_probe(struct platform_device *pdev)
  
- #define ALTINSTR_ENTRY(feature)						      \
-+	" .align " __stringify(ALTINSTR_ALIGN) "\n"			      \
- 	" .word 661b - .\n"				/* label           */ \
- 	" .word 663f - .\n"				/* new instruction */ \
- 	" .hword " __stringify(feature) "\n"		/* feature bit     */ \
-@@ -69,6 +65,7 @@ void apply_alternatives(void *start, size_t length);
- #include <asm/assembler.h>
+ err_pm_runtime:
+ 	pm_runtime_disable(&pdev->dev);
++err_disable_clocks:
++	clk_disable_unprepare(spdif->mclk);
++err_disable_hclk:
++	clk_disable_unprepare(spdif->hclk);
  
- .macro altinstruction_entry orig_offset alt_offset feature orig_len alt_len
-+	.align ALTINSTR_ALIGN
- 	.word \orig_offset - .
- 	.word \alt_offset - .
- 	.hword \feature
-diff --git a/arch/arm64/include/asm/alternative_types.h b/arch/arm64/include/asm/alternative_types.h
-new file mode 100644
-index 000000000000..26cf76167f2d
---- /dev/null
-+++ b/arch/arm64/include/asm/alternative_types.h
-@@ -0,0 +1,13 @@
-+/* SPDX-License-Identifier: GPL-2.0 */
-+#ifndef __ASM_ALTERNATIVE_TYPES_H
-+#define __ASM_ALTERNATIVE_TYPES_H
-+
-+struct alt_instr {
-+	s32 orig_offset;	/* offset to original instruction */
-+	s32 alt_offset;		/* offset to replacement instruction */
-+	u16 cpufeature;		/* cpufeature bit set for replacement */
-+	u8  orig_len;		/* size of original instruction(s) */
-+	u8  alt_len;		/* size of new instruction(s), <= orig_len */
-+};
-+
-+#endif
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 74b9a26a84b5..652165c8655a 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -25,6 +25,7 @@
- #include <linux/dma-mapping.h>
- #include <linux/kvm_host.h>
- #include <linux/suspend.h>
-+#include <asm/alternative_types.h>
- #include <asm/cpufeature.h>
- #include <asm/thread_info.h>
- #include <asm/memory.h>
-@@ -151,5 +152,8 @@ int main(void)
-   DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
-   DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
-   DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
-+  BLANK();
-+  DEFINE(ALTINSTR_ALIGN,	(63 - __builtin_clzl(__alignof__(struct alt_instr))));
-+
-   return 0;
+ 	return ret;
  }
 -- 
-2.14.2
+2.15.1
