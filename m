@@ -1,93 +1,42 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 11:16:07 +0000
-Subject: [PATCH 1/2] arm64: SW PAN: Point saved ttbr0 at the zero page when
- switching to init_mm
-In-Reply-To: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
-References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512558968-28980-2-git-send-email-will.deacon@arm.com>
+Date: Wed,  6 Dec 2017 11:16:06 +0000
+Subject: [PATCH 0/2] Fixes for SW PAN
+Message-ID: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-update_saved_ttbr0 mandates that mm->pgd is not swapper, since swapper
-contains kernel mappings and should never be installed into ttbr0. However,
-this means that callers must avoid passing the init_mm to update_saved_ttbr0
-which in turn can cause the saved ttbr0 value to be out-of-date in the context
-of the idle thread. For example, EFI runtime services may leave the saved ttbr0
-pointing at the EFI page table, and kernel threads may end up with stale
-references to freed page tables.
+Hi all,
 
-This patch changes update_saved_ttbr0 so that the init_mm points the saved
-ttbr0 value to the empty zero page, which always exists and never contains
-valid translations. EFI and switch can then call into update_saved_ttbr0
-unconditionally.
+After lots of collective head scratching in response to Vinayak's mail
+here:
 
-Cc: Mark Rutland <mark.rutland@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Vinayak Menon <vinmenon@codeaurora.org>
-Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
+  http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545641.html
+
+It turns out that we have a problem with SW PAN and kernel threads, where
+the saved ttbr0 value for a kernel thread can be stale and subsequently
+inherited by other kernel threads over a fork.
+
+These two patches attempt to fix that. We've not be able to reproduce
+the exact failure reported above, but I added some assertions to the
+uaccess routines to check for discrepancies between the active_mm pgd
+and the saved ttbr0 value (ignoring the zero page) and these no longer
+fire with these changes, but do fire without them if EFI runtime services
+are enabled on my Seattle board.
+
+Cheers,
+
+Will
+
+--->8
+
+Will Deacon (2):
+  arm64: SW PAN: Point saved ttbr0 at the zero page when switching to
+    init_mm
+  arm64: SW PAN: Update saved ttbr0 value on enter_lazy_tlb
+
  arch/arm64/include/asm/efi.h         |  4 +---
- arch/arm64/include/asm/mmu_context.h | 22 +++++++++++++---------
- 2 files changed, 14 insertions(+), 12 deletions(-)
+ arch/arm64/include/asm/mmu_context.h | 46 ++++++++++++++++++------------------
+ 2 files changed, 24 insertions(+), 26 deletions(-)
 
-diff --git a/arch/arm64/include/asm/efi.h b/arch/arm64/include/asm/efi.h
-index 650344d01124..c4cd5081d78b 100644
---- a/arch/arm64/include/asm/efi.h
-+++ b/arch/arm64/include/asm/efi.h
-@@ -132,11 +132,9 @@ static inline void efi_set_pgd(struct mm_struct *mm)
- 			 * Defer the switch to the current thread's TTBR0_EL1
- 			 * until uaccess_enable(). Restore the current
- 			 * thread's saved ttbr0 corresponding to its active_mm
--			 * (if different from init_mm).
- 			 */
- 			cpu_set_reserved_ttbr0();
--			if (current->active_mm != &init_mm)
--				update_saved_ttbr0(current, current->active_mm);
-+			update_saved_ttbr0(current, current->active_mm);
- 		}
- 	}
- }
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index 3257895a9b5e..f7773f90546e 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -174,11 +174,17 @@ enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
- static inline void update_saved_ttbr0(struct task_struct *tsk,
- 				      struct mm_struct *mm)
- {
--	if (system_uses_ttbr0_pan()) {
--		BUG_ON(mm->pgd == swapper_pg_dir);
--		task_thread_info(tsk)->ttbr0 =
--			virt_to_phys(mm->pgd) | ASID(mm) << 48;
--	}
-+	u64 ttbr;
-+
-+	if (!system_uses_ttbr0_pan())
-+		return;
-+
-+	if (mm == &init_mm)
-+		ttbr = __pa_symbol(empty_zero_page);
-+	else
-+		ttbr = virt_to_phys(mm->pgd) | ASID(mm) << 48;
-+
-+	task_thread_info(tsk)->ttbr0 = ttbr;
- }
- #else
- static inline void update_saved_ttbr0(struct task_struct *tsk,
-@@ -214,11 +220,9 @@ switch_mm(struct mm_struct *prev, struct mm_struct *next,
- 	 * Update the saved TTBR0_EL1 of the scheduled-in task as the previous
- 	 * value may have not been initialised yet (activate_mm caller) or the
- 	 * ASID has changed since the last run (following the context switch
--	 * of another thread of the same process). Avoid setting the reserved
--	 * TTBR0_EL1 to swapper_pg_dir (init_mm; e.g. via idle_task_exit).
-+	 * of another thread of the same process).
- 	 */
--	if (next != &init_mm)
--		update_saved_ttbr0(tsk, next);
-+	update_saved_ttbr0(tsk, next);
- }
- 
- #define deactivate_mm(tsk,mm)	do { } while (0)
 -- 
 2.1.4
