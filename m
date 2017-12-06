@@ -1,72 +1,151 @@
-From: fabrizio.castro@bp.renesas.com (Fabrizio Castro)
-Date: Wed,  6 Dec 2017 12:05:29 +0000
-Subject: [PATCH v2] ARM: dts: r8a7745: Add APMU node and second CPU core
-Message-ID: <1512561929-16540-1-git-send-email-fabrizio.castro@bp.renesas.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 6 Dec 2017 11:57:12 +0000
+Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <20171206115134.GZ22781@e103592.cambridge.arm.com>
+References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
+ <20171204122645.31535-12-ard.biesheuvel@linaro.org>
+ <20171205122757.GW22781@e103592.cambridge.arm.com>
+ <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
+ <CAKv+Gu88Ym4NxoLxVd07Z07PD454_ONV4D=pqvxezPvAPnd5og@mail.gmail.com>
+ <20171206115134.GZ22781@e103592.cambridge.arm.com>
+Message-ID: <CAKv+Gu83CR=KGawz5WRQygULcqX+DjhVjAeR-+QOGYx=2oPTzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 6 December 2017 at 11:51, Dave Martin <Dave.Martin@arm.com> wrote:
+> On Tue, Dec 05, 2017 at 06:04:34PM +0000, Ard Biesheuvel wrote:
+>> On 5 December 2017 at 12:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> >
+>> >
+>> >> On 5 Dec 2017, at 12:28, Dave Martin <Dave.Martin@arm.com> wrote:
+>> >>
+>> >>> On Mon, Dec 04, 2017 at 12:26:37PM +0000, Ard Biesheuvel wrote:
+>> >>> Add a support macro to conditionally yield the NEON (and thus the CPU)
+>> >>> that may be called from the assembler code. Given that especially the
+>> >>> instruction based accelerated crypto code may use very tight loops, add
+>> >>> some parametrization so that the TIF_NEED_RESCHED flag test is only
+>> >>> executed every so many loop iterations.
+>> >>>
+>> >>> In some cases, yielding the NEON involves saving and restoring a non
+>> >>> trivial amount of context (especially in the CRC folding algorithms),
+>> >>> and so the macro is split into two, and the code in between is only
+>> >>> executed when the yield path is taken, allowing the contex to be preserved.
+>> >>> The second macro takes a label argument that marks the resume-from-yield
+>> >>> path, which should restore the preserved context again.
+>> >>>
+>> >>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >>> ---
+>> >>> arch/arm64/include/asm/assembler.h | 50 ++++++++++++++++++++
+>> >>> 1 file changed, 50 insertions(+)
+>> >>>
+>> >>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+>> >>> index aef72d886677..917b026d3e00 100644
+>> >>> --- a/arch/arm64/include/asm/assembler.h
+>> >>> +++ b/arch/arm64/include/asm/assembler.h
+>> >>> @@ -512,4 +512,54 @@ alternative_else_nop_endif
+>> >>> #endif
+>> >>>    .endm
+>> >>>
+>> >>> +/*
+>> >>> + * yield_neon - check whether to yield to another runnable task from
+>> >>> + *        kernel mode NEON code (running with preemption disabled)
+>> >>> + *
+>> >>> + * - Check whether the preempt count is exactly 1, in which case disabling
+>> >>> + *   preemption once will make the task preemptible. If this is not the case,
+>> >>> + *   yielding is pointless.
+>> >>> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
+>> >>> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
+>> >>> + *   yield fixup code at @lbl.
+>> >>> + */
+>> >>> +    .macro        yield_neon, lbl:req, ctr, order, stride, loop
+>> >>> +    yield_neon_pre    \ctr, \order, \stride, \loop
+>> >>> +    yield_neon_post    \lbl
+>> >>> +    .endm
+>> >>> +
+>> >>> +    .macro        yield_neon_pre, ctr, order=0, stride, loop=4444f
+>> >>> +#ifdef CONFIG_PREEMPT
+>> >>> +    /*
+>> >>> +     * With some algorithms, it makes little sense to poll the
+>> >>> +     * TIF_NEED_RESCHED flag after every iteration, so only perform
+>> >>> +     * the check every 2^order strides.
+>> >>> +     */
+>> >>> +    .if        \order > 1
+>> >>> +    .if        (\stride & (\stride - 1)) != 0
+>> >>> +    .error        "stride should be a power of 2"
+>> >>> +    .endif
+>> >>> +    tst        \ctr, #((1 << \order) * \stride - 1) & ~(\stride - 1)
+>> >>> +    b.ne        \loop
+>> >>> +    .endif
+>> >>
+>> >> I'm not sure what baking in this check gives us, and this seems to
+>> >> conflate two rather different things: yielding and defining a
+>> >> "heartbeat" frequency for the calling code.
+>> >>
+>> >> Can we separate out the crypto-loop-helper semantics from the yield-
+>> >> neon stuff?
+>> >>
+>> >
+>> > Fair enough. I incorporated the check here so it disappears from the code entirely when !CONFIG_PREEMPT, because otherwise, you end up with a sequence that is mispredicted every # iterations without any benefit.
+>> > I guess i could macroise that separately though.
+>> >
+>> >> If we had
+>> >>
+>> >>    if_cond_yield_neon
+>> >>    // patchup code
+>> >>    endif_yield_neon
+>> >>
+>>
+>> I like this, but ...
+>>
+>> >> then the caller is free to conditionally branch over that as appropriate
+>> >> like
+>> >>
+>> >> loop:
+>> >>    // crypto stuff
+>> >>    tst x0, #0xf
+>> >>    b.ne    loop
+>> >>
+>> >>    if_cond_yield_neon
+>> >>    // patchup code
+>> >>    endif_cond_yield_neon
+>> >>
+>>
+>> I need to put the post patchup code somewhere too. Please refer to the
+>> CRC patches for the best examples of this.
+>
+> I'm not sure I follow.  If you need to do something different after
+> patchup, can't you either pull that code into the if...endif too, or
+> otherwise put a branch before the endif?
+>
 
-Add DT node for the Advanced Power Management Unit (APMU), add the
-second CPU core, and use "renesas,apmu" as "enable-method".
+No, not really.
 
-Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
-Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
-Reviewed-by: Biju Das <biju.das@bp.renesas.com>
----
-Dear All,
+What I currently have is
 
-I am reposting this patch now that its dependecy ("ARM: shmobile: rcar-gen2:
-Make sure CNTVOFF is initialized on CA7/15") is part of v4.15-rc1, similarly
-to patch "ARM: dts: r8a7794: Add SMP support".
+>    if_cond_yield_neon
+>    // patchup code
+>    endif_cond_yield_neon
 
-v2:
-- rebased against renesas-devel-20171205-v4.15-rc2
+which is being turned into
 
-Thanks
+    get_thread_info x0
+    ldr w1, [x0, #TSK_TI_PREEMPT]
+    ldr x0, [x0, #TSK_TI_FLAGS]
+    cmp w1, #1 // == PREEMPT_OFFSET
+    csel x0, x0, xzr, eq
+    tbnz x0, #TIF_NEED_RESCHED, 5555f // needs rescheduling?
+4444:
 
- arch/arm/boot/dts/r8a7745.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+    .subsection 1
+5555:
+    // patchup code
+    bl kernel_neon_end
+    bl kernel_neon_begin
+    // post patchup code goes here
+    b 4444b
+    .subsection
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index de13e15..0fa7861 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -38,6 +38,7 @@
- 	cpus {
- 		#address-cells = <1>;
- 		#size-cells = <0>;
-+		enable-method = "renesas,apmu";
- 
- 		cpu0: cpu at 0 {
- 			device_type = "cpu";
-@@ -49,6 +50,15 @@
- 			next-level-cache = <&L2_CA7>;
- 		};
- 
-+		cpu1: cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <1>;
-+			clock-frequency = <1000000000>;
-+			power-domains = <&sysc R8A7745_PD_CA7_CPU1>;
-+			next-level-cache = <&L2_CA7>;
-+		};
-+
- 		L2_CA7: cache-controller-0 {
- 			compatible = "cache";
- 			cache-unified;
-@@ -65,6 +75,12 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		apmu at e6151000 {
-+			compatible = "renesas,r8a7745-apmu", "renesas,apmu";
-+			reg = <0 0xe6151000 0 0x188>;
-+			cpus = <&cpu0 &cpu1>;
-+		};
-+
- 		gic: interrupt-controller at f1001000 {
- 			compatible = "arm,gic-400";
- 			#interrupt-cells = <3>;
--- 
-2.7.4
+so what I basically need is a place to put the post patchup code,
+unless I open code it and branch to a different label right after
+kernel_neon_begin
