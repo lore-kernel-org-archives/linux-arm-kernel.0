@@ -1,41 +1,64 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:35 +0100
-Subject: [PATCH 40/61] ARM: dts: iwg20d-q7: Enable PCIe Controller
+Date: Wed,  6 Dec 2017 11:22:37 +0100
+Subject: [PATCH 42/61] ARM: dts: r8a7745: add VIN dt support
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <b3a0317e312cc6d6359c7a0854d763cde528391d.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <1a20f21899e7ae886675874b5b5fb03eb43ea69b.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Biju Das <biju.das@bp.renesas.com>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Enable PCIe Controller & set PCIe bus clock frequency.
+Add VIN[01] support to SoC dt. Also, add aliases.
 
-Signed-off-by: Biju Das <biju.das@bp.renesas.com>
-Reviewed-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/iwg20d-q7-common.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/r8a7745.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm/boot/dts/iwg20d-q7-common.dtsi b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-index 3e4bc4d6b9d3..54470c6de891 100644
---- a/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-+++ b/arch/arm/boot/dts/iwg20d-q7-common.dtsi
-@@ -96,6 +96,14 @@
- 	pinctrl-names = "default";
- };
+diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
+index 52f13246fc8a..de13e156f071 100644
+--- a/arch/arm/boot/dts/r8a7745.dtsi
++++ b/arch/arm/boot/dts/r8a7745.dtsi
+@@ -31,6 +31,8 @@
+ 		spi1 = &msiof0;
+ 		spi2 = &msiof1;
+ 		spi3 = &msiof2;
++		vin0 = &vin0;
++		vin1 = &vin1;
+ 	};
  
-+&pcie_bus_clk {
-+	clock-frequency = <100000000>;
-+};
+ 	cpus {
+@@ -821,6 +823,28 @@
+ 			status = "disabled";
+ 		};
+ 
++		vin0: video at e6ef0000 {
++			compatible = "renesas,vin-r8a7745",
++				     "renesas,rcar-gen2-vin";
++			reg = <0 0xe6ef0000 0 0x1000>;
++			interrupts = <GIC_SPI 188 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 811>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 811>;
++			status = "disabled";
++		};
 +
-+&pciec {
-+	status = "okay";
-+};
++		vin1: video at e6ef1000 {
++			compatible = "renesas,vin-r8a7745",
++				     "renesas,rcar-gen2-vin";
++			reg = <0 0xe6ef1000 0 0x1000>;
++			interrupts = <GIC_SPI 189 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 810>;
++			power-domains = <&sysc R8A7745_PD_ALWAYS_ON>;
++			resets = <&cpg 810>;
++			status = "disabled";
++		};
 +
- &pfc {
- 	can0_pins: can0 {
- 		groups = "can0_data_d";
+ 		du: display at feb00000 {
+ 			compatible = "renesas,du-r8a7745";
+ 			reg = <0 0xfeb00000 0 0x40000>;
 -- 
 2.11.0
