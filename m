@@ -1,44 +1,58 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:37 +0000
-Subject: [PATCH v3 18/20] perf: arm_spe: Fail device probe when
- arm64_kernel_unmapped_at_el0()
-In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512563739-25239-19-git-send-email-will.deacon@arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 6 Dec 2017 12:58:17 +0000
+Subject: [PATCH 5/8] ASoC: uniphier: add support for UniPhier AIO driver
+In-Reply-To: <004801d36e57$ea1940d0$be4bc270$@socionext.com>
+References: <20171122114321.29196-1-suzuki.katsuhiro@socionext.com>
+ <20171122114321.29196-6-suzuki.katsuhiro@socionext.com>
+ <20171204183934.rd4vin22ktukwpip@sirena.org.uk>
+ <002b01d36d84$51d80aa0$f5881fe0$@socionext.com>
+ <20171205121440.GC11658@finisterre>
+ <004801d36e57$ea1940d0$be4bc270$@socionext.com>
+Message-ID: <20171206125817.GF1827@finisterre>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When running with the kernel unmapped whilst at EL0, the virtually-addressed
-SPE buffer is also unmapped, which can lead to buffer faults if userspace
-profiling is enabled and potentially also when writing back kernel samples
-unless an expensive drain operation is performed on exception return.
+On Wed, Dec 06, 2017 at 03:03:18PM +0900, Katsuhiro Suzuki wrote:
 
-For now, fail the SPE driver probe when arm64_kernel_unmapped_at_el0().
+> > I'd expect this code to be structured more like a library - have a
+> > driver that handles the specific IPs then have it call into a shared
+> > block of code that does the generic bits.  Though in this case the
+> > device specific bit looks like a couple of tiny data tables so I'm not
+> > sure it's worth making it conditional or separate at all.
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- drivers/perf/arm_spe_pmu.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+> Sorry... I agree your opinion, but I can't imagine the detail.
 
-diff --git a/drivers/perf/arm_spe_pmu.c b/drivers/perf/arm_spe_pmu.c
-index 8ce262fc2561..51b40aecb776 100644
---- a/drivers/perf/arm_spe_pmu.c
-+++ b/drivers/perf/arm_spe_pmu.c
-@@ -1164,6 +1164,15 @@ static int arm_spe_pmu_device_dt_probe(struct platform_device *pdev)
- 	struct arm_spe_pmu *spe_pmu;
- 	struct device *dev = &pdev->dev;
- 
-+	/*
-+	 * If kernelspace is unmapped when running at EL0, then the SPE
-+	 * buffer will fault and prematurely terminate the AUX session.
-+	 */
-+	if (arm64_kernel_unmapped_at_el0()) {
-+		dev_warn_once(dev, "profiling buffer inaccessible. Try passing \"kpti=off\" on the kernel command line\n");
-+		return -EPERM;
-+	}
-+
- 	spe_pmu = devm_kzalloc(dev, sizeof(*spe_pmu), GFP_KERNEL);
- 	if (!spe_pmu) {
- 		dev_err(dev, "failed to allocate spe_pmu\n");
--- 
-2.1.4
+> I think my driver has structure as follows (ex. startup):
+>   DAI: uniphier_aio_startup()@aio-core.c
+>   Lib: uniphier_aio_init()@aio-regctrl.c
+>   SoC specific: uniphier_aio_ld11_spec at aio-ld11.c
+
+> Am I wrong? Would you mean split the functions in aio-regctl.[ch] to other
+> kernel module? I wonder if you could tell me the example from existing
+> drivers. I'll try to fix my driver like as it.
+
+One example is how all the drivers that use the generic dmaengine code
+instantiate their DMA drivers, or how all the drivers for CODECs that
+have both I2C and SPIi control interfaces instantiate - given that the
+device specific code here seems to be mostly data tables that's probably
+the closest thing.
+
+> > At least.  I do think we need to get to the bottom of how flexible the
+> > hardware is first though.
+
+> Yes, indeed. This hardware is more flexible and complex, but now I (and our
+> company) don't use it. Of course, I don't want to hide some features of this
+> hardware from ALSA people. I should try to upstream all features in the future,
+> I think.
+
+My main concern here is to make sure that when you decide you need to
+use the more complex hardware that this can be done without too much
+pain to existing machines (and that they can benefit from as much of the
+enhanced functionality as is possible).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/bf132a6c/attachment.sig>
