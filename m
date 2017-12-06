@@ -1,82 +1,178 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed,  6 Dec 2017 19:43:45 +0000
-Subject: [PATCH v3 19/20] crypto: arm64/crct10dif-ce - yield NEON after every
- block of input
+Date: Wed,  6 Dec 2017 19:43:30 +0000
+Subject: [PATCH v3 04/20] crypto: arm64/aes-bs - move kernel mode neon
+ en/disable into loop
 In-Reply-To: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
 References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
-Message-ID: <20171206194346.24393-20-ard.biesheuvel@linaro.org>
+Message-ID: <20171206194346.24393-5-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Avoid excessive scheduling delays under a preemptible kernel by
-yielding the NEON after every block of input.
+When kernel mode NEON was first introduced on arm64, the preserve and
+restore of the userland NEON state was completely unoptimized, and
+involved saving all registers on each call to kernel_neon_begin(),
+and restoring them on each call to kernel_neon_end(). For this reason,
+the NEON crypto code that was introduced at the time keeps the NEON
+enabled throughout the execution of the crypto API methods, which may
+include calls back into the crypto API that could result in memory
+allocation or other actions that we should avoid when running with
+preemption disabled.
+
+Since then, we have optimized the kernel mode NEON handling, which now
+restores lazily (upon return to userland), and so the preserve action
+is only costly the first time it is called after entering the kernel.
+
+So let's put the kernel_neon_begin() and kernel_neon_end() calls around
+the actual invocations of the NEON crypto code, and run the remainder of
+the code with kernel mode NEON disabled (and preemption enabled)
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/crypto/crct10dif-ce-core.S | 32 +++++++++++++++++---
- 1 file changed, 28 insertions(+), 4 deletions(-)
+ arch/arm64/crypto/aes-neonbs-glue.c | 36 +++++++++-----------
+ 1 file changed, 17 insertions(+), 19 deletions(-)
 
-diff --git a/arch/arm64/crypto/crct10dif-ce-core.S b/arch/arm64/crypto/crct10dif-ce-core.S
-index d5b5a8c038c8..111675f7bad5 100644
---- a/arch/arm64/crypto/crct10dif-ce-core.S
-+++ b/arch/arm64/crypto/crct10dif-ce-core.S
-@@ -74,13 +74,19 @@
- 	.text
- 	.cpu		generic+crypto
+diff --git a/arch/arm64/crypto/aes-neonbs-glue.c b/arch/arm64/crypto/aes-neonbs-glue.c
+index 9d823c77ec84..e7a95a566462 100644
+--- a/arch/arm64/crypto/aes-neonbs-glue.c
++++ b/arch/arm64/crypto/aes-neonbs-glue.c
+@@ -99,9 +99,8 @@ static int __ecb_crypt(struct skcipher_request *req,
+ 	struct skcipher_walk walk;
+ 	int err;
  
--	arg1_low32	.req	w0
--	arg2		.req	x1
--	arg3		.req	x2
-+	arg1_low32	.req	w19
-+	arg2		.req	x20
-+	arg3		.req	x21
+-	err = skcipher_walk_virt(&walk, req, true);
++	err = skcipher_walk_virt(&walk, req, false);
  
- 	vzr		.req	v13
+-	kernel_neon_begin();
+ 	while (walk.nbytes >= AES_BLOCK_SIZE) {
+ 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
  
- ENTRY(crc_t10dif_pmull)
-+	frame_push	3, 128
-+
-+	mov		arg1_low32, w0
-+	mov		arg2, x1
-+	mov		arg3, x2
-+
- 	movi		vzr.16b, #0		// init zero register
+@@ -109,12 +108,13 @@ static int __ecb_crypt(struct skcipher_request *req,
+ 			blocks = round_down(blocks,
+ 					    walk.stride / AES_BLOCK_SIZE);
  
- 	// adjust the 16-bit initial_crc value, scale it to 32 bits
-@@ -175,8 +181,25 @@ CPU_LE(	ext		v12.16b, v12.16b, v12.16b, #8	)
- 	subs		arg3, arg3, #128
++		kernel_neon_begin();
+ 		fn(walk.dst.virt.addr, walk.src.virt.addr, ctx->rk,
+ 		   ctx->rounds, blocks);
++		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk,
+ 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
+ 	}
+-	kernel_neon_end();
  
- 	// check if there is another 64B in the buffer to be able to fold
--	b.ge		_fold_64_B_loop
-+	b.lt		_fold_64_B_end
-+
-+	if_will_cond_yield_neon
-+	stp		q0, q1, [sp, #48]
-+	stp		q2, q3, [sp, #80]
-+	stp		q4, q5, [sp, #112]
-+	stp		q6, q7, [sp, #144]
-+	do_cond_yield_neon
-+	ldp		q0, q1, [sp, #48]
-+	ldp		q2, q3, [sp, #80]
-+	ldp		q4, q5, [sp, #112]
-+	ldp		q6, q7, [sp, #144]
-+	ldr		q10, rk3
-+	movi		vzr.16b, #0		// init zero register
-+	endif_yield_neon
-+
-+	b		_fold_64_B_loop
+ 	return err;
+ }
+@@ -158,19 +158,19 @@ static int cbc_encrypt(struct skcipher_request *req)
+ 	struct skcipher_walk walk;
+ 	int err;
  
-+_fold_64_B_end:
- 	// at this point, the buffer pointer is pointing at the last y Bytes
- 	// of the buffer the 64B of folded data is in 4 of the vector
- 	// registers: v0, v1, v2, v3
-@@ -304,6 +327,7 @@ _barrett:
- _cleanup:
- 	// scale the result back to 16 bits
- 	lsr		x0, x0, #16
-+	frame_pop	3, 128
- 	ret
+-	err = skcipher_walk_virt(&walk, req, true);
++	err = skcipher_walk_virt(&walk, req, false);
  
- _less_than_128:
+-	kernel_neon_begin();
+ 	while (walk.nbytes >= AES_BLOCK_SIZE) {
+ 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
+ 
+ 		/* fall back to the non-bitsliced NEON implementation */
++		kernel_neon_begin();
+ 		neon_aes_cbc_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+ 				     ctx->enc, ctx->key.rounds, blocks,
+ 				     walk.iv);
++		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk, walk.nbytes % AES_BLOCK_SIZE);
+ 	}
+-	kernel_neon_end();
+ 	return err;
+ }
+ 
+@@ -181,9 +181,8 @@ static int cbc_decrypt(struct skcipher_request *req)
+ 	struct skcipher_walk walk;
+ 	int err;
+ 
+-	err = skcipher_walk_virt(&walk, req, true);
++	err = skcipher_walk_virt(&walk, req, false);
+ 
+-	kernel_neon_begin();
+ 	while (walk.nbytes >= AES_BLOCK_SIZE) {
+ 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
+ 
+@@ -191,13 +190,14 @@ static int cbc_decrypt(struct skcipher_request *req)
+ 			blocks = round_down(blocks,
+ 					    walk.stride / AES_BLOCK_SIZE);
+ 
++		kernel_neon_begin();
+ 		aesbs_cbc_decrypt(walk.dst.virt.addr, walk.src.virt.addr,
+ 				  ctx->key.rk, ctx->key.rounds, blocks,
+ 				  walk.iv);
++		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk,
+ 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
+ 	}
+-	kernel_neon_end();
+ 
+ 	return err;
+ }
+@@ -229,9 +229,8 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 	u8 buf[AES_BLOCK_SIZE];
+ 	int err;
+ 
+-	err = skcipher_walk_virt(&walk, req, true);
++	err = skcipher_walk_virt(&walk, req, false);
+ 
+-	kernel_neon_begin();
+ 	while (walk.nbytes > 0) {
+ 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
+ 		u8 *final = (walk.total % AES_BLOCK_SIZE) ? buf : NULL;
+@@ -242,8 +241,10 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 			final = NULL;
+ 		}
+ 
++		kernel_neon_begin();
+ 		aesbs_ctr_encrypt(walk.dst.virt.addr, walk.src.virt.addr,
+ 				  ctx->rk, ctx->rounds, blocks, walk.iv, final);
++		kernel_neon_end();
+ 
+ 		if (final) {
+ 			u8 *dst = walk.dst.virt.addr + blocks * AES_BLOCK_SIZE;
+@@ -258,8 +259,6 @@ static int ctr_encrypt(struct skcipher_request *req)
+ 		err = skcipher_walk_done(&walk,
+ 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
+ 	}
+-	kernel_neon_end();
+-
+ 	return err;
+ }
+ 
+@@ -304,12 +303,11 @@ static int __xts_crypt(struct skcipher_request *req,
+ 	struct skcipher_walk walk;
+ 	int err;
+ 
+-	err = skcipher_walk_virt(&walk, req, true);
++	err = skcipher_walk_virt(&walk, req, false);
+ 
+ 	kernel_neon_begin();
+-
+-	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey,
+-			     ctx->key.rounds, 1);
++	neon_aes_ecb_encrypt(walk.iv, walk.iv, ctx->twkey, ctx->key.rounds, 1);
++	kernel_neon_end();
+ 
+ 	while (walk.nbytes >= AES_BLOCK_SIZE) {
+ 		unsigned int blocks = walk.nbytes / AES_BLOCK_SIZE;
+@@ -318,13 +316,13 @@ static int __xts_crypt(struct skcipher_request *req,
+ 			blocks = round_down(blocks,
+ 					    walk.stride / AES_BLOCK_SIZE);
+ 
++		kernel_neon_begin();
+ 		fn(walk.dst.virt.addr, walk.src.virt.addr, ctx->key.rk,
+ 		   ctx->key.rounds, blocks, walk.iv);
++		kernel_neon_end();
+ 		err = skcipher_walk_done(&walk,
+ 					 walk.nbytes - blocks * AES_BLOCK_SIZE);
+ 	}
+-	kernel_neon_end();
+-
+ 	return err;
+ }
+ 
 -- 
 2.11.0
