@@ -1,38 +1,49 @@
-From: Tobias.Jordan@elektrobit.com (Tobias Jordan)
-Date: Wed, 6 Dec 2017 13:50:29 +0100
-Subject: [RFC] spi: sun6i: disable/unprepare clocks on remove
-Message-ID: <20171206125028.fqzmy354tgf7afis@agrajag.zerfleddert.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed,  6 Dec 2017 12:35:34 +0000
+Subject: [PATCH v3 15/20] arm64: tls: Avoid unconditional zeroing of
+ tpidrro_el0 for native tasks
+In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-16-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun6i_spi_probe() uses sun6i_spi_runtime_resume() to prepare/enable clocks,
-so sun6i_spi_remove() should use sun6i_spi_runtime_suspend() to
-disable/unprepare them.
+When unmapping the kernel at EL0, we use tpidrro_el0 as a scratch register
+during exception entry from native tasks and subsequently zero it in
+the kernel_ventry macro. We can therefore avoid zeroing tpidrro_el0
+in the context-switch path for native tasks using the entry trampoline.
 
-Found by Linux Driver Verification project (linuxtesting.org).
-
-Fixes: 3558fe900e8af spi: sunxi: Add Allwinner A31 SPI controller driver
-Signed-off-by: Tobias Jordan <Tobias.Jordan@elektrobit.com>
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
-This was found by LDV, and it looks very suspicious to me, but I'm not
-sure if the fix is that easy. Is suspend() called automatically when the
-driver is removed? If not, is it correct to unconditionally call
-suspend(), or should there be a check for the PM state instead?
+ arch/arm64/kernel/process.c | 12 +++++-------
+ 1 file changed, 5 insertions(+), 7 deletions(-)
 
- drivers/spi/spi-sun6i.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
-index fb38234249a8..5e5df09e5d04 100644
---- a/drivers/spi/spi-sun6i.c
-+++ b/drivers/spi/spi-sun6i.c
-@@ -541,6 +541,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
+diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
+index b2adcce7bc18..aba3a1fb492d 100644
+--- a/arch/arm64/kernel/process.c
++++ b/arch/arm64/kernel/process.c
+@@ -361,16 +361,14 @@ void tls_preserve_current_state(void)
  
- static int sun6i_spi_remove(struct platform_device *pdev)
+ static void tls_thread_switch(struct task_struct *next)
  {
-+	sun6i_spi_runtime_suspend(&pdev->dev);
- 	pm_runtime_disable(&pdev->dev);
+-	unsigned long tpidr, tpidrro;
+-
+ 	tls_preserve_current_state();
  
- 	return 0;
+-	tpidr = *task_user_tls(next);
+-	tpidrro = is_compat_thread(task_thread_info(next)) ?
+-		  next->thread.tp_value : 0;
++	if (is_compat_thread(task_thread_info(next)))
++		write_sysreg(next->thread.tp_value, tpidrro_el0);
++	else if (!arm64_kernel_unmapped_at_el0())
++		write_sysreg(0, tpidrro_el0);
+ 
+-	write_sysreg(tpidr, tpidr_el0);
+-	write_sysreg(tpidrro, tpidrro_el0);
++	write_sysreg(*task_user_tls(next), tpidr_el0);
+ }
+ 
+ /* Restore the UAO state depending on next's addr_limit */
 -- 
-2.11.0
+2.1.4
