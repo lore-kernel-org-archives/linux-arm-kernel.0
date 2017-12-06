@@ -1,64 +1,41 @@
-From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 06 Dec 2017 11:11:59 -0800
-Subject: [PATCH v3 3/3] arm64: dts: meson-axg: add clock DT info for Meson
- AXG SoC
-In-Reply-To: <20171206010055.GE4283@codeaurora.org> (Stephen Boyd's message of
- "Tue, 5 Dec 2017 17:00:55 -0800")
-References: <20171128125330.363-1-yixun.lan@amlogic.com>
- <20171128125330.363-4-yixun.lan@amlogic.com>
- <20171129193536.GB19419@codeaurora.org>
- <8353c264-3253-0268-91fc-8d42fbe82611@amlogic.com>
- <20171201163437.GE19419@codeaurora.org>
- <1512147583.12869.10.camel@baylibre.com>
- <20171206010055.GE4283@codeaurora.org>
-Message-ID: <7htvx3smbk.fsf@baylibre.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 6 Dec 2017 19:13:11 +0000
+Subject: [PATCH 4/9] ASoC: sun8i-codec: Add support for A64 SoC
+In-Reply-To: <20171206185308.ijt76lodwgkz2pm3@flea.lan>
+References: <20171203204157.20829-1-anarsoul@gmail.com>
+ <20171203204157.20829-5-anarsoul@gmail.com>
+ <20171205080444.zo2rlusqpjyraqcw@flea.lan>
+ <CA+E=qVdZME2fiMw09NUP4DNCYhk58dqSapCdfBjLrdMq5HFwyg@mail.gmail.com>
+ <20171206153205.k3l5sofdco3t75mi@flea.lan>
+ <20171206154810.eb2czpb4kusxv5kj@sirena.org.uk>
+ <20171206185308.ijt76lodwgkz2pm3@flea.lan>
+Message-ID: <20171206191311.7wlvqiolpho4zvxh@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen Boyd <sboyd@codeaurora.org> writes:
+On Wed, Dec 06, 2017 at 07:53:08PM +0100, Maxime Ripard wrote:
+> On Wed, Dec 06, 2017 at 03:48:10PM +0000, Mark Brown wrote:
 
-> On 12/01, Jerome Brunet wrote:
->> On Fri, 2017-12-01 at 08:34 -0800, Stephen Boyd wrote:
->> > On 11/30, Yixun Lan wrote:
->> > > Hi Stephen
->> > > 
->> > > On 11/30/17 03:35, Stephen Boyd wrote:
->> > > > 
->> > > > Maybe just call the node "bus at ff63c000"?
->> > > > 
->> > > 
->> > > isn't this just a name? what's the benefits to change?
->> > > personally, I tend to keep it this way, because it's better map to the
->> > > data sheet
->> > > 
->> > > we also has 'aobus', 'cbus' scattered there..
->> > 
->> > Per the ePAPR node names are supposed to be generic, like disk,
->> > cpu, display-controller, gpu, etc. I've never heard of a hiubus,
->> > so probably it's some vendor specific thing? We have the phandle
->> > anyway so it's not like we're losing much information here.
->> 
->> Stephen, there is a lot of busses on platform. We can't just call them all
->> 'bus'.
->> I don't get the problem with this name.
->> We are re-using the name from the datasheet here, no fancy invention. It seems
->> to be quite common. 
->> 
->
-> Ok. I'm not the maintainer of the DTS so no worries from me. I'm
-> just pointing out that the ePAPR says that node names should be
-> generic, and 'hiubus' doesn't sound generic to me. If it matches
-> some datasheet then I suppose that's good, but probably that sort
-> of distinction should have gone into the compatible string
-> instead of the node name.
+> > BCLK can be higher than the minimum there in most formats, though some
+> > hardware is more restrictive so we tend to go for the minimum clock rate.
 
-Stephen is right, the node-name should be generic (e.g. "bus") but the
-label can (should) be more SoC-specific, so it should look like:
+> How does that work in such a case? Is LRCK faster as well, and we're
+> keeping the same ratio, or will the codec buffer the current sample
+> until the next word?
 
-		hiubus: bus at ff63c000 {
+No, the extra clock cycles just get ignored - most of the formats define
+the location of the data in terms of LRCLK edges, any extra BCLK edges
+shouldn't do anything.
 
-Note that we weren't strict about this for all the rest of the amlogic
-SoCs (mostly because I didn't notice ) but we should start doing it
-correctly now.  I'll also clean up the existing DTs.
+> Is it usually a property of the codec or the DAI?
 
-Kevin
+Things that require extra cycles for some reason tend to be CODECs, but
+this can also be done just because whatever the clock master is doesn't
+have very flexible dividers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/62f7abdd/attachment.sig>
