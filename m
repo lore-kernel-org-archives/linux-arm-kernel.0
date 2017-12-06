@@ -1,39 +1,44 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:38 +0100
-Subject: [PATCH 43/61] ARM: dts: koelsch: Correct primary compatible value for
- eeprom
+Date: Wed,  6 Dec 2017 11:22:55 +0100
+Subject: [PATCH 60/61] ARM: dts: koelsch: Convert to named i2c-gpio bindings
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <8834d8667b8509e5968e5689790c4ac5410b47db.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <c14f3ec4ebb0c685b5261380559782caa76bd161.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-The Renesas part number of the two-wire serial interface EEPROM is not
-24C02, but R1EX24002ATAS0G.
+Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
+named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
+gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
+more error-prone unnamed variant.
 
-Hence change its primary compatible value to "renesas,r1ex24002", like
-on Gose.
+Switch to the new bindings, and add the missing GPIO_OPEN_DRAIN I/O
+flags, which were implicitly assumed before.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7791-koelsch.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 5 ++---
+ 1 file changed, 2 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
-index 4126de417922..fac9cdea4965 100644
+index fac9cdea4965..a50924d12b6f 100644
 --- a/arch/arm/boot/dts/r8a7791-koelsch.dts
 +++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
-@@ -708,7 +708,7 @@
+@@ -312,9 +312,8 @@
+ 		#size-cells = <0>;
+ 		compatible = "i2c-gpio";
+ 		status = "disabled";
+-		gpios = <&gpio7 16 GPIO_ACTIVE_HIGH /* sda */
+-			 &gpio7 15 GPIO_ACTIVE_HIGH /* scl */
+-			>;
++		sda-gpios = <&gpio7 16 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
++		scl-gpios = <&gpio7 15 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
+ 		i2c-gpio,delay-us = <5>;
  	};
  
- 	eeprom at 50 {
--		compatible = "renesas,24c02", "atmel,24c02";
-+		compatible = "renesas,r1ex24002", "atmel,24c02";
- 		reg = <0x50>;
- 		pagesize = <16>;
- 	};
 -- 
 2.11.0
