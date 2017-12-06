@@ -1,114 +1,58 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  6 Dec 2017 16:45:47 +0000
-Subject: [PATCH 3/3] arm64/sve: Avoid dereference of dead task_struct in KVM
- guest entry
-In-Reply-To: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
-References: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1512578747-4554-4-git-send-email-Dave.Martin@arm.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Wed, 6 Dec 2017 11:55:41 -0500
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
+References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+ <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+ <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
+ <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
+ <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
+ <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
+Message-ID: <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When deciding whether to invalidate FPSIMD state cached in the cpu,
-the backend function sve_flush_cpu_state() attempts to dereference
-__this_cpu_read(fpsimd_last_state).  However, this is not safe:
-there is no guarantee that this task_struct pointer is still valid,
-because the task could have exited in the meantime.
+On 12/6/2017 11:41 AM, Rafael J. Wysocki wrote:
+> On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
+>>>> Yes, it should, so I'm not sure why you need the list in the first place.
+>>>>
+>>>> Also it looks like something along the lines of devres_release_all()
+>>>> should be sufficient.
+>>> Good suggestion, let me test this.
+>>>
+>>
+>> I tried to pull the code into GED but the API is not public. I also looked
+>> at how it is used. I was afraid to mess up with the internals of base.c by
+>> calling devres_release_all() externally first and by the driver framework
+>> next. I moved away from this approach.
+> 
+> Are you sure it is called by the core in the shutdown path?
 
-This means that we need another means to get the appropriate value
-of TIF_SVE for the associated task.
+Sorry, I was thinking about a general case not the shutdown path. If we open
+this API and have device drivers call it from arbitrary places; then we could
+be opening a new can of worms that show up during device driver removal.
 
-This patch solves this issue by adding a cached copy of the TIF_SVE
-flag in fpsimd_last_state, which we can check without dereferencing
-the task pointer.
+If you feel confident (I'm not), I can pursue this approach too.
 
-In particular, although this patch is not a KVM fix per se, this
-means that this check is now done safely in the KVM world switch
-path (which is currently the only user of this code).
+> 
+>> I just fixed the function rename and changed the dev_info() to dev_dbg().
+> 
+> And why do you need the list?
+> 
+> ged_shutdown() will be called for every device for which ged_probe()
+> has been called.
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/kernel/fpsimd.c | 28 ++++++++++++++++------------
- 1 file changed, 16 insertions(+), 12 deletions(-)
+The problem I had here is that =the last argument is the context pointer when I
+call devm_free_irq().
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 007140b..3dc8058 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -114,7 +114,12 @@
-  *   returned from the 2nd syscall yet, TIF_FOREIGN_FPSTATE is still set so
-  *   whatever is in the FPSIMD registers is not saved to memory, but discarded.
-  */
--static DEFINE_PER_CPU(struct fpsimd_state *, fpsimd_last_state);
-+struct fpsimd_last_state_struct {
-+	struct fpsimd_state *st;
-+	bool sve_in_use;
-+};
-+
-+static DEFINE_PER_CPU(struct fpsimd_last_state_struct, fpsimd_last_state);
- 
- /* Default VL for tasks that don't set it explicitly: */
- static int sve_default_vl = -1;
-@@ -905,7 +910,7 @@ void fpsimd_thread_switch(struct task_struct *next)
- 		 */
- 		struct fpsimd_state *st = &next->thread.fpsimd_state;
- 
--		if (__this_cpu_read(fpsimd_last_state) == st
-+		if (__this_cpu_read(fpsimd_last_state.st) == st
- 		    && st->cpu == smp_processor_id())
- 			clear_tsk_thread_flag(next, TIF_FOREIGN_FPSTATE);
- 		else
-@@ -997,9 +1002,12 @@ void fpsimd_signal_preserve_current_state(void)
-  */
- static void fpsimd_bind_to_cpu(void)
- {
-+	struct fpsimd_last_state_struct *last =
-+		this_cpu_ptr(&fpsimd_last_state);
- 	struct fpsimd_state *st = &current->thread.fpsimd_state;
- 
--	__this_cpu_write(fpsimd_last_state, st);
-+	last->st = st;
-+	last->sve_in_use = test_thread_flag(TIF_SVE);
- 	st->cpu = smp_processor_id();
- }
- 
-@@ -1057,7 +1065,7 @@ void fpsimd_flush_task_state(struct task_struct *t)
- 
- static inline void fpsimd_flush_cpu_state(void)
- {
--	__this_cpu_write(fpsimd_last_state, NULL);
-+	__this_cpu_write(fpsimd_last_state.st, NULL);
- }
- 
- /*
-@@ -1070,14 +1078,10 @@ static inline void fpsimd_flush_cpu_state(void)
- #ifdef CONFIG_ARM64_SVE
- void sve_flush_cpu_state(void)
- {
--	struct fpsimd_state *const fpstate = __this_cpu_read(fpsimd_last_state);
--	struct task_struct *tsk;
--
--	if (!fpstate)
--		return;
-+	struct fpsimd_last_state_struct const *last =
-+		this_cpu_ptr(&fpsimd_last_state);
- 
--	tsk = container_of(fpstate, struct task_struct, thread.fpsimd_state);
--	if (test_tsk_thread_flag(tsk, TIF_SVE))
-+	if (last->st && last->sve_in_use)
- 		fpsimd_flush_cpu_state();
- }
- #endif /* CONFIG_ARM64_SVE */
-@@ -1272,7 +1276,7 @@ static inline void fpsimd_pm_init(void) { }
- #ifdef CONFIG_HOTPLUG_CPU
- static int fpsimd_cpu_dead(unsigned int cpu)
- {
--	per_cpu(fpsimd_last_state, cpu) = NULL;
-+	per_cpu(fpsimd_last_state.st, cpu) = NULL;
- 	return 0;
- }
- 
+If I don't pass the same context I used during IRQ registration, then the IRQ
+free API fails. That's why, I needed to keep the event pointer around until the
+IRQ free is called.
+
+
 -- 
-2.1.4
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
