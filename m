@@ -1,55 +1,38 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 6 Dec 2017 14:41:55 +0000
-Subject: 4.15-rc1 crash on Midway in teardown_hyp_mode()
-In-Reply-To: <10746458-42bd-c50f-3075-49811018099a@arm.com>
-References: <45e72322-52dd-4fdb-2e51-176524fb56a8@arm.com>
- <10746458-42bd-c50f-3075-49811018099a@arm.com>
-Message-ID: <2b9f0477-49bb-37e9-200c-0f2c477d559c@arm.com>
+Date: Wed,  6 Dec 2017 14:38:34 +0000
+Subject: [PATCH 13/18] arm64: Update the KVM memory map documentation
+In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
+References: <20171206143839.29223-1-marc.zyngier@arm.com>
+Message-ID: <20171206143839.29223-14-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 06/12/17 14:17, Andre Przywara wrote:
-> Hi,
-> 
-> On 06/12/17 14:11, Andre Przywara wrote:
->> Hi,
->>
->> while trying to boot 4.15-rc1 on my Calxeda Midway I observed a crash
->> (see below). I can't look further into this today, but wanted to report
->> this anyway.
->>
->> Digging around a bit this is due to the VGIC not initializing properly
->> due to GICC being advertised as just 4K, not 8K.
->> This can be worked around by adjusting the DT or using
->> irqchip.gicv2_force_probe. However this still raises some questions:
->> 1) Even if the VGIC fails to register, we should certainly not crash.
->> The chain of events seems to be:
->> virt/kvm/arm/arm.c:init_subsystems():
->>   - kvm_vgic_hyp_init() returns -ENODEV, this leads to vgic_present
->>     being set to false, but "err" being reset to 0 (meaning: carry on).
->>     However this seems now to miss some initialization.
->>   - kvm_timer_hyp_init() now fails on calling irq_set_vcpu_affinity(),
->>     because this returns -ENOSYS. This leads to it returning this error,
->>     init_subsystems() failing and subsequently tearing down KVM.
->>   - This seems to have some bug and leads to the kernel crash.
->>
->> Even with the VGIC not being usable, we should be able to cleanly tear
->> down KVM (or HYP?).
-> 
-> Just checked: If I let kvm_timer_hyp_init() deliberately fail in 4.14, I
-> get the same splat (4.14 works fine, otherwise). So this particular
-> issue existed already before. You should be able to reproduce it on any
-> box by forcing "err = -ENOSYS;" after the call to kvm_timer_hyp_init()
-> in virt/kvm/arm/arm.c:init_subsystems().
+Update the documentation to reflect the new tricks we play on the
+EL2 mappings...
 
-I wonder if the bigger hammer-type solution is not to expose that the
-GIC is not capable of EOImode==1, and not enable the vgic in that
-particular case...
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ Documentation/arm64/memory.txt | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-I'll cook an RFC patch set for you to test.
-
-Thanks,
-
-	M.
+diff --git a/Documentation/arm64/memory.txt b/Documentation/arm64/memory.txt
+index 671bc0639262..ea64e20037f6 100644
+--- a/Documentation/arm64/memory.txt
++++ b/Documentation/arm64/memory.txt
+@@ -86,9 +86,11 @@ Translation table lookup with 64KB pages:
+  +-------------------------------------------------> [63] TTBR0/1
+ 
+ 
+-When using KVM without the Virtualization Host Extensions, the hypervisor
+-maps kernel pages in EL2 at a fixed offset from the kernel VA. See the
+-kern_hyp_va macro for more details.
++When using KVM without the Virtualization Host Extensions, the
++hypervisor maps kernel pages in EL2 at a fixed offset (modulo a random
++offset) from the linear mapping. See the kern_hyp_va macro and
++kvm_update_va_mask function for more details. MMIO devices such as
++GICv2 gets mapped next to the HYP idmap page.
+ 
+ When using KVM with the Virtualization Host Extensions, no additional
+ mappings are created, since the host kernel runs directly in EL2.
 -- 
-Jazz is not dead. It just smells funny...
+2.14.2
