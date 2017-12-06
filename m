@@ -1,20 +1,42 @@
-From: santosh.shilimkar@oracle.com (santosh.shilimkar at oracle.com)
-Date: Wed, 6 Dec 2017 09:54:40 -0800
-Subject: [PATCH 0/2] 66AK2G: Add DT entry for UART1 and UART2
-In-Reply-To: <20171205064812.15758-1-vigneshr@ti.com>
-References: <20171205064812.15758-1-vigneshr@ti.com>
-Message-ID: <f43733da-2587-8c00-4682-9a85f762f2c9@oracle.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Dec 2017 17:56:42 +0000
+Subject: [PATCH 0/2] Fixes for SW PAN
+In-Reply-To: <5ee0b1f1-c7fc-af92-2b34-4555e59d7a20@codeaurora.org>
+References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+ <5ee0b1f1-c7fc-af92-2b34-4555e59d7a20@codeaurora.org>
+Message-ID: <20171206175641.GA26554@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/4/17 10:48 PM, Vignesh R wrote:
-> This series adds DT entry for the remaining two UART instances on 66AK2G
-> SoC.
+On Wed, Dec 06, 2017 at 11:01:46PM +0530, Vinayak Menon wrote:
+> On 12/6/2017 4:46 PM, Will Deacon wrote:
+> > Hi all,
+> >
+> > After lots of collective head scratching in response to Vinayak's mail
+> > here:
+> >
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545641.html
+> >
+> > It turns out that we have a problem with SW PAN and kernel threads, where
+> > the saved ttbr0 value for a kernel thread can be stale and subsequently
+> > inherited by other kernel threads over a fork.
+> >
+> > These two patches attempt to fix that. We've not be able to reproduce
+> > the exact failure reported above, but I added some assertions to the
+> > uaccess routines to check for discrepancies between the active_mm pgd
+> > and the saved ttbr0 value (ignoring the zero page) and these no longer
+> > fire with these changes, but do fire without them if EFI runtime services
+> > are enabled on my Seattle board.
 > 
-> Based on linux-next.
-> 
-> Franklin S Cooper Jr (2):
->    ARM: dts: keystone-k2g: Add UART 1 and 2 instances
->    ARM: dts: keystone-k2g-evm: Enable UART 2
-> 
-Applied !!
+> Thanks Will. So these 2 patches fix the case of kthreads having a stale saved ttbr0. The callstack I had shared
+> in the original issue description was not of a kthread (its user task with PF_KTHREAD not set. The tsk->mm was
+> set to NULL by exit_mm I think). So do you think this could be a different problem ?
+> I had a look at the dumps again and what I see is that, the PA part of the saved ttbr0
+> (from thread_info) is not the same as the pa(tsk->active_mm->pgd). The PA derived from saved ttbr0 actually
+> points to a page which is "now" owned by slab.
+
+Having not been able to reproduce the failure you described, I can't give
+you a good answer to this. How much information do you have about the task
+that crashes?
+
+Will
