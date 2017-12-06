@@ -1,38 +1,53 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:21:58 +0100
-Subject: [PATCH 03/61] ARM: dts: r8a7778: Use R-Car Gen1 Ether fallback compat
- string
+Date: Wed,  6 Dec 2017 11:22:24 +0100
+Subject: [PATCH 29/61] ARM: dts: koelsch: Move cec_clock to root node
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <1bfd944483b209c577fa50cc981b4f959a287f83.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <d72f4f03854d1225c72d682bf0e01377e7016419.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car Gen1 Ether fallback compat string
-in the DT of the r8a7778 SoC.
+cec-clock is a fixed clock generator that is not controlled by i2c5 and
+thus should not be a child of the i2c5 bus node. Rather, it should be
+a child of the root node of the DT.
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before considering the fallback compat string.
-
+Fixes: 02a5ab18d366 ("ARM: dts: koelsch: Add CEC clock for HDMI transmitter")
+Reported-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 ---
- arch/arm/boot/dts/r8a7778.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7791-koelsch.dts | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7778.dtsi b/arch/arm/boot/dts/r8a7778.dtsi
-index a39472aab867..d6e3c0400ec3 100644
---- a/arch/arm/boot/dts/r8a7778.dtsi
-+++ b/arch/arm/boot/dts/r8a7778.dtsi
-@@ -51,7 +51,8 @@
+diff --git a/arch/arm/boot/dts/r8a7791-koelsch.dts b/arch/arm/boot/dts/r8a7791-koelsch.dts
+index e164eda69baf..4126de417922 100644
+--- a/arch/arm/boot/dts/r8a7791-koelsch.dts
++++ b/arch/arm/boot/dts/r8a7791-koelsch.dts
+@@ -278,6 +278,12 @@
+ 		};
  	};
  
- 	ether: ethernet at fde00000 {
--		compatible = "renesas,ether-r8a7778";
-+		compatible = "renesas,ether-r8a7778",
-+			     "renesas,rcar-gen1-ether";
- 		reg = <0xfde00000 0x400>;
- 		interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp1_clks R8A7778_CLK_ETHER>;
++	cec_clock: cec-clock {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <12000000>;
++	};
++
+ 	hdmi-out {
+ 		compatible = "hdmi-connector";
+ 		type = "a";
+@@ -640,12 +646,6 @@
+ 		};
+ 	};
+ 
+-	cec_clock: cec-clock {
+-		compatible = "fixed-clock";
+-		#clock-cells = <0>;
+-		clock-frequency = <12000000>;
+-	};
+-
+ 	hdmi at 39 {
+ 		compatible = "adi,adv7511w";
+ 		reg = <0x39>;
 -- 
 2.11.0
