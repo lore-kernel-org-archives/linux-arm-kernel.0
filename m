@@ -1,118 +1,53 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 6 Dec 2017 13:27:15 +0000
-Subject: [PATCH v3 20/20] arm64: kaslr: Put kernel vectors address in
- separate data page
-In-Reply-To: <CAKv+Gu_qpJCXqfrGqMGDfjeYHQVYU4SWChMXdPi53g6rmqQz6Q@mail.gmail.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
- <1512563739-25239-21-git-send-email-will.deacon@arm.com>
- <CAKv+Gu_qpJCXqfrGqMGDfjeYHQVYU4SWChMXdPi53g6rmqQz6Q@mail.gmail.com>
-Message-ID: <20171206132714.GA31186@arm.com>
+From: aleksey.makarov@cavium.com (Aleksey Makarov)
+Date: Wed,  6 Dec 2017 16:30:56 +0300
+Subject: [PATCH net-next v3 0/2] net: thunderx: add support for PTP clock
+Message-ID: <20171206133100.26436-1-aleksey.makarov@cavium.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+This series adds support for IEEE 1588 Precision Time Protocol
+to Cavium ethernet driver.
 
-On Wed, Dec 06, 2017 at 12:59:40PM +0000, Ard Biesheuvel wrote:
-> On 6 December 2017 at 12:35, Will Deacon <will.deacon@arm.com> wrote:
-> > The literal pool entry for identifying the vectors base is the only piece
-> > of information in the trampoline page that identifies the true location
-> > of the kernel.
-> >
-> > This patch moves it into its own page, which is only mapped by the full
-> > kernel page table, which protects against any accidental leakage of the
-> > trampoline contents.
+The first patch adds support for the Precision Time Protocol Clocks and
+Timestamping coprocessor (PTP) found on Cavium processors.
+It registers a new PTP clock in the PTP core and provides functions
+to use the counter in BGX, TNS, GTI, and NIC blocks.
 
-[...]
+The second patch introduces support for the PTP protocol to the
+Cavium ThunderX ethernet driver.
 
-> > @@ -1073,6 +1079,11 @@ END(tramp_exit_compat)
-> >
-> >         .ltorg
-> >         .popsection                             // .entry.tramp.text
-> > +#ifdef CONFIG_RANDOMIZE_BASE
-> > +       .pushsection ".entry.tramp.data", "a"   // .entry.tramp.data
-> > +       .quad   vectors
-> > +       .popsection                             // .entry.tramp.data
-> 
-> This does not need to be in a section of its own, and doesn't need to
-> be padded to a full page.
-> 
-> If you just stick this in .rodata but align it to page size, you can
-> just map whichever page it ends up in into the TRAMP_DATA fixmap slot
-> (which is a r/o mapping anyway). You could then drop most of the
-> changes below. And actually, I'm not entirely sure whether it still
-> makes sense then to do this only for CONFIG_RANDOMIZE_BASE.
+v3:
+- rebase to net-next
 
-Good point; I momentarily forgot this was in the kernel page table anyway.
-How about something like the diff below merged on top (so this basically
-undoes a bunch of the patch)?
+v2: https://lkml.kernel.org/r/20171117134909.8954-1-aleksey.makarov at cavium.com
+- use readq()/writeq() in place of cavium_ptp_reg_read()/cavium_ptp_reg_write(),
+  don't use readq_relaxed()/writeq_relaxed() (David Daney)
 
-I'd prefer to keep the CONFIG_RANDOMIZE_BASE dependency, at least for now.
+v1: https://lkml.kernel.org/r/20171107190704.15458-1-aleksey.makarov at cavium.com
 
-Will
+Radoslaw Biernacki (1):
+  net: add support for Cavium PTP coprocessor
 
---->8
+Sunil Goutham (1):
+  net: thunderx: add timestamping support
 
-diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-index a70c6dd2cc19..031392ee5f47 100644
---- a/arch/arm64/kernel/entry.S
-+++ b/arch/arm64/kernel/entry.S
-@@ -1080,9 +1080,12 @@ END(tramp_exit_compat)
- 	.ltorg
- 	.popsection				// .entry.tramp.text
- #ifdef CONFIG_RANDOMIZE_BASE
--	.pushsection ".entry.tramp.data", "a"	// .entry.tramp.data
-+	.pushsection ".rodata", "a"
-+	.align PAGE_SHIFT
-+	.globl	__entry_tramp_data_start
-+__entry_tramp_data_start:
- 	.quad	vectors
--	.popsection				// .entry.tramp.data
-+	.popsection				// .rodata
- #endif /* CONFIG_RANDOMIZE_BASE */
- #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 976109b3ae51..27cf9be20a00 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -64,21 +64,8 @@ jiffies = jiffies_64;
- 	*(.entry.tramp.text)					\
- 	. = ALIGN(PAGE_SIZE);					\
- 	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
--#ifdef CONFIG_RANDOMIZE_BASE
--#define TRAMP_DATA						\
--	.entry.tramp.data : {					\
--		. = ALIGN(PAGE_SIZE);				\
--		VMLINUX_SYMBOL(__entry_tramp_data_start) = .;	\
--		*(.entry.tramp.data)				\
--		. = ALIGN(PAGE_SIZE);				\
--		VMLINUX_SYMBOL(__entry_tramp_data_end) = .;	\
--	}
--#else
--#define TRAMP_DATA
--#endif /* CONFIG_RANDOMIZE_BASE */
- #else
- #define TRAMP_TEXT
--#define TRAMP_DATA
- #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
- 
- /*
-@@ -150,7 +137,6 @@ SECTIONS
- 	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
- 	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
- 	NOTES
--	TRAMP_DATA
- 
- 	. = ALIGN(SEGMENT_ALIGN);
- 	__init_begin = .;
-@@ -268,10 +254,6 @@ ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
- #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
- ASSERT((__entry_tramp_text_end - __entry_tramp_text_start) == PAGE_SIZE,
- 	"Entry trampoline text too big")
--#ifdef CONFIG_RANDOMIZE_BASE
--ASSERT((__entry_tramp_data_end - __entry_tramp_data_start) == PAGE_SIZE,
--	"Entry trampoline data too big")
--#endif
- #endif
- /*
-  * If padding is applied before .head.text, virt<->phys conversions will fail.
+ drivers/net/ethernet/cavium/Kconfig                |  14 +
+ drivers/net/ethernet/cavium/Makefile               |   1 +
+ drivers/net/ethernet/cavium/common/Makefile        |   1 +
+ drivers/net/ethernet/cavium/common/cavium_ptp.c    | 334 +++++++++++++++++++++
+ drivers/net/ethernet/cavium/common/cavium_ptp.h    |  78 +++++
+ drivers/net/ethernet/cavium/thunder/nic.h          |  15 +
+ drivers/net/ethernet/cavium/thunder/nic_main.c     |  58 +++-
+ drivers/net/ethernet/cavium/thunder/nic_reg.h      |   1 +
+ .../net/ethernet/cavium/thunder/nicvf_ethtool.c    |  29 +-
+ drivers/net/ethernet/cavium/thunder/nicvf_main.c   | 173 ++++++++++-
+ drivers/net/ethernet/cavium/thunder/nicvf_queues.c |  26 ++
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.c  |  29 ++
+ drivers/net/ethernet/cavium/thunder/thunder_bgx.h  |   4 +
+ 13 files changed, 757 insertions(+), 6 deletions(-)
+ create mode 100644 drivers/net/ethernet/cavium/common/Makefile
+ create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.c
+ create mode 100644 drivers/net/ethernet/cavium/common/cavium_ptp.h
+
+-- 
+2.15.1
