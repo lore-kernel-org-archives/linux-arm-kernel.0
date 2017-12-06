@@ -1,45 +1,48 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  6 Dec 2017 14:38:24 +0000
-Subject: [PATCH 03/18] arm64: asm-offsets: Remove potential circular dependency
+Date: Wed,  6 Dec 2017 14:38:27 +0000
+Subject: [PATCH 06/18] arm64: insn: Add N immediate encoding
 In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
 References: <20171206143839.29223-1-marc.zyngier@arm.com>
-Message-ID: <20171206143839.29223-4-marc.zyngier@arm.com>
+Message-ID: <20171206143839.29223-7-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So far, we've been lucky enough that none of the include files
-that asm-offsets.c requires do include asm-offsets.h. This is
-about to change, and would introduce a nasty circular dependency...
-
-Let's now guard the inclusion of asm-offsets.h so that it never
-gets pulled from asm-offsets.c.
+We're missing the a way to generate the encoding of the N immediate,
+which is only a single bit used in a number of instruction that take
+an immediate.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/asm-offsets.h | 2 ++
- arch/arm64/kernel/asm-offsets.c      | 2 ++
- 2 files changed, 4 insertions(+)
+ arch/arm64/include/asm/insn.h | 1 +
+ arch/arm64/kernel/insn.c      | 4 ++++
+ 2 files changed, 5 insertions(+)
 
-diff --git a/arch/arm64/include/asm/asm-offsets.h b/arch/arm64/include/asm/asm-offsets.h
-index d370ee36a182..ed8df3a9c95a 100644
---- a/arch/arm64/include/asm/asm-offsets.h
-+++ b/arch/arm64/include/asm/asm-offsets.h
-@@ -1 +1,3 @@
-+#ifndef IN_ASM_OFFSET_GENERATOR
- #include <generated/asm-offsets.h>
-+#endif
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 742887330101..74b9a26a84b5 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -18,6 +18,8 @@
-  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-  */
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 4214c38d016b..21fffdd290a3 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -70,6 +70,7 @@ enum aarch64_insn_imm_type {
+ 	AARCH64_INSN_IMM_6,
+ 	AARCH64_INSN_IMM_S,
+ 	AARCH64_INSN_IMM_R,
++	AARCH64_INSN_IMM_N,
+ 	AARCH64_INSN_IMM_MAX
+ };
  
-+#define IN_ASM_OFFSET_GENERATOR	1
-+
- #include <linux/sched.h>
- #include <linux/mm.h>
- #include <linux/dma-mapping.h>
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index 2718a77da165..7e432662d454 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -343,6 +343,10 @@ static int __kprobes aarch64_get_imm_shift_mask(enum aarch64_insn_imm_type type,
+ 		mask = BIT(6) - 1;
+ 		shift = 16;
+ 		break;
++	case AARCH64_INSN_IMM_N:
++		mask = 1;
++		shift = 22;
++		break;
+ 	default:
+ 		return -EINVAL;
+ 	}
 -- 
 2.14.2
