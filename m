@@ -1,71 +1,42 @@
-From: Stefan.Potyra@elektrobit.com (Stefan Potyra)
-Date: Wed, 6 Dec 2017 16:03:24 +0100
-Subject: [PATCH] SoC: rockchip: disable clock on error
-Message-ID: <20171206150324.va4ph66ohjt3v7r3@agrajag.zerfleddert.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 6 Dec 2017 14:57:29 +0000
+Subject: [PATCH 04/18] arm64: alternatives: Enforce alignment of struct
+ alt_instr
+In-Reply-To: <20171206144847.GA28074@char.us.oracle.com>
+References: <20171206143839.29223-1-marc.zyngier@arm.com>
+ <20171206143839.29223-5-marc.zyngier@arm.com>
+ <20171206144847.GA28074@char.us.oracle.com>
+Message-ID: <dd8995ce-3065-3aba-2d93-9ed91de5cd50@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Disable the clocks in  rk_spdif_probe when an error occurs after one
-of the clocks has been enabled previously.
+On 06/12/17 14:48, Konrad Rzeszutek Wilk wrote:
+> On Wed, Dec 06, 2017 at 02:38:25PM +0000, Marc Zyngier wrote:
+>> We're playing a dangerous game with struct alt_instr, as we produce
+>> it using assembly tricks, but parse them using the C structure.
+>> We just assume that the respective alignments of the two will
+>> be the same.
+>>
+>> But as we add more fields to this structure, the alignment requirements
+>> of the structure may change, and lead to all kind of funky bugs.
+>>
+>> TO solve this, let's move the definition of struct alt_instr to its
+>> own file, and use this to generate the alignment constraint from
+>> asm-offsets.c. The various macros are then patched to take the
+>> alignment into account.
+> 
+> Would it be better to use .p2align as on 32-bit ARM you must
+> have it 4-byte aligned. Or at least have and BUILD_BUG_ON
+> to make sure the size can be divided by four??
+> 
+> Oh wait. You are not even touching ARM-32, how come? The alternative
+> code can run on ARM-32 ...
 
-Found by Linux Driver Verification project (linuxtesting.org).
+How? Given that I haven't written yet, I'd be grateful if you could
+share your time machine...
 
-Fixes: f874b80e1571 ASoC: rockchip: Add rockchip SPDIF transceiver driver
-Signed-off-by: Stefan Potyra <Stefan.Potyra@elektrobit.com>
----
- sound/soc/rockchip/rockchip_spdif.c | 18 +++++++++++++-----
- 1 file changed, 13 insertions(+), 5 deletions(-)
+Thanks,
 
-diff --git a/sound/soc/rockchip/rockchip_spdif.c b/sound/soc/rockchip/rockchip_spdif.c
-index ee5055d47d13..a89fe9b6463b 100644
---- a/sound/soc/rockchip/rockchip_spdif.c
-+++ b/sound/soc/rockchip/rockchip_spdif.c
-@@ -322,26 +322,30 @@ static int rk_spdif_probe(struct platform_device *pdev)
- 	spdif->mclk = devm_clk_get(&pdev->dev, "mclk");
- 	if (IS_ERR(spdif->mclk)) {
- 		dev_err(&pdev->dev, "Can't retrieve rk_spdif master clock\n");
--		return PTR_ERR(spdif->mclk);
-+		ret = PTR_ERR(spdif->mclk);
-+		goto err_disable_hclk;
- 	}
- 
- 	ret = clk_prepare_enable(spdif->mclk);
- 	if (ret) {
- 		dev_err(spdif->dev, "clock enable failed %d\n", ret);
--		return ret;
-+		goto err_disable_clocks;
- 	}
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	regs = devm_ioremap_resource(&pdev->dev, res);
--	if (IS_ERR(regs))
--		return PTR_ERR(regs);
-+	if (IS_ERR(regs)) {
-+		ret = PTR_ERR(regs);
-+		goto err_disable_clocks;
-+	}
- 
- 	spdif->regmap = devm_regmap_init_mmio_clk(&pdev->dev, "hclk", regs,
- 						  &rk_spdif_regmap_config);
- 	if (IS_ERR(spdif->regmap)) {
- 		dev_err(&pdev->dev,
- 			"Failed to initialise managed register map\n");
--		return PTR_ERR(spdif->regmap);
-+		ret = PTR_ERR(spdif->regmap);
-+		goto err_disable_clocks;
- 	}
- 
- 	spdif->playback_dma_data.addr = res->start + SPDIF_SMPDR;
-@@ -373,6 +377,10 @@ static int rk_spdif_probe(struct platform_device *pdev)
- 
- err_pm_runtime:
- 	pm_runtime_disable(&pdev->dev);
-+err_disable_clocks:
-+	clk_disable_unprepare(spdif->mclk);
-+err_disable_hclk:
-+	clk_disable_unprepare(spdif->hclk);
- 
- 	return ret;
- }
+	M.
 -- 
-2.15.1
+Jazz is not dead. It just smells funny...
