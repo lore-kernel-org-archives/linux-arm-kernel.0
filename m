@@ -1,103 +1,36 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 6 Dec 2017 11:56:50 -0800
-Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
-In-Reply-To: <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
-Message-ID: <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 06 Dec 2017 11:52:44 -0800
+Subject: [PATCH v5 0/2] meson: saradc: drop the sana clock
+In-Reply-To: <20171116090115.29915-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Thu, 16 Nov 2017 17:01:13 +0800")
+References: <20171116090115.29915-1-yixun.lan@amlogic.com>
+Message-ID: <7h609jskfn.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 31, 2017 at 8:51 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> This patch implements support for saving and restoring the SVE
-> registers around signals.
->
-> A fixed-size header struct sve_context is always included in the
-> signal frame encoding the thread's vector length at the time of
-> signal delivery, optionally followed by a variable-layout structure
-> encoding the SVE registers.
->
-> Because of the need to preserve backwards compatibility, the FPSIMD
-> view of the SVE registers is always dumped as a struct
-> fpsimd_context in the usual way, in addition to any sve_context.
->
-> The SVE vector registers are dumped in full, including bits 127:0
-> of each register which alias the corresponding FPSIMD vector
-> registers in the hardware.  To avoid any ambiguity about which
-> alias to restore during sigreturn, the kernel always restores bits
-> 127:0 of each SVE vector register from the fpsimd_context in the
-> signal frame (which must be present): userspace needs to take this
-> into account if it wants to modify the SVE vector register contents
-> on return from a signal.
->
-> FPSR and FPCR, which are used by both FPSIMD and SVE, are not
-> included in sve_context because they are always present in
-> fpsimd_context anyway.
->
-> For signal delivery, a new helper
-> fpsimd_signal_preserve_current_state() is added to update _both_
-> the FPSIMD and SVE views in the task struct, to make it easier to
-> populate this information into the signal frame.  Because of the
-> redundancy between the two views of the state, only one is updated
-> otherwise.
->
-> Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-> Cc: Alex Benn?e <alex.bennee@linaro.org>
-> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Cc: Will Deacon <will.deacon@arm.com>
->
-> ---
->
-> **Dropped** Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> (Non-trivial changes.)
->
-> Changes since v4
-> ----------------
->
-> Requested by Will Deacon:
->
->  * Fix inconsistent return semantics in restore_sve_fpsimd_context().
->
->    Currently a nonzero return value from __copy_from_user() is passed
->    back as-is to the caller or restore_sve_fpsimd_context(), rather than
->    translating it do an error code as is done elsewhere.
->
->    Callers of restore_sve_fpsimd_context() only care whether the return
->    value is 0 or not, so this isn't a big deal, but it is more
->    consistent to return proper error codes on failure in case we grow a
->    use for them later.
->
->    This patch returns -EFAULT in the __copy_from_user() error cases
->    that weren't explicitly handled.
->
-> Miscellaneous:
->
->  * Change inconsistent copy_to_user() calls to __copy_to_user() in
->    preserve_sve_context().
->
->    There are already __put_user_error() calls here.
->
->    The whole extended signal frame is already checked for
->    access_ok(VERIFY_WRITE) in get_sigframe().
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-Verifying all these __copy_to/from_user() calls is rather non-trivial.
-For example, I had to understand that the access_ok() check actually
-spans memory that both user->sigframe and user->next_frame point into.
-And it isn't clear to me that all users of apply_user_offset() are
-within this range too, along with other manually calculated offsets in
-setup_sigframe().
+> This is a rework for the patch [v4 4/4] of previous series,
+> which mean this will make the patch [1] obsolete.
+>
+> Changes since v4:
+>  * separate DTS for ARM(32bit) vs ARM64
+>  * add ACK from Martin
 
-And it's not clear if parse_user_sigframe() is safe either. Are
-user->fpsimd and user->sve checked somewhere? It seems like it's
-safely contained by in sf->uc.uc_mcontext.__reserved, but it's hard to
-read, though I do see access_ok() checks against __reserved at the end
-of the while loop.
+Thanks for splitting it up.
 
-Can we just drop all the __... calls for the fully checked
-copy_to/from_user() instead?
+> [1] [PATCH v4 4/4] ARM64: dts: meson: drop "sana" clock from SAR ADC
+> http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005266.html
+>
+> Xingyu Chen (2):
+>   ARM64: dts: meson: drop "sana" clock from SAR ADC
 
--Kees
+Applied to v4.16/dt64
 
--- 
-Kees Cook
-Pixel Security
+>   ARM: dts: meson: drop "sana" clock from SAR ADC
+
+Applied to v4.16/dt
+
+Thanks,
+
+Kevin
