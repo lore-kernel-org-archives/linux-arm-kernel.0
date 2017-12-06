@@ -1,44 +1,99 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:54 +0100
-Subject: [PATCH 59/61] ARM: dts: lager: Convert to named i2c-gpio bindings
-In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
-References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <e99185b298ba0288e88ea0a935342f01c8387b76.1512555546.git.horms+renesas@verge.net.au>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Wed, 6 Dec 2017 19:25:25 +0900
+Subject: [kernel-hardening][PATCH v4 2/3] arm: mm: dump: make the page table
+ dumping seq_file optional
+Message-ID: <20171206102525.GA7054@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch makes the page table dumping seq_file optional.
+It makes the page table dumping code usable for other cases.
 
-Commits 7d29f509d2cfd807 ("dt-bindings: i2c: i2c-gpio: Add support for
-named gpios") and 05c74778858d7d99 ("i2c: gpio: Add support for named
-gpios in DT") introduced named i2c-gpio DT bindings, and deprecated the
-more error-prone unnamed variant.
+This patch refers below commit of arm64.
+(ae5d1cf358a5
+("arm64: dump: Make the page table dumping seq_file optional"))
 
-Switch to the new bindings, and add the missing GPIO_OPEN_DRAIN I/O
-flags, which were implicitly assumed before.
-
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Reviewed-by: Wolfram Sang <wsa+renesas@sang-engineering.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Kees Cook <keescook@chromium.org>
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
 ---
- arch/arm/boot/dts/r8a7790-lager.dts | 5 ++---
- 1 file changed, 2 insertions(+), 3 deletions(-)
+v4: Add Acked-by from Kees Cook
+---
+ arch/arm/mm/dump.c | 28 +++++++++++++++++++++-------
+ 1 file changed, 21 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7790-lager.dts b/arch/arm/boot/dts/r8a7790-lager.dts
-index e3d27783b6b5..f2ea632381e7 100644
---- a/arch/arm/boot/dts/r8a7790-lager.dts
-+++ b/arch/arm/boot/dts/r8a7790-lager.dts
-@@ -272,9 +272,8 @@
- 		#size-cells = <0>;
- 		compatible = "i2c-gpio";
- 		status = "disabled";
--		gpios = <&gpio1 17 GPIO_ACTIVE_HIGH /* sda */
--			 &gpio1 16 GPIO_ACTIVE_HIGH /* scl */
--			>;
-+		sda-gpios = <&gpio1 17 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
-+		scl-gpios = <&gpio1 16 (GPIO_ACTIVE_HIGH | GPIO_OPEN_DRAIN)>;
- 		i2c-gpio,delay-us = <5>;
- 	};
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index 8dfe7c3..43a2bee 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -34,6 +34,18 @@
+ 	{ -1,			NULL },
+ };
  
++#define pt_dump_seq_printf(m, fmt, args...) \
++({                      \
++	if (m)					\
++		seq_printf(m, fmt, ##args);	\
++})
++
++#define pt_dump_seq_puts(m, fmt)    \
++({						\
++	if (m)					\
++		seq_printf(m, fmt);	\
++})
++
+ struct pg_state {
+ 	struct seq_file *seq;
+ 	const struct addr_marker *marker;
+@@ -210,7 +222,7 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t
+ 			s = bits->clear;
+ 
+ 		if (s)
+-			seq_printf(st->seq, " %s", s);
++			pt_dump_seq_printf(st->seq, " %s", s);
+ 	}
+ }
+ 
+@@ -224,7 +236,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
+ 		st->level = level;
+ 		st->current_prot = prot;
+ 		st->current_domain = domain;
+-		seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
++		pt_dump_seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
+ 	} else if (prot != st->current_prot || level != st->level ||
+ 		   domain != st->current_domain ||
+ 		   addr >= st->marker[1].start_address) {
+@@ -232,7 +244,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
+ 		unsigned long delta;
+ 
+ 		if (st->current_prot) {
+-			seq_printf(st->seq, "0x%08lx-0x%08lx   ",
++			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
+ 				   st->start_address, addr);
+ 
+ 			delta = (addr - st->start_address) >> 10;
+@@ -240,17 +252,19 @@ static void note_page(struct pg_state *st, unsigned long addr,
+ 				delta >>= 10;
+ 				unit++;
+ 			}
+-			seq_printf(st->seq, "%9lu%c", delta, *unit);
++			pt_dump_seq_printf(st->seq, "%9lu%c", delta, *unit);
+ 			if (st->current_domain)
+-				seq_printf(st->seq, " %s", st->current_domain);
++				pt_dump_seq_printf(st->seq, " %s",
++							st->current_domain);
+ 			if (pg_level[st->level].bits)
+ 				dump_prot(st, pg_level[st->level].bits, pg_level[st->level].num);
+-			seq_printf(st->seq, "\n");
++			pt_dump_seq_printf(st->seq, "\n");
+ 		}
+ 
+ 		if (addr >= st->marker[1].start_address) {
+ 			st->marker++;
+-			seq_printf(st->seq, "---[ %s ]---\n", st->marker->name);
++			pt_dump_seq_printf(st->seq, "---[ %s ]---\n",
++							st->marker->name);
+ 		}
+ 		st->start_address = addr;
+ 		st->current_prot = prot;
 -- 
-2.11.0
+1.9.1
