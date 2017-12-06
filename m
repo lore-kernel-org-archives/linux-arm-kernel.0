@@ -1,170 +1,251 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 6 Dec 2017 12:59:40 +0000
-Subject: [PATCH v3 20/20] arm64: kaslr: Put kernel vectors address in
- separate data page
-In-Reply-To: <1512563739-25239-21-git-send-email-will.deacon@arm.com>
-References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
- <1512563739-25239-21-git-send-email-will.deacon@arm.com>
-Message-ID: <CAKv+Gu_qpJCXqfrGqMGDfjeYHQVYU4SWChMXdPi53g6rmqQz6Q@mail.gmail.com>
+From: fabrice.gasnier@st.com (Fabrice Gasnier)
+Date: Wed, 6 Dec 2017 14:02:12 +0100
+Subject: [PATCH] iio: stm32: Adopt SPDX identifier
+In-Reply-To: <20171205145559.20294-1-benjamin.gaignard@st.com>
+References: <20171205145559.20294-1-benjamin.gaignard@st.com>
+Message-ID: <83055563-ba06-6d40-86d4-a52c0d2ff893@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 December 2017 at 12:35, Will Deacon <will.deacon@arm.com> wrote:
-> The literal pool entry for identifying the vectors base is the only piece
-> of information in the trampoline page that identifies the true location
-> of the kernel.
->
-> This patch moves it into its own page, which is only mapped by the full
-> kernel page table, which protects against any accidental leakage of the
-> trampoline contents.
->
-> Suggested-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
+On 12/05/2017 03:55 PM, Benjamin Gaignard wrote:
+> Add SPDX identifier in stm32's files in IIO directory
+> 
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
 > ---
->  arch/arm64/include/asm/fixmap.h |  1 +
->  arch/arm64/kernel/entry.S       | 11 +++++++++++
->  arch/arm64/kernel/vmlinux.lds.S | 35 ++++++++++++++++++++++++++++-------
->  arch/arm64/mm/mmu.c             | 10 +++++++++-
->  4 files changed, 49 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
-> index 8119b49be98d..ec1e6d6fa14c 100644
-> --- a/arch/arm64/include/asm/fixmap.h
-> +++ b/arch/arm64/include/asm/fixmap.h
-> @@ -59,6 +59,7 @@ enum fixed_addresses {
->  #endif /* CONFIG_ACPI_APEI_GHES */
->
->  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-> +       FIX_ENTRY_TRAMP_DATA,
->         FIX_ENTRY_TRAMP_TEXT,
->  #define TRAMP_VALIAS           (__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
->  #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
-> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
-> index 3eabcb194c87..a70c6dd2cc19 100644
-> --- a/arch/arm64/kernel/entry.S
-> +++ b/arch/arm64/kernel/entry.S
-> @@ -1030,7 +1030,13 @@ alternative_else_nop_endif
->         msr     tpidrro_el0, x30        // Restored in kernel_ventry
->         .endif
->         tramp_map_kernel        x30
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +       adr     x30, tramp_vectors + PAGE_SIZE
-> +alternative_insn isb, nop, ARM64_WORKAROUND_QCOM_FALKOR_E1003
-> +       ldr     x30, [x30]
-> +#else
->         ldr     x30, =vectors
-> +#endif
->         prfm    plil1strm, [x30, #(1b - tramp_vectors)]
->         msr     vbar_el1, x30
->         add     x30, x30, #(1b - tramp_vectors)
-> @@ -1073,6 +1079,11 @@ END(tramp_exit_compat)
->
->         .ltorg
->         .popsection                             // .entry.tramp.text
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +       .pushsection ".entry.tramp.data", "a"   // .entry.tramp.data
-> +       .quad   vectors
-> +       .popsection                             // .entry.tramp.data
+>  drivers/iio/adc/stm32-adc-core.c            | 14 +-------------
+>  drivers/iio/adc/stm32-adc-core.h            | 14 +-------------
+>  drivers/iio/adc/stm32-adc.c                 | 15 +--------------
+>  drivers/iio/counter/stm32-lptimer-cnt.c     |  2 +-
+>  drivers/iio/dac/stm32-dac-core.c            | 14 +-------------
+>  drivers/iio/dac/stm32-dac-core.h            | 15 +--------------
+>  drivers/iio/dac/stm32-dac.c                 | 15 +--------------
+>  drivers/iio/trigger/stm32-lptimer-trigger.c |  3 +--
+>  drivers/iio/trigger/stm32-timer-trigger.c   |  2 +-
+>  9 files changed, 9 insertions(+), 85 deletions(-)
 
-This does not need to be in a section of its own, and doesn't need to
-be padded to a full page.
+Acked-by: Fabrice Gasnier <fabrice.gasnier@st.com>
 
-If you just stick this in .rodata but align it to page size, you can
-just map whichever page it ends up in into the TRAMP_DATA fixmap slot
-(which is a r/o mapping anyway). You could then drop most of the
-changes below. And actually, I'm not entirely sure whether it still
-makes sense then to do this only for CONFIG_RANDOMIZE_BASE.
+Fabrice
 
-
-> +#endif /* CONFIG_RANDOMIZE_BASE */
->  #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
->
+> 
+> diff --git a/drivers/iio/adc/stm32-adc-core.c b/drivers/iio/adc/stm32-adc-core.c
+> index 6aefef99f935..40be7d9fadbf 100644
+> --- a/drivers/iio/adc/stm32-adc-core.c
+> +++ b/drivers/iio/adc/stm32-adc-core.c
+> @@ -1,3 +1,4 @@
+> +// SPDX-License-Identifier: GPL-2.0
 >  /*
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 6b4260f22aab..976109b3ae51 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -58,15 +58,28 @@ jiffies = jiffies_64;
->  #endif
->
->  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-> -#define TRAMP_TEXT                                     \
-> -       . = ALIGN(PAGE_SIZE);                           \
-> -       VMLINUX_SYMBOL(__entry_tramp_text_start) = .;   \
-> -       *(.entry.tramp.text)                            \
-> -       . = ALIGN(PAGE_SIZE);                           \
-> +#define TRAMP_TEXT                                             \
-> +       . = ALIGN(PAGE_SIZE);                                   \
-> +       VMLINUX_SYMBOL(__entry_tramp_text_start) = .;           \
-> +       *(.entry.tramp.text)                                    \
-> +       . = ALIGN(PAGE_SIZE);                                   \
->         VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +#define TRAMP_DATA                                             \
-> +       .entry.tramp.data : {                                   \
-> +               . = ALIGN(PAGE_SIZE);                           \
-> +               VMLINUX_SYMBOL(__entry_tramp_data_start) = .;   \
-> +               *(.entry.tramp.data)                            \
-> +               . = ALIGN(PAGE_SIZE);                           \
-> +               VMLINUX_SYMBOL(__entry_tramp_data_end) = .;     \
-> +       }
-> +#else
-> +#define TRAMP_DATA
-> +#endif /* CONFIG_RANDOMIZE_BASE */
->  #else
->  #define TRAMP_TEXT
-> -#endif
-> +#define TRAMP_DATA
-> +#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
->
->  /*
->   * The size of the PE/COFF section that covers the kernel image, which
-> @@ -137,6 +150,7 @@ SECTIONS
->         RO_DATA(PAGE_SIZE)              /* everything from this point to     */
->         EXCEPTION_TABLE(8)              /* __init_begin will be marked RO NX */
->         NOTES
-> +       TRAMP_DATA
->
->         . = ALIGN(SEGMENT_ALIGN);
->         __init_begin = .;
-> @@ -251,7 +265,14 @@ ASSERT(__idmap_text_end - (__idmap_text_start & ~(SZ_4K - 1)) <= SZ_4K,
->  ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
->         <= SZ_4K, "Hibernate exit text too big or misaligned")
->  #endif
-> -
-> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-> +ASSERT((__entry_tramp_text_end - __entry_tramp_text_start) == PAGE_SIZE,
-> +       "Entry trampoline text too big")
-> +#ifdef CONFIG_RANDOMIZE_BASE
-> +ASSERT((__entry_tramp_data_end - __entry_tramp_data_start) == PAGE_SIZE,
-> +       "Entry trampoline data too big")
-> +#endif
-> +#endif
->  /*
->   * If padding is applied before .head.text, virt<->phys conversions will fail.
+>   * This file is part of STM32 ADC driver
+>   *
+> @@ -6,19 +7,6 @@
+>   *
+>   * Inspired from: fsl-imx25-tsadc
+>   *
+> - * License type: GPLv2
+> - *
+> - * This program is free software; you can redistribute it and/or modify it
+> - * under the terms of the GNU General Public License version 2 as published by
+> - * the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> - * or FITNESS FOR A PARTICULAR PURPOSE.
+> - * See the GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program. If not, see <http://www.gnu.org/licenses/>.
 >   */
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index fe68a48c64cb..916d9ced1c3f 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -541,8 +541,16 @@ static int __init map_entry_trampoline(void)
->         __create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
->                              prot, pgd_pgtable_alloc, 0);
->
-> -       /* ...as well as the kernel page table */
-> +       /* Map both the text and data into the kernel page table */
->         __set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
-> +       if (IS_ENABLED(CONFIG_RANDOMIZE_BASE)) {
-> +               extern char __entry_tramp_data_start[];
-> +
-> +               __set_fixmap(FIX_ENTRY_TRAMP_DATA,
-> +                            __pa_symbol(__entry_tramp_data_start),
-> +                            PAGE_KERNEL_RO);
-> +       }
-> +
->         return 0;
->  }
->  core_initcall(map_entry_trampoline);
-> --
-> 2.1.4
->
+>  
+>  #include <linux/clk.h>
+> diff --git a/drivers/iio/adc/stm32-adc-core.h b/drivers/iio/adc/stm32-adc-core.h
+> index 250ee958a669..8af507b3f32d 100644
+> --- a/drivers/iio/adc/stm32-adc-core.h
+> +++ b/drivers/iio/adc/stm32-adc-core.h
+> @@ -1,22 +1,10 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+>  /*
+>   * This file is part of STM32 ADC driver
+>   *
+>   * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
+>   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
+>   *
+> - * License type: GPLv2
+> - *
+> - * This program is free software; you can redistribute it and/or modify it
+> - * under the terms of the GNU General Public License version 2 as published by
+> - * the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> - * or FITNESS FOR A PARTICULAR PURPOSE.
+> - * See the GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program. If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+>  #ifndef __STM32_ADC_H
+> diff --git a/drivers/iio/adc/stm32-adc.c b/drivers/iio/adc/stm32-adc.c
+> index c9d96f935dba..f9ccd705bcbb 100644
+> --- a/drivers/iio/adc/stm32-adc.c
+> +++ b/drivers/iio/adc/stm32-adc.c
+> @@ -1,22 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * This file is part of STM32 ADC driver
+>   *
+>   * Copyright (C) 2016, STMicroelectronics - All Rights Reserved
+>   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
+> - *
+> - * License type: GPLv2
+> - *
+> - * This program is free software; you can redistribute it and/or modify it
+> - * under the terms of the GNU General Public License version 2 as published by
+> - * the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> - * or FITNESS FOR A PARTICULAR PURPOSE.
+> - * See the GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program. If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+>  #include <linux/clk.h>
+> diff --git a/drivers/iio/counter/stm32-lptimer-cnt.c b/drivers/iio/counter/stm32-lptimer-cnt.c
+> index 81ae5f74216d..42fb8ba67090 100644
+> --- a/drivers/iio/counter/stm32-lptimer-cnt.c
+> +++ b/drivers/iio/counter/stm32-lptimer-cnt.c
+> @@ -1,3 +1,4 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * STM32 Low-Power Timer Encoder and Counter driver
+>   *
+> @@ -7,7 +8,6 @@
+>   *
+>   * Inspired by 104-quad-8 and stm32-timer-trigger drivers.
+>   *
+> - * License terms:  GNU General Public License (GPL), version 2
+>   */
+>  
+>  #include <linux/bitfield.h>
+> diff --git a/drivers/iio/dac/stm32-dac-core.c b/drivers/iio/dac/stm32-dac-core.c
+> index 55026fe1c610..d0fb3124de07 100644
+> --- a/drivers/iio/dac/stm32-dac-core.c
+> +++ b/drivers/iio/dac/stm32-dac-core.c
+> @@ -1,22 +1,10 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * This file is part of STM32 DAC driver
+>   *
+>   * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+>   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
+>   *
+> - * License type: GPLv2
+> - *
+> - * This program is free software; you can redistribute it and/or modify it
+> - * under the terms of the GNU General Public License version 2 as published by
+> - * the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> - * or FITNESS FOR A PARTICULAR PURPOSE.
+> - * See the GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program. If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+>  #include <linux/clk.h>
+> diff --git a/drivers/iio/dac/stm32-dac-core.h b/drivers/iio/dac/stm32-dac-core.h
+> index daf09931857c..d3b415fb9575 100644
+> --- a/drivers/iio/dac/stm32-dac-core.h
+> +++ b/drivers/iio/dac/stm32-dac-core.h
+> @@ -1,22 +1,9 @@
+> +/* SPDX-License-Identifier: GPL-2.0 */
+>  /*
+>   * This file is part of STM32 DAC driver
+>   *
+>   * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+>   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
+> - *
+> - * License type: GPLv2
+> - *
+> - * This program is free software; you can redistribute it and/or modify it
+> - * under the terms of the GNU General Public License version 2 as published by
+> - * the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> - * or FITNESS FOR A PARTICULAR PURPOSE.
+> - * See the GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program. If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+>  #ifndef __STM32_DAC_CORE_H
+> diff --git a/drivers/iio/dac/stm32-dac.c b/drivers/iio/dac/stm32-dac.c
+> index 9ffab02bf9f9..cce26a3a6627 100644
+> --- a/drivers/iio/dac/stm32-dac.c
+> +++ b/drivers/iio/dac/stm32-dac.c
+> @@ -1,23 +1,10 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * This file is part of STM32 DAC driver
+>   *
+>   * Copyright (C) 2017, STMicroelectronics - All Rights Reserved
+>   * Authors: Amelie Delaunay <amelie.delaunay@st.com>
+>   *	    Fabrice Gasnier <fabrice.gasnier@st.com>
+> - *
+> - * License type: GPLv2
+> - *
+> - * This program is free software; you can redistribute it and/or modify it
+> - * under the terms of the GNU General Public License version 2 as published by
+> - * the Free Software Foundation.
+> - *
+> - * This program is distributed in the hope that it will be useful, but
+> - * WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+> - * or FITNESS FOR A PARTICULAR PURPOSE.
+> - * See the GNU General Public License for more details.
+> - *
+> - * You should have received a copy of the GNU General Public License along with
+> - * this program. If not, see <http://www.gnu.org/licenses/>.
+>   */
+>  
+>  #include <linux/bitfield.h>
+> diff --git a/drivers/iio/trigger/stm32-lptimer-trigger.c b/drivers/iio/trigger/stm32-lptimer-trigger.c
+> index de361d879929..98cdc7e47f3d 100644
+> --- a/drivers/iio/trigger/stm32-lptimer-trigger.c
+> +++ b/drivers/iio/trigger/stm32-lptimer-trigger.c
+> @@ -1,3 +1,4 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * STM32 Low-Power Timer Trigger driver
+>   *
+> @@ -5,8 +6,6 @@
+>   *
+>   * Author: Fabrice Gasnier <fabrice.gasnier@st.com>.
+>   *
+> - * License terms:  GNU General Public License (GPL), version 2
+> - *
+>   * Inspired by Benjamin Gaignard's stm32-timer-trigger driver
+>   */
+>  
+> diff --git a/drivers/iio/trigger/stm32-timer-trigger.c b/drivers/iio/trigger/stm32-timer-trigger.c
+> index b542dc484969..ccf1ce653b25 100644
+> --- a/drivers/iio/trigger/stm32-timer-trigger.c
+> +++ b/drivers/iio/trigger/stm32-timer-trigger.c
+> @@ -1,9 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * Copyright (C) STMicroelectronics 2016
+>   *
+>   * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
+>   *
+> - * License terms:  GNU General Public License (GPL), version 2
+>   */
+>  
+>  #include <linux/iio/iio.h>
+> 
