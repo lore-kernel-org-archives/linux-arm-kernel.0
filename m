@@ -1,59 +1,86 @@
-From: chris@chris-wilson.co.uk (Chris Wilson)
-Date: Wed, 06 Dec 2017 12:09:42 +0000
-Subject: [RESEND PATCH 4/4] drm/meson: Add missing VPU init
-In-Reply-To: <50101688-72c0-565e-bc15-9c229fd1a167@baylibre.com>
-References: <1512561268-29806-1-git-send-email-narmstrong@baylibre.com>
- <1512561268-29806-5-git-send-email-narmstrong@baylibre.com>
- <151256172859.3497.16672223686685414318@mail.alporthouse.com>
- <50101688-72c0-565e-bc15-9c229fd1a167@baylibre.com>
-Message-ID: <151256218243.3497.3915689507960580831@mail.alporthouse.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 Dec 2017 12:10:00 +0000
+Subject: [PATCH 2/2] arm64: SW PAN: Update saved ttbr0 value on
+ enter_lazy_tlb
+In-Reply-To: <1512558968-28980-3-git-send-email-will.deacon@arm.com>
+References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+ <1512558968-28980-3-git-send-email-will.deacon@arm.com>
+Message-ID: <20171206120959.j6hqwpcfpue2gfcl@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Neil Armstrong (2017-12-06 12:03:59)
-> On 06/12/2017 13:02, Chris Wilson wrote:
-> > Quoting Neil Armstrong (2017-12-06 11:54:28)
-> >> The VPU init misses these configurations values.
-> >>
-> >> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
-> >> ---
-> >>  drivers/gpu/drm/meson/meson_drv.c       | 9 +++++++++
-> >>  drivers/gpu/drm/meson/meson_registers.h | 4 ++++
-> >>  2 files changed, 13 insertions(+)
-> >>
-> >> diff --git a/drivers/gpu/drm/meson/meson_drv.c b/drivers/gpu/drm/meson/meson_drv.c
-> >> index 3b804fd..f9ad0e9 100644
-> >> --- a/drivers/gpu/drm/meson/meson_drv.c
-> >> +++ b/drivers/gpu/drm/meson/meson_drv.c
-> >> @@ -151,6 +151,14 @@ static struct regmap_config meson_regmap_config = {
-> >>         .max_register   = 0x1000,
-> >>  };
-> >>  
-> >> +static void meson_vpu_init(struct meson_drm *priv)
-> >> +{
-> >> +       writel_relaxed(0x210000, priv->io_base + _REG(VPU_RDARB_MODE_L1C1));
-> >> +       writel_relaxed(0x10000, priv->io_base + _REG(VPU_RDARB_MODE_L1C2));
-> >> +       writel_relaxed(0x900000, priv->io_base + _REG(VPU_RDARB_MODE_L2C1));
-> >> +       writel_relaxed(0x20000, priv->io_base + _REG(VPU_WRARB_MODE_L2C1));
-> >> +}
-> > 
-> >> diff --git a/drivers/gpu/drm/meson/meson_registers.h b/drivers/gpu/drm/meson/meson_registers.h
-> >> index 2847381..bca8714 100644
-> >> --- a/drivers/gpu/drm/meson/meson_registers.h
-> >> +++ b/drivers/gpu/drm/meson/meson_registers.h
-> >> @@ -1363,6 +1363,10 @@
-> >>  #define VPU_PROT3_STAT_1 0x277a
-> >>  #define VPU_PROT3_STAT_2 0x277b
-> >>  #define VPU_PROT3_REQ_ONOFF 0x277c
-> >> +#define VPU_RDARB_MODE_L1C1 0x2790
-> >> +#define VPU_RDARB_MODE_L1C2 0x2799
-> > 
-> > Hmm, not naturally aligned for writel. Is the register width correct,
-> > address correct, or this really is an unaligned iowrite?
+On Wed, Dec 06, 2017 at 11:16:08AM +0000, Will Deacon wrote:
+> enter_lazy_tlb is called when a kernel thread rides on the back of
+> another mm, due to a context switch or an explicit call to unuse_mm
+> where a call to switch_mm is elided.
 > 
-> The registers are aligned with the documentation, then are used with the _REG() macro
-> to align them with the bus (on top of the file).
+> In these cases, it's important to keep the saved ttbr value up to date
+> with the active mm, otherwise we can end up with a stale value which
+> points to a potentially freed page table.
+> 
+> This patch implements enter_lazy_tlb for arm64, so that the saved ttbr0
+> is kept up-to-date with the active mm for kernel threads.
+> 
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Vinayak Menon <vinmenon@codeaurora.org>
+> Reported-by: Vinayak Menon <vinmenon@codeaurora.org>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Oh, that surprised me.
-Acked-by: Chris Wilson <chris@chris-wilson.co.uk>
--Chris
+As with the prior patch, I think this needs:
+
+Fixes: 39bc88e5e38e9b21 ("arm64: Disable TTBR0_EL1 during normal kernel execution")
+
+Other than that, looks good to me.
+
+Mark.
+
+> ---
+>  arch/arm64/include/asm/mmu_context.h | 24 ++++++++++--------------
+>  1 file changed, 10 insertions(+), 14 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index f7773f90546e..9d155fa9a507 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -156,20 +156,6 @@ void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
+>  
+>  #define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
+>  
+> -/*
+> - * This is called when "tsk" is about to enter lazy TLB mode.
+> - *
+> - * mm:  describes the currently active mm context
+> - * tsk: task which is entering lazy tlb
+> - * cpu: cpu number which is entering lazy tlb
+> - *
+> - * tsk->mm will be NULL
+> - */
+> -static inline void
+> -enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+> -{
+> -}
+> -
+>  #ifdef CONFIG_ARM64_SW_TTBR0_PAN
+>  static inline void update_saved_ttbr0(struct task_struct *tsk,
+>  				      struct mm_struct *mm)
+> @@ -193,6 +179,16 @@ static inline void update_saved_ttbr0(struct task_struct *tsk,
+>  }
+>  #endif
+>  
+> +static inline void
+> +enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
+> +{
+> +	/*
+> +	 * We don't actually care about the ttbr0 mapping, so point it at the
+> +	 * zero page.
+> +	 */
+> +	update_saved_ttbr0(tsk, &init_mm);
+> +}
+> +
+>  static inline void __switch_mm(struct mm_struct *next)
+>  {
+>  	unsigned int cpu = smp_processor_id();
+> -- 
+> 2.1.4
+> 
