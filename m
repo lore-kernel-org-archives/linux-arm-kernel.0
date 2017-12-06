@@ -1,17 +1,16 @@
 From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed,  6 Dec 2017 11:40:59 -0300
-Subject: [PATCH 20/36] perf tools arm64: Add support for get_cpuid_str
- function.
+Date: Wed,  6 Dec 2017 11:41:01 -0300
+Subject: [PATCH 22/36] perf vendor events arm64: Add ThunderX2 implementation
+ defined pmu core events
 In-Reply-To: <20171206144115.15097-1-acme@kernel.org>
 References: <20171206144115.15097-1-acme@kernel.org>
-Message-ID: <20171206144115.15097-21-acme@kernel.org>
+Message-ID: <20171206144115.15097-23-acme@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 
-The get_cpuid_str function returns the MIDR string of the first online
-cpu from the range of cpus associated with the PMU CORE device.
+This is not a full event list, but a short list of useful events.
 
 Signed-off-by: Ganapatrao Kulkarni <ganapatrao.kulkarni@cavium.com>
 Acked-by: Will Deacon <will.deacon@arm.com>
@@ -25,93 +24,103 @@ Cc: Peter Zijlstra <peterz@infradead.org>
 Cc: Robert Richter <robert.richter@cavium.com>
 Cc: Shaokun Zhang <zhangshaokun@hisilicon.com>
 Cc: linux-arm-kernel at lists.infradead.org
-Link: http://lkml.kernel.org/r/20171016183222.25750-3-ganapatrao.kulkarni at cavium.com
+Link: http://lkml.kernel.org/r/20171016183222.25750-5-ganapatrao.kulkarni at cavium.com
 Signed-off-by: Arnaldo Carvalho de Melo <acme@redhat.com>
 ---
- tools/perf/arch/arm64/util/Build    |  1 +
- tools/perf/arch/arm64/util/header.c | 65 +++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 tools/perf/arch/arm64/util/header.c
+ .../arch/arm64/cavium/thunderx2-imp-def.json       | 62 ++++++++++++++++++++++
+ tools/perf/pmu-events/arch/arm64/mapfile.csv       | 15 ++++++
+ 2 files changed, 77 insertions(+)
+ create mode 100644 tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+ create mode 100644 tools/perf/pmu-events/arch/arm64/mapfile.csv
 
-diff --git a/tools/perf/arch/arm64/util/Build b/tools/perf/arch/arm64/util/Build
-index cef6fb38d17e..b1ab72d2a42e 100644
---- a/tools/perf/arch/arm64/util/Build
-+++ b/tools/perf/arch/arm64/util/Build
-@@ -1,3 +1,4 @@
-+libperf-y += header.o
- libperf-$(CONFIG_DWARF)     += dwarf-regs.o
- libperf-$(CONFIG_LOCAL_LIBUNWIND) += unwind-libunwind.o
- 
-diff --git a/tools/perf/arch/arm64/util/header.c b/tools/perf/arch/arm64/util/header.c
+diff --git a/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
 new file mode 100644
-index 000000000000..534cd2507d83
+index 000000000000..2db45c40ebc7
 --- /dev/null
-+++ b/tools/perf/arch/arm64/util/header.c
-@@ -0,0 +1,65 @@
-+#include <stdio.h>
-+#include <stdlib.h>
-+#include <api/fs/fs.h>
-+#include "header.h"
-+
-+#define MIDR "/regs/identification/midr_el1"
-+#define MIDR_SIZE 19
-+#define MIDR_REVISION_MASK      0xf
-+#define MIDR_VARIANT_SHIFT      20
-+#define MIDR_VARIANT_MASK       (0xf << MIDR_VARIANT_SHIFT)
-+
-+char *get_cpuid_str(struct perf_pmu *pmu)
-+{
-+	char *buf = NULL;
-+	char path[PATH_MAX];
-+	const char *sysfs = sysfs__mountpoint();
-+	int cpu;
-+	u64 midr = 0;
-+	struct cpu_map *cpus;
-+	FILE *file;
-+
-+	if (!sysfs || !pmu || !pmu->cpus)
-+		return NULL;
-+
-+	buf = malloc(MIDR_SIZE);
-+	if (!buf)
-+		return NULL;
-+
-+	/* read midr from list of cpus mapped to this pmu */
-+	cpus = cpu_map__get(pmu->cpus);
-+	for (cpu = 0; cpu < cpus->nr; cpu++) {
-+		scnprintf(path, PATH_MAX, "%s/devices/system/cpu/cpu%d"MIDR,
-+				sysfs, cpus->map[cpu]);
-+
-+		file = fopen(path, "r");
-+		if (!file) {
-+			pr_debug("fopen failed for file %s\n", path);
-+			continue;
-+		}
-+
-+		if (!fgets(buf, MIDR_SIZE, file)) {
-+			fclose(file);
-+			continue;
-+		}
-+		fclose(file);
-+
-+		/* Ignore/clear Variant[23:20] and
-+		 * Revision[3:0] of MIDR
-+		 */
-+		midr = strtoul(buf, NULL, 16);
-+		midr &= (~(MIDR_VARIANT_MASK | MIDR_REVISION_MASK));
-+		scnprintf(buf, MIDR_SIZE, "0x%016lx", midr);
-+		/* got midr break loop */
-+		break;
-+	}
-+
-+	if (!midr) {
-+		pr_err("failed to get cpuid string for PMU %s\n", pmu->name);
-+		free(buf);
-+		buf = NULL;
-+	}
-+
-+	cpu_map__put(cpus);
-+	return buf;
-+}
++++ b/tools/perf/pmu-events/arch/arm64/cavium/thunderx2-imp-def.json
+@@ -0,0 +1,62 @@
++[
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, read",
++        "EventCode": "0x40",
++        "EventName": "l1d_cache_rd",
++        "BriefDescription": "L1D cache read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache access, write ",
++        "EventCode": "0x41",
++        "EventName": "l1d_cache_wr",
++        "BriefDescription": "L1D cache write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, read",
++        "EventCode": "0x42",
++        "EventName": "l1d_cache_refill_rd",
++        "BriefDescription": "L1D cache refill read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data cache refill, write",
++        "EventCode": "0x43",
++        "EventName": "l1d_cache_refill_wr",
++        "BriefDescription": "L1D refill write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, read",
++        "EventCode": "0x4C",
++        "EventName": "l1d_tlb_refill_rd",
++        "BriefDescription": "L1D tlb refill read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data TLB refill, write",
++        "EventCode": "0x4D",
++        "EventName": "l1d_tlb_refill_wr",
++        "BriefDescription": "L1D tlb refill write",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, read",
++        "EventCode": "0x4E",
++        "EventName": "l1d_tlb_rd",
++        "BriefDescription": "L1D tlb read",
++    },
++    {
++        "PublicDescription": "Attributable Level 1 data or unified TLB access, write",
++        "EventCode": "0x4F",
++        "EventName": "l1d_tlb_wr",
++        "BriefDescription": "L1D tlb write",
++    },
++    {
++        "PublicDescription": "Bus access read",
++        "EventCode": "0x60",
++        "EventName": "bus_access_rd",
++        "BriefDescription": "Bus access read",
++   },
++   {
++        "PublicDescription": "Bus access write",
++        "EventCode": "0x61",
++        "EventName": "bus_access_wr",
++        "BriefDescription": "Bus access write",
++   }
++]
+diff --git a/tools/perf/pmu-events/arch/arm64/mapfile.csv b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+new file mode 100644
+index 000000000000..219d6756134e
+--- /dev/null
++++ b/tools/perf/pmu-events/arch/arm64/mapfile.csv
+@@ -0,0 +1,15 @@
++# Format:
++#	MIDR,Version,JSON/file/pathname,Type
++#
++# where
++#	MIDR	Processor version
++#		Variant[23:20] and Revision [3:0] should be zero.
++#	Version could be used to track version of of JSON file
++#		but currently unused.
++#	JSON/file/pathname is the path to JSON file, relative
++#		to tools/perf/pmu-events/arch/arm64/.
++#	Type is core, uncore etc
++#
++#
++#Family-model,Version,Filename,EventType
++0x00000000420f5160,v1,cavium,core
 -- 
 2.13.6
