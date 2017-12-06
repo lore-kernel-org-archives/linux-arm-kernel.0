@@ -1,44 +1,44 @@
-From: gregory.0xf0@gmail.com (Gregory Fong)
-Date: Wed, 6 Dec 2017 14:29:02 -0800
-Subject: [PATCH 03/45] drivers: gpio: remove duplicate includes
-In-Reply-To: <1512439104-15507-1-git-send-email-pravin.shedge4linux@gmail.com>
-References: <1512439104-15507-1-git-send-email-pravin.shedge4linux@gmail.com>
-Message-ID: <CADtm3G4BsFfxvqXed-jmw5jPD5ZibNwFir7-k3XHU=+LEhyvWg@mail.gmail.com>
+From: branislav@radocaj.org (Branislav Radocaj)
+Date: Thu,  7 Dec 2017 00:07:38 +0100
+Subject: [PATCH] net: ethernet: arc: fix error handling in emac_rockchip_probe
+Message-ID: <20171206230738.2560-1-branislav@radocaj.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pravin,
+If clk_set_rate() fails, we should disable clk before return.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-On Mon, Dec 4, 2017 at 5:58 PM, Pravin Shedge
-<pravin.shedge4linux@gmail.com> wrote:
-> These duplicate includes have been found with scripts/checkincludes.pl but
-> they have been removed manually to avoid removing false positives.
->
-> Signed-off-by: Pravin Shedge <pravin.shedge4linux@gmail.com>
-> ---
->  drivers/gpio/gpio-brcmstb.c | 1 -
->  1 file changed, 1 deletion(-)
->
-> diff --git a/drivers/gpio/gpio-brcmstb.c b/drivers/gpio/gpio-brcmstb.c
-> index 545d43a..f40ec39 100644
-> --- a/drivers/gpio/gpio-brcmstb.c
-> +++ b/drivers/gpio/gpio-brcmstb.c
-> @@ -11,7 +11,6 @@
->   * GNU General Public License for more details.
->   */
->
-> -#include <linux/bitops.h>
+Signed-off-by: Branislav Radocaj <branislav@radocaj.org>
+---
+ drivers/net/ethernet/arc/emac_rockchip.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Please remove the second entry at the end of the include list instead
-of this one, since that is the duplicate added accidentally in
-d74423687f9d70417bfec68121cbd35f79bb170f "gpio: brcmstb: Do not use
-gc->pin2mask()" [1].
-
->  #include <linux/gpio/driver.h>
->  #include <linux/of_device.h>
->  #include <linux/of_irq.h>
-
-Thanks,
-Gregory
-
-[1] https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/drivers/gpio/gpio-brcmstb.c?id=d74423687f9d70417bfec68121cbd35f79bb170f
+diff --git a/drivers/net/ethernet/arc/emac_rockchip.c b/drivers/net/ethernet/arc/emac_rockchip.c
+index e278e3d96ee0..c6163874e4e7 100644
+--- a/drivers/net/ethernet/arc/emac_rockchip.c
++++ b/drivers/net/ethernet/arc/emac_rockchip.c
+@@ -220,9 +220,11 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 
+ 		/* RMII TX/RX needs always a rate of 25MHz */
+ 		err = clk_set_rate(priv->macclk, 25000000);
+-		if (err)
++		if (err) {
+ 			dev_err(dev,
+ 				"failed to change mac clock rate (%d)\n", err);
++			goto out_clk_disable_macclk;
++		}
+ 	}
+ 
+ 	err = arc_emac_probe(ndev, interface);
+@@ -232,7 +234,8 @@ static int emac_rockchip_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	return 0;
+-
++out_clk_disable_macclk:
++	clk_disable_unprepare(priv->macclk);
+ out_regulator_disable:
+ 	if (priv->regulator)
+ 		regulator_disable(priv->regulator);
+-- 
+2.11.0
