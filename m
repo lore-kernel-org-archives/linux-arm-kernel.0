@@ -1,137 +1,45 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed, 6 Dec 2017 14:37:57 +0000
-Subject: [PATCH v2 11/19] arm64: assembler: add macro to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <CAKv+Gu-MBUt4C4ZrjUD1veQSZ8xX8Q3hNS+E3kAWBVtZ7Um-FQ@mail.gmail.com>
-References: <20171204122645.31535-1-ard.biesheuvel@linaro.org>
- <20171204122645.31535-12-ard.biesheuvel@linaro.org>
- <20171205122757.GW22781@e103592.cambridge.arm.com>
- <DD92A22D-E5EF-4C97-8C76-4797892518A4@linaro.org>
- <CAKv+Gu88Ym4NxoLxVd07Z07PD454_ONV4D=pqvxezPvAPnd5og@mail.gmail.com>
- <20171206115134.GZ22781@e103592.cambridge.arm.com>
- <CAKv+Gu83CR=KGawz5WRQygULcqX+DjhVjAeR-+QOGYx=2oPTzA@mail.gmail.com>
- <20171206121251.GM12608@e103592.cambridge.arm.com>
- <CAKv+Gu-MBUt4C4ZrjUD1veQSZ8xX8Q3hNS+E3kAWBVtZ7Um-FQ@mail.gmail.com>
-Message-ID: <20171206143756.GC22781@e103592.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  6 Dec 2017 14:38:23 +0000
+Subject: [PATCH 02/18] arm64: asm-offsets: Remove unused definitions
+In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
+References: <20171206143839.29223-1-marc.zyngier@arm.com>
+Message-ID: <20171206143839.29223-3-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 12:25:44PM +0000, Ard Biesheuvel wrote:
-> On 6 December 2017 at 12:12, Dave P Martin <Dave.Martin@arm.com> wrote:
-> > On Wed, Dec 06, 2017 at 11:57:12AM +0000, Ard Biesheuvel wrote:
-> >> On 6 December 2017 at 11:51, Dave Martin <Dave.Martin@arm.com> wrote:
-> >> > On Tue, Dec 05, 2017 at 06:04:34PM +0000, Ard Biesheuvel wrote:
-> >> >> On 5 December 2017 at 12:45, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> >> >> >
-> >> >> >
-> >> >> >> On 5 Dec 2017, at 12:28, Dave Martin <Dave.Martin@arm.com> wrote:
+asm-offsets.h contains a number of definitions that are not used
+at all, and in some cases conflict with other definitions (such as
+NSEC_PER_SEC).
 
-[...]
+Spring clean-up time.
 
-> >> >> >> If we had
-> >> >> >>
-> >> >> >>    if_cond_yield_neon
-> >> >> >>    // patchup code
-> >> >> >>    endif_yield_neon
-> >> >> >>
-> >> >>
-> >> >> I like this, but ...
-> >> >>
-> >> >> >> then the caller is free to conditionally branch over that as appropriate
-> >> >> >> like
-> >> >> >>
-> >> >> >> loop:
-> >> >> >>    // crypto stuff
-> >> >> >>    tst x0, #0xf
-> >> >> >>    b.ne    loop
-> >> >> >>
-> >> >> >>    if_cond_yield_neon
-> >> >> >>    // patchup code
-> >> >> >>    endif_cond_yield_neon
-> >> >> >>
-> >> >>
-> >> >> I need to put the post patchup code somewhere too. Please refer to the
-> >> >> CRC patches for the best examples of this.
-> >> >
-> >> > I'm not sure I follow.  If you need to do something different after
-> >> > patchup, can't you either pull that code into the if...endif too, or
-> >> > otherwise put a branch before the endif?
-> >> >
-> >>
-> >> No, not really.
-> >>
-> >> What I currently have is
-> >>
-> >> >    if_cond_yield_neon
-> >> >    // patchup code
-> >> >    endif_cond_yield_neon
-> >>
-> >> which is being turned into
-> >>
-> >>     get_thread_info x0
-> >>     ldr w1, [x0, #TSK_TI_PREEMPT]
-> >>     ldr x0, [x0, #TSK_TI_FLAGS]
-> >>     cmp w1, #1 // == PREEMPT_OFFSET
-> >>     csel x0, x0, xzr, eq
-> >>     tbnz x0, #TIF_NEED_RESCHED, 5555f // needs rescheduling?
-> >> 4444:
-> >>
-> >>     .subsection 1
-> >> 5555:
-> >>     // patchup code
-> >>     bl kernel_neon_end
-> >>     bl kernel_neon_begin
-> >>     // post patchup code goes here
-> >>     b 4444b
-> >>     .subsection
-> >>
-> >> so what I basically need is a place to put the post patchup code,
-> >> unless I open code it and branch to a different label right after
-> >> kernel_neon_begin
-> >
-> > Ah, I get you.  I had convinced myself that there was only post-
-> > patchup code.
-> >
-> > So you conceptually want something like
-> >
-> > if_will_cond_yield_neon
-> >         // pre-yield patchup code
-> > do_cond_yield_neon
-> >         // post-yield patchup code
-> > endif_yield_neon
-> >
-> > .macro if_will_cond_yield_neon
-> >         // do preempt_count == 1 && TIF_NEED_RESCHED check
-> >         b.wont_yield 3432f
-> > .endm
-> >
-> > .macro do_cond_yield_neon
-> >         bl      kernel_neon_end
-> >         bl      kernel_neon_begin
-> > .endm
-> >
-> > .macro endif_yield_neon
-> > 3432:
-> > .endm
-> >
-> > The main difference I see is that this doesn't get the slow-case
-> > code out of line.
-> >
-> > Or have I still missed something?
-> >
-> 
-> No, that seems accurate. I think the idiom looks much better, but I'd
-> still like to get the code out of line, so that everything disappears
-> completely for !CONFIG_PREEMPT.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/kernel/asm-offsets.c | 5 -----
+ 1 file changed, 5 deletions(-)
 
-Sure, out-of-lining should still be possible by spilling into another
-section or subsection similarly to what you were already doing -- and
-it may still make sense to have (optional?) label arguments to allow
-some branch elision.  I didn't want to complicate things initially.
-
-> I'll try to rework my stuff using this as a starting point.
-
-Cool, let me know.
-
-Cheers
----Dave
+diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+index 7e8be0c22ce0..742887330101 100644
+--- a/arch/arm64/kernel/asm-offsets.c
++++ b/arch/arm64/kernel/asm-offsets.c
+@@ -83,10 +83,6 @@ int main(void)
+   DEFINE(VMA_VM_MM,		offsetof(struct vm_area_struct, vm_mm));
+   DEFINE(VMA_VM_FLAGS,		offsetof(struct vm_area_struct, vm_flags));
+   BLANK();
+-  DEFINE(VM_EXEC,	       	VM_EXEC);
+-  BLANK();
+-  DEFINE(PAGE_SZ,	       	PAGE_SIZE);
+-  BLANK();
+   DEFINE(__DMA_BIDIRECTIONAL,	DMA_BIDIRECTIONAL);
+   DEFINE(__DMA_TO_DEVICE,	DMA_TO_DEVICE);
+   DEFINE(__DMA_FROM_DEVICE,	DMA_FROM_DEVICE);
+@@ -98,7 +94,6 @@ int main(void)
+   DEFINE(CLOCK_REALTIME_COARSE,	CLOCK_REALTIME_COARSE);
+   DEFINE(CLOCK_MONOTONIC_COARSE,CLOCK_MONOTONIC_COARSE);
+   DEFINE(CLOCK_COARSE_RES,	LOW_RES_NSEC);
+-  DEFINE(NSEC_PER_SEC,		NSEC_PER_SEC);
+   BLANK();
+   DEFINE(VDSO_CS_CYCLE_LAST,	offsetof(struct vdso_data, cs_cycle_last));
+   DEFINE(VDSO_RAW_TIME_SEC,	offsetof(struct vdso_data, raw_time_sec));
+-- 
+2.14.2
