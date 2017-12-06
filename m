@@ -1,77 +1,30 @@
 From: Dave.Martin@arm.com (Dave Martin)
-Date: Wed,  6 Dec 2017 16:45:46 +0000
-Subject: [PATCH 2/3] arm64: fpsimd: Abstract out binding of task's fpsimd
- context to the cpu.
-In-Reply-To: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
-References: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
-Message-ID: <1512578747-4554-3-git-send-email-Dave.Martin@arm.com>
+Date: Wed,  6 Dec 2017 16:45:44 +0000
+Subject: [PATCH v2 0/3] arm64: SVE fixes for v4.15-rc2
+Message-ID: <1512578747-4554-1-git-send-email-Dave.Martin@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is currently some duplicate logic to associate current's
-FPSIMD context with the cpu when loading FPSIMD state into the cpu
-regs.
+This series contains a few fixes for known issues in the arm64 FPSIMD
+and SVE implementation.
 
-Subsequent patches will update that logic, so in order to ensure it
-only needs to be done in one place, this patch factors the relevant
-code out into a new function fpsimd_bind_to_cpu().
+This supersedes the previous posting. [1]
 
-Signed-off-by: Dave Martin <Dave.Martin@arm.com>
-Reviewed-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/fpsimd.c | 25 +++++++++++++++----------
- 1 file changed, 15 insertions(+), 10 deletions(-)
+Note that although patch 2 is not a fix, it provides refactoring that is
+used by the fix in patch 3.
 
-diff --git a/arch/arm64/kernel/fpsimd.c b/arch/arm64/kernel/fpsimd.c
-index 143b3e7..007140b 100644
---- a/arch/arm64/kernel/fpsimd.c
-+++ b/arch/arm64/kernel/fpsimd.c
-@@ -992,6 +992,18 @@ void fpsimd_signal_preserve_current_state(void)
- }
- 
- /*
-+ * Associate current's FPSIMD context with this cpu
-+ * Preemption must be disabled when calling this function.
-+ */
-+static void fpsimd_bind_to_cpu(void)
-+{
-+	struct fpsimd_state *st = &current->thread.fpsimd_state;
-+
-+	__this_cpu_write(fpsimd_last_state, st);
-+	st->cpu = smp_processor_id();
-+}
-+
-+/*
-  * Load the userland FPSIMD state of 'current' from memory, but only if the
-  * FPSIMD state already held in the registers is /not/ the most recent FPSIMD
-  * state of 'current'
-@@ -1004,11 +1016,8 @@ void fpsimd_restore_current_state(void)
- 	local_bh_disable();
- 
- 	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
--		struct fpsimd_state *st = &current->thread.fpsimd_state;
--
- 		task_fpsimd_load();
--		__this_cpu_write(fpsimd_last_state, st);
--		st->cpu = smp_processor_id();
-+		fpsimd_bind_to_cpu();
- 	}
- 
- 	local_bh_enable();
-@@ -1032,12 +1041,8 @@ void fpsimd_update_current_state(struct fpsimd_state *state)
- 	}
- 	task_fpsimd_load();
- 
--	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE)) {
--		struct fpsimd_state *st = &current->thread.fpsimd_state;
--
--		__this_cpu_write(fpsimd_last_state, st);
--		st->cpu = smp_processor_id();
--	}
-+	if (test_and_clear_thread_flag(TIF_FOREIGN_FPSTATE))
-+		fpsimd_bind_to_cpu();
- 
- 	local_bh_enable();
- }
+[1] [PATCH 0/3] arm64: SVE fixes for v4.15-rc1
+http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545126.html
+
+Dave Martin (3):
+  arm64: fpsimd: Prevent registers leaking from dead tasks
+  arm64: fpsimd: Abstract out binding of task's fpsimd context to the
+    cpu.
+  arm64/sve: Avoid dereference of dead task_struct in KVM guest entry
+
+ arch/arm64/kernel/fpsimd.c  | 51 ++++++++++++++++++++++++++-------------------
+ arch/arm64/kernel/process.c |  9 ++++++++
+ 2 files changed, 39 insertions(+), 21 deletions(-)
+
 -- 
 2.1.4
