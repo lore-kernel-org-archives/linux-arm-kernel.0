@@ -1,39 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:22:41 +0100
-Subject: [PATCH 46/61] ARM: dts: r8a73a4: Update CMT compat string
+Date: Wed,  6 Dec 2017 11:22:32 +0100
+Subject: [PATCH 37/61] ARM: dts: iwg20d-q7-dbcm-ca: Add can1 support to camera
+ DB
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <86656e9cc618c14d44f722786c568d1236211364.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <04e31b155f628e572d4ee2eeda5d6ee20ba86038.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-Use the recently updated r8a73a4 CMT1 compat string.
+CAN1 interface is exposed via connector J3 found on the camera daughter
+board. This patch enables can1 DT node from within the daughter board
+specific dtsi.
 
-With this change in place we can keep device-specific configuration in
-the driver and the driver can be able to support CMT1 specific features.
-
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Reviewed-by: Biju Das <biju.das@bp.renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a73a4.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a73a4.dtsi b/arch/arm/boot/dts/r8a73a4.dtsi
-index dd4d09712a2a..805b0fd70f53 100644
---- a/arch/arm/boot/dts/r8a73a4.dtsi
-+++ b/arch/arm/boot/dts/r8a73a4.dtsi
-@@ -132,7 +132,7 @@
+diff --git a/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
+index 4db18f2ef303..476273b3f994 100644
+--- a/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
++++ b/arch/arm/boot/dts/iwg20d-q7-dbcm-ca.dtsi
+@@ -32,6 +32,13 @@
  	};
+ };
  
- 	cmt1: timer at e6130000 {
--		compatible = "renesas,cmt-48-r8a73a4", "renesas,cmt-48-gen2";
-+		compatible = "renesas,r8a73a4-cmt1", "renesas,rcar-gen2-cmt1";
- 		reg = <0 0xe6130000 0 0x1004>;
- 		interrupts = <GIC_SPI 120 IRQ_TYPE_LEVEL_HIGH>;
- 		clocks = <&mstp3_clks R8A73A4_CLK_CMT1>;
++&can1 {
++	pinctrl-0 = <&can1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
+ &du {
+ 	pinctrl-0 = <&du_pins>;
+ 	pinctrl-names = "default";
+@@ -94,6 +101,11 @@
+ };
+ 
+ &pfc {
++	can1_pins: can1 {
++		groups = "can1_data_d";
++		function = "can1";
++	};
++
+ 	du_pins: du {
+ 		groups = "du_rgb888", "du_sync", "du_oddf", "du_clk_out_0";
+ 		function = "du";
 -- 
 2.11.0
