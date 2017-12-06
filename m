@@ -1,96 +1,66 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed,  6 Dec 2017 12:35:26 +0000
-Subject: [PATCH v3 07/20] arm64: mm: Allocate ASIDs in pairs
+Date: Wed,  6 Dec 2017 12:35:24 +0000
+Subject: [PATCH v3 05/20] arm64: mm: Rename post_ttbr0_update_workaround
 In-Reply-To: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
 References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
-Message-ID: <1512563739-25239-8-git-send-email-will.deacon@arm.com>
+Message-ID: <1512563739-25239-6-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In preparation for separate kernel/user ASIDs, allocate them in pairs
-for each mm_struct. The bottom bit distinguishes the two: if it is set,
-then the ASID will map only userspace.
+The post_ttbr0_update_workaround hook applies to any change to TTBRx_EL1.
+Since we're using TTBR1 for the ASID, rename the hook to make it clearer
+as to what it's doing.
 
 Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/include/asm/mmu.h |  1 +
- arch/arm64/mm/context.c      | 25 +++++++++++++++++--------
- 2 files changed, 18 insertions(+), 8 deletions(-)
+ arch/arm64/include/asm/assembler.h | 5 ++---
+ arch/arm64/kernel/entry.S          | 2 +-
+ arch/arm64/mm/proc.S               | 2 +-
+ 3 files changed, 4 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/include/asm/mmu.h b/arch/arm64/include/asm/mmu.h
-index 0d34bf0a89c7..01bfb184f2a8 100644
---- a/arch/arm64/include/asm/mmu.h
-+++ b/arch/arm64/include/asm/mmu.h
-@@ -17,6 +17,7 @@
- #define __ASM_MMU_H
+diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+index e1fa5db858b7..c45bc94f15d0 100644
+--- a/arch/arm64/include/asm/assembler.h
++++ b/arch/arm64/include/asm/assembler.h
+@@ -477,10 +477,9 @@ alternative_endif
+ 	.endm
  
- #define MMCF_AARCH32	0x1	/* mm context flag for AArch32 executables */
-+#define USER_ASID_FLAG	(UL(1) << 48)
- 
- typedef struct {
- 	atomic64_t	id;
-diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
-index 78a2dc596fee..1cb3bc92ae5c 100644
---- a/arch/arm64/mm/context.c
-+++ b/arch/arm64/mm/context.c
-@@ -39,7 +39,16 @@ static cpumask_t tlb_flush_pending;
- 
- #define ASID_MASK		(~GENMASK(asid_bits - 1, 0))
- #define ASID_FIRST_VERSION	(1UL << asid_bits)
--#define NUM_USER_ASIDS		ASID_FIRST_VERSION
-+
-+#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
-+#define NUM_USER_ASIDS		(ASID_FIRST_VERSION >> 1)
-+#define asid2idx(asid)		(((asid) & ~ASID_MASK) >> 1)
-+#define idx2asid(idx)		(((idx) << 1) & ~ASID_MASK)
-+#else
-+#define NUM_USER_ASIDS		(ASID_FIRST_VERSION)
-+#define asid2idx(asid)		((asid) & ~ASID_MASK)
-+#define idx2asid(idx)		asid2idx(idx)
-+#endif
- 
- /* Get the ASIDBits supported by the current CPU */
- static u32 get_cpu_asid_bits(void)
-@@ -98,7 +107,7 @@ static void flush_context(unsigned int cpu)
- 		 */
- 		if (asid == 0)
- 			asid = per_cpu(reserved_asids, i);
--		__set_bit(asid & ~ASID_MASK, asid_map);
-+		__set_bit(asid2idx(asid), asid_map);
- 		per_cpu(reserved_asids, i) = asid;
- 	}
- 
-@@ -153,16 +162,16 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- 		 * We had a valid ASID in a previous life, so try to re-use
- 		 * it if possible.
- 		 */
--		asid &= ~ASID_MASK;
--		if (!__test_and_set_bit(asid, asid_map))
-+		if (!__test_and_set_bit(asid2idx(asid), asid_map))
- 			return newasid;
- 	}
- 
- 	/*
- 	 * Allocate a free ASID. If we can't find one, take a note of the
--	 * currently active ASIDs and mark the TLBs as requiring flushes.
--	 * We always count from ASID #1, as we use ASID #0 when setting a
--	 * reserved TTBR0 for the init_mm.
-+	 * currently active ASIDs and mark the TLBs as requiring flushes.  We
-+	 * always count from ASID #2 (index 1), as we use ASID #0 when setting
-+	 * a reserved TTBR0 for the init_mm and we allocate ASIDs in even/odd
-+	 * pairs.
+ /*
+-/*
+- * Errata workaround post TTBR0_EL1 update.
++ * Errata workaround post TTBRx_EL1 update.
+  */
+-	.macro	post_ttbr0_update_workaround
++	.macro	post_ttbr_update_workaround
+ #ifdef CONFIG_CAVIUM_ERRATUM_27456
+ alternative_if ARM64_WORKAROUND_CAVIUM_27456
+ 	ic	iallu
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index 6d14b8f29b5f..804e43c9cb0b 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -257,7 +257,7 @@ alternative_else_nop_endif
+ 	 * Cavium erratum 27456 (broadcast TLBI instructions may cause I-cache
+ 	 * corruption).
  	 */
- 	asid = find_next_zero_bit(asid_map, NUM_USER_ASIDS, cur_idx);
- 	if (asid != NUM_USER_ASIDS)
-@@ -179,7 +188,7 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
- set_asid:
- 	__set_bit(asid, asid_map);
- 	cur_idx = asid;
--	return asid | generation;
-+	return idx2asid(asid) | generation;
- }
+-	post_ttbr0_update_workaround
++	post_ttbr_update_workaround
+ 	.endif
+ 1:
+ 	.if	\el != 0
+diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
+index f2ff0837577c..3146dc96f05b 100644
+--- a/arch/arm64/mm/proc.S
++++ b/arch/arm64/mm/proc.S
+@@ -145,7 +145,7 @@ ENTRY(cpu_do_switch_mm)
+ 	isb
+ 	msr	ttbr0_el1, x0			// now update TTBR0
+ 	isb
+-	post_ttbr0_update_workaround
++	post_ttbr_update_workaround
+ 	ret
+ ENDPROC(cpu_do_switch_mm)
  
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu)
 -- 
 2.1.4
