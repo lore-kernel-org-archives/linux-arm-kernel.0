@@ -1,64 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 6 Dec 2017 15:19:24 +0300
-Subject: [PATCH 4/7 v2] net: ethernet: i825xx: Fix platform_get_irq's
- error checking
-In-Reply-To: <20171205.104947.121188625730183933.davem@davemloft.net>
-References: <1512409703-20881-5-git-send-email-arvind.yadav.cs@gmail.com>
- <20171204.132556.1601454745789376393.davem@davemloft.net>
- <39363858-995c-eea4-070e-b21a7ac49bec@gmail.com>
- <20171205.104947.121188625730183933.davem@davemloft.net>
-Message-ID: <d0b7e1cc-4190-437a-6461-35cee6edc203@cogentembedded.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 Dec 2017 12:19:41 +0000
+Subject: [PATCH 0/2] Fixes for SW PAN
+In-Reply-To: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+References: <1512558968-28980-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20171206121941.vcxgcjb5pzr7dlpn@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/05/2017 06:49 PM, David Miller wrote:
-
->>> From: Arvind Yadav <arvind.yadav.cs@gmail.com>
->>> Date: Mon,  4 Dec 2017 23:18:20 +0530
->>>
->>>> @@ -120,9 +120,10 @@ static int sni_82596_probe(struct platform_device
->>>> *dev)
->>>>    	netdevice->dev_addr[5] = readb(eth_addr + 0x06);
->>>>    	iounmap(eth_addr);
->>>>    -	if (!netdevice->irq) {
->>>> +	if (netdevice->irq <= 0) {
->>>>    		printk(KERN_ERR "%s: IRQ not found for i82596 at 0x%lx\n",
->>>>    			__FILE__, netdevice->base_addr);
->>>> +		retval = netdevice->irq ? netdevice->irq : -ENODEV;
->>>>    		goto probe_failed;
->>>>    	}
->>> Ok, thinking about this some more...
->>>
->>> It is impossible to use platform_get_irq() without every single call
->>> site having this funny:
->>>
->>> 	ret = val ? val : -ENODEV;
->>>
->>> sequence.
->>>
->>> This is unnecessary duplication and it is also error prone, so I
->>> really think this logic belongs in platform_get_irq() itself.  It can
->>> convert '0' to -ENODEV and that way we need no special logic in the
->>> callers at all.
->> platform_get_irq() will return 0 only for sparc, If sparc initialize
->> platform
->> data irq[PROMINTR_MAX] as zero. Otherwise platform_get_irq() will
->> never return
->> 0. It will return either IRQ number or error (as negative number). But
->> I am getting
->> review comment by reviewer/maintainer in other subsystem to add check
->> for
->> zero. So I have done same changes here. Please correct me if i am
->> wrong.
+On Wed, Dec 06, 2017 at 11:16:06AM +0000, Will Deacon wrote:
+> Hi all,
 > 
-> If you make the change that I suggest, you instead can check for
+> After lots of collective head scratching in response to Vinayak's mail
+> here:
+> 
+>   http://lists.infradead.org/pipermail/linux-arm-kernel/2017-December/545641.html
+> 
+> It turns out that we have a problem with SW PAN and kernel threads, where
+> the saved ttbr0 value for a kernel thread can be stale and subsequently
+> inherited by other kernel threads over a fork.
+> 
+> These two patches attempt to fix that. We've not be able to reproduce
+> the exact failure reported above, but I added some assertions to the
+> uaccess routines to check for discrepancies between the active_mm pgd
+> and the saved ttbr0 value (ignoring the zero page) and these no longer
+> fire with these changes, but do fire without them if EFI runtime services
+> are enabled on my Seattle board.
 
-    I assume such change is needed only for the SPARC-specific section of 
-platform_get_irq()?
+Both patches look good to me, per my understanding of the problem, so
+FWIW, for the series:
 
-> '-ENODEV' to mean no IRQ.
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
 
-    No specific error check is needed, just irq < 0 check should be enough...
-Also, looking@platform_get_irq(), -ENXIO should be returned in this case.
+However, I think we have another issue in this area. We have sequences
+where we update the HW TTBR0 before the shadow, e.g. in efi_set_pgd(),
+where we do:
 
-MBR, Sergei
+	cpu_set_reserved_ttbr0();
+	update_saved_ttbr0(current, current->active_mm);
+
+... so if an exception comes in between after HW TTBR0 update but before
+the shadow update, the stale shadow value will be restored upon the
+exception return, leaving the HW TTBR0 stale.
+
+That's easy enough to fix in the efi code, e.g.
+
+	update_saved_ttbr0(current, current->active_mm);
+	barrier();
+	cpu_set_reserved_ttbr0();
+
+... but I haven't yet figured out a nice way to sort out switch_mm(),
+__switch_mm(), and check_and_switch_context().
+
+Thanks,
+Mark.
