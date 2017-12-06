@@ -1,74 +1,23 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 6 Dec 2017 15:54:36 -0600
-Subject: [PATCH v2 1/5] dt-bindings: rtc: add bindings for i.MX53 SRTC
-In-Reply-To: <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-2-linux-kernel-dev@beckhoff.com>
-Message-ID: <20171206215436.lwttn445wjilh3wo@rob-hp-laptop>
+Date: Wed, 6 Dec 2017 15:56:13 -0600
+Subject: [PATCH v3 01/15] dt-bindings: panel: lvds: Document power-supply
+ property
+In-Reply-To: <97ebf0615821d79e8d7718594fe3a542a743a05f.1512486553.git-series.maxime.ripard@free-electrons.com>
+References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <97ebf0615821d79e8d7718594fe3a542a743a05f.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20171206215613.xgedrjdeteqm6km5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 03:06:42PM +0100, linux-kernel-dev at beckhoff.com wrote:
-> From: Patrick Bruenn <p.bruenn@beckhoff.com>
+On Tue, Dec 05, 2017 at 04:10:13PM +0100, Maxime Ripard wrote:
+> The power-supply property is used by a vast majority of panels, including
+> panel-simple. Let's document it as a common property
 > 
-> Document the binding for i.MX53 SRTC implemented by rtc-mxc_v2
-> 
-> Signed-off-by: Patrick Bruenn <p.bruenn@beckhoff.com><Paste>
-> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
-> 
-> To: Alessandro Zummo <a.zummo@towertech.it>
-> To: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> 
-> Cc: Rob Herring <robh+dt@kernel.org>
-> Cc: Mark Rutland <mark.rutland@arm.com> (maintainer:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-> Cc: linux-rtc at vger.kernel.org (open list:REAL TIME CLOCK (RTC) SUBSYSTEM)
-> Cc: devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
-> Cc: linux-kernel at vger.kernel.org (open list)
-> Cc: Fabio Estevam <fabio.estevam@nxp.com>
-> Cc: Juergen Borleis <jbe@pengutronix.de>
-> Cc: Noel Vellemans <Noel.Vellemans@visionbms.com>
-> Cc: Shawn Guo <shawnguo@kernel.org>
-> Cc: Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
-> Cc: Russell King <linux@armlinux.org.uk> (maintainer:ARM PORT)
-> Cc: linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE IMX / MXC ARM ARCHITECTURE)
-> 
-> Cc: Philippe Ombredanne <pombredanne@nexb.com>
-> Cc: Lothar Wa?mann <LW@KARO-electronics.de>
-> ---
->  Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt | 17 +++++++++++++++++
->  1 file changed, 17 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
-> new file mode 100644
-> index 000000000000..796e7f4995db
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/rtc/rtc-mxc_v2.txt
-> @@ -0,0 +1,17 @@
-> +* i.MX53 Real Time Clock controller
-> +
-> +Required properties:
-> +- compatible: should be: "fsl,imx53-rtc"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- clocks: should contain the phandle for the rtc clock
+>  Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
+>  Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
+>  Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +-
+>  3 files changed, 8 insertions(+), 1 deletion(-)
 
-Shouldn't there be more than 1 here. From what I remember, the ipg clock 
-and the 32k clock?
-
-> +- interrupts: rtc alarm interrupt
-> +
-> +Example:
-> +
-> +srtc at 53fa4000 {
-
-rtc at ...
-
-> +	compatible = "fsl,imx53-rtc";
-> +	reg = <0x53fa4000 0x4000>;
-> +	interrupts = <24>;
-> +	clocks = <&clks IMX5_CLK_SRTC_GATE>;
-> +};
-> --
-> 2.11.0
+Reviewed-by: Rob Herring <robh@kernel.org>
