@@ -1,153 +1,94 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed,  6 Dec 2017 14:38:37 +0000
-Subject: [PATCH 16/18] KVM: arm/arm64: Move ioremap calls to
- create_hyp_io_mappings
+Date: Wed,  6 Dec 2017 14:38:39 +0000
+Subject: [PATCH 18/18] KVM: arm/arm64: Move HYP IO VAs to the "idmap" range
 In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
 References: <20171206143839.29223-1-marc.zyngier@arm.com>
-Message-ID: <20171206143839.29223-17-marc.zyngier@arm.com>
+Message-ID: <20171206143839.29223-19-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Both HYP io mappings call ioremap, followed by create_hyp_io_mappings.
-Let's move the ioremap call into create_hyp_io_mappings itself, which
-simplifies the code a bit and allows for further refactoring.
+We so far mapped our HYP IO (which is essencially the GICv2 control
+registers) using the same method as for memory. It recently appeared
+that is a bit unsafe:
+
+we compute the HYP VA using the kern_hyp_va helper, but that helper
+is only designed to deal with kernel VAs coming from the linear map,
+and not from the vmalloc region... This could in turn cause some bad
+aliasing between the two, amplified by the new VA randomisation.
+
+A solution is to come up with our very own basic VA allocator for
+MMIO. Since half of the HYP address space only contains a single
+page (the idmap), we have plenty to borrow from. Let's use the idmap
+as a base, and allocate downwards from it. GICv2 now lives on the
+other side of the great VA barrier.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/include/asm/kvm_mmu.h   |  3 ++-
- arch/arm64/include/asm/kvm_mmu.h |  3 ++-
- virt/kvm/arm/mmu.c               | 24 ++++++++++++++----------
- virt/kvm/arm/vgic/vgic-v2.c      | 31 ++++++++-----------------------
- 4 files changed, 26 insertions(+), 35 deletions(-)
+ virt/kvm/arm/mmu.c | 22 +++++++++++++++++-----
+ 1 file changed, 17 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-index fa6f2174276b..cb3bef71ec9b 100644
---- a/arch/arm/include/asm/kvm_mmu.h
-+++ b/arch/arm/include/asm/kvm_mmu.h
-@@ -41,7 +41,8 @@
- #include <asm/stage2_pgtable.h>
- 
- int create_hyp_mappings(void *from, void *to, pgprot_t prot);
--int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-+int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
-+			   void __iomem **kaddr);
- void free_hyp_pgds(void);
- 
- void stage2_unmap_vm(struct kvm *kvm);
-diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-index dcc3eef3b1ac..21a7335b87c8 100644
---- a/arch/arm64/include/asm/kvm_mmu.h
-+++ b/arch/arm64/include/asm/kvm_mmu.h
-@@ -126,7 +126,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
- #include <asm/stage2_pgtable.h>
- 
- int create_hyp_mappings(void *from, void *to, pgprot_t prot);
--int create_hyp_io_mappings(void *from, void *to, phys_addr_t);
-+int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
-+			   void __iomem **kaddr);
- void free_hyp_pgds(void);
- 
- void stage2_unmap_vm(struct kvm *kvm);
 diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
-index 326f257d6008..cc0b1a4fa55c 100644
+index 9f73a8a17147..d843548abd3d 100644
 --- a/virt/kvm/arm/mmu.c
 +++ b/virt/kvm/arm/mmu.c
-@@ -711,26 +711,30 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
- }
+@@ -43,6 +43,9 @@ static unsigned long hyp_idmap_start;
+ static unsigned long hyp_idmap_end;
+ static phys_addr_t hyp_idmap_vector;
  
- /**
-- * create_hyp_io_mappings - duplicate a kernel IO mapping into Hyp mode
-- * @from:	The kernel start VA of the range
-- * @to:		The kernel end VA of the range (exclusive)
-+ * create_hyp_io_mappings - Map IO into both kernel and HYP
-  * @phys_addr:	The physical start address which gets mapped
-+ * @size:	Size of the region being mapped
-+ * @kaddr:	Kernel VA for this mapping
-  *
-  * The resulting HYP VA is the same as the kernel VA, modulo
-  * HYP_PAGE_OFFSET.
-  */
--int create_hyp_io_mappings(void *from, void *to, phys_addr_t phys_addr)
-+int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
-+			   void __iomem **kaddr)
- {
--	unsigned long start = kern_hyp_va((unsigned long)from);
--	unsigned long end = kern_hyp_va((unsigned long)to);
-+	unsigned long start, end;
- 
--	if (is_kernel_in_hyp_mode())
-+	*kaddr = ioremap(phys_addr, size);
-+	if (!*kaddr)
-+		return -ENOMEM;
++static DEFINE_MUTEX(io_map_lock);
++static unsigned long io_map_base;
 +
-+	if (is_kernel_in_hyp_mode()) {
+ #define S2_PGD_SIZE	(PTRS_PER_S2_PGD * sizeof(pgd_t))
+ #define hyp_pgd_order get_order(PTRS_PER_PGD * sizeof(pgd_t))
+ 
+@@ -723,7 +726,8 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+ 			   void __iomem **kaddr,
+ 			   void __iomem **haddr)
+ {
+-	unsigned long start, end;
++	pgd_t *pgd = hyp_pgd;
++	unsigned long base;
+ 	int ret;
+ 
+ 	*kaddr = ioremap(phys_addr, size);
+@@ -735,19 +739,26 @@ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
  		return 0;
-+	}
+ 	}
  
--	/* Check for a valid kernel IO mapping */
--	if (!is_vmalloc_addr(from) || !is_vmalloc_addr(to - 1))
--		return -EINVAL;
++	mutex_lock(&io_map_lock);
++
++	base = io_map_base - size;
++	base &= ~(size - 1);
++
++	if (__kvm_cpu_uses_extended_idmap())
++		pgd = boot_hyp_pgd;
  
-+	start = kern_hyp_va((unsigned long)*kaddr);
-+	end = kern_hyp_va((unsigned long)*kaddr + size);
- 	return __create_hyp_mappings(hyp_pgd, start, end,
+-	start = kern_hyp_va((unsigned long)*kaddr);
+-	end = kern_hyp_va((unsigned long)*kaddr + size);
+-	ret = __create_hyp_mappings(hyp_pgd, start, end,
++	ret = __create_hyp_mappings(pgd, base, base + size,
  				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
- }
-diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
-index 80897102da26..bc49d702f9f0 100644
---- a/virt/kvm/arm/vgic/vgic-v2.c
-+++ b/virt/kvm/arm/vgic/vgic-v2.c
-@@ -332,16 +332,10 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 	if (!PAGE_ALIGNED(info->vcpu.start) ||
- 	    !PAGE_ALIGNED(resource_size(&info->vcpu))) {
- 		kvm_info("GICV region size/alignment is unsafe, using trapping (reduced performance)\n");
--		kvm_vgic_global_state.vcpu_base_va = ioremap(info->vcpu.start,
--							     resource_size(&info->vcpu));
--		if (!kvm_vgic_global_state.vcpu_base_va) {
--			kvm_err("Cannot ioremap GICV\n");
--			return -ENOMEM;
--		}
  
--		ret = create_hyp_io_mappings(kvm_vgic_global_state.vcpu_base_va,
--					     kvm_vgic_global_state.vcpu_base_va + resource_size(&info->vcpu),
--					     info->vcpu.start);
-+		ret = create_hyp_io_mappings(info->vcpu.start,
-+					     resource_size(&info->vcpu),
-+					     &kvm_vgic_global_state.vcpu_base_va);
- 		if (ret) {
- 			kvm_err("Cannot map GICV into hyp\n");
- 			goto out;
-@@ -350,26 +344,17 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
- 		static_branch_enable(&vgic_v2_cpuif_trap);
- 	}
- 
--	kvm_vgic_global_state.vctrl_base = ioremap(info->vctrl.start,
--						   resource_size(&info->vctrl));
--	if (!kvm_vgic_global_state.vctrl_base) {
--		kvm_err("Cannot ioremap GICH\n");
--		ret = -ENOMEM;
-+	ret = create_hyp_io_mappings(info->vctrl.start,
-+				     resource_size(&info->vctrl),
-+				     &kvm_vgic_global_state.vctrl_base);
-+	if (ret) {
-+		kvm_err("Cannot map VCTRL into hyp\n");
- 		goto out;
- 	}
- 
- 	vtr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VTR);
- 	kvm_vgic_global_state.nr_lr = (vtr & 0x3f) + 1;
- 
--	ret = create_hyp_io_mappings(kvm_vgic_global_state.vctrl_base,
--				     kvm_vgic_global_state.vctrl_base +
--					 resource_size(&info->vctrl),
--				     info->vctrl.start);
--	if (ret) {
--		kvm_err("Cannot map VCTRL into hyp\n");
--		goto out;
--	}
--
- 	ret = kvm_register_vgic_device(KVM_DEV_TYPE_ARM_VGIC_V2);
  	if (ret) {
- 		kvm_err("Cannot register GICv2 KVM device\n");
+ 		iounmap(*kaddr);
+ 		*kaddr = NULL;
+ 	} else {
+-		*haddr = (void __iomem *)start;
++		*haddr = (void __iomem *)base;
++		io_map_base = base;
+ 	}
+ 
++	mutex_unlock(&io_map_lock);
+ 	return ret;
+ }
+ 
+@@ -1828,6 +1839,7 @@ int kvm_mmu_init(void)
+ 			goto out;
+ 	}
+ 
++	io_map_base = hyp_idmap_start;
+ 	return 0;
+ out:
+ 	free_hyp_pgds();
 -- 
 2.14.2
