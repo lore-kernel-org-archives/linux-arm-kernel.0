@@ -1,131 +1,124 @@
-From: acme@kernel.org (Arnaldo Carvalho de Melo)
-Date: Wed, 6 Dec 2017 10:47:02 -0300
-Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
- UNCORE devices
-In-Reply-To: <71db0255-af9b-968a-7baa-238d7146f069@linux.intel.com>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
- <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
- <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
- <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
- <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
- <20171205184242.GA19952@kernel.org>
- <71db0255-af9b-968a-7baa-238d7146f069@linux.intel.com>
-Message-ID: <20171206134702.GA12234@kernel.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Wed, 6 Dec 2017 14:03:01 +0000
+Subject: [PATCH v3 20/20] arm64: kaslr: Put kernel vectors address in
+ separate data page
+In-Reply-To: <20171206132714.GA31186@arm.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <1512563739-25239-21-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu_qpJCXqfrGqMGDfjeYHQVYU4SWChMXdPi53g6rmqQz6Q@mail.gmail.com>
+ <20171206132714.GA31186@arm.com>
+Message-ID: <CAKv+Gu-=QbpCPLqiHabG=W21q5s6yM6-XhVRHDvjD1gj7ots4w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Wed, Dec 06, 2017 at 08:30:37AM +0800, Jin, Yao escreveu:
-> 
-> 
-> On 12/6/2017 2:42 AM, Arnaldo Carvalho de Melo wrote:
-> > Em Tue, Dec 05, 2017 at 08:35:22PM +0800, Jin, Yao escreveu:
-> > > A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
-> > 
-> > I'll take this as a Tested-by: you, ok?
-> 
-> Hi Arnaldo,
-> 
-> I didn't do a full test for this patch and for the whole patch series.
-> 
-> I just do a quick test and it shows that the regression issue which was
-> found in 'perf stat --per-thread' test case is disappear.
-> 
-> If you think it's enough for adding Tested-by, that's fine for me. :)
+On 6 December 2017 at 13:27, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Ard,
+>
+> On Wed, Dec 06, 2017 at 12:59:40PM +0000, Ard Biesheuvel wrote:
+>> On 6 December 2017 at 12:35, Will Deacon <will.deacon@arm.com> wrote:
+>> > The literal pool entry for identifying the vectors base is the only piece
+>> > of information in the trampoline page that identifies the true location
+>> > of the kernel.
+>> >
+>> > This patch moves it into its own page, which is only mapped by the full
+>> > kernel page table, which protects against any accidental leakage of the
+>> > trampoline contents.
+>
+> [...]
+>
+>> > @@ -1073,6 +1079,11 @@ END(tramp_exit_compat)
+>> >
+>> >         .ltorg
+>> >         .popsection                             // .entry.tramp.text
+>> > +#ifdef CONFIG_RANDOMIZE_BASE
+>> > +       .pushsection ".entry.tramp.data", "a"   // .entry.tramp.data
+>> > +       .quad   vectors
+>> > +       .popsection                             // .entry.tramp.data
+>>
+>> This does not need to be in a section of its own, and doesn't need to
+>> be padded to a full page.
+>>
+>> If you just stick this in .rodata but align it to page size, you can
+>> just map whichever page it ends up in into the TRAMP_DATA fixmap slot
+>> (which is a r/o mapping anyway). You could then drop most of the
+>> changes below. And actually, I'm not entirely sure whether it still
+>> makes sense then to do this only for CONFIG_RANDOMIZE_BASE.
+>
+> Good point; I momentarily forgot this was in the kernel page table anyway.
+> How about something like the diff below merged on top (so this basically
+> undoes a bunch of the patch)?
+>
 
-I guess this addresses at least your previous regression report, so I
-think it is warranted, thanks!
+Yes, that looks much better.
 
-- arnaldo
- 
-> Thanks
-> Jin Yao
-> 
-> > > See the log:
-> > > 
-> > > root at skl:/tmp# perf stat --per-thread -p 10322 -M CPI,IPC
-> > > ^C
-> > >   Performance counter stats for process id '10322':
-> > > 
-> > >            vmstat-10322             1,879,654      inst_retired.any #
-> > > 0.8 CPI
-> > >            vmstat-10322             1,565,807      cycles
-> > >            vmstat-10322             1,879,654      inst_retired.any #
-> > > 1.2 IPC
-> > >            vmstat-10322             1,565,807      cpu_clk_unhalted.thread
-> > > 
-> > >         2.850291804 seconds time elapsed
-> > > 
-> > > Thanks for fixing it quickly.
-> > > 
-> > > Thanks
-> > > Jin Yao
-> > > 
-> > > On 12/5/2017 3:23 PM, Jin, Yao wrote:
-> > > > Hi,
-> > > > 
-> > > > I applied the diff but it's failed.
-> > > > 
-> > > > jinyao at skl:~/skl-ws/perf-dev/lck-4594/src$ patch -p1 < 1.pat
-> > > > patching file tools/perf/util/pmu.c
-> > > > patch: **** malformed patch at line 41: *head, struct perf_pmu *pmu)
-> > > > 
-> > > > Could you send the patch as attachment to me in another mail thread?
-> > > > 
-> > > > to yao.jin at linux.intel.com
-> > > > cc yao.jin at intel.com
-> > > > 
-> > > > Thanks
-> > > > Jin Yao
-> > > > 
-> > > > On 12/5/2017 3:12 PM, Ganapatrao Kulkarni wrote:
-> > > > > diff --git a/tools/perf/util/pmu.c b/tools/perf/util/pmu.c
-> > > > > index 5ad8a18..57e38fd 100644
-> > > > > --- a/tools/perf/util/pmu.c
-> > > > > +++ b/tools/perf/util/pmu.c
-> > > > > @@ -538,6 +538,34 @@ static bool pmu_is_uncore(const char *name)
-> > > > >  ? }
-> > > > > 
-> > > > >  ? /*
-> > > > > + *? PMU CORE devices have different name other than cpu in sysfs on some
-> > > > > + *? platforms. looking for possible sysfs files to identify as core
-> > > > > device.
-> > > > > + */
-> > > > > +static int is_pmu_core(const char *name)
-> > > > > +{
-> > > > > + struct stat st;
-> > > > > + char path[PATH_MAX];
-> > > > > + const char *sysfs = sysfs__mountpoint();
-> > > > > +
-> > > > > + if (!sysfs)
-> > > > > + return 0;
-> > > > > +
-> > > > > + /* Look for cpu sysfs (x86 and others) */
-> > > > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/cpu", sysfs);
-> > > > > + if ((stat(path, &st) == 0) &&
-> > > > > + (strncmp(name, "cpu", strlen("cpu")) == 0))
-> > > > > + return 1;
-> > > > > +
-> > > > > + /* Look for cpu sysfs (specific to arm) */
-> > > > > + scnprintf(path, PATH_MAX, "%s/bus/event_source/devices/%s/cpus",
-> > > > > + sysfs, name);
-> > > > > + if (stat(path, &st) == 0)
-> > > > > + return 1;
-> > > > > +
-> > > > > + return 0;
-> > > > > +}
-> > > > > +
-> > > > > +/*
-> > > > >  ?? * Return the CPU id as a raw string.
-> > > > >  ?? *
-> > > > >  ?? * Each architecture should provide a more precise id string that
-> > > > > @@ -641,7 +669,7 @@ static void pmu_add_cpu_aliases(struct list_head
-> > > > > *head, struct perf_pmu *pmu)
-> > > > >  ?? break;
-> > > > >  ?? }
-> > > > > 
-> > > > > - if (pmu->is_uncore) {
-> > > > > + if (!is_pmu_core(name)) {
-> > > > >  ?? /* check for uncore devices */
-> > > > >  ?? if (pe->pmu == NULL)
-> > > > >  ?? continue;
+> I'd prefer to keep the CONFIG_RANDOMIZE_BASE dependency, at least for now.
+>
+
+Fair enough.
+
+> --->8
+>
+> diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+> index a70c6dd2cc19..031392ee5f47 100644
+> --- a/arch/arm64/kernel/entry.S
+> +++ b/arch/arm64/kernel/entry.S
+> @@ -1080,9 +1080,12 @@ END(tramp_exit_compat)
+>         .ltorg
+>         .popsection                             // .entry.tramp.text
+>  #ifdef CONFIG_RANDOMIZE_BASE
+> -       .pushsection ".entry.tramp.data", "a"   // .entry.tramp.data
+> +       .pushsection ".rodata", "a"
+> +       .align PAGE_SHIFT
+> +       .globl  __entry_tramp_data_start
+> +__entry_tramp_data_start:
+>         .quad   vectors
+> -       .popsection                             // .entry.tramp.data
+> +       .popsection                             // .rodata
+>  #endif /* CONFIG_RANDOMIZE_BASE */
+>  #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+>
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 976109b3ae51..27cf9be20a00 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -64,21 +64,8 @@ jiffies = jiffies_64;
+>         *(.entry.tramp.text)                                    \
+>         . = ALIGN(PAGE_SIZE);                                   \
+>         VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
+> -#ifdef CONFIG_RANDOMIZE_BASE
+> -#define TRAMP_DATA                                             \
+> -       .entry.tramp.data : {                                   \
+> -               . = ALIGN(PAGE_SIZE);                           \
+> -               VMLINUX_SYMBOL(__entry_tramp_data_start) = .;   \
+> -               *(.entry.tramp.data)                            \
+> -               . = ALIGN(PAGE_SIZE);                           \
+> -               VMLINUX_SYMBOL(__entry_tramp_data_end) = .;     \
+> -       }
+> -#else
+> -#define TRAMP_DATA
+> -#endif /* CONFIG_RANDOMIZE_BASE */
+>  #else
+>  #define TRAMP_TEXT
+> -#define TRAMP_DATA
+>  #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+>
+>  /*
+> @@ -150,7 +137,6 @@ SECTIONS
+>         RO_DATA(PAGE_SIZE)              /* everything from this point to     */
+>         EXCEPTION_TABLE(8)              /* __init_begin will be marked RO NX */
+>         NOTES
+> -       TRAMP_DATA
+>
+>         . = ALIGN(SEGMENT_ALIGN);
+>         __init_begin = .;
+> @@ -268,10 +254,6 @@ ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
+>  #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+>  ASSERT((__entry_tramp_text_end - __entry_tramp_text_start) == PAGE_SIZE,
+>         "Entry trampoline text too big")
+> -#ifdef CONFIG_RANDOMIZE_BASE
+> -ASSERT((__entry_tramp_data_end - __entry_tramp_data_start) == PAGE_SIZE,
+> -       "Entry trampoline data too big")
+> -#endif
+>  #endif
+>  /*
+>   * If padding is applied before .head.text, virt<->phys conversions will fail.
