@@ -1,68 +1,108 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 6 Dec 2017 15:43:40 +0000
-Subject: [PATCH 1/3] extcon: usbc-cros-ec: add support to notify USB type
- cables.
-In-Reply-To: <20171206111008.3079-1-enric.balletbo@collabora.com>
-References: <20171206111008.3079-1-enric.balletbo@collabora.com>
-Message-ID: <20171206154340.nzvk4svwliqxjk5u@dell>
+From: marcofrk@gmail.com (Marco Franchi)
+Date: Wed,  6 Dec 2017 13:15:17 -0200
+Subject: [PATCH v3 1/3] ARM: dts: imx6sx-sdb: Convert from fbdev to drm
+ bindings
+Message-ID: <1512573319-6624-1-git-send-email-marcofrk@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 06 Dec 2017, Enric Balletbo i Serra wrote:
+It is preferred to use the panel compatible string rather than passing
+the LCD timing in the device tree.
 
-> From: Benson Leung <bleung@chromium.org>
-> 
-> Extend the driver to notify host and device type cables and the presence
-> of power.
-> 
-> Signed-off-by: Benson Leung <bleung@chromium.org>
-> Signed-off-by: Enric Balletbo i Serra <enric.balletbo@collabora.com>
-> ---
->  drivers/extcon/extcon-usbc-cros-ec.c | 142 ++++++++++++++++++++++++++++++++++-
->  include/linux/mfd/cros_ec_commands.h |  17 +++++
->  2 files changed, 155 insertions(+), 4 deletions(-)
+So pass the "sii,43wvf1g" compatible string, which describes the parallel
+LCD.
 
-[...]
+Also pass the 'backlight' property as described in
+Documentation/devicetree/bindings/display/panel/simple-panel.txt
 
-> diff --git a/include/linux/mfd/cros_ec_commands.h b/include/linux/mfd/cros_ec_commands.h
-> index 2b16e95..c907353 100644
-> --- a/include/linux/mfd/cros_ec_commands.h
-> +++ b/include/linux/mfd/cros_ec_commands.h
-> @@ -2904,16 +2904,33 @@ enum usb_pd_control_mux {
->  	USB_PD_CTRL_MUX_AUTO = 5,
->  };
->  
-> +enum usb_pd_control_swap {
-> +	USB_PD_CTRL_SWAP_NONE = 0,
-> +	USB_PD_CTRL_SWAP_DATA = 1,
-> +	USB_PD_CTRL_SWAP_POWER = 2,
-> +	USB_PD_CTRL_SWAP_VCONN = 3,
-> +	USB_PD_CTRL_SWAP_COUNT
-> +};
-> +
->  struct ec_params_usb_pd_control {
->  	uint8_t port;
->  	uint8_t role;
->  	uint8_t mux;
-> +	uint8_t swap;
->  } __packed;
->  
->  #define PD_CTRL_RESP_ENABLED_COMMS      (1 << 0) /* Communication enabled */
->  #define PD_CTRL_RESP_ENABLED_CONNECTED  (1 << 1) /* Device connected */
->  #define PD_CTRL_RESP_ENABLED_PD_CAPABLE (1 << 2) /* Partner is PD capable */
->  
-> +#define PD_CTRL_RESP_ROLE_POWER         (1 << 0) /* 0=SNK/1=SRC */
-> +#define PD_CTRL_RESP_ROLE_DATA          (1 << 1) /* 0=UFP/1=DFP */
-> +#define PD_CTRL_RESP_ROLE_VCONN         (1 << 2) /* Vconn status */
-> +#define PD_CTRL_RESP_ROLE_DR_POWER      (1 << 3) /* Partner is dualrole power */
-> +#define PD_CTRL_RESP_ROLE_DR_DATA       (1 << 4) /* Partner is dualrole data */
-> +#define PD_CTRL_RESP_ROLE_USB_COMM      (1 << 5) /* Partner USB comm capable */
-> +#define PD_CTRL_RESP_ROLE_EXT_POWERED   (1 << 6) /* Partner externally powerd */
+Signed-off-by: Marco Franchi <marcofrk@gmail.com>
+---
+Changes since v2:
+-none
+ arch/arm/boot/dts/imx6sx-sdb.dtsi | 48 +++++++++++++++++++--------------------
+ 1 file changed, 24 insertions(+), 24 deletions(-)
 
-Looks like the BIT() macro would serve you well here.
-
+diff --git a/arch/arm/boot/dts/imx6sx-sdb.dtsi b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+index d57a41c..d35aa85 100644
+--- a/arch/arm/boot/dts/imx6sx-sdb.dtsi
++++ b/arch/arm/boot/dts/imx6sx-sdb.dtsi
+@@ -24,7 +24,7 @@
+ 		reg = <0x80000000 0x40000000>;
+ 	};
+ 
+-	backlight {
++	backlight_display: backlight-display {
+ 		compatible = "pwm-backlight";
+ 		pwms = <&pwm3 0 5000000>;
+ 		brightness-levels = <0 4 8 16 32 64 128 255>;
+@@ -129,6 +129,13 @@
+ 		enable-active-high;
+ 	};
+ 
++	reg_lcd_5v: regulator-lcd-5v {
++		compatible = "regulator-fixed";
++		regulator-name = "lcd-5v0";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++	};
++
+ 	sound {
+ 		compatible = "fsl,imx6sx-sdb-wm8962", "fsl,imx-audio-wm8962";
+ 		model = "wm8962-audio";
+@@ -144,6 +151,19 @@
+ 		mux-int-port = <2>;
+ 		mux-ext-port = <6>;
+ 	};
++
++	panel {
++		compatible = "sii,43wvf1g";
++		backlight = <&backlight_display>;
++		dvdd-supply = <&reg_lcd_3v3>;
++		avdd-supply = <&reg_lcd_5v>;
++
++		port {
++			panel_in: endpoint {
++				remote-endpoint = <&display_out>;
++			};
++		};
++	};
+ };
+ 
+ &audmux {
+@@ -221,31 +241,11 @@
+ &lcdif1 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&pinctrl_lcd>;
+-	lcd-supply = <&reg_lcd_3v3>;
+-	display = <&display0>;
+ 	status = "okay";
+ 
+-	display0: display0 {
+-		bits-per-pixel = <16>;
+-		bus-width = <24>;
+-
+-		display-timings {
+-			native-mode = <&timing0>;
+-			timing0: timing0 {
+-				clock-frequency = <33500000>;
+-				hactive = <800>;
+-				vactive = <480>;
+-				hback-porch = <89>;
+-				hfront-porch = <164>;
+-				vback-porch = <23>;
+-				vfront-porch = <10>;
+-				hsync-len = <10>;
+-				vsync-len = <10>;
+-				hsync-active = <0>;
+-				vsync-active = <0>;
+-				de-active = <1>;
+-				pixelclk-active = <0>;
+-			};
++	port {
++		display_out: endpoint {
++			remote-endpoint = <&panel_in>;
+ 		};
+ 	};
+ };
 -- 
-Lee Jones
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.7.4
