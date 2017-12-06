@@ -1,30 +1,34 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 6 Dec 2017 15:48:10 +0000
-Subject: [PATCH 4/9] ASoC: sun8i-codec: Add support for A64 SoC
-In-Reply-To: <20171206153205.k3l5sofdco3t75mi@flea.lan>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-5-anarsoul@gmail.com>
- <20171205080444.zo2rlusqpjyraqcw@flea.lan>
- <CA+E=qVdZME2fiMw09NUP4DNCYhk58dqSapCdfBjLrdMq5HFwyg@mail.gmail.com>
- <20171206153205.k3l5sofdco3t75mi@flea.lan>
-Message-ID: <20171206154810.eb2czpb4kusxv5kj@sirena.org.uk>
+From: nleeder@codeaurora.org (Neil Leeder)
+Date: Wed,  6 Dec 2017 10:55:33 -0500
+Subject: [PATCH] perf: qcom_l2_pmu: don't allow guest access
+Message-ID: <1512575733-923-1-git-send-email-nleeder@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 04:32:05PM +0100, Maxime Ripard wrote:
+Guests cannot access IMPDEF system registers, which are used
+by this driver. Disable the driver if it's running in a guest VM.
 
-> BCLK is sample rate * sample size * channels, and LRCK is running at
-> the sample rate. So the ratio is the sample size * channels.
+Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+---
+ drivers/perf/qcom_l2_pmu.c | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> Anything deviating from those standard i2s concepts should at least be
-> documented, with arguments to back them off.
-
-BCLK can be higher than the minimum there in most formats, though some
-hardware is more restrictive so we tend to go for the minimum clock rate.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 488 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/b9d03659/attachment.sig>
+diff --git a/drivers/perf/qcom_l2_pmu.c b/drivers/perf/qcom_l2_pmu.c
+index 4fdc848..49dc954 100644
+--- a/drivers/perf/qcom_l2_pmu.c
++++ b/drivers/perf/qcom_l2_pmu.c
+@@ -1057,6 +1057,10 @@ static int __init register_l2_cache_pmu_driver(void)
+ {
+ 	int err;
+ 
++	/* Don't enable driver if running as guest */
++	if (!is_hyp_mode_available())
++		return 0;
++
+ 	err = cpuhp_setup_state_multi(CPUHP_AP_PERF_ARM_QCOM_L2_ONLINE,
+ 				      "AP_PERF_ARM_QCOM_L2_ONLINE",
+ 				      l2cache_pmu_online_cpu,
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
