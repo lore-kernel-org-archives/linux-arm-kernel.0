@@ -1,101 +1,44 @@
-From: fabien.dessenne@st.com (Fabien DESSENNE)
-Date: Wed, 6 Dec 2017 11:03:23 +0000
-Subject: [PATCH RFC 4/4] crypto: stm32: convert to the new crypto engine
- API
-In-Reply-To: <20171129084121.9385-5-clabbe.montjoie@gmail.com>
-References: <20171129084121.9385-1-clabbe.montjoie@gmail.com>
- <20171129084121.9385-5-clabbe.montjoie@gmail.com>
-Message-ID: <5835a2df-64d2-1363-15a3-eec4db955d58@st.com>
+From: jean-philippe.brucker@arm.com (Jean-Philippe Brucker)
+Date: Wed, 6 Dec 2017 11:06:59 +0000
+Subject: [RFCv2 PATCH 26/36] iommu/arm-smmu-v3: Add support for Hardware
+ Translation Table Update
+In-Reply-To: <d2ec2e61-f758-0394-41d2-555ae65feb0d@huawei.com>
+References: <20171006133203.22803-1-jean-philippe.brucker@arm.com>
+ <20171006133203.22803-27-jean-philippe.brucker@arm.com>
+ <d2ec2e61-f758-0394-41d2-555ae65feb0d@huawei.com>
+Message-ID: <8bdba799-49ec-edc9-dbcf-9277424dea57@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 06/12/17 06:51, Yisheng Xie wrote:
+> Hi Jean,
+> 
+> On 2017/10/6 21:31, Jean-Philippe Brucker wrote:
+>> If the SMMU supports it and the kernel was built with HTTU support, enable
+>> +	if (IS_ENABLED(CONFIG_ARM64_HW_AFDBM) && (reg & (IDR0_HA | IDR0_HD))) {
+>> +		smmu->features |= ARM_SMMU_FEAT_HA;
+>> +		if (reg & IDR0_HD)
+>> +			smmu->features |= ARM_SMMU_FEAT_HD;
+>> +	}
+> 
+> What is relationship of armv8.1 HW_AFDBM and SMMUv3 HTTU? I mean why we need
+> IS_ENABLED(CONFIG_ARM64_HW_AFDBM) ?
 
+I think the reason we needed this was that, without CONFIG_ARM64_HW_AFDBM,
+the CPU wouldn't update the pte atomically and pte_dirty() wouldn't check
+the DBM bit 51 (only the SW dirty bit 55).
 
-On 29/11/17 09:41, Corentin Labbe wrote:
-> This patch convert the driver to the new crypto engine API.
->
-> Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
+Since af29678fe785 ("arm64: Remove the !CONFIG_ARM64_HW_AFDBM alternative
+code paths") removed lots of #ifdefs, I'll see if we can remove the above
+IS_ENABLED as well.
 
-Tested-by: Fabien Dessenne <fabien.dessenne@st.com>
+> If CONFIG_ARM64_HW_AFDBM=y but the process do not support ARMv8.1, should it also
+> enable related feature for SMMUv3?
 
-> ---
->   drivers/crypto/stm32/stm32-hash.c | 22 +++++++++++++++-------
->   1 file changed, 15 insertions(+), 7 deletions(-)
->
-> diff --git a/drivers/crypto/stm32/stm32-hash.c b/drivers/crypto/stm32/stm32-hash.c
-> index 4ca4a264a833..e3f9f7b04ce2 100644
-> --- a/drivers/crypto/stm32/stm32-hash.c
-> +++ b/drivers/crypto/stm32/stm32-hash.c
-> @@ -122,6 +122,7 @@ enum stm32_hash_data_format {
->   #define HASH_DMA_THRESHOLD		50
->   
->   struct stm32_hash_ctx {
-> +	struct crypto_engine_reqctx enginectx;
->   	struct stm32_hash_dev	*hdev;
->   	unsigned long		flags;
->   
-> @@ -811,7 +812,7 @@ static void stm32_hash_finish_req(struct ahash_request *req, int err)
->   		rctx->flags |= HASH_FLAGS_ERRORS;
->   	}
->   
-> -	crypto_finalize_hash_request(hdev->engine, req, err);
-> +	crypto_finalize_request(hdev->engine, &req->base, err);
->   }
->   
->   static int stm32_hash_hw_init(struct stm32_hash_dev *hdev,
-> @@ -828,15 +829,21 @@ static int stm32_hash_hw_init(struct stm32_hash_dev *hdev,
->   	return 0;
->   }
->   
-> +static int stm32_hash_one_request(struct crypto_engine *engine,
-> +				  struct crypto_async_request *areq);
-> +static int stm32_hash_prepare_req(struct crypto_engine *engine,
-> +				  struct crypto_async_request *areq);
-> +
->   static int stm32_hash_handle_queue(struct stm32_hash_dev *hdev,
->   				   struct ahash_request *req)
->   {
-> -	return crypto_transfer_hash_request_to_engine(hdev->engine, req);
-> +	return crypto_transfer_request_to_engine(hdev->engine, &req->base);
->   }
->   
->   static int stm32_hash_prepare_req(struct crypto_engine *engine,
-> -				  struct ahash_request *req)
-> +				  struct crypto_async_request *areq)
->   {
-> +	struct ahash_request *req = ahash_request_cast(areq);
->   	struct stm32_hash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
->   	struct stm32_hash_dev *hdev = stm32_hash_find_dev(ctx);
->   	struct stm32_hash_request_ctx *rctx;
-> @@ -855,8 +862,9 @@ static int stm32_hash_prepare_req(struct crypto_engine *engine,
->   }
->   
->   static int stm32_hash_one_request(struct crypto_engine *engine,
-> -				  struct ahash_request *req)
-> +				  struct crypto_async_request *areq)
->   {
-> +	struct ahash_request *req = ahash_request_cast(areq);
->   	struct stm32_hash_ctx *ctx = crypto_ahash_ctx(crypto_ahash_reqtfm(req));
->   	struct stm32_hash_dev *hdev = stm32_hash_find_dev(ctx);
->   	struct stm32_hash_request_ctx *rctx;
-> @@ -1033,6 +1041,9 @@ static int stm32_hash_cra_init_algs(struct crypto_tfm *tfm,
->   	if (algs_hmac_name)
->   		ctx->flags |= HASH_FLAGS_HMAC;
->   
-> +	ctx->enginectx.op.do_one_request = stm32_hash_one_request;
-> +	ctx->enginectx.op.prepare_request = stm32_hash_prepare_req;
-> +	ctx->enginectx.op.unprepare_request = NULL;
->   	return 0;
->   }
->   
-> @@ -1493,9 +1504,6 @@ static int stm32_hash_probe(struct platform_device *pdev)
->   		goto err_engine;
->   	}
->   
-> -	hdev->engine->prepare_hash_request = stm32_hash_prepare_req;
-> -	hdev->engine->hash_one_request = stm32_hash_one_request;
-> -
->   	ret = crypto_engine_start(hdev->engine);
->   	if (ret)
->   		goto err_engine_start;
+Yes I think we can enable HTTU in the SMMU even if the CPU doesn't support
+it (though HTTU is only useful when sharing process address spaces). The
+mm code checks for both HW and SW bits even when the CPU doesn't support
+ARMv8.1
+
+Thanks,
+Jean
