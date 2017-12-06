@@ -1,45 +1,32 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 6 Dec 2017 16:27:25 +0100
-Subject: [PATCH 2/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
-In-Reply-To: <CA+E=qVeZtWqLZddHtZMv264bWaVcReToYqkriYryf+wZnUVtCA@mail.gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-3-anarsoul@gmail.com>
- <CAEKpxBmHhZ+2WNXJEPbQFS6KeKsqRrZeNodRnu1M5yLc15DerA@mail.gmail.com>
- <CA+E=qVd+uM0Aq_=sf+fomQ-m+3Oy0MdG7OPjF5tVagG1UgKYzg@mail.gmail.com>
- <20171205080149.2siofhpynfrvnoiq@flea.lan>
- <CA+E=qVeZtWqLZddHtZMv264bWaVcReToYqkriYryf+wZnUVtCA@mail.gmail.com>
-Message-ID: <20171206152725.ejvum7s3ck7yzwgn@flea.lan>
+From: stefan@agner.ch (Stefan Agner)
+Date: Wed,  6 Dec 2017 16:30:01 +0100
+Subject: [PATCH 5/9] ARM: dts: imx7-colibri: specify cpu-supply
+In-Reply-To: <20171206153005.6144-1-stefan@agner.ch>
+References: <20171206153005.6144-1-stefan@agner.ch>
+Message-ID: <20171206153005.6144-5-stefan@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 03:04:19PM -0800, Vasily Khoruzhick wrote:
-> On Tue, Dec 5, 2017 at 12:01 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Sun, Dec 03, 2017 at 11:34:06PM -0800, Vasily Khoruzhick wrote:
-> >> I'd keep it sun50i_a64_acodec_i2s, since other 3 I2S modules aren't
-> >> compatible with this one, but similar to H3.
-> >
-> > Please don't top-post.
-> >
-> > What are those differences?
-> 
-> Different registers and their locations. Compare quirks for
-> sun50i_a64_acodec_i2s and sun8i_h3_i2s fro details.
+Specify CPU supply using the "cpu-supply" property instead of
+the invalid "arm-supply" property.
 
-Whatever differences should also be mentionned in your commit log.
+Signed-off-by: Stefan Agner <stefan@agner.ch>
+---
+ arch/arm/boot/dts/imx7-colibri.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Maxime
-
+diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi b/arch/arm/boot/dts/imx7-colibri.dtsi
+index f61041af026a..6498c1136ef1 100644
+--- a/arch/arm/boot/dts/imx7-colibri.dtsi
++++ b/arch/arm/boot/dts/imx7-colibri.dtsi
+@@ -86,7 +86,7 @@
+ };
+ 
+ &cpu0 {
+-	arm-supply = <&reg_DCDC2>;
++	cpu-supply = <&reg_DCDC2>;
+ };
+ 
+ &fec1 {
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171206/77ec3a6e/attachment.sig>
+2.15.1
