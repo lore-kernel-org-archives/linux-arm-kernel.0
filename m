@@ -1,115 +1,131 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed,  6 Dec 2017 11:09:06 -0500
-Subject: [PATCH V2] ACPI / GED: unregister interrupts during shutdown
-Message-ID: <1512576546-22863-1-git-send-email-okaya@codeaurora.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 7 Dec 2017 00:10:39 +0800
+Subject: [PATCH 2/2] clk: sunxi-ng: sun50i: a64: Add 2x fixed post-divider
+ to MMC module clocks
+In-Reply-To: <20171206155608.tuw73ht6gq7hyrho@flea.lan>
+References: <20171204051912.7485-1-wens@csie.org>
+ <20171204051912.7485-3-wens@csie.org>
+ <20171205195956.xdil2dsbtfwx35jj@flea.lan>
+ <CAGb2v67=2BbOGWpRyujaR-pn6ZEfb1rSRtmzP-kUzXRn_y+iNg@mail.gmail.com>
+ <20171206155608.tuw73ht6gq7hyrho@flea.lan>
+Message-ID: <CAGb2v64sxLK5fQ7Rmyy355diqq=0OYk8wRvOqjVJkdMWURwRUQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some GED interrupts could be pending by the time we are doing a reboot.
+On Wed, Dec 6, 2017 at 11:56 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Wed, Dec 06, 2017 at 10:30:26AM +0800, Chen-Yu Tsai wrote:
+>> On Wed, Dec 6, 2017 at 3:59 AM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > Hi,
+>> >
+>> > On Mon, Dec 04, 2017 at 01:19:12PM +0800, Chen-Yu Tsai wrote:
+>> >> On the A64, the MMC module clocks are fixed in the new timing mode,
+>> >> i.e. they do not have a bit to select the mode. These clocks have
+>> >> a 2x divider somewhere between the clock and the MMC module.
+>> >>
+>> >> To be consistent with other SoCs supporting the new timing mode,
+>> >> we model the 2x divider as a fixed post-divider on the MMC module
+>> >> clocks.
+>> >>
+>> >> This patch adds the post-dividers to the MMC clocks.
+>> >>
+>> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+>> >
+>> > I had a doubt applying that one... sorry.
+>> >
+>> >> ---
+>> >>  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 57 +++++++++++++++++++++++------------
+>> >>  1 file changed, 37 insertions(+), 20 deletions(-)
+>> >>
+>> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+>> >> index 2bb4cabf802f..ee9c12cf3f08 100644
+>> >> --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+>> >> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+>> >> @@ -400,28 +400,45 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(nand_clk, "nand", mod0_default_parents, 0x080,
+>> >>                                 BIT(31),      /* gate */
+>> >>                                 0);
+>> >>
+>> >> +/*
+>> >> + * MMC clocks are the new timing mode (see A83T & H3) variety, but without
+>> >> + * the mode switch. This means they have a 2x post divider between the clock
+>> >> + * and the MMC module. This is not documented in the manual, but is taken
+>> >> + * into consideration when setting the mmc module clocks in the BSP kernel.
+>> >> + * Without it, MMC performance is degraded.
+>> >> + *
+>> >> + * We model it here to be consistent with other SoCs supporting this mode.
+>> >> + * The alternative would be to add the 2x multiplier when setting the MMC
+>> >> + * module clock in the MMC driver, just for the A64.
+>> >> + */
+>> >>  static const char * const mmc_default_parents[] = { "osc24M", "pll-periph0-2x",
+>> >>                                                   "pll-periph1-2x" };
+>> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_default_parents, 0x088,
+>> >> -                               0, 4,         /* M */
+>> >> -                               16, 2,        /* P */
+>> >> -                               24, 2,        /* mux */
+>> >> -                               BIT(31),      /* gate */
+>> >> -                               0);
+>> >> -
+>> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_default_parents, 0x08c,
+>> >> -                               0, 4,         /* M */
+>> >> -                               16, 2,        /* P */
+>> >> -                               24, 2,        /* mux */
+>> >> -                               BIT(31),      /* gate */
+>> >> -                               0);
+>> >> -
+>> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_default_parents, 0x090,
+>> >> -                               0, 4,         /* M */
+>> >> -                               16, 2,        /* P */
+>> >> -                               24, 2,        /* mux */
+>> >> -                               BIT(31),      /* gate */
+>> >> -                               0);
+>> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0",
+>> >> +                                       mmc_default_parents, 0x088,
+>> >> +                                       0, 4,         /* M */
+>> >> +                                       16, 2,        /* P */
+>> >> +                                       24, 2,        /* mux */
+>> >> +                                       BIT(31),      /* gate */
+>> >> +                                       2,            /* post-div */
+>> >> +                                       0);
+>> >> +
+>> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1",
+>> >> +                                       mmc_default_parents, 0x08c,
+>> >> +                                       0, 4,         /* M */
+>> >> +                                       16, 2,        /* P */
+>> >> +                                       24, 2,        /* mux */
+>> >> +                                       BIT(31),      /* gate */
+>> >> +                                       2,            /* post-div */
+>> >> +                                       0);
+>> >> +
+>> >
+>> > Are you sure that the divider there for the non-eMMC clocks? Usually,
+>> > the new mode is only here for the eMMC, so we would divide the rate by
+>> > two in the non-eMMC case.
+>>
+>> The new mode is there for all MMC controllers. The other two MMC
+>> controllers even have the old/new timing mode switch. In case you
+>> forgot we have ".need_new_timings" set for the A64 compatible.
+>
+> But then, shouldn't we model them as such, using the work you did on
+> the A83t clocks?
 
-Even though GED driver uses devm_request_irq() to register the interrupt
-handler, the handler is not being freed on time during a shutdown since
-the driver is missing a shutdown callback.
+On the A64, the clocks don't have the switch. Only the MMC controller
+does. On the A83T, both do.
 
-If the ACPI handler is no longer available, this causes an interrupt
-storm and delays shutdown.
+ChenYu
 
-Register a shutdown callback and manually free the interrupts.
-
-Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
----
- drivers/acpi/evged.c | 36 ++++++++++++++++++++++++++++++++----
- 1 file changed, 32 insertions(+), 4 deletions(-)
-
-diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
-index 46f0603..8449f31 100644
---- a/drivers/acpi/evged.c
-+++ b/drivers/acpi/evged.c
-@@ -49,6 +49,11 @@
- 
- #define MODULE_NAME	"acpi-ged"
- 
-+struct acpi_ged_device {
-+	struct device *dev;
-+	struct list_head event_list;
-+};
-+
- struct acpi_ged_event {
- 	struct list_head node;
- 	struct device *dev;
-@@ -76,7 +81,8 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
- 	unsigned int irq;
- 	unsigned int gsi;
- 	unsigned int irqflags = IRQF_ONESHOT;
--	struct device *dev = context;
-+	struct acpi_ged_device *geddev = context;
-+	struct device *dev = geddev->dev;
- 	acpi_handle handle = ACPI_HANDLE(dev);
- 	acpi_handle evt_handle;
- 	struct resource r;
-@@ -102,8 +108,6 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
- 		return AE_ERROR;
- 	}
- 
--	dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
--
- 	event = devm_kzalloc(dev, sizeof(*event), GFP_KERNEL);
- 	if (!event)
- 		return AE_ERROR;
-@@ -122,29 +126,53 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
- 		return AE_ERROR;
- 	}
- 
-+	dev_dbg(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
-+	list_add_tail(&event->node, &geddev->event_list);
- 	return AE_OK;
- }
- 
- static int ged_probe(struct platform_device *pdev)
- {
-+	struct acpi_ged_device *geddev;
- 	acpi_status acpi_ret;
- 
-+	geddev = devm_kzalloc(&pdev->dev, sizeof(*geddev), GFP_KERNEL);
-+	if (!geddev)
-+		return -ENOMEM;
-+
-+	geddev->dev = &pdev->dev;
-+	INIT_LIST_HEAD(&geddev->event_list);
- 	acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
--				       acpi_ged_request_interrupt, &pdev->dev);
-+				       acpi_ged_request_interrupt, geddev);
- 	if (ACPI_FAILURE(acpi_ret)) {
- 		dev_err(&pdev->dev, "unable to parse the _CRS record\n");
- 		return -EINVAL;
- 	}
-+	platform_set_drvdata(pdev, geddev);
- 
- 	return 0;
- }
- 
-+static void ged_shutdown(struct platform_device *pdev)
-+{
-+	struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
-+	struct acpi_ged_event *event, *next;
-+
-+	list_for_each_entry_safe(event, next, &geddev->event_list, node) {
-+		devm_free_irq(geddev->dev, event->irq, event);
-+		list_del(&event->node);
-+		dev_dbg(geddev->dev, "GED releasing GSI %u @ IRQ %u\n",
-+			 event->gsi, event->irq);
-+	}
-+}
-+
- static const struct acpi_device_id ged_acpi_ids[] = {
- 	{"ACPI0013"},
- 	{},
- };
- 
- static struct platform_driver ged_driver = {
-+	.shutdown = ged_shutdown,
- 	.probe = ged_probe,
- 	.driver = {
- 		.name = MODULE_NAME,
--- 
-1.9.1
+>> But to eliminate any doubts or concerns, I've rerun tests for the
+>> micro SD card, instead of the eMMC. And yes the results are the same,
+>> 2x improvement (12 MB/s vs 23.7 MB/s).
+>
+> Ok, good.
+>
+> Thanks!
+> Maxime
+>
+> --
+> Maxime Ripard, Free Electrons
+> Embedded Linux and Kernel engineering
+> http://free-electrons.com
