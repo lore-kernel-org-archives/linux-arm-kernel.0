@@ -1,42 +1,60 @@
-From: julien.thierry@arm.com (Julien Thierry)
-Date: Wed,  6 Dec 2017 17:09:49 +0000
-Subject: [PATCH] arm64: kvm: Prevent restoring stale PMSCR_EL1 for vcpu
-Message-ID: <1512580189-5921-1-git-send-email-julien.thierry@arm.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 6 Dec 2017 18:16:04 +0100
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
+References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+ <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+ <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
+ <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
+ <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
+ <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
+ <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
+Message-ID: <CAJZ5v0iaursWFP_KRoJqT6-QoGkvpTot0oMvs6qdjkaP12p9jQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When VHE is not present, KVM needs to save and restores PMSCR_EL1 when
-possible. If SPE is used by the host, value of PMSCR_EL1 cannot be saved
-for the guest.
-If the host starts using SPE between two save+restore on the same vcpu,
-restore will write the value of PMSCR_EL1 read during the first save.
+On Wed, Dec 6, 2017 at 5:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 12/6/2017 11:41 AM, Rafael J. Wysocki wrote:
+>> On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
+>>>>> Yes, it should, so I'm not sure why you need the list in the first place.
+>>>>>
+>>>>> Also it looks like something along the lines of devres_release_all()
+>>>>> should be sufficient.
+>>>> Good suggestion, let me test this.
+>>>>
+>>>
+>>> I tried to pull the code into GED but the API is not public. I also looked
+>>> at how it is used. I was afraid to mess up with the internals of base.c by
+>>> calling devres_release_all() externally first and by the driver framework
+>>> next. I moved away from this approach.
+>>
+>> Are you sure it is called by the core in the shutdown path?
+>
+> Sorry, I was thinking about a general case not the shutdown path. If we open
+> this API and have device drivers call it from arbitrary places; then we could
+> be opening a new can of worms that show up during device driver removal.
+>
+> If you feel confident (I'm not), I can pursue this approach too.
+>
+>>
+>>> I just fixed the function rename and changed the dev_info() to dev_dbg().
+>>
+>> And why do you need the list?
+>>
+>> ged_shutdown() will be called for every device for which ged_probe()
+>> has been called.
+>
+> The problem I had here is that =the last argument is the context pointer when I
+> call devm_free_irq().
+>
+> If I don't pass the same context I used during IRQ registration, then the IRQ
+> free API fails. That's why, I needed to keep the event pointer around until the
+> IRQ free is called.
 
-Make sure __debug_save_spe_nvhe clears the value of the saved PMSCR_EL1
-when the guest cannot use SPE.
+OK
 
-Signed-off-by: Julien Thierry <julien.thierry@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: <stable@vger.kernel.org>
----
- arch/arm64/kvm/hyp/debug-sr.c | 3 +++
- 1 file changed, 3 insertions(+)
+Anyway, it looks like something is missing in the core.
 
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 321c9c0..f4363d4 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -74,6 +74,9 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
- {
- 	u64 reg;
-
-+	/* Clear pmscr in case of early return */
-+	*pmscr_el1 = 0;
-+
- 	/* SPE present on this CPU? */
- 	if (!cpuid_feature_extract_unsigned_field(read_sysreg(id_aa64dfr0_el1),
- 						  ID_AA64DFR0_PMSVER_SHIFT))
---
-1.9.1
+You shouldn't really need to do all that dance in a driver.
