@@ -1,43 +1,103 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 6 Dec 2017 09:20:04 -0200
-Subject: [PATCH 2/3] ARM: dts: imx6sl-evk: Rearrange the regulators node
-In-Reply-To: <1512528784-29288-2-git-send-email-marcofrk@gmail.com>
-References: <1512528784-29288-1-git-send-email-marcofrk@gmail.com>
- <1512528784-29288-2-git-send-email-marcofrk@gmail.com>
-Message-ID: <CAOMZO5DcOeGG6KaHptMD0fO1K9RE9jHXBirUdRXG-SHd1ZFfmw@mail.gmail.com>
+From: jacob-chen@iotwrt.com (Jacob Chen)
+Date: Wed,  6 Dec 2017 19:19:27 +0800
+Subject: [PATCH v3 00/12]  Rockchip ISP1 Driver
+Message-ID: <20171206111939.1153-1-jacob-chen@iotwrt.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marco,
+changes in V3:
+  - add some comments
+  - fix wrong use of v4l2_async_subdev_notifier_register
+  - optimize two paths capture at a time
+  - remove compose
+  - re-struct headers
+  - add a tmp wiki page: http://opensource.rock-chips.com/wiki_Rockchip-isp1
 
-You missed to pass the v2 notation for this patch in the Subject.
+changes in V2:
+  mipi-phy:
+    - use async probing
+    - make it be a child device of the GRF
 
-On Wed, Dec 6, 2017 at 12:53 AM, Marco Franchi <marcofrk@gmail.com> wrote:
+  isp:
+    - add dummy buffer
+    - change the way to get bus configuration, which make it possible to
+            add parallel sensor support in the future(without mipi-phy driver).
 
-> +       reg_usb_otg1_vbus: regulator-usb-otg1-vbus {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "usb_otg1_vbus";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               gpio = <&gpio4 0 0>;
+This patch series add a ISP(Camera) v4l2 driver for rockchip rk3288/rk3399 SoC.
 
-gpio = <&gpio4 0 GPIO_ACTIVE_HIGH>;
+Kernel Branch:
+https://github.com/wzyy2/linux/tree/rkisp1/drivers/media/platform/rockchip/isp1
 
-would easier to read.
+Wiki Pages:
+http://opensource.rock-chips.com/wiki_Rockchip-isp1
 
-> +       reg_usb_otg2_vbus: regulator-usb-otg2-vbus {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "usb_otg2_vbus";
-> +               regulator-min-microvolt = <5000000>;
-> +               regulator-max-microvolt = <5000000>;
-> +               gpio = <&gpio4 2 0>;
+Jacob Chen (8):
+  media: doc: add document for rkisp1 meta buffer format
+  media: rkisp1: add rockchip isp1 driver
+  media: rkisp1: add Rockchip MIPI Synopsys DPHY driver
+  dt-bindings: Document the Rockchip ISP1 bindings
+  dt-bindings: Document the Rockchip MIPI RX D-PHY bindings
+  ARM: dts: rockchip: add isp node for rk3288
+  ARM: dts: rockchip: add rx0 mipi-phy for rk3288
+  MAINTAINERS: add entry for Rockchip ISP1 driver
 
-Ditto.
+Jeffy Chen (1):
+  media: rkisp1: Add user space ABI definitions
 
-> -               };
-> +       reg_lcd_3v3: regulator-lcd-3v3 {
-> +               compatible = "regulator-fixed";
-> +               regulator-name = "lcd-3v3";
-> +               gpio = <&gpio4 3 0>;
+Shunqian Zheng (3):
+  media: videodev2.h, v4l2-ioctl: add rkisp1 meta buffer format
+  arm64: dts: rockchip: add isp0 node for rk3399
+  arm64: dts: rockchip: add rx0 mipi-phy for rk3399
 
-Ditto.
+ .../devicetree/bindings/media/rockchip-isp1.txt    |   57 +
+ .../bindings/media/rockchip-mipi-dphy.txt          |   71 +
+ Documentation/media/uapi/v4l/meta-formats.rst      |    2 +
+ .../media/uapi/v4l/pixfmt-meta-rkisp1-params.rst   |   17 +
+ .../media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst     |   18 +
+ MAINTAINERS                                        |   10 +
+ arch/arm/boot/dts/rk3288.dtsi                      |   24 +
+ arch/arm64/boot/dts/rockchip/rk3399.dtsi           |   26 +
+ drivers/media/platform/Kconfig                     |   10 +
+ drivers/media/platform/Makefile                    |    1 +
+ drivers/media/platform/rockchip/isp1/Makefile      |    8 +
+ drivers/media/platform/rockchip/isp1/capture.c     | 1684 ++++++++++++++++++++
+ drivers/media/platform/rockchip/isp1/capture.h     |  194 +++
+ drivers/media/platform/rockchip/isp1/common.h      |  137 ++
+ drivers/media/platform/rockchip/isp1/dev.c         |  655 ++++++++
+ drivers/media/platform/rockchip/isp1/dev.h         |  120 ++
+ drivers/media/platform/rockchip/isp1/isp_params.c  | 1543 ++++++++++++++++++
+ drivers/media/platform/rockchip/isp1/isp_params.h  |   76 +
+ drivers/media/platform/rockchip/isp1/isp_stats.c   |  521 ++++++
+ drivers/media/platform/rockchip/isp1/isp_stats.h   |   85 +
+ .../media/platform/rockchip/isp1/mipi_dphy_sy.c    |  787 +++++++++
+ drivers/media/platform/rockchip/isp1/regs.c        |  264 +++
+ drivers/media/platform/rockchip/isp1/regs.h        | 1582 ++++++++++++++++++
+ drivers/media/platform/rockchip/isp1/rkisp1.c      | 1201 ++++++++++++++
+ drivers/media/platform/rockchip/isp1/rkisp1.h      |  131 ++
+ drivers/media/v4l2-core/v4l2-ioctl.c               |    2 +
+ include/uapi/linux/rkisp1-config.h                 |  785 +++++++++
+ include/uapi/linux/videodev2.h                     |    4 +
+ 28 files changed, 10015 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
+ create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+ create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-params.rst
+ create mode 100644 Documentation/media/uapi/v4l/pixfmt-meta-rkisp1-stat.rst
+ create mode 100644 drivers/media/platform/rockchip/isp1/Makefile
+ create mode 100644 drivers/media/platform/rockchip/isp1/capture.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/capture.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/common.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/dev.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/dev.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_params.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/isp_stats.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/mipi_dphy_sy.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/regs.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/regs.h
+ create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.c
+ create mode 100644 drivers/media/platform/rockchip/isp1/rkisp1.h
+ create mode 100644 include/uapi/linux/rkisp1-config.h
+
+-- 
+2.15.0
