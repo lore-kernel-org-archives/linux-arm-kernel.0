@@ -1,48 +1,240 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Wed, 6 Dec 2017 15:40:35 +0100
-Subject: [PATCH v2 5/5] rtc: add mxc driver for i.MX53 SRTC
-In-Reply-To: <3BB206AB2B1BD448954845CE6FF69A8E01CB531D9C@NT-Mail07.beckhoff.com>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-6-linux-kernel-dev@beckhoff.com>
- <20171206083618.eea63zqmpgaaazwl@pengutronix.de>
- <3BB206AB2B1BD448954845CE6FF69A8E01CB531D9C@NT-Mail07.beckhoff.com>
-Message-ID: <20171206144035.5brxvavkx2u2tk23@pengutronix.de>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed,  6 Dec 2017 14:38:38 +0000
+Subject: [PATCH 17/18] KVM: arm/arm64: Keep GICv2 HYP VAs in
+ kvm_vgic_global_state
+In-Reply-To: <20171206143839.29223-1-marc.zyngier@arm.com>
+References: <20171206143839.29223-1-marc.zyngier@arm.com>
+Message-ID: <20171206143839.29223-18-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 10:17:06AM +0000, Patrick Br?nn wrote:
-> >From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
-> >Sent: Mittwoch, 6. Dezember 2017 09:36
-> >On Tue, Dec 05, 2017 at 03:06:46PM +0100, linux-kernel-dev at beckhoff.com
-> >wrote:
-> >> +static int mxc_rtc_wait_for_flag(void *__iomem ioaddr, int flag)
-> >> +{
-> >> +    unsigned int timeout = REG_READ_TIMEOUT;
-> >> +
-> >> +    while (!(readl(ioaddr) & flag)) {
-> >> +            if (!--timeout) {
-> >> +                    pr_err("Wait timeout for 0x%x@%p!\n", flag, ioaddr);
-> >
-> >Please use dev_* functions for printing. In this case the message should
-> >probably be printed from the caller.
-> Do you have a link at hand about dev_* vs. pr_*? I just choose pr_err here,
-> because I would have to change the functions signature to get a device.
-> However, I will drop the message and move it to the caller.
+As we're about to change the way we map devices at HYP, we need
+to move away from kern_hyp_va on an IO address.
 
-No, I don't have a link. However, a message printed with pr_err comes
-with absolutely no context, so without grepping the source you do not
-get a clue which device has a problem. You could add more context
-using some prefix either to each message or by using
+One way of achieving this is to store the VAs in kvm_vgic_global_state,
+and use that directly from the HYP code. This requires a small change
+to create_hyp_io_mappings so that it can also return a HYP VA.
 
-#define pr_fmt(fmt) "mydriver: " fmt
+We take this opportunity to nuke the vctrl_base field in the emulated
+distributor, as it is not used anymore.
 
-but then you still not know which instance the message throws. Using
-dev_* just does the right thing without much thinking.
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm/include/asm/kvm_mmu.h   |  3 ++-
+ arch/arm64/include/asm/kvm_mmu.h |  3 ++-
+ include/kvm/arm_vgic.h           | 12 ++++++------
+ virt/kvm/arm/hyp/vgic-v2-sr.c    | 10 +++-------
+ virt/kvm/arm/mmu.c               | 20 ++++++++++++++++----
+ virt/kvm/arm/vgic/vgic-init.c    |  6 ------
+ virt/kvm/arm/vgic/vgic-v2.c      | 13 +++++++------
+ 7 files changed, 36 insertions(+), 31 deletions(-)
 
-Sascha
-
+diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
+index cb3bef71ec9b..feff24b34506 100644
+--- a/arch/arm/include/asm/kvm_mmu.h
++++ b/arch/arm/include/asm/kvm_mmu.h
+@@ -42,7 +42,8 @@
+ 
+ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+-			   void __iomem **kaddr);
++			   void __iomem **kaddr,
++			   void __iomem **haddr);
+ void free_hyp_pgds(void);
+ 
+ void stage2_unmap_vm(struct kvm *kvm);
+diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
+index 21a7335b87c8..160444b78505 100644
+--- a/arch/arm64/include/asm/kvm_mmu.h
++++ b/arch/arm64/include/asm/kvm_mmu.h
+@@ -127,7 +127,8 @@ static inline unsigned long __kern_hyp_va(unsigned long v)
+ 
+ int create_hyp_mappings(void *from, void *to, pgprot_t prot);
+ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+-			   void __iomem **kaddr);
++			   void __iomem **kaddr,
++			   void __iomem **haddr);
+ void free_hyp_pgds(void);
+ 
+ void stage2_unmap_vm(struct kvm *kvm);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 8c896540a72c..8b3fbc03293b 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -57,11 +57,15 @@ struct vgic_global {
+ 	/* Physical address of vgic virtual cpu interface */
+ 	phys_addr_t		vcpu_base;
+ 
+-	/* GICV mapping */
++	/* GICV mapping, kernel VA */
+ 	void __iomem		*vcpu_base_va;
++	/* GICV mapping, HYP VA */
++	void __iomem		*vcpu_hyp_va;
+ 
+-	/* virtual control interface mapping */
++	/* virtual control interface mapping, kernel VA */
+ 	void __iomem		*vctrl_base;
++	/* virtual control interface mapping, HYP VA */
++	void __iomem		*vctrl_hyp;
+ 
+ 	/* Number of implemented list registers */
+ 	int			nr_lr;
+@@ -198,10 +202,6 @@ struct vgic_dist {
+ 
+ 	int			nr_spis;
+ 
+-	/* TODO: Consider moving to global state */
+-	/* Virtual control interface mapping */
+-	void __iomem		*vctrl_base;
+-
+ 	/* base addresses in guest physical address space: */
+ 	gpa_t			vgic_dist_base;		/* distributor */
+ 	union {
+diff --git a/virt/kvm/arm/hyp/vgic-v2-sr.c b/virt/kvm/arm/hyp/vgic-v2-sr.c
+index 19f63fbf3682..a3b224e09f74 100644
+--- a/virt/kvm/arm/hyp/vgic-v2-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v2-sr.c
+@@ -60,10 +60,8 @@ static void __hyp_text save_lrs(struct kvm_vcpu *vcpu, void __iomem *base)
+ /* vcpu is already in the HYP VA space */
+ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	struct vgic_dist *vgic = &kvm->arch.vgic;
+-	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
++	void __iomem *base = hyp_symbol_addr(kvm_vgic_global_state)->vctrl_hyp;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+ 
+ 	if (!base)
+@@ -85,10 +83,8 @@ void __hyp_text __vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ /* vcpu is already in the HYP VA space */
+ void __hyp_text __vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ {
+-	struct kvm *kvm = kern_hyp_va(vcpu->kvm);
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	struct vgic_dist *vgic = &kvm->arch.vgic;
+-	void __iomem *base = kern_hyp_va(vgic->vctrl_base);
++	void __iomem *base = hyp_symbol_addr(kvm_vgic_global_state)->vctrl_hyp;
+ 	int i;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+ 
+@@ -143,7 +139,7 @@ int __hyp_text __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu)
+ 		return -1;
+ 
+ 	rd = kvm_vcpu_dabt_get_rd(vcpu);
+-	addr  = kern_hyp_va(hyp_symbol_addr(kvm_vgic_global_state)->vcpu_base_va);
++	addr  = hyp_symbol_addr(kvm_vgic_global_state)->vcpu_hyp_va;
+ 	addr += fault_ipa - vgic->vgic_cpu_base;
+ 
+ 	if (kvm_vcpu_dabt_iswrite(vcpu)) {
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index cc0b1a4fa55c..9f73a8a17147 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -715,28 +715,40 @@ int create_hyp_mappings(void *from, void *to, pgprot_t prot)
+  * @phys_addr:	The physical start address which gets mapped
+  * @size:	Size of the region being mapped
+  * @kaddr:	Kernel VA for this mapping
++ * @haddr:	HYP VA for this mapping
+  *
+- * The resulting HYP VA is the same as the kernel VA, modulo
+- * HYP_PAGE_OFFSET.
++ * The resulting HYP VA is completely unrelated to the kernel VA.
+  */
+ int create_hyp_io_mappings(phys_addr_t phys_addr, size_t size,
+-			   void __iomem **kaddr)
++			   void __iomem **kaddr,
++			   void __iomem **haddr)
+ {
+ 	unsigned long start, end;
++	int ret;
+ 
+ 	*kaddr = ioremap(phys_addr, size);
+ 	if (!*kaddr)
+ 		return -ENOMEM;
+ 
+ 	if (is_kernel_in_hyp_mode()) {
++		*haddr = *kaddr;
+ 		return 0;
+ 	}
+ 
+ 
+ 	start = kern_hyp_va((unsigned long)*kaddr);
+ 	end = kern_hyp_va((unsigned long)*kaddr + size);
+-	return __create_hyp_mappings(hyp_pgd, start, end,
++	ret = __create_hyp_mappings(hyp_pgd, start, end,
+ 				     __phys_to_pfn(phys_addr), PAGE_HYP_DEVICE);
++
++	if (ret) {
++		iounmap(*kaddr);
++		*kaddr = NULL;
++	} else {
++		*haddr = (void __iomem *)start;
++	}
++
++	return ret;
+ }
+ 
+ /**
+diff --git a/virt/kvm/arm/vgic/vgic-init.c b/virt/kvm/arm/vgic/vgic-init.c
+index 62310122ee78..3f01b5975055 100644
+--- a/virt/kvm/arm/vgic/vgic-init.c
++++ b/virt/kvm/arm/vgic/vgic-init.c
+@@ -166,12 +166,6 @@ int kvm_vgic_create(struct kvm *kvm, u32 type)
+ 	kvm->arch.vgic.in_kernel = true;
+ 	kvm->arch.vgic.vgic_model = type;
+ 
+-	/*
+-	 * kvm_vgic_global_state.vctrl_base is set on vgic probe (kvm_arch_init)
+-	 * it is stored in distributor struct for asm save/restore purpose
+-	 */
+-	kvm->arch.vgic.vctrl_base = kvm_vgic_global_state.vctrl_base;
+-
+ 	kvm->arch.vgic.vgic_dist_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_cpu_base = VGIC_ADDR_UNDEF;
+ 	kvm->arch.vgic.vgic_redist_base = VGIC_ADDR_UNDEF;
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index bc49d702f9f0..f0f566e4494e 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -335,7 +335,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 
+ 		ret = create_hyp_io_mappings(info->vcpu.start,
+ 					     resource_size(&info->vcpu),
+-					     &kvm_vgic_global_state.vcpu_base_va);
++					     &kvm_vgic_global_state.vcpu_base_va,
++					     &kvm_vgic_global_state.vcpu_hyp_va);
+ 		if (ret) {
+ 			kvm_err("Cannot map GICV into hyp\n");
+ 			goto out;
+@@ -346,7 +347,8 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ 
+ 	ret = create_hyp_io_mappings(info->vctrl.start,
+ 				     resource_size(&info->vctrl),
+-				     &kvm_vgic_global_state.vctrl_base);
++				     &kvm_vgic_global_state.vctrl_base,
++				     &kvm_vgic_global_state.vctrl_hyp);
+ 	if (ret) {
+ 		kvm_err("Cannot map VCTRL into hyp\n");
+ 		goto out;
+@@ -381,15 +383,14 @@ int vgic_v2_probe(const struct gic_kvm_info *info)
+ void vgic_v2_load(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 
+-	writel_relaxed(cpu_if->vgic_vmcr, vgic->vctrl_base + GICH_VMCR);
++	writel_relaxed(cpu_if->vgic_vmcr,
++		       kvm_vgic_global_state.vctrl_base + GICH_VMCR);
+ }
+ 
+ void vgic_v2_put(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+-	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 
+-	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
++	cpu_if->vgic_vmcr = readl_relaxed(kvm_vgic_global_state.vctrl_base + GICH_VMCR);
+ }
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.14.2
