@@ -1,154 +1,115 @@
-From: P.Bruenn@beckhoff.com (=?iso-8859-1?Q?Patrick_Br=FCnn?=)
-Date: Wed, 6 Dec 2017 10:17:06 +0000
-Subject: [PATCH v2 5/5] rtc: add mxc driver for i.MX53 SRTC
-In-Reply-To: <20171206083618.eea63zqmpgaaazwl@pengutronix.de>
-References: <20171205140646.30367-1-linux-kernel-dev@beckhoff.com>
- <20171205140646.30367-6-linux-kernel-dev@beckhoff.com>
- <20171206083618.eea63zqmpgaaazwl@pengutronix.de>
-Message-ID: <3BB206AB2B1BD448954845CE6FF69A8E01CB531D9C@NT-Mail07.beckhoff.com>
+From: julien.thierry@arm.com (Julien Thierry)
+Date: Wed, 6 Dec 2017 10:17:12 +0000
+Subject: [PATCH] arm64/mm: Do not write ASID generation to ttbr0
+In-Reply-To: <5A26F485.10402@arm.com>
+References: <1512495507-23259-1-git-send-email-julien.thierry@arm.com>
+ <5A26F485.10402@arm.com>
+Message-ID: <4f4572cf-9ae1-24b9-ec46-d8bbc6179426@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From: Sascha Hauer [mailto:s.hauer at pengutronix.de]
->Sent: Mittwoch, 6. Dezember 2017 09:36
->On Tue, Dec 05, 2017 at 03:06:46PM +0100, linux-kernel-dev at beckhoff.com
->wrote:
->> +static int mxc_rtc_write_alarm_locked(struct mxc_rtc_data *const pdata,
->> +                                  struct rtc_time *alarm_tm)
->> +{
->> +    void __iomem *const ioaddr = pdata->ioaddr;
->> +    unsigned long time;
->> +
->> +    rtc_tm_to_time(alarm_tm, &time);
->> +
->> +    if (time > U32_MAX) {
->> +            pr_err("Hopefully I am out of service by then :-(\n");
->> +            return -EINVAL;
->> +    }
->
->This will never happen as on your target hardware unsigned long is a
->32bit type. Not sure what is best to do here. Maybe you should test
->the return value of rtc_tm_to_time. ATM it returns 0 unconditionally,
->but rtc_tm_to_time could detect when the input time doesn't fit into
->its return type and return an error in this case.
->Also I just realized that it's unsigned and only overflows in the year
->2106. I'm most likely dead then so I don't care that much ;)
->
-please see my response to Alexandre's follow up
+Hi James,
 
->> +/* This function is the RTC interrupt service routine. */
->> +static irqreturn_t mxc_rtc_interrupt(int irq, void *dev_id)
->> +{
->> +    struct platform_device *pdev = dev_id;
->> +    struct mxc_rtc_data *pdata = platform_get_drvdata(pdev);
->> +    void __iomem *ioaddr = pdata->ioaddr;
->> +    unsigned long flags;
->> +    u32 events = 0;
->> +    u32 lp_status;
->> +    u32 lp_cr;
->> +
->> +    spin_lock_irqsave(&pdata->lock, flags);
->> +    if (clk_prepare_enable(pdata->clk)) {
->> +            spin_unlock_irqrestore(&pdata->lock, flags);
->> +            return IRQ_NONE;
->> +    }
->
->You are not allowed to do a clk_prepare under a spinlock. That was the
->original reason to split enabling a clk into clk_prepare and clk_enable.
->Everything that can block is done in clk_prepare and only non blocking
->things are done in clk_enable.
->If you want to enable/disable the clock on demand you can clk_prepare()
->in probe and clk_enable when you actually need it.
->
-Thanks for clarification. To be honest when I read Lothar's suggestion it was
-the first time I thought about the idea of keeping the clk disabled most of
-the time. I am not very experienced with this. But a rtctest loop run for
-hours so I assume it would be okay to keep the clk disabled until hw access.
-If there is no objection from somebody who knows the i.MX53 SRTC HW
-better, I will stick to the clock on demand model and make sure I avoid
-blocking.
->> +
->> +static int mxc_rtc_read_time(struct device *dev, struct rtc_time *tm)
->> +{
->> +    struct mxc_rtc_data *pdata = dev_get_drvdata(dev);
->> +    time_t now;
->> +    int ret = mxc_rtc_lock(pdata);
->> +
->> +    if (ret)
->> +            return ret;
->> +
->> +    now = readl(pdata->ioaddr + SRTC_LPSCMR);
->> +    rtc_time_to_tm(now, tm);
->> +    ret = rtc_valid_tm(tm);
->> +    mxc_rtc_unlock(pdata);
->
->I don't think this needs to be locked.
-I will change this to only enable the clock for the readl()
+On 05/12/17 19:33, James Morse wrote:
+> Hi Julien,
+> 
+> On 05/12/17 17:38, Julien Thierry wrote:
+>> When writing the user ASID to ttbr0, 16bit get copied to ttbr0, potentially
+>> including part of the ASID generation in the ttbr0.ASID. If the kernel is
+>> using less than 16bits ASIDs and the other ttbr0 bits aren't RES0, two
+>> tasks using the same mm context might end up running with different
+>> ttbr0.ASID values.
+>> This would be triggered by one of the threads being scheduled before a
+>> roll-over and the second one scheduled after a roll-over.
+>>
+>> Pad the generation out of the 16bits of the mm id that are written to
+>> ttbr0. Thus, what the hardware sees is what the kernel considers ASID.
+> 
+> Is this to fix a system with a mix of 8/16 asid bits? Or someone being clever
+> and reducing asid_bits to stress rollover?
+> 
 
->> +static int mxc_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alrm)
->> +{
->> +    struct mxc_rtc_data *pdata = dev_get_drvdata(dev);
->> +    int ret = mxc_rtc_lock(pdata);
->> +
->> +    if (ret)
->> +            return ret;
->> +
->> +    ret = mxc_rtc_write_alarm_locked(pdata, &alrm->time);
->
->Is it worth it to make this a separate function?
-Maybe not, I think it is an artifact from a refactoring. I will reconsider this
-for the next version.
->
->> +    if (!ret) {
->> +            mxc_rtc_alarm_irq_enable_locked(pdata, alrm->enabled);
->> +            mxc_rtc_sync_lp_locked(pdata->ioaddr);
->> +    }
->> +    mxc_rtc_unlock(pdata);
->> +    return ret;
->> +}
->> +
->> +static const struct rtc_class_ops mxc_rtc_ops = {
->> +    .read_time = mxc_rtc_read_time,
->> +    .set_time = mxc_rtc_set_time,
->> +    .read_alarm = mxc_rtc_read_alarm,
->> +    .set_alarm = mxc_rtc_set_alarm,
->> +    .alarm_irq_enable = mxc_rtc_alarm_irq_enable,
->> +};
->> +
->> +static int mxc_rtc_wait_for_flag(void *__iomem ioaddr, int flag)
->> +{
->> +    unsigned int timeout = REG_READ_TIMEOUT;
->> +
->> +    while (!(readl(ioaddr) & flag)) {
->> +            if (!--timeout) {
->> +                    pr_err("Wait timeout for 0x%x@%p!\n", flag, ioaddr);
->
->Please use dev_* functions for printing. In this case the message should
->probably be printed from the caller.
-Do you have a link at hand about dev_* vs. pr_*? I just choose pr_err here,
-because I would have to change the functions signature to get a device.
-However, I will drop the message and move it to the caller.
+So it was motivated by the later. But hopefully the fix, pushing the 
+generation always over 16bits is also suitable for hardware that mixes 
+8/16bits asids. If it is not, do call it out.
 
->> +    /* clear lp interrupt status */
->> +    writel(0xFFFFFFFF, ioaddr + SRTC_LPSR);
+> (I think we should do something like this so we can test rollover.)
+> 
+> 
+>> diff --git a/arch/arm64/mm/context.c b/arch/arm64/mm/context.c
+>> index 6f40170..a7c72d4 100644
+>> --- a/arch/arm64/mm/context.c
+>> +++ b/arch/arm64/mm/context.c
+>> @@ -180,6 +190,13 @@ static u64 new_context(struct mm_struct *mm, unsigned int cpu)
+>>   	/* We're out of ASIDs, so increment the global generation count */
+>>   	generation = atomic64_add_return_relaxed(ASID_FIRST_VERSION,
+>>   						 &asid_generation);
 >> +
->> +    /* move out of init state */
->> +    writel((SRTC_LPCR_IE | SRTC_LPCR_NSA), ioaddr + SRTC_LPCR);
->> +    xc_rtc_wait_for_flag(ioaddr + SRTC_LPSR, SRTC_LPSR_IES);
->
->If this can fail, shouldn't you test for an error?
-very probably
->> +
->> +    /* move out of non-valid state */
->> +    writel((SRTC_LPCR_IE | SRTC_LPCR_NVE | SRTC_LPCR_NSA |
->> +            SRTC_LPCR_EN_LP), ioaddr + SRTC_LPCR);
->> +    mxc_rtc_wait_for_flag(ioaddr + SRTC_LPSR, SRTC_LPSR_NVES);
->
->dito
-sure
+>> +	/*
+>> +	 * It is unlikely the generation will ever overflow, but if this
+>> +	 * happens, let it be known strange things can occur.
+>> +	 */
+>> +	WARN_ON(generation == ASID_FIRST_VERSION);
+> 
+> Won't generation wrap to zero, not '1<<16'?
+
+Yes it will! Silly me...
+
+> 
+> asid_generation-is-never-zero is one of the nasty things in this code.
+> 
+> In check_and_switch_context() we switch to the 'fast path' where the current
+> asid is usable if: the generation matches and the active_asid isn't 0 (which
+> indicates a rollover has occurred).
+> 
+> from mm/context.c::check_and_switch_context():
+>> 	if (!((asid ^ atomic64_read(&asid_generation)) >> asid_bits)
+>> 	    && atomic64_xchg_relaxed(&per_cpu(active_asids, cpu), asid))
+>> 		goto switch_mm_fastpath;
+> 
+> 
+> If asid_generation is ever zero, (even briefly) multiple new tasks with
+> different pages-tables will pass the generation test, and run with asid=0.
+> 
+> Short of xchg(ASID_MAX_VERSION, ASID_FIRST_VERSION), every time, just in case, I
+> don't think this is something we can handle.
+> 
+> But, this thing is layers on layers of subtle behaviour, so I may have missed
+> something...
+> 
+> 
+
+I had not thought of that. However I believe we checked with 48bits and 
+the case of the generation overflowing would take a human life span (or 
+something on that scale) of a system running and spawning continuous 
+processes before reaching this. Which is why we decided on having a 
+WARN_ON for now. So I don't know if we want to change things for this 
+corner case which really means "things are going bad" more than anything 
+else.
+
+> Instead, do you think we can duplicate just the asid bits (asid & ASID_MASK)
+> into a new 16bit field in mm_context_t, which we then use instead of the ASID()
+> and mmid macros? (We only set a new asid in one place as returned by new_context()).
+> 
+
+I'm not sure I understand why this prevents running with asid = 0 when 
+generation is 0.
+
+> This would let context.c's asid_bits be arbitrary, as the hardware only uses the
+> masked value it exposes in the new field.
+> 
+> This doesn't solve the mixed 8/16 bit case. I think we should force those
+> systems to use 8bit asids via cpufeature to preserve as much of the generation
+> counter as possible.
+> 
+
+Hmmm right, I see that today we just panic the kernel when we have a 
+smaller asid size than the boot cpu...
+So if we boot on a 8bit asid cpu it should work but not the other way 
+around... I agree we probably should find a way to reduce the size of 
+software asids system wide when we find a cpu has less bits available.
 
 Thanks,
-Patrick
----
-Beckhoff Automation GmbH & Co. KG | Managing Director: Dipl. Phys. Hans Beckhoff
-Registered office: Verl, Germany | Register court: Guetersloh HRA 7075
+
+-- 
+Julien Thierry
