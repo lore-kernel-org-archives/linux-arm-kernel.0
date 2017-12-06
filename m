@@ -1,38 +1,57 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Wed,  6 Dec 2017 11:21:57 +0100
-Subject: [PATCH 02/61] ARM: dts: r8a7745: Use R-Car Gen2 Ether fallback compat
- string
+Date: Wed,  6 Dec 2017 11:22:06 +0100
+Subject: [PATCH 11/61] ARM: dts: iwg22d: Add /dev/ttySC5 support
 In-Reply-To: <cover.1512555546.git.horms+renesas@verge.net.au>
 References: <cover.1512555546.git.horms+renesas@verge.net.au>
-Message-ID: <d5960269113e286d14e56cd9c2956135309953c8.1512555546.git.horms+renesas@verge.net.au>
+Message-ID: <c7a5ddfbf171c222772087ba8697b163e8785caa.1512555546.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use newly added R-Car Gen2 Ether fallback compat string
-in the DT of the r8a7745 SoC.
+From: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
 
-This should have no run-time effect as the driver matches against
-the per-SoC compat string before considering the fallback compat string.
+Add support for HSCIF1 as /dev/ttySC5, keeping the same naming
+scheme adopted by iWave in their BSP release. This interface
+uses RTS/CTS.
 
+Signed-off-by: Fabrizio Castro <fabrizio.castro@bp.renesas.com>
+Signed-off-by: Chris Paterson <chris.paterson2@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm/boot/dts/r8a7745.dtsi | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/arch/arm/boot/dts/r8a7745.dtsi b/arch/arm/boot/dts/r8a7745.dtsi
-index 3a50f703601c..6ad93f0deb8f 100644
---- a/arch/arm/boot/dts/r8a7745.dtsi
-+++ b/arch/arm/boot/dts/r8a7745.dtsi
-@@ -615,7 +615,8 @@
- 		};
+diff --git a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+index edadeee8f1ec..82587d7b2056 100644
+--- a/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
++++ b/arch/arm/boot/dts/r8a7745-iwg22d-sodimm.dts
+@@ -17,6 +17,7 @@
  
- 		ether: ethernet at ee700000 {
--			compatible = "renesas,ether-r8a7745";
-+			compatible = "renesas,ether-r8a7745",
-+				     "renesas,rcar-gen2-ether";
- 			reg = <0 0xee700000 0 0x400>;
- 			interrupts = <GIC_SPI 162 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&cpg CPG_MOD 813>;
+ 	aliases {
+ 		serial3 = &scif4;
++		serial5 = &hscif1;
+ 		ethernet0 = &avb;
+ 	};
+ 
+@@ -39,7 +40,20 @@
+ 	};
+ };
+ 
++&hscif1 {
++	pinctrl-0 = <&hscif1_pins>;
++	pinctrl-names = "default";
++
++	uart-has-rtscts;
++	status = "okay";
++};
++
+ &pfc {
++	hscif1_pins: hscif1 {
++		groups = "hscif1_data", "hscif1_ctrl";
++		function = "hscif1";
++	};
++
+ 	scif4_pins: scif4 {
+ 		groups = "scif4_data_b";
+ 		function = "scif4";
 -- 
 2.11.0
