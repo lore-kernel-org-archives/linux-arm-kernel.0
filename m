@@ -1,24 +1,46 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 6 Dec 2017 15:57:06 -0600
-Subject: [PATCH v3 03/15] dt-bindings: display: sun4i-drm: Add LVDS
- properties
-In-Reply-To: <17851ba6277b69aa9cd81de5eead62bfed271661.1512486553.git-series.maxime.ripard@free-electrons.com>
+Date: Wed, 6 Dec 2017 15:59:22 -0600
+Subject: [PATCH v3 04/15] dt-bindings: display: sun4i-drm: Add A83T
+ pipeline
+In-Reply-To: <3762a8428aaf207e80ae86d4db2e50473576bb6d.1512486553.git-series.maxime.ripard@free-electrons.com>
 References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <17851ba6277b69aa9cd81de5eead62bfed271661.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <20171206215706.sthymdcegp2nenwx@rob-hp-laptop>
+ <3762a8428aaf207e80ae86d4db2e50473576bb6d.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <20171206215922.vtsa4xqa2e5xz7cp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 04:10:15PM +0100, Maxime Ripard wrote:
-> Some clocks and resets supposed to drive the LVDS logic in the display
-> engine have been overlooked when the driver was first introduced.
+On Tue, Dec 05, 2017 at 04:10:16PM +0100, Maxime Ripard wrote:
+> The A83T has two video pipelines in parallel that looks quite similar to
+> the other SoCs.
 > 
-> Add those additional resources to the binding, and we'll deal with the ABI
-> stability in the code.
+> The video planes are handled through a controller called the mixer, and the
+> video signal is then passed to the timing controller (TCON).
+> 
+> And while there is two instances of the mixers and TCONs, they have a
+> significant number of differences. The TCONs are quite easy to deal with,
+> one is supposed to generate TV (in the broader term, so including things
+> like HDMI) signals, the other one LCD (so RGB, LVDS, DSI) signals. And
+> while they are called TCON0 and TCON1 in the A83t datasheet, newer SoCs
+> call them TCON-TV and TCON-LCD, which seems more appropriate.
+> 
+> However, the mixers differ mostly by their capabilities, with some features
+> being available only in the first one, or the number of planes they expose,
+> but also through their register layout. And while the capabilities could be
+> represented as properties, the register layout differences would need to
+> express all the registers offsets as properties, which is usually quite
+> bad. Especially since documentation on that hardware block is close to
+> non-existant and we don't even have the list of all those registers in the
+> first place.
+> 
+> So let's call them mixer 0 and 1 in our compatibles, even though the name
+> is pretty bad...
+> 
+> At the moment, we only have tested the code on a board that has a single
+> display output, so we're leaving the tcon-tv and mixer1 out.
 > 
 > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 > ---
->  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 8 +++++++-
->  1 file changed, 8 insertions(+)
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+>  1 file changed, 3 insertions(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
