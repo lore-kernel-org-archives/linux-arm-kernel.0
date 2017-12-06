@@ -1,52 +1,38 @@
-From: jolsa@redhat.com (Jiri Olsa)
-Date: Wed, 6 Dec 2017 14:36:07 +0100
-Subject: [RFC PATCH 2/5] perf jevents: add support for arch recommended
- events
-In-Reply-To: <1512490399-94107-3-git-send-email-john.garry@huawei.com>
-References: <1512490399-94107-1-git-send-email-john.garry@huawei.com>
- <1512490399-94107-3-git-send-email-john.garry@huawei.com>
-Message-ID: <20171206133607.GA12508@krava>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Wed, 6 Dec 2017 14:37:29 +0100
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+ <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+Message-ID: <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 12:13:16AM +0800, John Garry wrote:
-> For some architectures (like arm64), there are architecture-
-> defined recommended events. Vendors may not be obliged to
-> follow the recommendation and may implement their own pmu
-> event for a specific event code.
-> 
-> This patch adds support for parsing events from arch-defined
-> recommended JSONs, and then fixing up vendor events when
-> they have implemented these events as recommended.
+On Wed, Dec 6, 2017 at 2:24 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> On 12/5/2017 5:18 PM, Rafael J. Wysocki wrote:
+>> On Tue, Dec 5, 2017 at 10:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>>> Some GED interrupts could be pending by the time we are doing a reboot.
 
-in the previous patch you added the vendor support, so
-you have arch|vendor|platform key for the event list
-and perf have the most current/local event list
+[cut]
 
-why would you need to fix it? if there's new event list,
-the table gets updated, perf is rebuilt.. I'm clearly
-missing something ;-)
+>
+>>
+>>>         .probe = ged_probe,
+>>>         .driver = {
+>>>                 .name = MODULE_NAME,
+>>> --
+>>
+>> Overall, it looks like we should just unbind the driver from all
+>> devices on shutdown.
+>
+> I see that shutdown is getting called on all GED instances. That should
+> take care of it, right?
 
-> In the vendor JSON, to specify that the event is supported
-> according to the recommendation, only the event code is
-> added to the JSON entry - no other event elements need be
-> added, like below:
-> [
->     {
->         "EventCode": "0x40",
->     },
-> 
-> ]
-> 
-> The pmu event parsing will check for "BriefDescription"
-> field presence only for this.
-> 
-> If "BriefDescription" is present, then it is implied
-> that the vendor has implemented their own custom event,
-> and there is no fixup. Other fields are ignored.
+Yes, it should, so I'm not sure why you need the list in the first place.
 
-if we are going this way, please use some new token,
-this list is supposed to be human readable
+Also it looks like something along the lines of devres_release_all()
+should be sufficient.
 
-thanks,
-jirka
+Thanks,
+Rafael
