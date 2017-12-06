@@ -1,166 +1,118 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Wed, 6 Dec 2017 08:24:09 -0500
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
-References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
-Message-ID: <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 6 Dec 2017 13:27:15 +0000
+Subject: [PATCH v3 20/20] arm64: kaslr: Put kernel vectors address in
+ separate data page
+In-Reply-To: <CAKv+Gu_qpJCXqfrGqMGDfjeYHQVYU4SWChMXdPi53g6rmqQz6Q@mail.gmail.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <1512563739-25239-21-git-send-email-will.deacon@arm.com>
+ <CAKv+Gu_qpJCXqfrGqMGDfjeYHQVYU4SWChMXdPi53g6rmqQz6Q@mail.gmail.com>
+Message-ID: <20171206132714.GA31186@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/5/2017 5:18 PM, Rafael J. Wysocki wrote:
-> On Tue, Dec 5, 2017 at 10:01 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
->> Some GED interrupts could be pending by the time we are doing a reboot.
->>
->> Even though GED driver uses devm_request_irq() to register the interrupt
->> handler, the handler is not being freed on time during a shutdown since
->> the driver is missing a shutdown callback.
->>
->> If the ACPI handler is no longer available, this causes an interrupt
->> storm and delays shutdown.
->>
->> Register a shutdown callback and manually free the interrupts.
->>
->> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
->> ---
->>  drivers/acpi/evged.c | 36 +++++++++++++++++++++++++++++++++---
->>  1 file changed, 33 insertions(+), 3 deletions(-)
->>
->> diff --git a/drivers/acpi/evged.c b/drivers/acpi/evged.c
->> index 46f0603..dde50ea 100644
->> --- a/drivers/acpi/evged.c
->> +++ b/drivers/acpi/evged.c
->> @@ -1,7 +1,7 @@
->>  /*
->>   * Generic Event Device for ACPI.
->>   *
->> - * Copyright (c) 2016, The Linux Foundation. All rights reserved.
->> + * Copyright (c) 2016-2017, The Linux Foundation. All rights reserved.
+Hi Ard,
+
+On Wed, Dec 06, 2017 at 12:59:40PM +0000, Ard Biesheuvel wrote:
+> On 6 December 2017 at 12:35, Will Deacon <will.deacon@arm.com> wrote:
+> > The literal pool entry for identifying the vectors base is the only piece
+> > of information in the trampoline page that identifies the true location
+> > of the kernel.
+> >
+> > This patch moves it into its own page, which is only mapped by the full
+> > kernel page table, which protects against any accidental leakage of the
+> > trampoline contents.
+
+[...]
+
+> > @@ -1073,6 +1079,11 @@ END(tramp_exit_compat)
+> >
+> >         .ltorg
+> >         .popsection                             // .entry.tramp.text
+> > +#ifdef CONFIG_RANDOMIZE_BASE
+> > +       .pushsection ".entry.tramp.data", "a"   // .entry.tramp.data
+> > +       .quad   vectors
+> > +       .popsection                             // .entry.tramp.data
 > 
-> Why are you changing this?
-
-Some legal BS that we are trying to figure out internally. This slipped through
-the cracks. I was going to remove it before posting.
-
+> This does not need to be in a section of its own, and doesn't need to
+> be padded to a full page.
 > 
->>   *
->>   * This program is free software; you can redistribute it and/or modify
->>   * it under the terms of the GNU General Public License version 2 and
->> @@ -49,6 +49,11 @@
->>
->>  #define MODULE_NAME    "acpi-ged"
->>
->> +struct acpi_ged_device {
->> +       struct device *dev;
->> +       struct list_head event_list;
->> +};
->> +
->>  struct acpi_ged_event {
->>         struct list_head node;
->>         struct device *dev;
->> @@ -76,7 +81,8 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
->>         unsigned int irq;
->>         unsigned int gsi;
->>         unsigned int irqflags = IRQF_ONESHOT;
->> -       struct device *dev = context;
->> +       struct acpi_ged_device *geddev = context;
->> +       struct device *dev = geddev->dev;
->>         acpi_handle handle = ACPI_HANDLE(dev);
->>         acpi_handle evt_handle;
->>         struct resource r;
->> @@ -122,29 +128,53 @@ static acpi_status acpi_ged_request_interrupt(struct acpi_resource *ares,
->>                 return AE_ERROR;
->>         }
->>
->> +       dev_info(dev, "GED listening GSI %u @ IRQ %u\n", gsi, irq);
-> 
-> Why dev_info()?
+> If you just stick this in .rodata but align it to page size, you can
+> just map whichever page it ends up in into the TRAMP_DATA fixmap slot
+> (which is a r/o mapping anyway). You could then drop most of the
+> changes below. And actually, I'm not entirely sure whether it still
+> makes sense then to do this only for CONFIG_RANDOMIZE_BASE.
 
-I can change it to dev_dbg.
+Good point; I momentarily forgot this was in the kernel page table anyway.
+How about something like the diff below merged on top (so this basically
+undoes a bunch of the patch)?
 
-> 
->> +       list_add_tail(&event->node, &geddev->event_list);
->>         return AE_OK;
->>  }
->>
->>  static int ged_probe(struct platform_device *pdev)
->>  {
->> +       struct acpi_ged_device *geddev;
->>         acpi_status acpi_ret;
->>
->> +       geddev = devm_kzalloc(&pdev->dev, sizeof(*geddev), GFP_KERNEL);
->> +       if (!geddev)
->> +               return -ENOMEM;
->> +
->> +       geddev->dev = &pdev->dev;
->> +       INIT_LIST_HEAD(&geddev->event_list);
->>         acpi_ret = acpi_walk_resources(ACPI_HANDLE(&pdev->dev), "_CRS",
->> -                                      acpi_ged_request_interrupt, &pdev->dev);
->> +                                      acpi_ged_request_interrupt, geddev);
->>         if (ACPI_FAILURE(acpi_ret)) {
->>                 dev_err(&pdev->dev, "unable to parse the _CRS record\n");
->>                 return -EINVAL;
->>         }
->> +       platform_set_drvdata(pdev, geddev);
->>
->>         return 0;
->>  }
->>
->> +static void ged_remove(struct platform_device *pdev)
->> +{
->> +       struct acpi_ged_device *geddev = platform_get_drvdata(pdev);
->> +       struct acpi_ged_event *event, *next;
->> +
->> +       list_for_each_entry_safe(event, next, &geddev->event_list, node) {
->> +               devm_free_irq(geddev->dev, event->irq, event);
->> +               list_del(&event->node);
->> +               dev_info(geddev->dev, "GED releasing GSI %u @ IRQ %u\n",
->> +                        event->gsi, event->irq);
-> 
-> dev_dbg() and that if you really need it.
+I'd prefer to keep the CONFIG_RANDOMIZE_BASE dependency, at least for now.
 
-will change to dev_dbg
+Will
 
-> 
->> +       }
->> +}
->> +
->>  static const struct acpi_device_id ged_acpi_ids[] = {
->>         {"ACPI0013"},
->>         {},
->>  };
->>
->>  static struct platform_driver ged_driver = {
->> +       .shutdown = ged_remove,
-> 
-> That ged_remove really should be called ged_shutdown.  It is confusing
-> as is, because there is a ->remove callback in the structure too.
+--->8
 
-I'll rename as shutdown.
-
-> 
->>         .probe = ged_probe,
->>         .driver = {
->>                 .name = MODULE_NAME,
->> --
-> 
-> Overall, it looks like we should just unbind the driver from all
-> devices on shutdown.
-
-I see that shutdown is getting called on all GED instances. That should
-take care of it, right?
-
-> 
-> Thanks,
-> Rafael
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-acpi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
-
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+diff --git a/arch/arm64/kernel/entry.S b/arch/arm64/kernel/entry.S
+index a70c6dd2cc19..031392ee5f47 100644
+--- a/arch/arm64/kernel/entry.S
++++ b/arch/arm64/kernel/entry.S
+@@ -1080,9 +1080,12 @@ END(tramp_exit_compat)
+ 	.ltorg
+ 	.popsection				// .entry.tramp.text
+ #ifdef CONFIG_RANDOMIZE_BASE
+-	.pushsection ".entry.tramp.data", "a"	// .entry.tramp.data
++	.pushsection ".rodata", "a"
++	.align PAGE_SHIFT
++	.globl	__entry_tramp_data_start
++__entry_tramp_data_start:
+ 	.quad	vectors
+-	.popsection				// .entry.tramp.data
++	.popsection				// .rodata
+ #endif /* CONFIG_RANDOMIZE_BASE */
+ #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 976109b3ae51..27cf9be20a00 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -64,21 +64,8 @@ jiffies = jiffies_64;
+ 	*(.entry.tramp.text)					\
+ 	. = ALIGN(PAGE_SIZE);					\
+ 	VMLINUX_SYMBOL(__entry_tramp_text_end) = .;
+-#ifdef CONFIG_RANDOMIZE_BASE
+-#define TRAMP_DATA						\
+-	.entry.tramp.data : {					\
+-		. = ALIGN(PAGE_SIZE);				\
+-		VMLINUX_SYMBOL(__entry_tramp_data_start) = .;	\
+-		*(.entry.tramp.data)				\
+-		. = ALIGN(PAGE_SIZE);				\
+-		VMLINUX_SYMBOL(__entry_tramp_data_end) = .;	\
+-	}
+-#else
+-#define TRAMP_DATA
+-#endif /* CONFIG_RANDOMIZE_BASE */
+ #else
+ #define TRAMP_TEXT
+-#define TRAMP_DATA
+ #endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+ 
+ /*
+@@ -150,7 +137,6 @@ SECTIONS
+ 	RO_DATA(PAGE_SIZE)		/* everything from this point to     */
+ 	EXCEPTION_TABLE(8)		/* __init_begin will be marked RO NX */
+ 	NOTES
+-	TRAMP_DATA
+ 
+ 	. = ALIGN(SEGMENT_ALIGN);
+ 	__init_begin = .;
+@@ -268,10 +254,6 @@ ASSERT(__hibernate_exit_text_end - (__hibernate_exit_text_start & ~(SZ_4K - 1))
+ #ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+ ASSERT((__entry_tramp_text_end - __entry_tramp_text_start) == PAGE_SIZE,
+ 	"Entry trampoline text too big")
+-#ifdef CONFIG_RANDOMIZE_BASE
+-ASSERT((__entry_tramp_data_end - __entry_tramp_data_start) == PAGE_SIZE,
+-	"Entry trampoline data too big")
+-#endif
+ #endif
+ /*
+  * If padding is applied before .head.text, virt<->phys conversions will fail.
