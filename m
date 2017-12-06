@@ -1,119 +1,126 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 6 Dec 2017 15:32:42 +0100
-Subject: [RESEND PATCH v2 00/14] tee: optee: add dynamic shared memory
- support
-In-Reply-To: <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
-References: <1507923164-12796-1-git-send-email-volodymyr_babchuk@epam.com>
- <1511959718-5421-1-git-send-email-volodymyr_babchuk@epam.com>
-Message-ID: <20171206143241.jjk5vq23wqid3woi@jax>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 6 Dec 2017 14:32:43 +0000
+Subject: [PATCH v3 11/20] arm64: mm: Map entry trampoline into trampoline
+ and kernel page tables
+In-Reply-To: <1512563739-25239-12-git-send-email-will.deacon@arm.com>
+References: <1512563739-25239-1-git-send-email-will.deacon@arm.com>
+ <1512563739-25239-12-git-send-email-will.deacon@arm.com>
+Message-ID: <20171206143243.rzcssrrkomyb66jg@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 29, 2017 at 02:48:24PM +0200, Volodymyr Babchuk wrote:
-> From: Volodymyr Babchuk <vlad.babchuk@gmail.com>
+On Wed, Dec 06, 2017 at 12:35:30PM +0000, Will Deacon wrote:
+> The exception entry trampoline needs to be mapped at the same virtual
+> address in both the trampoline page table (which maps nothing else)
+> and also the kernel page table, so that we can swizzle TTBR1_EL1 on
+> exceptions from and return to EL0.
 > 
-> Hello all,
+> This patch maps the trampoline at a fixed virtual address in the fixmap
+> area of the kernel virtual address space, which allows the kernel proper
+> to be randomized with respect to the trampoline when KASLR is enabled.
 > 
-> This is resend of OP-TEE dynamic SHM series. No changes
-> from last time. Correct version is used in the subject.
-> 
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Mark.
+
 > ---
-> Changes from v1:
+>  arch/arm64/include/asm/fixmap.h  |  4 ++++
+>  arch/arm64/include/asm/pgtable.h |  1 +
+>  arch/arm64/kernel/asm-offsets.c  |  6 +++++-
+>  arch/arm64/mm/mmu.c              | 23 +++++++++++++++++++++++
+>  4 files changed, 33 insertions(+), 1 deletion(-)
 > 
->  * Added support for 16K and 64K pages.  Elaborated commit messages
->  * More minor changes are described in corresponding patches.
-> 
-> While this patches are necessary for use OP-TEE in virualized
-> environment, they are not sufficient. Stuart Yoder was right, when
-> proposed to make static SHM optional. But that would be a breaking
-> change, because this will render unusable older client libraries and
-> supplicants.
-> 
-> Also, as Mark Rutland pointed, OP-TEE virtualization will need support
-> from hypervisor side.
-> 
-> Anyways, those patches allowed me to call OP-TEE from XEN's Dom0
-> without remapping static SHM region into Dom0 userspace.
-> 
-> Also, this patches allow me to share quite big buffers (I tried to use
-> three 2M buffers at a time). This is imposible with static SHM,
-> because static SHM on most platforms is only 2M.
-> 
-> Thanks to Yury Norov <ynorov@caviumnetworks.com> and
-> Mark Rutland <mark.rutland@arm.com> for reviewing this patch series.
-> 
-> ---
-> v1 cover letter:
-> This patch series enables dynamic shared memory support in the TEE
-> subsystem as a whole and in OP-TEE in particular.
-> 
-> Global Platform TEE specification [1] allows client applications
-> to register part of own memory as a shared buffer between
-> application and TEE. This allows fast zero-copy communication between
-> TEE and REE. But current implementation of TEE in Linux does not support
-> this feature.
-> 
-> Also, current implementation of OP-TEE transport uses fixed size
-> pre-shared buffer for all communications with OP-TEE OS. This is okay
-> in the most use cases. But this prevents use of OP-TEE in virtualized
-> environments, because:
->  a) We can't share the same buffer between different virtual machines
->  b) Physically contiguous memory as seen by VM can be non-contiguous
->     in reality (and as seen by OP-TEE OS) due to second stage of
->     MMU translation.
->  c) Size of this pre-shared buffer is limited.
-> 
-> So, first part of this patch series adds generic register/unregister
-> interface to tee subsystem. Next patches add necessary features
-> into OP-TEE driver, so it can use not only static pre-shared buffer,
-> but whole RAM to communicate with OP-TEE OS.
-> 
-> [1] https://www.globalplatform.org/specificationsdevice.asp
-> 
-> Jens Wiklander (2):
->   tee: flexible shared memory  pool creation
->   tee: add register user memory
-> 
-> Volodymyr Babchuk (12):
->   tee: shm: add accessors for buffer size and page offset
->   tee: shm: add page accessor functions
->   tee: optee: Update protocol definitions
->   tee: optee: add page list manipulation functions
->   tee: optee: add shared buffer registration functions
->   tee: optee: add registered shared parameters handling
->   tee: optee: add registered buffers handling into RPC calls
->   tee: optee: store OP-TEE capabilities in private data
->   tee: optee: add optee-specific shared pool implementation
->   tee: optee: enable dynamic SHM support
->   tee: use reference counting for tee_context
->   tee: shm: inline tee_shm_get_id()
-> 
->  drivers/tee/optee/Makefile        |   1 +
->  drivers/tee/optee/call.c          | 179 +++++++++++++++++++++++++++++-
->  drivers/tee/optee/core.c          | 152 +++++++++++++++++++------
->  drivers/tee/optee/optee_msg.h     |  38 ++++++-
->  drivers/tee/optee/optee_private.h |  27 ++++-
->  drivers/tee/optee/optee_smc.h     |   7 ++
->  drivers/tee/optee/rpc.c           |  77 +++++++++++--
->  drivers/tee/optee/shm_pool.c      |  75 +++++++++++++
->  drivers/tee/optee/shm_pool.h      |  23 ++++
->  drivers/tee/tee_core.c            |  81 ++++++++++++--
->  drivers/tee/tee_private.h         |  60 +---------
->  drivers/tee/tee_shm.c             | 227 +++++++++++++++++++++++++++++++-------
->  drivers/tee/tee_shm_pool.c        | 165 ++++++++++++++++-----------
->  include/linux/tee_drv.h           | 183 +++++++++++++++++++++++++++++-
->  include/uapi/linux/tee.h          |  30 +++++
->  15 files changed, 1104 insertions(+), 221 deletions(-)
->  create mode 100644 drivers/tee/optee/shm_pool.c
->  create mode 100644 drivers/tee/optee/shm_pool.h
-> 
+> diff --git a/arch/arm64/include/asm/fixmap.h b/arch/arm64/include/asm/fixmap.h
+> index 4052ec39e8db..8119b49be98d 100644
+> --- a/arch/arm64/include/asm/fixmap.h
+> +++ b/arch/arm64/include/asm/fixmap.h
+> @@ -58,6 +58,10 @@ enum fixed_addresses {
+>  	FIX_APEI_GHES_NMI,
+>  #endif /* CONFIG_ACPI_APEI_GHES */
+>  
+> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> +	FIX_ENTRY_TRAMP_TEXT,
+> +#define TRAMP_VALIAS		(__fix_to_virt(FIX_ENTRY_TRAMP_TEXT))
+> +#endif /* CONFIG_UNMAP_KERNEL_AT_EL0 */
+>  	__end_of_permanent_fixed_addresses,
+>  
+>  	/*
+> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
+> index 149d05fb9421..774003b247ad 100644
+> --- a/arch/arm64/include/asm/pgtable.h
+> +++ b/arch/arm64/include/asm/pgtable.h
+> @@ -680,6 +680,7 @@ static inline void pmdp_set_wrprotect(struct mm_struct *mm,
+>  
+>  extern pgd_t swapper_pg_dir[PTRS_PER_PGD];
+>  extern pgd_t idmap_pg_dir[PTRS_PER_PGD];
+> +extern pgd_t tramp_pg_dir[PTRS_PER_PGD];
+>  
+>  /*
+>   * Encode and decode a swap entry:
+> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
+> index 71bf088f1e4b..af247d10252f 100644
+> --- a/arch/arm64/kernel/asm-offsets.c
+> +++ b/arch/arm64/kernel/asm-offsets.c
+> @@ -24,6 +24,7 @@
+>  #include <linux/kvm_host.h>
+>  #include <linux/suspend.h>
+>  #include <asm/cpufeature.h>
+> +#include <asm/fixmap.h>
+>  #include <asm/thread_info.h>
+>  #include <asm/memory.h>
+>  #include <asm/smp_plat.h>
+> @@ -148,11 +149,14 @@ int main(void)
+>    DEFINE(ARM_SMCCC_RES_X2_OFFS,		offsetof(struct arm_smccc_res, a2));
+>    DEFINE(ARM_SMCCC_QUIRK_ID_OFFS,	offsetof(struct arm_smccc_quirk, id));
+>    DEFINE(ARM_SMCCC_QUIRK_STATE_OFFS,	offsetof(struct arm_smccc_quirk, state));
+> -
+>    BLANK();
+>    DEFINE(HIBERN_PBE_ORIG,	offsetof(struct pbe, orig_address));
+>    DEFINE(HIBERN_PBE_ADDR,	offsetof(struct pbe, address));
+>    DEFINE(HIBERN_PBE_NEXT,	offsetof(struct pbe, next));
+>    DEFINE(ARM64_FTR_SYSVAL,	offsetof(struct arm64_ftr_reg, sys_val));
+> +  BLANK();
+> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> +  DEFINE(TRAMP_VALIAS,		TRAMP_VALIAS);
+> +#endif
+>    return 0;
+>  }
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index 267d2b79d52d..fe68a48c64cb 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -525,6 +525,29 @@ static int __init parse_rodata(char *arg)
+>  }
+>  early_param("rodata", parse_rodata);
+>  
+> +#ifdef CONFIG_UNMAP_KERNEL_AT_EL0
+> +static int __init map_entry_trampoline(void)
+> +{
+> +	extern char __entry_tramp_text_start[];
+> +
+> +	pgprot_t prot = rodata_enabled ? PAGE_KERNEL_ROX : PAGE_KERNEL_EXEC;
+> +	phys_addr_t pa_start = __pa_symbol(__entry_tramp_text_start);
+> +
+> +	/* The trampoline is always mapped and can therefore be global */
+> +	pgprot_val(prot) &= ~PTE_NG;
+> +
+> +	/* Map only the text into the trampoline page table */
+> +	memset(tramp_pg_dir, 0, PGD_SIZE);
+> +	__create_pgd_mapping(tramp_pg_dir, pa_start, TRAMP_VALIAS, PAGE_SIZE,
+> +			     prot, pgd_pgtable_alloc, 0);
+> +
+> +	/* ...as well as the kernel page table */
+> +	__set_fixmap(FIX_ENTRY_TRAMP_TEXT, pa_start, prot);
+> +	return 0;
+> +}
+> +core_initcall(map_entry_trampoline);
+> +#endif
+> +
+>  /*
+>   * Create fine-grained mappings for the kernel.
+>   */
 > -- 
-> 2.7.4
+> 2.1.4
 > 
-
-This looks good to me. I've been testing this for quite some time now.
-If there's no further comments I'll pick it up send it in a pull request
-to arm-soc.
-
-Thanks,
-Jens
