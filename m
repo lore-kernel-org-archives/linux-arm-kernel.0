@@ -1,66 +1,68 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 7 Dec 2017 13:31:36 +0100
-Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
-In-Reply-To: <CAD=FV=VKEz9jvJaD2KTitH=2G+wb42RXHyRVKi4-zrypAu9jSA@mail.gmail.com>
-References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
- <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
- <20171031165629.GF9463@n2100.armlinux.org.uk>
- <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
- <CAD=FV=V3n0gjzpL860V6cgf8JVh5pmoL+i0t63Oot19T2afTPw@mail.gmail.com>
- <20171101092618.GN9463@n2100.armlinux.org.uk>
- <CAD=FV=VKEz9jvJaD2KTitH=2G+wb42RXHyRVKi4-zrypAu9jSA@mail.gmail.com>
-Message-ID: <20171207123136.GB24547@atrey.karlin.mff.cuni.cz>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 07 Dec 2017 12:35:02 +0000
+Subject: Applied "spi: sun4i: disable clocks in the remove function" to the
+ spi tree
+In-Reply-To: <1512631227-27334-1-git-send-email-takuo.koguchi.sw@hitachi.com>
+Message-ID: <E1eMvOI-0006Ak-FL@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+The patch
 
-> On Wed, Nov 1, 2017 at 2:26 AM, Russell King - ARM Linux
-> <linux@armlinux.org.uk> wrote:
-> > On Tue, Oct 31, 2017 at 05:23:19PM -0700, Doug Anderson wrote:
-> >> Hi,
-> >>
-> >> On Tue, Oct 31, 2017 at 10:45 AM, Linus Torvalds
-> >> <torvalds@linux-foundation.org> wrote:
-> >> > So I'm very much open to udelay improvements, and if somebody sends
-> >> > patches for particular platforms to do particularly well on that
-> >> > platform, I think we should merge them. But ...
-> >>
-> >> If I'm reading this all correctly, this sounds like you'd be willing
-> >> to merge <https://patchwork.kernel.org/patch/9429841/>.  This makes
-> >> udelay() guaranteed not to underrun on arm32 platforms.
-> >
-> > That's a mis-representation again.  It stops a timer-based udelay()
-> > possibly underrunning by one tick if we are close to the start of
-> > a count increment.  However, it does nothing for the loops_per_jiffy
-> > udelay(), which can still underrun.
-> >
-> > My argument against merging that patch is that with it merged, we get
-> > (as you say) a udelay() that doesn't underrun _when using a timer_
-> > but when we end up using the loops_per_jiffy udelay(), we're back to
-> > the old problem.
-> >
-> > My opinion is that's bad, because it encourages people to write drivers
-> > that rely on udelay() having "good" behaviour, which it is not guaranteed
-> > to have.  So, they'll specify a delay period of exactly what they want,
-> > and their drivers will then fail when running on systems that aren't
-> > using a timer-based udelay().
-> 
-> IMHO the current udelay is broken in an off-by-one way and it's easy
-> to fix.  Intentionally leaving a bug in the code seems silly.  This
-> seems to by what Linus is saying with his statement that "(a) platform
-> code could try to make their udelay/ndelay() be as good as it can be
-> on a particular platform".
-> 
-> So no matter the rest of the discussions, we should land that.  If you
-> disagree then I'm happy to re-post that patch straight to Linus later
-> this week since it sounds as if he'd take it.
+   spi: sun4i: disable clocks in the remove function
 
-Did this get fixed in any way? Russell having crazy arguments for
-keeping kernel buggy should not be good enough reason to keep the
-bugs...
+has been applied to the spi tree at
 
-									Pavel
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From c810daba0ab5226084a56893a789af427a801146 Mon Sep 17 00:00:00 2001
+From: Takuo Koguchi <takuo.koguchi@gmail.com>
+Date: Thu, 7 Dec 2017 16:20:14 +0900
+Subject: [PATCH] spi: sun4i: disable clocks in the remove function
+
+mclk and hclk need to be disabled. Since pm_runtime_disable does
+not disable the clocks, use pm_runtime_force_suspend instead.
+
+Found by Linux Driver Verification project (linuxtesting.org).
+
+Signed-off-by: Takuo Koguchi <takuo.koguchi.sw@hitachi.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-sun4i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index c5cd635c28f3..41410031f8e9 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -525,7 +525,7 @@ static int sun4i_spi_probe(struct platform_device *pdev)
+ 
+ static int sun4i_spi_remove(struct platform_device *pdev)
+ {
+-	pm_runtime_disable(&pdev->dev);
++	pm_runtime_force_suspend(&pdev->dev);
+ 
+ 	return 0;
+ }
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+2.15.0
