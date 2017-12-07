@@ -1,23 +1,32 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 6 Dec 2017 22:41:12 -0800
-Subject: [PATCH 5/6] clk: h8s2678: pr_err() strings should end with
- newlines
-In-Reply-To: <1f71746f971b6969882e2d7827334b416178d898.1511505932.git.arvind.yadav.cs@gmail.com>
-References: <cover.1511505932.git.arvind.yadav.cs@gmail.com>
- <1f71746f971b6969882e2d7827334b416178d898.1511505932.git.arvind.yadav.cs@gmail.com>
-Message-ID: <20171207064112.GT4283@codeaurora.org>
+From: sean.wang@mediatek.com (sean.wang at mediatek.com)
+Date: Thu, 7 Dec 2017 14:43:21 +0800
+Subject: [PATCH v2 0/3] Misc fixes up for MT7623 mmc
+Message-ID: <cover.1512628593.git.sean.wang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/24, Arvind Yadav wrote:
-> pr_err() messages should end with a new-line to avoid other messages
-> being concatenated.
-> 
-> Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
-> ---
+From: Sean Wang <sean.wang@mediatek.com>
 
-Applied to clk-next
+Changes since v1:
+- add tag from the feedback of v1
+- enhance dt-binding documentation
+
+Just add some fixes up for the current MT7623 support
+
+Patch 1) complement the missing dt-bindings definitions
+Patch 2) pick up the proper falling back as patch 1 defines.
+Patch 3) SD-card detection issue caused by the wrong polarity is being fixed up
+
+Sean Wang (3):
+  mmc: dt-bindings: add mmc support to MT7623 SoC
+  arm: dts: mt7623: update mmc related nodes with the appropriate
+    fallback
+  arm: dts: mt7623: fix card detection issue on bananapi-r2
+
+ Documentation/devicetree/bindings/mmc/mtk-sd.txt | 2 ++
+ arch/arm/boot/dts/mt7623.dtsi                    | 4 ++--
+ arch/arm/boot/dts/mt7623n-bananapi-bpi-r2.dts    | 2 +-
+ 3 files changed, 5 insertions(+), 3 deletions(-)
 
 -- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+2.7.4
