@@ -1,51 +1,39 @@
 From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Thu,  7 Dec 2017 10:19:37 -0500
-Subject: [PATCH v2 05/10] arm64: dts: qcom: apq8016-sbc: sort nodes
- alphabetically
-In-Reply-To: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
-References: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
-Message-ID: <20171207151942.5805-6-damien.riegel@savoirfairelinux.com>
+Date: Thu,  7 Dec 2017 10:19:32 -0500
+Subject: [PATCH v2 00/10] arm64: dts: qcom: dts improvements
+Message-ID: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Also, it was using whitespaces for indentation on some lines, fix that
-while moving it.
+The goal of this series was to add missing I2C bindings for BLSP_I2C1,
+BLSP_I2C3, and BLSP_I2C5. But while working on this, I noticed some
+styling issues and decided to tackle them in the same patchset, mostly
+because they touch the same files and the same people will be involved
+for the review.
 
-Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
----
- arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+In this second version, I followed the recommandation of Bjorn Andersson
+and splitted pinmuxing and pinconf. The reason behind that is that the
+pinmuxing is common as functions cannot be routed to other pins, but
+pinconfs are board-specific.
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-index d4b35d81a282..981450f50e10 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi
-@@ -544,14 +544,6 @@
- 	};
- };
- 
--&wcd_codec {
--        status = "okay";
--        clocks = <&gcc GCC_CODEC_DIGCODEC_CLK>;
--        clock-names = "mclk";
--	qcom,mbhc-vthreshold-low = <75 150 237 450 500>;
--	qcom,mbhc-vthreshold-high = <75 150 237 450 500>;
--};
--
- &smd_rpm_regulators {
- 	vdd_l1_l2_l3-supply = <&pm8916_s3>;
- 	vdd_l5-supply = <&pm8916_s3>;
-@@ -671,3 +663,11 @@
- 		regulator-max-microvolt = <3337000>;
- 	};
- };
-+
-+&wcd_codec {
-+	status = "okay";
-+	clocks = <&gcc GCC_CODEC_DIGCODEC_CLK>;
-+	clock-names = "mclk";
-+	qcom,mbhc-vthreshold-low = <75 150 237 450 500>;
-+	qcom,mbhc-vthreshold-high = <75 150 237 450 500>;
-+};
+Damien Riegel (10):
+  arm64: dts: qcom: pm8916: fix wcd_codec indentation
+  arm64: dts: qcom: msm8916-pins: remove assignments to bias-disable
+  arm64: dts: qcom: msm8916-pins: keep cdc_dmic pins in suspend mode
+  arm64: dts: qcom: msm8916: drop unused board-specific nodes
+  arm64: dts: qcom: apq8016-sbc: sort nodes alphabetically
+  arm64: dts: qcom: msm8916: move pinconfs to board files
+  arm64: dts: qcom: msm8916: drop remaining unused pinconfs
+  arm64: dts: qcom: msm8916-pins: move sdhc2 cd node with its siblings
+  arm64: dts: qcom: msm8916: normalize I2C and SPI nodes
+  arm64: dts: qcom: msm8916: add nodes for i2c1, i2c3, i2c5
+
+ arch/arm64/boot/dts/qcom/apq8016-sbc.dtsi  | 446 ++++++++++++++++++++++++++++-
+ arch/arm64/boot/dts/qcom/msm8916-mtp.dtsi  |  17 ++
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 393 ++++---------------------
+ arch/arm64/boot/dts/qcom/msm8916.dtsi      |  69 ++++-
+ arch/arm64/boot/dts/qcom/pm8916.dtsi       |  82 +++---
+ 5 files changed, 604 insertions(+), 403 deletions(-)
+
 -- 
 2.15.0
