@@ -1,133 +1,69 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 7 Dec 2017 10:10:42 +0100
-Subject: [PATCH 2/2] clk: sunxi-ng: sun50i: a64: Add 2x fixed
- post-divider to MMC module clocks
-In-Reply-To: <CAGb2v64sxLK5fQ7Rmyy355diqq=0OYk8wRvOqjVJkdMWURwRUQ@mail.gmail.com>
-References: <20171204051912.7485-1-wens@csie.org>
- <20171204051912.7485-3-wens@csie.org>
- <20171205195956.xdil2dsbtfwx35jj@flea.lan>
- <CAGb2v67=2BbOGWpRyujaR-pn6ZEfb1rSRtmzP-kUzXRn_y+iNg@mail.gmail.com>
- <20171206155608.tuw73ht6gq7hyrho@flea.lan>
- <CAGb2v64sxLK5fQ7Rmyy355diqq=0OYk8wRvOqjVJkdMWURwRUQ@mail.gmail.com>
-Message-ID: <20171207091042.fqoh7utt2ookqozj@flea.lan>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 7 Dec 2017 17:14:30 +0800
+Subject: [PATCH 3/8] mfd: axp20x: probe axp20x_adc driver for AXP813
+In-Reply-To: <41fcadb9-4fa9-65e8-5ef3-5844bcba1b1d@free-electrons.com>
+References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <302c93023d8c4a54cafe321d912df484e39727b7.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <20171205080855.arr7vlgnxoxmyedd@flea.lan>
+ <2021a653-d01e-f46f-2438-0760f579e0dc@free-electrons.com>
+ <CAGb2v67nD+WAEEyridP1K=k_KgBprWmbNNL7FPdZWv9ZYdrjJg@mail.gmail.com>
+ <41fcadb9-4fa9-65e8-5ef3-5844bcba1b1d@free-electrons.com>
+Message-ID: <CAGb2v66esOimRhDHL6QgYU3iWg2a6JiQm__0ivv3SdnQv=SGQg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 12:10:39AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Dec 6, 2017 at 11:56 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi,
-> >
-> > On Wed, Dec 06, 2017 at 10:30:26AM +0800, Chen-Yu Tsai wrote:
-> >> On Wed, Dec 6, 2017 at 3:59 AM, Maxime Ripard
-> >> <maxime.ripard@free-electrons.com> wrote:
-> >> > Hi,
-> >> >
-> >> > On Mon, Dec 04, 2017 at 01:19:12PM +0800, Chen-Yu Tsai wrote:
-> >> >> On the A64, the MMC module clocks are fixed in the new timing mode,
-> >> >> i.e. they do not have a bit to select the mode. These clocks have
-> >> >> a 2x divider somewhere between the clock and the MMC module.
-> >> >>
-> >> >> To be consistent with other SoCs supporting the new timing mode,
-> >> >> we model the 2x divider as a fixed post-divider on the MMC module
-> >> >> clocks.
-> >> >>
-> >> >> This patch adds the post-dividers to the MMC clocks.
-> >> >>
-> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> >> >
-> >> > I had a doubt applying that one... sorry.
-> >> >
-> >> >> ---
-> >> >>  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 57 +++++++++++++++++++++++------------
-> >> >>  1 file changed, 37 insertions(+), 20 deletions(-)
-> >> >>
-> >> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> >> >> index 2bb4cabf802f..ee9c12cf3f08 100644
-> >> >> --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> >> >> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
-> >> >> @@ -400,28 +400,45 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(nand_clk, "nand", mod0_default_parents, 0x080,
-> >> >>                                 BIT(31),      /* gate */
-> >> >>                                 0);
-> >> >>
-> >> >> +/*
-> >> >> + * MMC clocks are the new timing mode (see A83T & H3) variety, but without
-> >> >> + * the mode switch. This means they have a 2x post divider between the clock
-> >> >> + * and the MMC module. This is not documented in the manual, but is taken
-> >> >> + * into consideration when setting the mmc module clocks in the BSP kernel.
-> >> >> + * Without it, MMC performance is degraded.
-> >> >> + *
-> >> >> + * We model it here to be consistent with other SoCs supporting this mode.
-> >> >> + * The alternative would be to add the 2x multiplier when setting the MMC
-> >> >> + * module clock in the MMC driver, just for the A64.
-> >> >> + */
-> >> >>  static const char * const mmc_default_parents[] = { "osc24M", "pll-periph0-2x",
-> >> >>                                                   "pll-periph1-2x" };
-> >> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_default_parents, 0x088,
-> >> >> -                               0, 4,         /* M */
-> >> >> -                               16, 2,        /* P */
-> >> >> -                               24, 2,        /* mux */
-> >> >> -                               BIT(31),      /* gate */
-> >> >> -                               0);
-> >> >> -
-> >> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_default_parents, 0x08c,
-> >> >> -                               0, 4,         /* M */
-> >> >> -                               16, 2,        /* P */
-> >> >> -                               24, 2,        /* mux */
-> >> >> -                               BIT(31),      /* gate */
-> >> >> -                               0);
-> >> >> -
-> >> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_default_parents, 0x090,
-> >> >> -                               0, 4,         /* M */
-> >> >> -                               16, 2,        /* P */
-> >> >> -                               24, 2,        /* mux */
-> >> >> -                               BIT(31),      /* gate */
-> >> >> -                               0);
-> >> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0",
-> >> >> +                                       mmc_default_parents, 0x088,
-> >> >> +                                       0, 4,         /* M */
-> >> >> +                                       16, 2,        /* P */
-> >> >> +                                       24, 2,        /* mux */
-> >> >> +                                       BIT(31),      /* gate */
-> >> >> +                                       2,            /* post-div */
-> >> >> +                                       0);
-> >> >> +
-> >> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1",
-> >> >> +                                       mmc_default_parents, 0x08c,
-> >> >> +                                       0, 4,         /* M */
-> >> >> +                                       16, 2,        /* P */
-> >> >> +                                       24, 2,        /* mux */
-> >> >> +                                       BIT(31),      /* gate */
-> >> >> +                                       2,            /* post-div */
-> >> >> +                                       0);
-> >> >> +
-> >> >
-> >> > Are you sure that the divider there for the non-eMMC clocks? Usually,
-> >> > the new mode is only here for the eMMC, so we would divide the rate by
-> >> > two in the non-eMMC case.
-> >>
-> >> The new mode is there for all MMC controllers. The other two MMC
-> >> controllers even have the old/new timing mode switch. In case you
-> >> forgot we have ".need_new_timings" set for the A64 compatible.
-> >
-> > But then, shouldn't we model them as such, using the work you did on
-> > the A83t clocks?
-> 
-> On the A64, the clocks don't have the switch. Only the MMC controller
-> does. On the A83T, both do.
+On Thu, Dec 7, 2017 at 5:03 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
+> Hi Chen-Yu,
+>
+> On 07/12/2017 09:54, Chen-Yu Tsai wrote:
+>> On Thu, Dec 7, 2017 at 4:51 PM, Quentin Schulz
+>> <quentin.schulz@free-electrons.com> wrote:
+>>> Hi Maxime,
+>>>
+>>> On 05/12/2017 09:08, Maxime Ripard wrote:
+>>>> On Mon, Dec 04, 2017 at 03:12:49PM +0100, Quentin Schulz wrote:
+>>>>> This makes the axp20x_adc driver probe with platform device id
+>>>>> "axp813-adc".
+>>>>>
+>>>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>>>>> ---
+>>>>>  drivers/mfd/axp20x.c | 4 +++-
+>>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>>>>
+>>>>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>>>>> index 2468b43..42e54d1 100644
+>>>>> --- a/drivers/mfd/axp20x.c
+>>>>> +++ b/drivers/mfd/axp20x.c
+>>>>> @@ -878,7 +878,9 @@ static struct mfd_cell axp813_cells[] = {
+>>>>>              .resources              = axp803_pek_resources,
+>>>>>      }, {
+>>>>>              .name                   = "axp20x-regulator",
+>>>>> -    }
+>>>>> +    }, {
+>>>>> +            .name                   = "axp813-adc",
+>>>>> +    },
+>>>>
+>>>> Any particular reason you're not adding it to the DT?
+>>>>
+>>>
+>>> No, no particular reason. It's just the way it is currently for AXP209
+>>> and AXP22x so did the same for AXP813.
+>>>
+>>> I'll add DT "support" in next version for all AXPs supported by this
+>>> driver. Or is it worthy of a small separate patch series?
+>>
+>> IIRC there's no DT support because there's no need to reference
+>> it in the device tree.
+>>
+>
+> No current need but that does not mean there won't be a need later for
+> drivers to map IIO channels from the ADC driver (i.e. some components
+> wired to GPIOs of the PMIC for example).
 
-Ah, right. I've applied both patches.
+Hmm... Why would you map the IIO channels from the ADC? I thought those
+were all accessible from userspace?
 
-Maxime
+However, proper muxing of the GPIO pin to the ADC function makes sense.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/35516921/attachment.sig>
+ChenYu
