@@ -1,44 +1,48 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:42 +0100
-Subject: [PATCH 39/54] arm64: dts: renesas: r8a77995: Add CAN external clock
- support
+Date: Thu,  7 Dec 2017 10:53:55 +0100
+Subject: [PATCH 52/54] arm64: dts: renesas: v3msk: add EtherAVB support
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <5ba27becdf2c0a62a22d2225b1e205c2eee0ef37.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <a6b1b7359074229504b2a81837eaf6ec54d3b300.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Adds external CAN clock node for r8a77995. This clock can be used as
-fCAN clock of CAN and CAN FD controller.
+Define the V3M Starter Kit board dependent part of the EtherAVB
+device node.
 
-Based on a patch for r8a7796 by Chris Paterson.
+Based on the original (and large) patch by Vladimir Barinov.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 7 +++++++
- 1 file changed, 7 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 98b70542b812..0f78592d993c 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -51,6 +51,13 @@
- 		clock-frequency = <0>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+index 50f49212f54e..8624ca87d6b2 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
++++ b/arch/arm64/boot/dts/renesas/r8a77970-v3msk.dts
+@@ -31,6 +31,17 @@
  	};
+ };
  
-+	/* External CAN clock - to be overridden by boards that provide it */
-+	can_clk: can {
-+		compatible = "fixed-clock";
-+		#clock-cells = <0>;
-+		clock-frequency = <0>;
-+	};
++&avb {
++	renesas,no-ether-link;
++	phy-handle = <&phy0>;
++	status = "okay";
 +
- 	scif_clk: scif {
- 		compatible = "fixed-clock";
- 		#clock-cells = <0>;
++	phy0: ethernet-phy at 0 {
++		rxc-skew-ps = <1500>;
++		reg = <0>;
++	};
++};
++
+ &extal_clk {
+ 	clock-frequency = <16666666>;
+ };
 -- 
 2.11.0
