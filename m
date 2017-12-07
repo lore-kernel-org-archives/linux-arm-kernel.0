@@ -1,29 +1,48 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 7 Dec 2017 09:34:09 +0000
-Subject: [PATCH v5 9/9] mfd: axp20x: add pinctrl cell for AXP813
-In-Reply-To: <20171205144647.17594-10-quentin.schulz@free-electrons.com>
-References: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
- <20171205144647.17594-10-quentin.schulz@free-electrons.com>
-Message-ID: <20171207093409.pv57jrlohwp3g53y@dell>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu, 7 Dec 2017 10:35:31 +0100
+Subject: [PATCH] arm64: kvm: Prevent restoring stale PMSCR_EL1 for vcpu
+In-Reply-To: <1512580189-5921-1-git-send-email-julien.thierry@arm.com>
+References: <1512580189-5921-1-git-send-email-julien.thierry@arm.com>
+Message-ID: <20171207093531.GO32397@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 05 Dec 2017, Quentin Schulz wrote:
-
-> As GPIO/pinctrl driver now supports AXP813, add a cell for it.
+On Wed, Dec 06, 2017 at 05:09:49PM +0000, Julien Thierry wrote:
+> When VHE is not present, KVM needs to save and restores PMSCR_EL1 when
+> possible. If SPE is used by the host, value of PMSCR_EL1 cannot be saved
+> for the guest.
+> If the host starts using SPE between two save+restore on the same vcpu,
+> restore will write the value of PMSCR_EL1 read during the first save.
 > 
-> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> Acked-for-MFD-by: Lee Jones <lee.jones@linaro.org>
+> Make sure __debug_save_spe_nvhe clears the value of the saved PMSCR_EL1
+> when the guest cannot use SPE.
+> 
+> Signed-off-by: Julien Thierry <julien.thierry@arm.com>
+> Cc: Christoffer Dall <christoffer.dall@linaro.org>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: <stable@vger.kernel.org>
 > ---
->  drivers/mfd/axp20x.c | 3 +++
+>  arch/arm64/kvm/hyp/debug-sr.c | 3 +++
 >  1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+> index 321c9c0..f4363d4 100644
+> --- a/arch/arm64/kvm/hyp/debug-sr.c
+> +++ b/arch/arm64/kvm/hyp/debug-sr.c
+> @@ -74,6 +74,9 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+>  {
+>  	u64 reg;
+> 
+> +	/* Clear pmscr in case of early return */
+> +	*pmscr_el1 = 0;
+> +
+>  	/* SPE present on this CPU? */
+>  	if (!cpuid_feature_extract_unsigned_field(read_sysreg(id_aa64dfr0_el1),
+>  						  ID_AA64DFR0_PMSVER_SHIFT))
+> --
+> 1.9.1
 
 Applied, thanks.
-
--- 
-Lee Jones
-Linaro Services Technical Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+-Christoffer
