@@ -1,40 +1,79 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 7 Dec 2017 17:36:27 +0100
-Subject: [PATCH] spi: sun6i: disable/unprepare clocks on remove
-In-Reply-To: <20171207140453.55krsazvnfqr7ooe@agrajag.zerfleddert.de>
-References: <20171207140453.55krsazvnfqr7ooe@agrajag.zerfleddert.de>
-Message-ID: <20171207163627.i4nrojgveczjfeox@flea.lan>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Thu, 7 Dec 2017 09:39:12 -0700
+Subject: [PATCH] coresight: Fix disabling of CoreSight TPIU
+In-Reply-To: <CAJ9a7VgWdDL0aBg=XyNcb9iH6ZHCWEMosLPX8PnBurCjkE6ZbQ@mail.gmail.com>
+References: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
+ <CAJ9a7VgWdDL0aBg=XyNcb9iH6ZHCWEMosLPX8PnBurCjkE6ZbQ@mail.gmail.com>
+Message-ID: <CANLsYkziE8Y+nXCgTi62Ew5VH29jcsZi4QUMYx1ox9ewDu1=-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 03:04:53PM +0100, Tobias Jordan wrote:
-> sun6i_spi_probe() uses sun6i_spi_runtime_resume() to prepare/enable
-> clocks, so sun6i_spi_remove() should use sun6i_spi_runtime_suspend() to
-> disable/unprepare them if we're not suspended.
-> Replacing pm_runtime_disable() by pm_runtime_force_suspend() will ensure
-> that sun6i_spi_runtime_suspend() is called if needed.
-> 
-> Found by Linux Driver Verification project (linuxtesting.org).
-> 
-> Fixes: 3558fe900e8af spi: sunxi: Add Allwinner A31 SPI controller driver
+On 7 December 2017 at 09:14, Mike Leach <mike.leach@linaro.org> wrote:
+> Tested by: Mike Leach <mike.leach@linaro.org>
+>
+> On 24 November 2017 at 09:58, Robert Walker <robert.walker@arm.com> wrote:
+>> The CoreSight TPIU should be disabled when tracing to other sinks to allow
+>> them to operate at full bandwidth.
+>>
+>> This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
+>> configuring the TPIU to stop on flush, initiating a manual flush, waiting
+>> for the flush to complete and then waits for the TPIU to indicate it has
+>> stopped.
+>>
+>> Signed-off-by: Robert Walker <robert.walker@arm.com>
+>> ---
+>>  drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
+>>  1 file changed, 10 insertions(+), 3 deletions(-)
+>>
+>> diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+>> index bef49a3..4b46c49 100644
+>> --- a/drivers/hwtracing/coresight/coresight-tpiu.c
+>> +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+>> @@ -46,8 +46,11 @@
+>>  #define TPIU_ITATBCTR0         0xef8
+>>
+>>  /** register definition **/
+>> +/* FFSR - 0x300 */
+>> +#define FFSR_FT_STOPPED                BIT(1)
+>>  /* FFCR - 0x304 */
+>>  #define FFCR_FON_MAN           BIT(6)
+>> +#define FFCR_STOP_FI           BIT(12)
+>>
+>>  /**
+>>   * @base:      memory mapped base address for this component.
+>> @@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
+>>  {
+>>         CS_UNLOCK(drvdata->base);
+>>
+>> -       /* Clear formatter controle reg. */
+>> -       writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
+>> +       /* Clear formatter and stop on flush */
+>> +       writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
+>>         /* Generate manual flush */
+>> -       writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+>> +       writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+>> +       /* Wait for flush to complete */
+>> +       coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
+>> +       /* Wait for formatter to stop */
+>> +       coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
+>>
+>>         CS_LOCK(drvdata->base);
+>>  }
+>> --
+>> 1.9.1
 
-This isn't the proper fixes format.
+Applied - thanks.
+Mathieu
 
-> Signed-off-by: Tobias Jordan <Tobias.Jordan@elektrobit.com>
-
-Once fixed,
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/1aaa8c26/attachment.sig>
+>>
+>> _______________________________________________
+>> CoreSight mailing list
+>> CoreSight at lists.linaro.org
+>> https://lists.linaro.org/mailman/listinfo/coresight
+>
+>
+>
+> --
+> Mike Leach
+> Principal Engineer, ARM Ltd.
+> Blackburn Design Centre. UK
