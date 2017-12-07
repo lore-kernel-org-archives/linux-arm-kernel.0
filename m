@@ -1,30 +1,37 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 7 Dec 2017 17:02:35 +0100
-Subject: [PATCH net-next v2 3/8] net: phy: meson-gxl: add read and write
- helpers for bank registers
-In-Reply-To: <1512661873.7042.9.camel@baylibre.com>
-References: <20171207142715.32578-1-jbrunet@baylibre.com>
- <20171207142715.32578-4-jbrunet@baylibre.com>
- <20171207154610.GG24750@lunn.ch>
- <1512661873.7042.9.camel@baylibre.com>
-Message-ID: <20171207160235.GL24750@lunn.ch>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Thu,  7 Dec 2017 11:04:28 -0500
+Subject: [PATCH v4 1/2] of: documentation: add bindings documentation for
+ TS-7970
+Message-ID: <20171207160429.2698-1-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Banks actually comes from the datasheet, Yes.
-> I don't mind renaming it but I would be making things up. As you wish ?
+This adds the documentation for the TS-7970 by Technologic Systems.
 
-Keep it as is for the moment.
- 
-> Does the usual pages comes with this weird toggle thing to open the access ?
-> Would we able to use these generic helpers with our this kind of quirks ?
+Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
+---
+Changes v3 -> v4:
+  - rebase on master
 
-I don't think the API has been defined yet. But what has been
-discussed is adding functions to struct phy_driver. The driver can
-then implement whatever is needed to select a given page. There will
-then be helpers which take the lock, select the page, do the
-read/write, select page 0, and unlock.
+Changes v1 -> v2:
+  - rebase on master
+---
+ Documentation/devicetree/bindings/arm/technologic.txt | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-Supporting this funny toggle should not be a problem.
-
-	   Andrew
+diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
+index 33797acad846..187830bd4f51 100644
+--- a/Documentation/devicetree/bindings/arm/technologic.txt
++++ b/Documentation/devicetree/bindings/arm/technologic.txt
+@@ -10,3 +10,9 @@ It can be mounted on a carrier board providing additional peripheral connectors.
+ Required root node properties:
+ 	- compatible = "technologic,imx6dl-ts4900", "fsl,imx6dl"
+ 	- compatible = "technologic,imx6q-ts4900", "fsl,imx6q"
++
++TS-7970 is a System-on-Module based on the Freescale i.MX6 System-on-Chip.
++It can be mounted on a carrier board providing additional peripheral connectors.
++Required root node properties:
++	- compatible = "technologic,imx6dl-ts7970", "fsl,imx6dl"
++	- compatible = "technologic,imx6q-ts7970", "fsl,imx6q"
+-- 
+2.15.0
