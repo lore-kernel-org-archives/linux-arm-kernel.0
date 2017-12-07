@@ -1,40 +1,35 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Thu, 7 Dec 2017 15:00:18 -0200
-Subject: [PATCH] ARM: dts: imx6: RDU2: correct RTC compatible
-In-Reply-To: <20171207150923.25024-1-l.stach@pengutronix.de>
-References: <20171207150923.25024-1-l.stach@pengutronix.de>
-Message-ID: <CAOMZO5D+-WWuq2VXY-C=0KMBuxR=ZAPdLFQo+crLbLA31=qr4g@mail.gmail.com>
+From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
+Date: Thu, 7 Dec 2017 12:06:11 -0500
+Subject: [PATCH v8 2/2] ARM: dts: TS-4600: add basic device tree
+In-Reply-To: <CAOMZO5DcM0u9+DZjywsqadu834++rXAckqnkMqzZOo-vgFVs_w@mail.gmail.com>
+References: <20171123210410.7107-1-sebastien.bourdelin@savoirfairelinux.com>
+ <20171123210410.7107-2-sebastien.bourdelin@savoirfairelinux.com>
+ <CAOMZO5DcM0u9+DZjywsqadu834++rXAckqnkMqzZOo-vgFVs_w@mail.gmail.com>
+Message-ID: <1f11151e-fa71-5af6-245d-482fcbcec5e9@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+Hi Fabio
 
-+ Rob and device tree list
+On 11/26/2017 02:39 PM, Fabio Estevam wrote:
+> Hi Sebastien,
+> 
+> On Thu, Nov 23, 2017 at 7:04 PM, Sebastien Bourdelin
+> <sebastien.bourdelin@savoirfairelinux.com> wrote:
+> 
+>> +       reg_vddio_sd0: regulator-vddio-sd0 {
+>> +               compatible = "regulator-fixed";
+>> +               regulator-name = "vddio-sd0";
+>> +               regulator-min-microvolt = <3300000>;
+>> +               regulator-max-microvolt = <3300000>;
+>> +               regulator-boot-on;
+>> +               gpio = <&gpio3 28 GPIO_ACTIVE_HIGH>;
+> 
+> It seems this should be GPIO_ACTIVE_LOW instead, as you don't pass
+> 'enable-active-high' here.
+> 
 
-On Thu, Dec 7, 2017 at 1:09 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
-> The RTC is manufactured by Maxim. This is a cosmetic fix, as Linux
-> doesn't match the vendor string for i2c devices.
->
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> ---
->  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> index eef737bd52d9..6bef9a98678e 100644
-> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-> @@ -581,7 +581,7 @@
->         };
->
->         ds1341: rtc at 68 {
-> -               compatible = "dallas,ds1341";
-> +               compatible = "maxim,ds1341";
-
-Dallas has been acquired by Maxim and
-Documentation/devicetree/bindings/rtc/rtc-ds1307.txt
-mentions "dallas,ds1341", so better keep the existing notation.
+Yes! you are right, thanks for the catch!
 
 Regards,
-
-Fabio Estevam
+Sebastien.
