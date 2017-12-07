@@ -1,58 +1,119 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Dec 2017 17:58:12 +0000
-Subject: [GIT PULL] arm64: fixes for -rc3
-Message-ID: <20171207175811.GL15393@arm.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu, 07 Dec 2017 18:58:28 +0100
+Subject: [PATCH v2 0/7] Add CPU Frequency scaling support on Armada 37xx
+In-Reply-To: <88999738.5axjmjKUcc@aspire.rjw.lan> (Rafael J. Wysocki's message
+ of "Thu, 07 Dec 2017 18:14:22 +0100")
+References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
+ <88999738.5axjmjKUcc@aspire.rjw.lan>
+Message-ID: <87r2s6s9mj.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Rafael,
+ 
+ On jeu., d?c. 07 2017, "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
 
-Please pull the following arm64 fixes for 4.15-rc3.
+> On Thursday, December 7, 2017 2:56:09 PM CET Gregory CLEMENT wrote:
+>> Hi,
+>> 
+>> This is the second version of a series adding the CPU Frequency
+>> support on Armada 37xx using DVFS. It is based on the initial work of
+>> Evan Wang and Victor Gu.
+>> 
+>> The main change since the first version was a bug fixed in the
+>> "cpufreq: Add DVFS support for Armada 37xx" patch which was preventing
+>> to register the opp. An other noticeable change is the 4th patch which
+>> is new adding the use of dev_pm_opp_remove and removing an comment
+>> became wrong. The other changes are described in the change log.
+>> 
+>> DVFS control is done by a set of registers from the North Bridge Power
+>> Management block. The binding for this block is documented in patch 1.
+>> 
+>> While adding a new cpufreq driver I found that the Kconfig and
+>> Makefile were no more in order, so it is fixed by patch 2 and 3.
+>> 
+>> The 5th patch is just about updating the MAINTAINERS file with the new
+>> driver.
+>> 
+>> The next patch is the real purpose of the series. The main goal of
+>> this driver is to setup the CPU load level in the hardware to
+>> associate them to CPU frequencies and register a standard cpufreq
+>> driver. Note that the hardware also capable of doing AVS (Adaptive
+>> Voltage Scaling), by associating a voltage on each level beside the
+>> CPU frequency. However, this support is not yet ready, so it is not
+>> part of this series.
+>> 
+>> Finally, the last patch is for arm-soc the arm-soc subsystem through
+>> mvebu and update the device tree to support the CPU frequency scaling.
+>> 
+>> An update on the CPU clock driver is needed in order to take into
+>> account the DVFS setting. It's the purpose of an other series already
+>> sent, but is no dependencies between the series (for building or at
+>> runtime).
+>> 
+>> Thanks,
+>> 
+>> Gregory
+>> 
+>> Changelog:
+>> 
+>> v1 -> v2:
+>> 
+>>  - using syscon instead of nb_pm for the binding of the North bridge
+>>    power management unit: reported by Rob Herring
+>> 
+>>  - fix sorting inside the big LITTLE section for the Kconfig: reported
+>>    by Viresh Kumar
+>> 
+>>  - fix the bogus freq calculation in armada37xx_cpufreq_driver_init,
+>>    bug reported by Andre Heider
+>> 
+>>  - use dev_pm_opp_remove() on the previous opp if dev_pm_opp_add()
+>>    failed, reported by Viresh Kumar
+>> 
+>>  - add the Tested-by flag from Andre Heider on "cpufreq: Add DVFS
+>>    support for Armada 37xx" patch
+>> 
+>> Gregory CLEMENT (7):
+>>   dt-bindings: marvell: Add documentation for the North Bridge PM on
+>>     Armada 37xx
+>>   cpufreq: ARM: sort the Kconfig menu
+>>   cpufreq: sort the drivers in ARM part
+>>   cpufreq: mvebu: Use dev_pm_opp_remove()
+>>   MAINTAINERS: add new entries for Armada 37xx cpufreq driver
+>>   cpufreq: Add DVFS support for Armada 37xx
+>>   arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
+>> 
+>>  .../bindings/arm/marvell/armada-37xx.txt           |  19 ++
+>>  MAINTAINERS                                        |   1 +
+>>  arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   1 +
+>>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   7 +
+>>  drivers/cpufreq/Kconfig.arm                        |  89 ++++----
+>>  drivers/cpufreq/Makefile                           |   9 +-
+>>  drivers/cpufreq/armada-37xx-cpufreq.c              | 241 +++++++++++++++++++++
+>>  drivers/cpufreq/mvebu-cpufreq.c                    |  11 +-
+>>  8 files changed, 327 insertions(+), 51 deletions(-)
+>>  create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
+>
+> I'd like you to split patches [2-3/7] off this series as they aren't
+> exactly related to the other changes in it.
 
-Details in the tag, but they broadly fix some more FP register fallout
-from the SVE patches and also some problems with the PGD tracking in our
-software PAN emulation code, after we received a crash report from a 3.18
-kernel running a backport.
+Actually the patch 6 depend on patch 2 and 3. To be more precise they
+modify the same area inside the files drivers/cpufreq/Kconfig.arm and
+drivers/cpufreq/Makefile.
 
-Cheers,
+So if I move them in an other series then there could be some merge
+conflicts.
 
-Will
+Gregory
 
---->8
+>
+> Thanks,
+> Rafael
+>
 
-The following changes since commit ae64f9bd1d3621b5e60d7363bc20afb46aede215:
-
-  Linux 4.15-rc2 (2017-12-03 11:01:47 -0500)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to cb968afc789821cdf9e17e79ef08ab90e5bae0f2:
-
-  arm64/sve: Avoid dereference of dead task_struct in KVM guest entry (2017-12-06 19:08:05 +0000)
-
-----------------------------------------------------------------
-arm64 fixes:
-
-- Fix SW PAN pgd shadowing for kernel threads, EFI and exiting user tasks
-
-- Fix FP register leak when a task_struct is re-allocated
-
-- Fix potential use-after-free in FP state tracking used by KVM
-
-----------------------------------------------------------------
-Dave Martin (3):
-      arm64: fpsimd: Prevent registers leaking from dead tasks
-      arm64: fpsimd: Abstract out binding of task's fpsimd context to the cpu.
-      arm64/sve: Avoid dereference of dead task_struct in KVM guest entry
-
-Will Deacon (2):
-      arm64: SW PAN: Point saved ttbr0 at the zero page when switching to init_mm
-      arm64: SW PAN: Update saved ttbr0 value on enter_lazy_tlb
-
- arch/arm64/include/asm/efi.h         |  4 +--
- arch/arm64/include/asm/mmu_context.h | 46 ++++++++++++++++----------------
- arch/arm64/kernel/fpsimd.c           | 51 +++++++++++++++++++++---------------
- arch/arm64/kernel/process.c          |  9 +++++++
- 4 files changed, 63 insertions(+), 47 deletions(-)
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
