@@ -1,22 +1,30 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 7 Dec 2017 12:02:49 +0800
-Subject: [PATCH v3 10/15] ARM: dts: sun8i: a83t: Add display pipeline
-In-Reply-To: <97d3cee9d0d7a92893f646d72643bac520de5f05.1512486553.git-series.maxime.ripard@free-electrons.com>
-References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <97d3cee9d0d7a92893f646d72643bac520de5f05.1512486553.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v67XRO=C21AE2ZGK9zc5yQE5H4fMm3Gv6ZTwBUyOEDOoOQ@mail.gmail.com>
+From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
+Date: Thu, 7 Dec 2017 10:51:01 +0530
+Subject: [PATCH v7 0/6] dmaengine: xilinx_dma: Bug fixes
+Message-ID: <1512624067-13554-1-git-send-email-appanad@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 11:10 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The display pipeline on the A83T is mainly composed of the mixers and
-> TCONs, plus various encoders.
->
-> Let's add the first mixer and TCON to the DTSI since the only board I have
-> can use only the LVDS output on the first TCON. The other parts will be
-> added eventually.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+This patch series fixes below bugs in DMA and VDMA IP's
+---> Added channel idle checks in the driver before submitting the buffer descriptor to h/w.
+---> Fixes bug in Multi frame sotres handling in VDMA
+---> Fixes issues w.r.to multi frame descriptors submit with AXI DMA S2MM(recv) Side.
+---> Fixed kernel doc warnings in the driver.
+---> Fixed checkpatch errors in the driver.
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Kedareswara rao Appana (6):
+  dmaengine: xilinx_dma: Check for channel idle state before submitting
+    dma descriptor
+  dmaeninge: xilinx_dma: Fix bug in multiple frame stores scenario in
+    vdma
+  dmaengine: xilinx_dma: Fix race condition in the driver for multiple
+    descriptor scenario
+  dmaengine: xilinx_dma: Fix kernel doc warnings
+  dmaengine: xilinx_dma: fix style issues from checkpatch
+  dmaengine: xilinx_dma: Differentiate probe based on the ip type
+
+ drivers/dma/xilinx/xilinx_dma.c | 283 ++++++++++++++++++++++------------------
+ 1 file changed, 157 insertions(+), 126 deletions(-)
+
+-- 
+2.7.4
