@@ -1,44 +1,49 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Thu, 7 Dec 2017 14:03:20 -0500
-Subject: [PATCH 2/2] acpi, x86: Use SPCR table for earlycon on x86
-In-Reply-To: <CAOZdJXXdeY0+SRfSQC_X-L1UNemigO7DDgRk7jRdMKVe34NWvQ@mail.gmail.com>
-References: <20171207172912.17868-1-prarit@redhat.com>
- <20171207172912.17868-3-prarit@redhat.com>
- <CAOZdJXXdeY0+SRfSQC_X-L1UNemigO7DDgRk7jRdMKVe34NWvQ@mail.gmail.com>
-Message-ID: <c6ff196d-98e4-ab31-5d51-c342539afe96@redhat.com>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Fri,  8 Dec 2017 00:34:18 +0530
+Subject: [PATCH v2 1/3] regulator: axp20x: add drivevbus support for axp803
+Message-ID: <1512673460-7865-1-git-send-email-jagan@amarulasolutions.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Like axp221, axp223, axp813 the axp803 is also supporting external
+regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
 
+Add support for it.
 
-On 12/07/2017 01:46 PM, Timur Tabi wrote:
-> On Thu, Dec 7, 2017 at 11:29 AM, Prarit Bhargava <prarit@redhat.com> wrote:
->> -int __init acpi_parse_spcr(bool earlycon)
->> +int __init acpi_parse_spcr(bool earlycon, bool enable_console)
->>  {
->>         static char opts[ACPI_SPCR_OPTS_SIZE];
->>         static char uart[ACPI_SPCR_BUF_SIZE];
->> @@ -113,7 +113,8 @@ int __init acpi_parse_spcr(bool earlycon)
->>         if (earlycon)
->>                 setup_earlycon(opts);
->>
->> -       err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
->> +       if (enable_console)
->> +               err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
-> 
-> So if earlycon==true but enable_console==false, then you parse SPCR
-> and use it for the early console, but not the primary console?  I'm
-> not sure what that gives you.
-> 
+Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+---
+Changes for v2:
+- New patch
 
-On arm64 the original SPCR code provides both early and primary consoles (as
-you've pointed out).  IOW, if SPRC exists on arm64 a console will be
-initialized.  That is still the case after my change.
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 2 +-
+ drivers/regulator/axp20x-regulator.c             | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
 
-The expected behaviour on x86 is that unless someone specifies 'earlycon' or
-'console=' that no console should be initialized.  There are users (some IOT
-boxes, etc.) that do NOT want a console.
-
-The above code keeps the existing x86 behaviour.
-
-P.
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index 9455503..34f24a2 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -43,7 +43,7 @@ Optional properties:
+ 			  regulator to drive the OTG VBus, rather then
+ 			  as an input pin which signals whether the
+ 			  board is driving OTG VBus or not.
+-			  (axp221 / axp223 / axp813 only)
++			  (axp221 / axp223 / axp803/ axp813 only)
+ 
+ - x-powers,master-mode: Boolean (axp806 only). Set this when the PMIC is
+ 			wired for master mode. The default is slave mode.
+diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
+index 181622b..91b8ff8 100644
+--- a/drivers/regulator/axp20x-regulator.c
++++ b/drivers/regulator/axp20x-regulator.c
+@@ -721,6 +721,8 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
+ 	case AXP803_ID:
+ 		regulators = axp803_regulators;
+ 		nregulators = AXP803_REG_ID_MAX;
++		drivevbus = of_property_read_bool(pdev->dev.parent->of_node,
++						  "x-powers,drive-vbus-en");
+ 		break;
+ 	case AXP806_ID:
+ 		regulators = axp806_regulators;
+-- 
+2.7.4
