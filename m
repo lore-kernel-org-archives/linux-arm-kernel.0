@@ -1,27 +1,22 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Dec 2017 16:10:14 -0600
-Subject: [PATCH v5 2/4] clk: meson-axg: add clocks dt-bindings required
- header
-In-Reply-To: <20171207095300.15384-3-yixun.lan@amlogic.com>
-References: <20171207095300.15384-1-yixun.lan@amlogic.com>
- <20171207095300.15384-3-yixun.lan@amlogic.com>
-Message-ID: <20171207221014.6qwcb43w5hms4ma5@rob-hp-laptop>
+Date: Thu, 7 Dec 2017 16:14:17 -0600
+Subject: [RFC v2 2/2] dt-bindings: mailbox: Add Xilinx IPI Mailbox
+In-Reply-To: <1512368735-27147-3-git-send-email-jliang@xilinx.com>
+References: <1512368735-27147-1-git-send-email-jliang@xilinx.com>
+ <1512368735-27147-3-git-send-email-jliang@xilinx.com>
+Message-ID: <20171207221417.yfejyl37kecv7mxc@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 05:52:58PM +0800, Yixun Lan wrote:
-> From: Qiufang Dai <qiufang.dai@amlogic.com>
+On Sun, Dec 03, 2017 at 10:25:35PM -0800, Wendy Liang wrote:
+> Xilinx ZynqMP IPI(Inter Processor Interrupt) is a hardware block
+> in ZynqMP SoC used for the communication between various processor
+> systems.
 > 
-> Add the required header for the clocks ID dt-bindings
-> exported from various subsystem in the Meson-AXG SoC.
-> 
-> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
-> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> Signed-off-by: Wendy Liang <jliang@xilinx.com>
 > ---
->  include/dt-bindings/clock/axg-clkc.h | 71 ++++++++++++++++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
->  create mode 100644 include/dt-bindings/clock/axg-clkc.h
+>  .../bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt   | 104 +++++++++++++++++++++
+>  1 file changed, 104 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/xlnx,zynqmp-ipi-mailbox.txt
 
-Please add acks when posting new versions.
-
-Rob
+Reviewed-by: Rob Herring <robh@kernel.org>
