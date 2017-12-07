@@ -1,41 +1,79 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 7 Dec 2017 10:37:05 +0100
-Subject: [PATCH RFC 0/4] crypto: engine - Permit to enqueue all async
- requests
-In-Reply-To: <4d58a1fc-8577-3fdb-ae6b-e1fade7c6582@st.com>
-References: <20171129084121.9385-1-clabbe.montjoie@gmail.com>
- <4d58a1fc-8577-3fdb-ae6b-e1fade7c6582@st.com>
-Message-ID: <20171207093705.GB21647@Red>
+From: yixun.lan@amlogic.com (Yixun Lan)
+Date: Thu, 7 Dec 2017 17:52:56 +0800
+Subject: [PATCH v5 0/4] add clk controller driver for Meson-AXG SoC
+Message-ID: <20171207095300.15384-1-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 10:59:47AM +0000, Fabien DESSENNE wrote:
-> Hi Corentin,
-> 
-> 
-> I am fine with this proposal: it is generic enough and I have been able 
-> to test and run the crypto engine with aead_request without changing any 
-> single line of code.
-> 
-> This is what I need to be able to send the AEAD extension of the 
-> stm32-cryp driver (successfully tested with your engine upgrade proposal).
-> 
-> 
-> I have also tested the stm32-hash patch.
-> 
-> Note that stm32-cryp (new driver applied by Herbert recently 
-> [https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git/commit/?id=9e054ec21ef8344345b28603fb272fe999f735db]) 
-> would also need to be converted to the new crypto engine API : this is a 
-> trivial patch.
+Add driver for the clk controller which found in Meson AXG SoC
 
-Yes, patch for converting it is already done.
+  Note, we deliberately create a seperate source file for the Meson AXG
+series, instead of sharing code with previous GXBB/GXL - the file axg.c
+It would help us maintaining the code more easily.
 
-> 
-> Thank you for your proposal, I hope that this proposal is fine for 
-> Herbert too.
-> 
+Changes since v4 [4]:
+ - use devm_ioremap instead of devm_ioremap_resource
+ - rename DT node using generic name 'bus'
 
-Thanks for your test, I hope other maintainer will test it also.
+Changes since v3 [3]:
+ - separate dt-bindings header file
+ - adjust license note as standard way
+ - replace of_iomap with platform/devm API
+ - add Rob's Ack to Patch 1,4
 
-Regards
-Corentin Labbe
+Changes since v2 [2]:
+ - drop register offset calculation
+ - update dt-bindings for new compatible variant
+
+Changes since v1 [1]:
+ - rework register definion, use '(offset << 2)' to better match
+   the description from data sheet
+ - drop "#include dt-bindings/clock/gxbb-aoclkc.h" from dts
+ - rebase code to v4.15-rc1
+
+[4]
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005522.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005525.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005526.html
+
+[3]
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005487.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005488.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005489.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005490.html
+
+[2]
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005468.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005469.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005470.html
+
+[1] 
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005239.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005240.html
+  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005241.html
+
+
+
+Qiufang Dai (3):
+  clk: meson-axg: add clocks dt-bindings required header
+  clk: meson-axg: add clock controller drivers
+  arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
+
+Yixun Lan (1):
+  dt-bindings: clock: add compatible variant for the Meson-AXG
+
+ .../bindings/clock/amlogic,gxbb-clkc.txt           |   7 +-
+ arch/arm64/Kconfig.platforms                       |   1 +
+ arch/arm64/boot/dts/amlogic/meson-axg.dtsi         |  15 +
+ drivers/clk/meson/Kconfig                          |   8 +
+ drivers/clk/meson/Makefile                         |   1 +
+ drivers/clk/meson/axg.c                            | 944 +++++++++++++++++++++
+ drivers/clk/meson/axg.h                            | 126 +++
+ include/dt-bindings/clock/axg-clkc.h               |  71 ++
+ 8 files changed, 1171 insertions(+), 2 deletions(-)
+ create mode 100644 drivers/clk/meson/axg.c
+ create mode 100644 drivers/clk/meson/axg.h
+ create mode 100644 include/dt-bindings/clock/axg-clkc.h
+
+-- 
+2.15.0
