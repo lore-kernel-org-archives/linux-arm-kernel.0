@@ -1,156 +1,214 @@
 From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 7 Dec 2017 20:57:09 +0800
-Subject: [PATCH V7 06/12] clk: sprd: add composite clock support
+Date: Thu, 7 Dec 2017 20:57:06 +0800
+Subject: [PATCH V7 03/12] clk: sprd: add gate clock support
 In-Reply-To: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
 References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171207125715.16160-7-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171207125715.16160-4-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch introduced composite driver for Spreadtrum's SoCs. The
-functions of this composite clock simply consist of divider and
-mux clocks.
+Some clocks on the Spreadtrum's SoCs are just simple gates. Add
+support for those clocks.
 
 Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 ---
- drivers/clk/sprd/Makefile    |  1 +
- drivers/clk/sprd/composite.c | 60 ++++++++++++++++++++++++++++++++++++++++++++
- drivers/clk/sprd/composite.h | 51 +++++++++++++++++++++++++++++++++++++
- 3 files changed, 112 insertions(+)
- create mode 100644 drivers/clk/sprd/composite.c
- create mode 100644 drivers/clk/sprd/composite.h
+ drivers/clk/sprd/Makefile |   1 +
+ drivers/clk/sprd/gate.c   | 111 ++++++++++++++++++++++++++++++++++++++++++++++
+ drivers/clk/sprd/gate.h   |  59 ++++++++++++++++++++++++
+ 3 files changed, 171 insertions(+)
+ create mode 100644 drivers/clk/sprd/gate.c
+ create mode 100644 drivers/clk/sprd/gate.h
 
 diff --git a/drivers/clk/sprd/Makefile b/drivers/clk/sprd/Makefile
-index 80e6039..2262e76 100644
+index 74f4b80..8cd5592 100644
 --- a/drivers/clk/sprd/Makefile
 +++ b/drivers/clk/sprd/Makefile
-@@ -4,3 +4,4 @@ clk-sprd-y	+= common.o
- clk-sprd-y	+= gate.o
- clk-sprd-y	+= mux.o
- clk-sprd-y	+= div.o
-+clk-sprd-y	+= composite.o
-diff --git a/drivers/clk/sprd/composite.c b/drivers/clk/sprd/composite.c
+@@ -1,3 +1,4 @@
+ obj-$(CONFIG_SPRD_COMMON_CLK)	+= clk-sprd.o
+ 
+ clk-sprd-y	+= common.o
++clk-sprd-y	+= gate.o
+diff --git a/drivers/clk/sprd/gate.c b/drivers/clk/sprd/gate.c
 new file mode 100644
-index 0000000..ebb6448
+index 0000000..f59d193
 --- /dev/null
-+++ b/drivers/clk/sprd/composite.c
-@@ -0,0 +1,60 @@
++++ b/drivers/clk/sprd/gate.c
+@@ -0,0 +1,111 @@
 +// SPDX-License-Identifier: GPL-2.0
 +//
-+// Spreadtrum composite clock driver
++// Spreadtrum gate clock driver
 +//
 +// Copyright (C) 2017 Spreadtrum, Inc.
 +// Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 +
 +#include <linux/clk-provider.h>
++#include <linux/regmap.h>
 +
-+#include "composite.h"
++#include "gate.h"
 +
-+static long sprd_comp_round_rate(struct clk_hw *hw, unsigned long rate,
-+				unsigned long *parent_rate)
++static void clk_gate_toggle(const struct sprd_gate *sg, bool en)
 +{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++	const struct sprd_clk_common *common = &sg->common;
++	unsigned int reg;
++	bool set = sg->flags & CLK_GATE_SET_TO_DISABLE ? true : false;
 +
-+	return sprd_div_helper_round_rate(&cc->common, &cc->div,
-+					 rate, parent_rate);
++	set ^= en;
++
++	regmap_read(common->regmap, common->reg, &reg);
++
++	if (set)
++		reg |= sg->enable_mask;
++	else
++		reg &= ~sg->enable_mask;
++
++	regmap_write(common->regmap, common->reg, reg);
 +}
 +
-+static unsigned long sprd_comp_recalc_rate(struct clk_hw *hw,
-+					  unsigned long parent_rate)
++static void clk_sc_gate_toggle(const struct sprd_gate *sg, bool en)
 +{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++	const struct sprd_clk_common *common = &sg->common;
++	bool set = sg->flags & CLK_GATE_SET_TO_DISABLE ? 1 : 0;
++	unsigned int offset;
 +
-+	return sprd_div_helper_recalc_rate(&cc->common, &cc->div, parent_rate);
++	set ^= en;
++
++	/*
++	 * Each set/clear gate clock has three registers:
++	 * common->reg			- base register
++	 * common->reg + offset		- set register
++	 * common->reg + 2 * offset	- clear register
++	 */
++	offset = set ? sg->sc_offset : sg->sc_offset * 2;
++
++	regmap_write(common->regmap, common->reg + offset,
++			  sg->enable_mask);
 +}
 +
-+static int sprd_comp_set_rate(struct clk_hw *hw, unsigned long rate,
-+			     unsigned long parent_rate)
++static void sprd_gate_disable(struct clk_hw *hw)
 +{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
 +
-+	return sprd_div_helper_set_rate(&cc->common, &cc->div,
-+				       rate, parent_rate);
++	clk_gate_toggle(sg, false);
 +}
 +
-+static u8 sprd_comp_get_parent(struct clk_hw *hw)
++static int sprd_gate_enable(struct clk_hw *hw)
 +{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
 +
-+	return sprd_mux_helper_get_parent(&cc->common, &cc->mux);
++	clk_gate_toggle(sg, true);
++
++	return 0;
 +}
 +
-+static int sprd_comp_set_parent(struct clk_hw *hw, u8 index)
++static void sprd_sc_gate_disable(struct clk_hw *hw)
 +{
-+	struct sprd_comp *cc = hw_to_sprd_comp(hw);
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
 +
-+	return sprd_mux_helper_set_parent(&cc->common, &cc->mux, index);
++	clk_sc_gate_toggle(sg, false);
 +}
 +
-+const struct clk_ops sprd_comp_ops = {
-+	.get_parent	= sprd_comp_get_parent,
-+	.set_parent	= sprd_comp_set_parent,
++static int sprd_sc_gate_enable(struct clk_hw *hw)
++{
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
 +
-+	.round_rate	= sprd_comp_round_rate,
-+	.recalc_rate	= sprd_comp_recalc_rate,
-+	.set_rate	= sprd_comp_set_rate,
++	clk_sc_gate_toggle(sg, true);
++
++	return 0;
++}
++static int sprd_gate_is_enabled(struct clk_hw *hw)
++{
++	struct sprd_gate *sg = hw_to_sprd_gate(hw);
++	struct sprd_clk_common *common = &sg->common;
++	unsigned int reg;
++
++	regmap_read(common->regmap, common->reg, &reg);
++
++	if (sg->flags & CLK_GATE_SET_TO_DISABLE)
++		reg ^= sg->enable_mask;
++
++	reg &= sg->enable_mask;
++
++	return reg ? 1 : 0;
++}
++
++const struct clk_ops sprd_gate_ops = {
++	.disable	= sprd_gate_disable,
++	.enable		= sprd_gate_enable,
++	.is_enabled	= sprd_gate_is_enabled,
 +};
-+EXPORT_SYMBOL_GPL(sprd_comp_ops);
-diff --git a/drivers/clk/sprd/composite.h b/drivers/clk/sprd/composite.h
++EXPORT_SYMBOL_GPL(sprd_gate_ops);
++
++const struct clk_ops sprd_sc_gate_ops = {
++	.disable	= sprd_sc_gate_disable,
++	.enable		= sprd_sc_gate_enable,
++	.is_enabled	= sprd_gate_is_enabled,
++};
++EXPORT_SYMBOL_GPL(sprd_sc_gate_ops);
++
+diff --git a/drivers/clk/sprd/gate.h b/drivers/clk/sprd/gate.h
 new file mode 100644
-index 0000000..0984e9e
+index 0000000..2e582c6
 --- /dev/null
-+++ b/drivers/clk/sprd/composite.h
-@@ -0,0 +1,51 @@
++++ b/drivers/clk/sprd/gate.h
+@@ -0,0 +1,59 @@
 +// SPDX-License-Identifier: GPL-2.0
 +//
-+// Spreadtrum composite clock driver
++// Spreadtrum gate clock driver
 +//
 +// Copyright (C) 2017 Spreadtrum, Inc.
 +// Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
 +
-+#ifndef _SPRD_COMPOSITE_H_
-+#define _SPRD_COMPOSITE_H_
++#ifndef _SPRD_GATE_H_
++#define _SPRD_GATE_H_
 +
 +#include "common.h"
-+#include "mux.h"
-+#include "div.h"
 +
-+struct sprd_comp {
-+	struct sprd_mux_ssel	mux;
-+	struct sprd_div_internal	div;
++struct sprd_gate {
++	u32			enable_mask;
++	u16			flags;
++	u16			sc_offset;
++
 +	struct sprd_clk_common	common;
 +};
 +
-+#define SPRD_COMP_CLK_TABLE(_struct, _name, _parent, _reg, _table,	\
-+			_mshift, _mwidth, _dshift, _dwidth, _flags)	\
-+	struct sprd_comp _struct = {					\
-+		.mux	= _SPRD_MUX_CLK(_mshift, _mwidth, _table),	\
-+		.div	= _SPRD_DIV_CLK(_dshift, _dwidth),		\
-+		.common = {						\
++#define SPRD_SC_GATE_CLK_OPS(_struct, _name, _parent, _reg, _sc_offset,	\
++			     _enable_mask, _flags, _gate_flags, _ops)	\
++	struct sprd_gate _struct = {					\
++		.enable_mask	= _enable_mask,				\
++		.sc_offset	= _sc_offset,				\
++		.flags		= _gate_flags,				\
++		.common	= {						\
 +			.regmap		= NULL,				\
 +			.reg		= _reg,				\
-+			.hw.init = CLK_HW_INIT_PARENTS(_name,		\
-+						       _parent,		\
-+						       &sprd_comp_ops,	\
-+						       _flags),		\
-+			 }						\
++			.hw.init	= CLK_HW_INIT(_name,		\
++						      _parent,		\
++						      _ops,		\
++						      _flags),		\
++		}							\
 +	}
 +
-+#define SPRD_COMP_CLK(_struct, _name, _parent, _reg, _mshift,	\
-+			_mwidth, _dshift, _dwidth, _flags)	\
-+	SPRD_COMP_CLK_TABLE(_struct, _name, _parent, _reg,	\
-+			    NULL, _mshift, _mwidth,		\
-+			    _dshift, _dwidth, _flags)
++#define SPRD_GATE_CLK(_struct, _name, _parent, _reg,			\
++		      _enable_mask, _flags, _gate_flags)		\
++	SPRD_SC_GATE_CLK_OPS(_struct, _name, _parent, _reg, 0,		\
++			     _enable_mask, _flags, _gate_flags,		\
++			     &sprd_gate_ops)
 +
-+static inline struct sprd_comp *hw_to_sprd_comp(const struct clk_hw *hw)
++#define SPRD_SC_GATE_CLK(_struct, _name, _parent, _reg, _sc_offset,	\
++			 _enable_mask, _flags, _gate_flags)		\
++	SPRD_SC_GATE_CLK_OPS(_struct, _name, _parent, _reg, _sc_offset,	\
++			     _enable_mask, _flags, _gate_flags,		\
++			     &sprd_sc_gate_ops)
++
++static inline struct sprd_gate *hw_to_sprd_gate(const struct clk_hw *hw)
 +{
 +	struct sprd_clk_common *common = hw_to_sprd_clk_common(hw);
 +
-+	return container_of(common, struct sprd_comp, common);
++	return container_of(common, struct sprd_gate, common);
 +}
 +
-+extern const struct clk_ops sprd_comp_ops;
++extern const struct clk_ops sprd_gate_ops;
++extern const struct clk_ops sprd_sc_gate_ops;
 +
-+#endif /* _SPRD_COMPOSITE_H_ */
++#endif /* _SPRD_GATE_H_ */
 -- 
 2.7.4
