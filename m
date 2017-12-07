@@ -1,78 +1,141 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 07 Dec 2017 14:00:14 +0100
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <20171207082958.GA11882@kroah.com>
-References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0hEdK_vJcHeoz=Z2H6od=bktspPpTo37Y6qiOT2qptnaA@mail.gmail.com>
- <20171207082958.GA11882@kroah.com>
-Message-ID: <2960222.F3CtrQ5k26@aspire.rjw.lan>
+From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
+Date: Thu, 7 Dec 2017 20:57:04 +0800
+Subject: [PATCH V7 01/12] drivers: move clock common macros out from vendor
+ directories
+In-Reply-To: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
+References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
+Message-ID: <20171207125715.16160-2-chunyan.zhang@spreadtrum.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 7, 2017 9:29:58 AM CET Greg Kroah-Hartman wrote:
-> On Thu, Dec 07, 2017 at 12:19:25AM +0100, Rafael J. Wysocki wrote:
-> > Hi Greg,
-> > 
-> > On Wed, Dec 6, 2017 at 6:16 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > > On Wed, Dec 6, 2017 at 5:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> > >> On 12/6/2017 11:41 AM, Rafael J. Wysocki wrote:
-> > >>> On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> > >>>> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
-> > >>>>>> Yes, it should, so I'm not sure why you need the list in the first place.
-> > >>>>>>
-> > >>>>>> Also it looks like something along the lines of devres_release_all()
-> > >>>>>> should be sufficient.
-> > >>>>> Good suggestion, let me test this.
-> > >>>>>
-> > >>>>
-> > >>>> I tried to pull the code into GED but the API is not public. I also looked
-> > >>>> at how it is used. I was afraid to mess up with the internals of base.c by
-> > >>>> calling devres_release_all() externally first and by the driver framework
-> > >>>> next. I moved away from this approach.
-> > >>>
-> > >>> Are you sure it is called by the core in the shutdown path?
-> > >>
-> > >> Sorry, I was thinking about a general case not the shutdown path. If we open
-> > >> this API and have device drivers call it from arbitrary places; then we could
-> > >> be opening a new can of worms that show up during device driver removal.
-> > 
-> > [cut]
-> > 
-> > >
-> > > OK
-> > >
-> > > Anyway, it looks like something is missing in the core.
-> > >
-> > > You shouldn't really need to do all that dance in a driver.
-> > 
-> > We have a problem with the ACPI GED driver which essentially is a
-> > platform driver requesting a number of interrupts and handling them by
-> > dispatching a specific AML method.
-> > 
-> > It uses devm_request_threaded_irq() to request the interrupts, so it
-> > doesn't need a ->remove() callback, but it turns out to need a
-> > ->shutdown() one to free all of these interrupts at the shutdown time.
-> > 
-> > While we can add a ->shutdown() callback to it, that essentially needs
-> > to duplicate devres_release_all() somewhat.
-> > 
-> > Any suggestions what to do with that?
-> 
-> Just don't use devm_request_threaded_irq()?  :)
-> 
-> Seriously, those are just "helper" functions if your code happens to
-> follow the pattern they provide, if not, then don't use them, it's not
-> that hard to provide the correct code to unwind things properly by "open
-> coding" this logic as needed.
-> 
-> The devm_*irq() functions are known for not being able to be used all of
-> the time for lots of shutdown and cleanup issues, this isn't the first
-> time it has happened, which is why we are very careful when taking
-> "cleanup" patches that use those functions.
+These macros are used by more than one SoC vendor platforms, avoid to
+have many copies of these code, this patch moves them to the common
+header file which every clock drivers can access to.
 
-I see, thanks for the clarification.
+Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+---
+ drivers/clk/sunxi-ng/ccu_common.h | 29 -----------------------------
+ drivers/clk/zte/clk.h             | 18 ------------------
+ include/linux/clk-provider.h      | 38 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 38 insertions(+), 47 deletions(-)
 
-OK, we'll need to rework the driver somewhat, then.
-
-Thanks,
-Rafael
+diff --git a/drivers/clk/sunxi-ng/ccu_common.h b/drivers/clk/sunxi-ng/ccu_common.h
+index 5d684ce..568cfae 100644
+--- a/drivers/clk/sunxi-ng/ccu_common.h
++++ b/drivers/clk/sunxi-ng/ccu_common.h
+@@ -31,35 +31,6 @@
+ 
+ struct device_node;
+ 
+-#define CLK_HW_INIT(_name, _parent, _ops, _flags)			\
+-	&(struct clk_init_data) {					\
+-		.flags		= _flags,				\
+-		.name		= _name,				\
+-		.parent_names	= (const char *[]) { _parent },		\
+-		.num_parents	= 1,					\
+-		.ops 		= _ops,					\
+-	}
+-
+-#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)		\
+-	&(struct clk_init_data) {					\
+-		.flags		= _flags,				\
+-		.name		= _name,				\
+-		.parent_names	= _parents,				\
+-		.num_parents	= ARRAY_SIZE(_parents),			\
+-		.ops 		= _ops,					\
+-	}
+-
+-#define CLK_FIXED_FACTOR(_struct, _name, _parent,			\
+-			_div, _mult, _flags)				\
+-	struct clk_fixed_factor _struct = {				\
+-		.div		= _div,					\
+-		.mult		= _mult,				\
+-		.hw.init	= CLK_HW_INIT(_name,			\
+-					      _parent,			\
+-					      &clk_fixed_factor_ops,	\
+-					      _flags),			\
+-	}
+-
+ struct ccu_common {
+ 	void __iomem	*base;
+ 	u16		reg;
+diff --git a/drivers/clk/zte/clk.h b/drivers/clk/zte/clk.h
+index 4df0f12..f1041e3 100644
+--- a/drivers/clk/zte/clk.h
++++ b/drivers/clk/zte/clk.h
+@@ -14,24 +14,6 @@
+ 
+ #define PNAME(x) static const char *x[]
+ 
+-#define CLK_HW_INIT(_name, _parent, _ops, _flags)			\
+-	&(struct clk_init_data) {					\
+-		.flags		= _flags,				\
+-		.name		= _name,				\
+-		.parent_names	= (const char *[]) { _parent },		\
+-		.num_parents	= 1,					\
+-		.ops		= _ops,					\
+-	}
+-
+-#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)		\
+-	&(struct clk_init_data) {					\
+-		.flags		= _flags,				\
+-		.name		= _name,				\
+-		.parent_names	= _parents,				\
+-		.num_parents	= ARRAY_SIZE(_parents),			\
+-		.ops		= _ops,					\
+-	}
+-
+ struct zx_pll_config {
+ 	unsigned long rate;
+ 	u32 cfg0;
+diff --git a/include/linux/clk-provider.h b/include/linux/clk-provider.h
+index 7c925e6..26ea037 100644
+--- a/include/linux/clk-provider.h
++++ b/include/linux/clk-provider.h
+@@ -806,6 +806,44 @@ extern struct of_device_id __clk_of_table;
+ 	}								\
+ 	OF_DECLARE_1(clk, name, compat, name##_of_clk_init_driver)
+ 
++#define CLK_HW_INIT(_name, _parent, _ops, _flags)		\
++	(&(struct clk_init_data) {				\
++		.flags		= _flags,			\
++		.name		= _name,			\
++		.parent_names	= (const char *[]) { _parent },	\
++		.num_parents	= 1,				\
++		.ops		= _ops,				\
++	})
++
++#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)	\
++	(&(struct clk_init_data) {				\
++		.flags		= _flags,			\
++		.name		= _name,			\
++		.parent_names	= _parents,			\
++		.num_parents	= ARRAY_SIZE(_parents),		\
++		.ops		= _ops,				\
++	})
++
++#define CLK_HW_INIT_NO_PARENT(_name, _ops, _flags)	\
++	(&(struct clk_init_data) {			\
++		.flags          = _flags,		\
++		.name           = _name,		\
++		.parent_names   = NULL,			\
++		.num_parents    = 0,			\
++		.ops            = _ops,			\
++	})
++
++#define CLK_FIXED_FACTOR(_struct, _name, _parent,			\
++			_div, _mult, _flags)				\
++	struct clk_fixed_factor _struct = {				\
++		.div		= _div,					\
++		.mult		= _mult,				\
++		.hw.init	= CLK_HW_INIT(_name,			\
++					      _parent,			\
++					      &clk_fixed_factor_ops,	\
++					      _flags),			\
++	}
++
+ #ifdef CONFIG_OF
+ int of_clk_add_provider(struct device_node *np,
+ 			struct clk *(*clk_src_get)(struct of_phandle_args *args,
+-- 
+2.7.4
