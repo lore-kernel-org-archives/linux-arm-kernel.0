@@ -1,42 +1,55 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 7 Dec 2017 11:49:15 +0100
-Subject: [PATCH] Fix Bug for cadence i2c interrupt overrunning buffer
-In-Reply-To: <CAFcVECLWwo+OxSGAGYJfMSesjNT51X+Cwk+E_-RQk7gsEXy2YQ@mail.gmail.com>
-References: <20170916030252.10680-1-amworsley@gmail.com>
- <20171005120125.nnhomwg2e2twbaqm@ninjato>
- <CA+Y=x3=Ab-tZt-32Ve1qTB=REuQAZnGbX72ZeNpyX3EX7cR0pg@mail.gmail.com>
- <20171013184646.cy5gmpwrxbacje3m@ninjato>
- <CAFcVECJTUu7Kwd-2hx=4=iGwKFnpTAebR3ffjJHQLHKDZ3T4aw@mail.gmail.com>
- <CA+Y=x3nnQ0hQkBaGQ4+MDZsVgpdFCYqaMae9UrJ2vOOuAD9FdQ@mail.gmail.com>
- <CAFcVECK85xW_8oxVQGsHBGyZ4_5bcghpbonqDH-8tLp+Mwq=xQ@mail.gmail.com>
- <CA+Y=x3kpy0LE-mqjKWS8QWy7qzS2pNdDMHpDqZXRGvdt-UbYcA@mail.gmail.com>
- <CAFcVECLWwo+OxSGAGYJfMSesjNT51X+Cwk+E_-RQk7gsEXy2YQ@mail.gmail.com>
-Message-ID: <20171207104915.fdqkj35ga2yxeg3n@ninjato>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Dec 2017 10:49:48 +0000
+Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
+In-Reply-To: <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
+ <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+Message-ID: <20171207104948.GE31900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Kees,
 
-> > I attach a patch of the changes to the i2c driver showing my debug in
-> > this driver.
-> > As I said I am happy to send more verbose bug output - I have about 36
-> > odd runs with 9 occurences of the bug.
-> > Once it happen twice in the one run
+On Wed, Dec 06, 2017 at 11:56:50AM -0800, Kees Cook wrote:
+> On Tue, Oct 31, 2017 at 8:51 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+> > Miscellaneous:
 > >
-> > I include the crashing line from the runs where the bug occured (I
-> > added more diagnostics as the runs progressed):
+> >  * Change inconsistent copy_to_user() calls to __copy_to_user() in
+> >    preserve_sve_context().
+> >
+> >    There are already __put_user_error() calls here.
+> >
+> >    The whole extended signal frame is already checked for
+> >    access_ok(VERIFY_WRITE) in get_sigframe().
 > 
-> I'll check with out HW team as well and check your flow to
-> see if we can reproduce it; will also check if the existing errata
-> has larger scope.
-> I'll let you know if we require further assistance with debug
-> next week.
+> Verifying all these __copy_to/from_user() calls is rather non-trivial.
+> For example, I had to understand that the access_ok() check actually
+> spans memory that both user->sigframe and user->next_frame point into.
 
-Any news here?
+I don't think that's particularly difficult -- you just have to read the
+four lines preceding the access_ok.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/bb2a5f6f/attachment.sig>
+> And it isn't clear to me that all users of apply_user_offset() are
+> within this range too, along with other manually calculated offsets in
+> setup_sigframe().
+
+The offsets passed into apply_user_offset are calculated by
+setup_sigframe_layout as the stack is allocated, so they're correct by
+construction. We could add a size check in apply_user_offset if you like?
+
+> And it's not clear if parse_user_sigframe() is safe either. Are
+> user->fpsimd and user->sve checked somewhere? It seems like it's
+> safely contained by in sf->uc.uc_mcontext.__reserved, but it's hard to
+> read, though I do see access_ok() checks against __reserved at the end
+> of the while loop.
+
+This one is certainly more difficult to follow, mainly because it's spread
+about a bit and we have to check the extra context separately. However, the
+main part of the frame is checked in sys_rt_sigreturn before calling
+restore_sigframe, and the extra context is checked in parse_user_sigframe
+if we find it.
+
+Dave, any thoughts on making this easier to understand?
+
+Will
