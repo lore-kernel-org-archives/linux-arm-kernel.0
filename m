@@ -1,48 +1,40 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Thu, 7 Dec 2017 22:23:18 +0530
-Subject: [PATCH] arm64: allwinner: a64: orangepi-zero-plus2: add usb otg
-In-Reply-To: <20171207133409.cpp7wxx4yflkgavp@flea.lan>
-References: <1512644748-14491-1-git-send-email-jagan@amarulasolutions.com>
- <20171207133409.cpp7wxx4yflkgavp@flea.lan>
-Message-ID: <CAD6G_RQkBWth6iygyGfBX_rROEM7XUh3BmvoXfsxm8=po+kksQ@mail.gmail.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Thu, 7 Dec 2017 15:00:18 -0200
+Subject: [PATCH] ARM: dts: imx6: RDU2: correct RTC compatible
+In-Reply-To: <20171207150923.25024-1-l.stach@pengutronix.de>
+References: <20171207150923.25024-1-l.stach@pengutronix.de>
+Message-ID: <CAOMZO5D+-WWuq2VXY-C=0KMBuxR=ZAPdLFQo+crLbLA31=qr4g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 7:04 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi,
->
-> On Thu, Dec 07, 2017 at 04:35:48PM +0530, Jagan Teki wrote:
->> Add usb otg support for orangepi-zero-plus2 board:
->> - Add usb_otg node with dr_mode as 'otg'
->> - USB0-IDDET connected to PA21
->> - VBUS connected through DCIN which always on
->>
->> Tested mass storage function.
->>
->> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
->
-> Did you test the OTG or peripheral modes?
+Hi Lucas,
 
-dr_mode with otg and I've tested mas storage gadget with mmc disk emulation.
++ Rob and device tree list
 
+On Thu, Dec 7, 2017 at 1:09 PM, Lucas Stach <l.stach@pengutronix.de> wrote:
+> The RTC is manufactured by Maxim. This is a cosmetic fix, as Linux
+> doesn't match the vendor string for i2c devices.
 >
->> Note: Anyone please check vbus connection [1]
->> Since it is connected through DCIN of vcc-5v, I've added vcc-5v0
->> regulator for the same and attached to usb0_vbus-supply but it is
->> disabling during kernel boot.
->> [    1.887854] vcc5v0: disabling
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> VBUS is the power line that is provided on the USB connector. In
-> peripheral, that power is provided by the host, therefore it needs to
-> be shutdown on the peripheral end. This is the expected behaviour.
+> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> index eef737bd52d9..6bef9a98678e 100644
+> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> @@ -581,7 +581,7 @@
+>         };
+>
+>         ds1341: rtc at 68 {
+> -               compatible = "dallas,ds1341";
+> +               compatible = "maxim,ds1341";
 
-So, in my test with 'otg' host drive the vbus so-it is disabling at
-target end is it?
+Dallas has been acquired by Maxim and
+Documentation/devicetree/bindings/rtc/rtc-ds1307.txt
+mentions "dallas,ds1341", so better keep the existing notation.
 
-thanks!
--- 
-Jagan Teki
-Free Software Engineer | www.openedev.com
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Regards,
+
+Fabio Estevam
