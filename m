@@ -1,48 +1,68 @@
-From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
-Date: Thu, 7 Dec 2017 12:30:07 +0100
-Subject: [PATCH v2 0/8] arm64: Add initial Actions Semi S700 and
- CubieBoard7 support
-In-Reply-To: <e43387f9-60a6-129b-d0e9-dff6d0df301a@linaro.org>
-References: <20171113233427.5386-1-afaerber@suse.de>
- <e43387f9-60a6-129b-d0e9-dff6d0df301a@linaro.org>
-Message-ID: <2742e6af-2195-1f47-92eb-524107e426bd@suse.de>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 7 Dec 2017 12:30:47 +0100
+Subject: [kernel-hardening][PATCH v5 1/3] arm: mm: dump: make page table
+ dumping reusable
+In-Reply-To: <20171207105319.GA10075@pjb1027-Latitude-E5410>
+References: <20171207105319.GA10075@pjb1027-Latitude-E5410>
+Message-ID: <CAOFm3uFzFpDrc4KhH0qOLkXLioz=Fcz56hN-+POwuUHTAerv5g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 07.12.2017 um 10:20 schrieb Daniel Lezcano:
-> On 14/11/2017 00:34, Andreas F?rber wrote:
->> Hello,
->>
->> This series prepares the Actions Semi S700 SoC and Cubietech CubieBoard7.
->> It boots equally far as the S900 based Bubblegum-96 these patches are based on,
->> i.e. into an initrd with serial and all four cores up.
->>
->> v2 modifies the clocksource driver patches and adds SPS patches.
->>
->> Not having succeeded to replace the bootloader on eMMC or to try
->> booting from SD, the only working way I've found to boot mainline kernels
->> appears to be booting into Android, then issuing "reboot bootloader". U-Boot
->> is lacking the saveenv command, so it wasn't possible to change the bootdelay
->> to facilitate this.
-> 
-> Is it possible this change fixes your issue ?
-> 
-> http://git.denx.de/?p=u-boot.git;a=commit;h=c9e87ba66540cf72c164674a71af43853d087ba8
+Dear Jinbum,
 
-Actions is not yet supported in mainline U-Boot, and S500 boards did not
-have a problem there. The saveenv command is simply not enabled in this
-config deployed by Cubietech. Since I have not succeeded in getting a
-self-built U-Boot booted from SD, I cannot test individual commits on
-top either.
+On Thu, Dec 7, 2017 at 11:53 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
+> This patch refactors the arm page table dumping code,
+> so multiple tables may be registered with the framework.
+>
+> This patch refers below commits of arm64.
+> (4674fdb9f149 ("arm64: mm: dump: make page table dumping reusable"))
+> (4ddb9bf83349 ("arm64: dump: Make ptdump debugfs a separate option"))
+>
+> Tested-by: Laura Abbott <labbott@redhat.com>
+> Reviewed-by: Laura Abbott <labbott@redhat.com>
+> Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
+[]
+> diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
+> new file mode 100644
+> index 0000000..3a6c0b7
+> --- /dev/null
+> +++ b/arch/arm/include/asm/ptdump.h
+> @@ -0,0 +1,48 @@
+> +/*
+> + * Copyright (C) 2014 ARM Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * You should have received a copy of the GNU General Public License
+> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+> + */
 
-Maybe Cubietech or Actions can comment?
+Sorry if I am nitpicking, but have you considered replacing this
+beautiful piece of fine legalese with the new SPDX ids?
+e.g. this:
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (C) 2014 ARM Ltd.
 
-Regards,
-Andreas
+Or if this does not work and your includes break something if they are
+used in assembly, then this can work out too
 
->> Cf. https://en.opensuse.org/HCL:CubieBoard7
+> +/* SPDX-License-Identifier: GPL-2.0 */
+> +/* Copyright (C) 2014 ARM Ltd. */
+
+See Thomas doc patches, and Greg and Linus comments on these topics.
+
+This is much leaner, is it?
+Less legalese comment also means more code and a better, smaller
+boilerplate lines/total lines ratio!
+Thank you for your kind consideration.
 
 -- 
-SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
-GF: Felix Imend?rffer, Jane Smithard, Graham Norton
-HRB 21284 (AG N?rnberg)
+Cordially
+Philippe Ombredanne
