@@ -1,43 +1,67 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:07 +0100
-Subject: [PATCH 04/54] arm64: dts: renesas: r8a77970: Add RWDT node
+Date: Thu,  7 Dec 2017 10:53:05 +0100
+Subject: [PATCH 02/54] arm64: dts: renesas: r8a7795: Use R-Car SDHI Gen3
+ fallback compat string
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <206d082e55850797b7152a7c56ccc5c4a41b72ee.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <e4428a726d57fb6068346a736c79953657bc8da6.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Use newly added R-Car SDHI Gen3 fallback compat string
+in the DT of the r8a7795 SoC.
 
-Add a device node for the Watchdog Timer (WDT) controller on the
-Renesas R-Car V3M (r8a77970) SoC.
+This should have no run-time effect as the driver matches against
+the per-SoC compat string before considering the fallback compat string.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index 97e6981938e7..75d09f1724f0 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -103,6 +103,16 @@
- 						  IRQ_TYPE_LEVEL_LOW)>;
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 15ef292a8d9f..42c51f2ec30b 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -1539,7 +1539,8 @@
  		};
  
-+		rwdt: watchdog at e6020000 {
-+			compatible = "renesas,r8a77970-wdt",
-+				     "renesas,rcar-gen3-wdt";
-+			reg = <0 0xe6020000 0 0x0c>;
-+			clocks = <&cpg CPG_MOD 402>;
-+			power-domains = <&sysc 32>;
-+			resets = <&cpg 402>;
-+			status = "disabled";
-+		};
-+
- 		cpg: clock-controller at e6150000 {
- 			compatible = "renesas,r8a77970-cpg-mssr";
- 			reg = <0 0xe6150000 0 0x1000>;
+ 		sdhi0: sd at ee100000 {
+-			compatible = "renesas,sdhi-r8a7795";
++			compatible = "renesas,sdhi-r8a7795",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee100000 0 0x2000>;
+ 			interrupts = <GIC_SPI 165 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 314>;
+@@ -1550,7 +1551,8 @@
+ 		};
+ 
+ 		sdhi1: sd at ee120000 {
+-			compatible = "renesas,sdhi-r8a7795";
++			compatible = "renesas,sdhi-r8a7795",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee120000 0 0x2000>;
+ 			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 313>;
+@@ -1561,7 +1563,8 @@
+ 		};
+ 
+ 		sdhi2: sd at ee140000 {
+-			compatible = "renesas,sdhi-r8a7795";
++			compatible = "renesas,sdhi-r8a7795",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee140000 0 0x2000>;
+ 			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 312>;
+@@ -1572,7 +1575,8 @@
+ 		};
+ 
+ 		sdhi3: sd at ee160000 {
+-			compatible = "renesas,sdhi-r8a7795";
++			compatible = "renesas,sdhi-r8a7795",
++				     "renesas,rcar-gen3-sdhi";
+ 			reg = <0 0xee160000 0 0x2000>;
+ 			interrupts = <GIC_SPI 168 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&cpg CPG_MOD 311>;
 -- 
 2.11.0
