@@ -1,49 +1,46 @@
-From: liwei213@huawei.com (Li Wei)
-Date: Thu, 7 Dec 2017 18:20:24 +0800
-Subject: [PATCH v6 3/5] arm64: dts: add ufs dts node
-In-Reply-To: <20171207102026.14977-1-liwei213@huawei.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 7 Dec 2017 11:34:16 +0100
+Subject: [PATCH v6 1/5] scsi: ufs: add Hisilicon ufs driver code
+In-Reply-To: <20171207102026.14977-2-liwei213@huawei.com>
 References: <20171207102026.14977-1-liwei213@huawei.com>
-Message-ID: <20171207102026.14977-4-liwei213@huawei.com>
+ <20171207102026.14977-2-liwei213@huawei.com>
+Message-ID: <CAOFm3uEgT4gzusQpXb3SnriTdU0nAha2tcVKOoZJRjZw=dx7sg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-arm64: dts: add ufs node for Hisilicon.
+Dear Li,
 
-Signed-off-by: Li Wei <liwei213@huawei.com>
----
- arch/arm64/boot/dts/hisilicon/hi3660.dtsi | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
+On Thu, Dec 7, 2017 at 11:20 AM, Li Wei <liwei213@huawei.com> wrote:
+> add Hisilicon ufs driver code.
+>
+> Signed-off-by: Li Wei <liwei213@huawei.com>
+> Signed-off-by: Geng Jianfeng <gengjianfeng@hisilicon.com>
+> Signed-off-by: Zang Leigang <zangleigang@hisilicon.com>
+> Signed-off-by: Yu Jianfeng <steven.yujianfeng@hisilicon.com>
+[]
 
-diff --git a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-index ab0b95ba5ae5..3c57346366ad 100644
---- a/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-+++ b/arch/arm64/boot/dts/hisilicon/hi3660.dtsi
-@@ -904,6 +904,26 @@
- 			reset-gpios = <&gpio11 1 0 >;
- 		};
- 
-+		/* UFS */
-+		ufs: ufs at ff3b0000 {
-+			compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-+			/* 0: HCI standard */
-+			/* 1: UFS SYS CTRL */
-+			reg = <0x0 0xff3b0000 0x0 0x1000>,
-+				<0x0 0xff3b1000 0x0 0x1000>;
-+			interrupt-parent = <&gic>;
-+			interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-+				<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-+			clock-names = "ref_clk", "phy_clk";
-+			freq-table-hz = <0 0>, <0 0>;
-+			/* offset: 0x84; bit: 12 */
-+			/* offset: 0x84; bit: 7  */
-+			resets = <&crg_rst 0x84 12>,
-+				<&crg_rst 0x84 7>;
-+			reset-names = "rst", "assert";
-+		};
-+
- 		/* SD */
- 		dwmmc1: dwmmc1 at ff37f000 {
- 			#address-cells = <1>;
+> --- /dev/null
+> +++ b/drivers/scsi/ufs/ufs-hisi.c
+> @@ -0,0 +1,624 @@
+> +/*
+> + *
+> + * HiSilicon Hixxxx UFS Driver
+> + *
+> + * Copyright (c) 2016-2017 Linaro Ltd.
+> + * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + */
+
+Would you consider using the new SPDX license ids instead?
+Check Thomas doc patches for instructions.
+This would be great and while you are it may be this could be adopted
+for all HiSilicon and Huawei past, present and future contributions?
+Thank you for your kind consideration!
+
 -- 
-2.15.0
+Cordially
+Philippe Ombredanne
