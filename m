@@ -1,21 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Dec 2017 17:36:41 -0600
-Subject: [PATCH v2 1/7] dt-bindings: marvell: Add documentation for the
- North Bridge PM on Armada 37xx
-In-Reply-To: <20171207135616.23670-2-gregory.clement@free-electrons.com>
-References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
- <20171207135616.23670-2-gregory.clement@free-electrons.com>
-Message-ID: <20171207233641.dnz257is4zw426xo@rob-hp-laptop>
+Date: Thu, 7 Dec 2017 17:45:50 -0600
+Subject: [PATCH v4 1/2] of: documentation: add bindings documentation for
+ TS-7970
+In-Reply-To: <20171207160550.2782-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20171207160550.2782-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20171207234550.nyumi7fzg6wke46p@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 02:56:10PM +0100, Gregory CLEMENT wrote:
-> Extend the documentation of the Armada 37xx SoC with the the North
-> Bridge Power Management component.
+On Thu, Dec 07, 2017 at 11:05:49AM -0500, Sebastien Bourdelin wrote:
+> This adds the documentation for the TS-7970 by Technologic Systems.
 > 
-> Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
 > ---
->  .../devicetree/bindings/arm/marvell/armada-37xx.txt   | 19 +++++++++++++++++++
->  1 file changed, 19 insertions(+)
+> Changes v3 -> v4:
+>   - rebase on master
+> 
+> Changes v1 -> v2:
+>   - rebase on master
+> ---
+>  Documentation/devicetree/bindings/arm/technologic.txt | 6 ++++++
+>  1 file changed, 6 insertions(+)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
