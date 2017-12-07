@@ -1,57 +1,115 @@
-From: gengdongjiu@huawei.com (gengdongjiu)
-Date: Thu, 7 Dec 2017 13:55:36 +0800
-Subject: [PATCH RESEND] arm64: fault: avoid send SIGBUS two times
-In-Reply-To: <20171206161540.GB25408@arm.com>
-References: <20171205150235.46325-1-gengdongjiu@huawei.com>
- <20171206161540.GB25408@arm.com>
-Message-ID: <7d5791bf-39d4-b790-2f01-6abff800c6d0@huawei.com>
+From: nsekhar@ti.com (Sekhar Nori)
+Date: Thu, 7 Dec 2017 11:27:17 +0530
+Subject: [PATCH v2 1/3] ARM: davinci: Use platform_device_register_full()
+ to create pdev for dm365's eDMA
+In-Reply-To: <20171205123458.97837-2-amery@hanoverdisplays.com>
+References: <2298378f-37d0-0c04-dfe3-4503c58e5456@ti.com>
+ <20171204133359.45625-1-amery@hanoverdisplays.com>
+ <20171205123458.97837-1-amery@hanoverdisplays.com>
+ <20171205123458.97837-2-amery@hanoverdisplays.com>
+Message-ID: <3a6e1896-89de-9871-eac0-24b75097190a@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017/12/7 0:15, Will Deacon wrote:
->> --- a/arch/arm64/mm/fault.c
->> +++ b/arch/arm64/mm/fault.c
->> @@ -570,7 +570,6 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>  {
->>  	struct siginfo info;
->>  	const struct fault_info *inf;
->> -	int ret = 0;
->>  
->>  	inf = esr_to_fault_info(esr);
->>  	pr_err("Synchronous External Abort: %s (0x%08x) at 0x%016lx\n",
->> @@ -585,7 +584,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>  		if (interrupts_enabled(regs))
->>  			nmi_enter();
->>  
->> -		ret = ghes_notify_sea();
->> +		ghes_notify_sea();
->>  
->>  		if (interrupts_enabled(regs))
->>  			nmi_exit();
->> @@ -600,7 +599,7 @@ static int do_sea(unsigned long addr, unsigned int esr, struct pt_regs *regs)
->>  		info.si_addr  = (void __user *)addr;
->>  	arm64_notify_die("", regs, &info, esr);
->>  
->> -	return ret;
->> +	return 0;
-> Hmm, so this code is a bit of mess.
+Hi Alejandro,
+
+On Tuesday 05 December 2017 06:04 PM, Alejandro Mery wrote:
+> as it was done by 7ab388e85faa97a35d520720269e7c8e00ad54a0 for other davinci SoCs
 > 
-> Wouldn't it be better to have the signal dispatching code in do_mem_abort
-> check ESR.ESR_ELx_FnV, so then do_sea wouldn't have to, and we could just
-> return an error instead?
+> changes since v1:
+> * fix typo
+> 
+> Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
 
-Thanks the mail and comments!
+The patch itself looks good (and apologies for not catching the missing 
+DM365 conversion). But:
 
-Regardless ghes_notify_sea()'s return value, it always needs to deliver signal,
-because ghes_notify_sea()'s return value does not reflect whether the memory error
-handler(memory_failure()) handle the error successfully or failed. If let do_mem_abort()
-delivers the signal, we should always let do_sea() return error, then  the do_mem_abort() can
-always deliver signal. Then we will see the strange log as shown below when happen Synchronous External Abort.
+The way you refer to the commit in patch description will lead to 
+checkpatch error. And, we need more explanation in the patch description 
+than just referencing the commit which is being fixed. When fixing a 
+previous commit, its best to use the Fixes: tag (see below). Thats an 
+indication for stable tree maintainers to backport this patch all the 
+way till the time the offending commit was introduced into the kernel. 
+This way you don't have to do the backporting yourself.
 
-[  676.700652] Synchronous External Abort: synchronous external abort (0x96000410) at 0x0000000033ff7008
-[  676.723301] Unhandled fault: synchronous external abort (0x96000410) at 0x0000000033ff7008
+Please keep the changelog below the tearline "---" so it will not get 
+included in commit description. And, when submitting another version, 
+please carry forward the Reviewed-by: and and Acked-by: tags you 
+received for previous version (unless the patch has changed so 
+significantly that it does not make sense to do so anymore).
 
-so I think it is better send the signal in the do_sea(), not send it in the do_mem_abort().
-do_mem_abort() only send the signal when the exception does not defined in fault_info[]. Another benefit
-is that do_sea() can send different signal according to the Synchronous External Abort type, such as SIGBUS or SIGKILL.
-the do_mem_abort() can only send one kind signal.
+For this time, I fixed all of these up locally. Here is the final commit 
+text.
+
+--8<--
+ARM: davinci: Use platform_device_register_full() to create pdev for dm365's eDMA
+
+Convert the DM365 EDMA platform device creation to use
+struct platform_device_info XXXXXX __initconst and
+platform_device_register_full()
+
+This will allow us to specify the dma_mask for the device
+in an upcoming patch. Without this, EDMA on DM365 refuses
+to probe.
+
+Fixes: 7ab388e85faa ("ARM: davinci: Use platform_device_register_full() to create pdev for eDMA")
+Reviewed-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+Signed-off-by: Alejandro Mery <amery@hanoverdisplays.com>
+Signed-off-by: Sekhar Nori <nsekhar@ti.com>
+--8<--
+
+Thanks,
+Sekhar
+
+
+> ---
+>  arch/arm/mach-davinci/dm365.c | 20 +++++++++++++-------
+>  1 file changed, 13 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm/mach-davinci/dm365.c b/arch/arm/mach-davinci/dm365.c
+> index 8be04ec95adf..9bd17bc77b5c 100644
+> --- a/arch/arm/mach-davinci/dm365.c
+> +++ b/arch/arm/mach-davinci/dm365.c
+> @@ -925,12 +925,13 @@ static struct resource edma_resources[] = {
+>  	/* not using TC*_ERR */
+>  };
+>  
+> -static struct platform_device dm365_edma_device = {
+> -	.name			= "edma",
+> -	.id			= 0,
+> -	.dev.platform_data	= &dm365_edma_pdata,
+> -	.num_resources		= ARRAY_SIZE(edma_resources),
+> -	.resource		= edma_resources,
+> +static const struct platform_device_info dm365_edma_device __initconst = {
+> +	.name		= "edma",
+> +	.id		= 0,
+> +	.res		= edma_resources,
+> +	.num_res	= ARRAY_SIZE(edma_resources),
+> +	.data		= &dm365_edma_pdata,
+> +	.size_data	= sizeof(dm365_edma_pdata),
+>  };
+>  
+>  static struct resource dm365_asp_resources[] = {
+> @@ -1428,13 +1429,18 @@ int __init dm365_init_video(struct vpfe_config *vpfe_cfg,
+>  
+>  static int __init dm365_init_devices(void)
+>  {
+> +	struct platform_device *edma_pdev;
+>  	int ret = 0;
+>  
+>  	if (!cpu_is_davinci_dm365())
+>  		return 0;
+>  
+>  	davinci_cfg_reg(DM365_INT_EDMA_CC);
+> -	platform_device_register(&dm365_edma_device);
+> +	edma_pdev = platform_device_register_full(&dm365_edma_device);
+> +	if (IS_ERR(edma_pdev)) {
+> +		pr_warn("%s: Failed to register eDMA\n", __func__);
+> +		return PTR_ERR(edma_pdev);
+> +	}
+>  
+>  	platform_device_register(&dm365_mdio_device);
+>  	platform_device_register(&dm365_emac_device);
+> -- 
+> 2.15.0
+> 
