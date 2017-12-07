@@ -1,109 +1,53 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Wed, 6 Dec 2017 22:50:12 -0800
-Subject: [PATCH V6 02/12] clk: sprd: Add common infrastructure
-In-Reply-To: <20171127100115.20655-3-chunyan.zhang@spreadtrum.com>
-References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
- <20171127100115.20655-3-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171207065012.GW4283@codeaurora.org>
+From: mathias.nyman@linux.intel.com (Mathias Nyman)
+Date: Thu, 7 Dec 2017 08:55:56 +0200
+Subject: [PATCH] usb: xhci: fix TDS for MTK xHCI1.1
+In-Reply-To: <035626be9cb863b145b02369fe517d1c80335398.1512542108.git.chunfeng.yun@mediatek.com>
+References: <035626be9cb863b145b02369fe517d1c80335398.1512542108.git.chunfeng.yun@mediatek.com>
+Message-ID: <27d72801-417e-5726-561a-dd521795bc23@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/27, Chunyan Zhang wrote:
-> +
-> +	sprd_clk_set_regmap(desc, regmap);
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(sprd_clk_regmap_init);
-> +
-> +int sprd_clk_probe(struct device *dev, struct clk_hw_onecell_data *clkhw)
-> +{
-> +	int i, ret = 0;
+On 06.12.2017 08:42, Chunfeng Yun wrote:
+> For MTK's xHCI 1.0 or latter, TD size is the number of max
+> packet sized packets remaining in the TD, not including
+> this TRB (following spec).
+> 
+> For MTK's xHCI 0.96 and older, TD size is the number of max
+> packet sized packets remaining in the TD, including this TRB
+> (not following spec).
+> 
+> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+> ---
+>   drivers/usb/host/xhci-ring.c | 6 +++---
+>   1 file changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/usb/host/xhci-ring.c b/drivers/usb/host/xhci-ring.c
+> index c239c68..0619869 100644
+> --- a/drivers/usb/host/xhci-ring.c
+> +++ b/drivers/usb/host/xhci-ring.c
+> @@ -3108,7 +3108,7 @@ static u32 xhci_td_remainder(struct xhci_hcd *xhci, int transferred,
+>   {
+>   	u32 maxp, total_packet_count;
+>   
+> -	/* MTK xHCI is mostly 0.97 but contains some features from 1.0 */
+> +	/* MTK xHCI 0.96 contains some features from 1.0 */
+>   	if (xhci->hci_version < 0x100 && !(xhci->quirks & XHCI_MTK_HOST))
+>   		return ((td_total_len - transferred) >> 10);
+>   
+> @@ -3117,8 +3117,8 @@ static u32 xhci_td_remainder(struct xhci_hcd *xhci, int transferred,
+>   	    trb_buff_len == td_total_len)
+>   		return 0;
+>   
+> -	/* for MTK xHCI, TD size doesn't include this TRB */
+> -	if (xhci->quirks & XHCI_MTK_HOST)
+> +	/* for MTK xHCI 0.96, TD size include this TRB, but not in 1.x */
+> +	if ((xhci->quirks & XHCI_MTK_HOST) && (xhci->hci_version < 0x100))
+>   		trb_buff_len = 0;
+>   
+>   	maxp = usb_endpoint_maxp(&urb->ep->desc);
+> 
 
-ret shouldn't need to be initialized here.
+Thanks, adding.
+Adding stable tag as well
 
-> +	struct clk_hw *hw;
-> +
-> +	for (i = 0; i < clkhw->num; i++) {
-> +
-> +		hw = clkhw->hws[i];
-> +
-> +		if (!hw)
-> +			continue;
-> +
-> +		ret = devm_clk_hw_register(dev, hw);
-> +		if (ret) {
-> +			dev_err(dev, "Couldn't register clock %d - %s\n",
-> +				i, hw->init->name);
-> +			return ret;
-> +		}
-> +	}
-> +
-> +	ret = of_clk_add_hw_provider(dev->of_node, of_clk_hw_onecell_get,
-> +				     clkhw);
-
-You can use devm_ now for this.
-
-> +	if (ret)
-> +		dev_err(dev, "Failed to add clock provider.\n");
-
-Please remove the full stop on error messages.
-
-> +
-> +	return ret;
-> +}
-> +EXPORT_SYMBOL_GPL(sprd_clk_probe);
-> +
-> +MODULE_LICENSE("GPL v2");
-> diff --git a/drivers/clk/sprd/common.h b/drivers/clk/sprd/common.h
-> new file mode 100644
-> index 0000000..8cd774e
-> --- /dev/null
-> +++ b/drivers/clk/sprd/common.h
-> @@ -0,0 +1,52 @@
-> +/*
-> + * Spreadtrum clock infrastructure
-> + *
-> + * Copyright (C) 2017 Spreadtrum, Inc.
-> + * Author: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
-> + *
-> + * SPDX-License-Identifier: GPL-2.0
-> + */
-> +
-> +#ifndef _SPRD_CLK_COMMON_H_
-> +#define _SPRD_CLK_COMMON_H_
-> +
-> +#include <linux/clk-provider.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/regmap.h>
-> +
-> +#include "../clk_common.h"
-> +
-> +struct device_node;
-> +
-> +struct sprd_clk_common {
-> +	struct regmap	*regmap;
-> +	u32		reg;
-> +	struct clk_hw	hw;
-> +};
-> +
-> +struct sprd_clk_desc {
-> +	struct sprd_clk_common		**clk_clks;
-> +	unsigned long			num_clk_clks;
-> +	struct clk_hw_onecell_data      *hw_clks;
-> +};
-> +
-> +#define sprd_regmap_read(map, reg, val)				\
-> +({								\
-> +	(map) ? regmap_read((map), (reg), (val)) : (-EINVAL);	\
-
-Do we sometimes not have a map? This seems overly cautious.
-
-> +})
-> +
-> +#define sprd_regmap_write(map, reg, val)			\
-> +({								\
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Mathias
