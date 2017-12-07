@@ -1,173 +1,74 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Thu, 7 Dec 2017 09:14:33 +0100
-Subject: [PATCH 1/1] codestyle issue fixed drivers/staging/vc04_services
-In-Reply-To: <40d794a2bd0dd9dbb3add85c79b9b314ccbb480a.1512631936.git.lameli67@gmail.com>
-References: <40d794a2bd0dd9dbb3add85c79b9b314ccbb480a.1512631936.git.lameli67@gmail.com>
-Message-ID: <ee4ad6c7-9d5e-bd66-4738-148dddb69ef5@i2se.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 7 Dec 2017 09:18:16 +0100
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <20171207075203.gcxprq7ctv637fm7@GaryWorkstation>
+References: <20171205100148.5757-1-glin@suse.com>
+ <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
+ <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
+ <20171206183734.xmgecyrd5suiurm6@gmail.com>
+ <20171207015903.jaos5siysggzz4nc@GaryWorkstation>
+ <20171207060927.i4b4h6ahas3iiyrc@gmail.com>
+ <20171207075203.gcxprq7ctv637fm7@GaryWorkstation>
+Message-ID: <20171207081816.jy2rw5y5iyxeqw6n@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Mikhail,
 
-Am 07.12.2017 um 08:47 schrieb Mikhail Shvetsov:
-> From: Mike <lameli67@gmail.com>
+* Gary Lin <glin@suse.com> wrote:
 
-please provide your full name and a changelog. Also the subject should
-start with something like "staging: vchiq_arm:".
+> On Thu, Dec 07, 2017 at 07:09:27AM +0100, Ingo Molnar wrote:
+> > 
+> > * Gary Lin <glin@suse.com> wrote:
+> > 
+> > > On Wed, Dec 06, 2017 at 07:37:34PM +0100, Ingo Molnar wrote:
+> > > > 
+> > > > * Gary Lin <glin@suse.com> wrote:
+> > > > 
+> > > > > On Tue, Dec 05, 2017 at 04:14:26PM -0500, Josh Boyer wrote:
+> > > > > > On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
+> > > > > > > The series of patches introduce Security Version to EFI stub.
+> > > > > > >
+> > > > > > > Security Version is a monotonically increasing number and designed to
+> > > > > > > prevent the user from loading an insecure kernel accidentally. The
+> > > > > > > bootloader maintains a list of security versions corresponding to
+> > > > > > > different distributions. After fixing a critical vulnerability, the
+> > > > > > > distribution kernel maintainer bumps the "version", and the bootloader
+> > > > > > > updates the list automatically. When the user tries to load a kernel
+> > > > > > > with a lower security version, the bootloader shows a warning prompt
+> > > > > > > to notify the user the potential risk.
+> > > > > > 
+> > > > > > If a distribution releases a kernel with a higher security version and
+> > > > > > that it automatically updated on boot, what happens if that kernel
+> > > > > > contains a different bug that causes it to fail to boot or break
+> > > > > > critical functionality?  At that point, the user's machine would be in
+> > > > > > a state where the higher security version is enforced but the only
+> > > > > > kernel that provides that is broken.  Wouldn't that make a bad
+> > > > > > situation even worse by now requiring manual acceptance of the older
+> > > > > > SV kernel boot physically at the machine?
+> > > > > > 
+> > > > > > I feel like I'm missing a detail here or something.
+> > > > > > 
+> > > > > If the new kernel fails to boot, then the user has to choose the kernel
+> > > > > manually anyway, and there will be an option in the warning prompt to
+> > > > > lower SV.
+> > > > 
+> > > > And what if the firmware does not support a lowering of the SV?
+> > > > 
+> > > The SV list is manipulated by the bootloader, and the firmware only
+> > > provides the interface to the storage, i.e. non-volatile flash.
+> > 
+> > What about systems where the bootloader is part of the system and users only have 
+> > the ability to provide kernel images, but no ability to change the boot loader?
+> 
+> It depends on how the bootloader works. If the system uses my
+> implementation of shim loader, it surely has the ability to lower SV,
+> but it requires physical access on purpose.
 
->
-> Signed-off-by: Mike <lameli67@gmail.com>
-> ---
->  .../interface/vchiq_arm/vchiq_kern_lib.c           | 64 ++++++++++++----------
->  1 file changed, 35 insertions(+), 29 deletions(-)
->
-> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-> index 34f746db19cd..d21bb154f78c 100644
-> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
-> @@ -65,10 +65,10 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
->  	unsigned int size, VCHIQ_BULK_DIR_T dir);
->  
->  /****************************************************************************
-> -*
-> -*   vchiq_initialise
-> -*
-> -***************************************************************************/
-> + *
-> + *   vchiq_initialise
-> + *
-> + ***************************************************************************/
+And that's my problem: if in practice the bootloader is 'part of the system', is 
+signed and is updated like the firmware, then putting a "Security Version" into 
+the kernel image and architecting a boot protocol for a monotonic method for the 
+bootloader to restrict the loading of kernel images is an obviously bad idea.
 
-Instead of fixing the comment style, i prefer to drop this kind of
-useless comments in a separate patch.
+Thanks,
 
->  #define VCHIQ_INIT_RETRIES 10
->  VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
->  {
-> @@ -80,7 +80,9 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
->  	vchiq_log_trace(vchiq_core_log_level, "%s called", __func__);
->  
->  	/* VideoCore may not be ready due to boot up timing.
-> -	   It may never be ready if kernel and firmware are mismatched, so don't block forever. */
-> +	 * It may never be ready if kernel and firmware are mismatched, so don't
-> +	 * block forever.
-> +	 */
->  	for (i = 0; i < VCHIQ_INIT_RETRIES; i++) {
->  		state = vchiq_get_state();
->  		if (state)
-> @@ -93,7 +95,8 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
->  		goto failed;
->  	} else if (i > 0) {
->  		vchiq_log_warning(vchiq_core_log_level,
-> -			"%s: videocore initialized after %d retries\n", __func__, i);
-> +			"%s: videocore initialized after %d retries\n",
-> +			__func__, i);
-
-This isn't a comment, so it should be a separate patch.
-
->  	}
->  
->  	instance = kzalloc(sizeof(*instance), GFP_KERNEL);
-> @@ -121,10 +124,10 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
->  EXPORT_SYMBOL(vchiq_initialise);
->  
->  /****************************************************************************
-> -*
-> -*   vchiq_shutdown
-> -*
-> -***************************************************************************/
-> + *
-> + *   vchiq_shutdown
-> + *
-> + ***************************************************************************/
->  
->  VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
->  {
-> @@ -169,10 +172,10 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
->  EXPORT_SYMBOL(vchiq_shutdown);
->  
->  /****************************************************************************
-> -*
-> -*   vchiq_is_connected
-> -*
-> -***************************************************************************/
-> + *
-> + *   vchiq_is_connected
-> + *
-> + ***************************************************************************/
->  
->  static int vchiq_is_connected(VCHIQ_INSTANCE_T instance)
->  {
-> @@ -180,10 +183,10 @@ static int vchiq_is_connected(VCHIQ_INSTANCE_T instance)
->  }
->  
->  /****************************************************************************
-> -*
-> -*   vchiq_connect
-> -*
-> -***************************************************************************/
-> + *
-> + *   vchiq_connect
-> + *
-> + ***************************************************************************/
->  
->  VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
->  {
-> @@ -215,10 +218,10 @@ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
->  EXPORT_SYMBOL(vchiq_connect);
->  
->  /****************************************************************************
-> -*
-> -*   vchiq_add_service
-> -*
-> -***************************************************************************/
-> + *
-> + *   vchiq_add_service
-> + *
-> + ***************************************************************************/
->  
->  VCHIQ_STATUS_T vchiq_add_service(
->  	VCHIQ_INSTANCE_T              instance,
-> @@ -260,10 +263,10 @@ VCHIQ_STATUS_T vchiq_add_service(
->  EXPORT_SYMBOL(vchiq_add_service);
->  
->  /****************************************************************************
-> -*
-> -*   vchiq_open_service
-> -*
-> -***************************************************************************/
-> + *
-> + *   vchiq_open_service
-> + *
-> + ***************************************************************************/
->  
->  VCHIQ_STATUS_T vchiq_open_service(
->  	VCHIQ_INSTANCE_T              instance,
-> @@ -414,8 +417,9 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
->  			if ((bulk->data != data) ||
->  				(bulk->size != size)) {
->  				/* This is not a retry of the previous one.
-> -				** Cancel the signal when the transfer
-> -				** completes. */
-> +				 * Cancel the signal when the transfer
-> +				 * completes.
-> +				 */
->  				spin_lock(&bulk_waiter_spinlock);
->  				bulk->userdata = NULL;
->  				spin_unlock(&bulk_waiter_spinlock);
-> @@ -441,7 +445,9 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
->  
->  		if (bulk) {
->  			/* Cancel the signal when the transfer
-> -			 ** completes. */
-> +			 *
-
-Please avoid this empty line.
-
-Thanks
-
-> +			 * completes.
-> +			 */
->  			spin_lock(&bulk_waiter_spinlock);
->  			bulk->userdata = NULL;
->  			spin_unlock(&bulk_waiter_spinlock);
+	Ingo
