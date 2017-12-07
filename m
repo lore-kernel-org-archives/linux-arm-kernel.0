@@ -1,93 +1,55 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:25 +0100
-Subject: [PATCH 22/54] arm64: dts: renesas: r8a7795: Tie Audio-DMAC to
- IPMMU-MP0/1
+Date: Thu,  7 Dec 2017 10:53:23 +0100
+Subject: [PATCH 20/54] arm64: dts: renesas: r8a7795-es1: Add IPMMU device nodes
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <c2b57f76a725b65a24bae0fd1486b58addb7d75f.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <e4b9a493df45075bf3ae2d41fdc1a29e57fe024b.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Hook up r8a7795 ES2.0 Audio-DMAC nodes to the IPMMU-MP0.
-Hook up r8a7795 ES1.x Audio-DMAC nodes to the IPMMU-MP1.
+Add r8a7795 ES1.x IPMMU nodes and keep all disabled by default.
+
+This is a follow-up to a patch that adds IPMMU device nodes that
+are common to r8a7795 ES1.x and ES2.0
+
+Power domains are omitted as they appear to be undocumented.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 22 ++++++++++++++++++++++
- arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 16 ++++++++++++++++
- 2 files changed, 38 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-index 38b7cfb3b428..2dfe8108072c 100644
+index 246323eacb56..38b7cfb3b428 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-@@ -127,6 +127,28 @@
- 	renesas,ipmmu-main = <&ipmmu_mm 7>;
- };
+@@ -26,6 +26,22 @@
+ 	/delete-node/ mmu at fd960000;
+ 	/delete-node/ mmu at fd970000;
  
-+&audma0 {
-+	iommus = <&ipmmu_mp1 0>, <&ipmmu_mp1 1>,
-+	       <&ipmmu_mp1 2>, <&ipmmu_mp1 3>,
-+	       <&ipmmu_mp1 4>, <&ipmmu_mp1 5>,
-+	       <&ipmmu_mp1 6>, <&ipmmu_mp1 7>,
-+	       <&ipmmu_mp1 8>, <&ipmmu_mp1 9>,
-+	       <&ipmmu_mp1 10>, <&ipmmu_mp1 11>,
-+	       <&ipmmu_mp1 12>, <&ipmmu_mp1 13>,
-+	       <&ipmmu_mp1 14>, <&ipmmu_mp1 15>;
-+};
++	ipmmu_mp1: mmu at ec680000 {
++		compatible = "renesas,ipmmu-r8a7795";
++		reg = <0 0xec680000 0 0x1000>;
++		renesas,ipmmu-main = <&ipmmu_mm 5>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
 +
-+&audma1 {
-+	iommus = <&ipmmu_mp1 16>, <&ipmmu_mp1 17>,
-+	       <&ipmmu_mp1 18>, <&ipmmu_mp1 19>,
-+	       <&ipmmu_mp1 20>, <&ipmmu_mp1 21>,
-+	       <&ipmmu_mp1 22>, <&ipmmu_mp1 23>,
-+	       <&ipmmu_mp1 24>, <&ipmmu_mp1 25>,
-+	       <&ipmmu_mp1 26>, <&ipmmu_mp1 27>,
-+	       <&ipmmu_mp1 28>, <&ipmmu_mp1 29>,
-+	       <&ipmmu_mp1 30>, <&ipmmu_mp1 31>;
-+};
++	ipmmu_sy: mmu at e7730000 {
++		compatible = "renesas,ipmmu-r8a7795";
++		reg = <0 0xe7730000 0 0x1000>;
++		renesas,ipmmu-main = <&ipmmu_mm 8>;
++		#iommu-cells = <1>;
++		status = "disabled";
++	};
 +
- &du {
- 	vsps = <&vspd0 &vspd1 &vspd2 &vspd3>;
- };
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index af200aa55fce..2ca746c304d5 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -724,6 +724,14 @@
- 			resets = <&cpg 502>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-+			iommus = <&ipmmu_mp0 0>, <&ipmmu_mp0 1>,
-+			       <&ipmmu_mp0 2>, <&ipmmu_mp0 3>,
-+			       <&ipmmu_mp0 4>, <&ipmmu_mp0 5>,
-+			       <&ipmmu_mp0 6>, <&ipmmu_mp0 7>,
-+			       <&ipmmu_mp0 8>, <&ipmmu_mp0 9>,
-+			       <&ipmmu_mp0 10>, <&ipmmu_mp0 11>,
-+			       <&ipmmu_mp0 12>, <&ipmmu_mp0 13>,
-+			       <&ipmmu_mp0 14>, <&ipmmu_mp0 15>;
- 		};
- 
- 		audma1: dma-controller at ec720000 {
-@@ -758,6 +766,14 @@
- 			resets = <&cpg 501>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-+			iommus = <&ipmmu_mp0 16>, <&ipmmu_mp0 17>,
-+			       <&ipmmu_mp0 18>, <&ipmmu_mp0 19>,
-+			       <&ipmmu_mp0 20>, <&ipmmu_mp0 21>,
-+			       <&ipmmu_mp0 22>, <&ipmmu_mp0 23>,
-+			       <&ipmmu_mp0 24>, <&ipmmu_mp0 25>,
-+			       <&ipmmu_mp0 26>, <&ipmmu_mp0 27>,
-+			       <&ipmmu_mp0 28>, <&ipmmu_mp0 29>,
-+			       <&ipmmu_mp0 30>, <&ipmmu_mp0 31>;
- 		};
- 
- 		avb: ethernet at e6800000 {
+ 	/delete-node/ usb-phy at ee0e0200;
+ 	/delete-node/ usb at ee0e0100;
+ 	/delete-node/ usb at ee0e0000;
 -- 
 2.11.0
