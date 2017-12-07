@@ -1,115 +1,37 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Thu, 07 Dec 2017 09:59:43 +0100
-Subject: [PATCH 8/9] ARM: dts: imx7-colibri: add MCP2515 CAN controller
-In-Reply-To: <20171206153005.6144-8-stefan@agner.ch>
-References: <20171206153005.6144-1-stefan@agner.ch>
- <20171206153005.6144-8-stefan@agner.ch>
-Message-ID: <b456b34d71cce8e886ea1463128b6fc5@agner.ch>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 7 Dec 2017 10:10:29 +0100
+Subject: [PATCH v5 00/11] add pinmuxing support for pins in AXP209 and
+ AXP813 PMICs
+In-Reply-To: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
+References: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
+Message-ID: <CACRpkdYWoi0MQagPZHD8arr1fv4ssorJqZDRnb0vmx2WFvqi3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2017-12-06 16:30, Stefan Agner wrote:
-> The Colibri Evaluation Carrier Board provides a MCP2515 CAN
-> controller connected via SPI. Note that the i.MX 7 provides
-> an internal CAN controller which is much better suited for CAN
-> operations. Using the MCP2515 with a Colibri iMX7 module is
-> mainly useful to test the SPI interface.
-> 
-> Signed-off-by: Stefan Agner <stefan@agner.ch>
-> ---
->  arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi | 25 +++++++++++++++++++++++++
->  arch/arm/boot/dts/imx7-colibri.dtsi         | 14 +++++++++++++-
->  2 files changed, 38 insertions(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-> b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-> index 87c23b769a08..3d6c282dd258 100644
-> --- a/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-> +++ b/arch/arm/boot/dts/imx7-colibri-eval-v3.dtsi
-> @@ -45,6 +45,13 @@
->  		stdout-path = "serial0:115200n8";
->  	};
->  
-> +	/* fixed crystal dedicated to mpc258x */
-> +	clk16m: clk16m {
-> +		compatible = "fixed-clock";
-> +		#clock-cells = <0>;
-> +		clock-frequency = <16000000>;
-> +	};
-> +
->  	panel: panel {
->  		compatible = "edt,et057090dhu";
->  		backlight = <&bl>;
-> @@ -99,6 +106,24 @@
->  	status = "okay";
->  };
->  
-> +&ecspi3 {
-> +	status = "okay";
-> +
-> +	mcp258x0: mcp258x at 0 {
+On Tue, Dec 5, 2017 at 3:46 PM, Quentin Schulz
+<quentin.schulz@free-electrons.com> wrote:
 
+> The AXP209 and AXP813 PMICs have several pins (respectively 3 and 2) that can
+> be used either as GPIOs or for other purposes (ADC or LDO here).
+>
+> We already have a GPIO driver for the GPIO use of those pins on the AXP209.
+> Let's "upgrade" this driver to support all the functions these pins can have.
+>
+> Then we add support to this driver for the AXP813 which is slighlty different
+> (basically a different offset in two registers and one less pin).
+>
+> I suggest patches 1 to 8 go through Linus's tree and 9 via Lee's.
+>
+> v5:
+>   - add reference to pinctrl dt-bindings in driver's dt-binding,
+>   - add statement that this driver employs per-pin muxing pattern,
+>   - add a patch on top of the patch series to fix checkpatch warnings,
+>   - add a few information to the Kconfig to make checkpatch happy,
 
-Just realized that this is somewhat bogus, this should be "mcp2515:
-can at 0".
+I have applied patches 1-8 to an immutable branch in the GPIO
+tree, then merged that into the GPIO "devel" branch as well as the
+pinctrl "devel" branch so we can develop the driver in the pinctrl
+tree henceforth.
 
---
-Stefan
-
-> +		compatible = "microchip,mcp2515";
-> +		pinctrl-names = "default";
-> +		pinctrl-0 = <&pinctrl_can_int>;
-> +		reg = <0>;
-> +		clocks = <&clk16m>;
-> +		interrupt-parent = <&gpio5>;
-> +		interrupts = <2 IRQ_TYPE_EDGE_FALLING>;
-> +		spi-max-frequency = <10000000>;
-> +		vdd-supply = <&reg_3v3>;
-> +		xceiver-supply = <&reg_5v0>;
-> +		status = "okay";
-> +	};
-> +};
-> +
->  &fec1 {
->  	status = "okay";
->  };
-> diff --git a/arch/arm/boot/dts/imx7-colibri.dtsi
-> b/arch/arm/boot/dts/imx7-colibri.dtsi
-> index 689ff6822634..e1c6da0a65e4 100644
-> --- a/arch/arm/boot/dts/imx7-colibri.dtsi
-> +++ b/arch/arm/boot/dts/imx7-colibri.dtsi
-> @@ -92,6 +92,13 @@
->  	cpu-supply = <&reg_DCDC2>;
->  };
->  
-> +&ecspi3 {
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&pinctrl_ecspi3 &pinctrl_ecspi3_cs>;
-> +	num-cs = <1>;
-> +	cs-gpios = <&gpio4 11 GPIO_ACTIVE_HIGH>;
-> +};
-> +
->  &fec1 {
->  	pinctrl-names = "default";
->  	pinctrl-0 = <&pinctrl_enet1>;
-> @@ -313,7 +320,6 @@
->  		fsl,pins = <
->  			MX7D_PAD_ENET1_RGMII_RD3__GPIO7_IO3	0x74 /* SODIMM 55 */
->  			MX7D_PAD_ENET1_RGMII_RD2__GPIO7_IO2	0x74 /* SODIMM 63 */
-> -			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
->  			MX7D_PAD_SAI1_RX_SYNC__GPIO6_IO16	0x14 /* SODIMM 77 */
->  			MX7D_PAD_EPDC_DATA09__GPIO2_IO9		0x14 /* SODIMM 89 */
->  			MX7D_PAD_EPDC_DATA08__GPIO2_IO8		0x74 /* SODIMM 91 */
-> @@ -400,6 +406,12 @@
->  		>;
->  	};
->  
-> +	pinctrl_can_int: can-int-grp {
-> +		fsl,pins = <
-> +			MX7D_PAD_SD1_RESET_B__GPIO5_IO2		0X14 /* SODIMM 73 */
-> +		>;
-> +	};
-> +
->  	pinctrl_enet1: enet1grp {
->  		fsl,pins = <
->  			MX7D_PAD_ENET1_CRS__GPIO7_IO14			0x14
+Yours,
+Linus Walleij
