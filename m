@@ -1,114 +1,173 @@
-From: zhang.lyra@gmail.com (Chunyan Zhang)
-Date: Thu, 7 Dec 2017 16:08:37 +0800
-Subject: [PATCH V6 01/12] drivers: move clock common macros out from
- vendor directories
-In-Reply-To: <20171207064723.GV4283@codeaurora.org>
-References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
- <20171127100115.20655-2-chunyan.zhang@spreadtrum.com>
- <20171207064723.GV4283@codeaurora.org>
-Message-ID: <CAAfSe-ufFDXTxUxTSW8Au9wdwoHKcB6RBdVdX36RrZQC4x0knw@mail.gmail.com>
+From: stefan.wahren@i2se.com (Stefan Wahren)
+Date: Thu, 7 Dec 2017 09:14:33 +0100
+Subject: [PATCH 1/1] codestyle issue fixed drivers/staging/vc04_services
+In-Reply-To: <40d794a2bd0dd9dbb3add85c79b9b314ccbb480a.1512631936.git.lameli67@gmail.com>
+References: <40d794a2bd0dd9dbb3add85c79b9b314ccbb480a.1512631936.git.lameli67@gmail.com>
+Message-ID: <ee4ad6c7-9d5e-bd66-4738-148dddb69ef5@i2se.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 December 2017 at 14:47, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> On 11/27, Chunyan Zhang wrote:
->> These macros are used by more than one SoC vendor platforms, avoid to
->> have many copies of these code, this patch moves them to the common
->> clock directory which every clock drivers can access to.
->>
->> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
->> ---
->>  drivers/clk/clk_common.h | 60 ++++++++++++++++++++++++++++++++++++++++++++++++
->>  1 file changed, 60 insertions(+)
->>  create mode 100644 drivers/clk/clk_common.h
->>
->> diff --git a/drivers/clk/clk_common.h b/drivers/clk/clk_common.h
->> new file mode 100644
->> index 0000000..21e93d2
->> --- /dev/null
->> +++ b/drivers/clk/clk_common.h
->> @@ -0,0 +1,60 @@
->> +/*
->> + * drivers/clk/clk_common.h
->
-> We don't need this in the file too. Please remove this line.
->
->> + *
->> + * SPDX-License-Identifier: GPL-2.0
->> + */
->> +
->> +#ifndef _CLK_COMMON_H_
->> +#define _CLK_COMMON_H_
->> +
->> +#include <linux/clk-provider.h>
->
-> Maybe these macros should just go into clk-provider.h?
+Hello Mikhail,
 
-Ok.  And I will also remove the same macros from sunxi-ng/ccu_common.h
-and zte/clk.h.
+Am 07.12.2017 um 08:47 schrieb Mikhail Shvetsov:
+> From: Mike <lameli67@gmail.com>
+
+please provide your full name and a changelog. Also the subject should
+start with something like "staging: vchiq_arm:".
 
 >
->> +
->> +#define CLK_HW_INIT(_name, _parent, _ops, _flags)            \
->> +     (&(struct clk_init_data) {                              \
->> +             .flags          = _flags,                       \
->> +             .name           = _name,                        \
->> +             .parent_names   = (const char *[]) { _parent }, \
->> +             .num_parents    = 1,                            \
->> +             .ops            = _ops,                         \
->> +     })
+> Signed-off-by: Mike <lameli67@gmail.com>
+> ---
+>  .../interface/vchiq_arm/vchiq_kern_lib.c           | 64 ++++++++++++----------
+>  1 file changed, 35 insertions(+), 29 deletions(-)
 >
-> Hopefully we don't extend the init structure anymore to have
-> something else. I guess we'll do something if that happens.
->
->> +
->> +#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)   \
->> +     (&(struct clk_init_data) {                              \
->> +             .flags          = _flags,                       \
->> +             .name           = _name,                        \
->> +             .parent_names   = _parents,                     \
->> +             .num_parents    = ARRAY_SIZE(_parents),         \
->> +             .ops            = _ops,                         \
->> +     })
->> +
->> +#define CLK_HW_INIT_NO_PARENT(_name, _ops, _flags)     \
->> +     (&(struct clk_init_data) {                      \
->> +             .flags          = _flags,               \
->> +             .name           = _name,                \
->> +             .parent_names   = NULL,                 \
->> +             .num_parents    = 0,                    \
->> +             .ops            = _ops,                 \
->> +     })
->> +
->> +#define CLK_FIXED_FACTOR(_struct, _name, _parent,                    \
->> +                     _div, _mult, _flags)                            \
->> +     struct clk_fixed_factor _struct = {                             \
->> +             .div            = _div,                                 \
->> +             .mult           = _mult,                                \
->> +             .hw.init        = CLK_HW_INIT(_name,                    \
->> +                                           _parent,                  \
->> +                                           &clk_fixed_factor_ops,    \
->> +                                           _flags),                  \
->> +     }
->> +
->> +#define CLK_FIXED_RATE(_struct, _name, _flags,                               \
->> +                    _fixed_rate, _fixed_accuracy)                    \
->> +     struct clk_fixed_rate _struct = {                               \
->> +             .fixed_rate     = _fixed_rate,                          \
->> +             .fixed_accuracy = _fixed_accuracy,                      \
->> +             .hw.init        = CLK_HW_INIT_NO_PARENT(_name,          \
->> +                                       &clk_fixed_rate_ops,          \
->> +                                                     _flags),        \
->> +     }
->
-> Maybe don't add this one? Usually fixed rate clks come from DT.
+> diff --git a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
+> index 34f746db19cd..d21bb154f78c 100644
+> --- a/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
+> +++ b/drivers/staging/vc04_services/interface/vchiq_arm/vchiq_kern_lib.c
+> @@ -65,10 +65,10 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
+>  	unsigned int size, VCHIQ_BULK_DIR_T dir);
+>  
+>  /****************************************************************************
+> -*
+> -*   vchiq_initialise
+> -*
+> -***************************************************************************/
+> + *
+> + *   vchiq_initialise
+> + *
+> + ***************************************************************************/
 
-Ok, will also move the fixed rate clks from our driver to DT.
+Instead of fixing the comment style, i prefer to drop this kind of
+useless comments in a separate patch.
 
-Thanks,
-Chunyan
+>  #define VCHIQ_INIT_RETRIES 10
+>  VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
+>  {
+> @@ -80,7 +80,9 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
+>  	vchiq_log_trace(vchiq_core_log_level, "%s called", __func__);
+>  
+>  	/* VideoCore may not be ready due to boot up timing.
+> -	   It may never be ready if kernel and firmware are mismatched, so don't block forever. */
+> +	 * It may never be ready if kernel and firmware are mismatched, so don't
+> +	 * block forever.
+> +	 */
+>  	for (i = 0; i < VCHIQ_INIT_RETRIES; i++) {
+>  		state = vchiq_get_state();
+>  		if (state)
+> @@ -93,7 +95,8 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
+>  		goto failed;
+>  	} else if (i > 0) {
+>  		vchiq_log_warning(vchiq_core_log_level,
+> -			"%s: videocore initialized after %d retries\n", __func__, i);
+> +			"%s: videocore initialized after %d retries\n",
+> +			__func__, i);
 
->
-> --
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+This isn't a comment, so it should be a separate patch.
+
+>  	}
+>  
+>  	instance = kzalloc(sizeof(*instance), GFP_KERNEL);
+> @@ -121,10 +124,10 @@ VCHIQ_STATUS_T vchiq_initialise(VCHIQ_INSTANCE_T *instance_out)
+>  EXPORT_SYMBOL(vchiq_initialise);
+>  
+>  /****************************************************************************
+> -*
+> -*   vchiq_shutdown
+> -*
+> -***************************************************************************/
+> + *
+> + *   vchiq_shutdown
+> + *
+> + ***************************************************************************/
+>  
+>  VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
+>  {
+> @@ -169,10 +172,10 @@ VCHIQ_STATUS_T vchiq_shutdown(VCHIQ_INSTANCE_T instance)
+>  EXPORT_SYMBOL(vchiq_shutdown);
+>  
+>  /****************************************************************************
+> -*
+> -*   vchiq_is_connected
+> -*
+> -***************************************************************************/
+> + *
+> + *   vchiq_is_connected
+> + *
+> + ***************************************************************************/
+>  
+>  static int vchiq_is_connected(VCHIQ_INSTANCE_T instance)
+>  {
+> @@ -180,10 +183,10 @@ static int vchiq_is_connected(VCHIQ_INSTANCE_T instance)
+>  }
+>  
+>  /****************************************************************************
+> -*
+> -*   vchiq_connect
+> -*
+> -***************************************************************************/
+> + *
+> + *   vchiq_connect
+> + *
+> + ***************************************************************************/
+>  
+>  VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
+>  {
+> @@ -215,10 +218,10 @@ VCHIQ_STATUS_T vchiq_connect(VCHIQ_INSTANCE_T instance)
+>  EXPORT_SYMBOL(vchiq_connect);
+>  
+>  /****************************************************************************
+> -*
+> -*   vchiq_add_service
+> -*
+> -***************************************************************************/
+> + *
+> + *   vchiq_add_service
+> + *
+> + ***************************************************************************/
+>  
+>  VCHIQ_STATUS_T vchiq_add_service(
+>  	VCHIQ_INSTANCE_T              instance,
+> @@ -260,10 +263,10 @@ VCHIQ_STATUS_T vchiq_add_service(
+>  EXPORT_SYMBOL(vchiq_add_service);
+>  
+>  /****************************************************************************
+> -*
+> -*   vchiq_open_service
+> -*
+> -***************************************************************************/
+> + *
+> + *   vchiq_open_service
+> + *
+> + ***************************************************************************/
+>  
+>  VCHIQ_STATUS_T vchiq_open_service(
+>  	VCHIQ_INSTANCE_T              instance,
+> @@ -414,8 +417,9 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
+>  			if ((bulk->data != data) ||
+>  				(bulk->size != size)) {
+>  				/* This is not a retry of the previous one.
+> -				** Cancel the signal when the transfer
+> -				** completes. */
+> +				 * Cancel the signal when the transfer
+> +				 * completes.
+> +				 */
+>  				spin_lock(&bulk_waiter_spinlock);
+>  				bulk->userdata = NULL;
+>  				spin_unlock(&bulk_waiter_spinlock);
+> @@ -441,7 +445,9 @@ vchiq_blocking_bulk_transfer(VCHIQ_SERVICE_HANDLE_T handle, void *data,
+>  
+>  		if (bulk) {
+>  			/* Cancel the signal when the transfer
+> -			 ** completes. */
+> +			 *
+
+Please avoid this empty line.
+
+Thanks
+
+> +			 * completes.
+> +			 */
+>  			spin_lock(&bulk_waiter_spinlock);
+>  			bulk->userdata = NULL;
+>  			spin_unlock(&bulk_waiter_spinlock);
