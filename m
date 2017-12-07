@@ -1,114 +1,77 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu,  7 Dec 2017 21:18:03 +0100
-Subject: [PATCH 01/12] dt-bindings: mtd: add Marvell NAND controller
+Date: Thu,  7 Dec 2017 21:18:06 +0100
+Subject: [PATCH 04/12] dt-bindings: mtd: remove pxa3xx NAND controller
  documentation
 In-Reply-To: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
 References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171207201814.30411-2-miquel.raynal@free-electrons.com>
+Message-ID: <20171207201814.30411-5-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Document the legacy and the new bindings for Marvell NAND controller.
-
-The pxa3xx_nand.c driver does only support legacy bindings, which are
-incomplete and inaccurate. A rework of this controller (called
-marvell_nand.c) does support both.
+The deprecated pxa3xx_nand.c driver does not exist anymore, it has been
+replaced by marvell_nand.c which has its own up-to-date documentation.
 
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- .../devicetree/bindings/mtd/marvell-nand.txt       | 84 ++++++++++++++++++++++
- 1 file changed, 84 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mtd/marvell-nand.txt
+ .../devicetree/bindings/mtd/pxa3xx-nand.txt        | 50 ----------------------
+ 1 file changed, 50 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
 
-diff --git a/Documentation/devicetree/bindings/mtd/marvell-nand.txt b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-new file mode 100644
-index 000000000000..0b3d5e0bab83
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mtd/marvell-nand.txt
-@@ -0,0 +1,84 @@
-+Marvell NAND Flash Controller (NFC)
-+
-+Required properties:
-+- compatible: can be one of the following:
-+    * "marvell,armada-8k-nand-controller"
-+    * "marvell,armada370-nand-controller"
-+    * "marvell,pxa3xx-nand-controller"
-+    * "marvell,armada-8k-nand" (deprecated)
-+    * "marvell,armada370-nand" (deprecated)
-+    * "marvell,pxa3xx-nand" (deprecated)
-+- reg: NAND flash controller memory area.
-+- #address-cells: shall be set to 1. Encode the NAND CS.
-+- #size-cells: shall be set to 0.
-+- interrupts: shall define the NAND controller interrupt.
-+- clocks: shall reference the NAND controller clock.
-+- marvell,system-controller: Set to retrieve the syscon node that handles
-+  NAND controller related registers (only required with the
-+  "marvell,armada-8k-nand[-controller]" compatibles).
-+
-+Optional properties:
-+- label: see partition.txt. New platforms shall omit this property.
-+- dmas: shall reference DMA channel associated to the NAND controller.
-+- dma-names: shall be "rxtx".
-+
-+Optional children nodes:
-+Children nodes represent the available NAND chips.
-+
-+Required properties:
-+- reg: shall contain the native Chip Select ids (0-3)
-+- marvell,rb: shall contain the native Ready/Busy ids (0-1)
-+
-+Optional properties:
-+- marvell,nand-keep-config: orders the driver not to take the timings
-+  from the core and leaving them completely untouched. Bootloader
-+  timings will then be used.
-+- nand-on-flash-bbt: see nand.txt.
-+- nand-ecc-mode: see nand.txt. Will use hardware ECC if not specified.
-+- nand-ecc-algo: see nand.txt. This property may be added when using
-+  hardware ECC for clarification but will be ignored by the driver
-+  because ECC mode is chosen depending on the page size and the strength
-+  required by the NAND chip. This value may be overwritten with
-+  nand-ecc-strength property.
-+- nand-ecc-strength: see nand.txt.
-+- nand-ecc-step-size: see nand.txt. This has no effect and will be
-+  ignored by the driver when using hardware ECC because Marvell's NAND
-+  flash controller does use fixed strength (1-bit for Hamming, 16-bit
-+  for BCH), so the step size will shrink or grow in order to fit the
-+  required strength. Step sizes are not completely random for all and
-+  follow certain patterns described in AN-379, "Marvell SoC NFC ECC".
-+
-+See Documentation/devicetree/bindings/mtd/nand.txt for more details on
-+generic bindings.
-+
-+
-+Example:
-+nand_controller: nand-controller at d0000 {
-+	compatible = "marvell,armada370-nand-controller";
-+	reg = <0xd0000 0x54>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&coredivclk 0>;
-+
-+	nand at 0 {
-+		reg = <0>;
-+		marvell,rb = <0>;
-+		nand-ecc-mode = "hw";
-+		marvell,nand-keep-config;
-+		nand-on-flash-bbt;
-+		nand-ecc-strength = <4>;
-+		nand-ecc-step-size = <512>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "Rootfs";
-+				reg = <0x00000000 0x40000000>;
-+			};
-+		};
-+	};
-+};
+diff --git a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt b/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
+deleted file mode 100644
+index d4ee4da58463..000000000000
+--- a/Documentation/devicetree/bindings/mtd/pxa3xx-nand.txt
++++ /dev/null
+@@ -1,50 +0,0 @@
+-PXA3xx NAND DT bindings
+-
+-Required properties:
+-
+- - compatible:		Should be set to one of the following:
+-			marvell,pxa3xx-nand
+-			marvell,armada370-nand
+-			marvell,armada-8k-nand
+- - reg: 		The register base for the controller
+- - interrupts:		The interrupt to map
+- - #address-cells:	Set to <1> if the node includes partitions
+- - marvell,system-controller: Set to retrieve the syscon node that handles
+-			NAND controller related registers (only required
+-			with marvell,armada-8k-nand compatible).
+-
+-Optional properties:
+-
+- - dmas:			dma data channel, see dma.txt binding doc
+- - marvell,nand-enable-arbiter:	Set to enable the bus arbiter
+- - marvell,nand-keep-config:	Set to keep the NAND controller config as set
+-				by the bootloader
+- - num-cs:			Number of chipselect lines to use
+- - nand-on-flash-bbt: 		boolean to enable on flash bbt option if
+-				not present false
+- - nand-ecc-strength:           number of bits to correct per ECC step
+- - nand-ecc-step-size:          number of data bytes covered by a single ECC step
+-
+-The following ECC strength and step size are currently supported:
+-
+- - nand-ecc-strength = <1>, nand-ecc-step-size = <512>
+- - nand-ecc-strength = <4>, nand-ecc-step-size = <512>
+- - nand-ecc-strength = <8>, nand-ecc-step-size = <512>
+-
+-Example:
+-
+-	nand0: nand at 43100000 {
+-		compatible = "marvell,pxa3xx-nand";
+-		reg = <0x43100000 90>;
+-		interrupts = <45>;
+-		dmas = <&pdma 97 0>;
+-		dma-names = "data";
+-		#address-cells = <1>;
+-
+-		marvell,nand-enable-arbiter;
+-		marvell,nand-keep-config;
+-		num-cs = <1>;
+-
+-		/* partitions (optional) */
+-	};
+-
 -- 
 2.11.0
