@@ -1,61 +1,27 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu,  7 Dec 2017 15:27:13 +0100
-Subject: [PATCH net-next v2 6/8] net: phy: meson-gxl: leave CONFIG_A6 untouched
-In-Reply-To: <20171207142715.32578-1-jbrunet@baylibre.com>
-References: <20171207142715.32578-1-jbrunet@baylibre.com>
-Message-ID: <20171207142715.32578-7-jbrunet@baylibre.com>
+From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
+Date: Thu, 7 Dec 2017 14:30:52 +0000
+Subject: [RFC PATCH 1/6] drm: Add Content Protection property
+In-Reply-To: <20171205104538.b4fxdjad3c46koas@phenom.ffwll.local>
+References: <20171130030907.26848-1-seanpaul@chromium.org>
+ <20171130030907.26848-2-seanpaul@chromium.org>
+ <20171205102840.GB12982@amd>
+ <20171205104538.b4fxdjad3c46koas@phenom.ffwll.local>
+Message-ID: <20171207143052.533e1e94@alans-desktop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PHY performs just as well when left in its default configuration and
-it makes senses because this poke gets reset just after init.
+> If you want to actually lock down a machine to implement content
+> protection, then you need secure boot without unlockable boot-loader and a
+> pile more bits in userspace. 
 
-According to the documentation, all registers in the Analog/DSP bank are
-reset when there is a mode switch from 10BT to 100BT.
+So let me take my Intel hat off for a moment.
 
-In the end, we have used the default configuration so far and there is no
-reason to change now. Remove CONFIG_A6 poke to make this clear.
+The upstream policy has always been that we don't merge things which
+don't have an open usable user space. Is the HDCP encryption feature
+useful on its own ? What do users get from it ?
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
+If this is just an enabler for a lump of binary stuff in ChromeOS then I
+don't think it belongs, if it is useful standalone then it seems it does
+belong ?
 
-Out of curiosity, I tried to re-apply the ANALOG/DSP settings on speed
-changes (patch available here [0] if someone wants to try) but I did
-not notice any change as a result. In the end, I thought it was safer
-to keep on using the ANALOG settings we have been actually using so far,
-everybody seems to be happy with them
-
-[0]: https://github.com/jeromebrunet/linux/commit/b594288e629a61574e76112497474fd3cf46c781
-
- drivers/net/phy/meson-gxl.c | 9 ---------
- 1 file changed, 9 deletions(-)
-
-diff --git a/drivers/net/phy/meson-gxl.c b/drivers/net/phy/meson-gxl.c
-index 726e0eeed475..5325940fe899 100644
---- a/drivers/net/phy/meson-gxl.c
-+++ b/drivers/net/phy/meson-gxl.c
-@@ -38,9 +38,6 @@
- #define BANK_WOL		1
- #define BANK_BIST		3
- 
--/* Analog/DSP Registers */
--#define A6_CONFIG_REG	0x17
--
- /* WOL Registers */
- #define LPI_STATUS	0xc
- #define  LPI_STATUS_RSV12	BIT(12)
-@@ -126,12 +123,6 @@ static int meson_gxl_config_init(struct phy_device *phydev)
- {
- 	int ret;
- 
--	/* Write CONFIG_A6*/
--	ret = meson_gxl_write_reg(phydev, BANK_ANALOG_DSP, A6_CONFIG_REG,
--				  0x8e0d);
--	if (ret)
--		return ret;
--
- 	/* Enable fractional PLL */
- 	ret = meson_gxl_write_reg(phydev, BANK_BIST, FR_PLL_CONTROL, 0x5);
- 	if (ret)
--- 
-2.14.3
+Alan
