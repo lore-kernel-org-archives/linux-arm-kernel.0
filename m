@@ -1,73 +1,49 @@
-From: mike.leach@linaro.org (Mike Leach)
-Date: Thu, 7 Dec 2017 16:14:03 +0000
-Subject: [PATCH] coresight: Fix disabling of CoreSight TPIU
-In-Reply-To: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
-References: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
-Message-ID: <CAJ9a7VgWdDL0aBg=XyNcb9iH6ZHCWEMosLPX8PnBurCjkE6ZbQ@mail.gmail.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 7 Dec 2017 16:15:02 +0000
+Subject: [PATCH v3 11/20] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <CAKv+Gu-Otcg4UxhJA44PbbYamBJd26Be+YsSUQUaB+qy9owzvQ@mail.gmail.com>
+References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
+ <20171206194346.24393-12-ard.biesheuvel@linaro.org>
+ <20171207143934.GF22781@e103592.cambridge.arm.com>
+ <CAKv+Gu8N6w3+VFpF3kq-qg9Gij=4VbtQqu+yfvfA67p2kWaRLg@mail.gmail.com>
+ <CAKv+Gu-Otcg4UxhJA44PbbYamBJd26Be+YsSUQUaB+qy9owzvQ@mail.gmail.com>
+Message-ID: <20171207161502.GI22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested by: Mike Leach <mike.leach@linaro.org>
+On Thu, Dec 07, 2017 at 03:47:43PM +0000, Ard Biesheuvel wrote:
+> On 7 December 2017 at 14:50, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> > On 7 December 2017 at 14:39, Dave Martin <Dave.Martin@arm.com> wrote:
+> >> On Wed, Dec 06, 2017 at 07:43:37PM +0000, Ard Biesheuvel wrote:
 
-On 24 November 2017 at 09:58, Robert Walker <robert.walker@arm.com> wrote:
-> The CoreSight TPIU should be disabled when tracing to other sinks to allow
-> them to operate at full bandwidth.
->
-> This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
-> configuring the TPIU to stop on flush, initiating a manual flush, waiting
-> for the flush to complete and then waits for the TPIU to indicate it has
-> stopped.
->
-> Signed-off-by: Robert Walker <robert.walker@arm.com>
-> ---
->  drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
->  1 file changed, 10 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-> index bef49a3..4b46c49 100644
-> --- a/drivers/hwtracing/coresight/coresight-tpiu.c
-> +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-> @@ -46,8 +46,11 @@
->  #define TPIU_ITATBCTR0         0xef8
->
->  /** register definition **/
-> +/* FFSR - 0x300 */
-> +#define FFSR_FT_STOPPED                BIT(1)
->  /* FFCR - 0x304 */
->  #define FFCR_FON_MAN           BIT(6)
-> +#define FFCR_STOP_FI           BIT(12)
->
->  /**
->   * @base:      memory mapped base address for this component.
-> @@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
->  {
->         CS_UNLOCK(drvdata->base);
->
-> -       /* Clear formatter controle reg. */
-> -       writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
-> +       /* Clear formatter and stop on flush */
-> +       writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
->         /* Generate manual flush */
-> -       writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-> +       writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
-> +       /* Wait for flush to complete */
-> +       coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
-> +       /* Wait for formatter to stop */
-> +       coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
->
->         CS_LOCK(drvdata->base);
->  }
-> --
-> 1.9.1
->
-> _______________________________________________
-> CoreSight mailing list
-> CoreSight at lists.linaro.org
-> https://lists.linaro.org/mailman/listinfo/coresight
+[...]
 
+> >>> +     .macro          if_will_cond_yield_neon
+> >>> +#ifdef CONFIG_PREEMPT
+> >>> +     get_thread_info x0
+> >>> +     ldr             w1, [x0, #TSK_TI_PREEMPT]
+> >>> +     ldr             x0, [x0, #TSK_TI_FLAGS]
+> >>> +     cmp             w1, #1 // == PREEMPT_OFFSET
+> >>
+> >> Can we at least drop a BUILD_BUG_ON() somewhere to check this?
+> >>
+> >> Maybe in kernel_neon_begin() since this is intimately kernel-mode NEON
+> >> related.
+> >>
+> >
+> > Sure.
+> >
+> 
+> I only just understood your asm-offsets remark earlier. I wasn't aware
+> that it allows exposing random constants as well (although it is
+> fairly obvious now that I do). So I will expose PREEMPT_OFFSET rather
+> than open code it
 
+[...]
 
--- 
-Mike Leach
-Principal Engineer, ARM Ltd.
-Blackburn Design Centre. UK
+OK, yes, this works for any C expression that is compiletime-constant
+but requires evaluation that the assembler doesn't understand.
+
+Cheers
+---Dave
