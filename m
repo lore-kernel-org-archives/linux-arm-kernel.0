@@ -1,185 +1,86 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 7 Dec 2017 13:25:21 +0100
-Subject: [PATCH v3 08/15] drm/sun4i: Add LVDS support
-In-Reply-To: <CAGb2v65Voua-AjHDnCLgDOKqUeSG-yD4wuSO5-BJ230FCp4OuQ@mail.gmail.com>
-References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <b900e5963180c94ca02bde178b6674622a127787.1512486553.git-series.maxime.ripard@free-electrons.com>
- <CAGb2v65Voua-AjHDnCLgDOKqUeSG-yD4wuSO5-BJ230FCp4OuQ@mail.gmail.com>
-Message-ID: <20171207122521.frv5zgaay3sgol6f@flea.lan>
+From: kristina.martsenko@arm.com (Kristina Martsenko)
+Date: Thu, 7 Dec 2017 12:29:43 +0000
+Subject: [RFC 3/9] arm64: handle 52-bit addresses in TTBR
+In-Reply-To: <8ebb78d3-68b0-3272-e12b-005c1b524736@arm.com>
+References: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
+ <1511265485-27163-4-git-send-email-kristina.martsenko@arm.com>
+ <8ebb78d3-68b0-3272-e12b-005c1b524736@arm.com>
+Message-ID: <42182cdd-be9f-841f-6fda-1486ac2ded2f@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Dec 07, 2017 at 02:05:47PM +0800, Chen-Yu Tsai wrote:
-> > +static void sun4i_tcon_lvds_set_status(struct sun4i_tcon *tcon,
-> > +                                      const struct drm_encoder *encoder,
-> > +                                      bool enabled)
-> > +{
-> > +       if (enabled) {
-> > +               u8 val;
-> > +
-> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_IF_REG,
-> > +                                  SUN4I_TCON0_LVDS_IF_EN,
-> > +                                  SUN4I_TCON0_LVDS_IF_EN);
-> > +
-> > +               regmap_write(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-> > +                            SUN4I_TCON0_LVDS_ANA0_C(2) |
-> > +                            SUN4I_TCON0_LVDS_ANA0_V(3) |
-> > +                            SUN4I_TCON0_LVDS_ANA0_PD(2) |
-> > +                            SUN4I_TCON0_LVDS_ANA0_EN_LDO);
-> > +               udelay(2);
-> > +
-> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_MB,
-> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_MB);
-> > +               udelay(2);
-> > +
-> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_DRVC,
-> > +                                  SUN4I_TCON0_LVDS_ANA0_EN_DRVC);
-> > +
-> > +               if (sun4i_tcon_get_pixel_depth(encoder) == 18)
-> > +                       val = 7;
-> > +               else
-> > +                       val = 0xf;
-> > +
-> > +               regmap_write_bits(tcon->regs, SUN4I_TCON0_LVDS_ANA0_REG,
-> > +                                 SUN4I_TCON0_LVDS_ANA0_EN_DRVD(0xf),
-> > +                                 SUN4I_TCON0_LVDS_ANA0_EN_DRVD(val));
+On 21/11/17 14:39, Robin Murphy wrote:
+> Hi Kristina,
 > 
-> I suggest changing the prefix of the macros of the analog bits to
-> SUN6I_TCON0_*. The register definitions and sequence do not apply
-> to the A10/A20. Furthermore you should add a comment saying this
-> doesn't apply to the A10/A20. In the future we might want to move
-> this part into a separate function, referenced by a function pointer
-> from the quirks structure.
+> On 21/11/17 11:57, Kristina Martsenko wrote:
+>> The top 4 bits of a 52-bit physical address are positioned at bits 2..5
+>> in the TTBR registers. Introduce a couple of macros to move the bits
+>> there, and change all TTBR writers to use them.
+>>
+>> Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
+>> 52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
+>> system without 52-bit PA can only use up to 48-bit PAs. Add a kconfig
+>> dependency to ensure PAN is configured.
+>>
+>> In addition, when using 52-bit PA there is a special alignment
+>> requirement on the top-level table. We don't currently have any VA_BITS
+>> configuration that would violate the requirement, but one could be added
+>> in the future, so add a compile-time BUG_ON to check for it.
+>>
+>> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+>> ---
 
-I'll change the bit field names and add a comment like you suggested.
+[...]
 
-> > +       } else {
-> > +               regmap_update_bits(tcon->regs, SUN4I_TCON0_LVDS_IF_REG,
-> > +                                  SUN4I_TCON0_LVDS_IF_EN, 0);
-> > +       }
-> > +}
-> > +
-> >  void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
-> >                            const struct drm_encoder *encoder,
-> >                            bool enabled)
-> >  {
-> > +       bool is_lvds = false;
-> >         int channel;
-> >
-> >         switch (encoder->encoder_type) {
-> > +       case DRM_MODE_ENCODER_LVDS:
-> > +               is_lvds = true;
-> > +               /* Fallthrough */
-> >         case DRM_MODE_ENCODER_NONE:
-> >                 channel = 0;
-> >                 break;
-> > @@ -84,10 +171,16 @@ void sun4i_tcon_set_status(struct sun4i_tcon *tcon,
-> >                 return;
-> >         }
-> >
-> > +       if (is_lvds && !enabled)
-> > +               sun4i_tcon_lvds_set_status(tcon, encoder, false);
-> > +
-> >         regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-> >                            SUN4I_TCON_GCTL_TCON_ENABLE,
-> >                            enabled ? SUN4I_TCON_GCTL_TCON_ENABLE : 0);
-> >
-> > +       if (is_lvds && enabled)
-> > +               sun4i_tcon_lvds_set_status(tcon, encoder, true);
-> > +
-> >         sun4i_tcon_channel_set_status(tcon, channel, enabled);
-> >  }
-> >
-> > @@ -170,6 +263,78 @@ static void sun4i_tcon0_mode_set_common(struct sun4i_tcon *tcon,
-> >                      SUN4I_TCON0_BASIC0_Y(mode->crtc_vdisplay));
-> >  }
-> >
-> > +static void sun4i_tcon0_mode_set_lvds(struct sun4i_tcon *tcon,
-> > +                                     const struct drm_encoder *encoder,
-> > +                                     const struct drm_display_mode *mode)
-> > +{
-> > +       unsigned int bp;
-> > +       u8 clk_delay;
-> > +       u32 reg, val = 0;
-> > +
-> > +       tcon->dclk_min_div = 7;
-> > +       tcon->dclk_max_div = 7;
-> > +       sun4i_tcon0_mode_set_common(tcon, mode);
-> > +
-> > +       /* Adjust clock delay */
-> > +       clk_delay = sun4i_tcon_get_clk_delay(mode, 0);
-> > +       regmap_update_bits(tcon->regs, SUN4I_TCON0_CTL_REG,
-> > +                          SUN4I_TCON0_CTL_CLK_DELAY_MASK,
-> > +                          SUN4I_TCON0_CTL_CLK_DELAY(clk_delay));
-> > +
-> > +       /*
-> > +        * This is called a backporch in the register documentation,
-> > +        * but it really is the back porch + hsync
-> > +        */
-> > +       bp = mode->crtc_htotal - mode->crtc_hsync_start;
-> > +       DRM_DEBUG_DRIVER("Setting horizontal total %d, backporch %d\n",
-> > +                        mode->crtc_htotal, bp);
-> > +
-> > +       /* Set horizontal display timings */
-> > +       regmap_write(tcon->regs, SUN4I_TCON0_BASIC1_REG,
-> > +                    SUN4I_TCON0_BASIC1_H_TOTAL(mode->htotal) |
-> > +                    SUN4I_TCON0_BASIC1_H_BACKPORCH(bp));
-> > +
-> > +       /*
-> > +        * This is called a backporch in the register documentation,
-> > +        * but it really is the back porch + hsync
-> > +        */
-> > +       bp = mode->crtc_vtotal - mode->crtc_vsync_start;
-> > +       DRM_DEBUG_DRIVER("Setting vertical total %d, backporch %d\n",
-> > +                        mode->crtc_vtotal, bp);
-> > +
-> > +       /* Set vertical display timings */
-> > +       regmap_write(tcon->regs, SUN4I_TCON0_BASIC2_REG,
-> > +                    SUN4I_TCON0_BASIC2_V_TOTAL(mode->crtc_vtotal * 2) |
-> > +                    SUN4I_TCON0_BASIC2_V_BACKPORCH(bp));
+>> diff --git a/arch/arm64/include/asm/assembler.h
+>> b/arch/arm64/include/asm/assembler.h
+>> index 04cf94766b78..ba3c796b9fe1 100644
+>> --- a/arch/arm64/include/asm/assembler.h
+>> +++ b/arch/arm64/include/asm/assembler.h
+>> @@ -512,4 +512,21 @@ alternative_else_nop_endif
+>> ? #endif
+>> ????? .endm
+>> ? +/*
+>> + * Arrange a physical address in a TTBR register, taking care of 52-bit
+>> + * addresses.
+>> + *
+>> + *???? phys:??? physical address, preserved
+>> + *???? ttbr:??? returns the TTBR value
+>> + */
+>> +??? .macro??? phys_to_ttbr, phys, ttbr
+>> +#ifdef CONFIG_ARM64_PA_BITS_52
+>> +??? and??? \ttbr, \phys, #(1 << 48) - 1
+>> +??? orr??? \ttbr, \ttbr, \phys, lsr #48 - 2
+>> +??? bic??? \ttbr, \ttbr, #(1 << 2) - 1
 > 
-> Can we move the above to a common function?
+> Is there any reason for masking off each end of the result separately
+> like this, or could we just do it more straightforwardly?
 
-Until we have DSI support figured out I'd rather not do too much of
-consolidation. We know already a few things are going to change there
-(like the clk_delay), but it's not clear yet how much.
+I don't recall any reason, maybe just to keep it simple, to avoid having
+a separate mask macro.
 
-> > +       /* Map output pins to channel 0 */
-> > +       regmap_update_bits(tcon->regs, SUN4I_TCON_GCTL_REG,
-> > +                          SUN4I_TCON_GCTL_IOMAP_MASK,
-> > +                          SUN4I_TCON_GCTL_IOMAP_TCON0);
-> > +
-> > +       /* Enable the output on the pins */
-> > +       regmap_write(tcon->regs, SUN4I_TCON0_IO_TRI_REG, 0xe0000000);
+> #define TTBR_BADDR_MASK ((1 << 46) - 1) << 2
 > 
-> Is this still needed? You are no longer using the TCON LCD pins
-> with LVDS.
-
-We do. It's a separate function of the pins, but it's the same pins.
-
-> >  static const struct sun4i_tcon_quirks sun6i_a31s_quirks = {
-> >         .has_channel_1          = true,
-> > +       .has_lvds_pll           = true,
+> ????orr??? \ttbr, \phys, \phys, lsr #46
+> ????and??? \ttbr, \ttbr, #TTBR_BADDR_MASK
 > 
-> The A31s does not have MIPI.
+> (and equivalently for phys_to_pte in patch 4)
 
-I'll change that.
+Ok, I'll rewrite it like this. (Note that mask is 52-bit-specific though.)
 
-Thanks!
-Maxime
+> Even better if there's a convenient place to define the mask such that
+> it can be shared with KVM's existing VTTBR stuff too.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/bcca38af/attachment.sig>
+Do you mean VTTBR_BADDR_MASK? I don't think this would be useful there,
+VTTBR_BADDR_MASK checks the alignment of the address that goes into
+VTTBR (not the VTTBR value itself), and takes into account specifically
+the 40-bit IPA and concatenated page tables.
+
+Kristina
+
+>> +#else
+>> +??? mov??? \ttbr, \phys
+>> +#endif
+>> +??? .endm
+>> +
+>> ? #endif??? /* __ASM_ASSEMBLER_H */
