@@ -1,72 +1,34 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:37 +0100
-Subject: [PATCH 34/54] arm64: dts: renesas: salvator-common: Add BD9571 PMIC
+Date: Thu,  7 Dec 2017 10:53:38 +0100
+Subject: [PATCH 35/54] arm64: dts: renesas: r8a7795-es1-salvator-x: Add SoC
+ name to file header
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <f80f4920b78dbcbebbe5e0a1383bce7849cd08af.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <aa8c6e451e96cb0db85e19d31da0b9bcc04e7217.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Add a device node for the ROHM BD9571MWV PMIC.
-
-This was based on the example in the DT binding documentation, but using
-IRQ0 instead of a GPIO interrupt, as that matches the schematics, and
-because INTC-EX is a simpler block.
+Document clearly which SoC this DTS applies to, to distinguish from
+Salvator-X boards equipped with other SoCs.
 
 Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/salvator-common.dtsi | 29 ++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-index 24a32c63ce7c..b9505a65a793 100644
---- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-+++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
-@@ -355,6 +355,30 @@
- 
- &i2c_dvfs {
- 	status = "okay";
-+
-+	pmic: pmic at 30 {
-+		pinctrl-0 = <&irq0_pins>;
-+		pinctrl-names = "default";
-+
-+		compatible = "rohm,bd9571mwv";
-+		reg = <0x30>;
-+		interrupt-parent = <&intc_ex>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		interrupt-controller;
-+		#interrupt-cells = <2>;
-+		gpio-controller;
-+		#gpio-cells = <2>;
-+
-+		regulators {
-+			dvfs: dvfs {
-+				regulator-name = "dvfs";
-+				regulator-min-microvolt = <750000>;
-+				regulator-max-microvolt = <1030000>;
-+				regulator-boot-on;
-+				regulator-always-on;
-+			};
-+		};
-+	};
- };
- 
- &ohci0 {
-@@ -410,6 +434,11 @@
- 		function = "i2c2";
- 	};
- 
-+	irq0_pins: irq0 {
-+		groups = "intc_ex_irq0";
-+		function = "intc_ex";
-+	};
-+
- 	pwm1_pins: pwm1 {
- 		groups = "pwm1_a";
- 		function = "pwm1";
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+index 3f7d5f51e428..7f2a3d923f21 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
+@@ -1,5 +1,5 @@
+ /*
+- * Device Tree Source for the Salvator-X board
++ * Device Tree Source for the Salvator-X board with R-Car H3 ES1.x
+  *
+  * Copyright (C) 2015 Renesas Electronics Corp.
+  *
 -- 
 2.11.0
