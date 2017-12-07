@@ -1,120 +1,72 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Dec 2017 17:26:20 -0600
-Subject: [PATCH v3 07/12] dt-bindings: Document the Rockchip MIPI RX
- D-PHY bindings
-In-Reply-To: <20171206111939.1153-8-jacob-chen@iotwrt.com>
-References: <20171206111939.1153-1-jacob-chen@iotwrt.com>
- <20171206111939.1153-8-jacob-chen@iotwrt.com>
-Message-ID: <20171207232620.zlralmdpiw6qseb6@rob-hp-laptop>
+Date: Thu, 7 Dec 2017 17:35:48 -0600
+Subject: [PATCH v6 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
+In-Reply-To: <20171207102026.14977-3-liwei213@huawei.com>
+References: <20171207102026.14977-1-liwei213@huawei.com>
+ <20171207102026.14977-3-liwei213@huawei.com>
+Message-ID: <20171207233548.kcgtlxfdsh3ibsxu@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 07:19:34PM +0800, Jacob Chen wrote:
-> From: Jacob Chen <jacob2.chen@rock-chips.com>
+On Thu, Dec 07, 2017 at 06:20:23PM +0800, Li Wei wrote:
+> add ufs node document for Hisilicon.
 > 
-> Add DT bindings documentation for Rockchip MIPI D-PHY RX
-> 
-> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+> Signed-off-by: Li Wei <liwei213@huawei.com>
 > ---
->  .../bindings/media/rockchip-mipi-dphy.txt          | 71 ++++++++++++++++++++++
->  1 file changed, 71 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+
+Version history?
+
+>  Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 38 ++++++++++++++++++++++
+>  1 file changed, 38 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt b/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
+> diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
 > new file mode 100644
-> index 000000000000..cef9450db051
+> index 000000000000..73e10698960e
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/rockchip-mipi-dphy.txt
-> @@ -0,0 +1,71 @@
-> +Rockchip SoC MIPI RX D-PHY
-> +-------------------------------------------------------------
+> +++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+> @@ -0,0 +1,38 @@
+> +* Hisilicon Universal Flash Storage (UFS) Host Controller
+> +
+> +UFS nodes are defined to describe on-chip UFS hardware macro.
+> +Each UFS Host Controller should have its own node.
 > +
 > +Required properties:
+> +- compatible        : compatible list, contains one of the following -
+> +					"hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
+> +					host controller present on Hi36xx chipset.
+> +- reg               : should contain UFS register address space & UFS SYS CTRL register address,
+> +- interrupt-parent  : interrupt device
+> +- interrupts        : interrupt number
+> +- clocks	        : List of phandle and clock specifier pairs
+> +- clock-names       : List of clock input name strings sorted in the same
+> +					order as the clocks property. "ref_clk", "phy_clk" is optional
+> +- resets            : reset node register, one reset the clk and the other reset the controller
+> +- reset-names       : describe reset node register
 > +
-> +- compatible: value should be one of the following
-> +    "rockchip,rk3288-mipi-dphy";
-> +    "rockchip,rk3399-mipi-dphy";
-
-Drop the ';'
-
-> +- rockchip,grf: GRF regs.
-> +- bus-width : maximum number of data lanes supported (SoC specific);
-> +- clocks : list of clock specifiers, corresponding to entries in
-> +		    clock-names property;
-> +- clock-names: required clock name.
+> +Example:
 > +
-> +The device node should contain two 'port' child node, according to the bindings
-> +defined in Documentation/devicetree/bindings/media/video-interfaces.txt.
-> +The first port should be connected to sensor nodes, and the second port should be
-> +connected to isp node. The following are properties specific to those nodes.
+> +	ufs: ufs at ff3b0000 {
+> +		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
+> +		/* 0: HCI standard */
+> +		/* 1: UFS SYS CTRL */
+> +		reg = <0x0 0xff3b0000 0x0 0x1000>,
+> +			<0x0 0xff3b1000 0x0 0x1000>;
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
+> +			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
+> +		clock-names = "ref_clk", "phy_clk";
+> +		freq-table-hz = <0 0>, <0 0>;
 
-Need to list how many endpoints if there are more than 1.
+? Not documented.
 
-> +
-> +endpoint node
-> +-------------
-> +
-> +- data-lanes : (required) an array specifying active physical MIPI-CSI2
-> +		data input lanes and their mapping to logical lanes; the
-> +		array's content is unused, only its length is meaningful;
-> +
-> +Device node example
-> +-------------------
-> +
-> +    mipi_dphy_rx0: mipi-dphy-rx0 {
-> +        compatible = "rockchip,rk3399-mipi-dphy";
-> +        clocks = <&cru SCLK_MIPIDPHY_REF>,
-> +            <&cru SCLK_DPHY_RX0_CFG>,
-> +            <&cru PCLK_VIO_GRF>;
-> +        clock-names = "dphy-ref", "dphy-cfg", "grf";
-> +        power-domains = <&power RK3399_PD_VIO>;
-> +        bus-width = <4>;
-
-rockchip,grf?
-
-No other registers? Can you just make this a child of the grf block with 
-a proper reg property for the range of dphy registers?
-
-> +
-> +        ports {
-> +            #address-cells = <1>;
-> +            #size-cells = <0>;
-> +
-> +            port at 0 {
-> +                reg = <0>;
-> +                #address-cells = <1>;
-> +                #size-cells = <0>;
-> +
-> +                mipi_in_wcam: endpoint at 0 {
-> +                    reg = <0>;
-> +                    remote-endpoint = <&wcam_out>;
-> +                    data-lanes = <1 2>;
-> +                };
-> +                mipi_in_ucam: endpoint at 1 {
-> +                    reg = <1>;
-> +                    remote-endpoint = <&ucam_out>;
-> +                    data-lanes = <1>;
-> +                };
-> +            };
-> +
-> +            port at 1 {
-> +                reg = <1>;
-> +                #address-cells = <1>;
-> +                #size-cells = <0>;
-> +
-> +                dphy_rx0_out: endpoint at 0 {
-> +                    reg = <0>;
-
-Don't need reg and everything associated with it if there's only 1 
-endpoint. 
-
-> +                    remote-endpoint = <&isp0_mipi_in>;
-> +                };
-> +            };
-> +        };
-> +    };
-> \ No newline at end of file
-
-Please fix.
-
-Rob
+> +		/* offset: 0x84; bit: 12 */
+> +		/* offset: 0x84; bit: 7  */
+> +		resets = <&crg_rst 0x84 12>,
+> +			<&crg_rst 0x84 7>;
+> +		reset-names = "rst", "assert";
+> +	};
+> -- 
+> 2.15.0
+> 
