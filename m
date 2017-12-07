@@ -1,36 +1,39 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  7 Dec 2017 16:58:58 +0100
-Subject: [PATCH v4 13/15] ARM: dts: sun8i: a83t: Add the PWM pin group
+Date: Thu,  7 Dec 2017 16:58:56 +0100
+Subject: [PATCH v4 11/15] ARM: dts: sun8i: a83t: Enable the PWM
 In-Reply-To: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <b58547cd03f88c65162f362361023b44a4b6fc89.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <0ba30615a45a4dbbde0403b19ec3dd70ee7a8f4b.1512662253.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A83T has a PWM that can be output from the SoC. Let's add a pinctrl
-group for it.
+The A83T has the same PWM block than the H3. Add it to our DT.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm/boot/dts/sun8i-a83t.dtsi |  9 +++++++++
+ 1 file changed, 9 insertions(+)
 
 diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index e200df5a9058..a37517d4472a 100644
+index e4db38c717d9..7a49b9f085eb 100644
 --- a/arch/arm/boot/dts/sun8i-a83t.dtsi
 +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -446,6 +446,11 @@
- 				bias-pull-up;
- 			};
+@@ -497,6 +497,15 @@
+ 			status = "disabled";
+ 		};
  
-+			pwm_pin: pwm-pin {
-+				pins = "PD28";
-+				function = "pwm";
-+			};
++		pwm: pwm at 1c21400 {
++			compatible = "allwinner,sun8i-a83t-pwm",
++				     "allwinner,sun8i-h3-pwm";
++			reg = <0x01c21400 0x400>;
++			clocks = <&osc24M>;
++			#pwm-cells = <3>;
++			status = "disabled";
++		};
 +
- 			spdif_tx_pin: spdif-tx-pin {
- 				pins = "PE18";
- 				function = "spdif";
+ 		uart0: serial at 1c28000 {
+ 			compatible = "snps,dw-apb-uart";
+ 			reg = <0x01c28000 0x400>;
 -- 
 git-series 0.9.1
