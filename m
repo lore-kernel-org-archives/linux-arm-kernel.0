@@ -1,136 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 7 Dec 2017 15:51:48 +0000
-Subject: [PATCH v3 11/20] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <CAKv+Gu-Otcg4UxhJA44PbbYamBJd26Be+YsSUQUaB+qy9owzvQ@mail.gmail.com>
-References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
- <20171206194346.24393-12-ard.biesheuvel@linaro.org>
- <20171207143934.GF22781@e103592.cambridge.arm.com>
- <CAKv+Gu8N6w3+VFpF3kq-qg9Gij=4VbtQqu+yfvfA67p2kWaRLg@mail.gmail.com>
- <CAKv+Gu-Otcg4UxhJA44PbbYamBJd26Be+YsSUQUaB+qy9owzvQ@mail.gmail.com>
-Message-ID: <CAKv+Gu8B=53Tz1Twr==ze_qcwdDu+9JA5B2f9JgNn1E3+EnG6g@mail.gmail.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 7 Dec 2017 07:52:52 -0800
+Subject: [RESEND PATCH v3 2/2] ARM64: dts: meson-axg: add pinctrl DT info
+ for Meson-AXG SoC
+In-Reply-To: <9d28dcdf-655b-a843-1f21-24ebb1f27be3@amlogic.com>
+References: <20171120102354.5354-1-yixun.lan@amlogic.com>
+ <20171120102354.5354-3-yixun.lan@amlogic.com>
+ <7htvx3r4o7.fsf@baylibre.com>
+ <9d28dcdf-655b-a843-1f21-24ebb1f27be3@amlogic.com>
+Message-ID: <CAOi56cXtSjsNjOWLEwzox7nCGnG-WOOzPkM1+MSvaPnyOtLuZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 December 2017 at 15:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 7 December 2017 at 14:50, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> On 7 December 2017 at 14:39, Dave Martin <Dave.Martin@arm.com> wrote:
->>> On Wed, Dec 06, 2017 at 07:43:37PM +0000, Ard Biesheuvel wrote:
->>>> Add support macros to conditionally yield the NEON (and thus the CPU)
->>>> that may be called from the assembler code.
->>>>
->>>> In some cases, yielding the NEON involves saving and restoring a non
->>>> trivial amount of context (especially in the CRC folding algorithms),
->>>> and so the macro is split into three, and the code in between is only
->>>> executed when the yield path is taken, allowing the context to be preserved.
->>>> The third macro takes an optional label argument that marks the resume
->>>> path after a yield has been performed.
->>>>
->>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>>> ---
->>>>  arch/arm64/include/asm/assembler.h | 51 ++++++++++++++++++++
->>>>  1 file changed, 51 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->>>> index 5f61487e9f93..c54e408fd5a7 100644
->>>> --- a/arch/arm64/include/asm/assembler.h
->>>> +++ b/arch/arm64/include/asm/assembler.h
->>>> @@ -572,4 +572,55 @@ alternative_else_nop_endif
->>>>  #endif
->>>>       .endm
->>>>
->>>> +/*
->>>> + * Check whether to yield to another runnable task from kernel mode NEON code
->>>> + * (which runs with preemption disabled).
->>>> + *
->>>> + * if_will_cond_yield_neon
->>>> + *        // pre-yield patchup code
->>>> + * do_cond_yield_neon
->>>> + *        // post-yield patchup code
->>>> + * endif_yield_neon
->>>
->>> ^ Mention the lbl argument?
->>>
+On Wed, Dec 6, 2017 at 5:44 PM, Yixun Lan <yixun.lan@amlogic.com> wrote:
+> Hi Kevin
+>
+>
+> On 12/07/17 04:18, Kevin Hilman wrote:
+>> Yixun Lan <yixun.lan@amlogic.com> writes:
 >>
->> Yep will do
+>>> From: Xingyu Chen <xingyu.chen@amlogic.com>
+>>>
+>>> Add new pinctrl DT info for the Amlogic's Meson-AXG SoC.
+>>>
+>>> Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
+>>> Signed-off-by: Xingyu Chen <xingyu.chen@amlogic.com>
+>>> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>>> ---
+>>>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 44 ++++++++++++++++++++++++++++++
+>>>  1 file changed, 44 insertions(+)
+>>>
+>>> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>>> index 5fc33b76b91c..e0fb860e12c5 100644
+>>> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>>> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+>>> @@ -9,6 +9,7 @@
+>>>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>>>  #include <dt-bindings/clock/axg-clkc.h>
+>>>  #include <dt-bindings/clock/axg-aoclkc.h>
 >>
->>>> + *
->>>> + * - Check whether the preempt count is exactly 1, in which case disabling
->>>
->>>                                                            enabling ^
->>>
->>>> + *   preemption once will make the task preemptible. If this is not the case,
->>>> + *   yielding is pointless.
->>>> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
->>>> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
->>>> + *   yield fixup code.
->>>
->>> Mention that neither patchup sequence is allowed to use section-changing
->>> directives?
->>>
->>> For example:
->>>
->>>         if_will_cond_yield_neon
->>>                 // some code
->>>
->>>                 .pushsection .rodata, "a"
->>> foo:                    .quad // some literal data for some reason
->>>                 .popsection
->>>
->>>                 // some code
->>>         do_cond_yield_neon
->>>
->>> is not safe, because .previous is now .rodata.
->>>
+>> This doesn't apply because this aoclkc.h header does not exist in
+>> mainline.
 >>
->> Are you sure this is true?
->>
->> The gas info page for .previous tells me
->>
->>    In terms of the section stack, this directive swaps the current
->> section with the top section on the section stack.
->>
->> and it seems to me that .rodata is no longer on the section stack
->> after .popsection. In that sense, push/pop should be safe, but
->> section/subsection/previous is not (I think). So yes, let's put a note
->> in to mention that section directives are unsupported.
->>
->>> (You could protect against this with
->>>         .pushsection .text; .previous; .subsection 1; // ...
->>>         .popsection
->>> but it may be overkill.)
->>>
->>>> + *
->>>> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
->>>> + * and may clobber x2 .. x18 if the yield path is taken.
->>>> + */
->>>> +
->>>> +     .macro          cond_yield_neon, lbl
->>>> +     if_will_cond_yield_neon
->>>> +     do_cond_yield_neon
->>>> +     endif_yield_neon        \lbl
->>>> +     .endm
->>>> +
->>>> +     .macro          if_will_cond_yield_neon
->>>> +#ifdef CONFIG_PREEMPT
->>>> +     get_thread_info x0
->>>> +     ldr             w1, [x0, #TSK_TI_PREEMPT]
->>>> +     ldr             x0, [x0, #TSK_TI_FLAGS]
->>>> +     cmp             w1, #1 // == PREEMPT_OFFSET
->>>
->>> Can we at least drop a BUILD_BUG_ON() somewhere to check this?
->>>
->>> Maybe in kernel_neon_begin() since this is intimately kernel-mode NEON
->>> related.
->>>
->>
->> Sure.
+>> Kevin
 >>
 >
-> I only just understood your asm-offsets remark earlier. I wasn't aware
-> that it allows exposing random constants as well (although it is
-> fairly obvious now that I do). So I will expose PREEMPT_OFFSET rather
-> than open code it
+> this is due to I create the patch in serial sequence (first clk, then
+> pinctrl), I probably will fix my work flow next time - to rebase all the
+> patch separately on the -rc version
 >
+> but here, the pinctrl DT part has no dependency on DT clk patch..
+> you could drop the above two #include and just apply the reset
+>
+> could you amend & apply this? or do you want me to send another updated
+> version?
 
-Of course, I mean 'arbitrary' not 'random' (like 6666)
+I prefer that you rebase (either on -rc or my v4.16/dt64 branch[1]) and resend.
+
+Thanks,
+
+Kevin
+
+[1] https://git.kernel.org/pub/scm/linux/kernel/git/khilman/linux-amlogic.git/log/?h=v4.16/dt64
