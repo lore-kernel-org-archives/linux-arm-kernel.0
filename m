@@ -1,47 +1,58 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 7 Dec 2017 12:50:50 -0500
-Subject: [PATCH V6 4/7] OF: properties: Implement get_match_data() callback
-In-Reply-To: <20171207162036.6a71a4f5@karo-electronics.de>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-5-git-send-email-okaya@codeaurora.org>
- <20171207141029.575c0a03@karo-electronics.de>
- <def8e351-bc2d-7adc-fdc5-362b365302a8@codeaurora.org>
- <20171207162036.6a71a4f5@karo-electronics.de>
-Message-ID: <661cbe4d-ea33-3e84-b5f2-ab6517cbb135@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Dec 2017 17:58:12 +0000
+Subject: [GIT PULL] arm64: fixes for -rc3
+Message-ID: <20171207175811.GL15393@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/7/2017 10:20 AM, Lothar Wa?mann wrote:
-> Hi,
-> 
-> On Thu, 7 Dec 2017 09:45:31 -0500 Sinan Kaya wrote:
->> On 12/7/2017 8:10 AM, Lothar Wa?mann wrote:
->>>> +void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
->>>> +			       struct device *dev)
->>> Shouldn't this be 'const void *of_fwnode_get_match_data
->>
->> OF keeps the driver data as a (const void*) internally. ACPI keeps the
->> driver data as kernel_ulong_t in struct acpi_device_id.
->>
->> I tried to find the middle ground here by converting output to void*
->> but not keeping const.
->>
-> It should be no problem to cast a (const void *) to an unsigned long
-> data type (without const qualifier).
-> 
+Hi Linus,
 
-It is the other way around. If I change this API to return a a (const void*),
-the device_get_match_data() function need to return a (const void *).
+Please pull the following arm64 fixes for 4.15-rc3.
 
-While implementing the ACPI piece, I have to convert an unsigned long to
-(const void *) in ACPI code so that the APIs are compatible.
+Details in the tag, but they broadly fix some more FP register fallout
+from the SVE patches and also some problems with the PGD tracking in our
+software PAN emulation code, after we received a crash report from a 3.18
+kernel running a backport.
 
-> 
-> Lothar Wa?mann
-> 
+Cheers,
 
+Will
 
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+--->8
+
+The following changes since commit ae64f9bd1d3621b5e60d7363bc20afb46aede215:
+
+  Linux 4.15-rc2 (2017-12-03 11:01:47 -0500)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
+
+for you to fetch changes up to cb968afc789821cdf9e17e79ef08ab90e5bae0f2:
+
+  arm64/sve: Avoid dereference of dead task_struct in KVM guest entry (2017-12-06 19:08:05 +0000)
+
+----------------------------------------------------------------
+arm64 fixes:
+
+- Fix SW PAN pgd shadowing for kernel threads, EFI and exiting user tasks
+
+- Fix FP register leak when a task_struct is re-allocated
+
+- Fix potential use-after-free in FP state tracking used by KVM
+
+----------------------------------------------------------------
+Dave Martin (3):
+      arm64: fpsimd: Prevent registers leaking from dead tasks
+      arm64: fpsimd: Abstract out binding of task's fpsimd context to the cpu.
+      arm64/sve: Avoid dereference of dead task_struct in KVM guest entry
+
+Will Deacon (2):
+      arm64: SW PAN: Point saved ttbr0 at the zero page when switching to init_mm
+      arm64: SW PAN: Update saved ttbr0 value on enter_lazy_tlb
+
+ arch/arm64/include/asm/efi.h         |  4 +--
+ arch/arm64/include/asm/mmu_context.h | 46 ++++++++++++++++----------------
+ arch/arm64/kernel/fpsimd.c           | 51 +++++++++++++++++++++---------------
+ arch/arm64/kernel/process.c          |  9 +++++++
+ 4 files changed, 63 insertions(+), 47 deletions(-)
