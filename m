@@ -1,447 +1,81 @@
-From: ludovic.desroches@microchip.com (Ludovic Desroches)
-Date: Thu, 7 Dec 2017 09:24:53 +0100
-Subject: [RESEND PATCH V2] ARM: dts: introduce the sama5d2 ptc ek board
-In-Reply-To: <20171206065844.27689-1-ludovic.desroches@microchip.com>
-References: <20171206065844.27689-1-ludovic.desroches@microchip.com>
-Message-ID: <20171207082453.10593-1-ludovic.desroches@microchip.com>
+From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
+Date: Thu, 7 Dec 2017 09:29:58 +0100
+Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
+In-Reply-To: <CAJZ5v0hEdK_vJcHeoz=Z2H6od=bktspPpTo37Y6qiOT2qptnaA@mail.gmail.com>
+References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
+ <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
+ <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
+ <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
+ <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
+ <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
+ <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
+ <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
+ <CAJZ5v0iaursWFP_KRoJqT6-QoGkvpTot0oMvs6qdjkaP12p9jQ@mail.gmail.com>
+ <CAJZ5v0hEdK_vJcHeoz=Z2H6od=bktspPpTo37Y6qiOT2qptnaA@mail.gmail.com>
+Message-ID: <20171207082958.GA11882@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the official SAMA5D2 Peripheral Touch Controller Evaluation
-Kit board.
+On Thu, Dec 07, 2017 at 12:19:25AM +0100, Rafael J. Wysocki wrote:
+> Hi Greg,
+> 
+> On Wed, Dec 6, 2017 at 6:16 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
+> > On Wed, Dec 6, 2017 at 5:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> >> On 12/6/2017 11:41 AM, Rafael J. Wysocki wrote:
+> >>> On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> >>>> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
+> >>>>>> Yes, it should, so I'm not sure why you need the list in the first place.
+> >>>>>>
+> >>>>>> Also it looks like something along the lines of devres_release_all()
+> >>>>>> should be sufficient.
+> >>>>> Good suggestion, let me test this.
+> >>>>>
+> >>>>
+> >>>> I tried to pull the code into GED but the API is not public. I also looked
+> >>>> at how it is used. I was afraid to mess up with the internals of base.c by
+> >>>> calling devres_release_all() externally first and by the driver framework
+> >>>> next. I moved away from this approach.
+> >>>
+> >>> Are you sure it is called by the core in the shutdown path?
+> >>
+> >> Sorry, I was thinking about a general case not the shutdown path. If we open
+> >> this API and have device drivers call it from arbitrary places; then we could
+> >> be opening a new can of worms that show up during device driver removal.
+> 
+> [cut]
+> 
+> >
+> > OK
+> >
+> > Anyway, it looks like something is missing in the core.
+> >
+> > You shouldn't really need to do all that dance in a driver.
+> 
+> We have a problem with the ACPI GED driver which essentially is a
+> platform driver requesting a number of interrupts and handling them by
+> dispatching a specific AML method.
+> 
+> It uses devm_request_threaded_irq() to request the interrupts, so it
+> doesn't need a ->remove() callback, but it turns out to need a
+> ->shutdown() one to free all of these interrupts at the shutdown time.
+> 
+> While we can add a ->shutdown() callback to it, that essentially needs
+> to duplicate devres_release_all() somewhat.
+> 
+> Any suggestions what to do with that?
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
----
-Resend: Put SPDX-License-Identifier at the beginning of the file.
+Just don't use devm_request_threaded_irq()?  :)
 
-Changes:
-- v2:
-  - remove memory node
-  - use SPDX-License-Identifier
+Seriously, those are just "helper" functions if your code happens to
+follow the pattern they provide, if not, then don't use them, it's not
+that hard to provide the correct code to unwind things properly by "open
+coding" this logic as needed.
 
- arch/arm/boot/dts/Makefile                |   1 +
- arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 401 ++++++++++++++++++++++++++++++
- 2 files changed, 402 insertions(+)
- create mode 100644 arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+The devm_*irq() functions are known for not being able to be used all of
+the time for lots of shutdown and cleanup issues, this isn't the first
+time it has happened, which is why we are very careful when taking
+"cleanup" patches that use those functions.
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 043d7c720d0c..ed60582eb1da 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -48,6 +48,7 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
- dtb-$(CONFIG_SOC_SAM_V7) += \
- 	at91-kizbox2.dtb \
- 	at91-sama5d27_som1_ek.dtb \
-+	at91-sama5d2_ptc_ek.dtb \
- 	at91-sama5d2_xplained.dtb \
- 	at91-sama5d3_xplained.dtb \
- 	at91-tse850-3.dtb \
-diff --git a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
-new file mode 100644
-index 000000000000..186cb03e2672
---- /dev/null
-+++ b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
-@@ -0,0 +1,401 @@
-+// SPDX-License-Identifier: (GPL-2.0+ OR X11)
-+/*
-+ * at91-sama5d2_ptc_ek.dts - Device Tree file for SAMA5D2 PTC EK board
-+ *
-+ *  Copyright (C) 2017 Microchip/Atmel,
-+ *		  2017 Wenyou Yang <wenyou.yang@microchip.com>
-+ *		  2017 Ludovic Desroches <ludovic.desroches@microchip.com>
-+ */
-+/dts-v1/;
-+#include "sama5d2.dtsi"
-+#include "sama5d2-pinfunc.h"
-+#include <dt-bindings/mfd/atmel-flexcom.h>
-+#include <dt-bindings/gpio/gpio.h>
-+
-+/ {
-+	model = "Atmel SAMA5D2 PTC EK";
-+	compatible = "atmel,sama5d2-ptc_ek", "atmel,sama5d2", "atmel,sama5";
-+
-+	aliases {
-+		serial0 = &uart0;
-+		i2c0	= &i2c0;
-+		i2c1	= &i2c1;
-+		i2c2	= &i2c2;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	clocks {
-+		slow_xtal {
-+			clock-frequency = <32768>;
-+		};
-+
-+		main_xtal {
-+			clock-frequency = <24000000>;
-+		};
-+	};
-+
-+	ahb {
-+		usb0: gadget at 300000 {
-+			atmel,vbus-gpio = <&pioA PIN_PA27 GPIO_ACTIVE_HIGH>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usba_vbus>;
-+			status = "okay";
-+		};
-+
-+		usb1: ohci at 400000 {
-+			num-ports = <3>;
-+			atmel,vbus-gpio = <0
-+					   &pioA PIN_PB12 GPIO_ACTIVE_HIGH
-+					   0
-+					  >;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_usb_default>;
-+			status = "okay";
-+		};
-+
-+		usb2: ehci at 500000 {
-+			status = "okay";
-+		};
-+
-+		ebi: ebi at 10000000 {
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_nand_default>;
-+			status = "okay"; /* conflicts with sdmmc1 and qspi0 */
-+
-+			nand_controller: nand-controller {
-+				status = "okay";
-+
-+				nand at 3 {
-+					reg = <0x3 0x0 0x2>;
-+					atmel,rb = <0>;
-+					nand-bus-width = <8>;
-+					nand-ecc-mode = "hw";
-+					nand-on-flash-bbt;
-+					label = "atmel_nand";
-+
-+					partitions {
-+						compatible = "fixed-partitions";
-+						#address-cells = <1>;
-+						#size-cells = <1>;
-+
-+						at91bootstrap at 0 {
-+							label = "bootstrap";
-+							reg = <0x0 0x40000>;
-+						};
-+
-+						bootloader at 40000 {
-+							label = "bootloader";
-+							reg = <0x40000 0xc0000>;
-+						};
-+
-+						bootloaderenv at 0x100000 {
-+							label = "bootloader env";
-+							reg = <0x100000 0x40000>;
-+						};
-+
-+						bootloaderenvred at 0x140000 {
-+							label = "bootloader env redundant";
-+							reg = <0x140000 0x40000>;
-+						};
-+
-+						dtb at 180000 {
-+							label = "device tree";
-+							reg = <0x180000 0x80000>;
-+						};
-+
-+						kernel at 200000 {
-+							label = "kernel";
-+							reg = <0x200000 0x600000>;
-+						};
-+
-+						rootfs at 800000 {
-+							label = "rootfs";
-+							reg = <0x800000 0x1f800000>;
-+						};
-+					};
-+				};
-+			};
-+		};
-+
-+		sdmmc0: sdio-host at a0000000 {
-+			bus-width = <8>;
-+			pinctrl-names = "default";
-+			pinctrl-0 = <&pinctrl_sdmmc0_default>;
-+			non-removable;
-+			mmc-ddr-1_8v;
-+			status = "okay";
-+		};
-+
-+		apb {
-+			spi0: spi at f8000000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi0_default>;
-+				status = "okay";
-+			};
-+
-+			macb0: ethernet at f8008000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_macb0_default &pinctrl_macb0_phy_irq>;
-+				phy-mode = "rmii";
-+				status = "okay";
-+
-+				ethernet-phy at 1 {
-+					reg = <0x1>;
-+					interrupt-parent = <&pioA>;
-+					interrupts = <56 IRQ_TYPE_LEVEL_LOW>;
-+				};
-+			};
-+
-+			uart0: serial at f801c000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart0_default>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "okay";
-+			};
-+
-+			uart2: serial at f8024000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_uart2_default>;
-+				atmel,use-dma-rx;
-+				atmel,use-dma-tx;
-+				status = "okay";
-+			};
-+
-+			i2c0: i2c at f8028000 {
-+				dmas = <0>, <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c0_default>;
-+				status = "okay";
-+			};
-+
-+			flx0: flexcom at f8034000 {
-+				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
-+				status = "okay";
-+
-+				i2c2: i2c at 600 {
-+					compatible = "atmel,sama5d2-i2c";
-+					reg = <0x600 0x200>;
-+					interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
-+					dmas = <0>, <0>;
-+					dma-names = "tx", "rx";
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					clocks = <&flx0_clk>;
-+					pinctrl-names = "default";
-+					pinctrl-0 = <&pinctrl_flx0_default>;
-+					atmel,fifo-size = <16>;
-+					status = "okay";
-+				};
-+			};
-+
-+			shdwc at f8048010 {
-+				atmel,shdwc-debouncer = <976>;
-+
-+				input at 0 {
-+					reg = <0>;
-+					atmel,wakeup-type = "low";
-+				};
-+			};
-+
-+			watchdog at f8048040 {
-+				status = "okay";
-+			};
-+
-+			spi1: spi at fc000000 {
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_spi1_default>;
-+				status = "okay";
-+			};
-+
-+			i2c1: i2c at fc028000 {
-+				dmas = <0>, <0>;
-+				pinctrl-names = "default";
-+				pinctrl-0 = <&pinctrl_i2c1_default>;
-+				status = "okay";
-+
-+				at24 at 50 {
-+					compatible = "24c02";
-+					reg = <0x50>;
-+					pagesize = <8>;
-+				};
-+			};
-+
-+			pinctrl at fc038000 {
-+				pinctrl_flx0_default: flx0_default {
-+					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
-+						 <PIN_PB29__FLEXCOM0_IO1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_i2c0_default: i2c0_default {
-+					pinmux = <PIN_PD21__TWD0>,
-+						 <PIN_PD22__TWCK0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_i2c1_default: i2c1_default {
-+					pinmux = <PIN_PC6__TWD1>,
-+						 <PIN_PC7__TWCK1>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_key_gpio_default: key_gpio_default {
-+					pinmux = <PIN_PA10__GPIO>;
-+					bias-pull-up;
-+				};
-+
-+				pinctrl_led_gpio_default: led_gpio_default {
-+					pinmux = <PIN_PB6__GPIO>,
-+						 <PIN_PB8__GPIO>,
-+						 <PIN_PB10__GPIO>;
-+					bias-pull-up;
-+				};
-+
-+				pinctrl_macb0_default: macb0_default {
-+					pinmux = <PIN_PB14__GTXCK>,
-+						 <PIN_PB15__GTXEN>,
-+						 <PIN_PB16__GRXDV>,
-+						 <PIN_PB17__GRXER>,
-+						 <PIN_PB18__GRX0>,
-+						 <PIN_PB19__GRX1>,
-+						 <PIN_PB20__GTX0>,
-+						 <PIN_PB21__GTX1>,
-+						 <PIN_PB22__GMDC>,
-+						 <PIN_PB23__GMDIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_macb0_phy_irq: macb0_phy_irq {
-+					pinmux = <PIN_PB24__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_nand_default: nand_default {
-+					re_we_data {
-+						pinmux = <PIN_PA22__D0>,
-+							 <PIN_PA23__D1>,
-+							 <PIN_PA24__D2>,
-+							 <PIN_PA25__D3>,
-+							 <PIN_PA26__D4>,
-+							 <PIN_PA27__D5>,
-+							 <PIN_PA28__D6>,
-+							 <PIN_PA29__D7>,
-+							 <PIN_PA30__NWE_NANDWE>,
-+							 <PIN_PB2__NRD_NANDOE>;
-+						bias-pull-up;
-+					};
-+
-+					ale_cle_rdy_cs {
-+						pinmux = <PIN_PB0__A21_NANDALE>,
-+							 <PIN_PB1__A22_NANDCLE>,
-+							 <PIN_PC8__NANDRDY>,
-+							 <PIN_PA31__NCS3>;
-+						bias-pull-up;
-+					};
-+				};
-+
-+				pinctrl_sdmmc0_default: sdmmc0_default {
-+					cmd_data {
-+						pinmux = <PIN_PA1__SDMMC0_CMD>,
-+							 <PIN_PA2__SDMMC0_DAT0>,
-+							 <PIN_PA3__SDMMC0_DAT1>,
-+							 <PIN_PA4__SDMMC0_DAT2>,
-+							 <PIN_PA5__SDMMC0_DAT3>,
-+							 <PIN_PA6__SDMMC0_DAT4>,
-+							 <PIN_PA7__SDMMC0_DAT5>,
-+							 <PIN_PA8__SDMMC0_DAT6>,
-+							 <PIN_PA9__SDMMC0_DAT7>;
-+						bias-pull-up;
-+					};
-+
-+					ck_cd_vddsel {
-+						pinmux = <PIN_PA0__SDMMC0_CK>,
-+							 <PIN_PA11__SDMMC0_VDDSEL>,
-+							 <PIN_PA13__SDMMC0_CD>;
-+						bias-disable;
-+					};
-+				};
-+
-+				pinctrl_spi0_default: spi0_default {
-+					pinmux = <PIN_PA14__SPI0_SPCK>,
-+						 <PIN_PA15__SPI0_MOSI>,
-+						 <PIN_PA16__SPI0_MISO>,
-+						 <PIN_PA17__SPI0_NPCS0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_spi1_default: spi1_default {
-+					pinmux = <PIN_PC1__SPI1_SPCK>,
-+						 <PIN_PC2__SPI1_MOSI>,
-+						 <PIN_PC3__SPI1_MISO>,
-+						 <PIN_PC4__SPI1_NPCS0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_uart0_default: uart0_default {
-+					pinmux = <PIN_PB26__URXD0>,
-+						 <PIN_PB27__UTXD0>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_uart2_default: uart2_default {
-+					pinmux = <PIN_PD23__URXD2>,
-+						 <PIN_PD24__UTXD2>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_usb_default: usb_default {
-+					pinmux = <PIN_PB12__GPIO>;
-+					bias-disable;
-+				};
-+
-+				pinctrl_usba_vbus: usba_vbus {
-+					pinmux = <PIN_PB11__GPIO>;
-+					bias-disable;
-+				};
-+
-+			};
-+
-+		};
-+	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_key_gpio_default>;
-+
-+		bp1 {
-+			label = "PB_USER";
-+			gpios = <&pioA PIN_PA10 GPIO_ACTIVE_LOW>;
-+			linux,code = <0x104>;
-+		};
-+	};
-+
-+	leds {
-+		compatible = "gpio-leds";
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pinctrl_led_gpio_default>;
-+		status = "okay";
-+
-+		red {
-+			label = "red";
-+			gpios = <&pioA PIN_PB10 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		green {
-+			label = "green";
-+			gpios = <&pioA PIN_PB8 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		blue {
-+			label = "blue";
-+			gpios = <&pioA PIN_PB6 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "heartbeat";
-+		};
-+	};
-+};
--- 
-2.12.2
+thanks,
+
+greg k-h
