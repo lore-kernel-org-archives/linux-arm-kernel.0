@@ -1,43 +1,128 @@
-From: rafael@kernel.org (Rafael J. Wysocki)
-Date: Thu, 7 Dec 2017 23:19:51 +0100
-Subject: [PATCH V6 3/7] device property: Introduce a common API to fetch
- device match data
-In-Reply-To: <20171207220642.qqiwf4vvk2gf42uf@valkosipuli.retiisi.org.uk>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
- <20171207124044.utyrn2mzzyml42b2@valkosipuli.retiisi.org.uk>
- <c2b38889-888a-3518-bf59-c2377f64a8ce@codeaurora.org>
- <20171207220642.qqiwf4vvk2gf42uf@valkosipuli.retiisi.org.uk>
-Message-ID: <CAJZ5v0inHMCLGyPaAeuJNo2VH7f3Th0KdpT2UkPBCsvrSDi0gQ@mail.gmail.com>
+From: anarsoul@gmail.com (Vasily Khoruzhick)
+Date: Thu, 7 Dec 2017 14:48:38 -0800
+Subject: [PATCH 2/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+In-Reply-To: <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
+References: <20171203204157.20829-1-anarsoul@gmail.com>
+ <20171203204157.20829-3-anarsoul@gmail.com>
+ <CAEKpxBmHhZ+2WNXJEPbQFS6KeKsqRrZeNodRnu1M5yLc15DerA@mail.gmail.com>
+ <CA+E=qVd+uM0Aq_=sf+fomQ-m+3Oy0MdG7OPjF5tVagG1UgKYzg@mail.gmail.com>
+ <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
+Message-ID: <CA+E=qVdcmPpUT0ddjdwY96ORiU5rQvMsYcfsEhOUsYQyKRgbRA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 11:06 PM, Sakari Ailus <sakari.ailus@iki.fi> wrote:
-> On Thu, Dec 07, 2017 at 03:17:52PM -0500, Sinan Kaya wrote:
->> On 12/7/2017 7:40 AM, Sakari Ailus wrote:
->> > On Tue, Dec 05, 2017 at 12:04:48PM -0500, Sinan Kaya wrote:
->> >> @@ -101,6 +103,8 @@ struct fwnode_operations {
->> >>    (*graph_get_port_parent)(struct fwnode_handle *fwnode);
->> >>    int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
->> >>                                struct fwnode_endpoint *endpoint);
->> >> +  void *(*get_match_data)(const struct fwnode_handle *fwnode,
->> >> +                          struct device *dev);
->> >
->> > You can make dev const, too.
->> >
->>
->> done, I couldn't change device_get_match_data() parameter const due to
->> dev_fwnode() function.
->>
->>                  from /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:13:
->>
->> /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:1341:39: warning: passing argument 1 of 'dev_fwnode' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
->>   return fwnode_call_ptr_op(dev_fwnode(dev), device_get_match_data,
+On Thu, Dec 7, 2017 at 1:21 AM, Code Kipper <codekipper@gmail.com> wrote:
+> On 4 December 2017 at 08:34, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>> I'd keep it sun50i_a64_acodec_i2s, since other 3 I2S modules aren't
+>> compatible with this one, but similar to H3.
 >
-> Right. Makes sense.
->
-> I guess it's not perhaps worth it introducing dev_fwnode_const just for
-> this. devices are seldom if ever const anyway.
+> Well I wouldn't and the description of it is usage is clearly stated
+> in the devicetree
+> for the dai.
 
-They cannot be const.  Had they been const, it wouldn't have been
-possible to register them even. :-)
+OK, how would you name 3 other I2S modules that are present in A64?
+
+>> On Sun, Dec 3, 2017 at 10:42 PM, Code Kipper <codekipper@gmail.com> wrote:
+>>> On 3 December 2017 at 21:41, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>>>> From: Marcus Cooper <codekipper@gmail.com>
+>>>>
+>>>> The I2S block used for the audio codec in the A64 is very similar
+>>>> to what is used by the A10(sun4i) devices. However, its TX FIFO is
+>>>> located at a different address.
+>>>>
+>>>> [vasilykh: - added fixed_wss and wss_value to A64 quirks,
+>>>>            - changed compatible to 'allwinner,sun50i-a64-acodec-i2s,
+>>>>              since A64 has 3 more I2S blocks that are not compatible
+>>>>              with audio codec I2S]
+> This needs to be investigated more...I'm suspicious of the
+> SUN8I_I2S_FMT0_LRCK_PERIOD value which is hardcoded to 0x1f.
+> I've made this following change
+> https://github.com/codekipper/linux-sunxi/commit/4c5fe5f5576cfbb2e1e94a99cd19dfdc9403ea50
+> which seems to work for me but I would like to look at it with a logic
+> analyser and test other sample depths.
+> CK
+
+I'm afraid it's not possible to get inside of SoC, since internal I2S
+pins do not go out. And other 3 I2S modules are different from one for
+internal codec.
+
+>>>>
+>>>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
+>>>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
+>>>> ---
+>>>>  .../devicetree/bindings/sound/sun4i-i2s.txt        |  2 ++
+>>>>  sound/soc/sunxi/sun4i-i2s.c                        | 23 ++++++++++++++++++++++
+>>>>  2 files changed, 25 insertions(+)
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>>>> index 05d7135a8d2f..ab86f266962a 100644
+>>>> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>>>> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
+>>>> @@ -9,6 +9,7 @@ Required properties:
+>>>>     - "allwinner,sun4i-a10-i2s"
+>>>>     - "allwinner,sun6i-a31-i2s"
+>>>>     - "allwinner,sun8i-h3-i2s"
+>>>> +   - "allwinner,sun50i-a64-acodec-i2s"
+>>>>  - reg: physical base address of the controller and length of memory mapped
+>>>>    region.
+>>>>  - interrupts: should contain the I2S interrupt.
+>>>> @@ -24,6 +25,7 @@ Required properties:
+>>>>  Required properties for the following compatibles:
+>>>>         - "allwinner,sun6i-a31-i2s"
+>>>>         - "allwinner,sun8i-h3-i2s"
+>>>> +       - "allwinner,sun50i-a64-acodec-i2s"
+>>> I would keep the compatible format the same. ie.
+>>> allwinner,sun50i-a64-i2s. The A33 for example uses the sun6i-a31-i2s
+>>> for it's dai.
+>>>
+>>>>  - resets: phandle to the reset line for this codec
+>>>>
+>>>>  Example:
+>>>> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
+>>>> index 54c16eb64713..2c060e015725 100644
+>>>> --- a/sound/soc/sunxi/sun4i-i2s.c
+>>>> +++ b/sound/soc/sunxi/sun4i-i2s.c
+>>>> @@ -942,6 +942,25 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
+>>>>         .field_rxchansel        = REG_FIELD(SUN8I_I2S_RX_CHAN_SEL_REG, 0, 2),
+>>>>  };
+>>>>
+>>>> +static const struct sun4i_i2s_quirks sun50i_a64_acodec_i2s_quirks = {
+>>> ditto
+>>>> +       .has_reset              = true,
+>>>> +       .reg_offset_txdata      = SUN8I_I2S_FIFO_TX_REG,
+>>>> +       .sun4i_i2s_regmap       = &sun4i_i2s_regmap_config,
+>>>> +       .has_slave_select_bit   = true,
+>>>> +       .fixed_wss              = true,
+>>>> +       .wss_value              = 3,
+>>>> +       .field_clkdiv_mclk_en   = REG_FIELD(SUN4I_I2S_CLK_DIV_REG, 7, 7),
+>>>> +       .field_fmt_wss          = REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
+>>>> +       .field_fmt_sr           = REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
+>>>> +       .field_fmt_bclk         = REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
+>>>> +       .field_fmt_lrclk        = REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
+>>>> +       .field_fmt_mode         = REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
+>>>> +       .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
+>>>> +       .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
+>>>> +       .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
+>>>> +       .field_rxchansel        = REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
+>>>> +};
+>>>> +
+>>>>  static int sun4i_i2s_init_regmap_fields(struct device *dev,
+>>>>                                         struct sun4i_i2s *i2s)
+>>>>  {
+>>>> @@ -1146,6 +1165,10 @@ static const struct of_device_id sun4i_i2s_match[] = {
+>>>>                 .compatible = "allwinner,sun8i-h3-i2s",
+>>>>                 .data = &sun8i_h3_i2s_quirks,
+>>>>         },
+>>>> +       {
+>>>> +               .compatible = "allwinner,sun50i-a64-acodec-i2s",
+>>>> +               .data = &sun50i_a64_acodec_i2s_quirks,
+>>> ditto
+>>> BR,
+>>> CK
+>>>> +       },
+>>>>         {}
+>>>>  };
+>>>>  MODULE_DEVICE_TABLE(of, sun4i_i2s_match);
+>>>> --
+>>>> 2.15.0
+>>>>
