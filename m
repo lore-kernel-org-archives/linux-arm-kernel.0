@@ -1,12 +1,11 @@
 From: khilman@baylibre.com (Kevin Hilman)
-Date: Wed, 06 Dec 2017 16:55:08 -0800
-Subject: [PATCH 1/6] mmc: meson-gx-mmc: Fix platform_get_irq's error
+Date: Wed, 06 Dec 2017 16:58:27 -0800
+Subject: [PATCH 1/6 v3] mmc: meson-gx-mmc: Fix platform_get_irq's error
  checking
-In-Reply-To: <1510950502-22565-2-git-send-email-arvind.yadav.cs@gmail.com>
- (Arvind Yadav's message of "Sat, 18 Nov 2017 01:58:17 +0530")
-References: <1510950502-22565-1-git-send-email-arvind.yadav.cs@gmail.com>
- <1510950502-22565-2-git-send-email-arvind.yadav.cs@gmail.com>
-Message-ID: <7hfu8nmk5v.fsf@baylibre.com>
+In-Reply-To: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
+ (Arvind Yadav's message of "Sun, 19 Nov 2017 10:22:43 +0530")
+References: <c1c27676e9f141ace1254b40807bf2dc03f072c6.1511066652.git.arvind.yadav.cs@gmail.com>
+Message-ID: <7h4lp3mk0c.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -18,4 +17,4 @@ Arvind Yadav <arvind.yadav.cs@gmail.com> writes:
 >
 > Signed-off-by: Arvind Yadav <arvind.yadav.cs@gmail.com>
 
-Reviewed-by: Kevin Hilman <khilman@baylibre.com>
+Acked-by: Kevin Hilman <khilman@baylibre.com>
