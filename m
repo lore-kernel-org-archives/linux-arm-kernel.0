@@ -1,55 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 7 Dec 2017 10:49:48 +0000
-Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
-In-Reply-To: <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
-References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
- <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
- <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
-Message-ID: <20171207104948.GE31900@arm.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 7 Dec 2017 11:50:29 +0100
+Subject: [PATCH v3 08/15] drm/sun4i: Add LVDS support
+In-Reply-To: <CAOFm3uEpnBFUDBHK+SqQ-pGUPcWbGXNrWum4HRJ34tMtoX-2Qw@mail.gmail.com>
+References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <b900e5963180c94ca02bde178b6674622a127787.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <CAOFm3uEpnBFUDBHK+SqQ-pGUPcWbGXNrWum4HRJ34tMtoX-2Qw@mail.gmail.com>
+Message-ID: <20171207105029.w4k2zwlr4aygzdzg@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kees,
+Hi,
 
-On Wed, Dec 06, 2017 at 11:56:50AM -0800, Kees Cook wrote:
-> On Tue, Oct 31, 2017 at 8:51 AM, Dave Martin <Dave.Martin@arm.com> wrote:
-> > Miscellaneous:
+On Thu, Dec 07, 2017 at 11:14:27AM +0100, Philippe Ombredanne wrote:
+> On Tue, Dec 5, 2017 at 4:10 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The TCON supports the LVDS interface to output to a panel or a bridge.
+> > Let's add support for it.
 > >
-> >  * Change inconsistent copy_to_user() calls to __copy_to_user() in
-> >    preserve_sve_context().
-> >
-> >    There are already __put_user_error() calls here.
-> >
-> >    The whole extended signal frame is already checked for
-> >    access_ok(VERIFY_WRITE) in get_sigframe().
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> []
+> > --- /dev/null
+> > +++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+> > @@ -0,0 +1,183 @@
+> > +/*
+> > + * Copyright (C) 2015 NextThing Co
+> > + * Copyright (C) 2015-2017 Free Electrons
+> > + *
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or
+> > + * modify it under the terms of the GNU General Public License as
+> > + * published by the Free Software Foundation; either version 2 of
+> > + * the License, or (at your option) any later version.
+> > + */
 > 
-> Verifying all these __copy_to/from_user() calls is rather non-trivial.
-> For example, I had to understand that the access_ok() check actually
-> spans memory that both user->sigframe and user->next_frame point into.
+> Would you consider using the new SPDX ids instead of this fine legalese?
+> e.g. this as the top line:
+> 
+> // SPDX-License-Identifier: GPL-2.0+
 
-I don't think that's particularly difficult -- you just have to read the
-four lines preceding the access_ok.
+I did, and then forgot about it.
 
-> And it isn't clear to me that all users of apply_user_offset() are
-> within this range too, along with other manually calculated offsets in
-> setup_sigframe().
+This will be in my next iteration, thanks!
+Maxime
 
-The offsets passed into apply_user_offset are calculated by
-setup_sigframe_layout as the stack is allocated, so they're correct by
-construction. We could add a size check in apply_user_offset if you like?
-
-> And it's not clear if parse_user_sigframe() is safe either. Are
-> user->fpsimd and user->sve checked somewhere? It seems like it's
-> safely contained by in sf->uc.uc_mcontext.__reserved, but it's hard to
-> read, though I do see access_ok() checks against __reserved at the end
-> of the while loop.
-
-This one is certainly more difficult to follow, mainly because it's spread
-about a bit and we have to check the extra context separately. However, the
-main part of the frame is checked in sys_rt_sigreturn before calling
-restore_sigframe, and the extra context is checked in parse_user_sigframe
-if we find it.
-
-Dave, any thoughts on making this easier to understand?
-
-Will
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/af641469/attachment.sig>
