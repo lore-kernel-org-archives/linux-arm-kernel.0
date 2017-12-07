@@ -1,27 +1,55 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 7 Dec 2017 14:17:20 +0100
-Subject: [PATCH v2] i2c: stm32: Fix copyrights
-In-Reply-To: <20171207095437.bm4uiy7o2amzbtv3@ninjato>
-References: <20171130084357.23327-1-benjamin.gaignard@st.com>
- <20171207095437.bm4uiy7o2amzbtv3@ninjato>
-Message-ID: <9fe6a754-b4fe-970b-c4dd-23b0687b9207@st.com>
+From: afaerber@suse.de (=?UTF-8?Q?Andreas_F=c3=a4rber?=)
+Date: Thu, 7 Dec 2017 14:16:21 +0100
+Subject: [PATCH v2 4/8] clocksource: owl: Prepare S700
+In-Reply-To: <f1480e8b-81b8-e425-794a-abbe77387877@linaro.org>
+References: <20171113233427.5386-1-afaerber@suse.de>
+ <20171113233427.5386-5-afaerber@suse.de>
+ <ca3caff7-996e-a08d-4d4e-2cf239929535@suse.de>
+ <126e159d-76db-8249-6844-d2a968c4a083@linaro.org>
+ <95e19098-e7a0-424e-3970-5c391605c059@suse.de>
+ <f1480e8b-81b8-e425-794a-abbe77387877@linaro.org>
+Message-ID: <b4da6f90-d105-f6a4-5c33-1e1fb200738a@suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Wolfram,
-
-I take over ownership of this driver from now on.
-
-Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-
-On 12/07/2017 10:54 AM, Wolfram Sang wrote:
-> On Thu, Nov 30, 2017 at 09:43:57AM +0100, Benjamin Gaignard wrote:
->> Uniformize STMicroelectronics copyrights headers
->> Add SPDX identifier
+Am 07.12.2017 um 14:11 schrieb Daniel Lezcano:
+> On 07/12/2017 13:47, Andreas F?rber wrote:
+>> Am 07.12.2017 um 10:23 schrieb Daniel Lezcano:
+>>> On 05/12/2017 00:00, Andreas F?rber wrote:
+>>>> Hi Daniel,
+>>>>
+>>>> Am 14.11.2017 um 00:34 schrieb Andreas F?rber:
+>>>>> Actions S700 has two 2Hz timers like S500, and four TIMx timers like S900.
+>>>>>
+>>>>> Signed-off-by: Andreas F?rber <afaerber@suse.de>
+>>>>> ---
+>>>>>  v1 -> v2:
+>>>>>  * Adopted TIMER_OF_DECLARE() (Daniel)
+>>>>>  
+>>>>>  drivers/clocksource/owl-timer.c | 1 +
+>>>>>  1 file changed, 1 insertion(+)
+>>>>
+>>>> Are you planning to queue this v2 patch for 4.16?
+>>>
+>>> Yeah, what about the patch 1/8 ?
 >>
->> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
->> Acked-by: Alexandre TORGUE <alexandre.torgue@st.com>
->> CC: M'boumba Cedric Madianga <cedric.madianga@gmail.com>
+>> In linux-next already.
 > 
-> I'd need an ack from M'boumba Cedric Madianga for this one.
+> Yeah, but that does not mean the patch is merged. Do you mean it is
+> merged in arm-soc, so it is visible in linux-next?
+
+No, I am waiting to send my initial 4.16 pull to arm-soc and wanted to
+clarify what (if anything) from this series can still go into that pull.
+
+>> If you take 2-4, I can take 5; if you'd rather have me take the binding,
+>> fine with me as well.
 > 
+> I will take patches 2-4.
+
+Thanks,
+Andreas
+
+-- 
+SUSE Linux GmbH, Maxfeldstr. 5, 90409 N?rnberg, Germany
+GF: Felix Imend?rffer, Jane Smithard, Graham Norton
+HRB 21284 (AG N?rnberg)
