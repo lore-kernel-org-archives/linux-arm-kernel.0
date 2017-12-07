@@ -1,117 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 7 Dec 2017 10:54:06 +0000
-Subject: [PATCH v5 08/16] arm64: Add vmap_stack header file
-In-Reply-To: <20171206190142.9246-9-james.morse@arm.com>
-References: <20171206190142.9246-1-james.morse@arm.com>
- <20171206190142.9246-9-james.morse@arm.com>
-Message-ID: <20171207105405.n2uxzi5dtbw2435e@lakrids.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu,  7 Dec 2017 11:45:45 +0000
+Subject: [PATCH] KVM: arm/arm64: Fix HYP unmapping going off limits
+Message-ID: <20171207114545.23845-1-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+When we unmap the HYP memory, we try to be clever and unmap one
+PGD at a time. If we start with a non-PGD aligned address and try
+to unmap a whole PGD, things go horribly wrong in unmap_hyp_range
+(addr and end can never match, and it all goes really badly as we
+keep incrementing pgd and parse random memory as page tables...).
 
-On Wed, Dec 06, 2017 at 07:01:34PM +0000, James Morse wrote:
-> Today the arm64 arch code allocates an extra IRQ stack per-cpu. If we
-> also have SDEI and VMAP stacks we need two extra per-cpu VMAP stacks.
-> 
-> Move the VMAP stack allocation out to a helper in a new header file.
-> This avoids missing THREADINFO_GFP, or getting the all-important alignment
-> wrong.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
-> ---
-> Changes since v4:
->  * Added gfp.h include
-> 
-> Changes since v3:
->  * Added BUILD_BUG() instead of a spooky link error
-> 
->  arch/arm64/include/asm/vmap_stack.h | 26 ++++++++++++++++++++++++++
->  arch/arm64/kernel/irq.c             | 13 ++-----------
->  2 files changed, 28 insertions(+), 11 deletions(-)
->  create mode 100644 arch/arm64/include/asm/vmap_stack.h
-> 
-> diff --git a/arch/arm64/include/asm/vmap_stack.h b/arch/arm64/include/asm/vmap_stack.h
-> new file mode 100644
-> index 000000000000..5465e4e65987
-> --- /dev/null
-> +++ b/arch/arm64/include/asm/vmap_stack.h
-> @@ -0,0 +1,26 @@
-> +// SPDX-License-Identifier: GPL-2.0
-> +// Copyright (C) 2017 Arm Ltd.
-> +#ifndef __ASM_VMAP_STACK_H
-> +#define __ASM_VMAP_STACK_H
-> +
-> +#include <linux/gfp.h>
-> +#include <linux/vmalloc.h>
-> +#include <asm/memory.h>
-> +#include <asm/pgtable.h>
-> +#include <asm/thread_info.h>
+The obvious fix is to let unmap_hyp_range do what it does best,
+which is to iterate over a range.
 
-I think we also need:
+Cc: stable at vger.kernel.org
+Reported-by: Andre Przywara <andre.przywara@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ virt/kvm/arm/mmu.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
 
-#include <linux/bug.h>		// for BUILD_BUG_ON()
-#incldue <linux/kconfig.h>	// for IS_ENABLED()
-
-Otherwise, this looks good to me. With those includes folded in:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Thanks,
-Mark.
-
-> +
-> +/*
-> + * To ensure that VMAP'd stack overflow detection works correctly, all VMAP'd
-> + * stacks need to have the same alignment.
-> + */
-> +static inline unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node)
-> +{
-> +	BUILD_BUG_ON(!IS_ENABLED(CONFIG_VMAP_STACK));
-> +
-> +	return __vmalloc_node_range(stack_size, THREAD_ALIGN,
-> +				    VMALLOC_START, VMALLOC_END,
-> +				    THREADINFO_GFP, PAGE_KERNEL, 0, node,
-> +				    __builtin_return_address(0));
-> +}
-> +
-> +#endif /* __ASM_VMAP_STACK_H */
-> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
-> index 713561e5bcab..60e5fc661f74 100644
-> --- a/arch/arm64/kernel/irq.c
-> +++ b/arch/arm64/kernel/irq.c
-> @@ -29,6 +29,7 @@
->  #include <linux/irqchip.h>
->  #include <linux/seq_file.h>
->  #include <linux/vmalloc.h>
-> +#include <asm/vmap_stack.h>
->  
->  unsigned long irq_err_count;
->  
-> @@ -58,17 +59,7 @@ static void init_irq_stacks(void)
->  	unsigned long *p;
->  
->  	for_each_possible_cpu(cpu) {
-> -		/*
-> -		* To ensure that VMAP'd stack overflow detection works
-> -		* correctly, the IRQ stacks need to have the same
-> -		* alignment as other stacks.
-> -		*/
-> -		p = __vmalloc_node_range(IRQ_STACK_SIZE, THREAD_ALIGN,
-> -					 VMALLOC_START, VMALLOC_END,
-> -					 THREADINFO_GFP, PAGE_KERNEL,
-> -					 0, cpu_to_node(cpu),
-> -					 __builtin_return_address(0));
-> -
-> +		p = arch_alloc_vmap_stack(IRQ_STACK_SIZE, cpu_to_node(cpu));
->  		per_cpu(irq_stack_ptr, cpu) = p;
->  	}
->  }
-> -- 
-> 2.15.0
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/virt/kvm/arm/mmu.c b/virt/kvm/arm/mmu.c
+index b36945d49986..b4b69c2d1012 100644
+--- a/virt/kvm/arm/mmu.c
++++ b/virt/kvm/arm/mmu.c
+@@ -509,8 +509,6 @@ static void unmap_hyp_range(pgd_t *pgdp, phys_addr_t start, u64 size)
+  */
+ void free_hyp_pgds(void)
+ {
+-	unsigned long addr;
+-
+ 	mutex_lock(&kvm_hyp_pgd_mutex);
+ 
+ 	if (boot_hyp_pgd) {
+@@ -521,10 +519,10 @@ void free_hyp_pgds(void)
+ 
+ 	if (hyp_pgd) {
+ 		unmap_hyp_range(hyp_pgd, hyp_idmap_start, PAGE_SIZE);
+-		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
+-			unmap_hyp_range(hyp_pgd, kern_hyp_va(addr), PGDIR_SIZE);
+-		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
+-			unmap_hyp_range(hyp_pgd, kern_hyp_va(addr), PGDIR_SIZE);
++		unmap_hyp_range(hyp_pgd, kern_hyp_va(PAGE_OFFSET),
++				(uintptr_t)high_memory - PAGE_OFFSET);
++		unmap_hyp_range(hyp_pgd, kern_hyp_va(VMALLOC_START),
++				VMALLOC_END - VMALLOC_START);
+ 
+ 		free_pages((unsigned long)hyp_pgd, hyp_pgd_order);
+ 		hyp_pgd = NULL;
+-- 
+2.14.2
