@@ -1,9 +1,9 @@
 From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Thu,  7 Dec 2017 11:04:29 -0500
+Date: Thu,  7 Dec 2017 11:05:50 -0500
 Subject: [PATCH v4 2/2] ARM: dts: TS-7970: add basic device tree
-In-Reply-To: <20171207160429.2698-1-sebastien.bourdelin@savoirfairelinux.com>
-References: <20171207160429.2698-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20171207160429.2698-2-sebastien.bourdelin@savoirfairelinux.com>
+In-Reply-To: <20171207160550.2782-1-sebastien.bourdelin@savoirfairelinux.com>
+References: <20171207160550.2782-1-sebastien.bourdelin@savoirfairelinux.com>
+Message-ID: <20171207160550.2782-2-sebastien.bourdelin@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
