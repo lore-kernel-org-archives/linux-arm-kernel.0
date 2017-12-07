@@ -1,134 +1,124 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 7 Dec 2017 11:55:08 +0100
-Subject: [PATCH v3 09/15] drm/sun4i: Add A83T support
-In-Reply-To: <1729482.Mgh5nx8BIs@jernej-laptop>
-References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <0f8137abb37de936db82c1251556ee84fb23c7fe.1512486553.git-series.maxime.ripard@free-electrons.com>
- <1823097.lykhZvJrH4@jernej-laptop>
- <1729482.Mgh5nx8BIs@jernej-laptop>
-Message-ID: <20171207105508.ps22szj3y5pjwhdd@flea.lan>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 7 Dec 2017 11:54:27 +0100
+Subject: [PATCH v4 4/8] arm: OMAP: Move dmtimer driver out of plat-omap to
+ drivers under clocksource
+In-Reply-To: <1512105397-2544-5-git-send-email-j-keerthy@ti.com>
+References: <1512105397-2544-1-git-send-email-j-keerthy@ti.com>
+ <1512105397-2544-5-git-send-email-j-keerthy@ti.com>
+Message-ID: <e71f4c7b-e5c7-6305-dc1c-274da6fbf07d@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Wed, Dec 06, 2017 at 05:37:47PM +0100, Jernej ?krabec wrote:
-> Hi,
+On 01/12/2017 06:16, Keerthy wrote:
+> Move the dmtimer driver out of plat-omap to clocksource.
+> So that non-omap devices also could use this.
 > 
-> Dne torek, 05. december 2017 ob 16:42:55 CET je Jernej ?krabec napisal(a):
-> > Hi Maxime,
-> > 
-> > Dne torek, 05. december 2017 ob 16:10:21 CET je Maxime Ripard napisal(a):
-> > > Add support for the A83T display pipeline.
-> > > 
-> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
-> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > > ---
-> > > 
-> > >  drivers/gpu/drm/sun4i/sun4i_drv.c   |  1 +
-> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c  |  5 +++++
-> > >  drivers/gpu/drm/sun4i/sun8i_mixer.c |  9 +++++++++
-> > >  3 files changed, 15 insertions(+)
-> > > 
-> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > > b/drivers/gpu/drm/sun4i/sun4i_drv.c index 49215d91c853..6f5e721b545e
-> > > 100644
-> > > --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> > > @@ -347,6 +347,7 @@ static const struct of_device_id sun4i_drv_of_table[]
-> > > =
-> > > { { .compatible = "allwinner,sun6i-a31s-display-engine" },
-> > > 
-> > >  	{ .compatible = "allwinner,sun7i-a20-display-engine" },
-> > >  	{ .compatible = "allwinner,sun8i-a33-display-engine" },
-> > > 
-> > > +	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
-> > > 
-> > >  	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
-> > >  	{ }
-> > >  
-> > >  };
-> > > 
-> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 92f4738101e6..9b757450555f
-> > > 100644
-> > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-> > > @@ -1132,6 +1132,10 @@ static const struct sun4i_tcon_quirks
-> > > sun8i_a33_quirks = { .has_lvds_pll		= true,
-> > > 
-> > >  };
-> > > 
-> > > +static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
-> > > +	/* nothing is supported */
-> > > +};
-> > > +
-> > > 
-> > >  static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
-> > >  
-> > >  	/* nothing is supported */
-> > >  
-> > >  };
-> > > 
-> > > @@ -1144,6 +1148,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
-> > > 
-> > >  	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = 
-> &sun6i_a31s_quirks
-> > >  	},
-> > > 
-> > > { .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks }, {
-> > > .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks }, +	
-> {
-> > > .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data =
-> > > &sun8i_a83t_lcd_quirks }, { .compatible = "allwinner,sun8i-v3s-tcon",
-> > > .data
-> > > = &sun8i_v3s_quirks }, { }
-> > > 
-> > >  };
-> > > 
-> > > diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > > b/drivers/gpu/drm/sun4i/sun8i_mixer.c index ff235e3228ce..6829bec4ba68
-> > > 100644
-> > > --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > > +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-> > > @@ -477,6 +477,11 @@ static int sun8i_mixer_remove(struct platform_device
-> > > *pdev) return 0;
-> > > 
-> > >  }
-> > > 
-> > > +static const struct sun8i_mixer_cfg sun8i_a83t_mixer_cfg = {
-> > > +	.vi_num = 1,
-> > > +	.ui_num = 3,
-> > > +};
-> > > +
-> > 
-> > I think you should expand that structure with:
-> > .ccsc = 0,
-> > .scaler_mask = 0xf,
-> > .mod_rate = 150000000,
+> No Code changes done to the driver file.
 > 
-> I guess you could set higher clock if CLK_SET_RATE_PARENT flag is set to de_clk 
-> in A83T CCU driver. BSP sets it to 500 MHz, which is a bit high...
+> Signed-off-by: Keerthy <j-keerthy@ti.com>
+> Reviewed-by: Sebastian Reichel <sebastian.reichel@collabora.co.uk>
+> ---
+> 
+> Changes in v3:
+> 
+>   * Added Sebastian's Reviewed-by.
+> 
+> Changes in v2:
+> 
+>   * No code changes in this v2 version. Only enhanced patch
+>     statistics for renames.
+> 
+>  arch/arm/plat-omap/Kconfig                            | 6 ------
+>  arch/arm/plat-omap/Makefile                           | 1 -
+>  drivers/clocksource/Kconfig                           | 6 ++++++
+>  drivers/clocksource/Makefile                          | 1 +
+>  {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c | 0
+>  5 files changed, 7 insertions(+), 7 deletions(-)
+>  rename {arch/arm/plat-omap => drivers/clocksource}/dmtimer.c (100%)
 
-Actually, I didn't have to change the rate used by default, so it's
-not clear what it should be on the A83T.
+Take the opportunity to rename it timer-dm.c
 
-And yeah, I'd like to avoid setting it at 500MHz without any
-particular reason. The A83T draws way to much power already without
-making it worse.
+> diff --git a/arch/arm/plat-omap/Kconfig b/arch/arm/plat-omap/Kconfig
+> index 7276afe..afc1a1d 100644
+> --- a/arch/arm/plat-omap/Kconfig
+> +++ b/arch/arm/plat-omap/Kconfig
+> @@ -106,12 +106,6 @@ config OMAP3_L2_AUX_SECURE_SERVICE_SET_ID
+>  	help
+>  	  PPA routine service ID for setting L2 auxiliary control register.
+>  
+> -config OMAP_DM_TIMER
+> -	bool "Use dual-mode timer"
+> -	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+> -	help
+> -	 Select this option if you want to use OMAP Dual-Mode timers.
+> -
+>  config OMAP_SERIAL_WAKE
+>  	bool "Enable wake-up events for serial ports"
+>  	depends on ARCH_OMAP1 && OMAP_MUX
+> diff --git a/arch/arm/plat-omap/Makefile b/arch/arm/plat-omap/Makefile
+> index 47e1867..7215ada 100644
+> --- a/arch/arm/plat-omap/Makefile
+> +++ b/arch/arm/plat-omap/Makefile
+> @@ -9,5 +9,4 @@ obj-y := sram.o dma.o counter_32k.o
+>  
+>  # omap_device support (OMAP2+ only at the moment)
+>  
+> -obj-$(CONFIG_OMAP_DM_TIMER) += dmtimer.o
+>  obj-$(CONFIG_OMAP_DEBUG_LEDS) += debug-leds.o
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index c729a88..4da66cf 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -46,6 +46,12 @@ config DIGICOLOR_TIMER
+>  	help
+>  	  Enables the support for the digicolor timer driver.
+>  
+> +config OMAP_DM_TIMER
+> +	bool "Use dual-mode timer"
+> +	depends on ARCH_OMAP16XX || ARCH_OMAP2PLUS
+> +	help
+> +	 Select this option if you want to use Dual-Mode timers.
+> +
 
-I'll add the CCSC and scaler_mask fields.
+So in the clocksource directory the rule is the following:
 
-Maxime
+The config option is silent except if COMPILE_TEST is set.
+
+It is the Kconfig's platform which select the driver so there is no deps
+on the ARCH.
+
+config OMAP_DM_TIMER
+	bool "Use dual-mode timer" if COMPILE_TEST
+	help
+	 Select this option if you want to use Dual-Mode timers.
+
+Here you will have to make sure the driver compiles on x86.
+
+>  config DW_APB_TIMER
+>  	bool "DW APB timer driver" if COMPILE_TEST
+>  	help
+> diff --git a/drivers/clocksource/Makefile b/drivers/clocksource/Makefile
+> index 72711f1..b077076 100644
+> --- a/drivers/clocksource/Makefile
+> +++ b/drivers/clocksource/Makefile
+> @@ -16,6 +16,7 @@ obj-$(CONFIG_EM_TIMER_STI)	+= em_sti.o
+>  obj-$(CONFIG_CLKBLD_I8253)	+= i8253.o
+>  obj-$(CONFIG_CLKSRC_MMIO)	+= mmio.o
+>  obj-$(CONFIG_DIGICOLOR_TIMER)	+= timer-digicolor.o
+> +obj-$(CONFIG_OMAP_DM_TIMER)	+= dmtimer.o
+>  obj-$(CONFIG_DW_APB_TIMER)	+= dw_apb_timer.o
+>  obj-$(CONFIG_DW_APB_TIMER_OF)	+= dw_apb_timer_of.o
+>  obj-$(CONFIG_FTTMR010_TIMER)	+= timer-fttmr010.o
+> diff --git a/arch/arm/plat-omap/dmtimer.c b/drivers/clocksource/dmtimer.c
+> similarity index 100%
+> rename from arch/arm/plat-omap/dmtimer.c
+> rename to drivers/clocksource/dmtimer.c
+> 
+
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/c02352d1/attachment.sig>
+ <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
