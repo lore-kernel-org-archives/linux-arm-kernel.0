@@ -1,76 +1,160 @@
-From: nsekhar@ti.com (Sekhar Nori)
-Date: Thu, 7 Dec 2017 20:22:07 +0530
-Subject: [PATCH v1 1/6] ARM: davinci: clean up map_io functions
-In-Reply-To: <1512182054-17410-2-git-send-email-david@lechnology.com>
-References: <1512182054-17410-1-git-send-email-david@lechnology.com>
- <1512182054-17410-2-git-send-email-david@lechnology.com>
-Message-ID: <2e0a60bb-08be-5d0c-3c4c-c9e075c9170a@ti.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Thu, 7 Dec 2017 14:53:09 +0000
+Subject: [PATCH v3 10/20] arm64: assembler: add utility macros to
+ push/pop stack frames
+In-Reply-To: <CAKv+Gu_82v_L9dZczQZbkmksc1wvOBsa28URP4Q7MEcvAwxhmw@mail.gmail.com>
+References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
+ <20171206194346.24393-11-ard.biesheuvel@linaro.org>
+ <20171207141104.GE22781@e103592.cambridge.arm.com>
+ <CAKv+Gu_82v_L9dZczQZbkmksc1wvOBsa28URP4Q7MEcvAwxhmw@mail.gmail.com>
+Message-ID: <20171207145309.GG22781@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 02 December 2017 08:04 AM, David Lechner wrote:
-> This cleans up the map_io functions in the board init files for
-> mach-davinci.
+On Thu, Dec 07, 2017 at 02:21:17PM +0000, Ard Biesheuvel wrote:
+> On 7 December 2017 at 14:11, Dave Martin <Dave.Martin@arm.com> wrote:
+> > On Wed, Dec 06, 2017 at 07:43:36PM +0000, Ard Biesheuvel wrote:
+> >> We are going to add code to all the NEON crypto routines that will
+> >> turn them into non-leaf functions, so we need to manage the stack
+> >> frames. To make this less tedious and error prone, add some macros
+> >> that take the number of callee saved registers to preserve and the
+> >> extra size to allocate in the stack frame (for locals) and emit
+> >> the ldp/stp sequences.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/assembler.h | 60 ++++++++++++++++++++
+> >>  1 file changed, 60 insertions(+)
+> >>
+> >> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> >> index aef72d886677..5f61487e9f93 100644
+> >> --- a/arch/arm64/include/asm/assembler.h
+> >> +++ b/arch/arm64/include/asm/assembler.h
+> >> @@ -499,6 +499,66 @@ alternative_else_nop_endif
+> >>  #endif
+> >>       .endm
+> >>
+> >> +     /*
+> >> +      * frame_push - Push @regcount callee saved registers to the stack,
+> >> +      *              starting at x19, as well as x29/x30, and set x29 to
+> >> +      *              the new value of sp. Add @extra bytes of stack space
+> >> +      *              for locals.
+> >> +      */
+> >> +     .macro          frame_push, regcount:req, extra
+> >> +     __frame         st, \regcount, \extra
+> >> +     .endm
+> >> +
+> >> +     /*
+> >> +      * frame_pop  - Pop @regcount callee saved registers from the stack,
+> >> +      *              starting at x19, as well as x29/x30. Also pop @extra
+> >> +      *              bytes of stack space for locals.
+> >> +      */
+> >> +     .macro          frame_pop, regcount:req, extra
+> >> +     __frame         ld, \regcount, \extra
+> >> +     .endm
+> >> +
+> >> +     .macro          __frame, op, regcount:req, extra=0
+> >> +     .ifc            \op, st
+> >> +     stp             x29, x30, [sp, #-((\regcount + 3) / 2) * 16 - \extra]!
+> >> +     mov             x29, sp
+> >> +     .endif
+> >> +     .if             \regcount < 0 || \regcount > 10
+> >> +     .error          "regcount should be in the range [0 ... 10]"
+> >> +     .endif
+> >> +     .if             (\extra % 16) != 0
+> >> +     .error          "extra should be a multiple of 16 bytes"
+> >> +     .endif
+> >> +     .if             \regcount > 1
+> >> +     \op\()p         x19, x20, [sp, #16]
+> >> +     .if             \regcount > 3
+> >> +     \op\()p         x21, x22, [sp, #32]
+> >> +     .if             \regcount > 5
+> >> +     \op\()p         x23, x24, [sp, #48]
+> >> +     .if             \regcount > 7
+> >> +     \op\()p         x25, x26, [sp, #64]
+> >> +     .if             \regcount > 9
+> >> +     \op\()p         x27, x28, [sp, #80]
+> >
+> > Can the _for thing I introduced in fpsimdmacros.h be any use here?
+> > Alternatively, the following could replace that .if-slide,
+> > providing the calling macro does .altmacro .. .noaltmacro somewhere.
+> >
+> > .macro _pushpop2 op, n1, n2, offset
+> >         \op     x\n1, x\n2, [sp, #\offset]
+> > .endm
+> >
+> > .macro _pushpop op, first, last, offset
+> >         .if \first < \last
+> >         _pushpop2 \op\()p, \first, %\first + 1, \offset
+> >         _pushpop \op, %\first + 2, \last, %\offset + 16
+> >         .elseif \first == \last
+> >         \op\()r x\first, [sp, #\offset]
+> >         .endif
+> > .endm
+> >
 > 
-> Most of the boards had a wrapper function around <board>_init(). This
-> wrapper is removed and the function is used directly. Additionally, the
-> <board>_init() functions are renamed to <board>_map_io() to match the
-> field name.
+> I'd prefer not to rely on altmacro, for reasons you pointed out
+> yourself a while ago IIRC.
 > 
-> Signed-off-by: David Lechner <david@lechnology.com>
+> I agree your version is more compact, but for a write once thing, I'm
+> not sure if it matters.
+> 
+> > Also, I wonder whether it would be more readable at the call site
+> > to specify the first and last reg numbers instead of the reg count,
+> > e.g.:
+> >
+> >         frame_push first_reg=19, last_reg=23
+> >
+> > (or whatever).  Just syntactic sugar though.
+> >
+> 
+> Again, this will involve arithmetic on macro arguments, which implies
+> altmacro. Relying on altmacro being set is dodgy, and unfortunately,
+> we can't enable it in the macro without keeping it enabled (or we may
+> disable it on behalf of the caller. I guess we could try to come up
+> with a smart way to infer whether altmacro was enabled, and only
+> disable it afterwards if it wasn't, using some directives that get
+> interpreted differently, but to be honest, I factored out this
+> sequence so I could think about more important things :-)
 
-> diff --git a/arch/arm/mach-davinci/board-dm646x-evm.c b/arch/arm/mach-davinci/board-dm646x-evm.c
-> index cb0a41e..f0e2762 100644
-> --- a/arch/arm/mach-davinci/board-dm646x-evm.c
-> +++ b/arch/arm/mach-davinci/board-dm646x-evm.c
-> @@ -716,16 +716,6 @@ static void __init evm_init_i2c(void)
->  }
->  #endif
->  
-> -#define DM6467T_EVM_REF_FREQ		33000000
-> -
-> -static void __init davinci_map_io(void)
-> -{
-> -	dm646x_init();
+Sure, no worries.
 
-The call to dm646x_init() is dropped here, but I don't see it added
-back, at least in this patch.
+I've changed my mind a bit about .altmacro, in that it is not really
+usable at all unless turned on explicitly, and then off again, only
+where it's needed.  So if you just assume it's always off, things are
+sane (and that's what happens in practice).
 
-> diff --git a/arch/arm/mach-davinci/dm646x.c b/arch/arm/mach-davinci/dm646x.c
-> index da21353..b3be5c8 100644
-> --- a/arch/arm/mach-davinci/dm646x.c
-> +++ b/arch/arm/mach-davinci/dm646x.c
-> @@ -17,6 +17,7 @@
->  #include <linux/platform_data/edma.h>
->  #include <linux/platform_data/gpio-davinci.h>
->  
-> +#include <asm/mach-types.h>
->  #include <asm/mach/map.h>
->  
->  #include <mach/cputype.h>
-> @@ -952,11 +953,16 @@ int __init dm646x_init_edma(struct edma_rsv_info *rsv)
->  	return IS_ERR(edma_pdev) ? PTR_ERR(edma_pdev) : 0;
->  }
->  
-> -void __init dm646x_init(void)
-> +#define DM6467T_EVM_REF_FREQ		33000000
-> +
-> +void __init dm646x_map_io(void)
->  {
->  	davinci_common_init(&davinci_soc_info_dm646x);
->  	davinci_map_sysmod();
->  	davinci_clk_init(davinci_soc_info_dm646x.cpu_clks);
-> +
-> +	if (machine_is_davinci_dm6467tevm())
-> +		davinci_set_refclk_rate(DM6467T_EVM_REF_FREQ);
->  }
+But it's not really needed here -- my main confusion was with the
+deeply nested .ifs, but perhaps that could be avoided more
+straightforwardly:
 
-I think we should leave the DM646x case out of this since there are
-additional issues like introducing these EVM specific defines in a file
-meant for SoC.
+	.if	\regcount > 1
+	\op\()p	x19, x20, [sp, #16]
+	.endif
+	.if	\regcount > 3
+	\op\()p	x21, x22, [sp, #32]
+	.endif
+	// ...
+	.if	\regcount > 9
+	\op\()p	x27, x28, [sp, #80]
+	.endif
 
-Is this clean-up a must for you to implement rest of the series (haven't
-looked at other patches yet).
+	.if	\regcount == 1
+	\op\()r	x19, [sp, #20]
+	.endif
+	.if	\regcount == 3
+	\op\()r	x21, [sp, #22]
+	.endif
+	// ...
+	.if	\regcount == 9
+	\op\()r	x27, [sp, #28]
+	.endif
 
-Thanks,
-Sekhar
+
+One other thing, should you be protecting the macro args with ()?
+
+It seems unlikely that an expression would be passed for regcount,
+but for extra it's a bit more plausible.
+
+Cheers
+---Dave
