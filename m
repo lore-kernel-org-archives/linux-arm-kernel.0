@@ -1,189 +1,73 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 7 Dec 2017 16:11:57 +0000
-Subject: [PATCH v3 11/20] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <CAKv+Gu8N6w3+VFpF3kq-qg9Gij=4VbtQqu+yfvfA67p2kWaRLg@mail.gmail.com>
-References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
- <20171206194346.24393-12-ard.biesheuvel@linaro.org>
- <20171207143934.GF22781@e103592.cambridge.arm.com>
- <CAKv+Gu8N6w3+VFpF3kq-qg9Gij=4VbtQqu+yfvfA67p2kWaRLg@mail.gmail.com>
-Message-ID: <20171207161156.GH22781@e103592.cambridge.arm.com>
+From: mike.leach@linaro.org (Mike Leach)
+Date: Thu, 7 Dec 2017 16:14:03 +0000
+Subject: [PATCH] coresight: Fix disabling of CoreSight TPIU
+In-Reply-To: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
+References: <1511517525-3270-1-git-send-email-robert.walker@arm.com>
+Message-ID: <CAJ9a7VgWdDL0aBg=XyNcb9iH6ZHCWEMosLPX8PnBurCjkE6ZbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 02:50:11PM +0000, Ard Biesheuvel wrote:
-> On 7 December 2017 at 14:39, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Wed, Dec 06, 2017 at 07:43:37PM +0000, Ard Biesheuvel wrote:
-> >> Add support macros to conditionally yield the NEON (and thus the CPU)
-> >> that may be called from the assembler code.
-> >>
-> >> In some cases, yielding the NEON involves saving and restoring a non
-> >> trivial amount of context (especially in the CRC folding algorithms),
-> >> and so the macro is split into three, and the code in between is only
-> >> executed when the yield path is taken, allowing the context to be preserved.
-> >> The third macro takes an optional label argument that marks the resume
-> >> path after a yield has been performed.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/include/asm/assembler.h | 51 ++++++++++++++++++++
-> >>  1 file changed, 51 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> >> index 5f61487e9f93..c54e408fd5a7 100644
-> >> --- a/arch/arm64/include/asm/assembler.h
-> >> +++ b/arch/arm64/include/asm/assembler.h
-> >> @@ -572,4 +572,55 @@ alternative_else_nop_endif
-> >>  #endif
-> >>       .endm
-> >>
-> >> +/*
-> >> + * Check whether to yield to another runnable task from kernel mode NEON code
-> >> + * (which runs with preemption disabled).
-> >> + *
-> >> + * if_will_cond_yield_neon
-> >> + *        // pre-yield patchup code
-> >> + * do_cond_yield_neon
-> >> + *        // post-yield patchup code
-> >> + * endif_yield_neon
-> >
-> > ^ Mention the lbl argument?
-> >
-> 
-> Yep will do
-> 
-> >> + *
-> >> + * - Check whether the preempt count is exactly 1, in which case disabling
-> >
-> >                                                            enabling ^
-> >
-> >> + *   preemption once will make the task preemptible. If this is not the case,
-> >> + *   yielding is pointless.
-> >> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
-> >> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
-> >> + *   yield fixup code.
-> >
-> > Mention that neither patchup sequence is allowed to use section-changing
-> > directives?
-> >
-> > For example:
-> >
-> >         if_will_cond_yield_neon
-> >                 // some code
-> >
-> >                 .pushsection .rodata, "a"
-> > foo:                    .quad // some literal data for some reason
-> >                 .popsection
-> >
-> >                 // some code
-> >         do_cond_yield_neon
-> >
-> > is not safe, because .previous is now .rodata.
-> >
-> 
-> Are you sure this is true?
-> 
-> The gas info page for .previous tells me
-> 
->    In terms of the section stack, this directive swaps the current
-> section with the top section on the section stack.
+Tested by: Mike Leach <mike.leach@linaro.org>
 
-That statement is either misleading or wrong, but the actual behaviour
-doesn't seem straightforward either.
+On 24 November 2017 at 09:58, Robert Walker <robert.walker@arm.com> wrote:
+> The CoreSight TPIU should be disabled when tracing to other sinks to allow
+> them to operate at full bandwidth.
+>
+> This patch fixes tpiu_disable_hw() to correctly disable the TPIU by
+> configuring the TPIU to stop on flush, initiating a manual flush, waiting
+> for the flush to complete and then waits for the TPIU to indicate it has
+> stopped.
+>
+> Signed-off-by: Robert Walker <robert.walker@arm.com>
+> ---
+>  drivers/hwtracing/coresight/coresight-tpiu.c | 13 ++++++++++---
+>  1 file changed, 10 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
+> index bef49a3..4b46c49 100644
+> --- a/drivers/hwtracing/coresight/coresight-tpiu.c
+> +++ b/drivers/hwtracing/coresight/coresight-tpiu.c
+> @@ -46,8 +46,11 @@
+>  #define TPIU_ITATBCTR0         0xef8
+>
+>  /** register definition **/
+> +/* FFSR - 0x300 */
+> +#define FFSR_FT_STOPPED                BIT(1)
+>  /* FFCR - 0x304 */
+>  #define FFCR_FON_MAN           BIT(6)
+> +#define FFCR_STOP_FI           BIT(12)
+>
+>  /**
+>   * @base:      memory mapped base address for this component.
+> @@ -85,10 +88,14 @@ static void tpiu_disable_hw(struct tpiu_drvdata *drvdata)
+>  {
+>         CS_UNLOCK(drvdata->base);
+>
+> -       /* Clear formatter controle reg. */
+> -       writel_relaxed(0x0, drvdata->base + TPIU_FFCR);
+> +       /* Clear formatter and stop on flush */
+> +       writel_relaxed(FFCR_STOP_FI, drvdata->base + TPIU_FFCR);
+>         /* Generate manual flush */
+> -       writel_relaxed(FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+> +       writel_relaxed(FFCR_STOP_FI | FFCR_FON_MAN, drvdata->base + TPIU_FFCR);
+> +       /* Wait for flush to complete */
+> +       coresight_timeout(drvdata->base, TPIU_FFCR, FFCR_FON_MAN, 0);
+> +       /* Wait for formatter to stop */
+> +       coresight_timeout(drvdata->base, TPIU_FFSR, FFSR_FT_STOPPED, 1);
+>
+>         CS_LOCK(drvdata->base);
+>  }
+> --
+> 1.9.1
+>
+> _______________________________________________
+> CoreSight mailing list
+> CoreSight at lists.linaro.org
+> https://lists.linaro.org/mailman/listinfo/coresight
 
 
-> and it seems to me that .rodata is no longer on the section stack
-> after .popsection. In that sense, push/pop should be safe, but
 
-My suggestion does seem to work here (I've used it in the past) but
-it's probably best not to rely on it unnecessarily...  One would
-have to read the gas code and get the docs fixed first.
-
-> section/subsection/previous is not (I think). So yes, let's put a note
-> in to mention that section directives are unsupported.
-
-... here I'd agree: it doesn't seem justified relying on dubious
-tricks here, since there's doubt about whether my suggestion is
-really safe.
-
-> 
-> > (You could protect against this with
-> >         .pushsection .text; .previous; .subsection 1; // ...
-> >         .popsection
-> > but it may be overkill.)
-> >
-> >> + *
-> >> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
-> >> + * and may clobber x2 .. x18 if the yield path is taken.
-> >> + */
-> >> +
-> >> +     .macro          cond_yield_neon, lbl
-> >> +     if_will_cond_yield_neon
-> >> +     do_cond_yield_neon
-> >> +     endif_yield_neon        \lbl
-> >> +     .endm
-> >> +
-> >> +     .macro          if_will_cond_yield_neon
-> >> +#ifdef CONFIG_PREEMPT
-> >> +     get_thread_info x0
-> >> +     ldr             w1, [x0, #TSK_TI_PREEMPT]
-> >> +     ldr             x0, [x0, #TSK_TI_FLAGS]
-> >> +     cmp             w1, #1 // == PREEMPT_OFFSET
-> >
-> > Can we at least drop a BUILD_BUG_ON() somewhere to check this?
-> >
-> > Maybe in kernel_neon_begin() since this is intimately kernel-mode NEON
-> > related.
-> >
-> 
-> Sure.
-> 
-> >> +     csel            x0, x0, xzr, eq
-> >> +     tbnz            x0, #TIF_NEED_RESCHED, 5555f    // needs rescheduling?
-> >> +#endif
-> >
-> > A comment that we will fall through to 6666f here may be helpful.
-> >
-> 
-> Indeed. Will add that.
-> 
-> >> +     .subsection     1
-> >> +5555:
-> >> +     .endm
-> >> +
-> >> +     .macro          do_cond_yield_neon
-> >> +     bl              kernel_neon_end
-> >> +     bl              kernel_neon_begin
-> >> +     .endm
-> >> +
-> >> +     .macro          endif_yield_neon, lbl=6666f
-> >> +     b               \lbl
-> >> +     .previous
-> >> +6666:
-> >
-> > Could have slightly more random "random" labels here, but otherwise
-> > it looks ok to me.
-> >
-> 
-> Which number did you have in mind that is more random than 6666? :-)
-> 
-> > I might go through and replace all the random labels with something
-> > more robust sometime, but I've never been sure it was worth the
-> > effort...
-> >
-> 
-> I guess we could invent all kinds of elaborate schemes but as you say,
-> having 4 digit numbers and grep'ing the source before you add a new
-> one has been working fine so far, so I don't think it should be a
-> priority.
-
-You could try $RANDOM for inspiration.
-
-Nested macro use is rare, but a scheme with only 10 possible random
-numbers seems a little too optiimstic -- and in practice people don't
-always remember to grep when adding new ones.
-
-9999, 8888, 1111 and 2222 are already taken even without this patch.
-
-Cheers
----Dave
+-- 
+Mike Leach
+Principal Engineer, ARM Ltd.
+Blackburn Design Centre. UK
