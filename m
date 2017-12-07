@@ -1,217 +1,265 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 11:54:16 +0100
-Subject: [PATCH v7 6/8] KVM: arm/arm64: Support VGIC dist pend/active changes
- for mapped IRQs
-In-Reply-To: <20171207105418.22428-1-christoffer.dall@linaro.org>
-References: <20171207105418.22428-1-christoffer.dall@linaro.org>
-Message-ID: <20171207105418.22428-7-christoffer.dall@linaro.org>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Thu, 7 Dec 2017 19:54:44 +0900
+Subject: [kernel-hardening][PATCH v5 3/3] arm: mm: dump: add checking for
+ writable and executable pages
+Message-ID: <20171207105444.GA10105@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For mapped IRQs (with the HW bit set in the LR) we have to follow some
-rules of the architecture.  One of these rules is that VM must not be
-allowed to deactivate a virtual interrupt with the HW bit set unless the
-physical interrupt is also active.
+Page mappings with full RWX permissions are a security risk.
+x86, arm64 has an option to walk the page tables
+and dump any bad pages.
 
-This works fine when injecting mapped interrupts, because we leave it up
-to the injector to either set EOImode==1 or manually set the active
-state of the physical interrupt.
+(1404d6f13e47
+("arm64: dump: Add checking for writable and exectuable pages"))
+Add a similar implementation for arm.
 
-However, the guest can set virtual interrupt to be pending or active by
-writing to the virtual distributor, which could lead to deactivating a
-virtual interrupt with the HW bit set without the physical interrupt
-being active.
-
-We could set the physical interrupt to active whenever we are about to
-enter the VM with a HW interrupt either pending or active, but that
-would be really slow, especially on GICv2.  So we take the long way
-around and do the hard work when needed, which is expected to be
-extremely rare.
-
-When the VM sets the pending state for a HW interrupt on the virtual
-distributor we set the active state on the physical distributor, because
-the virtual interrupt can become active and then the guest can
-deactivate it.
-
-When the VM clears the pending state we also clear it on the physical
-side, because the injector might otherwise raise the interrupt.  We also
-clear the physical active state when the virtual interrupt is not
-active, since otherwise a SPEND/CPEND sequence from the guest would
-prevent signaling of future interrupts.
-
-Changing the state of mapped interrupts from userspace is not supported,
-and it's expected that userspace unmaps devices from VFIO before
-attempting to set the interrupt state, because the interrupt state is
-driven by hardware.
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+Tested-by: Laura Abbott <labbott@redhat.com>
+Reviewed-by: Laura Abbott <labbott@redhat.com>
+Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
 ---
- virt/kvm/arm/vgic/vgic-mmio.c | 71 +++++++++++++++++++++++++++++++++++++++----
- virt/kvm/arm/vgic/vgic.c      |  7 +++++
- virt/kvm/arm/vgic/vgic.h      |  1 +
- 3 files changed, 73 insertions(+), 6 deletions(-)
+v5: No changes
+    (Just add Tested-by, Reviewed-by from Laura Abbott)
+---
+ arch/arm/Kconfig.debug        | 27 ++++++++++++++++++++
+ arch/arm/include/asm/ptdump.h |  8 ++++++
+ arch/arm/mm/dump.c            | 58 ++++++++++++++++++++++++++++++++++++++++++-
+ arch/arm/mm/init.c            |  2 ++
+ 4 files changed, 94 insertions(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic/vgic-mmio.c b/virt/kvm/arm/vgic/vgic-mmio.c
-index fdad95f62fa3..83d82bd7dc4e 100644
---- a/virt/kvm/arm/vgic/vgic-mmio.c
-+++ b/virt/kvm/arm/vgic/vgic-mmio.c
-@@ -16,6 +16,7 @@
- #include <linux/kvm.h>
- #include <linux/kvm_host.h>
- #include <kvm/iodev.h>
-+#include <kvm/arm_arch_timer.h>
- #include <kvm/arm_vgic.h>
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index e7b94db..78a6470 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -20,6 +20,33 @@ config ARM_PTDUMP_DEBUGFS
+ 	  kernel.
+ 	  If in doubt, say "N"
  
- #include "vgic.h"
-@@ -143,10 +144,22 @@ static struct kvm_vcpu *vgic_get_mmio_requester_vcpu(void)
- 	return vcpu;
++config DEBUG_WX
++	bool "Warn on W+X mappings at boot"
++	select ARM_PTDUMP_CORE
++	---help---
++		Generate a warning if any W+X mappings are found at boot.
++
++		This is useful for discovering cases where the kernel is leaving
++		W+X mappings after applying NX, as such mappings are a security risk.
++
++		Look for a message in dmesg output like this:
++
++			arm/mm: Checked W+X mappings: passed, no W+X pages found.
++
++		or like this, if the check failed:
++
++			arm/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
++
++		Note that even if the check fails, your kernel is possibly
++		still fine, as W+X mappings are not a security hole in
++		themselves, what they do is that they make the exploitation
++		of other unfixed kernel bugs easier.
++
++		There is no runtime or memory usage effect of this option
++		once the kernel has booted up - it's a one time check.
++
++		If in doubt, say "Y".
++
+ # RMK wants arm kernels compiled with frame pointers or stack unwinding.
+ # If you know what you are doing and are willing to live without stack
+ # traces, you can get a slightly smaller kernel by setting this option to
+diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
+index 3a6c0b7..b6a0162 100644
+--- a/arch/arm/include/asm/ptdump.h
++++ b/arch/arm/include/asm/ptdump.h
+@@ -43,6 +43,14 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
  }
+ #endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
  
-+/* Must be called with irq->irq_lock held */
-+static void vgic_hw_irq_spending(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-+				 bool is_uaccess)
-+{
-+	if (is_uaccess)
-+		return;
++void ptdump_check_wx(void);
 +
-+	irq->pending_latch = true;
-+	vgic_irq_set_phys_active(irq, true);
-+}
-+
- void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
- 			      gpa_t addr, unsigned int len,
- 			      unsigned long val)
- {
-+	bool is_uaccess = !vgic_get_mmio_requester_vcpu();
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
- 	int i;
- 	unsigned long flags;
-@@ -155,17 +168,45 @@ void vgic_mmio_write_spending(struct kvm_vcpu *vcpu,
- 		struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, intid + i);
+ #endif /* CONFIG_ARM_PTDUMP_CORE */
  
- 		spin_lock_irqsave(&irq->irq_lock, flags);
--		irq->pending_latch = true;
--
-+		if (irq->hw)
-+			vgic_hw_irq_spending(vcpu, irq, is_uaccess);
-+		else
-+			irq->pending_latch = true;
- 		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
++#ifdef CONFIG_DEBUG_WX
++#define debug_checkwx() ptdump_check_wx()
++#else
++#define debug_checkwx() do { } while (0)
++#endif
++
+ #endif /* __ASM_PTDUMP_H */
+diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
+index 43a2bee..084779c 100644
+--- a/arch/arm/mm/dump.c
++++ b/arch/arm/mm/dump.c
+@@ -52,6 +52,8 @@ struct pg_state {
+ 	unsigned long start_address;
+ 	unsigned level;
+ 	u64 current_prot;
++	bool check_wx;
++	unsigned long wx_pages;
+ 	const char *current_domain;
+ };
+ 
+@@ -60,6 +62,8 @@ struct prot_bits {
+ 	u64		val;
+ 	const char	*set;
+ 	const char	*clear;
++	bool		ro_bit;
++	bool		nx_bit;
+ };
+ 
+ static const struct prot_bits pte_bits[] = {
+@@ -73,11 +77,13 @@ struct prot_bits {
+ 		.val	= L_PTE_RDONLY,
+ 		.set	= "ro",
+ 		.clear	= "RW",
++		.ro_bit	= true,
+ 	}, {
+ 		.mask	= L_PTE_XN,
+ 		.val	= L_PTE_XN,
+ 		.set	= "NX",
+ 		.clear	= "x ",
++		.nx_bit	= true,
+ 	}, {
+ 		.mask	= L_PTE_SHARED,
+ 		.val	= L_PTE_SHARED,
+@@ -141,11 +147,13 @@ struct prot_bits {
+ 		.val	= L_PMD_SECT_RDONLY | PMD_SECT_AP2,
+ 		.set	= "ro",
+ 		.clear	= "RW",
++		.ro_bit	= true,
+ #elif __LINUX_ARM_ARCH__ >= 6
+ 	{
+ 		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.val	= PMD_SECT_APX | PMD_SECT_AP_WRITE,
+ 		.set	= "    ro",
++		.ro_bit	= true,
+ 	}, {
+ 		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.val	= PMD_SECT_AP_WRITE,
+@@ -164,6 +172,7 @@ struct prot_bits {
+ 		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.val    = 0,
+ 		.set    = "    ro",
++		.ro_bit	= true,
+ 	}, {
+ 		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
+ 		.val    = PMD_SECT_AP_WRITE,
+@@ -182,6 +191,7 @@ struct prot_bits {
+ 		.val	= PMD_SECT_XN,
+ 		.set	= "NX",
+ 		.clear	= "x ",
++		.nx_bit	= true,
+ 	}, {
+ 		.mask	= PMD_SECT_S,
+ 		.val	= PMD_SECT_S,
+@@ -194,6 +204,8 @@ struct pg_level {
+ 	const struct prot_bits *bits;
+ 	size_t num;
+ 	u64 mask;
++	const struct prot_bits *ro_bit;
++	const struct prot_bits *nx_bit;
+ };
+ 
+ static struct pg_level pg_level[] = {
+@@ -226,6 +238,23 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t
  	}
  }
  
-+/* Must be called with irq->irq_lock held */
-+static void vgic_hw_irq_cpending(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-+				 bool is_uaccess)
++static void note_prot_wx(struct pg_state *st, unsigned long addr)
 +{
-+	if (is_uaccess)
++	if (!st->check_wx)
++		return;
++	if ((st->current_prot & pg_level[st->level].ro_bit->mask) ==
++				pg_level[st->level].ro_bit->val)
++		return;
++	if ((st->current_prot & pg_level[st->level].nx_bit->mask) ==
++				pg_level[st->level].nx_bit->val)
 +		return;
 +
-+	irq->pending_latch = false;
++	WARN_ONCE(1, "arm/mm: Found insecure W+X mapping at address %pS\n",
++			(void *)st->start_address);
 +
-+	/*
-+	 * We don't want the guest to effectively mask the physical
-+	 * interrupt by doing a write to SPENDR followed by a write to
-+	 * CPENDR for HW interrupts, so we clear the active state on
-+	 * the physical side if the virtual interrupt is not active.
-+	 * This may lead to taking an additional interrupt on the
-+	 * host, but that should not be a problem as the worst that
-+	 * can happen is an additional vgic injection.  We also clear
-+	 * the pending state to maintain proper semantics for edge HW
-+	 * interrupts.
-+	 */
-+	vgic_irq_set_phys_pending(irq, false);
-+	if (!irq->active)
-+		vgic_irq_set_phys_active(irq, false);
++	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
 +}
 +
- void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
- 			      gpa_t addr, unsigned int len,
- 			      unsigned long val)
+ static void note_page(struct pg_state *st, unsigned long addr,
+ 		      unsigned int level, u64 val, const char *domain)
  {
-+	bool is_uaccess = !vgic_get_mmio_requester_vcpu();
- 	u32 intid = VGIC_ADDR_TO_INTID(addr, 1);
- 	int i;
- 	unsigned long flags;
-@@ -175,7 +216,10 @@ void vgic_mmio_write_cpending(struct kvm_vcpu *vcpu,
+@@ -244,6 +273,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
+ 		unsigned long delta;
  
- 		spin_lock_irqsave(&irq->irq_lock, flags);
+ 		if (st->current_prot) {
++			note_prot_wx(st, addr);
+ 			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
+ 				   st->start_address, addr);
  
--		irq->pending_latch = false;
-+		if (irq->hw)
-+			vgic_hw_irq_cpending(vcpu, irq, is_uaccess);
-+		else
-+			irq->pending_latch = false;
+@@ -367,6 +397,7 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
+ 	struct pg_state st = {
+ 		.seq = m,
+ 		.marker = info->markers,
++		.check_wx = false,
+ 	};
  
- 		spin_unlock_irqrestore(&irq->irq_lock, flags);
- 		vgic_put_irq(vcpu->kvm, irq);
-@@ -202,8 +246,19 @@ unsigned long vgic_mmio_read_active(struct kvm_vcpu *vcpu,
- 	return value;
+ 	walk_pgd(&st, info->mm, info->base_addr);
+@@ -379,8 +410,13 @@ static void ptdump_initialize(void)
+ 
+ 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
+ 		if (pg_level[i].bits)
+-			for (j = 0; j < pg_level[i].num; j++)
++			for (j = 0; j < pg_level[i].num; j++) {
+ 				pg_level[i].mask |= pg_level[i].bits[j].mask;
++				if (pg_level[i].bits[j].ro_bit)
++					pg_level[i].ro_bit = &pg_level[i].bits[j];
++				if (pg_level[i].bits[j].nx_bit)
++					pg_level[i].nx_bit = &pg_level[i].bits[j];
++			}
+ 
+ 	address_markers[2].start_address = VMALLOC_START;
  }
+@@ -391,6 +427,26 @@ static void ptdump_initialize(void)
+ 	.base_addr = 0,
+ };
  
-+/* Must be called with irq->irq_lock held */
-+static void vgic_hw_irq_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
-+				      bool active, bool is_uaccess)
++void ptdump_check_wx(void)
 +{
-+	if (is_uaccess)
-+		return;
++	struct pg_state st = {
++		.seq = NULL,
++		.marker = (struct addr_marker[]) {
++			{ 0, NULL},
++			{ -1, NULL},
++		},
++		.check_wx = true,
++	};
 +
-+	irq->active = active;
-+	vgic_irq_set_phys_active(irq, active);
-+}
-+
- static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
--				    bool new_active_state)
-+				    bool active)
- {
- 	unsigned long flags;
- 	struct kvm_vcpu *requester_vcpu = vgic_get_mmio_requester_vcpu();
-@@ -231,8 +286,12 @@ static void vgic_mmio_change_active(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	       irq->vcpu->cpu != -1) /* VCPU thread is running */
- 		cond_resched_lock(&irq->irq_lock);
- 
--	irq->active = new_active_state;
--	if (new_active_state)
-+	if (irq->hw)
-+		vgic_hw_irq_change_active(vcpu, irq, active, !requester_vcpu);
++	walk_pgd(&st, &init_mm, 0);
++	note_page(&st, 0, 0, 0, NULL);
++	if (st.wx_pages)
++		pr_warn("Checked W+X mappings: FAILED, %lu W+X pages found\n",
++			st.wx_pages);
 +	else
-+		irq->active = active;
-+
-+	if (irq->active)
- 		vgic_queue_irq_unlock(vcpu->kvm, irq, flags);
- 	else
- 		spin_unlock_irqrestore(&irq->irq_lock, flags);
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index eadabb249d2a..f4c92fae9cd3 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -144,6 +144,13 @@ void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq)
- 	kfree(irq);
- }
- 
-+void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending)
-+{
-+	WARN_ON(irq_set_irqchip_state(irq->host_irq,
-+				      IRQCHIP_STATE_PENDING,
-+				      pending));
++		pr_info("Checked W+X mappings: passed, no W+X pages found\n");
 +}
 +
- /* Get the input level of a mapped IRQ directly from the physical GIC */
- bool vgic_get_phys_line_level(struct vgic_irq *irq)
+ static int ptdump_init(void)
  {
-diff --git a/virt/kvm/arm/vgic/vgic.h b/virt/kvm/arm/vgic/vgic.h
-index d0787983a357..12c37b89f7a3 100644
---- a/virt/kvm/arm/vgic/vgic.h
-+++ b/virt/kvm/arm/vgic/vgic.h
-@@ -146,6 +146,7 @@ struct vgic_irq *vgic_get_irq(struct kvm *kvm, struct kvm_vcpu *vcpu,
- 			      u32 intid);
- void vgic_put_irq(struct kvm *kvm, struct vgic_irq *irq);
- bool vgic_get_phys_line_level(struct vgic_irq *irq);
-+void vgic_irq_set_phys_pending(struct vgic_irq *irq, bool pending);
- void vgic_irq_set_phys_active(struct vgic_irq *irq, bool active);
- bool vgic_queue_irq_unlock(struct kvm *kvm, struct vgic_irq *irq,
- 			   unsigned long flags);
+ 	ptdump_initialize();
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index a1f11a7..bd6f451 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -36,6 +36,7 @@
+ #include <asm/system_info.h>
+ #include <asm/tlb.h>
+ #include <asm/fixmap.h>
++#include <asm/ptdump.h>
+ 
+ #include <asm/mach/arch.h>
+ #include <asm/mach/map.h>
+@@ -738,6 +739,7 @@ static int __mark_rodata_ro(void *unused)
+ void mark_rodata_ro(void)
+ {
+ 	stop_machine(__mark_rodata_ro, NULL, NULL);
++	debug_checkwx();
+ }
+ 
+ void set_kernel_text_rw(void)
 -- 
-2.14.2
+1.9.1
