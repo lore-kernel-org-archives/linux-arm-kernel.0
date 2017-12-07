@@ -1,37 +1,37 @@
-From: sebastien.bourdelin@savoirfairelinux.com (Sebastien Bourdelin)
-Date: Thu,  7 Dec 2017 11:05:49 -0500
-Subject: [PATCH v4 1/2] of: documentation: add bindings documentation for
- TS-7970
-Message-ID: <20171207160550.2782-1-sebastien.bourdelin@savoirfairelinux.com>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu, 07 Dec 2017 17:04:49 +0100
+Subject: [PATCH net-next v2 7/8] net: phy: meson-gxl: add interrupt support
+In-Reply-To: <20171207155421.GJ24750@lunn.ch>
+References: <20171207142715.32578-1-jbrunet@baylibre.com>
+ <20171207142715.32578-8-jbrunet@baylibre.com>
+ <20171207155421.GJ24750@lunn.ch>
+Message-ID: <1512662689.7042.20.camel@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds the documentation for the TS-7970 by Technologic Systems.
+On Thu, 2017-12-07 at 16:54 +0100, Andrew Lunn wrote:
+> On Thu, Dec 07, 2017 at 03:27:14PM +0100, Jerome Brunet wrote:
+> > Enable interrupt support in meson-gxl PHY driver
+> 
+> Hi Jerome
+> 
+> Is it possible to implement did_interrupt()? That allows for shared
+> interrupts. It does however work fine without it, so long as the
+> interrupt is not shared.
 
-Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
----
-Changes v3 -> v4:
-  - rebase on master
+Hi Andrew,
 
-Changes v1 -> v2:
-  - rebase on master
----
- Documentation/devicetree/bindings/arm/technologic.txt | 6 ++++++
- 1 file changed, 6 insertions(+)
+It is always possible ;). The irq status registers gets reset on read.
 
-diff --git a/Documentation/devicetree/bindings/arm/technologic.txt b/Documentation/devicetree/bindings/arm/technologic.txt
-index 33797acad846..187830bd4f51 100644
---- a/Documentation/devicetree/bindings/arm/technologic.txt
-+++ b/Documentation/devicetree/bindings/arm/technologic.txt
-@@ -10,3 +10,9 @@ It can be mounted on a carrier board providing additional peripheral connectors.
- Required root node properties:
- 	- compatible = "technologic,imx6dl-ts4900", "fsl,imx6dl"
- 	- compatible = "technologic,imx6q-ts4900", "fsl,imx6q"
-+
-+TS-7970 is a System-on-Module based on the Freescale i.MX6 System-on-Chip.
-+It can be mounted on a carrier board providing additional peripheral connectors.
-+Required root node properties:
-+	- compatible = "technologic,imx6dl-ts7970", "fsl,imx6dl"
-+	- compatible = "technologic,imx6q-ts7970", "fsl,imx6q"
--- 
-2.15.0
+In such case, ack_interrupt() and did_interrupt() would be more or less the same
+function, except for the returned value, I guess ?
+
+The phy being internal, I think it is unlikely to ever share its interrupt
+though. If you prefer I implement this callback, I can certainly re-spin with it
+?
+
+Thanks for the lightning fast review by the way !
+
+> 
+> 	  Thanks
+> 		Andrew
