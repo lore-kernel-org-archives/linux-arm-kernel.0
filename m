@@ -1,45 +1,228 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:21 +0100
-Subject: [PATCH 18/54] arm64: dts: renesas: r8a77995: Add SDHI (MMC) support
+Date: Thu,  7 Dec 2017 10:53:22 +0100
+Subject: [PATCH 19/54] arm64: dts: renesas: r8a7795: Add IPMMU device nodes
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <83f18749c2f65ae699d909f6f9a6242681344176.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <3b7e7848f0e88b369519e8f479cdabf6eb998af5.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+From: Magnus Damm <damm+renesas@opensource.se>
 
-R-Car D3 has only one SDHI controller.
+Add r8a7795 IPMMU nodes and keep all disabled by default.
 
-Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This includes all IPMMU devices for r8a7795 ES2.0. Those
+not present in r8a7795 ES1.x are removed from the DT for those
+SoCs using delete-node. A follow-up patch will add IPMMU devices
+to ES1.x which are not also present in ES2.0.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a77995.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi |  25 +++++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi     | 145 +++++++++++++++++++++++++++
+ 2 files changed, 170 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-index 04a392a9d9de..98b70542b812 100644
---- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
-@@ -438,6 +438,18 @@
- 			status = "disabled";
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+index 655dd30639c5..246323eacb56 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
+@@ -21,6 +21,11 @@
+ 		status = "disabled";
+ 	};
+ 
++	/delete-node/ mmu at febe0000;
++	/delete-node/ mmu at fe980000;
++	/delete-node/ mmu at fd960000;
++	/delete-node/ mmu at fd970000;
++
+ 	/delete-node/ usb-phy at ee0e0200;
+ 	/delete-node/ usb at ee0e0100;
+ 	/delete-node/ usb at ee0e0000;
+@@ -86,6 +91,26 @@
+ 	};
+ };
+ 
++&ipmmu_vi0 {
++	renesas,ipmmu-main = <&ipmmu_mm 11>;
++};
++
++&ipmmu_vp0 {
++	renesas,ipmmu-main = <&ipmmu_mm 12>;
++};
++
++&ipmmu_vc0 {
++	renesas,ipmmu-main = <&ipmmu_mm 9>;
++};
++
++&ipmmu_vc1 {
++	renesas,ipmmu-main = <&ipmmu_mm 10>;
++};
++
++&ipmmu_rt {
++	renesas,ipmmu-main = <&ipmmu_mm 7>;
++};
++
+ &du {
+ 	vsps = <&vspd0 &vspd1 &vspd2 &vspd3>;
+ };
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 42c51f2ec30b..1a091bb41b7f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -421,6 +421,151 @@
+ 			resets = <&cpg 407>;
  		};
  
-+		sdhi2: sd at ee140000 {
-+			compatible = "renesas,sdhi-r8a77995",
-+				     "renesas,rcar-gen3-sdhi";
-+			reg = <0 0xee140000 0 0x2000>;
-+			interrupts = <GIC_SPI 167 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&cpg CPG_MOD 312>;
-+			max-frequency = <200000000>;
-+			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
-+			resets = <&cpg 312>;
++		ipmmu_vi0: mmu at febd0000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfebd0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 14>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
 +			status = "disabled";
 +		};
 +
- 		ehci0: usb at ee080100 {
- 			compatible = "generic-ehci";
- 			reg = <0 0xee080100 0 0x100>;
++		ipmmu_vi1: mmu at febe0000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfebe0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 15>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_vp0: mmu at fe990000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfe990000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 16>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_vp1: mmu at fe980000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfe980000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 17>;
++			power-domains = <&sysc R8A7795_PD_A3VP>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_vc0: mmu at fe6b0000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfe6b0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 12>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_vc1: mmu at fe6f0000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfe6f0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 13>;
++			power-domains = <&sysc R8A7795_PD_A3VC>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_pv0: mmu at fd800000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfd800000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 6>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_pv2: mmu at fd960000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfd960000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 8>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_pv3: mmu at fd970000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xfd970000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 9>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ir: mmu at ff8b0000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xff8b0000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 3>;
++			power-domains = <&sysc R8A7795_PD_A3IR>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_hc: mmu at e6570000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xe6570000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 2>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_rt: mmu at ffc80000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xffc80000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 10>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_mp0: mmu at ec670000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xec670000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 4>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ds0: mmu at e6740000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xe6740000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 0>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_ds1: mmu at e7740000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xe7740000 0 0x1000>;
++			renesas,ipmmu-main = <&ipmmu_mm 1>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
++		ipmmu_mm: mmu at e67b0000 {
++			compatible = "renesas,ipmmu-r8a7795";
++			reg = <0 0xe67b0000 0 0x1000>;
++			interrupts = <GIC_SPI 196 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>;
++			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
++			#iommu-cells = <1>;
++			status = "disabled";
++		};
++
+ 		dmac0: dma-controller at e6700000 {
+ 			compatible = "renesas,dmac-r8a7795",
+ 				     "renesas,rcar-dmac";
 -- 
 2.11.0
