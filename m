@@ -1,10 +1,10 @@
 From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu,  7 Dec 2017 21:18:11 +0100
-Subject: [PATCH 09/12] ARM: dts: armada-39x: use reworked NAND controller
- driver
+Date: Thu,  7 Dec 2017 21:18:14 +0100
+Subject: [PATCH 12/12] ARM64: dts: marvell: use reworked NAND controller
+ driver on Armada 8K
 In-Reply-To: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
 References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171207201814.30411-10-miquel.raynal@free-electrons.com>
+Message-ID: <20171207201814.30411-13-miquel.raynal@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,154 +19,44 @@ needed or harmless).
 
 Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
 ---
- arch/arm/boot/dts/armada-390-db.dts | 66 +++++++++++++++++----------------
- arch/arm/boot/dts/armada-395-gp.dts | 74 +++++++++++++++++++------------------
- arch/arm/boot/dts/armada-398-db.dts | 60 +++++++++++++++++-------------
- arch/arm/boot/dts/armada-39x.dtsi   |  6 +--
- 4 files changed, 112 insertions(+), 94 deletions(-)
+ arch/arm64/boot/dts/marvell/armada-8040-db.dts     | 46 +++++++++++++---------
+ .../arm64/boot/dts/marvell/armada-cp110-slave.dtsi | 10 ++---
+ 2 files changed, 32 insertions(+), 24 deletions(-)
 
-diff --git a/arch/arm/boot/dts/armada-390-db.dts b/arch/arm/boot/dts/armada-390-db.dts
-index c718a5242595..2135a48cd385 100644
---- a/arch/arm/boot/dts/armada-390-db.dts
-+++ b/arch/arm/boot/dts/armada-390-db.dts
-@@ -86,37 +86,6 @@
- 				status = "okay";
- 			};
- 
--			flash at d0000 {
--				status = "okay";
--				pinctrl-0 = <&nand_pins>;
--				pinctrl-names = "default";
--				num-cs = <1>;
--				marvell,nand-keep-config;
--				marvell,nand-enable-arbiter;
--				nand-on-flash-bbt;
--				nand-ecc-strength = <8>;
--				nand-ecc-step-size = <512>;
+diff --git a/arch/arm64/boot/dts/marvell/armada-8040-db.dts b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+index b1f6cccc5081..c25ac3fa9aec 100644
+--- a/arch/arm64/boot/dts/marvell/armada-8040-db.dts
++++ b/arch/arm64/boot/dts/marvell/armada-8040-db.dts
+@@ -272,27 +272,35 @@
+  * Proper NAND usage will require DPR-76 to be in position 1-2, which disables
+  * MDIO signal of CP1.
+  */
+-&cps_nand {
+-	num-cs = <1>;
++&cps_nand_controller {
+ 	pinctrl-0 = <&nand_pins>, <&nand_rb>;
+ 	pinctrl-names = "default";
+-	nand-ecc-strength = <4>;
+-	nand-ecc-step-size = <512>;
+-	marvell,nand-enable-arbiter;
+-	marvell,system-controller = <&cps_syscon0>;
+-	nand-on-flash-bbt;
 -
--				partitions {
--					compatible = "fixed-partitions";
--					#address-cells = <1>;
--					#size-cells = <1>;
--
--					partition at 0 {
--						label = "U-Boot";
--						reg = <0 0x800000>;
--					};
--					partition at 800000 {
--						label = "Linux";
--						reg = <0x800000 0x800000>;
--					};
--					partition at 1000000 {
--						label = "Filesystem";
--						reg = <0x1000000 0x3f000000>;
--					};
--				};
--			};
--
- 			/* CON98 */
- 			usb3 at f8000 {
- 				status = "okay";
-@@ -173,3 +142,38 @@
- 		};
- 	};
- };
-+
-+&nand_controller {
-+	status = "okay";
-+	pinctrl-0 = <&nand_pins>;
-+	pinctrl-names = "default";
+-	partition at 0 {
+-		label = "U-Boot";
+-		reg = <0 0x200000>;
+-	};
+-	partition at 200000 {
+-		label = "Linux";
+-		reg = <0x200000 0xe00000>;
+-	};
+-	partition at 1000000 {
+-		label = "Filesystem";
+-		reg = <0x1000000 0x3f000000>;
 +
 +	nand at 0 {
 +		reg = <0>;
-+		label = "pxa3xx_nand-0";
 +		marvell,rb = <0>;
-+		marvell,nand-keep-config;
-+		nand-on-flash-bbt;
-+		nand-ecc-strength = <8>;
-+		nand-ecc-step-size = <512>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "U-Boot";
-+				reg = <0 0x800000>;
-+			};
-+			partition at 800000 {
-+				label = "Linux";
-+				reg = <0x800000 0x800000>;
-+			};
-+			partition at 1000000 {
-+				label = "Filesystem";
-+				reg = <0x1000000 0x3f000000>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-395-gp.dts b/arch/arm/boot/dts/armada-395-gp.dts
-index ef491b524fd6..d3422f77d057 100644
---- a/arch/arm/boot/dts/armada-395-gp.dts
-+++ b/arch/arm/boot/dts/armada-395-gp.dts
-@@ -88,41 +88,6 @@
- 				status = "okay";
- 			};
- 
--			flash at d0000 {
--				status = "okay";
--				pinctrl-0 = <&nand_pins>;
--				pinctrl-names = "default";
--				num-cs = <1>;
--				marvell,nand-keep-config;
--				marvell,nand-enable-arbiter;
--				nand-on-flash-bbt;
--				nand-ecc-strength = <4>;
--				nand-ecc-step-size = <512>;
--
--				partitions {
--					compatible = "fixed-partitions";
--					#address-cells = <1>;
--					#size-cells = <1>;
--
--					partition at 0 {
--						label = "U-Boot";
--						reg = <0x00000000 0x00600000>;
--						read-only;
--					};
--
--					partition at 800000 {
--						label = "uImage";
--						reg = <0x00600000 0x00400000>;
--						read-only;
--					};
--
--					partition at 1000000 {
--						label = "Root";
--						reg = <0x00a00000 0x3f600000>;
--					};
--				};
--			};
--
- 			/* CON18 */
- 			sdhci at d8000 {
- 				clock-frequency = <200000000>;
-@@ -161,3 +126,42 @@
- 		};
- 	};
- };
-+
-+&nand_controller {
-+	status = "okay";
-+	pinctrl-0 = <&nand_pins>;
-+	pinctrl-names = "default";
-+
-+	nand at 0 {
-+		reg = <0>;
-+		label = "pxa3xx_nand-0";
-+		marvell,rb = <0>;
-+		marvell,nand-keep-config;
 +		nand-on-flash-bbt;
 +		nand-ecc-strength = <4>;
 +		nand-ecc-step-size = <512>;
@@ -178,116 +68,49 @@ index ef491b524fd6..d3422f77d057 100644
 +
 +			partition at 0 {
 +				label = "U-Boot";
-+				reg = <0x00000000 0x00600000>;
-+				read-only;
++				reg = <0 0x200000>;
 +			};
-+
-+			partition at 800000 {
-+				label = "uImage";
-+				reg = <0x00600000 0x00400000>;
-+				read-only;
-+			};
-+
-+			partition at 1000000 {
-+				label = "Root";
-+				reg = <0x00a00000 0x3f600000>;
-+			};
-+		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-398-db.dts b/arch/arm/boot/dts/armada-398-db.dts
-index f0e0379f7619..e73e5e453fd7 100644
---- a/arch/arm/boot/dts/armada-398-db.dts
-+++ b/arch/arm/boot/dts/armada-398-db.dts
-@@ -88,31 +88,6 @@
- 				status = "okay";
- 			};
- 
--			flash at d0000 {
--				status = "okay";
--				pinctrl-0 = <&nand_pins>;
--				pinctrl-names = "default";
--				num-cs = <1>;
--				marvell,nand-keep-config;
--				marvell,nand-enable-arbiter;
--				nand-on-flash-bbt;
--				nand-ecc-strength = <8>;
--				nand-ecc-step-size = <512>;
--
--				partition at 0 {
--					label = "U-Boot";
--					reg = <0 0x800000>;
--				};
--				partition at 800000 {
--					label = "Linux";
--					reg = <0x800000 0x800000>;
--				};
--				partition at 1000000 {
--					label = "Filesystem";
--					reg = <0x1000000 0x3f000000>;
--				};
--			};
--
- 			usb3 at f8000 {
- 				status = "okay";
- 			};
-@@ -159,3 +134,38 @@
- 		};
- 	};
- };
-+
-+&nand_controller {
-+	status = "okay";
-+	pinctrl-0 = <&nand_pins>;
-+	pinctrl-names = "default";
-+
-+	nand at 0 {
-+		reg = <0>;
-+		label = "pxa3xx_nand-0";
-+		marvell,rb = <0>;
-+		marvell,nand-keep-config;
-+		nand-on-flash-bbt;
-+		nand-ecc-strength = <8>;
-+		nand-ecc-step-size = <512>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "U-Boot";
-+				reg = <0 0x800000>;
-+			};
-+			partition at 800000 {
++			partition at 200000 {
 +				label = "Linux";
-+				reg = <0x800000 0x800000>;
++				reg = <0x200000 0xe00000>;
 +			};
 +			partition at 1000000 {
 +				label = "Filesystem";
 +				reg = <0x1000000 0x3f000000>;
 +			};
 +		};
-+	};
-+};
-diff --git a/arch/arm/boot/dts/armada-39x.dtsi b/arch/arm/boot/dts/armada-39x.dtsi
-index 5218bd2a248d..a8322de3f0b3 100644
---- a/arch/arm/boot/dts/armada-39x.dtsi
-+++ b/arch/arm/boot/dts/armada-39x.dtsi
-@@ -404,11 +404,11 @@
- 				interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
+ 	};
+ };
+ 
+diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+index cb1fb49ccf81..8610163bb1a4 100644
+--- a/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-cp110-slave.dtsi
+@@ -310,20 +310,20 @@
+ 				status = "disabled";
  			};
  
--			flash at d0000 {
--				compatible = "marvell,armada370-nand";
-+			nand_controller: nand-controller at d0000 {
-+				compatible = "marvell,armada370-nand-controller";
- 				reg = <0xd0000 0x54>;
+-			cps_nand: nand at 720000 {
++			cps_nand_controller: nand at 720000 {
+ 				/*
+ 				 * Due to the limiation of the pin available
+ 				 * this controller is only usable on the CPM
+ 				 * for A7K and on the CPS for A8K.
+ 				 */
+-				compatible = "marvell,armada370-nand",
+-					     "marvell,armada-8k-nand";
++				compatible = "marvell,armada-8k-nand-controller",
++					     "marvell,armada370-nand-controller";
+ 				reg = <0x720000 0x54>;
  				#address-cells = <1>;
 -				#size-cells = <1>;
 +				#size-cells = <0>;
- 				interrupts = <GIC_SPI 84 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&coredivclk 0>;
+ 				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
+ 				clocks = <&cps_clk 1 2>;
+-				marvell,system-controller = <&cpm_syscon0>;
++				marvell,system-controller = <&cps_syscon0>;
  				status = "disabled";
+ 			};
+ 
 -- 
 2.11.0
