@@ -1,30 +1,49 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu,  7 Dec 2017 16:09:23 +0100
-Subject: [PATCH] ARM: dts: imx6: RDU2: correct RTC compatible
-Message-ID: <20171207150923.25024-1-l.stach@pengutronix.de>
+From: salyzyn@android.com (Mark Salyzyn)
+Date: Thu, 7 Dec 2017 07:16:07 -0800
+Subject: [PATCH 0/6] arm64: compat: Add COMPAT_VDSO
+In-Reply-To: <20171115220529.14458-1-salyzyn@android.com>
+References: <20171115220529.14458-1-salyzyn@android.com>
+Message-ID: <a40b34a1-b153-fe3b-3831-a9fdc13cdd43@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RTC is manufactured by Maxim. This is a cosmetic fix, as Linux
-doesn't match the vendor string for i2c devices.
+On 11/15/2017 02:05 PM, Mark Salyzyn wrote:
+> Add compatible vDSO32 support to arm64, provide the files necessary
+> for building a compat (AArch32) vDSO in arch/arm64/kernel/vdso32.
+>
+> Leverages effort to unify the vgettimeofday.c file as outlined below.
+>
+> To be applied over top the following pending patches:
+>
+> [PATCH] arm64: compat: Remove leftover variable declaration
+> NB: approved, in arch64/for-next/core
+> [PATCH v3 1/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (C sources)
+> [PATCH v3 2/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (assembler sources)
+> [PATCH v3 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
+> [PATCH] arm64: compat: Expose offset to registers in sigframes
+> [PATCH v5 01/12] arm: vdso: rename vdso_datapage variables
+> [PATCH v5 02/12] arm: vdso: add include file defining __get_datapage()
+> [PATCH v5 03/12] arm: vdso: inline assembler operations to compiler.h
+> [PATCH v5 04/12] arm: vdso: do calculations outside reader loops
+> [PATCH v6 05/12] arm: vdso: Add support for CLOCK_MONOTONIC_RAW
+> [PATCH v5 06/12] arm: vdso: add support for clock_getres
+> [PATCH v5 07/12] arm: vdso: disable profiling
+> [PATCH v5 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
+> [PATCH v5 09/12] arm: vdso: move vgettimeofday.c to lib/vdso/
+> [PATCH v5 10/12] arm64: vdso: replace gettimeofday.S with global vgettimeofday.C
+> [PATCH v5 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
+> [PATCH v5 12/12] lib: vdso: do not expose gettimeofday, if no arch supported timer
+> [PATCH] lib: vdso: add support for time
+>
+> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
+> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Dave Martin <Dave.Martin@arm.com>
+> Cc: "Eric W. Biederman" <ebiederm@xmission.com>
+> Cc: linux-arm-kernel at lists.infradead.org
+> Cc: linux-kernel at vger.kernel.org
 
-Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
----
- arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Any action for me to take?
 
-diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-index eef737bd52d9..6bef9a98678e 100644
---- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
-@@ -581,7 +581,7 @@
- 	};
- 
- 	ds1341: rtc at 68 {
--		compatible = "dallas,ds1341";
-+		compatible = "maxim,ds1341";
- 		reg = <0x68>;
- 	};
- };
--- 
-2.11.0
+-- Mark
