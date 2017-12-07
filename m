@@ -1,55 +1,52 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Wed, 6 Dec 2017 17:45:35 -0800
-Subject: [kernel-hardening][PATCH v4 0/3] arm: Makes ptdump resuable and
- add WX page checking
-In-Reply-To: <20171206102315.GA7012@pjb1027-Latitude-E5410>
-References: <20171206102315.GA7012@pjb1027-Latitude-E5410>
-Message-ID: <c7168304-aad6-35d0-8c16-ae9494e5a026@redhat.com>
+From: glin@suse.com (Gary Lin)
+Date: Thu, 7 Dec 2017 09:59:03 +0800
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <20171206183734.xmgecyrd5suiurm6@gmail.com>
+References: <20171205100148.5757-1-glin@suse.com>
+ <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
+ <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
+ <20171206183734.xmgecyrd5suiurm6@gmail.com>
+Message-ID: <20171207015903.jaos5siysggzz4nc@GaryWorkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/06/2017 02:23 AM, Jinbum Park wrote:
-> Hi,
+On Wed, Dec 06, 2017 at 07:37:34PM +0100, Ingo Molnar wrote:
 > 
-> Page table dumping code for arm64-x86 is reusable,
-> and they have function for WX page checking.
-> But arm doesn't have that.
+> * Gary Lin <glin@suse.com> wrote:
 > 
-> This path series are to makes ptdump reusable,
-> and add WX page checking for arm.
-> This is heavily based on arm64 version.
+> > On Tue, Dec 05, 2017 at 04:14:26PM -0500, Josh Boyer wrote:
+> > > On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
+> > > > The series of patches introduce Security Version to EFI stub.
+> > > >
+> > > > Security Version is a monotonically increasing number and designed to
+> > > > prevent the user from loading an insecure kernel accidentally. The
+> > > > bootloader maintains a list of security versions corresponding to
+> > > > different distributions. After fixing a critical vulnerability, the
+> > > > distribution kernel maintainer bumps the "version", and the bootloader
+> > > > updates the list automatically. When the user tries to load a kernel
+> > > > with a lower security version, the bootloader shows a warning prompt
+> > > > to notify the user the potential risk.
+> > > 
+> > > If a distribution releases a kernel with a higher security version and
+> > > that it automatically updated on boot, what happens if that kernel
+> > > contains a different bug that causes it to fail to boot or break
+> > > critical functionality?  At that point, the user's machine would be in
+> > > a state where the higher security version is enforced but the only
+> > > kernel that provides that is broken.  Wouldn't that make a bad
+> > > situation even worse by now requiring manual acceptance of the older
+> > > SV kernel boot physically at the machine?
+> > > 
+> > > I feel like I'm missing a detail here or something.
+> > > 
+> > If the new kernel fails to boot, then the user has to choose the kernel
+> > manually anyway, and there will be an option in the warning prompt to
+> > lower SV.
 > 
-> v2 :
-> Fix a sender name of mail header, there was an mistake.
-> (from "jinb.park" to Jinbum Park)
-> Contents of patch-set are perfectly same.
+> And what if the firmware does not support a lowering of the SV?
 > 
-> v3 :
-> Take advantage of the existing pg_level and bits arrays
-> to check ro, nx prot.
-> 
-> v4 :
-> Add boolean for ro_bit, nx_bit into prot_bits
-> to point ro_bit, nx_bit in pg_level.
-> This change is suggested by Laura Abbott.
-> 
-> jinb.park (3):
->    arm: mm: dump: make page table dumping reusable
->    arm: mm: dump: make the page table dumping seq_file optional
->    arm: mm: dump: add checking for writable and executable pages
-> 
->   arch/arm/Kconfig.debug        |  33 ++++++++-
->   arch/arm/include/asm/ptdump.h |  56 ++++++++++++++++
->   arch/arm/mm/Makefile          |   3 +-
->   arch/arm/mm/dump.c            | 151 +++++++++++++++++++++++++++++-------------
->   arch/arm/mm/init.c            |   2 +
->   arch/arm/mm/ptdump_debugfs.c  |  34 ++++++++++
->   6 files changed, 232 insertions(+), 47 deletions(-)
->   create mode 100644 arch/arm/include/asm/ptdump.h
->   create mode 100644 arch/arm/mm/ptdump_debugfs.c
-> 
+The SV list is manipulated by the bootloader, and the firmware only
+provides the interface to the storage, i.e. non-volatile flash.
 
-You can add
+Cheers,
 
-Tested-by: Laura Abbott <labbott@redhat.com>
-Reviewed-by: Laura Abbott <labbott@redhat.com>
+Gary Lin
