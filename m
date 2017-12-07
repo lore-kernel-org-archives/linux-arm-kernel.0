@@ -1,36 +1,42 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:46 +0100
-Subject: [PATCH 43/54] arm64: dts: renesas: r8a77970: sort includes
-In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
-References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <830241c1e8cea1557b1de099756775e9fa0ab561.1512640145.git.horms+renesas@verge.net.au>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 7 Dec 2017 11:14:27 +0100
+Subject: [PATCH v3 08/15] drm/sun4i: Add LVDS support
+In-Reply-To: <b900e5963180c94ca02bde178b6674622a127787.1512486553.git-series.maxime.ripard@free-electrons.com>
+References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <b900e5963180c94ca02bde178b6674622a127787.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAOFm3uEpnBFUDBHK+SqQ-pGUPcWbGXNrWum4HRJ34tMtoX-2Qw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sort includes used in r8a77970 DTS to improve maintainability
-and for consistency with other R-Car DTS files.
+On Tue, Dec 5, 2017 at 4:10 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The TCON supports the LVDS interface to output to a panel or a bridge.
+> Let's add support for it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+[]
+> --- /dev/null
+> +++ b/drivers/gpu/drm/sun4i/sun4i_lvds.c
+> @@ -0,0 +1,183 @@
+> +/*
+> + * Copyright (C) 2015 NextThing Co
+> + * Copyright (C) 2015-2017 Free Electrons
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or
+> + * modify it under the terms of the GNU General Public License as
+> + * published by the Free Software Foundation; either version 2 of
+> + * the License, or (at your option) any later version.
+> + */
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
----
- arch/arm64/boot/dts/renesas/r8a77970.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Maxime,
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-index 75d09f1724f0..8b97842aedb7 100644
---- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
-@@ -9,9 +9,9 @@
-  * kind, whether express or implied.
-  */
- 
--#include <dt-bindings/interrupt-controller/irq.h>
--#include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/renesas-cpg-mssr.h>
-+#include <dt-bindings/interrupt-controller/arm-gic.h>
-+#include <dt-bindings/interrupt-controller/irq.h>
- 
- / {
- 	compatible = "renesas,r8a77970";
+Would you consider using the new SPDX ids instead of this fine legalese?
+e.g. this as the top line:
+
+// SPDX-License-Identifier: GPL-2.0+
+
 -- 
-2.11.0
+Cordially
+Philippe Ombredanne
