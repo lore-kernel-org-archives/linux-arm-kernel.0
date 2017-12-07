@@ -1,49 +1,116 @@
-From: salyzyn@android.com (Mark Salyzyn)
-Date: Thu, 7 Dec 2017 07:16:07 -0800
-Subject: [PATCH 0/6] arm64: compat: Add COMPAT_VDSO
-In-Reply-To: <20171115220529.14458-1-salyzyn@android.com>
-References: <20171115220529.14458-1-salyzyn@android.com>
-Message-ID: <a40b34a1-b153-fe3b-3831-a9fdc13cdd43@android.com>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Thu,  7 Dec 2017 10:19:33 -0500
+Subject: [PATCH v2 01/10] arm64: dts: qcom: pm8916: fix wcd_codec indentation
+In-Reply-To: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
+References: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
+Message-ID: <20171207151942.5805-2-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2017 02:05 PM, Mark Salyzyn wrote:
-> Add compatible vDSO32 support to arm64, provide the files necessary
-> for building a compat (AArch32) vDSO in arch/arm64/kernel/vdso32.
->
-> Leverages effort to unify the vgettimeofday.c file as outlined below.
->
-> To be applied over top the following pending patches:
->
-> [PATCH] arm64: compat: Remove leftover variable declaration
-> NB: approved, in arch64/for-next/core
-> [PATCH v3 1/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (C sources)
-> [PATCH v3 2/3] arm64: compat: Split the sigreturn trampolines and kuser helpers (assembler sources)
-> [PATCH v3 3/3] arm64: compat: Add CONFIG_KUSER_HELPERS
-> [PATCH] arm64: compat: Expose offset to registers in sigframes
-> [PATCH v5 01/12] arm: vdso: rename vdso_datapage variables
-> [PATCH v5 02/12] arm: vdso: add include file defining __get_datapage()
-> [PATCH v5 03/12] arm: vdso: inline assembler operations to compiler.h
-> [PATCH v5 04/12] arm: vdso: do calculations outside reader loops
-> [PATCH v6 05/12] arm: vdso: Add support for CLOCK_MONOTONIC_RAW
-> [PATCH v5 06/12] arm: vdso: add support for clock_getres
-> [PATCH v5 07/12] arm: vdso: disable profiling
-> [PATCH v5 08/12] arm: vdso: Add ARCH_CLOCK_FIXED_MASK
-> [PATCH v5 09/12] arm: vdso: move vgettimeofday.c to lib/vdso/
-> [PATCH v5 10/12] arm64: vdso: replace gettimeofday.S with global vgettimeofday.C
-> [PATCH v5 11/12] lib: vdso: Add support for CLOCK_BOOTTIME
-> [PATCH v5 12/12] lib: vdso: do not expose gettimeofday, if no arch supported timer
-> [PATCH] lib: vdso: add support for time
->
-> Signed-off-by: Kevin Brodsky <kevin.brodsky@arm.com>
-> Signed-off-by: Mark Salyzyn <salyzyn@android.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Dave Martin <Dave.Martin@arm.com>
-> Cc: "Eric W. Biederman" <ebiederm@xmission.com>
-> Cc: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org
+Indentation did not respect kernel standards, so fix that for the usual
+indent with tabs, align with spaces. While at it, remove some empty
+lines before and after the closing parenthesis of this block.
 
-Any action for me to take?
+Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
+---
+Changes in v2:
+ - Added Reviewed-by Bjorn Andersson
 
--- Mark
+ arch/arm64/boot/dts/qcom/pm8916.dtsi | 82 ++++++++++++++++++------------------
+ 1 file changed, 40 insertions(+), 42 deletions(-)
+
+diff --git a/arch/arm64/boot/dts/qcom/pm8916.dtsi b/arch/arm64/boot/dts/qcom/pm8916.dtsi
+index 53deebf9f515..d19f4cb9a5f3 100644
+--- a/arch/arm64/boot/dts/qcom/pm8916.dtsi
++++ b/arch/arm64/boot/dts/qcom/pm8916.dtsi
+@@ -96,47 +96,45 @@
+ 		#address-cells = <1>;
+ 		#size-cells = <0>;
+ 
+-                wcd_codec: codec at f000 {
+-                       compatible = "qcom,pm8916-wcd-analog-codec";
+-	               reg = <0xf000 0x200>;
+-	               reg-names = "pmic-codec-core";
+-	               clocks = <&gcc GCC_CODEC_DIGCODEC_CLK>;
+-	               clock-names = "mclk";
+-	               interrupt-parent = <&spmi_bus>;
+-	               interrupts = <0x1 0xf0 0x0 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf0 0x1 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf0 0x2 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf0 0x3 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf0 0x4 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf0 0x5 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf0 0x6 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf0 0x7 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf1 0x0 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf1 0x1 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf1 0x2 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf1 0x3 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf1 0x4 IRQ_TYPE_NONE>,
+-	                            <0x1 0xf1 0x5 IRQ_TYPE_NONE>;
+-	               interrupt-names = "cdc_spk_cnp_int",
+-	                                 "cdc_spk_clip_int",
+-	                                 "cdc_spk_ocp_int",
+-	                                 "mbhc_ins_rem_det1",
+-	                                 "mbhc_but_rel_det",
+-	                                 "mbhc_but_press_det",
+-	                                 "mbhc_ins_rem_det",
+-	                                 "mbhc_switch_int",
+-	                                 "cdc_ear_ocp_int",
+-	                                 "cdc_hphr_ocp_int",
+-	                                 "cdc_hphl_ocp_det",
+-	                                 "cdc_ear_cnp_int",
+-	                                 "cdc_hphr_cnp_int",
+-	                                 "cdc_hphl_cnp_int";
+-	               vdd-cdc-io-supply = <&pm8916_l5>;
+-	               vdd-cdc-tx-rx-cx-supply = <&pm8916_l5>;
+-	               vdd-micbias-supply = <&pm8916_l13>;
+-	               #sound-dai-cells = <1>;
+-
+-                };
+-
++		wcd_codec: codec at f000 {
++			compatible = "qcom,pm8916-wcd-analog-codec";
++			reg = <0xf000 0x200>;
++			reg-names = "pmic-codec-core";
++			clocks = <&gcc GCC_CODEC_DIGCODEC_CLK>;
++			clock-names = "mclk";
++			interrupt-parent = <&spmi_bus>;
++			interrupts = <0x1 0xf0 0x0 IRQ_TYPE_NONE>,
++				     <0x1 0xf0 0x1 IRQ_TYPE_NONE>,
++				     <0x1 0xf0 0x2 IRQ_TYPE_NONE>,
++				     <0x1 0xf0 0x3 IRQ_TYPE_NONE>,
++				     <0x1 0xf0 0x4 IRQ_TYPE_NONE>,
++				     <0x1 0xf0 0x5 IRQ_TYPE_NONE>,
++				     <0x1 0xf0 0x6 IRQ_TYPE_NONE>,
++				     <0x1 0xf0 0x7 IRQ_TYPE_NONE>,
++				     <0x1 0xf1 0x0 IRQ_TYPE_NONE>,
++				     <0x1 0xf1 0x1 IRQ_TYPE_NONE>,
++				     <0x1 0xf1 0x2 IRQ_TYPE_NONE>,
++				     <0x1 0xf1 0x3 IRQ_TYPE_NONE>,
++				     <0x1 0xf1 0x4 IRQ_TYPE_NONE>,
++				     <0x1 0xf1 0x5 IRQ_TYPE_NONE>;
++			interrupt-names = "cdc_spk_cnp_int",
++					  "cdc_spk_clip_int",
++					  "cdc_spk_ocp_int",
++					  "mbhc_ins_rem_det1",
++					  "mbhc_but_rel_det",
++					  "mbhc_but_press_det",
++					  "mbhc_ins_rem_det",
++					  "mbhc_switch_int",
++					  "cdc_ear_ocp_int",
++					  "cdc_hphr_ocp_int",
++					  "cdc_hphl_ocp_det",
++					  "cdc_ear_cnp_int",
++					  "cdc_hphr_cnp_int",
++					  "cdc_hphl_cnp_int";
++			vdd-cdc-io-supply = <&pm8916_l5>;
++			vdd-cdc-tx-rx-cx-supply = <&pm8916_l5>;
++			vdd-micbias-supply = <&pm8916_l13>;
++			#sound-dai-cells = <1>;
++		};
+ 	};
+ };
+-- 
+2.15.0
