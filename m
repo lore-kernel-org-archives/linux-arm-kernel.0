@@ -1,49 +1,51 @@
-From: yao.jin@linux.intel.com (Jin, Yao)
-Date: Thu, 7 Dec 2017 08:49:48 +0800
-Subject: [PATCH v9 3/5] perf utils: use pmu->is_uncore to detect PMU
- UNCORE devices
-In-Reply-To: <20171206134702.GA12234@kernel.org>
-References: <20171016183222.25750-1-ganapatrao.kulkarni@cavium.com>
- <20171016183222.25750-4-ganapatrao.kulkarni@cavium.com>
- <6fdad34d-1612-0447-e58e-5c748f92668d@linux.intel.com>
- <CAKTKpr7oM4h_gxj1P=r_J_T5L_Mmtqqj_Uvji-fARKnQRnCP1w@mail.gmail.com>
- <d576d4c6-663c-dfc1-5618-3fa7c5102e7a@linux.intel.com>
- <1f79aa3c-a061-7c55-5d3e-f13638be01ad@linux.intel.com>
- <20171205184242.GA19952@kernel.org>
- <71db0255-af9b-968a-7baa-238d7146f069@linux.intel.com>
- <20171206134702.GA12234@kernel.org>
-Message-ID: <ee3254dd-7f03-e70d-8854-23001e0fda0c@linux.intel.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Wed, 06 Dec 2017 16:50:02 -0800
+Subject: [PATCH v4 4/4] arm64: dts: meson-axg: add clock DT info for Meson
+ AXG SoC
+In-Reply-To: <20171201012452.27086-5-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Fri, 1 Dec 2017 09:24:52 +0800")
+References: <20171201012452.27086-1-yixun.lan@amlogic.com>
+ <20171201012452.27086-5-yixun.lan@amlogic.com>
+Message-ID: <7ho9nbmked.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
+> From: Qiufang Dai <qiufang.dai@amlogic.com>
+>
+> Try to add Hiubus DT info, and also enable clock DT info
+> for the Amlogic's Meson-AXG SoC.
+>
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 15 +++++++++++++++
+>  1 file changed, 15 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index b932a784b02a..36a2e98338a8 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -7,6 +7,7 @@
+>  #include <dt-bindings/gpio/gpio.h>
+>  #include <dt-bindings/interrupt-controller/irq.h>
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include <dt-bindings/clock/axg-clkc.h>
 
-On 12/6/2017 9:47 PM, Arnaldo Carvalho de Melo wrote:
-> Em Wed, Dec 06, 2017 at 08:30:37AM +0800, Jin, Yao escreveu:
->>
->>
->> On 12/6/2017 2:42 AM, Arnaldo Carvalho de Melo wrote:
->>> Em Tue, Dec 05, 2017 at 08:35:22PM +0800, Jin, Yao escreveu:
->>>> A quick test with the new patch 'fix_json_v9_2.patch' shows it working.
->>>
->>> I'll take this as a Tested-by: you, ok?
->>
->> Hi Arnaldo,
->>
->> I didn't do a full test for this patch and for the whole patch series.
->>
->> I just do a quick test and it shows that the regression issue which was
->> found in 'perf stat --per-thread' test case is disappear.
->>
->> If you think it's enough for adding Tested-by, that's fine for me. :)
-> 
-> I guess this addresses at least your previous regression report, so I
-> think it is warranted, thanks!
-> 
-> - arnaldo
->   
+This #include will cause an unnessary dependency from the amlogic tree
+to the clock tree even though this patch is not currently using any of
+the #defines from that header.  It will simplify the dependencies if you
+drop this #include from this patch.
 
-That's fine, thanks!
+In my comment on the cover letter, I suggested adding a patch that also
+switches the UART over to the new clock provider.  That is the patch
+that should add this #include, since it will actually need #defines from
+the header.
 
-Thanks
-Jin Yao
+Doing it in that order means that we could merge this patch
+independently of the clock driver, and then merge the UART switch-over
+patch only after the driver (and headers) are merged.
+
+Kevin
