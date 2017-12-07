@@ -1,68 +1,74 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  7 Dec 2017 16:58:51 +0100
-Subject: [PATCH v4 06/15] drm/sun4i: Force the mixer rate at 150MHz
+Date: Thu,  7 Dec 2017 16:58:49 +0100
+Subject: [PATCH v4 04/15] dt-bindings: display: sun4i-drm: Add A83T pipeline
 In-Reply-To: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <34f2c9d5c9ab48ead94253144a8e829cccfa4653.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <4ceba537249abbfd5f8aa2d82afb93f84dc20359.1512662253.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It seems like the mixer can only run properly when clocked at 150MHz. In
-order to have something more robust than simply a fire-and-forget
-assigned-clocks-rate, let's put that in the code.
+The A83T has two video pipelines in parallel that looks quite similar to
+the other SoCs.
 
+The video planes are handled through a controller called the mixer, and the
+video signal is then passed to the timing controller (TCON).
+
+And while there is two instances of the mixers and TCONs, they have a
+significant number of differences. The TCONs are quite easy to deal with,
+one is supposed to generate TV (in the broader term, so including things
+like HDMI) signals, the other one LCD (so RGB, LVDS, DSI) signals. And
+while they are called TCON0 and TCON1 in the A83t datasheet, newer SoCs
+call them TCON-TV and TCON-LCD, which seems more appropriate.
+
+However, the mixers differ mostly by their capabilities, with some features
+being available only in the first one, or the number of planes they expose,
+but also through their register layout. And while the capabilities could be
+represented as properties, the register layout differences would need to
+express all the registers offsets as properties, which is usually quite
+bad. Especially since documentation on that hardware block is close to
+non-existant and we don't even have the list of all those registers in the
+first place.
+
+So let's call them mixer 0 and 1 in our compatibles, even though the name
+is pretty bad...
+
+At the moment, we only have tested the code on a board that has a single
+display output, so we're leaving the tcon-tv and mixer1 out.
+
+Reviewed-by: Rob Herring <robh@kernel.org>
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun8i_mixer.c |  9 +++++++++
- drivers/gpu/drm/sun4i/sun8i_mixer.h |  3 +++
- 2 files changed, 12 insertions(+)
+ Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-index 29ceeb016d72..ff235e3228ce 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
-@@ -400,6 +400,14 @@ static int sun8i_mixer_bind(struct device *dev, struct device *master,
- 	}
- 	clk_prepare_enable(mixer->mod_clk);
+diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+index 1e21cfaac9e2..9f073af4c711 100644
+--- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
++++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+@@ -93,6 +93,7 @@ Required properties:
+    * allwinner,sun6i-a31s-tcon
+    * allwinner,sun7i-a20-tcon
+    * allwinner,sun8i-a33-tcon
++   * allwinner,sun8i-a83t-tcon-lcd
+    * allwinner,sun8i-v3s-tcon
+  - reg: base address and size of memory-mapped region
+  - interrupts: interrupt associated to this IP
+@@ -225,6 +226,7 @@ supported.
  
-+	/*
-+	 * It seems that we need to enforce that rate for whatever
-+	 * reason for the mixer to be functional. Make sure it's the
-+	 * case.
-+	 */
-+	if (mixer->cfg->mod_rate)
-+		clk_set_rate(mixer->mod_clk, mixer->cfg->mod_rate);
-+
- 	list_add_tail(&mixer->engine.list, &drv->engine_list);
+ Required properties:
+   - compatible: value must be one of:
++    * allwinner,sun8i-a83t-de2-mixer-0
+     * allwinner,sun8i-v3s-de2-mixer
+   - reg: base address and size of the memory-mapped region.
+   - clocks: phandles to the clocks feeding the mixer
+@@ -254,6 +256,7 @@ Required properties:
+     * allwinner,sun6i-a31s-display-engine
+     * allwinner,sun7i-a20-display-engine
+     * allwinner,sun8i-a33-display-engine
++    * allwinner,sun8i-a83t-display-engine
+     * allwinner,sun8i-v3s-display-engine
  
- 	/* Reset the registers */
-@@ -474,6 +482,7 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
- 	.ui_num = 1,
- 	.scaler_mask = 0x3,
- 	.ccsc = 0,
-+	.mod_rate = 150000000,
- };
- 
- static const struct of_device_id sun8i_mixer_of_table[] = {
-diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.h b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-index bc58040a88f9..f34e70c42adf 100644
---- a/drivers/gpu/drm/sun4i/sun8i_mixer.h
-+++ b/drivers/gpu/drm/sun4i/sun8i_mixer.h
-@@ -121,12 +121,15 @@ struct de2_fmt_info {
-  *	Set value to 0 if this is first mixer or second mixer with VEP support.
-  *	Set value to 1 if this is second mixer without VEP support. Other values
-  *	are invalid.
-+ * @mod_rate: module clock rate that needs to be set in order to have
-+ *	a functional block.
-  */
- struct sun8i_mixer_cfg {
- 	int		vi_num;
- 	int		ui_num;
- 	int		scaler_mask;
- 	int		ccsc;
-+	unsigned long	mod_rate;
- };
- 
- struct sun8i_mixer {
+   - allwinner,pipelines: list of phandle to the display engine
 -- 
 git-series 0.9.1
