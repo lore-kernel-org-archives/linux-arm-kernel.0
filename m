@@ -1,44 +1,72 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 11:54:11 +0100
-Subject: [PATCH v7 1/8] KVM: arm/arm64: Remove redundant preemptible checks
+Date: Thu,  7 Dec 2017 11:54:18 +0100
+Subject: [PATCH v7 8/8] KVM: arm/arm64: Avoid work when userspace iqchips are
+ not used
 In-Reply-To: <20171207105418.22428-1-christoffer.dall@linaro.org>
 References: <20171207105418.22428-1-christoffer.dall@linaro.org>
-Message-ID: <20171207105418.22428-2-christoffer.dall@linaro.org>
+Message-ID: <20171207105418.22428-9-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The __this_cpu_read() and __this_cpu_write() functions already implement
-checks for the required preemption levels when using
-CONFIG_DEBUG_PREEMPT which gives you nice error messages and such.
-Therefore there is no need to explicitly check this using a BUG_ON() in
-the code (which we don't do for other uses of per cpu variables either).
+We currently check if the VM has a userspace irqchip on every exit from
+the VCPU, and if so, we do some work to ensure correct timer behavior.
+This is unfortunate, as we could avoid doing any work entirely, if we
+didn't have to support irqchip in userspace.
 
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Reviewed-by: Andre Przywara <andre.przywara@arm.com>
+Realizing the userspace irqchip on ARM is mostly a developer or hobby
+feature, and is unlikely to be used in servers or other scenarios where
+performance is a priority, we can use a refcounted static key to only
+check the irqchip configuration when we have at least one VM that uses
+an irqchip in userspace.
+
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- virt/kvm/arm/arm.c | 2 --
- 1 file changed, 2 deletions(-)
+ virt/kvm/arm/arch_timer.c | 11 +++++++++--
+ 1 file changed, 9 insertions(+), 2 deletions(-)
 
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a6524ff27de4..859ff7e3a1eb 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -71,7 +71,6 @@ static DEFINE_PER_CPU(unsigned char, kvm_arm_hardware_enabled);
+diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
+index 82d4963f63b8..df21451e7654 100644
+--- a/virt/kvm/arm/arch_timer.c
++++ b/virt/kvm/arm/arch_timer.c
+@@ -51,6 +51,8 @@ static void kvm_timer_update_irq(struct kvm_vcpu *vcpu, bool new_level,
+ 				 struct arch_timer_context *timer_ctx);
+ static bool kvm_timer_should_fire(struct arch_timer_context *timer_ctx);
  
- static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
++static DEFINE_STATIC_KEY_FALSE(userspace_irqchip_in_use);
++
+ u64 kvm_phys_timer_read(void)
  {
--	BUG_ON(preemptible());
- 	__this_cpu_write(kvm_arm_running_vcpu, vcpu);
- }
- 
-@@ -81,7 +80,6 @@ static void kvm_arm_set_running_vcpu(struct kvm_vcpu *vcpu)
+ 	return timecounter->cc->read(timecounter->cc);
+@@ -569,7 +571,8 @@ static void unmask_vtimer_irq_user(struct kvm_vcpu *vcpu)
   */
- struct kvm_vcpu *kvm_arm_get_running_vcpu(void)
+ void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
  {
--	BUG_ON(preemptible());
- 	return __this_cpu_read(kvm_arm_running_vcpu);
+-	unmask_vtimer_irq_user(vcpu);
++	if (static_branch_unlikely(&userspace_irqchip_in_use))
++		unmask_vtimer_irq_user(vcpu);
  }
  
+ int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
+@@ -774,6 +777,8 @@ void kvm_timer_vcpu_terminate(struct kvm_vcpu *vcpu)
+ 	soft_timer_cancel(&timer->bg_timer, &timer->expired);
+ 	soft_timer_cancel(&timer->phys_timer, NULL);
+ 	kvm_vgic_unmap_phys_irq(vcpu, vtimer->irq.irq);
++	if (timer->enabled && !irqchip_in_kernel(vcpu->kvm))
++		static_branch_dec(&userspace_irqchip_in_use);
+ }
+ 
+ static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
+@@ -826,8 +831,10 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 		return 0;
+ 
+ 	/* Without a VGIC we do not map virtual IRQs to physical IRQs */
+-	if (!irqchip_in_kernel(vcpu->kvm))
++	if (!irqchip_in_kernel(vcpu->kvm)) {
++		static_branch_inc(&userspace_irqchip_in_use);
+ 		goto no_vgic;
++	}
+ 
+ 	if (!vgic_initialized(vcpu->kvm))
+ 		return -ENODEV;
 -- 
 2.14.2
