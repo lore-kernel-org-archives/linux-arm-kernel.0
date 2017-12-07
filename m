@@ -1,27 +1,29 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 7 Dec 2017 12:18:57 -0500
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <CAJZ5v0g7APeWHkL+c5LT7sx4xpZn=TxCSpt5y=DU7yOiyUkNRg@mail.gmail.com>
-References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0hEdK_vJcHeoz=Z2H6od=bktspPpTo37Y6qiOT2qptnaA@mail.gmail.com>
- <20171207082958.GA11882@kroah.com> <2960222.F3CtrQ5k26@aspire.rjw.lan>
- <e17a3ac6-aac3-09ee-7307-01ddc780507a@codeaurora.org>
- <CAJZ5v0g7APeWHkL+c5LT7sx4xpZn=TxCSpt5y=DU7yOiyUkNRg@mail.gmail.com>
-Message-ID: <20707334-001e-f138-59af-a23cdee05737@codeaurora.org>
+From: david@lechnology.com (David Lechner)
+Date: Thu, 7 Dec 2017 11:15:02 -0600
+Subject: [PATCH v3] ARM: da850: Fix LEGO EV3 battery voltage gpio
+In-Reply-To: <1b2fe02d-1c8f-e4e8-53b6-692c4545faf6@ti.com>
+References: <1512338693-16781-1-git-send-email-david@lechnology.com>
+ <1b2fe02d-1c8f-e4e8-53b6-692c4545faf6@ti.com>
+Message-ID: <0073467e-29d0-9b76-1caa-1605d5897321@lechnology.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/7/2017 12:10 PM, Rafael J. Wysocki wrote:
->> My take away from the discussion is:
->> 1. don't use devm family of functions for IRQ registration/free
->> 2. still keep track of the events
->> 3. call free_irq on shutdown.
-> Yes.  And on remove too.
+On 12/07/2017 01:35 AM, Sekhar Nori wrote:
+> On Monday 04 December 2017 03:34 AM, David Lechner wrote:
+>> This fixes the battery voltage monitoring gpio-hog settings.
+>>
+>> When the gpio is low, it turns off the battery voltage to the ADC chip.
+>> However, this needs to be on all of the time so that we can monitor
+>> battery voltage.
+>>
+>> Also, there was a typo that prevented pinmuxing from working correctly.
+>>
+>> Signed-off-by: David Lechner <david@lechnology.com>
+> 
+> Applied to fixes with subject line changed to:
+> 
+> ARM: dts: da850-lego-ev3: Fix battery voltage gpio
+> 
+> Please follow this style for future patches.
 
-OK, will make the changes and post a newer version. Thanks for the
-confirmation.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+Ack
