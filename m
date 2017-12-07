@@ -1,79 +1,39 @@
 From: yixun.lan@amlogic.com (Yixun Lan)
-Date: Thu, 7 Dec 2017 17:52:56 +0800
-Subject: [PATCH v5 0/4] add clk controller driver for Meson-AXG SoC
-Message-ID: <20171207095300.15384-1-yixun.lan@amlogic.com>
+Date: Thu, 7 Dec 2017 17:52:57 +0800
+Subject: [PATCH v5 1/4] dt-bindings: clock: add compatible variant for the
+ Meson-AXG
+In-Reply-To: <20171207095300.15384-1-yixun.lan@amlogic.com>
+References: <20171207095300.15384-1-yixun.lan@amlogic.com>
+Message-ID: <20171207095300.15384-2-yixun.lan@amlogic.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add driver for the clk controller which found in Meson AXG SoC
+Update the documentation to support clock driver for the Amlogic's
+Meson-AXG SoC.
 
-  Note, we deliberately create a seperate source file for the Meson AXG
-series, instead of sharing code with previous GXBB/GXL - the file axg.c
-It would help us maintaining the code more easily.
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+---
+ Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
 
-Changes since v4 [4]:
- - use devm_ioremap instead of devm_ioremap_resource
- - rename DT node using generic name 'bus'
-
-Changes since v3 [3]:
- - separate dt-bindings header file
- - adjust license note as standard way
- - replace of_iomap with platform/devm API
- - add Rob's Ack to Patch 1,4
-
-Changes since v2 [2]:
- - drop register offset calculation
- - update dt-bindings for new compatible variant
-
-Changes since v1 [1]:
- - rework register definion, use '(offset << 2)' to better match
-   the description from data sheet
- - drop "#include dt-bindings/clock/gxbb-aoclkc.h" from dts
- - rebase code to v4.15-rc1
-
-[4]
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005522.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005525.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005526.html
-
-[3]
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005487.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005488.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005489.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005490.html
-
-[2]
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005468.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005469.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005470.html
-
-[1] 
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005239.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005240.html
-  http://lists.infradead.org/pipermail/linux-amlogic/2017-November/005241.html
-
-
-
-Qiufang Dai (3):
-  clk: meson-axg: add clocks dt-bindings required header
-  clk: meson-axg: add clock controller drivers
-  arm64: dts: meson-axg: add clock DT info for Meson AXG SoC
-
-Yixun Lan (1):
-  dt-bindings: clock: add compatible variant for the Meson-AXG
-
- .../bindings/clock/amlogic,gxbb-clkc.txt           |   7 +-
- arch/arm64/Kconfig.platforms                       |   1 +
- arch/arm64/boot/dts/amlogic/meson-axg.dtsi         |  15 +
- drivers/clk/meson/Kconfig                          |   8 +
- drivers/clk/meson/Makefile                         |   1 +
- drivers/clk/meson/axg.c                            | 944 +++++++++++++++++++++
- drivers/clk/meson/axg.h                            | 126 +++
- include/dt-bindings/clock/axg-clkc.h               |  71 ++
- 8 files changed, 1171 insertions(+), 2 deletions(-)
- create mode 100644 drivers/clk/meson/axg.c
- create mode 100644 drivers/clk/meson/axg.h
- create mode 100644 include/dt-bindings/clock/axg-clkc.h
-
+diff --git a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
+index 924040769186..e2b377ed6f91 100644
+--- a/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
++++ b/Documentation/devicetree/bindings/clock/amlogic,gxbb-clkc.txt
+@@ -5,8 +5,11 @@ controllers within the SoC.
+ 
+ Required Properties:
+ 
+-- compatible: should be "amlogic,gxbb-clkc" for GXBB SoC,
+-	      or "amlogic,gxl-clkc" for GXL and GXM SoC.
++- compatible: should be:
++		"amlogic,gxbb-clkc" for GXBB SoC,
++		"amlogic,gxl-clkc" for GXL and GXM SoC,
++		"amlogic,axg-clkc" for AXG SoC.
++
+ - reg: physical base address of the clock controller and length of memory
+        mapped region.
+ 
 -- 
 2.15.0
