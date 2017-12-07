@@ -1,78 +1,114 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 7 Dec 2017 16:04:49 +0800
-Subject: [PATCH v3 2/3] clk: hisilicon: Add support for Hi3660 stub clocks
-In-Reply-To: <20171207070550.GY4283@codeaurora.org>
-References: <1510910852-2175-1-git-send-email-xuyiping@hisilicon.com>
- <1510910852-2175-3-git-send-email-xuyiping@hisilicon.com>
- <20171207070550.GY4283@codeaurora.org>
-Message-ID: <20171207080449.GB5371@leoy-linaro>
+From: zhang.lyra@gmail.com (Chunyan Zhang)
+Date: Thu, 7 Dec 2017 16:08:37 +0800
+Subject: [PATCH V6 01/12] drivers: move clock common macros out from
+ vendor directories
+In-Reply-To: <20171207064723.GV4283@codeaurora.org>
+References: <20171127100115.20655-1-chunyan.zhang@spreadtrum.com>
+ <20171127100115.20655-2-chunyan.zhang@spreadtrum.com>
+ <20171207064723.GV4283@codeaurora.org>
+Message-ID: <CAAfSe-ufFDXTxUxTSW8Au9wdwoHKcB6RBdVdX36RrZQC4x0knw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 11:05:50PM -0800, Stephen Boyd wrote:
-> On 11/17, Xu YiPing wrote:
-> > From: Kaihua Zhong <zhongkaihua@huawei.com>
-> > +
-> > +static struct clk_hw *hi3660_stub_clk_hw_get(struct of_phandle_args *clkspec,
-> > +					     void *data)
-> > +{
-> > +	unsigned int idx = clkspec->args[0];
-> > +
-> > +	if (idx > HI3660_CLK_STUB_NUM) {
-> 
-> This should be >=
-> 
-> > +	}
-> > +
-> > +	return &hi3660_stub_clks[idx].hw;
-> > +}
-> > +
-> > +static int hi3660_stub_clk_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct resource *res;
-> > +	unsigned int i;
-> > +	int ret;
-> > +
-> > +	/* Use mailbox client without blocking */
-> > +	stub_clk_chan.cl.dev = dev;
-> > +	stub_clk_chan.cl.tx_done = NULL;
-> > +	stub_clk_chan.cl.tx_block = false;
-> > +	stub_clk_chan.cl.knows_txdone = false;
-> > +
-> > +	/* Allocate mailbox channel */
-> > +	stub_clk_chan.mbox = mbox_request_channel(&stub_clk_chan.cl, 0);
-> > +	if (IS_ERR(stub_clk_chan.mbox))
-> > +		return PTR_ERR(stub_clk_chan.mbox);
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	freq_reg = devm_ioremap(dev, res->start, resource_size(res));
-> > +	if (IS_ERR(freq_reg))
-> 
-> Pretty sure this returns NULL on failure, not an error pointer.
-> 
-> > +		return -ENOMEM;
-> > +
-> > +	freq_reg += HI3660_STUB_CLOCK_DATA;
-> > +
-> > +	for (i = 0; i < HI3660_CLK_STUB_NUM; i++) {
-> > +		ret = devm_clk_hw_register(&pdev->dev, &hi3660_stub_clks[i].hw);
-> > +		if (ret)
-> > +			return ret;
-> > +	}
-> > +
-> > +	ret = of_clk_add_hw_provider(pdev->dev.of_node, hi3660_stub_clk_hw_get,
-> > +				     hi3660_stub_clks);
-> 
-> This can use devm
-> 
-> > +	return ret;
-> > +}
-> > +
-> 
-> I fixed it all and merged into clk-next.
+On 7 December 2017 at 14:47, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 11/27, Chunyan Zhang wrote:
+>> These macros are used by more than one SoC vendor platforms, avoid to
+>> have many copies of these code, this patch moves them to the common
+>> clock directory which every clock drivers can access to.
+>>
+>> Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
+>> ---
+>>  drivers/clk/clk_common.h | 60 ++++++++++++++++++++++++++++++++++++++++++++++++
+>>  1 file changed, 60 insertions(+)
+>>  create mode 100644 drivers/clk/clk_common.h
+>>
+>> diff --git a/drivers/clk/clk_common.h b/drivers/clk/clk_common.h
+>> new file mode 100644
+>> index 0000000..21e93d2
+>> --- /dev/null
+>> +++ b/drivers/clk/clk_common.h
+>> @@ -0,0 +1,60 @@
+>> +/*
+>> + * drivers/clk/clk_common.h
+>
+> We don't need this in the file too. Please remove this line.
+>
+>> + *
+>> + * SPDX-License-Identifier: GPL-2.0
+>> + */
+>> +
+>> +#ifndef _CLK_COMMON_H_
+>> +#define _CLK_COMMON_H_
+>> +
+>> +#include <linux/clk-provider.h>
+>
+> Maybe these macros should just go into clk-provider.h?
 
-Ah, very appreciate your help, Stephen.
+Ok.  And I will also remove the same macros from sunxi-ng/ccu_common.h
+and zte/clk.h.
+
+>
+>> +
+>> +#define CLK_HW_INIT(_name, _parent, _ops, _flags)            \
+>> +     (&(struct clk_init_data) {                              \
+>> +             .flags          = _flags,                       \
+>> +             .name           = _name,                        \
+>> +             .parent_names   = (const char *[]) { _parent }, \
+>> +             .num_parents    = 1,                            \
+>> +             .ops            = _ops,                         \
+>> +     })
+>
+> Hopefully we don't extend the init structure anymore to have
+> something else. I guess we'll do something if that happens.
+>
+>> +
+>> +#define CLK_HW_INIT_PARENTS(_name, _parents, _ops, _flags)   \
+>> +     (&(struct clk_init_data) {                              \
+>> +             .flags          = _flags,                       \
+>> +             .name           = _name,                        \
+>> +             .parent_names   = _parents,                     \
+>> +             .num_parents    = ARRAY_SIZE(_parents),         \
+>> +             .ops            = _ops,                         \
+>> +     })
+>> +
+>> +#define CLK_HW_INIT_NO_PARENT(_name, _ops, _flags)     \
+>> +     (&(struct clk_init_data) {                      \
+>> +             .flags          = _flags,               \
+>> +             .name           = _name,                \
+>> +             .parent_names   = NULL,                 \
+>> +             .num_parents    = 0,                    \
+>> +             .ops            = _ops,                 \
+>> +     })
+>> +
+>> +#define CLK_FIXED_FACTOR(_struct, _name, _parent,                    \
+>> +                     _div, _mult, _flags)                            \
+>> +     struct clk_fixed_factor _struct = {                             \
+>> +             .div            = _div,                                 \
+>> +             .mult           = _mult,                                \
+>> +             .hw.init        = CLK_HW_INIT(_name,                    \
+>> +                                           _parent,                  \
+>> +                                           &clk_fixed_factor_ops,    \
+>> +                                           _flags),                  \
+>> +     }
+>> +
+>> +#define CLK_FIXED_RATE(_struct, _name, _flags,                               \
+>> +                    _fixed_rate, _fixed_accuracy)                    \
+>> +     struct clk_fixed_rate _struct = {                               \
+>> +             .fixed_rate     = _fixed_rate,                          \
+>> +             .fixed_accuracy = _fixed_accuracy,                      \
+>> +             .hw.init        = CLK_HW_INIT_NO_PARENT(_name,          \
+>> +                                       &clk_fixed_rate_ops,          \
+>> +                                                     _flags),        \
+>> +     }
+>
+> Maybe don't add this one? Usually fixed rate clks come from DT.
+
+Ok, will also move the fixed rate clks from our driver to DT.
 
 Thanks,
-Leo Yan
+Chunyan
+
+>
+> --
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+> a Linux Foundation Collaborative Project
