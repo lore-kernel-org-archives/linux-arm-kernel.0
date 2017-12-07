@@ -1,100 +1,66 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 7 Dec 2017 14:29:49 +0200
-Subject: [PATCH V6 3/7] device property: Introduce a common API to fetch
- device match data
-In-Reply-To: <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <20171207122948.yyl6adb6lnb56gok@valkosipuli.retiisi.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 7 Dec 2017 13:31:36 +0100
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <CAD=FV=VKEz9jvJaD2KTitH=2G+wb42RXHyRVKi4-zrypAu9jSA@mail.gmail.com>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <CA+55aFzy9=RtFRuJhFbF+PL_PCrkZsKtAKrq6WJo1z9eW9gLSA@mail.gmail.com>
+ <20171031165629.GF9463@n2100.armlinux.org.uk>
+ <CA+55aFwDquBXt_EYT3JFoWkeFsZTym5qUXig-DePXXzm07uABw@mail.gmail.com>
+ <CAD=FV=V3n0gjzpL860V6cgf8JVh5pmoL+i0t63Oot19T2afTPw@mail.gmail.com>
+ <20171101092618.GN9463@n2100.armlinux.org.uk>
+ <CAD=FV=VKEz9jvJaD2KTitH=2G+wb42RXHyRVKi4-zrypAu9jSA@mail.gmail.com>
+Message-ID: <20171207123136.GB24547@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+Hi!
 
-Thanks for the update.
-
-Just one small comment below.
-
-On Tue, Dec 05, 2017 at 12:04:48PM -0500, Sinan Kaya wrote:
-> There is an OF/ACPI function to obtain the driver data. We want to hide
-> OF/ACPI details from the device drivers and abstract following the device
-> family of functions.
+> On Wed, Nov 1, 2017 at 2:26 AM, Russell King - ARM Linux
+> <linux@armlinux.org.uk> wrote:
+> > On Tue, Oct 31, 2017 at 05:23:19PM -0700, Doug Anderson wrote:
+> >> Hi,
+> >>
+> >> On Tue, Oct 31, 2017 at 10:45 AM, Linus Torvalds
+> >> <torvalds@linux-foundation.org> wrote:
+> >> > So I'm very much open to udelay improvements, and if somebody sends
+> >> > patches for particular platforms to do particularly well on that
+> >> > platform, I think we should merge them. But ...
+> >>
+> >> If I'm reading this all correctly, this sounds like you'd be willing
+> >> to merge <https://patchwork.kernel.org/patch/9429841/>.  This makes
+> >> udelay() guaranteed not to underrun on arm32 platforms.
+> >
+> > That's a mis-representation again.  It stops a timer-based udelay()
+> > possibly underrunning by one tick if we are close to the start of
+> > a count increment.  However, it does nothing for the loops_per_jiffy
+> > udelay(), which can still underrun.
+> >
+> > My argument against merging that patch is that with it merged, we get
+> > (as you say) a udelay() that doesn't underrun _when using a timer_
+> > but when we end up using the loops_per_jiffy udelay(), we're back to
+> > the old problem.
+> >
+> > My opinion is that's bad, because it encourages people to write drivers
+> > that rely on udelay() having "good" behaviour, which it is not guaranteed
+> > to have.  So, they'll specify a delay period of exactly what they want,
+> > and their drivers will then fail when running on systems that aren't
+> > using a timer-based udelay().
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/base/property.c  | 6 ++++++
->  include/linux/fwnode.h   | 4 ++++
->  include/linux/property.h | 2 ++
->  3 files changed, 12 insertions(+)
+> IMHO the current udelay is broken in an off-by-one way and it's easy
+> to fix.  Intentionally leaving a bug in the code seems silly.  This
+> seems to by what Linus is saying with his statement that "(a) platform
+> code could try to make their udelay/ndelay() be as good as it can be
+> on a particular platform".
 > 
-> diff --git a/drivers/base/property.c b/drivers/base/property.c
-> index 7ed99c1..65bf6f2 100644
-> --- a/drivers/base/property.c
-> +++ b/drivers/base/property.c
-> @@ -1335,3 +1335,9 @@ int fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
->  	return fwnode_call_int_op(fwnode, graph_parse_endpoint, endpoint);
->  }
->  EXPORT_SYMBOL(fwnode_graph_parse_endpoint);
-> +
-> +void *device_get_match_data(struct device *dev)
-> +{
-> +	return fwnode_call_ptr_op(dev_fwnode(dev), get_match_data, dev);
-> +}
-> +EXPORT_SYMBOL_GPL(device_get_match_data);
-> diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
-> index 0c35b6c..ab9aab5 100644
-> --- a/include/linux/fwnode.h
-> +++ b/include/linux/fwnode.h
-> @@ -15,6 +15,7 @@
->  #include <linux/types.h>
->  
->  struct fwnode_operations;
-> +struct device;
->  
->  struct fwnode_handle {
->  	struct fwnode_handle *secondary;
-> @@ -66,6 +67,7 @@ struct fwnode_reference_args {
->   *			       endpoint node.
->   * @graph_get_port_parent: Return the parent node of a port node.
->   * @graph_parse_endpoint: Parse endpoint for port and endpoint id.
-> + * @get_match_data: Return the driver match data.
+> So no matter the rest of the discussions, we should land that.  If you
+> disagree then I'm happy to re-post that patch straight to Linus later
+> this week since it sounds as if he'd take it.
 
-Could you arrange the new get_match_data op closer to the other ops that
-don't deal with the graphs? Such as device_is_available. As the ops are
-dealing generally with fwnodes, I might call this device_get_match_data to
-explicitly mention it's for devices.
+Did this get fixed in any way? Russell having crazy arguments for
+keeping kernel buggy should not be good enough reason to keep the
+bugs...
 
->   */
->  struct fwnode_operations {
->  	void (*get)(struct fwnode_handle *fwnode);
-> @@ -101,6 +103,8 @@ struct fwnode_operations {
->  	(*graph_get_port_parent)(struct fwnode_handle *fwnode);
->  	int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
->  				    struct fwnode_endpoint *endpoint);
-> +	void *(*get_match_data)(const struct fwnode_handle *fwnode,
-> +				struct device *dev);
-
-Same comment about the order here.
-
->  };
->  
->  #define fwnode_has_op(fwnode, op)				\
-> diff --git a/include/linux/property.h b/include/linux/property.h
-> index 6bebee1..01fa55b 100644
-> --- a/include/linux/property.h
-> +++ b/include/linux/property.h
-> @@ -275,6 +275,8 @@ int device_add_properties(struct device *dev,
->  
->  enum dev_dma_attr device_get_dma_attr(struct device *dev);
->  
-> +void *device_get_match_data(struct device *dev);
-> +
->  int device_get_phy_mode(struct device *dev);
->  
->  void *device_get_mac_address(struct device *dev, char *addr, int alen);
-
+									Pavel
 -- 
-Kind regards,
-
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
