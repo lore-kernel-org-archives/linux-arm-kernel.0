@@ -1,126 +1,117 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 11:54:15 +0100
-Subject: [PATCH v7 5/8] KVM: arm/arm64: Support a vgic interrupt line level
- sample function
-In-Reply-To: <20171207105418.22428-1-christoffer.dall@linaro.org>
-References: <20171207105418.22428-1-christoffer.dall@linaro.org>
-Message-ID: <20171207105418.22428-6-christoffer.dall@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 7 Dec 2017 10:54:06 +0000
+Subject: [PATCH v5 08/16] arm64: Add vmap_stack header file
+In-Reply-To: <20171206190142.9246-9-james.morse@arm.com>
+References: <20171206190142.9246-1-james.morse@arm.com>
+ <20171206190142.9246-9-james.morse@arm.com>
+Message-ID: <20171207105405.n2uxzi5dtbw2435e@lakrids.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The GIC sometimes need to sample the physical line of a mapped
-interrupt.  As we know this to be notoriously slow, provide a callback
-function for devices (such as the timer) which can do this much faster
-than talking to the distributor, for example by comparing a few
-in-memory values.  Fall back to the good old method of poking the
-physical GIC if no callback is provided.
+Hi James,
 
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- include/kvm/arm_vgic.h    | 13 ++++++++++++-
- virt/kvm/arm/arch_timer.c |  3 ++-
- virt/kvm/arm/vgic/vgic.c  | 12 +++++++++---
- 3 files changed, 23 insertions(+), 5 deletions(-)
+On Wed, Dec 06, 2017 at 07:01:34PM +0000, James Morse wrote:
+> Today the arm64 arch code allocates an extra IRQ stack per-cpu. If we
+> also have SDEI and VMAP stacks we need two extra per-cpu VMAP stacks.
+> 
+> Move the VMAP stack allocation out to a helper in a new header file.
+> This avoids missing THREADINFO_GFP, or getting the all-important alignment
+> wrong.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
+> Reviewed-by: Catalin Marinas <catalin.marinas@arm.com>
+> ---
+> Changes since v4:
+>  * Added gfp.h include
+> 
+> Changes since v3:
+>  * Added BUILD_BUG() instead of a spooky link error
+> 
+>  arch/arm64/include/asm/vmap_stack.h | 26 ++++++++++++++++++++++++++
+>  arch/arm64/kernel/irq.c             | 13 ++-----------
+>  2 files changed, 28 insertions(+), 11 deletions(-)
+>  create mode 100644 arch/arm64/include/asm/vmap_stack.h
+> 
+> diff --git a/arch/arm64/include/asm/vmap_stack.h b/arch/arm64/include/asm/vmap_stack.h
+> new file mode 100644
+> index 000000000000..5465e4e65987
+> --- /dev/null
+> +++ b/arch/arm64/include/asm/vmap_stack.h
+> @@ -0,0 +1,26 @@
+> +// SPDX-License-Identifier: GPL-2.0
+> +// Copyright (C) 2017 Arm Ltd.
+> +#ifndef __ASM_VMAP_STACK_H
+> +#define __ASM_VMAP_STACK_H
+> +
+> +#include <linux/gfp.h>
+> +#include <linux/vmalloc.h>
+> +#include <asm/memory.h>
+> +#include <asm/pgtable.h>
+> +#include <asm/thread_info.h>
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 8c896540a72c..cdbd142ca7f2 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -130,6 +130,17 @@ struct vgic_irq {
- 	u8 priority;
- 	enum vgic_irq_config config;	/* Level or edge */
- 
-+	/*
-+	 * Callback function pointer to in-kernel devices that can tell us the
-+	 * state of the input level of mapped level-triggered IRQ faster than
-+	 * peaking into the physical GIC.
-+	 *
-+	 * Always called in non-preemptible section and the functions can use
-+	 * kvm_arm_get_running_vcpu() to get the vcpu pointer for private
-+	 * IRQs.
-+	 */
-+	bool (*get_input_level)(int vintid);
-+
- 	void *owner;			/* Opaque pointer to reserve an interrupt
- 					   for in-kernel devices. */
- };
-@@ -331,7 +342,7 @@ void kvm_vgic_init_cpu_hardware(void);
- int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 			bool level, void *owner);
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
--			  u32 vintid);
-+			  u32 vintid, bool (*get_input_level)(int vindid));
- int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
- bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
- 
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index dd5aca05c500..e78ba5e20f74 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -840,7 +840,8 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
- 		return -EINVAL;
- 	}
- 
--	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
-+	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
-+				    NULL);
- 	if (ret)
- 		return ret;
- 
-diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
-index 607cbbc27a1c..eadabb249d2a 100644
---- a/virt/kvm/arm/vgic/vgic.c
-+++ b/virt/kvm/arm/vgic/vgic.c
-@@ -151,6 +151,9 @@ bool vgic_get_phys_line_level(struct vgic_irq *irq)
- 
- 	BUG_ON(!irq->hw);
- 
-+	if (irq->get_input_level)
-+		return irq->get_input_level(irq->intid);
-+
- 	WARN_ON(irq_get_irqchip_state(irq->host_irq,
- 				      IRQCHIP_STATE_PENDING,
- 				      &line_level));
-@@ -436,7 +439,8 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
- 
- /* @irq->irq_lock must be held */
- static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
--			    unsigned int host_irq)
-+			    unsigned int host_irq,
-+			    bool (*get_input_level)(int vindid))
- {
- 	struct irq_desc *desc;
- 	struct irq_data *data;
-@@ -456,6 +460,7 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
- 	irq->hw = true;
- 	irq->host_irq = host_irq;
- 	irq->hwintid = data->hwirq;
-+	irq->get_input_level = get_input_level;
- 	return 0;
- }
- 
-@@ -464,10 +469,11 @@ static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
- {
- 	irq->hw = false;
- 	irq->hwintid = 0;
-+	irq->get_input_level = NULL;
- }
- 
- int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
--			  u32 vintid)
-+			  u32 vintid, bool (*get_input_level)(int vindid))
- {
- 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
- 	unsigned long flags;
-@@ -476,7 +482,7 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
- 	BUG_ON(!irq);
- 
- 	spin_lock_irqsave(&irq->irq_lock, flags);
--	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
-+	ret = kvm_vgic_map_irq(vcpu, irq, host_irq, get_input_level);
- 	spin_unlock_irqrestore(&irq->irq_lock, flags);
- 	vgic_put_irq(vcpu->kvm, irq);
- 
--- 
-2.14.2
+I think we also need:
+
+#include <linux/bug.h>		// for BUILD_BUG_ON()
+#incldue <linux/kconfig.h>	// for IS_ENABLED()
+
+Otherwise, this looks good to me. With those includes folded in:
+
+Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+
+Thanks,
+Mark.
+
+> +
+> +/*
+> + * To ensure that VMAP'd stack overflow detection works correctly, all VMAP'd
+> + * stacks need to have the same alignment.
+> + */
+> +static inline unsigned long *arch_alloc_vmap_stack(size_t stack_size, int node)
+> +{
+> +	BUILD_BUG_ON(!IS_ENABLED(CONFIG_VMAP_STACK));
+> +
+> +	return __vmalloc_node_range(stack_size, THREAD_ALIGN,
+> +				    VMALLOC_START, VMALLOC_END,
+> +				    THREADINFO_GFP, PAGE_KERNEL, 0, node,
+> +				    __builtin_return_address(0));
+> +}
+> +
+> +#endif /* __ASM_VMAP_STACK_H */
+> diff --git a/arch/arm64/kernel/irq.c b/arch/arm64/kernel/irq.c
+> index 713561e5bcab..60e5fc661f74 100644
+> --- a/arch/arm64/kernel/irq.c
+> +++ b/arch/arm64/kernel/irq.c
+> @@ -29,6 +29,7 @@
+>  #include <linux/irqchip.h>
+>  #include <linux/seq_file.h>
+>  #include <linux/vmalloc.h>
+> +#include <asm/vmap_stack.h>
+>  
+>  unsigned long irq_err_count;
+>  
+> @@ -58,17 +59,7 @@ static void init_irq_stacks(void)
+>  	unsigned long *p;
+>  
+>  	for_each_possible_cpu(cpu) {
+> -		/*
+> -		* To ensure that VMAP'd stack overflow detection works
+> -		* correctly, the IRQ stacks need to have the same
+> -		* alignment as other stacks.
+> -		*/
+> -		p = __vmalloc_node_range(IRQ_STACK_SIZE, THREAD_ALIGN,
+> -					 VMALLOC_START, VMALLOC_END,
+> -					 THREADINFO_GFP, PAGE_KERNEL,
+> -					 0, cpu_to_node(cpu),
+> -					 __builtin_return_address(0));
+> -
+> +		p = arch_alloc_vmap_stack(IRQ_STACK_SIZE, cpu_to_node(cpu));
+>  		per_cpu(irq_stack_ptr, cpu) = p;
+>  	}
+>  }
+> -- 
+> 2.15.0
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
