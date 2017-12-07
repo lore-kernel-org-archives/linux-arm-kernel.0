@@ -1,83 +1,23 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu,  7 Dec 2017 15:27:14 +0100
-Subject: [PATCH net-next v2 7/8] net: phy: meson-gxl: add interrupt support
-In-Reply-To: <20171207142715.32578-1-jbrunet@baylibre.com>
-References: <20171207142715.32578-1-jbrunet@baylibre.com>
-Message-ID: <20171207142715.32578-8-jbrunet@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Dec 2017 15:43:48 +0100
+Subject: [PATCH] arm: dts: qcom: fix missing #phy-cells for apq8064
+In-Reply-To: <20171109225422.14280-1-robh@kernel.org>
+References: <20171109225422.14280-1-robh@kernel.org>
+Message-ID: <CAK8P3a3wupYd7XiJrYsFafbmdpiw_zFVd42E8Ucm9oNXtwzWSQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable interrupt support in meson-gxl PHY driver
+On Thu, Nov 9, 2017 at 11:54 PM, Rob Herring <robh@kernel.org> wrote:
+> Fix dtc warnings for missing #phy-cells for apq8064:
+>
+> Warning (phys_property): Missing property '#phy-cells' in node /soc/dsi-phy at 4700200 or bad phandle (referred from /soc/mdss_dsi at 4700000:phys[0])
+> Warning (phys_property): Missing property '#phy-cells' in node /soc/hdmi-phy at 4a00400 or bad phandle (referred from /soc/hdmi-tx at 4a00000:phys[0])
+>
+> Cc: Andy Gross <andy.gross@linaro.org>
+> Cc: David Brown <david.brown@linaro.org>
+> Cc: linux-arm-msm at vger.kernel.org
+> Signed-off-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
----
- drivers/net/phy/meson-gxl.c | 37 ++++++++++++++++++++++++++++++++++++-
- 1 file changed, 36 insertions(+), 1 deletion(-)
+Applied to fixes, thanks!
 
-diff --git a/drivers/net/phy/meson-gxl.c b/drivers/net/phy/meson-gxl.c
-index 5325940fe899..861b021b9758 100644
---- a/drivers/net/phy/meson-gxl.c
-+++ b/drivers/net/phy/meson-gxl.c
-@@ -33,6 +33,14 @@
- #define  TSTCNTL_WRITE_ADDRESS	GENMASK(4, 0)
- #define TSTREAD1	21
- #define TSTWRITE	23
-+#define INTSRC_FLAG	29
-+#define  INTSRC_ANEG_PR		BIT(1)
-+#define  INTSRC_PARALLEL_FAULT	BIT(2)
-+#define  INTSRC_ANEG_LP_ACK	BIT(3)
-+#define  INTSRC_LINK_DOWN	BIT(4)
-+#define  INTSRC_REMOTE_FAULT	BIT(5)
-+#define  INTSRC_ANEG_COMPLETE	BIT(6)
-+#define INTSRC_MASK	30
- 
- #define BANK_ANALOG_DSP		0
- #define BANK_WOL		1
-@@ -193,17 +201,44 @@ int meson_gxl_read_status(struct phy_device *phydev)
- 	return genphy_read_status(phydev);
- }
- 
-+static int meson_gxl_ack_interrupt(struct phy_device *phydev)
-+{
-+	int ret = phy_read(phydev, INTSRC_FLAG);
-+
-+	return ret < 0 ? ret : 0;
-+}
-+
-+static int meson_gxl_config_intr(struct phy_device *phydev)
-+{
-+	u16 val;
-+
-+	if (phydev->interrupts == PHY_INTERRUPT_ENABLED) {
-+		val = INTSRC_ANEG_PR
-+			| INTSRC_PARALLEL_FAULT
-+			| INTSRC_ANEG_LP_ACK
-+			| INTSRC_LINK_DOWN
-+			| INTSRC_REMOTE_FAULT
-+			| INTSRC_ANEG_COMPLETE;
-+	} else {
-+		val = 0;
-+	}
-+
-+	return phy_write(phydev, INTSRC_MASK, val);
-+}
-+
- static struct phy_driver meson_gxl_phy[] = {
- 	{
- 		.phy_id		= 0x01814400,
- 		.phy_id_mask	= 0xfffffff0,
- 		.name		= "Meson GXL Internal PHY",
- 		.features	= PHY_BASIC_FEATURES,
--		.flags		= PHY_IS_INTERNAL,
-+		.flags		= PHY_IS_INTERNAL | PHY_HAS_INTERRUPT,
- 		.config_init	= meson_gxl_config_init,
- 		.config_aneg	= genphy_config_aneg,
- 		.aneg_done      = genphy_aneg_done,
- 		.read_status	= meson_gxl_read_status,
-+		.ack_interrupt	= meson_gxl_ack_interrupt,
-+		.config_intr	= meson_gxl_config_intr,
- 		.suspend        = genphy_suspend,
- 		.resume         = genphy_resume,
- 	},
--- 
-2.14.3
+       Anrd
