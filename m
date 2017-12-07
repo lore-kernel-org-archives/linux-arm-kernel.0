@@ -1,128 +1,55 @@
-From: anarsoul@gmail.com (Vasily Khoruzhick)
-Date: Thu, 7 Dec 2017 14:48:38 -0800
-Subject: [PATCH 2/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
-In-Reply-To: <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-3-anarsoul@gmail.com>
- <CAEKpxBmHhZ+2WNXJEPbQFS6KeKsqRrZeNodRnu1M5yLc15DerA@mail.gmail.com>
- <CA+E=qVd+uM0Aq_=sf+fomQ-m+3Oy0MdG7OPjF5tVagG1UgKYzg@mail.gmail.com>
- <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
-Message-ID: <CA+E=qVdcmPpUT0ddjdwY96ORiU5rQvMsYcfsEhOUsYQyKRgbRA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 7 Dec 2017 17:20:33 -0600
+Subject: [PATCH v3 06/12] dt-bindings: Document the Rockchip ISP1 bindings
+In-Reply-To: <20171206111939.1153-7-jacob-chen@iotwrt.com>
+References: <20171206111939.1153-1-jacob-chen@iotwrt.com>
+ <20171206111939.1153-7-jacob-chen@iotwrt.com>
+Message-ID: <20171207232033.itx4pvdgkyl4a5qp@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 1:21 AM, Code Kipper <codekipper@gmail.com> wrote:
-> On 4 December 2017 at 08:34, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->> I'd keep it sun50i_a64_acodec_i2s, since other 3 I2S modules aren't
->> compatible with this one, but similar to H3.
->
-> Well I wouldn't and the description of it is usage is clearly stated
-> in the devicetree
-> for the dai.
+On Wed, Dec 06, 2017 at 07:19:33PM +0800, Jacob Chen wrote:
+> From: Jacob Chen <jacob2.chen@rock-chips.com>
+> 
+> Add DT bindings documentation for Rockchip ISP1
+> 
+> Signed-off-by: Jacob Chen <jacob2.chen@rock-chips.com>
+> ---
+>  .../devicetree/bindings/media/rockchip-isp1.txt    | 57 ++++++++++++++++++++++
+>  1 file changed, 57 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/rockchip-isp1.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/rockchip-isp1.txt b/Documentation/devicetree/bindings/media/rockchip-isp1.txt
+> new file mode 100644
+> index 000000000000..0971ed94ed69
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/rockchip-isp1.txt
+> @@ -0,0 +1,57 @@
+> +Rockchip SoC Image Signal Processing unit v1
+> +----------------------------------------------
+> +
+> +Rockchip ISP1 is the Camera interface for the Rockchip series of SoCs
+> +which contains image processing, scaling, and compression funcitons.
+> +
+> +Required properties:
+> +  - compatible: value should be one of the following
+> +      "rockchip,rk3288-cif-isp";
+> +      "rockchip,rk3399-cif-isp";
+> +  - reg : offset and length of the register set for the device.
+> +  - interrupts: should contain ISP interrupt.
+> +  - clocks: phandle to the required clocks.
+> +  - clock-names: required clock name.
+> +  - iommus: required a iommu node.
+> +
+> +The device node should contain one 'port' child node with child 'endpoint'
+> +nodes, according to the bindings defined in Documentation/devicetree/bindings/
+> +media/video-interfaces.txt.
+> +
+> +For sensor with a parallel video bus, it could be linked directly to the isp.
+> +For sensor with a MIPI CSI-2 video bus, it should be linked through the
+> +MIPI-DPHY, which is defined in rockchip-mipi-dphy.txt.
 
-OK, how would you name 3 other I2S modules that are present in A64?
+As I mentioned on the last version, you need to list that there are 2 
+endpoints for the port and what their assignment is.
 
->> On Sun, Dec 3, 2017 at 10:42 PM, Code Kipper <codekipper@gmail.com> wrote:
->>> On 3 December 2017 at 21:41, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->>>> From: Marcus Cooper <codekipper@gmail.com>
->>>>
->>>> The I2S block used for the audio codec in the A64 is very similar
->>>> to what is used by the A10(sun4i) devices. However, its TX FIFO is
->>>> located at a different address.
->>>>
->>>> [vasilykh: - added fixed_wss and wss_value to A64 quirks,
->>>>            - changed compatible to 'allwinner,sun50i-a64-acodec-i2s,
->>>>              since A64 has 3 more I2S blocks that are not compatible
->>>>              with audio codec I2S]
-> This needs to be investigated more...I'm suspicious of the
-> SUN8I_I2S_FMT0_LRCK_PERIOD value which is hardcoded to 0x1f.
-> I've made this following change
-> https://github.com/codekipper/linux-sunxi/commit/4c5fe5f5576cfbb2e1e94a99cd19dfdc9403ea50
-> which seems to work for me but I would like to look at it with a logic
-> analyser and test other sample depths.
-> CK
-
-I'm afraid it's not possible to get inside of SoC, since internal I2S
-pins do not go out. And other 3 I2S modules are different from one for
-internal codec.
-
->>>>
->>>> Signed-off-by: Marcus Cooper <codekipper@gmail.com>
->>>> Signed-off-by: Vasily Khoruzhick <anarsoul@gmail.com>
->>>> ---
->>>>  .../devicetree/bindings/sound/sun4i-i2s.txt        |  2 ++
->>>>  sound/soc/sunxi/sun4i-i2s.c                        | 23 ++++++++++++++++++++++
->>>>  2 files changed, 25 insertions(+)
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
->>>> index 05d7135a8d2f..ab86f266962a 100644
->>>> --- a/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
->>>> +++ b/Documentation/devicetree/bindings/sound/sun4i-i2s.txt
->>>> @@ -9,6 +9,7 @@ Required properties:
->>>>     - "allwinner,sun4i-a10-i2s"
->>>>     - "allwinner,sun6i-a31-i2s"
->>>>     - "allwinner,sun8i-h3-i2s"
->>>> +   - "allwinner,sun50i-a64-acodec-i2s"
->>>>  - reg: physical base address of the controller and length of memory mapped
->>>>    region.
->>>>  - interrupts: should contain the I2S interrupt.
->>>> @@ -24,6 +25,7 @@ Required properties:
->>>>  Required properties for the following compatibles:
->>>>         - "allwinner,sun6i-a31-i2s"
->>>>         - "allwinner,sun8i-h3-i2s"
->>>> +       - "allwinner,sun50i-a64-acodec-i2s"
->>> I would keep the compatible format the same. ie.
->>> allwinner,sun50i-a64-i2s. The A33 for example uses the sun6i-a31-i2s
->>> for it's dai.
->>>
->>>>  - resets: phandle to the reset line for this codec
->>>>
->>>>  Example:
->>>> diff --git a/sound/soc/sunxi/sun4i-i2s.c b/sound/soc/sunxi/sun4i-i2s.c
->>>> index 54c16eb64713..2c060e015725 100644
->>>> --- a/sound/soc/sunxi/sun4i-i2s.c
->>>> +++ b/sound/soc/sunxi/sun4i-i2s.c
->>>> @@ -942,6 +942,25 @@ static const struct sun4i_i2s_quirks sun8i_h3_i2s_quirks = {
->>>>         .field_rxchansel        = REG_FIELD(SUN8I_I2S_RX_CHAN_SEL_REG, 0, 2),
->>>>  };
->>>>
->>>> +static const struct sun4i_i2s_quirks sun50i_a64_acodec_i2s_quirks = {
->>> ditto
->>>> +       .has_reset              = true,
->>>> +       .reg_offset_txdata      = SUN8I_I2S_FIFO_TX_REG,
->>>> +       .sun4i_i2s_regmap       = &sun4i_i2s_regmap_config,
->>>> +       .has_slave_select_bit   = true,
->>>> +       .fixed_wss              = true,
->>>> +       .wss_value              = 3,
->>>> +       .field_clkdiv_mclk_en   = REG_FIELD(SUN4I_I2S_CLK_DIV_REG, 7, 7),
->>>> +       .field_fmt_wss          = REG_FIELD(SUN4I_I2S_FMT0_REG, 2, 3),
->>>> +       .field_fmt_sr           = REG_FIELD(SUN4I_I2S_FMT0_REG, 4, 5),
->>>> +       .field_fmt_bclk         = REG_FIELD(SUN4I_I2S_FMT0_REG, 6, 6),
->>>> +       .field_fmt_lrclk        = REG_FIELD(SUN4I_I2S_FMT0_REG, 7, 7),
->>>> +       .field_fmt_mode         = REG_FIELD(SUN4I_I2S_FMT0_REG, 0, 1),
->>>> +       .field_txchanmap        = REG_FIELD(SUN4I_I2S_TX_CHAN_MAP_REG, 0, 31),
->>>> +       .field_rxchanmap        = REG_FIELD(SUN4I_I2S_RX_CHAN_MAP_REG, 0, 31),
->>>> +       .field_txchansel        = REG_FIELD(SUN4I_I2S_TX_CHAN_SEL_REG, 0, 2),
->>>> +       .field_rxchansel        = REG_FIELD(SUN4I_I2S_RX_CHAN_SEL_REG, 0, 2),
->>>> +};
->>>> +
->>>>  static int sun4i_i2s_init_regmap_fields(struct device *dev,
->>>>                                         struct sun4i_i2s *i2s)
->>>>  {
->>>> @@ -1146,6 +1165,10 @@ static const struct of_device_id sun4i_i2s_match[] = {
->>>>                 .compatible = "allwinner,sun8i-h3-i2s",
->>>>                 .data = &sun8i_h3_i2s_quirks,
->>>>         },
->>>> +       {
->>>> +               .compatible = "allwinner,sun50i-a64-acodec-i2s",
->>>> +               .data = &sun50i_a64_acodec_i2s_quirks,
->>> ditto
->>> BR,
->>> CK
->>>> +       },
->>>>         {}
->>>>  };
->>>>  MODULE_DEVICE_TABLE(of, sun4i_i2s_match);
->>>> --
->>>> 2.15.0
->>>>
+Rob
