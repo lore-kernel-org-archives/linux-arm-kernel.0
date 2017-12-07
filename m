@@ -1,30 +1,53 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Thu, 7 Dec 2017 11:52:29 +0100
-Subject: [PATCH] i2c: stm32: Fixes multibyte transfer for STM32F4 I2C
- controller
-In-Reply-To: <CAFvLkMTsgxpjoGRgq7J0NFkT=YsOTYL6smkVhOPcfD=26Hzutg@mail.gmail.com>
-References: <1507722788-31224-1-git-send-email-radoslaw.pietrzyk@gmail.com>
- <990c3275-35b3-68da-453c-d1a80e867df7@st.com>
- <CAFvLkMS6+o3D88Rj23of56KtjonwFAVD_aEP3eWaA2H=U5WP4Q@mail.gmail.com>
- <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
- <CAFvLkMS9Q801biCBYp+fJeiOo22zr436Td43PH3GG8E6diSL3A@mail.gmail.com>
- <b24d9699-a88d-6a83-ceaf-140ea8b4db97@st.com>
- <CAFvLkMTsgxpjoGRgq7J0NFkT=YsOTYL6smkVhOPcfD=26Hzutg@mail.gmail.com>
-Message-ID: <20171207105229.jxxyfofsgub27nip@ninjato>
+From: jinb.park7@gmail.com (Jinbum Park)
+Date: Thu, 7 Dec 2017 19:52:29 +0900
+Subject: [kernel-hardening][PATCH v5 0/3] arm: Makes ptdump resuable and add
+ WX page checking
+Message-ID: <20171207105229.GA10046@pjb1027-Latitude-E5410>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 24, 2017 at 01:45:43PM +0200, Rados?aw Pietrzyk wrote:
-> I'm afraid that didn't help and the problem still exists even with
-> those patches applied.
+Hi,
 
-So, my reading is: There is an issue which needs to be investigated?
-Does applying the patch make sense until the issue is fully understood?
+Page table dumping code for arm64-x86 is reusable,
+and they have function for WX page checking.
+But arm doesn't have that.
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/c3624399/attachment.sig>
+This path series are to makes ptdump reusable,
+and add WX page checking for arm.
+This is heavily based on arm64 version.
+
+v2 :
+Fix a sender name of mail header, there was an mistake.
+(from "jinb.park" to Jinbum Park)
+Contents of patch-set are perfectly same.
+
+v3 :
+Take advantage of the existing pg_level and bits arrays
+to check ro, nx prot.
+
+v4 :
+Add boolean for ro_bit, nx_bit into prot_bits
+to point ro_bit, nx_bit in pg_level.
+This change is suggested by Laura Abbott.
+
+v5 : 
+No changes of code.
+Just add Tested-by, Reviewed-by from Laura Abbott.
+
+jinb.park (3):
+  arm: mm: dump: make page table dumping reusable
+  arm: mm: dump: make the page table dumping seq_file optional
+  arm: mm: dump: add checking for writable and executable pages
+
+ arch/arm/Kconfig.debug        |  33 ++++++++-
+ arch/arm/include/asm/ptdump.h |  56 ++++++++++++++++
+ arch/arm/mm/Makefile          |   3 +-
+ arch/arm/mm/dump.c            | 151 +++++++++++++++++++++++++++++-------------
+ arch/arm/mm/init.c            |   2 +
+ arch/arm/mm/ptdump_debugfs.c  |  34 ++++++++++
+ 6 files changed, 232 insertions(+), 47 deletions(-)
+ create mode 100644 arch/arm/include/asm/ptdump.h
+ create mode 100644 arch/arm/mm/ptdump_debugfs.c
+
+-- 
+1.9.1
