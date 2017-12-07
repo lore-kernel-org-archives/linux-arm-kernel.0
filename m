@@ -1,96 +1,146 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 07 Dec 2017 18:14:22 +0100
-Subject: [PATCH v2 0/7] Add CPU Frequency scaling support on Armada 37xx
-In-Reply-To: <20171207135616.23670-1-gregory.clement@free-electrons.com>
-References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
-Message-ID: <88999738.5axjmjKUcc@aspire.rjw.lan>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu,  7 Dec 2017 18:06:22 +0100
+Subject: [PATCH v2 28/36] KVM: arm64: Configure FPSIMD traps on vcpu load/put
+ for VHE
+In-Reply-To: <20171207170630.592-1-christoffer.dall@linaro.org>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+Message-ID: <20171207170630.592-29-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, December 7, 2017 2:56:09 PM CET Gregory CLEMENT wrote:
-> Hi,
-> 
-> This is the second version of a series adding the CPU Frequency
-> support on Armada 37xx using DVFS. It is based on the initial work of
-> Evan Wang and Victor Gu.
-> 
-> The main change since the first version was a bug fixed in the
-> "cpufreq: Add DVFS support for Armada 37xx" patch which was preventing
-> to register the opp. An other noticeable change is the 4th patch which
-> is new adding the use of dev_pm_opp_remove and removing an comment
-> became wrong. The other changes are described in the change log.
-> 
-> DVFS control is done by a set of registers from the North Bridge Power
-> Management block. The binding for this block is documented in patch 1.
-> 
-> While adding a new cpufreq driver I found that the Kconfig and
-> Makefile were no more in order, so it is fixed by patch 2 and 3.
-> 
-> The 5th patch is just about updating the MAINTAINERS file with the new
-> driver.
-> 
-> The next patch is the real purpose of the series. The main goal of
-> this driver is to setup the CPU load level in the hardware to
-> associate them to CPU frequencies and register a standard cpufreq
-> driver. Note that the hardware also capable of doing AVS (Adaptive
-> Voltage Scaling), by associating a voltage on each level beside the
-> CPU frequency. However, this support is not yet ready, so it is not
-> part of this series.
-> 
-> Finally, the last patch is for arm-soc the arm-soc subsystem through
-> mvebu and update the device tree to support the CPU frequency scaling.
-> 
-> An update on the CPU clock driver is needed in order to take into
-> account the DVFS setting. It's the purpose of an other series already
-> sent, but is no dependencies between the series (for building or at
-> runtime).
-> 
-> Thanks,
-> 
-> Gregory
-> 
-> Changelog:
-> 
-> v1 -> v2:
-> 
->  - using syscon instead of nb_pm for the binding of the North bridge
->    power management unit: reported by Rob Herring
-> 
->  - fix sorting inside the big LITTLE section for the Kconfig: reported
->    by Viresh Kumar
-> 
->  - fix the bogus freq calculation in armada37xx_cpufreq_driver_init,
->    bug reported by Andre Heider
-> 
->  - use dev_pm_opp_remove() on the previous opp if dev_pm_opp_add()
->    failed, reported by Viresh Kumar
-> 
->  - add the Tested-by flag from Andre Heider on "cpufreq: Add DVFS
->    support for Armada 37xx" patch
-> 
-> Gregory CLEMENT (7):
->   dt-bindings: marvell: Add documentation for the North Bridge PM on
->     Armada 37xx
->   cpufreq: ARM: sort the Kconfig menu
->   cpufreq: sort the drivers in ARM part
->   cpufreq: mvebu: Use dev_pm_opp_remove()
->   MAINTAINERS: add new entries for Armada 37xx cpufreq driver
->   cpufreq: Add DVFS support for Armada 37xx
->   arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
-> 
->  .../bindings/arm/marvell/armada-37xx.txt           |  19 ++
->  MAINTAINERS                                        |   1 +
->  arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   1 +
->  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   7 +
->  drivers/cpufreq/Kconfig.arm                        |  89 ++++----
->  drivers/cpufreq/Makefile                           |   9 +-
->  drivers/cpufreq/armada-37xx-cpufreq.c              | 241 +++++++++++++++++++++
->  drivers/cpufreq/mvebu-cpufreq.c                    |  11 +-
->  8 files changed, 327 insertions(+), 51 deletions(-)
->  create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
+There is no need to enable/disable traps to FP registers on every switch
+to/from the VM, because the host kernel does not use this resource
+without calling vcpu_put.  We can therefore move things around enough
+that we still always write FPEXC32_EL2 before programming CPTR_EL2 but
+only program these during vcpu load/put.
 
-I'd like you to split patches [2-3/7] off this series as they aren't
-exactly related to the other changes in it.
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/include/asm/kvm_hyp.h |  3 +++
+ arch/arm64/kvm/hyp/switch.c      | 34 ++++++++++++++++++++++++----------
+ arch/arm64/kvm/hyp/sysreg-sr.c   |  4 ++++
+ 3 files changed, 31 insertions(+), 10 deletions(-)
 
-Thanks,
-Rafael
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 3f54c55f77a1..28d5f3cb4001 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -148,6 +148,9 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+ void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+ bool __fpsimd_enabled(void);
+ 
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu);
++void deactivate_traps_vhe_put(void);
++
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+ void __noreturn __hyp_do_panic(unsigned long, ...);
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index c01bcfc3fb52..44aae69a7fec 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -24,22 +24,25 @@
+ #include <asm/fpsimd.h>
+ #include <asm/debug-monitors.h>
+ 
+-static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
++static void __hyp_text __activate_traps_fpsimd32(struct kvm_vcpu *vcpu)
+ {
+ 	/*
+-	 * We are about to set CPTR_EL2.TFP to trap all floating point
+-	 * register accesses to EL2, however, the ARM ARM clearly states that
+-	 * traps are only taken to EL2 if the operation would not otherwise
+-	 * trap to EL1.  Therefore, always make sure that for 32-bit guests,
+-	 * we set FPEXC.EN to prevent traps to EL1, when setting the TFP bit.
+-	 * If FP/ASIMD is not implemented, FPEXC is UNDEFINED and any access to
+-	 * it will cause an exception.
++	 * We are about to trap all floating point register accesses to EL2,
++	 * however, traps are only taken to EL2 if the operation would not
++	 * otherwise trap to EL1.  Therefore, always make sure that for 32-bit
++	 * guests, we set FPEXC.EN to prevent traps to EL1, when setting the
++	 * TFP bit.  If FP/ASIMD is not implemented, FPEXC is UNDEFINED and
++	 * any access to it will cause an exception.
+ 	 */
+ 	if (vcpu_el1_is_32bit(vcpu) && system_supports_fpsimd() &&
+ 	    !vcpu->arch.guest_vfp_loaded) {
+ 		write_sysreg(1 << 30, fpexc32_el2);
+ 		isb();
+ 	}
++}
++
++static void __hyp_text __activate_traps_common(struct kvm_vcpu *vcpu)
++{
+ 	write_sysreg(vcpu->arch.hcr_el2, hcr_el2);
+ 
+ 	/* Trap on AArch32 cp15 c15 (impdef sysregs) accesses (EL1 or EL0) */
+@@ -61,10 +64,12 @@ static void __hyp_text __deactivate_traps_common(void)
+ 	write_sysreg(0, pmuserenr_el0);
+ }
+ 
+-static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++void activate_traps_vhe_load(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
++	__activate_traps_fpsimd32(vcpu);
++
+ 	val = read_sysreg(cpacr_el1);
+ 	val |= CPACR_EL1_TTA;
+ 	val &= ~CPACR_EL1_ZEN;
+@@ -73,7 +78,15 @@ static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
+ 	else
+ 		val &= ~CPACR_EL1_FPEN;
+ 	write_sysreg(val, cpacr_el1);
++}
+ 
++void deactivate_traps_vhe_put(void)
++{
++	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
++}
++
++static void __hyp_text __activate_traps_vhe(struct kvm_vcpu *vcpu)
++{
+ 	write_sysreg(__kvm_hyp_vector, vbar_el1);
+ }
+ 
+@@ -81,6 +94,8 @@ static void __hyp_text __activate_traps_nvhe(struct kvm_vcpu *vcpu)
+ {
+ 	u64 val;
+ 
++	__activate_traps_fpsimd32(vcpu);
++
+ 	val = CPTR_EL2_DEFAULT;
+ 	val |= CPTR_EL2_TTA | CPTR_EL2_TZ;
+ 	if (vcpu->arch.guest_vfp_loaded)
+@@ -111,7 +126,6 @@ static void __hyp_text __deactivate_traps_vhe(void)
+ 
+ 	write_sysreg(mdcr_el2, mdcr_el2);
+ 	write_sysreg(HCR_HOST_VHE_FLAGS, hcr_el2);
+-	write_sysreg(CPACR_EL1_DEFAULT, cpacr_el1);
+ 	write_sysreg(vectors, vbar_el1);
+ }
+ 
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
+index 65abf1aeba59..b647fea93fdc 100644
+--- a/arch/arm64/kvm/hyp/sysreg-sr.c
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -254,6 +254,8 @@ void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
+ 	__sysreg_restore_el1_state(guest_ctxt);
+ 
+ 	vcpu->arch.sysregs_loaded_on_cpu = true;
++
++	activate_traps_vhe_load(vcpu);
+ }
+ 
+ /**
+@@ -286,6 +288,8 @@ void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
+ 	if (!has_vhe())
+ 		return;
+ 
++	deactivate_traps_vhe_put();
++
+ 	__sysreg_save_el1_state(guest_ctxt);
+ 	__sysreg_save_user_state(guest_ctxt);
+ 	__sysreg32_save_state(vcpu);
+-- 
+2.14.2
