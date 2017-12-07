@@ -1,96 +1,67 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Thu, 7 Dec 2017 11:11:31 +0100
-Subject: [PATCH] mfd: stm32: Adopt SPDX identifier
-In-Reply-To: <20171205145809.20514-1-benjamin.gaignard@st.com>
-References: <20171205145809.20514-1-benjamin.gaignard@st.com>
-Message-ID: <CAOFm3uHNpE0TMhjdm5gLjOUOc7zivx1Swzg=CniXG5GKmQuCjQ@mail.gmail.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  7 Dec 2017 10:53:43 +0100
+Subject: [PATCH 40/54] arm64: dts: renesas: r8a77995: Add CAN support
+In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
+References: <cover.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <acaa51a35828d1188e1917d08a3c8c0447d3109b.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 3:58 PM, Benjamin Gaignard
-<benjamin.gaignard@linaro.org> wrote:
-> Add SPDX identifier
->
-> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
-> ---
->  drivers/mfd/stm32-lptimer.c       | 2 +-
->  drivers/mfd/stm32-timers.c        | 2 +-
->  include/linux/mfd/stm32-lptimer.h | 2 +-
->  include/linux/mfd/stm32-timers.h  | 2 +-
->  4 files changed, 4 insertions(+), 4 deletions(-)
->
-> diff --git a/drivers/mfd/stm32-lptimer.c b/drivers/mfd/stm32-lptimer.c
-> index 075330a25f61..2606e340c9f7 100644
-> --- a/drivers/mfd/stm32-lptimer.c
-> +++ b/drivers/mfd/stm32-lptimer.c
-> @@ -1,3 +1,4 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * STM32 Low-Power Timer parent driver.
->   *
-> @@ -7,7 +8,6 @@
->   *
->   * Inspired by Benjamin Gaignard's stm32-timers driver
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
->   */
->
->  #include <linux/mfd/stm32-lptimer.h>
-> diff --git a/drivers/mfd/stm32-timers.c b/drivers/mfd/stm32-timers.c
-> index a6675a449409..250c4c4411cd 100644
-> --- a/drivers/mfd/stm32-timers.c
-> +++ b/drivers/mfd/stm32-timers.c
-> @@ -1,9 +1,9 @@
-> +// SPDX-License-Identifier: GPL-2.0
->  /*
->   * Copyright (C) STMicroelectronics 2016
->   *
->   * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
->   */
->
->  #include <linux/mfd/stm32-timers.h>
-> diff --git a/include/linux/mfd/stm32-lptimer.h b/include/linux/mfd/stm32-lptimer.h
-> index 77c7cf40d9b4..e5a2cc8aea56 100644
-> --- a/include/linux/mfd/stm32-lptimer.h
-> +++ b/include/linux/mfd/stm32-lptimer.h
-> @@ -1,3 +1,4 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
->  /*
->   * STM32 Low-Power Timer parent driver.
->   *
-> @@ -7,7 +8,6 @@
->   *
->   * Inspired by Benjamin Gaignard's stm32-timers driver
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
->   */
->
->  #ifndef _LINUX_STM32_LPTIMER_H_
-> diff --git a/include/linux/mfd/stm32-timers.h b/include/linux/mfd/stm32-timers.h
-> index ce7346e7f77a..13ffe2696e4b 100644
-> --- a/include/linux/mfd/stm32-timers.h
-> +++ b/include/linux/mfd/stm32-timers.h
-> @@ -1,9 +1,9 @@
-> +/* SPDX-License-Identifier: GPL-2.0 */
->  /*
->   * Copyright (C) STMicroelectronics 2016
->   *
->   * Author: Benjamin Gaignard <benjamin.gaignard@st.com>
->   *
-> - * License terms:  GNU General Public License (GPL), version 2
->   */
->
->  #ifndef _LINUX_STM32_GPTIMER_H_
-> --
-> 2.15.0
->
+From: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 
-Thank you for using the simpler SPDX license ids!
+Adds CAN controller nodes for r8a77995.
 
-Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+Based on a patch for r8a7796 by Chris Paterson.
 
+Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+ arch/arm64/boot/dts/renesas/r8a77995.dtsi | 32 +++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a77995.dtsi b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+index 0f78592d993c..b2c8db15db53 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77995.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77995.dtsi
+@@ -346,6 +346,38 @@
+ 			resets = <&cpg 906>;
+ 		};
+ 
++		can0: can at e6c30000 {
++			compatible = "renesas,can-r8a77995",
++				     "renesas,rcar-gen3-can";
++			reg = <0 0xe6c30000 0 0x1000>;
++			interrupts = <GIC_SPI 186 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 916>,
++			       <&cpg CPG_CORE R8A77995_CLK_CANFD>,
++			       <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			assigned-clocks = <&cpg CPG_CORE R8A77995_CLK_CANFD>;
++			assigned-clock-rates = <40000000>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 916>;
++			status = "disabled";
++		};
++
++		can1: can at e6c38000 {
++			compatible = "renesas,can-r8a77995",
++				     "renesas,rcar-gen3-can";
++			reg = <0 0xe6c38000 0 0x1000>;
++			interrupts = <GIC_SPI 187 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cpg CPG_MOD 915>,
++			       <&cpg CPG_CORE R8A77995_CLK_CANFD>,
++			       <&can_clk>;
++			clock-names = "clkp1", "clkp2", "can_clk";
++			assigned-clocks = <&cpg CPG_CORE R8A77995_CLK_CANFD>;
++			assigned-clock-rates = <40000000>;
++			power-domains = <&sysc R8A77995_PD_ALWAYS_ON>;
++			resets = <&cpg 915>;
++			status = "disabled";
++		};
++
+ 		avb: ethernet at e6800000 {
+ 			compatible = "renesas,etheravb-r8a77995",
+ 				     "renesas,etheravb-rcar-gen3";
 -- 
-Cordially
-Philippe Ombredanne
+2.11.0
