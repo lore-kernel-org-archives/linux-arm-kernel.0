@@ -1,67 +1,89 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 18:06:10 +0100
-Subject: [PATCH v2 16/36] KVM: arm64: Rewrite sysreg alternatives to static
- keys
+Date: Thu,  7 Dec 2017 18:06:15 +0100
+Subject: [PATCH v2 21/36] KVM: arm64: Change 32-bit handling of VM system
+ registers
 In-Reply-To: <20171207170630.592-1-christoffer.dall@linaro.org>
 References: <20171207170630.592-1-christoffer.dall@linaro.org>
-Message-ID: <20171207170630.592-17-christoffer.dall@linaro.org>
+Message-ID: <20171207170630.592-22-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to move calls around in the sysreg save/restore logic,
-let's first rewrite the alternative function callers, because it is
-going to make the next patches much easier to read.
+We currently handle 32-bit accesses to trapped VM system registers using
+the 32-bit index into the coproc array on the vcpu structure, which is a
+union of the coproc array and the sysreg array.
 
+Since all the 32-bit coproc indicies are created to correspond to the
+architectural mapping between 64-bit system registers and 32-bit
+coprocessor registers, and because the AArch64 system registers are the
+double in size of the AArch32 coprocessor registers, we can always find
+the system register entry that we must update by dividing the 32-bit
+coproc index by 2.
+
+This is going to make our lives much easier when we have to start
+accessing system registers that use deferred save/restore and might
+have to be read directly from the physical CPU.
+
+Reviewed-by: Andrew Jones <drjones@redhat.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm64/kvm/hyp/sysreg-sr.c | 17 ++++-------------
- 1 file changed, 4 insertions(+), 13 deletions(-)
+ arch/arm64/include/asm/kvm_host.h |  8 --------
+ arch/arm64/kvm/sys_regs.c         | 20 +++++++++++++++-----
+ 2 files changed, 15 insertions(+), 13 deletions(-)
 
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index bbfb4d01af88..e747f2fd31be 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -22,9 +22,6 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_hyp.h>
+diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
+index c841eeeeb5c5..de0d55b30b61 100644
+--- a/arch/arm64/include/asm/kvm_host.h
++++ b/arch/arm64/include/asm/kvm_host.h
+@@ -290,14 +290,6 @@ struct kvm_vcpu_arch {
+ #define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
+ #define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
  
--/* Yes, this does nothing, on purpose */
--static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
+-#ifdef CONFIG_CPU_BIG_ENDIAN
+-#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r))
+-#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r) + 1)
+-#else
+-#define vcpu_cp15_64_high(v,r)	vcpu_cp15((v),(r) + 1)
+-#define vcpu_cp15_64_low(v,r)	vcpu_cp15((v),(r))
+-#endif
 -
- /*
-  * Non-VHE: Both host and guest must save everything.
-  *
-@@ -78,13 +75,10 @@ static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
- 	ctxt->gp_regs.regs.pstate	= read_sysreg_el2(spsr);
- }
- 
--static hyp_alternate_select(__sysreg_call_save_host_state,
--			    __sysreg_save_el1_state, __sysreg_do_nothing,
--			    ARM64_HAS_VIRT_HOST_EXTN);
--
- void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
+ struct kvm_vm_stat {
+ 	ulong remote_tlb_flush;
+ };
+diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
+index 1830ebc227d1..62c12ab9e6c4 100644
+--- a/arch/arm64/kvm/sys_regs.c
++++ b/arch/arm64/kvm/sys_regs.c
+@@ -121,16 +121,26 @@ static bool access_vm_reg(struct kvm_vcpu *vcpu,
+ 			  const struct sys_reg_desc *r)
  {
--	__sysreg_call_save_host_state()(ctxt);
-+	if (!has_vhe())
-+		__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
- 	__sysreg_save_user_state(ctxt);
- }
-@@ -142,13 +136,10 @@ static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
- 	write_sysreg_el2(ctxt->gp_regs.regs.pstate,	spsr);
- }
+ 	bool was_enabled = vcpu_has_cache_enabled(vcpu);
++	u64 val;
++	int reg = r->reg;
  
--static hyp_alternate_select(__sysreg_call_restore_host_state,
--			    __sysreg_restore_el1_state, __sysreg_do_nothing,
--			    ARM64_HAS_VIRT_HOST_EXTN);
--
- void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
- {
--	__sysreg_call_restore_host_state()(ctxt);
-+	if (!has_vhe())
-+		__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
- 	__sysreg_restore_user_state(ctxt);
- }
+ 	BUG_ON(!p->is_write);
+ 
+-	if (!p->is_aarch32) {
+-		vcpu_sys_reg(vcpu, r->reg) = p->regval;
++	/* See the 32bit mapping in kvm_host.h */
++	if (p->is_aarch32)
++		reg = r->reg / 2;
++
++	if (!p->is_aarch32 || !p->is_32bit) {
++		val = p->regval;
+ 	} else {
+-		if (!p->is_32bit)
+-			vcpu_cp15_64_high(vcpu, r->reg) = upper_32_bits(p->regval);
+-		vcpu_cp15_64_low(vcpu, r->reg) = lower_32_bits(p->regval);
++		val = vcpu_sys_reg(vcpu, reg);
++		if (r->reg % 2)
++			val = (p->regval << 32) | (u64)lower_32_bits(val);
++		else
++			val = ((u64)upper_32_bits(val) << 32) |
++				(u64)lower_32_bits(p->regval);
+ 	}
++	vcpu_sys_reg(vcpu, reg) = val;
+ 
+ 	kvm_toggle_cache(vcpu, was_enabled);
+ 	return true;
 -- 
 2.14.2
