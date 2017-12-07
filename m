@@ -1,88 +1,85 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  7 Dec 2017 16:58:52 +0100
-Subject: [PATCH v4 07/15] drm/sun4i: Create minimal multipliers and dividers
+Date: Thu,  7 Dec 2017 16:58:54 +0100
+Subject: [PATCH v4 09/15] drm/sun4i: Add A83T support
 In-Reply-To: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <4f8708474fdd6e6e6c8452042e1ce70fc4cb5fa8.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <e508e91fa0683d30c3e98d37795a1f003c8c3e0c.1512662253.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The various outputs the TCON can provide have different constraints on the
-dotclock divider. Let's make them configurable by the various mode_set
-functions.
+Add support for the A83T display pipeline.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_dotclock.c | 10 +++++++---
- drivers/gpu/drm/sun4i/sun4i_tcon.c     |  2 ++
- drivers/gpu/drm/sun4i/sun4i_tcon.h     |  2 ++
- 3 files changed, 11 insertions(+), 3 deletions(-)
+ drivers/gpu/drm/sun4i/sun4i_drv.c   |  1 +
+ drivers/gpu/drm/sun4i/sun4i_tcon.c  |  5 +++++
+ drivers/gpu/drm/sun4i/sun8i_mixer.c | 11 +++++++++++
+ 3 files changed, 17 insertions(+)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_dotclock.c b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-index d401156490f3..023f39bda633 100644
---- a/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_dotclock.c
-@@ -17,8 +17,9 @@
- #include "sun4i_dotclock.h"
- 
- struct sun4i_dclk {
--	struct clk_hw	hw;
--	struct regmap	*regmap;
-+	struct clk_hw		hw;
-+	struct regmap		*regmap;
-+	struct sun4i_tcon	*tcon;
+diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
+index 49215d91c853..6f5e721b545e 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_drv.c
++++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+@@ -347,6 +347,7 @@ static const struct of_device_id sun4i_drv_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31s-display-engine" },
+ 	{ .compatible = "allwinner,sun7i-a20-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-a33-display-engine" },
++	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
+ 	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+ 	{ }
  };
- 
- static inline struct sun4i_dclk *hw_to_dclk(struct clk_hw *hw)
-@@ -73,11 +74,13 @@ static unsigned long sun4i_dclk_recalc_rate(struct clk_hw *hw,
- static long sun4i_dclk_round_rate(struct clk_hw *hw, unsigned long rate,
- 				  unsigned long *parent_rate)
- {
-+	struct sun4i_dclk *dclk = hw_to_dclk(hw);
-+	struct sun4i_tcon *tcon = dclk->tcon;
- 	unsigned long best_parent = 0;
- 	u8 best_div = 1;
- 	int i;
- 
--	for (i = 6; i <= 127; i++) {
-+	for (i = tcon->dclk_min_div; i <= tcon->dclk_max_div; i++) {
- 		unsigned long ideal = rate * i;
- 		unsigned long rounded;
- 
-@@ -167,6 +170,7 @@ int sun4i_dclk_create(struct device *dev, struct sun4i_tcon *tcon)
- 	dclk = devm_kzalloc(dev, sizeof(*dclk), GFP_KERNEL);
- 	if (!dclk)
- 		return -ENOMEM;
-+	dclk->tcon = tcon;
- 
- 	init.name = clk_name;
- 	init.ops = &sun4i_dclk_ops;
 diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-index ea056a3d2131..46e28ca1f676 100644
+index 777c7348d0cf..a0f651d2a495 100644
 --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
 +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
-@@ -177,6 +177,8 @@ static void sun4i_tcon0_mode_set_rgb(struct sun4i_tcon *tcon,
- 	u8 clk_delay;
- 	u32 val = 0;
+@@ -1136,6 +1136,10 @@ static const struct sun4i_tcon_quirks sun8i_a33_quirks = {
+ 	.has_lvds_pll		= true,
+ };
  
-+	tcon->dclk_min_div = 6;
-+	tcon->dclk_max_div = 127;
- 	sun4i_tcon0_mode_set_common(tcon, mode);
++static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
++	/* nothing is supported */
++};
++
+ static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
+ 	/* nothing is supported */
+ };
+@@ -1148,6 +1152,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
+ 	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = &sun6i_a31s_quirks },
+ 	{ .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks },
+ 	{ .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks },
++	{ .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data = &sun8i_a83t_lcd_quirks },
+ 	{ .compatible = "allwinner,sun8i-v3s-tcon", .data = &sun8i_v3s_quirks },
+ 	{ }
+ };
+diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+index ff235e3228ce..1c963b5af522 100644
+--- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
++++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+@@ -477,6 +477,13 @@ static int sun8i_mixer_remove(struct platform_device *pdev)
+ 	return 0;
+ }
  
- 	/* Adjust clock delay */
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.h b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-index 839266a38505..bd3ad7684870 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tcon.h
-+++ b/drivers/gpu/drm/sun4i/sun4i_tcon.h
-@@ -169,6 +169,8 @@ struct sun4i_tcon {
++static const struct sun8i_mixer_cfg sun8i_a83t_mixer0_cfg = {
++	.ccsc		= 0,
++	.scaler_mask	= 0xf,
++	.ui_num		= 3,
++	.vi_num		= 1,
++};
++
+ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
+ 	.vi_num = 2,
+ 	.ui_num = 1,
+@@ -487,6 +494,10 @@ static const struct sun8i_mixer_cfg sun8i_v3s_mixer_cfg = {
  
- 	/* Pixel clock */
- 	struct clk			*dclk;
-+	u8				dclk_max_div;
-+	u8				dclk_min_div;
- 
- 	/* Reset control */
- 	struct reset_control		*lcd_rst;
+ static const struct of_device_id sun8i_mixer_of_table[] = {
+ 	{
++		.compatible = "allwinner,sun8i-a83t-de2-mixer-0",
++		.data = &sun8i_a83t_mixer0_cfg,
++	},
++	{
+ 		.compatible = "allwinner,sun8i-v3s-de2-mixer",
+ 		.data = &sun8i_v3s_mixer_cfg,
+ 	},
 -- 
 git-series 0.9.1
