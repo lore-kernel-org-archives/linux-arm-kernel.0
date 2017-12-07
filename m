@@ -1,142 +1,309 @@
-From: prarit@redhat.com (Prarit Bhargava)
-Date: Thu,  7 Dec 2017 12:29:12 -0500
-Subject: [PATCH 2/2] acpi, x86: Use SPCR table for earlycon on x86
-In-Reply-To: <20171207172912.17868-1-prarit@redhat.com>
-References: <20171207172912.17868-1-prarit@redhat.com>
-Message-ID: <20171207172912.17868-3-prarit@redhat.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Thu,  7 Dec 2017 18:06:29 +0100
+Subject: [PATCH v2 35/36] KVM: arm/arm64: Move VGIC APR save/restore to vgic
+ put/load
+In-Reply-To: <20171207170630.592-1-christoffer.dall@linaro.org>
+References: <20171207170630.592-1-christoffer.dall@linaro.org>
+Message-ID: <20171207170630.592-36-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ACPI SPCR code has been used to define an earlycon console for arm64
-and can be used for x86.
+The APRs can only have bits set when the guest acknowledges an interrupt
+in the LR and can only have a bit cleared when the guest EOIs an
+interrupt in the LR.  Therefore, if we have no LRs with any
+pending/active interrupts, the APR cannot change value and there is no
+need to clear it on every exit from the VM (hint: it will have already
+been cleared when we exited the guest the last time with the LRs all
+EOIed).
 
-Modify the ACPI SPCR parsing code to account for console behaviour
-differences between arm64 and x86.  Initialize the SPCR code from
-x86 ACPI initialization code.
+The only case we need to take care of is when we migrate the VCPU away
+from a CPU or migrate a new VCPU onto a CPU, or when we return to
+userspace to capture the state of the VCPU for migration.  To make sure
+this works, factor out the APR save/restore functionality into separate
+functions called from the VCPU (and by extension VGIC) put/load hooks.
 
-Signed-off-by: Prarit Bhargava <prarit@redhat.com>
-
-Cc: linux-doc at vger.kernel.org
-Cc: linux-kernel at vger.kernel.org
-Cc: linux-arm-kernel at lists.infradead.org
-Cc: linux-pm at vger.kernel.org
-Cc: linux-acpi at vger.kernel.org
-Cc: linux-serial at vger.kernel.org
-Cc: Bhupesh Sharma <bhsharma@redhat.com>
-Cc: Lv Zheng <lv.zheng@intel.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
-Cc: Ingo Molnar <mingo@redhat.com>
-Cc: "H. Peter Anvin" <hpa@zytor.com>
-Cc: x86 at kernel.org
-Cc: Jonathan Corbet <corbet@lwn.net>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: "Rafael J. Wysocki" <rjw@rjwysocki.net>
+Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- Documentation/admin-guide/kernel-parameters.txt | 3 +++
- arch/arm64/kernel/acpi.c                        | 2 +-
- arch/x86/kernel/acpi/boot.c                     | 3 +++
- drivers/acpi/Kconfig                            | 2 +-
- drivers/acpi/spcr.c                             | 5 +++--
- include/linux/acpi.h                            | 7 +++++--
- 6 files changed, 16 insertions(+), 6 deletions(-)
+ arch/arm/include/asm/kvm_hyp.h   |   2 +
+ arch/arm64/include/asm/kvm_hyp.h |   2 +
+ virt/kvm/arm/hyp/vgic-v3-sr.c    | 123 +++++++++++++++++++++------------------
+ virt/kvm/arm/vgic/vgic-v2.c      |   7 +--
+ virt/kvm/arm/vgic/vgic-v3.c      |   5 ++
+ 5 files changed, 77 insertions(+), 62 deletions(-)
 
-diff --git a/Documentation/admin-guide/kernel-parameters.txt b/Documentation/admin-guide/kernel-parameters.txt
-index 0d173289c67e..c7cc890a0e81 100644
---- a/Documentation/admin-guide/kernel-parameters.txt
-+++ b/Documentation/admin-guide/kernel-parameters.txt
-@@ -918,6 +918,9 @@
- 			stdout-path property in device tree's chosen node,
- 			or determined by the ACPI SPCR table.
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index ab20ffa8b9e7..b3dd4f4304f5 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -109,6 +109,8 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
  
-+			[X86] When used with no options the early console is
-+			determined by the ACPI SPCR table.
-+
- 		cdns,<addr>[,options]
- 			Start an early, polled-mode console on a Cadence
- 			(xuartps) serial port at the specified address. Only
-diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-index ef74e1f3e468..9d7842022d47 100644
---- a/arch/arm64/kernel/acpi.c
-+++ b/arch/arm64/kernel/acpi.c
-@@ -355,7 +355,7 @@ void __init acpi_boot_table_init(void)
- 			early_init_dt_scan_chosen_stdout();
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
++void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
++void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
+ 
+ asmlinkage void __vfp_save_state(struct vfp_hard_struct *vfp);
+ asmlinkage void __vfp_restore_state(struct vfp_hard_struct *vfp);
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index bd3fe6446728..62872ceefa33 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -125,6 +125,8 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+ 
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
++void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
++void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
+ int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
+ 
+ void __timer_enable_traps(struct kvm_vcpu *vcpu);
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 9abf2f3c12b5..811b42c8441d 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -221,14 +221,11 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 
+ 	if (used_lrs) {
+ 		int i;
+-		u32 nr_pre_bits;
+ 		u32 elrsr;
+ 
+ 		elrsr = read_gicreg(ICH_ELSR_EL2);
+ 
+ 		write_gicreg(0, ICH_HCR_EL2);
+-		val = read_gicreg(ICH_VTR_EL2);
+-		nr_pre_bits = vtr_to_nr_pre_bits(val);
+ 
+ 		for (i = 0; i < used_lrs; i++) {
+ 			if (elrsr & (1 << i))
+@@ -238,39 +235,10 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ 
+ 			__gic_v3_set_lr(0, i);
+ 		}
+-
+-		switch (nr_pre_bits) {
+-		case 7:
+-			cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
+-			cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
+-		case 6:
+-			cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
+-		default:
+-			cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
+-		}
+-
+-		switch (nr_pre_bits) {
+-		case 7:
+-			cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
+-			cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
+-		case 6:
+-			cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
+-		default:
+-			cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
+-		}
  	} else {
- 		/* Always enable the ACPI SPCR console */
--		acpi_parse_spcr(console_acpi_spcr_enable);
-+		acpi_parse_spcr(console_acpi_spcr_enable, true);
- 		if (IS_ENABLED(CONFIG_ACPI_BGRT))
- 			acpi_table_parse(ACPI_SIG_BGRT, acpi_parse_bgrt);
+ 		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+ 		    cpu_if->its_vpe.its_vm)
+ 			write_gicreg(0, ICH_HCR_EL2);
+-
+-		cpu_if->vgic_ap0r[0] = 0;
+-		cpu_if->vgic_ap0r[1] = 0;
+-		cpu_if->vgic_ap0r[2] = 0;
+-		cpu_if->vgic_ap0r[3] = 0;
+-		cpu_if->vgic_ap1r[0] = 0;
+-		cpu_if->vgic_ap1r[1] = 0;
+-		cpu_if->vgic_ap1r[2] = 0;
+-		cpu_if->vgic_ap1r[3] = 0;
  	}
-diff --git a/arch/x86/kernel/acpi/boot.c b/arch/x86/kernel/acpi/boot.c
-index f4c463df8b08..4527ecbab4cb 100644
---- a/arch/x86/kernel/acpi/boot.c
-+++ b/arch/x86/kernel/acpi/boot.c
-@@ -1626,6 +1626,9 @@ int __init acpi_boot_init(void)
- 	if (!acpi_noirq)
- 		x86_init.pci.init = pci_acpi_init;
  
-+	/* Do not enable ACPI SPCR console by default */
-+	acpi_parse_spcr(console_acpi_spcr_enable, console_acpi_spcr_enable);
-+
- 	return 0;
+ 	val = read_gicreg(ICC_SRE_EL2);
+@@ -287,8 +255,6 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+-	u64 val;
+-	u32 nr_pre_bits;
+ 	int i;
+ 
+ 	/*
+@@ -306,32 +272,9 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+ 	}
+ 
+-	val = read_gicreg(ICH_VTR_EL2);
+-	nr_pre_bits = vtr_to_nr_pre_bits(val);
+-
+ 	if (used_lrs) {
+ 		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+ 
+-		switch (nr_pre_bits) {
+-		case 7:
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
+-		case 6:
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
+-		default:
+-			__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
+-		}
+-
+-		switch (nr_pre_bits) {
+-		case 7:
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
+-		case 6:
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
+-		default:
+-			__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
+-		}
+-
+ 		for (i = 0; i < used_lrs; i++)
+ 			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+ 	} else {
+@@ -364,6 +307,72 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 		     ICC_SRE_EL2);
  }
  
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index ae25159dd976..6bcddd149ca7 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -562,7 +562,7 @@ config TPS68470_PMIC_OPREGION
- 
- config ACPI_SPCR_TABLE
- 	bool "ACPI Serial Port Console Redirection Support"
--	default y if ARM64
-+	default y if (X86 || ARM64)
- 	help
- 	  Enable support for Serial Port Console Redirection (SPCR) Table.
- 	  This table provides information about the configuration of the
-diff --git a/drivers/acpi/spcr.c b/drivers/acpi/spcr.c
-index d8ad8fa67582..23abb1c207a0 100644
---- a/drivers/acpi/spcr.c
-+++ b/drivers/acpi/spcr.c
-@@ -40,7 +40,7 @@ bool console_acpi_spcr_enable __initdata;
-  * from arch initialization code as soon as the DT/ACPI decision is made.
-  *
-  */
--int __init acpi_parse_spcr(bool earlycon)
-+int __init acpi_parse_spcr(bool earlycon, bool enable_console)
- {
- 	static char opts[ACPI_SPCR_OPTS_SIZE];
- 	static char uart[ACPI_SPCR_BUF_SIZE];
-@@ -113,7 +113,8 @@ int __init acpi_parse_spcr(bool earlycon)
- 	if (earlycon)
- 		setup_earlycon(opts);
- 
--	err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
-+	if (enable_console)
-+		err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
- done:
- 	acpi_put_table((struct acpi_table_header *)table);
- 	return err;
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 818c1053cc6f..252d692f017f 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -1248,10 +1248,13 @@ extern bool console_acpi_spcr_enable __initdata;
- extern int acpi_arch_setup_console(struct acpi_table_spcr *table,
- 				   char *opts, char *uart, char *iotype,
- 				   int baud_rate, bool earlycon);
--int acpi_parse_spcr(bool earlycon);
-+int acpi_parse_spcr(bool earlycon, bool enable_console);
- #else
- static const bool console_acpi_spcr_enable;
--static inline int acpi_parse_spcr(bool earlycon) { return 0; }
-+static inline int acpi_parse_spcr(bool earlycon, bool enable_console)
++void __hyp_text __vgic_v3_save_aprs(struct kvm_vcpu *vcpu)
 +{
-+	return 0;
++	struct vgic_v3_cpu_if *cpu_if;
++	u64 val;
++	u32 nr_pre_bits;
++
++	vcpu = kern_hyp_va(vcpu);
++	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
++
++	val = read_gicreg(ICH_VTR_EL2);
++	nr_pre_bits = vtr_to_nr_pre_bits(val);
++
++	switch (nr_pre_bits) {
++	case 7:
++		cpu_if->vgic_ap0r[3] = __vgic_v3_read_ap0rn(3);
++		cpu_if->vgic_ap0r[2] = __vgic_v3_read_ap0rn(2);
++	case 6:
++		cpu_if->vgic_ap0r[1] = __vgic_v3_read_ap0rn(1);
++	default:
++		cpu_if->vgic_ap0r[0] = __vgic_v3_read_ap0rn(0);
++	}
++
++	switch (nr_pre_bits) {
++	case 7:
++		cpu_if->vgic_ap1r[3] = __vgic_v3_read_ap1rn(3);
++		cpu_if->vgic_ap1r[2] = __vgic_v3_read_ap1rn(2);
++	case 6:
++		cpu_if->vgic_ap1r[1] = __vgic_v3_read_ap1rn(1);
++	default:
++		cpu_if->vgic_ap1r[0] = __vgic_v3_read_ap1rn(0);
++	}
 +}
- #endif
++
++void __hyp_text __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu)
++{
++	struct vgic_v3_cpu_if *cpu_if;
++	u64 val;
++	u32 nr_pre_bits;
++
++	vcpu = kern_hyp_va(vcpu);
++	cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
++
++	val = read_gicreg(ICH_VTR_EL2);
++	nr_pre_bits = vtr_to_nr_pre_bits(val);
++
++	switch (nr_pre_bits) {
++	case 7:
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[3], 3);
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[2], 2);
++	case 6:
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[1], 1);
++	default:
++		__vgic_v3_write_ap0rn(cpu_if->vgic_ap0r[0], 0);
++	}
++
++	switch (nr_pre_bits) {
++	case 7:
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[3], 3);
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[2], 2);
++	case 6:
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[1], 1);
++	default:
++		__vgic_v3_write_ap1rn(cpu_if->vgic_ap1r[0], 0);
++	}
++}
++
+ void __hyp_text __vgic_v3_init_lrs(void)
+ {
+ 	int max_lr_idx = vtr_to_max_lr_idx(read_gicreg(ICH_VTR_EL2));
+diff --git a/virt/kvm/arm/vgic/vgic-v2.c b/virt/kvm/arm/vgic/vgic-v2.c
+index 1e5f3eb6973d..ca7cfee9f353 100644
+--- a/virt/kvm/arm/vgic/vgic-v2.c
++++ b/virt/kvm/arm/vgic/vgic-v2.c
+@@ -446,7 +446,6 @@ void vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct kvm *kvm = vcpu->kvm;
+ 	struct vgic_dist *vgic = &kvm->arch.vgic;
+-	struct vgic_v2_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v2;
+ 	void __iomem *base = vgic->vctrl_base;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
  
- #if IS_ENABLED(CONFIG_ACPI_GENERIC_GSI)
+@@ -454,11 +453,8 @@ void vgic_v2_save_state(struct kvm_vcpu *vcpu)
+ 		return;
+ 
+ 	if (used_lrs) {
+-		cpu_if->vgic_apr = readl_relaxed(base + GICH_APR);
+ 		save_lrs(vcpu, base);
+ 		writel_relaxed(0, base + GICH_HCR);
+-	} else {
+-		cpu_if->vgic_apr = 0;
+ 	}
+ }
+ 
+@@ -476,7 +472,6 @@ void vgic_v2_restore_state(struct kvm_vcpu *vcpu)
+ 
+ 	if (used_lrs) {
+ 		writel_relaxed(cpu_if->vgic_hcr, base + GICH_HCR);
+-		writel_relaxed(cpu_if->vgic_apr, base + GICH_APR);
+ 		for (i = 0; i < used_lrs; i++) {
+ 			writel_relaxed(cpu_if->vgic_lr[i],
+ 				       base + GICH_LR0 + (i * 4));
+@@ -490,6 +485,7 @@ void vgic_v2_load(struct kvm_vcpu *vcpu)
+ 	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 
+ 	writel_relaxed(cpu_if->vgic_vmcr, vgic->vctrl_base + GICH_VMCR);
++	writel_relaxed(cpu_if->vgic_apr, vgic->vctrl_base + GICH_APR);
+ }
+ 
+ void vgic_v2_put(struct kvm_vcpu *vcpu)
+@@ -498,4 +494,5 @@ void vgic_v2_put(struct kvm_vcpu *vcpu)
+ 	struct vgic_dist *vgic = &vcpu->kvm->arch.vgic;
+ 
+ 	cpu_if->vgic_vmcr = readl_relaxed(vgic->vctrl_base + GICH_VMCR);
++	cpu_if->vgic_apr = readl_relaxed(vgic->vctrl_base + GICH_APR);
+ }
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index b76e21f3e6bd..4bafcd1e6bb8 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -16,6 +16,7 @@
+ #include <linux/kvm.h>
+ #include <linux/kvm_host.h>
+ #include <kvm/arm_vgic.h>
++#include <asm/kvm_hyp.h>
+ #include <asm/kvm_mmu.h>
+ #include <asm/kvm_asm.h>
+ 
+@@ -587,6 +588,8 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
+ 	 */
+ 	if (likely(cpu_if->vgic_sre))
+ 		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
++
++	kvm_call_hyp(__vgic_v3_restore_aprs, vcpu);
+ }
+ 
+ void vgic_v3_put(struct kvm_vcpu *vcpu)
+@@ -595,4 +598,6 @@ void vgic_v3_put(struct kvm_vcpu *vcpu)
+ 
+ 	if (likely(cpu_if->vgic_sre))
+ 		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
++
++	kvm_call_hyp(__vgic_v3_save_aprs, vcpu);
+ }
 -- 
-2.15.0.rc0.39.g2f0e14e64
+2.14.2
