@@ -1,86 +1,100 @@
-From: kristina.martsenko@arm.com (Kristina Martsenko)
-Date: Thu, 7 Dec 2017 12:29:43 +0000
-Subject: [RFC 3/9] arm64: handle 52-bit addresses in TTBR
-In-Reply-To: <8ebb78d3-68b0-3272-e12b-005c1b524736@arm.com>
-References: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
- <1511265485-27163-4-git-send-email-kristina.martsenko@arm.com>
- <8ebb78d3-68b0-3272-e12b-005c1b524736@arm.com>
-Message-ID: <42182cdd-be9f-841f-6fda-1486ac2ded2f@arm.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Thu, 7 Dec 2017 14:29:49 +0200
+Subject: [PATCH V6 3/7] device property: Introduce a common API to fetch
+ device match data
+In-Reply-To: <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
+References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+ <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
+Message-ID: <20171207122948.yyl6adb6lnb56gok@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/11/17 14:39, Robin Murphy wrote:
-> Hi Kristina,
+Hi Sinan,
+
+Thanks for the update.
+
+Just one small comment below.
+
+On Tue, Dec 05, 2017 at 12:04:48PM -0500, Sinan Kaya wrote:
+> There is an OF/ACPI function to obtain the driver data. We want to hide
+> OF/ACPI details from the device drivers and abstract following the device
+> family of functions.
 > 
-> On 21/11/17 11:57, Kristina Martsenko wrote:
->> The top 4 bits of a 52-bit physical address are positioned at bits 2..5
->> in the TTBR registers. Introduce a couple of macros to move the bits
->> there, and change all TTBR writers to use them.
->>
->> Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
->> 52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
->> system without 52-bit PA can only use up to 48-bit PAs. Add a kconfig
->> dependency to ensure PAN is configured.
->>
->> In addition, when using 52-bit PA there is a special alignment
->> requirement on the top-level table. We don't currently have any VA_BITS
->> configuration that would violate the requirement, but one could be added
->> in the future, so add a compile-time BUG_ON to check for it.
->>
->> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
->> ---
-
-[...]
-
->> diff --git a/arch/arm64/include/asm/assembler.h
->> b/arch/arm64/include/asm/assembler.h
->> index 04cf94766b78..ba3c796b9fe1 100644
->> --- a/arch/arm64/include/asm/assembler.h
->> +++ b/arch/arm64/include/asm/assembler.h
->> @@ -512,4 +512,21 @@ alternative_else_nop_endif
->> ? #endif
->> ????? .endm
->> ? +/*
->> + * Arrange a physical address in a TTBR register, taking care of 52-bit
->> + * addresses.
->> + *
->> + *???? phys:??? physical address, preserved
->> + *???? ttbr:??? returns the TTBR value
->> + */
->> +??? .macro??? phys_to_ttbr, phys, ttbr
->> +#ifdef CONFIG_ARM64_PA_BITS_52
->> +??? and??? \ttbr, \phys, #(1 << 48) - 1
->> +??? orr??? \ttbr, \ttbr, \phys, lsr #48 - 2
->> +??? bic??? \ttbr, \ttbr, #(1 << 2) - 1
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/base/property.c  | 6 ++++++
+>  include/linux/fwnode.h   | 4 ++++
+>  include/linux/property.h | 2 ++
+>  3 files changed, 12 insertions(+)
 > 
-> Is there any reason for masking off each end of the result separately
-> like this, or could we just do it more straightforwardly?
+> diff --git a/drivers/base/property.c b/drivers/base/property.c
+> index 7ed99c1..65bf6f2 100644
+> --- a/drivers/base/property.c
+> +++ b/drivers/base/property.c
+> @@ -1335,3 +1335,9 @@ int fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+>  	return fwnode_call_int_op(fwnode, graph_parse_endpoint, endpoint);
+>  }
+>  EXPORT_SYMBOL(fwnode_graph_parse_endpoint);
+> +
+> +void *device_get_match_data(struct device *dev)
+> +{
+> +	return fwnode_call_ptr_op(dev_fwnode(dev), get_match_data, dev);
+> +}
+> +EXPORT_SYMBOL_GPL(device_get_match_data);
+> diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
+> index 0c35b6c..ab9aab5 100644
+> --- a/include/linux/fwnode.h
+> +++ b/include/linux/fwnode.h
+> @@ -15,6 +15,7 @@
+>  #include <linux/types.h>
+>  
+>  struct fwnode_operations;
+> +struct device;
+>  
+>  struct fwnode_handle {
+>  	struct fwnode_handle *secondary;
+> @@ -66,6 +67,7 @@ struct fwnode_reference_args {
+>   *			       endpoint node.
+>   * @graph_get_port_parent: Return the parent node of a port node.
+>   * @graph_parse_endpoint: Parse endpoint for port and endpoint id.
+> + * @get_match_data: Return the driver match data.
 
-I don't recall any reason, maybe just to keep it simple, to avoid having
-a separate mask macro.
+Could you arrange the new get_match_data op closer to the other ops that
+don't deal with the graphs? Such as device_is_available. As the ops are
+dealing generally with fwnodes, I might call this device_get_match_data to
+explicitly mention it's for devices.
 
-> #define TTBR_BADDR_MASK ((1 << 46) - 1) << 2
-> 
-> ????orr??? \ttbr, \phys, \phys, lsr #46
-> ????and??? \ttbr, \ttbr, #TTBR_BADDR_MASK
-> 
-> (and equivalently for phys_to_pte in patch 4)
+>   */
+>  struct fwnode_operations {
+>  	void (*get)(struct fwnode_handle *fwnode);
+> @@ -101,6 +103,8 @@ struct fwnode_operations {
+>  	(*graph_get_port_parent)(struct fwnode_handle *fwnode);
+>  	int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
+>  				    struct fwnode_endpoint *endpoint);
+> +	void *(*get_match_data)(const struct fwnode_handle *fwnode,
+> +				struct device *dev);
 
-Ok, I'll rewrite it like this. (Note that mask is 52-bit-specific though.)
+Same comment about the order here.
 
-> Even better if there's a convenient place to define the mask such that
-> it can be shared with KVM's existing VTTBR stuff too.
+>  };
+>  
+>  #define fwnode_has_op(fwnode, op)				\
+> diff --git a/include/linux/property.h b/include/linux/property.h
+> index 6bebee1..01fa55b 100644
+> --- a/include/linux/property.h
+> +++ b/include/linux/property.h
+> @@ -275,6 +275,8 @@ int device_add_properties(struct device *dev,
+>  
+>  enum dev_dma_attr device_get_dma_attr(struct device *dev);
+>  
+> +void *device_get_match_data(struct device *dev);
+> +
+>  int device_get_phy_mode(struct device *dev);
+>  
+>  void *device_get_mac_address(struct device *dev, char *addr, int alen);
 
-Do you mean VTTBR_BADDR_MASK? I don't think this would be useful there,
-VTTBR_BADDR_MASK checks the alignment of the address that goes into
-VTTBR (not the VTTBR value itself), and takes into account specifically
-the 40-bit IPA and concatenated page tables.
+-- 
+Kind regards,
 
-Kristina
-
->> +#else
->> +??? mov??? \ttbr, \phys
->> +#endif
->> +??? .endm
->> +
->> ? #endif??? /* __ASM_ASSEMBLER_H */
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
