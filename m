@@ -1,330 +1,46 @@
-From: clabbe.montjoie@gmail.com (Corentin Labbe)
-Date: Thu, 7 Dec 2017 10:24:50 +0100
-Subject: [PATCH RFC 1/4] crypto: engine - Permit to enqueue all async
- requests
-In-Reply-To: <091ff463-9958-7f96-7ebb-87b36d63cce4@st.com>
-References: <20171129084121.9385-1-clabbe.montjoie@gmail.com>
- <20171129084121.9385-2-clabbe.montjoie@gmail.com>
- <091ff463-9958-7f96-7ebb-87b36d63cce4@st.com>
-Message-ID: <20171207092450.GA21647@Red>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 7 Dec 2017 17:30:48 +0800
+Subject: [PATCH 2/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
+In-Reply-To: <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
+References: <20171203204157.20829-1-anarsoul@gmail.com>
+ <20171203204157.20829-3-anarsoul@gmail.com>
+ <CAEKpxBmHhZ+2WNXJEPbQFS6KeKsqRrZeNodRnu1M5yLc15DerA@mail.gmail.com>
+ <CA+E=qVd+uM0Aq_=sf+fomQ-m+3Oy0MdG7OPjF5tVagG1UgKYzg@mail.gmail.com>
+ <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
+Message-ID: <CAGb2v67R76U0+JSS0yMDUCB52QXe=xbt8w=49sTn0TNTM8SccQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 11:02:23AM +0000, Fabien DESSENNE wrote:
-> 
-> 
-> On 29/11/17 09:41, Corentin Labbe wrote:
-> > The crypto engine could actually only enqueue hash and ablkcipher request.
-> > This patch permit it to enqueue any type of crypto_async_request.
-> >
-> > Signed-off-by: Corentin Labbe <clabbe.montjoie@gmail.com>
-> > ---
-> >   crypto/crypto_engine.c  | 188 +++++++++++-------------------------------------
-> >   include/crypto/engine.h |  46 +++++-------
-> >   2 files changed, 60 insertions(+), 174 deletions(-)
-> >
-> > diff --git a/crypto/crypto_engine.c b/crypto/crypto_engine.c
-> > index 61e7c4e02fd2..f7c4c4c1f41b 100644
-> > --- a/crypto/crypto_engine.c
-> > +++ b/crypto/crypto_engine.c
-> > @@ -34,11 +34,10 @@ static void crypto_pump_requests(struct crypto_engine *engine,
-> >   				 bool in_kthread)
-> >   {
-> >   	struct crypto_async_request *async_req, *backlog;
-> > -	struct ahash_request *hreq;
-> > -	struct ablkcipher_request *breq;
-> >   	unsigned long flags;
-> >   	bool was_busy = false;
-> > -	int ret, rtype;
-> > +	int ret;
-> > +	struct crypto_engine_reqctx *enginectx;
-> >   
-> >   	spin_lock_irqsave(&engine->queue_lock, flags);
-> >   
-> > @@ -94,7 +93,6 @@ static void crypto_pump_requests(struct crypto_engine *engine,
-> >   
-> >   	spin_unlock_irqrestore(&engine->queue_lock, flags);
-> >   
-> > -	rtype = crypto_tfm_alg_type(engine->cur_req->tfm);
-> >   	/* Until here we get the request need to be encrypted successfully */
-> >   	if (!was_busy && engine->prepare_crypt_hardware) {
-> >   		ret = engine->prepare_crypt_hardware(engine);
-> > @@ -104,57 +102,31 @@ static void crypto_pump_requests(struct crypto_engine *engine,
-> >   		}
-> >   	}
-> >   
-> > -	switch (rtype) {
-> > -	case CRYPTO_ALG_TYPE_AHASH:
-> > -		hreq = ahash_request_cast(engine->cur_req);
-> > -		if (engine->prepare_hash_request) {
-> > -			ret = engine->prepare_hash_request(engine, hreq);
-> > -			if (ret) {
-> > -				dev_err(engine->dev, "failed to prepare request: %d\n",
-> > -					ret);
-> > -				goto req_err;
-> > -			}
-> > -			engine->cur_req_prepared = true;
-> > -		}
-> > -		ret = engine->hash_one_request(engine, hreq);
-> > -		if (ret) {
-> > -			dev_err(engine->dev, "failed to hash one request from queue\n");
-> > -			goto req_err;
-> > -		}
-> > -		return;
-> > -	case CRYPTO_ALG_TYPE_ABLKCIPHER:
-> > -		breq = ablkcipher_request_cast(engine->cur_req);
-> > -		if (engine->prepare_cipher_request) {
-> > -			ret = engine->prepare_cipher_request(engine, breq);
-> > -			if (ret) {
-> > -				dev_err(engine->dev, "failed to prepare request: %d\n",
-> > -					ret);
-> > -				goto req_err;
-> > -			}
-> > -			engine->cur_req_prepared = true;
-> > -		}
-> > -		ret = engine->cipher_one_request(engine, breq);
-> > +	enginectx = crypto_tfm_ctx(async_req->tfm);
-> > +
-> > +	if (enginectx->op.prepare_request) {
-> > +		ret = enginectx->op.prepare_request(engine, async_req);
-> >   		if (ret) {
-> > -			dev_err(engine->dev, "failed to cipher one request from queue\n");
-> > +			dev_err(engine->dev, "failed to prepare request: %d\n",
-> > +				ret);
-> >   			goto req_err;
-> >   		}
-> > -		return;
-> > -	default:
-> > -		dev_err(engine->dev, "failed to prepare request of unknown type\n");
-> > -		return;
-> > +		engine->cur_req_prepared = true;
-> > +	}
-> > +	if (!enginectx->op.do_one_request) {
-> > +		dev_err(engine->dev, "failed to do request\n");
-> > +		ret = -EINVAL;
-> > +		goto req_err;
-> > +	}
-> > +	ret = enginectx->op.do_one_request(engine, async_req);
-> > +	if (ret) {
-> > +		dev_err(engine->dev, "failed to hash one request from queue\n");
-> > +		goto req_err;
-> >   	}
-> > +	return;
-> >   
-> >   req_err:
-> > -	switch (rtype) {
-> > -	case CRYPTO_ALG_TYPE_AHASH:
-> > -		hreq = ahash_request_cast(engine->cur_req);
-> > -		crypto_finalize_hash_request(engine, hreq, ret);
-> > -		break;
-> > -	case CRYPTO_ALG_TYPE_ABLKCIPHER:
-> > -		breq = ablkcipher_request_cast(engine->cur_req);
-> > -		crypto_finalize_cipher_request(engine, breq, ret);
-> > -		break;
-> > -	}
-> > +	crypto_finalize_request(engine, async_req, ret);
-> >   	return;
-> >   
-> >   out:
-> > @@ -170,59 +142,16 @@ static void crypto_pump_work(struct kthread_work *work)
-> >   }
-> >   
-> >   /**
-> > - * crypto_transfer_cipher_request - transfer the new request into the
-> > - * enginequeue
-> > + * crypto_transfer_request - transfer the new request into the engine queue
-> >    * @engine: the hardware engine
-> >    * @req: the request need to be listed into the engine queue
-> >    */
-> > -int crypto_transfer_cipher_request(struct crypto_engine *engine,
-> > -				   struct ablkcipher_request *req,
-> > -				   bool need_pump)
-> > +int crypto_transfer_request(struct crypto_engine *engine,
-> > +			    struct crypto_async_request *req, bool need_pump)
-> >   {
-> >   	unsigned long flags;
-> >   	int ret;
-> >   
-> > -	spin_lock_irqsave(&engine->queue_lock, flags);
-> > -
-> > -	if (!engine->running) {
-> > -		spin_unlock_irqrestore(&engine->queue_lock, flags);
-> > -		return -ESHUTDOWN;
-> > -	}
-> > -
-> > -	ret = ablkcipher_enqueue_request(&engine->queue, req);
-> > -
-> > -	if (!engine->busy && need_pump)
-> > -		kthread_queue_work(engine->kworker, &engine->pump_requests);
-> > -
-> > -	spin_unlock_irqrestore(&engine->queue_lock, flags);
-> > -	return ret;
-> > -}
-> > -EXPORT_SYMBOL_GPL(crypto_transfer_cipher_request);
-> > -
-> > -/**
-> > - * crypto_transfer_cipher_request_to_engine - transfer one request to list
-> > - * into the engine queue
-> > - * @engine: the hardware engine
-> > - * @req: the request need to be listed into the engine queue
-> > - */
-> > -int crypto_transfer_cipher_request_to_engine(struct crypto_engine *engine,
-> > -					     struct ablkcipher_request *req)
-> > -{
-> > -	return crypto_transfer_cipher_request(engine, req, true);
-> > -}
-> > -EXPORT_SYMBOL_GPL(crypto_transfer_cipher_request_to_engine);
-> > -
-> > -/**
-> > - * crypto_transfer_hash_request - transfer the new request into the
-> > - * enginequeue
-> > - * @engine: the hardware engine
-> > - * @req: the request need to be listed into the engine queue
-> > - */
-> > -int crypto_transfer_hash_request(struct crypto_engine *engine,
-> > -				 struct ahash_request *req, bool need_pump)
-> > -{
-> > -	unsigned long flags;
-> > -	int ret;
-> >   
-> >   	spin_lock_irqsave(&engine->queue_lock, flags);
-> >   
-> > @@ -231,7 +160,7 @@ int crypto_transfer_hash_request(struct crypto_engine *engine,
-> >   		return -ESHUTDOWN;
-> >   	}
-> >   
-> > -	ret = ahash_enqueue_request(&engine->queue, req);
-> > +	ret = crypto_enqueue_request(&engine->queue, req);
-> >   
-> >   	if (!engine->busy && need_pump)
-> >   		kthread_queue_work(engine->kworker, &engine->pump_requests);
-> > @@ -239,80 +168,45 @@ int crypto_transfer_hash_request(struct crypto_engine *engine,
-> >   	spin_unlock_irqrestore(&engine->queue_lock, flags);
-> >   	return ret;
-> >   }
-> > -EXPORT_SYMBOL_GPL(crypto_transfer_hash_request);
-> > +EXPORT_SYMBOL_GPL(crypto_transfer_request);
-> >   
-> >   /**
-> > - * crypto_transfer_hash_request_to_engine - transfer one request to list
-> > + * crypto_transfer_request_to_engine - transfer one request to list
-> >    * into the engine queue
-> >    * @engine: the hardware engine
-> >    * @req: the request need to be listed into the engine queue
-> >    */
-> > -int crypto_transfer_hash_request_to_engine(struct crypto_engine *engine,
-> > -					   struct ahash_request *req)
-> > -{
-> > -	return crypto_transfer_hash_request(engine, req, true);
-> > -}
-> > -EXPORT_SYMBOL_GPL(crypto_transfer_hash_request_to_engine);
-> > -
-> > -/**
-> > - * crypto_finalize_cipher_request - finalize one request if the request is done
-> > - * @engine: the hardware engine
-> > - * @req: the request need to be finalized
-> > - * @err: error number
-> > - */
-> > -void crypto_finalize_cipher_request(struct crypto_engine *engine,
-> > -				    struct ablkcipher_request *req, int err)
-> > +int crypto_transfer_request_to_engine(struct crypto_engine *engine,
-> > +				      struct crypto_async_request *req)
-> >   {
-> > -	unsigned long flags;
-> > -	bool finalize_cur_req = false;
-> > -	int ret;
-> > -
-> > -	spin_lock_irqsave(&engine->queue_lock, flags);
-> > -	if (engine->cur_req == &req->base)
-> > -		finalize_cur_req = true;
-> > -	spin_unlock_irqrestore(&engine->queue_lock, flags);
-> > -
-> > -	if (finalize_cur_req) {
-> > -		if (engine->cur_req_prepared &&
-> > -		    engine->unprepare_cipher_request) {
-> > -			ret = engine->unprepare_cipher_request(engine, req);
-> > -			if (ret)
-> > -				dev_err(engine->dev, "failed to unprepare request\n");
-> > -		}
-> > -		spin_lock_irqsave(&engine->queue_lock, flags);
-> > -		engine->cur_req = NULL;
-> > -		engine->cur_req_prepared = false;
-> > -		spin_unlock_irqrestore(&engine->queue_lock, flags);
-> > -	}
-> > -
-> > -	req->base.complete(&req->base, err);
-> > -
-> > -	kthread_queue_work(engine->kworker, &engine->pump_requests);
-> > +	return crypto_transfer_request(engine, req, true);
-> >   }
-> > -EXPORT_SYMBOL_GPL(crypto_finalize_cipher_request);
-> > +EXPORT_SYMBOL_GPL(crypto_transfer_request_to_engine);
-> >   
-> >   /**
-> > - * crypto_finalize_hash_request - finalize one request if the request is done
-> > + * crypto_finalize_request - finalize one request if the request is done
-> >    * @engine: the hardware engine
-> >    * @req: the request need to be finalized
-> >    * @err: error number
-> >    */
-> > -void crypto_finalize_hash_request(struct crypto_engine *engine,
-> > -				  struct ahash_request *req, int err)
-> > +void crypto_finalize_request(struct crypto_engine *engine,
-> > +			     struct crypto_async_request *req, int err)
-> >   {
-> >   	unsigned long flags;
-> >   	bool finalize_cur_req = false;
-> >   	int ret;
-> > +	struct crypto_engine_reqctx *enginectx;
-> >   
-> >   	spin_lock_irqsave(&engine->queue_lock, flags);
-> > -	if (engine->cur_req == &req->base)
-> > +	if (engine->cur_req == req)
-> >   		finalize_cur_req = true;
-> >   	spin_unlock_irqrestore(&engine->queue_lock, flags);
-> >   
-> >   	if (finalize_cur_req) {
-> > +		enginectx = crypto_tfm_ctx(req->tfm);
-> >   		if (engine->cur_req_prepared &&
-> > -		    engine->unprepare_hash_request) {
-> > -			ret = engine->unprepare_hash_request(engine, req);
-> > +		    enginectx->op.unprepare_request) {
-> > +			ret = enginectx->op.unprepare_request(engine, req);
-> >   			if (ret)
-> >   				dev_err(engine->dev, "failed to unprepare request\n");
-> >   		}
-> > @@ -322,11 +216,11 @@ void crypto_finalize_hash_request(struct crypto_engine *engine,
-> >   		spin_unlock_irqrestore(&engine->queue_lock, flags);
-> >   	}
-> >   
-> > -	req->base.complete(&req->base, err);
-> > +	req->complete(req, err);
-> >   
-> >   	kthread_queue_work(engine->kworker, &engine->pump_requests);
-> >   }
-> > -EXPORT_SYMBOL_GPL(crypto_finalize_hash_request);
-> > +EXPORT_SYMBOL_GPL(crypto_finalize_request);
-> >   
-> >   /**
-> >    * crypto_engine_start - start the hardware engine
-> > diff --git a/include/crypto/engine.h b/include/crypto/engine.h
-> > index dd04c1699b51..2e45db45849b 100644
-> > --- a/include/crypto/engine.h
-> > +++ b/include/crypto/engine.h
-> > @@ -17,7 +17,6 @@
-> >   #include <linux/kernel.h>
-> >   #include <linux/kthread.h>
-> >   #include <crypto/algapi.h>
-> > -#include <crypto/hash.h>
-> >   
-> >   #define ENGINE_NAME_LEN	30
-> >   /*
-> > @@ -65,19 +64,6 @@ struct crypto_engine {
-> 
-> You also need to remove these 6 functions from the comment header of 
-> that structure
-> 
+On Thu, Dec 7, 2017 at 5:21 PM, Code Kipper <codekipper@gmail.com> wrote:
+> On 4 December 2017 at 08:34, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>> I'd keep it sun50i_a64_acodec_i2s, since other 3 I2S modules aren't
+>> compatible with this one, but similar to H3.
+>
+> Well I wouldn't and the description of it is usage is clearly stated
+> in the devicetree
+> for the dai.
+>>
+>> On Sun, Dec 3, 2017 at 10:42 PM, Code Kipper <codekipper@gmail.com> wrote:
+>>> On 3 December 2017 at 21:41, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
+>>>> From: Marcus Cooper <codekipper@gmail.com>
+>>>>
+>>>> The I2S block used for the audio codec in the A64 is very similar
+>>>> to what is used by the A10(sun4i) devices. However, its TX FIFO is
+>>>> located at a different address.
+>>>>
+>>>> [vasilykh: - added fixed_wss and wss_value to A64 quirks,
+>>>>            - changed compatible to 'allwinner,sun50i-a64-acodec-i2s,
+>>>>              since A64 has 3 more I2S blocks that are not compatible
+>>>>              with audio codec I2S]
+> This needs to be investigated more...I'm suspicious of the
+> SUN8I_I2S_FMT0_LRCK_PERIOD value which is hardcoded to 0x1f.
+> I've made this following change
+> https://github.com/codekipper/linux-sunxi/commit/4c5fe5f5576cfbb2e1e94a99cd19dfdc9403ea50
+> which seems to work for me but I would like to look at it with a logic
+> analyser and test other sample depths.
+> CK
 
-Thanks, fixed for next version.
+Another good reason not to have hard-coded values for things that
+are rightly configurable. :)
 
-Regards
+ChenYu
