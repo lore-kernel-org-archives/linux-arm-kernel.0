@@ -1,50 +1,54 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 7 Dec 2017 11:37:15 +0800
-Subject: [PATCH v3 04/15] dt-bindings: display: sun4i-drm: Add A83T
- pipeline
-In-Reply-To: <20171206215922.vtsa4xqa2e5xz7cp@rob-hp-laptop>
+Date: Thu, 7 Dec 2017 11:57:49 +0800
+Subject: [PATCH v3 03/15] dt-bindings: display: sun4i-drm: Add LVDS
+ properties
+In-Reply-To: <17851ba6277b69aa9cd81de5eead62bfed271661.1512486553.git-series.maxime.ripard@free-electrons.com>
 References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
- <3762a8428aaf207e80ae86d4db2e50473576bb6d.1512486553.git-series.maxime.ripard@free-electrons.com>
- <20171206215922.vtsa4xqa2e5xz7cp@rob-hp-laptop>
-Message-ID: <CAGb2v64q9LMKWFvAVK66q3uz5f9G9NSO-p99YEv5ejK4Qs=x-g@mail.gmail.com>
+ <17851ba6277b69aa9cd81de5eead62bfed271661.1512486553.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65MPAoK081odGaysmiGg08VnpUMQbBDeU3A49TJMNxHwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 5:59 AM, Rob Herring <robh@kernel.org> wrote:
-> On Tue, Dec 05, 2017 at 04:10:16PM +0100, Maxime Ripard wrote:
->> The A83T has two video pipelines in parallel that looks quite similar to
->> the other SoCs.
->>
->> The video planes are handled through a controller called the mixer, and the
->> video signal is then passed to the timing controller (TCON).
->>
->> And while there is two instances of the mixers and TCONs, they have a
->> significant number of differences. The TCONs are quite easy to deal with,
->> one is supposed to generate TV (in the broader term, so including things
->> like HDMI) signals, the other one LCD (so RGB, LVDS, DSI) signals. And
->> while they are called TCON0 and TCON1 in the A83t datasheet, newer SoCs
->> call them TCON-TV and TCON-LCD, which seems more appropriate.
->>
->> However, the mixers differ mostly by their capabilities, with some features
->> being available only in the first one, or the number of planes they expose,
->> but also through their register layout. And while the capabilities could be
->> represented as properties, the register layout differences would need to
->> express all the registers offsets as properties, which is usually quite
->> bad. Especially since documentation on that hardware block is close to
->> non-existant and we don't even have the list of all those registers in the
->> first place.
->>
->> So let's call them mixer 0 and 1 in our compatibles, even though the name
->> is pretty bad...
->>
->> At the moment, we only have tested the code on a board that has a single
->> display output, so we're leaving the tcon-tv and mixer1 out.
->>
->> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
->> ---
->>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 3 +++
->>  1 file changed, 3 insertions(+)
+On Tue, Dec 5, 2017 at 11:10 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Some clocks and resets supposed to drive the LVDS logic in the display
+> engine have been overlooked when the driver was first introduced.
 >
-> Reviewed-by: Rob Herring <robh@kernel.org>
+> Add those additional resources to the binding, and we'll deal with the ABI
+> stability in the code.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt | 8 +++++++-
+>  1 file changed, 8 insertions(+)
+>
+> diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> index 50cc72ee1168..d4259a4f5171 100644
+> --- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> +++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
+> @@ -121,6 +121,14 @@ Required properties:
+>  On SoCs other than the A33 and V3s, there is one more clock required:
+>     - 'tcon-ch1': The clock driving the TCON channel 1
+>
+> +On SoCs that support LVDS (all SoCs but the A13, H3, H5 and V3s), you
+> +need one more reset line:
+> +   - 'lvds': The reset line driving the LVDS logic
+> +
+> +And on the SoCs newer than the A31 (sun6i and sun8i families), you
+> +need one more clock line:
+> +   - 'lvds-pll': The PLL that can be used to drive the LVDS clock
 
-Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+Is this referring to TCON0_LVDS_Clk_Sel, which can use the MIPI PLL
+on the A33? Maybe the description should be more clear, like:
+
+  - 'lvds-alt': An alternative clock separate from the TCON
+                that can be used to drive the LVDS clock.
+
+ChenYu
+
+> +
+>  DRC
+>  ---
+>
+> --
+> git-series 0.9.1
