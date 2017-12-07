@@ -1,73 +1,44 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  7 Dec 2017 16:10:26 -0500
-Subject: [PATCH V7 2/7] ACPI / bus: Introduce acpi_get_match_data() function
+Date: Thu,  7 Dec 2017 16:10:28 -0500
+Subject: [PATCH V7 4/7] OF: properties: Implement get_match_data() callback
 In-Reply-To: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
 References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1512681031-11343-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512681031-11343-5-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OF has of_device_get_match_data() function to extract driver specific data
-structure. Add a similar function for ACPI.
+Now that we have a get_match_data() callback as part of the firmware node,
+implement the OF specific piece for it.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+Reviewed-by: Rob Herring <robh@kernel.org>
+Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 ---
- drivers/acpi/bus.c   | 18 ++++++++++++++++++
- include/linux/acpi.h |  6 ++++++
- 2 files changed, 24 insertions(+)
+ drivers/of/property.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-index 4d0979e..f87ed3b 100644
---- a/drivers/acpi/bus.c
-+++ b/drivers/acpi/bus.c
-@@ -785,6 +785,24 @@ const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
- }
- EXPORT_SYMBOL_GPL(acpi_match_device);
- 
-+void *acpi_get_match_data(const struct device *dev)
-+{
-+	const struct acpi_device_id *match;
-+
-+	if (!dev->driver)
-+		return NULL;
-+
-+	if (!dev->driver->acpi_match_table)
-+		return NULL;
-+
-+	match = acpi_match_device(dev->driver->acpi_match_table, dev);
-+	if (!match)
-+		return NULL;
-+
-+	return (void *)match->driver_data;
-+}
-+EXPORT_SYMBOL_GPL(acpi_get_match_data);
-+
- int acpi_match_device_ids(struct acpi_device *device,
- 			  const struct acpi_device_id *ids)
- {
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 502af53..a927260 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -584,6 +584,7 @@ extern int acpi_nvs_for_each_region(int (*func)(__u64, __u64, void *),
- const struct acpi_device_id *acpi_match_device(const struct acpi_device_id *ids,
- 					       const struct device *dev);
- 
-+void *acpi_get_match_data(const struct device *dev);
- extern bool acpi_driver_match_device(struct device *dev,
- 				     const struct device_driver *drv);
- int acpi_device_uevent_modalias(struct device *, struct kobj_uevent_env *);
-@@ -755,6 +756,11 @@ static inline const struct acpi_device_id *acpi_match_device(
- 	return NULL;
+diff --git a/drivers/of/property.c b/drivers/of/property.c
+index 264c355..543e059 100644
+--- a/drivers/of/property.c
++++ b/drivers/of/property.c
+@@ -981,10 +981,18 @@ static int of_fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+ 	return 0;
  }
  
-+static inline void *acpi_get_match_data(const struct device *dev)
++static void *
++of_fwnode_device_get_match_data(const struct fwnode_handle *fwnode,
++				const struct device *dev)
 +{
-+	return NULL;
++	return (void *)of_device_get_match_data(dev);
 +}
 +
- static inline bool acpi_driver_match_device(struct device *dev,
- 					    const struct device_driver *drv)
- {
+ const struct fwnode_operations of_fwnode_ops = {
+ 	.get = of_fwnode_get,
+ 	.put = of_fwnode_put,
+ 	.device_is_available = of_fwnode_device_is_available,
++	.device_get_match_data = of_fwnode_device_get_match_data,
+ 	.property_present = of_fwnode_property_present,
+ 	.property_read_int_array = of_fwnode_property_read_int_array,
+ 	.property_read_string_array = of_fwnode_property_read_string_array,
 -- 
 1.9.1
