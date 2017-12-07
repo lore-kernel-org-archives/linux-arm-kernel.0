@@ -1,35 +1,59 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu,  7 Dec 2017 13:19:59 -0800
-Subject: [GIT PULL] two dts compiler warning fixes for v4.15-rc cycle
-Message-ID: <pull-1512681573-431149@atomide.com>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 7 Dec 2017 22:19:33 +0100
+Subject: [PATCH v8 1/3] arm: npcm: add basic support for Nuvoton BMCs
+In-Reply-To: <CAFd5g45+dNuayw=s08iwAj2wrUYNXnGd5SbA+OVvsL_J6APHGA@mail.gmail.com>
+References: <20171117190747.21642-1-brendanhiggins@google.com>
+ <20171117190747.21642-2-brendanhiggins@google.com>
+ <CAFd5g45+dNuayw=s08iwAj2wrUYNXnGd5SbA+OVvsL_J6APHGA@mail.gmail.com>
+Message-ID: <CAOFm3uG=i3gOnKEMEPNii070+pB7Aqt2GmxgB5G0DCfGzhCkZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: "Tony Lindgren" <tony@atomide.com>
+Brendan,
 
-The following changes since commit 4fbd8d194f06c8a3fd2af1ce560ddb31f7ec8323:
+On Thu, Dec 7, 2017 at 9:37 PM, Brendan Higgins
+<brendanhiggins@google.com> wrote:
+> Any update on this?
+>
+> On Fri, Nov 17, 2017 at 11:07 AM, Brendan Higgins
+> <brendanhiggins@google.com> wrote:
+>> Adds basic support for the Nuvoton NPCM750 BMC.
+>>
+>> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
+>> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
+>> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
+>> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
+>> Tested-by: Avi Fishman <avifishman70@gmail.com>
 
-  Linux 4.15-rc1 (2017-11-26 16:01:47 -0800)
+<snip>
 
-are available in the Git repository at:
+>> --- /dev/null
+>> +++ b/arch/arm/mach-npcm/npcm7xx.c
+>> @@ -0,0 +1,25 @@
+>> +/*
+>> + * Copyright (c) 2017 Nuvoton Technology corporation.
+>> + * Copyright 2017 Google, Inc.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + */
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.15/fixes-dt-warnings
+Have you considered using the new SPDX ids here instead of the
+traditional license boilerplate?
 
-for you to fetch changes up to c22fe696157dc94a25cc5396b43b29b6d6f4a189:
+This could come out this way:
 
-  ARM: dts: Fix dm814x missing phy-cells property (2017-12-05 08:29:04 -0800)
+// SPDX-License-Identifier: GPL-2.0
+// Copyright (c) 2017 Nuvoton Technology corporation.
+// Copyright 2017 Google, Inc.
 
-----------------------------------------------------------------
-Two fixes for dts compiler warnings
+It is shorter and simpler, with a better code/comments ratio.
+And if you wonder about why using C++ style comment, please check
+Linus posts on the topic, as well as Thomas doc patches.
 
-These recently started showing up with better dtc checks being
-introduced.
+Thank you for your kind consideration!
 
-----------------------------------------------------------------
-Tony Lindgren (2):
-      ARM: dts: Fix elm interrupt compiler warning
-      ARM: dts: Fix dm814x missing phy-cells property
-
- arch/arm/boot/dts/dm814x.dtsi | 1 +
- arch/arm/boot/dts/omap4.dtsi  | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+-- 
+Cordially
+Philippe Ombredanne
