@@ -1,55 +1,81 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:13 +0100
-Subject: [PATCH 10/54] arm64: dts: renesas: r8a7796: Tie Audio-DMAC to IPMMU-MP
+Date: Thu,  7 Dec 2017 10:53:18 +0100
+Subject: [PATCH 15/54] arm64: dts: renesas: ulcb-kf: enable USB2 PHY of
+ channel 0
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <13312527a220d077984cc1d20d1ec73db22a866a.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <80785024767c03ff28861db0faf274fffb8d713a.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hook up r8a7796 Audio-DMAC nodes to the IPMMU-MP.
+From: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 
-Based on work for the r8a7795 by Magnus Damm.
+This supports USB2 PHY channel #0 on ULCB Kingfisher board
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+The dedicated USB0_PWEN pin is used to control CN13 VBUS source from U43
+power supply.
+MAX3355 can also provide VBUS, hence it should be disabled via OTG_OFFVBUSn
+node coming from gpio expander TCA9539.
+Set MAX3355 enabled using OTG_EXTLPn node to be able to read OTG ID of
+CN13.
+
+Signed-off-by: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
 Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm64/boot/dts/renesas/r8a7796.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/boot/dts/renesas/ulcb-kf.dtsi | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7796.dtsi b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-index 84f38056f8e6..fd875b5ea861 100644
---- a/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7796.dtsi
-@@ -1327,6 +1327,14 @@
- 			resets = <&cpg 502>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-+			iommus = <&ipmmu_mp 0>, <&ipmmu_mp 1>,
-+			       <&ipmmu_mp 2>, <&ipmmu_mp 3>,
-+			       <&ipmmu_mp 4>, <&ipmmu_mp 5>,
-+			       <&ipmmu_mp 6>, <&ipmmu_mp 7>,
-+			       <&ipmmu_mp 8>, <&ipmmu_mp 9>,
-+			       <&ipmmu_mp 10>, <&ipmmu_mp 11>,
-+			       <&ipmmu_mp 12>, <&ipmmu_mp 13>,
-+			       <&ipmmu_mp 14>, <&ipmmu_mp 15>;
+diff --git a/arch/arm64/boot/dts/renesas/ulcb-kf.dtsi b/arch/arm64/boot/dts/renesas/ulcb-kf.dtsi
+index 657ad1041965..48a2e8f48e3f 100644
+--- a/arch/arm64/boot/dts/renesas/ulcb-kf.dtsi
++++ b/arch/arm64/boot/dts/renesas/ulcb-kf.dtsi
+@@ -67,6 +67,20 @@
+ 			output-high;
+ 			line-name = "HUB rst";
  		};
++
++		otg_offvbusn {
++			gpio-hog;
++			gpios = <8 GPIO_ACTIVE_HIGH>;
++			output-low;
++			line-name = "OTG OFFVBUSn";
++		};
++
++		otg_extlpn {
++			gpio-hog;
++			gpios = <9 GPIO_ACTIVE_HIGH>;
++			output-high;
++			line-name = "OTG EXTLPn";
++		};
+ 	};
  
- 		audma1: dma-controller at ec720000 {
-@@ -1361,6 +1369,14 @@
- 			resets = <&cpg 501>;
- 			#dma-cells = <1>;
- 			dma-channels = <16>;
-+			iommus = <&ipmmu_mp 16>, <&ipmmu_mp 17>,
-+			       <&ipmmu_mp 18>, <&ipmmu_mp 19>,
-+			       <&ipmmu_mp 20>, <&ipmmu_mp 21>,
-+			       <&ipmmu_mp 22>, <&ipmmu_mp 23>,
-+			       <&ipmmu_mp 24>, <&ipmmu_mp 25>,
-+			       <&ipmmu_mp 26>, <&ipmmu_mp 27>,
-+			       <&ipmmu_mp 28>, <&ipmmu_mp 29>,
-+			       <&ipmmu_mp 30>, <&ipmmu_mp 31>;
- 		};
+ 	gpio_exp_75: gpio at 75 {
+@@ -154,6 +168,11 @@
+ 		groups = "scif1_data_b", "scif1_ctrl";
+ 		function = "scif1";
+ 	};
++
++	usb0_pins: usb0 {
++		groups = "usb0";
++		function = "usb0";
++	};
+ };
  
- 		usb_dmac0: dma-controller at e65a0000 {
+ &scif1 {
+@@ -164,6 +183,13 @@
+ 	status = "okay";
+ };
+ 
++&usb2_phy0 {
++	pinctrl-0 = <&usb0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
+ &xhci0 {
+ 	status = "okay";
+ };
 -- 
 2.11.0
