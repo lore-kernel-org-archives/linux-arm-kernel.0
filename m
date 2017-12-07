@@ -1,265 +1,134 @@
-From: jinb.park7@gmail.com (Jinbum Park)
-Date: Thu, 7 Dec 2017 19:54:44 +0900
-Subject: [kernel-hardening][PATCH v5 3/3] arm: mm: dump: add checking for
- writable and executable pages
-Message-ID: <20171207105444.GA10105@pjb1027-Latitude-E5410>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 7 Dec 2017 11:55:08 +0100
+Subject: [PATCH v3 09/15] drm/sun4i: Add A83T support
+In-Reply-To: <1729482.Mgh5nx8BIs@jernej-laptop>
+References: <cover.825a49a4c1c565a548f3de0375e7537e7e8fd3a4.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <0f8137abb37de936db82c1251556ee84fb23c7fe.1512486553.git-series.maxime.ripard@free-electrons.com>
+ <1823097.lykhZvJrH4@jernej-laptop>
+ <1729482.Mgh5nx8BIs@jernej-laptop>
+Message-ID: <20171207105508.ps22szj3y5pjwhdd@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Page mappings with full RWX permissions are a security risk.
-x86, arm64 has an option to walk the page tables
-and dump any bad pages.
+Hi,
 
-(1404d6f13e47
-("arm64: dump: Add checking for writable and exectuable pages"))
-Add a similar implementation for arm.
+On Wed, Dec 06, 2017 at 05:37:47PM +0100, Jernej ?krabec wrote:
+> Hi,
+> 
+> Dne torek, 05. december 2017 ob 16:42:55 CET je Jernej ?krabec napisal(a):
+> > Hi Maxime,
+> > 
+> > Dne torek, 05. december 2017 ob 16:10:21 CET je Maxime Ripard napisal(a):
+> > > Add support for the A83T display pipeline.
+> > > 
+> > > Reviewed-by: Chen-Yu Tsai <wens@csie.org>
+> > > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > > ---
+> > > 
+> > >  drivers/gpu/drm/sun4i/sun4i_drv.c   |  1 +
+> > >  drivers/gpu/drm/sun4i/sun4i_tcon.c  |  5 +++++
+> > >  drivers/gpu/drm/sun4i/sun8i_mixer.c |  9 +++++++++
+> > >  3 files changed, 15 insertions(+)
+> > > 
+> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > > b/drivers/gpu/drm/sun4i/sun4i_drv.c index 49215d91c853..6f5e721b545e
+> > > 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
+> > > @@ -347,6 +347,7 @@ static const struct of_device_id sun4i_drv_of_table[]
+> > > =
+> > > { { .compatible = "allwinner,sun6i-a31s-display-engine" },
+> > > 
+> > >  	{ .compatible = "allwinner,sun7i-a20-display-engine" },
+> > >  	{ .compatible = "allwinner,sun8i-a33-display-engine" },
+> > > 
+> > > +	{ .compatible = "allwinner,sun8i-a83t-display-engine" },
+> > > 
+> > >  	{ .compatible = "allwinner,sun8i-v3s-display-engine" },
+> > >  	{ }
+> > >  
+> > >  };
+> > > 
+> > > diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > b/drivers/gpu/drm/sun4i/sun4i_tcon.c index 92f4738101e6..9b757450555f
+> > > 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+> > > @@ -1132,6 +1132,10 @@ static const struct sun4i_tcon_quirks
+> > > sun8i_a33_quirks = { .has_lvds_pll		= true,
+> > > 
+> > >  };
+> > > 
+> > > +static const struct sun4i_tcon_quirks sun8i_a83t_lcd_quirks = {
+> > > +	/* nothing is supported */
+> > > +};
+> > > +
+> > > 
+> > >  static const struct sun4i_tcon_quirks sun8i_v3s_quirks = {
+> > >  
+> > >  	/* nothing is supported */
+> > >  
+> > >  };
+> > > 
+> > > @@ -1144,6 +1148,7 @@ const struct of_device_id sun4i_tcon_of_table[] = {
+> > > 
+> > >  	{ .compatible = "allwinner,sun6i-a31s-tcon", .data = 
+> &sun6i_a31s_quirks
+> > >  	},
+> > > 
+> > > { .compatible = "allwinner,sun7i-a20-tcon", .data = &sun7i_a20_quirks }, {
+> > > .compatible = "allwinner,sun8i-a33-tcon", .data = &sun8i_a33_quirks }, +	
+> {
+> > > .compatible = "allwinner,sun8i-a83t-tcon-lcd", .data =
+> > > &sun8i_a83t_lcd_quirks }, { .compatible = "allwinner,sun8i-v3s-tcon",
+> > > .data
+> > > = &sun8i_v3s_quirks }, { }
+> > > 
+> > >  };
+> > > 
+> > > diff --git a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > > b/drivers/gpu/drm/sun4i/sun8i_mixer.c index ff235e3228ce..6829bec4ba68
+> > > 100644
+> > > --- a/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > > +++ b/drivers/gpu/drm/sun4i/sun8i_mixer.c
+> > > @@ -477,6 +477,11 @@ static int sun8i_mixer_remove(struct platform_device
+> > > *pdev) return 0;
+> > > 
+> > >  }
+> > > 
+> > > +static const struct sun8i_mixer_cfg sun8i_a83t_mixer_cfg = {
+> > > +	.vi_num = 1,
+> > > +	.ui_num = 3,
+> > > +};
+> > > +
+> > 
+> > I think you should expand that structure with:
+> > .ccsc = 0,
+> > .scaler_mask = 0xf,
+> > .mod_rate = 150000000,
+> 
+> I guess you could set higher clock if CLK_SET_RATE_PARENT flag is set to de_clk 
+> in A83T CCU driver. BSP sets it to 500 MHz, which is a bit high...
 
-Tested-by: Laura Abbott <labbott@redhat.com>
-Reviewed-by: Laura Abbott <labbott@redhat.com>
-Signed-off-by: Jinbum Park <jinb.park7@gmail.com>
----
-v5: No changes
-    (Just add Tested-by, Reviewed-by from Laura Abbott)
----
- arch/arm/Kconfig.debug        | 27 ++++++++++++++++++++
- arch/arm/include/asm/ptdump.h |  8 ++++++
- arch/arm/mm/dump.c            | 58 ++++++++++++++++++++++++++++++++++++++++++-
- arch/arm/mm/init.c            |  2 ++
- 4 files changed, 94 insertions(+), 1 deletion(-)
+Actually, I didn't have to change the rate used by default, so it's
+not clear what it should be on the A83T.
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index e7b94db..78a6470 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -20,6 +20,33 @@ config ARM_PTDUMP_DEBUGFS
- 	  kernel.
- 	  If in doubt, say "N"
- 
-+config DEBUG_WX
-+	bool "Warn on W+X mappings at boot"
-+	select ARM_PTDUMP_CORE
-+	---help---
-+		Generate a warning if any W+X mappings are found at boot.
-+
-+		This is useful for discovering cases where the kernel is leaving
-+		W+X mappings after applying NX, as such mappings are a security risk.
-+
-+		Look for a message in dmesg output like this:
-+
-+			arm/mm: Checked W+X mappings: passed, no W+X pages found.
-+
-+		or like this, if the check failed:
-+
-+			arm/mm: Checked W+X mappings: FAILED, <N> W+X pages found.
-+
-+		Note that even if the check fails, your kernel is possibly
-+		still fine, as W+X mappings are not a security hole in
-+		themselves, what they do is that they make the exploitation
-+		of other unfixed kernel bugs easier.
-+
-+		There is no runtime or memory usage effect of this option
-+		once the kernel has booted up - it's a one time check.
-+
-+		If in doubt, say "Y".
-+
- # RMK wants arm kernels compiled with frame pointers or stack unwinding.
- # If you know what you are doing and are willing to live without stack
- # traces, you can get a slightly smaller kernel by setting this option to
-diff --git a/arch/arm/include/asm/ptdump.h b/arch/arm/include/asm/ptdump.h
-index 3a6c0b7..b6a0162 100644
---- a/arch/arm/include/asm/ptdump.h
-+++ b/arch/arm/include/asm/ptdump.h
-@@ -43,6 +43,14 @@ static inline int ptdump_debugfs_register(struct ptdump_info *info,
- }
- #endif /* CONFIG_ARM_PTDUMP_DEBUGFS */
- 
-+void ptdump_check_wx(void);
-+
- #endif /* CONFIG_ARM_PTDUMP_CORE */
- 
-+#ifdef CONFIG_DEBUG_WX
-+#define debug_checkwx() ptdump_check_wx()
-+#else
-+#define debug_checkwx() do { } while (0)
-+#endif
-+
- #endif /* __ASM_PTDUMP_H */
-diff --git a/arch/arm/mm/dump.c b/arch/arm/mm/dump.c
-index 43a2bee..084779c 100644
---- a/arch/arm/mm/dump.c
-+++ b/arch/arm/mm/dump.c
-@@ -52,6 +52,8 @@ struct pg_state {
- 	unsigned long start_address;
- 	unsigned level;
- 	u64 current_prot;
-+	bool check_wx;
-+	unsigned long wx_pages;
- 	const char *current_domain;
- };
- 
-@@ -60,6 +62,8 @@ struct prot_bits {
- 	u64		val;
- 	const char	*set;
- 	const char	*clear;
-+	bool		ro_bit;
-+	bool		nx_bit;
- };
- 
- static const struct prot_bits pte_bits[] = {
-@@ -73,11 +77,13 @@ struct prot_bits {
- 		.val	= L_PTE_RDONLY,
- 		.set	= "ro",
- 		.clear	= "RW",
-+		.ro_bit	= true,
- 	}, {
- 		.mask	= L_PTE_XN,
- 		.val	= L_PTE_XN,
- 		.set	= "NX",
- 		.clear	= "x ",
-+		.nx_bit	= true,
- 	}, {
- 		.mask	= L_PTE_SHARED,
- 		.val	= L_PTE_SHARED,
-@@ -141,11 +147,13 @@ struct prot_bits {
- 		.val	= L_PMD_SECT_RDONLY | PMD_SECT_AP2,
- 		.set	= "ro",
- 		.clear	= "RW",
-+		.ro_bit	= true,
- #elif __LINUX_ARM_ARCH__ >= 6
- 	{
- 		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val	= PMD_SECT_APX | PMD_SECT_AP_WRITE,
- 		.set	= "    ro",
-+		.ro_bit	= true,
- 	}, {
- 		.mask	= PMD_SECT_APX | PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val	= PMD_SECT_AP_WRITE,
-@@ -164,6 +172,7 @@ struct prot_bits {
- 		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val    = 0,
- 		.set    = "    ro",
-+		.ro_bit	= true,
- 	}, {
- 		.mask   = PMD_SECT_AP_READ | PMD_SECT_AP_WRITE,
- 		.val    = PMD_SECT_AP_WRITE,
-@@ -182,6 +191,7 @@ struct prot_bits {
- 		.val	= PMD_SECT_XN,
- 		.set	= "NX",
- 		.clear	= "x ",
-+		.nx_bit	= true,
- 	}, {
- 		.mask	= PMD_SECT_S,
- 		.val	= PMD_SECT_S,
-@@ -194,6 +204,8 @@ struct pg_level {
- 	const struct prot_bits *bits;
- 	size_t num;
- 	u64 mask;
-+	const struct prot_bits *ro_bit;
-+	const struct prot_bits *nx_bit;
- };
- 
- static struct pg_level pg_level[] = {
-@@ -226,6 +238,23 @@ static void dump_prot(struct pg_state *st, const struct prot_bits *bits, size_t
- 	}
- }
- 
-+static void note_prot_wx(struct pg_state *st, unsigned long addr)
-+{
-+	if (!st->check_wx)
-+		return;
-+	if ((st->current_prot & pg_level[st->level].ro_bit->mask) ==
-+				pg_level[st->level].ro_bit->val)
-+		return;
-+	if ((st->current_prot & pg_level[st->level].nx_bit->mask) ==
-+				pg_level[st->level].nx_bit->val)
-+		return;
-+
-+	WARN_ONCE(1, "arm/mm: Found insecure W+X mapping at address %pS\n",
-+			(void *)st->start_address);
-+
-+	st->wx_pages += (addr - st->start_address) / PAGE_SIZE;
-+}
-+
- static void note_page(struct pg_state *st, unsigned long addr,
- 		      unsigned int level, u64 val, const char *domain)
- {
-@@ -244,6 +273,7 @@ static void note_page(struct pg_state *st, unsigned long addr,
- 		unsigned long delta;
- 
- 		if (st->current_prot) {
-+			note_prot_wx(st, addr);
- 			pt_dump_seq_printf(st->seq, "0x%08lx-0x%08lx   ",
- 				   st->start_address, addr);
- 
-@@ -367,6 +397,7 @@ void ptdump_walk_pgd(struct seq_file *m, struct ptdump_info *info)
- 	struct pg_state st = {
- 		.seq = m,
- 		.marker = info->markers,
-+		.check_wx = false,
- 	};
- 
- 	walk_pgd(&st, info->mm, info->base_addr);
-@@ -379,8 +410,13 @@ static void ptdump_initialize(void)
- 
- 	for (i = 0; i < ARRAY_SIZE(pg_level); i++)
- 		if (pg_level[i].bits)
--			for (j = 0; j < pg_level[i].num; j++)
-+			for (j = 0; j < pg_level[i].num; j++) {
- 				pg_level[i].mask |= pg_level[i].bits[j].mask;
-+				if (pg_level[i].bits[j].ro_bit)
-+					pg_level[i].ro_bit = &pg_level[i].bits[j];
-+				if (pg_level[i].bits[j].nx_bit)
-+					pg_level[i].nx_bit = &pg_level[i].bits[j];
-+			}
- 
- 	address_markers[2].start_address = VMALLOC_START;
- }
-@@ -391,6 +427,26 @@ static void ptdump_initialize(void)
- 	.base_addr = 0,
- };
- 
-+void ptdump_check_wx(void)
-+{
-+	struct pg_state st = {
-+		.seq = NULL,
-+		.marker = (struct addr_marker[]) {
-+			{ 0, NULL},
-+			{ -1, NULL},
-+		},
-+		.check_wx = true,
-+	};
-+
-+	walk_pgd(&st, &init_mm, 0);
-+	note_page(&st, 0, 0, 0, NULL);
-+	if (st.wx_pages)
-+		pr_warn("Checked W+X mappings: FAILED, %lu W+X pages found\n",
-+			st.wx_pages);
-+	else
-+		pr_info("Checked W+X mappings: passed, no W+X pages found\n");
-+}
-+
- static int ptdump_init(void)
- {
- 	ptdump_initialize();
-diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-index a1f11a7..bd6f451 100644
---- a/arch/arm/mm/init.c
-+++ b/arch/arm/mm/init.c
-@@ -36,6 +36,7 @@
- #include <asm/system_info.h>
- #include <asm/tlb.h>
- #include <asm/fixmap.h>
-+#include <asm/ptdump.h>
- 
- #include <asm/mach/arch.h>
- #include <asm/mach/map.h>
-@@ -738,6 +739,7 @@ static int __mark_rodata_ro(void *unused)
- void mark_rodata_ro(void)
- {
- 	stop_machine(__mark_rodata_ro, NULL, NULL);
-+	debug_checkwx();
- }
- 
- void set_kernel_text_rw(void)
+And yeah, I'd like to avoid setting it at 500MHz without any
+particular reason. The A83T draws way to much power already without
+making it worse.
+
+I'll add the CCSC and scaler_mask fields.
+
+Maxime
+
 -- 
-1.9.1
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/c02352d1/attachment.sig>
