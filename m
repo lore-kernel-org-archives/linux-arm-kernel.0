@@ -1,42 +1,27 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Fri, 8 Dec 2017 00:06:42 +0200
-Subject: [PATCH V6 3/7] device property: Introduce a common API to fetch
- device match data
-In-Reply-To: <c2b38889-888a-3518-bf59-c2377f64a8ce@codeaurora.org>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
- <20171207124044.utyrn2mzzyml42b2@valkosipuli.retiisi.org.uk>
- <c2b38889-888a-3518-bf59-c2377f64a8ce@codeaurora.org>
-Message-ID: <20171207220642.qqiwf4vvk2gf42uf@valkosipuli.retiisi.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 7 Dec 2017 16:10:14 -0600
+Subject: [PATCH v5 2/4] clk: meson-axg: add clocks dt-bindings required
+ header
+In-Reply-To: <20171207095300.15384-3-yixun.lan@amlogic.com>
+References: <20171207095300.15384-1-yixun.lan@amlogic.com>
+ <20171207095300.15384-3-yixun.lan@amlogic.com>
+Message-ID: <20171207221014.6qwcb43w5hms4ma5@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 03:17:52PM -0500, Sinan Kaya wrote:
-> On 12/7/2017 7:40 AM, Sakari Ailus wrote:
-> > On Tue, Dec 05, 2017 at 12:04:48PM -0500, Sinan Kaya wrote:
-> >> @@ -101,6 +103,8 @@ struct fwnode_operations {
-> >>  	(*graph_get_port_parent)(struct fwnode_handle *fwnode);
-> >>  	int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
-> >>  				    struct fwnode_endpoint *endpoint);
-> >> +	void *(*get_match_data)(const struct fwnode_handle *fwnode,
-> >> +				struct device *dev);
-> > 
-> > You can make dev const, too.
-> > 
+On Thu, Dec 07, 2017 at 05:52:58PM +0800, Yixun Lan wrote:
+> From: Qiufang Dai <qiufang.dai@amlogic.com>
 > 
-> done, I couldn't change device_get_match_data() parameter const due to
-> dev_fwnode() function.
+> Add the required header for the clocks ID dt-bindings
+> exported from various subsystem in the Meson-AXG SoC.
 > 
->                  from /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:13:
-> 
-> /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:1341:39: warning: passing argument 1 of 'dev_fwnode' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
->   return fwnode_call_ptr_op(dev_fwnode(dev), device_get_match_data,
+> Signed-off-by: Qiufang Dai <qiufang.dai@amlogic.com>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+> ---
+>  include/dt-bindings/clock/axg-clkc.h | 71 ++++++++++++++++++++++++++++++++++++
+>  1 file changed, 71 insertions(+)
+>  create mode 100644 include/dt-bindings/clock/axg-clkc.h
 
-Right. Makes sense.
+Please add acks when posting new versions.
 
-I guess it's not perhaps worth it introducing dev_fwnode_const just for
-this. devices are seldom if ever const anyway.
-
--- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+Rob
