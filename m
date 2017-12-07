@@ -1,85 +1,142 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Thu, 7 Dec 2017 12:40:25 +0530
-Subject: [PATCH 2/2] arm64: allwinner: a64: bananapi-m64: add usb otg
-In-Reply-To: <CAGb2v65OcqHSDyRowK7UKUpav_CbNtRm9DSs+_uLaZcbu6b7fg@mail.gmail.com>
-References: <1512582664-24936-1-git-send-email-jagan@amarulasolutions.com>
- <CAGb2v67uFnV+m1Ub7rFVGhkv0HKD4ukpQFtJ1pqRi2vf4F=tFA@mail.gmail.com>
- <CAD6G_RR-VccHjdrXs55=C50OvDEr96c7axtbR0eKp2THFNx6sg@mail.gmail.com>
- <CAGb2v67dh=dfPKdDOwfj8m7qmUk-=s4kXS3FvZLczskrjbr7eQ@mail.gmail.com>
- <CAD6G_RR-L1RH899peZgWdapyrENJC7b9-H0pNPu9+Ji93JnQ=w@mail.gmail.com>
- <CAGb2v65OcqHSDyRowK7UKUpav_CbNtRm9DSs+_uLaZcbu6b7fg@mail.gmail.com>
-Message-ID: <CAD6G_RR0RMrx-oziEJS_8+7dLH9PeOqOHRaXAvLwFaVyC01BwA@mail.gmail.com>
+From: yinbo.zhu@nxp.com (Yinbo Zhu)
+Date: Thu, 7 Dec 2017 07:33:28 +0000
+Subject: [PATCH v2] arm64: dts: ls1088a: Add USB support
+In-Reply-To: <VI1PR04MB1262DD3C6A18257DEE2E907DE9200@VI1PR04MB1262.eurprd04.prod.outlook.com>
+References: <20170913091009.21448-1-yinbo.zhu@nxp.com>
+ <20170922065454.GF26358@dragon>
+ <VI1PR04MB1262D160BA8625330E32CAF9E9470@VI1PR04MB1262.eurprd04.prod.outlook.com>
+ <AM3PR04MB12515DB71B8ACF7422A20244E9280@AM3PR04MB1251.eurprd04.prod.outlook.com>
+ <VI1PR04MB1262DD3C6A18257DEE2E907DE9200@VI1PR04MB1262.eurprd04.prod.outlook.com>
+Message-ID: <VI1PR04MB1262C44016CE4ECB8902E7E7E9330@VI1PR04MB1262.eurprd04.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 12:31 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> On Thu, Dec 7, 2017 at 2:54 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
->> On Thu, Dec 7, 2017 at 11:56 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->>> On Thu, Dec 7, 2017 at 2:18 PM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
->>>> On Thu, Dec 7, 2017 at 8:54 AM, Chen-Yu Tsai <wens@csie.org> wrote:
->>>>> On Thu, Dec 7, 2017 at 1:51 AM, Jagan Teki <jagannadh.teki@gmail.com> wrote:
->>>>>> usb otg on bananapi-m64 has configured with USB-ID with PH9
->>>>>> and USB-DRVVBUS attached with dcdc1 regulatort.
->>>>>
->>>>> That is not how you read the schematic...
->>>>>
->>>>> Intersecting lines that are tied together will have a dot representing
->>>>> the connection. The DCDC1 line is a pull-up for the ID pin. This is very
->>>>> clear because it has a resistor connected in series.
->>>>>
->>>>> VBUS for OTG is controlled by the IC displayed to the right in the
->>>>> schematic, which is powered from 5V, and controlled by the DRVVBUS
->>>>> pin from the PMIC. Please take a look at how the A31/A33/A83T board
->>>>> dts files represent this.
->>>>
->>>> This is where I confused, USB-DRVVBUS is connected to pin 51 of PMIC
->>>> if we add 5v regulator how can configure gpio number for this? I saw
->>>
->>> From the axp20x bindings:
->>>
->>> - x-powers,drive-vbus-en: boolean, set this when the N_VBUSEN pin is
->>>                           used as an output pin to control an external
->>>                           regulator to drive the OTG VBus, rather then
->>>                           as an input pin which signals whether the
->>>                           board is driving OTG VBus or not.
->>>                           (axp221 / axp223 / axp813 only)
->>>
->>> Setting this allows you to use the "drivevbus" regulator under the PMIC.
->>> As I said, look at how other boards are doing it.
->>>
->>>> sun8i-a33-olinuxino.dts which is also similar but it has gpio = <&pio
->>>> 1 9 GPIO_ACTIVE_HIGH>;
->>>
->>> I have no idea where you saw this. It does not exist in my tree.
->>>
->>> Why don't you just trace backwards from the usb0_vbus-supply property
->>> under the usbphy node, and see where it all leads.
->>
->> This what exactly I did, usb0_vbus-supply = <&reg_drivevbus>; on
->
-> This is not what you did in your patch.
->
->> sun8i-a33-olinuxino.dts is using usb0-vbus from
->> sunxi-common-regulators.dtsi. reg_usb0_vbus regulator using gpio9
->> which I couldn't find it on schematics.
->
-> And I'm telling you that in mainline a33-olinuxino.dts it is:
->
->     usb0_vbus-supply = <&reg_drivevbus>;
->
-> It has been that way since the initial commit adding the file.
-> What tree are you looking at exactly? Take a good look at everything,
-> including your patch, and stop arguing.
+Hi shawn guo,
 
-Sorry, you miss understand. I've seen a33-olinuxino and bananapi-m64
-has similar connection in otg. Just trying to compare both and
-understand what I did different in my patch. Anyway thanks for your
-time I will send next version it will be worth discussing the same
-there.
+If my patch has no other issue, 
+Can you help me push it to upstream.
 
-thanks!
--- 
-Jagan Teki
-Free Software Engineer | www.openedev.com
-U-Boot, Linux | Upstream Maintainer
-Hyderabad, India.
+Thanks.
+BRs.
+
+-----Original Message-----
+From: Yinbo Zhu 
+Sent: Wednesday, November 22, 2017 9:32 AM
+To: 'Shawn Guo' <shawnguo@kernel.org>
+Cc: 'Rob Herring' <robh+dt@kernel.org>; 'Mark Rutland' <mark.rutland@arm.com>; 'Catalin Marinas )' <catalin.marinas@arm.com>; 'Will Deacon )' <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; 'Raghav Dogra' <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; 'open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS' <devicetree@vger.kernel.org>; 'linux-arm-kernel at lists.infradead.org' <linux-arm-kernel@lists.infradead.org>; 'open list' <linux-kernel@vger.kernel.org>
+Subject: RE: [PATCH v2] arm64: dts: ls1088a: Add USB support
+
+Hi
+
+-----Original Message-----
+From: Yinbo Zhu 
+Sent: Tuesday, November 14, 2017 4:00 PM
+To: 'Shawn Guo' <shawnguo@kernel.org>
+Cc: 'Rob Herring' <robh+dt@kernel.org>; 'Mark Rutland' <mark.rutland@arm.com>; 'Catalin Marinas )' <catalin.marinas@arm.com>; 'Will Deacon )' <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; 'Raghav Dogra' <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; 'open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS' <devicetree@vger.kernel.org>; 'linux-arm-kernel at lists.infradead.org' <linux-arm-kernel@lists.infradead.org>; 'open list' <linux-kernel@vger.kernel.org>
+Subject: RE: [PATCH v2] arm64: dts: ls1088a: Add USB support
+
+
+
+-----Original Message-----
+From: Yinbo Zhu 
+Sent: Tuesday, October 24, 2017 5:15 PM
+To: Shawn Guo <shawnguo@kernel.org>
+Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; Raghav Dogra <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open list <linux-kernel@vger.kernel.org>
+Subject: RE: [PATCH v2] arm64: dts: ls1088a: Add USB support
+
+
+-----Original Message-----
+From: Shawn Guo [mailto:shawnguo at kernel.org] 
+Sent: Friday, September 22, 2017 2:55 PM
+To: Yinbo Zhu <yinbo.zhu@nxp.com>
+Cc: Rob Herring <robh+dt@kernel.org>; Mark Rutland <mark.rutland@arm.com>; Catalin Marinas ) <catalin.marinas@arm.com>; Will Deacon ) <will.deacon@arm.com>; Harninder Rai <harninder.rai@nxp.com>; Raghav Dogra <raghav.dogra@nxp.com>; Ashish Kumar <ashish.kumar@nxp.com>; Andy Tang <andy.tang@nxp.com>; open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS <devicetree@vger.kernel.org>; linux-arm-kernel at lists.infradead.org; open list <linux-kernel@vger.kernel.org>
+Subject: Re: [PATCH v2] arm64: dts: ls1088a: Add USB support
+
+On Wed, Sep 13, 2017 at 05:10:09PM +0800, yinbo.zhu at nxp.com wrote:
+> From: "yinbo.zhu" <yinbo.zhu@nxp.com>
+> 
+> Fix the issue that usb is not detected on ls1088ardb
+
+>It's not really about fixing issue but adding support.
+
+The patch had been tested on upstream 4.14 code, it can fix the issue. 
+> 
+> Signed-off-by: yinbo.zhu <yinbo.zhu@nxp.com>
+> Signed-off-by: Ran Wang <ran.wang_1@nxp.com>
+> ---
+
+>You should better have a version history here to tell what's changed between version.
+
+>I will add a version history on next v3 patch
+Hi,
+
+I had modified the code as v4 version, 
+https://patchwork.kernel.org/patch/10027393/
+please check.
+
+Thanks,
+BRs
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts |  8 ++++++++
+>  arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi    | 20 ++++++++++++++++++++
+>  2 files changed, 28 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts 
+> b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> index 213abb72de93..6c3c3bc4b681 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a-rdb.dts
+> @@ -118,6 +118,14 @@
+>  	status = "okay";
+>  };
+>  
+> +&usb0 {
+> +	status = "okay";
+> +};
+> +
+> +&usb1 {
+> +	status = "okay";
+> +};
+> +
+>  &esdhc {
+
+>Please sort these labeled nodes alphabetically.
+
+>Shawn
+
+>  	status = "okay";
+>  };
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi 
+> b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> index c144d06a6e33..c23fede8cf5d 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls1088a.dtsi
+> @@ -359,6 +359,26 @@
+>  			status = "disabled";
+>  		};
+>  
+> +		usb0: usb3 at 3100000 {
+> +			compatible = "snps,dwc3";
+> +			reg = <0x0 0x3100000 0x0 0x10000>;
+> +			interrupts = <0 80 IRQ_TYPE_LEVEL_HIGH>;
+> +			dr_mode = "host";
+> +			snps,quirk-frame-length-adjustment = <0x20>;
+> +			snps,dis_rxdet_inp3_quirk;
+> +			status = "disabled";
+> +		};
+> +
+> +		usb1: usb3 at 3110000 {
+> +			compatible = "snps,dwc3";
+> +			reg = <0x0 0x3110000 0x0 0x10000>;
+> +			interrupts = <0 81 IRQ_TYPE_LEVEL_HIGH>;
+> +			dr_mode = "host";
+> +			snps,quirk-frame-length-adjustment = <0x20>;
+> +			snps,dis_rxdet_inp3_quirk;
+> +			status = "disabled";
+> +		};
+> +
+>  		sata: sata at 3200000 {
+>  			compatible = "fsl,ls1088a-ahci";
+>  			reg = <0x0 0x3200000 0x0 0x10000>,
+> --
+> 2.14.1
+> 
