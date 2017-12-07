@@ -1,126 +1,28 @@
-From: miquel.raynal@free-electrons.com (Miquel Raynal)
-Date: Thu,  7 Dec 2017 21:18:13 +0100
-Subject: [PATCH 11/12] ARM64: dts: marvell: use reworked NAND controller
- driver on Armada 7K
-In-Reply-To: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
-References: <20171207201814.30411-1-miquel.raynal@free-electrons.com>
-Message-ID: <20171207201814.30411-12-miquel.raynal@free-electrons.com>
+From: khilman@baylibre.com (Kevin Hilman)
+Date: Thu, 07 Dec 2017 12:31:16 -0800
+Subject: [PATCH] clk: meson: make the spinlock naming more specific
+In-Reply-To: <20171204052739.10747-1-yixun.lan@amlogic.com> (Yixun Lan's
+ message of "Mon, 4 Dec 2017 13:27:39 +0800")
+References: <20171204052739.10747-1-yixun.lan@amlogic.com>
+Message-ID: <7hpo7qp9ez.fsf@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use the new bindings of the reworked Marvell NAND controller driver.
-Also adapt the nand controller node organization to distinguish which
-property is relevant for the controller, and which one is NAND chip
-specific. Expose the partitions as a subnode of the NAND chip.
+Yixun Lan <yixun.lan@amlogic.com> writes:
 
-Remove the 'marvell,nand-enable-arbiter' property, not needed anymore as
-the driver activates the arbiter by default for all boards (either
-needed or harmless).
+> Make the spinlock more specific, so better for lockdep
+> debugging and ctags/grep.
+>
+> Signed-off-by: Yixun Lan <yixun.lan@amlogic.com>
+>
+> ---
+>
+> this patch try to address the issue which bring up by Stephen at [1]
+> [1] http://lists.infradead.org/pipermail/linux-amlogic/2017-December/005534.html
 
-Signed-off-by: Miquel Raynal <miquel.raynal@free-electrons.com>
----
- arch/arm64/boot/dts/marvell/armada-7040-db.dts     | 52 +++++++++++++---------
- .../boot/dts/marvell/armada-cp110-master.dtsi      |  8 ++--
- 2 files changed, 36 insertions(+), 24 deletions(-)
+FYI... for future reference, it's common to use a Suggested-by tag to
+give credit for these kinds of things.  e.g.:
 
-diff --git a/arch/arm64/boot/dts/marvell/armada-7040-db.dts b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-index 52b5341cb270..758452c10612 100644
---- a/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-+++ b/arch/arm64/boot/dts/marvell/armada-7040-db.dts
-@@ -156,36 +156,48 @@
- 	};
- };
- 
--&cpm_nand {
-+&cpm_nand_controller {
- 	/*
- 	 * SPI on CPM and NAND have common pins on this board. We can
--	 * use only one at a time. To enable the NAND (whihch will
-+	 * use only one at a time. To enable the NAND (which will
- 	 * disable the SPI), the "status = "okay";" line have to be
- 	 * added here.
- 	 */
--	num-cs = <1>;
- 	pinctrl-0 = <&nand_pins>, <&nand_rb>;
- 	pinctrl-names = "default";
--	nand-ecc-strength = <4>;
--	nand-ecc-step-size = <512>;
--	marvell,nand-enable-arbiter;
--	nand-on-flash-bbt;
--
--	partition at 0 {
--		label = "U-Boot";
--		reg = <0 0x200000>;
--	};
--	partition at 200000 {
--		label = "Linux";
--		reg = <0x200000 0xe00000>;
--	};
--	partition at 1000000 {
--		label = "Filesystem";
--		reg = <0x1000000 0x3f000000>;
-+
-+	nand at 0 {
-+		reg = <0>;
-+		label = "pxa3xx_nand-0";
-+		marvell,rb = <0>;
-+		nand-on-flash-bbt;
-+		nand-ecc-strength = <4>;
-+		nand-ecc-step-size = <512>;
-+
-+		partitions {
-+			compatible = "fixed-partitions";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "U-Boot";
-+				reg = <0 0x200000>;
-+			};
-+
-+			partition at 200000 {
-+				label = "Linux";
-+				reg = <0x200000 0xe00000>;
-+			};
-+
-+			partition at 1000000 {
-+				label = "Filesystem";
-+				reg = <0x1000000 0x3f000000>;
-+			};
-+
-+		};
- 	};
- };
- 
--
- &cpm_spi1 {
- 	status = "okay";
- 
-diff --git a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-index e3b64d03fbd8..8a3cff9a7343 100644
---- a/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-+++ b/arch/arm64/boot/dts/marvell/armada-cp110-master.dtsi
-@@ -309,17 +309,17 @@
- 				status = "disabled";
- 			};
- 
--			cpm_nand: nand at 720000 {
-+			cpm_nand_controller: nand at 720000 {
- 				/*
- 				 * Due to the limiation of the pin available
- 				 * this controller is only usable on the CPM
- 				 * for A7K and on the CPS for A8K.
- 				 */
--				compatible = "marvell,armada-8k-nand",
--					     "marvell,armada370-nand";
-+				compatible = "marvell,armada-8k-nand-controller",
-+					     "marvell,armada370-nand-controller";
- 				reg = <0x720000 0x54>;
- 				#address-cells = <1>;
--				#size-cells = <1>;
-+				#size-cells = <0>;
- 				interrupts = <ICU_GRP_NSR 115 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&cpm_clk 1 2>;
- 				marvell,system-controller = <&cpm_syscon0>;
--- 
-2.11.0
+Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+
+Kevin
