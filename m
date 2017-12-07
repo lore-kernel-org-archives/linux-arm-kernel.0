@@ -1,90 +1,137 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  7 Dec 2017 14:56:09 +0100
-Subject: [PATCH v2 0/7] Add CPU Frequency scaling support on Armada 37xx
-Message-ID: <20171207135616.23670-1-gregory.clement@free-electrons.com>
+Date: Thu,  7 Dec 2017 14:56:11 +0100
+Subject: [PATCH v2 2/7] cpufreq: ARM: sort the Kconfig menu
+In-Reply-To: <20171207135616.23670-1-gregory.clement@free-electrons.com>
+References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
+Message-ID: <20171207135616.23670-3-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Group all the related big LITTLE configuration together and sort the
+other entries in alphabetic order.
 
-This is the second version of a series adding the CPU Frequency
-support on Armada 37xx using DVFS. It is based on the initial work of
-Evan Wang and Victor Gu.
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ drivers/cpufreq/Kconfig.arm | 82 ++++++++++++++++++++++-----------------------
+ 1 file changed, 41 insertions(+), 41 deletions(-)
 
-The main change since the first version was a bug fixed in the
-"cpufreq: Add DVFS support for Armada 37xx" patch which was preventing
-to register the opp. An other noticeable change is the 4th patch which
-is new adding the use of dev_pm_opp_remove and removing an comment
-became wrong. The other changes are described in the change log.
-
-DVFS control is done by a set of registers from the North Bridge Power
-Management block. The binding for this block is documented in patch 1.
-
-While adding a new cpufreq driver I found that the Kconfig and
-Makefile were no more in order, so it is fixed by patch 2 and 3.
-
-The 5th patch is just about updating the MAINTAINERS file with the new
-driver.
-
-The next patch is the real purpose of the series. The main goal of
-this driver is to setup the CPU load level in the hardware to
-associate them to CPU frequencies and register a standard cpufreq
-driver. Note that the hardware also capable of doing AVS (Adaptive
-Voltage Scaling), by associating a voltage on each level beside the
-CPU frequency. However, this support is not yet ready, so it is not
-part of this series.
-
-Finally, the last patch is for arm-soc the arm-soc subsystem through
-mvebu and update the device tree to support the CPU frequency scaling.
-
-An update on the CPU clock driver is needed in order to take into
-account the DVFS setting. It's the purpose of an other series already
-sent, but is no dependencies between the series (for building or at
-runtime).
-
-Thanks,
-
-Gregory
-
-Changelog:
-
-v1 -> v2:
-
- - using syscon instead of nb_pm for the binding of the North bridge
-   power management unit: reported by Rob Herring
-
- - fix sorting inside the big LITTLE section for the Kconfig: reported
-   by Viresh Kumar
-
- - fix the bogus freq calculation in armada37xx_cpufreq_driver_init,
-   bug reported by Andre Heider
-
- - use dev_pm_opp_remove() on the previous opp if dev_pm_opp_add()
-   failed, reported by Viresh Kumar
-
- - add the Tested-by flag from Andre Heider on "cpufreq: Add DVFS
-   support for Armada 37xx" patch
-
-Gregory CLEMENT (7):
-  dt-bindings: marvell: Add documentation for the North Bridge PM on
-    Armada 37xx
-  cpufreq: ARM: sort the Kconfig menu
-  cpufreq: sort the drivers in ARM part
-  cpufreq: mvebu: Use dev_pm_opp_remove()
-  MAINTAINERS: add new entries for Armada 37xx cpufreq driver
-  cpufreq: Add DVFS support for Armada 37xx
-  arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
-
- .../bindings/arm/marvell/armada-37xx.txt           |  19 ++
- MAINTAINERS                                        |   1 +
- arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   1 +
- arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   7 +
- drivers/cpufreq/Kconfig.arm                        |  89 ++++----
- drivers/cpufreq/Makefile                           |   9 +-
- drivers/cpufreq/armada-37xx-cpufreq.c              | 241 +++++++++++++++++++++
- drivers/cpufreq/mvebu-cpufreq.c                    |  11 +-
- 8 files changed, 327 insertions(+), 51 deletions(-)
- create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
-
+diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
+index bdce4488ded1..0baf43837b51 100644
+--- a/drivers/cpufreq/Kconfig.arm
++++ b/drivers/cpufreq/Kconfig.arm
+@@ -2,6 +2,23 @@
+ # ARM CPU Frequency scaling drivers
+ #
+ 
++config ACPI_CPPC_CPUFREQ
++	tristate "CPUFreq driver based on the ACPI CPPC spec"
++	depends on ACPI_PROCESSOR
++	select ACPI_CPPC_LIB
++	default n
++	help
++	  This adds a CPUFreq driver which uses CPPC methods
++	  as described in the ACPIv5.1 spec. CPPC stands for
++	  Collaborative Processor Performance Controls. It
++	  is based on an abstract continuous scale of CPU
++	  performance values which allows the remote power
++	  processor to flexibly optimize for power and
++	  performance. CPPC relies on power management firmware
++	  support for its operation.
++
++	  If in doubt, say N.
++
+ # big LITTLE core layer and glue drivers
+ config ARM_BIG_LITTLE_CPUFREQ
+ 	tristate "Generic ARM big LITTLE CPUfreq driver"
+@@ -12,6 +29,30 @@ config ARM_BIG_LITTLE_CPUFREQ
+ 	help
+ 	  This enables the Generic CPUfreq driver for ARM big.LITTLE platforms.
+ 
++config ARM_DT_BL_CPUFREQ
++	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
++	depends on ARM_BIG_LITTLE_CPUFREQ && OF
++	help
++	  This enables probing via DT for Generic CPUfreq driver for ARM
++	  big.LITTLE platform. This gets frequency tables from DT.
++
++config ARM_SCPI_CPUFREQ
++        tristate "SCPI based CPUfreq driver"
++	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
++        help
++	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
++	  using SCPI protocol for CPU power management.
++
++	  This driver uses SCPI Message Protocol driver to interact with the
++	  firmware providing the CPU DVFS functionality.
++
++config ARM_VEXPRESS_SPC_CPUFREQ
++        tristate "Versatile Express SPC based CPUfreq driver"
++	depends on ARM_BIG_LITTLE_CPUFREQ && ARCH_VEXPRESS_SPC
++        help
++          This add the CPUfreq driver support for Versatile Express
++	  big.LITTLE platforms using SPC for power management.
++
+ config ARM_BRCMSTB_AVS_CPUFREQ
+ 	tristate "Broadcom STB AVS CPUfreq driver"
+ 	depends on ARCH_BRCMSTB || COMPILE_TEST
+@@ -33,20 +74,6 @@ config ARM_BRCMSTB_AVS_CPUFREQ_DEBUG
+ 
+ 	  If in doubt, say N.
+ 
+-config ARM_DT_BL_CPUFREQ
+-	tristate "Generic probing via DT for ARM big LITTLE CPUfreq driver"
+-	depends on ARM_BIG_LITTLE_CPUFREQ && OF
+-	help
+-	  This enables probing via DT for Generic CPUfreq driver for ARM
+-	  big.LITTLE platform. This gets frequency tables from DT.
+-
+-config ARM_VEXPRESS_SPC_CPUFREQ
+-        tristate "Versatile Express SPC based CPUfreq driver"
+-	depends on ARM_BIG_LITTLE_CPUFREQ && ARCH_VEXPRESS_SPC
+-        help
+-          This add the CPUfreq driver support for Versatile Express
+-	  big.LITTLE platforms using SPC for power management.
+-
+ config ARM_EXYNOS5440_CPUFREQ
+ 	tristate "SAMSUNG EXYNOS5440"
+ 	depends on SOC_EXYNOS5440
+@@ -205,16 +232,6 @@ config ARM_SA1100_CPUFREQ
+ config ARM_SA1110_CPUFREQ
+ 	bool
+ 
+-config ARM_SCPI_CPUFREQ
+-        tristate "SCPI based CPUfreq driver"
+-	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
+-        help
+-	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
+-	  using SCPI protocol for CPU power management.
+-
+-	  This driver uses SCPI Message Protocol driver to interact with the
+-	  firmware providing the CPU DVFS functionality.
+-
+ config ARM_SPEAR_CPUFREQ
+ 	bool "SPEAr CPUFreq support"
+ 	depends on PLAT_SPEAR
+@@ -275,20 +292,3 @@ config ARM_PXA2xx_CPUFREQ
+ 	  This add the CPUFreq driver support for Intel PXA2xx SOCs.
+ 
+ 	  If in doubt, say N.
+-
+-config ACPI_CPPC_CPUFREQ
+-	tristate "CPUFreq driver based on the ACPI CPPC spec"
+-	depends on ACPI_PROCESSOR
+-	select ACPI_CPPC_LIB
+-	default n
+-	help
+-	  This adds a CPUFreq driver which uses CPPC methods
+-	  as described in the ACPIv5.1 spec. CPPC stands for
+-	  Collaborative Processor Performance Controls. It
+-	  is based on an abstract continuous scale of CPU
+-	  performance values which allows the remote power
+-	  processor to flexibly optimize for power and
+-	  performance. CPPC relies on power management firmware
+-	  support for its operation.
+-
+-	  If in doubt, say N.
 -- 
 2.15.0
