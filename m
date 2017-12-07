@@ -1,132 +1,30 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 7 Dec 2017 14:39:34 +0000
-Subject: [PATCH v3 11/20] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <20171206194346.24393-12-ard.biesheuvel@linaro.org>
-References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
- <20171206194346.24393-12-ard.biesheuvel@linaro.org>
-Message-ID: <20171207143934.GF22781@e103592.cambridge.arm.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Thu,  7 Dec 2017 16:09:23 +0100
+Subject: [PATCH] ARM: dts: imx6: RDU2: correct RTC compatible
+Message-ID: <20171207150923.25024-1-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 06, 2017 at 07:43:37PM +0000, Ard Biesheuvel wrote:
-> Add support macros to conditionally yield the NEON (and thus the CPU)
-> that may be called from the assembler code.
-> 
-> In some cases, yielding the NEON involves saving and restoring a non
-> trivial amount of context (especially in the CRC folding algorithms),
-> and so the macro is split into three, and the code in between is only
-> executed when the yield path is taken, allowing the context to be preserved.
-> The third macro takes an optional label argument that marks the resume
-> path after a yield has been performed.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/assembler.h | 51 ++++++++++++++++++++
->  1 file changed, 51 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> index 5f61487e9f93..c54e408fd5a7 100644
-> --- a/arch/arm64/include/asm/assembler.h
-> +++ b/arch/arm64/include/asm/assembler.h
-> @@ -572,4 +572,55 @@ alternative_else_nop_endif
->  #endif
->  	.endm
->  
-> +/*
-> + * Check whether to yield to another runnable task from kernel mode NEON code
-> + * (which runs with preemption disabled).
-> + *
-> + * if_will_cond_yield_neon
-> + *        // pre-yield patchup code
-> + * do_cond_yield_neon
-> + *        // post-yield patchup code
-> + * endif_yield_neon
+The RTC is manufactured by Maxim. This is a cosmetic fix, as Linux
+doesn't match the vendor string for i2c devices.
 
-^ Mention the lbl argument?
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+---
+ arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-> + *
-> + * - Check whether the preempt count is exactly 1, in which case disabling
-
-                                                           enabling ^
-
-> + *   preemption once will make the task preemptible. If this is not the case,
-> + *   yielding is pointless.
-> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
-> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
-> + *   yield fixup code.
-
-Mention that neither patchup sequence is allowed to use section-changing
-directives?
-
-For example:
-
-	if_will_cond_yield_neon
-		// some code
-
-		.pushsection .rodata, "a"
-foo: 			.quad // some literal data for some reason
-		.popsection
-
-		// some code
-	do_cond_yield_neon
-
-is not safe, because .previous is now .rodata.
-
-(You could protect against this with
-	.pushsection .text; .previous; .subsection 1; // ...
-	.popsection
-but it may be overkill.)
-
-> + *
-> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
-> + * and may clobber x2 .. x18 if the yield path is taken.
-> + */
-> +
-> +	.macro		cond_yield_neon, lbl
-> +	if_will_cond_yield_neon
-> +	do_cond_yield_neon
-> +	endif_yield_neon	\lbl
-> +	.endm
-> +
-> +	.macro		if_will_cond_yield_neon
-> +#ifdef CONFIG_PREEMPT
-> +	get_thread_info	x0
-> +	ldr		w1, [x0, #TSK_TI_PREEMPT]
-> +	ldr		x0, [x0, #TSK_TI_FLAGS]
-> +	cmp		w1, #1 // == PREEMPT_OFFSET
-
-Can we at least drop a BUILD_BUG_ON() somewhere to check this?
-
-Maybe in kernel_neon_begin() since this is intimately kernel-mode NEON
-related.
-
-> +	csel		x0, x0, xzr, eq
-> +	tbnz		x0, #TIF_NEED_RESCHED, 5555f	// needs rescheduling?
-> +#endif
-
-A comment that we will fall through to 6666f here may be helpful.
-
-> +	.subsection	1
-> +5555:
-> +	.endm
-> +
-> +	.macro		do_cond_yield_neon
-> +	bl		kernel_neon_end
-> +	bl		kernel_neon_begin
-> +	.endm
-> +
-> +	.macro		endif_yield_neon, lbl=6666f
-> +	b		\lbl
-> +	.previous
-> +6666:
-
-Could have slightly more random "random" labels here, but otherwise
-it looks ok to me.
-
-I might go through and replace all the random labels with something
-more robust sometime, but I've never been sure it was worth the
-effort...
-
-Cheers
----Dave
+diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+index eef737bd52d9..6bef9a98678e 100644
+--- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
++++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+@@ -581,7 +581,7 @@
+ 	};
+ 
+ 	ds1341: rtc at 68 {
+-		compatible = "dallas,ds1341";
++		compatible = "maxim,ds1341";
+ 		reg = <0x68>;
+ 	};
+ };
+-- 
+2.11.0
