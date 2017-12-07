@@ -1,81 +1,77 @@
-From: gregkh@linuxfoundation.org (Greg Kroah-Hartman)
-Date: Thu, 7 Dec 2017 09:29:58 +0100
-Subject: [PATCH] ACPI / GED: unregister interrupts during shutdown
-In-Reply-To: <CAJZ5v0hEdK_vJcHeoz=Z2H6od=bktspPpTo37Y6qiOT2qptnaA@mail.gmail.com>
-References: <1512507705-2411-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0jcFqG=Jd19ms7XQMR+rGfdKTEaN7SK91DPzBa=xcMY1w@mail.gmail.com>
- <0b661eec-f9c7-7818-ad09-f3d488adcefe@codeaurora.org>
- <CAJZ5v0hkajauiqEmEVv+k-OYeP+_S4wufjuR7vmhcxARpRpw=g@mail.gmail.com>
- <fe65ff1a-a8b8-c29b-161d-72cbfea5c056@codeaurora.org>
- <aa5bcbab-b059-1abf-1553-371fe5750455@codeaurora.org>
- <CAJZ5v0iifeFpJsSwXO1AGLW3rn1cG7t3V6ZAnu34-K=D_DavBA@mail.gmail.com>
- <e0f77da3-93d8-d474-3531-488f8f5f6108@codeaurora.org>
- <CAJZ5v0iaursWFP_KRoJqT6-QoGkvpTot0oMvs6qdjkaP12p9jQ@mail.gmail.com>
- <CAJZ5v0hEdK_vJcHeoz=Z2H6od=bktspPpTo37Y6qiOT2qptnaA@mail.gmail.com>
-Message-ID: <20171207082958.GA11882@kroah.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Thu, 7 Dec 2017 09:35:50 +0100
+Subject: [PATCH] ARM64: dts: amlogic: use generic bus node names
+In-Reply-To: <20171206193005.24171-1-khilman@baylibre.com>
+References: <20171206193005.24171-1-khilman@baylibre.com>
+Message-ID: <fb631d1c-2b12-34e4-c157-ba11242e68de@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 12:19:25AM +0100, Rafael J. Wysocki wrote:
-> Hi Greg,
+On 06/12/2017 20:30, Kevin Hilman wrote:
+> The DT spec recommends that node-names have generic names like "bus".
+> Fix that in the Amlogic DTs, while leaving the label names to have more
+> SoC-specific names that match with the HW documentation.
 > 
-> On Wed, Dec 6, 2017 at 6:16 PM, Rafael J. Wysocki <rafael@kernel.org> wrote:
-> > On Wed, Dec 6, 2017 at 5:55 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> >> On 12/6/2017 11:41 AM, Rafael J. Wysocki wrote:
-> >>> On Wed, Dec 6, 2017 at 5:11 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> >>>> On 12/6/2017 9:57 AM, Sinan Kaya wrote:
-> >>>>>> Yes, it should, so I'm not sure why you need the list in the first place.
-> >>>>>>
-> >>>>>> Also it looks like something along the lines of devres_release_all()
-> >>>>>> should be sufficient.
-> >>>>> Good suggestion, let me test this.
-> >>>>>
-> >>>>
-> >>>> I tried to pull the code into GED but the API is not public. I also looked
-> >>>> at how it is used. I was afraid to mess up with the internals of base.c by
-> >>>> calling devres_release_all() externally first and by the driver framework
-> >>>> next. I moved away from this approach.
-> >>>
-> >>> Are you sure it is called by the core in the shutdown path?
-> >>
-> >> Sorry, I was thinking about a general case not the shutdown path. If we open
-> >> this API and have device drivers call it from arbitrary places; then we could
-> >> be opening a new can of worms that show up during device driver removal.
+> Suggested-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Kevin Hilman <khilman@baylibre.com>
+> ---
+>  arch/arm64/boot/dts/amlogic/meson-axg.dtsi | 4 ++--
+>  arch/arm64/boot/dts/amlogic/meson-gx.dtsi  | 6 +++---
+>  2 files changed, 5 insertions(+), 5 deletions(-)
 > 
-> [cut]
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> index b932a784b02a..e7213eb53958 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-axg.dtsi
+> @@ -113,7 +113,7 @@
+>  		#size-cells = <2>;
+>  		ranges;
+>  
+> -		cbus: cbus at ffd00000 {
+> +		cbus: bus at ffd00000 {
+>  			compatible = "simple-bus";
+>  			reg = <0x0 0xffd00000 0x0 0x25000>;
+>  			#address-cells = <2>;
+> @@ -175,7 +175,7 @@
+>  			};
+>  		};
+>  
+> -		aobus: aobus at ff800000 {
+> +		aobus: bus at ff800000 {
+>  			compatible = "simple-bus";
+>  			reg = <0x0 0xff800000 0x0 0x100000>;
+>  			#address-cells = <2>;
+> diff --git a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> index 7cdbf58a062f..6cb3c2a52baf 100644
+> --- a/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> +++ b/arch/arm64/boot/dts/amlogic/meson-gx.dtsi
+> @@ -211,7 +211,7 @@
+>  		#size-cells = <2>;
+>  		ranges;
+>  
+> -		cbus: cbus at c1100000 {
+> +		cbus: bus at c1100000 {
+>  			compatible = "simple-bus";
+>  			reg = <0x0 0xc1100000 0x0 0x100000>;
+>  			#address-cells = <2>;
+> @@ -366,7 +366,7 @@
+>  			};
+>  		};
+>  
+> -		aobus: aobus at c8100000 {
+> +		aobus: bus at c8100000 {
+>  			compatible = "simple-bus";
+>  			reg = <0x0 0xc8100000 0x0 0x100000>;
+>  			#address-cells = <2>;
+> @@ -453,7 +453,7 @@
+>  			};
+>  		};
+>  
+> -		hiubus: hiubus at c883c000 {
+> +		hiubus: bus at c883c000 {
+>  			compatible = "simple-bus";
+>  			reg = <0x0 0xc883c000 0x0 0x2000>;
+>  			#address-cells = <2>;
 > 
-> >
-> > OK
-> >
-> > Anyway, it looks like something is missing in the core.
-> >
-> > You shouldn't really need to do all that dance in a driver.
-> 
-> We have a problem with the ACPI GED driver which essentially is a
-> platform driver requesting a number of interrupts and handling them by
-> dispatching a specific AML method.
-> 
-> It uses devm_request_threaded_irq() to request the interrupts, so it
-> doesn't need a ->remove() callback, but it turns out to need a
-> ->shutdown() one to free all of these interrupts at the shutdown time.
-> 
-> While we can add a ->shutdown() callback to it, that essentially needs
-> to duplicate devres_release_all() somewhat.
-> 
-> Any suggestions what to do with that?
 
-Just don't use devm_request_threaded_irq()?  :)
-
-Seriously, those are just "helper" functions if your code happens to
-follow the pattern they provide, if not, then don't use them, it's not
-that hard to provide the correct code to unwind things properly by "open
-coding" this logic as needed.
-
-The devm_*irq() functions are known for not being able to be used all of
-the time for lots of shutdown and cleanup issues, this isn't the first
-time it has happened, which is why we are very careful when taking
-"cleanup" patches that use those functions.
-
-thanks,
-
-greg k-h
+Reviewed-by: Neil Armstrong <narmstrong@baylibre.com>
