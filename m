@@ -1,45 +1,35 @@
-From: sean.wang@mediatek.com (sean.wang at mediatek.com)
-Date: Thu, 7 Dec 2017 14:43:23 +0800
-Subject: [PATCH v2 2/3] arm: dts: mt7623: update mmc related nodes with the
- appropriate fallback
-In-Reply-To: <cover.1512628593.git.sean.wang@mediatek.com>
-References: <cover.1512628593.git.sean.wang@mediatek.com>
-Message-ID: <134d7930a10387749cba9a630185c67912c924c8.1512628593.git.sean.wang@mediatek.com>
+From: takuo.koguchi@gmail.com (Takuo Koguchi)
+Date: Thu,  7 Dec 2017 16:20:14 +0900
+Subject: [PATCH V3] spi: sun4i: disable clocks in the remove function
+In-Reply-To: <20171206152005.yfbyylu6tbe5gnnv@flea.lan>
+Message-ID: <1512631227-27334-1-git-send-email-takuo.koguchi.sw@hitachi.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sean Wang <sean.wang@mediatek.com>
+mclk and hclk need to be disabled. Since pm_runtime_disable does
+not disable the clocks, use pm_runtime_force_suspend instead.
 
-The current mmc related nodes should be falling back to MT2701
-as the dt-binding defines and which has more appropriate setup
-for MT7623.
+Found by Linux Driver Verification project (linuxtesting.org).
 
-Signed-off-by: Sean Wang <sean.wang@mediatek.com>
+Signed-off-by: Takuo Koguchi <takuo.koguchi.sw@hitachi.com>
 ---
- arch/arm/boot/dts/mt7623.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ V3: remove redundant pm_runtime_disable call.
+     Compile test only, no runtime test done.
+ drivers/spi/spi-sun4i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/mt7623.dtsi b/arch/arm/boot/dts/mt7623.dtsi
-index 0640fb7..343d3b1 100644
---- a/arch/arm/boot/dts/mt7623.dtsi
-+++ b/arch/arm/boot/dts/mt7623.dtsi
-@@ -641,7 +641,7 @@
+diff --git a/drivers/spi/spi-sun4i.c b/drivers/spi/spi-sun4i.c
+index c5cd635..4141003 100644
+--- a/drivers/spi/spi-sun4i.c
++++ b/drivers/spi/spi-sun4i.c
+@@ -525,7 +525,7 @@ static int sun4i_spi_probe(struct platform_device *pdev)
  
- 	mmc0: mmc at 11230000 {
- 		compatible = "mediatek,mt7623-mmc",
--			     "mediatek,mt8135-mmc";
-+			     "mediatek,mt2701-mmc";
- 		reg = <0 0x11230000 0 0x1000>;
- 		interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_MSDC30_0>,
-@@ -652,7 +652,7 @@
+ static int sun4i_spi_remove(struct platform_device *pdev)
+ {
+-	pm_runtime_disable(&pdev->dev);
++	pm_runtime_force_suspend(&pdev->dev);
  
- 	mmc1: mmc at 11240000 {
- 		compatible = "mediatek,mt7623-mmc",
--			     "mediatek,mt8135-mmc";
-+			     "mediatek,mt2701-mmc";
- 		reg = <0 0x11240000 0 0x1000>;
- 		interrupts = <GIC_SPI 40 IRQ_TYPE_LEVEL_LOW>;
- 		clocks = <&pericfg CLK_PERI_MSDC30_1>,
+ 	return 0;
+ }
 -- 
 2.7.4
