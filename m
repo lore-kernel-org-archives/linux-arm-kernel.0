@@ -1,160 +1,39 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Thu, 7 Dec 2017 14:53:09 +0000
-Subject: [PATCH v3 10/20] arm64: assembler: add utility macros to
- push/pop stack frames
-In-Reply-To: <CAKv+Gu_82v_L9dZczQZbkmksc1wvOBsa28URP4Q7MEcvAwxhmw@mail.gmail.com>
-References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
- <20171206194346.24393-11-ard.biesheuvel@linaro.org>
- <20171207141104.GE22781@e103592.cambridge.arm.com>
- <CAKv+Gu_82v_L9dZczQZbkmksc1wvOBsa28URP4Q7MEcvAwxhmw@mail.gmail.com>
-Message-ID: <20171207145309.GG22781@e103592.cambridge.arm.com>
+From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
+Date: Thu, 07 Dec 2017 15:53:23 +0100
+Subject: [PATCH] media: s5p-jpeg: Fix off-by-one problem
+In-Reply-To: <20171206163746.8456-1-flavio.ceolin@intel.com>
+References: <CGME20171206163802epcas1p3527bd6a922fd31aa80cf349a510a71eb@epcas1p3.samsung.com>
+ <20171206163746.8456-1-flavio.ceolin@intel.com>
+Message-ID: <67ddf04e-2f0f-c14b-90ce-0f29a3647e16@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 02:21:17PM +0000, Ard Biesheuvel wrote:
-> On 7 December 2017 at 14:11, Dave Martin <Dave.Martin@arm.com> wrote:
-> > On Wed, Dec 06, 2017 at 07:43:36PM +0000, Ard Biesheuvel wrote:
-> >> We are going to add code to all the NEON crypto routines that will
-> >> turn them into non-leaf functions, so we need to manage the stack
-> >> frames. To make this less tedious and error prone, add some macros
-> >> that take the number of callee saved registers to preserve and the
-> >> extra size to allocate in the stack frame (for locals) and emit
-> >> the ldp/stp sequences.
-> >>
-> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> >> ---
-> >>  arch/arm64/include/asm/assembler.h | 60 ++++++++++++++++++++
-> >>  1 file changed, 60 insertions(+)
-> >>
-> >> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
-> >> index aef72d886677..5f61487e9f93 100644
-> >> --- a/arch/arm64/include/asm/assembler.h
-> >> +++ b/arch/arm64/include/asm/assembler.h
-> >> @@ -499,6 +499,66 @@ alternative_else_nop_endif
-> >>  #endif
-> >>       .endm
-> >>
-> >> +     /*
-> >> +      * frame_push - Push @regcount callee saved registers to the stack,
-> >> +      *              starting at x19, as well as x29/x30, and set x29 to
-> >> +      *              the new value of sp. Add @extra bytes of stack space
-> >> +      *              for locals.
-> >> +      */
-> >> +     .macro          frame_push, regcount:req, extra
-> >> +     __frame         st, \regcount, \extra
-> >> +     .endm
-> >> +
-> >> +     /*
-> >> +      * frame_pop  - Pop @regcount callee saved registers from the stack,
-> >> +      *              starting at x19, as well as x29/x30. Also pop @extra
-> >> +      *              bytes of stack space for locals.
-> >> +      */
-> >> +     .macro          frame_pop, regcount:req, extra
-> >> +     __frame         ld, \regcount, \extra
-> >> +     .endm
-> >> +
-> >> +     .macro          __frame, op, regcount:req, extra=0
-> >> +     .ifc            \op, st
-> >> +     stp             x29, x30, [sp, #-((\regcount + 3) / 2) * 16 - \extra]!
-> >> +     mov             x29, sp
-> >> +     .endif
-> >> +     .if             \regcount < 0 || \regcount > 10
-> >> +     .error          "regcount should be in the range [0 ... 10]"
-> >> +     .endif
-> >> +     .if             (\extra % 16) != 0
-> >> +     .error          "extra should be a multiple of 16 bytes"
-> >> +     .endif
-> >> +     .if             \regcount > 1
-> >> +     \op\()p         x19, x20, [sp, #16]
-> >> +     .if             \regcount > 3
-> >> +     \op\()p         x21, x22, [sp, #32]
-> >> +     .if             \regcount > 5
-> >> +     \op\()p         x23, x24, [sp, #48]
-> >> +     .if             \regcount > 7
-> >> +     \op\()p         x25, x26, [sp, #64]
-> >> +     .if             \regcount > 9
-> >> +     \op\()p         x27, x28, [sp, #80]
-> >
-> > Can the _for thing I introduced in fpsimdmacros.h be any use here?
-> > Alternatively, the following could replace that .if-slide,
-> > providing the calling macro does .altmacro .. .noaltmacro somewhere.
-> >
-> > .macro _pushpop2 op, n1, n2, offset
-> >         \op     x\n1, x\n2, [sp, #\offset]
-> > .endm
-> >
-> > .macro _pushpop op, first, last, offset
-> >         .if \first < \last
-> >         _pushpop2 \op\()p, \first, %\first + 1, \offset
-> >         _pushpop \op, %\first + 2, \last, %\offset + 16
-> >         .elseif \first == \last
-> >         \op\()r x\first, [sp, #\offset]
-> >         .endif
-> > .endm
-> >
+W dniu 06.12.2017 o?17:37, Flavio Ceolin pisze:
+> s5p_jpeg_runtime_resume() does not call clk_disable_unprepare() for
+> jpeg->clocks[0] when one of the clk_prepare_enable() fails.
 > 
-> I'd prefer not to rely on altmacro, for reasons you pointed out
-> yourself a while ago IIRC.
+> Found by Linux Driver Verification project (linuxtesting.org).
 > 
-> I agree your version is more compact, but for a write once thing, I'm
-> not sure if it matters.
+> Signed-off-by: Flavio Ceolin <flavio.ceolin@intel.com>
+
+Acked-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+
+
+> ---
+>   drivers/media/platform/s5p-jpeg/jpeg-core.c | 2 +-
+>   1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> > Also, I wonder whether it would be more readable at the call site
-> > to specify the first and last reg numbers instead of the reg count,
-> > e.g.:
-> >
-> >         frame_push first_reg=19, last_reg=23
-> >
-> > (or whatever).  Just syntactic sugar though.
-> >
+> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+> index faac816..79b63da 100644
+> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
+> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
+> @@ -3086,7 +3086,7 @@ static int s5p_jpeg_runtime_resume(struct device *dev)
+>   	for (i = 0; i < jpeg->variant->num_clocks; i++) {
+>   		ret = clk_prepare_enable(jpeg->clocks[i]);
+>   		if (ret) {
+> -			while (--i > 0)
+> +			while (--i >= 0)
+>   				clk_disable_unprepare(jpeg->clocks[i]);
+>   			return ret;
+>   		}
 > 
-> Again, this will involve arithmetic on macro arguments, which implies
-> altmacro. Relying on altmacro being set is dodgy, and unfortunately,
-> we can't enable it in the macro without keeping it enabled (or we may
-> disable it on behalf of the caller. I guess we could try to come up
-> with a smart way to infer whether altmacro was enabled, and only
-> disable it afterwards if it wasn't, using some directives that get
-> interpreted differently, but to be honest, I factored out this
-> sequence so I could think about more important things :-)
-
-Sure, no worries.
-
-I've changed my mind a bit about .altmacro, in that it is not really
-usable at all unless turned on explicitly, and then off again, only
-where it's needed.  So if you just assume it's always off, things are
-sane (and that's what happens in practice).
-
-But it's not really needed here -- my main confusion was with the
-deeply nested .ifs, but perhaps that could be avoided more
-straightforwardly:
-
-	.if	\regcount > 1
-	\op\()p	x19, x20, [sp, #16]
-	.endif
-	.if	\regcount > 3
-	\op\()p	x21, x22, [sp, #32]
-	.endif
-	// ...
-	.if	\regcount > 9
-	\op\()p	x27, x28, [sp, #80]
-	.endif
-
-	.if	\regcount == 1
-	\op\()r	x19, [sp, #20]
-	.endif
-	.if	\regcount == 3
-	\op\()r	x21, [sp, #22]
-	.endif
-	// ...
-	.if	\regcount == 9
-	\op\()r	x27, [sp, #28]
-	.endif
-
-
-One other thing, should you be protecting the macro args with ()?
-
-It seems unlikely that an expression would be passed for regcount,
-but for extra it's a bit more plausible.
-
-Cheers
----Dave
