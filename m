@@ -1,23 +1,27 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 7 Dec 2017 15:43:48 +0100
-Subject: [PATCH] arm: dts: qcom: fix missing #phy-cells for apq8064
-In-Reply-To: <20171109225422.14280-1-robh@kernel.org>
-References: <20171109225422.14280-1-robh@kernel.org>
-Message-ID: <CAK8P3a3wupYd7XiJrYsFafbmdpiw_zFVd42E8Ucm9oNXtwzWSQ@mail.gmail.com>
+Date: Thu, 7 Dec 2017 15:44:29 +0100
+Subject: [PATCH 4/6] arm: dts: nspire: Add missing #phy-cells to
+ usb-nop-xceiv
+In-Reply-To: <20171109222614.5719-4-robh@kernel.org>
+References: <20171109222614.5719-1-robh@kernel.org>
+ <20171109222614.5719-4-robh@kernel.org>
+Message-ID: <CAK8P3a3mYm6f0Z9Yis2YjikidikqPTV8w1qLsSrR6=onrVhD8Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 9, 2017 at 11:54 PM, Rob Herring <robh@kernel.org> wrote:
-> Fix dtc warnings for missing #phy-cells for apq8064:
+On Thu, Nov 9, 2017 at 11:26 PM, Rob Herring <robh@kernel.org> wrote:
+> "usb-nop-xceiv" is using the phy binding, but is missing #phy-cells
+> property. This is probably because the binding was the precursor to the phy
+> binding.
 >
-> Warning (phys_property): Missing property '#phy-cells' in node /soc/dsi-phy at 4700200 or bad phandle (referred from /soc/mdss_dsi at 4700000:phys[0])
-> Warning (phys_property): Missing property '#phy-cells' in node /soc/hdmi-phy at 4a00400 or bad phandle (referred from /soc/hdmi-tx at 4a00000:phys[0])
+> Fixes the following warning in nspire dts files:
 >
-> Cc: Andy Gross <andy.gross@linaro.org>
-> Cc: David Brown <david.brown@linaro.org>
-> Cc: linux-arm-msm at vger.kernel.org
+> Warning (phys_property): Missing property '#phy-cells' in node ...
+>
 > Signed-off-by: Rob Herring <robh@kernel.org>
+> ---
+> Doesn't seem to be a maintainer for nspire. Arnd, please apply.
 
 Applied to fixes, thanks!
 
-       Anrd
+       Arnd
