@@ -1,63 +1,34 @@
-From: liwei213@huawei.com (Li Wei)
-Date: Thu, 7 Dec 2017 18:20:23 +0800
-Subject: [PATCH v6 2/5] dt-bindings: scsi: ufs: add document for hisi-ufs
-In-Reply-To: <20171207102026.14977-1-liwei213@huawei.com>
-References: <20171207102026.14977-1-liwei213@huawei.com>
-Message-ID: <20171207102026.14977-3-liwei213@huawei.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  7 Dec 2017 10:53:50 +0100
+Subject: [PATCH 47/54] arm64: dts: renesas: r8a77970: Connect Ethernet-AVB to
+ IPMMU-RT
+In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
+References: <cover.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <0639be574ea246d65565b0bfe490a84baaee3d61.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-add ufs node document for Hisilicon.
+Add IPMMU-RT to the Ethernet-AVB device node.
 
-Signed-off-by: Li Wei <liwei213@huawei.com>
+Based on work by Magnus Damm for the r8a7795.
+
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- Documentation/devicetree/bindings/ufs/ufs-hisi.txt | 38 ++++++++++++++++++++++
- 1 file changed, 38 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/ufs/ufs-hisi.txt
+ arch/arm64/boot/dts/renesas/r8a77970.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/ufs/ufs-hisi.txt b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-new file mode 100644
-index 000000000000..73e10698960e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/ufs/ufs-hisi.txt
-@@ -0,0 +1,38 @@
-+* Hisilicon Universal Flash Storage (UFS) Host Controller
-+
-+UFS nodes are defined to describe on-chip UFS hardware macro.
-+Each UFS Host Controller should have its own node.
-+
-+Required properties:
-+- compatible        : compatible list, contains one of the following -
-+					"hisilicon,hi3660-ufs", "jedec,ufs-1.1" for hisi ufs
-+					host controller present on Hi36xx chipset.
-+- reg               : should contain UFS register address space & UFS SYS CTRL register address,
-+- interrupt-parent  : interrupt device
-+- interrupts        : interrupt number
-+- clocks	        : List of phandle and clock specifier pairs
-+- clock-names       : List of clock input name strings sorted in the same
-+					order as the clocks property. "ref_clk", "phy_clk" is optional
-+- resets            : reset node register, one reset the clk and the other reset the controller
-+- reset-names       : describe reset node register
-+
-+Example:
-+
-+	ufs: ufs at ff3b0000 {
-+		compatible = "hisilicon,hi3660-ufs", "jedec,ufs-1.1";
-+		/* 0: HCI standard */
-+		/* 1: UFS SYS CTRL */
-+		reg = <0x0 0xff3b0000 0x0 0x1000>,
-+			<0x0 0xff3b1000 0x0 0x1000>;
-+		interrupt-parent = <&gic>;
-+		interrupts = <GIC_SPI 278 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&crg_ctrl HI3660_CLK_GATE_UFSIO_REF>,
-+			<&crg_ctrl HI3660_CLK_GATE_UFSPHY_CFG>;
-+		clock-names = "ref_clk", "phy_clk";
-+		freq-table-hz = <0 0>, <0 0>;
-+		/* offset: 0x84; bit: 12 */
-+		/* offset: 0x84; bit: 7  */
-+		resets = <&crg_rst 0x84 12>,
-+			<&crg_rst 0x84 7>;
-+		reset-names = "rst", "assert";
-+	};
+diff --git a/arch/arm64/boot/dts/renesas/r8a77970.dtsi b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+index 108c6159c847..0f93484e650a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a77970.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a77970.dtsi
+@@ -440,6 +440,7 @@
+ 			power-domains = <&sysc 32>;
+ 			resets = <&cpg 812>;
+ 			phy-mode = "rgmii-id";
++			iommus = <&ipmmu_rt 3>;
+ 			#address-cells = <1>;
+ 			#size-cells = <0>;
+ 		};
 -- 
-2.15.0
+2.11.0
