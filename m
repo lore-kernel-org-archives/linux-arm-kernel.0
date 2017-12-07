@@ -1,285 +1,139 @@
-From: brendanhiggins@google.com (Brendan Higgins)
-Date: Thu, 7 Dec 2017 12:37:21 -0800
-Subject: [PATCH v8 1/3] arm: npcm: add basic support for Nuvoton BMCs
-In-Reply-To: <20171117190747.21642-2-brendanhiggins@google.com>
-References: <20171117190747.21642-1-brendanhiggins@google.com>
- <20171117190747.21642-2-brendanhiggins@google.com>
-Message-ID: <CAFd5g45+dNuayw=s08iwAj2wrUYNXnGd5SbA+OVvsL_J6APHGA@mail.gmail.com>
+From: benjamin.gaignard@linaro.org (Benjamin Gaignard)
+Date: Thu, 7 Dec 2017 21:36:09 +0100
+Subject: [PATCH v8 4/6] clocksource: stm32: only use 32 bits timers
+In-Reply-To: <2afa343b-3a23-3352-33b3-2133678a4122@linaro.org>
+References: <1510649563-22975-1-git-send-email-benjamin.gaignard@linaro.org>
+ <1510649563-22975-5-git-send-email-benjamin.gaignard@linaro.org>
+ <44bb54e6-c9e8-4b54-d490-a1800bf6d74c@linaro.org>
+ <CA+M3ks5Q_ZUHODV=eA4caT9NdrxKw1qiaWwc87w9FiC_uqwfBQ@mail.gmail.com>
+ <2afa343b-3a23-3352-33b3-2133678a4122@linaro.org>
+Message-ID: <CA+M3ks4KLy0VkJOSGR7tmefOT1rw9nrMsRQvwwK-YZQ7Gm7hQA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Any update on this?
+2017-12-07 17:49 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> On 07/12/2017 17:33, Benjamin Gaignard wrote:
+>> 2017-12-07 16:27 GMT+01:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+>>> On 14/11/2017 09:52, Benjamin Gaignard wrote:
+>>>> The clock driving counters is at 90MHz so the maximum period
+>>>> for 16 bis counters is around 750 ms which is a short period
+>>>> for a clocksource.
+>>>
+>>> Isn't it 728us ?
+>>
+>> yes it is: 2^16 / 90.000.000 => 728us
+>
+> Ok, now I can do the connection with the previous patch.
+>
+> So, the real issue of all this is the 16bits clocksource is wrapping up
+> every 728us, hence the clockevent periodically expires every ~728us to
+> keep the timekeeping consistent. Unfortunately, the kernel has a too
+> high overhead for this as the system is consistently processing this
+> timer leading to a CPU time resource starvation.
+>
+> Is that correct ?
 
-On Fri, Nov 17, 2017 at 11:07 AM, Brendan Higgins
-<brendanhiggins@google.com> wrote:
-> Adds basic support for the Nuvoton NPCM750 BMC.
+Yes that is correct
+
 >
-> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
-> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
-> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
-> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
-> Tested-by: Avi Fishman <avifishman70@gmail.com>
-> ---
-> Changes since v7:
->   - Fixed useless parameter in print statement
->   - Added/cleaned up some comments
->   - Fixed typo in DT_MACHINE_START
->   - Got rid of L2C aux value
->   - Dropped unnecessary memory barriers
->   - Renamed CPU_NPCM750 to ARCH_NPCM750
->   - Fixed some other minor issues
-> ---
->  arch/arm/Kconfig             |  2 ++
->  arch/arm/Makefile            |  1 +
->  arch/arm/mach-npcm/Kconfig   | 48 +++++++++++++++++++++++++
->  arch/arm/mach-npcm/Makefile  |  3 ++
->  arch/arm/mach-npcm/headsmp.S | 21 +++++++++++
->  arch/arm/mach-npcm/npcm7xx.c | 25 +++++++++++++
->  arch/arm/mach-npcm/platsmp.c | 85 ++++++++++++++++++++++++++++++++++++++++++++
->  7 files changed, 185 insertions(+)
->  create mode 100644 arch/arm/mach-npcm/Kconfig
->  create mode 100644 arch/arm/mach-npcm/Makefile
->  create mode 100644 arch/arm/mach-npcm/headsmp.S
->  create mode 100644 arch/arm/mach-npcm/npcm7xx.c
->  create mode 100644 arch/arm/mach-npcm/platsmp.c
 >
-> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-> index 61a0cb15067e..05543f1cfbde 100644
-> --- a/arch/arm/Kconfig
-> +++ b/arch/arm/Kconfig
-> @@ -782,6 +782,8 @@ source "arch/arm/mach-netx/Kconfig"
+>>>> For 32 bits counters this period is close
+>>>> 47 secondes which is more acceptable.
+>>>>
+>>>> This patch remove 16 bits counters support and makes sure that
+>>>> they won't be probed anymore.
+>>>>
+>>>> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@linaro.org>
+>>>> ---
+>>>>  drivers/clocksource/timer-stm32.c | 26 ++++++++++++--------------
+>>>>  1 file changed, 12 insertions(+), 14 deletions(-)
+>>>>
+>>>> diff --git a/drivers/clocksource/timer-stm32.c b/drivers/clocksource/timer-stm32.c
+>>>> index ae41a19..8173bcf 100644
+>>>> --- a/drivers/clocksource/timer-stm32.c
+>>>> +++ b/drivers/clocksource/timer-stm32.c
+>>>> @@ -83,9 +83,9 @@ static irqreturn_t stm32_clock_event_handler(int irq, void *dev_id)
+>>>>  static int __init stm32_clockevent_init(struct device_node *node)
+>>>>  {
+>>>>       struct reset_control *rstc;
+>>>> -     unsigned long max_delta;
+>>>> -     int ret, bits, prescaler = 1;
+>>>> +     unsigned long max_arr;
+>>>>       struct timer_of *to;
+>>>> +     int ret;
+>>>>
+>>>>       to = kzalloc(sizeof(*to), GFP_KERNEL);
+>>>>       if (!to)
+>>>> @@ -115,29 +115,27 @@ static int __init stm32_clockevent_init(struct device_node *node)
+>>>>
+>>>>       /* Detect whether the timer is 16 or 32 bits */
+>>>>       writel_relaxed(~0U, timer_of_base(to) + TIM_ARR);
+>>>> -     max_delta = readl_relaxed(timer_of_base(to) + TIM_ARR);
+>>>> -     if (max_delta == ~0U) {
+>>>> -             prescaler = 1;
+>>>> -             bits = 32;
+>>>> -     } else {
+>>>> -             prescaler = 1024;
+>>>> -             bits = 16;
+>>>> +     max_arr = readl_relaxed(timer_of_base(to) + TIM_ARR);
+>>>> +     if (max_arr != ~0U) {
+>>>> +             pr_err("32 bits timer is needed\n");
+>>>> +             ret = -EINVAL;
+>>>> +             goto deinit;
+>>>>       }
+>>>> +
+>>>>       writel_relaxed(0, timer_of_base(to) + TIM_ARR);
+>>>>
+>>>> -     writel_relaxed(prescaler - 1, timer_of_base(to) + TIM_PSC);
+>>>> +     writel_relaxed(0, timer_of_base(to) + TIM_PSC);
+>>>>       writel_relaxed(TIM_EGR_UG, timer_of_base(to) + TIM_EGR);
+>>>>       writel_relaxed(TIM_DIER_UIE, timer_of_base(to) + TIM_DIER);
+>>>>       writel_relaxed(0, timer_of_base(to) + TIM_SR);
+>>>>
+>>>>       clockevents_config_and_register(&to->clkevt,
+>>>> -                                     timer_of_period(to), MIN_DELTA, max_delta);
+>>>> -
+>>>> -     pr_info("%pOF: STM32 clockevent driver initialized (%d bits)\n",
+>>>> -                     node, bits);
+>>>> +                                     timer_of_period(to), MIN_DELTA, ~0U);
+>>>>
+>>>>       return 0;
+>>>>
+>>>> +deinit:
+>>>> +     timer_of_exit(to);
+>>>>  err:
+>>>>       kfree(to);
+>>>>       return ret;
+>>>>
+>>>
+>>>
+>>> --
+>>>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+>>>
+>>> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+>>> <http://twitter.com/#!/linaroorg> Twitter |
+>>> <http://www.linaro.org/linaro-blog/> Blog
+>>>
+>>
+>>
+>>
 >
->  source "arch/arm/mach-nomadik/Kconfig"
 >
-> +source "arch/arm/mach-npcm/Kconfig"
-> +
->  source "arch/arm/mach-nspire/Kconfig"
->
->  source "arch/arm/plat-omap/Kconfig"
-> diff --git a/arch/arm/Makefile b/arch/arm/Makefile
-> index 47d3a1ab08d2..60ca50c7d762 100644
-> --- a/arch/arm/Makefile
-> +++ b/arch/arm/Makefile
-> @@ -191,6 +191,7 @@ machine-$(CONFIG_ARCH_MEDIATEK)             += mediatek
->  machine-$(CONFIG_ARCH_MXS)             += mxs
->  machine-$(CONFIG_ARCH_NETX)            += netx
->  machine-$(CONFIG_ARCH_NOMADIK)         += nomadik
-> +machine-$(CONFIG_ARCH_NPCM)            += npcm
->  machine-$(CONFIG_ARCH_NSPIRE)          += nspire
->  machine-$(CONFIG_ARCH_OXNAS)           += oxnas
->  machine-$(CONFIG_ARCH_OMAP1)           += omap1
-> diff --git a/arch/arm/mach-npcm/Kconfig b/arch/arm/mach-npcm/Kconfig
-> new file mode 100644
-> index 000000000000..6ff9df2636be
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/Kconfig
-> @@ -0,0 +1,48 @@
-> +menuconfig ARCH_NPCM
-> +       bool "Nuvoton NPCM Architecture"
-> +       select ARCH_REQUIRE_GPIOLIB
-> +       select USE_OF
-> +       select PINCTRL
-> +       select PINCTRL_NPCM7XX
-> +
-> +if ARCH_NPCM
-> +
-> +comment "NPCM7XX CPU type"
-> +
-> +config ARCH_NPCM750
-> +       depends on ARCH_NPCM && ARCH_MULTI_V7
-> +       bool "Support for NPCM750 BMC CPU (Poleg)"
-> +       select CACHE_L2X0
-> +       select CPU_V7
-> +       select ARM_GIC
-> +       select HAVE_SMP
-> +       select SMP
-> +       select SMP_ON_UP
-> +       select HAVE_ARM_SCU
-> +       select HAVE_ARM_TWD if SMP
-> +       select ARM_ERRATA_720789
-> +       select ARM_ERRATA_754322
-> +       select ARM_ERRATA_764369
-> +       select ARM_ERRATA_794072
-> +       select PL310_ERRATA_588369
-> +       select PL310_ERRATA_727915
-> +       select USB_EHCI_ROOT_HUB_TT
-> +       select USB_ARCH_HAS_HCD
-> +       select USB_ARCH_HAS_EHCI
-> +       select USB_EHCI_HCD
-> +       select USB_ARCH_HAS_OHCI
-> +       select USB_OHCI_HCD
-> +       select USB
-> +       select FIQ
-> +       select CPU_USE_DOMAINS
-> +       select GENERIC_CLOCKEVENTS
-> +       select CLKDEV_LOOKUP
-> +       select COMMON_CLK if OF
-> +       select NPCM750_TIMER
-> +       select MFD_SYSCON
-> +       help
-> +         Support for NPCM750 BMC CPU (Poleg).
-> +
-> +         Nuvoton NPCM750 BMC based on the Cortex A9.
-> +
-> +endif
-> diff --git a/arch/arm/mach-npcm/Makefile b/arch/arm/mach-npcm/Makefile
-> new file mode 100644
-> index 000000000000..c7a1316d27c1
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/Makefile
-> @@ -0,0 +1,3 @@
-> +AFLAGS_headsmp.o               += -march=armv7-a
-> +
-> +obj-$(CONFIG_ARCH_NPCM750)     += npcm7xx.o platsmp.o headsmp.o
-> diff --git a/arch/arm/mach-npcm/headsmp.S b/arch/arm/mach-npcm/headsmp.S
-> new file mode 100644
-> index 000000000000..2d0d8880634b
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/headsmp.S
-> @@ -0,0 +1,21 @@
-> +/*
-> + * Copyright 2017 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/linkage.h>
-> +#include <linux/init.h>
-> +#include <asm/assembler.h>
-> +
-> +/*
-> + * The boot ROM does not start secondary CPUs in SVC mode, so we need to do that
-> + * here.
-> + */
-> +ENTRY(npcm7xx_secondary_startup)
-> +       safe_svcmode_maskall r0
-> +
-> +       b       secondary_startup
-> +ENDPROC(npcm7xx_secondary_startup)
-> diff --git a/arch/arm/mach-npcm/npcm7xx.c b/arch/arm/mach-npcm/npcm7xx.c
-> new file mode 100644
-> index 000000000000..500bdd0a9ebb
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/npcm7xx.c
-> @@ -0,0 +1,25 @@
-> +/*
-> + * Copyright (c) 2017 Nuvoton Technology corporation.
-> + * Copyright 2017 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/types.h>
-> +#include <asm/mach/arch.h>
-> +#include <asm/mach-types.h>
-> +#include <asm/mach/map.h>
-> +#include <asm/hardware/cache-l2x0.h>
-> +
-> +static const char *const npcm7xx_dt_match[] = {
-> +       "nuvoton,npcm750",
-> +       NULL
-> +};
-> +
-> +DT_MACHINE_START(NPCM7XX_DT, "NPCM7XX Chip family")
-> +       .atag_offset    = 0x100,
-> +       .dt_compat      = npcm7xx_dt_match,
-> +MACHINE_END
-> diff --git a/arch/arm/mach-npcm/platsmp.c b/arch/arm/mach-npcm/platsmp.c
-> new file mode 100644
-> index 000000000000..959af7bd741f
-> --- /dev/null
-> +++ b/arch/arm/mach-npcm/platsmp.c
-> @@ -0,0 +1,85 @@
-> +/*
-> + * Copyright 2017 Google, Inc.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + */
-> +
-> +#define pr_fmt(fmt) "nuvoton,npcm7xx-smp: " fmt
-> +
-> +#include <linux/delay.h>
-> +#include <linux/device.h>
-> +#include <linux/smp.h>
-> +#include <linux/io.h>
-> +#include <linux/of.h>
-> +#include <linux/of_device.h>
-> +#include <linux/of_platform.h>
-> +#include <linux/of_address.h>
-> +#include <asm/cacheflush.h>
-> +#include <asm/smp.h>
-> +#include <asm/smp_plat.h>
-> +#include <asm/smp_scu.h>
-> +
-> +#define NPCM7XX_SCRPAD_REG 0x13c
-> +
-> +extern void npcm7xx_secondary_startup(void);
-> +
-> +static int npcm7xx_smp_boot_secondary(unsigned int cpu,
-> +                                     struct task_struct *idle)
-> +{
-> +       struct device_node *gcr_np;
-> +       void __iomem *gcr_base;
-> +       int ret = 0;
-> +
-> +       gcr_np = of_find_compatible_node(NULL, NULL, "nuvoton,npcm750-gcr");
-> +       if (!gcr_np) {
-> +               pr_err("no gcr device node\n");
-> +               ret = -ENODEV;
-> +               goto out;
-> +       }
-> +       gcr_base = of_iomap(gcr_np, 0);
-> +       if (!gcr_base) {
-> +               pr_err("could not iomap gcr");
-> +               ret = -ENOMEM;
-> +               goto out;
-> +       }
-> +
-> +       /* give boot ROM kernel start address. */
-> +       iowrite32(__pa_symbol(npcm7xx_secondary_startup), gcr_base +
-> +                 NPCM7XX_SCRPAD_REG);
-> +       /* make sure the previous write is seen by all observers. */
-> +       dsb_sev();
-> +
-> +       iounmap(gcr_base);
-> +out:
-> +       return ret;
-> +}
-> +
-> +static void __init npcm7xx_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +       struct device_node *scu_np;
-> +       void __iomem *scu_base;
-> +
-> +       scu_np = of_find_compatible_node(NULL, NULL, "arm,cortex-a9-scu");
-> +       if (!scu_np) {
-> +               pr_err("no scu device node\n");
-> +               return;
-> +       }
-> +       scu_base = of_iomap(scu_np, 0);
-> +       if (!scu_base) {
-> +               pr_err("could not iomap scu");
-> +               return;
-> +       }
-> +
-> +       scu_enable(scu_base);
-> +
-> +       iounmap(scu_base);
-> +}
-> +
-> +static struct smp_operations npcm7xx_smp_ops __initdata = {
-> +       .smp_prepare_cpus = npcm7xx_smp_prepare_cpus,
-> +       .smp_boot_secondary = npcm7xx_smp_boot_secondary,
-> +};
-> +
-> +CPU_METHOD_OF_DECLARE(npcm7xx_smp, "nuvoton,npcm7xx-smp", &npcm7xx_smp_ops);
 > --
-> 2.15.0.448.gf294e3d99a-goog
+>  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 >
+> Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+> <http://twitter.com/#!/linaroorg> Twitter |
+> <http://www.linaro.org/linaro-blog/> Blog
+>
+
+
+
+-- 
+Benjamin Gaignard
+
+Graphic Study Group
+
+Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro: Facebook | Twitter | Blog
