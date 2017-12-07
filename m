@@ -1,46 +1,78 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 7 Dec 2017 17:30:48 +0800
-Subject: [PATCH 2/9] ASoC: sun4i-i2s: Add compatibility with A64 codec I2S
-In-Reply-To: <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
-References: <20171203204157.20829-1-anarsoul@gmail.com>
- <20171203204157.20829-3-anarsoul@gmail.com>
- <CAEKpxBmHhZ+2WNXJEPbQFS6KeKsqRrZeNodRnu1M5yLc15DerA@mail.gmail.com>
- <CA+E=qVd+uM0Aq_=sf+fomQ-m+3Oy0MdG7OPjF5tVagG1UgKYzg@mail.gmail.com>
- <CAEKpxBnWYiSq-Xrzj9MET61kGyVSJZPNnWpDh8jwnmdtw=GKtA@mail.gmail.com>
-Message-ID: <CAGb2v67R76U0+JSS0yMDUCB52QXe=xbt8w=49sTn0TNTM8SccQ@mail.gmail.com>
+From: lollivier@baylibre.com (Loys Ollivier)
+Date: Thu, 7 Dec 2017 10:34:11 +0100
+Subject: [PATCH v2] firmware: qcom: scm: Fix incorrect of_node_put call in
+ scm_init
+In-Reply-To: <40113581-4b8c-defe-ba90-0aabc30a1b6d@linaro.org>
+References: <1512555692-14439-1-git-send-email-lollivier@baylibre.com>
+ <20171206200601.GH4283@codeaurora.org>
+ <40113581-4b8c-defe-ba90-0aabc30a1b6d@linaro.org>
+Message-ID: <c049d689-44f0-3ee6-ca50-af4873545fce@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 5:21 PM, Code Kipper <codekipper@gmail.com> wrote:
-> On 4 December 2017 at 08:34, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->> I'd keep it sun50i_a64_acodec_i2s, since other 3 I2S modules aren't
->> compatible with this one, but similar to H3.
->
-> Well I wouldn't and the description of it is usage is clearly stated
-> in the devicetree
-> for the dai.
+
+
+On 07/12/2017 09:42, Jerome Forissier wrote:
+> 
+> 
+> On 12/06/2017 09:06 PM, Stephen Boyd wrote:
+>> On 12/06, Loys Ollivier wrote:
+>>> When using other platform architectures, in the init of the qcom_scm
+>>> driver, of_node_put is called on /firmware if no qcom dt is found.
+>>> This results in a kernel error: Bad of_node_put() on /firmware.
+>>>
+>>> The call to of_node_put from the qcom_scm init is unnecessary as
+>>> of_find_matching_node is calling it automatically.
+>>>
+>>> Remove this of_node_put().
+>>>
+>>> Fixes: d0f6fa7ba2d6 ("firmware: qcom: scm: Convert SCM to platform driver")
+>>> Signed-off-by: Loys Ollivier <lollivier@baylibre.com>
+>>> ---
 >>
->> On Sun, Dec 3, 2017 at 10:42 PM, Code Kipper <codekipper@gmail.com> wrote:
->>> On 3 December 2017 at 21:41, Vasily Khoruzhick <anarsoul@gmail.com> wrote:
->>>> From: Marcus Cooper <codekipper@gmail.com>
->>>>
->>>> The I2S block used for the audio codec in the A64 is very similar
->>>> to what is used by the A10(sun4i) devices. However, its TX FIFO is
->>>> located at a different address.
->>>>
->>>> [vasilykh: - added fixed_wss and wss_value to A64 quirks,
->>>>            - changed compatible to 'allwinner,sun50i-a64-acodec-i2s,
->>>>              since A64 has 3 more I2S blocks that are not compatible
->>>>              with audio codec I2S]
-> This needs to be investigated more...I'm suspicious of the
-> SUN8I_I2S_FMT0_LRCK_PERIOD value which is hardcoded to 0x1f.
-> I've made this following change
-> https://github.com/codekipper/linux-sunxi/commit/4c5fe5f5576cfbb2e1e94a99cd19dfdc9403ea50
-> which seems to work for me but I would like to look at it with a logic
-> analyser and test other sample depths.
-> CK
-
-Another good reason not to have hard-coded values for things that
-are rightly configurable. :)
-
-ChenYu
+>> This still looks wrong. Especially if of_find_matching_node() is
+>> going to look for siblings of the /firmware node for the
+>> compatible string for scm device. Why do we check at all? Can't
+>> we just delete this and let of_platform_populate() take care of
+>> it? BTW, OP-TEE driver seems to have a similar problem.
+> 
+> https://lkml.org/lkml/2017/11/29/230
+>
+Well, the patch I sent is a fix for a specific bug I am encountering.
+I tested the patch and it solves my problem. Stephen, your changes looks
+good but it's a change in the driver's behavior. Maybe it could be
+another patch ?
+It looks like OP-TEE had the same idea.
+>>
+>> ---8<----
+>>
+>> diff --git a/drivers/firmware/qcom_scm.c b/drivers/firmware/qcom_scm.c
+>> index af4c75217ea6..440d8f796faa 100644
+>> --- a/drivers/firmware/qcom_scm.c
+>> +++ b/drivers/firmware/qcom_scm.c
+>> @@ -626,23 +626,11 @@ static int __init qcom_scm_init(void)
+>>  	int ret;
+>>  
+>>  	fw_np = of_find_node_by_name(NULL, "firmware");
+>> -
+>>  	if (!fw_np)
+>> -		return -ENODEV;
+>> -
+>> -	np = of_find_matching_node(fw_np, qcom_scm_dt_match);
+>> -
+>> -	if (!np) {
+>> -		of_node_put(fw_np);
+>> -		return -ENODEV;
+>> -	}
+>> -
+>> -	of_node_put(np);
+>> +		return 0;
+>>  
+>>  	ret = of_platform_populate(fw_np, qcom_scm_dt_match, NULL, NULL);
+>> -
+>>  	of_node_put(fw_np);
+>> -
+>>  	if (ret)
+>>  		return ret;
+>>  
+>>
