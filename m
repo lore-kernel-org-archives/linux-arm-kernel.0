@@ -1,16 +1,91 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 07 Dec 2017 13:39:32 -0500 (EST)
-Subject: [PATCH net-next v3 0/2] net: thunderx: add support for PTP clock
-In-Reply-To: <20171206133100.26436-1-aleksey.makarov@cavium.com>
-References: <20171206133100.26436-1-aleksey.makarov@cavium.com>
-Message-ID: <20171207.133932.904724095727636711.davem@davemloft.net>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 7 Dec 2017 12:43:26 -0600
+Subject: [PATCH 1/2] acpi, spcr: Make SPCR avialable to other architectures
+In-Reply-To: <20171207172912.17868-2-prarit@redhat.com>
+References: <20171207172912.17868-1-prarit@redhat.com>
+ <20171207172912.17868-2-prarit@redhat.com>
+Message-ID: <CAOZdJXV4E6gu=Ed6nOCcEp2afe_g8Ot-H5oO5=6+ye51cv9hUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Aleksey Makarov <aleksey.makarov@cavium.com>
-Date: Wed,  6 Dec 2017 16:30:56 +0300
+On Thu, Dec 7, 2017 at 11:29 AM, Prarit Bhargava <prarit@redhat.com> wrote:
+> Other architectures can use SPCR to setup an early console or console but
+> the current code is ARM64 specific.
+>
+> Change the name of parse_spcr() to acpi_parse_spcr().  Add a weak
+> function acpi_arch_setup_console() that can be used for arch-specific
+> setup.  Move SPCR initialization flag into ACPI code.  Update the
+> Documention on the use of the SPCR earlycon.
+>
+> This patch does not change arm64 behaviour.
 
-> This series adds support for IEEE 1588 Precision Time Protocol
-> to Cavium ethernet driver.
+Let's hope so.  Our E44 erratum work-around has caused lots of
+problems in the past, so the code is a bit fragile.
 
-Series applied, thank you.
+> +static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
+> +{
+> +       if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+> +               return false;
+> +
+> +       if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
+> +               return true;
+> +
+> +       if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+> +                       h->oem_revision == 1)
+> +               return true;
+> +
+> +       return false;
+> +}
+
+Please give us a chance to test this patch before merging. We've had a
+lot of problems with our E44 work-around, and we need to make sure
+that qdf2400_erratum_44_present function is called before the pl011
+driver is probed.
+
+> +
+> +/*
+> + * APM X-Gene v1 and v2 UART hardware is an 16550 like device but has its
+> + * register aligned to 32-bit. In addition, the BIOS also encoded the
+> + * access width to be 8 bits. This function detects this errata condition.
+> + */
+> +static bool xgene_8250_erratum_present(struct acpi_table_spcr *tb)
+> +{
+> +       bool xgene_8250 = false;
+> +
+> +       if (tb->interface_type != ACPI_DBG2_16550_COMPATIBLE)
+> +               return false;
+> +
+> +       if (memcmp(tb->header.oem_id, "APMC0D", ACPI_OEM_ID_SIZE) &&
+> +           memcmp(tb->header.oem_id, "HPE   ", ACPI_OEM_ID_SIZE))
+> +               return false;
+> +
+> +       if (!memcmp(tb->header.oem_table_id, "XGENESPC",
+> +           ACPI_OEM_TABLE_ID_SIZE) && tb->header.oem_revision == 0)
+> +               xgene_8250 = true;
+> +
+> +       if (!memcmp(tb->header.oem_table_id, "ProLiant",
+> +           ACPI_OEM_TABLE_ID_SIZE) && tb->header.oem_revision == 1)
+> +               xgene_8250 = true;
+> +
+> +       return xgene_8250;
+> +}
+
+I suspect that this function has the same issues as
+qdf2400_erratum_44_present().
+
+> +config ACPI_SPCR_TABLE
+> +       bool "ACPI Serial Port Console Redirection Support"
+> +       default y if ARM64
+> +       help
+> +         Enable support for Serial Port Console Redirection (SPCR) Table.
+> +         This table provides information about the configuration of the
+> +         earlycon console.
+> +
+
+So ACPI without SPCR has never been tested by us.  Making it optional
+makes me a little nervous.  We'll have to evaluate this change.
+
+-- 
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm
+Technologies, Inc.  Qualcomm Technologies, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
