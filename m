@@ -1,26 +1,33 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 7 Dec 2017 09:45:31 -0500
-Subject: [PATCH V6 4/7] OF: properties: Implement get_match_data() callback
-In-Reply-To: <20171207141029.575c0a03@karo-electronics.de>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <1512493493-6464-5-git-send-email-okaya@codeaurora.org>
- <20171207141029.575c0a03@karo-electronics.de>
-Message-ID: <def8e351-bc2d-7adc-fdc5-362b365302a8@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Dec 2017 15:45:37 +0100
+Subject: [PATCH v2] ARM: omap2: hide omap3_save_secure_ram on non-OMAP3
+ builds
+In-Reply-To: <20171206220436.GA28152@atomide.com>
+References: <20171206214916.2856657-1-arnd@arndb.de>
+ <20171206220436.GA28152@atomide.com>
+Message-ID: <CAK8P3a0JYok7P+Xa89GZKedz_h5z6mmzoZn_myaEt89koU+Btg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/7/2017 8:10 AM, Lothar Wa?mann wrote:
->> +void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
->> +			       struct device *dev)
-> Shouldn't this be 'const void *of_fwnode_get_match_data
+On Wed, Dec 6, 2017 at 11:04 PM, Tony Lindgren <tony@atomide.com> wrote:
+> * Arnd Bergmann <arnd@arndb.de> [171206 21:52]:
+>> In configurations without CONFIG_OMAP3 but with secure RAM support,
+>> we now run into a link failure:
+>>
+>> arch/arm/mach-omap2/omap-secure.o: In function `omap3_save_secure_ram':
+>> omap-secure.c:(.text+0x130): undefined reference to `save_secure_ram_context'
+>>
+>> The omap3_save_secure_ram() function is only called from the OMAP34xx
+>> power management code, so we can simply hide that function in the
+>> appropriate #ifdef.
+>>
+>> Fixes: d09220a887f7 ("ARM: OMAP2+: Fix SRAM virt to phys translation for save_secure_ram_context")
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> ---
+>> v2: also check for CONFIG_PM
+>
+> Acked-by: Tony Lindgren <tony@atomide.com>
 
-OF keeps the driver data as a (const void*) internally. ACPI keeps the
-driver data as kernel_ulong_t in struct acpi_device_id.
+Applied now
 
-I tried to find the middle ground here by converting output to void*
-but not keeping const.
-
--- 
-Sinan Kaya
-Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
-Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
+       Arnd
