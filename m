@@ -1,44 +1,82 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu,  7 Dec 2017 16:10:28 -0500
-Subject: [PATCH V7 4/7] OF: properties: Implement get_match_data() callback
+Date: Thu,  7 Dec 2017 16:10:27 -0500
+Subject: [PATCH V7 3/7] device property: Introduce a common API to fetch
+ device match data
 In-Reply-To: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
 References: <1512681031-11343-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1512681031-11343-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <1512681031-11343-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have a get_match_data() callback as part of the firmware node,
-implement the OF specific piece for it.
+There is an OF/ACPI function to obtain the driver data. We want to hide
+OF/ACPI details from the device drivers and abstract following the device
+family of functions.
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 Reviewed-by: Rob Herring <robh@kernel.org>
 Acked-by: Sakari Ailus <sakari.ailus@linux.intel.com>
 ---
- drivers/of/property.c | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ drivers/base/property.c  | 7 +++++++
+ include/linux/fwnode.h   | 4 ++++
+ include/linux/property.h | 2 ++
+ 3 files changed, 13 insertions(+)
 
-diff --git a/drivers/of/property.c b/drivers/of/property.c
-index 264c355..543e059 100644
---- a/drivers/of/property.c
-+++ b/drivers/of/property.c
-@@ -981,10 +981,18 @@ static int of_fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
- 	return 0;
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index 7ed99c1..ee704a8 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -1335,3 +1335,10 @@ int fwnode_graph_parse_endpoint(const struct fwnode_handle *fwnode,
+ 	return fwnode_call_int_op(fwnode, graph_parse_endpoint, endpoint);
  }
- 
-+static void *
-+of_fwnode_device_get_match_data(const struct fwnode_handle *fwnode,
-+				const struct device *dev)
-+{
-+	return (void *)of_device_get_match_data(dev);
-+}
+ EXPORT_SYMBOL(fwnode_graph_parse_endpoint);
 +
- const struct fwnode_operations of_fwnode_ops = {
- 	.get = of_fwnode_get,
- 	.put = of_fwnode_put,
- 	.device_is_available = of_fwnode_device_is_available,
-+	.device_get_match_data = of_fwnode_device_get_match_data,
- 	.property_present = of_fwnode_property_present,
- 	.property_read_int_array = of_fwnode_property_read_int_array,
- 	.property_read_string_array = of_fwnode_property_read_string_array,
++void *device_get_match_data(struct device *dev)
++{
++	return fwnode_call_ptr_op(dev_fwnode(dev), device_get_match_data,
++				  dev);
++}
++EXPORT_SYMBOL_GPL(device_get_match_data);
+diff --git a/include/linux/fwnode.h b/include/linux/fwnode.h
+index 0c35b6c..e2b4b22 100644
+--- a/include/linux/fwnode.h
++++ b/include/linux/fwnode.h
+@@ -15,6 +15,7 @@
+ #include <linux/types.h>
+ 
+ struct fwnode_operations;
++struct device;
+ 
+ struct fwnode_handle {
+ 	struct fwnode_handle *secondary;
+@@ -51,6 +52,7 @@ struct fwnode_reference_args {
+  * struct fwnode_operations - Operations for fwnode interface
+  * @get: Get a reference to an fwnode.
+  * @put: Put a reference to an fwnode.
++ * @device_get_match_data: Return the device driver match data.
+  * @property_present: Return true if a property is present.
+  * @property_read_integer_array: Read an array of integer properties. Return
+  *				 zero on success, a negative error code
+@@ -71,6 +73,8 @@ struct fwnode_operations {
+ 	void (*get)(struct fwnode_handle *fwnode);
+ 	void (*put)(struct fwnode_handle *fwnode);
+ 	bool (*device_is_available)(const struct fwnode_handle *fwnode);
++	void *(*device_get_match_data)(const struct fwnode_handle *fwnode,
++				       const struct device *dev);
+ 	bool (*property_present)(const struct fwnode_handle *fwnode,
+ 				 const char *propname);
+ 	int (*property_read_int_array)(const struct fwnode_handle *fwnode,
+diff --git a/include/linux/property.h b/include/linux/property.h
+index 6bebee1..01fa55b 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -275,6 +275,8 @@ int device_add_properties(struct device *dev,
+ 
+ enum dev_dma_attr device_get_dma_attr(struct device *dev);
+ 
++void *device_get_match_data(struct device *dev);
++
+ int device_get_phy_mode(struct device *dev);
+ 
+ void *device_get_mac_address(struct device *dev, char *addr, int alen);
 -- 
 1.9.1
