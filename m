@@ -1,68 +1,72 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:36 +0100
-Subject: [PATCH 33/54] arm64: dts: renesas: r8a7795: Enable IPMMU-VI0, VP1, DS0,
- DS1 and MM
+Date: Thu,  7 Dec 2017 10:53:37 +0100
+Subject: [PATCH 34/54] arm64: dts: renesas: salvator-common: Add BD9571 PMIC
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <27767b784b5a7b13aedc248029570da0487722f5.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <f80f4920b78dbcbebbe5e0a1383bce7849cd08af.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Magnus Damm <damm+renesas@opensource.se>
+From: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Enable the r8a7795 device nodes for IPMMU-VI0, IPMMU-VP1, IPMMU-DS0,
-IPMMU-DS1 and the shared IPMMU-MM device.
+Add a device node for the ROHM BD9571MWV PMIC.
 
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+This was based on the example in the DT binding documentation, but using
+IRQ0 instead of a GPIO interrupt, as that matches the schematics, and
+because INTC-EX is a simpler block.
+
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
 ---
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 5 -----
- 1 file changed, 5 deletions(-)
+ arch/arm64/boot/dts/renesas/salvator-common.dtsi | 29 ++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 08c125cfa5d6..a438d58f1b50 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -427,7 +427,6 @@
- 			renesas,ipmmu-main = <&ipmmu_mm 14>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
+diff --git a/arch/arm64/boot/dts/renesas/salvator-common.dtsi b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+index 24a32c63ce7c..b9505a65a793 100644
+--- a/arch/arm64/boot/dts/renesas/salvator-common.dtsi
++++ b/arch/arm64/boot/dts/renesas/salvator-common.dtsi
+@@ -355,6 +355,30 @@
  
- 		ipmmu_vi1: mmu at febe0000 {
-@@ -454,7 +453,6 @@
- 			renesas,ipmmu-main = <&ipmmu_mm 17>;
- 			power-domains = <&sysc R8A7795_PD_A3VP>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
+ &i2c_dvfs {
+ 	status = "okay";
++
++	pmic: pmic at 30 {
++		pinctrl-0 = <&irq0_pins>;
++		pinctrl-names = "default";
++
++		compatible = "rohm,bd9571mwv";
++		reg = <0x30>;
++		interrupt-parent = <&intc_ex>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		interrupt-controller;
++		#interrupt-cells = <2>;
++		gpio-controller;
++		#gpio-cells = <2>;
++
++		regulators {
++			dvfs: dvfs {
++				regulator-name = "dvfs";
++				regulator-min-microvolt = <750000>;
++				regulator-max-microvolt = <1030000>;
++				regulator-boot-on;
++				regulator-always-on;
++			};
++		};
++	};
+ };
  
- 		ipmmu_vc0: mmu at fe6b0000 {
-@@ -544,7 +542,6 @@
- 			renesas,ipmmu-main = <&ipmmu_mm 0>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
+ &ohci0 {
+@@ -410,6 +434,11 @@
+ 		function = "i2c2";
+ 	};
  
- 		ipmmu_ds1: mmu at e7740000 {
-@@ -553,7 +550,6 @@
- 			renesas,ipmmu-main = <&ipmmu_mm 1>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
- 
- 		ipmmu_mm: mmu at e67b0000 {
-@@ -563,7 +559,6 @@
- 				     <GIC_SPI 197 IRQ_TYPE_LEVEL_HIGH>;
- 			power-domains = <&sysc R8A7795_PD_ALWAYS_ON>;
- 			#iommu-cells = <1>;
--			status = "disabled";
- 		};
- 
- 		dmac0: dma-controller at e6700000 {
++	irq0_pins: irq0 {
++		groups = "intc_ex_irq0";
++		function = "intc_ex";
++	};
++
+ 	pwm1_pins: pwm1 {
+ 		groups = "pwm1_a";
+ 		function = "pwm1";
 -- 
 2.11.0
