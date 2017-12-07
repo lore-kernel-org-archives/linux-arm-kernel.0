@@ -1,65 +1,37 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  7 Dec 2017 16:58:46 +0100
-Subject: [PATCH v4 01/15] dt-bindings: panel: lvds: Document power-supply
- property
+Date: Thu,  7 Dec 2017 16:58:59 +0100
+Subject: [PATCH v4 14/15] ARM: dts: sun8i: a711: Reinstate the PMIC compatible
 In-Reply-To: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <10bad1055cf009e0f61e5779dd3d34d1b83c43f5.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <80711a93a5e49166a26ade747687d8ba4ef7a6f3.1512662253.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power-supply property is used by a vast majority of panels, including
-panel-simple. Let's document it as a common property
+When we added the regulator support in commit 90c5d7cdae64 ("ARM: dts:
+sun8i: a711: Add regulator support"), we also dropped the PMIC's
+compatible. Since it's not in the PMIC DTSI, unlike most other PMIC
+DTSI, it obviously wasn't probing anymore.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Re-add it so that everything works again.
+
+Fixes: 90c5d7cdae64 ("ARM: dts: sun8i: a711: Add regulator support")
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/panel/panel-common.txt | 6 ++++++
- Documentation/devicetree/bindings/display/panel/panel-lvds.txt   | 1 +
- Documentation/devicetree/bindings/display/panel/simple-panel.txt | 2 +-
- 3 files changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/display/panel/panel-common.txt b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-index ec52c472c845..125ea68052af 100644
---- a/Documentation/devicetree/bindings/display/panel/panel-common.txt
-+++ b/Documentation/devicetree/bindings/display/panel/panel-common.txt
-@@ -78,6 +78,12 @@ used for panels that implement compatible control signals.
-   while active. Active high reset signals can be supported by inverting the
-   GPIO specifier polarity flag.
+diff --git a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+index 98715538932f..a021ee6da396 100644
+--- a/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
++++ b/arch/arm/boot/dts/sun8i-a83t-tbs-a711.dts
+@@ -146,6 +146,7 @@
+ 	status = "okay";
  
-+Power
-+-----
-+
-+- power-supply: many display panels need an additional power supply in
-+  order to be fully powered-up. For such panels, power-supply contains
-+  a phandle to the regulator powering the panel.
- 
- Backlight
- ---------
-diff --git a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-index b938269f841e..250850a2150b 100644
---- a/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-+++ b/Documentation/devicetree/bindings/display/panel/panel-lvds.txt
-@@ -32,6 +32,7 @@ Optional properties:
- - label: See panel-common.txt.
- - gpios: See panel-common.txt.
- - backlight: See panel-common.txt.
-+- power-supply: See panel-common.txt.
- - data-mirror: If set, reverse the bit order described in the data mappings
-   below on all data lanes, transmitting bits for slots 6 to 0 instead of
-   0 to 6.
-diff --git a/Documentation/devicetree/bindings/display/panel/simple-panel.txt b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-index 1341bbf4aa3d..16d8ff088b7d 100644
---- a/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-+++ b/Documentation/devicetree/bindings/display/panel/simple-panel.txt
-@@ -1,7 +1,7 @@
- Simple display panel
- 
- Required properties:
--- power-supply: regulator to provide the supply voltage
-+- power-supply: See panel-common.txt
- 
- Optional properties:
- - ddc-i2c-bus: phandle of an I2C controller used for DDC EDID probing
+ 	axp81x: pmic at 3a3 {
++		compatible = "x-powers,axp813";
+ 		reg = <0x3a3>;
+ 		interrupt-parent = <&r_intc>;
+ 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
 -- 
 git-series 0.9.1
