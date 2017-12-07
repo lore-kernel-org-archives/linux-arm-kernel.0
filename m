@@ -1,32 +1,58 @@
 From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu,  7 Dec 2017 14:56:14 +0100
-Subject: [PATCH v2 5/7] MAINTAINERS: add new entries for Armada 37xx cpufreq
- driver
+Date: Thu,  7 Dec 2017 14:56:16 +0100
+Subject: [PATCH v2 7/7] arm64: dts: marvell: armada-37xx: add nodes allowing
+ cpufreq support
 In-Reply-To: <20171207135616.23670-1-gregory.clement@free-electrons.com>
 References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
-Message-ID: <20171207135616.23670-6-gregory.clement@free-electrons.com>
+Message-ID: <20171207135616.23670-8-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This new driver belongs to the mvebu family, update the MAINTAINER file
-to document it.
+In order to be able to use cpu freq, we need to associate a clock to each
+CPU and to expose the power management registers.
 
 Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
 ---
- MAINTAINERS | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm64/boot/dts/marvell/armada-372x.dtsi | 1 +
+ arch/arm64/boot/dts/marvell/armada-37xx.dtsi | 7 +++++++
+ 2 files changed, 8 insertions(+)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index aa71ab52fd76..98dcee849481 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1582,6 +1582,7 @@ F:	arch/arm/boot/dts/kirkwood*
- F:	arch/arm/configs/mvebu_*_defconfig
- F:	arch/arm/mach-mvebu/
- F:	arch/arm64/boot/dts/marvell/armada*
-+F:	drivers/cpufreq/armada-37xx-cpufreq.c
- F:	drivers/cpufreq/mvebu-cpufreq.c
- F:	drivers/irqchip/irq-armada-370-xp.c
- F:	drivers/irqchip/irq-mvebu-*
+diff --git a/arch/arm64/boot/dts/marvell/armada-372x.dtsi b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+index 59d7557d3b1b..2554e0baea6b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-372x.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-372x.dtsi
+@@ -56,6 +56,7 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53","arm,armv8";
+ 			reg = <0x1>;
++			clocks = <&nb_periph_clk 16>;
+ 			enable-method = "psci";
+ 		};
+ 	};
+diff --git a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+index 90c26d616a54..3056d7168e0b 100644
+--- a/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
++++ b/arch/arm64/boot/dts/marvell/armada-37xx.dtsi
+@@ -65,6 +65,7 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0>;
++			clocks = <&nb_periph_clk 16>;
+ 			enable-method = "psci";
+ 		};
+ 	};
+@@ -234,6 +235,12 @@
+ 				};
+ 			};
+ 
++			nb_pm: syscon at 14000 {
++				compatible = "marvell,armada-3700-nb-pm",
++					     "syscon";
++				reg = <0x14000 0x60>;
++			};
++
+ 			pinctrl_sb: pinctrl at 18800 {
+ 				compatible = "marvell,armada3710-sb-pinctrl",
+ 					     "syscon", "simple-mfd";
 -- 
 2.15.0
