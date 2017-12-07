@@ -1,37 +1,133 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 7 Dec 2017 10:10:29 +0100
-Subject: [PATCH v5 00/11] add pinmuxing support for pins in AXP209 and
- AXP813 PMICs
-In-Reply-To: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
-References: <20171205144647.17594-1-quentin.schulz@free-electrons.com>
-Message-ID: <CACRpkdYWoi0MQagPZHD8arr1fv4ssorJqZDRnb0vmx2WFvqi3A@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 7 Dec 2017 10:10:42 +0100
+Subject: [PATCH 2/2] clk: sunxi-ng: sun50i: a64: Add 2x fixed
+ post-divider to MMC module clocks
+In-Reply-To: <CAGb2v64sxLK5fQ7Rmyy355diqq=0OYk8wRvOqjVJkdMWURwRUQ@mail.gmail.com>
+References: <20171204051912.7485-1-wens@csie.org>
+ <20171204051912.7485-3-wens@csie.org>
+ <20171205195956.xdil2dsbtfwx35jj@flea.lan>
+ <CAGb2v67=2BbOGWpRyujaR-pn6ZEfb1rSRtmzP-kUzXRn_y+iNg@mail.gmail.com>
+ <20171206155608.tuw73ht6gq7hyrho@flea.lan>
+ <CAGb2v64sxLK5fQ7Rmyy355diqq=0OYk8wRvOqjVJkdMWURwRUQ@mail.gmail.com>
+Message-ID: <20171207091042.fqoh7utt2ookqozj@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 5, 2017 at 3:46 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
+On Thu, Dec 07, 2017 at 12:10:39AM +0800, Chen-Yu Tsai wrote:
+> On Wed, Dec 6, 2017 at 11:56 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > Hi,
+> >
+> > On Wed, Dec 06, 2017 at 10:30:26AM +0800, Chen-Yu Tsai wrote:
+> >> On Wed, Dec 6, 2017 at 3:59 AM, Maxime Ripard
+> >> <maxime.ripard@free-electrons.com> wrote:
+> >> > Hi,
+> >> >
+> >> > On Mon, Dec 04, 2017 at 01:19:12PM +0800, Chen-Yu Tsai wrote:
+> >> >> On the A64, the MMC module clocks are fixed in the new timing mode,
+> >> >> i.e. they do not have a bit to select the mode. These clocks have
+> >> >> a 2x divider somewhere between the clock and the MMC module.
+> >> >>
+> >> >> To be consistent with other SoCs supporting the new timing mode,
+> >> >> we model the 2x divider as a fixed post-divider on the MMC module
+> >> >> clocks.
+> >> >>
+> >> >> This patch adds the post-dividers to the MMC clocks.
+> >> >>
+> >> >> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> >> >
+> >> > I had a doubt applying that one... sorry.
+> >> >
+> >> >> ---
+> >> >>  drivers/clk/sunxi-ng/ccu-sun50i-a64.c | 57 +++++++++++++++++++++++------------
+> >> >>  1 file changed, 37 insertions(+), 20 deletions(-)
+> >> >>
+> >> >> diff --git a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> >> >> index 2bb4cabf802f..ee9c12cf3f08 100644
+> >> >> --- a/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> >> >> +++ b/drivers/clk/sunxi-ng/ccu-sun50i-a64.c
+> >> >> @@ -400,28 +400,45 @@ static SUNXI_CCU_MP_WITH_MUX_GATE(nand_clk, "nand", mod0_default_parents, 0x080,
+> >> >>                                 BIT(31),      /* gate */
+> >> >>                                 0);
+> >> >>
+> >> >> +/*
+> >> >> + * MMC clocks are the new timing mode (see A83T & H3) variety, but without
+> >> >> + * the mode switch. This means they have a 2x post divider between the clock
+> >> >> + * and the MMC module. This is not documented in the manual, but is taken
+> >> >> + * into consideration when setting the mmc module clocks in the BSP kernel.
+> >> >> + * Without it, MMC performance is degraded.
+> >> >> + *
+> >> >> + * We model it here to be consistent with other SoCs supporting this mode.
+> >> >> + * The alternative would be to add the 2x multiplier when setting the MMC
+> >> >> + * module clock in the MMC driver, just for the A64.
+> >> >> + */
+> >> >>  static const char * const mmc_default_parents[] = { "osc24M", "pll-periph0-2x",
+> >> >>                                                   "pll-periph1-2x" };
+> >> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc0_clk, "mmc0", mmc_default_parents, 0x088,
+> >> >> -                               0, 4,         /* M */
+> >> >> -                               16, 2,        /* P */
+> >> >> -                               24, 2,        /* mux */
+> >> >> -                               BIT(31),      /* gate */
+> >> >> -                               0);
+> >> >> -
+> >> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc1_clk, "mmc1", mmc_default_parents, 0x08c,
+> >> >> -                               0, 4,         /* M */
+> >> >> -                               16, 2,        /* P */
+> >> >> -                               24, 2,        /* mux */
+> >> >> -                               BIT(31),      /* gate */
+> >> >> -                               0);
+> >> >> -
+> >> >> -static SUNXI_CCU_MP_WITH_MUX_GATE(mmc2_clk, "mmc2", mmc_default_parents, 0x090,
+> >> >> -                               0, 4,         /* M */
+> >> >> -                               16, 2,        /* P */
+> >> >> -                               24, 2,        /* mux */
+> >> >> -                               BIT(31),      /* gate */
+> >> >> -                               0);
+> >> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc0_clk, "mmc0",
+> >> >> +                                       mmc_default_parents, 0x088,
+> >> >> +                                       0, 4,         /* M */
+> >> >> +                                       16, 2,        /* P */
+> >> >> +                                       24, 2,        /* mux */
+> >> >> +                                       BIT(31),      /* gate */
+> >> >> +                                       2,            /* post-div */
+> >> >> +                                       0);
+> >> >> +
+> >> >> +static SUNXI_CCU_MP_WITH_MUX_GATE_POSTDIV(mmc1_clk, "mmc1",
+> >> >> +                                       mmc_default_parents, 0x08c,
+> >> >> +                                       0, 4,         /* M */
+> >> >> +                                       16, 2,        /* P */
+> >> >> +                                       24, 2,        /* mux */
+> >> >> +                                       BIT(31),      /* gate */
+> >> >> +                                       2,            /* post-div */
+> >> >> +                                       0);
+> >> >> +
+> >> >
+> >> > Are you sure that the divider there for the non-eMMC clocks? Usually,
+> >> > the new mode is only here for the eMMC, so we would divide the rate by
+> >> > two in the non-eMMC case.
+> >>
+> >> The new mode is there for all MMC controllers. The other two MMC
+> >> controllers even have the old/new timing mode switch. In case you
+> >> forgot we have ".need_new_timings" set for the A64 compatible.
+> >
+> > But then, shouldn't we model them as such, using the work you did on
+> > the A83t clocks?
+> 
+> On the A64, the clocks don't have the switch. Only the MMC controller
+> does. On the A83T, both do.
 
-> The AXP209 and AXP813 PMICs have several pins (respectively 3 and 2) that can
-> be used either as GPIOs or for other purposes (ADC or LDO here).
->
-> We already have a GPIO driver for the GPIO use of those pins on the AXP209.
-> Let's "upgrade" this driver to support all the functions these pins can have.
->
-> Then we add support to this driver for the AXP813 which is slighlty different
-> (basically a different offset in two registers and one less pin).
->
-> I suggest patches 1 to 8 go through Linus's tree and 9 via Lee's.
->
-> v5:
->   - add reference to pinctrl dt-bindings in driver's dt-binding,
->   - add statement that this driver employs per-pin muxing pattern,
->   - add a patch on top of the patch series to fix checkpatch warnings,
->   - add a few information to the Kconfig to make checkpatch happy,
+Ah, right. I've applied both patches.
 
-I have applied patches 1-8 to an immutable branch in the GPIO
-tree, then merged that into the GPIO "devel" branch as well as the
-pinctrl "devel" branch so we can develop the driver in the pinctrl
-tree henceforth.
+Maxime
 
-Yours,
-Linus Walleij
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/35516921/attachment.sig>
