@@ -1,65 +1,79 @@
-From: quentin.schulz@free-electrons.com (Quentin Schulz)
-Date: Thu, 7 Dec 2017 10:03:49 +0100
-Subject: [PATCH 3/8] mfd: axp20x: probe axp20x_adc driver for AXP813
-In-Reply-To: <CAGb2v67nD+WAEEyridP1K=k_KgBprWmbNNL7FPdZWv9ZYdrjJg@mail.gmail.com>
-References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
- <302c93023d8c4a54cafe321d912df484e39727b7.1512396054.git-series.quentin.schulz@free-electrons.com>
- <20171205080855.arr7vlgnxoxmyedd@flea.lan>
- <2021a653-d01e-f46f-2438-0760f579e0dc@free-electrons.com>
- <CAGb2v67nD+WAEEyridP1K=k_KgBprWmbNNL7FPdZWv9ZYdrjJg@mail.gmail.com>
-Message-ID: <41fcadb9-4fa9-65e8-5ef3-5844bcba1b1d@free-electrons.com>
+From: t-kristo@ti.com (Tero Kristo)
+Date: Thu, 7 Dec 2017 11:03:30 +0200
+Subject: [PATCH 1/3] Documentation: dt: memory: ti-emif: add edac support
+ under emif
+In-Reply-To: <1510087139-21885-2-git-send-email-t-kristo@ti.com>
+References: <1510087139-21885-1-git-send-email-t-kristo@ti.com>
+ <1510087139-21885-2-git-send-email-t-kristo@ti.com>
+Message-ID: <823a5602-52fb-a97f-ae09-c9af343f5bc8@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
+Rob,
 
-On 07/12/2017 09:54, Chen-Yu Tsai wrote:
-> On Thu, Dec 7, 2017 at 4:51 PM, Quentin Schulz
-> <quentin.schulz@free-electrons.com> wrote:
->> Hi Maxime,
->>
->> On 05/12/2017 09:08, Maxime Ripard wrote:
->>> On Mon, Dec 04, 2017 at 03:12:49PM +0100, Quentin Schulz wrote:
->>>> This makes the axp20x_adc driver probe with platform device id
->>>> "axp813-adc".
->>>>
->>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>>> ---
->>>>  drivers/mfd/axp20x.c | 4 +++-
->>>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>>
->>>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->>>> index 2468b43..42e54d1 100644
->>>> --- a/drivers/mfd/axp20x.c
->>>> +++ b/drivers/mfd/axp20x.c
->>>> @@ -878,7 +878,9 @@ static struct mfd_cell axp813_cells[] = {
->>>>              .resources              = axp803_pek_resources,
->>>>      }, {
->>>>              .name                   = "axp20x-regulator",
->>>> -    }
->>>> +    }, {
->>>> +            .name                   = "axp813-adc",
->>>> +    },
->>>
->>> Any particular reason you're not adding it to the DT?
->>>
->>
->> No, no particular reason. It's just the way it is currently for AXP209
->> and AXP22x so did the same for AXP813.
->>
->> I'll add DT "support" in next version for all AXPs supported by this
->> driver. Or is it worthy of a small separate patch series?
+Any comments on this? I guess the series is only pending an ack on this one.
+
+(Added devicetree ML to delivery, it seems I missed this on the original 
+post.)
+
+-Tero
+
+On 07/11/17 22:38, Tero Kristo wrote:
+> Certain revisions of the TI EMIF IP contain ECC support in them. Reflect
+> this in the DT binding.
 > 
-> IIRC there's no DT support because there's no need to reference
-> it in the device tree.
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+> Cc: Tony Lindgren <tony@atomide.com>
+> Cc: Santosh Shilimkar <ssantosh@kernel.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+> ---
+>   .../devicetree/bindings/memory-controllers/ti/emif.txt   | 16 +++++++++++++++-
+>   1 file changed, 15 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+> index 0db6047..f56a347 100644
+> --- a/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+> +++ b/Documentation/devicetree/bindings/memory-controllers/ti/emif.txt
+> @@ -3,12 +3,16 @@
+>   EMIF - External Memory Interface - is an SDRAM controller used in
+>   TI SoCs. EMIF supports, based on the IP revision, one or more of
+>   DDR2/DDR3/LPDDR2 protocols. This binding describes a given instance
+> -of the EMIF IP and memory parts attached to it.
+> +of the EMIF IP and memory parts attached to it. Certain revisions
+> +of the EMIF IP controller also contain optional ECC support, which
+> +corrects one bit errors and detects two bit errors.
+>   
+>   Required properties:
+>   - compatible	: Should be of the form "ti,emif-<ip-rev>" where <ip-rev>
+>     is the IP revision of the specific EMIF instance.
+>   		  For am437x should be ti,emif-am4372.
+> +		  For dra7xx should be ti,emif-dra7xx.
+> +		  For k2x family, should be ti,emif-keystone.
+>   
+>   - phy-type	: <u32> indicating the DDR phy type. Following are the
+>     allowed values
+> @@ -42,6 +46,10 @@ Optional properties:
+>   - hw-caps-temp-alert	: Have this property if the controller
+>     has capability for generating SDRAM temperature alerts
+>   
+> +- interrupts		: A list of interrupt specifiers for memory
+> +  controller interrupts, if available. Required for EMIF instances
+> +  that support ECC.
+> +
+>   Example:
+>   
+>   emif1: emif at 0x4c000000 {
+> @@ -54,3 +62,9 @@ emif1: emif at 0x4c000000 {
+>   	hw-caps-ll-interface;
+>   	hw-caps-temp-alert;
+>   };
+> +
+> +emif1: emif at 4c000000 {
+> +	compatible = "ti,emif-dra7";
+> +	reg = <0x4c000000 0x200>;
+> +	interrupts = <GIC_SPI 105 IRQ_TYPE_LEVEL_HIGH>;
+> +};
 > 
 
-No current need but that does not mean there won't be a need later for
-drivers to map IIO channels from the ADC driver (i.e. some components
-wired to GPIOs of the PMIC for example).
-
-Quentin
--- 
-Quentin Schulz, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+--
+Texas Instruments Finland Oy, Porkkalankatu 22, 00180 Helsinki. Y-tunnus/Business ID: 0615521-4. Kotipaikka/Domicile: Helsinki
