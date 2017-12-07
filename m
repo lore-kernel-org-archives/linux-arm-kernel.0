@@ -1,29 +1,47 @@
-From: david@lechnology.com (David Lechner)
-Date: Thu, 7 Dec 2017 11:15:02 -0600
-Subject: [PATCH v3] ARM: da850: Fix LEGO EV3 battery voltage gpio
-In-Reply-To: <1b2fe02d-1c8f-e4e8-53b6-692c4545faf6@ti.com>
-References: <1512338693-16781-1-git-send-email-david@lechnology.com>
- <1b2fe02d-1c8f-e4e8-53b6-692c4545faf6@ti.com>
-Message-ID: <0073467e-29d0-9b76-1caa-1605d5897321@lechnology.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Thu, 7 Dec 2017 18:12:31 +0100
+Subject: [PATCH] ARM: dts: imx6: RDU2: correct RTC compatible
+In-Reply-To: <20171207150923.25024-1-l.stach@pengutronix.de>
+References: <20171207150923.25024-1-l.stach@pengutronix.de>
+Message-ID: <20171207171231.GX21780@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/07/2017 01:35 AM, Sekhar Nori wrote:
-> On Monday 04 December 2017 03:34 AM, David Lechner wrote:
->> This fixes the battery voltage monitoring gpio-hog settings.
->>
->> When the gpio is low, it turns off the battery voltage to the ADC chip.
->> However, this needs to be on all of the time so that we can monitor
->> battery voltage.
->>
->> Also, there was a typo that prevented pinmuxing from working correctly.
->>
->> Signed-off-by: David Lechner <david@lechnology.com>
+On 07/12/2017 at 16:09:23 +0100, Lucas Stach wrote:
+> The RTC is manufactured by Maxim. This is a cosmetic fix, as Linux
+> doesn't match the vendor string for i2c devices.
 > 
-> Applied to fixes with subject line changed to:
-> 
-> ARM: dts: da850-lego-ev3: Fix battery voltage gpio
-> 
-> Please follow this style for future patches.
 
-Ack
+Actually, it does, see da10c06a044b3752f9162a88b7d26ed2409c5314.
+
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> ---
+>  arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> index eef737bd52d9..6bef9a98678e 100644
+> --- a/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> +++ b/arch/arm/boot/dts/imx6qdl-zii-rdu2.dtsi
+> @@ -581,7 +581,7 @@
+>  	};
+>  
+>  	ds1341: rtc at 68 {
+> -		compatible = "dallas,ds1341";
+> +		compatible = "maxim,ds1341";
+>  		reg = <0x68>;
+>  	};
+>  };
+> -- 
+> 2.11.0
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+Alexandre Belloni, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
