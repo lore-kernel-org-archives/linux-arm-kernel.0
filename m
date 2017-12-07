@@ -1,137 +1,84 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  7 Dec 2017 16:58:55 +0100
-Subject: [PATCH v4 10/15] ARM: dts: sun8i: a83t: Add display pipeline
+Date: Thu,  7 Dec 2017 16:58:47 +0100
+Subject: [PATCH v4 02/15] drm/panel: lvds: Add support for the power-supply
+ property
 In-Reply-To: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <66bcfdad37cb5ed6e4629bea6874e5e192f0ba01.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <a409d25d031203e960840c3d4927e9309351b7a3.1512662253.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display pipeline on the A83T is mainly composed of the mixers and
-TCONs, plus various encoders.
-
-Let's add the first mixer and TCON to the DTSI since the only board I have
-can use only the LVDS output on the first TCON. The other parts will be
-added eventually.
+A significant number of panels need to power up a regulator in order to
+operate properly. Add support for the power-supply property to enable and
+disable such a regulator whenever needed.
 
 Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- arch/arm/boot/dts/sun8i-a83t.dtsi | 79 ++++++++++++++++++++++++++++++++-
- 1 file changed, 79 insertions(+)
+ drivers/gpu/drm/panel/panel-lvds.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-index 19acae1b4089..e4db38c717d9 100644
---- a/arch/arm/boot/dts/sun8i-a83t.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-@@ -45,8 +45,10 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
+diff --git a/drivers/gpu/drm/panel/panel-lvds.c b/drivers/gpu/drm/panel/panel-lvds.c
+index e2d57c01200b..57e38a9e7ab4 100644
+--- a/drivers/gpu/drm/panel/panel-lvds.c
++++ b/drivers/gpu/drm/panel/panel-lvds.c
+@@ -17,6 +17,7 @@
+ #include <linux/module.h>
+ #include <linux/of_platform.h>
+ #include <linux/platform_device.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/slab.h>
  
- #include <dt-bindings/clock/sun8i-a83t-ccu.h>
-+#include <dt-bindings/clock/sun8i-de2.h>
- #include <dt-bindings/clock/sun8i-r-ccu.h>
- #include <dt-bindings/reset/sun8i-a83t-ccu.h>
-+#include <dt-bindings/reset/sun8i-de2.h>
- #include <dt-bindings/reset/sun8i-r-ccu.h>
+ #include <drm/drmP.h>
+@@ -39,6 +40,7 @@ struct panel_lvds {
+ 	bool data_mirror;
  
- / {
-@@ -151,6 +153,12 @@
- 		};
- 	};
+ 	struct backlight_device *backlight;
++	struct regulator *supply;
  
-+	de: display-engine {
-+		compatible = "allwinner,sun8i-a83t-display-engine";
-+		allwinner,pipelines = <&mixer0>;
-+		status = "disabled";
-+	};
-+
- 	memory {
- 		reg = <0x40000000 0x80000000>;
- 		device_type = "memory";
-@@ -162,6 +170,44 @@
- 		#size-cells = <1>;
- 		ranges;
+ 	struct gpio_desc *enable_gpio;
+ 	struct gpio_desc *reset_gpio;
+@@ -69,6 +71,9 @@ static int panel_lvds_unprepare(struct drm_panel *panel)
+ 	if (lvds->enable_gpio)
+ 		gpiod_set_value_cansleep(lvds->enable_gpio, 0);
  
-+		display_clocks: clock at 1000000 {
-+			compatible = "allwinner,sun8i-a83t-de2-clk";
-+			reg = <0x01000000 0x100000>;
-+			clocks = <&ccu CLK_PLL_DE>,
-+				 <&ccu CLK_BUS_DE>;
-+			clock-names = "mod",
-+				      "bus";
-+			resets = <&ccu RST_BUS_DE>;
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+		};
++	if (lvds->supply)
++		regulator_disable(lvds->supply);
 +
-+		mixer0: mixer at 1100000 {
-+			compatible = "allwinner,sun8i-a83t-de2-mixer-0";
-+			reg = <0x01100000 0x100000>;
-+			clocks = <&display_clocks CLK_BUS_MIXER0>,
-+				 <&display_clocks CLK_MIXER0>;
-+			clock-names = "bus",
-+				      "mod";
-+			resets = <&display_clocks RST_MIXER0>;
-+
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+
-+				mixer0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+
-+					mixer0_out_tcon0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&tcon0_in_mixer0>;
-+					};
-+				};
-+			};
-+		};
-+
- 		syscon: syscon at 1c00000 {
- 			compatible = "allwinner,sun8i-a83t-system-controller",
- 				"syscon";
-@@ -177,6 +223,39 @@
- 			#dma-cells = <1>;
- 		};
+ 	return 0;
+ }
  
-+		tcon0: lcd-controller at 1c0c000 {
-+			compatible = "allwinner,sun8i-a83t-tcon-lcd";
-+			reg = <0x01c0c000 0x1000>;
-+			interrupts = <GIC_SPI 86 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&ccu CLK_BUS_TCON0>, <&ccu CLK_TCON0>;
-+			clock-names = "ahb", "tcon-ch0";
-+			clock-output-names = "tcon-pixel-clock";
-+			resets = <&ccu RST_BUS_TCON0>, <&ccu RST_BUS_LVDS>;
-+			reset-names = "lcd", "lvds";
+@@ -76,6 +81,17 @@ static int panel_lvds_prepare(struct drm_panel *panel)
+ {
+ 	struct panel_lvds *lvds = to_panel_lvds(panel);
+ 
++	if (lvds->supply) {
++		int err;
 +
-+			ports {
-+				#address-cells = <1>;
-+				#size-cells = <0>;
++		err = regulator_enable(lvds->supply);
++		if (err < 0) {
++			dev_err(lvds->dev, "failed to enable supply: %d\n",
++				err);
++			return err;
++		}
++	}
 +
-+				tcon0_in: port at 0 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <0>;
+ 	if (lvds->enable_gpio)
+ 		gpiod_set_value_cansleep(lvds->enable_gpio, 1);
+ 
+@@ -196,6 +212,13 @@ static int panel_lvds_probe(struct platform_device *pdev)
+ 	if (ret < 0)
+ 		return ret;
+ 
++	lvds->supply = devm_regulator_get_optional(lvds->dev, "power");
++	if (IS_ERR(lvds->supply)) {
++		ret = PTR_ERR(lvds->supply);
++		dev_err(lvds->dev, "failed to request regulator: %d\n", ret);
++		return ret;
++	}
 +
-+					tcon0_in_mixer0: endpoint at 0 {
-+						reg = <0>;
-+						remote-endpoint = <&mixer0_out_tcon0>;
-+					};
-+				};
-+
-+				tcon0_out: port at 1 {
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					reg = <1>;
-+				};
-+			};
-+		};
-+
- 		mmc0: mmc at 1c0f000 {
- 			compatible = "allwinner,sun8i-a83t-mmc",
- 				     "allwinner,sun7i-a20-mmc";
+ 	/* Get GPIOs and backlight controller. */
+ 	lvds->enable_gpio = devm_gpiod_get_optional(lvds->dev, "enable",
+ 						     GPIOD_OUT_LOW);
 -- 
 git-series 0.9.1
