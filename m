@@ -1,80 +1,23 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Thu, 7 Dec 2017 19:53:34 +0800
-Subject: [PATCH 1/3] phy: phy-mtk-tphy: use auto instead of force to bypass
- utmi signals
-Message-ID: <ff2797a0487a0b30a2292c2685dedcbbfeead293.1512647458.git.chunfeng.yun@mediatek.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 7 Dec 2017 11:58:58 +0000
+Subject: [PATCH V3] spi: sun4i: disable clocks in the remove function
+In-Reply-To: <1512631227-27334-1-git-send-email-takuo.koguchi.sw@hitachi.com>
+References: <20171206152005.yfbyylu6tbe5gnnv@flea.lan>
+ <1512631227-27334-1-git-send-email-takuo.koguchi.sw@hitachi.com>
+Message-ID: <20171207115858.rsycg7esimogylbr@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When system is running, if usb2 phy is forced to bypass utmi signals,
-all PLL will be turned off, and it can't detect device connection
-anymore, so replace force mode with auto mode which can bypass utmi
-signals automatically if no device attached for normal flow.
-But keep the force mode to fix RX sensitivity degradation issue.
+On Thu, Dec 07, 2017 at 04:20:14PM +0900, Takuo Koguchi wrote:
+> mclk and hclk need to be disabled. Since pm_runtime_disable does
+> not disable the clocks, use pm_runtime_force_suspend instead.
 
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/phy/mediatek/phy-mtk-tphy.c | 19 +++++++------------
- 1 file changed, 7 insertions(+), 12 deletions(-)
-
-diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
-index fb8aba4..5d9d7f3 100644
---- a/drivers/phy/mediatek/phy-mtk-tphy.c
-+++ b/drivers/phy/mediatek/phy-mtk-tphy.c
-@@ -440,9 +440,9 @@ static void u2_phy_instance_init(struct mtk_tphy *tphy,
- 	u32 index = instance->index;
- 	u32 tmp;
- 
--	/* switch to USB function. (system register, force ip into usb mode) */
-+	/* switch to USB function, and enable usb pll */
- 	tmp = readl(com + U3P_U2PHYDTM0);
--	tmp &= ~P2C_FORCE_UART_EN;
-+	tmp &= ~(P2C_FORCE_UART_EN | P2C_FORCE_SUSPENDM);
- 	tmp |= P2C_RG_XCVRSEL_VAL(1) | P2C_RG_DATAIN_VAL(0);
- 	writel(tmp, com + U3P_U2PHYDTM0);
- 
-@@ -502,10 +502,8 @@ static void u2_phy_instance_power_on(struct mtk_tphy *tphy,
- 	u32 index = instance->index;
- 	u32 tmp;
- 
--	/* (force_suspendm=0) (let suspendm=1, enable usb 480MHz pll) */
- 	tmp = readl(com + U3P_U2PHYDTM0);
--	tmp &= ~(P2C_FORCE_SUSPENDM | P2C_RG_XCVRSEL);
--	tmp &= ~(P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
-+	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN | P2C_DTM0_PART_MASK);
- 	writel(tmp, com + U3P_U2PHYDTM0);
- 
- 	/* OTG Enable */
-@@ -540,7 +538,6 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
- 
- 	tmp = readl(com + U3P_U2PHYDTM0);
- 	tmp &= ~(P2C_RG_XCVRSEL | P2C_RG_DATAIN);
--	tmp |= P2C_FORCE_SUSPENDM;
- 	writel(tmp, com + U3P_U2PHYDTM0);
- 
- 	/* OTG Disable */
-@@ -548,18 +545,16 @@ static void u2_phy_instance_power_off(struct mtk_tphy *tphy,
- 	tmp &= ~PA6_RG_U2_OTG_VBUSCMP_EN;
- 	writel(tmp, com + U3P_USBPHYACR6);
- 
--	/* let suspendm=0, set utmi into analog power down */
--	tmp = readl(com + U3P_U2PHYDTM0);
--	tmp &= ~P2C_RG_SUSPENDM;
--	writel(tmp, com + U3P_U2PHYDTM0);
--	udelay(1);
--
- 	tmp = readl(com + U3P_U2PHYDTM1);
- 	tmp &= ~(P2C_RG_VBUSVALID | P2C_RG_AVALID);
- 	tmp |= P2C_RG_SESSEND;
- 	writel(tmp, com + U3P_U2PHYDTM1);
- 
- 	if (tphy->pdata->avoid_rx_sen_degradation && index) {
-+		tmp = readl(com + U3P_U2PHYDTM0);
-+		tmp &= ~(P2C_RG_SUSPENDM | P2C_FORCE_SUSPENDM);
-+		writel(tmp, com + U3P_U2PHYDTM0);
-+
- 		tmp = readl(com + U3D_U2PHYDCR0);
- 		tmp &= ~P2C_RG_SIF_U2PLL_FORCE_ON;
- 		writel(tmp, com + U3D_U2PHYDCR0);
--- 
-1.9.1
+Please don't send new patches in reply to existing threads, it makes it
+harder to spot them.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 488 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/5a69ab48/attachment-0001.sig>
