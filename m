@@ -1,34 +1,65 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:39 +0100
-Subject: [PATCH 36/54] arm64: dts: renesas: r8a7795-salvator-x: Add SoC name
- to file header
-In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
-References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <3d5863e6112adb8265456ca201d90bd9dc4eb886.1512640145.git.horms+renesas@verge.net.au>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 7 Dec 2017 11:11:13 +0100
+Subject: [PATCH] pwn: stm32: Adopt SPDX identifier
+In-Reply-To: <20171205145721.20403-1-benjamin.gaignard@st.com>
+References: <20171205145721.20403-1-benjamin.gaignard@st.com>
+Message-ID: <CAOFm3uFYjUvnwb2zqdJEuHp4WEnfmxrcZxRta2Cnfz3Q1=55rw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Tue, Dec 5, 2017 at 3:57 PM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
+> Add SPDX identifer
+>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  drivers/pwm/pwm-stm32-lp.c | 3 +--
+>  drivers/pwm/pwm-stm32.c    | 3 +--
+>  2 files changed, 2 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/pwm/pwm-stm32-lp.c b/drivers/pwm/pwm-stm32-lp.c
+> index 1ac9e4384142..cbd271e80c3c 100644
+> --- a/drivers/pwm/pwm-stm32-lp.c
+> +++ b/drivers/pwm/pwm-stm32-lp.c
+> @@ -1,3 +1,4 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * STM32 Low-Power Timer PWM driver
+>   *
+> @@ -5,8 +6,6 @@
+>   *
+>   * Author: Gerald Baeza <gerald.baeza@st.com>
+>   *
+> - * License terms: GNU General Public License (GPL), version 2
+> - *
+>   * Inspired by Gerald Baeza's pwm-stm32 driver
+>   */
+>
+> diff --git a/drivers/pwm/pwm-stm32.c b/drivers/pwm/pwm-stm32.c
+> index 6139512aab7b..be56d7af89c9 100644
+> --- a/drivers/pwm/pwm-stm32.c
+> +++ b/drivers/pwm/pwm-stm32.c
+> @@ -1,10 +1,9 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * Copyright (C) STMicroelectronics 2016
+>   *
+>   * Author: Gerald Baeza <gerald.baeza@st.com>
+>   *
+> - * License terms: GNU General Public License (GPL), version 2
+> - *
+>   * Inspired by timer-stm32.c from Maxime Coquelin
+>   *             pwm-atmel.c from Bo Shen
+>   */
+> --
+> 2.15.0
+>
 
-Document clearly which SoC this DTS applies to, to distinguish from
-Salvator-X boards equipped with other SoCs.
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Thank you for using the simpler SPDX license ids!
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index 17953070f38d..af467419266a 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -1,5 +1,5 @@
- /*
-- * Device Tree Source for the Salvator-X board
-+ * Device Tree Source for the Salvator-X board with R-Car H3 ES2.0
-  *
-  * Copyright (C) 2015 Renesas Electronics Corp.
-  *
+Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
+
 -- 
-2.11.0
+Cordially
+Philippe Ombredanne
