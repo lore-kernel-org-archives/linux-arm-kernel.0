@@ -1,69 +1,35 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 7 Dec 2017 17:14:30 +0800
-Subject: [PATCH 3/8] mfd: axp20x: probe axp20x_adc driver for AXP813
-In-Reply-To: <41fcadb9-4fa9-65e8-5ef3-5844bcba1b1d@free-electrons.com>
-References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
- <302c93023d8c4a54cafe321d912df484e39727b7.1512396054.git-series.quentin.schulz@free-electrons.com>
- <20171205080855.arr7vlgnxoxmyedd@flea.lan>
- <2021a653-d01e-f46f-2438-0760f579e0dc@free-electrons.com>
- <CAGb2v67nD+WAEEyridP1K=k_KgBprWmbNNL7FPdZWv9ZYdrjJg@mail.gmail.com>
- <41fcadb9-4fa9-65e8-5ef3-5844bcba1b1d@free-electrons.com>
-Message-ID: <CAGb2v66esOimRhDHL6QgYU3iWg2a6JiQm__0ivv3SdnQv=SGQg@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 7 Dec 2017 10:18:47 +0100
+Subject: [PATCH V3] spi: sun4i: disable clocks in the remove function
+In-Reply-To: <1512631227-27334-1-git-send-email-takuo.koguchi.sw@hitachi.com>
+References: <20171206152005.yfbyylu6tbe5gnnv@flea.lan>
+ <1512631227-27334-1-git-send-email-takuo.koguchi.sw@hitachi.com>
+Message-ID: <20171207091847.rf76dol6iqcfeomr@flea.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 5:03 PM, Quentin Schulz
-<quentin.schulz@free-electrons.com> wrote:
-> Hi Chen-Yu,
->
-> On 07/12/2017 09:54, Chen-Yu Tsai wrote:
->> On Thu, Dec 7, 2017 at 4:51 PM, Quentin Schulz
->> <quentin.schulz@free-electrons.com> wrote:
->>> Hi Maxime,
->>>
->>> On 05/12/2017 09:08, Maxime Ripard wrote:
->>>> On Mon, Dec 04, 2017 at 03:12:49PM +0100, Quentin Schulz wrote:
->>>>> This makes the axp20x_adc driver probe with platform device id
->>>>> "axp813-adc".
->>>>>
->>>>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
->>>>> ---
->>>>>  drivers/mfd/axp20x.c | 4 +++-
->>>>>  1 file changed, 3 insertions(+), 1 deletion(-)
->>>>>
->>>>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
->>>>> index 2468b43..42e54d1 100644
->>>>> --- a/drivers/mfd/axp20x.c
->>>>> +++ b/drivers/mfd/axp20x.c
->>>>> @@ -878,7 +878,9 @@ static struct mfd_cell axp813_cells[] = {
->>>>>              .resources              = axp803_pek_resources,
->>>>>      }, {
->>>>>              .name                   = "axp20x-regulator",
->>>>> -    }
->>>>> +    }, {
->>>>> +            .name                   = "axp813-adc",
->>>>> +    },
->>>>
->>>> Any particular reason you're not adding it to the DT?
->>>>
->>>
->>> No, no particular reason. It's just the way it is currently for AXP209
->>> and AXP22x so did the same for AXP813.
->>>
->>> I'll add DT "support" in next version for all AXPs supported by this
->>> driver. Or is it worthy of a small separate patch series?
->>
->> IIRC there's no DT support because there's no need to reference
->> it in the device tree.
->>
->
-> No current need but that does not mean there won't be a need later for
-> drivers to map IIO channels from the ADC driver (i.e. some components
-> wired to GPIOs of the PMIC for example).
+Hi,
 
-Hmm... Why would you map the IIO channels from the ADC? I thought those
-were all accessible from userspace?
+On Thu, Dec 07, 2017 at 04:20:14PM +0900, Takuo Koguchi wrote:
+> mclk and hclk need to be disabled. Since pm_runtime_disable does
+> not disable the clocks, use pm_runtime_force_suspend instead.
+> 
+> Found by Linux Driver Verification project (linuxtesting.org).
+> 
+> Signed-off-by: Takuo Koguchi <takuo.koguchi.sw@hitachi.com>
 
-However, proper muxing of the GPIO pin to the ADC function makes sense.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-ChenYu
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 833 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/ba561d5f/attachment.sig>
