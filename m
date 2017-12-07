@@ -1,16 +1,16 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:31 +0100
-Subject: [PATCH 28/54] arm64: dts: renesas: r8a7795: Point VSPI via FCPVI to
- IPMMU-VP0/1
+Date: Thu,  7 Dec 2017 10:53:30 +0100
+Subject: [PATCH 27/54] arm64: dts: renesas: r8a7795: Point VSPBC/VSPBD via
+ FCPVB to IPMMU-VP0/1
 In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
 References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <a02aac487325b5bba09a7fd48569d36eb2394a51.1512640145.git.horms+renesas@verge.net.au>
+Message-ID: <cdd919ba225433a334b2f2c2ef71c7e70f80173e.1512640145.git.horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Magnus Damm <damm+renesas@opensource.se>
 
-Hook up the FCPVI devices to allow use of VSPI with
+Hook up the FCPVB devices to allow use of VSPBC/VSPBD with
 IPMMU-VP0 and IPMMU-VP1.
 
 Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
@@ -22,39 +22,39 @@ Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
  2 files changed, 6 insertions(+)
 
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-index 3d50627c0670..b2d2f04c5e1c 100644
+index 736281335653..3d50627c0670 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795-es1.dtsi
-@@ -159,6 +159,10 @@
- 	iommus = <&ipmmu_vp0 1>;
+@@ -151,6 +151,10 @@
+ 	       <&ipmmu_mp1 30>, <&ipmmu_mp1 31>;
  };
  
-+&fcpvi1 {
-+	iommus = <&ipmmu_vp0 9>;
++&fcpvb1 {
++	iommus = <&ipmmu_vp0 7>;
 +};
 +
- &fcpvd2 {
- 	iommus = <&ipmmu_vi0 10>;
+ &fcpf1 {
+ 	iommus = <&ipmmu_vp0 1>;
  };
 diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 35efacd1ec21..10c7728d1b25 100644
+index f7d7c98a7f73..35efacd1ec21 100644
 --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -2120,6 +2120,7 @@
- 			clocks = <&cpg CPG_MOD 611>;
+@@ -2062,6 +2062,7 @@
+ 			clocks = <&cpg CPG_MOD 606>;
  			power-domains = <&sysc R8A7795_PD_A3VP>;
- 			resets = <&cpg 611>;
-+			iommus = <&ipmmu_vp0 8>;
+ 			resets = <&cpg 606>;
++			iommus = <&ipmmu_vp1 7>;
  		};
  
- 		vspi1: vsp at fe9b0000 {
-@@ -2139,6 +2140,7 @@
- 			clocks = <&cpg CPG_MOD 610>;
+ 		fcpf0: fcp at fe950000 {
+@@ -2099,6 +2100,7 @@
+ 			clocks = <&cpg CPG_MOD 607>;
  			power-domains = <&sysc R8A7795_PD_A3VP>;
- 			resets = <&cpg 610>;
-+			iommus = <&ipmmu_vp1 9>;
+ 			resets = <&cpg 607>;
++			iommus = <&ipmmu_vp0 5>;
  		};
  
- 		vspd0: vsp at fea20000 {
+ 		vspi0: vsp at fe9a0000 {
 -- 
 2.11.0
