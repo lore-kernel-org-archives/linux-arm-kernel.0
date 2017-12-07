@@ -1,84 +1,35 @@
-From: chunyan.zhang@spreadtrum.com (Chunyan Zhang)
-Date: Thu, 7 Dec 2017 20:57:14 +0800
-Subject: [PATCH V7 11/12] arm64: dts: add syscon for whale2 platform
-In-Reply-To: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
-References: <20171207125715.16160-1-chunyan.zhang@spreadtrum.com>
-Message-ID: <20171207125715.16160-12-chunyan.zhang@spreadtrum.com>
+From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
+Date: Thu, 7 Dec 2017 14:23:52 +0100
+Subject: [PATCH] i2c: stm32: Fixes multibyte transfer for STM32F4 I2C
+ controller
+In-Reply-To: <20171207105229.jxxyfofsgub27nip@ninjato>
+References: <1507722788-31224-1-git-send-email-radoslaw.pietrzyk@gmail.com>
+ <990c3275-35b3-68da-453c-d1a80e867df7@st.com>
+ <CAFvLkMS6+o3D88Rj23of56KtjonwFAVD_aEP3eWaA2H=U5WP4Q@mail.gmail.com>
+ <2d892fec-0496-8a6f-51c9-439b933d9975@st.com>
+ <CAFvLkMS9Q801biCBYp+fJeiOo22zr436Td43PH3GG8E6diSL3A@mail.gmail.com>
+ <b24d9699-a88d-6a83-ceaf-140ea8b4db97@st.com>
+ <CAFvLkMTsgxpjoGRgq7J0NFkT=YsOTYL6smkVhOPcfD=26Hzutg@mail.gmail.com>
+ <20171207105229.jxxyfofsgub27nip@ninjato>
+Message-ID: <dae4399e-4209-b052-a4c0-8a11c17ce032@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks on SC9860 are in the same address area with syscon
-devices, the proper syscon node will be quoted under the
-definitions of those clocks in DT.
 
-Signed-off-by: Chunyan Zhang <chunyan.zhang@spreadtrum.com>
----
- arch/arm64/boot/dts/sprd/whale2.dtsi | 46 +++++++++++++++++++++++++++++++++++-
- 1 file changed, 45 insertions(+), 1 deletion(-)
+I do believe some investigation has to be done prior merging this patch.
+The impact is genuine and has to be tested thoroughly before granting an ack.
 
-diff --git a/arch/arm64/boot/dts/sprd/whale2.dtsi b/arch/arm64/boot/dts/sprd/whale2.dtsi
-index 7c217c5..6ea3a75 100644
---- a/arch/arm64/boot/dts/sprd/whale2.dtsi
-+++ b/arch/arm64/boot/dts/sprd/whale2.dtsi
-@@ -17,6 +17,51 @@
- 		#size-cells = <2>;
- 		ranges;
- 
-+		ap_ahb_regs: syscon at 20210000 {
-+			compatible = "syscon";
-+			reg = <0 0x20210000 0 0x10000>;
-+		};
-+
-+		pmu_regs: syscon at 402b0000 {
-+			compatible = "syscon";
-+			reg = <0 0x402b0000 0 0x10000>;
-+		};
-+
-+		aon_regs: syscon at 402e0000 {
-+			compatible = "syscon";
-+			reg = <0 0x402e0000 0 0x10000>;
-+		};
-+
-+		ana_regs: syscon at 40400000 {
-+			compatible = "syscon";
-+			reg = <0 0x40400000 0 0x10000>;
-+		};
-+
-+		agcp_regs: syscon at 415e0000 {
-+			compatible = "syscon";
-+			reg = <0 0x415e0000 0 0x1000000>;
-+		};
-+
-+		vsp_regs: syscon at 61100000 {
-+			compatible = "syscon";
-+			reg = <0 0x61100000 0 0x10000>;
-+		};
-+
-+		cam_regs: syscon at 62100000 {
-+			compatible = "syscon";
-+			reg = <0 0x62100000 0 0x10000>;
-+		};
-+
-+		disp_regs: syscon at 63100000 {
-+			compatible = "syscon";
-+			reg = <0 0x63100000 0 0x10000>;
-+		};
-+
-+		ap_apb_regs: syscon at 70b00000 {
-+			compatible = "syscon";
-+			reg = <0 0x70b00000 0 0x40000>;
-+		};
-+
- 		ap-apb {
- 			compatible = "simple-bus";
- 			#address-cells = <1>;
-@@ -59,7 +104,6 @@
- 				status = "disabled";
- 			};
- 		};
--
- 	};
- 
- 	ext_26m: ext-26m {
--- 
-2.7.4
+Thus I prefer having a better understanding of the issue.
+I will try to work on this later on.
+
+Regards
+
+
+On 12/07/2017 11:52 AM, Wolfram Sang wrote:
+> On Tue, Oct 24, 2017 at 01:45:43PM +0200, Rados?aw Pietrzyk wrote:
+>> I'm afraid that didn't help and the problem still exists even with
+>> those patches applied.
+> 
+> So, my reading is: There is an issue which needs to be investigated?
+> Does applying the patch make sense until the issue is fully understood?
+> 
