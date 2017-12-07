@@ -1,111 +1,93 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 18:05:59 +0100
-Subject: [PATCH v2 05/36] KVM: arm/arm64: Add kvm_vcpu_load_sysregs and
- kvm_vcpu_put_sysregs
+Date: Thu,  7 Dec 2017 18:06:02 +0100
+Subject: [PATCH v2 08/36] KVM: arm64: Slightly improve debug save/restore
+ functions
 In-Reply-To: <20171207170630.592-1-christoffer.dall@linaro.org>
 References: <20171207170630.592-1-christoffer.dall@linaro.org>
-Message-ID: <20171207170630.592-6-christoffer.dall@linaro.org>
+Message-ID: <20171207170630.592-9-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As we are about to move a bunch of save/restore logic for VHE kernels to
-the load and put functions, we need some infrastructure to do this.
+The debug save/restore functions can be improved by using the has_vhe()
+static key instead of the instruction alternative.  Using the static key
+uses the same paradigm as we're going to use elsewhere, it makes the
+code more readable, and it generates slightly better code (no
+stack setups and function calls unless necessary).
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
+We also use a static key on the restore path, because it will be
+marginally faster than loading a value from memory.
+
+Finally, we don't have to conditionally clear the debug dirty flag if
+it's set, we can just clear it.
+
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
 
 Notes:
     Changes since v1:
-     - Reworded comments as suggested by Drew
+     - Change dot to comma in comment
+     - Rename __debug_restore_spe to __debug_restore_spe_nvhe
 
- arch/arm/include/asm/kvm_host.h   |  3 +++
- arch/arm64/include/asm/kvm_host.h |  3 +++
- arch/arm64/kvm/hyp/sysreg-sr.c    | 30 ++++++++++++++++++++++++++++++
- virt/kvm/arm/arm.c                |  2 ++
- 4 files changed, 38 insertions(+)
+ arch/arm64/kvm/hyp/debug-sr.c | 26 ++++++++++++--------------
+ 1 file changed, 12 insertions(+), 14 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index b92d2bcb3c08..8fce576199e0 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -298,4 +298,7 @@ int kvm_arm_vcpu_arch_has_attr(struct kvm_vcpu *vcpu,
- /* All host FP/SIMD state is restored on guest exit, so nothing to save: */
- static inline void kvm_fpsimd_flush_cpu_state(void) {}
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+index 406829b6a43e..81b8ad44f9e0 100644
+--- a/arch/arm64/kvm/hyp/debug-sr.c
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -65,11 +65,6 @@
+ 	default:	write_debug(ptr[0], reg, 0);			\
+ 	}
  
-+static inline void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu) {}
-+static inline void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu) {}
-+
- #endif /* __ARM_KVM_HOST_H__ */
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index d85c1e6ec53f..20fab9194794 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -410,4 +410,7 @@ static inline void kvm_fpsimd_flush_cpu_state(void)
- 		sve_flush_cpu_state();
- }
- 
-+void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu);
-+void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu);
-+
- #endif /* __ARM64_KVM_HOST_H__ */
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index e19d89cabf2a..cbbcd6f410a8 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -184,6 +184,36 @@ void __hyp_text __sysreg32_restore_state(struct kvm_vcpu *vcpu)
- 		write_sysreg(sysreg[DBGVCR32_EL2], dbgvcr32_el2);
- }
- 
-+/**
-+ * kvm_vcpu_load_sysregs - Load guest system registers to the physical CPU
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * Load system registers that do not affect the host's execution, for
-+ * example EL1 system registers on a VHE system where the host kernel
-+ * runs at EL2.  This function is called from KVM's vcpu_load() function
-+ * and loading system register state early avoids having to load them on
-+ * every entry to the VM.
-+ */
-+void kvm_vcpu_load_sysregs(struct kvm_vcpu *vcpu)
-+{
-+}
-+
-+/**
-+ * kvm_vcpu_put_sysregs - Restore host system registers to the physical CPU
-+ *
-+ * @vcpu: The VCPU pointer
-+ *
-+ * Save guest system registers that do not affect the host's execution, for
-+ * example EL1 system registers on a VHE system where the host kernel
-+ * runs at EL2.  This function is called from KVM's vcpu_put() function
-+ * and deferring saving system register state until we're no longer running the
-+ * VCPU avoids having to save them on every exit from the VM.
-+ */
-+void kvm_vcpu_put_sysregs(struct kvm_vcpu *vcpu)
-+{
-+}
-+
- void __hyp_text __kvm_set_tpidr_el2(u64 tpidr_el2)
+-static void __hyp_text __debug_save_spe_vhe(u64 *pmscr_el1)
+-{
+-	/* The vcpu can run. but it can't hide. */
+-}
+-
+ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
  {
- 	asm("msr tpidr_el2, %0": : "r" (tpidr_el2));
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index e5a5cf0d17fe..3e10343374a1 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -357,10 +357,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
- 	kvm_arm_set_running_vcpu(vcpu);
- 	kvm_vgic_load(vcpu);
- 	kvm_timer_vcpu_load(vcpu);
-+	kvm_vcpu_load_sysregs(vcpu);
+ 	u64 reg;
+@@ -99,11 +94,7 @@ static void __hyp_text __debug_save_spe_nvhe(u64 *pmscr_el1)
+ 	dsb(nsh);
  }
  
- void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
+-static hyp_alternate_select(__debug_save_spe,
+-			    __debug_save_spe_nvhe, __debug_save_spe_vhe,
+-			    ARM64_HAS_VIRT_HOST_EXTN);
+-
+-static void __hyp_text __debug_restore_spe(u64 pmscr_el1)
++static void __hyp_text __debug_restore_spe_nvhe(u64 pmscr_el1)
  {
-+	kvm_vcpu_put_sysregs(vcpu);
- 	kvm_timer_vcpu_put(vcpu);
- 	kvm_vgic_put(vcpu);
+ 	if (!pmscr_el1)
+ 		return;
+@@ -164,17 +155,24 @@ void __hyp_text __debug_cond_save_host_state(struct kvm_vcpu *vcpu)
+ {
+ 	__debug_save_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			   kern_hyp_va(vcpu->arch.host_cpu_context));
+-	__debug_save_spe()(&vcpu->arch.host_debug_state.pmscr_el1);
++
++	/*
++	 * Non-VHE: Disable and flush SPE data generation
++	 * VHE: The vcpu can run, but it can't hide.
++	 */
++	if (!has_vhe())
++		__debug_save_spe_nvhe(&vcpu->arch.host_debug_state.pmscr_el1);
+ }
  
+ void __hyp_text __debug_cond_restore_host_state(struct kvm_vcpu *vcpu)
+ {
+-	__debug_restore_spe(vcpu->arch.host_debug_state.pmscr_el1);
++	if (!has_vhe())
++		__debug_restore_spe_nvhe(vcpu->arch.host_debug_state.pmscr_el1);
++
+ 	__debug_restore_state(vcpu, &vcpu->arch.host_debug_state.regs,
+ 			      kern_hyp_va(vcpu->arch.host_cpu_context));
+ 
+-	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY)
+-		vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
++	vcpu->arch.debug_flags &= ~KVM_ARM64_DEBUG_DIRTY;
+ }
+ 
+ u32 __hyp_text __kvm_get_mdcr_el2(void)
 -- 
 2.14.2
