@@ -1,61 +1,47 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Thu, 7 Dec 2017 09:45:02 -0800
-Subject: [kernel-hardening][PATCH v4 0/3] arm: Makes ptdump resuable and
- add WX page checking
-In-Reply-To: <20171206102315.GA7012@pjb1027-Latitude-E5410>
-References: <20171206102315.GA7012@pjb1027-Latitude-E5410>
-Message-ID: <CAGXu5jLcvKMOXEMXix3iMzssnN1f26GCaMMGzOK=xXze=Y07kw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 7 Dec 2017 12:50:50 -0500
+Subject: [PATCH V6 4/7] OF: properties: Implement get_match_data() callback
+In-Reply-To: <20171207162036.6a71a4f5@karo-electronics.de>
+References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+ <1512493493-6464-5-git-send-email-okaya@codeaurora.org>
+ <20171207141029.575c0a03@karo-electronics.de>
+ <def8e351-bc2d-7adc-fdc5-362b365302a8@codeaurora.org>
+ <20171207162036.6a71a4f5@karo-electronics.de>
+Message-ID: <661cbe4d-ea33-3e84-b5f2-ab6517cbb135@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Dec 6, 2017 at 2:23 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
+On 12/7/2017 10:20 AM, Lothar Wa?mann wrote:
 > Hi,
->
-> Page table dumping code for arm64-x86 is reusable,
-> and they have function for WX page checking.
-> But arm doesn't have that.
->
-> This path series are to makes ptdump reusable,
-> and add WX page checking for arm.
-> This is heavily based on arm64 version.
->
-> v2 :
-> Fix a sender name of mail header, there was an mistake.
-> (from "jinb.park" to Jinbum Park)
-> Contents of patch-set are perfectly same.
->
-> v3 :
-> Take advantage of the existing pg_level and bits arrays
-> to check ro, nx prot.
->
-> v4 :
-> Add boolean for ro_bit, nx_bit into prot_bits
-> to point ro_bit, nx_bit in pg_level.
-> This change is suggested by Laura Abbott.
->
-> jinb.park (3):
->   arm: mm: dump: make page table dumping reusable
->   arm: mm: dump: make the page table dumping seq_file optional
->   arm: mm: dump: add checking for writable and executable pages
->
->  arch/arm/Kconfig.debug        |  33 ++++++++-
->  arch/arm/include/asm/ptdump.h |  56 ++++++++++++++++
->  arch/arm/mm/Makefile          |   3 +-
->  arch/arm/mm/dump.c            | 151 +++++++++++++++++++++++++++++-------------
->  arch/arm/mm/init.c            |   2 +
->  arch/arm/mm/ptdump_debugfs.c  |  34 ++++++++++
->  6 files changed, 232 insertions(+), 47 deletions(-)
->  create mode 100644 arch/arm/include/asm/ptdump.h
->  create mode 100644 arch/arm/mm/ptdump_debugfs.c
+> 
+> On Thu, 7 Dec 2017 09:45:31 -0500 Sinan Kaya wrote:
+>> On 12/7/2017 8:10 AM, Lothar Wa?mann wrote:
+>>>> +void *of_fwnode_get_match_data(const struct fwnode_handle *fwnode,
+>>>> +			       struct device *dev)
+>>> Shouldn't this be 'const void *of_fwnode_get_match_data
+>>
+>> OF keeps the driver data as a (const void*) internally. ACPI keeps the
+>> driver data as kernel_ulong_t in struct acpi_device_id.
+>>
+>> I tried to find the middle ground here by converting output to void*
+>> but not keeping const.
+>>
+> It should be no problem to cast a (const void *) to an unsigned long
+> data type (without const qualifier).
+> 
 
-Please consider this series:
+It is the other way around. If I change this API to return a a (const void*),
+the device_get_match_data() function need to return a (const void *).
 
-Reviewed-by: Kees Cook <keescook@chromium.org>
+While implementing the ACPI piece, I have to convert an unsigned long to
+(const void *) in ACPI code so that the APIs are compatible.
 
-With Laura's review, this is probably ready to put into the ARM patch tracker.
+> 
+> Lothar Wa?mann
+> 
 
--Kees
 
 -- 
-Kees Cook
-Pixel Security
+Sinan Kaya
+Qualcomm Datacenter Technologies, Inc. as an affiliate of Qualcomm Technologies, Inc.
+Qualcomm Technologies, Inc. is a member of the Code Aurora Forum, a Linux Foundation Collaborative Project.
