@@ -1,23 +1,24 @@
 From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 7 Dec 2017 14:15:58 +0100
-Subject: [PATCH v2 3/8] clocksource: owl: Adopt TIMER_OF_DECLARE()
-In-Reply-To: <20171113233427.5386-4-afaerber@suse.de>
+Date: Thu, 7 Dec 2017 14:16:22 +0100
+Subject: [PATCH v2 4/8] clocksource: owl: Prepare S700
+In-Reply-To: <20171113233427.5386-5-afaerber@suse.de>
 References: <20171113233427.5386-1-afaerber@suse.de>
- <20171113233427.5386-4-afaerber@suse.de>
-Message-ID: <ea505d67-79da-9e59-07e9-047cecd6695c@linaro.org>
+ <20171113233427.5386-5-afaerber@suse.de>
+Message-ID: <39ec174d-91fb-3d06-3973-74c589f48b32@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 14/11/2017 00:34, Andreas F?rber wrote:
-> Commit 1727339590fdb5a1ded881b540cd32121278d414 ("clocksource/drivers:
-> Rename CLOCKSOURCE_OF_DECLARE to TIMER_OF_DECLARE") deprecated
-> CLOCKSOURCE_OF_DECLARE(), so adopt the new macro TIMER_OF_DECLARE().
+> Actions S700 has two 2Hz timers like S500, and four TIMx timers like S900.
 > 
-> Reported-by: Daniel Lezcano <daniel.lezcano@linaro.org>
 > Signed-off-by: Andreas F?rber <afaerber@suse.de>
 > ---
 
-Applied for 4.16
+Applied for 4.16.
+
+Thanks
+
+  -- Daniel
 
 
 -- 
