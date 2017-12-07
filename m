@@ -1,46 +1,40 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 7 Dec 2017 14:34:09 +0100
-Subject: [PATCH] arm64: allwinner: a64: orangepi-zero-plus2: add usb otg
-In-Reply-To: <1512644748-14491-1-git-send-email-jagan@amarulasolutions.com>
-References: <1512644748-14491-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <20171207133409.cpp7wxx4yflkgavp@flea.lan>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 7 Dec 2017 13:38:13 +0000
+Subject: [PATCH] perf: qcom_l2_pmu: don't allow guest access
+In-Reply-To: <bc650fac-702c-e554-43ca-9cd3cfed9696@codeaurora.org>
+References: <1512575733-923-1-git-send-email-nleeder@codeaurora.org>
+ <20171206161149.ezlzzcuvxbot5tio@lakrids.cambridge.arm.com>
+ <bc650fac-702c-e554-43ca-9cd3cfed9696@codeaurora.org>
+Message-ID: <20171207133812.GG31900@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Dec 07, 2017 at 04:35:48PM +0530, Jagan Teki wrote:
-> Add usb otg support for orangepi-zero-plus2 board:
-> - Add usb_otg node with dr_mode as 'otg'
-> - USB0-IDDET connected to PA21
-> - VBUS connected through DCIN which always on
+On Wed, Dec 06, 2017 at 04:19:24PM -0500, Leeder, Neil wrote:
+> On 12/6/2017 11:11 AM, Mark Rutland wrote:
+> > On Wed, Dec 06, 2017 at 10:55:33AM -0500, Neil Leeder wrote:
+> >> Guests cannot access IMPDEF system registers, which are used
+> >> by this driver. Disable the driver if it's running in a guest VM.
+> >>
+> >> Signed-off-by: Neil Leeder <nleeder@codeaurora.org>
+> >> ---
+> >>  drivers/perf/qcom_l2_pmu.c | 4 ++++
+> >>  1 file changed, 4 insertions(+)
+> > 
+> > I'm a little confused by this. Why is this hypervisor providing a
+> > QCOM8130 device to the guest that it cannot use?
+> > 
+> > Could you elaborate on what's going on?
+> > 
 > 
-> Tested mass storage function.
-> 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+> While there's an argument that the guest shouldn't be loading the driver
+> in the first place, we can't control everyone's guest configuration or what
+> their hypervisor does.
 
-Did you test the OTG or peripheral modes?
+Ok, but why is the hypervisor advertising a device that effectively doesn't
+exist? Most drivers trust the firmware tables they are given, so this makes
+it sound like we should start annotating all drivers for devices that we
+don't expect to see in a guest with is_hyp_mode_available() checks.
 
-> Note: Anyone please check vbus connection [1]
-> Since it is connected through DCIN of vcc-5v, I've added vcc-5v0
-> regulator for the same and attached to usb0_vbus-supply but it is
-> disabling during kernel boot.
-> [    1.887854] vcc5v0: disabling
+That doesn't feel quite right to me.
 
-VBUS is the power line that is provided on the USB connector. In
-peripheral, that power is provided by the host, therefore it needs to
-be shutdown on the peripheral end. This is the expected behaviour.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/372d069a/attachment.sig>
+Will
