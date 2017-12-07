@@ -1,27 +1,72 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 7 Dec 2017 12:46:40 -0600
-Subject: [PATCH 2/2] acpi, x86: Use SPCR table for earlycon on x86
-In-Reply-To: <20171207172912.17868-3-prarit@redhat.com>
-References: <20171207172912.17868-1-prarit@redhat.com>
- <20171207172912.17868-3-prarit@redhat.com>
-Message-ID: <CAOZdJXXdeY0+SRfSQC_X-L1UNemigO7DDgRk7jRdMKVe34NWvQ@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 7 Dec 2017 10:50:38 -0800
+Subject: [PATCH v5 15/30] arm64/sve: Signal handling support
+In-Reply-To: <20171207104948.GE31900@arm.com>
+References: <1509465082-30427-1-git-send-email-Dave.Martin@arm.com>
+ <1509465082-30427-16-git-send-email-Dave.Martin@arm.com>
+ <CAGXu5jJgsAg1VBMbx=mV3ep4hzs+1G46Sow4eeFqCK31b_sORA@mail.gmail.com>
+ <20171207104948.GE31900@arm.com>
+Message-ID: <CAGXu5jLO6tHm-mCPBo-csCw--+_jhLfGD_sHXCkFjmyvdame=g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 7, 2017 at 11:29 AM, Prarit Bhargava <prarit@redhat.com> wrote:
-> -int __init acpi_parse_spcr(bool earlycon)
-> +int __init acpi_parse_spcr(bool earlycon, bool enable_console)
->  {
->         static char opts[ACPI_SPCR_OPTS_SIZE];
->         static char uart[ACPI_SPCR_BUF_SIZE];
-> @@ -113,7 +113,8 @@ int __init acpi_parse_spcr(bool earlycon)
->         if (earlycon)
->                 setup_earlycon(opts);
+On Thu, Dec 7, 2017 at 2:49 AM, Will Deacon <will.deacon@arm.com> wrote:
+> Hi Kees,
 >
-> -       err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
-> +       if (enable_console)
-> +               err = add_preferred_console(uart, 0, opts + strlen(uart) + 1);
+> On Wed, Dec 06, 2017 at 11:56:50AM -0800, Kees Cook wrote:
+>> On Tue, Oct 31, 2017 at 8:51 AM, Dave Martin <Dave.Martin@arm.com> wrote:
+>> > Miscellaneous:
+>> >
+>> >  * Change inconsistent copy_to_user() calls to __copy_to_user() in
+>> >    preserve_sve_context().
+>> >
+>> >    There are already __put_user_error() calls here.
+>> >
+>> >    The whole extended signal frame is already checked for
+>> >    access_ok(VERIFY_WRITE) in get_sigframe().
+>>
+>> Verifying all these __copy_to/from_user() calls is rather non-trivial.
+>> For example, I had to understand that the access_ok() check actually
+>> spans memory that both user->sigframe and user->next_frame point into.
+>
+> I don't think that's particularly difficult -- you just have to read the
+> four lines preceding the access_ok.
 
-So if earlycon==true but enable_console==false, then you parse SPCR
-and use it for the early console, but not the primary console?  I'm
-not sure what that gives you.
+Sure, but someone working backward from finding the __copy_*, it's
+less obvious. :)
+
+>> And it isn't clear to me that all users of apply_user_offset() are
+>> within this range too, along with other manually calculated offsets in
+>> setup_sigframe().
+>
+> The offsets passed into apply_user_offset are calculated by
+> setup_sigframe_layout as the stack is allocated, so they're correct by
+> construction. We could add a size check in apply_user_offset if you like?
+>
+>> And it's not clear if parse_user_sigframe() is safe either. Are
+>> user->fpsimd and user->sve checked somewhere? It seems like it's
+>> safely contained by in sf->uc.uc_mcontext.__reserved, but it's hard to
+>> read, though I do see access_ok() checks against __reserved at the end
+>> of the while loop.
+>
+> This one is certainly more difficult to follow, mainly because it's spread
+> about a bit and we have to check the extra context separately. However, the
+> main part of the frame is checked in sys_rt_sigreturn before calling
+> restore_sigframe, and the extra context is checked in parse_user_sigframe
+> if we find it.
+>
+> Dave, any thoughts on making this easier to understand?
+
+My question is mainly: why not just use copy_*() everywhere instead?
+Having these things so spread out makes it fragile, and there's very
+little performance benefit from using __copy_*() over copy_*().
+
+As far as I can see, everything looks correctly checked here, but it
+took a while to convince myself of it. Having Dave's description in
+the other reply certainly helped, though, thanks for that! :)
+
+-Kees
+
+-- 
+Kees Cook
+Pixel Security
