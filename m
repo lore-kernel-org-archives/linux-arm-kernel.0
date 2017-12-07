@@ -1,182 +1,126 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 11:54:17 +0100
-Subject: [PATCH v7 7/8] KVM: arm/arm64: Provide a get_input_level for the arch
- timer
+Date: Thu,  7 Dec 2017 11:54:15 +0100
+Subject: [PATCH v7 5/8] KVM: arm/arm64: Support a vgic interrupt line level
+ sample function
 In-Reply-To: <20171207105418.22428-1-christoffer.dall@linaro.org>
 References: <20171207105418.22428-1-christoffer.dall@linaro.org>
-Message-ID: <20171207105418.22428-8-christoffer.dall@linaro.org>
+Message-ID: <20171207105418.22428-6-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The VGIC can now support the life-cycle of mapped level-triggered
-interrupts, and we no longer have to read back the timer state on every
-exit from the VM if we had an asserted timer interrupt signal, because
-the VGIC already knows if we hit the unlikely case where the guest
-disables the timer without ACKing the virtual timer interrupt.
+The GIC sometimes need to sample the physical line of a mapped
+interrupt.  As we know this to be notoriously slow, provide a callback
+function for devices (such as the timer) which can do this much faster
+than talking to the distributor, for example by comparing a few
+in-memory values.  Fall back to the good old method of poking the
+physical GIC if no callback is provided.
 
-This means we rework a bit of the code to factor out the functionality
-to snapshot the timer state from vtimer_save_state(), and we can reuse
-this functionality in the sync path when we have an irqchip in
-userspace, and also to support our implementation of the
-get_input_level() function for the timer.
-
-This change also means that we can no longer rely on the timer's view of
-the interrupt line to set the active state, because we no longer
-maintain this state for mapped interrupts when exiting from the guest.
-Instead, we only set the active state if the virtual interrupt is
-active, and otherwise we simply let the timer fire again and raise the
-virtual interrupt from the ISR.
-
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/kvm/arm_arch_timer.h |  2 ++
- virt/kvm/arm/arch_timer.c    | 75 +++++++++++++++++++++-----------------------
- 2 files changed, 38 insertions(+), 39 deletions(-)
+ include/kvm/arm_vgic.h    | 13 ++++++++++++-
+ virt/kvm/arm/arch_timer.c |  3 ++-
+ virt/kvm/arm/vgic/vgic.c  | 12 +++++++++---
+ 3 files changed, 23 insertions(+), 5 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 01ee473517e2..f57f795d704c 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -90,6 +90,8 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu);
+diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
+index 8c896540a72c..cdbd142ca7f2 100644
+--- a/include/kvm/arm_vgic.h
++++ b/include/kvm/arm_vgic.h
+@@ -130,6 +130,17 @@ struct vgic_irq {
+ 	u8 priority;
+ 	enum vgic_irq_config config;	/* Level or edge */
  
- void kvm_timer_init_vhe(void);
- 
-+bool kvm_arch_timer_get_input_level(int vintid);
++	/*
++	 * Callback function pointer to in-kernel devices that can tell us the
++	 * state of the input level of mapped level-triggered IRQ faster than
++	 * peaking into the physical GIC.
++	 *
++	 * Always called in non-preemptible section and the functions can use
++	 * kvm_arm_get_running_vcpu() to get the vcpu pointer for private
++	 * IRQs.
++	 */
++	bool (*get_input_level)(int vintid);
 +
- #define vcpu_vtimer(v)	(&(v)->arch.timer_cpu.vtimer)
- #define vcpu_ptimer(v)	(&(v)->arch.timer_cpu.ptimer)
+ 	void *owner;			/* Opaque pointer to reserve an interrupt
+ 					   for in-kernel devices. */
+ };
+@@ -331,7 +342,7 @@ void kvm_vgic_init_cpu_hardware(void);
+ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 			bool level, void *owner);
+ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+-			  u32 vintid);
++			  u32 vintid, bool (*get_input_level)(int vindid));
+ int kvm_vgic_unmap_phys_irq(struct kvm_vcpu *vcpu, unsigned int vintid);
+ bool kvm_vgic_map_is_active(struct kvm_vcpu *vcpu, unsigned int vintid);
  
 diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index e78ba5e20f74..82d4963f63b8 100644
+index dd5aca05c500..e78ba5e20f74 100644
 --- a/virt/kvm/arm/arch_timer.c
 +++ b/virt/kvm/arm/arch_timer.c
-@@ -343,6 +343,12 @@ static void kvm_timer_update_state(struct kvm_vcpu *vcpu)
- 	phys_timer_emulate(vcpu);
- }
- 
-+static void __timer_snapshot_state(struct arch_timer_context *timer)
-+{
-+	timer->cnt_ctl = read_sysreg_el0(cntv_ctl);
-+	timer->cnt_cval = read_sysreg_el0(cntv_cval);
-+}
-+
- static void vtimer_save_state(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -354,10 +360,8 @@ static void vtimer_save_state(struct kvm_vcpu *vcpu)
- 	if (!vtimer->loaded)
- 		goto out;
- 
--	if (timer->enabled) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
--		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
--	}
-+	if (timer->enabled)
-+		__timer_snapshot_state(vtimer);
- 
- 	/* Disable the virtual timer */
- 	write_sysreg_el0(0, cntv_ctl);
-@@ -454,8 +458,7 @@ static void kvm_timer_vcpu_load_vgic(struct kvm_vcpu *vcpu)
- 	bool phys_active;
- 	int ret;
- 
--	phys_active = vtimer->irq.level ||
--		      kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
-+	phys_active = kvm_vgic_map_is_active(vcpu, vtimer->irq.irq);
- 
- 	ret = irq_set_irqchip_state(host_vtimer_irq,
- 				    IRQCHIP_STATE_ACTIVE,
-@@ -541,27 +544,19 @@ void kvm_timer_vcpu_put(struct kvm_vcpu *vcpu)
- 	set_cntvoff(0);
- }
- 
--static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
-+/*
-+ * With a userspace irqchip we have to check if the guest de-asserted the
-+ * timer and if so, unmask the timer irq signal on the host interrupt
-+ * controller to ensure that we see future timer signals.
-+ */
-+static void unmask_vtimer_irq_user(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
- 
- 	if (unlikely(!irqchip_in_kernel(vcpu->kvm))) {
--		kvm_vtimer_update_mask_user(vcpu);
--		return;
--	}
--
--	/*
--	 * If the guest disabled the timer without acking the interrupt, then
--	 * we must make sure the physical and virtual active states are in
--	 * sync by deactivating the physical interrupt, because otherwise we
--	 * wouldn't see the next timer interrupt in the host.
--	 */
--	if (!kvm_vgic_map_is_active(vcpu, vtimer->irq.irq)) {
--		int ret;
--		ret = irq_set_irqchip_state(host_vtimer_irq,
--					    IRQCHIP_STATE_ACTIVE,
--					    false);
--		WARN_ON(ret);
-+		__timer_snapshot_state(vtimer);
-+		if (!kvm_timer_should_fire(vtimer))
-+			kvm_vtimer_update_mask_user(vcpu);
- 	}
- }
- 
-@@ -574,21 +569,7 @@ static void unmask_vtimer_irq(struct kvm_vcpu *vcpu)
-  */
- void kvm_timer_sync_hwstate(struct kvm_vcpu *vcpu)
- {
--	struct arch_timer_context *vtimer = vcpu_vtimer(vcpu);
--
--	/*
--	 * If we entered the guest with the vtimer output asserted we have to
--	 * check if the guest has modified the timer so that we should lower
--	 * the line at this point.
--	 */
--	if (vtimer->irq.level) {
--		vtimer->cnt_ctl = read_sysreg_el0(cntv_ctl);
--		vtimer->cnt_cval = read_sysreg_el0(cntv_cval);
--		if (!kvm_timer_should_fire(vtimer)) {
--			kvm_timer_update_irq(vcpu, false, vtimer);
--			unmask_vtimer_irq(vcpu);
--		}
--	}
-+	unmask_vtimer_irq_user(vcpu);
- }
- 
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu)
-@@ -819,6 +800,22 @@ static bool timer_irqs_are_valid(struct kvm_vcpu *vcpu)
- 	return true;
- }
- 
-+bool kvm_arch_timer_get_input_level(int vintid)
-+{
-+	struct kvm_vcpu *vcpu = kvm_arm_get_running_vcpu();
-+	struct arch_timer_context *timer;
-+
-+	if (vintid == vcpu_vtimer(vcpu)->irq.irq)
-+		timer = vcpu_vtimer(vcpu);
-+	else
-+		BUG(); /* We only map the vtimer so far */
-+
-+	if (timer->loaded)
-+		__timer_snapshot_state(timer);
-+
-+	return kvm_timer_should_fire(timer);
-+}
-+
- int kvm_timer_enable(struct kvm_vcpu *vcpu)
- {
- 	struct arch_timer_cpu *timer = &vcpu->arch.timer_cpu;
-@@ -841,7 +838,7 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+@@ -840,7 +840,8 @@ int kvm_timer_enable(struct kvm_vcpu *vcpu)
+ 		return -EINVAL;
  	}
  
- 	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
--				    NULL);
-+				    kvm_arch_timer_get_input_level);
+-	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq);
++	ret = kvm_vgic_map_phys_irq(vcpu, host_vtimer_irq, vtimer->irq.irq,
++				    NULL);
  	if (ret)
  		return ret;
+ 
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 607cbbc27a1c..eadabb249d2a 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -151,6 +151,9 @@ bool vgic_get_phys_line_level(struct vgic_irq *irq)
+ 
+ 	BUG_ON(!irq->hw);
+ 
++	if (irq->get_input_level)
++		return irq->get_input_level(irq->intid);
++
+ 	WARN_ON(irq_get_irqchip_state(irq->host_irq,
+ 				      IRQCHIP_STATE_PENDING,
+ 				      &line_level));
+@@ -436,7 +439,8 @@ int kvm_vgic_inject_irq(struct kvm *kvm, int cpuid, unsigned int intid,
+ 
+ /* @irq->irq_lock must be held */
+ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+-			    unsigned int host_irq)
++			    unsigned int host_irq,
++			    bool (*get_input_level)(int vindid))
+ {
+ 	struct irq_desc *desc;
+ 	struct irq_data *data;
+@@ -456,6 +460,7 @@ static int kvm_vgic_map_irq(struct kvm_vcpu *vcpu, struct vgic_irq *irq,
+ 	irq->hw = true;
+ 	irq->host_irq = host_irq;
+ 	irq->hwintid = data->hwirq;
++	irq->get_input_level = get_input_level;
+ 	return 0;
+ }
+ 
+@@ -464,10 +469,11 @@ static inline void kvm_vgic_unmap_irq(struct vgic_irq *irq)
+ {
+ 	irq->hw = false;
+ 	irq->hwintid = 0;
++	irq->get_input_level = NULL;
+ }
+ 
+ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+-			  u32 vintid)
++			  u32 vintid, bool (*get_input_level)(int vindid))
+ {
+ 	struct vgic_irq *irq = vgic_get_irq(vcpu->kvm, vcpu, vintid);
+ 	unsigned long flags;
+@@ -476,7 +482,7 @@ int kvm_vgic_map_phys_irq(struct kvm_vcpu *vcpu, unsigned int host_irq,
+ 	BUG_ON(!irq);
+ 
+ 	spin_lock_irqsave(&irq->irq_lock, flags);
+-	ret = kvm_vgic_map_irq(vcpu, irq, host_irq);
++	ret = kvm_vgic_map_irq(vcpu, irq, host_irq, get_input_level);
+ 	spin_unlock_irqrestore(&irq->irq_lock, flags);
+ 	vgic_put_irq(vcpu->kvm, irq);
  
 -- 
 2.14.2
