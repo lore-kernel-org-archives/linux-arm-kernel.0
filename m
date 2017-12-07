@@ -1,41 +1,83 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Thu, 7 Dec 2017 11:16:51 +0100
-Subject: linux-next on Nokia N900: hang on boot
-In-Reply-To: <20171202111954.4gg43xkb2wf5ebmn@pali>
-References: <20171202101456.GA1810@amd> <20171202111954.4gg43xkb2wf5ebmn@pali>
-Message-ID: <20171207101651.GA23691@amd>
+From: glin@suse.com (Gary Lin)
+Date: Thu, 7 Dec 2017 18:27:50 +0800
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <20171207081816.jy2rw5y5iyxeqw6n@gmail.com>
+References: <20171205100148.5757-1-glin@suse.com>
+ <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
+ <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
+ <20171206183734.xmgecyrd5suiurm6@gmail.com>
+ <20171207015903.jaos5siysggzz4nc@GaryWorkstation>
+ <20171207060927.i4b4h6ahas3iiyrc@gmail.com>
+ <20171207075203.gcxprq7ctv637fm7@GaryWorkstation>
+ <20171207081816.jy2rw5y5iyxeqw6n@gmail.com>
+Message-ID: <20171207102749.cv7ybllv2vi7o7hw@GaryWorkstation>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat 2017-12-02 12:19:54, Pali Roh?r wrote:
-> On Saturday 02 December 2017 11:14:56 Pavel Machek wrote:
-> > Hi!
-> > 
-> > next from 2017-12-01 was tested.
-> > 
-> > MMC is detected, but then I see wtl4030_bci: .. battery temperature
-> > out of range, and machine halts. This is just before userspace would
-> > be started.
-> > 
-> > 4.15-rc1 seems to work ok on the box.
-> > 
-> > Any ideas?
+On Thu, Dec 07, 2017 at 09:18:16AM +0100, Ingo Molnar wrote:
 > 
-> twl4030_bci is not available on Nokia N900, so we should not try to read
-> its registers.
+> * Gary Lin <glin@suse.com> wrote:
+> 
+> > On Thu, Dec 07, 2017 at 07:09:27AM +0100, Ingo Molnar wrote:
+> > > 
+> > > * Gary Lin <glin@suse.com> wrote:
+> > > 
+> > > > On Wed, Dec 06, 2017 at 07:37:34PM +0100, Ingo Molnar wrote:
+> > > > > 
+> > > > > * Gary Lin <glin@suse.com> wrote:
+> > > > > 
+> > > > > > On Tue, Dec 05, 2017 at 04:14:26PM -0500, Josh Boyer wrote:
+> > > > > > > On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
+> > > > > > > > The series of patches introduce Security Version to EFI stub.
+> > > > > > > >
+> > > > > > > > Security Version is a monotonically increasing number and designed to
+> > > > > > > > prevent the user from loading an insecure kernel accidentally. The
+> > > > > > > > bootloader maintains a list of security versions corresponding to
+> > > > > > > > different distributions. After fixing a critical vulnerability, the
+> > > > > > > > distribution kernel maintainer bumps the "version", and the bootloader
+> > > > > > > > updates the list automatically. When the user tries to load a kernel
+> > > > > > > > with a lower security version, the bootloader shows a warning prompt
+> > > > > > > > to notify the user the potential risk.
+> > > > > > > 
+> > > > > > > If a distribution releases a kernel with a higher security version and
+> > > > > > > that it automatically updated on boot, what happens if that kernel
+> > > > > > > contains a different bug that causes it to fail to boot or break
+> > > > > > > critical functionality?  At that point, the user's machine would be in
+> > > > > > > a state where the higher security version is enforced but the only
+> > > > > > > kernel that provides that is broken.  Wouldn't that make a bad
+> > > > > > > situation even worse by now requiring manual acceptance of the older
+> > > > > > > SV kernel boot physically at the machine?
+> > > > > > > 
+> > > > > > > I feel like I'm missing a detail here or something.
+> > > > > > > 
+> > > > > > If the new kernel fails to boot, then the user has to choose the kernel
+> > > > > > manually anyway, and there will be an option in the warning prompt to
+> > > > > > lower SV.
+> > > > > 
+> > > > > And what if the firmware does not support a lowering of the SV?
+> > > > > 
+> > > > The SV list is manipulated by the bootloader, and the firmware only
+> > > > provides the interface to the storage, i.e. non-volatile flash.
+> > > 
+> > > What about systems where the bootloader is part of the system and users only have 
+> > > the ability to provide kernel images, but no ability to change the boot loader?
+> > 
+> > It depends on how the bootloader works. If the system uses my
+> > implementation of shim loader, it surely has the ability to lower SV,
+> > but it requires physical access on purpose.
+> 
+> And that's my problem: if in practice the bootloader is 'part of the system', is 
+> signed and is updated like the firmware, then putting a "Security Version" into 
+> the kernel image and architecting a boot protocol for a monotonic method for the 
+> bootloader to restrict the loading of kernel images is an obviously bad idea.
+> 
+Even though the bootloader doesn't actually block the booting?
 
-Today's git boots on N900; good. What is going on with twl4030_bci I
-don't have time to investigate at the moment.
+If the bootloader loads a kernel with lower SV, by default, the warning
+prompt lasts for 30 seconds, and the system continues booting if the
+user doesn't intervene. For the paranoid user, a variable can be set to
+make the bootloader wait forever. Is it acceptable?
 
-Best regards,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 181 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/f2ced812/attachment.sig>
+Thanks,
+
+Gary Lin
