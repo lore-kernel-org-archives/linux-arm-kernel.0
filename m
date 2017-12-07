@@ -1,25 +1,47 @@
-From: pierre-yves.mordret@st.com (Pierre Yves MORDRET)
-Date: Thu, 7 Dec 2017 14:42:00 +0100
-Subject: [PATCH v2] i2c: stm32: Fix copyrights
-In-Reply-To: <20171207133114.yma62uhgk6apny3c@ninjato>
-References: <20171130084357.23327-1-benjamin.gaignard@st.com>
- <20171207095437.bm4uiy7o2amzbtv3@ninjato>
- <9fe6a754-b4fe-970b-c4dd-23b0687b9207@st.com>
- <20171207133114.yma62uhgk6apny3c@ninjato>
-Message-ID: <2bf29a80-e280-9596-78c8-36ee1937bd0d@st.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Thu,  7 Dec 2017 14:56:10 +0100
+Subject: [PATCH v2 1/7] dt-bindings: marvell: Add documentation for the North
+ Bridge PM on Armada 37xx
+In-Reply-To: <20171207135616.23670-1-gregory.clement@free-electrons.com>
+References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
+Message-ID: <20171207135616.23670-2-gregory.clement@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ok. will do
+Extend the documentation of the Armada 37xx SoC with the the North
+Bridge Power Management component.
 
-~PYM~
+Signed-off-by: Gregory CLEMENT <gregory.clement@free-electrons.com>
+---
+ .../devicetree/bindings/arm/marvell/armada-37xx.txt   | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-On 12/07/2017 02:31 PM, Wolfram Sang wrote:
-> 
->> I take over ownership of this driver from now on.
->>
->> Acked-by: Pierre-Yves MORDRET <pierre-yves.mordret@st.com>
-> 
-> Ok. Thanks! Can you create a MAINTAINERS entry so you will get
-> automatically CCed on patches touching your driver?
-> 
+diff --git a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+index 51336e5fc761..35c3c3460d17 100644
+--- a/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
++++ b/Documentation/devicetree/bindings/arm/marvell/armada-37xx.txt
+@@ -14,3 +14,22 @@ following property before the previous one:
+ Example:
+ 
+ compatible = "marvell,armada-3720-db", "marvell,armada3720", "marvell,armada3710";
++
++
++Power management
++----------------
++
++For power management (particularly DVFS and AVS), the North Bridge
++Power Management component is needed:
++
++Required properties:
++- compatible     : should contain "marvell,armada-3700-nb-pm", "syscon";
++- reg            : the register start and length for the North Bridge
++		    Power Management
++
++Example:
++
++nb_pm: syscon at 14000 {
++	compatible = "marvell,armada-3700-nb-pm", "syscon";
++	reg = <0x14000 0x60>;
++}
+-- 
+2.15.0
