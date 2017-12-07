@@ -1,43 +1,47 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu,  7 Dec 2017 16:58:48 +0100
-Subject: [PATCH v4 03/15] dt-bindings: display: sun4i-drm: Add LVDS properties
+Date: Thu,  7 Dec 2017 16:58:50 +0100
+Subject: [PATCH v4 05/15] drm/sun4i: Fix error path handling
 In-Reply-To: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
 References: <cover.e46a07c0e181d735c807dc94fe0ce0ea013788be.1512662253.git-series.maxime.ripard@free-electrons.com>
-Message-ID: <8b7042f5e85cc868ea802deba79a0c53ffbe6564.1512662253.git-series.maxime.ripard@free-electrons.com>
+Message-ID: <f83c1cebc731f0b4251f5ddd7b38c718cd79bb0b.1512662253.git-series.maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some clocks and resets supposed to drive the LVDS logic in the display
-engine have been overlooked when the driver was first introduced.
+The commit 4c7f16d14a33 ("drm/sun4i: Fix TCON clock and regmap
+initialization sequence") moved a bunch of logic around, but forgot to
+update the gotos after the introduction of the err_free_dotclock label.
 
-Add those additional resources to the binding, and we'll deal with the ABI
-stability in the code.
+It means that if we fail later that the one introduced in that commit,
+we'll just to the old label which isn't free the clock we created. This
+will result in a breakage as soon as someone tries to do something with
+that clock, since its resources will have been long reclaimed.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Cc: <stable@vger.kernel.org>
+Fixes: 4c7f16d14a33 ("drm/sun4i: Fix TCON clock and regmap initialization sequence")
+Reviewed-by: Chen-Yu Tsai <wens@csie.org>
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt |  9 +++++++-
- 1 file changed, 9 insertions(+)
+ drivers/gpu/drm/sun4i/sun4i_tcon.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-index 50cc72ee1168..1e21cfaac9e2 100644
---- a/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-+++ b/Documentation/devicetree/bindings/display/sunxi/sun4i-drm.txt
-@@ -121,6 +121,15 @@ Required properties:
- On SoCs other than the A33 and V3s, there is one more clock required:
-    - 'tcon-ch1': The clock driving the TCON channel 1
+diff --git a/drivers/gpu/drm/sun4i/sun4i_tcon.c b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+index a1ed462c2430..ea056a3d2131 100644
+--- a/drivers/gpu/drm/sun4i/sun4i_tcon.c
++++ b/drivers/gpu/drm/sun4i/sun4i_tcon.c
+@@ -724,12 +724,12 @@ static int sun4i_tcon_bind(struct device *dev, struct device *master,
+ 	if (IS_ERR(tcon->crtc)) {
+ 		dev_err(dev, "Couldn't create our CRTC\n");
+ 		ret = PTR_ERR(tcon->crtc);
+-		goto err_free_clocks;
++		goto err_free_dotclock;
+ 	}
  
-+On SoCs that support LVDS (all SoCs but the A13, H3, H5 and V3s), you
-+need one more reset line:
-+   - 'lvds': The reset line driving the LVDS logic
-+
-+And on the SoCs newer than the A31 (sun6i and sun8i families), you
-+need one more clock line:
-+   - 'lvds-alt': An alternative clock source, separate from the TCON channel 0
-+                 clock, that can be used to drive the LVDS clock
-+
- DRC
- ---
+ 	ret = sun4i_rgb_init(drm, tcon);
+ 	if (ret < 0)
+-		goto err_free_clocks;
++		goto err_free_dotclock;
  
+ 	if (tcon->quirks->needs_de_be_mux) {
+ 		/*
 -- 
 git-series 0.9.1
