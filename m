@@ -1,119 +1,72 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Thu, 07 Dec 2017 18:58:28 +0100
-Subject: [PATCH v2 0/7] Add CPU Frequency scaling support on Armada 37xx
-In-Reply-To: <88999738.5axjmjKUcc@aspire.rjw.lan> (Rafael J. Wysocki's message
- of "Thu, 07 Dec 2017 18:14:22 +0100")
-References: <20171207135616.23670-1-gregory.clement@free-electrons.com>
- <88999738.5axjmjKUcc@aspire.rjw.lan>
-Message-ID: <87r2s6s9mj.fsf@free-electrons.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 07 Dec 2017 17:48:46 +0000
+Subject: Applied "spi: sun6i: disable/unprepare clocks on remove" to the spi
+ tree
+In-Reply-To: <20171207140453.55krsazvnfqr7ooe@agrajag.zerfleddert.de>
+Message-ID: <E1eN0Hu-00049R-2F@debutante>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rafael,
+The patch
+
+   spi: sun6i: disable/unprepare clocks on remove
+
+has been applied to the spi tree at
+
+   https://git.kernel.org/pub/scm/linux/kernel/git/broonie/spi.git 
+
+All being well this means that it will be integrated into the linux-next
+tree (usually sometime in the next 24 hours) and sent to Linus during
+the next merge window (or sooner if it is a bug fix), however if
+problems are discovered then the patch may be dropped or reverted.  
+
+You may get further e-mails resulting from automated or manual testing
+and review of the tree, please engage with people reporting problems and
+send followup patches addressing any issues that are reported if needed.
+
+If any updates are required or you are submitting further changes they
+should be sent as incremental updates against current git, existing
+patches will not be replaced.
+
+Please add any relevant lists and maintainers to the CCs when replying
+to this mail.
+
+Thanks,
+Mark
+
+>From 2d9bbd02c54094ceffa555143b0d68cd06504d63 Mon Sep 17 00:00:00 2001
+From: Tobias Jordan <Tobias.Jordan@elektrobit.com>
+Date: Thu, 7 Dec 2017 15:04:53 +0100
+Subject: [PATCH] spi: sun6i: disable/unprepare clocks on remove
+
+sun6i_spi_probe() uses sun6i_spi_runtime_resume() to prepare/enable
+clocks, so sun6i_spi_remove() should use sun6i_spi_runtime_suspend() to
+disable/unprepare them if we're not suspended.
+Replacing pm_runtime_disable() by pm_runtime_force_suspend() will ensure
+that sun6i_spi_runtime_suspend() is called if needed.
+
+Found by Linux Driver Verification project (linuxtesting.org).
+
+Fixes: 3558fe900e8af (spi: sunxi: Add Allwinner A31 SPI controller driver)
+Signed-off-by: Tobias Jordan <Tobias.Jordan@elektrobit.com>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Signed-off-by: Mark Brown <broonie@kernel.org>
+---
+ drivers/spi/spi-sun6i.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/spi/spi-sun6i.c b/drivers/spi/spi-sun6i.c
+index fb38234249a8..8533f4edd00a 100644
+--- a/drivers/spi/spi-sun6i.c
++++ b/drivers/spi/spi-sun6i.c
+@@ -541,7 +541,7 @@ static int sun6i_spi_probe(struct platform_device *pdev)
  
- On jeu., d?c. 07 2017, "Rafael J. Wysocki" <rjw@rjwysocki.net> wrote:
-
-> On Thursday, December 7, 2017 2:56:09 PM CET Gregory CLEMENT wrote:
->> Hi,
->> 
->> This is the second version of a series adding the CPU Frequency
->> support on Armada 37xx using DVFS. It is based on the initial work of
->> Evan Wang and Victor Gu.
->> 
->> The main change since the first version was a bug fixed in the
->> "cpufreq: Add DVFS support for Armada 37xx" patch which was preventing
->> to register the opp. An other noticeable change is the 4th patch which
->> is new adding the use of dev_pm_opp_remove and removing an comment
->> became wrong. The other changes are described in the change log.
->> 
->> DVFS control is done by a set of registers from the North Bridge Power
->> Management block. The binding for this block is documented in patch 1.
->> 
->> While adding a new cpufreq driver I found that the Kconfig and
->> Makefile were no more in order, so it is fixed by patch 2 and 3.
->> 
->> The 5th patch is just about updating the MAINTAINERS file with the new
->> driver.
->> 
->> The next patch is the real purpose of the series. The main goal of
->> this driver is to setup the CPU load level in the hardware to
->> associate them to CPU frequencies and register a standard cpufreq
->> driver. Note that the hardware also capable of doing AVS (Adaptive
->> Voltage Scaling), by associating a voltage on each level beside the
->> CPU frequency. However, this support is not yet ready, so it is not
->> part of this series.
->> 
->> Finally, the last patch is for arm-soc the arm-soc subsystem through
->> mvebu and update the device tree to support the CPU frequency scaling.
->> 
->> An update on the CPU clock driver is needed in order to take into
->> account the DVFS setting. It's the purpose of an other series already
->> sent, but is no dependencies between the series (for building or at
->> runtime).
->> 
->> Thanks,
->> 
->> Gregory
->> 
->> Changelog:
->> 
->> v1 -> v2:
->> 
->>  - using syscon instead of nb_pm for the binding of the North bridge
->>    power management unit: reported by Rob Herring
->> 
->>  - fix sorting inside the big LITTLE section for the Kconfig: reported
->>    by Viresh Kumar
->> 
->>  - fix the bogus freq calculation in armada37xx_cpufreq_driver_init,
->>    bug reported by Andre Heider
->> 
->>  - use dev_pm_opp_remove() on the previous opp if dev_pm_opp_add()
->>    failed, reported by Viresh Kumar
->> 
->>  - add the Tested-by flag from Andre Heider on "cpufreq: Add DVFS
->>    support for Armada 37xx" patch
->> 
->> Gregory CLEMENT (7):
->>   dt-bindings: marvell: Add documentation for the North Bridge PM on
->>     Armada 37xx
->>   cpufreq: ARM: sort the Kconfig menu
->>   cpufreq: sort the drivers in ARM part
->>   cpufreq: mvebu: Use dev_pm_opp_remove()
->>   MAINTAINERS: add new entries for Armada 37xx cpufreq driver
->>   cpufreq: Add DVFS support for Armada 37xx
->>   arm64: dts: marvell: armada-37xx: add nodes allowing cpufreq support
->> 
->>  .../bindings/arm/marvell/armada-37xx.txt           |  19 ++
->>  MAINTAINERS                                        |   1 +
->>  arch/arm64/boot/dts/marvell/armada-372x.dtsi       |   1 +
->>  arch/arm64/boot/dts/marvell/armada-37xx.dtsi       |   7 +
->>  drivers/cpufreq/Kconfig.arm                        |  89 ++++----
->>  drivers/cpufreq/Makefile                           |   9 +-
->>  drivers/cpufreq/armada-37xx-cpufreq.c              | 241 +++++++++++++++++++++
->>  drivers/cpufreq/mvebu-cpufreq.c                    |  11 +-
->>  8 files changed, 327 insertions(+), 51 deletions(-)
->>  create mode 100644 drivers/cpufreq/armada-37xx-cpufreq.c
->
-> I'd like you to split patches [2-3/7] off this series as they aren't
-> exactly related to the other changes in it.
-
-Actually the patch 6 depend on patch 2 and 3. To be more precise they
-modify the same area inside the files drivers/cpufreq/Kconfig.arm and
-drivers/cpufreq/Makefile.
-
-So if I move them in an other series then there could be some merge
-conflicts.
-
-Gregory
-
->
-> Thanks,
-> Rafael
->
-
+ static int sun6i_spi_remove(struct platform_device *pdev)
+ {
+-	pm_runtime_disable(&pdev->dev);
++	pm_runtime_force_suspend(&pdev->dev);
+ 
+ 	return 0;
+ }
 -- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+2.15.1
