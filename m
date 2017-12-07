@@ -1,48 +1,48 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 7 Dec 2017 17:52:28 +0100
-Subject: [PATCH v2] clocksource: tcb_clksrc: Fix clock speed message
-In-Reply-To: <99fd8a35-9522-bb80-9aea-e4c266cdbc62@microchip.com>
-References: <20171201122233.21828-1-romain.izard.pro@gmail.com>
- <6f3d309e-2e71-3f60-5910-0d8b1f051836@linaro.org>
- <99fd8a35-9522-bb80-9aea-e4c266cdbc62@microchip.com>
-Message-ID: <4f811006-1c3e-f92c-7623-0839ddcd18de@linaro.org>
+From: jagannadh.teki@gmail.com (Jagan Teki)
+Date: Thu, 7 Dec 2017 22:23:18 +0530
+Subject: [PATCH] arm64: allwinner: a64: orangepi-zero-plus2: add usb otg
+In-Reply-To: <20171207133409.cpp7wxx4yflkgavp@flea.lan>
+References: <1512644748-14491-1-git-send-email-jagan@amarulasolutions.com>
+ <20171207133409.cpp7wxx4yflkgavp@flea.lan>
+Message-ID: <CAD6G_RQkBWth6iygyGfBX_rROEM7XUh3BmvoXfsxm8=po+kksQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 07/12/2017 17:34, Nicolas Ferre wrote:
-> On 07/12/2017 at 12:01, Daniel Lezcano wrote:
->> On 01/12/2017 13:22, Romain Izard wrote:
->>> The clock speed displayed at boot in an information message was 500 kHz
->>> too high compared to its real value. As the value is not used anywhere,
->>> there is no functional impact.
->>>
->>> Fix the rounding formula to display the correct value.
->>>
->>> Signed-off-by: Romain Izard <romain.izard.pro@gmail.com>
->>> ---
->>> v2: rebase over v4.15-rc1
->>>
->>> There is no specified maintainer for this file, only supporters.
+On Thu, Dec 7, 2017 at 7:04 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
+>
+> On Thu, Dec 07, 2017 at 04:35:48PM +0530, Jagan Teki wrote:
+>> Add usb otg support for orangepi-zero-plus2 board:
+>> - Add usb_otg node with dr_mode as 'otg'
+>> - USB0-IDDET connected to PA21
+>> - VBUS connected through DCIN which always on
 >>
->> That is not correct, it defaults to Thomas and me, the maintainers of
->> drivers/clocksource :)
+>> Tested mass storage function.
 >>
->>> Nicolas, could you pick this through the at91 tree as the TCB block
->>> is an AT91 peripheral ?
->>
->> Nicolas, do you agree with this change ? If yes, I will take it.
-> 
-> Yes, fine with me:
-> Acked-by: Nicolas Ferre <nicolas.ferre@microchip.com>
-> 
-> Thanks Daniel for the "heads-up".
+>> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
+>
+> Did you test the OTG or peripheral modes?
 
-Thanks, applied 4.16.
+dr_mode with otg and I've tested mas storage gadget with mmc disk emulation.
 
+>
+>> Note: Anyone please check vbus connection [1]
+>> Since it is connected through DCIN of vcc-5v, I've added vcc-5v0
+>> regulator for the same and attached to usb0_vbus-supply but it is
+>> disabling during kernel boot.
+>> [    1.887854] vcc5v0: disabling
+>
+> VBUS is the power line that is provided on the USB connector. In
+> peripheral, that power is provided by the host, therefore it needs to
+> be shutdown on the peripheral end. This is the expected behaviour.
 
+So, in my test with 'otg' host drive the vbus so-it is disabling at
+target end is it?
+
+thanks!
 -- 
- <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Jagan Teki
+Free Software Engineer | www.openedev.com
+U-Boot, Linux | Upstream Maintainer
+Hyderabad, India.
