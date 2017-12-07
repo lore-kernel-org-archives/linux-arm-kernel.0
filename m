@@ -1,46 +1,86 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Thu, 7 Dec 2017 11:34:16 +0100
-Subject: [PATCH v6 1/5] scsi: ufs: add Hisilicon ufs driver code
-In-Reply-To: <20171207102026.14977-2-liwei213@huawei.com>
-References: <20171207102026.14977-1-liwei213@huawei.com>
- <20171207102026.14977-2-liwei213@huawei.com>
-Message-ID: <CAOFm3uEgT4gzusQpXb3SnriTdU0nAha2tcVKOoZJRjZw=dx7sg@mail.gmail.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Thu, 7 Dec 2017 11:35:52 +0100
+Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
+In-Reply-To: <20171207102749.cv7ybllv2vi7o7hw@GaryWorkstation>
+References: <20171205100148.5757-1-glin@suse.com>
+ <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
+ <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
+ <20171206183734.xmgecyrd5suiurm6@gmail.com>
+ <20171207015903.jaos5siysggzz4nc@GaryWorkstation>
+ <20171207060927.i4b4h6ahas3iiyrc@gmail.com>
+ <20171207075203.gcxprq7ctv637fm7@GaryWorkstation>
+ <20171207081816.jy2rw5y5iyxeqw6n@gmail.com>
+ <20171207102749.cv7ybllv2vi7o7hw@GaryWorkstation>
+Message-ID: <20171207103552.axrydmelueigdwyd@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Li,
 
-On Thu, Dec 7, 2017 at 11:20 AM, Li Wei <liwei213@huawei.com> wrote:
-> add Hisilicon ufs driver code.
->
-> Signed-off-by: Li Wei <liwei213@huawei.com>
-> Signed-off-by: Geng Jianfeng <gengjianfeng@hisilicon.com>
-> Signed-off-by: Zang Leigang <zangleigang@hisilicon.com>
-> Signed-off-by: Yu Jianfeng <steven.yujianfeng@hisilicon.com>
-[]
 
-> --- /dev/null
-> +++ b/drivers/scsi/ufs/ufs-hisi.c
-> @@ -0,0 +1,624 @@
-> +/*
-> + *
-> + * HiSilicon Hixxxx UFS Driver
-> + *
-> + * Copyright (c) 2016-2017 Linaro Ltd.
-> + * Copyright (c) 2016-2017 HiSilicon Technologies Co., Ltd.
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License, or
-> + * (at your option) any later version.
-> + */
+* Gary Lin <glin@suse.com> wrote:
 
-Would you consider using the new SPDX license ids instead?
-Check Thomas doc patches for instructions.
-This would be great and while you are it may be this could be adopted
-for all HiSilicon and Huawei past, present and future contributions?
-Thank you for your kind consideration!
+> On Thu, Dec 07, 2017 at 09:18:16AM +0100, Ingo Molnar wrote:
+> > 
+> > * Gary Lin <glin@suse.com> wrote:
+> > 
+> > > On Thu, Dec 07, 2017 at 07:09:27AM +0100, Ingo Molnar wrote:
+> > > > 
+> > > > * Gary Lin <glin@suse.com> wrote:
+> > > > 
+> > > > > On Wed, Dec 06, 2017 at 07:37:34PM +0100, Ingo Molnar wrote:
+> > > > > > 
+> > > > > > * Gary Lin <glin@suse.com> wrote:
+> > > > > > 
+> > > > > > > On Tue, Dec 05, 2017 at 04:14:26PM -0500, Josh Boyer wrote:
+> > > > > > > > On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
+> > > > > > > > > The series of patches introduce Security Version to EFI stub.
+> > > > > > > > >
+> > > > > > > > > Security Version is a monotonically increasing number and designed to
+> > > > > > > > > prevent the user from loading an insecure kernel accidentally. The
+> > > > > > > > > bootloader maintains a list of security versions corresponding to
+> > > > > > > > > different distributions. After fixing a critical vulnerability, the
+> > > > > > > > > distribution kernel maintainer bumps the "version", and the bootloader
+> > > > > > > > > updates the list automatically. When the user tries to load a kernel
+> > > > > > > > > with a lower security version, the bootloader shows a warning prompt
+> > > > > > > > > to notify the user the potential risk.
+> > > > > > > > 
+> > > > > > > > If a distribution releases a kernel with a higher security version and
+> > > > > > > > that it automatically updated on boot, what happens if that kernel
+> > > > > > > > contains a different bug that causes it to fail to boot or break
+> > > > > > > > critical functionality?  At that point, the user's machine would be in
+> > > > > > > > a state where the higher security version is enforced but the only
+> > > > > > > > kernel that provides that is broken.  Wouldn't that make a bad
+> > > > > > > > situation even worse by now requiring manual acceptance of the older
+> > > > > > > > SV kernel boot physically at the machine?
+> > > > > > > > 
+> > > > > > > > I feel like I'm missing a detail here or something.
+> > > > > > > > 
+> > > > > > > If the new kernel fails to boot, then the user has to choose the kernel
+> > > > > > > manually anyway, and there will be an option in the warning prompt to
+> > > > > > > lower SV.
+> > > > > > 
+> > > > > > And what if the firmware does not support a lowering of the SV?
+> > > > > > 
+> > > > > The SV list is manipulated by the bootloader, and the firmware only
+> > > > > provides the interface to the storage, i.e. non-volatile flash.
+> > > > 
+> > > > What about systems where the bootloader is part of the system and users only have 
+> > > > the ability to provide kernel images, but no ability to change the boot loader?
+> > > 
+> > > It depends on how the bootloader works. If the system uses my
+> > > implementation of shim loader, it surely has the ability to lower SV,
+> > > but it requires physical access on purpose.
+> > 
+> > And that's my problem: if in practice the bootloader is 'part of the system', is 
+> > signed and is updated like the firmware, then putting a "Security Version" into 
+> > the kernel image and architecting a boot protocol for a monotonic method for the 
+> > bootloader to restrict the loading of kernel images is an obviously bad idea.
+> > 
+> Even though the bootloader doesn't actually block the booting?
 
--- 
-Cordially
-Philippe Ombredanne
+We don't know that for sure, in that scenario *how* the bootloader interprets the 
+SV is not under the user's control...
+
+Thanks,
+
+	Ingo
