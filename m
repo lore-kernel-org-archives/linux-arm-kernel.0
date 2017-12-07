@@ -1,96 +1,83 @@
 From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Thu,  7 Dec 2017 10:19:39 -0500
-Subject: [PATCH v2 07/10] arm64: dts: qcom: msm8916: drop remaining unused
- pinconfs
+Date: Thu,  7 Dec 2017 10:19:34 -0500
+Subject: [PATCH v2 02/10] arm64: dts: qcom: msm8916-pins: remove assignments
+ to bias-disable
 In-Reply-To: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
 References: <20171207151942.5805-1-damien.riegel@savoirfairelinux.com>
-Message-ID: <20171207151942.5805-8-damien.riegel@savoirfairelinux.com>
+Message-ID: <20171207151942.5805-3-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This commit drops pin configs that cannot be moved to board files as
-no boards use them.
+Drop assignments to bias-disable as the documentation [1] states that
+this property doesn't take a value. Other occurrences of this property
+respect that.
+
+[1] Documentation/devicetree/bindings/pinctrl/qcom,msm8916-pinctrl.txt
 
 Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+Reviewed-by: Bjorn Andersson <bjorn.andersson@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 33 ------------------------------
- 1 file changed, 33 deletions(-)
+Changes in v2:
+ - Added Reviewed-by Bjorn Andersson
+
+ arch/arm64/boot/dts/qcom/msm8916-pins.dtsi | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-index 0790232c4654..c79301f204b7 100644
+index 4cb0b5834143..c67ad8ed8b60 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916-pins.dtsi
-@@ -311,26 +311,13 @@
- 				pins = "gpio113", "gpio114", "gpio115",
- 				       "gpio116";
- 			};
--			pinconf {
--				pins = "gpio113", "gpio114", "gpio115",
--				       "gpio116";
--				drive-strength = <8>;
--				bias-pull-none;
--			};
- 		};
--
- 		ext_pri_tlmm_lines_sus: ext_pa_off {
- 			pinmux {
- 				function = "pri_mi2s";
- 				pins = "gpio113", "gpio114", "gpio115",
- 				       "gpio116";
- 			};
--			pinconf {
--				pins = "gpio113", "gpio114", "gpio115",
--				       "gpio116";
--				drive-strength = <2>;
--				bias-disable;
--			};
+@@ -278,7 +278,7 @@
+ 		pinconf {
+ 			pins = "gpio6", "gpio7";
+ 			drive-strength = <16>;
+-			bias-disable = <0>;
++			bias-disable;
  		};
  	};
  
-@@ -340,23 +327,12 @@
- 				function = "pri_mi2s_ws";
- 				pins = "gpio110";
- 			};
--			pinconf {
--				pins = "gpio110";
--				drive-strength = <8>;
--				bias-pull-none;
--			};
- 		};
--
- 		ext_pri_ws_sus: ext_pa_off {
- 			pinmux {
- 				function = "pri_mi2s_ws";
- 				pins = "gpio110";
- 			};
--			pinconf {
--				pins = "gpio110";
--				drive-strength = <2>;
--				bias-disable;
--			};
+@@ -290,7 +290,7 @@
+ 		pinconf {
+ 			pins = "gpio6", "gpio7";
+ 			drive-strength = <2>;
+-			bias-disable = <0>;
++			bias-disable;
  		};
  	};
  
-@@ -403,10 +379,6 @@
- 				function = "dmic0_data";
- 				pins = "gpio1";
- 			};
--			pinconf {
--				pins = "gpio0", "gpio1";
--				drive-strength = <8>;
--			};
+@@ -302,7 +302,7 @@
+ 		pinconf {
+ 			pins = "gpio14", "gpio15";
+ 			drive-strength = <16>;
+-			bias-disable = <0>;
++			bias-disable;
  		};
- 		cdc_dmic_lines_sus: dmic_lines_off {
- 			pinmux_dmic0_clk {
-@@ -417,11 +389,6 @@
- 				function = "dmic0_data";
- 				pins = "gpio1";
- 			};
--			pinconf {
--				pins = "gpio0", "gpio1";
--				drive-strength = <2>;
--				bias-disable;
--			};
+ 	};
+ 
+@@ -314,7 +314,7 @@
+ 		pinconf {
+ 			pins = "gpio14", "gpio15";
+ 			drive-strength = <2>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
+@@ -326,7 +326,7 @@
+ 		pinconf {
+ 			pins = "gpio22", "gpio23";
+ 			drive-strength = <16>;
+-			bias-disable = <0>;
++			bias-disable;
+ 		};
+ 	};
+ 
+@@ -338,7 +338,7 @@
+ 		pinconf {
+ 			pins = "gpio22", "gpio23";
+ 			drive-strength = <2>;
+-			bias-disable = <0>;
++			bias-disable;
  		};
  	};
  
