@@ -1,25 +1,25 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Dec 2017 17:45:50 -0600
-Subject: [PATCH v4 1/2] of: documentation: add bindings documentation for
- TS-7970
-In-Reply-To: <20171207160550.2782-1-sebastien.bourdelin@savoirfairelinux.com>
-References: <20171207160550.2782-1-sebastien.bourdelin@savoirfairelinux.com>
-Message-ID: <20171207234550.nyumi7fzg6wke46p@rob-hp-laptop>
+Date: Thu, 7 Dec 2017 17:46:42 -0600
+Subject: [PATCH v2 1/3] regulator: axp20x: add drivevbus support for axp803
+In-Reply-To: <1512673460-7865-1-git-send-email-jagan@amarulasolutions.com>
+References: <1512673460-7865-1-git-send-email-jagan@amarulasolutions.com>
+Message-ID: <20171207234642.ucqmtxpufvhu4cgr@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Dec 07, 2017 at 11:05:49AM -0500, Sebastien Bourdelin wrote:
-> This adds the documentation for the TS-7970 by Technologic Systems.
+On Fri, Dec 08, 2017 at 12:34:18AM +0530, Jagan Teki wrote:
+> Like axp221, axp223, axp813 the axp803 is also supporting external
+> regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
 > 
-> Signed-off-by: Sebastien Bourdelin <sebastien.bourdelin@savoirfairelinux.com>
-> ---
-> Changes v3 -> v4:
->   - rebase on master
+> Add support for it.
 > 
-> Changes v1 -> v2:
->   - rebase on master
+> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
 > ---
->  Documentation/devicetree/bindings/arm/technologic.txt | 6 ++++++
->  1 file changed, 6 insertions(+)
+> Changes for v2:
+> - New patch
+> 
+>  Documentation/devicetree/bindings/mfd/axp20x.txt | 2 +-
+>  drivers/regulator/axp20x-regulator.c             | 2 ++
+>  2 files changed, 3 insertions(+), 1 deletion(-)
 
 Reviewed-by: Rob Herring <robh@kernel.org>
