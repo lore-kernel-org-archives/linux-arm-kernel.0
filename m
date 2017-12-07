@@ -1,34 +1,64 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu,  7 Dec 2017 10:53:38 +0100
-Subject: [PATCH 35/54] arm64: dts: renesas: r8a7795-es1-salvator-x: Add SoC
- name to file header
-In-Reply-To: <cover.1512640145.git.horms+renesas@verge.net.au>
-References: <cover.1512640145.git.horms+renesas@verge.net.au>
-Message-ID: <aa8c6e451e96cb0db85e19d31da0b9bcc04e7217.1512640145.git.horms+renesas@verge.net.au>
+From: pombredanne@nexb.com (Philippe Ombredanne)
+Date: Thu, 7 Dec 2017 11:09:39 +0100
+Subject: [PATCH] media: platform: stm32: Adopt SPDX identifier
+In-Reply-To: <20171205145107.17785-1-benjamin.gaignard@st.com>
+References: <20171205145107.17785-1-benjamin.gaignard@st.com>
+Message-ID: <CAOFm3uHXhH-zuyi+L5zVzPW_vgZPHVoZZ+8WWo+eyD3dXOpxMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+On Tue, Dec 5, 2017 at 3:51 PM, Benjamin Gaignard
+<benjamin.gaignard@linaro.org> wrote:
+> Add SPDX identifiers to files under stm32 directory
+>
+> Signed-off-by: Benjamin Gaignard <benjamin.gaignard@st.com>
+> ---
+>  drivers/media/platform/stm32/stm32-cec.c  | 5 +----
+>  drivers/media/platform/stm32/stm32-dcmi.c | 2 +-
+>  2 files changed, 2 insertions(+), 5 deletions(-)
+>
+> diff --git a/drivers/media/platform/stm32/stm32-cec.c b/drivers/media/platform/stm32/stm32-cec.c
+> index 0e5aa17bdd40..7c496bc1cf38 100644
+> --- a/drivers/media/platform/stm32/stm32-cec.c
+> +++ b/drivers/media/platform/stm32/stm32-cec.c
+> @@ -1,11 +1,8 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * STM32 CEC driver
+>   * Copyright (C) STMicroelectronics SA 2017
+>   *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License as published by
+> - * the Free Software Foundation; either version 2 of the License, or
+> - * (at your option) any later version.
+>   */
+>
+>  #include <linux/clk.h>
+> diff --git a/drivers/media/platform/stm32/stm32-dcmi.c b/drivers/media/platform/stm32/stm32-dcmi.c
+> index ac4c450a6c7d..519952bec6d5 100644
+> --- a/drivers/media/platform/stm32/stm32-dcmi.c
+> +++ b/drivers/media/platform/stm32/stm32-dcmi.c
+> @@ -1,3 +1,4 @@
+> +// SPDX-License-Identifier: GPL-2.0
+>  /*
+>   * Driver for STM32 Digital Camera Memory Interface
+>   *
+> @@ -5,7 +6,6 @@
+>   * Authors: Yannick Fertre <yannick.fertre@st.com>
+>   *          Hugues Fruchet <hugues.fruchet@st.com>
+>   *          for STMicroelectronics.
+> - * License terms:  GNU General Public License (GPL), version 2
+>   *
+>   * This driver is based on atmel_isi.c
+>   *
+> --
+> 2.15.0
+>
 
-Document clearly which SoC this DTS applies to, to distinguish from
-Salvator-X boards equipped with other SoCs.
+Thank you for using the simpler SPDX license ids!
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
- arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Acked-by: Philippe Ombredanne <pombredanne@nexb.com>
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-index 3f7d5f51e428..7f2a3d923f21 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-es1-salvator-x.dts
-@@ -1,5 +1,5 @@
- /*
-- * Device Tree Source for the Salvator-X board
-+ * Device Tree Source for the Salvator-X board with R-Car H3 ES1.x
-  *
-  * Copyright (C) 2015 Renesas Electronics Corp.
-  *
 -- 
-2.11.0
+Cordially
+Philippe Ombredanne
