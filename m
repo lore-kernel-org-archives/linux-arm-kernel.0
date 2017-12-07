@@ -1,84 +1,103 @@
-From: jagannadh.teki@gmail.com (Jagan Teki)
-Date: Fri,  8 Dec 2017 00:34:20 +0530
-Subject: [PATCH v2 3/3] arm64: allwinner: a64: bananapi-m64: add usb otg
-In-Reply-To: <1512673460-7865-1-git-send-email-jagan@amarulasolutions.com>
-References: <1512673460-7865-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <1512673460-7865-3-git-send-email-jagan@amarulasolutions.com>
+From: prarit@redhat.com (Prarit Bhargava)
+Date: Thu, 7 Dec 2017 14:05:20 -0500
+Subject: [PATCH 1/2] acpi, spcr: Make SPCR avialable to other architectures
+In-Reply-To: <CAOZdJXV4E6gu=Ed6nOCcEp2afe_g8Ot-H5oO5=6+ye51cv9hUg@mail.gmail.com>
+References: <20171207172912.17868-1-prarit@redhat.com>
+ <20171207172912.17868-2-prarit@redhat.com>
+ <CAOZdJXV4E6gu=Ed6nOCcEp2afe_g8Ot-H5oO5=6+ye51cv9hUg@mail.gmail.com>
+Message-ID: <f8ab5b48-cc72-3f46-0843-d2df5964eb21@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add usb otg support for bananapi-m64 board,
-- USB-ID connected with PH9
-- USB-DRVVBUS controlled by N_VBUSEN pin from PMIC
 
-Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
----
-Changes for v2:
-- add drvvbus regulator
-- add N_VBUSEN pin
 
- .../boot/dts/allwinner/sun50i-a64-bananapi-m64.dts  | 21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+On 12/07/2017 01:43 PM, Timur Tabi wrote:
+> On Thu, Dec 7, 2017 at 11:29 AM, Prarit Bhargava <prarit@redhat.com> wrote:
+>> Other architectures can use SPCR to setup an early console or console but
+>> the current code is ARM64 specific.
+>>
+>> Change the name of parse_spcr() to acpi_parse_spcr().  Add a weak
+>> function acpi_arch_setup_console() that can be used for arch-specific
+>> setup.  Move SPCR initialization flag into ACPI code.  Update the
+>> Documention on the use of the SPCR earlycon.
+>>
+>> This patch does not change arm64 behaviour.
+> 
+> Let's hope so.  Our E44 erratum work-around has caused lots of
+> problems in the past, so the code is a bit fragile.
+> 
+>> +static bool qdf2400_erratum_44_present(struct acpi_table_header *h)
+>> +{
+>> +       if (memcmp(h->oem_id, "QCOM  ", ACPI_OEM_ID_SIZE))
+>> +               return false;
+>> +
+>> +       if (!memcmp(h->oem_table_id, "QDF2432 ", ACPI_OEM_TABLE_ID_SIZE))
+>> +               return true;
+>> +
+>> +       if (!memcmp(h->oem_table_id, "QDF2400 ", ACPI_OEM_TABLE_ID_SIZE) &&
+>> +                       h->oem_revision == 1)
+>> +               return true;
+>> +
+>> +       return false;
+>> +}
+> 
+> Please give us a chance to test this patch before merging. We've had a
+> lot of problems with our E44 work-around, and we need to make sure
+> that qdf2400_erratum_44_present function is called before the pl011
+> driver is probed.
 
-diff --git a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-index 4a8d3f8..e4b2d8e 100644
---- a/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-+++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-bananapi-m64.dts
-@@ -66,6 +66,10 @@
- 	};
- };
- 
-+&ehci0 {
-+	status = "okay";
-+};
-+
- &ehci1 {
- 	status = "okay";
- };
-@@ -136,6 +140,10 @@
- 	status = "okay";
- };
- 
-+&ohci0 {
-+	status = "okay";
-+};
-+
- &ohci1 {
- 	status = "okay";
- };
-@@ -148,6 +156,7 @@
- 		reg = <0x3a3>;
- 		interrupt-parent = <&r_intc>;
- 		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+		x-powers,drive-vbus-en; /* set N_VBUSEN as output pin */
- 	};
- };
- 
-@@ -243,6 +252,11 @@
- 	regulator-name = "vdd-cpus";
- };
- 
-+&reg_drivevbus {
-+	regulator-name = "usb0-vbus";
-+	status = "okay";
-+};
-+
- &reg_rtc_ldo {
- 	regulator-name = "vcc-rtc";
- };
-@@ -259,6 +273,13 @@
- 	status = "okay";
- };
- 
-+&usb_otg {
-+	dr_mode = "otg";
-+	status = "okay";
-+};
-+
- &usbphy {
-+	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
-+	usb0_vbus-supply = <&reg_drivevbus>;
- 	status = "okay";
- };
--- 
-2.7.4
+Timor, do you know of a specific system that has this problem?  If so, I
+could see if we have one @ Red Hat and test on it to verify the WAR.
+
+> 
+>> +
+>> +/*
+>> + * APM X-Gene v1 and v2 UART hardware is an 16550 like device but has its
+>> + * register aligned to 32-bit. In addition, the BIOS also encoded the
+>> + * access width to be 8 bits. This function detects this errata condition.
+>> + */
+>> +static bool xgene_8250_erratum_present(struct acpi_table_spcr *tb)
+>> +{
+>> +       bool xgene_8250 = false;
+>> +
+>> +       if (tb->interface_type != ACPI_DBG2_16550_COMPATIBLE)
+>> +               return false;
+>> +
+>> +       if (memcmp(tb->header.oem_id, "APMC0D", ACPI_OEM_ID_SIZE) &&
+>> +           memcmp(tb->header.oem_id, "HPE   ", ACPI_OEM_ID_SIZE))
+>> +               return false;
+>> +
+>> +       if (!memcmp(tb->header.oem_table_id, "XGENESPC",
+>> +           ACPI_OEM_TABLE_ID_SIZE) && tb->header.oem_revision == 0)
+>> +               xgene_8250 = true;
+>> +
+>> +       if (!memcmp(tb->header.oem_table_id, "ProLiant",
+>> +           ACPI_OEM_TABLE_ID_SIZE) && tb->header.oem_revision == 1)
+>> +               xgene_8250 = true;
+>> +
+>> +       return xgene_8250;
+>> +}
+> 
+> I suspect that this function has the same issues as
+> qdf2400_erratum_44_present().
+>
+
+Ditto.
+
+>> +config ACPI_SPCR_TABLE
+>> +       bool "ACPI Serial Port Console Redirection Support"
+>> +       default y if ARM64
+>> +       help
+>> +         Enable support for Serial Port Console Redirection (SPCR) Table.
+>> +         This table provides information about the configuration of the
+>> +         earlycon console.
+>> +
+> 
+> So ACPI without SPCR has never been tested by us.  Making it optional
+> makes me a little nervous.  We'll have to evaluate this change.
+> 
+
+It is 'y' for ARM64?  Maybe I have that wrong but I thought that would
+always build it for ARM64.
+
+P.
