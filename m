@@ -1,57 +1,136 @@
-From: jbrunet@baylibre.com (Jerome Brunet)
-Date: Thu, 07 Dec 2017 16:51:13 +0100
-Subject: [PATCH net-next v2 3/8] net: phy: meson-gxl: add read and write
- helpers for bank registers
-In-Reply-To: <20171207154610.GG24750@lunn.ch>
-References: <20171207142715.32578-1-jbrunet@baylibre.com>
- <20171207142715.32578-4-jbrunet@baylibre.com>
- <20171207154610.GG24750@lunn.ch>
-Message-ID: <1512661873.7042.9.camel@baylibre.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 7 Dec 2017 15:51:48 +0000
+Subject: [PATCH v3 11/20] arm64: assembler: add macros to conditionally
+ yield the NEON under PREEMPT
+In-Reply-To: <CAKv+Gu-Otcg4UxhJA44PbbYamBJd26Be+YsSUQUaB+qy9owzvQ@mail.gmail.com>
+References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
+ <20171206194346.24393-12-ard.biesheuvel@linaro.org>
+ <20171207143934.GF22781@e103592.cambridge.arm.com>
+ <CAKv+Gu8N6w3+VFpF3kq-qg9Gij=4VbtQqu+yfvfA67p2kWaRLg@mail.gmail.com>
+ <CAKv+Gu-Otcg4UxhJA44PbbYamBJd26Be+YsSUQUaB+qy9owzvQ@mail.gmail.com>
+Message-ID: <CAKv+Gu8B=53Tz1Twr==ze_qcwdDu+9JA5B2f9JgNn1E3+EnG6g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2017-12-07 at 16:46 +0100, Andrew Lunn wrote:
-> On Thu, Dec 07, 2017 at 03:27:10PM +0100, Jerome Brunet wrote:
-> > Add read and write helpers to manipulate banked registers on this PHY
-> > This helps clarify the settings applied to these registers in the init
-> > function and upcoming changes.
-> > 
-> > Signed-off-by: Jerome Brunet <jbrunet@baylibre.com>
-> > ---
-> >  drivers/net/phy/meson-gxl.c | 103 ++++++++++++++++++++++++++++-------------
-> > ---
-> >  1 file changed, 67 insertions(+), 36 deletions(-)
-> > 
-> > diff --git a/drivers/net/phy/meson-gxl.c b/drivers/net/phy/meson-gxl.c
-> > index d82aa8cea401..05054770aefb 100644
-> > --- a/drivers/net/phy/meson-gxl.c
-> > +++ b/drivers/net/phy/meson-gxl.c
-> > @@ -45,11 +45,13 @@
-> >  #define FR_PLL_DIV0	0x1c
-> >  #define FR_PLL_DIV1	0x1d
-> >  
-> > -static int meson_gxl_config_init(struct phy_device *phydev)
-> > +static int meson_gxl_open_banks(struct phy_device *phydev)
-> 
-> Hi Jerome
-> 
-> Does the word bank come from the datasheet? Most of the phy drives use
-> page instead.
-> 
-> Also, we have discovered a race condition which affects drivers using
-> pages, which can lead to corruption of registers. At some point, i
-> expect we will be adding helpers to access paged registers, which do
-> the right thing with respect to locks.
-> 
-> So it would be nice if you used the work page, not bank.
+On 7 December 2017 at 15:47, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 7 December 2017 at 14:50, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> On 7 December 2017 at 14:39, Dave Martin <Dave.Martin@arm.com> wrote:
+>>> On Wed, Dec 06, 2017 at 07:43:37PM +0000, Ard Biesheuvel wrote:
+>>>> Add support macros to conditionally yield the NEON (and thus the CPU)
+>>>> that may be called from the assembler code.
+>>>>
+>>>> In some cases, yielding the NEON involves saving and restoring a non
+>>>> trivial amount of context (especially in the CRC folding algorithms),
+>>>> and so the macro is split into three, and the code in between is only
+>>>> executed when the yield path is taken, allowing the context to be preserved.
+>>>> The third macro takes an optional label argument that marks the resume
+>>>> path after a yield has been performed.
+>>>>
+>>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>>> ---
+>>>>  arch/arm64/include/asm/assembler.h | 51 ++++++++++++++++++++
+>>>>  1 file changed, 51 insertions(+)
+>>>>
+>>>> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+>>>> index 5f61487e9f93..c54e408fd5a7 100644
+>>>> --- a/arch/arm64/include/asm/assembler.h
+>>>> +++ b/arch/arm64/include/asm/assembler.h
+>>>> @@ -572,4 +572,55 @@ alternative_else_nop_endif
+>>>>  #endif
+>>>>       .endm
+>>>>
+>>>> +/*
+>>>> + * Check whether to yield to another runnable task from kernel mode NEON code
+>>>> + * (which runs with preemption disabled).
+>>>> + *
+>>>> + * if_will_cond_yield_neon
+>>>> + *        // pre-yield patchup code
+>>>> + * do_cond_yield_neon
+>>>> + *        // post-yield patchup code
+>>>> + * endif_yield_neon
+>>>
+>>> ^ Mention the lbl argument?
+>>>
+>>
+>> Yep will do
+>>
+>>>> + *
+>>>> + * - Check whether the preempt count is exactly 1, in which case disabling
+>>>
+>>>                                                            enabling ^
+>>>
+>>>> + *   preemption once will make the task preemptible. If this is not the case,
+>>>> + *   yielding is pointless.
+>>>> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
+>>>> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
+>>>> + *   yield fixup code.
+>>>
+>>> Mention that neither patchup sequence is allowed to use section-changing
+>>> directives?
+>>>
+>>> For example:
+>>>
+>>>         if_will_cond_yield_neon
+>>>                 // some code
+>>>
+>>>                 .pushsection .rodata, "a"
+>>> foo:                    .quad // some literal data for some reason
+>>>                 .popsection
+>>>
+>>>                 // some code
+>>>         do_cond_yield_neon
+>>>
+>>> is not safe, because .previous is now .rodata.
+>>>
+>>
+>> Are you sure this is true?
+>>
+>> The gas info page for .previous tells me
+>>
+>>    In terms of the section stack, this directive swaps the current
+>> section with the top section on the section stack.
+>>
+>> and it seems to me that .rodata is no longer on the section stack
+>> after .popsection. In that sense, push/pop should be safe, but
+>> section/subsection/previous is not (I think). So yes, let's put a note
+>> in to mention that section directives are unsupported.
+>>
+>>> (You could protect against this with
+>>>         .pushsection .text; .previous; .subsection 1; // ...
+>>>         .popsection
+>>> but it may be overkill.)
+>>>
+>>>> + *
+>>>> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
+>>>> + * and may clobber x2 .. x18 if the yield path is taken.
+>>>> + */
+>>>> +
+>>>> +     .macro          cond_yield_neon, lbl
+>>>> +     if_will_cond_yield_neon
+>>>> +     do_cond_yield_neon
+>>>> +     endif_yield_neon        \lbl
+>>>> +     .endm
+>>>> +
+>>>> +     .macro          if_will_cond_yield_neon
+>>>> +#ifdef CONFIG_PREEMPT
+>>>> +     get_thread_info x0
+>>>> +     ldr             w1, [x0, #TSK_TI_PREEMPT]
+>>>> +     ldr             x0, [x0, #TSK_TI_FLAGS]
+>>>> +     cmp             w1, #1 // == PREEMPT_OFFSET
+>>>
+>>> Can we at least drop a BUILD_BUG_ON() somewhere to check this?
+>>>
+>>> Maybe in kernel_neon_begin() since this is intimately kernel-mode NEON
+>>> related.
+>>>
+>>
+>> Sure.
+>>
+>
+> I only just understood your asm-offsets remark earlier. I wasn't aware
+> that it allows exposing random constants as well (although it is
+> fairly obvious now that I do). So I will expose PREEMPT_OFFSET rather
+> than open code it
+>
 
-Banks actually comes from the datasheet, Yes.
-I don't mind renaming it but I would be making things up. As you wish ?
-
-Does the usual pages comes with this weird toggle thing to open the access ?
-Would we able to use these generic helpers with our this kind of quirks ?
-
-> 
->    Thanks
-> 
->       Andrew
+Of course, I mean 'arbitrary' not 'random' (like 6666)
