@@ -1,39 +1,28 @@
-From: andrzej.p@samsung.com (Andrzej Pietrasiewicz)
-Date: Thu, 07 Dec 2017 15:53:23 +0100
-Subject: [PATCH] media: s5p-jpeg: Fix off-by-one problem
-In-Reply-To: <20171206163746.8456-1-flavio.ceolin@intel.com>
-References: <CGME20171206163802epcas1p3527bd6a922fd31aa80cf349a510a71eb@epcas1p3.samsung.com>
- <20171206163746.8456-1-flavio.ceolin@intel.com>
-Message-ID: <67ddf04e-2f0f-c14b-90ce-0f29a3647e16@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 7 Dec 2017 15:53:59 +0100
+Subject: [PATCH] arm: dts: qcom: fix missing #phy-cells for apq8064
+In-Reply-To: <CAK8P3a3wupYd7XiJrYsFafbmdpiw_zFVd42E8Ucm9oNXtwzWSQ@mail.gmail.com>
+References: <20171109225422.14280-1-robh@kernel.org>
+ <CAK8P3a3wupYd7XiJrYsFafbmdpiw_zFVd42E8Ucm9oNXtwzWSQ@mail.gmail.com>
+Message-ID: <CAK8P3a1VAquccZnvDKUwjToHM6qBeKzehwmTGCjb5_yPhsrPaw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 06.12.2017 o?17:37, Flavio Ceolin pisze:
-> s5p_jpeg_runtime_resume() does not call clk_disable_unprepare() for
-> jpeg->clocks[0] when one of the clk_prepare_enable() fails.
-> 
-> Found by Linux Driver Verification project (linuxtesting.org).
-> 
-> Signed-off-by: Flavio Ceolin <flavio.ceolin@intel.com>
+On Thu, Dec 7, 2017 at 3:43 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thu, Nov 9, 2017 at 11:54 PM, Rob Herring <robh@kernel.org> wrote:
+>> Fix dtc warnings for missing #phy-cells for apq8064:
+>>
+>> Warning (phys_property): Missing property '#phy-cells' in node /soc/dsi-phy at 4700200 or bad phandle (referred from /soc/mdss_dsi at 4700000:phys[0])
+>> Warning (phys_property): Missing property '#phy-cells' in node /soc/hdmi-phy at 4a00400 or bad phandle (referred from /soc/hdmi-tx at 4a00000:phys[0])
+>>
+>> Cc: Andy Gross <andy.gross@linaro.org>
+>> Cc: David Brown <david.brown@linaro.org>
+>> Cc: linux-arm-msm at vger.kernel.org
+>> Signed-off-by: Rob Herring <robh@kernel.org>
+>
+> Applied to fixes, thanks!
 
-Acked-by: Andrzej Pietrasiewicz <andrzej.p@samsung.com>
+This was apparently already there, I took it out again, as applying it
+twice resulted in build failure :(
 
-
-> ---
->   drivers/media/platform/s5p-jpeg/jpeg-core.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/media/platform/s5p-jpeg/jpeg-core.c b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> index faac816..79b63da 100644
-> --- a/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> +++ b/drivers/media/platform/s5p-jpeg/jpeg-core.c
-> @@ -3086,7 +3086,7 @@ static int s5p_jpeg_runtime_resume(struct device *dev)
->   	for (i = 0; i < jpeg->variant->num_clocks; i++) {
->   		ret = clk_prepare_enable(jpeg->clocks[i]);
->   		if (ret) {
-> -			while (--i > 0)
-> +			while (--i >= 0)
->   				clk_disable_unprepare(jpeg->clocks[i]);
->   			return ret;
->   		}
-> 
+       Arnd
