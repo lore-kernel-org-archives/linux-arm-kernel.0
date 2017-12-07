@@ -1,162 +1,108 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 7 Dec 2017 14:50:11 +0000
-Subject: [PATCH v3 11/20] arm64: assembler: add macros to conditionally
- yield the NEON under PREEMPT
-In-Reply-To: <20171207143934.GF22781@e103592.cambridge.arm.com>
-References: <20171206194346.24393-1-ard.biesheuvel@linaro.org>
- <20171206194346.24393-12-ard.biesheuvel@linaro.org>
- <20171207143934.GF22781@e103592.cambridge.arm.com>
-Message-ID: <CAKv+Gu8N6w3+VFpF3kq-qg9Gij=4VbtQqu+yfvfA67p2kWaRLg@mail.gmail.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Thu, 7 Dec 2017 14:51:03 +0000
+Subject: [RFC 3/9] arm64: handle 52-bit addresses in TTBR
+In-Reply-To: <42182cdd-be9f-841f-6fda-1486ac2ded2f@arm.com>
+References: <1511265485-27163-1-git-send-email-kristina.martsenko@arm.com>
+ <1511265485-27163-4-git-send-email-kristina.martsenko@arm.com>
+ <8ebb78d3-68b0-3272-e12b-005c1b524736@arm.com>
+ <42182cdd-be9f-841f-6fda-1486ac2ded2f@arm.com>
+Message-ID: <78ff6e58-a02e-b914-11c4-c9174d31d607@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 7 December 2017 at 14:39, Dave Martin <Dave.Martin@arm.com> wrote:
-> On Wed, Dec 06, 2017 at 07:43:37PM +0000, Ard Biesheuvel wrote:
->> Add support macros to conditionally yield the NEON (and thus the CPU)
->> that may be called from the assembler code.
+On 07/12/17 12:29, Kristina Martsenko wrote:
+> On 21/11/17 14:39, Robin Murphy wrote:
+>> Hi Kristina,
 >>
->> In some cases, yielding the NEON involves saving and restoring a non
->> trivial amount of context (especially in the CRC folding algorithms),
->> and so the macro is split into three, and the code in between is only
->> executed when the yield path is taken, allowing the context to be preserved.
->> The third macro takes an optional label argument that marks the resume
->> path after a yield has been performed.
+>> On 21/11/17 11:57, Kristina Martsenko wrote:
+>>> The top 4 bits of a 52-bit physical address are positioned at bits 2..5
+>>> in the TTBR registers. Introduce a couple of macros to move the bits
+>>> there, and change all TTBR writers to use them.
+>>>
+>>> Leave TTBR0 PAN code unchanged, to avoid complicating it. A system with
+>>> 52-bit PA will have PAN anyway (because it's ARMv8.1 or later), and a
+>>> system without 52-bit PA can only use up to 48-bit PAs. Add a kconfig
+>>> dependency to ensure PAN is configured.
+>>>
+>>> In addition, when using 52-bit PA there is a special alignment
+>>> requirement on the top-level table. We don't currently have any VA_BITS
+>>> configuration that would violate the requirement, but one could be added
+>>> in the future, so add a compile-time BUG_ON to check for it.
+>>>
+>>> Signed-off-by: Kristina Martsenko <kristina.martsenko@arm.com>
+>>> ---
+> 
+> [...]
+> 
+>>> diff --git a/arch/arm64/include/asm/assembler.h
+>>> b/arch/arm64/include/asm/assembler.h
+>>> index 04cf94766b78..ba3c796b9fe1 100644
+>>> --- a/arch/arm64/include/asm/assembler.h
+>>> +++ b/arch/arm64/include/asm/assembler.h
+>>> @@ -512,4 +512,21 @@ alternative_else_nop_endif
+>>>  ? #endif
+>>>  ????? .endm
+>>>  ? +/*
+>>> + * Arrange a physical address in a TTBR register, taking care of 52-bit
+>>> + * addresses.
+>>> + *
+>>> + *???? phys:??? physical address, preserved
+>>> + *???? ttbr:??? returns the TTBR value
+>>> + */
+>>> +??? .macro??? phys_to_ttbr, phys, ttbr
+>>> +#ifdef CONFIG_ARM64_PA_BITS_52
+>>> +??? and??? \ttbr, \phys, #(1 << 48) - 1
+>>> +??? orr??? \ttbr, \ttbr, \phys, lsr #48 - 2
+>>> +??? bic??? \ttbr, \ttbr, #(1 << 2) - 1
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/assembler.h | 51 ++++++++++++++++++++
->>  1 file changed, 51 insertions(+)
+>> Is there any reason for masking off each end of the result separately
+>> like this, or could we just do it more straightforwardly?
+> 
+> I don't recall any reason, maybe just to keep it simple, to avoid having
+> a separate mask macro.
+> 
+>> #define TTBR_BADDR_MASK ((1 << 46) - 1) << 2
 >>
->> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
->> index 5f61487e9f93..c54e408fd5a7 100644
->> --- a/arch/arm64/include/asm/assembler.h
->> +++ b/arch/arm64/include/asm/assembler.h
->> @@ -572,4 +572,55 @@ alternative_else_nop_endif
->>  #endif
->>       .endm
+>>  ????orr??? \ttbr, \phys, \phys, lsr #46
+>>  ????and??? \ttbr, \ttbr, #TTBR_BADDR_MASK
 >>
->> +/*
->> + * Check whether to yield to another runnable task from kernel mode NEON code
->> + * (which runs with preemption disabled).
->> + *
->> + * if_will_cond_yield_neon
->> + *        // pre-yield patchup code
->> + * do_cond_yield_neon
->> + *        // post-yield patchup code
->> + * endif_yield_neon
->
-> ^ Mention the lbl argument?
->
+>> (and equivalently for phys_to_pte in patch 4)
+> 
+> Ok, I'll rewrite it like this. (Note that mask is 52-bit-specific though.)
 
-Yep will do
+I don't see that it need be 52-bit specific - true the BADDR field 
+itself is strictly bits 47:1, but AFAICS bit 1 is always going to be 
+RES0: either explicitly in the 52-bit case, or from the (x-1):1 
+definition otherwise, since the requirement that a table must be aligned 
+to its size infers an absolute lower bound of x >= 3 (it may be larger 
+still due to other reasons, but I'm finding this area of the ARM ARM 
+obnoxiously difficult to read). Thus defining the mask as covering 47:2 
+should still be reasonable in all cases.
 
->> + *
->> + * - Check whether the preempt count is exactly 1, in which case disabling
->
->                                                            enabling ^
->
->> + *   preemption once will make the task preemptible. If this is not the case,
->> + *   yielding is pointless.
->> + * - Check whether TIF_NEED_RESCHED is set, and if so, disable and re-enable
->> + *   kernel mode NEON (which will trigger a reschedule), and branch to the
->> + *   yield fixup code.
->
-> Mention that neither patchup sequence is allowed to use section-changing
-> directives?
->
-> For example:
->
->         if_will_cond_yield_neon
->                 // some code
->
->                 .pushsection .rodata, "a"
-> foo:                    .quad // some literal data for some reason
->                 .popsection
->
->                 // some code
->         do_cond_yield_neon
->
-> is not safe, because .previous is now .rodata.
->
+>> Even better if there's a convenient place to define the mask such that
+>> it can be shared with KVM's existing VTTBR stuff too.
+> 
+> Do you mean VTTBR_BADDR_MASK? I don't think this would be useful there,
+> VTTBR_BADDR_MASK checks the alignment of the address that goes into
+> VTTBR (not the VTTBR value itself), and takes into account specifically
+> the 40-bit IPA and concatenated page tables.
 
-Are you sure this is true?
+Ah, I see - from skimming the code I managed to assume VTTBR_BADDR_MASK 
+was a mask for the actual VTTBR.BADDR register field; I hadn't delved 
+into all the VTTBR_X gubbins (yuck). Fair enough, scratch that idea. At 
+least TTBR_ASID_MASK[1] gets to have a friend :)
 
-The gas info page for .previous tells me
+Robin.
 
-   In terms of the section stack, this directive swaps the current
-section with the top section on the section stack.
+[1] 
+https://www.mail-archive.com/linux-kernel at vger.kernel.org/msg1555176.html
 
-and it seems to me that .rodata is no longer on the section stack
-after .popsection. In that sense, push/pop should be safe, but
-section/subsection/previous is not (I think). So yes, let's put a note
-in to mention that section directives are unsupported.
-
-> (You could protect against this with
->         .pushsection .text; .previous; .subsection 1; // ...
->         .popsection
-> but it may be overkill.)
->
->> + *
->> + * This macro sequence clobbers x0, x1 and the flags register unconditionally,
->> + * and may clobber x2 .. x18 if the yield path is taken.
->> + */
->> +
->> +     .macro          cond_yield_neon, lbl
->> +     if_will_cond_yield_neon
->> +     do_cond_yield_neon
->> +     endif_yield_neon        \lbl
->> +     .endm
->> +
->> +     .macro          if_will_cond_yield_neon
->> +#ifdef CONFIG_PREEMPT
->> +     get_thread_info x0
->> +     ldr             w1, [x0, #TSK_TI_PREEMPT]
->> +     ldr             x0, [x0, #TSK_TI_FLAGS]
->> +     cmp             w1, #1 // == PREEMPT_OFFSET
->
-> Can we at least drop a BUILD_BUG_ON() somewhere to check this?
->
-> Maybe in kernel_neon_begin() since this is intimately kernel-mode NEON
-> related.
->
-
-Sure.
-
->> +     csel            x0, x0, xzr, eq
->> +     tbnz            x0, #TIF_NEED_RESCHED, 5555f    // needs rescheduling?
->> +#endif
->
-> A comment that we will fall through to 6666f here may be helpful.
->
-
-Indeed. Will add that.
-
->> +     .subsection     1
->> +5555:
->> +     .endm
->> +
->> +     .macro          do_cond_yield_neon
->> +     bl              kernel_neon_end
->> +     bl              kernel_neon_begin
->> +     .endm
->> +
->> +     .macro          endif_yield_neon, lbl=6666f
->> +     b               \lbl
->> +     .previous
->> +6666:
->
-> Could have slightly more random "random" labels here, but otherwise
-> it looks ok to me.
->
-
-Which number did you have in mind that is more random than 6666? :-)
-
-> I might go through and replace all the random labels with something
-> more robust sometime, but I've never been sure it was worth the
-> effort...
->
-
-I guess we could invent all kinds of elaborate schemes but as you say,
-having 4 digit numbers and grep'ing the source before you add a new
-one has been working fine so far, so I don't think it should be a
-priority.
+> 
+> Kristina
+> 
+>>> +#else
+>>> +??? mov??? \ttbr, \phys
+>>> +#endif
+>>> +??? .endm
+>>> +
+>>>  ? #endif??? /* __ASM_ASSEMBLER_H */
