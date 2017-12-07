@@ -1,38 +1,96 @@
-From: sakari.ailus@iki.fi (Sakari Ailus)
-Date: Thu, 7 Dec 2017 14:41:17 +0200
-Subject: [PATCH V6 0/7] dmaengine: qcom_hidma: add support for bugfixed HW
-In-Reply-To: <CAJZ5v0gq-Xv1V90GEcfxdnrADQn2Gern=LBnsbSzmrU9M0+FEQ@mail.gmail.com>
-References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
- <CAJZ5v0gq-Xv1V90GEcfxdnrADQn2Gern=LBnsbSzmrU9M0+FEQ@mail.gmail.com>
-Message-ID: <20171207124116.76st5qalao6vbvwf@valkosipuli.retiisi.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Thu, 7 Dec 2017 13:43:26 +0100
+Subject: [RFC] Improving udelay/ndelay on platforms where that is possible
+In-Reply-To: <20171115131351.GE31757@n2100.armlinux.org.uk>
+References: <d3f42f35-8175-58f6-78b7-3331efe64da2@sigmadesigns.com>
+ <20171101175325.2557ce85@alans-desktop>
+ <4b707ce0-6067-ab36-e167-1acf348d26bf@free.fr>
+ <CA+55aFxxH0HE9SfUoLVqsvDKO0PfeM+vSoDmbXQv85yJcPZoPQ@mail.gmail.com>
+ <e03436d1-b140-3f29-59a6-3b1eb6bf9da4@free.fr>
+ <11393e07-b042-180c-3bcd-484bf51eada6@sigmadesigns.com>
+ <20171115131351.GE31757@n2100.armlinux.org.uk>
+Message-ID: <20171207124326.GC24547@atrey.karlin.mff.cuni.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Dec 05, 2017 at 11:05:52PM +0100, Rafael J. Wysocki wrote:
-> On Tue, Dec 5, 2017 at 6:04 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> > Introduce new ACPI and OF device ids for thw HW along with the helper
-> > functions.
-> >
-> > Changes from v5:
-> > * use struct device as a calling parameter to get_match_data() callback
-> > so that we can reuse the existing OF API.
-> > * revert the change on acpi_get_match_data() to V4.
-> >
-> > Sinan Kaya (7):
-> >   Documentation: DT: qcom_hidma: Bump HW revision for the bugfixed HW
-> >   ACPI / bus: Introduce acpi_get_match_data() function
-> >   device property: Introduce a common API to fetch device match data
-> >   OF: properties: Implement get_match_data() callback
-> >   ACPI: properties: Implement get_match_data() callback
-> >   dmaengine: qcom_hidma: Add support for the new revision
-> >   dmaengine: qcom_hidma: Add identity register support
+> On Wed, Nov 15, 2017 at 01:51:54PM +0100, Marc Gonzalez wrote:
+> > On 01/11/2017 20:38, Marc Gonzalez wrote:
+> > 
+> > > OK, I'll just send my patch, and then crawl back under my rock.
+> > 
+> > Linus,
+> > 
+> > As promised, the patch is provided below. And as promised, I will
+> > no longer bring this up on LKML.
+> > 
+> > FWIW, I have checked that the computed value matches the expected
+> > value for all HZ and delay_us, and for a few clock frequencies,
+> > using the following program:
+> > 
+> > $ cat delays.c
+> > #include <stdio.h>
+> > #define MEGA 1000000u
+> > typedef unsigned int uint;
+> > typedef unsigned long long u64;
+> > #define DIV_ROUND_UP(n,d) (((n) + (d) - 1) / (d))
+> > 
+> > static const uint HZ_tab[] = { 100, 250, 300, 1000 };
+> > 
+> > static void check_cycle_count(uint freq, uint HZ, uint delay_us)
+> > {
+> > 	uint UDELAY_MULT = (2147 * HZ) + (483648 * HZ / MEGA);
+> > 	uint lpj = DIV_ROUND_UP(freq, HZ);
+> > 	uint computed = ((u64)lpj * delay_us * UDELAY_MULT >> 31) + 1;
+> > 	uint expected = DIV_ROUND_UP((u64)delay_us * freq, MEGA);
+> > 
+> > 	if (computed != expected)
+> > 		printf("freq=%u HZ=%u delay_us=%u comp=%u exp=%u\n", freq, HZ, delay_us, computed, expected);
+> > }
+> > 
+> > int main(void)
+> > {
+> > 	uint idx, delay_us, freq;
+> > 
+> > 	for (freq = 3*MEGA; freq <= 100*MEGA; freq += 3*MEGA)
+> > 		for (idx = 0; idx < sizeof HZ_tab / sizeof *HZ_tab; ++idx)
+> > 			for (delay_us = 1; delay_us <= 2000; ++delay_us)
+> > 				check_cycle_count(freq, HZ_tab[idx], delay_us);
+> > 
+> > 	return 0;
+> > }
+> > 
+> > 
+> > 
+> > -- >8 --
+> > Subject: [PATCH] ARM: Tweak clock-based udelay implementation
+> > 
+> > In 9f8197980d87a ("delay: Add explanation of udelay() inaccuracy")
+> > Russell pointed out that loop-based delays may return early.
+> > 
+> > On the arm platform, delays may be either loop-based or clock-based.
+> > 
+> > This patch tweaks the clock-based implementation so that udelay(N)
+> > is guaranteed to spin at least N microseconds.
 > 
-> Sakari, can you please have a look at this series?
+> As I've already said, I don't want this, because it encourages people
+> to use too-small delays in driver code, and if we merge it then you
+> will look at your data sheet, decide it says "you need to wait 10us"
+> and write in your driver "udelay(10)" which will break on the loops
+> based delay.
 > 
-> I'm particularly interested in your opinion on patches [2-3/7] and [5/7].
+> udelay() needs to offer a consistent interface so that drivers know
+> what to expect no matter what the implementation is.  Making one
+> implementation conform to your ideas while leaving the other
+> implementations with other expectations is a recipe for bugs.
 
-Reviewed. Thanks for the heads up!
+udelay() needs to be consistent across platforms, and yes, udelay(10)
+is expected to delay at least 10usec.
 
+If that is not true on your platform, _fix your platform_. But it is
+not valid to reject patches fixing other platforms, just because your
+platform is broken.
+
+									Pavel
 -- 
-Sakari Ailus
-e-mail: sakari.ailus at iki.fi
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
