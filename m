@@ -1,74 +1,447 @@
-From: mingo@kernel.org (Ingo Molnar)
-Date: Thu, 7 Dec 2017 09:18:16 +0100
-Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
-In-Reply-To: <20171207075203.gcxprq7ctv637fm7@GaryWorkstation>
-References: <20171205100148.5757-1-glin@suse.com>
- <CA+5PVA4k9RN22i2d=4GCPnm9bwi5KUgp8PiV=9X1pBZxN1xPmg@mail.gmail.com>
- <20171206032437.pifxxcewgozlghfs@GaryWorkstation>
- <20171206183734.xmgecyrd5suiurm6@gmail.com>
- <20171207015903.jaos5siysggzz4nc@GaryWorkstation>
- <20171207060927.i4b4h6ahas3iiyrc@gmail.com>
- <20171207075203.gcxprq7ctv637fm7@GaryWorkstation>
-Message-ID: <20171207081816.jy2rw5y5iyxeqw6n@gmail.com>
+From: ludovic.desroches@microchip.com (Ludovic Desroches)
+Date: Thu, 7 Dec 2017 09:24:53 +0100
+Subject: [RESEND PATCH V2] ARM: dts: introduce the sama5d2 ptc ek board
+In-Reply-To: <20171206065844.27689-1-ludovic.desroches@microchip.com>
+References: <20171206065844.27689-1-ludovic.desroches@microchip.com>
+Message-ID: <20171207082453.10593-1-ludovic.desroches@microchip.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the official SAMA5D2 Peripheral Touch Controller Evaluation
+Kit board.
 
-* Gary Lin <glin@suse.com> wrote:
+Signed-off-by: Ludovic Desroches <ludovic.desroches@microchip.com>
+---
+Resend: Put SPDX-License-Identifier at the beginning of the file.
 
-> On Thu, Dec 07, 2017 at 07:09:27AM +0100, Ingo Molnar wrote:
-> > 
-> > * Gary Lin <glin@suse.com> wrote:
-> > 
-> > > On Wed, Dec 06, 2017 at 07:37:34PM +0100, Ingo Molnar wrote:
-> > > > 
-> > > > * Gary Lin <glin@suse.com> wrote:
-> > > > 
-> > > > > On Tue, Dec 05, 2017 at 04:14:26PM -0500, Josh Boyer wrote:
-> > > > > > On Tue, Dec 5, 2017 at 5:01 AM, Gary Lin <glin@suse.com> wrote:
-> > > > > > > The series of patches introduce Security Version to EFI stub.
-> > > > > > >
-> > > > > > > Security Version is a monotonically increasing number and designed to
-> > > > > > > prevent the user from loading an insecure kernel accidentally. The
-> > > > > > > bootloader maintains a list of security versions corresponding to
-> > > > > > > different distributions. After fixing a critical vulnerability, the
-> > > > > > > distribution kernel maintainer bumps the "version", and the bootloader
-> > > > > > > updates the list automatically. When the user tries to load a kernel
-> > > > > > > with a lower security version, the bootloader shows a warning prompt
-> > > > > > > to notify the user the potential risk.
-> > > > > > 
-> > > > > > If a distribution releases a kernel with a higher security version and
-> > > > > > that it automatically updated on boot, what happens if that kernel
-> > > > > > contains a different bug that causes it to fail to boot or break
-> > > > > > critical functionality?  At that point, the user's machine would be in
-> > > > > > a state where the higher security version is enforced but the only
-> > > > > > kernel that provides that is broken.  Wouldn't that make a bad
-> > > > > > situation even worse by now requiring manual acceptance of the older
-> > > > > > SV kernel boot physically at the machine?
-> > > > > > 
-> > > > > > I feel like I'm missing a detail here or something.
-> > > > > > 
-> > > > > If the new kernel fails to boot, then the user has to choose the kernel
-> > > > > manually anyway, and there will be an option in the warning prompt to
-> > > > > lower SV.
-> > > > 
-> > > > And what if the firmware does not support a lowering of the SV?
-> > > > 
-> > > The SV list is manipulated by the bootloader, and the firmware only
-> > > provides the interface to the storage, i.e. non-volatile flash.
-> > 
-> > What about systems where the bootloader is part of the system and users only have 
-> > the ability to provide kernel images, but no ability to change the boot loader?
-> 
-> It depends on how the bootloader works. If the system uses my
-> implementation of shim loader, it surely has the ability to lower SV,
-> but it requires physical access on purpose.
+Changes:
+- v2:
+  - remove memory node
+  - use SPDX-License-Identifier
 
-And that's my problem: if in practice the bootloader is 'part of the system', is 
-signed and is updated like the firmware, then putting a "Security Version" into 
-the kernel image and architecting a boot protocol for a monotonic method for the 
-bootloader to restrict the loading of kernel images is an obviously bad idea.
+ arch/arm/boot/dts/Makefile                |   1 +
+ arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts | 401 ++++++++++++++++++++++++++++++
+ 2 files changed, 402 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
 
-Thanks,
-
-	Ingo
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 043d7c720d0c..ed60582eb1da 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -48,6 +48,7 @@ dtb-$(CONFIG_SOC_AT91SAM9) += \
+ dtb-$(CONFIG_SOC_SAM_V7) += \
+ 	at91-kizbox2.dtb \
+ 	at91-sama5d27_som1_ek.dtb \
++	at91-sama5d2_ptc_ek.dtb \
+ 	at91-sama5d2_xplained.dtb \
+ 	at91-sama5d3_xplained.dtb \
+ 	at91-tse850-3.dtb \
+diff --git a/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+new file mode 100644
+index 000000000000..186cb03e2672
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-sama5d2_ptc_ek.dts
+@@ -0,0 +1,401 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR X11)
++/*
++ * at91-sama5d2_ptc_ek.dts - Device Tree file for SAMA5D2 PTC EK board
++ *
++ *  Copyright (C) 2017 Microchip/Atmel,
++ *		  2017 Wenyou Yang <wenyou.yang@microchip.com>
++ *		  2017 Ludovic Desroches <ludovic.desroches@microchip.com>
++ */
++/dts-v1/;
++#include "sama5d2.dtsi"
++#include "sama5d2-pinfunc.h"
++#include <dt-bindings/mfd/atmel-flexcom.h>
++#include <dt-bindings/gpio/gpio.h>
++
++/ {
++	model = "Atmel SAMA5D2 PTC EK";
++	compatible = "atmel,sama5d2-ptc_ek", "atmel,sama5d2", "atmel,sama5";
++
++	aliases {
++		serial0 = &uart0;
++		i2c0	= &i2c0;
++		i2c1	= &i2c1;
++		i2c2	= &i2c2;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	clocks {
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <24000000>;
++		};
++	};
++
++	ahb {
++		usb0: gadget at 300000 {
++			atmel,vbus-gpio = <&pioA PIN_PA27 GPIO_ACTIVE_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usba_vbus>;
++			status = "okay";
++		};
++
++		usb1: ohci at 400000 {
++			num-ports = <3>;
++			atmel,vbus-gpio = <0
++					   &pioA PIN_PB12 GPIO_ACTIVE_HIGH
++					   0
++					  >;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usb_default>;
++			status = "okay";
++		};
++
++		usb2: ehci at 500000 {
++			status = "okay";
++		};
++
++		ebi: ebi at 10000000 {
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_nand_default>;
++			status = "okay"; /* conflicts with sdmmc1 and qspi0 */
++
++			nand_controller: nand-controller {
++				status = "okay";
++
++				nand at 3 {
++					reg = <0x3 0x0 0x2>;
++					atmel,rb = <0>;
++					nand-bus-width = <8>;
++					nand-ecc-mode = "hw";
++					nand-on-flash-bbt;
++					label = "atmel_nand";
++
++					partitions {
++						compatible = "fixed-partitions";
++						#address-cells = <1>;
++						#size-cells = <1>;
++
++						at91bootstrap at 0 {
++							label = "bootstrap";
++							reg = <0x0 0x40000>;
++						};
++
++						bootloader at 40000 {
++							label = "bootloader";
++							reg = <0x40000 0xc0000>;
++						};
++
++						bootloaderenv at 0x100000 {
++							label = "bootloader env";
++							reg = <0x100000 0x40000>;
++						};
++
++						bootloaderenvred at 0x140000 {
++							label = "bootloader env redundant";
++							reg = <0x140000 0x40000>;
++						};
++
++						dtb at 180000 {
++							label = "device tree";
++							reg = <0x180000 0x80000>;
++						};
++
++						kernel at 200000 {
++							label = "kernel";
++							reg = <0x200000 0x600000>;
++						};
++
++						rootfs at 800000 {
++							label = "rootfs";
++							reg = <0x800000 0x1f800000>;
++						};
++					};
++				};
++			};
++		};
++
++		sdmmc0: sdio-host at a0000000 {
++			bus-width = <8>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_sdmmc0_default>;
++			non-removable;
++			mmc-ddr-1_8v;
++			status = "okay";
++		};
++
++		apb {
++			spi0: spi at f8000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi0_default>;
++				status = "okay";
++			};
++
++			macb0: ethernet at f8008000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_macb0_default &pinctrl_macb0_phy_irq>;
++				phy-mode = "rmii";
++				status = "okay";
++
++				ethernet-phy at 1 {
++					reg = <0x1>;
++					interrupt-parent = <&pioA>;
++					interrupts = <56 IRQ_TYPE_LEVEL_LOW>;
++				};
++			};
++
++			uart0: serial at f801c000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart0_default>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "okay";
++			};
++
++			uart2: serial at f8024000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_uart2_default>;
++				atmel,use-dma-rx;
++				atmel,use-dma-tx;
++				status = "okay";
++			};
++
++			i2c0: i2c at f8028000 {
++				dmas = <0>, <0>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c0_default>;
++				status = "okay";
++			};
++
++			flx0: flexcom at f8034000 {
++				atmel,flexcom-mode = <ATMEL_FLEXCOM_MODE_TWI>;
++				status = "okay";
++
++				i2c2: i2c at 600 {
++					compatible = "atmel,sama5d2-i2c";
++					reg = <0x600 0x200>;
++					interrupts = <19 IRQ_TYPE_LEVEL_HIGH 7>;
++					dmas = <0>, <0>;
++					dma-names = "tx", "rx";
++					#address-cells = <1>;
++					#size-cells = <0>;
++					clocks = <&flx0_clk>;
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_flx0_default>;
++					atmel,fifo-size = <16>;
++					status = "okay";
++				};
++			};
++
++			shdwc at f8048010 {
++				atmel,shdwc-debouncer = <976>;
++
++				input at 0 {
++					reg = <0>;
++					atmel,wakeup-type = "low";
++				};
++			};
++
++			watchdog at f8048040 {
++				status = "okay";
++			};
++
++			spi1: spi at fc000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_spi1_default>;
++				status = "okay";
++			};
++
++			i2c1: i2c at fc028000 {
++				dmas = <0>, <0>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_i2c1_default>;
++				status = "okay";
++
++				at24 at 50 {
++					compatible = "24c02";
++					reg = <0x50>;
++					pagesize = <8>;
++				};
++			};
++
++			pinctrl at fc038000 {
++				pinctrl_flx0_default: flx0_default {
++					pinmux = <PIN_PB28__FLEXCOM0_IO0>,
++						 <PIN_PB29__FLEXCOM0_IO1>;
++					bias-disable;
++				};
++
++				pinctrl_i2c0_default: i2c0_default {
++					pinmux = <PIN_PD21__TWD0>,
++						 <PIN_PD22__TWCK0>;
++					bias-disable;
++				};
++
++				pinctrl_i2c1_default: i2c1_default {
++					pinmux = <PIN_PC6__TWD1>,
++						 <PIN_PC7__TWCK1>;
++					bias-disable;
++				};
++
++				pinctrl_key_gpio_default: key_gpio_default {
++					pinmux = <PIN_PA10__GPIO>;
++					bias-pull-up;
++				};
++
++				pinctrl_led_gpio_default: led_gpio_default {
++					pinmux = <PIN_PB6__GPIO>,
++						 <PIN_PB8__GPIO>,
++						 <PIN_PB10__GPIO>;
++					bias-pull-up;
++				};
++
++				pinctrl_macb0_default: macb0_default {
++					pinmux = <PIN_PB14__GTXCK>,
++						 <PIN_PB15__GTXEN>,
++						 <PIN_PB16__GRXDV>,
++						 <PIN_PB17__GRXER>,
++						 <PIN_PB18__GRX0>,
++						 <PIN_PB19__GRX1>,
++						 <PIN_PB20__GTX0>,
++						 <PIN_PB21__GTX1>,
++						 <PIN_PB22__GMDC>,
++						 <PIN_PB23__GMDIO>;
++					bias-disable;
++				};
++
++				pinctrl_macb0_phy_irq: macb0_phy_irq {
++					pinmux = <PIN_PB24__GPIO>;
++					bias-disable;
++				};
++
++				pinctrl_nand_default: nand_default {
++					re_we_data {
++						pinmux = <PIN_PA22__D0>,
++							 <PIN_PA23__D1>,
++							 <PIN_PA24__D2>,
++							 <PIN_PA25__D3>,
++							 <PIN_PA26__D4>,
++							 <PIN_PA27__D5>,
++							 <PIN_PA28__D6>,
++							 <PIN_PA29__D7>,
++							 <PIN_PA30__NWE_NANDWE>,
++							 <PIN_PB2__NRD_NANDOE>;
++						bias-pull-up;
++					};
++
++					ale_cle_rdy_cs {
++						pinmux = <PIN_PB0__A21_NANDALE>,
++							 <PIN_PB1__A22_NANDCLE>,
++							 <PIN_PC8__NANDRDY>,
++							 <PIN_PA31__NCS3>;
++						bias-pull-up;
++					};
++				};
++
++				pinctrl_sdmmc0_default: sdmmc0_default {
++					cmd_data {
++						pinmux = <PIN_PA1__SDMMC0_CMD>,
++							 <PIN_PA2__SDMMC0_DAT0>,
++							 <PIN_PA3__SDMMC0_DAT1>,
++							 <PIN_PA4__SDMMC0_DAT2>,
++							 <PIN_PA5__SDMMC0_DAT3>,
++							 <PIN_PA6__SDMMC0_DAT4>,
++							 <PIN_PA7__SDMMC0_DAT5>,
++							 <PIN_PA8__SDMMC0_DAT6>,
++							 <PIN_PA9__SDMMC0_DAT7>;
++						bias-pull-up;
++					};
++
++					ck_cd_vddsel {
++						pinmux = <PIN_PA0__SDMMC0_CK>,
++							 <PIN_PA11__SDMMC0_VDDSEL>,
++							 <PIN_PA13__SDMMC0_CD>;
++						bias-disable;
++					};
++				};
++
++				pinctrl_spi0_default: spi0_default {
++					pinmux = <PIN_PA14__SPI0_SPCK>,
++						 <PIN_PA15__SPI0_MOSI>,
++						 <PIN_PA16__SPI0_MISO>,
++						 <PIN_PA17__SPI0_NPCS0>;
++					bias-disable;
++				};
++
++				pinctrl_spi1_default: spi1_default {
++					pinmux = <PIN_PC1__SPI1_SPCK>,
++						 <PIN_PC2__SPI1_MOSI>,
++						 <PIN_PC3__SPI1_MISO>,
++						 <PIN_PC4__SPI1_NPCS0>;
++					bias-disable;
++				};
++
++				pinctrl_uart0_default: uart0_default {
++					pinmux = <PIN_PB26__URXD0>,
++						 <PIN_PB27__UTXD0>;
++					bias-disable;
++				};
++
++				pinctrl_uart2_default: uart2_default {
++					pinmux = <PIN_PD23__URXD2>,
++						 <PIN_PD24__UTXD2>;
++					bias-disable;
++				};
++
++				pinctrl_usb_default: usb_default {
++					pinmux = <PIN_PB12__GPIO>;
++					bias-disable;
++				};
++
++				pinctrl_usba_vbus: usba_vbus {
++					pinmux = <PIN_PB11__GPIO>;
++					bias-disable;
++				};
++
++			};
++
++		};
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_key_gpio_default>;
++
++		bp1 {
++			label = "PB_USER";
++			gpios = <&pioA PIN_PA10 GPIO_ACTIVE_LOW>;
++			linux,code = <0x104>;
++		};
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_led_gpio_default>;
++		status = "okay";
++
++		red {
++			label = "red";
++			gpios = <&pioA PIN_PB10 GPIO_ACTIVE_HIGH>;
++		};
++
++		green {
++			label = "green";
++			gpios = <&pioA PIN_PB8 GPIO_ACTIVE_HIGH>;
++		};
++
++		blue {
++			label = "blue";
++			gpios = <&pioA PIN_PB6 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++};
+-- 
+2.12.2
