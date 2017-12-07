@@ -1,37 +1,41 @@
-From: gnomes@lxorguk.ukuu.org.uk (Alan Cox)
-Date: Thu, 7 Dec 2017 14:26:57 +0000
-Subject: [RFC v3 PATCH 0/2] Introduce Security Version to EFI Stub
-In-Reply-To: <20171205100148.5757-1-glin@suse.com>
-References: <20171205100148.5757-1-glin@suse.com>
-Message-ID: <20171207142657.52e1363a@alans-desktop>
+From: jbrunet@baylibre.com (Jerome Brunet)
+Date: Thu,  7 Dec 2017 15:27:07 +0100
+Subject: [PATCH net-next v2 0/8] phy: net: meson-gxl: clean-up and improvements
+Message-ID: <20171207142715.32578-1-jbrunet@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue,  5 Dec 2017 18:01:46 +0800
-Gary Lin <glin@suse.com> wrote:
+The patchset is a v2 of the previous single clean-up patch [0] which was
+part of larger series. I initially to send these patches separately but
+adding helper function without using them did not make much sense after
+all. So, here is the complete patchset.
 
-> The series of patches introduce Security Version to EFI stub.
-> 
-> Security Version is a monotonically increasing number and designed to
-> prevent the user from loading an insecure kernel accidentally. The
-> bootloader maintains a list of security versions corresponding to
-> different distributions. After fixing a critical vulnerability, the
-> distribution kernel maintainer bumps the "version", and the bootloader
-> updates the list automatically. 
+This patchset add defines for the control registers and helpers to access
+the banked registers. The goal being to make it easier to understand what
+the driver actually does.
 
-This seems a mindbogglingly complicated way to implement something you
-could do with a trivial script in the package that updates the list of
-iffy kernels and when generating the new grub.conf puts them in a menu
-of 'old insecure' kernels.
+Then there is fix for the incorrect sampling of the MII LPA register which
+is often breaking the auto-negotiation with this PHY. More details on this
+in the related patch
 
-Why do you even need this in the EFI stub ?
+CONFIG_A6 settings is removed since this statement was without effect
 
-What happens if you want to invalidate an old kernel but not push a new
-one ? Today if you've got a package that maintains the list of 'iffy'
-kernels you can push a tiny package, under your scheme you've got to push
-new kernels which is an un-necessary and high risk OS change.
+Finally interrupt support is added, speeding things up a little
 
-It just feels like an attempt to solve the problem in completely the
-wrong place.
+This series has been tested on the libretech-cc and khadas VIM
 
-Alan
+Jerome Brunet (8):
+  net: phy: meson-gxl: check phy_write return value
+  net: phy: meson-gxl: define control registers
+  net: phy: meson-gxl: add read and write helpers for bank registers
+  net: phy: meson-gxl: use genphy_config_init
+  net: phy: meson-gxl: detect LPA corruption
+  net: phy: meson-gxl: leave CONFIG_A6 untouched
+  net: phy: meson-gxl: add interrupt support
+  net: phy: meson-gxl: join the authors
+
+ drivers/net/phy/meson-gxl.c | 215 ++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 197 insertions(+), 18 deletions(-)
+
+-- 
+2.14.3
