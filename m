@@ -1,25 +1,23 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 7 Dec 2017 17:46:42 -0600
-Subject: [PATCH v2 1/3] regulator: axp20x: add drivevbus support for axp803
-In-Reply-To: <1512673460-7865-1-git-send-email-jagan@amarulasolutions.com>
-References: <1512673460-7865-1-git-send-email-jagan@amarulasolutions.com>
-Message-ID: <20171207234642.ucqmtxpufvhu4cgr@rob-hp-laptop>
+From: kubakici@wp.pl (Jakub Kicinski)
+Date: Thu, 7 Dec 2017 15:56:39 -0800
+Subject: [PATCH net-next v3 0/2] net: thunderx: add support for PTP clock
+In-Reply-To: <20171206133100.26436-1-aleksey.makarov@cavium.com>
+References: <20171206133100.26436-1-aleksey.makarov@cavium.com>
+Message-ID: <20171207155639.0787247a@cakuba.netronome.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Dec 08, 2017 at 12:34:18AM +0530, Jagan Teki wrote:
-> Like axp221, axp223, axp813 the axp803 is also supporting external
-> regulator to drive the  OTG VBus through N_VBUSEN PMIC pin.
+On Wed,  6 Dec 2017 16:30:56 +0300, Aleksey Makarov wrote:
+> This series adds support for IEEE 1588 Precision Time Protocol
+> to Cavium ethernet driver.
 > 
-> Add support for it.
+> The first patch adds support for the Precision Time Protocol Clocks and
+> Timestamping coprocessor (PTP) found on Cavium processors.
+> It registers a new PTP clock in the PTP core and provides functions
+> to use the counter in BGX, TNS, GTI, and NIC blocks.
 > 
-> Signed-off-by: Jagan Teki <jagan@amarulasolutions.com>
-> ---
-> Changes for v2:
-> - New patch
-> 
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 2 +-
->  drivers/regulator/axp20x-regulator.c             | 2 ++
->  2 files changed, 3 insertions(+), 1 deletion(-)
+> The second patch introduces support for the PTP protocol to the
+> Cavium ThunderX ethernet driver.
 
-Reviewed-by: Rob Herring <robh@kernel.org>
+Since this is PTP-related, would it make sense to CC Richard Cochran 
+on the next revision?
