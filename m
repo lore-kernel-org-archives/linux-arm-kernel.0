@@ -1,40 +1,59 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 7 Dec 2017 09:51:22 +0100
-Subject: [PATCH] drm/sun4i: Fix uninitialized variables in vi layer
-In-Reply-To: <20171206152603.25937-1-jernej.skrabec@siol.net>
-References: <20171206152603.25937-1-jernej.skrabec@siol.net>
-Message-ID: <20171207085122.svfbm7xkd4cxfgvd@flea.lan>
+From: quentin.schulz@free-electrons.com (Quentin Schulz)
+Date: Thu, 7 Dec 2017 09:51:29 +0100
+Subject: [PATCH 3/8] mfd: axp20x: probe axp20x_adc driver for AXP813
+In-Reply-To: <20171205080855.arr7vlgnxoxmyedd@flea.lan>
+References: <cover.4052f8c517c42db26a3cabe078cad333243d371c.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <302c93023d8c4a54cafe321d912df484e39727b7.1512396054.git-series.quentin.schulz@free-electrons.com>
+ <20171205080855.arr7vlgnxoxmyedd@flea.lan>
+Message-ID: <2021a653-d01e-f46f-2438-0760f579e0dc@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Maxime,
 
-On Wed, Dec 06, 2017 at 04:26:03PM +0100, Jernej Skrabec wrote:
-> min_scale and max_scale in sun8i_vi_layer_atomic_check() can be used
-> without initialization.
+On 05/12/2017 09:08, Maxime Ripard wrote:
+> On Mon, Dec 04, 2017 at 03:12:49PM +0100, Quentin Schulz wrote:
+>> This makes the axp20x_adc driver probe with platform device id
+>> "axp813-adc".
+>>
+>> Signed-off-by: Quentin Schulz <quentin.schulz@free-electrons.com>
+>> ---
+>>  drivers/mfd/axp20x.c | 4 +++-
+>>  1 file changed, 3 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/drivers/mfd/axp20x.c b/drivers/mfd/axp20x.c
+>> index 2468b43..42e54d1 100644
+>> --- a/drivers/mfd/axp20x.c
+>> +++ b/drivers/mfd/axp20x.c
+>> @@ -878,7 +878,9 @@ static struct mfd_cell axp813_cells[] = {
+>>  		.resources		= axp803_pek_resources,
+>>  	}, {
+>>  		.name			= "axp20x-regulator",
+>> -	}
+>> +	}, {
+>> +		.name			= "axp813-adc",
+>> +	},
 > 
-> Fix that.
+> Any particular reason you're not adding it to the DT?
 > 
-> Fixes: 	b862a648de3b (drm/sun4i: Add support for HW scaling to DE2)
-> 
-> Signed-off-by: Jernej Skrabec <jernej.skrabec@siol.net>
 
-I've applied this, but your fixes tag was at the wrong format. You
-should use the one documented here:
-https://www.kernel.org/doc/html/latest/process/submitting-patches.html#using-reported-by-tested-by-reviewed-by-suggested-by-and-fixes
+No, no particular reason. It's just the way it is currently for AXP209
+and AXP22x so did the same for AXP813.
 
-or you can even use the git option to generate it directly.
+I'll add DT "support" in next version for all AXPs supported by this
+driver. Or is it worthy of a small separate patch series?
 
-Maxime
-
+Thanks,
+Quentin
 -- 
-Maxime Ripard, Free Electrons
+Quentin Schulz, Free Electrons
 Embedded Linux and Kernel engineering
 http://free-electrons.com
+
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 833 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/30fc57f6/attachment.sig>
+Size: 801 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20171207/4372e56c/attachment.sig>
