@@ -1,308 +1,359 @@
 From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 18:06:18 +0100
-Subject: [PATCH v2 24/36] KVM: arm64: Prepare to handle traps on remaining
- deferred EL1 sysregs
+Date: Thu,  7 Dec 2017 18:06:30 +0100
+Subject: [PATCH v2 36/36] KVM: arm/arm64: Avoid VGICv3 save/restore on VHE
+ with no IRQs
 In-Reply-To: <20171207170630.592-1-christoffer.dall@linaro.org>
 References: <20171207170630.592-1-christoffer.dall@linaro.org>
-Message-ID: <20171207170630.592-25-christoffer.dall@linaro.org>
+Message-ID: <20171207170630.592-37-christoffer.dall@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Handle accesses during traps to any remaining EL1 registers which can be
-deferred to vcpu_load and vcpu_put, by either accessing them directly on
-the physical CPU when the latest version is stored there, or by
-synchronizing the memory representation with the CPU state.
+We can finally get completely rid of any calls to the VGICv3
+save/restore functions when the AP lists are empty on VHE systems.  This
+requires carefully factoring out trap configuration from saving and
+restoring state, and carefully choosing what to do on the VHE and
+non-VHE path.
+
+One of the challenges is that we cannot save/restore the VMCR lazily
+because we can only write the VMCR when ICC_SRE_EL1.SRE is cleared when
+emulating a GICv2-on-GICv3, since otherwise all Group-0 interrupts end
+up being delivered as FIQ.
+
+To solve this problem, and still provide fast performance in the fast
+path of exiting a VM when no interrupts are pending (which also
+optimized the latency for actually delivering virtual interrupts coming
+from physical interrupts), we orchestrate a dance of only doing the
+activate/deactivate traps in vgic load/put for VHE systems (which can
+have ICC_SRE_EL1.SRE cleared when running in the host), and doing the
+configuration on every round-trip on non-VHE systems.
 
 Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- arch/arm/include/asm/kvm_emulate.h   | 16 ++++++++++++
- arch/arm/include/asm/kvm_host.h      |  2 ++
- arch/arm64/include/asm/kvm_emulate.h | 49 +++++++++++++++++++++++++-----------
- arch/arm64/include/asm/kvm_host.h    |  2 ++
- arch/arm64/kvm/inject_fault.c        | 19 ++++++++++----
- arch/arm64/kvm/sys_regs.c            |  6 ++++-
- virt/kvm/arm/aarch32.c               | 22 +++++++++++++---
- 7 files changed, 93 insertions(+), 23 deletions(-)
+ arch/arm/include/asm/kvm_hyp.h   |   2 +
+ arch/arm/kvm/hyp/switch.c        |   8 ++-
+ arch/arm64/include/asm/kvm_hyp.h |   2 +
+ arch/arm64/kvm/hyp/switch.c      |   8 ++-
+ virt/kvm/arm/hyp/vgic-v3-sr.c    | 121 +++++++++++++++++++++++++--------------
+ virt/kvm/arm/vgic/vgic-v3.c      |   6 ++
+ virt/kvm/arm/vgic/vgic.c         |   7 +--
+ 7 files changed, 103 insertions(+), 51 deletions(-)
 
-diff --git a/arch/arm/include/asm/kvm_emulate.h b/arch/arm/include/asm/kvm_emulate.h
-index d5e1b8bf6422..47efa953460a 100644
---- a/arch/arm/include/asm/kvm_emulate.h
-+++ b/arch/arm/include/asm/kvm_emulate.h
-@@ -55,6 +55,22 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
- 	*vcpu_reg(vcpu, reg_num) = val;
- }
+diff --git a/arch/arm/include/asm/kvm_hyp.h b/arch/arm/include/asm/kvm_hyp.h
+index b3dd4f4304f5..d01676e5b816 100644
+--- a/arch/arm/include/asm/kvm_hyp.h
++++ b/arch/arm/include/asm/kvm_hyp.h
+@@ -109,6 +109,8 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
  
-+/* Set the SPSR for the current mode */
-+static inline void vcpu_set_spsr(struct kvm_vcpu *vcpu, unsigned long val)
-+{
-+	*vcpu_spsr(vcpu) = val;
-+}
-+
-+static inline unsigned long vcpu_get_vbar(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu_cp15(vcpu, c12_VBAR);
-+}
-+
-+static inline u32 vcpu_get_c1_sctlr(struct kvm_vcpu *vcpu)
-+{
-+	return vcpu_cp15(vcpu, c1_SCTLR);
-+}
-+
- bool kvm_condition_valid32(const struct kvm_vcpu *vcpu);
- void kvm_skip_instr32(struct kvm_vcpu *vcpu, bool is_wide_instr);
- void kvm_inject_undef32(struct kvm_vcpu *vcpu);
-diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
-index 8fce576199e0..997c0568bfa3 100644
---- a/arch/arm/include/asm/kvm_host.h
-+++ b/arch/arm/include/asm/kvm_host.h
-@@ -203,6 +203,8 @@ struct kvm_vcpu_stat {
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
++void __vgic_v3_activate_traps(struct kvm_vcpu *vcpu);
++void __vgic_v3_deactivate_traps(struct kvm_vcpu *vcpu);
+ void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
  
- #define vcpu_cp15(v,r)	(v)->arch.ctxt.cp15[r]
+diff --git a/arch/arm/kvm/hyp/switch.c b/arch/arm/kvm/hyp/switch.c
+index 214187446e63..337c76230885 100644
+--- a/arch/arm/kvm/hyp/switch.c
++++ b/arch/arm/kvm/hyp/switch.c
+@@ -89,14 +89,18 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
  
-+#define vcpu_sysregs_loaded(_v)	(false)
-+
- int kvm_vcpu_preferred_target(struct kvm_vcpu_init *init);
- unsigned long kvm_arm_num_regs(struct kvm_vcpu *vcpu);
- int kvm_arm_copy_reg_indices(struct kvm_vcpu *vcpu, u64 __user *indices);
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 635137e6ed1c..3f765b9de94d 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -26,6 +26,7 @@
- 
- #include <asm/esr.h>
- #include <asm/kvm_arm.h>
-+#include <asm/kvm_hyp.h>
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
- #include <asm/cputype.h>
-@@ -77,11 +78,6 @@ static inline unsigned long *vcpu_pc(const struct kvm_vcpu *vcpu)
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pc;
- }
- 
--static inline unsigned long *vcpu_elr_el1(const struct kvm_vcpu *vcpu)
--{
--	return (unsigned long *)&vcpu_gp_regs(vcpu)->elr_el1;
--}
--
- static inline unsigned long *vcpu_cpsr(const struct kvm_vcpu *vcpu)
+ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
  {
- 	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.pstate;
-@@ -92,6 +88,40 @@ static inline bool vcpu_mode_is_32bit(const struct kvm_vcpu *vcpu)
- 	return !!(*vcpu_cpsr(vcpu) & PSR_MODE32_BIT);
+-	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
+ 		__vgic_v3_save_state(vcpu);
++		__vgic_v3_deactivate_traps(vcpu);
++	}
  }
  
-+/* Set the SPSR for the current mode */
-+static inline void vcpu_set_spsr(struct kvm_vcpu *vcpu, u64 val)
-+{
-+	if (vcpu_mode_is_32bit(vcpu))
-+		*vcpu_spsr32(vcpu) = val;
-+
-+	if (vcpu->arch.sysregs_loaded_on_cpu)
-+		write_sysreg_el1(val, spsr);
-+	else
-+		vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1] = val;
-+}
-+
-+static inline unsigned long vcpu_get_vbar(struct kvm_vcpu *vcpu)
-+{
-+	unsigned long vbar;
-+
-+	if (vcpu->arch.sysregs_loaded_on_cpu)
-+		vbar = read_sysreg_el1(vbar);
-+	else
-+		vbar = vcpu_sys_reg(vcpu, VBAR_EL1);
-+
-+	if (vcpu_el1_is_32bit(vcpu))
-+		return lower_32_bits(vbar);
-+	return vbar;
-+}
-+
-+static inline u32 vcpu_get_c1_sctlr(struct kvm_vcpu *vcpu)
-+{
-+	if (vcpu_sysregs_loaded(vcpu))
-+		return lower_32_bits(read_sysreg_el1(sctlr));
-+	else
-+		return vcpu_cp15(vcpu, c1_SCTLR);
-+}
-+
- static inline bool kvm_condition_valid(const struct kvm_vcpu *vcpu)
+ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
  {
- 	if (vcpu_mode_is_32bit(vcpu))
-@@ -131,15 +161,6 @@ static inline void vcpu_set_reg(struct kvm_vcpu *vcpu, u8 reg_num,
- 		vcpu_gp_regs(vcpu)->regs.regs[reg_num] = val;
+-	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
++		__vgic_v3_activate_traps(vcpu);
+ 		__vgic_v3_restore_state(vcpu);
++	}
  }
  
--/* Get vcpu SPSR for current mode */
--static inline unsigned long *vcpu_spsr(const struct kvm_vcpu *vcpu)
--{
--	if (vcpu_mode_is_32bit(vcpu))
--		return vcpu_spsr32(vcpu);
--
--	return (unsigned long *)&vcpu_gp_regs(vcpu)->spsr[KVM_SPSR_EL1];
--}
--
- static inline bool vcpu_mode_priv(const struct kvm_vcpu *vcpu)
+ static bool __hyp_text __populate_fault_info(struct kvm_vcpu *vcpu)
+diff --git a/arch/arm64/include/asm/kvm_hyp.h b/arch/arm64/include/asm/kvm_hyp.h
+index 62872ceefa33..1c21a706fc83 100644
+--- a/arch/arm64/include/asm/kvm_hyp.h
++++ b/arch/arm64/include/asm/kvm_hyp.h
+@@ -125,6 +125,8 @@ int __vgic_v2_perform_cpuif_access(struct kvm_vcpu *vcpu);
+ 
+ void __vgic_v3_save_state(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
++void __vgic_v3_activate_traps(struct kvm_vcpu *vcpu);
++void __vgic_v3_deactivate_traps(struct kvm_vcpu *vcpu);
+ void __vgic_v3_save_aprs(struct kvm_vcpu *vcpu);
+ void __vgic_v3_restore_aprs(struct kvm_vcpu *vcpu);
+ int __vgic_v3_perform_cpuif_access(struct kvm_vcpu *vcpu);
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 947684312079..832aa3e928fe 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -185,14 +185,18 @@ static void __hyp_text __deactivate_vm(struct kvm_vcpu *vcpu)
+ 
+ static void __hyp_text __vgic_save_state(struct kvm_vcpu *vcpu)
  {
- 	u32 mode;
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index f6afe685a280..992c19816893 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -294,6 +294,8 @@ struct kvm_vcpu_arch {
- #define vcpu_cp14(v,r)		((v)->arch.ctxt.copro[(r)])
- #define vcpu_cp15(v,r)		((v)->arch.ctxt.copro[(r)])
- 
-+#define vcpu_sysregs_loaded(_v)	((_v)->arch.sysregs_loaded_on_cpu)
-+
- struct kvm_vm_stat {
- 	ulong remote_tlb_flush;
- };
-diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
-index 2d38ede2eff0..1d941e8e8102 100644
---- a/arch/arm64/kvm/inject_fault.c
-+++ b/arch/arm64/kvm/inject_fault.c
-@@ -23,6 +23,7 @@
- 
- #include <linux/kvm_host.h>
- #include <asm/kvm_emulate.h>
-+#include <asm/kvm_hyp.h>
- #include <asm/esr.h>
- 
- #define PSTATE_FAULT_BITS_64 	(PSR_MODE_EL1h | PSR_A_BIT | PSR_F_BIT | \
-@@ -33,6 +34,14 @@
- #define LOWER_EL_AArch64_VECTOR		0x400
- #define LOWER_EL_AArch32_VECTOR		0x600
- 
-+static void vcpu_set_elr_el1(struct kvm_vcpu *vcpu, u64 val)
-+{
-+	if (vcpu->arch.sysregs_loaded_on_cpu)
-+		write_sysreg_el1(val, elr);
-+	else
-+		vcpu_gp_regs(vcpu)->elr_el1 = val;
-+}
-+
- enum exception_type {
- 	except_type_sync	= 0,
- 	except_type_irq		= 0x80,
-@@ -58,7 +67,7 @@ static u64 get_except_vector(struct kvm_vcpu *vcpu, enum exception_type type)
- 		exc_offset = LOWER_EL_AArch32_VECTOR;
- 	}
- 
--	return vcpu_sys_reg(vcpu, VBAR_EL1) + exc_offset + type;
-+	return vcpu_get_vbar(vcpu) + exc_offset + type;
+-	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
+ 		__vgic_v3_save_state(vcpu);
++		__vgic_v3_deactivate_traps(vcpu);
++	}
  }
  
- static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr)
-@@ -67,11 +76,11 @@ static void inject_abt64(struct kvm_vcpu *vcpu, bool is_iabt, unsigned long addr
- 	bool is_aarch32 = vcpu_mode_is_32bit(vcpu);
- 	u32 esr = 0;
+ static void __hyp_text __vgic_restore_state(struct kvm_vcpu *vcpu)
+ {
+-	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif))
++	if (static_branch_unlikely(&kvm_vgic_global_state.gicv3_cpuif)) {
++		__vgic_v3_activate_traps(vcpu);
+ 		__vgic_v3_restore_state(vcpu);
++	}
+ }
  
--	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
-+	vcpu_set_elr_el1(vcpu, *vcpu_pc(vcpu));
- 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
- 
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
--	*vcpu_spsr(vcpu) = cpsr;
-+	vcpu_set_spsr(vcpu, cpsr);
- 
- 	vcpu_sys_reg(vcpu, FAR_EL1) = addr;
- 
-@@ -102,11 +111,11 @@ static void inject_undef64(struct kvm_vcpu *vcpu)
- 	unsigned long cpsr = *vcpu_cpsr(vcpu);
- 	u32 esr = (ESR_ELx_EC_UNKNOWN << ESR_ELx_EC_SHIFT);
- 
--	*vcpu_elr_el1(vcpu) = *vcpu_pc(vcpu);
-+	vcpu_set_elr_el1(vcpu, *vcpu_pc(vcpu));
- 	*vcpu_pc(vcpu) = get_except_vector(vcpu, except_type_sync);
- 
- 	*vcpu_cpsr(vcpu) = PSTATE_FAULT_BITS_64;
--	*vcpu_spsr(vcpu) = cpsr;
-+	vcpu_set_spsr(vcpu, cpsr);
+ static bool __hyp_text __true_value(void)
+diff --git a/virt/kvm/arm/hyp/vgic-v3-sr.c b/virt/kvm/arm/hyp/vgic-v3-sr.c
+index 811b42c8441d..e5f3bc7582b6 100644
+--- a/virt/kvm/arm/hyp/vgic-v3-sr.c
++++ b/virt/kvm/arm/hyp/vgic-v3-sr.c
+@@ -208,15 +208,15 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+-	u64 val;
  
  	/*
- 	 * Build an unknown exception, depending on the instruction
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 80adbec933de..6109dc8d5fb7 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -87,12 +87,16 @@ static u32 cache_levels;
- static u32 get_ccsidr(u32 csselr)
- {
- 	u32 ccsidr;
-+	u32 csselr_preserve;
+ 	 * Make sure stores to the GIC via the memory mapped interface
+-	 * are now visible to the system register interface.
++	 * are now visible to the system register interface when reading the
++	 * LRs, and when reading back the VMCR on non-VHE systems.
+ 	 */
+-	if (!cpu_if->vgic_sre) {
+-		dsb(st);
+-		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
++	if (used_lrs || !has_vhe()) {
++		if (!cpu_if->vgic_sre)
++			dsb(st);
+ 	}
  
--	/* Make sure noone else changes CSSELR during this! */
-+	/* Make sure noone else changes CSSELR during this and preserve any
-+	 * existing value in the CSSELR! */
- 	local_irq_disable();
-+	csselr_preserve = read_sysreg(csselr_el1);
- 	write_sysreg(csselr, csselr_el1);
- 	isb();
- 	ccsidr = read_sysreg(ccsidr_el1);
-+	write_sysreg(csselr_preserve, csselr_el1);
- 	local_irq_enable();
+ 	if (used_lrs) {
+@@ -225,7 +225,7 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
  
- 	return ccsidr;
-diff --git a/virt/kvm/arm/aarch32.c b/virt/kvm/arm/aarch32.c
-index 8bc479fa37e6..67b62ff79b6f 100644
---- a/virt/kvm/arm/aarch32.c
-+++ b/virt/kvm/arm/aarch32.c
-@@ -166,7 +166,7 @@ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
- 	unsigned long new_spsr_value = *vcpu_cpsr(vcpu);
- 	bool is_thumb = (new_spsr_value & COMPAT_PSR_T_BIT);
- 	u32 return_offset = return_offsets[vect_offset >> 2][is_thumb];
--	u32 sctlr = vcpu_cp15(vcpu, c1_SCTLR);
-+	u32 sctlr = vcpu_get_c1_sctlr(vcpu);
+ 		elrsr = read_gicreg(ICH_ELSR_EL2);
  
- 	cpsr = mode | COMPAT_PSR_I_BIT;
+-		write_gicreg(0, ICH_HCR_EL2);
++		write_gicreg(cpu_if->vgic_hcr & ~ICH_HCR_EN, ICH_HCR_EL2);
  
-@@ -178,14 +178,14 @@ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
- 	*vcpu_cpsr(vcpu) = cpsr;
+ 		for (i = 0; i < used_lrs; i++) {
+ 			if (elrsr & (1 << i))
+@@ -235,19 +235,6 @@ void __hyp_text __vgic_v3_save_state(struct kvm_vcpu *vcpu)
  
- 	/* Note: These now point to the banked copies */
--	*vcpu_spsr(vcpu) = new_spsr_value;
-+	vcpu_set_spsr(vcpu, new_spsr_value);
- 	*vcpu_reg32(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
- 
- 	/* Branch to exception vector */
- 	if (sctlr & (1 << 13))
- 		vect_offset += 0xffff0000;
- 	else /* always have security exceptions */
--		vect_offset += vcpu_cp15(vcpu, c12_VBAR);
-+		vect_offset += vcpu_get_vbar(vcpu);
- 
- 	*vcpu_pc(vcpu) = vect_offset;
+ 			__gic_v3_set_lr(0, i);
+ 		}
+-	} else {
+-		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+-		    cpu_if->its_vpe.its_vm)
+-			write_gicreg(0, ICH_HCR_EL2);
+-	}
+-
+-	val = read_gicreg(ICC_SRE_EL2);
+-	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
+-
+-	if (!cpu_if->vgic_sre) {
+-		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+-		isb();
+-		write_gicreg(1, ICC_SRE_EL1);
+ 	}
  }
-@@ -206,6 +206,19 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
- 	u32 *far, *fsr;
- 	bool is_lpae;
  
+@@ -257,6 +244,31 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 	u64 used_lrs = vcpu->arch.vgic_cpu.used_lrs;
+ 	int i;
+ 
++	if (used_lrs) {
++		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
++
++		for (i = 0; i < used_lrs; i++)
++			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
++	}
++
 +	/*
-+	 * The emulation code here is going to modify several system
-+	 * registers, so on arm64 with VHE we want to load them into memory
-+	 * and store them back into registers, ensuring that we observe the
-+	 * most recent values and that we expose the right values back to the
-+	 * guest.
-+	 *
-+	 * We disable preemption to avoid racing with another vcpu_put/load
-+	 * operation.
++	 * Ensure that writes to the LRs, and on non-VHE systems ensure that
++	 * the write to the VMCR in __vgic_v3_activate_traps(), will have
++	 * reached the (re)distributors. This ensure the guest will read the
++	 * correct values from the memory-mapped interface.
 +	 */
-+	preempt_disable();
-+	kvm_vcpu_put_sysregs(vcpu);
++	if (used_lrs || !has_vhe()) {
++		if (!cpu_if->vgic_sre) {
++			isb();
++			dsb(sy);
++		}
++	}
++}
 +
- 	if (is_pabt) {
- 		vect_offset = 12;
- 		far = &vcpu_cp15(vcpu, c6_IFAR);
-@@ -226,6 +239,9 @@ static void inject_abt32(struct kvm_vcpu *vcpu, bool is_pabt,
- 		*fsr = 1 << 9 | 0x34;
- 	else
- 		*fsr = 0x14;
++void __hyp_text __vgic_v3_activate_traps(struct kvm_vcpu *vcpu)
++{
++	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
 +
-+	kvm_vcpu_load_sysregs(vcpu);
-+	preempt_enable();
+ 	/*
+ 	 * VFIQEn is RES1 if ICC_SRE_EL1.SRE is 1. This causes a
+ 	 * Group0 interrupt (as generated in GICv2 mode) to be
+@@ -264,47 +276,70 @@ void __hyp_text __vgic_v3_restore_state(struct kvm_vcpu *vcpu)
+ 	 * consequences. So we must make sure that ICC_SRE_EL1 has
+ 	 * been actually programmed with the value we want before
+ 	 * starting to mess with the rest of the GIC, and VMCR_EL2 in
+-	 * particular.
++	 * particular.  This logic must be called before
++	 * __vgic_v3_restore_state().
+ 	 */
+ 	if (!cpu_if->vgic_sre) {
+ 		write_gicreg(0, ICC_SRE_EL1);
+ 		isb();
+ 		write_gicreg(cpu_if->vgic_vmcr, ICH_VMCR_EL2);
+-	}
+ 
+-	if (used_lrs) {
+-		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
+ 
+-		for (i = 0; i < used_lrs; i++)
+-			__gic_v3_set_lr(cpu_if->vgic_lr[i], i);
+-	} else {
+-		/*
+-		 * If we need to trap system registers, we must write
+-		 * ICH_HCR_EL2 anyway, even if no interrupts are being
+-		 * injected. Same thing if GICv4 is used, as VLPI
+-		 * delivery is gated by ICH_HCR_EL2.En.
+-		 */
+-		if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
+-		    cpu_if->its_vpe.its_vm)
+-			write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
++		if (has_vhe()) {
++			/*
++			 * Ensure that the write to the VMCR will have reached
++			 * the (re)distributors. This ensure the guest will
++			 * read the correct values from the memory-mapped
++			 * interface.
++			 */
++			isb();
++			dsb(sy);
++		}
+ 	}
+ 
+ 	/*
+-	 * Ensures that the above will have reached the
+-	 * (re)distributors. This ensure the guest will read the
+-	 * correct values from the memory-mapped interface.
++	 * Prevent the guest from touching the GIC system registers if
++	 * SRE isn't enabled for GICv3 emulation.
++	 */
++	write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
++		     ICC_SRE_EL2);
++
++	/*
++	 * If we need to trap system registers, we must write
++	 * ICH_HCR_EL2 anyway, even if no interrupts are being
++	 * injected,
+ 	 */
++	if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
++	    cpu_if->its_vpe.its_vm)
++		write_gicreg(cpu_if->vgic_hcr, ICH_HCR_EL2);
++}
++
++void __hyp_text __vgic_v3_deactivate_traps(struct kvm_vcpu *vcpu)
++{
++	struct vgic_v3_cpu_if *cpu_if = &vcpu->arch.vgic_cpu.vgic_v3;
++	u64 val;
++
+ 	if (!cpu_if->vgic_sre) {
++		cpu_if->vgic_vmcr = read_gicreg(ICH_VMCR_EL2);
++	}
++
++
++	val = read_gicreg(ICC_SRE_EL2);
++	write_gicreg(val | ICC_SRE_EL2_ENABLE, ICC_SRE_EL2);
++
++	if (!cpu_if->vgic_sre) {
++		/* Make sure ENABLE is set at EL2 before setting SRE at EL1 */
+ 		isb();
+-		dsb(sy);
++		write_gicreg(1, ICC_SRE_EL1);
+ 	}
+ 
+ 	/*
+-	 * Prevent the guest from touching the GIC system registers if
+-	 * SRE isn't enabled for GICv3 emulation.
++	 * If we were trapping system registers, we enabled the VGIC even if
++	 * no interrupts were being injected, and we disable it again here.
+ 	 */
+-	write_gicreg(read_gicreg(ICC_SRE_EL2) & ~ICC_SRE_EL2_ENABLE,
+-		     ICC_SRE_EL2);
++	if (static_branch_unlikely(&vgic_v3_cpuif_trap) ||
++	    cpu_if->its_vpe.its_vm)
++		write_gicreg(0, ICH_HCR_EL2);
  }
  
- void kvm_inject_dabt32(struct kvm_vcpu *vcpu, unsigned long addr)
+ void __hyp_text __vgic_v3_save_aprs(struct kvm_vcpu *vcpu)
+diff --git a/virt/kvm/arm/vgic/vgic-v3.c b/virt/kvm/arm/vgic/vgic-v3.c
+index 4bafcd1e6bb8..4200657694f0 100644
+--- a/virt/kvm/arm/vgic/vgic-v3.c
++++ b/virt/kvm/arm/vgic/vgic-v3.c
+@@ -590,6 +590,9 @@ void vgic_v3_load(struct kvm_vcpu *vcpu)
+ 		kvm_call_hyp(__vgic_v3_write_vmcr, cpu_if->vgic_vmcr);
+ 
+ 	kvm_call_hyp(__vgic_v3_restore_aprs, vcpu);
++
++	if (has_vhe())
++		__vgic_v3_activate_traps(vcpu);
+ }
+ 
+ void vgic_v3_put(struct kvm_vcpu *vcpu)
+@@ -600,4 +603,7 @@ void vgic_v3_put(struct kvm_vcpu *vcpu)
+ 		cpu_if->vgic_vmcr = kvm_call_hyp(__vgic_v3_read_vmcr);
+ 
+ 	kvm_call_hyp(__vgic_v3_save_aprs, vcpu);
++
++	if (has_vhe())
++		__vgic_v3_deactivate_traps(vcpu);
+ }
+diff --git a/virt/kvm/arm/vgic/vgic.c b/virt/kvm/arm/vgic/vgic.c
+index 636200cace55..352eb09d8fab 100644
+--- a/virt/kvm/arm/vgic/vgic.c
++++ b/virt/kvm/arm/vgic/vgic.c
+@@ -764,14 +764,14 @@ void kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
+ {
+ 	struct vgic_cpu *vgic_cpu = &vcpu->arch.vgic_cpu;
+ 
+-	vgic_save_state(vcpu);
+-
+ 	WARN_ON(vgic_v4_sync_hwstate(vcpu));
+ 
+ 	/* An empty ap_list_head implies used_lrs == 0 */
+ 	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+ 		return;
+ 
++	vgic_save_state(vcpu);
++
+ 	if (vgic_cpu->used_lrs)
+ 		vgic_fold_lr_state(vcpu);
+ 	vgic_prune_ap_list(vcpu);
+@@ -800,7 +800,7 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	 * this.
+ 	 */
+ 	if (list_empty(&vcpu->arch.vgic_cpu.ap_list_head))
+-		goto out;
++		return;
+ 
+ 	DEBUG_SPINLOCK_BUG_ON(!irqs_disabled());
+ 
+@@ -808,7 +808,6 @@ void kvm_vgic_flush_hwstate(struct kvm_vcpu *vcpu)
+ 	vgic_flush_lr_state(vcpu);
+ 	spin_unlock(&vcpu->arch.vgic_cpu.ap_list_lock);
+ 
+-out:
+ 	vgic_restore_state(vcpu);
+ }
+ 
 -- 
 2.14.2
