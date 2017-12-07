@@ -1,78 +1,58 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Thu,  7 Dec 2017 11:46:15 +0000
-Subject: [PATCH] KVM: arm/arm64: timer: Don't set irq as forwarded if no
- usable GIC
-Message-ID: <20171207114615.23950-1-marc.zyngier@arm.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Thu, 7 Dec 2017 19:53:36 +0800
+Subject: [PATCH 3/3] phy: phy-mtk-tphy: use of_device_get_match_data()
+In-Reply-To: <ff2797a0487a0b30a2292c2685dedcbbfeead293.1512647458.git.chunfeng.yun@mediatek.com>
+References: <ff2797a0487a0b30a2292c2685dedcbbfeead293.1512647458.git.chunfeng.yun@mediatek.com>
+Message-ID: <808e7e783be76e0d5d5eab9f805e8be2d77a7a1b.1512647458.git.chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we don't have a usable GIC, do not try to set the vcpu affinity
-as this is guaranteed to fail.
+reduce the boilerplate code to get the specific data
 
-Reported-by: Andre Przywara <andre.przywara@arm.com>
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
 ---
- include/kvm/arm_arch_timer.h |  2 +-
- virt/kvm/arm/arch_timer.c    | 13 ++++++++-----
- virt/kvm/arm/arm.c           |  2 +-
- 3 files changed, 10 insertions(+), 7 deletions(-)
+ drivers/phy/mediatek/phy-mtk-tphy.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
 
-diff --git a/include/kvm/arm_arch_timer.h b/include/kvm/arm_arch_timer.h
-index 01ee473517e2..5fa4fef257a4 100644
---- a/include/kvm/arm_arch_timer.h
-+++ b/include/kvm/arm_arch_timer.h
-@@ -62,7 +62,7 @@ struct arch_timer_cpu {
- 	bool			enabled;
- };
+diff --git a/drivers/phy/mediatek/phy-mtk-tphy.c b/drivers/phy/mediatek/phy-mtk-tphy.c
+index d99f79b1..bd26de3 100644
+--- a/drivers/phy/mediatek/phy-mtk-tphy.c
++++ b/drivers/phy/mediatek/phy-mtk-tphy.c
+@@ -20,6 +20,7 @@
+ #include <linux/iopoll.h>
+ #include <linux/module.h>
+ #include <linux/of_address.h>
++#include <linux/of_device.h>
+ #include <linux/phy/phy.h>
+ #include <linux/platform_device.h>
  
--int kvm_timer_hyp_init(void);
-+int kvm_timer_hyp_init(bool);
- int kvm_timer_enable(struct kvm_vcpu *vcpu);
- int kvm_timer_vcpu_reset(struct kvm_vcpu *vcpu);
- void kvm_timer_vcpu_init(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/arch_timer.c b/virt/kvm/arm/arch_timer.c
-index 4151250ce8da..4804b5608013 100644
---- a/virt/kvm/arm/arch_timer.c
-+++ b/virt/kvm/arm/arch_timer.c
-@@ -726,7 +726,7 @@ static int kvm_timer_dying_cpu(unsigned int cpu)
- 	return 0;
- }
+@@ -995,7 +996,6 @@ static struct phy *mtk_phy_xlate(struct device *dev,
  
--int kvm_timer_hyp_init(void)
-+int kvm_timer_hyp_init(bool has_gic)
+ static int mtk_tphy_probe(struct platform_device *pdev)
  {
- 	struct arch_timer_kvm_info *info;
- 	int err;
-@@ -762,10 +762,13 @@ int kvm_timer_hyp_init(void)
- 		return err;
- 	}
+-	const struct of_device_id *match;
+ 	struct device *dev = &pdev->dev;
+ 	struct device_node *np = dev->of_node;
+ 	struct device_node *child_np;
+@@ -1005,15 +1005,14 @@ static int mtk_tphy_probe(struct platform_device *pdev)
+ 	struct resource res;
+ 	int port, retval;
  
--	err = irq_set_vcpu_affinity(host_vtimer_irq, kvm_get_running_vcpus());
--	if (err) {
--		kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
--		goto out_free_irq;
-+	if (has_gic) {
-+		err = irq_set_vcpu_affinity(host_vtimer_irq,
-+					    kvm_get_running_vcpus());
-+		if (err) {
-+			kvm_err("kvm_arch_timer: error setting vcpu affinity\n");
-+			goto out_free_irq;
-+		}
- 	}
+-	match = of_match_node(mtk_tphy_id_table, pdev->dev.of_node);
+-	if (!match)
+-		return -EINVAL;
+-
+ 	tphy = devm_kzalloc(dev, sizeof(*tphy), GFP_KERNEL);
+ 	if (!tphy)
+ 		return -ENOMEM;
  
- 	kvm_info("virtual timer IRQ%d\n", host_vtimer_irq);
-diff --git a/virt/kvm/arm/arm.c b/virt/kvm/arm/arm.c
-index a67c106d73f5..d9df6d0731e6 100644
---- a/virt/kvm/arm/arm.c
-+++ b/virt/kvm/arm/arm.c
-@@ -1323,7 +1323,7 @@ static int init_subsystems(void)
- 	/*
- 	 * Init HYP architected timer support
- 	 */
--	err = kvm_timer_hyp_init();
-+	err = kvm_timer_hyp_init(vgic_present);
- 	if (err)
- 		goto out;
- 
+-	tphy->pdata = match->data;
++	tphy->pdata = of_device_get_match_data(dev);
++	if (!tphy->pdata)
++		return -EINVAL;
++
+ 	tphy->nphys = of_get_child_count(np);
+ 	tphy->phys = devm_kcalloc(dev, tphy->nphys,
+ 				  sizeof(*tphy->phys), GFP_KERNEL);
 -- 
-2.14.2
+1.9.1
