@@ -1,59 +1,42 @@
-From: pombredanne@nexb.com (Philippe Ombredanne)
-Date: Thu, 7 Dec 2017 22:19:33 +0100
-Subject: [PATCH v8 1/3] arm: npcm: add basic support for Nuvoton BMCs
-In-Reply-To: <CAFd5g45+dNuayw=s08iwAj2wrUYNXnGd5SbA+OVvsL_J6APHGA@mail.gmail.com>
-References: <20171117190747.21642-1-brendanhiggins@google.com>
- <20171117190747.21642-2-brendanhiggins@google.com>
- <CAFd5g45+dNuayw=s08iwAj2wrUYNXnGd5SbA+OVvsL_J6APHGA@mail.gmail.com>
-Message-ID: <CAOFm3uG=i3gOnKEMEPNii070+pB7Aqt2GmxgB5G0DCfGzhCkZQ@mail.gmail.com>
+From: sakari.ailus@iki.fi (Sakari Ailus)
+Date: Fri, 8 Dec 2017 00:06:42 +0200
+Subject: [PATCH V6 3/7] device property: Introduce a common API to fetch
+ device match data
+In-Reply-To: <c2b38889-888a-3518-bf59-c2377f64a8ce@codeaurora.org>
+References: <1512493493-6464-1-git-send-email-okaya@codeaurora.org>
+ <1512493493-6464-4-git-send-email-okaya@codeaurora.org>
+ <20171207124044.utyrn2mzzyml42b2@valkosipuli.retiisi.org.uk>
+ <c2b38889-888a-3518-bf59-c2377f64a8ce@codeaurora.org>
+Message-ID: <20171207220642.qqiwf4vvk2gf42uf@valkosipuli.retiisi.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Brendan,
+On Thu, Dec 07, 2017 at 03:17:52PM -0500, Sinan Kaya wrote:
+> On 12/7/2017 7:40 AM, Sakari Ailus wrote:
+> > On Tue, Dec 05, 2017 at 12:04:48PM -0500, Sinan Kaya wrote:
+> >> @@ -101,6 +103,8 @@ struct fwnode_operations {
+> >>  	(*graph_get_port_parent)(struct fwnode_handle *fwnode);
+> >>  	int (*graph_parse_endpoint)(const struct fwnode_handle *fwnode,
+> >>  				    struct fwnode_endpoint *endpoint);
+> >> +	void *(*get_match_data)(const struct fwnode_handle *fwnode,
+> >> +				struct device *dev);
+> > 
+> > You can make dev const, too.
+> > 
+> 
+> done, I couldn't change device_get_match_data() parameter const due to
+> dev_fwnode() function.
+> 
+>                  from /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:13:
+> 
+> /local/mnt/workspace/projects/caf/kernel/drivers/base/property.c:1341:39: warning: passing argument 1 of 'dev_fwnode' discards 'const' qualifier from pointer target type [-Wdiscarded-qualifiers]
+>   return fwnode_call_ptr_op(dev_fwnode(dev), device_get_match_data,
 
-On Thu, Dec 7, 2017 at 9:37 PM, Brendan Higgins
-<brendanhiggins@google.com> wrote:
-> Any update on this?
->
-> On Fri, Nov 17, 2017 at 11:07 AM, Brendan Higgins
-> <brendanhiggins@google.com> wrote:
->> Adds basic support for the Nuvoton NPCM750 BMC.
->>
->> Signed-off-by: Brendan Higgins <brendanhiggins@google.com>
->> Reviewed-by: Tomer Maimon <tmaimon77@gmail.com>
->> Reviewed-by: Avi Fishman <avifishman70@gmail.com>
->> Tested-by: Tomer Maimon <tmaimon77@gmail.com>
->> Tested-by: Avi Fishman <avifishman70@gmail.com>
+Right. Makes sense.
 
-<snip>
-
->> --- /dev/null
->> +++ b/arch/arm/mach-npcm/npcm7xx.c
->> @@ -0,0 +1,25 @@
->> +/*
->> + * Copyright (c) 2017 Nuvoton Technology corporation.
->> + * Copyright 2017 Google, Inc.
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License version 2 as
->> + * published by the Free Software Foundation.
->> + */
-
-Have you considered using the new SPDX ids here instead of the
-traditional license boilerplate?
-
-This could come out this way:
-
-// SPDX-License-Identifier: GPL-2.0
-// Copyright (c) 2017 Nuvoton Technology corporation.
-// Copyright 2017 Google, Inc.
-
-It is shorter and simpler, with a better code/comments ratio.
-And if you wonder about why using C++ style comment, please check
-Linus posts on the topic, as well as Thomas doc patches.
-
-Thank you for your kind consideration!
+I guess it's not perhaps worth it introducing dev_fwnode_const just for
+this. devices are seldom if ever const anyway.
 
 -- 
-Cordially
-Philippe Ombredanne
+Sakari Ailus
+e-mail: sakari.ailus at iki.fi
