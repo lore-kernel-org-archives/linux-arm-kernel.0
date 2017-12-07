@@ -1,139 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu,  7 Dec 2017 18:06:09 +0100
-Subject: [PATCH v2 15/36] KVM: arm64: Move userspace system registers into
- separate function
-In-Reply-To: <20171207170630.592-1-christoffer.dall@linaro.org>
-References: <20171207170630.592-1-christoffer.dall@linaro.org>
-Message-ID: <20171207170630.592-16-christoffer.dall@linaro.org>
+From: keescook@chromium.org (Kees Cook)
+Date: Thu, 7 Dec 2017 09:45:02 -0800
+Subject: [kernel-hardening][PATCH v4 0/3] arm: Makes ptdump resuable and
+ add WX page checking
+In-Reply-To: <20171206102315.GA7012@pjb1027-Latitude-E5410>
+References: <20171206102315.GA7012@pjb1027-Latitude-E5410>
+Message-ID: <CAGXu5jLcvKMOXEMXix3iMzssnN1f26GCaMMGzOK=xXze=Y07kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's a semantic difference between the EL1 registers that control
-operation of a kernel running in EL1 and EL1 registers that only control
-userspace execution in EL0.  Since we can defer saving/restoring the
-latter, move them into their own function.
+On Wed, Dec 6, 2017 at 2:23 AM, Jinbum Park <jinb.park7@gmail.com> wrote:
+> Hi,
+>
+> Page table dumping code for arm64-x86 is reusable,
+> and they have function for WX page checking.
+> But arm doesn't have that.
+>
+> This path series are to makes ptdump reusable,
+> and add WX page checking for arm.
+> This is heavily based on arm64 version.
+>
+> v2 :
+> Fix a sender name of mail header, there was an mistake.
+> (from "jinb.park" to Jinbum Park)
+> Contents of patch-set are perfectly same.
+>
+> v3 :
+> Take advantage of the existing pg_level and bits arrays
+> to check ro, nx prot.
+>
+> v4 :
+> Add boolean for ro_bit, nx_bit into prot_bits
+> to point ro_bit, nx_bit in pg_level.
+> This change is suggested by Laura Abbott.
+>
+> jinb.park (3):
+>   arm: mm: dump: make page table dumping reusable
+>   arm: mm: dump: make the page table dumping seq_file optional
+>   arm: mm: dump: add checking for writable and executable pages
+>
+>  arch/arm/Kconfig.debug        |  33 ++++++++-
+>  arch/arm/include/asm/ptdump.h |  56 ++++++++++++++++
+>  arch/arm/mm/Makefile          |   3 +-
+>  arch/arm/mm/dump.c            | 151 +++++++++++++++++++++++++++++-------------
+>  arch/arm/mm/init.c            |   2 +
+>  arch/arm/mm/ptdump_debugfs.c  |  34 ++++++++++
+>  6 files changed, 232 insertions(+), 47 deletions(-)
+>  create mode 100644 arch/arm/include/asm/ptdump.h
+>  create mode 100644 arch/arm/mm/ptdump_debugfs.c
 
-We also take this chance to rename the function saving/restoring the
-remaining system register to make it clear this function deals with
-the EL1 system registers.
+Please consider this series:
 
-No functional change.
+Reviewed-by: Kees Cook <keescook@chromium.org>
 
-Reviewed-by: Andrew Jones <drjones@redhat.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
+With Laura's review, this is probably ready to put into the ARM patch tracker.
 
-Notes:
-    Changes since v1:
-     - Added comment about sp_el0 to common save sysreg save/restore functions
+-Kees
 
- arch/arm64/kvm/hyp/sysreg-sr.c | 44 +++++++++++++++++++++++++++++++-----------
- 1 file changed, 33 insertions(+), 11 deletions(-)
-
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 68a7d164e5e1..bbfb4d01af88 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -33,15 +33,24 @@ static void __hyp_text __sysreg_do_nothing(struct kvm_cpu_context *ctxt) { }
-  */
- 
- static void __hyp_text __sysreg_save_common_state(struct kvm_cpu_context *ctxt)
-+{
-+	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
-+
-+	/*
-+	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-+	 * therefore be saved/restored on every entry/exit to/from the guest.
-+	 */
-+	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
-+}
-+
-+static void __hyp_text __sysreg_save_user_state(struct kvm_cpu_context *ctxt)
- {
- 	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
- 	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
- 	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
--	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
--	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
- }
- 
--static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
-+static void __hyp_text __sysreg_save_el1_state(struct kvm_cpu_context *ctxt)
- {
- 	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
- 	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
-@@ -70,31 +79,42 @@ static void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
- }
- 
- static hyp_alternate_select(__sysreg_call_save_host_state,
--			    __sysreg_save_state, __sysreg_do_nothing,
-+			    __sysreg_save_el1_state, __sysreg_do_nothing,
- 			    ARM64_HAS_VIRT_HOST_EXTN);
- 
- void __hyp_text __sysreg_save_host_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_call_save_host_state()(ctxt);
- 	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
- }
- 
- void __hyp_text __sysreg_save_guest_state(struct kvm_cpu_context *ctxt)
- {
--	__sysreg_save_state(ctxt);
-+	__sysreg_save_el1_state(ctxt);
- 	__sysreg_save_common_state(ctxt);
-+	__sysreg_save_user_state(ctxt);
- }
- 
- static void __hyp_text __sysreg_restore_common_state(struct kvm_cpu_context *ctxt)
- {
--	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
--	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
--	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
- 	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
-+
-+	/*
-+	 * The host arm64 Linux uses sp_el0 to point to 'current' and it must
-+	 * therefore be saved/restored on every entry/exit to/from the guest.
-+	 */
- 	write_sysreg(ctxt->gp_regs.regs.sp,	  sp_el0);
- }
- 
--static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
-+static void __hyp_text __sysreg_restore_user_state(struct kvm_cpu_context *ctxt)
-+{
-+	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  	actlr_el1);
-+	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  	tpidr_el0);
-+	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], 	tpidrro_el0);
-+}
-+
-+static void __hyp_text __sysreg_restore_el1_state(struct kvm_cpu_context *ctxt)
- {
- 	write_sysreg(ctxt->sys_regs[MPIDR_EL1],		vmpidr_el2);
- 	write_sysreg(ctxt->sys_regs[CSSELR_EL1],	csselr_el1);
-@@ -123,19 +143,21 @@ static void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
- }
- 
- static hyp_alternate_select(__sysreg_call_restore_host_state,
--			    __sysreg_restore_state, __sysreg_do_nothing,
-+			    __sysreg_restore_el1_state, __sysreg_do_nothing,
- 			    ARM64_HAS_VIRT_HOST_EXTN);
- 
- void __hyp_text __sysreg_restore_host_state(struct kvm_cpu_context *ctxt)
- {
- 	__sysreg_call_restore_host_state()(ctxt);
- 	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
- }
- 
- void __hyp_text __sysreg_restore_guest_state(struct kvm_cpu_context *ctxt)
- {
--	__sysreg_restore_state(ctxt);
-+	__sysreg_restore_el1_state(ctxt);
- 	__sysreg_restore_common_state(ctxt);
-+	__sysreg_restore_user_state(ctxt);
- }
- 
- static void __hyp_text __fpsimd32_save_state(struct kvm_cpu_context *ctxt)
 -- 
-2.14.2
+Kees Cook
+Pixel Security
